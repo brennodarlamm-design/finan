@@ -35,12 +35,63 @@ let qrDataUrl = null;
 let connectionStatus = 'disconnected'; // 'disconnected' | 'connecting' | 'qr_ready' | 'connected'
 let lastConnectedAt = null;
 
-// Formata número de telefone brasileiro (DDI + DDD + Número)
-function formatWhatsAppJid(phone) {
+// Resolve o JID canônico oficial no WhatsApp (trata variação de 8 e 9 dígitos no Brasil)
+async function resolveWhatsAppJid(phone) {
   let cleaned = String(phone).replace(/\D/g, '');
   if (!cleaned.startsWith('55')) {
     cleaned = '55' + cleaned;
   }
+
+  // 1. Se o destino for o próprio número conectado, usa o próprio JID do socket
+  if (sock && sock.user && sock.user.id) {
+    const myNum = sock.user.id.split(':')[0].replace(/\D/g, '');
+    const myClean = myNum.startsWith('55') ? myNum : '55' + myNum;
+    if (cleaned === myClean || cleaned.slice(-8) === myClean.slice(-8)) {
+      const myJid = sock.user.id.includes('@') ? sock.user.id.split(':')[0] + '@s.whatsapp.net' : `${myClean}@s.whatsapp.net`;
+      console.log(`🎯 [WhatsApp] Destino é o próprio aparelho conectado (${myJid})`);
+      return myJid;
+    }
+  }
+
+  // 2. Consulta a API oficial onWhatsApp do Baileys para validar se o número existe na Meta
+  try {
+    if (sock && sock.onWhatsApp) {
+      // Tenta o número exatamente como veio
+      const res1 = await sock.onWhatsApp(cleaned);
+      if (res1 && res1.length > 0 && res1[0].exists) {
+        console.log(`🎯 [WhatsApp] JID validado na Meta: ${res1[0].jid}`);
+        return res1[0].jid;
+      }
+
+      // Se for número BR com 13 dígitos (55 + DDD + 9 dígitos), tenta sem o 9º dígito (12 dígitos)
+      if (cleaned.length === 13 && cleaned.startsWith('55')) {
+        const ddd = cleaned.substring(2, 4);
+        const rest = cleaned.substring(5);
+        const altPhone = `55${ddd}${rest}`;
+        const res2 = await sock.onWhatsApp(altPhone);
+        if (res2 && res2.length > 0 && res2[0].exists) {
+          console.log(`🎯 [WhatsApp] JID canônico validado sem o 9º dígito: ${res2[0].jid}`);
+          return res2[0].jid;
+        }
+      }
+
+      // Se for número BR com 12 dígitos (55 + DDD + 8 dígitos), tenta adicionando o 9
+      if (cleaned.length === 12 && cleaned.startsWith('55')) {
+        const ddd = cleaned.substring(2, 4);
+        const rest = cleaned.substring(4);
+        const altPhone = `55${ddd}9${rest}`;
+        const res3 = await sock.onWhatsApp(altPhone);
+        if (res3 && res3.length > 0 && res3[0].exists) {
+          console.log(`🎯 [WhatsApp] JID canônico validado com o 9º dígito: ${res3[0].jid}`);
+          return res3[0].jid;
+        }
+      }
+    }
+  } catch (err) {
+    console.warn('⚠️ [WhatsApp] Aviso ao consultar onWhatsApp:', err.message);
+  }
+
+  // Fallback padrão se não conseguir consultar
   return `${cleaned}@s.whatsapp.net`;
 }
 
@@ -307,11 +358,12 @@ app.post('/send-message', async (req, res) => {
       });
     }
 
-    const jid = formatWhatsAppJid(destPhone);
+    const jid = await resolveWhatsAppJid(destPhone);
+    console.log(`📤 [WhatsApp] Disparando para JID canônico: ${jid} (número solicitado: ${destPhone})`);
     const sent = await sock.sendMessage(jid, { text: message });
 
-    console.log(`📤 [WhatsApp] Mensagem enviada com sucesso para ${destPhone}!`);
-    return res.json({ success: true, messageId: sent.key.id, to: destPhone });
+    console.log(`✅ [WhatsApp] Mensagem entregue com sucesso para ${jid} (ID: ${sent.key.id})!`);
+    return res.json({ success: true, messageId: sent.key.id, to: destPhone, canonicalJid: jid });
   } catch (err) {
     console.error('❌ Erro ao enviar mensagem:', err);
     return res.status(500).json({ error: err.message });
@@ -379,9 +431,9 @@ async function executarResumoMatinal() {
     const msg = `🏢 *ANGELIM CONSTRUTORA — RESUMO MATINAL*\n📅 *Data:* ${new Date().toLocaleDateString('pt-BR')}\n\n⚠️ *Atenção:* Você possui *${boletos.length} conta(s)* com vencimento hoje ou pendentes:\n${listaTexto}\n💰 *Total a pagar:* ${totalFmt}\n\n_Mensagem automática gerada pelo ERP Angelim na nuvem._`;
 
     if (connectionStatus === 'connected' && sock) {
-      const jid = formatWhatsAppJid(TARGET_PHONE);
+      const jid = await resolveWhatsAppJid(TARGET_PHONE);
       await sock.sendMessage(jid, { text: msg });
-      console.log(`✅ [Cron] Resumo matinal de R$ ${totalValor} enviado com sucesso para ${TARGET_PHONE}!`);
+      console.log(`✅ [Cron] Resumo matinal de R$ ${totalValor} enviado com sucesso para ${jid}!`);
     } else {
       console.log('⚠️ [Cron] WhatsApp não conectado no momento do disparo matinal.');
     }
