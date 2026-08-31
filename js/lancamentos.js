@@ -1,10 +1,14 @@
 // js/lancamentos.js — Financial Entries Module (Receitas + Despesas)
 
 const Lancamentos = {
+  _limit: 30,
+
   render(obraId) {
+    this._limit = 30;
     const r = DB.getResumo(obraId==='todas'?null:obraId);
     const lans = DB.getLancamentos(obraId==='todas'?null:obraId);
     const showObra = obraId==='todas';
+    const visiveis = lans.slice(0, this._limit);
     return `
     <div class="page-header">
       <div><h1 class="page-title">&#x1F4B0; Lan&ccedil;amentos</h1><p class="page-sub">Controle de receitas e despesas com vencimentos e contas banc&aacute;rias</p></div>
@@ -82,8 +86,8 @@ const Lancamentos = {
       <button class="btn btn-secondary btn-sm" onclick="Lancamentos.clearFilters()" style="align-self:flex-end">Limpar</button>
     </div>
 
-    <div class="card" style="padding:0;">
-      <div class="tbl-wrap" style="border:none;border-radius:14px;">
+    <div class="card" style="padding:0;overflow:hidden;">
+      <div class="tbl-wrap" style="border:none;border-radius:14px 14px 0 0;">
         <table>
           <thead><tr>
             <th>Data Emiss&atilde;o</th>
@@ -97,9 +101,12 @@ const Lancamentos = {
             <th title="Conciliado">&#x2696;</th>
             <th style="text-align:center;">A&ccedil;&otilde;es</th>
           </tr></thead>
-          <tbody id="t-lans">${this._rows(lans,showObra)}</tbody>
-          <tfoot id="t-foot"><tr>${this._foot(lans,showObra)}</tr></tfoot>
+          <tbody id="t-lans">${this._rows(visiveis,showObra)}</tbody>
+          <tfoot id="t-foot"><tr>${this._foot(lans,showObra,visiveis.length)}</tr></tfoot>
         </table>
+      </div>
+      <div id="lan-load-more-bar">
+        ${this._loadMoreHtml(lans.length, visiveis.length)}
       </div>
     </div>`;
   },
@@ -157,11 +164,17 @@ const Lancamentos = {
     }).join('');
   },
 
-  _foot(lans, showObra) {
+  _foot(lans, showObra, visiveisCount = null) {
     const cols = showObra ? 15 : 14;
     const rec = lans.filter(l=>l.tipo==='receita').reduce((s,l)=>s+l.valor,0);
     const desp = lans.filter(l=>l.tipo==='despesa').reduce((s,l)=>s+l.valor,0);
-    return `<td colspan="${cols-7}" style="font-weight:700;color:var(--text3);font-size:.75rem">TOTAL FILTRADO (${lans.length} itens)</td>
+    const total = lans.length;
+    const vCount = visiveisCount !== null ? visiveisCount : Math.min(total, this._limit || 30);
+    const labelTxt = total > vCount
+      ? `TOTAL FILTRADO (${total} itens &bull; exibindo ${vCount})`
+      : `TOTAL FILTRADO (${total} itens)`;
+
+    return `<td colspan="${cols-7}" style="font-weight:700;color:var(--text3);font-size:.75rem">${labelTxt}</td>
       <td colspan="2" style="font-weight:800;color:var(--success);white-space:nowrap">+${Utils.fmt.currency(rec)}</td>
       <td colspan="5" style="font-weight:800;color:var(--danger);white-space:nowrap">&minus;${Utils.fmt.currency(desp)}</td>`;
   },
@@ -504,25 +517,77 @@ const Lancamentos = {
     return DB.getLancamentos(oid==='todas'?null:oid, f);
   },
 
-  _refresh() {
+  _loadMoreHtml(total, visiveis) {
+    if (total === 0) return '';
+    if (visiveis >= total) {
+      return `
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 18px;background:rgba(20,31,14,0.6);border-top:1px solid var(--border-s);flex-wrap:wrap;gap:8px;">
+        <span style="font-size:.78rem;color:var(--text3);">
+          ✓ Exibindo todos os <strong>${total}</strong> lançamentos
+        </span>
+      </div>`;
+    }
+    const restantes = total - visiveis;
+    const prox = Math.min(30, restantes);
+    return `
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 18px;background:rgba(20,31,14,0.85);border-top:1px solid var(--border-s);flex-wrap:wrap;gap:12px;">
+      <div style="display:flex;align-items:center;gap:10px;">
+        <span style="font-size:.82rem;color:var(--text2);">
+          Exibindo <strong>${visiveis}</strong> de <strong>${total}</strong> lançamentos
+        </span>
+        <span class="badge badge-warning" style="font-size:.72rem;padding:3px 8px;font-weight:700;">
+          ${restantes} restantes
+        </span>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+        <button class="btn btn-secondary btn-sm" onclick="Lancamentos.carregarMais(30)" style="font-weight:700;display:flex;align-items:center;gap:6px;border:1px solid var(--accent);color:var(--accent2);cursor:pointer;">
+          <span>➕ Carregar mais ${prox}</span>
+        </button>
+        <button class="btn btn-primary btn-sm" onclick="Lancamentos.carregarTodos()" style="font-weight:700;display:flex;align-items:center;gap:6px;cursor:pointer;">
+          <span>⚡ Carregar restante (${restantes})</span>
+        </button>
+      </div>
+    </div>`;
+  },
+
+  carregarMais(qtd = 30) {
+    this._limit += qtd;
+    this._refresh(false);
+  },
+
+  carregarTodos() {
+    this._limit = Infinity;
+    this._refresh(false);
+  },
+
+  _refresh(resetLimit = false) {
+    if (resetLimit) {
+      this._limit = 30;
+    }
     const showObra = App.obraId==='todas';
     const lans = this._getFiltered();
+    const visiveis = lans.slice(0, this._limit);
     const tb = document.getElementById('t-lans');
     const tf = document.getElementById('t-foot');
-    if (tb) tb.innerHTML = this._rows(lans,showObra);
-    if (tf) tf.innerHTML = `<tr>${this._foot(lans,showObra)}</tr>`;
+    const lm = document.getElementById('lan-load-more-bar');
+    if (tb) tb.innerHTML = this._rows(visiveis, showObra);
+    if (tf) tf.innerHTML = `<tr>${this._foot(lans, showObra, visiveis.length)}</tr>`;
+    if (lm) lm.innerHTML = this._loadMoreHtml(lans.length, visiveis.length);
   },
 
   clearFilters() {
     ['f-srch','f-tipo','f-cat','f-status','f-di','f-df'].forEach(id=>{ const el=document.getElementById(id); if(el) el.value=''; });
-    this._refresh();
+    this._refresh(true);
   },
 
   init() {
     const ids = ['f-srch','f-tipo','f-cat','f-status','f-di','f-df'];
     ids.forEach(id => {
       const el = document.getElementById(id);
-      if (el) { el.addEventListener('change',()=>this._refresh()); el.addEventListener('input',()=>this._refresh()); }
+      if (el) {
+        el.addEventListener('change', () => this._refresh(true));
+        el.addEventListener('input', () => this._refresh(true));
+      }
     });
   }
 };
