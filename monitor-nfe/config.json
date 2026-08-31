@@ -1,0 +1,55 @@
+{
+  "_instrucoes": "Preencha todos os campos abaixo antes de rodar o script.",
+
+  "certificado": {
+    "caminho": "D:\\ANGELIM CONSTRUTORA LTDA65512273000160.pfx",
+    "_caminho_hint": "Caminho completo para o arquivo .pfx do certificado A1",
+    "senha": "123456",
+    "_senha_hint": "Senha do arquivo .pfx"
+  },
+
+  "empresa": {
+    "cnpj": "65512273000160",
+    "_cnpj_hint": "CNPJ da empresa SEM pontos, tracos ou barras (so numeros, 14 digitos)",
+    "razao_social": "Angelim Construtora LTDA",
+    "uf": "RR",
+    "cod_uf": "14",
+    "_cod_uf_hint": "Codigo IBGE da UF: RR=14 (Roraima)"
+  },
+
+  "sefaz": {
+    "ambiente": "1",
+    "_ambiente_hint": "1=Produção | 2=Homologação",
+    "url_producao": "https://www1.nfe.fazenda.gov.br/NFeDistribuicaoDFe/NFeDistribuicaoDFe.asmx",
+    "url_homologacao": "https://hom.nfe.fazenda.gov.br/NFeDistribuicaoDFe/NFeDistribuicaoDFe.asmx"
+  },
+
+  "meudanfe": {
+    "api_key": "1879826c-ee82-416d-b887-b5aaf4e059d4",
+    "api_base": "https://api.meudanfe.com.br/v2"
+  },
+
+  "saida": {
+    "pasta_xml": ".\\xmls",
+    "_pasta_xml_hint": "Pasta onde os XMLs baixados serão salvos. Use caminho relativo ou absoluto.",
+    "pasta_logs": ".\\logs",
+    "salvar_xml_local": true,
+    "_salvar_hint": "Se true, salva o XML em arquivo local além de enviar para o MeuDanfe"
+  },
+
+  "agendamento": {
+    "intervalo_minutos": 60,
+    "_hint": "Não altere aqui — configure no Agendador de Tarefas do Windows"
+  },
+
+  "whatsapp": {
+    "ativo": true,
+    "telefone_destino": "5595991363678",
+    "_telefone_hint": "Telefone com DDD para onde o robô matinal enviará o resumo das contas",
+    "webhook_url": "http://localhost:3333/send-message",
+    "_webhook_hint": "Servidor local do WhatsApp (porta 3333) ou Evolution API / Z-API",
+    "api_token": "",
+    "horario_envio": "08:00",
+    "notificar_windows_toast": true
+  }
+}

@@ -1,0 +1,75 @@
+// api/send-whatsapp.js — Serverless Proxy para disparo silencioso de WhatsApp via Evolution API / Webhook
+
+export default async function handler(req, res) {
+  // Configura CORS
+  res.setHeader('Access-Control-Allow-Credentials', true);
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT');
+  res.setHeader('Access-Control-Allow-Headers', 'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version, apikey, Authorization');
+
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end();
+  }
+
+  if (req.method !== 'POST') {
+    return res.status(405).json({ error: 'Método não permitido' });
+  }
+
+  try {
+    const { phone, number, text, message, apiUrl, apiKey, instance } = req.body || {};
+    const destPhone = (phone || number || '').replace(/\D/g, '');
+    const msgText = text || message;
+
+    if (!destPhone || !msgText) {
+      return res.status(400).json({ error: 'Telefone e mensagem são obrigatórios.' });
+    }
+
+    const numFmt = destPhone.startsWith('55') ? destPhone : `55${destPhone}`;
+    const targetBaseUrl = (apiUrl || process.env.EVOLUTION_API_URL || 'http://localhost:3333/send-message').trim();
+    const targetApiKey = (apiKey || process.env.EVOLUTION_API_KEY || '').trim();
+    const targetInstance = (instance || process.env.EVOLUTION_INSTANCE || 'angelim').trim();
+
+    let targetUrl = targetBaseUrl;
+    const headers = {
+      'Content-Type': 'application/json',
+      'bypass-tunnel-reminder': 'true',
+      'Bypass-Tunnel-Reminder': 'true',
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'
+    };
+
+    if (!targetBaseUrl.includes('/send-message') && !targetBaseUrl.includes('/message/sendText')) {
+      const cleanBase = targetBaseUrl.replace(/\/$/, '');
+      targetUrl = `${cleanBase}/message/sendText/${targetInstance}`;
+      if (targetApiKey) {
+        headers['apikey'] = targetApiKey;
+        headers['Authorization'] = `Bearer ${targetApiKey}`;
+      }
+    } else if (targetApiKey) {
+      headers['apikey'] = targetApiKey;
+    }
+
+    const bodyPayload = JSON.stringify({
+      number: numFmt,
+      phone: numFmt,
+      to: numFmt,
+      text: msgText,
+      message: msgText
+    });
+
+    const response = await fetch(targetUrl, {
+      method: 'POST',
+      headers: headers,
+      body: bodyPayload
+    });
+
+    const data = await response.json().catch(() => ({ status: response.status }));
+
+    if (response.ok) {
+      return res.status(200).json({ success: true, to: numFmt, result: data });
+    } else {
+      return res.status(response.status).json({ success: false, error: data.error || 'Erro no envio', details: data });
+    }
+  } catch (err) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+}

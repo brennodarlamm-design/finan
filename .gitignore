@@ -1,0 +1,23 @@
+# Dependências
+node_modules/
+backend/node_modules/
+monitor-nfe/whatsapp-server/node_modules/
+
+# Autenticação WhatsApp e Sessões locais
+auth_info_baileys/
+backend/auth_info_baileys/
+.wwebjs_auth/
+.wwebjs_cache/
+
+# Variáveis locais e credenciais
+.env
+.env.local
+.env.*.local
+*.log
+
+# Vercel
+.vercel/
+
+# Backups temporários
+*.tmp
+*.bak

@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Angelim Construtora — Sistema Financeiro</title>
+  <meta name="description" content="Sistema financeiro completo da Angelim Construtora para gestão de obras financiadas pela Caixa Econômica Federal. Controle de receitas, despesas, notas fiscais e medições.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <style>
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    :root{
+      --bg-base:#080F05;--bg-card:#182713;--border:#243518;
+      --accent:#C9A227;--accent2:#E8C84A;--accent-glow:rgba(201,162,39,.28);
+      --success:#10b981;--warning:#f59e0b;--danger:#ef4444;
+      --text:#F0EAD6;--text2:#A8C090;--text3:#5A7048;
+      --radius:10px;--shadow:0 8px 40px rgba(0,0,0,.7);
+    }
+    html,body{height:100%;font-family:'Inter',sans-serif;background:var(--bg-base);color:var(--text);}
+    .page{display:flex;min-height:100vh;}
+
+    /* ── LEFT PANEL ── */
+    .panel-left{
+      flex:1;position:relative;overflow:hidden;
+      background:linear-gradient(135deg,#060D04 0%,#0E1A09 50%,#142210 100%);
+      display:flex;align-items:center;justify-content:center;
+    }
+    .grid-bg{
+      position:absolute;inset:0;
+      background-image:linear-gradient(rgba(201,162,39,.05) 1px,transparent 1px),linear-gradient(90deg,rgba(201,162,39,.05) 1px,transparent 1px);
+      background-size:44px 44px;
+    }
+    .orb{position:absolute;border-radius:50%;filter:blur(80px);animation:float 10s ease-in-out infinite;}
+    .o1{width:500px;height:500px;background:rgba(201,162,39,.08);top:-150px;left:-150px;}
+    .o2{width:350px;height:350px;background:rgba(100,140,60,.06);bottom:-80px;right:-80px;animation-delay:-5s;}
+    .o3{width:220px;height:220px;background:rgba(232,200,74,.07);top:42%;left:35%;animation-delay:-2.5s;}
+    @keyframes float{0%,100%{transform:translate(0,0) scale(1)}33%{transform:translate(25px,-25px) scale(1.06)}66%{transform:translate(-12px,12px) scale(.94)}}
+
+    .panel-left-content{position:relative;z-index:1;max-width:520px;padding:48px;}
+
+    /* Logo grande lado esquerdo */
+    .hero-logo{
+      display:flex;align-items:center;gap:20px;margin-bottom:36px;
+    }
+    .hero-logo-icon{
+      width:80px;height:80px;flex-shrink:0;
+      filter:drop-shadow(0 0 24px rgba(201,162,39,.5));
+      animation:pulse 3s ease-in-out infinite;
+    }
+    @keyframes pulse{0%,100%{filter:drop-shadow(0 0 24px rgba(201,162,39,.5))}50%{filter:drop-shadow(0 0 44px rgba(201,162,39,.85))}}
+    .hero-logo-text .brand-name{
+      font-size:2.2rem;font-weight:900;letter-spacing:.04em;
+      background:linear-gradient(135deg,#E8C84A,#C9A227);
+      -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
+      line-height:1;
+    }
+    .hero-logo-text .brand-sub{
+      font-size:.8rem;font-weight:600;letter-spacing:.22em;text-transform:uppercase;
+      color:rgba(201,162,39,.65);margin-top:5px;
+    }
+
+    .hero-title{font-size:1.85rem;font-weight:800;line-height:1.2;margin-bottom:14px;color:var(--text);}
+    .hero-title span{background:linear-gradient(135deg,#E8C84A,#C9A227);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;}
+    .hero-desc{color:rgba(240,234,214,.5);font-size:.93rem;line-height:1.7;margin-bottom:40px;}
+    .features{display:flex;flex-direction:column;gap:10px;}
+    .feat{
+      display:flex;align-items:center;gap:14px;
+      background:rgba(201,162,39,.04);border:1px solid rgba(201,162,39,.1);
+      border-radius:12px;padding:14px 18px;
+      transition:border-color .2s,background .2s;
+    }
+    .feat:hover{background:rgba(201,162,39,.08);border-color:rgba(201,162,39,.25);}
+    .feat-icon{font-size:22px;width:38px;text-align:center;flex-shrink:0;}
+    .feat-text strong{display:block;font-size:.875rem;color:var(--text);margin-bottom:2px;}
+    .feat-text span{font-size:.78rem;color:rgba(240,234,214,.4);}
+
+    /* Divider dourado */
+    .hero-divider{
+      width:60px;height:2px;margin-bottom:28px;
+      background:linear-gradient(90deg,transparent,#C9A227,transparent);
+      border-radius:1px;
+    }
+
+    /* ── RIGHT PANEL ── */
+    .panel-right{
+      width:480px;flex-shrink:0;
+      background:var(--bg-card);
+      border-left:1px solid var(--border);
+      display:flex;align-items:center;justify-content:center;padding:48px;
+    }
+    .form-wrap{width:100%;max-width:360px;}
+
+    .logo-row{display:flex;align-items:center;gap:14px;margin-bottom:44px;}
+    .logo-box{
+      width:52px;height:52px;border-radius:13px;
+      background:linear-gradient(135deg,#1C2D12,#243818);
+      border:1px solid rgba(201,162,39,.3);
+      display:flex;align-items:center;justify-content:center;
+      box-shadow:0 6px 24px rgba(201,162,39,.3);
+    }
+    .logo-box-text h2{
+      font-size:1.35rem;font-weight:900;letter-spacing:.05em;
+      background:linear-gradient(135deg,#E8C84A,#C9A227);
+      -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
+    }
+    .logo-box-text p{color:var(--text3);font-size:.72rem;margin-top:2px;letter-spacing:.08em;text-transform:uppercase;}
+
+    .welcome-h{font-size:1.35rem;font-weight:800;margin-bottom:6px;color:var(--text);}
+    .welcome-p{color:var(--text2);font-size:.875rem;margin-bottom:32px;}
+
+    .label{display:block;font-size:.8rem;font-weight:600;color:var(--text2);margin-bottom:7px;letter-spacing:.03em;}
+    .inp{
+      width:100%;padding:12px 16px;
+      background:#0C1408;border:1px solid var(--border);border-radius:var(--radius);
+      color:var(--text);font-size:.9rem;font-family:inherit;outline:none;
+      transition:border-color .2s,box-shadow .2s;
+    }
+    .inp:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-glow);}
+    .inp::placeholder{color:var(--text3);}
+    .inp-wrap{position:relative;}
+    .inp-wrap .inp{padding-right:44px;}
+    .eye-btn{
+      position:absolute;right:12px;top:50%;transform:translateY(-50%);
+      background:none;border:none;color:var(--text3);cursor:pointer;
+      display:flex;align-items:center;padding:4px;transition:color .2s;
+    }
+    .eye-btn:hover{color:var(--text);}
+    .fgroup{margin-bottom:18px;}
+
+    .btn-primary{
+      width:100%;padding:14px;border:none;border-radius:var(--radius);
+      background:linear-gradient(135deg,#C9A227,#E8C84A);color:#1C2D12;
+      font-size:.95rem;font-weight:800;font-family:inherit;cursor:pointer;
+      display:flex;align-items:center;justify-content:center;gap:10px;
+      box-shadow:0 6px 24px rgba(201,162,39,.4);
+      transition:all .2s;margin-top:4px;
+    }
+    .btn-primary:hover:not(:disabled){background:linear-gradient(135deg,#B8911E,#C9A227);box-shadow:0 8px 32px rgba(201,162,39,.55);transform:translateY(-1px);}
+    .btn-primary:disabled{opacity:.7;cursor:not-allowed;transform:none;}
+
+    .demo-box{
+      margin-top:24px;padding:16px;
+      background:rgba(201,162,39,.06);border:1px solid rgba(201,162,39,.18);
+      border-radius:10px;font-size:.8rem;
+    }
+    .demo-box strong{color:var(--accent);}
+    .demo-cred{display:flex;justify-content:space-between;margin-top:10px;gap:8px;}
+    .demo-cred code{
+      background:rgba(0,0,0,.4);padding:4px 10px;border-radius:6px;
+      color:var(--accent2);font-size:.83rem;
+    }
+
+    .err-box{
+      padding:12px 16px;margin-top:14px;
+      background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.3);
+      border-radius:var(--radius);color:var(--danger);font-size:.85rem;display:none;
+    }
+    .spinner{width:20px;height:20px;border:2px solid rgba(28,45,18,.4);border-top-color:#1C2D12;border-radius:50%;animation:spin .7s linear infinite;}
+    @keyframes spin{to{transform:rotate(360deg)}}
+
+    @media(max-width:860px){.panel-left{display:none}.panel-right{width:100%;border-left:none;}}
+  </style>
+</head>
+<body>
+<div class="page">
+
+  <!-- LEFT -->
+  <div class="panel-left">
+    <div class="grid-bg"></div>
+    <div class="orb o1"></div>
+    <div class="orb o2"></div>
+    <div class="orb o3"></div>
+    <div class="panel-left-content">
+
+      <div class="hero-logo" style="margin-bottom:30px;">
+        <img src="img/logo.png" alt="Angelim Construtora" style="width:140px;height:140px;border-radius:16px;box-shadow:0 8px 32px rgba(0,0,0,0.6);border:1px solid rgba(201,162,39,0.4);object-fit:cover;">
+        <div class="hero-logo-text">
+          <div class="brand-name">ANGELIM</div>
+          <div class="brand-sub">CONSTRUTORA &middot; GEST&Atilde;O FINANCEIRA</div>
+        </div>
+      </div>
+
+      <div class="hero-tagline">
+        Sistema Financeiro de <strong>Alta Precisão</strong> para Gestão de Obras Financiadas Caixa
+      </div>
+
+      <div class="features-list">
+        <div class="feat">
+          <span class="feat-icon">💰</span>
+          <div class="feat-text">
+            <strong>Lançamentos Financeiros</strong>
+            <span>Receitas, despesas, notas fiscais por obra</span>
+          </div>
+        </div>
+        <div class="feat">
+          <span class="feat-icon">🏦</span>
+          <div class="feat-text">
+            <strong>Medições Caixa</strong>
+            <span>Cronograma físico-financeiro e liberações</span>
+          </div>
+        </div>
+        <div class="feat">
+          <span class="feat-icon">📊</span>
+          <div class="feat-text">
+            <strong>Dashboard Analítico</strong>
+            <span>KPIs, gráficos e filtros em tempo real</span>
+          </div>
+        </div>
+        <div class="feat">
+          <span class="feat-icon">🔄</span>
+          <div class="feat-text">
+            <strong>Importação OFX</strong>
+            <span>Conciliação bancária automática</span>
+          </div>
+        </div>
+        <div class="feat">
+          <span class="feat-icon">📥</span>
+          <div class="feat-text">
+            <strong>Exportação Excel / PDF</strong>
+            <span>Relatórios completos por obra</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- RIGHT -->
+  <div class="panel-right">
+    <div class="form-wrap">
+      <div class="logo-row" style="display:flex;align-items:center;gap:16px;margin-bottom:28px;">
+        <img src="img/logo.png" alt="Angelim Construtora" style="width:58px;height:58px;border-radius:10px;border:1px solid rgba(201,162,39,0.4);box-shadow:0 4px 16px rgba(0,0,0,0.4);object-fit:cover;">
+        <div class="logo-box-text">
+          <h2>ANGELIM</h2>
+          <p>Construtora · Sistema Financeiro</p>
+        </div>
+      </div>
+
+      <h2 class="welcome-h">Bem-vindo de volta!</h2>
+      <p class="welcome-p">Entre com suas credenciais para acessar o sistema</p>
+
+      <form id="login-form" autocomplete="on">
+        <div class="fgroup">
+          <label class="label" for="username">Usuário</label>
+          <input class="inp" type="text" id="username" name="username" placeholder="Digite seu usuário" autocomplete="username" required>
+        </div>
+        <div class="fgroup">
+          <label class="label" for="password">Senha</label>
+          <div class="inp-wrap">
+            <input class="inp" type="password" id="password" name="password" placeholder="Digite sua senha" autocomplete="current-password" required>
+            <button type="button" class="eye-btn" id="eye-btn" onclick="togglePwd()" title="Mostrar/Ocultar senha">
+              <svg id="eye-icon" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>
+              </svg>
+            </button>
+          </div>
+        </div>
+        <div style="display:flex;justify-content:flex-end;margin-bottom:24px;">
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:.83rem;color:var(--text2);">
+            <input type="checkbox" id="remember" style="accent-color:var(--accent);width:14px;height:14px;">
+            Lembrar-me
+          </label>
+        </div>
+        <button type="submit" class="btn-primary" id="login-btn">
+          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+            <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/>
+            <polyline points="10 17 15 12 10 7"/>
+            <line x1="15" y1="12" x2="3" y2="12"/>
+          </svg>
+          Entrar no Sistema
+        </button>
+        <div class="err-box" id="err-box"></div>
+      </form>
+
+      <div class="demo-box">
+        <strong>🔑 Acesso Inicial / Administrador:</strong>
+        <div class="demo-cred">
+          <span>Usuário: <code>admin</code></span>
+          <span>Senha: <code>admin123</code></span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="js/auth.js"></script>
+<script>
+  if (Auth.isLoggedIn()) { window.location.href = 'app.html'; }
+
+  document.getElementById('login-form').addEventListener('submit', function(e) {
+    e.preventDefault();
+    const btn = document.getElementById('login-btn');
+    btn.disabled = true;
+    btn.innerHTML = '<div class="spinner"></div> Verificando...';
+    document.getElementById('err-box').style.display = 'none';
+
+    setTimeout(() => {
+      const u = document.getElementById('username').value.trim();
+      const p = document.getElementById('password').value;
+      const r = document.getElementById('remember').checked;
+      const result = Auth.login(u, p, r);
+      if (result.success) {
+        btn.innerHTML = '✓ Bem-vindo! Redirecionando...';
+        setTimeout(() => window.location.href = 'app.html', 400);
+      } else {
+        const e2 = document.getElementById('err-box');
+        e2.textContent = result.message;
+        e2.style.display = 'block';
+        btn.disabled = false;
+        btn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></svg> Entrar no Sistema';
+      }
+    }, 700);
+  });
+
+  function togglePwd() {
+    const pwd = document.getElementById('password');
+    const isHidden = pwd.type === 'password';
+    pwd.type = isHidden ? 'text' : 'password';
+    document.getElementById('eye-icon').innerHTML = isHidden
+      ? '<path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/>'
+      : '<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>';
+  }
+</script>
+</body>
+</html>

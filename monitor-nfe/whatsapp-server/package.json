@@ -1,0 +1,16 @@
+{
+  "name": "angelim-whatsapp-server",
+  "version": "1.0.0",
+  "description": "Servidor local de WhatsApp da Angelim Construtora para envio automático de boletos",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^4.19.2",
+    "localtunnel": "^2.0.2",
+    "qrcode": "^1.5.3",
+    "whatsapp-web.js": "^1.26.0"
+  }
+}

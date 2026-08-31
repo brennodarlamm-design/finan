@@ -1,0 +1,13 @@
+{
+  "name": "financas-angelim",
+  "version": "2.3.0",
+  "description": "Sistema Financeiro & Gestão de Obras - Angelim Construtora",
+  "type": "module",
+  "scripts": {
+    "dev": "npx serve ."
+  },
+  "dependencies": {
+    "@neondatabase/serverless": "^0.9.5",
+    "dotenv": "^16.4.5"
+  }
+}
