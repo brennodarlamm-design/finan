@@ -225,7 +225,7 @@ const DB = {
     const aReceber = lans.filter(l => l.tipo === 'receita' && l.status === 'a_receber');
     return {
       totalReceitas: rec, totalDespesas: desp, saldo: rec - desp,
-      nfPendentes: nfItems.length, nfPendentesValor: nfItems.reduce((s,n)=>s+n.valor_bruto,0),
+      nfPendentes: nfItems.length, nfPendentesValor: nfItems.reduce((s,n)=>s+(n.valor_total||n.valor_bruto||0),0),
       aPagar: aPagar.length, aPagarValor: aPagar.reduce((s,l)=>s+l.valor,0),
       aReceber: aReceber.length, aReceberValor: aReceber.reduce((s,l)=>s+l.valor,0)
     };
