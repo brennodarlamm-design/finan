@@ -25,7 +25,7 @@ export default async function handler(req, res) {
     }
 
     const numFmt = destPhone.startsWith('55') ? destPhone : `55${destPhone}`;
-    const targetBaseUrl = (apiUrl || process.env.EVOLUTION_API_URL || 'http://localhost:3333/send-message').trim();
+    const targetBaseUrl = (apiUrl || process.env.EVOLUTION_API_URL || 'https://finan-wf12.onrender.com/send-message').trim();
     const targetApiKey = (apiKey || process.env.EVOLUTION_API_KEY || '').trim();
     const targetInstance = (instance || process.env.EVOLUTION_INSTANCE || 'angelim').trim();
 

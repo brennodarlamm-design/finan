@@ -46,7 +46,7 @@
     "ativo": true,
     "telefone_destino": "5595991363678",
     "_telefone_hint": "Telefone com DDD para onde o robô matinal enviará o resumo das contas",
-    "webhook_url": "http://localhost:3333/send-message",
+    "webhook_url": "https://finan-wf12.onrender.com/send-message",
     "_webhook_hint": "Servidor local do WhatsApp (porta 3333) ou Evolution API / Z-API",
     "api_token": "",
     "horario_envio": "08:00",

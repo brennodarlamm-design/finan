@@ -11,7 +11,11 @@ const WhatsApp = {
   },
 
   getEvolutionUrl() {
-    return localStorage.getItem('finobra_evolution_url') || 'http://localhost:3333/send-message';
+    const saved = localStorage.getItem('finobra_evolution_url');
+    if (!saved || saved === 'http://localhost:3333/send-message') {
+      return 'https://finan-wf12.onrender.com/send-message';
+    }
+    return saved;
   },
 
   setEvolutionUrl(url) {
@@ -273,7 +277,7 @@ const WhatsApp = {
             <div class="form-group" style="margin-bottom:8px;">
               <label class="form-label" style="font-size:.74rem;">URL da API / Endpoint</label>
               <input type="text" id="cfg-wa-url" class="form-control"
-                placeholder="http://localhost:3333/send-message ou http://localhost:8080"
+                placeholder="https://finan-wf12.onrender.com/send-message ou http://localhost:3333/send-message"
                 value="${url}">
             </div>
 
