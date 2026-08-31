@@ -156,7 +156,9 @@ const WhatsApp = {
       msg += `\n🧾 *Chave NF-e:*\n\`${dados.chave_nfe}\`\n`;
     }
 
-    msg += `\n👉 _Notificação gerada pelo Sistema Financeiro Angelim Construtora_`;
+    const emp = typeof DB !== 'undefined' ? DB.getEmpresa() : null;
+    const nomeEmp = emp?.nome_fantasia || emp?.razao_social || 'Sistema Financeiro';
+    msg += `\n👉 _Notificação gerada pelo Sistema Financeiro ${nomeEmp}_`;
 
     this.abrirEnvio(msg);
   },

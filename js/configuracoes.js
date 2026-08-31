@@ -1,18 +1,21 @@
 // js/configuracoes.js — Settings: Users & Bank Accounts
 
 const Configuracoes = {
-  _activeTab: 'usuarios',
+  _activeTab: 'empresa',
 
   render(obraId) {
     if (!document.getElementById('cfg-tab-styles')) {
       const s = document.createElement('style');
       s.id = 'cfg-tab-styles';
-      s.textContent = '.cfg-tab{padding:10px 24px;border:none;background:transparent;color:var(--text3);font-family:inherit;font-size:.875rem;font-weight:600;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-2px;transition:color .2s,border-color .2s;}.cfg-tab:hover{color:var(--text);}.cfg-tab-active{color:var(--accent)!important;border-bottom-color:var(--accent)!important;}';
+      s.textContent = '.cfg-tab{padding:10px 20px;border:none;background:transparent;color:var(--text3);font-family:inherit;font-size:.875rem;font-weight:600;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-2px;transition:color .2s,border-color .2s;}.cfg-tab:hover{color:var(--text);}.cfg-tab-active{color:var(--accent)!important;border-bottom-color:var(--accent)!important;}';
       document.head.appendChild(s);
     }
     return `
     <div>
-      <div style="display:flex;gap:0;border-bottom:2px solid var(--border);margin-bottom:24px;">
+      <div style="display:flex;gap:0;border-bottom:2px solid var(--border);margin-bottom:24px;overflow-x:auto;">
+        <button id="cfg-tab-empresa" class="cfg-tab${this._activeTab==='empresa'?' cfg-tab-active':''}" onclick="Configuracoes._switch('empresa')">
+          &#x1F3E2; Minha Empresa
+        </button>
         <button id="cfg-tab-usuarios" class="cfg-tab${this._activeTab==='usuarios'?' cfg-tab-active':''}" onclick="Configuracoes._switch('usuarios')">
           &#x1F465; Usu&aacute;rios
         </button>
@@ -42,10 +45,202 @@ const Configuracoes = {
   },
 
   _renderTab(tab, obraId) {
+    if (tab === 'empresa') return this._renderEmpresa();
     if (tab === 'contas') return Contas._html(obraId);
     if (tab === 'sistema') return this._renderSistema();
     if (tab === 'categorias') return this._renderCategorias();
     return this._renderUsuarios();
+  },
+
+  // ── MINHA EMPRESA / DADOS CADASTRAIS ───────────────────
+  _renderEmpresa() {
+    const emp = DB.getEmpresa();
+    return `
+    <div class="page-header">
+      <div>
+        <h1 class="page-title">&#x1F3E2; Dados da Minha Empresa</h1>
+        <p class="page-sub">Configure a raz&atilde;o social, CNPJ, contatos e logotipo exibidos nos recibos, relat&oacute;rios e no sistema</p>
+      </div>
+    </div>
+
+    <div class="g2" style="align-items:start;">
+      <!-- FORMULÁRIO -->
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">&#x270F;&#xFE0F; Informa&ccedil;&otilde;es Cadastrais</div>
+        </div>
+        <form id="cfg-empresa-form" onsubmit="Configuracoes.saveEmpresa(event)">
+          <div class="g2">
+            <div class="form-group">
+              <label class="form-label">Nome Fantasia *</label>
+              <input class="form-control" name="nome_fantasia" id="cfg-emp-fantasia" value="${emp.nome_fantasia || ''}" required placeholder="Ex: Silva &amp; Souza Engenharia">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Raz&atilde;o Social</label>
+              <input class="form-control" name="razao_social" id="cfg-emp-razao" value="${emp.razao_social || emp.nome_fantasia || ''}" placeholder="Ex: Silva &amp; Souza Construtora LTDA">
+            </div>
+          </div>
+
+          <div class="g2">
+            <div class="form-group">
+              <label class="form-label">CNPJ ou CPF</label>
+              <div style="display:flex;gap:6px;">
+                <input class="form-control" name="cnpj" id="cfg-emp-cnpj" value="${emp.cnpj || ''}" placeholder="00.000.000/0001-00">
+                <button type="button" class="btn btn-secondary btn-sm" onclick="Configuracoes.buscarCnpj()" title="Buscar dados do CNPJ na Receita">🔍</button>
+              </div>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Telefone / WhatsApp</label>
+              <input class="form-control" name="telefone" id="cfg-emp-tel" value="${emp.telefone || ''}" placeholder="(00) 90000-0000">
+            </div>
+          </div>
+
+          <div class="g2">
+            <div class="form-group">
+              <label class="form-label">E-mail Comercial</label>
+              <input class="form-control" name="email" id="cfg-emp-email" type="email" value="${emp.email || ''}" placeholder="contato@empresa.com">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Endere&ccedil;o Completo</label>
+              <input class="form-control" name="endereco" id="cfg-emp-end" value="${emp.endereco || ''}" placeholder="Rua, N&uacute;mero, Bairro">
+            </div>
+          </div>
+
+          <div class="g2">
+            <div class="form-group">
+              <label class="form-label">Cidade</label>
+              <input class="form-control" name="cidade" id="cfg-emp-cidade" value="${emp.cidade || ''}" placeholder="Cidade">
+            </div>
+            <div class="form-group">
+              <label class="form-label">UF (Estado)</label>
+              <input class="form-control" name="uf" id="cfg-emp-uf" value="${emp.uf || ''}" placeholder="UF" maxlength="2" style="text-transform:uppercase;">
+            </div>
+          </div>
+
+          <div class="g2">
+            <div class="form-group">
+              <label class="form-label">Respons&aacute;vel T&eacute;cnico / Engenheiro</label>
+              <input class="form-control" name="responsavel" id="cfg-emp-resp" value="${emp.responsavel || ''}" placeholder="Nome do respons&aacute;vel">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Registro Profissional (CREA / CAU)</label>
+              <input class="form-control" name="crea_cau" id="cfg-emp-crea" value="${emp.crea_cau || ''}" placeholder="Ex: CREA-SP 12345/D">
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Logotipo da Empresa</label>
+            <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+              <input type="file" id="cfg-logo-file" accept="image/*" style="display:none;" onchange="Configuracoes.handleLogoUpload(this)">
+              <button type="button" class="btn btn-secondary btn-sm" onclick="document.getElementById('cfg-logo-file').click()">📁 Selecionar Arquivo</button>
+              ${emp.logo_url ? `<button type="button" class="btn btn-ghost btn-sm" style="color:var(--danger);" onclick="Configuracoes.removerLogo()">🗑️ Remover Logo</button>` : ''}
+              <span id="cfg-logo-txt" style="font-size:.78rem;color:var(--text3);">${emp.logo_url ? 'Logotipo salvo no sistema' : 'Nenhuma imagem selecionada'}</span>
+            </div>
+            <input type="hidden" name="logo_url" id="cfg-emp-logo" value="${emp.logo_url || ''}">
+          </div>
+
+          <button type="submit" class="btn btn-primary" style="margin-top:10px;">
+            &#x1F4BE; Salvar Altera&ccedil;&otilde;es da Empresa
+          </button>
+        </form>
+      </div>
+
+      <!-- PREVIEW CARD -->
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">&#x1F441;&#xFE0F; Pr&eacute;-visualiza&ccedil;&atilde;o da Marca</div>
+        </div>
+        <div style="background:var(--bg-secondary);border:1px solid var(--border);border-radius:12px;padding:20px;text-align:center;">
+          <div style="margin-bottom:16px;">
+            ${emp.logo_url ? `<img src="${emp.logo_url}" alt="Logo" style="max-width:140px;max-height:70px;border-radius:8px;border:1px solid rgba(201,162,39,.4);object-fit:contain;">` : `<div style="width:64px;height:64px;border-radius:12px;background:linear-gradient(135deg,#1C2D12,#243818);border:1px solid rgba(201,162,39,.4);display:inline-flex;align-items:center;justify-content:center;font-size:2rem;">🏢</div>`}
+          </div>
+          <div style="font-size:1.2rem;font-weight:900;background:linear-gradient(135deg,var(--accent2),var(--accent));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;">
+            ${emp.nome_fantasia || 'Nome da Construtora'}
+          </div>
+          <div style="color:var(--text2);font-size:.82rem;margin-top:2px;">
+            ${emp.razao_social || 'Razão Social Não Informada'}
+          </div>
+          <div style="color:var(--text3);font-size:.76rem;margin-top:8px;">
+            CNPJ: ${emp.cnpj || '00.000.000/0000-00'} &middot; ${emp.cidade || 'Cidade'}/${emp.uf || 'UF'}
+          </div>
+          ${emp.responsavel ? `<div style="margin-top:12px;font-size:.76rem;color:var(--accent2);background:rgba(201,162,39,.08);padding:4px 10px;border-radius:6px;display:inline-block;">Responsável: ${emp.responsavel} ${emp.crea_cau ? `(${emp.crea_cau})` : ''}</div>` : ''}
+        </div>
+      </div>
+    </div>`;
+  },
+
+  handleLogoUpload(input) {
+    const file = input.files[0];
+    if (!file) return;
+    if (file.size > 2 * 1024 * 1024) {
+      Utils.toast('A imagem deve ter no máximo 2MB.', 'warning');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = e => {
+      document.getElementById('cfg-emp-logo').value = e.target.result;
+      document.getElementById('cfg-logo-txt').textContent = `✓ ${file.name} carregado`;
+      Utils.toast('Logotipo carregado! Clique em Salvar para aplicar.', 'success');
+    };
+    reader.readAsDataURL(file);
+  },
+
+  removerLogo() {
+    document.getElementById('cfg-emp-logo').value = '';
+    document.getElementById('cfg-logo-txt').textContent = 'Logotipo removido';
+    Utils.toast('Logotipo removido. Clique em Salvar para aplicar.', 'info');
+  },
+
+  async buscarCnpj() {
+    const raw = (document.getElementById('cfg-emp-cnpj')?.value || '').replace(/\D/g, '');
+    if (raw.length !== 14) {
+      Utils.toast('Informe um CNPJ válido com 14 dígitos para consultar!', 'warning');
+      return;
+    }
+    Utils.toast('Consultando CNPJ na Receita Federal...', 'info');
+    try {
+      const res = await fetch(`/api/cnpj?cnpj=${raw}`);
+      if (!res.ok) throw new Error('Falha na consulta');
+      const data = await res.json();
+      if (data.razao_social || data.nome_fantasia) {
+        if (data.nome_fantasia && document.getElementById('cfg-emp-fantasia')) document.getElementById('cfg-emp-fantasia').value = data.nome_fantasia;
+        if (data.razao_social && document.getElementById('cfg-emp-razao')) document.getElementById('cfg-emp-razao').value = data.razao_social;
+        if (data.municipio && document.getElementById('cfg-emp-cidade')) document.getElementById('cfg-emp-cidade').value = data.municipio;
+        if (data.uf && document.getElementById('cfg-emp-uf')) document.getElementById('cfg-emp-uf').value = data.uf;
+        if (data.ddd_telefone_1 && document.getElementById('cfg-emp-tel')) document.getElementById('cfg-emp-tel').value = data.ddd_telefone_1;
+        if (data.email && document.getElementById('cfg-emp-email')) document.getElementById('cfg-emp-email').value = data.email;
+        if (data.logradouro && document.getElementById('cfg-emp-end')) document.getElementById('cfg-emp-end').value = `${data.logradouro}, ${data.numero || ''} - ${data.bairro || ''}`;
+        Utils.toast('Dados do CNPJ preenchidos automaticamente!', 'success');
+      } else {
+        Utils.toast('CNPJ consultado mas sem dados adicionais.', 'info');
+      }
+    } catch {
+      Utils.toast('Não foi possível consultar o CNPJ online.', 'warning');
+    }
+  },
+
+  saveEmpresa(e) {
+    e.preventDefault();
+    const fd = new FormData(e.target);
+    const empresaData = {
+      nome_fantasia: fd.get('nome_fantasia').trim(),
+      razao_social: (fd.get('razao_social') || fd.get('nome_fantasia')).trim(),
+      cnpj: fd.get('cnpj').trim(),
+      telefone: fd.get('telefone').trim(),
+      whatsapp: fd.get('telefone').trim().replace(/\D/g, ''),
+      email: fd.get('email').trim(),
+      endereco: fd.get('endereco').trim(),
+      cidade: fd.get('cidade').trim(),
+      uf: fd.get('uf').trim().toUpperCase(),
+      responsavel: fd.get('responsavel').trim(),
+      crea_cau: fd.get('crea_cau').trim(),
+      logo_url: fd.get('logo_url') || '',
+      configurada: true
+    };
+    DB.saveEmpresa(empresaData);
+    Utils.toast('Dados da empresa salvos com sucesso!', 'success');
+    App.renderShell();
+    this._switch('empresa');
   },
 
   // ── USUARIOS ──────────────────────────────────────────

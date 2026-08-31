@@ -134,6 +134,7 @@ const Recibos = {
     const hoje = Utils.today();
     const valorPadrao = dadosPreenchidos.valor || '';
     const extensoPadrao = valorPadrao ? Utils.extenso(valorPadrao) : '';
+    const emp = DB.getEmpresa();
 
     Utils.showModal(`
       <div class="modal" style="max-width:680px;">
@@ -165,11 +166,11 @@ const Recibos = {
             <div class="form-row cols-2" style="margin-bottom:14px;">
               <div class="form-group">
                 <label class="form-label" id="lbl-rec-pagador">Pagador (Quem paga) *</label>
-                <input class="form-control" name="pagador_nome" id="rec-pagador-nome" value="${dadosPreenchidos.pagador_nome || 'Angelim Construtora LTDA'}" required>
+                <input class="form-control" name="pagador_nome" id="rec-pagador-nome" value="${dadosPreenchidos.pagador_nome || emp.razao_social || emp.nome_fantasia || 'Minha Construtora'}" required>
               </div>
               <div class="form-group">
                 <label class="form-label">CPF / CNPJ do Pagador</label>
-                <input class="form-control" name="pagador_doc" id="rec-pagador-doc" value="${dadosPreenchidos.pagador_doc || '12.345.678/0001-90'}" placeholder="00.000.000/0001-00">
+                <input class="form-control" name="pagador_doc" id="rec-pagador-doc" value="${dadosPreenchidos.pagador_doc || emp.cnpj || ''}" placeholder="00.000.000/0001-00">
               </div>
             </div>
 
@@ -246,9 +247,10 @@ const Recibos = {
   _onTipoChange(tipo) {
     const pagadorNome = document.getElementById('rec-pagador-nome');
     const pagadorDoc = document.getElementById('rec-pagador-doc');
+    const emp = DB.getEmpresa();
     if (tipo === 'pagamento') {
-      if (pagadorNome) pagadorNome.value = 'Angelim Construtora LTDA';
-      if (pagadorDoc) pagadorDoc.value = '12.345.678/0001-90';
+      if (pagadorNome) pagadorNome.value = emp.razao_social || emp.nome_fantasia || '';
+      if (pagadorDoc) pagadorDoc.value = emp.cnpj || '';
     } else {
       if (pagadorNome) pagadorNome.value = '';
       if (pagadorDoc) pagadorDoc.value = '';
@@ -330,15 +332,21 @@ const Recibos = {
     const meses = ['','janeiro','fevereiro','março','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro'];
     const dataPorExtenso = `${parseInt(d, 10)} de ${meses[parseInt(m, 10)]} de ${y}`;
 
+    const emp = DB.getEmpresa();
+    const brandName = (emp.nome_fantasia || emp.razao_social || 'Minha Construtora').toUpperCase();
+    const logoHtml = emp.logo_url 
+      ? `<img src="${emp.logo_url}" alt="${brandName}" style="max-width:60px;max-height:60px;border-radius:8px;border:1px solid #c9a227;object-fit:contain;">`
+      : `<div style="width:48px;height:48px;border-radius:8px;background:#182713;border:1px solid #c9a227;display:flex;align-items:center;justify-content:center;font-size:1.5rem;">🏢</div>`;
+
     return `
     <div style="border:2px solid #0f172a;padding:28px;border-radius:8px;position:relative;background:#ffffff;color:#0f172a;">
       
       <!-- Cabeçalho -->
       <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:2px solid #c9a227;padding-bottom:16px;margin-bottom:20px;">
         <div style="display:flex;align-items:center;gap:12px;">
-          <img src="img/logo.png" alt="Angelim Construtora" style="width:52px;height:52px;border-radius:8px;border:1px solid #c9a227;object-fit:cover;">
+          ${logoHtml}
           <div>
-            <div style="font-size:1.15rem;font-weight:900;color:#0f172a;line-height:1.1;letter-spacing:0.5px;">ANGELIM CONSTRUTORA</div>
+            <div style="font-size:1.15rem;font-weight:900;color:#0f172a;line-height:1.1;letter-spacing:0.5px;">${brandName}</div>
             <div style="font-size:.72rem;font-weight:800;color:#b45309;text-transform:uppercase;">Engenharia Civil &amp; Gestão de Obras</div>
           </div>
         </div>

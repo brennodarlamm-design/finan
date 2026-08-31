@@ -235,18 +235,36 @@
         </div>
       </div>
 
-      <h2 class="welcome-h">Bem-vindo de volta!</h2>
-      <p class="welcome-p">Entre com suas credenciais para acessar o sistema</p>
+      <h2 class="welcome-h" id="welcome-title">Bem-vindo de volta!</h2>
+      <p class="welcome-p" id="welcome-subtitle">Selecione uma conta ou entre com suas credenciais</p>
+
+      <!-- Perfil Rápido Selector -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:20px;">
+        <button type="button" class="user-chip-btn active" id="chip-angelim" onclick="selectQuickUser('admin','admin123','Angelim Construtora')">
+          <span style="font-size:1.1rem;">🏢</span>
+          <div style="text-align:left;overflow:hidden;">
+            <strong style="display:block;font-size:.78rem;white-space:nowrap;text-overflow:ellipsis;overflow:hidden;">Angelim</strong>
+            <span style="font-size:.68rem;opacity:.7;">Dados Demo</span>
+          </div>
+        </button>
+        <button type="button" class="user-chip-btn" id="chip-empresa" onclick="selectQuickUser('empresa','empresa123','Minha Empresa (Zerada)')">
+          <span style="font-size:1.1rem;">✨</span>
+          <div style="text-align:left;overflow:hidden;">
+            <strong style="display:block;font-size:.78rem;white-space:nowrap;text-overflow:ellipsis;overflow:hidden;color:var(--accent2);">Nova Empresa</strong>
+            <span style="font-size:.68rem;opacity:.7;">Sistema Zerado</span>
+          </div>
+        </button>
+      </div>
 
       <form id="login-form" autocomplete="on">
         <div class="fgroup">
-          <label class="label" for="username">Usuário</label>
-          <input class="inp" type="text" id="username" name="username" placeholder="Digite seu usuário" autocomplete="username" required>
+          <label class="label" for="username">Usuário ou E-mail</label>
+          <input class="inp" type="text" id="username" name="username" value="admin" placeholder="Digite seu usuário" autocomplete="username" required>
         </div>
         <div class="fgroup">
           <label class="label" for="password">Senha</label>
           <div class="inp-wrap">
-            <input class="inp" type="password" id="password" name="password" placeholder="Digite sua senha" autocomplete="current-password" required>
+            <input class="inp" type="password" id="password" name="password" value="admin123" placeholder="Digite sua senha" autocomplete="current-password" required>
             <button type="button" class="eye-btn" id="eye-btn" onclick="togglePwd()" title="Mostrar/Ocultar senha">
               <svg id="eye-icon" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>
@@ -254,11 +272,14 @@
             </button>
           </div>
         </div>
-        <div style="display:flex;justify-content:flex-end;margin-bottom:24px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:22px;">
           <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:.83rem;color:var(--text2);">
-            <input type="checkbox" id="remember" style="accent-color:var(--accent);width:14px;height:14px;">
+            <input type="checkbox" id="remember" style="accent-color:var(--accent);width:14px;height:14px;" checked>
             Lembrar-me
           </label>
+          <button type="button" onclick="openRegisterModal()" style="background:none;border:none;color:var(--accent2);font-size:.82rem;font-weight:600;cursor:pointer;text-decoration:underline;">
+            + Cadastrar Nova Empresa
+          </button>
         </div>
         <button type="submit" class="btn-primary" id="login-btn">
           <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
@@ -266,25 +287,148 @@
             <polyline points="10 17 15 12 10 7"/>
             <line x1="15" y1="12" x2="3" y2="12"/>
           </svg>
-          Entrar no Sistema
+          <span id="btn-text">Entrar no Sistema</span>
         </button>
         <div class="err-box" id="err-box"></div>
       </form>
 
       <div class="demo-box">
-        <strong>🔑 Acesso Inicial / Administrador:</strong>
-        <div class="demo-cred">
-          <span>Usuário: <code>admin</code></span>
-          <span>Senha: <code>admin123</code></span>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+          <strong>🔑 Acessos Disponíveis:</strong>
+          <span style="font-size:.72rem;color:var(--accent2);background:rgba(201,162,39,.12);padding:2px 6px;border-radius:4px;">1-Clique acima para preencher</span>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:6px;margin-top:6px;font-size:.78rem;">
+          <div style="display:flex;justify-content:space-between;align-items:center;background:rgba(0,0,0,.3);padding:6px 10px;border-radius:6px;">
+            <span>🏢 Angelim (Demo):</span>
+            <code style="color:var(--accent2);">admin / admin123</code>
+          </div>
+          <div style="display:flex;justify-content:space-between;align-items:center;background:rgba(0,0,0,.3);padding:6px 10px;border-radius:6px;">
+            <span>✨ Minha Empresa (Zerado):</span>
+            <code style="color:#10b981;">empresa / empresa123</code>
+          </div>
         </div>
       </div>
     </div>
   </div>
 </div>
 
+<!-- MODAL DE CADASTRO DE NOVA EMPRESA / CONTA -->
+<div id="register-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:999;align-items:center;justify-content:center;padding:20px;backdrop-filter:blur(8px);">
+  <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:16px;width:100%;max-width:460px;padding:32px;box-shadow:var(--shadow);position:relative;animation:modalIn .25s ease;">
+    <button onclick="closeRegisterModal()" style="position:absolute;top:18px;right:18px;background:none;border:none;color:var(--text3);font-size:1.4rem;cursor:pointer;line-height:1;">&times;</button>
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;">
+      <div style="width:42px;height:42px;border-radius:10px;background:linear-gradient(135deg,#1C2D12,#243818);border:1px solid rgba(201,162,39,.4);display:flex;align-items:center;justify-content:center;font-size:1.3rem;">🏢</div>
+      <div>
+        <h3 style="font-size:1.15rem;font-weight:800;color:var(--text);">Cadastrar Minha Empresa</h3>
+        <p style="font-size:.78rem;color:var(--text2);margin-top:2px;">Inicie com um sistema 100% limpo e personalizado</p>
+      </div>
+    </div>
+
+    <form id="register-form">
+      <div class="fgroup">
+        <label class="label">Nome da Empresa / Construtora *</label>
+        <input class="inp" type="text" id="reg-empresa" placeholder="Ex: Silva & Souza Engenharia" required>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+        <div class="fgroup">
+          <label class="label">Seu Nome Completo *</label>
+          <input class="inp" type="text" id="reg-nome" placeholder="Ex: Carlos Silva" required>
+        </div>
+        <div class="fgroup">
+          <label class="label">CNPJ ou CPF (Opcional)</label>
+          <input class="inp" type="text" id="reg-cnpj" placeholder="00.000.000/0001-00">
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+        <div class="fgroup">
+          <label class="label">Nome de Usuário (Login) *</label>
+          <input class="inp" type="text" id="reg-username" placeholder="ex: carlossilva" required>
+        </div>
+        <div class="fgroup">
+          <label class="label">Senha de Acesso *</label>
+          <input class="inp" type="password" id="reg-senha" placeholder="Mínimo 4 dígitos" required>
+        </div>
+      </div>
+      <div class="fgroup">
+        <label class="label">E-mail de Contato</label>
+        <input class="inp" type="email" id="reg-email" placeholder="contato@minhaempresa.com">
+      </div>
+      <div class="err-box" id="reg-err-box" style="margin-bottom:14px;"></div>
+      <button type="submit" class="btn-primary" id="reg-btn" style="margin-top:8px;">
+        🚀 Criar Conta e Abrir Sistema Zerado
+      </button>
+    </form>
+  </div>
+</div>
+
+<style>
+  .user-chip-btn {
+    display:flex;align-items:center;gap:10px;padding:10px 12px;
+    background:rgba(201,162,39,.06);border:1px solid rgba(201,162,39,.18);
+    border-radius:10px;color:var(--text);font-family:inherit;cursor:pointer;
+    transition:all .2s;
+  }
+  .user-chip-btn:hover {
+    background:rgba(201,162,39,.12);border-color:rgba(201,162,39,.35);
+  }
+  .user-chip-btn.active {
+    background:rgba(201,162,39,.18);border-color:var(--accent);
+    box-shadow:0 0 12px rgba(201,162,39,.25);
+  }
+  @keyframes modalIn { from { opacity:0; transform:scale(.95); } to { opacity:1; transform:scale(1); } }
+</style>
+
 <script src="js/auth.js"></script>
 <script>
   if (Auth.isLoggedIn()) { window.location.href = 'app.html'; }
+
+  function selectQuickUser(u, p, label) {
+    document.getElementById('username').value = u;
+    document.getElementById('password').value = p;
+    document.querySelectorAll('.user-chip-btn').forEach(b => b.classList.remove('active'));
+    if (u === 'admin') document.getElementById('chip-angelim').classList.add('active');
+    else if (u === 'empresa') document.getElementById('chip-empresa').classList.add('active');
+  }
+
+  function openRegisterModal() {
+    document.getElementById('register-modal').style.display = 'flex';
+  }
+
+  function closeRegisterModal() {
+    document.getElementById('register-modal').style.display = 'none';
+  }
+
+  document.getElementById('register-form').addEventListener('submit', function(e) {
+    e.preventDefault();
+    const btn = document.getElementById('reg-btn');
+    btn.disabled = true;
+    btn.textContent = 'Criando conta e preparando sistema...';
+    document.getElementById('reg-err-box').style.display = 'none';
+
+    const empNome = document.getElementById('reg-empresa').value.trim();
+    const nome = document.getElementById('reg-nome').value.trim();
+    const cnpj = document.getElementById('reg-cnpj').value.trim();
+    const username = document.getElementById('reg-username').value.trim();
+    const senha = document.getElementById('reg-senha').value;
+    const email = document.getElementById('reg-email').value.trim();
+
+    const regResult = Auth.register({ nome, username, email, senha, empresaNome: empNome, cnpj });
+    if (!regResult.success) {
+      const eBox = document.getElementById('reg-err-box');
+      eBox.textContent = regResult.message;
+      eBox.style.display = 'block';
+      btn.disabled = false;
+      btn.textContent = '🚀 Criar Conta e Abrir Sistema Zerado';
+      return;
+    }
+
+    // Auto login
+    const loginResult = Auth.login(username, senha, true);
+    if (loginResult.success) {
+      btn.textContent = '✓ Conta criada com sucesso! Entrando...';
+      setTimeout(() => window.location.href = 'app.html', 500);
+    }
+  });
 
   document.getElementById('login-form').addEventListener('submit', function(e) {
     e.preventDefault();
@@ -300,7 +444,7 @@
       const result = Auth.login(u, p, r);
       if (result.success) {
         btn.innerHTML = '✓ Bem-vindo! Redirecionando...';
-        setTimeout(() => window.location.href = 'app.html', 400);
+        setTimeout(() => window.location.href = 'app.html', 350);
       } else {
         const e2 = document.getElementById('err-box');
         e2.textContent = result.message;
@@ -308,7 +452,7 @@
         btn.disabled = false;
         btn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></svg> Entrar no Sistema';
       }
-    }, 700);
+    }, 500);
   });
 
   function togglePwd() {

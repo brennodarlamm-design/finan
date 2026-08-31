@@ -999,20 +999,28 @@ const PreCompras = {
 
         <div class="modal-body" style="padding:20px;overflow-y:auto;flex:1;background:#fff;color:#0f172a;border-radius:0 0 10px 10px;" id="folha-ordem-compra">
           
-          <!-- CABEÇALHO TIMBRADO ANGELIM -->
-          <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:3px solid #1C2D12;padding-bottom:16px;margin-bottom:16px;">
-            <div style="display:flex;align-items:center;gap:14px;">
-              <img src="img/logo.png" alt="Angelim Construtora" style="width:70px;height:70px;border-radius:8px;object-fit:contain;border:1px solid #cbd5e1;">
-              <div>
-                <h1 style="margin:0;font-size:1.4rem;font-weight:900;color:#1C2D12;letter-spacing:0.5px;">ANGELIM CONSTRUTORA</h1>
-                <p style="margin:2px 0 0;font-size:.78rem;color:#475569;font-weight:600;">SISTEMA DE GESTÃO FINANCEIRA E CONTROLE DE OBRAS</p>
-                <p style="margin:2px 0 0;font-size:.72rem;color:#64748b;">CNPJ: 12.345.678/0001-90 &middot; Roraima / São Paulo &middot; Contratos Caixa Econômica Federal</p>
+          <!-- CABEÇALHO TIMBRADO -->
+          ${(() => {
+            const emp = DB.getEmpresa();
+            const brandName = (emp.nome_fantasia || emp.razao_social || 'Minha Construtora').toUpperCase();
+            const logoHtml = emp.logo_url
+              ? `<img src="${emp.logo_url}" alt="${brandName}" style="width:70px;height:70px;border-radius:8px;object-fit:contain;border:1px solid #cbd5e1;">`
+              : `<div style="width:56px;height:56px;border-radius:8px;background:#182713;border:1px solid #c9a227;display:flex;align-items:center;justify-content:center;font-size:1.8rem;">🏢</div>`;
+            return `
+            <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:3px solid #1C2D12;padding-bottom:16px;margin-bottom:16px;">
+              <div style="display:flex;align-items:center;gap:14px;">
+                ${logoHtml}
+                <div>
+                  <h1 style="margin:0;font-size:1.4rem;font-weight:900;color:#1C2D12;letter-spacing:0.5px;">${brandName}</h1>
+                  <p style="margin:2px 0 0;font-size:.78rem;color:#475569;font-weight:600;">SISTEMA DE GESTÃO FINANCEIRA E CONTROLE DE OBRAS</p>
+                  <p style="margin:2px 0 0;font-size:.72rem;color:#64748b;">CNPJ: ${emp.cnpj || 'Não informado'} &middot; ${emp.cidade || ''}/${emp.uf || ''} &middot; Gestão Integrada</p>
+                </div>
               </div>
-            </div>
-            <div>
-              ${seloStatus}
-            </div>
-          </div>
+              <div>
+                ${seloStatus}
+              </div>
+            </div>`;
+          })()}
 
           <!-- TÍTULO DO DOCUMENTO -->
           <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;padding:10px 16px;display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
@@ -1136,7 +1144,7 @@ const PreCompras = {
           </div>
 
           <div style="margin-top:24px;text-align:center;font-size:.65rem;color:#94a3b8;border-top:1px solid #f1f5f9;padding-top:8px;">
-            Emitido via Angelim Construtora Sistema Financeiro &middot; Data de Emissão: ${new Date().toLocaleString('pt-BR')} &middot; Documento Interno de Controle
+            Emitido via ${DB.getEmpresa().nome_fantasia || 'Sistema Financeiro'} &middot; Data de Emissão: ${new Date().toLocaleString('pt-BR')} &middot; Documento Interno de Controle
           </div>
 
         </div>
@@ -1163,7 +1171,7 @@ const PreCompras = {
       <html lang="pt-BR">
       <head>
         <meta charset="UTF-8">
-        <title>Ordem de Compra — Angelim Construtora</title>
+        <title>Ordem de Compra — ${DB.getEmpresa().nome_fantasia || 'Construtora'}</title>
         <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
         <style>
           *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }

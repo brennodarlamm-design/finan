@@ -1,4 +1,4 @@
-// js/data.js — Data Layer with LocalStorage + Demo Data
+// js/data.js — Data Layer with LocalStorage + Multi-Tenant Scoping & Demo Data
 
 const DB = {
   K: {
@@ -9,35 +9,127 @@ const DB = {
     fornecedores: 'finobra_fornecedores'
   },
 
-  getAll(key) { try { return JSON.parse(localStorage.getItem(this.K[key]) || '[]'); } catch { return []; } },
-  save(key, data) {
+  _t() {
+    return (typeof Auth !== 'undefined' && Auth.getCurrentTenantId) ? Auth.getCurrentTenantId() : 'angelim';
+  },
+
+  _k(key) {
+    const t = this._t();
+    if (t === 'angelim') {
+      return this.K[key] || `finobra_${key}`;
+    }
+    return `finobra_${t}_${key}`;
+  },
+
+  _ck(name) {
+    const t = this._t();
+    if (t === 'angelim') return name;
+    return `${name}_${t}`;
+  },
+
+  // ── GESTÃO DA EMPRESA / CONSTRUTORA ──
+  getEmpresa() {
+    const t = this._t();
+    const raw = localStorage.getItem(`finobra_${t}_empresa`);
+    if (raw) {
+      try {
+        const obj = JSON.parse(raw);
+        if (obj && typeof obj === 'object') return obj;
+      } catch {}
+    }
+
+    if (t === 'angelim') {
+      return {
+        id: 'angelim',
+        razao_social: 'Angelim Construtora LTDA',
+        nome_fantasia: 'Angelim Construtora',
+        cnpj: '12.345.678/0001-90',
+        telefone: '(95) 99123-4567',
+        whatsapp: '95991234567',
+        email: 'contato@angelim.com.br',
+        cidade: 'Boa Vista',
+        uf: 'RR',
+        endereco: 'Av. Principal, 1000 - Centro',
+        responsavel: 'Eng. Ricardo Almeida',
+        crea_cau: 'CREA-RR 12345/D',
+        logo_url: 'img/logo.png',
+        configurada: true
+      };
+    }
+
+    const session = typeof Auth !== 'undefined' ? Auth.getUser() : null;
+    const nomeEmp = session?.empresaNome || (session?.nome ? session.nome + ' Construtora' : '');
+    return {
+      id: t,
+      razao_social: nomeEmp || '',
+      nome_fantasia: nomeEmp || '',
+      cnpj: '',
+      telefone: '',
+      whatsapp: '',
+      email: session?.email || '',
+      cidade: '',
+      uf: '',
+      endereco: '',
+      responsavel: session?.nome || '',
+      crea_cau: '',
+      logo_url: '',
+      configurada: !!(session?.empresaNome)
+    };
+  },
+
+  saveEmpresa(empresaData) {
+    const t = this._t();
+    const current = this.getEmpresa();
+    const updated = {
+      ...current,
+      ...empresaData,
+      id: t,
+      configurada: true,
+      updated_at: new Date().toISOString()
+    };
+    localStorage.setItem(`finobra_${t}_empresa`, JSON.stringify(updated));
+    return updated;
+  },
+
+  getAll(key) {
     try {
-      localStorage.setItem(this.K[key], JSON.stringify(data));
+      return JSON.parse(localStorage.getItem(this._k(key)) || '[]');
+    } catch {
+      return [];
+    }
+  },
+
+  save(key, data) {
+    const storageKey = this._k(key);
+    try {
+      localStorage.setItem(storageKey, JSON.stringify(data));
     } catch (e) {
       console.warn(`[Storage] Quota excedida ao salvar ${key}. Liberando espaço no LocalStorage...`);
       this.purgeStorage();
       try {
-        localStorage.setItem(this.K[key], JSON.stringify(data));
+        localStorage.setItem(storageKey, JSON.stringify(data));
       } catch (e2) {
         console.error(`[Storage] Falha ao persistir ${key} no cache local:`, e2);
       }
     }
   },
+
   purgeStorage() {
     try {
       // 1. Remove snapshots grandes e caches temporários não essenciais
       const heavyKeys = [
-        'finobra_snapshot_seguranca',
-        'finobra_backup_temp',
+        this._ck('finobra_snapshot_seguranca'),
+        this._ck('finobra_backup_temp'),
         'sinapi_itens_cache',
-        'finobra_ofximports_cache'
+        this._ck('finobra_ofximports_cache')
       ];
       heavyKeys.forEach(k => {
         try { localStorage.removeItem(k); } catch {}
       });
 
-      // 2. Remove base64 pesado de documentos no LocalStorage (dados reais permanecem no Neon)
-      const docsRaw = localStorage.getItem('finobra_documentos');
+      // 2. Remove base64 pesado de documentos no LocalStorage
+      const docsKey = this._ck('finobra_documentos');
+      const docsRaw = localStorage.getItem(docsKey);
       if (docsRaw) {
         const docs = JSON.parse(docsRaw);
         if (Array.isArray(docs)) {
@@ -45,7 +137,7 @@ const DB = {
             const { base64_data, base64, ...rest } = d;
             return rest;
           });
-          localStorage.setItem('finobra_documentos', JSON.stringify(lightDocs));
+          localStorage.setItem(docsKey, JSON.stringify(lightDocs));
         }
       }
     } catch (err) {
@@ -77,10 +169,6 @@ const DB = {
   },
   uuid() { return Date.now().toString(36) + Math.random().toString(36).substr(2, 9); },
 
-  init() {
-    this.cleanAllDatesInStorage();
-  },
-
   cleanAllDatesInStorage() {
     try {
       const lans = this.getAll('lancamentos');
@@ -92,7 +180,7 @@ const DB = {
           data_pagamento: (typeof Utils !== 'undefined' && Utils.cleanDate) ? Utils.cleanDate(l.data_pagamento) || null : (l.data_pagamento ? String(l.data_pagamento).split('T')[0] : null),
           valor: Number(l.valor) || 0
         }));
-        localStorage.setItem(this.K.lancamentos, JSON.stringify(cleaned));
+        this.save('lancamentos', cleaned);
       }
 
       const notas = this.getAll('notas');
@@ -104,7 +192,7 @@ const DB = {
           data_pagamento: (typeof Utils !== 'undefined' && Utils.cleanDate) ? Utils.cleanDate(n.data_pagamento) || null : (n.data_pagamento ? String(n.data_pagamento).split('T')[0] : null),
           valor_total: Number(n.valor_total) || 0
         }));
-        localStorage.setItem(this.K.notas, JSON.stringify(cleaned));
+        this.save('notas', cleaned);
       }
     } catch(e) {
       console.warn('Erro ao limpar datas no storage:', e);
@@ -113,6 +201,11 @@ const DB = {
 
   // ── NEON CLOUD SYNC ──
   async syncFromCloud() {
+    // Apenas o tenant padrão 'angelim' sincroniza com o banco Neon central da Angelim
+    if (this._t() !== 'angelim') {
+      return true;
+    }
+
     try {
       const res = await fetch('/api/db?table=all');
       if (!res.ok) return false;
@@ -164,6 +257,8 @@ const DB = {
   },
 
   syncToCloud(action, table, data, id) {
+    // Sincroniza com Neon apenas se for o tenant central da Angelim
+    if (this._t() !== 'angelim') return;
     try {
       fetch('/api/db', {
         method: 'POST',
@@ -174,6 +269,7 @@ const DB = {
   },
 
   async syncAllToCloud() {
+    if (this._t() !== 'angelim') return { success: true, message: 'Tenant local em operação isolada.' };
     try {
       const payload = {
         clientes: this.getAll('clientes'),
@@ -328,37 +424,39 @@ const DB = {
     this.purgeStorage();
     // Garante que todas as coleções existam no LocalStorage como array vazio se inexistentes
     Object.keys(this.K).forEach(k => {
-      if (localStorage.getItem(this.K[k]) === null) {
-        this.save(k, []);
+      const sk = this._k(k);
+      if (localStorage.getItem(sk) === null) {
+        localStorage.setItem(sk, '[]');
       }
     });
-    if (localStorage.getItem('finobra_documentos') === null) {
-      localStorage.setItem('finobra_documentos', '[]');
+    const docsKey = this._ck('finobra_documentos');
+    if (localStorage.getItem(docsKey) === null) {
+      localStorage.setItem(docsKey, '[]');
     }
-    if (localStorage.getItem('finobra_recibos') === null) {
-      localStorage.setItem('finobra_recibos', '[]');
+    const recKey = this._ck('finobra_recibos');
+    if (localStorage.getItem(recKey) === null) {
+      localStorage.setItem(recKey, '[]');
     }
-    if (localStorage.getItem('orcamentos_sinapi') === null) {
-      localStorage.setItem('orcamentos_sinapi', '[]');
-    }
-    // Migração: garante que fornecedores exista
-    if (localStorage.getItem('finobra_fornecedores') === null) {
-      localStorage.setItem('finobra_fornecedores', '[]');
+    const sinapiKey = this._ck('orcamentos_sinapi');
+    if (localStorage.getItem(sinapiKey) === null) {
+      localStorage.setItem(sinapiKey, '[]');
     }
   },
 
-  isDemoLoaded() { return localStorage.getItem('finobra_demo_v2') === 'true'; },
+  isDemoLoaded() {
+    return localStorage.getItem(this._ck('finobra_demo_v2')) === 'true';
+  },
 
   clearAllData() {
     Object.keys(this.K).forEach(k => {
       this.save(k, []);
     });
-    localStorage.setItem('finobra_documentos', '[]');
-    localStorage.setItem('finobra_recibos', '[]');
-    localStorage.setItem('orcamentos_sinapi', '[]');
-    localStorage.setItem('finobra_fornecedores', '[]');
-    localStorage.removeItem('finobra_demo_v2');
-    localStorage.setItem('finobra_clean_mode', 'true');
+    localStorage.setItem(this._ck('finobra_documentos'), '[]');
+    localStorage.setItem(this._ck('finobra_recibos'), '[]');
+    localStorage.setItem(this._ck('orcamentos_sinapi'), '[]');
+    localStorage.setItem(this._k('fornecedores'), '[]');
+    localStorage.removeItem(this._ck('finobra_demo_v2'));
+    localStorage.setItem(this._ck('finobra_clean_mode'), 'true');
     console.log('[FinObra] 🧹 Todos os dados foram limpos com sucesso. Pronto para novos cadastros!');
   },
 
@@ -418,12 +516,12 @@ const DB = {
   seedDemoData(force = false) {
     if (!force) {
       // Se não for forçado, não carrega demo automaticamente em modo limpo
-      if (localStorage.getItem('finobra_clean_mode') === 'true' || !this.isDemoLoaded()) {
+      if (localStorage.getItem(this._ck('finobra_clean_mode')) === 'true' || !this.isDemoLoaded()) {
         return;
       }
     }
-    localStorage.removeItem('finobra_clean_mode');
-    localStorage.setItem('finobra_demo_v2', 'true');
+    localStorage.removeItem(this._ck('finobra_clean_mode'));
+    localStorage.setItem(this._ck('finobra_demo_v2'), 'true');
 
     let ld = this.getAll('lancamentos');
     const hasEscritorio = ld.some(l => l.obra_id === 'escritorio');
@@ -751,7 +849,7 @@ const DB = {
       this.save('fornecedores', fd);
     }
 
-    localStorage.setItem('finobra_demo_v2', 'true');
+    localStorage.setItem(this._ck('finobra_demo_v2'), 'true');
     this.seedSinapiDemo();
     console.log('[FinObra] ✅ Dados de demonstração carregados!');
   },

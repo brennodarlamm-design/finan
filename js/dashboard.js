@@ -588,11 +588,15 @@ const Dashboard = {
   imprimirPainelDashboard() {
     Utils.closeModal();
     const obraId = App.obraId;
-    const r = DB.getResumo(obraId === 'todas' ? null : obraId);
+    const resumo = DB.getResumo(obraId === 'todas' ? null : obraId);
     const cs = DB.getAll('clientes');
     const obraAtual = obraId !== 'todas' ? cs.find(c=>c.id===obraId) : null;
-    const lans = DB.getLancamentos(obraId === 'todas' ? null : obraId).slice(0, 8);
     const emissao = new Date().toLocaleString('pt-BR');
+    const emp = DB.getEmpresa();
+    const empNome = (emp.nome_fantasia || emp.razao_social || 'Minha Construtora').toUpperCase();
+    const logoHtml = emp.logo_url
+      ? `<img src="${emp.logo_url}" alt="${empNome}" style="max-width:54px;max-height:54px;border-radius:8px;border:1px solid #c9a227;object-fit:contain;">`
+      : `<div style="width:46px;height:46px;border-radius:8px;background:#182713;border:1px solid #c9a227;display:flex;align-items:center;justify-content:center;font-size:1.4rem;">🏢</div>`;
 
     const html = `
     <div style="font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#0f172a;background:#ffffff;padding:24px;max-width:820px;margin:0 auto;">
@@ -600,9 +604,9 @@ const Dashboard = {
       <!-- Cabeçalho Oficial -->
       <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:2px solid #c9a227;padding-bottom:14px;margin-bottom:20px;">
         <div style="display:flex;align-items:center;gap:14px;">
-          <img src="img/logo.png" alt="Angelim Construtora" style="width:52px;height:52px;border-radius:8px;border:1px solid #c9a227;object-fit:cover;">
+          ${logoHtml}
           <div>
-            <div style="font-size:1.25rem;font-weight:900;letter-spacing:0.5px;color:#0f172a;line-height:1.1;">ANGELIM CONSTRUTORA</div>
+            <div style="font-size:1.25rem;font-weight:900;letter-spacing:0.5px;color:#0f172a;line-height:1.1;">${empNome}</div>
             <div style="font-size:.76rem;font-weight:800;color:#b45309;text-transform:uppercase;">Painel Financeiro Executivo &middot; Dashboard</div>
           </div>
         </div>
@@ -613,24 +617,6 @@ const Dashboard = {
       </div>
 
       <!-- Grade de KPIs -->
-      <div style="display:grid;grid-template-columns:repeat(3, 1fr);gap:12px;margin-bottom:20px;">
-        <div style="background:#f8fafc;border:1px solid #cbd5e1;border-radius:6px;padding:12px;text-align:center;">
-          <div style="font-size:.7rem;font-weight:800;color:#475569;text-transform:uppercase;">Total Recebido</div>
-          <div style="font-size:1.25rem;font-weight:900;color:#15803d;margin-top:2px;">${Utils.fmt.currency(r.totalReceitas)}</div>
-        </div>
-        <div style="background:#f8fafc;border:1px solid #cbd5e1;border-radius:6px;padding:12px;text-align:center;">
-          <div style="font-size:.7rem;font-weight:800;color:#475569;text-transform:uppercase;">Total Gasto</div>
-          <div style="font-size:1.25rem;font-weight:900;color:#b91c1c;margin-top:2px;">${Utils.fmt.currency(r.totalDespesas)}</div>
-        </div>
-        <div style="background:#f8fafc;border:1px solid #cbd5e1;border-radius:6px;padding:12px;text-align:center;">
-          <div style="font-size:.7rem;font-weight:800;color:#475569;text-transform:uppercase;">Saldo Dispon&iacute;vel</div>
-          <div style="font-size:1.25rem;font-weight:900;color:${r.saldo>=0?'#15803d':'#b91c1c'};margin-top:2px;">${Utils.fmt.currency(r.saldo)}</div>
-        </div>
-        <div style="background:#f8fafc;border:1px solid #cbd5e1;border-radius:6px;padding:12px;text-align:center;">
-          <div style="font-size:.7rem;font-weight:800;color:#475569;text-transform:uppercase;">Contas a Pagar</div>
-          <div style="font-size:1.15rem;font-weight:900;color:#b45309;margin-top:2px;">${Utils.fmt.currency(r.aPagarValor)}</div>
-        </div>
-        <div style="background:#f8fafc;border:1px solid #cbd5e1;border-radius:6px;padding:12px;text-align:center;">
           <div style="font-size:.7rem;font-weight:800;color:#475569;text-transform:uppercase;">NFs Pendentes</div>
           <div style="font-size:1.15rem;font-weight:900;color:#0369a1;margin-top:2px;">${r.nfPendentes} (${Utils.fmt.currency(r.nfPendentesValor)})</div>
         </div>
@@ -698,11 +684,11 @@ const Dashboard = {
 
       <div style="margin-top:24px;border-top:1px dashed #cbd5e1;padding-top:8px;display:flex;justify-content:space-between;font-size:.7rem;color:#94a3b8;">
         <span>Documento oficial gerado via Sistema FinObra</span>
-        <span>Autentica&ccedil;&atilde;o: ANG-DASH-${Date.now().toString(36).toUpperCase()}</span>
+        <span>Autentica&ccedil;&atilde;o: DASH-${Date.now().toString(36).toUpperCase()}</span>
       </div>
     </div>`;
 
-    this._dispararImpressaoFrame(html, `Dashboard — Angelim Construtora`);
+    this._dispararImpressaoFrame(html, `Dashboard — ${emp.nome_fantasia || 'Financeiro'}`);
   },
 
   // Imprime os Dados em Lista (Relatório Tabular)

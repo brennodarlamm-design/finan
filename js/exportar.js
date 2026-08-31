@@ -116,6 +116,9 @@ const Exportar = {
     let html = `
     <style>
       /* ===== RESPONSIVIDADE MOBILE DOS RELATÓRIOS ===== */
+      @media print {
+        .ang-doc-container { padding: 0 !important; box-shadow: none !important; }
+      }
 
       /* Scroll horizontal em todas as tabelas */
       .ang-tbl-wrap {
@@ -156,9 +159,9 @@ const Exportar = {
     </style>
     <div class="ang-header" style="border-bottom:2px solid #c9a227;padding-bottom:16px;margin-bottom:20px;display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:10px;">
       <div style="display:flex;align-items:center;gap:14px;">
-        <img src="img/logo.png" alt="Angelim Construtora" style="width:54px;height:54px;border-radius:8px;border:1px solid #c9a227;object-fit:cover;flex-shrink:0;">
+        ${logoHtml}
         <div>
-          <div style="font-size:1.2rem;font-weight:900;letter-spacing:1px;color:#0d1811;line-height:1.1;">ANGELIM CONSTRUTORA</div>
+          <div style="font-size:1.2rem;font-weight:900;letter-spacing:1px;color:#0d1811;line-height:1.1;">${empNome.toUpperCase()}</div>
           <div style="font-size:.78rem;font-weight:700;color:#c9a227;text-transform:uppercase;letter-spacing:0.5px;">Gest&atilde;o Financeira &amp; Engenharia Civil</div>
         </div>
       </div>
@@ -517,16 +520,16 @@ const Exportar = {
         <div>
           <div style="border-bottom:1px solid #94a3b8;margin-bottom:6px;height:30px;"></div>
           <strong style="color:#0f172a;">${clienteUnico?.engenheiro_responsavel || 'Engenheiro Responsável Técnico'}</strong><br>
-          <span style="color:#64748b;font-size:.72rem;">CREA / Responsabilidade Técnica</span>
+          <span style="color:#64748b;font-size:.72rem;">${emp.responsavel ? emp.responsavel : 'Responsável Técnico'} ${emp.crea_cau ? `(${emp.crea_cau})` : ''}</span>
         </div>
         <div>
           <div style="border-bottom:1px solid #94a3b8;margin-bottom:6px;height:30px;"></div>
-          <strong style="color:#0f172a;">Angelim Construtora LTDA</strong><br>
+          <strong style="color:#0f172a;">${emp.razao_social || empNome}</strong><br>
           <span style="color:#64748b;font-size:.72rem;">Gestão Financeira e Administrativa</span>
         </div>
       </div>
       <div style="font-size:.7rem;color:#94a3b8;text-align:center;border-top:1px dashed #e2e8f0;padding-top:10px;">
-        Angelim Construtora &middot; Sistema de Gest&atilde;o de Obras Financiadas Caixa &middot; Documento v&aacute;lido para fins de acompanhamento gerencial.
+        ${empNome} &middot; Sistema de Gest&atilde;o de Obras &middot; Documento v&aacute;lido para fins de acompanhamento gerencial.
       </div>
     </div>`;
 
@@ -559,7 +562,7 @@ const Exportar = {
       <!DOCTYPE html>
       <html>
         <head>
-          <title>Relatório Angelim Construtora</title>
+          <title>Relatório ${DB.getEmpresa().nome_fantasia || 'Financeiro'}</title>
           <meta charset="utf-8">
           <style>
             @page { size: A4 portrait; margin: 15mm 12mm 15mm 12mm; }

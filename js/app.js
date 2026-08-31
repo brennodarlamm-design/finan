@@ -48,12 +48,30 @@ const App = {
     this.renderShell();
     window.addEventListener('hashchange', () => this.navigate(location.hash.replace('#','')||'dashboard'));
     this.navigate(location.hash.replace('#','')||'dashboard');
+
+    // Onboarding automático para novo usuário cuja empresa ainda não foi configurada
+    const emp = DB.getEmpresa();
+    if (!emp.configurada && Auth.getCurrentTenantId() !== 'angelim') {
+      setTimeout(() => this.showOnboardingEmpresa(), 350);
+    }
   },
 
   renderShell() {
     const u = Auth.getUser();
+    const emp = DB.getEmpresa();
     const resumoPre = DB.getPreComprasResumo('todas');
     const badgePre = resumoPre.pendentesQtd > 0 ? `<span class="nav-badge" style="background:#f59e0b;color:#182713;font-weight:900;" title="${resumoPre.pendentesQtd} pedido(s) pendente(s)">${resumoPre.pendentesQtd}</span>` : '';
+
+    const brandName = emp.nome_fantasia || emp.razao_social || 'Minha Empresa';
+    const logoHtml = emp.logo_url
+      ? `<img src="${emp.logo_url}" alt="${brandName}" style="width:100%;max-width:130px;max-height:50px;border-radius:8px;border:1px solid rgba(201,162,39,.35);box-shadow:0 4px 16px rgba(0,0,0,.5);object-fit:contain;">`
+      : `<div style="display:flex;align-items:center;gap:10px;overflow:hidden;width:100%;">
+          <div style="width:38px;height:38px;border-radius:8px;background:linear-gradient(135deg,#1C2D12,#243818);border:1px solid rgba(201,162,39,.5);display:flex;align-items:center;justify-content:center;font-size:1.2rem;flex-shrink:0;box-shadow:0 4px 12px rgba(201,162,39,.3);">🏢</div>
+          <div style="min-width:0;overflow:hidden;flex:1;">
+            <div style="font-weight:900;font-size:.9rem;background:linear-gradient(135deg,var(--accent2),var(--accent));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;white-space:nowrap;text-overflow:ellipsis;overflow:hidden;" title="${brandName}">${brandName}</div>
+            <div style="font-size:.65rem;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;">Gestão de Obras</div>
+          </div>
+        </div>`;
 
     document.getElementById('app-root').innerHTML = `
       <div class="app">
@@ -61,8 +79,8 @@ const App = {
         <div class="sidebar-overlay" id="sidebar-overlay" onclick="App.closeSidebar()"></div>
 
         <aside class="sidebar" id="sidebar">
-          <div class="sidebar-logo" style="padding:14px 16px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--border-s);">
-            <img src="img/logo.png" alt="Angelim Construtora" style="width:100%;max-width:130px;height:auto;border-radius:8px;border:1px solid rgba(201,162,39,.35);box-shadow:0 4px 16px rgba(0,0,0,.5);object-fit:contain;">
+          <div class="sidebar-logo" style="padding:14px 16px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--border-s);min-height:70px;">
+            ${logoHtml}
             <button class="icon-btn mobile-close-btn" onclick="App.closeSidebar()" title="Fechar Menu" style="font-size:1.1rem;padding:4px 8px;">✕</button>
           </div>
           <nav class="sidebar-nav">
@@ -91,7 +109,7 @@ const App = {
               <div class="user-av">${u?.avatar||'AD'}</div>
               <div class="user-info">
                 <div class="user-name">${u?.nome||'Administrador'}</div>
-                <div class="user-role">${u?.perfil==='admin'?'Administrador':'Gestor'}</div>
+                <div class="user-role">${brandName}</div>
               </div>
             </div>
           </div>
@@ -104,7 +122,7 @@ const App = {
             </button>
             <div style="min-width:0;flex-shrink:1;">
               <div class="header-title" id="h-title">📊 Dashboard</div>
-              <div class="header-sub">Angelim Construtora — Gestão Financeira</div>
+              <div class="header-sub">${brandName} — Gestão Financeira</div>
             </div>
             <div class="hspacer"></div>
             <div id="demo-badge" class="demo-badge" style="${DB.isDemoLoaded()?'':'display:none'}">
@@ -324,16 +342,20 @@ const App = {
 
   showUserMenu() {
     const u = Auth.getUser();
+    const emp = DB.getEmpresa();
     Utils.showModal(`
-      <div class="modal" style="max-width:340px">
-        <div class="modal-header"><span class="modal-title">👤 Usuário</span><button class="modal-close" onclick="Utils.closeModal()">✕</button></div>
+      <div class="modal" style="max-width:360px">
+        <div class="modal-header"><span class="modal-title">👤 Minha Conta</span><button class="modal-close" onclick="Utils.closeModal()">✕</button></div>
         <div class="modal-body" style="text-align:center;">
           <div class="user-av" style="width:60px;height:60px;font-size:1.4rem;margin:0 auto 12px;">${u?.avatar}</div>
           <div style="font-weight:800;font-size:1.05rem;">${u?.nome}</div>
-          <div style="color:var(--text3);font-size:.8rem;margin-top:4px;">${u?.perfil==='admin'?'Administrador':'Gestor'}</div>
-          <div style="color:var(--text3);font-size:.75rem;margin-top:4px;margin-bottom:16px;">Logado: ${Utils.fmt.datetime(u?.loginAt)}</div>
+          <div style="color:var(--accent2);font-size:.84rem;margin-top:2px;font-weight:600;">${emp.nome_fantasia || emp.razao_social || 'Minha Empresa'}</div>
+          <div style="color:var(--text3);font-size:.75rem;margin-top:4px;margin-bottom:16px;">${u?.perfil==='admin'?'Administrador':'Gestor'} &middot; Logado: ${Utils.fmt.datetime(u?.loginAt)}</div>
           
           <div style="display:flex;flex-direction:column;gap:8px;text-align:left;">
+            <button class="btn btn-secondary btn-block" onclick="Utils.closeModal();App.showOnboardingEmpresa()">
+              🏢 Dados &amp; Logotipo da Empresa
+            </button>
             <button class="btn btn-secondary btn-block" onclick="Utils.closeModal();Configuracoes.showMeuPerfil()">
               👤 Meu Perfil / Alterar Senha
             </button>
@@ -346,6 +368,153 @@ const App = {
           <button class="btn btn-danger btn-block" onclick="Utils.closeModal();Auth.logout()">Sair do Sistema</button>
         </div>
       </div>`);
+  },
+
+  showOnboardingEmpresa() {
+    const emp = DB.getEmpresa();
+    const u = Auth.getUser();
+    Utils.showModal(`
+      <div class="modal" style="max-width:560px;">
+        <div class="modal-header">
+          <span class="modal-title">🏢 Cadastro da Minha Empresa</span>
+          <button class="modal-close" onclick="Utils.closeModal()">✕</button>
+        </div>
+        <form class="modal-body" id="f-onboarding-empresa" onsubmit="App.saveOnboardingEmpresa(event)">
+          <div style="background:rgba(201,162,39,.08);border:1px solid rgba(201,162,39,.25);border-radius:12px;padding:12px 16px;margin-bottom:16px;display:flex;gap:12px;align-items:center;">
+            <span style="font-size:1.8rem;">🚀</span>
+            <div style="font-size:.82rem;line-height:1.4;color:var(--text);">
+              <strong>Personalize seu Sistema de Gestão!</strong><br>
+              <span style="color:var(--text2);">Estes dados e logotipo serão usados automaticamente na interface, relatórios, recibos e ordens de compra.</span>
+            </div>
+          </div>
+
+          <div class="g2">
+            <div class="form-group">
+              <label class="form-label">Nome Fantasia da Empresa *</label>
+              <input class="form-control" name="nome_fantasia" id="ob-nome-fantasia" value="${emp.nome_fantasia || ''}" required placeholder="Ex: Silva & Souza Engenharia">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Razão Social</label>
+              <input class="form-control" name="razao_social" id="ob-razao-social" value="${emp.razao_social || emp.nome_fantasia || ''}" placeholder="Ex: Silva & Souza Construtora LTDA">
+            </div>
+          </div>
+
+          <div class="g2">
+            <div class="form-group">
+              <label class="form-label">CNPJ ou CPF</label>
+              <div style="display:flex;gap:6px;">
+                <input class="form-control" name="cnpj" id="ob-cnpj" value="${emp.cnpj || ''}" placeholder="00.000.000/0001-00">
+                <button type="button" class="btn btn-secondary btn-sm" onclick="App.consultarCnpjOnboarding()" title="Buscar CNPJ na Receita">🔍</button>
+              </div>
+            </div>
+            <div class="form-group">
+              <label class="form-label">WhatsApp / Telefone de Contato</label>
+              <input class="form-control" name="telefone" id="ob-tel" value="${emp.telefone || ''}" placeholder="(00) 90000-0000">
+            </div>
+          </div>
+
+          <div class="g2">
+            <div class="form-group">
+              <label class="form-label">Cidade / UF</label>
+              <div style="display:flex;gap:6px;">
+                <input class="form-control" name="cidade" id="ob-cidade" value="${emp.cidade || ''}" placeholder="Cidade" style="flex:2;">
+                <input class="form-control" name="uf" id="ob-uf" value="${emp.uf || ''}" placeholder="UF" maxlength="2" style="flex:1;text-transform:uppercase;">
+              </div>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Responsável Técnico / Engenheiro</label>
+              <input class="form-control" name="responsavel" id="ob-responsavel" value="${emp.responsavel || u?.nome || ''}" placeholder="Nome do engenheiro/responsável">
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Logotipo da Empresa</label>
+            <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+              <input type="file" id="ob-logo-file" accept="image/*" style="display:none;" onchange="App.handleLogoUploadOnboarding(this)">
+              <button type="button" class="btn btn-secondary btn-sm" onclick="document.getElementById('ob-logo-file').click()">📁 Escolher Logotipo</button>
+              ${emp.logo_url ? `<button type="button" class="btn btn-ghost btn-sm" style="color:var(--danger);" onclick="App.removerLogoOnboarding()">🗑️ Remover Logo</button>` : ''}
+              <span id="ob-logo-preview-txt" style="font-size:.78rem;color:var(--text3);">${emp.logo_url ? 'Logotipo atual salvo' : 'Nenhuma imagem selecionada'}</span>
+            </div>
+            <input type="hidden" name="logo_url" id="ob-logo-url" value="${emp.logo_url || ''}">
+          </div>
+
+          <div class="modal-footer" style="padding-bottom:0;">
+            <button type="button" class="btn btn-secondary" onclick="Utils.closeModal()">Cancelar</button>
+            <button type="submit" class="btn btn-primary">💾 Salvar Dados da Empresa</button>
+          </div>
+        </form>
+      </div>
+    `);
+  },
+
+  handleLogoUploadOnboarding(input) {
+    const file = input.files[0];
+    if (!file) return;
+    if (file.size > 2 * 1024 * 1024) {
+      Utils.toast('A imagem deve ter no máximo 2MB.', 'warning');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = e => {
+      document.getElementById('ob-logo-url').value = e.target.result;
+      document.getElementById('ob-logo-preview-txt').textContent = `✓ ${file.name} carregado`;
+      Utils.toast('Logotipo carregado com sucesso!', 'success');
+    };
+    reader.readAsDataURL(file);
+  },
+
+  removerLogoOnboarding() {
+    document.getElementById('ob-logo-url').value = '';
+    document.getElementById('ob-logo-preview-txt').textContent = 'Logotipo removido';
+    Utils.toast('Logotipo removido.', 'info');
+  },
+
+  async consultarCnpjOnboarding() {
+    const raw = (document.getElementById('ob-cnpj')?.value || '').replace(/\D/g, '');
+    if (raw.length !== 14) {
+      Utils.toast('Informe um CNPJ válido com 14 dígitos para consultar!', 'warning');
+      return;
+    }
+    Utils.toast('Consultando CNPJ na Receita Federal...', 'info');
+    try {
+      const res = await fetch(`/api/cnpj?cnpj=${raw}`);
+      if (!res.ok) throw new Error('Falha na consulta');
+      const data = await res.json();
+      if (data.razao_social || data.nome_fantasia) {
+        if (data.nome_fantasia && document.getElementById('ob-nome-fantasia')) document.getElementById('ob-nome-fantasia').value = data.nome_fantasia;
+        if (data.razao_social && document.getElementById('ob-razao-social')) document.getElementById('ob-razao-social').value = data.razao_social;
+        if (data.municipio && document.getElementById('ob-cidade')) document.getElementById('ob-cidade').value = data.municipio;
+        if (data.uf && document.getElementById('ob-uf')) document.getElementById('ob-uf').value = data.uf;
+        if (data.ddd_telefone_1 && document.getElementById('ob-tel')) document.getElementById('ob-tel').value = data.ddd_telefone_1;
+        Utils.toast('Dados do CNPJ preenchidos automaticamente!', 'success');
+      } else {
+        Utils.toast('CNPJ consultado mas sem dados adicionais.', 'info');
+      }
+    } catch {
+      Utils.toast('Não foi possível consultar o CNPJ online.', 'warning');
+    }
+  },
+
+  saveOnboardingEmpresa(e) {
+    e.preventDefault();
+    const fd = new FormData(e.target);
+    const empresaData = {
+      nome_fantasia: fd.get('nome_fantasia').trim(),
+      razao_social: (fd.get('razao_social') || fd.get('nome_fantasia')).trim(),
+      cnpj: fd.get('cnpj').trim(),
+      telefone: fd.get('telefone').trim(),
+      whatsapp: fd.get('telefone').trim().replace(/\D/g, ''),
+      cidade: fd.get('cidade').trim(),
+      uf: fd.get('uf').trim().toUpperCase(),
+      responsavel: fd.get('responsavel').trim(),
+      logo_url: fd.get('logo_url') || '',
+      configurada: true
+    };
+    DB.saveEmpresa(empresaData);
+    Utils.closeModal();
+    Utils.toast('Empresa salva com sucesso!', 'success');
+    this.renderShell();
+    this.navigate(this.route);
   },
 
   clearAllData() {
