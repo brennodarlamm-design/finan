@@ -54,6 +54,14 @@ const App = {
     if (!emp.configurada && Auth.getCurrentTenantId() !== 'angelim') {
       setTimeout(() => this.showOnboardingEmpresa(), 350);
     }
+
+    // Atalho de teclado global Ctrl+B para recolher/expandir sidebar
+    window.addEventListener('keydown', (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'b' && !['INPUT','TEXTAREA','SELECT'].includes(document.activeElement?.tagName)) {
+        e.preventDefault();
+        this.toggleSidebar();
+      }
+    });
   },
 
   renderShell() {
@@ -73,8 +81,10 @@ const App = {
           </div>
         </div>`;
 
+    const isCollapsed = window.innerWidth > 768 && localStorage.getItem('finobra_sidebar_collapsed') === 'true';
+
     document.getElementById('app-root').innerHTML = `
-      <div class="app">
+      <div class="app ${isCollapsed ? 'sidebar-collapsed' : ''}" id="app-container">
         <!-- Overlay Escuro para Mobile -->
         <div class="sidebar-overlay" id="sidebar-overlay" onclick="App.closeSidebar()"></div>
 
@@ -117,7 +127,7 @@ const App = {
 
         <div style="flex:1;display:flex;flex-direction:column;min-width:0;">
           <header class="main-header" id="main-header">
-            <button class="icon-btn" id="mob-menu" onclick="App.toggleSidebar()" title="Abrir Menu de Navegação">
+            <button class="icon-btn" id="mob-menu" onclick="App.toggleSidebar()" title="Recolher / Expandir Menu Lateral (Ctrl+B)">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
             </button>
             <div style="min-width:0;flex-shrink:1;">
@@ -547,17 +557,39 @@ const App = {
   },
 
   toggleSidebar() {
+    const isMobile = window.innerWidth <= 768;
+    const app = document.getElementById('app-container') || document.querySelector('.app');
     const sb = document.getElementById('sidebar');
     const ov = document.getElementById('sidebar-overlay');
-    sb.classList.toggle('open');
-    if (ov) ov.classList.toggle('active', sb.classList.contains('open'));
+
+    if (isMobile) {
+      if (sb) {
+        sb.classList.toggle('open');
+        if (ov) ov.classList.toggle('active', sb.classList.contains('open'));
+      }
+    } else {
+      if (app) {
+        const collapsed = app.classList.toggle('sidebar-collapsed');
+        localStorage.setItem('finobra_sidebar_collapsed', collapsed ? 'true' : 'false');
+        
+        // Reajusta gráficos após animação da barra
+        setTimeout(() => {
+          if (this._charts) {
+            this._charts.forEach(c => { try { c.resize(); } catch(e){} });
+          }
+        }, 320);
+      }
+    }
   },
 
   closeSidebar() {
+    const isMobile = window.innerWidth <= 768;
     const sb = document.getElementById('sidebar');
     const ov = document.getElementById('sidebar-overlay');
-    if (sb) sb.classList.remove('open');
-    if (ov) ov.classList.remove('active');
+    if (isMobile) {
+      if (sb) sb.classList.remove('open');
+      if (ov) ov.classList.remove('active');
+    }
   },
 
   registerChart(c) { this._charts.push(c); }
