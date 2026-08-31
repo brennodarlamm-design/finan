@@ -885,7 +885,7 @@ const NFe = {
               <div>
                 <label class="form-label" style="font-size:.78rem;font-weight:700;">Conta de Pagamento *</label>
                 <select id="nfe-dest-conta" class="form-control" required>
-                  ${contas.map(c => `<option value="${c.id}">${c.nome} (${Utils.fmt.currency(c.saldo_atual||0)})</option>`).join('')}
+                  ${contas.map(c => { const label = c.apelido || c.banco_nome || 'Conta'; const saldo = Utils.fmt.currency(c.saldo_atual||0); return `<option value="${c.id}">${label} — ${c.numero||''} (${saldo})</option>`; }).join('')}
                 </select>
               </div>
               <div>
@@ -932,7 +932,7 @@ const NFe = {
                   <div>
                     <label class="form-label" style="font-size:.78rem;font-weight:700;">Conta Bancária Debitada *</label>
                     <select id="nfe-conta-pagto" class="form-control">
-                      ${contas.map(c => `<option value="${c.nome || c.id}">${c.nome}</option>`).join('')}
+                      ${contas.map(c => { const label = c.apelido || c.banco_nome || 'Conta'; return `<option value="${label}">${label} — ${c.numero||''}</option>`; }).join('')}
                     </select>
                   </div>
                 </div>
