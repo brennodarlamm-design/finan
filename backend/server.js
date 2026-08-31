@@ -23,15 +23,23 @@ app.use(cors());
 app.use(express.json());
 
 const PORT = process.env.PORT || 3333;
-const DATABASE_URL = process.env.DATABASE_URL;
+let rawDbUrl = process.env.DATABASE_URL || '';
+rawDbUrl = rawDbUrl.trim().replace(/^["']|["']$/g, '');
 
-if (!DATABASE_URL) {
-  console.error('⚠️ [Aviso] DATABASE_URL não configurada no ambiente. Configure no .env ou no painel do Render.');
+let sql = null;
+if (!rawDbUrl) {
+  console.warn('⚠️ [Aviso] DATABASE_URL não configurada no ambiente. Configure no .env ou no painel do Render.');
+} else {
+  try {
+    sql = neon(rawDbUrl);
+    console.log('✅ Cliente Neon PostgreSQL inicializado.');
+  } catch (err) {
+    console.error('❌ [Erro Neon] String de conexão inválida ou incompleta:', err.message);
+    console.error('   Valor recebido:', rawDbUrl);
+  }
 }
 
 const TARGET_PHONE = process.env.TARGET_PHONE || '5595991363678';
-
-const sql = DATABASE_URL ? neon(DATABASE_URL) : null;
 
 // ── ESTADO DO WHATSAPP ───────────────────────────────────────────────────────
 let sock = null;
@@ -102,6 +110,7 @@ async function resolveWhatsAppJid(phone) {
 
 // ── PERSISTÊNCIA DO AUTH NO NEON POSTGRESQL ─────────────────────────────────
 async function syncAuthFromPostgres(authDir) {
+  if (!sql) return;
   try {
     await sql`
       CREATE TABLE IF NOT EXISTS whatsapp_auth (
@@ -124,6 +133,7 @@ async function syncAuthFromPostgres(authDir) {
 }
 
 async function saveAuthToPostgres(authDir) {
+  if (!sql) return;
   try {
     if (!fs.existsSync(authDir)) return;
     const files = fs.readdirSync(authDir);
@@ -377,6 +387,9 @@ app.post('/send-message', async (req, res) => {
 
 // 4. Teste de Conexão com o Neon
 app.get('/test-neon', async (req, res) => {
+  if (!sql) {
+    return res.status(503).json({ success: false, error: 'DATABASE_URL não configurada ou inválida no servidor.' });
+  }
   try {
     const result = await sql`SELECT version(), CURRENT_TIMESTAMP as agora;`;
     const [obras, lancamentos] = await Promise.all([
@@ -398,6 +411,10 @@ app.get('/test-neon', async (req, res) => {
 
 // ── ROBÔ CRON MATINAL (08:00 AM) ─────────────────────────────────────────────
 async function executarResumoMatinal() {
+  if (!sql) {
+    console.warn('⚠️ [Cron] DATABASE_URL não disponível. Resumo matinal ignorado.');
+    return;
+  }
   console.log('⏰ [Cron] Executando verificação matinal no Neon PostgreSQL...');
   try {
     const hoje = new Date().toISOString().split('T')[0];
