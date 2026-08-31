@@ -73,15 +73,23 @@ async function saveAuthToPostgres(authDir) {
     const files = fs.readdirSync(authDir);
     for (const file of files) {
       const filePath = path.join(authDir, file);
-      if (fs.statSync(filePath).isFile()) {
-        const content = fs.readFileSync(filePath, 'utf8');
-        await sql`
-          INSERT INTO whatsapp_auth (key, value, updated_at)
-          VALUES (${file}, ${content}, CURRENT_TIMESTAMP)
-          ON CONFLICT (key) DO UPDATE SET
-            value = EXCLUDED.value,
-            updated_at = CURRENT_TIMESTAMP;
-        `;
+      try {
+        if (fs.existsSync(filePath) && fs.statSync(filePath).isFile()) {
+          const content = fs.readFileSync(filePath, 'utf8');
+          await sql`
+            INSERT INTO whatsapp_auth (key, value, updated_at)
+            VALUES (${file}, ${content}, CURRENT_TIMESTAMP)
+            ON CONFLICT (key) DO UPDATE SET
+              value = EXCLUDED.value,
+              updated_at = CURRENT_TIMESTAMP;
+          `;
+        }
+      } catch (fileErr) {
+        if (fileErr.code === 'ENOENT') {
+          try {
+            await sql`DELETE FROM whatsapp_auth WHERE key = ${file};`;
+          } catch {}
+        }
       }
     }
   } catch (err) {
