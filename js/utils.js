@@ -3,10 +3,55 @@
 const Utils = {
   fmt: {
     currency(v) { return new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(v||0); },
-    date(d) { if(!d) return '—'; const [y,m,dd]=d.split('-'); return `${dd}/${m}/${y}`; },
-    datetime(d) { if(!d) return '—'; return new Date(d).toLocaleString('pt-BR'); },
+    date(d) {
+      if (!d || d === '—' || d === '-') return '—';
+      if (d instanceof Date) {
+        const y = d.getUTCFullYear();
+        const m = String(d.getUTCMonth() + 1).padStart(2, '0');
+        const day = String(d.getUTCDate()).padStart(2, '0');
+        return `${day}/${m}/${y}`;
+      }
+      let s = String(d).trim();
+      if (s.includes('T')) s = s.split('T')[0];
+      if (s.includes(' ')) s = s.split(' ')[0];
+      const parts = s.split('-');
+      if (parts.length === 3) {
+        const [y, m, dd] = parts;
+        return `${dd.padStart(2, '0')}/${m.padStart(2, '0')}/${y}`;
+      }
+      if (s.includes('/')) return s;
+      return s;
+    },
+    datetime(d) {
+      if (!d || d === '—' || d === '-') return '—';
+      try {
+        const dt = new Date(d);
+        if (isNaN(dt.getTime())) return d;
+        return dt.toLocaleString('pt-BR');
+      } catch {
+        return d;
+      }
+    },
     percent(v) { return `${(v||0).toFixed(1)}%`; },
     num(v) { return new Intl.NumberFormat('pt-BR').format(v||0); },
+  },
+
+  cleanDate(d) {
+    if (!d || d === '—' || d === '-') return '';
+    if (d instanceof Date) {
+      const y = d.getUTCFullYear();
+      const m = String(d.getUTCMonth() + 1).padStart(2, '0');
+      const day = String(d.getUTCDate()).padStart(2, '0');
+      return `${y}-${m}-${day}`;
+    }
+    let s = String(d).trim();
+    if (s.includes('T')) s = s.split('T')[0];
+    if (s.includes(' ')) s = s.split(' ')[0];
+    const match = s.match(/^\d{4}-\d{2}-\d{2}/);
+    if (match) return match[0];
+    const brMatch = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+    if (brMatch) return `${brMatch[3]}-${brMatch[2].padStart(2, '0')}-${brMatch[1].padStart(2, '0')}`;
+    return s;
   },
 
   today() { return new Date().toISOString().split('T')[0]; },

@@ -77,6 +77,40 @@ const DB = {
   },
   uuid() { return Date.now().toString(36) + Math.random().toString(36).substr(2, 9); },
 
+  init() {
+    this.cleanAllDatesInStorage();
+  },
+
+  cleanAllDatesInStorage() {
+    try {
+      const lans = this.getAll('lancamentos');
+      if (Array.isArray(lans) && lans.length > 0) {
+        const cleaned = lans.map(l => ({
+          ...l,
+          data: (typeof Utils !== 'undefined' && Utils.cleanDate) ? Utils.cleanDate(l.data) || l.data : (l.data ? String(l.data).split('T')[0] : l.data),
+          data_vencimento: (typeof Utils !== 'undefined' && Utils.cleanDate) ? Utils.cleanDate(l.data_vencimento) || Utils.cleanDate(l.data) || l.data : (l.data_vencimento ? String(l.data_vencimento).split('T')[0] : l.data),
+          data_pagamento: (typeof Utils !== 'undefined' && Utils.cleanDate) ? Utils.cleanDate(l.data_pagamento) || null : (l.data_pagamento ? String(l.data_pagamento).split('T')[0] : null),
+          valor: Number(l.valor) || 0
+        }));
+        localStorage.setItem(this.K.lancamentos, JSON.stringify(cleaned));
+      }
+
+      const notas = this.getAll('notas');
+      if (Array.isArray(notas) && notas.length > 0) {
+        const cleaned = notas.map(n => ({
+          ...n,
+          data_emissao: (typeof Utils !== 'undefined' && Utils.cleanDate) ? Utils.cleanDate(n.data_emissao) || n.data_emissao : (n.data_emissao ? String(n.data_emissao).split('T')[0] : n.data_emissao),
+          data_vencimento: (typeof Utils !== 'undefined' && Utils.cleanDate) ? Utils.cleanDate(n.data_vencimento) || null : (n.data_vencimento ? String(n.data_vencimento).split('T')[0] : null),
+          data_pagamento: (typeof Utils !== 'undefined' && Utils.cleanDate) ? Utils.cleanDate(n.data_pagamento) || null : (n.data_pagamento ? String(n.data_pagamento).split('T')[0] : null),
+          valor_total: Number(n.valor_total) || 0
+        }));
+        localStorage.setItem(this.K.notas, JSON.stringify(cleaned));
+      }
+    } catch(e) {
+      console.warn('Erro ao limpar datas no storage:', e);
+    }
+  },
+
   // ── NEON CLOUD SYNC ──
   async syncFromCloud() {
     try {
@@ -86,12 +120,40 @@ const DB = {
       if (!json.success || !json.data) return false;
 
       const d = json.data;
-      if (Array.isArray(d.clientes) && d.clientes.length > 0) this.save('clientes', d.clientes);
+      if (Array.isArray(d.clientes) && d.clientes.length > 0) {
+        this.save('clientes', d.clientes.map(o => ({
+          ...o,
+          data_inicio: (typeof Utils !== 'undefined' && Utils.cleanDate) ? Utils.cleanDate(o.data_inicio) : (o.data_inicio ? String(o.data_inicio).split('T')[0] : o.data_inicio),
+          data_previsao: (typeof Utils !== 'undefined' && Utils.cleanDate) ? Utils.cleanDate(o.data_previsao) : (o.data_previsao ? String(o.data_previsao).split('T')[0] : o.data_previsao)
+        })));
+      }
       if (Array.isArray(d.fornecedores) && d.fornecedores.length > 0) this.save('fornecedores', d.fornecedores);
-      if (Array.isArray(d.lancamentos) && d.lancamentos.length > 0) this.save('lancamentos', d.lancamentos);
-      if (Array.isArray(d.notas) && d.notas.length > 0) this.save('notas', d.notas);
+      if (Array.isArray(d.lancamentos) && d.lancamentos.length > 0) {
+        this.save('lancamentos', d.lancamentos.map(l => ({
+          ...l,
+          data: (typeof Utils !== 'undefined' && Utils.cleanDate) ? Utils.cleanDate(l.data) || l.data : (l.data ? String(l.data).split('T')[0] : l.data),
+          data_vencimento: (typeof Utils !== 'undefined' && Utils.cleanDate) ? Utils.cleanDate(l.data_vencimento) || Utils.cleanDate(l.data) || l.data : (l.data_vencimento ? String(l.data_vencimento).split('T')[0] : l.data),
+          data_pagamento: (typeof Utils !== 'undefined' && Utils.cleanDate) ? Utils.cleanDate(l.data_pagamento) || null : (l.data_pagamento ? String(l.data_pagamento).split('T')[0] : null),
+          valor: Number(l.valor) || 0
+        })));
+      }
+      if (Array.isArray(d.notas) && d.notas.length > 0) {
+        this.save('notas', d.notas.map(n => ({
+          ...n,
+          data_emissao: (typeof Utils !== 'undefined' && Utils.cleanDate) ? Utils.cleanDate(n.data_emissao) || n.data_emissao : (n.data_emissao ? String(n.data_emissao).split('T')[0] : n.data_emissao),
+          data_vencimento: (typeof Utils !== 'undefined' && Utils.cleanDate) ? Utils.cleanDate(n.data_vencimento) || null : (n.data_vencimento ? String(n.data_vencimento).split('T')[0] : null),
+          data_pagamento: (typeof Utils !== 'undefined' && Utils.cleanDate) ? Utils.cleanDate(n.data_pagamento) || null : (n.data_pagamento ? String(n.data_pagamento).split('T')[0] : null),
+          valor_total: Number(n.valor_total) || 0
+        })));
+      }
       if (Array.isArray(d.orcamentos) && d.orcamentos.length > 0) this.save('orcamentos', d.orcamentos);
-      if (Array.isArray(d.medicoes) && d.medicoes.length > 0) this.save('medicoes', d.medicoes);
+      if (Array.isArray(d.medicoes) && d.medicoes.length > 0) {
+        this.save('medicoes', d.medicoes.map(m => ({
+          ...m,
+          data: (typeof Utils !== 'undefined' && Utils.cleanDate) ? Utils.cleanDate(m.data) || m.data : (m.data ? String(m.data).split('T')[0] : m.data),
+          valor_medido: Number(m.valor_medido) || 0
+        })));
+      }
 
       console.log('✅ Dados sincronizados com Neon PostgreSQL!');
       return true;

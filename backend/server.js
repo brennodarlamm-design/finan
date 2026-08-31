@@ -409,6 +409,23 @@ app.get('/test-neon', async (req, res) => {
   }
 });
 
+function formatDateBR(d) {
+  if (!d) return '—';
+  if (d instanceof Date) {
+    const y = d.getUTCFullYear();
+    const m = String(d.getUTCMonth() + 1).padStart(2, '0');
+    const day = String(d.getUTCDate()).padStart(2, '0');
+    return `${day}/${m}/${y}`;
+  }
+  let s = String(d).trim();
+  if (s.includes('T')) s = s.split('T')[0];
+  const parts = s.split('-');
+  if (parts.length === 3) {
+    return `${parts[2]}/${parts[1]}/${parts[0]}`;
+  }
+  return s;
+}
+
 // ── ROBÔ CRON MATINAL (08:00 AM) ─────────────────────────────────────────────
 async function executarResumoMatinal() {
   if (!sql) {
@@ -442,7 +459,8 @@ async function executarResumoMatinal() {
       const v = Number(b.valor) || 0;
       totalValor += v;
       const vFmt = v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-      listaTexto += `\n${idx + 1}. *${b.fornecedor_beneficiario || b.descricao}*\n   💵 Valor: ${vFmt}\n   📅 Vencimento: ${b.data_vencimento || b.data}\n`;
+      const dtVencFmt = formatDateBR(b.data_vencimento || b.data);
+      listaTexto += `\n${idx + 1}. *${b.fornecedor_beneficiario || b.descricao}*\n   💵 Valor: ${vFmt}\n   📅 Vencimento: ${dtVencFmt}\n`;
       if (b.codigo_barras) {
         listaTexto += `   🔢 Código: \`${b.codigo_barras}\`\n`;
       }

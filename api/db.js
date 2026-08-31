@@ -11,9 +11,21 @@ function getSql() {
 }
 
 function cleanDate(d) {
-  if (!d || typeof d !== 'string' || d.trim() === '' || d === '—' || d === '-') return null;
-  const match = d.match(/^\d{4}-\d{2}-\d{2}/);
-  if (match) return match[0];
+  if (!d || d === '—' || d === '-') return null;
+  if (d instanceof Date) {
+    const y = d.getUTCFullYear();
+    const m = String(d.getUTCMonth() + 1).padStart(2, '0');
+    const day = String(d.getUTCDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  }
+  if (typeof d === 'string') {
+    const trimmed = d.trim();
+    if (!trimmed) return null;
+    const match = trimmed.match(/^\d{4}-\d{2}-\d{2}/);
+    if (match) return match[0];
+    const brMatch = trimmed.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+    if (brMatch) return `${brMatch[3]}-${brMatch[2].padStart(2, '0')}-${brMatch[1].padStart(2, '0')}`;
+  }
   return null;
 }
 
@@ -53,7 +65,11 @@ export default async function handler(req, res) {
         return res.status(200).json({
           success: true,
           data: {
-            clientes: obras,
+            clientes: obras.map(o => ({
+              ...o,
+              data_inicio: cleanDate(o.data_inicio),
+              data_previsao: cleanDate(o.data_previsao)
+            })),
             fornecedores: fornecedores.map(f => ({
               ...f,
               cnpj: f.cnpj_cpf || f.cnpj || '',
@@ -65,14 +81,24 @@ export default async function handler(req, res) {
             })),
             lancamentos: lancamentos.map(l => ({
               ...l,
-              valor: Number(l.valor) || 0
+              data: cleanDate(l.data) || new Date().toISOString().split('T')[0],
+              data_vencimento: cleanDate(l.data_vencimento) || cleanDate(l.data),
+              data_pagamento: cleanDate(l.data_pagamento),
+              valor: cleanNum(l.valor)
             })),
             notas: notas.map(n => ({
               ...n,
-              valor_total: Number(n.valor_total) || 0
+              data_emissao: cleanDate(n.data_emissao),
+              data_vencimento: cleanDate(n.data_vencimento),
+              data_pagamento: cleanDate(n.data_pagamento),
+              valor_total: cleanNum(n.valor_total)
             })),
             orcamentos: orcamentos,
-            medicoes: medicoes,
+            medicoes: medicoes.map(m => ({
+              ...m,
+              data: cleanDate(m.data),
+              valor_medido: cleanNum(m.valor_medido)
+            })),
             documentos: documentos
           }
         });
@@ -85,12 +111,28 @@ export default async function handler(req, res) {
         } else {
           items = await sql`SELECT * FROM lancamentos ORDER BY data DESC;`;
         }
-        return res.status(200).json({ success: true, data: items });
+        return res.status(200).json({
+          success: true,
+          data: items.map(l => ({
+            ...l,
+            data: cleanDate(l.data) || new Date().toISOString().split('T')[0],
+            data_vencimento: cleanDate(l.data_vencimento) || cleanDate(l.data),
+            data_pagamento: cleanDate(l.data_pagamento),
+            valor: cleanNum(l.valor)
+          }))
+        });
       }
 
       if (table === 'obras' || table === 'clientes') {
         const items = await sql`SELECT * FROM obras ORDER BY nome ASC;`;
-        return res.status(200).json({ success: true, data: items });
+        return res.status(200).json({
+          success: true,
+          data: items.map(o => ({
+            ...o,
+            data_inicio: cleanDate(o.data_inicio),
+            data_previsao: cleanDate(o.data_previsao)
+          }))
+        });
       }
 
       if (table === 'fornecedores') {

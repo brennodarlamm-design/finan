@@ -326,9 +326,9 @@ const Recibos = {
     const obraNome = c ? `${c.nome} (${c.cidade}/${c.estado})` : (r.obra_nome || 'Geral');
     const valorFmt = Utils.fmt.currency(r.valor);
     const dataFmt = Utils.fmt.date(r.data);
-    const [y, m, d] = (r.data || Utils.today()).split('-');
+    const [y, m, d] = (Utils.cleanDate(r.data) || Utils.today()).split('-');
     const meses = ['','janeiro','fevereiro','março','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro'];
-    const dataPorExtenso = `${parseInt(d)} de ${meses[parseInt(m)]} de ${y}`;
+    const dataPorExtenso = `${parseInt(d, 10)} de ${meses[parseInt(m, 10)]} de ${y}`;
 
     return `
     <div style="border:2px solid #0f172a;padding:28px;border-radius:8px;position:relative;background:#ffffff;color:#0f172a;">
