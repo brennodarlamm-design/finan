@@ -116,6 +116,17 @@ async function startWhatsApp() {
       await saveAuthToPostgres(authDir);
     });
 
+    // Observa e sincroniza automaticamente qualquer arquivo de chave criado pelo Baileys
+    let syncTimer = null;
+    try {
+      fs.watch(authDir, () => {
+        if (syncTimer) clearTimeout(syncTimer);
+        syncTimer = setTimeout(() => {
+          saveAuthToPostgres(authDir).catch(() => {});
+        }, 500);
+      });
+    } catch {}
+
     sock.ev.on('connection.update', async (update) => {
       const { connection, lastDisconnect, qr } = update;
 
