@@ -25,7 +25,13 @@ export default async function handler(req, res) {
     }
 
     const numFmt = destPhone.startsWith('55') ? destPhone : `55${destPhone}`;
-    const targetBaseUrl = (apiUrl || process.env.EVOLUTION_API_URL || 'https://finan-wf12.onrender.com/send-message').trim();
+    let targetBaseUrl = (apiUrl || process.env.EVOLUTION_API_URL || 'https://finan-wf12.onrender.com/send-message').trim();
+    
+    // Se a URL enviada for um túnel temporário que expirou ou localhost, redireciona para o Render
+    if (targetBaseUrl.includes('trycloudflare.com') || targetBaseUrl.includes('loca.lt') || targetBaseUrl.includes('ngrok')) {
+      targetBaseUrl = 'https://finan-wf12.onrender.com/send-message';
+    }
+
     const targetApiKey = (apiKey || process.env.EVOLUTION_API_KEY || '').trim();
     const targetInstance = (instance || process.env.EVOLUTION_INSTANCE || 'angelim').trim();
 
@@ -56,11 +62,25 @@ export default async function handler(req, res) {
       message: msgText
     });
 
-    const response = await fetch(targetUrl, {
-      method: 'POST',
-      headers: headers,
-      body: bodyPayload
-    });
+    let response;
+    try {
+      response = await fetch(targetUrl, {
+        method: 'POST',
+        headers: headers,
+        body: bodyPayload,
+        signal: AbortSignal.timeout(6000)
+      });
+    } catch (primaryErr) {
+      console.warn('Falha no targetUrl primário, tentando fallback Render 24/7:', primaryErr.message);
+      // Fallback automático para o backend em nuvem do Render
+      const cloudUrl = 'https://finan-wf12.onrender.com/send-message';
+      response = await fetch(cloudUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone: numFmt, message: msgText }),
+        signal: AbortSignal.timeout(8000)
+      });
+    }
 
     const data = await response.json().catch(() => ({ status: response.status }));
 

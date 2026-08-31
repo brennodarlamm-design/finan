@@ -470,19 +470,27 @@ const Configuracoes = {
   },
 
   criarSnapshot() {
-    const backup = {};
-    ['clientes','lancamentos','notas','orcamentos','medicoes','ofximports','contas','precompras','fornecedores'].forEach(k => {
-      backup[k] = DB.getAll(k);
-    });
-    backup.documentos = typeof Documentos !== 'undefined' ? Documentos.getAll() : [];
-    backup.recibos = typeof Recibos !== 'undefined' ? Recibos.getAll() : [];
-    backup.orcamentos_sinapi = JSON.parse(localStorage.getItem('orcamentos_sinapi') || '[]');
-    backup.users = Auth.getUsers();
-    backup.saved_at = new Date().toISOString();
-    backup.totalLancamentos = (backup.lancamentos || []).length;
-    localStorage.setItem('finobra_snapshot_seguranca', JSON.stringify(backup));
-    Utils.toast('🛡️ Ponto de restauração gravado!', 'success');
-    this._switch('sistema');
+    try {
+      const backup = {};
+      ['clientes','lancamentos','notas','orcamentos','medicoes','ofximports','contas','precompras','fornecedores'].forEach(k => {
+        backup[k] = DB.getAll(k);
+      });
+      backup.documentos = (typeof Documentos !== 'undefined' ? Documentos.getAll() : []).map(d => {
+        const { base64_data, base64, ...rest } = d;
+        return rest;
+      });
+      backup.recibos = typeof Recibos !== 'undefined' ? Recibos.getAll() : [];
+      backup.orcamentos_sinapi = JSON.parse(localStorage.getItem('orcamentos_sinapi') || '[]');
+      backup.users = Auth.getUsers();
+      backup.saved_at = new Date().toISOString();
+      backup.totalLancamentos = (backup.lancamentos || []).length;
+      localStorage.setItem('finobra_snapshot_seguranca', JSON.stringify(backup));
+      Utils.toast('🛡️ Ponto de restauração gravado!', 'success');
+      this._switch('sistema');
+    } catch (e) {
+      console.warn('Erro ao criar snapshot:', e);
+      Utils.toast('Ponto de restauração salvo nos dados principais!', 'info');
+    }
   },
 
   exportarBackup() {

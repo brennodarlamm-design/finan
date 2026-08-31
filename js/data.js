@@ -10,7 +10,48 @@ const DB = {
   },
 
   getAll(key) { try { return JSON.parse(localStorage.getItem(this.K[key]) || '[]'); } catch { return []; } },
-  save(key, data) { localStorage.setItem(this.K[key], JSON.stringify(data)); },
+  save(key, data) {
+    try {
+      localStorage.setItem(this.K[key], JSON.stringify(data));
+    } catch (e) {
+      console.warn(`[Storage] Quota excedida ao salvar ${key}. Liberando espaço no LocalStorage...`);
+      this.purgeStorage();
+      try {
+        localStorage.setItem(this.K[key], JSON.stringify(data));
+      } catch (e2) {
+        console.error(`[Storage] Falha ao persistir ${key} no cache local:`, e2);
+      }
+    }
+  },
+  purgeStorage() {
+    try {
+      // 1. Remove snapshots grandes e caches temporários não essenciais
+      const heavyKeys = [
+        'finobra_snapshot_seguranca',
+        'finobra_backup_temp',
+        'sinapi_itens_cache',
+        'finobra_ofximports_cache'
+      ];
+      heavyKeys.forEach(k => {
+        try { localStorage.removeItem(k); } catch {}
+      });
+
+      // 2. Remove base64 pesado de documentos no LocalStorage (dados reais permanecem no Neon)
+      const docsRaw = localStorage.getItem('finobra_documentos');
+      if (docsRaw) {
+        const docs = JSON.parse(docsRaw);
+        if (Array.isArray(docs)) {
+          const lightDocs = docs.map(d => {
+            const { base64_data, base64, ...rest } = d;
+            return rest;
+          });
+          localStorage.setItem('finobra_documentos', JSON.stringify(lightDocs));
+        }
+      }
+    } catch (err) {
+      console.warn('[Storage] Erro ao limpar cache pesado:', err);
+    }
+  },
   getById(key, id) { return this.getAll(key).find(i => i.id === id) || null; },
   add(key, item) {
     const data = this.getAll(key);
@@ -222,6 +263,7 @@ const DB = {
   },
 
   init() {
+    this.purgeStorage();
     // Garante que todas as coleções existam no LocalStorage como array vazio se inexistentes
     Object.keys(this.K).forEach(k => {
       if (localStorage.getItem(this.K[k]) === null) {

@@ -11,9 +11,11 @@ const WhatsApp = {
   },
 
   getEvolutionUrl() {
-    const saved = localStorage.getItem('finobra_evolution_url');
-    if (!saved || saved === 'http://localhost:3333/send-message') {
-      return 'https://finan-wf12.onrender.com/send-message';
+    let saved = (localStorage.getItem('finobra_evolution_url') || '').trim();
+    // Limpa automaticamente túneis temporários mortos (trycloudflare, ngrok, loca.lt) ou localhost
+    if (!saved || saved.includes('trycloudflare.com') || saved.includes('loca.lt') || saved.includes('ngrok') || saved.includes('localhost:3333')) {
+      saved = 'https://finan-wf12.onrender.com/send-message';
+      localStorage.setItem('finobra_evolution_url', saved);
     }
     return saved;
   },
@@ -100,47 +102,33 @@ const WhatsApp = {
         return;
       }
     } catch (errProxy) {
-      console.log('Tentando chamada direta...');
+      console.log('Proxy falhou, tentando chamada direta ao backend Render...');
     }
 
-    // 2. Fallback: chamada direta com headers de bypass
+    // 2. Fallback direto para o backend 24/7 do Render
     try {
-      let targetUrl = apiUrl;
-      const headers = {
-        'Content-Type': 'application/json',
-        'bypass-tunnel-reminder': 'true',
-        'Bypass-Tunnel-Reminder': 'true'
-      };
-
-      if (!apiUrl.includes('/send-message') && !apiUrl.includes('/message/sendText')) {
-        const baseUrl = apiUrl.replace(/\/$/, '');
-        targetUrl = `${baseUrl}/message/sendText/${instance || 'angelim'}`;
-        if (apiKey) {
-          headers['apikey'] = apiKey;
-        }
-      }
-
-      const res = await fetch(targetUrl, {
+      const cloudUrl = 'https://finan-wf12.onrender.com/send-message';
+      const resCloud = await fetch(cloudUrl, {
         method: 'POST',
-        headers: headers,
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          number: numFmt,
           phone: numFmt,
-          to: numFmt,
-          text: texto,
           message: texto
         })
       });
 
-      if (res.ok) {
+      const dataCloud = await resCloud.json().catch(() => ({}));
+      if (resCloud.ok && dataCloud.success) {
         Utils.toast('✅ Mensagem enviada com sucesso para o WhatsApp!', 'success');
         return;
       }
-    } catch (errLocal) {
-      console.warn('Erro ao disparar direto:', errLocal);
+    } catch (errCloud) {
+      console.warn('Erro no envio direto Render:', errCloud);
     }
 
-    Utils.toast('⚠️ Não foi possível conectar ao servidor WhatsApp. Verifique se o IniciarWhatsApp.bat está aberto.', 'warning');
+    // 3. Fallback amigável: WhatsApp Web
+    Utils.toast('⚠️ Abrindo WhatsApp Web...', 'info');
+    window.open(this.gerarLink(texto, telefone), '_blank');
   },
 
   // Alerta de Boleto / Vencimento Individual

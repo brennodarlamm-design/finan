@@ -11,7 +11,20 @@ const Documentos = {
   },
 
   salvarLista(docs) {
-    localStorage.setItem(this._KEY, JSON.stringify(docs));
+    try {
+      localStorage.setItem(this._KEY, JSON.stringify(docs));
+    } catch (e) {
+      console.warn('[Documentos] Quota excedida ao salvar documentos. Gravando metadados leves...');
+      const light = (docs || []).map(d => {
+        const { base64_data, base64, ...rest } = d;
+        return rest;
+      });
+      try {
+        localStorage.setItem(this._KEY, JSON.stringify(light));
+      } catch (e2) {
+        console.error('[Documentos] Falha ao persistir metadados dos documentos:', e2);
+      }
+    }
   },
 
   listar(entidadeTipo, entidadeId) {
