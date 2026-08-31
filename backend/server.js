@@ -44,6 +44,51 @@ function formatWhatsAppJid(phone) {
   return `${cleaned}@s.whatsapp.net`;
 }
 
+// ── PERSISTÊNCIA DO AUTH NO NEON POSTGRESQL ─────────────────────────────────
+async function syncAuthFromPostgres(authDir) {
+  try {
+    await sql`
+      CREATE TABLE IF NOT EXISTS whatsapp_auth (
+        key VARCHAR(255) PRIMARY KEY,
+        value TEXT NOT NULL,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `;
+    const rows = await sql`SELECT key, value FROM whatsapp_auth;`;
+    if (rows && rows.length > 0) {
+      console.log(`📥 [WhatsApp] Restaurando ${rows.length} chave(s) de sessão do Neon PostgreSQL...`);
+      for (const row of rows) {
+        const filePath = path.join(authDir, row.key);
+        fs.writeFileSync(filePath, row.value, 'utf8');
+      }
+    }
+  } catch (err) {
+    console.warn('⚠️ [WhatsApp] Falha ao ler sessão do Neon:', err.message);
+  }
+}
+
+async function saveAuthToPostgres(authDir) {
+  try {
+    if (!fs.existsSync(authDir)) return;
+    const files = fs.readdirSync(authDir);
+    for (const file of files) {
+      const filePath = path.join(authDir, file);
+      if (fs.statSync(filePath).isFile()) {
+        const content = fs.readFileSync(filePath, 'utf8');
+        await sql`
+          INSERT INTO whatsapp_auth (key, value, updated_at)
+          VALUES (${file}, ${content}, CURRENT_TIMESTAMP)
+          ON CONFLICT (key) DO UPDATE SET
+            value = EXCLUDED.value,
+            updated_at = CURRENT_TIMESTAMP;
+        `;
+      }
+    }
+  } catch (err) {
+    console.warn('⚠️ [WhatsApp] Falha ao salvar sessão no Neon:', err.message);
+  }
+}
+
 // ── INICIALIZAÇÃO DO BAILEYS ─────────────────────────────────────────────────
 async function startWhatsApp() {
   try {
@@ -51,6 +96,9 @@ async function startWhatsApp() {
     if (!fs.existsSync(authDir)) {
       fs.mkdirSync(authDir, { recursive: true });
     }
+
+    // Restaura as chaves do PostgreSQL se existirem
+    await syncAuthFromPostgres(authDir);
 
     const { state, saveCreds } = await useMultiFileAuthState(authDir);
     const { version } = await fetchLatestBaileysVersion();
@@ -63,7 +111,10 @@ async function startWhatsApp() {
       browser: ['Angelim Construtora ERP', 'Chrome', '1.0.0']
     });
 
-    sock.ev.on('creds.update', saveCreds);
+    sock.ev.on('creds.update', async () => {
+      await saveCreds();
+      await saveAuthToPostgres(authDir);
+    });
 
     sock.ev.on('connection.update', async (update) => {
       const { connection, lastDisconnect, qr } = update;
@@ -86,7 +137,12 @@ async function startWhatsApp() {
         if (shouldReconnect) {
           setTimeout(startWhatsApp, 3000);
         } else {
-          console.log('⚠️ [WhatsApp] Desconectado permanentemente. Exclua auth_info_baileys e escaneie novo QR.');
+          console.log('⚠️ [WhatsApp] Desconectado permanentemente. Limpando sessão no Neon...');
+          try {
+            await sql`DELETE FROM whatsapp_auth;`;
+            fs.rmSync(authDir, { recursive: true, force: true });
+          } catch {}
+          setTimeout(startWhatsApp, 3000);
         }
       } else if (connection === 'open') {
         console.log('✅ [WhatsApp] Conectado e pronto para envio 24/7!');
@@ -94,6 +150,7 @@ async function startWhatsApp() {
         currentQR = null;
         qrDataUrl = null;
         lastConnectedAt = new Date().toISOString();
+        await saveAuthToPostgres(authDir);
       }
     });
   } catch (err) {
