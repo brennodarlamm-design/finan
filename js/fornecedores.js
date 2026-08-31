@@ -500,7 +500,7 @@ const Fornecedores = {
     this._setStatus('⏳ Consultando Receita Federal via BrasilAPI...', 'loading');
 
     try {
-      const res = await fetch(`https://brasilapi.com.br/api/cnpj/v1/${cnpj}`);
+      const res = await fetch(`/api/cnpj?cnpj=${cnpj}`);
       if (!res.ok) {
         const errData = await res.json().catch(()=>({}));
         throw new Error(errData.message || `CNPJ não encontrado (status ${res.status})`);
