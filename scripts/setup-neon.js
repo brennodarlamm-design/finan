@@ -6,9 +6,14 @@ import dotenv from 'dotenv';
 dotenv.config({ path: '.env.local' });
 dotenv.config();
 
-const connectionString = process.env.DATABASE_URL || 'postgresql://neondb_owner:npg_5gVqFJ3NRyvK@ep-solitary-river-ach3x8za-pooler.sa-east-1.aws.neon.tech/neondb?sslmode=require';
+const connectionString = process.env.DATABASE_URL;
 
-console.log('Conectando ao Neon PostgreSQL (sa-east-1)...');
+if (!connectionString) {
+  console.error('❌ ERRO: DATABASE_URL não foi definida. Defina DATABASE_URL no arquivo .env.local ou nas variáveis de ambiente.');
+  process.exit(1);
+}
+
+console.log('Conectando ao Neon PostgreSQL...');
 
 const sql = neon(connectionString);
 

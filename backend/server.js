@@ -23,10 +23,15 @@ app.use(cors());
 app.use(express.json());
 
 const PORT = process.env.PORT || 3333;
-const DATABASE_URL = process.env.DATABASE_URL || 'postgresql://neondb_owner:npg_5gVqFJ3NRyvK@ep-solitary-river-ach3x8za-pooler.sa-east-1.aws.neon.tech/neondb?sslmode=require';
+const DATABASE_URL = process.env.DATABASE_URL;
+
+if (!DATABASE_URL) {
+  console.error('⚠️ [Aviso] DATABASE_URL não configurada no ambiente. Configure no .env ou no painel do Render.');
+}
+
 const TARGET_PHONE = process.env.TARGET_PHONE || '5595991363678';
 
-const sql = neon(DATABASE_URL);
+const sql = DATABASE_URL ? neon(DATABASE_URL) : null;
 
 // ── ESTADO DO WHATSAPP ───────────────────────────────────────────────────────
 let sock = null;

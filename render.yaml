@@ -11,6 +11,6 @@ services:
       - key: PORT
         value: 3333
       - key: DATABASE_URL
-        value: postgresql://neondb_owner:npg_5gVqFJ3NRyvK@ep-solitary-river-ach3x8za-pooler.sa-east-1.aws.neon.tech/neondb?sslmode=require
+        sync: false
       - key: TARGET_PHONE
         value: 5595991363678

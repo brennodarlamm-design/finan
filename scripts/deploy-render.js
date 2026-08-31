@@ -1,7 +1,14 @@
-// scripts/deploy-render.js — Cria e provisiona o Web Service no Render via API oficial
+import dotenv from 'dotenv';
+dotenv.config({ path: '.env.local' });
+dotenv.config();
 
-const RENDER_API_KEY = 'rnd_gjIh7VpABUcRBULQRRaLRZguj9iO';
+const RENDER_API_KEY = process.env.RENDER_API_KEY;
 const API_BASE = 'https://api.render.com/v1';
+
+if (!RENDER_API_KEY) {
+  console.error('❌ ERRO: RENDER_API_KEY não foi definida nas variáveis de ambiente ou no .env.local');
+  process.exit(1);
+}
 
 async function req(endpoint, options = {}) {
   const url = `${API_BASE}${endpoint}`;
@@ -74,11 +81,11 @@ async function main() {
       envVars: [
         {
           key: 'DATABASE_URL',
-          value: 'postgresql://neondb_owner:npg_5gVqFJ3NRyvK@ep-solitary-river-ach3x8za-pooler.sa-east-1.aws.neon.tech/neondb?sslmode=require'
+          value: process.env.DATABASE_URL || ''
         },
         {
           key: 'TARGET_PHONE',
-          value: '5595991363678'
+          value: process.env.TARGET_PHONE || '5595991363678'
         },
         {
           key: 'PORT',

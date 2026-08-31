@@ -3,7 +3,10 @@
 import { neon } from '@neondatabase/serverless';
 
 function getSql() {
-  const conn = process.env.DATABASE_URL || 'postgresql://neondb_owner:npg_5gVqFJ3NRyvK@ep-solitary-river-ach3x8za-pooler.sa-east-1.aws.neon.tech/neondb?sslmode=require';
+  const conn = process.env.DATABASE_URL;
+  if (!conn) {
+    throw new Error('Variável de ambiente DATABASE_URL não configurada.');
+  }
   return neon(conn);
 }
 
