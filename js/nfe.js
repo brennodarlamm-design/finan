@@ -918,6 +918,27 @@ const NFe = {
               </div>
             </div>
 
+            <div style="margin-bottom:14px;">
+              <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:.84rem;font-weight:700;color:var(--text);background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--r-md);padding:10px 14px;user-select:none;" id="nfe-ja-pago-label">
+                <input type="checkbox" id="nfe-ja-pago" style="width:18px;height:18px;accent-color:var(--success);cursor:pointer;" onchange="NFe._toggleJaPago(this)">
+                <span>✅ Esta despesa <strong>já foi paga</strong> — informar data e conta do pagamento</span>
+              </label>
+              <div id="nfe-pagamento-section" style="display:none;margin-top:8px;padding:12px 14px;background:rgba(16,185,129,.07);border:1px solid rgba(16,185,129,.25);border-radius:var(--r-md);">
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+                  <div>
+                    <label class="form-label" style="font-size:.78rem;font-weight:700;">Data do Pagamento *</label>
+                    <input type="date" id="nfe-data-pagto" class="form-control" value="${Utils.today()}">
+                  </div>
+                  <div>
+                    <label class="form-label" style="font-size:.78rem;font-weight:700;">Conta Bancária Debitada *</label>
+                    <select id="nfe-conta-pagto" class="form-control">
+                      ${contas.map(c => `<option value="${c.nome || c.id}">${c.nome}</option>`).join('')}
+                    </select>
+                  </div>
+                </div>
+              </div>
+            </div>
+
             <div style="background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--r-md);padding:10px 14px;margin-bottom:14px;font-size:.78rem;color:var(--text2);">
               <div style="display:flex;align-items:center;gap:6px;font-weight:700;color:var(--accent);">
                 <span>ℹ️ Ações Automáticas:</span>
@@ -940,6 +961,11 @@ const NFe = {
       </div>`);
   },
 
+  _toggleJaPago(checkbox) {
+    const section = document.getElementById('nfe-pagamento-section');
+    if (section) section.style.display = checkbox.checked ? 'block' : 'none';
+  },
+
   async _confirmarGeracaoLancamento(chave) {
     const parsed = window._tempNFeParsed || {};
     try {
@@ -950,6 +976,9 @@ const NFe = {
       const desc = document.getElementById('nfe-dest-desc')?.value || `NF ${parsed.numero_nf} — ${parsed.emitente}`;
       const valor = parseFloat(document.getElementById('nfe-dest-valor')?.value) || parsed.valor_bruto;
       const venc = document.getElementById('nfe-dest-venc')?.value || parsed.data_emissao || Utils.today();
+      const jaPago = document.getElementById('nfe-ja-pago')?.checked || false;
+      const dataPagto = jaPago ? (document.getElementById('nfe-data-pagto')?.value || Utils.today()) : null;
+      const contaPagtoNome = jaPago ? (document.getElementById('nfe-conta-pagto')?.value || '') : null;
 
       if (!obraId) { Utils.toast('Por favor, selecione a Obra / Centro de Custo.', 'error'); return; }
 
@@ -965,53 +994,53 @@ const NFe = {
       });
 
       if (!forn && parsed.emitente) {
-        forn = DB.create('fornecedores', {
+        forn = DB.add('fornecedores', {
           nome: parsed.emitente,
           razao_social: parsed.emitente,
-          cnpj: parsed.cnpj_emitente || '',
+          cnpj_cpf: parsed.cnpj_emitente || '',
           telefone: parsed.telefone_emitente || '',
-          cidade: parsed.cidade_emitente || '',
-          uf: parsed.uf_emitente || '',
-          categoria: cat,
-          criado_em: new Date().toISOString()
+          categoria: cat
         });
       }
       fornecedorId = forn?.id || null;
 
       // 2. Cria o Lançamento Financeiro (Despesa)
-      const lanc = DB.create('lancamentos', {
+      const contaBancaria = contaPagtoNome ||
+        (DB.getAll('contas').find(c => c.id === contaId)?.nome) || '';
+
+      const lanc = DB.add('lancamentos', {
         tipo: 'despesa',
         obra_id: obraId,
-        conta_id: contaId,
+        conta_bancaria: contaBancaria,
         categoria: cat,
         descricao: desc,
         valor: valor,
         data: parsed.data_emissao || Utils.today(),
         data_vencimento: venc,
-        status: 'pendente',
-        forma_pagamento: forma,
+        data_pagamento: dataPagto || null,
+        status: jaPago ? 'pago' : 'a_pagar',
+        fornecedor_beneficiario: parsed.emitente || '',
         fornecedor_id: fornecedorId,
         chave_nfe: chave,
-        criado_em: new Date().toISOString()
+        conciliado: false
       });
 
       // 3. Cria o registro na tabela de Notas Fiscais
-      DB.create('notas', {
+      DB.add('notas', {
         numero_nf: parsed.numero_nf,
         serie: parsed.serie || '1',
         emitente: parsed.emitente,
         cnpj_emitente: parsed.cnpj_emitente,
-        destinatario: parsed.destinatario || 'Angelim Construtora LTDA',
         data_emissao: parsed.data_emissao || Utils.today(),
         data_vencimento: venc,
-        valor_bruto: parsed.valor_bruto || valor,
-        impostos: parsed.impostos || 0,
-        valor_liquido: parsed.valor_liquido || valor,
+        data_pagamento: dataPagto || null,
+        valor_total: parsed.valor_bruto || valor,
         tipo: 'entrada',
         categoria: cat,
-        status: 'pendente',
+        status: jaPago ? 'pago' : 'pendente',
         obra_id: obraId,
         lancamento_id: lanc.id,
+        chave_acesso: chave,
         chave_nfe: chave,
         observacoes: `Gerado automaticamente via busca NF-e em ${Utils.fmt.datetime(new Date().toISOString())}`
       });
