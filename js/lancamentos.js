@@ -16,6 +16,9 @@ const Lancamentos = {
         <button class="btn btn-secondary btn-sm" onclick="ImportarExcel.abrirModal('${obraId}')" style="display:flex;align-items:center;gap:6px;border:1px solid var(--accent);color:var(--accent2);">
           📊 Importar Planilha Excel
         </button>
+        <button class="btn btn-secondary btn-sm" onclick="Lancamentos.abrirAnaliseProdutos()" style="display:flex;align-items:center;gap:6px;">
+          🔍 Gastos por Produto
+        </button>
         <button class="btn btn-success btn-sm" onclick="Lancamentos.showForm('receita')">&uarr; Nova Receita</button>
         <button class="btn btn-danger btn-sm" onclick="Lancamentos.showForm('despesa')">&darr; Nova Despesa</button>
       </div>
@@ -136,6 +139,7 @@ const Lancamentos = {
         ${showObra?`<td style="font-size:.76rem;color:var(--text2);max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${c?.nome||'&mdash;'}</td>`:''}
         <td>
           <div style="font-weight:600">${l.descricao}</div>
+          ${l.itens && l.itens.length ? `<div style="font-size:.7rem;color:var(--accent2);margin-top:2px;cursor:pointer" onclick="Lancamentos.verItens('${l.id}')" title="Ver produtos deste lançamento">📦 ${l.itens.length} produto${l.itens.length>1?'s':''}</div>` : ''}
           ${l.codigo_barras ? `<div style="font-size:.7rem;font-family:monospace;color:var(--accent2);" title="Linha digitável do boleto">🔢 ${l.codigo_barras}</div>` : ''}
           ${l.observacoes?`<div style="font-size:.72rem;color:var(--text3)">${l.observacoes}</div>`:''}
         </td>
@@ -313,6 +317,32 @@ const Lancamentos = {
 
             <div class="form-group"><label class="form-label">Observa&ccedil;&otilde;es</label><textarea class="form-control" name="observacoes" rows="2" placeholder="Observações adicionais ou notas">${l.observacoes||''}</textarea></div>
 
+            <!-- SEÇÃO DE ITENS / PRODUTOS -->
+            ${tipo === 'despesa' ? `
+            <div style="border:1px solid var(--border);border-radius:10px;margin-top:8px;overflow:hidden;">
+              <div style="background:var(--bg-secondary);padding:10px 14px;display:flex;justify-content:space-between;align-items:center;cursor:pointer" onclick="Lancamentos._toggleItens()">
+                <div style="font-weight:700;font-size:.85rem;color:var(--text);">📦 Itens / Produtos deste Lançamento <span style="font-size:.75rem;font-weight:400;color:var(--text3);">(opcional — para rastrear gastos por produto)</span></div>
+                <span id="itens-toggle-icon" style="font-size:.8rem;color:var(--accent2);">${l.itens?.length?'▲ Recolher':'▼ Expandir'}</span>
+              </div>
+              <div id="itens-section" style="display:${l.itens?.length?'block':'none'};padding:14px;">
+                <div id="itens-lista">
+                  ${(l.itens||[]).map(it => `
+                    <div class="item-row" style="display:grid;grid-template-columns:2fr .7fr .8fr 1fr auto;gap:6px;margin-bottom:8px;align-items:center;">
+                      <input class="form-control item-produto" placeholder="Produto (ex: Cimento CP-II)" value="${it.produto}" oninput="Lancamentos._recalcItem(this)" style="font-size:.82rem;">
+                      <input class="form-control item-qtd" type="number" placeholder="Qtd" step="0.01" min="0" value="${it.qtd}" oninput="Lancamentos._recalcItem(this)" style="font-size:.82rem;text-align:right;">
+                      <input class="form-control item-unidade" placeholder="Un (sc, m², kg)" value="${it.unidade}" style="font-size:.82rem;">
+                      <input class="form-control item-vunit" type="number" placeholder="Valor unit. R$" step="0.01" min="0" value="${it.valor_unit}" oninput="Lancamentos._recalcItem(this)" style="font-size:.82rem;text-align:right;">
+                      <button type="button" class="icon-btn" onclick="this.closest('.item-row').remove();Lancamentos._atualizarTotalItens()" title="Remover" style="color:var(--danger);font-size:15px;">🗑️</button>
+                    </div>
+                  `).join('')}
+                </div>
+                <button type="button" class="btn btn-secondary btn-sm" onclick="Lancamentos._addItem()" style="margin-top:8px;display:flex;align-items:center;gap:6px;">
+                  ➕ Adicionar Produto
+                </button>
+                <div id="itens-total-display" style="margin-top:10px;font-size:.82rem;color:var(--text3);">${l.itens?.length?`Total dos itens: ${Utils.fmt.currency(l.valor)}`:''}</div>
+              </div>
+            </div>` : ''}
+
             ${isEdit ? `
             <div style="background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--r-md);padding:12px;margin-top:14px;display:flex;justify-content:space-between;align-items:center;">
               <div>
@@ -402,6 +432,25 @@ const Lancamentos = {
     d.valor = parseFloat(d.valor)||0;
     d.conciliado = d.conciliado==='true';
     d.data_vencimento = d.data_vencimento || d.data;
+
+    // Salvar itens de produto
+    const itensRows = document.querySelectorAll('#itens-lista .item-row');
+    const itens = [];
+    itensRows.forEach(row => {
+      const produto = row.querySelector('.item-produto')?.value?.trim();
+      const qtd = parseFloat(row.querySelector('.item-qtd')?.value) || 0;
+      const unidade = row.querySelector('.item-unidade')?.value?.trim() || 'un';
+      const valorUnit = parseFloat(row.querySelector('.item-vunit')?.value) || 0;
+      if (produto && (qtd > 0 || valorUnit > 0)) {
+        itens.push({ produto, qtd, unidade, valor_unit: valorUnit, total: qtd * valorUnit });
+      }
+    });
+    d.itens = itens;
+    // Se tem itens e valor não foi editado manualmente, recalcular
+    if (itens.length > 0) {
+      const totalItens = itens.reduce((s, it) => s + it.total, 0);
+      if (totalItens > 0 && d.valor === 0) d.valor = totalItens;
+    }
 
     // Trata data_pagamento
     if (d.status === 'pago' || d.status === 'recebido') {
@@ -578,6 +627,220 @@ const Lancamentos = {
   clearFilters() {
     ['f-srch','f-tipo','f-cat','f-status','f-di','f-df'].forEach(id=>{ const el=document.getElementById(id); if(el) el.value=''; });
     this._refresh(true);
+  },
+
+  _toggleItens() {
+    const sec = document.getElementById('itens-section');
+    const icon = document.getElementById('itens-toggle-icon');
+    if (!sec) return;
+    if (sec.style.display === 'none') {
+      sec.style.display = 'block';
+      if (icon) icon.textContent = '▲ Recolher';
+      if (!document.querySelector('#itens-lista .item-row')) this._addItem();
+    } else {
+      sec.style.display = 'none';
+      if (icon) icon.textContent = '▼ Expandir';
+    }
+  },
+
+  _addItem(item = null) {
+    const lista = document.getElementById('itens-lista');
+    if (!lista) return;
+    const idx = lista.querySelectorAll('.item-row').length;
+    const row = document.createElement('div');
+    row.className = 'item-row';
+    row.style.cssText = 'display:grid;grid-template-columns:2fr .7fr .8fr 1fr auto;gap:6px;margin-bottom:8px;align-items:center;';
+    row.innerHTML = `
+      <input class="form-control item-produto" placeholder="Produto (ex: Cimento CP-II)" value="${item?.produto||''}" oninput="Lancamentos._recalcItem(this)" style="font-size:.82rem;">
+      <input class="form-control item-qtd" type="number" placeholder="Qtd" step="0.01" min="0" value="${item?.qtd||''}" oninput="Lancamentos._recalcItem(this)" style="font-size:.82rem;text-align:right;">
+      <input class="form-control item-unidade" placeholder="Un (sc, m², kg)" value="${item?.unidade||'un'}" style="font-size:.82rem;">
+      <input class="form-control item-vunit" type="number" placeholder="Valor unit. R$" step="0.01" min="0" value="${item?.valor_unit||''}" oninput="Lancamentos._recalcItem(this)" style="font-size:.82rem;text-align:right;">
+      <button type="button" class="icon-btn" onclick="this.closest('.item-row').remove();Lancamentos._atualizarTotalItens()" title="Remover" style="color:var(--danger);font-size:15px;">🗑️</button>
+    `;
+    lista.appendChild(row);
+    if (item?.produto) this._atualizarTotalItens();
+  },
+
+  _recalcItem(el) {
+    this._atualizarTotalItens();
+    // Se total dos itens > 0, atualiza o campo valor do form
+    const valorInput = document.querySelector('#f-lan [name="valor"]');
+    if (!valorInput) return;
+    const total = this._somarItens();
+    if (total > 0) valorInput.value = total.toFixed(2);
+  },
+
+  _somarItens() {
+    let soma = 0;
+    document.querySelectorAll('#itens-lista .item-row').forEach(row => {
+      const qtd = parseFloat(row.querySelector('.item-qtd')?.value) || 0;
+      const vu  = parseFloat(row.querySelector('.item-vunit')?.value) || 0;
+      soma += qtd * vu;
+    });
+    return soma;
+  },
+
+  _atualizarTotalItens() {
+    const display = document.getElementById('itens-total-display');
+    if (!display) return;
+    const total = this._somarItens();
+    display.textContent = total > 0 ? `Total dos itens: ${Utils.fmt.currency(total)}` : '';
+  },
+
+  verItens(id) {
+    const l = DB.getById('lancamentos', id);
+    if (!l || !l.itens?.length) return;
+    const rows = l.itens.map((it, i) => `
+      <tr style="background:${i%2===0?'var(--bg-card)':'var(--bg-secondary)'}">
+        <td style="padding:8px 12px;font-weight:700;color:var(--text);">${it.produto}</td>
+        <td style="padding:8px 12px;text-align:right;color:var(--text2);">${it.qtd} ${it.unidade}</td>
+        <td style="padding:8px 12px;text-align:right;color:var(--text2);">${Utils.fmt.currency(it.valor_unit)}</td>
+        <td style="padding:8px 12px;text-align:right;font-weight:800;color:var(--danger);">- ${Utils.fmt.currency(it.total)}</td>
+      </tr>`).join('');
+    Utils.showModal(`
+      <div class="modal" style="max-width:560px;">
+        <div class="modal-header">
+          <span class="modal-title">📦 Produtos — ${l.descricao}</span>
+          <button class="modal-close" onclick="Utils.closeModal()">✕</button>
+        </div>
+        <div class="modal-body">
+          <table style="width:100%;border-collapse:collapse;font-size:.84rem;">
+            <thead><tr style="background:var(--bg-secondary);color:var(--text3);font-size:.72rem;text-transform:uppercase;">
+              <th style="padding:8px 12px;text-align:left;">Produto</th>
+              <th style="padding:8px 12px;text-align:right;">Qtd</th>
+              <th style="padding:8px 12px;text-align:right;">Valor Unit.</th>
+              <th style="padding:8px 12px;text-align:right;">Total</th>
+            </tr></thead>
+            <tbody>${rows}</tbody>
+            <tfoot><tr style="border-top:2px solid var(--border);">
+              <td colspan="3" style="padding:10px 12px;font-weight:800;color:var(--text);">TOTAL</td>
+              <td style="padding:10px 12px;text-align:right;font-weight:900;color:var(--danger);font-size:1rem;">- ${Utils.fmt.currency(l.valor)}</td>
+            </tr></tfoot>
+          </table>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-secondary" onclick="Utils.closeModal()">Fechar</button>
+          <button class="btn btn-primary" onclick="Utils.closeModal();Lancamentos.showForm('${l.tipo}','${l.id}')">✏️ Editar Lançamento</button>
+        </div>
+      </div>`);
+  },
+
+  abrirAnaliseProdutos() {
+    const obraId = App.obraId;
+    const todosLans = DB.getLancamentos(obraId === 'todas' ? null : obraId);
+    const lansComItens = todosLans.filter(l => l.itens && l.itens.length > 0 && l.tipo === 'despesa');
+
+    // Agregar por produto (case-insensitive)
+    const produtos = {};
+    lansComItens.forEach(l => {
+      const obra = l.obra_id === 'escritorio' ? '🏢 Sede / Escritório' : (DB.getById('clientes', l.obra_id)?.nome || '—');
+      l.itens.forEach(it => {
+        const key = it.produto.trim().toLowerCase();
+        if (!produtos[key]) produtos[key] = { nome: it.produto, total: 0, qtd_total: 0, unidade: it.unidade, lancamentos: [], obras: new Set() };
+        produtos[key].total += it.total || (it.qtd * it.valor_unit);
+        produtos[key].qtd_total += it.qtd;
+        produtos[key].lancamentos.push({ desc: l.descricao, data: l.data, valor: it.total || (it.qtd * it.valor_unit), obra });
+        produtos[key].obras.add(obra);
+      });
+    });
+
+    const ranking = Object.values(produtos).sort((a, b) => b.total - a.total);
+    const totalGeral = ranking.reduce((s, p) => s + p.total, 0);
+
+    if (!ranking.length) {
+      Utils.toast('Nenhum lançamento com itens de produto encontrado. Edite um lançamento de despesa e adicione produtos.', 'info');
+      return;
+    }
+
+    const rows = ranking.map((p, i) => {
+      const pct = totalGeral > 0 ? ((p.total / totalGeral) * 100).toFixed(1) : '0.0';
+      const obras = [...p.obras].join(', ');
+      const detalhes = p.lancamentos.map(lc => `<li style="font-size:.72rem;color:var(--text3);">${Utils.fmt.date(lc.data)} — ${lc.desc} (${Utils.fmt.currency(lc.valor)})</li>`).join('');
+      return `
+        <tr style="background:${i%2===0?'var(--bg-card)':'var(--bg-secondary)'};cursor:pointer" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'table-row':'none'">
+          <td style="padding:10px 12px;">
+            <div style="font-weight:700;color:var(--text);">${p.nome}</div>
+            <div style="font-size:.72rem;color:var(--text3);">${obras}</div>
+          </td>
+          <td style="padding:10px 12px;text-align:right;color:var(--text2);font-size:.82rem;">${p.qtd_total.toLocaleString('pt-BR')} ${p.unidade}</td>
+          <td style="padding:10px 12px;text-align:right;">
+            <div style="font-weight:800;color:var(--danger);">${Utils.fmt.currency(p.total)}</div>
+            <div style="height:4px;background:var(--bg-secondary);border-radius:2px;margin-top:4px;min-width:80px;">
+              <div style="height:4px;background:var(--danger);border-radius:2px;width:${pct}%;"></div>
+            </div>
+          </td>
+          <td style="padding:10px 12px;text-align:center;font-size:.78rem;color:var(--text3);">${pct}%</td>
+          <td style="padding:10px 12px;text-align:center;font-size:.78rem;color:var(--text3);">${p.lancamentos.length}</td>
+        </tr>
+        <tr style="display:none;background:var(--bg-secondary);">
+          <td colspan="5" style="padding:4px 20px 12px;">
+            <ul style="margin:0;padding-left:16px;">${detalhes}</ul>
+          </td>
+        </tr>`;
+    }).join('');
+
+    Utils.showModal(`
+      <div class="modal" style="max-width:720px;">
+        <div class="modal-header">
+          <span class="modal-title">🔍 Gastos por Produto${obraId !== 'todas' ? ` — ${DB.getById('clientes', obraId)?.nome || ''}` : ' — Todas as Obras'}</span>
+          <button class="modal-close" onclick="Utils.closeModal()">✕</button>
+        </div>
+        <div class="modal-body" style="padding:0;">
+          <div style="padding:14px 18px;background:var(--bg-secondary);border-bottom:1px solid var(--border);display:flex;gap:12px;flex-wrap:wrap;">
+            <div style="flex:1;min-width:140px;">
+              <div style="font-size:.72rem;color:var(--text3);text-transform:uppercase;font-weight:700;">Total Geral (Produtos)</div>
+              <div style="font-size:1.3rem;font-weight:900;color:var(--danger);">${Utils.fmt.currency(totalGeral)}</div>
+            </div>
+            <div style="flex:1;min-width:140px;">
+              <div style="font-size:.72rem;color:var(--text3);text-transform:uppercase;font-weight:700;">Produtos Distintos</div>
+              <div style="font-size:1.3rem;font-weight:900;color:var(--accent2);">${ranking.length}</div>
+            </div>
+            <div style="flex:1;min-width:140px;">
+              <div style="font-size:.72rem;color:var(--text3);text-transform:uppercase;font-weight:700;">Lançamentos com Itens</div>
+              <div style="font-size:1.3rem;font-weight:900;color:var(--text);">${lansComItens.length}</div>
+            </div>
+          </div>
+          <div style="padding:12px 18px;border-bottom:1px solid var(--border);">
+            <input class="form-control" id="prod-search" placeholder="🔍 Filtrar produto..." oninput="Lancamentos._filtrarProdutos(this.value)" style="max-width:300px;font-size:.84rem;">
+          </div>
+          <div style="overflow-y:auto;max-height:420px;">
+            <table id="prod-table" style="width:100%;border-collapse:collapse;font-size:.84rem;">
+              <thead style="position:sticky;top:0;z-index:1;">
+                <tr style="background:var(--bg-secondary);color:var(--text3);font-size:.72rem;text-transform:uppercase;">
+                  <th style="padding:8px 12px;text-align:left;">Produto</th>
+                  <th style="padding:8px 12px;text-align:right;">Quantidade Total</th>
+                  <th style="padding:8px 12px;text-align:right;">Total Gasto</th>
+                  <th style="padding:8px 12px;text-align:center;">% do Total</th>
+                  <th style="padding:8px 12px;text-align:center;">Compras</th>
+                </tr>
+              </thead>
+              <tbody id="prod-tbody">${rows}</tbody>
+            </table>
+          </div>
+          <div style="padding:10px 18px;font-size:.72rem;color:var(--text3);border-top:1px solid var(--border);">
+            💡 Clique em um produto para ver o histórico de compras. Adicione produtos nos lançamentos de despesa.
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-secondary" onclick="Utils.closeModal()">Fechar</button>
+        </div>
+      </div>`);
+  },
+
+  _filtrarProdutos(q) {
+    const tbody = document.getElementById('prod-tbody');
+    if (!tbody) return;
+    const rows = tbody.querySelectorAll('tr');
+    let skip = false;
+    rows.forEach(tr => {
+      if (tr.querySelector('td[colspan]')) { skip = false; return; } // linha de detalhe ignora
+      if (skip) { skip = false; return; }
+      const texto = tr.textContent.toLowerCase();
+      const visivel = !q || texto.includes(q.toLowerCase());
+      tr.style.display = visivel ? '' : 'none';
+      // próxima é a linha de detalhe — esconde junto
+      if (!visivel) skip = true;
+    });
   },
 
   init() {
