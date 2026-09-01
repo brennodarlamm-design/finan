@@ -433,7 +433,26 @@ const Lancamentos = {
     d.conciliado = d.conciliado==='true';
     d.data_vencimento = d.data_vencimento || d.data;
 
-    // Salvar itens de produto
+    // Tratar fornecedor selecionado do cadastro ou digitado manualmente
+    const selForn = document.getElementById('lan-forn-sel')?.value;
+    const manForn = document.getElementById('lan-forn-manual')?.value || '';
+    if (selForn && selForn !== '__manual__' && selForn !== '') {
+      d.fornecedor_beneficiario = selForn;
+    } else if (selForn === '__manual__' && manForn) {
+      d.fornecedor_beneficiario = manForn;
+    }
+    delete d.conta_bancaria_manual;
+
+    // Cadastra/vincula fornecedor se digitado manualmente
+    if (typeof Fornecedores !== 'undefined' && d.fornecedor_beneficiario) {
+      Fornecedores.encontrarOuCriar({
+        razao_social: d.fornecedor_beneficiario,
+        nome_fantasia: d.fornecedor_beneficiario,
+        categoria: d.categoria || 'material'
+      });
+    }
+
+    // Salvar itens de produto e vincular ao módulo Produtos
     const itensRows = document.querySelectorAll('#itens-lista .item-row');
     const itens = [];
     itensRows.forEach(row => {
@@ -441,12 +460,29 @@ const Lancamentos = {
       const qtd = parseFloat(row.querySelector('.item-qtd')?.value) || 0;
       const unidade = row.querySelector('.item-unidade')?.value?.trim() || 'un';
       const valorUnit = parseFloat(row.querySelector('.item-vunit')?.value) || 0;
+      let produtoId = row.querySelector('.item-produto-id')?.value || null;
+
       if (produto && (qtd > 0 || valorUnit > 0)) {
-        itens.push({ produto, qtd, unidade, valor_unit: valorUnit, total: qtd * valorUnit });
+        if (typeof Produtos !== 'undefined') {
+          const prod = Produtos.encontrarOuCriar(produto, unidade, d.categoria || 'material');
+          if (prod) {
+            produtoId = prod.id;
+            Produtos.atualizarValorMedio(prod.id);
+          }
+        }
+        itens.push({
+          produto,
+          qtd,
+          unidade,
+          valor_unit: valorUnit,
+          total: qtd * valorUnit,
+          produto_id: produtoId
+        });
       }
     });
     d.itens = itens;
-    // Se tem itens e valor não foi editado manualmente, recalcular
+
+    // Se tem itens e valor não foi editado manualmente ou está zerado, recalcular
     if (itens.length > 0) {
       const totalItens = itens.reduce((s, it) => s + it.total, 0);
       if (totalItens > 0 && d.valor === 0) d.valor = totalItens;
@@ -467,17 +503,6 @@ const Lancamentos = {
     } else {
       d.conta_bancaria = manConta;
     }
-    delete d.conta_bancaria_manual;
-
-    // Tratar fornecedor selecionado do cadastro ou digitado manualmente
-    const selForn = document.getElementById('lan-forn-sel')?.value;
-    const manForn = document.getElementById('lan-forn-manual')?.value || '';
-    if (selForn && selForn !== '__manual__' && selForn !== '') {
-      d.fornecedor_beneficiario = selForn;
-    } else if (selForn === '__manual__') {
-      d.fornecedor_beneficiario = manForn;
-    }
-    // se d.fornecedor_beneficiario já veio do FormData (campo hidden), mantém
 
     if (!d.nota_fiscal_id) delete d.nota_fiscal_id;
     if (id) { DB.update('lancamentos',id,d); Utils.toast('Lançamento atualizado!','success'); }
@@ -646,12 +671,23 @@ const Lancamentos = {
   _addItem(item = null) {
     const lista = document.getElementById('itens-lista');
     if (!lista) return;
-    const idx = lista.querySelectorAll('.item-row').length;
+    const prods = typeof DB !== 'undefined' ? DB.getAll('produtos') : [];
+    const prodsDatalistId = 'prod-options-list';
+    
+    // Cria datalist se não existir
+    if (!document.getElementById(prodsDatalistId)) {
+      const dl = document.createElement('datalist');
+      dl.id = prodsDatalistId;
+      dl.innerHTML = prods.map(p => `<option value="${p.nome}" data-unidade="${p.unidade||'un'}" data-valor="${p.valor_medio||0}" data-id="${p.id}">${p.nome} (${p.unidade||'un'})</option>`).join('');
+      document.body.appendChild(dl);
+    }
+
     const row = document.createElement('div');
     row.className = 'item-row';
     row.style.cssText = 'display:grid;grid-template-columns:2fr .7fr .8fr 1fr auto;gap:6px;margin-bottom:8px;align-items:center;';
     row.innerHTML = `
-      <input class="form-control item-produto" placeholder="Produto (ex: Cimento CP-II)" value="${item?.produto||''}" oninput="Lancamentos._recalcItem(this)" style="font-size:.82rem;">
+      <input type="hidden" class="item-produto-id" value="${item?.produto_id || ''}">
+      <input class="form-control item-produto" list="${prodsDatalistId}" placeholder="Produto (ex: Cimento CP-II)" value="${item?.produto||''}" oninput="Lancamentos._onProdutoInput(this)" style="font-size:.82rem;">
       <input class="form-control item-qtd" type="number" placeholder="Qtd" step="0.01" min="0" value="${item?.qtd||''}" oninput="Lancamentos._recalcItem(this)" style="font-size:.82rem;text-align:right;">
       <input class="form-control item-unidade" placeholder="Un (sc, m², kg)" value="${item?.unidade||'un'}" style="font-size:.82rem;">
       <input class="form-control item-vunit" type="number" placeholder="Valor unit. R$" step="0.01" min="0" value="${item?.valor_unit||''}" oninput="Lancamentos._recalcItem(this)" style="font-size:.82rem;text-align:right;">
@@ -661,9 +697,25 @@ const Lancamentos = {
     if (item?.produto) this._atualizarTotalItens();
   },
 
+  _onProdutoInput(inp) {
+    const val = inp.value.trim().toLowerCase();
+    const row = inp.closest('.item-row');
+    if (!row) return;
+    const prods = typeof DB !== 'undefined' ? DB.getAll('produtos') : [];
+    const match = prods.find(p => p.nome.toLowerCase() === val);
+    if (match) {
+      const idInp = row.querySelector('.item-produto-id');
+      const unInp = row.querySelector('.item-unidade');
+      const vuInp = row.querySelector('.item-vunit');
+      if (idInp) idInp.value = match.id;
+      if (unInp && match.unidade) unInp.value = match.unidade;
+      if (vuInp && match.valor_medio && !vuInp.value) vuInp.value = match.valor_medio;
+    }
+    this._recalcItem(inp);
+  },
+
   _recalcItem(el) {
     this._atualizarTotalItens();
-    // Se total dos itens > 0, atualiza o campo valor do form
     const valorInput = document.querySelector('#f-lan [name="valor"]');
     if (!valorInput) return;
     const total = this._somarItens();
@@ -695,7 +747,7 @@ const Lancamentos = {
         <td style="padding:8px 12px;font-weight:700;color:var(--text);">${it.produto}</td>
         <td style="padding:8px 12px;text-align:right;color:var(--text2);">${it.qtd} ${it.unidade}</td>
         <td style="padding:8px 12px;text-align:right;color:var(--text2);">${Utils.fmt.currency(it.valor_unit)}</td>
-        <td style="padding:8px 12px;text-align:right;font-weight:800;color:var(--danger);">- ${Utils.fmt.currency(it.total)}</td>
+        <td style="padding:8px 12px;text-align:right;font-weight:800;color:var(--danger);">- ${Utils.fmt.currency(it.total || (it.qtd * it.valor_unit))}</td>
       </tr>`).join('');
     Utils.showModal(`
       <div class="modal" style="max-width:560px;">
@@ -726,121 +778,11 @@ const Lancamentos = {
   },
 
   abrirAnaliseProdutos() {
-    const obraId = App.obraId;
-    const todosLans = DB.getLancamentos(obraId === 'todas' ? null : obraId);
-    const lansComItens = todosLans.filter(l => l.itens && l.itens.length > 0 && l.tipo === 'despesa');
-
-    // Agregar por produto (case-insensitive)
-    const produtos = {};
-    lansComItens.forEach(l => {
-      const obra = l.obra_id === 'escritorio' ? '🏢 Sede / Escritório' : (DB.getById('clientes', l.obra_id)?.nome || '—');
-      l.itens.forEach(it => {
-        const key = it.produto.trim().toLowerCase();
-        if (!produtos[key]) produtos[key] = { nome: it.produto, total: 0, qtd_total: 0, unidade: it.unidade, lancamentos: [], obras: new Set() };
-        produtos[key].total += it.total || (it.qtd * it.valor_unit);
-        produtos[key].qtd_total += it.qtd;
-        produtos[key].lancamentos.push({ desc: l.descricao, data: l.data, valor: it.total || (it.qtd * it.valor_unit), obra });
-        produtos[key].obras.add(obra);
-      });
-    });
-
-    const ranking = Object.values(produtos).sort((a, b) => b.total - a.total);
-    const totalGeral = ranking.reduce((s, p) => s + p.total, 0);
-
-    if (!ranking.length) {
-      Utils.toast('Nenhum lançamento com itens de produto encontrado. Edite um lançamento de despesa e adicione produtos.', 'info');
-      return;
+    if (typeof Produtos !== 'undefined' && Produtos.showAnalise) {
+      Produtos.showAnalise();
+    } else {
+      App.navigate('produtos');
     }
-
-    const rows = ranking.map((p, i) => {
-      const pct = totalGeral > 0 ? ((p.total / totalGeral) * 100).toFixed(1) : '0.0';
-      const obras = [...p.obras].join(', ');
-      const detalhes = p.lancamentos.map(lc => `<li style="font-size:.72rem;color:var(--text3);">${Utils.fmt.date(lc.data)} — ${lc.desc} (${Utils.fmt.currency(lc.valor)})</li>`).join('');
-      return `
-        <tr style="background:${i%2===0?'var(--bg-card)':'var(--bg-secondary)'};cursor:pointer" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'table-row':'none'">
-          <td style="padding:10px 12px;">
-            <div style="font-weight:700;color:var(--text);">${p.nome}</div>
-            <div style="font-size:.72rem;color:var(--text3);">${obras}</div>
-          </td>
-          <td style="padding:10px 12px;text-align:right;color:var(--text2);font-size:.82rem;">${p.qtd_total.toLocaleString('pt-BR')} ${p.unidade}</td>
-          <td style="padding:10px 12px;text-align:right;">
-            <div style="font-weight:800;color:var(--danger);">${Utils.fmt.currency(p.total)}</div>
-            <div style="height:4px;background:var(--bg-secondary);border-radius:2px;margin-top:4px;min-width:80px;">
-              <div style="height:4px;background:var(--danger);border-radius:2px;width:${pct}%;"></div>
-            </div>
-          </td>
-          <td style="padding:10px 12px;text-align:center;font-size:.78rem;color:var(--text3);">${pct}%</td>
-          <td style="padding:10px 12px;text-align:center;font-size:.78rem;color:var(--text3);">${p.lancamentos.length}</td>
-        </tr>
-        <tr style="display:none;background:var(--bg-secondary);">
-          <td colspan="5" style="padding:4px 20px 12px;">
-            <ul style="margin:0;padding-left:16px;">${detalhes}</ul>
-          </td>
-        </tr>`;
-    }).join('');
-
-    Utils.showModal(`
-      <div class="modal" style="max-width:720px;">
-        <div class="modal-header">
-          <span class="modal-title">🔍 Gastos por Produto${obraId !== 'todas' ? ` — ${DB.getById('clientes', obraId)?.nome || ''}` : ' — Todas as Obras'}</span>
-          <button class="modal-close" onclick="Utils.closeModal()">✕</button>
-        </div>
-        <div class="modal-body" style="padding:0;">
-          <div style="padding:14px 18px;background:var(--bg-secondary);border-bottom:1px solid var(--border);display:flex;gap:12px;flex-wrap:wrap;">
-            <div style="flex:1;min-width:140px;">
-              <div style="font-size:.72rem;color:var(--text3);text-transform:uppercase;font-weight:700;">Total Geral (Produtos)</div>
-              <div style="font-size:1.3rem;font-weight:900;color:var(--danger);">${Utils.fmt.currency(totalGeral)}</div>
-            </div>
-            <div style="flex:1;min-width:140px;">
-              <div style="font-size:.72rem;color:var(--text3);text-transform:uppercase;font-weight:700;">Produtos Distintos</div>
-              <div style="font-size:1.3rem;font-weight:900;color:var(--accent2);">${ranking.length}</div>
-            </div>
-            <div style="flex:1;min-width:140px;">
-              <div style="font-size:.72rem;color:var(--text3);text-transform:uppercase;font-weight:700;">Lançamentos com Itens</div>
-              <div style="font-size:1.3rem;font-weight:900;color:var(--text);">${lansComItens.length}</div>
-            </div>
-          </div>
-          <div style="padding:12px 18px;border-bottom:1px solid var(--border);">
-            <input class="form-control" id="prod-search" placeholder="🔍 Filtrar produto..." oninput="Lancamentos._filtrarProdutos(this.value)" style="max-width:300px;font-size:.84rem;">
-          </div>
-          <div style="overflow-y:auto;max-height:420px;">
-            <table id="prod-table" style="width:100%;border-collapse:collapse;font-size:.84rem;">
-              <thead style="position:sticky;top:0;z-index:1;">
-                <tr style="background:var(--bg-secondary);color:var(--text3);font-size:.72rem;text-transform:uppercase;">
-                  <th style="padding:8px 12px;text-align:left;">Produto</th>
-                  <th style="padding:8px 12px;text-align:right;">Quantidade Total</th>
-                  <th style="padding:8px 12px;text-align:right;">Total Gasto</th>
-                  <th style="padding:8px 12px;text-align:center;">% do Total</th>
-                  <th style="padding:8px 12px;text-align:center;">Compras</th>
-                </tr>
-              </thead>
-              <tbody id="prod-tbody">${rows}</tbody>
-            </table>
-          </div>
-          <div style="padding:10px 18px;font-size:.72rem;color:var(--text3);border-top:1px solid var(--border);">
-            💡 Clique em um produto para ver o histórico de compras. Adicione produtos nos lançamentos de despesa.
-          </div>
-        </div>
-        <div class="modal-footer">
-          <button class="btn btn-secondary" onclick="Utils.closeModal()">Fechar</button>
-        </div>
-      </div>`);
-  },
-
-  _filtrarProdutos(q) {
-    const tbody = document.getElementById('prod-tbody');
-    if (!tbody) return;
-    const rows = tbody.querySelectorAll('tr');
-    let skip = false;
-    rows.forEach(tr => {
-      if (tr.querySelector('td[colspan]')) { skip = false; return; } // linha de detalhe ignora
-      if (skip) { skip = false; return; }
-      const texto = tr.textContent.toLowerCase();
-      const visivel = !q || texto.includes(q.toLowerCase());
-      tr.style.display = visivel ? '' : 'none';
-      // próxima é a linha de detalhe — esconde junto
-      if (!visivel) skip = true;
-    });
   },
 
   init() {

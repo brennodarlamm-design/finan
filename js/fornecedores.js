@@ -58,6 +58,7 @@ const Fornecedores = {
         <p class="page-sub">Cadastro integrado com consulta automática à Receita Federal via CNPJ</p>
       </div>
       <div class="page-actions" style="display:flex;gap:8px;flex-wrap:wrap;">
+        <button class="btn btn-secondary btn-sm" onclick="Fornecedores.limparDuplicados()" title="Verificar e unificar registros com mesmo CNPJ ou nome">🧹 Unificar Duplicados</button>
         <button class="btn btn-primary" onclick="Fornecedores.showForm()">+ Novo Fornecedor</button>
       </div>
     </div>
@@ -554,25 +555,51 @@ const Fornecedores = {
     data.ativo = data.ativo !== 'false';
     data.prazo_pagamento = data.prazo_pagamento ? parseInt(data.prazo_pagamento) : null;
 
+    const nomeNorm = (data.nome_fantasia || data.razao_social || '').trim().toLowerCase();
+    const razaoNorm = (data.razao_social || '').trim().toLowerCase();
+
     if (id) {
+      // Checa duplicidade em outros registros
+      const outros = DB.getAll('fornecedores').filter(f => f.id !== id);
+      if (!isPF && data.cnpj && outros.some(f => f.cnpj === data.cnpj)) {
+        Utils.toast(`⚠ Outro fornecedor já possui este CNPJ`, 'warning');
+        return;
+      }
+      if (isPF && data.cpf && outros.some(f => f.cpf === data.cpf)) {
+        Utils.toast(`⚠ Outro fornecedor já possui este CPF`, 'warning');
+        return;
+      }
       DB.update('fornecedores', id, data);
       Utils.toast('Cadastro atualizado com sucesso!', 'success');
     } else {
-      // Verifica duplicação por CNPJ ou CPF
+      // 1. Verifica duplicação por CNPJ ou CPF
       if (!isPF && data.cnpj) {
         const exist = DB.getAll('fornecedores').find(f => f.cnpj === data.cnpj);
         if (exist) {
-          Utils.toast(`⚠ CNPJ já cadastrado: ${exist.razao_social}`, 'warning');
+          Utils.toast(`⚠ CNPJ já cadastrado: ${exist.razao_social || exist.nome_fantasia}`, 'warning');
           return;
         }
       }
       if (isPF && data.cpf) {
         const exist = DB.getAll('fornecedores').find(f => f.cpf === data.cpf);
         if (exist) {
-          Utils.toast(`⚠ CPF já cadastrado: ${exist.razao_social}`, 'warning');
+          Utils.toast(`⚠ CPF já cadastrado: ${exist.razao_social || exist.nome_fantasia}`, 'warning');
           return;
         }
       }
+      // 2. Verifica duplicação por Nome / Razão Social
+      if (razaoNorm) {
+        const existNome = DB.getAll('fornecedores').find(f => {
+          const fRazao = (f.razao_social || '').trim().toLowerCase();
+          const fFantasia = (f.nome_fantasia || '').trim().toLowerCase();
+          return (fRazao && fRazao === razaoNorm) || (fFantasia && fFantasia === nomeNorm);
+        });
+        if (existNome) {
+          Utils.toast(`⚠ Fornecedor já cadastrado com este nome: ${existNome.razao_social || existNome.nome_fantasia}`, 'warning');
+          return;
+        }
+      }
+
       DB.add('fornecedores', data);
       Utils.toast('Cadastro realizado com sucesso!', 'success');
     }
@@ -653,8 +680,81 @@ const Fornecedores = {
    */
   getByNome(nome) {
     if (!nome) return null;
+    const n = nome.trim().toLowerCase();
     const lista = DB.getAll('fornecedores');
-    return lista.find(f => f.nome_fantasia === nome || f.razao_social === nome) || null;
+    return lista.find(f => (f.nome_fantasia && f.nome_fantasia.trim().toLowerCase() === n) || (f.razao_social && f.razao_social.trim().toLowerCase() === n)) || null;
+  },
+
+  /**
+   * Encontra fornecedor existente por CNPJ/CPF ou nome, ou cadastra automaticamente se não existir.
+   */
+  encontrarOuCriar(dados) {
+    if (!dados) return null;
+    const nome = (dados.nome_fantasia || dados.razao_social || '').trim();
+    const cnpj = (dados.cnpj || '').replace(/\D/g, '');
+    const cpf  = (dados.cpf || '').replace(/\D/g, '');
+    const lista = DB.getAll('fornecedores');
+
+    // 1. Busca por CNPJ
+    if (cnpj) {
+      const achado = lista.find(f => (f.cnpj || '').replace(/\D/g, '') === cnpj);
+      if (achado) return achado;
+    }
+    // 2. Busca por CPF
+    if (cpf) {
+      const achado = lista.find(f => (f.cpf || '').replace(/\D/g, '') === cpf);
+      if (achado) return achado;
+    }
+    // 3. Busca por Nome
+    if (nome) {
+      const achado = this.getByNome(nome);
+      if (achado) return achado;
+    }
+
+    // Não existe: cadastra novo
+    const novo = {
+      tipo_pessoa: dados.tipo_pessoa || (cpf ? 'pf' : 'pj'),
+      razao_social: dados.razao_social || nome,
+      nome_fantasia: dados.nome_fantasia || nome,
+      cnpj: cnpj,
+      cpf: cpf,
+      categoria: dados.categoria || 'material',
+      telefone: dados.telefone || '',
+      email: dados.email || '',
+      ativo: true
+    };
+    return DB.add('fornecedores', novo);
+  },
+
+  /**
+   * Remove registros duplicados existentes no banco de dados, unificando por CNPJ ou nome.
+   */
+  limparDuplicados() {
+    const lista = DB.getAll('fornecedores');
+    const vistos = new Set();
+    const unicos = [];
+    let removidos = 0;
+
+    lista.forEach(f => {
+      const doc = (f.cnpj || f.cpf || '').replace(/\D/g, '');
+      const nome = (f.razao_social || f.nome_fantasia || '').trim().toLowerCase();
+      const chave = doc ? `doc_${doc}` : `nome_${nome}`;
+
+      if (chave && vistos.has(chave)) {
+        removidos++;
+      } else {
+        if (chave) vistos.add(chave);
+        unicos.push(f);
+      }
+    });
+
+    if (removidos > 0) {
+      DB.save('fornecedores', unicos);
+      Utils.toast(`Foram unificados/removidos ${removidos} fornecedor(es) duplicado(s).`, 'success');
+      this._refresh();
+    } else {
+      Utils.toast('Nenhum fornecedor duplicado encontrado.', 'info');
+    }
   },
 
   // ─────────────────────────────────────────────────────────────

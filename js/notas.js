@@ -78,12 +78,15 @@ const Notas = {
 
   _getFiltered(obraId, filters={}) {
     let nfs = DB.getAll('notas');
-    if (obraId && obraId!=='todas') nfs=nfs.filter(n=>n.obra_id===obraId);
-    if (filters.tipo) nfs=nfs.filter(n=>n.tipo===filters.tipo);
-    if (filters.categoria) nfs=nfs.filter(n=>n.categoria===filters.categoria);
-    if (filters.status) nfs=nfs.filter(n=>n.status===filters.status);
-    if (filters.search) { const s=filters.search.toLowerCase(); nfs=nfs.filter(n=>((n.numero_nf||'')+(n.emitente||'')+(n.chave_nfe||'')).toLowerCase().includes(s)); }
-    return nfs.sort((a,b)=>(b.data_emissao||'').localeCompare(a.data_emissao||''));
+    if (obraId && obraId !== 'todas') nfs = nfs.filter(n => n.obra_id === obraId);
+    if (filters.tipo) nfs = nfs.filter(n => n.tipo === filters.tipo);
+    if (filters.categoria) nfs = nfs.filter(n => n.categoria === filters.categoria);
+    if (filters.status) nfs = nfs.filter(n => n.status === filters.status);
+    if (filters.search && filters.search.trim()) {
+      const s = filters.search.toLowerCase().trim();
+      nfs = nfs.filter(n => ((n.numero_nf||'') + ' ' + (n.emitente||'') + ' ' + (n.chave_nfe||'')).toLowerCase().includes(s));
+    }
+    return nfs.sort((a, b) => (b.data_emissao || '').localeCompare(a.data_emissao || ''));
   },
 
   _rows(nfs, showObra) {
@@ -107,7 +110,10 @@ const Notas = {
       const isSaida = n.tipo === 'saida';
 
       return `<tr>
-        <td style="font-weight:800;color:var(--accent2)">${n.numero_nf || '—'}</td>
+        <td style="font-weight:800;color:var(--accent2)">
+          ${n.numero_nf || '—'}
+          ${n.itens && n.itens.length ? `<div style="font-size:.7rem;color:var(--accent2);cursor:pointer;margin-top:2px;font-weight:400;" onclick="Notas.verItens('${n.id}')" title="Ver produtos desta NF">📦 ${n.itens.length} item(ns)</div>` : ''}
+        </td>
         <td style="white-space:nowrap;font-size:.8rem">${Utils.fmt.date(n.data_emissao)}</td>
         <td style="white-space:nowrap;font-size:.8rem;color:${n.status==='vencida'?'var(--danger)':'inherit'}">${Utils.fmt.date(n.data_vencimento)}</td>
         <td style="white-space:nowrap;">${dtPagFmt}</td>
@@ -143,6 +149,44 @@ const Notas = {
       <td style="font-weight:800;color:var(--danger)">${Utils.fmt.currency(ti)}</td>
       <td style="font-weight:800;color:var(--success)">${Utils.fmt.currency(tl)}</td>
       <td colspan="4"></td>`;
+  },
+
+  verItens(id) {
+    const n = DB.getById('notas', id);
+    if (!n || !n.itens?.length) return;
+    const rows = n.itens.map((it, i) => `
+      <tr style="background:${i%2===0?'var(--bg-card)':'var(--bg-secondary)'}">
+        <td style="padding:8px 12px;font-weight:700;color:var(--text);">${it.produto}</td>
+        <td style="padding:8px 12px;text-align:right;color:var(--text2);">${it.qtd} ${it.unidade || 'un'}</td>
+        <td style="padding:8px 12px;text-align:right;color:var(--text2);">${Utils.fmt.currency(it.valor_unit)}</td>
+        <td style="padding:8px 12px;text-align:right;font-weight:800;color:var(--danger);">${Utils.fmt.currency(it.total || (it.qtd * it.valor_unit))}</td>
+      </tr>`).join('');
+    Utils.showModal(`
+      <div class="modal" style="max-width:580px;">
+        <div class="modal-header">
+          <span class="modal-title">📦 Itens — NF ${n.numero_nf} (${n.emitente})</span>
+          <button class="modal-close" onclick="Utils.closeModal()">✕</button>
+        </div>
+        <div class="modal-body">
+          <table style="width:100%;border-collapse:collapse;font-size:.84rem;">
+            <thead><tr style="background:var(--bg-secondary);color:var(--text3);font-size:.72rem;text-transform:uppercase;">
+              <th style="padding:8px 12px;text-align:left;">Produto</th>
+              <th style="padding:8px 12px;text-align:right;">Qtd</th>
+              <th style="padding:8px 12px;text-align:right;">Valor Unit.</th>
+              <th style="padding:8px 12px;text-align:right;">Total</th>
+            </tr></thead>
+            <tbody>${rows}</tbody>
+            <tfoot><tr style="border-top:2px solid var(--border);">
+              <td colspan="3" style="padding:10px 12px;font-weight:800;color:var(--text);">TOTAL DA NF</td>
+              <td style="padding:10px 12px;text-align:right;font-weight:900;color:var(--success);font-size:1rem;">${Utils.fmt.currency(n.valor_bruto || n.valor_total)}</td>
+            </tr></tfoot>
+          </table>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-secondary" onclick="Utils.closeModal()">Fechar</button>
+          <button class="btn btn-primary" onclick="Utils.closeModal();App.navigate('produtos')">Ver no Módulo Produtos</button>
+        </div>
+      </div>`);
   },
 
   showForm(id=null) {
@@ -253,8 +297,26 @@ const Notas = {
       d.data_pagamento = null;
     }
     if(!d.lancamento_id) delete d.lancamento_id;
-    if(id){DB.update('notas',id,d);Utils.toast('NF atualizada!','success');}
-    else{DB.add('notas',d);Utils.toast('NF cadastrada!','success');}
+
+    // Vincula/cadastra fornecedor se ainda não existir
+    if (typeof Fornecedores !== 'undefined' && d.emitente) {
+      Fornecedores.encontrarOuCriar({
+        razao_social: d.emitente,
+        nome_fantasia: d.emitente,
+        cnpj: d.cnpj_emitente,
+        categoria: d.categoria || 'material'
+      });
+    }
+
+    if(id){
+      const notaAntiga = DB.getById('notas', id);
+      d.itens = notaAntiga?.itens || [];
+      DB.update('notas',id,d);
+      Utils.toast('NF atualizada!','success');
+    } else {
+      DB.add('notas',d);
+      Utils.toast('NF cadastrada!','success');
+    }
     Utils.closeModal();
     this._refresh();
   },
@@ -340,7 +402,7 @@ const Notas = {
     const tb=document.getElementById('t-nfs');
     const tf=document.getElementById('t-nf-foot');
     if(tb) tb.innerHTML=this._rows(nfs,showObra);
-    if(tf) tf.innerHTML=this._foot(nfs);
+    if(tf) tf.innerHTML=this._foot(nfs,showObra);
   },
 
   init() {
@@ -357,9 +419,8 @@ const Notas = {
   handleXmlFiles(event) {
     const files = Array.from(event.target.files);
     if (!files.length) return;
-    let imported = 0, errors = 0, duplicates = 0;
-    const results = [];
     let processed = 0;
+    const results = [];
 
     files.forEach(file => {
       const reader = new FileReader();
@@ -373,7 +434,6 @@ const Notas = {
         processed++;
         if (processed === files.length) {
           this.showXmlPreview(results);
-          // Reset input so same file can be re-imported
           event.target.value = '';
         }
       };
@@ -385,20 +445,15 @@ const Notas = {
     const parser = new DOMParser();
     const doc = parser.parseFromString(xmlText, 'application/xml');
 
-    // Verifica erros de parse
     if (doc.querySelector('parsererror')) throw new Error('XML inválido ou corrompido.');
 
-    // Helper: pega texto de tag, ignorando namespace
     const get = (parent, tag) => {
-      // Tenta com e sem namespace
       let el = parent.querySelector(tag);
       if (!el) {
-        // Busca ignorando namespace (nfe:tag)
         const all = parent.getElementsByTagName(tag);
         el = all.length ? all[0] : null;
       }
       if (!el) {
-        // Tenta variações com * namespace
         const all = parent.querySelectorAll('*');
         for (const node of all) {
           if (node.localName === tag) { el = node; break; }
@@ -407,28 +462,23 @@ const Notas = {
       return el?.textContent?.trim() || '';
     };
 
-    // Raiz: NFe > infNFe
     const infNFe = doc.querySelector('infNFe') ||
                    Array.from(doc.querySelectorAll('*')).find(el => el.localName === 'infNFe');
     if (!infNFe) throw new Error('Estrutura NF-e não encontrada no XML. Verifique se é um XML de NF-e válido.');
 
-    // Chave de acesso (no atributo Id do infNFe)
     const chaveRaw = infNFe.getAttribute('Id') || '';
     const chave = chaveRaw.replace(/^NFe/, '').trim();
 
-    // ide — identificação
     const ide = infNFe.querySelector('ide') ||
                 Array.from(infNFe.querySelectorAll('*')).find(el => el.localName === 'ide');
 
     const nNF    = get(ide || infNFe, 'nNF');
     const serie  = get(ide || infNFe, 'serie');
     const dhEmi  = get(ide || infNFe, 'dhEmi') || get(ide || infNFe, 'dEmi');
-    const tpNF   = get(ide || infNFe, 'tpNF'); // 0=entrada, 1=saída
+    const tpNF   = get(ide || infNFe, 'tpNF');
 
-    // Data emissão (ISO ou datetime)
     const dataEmissao = dhEmi ? dhEmi.substring(0, 10) : Utils.today();
 
-    // emit — emitente
     const emit = infNFe.querySelector('emit') ||
                  Array.from(infNFe.querySelectorAll('*')).find(el => el.localName === 'emit');
     const emitenteNome = get(emit || infNFe, 'xNome') || get(emit || infNFe, 'xFant');
@@ -437,15 +487,13 @@ const Notas = {
       ? emitenteCNPJ.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/, '$1.$2.$3/$4-$5')
       : emitenteCNPJ;
 
-    // dest — destinatário
     const dest = infNFe.querySelector('dest') ||
                  Array.from(infNFe.querySelectorAll('*')).find(el => el.localName === 'dest');
     const destinatario = get(dest || infNFe, 'xNome');
 
-    // ICMSTot — totais
     const icmsTot = infNFe.querySelector('ICMSTot') ||
                     Array.from(infNFe.querySelectorAll('*')).find(el => el.localName === 'ICMSTot');
-    const vNF   = parseFloat(get(icmsTot || infNFe, 'vNF'))   || 0; // valor total NF
+    const vNF   = parseFloat(get(icmsTot || infNFe, 'vNF'))   || 0;
     const vICMS = parseFloat(get(icmsTot || infNFe, 'vICMS')) || 0;
     const vIPI  = parseFloat(get(icmsTot || infNFe, 'vIPI'))  || 0;
     const vPIS  = parseFloat(get(icmsTot || infNFe, 'vPIS'))  || 0;
@@ -454,13 +502,37 @@ const Notas = {
     const impostos = parseFloat((vICMS + vIPI + vPIS + vCOFINS + vISS).toFixed(2));
     const valorLiquido = parseFloat((vNF - impostos).toFixed(2));
 
-    // Tipo: NF-e tpNF=0 entrada, 1=saída (do emitente)
-    // Na perspectiva da construtora: entrada = ela comprou (recebeu mercadoria)
     const tipo = tpNF === '0' ? 'entrada' : 'saida';
 
     if (!nNF) throw new Error('Número da NF não encontrado no XML.');
     if (!emitenteNome) throw new Error('Emitente não encontrado no XML.');
     if (vNF === 0) throw new Error('Valor da NF é zero ou não encontrado.');
+
+    // ── Extração dos Produtos / Itens (<det>) ──
+    const itens = [];
+    const dets = infNFe.querySelectorAll('det');
+    const detList = dets.length ? Array.from(dets) : Array.from(infNFe.querySelectorAll('*')).filter(el => el.localName === 'det');
+
+    detList.forEach(det => {
+      const prod = det.querySelector('prod') || Array.from(det.querySelectorAll('*')).find(el => el.localName === 'prod') || det;
+      const cProd = get(prod, 'cProd');
+      const xProd = get(prod, 'xProd');
+      const uCom  = get(prod, 'uCom') || 'un';
+      const qCom  = parseFloat(get(prod, 'qCom')) || 0;
+      const vUnCom= parseFloat(get(prod, 'vUnCom')) || 0;
+      const vProd = parseFloat(get(prod, 'vProd')) || (qCom * vUnCom);
+
+      if (xProd && (qCom > 0 || vProd > 0)) {
+        itens.push({
+          codigo: cProd,
+          produto: xProd,
+          unidade: uCom.toLowerCase().trim(),
+          qtd: qCom,
+          valor_unit: vUnCom,
+          total: vProd
+        });
+      }
+    });
 
     return {
       numero_nf:      nNF,
@@ -474,10 +546,11 @@ const Notas = {
       impostos:       impostos,
       valor_liquido:  valorLiquido,
       tipo:           tipo,
-      categoria:      'servico',
+      categoria:      'material',
       status:         'pendente',
       chave_nfe:      chave,
       observacoes:    '',
+      itens:          itens
     };
   },
 
@@ -485,7 +558,6 @@ const Notas = {
     const ok = results.filter(r => r.ok);
     const err = results.filter(r => !r.ok);
 
-    // Verifica duplicatas (chave já cadastrada)
     const existingChaves = new Set(DB.getAll('notas').map(n => n.chave_nfe).filter(Boolean));
     ok.forEach(r => { r.duplicate = r.data.chave_nfe && existingChaves.has(r.data.chave_nfe); });
 
@@ -508,12 +580,12 @@ const Notas = {
             ${dups.map(r => `<div style="color:var(--warning);margin-top:3px">${r.file} — NF ${r.data.numero_nf} (chave já existe)</div>`).join('')}
           </div>` : ''}
           ${toImport.length === 0 ? `<div style="text-align:center;padding:32px;color:var(--text3)">Nenhuma NF nova para importar.</div>` : `
-          <div style="font-size:.82rem;color:var(--text2);margin-bottom:12px">✅ <strong>${toImport.length} NF(s)</strong> prontas para importar:</div>
+          <div style="font-size:.82rem;color:var(--text2);margin-bottom:12px">✅ <strong>${toImport.length} NF(s)</strong> prontas para importar (com cadastro automático de produtos):</div>
           <div class="tbl-wrap" style="max-height:360px;overflow-y:auto">
             <table>
               <thead><tr>
                 <th>Arquivo</th><th>Nº NF</th><th>Emissão</th><th>Emitente</th>
-                <th>CNPJ</th><th>Tipo</th><th>Valor Bruto</th><th>Impostos</th><th>Valor Líquido</th><th>Obra</th>
+                <th>CNPJ</th><th>Itens</th><th>Tipo</th><th>Valor Bruto</th><th>Obra</th>
               </tr></thead>
               <tbody>
                 ${toImport.map((r, i) => `<tr>
@@ -522,10 +594,9 @@ const Notas = {
                   <td style="font-size:.8rem">${Utils.fmt.date(r.data.data_emissao)}</td>
                   <td style="font-size:.78rem;max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${r.data.emitente}">${r.data.emitente}</td>
                   <td style="font-size:.74rem;color:var(--text2)">${r.data.cnpj_emitente}</td>
+                  <td><span class="badge badge-accent" style="font-size:.72rem;">📦 ${r.data.itens?.length || 0} produto(s)</span></td>
                   <td>${r.data.tipo==='entrada'?'<span class="badge badge-info">↓ Entrada</span>':'<span class="badge badge-accent">↑ Saída</span>'}</td>
                   <td style="font-weight:700">${Utils.fmt.currency(r.data.valor_bruto)}</td>
-                  <td style="color:var(--danger);font-size:.8rem">${Utils.fmt.currency(r.data.impostos)}</td>
-                  <td style="font-weight:700;color:var(--success)">${Utils.fmt.currency(r.data.valor_liquido)}</td>
                   <td style="min-width:140px">
                     <select class="form-control" style="font-size:.78rem;padding:5px 8px" id="xml-obra-${i}">
                       ${Utils.clienteOptions(App.obraId !== 'todas' ? App.obraId : '')}
@@ -538,26 +609,47 @@ const Notas = {
         </div>
         <div class="modal-footer">
           <button class="btn btn-secondary" onclick="Utils.closeModal()">Cancelar</button>
-          ${toImport.length > 0 ? `<button class="btn btn-primary" onclick="Notas.confirmXmlImport(${JSON.stringify(toImport.map(r=>r.data)).replace(/"/g,'&quot;')})">✅ Importar ${toImport.length} NF(s)</button>` : ''}
+          ${toImport.length > 0 ? `<button class="btn btn-primary" onclick="Notas.confirmXmlImport(${JSON.stringify(toImport.map(r=>r.data)).replace(/"/g,'&quot;')})">✅ Importar ${toImport.length} NF(s) e Cadastrar Produtos</button>` : ''}
         </div>
       </div>`);
   },
 
   confirmXmlImport(nfsData) {
-    // Relê as obras selecionadas do DOM antes de fechar o modal
-    const nfs = nfsData.map ? nfsData : JSON.parse(nfsData);
+    const nfs = typeof nfsData === 'string' ? JSON.parse(nfsData) : nfsData;
     const rows = document.querySelectorAll('[id^="xml-obra-"]');
     rows.forEach((sel, i) => { if (nfs[i]) nfs[i].obra_id = sel.value; });
 
     let count = 0;
     nfs.forEach(nf => {
       if (!nf.obra_id) { Utils.toast('Selecione uma obra para cada NF!', 'warning'); return; }
+
+      // 1. Cadastra ou vincula fornecedor sem duplicar
+      if (typeof Fornecedores !== 'undefined' && nf.emitente) {
+        Fornecedores.encontrarOuCriar({
+          razao_social: nf.emitente,
+          nome_fantasia: nf.emitente,
+          cnpj: nf.cnpj_emitente,
+          categoria: nf.categoria || 'material'
+        });
+      }
+
+      // 2. Cadastra ou vincula produtos e calcula/atualiza histórico
+      if (Array.isArray(nf.itens) && typeof Produtos !== 'undefined') {
+        nf.itens.forEach(it => {
+          const prod = Produtos.encontrarOuCriar(it.produto, it.unidade, nf.categoria || 'material');
+          if (prod) {
+            it.produto_id = prod.id;
+            Produtos.atualizarValorMedio(prod.id);
+          }
+        });
+      }
+
       DB.add('notas', nf);
       count++;
     });
 
     Utils.closeModal();
     this._refresh();
-    Utils.toast(`${count} NF(s) importada(s) com sucesso!`, 'success');
+    Utils.toast(`${count} NF(s) importada(s) e produtos vinculados com sucesso!`, 'success');
   }
 };

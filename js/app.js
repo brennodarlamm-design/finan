@@ -13,7 +13,8 @@ const App = {
     ofx: OFX, notas: Notas, nfe: NFe, orcamentos: Orcamentos,
     medicoes: Medicoes, exportar: Exportar,
     contas: Contas, configuracoes: Configuracoes,
-    fornecedores: Fornecedores
+    fornecedores: Fornecedores,
+    produtos: Produtos
   },
 
   routeMeta: {
@@ -32,6 +33,7 @@ const App = {
     contas:    { icon:'🏦', label:'Contas Bancárias' },
     configuracoes: { icon:'⚙️', label:'Configurações' },
     fornecedores: { icon:'🏗️', label:'Fornecedores' },
+    produtos: { icon:'📦', label:'Produtos / Insumos' },
   },
 
   async init() {
@@ -98,6 +100,7 @@ const App = {
             ${this._navItem('dashboard','📊','Dashboard')}
             ${this._navItem('clientes','👥','Clientes / Obras')}
             ${this._navItem('fornecedores','🏗️','Fornecedores')}
+            ${this._navItem('produtos','📦','Produtos / Insumos')}
             ${this._navItem('lancamentos','💰','Lançamentos')}
             ${this._navItem('escritorio','🏢','Despesas Escritório')}
             ${this._navItem('precompras','🛒','Pré-Compras',badgePre)}
