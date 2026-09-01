@@ -570,13 +570,17 @@ const Exportar = {
           <title>Relatório ${DB.getEmpresa().nome_fantasia || 'Financeiro'}</title>
           <meta charset="utf-8">
           <style>
-            @page { size: A4 portrait; margin: 15mm 12mm 15mm 12mm; }
+            @page { size: A4 landscape; margin: 10mm 8mm 10mm 8mm; }
             * { box-sizing: border-box; }
             body { font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, Helvetica, Arial, sans-serif; margin: 0; padding: 0; background: #fff; color: #0f172a; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-            table { page-break-inside: auto; }
+            table { page-break-inside: auto; width: 100% !important; table-layout: fixed; }
             tr { page-break-inside: avoid; page-break-after: auto; }
             thead { display: table-header-group; }
             tfoot { display: table-footer-group; }
+            td, th { overflow: hidden; text-overflow: ellipsis; word-break: break-word; }
+            .ang-tbl-wrap { overflow: visible !important; }
+            .ang-tbl-wrap table { min-width: unset !important; font-size: 0.65rem !important; }
+            .ang-tbl-wrap td, .ang-tbl-wrap th { padding: 5px 5px !important; font-size: 0.65rem !important; white-space: normal !important; }
           </style>
         </head>
         <body>
@@ -604,8 +608,17 @@ const Exportar = {
           <meta charset="utf-8">
           <style>
             body { font-family: 'Segoe UI', sans-serif; background: #f1f5f9; padding: 30px; margin: 0; display: flex; justify-content: center; }
-            .sheet { background: #fff; max-width: 900px; width: 100%; padding: 40px; border-radius: 8px; box-shadow: 0 4px 20px rgba(0,0,0,0.1); }
-            @media print { body { background: #fff; padding: 0; } .sheet { box-shadow: none; padding: 0; max-width: 100%; } }
+            .sheet { background: #fff; max-width: 100%; width: 100%; padding: 40px; border-radius: 8px; box-shadow: 0 4px 20px rgba(0,0,0,0.1); }
+            @media print {
+              @page { size: A4 landscape; margin: 10mm 8mm 10mm 8mm; }
+              body { background: #fff; padding: 0; display: block; }
+              .sheet { box-shadow: none; padding: 0; max-width: 100%; }
+              table { width: 100% !important; table-layout: fixed; }
+              td, th { overflow: hidden; text-overflow: ellipsis; word-break: break-word; }
+              .ang-tbl-wrap { overflow: visible !important; }
+              .ang-tbl-wrap table { min-width: unset !important; font-size: 0.65rem !important; }
+              .ang-tbl-wrap td, .ang-tbl-wrap th { padding: 5px 5px !important; font-size: 0.65rem !important; white-space: normal !important; }
+            }
           </style>
         </head>
         <body>
