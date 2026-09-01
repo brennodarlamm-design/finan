@@ -34,16 +34,28 @@ CREATE TABLE IF NOT EXISTS notas_fiscais (
     id VARCHAR(64) PRIMARY KEY,
     numero_nf VARCHAR(64),
     serie VARCHAR(32),
-    chave_acesso VARCHAR(64) UNIQUE,
+    chave_acesso VARCHAR(64),
+    chave_nfe VARCHAR(64),
     emitente VARCHAR(255),
     cnpj_emitente VARCHAR(32),
-    valor_total NUMERIC(15, 2) DEFAULT 0,
+    destinatario VARCHAR(255),
     data_emissao DATE,
+    data_vencimento DATE,
+    data_pagamento DATE,
+    valor_bruto NUMERIC(15, 2) DEFAULT 0,
+    impostos NUMERIC(15, 2) DEFAULT 0,
+    valor_liquido NUMERIC(15, 2) DEFAULT 0,
+    valor_total NUMERIC(15, 2) DEFAULT 0,
+    tipo VARCHAR(20) DEFAULT 'entrada',
+    categoria VARCHAR(100),
     obra_id VARCHAR(64) REFERENCES obras(id) ON DELETE SET NULL,
-    status VARCHAR(50) DEFAULT 'ativo',
+    lancamento_id VARCHAR(64),
+    status VARCHAR(50) DEFAULT 'paga',
+    observacoes TEXT,
     pdf_url TEXT,
     xml_data TEXT,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE
 );
 
 -- 4. Lançamentos Financeiros (Contas a Pagar, Contas a Receber, Boletos)

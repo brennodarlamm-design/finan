@@ -185,13 +185,25 @@ const DB = {
 
       const notas = this.getAll('notas');
       if (Array.isArray(notas) && notas.length > 0) {
-        const cleaned = notas.map(n => ({
-          ...n,
-          data_emissao: (typeof Utils !== 'undefined' && Utils.cleanDate) ? Utils.cleanDate(n.data_emissao) || n.data_emissao : (n.data_emissao ? String(n.data_emissao).split('T')[0] : n.data_emissao),
-          data_vencimento: (typeof Utils !== 'undefined' && Utils.cleanDate) ? Utils.cleanDate(n.data_vencimento) || null : (n.data_vencimento ? String(n.data_vencimento).split('T')[0] : null),
-          data_pagamento: (typeof Utils !== 'undefined' && Utils.cleanDate) ? Utils.cleanDate(n.data_pagamento) || null : (n.data_pagamento ? String(n.data_pagamento).split('T')[0] : null),
-          valor_total: Number(n.valor_total) || 0
-        }));
+        const cleaned = notas.map(n => {
+          const vBruto = Number(n.valor_bruto !== undefined ? n.valor_bruto : n.valor_total) || 0;
+          const vImp = Number(n.impostos) || 0;
+          const vLiq = Number(n.valor_liquido !== undefined ? n.valor_liquido : (vBruto - vImp)) || 0;
+          const vTot = Number(n.valor_total !== undefined ? n.valor_total : vBruto) || 0;
+          return {
+            ...n,
+            data_emissao: (typeof Utils !== 'undefined' && Utils.cleanDate) ? Utils.cleanDate(n.data_emissao) || n.data_emissao : (n.data_emissao ? String(n.data_emissao).split('T')[0] : n.data_emissao),
+            data_vencimento: (typeof Utils !== 'undefined' && Utils.cleanDate) ? Utils.cleanDate(n.data_vencimento) || null : (n.data_vencimento ? String(n.data_vencimento).split('T')[0] : null),
+            data_pagamento: (typeof Utils !== 'undefined' && Utils.cleanDate) ? Utils.cleanDate(n.data_pagamento) || null : (n.data_pagamento ? String(n.data_pagamento).split('T')[0] : null),
+            valor_bruto: vBruto,
+            impostos: vImp,
+            valor_liquido: vLiq,
+            valor_total: vTot,
+            categoria: n.categoria || 'material',
+            tipo: n.tipo || 'entrada',
+            chave_nfe: n.chave_nfe || n.chave_acesso || ''
+          };
+        });
         this.save('notas', cleaned);
       }
     } catch(e) {
@@ -231,13 +243,25 @@ const DB = {
         })));
       }
       if (Array.isArray(d.notas) && d.notas.length > 0) {
-        this.save('notas', d.notas.map(n => ({
-          ...n,
-          data_emissao: (typeof Utils !== 'undefined' && Utils.cleanDate) ? Utils.cleanDate(n.data_emissao) || n.data_emissao : (n.data_emissao ? String(n.data_emissao).split('T')[0] : n.data_emissao),
-          data_vencimento: (typeof Utils !== 'undefined' && Utils.cleanDate) ? Utils.cleanDate(n.data_vencimento) || null : (n.data_vencimento ? String(n.data_vencimento).split('T')[0] : null),
-          data_pagamento: (typeof Utils !== 'undefined' && Utils.cleanDate) ? Utils.cleanDate(n.data_pagamento) || null : (n.data_pagamento ? String(n.data_pagamento).split('T')[0] : null),
-          valor_total: Number(n.valor_total) || 0
-        })));
+        this.save('notas', d.notas.map(n => {
+          const vBruto = Number(n.valor_bruto !== undefined ? n.valor_bruto : n.valor_total) || 0;
+          const vImp = Number(n.impostos) || 0;
+          const vLiq = Number(n.valor_liquido !== undefined ? n.valor_liquido : (vBruto - vImp)) || 0;
+          const vTot = Number(n.valor_total !== undefined ? n.valor_total : vBruto) || 0;
+          return {
+            ...n,
+            data_emissao: (typeof Utils !== 'undefined' && Utils.cleanDate) ? Utils.cleanDate(n.data_emissao) || n.data_emissao : (n.data_emissao ? String(n.data_emissao).split('T')[0] : n.data_emissao),
+            data_vencimento: (typeof Utils !== 'undefined' && Utils.cleanDate) ? Utils.cleanDate(n.data_vencimento) || null : (n.data_vencimento ? String(n.data_vencimento).split('T')[0] : null),
+            data_pagamento: (typeof Utils !== 'undefined' && Utils.cleanDate) ? Utils.cleanDate(n.data_pagamento) || null : (n.data_pagamento ? String(n.data_pagamento).split('T')[0] : null),
+            valor_bruto: vBruto,
+            impostos: vImp,
+            valor_liquido: vLiq,
+            valor_total: vTot,
+            categoria: n.categoria || 'material',
+            tipo: n.tipo || 'entrada',
+            chave_nfe: n.chave_nfe || n.chave_acesso || ''
+          };
+        }));
       }
       if (Array.isArray(d.orcamentos) && d.orcamentos.length > 0) this.save('orcamentos', d.orcamentos);
       if (Array.isArray(d.medicoes) && d.medicoes.length > 0) {
@@ -274,7 +298,8 @@ const DB = {
       const payload = {
         clientes: this.getAll('clientes'),
         fornecedores: this.getAll('fornecedores'),
-        lancamentos: this.getAll('lancamentos')
+        lancamentos: this.getAll('lancamentos'),
+        notas: this.getAll('notas')
       };
       const res = await fetch('/api/db', {
         method: 'POST',

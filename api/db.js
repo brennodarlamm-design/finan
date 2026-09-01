@@ -91,7 +91,13 @@ export default async function handler(req, res) {
               data_emissao: cleanDate(n.data_emissao),
               data_vencimento: cleanDate(n.data_vencimento),
               data_pagamento: cleanDate(n.data_pagamento),
-              valor_total: cleanNum(n.valor_total)
+              valor_bruto: cleanNum(n.valor_bruto !== undefined ? n.valor_bruto : n.valor_total),
+              impostos: cleanNum(n.impostos),
+              valor_liquido: cleanNum(n.valor_liquido !== undefined ? n.valor_liquido : (n.valor_bruto || n.valor_total)),
+              valor_total: cleanNum(n.valor_total !== undefined ? n.valor_total : n.valor_bruto),
+              categoria: n.categoria || 'material',
+              tipo: n.tipo || 'entrada',
+              chave_nfe: n.chave_nfe || n.chave_acesso || ''
             })),
             orcamentos: orcamentos,
             medicoes: medicoes.map(m => ({
@@ -119,6 +125,31 @@ export default async function handler(req, res) {
             data_vencimento: cleanDate(l.data_vencimento) || cleanDate(l.data),
             data_pagamento: cleanDate(l.data_pagamento),
             valor: cleanNum(l.valor)
+          }))
+        });
+      }
+
+      if (table === 'notas' || table === 'notas_fiscais') {
+        let items;
+        if (obra_id) {
+          items = await sql`SELECT * FROM notas_fiscais WHERE obra_id = ${obra_id} ORDER BY data_emissao DESC;`;
+        } else {
+          items = await sql`SELECT * FROM notas_fiscais ORDER BY data_emissao DESC;`;
+        }
+        return res.status(200).json({
+          success: true,
+          data: items.map(n => ({
+            ...n,
+            data_emissao: cleanDate(n.data_emissao),
+            data_vencimento: cleanDate(n.data_vencimento),
+            data_pagamento: cleanDate(n.data_pagamento),
+            valor_bruto: cleanNum(n.valor_bruto !== undefined ? n.valor_bruto : n.valor_total),
+            impostos: cleanNum(n.impostos),
+            valor_liquido: cleanNum(n.valor_liquido !== undefined ? n.valor_liquido : (n.valor_bruto || n.valor_total)),
+            valor_total: cleanNum(n.valor_total !== undefined ? n.valor_total : n.valor_bruto),
+            categoria: n.categoria || 'material',
+            tipo: n.tipo || 'entrada',
+            chave_nfe: n.chave_nfe || n.chave_acesso || ''
           }))
         });
       }
@@ -226,6 +257,55 @@ export default async function handler(req, res) {
           }
         }
 
+        // Notas Fiscais
+        if (Array.isArray(payload.notas)) {
+          for (const n of payload.notas) {
+            if (!n.id) continue;
+            const vBruto = cleanNum(n.valor_bruto !== undefined ? n.valor_bruto : n.valor_total);
+            const vImp = cleanNum(n.impostos);
+            const vLiq = cleanNum(n.valor_liquido !== undefined ? n.valor_liquido : (vBruto - vImp));
+            const vTot = cleanNum(n.valor_total !== undefined ? n.valor_total : vBruto);
+
+            await sql`
+              INSERT INTO notas_fiscais (
+                id, numero_nf, serie, chave_acesso, chave_nfe, emitente, cnpj_emitente, destinatario,
+                data_emissao, data_vencimento, data_pagamento, valor_bruto, impostos, valor_liquido, valor_total,
+                tipo, categoria, status, lancamento_id, observacoes, obra_id
+              )
+              VALUES (
+                ${n.id}, ${n.numero_nf || ''}, ${n.serie || ''}, ${n.chave_nfe || n.chave_acesso || null}, ${n.chave_nfe || n.chave_acesso || ''},
+                ${n.emitente || ''}, ${n.cnpj_emitente || ''}, ${n.destinatario || ''},
+                ${cleanDate(n.data_emissao)}, ${cleanDate(n.data_vencimento)}, ${cleanDate(n.data_pagamento)},
+                ${vBruto}, ${vImp}, ${vLiq}, ${vTot},
+                ${n.tipo || 'entrada'}, ${n.categoria || 'material'}, ${n.status || 'paga'},
+                ${n.lancamento_id || null}, ${n.observacoes || ''}, ${n.obra_id || null}
+              )
+              ON CONFLICT (id) DO UPDATE SET
+                numero_nf = EXCLUDED.numero_nf,
+                serie = EXCLUDED.serie,
+                chave_acesso = EXCLUDED.chave_acesso,
+                chave_nfe = EXCLUDED.chave_nfe,
+                emitente = EXCLUDED.emitente,
+                cnpj_emitente = EXCLUDED.cnpj_emitente,
+                destinatario = EXCLUDED.destinatario,
+                data_emissao = EXCLUDED.data_emissao,
+                data_vencimento = EXCLUDED.data_vencimento,
+                data_pagamento = EXCLUDED.data_pagamento,
+                valor_bruto = EXCLUDED.valor_bruto,
+                impostos = EXCLUDED.impostos,
+                valor_liquido = EXCLUDED.valor_liquido,
+                valor_total = EXCLUDED.valor_total,
+                tipo = EXCLUDED.tipo,
+                categoria = EXCLUDED.categoria,
+                status = EXCLUDED.status,
+                lancamento_id = EXCLUDED.lancamento_id,
+                observacoes = EXCLUDED.observacoes,
+                obra_id = EXCLUDED.obra_id;
+            `;
+            totalCount++;
+          }
+        }
+
         return res.status(200).json({ success: true, synced: totalCount, message: 'Dados sincronizados com o Neon PostgreSQL!' });
       }
 
@@ -267,6 +347,52 @@ export default async function handler(req, res) {
               conciliado = EXCLUDED.conciliado;
           `;
           return res.status(200).json({ success: true, id: l.id });
+        }
+
+        if (table === 'notas' || table === 'notas_fiscais') {
+          const n = data;
+          const vBruto = cleanNum(n.valor_bruto !== undefined ? n.valor_bruto : n.valor_total);
+          const vImp = cleanNum(n.impostos);
+          const vLiq = cleanNum(n.valor_liquido !== undefined ? n.valor_liquido : (vBruto - vImp));
+          const vTot = cleanNum(n.valor_total !== undefined ? n.valor_total : vBruto);
+
+          await sql`
+            INSERT INTO notas_fiscais (
+              id, numero_nf, serie, chave_acesso, chave_nfe, emitente, cnpj_emitente, destinatario,
+              data_emissao, data_vencimento, data_pagamento, valor_bruto, impostos, valor_liquido, valor_total,
+              tipo, categoria, status, lancamento_id, observacoes, obra_id
+            )
+            VALUES (
+              ${n.id}, ${n.numero_nf || ''}, ${n.serie || ''}, ${n.chave_nfe || n.chave_acesso || null}, ${n.chave_nfe || n.chave_acesso || ''},
+              ${n.emitente || ''}, ${n.cnpj_emitente || ''}, ${n.destinatario || ''},
+              ${cleanDate(n.data_emissao)}, ${cleanDate(n.data_vencimento)}, ${cleanDate(n.data_pagamento)},
+              ${vBruto}, ${vImp}, ${vLiq}, ${vTot},
+              ${n.tipo || 'entrada'}, ${n.categoria || 'material'}, ${n.status || 'paga'},
+              ${n.lancamento_id || null}, ${n.observacoes || ''}, ${n.obra_id || null}
+            )
+            ON CONFLICT (id) DO UPDATE SET
+              numero_nf = EXCLUDED.numero_nf,
+              serie = EXCLUDED.serie,
+              chave_acesso = EXCLUDED.chave_acesso,
+              chave_nfe = EXCLUDED.chave_nfe,
+              emitente = EXCLUDED.emitente,
+              cnpj_emitente = EXCLUDED.cnpj_emitente,
+              destinatario = EXCLUDED.destinatario,
+              data_emissao = EXCLUDED.data_emissao,
+              data_vencimento = EXCLUDED.data_vencimento,
+              data_pagamento = EXCLUDED.data_pagamento,
+              valor_bruto = EXCLUDED.valor_bruto,
+              impostos = EXCLUDED.impostos,
+              valor_liquido = EXCLUDED.valor_liquido,
+              valor_total = EXCLUDED.valor_total,
+              tipo = EXCLUDED.tipo,
+              categoria = EXCLUDED.categoria,
+              status = EXCLUDED.status,
+              lancamento_id = EXCLUDED.lancamento_id,
+              observacoes = EXCLUDED.observacoes,
+              obra_id = EXCLUDED.obra_id;
+          `;
+          return res.status(200).json({ success: true, id: n.id });
         }
 
         if (table === 'obras' || table === 'clientes') {
@@ -314,6 +440,10 @@ export default async function handler(req, res) {
       if (action === 'delete' && id) {
         if (table === 'lancamentos') {
           await sql`DELETE FROM lancamentos WHERE id = ${id};`;
+          return res.status(200).json({ success: true, id });
+        }
+        if (table === 'notas' || table === 'notas_fiscais') {
+          await sql`DELETE FROM notas_fiscais WHERE id = ${id};`;
           return res.status(200).json({ success: true, id });
         }
         if (table === 'obras' || table === 'clientes') {

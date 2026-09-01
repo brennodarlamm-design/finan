@@ -3,9 +3,11 @@
 const Notas = {
   render(obraId) {
     const nfs = this._getFiltered(obraId);
-    const total = nfs.reduce((s,n)=>s+n.valor_bruto,0);
-    const pendentes = nfs.filter(n=>n.status==='pendente');
+    const total = nfs.reduce((s,n)=>s+(Number(n.valor_bruto !== undefined ? n.valor_bruto : n.valor_total) || 0),0);
+    const pendentes = nfs.filter(n=>n.status==='pendente' || n.status==='vencida');
     const pagas = nfs.filter(n=>n.status==='paga');
+    const totalPagas = pagas.reduce((s,n)=>s+(Number(n.valor_bruto !== undefined ? n.valor_bruto : n.valor_total) || 0),0);
+    const totalPendentes = pendentes.reduce((s,n)=>s+(Number(n.valor_bruto !== undefined ? n.valor_bruto : n.valor_total) || 0),0);
     return `
     <div class="page-header">
       <div><h1 class="page-title">🧾 Notas Fiscais</h1><p class="page-sub">${nfs.length} NFs cadastradas</p></div>
@@ -21,9 +23,9 @@ const Notas = {
 
     <div class="g4" style="margin-bottom:16px;">
       <div class="kpi-card" style="padding:14px;"><div class="kpi-label">Total NFs</div><div class="kpi-value blue" style="font-size:1.2rem">${Utils.fmt.currency(total)}</div></div>
-      <div class="kpi-card" style="padding:14px;"><div class="kpi-label">Pagas</div><div class="kpi-value green" style="font-size:1.2rem">${Utils.fmt.currency(pagas.reduce((s,n)=>s+n.valor_bruto,0))}</div></div>
+      <div class="kpi-card" style="padding:14px;"><div class="kpi-label">Pagas</div><div class="kpi-value green" style="font-size:1.2rem">${Utils.fmt.currency(totalPagas)}</div></div>
       <div class="kpi-card" style="padding:14px;"><div class="kpi-label">Pendentes</div><div class="kpi-value yellow" style="font-size:1.2rem">${pendentes.length}</div></div>
-      <div class="kpi-card" style="padding:14px;"><div class="kpi-label">Valor Pendente</div><div class="kpi-value yellow" style="font-size:1.2rem">${Utils.fmt.currency(pendentes.reduce((s,n)=>s+n.valor_bruto,0))}</div></div>
+      <div class="kpi-card" style="padding:14px;"><div class="kpi-label">Valor Pendente</div><div class="kpi-value yellow" style="font-size:1.2rem">${Utils.fmt.currency(totalPendentes)}</div></div>
     </div>
 
     <div class="filters-bar">
@@ -80,8 +82,8 @@ const Notas = {
     if (filters.tipo) nfs=nfs.filter(n=>n.tipo===filters.tipo);
     if (filters.categoria) nfs=nfs.filter(n=>n.categoria===filters.categoria);
     if (filters.status) nfs=nfs.filter(n=>n.status===filters.status);
-    if (filters.search) { const s=filters.search.toLowerCase(); nfs=nfs.filter(n=>(n.numero_nf+n.emitente+n.chave_nfe).toLowerCase().includes(s)); }
-    return nfs.sort((a,b)=>b.data_emissao.localeCompare(a.data_emissao));
+    if (filters.search) { const s=filters.search.toLowerCase(); nfs=nfs.filter(n=>((n.numero_nf||'')+(n.emitente||'')+(n.chave_nfe||'')).toLowerCase().includes(s)); }
+    return nfs.sort((a,b)=>(b.data_emissao||'').localeCompare(a.data_emissao||''));
   },
 
   _rows(nfs, showObra) {
@@ -98,19 +100,25 @@ const Notas = {
         ? `<span style="color:var(--success);font-weight:700;font-size:.78rem;">✓ ${Utils.fmt.date(n.data_pagamento || n.data_emissao)}</span>`
         : `<span style="color:var(--text3);font-size:.75rem;">—</span>`;
 
+      const vBruto = Number(n.valor_bruto !== undefined ? n.valor_bruto : n.valor_total) || 0;
+      const vImpostos = Number(n.impostos) || 0;
+      const vLiquido = Number(n.valor_liquido !== undefined ? n.valor_liquido : (vBruto - vImpostos)) || 0;
+      const cat = n.categoria || 'material';
+      const isSaida = n.tipo === 'saida';
+
       return `<tr>
-        <td style="font-weight:800;color:var(--accent2)">${n.numero_nf}</td>
+        <td style="font-weight:800;color:var(--accent2)">${n.numero_nf || '—'}</td>
         <td style="white-space:nowrap;font-size:.8rem">${Utils.fmt.date(n.data_emissao)}</td>
         <td style="white-space:nowrap;font-size:.8rem;color:${n.status==='vencida'?'var(--danger)':'inherit'}">${Utils.fmt.date(n.data_vencimento)}</td>
         <td style="white-space:nowrap;">${dtPagFmt}</td>
         ${showObra?`<td style="font-size:.76rem;color:var(--text2)">${c?.nome||'—'}</td>`:''}
-        <td style="font-size:.78rem;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${n.emitente}">${n.emitente}</td>
-        <td>${Utils.catLabel(n.categoria)}</td>
-        <td>${n.tipo==='entrada'?'<span class="badge badge-info">↓ Entrada</span>':'<span class="badge badge-accent">↑ Saída</span>'}</td>
-        <td style="font-weight:700">${Utils.fmt.currency(n.valor_bruto)}</td>
-        <td style="color:var(--danger);font-size:.8rem">${Utils.fmt.currency(n.impostos)}</td>
-        <td style="font-weight:700;color:var(--success)">${Utils.fmt.currency(n.valor_liquido)}</td>
-        <td>${Utils.badge(n.status)}</td>
+        <td style="font-size:.78rem;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${n.emitente || ''}">${n.emitente || '—'}</td>
+        <td>${Utils.catLabel(cat)}</td>
+        <td>${!isSaida?'<span class="badge badge-info">↓ Entrada</span>':'<span class="badge badge-accent">↑ Saída</span>'}</td>
+        <td style="font-weight:700">${Utils.fmt.currency(vBruto)}</td>
+        <td style="color:var(--danger);font-size:.8rem">${Utils.fmt.currency(vImpostos)}</td>
+        <td style="font-weight:700;color:var(--success)">${Utils.fmt.currency(vLiquido)}</td>
+        <td>${Utils.badge(n.status || 'pendente')}</td>
         <td style="text-align:center;">${clipBadge}</td>
         <td>${l?`<span style="font-size:.75rem;color:var(--text2)" title="${l.descricao}">✅ ${l.descricao.slice(0,20)}...</span>`:'<span style="font-size:.72rem;color:var(--text3)">Não vinculada</span>'}</td>
         <td style="text-align:center;"><div style="display:flex;gap:4px;justify-content:center;align-items:center;">
@@ -126,9 +134,9 @@ const Notas = {
   },
 
   _foot(nfs, showObra) {
-    const tb=nfs.reduce((s,n)=>s+n.valor_bruto,0);
-    const ti=nfs.reduce((s,n)=>s+n.impostos,0);
-    const tl=nfs.reduce((s,n)=>s+n.valor_liquido,0);
+    const tb = nfs.reduce((s,n)=>s+(Number(n.valor_bruto !== undefined ? n.valor_bruto : n.valor_total) || 0), 0);
+    const ti = nfs.reduce((s,n)=>s+(Number(n.impostos) || 0), 0);
+    const tl = nfs.reduce((s,n)=>s+(Number(n.valor_liquido !== undefined ? n.valor_liquido : ((Number(n.valor_bruto !== undefined ? n.valor_bruto : n.valor_total) || 0) - (Number(n.impostos) || 0))) || 0), 0);
     const cols = showObra ? 8 : 7;
     return `<td colspan="${cols}" style="font-weight:700;color:var(--text3);font-size:.75rem">TOTAL (${nfs.length} NFs)</td>
       <td style="font-weight:800">${Utils.fmt.currency(tb)}</td>
