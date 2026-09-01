@@ -576,19 +576,19 @@ async function executarResumoMatinal() {
   try {
     const hoje = new Date().toISOString().split('T')[0];
 
-    // Busca contas a pagar vencendo hoje ou já vencidas
+    // Busca contas a pagar vencendo hoje ou já vencidas (com casting de data robusto)
     const boletos = await sql`
       SELECT l.*, o.nome as obra_nome
       FROM lancamentos l
       LEFT JOIN obras o ON l.obra_id = o.id
       WHERE l.tipo = 'despesa'
         AND l.status = 'a_pagar'
-        AND (l.data_vencimento <= ${hoje} OR l.data <= ${hoje})
-      ORDER BY l.data_vencimento ASC;
+        AND (DATE(COALESCE(l.data_vencimento, l.data)) <= ${hoje}::date)
+      ORDER BY COALESCE(l.data_vencimento, l.data) ASC;
     `;
 
     if (!boletos || boletos.length === 0) {
-      console.log('✅ [Cron] Nenhuma conta vencendo hoje.');
+      console.log('✅ [Cron] Nenhuma conta vencendo hoje ou pendente.');
       return;
     }
 
