@@ -40,6 +40,7 @@ if (!rawDbUrl) {
 }
 
 const TARGET_PHONE = process.env.TARGET_PHONE || '5595991363678';
+const AUTH_DIR = path.resolve('auth_info_baileys');
 
 // ── ESTADO DO WHATSAPP ───────────────────────────────────────────────────────
 let sock = null;
@@ -47,6 +48,7 @@ let currentQR = null;
 let qrDataUrl = null;
 let connectionStatus = 'disconnected'; // 'disconnected' | 'connecting' | 'qr_ready' | 'connected'
 let lastConnectedAt = null;
+let isStartingWhatsApp = false;
 
 // Resolve o JID canônico oficial no WhatsApp (trata variação de 8 e 9 dígitos no Brasil)
 async function resolveWhatsAppJid(phone) {
@@ -163,18 +165,64 @@ async function saveAuthToPostgres(authDir) {
   }
 }
 
-// ── INICIALIZAÇÃO DO BAILEYS ─────────────────────────────────────────────────
-async function startWhatsApp() {
+// ── LIMPEZA E RESET DE SESSÃO ───────────────────────────────────────────────
+async function resetWhatsAppSession(reason = 'Reset manual ou sessão inválida') {
+  console.log(`🧹 [WhatsApp] Limpando sessão (${reason})...`);
+  connectionStatus = 'disconnected';
+  currentQR = null;
+  qrDataUrl = null;
+
+  if (sock) {
+    try {
+      sock.ev?.removeAllListeners();
+      sock.ws?.close();
+      sock.end?.();
+    } catch {}
+    sock = null;
+  }
+
+  // 1. Limpa banco de dados Neon
+  if (sql) {
+    try {
+      await sql`DELETE FROM whatsapp_auth;`;
+      console.log('✅ [WhatsApp] Tabela whatsapp_auth limpa no Neon.');
+    } catch (e) {
+      console.warn('⚠️ [WhatsApp] Erro ao limpar whatsapp_auth no Neon:', e.message);
+    }
+  }
+
+  // 2. Limpa pasta local de credenciais
   try {
-    const authDir = path.resolve('auth_info_baileys');
-    if (!fs.existsSync(authDir)) {
-      fs.mkdirSync(authDir, { recursive: true });
+    if (fs.existsSync(AUTH_DIR)) {
+      fs.rmSync(AUTH_DIR, { recursive: true, force: true });
+      console.log('✅ [WhatsApp] Pasta auth_info_baileys removida localmente.');
+    }
+  } catch (e) {
+    console.warn('⚠️ [WhatsApp] Erro ao deletar pasta auth local:', e.message);
+  }
+
+  // 3. Reinicia o WhatsApp para gerar novo QR Code
+  setTimeout(() => {
+    startWhatsApp(true);
+  }, 1000);
+}
+
+// ── INICIALIZAÇÃO DO BAILEYS ─────────────────────────────────────────────────
+async function startWhatsApp(forceClean = false) {
+  if (isStartingWhatsApp) return;
+  isStartingWhatsApp = true;
+
+  try {
+    if (!fs.existsSync(AUTH_DIR)) {
+      fs.mkdirSync(AUTH_DIR, { recursive: true });
     }
 
-    // Restaura as chaves do PostgreSQL se existirem
-    await syncAuthFromPostgres(authDir);
+    if (!forceClean) {
+      // Restaura as chaves do PostgreSQL se existirem
+      await syncAuthFromPostgres(AUTH_DIR);
+    }
 
-    const { state, saveCreds } = await useMultiFileAuthState(authDir);
+    const { state, saveCreds } = await useMultiFileAuthState(AUTH_DIR);
     const { version } = await fetchLatestBaileysVersion();
 
     sock = makeWASocket({
@@ -182,21 +230,24 @@ async function startWhatsApp() {
       logger: pino({ level: 'silent' }),
       printQRInTerminal: false,
       auth: state,
-      browser: ['Angelim Construtora ERP', 'Chrome', '1.0.0']
+      browser: ['Angelim Construtora ERP', 'Chrome', '1.0.0'],
+      connectTimeoutMs: 60000,
+      defaultQueryTimeoutMs: 60000,
+      keepAliveIntervalMs: 25000
     });
 
     sock.ev.on('creds.update', async () => {
       await saveCreds();
-      await saveAuthToPostgres(authDir);
+      await saveAuthToPostgres(AUTH_DIR);
     });
 
     // Observa e sincroniza automaticamente qualquer arquivo de chave criado pelo Baileys
     let syncTimer = null;
     try {
-      fs.watch(authDir, () => {
+      fs.watch(AUTH_DIR, () => {
         if (syncTimer) clearTimeout(syncTimer);
         syncTimer = setTimeout(() => {
-          saveAuthToPostgres(authDir).catch(() => {});
+          saveAuthToPostgres(AUTH_DIR).catch(() => {});
         }, 500);
       });
     } catch {}
@@ -213,21 +264,23 @@ async function startWhatsApp() {
 
       if (connection === 'close') {
         const statusCode = lastDisconnect?.error?.output?.statusCode;
-        const shouldReconnect = statusCode !== DisconnectReason.loggedOut;
-        console.log(`🔌 [WhatsApp] Conexão fechada (${statusCode}). Reconectar: ${shouldReconnect}`);
+        const errMessage = lastDisconnect?.error?.message || '';
+        const shouldReconnect = statusCode !== DisconnectReason.loggedOut && statusCode !== 401;
+
+        console.log(`🔌 [WhatsApp] Conexão fechada (${statusCode} - ${errMessage}). Reconectar: ${shouldReconnect}`);
         connectionStatus = 'disconnected';
         currentQR = null;
         qrDataUrl = null;
 
         if (shouldReconnect) {
-          setTimeout(startWhatsApp, 3000);
+          setTimeout(() => {
+            isStartingWhatsApp = false;
+            startWhatsApp();
+          }, 3000);
         } else {
-          console.log('⚠️ [WhatsApp] Desconectado permanentemente. Limpando sessão no Neon...');
-          try {
-            await sql`DELETE FROM whatsapp_auth;`;
-            fs.rmSync(authDir, { recursive: true, force: true });
-          } catch {}
-          setTimeout(startWhatsApp, 3000);
+          console.log('⚠️ [WhatsApp] Sessão desconectada ou revogada pelo WhatsApp. Resetando credenciais...');
+          isStartingWhatsApp = false;
+          await resetWhatsAppSession('Desconectado permanentemente (401 / Logged Out)');
         }
       } else if (connection === 'open') {
         console.log('✅ [WhatsApp] Conectado e pronto para envio 24/7!');
@@ -235,14 +288,53 @@ async function startWhatsApp() {
         currentQR = null;
         qrDataUrl = null;
         lastConnectedAt = new Date().toISOString();
-        await saveAuthToPostgres(authDir);
+        await saveAuthToPostgres(AUTH_DIR);
       }
     });
   } catch (err) {
-    console.error('❌ Erro ao iniciar WhatsApp Baileys:', err);
-    setTimeout(startWhatsApp, 5000);
+    console.error('❌ Erro ao iniciar WhatsApp Baileys:', err.message);
+    if (err.message && (err.message.includes('Unsupported state') || err.message.includes('authenticate data') || err.message.includes('Bad MAC'))) {
+      console.warn('🚨 Detectadas chaves de criptografia inválidas no startup. Resetando sessão...');
+      isStartingWhatsApp = false;
+      await resetWhatsAppSession('Chaves inválidas no startup');
+      return;
+    }
+    setTimeout(() => {
+      isStartingWhatsApp = false;
+      startWhatsApp();
+    }, 5000);
+  } finally {
+    isStartingWhatsApp = false;
   }
 }
+
+// ── PROTEÇÃO GLOBAL CONTRA CRASHES POR CRIPTOGRAFIA / NOISE HANDSHAKE ────────
+process.on('uncaughtException', async (err) => {
+  const msg = err?.message || String(err);
+  console.error('⚠️ [UncaughtException]', msg);
+
+  if (
+    msg.includes('Unsupported state') ||
+    msg.includes('unable to authenticate data') ||
+    msg.includes('Bad MAC') ||
+    msg.includes('noise-handler') ||
+    msg.includes('Decipheriv')
+  ) {
+    console.warn('🚨 [Auto-Recovery] Falha crítica de decifração/sessão do WhatsApp detectada.');
+    console.warn('🔄 Resetando automaticamente sessão corrompida do Neon e gerando novo QR Code...');
+    try {
+      await resetWhatsAppSession('Recuperação automática de erro de decifração Noise/AES-GCM');
+    } catch (resetErr) {
+      console.error('❌ Falha no reset automático:', resetErr);
+    }
+  } else {
+    console.error('Stack:', err?.stack);
+  }
+});
+
+process.on('unhandledRejection', (reason) => {
+  console.warn('⚠️ [UnhandledRejection]', reason);
+});
 
 startWhatsApp();
 
@@ -288,6 +380,8 @@ app.get('/qr', (req, res) => {
           .badge { background: #10b981; color: #022c22; font-weight: 700; padding: 6px 14px; border-radius: 999px; display: inline-block; margin-bottom: 16px; }
           h1 { margin: 0 0 8px; font-size: 1.5rem; }
           p { color: #94a3b8; font-size: 0.9rem; line-height: 1.5; }
+          .btn-danger { display: inline-block; margin-top: 20px; background: #dc2626; color: white; border: none; padding: 10px 20px; border-radius: 8px; font-weight: 600; cursor: pointer; text-decoration: none; font-size: 0.85rem; transition: background 0.2s; }
+          .btn-danger:hover { background: #b91c1c; }
         </style>
       </head>
       <body>
@@ -295,6 +389,9 @@ app.get('/qr', (req, res) => {
           <div class="badge">🟢 100% CONECTADO</div>
           <h1>WhatsApp Conectado!</h1>
           <p>O robô 24/7 da <strong>Angelim Construtora</strong> está ativo e pronto para enviar mensagens e relatórios automáticos.</p>
+          <form action="/reset-auth" method="POST" onsubmit="return confirm('Deseja realmente desconectar e resetar a sessão?');">
+            <button type="submit" class="btn-danger">🔌 Desconectar e Trocar de Aparelho</button>
+          </form>
         </div>
       </body>
       </html>
@@ -317,6 +414,7 @@ app.get('/qr', (req, res) => {
           h1 { margin: 0 0 8px; font-size: 1.4rem; }
           p { color: #94a3b8; font-size: 0.85rem; line-height: 1.4; margin: 0; }
           .pulse { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #f59e0b; margin-right: 6px; }
+          .btn-subtle { display: inline-block; margin-top: 15px; color: #94a3b8; font-size: 0.75rem; text-decoration: underline; background: transparent; border: none; cursor: pointer; }
         </style>
       </head>
       <body>
@@ -327,6 +425,9 @@ app.get('/qr', (req, res) => {
             <img src="${qrDataUrl}" alt="QR Code WhatsApp" style="width: 260px; height: 260px; display: block;" />
           </div>
           <p style="font-size: 0.75rem; color: #64748b;">A página atualiza automaticamente a cada 15 segundos.</p>
+          <form action="/reset-auth" method="POST">
+            <button type="submit" class="btn-subtle">🔄 Limpar sessão e forçar novo QR Code</button>
+          </form>
         </div>
       </body>
       </html>
@@ -343,16 +444,55 @@ app.get('/qr', (req, res) => {
       <title>Gerando QR Code...</title>
       <style>
         body { font-family: system-ui, sans-serif; background: #0f172a; color: #f8fafc; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; text-align: center; }
+        .btn-subtle { display: inline-block; margin-top: 20px; color: #ef4444; font-size: 0.8rem; text-decoration: underline; background: transparent; border: none; cursor: pointer; }
       </style>
     </head>
     <body>
       <div>
         <h2>⏳ Iniciando motor WhatsApp...</h2>
         <p style="color:#94a3b8;">Gerando novo QR Code em instantes...</p>
+        <form action="/reset-auth" method="POST">
+          <button type="submit" class="btn-subtle">⚠️ Forçar limpeza completa da sessão</button>
+        </form>
       </div>
     </body>
     </html>
   `);
+});
+
+// 2.1 Rota de Reset Manual da Sessão
+app.all('/reset-auth', async (req, res) => {
+  console.log('🔄 [API] Requisição de reset de autenticação recebida.');
+  await resetWhatsAppSession('Solicitado via API /reset-auth');
+  
+  if (req.headers.accept && req.headers.accept.includes('text/html')) {
+    return res.send(`
+      <!DOCTYPE html>
+      <html lang="pt-BR">
+      <head>
+        <meta charset="UTF-8">
+        <meta http-equiv="refresh" content="3; url=/qr">
+        <title>Sessão Resetada</title>
+        <style>
+          body { font-family: system-ui, sans-serif; background: #0f172a; color: #f8fafc; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; text-align: center; }
+        </style>
+      </head>
+      <body>
+        <div>
+          <h2>✅ Sessão resetada com sucesso!</h2>
+          <p style="color:#94a3b8;">Redirecionando para a tela do QR Code em 3 segundos...</p>
+          <a href="/qr" style="color:#38bdf8;">Clique aqui se não for redirecionado</a>
+        </div>
+      </body>
+      </html>
+    `);
+  }
+
+  return res.json({
+    success: true,
+    message: 'Sessão do WhatsApp limpa no Neon PostgreSQL e no servidor. Novo QR Code será gerado.',
+    hint: 'Acesse /qr para escanear o novo QR Code.'
+  });
 });
 
 // 3. Disparo de Mensagem em Segundo Plano
