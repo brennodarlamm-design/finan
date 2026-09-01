@@ -35,6 +35,7 @@ const Exportar = {
             <button class="btn btn-secondary btn-sm" onclick="Exportar.exportarExcel('medicoes')">&#x1F528; Medi&ccedil;&otilde;es Caixa</button>
             <button class="btn btn-secondary btn-sm" onclick="Exportar.exportarExcel('orcamentos')">&#x1F4CB; Previsto &times; Real.</button>
           </div>
+          <button class="btn btn-secondary btn-sm btn-block" onclick="Exportar.exportarExcel('escritorio')">&#x1F3E2; Despesas Escrit&oacute;rio (.xlsx)</button>
           <button class="btn btn-secondary btn-sm btn-block" onclick="Exportar.exportarExcel('sinapi')">&#x1F3D7;&#xFE0F; Or&ccedil;amentos SINAPI (.xlsx)</button>
         </div>
       </div>
@@ -48,6 +49,7 @@ const Exportar = {
           <select class="form-control" id="exp-preview-type" onchange="Exportar.preview(this.value)">
             <option value="completo">&#x1F4CA; Relat&oacute;rio Financeiro Executivo</option>
             <option value="lancamentos">&#x1F4B0; Extrato de Lan&ccedil;amentos</option>
+            <option value="escritorio">&#x1F3E2; Despesas do Escrit&oacute;rio / Sede</option>
             <option value="notas">&#x1F9FE; Relat&oacute;rio de Notas Fiscais</option>
             <option value="medicoes">&#x1F528; Hist&oacute;rico de Medi&ccedil;&otilde;es Caixa</option>
             <option value="orcamentos">&#x1F4CB; Controle Previsto &times; Realizado</option>
@@ -270,6 +272,99 @@ const Exportar = {
           }).join('')}
         </tbody>
       </table></div>`;
+    } else if (type === 'escritorio') {
+      // ── DESPESAS DO ESCRITÓRIO / SEDE ──────────────────────────────
+      const todosLans = DB.getLancamentos(null);
+      const lans = todosLans.filter(l => l.obra_id === 'escritorio' && l.tipo === 'despesa');
+      lans.sort((a, b) => b.data.localeCompare(a.data));
+      const hoje = Utils.today();
+
+      const totDesp = lans.reduce((s, l) => s + l.valor, 0);
+      const totPago = lans.filter(l => l.status === 'pago').reduce((s, l) => s + l.valor, 0);
+      const totPendente = lans.filter(l => l.status === 'a_pagar').reduce((s, l) => s + l.valor, 0);
+      const totAtrasado = lans.filter(l => l.status === 'a_pagar' && (l.data_vencimento || l.data) < hoje).reduce((s, l) => s + l.valor, 0);
+
+      // Totais por categoria
+      const porCat = {};
+      lans.forEach(l => {
+        const cat = Utils.catLabel(l.categoria) || l.categoria || 'Outros';
+        porCat[cat] = (porCat[cat] || 0) + l.valor;
+      });
+      const catRows = Object.entries(porCat).sort((a, b) => b[1] - a[1]);
+
+      html += `
+      <div class="ang-section-header" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:8px;">
+        <h2 style="font-size:1.05rem;font-weight:900;color:#0f172a;margin:0;">&#x1F3E2; Despesas do Escritório / Sede (${lans.length} lançamentos)</h2>
+        <div class="ang-totals-row" style="font-size:.82rem;display:flex;flex-wrap:wrap;gap:6px;">
+          <span style="display:inline-block;background:#fee2e2;color:#b91c1c;padding:4px 10px;border-radius:4px;font-weight:800;">Total: ${Utils.fmt.currency(totDesp)}</span>
+          <span style="display:inline-block;background:#dcfce7;color:#15803d;padding:4px 10px;border-radius:4px;font-weight:800;">Pago: ${Utils.fmt.currency(totPago)}</span>
+          <span style="display:inline-block;background:#fef3c7;color:#92400e;padding:4px 10px;border-radius:4px;font-weight:800;">Pendente: ${Utils.fmt.currency(totPendente)}</span>
+          ${totAtrasado > 0 ? `<span style="display:inline-block;background:#fee2e2;color:#991b1b;padding:4px 10px;border-radius:4px;font-weight:800;border:1px solid #fca5a5;">&#x26A0; Atrasado: ${Utils.fmt.currency(totAtrasado)}</span>` : ''}
+        </div>
+      </div>
+
+      ${catRows.length > 0 ? `
+      <div style="margin-bottom:18px;">
+        <div style="font-size:.72rem;font-weight:900;text-transform:uppercase;color:#b45309;margin-bottom:8px;letter-spacing:.5px;">Resumo por Categoria</div>
+        <div style="display:flex;flex-wrap:wrap;gap:8px;">
+          ${catRows.map(([cat, val]) => `
+            <div style="background:#f8fafc;border:1px solid #cbd5e1;border-radius:6px;padding:8px 14px;min-width:140px;">
+              <div style="font-size:.72rem;color:#475569;font-weight:700;">${cat}</div>
+              <div style="font-size:.95rem;font-weight:900;color:#b91c1c;margin-top:2px;">${Utils.fmt.currency(val)}</div>
+              <div style="font-size:.65rem;color:#94a3b8;margin-top:1px;">${((val/totDesp)*100).toFixed(1)}% do total</div>
+            </div>`).join('')}
+        </div>
+      </div>` : ''}
+
+      <div class="ang-tbl-wrap"><table style="width:100%;border-collapse:collapse;font-size:.78rem;margin-bottom:24px;color:#0f172a;">
+        <thead>
+          <tr style="background:#7c3aed;color:#ffffff;text-align:left;">
+            <th style="padding:9px 10px;border-top-left-radius:4px;color:#ffffff;">Emissão</th>
+            <th style="padding:9px 10px;color:#ffffff;">Vencimento</th>
+            <th style="padding:9px 10px;color:#ffffff;">Pago em</th>
+            <th style="padding:9px 10px;color:#ffffff;">Categoria</th>
+            <th style="padding:9px 10px;color:#ffffff;">Descrição</th>
+            <th style="padding:9px 10px;color:#ffffff;">Beneficiário / Conta</th>
+            <th style="padding:9px 10px;text-align:right;color:#ffffff;">Valor</th>
+            <th style="padding:9px 10px;text-align:center;border-top-right-radius:4px;color:#ffffff;">Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${lans.map((l, i) => {
+            const venc = l.data_vencimento || l.data;
+            const isAtrasado = l.status === 'a_pagar' && venc < hoje;
+            const isBaixado = l.status === 'pago';
+            const statusBg = isAtrasado ? '#fee2e2' : (isBaixado ? '#dcfce7' : '#fef3c7');
+            const statusColor = isAtrasado ? '#991b1b' : (isBaixado ? '#15803d' : '#92400e');
+            const statusTxt = isAtrasado ? 'Atrasado' : l.status;
+            const dtPagFmt = isBaixado ? Utils.fmt.date(l.data_pagamento || l.data) : '&mdash;';
+            return `
+            <tr style="background:${i%2===0?'#ffffff':'#faf5ff'};border-bottom:1px solid #cbd5e1;">
+              <td style="padding:8px 10px;font-weight:700;color:#0f172a;white-space:nowrap;">${Utils.fmt.date(l.data)}</td>
+              <td style="padding:8px 10px;font-weight:800;color:${isAtrasado?'#b91c1c':'#0284c7'};white-space:nowrap;">${Utils.fmt.date(venc)}</td>
+              <td style="padding:8px 10px;font-weight:700;color:#15803d;white-space:nowrap;">${dtPagFmt}</td>
+              <td style="padding:8px 10px;color:#334155;font-weight:700;">${Utils.catLabel(l.categoria)||l.categoria||'&mdash;'}</td>
+              <td style="padding:8px 10px;font-weight:700;color:#0f172a;">${l.descricao}</td>
+              <td style="padding:8px 10px;color:#334155;">
+                <div style="font-weight:700;color:#0f172a;">${l.fornecedor_beneficiario||'&mdash;'}</div>
+                ${l.conta_bancaria ? `<div style="font-size:.7rem;color:#475569;font-weight:600;">&#x1F3E6; ${l.conta_bancaria}</div>` : ''}
+              </td>
+              <td style="padding:8px 10px;text-align:right;font-weight:900;font-size:.85rem;color:#b91c1c;white-space:nowrap;">- ${Utils.fmt.currency(l.valor)}</td>
+              <td style="padding:8px 10px;text-align:center;">
+                <span style="display:inline-block;padding:3px 8px;border-radius:4px;font-size:.72rem;font-weight:800;background:${statusBg};color:${statusColor};border:1px solid rgba(0,0,0,0.06);">${statusTxt}</span>
+              </td>
+            </tr>`;
+          }).join('')}
+        </tbody>
+        <tfoot>
+          <tr style="background:#f3e8ff;border-top:2px solid #7c3aed;">
+            <td colspan="6" style="padding:9px 10px;font-weight:900;color:#5b21b6;font-size:.8rem;">TOTAL GERAL — ${lans.length} despesas do escritório</td>
+            <td style="padding:9px 10px;text-align:right;font-weight:900;color:#b91c1c;font-size:.92rem;">- ${Utils.fmt.currency(totDesp)}</td>
+            <td></td>
+          </tr>
+        </tfoot>
+      </table></div>`;
+
     } else if (type === 'notas') {
       const nfs = obraId === 'todas' ? DB.getAll('notas') : DB.getAll('notas').filter(n => n.obra_id === obraId);
       const totBruto = nfs.reduce((s, n) => s + (n.valor_bruto || 0), 0);
@@ -733,6 +828,17 @@ const Exportar = {
         });
       });
       addSheet(rows,'Orçamentos SINAPI');
+    }
+    if (tipo === 'escritorio') {
+      const todosLans = DB.getLancamentos(null);
+      const lans = todosLans.filter(l => l.obra_id === 'escritorio' && l.tipo === 'despesa');
+      lans.sort((a, b) => a.data.localeCompare(b.data));
+      const rows = [['Data Emissão','Data Vencimento','Data Pagamento','Categoria','Descrição','Fornecedor / Beneficiário','Conta Bancária','Valor (R$)','Status']];
+      lans.forEach(l => {
+        const dtPag = l.status === 'pago' ? (l.data_pagamento || l.data) : '';
+        rows.push([l.data, l.data_vencimento||l.data, dtPag, Utils.catLabel(l.categoria)||l.categoria||'', l.descricao, l.fornecedor_beneficiario||'', l.conta_bancaria||'', l.valor, l.status]);
+      });
+      addSheet(rows, 'Despesas Escritório');
     }
 
     const dataIso = new Date().toISOString().slice(0, 10);
