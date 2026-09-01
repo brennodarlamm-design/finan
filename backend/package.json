@@ -1,6 +1,6 @@
 {
   "name": "angelim-backend-render",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Backend 24/7 para Angelim Construtora no Render com Neon PostgreSQL e WhatsApp",
   "main": "server.js",
   "type": "module",
