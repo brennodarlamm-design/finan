@@ -110,6 +110,11 @@ const Exportar = {
     const cs = obraId === 'todas' ? DB.getAll('clientes') : [DB.getById('clientes', obraId)].filter(Boolean);
     const clienteUnico = cs.length === 1 ? cs[0] : null;
     const emissao = new Date().toLocaleString('pt-BR');
+    const emp = DB.getEmpresa();
+    const empNome = emp.nome_fantasia || emp.razao_social || 'Angelim Construtora';
+    const logoHtml = emp.logo_url 
+      ? `<img src="${emp.logo_url}" alt="${empNome}" style="max-height:48px;max-width:120px;object-fit:contain;">` 
+      : `<div style="width:44px;height:44px;border-radius:8px;background:#182713;border:1px solid #c9a227;display:flex;align-items:center;justify-content:center;font-size:1.4rem;">🏢</div>`;
 
     // Cabeçalho Institucional Angelim
     const docId = `ANG-${Date.now().toString(36).toUpperCase()}`;
