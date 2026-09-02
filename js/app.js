@@ -38,6 +38,10 @@ const App = {
 
   async init() {
     if (!Auth.requireAuth()) return;
+
+    // ── Mostrar loader de sincronização ────────────────────────────
+    this._showSyncLoader();
+
     DB.init();
     await DB.syncFromCloud();
     if (DB.isDemoLoaded()) {
@@ -48,8 +52,14 @@ const App = {
       }
     }
     this.renderShell();
+
+    // ── Ocultar loader após renderizar ─────────────────────────────
+    this._hideSyncLoader();
+
     window.addEventListener('hashchange', () => this.navigate(location.hash.replace('#','')||'dashboard'));
     this.navigate(location.hash.replace('#','')||'dashboard');
+
+    if (typeof BuscaGlobal !== 'undefined') BuscaGlobal.init();
 
     // Onboarding automático para novo usuário cuja empresa ainda não foi configurada
     const emp = DB.getEmpresa();
@@ -142,7 +152,17 @@ const App = {
               ⚠ Dados Demo
               <button style="background:none;border:none;color:inherit;cursor:pointer;font-size:.68rem;text-decoration:underline;margin-left:4px;padding:0" onclick="App.clearDemo()">Limpar</button>
             </div>
-            <div class="obra-sel-btn" onclick="App.abrirBuscaObras()" title="Filtrar ou pesquisar obra (Atalho: Ctrl+K ou /)">
+            <!-- Botão Busca Global -->
+            <div class="header-search-btn" onclick="typeof BuscaGlobal !== 'undefined' && BuscaGlobal.abrir()" title="Busca Global em todo o sistema (Ctrl+K)" style="cursor:pointer;display:flex;align-items:center;gap:6px;background:rgba(255,255,255,.05);border:1px solid var(--border);border-radius:8px;padding:5px 10px;transition:all .2s;">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+              <span style="font-size:.78rem;color:var(--text2);font-weight:600;">Buscar...</span>
+              <kbd style="font-size:.65rem;color:var(--text3);background:rgba(255,255,255,.06);border:1px solid var(--border);border-radius:3px;padding:1px 4px;">Ctrl+K</kbd>
+            </div>
+            <!-- Central de Alertas Notificações -->
+            <div id="header-notif-container">
+              ${typeof Notificacoes !== 'undefined' ? Notificacoes.renderBellBtn() : ''}
+            </div>
+            <div class="obra-sel-btn" onclick="App.abrirBuscaObras()" title="Filtrar ou pesquisar obra">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
               <span class="obra-sel-label" id="obra-sel-current-name">Todas as Obras</span>
               <span style="font-size:.68rem;color:var(--text3);background:rgba(255,255,255,0.06);padding:1px 4px;border-radius:4px;">🔍</span>
@@ -164,7 +184,10 @@ const App = {
   _bindKeyboardShortcuts() {
     document.removeEventListener('keydown', this._onKeydownHandler);
     this._onKeydownHandler = e => {
-      if ((e.ctrlKey && e.key.toLowerCase() === 'k') || (e.key === '/' && document.activeElement.tagName !== 'INPUT' && document.activeElement.tagName !== 'TEXTAREA' && document.activeElement.tagName !== 'SELECT')) {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        if (typeof BuscaGlobal !== 'undefined') BuscaGlobal.abrir();
+      } else if (e.key === '/' && !['INPUT','TEXTAREA','SELECT'].includes(document.activeElement?.tagName)) {
         e.preventDefault();
         this.abrirBuscaObras();
       }
@@ -595,7 +618,53 @@ const App = {
     }
   },
 
-  registerChart(c) { this._charts.push(c); }
+  registerChart(c) { this._charts.push(c); },
+
+  // ── Loader de Sincronização ────────────────────────────────────────────────
+  _showSyncLoader() {
+    if (document.getElementById('sync-loader')) return;
+    const emp = DB.getEmpresa();
+    const brand = emp?.nome_fantasia || emp?.razao_social || 'Sistema';
+    const el = document.createElement('div');
+    el.id = 'sync-loader';
+    el.innerHTML = `
+      <div style="
+        position:fixed;inset:0;z-index:99999;
+        background:linear-gradient(135deg,#0a0f1a 0%,#0d1525 50%,#0a1020 100%);
+        display:flex;flex-direction:column;align-items:center;justify-content:center;
+        font-family:'Inter',sans-serif;transition:opacity .4s ease;">
+        <div style="text-align:center;padding:40px;">
+          <div style="font-size:3rem;margin-bottom:16px;animation:syncPulse 1.5s ease-in-out infinite;">🏗️</div>
+          <div style="font-size:1.4rem;font-weight:900;color:#fff;margin-bottom:6px;">${brand}</div>
+          <div style="font-size:.85rem;color:#94a3b8;margin-bottom:28px;">Carregando dados do sistema...</div>
+          <div style="display:flex;gap:6px;justify-content:center;margin-bottom:20px;">
+            ${[0,1,2].map(i=>`<div style="width:8px;height:8px;border-radius:50%;background:#4f46e5;animation:syncDot 1.2s ease-in-out ${i*0.2}s infinite;"></div>`).join('')}
+          </div>
+          <div id="sync-loader-msg" style="font-size:.75rem;color:#475569;">Conectando ao banco de dados...</div>
+        </div>
+      </div>
+      <style>
+        @keyframes syncPulse { 0%,100%{transform:scale(1);opacity:.9} 50%{transform:scale(1.12);opacity:1} }
+        @keyframes syncDot { 0%,80%,100%{transform:scale(.6);opacity:.4} 40%{transform:scale(1);opacity:1} }
+      </style>`;
+    document.body.appendChild(el);
+
+    // Atualizar mensagem progressivamente
+    const msgs = ['Conectando ao banco de dados...','Sincronizando lançamentos...','Carregando obras e fornecedores...','Quase pronto...'];
+    let idx = 0;
+    this._loaderTimer = setInterval(() => {
+      const msgEl = document.getElementById('sync-loader-msg');
+      if (msgEl && idx < msgs.length) { msgEl.textContent = msgs[idx++]; }
+    }, 600);
+  },
+
+  _hideSyncLoader() {
+    clearInterval(this._loaderTimer);
+    const el = document.getElementById('sync-loader');
+    if (!el) return;
+    el.querySelector('div').style.opacity = '0';
+    setTimeout(() => el.remove(), 420);
+  }
 };
 
 window.addEventListener('DOMContentLoaded', () => App.init());

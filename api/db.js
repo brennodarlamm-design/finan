@@ -44,6 +44,17 @@ export default async function handler(req, res) {
     return res.status(200).end();
   }
 
+  // ── Autenticação básica por token ─────────────────────────────────────────
+  // Permite acesso sem token em desenvolvimento local (sem VERCEL_API_SECRET)
+  const secret = process.env.VERCEL_API_SECRET;
+  if (secret) {
+    const authHeader = req.headers['authorization'] || '';
+    const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : req.headers['x-api-key'] || '';
+    if (token !== secret) {
+      return res.status(401).json({ success: false, error: 'Unauthorized' });
+    }
+  }
+
   const sql = getSql();
 
   try {

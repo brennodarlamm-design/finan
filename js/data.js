@@ -212,6 +212,14 @@ const DB = {
   },
 
   // ── NEON CLOUD SYNC ──
+  // Header de autenticação para todas as chamadas da API
+  _apiHeaders() {
+    const secret = (typeof window !== 'undefined' && window.__API_SECRET) ? window.__API_SECRET : '';
+    return secret
+      ? { 'Content-Type': 'application/json', 'Authorization': `Bearer ${secret}` }
+      : { 'Content-Type': 'application/json' };
+  },
+
   async syncFromCloud() {
     // Apenas o tenant padrão 'angelim' sincroniza com o banco Neon central da Angelim
     if (this._t() !== 'angelim') {
@@ -219,7 +227,7 @@ const DB = {
     }
 
     try {
-      const res = await fetch('/api/db?table=all');
+      const res = await fetch('/api/db?table=all', { headers: this._apiHeaders() });
       if (!res.ok) return false;
       const json = await res.json();
       if (!json.success || !json.data) return false;
@@ -286,7 +294,7 @@ const DB = {
     try {
       fetch('/api/db', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: this._apiHeaders(),
         body: JSON.stringify({ action, table, data, id })
       }).catch(() => {});
     } catch {}

@@ -16,7 +16,12 @@ const OCR = {
               <div style="font-size:.72rem;font-weight:400;color:#a5b4fc;margin-top:1px;">Gemini Vision IA · Boleto · NF-e · NFC-e · NFS-e · Contas</div>
             </div>
           </span>
-          <button class="modal-close" onclick="Utils.closeModal()" style="color:#a5b4fc;">✕</button>
+          <div style="display:flex;align-items:center;gap:8px;">
+            <button class="btn btn-ghost btn-sm" onclick="OCR.abrirHistorico()" style="color:#a5b4fc;font-size:.76rem;display:flex;align-items:center;gap:5px;border:1px solid rgba(165,180,252,.3);border-radius:8px;padding:3px 8px;" title="Ver documentos lidos anteriormente">
+              📜 Histórico (${this.obterHistorico().length})
+            </button>
+            <button class="modal-close" onclick="Utils.closeModal()" style="color:#a5b4fc;">✕</button>
+          </div>
         </div>
         <div class="modal-body" style="padding:24px;">
 
@@ -151,6 +156,9 @@ const OCR = {
       // Guardar arquivo para anexar depois
       this._arquivoAtual = file;
       this._base64Atual  = base64;
+
+      // Salvar no histórico de leituras
+      this._salvarNoHistorico(file.name, data.dados, base64);
 
       // Mostrar resultado
       this._mostrarResultado(data.dados);
@@ -476,5 +484,137 @@ const OCR = {
   // Guardar estado temporário
   _arquivoAtual: null,
   _base64Atual:  null,
-  _dadosOCR:     null
+  _dadosOCR:     null,
+
+  // ── HISTÓRICO DE DOCUMENTOS LIDOS PELO OCR ────────────────────────────────
+  obterHistorico() {
+    try {
+      return JSON.parse(localStorage.getItem('finobra_ocr_historico') || '[]');
+    } catch {
+      return [];
+    }
+  },
+
+  _salvarNoHistorico(nomeArquivo, dados, base64) {
+    try {
+      const hist = this.obterHistorico();
+      const novoItem = {
+        id: 'ocr_' + Date.now().toString(36) + Math.random().toString(36).substr(2,4),
+        data_hora: new Date().toISOString(),
+        nome_arquivo: nomeArquivo,
+        dados: dados,
+        // Guarda preview leve (thumbnail de no máximo 200 chars ou nulo para economizar espaço)
+        tipo_documento: dados.tipo_documento || 'outro',
+        fornecedor: dados.fornecedor_beneficiario || 'Não informado',
+        valor: dados.valor || 0,
+        data_vencimento: dados.data_vencimento || dados.data || '',
+        confianca: dados.confianca || 0
+      };
+
+      // Limitar aos últimos 30 itens no histórico
+      hist.unshift(novoItem);
+      if (hist.length > 30) hist.pop();
+
+      localStorage.setItem('finobra_ocr_historico', JSON.stringify(hist));
+    } catch (err) {
+      console.warn('[OCR] Erro ao salvar no histórico local:', err);
+    }
+  },
+
+  abrirHistorico() {
+    const hist = this.obterHistorico();
+
+    Utils.showModal(`
+      <div class="modal" id="ocr-hist-modal" style="max-width:680px;width:95vw;">
+        <div class="modal-header" style="background:linear-gradient(135deg,#1e1b4b 0%,#312e81 100%);border-radius:var(--r-lg) var(--r-lg) 0 0;">
+          <div class="modal-title" style="color:#e0e7ff;display:flex;align-items:center;gap:8px;">
+            <span style="font-size:1.3rem;">📜</span>
+            <div>
+              <div style="font-weight:800;font-size:1rem;">Histórico de Leituras da IA</div>
+              <div style="font-size:.72rem;color:#a5b4fc;">${hist.length} leitura(s) armazenada(s) localmente</div>
+            </div>
+          </div>
+          <div style="display:flex;align-items:center;gap:6px;">
+            ${hist.length > 0 ? `<button class="btn btn-ghost btn-sm" onclick="OCR.limparHistorico()" style="color:#f87171;font-size:.72rem;" title="Limpar todo o histórico">🗑️ Limpar</button>` : ''}
+            <button class="modal-close" onclick="Utils.closeModal()" style="color:#a5b4fc;">✕</button>
+          </div>
+        </div>
+
+        <div class="modal-body" style="padding:16px;max-height:70vh;overflow-y:auto;">
+          ${hist.length === 0 ? `
+            <div style="text-align:center;padding:40px;color:var(--text3);">
+              <div style="font-size:3rem;margin-bottom:10px;">📄</div>
+              <div style="font-size:.95rem;font-weight:700;color:var(--text);">Nenhum documento lido ainda</div>
+              <div style="font-size:.8rem;margin-top:4px;">As leituras de boletos e notas com a IA ficarão salvas aqui.</div>
+            </div>
+          ` : `
+            <div style="display:flex;flex-direction:column;gap:8px;">
+              ${hist.map((item, idx) => {
+                const confPct = Math.round((item.confianca || 0) * 100);
+                const icone = this._iconeTipoDoc(item.tipo_documento);
+                const dtFmt = new Date(item.data_hora).toLocaleString('pt-BR');
+
+                return `
+                  <div style="
+                    padding:12px 14px;border-radius:10px;border:1px solid var(--border);
+                    background:var(--bg-secondary);display:flex;align-items:center;gap:12px;
+                    transition:all .15s;">
+                    <div style="font-size:1.6rem;line-height:1;width:36px;text-align:center;">${icone}</div>
+                    <div style="flex:1;min-width:0;">
+                      <div style="display:flex;align-items:center;gap:8px;">
+                        <strong style="font-size:.85rem;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
+                          ${item.fornecedor}
+                        </strong>
+                        <span style="font-size:.68rem;background:rgba(79,70,229,.15);color:#818cf8;padding:1px 6px;border-radius:4px;font-weight:700;">
+                          ${this._labelTipoDoc(item.tipo_documento)}
+                        </span>
+                      </div>
+                      <div style="font-size:.74rem;color:var(--text3);margin-top:2px;display:flex;gap:10px;flex-wrap:wrap;">
+                        <span>📁 ${item.nome_arquivo}</span>
+                        <span>🕒 ${dtFmt}</span>
+                        ${item.data_vencimento ? `<span>📅 Venc: ${Utils.fmt.date(item.data_vencimento)}</span>` : ''}
+                      </div>
+                    </div>
+                    <div style="text-align:right;flex-shrink:0;">
+                      <div style="font-weight:900;font-size:.92rem;color:var(--accent2);">${Utils.fmt.currency(item.valor)}</div>
+                      <div style="font-size:.68rem;color:${confPct>=80?'#10b981':confPct>=50?'#f59e0b':'#ef4444'};font-weight:700;margin-top:2px;">
+                        ${confPct}% confiança
+                      </div>
+                    </div>
+                    <button class="btn btn-secondary btn-sm" onclick="OCR.reutilizarHistorico('${item.id}')" style="font-size:.75rem;padding:4px 8px;font-weight:700;white-space:nowrap;" title="Abrir dados deste documento">
+                      Abrir ➔
+                    </button>
+                  </div>
+                `;
+              }).join('')}
+            </div>
+          `}
+        </div>
+
+        <div class="modal-footer" style="padding:10px 16px;display:flex;justify-content:space-between;align-items:center;">
+          <button class="btn btn-secondary btn-sm" onclick="OCR.abrirModal()">← Voltar ao Escaneador</button>
+          <button class="btn btn-secondary btn-sm" onclick="Utils.closeModal()">Fechar</button>
+        </div>
+      </div>
+    `);
+  },
+
+  reutilizarHistorico(id) {
+    const hist = this.obterHistorico();
+    const item = hist.find(x => x.id === id);
+    if (!item || !item.dados) return;
+
+    Utils.closeModal();
+    this.abrirModal();
+    setTimeout(() => {
+      this._mostrarResultado(item.dados);
+    }, 150);
+  },
+
+  limparHistorico() {
+    if (!confirm('Deseja realmente limpar todo o histórico de leituras do OCR?')) return;
+    localStorage.removeItem('finobra_ocr_historico');
+    Utils.toast('Histórico de OCR limpo!', 'info');
+    this.abrirHistorico();
+  }
 };

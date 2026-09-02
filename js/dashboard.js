@@ -88,6 +88,20 @@ const Dashboard = {
       </div>
     </div>
 
+    <!-- Projeção de Fluxo de Caixa Futuro (90 Dias) -->
+    <div class="card" style="margin-bottom:14px;">
+      <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
+        <div>
+          <div class="card-title">📈 Projeção de Fluxo de Caixa Futuro (Próximos 90 Dias)</div>
+          <div style="font-size:.74rem;color:var(--text3);margin-top:2px;">Previsão de entradas, saídas e evolução do saldo acumulado projetado</div>
+        </div>
+        <div id="fluxo-resumo-badges" style="display:flex;gap:8px;flex-wrap:wrap;"></div>
+      </div>
+      <div class="chart-container" style="position:relative;height:260px;">
+        <canvas id="ch-fluxo-90d"></canvas>
+      </div>
+    </div>
+
     <div class="g2" style="margin-bottom:14px;">
       <div class="card">
         <div class="card-header">
@@ -428,6 +442,7 @@ const Dashboard = {
     setTimeout(() => {
       this._barChart(obraId);
       this._donutChart(obraId);
+      this._fluxoCaixaChart(obraId);
     }, 60);
   },
 
@@ -516,6 +531,153 @@ const Dashboard = {
         }
       }
     });
+    App.registerChart(ch);
+  },
+
+  _fluxoCaixaChart(obraId) {
+    const canvas = document.getElementById('ch-fluxo-90d');
+    if (!canvas) return;
+
+    const r = DB.getResumo(obraId === 'todas' ? null : obraId);
+    let runningBalance = r.saldo || 0;
+
+    const hoje = new Date();
+    hoje.setHours(0,0,0,0);
+
+    // 12 semanas (84 dias)
+    const semanas = [];
+    const labels = [];
+    for (let s = 0; s < 12; s++) {
+      const dtInicio = new Date(hoje);
+      dtInicio.setDate(hoje.getDate() + (s * 7));
+      const dtFim = new Date(hoje);
+      dtFim.setDate(hoje.getDate() + (s * 7) + 6);
+
+      const iniStr = dtInicio.toISOString().split('T')[0];
+      const fimStr = dtFim.toISOString().split('T')[0];
+      const dLabel = `${dtInicio.getDate().toString().padStart(2,'0')}/${(dtInicio.getMonth()+1).toString().padStart(2,'0')}`;
+
+      semanas.push({ iniStr, fimStr, label: `Sem ${s+1} (${dLabel})`, rec: 0, desp: 0, saldoProjetado: 0 });
+      labels.push(`Sem ${s+1} (${dLabel})`);
+    }
+
+    // Buscar lançamentos a vencer / receber
+    const lans = DB.getLancamentos(obraId === 'todas' ? null : obraId);
+    let totalPrevRec = 0;
+    let totalPrevDesp = 0;
+
+    lans.forEach(l => {
+      const venc = l.data_vencimento || l.data;
+      if (!venc) return;
+
+      semanas.forEach(sem => {
+        if (venc >= sem.iniStr && venc <= sem.fimStr) {
+          if (l.tipo === 'receita' && (l.status === 'a_receber' || l.status === 'pendente')) {
+            sem.rec += l.valor;
+            totalPrevRec += l.valor;
+          } else if (l.tipo === 'despesa' && (l.status === 'a_pagar' || l.status === 'pendente')) {
+            sem.desp += l.valor;
+            totalPrevDesp += l.valor;
+          }
+        }
+      });
+    });
+
+    // Calcular evolução do saldo acumulado projetado
+    const saldosAcumulados = [];
+    const recsArray = [];
+    const despsArray = [];
+
+    semanas.forEach(sem => {
+      runningBalance += (sem.rec - sem.desp);
+      sem.saldoProjetado = runningBalance;
+      saldosAcumulados.push(runningBalance);
+      recsArray.push(sem.rec);
+      despsArray.push(sem.desp);
+    });
+
+    // Atualizar badges de resumo no topo do card
+    const badgesContainer = document.getElementById('fluxo-resumo-badges');
+    if (badgesContainer) {
+      const saldoFinal = saldosAcumulados[saldosAcumulados.length - 1] || 0;
+      badgesContainer.innerHTML = `
+        <span style="background:rgba(16,185,129,.15);color:var(--success);padding:3px 10px;border-radius:12px;font-size:.74rem;font-weight:700;">
+          + Entradas Previstas: ${Utils.fmt.currency(totalPrevRec)}
+        </span>
+        <span style="background:rgba(239,68,68,.15);color:var(--danger);padding:3px 10px;border-radius:12px;font-size:.74rem;font-weight:700;">
+          − Saídas Previstas: ${Utils.fmt.currency(totalPrevDesp)}
+        </span>
+        <span style="background:${saldoFinal>=0?'rgba(201,162,39,.18)':'rgba(239,68,68,.25)'};color:${saldoFinal>=0?'var(--accent2)':'#f87171'};padding:3px 10px;border-radius:12px;font-size:.74rem;font-weight:800;border:1px solid ${saldoFinal>=0?'rgba(201,162,39,.4)':'rgba(239,68,68,.5)'};">
+          Saldo em 90d: ${Utils.fmt.currency(saldoFinal)}
+        </span>`;
+    }
+
+    const ch = new Chart(canvas, {
+      type: 'bar',
+      data: {
+        labels: labels,
+        datasets: [
+          {
+            label: 'Saldo Acumulado Projetado (R$)',
+            type: 'line',
+            data: saldosAcumulados,
+            borderColor: '#eab308',
+            backgroundColor: 'rgba(234,179,8,0.1)',
+            borderWidth: 2.5,
+            pointBackgroundColor: '#eab308',
+            pointRadius: 4,
+            pointHoverRadius: 6,
+            tension: 0.3,
+            fill: false,
+            yAxisID: 'y'
+          },
+          {
+            label: 'Entradas Previstas',
+            data: recsArray,
+            backgroundColor: 'rgba(16,185,129,0.7)',
+            borderRadius: 4,
+            yAxisID: 'y'
+          },
+          {
+            label: 'Saídas Previstas',
+            data: despsArray,
+            backgroundColor: 'rgba(239,68,68,0.7)',
+            borderRadius: 4,
+            yAxisID: 'y'
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        interaction: { mode: 'index', intersect: false },
+        plugins: {
+          legend: {
+            labels: { color: '#94a3b8', font: { size: 11, family: 'Inter' }, boxWidth: 12 }
+          },
+          tooltip: {
+            callbacks: {
+              label: c => ` ${c.dataset.label}: ${Utils.fmt.currency(c.raw)}`
+            }
+          }
+        },
+        scales: {
+          x: {
+            grid: { color: 'rgba(255,255,255,0.04)' },
+            ticks: { color: '#94a3b8', font: { size: 10, family: 'Inter' } }
+          },
+          y: {
+            grid: { color: 'rgba(255,255,255,0.06)' },
+            ticks: {
+              color: '#94a3b8',
+              font: { size: 10, family: 'Inter' },
+              callback: v => Utils.fmt.currency(v)
+            }
+          }
+        }
+      }
+    });
+
     App.registerChart(ch);
   },
 
