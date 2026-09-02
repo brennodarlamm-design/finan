@@ -172,12 +172,13 @@ const DB = {
   cleanAllDatesInStorage() {
     try {
       const lans = this.getAll('lancamentos');
+      const toDate = d => (typeof Utils !== 'undefined' && Utils.cleanDate) ? Utils.cleanDate(d) : (d ? String(d).split('T')[0] : '');
       if (Array.isArray(lans) && lans.length > 0) {
         const cleaned = lans.map(l => ({
           ...l,
-          data: (typeof Utils !== 'undefined' && Utils.cleanDate) ? Utils.cleanDate(l.data) || l.data : (l.data ? String(l.data).split('T')[0] : l.data),
-          data_vencimento: (typeof Utils !== 'undefined' && Utils.cleanDate) ? Utils.cleanDate(l.data_vencimento) || Utils.cleanDate(l.data) || l.data : (l.data_vencimento ? String(l.data_vencimento).split('T')[0] : l.data),
-          data_pagamento: (typeof Utils !== 'undefined' && Utils.cleanDate) ? Utils.cleanDate(l.data_pagamento) || null : (l.data_pagamento ? String(l.data_pagamento).split('T')[0] : null),
+          data: toDate(l.data) || Utils.today(),
+          data_vencimento: toDate(l.data_vencimento) || toDate(l.data) || Utils.today(),
+          data_pagamento: toDate(l.data_pagamento) || null,
           valor: Number(l.valor) || 0
         }));
         this.save('lancamentos', cleaned);
@@ -192,9 +193,9 @@ const DB = {
           const vTot = Number(n.valor_total !== undefined ? n.valor_total : vBruto) || 0;
           return {
             ...n,
-            data_emissao: (typeof Utils !== 'undefined' && Utils.cleanDate) ? Utils.cleanDate(n.data_emissao) || n.data_emissao : (n.data_emissao ? String(n.data_emissao).split('T')[0] : n.data_emissao),
-            data_vencimento: (typeof Utils !== 'undefined' && Utils.cleanDate) ? Utils.cleanDate(n.data_vencimento) || null : (n.data_vencimento ? String(n.data_vencimento).split('T')[0] : null),
-            data_pagamento: (typeof Utils !== 'undefined' && Utils.cleanDate) ? Utils.cleanDate(n.data_pagamento) || null : (n.data_pagamento ? String(n.data_pagamento).split('T')[0] : null),
+            data_emissao: toDate(n.data_emissao) || Utils.today(),
+            data_vencimento: toDate(n.data_vencimento) || null,
+            data_pagamento: toDate(n.data_pagamento) || null,
             valor_bruto: vBruto,
             impostos: vImp,
             valor_liquido: vLiq,
@@ -278,6 +279,28 @@ const DB = {
           data: (typeof Utils !== 'undefined' && Utils.cleanDate) ? Utils.cleanDate(m.data) || m.data : (m.data ? String(m.data).split('T')[0] : m.data),
           valor_medido: Number(m.valor_medido) || 0
         })));
+      }
+      if (Array.isArray(d.documentos) && d.documentos.length > 0 && typeof Documentos !== 'undefined') {
+        const locais = Documentos.getAll() || [];
+        const localMap = new Map(locais.map(x => [x.id, x]));
+        const merged = d.documentos.map(cloudDoc => {
+          const loc = localMap.get(cloudDoc.id);
+          return {
+            id: cloudDoc.id,
+            entidade_tipo: cloudDoc.tipo,
+            entidade_id: cloudDoc.referencia_id,
+            titulo: cloudDoc.titulo,
+            nome_arquivo: cloudDoc.nome_arquivo,
+            tipo_mime: cloudDoc.tipo_arquivo,
+            tamanho: cloudDoc.tamanho_bytes,
+            criado_em: cloudDoc.created_at,
+            data_base64: loc?.data_base64 || loc?.base64_data || cloudDoc.base64_data || null
+          };
+        });
+        locais.forEach(l => {
+          if (!merged.some(m => m.id === l.id)) merged.push(l);
+        });
+        Documentos.salvarLista(merged);
       }
 
       console.log('✅ Dados sincronizados com Neon PostgreSQL!');

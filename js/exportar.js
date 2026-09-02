@@ -35,6 +35,10 @@ const Exportar = {
             <button class="btn btn-secondary btn-sm" onclick="Exportar.exportarExcel('medicoes')">&#x1F528; Medi&ccedil;&otilde;es Caixa</button>
             <button class="btn btn-secondary btn-sm" onclick="Exportar.exportarExcel('orcamentos')">&#x1F4CB; Previsto &times; Real.</button>
           </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+            <button class="btn btn-secondary btn-sm" onclick="Exportar.exportarExcel('dre')">📊 DRE Gerencial (.xlsx)</button>
+            <button class="btn btn-secondary btn-sm" onclick="Exportar.exportarExcel('fluxo')">📈 Fluxo 90d (.xlsx)</button>
+          </div>
           <button class="btn btn-secondary btn-sm btn-block" onclick="Exportar.exportarExcel('escritorio')">&#x1F3E2; Despesas Escrit&oacute;rio (.xlsx)</button>
           <button class="btn btn-secondary btn-sm btn-block" onclick="Exportar.exportarExcel('sinapi')">&#x1F3D7;&#xFE0F; Or&ccedil;amentos SINAPI (.xlsx)</button>
         </div>
@@ -48,6 +52,8 @@ const Exportar = {
           <label class="form-label">Modelo do Relat&oacute;rio</label>
           <select class="form-control" id="exp-preview-type" onchange="Exportar.preview(this.value)">
             <option value="completo">&#x1F4CA; Relat&oacute;rio Financeiro Executivo</option>
+            <option value="dre">📊 DRE Gerencial (Resultado &amp; Margens)</option>
+            <option value="fluxo">📈 Projeção de Fluxo de Caixa (90 Dias)</option>
             <option value="lancamentos">&#x1F4B0; Extrato de Lan&ccedil;amentos</option>
             <option value="escritorio">&#x1F3E2; Despesas do Escrit&oacute;rio / Sede</option>
             <option value="notas">&#x1F9FE; Relat&oacute;rio de Notas Fiscais</option>
@@ -573,6 +579,175 @@ const Exportar = {
           </table></div>
         </div>`;
       }).join('')}`;
+    } else if (type === 'dre') {
+      // ── DRE GERENCIAL EXECUTIVA ───────────────────────────────────
+      const todosLans = obraId === 'todas' ? DB.getAll('lancamentos') : DB.getLancamentos(obraId);
+      const recs = todosLans.filter(l => l.tipo === 'receita').reduce((s,l) => s + l.valor, 0);
+      const mat  = todosLans.filter(l => l.tipo === 'despesa' && l.categoria === 'material').reduce((s,l) => s + l.valor, 0);
+      const mo   = todosLans.filter(l => l.tipo === 'despesa' && l.categoria === 'mao_de_obra').reduce((s,l) => s + l.valor, 0);
+      const srv  = todosLans.filter(l => l.tipo === 'despesa' && l.categoria === 'servico').reduce((s,l) => s + l.valor, 0);
+      const eqp  = todosLans.filter(l => l.tipo === 'despesa' && l.categoria === 'equipamento').reduce((s,l) => s + l.valor, 0);
+      const adm  = todosLans.filter(l => l.tipo === 'despesa' && (l.categoria === 'administrativo' || l.obra_id === 'escritorio')).reduce((s,l) => s + l.valor, 0);
+      const imp  = todosLans.filter(l => l.tipo === 'despesa' && l.categoria === 'impostos').reduce((s,l) => s + l.valor, 0);
+      const out  = todosLans.filter(l => l.tipo === 'despesa' && !['material','mao_de_obra','servico','equipamento','administrativo','impostos'].includes(l.categoria) && l.obra_id !== 'escritorio').reduce((s,l) => s + l.valor, 0);
+
+      const custosDiretos = mat + mo + srv + eqp;
+      const margemBruta = recs - custosDiretos;
+      const margemBrutaPct = recs > 0 ? ((margemBruta / recs) * 100).toFixed(1) : '0.0';
+      const despesasTotais = custosDiretos + adm + imp + out;
+      const lucroLiquido = recs - despesasTotais;
+      const margemLiqPct = recs > 0 ? ((lucroLiquido / recs) * 100).toFixed(1) : '0.0';
+
+      html += `
+      <div style="margin-bottom:18px;">
+        <h2 style="font-size:1.05rem;font-weight:900;color:#0f172a;margin:0;">📊 DRE Gerencial — Demonstrativo de Resultado</h2>
+        <div style="font-size:.78rem;color:#475569;margin-top:2px;">Centro de custo: <strong>${clienteUnico ? clienteUnico.nome : 'Todas as Obras (Consolidado)'}</strong></div>
+      </div>
+      <div class="ang-tbl-wrap" style="margin-bottom:20px;">
+        <table style="width:100%;border-collapse:collapse;font-size:.82rem;">
+          <thead>
+            <tr style="background:#0f172a;color:#fff;">
+              <th style="padding:10px 14px;text-align:left;">Conta Contábil / Descrição</th>
+              <th style="padding:10px 14px;text-align:right;width:150px;">Valor (R$)</th>
+              <th style="padding:10px 14px;text-align:right;width:100px;">% Receita</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr style="background:#f0fdf4;border-bottom:2px solid #86efac;font-weight:900;">
+              <td style="padding:10px 14px;color:#15803d;">(+) RECEITA OPERACIONAL BRUTA</td>
+              <td style="padding:10px 14px;text-align:right;color:#15803d;font-size:.95rem;">${Utils.fmt.currency(recs)}</td>
+              <td style="padding:10px 14px;text-align:right;color:#15803d;">100.0%</td>
+            </tr>
+            <tr style="border-bottom:1px solid #e2e8f0;">
+              <td style="padding:8px 14px;padding-left:28px;color:#475569;">&bull; Medições de Obras Liberadas e Faturadas</td>
+              <td style="padding:8px 14px;text-align:right;color:#334155;">${Utils.fmt.currency(recs)}</td>
+              <td style="padding:8px 14px;text-align:right;color:#64748b;">100.0%</td>
+            </tr>
+            <tr style="background:#fef2f2;border-top:2px solid #fca5a5;font-weight:800;">
+              <td style="padding:9px 14px;color:#b91c1c;">(−) CUSTOS DIRETOS DE PRODUÇÃO / OBRAS</td>
+              <td style="padding:9px 14px;text-align:right;color:#b91c1c;">${Utils.fmt.currency(custosDiretos)}</td>
+              <td style="padding:9px 14px;text-align:right;color:#b91c1c;">${recs>0?((custosDiretos/recs)*100).toFixed(1):'0.0'}%</td>
+            </tr>
+            <tr style="border-bottom:1px solid #f1f5f9;">
+              <td style="padding:7px 14px;padding-left:28px;color:#475569;">&bull; Materiais de Construção</td>
+              <td style="padding:7px 14px;text-align:right;color:#334155;">${Utils.fmt.currency(mat)}</td>
+              <td style="padding:7px 14px;text-align:right;color:#64748b;">${recs>0?((mat/recs)*100).toFixed(1):'0.0'}%</td>
+            </tr>
+            <tr style="border-bottom:1px solid #f1f5f9;">
+              <td style="padding:7px 14px;padding-left:28px;color:#475569;">&bull; Mão de Obra e Equipes Próprias</td>
+              <td style="padding:7px 14px;text-align:right;color:#334155;">${Utils.fmt.currency(mo)}</td>
+              <td style="padding:7px 14px;text-align:right;color:#64748b;">${recs>0?((mo/recs)*100).toFixed(1):'0.0'}%</td>
+            </tr>
+            <tr style="border-bottom:1px solid #f1f5f9;">
+              <td style="padding:7px 14px;padding-left:28px;color:#475569;">&bull; Serviços Terceirizados e Empreiteiros</td>
+              <td style="padding:7px 14px;text-align:right;color:#334155;">${Utils.fmt.currency(srv)}</td>
+              <td style="padding:7px 14px;text-align:right;color:#64748b;">${recs>0?((srv/recs)*100).toFixed(1):'0.0'}%</td>
+            </tr>
+            <tr style="border-bottom:1px solid #e2e8f0;">
+              <td style="padding:7px 14px;padding-left:28px;color:#475569;">&bull; Locação de Máquinas e Equipamentos</td>
+              <td style="padding:7px 14px;text-align:right;color:#334155;">${Utils.fmt.currency(eqp)}</td>
+              <td style="padding:7px 14px;text-align:right;color:#64748b;">${recs>0?((eqp/recs)*100).toFixed(1):'0.0'}%</td>
+            </tr>
+            <tr style="background:#f8fafc;border-top:2px solid #cbd5e1;border-bottom:2px solid #cbd5e1;font-weight:900;">
+              <td style="padding:10px 14px;color:#0f172a;">(=) MARGEM BRUTA OPERACIONAL</td>
+              <td style="padding:10px 14px;text-align:right;color:${margemBruta>=0?'#15803d':'#b91c1c'};font-size:.95rem;">${Utils.fmt.currency(margemBruta)}</td>
+              <td style="padding:10px 14px;text-align:right;color:${margemBruta>=0?'#15803d':'#b91c1c'};">${margemBrutaPct}%</td>
+            </tr>
+            <tr style="background:#fef2f2;font-weight:800;">
+              <td style="padding:8px 14px;color:#b91c1c;">(−) DESPESAS INDIRETAS E ADMINISTRATIVAS</td>
+              <td style="padding:8px 14px;text-align:right;color:#b91c1c;">${Utils.fmt.currency(adm + imp + out)}</td>
+              <td style="padding:8px 14px;text-align:right;color:#b91c1c;">${recs>0?(((adm+imp+out)/recs)*100).toFixed(1):'0.0'}%</td>
+            </tr>
+            <tr style="border-bottom:1px solid #f1f5f9;">
+              <td style="padding:7px 14px;padding-left:28px;color:#475569;">&bull; Administrativo / Sede / Escritório</td>
+              <td style="padding:7px 14px;text-align:right;color:#334155;">${Utils.fmt.currency(adm)}</td>
+              <td style="padding:7px 14px;text-align:right;color:#64748b;">${recs>0?((adm/recs)*100).toFixed(1):'0.0'}%</td>
+            </tr>
+            <tr style="border-bottom:1px solid #f1f5f9;">
+              <td style="padding:7px 14px;padding-left:28px;color:#475569;">&bull; Impostos e Tributos</td>
+              <td style="padding:7px 14px;text-align:right;color:#334155;">${Utils.fmt.currency(imp)}</td>
+              <td style="padding:7px 14px;text-align:right;color:#64748b;">${recs>0?((imp/recs)*100).toFixed(1):'0.0'}%</td>
+            </tr>
+            <tr style="background:${lucroLiquido>=0?'#f0fdf4':'#fef2f2'};border-top:3px solid ${lucroLiquido>=0?'#22c55e':'#ef4444'};border-bottom:3px solid ${lucroLiquido>=0?'#22c55e':'#ef4444'};font-weight:900;">
+              <td style="padding:12px 14px;font-size:1rem;color:${lucroLiquido>=0?'#15803d':'#b91c1c'};">(=) RESULTADO LÍQUIDO DO EXERCÍCIO</td>
+              <td style="padding:12px 14px;text-align:right;font-size:1.1rem;color:${lucroLiquido>=0?'#15803d':'#b91c1c'};">${Utils.fmt.currency(lucroLiquido)}</td>
+              <td style="padding:12px 14px;text-align:right;font-size:1rem;color:${lucroLiquido>=0?'#15803d':'#b91c1c'};">${margemLiqPct}%</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>`;
+    } else if (type === 'fluxo') {
+      // ── PROJEÇÃO DE FLUXO DE CAIXA (90 DIAS) ──────────────────────
+      const r = DB.getResumo(obraId === 'todas' ? null : obraId);
+      let running = r.saldo || 0;
+      const hoje = new Date();
+      hoje.setHours(0,0,0,0);
+
+      const semanas = [];
+      for (let s = 0; s < 12; s++) {
+        const dtIni = new Date(hoje);
+        dtIni.setDate(hoje.getDate() + (s * 7));
+        const dtFim = new Date(hoje);
+        dtFim.setDate(hoje.getDate() + (s * 7) + 6);
+        semanas.push({
+          num: s + 1,
+          iniStr: dtIni.toISOString().split('T')[0],
+          fimStr: dtFim.toISOString().split('T')[0],
+          label: `${dtIni.toLocaleDateString('pt-BR')} a ${dtFim.toLocaleDateString('pt-BR')}`,
+          rec: 0, desp: 0, saldoFinal: 0
+        });
+      }
+
+      const lans = DB.getLancamentos(obraId === 'todas' ? null : obraId);
+      lans.forEach(l => {
+        const venc = l.data_vencimento || l.data;
+        if (!venc) return;
+        semanas.forEach(sem => {
+          if (venc >= sem.iniStr && venc <= sem.fimStr) {
+            if (l.tipo === 'receita' && (l.status === 'a_receber' || l.status === 'pendente')) sem.rec += l.valor;
+            if (l.tipo === 'despesa' && (l.status === 'a_pagar' || l.status === 'pendente')) sem.desp += l.valor;
+          }
+        });
+      });
+
+      semanas.forEach(s => {
+        running += (s.rec - s.desp);
+        s.saldoFinal = running;
+      });
+
+      html += `
+      <div style="margin-bottom:18px;">
+        <h2 style="font-size:1.05rem;font-weight:900;color:#0f172a;margin:0;">📈 Extrato de Projeção de Fluxo de Caixa (12 Semanas / 90 Dias)</h2>
+        <div style="font-size:.78rem;color:#475569;margin-top:2px;">Saldo inicial disponível em caixa: <strong>${Utils.fmt.currency(r.saldo||0)}</strong></div>
+      </div>
+      <div class="ang-tbl-wrap" style="margin-bottom:20px;">
+        <table style="width:100%;border-collapse:collapse;font-size:.82rem;">
+          <thead>
+            <tr style="background:#0f172a;color:#fff;">
+              <th style="padding:8px 10px;text-align:center;width:45px;">Sem</th>
+              <th style="padding:8px 10px;text-align:left;">Período Semanal</th>
+              <th style="padding:8px 10px;text-align:right;color:#86efac;">(+) Entradas Previstas</th>
+              <th style="padding:8px 10px;text-align:right;color:#fca5a5;">(−) Saídas Previstas</th>
+              <th style="padding:8px 10px;text-align:right;">Resultado Semanal</th>
+              <th style="padding:8px 10px;text-align:right;">Saldo Acumulado Projetado</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${semanas.map(s => {
+              const resSem = s.rec - s.desp;
+              return `
+              <tr style="border-bottom:1px solid #cbd5e1;background:${s.saldoFinal<0?'#fef2f2':'#ffffff'};">
+                <td style="padding:8px 10px;text-align:center;font-weight:800;color:#0284c7;">${s.num}</td>
+                <td style="padding:8px 10px;color:#1e293b;font-weight:600;">${s.label}</td>
+                <td style="padding:8px 10px;text-align:right;color:#15803d;font-weight:700;">${Utils.fmt.currency(s.rec)}</td>
+                <td style="padding:8px 10px;text-align:right;color:#b91c1c;font-weight:700;">${Utils.fmt.currency(s.desp)}</td>
+                <td style="padding:8px 10px;text-align:right;font-weight:800;color:${resSem>=0?'#15803d':'#b91c1c'};">${resSem>=0?'+':''}${Utils.fmt.currency(resSem)}</td>
+                <td style="padding:8px 10px;text-align:right;font-weight:900;color:${s.saldoFinal>=0?'#0f172a':'#b91c1c'};">${Utils.fmt.currency(s.saldoFinal)}</td>
+              </tr>`;
+            }).join('')}
+          </tbody>
+        </table>
+      </div>`;
     } else {
       // Relatório Executivo Completo
       html += `
@@ -839,6 +1014,67 @@ const Exportar = {
         rows.push([l.data, l.data_vencimento||l.data, dtPag, Utils.catLabel(l.categoria)||l.categoria||'', l.descricao, l.fornecedor_beneficiario||'', l.conta_bancaria||'', l.valor, l.status]);
       });
       addSheet(rows, 'Despesas Escritório');
+    }
+    if (tipo === 'dre') {
+      const todosLans = obraId === 'todas' ? DB.getAll('lancamentos') : DB.getLancamentos(obraId);
+      const recs = todosLans.filter(l => l.tipo === 'receita').reduce((s,l) => s + l.valor, 0);
+      const mat  = todosLans.filter(l => l.tipo === 'despesa' && l.categoria === 'material').reduce((s,l) => s + l.valor, 0);
+      const mo   = todosLans.filter(l => l.tipo === 'despesa' && l.categoria === 'mao_de_obra').reduce((s,l) => s + l.valor, 0);
+      const srv  = todosLans.filter(l => l.tipo === 'despesa' && l.categoria === 'servico').reduce((s,l) => s + l.valor, 0);
+      const eqp  = todosLans.filter(l => l.tipo === 'despesa' && l.categoria === 'equipamento').reduce((s,l) => s + l.valor, 0);
+      const adm  = todosLans.filter(l => l.tipo === 'despesa' && (l.categoria === 'administrativo' || l.obra_id === 'escritorio')).reduce((s,l) => s + l.valor, 0);
+      const imp  = todosLans.filter(l => l.tipo === 'despesa' && l.categoria === 'impostos').reduce((s,l) => s + l.valor, 0);
+
+      const rows = [
+        ['DRE GERENCIAL — ANGELIM CONSTRUTORA','',''],
+        ['Obra / Centro de Custo:', safeNome, ''],
+        ['Data de Emissão:', new Date().toLocaleDateString('pt-BR'), ''],
+        ['','',''],
+        ['Conta Contábil / Linha DRE', 'Valor (R$)', '% Receita'],
+        ['(+) RECEITA OPERACIONAL BRUTA', recs, '100.0%'],
+        ['(−) Materiais de Construção', mat, recs > 0 ? ((mat/recs)*100).toFixed(1)+'%' : '0%'],
+        ['(−) Mão de Obra e Equipes', mo, recs > 0 ? ((mo/recs)*100).toFixed(1)+'%' : '0%'],
+        ['(−) Serviços Terceirizados', srv, recs > 0 ? ((srv/recs)*100).toFixed(1)+'%' : '0%'],
+        ['(−) Locação de Equipamentos', eqp, recs > 0 ? ((eqp/recs)*100).toFixed(1)+'%' : '0%'],
+        ['(=) MARGEM BRUTA OPERACIONAL', recs - (mat+mo+srv+eqp), recs > 0 ? (((recs - (mat+mo+srv+eqp))/recs)*100).toFixed(1)+'%' : '0%'],
+        ['(−) Administrativo / Sede', adm, recs > 0 ? ((adm/recs)*100).toFixed(1)+'%' : '0%'],
+        ['(−) Impostos e Tributos', imp, recs > 0 ? ((imp/recs)*100).toFixed(1)+'%' : '0%'],
+        ['(=) RESULTADO LÍQUIDO', recs - (mat+mo+srv+eqp+adm+imp), recs > 0 ? (((recs - (mat+mo+srv+eqp+adm+imp))/recs)*100).toFixed(1)+'%' : '0%']
+      ];
+      addSheet(rows, 'DRE Gerencial');
+    }
+    if (tipo === 'fluxo') {
+      const r = DB.getResumo(obraId === 'todas' ? null : obraId);
+      let running = r.saldo || 0;
+      const hoje = new Date();
+      hoje.setHours(0,0,0,0);
+
+      const rows = [
+        ['EXTRATO DE FLUXO DE CAIXA PROJETADO (12 SEMANAS / 90 DIAS)','','','',''],
+        ['Saldo Inicial Disponível:', running, '','',''],
+        ['','','','',''],
+        ['Semana', 'Período', 'Entradas Previstas (R$)', 'Saídas Previstas (R$)', 'Resultado Semanal (R$)', 'Saldo Acumulado (R$)']
+      ];
+
+      const lans = DB.getLancamentos(obraId === 'todas' ? null : obraId);
+      for (let s = 0; s < 12; s++) {
+        const dtIni = new Date(hoje); dtIni.setDate(hoje.getDate() + (s * 7));
+        const dtFim = new Date(hoje); dtFim.setDate(hoje.getDate() + (s * 7) + 6);
+        const iniStr = dtIni.toISOString().split('T')[0];
+        const fimStr = dtFim.toISOString().split('T')[0];
+        let rec = 0, desp = 0;
+        lans.forEach(l => {
+          const venc = l.data_vencimento || l.data;
+          if (venc >= iniStr && venc <= fimStr) {
+            if (l.tipo === 'receita' && (l.status === 'a_receber' || l.status === 'pendente')) rec += l.valor;
+            if (l.tipo === 'despesa' && (l.status === 'a_pagar' || l.status === 'pendente')) desp += l.valor;
+          }
+        });
+        const resSem = rec - desp;
+        running += resSem;
+        rows.push([`Sem ${s+1}`, `${dtIni.toLocaleDateString('pt-BR')} a ${dtFim.toLocaleDateString('pt-BR')}`, rec, desp, resSem, running]);
+      }
+      addSheet(rows, 'Fluxo de Caixa 90d');
     }
 
     const dataIso = new Date().toISOString().slice(0, 10);

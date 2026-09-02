@@ -445,6 +445,28 @@ export default async function handler(req, res) {
           `;
           return res.status(200).json({ success: true, id: f.id });
         }
+
+        if (table === 'documentos') {
+          const doc = data;
+          await sql`
+            INSERT INTO documentos (
+              id, tipo, referencia_id, titulo, categoria, nome_arquivo,
+              tipo_arquivo, tamanho_bytes, base64_data, created_at
+            )
+            VALUES (
+              ${doc.id}, ${doc.entidade_tipo || doc.tipo || 'geral'}, ${doc.entidade_id || doc.referencia_id || ''},
+              ${doc.titulo || doc.nome_arquivo || 'Documento'}, ${doc.categoria || ''}, ${doc.nome_arquivo || ''},
+              ${doc.tipo_mime || doc.tipo_arquivo || 'application/octet-stream'}, ${cleanNum(doc.tamanho || doc.tamanho_bytes)},
+              ${doc.data_base64 || doc.base64_data || null}, ${doc.criado_em || new Date().toISOString()}
+            )
+            ON CONFLICT (id) DO UPDATE SET
+              titulo = EXCLUDED.titulo,
+              categoria = EXCLUDED.categoria,
+              nome_arquivo = EXCLUDED.nome_arquivo,
+              base64_data = COALESCE(EXCLUDED.base64_data, documentos.base64_data);
+          `;
+          return res.status(200).json({ success: true, id: doc.id });
+        }
       }
 
       // 3. Excluir Registro Individual
@@ -463,6 +485,10 @@ export default async function handler(req, res) {
         }
         if (table === 'fornecedores') {
           await sql`DELETE FROM fornecedores WHERE id = ${id};`;
+          return res.status(200).json({ success: true, id });
+        }
+        if (table === 'documentos') {
+          await sql`DELETE FROM documentos WHERE id = ${id};`;
           return res.status(200).json({ success: true, id });
         }
       }

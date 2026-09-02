@@ -45,12 +45,22 @@ const Documentos = {
     };
     docs.push(item);
     this.salvarLista(docs);
+
+    // Sincronizar com banco de dados Neon
+    if (typeof DB !== 'undefined' && DB.syncToCloud) {
+      DB.syncToCloud('save', 'documentos', item);
+    }
     return item;
   },
 
   remover(id) {
     const docs = this.getAll().filter(d => d.id !== id);
     this.salvarLista(docs);
+
+    // Remover do banco de dados Neon
+    if (typeof DB !== 'undefined' && DB.syncToCloud) {
+      DB.syncToCloud('delete', 'documentos', null, id);
+    }
   },
 
   // Cria boletos e documentos de demonstração
