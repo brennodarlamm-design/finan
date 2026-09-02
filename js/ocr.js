@@ -1,4 +1,4 @@
-﻿// js/ocr.js — Robô de Reconhecimento Automático de Documentos Fiscais
+// js/ocr.js — Robô de Reconhecimento Automático de Documentos Fiscais
 // Integra com Google Gemini Vision via /api/reconhecer-documento
 // Suporta: Boletos, NF-e, NFC-e, NFS-e, Contas de Consumo, DAS, DARF, GPS e outros
 
@@ -20,37 +20,51 @@ const OCR = {
         </div>
         <div class="modal-body" style="padding:24px;">
 
-          <!-- Dropzone -->
+          <!-- Botões de ação principais -->
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px;">
+
+            <!-- Tirar Foto com a Câmera -->
+            <label for="ocr-camera-input" style="
+              display:flex;flex-direction:column;align-items:center;justify-content:center;
+              gap:8px;padding:20px 12px;border-radius:14px;cursor:pointer;
+              background:linear-gradient(135deg,rgba(16,185,129,.12) 0%,rgba(5,150,105,.08) 100%);
+              border:2px solid rgba(16,185,129,.4);transition:all .2s;text-align:center;">
+              <span style="font-size:2.2rem;">📷</span>
+              <span style="font-size:.88rem;font-weight:800;color:#10b981;">Tirar Foto</span>
+              <span style="font-size:.7rem;color:var(--text3);">Câmera do celular</span>
+              <input type="file" id="ocr-camera-input" accept="image/*" capture="environment"
+                style="display:none;" onchange="OCR._onFileSelected(this)">
+            </label>
+
+            <!-- Escolher da Galeria / Arquivo -->
+            <label for="ocr-file-input" style="
+              display:flex;flex-direction:column;align-items:center;justify-content:center;
+              gap:8px;padding:20px 12px;border-radius:14px;cursor:pointer;
+              background:linear-gradient(135deg,rgba(79,70,229,.12) 0%,rgba(99,102,241,.08) 100%);
+              border:2px solid rgba(79,70,229,.4);transition:all .2s;text-align:center;">
+              <span style="font-size:2.2rem;">📁</span>
+              <span style="font-size:.88rem;font-weight:800;color:#818cf8;">Galeria / Arquivo</span>
+              <span style="font-size:.7rem;color:var(--text3);">PDF · PNG · JPG (5MB)</span>
+              <input type="file" id="ocr-file-input" accept="image/*,application/pdf"
+                style="display:none;" onchange="OCR._onFileSelected(this)">
+            </label>
+          </div>
+
+          <!-- Dropzone drag-and-drop (desktop) -->
           <div id="ocr-dropzone"
-            style="border:2px dashed #4f46e5;border-radius:14px;padding:36px 24px;text-align:center;
-                   background:linear-gradient(135deg,rgba(79,70,229,.06) 0%,rgba(99,102,241,.04) 100%);
-                   cursor:pointer;transition:all .2s;position:relative;"
+            style="border:2px dashed rgba(79,70,229,.4);border-radius:12px;padding:16px;text-align:center;
+                   background:rgba(79,70,229,.04);cursor:pointer;transition:all .2s;"
             onclick="document.getElementById('ocr-file-input').click()"
             ondragover="OCR._onDragOver(event)"
             ondragleave="OCR._onDragLeave(event)"
             ondrop="OCR._onDrop(event)">
-
-            <div style="font-size:3rem;margin-bottom:10px;line-height:1;">📄</div>
-            <div style="font-size:1rem;font-weight:700;color:var(--text);margin-bottom:6px;">
-              Arraste o documento aqui
+            <div style="font-size:.78rem;color:var(--text3);">
+              🖥️ Ou arraste um arquivo aqui (PDF, imagem)
             </div>
-            <div style="font-size:.8rem;color:var(--text3);margin-bottom:16px;">
-              ou clique para selecionar o arquivo
-            </div>
-            <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap;">
-              <span style="background:rgba(79,70,229,.15);color:#818cf8;border:1px solid rgba(79,70,229,.3);border-radius:6px;padding:3px 10px;font-size:.72rem;font-weight:700;">PDF</span>
-              <span style="background:rgba(79,70,229,.15);color:#818cf8;border:1px solid rgba(79,70,229,.3);border-radius:6px;padding:3px 10px;font-size:.72rem;font-weight:700;">PNG</span>
-              <span style="background:rgba(79,70,229,.15);color:#818cf8;border:1px solid rgba(79,70,229,.3);border-radius:6px;padding:3px 10px;font-size:.72rem;font-weight:700;">JPG</span>
-              <span style="background:rgba(79,70,229,.15);color:#818cf8;border:1px solid rgba(79,70,229,.3);border-radius:6px;padding:3px 10px;font-size:.72rem;font-weight:700;">JPEG</span>
-              <span style="background:rgba(79,70,229,.15);color:#818cf8;border:1px solid rgba(79,70,229,.3);border-radius:6px;padding:3px 10px;font-size:.72rem;font-weight:700;">WEBP</span>
-            </div>
-            <div style="font-size:.72rem;color:var(--text3);margin-top:10px;">Máximo: 5 MB</div>
-            <input type="file" id="ocr-file-input" accept="image/*,application/pdf" style="display:none;"
-              onchange="OCR._onFileSelected(this)">
           </div>
 
           <!-- Tipos suportados -->
-          <div style="margin-top:20px;">
+          <div style="margin-top:16px;">
             <div style="font-size:.72rem;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px;">Documentos Reconhecidos</div>
             <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;">
               ${[
