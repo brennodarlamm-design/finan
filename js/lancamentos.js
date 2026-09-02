@@ -505,8 +505,25 @@ const Lancamentos = {
     }
 
     if (!d.nota_fiscal_id) delete d.nota_fiscal_id;
-    if (id) { DB.update('lancamentos',id,d); Utils.toast('Lançamento atualizado!','success'); }
-    else { DB.add('lancamentos',d); Utils.toast('Lançamento adicionado!','success'); }
+    let savedRec = null;
+    if (id) {
+      savedRec = DB.update('lancamentos', id, d);
+      Utils.toast('Lançamento atualizado!', 'success');
+    } else {
+      savedRec = DB.add('lancamentos', d);
+      Utils.toast('Lançamento adicionado!', 'success');
+    }
+
+    // Se a criação foi originada da tela de conciliação OFX, vincula automaticamente
+    if (typeof OFX !== 'undefined' && OFX._reconcileContext) {
+      const { importId, trnId } = OFX._reconcileContext;
+      OFX._reconcileContext = null;
+      const targetId = id || savedRec?.id;
+      if (targetId && importId && trnId) {
+        OFX.conciliar(importId, trnId, targetId, false);
+      }
+    }
+
     Utils.closeModal();
     this._refresh();
   },
