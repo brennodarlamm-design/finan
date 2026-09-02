@@ -73,14 +73,29 @@ const Documentos = {
       return this._memoryBlobs.get(id);
     }
     const doc = this.getById(id);
-    if (doc && doc.data_base64) {
-      this._memoryBlobs.set(id, doc.data_base64);
-      return doc.data_base64;
+    if (doc && (doc.data_base64 || doc.base64_data)) {
+      const b = doc.data_base64 || doc.base64_data;
+      this._memoryBlobs.set(id, b);
+      return b;
     }
     const fromIdb = await this._idbGet(id);
     if (fromIdb) {
       this._memoryBlobs.set(id, fromIdb);
       return fromIdb;
+    }
+    // Tenta buscar da nuvem (Neon) se o arquivo foi anexado por outro dispositivo (ex: celular)
+    try {
+      const res = await fetch(`/api/db?table=documento_conteudo&id=${encodeURIComponent(id)}`);
+      if (res.ok) {
+        const json = await res.json();
+        if (json.base64) {
+          this._memoryBlobs.set(id, json.base64);
+          this._idbSet(id, json.base64);
+          return json.base64;
+        }
+      }
+    } catch (e) {
+      console.warn('[Documentos] Falha ao obter conteúdo da nuvem:', e);
     }
     return null;
   },
@@ -164,9 +179,12 @@ const Documentos = {
     docs.push(item);
     this.salvarLista(docs);
 
-    // Sincronizar com banco de dados Neon
+    // Sincronizar com banco de dados Neon (incluindo base64 para que outros dispositivos tenham acesso ao arquivo)
     if (typeof DB !== 'undefined' && DB.syncToCloud) {
-      DB.syncToCloud('save', 'documentos', item);
+      DB.syncToCloud('save', 'documentos', {
+        ...item,
+        base64_data: base64
+      });
     }
     return item;
   },
@@ -373,9 +391,10 @@ const Documentos = {
       return;
     }
 
+    Utils.toast('Carregando anexo...', 'info');
     const conteudo = await this.obterConteudo(id);
     if (!conteudo) {
-      Utils.toast('Conteúdo do arquivo não disponível neste dispositivo.', 'warning');
+      Utils.toast('Conteúdo do arquivo não disponível neste dispositivo nem na nuvem.', 'warning');
       return;
     }
 
@@ -407,6 +426,7 @@ const Documentos = {
   async baixar(id) {
     const doc = this.getById(id);
     if (!doc) return;
+    Utils.toast('Baixando anexo...', 'info');
     const conteudo = await this.obterConteudo(id);
     if (!conteudo) {
       Utils.toast('Conteúdo do arquivo não disponível.', 'warning');

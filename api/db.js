@@ -48,7 +48,7 @@ export default async function handler(req, res) {
   try {
     // ── GET: Consultar dados ───────────────────────────────────────────────────
     if (req.method === 'GET') {
-      const { table, obra_id } = req.query;
+      const { table, obra_id, id } = req.query || {};
 
       if (!table || table === 'all') {
         const [obras, fornecedores, lancamentos, notas, orcamentos, medicoes, documentos, produtos] = await Promise.all([
@@ -180,6 +180,34 @@ export default async function handler(req, res) {
       if (table === 'produtos') {
         const items = await sql`SELECT * FROM produtos ORDER BY nome ASC;`;
         return res.status(200).json({ success: true, data: items.map(p => ({ ...p, valor_medio: cleanNum(p.valor_medio) })) });
+      }
+
+      if (table === 'documento_conteudo') {
+        const docId = id || req.query.id;
+        if (!docId) return res.status(400).json({ error: 'ID do documento obrigatório' });
+        const rows = await sql`SELECT base64_data, tipo_arquivo, nome_arquivo FROM documentos WHERE id = ${docId} LIMIT 1;`;
+        if (!rows.length || !rows[0].base64_data) {
+          return res.status(404).json({ success: false, error: 'Conteúdo do arquivo não encontrado na nuvem' });
+        }
+        return res.status(200).json({
+          success: true,
+          base64: rows[0].base64_data,
+          tipo: rows[0].tipo_arquivo,
+          nome: rows[0].nome_arquivo
+        });
+      }
+
+      if (table === 'ocr_historico') {
+        const items = await sql`SELECT * FROM ocr_historico ORDER BY data_hora DESC LIMIT 50;`;
+        return res.status(200).json({
+          success: true,
+          data: items.map(h => ({
+            ...h,
+            valor: cleanNum(h.valor),
+            confianca: cleanNum(h.confianca),
+            dados: typeof h.dados === 'string' ? JSON.parse(h.dados) : (h.dados || {})
+          }))
+        });
       }
 
       return res.status(200).json({ success: true, data: [], message: `Tabela '${table}' disponível localmente.` });
@@ -493,6 +521,29 @@ export default async function handler(req, res) {
           `;
           return res.status(200).json({ success: true, id: p.id });
         }
+
+        if (table === 'ocr_historico') {
+          const h = data;
+          const dadosJson = JSON.stringify(h.dados || {});
+          await sql`
+            INSERT INTO ocr_historico (id, data_hora, nome_arquivo, tipo_documento, fornecedor, valor, data_vencimento, confianca, dados)
+            VALUES (
+              ${h.id}, ${h.data_hora || new Date().toISOString()}, ${h.nome_arquivo || ''},
+              ${h.tipo_documento || 'outro'}, ${h.fornecedor || 'Não informado'}, ${cleanNum(h.valor)},
+              ${h.data_vencimento || null}, ${cleanNum(h.confianca)}, ${dadosJson}
+            )
+            ON CONFLICT (id) DO UPDATE SET
+              data_hora = EXCLUDED.data_hora,
+              nome_arquivo = EXCLUDED.nome_arquivo,
+              tipo_documento = EXCLUDED.tipo_documento,
+              fornecedor = EXCLUDED.fornecedor,
+              valor = EXCLUDED.valor,
+              data_vencimento = EXCLUDED.data_vencimento,
+              confianca = EXCLUDED.confianca,
+              dados = EXCLUDED.dados;
+          `;
+          return res.status(200).json({ success: true, id: h.id });
+        }
       }
 
       // 3. Excluir Registro Individual
@@ -519,6 +570,14 @@ export default async function handler(req, res) {
         }
         if (table === 'produtos') {
           await sql`DELETE FROM produtos WHERE id = ${id};`;
+          return res.status(200).json({ success: true, id });
+        }
+        if (table === 'ocr_historico') {
+          if (id === 'all') {
+            await sql`DELETE FROM ocr_historico;`;
+          } else {
+            await sql`DELETE FROM ocr_historico WHERE id = ${id};`;
+          }
           return res.status(200).json({ success: true, id });
         }
       }

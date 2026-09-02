@@ -323,7 +323,7 @@ const DB = {
   syncToCloud(action, table, data, id) {
     // Sincroniza com Neon apenas se for o tenant central da Angelim
     if (this._t() !== 'angelim') return;
-    const cloudTables = ['lancamentos', 'notas', 'notas_fiscais', 'obras', 'clientes', 'fornecedores', 'documentos', 'produtos'];
+    const cloudTables = ['lancamentos', 'notas', 'notas_fiscais', 'obras', 'clientes', 'fornecedores', 'documentos', 'produtos', 'ocr_historico'];
     if (!cloudTables.includes(table)) return;
     try {
       fetch('/api/db', {
