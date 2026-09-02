@@ -98,6 +98,9 @@ const Utils = {
       // Receitas e Obras
       parcela_caixa:'🏦 Parcela Caixa',
       entrada_propria:'💵 Entrada Própria',
+      aporte_financeiro:'💼 Aporte Financeiro',
+      emprestimo:'🤝 Empréstimo',
+      financiamento:'🏗️ Financiamento',
       material:'🧱 Material',
       mao_de_obra:'👷 Mão de Obra',
       servico:'🔧 Serviço',

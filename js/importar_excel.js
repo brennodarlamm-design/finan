@@ -326,8 +326,11 @@ const ImportarExcel = {
   _normalizeCategory(catStr, tipo) {
     const s = (catStr || '').toLowerCase();
     if (tipo === 'receita') {
-      if (/caixa|financ|parc/i.test(s)) return 'parcela_caixa';
+      if (/caixa|parc/i.test(s)) return 'parcela_caixa';
       if (/prop|entrad/i.test(s)) return 'entrada_propria';
+      if (/aport/i.test(s)) return 'aporte_financeiro';
+      if (/empr[eé]st/i.test(s)) return 'emprestimo';
+      if (/financ/i.test(s)) return 'financiamento';
       return 'outro';
     }
     if (/energ|luz|cpfl|equat/i.test(s)) return 'energia';
@@ -403,14 +406,19 @@ const ImportarExcel = {
         <td>
           <select class="form-control" style="padding:2px 4px;font-size:.76rem;max-width:130px;" onchange="ImportarExcel.updateCell('${item.id_temp}', 'categoria', this.value)">
             <option value="${item.categoria}" selected>${Utils.catLabel(item.categoria)}</option>
+            <optgroup label="💰 Receitas">
+              <option value="parcela_caixa">🏦 Parcela Caixa</option>
+              <option value="entrada_propria">💵 Entrada Própria</option>
+              <option value="aporte_financeiro">💼 Aporte Financeiro</option>
+              <option value="emprestimo">🤝 Empréstimo</option>
+              <option value="financiamento">🏗️ Financiamento</option>
+            </optgroup>
             <optgroup label="🏗️ Obras">
               <option value="material">🧱 Material</option>
               <option value="mao_de_obra">👷 Mão de Obra</option>
               <option value="servico">🔧 Serviço</option>
               <option value="equipamento">🏗️ Equipamento</option>
               <option value="taxa">📋 Taxa/Imposto</option>
-              <option value="parcela_caixa">🏦 Parcela Caixa</option>
-              <option value="entrada_propria">💵 Entrada Própria</option>
             </optgroup>
             <optgroup label="🏢 Escritório">
               <option value="energia">💡 Energia Elétrica</option>

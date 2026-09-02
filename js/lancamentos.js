@@ -53,9 +53,14 @@ const Lancamentos = {
         <label class="filter-label">Categoria</label>
         <select class="form-control" id="f-cat" style="min-width:140px">
           <option value="">Todas</option>
-          <optgroup label="🏗️ Obras">
+          <optgroup label="💰 Receitas">
             <option value="parcela_caixa">&#x1F3E6; Parcela Caixa</option>
             <option value="entrada_propria">&#x1F4B5; Entrada Pr&oacute;pria</option>
+            <option value="aporte_financeiro">💼 Aporte Financeiro</option>
+            <option value="emprestimo">🤝 Empréstimo</option>
+            <option value="financiamento">🏗️ Financiamento</option>
+          </optgroup>
+          <optgroup label="🏗️ Obras">
             <option value="material">&#x1F9F1; Material</option>
             <option value="mao_de_obra">&#x1F477; M&atilde;o de Obra</option>
             <option value="servico">&#x1F527; Servi&ccedil;o</option>
@@ -210,8 +215,14 @@ const Lancamentos = {
   showForm(tipo, id=null) {
     const l = id ? DB.getById('lancamentos',id)||{tipo} : {tipo};
     const isEdit = !!id;
-    const notas = DB.getAll('notas');
-    const catRec = [['parcela_caixa','🏦 Parcela Caixa'],['entrada_propria','💵 Entrada Própria'],['outro','📦 Outros']];
+    const catRec = [
+      ['parcela_caixa','🏦 Parcela Caixa'],
+      ['entrada_propria','💵 Entrada Própria'],
+      ['aporte_financeiro','💼 Aporte Financeiro'],
+      ['emprestimo','🤝 Empréstimo'],
+      ['financiamento','🏗️ Financiamento'],
+      ['outro','📦 Outros']
+    ];
     const catDesp = [
       ['material','🧱 Material de Obra'],
       ['mao_de_obra','👷 Mão de Obra'],
