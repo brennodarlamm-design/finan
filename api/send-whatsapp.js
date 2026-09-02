@@ -16,12 +16,12 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { phone, number, text, message, apiUrl, apiKey, instance } = req.body || {};
+    const { phone, number, text, message, base64, mimeType, fileName, caption, apiUrl, apiKey, instance } = req.body || {};
     const destPhone = (phone || number || '').replace(/\D/g, '');
-    const msgText = text || message;
+    const msgText = text || message || caption || '';
 
-    if (!destPhone || !msgText) {
-      return res.status(400).json({ error: 'Telefone e mensagem são obrigatórios.' });
+    if (!destPhone || (!msgText && !base64)) {
+      return res.status(400).json({ error: 'Telefone e mensagem/arquivo são obrigatórios.' });
     }
 
     const numFmt = destPhone.startsWith('55') ? destPhone : `55${destPhone}`;
@@ -54,13 +54,21 @@ export default async function handler(req, res) {
       headers['apikey'] = targetApiKey;
     }
 
-    const bodyPayload = JSON.stringify({
+    const payloadObj = {
       number: numFmt,
       phone: numFmt,
       to: numFmt,
       text: msgText,
-      message: msgText
-    });
+      message: msgText,
+      caption: caption || msgText
+    };
+    if (base64) {
+      payloadObj.base64 = base64;
+      payloadObj.mimeType = mimeType;
+      payloadObj.fileName = fileName;
+    }
+
+    const bodyPayload = JSON.stringify(payloadObj);
 
     let response;
     try {
@@ -77,8 +85,8 @@ export default async function handler(req, res) {
       response = await fetch(cloudUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone: numFmt, message: msgText }),
-        signal: AbortSignal.timeout(8000)
+        body: bodyPayload,
+        signal: AbortSignal.timeout(10000)
       });
     }
 

@@ -20,7 +20,8 @@ dotenv.config();
 
 const app = express();
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '25mb' }));
+app.use(express.urlencoded({ extended: true, limit: '25mb' }));
 
 const PORT = process.env.PORT || 3333;
 let rawDbUrl = process.env.DATABASE_URL || '';
@@ -364,6 +365,39 @@ app.get('/status', (req, res) => {
   });
 });
 
+// 1.1 Health Check Monitor
+app.get('/health', async (req, res) => {
+  let dbOk = false;
+  let dbLatencyMs = null;
+  if (sql) {
+    try {
+      const t0 = Date.now();
+      await sql`SELECT 1;`;
+      dbLatencyMs = Date.now() - t0;
+      dbOk = true;
+    } catch {}
+  }
+
+  const mem = process.memoryUsage();
+  res.json({
+    status: dbOk ? 'healthy' : 'degraded',
+    uptime_seconds: Math.round(process.uptime()),
+    whatsapp: {
+      status: connectionStatus,
+      connected: connectionStatus === 'connected',
+      last_connected: lastConnectedAt
+    },
+    database: {
+      connected: dbOk,
+      latency_ms: dbLatencyMs
+    },
+    memory: {
+      rss_mb: Math.round(mem.rss / 1024 / 1024),
+      heap_mb: Math.round(mem.heapUsed / 1024 / 1024)
+    }
+  });
+});
+
 // 2. Página Web Visual do QR Code
 app.get('/qr', (req, res) => {
   if (connectionStatus === 'connected') {
@@ -495,14 +529,15 @@ app.all('/reset-auth', async (req, res) => {
   });
 });
 
-// 3. Disparo de Mensagem em Segundo Plano
+// 3. Disparo de Mensagem em Segundo Plano (Texto, Imagem ou Documento PDF)
 app.post('/send-message', async (req, res) => {
   try {
-    const { phone, message } = req.body;
+    const { phone, message, text, base64, mimeType, fileName, caption } = req.body;
     const destPhone = phone || TARGET_PHONE;
+    const msgText = message || text || caption || '';
 
-    if (!message) {
-      return res.status(400).json({ error: 'Campo "message" é obrigatório.' });
+    if (!msgText && !base64) {
+      return res.status(400).json({ error: 'Campo "message" ou "base64" é obrigatório.' });
     }
 
     if (connectionStatus !== 'connected' || !sock) {
@@ -514,11 +549,35 @@ app.post('/send-message', async (req, res) => {
     }
 
     const jid = await resolveWhatsAppJid(destPhone);
-    console.log(`📤 [WhatsApp] Disparando para JID canônico: ${jid} (número solicitado: ${destPhone})`);
-    const sent = await sock.sendMessage(jid, { text: message });
+    let sent;
 
-    console.log(`✅ [WhatsApp] Mensagem entregue com sucesso para ${jid} (ID: ${sent.key.id})!`);
-    return res.json({ success: true, messageId: sent.key.id, to: destPhone, canonicalJid: jid });
+    if (base64) {
+      const cleanB64 = base64.replace(/^data:[^;]+;base64,/, '');
+      const buf = Buffer.from(cleanB64, 'base64');
+      const mime = mimeType || 'application/pdf';
+
+      if (mime.startsWith('image/')) {
+        console.log(`📤 [WhatsApp] Enviando imagem para ${jid}...`);
+        sent = await sock.sendMessage(jid, {
+          image: buf,
+          caption: msgText || undefined
+        });
+      } else {
+        console.log(`📤 [WhatsApp] Enviando documento (${mime}) para ${jid}...`);
+        sent = await sock.sendMessage(jid, {
+          document: buf,
+          mimetype: mime,
+          fileName: fileName || 'documento.pdf',
+          caption: msgText || undefined
+        });
+      }
+    } else {
+      console.log(`📤 [WhatsApp] Disparando texto para JID canônico: ${jid} (número solicitado: ${destPhone})`);
+      sent = await sock.sendMessage(jid, { text: msgText });
+    }
+
+    console.log(`✅ [WhatsApp] Mensagem entregue com sucesso para ${jid} (ID: ${sent?.key?.id})!`);
+    return res.json({ success: true, messageId: sent?.key?.id, to: destPhone, canonicalJid: jid });
   } catch (err) {
     console.error('❌ Erro ao enviar mensagem:', err);
     return res.status(500).json({ error: err.message });
@@ -582,7 +641,7 @@ async function executarResumoMatinal() {
       FROM lancamentos l
       LEFT JOIN obras o ON l.obra_id = o.id
       WHERE l.tipo = 'despesa'
-        AND l.status = 'a_pagar'
+        AND l.status IN ('a_pagar', 'pendente')
         AND (DATE(COALESCE(l.data_vencimento, l.data)) <= ${hoje}::date)
       ORDER BY COALESCE(l.data_vencimento, l.data) ASC;
     `;
@@ -631,6 +690,17 @@ cron.schedule('0 12 * * *', () => {
 app.post('/cron/daily-summary', async (req, res) => {
   await executarResumoMatinal();
   return res.json({ success: true, message: 'Rotina matinal executada!' });
+});
+
+// ── KEEP-ALIVE SELF-PING (EVITA SLEEP NO RENDER FREE TIER) ─────────────────
+const RENDER_EXTERNAL_URL = process.env.RENDER_EXTERNAL_URL || 'https://finan-wf12.onrender.com';
+cron.schedule('*/10 * * * *', async () => {
+  try {
+    const pingRes = await fetch(`${RENDER_EXTERNAL_URL}/health`);
+    console.log(`💓 [Keep-Alive] Ping no servidor (${pingRes.status})`);
+  } catch (pingErr) {
+    console.warn('⚠️ [Keep-Alive] Aviso no auto-ping:', pingErr.message);
+  }
 });
 
 // ── INICIALIZAÇÃO DO SERVIDOR ────────────────────────────────────────────────
