@@ -1,10 +1,15 @@
-// js/ofx.js — OFX Bank Statement Import & Multi-Project Conciliation (Geral / Todas as Obras e Sede)
+// js/ofx.js — OFX Bank Statement Import & Smart Multi-Project Conciliation (Robô Inteligente com Filtro por Aproximação de Valor)
 
 const OFX = {
   _importData: null,
   _reconcileContext: null,
   _activeFilterTab: 'todas',
   _activeSearchTerm: '',
+  
+  // Configurações padrão do Robô Inteligente
+  _toleranciaValor: 10,       // R$ 10 padrão (ou string 'pct:2')
+  _toleranciaDias: 7,         // ± 7 dias padrão
+  _toleranciaScoreMin: 50,
 
   render(obraId) {
     const imports = DB.getAll('ofximports') || [];
@@ -35,8 +40,45 @@ const OFX = {
           <input class="form-control" id="ofx-conta" placeholder="Ex: Banco do Brasil Ag: 0501 Cc: 12345-6" style="margin-top:6px;display:none">
         </div>
 
-        <div class="drop-zone" id="ofx-drop" onclick="document.getElementById('ofx-file').click()" style="padding:32px 20px;">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="width:40px;height:40px;margin:0 auto 10px;display:block;color:var(--accent)"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+        <!-- Painel de Configuração do Robô Inteligente para a Importação -->
+        <div style="background:rgba(201,162,39,0.05);border:1px solid rgba(201,162,39,0.25);border-radius:var(--r-md);padding:12px 14px;margin-bottom:14px;">
+          <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px;">
+            <span style="font-size:1.1rem;">🤖</span>
+            <span style="font-weight:700;font-size:.85rem;color:var(--accent);">Robô Inteligente de Conciliação</span>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+            <div>
+              <label style="font-size:.72rem;color:var(--text2);display:block;margin-bottom:3px;font-weight:600;">Filtro por Aproximação de Valor</label>
+              <select class="form-control" id="ofx-tol-valor" style="font-size:.78rem;padding:5px 8px;" onchange="OFX._toleranciaValor = this.value">
+                <option value="0">🎯 Exato (R$ 0,00)</option>
+                <option value="1">🤏 ± R$ 1,00 (Centavos)</option>
+                <option value="5">💵 ± R$ 5,00 (Pequenas tarifas)</option>
+                <option value="10" selected>💵 ± R$ 10,00 (Padrão)</option>
+                <option value="25">💰 ± R$ 25,00</option>
+                <option value="50">💰 ± R$ 50,00</option>
+                <option value="100">💼 ± R$ 100,00</option>
+                <option value="200">💼 ± R$ 200,00</option>
+                <option value="pct:1">📊 ± 1% do valor</option>
+                <option value="pct:2">📊 ± 2% do valor</option>
+                <option value="pct:5">📊 ± 5% do valor</option>
+              </select>
+            </div>
+            <div>
+              <label style="font-size:.72rem;color:var(--text2);display:block;margin-bottom:3px;font-weight:600;">Margem de Datas</label>
+              <select class="form-control" id="ofx-tol-dias" style="font-size:.78rem;padding:5px 8px;" onchange="OFX._toleranciaDias = parseInt(this.value)">
+                <option value="0">📅 Mesmo dia (0 dias)</option>
+                <option value="3">📅 ± 3 dias</option>
+                <option value="7" selected>📅 ± 7 dias (Padrão)</option>
+                <option value="15">📅 ± 15 dias</option>
+                <option value="30">📅 ± 30 dias (Mesmo mês)</option>
+                <option value="999">📅 Sem restrição de data</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <div class="drop-zone" id="ofx-drop" onclick="document.getElementById('ofx-file').click()" style="padding:28px 20px;">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="width:38px;height:38px;margin:0 auto 10px;display:block;color:var(--accent)"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
           <p style="font-size:.92rem;font-weight:700;margin-bottom:4px">Arraste seu extrato bancário OFX aqui</p>
           <p style="font-size:.78rem;color:var(--text3)">Compatível com Caixa, BB, Bradesco, Itaú, Santander, Sicredi, Sicoob, Inter, Nubank (.ofx, .qfx)</p>
           <input type="file" id="ofx-file" accept=".ofx,.qfx,.OFX,.QFX" style="display:none">
@@ -46,7 +88,7 @@ const OFX = {
 
         <div style="margin-top:16px;display:flex;gap:8px;align-items:center;justify-content:space-between;">
           <button class="btn btn-secondary" onclick="OFX.demoOFX()">📋 Carregar OFX Demo</button>
-          <button class="btn btn-primary" id="ofx-import-btn" onclick="OFX.processImport()" style="display:none;font-weight:700;">✔ Importar e Conciliar Geral</button>
+          <button class="btn btn-primary" id="ofx-import-btn" onclick="OFX.processImport()" style="display:none;font-weight:700;">✔ Importar e Conciliar com Robô</button>
         </div>
       </div>
 
@@ -199,6 +241,67 @@ const OFX = {
     </div>`;
   },
 
+  // Retorna a tolerância máxima em R$ a partir do valor base e da regra configurada
+  _calcularDiferencaMax(valorExtrato, tol) {
+    if (typeof tol === 'string' && tol.startsWith('pct:')) {
+      const pct = parseFloat(tol.split(':')[1]) || 0;
+      return (Number(valorExtrato) * pct) / 100;
+    }
+    return parseFloat(tol) || 0;
+  },
+
+  // Algoritmo do Robô Inteligente para avaliar match entre transação e lançamento
+  _avaliarMatch(trn, lan, tolValor, tolDias) {
+    const isCredit = trn.tipo === 'credito';
+    const isReceita = lan.tipo === 'receita';
+    if ((isCredit && !isReceita) || (!isCredit && isReceita)) return null;
+
+    const vTrn = Number(trn.valor);
+    const vLan = Number(lan.valor);
+    const diffValor = Math.abs(vLan - vTrn);
+    const maxDiffValor = this._calcularDiferencaMax(vTrn, tolValor);
+
+    // Se ultrapassar a tolerância de valor, não combina
+    if (diffValor > maxDiffValor) return null;
+
+    const dLanStr = lan.data_pagamento || lan.data_vencimento || lan.data;
+    let diffDias = 0;
+    if (dLanStr && trn.data) {
+      diffDias = Math.abs(new Date(dLanStr) - new Date(trn.data)) / (86400000);
+    }
+
+    // Se ultrapassar a tolerância de dias, não combina
+    if (diffDias > tolDias) return null;
+
+    // Cálculo do Score de Confiança do Robô (0 a 100%)
+    let scoreValor = maxDiffValor > 0 ? (1 - (diffValor / (maxDiffValor || 1))) * 45 : 45;
+    if (diffValor < 0.05) scoreValor = 50; // valor exato ganha bônus
+
+    let scoreData = tolDias > 0 ? (1 - (diffDias / (tolDias || 1))) * 30 : 30;
+    if (diffDias === 0) scoreData = 35; // mesmo dia ganha bônus
+
+    // Similaridade de texto / palavras-chave no Memo e Descrição
+    let scoreTexto = 0;
+    const memoWords = (trn.memo || '').toLowerCase().split(/[\s,.-]+/).filter(w => w.length > 2);
+    const descText = `${lan.descricao || ''} ${lan.fornecedor_beneficiario || ''}`.toLowerCase();
+    let wordsMatched = 0;
+    memoWords.forEach(w => { if (descText.includes(w)) wordsMatched++; });
+    if (memoWords.length > 0) {
+      scoreTexto = Math.min(15, (wordsMatched / memoWords.length) * 15);
+    }
+
+    const scoreTotal = Math.min(100, Math.round(scoreValor + scoreData + scoreTexto));
+
+    return {
+      lancamento: lan,
+      transacao: trn,
+      diffValor,
+      diffDias: Math.round(diffDias),
+      score: scoreTotal,
+      isExato: diffValor < 0.05
+    };
+  },
+
   processImport() {
     if (!this._importData || !this._importData.transacoes.length) {
       Utils.toast('Nenhum dado de extrato carregado para importar.', 'warning');
@@ -209,27 +312,42 @@ const OFX = {
     const conta_manual = document.getElementById('ofx-conta')?.value || '';
     const conta = (conta_sel && conta_sel !== '__manual__') ? conta_sel : conta_manual;
 
+    const tolValor = document.getElementById('ofx-tol-valor')?.value || this._toleranciaValor;
+    const tolDias = parseInt(document.getElementById('ofx-tol-dias')?.value) || this._toleranciaDias;
+
     // Fetch ALL non-deleted transactions across all obras and headquarters
     const allLans = DB.getLancamentos(null);
+    const unconciliatedLans = allLans.filter(l => !l.conciliado);
 
-    // Smart Auto-Matching algorithm across all projects & sede
     let autoMatchedCount = 0;
-    const trns = this._importData.transacoes.map(t => {
-      // Find candidate launch: matches value, type, and close date (±4 days)
-      const matched = allLans.find(l => {
-        if (l.conciliado) return false;
-        const valMatch = Math.abs(Number(l.valor) - Number(t.valor)) < 0.05 || Math.abs(Number(l.valor) - Number(t.valor)) < 1.00;
-        const tipoMatch = (t.tipo === 'credito' && l.tipo === 'receita') || (t.tipo === 'debito' && l.tipo === 'despesa');
-        const dLan = l.data_pagamento || l.data_vencimento || l.data;
-        const dateMatch = !dLan || !t.data || l.data === t.data || Math.abs(new Date(dLan) - new Date(t.data)) <= (4 * 86400000);
-        return valMatch && tipoMatch && dateMatch;
-      });
+    const matchedLanIds = new Set();
 
-      if (matched) {
-        autoMatchedCount++;
-        DB.update('lancamentos', matched.id, { conciliado: true });
-        return { ...t, status: 'conciliada', lancamento_id: matched.id };
+    const trns = this._importData.transacoes.map(t => {
+      // Busca melhor match disponível pelo Robô Inteligente
+      let bestMatch = null;
+      for (const lan of unconciliatedLans) {
+        if (matchedLanIds.has(lan.id)) continue;
+        const res = OFX._avaliarMatch(t, lan, tolValor, tolDias);
+        if (res && res.score >= OFX._toleranciaScoreMin) {
+          if (!bestMatch || res.score > bestMatch.score) {
+            bestMatch = res;
+          }
+        }
       }
+
+      if (bestMatch) {
+        autoMatchedCount++;
+        matchedLanIds.add(bestMatch.lancamento.id);
+        DB.update('lancamentos', bestMatch.lancamento.id, { conciliado: true });
+        return {
+          ...t,
+          status: 'conciliada',
+          lancamento_id: bestMatch.lancamento.id,
+          match_score: bestMatch.score,
+          match_diff_valor: bestMatch.diffValor
+        };
+      }
+
       return { ...t, status: 'pendente', lancamento_id: null };
     });
 
@@ -253,7 +371,7 @@ const OFX = {
     const btnImp = document.getElementById('ofx-import-btn');
     if (btnImp) btnImp.style.display = 'none';
 
-    Utils.toast(`Extrato importado com sucesso! ${autoMatchedCount}/${trns.length} transações conciliadas automaticamente.`, 'success');
+    Utils.toast(`Extrato importado! Robô conciliou ${autoMatchedCount}/${trns.length} transações com base no filtro de aproximação.`, 'success');
 
     // Refresh OFX screen
     const el = document.getElementById('route-content');
@@ -311,7 +429,7 @@ const OFX = {
     }
 
     Utils.showModal(`
-      <div class="modal" style="max-width:920px;width:95vw;max-height:90vh;display:flex;flex-direction:column;">
+      <div class="modal" style="max-width:960px;width:95vw;max-height:92vh;display:flex;flex-direction:column;">
         <div class="modal-header" style="border-bottom:1px solid var(--border-s);padding:14px 20px;">
           <div>
             <div class="modal-title" style="display:flex;align-items:center;gap:8px;">
@@ -326,6 +444,58 @@ const OFX = {
         </div>
 
         <div class="modal-body" style="padding:16px 20px;overflow-y:auto;flex:1;">
+          
+          <!-- Barra do Robô Inteligente de Conciliação com Filtro por Aproximação -->
+          <div style="background:linear-gradient(135deg,rgba(201,162,39,0.08),rgba(201,162,39,0.02));border:1px solid rgba(201,162,39,0.3);border-radius:var(--r-md);padding:12px 16px;margin-bottom:16px;display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px;">
+            <div style="display:flex;align-items:center;gap:10px;">
+              <span style="font-size:1.4rem;">🤖</span>
+              <div>
+                <div style="font-weight:800;font-size:.88rem;color:var(--accent);display:flex;align-items:center;gap:6px;">
+                  Robô Inteligente de Auto-Conciliação
+                  <span class="badge badge-info" style="font-size:.65rem;">Filtro por Aproximação</span>
+                </div>
+                <div style="font-size:.74rem;color:var(--text2);margin-top:2px;">
+                  Cruza as transações bancárias com lançamentos de todas as obras considerando margem de valor e datas.
+                </div>
+              </div>
+            </div>
+
+            <div style="display:flex;flex-wrap:wrap;align-items:center;gap:8px;">
+              <div style="display:flex;align-items:center;gap:6px;">
+                <label style="font-size:.72rem;color:var(--text3);font-weight:600;white-space:nowrap;">Aproximação Valor:</label>
+                <select id="modal-tol-valor" class="form-control" style="font-size:.75rem;padding:4px 8px;width:auto;" onchange="OFX._onMudarToleranciaModal('${importId}', this.value, null)">
+                  <option value="0" ${OFX._toleranciaValor==='0'||OFX._toleranciaValor===0?'selected':''}>🎯 Exato (R$ 0)</option>
+                  <option value="1" ${OFX._toleranciaValor==='1'||OFX._toleranciaValor===1?'selected':''}>🤏 ± R$ 1,00</option>
+                  <option value="5" ${OFX._toleranciaValor==='5'||OFX._toleranciaValor===5?'selected':''}>💵 ± R$ 5,00</option>
+                  <option value="10" ${OFX._toleranciaValor==='10'||OFX._toleranciaValor===10?'selected':''}>💵 ± R$ 10,00</option>
+                  <option value="25" ${OFX._toleranciaValor==='25'||OFX._toleranciaValor===25?'selected':''}>💰 ± R$ 25,00</option>
+                  <option value="50" ${OFX._toleranciaValor==='50'||OFX._toleranciaValor===50?'selected':''}>💰 ± R$ 50,00</option>
+                  <option value="100" ${OFX._toleranciaValor==='100'||OFX._toleranciaValor===100?'selected':''}>💼 ± R$ 100,00</option>
+                  <option value="200" ${OFX._toleranciaValor==='200'||OFX._toleranciaValor===200?'selected':''}>💼 ± R$ 200,00</option>
+                  <option value="pct:1" ${OFX._toleranciaValor==='pct:1'?'selected':''}>📊 ± 1%</option>
+                  <option value="pct:2" ${OFX._toleranciaValor==='pct:2'?'selected':''}>📊 ± 2%</option>
+                  <option value="pct:5" ${OFX._toleranciaValor==='pct:5'?'selected':''}>📊 ± 5%</option>
+                </select>
+              </div>
+
+              <div style="display:flex;align-items:center;gap:6px;">
+                <label style="font-size:.72rem;color:var(--text3);font-weight:600;white-space:nowrap;">Datas:</label>
+                <select id="modal-tol-dias" class="form-control" style="font-size:.75rem;padding:4px 8px;width:auto;" onchange="OFX._onMudarToleranciaModal('${importId}', null, this.value)">
+                  <option value="0" ${OFX._toleranciaDias===0?'selected':''}>📅 Mesmo dia</option>
+                  <option value="3" ${OFX._toleranciaDias===3?'selected':''}>📅 ± 3 dias</option>
+                  <option value="7" ${OFX._toleranciaDias===7?'selected':''}>📅 ± 7 dias</option>
+                  <option value="15" ${OFX._toleranciaDias===15?'selected':''}>📅 ± 15 dias</option>
+                  <option value="30" ${OFX._toleranciaDias===30?'selected':''}>📅 ± 30 dias</option>
+                  <option value="999" ${OFX._toleranciaDias===999?'selected':''}>📅 Sem limite</option>
+                </select>
+              </div>
+
+              <button class="btn btn-primary btn-sm" onclick="OFX._abrirModalRobo('${importId}')" style="font-weight:700;padding:6px 12px;display:flex;align-items:center;gap:4px;box-shadow:var(--shadow-accent);">
+                <span>⚡ Executar Robô</span>
+              </button>
+            </div>
+          </div>
+
           <!-- Controls & Filter Tabs -->
           <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between;margin-bottom:16px;">
             <div style="display:flex;gap:6px;">
@@ -366,43 +536,215 @@ const OFX = {
       </div>`);
   },
 
+  _onMudarToleranciaModal(importId, tolValor, tolDias) {
+    if (tolValor !== null) this._toleranciaValor = tolValor;
+    if (tolDias !== null) this._toleranciaDias = parseInt(tolDias);
+    this.viewImport(importId, this._activeFilterTab, this._activeSearchTerm);
+  },
+
+  // Modal com o relatório de sugestões do Robô Inteligente
+  _abrirModalRobo(importId) {
+    const imp = DB.getById('ofximports', importId);
+    if (!imp) return;
+
+    const allLans = DB.getLancamentos(null);
+    const clientesMap = Object.fromEntries((DB.getAll('clientes') || []).map(c => [c.id, c]));
+    const pendentes = (imp.transacoes || []).filter(t => t.status === 'pendente');
+    const unconciliatedLans = allLans.filter(l => !l.conciliado);
+
+    const matchesEncontrados = [];
+    const matchedLanIds = new Set();
+
+    pendentes.forEach(trn => {
+      let best = null;
+      unconciliatedLans.forEach(lan => {
+        if (matchedLanIds.has(lan.id)) return;
+        const res = OFX._avaliarMatch(trn, lan, OFX._toleranciaValor, OFX._toleranciaDias);
+        if (res && res.score >= OFX._toleranciaScoreMin) {
+          if (!best || res.score > best.score) {
+            best = res;
+          }
+        }
+      });
+
+      if (best) {
+        matchedLanIds.add(best.lancamento.id);
+        matchesEncontrados.push(best);
+      }
+    });
+
+    const tolLabel = typeof OFX._toleranciaValor === 'string' && OFX._toleranciaValor.startsWith('pct:')
+      ? `± ${OFX._toleranciaValor.split(':')[1]}%`
+      : `± R$ ${OFX._toleranciaValor},00`;
+
+    Utils.showModal(`
+      <div class="modal" style="max-width:880px;width:95vw;max-height:85vh;display:flex;flex-direction:column;">
+        <div class="modal-header" style="border-bottom:1px solid var(--border-s);padding:14px 20px;">
+          <div>
+            <div class="modal-title" style="display:flex;align-items:center;gap:8px;">
+              <span>🤖 Sugestões do Robô Inteligente</span>
+              <span class="badge badge-warning" style="font-size:.72rem;">Filtro: ${tolLabel} · ± ${OFX._toleranciaDias} dias</span>
+            </div>
+            <div style="font-size:.76rem;color:var(--text3);margin-top:2px;">
+              O robô analisou as ${pendentes.length} transações pendentes e encontrou ${matchesEncontrados.length} correspondência(s).
+            </div>
+          </div>
+          <button class="modal-close" onclick="OFX.viewImport('${importId}')">✕</button>
+        </div>
+
+        <div class="modal-body" style="padding:16px 20px;overflow-y:auto;flex:1;">
+          ${matchesEncontrados.length > 0 ? `
+            <div style="margin-bottom:14px;display:flex;align-items:center;justify-content:space-between;">
+              <span style="font-size:.82rem;color:var(--text2);">Revise as sugestões calculadas pelo robô:</span>
+              <button class="btn btn-primary btn-sm" onclick="OFX._confirmarTodosMatchesRobo('${importId}')" style="font-weight:700;">
+                ⚡ Conciliar Todas (${matchesEncontrados.length})
+              </button>
+            </div>
+
+            <div class="tbl-wrap" style="border:none;">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Transação Extrato OFX</th>
+                    <th>Valor Extrato</th>
+                    <th style="text-align:center">Confiança</th>
+                    <th>Lançamento do Sistema</th>
+                    <th>Obra / Centro</th>
+                    <th>Diferença</th>
+                    <th style="text-align:right">Ação</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${matchesEncontrados.map(m => {
+                    const trn = m.transacao;
+                    const lan = m.lancamento;
+                    const obNome = lan.obra_id === 'escritorio' ? '🏢 Sede' : (clientesMap[lan.obra_id]?.nome || 'Obra');
+                    const isCredit = trn.tipo === 'credito';
+                    const diffFmt = m.diffValor === 0 ? '<span style="color:var(--success);font-weight:700;">Exato (R$ 0)</span>' : `<span style="color:var(--warning);font-weight:700;">± ${Utils.fmt.currency(m.diffValor)}</span>`;
+                    const scoreBadgeCls = m.score >= 90 ? 'badge-success' : m.score >= 70 ? 'badge-warning' : 'badge-secondary';
+
+                    return `<tr>
+                      <td style="font-size:.78rem;font-weight:600;">
+                        ${isCredit?'📈':'📉'} ${trn.memo.slice(0,28)}<br>
+                        <span style="font-size:.7rem;color:var(--text3);">📅 ${Utils.fmt.date(trn.data)}</span>
+                      </td>
+                      <td style="font-size:.82rem;font-weight:800;color:${isCredit?'var(--success)':'var(--danger)'};white-space:nowrap;">
+                        ${Utils.fmt.currency(trn.valor)}
+                      </td>
+                      <td style="text-align:center;">
+                        <span class="badge ${scoreBadgeCls}" style="font-size:.72rem;">${m.score}%</span>
+                      </td>
+                      <td style="font-size:.78rem;">
+                        <strong>${lan.descricao.slice(0,30)}</strong><br>
+                        <span style="font-size:.7rem;color:var(--text3);">${Utils.fmt.date(lan.data)} · ${Utils.fmt.currency(lan.valor)}</span>
+                      </td>
+                      <td style="font-size:.76rem;color:var(--accent);">
+                        ${obNome}
+                      </td>
+                      <td style="font-size:.75rem;white-space:nowrap;">
+                        ${diffFmt}
+                      </td>
+                      <td style="text-align:right;white-space:nowrap;">
+                        <button class="btn btn-secondary btn-sm" onclick="OFX.conciliar('${importId}','${trn.id}','${lan.id}');OFX._abrirModalRobo('${importId}');" style="padding:3px 8px;font-size:.72rem;">✔ Conciliar</button>
+                      </td>
+                    </tr>`;
+                  }).join('')}
+                </tbody>
+              </table>
+            </div>
+          ` : `
+            <div class="empty-state" style="padding:40px 10px;">
+              <span style="font-size:2.5rem;display:block;margin-bottom:10px;">🔍</span>
+              <p style="font-size:.92rem;font-weight:700;color:var(--text);">Nenhuma correspondência adicional encontrada</p>
+              <p style="font-size:.78rem;color:var(--text3);margin-top:4px;">Tente aumentar o filtro de aproximação de valor (ex: ± R$ 50 ou ± 5%) ou a margem de datas.</p>
+            </div>
+          `}
+        </div>
+
+        <div class="modal-footer" style="padding:12px 20px;border-top:1px solid var(--border-s);justify-content:flex-end;">
+          <button class="btn btn-secondary btn-sm" onclick="OFX.viewImport('${importId}')">Voltar à Conciliação</button>
+        </div>
+      </div>
+    `);
+  },
+
+  _confirmarTodosMatchesRobo(importId) {
+    const imp = DB.getById('ofximports', importId);
+    if (!imp) return;
+
+    const allLans = DB.getLancamentos(null);
+    const pendentes = (imp.transacoes || []).filter(t => t.status === 'pendente');
+    const unconciliatedLans = allLans.filter(l => !l.conciliado);
+
+    const matchedLanIds = new Set();
+    let count = 0;
+
+    pendentes.forEach(trn => {
+      let best = null;
+      unconciliatedLans.forEach(lan => {
+        if (matchedLanIds.has(lan.id)) return;
+        const res = OFX._avaliarMatch(trn, lan, OFX._toleranciaValor, OFX._toleranciaDias);
+        if (res && res.score >= OFX._toleranciaScoreMin) {
+          if (!best || res.score > best.score) {
+            best = res;
+          }
+        }
+      });
+
+      if (best) {
+        matchedLanIds.add(best.lancamento.id);
+        const idx = imp.transacoes.findIndex(t => t.id === trn.id);
+        if (idx !== -1) {
+          imp.transacoes[idx].status = 'conciliada';
+          imp.transacoes[idx].lancamento_id = best.lancamento.id;
+          imp.transacoes[idx].match_score = best.score;
+          DB.update('lancamentos', best.lancamento.id, { conciliado: true });
+          count++;
+        }
+      }
+    });
+
+    DB.update('ofximports', importId, { transacoes: imp.transacoes });
+    Utils.toast(`Robô conciliou ${count} transações em lote com sucesso!`, 'success');
+    this.viewImport(importId);
+  },
+
   _recItem(t, allLans, clientesMap, importId) {
     const isCredit = t.tipo === 'credito';
     const matched = t.lancamento_id ? allLans.find(l => l.id === t.lancamento_id) : null;
     const cls = t.status === 'conciliada' ? 'matched' : t.status === 'ignorada' ? 'ignored' : '';
 
-    // If pending, find candidate matches across ALL obras + sede
+    // If pending, find candidate matches across ALL obras + sede considering the proximity filter
     let candidateOptionsHtml = '';
     if (t.status === 'pendente') {
       const neededType = isCredit ? 'receita' : 'despesa';
-      // Candidates with close value (within R$ 100) and matching type
-      const candidates = allLans.filter(l => {
-        if (l.conciliado) return false;
-        if (l.tipo !== neededType) return false;
-        return Math.abs(Number(l.valor) - Number(t.valor)) <= 100;
-      }).sort((a, b) => {
-        // Exact value first
-        const diffA = Math.abs(Number(a.valor) - Number(t.valor));
-        const diffB = Math.abs(Number(b.valor) - Number(t.valor));
-        return diffA - diffB;
-      });
+      const maxDiff = this._calcularDiferencaMax(t.valor, this._toleranciaValor);
 
-      // Also add other recent unconciliated launches of same type if candidates are few
+      // Avalia cada lançamento com o algoritmo do robô
+      const scoredCandidates = allLans
+        .filter(l => !l.conciliado && l.tipo === neededType)
+        .map(l => OFX._avaliarMatch(t, l, OFX._toleranciaValor, OFX._toleranciaDias))
+        .filter(Boolean)
+        .sort((a, b) => b.score - a.score);
+
+      // Também inclui outros lançamentos próximos se a lista for pequena
       let extraLans = [];
-      if (candidates.length < 5) {
-        extraLans = allLans.filter(l => !l.conciliado && l.tipo === neededType && !candidates.some(c => c.id === l.id)).slice(0, 10);
+      if (scoredCandidates.length < 4) {
+        extraLans = allLans.filter(l => !l.conciliado && l.tipo === neededType && !scoredCandidates.some(c => c.lancamento.id === l.id)).slice(0, 10);
       }
 
       candidateOptionsHtml = `
         <select style="background:var(--bg-input);border:1px solid var(--border-d);color:var(--text);border-radius:6px;padding:6px;font-size:.75rem;width:100%;max-width:280px;" onchange="OFX.conciliar('${importId}','${t.id}',this.value)">
-          <option value="">➕ Vincular a lançamento existente...</option>
-          ${candidates.length > 0 ? `<optgroup label="✨ Sugestões por Valor">${candidates.map(l => {
+          <option value="">➕ Vincular lançamento...</option>
+          ${scoredCandidates.length > 0 ? `<optgroup label="🤖 Sugestões do Robô (${scoredCandidates.length})">${scoredCandidates.map(c => {
+            const l = c.lancamento;
             const obNome = l.obra_id === 'escritorio' ? '🏢 Sede' : (clientesMap[l.obra_id]?.nome || 'Obra');
-            return `<option value="${l.id}">[${obNome}] ${l.descricao.slice(0, 26)} (${Utils.fmt.currency(l.valor)} - ${Utils.fmt.date(l.data)})</option>`;
+            const diffTxt = c.diffValor === 0 ? 'Exato' : `±${Utils.fmt.currency(c.diffValor)}`;
+            return `<option value="${l.id}">[${obNome}] ${l.descricao.slice(0, 24)} (${Utils.fmt.currency(l.valor)} · ${diffTxt} · ${c.score}%)</option>`;
           }).join('')}</optgroup>` : ''}
           ${extraLans.length > 0 ? `<optgroup label="📋 Outros Lançamentos">${extraLans.map(l => {
             const obNome = l.obra_id === 'escritorio' ? '🏢 Sede' : (clientesMap[l.obra_id]?.nome || 'Obra');
-            return `<option value="${l.id}">[${obNome}] ${l.descricao.slice(0, 26)} (${Utils.fmt.currency(l.valor)} - ${Utils.fmt.date(l.data)})</option>`;
+            return `<option value="${l.id}">[${obNome}] ${l.descricao.slice(0, 24)} (${Utils.fmt.currency(l.valor)} - ${Utils.fmt.date(l.data)})</option>`;
           }).join('')}</optgroup>` : ''}
         </select>
       `;
@@ -411,9 +753,14 @@ const OFX = {
     let matchedHtml = '';
     if (t.status === 'conciliada' && matched) {
       const obNome = matched.obra_id === 'escritorio' ? '🏢 Sede / Escritório' : (clientesMap[matched.obra_id]?.nome || 'Obra');
+      const diffVal = Math.abs(Number(matched.valor) - Number(t.valor));
+      const diffLabel = diffVal > 0.05 ? `<span style="font-size:.68rem;color:var(--warning);font-weight:600;">(Dif: ±${Utils.fmt.currency(diffVal)})</span>` : '';
       matchedHtml = `
         <div style="font-size:.76rem;color:var(--success);display:flex;flex-direction:column;">
-          <span style="font-weight:700;">✅ [${obNome}]</span>
+          <div style="display:flex;align-items:center;gap:4px;">
+            <span style="font-weight:700;">✅ [${obNome}]</span>
+            ${diffLabel}
+          </div>
           <span style="color:var(--text);">${matched.descricao.slice(0, 32)} · ${Utils.fmt.currency(matched.valor)}</span>
         </div>
       `;
@@ -441,7 +788,7 @@ const OFX = {
         ${isCredit ? '+' : '−'}${Utils.fmt.currency(t.valor)}
       </div>
 
-      <div style="min-width:220px;flex-shrink:0;">
+      <div style="min-width:230px;flex-shrink:0;">
         ${matchedHtml}
       </div>
 
