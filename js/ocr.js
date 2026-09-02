@@ -205,29 +205,52 @@ const OCR = {
     const contas = (typeof DB !== 'undefined' ? DB.getAll('contas') : []) || [];
     const defaultObraId = (typeof App !== 'undefined' && App.currentObraId && App.currentObraId !== 'todas') ? App.currentObraId : 'escritorio';
 
-    // Montar lista de itens se houver
+    // Garantir que itens existam; se não vieram produtos explícitos na NFC-e/NF-e, sintetizar da descrição
+    let itens = Array.isArray(d.itens) && d.itens.length ? [...d.itens] : [];
+    if (!itens.length && d.valor && d.descricao_sugerida) {
+      const cleanNome = d.descricao_sugerida
+        .replace(/^(compra\s+de\s+|aquisição\s+de\s+|aquisicao\s+de\s+|pgto\s+de\s+|pagamento\s+de\s+|fornecimento\s+de\s+|nfce\s+-\s+|nfe\s+-\s+)/i, '')
+        .trim();
+      if (cleanNome) {
+        itens.push({
+          produto: cleanNome,
+          qtd: 1,
+          unidade: 'un',
+          valor_unit: d.valor,
+          total: d.valor
+        });
+      }
+    }
+    d.itens = itens;
+
+    // Montar lista de itens
     const itensHtml = d.itens && d.itens.length ? `
-      <div style="margin-top:14px;">
-        <div style="font-size:.75rem;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px;">
-          📦 Itens Detectados (${d.itens.length})
+      <div style="margin-top:14px;background:var(--bg-secondary);border:1px solid var(--border);border-radius:10px;padding:12px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+          <div style="font-size:.76rem;font-weight:800;color:var(--text);text-transform:uppercase;letter-spacing:.05em;">
+            📦 Produtos / Insumos Detectados (${d.itens.length})
+          </div>
+          <span style="font-size:.72rem;color:var(--success);font-weight:700;">
+            ✓ Cadastro automático em Produtos
+          </span>
         </div>
-        <div style="border:1px solid var(--border);border-radius:8px;overflow:hidden;">
+        <div style="border:1px solid var(--border);border-radius:8px;overflow:hidden;background:var(--bg-card);">
           <table style="width:100%;border-collapse:collapse;font-size:.76rem;">
             <thead>
-              <tr style="background:var(--bg-secondary);">
-                <th style="padding:6px 10px;text-align:left;font-weight:700;color:var(--text3);">Produto / Serviço</th>
-                <th style="padding:6px 10px;text-align:right;font-weight:700;color:var(--text3);">Qtd</th>
-                <th style="padding:6px 10px;text-align:center;font-weight:700;color:var(--text3);">Un</th>
-                <th style="padding:6px 10px;text-align:right;font-weight:700;color:var(--text3);">V. Unit.</th>
+              <tr style="background:var(--bg-secondary);border-bottom:1px solid var(--border);">
+                <th style="padding:6px 10px;text-align:left;font-weight:700;color:var(--text3);">Produto / Insumo</th>
+                <th style="padding:6px 10px;text-align:right;font-weight:700;color:var(--text3);width:60px;">Qtd</th>
+                <th style="padding:6px 10px;text-align:center;font-weight:700;color:var(--text3);width:50px;">Un</th>
+                <th style="padding:6px 10px;text-align:right;font-weight:700;color:var(--text3);width:90px;">V. Unit.</th>
               </tr>
             </thead>
             <tbody>
               ${d.itens.map(it => `
                 <tr style="border-top:1px solid var(--border);">
-                  <td style="padding:6px 10px;color:var(--text);">${it.produto || '—'}</td>
-                  <td style="padding:6px 10px;text-align:right;color:var(--text2);">${it.qtd || '—'}</td>
-                  <td style="padding:6px 10px;text-align:center;color:var(--text3);">${it.unidade || '—'}</td>
-                  <td style="padding:6px 10px;text-align:right;color:var(--text2);">${it.valor_unit ? Utils.fmt.currency(it.valor_unit) : '—'}</td>
+                  <td style="padding:7px 10px;color:var(--text);font-weight:600;">${it.produto || '—'}</td>
+                  <td style="padding:7px 10px;text-align:right;color:var(--text2);">${it.qtd || 1}</td>
+                  <td style="padding:7px 10px;text-align:center;color:var(--text3);">${it.unidade || 'un'}</td>
+                  <td style="padding:7px 10px;text-align:right;color:var(--text);font-weight:700;">${it.valor_unit ? Utils.fmt.currency(it.valor_unit) : '—'}</td>
                 </tr>
               `).join('')}
             </tbody>
@@ -498,7 +521,42 @@ const OCR = {
       fornecedorId = forn?.id || null;
     }
 
-    // 2. Cria o lançamento no DB
+    // 2. Prepara e cadastra os produtos/itens em Produtos
+    let itensParaSalvar = (this._dadosOCR?.itens && this._dadosOCR.itens.length)
+      ? [...this._dadosOCR.itens]
+      : [];
+
+    if (!itensParaSalvar.length && valor > 0 && descricao) {
+      const cleanNome = descricao
+        .replace(/^(compra\s+de\s+|aquisição\s+de\s+|aquisicao\s+de\s+|pgto\s+de\s+|pagamento\s+de\s+|fornecimento\s+de\s+|nfce\s+-\s+|nfe\s+-\s+)/i, '')
+        .trim();
+      if (cleanNome) {
+        itensParaSalvar.push({
+          produto: cleanNome,
+          qtd: 1,
+          unidade: 'un',
+          valor_unit: valor,
+          total: valor
+        });
+      }
+    }
+
+    let prodsCadastrados = [];
+    if (typeof Produtos !== 'undefined' && Produtos.encontrarOuCriar) {
+      itensParaSalvar.forEach(it => {
+        if (it.produto && it.produto.trim()) {
+          const prod = Produtos.encontrarOuCriar(it.produto, it.unidade || 'un', categoria);
+          if (prod) {
+            it.produto_id = prod.id;
+            prodsCadastrados.push(prod.nome);
+            if (Produtos.atualizarValorMedio) {
+              Produtos.atualizarValorMedio(prod.id);
+            }
+          }
+        }
+      });
+    }
+
     const tipo = this._dadosOCR?.tipo_lancamento === 'receita' ? 'receita' : 'despesa';
     const lanc = DB.add('lancamentos', {
       tipo,
@@ -516,7 +574,7 @@ const OCR = {
       codigo_barras: barcode || '',
       origem: 'ocr',
       observacoes: [obs, numDoc ? `Doc: ${numDoc}` : '', this._dadosOCR?.chave_acesso ? `Chave NF-e: ${this._dadosOCR.chave_acesso}` : ''].filter(Boolean).join(' | ') || '',
-      itens: this._dadosOCR?.itens || [],
+      itens: itensParaSalvar,
       conciliado: false
     });
 
@@ -538,6 +596,7 @@ const OCR = {
           obra_id: obraId,
           lancamento_id: lanc.id,
           chave_acesso: this._dadosOCR?.chave_acesso || '',
+          itens: itensParaSalvar,
           observacoes: `Reconhecido via OCR em ${new Date().toLocaleString('pt-BR')}`
         });
       } catch (errNota) {

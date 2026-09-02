@@ -83,7 +83,8 @@ export default async function handler(req, res) {
               data: cleanDate(l.data) || new Date().toISOString().split('T')[0],
               data_vencimento: cleanDate(l.data_vencimento) || cleanDate(l.data),
               data_pagamento: cleanDate(l.data_pagamento),
-              valor: cleanNum(l.valor)
+              valor: cleanNum(l.valor),
+              itens: Array.isArray(l.itens) ? l.itens : (typeof l.itens === 'string' ? JSON.parse(l.itens || '[]') : [])
             })),
             notas: notas.map(n => ({
               ...n,
@@ -96,7 +97,8 @@ export default async function handler(req, res) {
               valor_total: cleanNum(n.valor_total !== undefined ? n.valor_total : n.valor_bruto),
               categoria: n.categoria || 'material',
               tipo: n.tipo || 'entrada',
-              chave_nfe: n.chave_nfe || n.chave_acesso || ''
+              chave_nfe: n.chave_nfe || n.chave_acesso || '',
+              itens: Array.isArray(n.itens) ? n.itens : (typeof n.itens === 'string' ? JSON.parse(n.itens || '[]') : [])
             })),
             orcamentos: orcamentos,
             medicoes: medicoes.map(m => ({
@@ -230,17 +232,19 @@ export default async function handler(req, res) {
             const dataLanc = cleanDate(l.data) || new Date().toISOString().split('T')[0];
             const dataVenc = cleanDate(l.data_vencimento) || dataLanc;
             const dataPag = cleanDate(l.data_pagamento);
+            const itensJson = JSON.stringify(Array.isArray(l.itens) ? l.itens : []);
 
             await sql`
               INSERT INTO lancamentos (
                 id, data, data_vencimento, data_pagamento, descricao, categoria,
                 fornecedor_beneficiario, conta_bancaria, tipo, valor, status,
-                obra_id, nota_fiscal_id, codigo_barras, chave_nfe, observacoes, conciliado
+                obra_id, nota_fiscal_id, codigo_barras, chave_nfe, observacoes, conciliado, itens
               )
               VALUES (
                 ${l.id}, ${dataLanc}, ${dataVenc}, ${dataPag}, ${l.descricao}, ${l.categoria || 'Outros'},
                 ${l.fornecedor_beneficiario || ''}, ${l.conta_bancaria || ''}, ${l.tipo || 'despesa'}, ${cleanNum(l.valor)}, ${l.status || 'pendente'},
-                ${l.obra_id || null}, ${l.nota_fiscal_id || null}, ${l.codigo_barras || null}, ${l.chave_nfe || null}, ${l.observacoes || ''}, ${!!l.conciliado}
+                ${l.obra_id || null}, ${l.nota_fiscal_id || null}, ${l.codigo_barras || null}, ${l.chave_nfe || null}, ${l.observacoes || ''}, ${!!l.conciliado},
+                ${itensJson}
               )
               ON CONFLICT (id) DO UPDATE SET
                 data = EXCLUDED.data,
@@ -250,7 +254,8 @@ export default async function handler(req, res) {
                 valor = EXCLUDED.valor,
                 status = EXCLUDED.status,
                 codigo_barras = EXCLUDED.codigo_barras,
-                conciliado = EXCLUDED.conciliado;
+                conciliado = EXCLUDED.conciliado,
+                itens = EXCLUDED.itens;
             `;
             totalCount++;
           }
@@ -264,12 +269,13 @@ export default async function handler(req, res) {
             const vImp = cleanNum(n.impostos);
             const vLiq = cleanNum(n.valor_liquido !== undefined ? n.valor_liquido : (vBruto - vImp));
             const vTot = cleanNum(n.valor_total !== undefined ? n.valor_total : vBruto);
+            const itensNotaJson = JSON.stringify(Array.isArray(n.itens) ? n.itens : []);
 
             await sql`
               INSERT INTO notas_fiscais (
                 id, numero_nf, serie, chave_acesso, chave_nfe, emitente, cnpj_emitente, destinatario,
                 data_emissao, data_vencimento, data_pagamento, valor_bruto, impostos, valor_liquido, valor_total,
-                tipo, categoria, status, lancamento_id, observacoes, obra_id
+                tipo, categoria, status, lancamento_id, observacoes, obra_id, itens
               )
               VALUES (
                 ${n.id}, ${n.numero_nf || ''}, ${n.serie || ''}, ${n.chave_nfe || n.chave_acesso || null}, ${n.chave_nfe || n.chave_acesso || ''},
@@ -277,7 +283,8 @@ export default async function handler(req, res) {
                 ${cleanDate(n.data_emissao)}, ${cleanDate(n.data_vencimento)}, ${cleanDate(n.data_pagamento)},
                 ${vBruto}, ${vImp}, ${vLiq}, ${vTot},
                 ${n.tipo || 'entrada'}, ${n.categoria || 'material'}, ${n.status || 'paga'},
-                ${n.lancamento_id || null}, ${n.observacoes || ''}, ${n.obra_id || null}
+                ${n.lancamento_id || null}, ${n.observacoes || ''}, ${n.obra_id || null},
+                ${itensNotaJson}
               )
               ON CONFLICT (id) DO UPDATE SET
                 numero_nf = EXCLUDED.numero_nf,
@@ -299,7 +306,8 @@ export default async function handler(req, res) {
                 status = EXCLUDED.status,
                 lancamento_id = EXCLUDED.lancamento_id,
                 observacoes = EXCLUDED.observacoes,
-                obra_id = EXCLUDED.obra_id;
+                obra_id = EXCLUDED.obra_id,
+                itens = EXCLUDED.itens;
             `;
             totalCount++;
           }

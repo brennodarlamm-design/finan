@@ -14,6 +14,7 @@ const Produtos = {
   // RENDER PRINCIPAL
   // ────────────────────────────────────────────────────────────
   render(obraId) {
+    this.sincronizarComLancamentos();
     const produtos = DB.getAll('produtos');
     const analise  = this.getAnaliseGastos(obraId === 'todas' ? null : obraId);
     const totalGasto = analise.reduce((s, p) => s + p.total, 0);
@@ -434,5 +435,66 @@ const Produtos = {
     return html;
   },
 
-  init() {}
+  sincronizarComLancamentos() {
+    try {
+      const lancs = (typeof DB !== 'undefined' ? DB.getAll('lancamentos') : []) || [];
+      let updatedAny = false;
+
+      lancs.forEach(l => {
+        if (l.tipo !== 'despesa') return;
+
+        // 1. Se tem itens no lançamento, garante que todos estão em produtos
+        if (Array.isArray(l.itens) && l.itens.length > 0) {
+          l.itens.forEach(it => {
+            if (it.produto && it.produto.trim()) {
+              const prod = this.encontrarOuCriar(it.produto, it.unidade || 'un', l.categoria || 'material');
+              if (prod && !it.produto_id) {
+                it.produto_id = prod.id;
+                updatedAny = true;
+              }
+              if (prod) this.atualizarValorMedio(prod.id);
+            }
+          });
+        }
+        // 2. Se não tem itens, mas tem descrição de compra/material (ex: OCR de NFC-e/NF-e)
+        else if (l.valor > 0 && l.descricao && l.descricao.trim()) {
+          const desc = l.descricao.trim();
+          const cleanNome = desc.replace(/^(compra\s+de\s+|aquisição\s+de\s+|aquisicao\s+de\s+|pgto\s+de\s+|pagamento\s+de\s+|fornecimento\s+de\s+|nfce\s+-\s+|nfe\s+-\s+)/i, '').trim();
+          if (cleanNome.length >= 3 && (l.categoria === 'material' || l.origem === 'ocr' || /^(compra|aquisi|trilho|cimento|tinta|piso|bloco|areia|brita|tubo|cabo|ferro|aco|madeira)/i.test(desc))) {
+            const prod = this.encontrarOuCriar(cleanNome, 'un', l.categoria || 'material');
+            if (prod) {
+              l.itens = [{
+                produto: cleanNome,
+                produto_id: prod.id,
+                qtd: 1,
+                unidade: 'un',
+                valor_unit: l.valor,
+                total: l.valor
+              }];
+              this.atualizarValorMedio(prod.id);
+              updatedAny = true;
+            }
+          }
+        }
+      });
+
+      if (updatedAny && typeof DB !== 'undefined') {
+        DB.save('lancamentos', lancs);
+      }
+    } catch (e) {
+      console.warn('[Produtos] Erro ao sincronizar com lançamentos:', e);
+    }
+  },
+
+  init() {
+    this.sincronizarComLancamentos();
+  }
 };
+
+if (typeof window !== 'undefined') {
+  setTimeout(() => {
+    if (typeof Produtos !== 'undefined' && Produtos.sincronizarComLancamentos) {
+      Produtos.sincronizarComLancamentos();
+    }
+  }, 150);
+}

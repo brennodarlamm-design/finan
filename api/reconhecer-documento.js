@@ -52,7 +52,7 @@ Retorne APENAS um objeto JSON válido (sem markdown, sem explicações) com os s
   "confianca": numero de 0 a 1 indicando confiança na leitura
 }
 
-Regras: itens só quando houver produtos explícitos. valor = total a pagar (numero). Datas ISO YYYY-MM-DD. confianca: 1.0=clareza total, 0.5=parcial, 0.2=ilegível. Nao invente dados - use null. Retorne APENAS o JSON.`;
+Regras: Para qualquer NF-e, NFC-e, cupom fiscal, fatura ou recibo de compra, você DEVE OBRIGATORIAMENTE extrair os produtos/serviços para a lista 'itens'. Mesmo se houver apenas 1 produto no documento, inclua-o no array 'itens' com sua descrição, quantidade (default 1), unidade (default 'un') e valor unitário. valor = total a pagar (numero). Datas ISO YYYY-MM-DD. confianca: 1.0=clareza total, 0.5=parcial, 0.2=ilegível. Nao invente dados - use null. Retorne APENAS o JSON.`;
 
   try {
     const models = [
