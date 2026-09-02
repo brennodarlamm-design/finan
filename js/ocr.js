@@ -7,8 +7,8 @@ const OCR = {
   // ── Ponto de entrada: abre o modal de upload ─────────────────────────────
   abrirModal() {
     Utils.showModal(`
-      <div class="modal" id="ocr-modal" style="max-width:580px;width:95vw;">
-        <div class="modal-header" style="background:linear-gradient(135deg,#1e1b4b 0%,#312e81 100%);border-radius:var(--r-lg) var(--r-lg) 0 0;">
+      <div class="modal" id="ocr-modal" style="max-width:680px;width:95vw;max-height:92vh;display:flex;flex-direction:column;overflow:hidden;">
+        <div class="modal-header" style="background:linear-gradient(135deg,#1e1b4b 0%,#312e81 100%);border-radius:var(--r-lg) var(--r-lg) 0 0;flex-shrink:0;">
           <span class="modal-title" style="color:#e0e7ff;font-size:1.05rem;display:flex;align-items:center;gap:10px;">
             <span style="font-size:1.5rem;">🤖</span>
             <div>
@@ -23,7 +23,7 @@ const OCR = {
             <button class="modal-close" onclick="Utils.closeModal()" style="color:#a5b4fc;">✕</button>
           </div>
         </div>
-        <div class="modal-body" style="padding:24px;">
+        <div class="modal-body" id="ocr-modal-body" style="padding:20px 24px;overflow-y:auto;flex:1;">
 
           <!-- Botões de ação principais -->
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px;">
@@ -84,6 +84,8 @@ const OCR = {
             </div>
           </div>
 
+        </div>
+        <div class="modal-footer" id="ocr-modal-footer" style="padding:12px 24px;border-top:1px solid var(--border);display:none;background:var(--bg-card);flex-shrink:0;justify-content:space-between;align-items:center;">
         </div>
       </div>
     `);
@@ -191,13 +193,17 @@ const OCR = {
 
   // ── Tela de Resultado ─────────────────────────────────────────────────────
   _mostrarResultado(d) {
-    const modal = document.querySelector('#ocr-modal .modal-body');
+    const modal = document.querySelector('#ocr-modal .modal-body') || document.getElementById('ocr-modal-body');
     if (!modal) return;
 
     const confiancaPct = Math.round((d.confianca || 0) * 100);
     const corConfianca = confiancaPct >= 80 ? '#10b981' : confiancaPct >= 50 ? '#f59e0b' : '#ef4444';
     const iconeTipo    = this._iconeTipoDoc(d.tipo_documento);
     const catLabel     = Utils.catLabel(d.categoria_sugerida || 'outro');
+
+    const obras = (typeof DB !== 'undefined' ? DB.getAll('clientes') : []) || [];
+    const contas = (typeof DB !== 'undefined' ? DB.getAll('contas') : []) || [];
+    const defaultObraId = (typeof App !== 'undefined' && App.currentObraId && App.currentObraId !== 'todas') ? App.currentObraId : 'escritorio';
 
     // Montar lista de itens se houver
     const itensHtml = d.itens && d.itens.length ? `
@@ -231,7 +237,7 @@ const OCR = {
 
     modal.innerHTML = `
       <!-- Cabeçalho do resultado -->
-      <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;padding:12px 16px;
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;padding:12px 16px;
                   background:linear-gradient(135deg,rgba(16,185,129,.08) 0%,rgba(5,150,105,.05) 100%);
                   border:1px solid rgba(16,185,129,.25);border-radius:10px;">
         <span style="font-size:2rem;">${iconeTipo}</span>
@@ -247,6 +253,52 @@ const OCR = {
         <button class="btn btn-sm btn-secondary" onclick="OCR.abrirModal()" style="font-size:.72rem;">
           🔄 Trocar
         </button>
+      </div>
+
+      <!-- Centro de Custo (Sede ou Obra) e Conta Bancária -->
+      <div style="background:rgba(201,162,39,.1);border:1px solid rgba(201,162,39,.4);border-radius:10px;padding:12px 14px;margin-bottom:14px;">
+        <div style="font-size:.74rem;font-weight:800;color:var(--accent2);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px;">
+          📍 Centro de Custo (Sede ou Obra) & Pagamento *
+        </div>
+        <div style="display:grid;grid-template-columns:1.2fr 1fr;gap:10px;">
+          <div>
+            <label style="font-size:.76rem;color:var(--text);font-weight:800;display:block;margin-bottom:4px;">
+              Centro de Custo *
+            </label>
+            <select id="ocr-obra" class="form-control" style="font-size:.85rem;font-weight:700;border:2px solid var(--accent);background:var(--bg-card);" required>
+              <option value="escritorio" ${defaultObraId==='escritorio'?'selected':''}>🏢 Sede / Escritório Central</option>
+              <optgroup label="🏗️ Obras em Andamento">
+                ${obras.map(o => `<option value="${o.id}" ${defaultObraId===o.id?'selected':''}>${o.nome}</option>`).join('')}
+              </optgroup>
+            </select>
+          </div>
+          <div>
+            <label style="font-size:.76rem;color:var(--text);font-weight:800;display:block;margin-bottom:4px;">
+              Conta Bancária
+            </label>
+            <select id="ocr-conta" class="form-control" style="font-size:.85rem;background:var(--bg-card);">
+              <option value="">Selecione a conta...</option>
+              ${contas.map(c => `<option value="${c.apelido || c.banco_nome}">${c.apelido || c.banco_nome} (${c.agencia||''}/${c.numero||''})</option>`).join('')}
+            </select>
+          </div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px;">
+          <div>
+            <label style="font-size:.74rem;color:var(--text3);font-weight:700;display:block;margin-bottom:4px;">
+              Status do Lançamento
+            </label>
+            <select id="ocr-status" class="form-control" style="font-size:.85rem;" onchange="OCR._onStatusChange(this.value)">
+              <option value="a_pagar" selected>⏳ A Pagar (Previsão)</option>
+              <option value="pago">✓ Já Pago (Efetivado)</option>
+            </select>
+          </div>
+          <div id="ocr-dt-pagto-wrap" style="display:none;">
+            <label style="font-size:.74rem;color:var(--success);font-weight:700;display:block;margin-bottom:4px;">
+              Data do Pagamento Efetivo
+            </label>
+            <input id="ocr-data-pagto" class="form-control" type="date" value="${Utils.today()}" style="font-size:.85rem;border-color:var(--success);">
+          </div>
+        </div>
       </div>
 
       <!-- Campos extraídos (editáveis) -->
@@ -338,22 +390,40 @@ const OCR = {
       <div style="margin-top:14px;padding:10px 14px;background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.3);border-radius:8px;font-size:.78rem;color:#f59e0b;">
         ⚠️ <strong>Confiança ${confiancaPct}%</strong> — Alguns campos podem estar incorretos. Revise os dados antes de criar o lançamento.
       </div>` : ''}
+
+      <!-- Botão de Ação Destacado no Final do Formulário -->
+      <div style="margin-top:20px;padding:14px 16px;background:var(--bg-secondary);border:1px solid var(--border);border-radius:10px;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;">
+        <button type="button" class="btn btn-secondary" onclick="Utils.closeModal()" style="font-weight:700;padding:10px 18px;">✕ Cancelar</button>
+        <button type="button" class="btn btn-success" onclick="OCR.confirmarESalvarLancamento()" style="display:flex;align-items:center;gap:8px;font-size:1rem;font-weight:900;padding:12px 26px;background:linear-gradient(135deg,#16a34a,#15803d);color:#fff;box-shadow:0 4px 14px rgba(22,163,74,.4);border:none;border-radius:8px;cursor:pointer;">
+          ✓ Confirmar e Salvar Lançamento
+        </button>
+      </div>
     `;
 
-    // Atualizar footer
-    const footer = document.querySelector('#ocr-modal')?.closest('.modal')?.querySelector?.('.modal-footer')
+    // Atualizar footer fixo do modal
+    const footer = document.getElementById('ocr-modal-footer')
+                || document.querySelector('#ocr-modal .modal-footer')
                 || document.querySelector('.modal-footer');
     if (footer) {
+      footer.style.display = 'flex';
+      footer.style.justifyContent = 'space-between';
+      footer.style.alignItems = 'center';
+      footer.style.width = '100%';
       footer.innerHTML = `
-        <button class="btn btn-secondary" onclick="Utils.closeModal()">Cancelar</button>
-        <button class="btn btn-primary" onclick="OCR._criarLancamento()" style="display:flex;align-items:center;gap:8px;background:linear-gradient(135deg,#4f46e5,#7c3aed);">
-          ✓ Criar Lançamento
+        <button class="btn btn-secondary" onclick="Utils.closeModal()">✕ Cancelar</button>
+        <button class="btn btn-success" onclick="OCR.confirmarESalvarLancamento()" style="display:flex;align-items:center;gap:8px;font-size:.95rem;font-weight:900;padding:10px 22px;background:linear-gradient(135deg,#16a34a,#15803d);color:#fff;box-shadow:0 3px 10px rgba(22,163,74,.35);border:none;border-radius:6px;cursor:pointer;">
+          ✓ Confirmar e Salvar Lançamento
         </button>
       `;
     }
 
     // Guardar dados originais
     this._dadosOCR = d;
+  },
+
+  _onStatusChange(val) {
+    const wrap = document.getElementById('ocr-dt-pagto-wrap');
+    if (wrap) wrap.style.display = val === 'pago' ? 'block' : 'none';
   },
 
   // ── Tela de Erro ──────────────────────────────────────────────────────────
@@ -377,50 +447,142 @@ const OCR = {
     `;
   },
 
-  // ── Cria o lançamento com os dados revisados ──────────────────────────────
-  _criarLancamento() {
+  // ── Cria e salva o lançamento diretamente com centro de custo e anexo ─────────────
+  confirmarESalvarLancamento() {
     const get = id => document.getElementById(id)?.value?.trim() || '';
 
+    const obraId      = get('ocr-obra');
+    const conta       = get('ocr-conta');
+    const status      = get('ocr-status') || 'a_pagar';
+    const dataPagto   = status === 'pago' ? (get('ocr-data-pagto') || Utils.today()) : null;
     const fornecedor  = get('ocr-fornecedor');
+    const cnpj        = get('ocr-cnpj');
     const valor       = parseFloat(get('ocr-valor'));
     const dataEmissao = get('ocr-data-emissao') || Utils.today();
     const vencimento  = get('ocr-vencimento')   || Utils.today();
     const descricao   = get('ocr-descricao')    || fornecedor || 'Lançamento via OCR';
-    const categoria   = get('ocr-categoria')    || 'outro';
+    const categoria   = get('ocr-categoria')    || 'material';
     const numDoc      = get('ocr-num-doc');
     const barcode     = get('ocr-barcode');
     const obs         = get('ocr-obs');
 
+    if (!obraId) {
+      Utils.toast('Selecione se o lançamento é da Sede / Escritório ou de uma Obra.', 'warning');
+      document.getElementById('ocr-obra')?.focus();
+      return;
+    }
+
     if (!valor || isNaN(valor) || valor <= 0) {
-      Utils.toast('Informe o valor do documento antes de criar o lançamento.', 'error');
+      Utils.toast('Informe um valor válido para o lançamento.', 'warning');
       document.getElementById('ocr-valor')?.focus();
       return;
     }
 
-    // Montar objeto de lançamento com dados do OCR
-    const dadosLancamento = {
-      tipo:                   this._dadosOCR?.tipo_lancamento === 'receita' ? 'receita' : 'despesa',
-      fornecedor_beneficiario: fornecedor,
-      valor,
-      data:                   dataEmissao,
-      data_vencimento:        vencimento,
-      descricao,
-      categoria,
-      codigo_barras:          barcode || '',
-      observacoes:            [obs, numDoc ? `Doc: ${numDoc}` : '', this._dadosOCR?.chave_acesso ? `Chave NF-e: ${this._dadosOCR.chave_acesso}` : ''].filter(Boolean).join(' | ') || '',
-      status:                 'a_pagar',
-      origem:                 'ocr',
-      itens:                  this._dadosOCR?.itens || []
-    };
-
-    // Fechar modal e abrir formulário de lançamento pré-preenchido
-    Utils.closeModal();
-
-    setTimeout(() => {
-      if (typeof Lancamentos !== 'undefined') {
-        Lancamentos.showFormOCR(dadosLancamento, this._arquivoAtual, this._base64Atual);
+    // 1. Cadastra fornecedor se não existir
+    let fornecedorId = null;
+    if (fornecedor) {
+      const fornecedores = DB.getAll('fornecedores') || [];
+      const cnpjLimpo = cnpj.replace(/\D/g, '');
+      let forn = fornecedores.find(f => {
+        const fCnpj = (f.cnpj || f.cpf || '').replace(/\D/g, '');
+        return (cnpjLimpo && fCnpj === cnpjLimpo) || (f.nome && f.nome.toLowerCase() === fornecedor.toLowerCase());
+      });
+      if (!forn) {
+        forn = DB.add('fornecedores', {
+          nome: fornecedor,
+          razao_social: fornecedor,
+          cnpj_cpf: cnpj || '',
+          categoria: categoria
+        });
       }
-    }, 150);
+      fornecedorId = forn?.id || null;
+    }
+
+    // 2. Cria o lançamento no DB
+    const tipo = this._dadosOCR?.tipo_lancamento === 'receita' ? 'receita' : 'despesa';
+    const lanc = DB.add('lancamentos', {
+      tipo,
+      obra_id: obraId,
+      conta_bancaria: conta,
+      categoria,
+      descricao,
+      valor,
+      data: dataEmissao,
+      data_vencimento: vencimento,
+      data_pagamento: dataPagto,
+      status,
+      fornecedor_beneficiario: fornecedor,
+      fornecedor_id: fornecedorId,
+      codigo_barras: barcode || '',
+      origem: 'ocr',
+      observacoes: [obs, numDoc ? `Doc: ${numDoc}` : '', this._dadosOCR?.chave_acesso ? `Chave NF-e: ${this._dadosOCR.chave_acesso}` : ''].filter(Boolean).join(' | ') || '',
+      itens: this._dadosOCR?.itens || [],
+      conciliado: false
+    });
+
+    // 3. Cria nota fiscal se for documento fiscal
+    if (numDoc || this._dadosOCR?.chave_acesso || ['nfe','nfce','nfse'].includes(this._dadosOCR?.tipo_documento)) {
+      try {
+        DB.add('notas', {
+          numero_nf: numDoc || 'S/N',
+          serie: '1',
+          emitente: fornecedor || 'Fornecedor',
+          cnpj_emitente: cnpj || '',
+          data_emissao: dataEmissao,
+          data_vencimento: vencimento,
+          data_pagamento: dataPagto,
+          valor_total: valor,
+          tipo: tipo === 'despesa' ? 'entrada' : 'saida',
+          categoria,
+          status: status === 'pago' ? 'paga' : 'pendente',
+          obra_id: obraId,
+          lancamento_id: lanc.id,
+          chave_acesso: this._dadosOCR?.chave_acesso || '',
+          observacoes: `Reconhecido via OCR em ${new Date().toLocaleString('pt-BR')}`
+        });
+      } catch (errNota) {
+        console.warn('Erro ao criar nota fiscal vinculada:', errNota);
+      }
+    }
+
+    // 4. Anexa o arquivo/comprovante se disponível
+    if (this._base64Atual && typeof Documentos !== 'undefined') {
+      try {
+        const ext = (this._arquivoAtual?.name || '').split('.').pop() || 'pdf';
+        Documentos.adicionar({
+          entidade_tipo: 'lancamento',
+          entidade_id: lanc.id,
+          titulo: `Comprovante / ${descricao.slice(0, 30)}`,
+          nome_arquivo: this._arquivoAtual?.name || `documento_ocr_${lanc.id}.${ext}`,
+          tipo_mime: this._arquivoAtual?.type || 'application/pdf',
+          tamanho: this._arquivoAtual?.size || Math.round(this._base64Atual.length * 0.75),
+          data_base64: this._base64Atual
+        });
+      } catch (errDoc) {
+        console.warn('Erro ao anexar arquivo ao lançamento:', errDoc);
+      }
+    }
+
+    Utils.closeModal();
+    Utils.toast(`✅ Lançamento de ${Utils.fmt.currency(valor)} registrado com sucesso!`, 'success');
+
+    // Atualiza telas abertas
+    if (typeof Lancamentos !== 'undefined' && Lancamentos.render) {
+      const appContent = document.getElementById('app-content');
+      if (appContent && typeof App !== 'undefined' && App.currentRoute === 'lancamentos') {
+        appContent.innerHTML = Lancamentos.render(App.currentObraId);
+        if (Lancamentos.init) Lancamentos.init(App.currentObraId);
+      }
+    }
+    if (typeof Dashboard !== 'undefined' && typeof App !== 'undefined' && App.currentRoute === 'dashboard') {
+      const appContent = document.getElementById('app-content');
+      if (appContent) appContent.innerHTML = Dashboard.render(App.currentObraId);
+    }
+  },
+
+  // Alias para manter compatibilidade
+  _criarLancamento() {
+    this.confirmarESalvarLancamento();
   },
 
   // ── Helpers ───────────────────────────────────────────────────────────────
