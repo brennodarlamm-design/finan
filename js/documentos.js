@@ -394,7 +394,20 @@ const Documentos = {
     Utils.toast('Carregando anexo...', 'info');
     const conteudo = await this.obterConteudo(id);
     if (!conteudo) {
-      Utils.toast('Conteúdo do arquivo não disponível neste dispositivo nem na nuvem.', 'warning');
+      Utils.showModal(`
+        <div class="modal" style="max-width:480px;text-align:center;padding:24px;">
+          <div style="font-size:3rem;margin-bottom:12px;">📱 ➔ 💻</div>
+          <h3 style="font-size:1.1rem;font-weight:800;margin-bottom:8px;color:var(--text);">Arquivo Gravado no Celular</h3>
+          <p style="font-size:.85rem;color:var(--text2);line-height:1.5;margin-bottom:16px;text-align:left;background:var(--bg-secondary);padding:14px;border-radius:8px;border:1px solid var(--border);">
+            O arquivo deste comprovante (<strong>${doc.nome_arquivo || doc.titulo}</strong>) foi gerado no smartphone e ainda está pendente de sincronização com o banco de dados em nuvem.
+            <br><br>
+            👉 <strong>Como sincronizar:</strong> Abra a página no celular e dê um <em>recarregar (F5/puxar para baixo)</em>. O aplicativo enviará o arquivo automaticamente para a nuvem e ele abrirá aqui no computador imediatamente!
+          </p>
+          <div style="display:flex;gap:8px;justify-content:center;">
+            <button class="btn btn-primary" onclick="Utils.closeModal()">OK, vou abrir no celular</button>
+          </div>
+        </div>
+      `);
       return;
     }
 
@@ -429,7 +442,7 @@ const Documentos = {
     Utils.toast('Baixando anexo...', 'info');
     const conteudo = await this.obterConteudo(id);
     if (!conteudo) {
-      Utils.toast('Conteúdo do arquivo não disponível.', 'warning');
+      Utils.toast('Arquivo pendente no celular. Abra o app no celular para sincronizar.', 'warning');
       return;
     }
 
@@ -439,10 +452,40 @@ const Documentos = {
     document.body.appendChild(link);
     link.click();
     link.remove();
+  },
+
+  // Sincroniza arquivos que já estão salvos localmente no celular diretamente para a nuvem
+  async sincronizarPendentesParaNuvem() {
+    if (typeof DB === 'undefined' || !DB.syncToCloud || (DB._t && DB._t() !== 'angelim')) return;
+    const docs = this.getAll();
+    if (!docs.length) return;
+
+    for (const d of docs) {
+      try {
+        let b64 = this._memoryBlobs.get(d.id);
+        if (!b64) b64 = await this._idbGet(d.id);
+
+        if (b64) {
+          const syncKey = 'finobra_cloud_uploaded_' + d.id;
+          if (!localStorage.getItem(syncKey)) {
+            DB.syncToCloud('save', 'documentos', {
+              ...d,
+              base64_data: b64
+            });
+            localStorage.setItem(syncKey, '1');
+          }
+        }
+      } catch (e) {
+        console.warn('[Documentos] Falha ao enviar anexo pendente para nuvem:', d.id, e);
+      }
+    }
   }
 };
 
-// Executar migração automática de armazenamento ao carregar
+// Executar migração e sincronização automática de armazenamento ao carregar
 if (typeof window !== 'undefined') {
-  setTimeout(() => Documentos._migrarLocalStorage(), 100);
+  setTimeout(() => {
+    Documentos._migrarLocalStorage();
+    Documentos.sincronizarPendentesParaNuvem();
+  }, 1000);
 }
