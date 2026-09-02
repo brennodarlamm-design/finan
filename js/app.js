@@ -44,13 +44,6 @@ const App = {
 
     DB.init();
     await DB.syncFromCloud();
-    if (DB.isDemoLoaded()) {
-      DB.seedDemoData();
-      DB.seedSinapiDemo();
-      if (typeof Documentos !== 'undefined' && Documentos.seedDemoDocs) {
-        Documentos.seedDemoDocs();
-      }
-    }
     this.renderShell();
 
     // ── Ocultar loader após renderizar ─────────────────────────────
@@ -148,10 +141,6 @@ const App = {
               <div class="header-sub">${brandName} — Gestão Financeira</div>
             </div>
             <div class="hspacer"></div>
-            <div id="demo-badge" class="demo-badge" style="${DB.isDemoLoaded()?'':'display:none'}">
-              ⚠ Dados Demo
-              <button style="background:none;border:none;color:inherit;cursor:pointer;font-size:.68rem;text-decoration:underline;margin-left:4px;padding:0" onclick="App.clearDemo()">Limpar</button>
-            </div>
             <!-- Botão Busca Global -->
             <div class="header-search-btn" onclick="typeof BuscaGlobal !== 'undefined' && BuscaGlobal.abrir()" title="Busca Global em todo o sistema (Ctrl+K)" style="cursor:pointer;display:flex;align-items:center;gap:6px;background:rgba(255,255,255,.05);border:1px solid var(--border);border-radius:8px;padding:5px 10px;transition:all .2s;">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
@@ -566,20 +555,10 @@ const App = {
   },
 
   clearDemo() {
-    this.clearAllData();
-  },
-
-  loadDemoData() {
-    DB.seedDemoData(true);
-    DB.seedSinapiDemo(true);
-    if (typeof Documentos !== 'undefined' && Documentos.seedDemoDocs) {
-      Documentos.seedDemoDocs(true);
-    }
-    const badge = document.getElementById('demo-badge');
-    if (badge) badge.style.display = '';
+    DB.expurgarDadosDemo();
     this.refreshObraSelector();
     this.navigate(this.route);
-    Utils.toast('Dados de demonstração carregados!', 'info');
+    Utils.toast('✅ Dados demo expurgados com sucesso!', 'success');
   },
 
   toggleSidebar() {

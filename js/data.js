@@ -489,6 +489,7 @@ const DB = {
 
   init() {
     this.purgeStorage();
+    this.expurgarDadosDemo();
     // Garante que todas as coleções existam no LocalStorage como array vazio se inexistentes
     Object.keys(this.K).forEach(k => {
       const sk = this._k(k);
@@ -510,8 +511,89 @@ const DB = {
     }
   },
 
+  // ── Expurgar permanentemente dados fictícios de demonstração ──────────────
+  expurgarDadosDemo() {
+    try {
+      // 1. Remove flags de demo do localStorage
+      localStorage.removeItem(this._ck('finobra_demo_v2'));
+      localStorage.removeItem(this._ck('finobra_demo'));
+      localStorage.removeItem('sinapi_base_onerado');
+      localStorage.setItem(this._ck('finobra_clean_mode'), 'true');
+
+      // 2. Limpa lançamentos demo
+      const demoLansIds = new Set(['l001','l002','l003','l004','l010','l011','l012','l013','l014','l015','l016','l017','l018','l021','l022','l023','l024','l025','l026','l027']);
+      const demoObrasIds = new Set(['cli_001', 'cli_002', 'cli_003']);
+
+      const lans = this.getAll('lancamentos') || [];
+      const lansFiltrados = lans.filter(l => {
+        if (l._demo) return false;
+        if (demoLansIds.has(l.id)) return false;
+        if (typeof l.id === 'string' && (l.id.startsWith('l_adm') || l.id.startsWith('l0'))) return false;
+        if (demoObrasIds.has(l.obra_id)) return false;
+        return true;
+      });
+      if (lansFiltrados.length !== lans.length) {
+        this.save('lancamentos', lansFiltrados);
+      }
+
+      // 3. Limpa obras demo
+      const obras = this.getAll('clientes') || [];
+      const obrasFiltradas = obras.filter(o => {
+        if (o._demo) return false;
+        if (demoObrasIds.has(o.id)) return false;
+        if (['João Carlos Ferreira', 'Maria Aparecida Santos', 'Roberto Silva Lima'].includes(o.nome)) return false;
+        return true;
+      });
+      if (obrasFiltradas.length !== obras.length) {
+        this.save('clientes', obrasFiltradas);
+      }
+
+      // 4. Limpa notas fiscais demo
+      const notas = this.getAll('notas') || [];
+      const notasFiltradas = notas.filter(n => {
+        if (n._demo) return false;
+        if (typeof n.id === 'string' && n.id.startsWith('nf_0')) return false;
+        if (demoObrasIds.has(n.obra_id)) return false;
+        return true;
+      });
+      if (notasFiltradas.length !== notas.length) {
+        this.save('notas', notasFiltradas);
+      }
+
+      // 5. Limpa documentos demo
+      const docsKey = this._ck('finobra_documentos');
+      let docs = [];
+      try { docs = JSON.parse(localStorage.getItem(docsKey) || '[]'); } catch {}
+      const docsFiltrados = docs.filter(d => {
+        if (d._demo) return false;
+        if (typeof d.id === 'string' && d.id.startsWith('doc_demo_')) return false;
+        if (typeof d.referencia_id === 'string' && (d.referencia_id.startsWith('l0') || d.referencia_id.startsWith('l_adm'))) return false;
+        return true;
+      });
+      if (docsFiltrados.length !== docs.length) {
+        localStorage.setItem(docsKey, JSON.stringify(docsFiltrados));
+      }
+
+      // 6. Limpa medições demo
+      const med = this.getAll('medicoes') || [];
+      const medFiltradas = med.filter(m => !m._demo && !['med_001','med_002','med_003'].includes(m.id) && !demoObrasIds.has(m.obra_id));
+      if (medFiltradas.length !== med.length) {
+        this.save('medicoes', medFiltradas);
+      }
+
+      // 7. Limpa fornecedores demo
+      const forn = this.getAll('fornecedores') || [];
+      const fornFiltrados = forn.filter(f => !f._demo && !(typeof f.id === 'string' && f.id.startsWith('forn_0')));
+      if (fornFiltrados.length !== forn.length) {
+        this.save('fornecedores', fornFiltrados);
+      }
+    } catch (err) {
+      console.warn('[DB] Erro ao expurgar dados demo:', err);
+    }
+  },
+
   isDemoLoaded() {
-    return localStorage.getItem(this._ck('finobra_demo_v2')) === 'true';
+    return false;
   },
 
   clearAllData() {
@@ -528,7 +610,7 @@ const DB = {
   },
 
   clearDemo() {
-    this.clearAllData();
+    this.expurgarDadosDemo();
   },
 
   _fmtDateAdd(days = 0) {
@@ -537,19 +619,7 @@ const DB = {
     return d.toISOString().split('T')[0];
   },
 
-  refreshDemoVencimentos() {
-    if (typeof DBDemo !== 'undefined') DBDemo.refreshVencimentos();
-  },
-
-  seedDemoData(force = false) {
-    if (typeof DBDemo !== 'undefined') {
-      DBDemo.seed(this, force);
-    }
-  },
-
-  seedSinapiDemo(force = false) {
-    if (typeof DBDemo !== 'undefined') {
-      DBDemo.seedSinapi(force);
-    }
-  }
+  refreshDemoVencimentos() {},
+  seedDemoData() {},
+  seedSinapiDemo() {}
 };

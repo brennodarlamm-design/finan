@@ -602,14 +602,13 @@ const Configuracoes = {
       <div class="card">
         <div class="card-header"><div class="card-title">&#x1F5C4;&#xFE0F; Gerenciamento de Dados</div></div>
         <p style="color:var(--text2);font-size:.84rem;margin-bottom:8px;">
-          <strong>Status:</strong> ${isDemoLoaded ? '<span class="badge badge-warning">Modo Demonstração (Dados Fictícios)</span>' : '<span class="badge badge-success">Sistema Limpo / Produção</span>'}
+          <strong>Status:</strong> <span class="badge badge-success">Sistema em Produção</span>
         </p>
         <p style="color:var(--text3);font-size:.8rem;margin-bottom:16px;">
           ${totalClientes} obra(s) cadastrada(s) &middot; ${totalLancamentos} lançamento(s) &middot; ${totalFornecedores} fornecedor(es).
         </p>
         <div style="display:flex;gap:8px;flex-wrap:wrap;">
           <button class="btn btn-danger btn-sm" onclick="App.clearAllData()">&#x1F5D1; Zerar / Limpar Todos os Dados</button>
-          ${!isDemoLoaded ? `<button class="btn btn-secondary btn-sm" onclick="App.loadDemoData()">&#x1F4E5; Carregar Dados Demo</button>` : ''}
         </div>
       </div>
       <div class="card">
