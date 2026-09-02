@@ -303,6 +303,15 @@ const DB = {
         Documentos.salvarLista(merged);
       }
 
+      if (Array.isArray(d.produtos) && d.produtos.length > 0) {
+        const locais = this.getAll('produtos') || [];
+        const localMap = new Map(locais.map(p => [p.id, p]));
+        d.produtos.forEach(cp => {
+          localMap.set(cp.id, { ...(localMap.get(cp.id) || {}), ...cp });
+        });
+        this.save('produtos', Array.from(localMap.values()));
+      }
+
       console.log('✅ Dados sincronizados com Neon PostgreSQL!');
       return true;
     } catch (e) {
@@ -314,6 +323,8 @@ const DB = {
   syncToCloud(action, table, data, id) {
     // Sincroniza com Neon apenas se for o tenant central da Angelim
     if (this._t() !== 'angelim') return;
+    const cloudTables = ['lancamentos', 'notas', 'notas_fiscais', 'obras', 'clientes', 'fornecedores', 'documentos', 'produtos'];
+    if (!cloudTables.includes(table)) return;
     try {
       fetch('/api/db', {
         method: 'POST',

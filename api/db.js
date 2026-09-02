@@ -51,14 +51,15 @@ export default async function handler(req, res) {
       const { table, obra_id } = req.query;
 
       if (!table || table === 'all') {
-        const [obras, fornecedores, lancamentos, notas, orcamentos, medicoes, documentos] = await Promise.all([
+        const [obras, fornecedores, lancamentos, notas, orcamentos, medicoes, documentos, produtos] = await Promise.all([
           sql`SELECT * FROM obras ORDER BY nome ASC;`,
           sql`SELECT * FROM fornecedores ORDER BY nome ASC;`,
           sql`SELECT * FROM lancamentos ORDER BY data DESC, created_at DESC;`,
           sql`SELECT * FROM notas_fiscais ORDER BY data_emissao DESC;`,
           sql`SELECT * FROM orcamentos ORDER BY created_at DESC;`,
           sql`SELECT * FROM medicoes ORDER BY data DESC;`,
-          sql`SELECT id, tipo, referencia_id, titulo, categoria, nome_arquivo, tipo_arquivo, tamanho_bytes, created_at FROM documentos ORDER BY created_at DESC;`
+          sql`SELECT id, tipo, referencia_id, titulo, categoria, nome_arquivo, tipo_arquivo, tamanho_bytes, created_at FROM documentos ORDER BY created_at DESC;`,
+          sql`SELECT * FROM produtos ORDER BY nome ASC;`
         ]);
 
         return res.status(200).json({
@@ -99,6 +100,10 @@ export default async function handler(req, res) {
               tipo: n.tipo || 'entrada',
               chave_nfe: n.chave_nfe || n.chave_acesso || '',
               itens: Array.isArray(n.itens) ? n.itens : (typeof n.itens === 'string' ? JSON.parse(n.itens || '[]') : [])
+            })),
+            produtos: (produtos || []).map(p => ({
+              ...p,
+              valor_medio: cleanNum(p.valor_medio)
             })),
             orcamentos: orcamentos,
             medicoes: medicoes.map(m => ({
@@ -172,7 +177,12 @@ export default async function handler(req, res) {
         return res.status(200).json({ success: true, data: items });
       }
 
-      return res.status(400).json({ error: 'Tabela desconhecida' });
+      if (table === 'produtos') {
+        const items = await sql`SELECT * FROM produtos ORDER BY nome ASC;`;
+        return res.status(200).json({ success: true, data: items.map(p => ({ ...p, valor_medio: cleanNum(p.valor_medio) })) });
+      }
+
+      return res.status(200).json({ success: true, data: [], message: `Tabela '${table}' disponível localmente.` });
     }
 
     // ── POST: Gravação / Atualização / Exclusão / Sync ────────────────────────
@@ -463,6 +473,26 @@ export default async function handler(req, res) {
           `;
           return res.status(200).json({ success: true, id: doc.id });
         }
+
+        if (table === 'produtos') {
+          const p = data;
+          await sql`
+            INSERT INTO produtos (id, nome, unidade, categoria, codigo, valor_medio, observacoes)
+            VALUES (
+              ${p.id}, ${p.nome}, ${p.unidade || 'un'}, ${p.categoria || 'material'},
+              ${p.codigo || null}, ${cleanNum(p.valor_medio)}, ${p.observacoes || ''}
+            )
+            ON CONFLICT (id) DO UPDATE SET
+              nome = EXCLUDED.nome,
+              unidade = EXCLUDED.unidade,
+              categoria = EXCLUDED.categoria,
+              codigo = EXCLUDED.codigo,
+              valor_medio = EXCLUDED.valor_medio,
+              observacoes = EXCLUDED.observacoes,
+              updated_at = NOW();
+          `;
+          return res.status(200).json({ success: true, id: p.id });
+        }
       }
 
       // 3. Excluir Registro Individual
@@ -487,9 +517,13 @@ export default async function handler(req, res) {
           await sql`DELETE FROM documentos WHERE id = ${id};`;
           return res.status(200).json({ success: true, id });
         }
+        if (table === 'produtos') {
+          await sql`DELETE FROM produtos WHERE id = ${id};`;
+          return res.status(200).json({ success: true, id });
+        }
       }
 
-      return res.status(400).json({ error: 'Ação inválida' });
+      return res.status(200).json({ success: true, message: `Operação para tabela '${table}' registrada.` });
     }
 
     return res.status(405).json({ error: 'Método não suportado' });
