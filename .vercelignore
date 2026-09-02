@@ -1,5 +1,10 @@
 .vercel
 .env*
 monitor-nfe
+backend
+bin
+scripts
 *.pfx
 *.log
+*.tmp
+*.bak

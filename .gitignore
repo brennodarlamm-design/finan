@@ -18,6 +18,7 @@ backend/auth_info_baileys/
 # Vercel
 .vercel/
 
-# Backups temporários
+# Backups temporários e binários locais
 *.tmp
 *.bak
+bin/
