@@ -19,6 +19,9 @@ const Lancamentos = {
         <button class="btn btn-secondary btn-sm" onclick="Lancamentos.abrirAnaliseProdutos()" style="display:flex;align-items:center;gap:6px;">
           🔍 Gastos por Produto
         </button>
+        <button class="btn btn-sm" onclick="OCR.abrirModal()" style="display:flex;align-items:center;gap:6px;background:linear-gradient(135deg,#4f46e5,#7c3aed);color:#fff;border:none;font-weight:700;box-shadow:0 2px 8px rgba(79,70,229,.35);" title="Reconhecer boleto, NF-e, NFC-e, NFS-e ou qualquer conta automaticamente com IA">
+          🤖 Ler Documento
+        </button>
         <button class="btn btn-success btn-sm" onclick="Lancamentos.showForm('receita')">&uarr; Nova Receita</button>
         <button class="btn btn-danger btn-sm" onclick="Lancamentos.showForm('despesa')">&darr; Nova Despesa</button>
       </div>
@@ -312,7 +315,7 @@ const Lancamentos = {
 
             <div class="form-row cols-2" style="margin-bottom:14px;">
               <div class="form-group"><label class="form-label">Conciliado?</label><select class="form-control" name="conciliado"><option value="true" ${l.conciliado?'selected':''}>&#x2705; Sim</option><option value="false" ${!l.conciliado?'selected':''}>&#x23F3; N&atilde;o</option></select></div>
-              <div class="form-group"><label class="form-label">Origem</label><select class="form-control" name="origem"><option value="manual" ${(l.origem||'manual')==='manual'?'selected':''}>&#x270D; Manual</option><option value="ofx" ${l.origem==='ofx'?'selected':''}>&#x1F504; Importado OFX</option><option value="importacao_excel" ${l.origem==='importacao_excel'?'selected':''}>📊 Planilha Excel</option><option value="medicao" ${l.origem==='medicao'?'selected':''}>&#x1F4CB; Medi&ccedil;&atilde;o Caixa</option></select></div>
+              <div class="form-group"><label class="form-label">Origem</label><select class="form-control" name="origem"><option value="manual" ${(l.origem||'manual')==='manual'?'selected':''}>&#x270D; Manual</option><option value="ocr" ${l.origem==='ocr'?'selected':''}>🤖 Reconhecimento OCR</option><option value="ofx" ${l.origem==='ofx'?'selected':''}>&#x1F504; Importado OFX</option><option value="importacao_excel" ${l.origem==='importacao_excel'?'selected':''}>📊 Planilha Excel</option><option value="medicao" ${l.origem==='medicao'?'selected':''}>&#x1F4CB; Medi&ccedil;&atilde;o Caixa</option></select></div>
             </div>
 
             <div class="form-group"><label class="form-label">Observa&ccedil;&otilde;es</label><textarea class="form-control" name="observacoes" rows="2" placeholder="Observações adicionais ou notas">${l.observacoes||''}</textarea></div>
@@ -525,6 +528,24 @@ const Lancamentos = {
     }
 
     Utils.closeModal();
+
+    // Se o lançamento veio de OCR, anexar o documento automaticamente
+    if (!id && this._ocrArquivoPendente && savedRec?.id && typeof Documentos !== 'undefined') {
+      const { arquivo, base64 } = this._ocrArquivoPendente;
+      this._ocrArquivoPendente = null;
+      Documentos.adicionar({
+        entidade_tipo: 'lancamento',
+        entidade_id:   savedRec.id,
+        titulo:        arquivo.name,
+        nome_arquivo:  arquivo.name,
+        tipo_mime:     arquivo.type || 'application/octet-stream',
+        tamanho:       arquivo.size,
+        data_base64:   base64,
+        _origem:       'ocr'
+      });
+      Utils.toast('📎 Documento original anexado automaticamente!', 'info');
+    }
+
     this._refresh();
   },
 
@@ -801,6 +822,76 @@ const Lancamentos = {
       App.navigate('produtos');
     }
   },
+
+  // ── Abre formulário de lançamento pré-preenchido pelo robô OCR ─────────────
+  showFormOCR(dadosOCR, arquivo, base64) {
+    const tipo = dadosOCR.tipo || 'despesa';
+
+    // Abrir formulário normal
+    this.showForm(tipo);
+
+    // Aguardar o modal renderizar e então preencher os campos
+    setTimeout(() => {
+      const form = document.getElementById('f-lan');
+      if (!form) return;
+
+      const set = (name, val) => {
+        const el = form.querySelector(`[name="${name}"]`);
+        if (el && val !== undefined && val !== null && val !== '') el.value = val;
+      };
+
+      set('valor',                  dadosOCR.valor);
+      set('data',                   dadosOCR.data         || Utils.today());
+      set('data_vencimento',        dadosOCR.data_vencimento || dadosOCR.data || Utils.today());
+      set('descricao',              dadosOCR.descricao);
+      set('fornecedor_beneficiario', dadosOCR.fornecedor_beneficiario);
+      set('categoria',              dadosOCR.categoria);
+      set('codigo_barras',          dadosOCR.codigo_barras);
+      set('observacoes',            dadosOCR.observacoes);
+      set('origem',                 'ocr');
+
+      // Preencher fornecedor manual (campo de texto visível)
+      const fornManual = document.getElementById('lan-forn-manual');
+      if (fornManual && dadosOCR.fornecedor_beneficiario) {
+        fornManual.value   = dadosOCR.fornecedor_beneficiario;
+        fornManual.style.display = 'block';
+      }
+
+      // Preencher itens se houver
+      if (dadosOCR.itens && dadosOCR.itens.length > 0) {
+        // Expandir seção de itens
+        const itensSection = document.getElementById('itens-section');
+        const itensToggle  = document.getElementById('itens-toggle-icon');
+        if (itensSection) itensSection.style.display = 'block';
+        if (itensToggle)  itensToggle.textContent = '▲ Recolher';
+
+        const itensLista = document.getElementById('itens-lista');
+        if (itensLista) {
+          itensLista.innerHTML = dadosOCR.itens.map(it => `
+            <div class="item-row" style="display:grid;grid-template-columns:2fr .7fr .8fr 1fr auto;gap:6px;margin-bottom:8px;align-items:center;">
+              <input class="form-control item-produto" placeholder="Produto" value="${(it.produto||'').replace(/"/g,'&quot;')}" oninput="Lancamentos._recalcItem(this)" style="font-size:.82rem;">
+              <input class="form-control item-qtd" type="number" placeholder="Qtd" step="0.01" min="0" value="${it.qtd||''}" oninput="Lancamentos._recalcItem(this)" style="font-size:.82rem;text-align:right;">
+              <input class="form-control item-unidade" placeholder="Un" value="${it.unidade||'un'}" style="font-size:.82rem;">
+              <input class="form-control item-vunit" type="number" placeholder="V. unit." step="0.01" min="0" value="${it.valor_unit||''}" oninput="Lancamentos._recalcItem(this)" style="font-size:.82rem;text-align:right;">
+              <button type="button" class="icon-btn" onclick="this.closest('.item-row').remove();Lancamentos._atualizarTotalItens()" title="Remover" style="color:var(--danger);font-size:15px;">🗑️</button>
+            </div>`).join('');
+          this._atualizarTotalItens();
+        }
+      }
+
+      // Toast informativo
+      Utils.toast(`🤖 Formulário pré-preenchido pelo OCR! Revise e salve.`, 'info');
+
+      // Se tiver arquivo, anexar automaticamente após salvar
+      // Guardar referência para anexo pós-save
+      if (arquivo && base64) {
+        Lancamentos._ocrArquivoPendente = { arquivo, base64 };
+      }
+    }, 200);
+  },
+
+  // Referência ao arquivo OCR para anexar após salvar
+  _ocrArquivoPendente: null,
 
   init() {
     const ids = ['f-srch','f-tipo','f-cat','f-status','f-di','f-df'];
