@@ -134,7 +134,7 @@ const DB = {
         const docs = JSON.parse(docsRaw);
         if (Array.isArray(docs)) {
           const lightDocs = docs.map(d => {
-            const { base64_data, base64, ...rest } = d;
+            const { data_base64, base64_data, base64, conteudo_base64, ...rest } = d;
             return rest;
           });
           localStorage.setItem(docsKey, JSON.stringify(lightDocs));

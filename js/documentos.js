@@ -3,6 +3,111 @@
 
 const Documentos = {
   _KEY: 'finobra_documentos',
+  _memoryBlobs: new Map(),
+  _dbPromise: null,
+
+  _getIdb() {
+    if (this._dbPromise) return this._dbPromise;
+    this._dbPromise = new Promise((resolve) => {
+      if (typeof indexedDB === 'undefined') return resolve(null);
+      try {
+        const req = indexedDB.open('finobra_blobs_db', 1);
+        req.onupgradeneeded = e => {
+          const db = e.target.result;
+          if (!db.objectStoreNames.contains('blobs')) {
+            db.createObjectStore('blobs', { keyPath: 'id' });
+          }
+        };
+        req.onsuccess = e => resolve(e.target.result);
+        req.onerror = e => {
+          console.warn('[Documentos] IndexedDB não disponível:', e);
+          resolve(null);
+        };
+      } catch {
+        resolve(null);
+      }
+    });
+    return this._dbPromise;
+  },
+
+  async _idbSet(id, base64) {
+    if (!id || !base64) return false;
+    try {
+      const db = await this._getIdb();
+      if (!db) return false;
+      return new Promise(resolve => {
+        const tx = db.transaction('blobs', 'readwrite');
+        tx.objectStore('blobs').put({ id, data: base64, ts: Date.now() });
+        tx.oncomplete = () => resolve(true);
+        tx.onerror = () => resolve(false);
+      });
+    } catch { return false; }
+  },
+
+  async _idbGet(id) {
+    if (!id) return null;
+    try {
+      const db = await this._getIdb();
+      if (!db) return null;
+      return new Promise(resolve => {
+        const tx = db.transaction('blobs', 'readonly');
+        const req = tx.objectStore('blobs').get(id);
+        req.onsuccess = () => resolve(req.result ? req.result.data : null);
+        req.onerror = () => resolve(null);
+      });
+    } catch { return null; }
+  },
+
+  async _idbDelete(id) {
+    if (!id) return;
+    try {
+      const db = await this._getIdb();
+      if (!db) return;
+      const tx = db.transaction('blobs', 'readwrite');
+      tx.objectStore('blobs').delete(id);
+    } catch {}
+  },
+
+  async obterConteudo(id) {
+    if (this._memoryBlobs.has(id)) {
+      return this._memoryBlobs.get(id);
+    }
+    const doc = this.getById(id);
+    if (doc && doc.data_base64) {
+      this._memoryBlobs.set(id, doc.data_base64);
+      return doc.data_base64;
+    }
+    const fromIdb = await this._idbGet(id);
+    if (fromIdb) {
+      this._memoryBlobs.set(id, fromIdb);
+      return fromIdb;
+    }
+    return null;
+  },
+
+  _migrarLocalStorage() {
+    try {
+      const raw = localStorage.getItem(this._KEY);
+      if (!raw) return;
+      const docs = JSON.parse(raw);
+      if (Array.isArray(docs)) {
+        let migrou = false;
+        docs.forEach(d => {
+          const b64 = d.data_base64 || d.base64_data || d.base64;
+          if (b64) {
+            this._memoryBlobs.set(d.id, b64);
+            this._idbSet(d.id, b64);
+            migrou = true;
+          }
+        });
+        if (migrou) {
+          this.salvarLista(docs);
+        }
+      }
+    } catch (e) {
+      console.warn('[Documentos] Falha ao verificar migração de armazenamento:', e);
+    }
+  },
 
   getAll() {
     try {
@@ -11,15 +116,18 @@ const Documentos = {
   },
 
   salvarLista(docs) {
+    const light = (docs || []).map(d => {
+      const { data_base64, base64_data, base64, conteudo_base64, ...rest } = d;
+      return rest;
+    });
+
     try {
-      localStorage.setItem(this._KEY, JSON.stringify(docs));
+      localStorage.setItem(this._KEY, JSON.stringify(light));
     } catch (e) {
-      console.warn('[Documentos] Quota excedida ao salvar documentos. Gravando metadados leves...');
-      const light = (docs || []).map(d => {
-        const { base64_data, base64, ...rest } = d;
-        return rest;
-      });
+      console.warn('[Documentos] Quota excedida ao gravar no localStorage. Executando limpeza preventiva...');
       try {
+        const keysToClean = ['finobra_nfe_recents', 'finobra_temp_cache', 'finan_cache'];
+        keysToClean.forEach(k => localStorage.removeItem(k));
         localStorage.setItem(this._KEY, JSON.stringify(light));
       } catch (e2) {
         console.error('[Documentos] Falha ao persistir metadados dos documentos:', e2);
@@ -38,11 +146,21 @@ const Documentos = {
 
   adicionar(doc) {
     const docs = this.getAll();
+    const id = doc.id || ('doc_' + Date.now().toString(36) + Math.random().toString(36).substr(2, 5));
+    const base64 = doc.data_base64 || doc.base64 || doc.base64_data || '';
+
+    if (base64) {
+      this._memoryBlobs.set(id, base64);
+      this._idbSet(id, base64);
+    }
+
+    const { data_base64, base64_data, base64: _b, conteudo_base64, ...lightDoc } = doc;
     const item = {
-      id: 'doc_' + Date.now().toString(36) + Math.random().toString(36).substr(2, 5),
-      criado_em: new Date().toISOString(),
-      ...doc
+      id,
+      criado_em: doc.criado_em || new Date().toISOString(),
+      ...lightDoc
     };
+
     docs.push(item);
     this.salvarLista(docs);
 
@@ -54,6 +172,8 @@ const Documentos = {
   },
 
   remover(id) {
+    this._memoryBlobs.delete(id);
+    this._idbDelete(id);
     const docs = this.getAll().filter(d => d.id !== id);
     this.salvarLista(docs);
 
@@ -467,15 +587,21 @@ const Documentos = {
     });
   },
 
-  visualizar(id) {
+  async visualizar(id) {
     const doc = this.getById(id);
-    if (!doc || !doc.data_base64) {
+    if (!doc) {
       Utils.toast('Arquivo não encontrado.', 'error');
       return;
     }
 
+    const conteudo = await this.obterConteudo(id);
+    if (!conteudo) {
+      Utils.toast('Conteúdo do arquivo não disponível neste dispositivo.', 'warning');
+      return;
+    }
+
     const isPDF = doc.tipo_mime === 'application/pdf' || (doc.nome_arquivo || '').toLowerCase().endsWith('.pdf');
-    const isHTML = doc.tipo_mime === 'text/html' || (doc.nome_arquivo || '').toLowerCase().endsWith('.html') || doc.data_base64.startsWith('data:text/html');
+    const isHTML = doc.tipo_mime === 'text/html' || (doc.nome_arquivo || '').toLowerCase().endsWith('.html') || conteudo.startsWith('data:text/html');
 
     Utils.showModal(`
       <div class="modal" style="max-width:850px;width:95vw;height:85vh;display:flex;flex-direction:column;">
@@ -488,10 +614,10 @@ const Documentos = {
         </div>
         <div class="modal-body" style="flex:1;padding:0;overflow:hidden;background:#0f172a;display:flex;align-items:center;justify-content:center;">
           ${isPDF || isHTML ? `
-            <iframe src="${doc.data_base64}" style="width:100%;height:100%;border:none;background:#ffffff;"></iframe>
+            <iframe src="${conteudo}" style="width:100%;height:100%;border:none;background:#ffffff;"></iframe>
           ` : `
             <div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;padding:16px;overflow:auto;">
-              <img src="${doc.data_base64}" style="max-width:100%;max-height:100%;object-fit:contain;border-radius:4px;box-shadow:0 4px 20px rgba(0,0,0,0.5);" onerror="this.parentElement.innerHTML='<div style=\\'color:#fff;padding:20px;text-align:center;\\'>Não foi possível exibir a pré-visualização. Clique em Baixar para ver o arquivo.</div>'">
+              <img src="${conteudo}" style="max-width:100%;max-height:100%;object-fit:contain;border-radius:4px;box-shadow:0 4px 20px rgba(0,0,0,0.5);" onerror="this.parentElement.innerHTML='<div style=\\'color:#fff;padding:20px;text-align:center;\\'>Não foi possível exibir a pré-visualização. Clique em Baixar para ver o arquivo.</div>'">
             </div>
           `}
         </div>
@@ -499,15 +625,25 @@ const Documentos = {
     `);
   },
 
-  baixar(id) {
+  async baixar(id) {
     const doc = this.getById(id);
-    if (!doc || !doc.data_base64) return;
+    if (!doc) return;
+    const conteudo = await this.obterConteudo(id);
+    if (!conteudo) {
+      Utils.toast('Conteúdo do arquivo não disponível.', 'warning');
+      return;
+    }
 
     const link = document.createElement('a');
-    link.href = doc.data_base64;
+    link.href = conteudo;
     link.download = doc.nome_arquivo || 'documento';
     document.body.appendChild(link);
     link.click();
     link.remove();
   }
 };
+
+// Executar migração automática de armazenamento ao carregar
+if (typeof window !== 'undefined') {
+  setTimeout(() => Documentos._migrarLocalStorage(), 100);
+}
