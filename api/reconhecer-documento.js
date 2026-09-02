@@ -55,7 +55,12 @@ Retorne APENAS um objeto JSON válido (sem markdown, sem explicações) com os s
 Regras: itens só quando houver produtos explícitos. valor = total a pagar (numero). Datas ISO YYYY-MM-DD. confianca: 1.0=clareza total, 0.5=parcial, 0.2=ilegível. Nao invente dados - use null. Retorne APENAS o JSON.`;
 
   try {
-    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+    const models = [
+      'gemini-3.5-flash',
+      'gemini-flash-latest',
+      'gemini-3.1-flash-lite',
+      'gemini-3.6-flash'
+    ];
 
     const payload = {
       contents: [{
@@ -71,19 +76,36 @@ Regras: itens só quando houver produtos explícitos. valor = total a pagar (num
       }
     };
 
-    const geminiRes = await fetch(geminiUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
-    });
+    let geminiData = null;
+    let lastError = null;
 
-    if (!geminiRes.ok) {
-      const errText = await geminiRes.text();
-      console.error('[OCR] Gemini API error:', geminiRes.status, errText);
-      return res.status(502).json({ error: `Erro na API do Gemini: ${geminiRes.status}`, detalhe: errText.slice(0, 300) });
+    for (const model of models) {
+      try {
+        const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+        const geminiRes = await fetch(geminiUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+
+        if (geminiRes.ok) {
+          geminiData = await geminiRes.json();
+          break;
+        } else {
+          const errTxt = await geminiRes.text();
+          lastError = `[${model}] HTTP ${geminiRes.status}: ${errTxt.slice(0, 150)}`;
+          console.warn('[OCR] Tentativa falhou com modelo', model, geminiRes.status);
+        }
+      } catch (errNet) {
+        lastError = `[${model}] ${errNet.message}`;
+      }
     }
 
-    const geminiData = await geminiRes.json();
+    if (!geminiData) {
+      console.error('[OCR] Todos os modelos Gemini falharam:', lastError);
+      return res.status(502).json({ error: 'Erro na API do Gemini Vision', detalhe: lastError });
+    }
+
     const rawText = geminiData?.candidates?.[0]?.content?.parts?.[0]?.text || '';
 
     let dadosOCR;
