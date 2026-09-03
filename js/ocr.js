@@ -49,7 +49,7 @@ const OCR = {
               border:2px solid rgba(79,70,229,.4);transition:all .2s;text-align:center;">
               <span style="font-size:2.2rem;">📁</span>
               <span style="font-size:.88rem;font-weight:800;color:#818cf8;">Galeria / Arquivo</span>
-              <span style="font-size:.7rem;color:var(--text3);">PDF · PNG · JPG (5MB)</span>
+              <span style="font-size:.7rem;color:var(--text3);">PDF (até 3MB) · Imagens</span>
               <input type="file" id="ocr-file-input" accept="image/*,application/pdf"
                 style="display:none;" onchange="OCR._onFileSelected(this)">
             </label>
@@ -131,8 +131,17 @@ const OCR = {
       Utils.toast('Formato não suportado. Use PDF, PNG, JPG, JPEG ou WEBP.', 'error');
       return;
     }
-    if (file.size > 5 * 1024 * 1024) {
-      Utils.toast('Arquivo muito grande. O limite é 5 MB.', 'error');
+    const isPdf = file.type === 'application/pdf';
+
+    // Limite de PDF: 3.2MB para garantir payload base64 < 4.5MB (limite da nuvem Vercel)
+    if (isPdf && file.size > 3.2 * 1024 * 1024) {
+      Utils.toast('Arquivo PDF muito grande. Para documentos em PDF o limite é de 3,2 MB. Envie uma foto ou arquivo menor.', 'error');
+      return;
+    }
+
+    // Limite de imagem: até 25MB (será automaticamente redimensionada/comprimida via Canvas no navegador)
+    if (!isPdf && file.size > 25 * 1024 * 1024) {
+      Utils.toast('Imagem muito grande. O limite máximo é 25 MB.', 'error');
       return;
     }
 
@@ -140,19 +149,35 @@ const OCR = {
     this._mostrarLoading(file.name);
 
     try {
-      const base64 = await this._lerBase64(file);
+      // Prepara e comprime a imagem (reduz fotos de celular de 5-15MB para ~300KB mantendo total nitidez)
+      const { base64, mimeType } = await this._prepararArquivoEBase64(file);
 
       // Chamar API
       const resp = await fetch('/api/reconhecer-documento', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ base64, mimeType: file.type })
+        body: JSON.stringify({ base64, mimeType })
       });
 
-      const data = await resp.json();
+      const responseText = await resp.text();
+      let data = null;
+      try {
+        data = JSON.parse(responseText);
+      } catch (parseErr) {
+        if (resp.status === 413) {
+          throw new Error('O arquivo enviado ultrapassou o limite do servidor (4,5 MB). Tente reduzir o documento.');
+        }
+        if (resp.status === 504 || resp.status === 500) {
+          throw new Error('O servidor de IA demorou para responder ou está sobrecarregado momentaneamente. Por favor, tente novamente.');
+        }
+        if (resp.status === 502) {
+          throw new Error('Serviço de IA temporariamente indisponível. Tente novamente em alguns segundos.');
+        }
+        throw new Error(`Resposta do servidor (${resp.status}): ${responseText.slice(0, 100)}`);
+      }
 
-      if (!resp.ok || !data.ok) {
-        throw new Error(data.error || 'Erro desconhecido na API');
+      if (!resp.ok || !data || !data.ok) {
+        throw new Error(data?.error || data?.detalhe || `Erro na API (${resp.status})`);
       }
 
       // Guardar arquivo para anexar depois
@@ -169,6 +194,66 @@ const OCR = {
       console.error('[OCR]', err);
       this._mostrarErro(err.message);
     }
+  },
+
+  // ── Redimensiona e comprime imagens via Canvas no navegador ───────────────
+  async _prepararArquivoEBase64(file) {
+    if (file.type === 'application/pdf') {
+      const base64 = await this._lerBase64(file);
+      return { base64, mimeType: 'application/pdf' };
+    }
+
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onerror = async () => {
+        const fallback = await this._lerBase64(file);
+        resolve({ base64: fallback, mimeType: file.type });
+      };
+      reader.onload = (e) => {
+        const img = new Image();
+        img.onerror = () => {
+          resolve({ base64: e.target.result, mimeType: file.type });
+        };
+        img.onload = () => {
+          try {
+            const maxDim = 1800; // Resolução ideal para OCR do Gemini Vision (nítida e compacta)
+            let width = img.width;
+            let height = img.height;
+
+            if (width > maxDim || height > maxDim) {
+              if (width > height) {
+                height = Math.round((height * maxDim) / width);
+                width = maxDim;
+              } else {
+                width = Math.round((width * maxDim) / height);
+                height = maxDim;
+              }
+            }
+
+            const canvas = document.createElement('canvas');
+            canvas.width = width;
+            canvas.height = height;
+            const ctx = canvas.getContext('2d');
+
+            // Fundo branco sólido (evita problemas com transparência)
+            ctx.fillStyle = '#FFFFFF';
+            ctx.fillRect(0, 0, width, height);
+            ctx.drawImage(img, 0, 0, width, height);
+
+            const compressedBase64 = canvas.toDataURL('image/jpeg', 0.85);
+            resolve({
+              base64: compressedBase64,
+              mimeType: 'image/jpeg'
+            });
+          } catch (err) {
+            console.warn('[OCR] Falha ao comprimir imagem via Canvas:', err);
+            resolve({ base64: e.target.result, mimeType: file.type });
+          }
+        };
+        img.src = e.target.result;
+      };
+      reader.readAsDataURL(file);
+    });
   },
 
   // ── Tela de Loading ───────────────────────────────────────────────────────

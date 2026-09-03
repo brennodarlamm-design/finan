@@ -1,6 +1,15 @@
 // api/reconhecer-documento.js — Robô de Reconhecimento de Documentos Fiscais
 // Recebe PDF/imagem em base64, envia ao Google Gemini Vision e retorna dados estruturados
 
+export const config = {
+  maxDuration: 60,
+  api: {
+    bodyParser: {
+      sizeLimit: '4.5mb'
+    }
+  }
+};
+
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST,OPTIONS');
@@ -56,10 +65,10 @@ Regras: Para qualquer NF-e, NFC-e, cupom fiscal, fatura ou recibo de compra, voc
 
   try {
     const models = [
+      'gemini-3.7-flash',
+      'gemini-3.6-flash',
       'gemini-3.5-flash',
-      'gemini-flash-latest',
-      'gemini-3.1-flash-lite',
-      'gemini-3.6-flash'
+      'gemini-flash-latest'
     ];
 
     const payload = {
@@ -85,6 +94,7 @@ Regras: Para qualquer NF-e, NFC-e, cupom fiscal, fatura ou recibo de compra, voc
         const geminiRes = await fetch(geminiUrl, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
+          signal: AbortSignal.timeout(18000),
           body: JSON.stringify(payload)
         });
 
@@ -98,6 +108,7 @@ Regras: Para qualquer NF-e, NFC-e, cupom fiscal, fatura ou recibo de compra, voc
         }
       } catch (errNet) {
         lastError = `[${model}] ${errNet.message}`;
+        console.warn('[OCR] Tentativa falhou com modelo', model, errNet.message);
       }
     }
 
