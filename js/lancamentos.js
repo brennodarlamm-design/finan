@@ -215,6 +215,7 @@ const Lancamentos = {
   showForm(tipo, id=null) {
     const l = id ? DB.getById('lancamentos',id)||{tipo} : {tipo};
     const isEdit = !!id;
+    const notas = typeof DB !== 'undefined' ? (DB.getAll('notas') || []) : [];
     const catRec = [
       ['parcela_caixa','🏦 Parcela Caixa'],
       ['entrada_propria','💵 Entrada Própria'],
@@ -325,7 +326,7 @@ const Lancamentos = {
               <input class="form-control" name="codigo_barras" value="${l.codigo_barras||''}" placeholder="Ex: 34191.79001 01043.510047 91020.150008 5 98760000012000" style="font-family:monospace;font-size:.82rem;">
             </div>
 
-            ${tipo==='despesa'?`<div class="form-group" style="margin-bottom:14px;"><label class="form-label">Vincular Nota Fiscal</label><select class="form-control" name="nota_fiscal_id"><option value="">Nenhuma NF vinculada</option>${notas.filter(n=>n.tipo==='entrada').map(n=>`<option value="${n.id}" ${l.nota_fiscal_id===n.id?'selected':''}>NF ${n.numero_nf} &mdash; ${n.emitente.slice(0,30)} (${Utils.fmt.currency(n.valor_bruto)})</option>`).join('')}</select></div>`:''}
+            ${tipo==='despesa'?`<div class="form-group" style="margin-bottom:14px;"><label class="form-label">Vincular Nota Fiscal</label><select class="form-control" name="nota_fiscal_id"><option value="">Nenhuma NF vinculada</option>${notas.filter(n=>n.tipo==='entrada').map(n=>`<option value="${n.id}" ${l.nota_fiscal_id===n.id?'selected':''}>NF ${n.numero_nf||'S/N'} &mdash; ${(n.emitente||'Sem emitente').slice(0,30)} (${Utils.fmt.currency(n.valor_bruto !== undefined ? n.valor_bruto : (n.valor_total || 0))})</option>`).join('')}</select></div>`:''}
 
             <div class="form-row cols-2" style="margin-bottom:14px;">
               <div class="form-group"><label class="form-label">Conciliado?</label><select class="form-control" name="conciliado"><option value="true" ${l.conciliado?'selected':''}>&#x2705; Sim</option><option value="false" ${!l.conciliado?'selected':''}>&#x23F3; N&atilde;o</option></select></div>
