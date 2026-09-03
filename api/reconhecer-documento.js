@@ -66,9 +66,9 @@ Regras: Para qualquer NF-e, NFC-e, cupom fiscal, fatura ou recibo de compra, voc
   try {
     const models = [
       'gemini-3.7-flash',
-      'gemini-3.6-flash',
       'gemini-3.5-flash',
-      'gemini-flash-latest'
+      'gemini-flash-latest',
+      'gemini-3.6-flash'
     ];
 
     const payload = {
@@ -80,7 +80,7 @@ Regras: Para qualquer NF-e, NFC-e, cupom fiscal, fatura ou recibo de compra, voc
       }],
       generationConfig: {
         temperature: 0.1,
-        maxOutputTokens: 2048,
+        maxOutputTokens: 8192,
         responseMimeType: 'application/json'
       }
     };
@@ -94,7 +94,7 @@ Regras: Para qualquer NF-e, NFC-e, cupom fiscal, fatura ou recibo de compra, voc
         const geminiRes = await fetch(geminiUrl, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          signal: AbortSignal.timeout(18000),
+          signal: AbortSignal.timeout(28000),
           body: JSON.stringify(payload)
         });
 
@@ -117,15 +117,20 @@ Regras: Para qualquer NF-e, NFC-e, cupom fiscal, fatura ou recibo de compra, voc
       return res.status(502).json({ error: 'Erro na API do Gemini Vision', detalhe: lastError });
     }
 
-    const rawText = geminiData?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+    // Extrai o texto de todos os parts da resposta
+    const parts = geminiData?.candidates?.[0]?.content?.parts || [];
+    let rawText = '';
+    for (const part of parts) {
+      if (part.text) rawText += part.text;
+    }
+    rawText = rawText.trim();
 
     let dadosOCR;
     try {
-      const cleaned = rawText.replace(/^```json\s*/i,'').replace(/^```\s*/i,'').replace(/\s*```$/i,'').trim();
-      dadosOCR = JSON.parse(cleaned);
+      dadosOCR = repairJson(rawText);
     } catch (parseErr) {
       console.error('[OCR] Falha ao parsear JSON do Gemini:', rawText);
-      return res.status(422).json({ error: 'Não foi possível interpretar a resposta da IA.', rawResponse: rawText.slice(0,500) });
+      return res.status(422).json({ error: 'Não foi possível interpretar a resposta da IA.', rawResponse: rawText.slice(0, 500) });
     }
 
     dadosOCR.valor     = typeof dadosOCR.valor === 'number' && !isNaN(dadosOCR.valor) ? dadosOCR.valor : null;
@@ -139,3 +144,81 @@ Regras: Para qualquer NF-e, NFC-e, cupom fiscal, fatura ou recibo de compra, voc
     return res.status(500).json({ error: 'Erro interno ao processar o documento.', detalhe: err.message });
   }
 }
+
+function repairJson(str) {
+  if (!str || typeof str !== 'string') {
+    throw new Error('Conteúdo vazio da IA');
+  }
+
+  let s = str.trim();
+
+  // Remove markdown code fences se houver
+  s = s.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim();
+
+  // Se houver texto introdutório antes do primeiro '{', descarta
+  const firstBrace = s.indexOf('{');
+  if (firstBrace > 0) {
+    s = s.slice(firstBrace).trim();
+  }
+
+  // Tenta parse direto primeiro
+  try {
+    return JSON.parse(s);
+  } catch (initialErr) {
+    // Prossegue para reparo estrutural
+  }
+
+  // Se houver caracteres espúrios após a última chave '}', tenta cortar
+  const lastBrace = s.lastIndexOf('}');
+  if (lastBrace > 0 && lastBrace < s.length - 1) {
+    try {
+      return JSON.parse(s.slice(0, lastBrace + 1));
+    } catch (e) {}
+  }
+
+  // Reparação de colchetes, chaves e aspas abertas (típico de respostas truncadas)
+  let inString = false;
+  let escape = false;
+  const stack = [];
+
+  for (let i = 0; i < s.length; i++) {
+    const char = s[i];
+    if (escape) {
+      escape = false;
+      continue;
+    }
+    if (char === '\\') {
+      escape = true;
+      continue;
+    }
+    if (char === '"') {
+      inString = !inString;
+      continue;
+    }
+    if (!inString) {
+      if (char === '{' || char === '[') {
+        stack.push(char);
+      } else if (char === '}') {
+        if (stack.length > 0 && stack[stack.length - 1] === '{') stack.pop();
+      } else if (char === ']') {
+        if (stack.length > 0 && stack[stack.length - 1] === '[') stack.pop();
+      }
+    }
+  }
+
+  // Se ficou com string aberta, fecha aspas
+  if (inString) s += '"';
+
+  // Remove vírgulas órfãs no final
+  s = s.trim().replace(/,\s*$/, '');
+
+  // Fecha todos os colchetes e chaves pendentes
+  while (stack.length > 0) {
+    const last = stack.pop();
+    if (last === '{') s += '}';
+    else if (last === '[') s += ']';
+  }
+
+  return JSON.parse(s);
+}
+
