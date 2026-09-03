@@ -12,7 +12,6 @@ const OFX = {
   _toleranciaScoreMin: 50,
 
   render(obraId) {
-    this.sincronizarComLancamentos();
     const imports = DB.getAll('ofximports') || [];
     return `
     <div class="page-header">
@@ -21,7 +20,6 @@ const OFX = {
         <p class="page-sub">Conciliação bancária geral — importe extratos bancários (.ofx / .qfx) e cruze com os lançamentos de todas as obras e da sede</p>
       </div>
     </div>
-
 
     <div class="g2" style="margin-bottom:16px;">
       <!-- Card: Upload / Import -->
@@ -98,12 +96,8 @@ const OFX = {
       <div class="card">
         <div class="card-header" style="display:flex;align-items:center;justify-content:space-between;">
           <div class="card-title">📊 Histórico de Extratos Importados</div>
-          <div style="display:flex;align-items:center;gap:8px;">
-            <button class="btn btn-secondary btn-sm" onclick="const n = OFX.sincronizarComLancamentos(); Utils.toast(n > 0 ? (n + ' transação(ões) conciliada(s) com lançamentos!') : 'Extratos já sincronizados!', 'success'); App.navigate('ofx');" title="Sincronizar lançamentos com extratos OFX" style="font-size:.74rem;padding:4px 8px;">🔄 Sincronizar Tudo</button>
-            <span class="badge badge-secondary" style="font-size:.72rem;">${imports.length} extrato(s)</span>
-          </div>
+          <span class="badge badge-secondary" style="font-size:.72rem;">${imports.length} extrato(s)</span>
         </div>
-
         ${imports.length ? `<div class="tbl-wrap" style="border:none;max-height:420px;overflow-y:auto;"><table>
           <thead><tr>
             <th>Data Importação</th>
@@ -392,109 +386,12 @@ const OFX = {
     }, 200);
   },
 
-  sincronizarComLancamentos(specificImportId = null) {
-    const imports = DB.getAll('ofximports') || [];
-    if (!imports.length) return 0;
-
-    const allLans = DB.getLancamentos(null);
-    if (!allLans || !allLans.length) return 0;
-
-    let totalConciliadas = 0;
-    const usedLanIds = new Set();
-
-    // Registra lançamentos já associados para evitar colisões
-    imports.forEach(imp => {
-      (imp.transacoes || []).forEach(t => {
-        if (t.status === 'conciliada' && t.lancamento_id) {
-          usedLanIds.add(t.lancamento_id);
-        }
-      });
-    });
-
-    imports.forEach(imp => {
-      if (specificImportId && imp.id !== specificImportId) return;
-
-      let modificado = false;
-      const trns = Array.isArray(imp.transacoes) ? imp.transacoes : [];
-
-      trns.forEach(t => {
-        // Se já está conciliada e o lançamento existe, mantém
-        if (t.status === 'conciliada' && t.lancamento_id) {
-          const exists = allLans.some(l => l.id === t.lancamento_id);
-          if (exists) return;
-        }
-
-        const valAbs = Math.abs(Number(t.valor));
-        const fitidClean = (t.fitid || '').trim();
-        const memoClean = (t.memo || '').trim();
-        const tDate = t.data ? (typeof t.data === 'string' ? t.data.slice(0, 10) : '') : '';
-
-        // 1. Busca por observações / memo / fitid gravados no lançamento
-        let match = allLans.find(l => {
-          if (usedLanIds.has(l.id)) return false;
-          const obs = (l.observacoes || '').trim();
-          if (fitidClean && obs.includes(fitidClean)) return true;
-          if (memoClean && (obs.includes(memoClean) || memoClean.includes(obs))) return true;
-          return false;
-        });
-
-        // 2. Busca por Data exata + Valor exato + descrição COMIDA ou Fornecedor
-        if (!match && tDate) {
-          match = allLans.find(l => {
-            if (usedLanIds.has(l.id)) return false;
-            const lVal = Math.abs(Number(l.valor));
-            if (Math.abs(lVal - valAbs) > 0.01) return false;
-            const lDate = l.data ? (l.data instanceof Date ? l.data.toISOString().slice(0, 10) : String(l.data).slice(0, 10)) : '';
-            if (lDate !== tDate) return false;
-
-            const desc = (l.descricao || '').toUpperCase();
-            const forn = (l.fornecedor_beneficiario || '').toUpperCase();
-            const m = memoClean.toUpperCase();
-
-            return (
-              desc.includes('COMIDA') ||
-              m.includes('ARAUJO') || m.includes('SARAIVA') ||
-              m.includes('ATACAD') || m.includes('NOVA ERA') ||
-              m.includes('GAVIAO') || m.includes('GOIANA') ||
-              m.includes('SUPERMERCADO') || m.includes('DB') ||
-              m.includes('FRIBOI') || m.includes('GABRIEL') ||
-              (forn && m.includes(forn.slice(0, 8)))
-            );
-          });
-        }
-
-        if (match) {
-          usedLanIds.add(match.id);
-          t.status = 'conciliada';
-          t.lancamento_id = match.id;
-          t.match_score = 100;
-          t.match_diff_valor = 0;
-          modificado = true;
-          totalConciliadas++;
-
-          if (!match.conciliado) {
-            match.conciliado = true;
-            DB.update('lancamentos', match.id, { conciliado: true });
-          }
-        }
-      });
-
-      if (modificado) {
-        DB.update('ofximports', imp.id, { transacoes: imp.transacoes });
-      }
-    });
-
-    return totalConciliadas;
-  },
-
   viewImport(importId, tab = 'todas', search = '') {
-    this.sincronizarComLancamentos(importId);
     const imp = DB.getById('ofximports', importId);
     if (!imp) {
       Utils.toast('Extrato não encontrado.', 'warning');
       return;
     }
-
 
     this._activeFilterTab = tab;
     this._activeSearchTerm = search;
@@ -593,15 +490,11 @@ const OFX = {
                 </select>
               </div>
 
-              <button class="btn btn-secondary btn-sm" onclick="const n = OFX.sincronizarComLancamentos('${importId}'); OFX.viewImport('${importId}', '${tab}', '${search}'); Utils.toast(n > 0 ? (n + ' transação(ões) conciliada(s)!') : 'Extrato 100% sincronizado com lançamentos!', 'success');" style="font-weight:700;padding:6px 12px;display:flex;align-items:center;gap:4px;" title="Varre lançamentos existentes e concilia automaticamente">
-                <span>🔄 Sincronizar Lançados</span>
-              </button>
               <button class="btn btn-primary btn-sm" onclick="OFX._abrirModalRobo('${importId}')" style="font-weight:700;padding:6px 12px;display:flex;align-items:center;gap:4px;box-shadow:var(--shadow-accent);">
                 <span>⚡ Executar Robô</span>
               </button>
             </div>
           </div>
-
 
           <!-- Controls & Filter Tabs -->
           <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between;margin-bottom:16px;">
@@ -776,10 +669,8 @@ const OFX = {
   },
 
   _confirmarTodosMatchesRobo(importId) {
-    this.sincronizarComLancamentos(importId);
     const imp = DB.getById('ofximports', importId);
     if (!imp) return;
-
 
     const allLans = DB.getLancamentos(null);
     const pendentes = (imp.transacoes || []).filter(t => t.status === 'pendente');
