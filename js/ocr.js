@@ -49,7 +49,7 @@ const OCR = {
               border:2px solid rgba(79,70,229,.4);transition:all .2s;text-align:center;">
               <span style="font-size:2.2rem;">📁</span>
               <span style="font-size:.88rem;font-weight:800;color:#818cf8;">Galeria / Arquivo</span>
-              <span style="font-size:.7rem;color:var(--text3);">PDF (até 3MB) · Imagens</span>
+              <span style="font-size:.7rem;color:var(--text3);">PDF (até 20MB) · Imagens</span>
               <input type="file" id="ocr-file-input" accept="image/*,application/pdf"
                 style="display:none;" onchange="OCR._onFileSelected(this)">
             </label>
@@ -133,13 +133,13 @@ const OCR = {
     }
     const isPdf = file.type === 'application/pdf';
 
-    // Limite de PDF: 3.2MB para garantir payload base64 < 4.5MB (limite da nuvem Vercel)
-    if (isPdf && file.size > 3.2 * 1024 * 1024) {
-      Utils.toast('Arquivo PDF muito grande. Para documentos em PDF o limite é de 3,2 MB. Envie uma foto ou arquivo menor.', 'error');
+    // Limite de PDF: até 20MB (renderizado via Canvas no navegador pelo PDF.js para ~400KB, evitando limite de 4,5MB da nuvem)
+    if (isPdf && file.size > 20 * 1024 * 1024) {
+      Utils.toast('Arquivo PDF muito grande. O limite máximo é de 20 MB.', 'error');
       return;
     }
 
-    // Limite de imagem: até 25MB (será automaticamente redimensionada/comprimida via Canvas no navegador)
+    // Limite de imagem: até 25MB (automaticamente redimensionada/comprimida via Canvas no navegador)
     if (!isPdf && file.size > 25 * 1024 * 1024) {
       Utils.toast('Imagem muito grande. O limite máximo é 25 MB.', 'error');
       return;
@@ -149,7 +149,7 @@ const OCR = {
     this._mostrarLoading(file.name);
 
     try {
-      // Prepara e comprime a imagem (reduz fotos de celular de 5-15MB para ~300KB mantendo total nitidez)
+      // Prepara e comprime o documento (PDFs e fotos são convertidos no navegador para imagens de ~300KB a 500KB)
       const { base64, mimeType } = await this._prepararArquivoEBase64(file);
 
       // Chamar API
@@ -196,11 +196,21 @@ const OCR = {
     }
   },
 
-  // ── Redimensiona e comprime imagens via Canvas no navegador ───────────────
+  // ── Redimensiona e comprime documentos via Canvas no navegador ────────────
   async _prepararArquivoEBase64(file) {
     if (file.type === 'application/pdf') {
-      const base64 = await this._lerBase64(file);
-      return { base64, mimeType: 'application/pdf' };
+      try {
+        // Converte as páginas do PDF para imagem JPEG nítida via PDF.js + Canvas
+        // Isso permite boletos e notas em PDF de 5MB, 10MB, 20MB sem estourar o limite de 4,5MB da Vercel
+        return await this._converterPdfParaImagem(file);
+      } catch (errPdf) {
+        console.warn('[OCR] Conversão de PDF via Canvas falhou, tentando leitura direta:', errPdf);
+        if (file.size <= 3.2 * 1024 * 1024) {
+          const base64 = await this._lerBase64(file);
+          return { base64, mimeType: 'application/pdf' };
+        }
+        throw new Error('Não foi possível ler as páginas do PDF: ' + (errPdf.message || 'Arquivo corrompido ou protegido.'));
+      }
     }
 
     return new Promise((resolve) => {
@@ -254,6 +264,78 @@ const OCR = {
       };
       reader.readAsDataURL(file);
     });
+  },
+
+  // ── Renderiza páginas de PDF para imagem de alta resolução via PDF.js ──────
+  async _converterPdfParaImagem(file) {
+    if (typeof window !== 'undefined' && !window.pdfjsLib) {
+      await new Promise((resolve, reject) => {
+        const s = document.createElement('script');
+        s.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
+        s.onload = () => {
+          if (window.pdfjsLib) {
+            window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+            resolve();
+          } else {
+            reject(new Error('PDF.js não disponível'));
+          }
+        };
+        s.onerror = () => reject(new Error('Falha ao carregar biblioteca PDF.js'));
+        document.head.appendChild(s);
+      });
+    } else if (window.pdfjsLib && !window.pdfjsLib.GlobalWorkerOptions?.workerSrc) {
+      window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    }
+
+    const arrayBuffer = await file.arrayBuffer();
+    const loadingTask = window.pdfjsLib.getDocument({ data: arrayBuffer });
+    const pdfDoc = await loadingTask.promise;
+
+    // Renderiza até 2 páginas (boletos e NFs normalmente têm 1 ou 2 páginas)
+    const numPages = Math.min(pdfDoc.numPages, 2);
+    const renderedPages = [];
+    let totalHeight = 0;
+    let maxWidth = 0;
+
+    for (let i = 1; i <= numPages; i++) {
+      const page = await pdfDoc.getPage(i);
+      const vpDefault = page.getViewport({ scale: 1.0 });
+      // Escala visando ~1600px de largura para perfeita nitidez do código de barras e texto
+      const targetWidth = 1600;
+      const scale = Math.min(2.5, Math.max(1.0, targetWidth / vpDefault.width));
+      const viewport = page.getViewport({ scale });
+
+      renderedPages.push({ page, viewport });
+      totalHeight += viewport.height;
+      if (viewport.width > maxWidth) maxWidth = viewport.width;
+    }
+
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.round(maxWidth);
+    canvas.height = Math.round(totalHeight);
+    const ctx = canvas.getContext('2d');
+
+    // Fundo branco sólido
+    ctx.fillStyle = '#FFFFFF';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    let currentY = 0;
+    for (const { page, viewport } of renderedPages) {
+      ctx.save();
+      ctx.translate(0, currentY);
+      await page.render({
+        canvasContext: ctx,
+        viewport: viewport
+      }).promise;
+      ctx.restore();
+      currentY += viewport.height;
+    }
+
+    const compressedBase64 = canvas.toDataURL('image/jpeg', 0.85);
+    return {
+      base64: compressedBase64,
+      mimeType: 'image/jpeg'
+    };
   },
 
   // ── Tela de Loading ───────────────────────────────────────────────────────
