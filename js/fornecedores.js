@@ -555,6 +555,10 @@ const Fornecedores = {
     data.ativo = data.ativo !== 'false';
     data.prazo_pagamento = data.prazo_pagamento ? parseInt(data.prazo_pagamento) : null;
 
+    data.nome = (data.nome_fantasia || data.razao_social || data.nome || 'Fornecedor').trim();
+    data.razao_social = (data.razao_social || data.nome_fantasia || data.nome || '').trim();
+    data.nome_fantasia = (data.nome_fantasia || data.razao_social || data.nome || '').trim();
+
     const nomeNorm = (data.nome_fantasia || data.razao_social || '').trim().toLowerCase();
     const razaoNorm = (data.razao_social || '').trim().toLowerCase();
 
@@ -712,10 +716,12 @@ const Fornecedores = {
     }
 
     // Não existe: cadastra novo
+    const nomeFinal = (nome || dados.nome_fantasia || dados.razao_social || 'Fornecedor').trim();
     const novo = {
+      nome: nomeFinal,
       tipo_pessoa: dados.tipo_pessoa || (cpf ? 'pf' : 'pj'),
-      razao_social: dados.razao_social || nome,
-      nome_fantasia: dados.nome_fantasia || nome,
+      razao_social: dados.razao_social || nomeFinal,
+      nome_fantasia: dados.nome_fantasia || nomeFinal,
       cnpj: cnpj,
       cpf: cpf,
       categoria: dados.categoria || 'material',

@@ -246,12 +246,15 @@ export default async function handler(req, res) {
         // Fornecedores
         if (Array.isArray(payload.fornecedores)) {
           for (const f of payload.fornecedores) {
-            if (!f.id || !f.nome) continue;
+            if (!f.id) continue;
+            const nomeFinal = (f.nome || f.nome_fantasia || f.razao_social || f.razao || 'Fornecedor').trim();
+            const razaoSocialFinal = (f.razao_social || f.nome_fantasia || f.nome || nomeFinal).trim();
+            const cnpjCpfFinal = (f.cnpj_cpf || f.cnpj || f.cpf || '').replace(/\D/g, '');
             await sql`
               INSERT INTO fornecedores (id, nome, razao_social, cnpj_cpf, telefone, email, categoria, chave_pix, banco_info)
               VALUES (
-                ${f.id}, ${f.nome}, ${f.razao_social || f.nome}, ${f.cnpj_cpf || f.cnpj || ''},
-                ${f.telefone || ''}, ${f.email || ''}, ${f.categoria || ''}, ${f.chave_pix || ''}, ${f.banco_info || ''}
+                ${f.id}, ${nomeFinal}, ${razaoSocialFinal}, ${cnpjCpfFinal},
+                ${f.telefone || ''}, ${f.email || ''}, ${f.categoria || 'outros'}, ${f.chave_pix || ''}, ${f.banco_info || ''}
               )
               ON CONFLICT (id) DO UPDATE SET
                 nome = EXCLUDED.nome,
@@ -461,11 +464,15 @@ export default async function handler(req, res) {
 
         if (table === 'fornecedores') {
           const f = data;
+          const nomeFinal = (f.nome || f.nome_fantasia || f.razao_social || f.razao || 'Fornecedor').trim();
+          const razaoSocialFinal = (f.razao_social || f.nome_fantasia || f.nome || nomeFinal).trim();
+          const cnpjCpfFinal = (f.cnpj_cpf || f.cnpj || f.cpf || '').replace(/\D/g, '');
+
           await sql`
             INSERT INTO fornecedores (id, nome, razao_social, cnpj_cpf, telefone, email, categoria, chave_pix, banco_info)
             VALUES (
-              ${f.id}, ${f.nome}, ${f.razao_social || f.nome}, ${f.cnpj_cpf || f.cnpj || ''},
-              ${f.telefone || ''}, ${f.email || ''}, ${f.categoria || ''}, ${f.chave_pix || ''}, ${f.banco_info || ''}
+              ${f.id}, ${nomeFinal}, ${razaoSocialFinal}, ${cnpjCpfFinal},
+              ${f.telefone || ''}, ${f.email || ''}, ${f.categoria || 'outros'}, ${f.chave_pix || ''}, ${f.banco_info || ''}
             )
             ON CONFLICT (id) DO UPDATE SET
               nome = EXCLUDED.nome,
