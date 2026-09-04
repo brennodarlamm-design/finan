@@ -41,17 +41,18 @@ const DB = {
     if (t === 'angelim') {
       return {
         id: 'angelim',
-        razao_social: 'Angelim Construtora LTDA',
+        razao_social: 'ANGELIM CONSTRUTORA LTDA',
         nome_fantasia: 'Angelim Construtora',
-        cnpj: '12.345.678/0001-90',
-        telefone: '(95) 99123-4567',
-        whatsapp: '95991234567',
-        email: 'contato@angelim.com.br',
+        cnpj: '65.512.273/0001-60',
+        telefone: '(95) 99142-3559',
+        whatsapp: '95991423559',
+        email: 'angelimconstrutora@gmail.com',
         cidade: 'Boa Vista',
         uf: 'RR',
-        endereco: 'Av. Principal, 1000 - Centro',
-        responsavel: 'Eng. Ricardo Almeida',
-        crea_cau: 'CREA-RR 12345/D',
+        endereco: 'Rua Andrômeda, nº 228, Bairro Cidade Satélite',
+        responsavel: 'Naira de Amorim da Silva',
+        cargo_responsavel: 'Administradora',
+        qualificacao_responsavel: 'brasileira, solteira, não convivente em regime de união estável, nascida em 07 de agosto de 1999, portadora da Cédula de Identidade RG nº 386634-3 SSP/RR, inscrita no CPF nº 029.525.532-38',
         logo_url: 'img/logo.png',
         configurada: true
       };
