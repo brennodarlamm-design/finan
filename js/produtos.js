@@ -1,6 +1,8 @@
 // js/produtos.js — Módulo de Cadastro e Rastreamento de Produtos
 
 const Produtos = {
+  _limit: 30,
+  _lastSyncTime: 0,
 
   CATEGORIAS: [
     { value: 'material',    label: '🧱 Material de Construção' },
@@ -14,10 +16,13 @@ const Produtos = {
   // RENDER PRINCIPAL
   // ────────────────────────────────────────────────────────────
   render(obraId) {
+    this._limit = 30;
     this.sincronizarComLancamentos();
     const produtos = DB.getAll('produtos');
     const analise  = this.getAnaliseGastos(obraId === 'todas' ? null : obraId);
     const totalGasto = analise.reduce((s, p) => s + p.total, 0);
+    const filtrados = this._getFilteredList(produtos);
+    const visiveis  = filtrados.slice(0, this._limit);
 
     return `
     <div class="page-header">
@@ -56,11 +61,11 @@ const Produtos = {
       <div class="filter-group" style="flex:1">
         <label class="filter-label">Buscar</label>
         <div class="search-bar"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
-        <input class="form-control" id="prod-srch" placeholder="Nome ou código..." oninput="Produtos._refresh()"></div>
+        <input class="form-control" id="prod-srch" placeholder="Nome ou código..." oninput="Produtos._refresh(true)"></div>
       </div>
       <div class="filter-group">
         <label class="filter-label">Categoria</label>
-        <select class="form-control" id="prod-cat" style="min-width:160px" onchange="Produtos._refresh()">
+        <select class="form-control" id="prod-cat" style="min-width:160px" onchange="Produtos._refresh(true)">
           <option value="">Todas</option>
           ${this.CATEGORIAS.map(c => `<option value="${c.value}">${c.label}</option>`).join('')}
         </select>
@@ -75,26 +80,77 @@ const Produtos = {
             <th>Valor Médio</th><th>Qtd Total Consumida</th><th>Total Gasto</th>
             <th style="text-align:center;">Ações</th>
           </tr></thead>
-          <tbody id="prod-tbody">${this._rows(produtos, analise)}</tbody>
+          <tbody id="prod-tbody">${this._rows(produtos, analise, visiveis)}</tbody>
         </table>
+      </div>
+      <div id="prod-load-more-bar">
+        ${this._loadMoreHtml(filtrados.length, visiveis.length)}
       </div>
     </div>`;
   },
 
-  _rows(produtos, analise) {
+  _getFilteredList(produtos) {
+    const srch = document.getElementById('prod-srch')?.value?.toLowerCase() || '';
+    const cat  = document.getElementById('prod-cat')?.value || '';
+
+    let lista = produtos || [];
+    if (srch) lista = lista.filter(p => (p.nome + ' ' + (p.codigo || '')).toLowerCase().includes(srch));
+    if (cat)  lista = lista.filter(p => p.categoria === cat);
+    return lista;
+  },
+
+  _loadMoreHtml(total, visiveis) {
+    if (total === 0) return '';
+    if (visiveis >= total) {
+      return `
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 18px;background:rgba(20,31,14,0.6);border-top:1px solid var(--border-s);flex-wrap:wrap;gap:8px;">
+        <span style="font-size:.78rem;color:var(--text3);">
+          ✓ Exibindo todos os <strong>${total}</strong> produtos
+        </span>
+      </div>`;
+    }
+    const restantes = total - visiveis;
+    const prox = Math.min(30, restantes);
+    return `
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 18px;background:rgba(20,31,14,0.85);border-top:1px solid var(--border-s);flex-wrap:wrap;gap:12px;">
+      <div style="display:flex;align-items:center;gap:10px;">
+        <span style="font-size:.82rem;color:var(--text2);">
+          Exibindo <strong>${visiveis}</strong> de <strong>${total}</strong> produtos
+        </span>
+        <span class="badge badge-warning" style="font-size:.72rem;padding:3px 8px;font-weight:700;">
+          ${restantes} restantes
+        </span>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+        <button class="btn btn-secondary btn-sm" onclick="Produtos.carregarMais(30)" style="font-weight:700;display:flex;align-items:center;gap:6px;border:1px solid var(--accent);color:var(--accent2);cursor:pointer;">
+          <span>➕ Carregar mais ${prox}</span>
+        </button>
+        <button class="btn btn-primary btn-sm" onclick="Produtos.carregarTodos()" style="font-weight:700;display:flex;align-items:center;gap:6px;cursor:pointer;">
+          <span>⚡ Carregar restante (${restantes})</span>
+        </button>
+      </div>
+    </div>`;
+  },
+
+  carregarMais(qtd = 30) {
+    this._limit += qtd;
+    this._refresh(false);
+  },
+
+  carregarTodos() {
+    this._limit = Infinity;
+    this._refresh(false);
+  },
+
+  _rows(produtos, analise, visiveis = null) {
     if (!analise) analise = this.getAnaliseGastos();
     const analiseMap = {};
     analise.forEach(a => { analiseMap[a.id] = a; });
 
-    const srch = document.getElementById('prod-srch')?.value?.toLowerCase() || '';
-    const cat  = document.getElementById('prod-cat')?.value || '';
-
-    let lista = produtos;
-    if (srch) lista = lista.filter(p => (p.nome + ' ' + (p.codigo || '')).toLowerCase().includes(srch));
-    if (cat)  lista = lista.filter(p => p.categoria === cat);
+    let lista = visiveis !== null ? visiveis : this._getFilteredList(produtos).slice(0, this._limit || 30);
 
     if (!lista.length) return `<tr><td colspan="8" style="text-align:center;color:var(--text3);padding:32px">
-      ${produtos.length === 0 ? 'Nenhum produto cadastrado. Importe uma NF-e com itens ou cadastre manualmente.' : 'Nenhum produto encontrado.'}
+      ${(produtos || []).length === 0 ? 'Nenhum produto cadastrado. Importe uma NF-e com itens ou cadastre manualmente.' : 'Nenhum produto encontrado.'}
     </td></tr>`;
 
     return lista.map((p, i) => {
@@ -196,23 +252,30 @@ const Produtos = {
       Utils.toast('Produto cadastrado!', 'success');
     }
     Utils.closeModal();
-    this._refresh();
+    this._refresh(true);
   },
 
   del(id) {
     Utils.confirm('Excluir este produto? O histórico em lançamentos e NFs não será apagado.', () => {
       DB.remove('produtos', id);
       Utils.toast('Produto excluído.', 'info');
-      this._refresh();
+      this._refresh(true);
     });
   },
 
-  _refresh() {
+  _refresh(resetLimit = false) {
+    if (resetLimit) {
+      this._limit = 30;
+    }
     const tbody = document.getElementById('prod-tbody');
+    const lm = document.getElementById('prod-load-more-bar');
     if (!tbody) return;
     const produtos = DB.getAll('produtos');
     const analise  = this.getAnaliseGastos();
-    tbody.innerHTML = this._rows(produtos, analise);
+    const filtrados = this._getFilteredList(produtos);
+    const visiveis  = filtrados.slice(0, this._limit);
+    tbody.innerHTML = this._rows(produtos, analise, visiveis);
+    if (lm) lm.innerHTML = this._loadMoreHtml(filtrados.length, visiveis.length);
   },
 
   // ────────────────────────────────────────────────────────────
@@ -225,11 +288,14 @@ const Produtos = {
       mapa[p.id] = { id: p.id, nome: p.nome, unidade: p.unidade || 'un', total: 0, qtd_total: 0, compras: 0, obras: new Set(), historico: [] };
     });
 
+    const clientes = DB.getAll('clientes') || [];
+    const clientesMap = new Map(clientes.map(c => [c.id, c.nome]));
+    clientesMap.set('escritorio', '🏢 Escritório');
+
     // Lançamentos com itens vinculados a produto_id
     DB.getAll('lancamentos').filter(l => l.itens && l.itens.length && l.tipo === 'despesa').forEach(l => {
       if (obraId && l.obra_id !== obraId) return;
-      const obraObj = l.obra_id === 'escritorio' ? { nome: '🏢 Escritório' } : DB.getById('clientes', l.obra_id);
-      const obraNome = obraObj?.nome || '—';
+      const obraNome = clientesMap.get(l.obra_id) || '—';
       l.itens.forEach(it => {
         if (!it.produto_id || !mapa[it.produto_id]) return;
         const tot = it.total || (it.qtd * it.valor_unit) || 0;
@@ -244,8 +310,7 @@ const Produtos = {
     // Notas com itens vinculados a produto_id
     DB.getAll('notas').filter(n => n.itens && n.itens.length).forEach(n => {
       if (obraId && n.obra_id !== obraId) return;
-      const obraObj = n.obra_id === 'escritorio' ? { nome: '🏢 Escritório' } : DB.getById('clientes', n.obra_id);
-      const obraNome = obraObj?.nome || '—';
+      const obraNome = clientesMap.get(n.obra_id) || '—';
       n.itens.forEach(it => {
         if (!it.produto_id || !mapa[it.produto_id]) return;
         const tot = it.total || (it.qtd * it.valor_unit) || 0;
@@ -340,14 +405,18 @@ const Produtos = {
     });
   },
 
-  verHistorico(produtoId) {
+  verHistorico(produtoId, limit = 30) {
     const p = DB.getById('produtos', produtoId);
     if (!p) return;
     const analise = this.getAnaliseGastos();
     const dados = analise.find(a => a.id === produtoId);
     if (!dados) { Utils.toast('Sem histórico para este produto.', 'info'); return; }
 
-    const linhas = dados.historico.sort((a, b) => (b.data || '').localeCompare(a.data || '')).map((h, i) => `
+    const ordenados = (dados.historico || []).sort((a, b) => (b.data || '').localeCompare(a.data || ''));
+    const totalHistorico = ordenados.length;
+    const historicoVisivel = limit ? ordenados.slice(0, limit) : ordenados;
+
+    const linhas = historicoVisivel.map((h, i) => `
       <tr style="background:${i%2===0?'var(--bg-card)':'var(--bg-secondary)'}">
         <td style="padding:8px 12px;font-size:.78rem;">${Utils.fmt.date(h.data)}</td>
         <td style="padding:8px 12px;font-size:.78rem;color:var(--text2);">${h.desc}</td>
@@ -356,6 +425,13 @@ const Produtos = {
         <td style="padding:8px 12px;text-align:right;font-weight:800;color:var(--danger);">${Utils.fmt.currency(h.valor)}</td>
         <td style="padding:8px 12px;"><span class="badge ${h.fonte==='Nota Fiscal'?'badge-info':'badge-accent'}" style="font-size:.68rem;">${h.fonte}</span></td>
       </tr>`).join('');
+
+    const footerAviso = totalHistorico > historicoVisivel.length
+      ? `<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 18px;background:var(--bg-secondary);border-top:1px solid var(--border);font-size:.78rem;">
+           <span style="color:var(--text3);">Exibindo os <strong>${historicoVisivel.length}</strong> mais recentes de <strong>${totalHistorico}</strong> lançamentos</span>
+           <button class="btn btn-secondary btn-sm" onclick="Produtos.verHistorico('${produtoId}', 0)" style="font-size:.74rem;">Ver todos (${totalHistorico})</button>
+         </div>`
+      : '';
 
     Utils.showModal(`
       <div class="modal" style="max-width:700px;">
@@ -379,6 +455,7 @@ const Produtos = {
               <tbody>${linhas}</tbody>
             </table>
           </div>
+          ${footerAviso}
         </div>
         <div class="modal-footer"><button class="btn btn-secondary" onclick="Utils.closeModal()">Fechar</button></div>
       </div>`);
@@ -436,13 +513,22 @@ const Produtos = {
   },
 
   sincronizarComLancamentos() {
+    const agora = Date.now();
+    // Rate limit: evita rodar sincronização pesada repetidas vezes seguidas (cooldown de 15s)
+    if (this._lastSyncTime && (agora - this._lastSyncTime < 15000)) {
+      return;
+    }
+    this._lastSyncTime = agora;
+
     try {
-      const lancs = (typeof DB !== 'undefined' ? DB.getAll('lancamentos') : []) || [];
+      const todosLancs = (typeof DB !== 'undefined' ? DB.getAll('lancamentos') : []) || [];
+      // Limite de taxa/lote: processa apenas os 30 lançamentos de despesa mais recentes para carregamento ultra-rápido
+      const despesas = todosLancs.filter(l => l.tipo === 'despesa');
+      const ultimosLancs = despesas.slice(0, 30);
       let updatedAny = false;
+      const prodsToUpdate = new Set();
 
-      lancs.forEach(l => {
-        if (l.tipo !== 'despesa') return;
-
+      ultimosLancs.forEach(l => {
         // 1. Se tem itens no lançamento, garante que todos estão em produtos
         if (Array.isArray(l.itens) && l.itens.length > 0) {
           l.itens.forEach(it => {
@@ -452,7 +538,7 @@ const Produtos = {
                 it.produto_id = prod.id;
                 updatedAny = true;
               }
-              if (prod) this.atualizarValorMedio(prod.id);
+              if (prod) prodsToUpdate.add(prod.id);
             }
           });
         }
@@ -471,7 +557,7 @@ const Produtos = {
                 valor_unit: l.valor,
                 total: l.valor
               }];
-              this.atualizarValorMedio(prod.id);
+              prodsToUpdate.add(prod.id);
               updatedAny = true;
             }
           }
@@ -479,7 +565,19 @@ const Produtos = {
       });
 
       if (updatedAny && typeof DB !== 'undefined') {
-        DB.save('lancamentos', lancs);
+        DB.save('lancamentos', todosLancs);
+      }
+
+      // Atualiza valor médio em lote com apenas 1 cálculo de análise agregado
+      if (prodsToUpdate.size > 0) {
+        const analise = this.getAnaliseGastos();
+        const analiseMap = new Map(analise.map(a => [a.id, a]));
+        prodsToUpdate.forEach(pId => {
+          const dados = analiseMap.get(pId);
+          if (dados && dados.qtd_total > 0) {
+            DB.update('produtos', pId, { valor_medio: parseFloat((dados.total / dados.qtd_total).toFixed(4)) });
+          }
+        });
       }
     } catch (e) {
       console.warn('[Produtos] Erro ao sincronizar com lançamentos:', e);
