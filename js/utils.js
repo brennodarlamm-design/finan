@@ -56,6 +56,19 @@ const Utils = {
 
   today() { return new Date().toISOString().split('T')[0]; },
 
+  diasEntre(d1, d2) {
+    if (!d1 || !d2) return 0;
+    try {
+      const dt1 = new Date(this.cleanDate(d1) + 'T00:00:00');
+      const dt2 = new Date(this.cleanDate(d2) + 'T00:00:00');
+      const diff = dt2.getTime() - dt1.getTime();
+      const dias = Math.round(diff / (1000 * 60 * 60 * 24));
+      return isNaN(dias) || dias < 0 ? 0 : dias;
+    } catch {
+      return 0;
+    }
+  },
+
   badge(status) {
     const m = {
       pago:'<span class="badge badge-success">✓ Pago</span>',

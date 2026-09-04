@@ -946,6 +946,23 @@ const Contratos = {
     `);
   },
 
+  _calcularDias(d1, d2) {
+    if (!d1 || !d2) return '30';
+    try {
+      if (typeof Utils !== 'undefined' && typeof Utils.diasEntre === 'function') {
+        const d = Utils.diasEntre(d1, d2);
+        return d > 0 ? String(d) : '30';
+      }
+      const dt1 = new Date(d1);
+      const dt2 = new Date(d2);
+      const diff = dt2.getTime() - dt1.getTime();
+      const dias = Math.round(diff / (1000 * 60 * 60 * 24));
+      return isNaN(dias) || dias <= 0 ? '30' : String(dias);
+    } catch {
+      return '30';
+    }
+  },
+
   // ─────────────────────────────────────────────────────────────
   // GERADOR DO HTML INSTITUCIONAL DO CONTRATO
   // ─────────────────────────────────────────────────────────────
@@ -982,7 +999,7 @@ const Contratos = {
         .replace(/\{FORMA_PAGAMENTO\}/g, c.forma_pagamento || 'Conforme medições aprovadas')
         .replace(/\{DATA_INICIO\}/g, Utils.fmt.date(c.data_inicio))
         .replace(/\{DATA_PREVISAO\}/g, Utils.fmt.date(c.data_previsao))
-        .replace(/\{PRAZO_DIAS\}/g, Utils.diasEntre(c.data_inicio, c.data_previsao) || '30')
+        .replace(/\{PRAZO_DIAS\}/g, this._calcularDias(c.data_inicio, c.data_previsao))
         .replace(/\{NUM_CONTRATO_CAIXA\}/g, cli?.num_contrato_caixa || '—')
         .replace(/\{CIDADE_UF\}/g, cli ? `${cli.cidade} - ${cli.estado}` : (emp.cidade ? `${emp.cidade} - ${emp.uf}` : 'Boa Vista - RR'))
         .replace(/\{OBJETO_DETALHADO\}/g, c.titulo || 'Serviços de Construção Civil');
