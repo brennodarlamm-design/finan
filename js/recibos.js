@@ -550,13 +550,13 @@ const Recibos = {
         </div>
       </div>
 
-      <!-- Selo de Assinatura Eletrônica e Integridade Jurídica -->
-      ${r.assinatura ? Assinador.renderCarimboAssinatura(r.assinatura) : ''}
+      <!-- Selo de Assinatura Eletrônica e Integridade Jurídica com QR Code -->
+      ${r.assinatura ? Assinador.renderCarimboAssinatura(r.assinatura, { docTipo: 'recibo', docId: r.id }) : ''}
 
-      <!-- Rodapé -->
-      <div style="margin-top:28px;border-top:1px dashed #cbd5e1;padding-top:8px;display:flex;justify-content:space-between;align-items:center;font-size:.68rem;color:#94a3b8;">
+      <!-- Rodapé com Link de Validação e Código -->
+      <div style="margin-top:28px;border-top:1px dashed #cbd5e1;padding-top:8px;display:flex;justify-content:space-between;align-items:center;font-size:.68rem;color:#64748b;flex-wrap:wrap;gap:8px;">
         <span>Documento emitido eletronicamente via Sistema FinObra</span>
-        <span>Autenticação: ${r.assinatura ? r.assinatura.codigo_validacao : `ANG-REC-${r.id.toUpperCase()}`}</span>
+        <span>Validar em: <a href="validar.html${r.assinatura ? `?val=${r.assinatura.codigo_validacao}` : ''}" target="_blank" style="color:#0284c7;text-decoration:none;font-weight:700;">finan-as-bay.vercel.app/validar.html</a> &bull; Código: <strong style="font-family:monospace;color:#0f172a;background:#f1f5f9;padding:1px 5px;border-radius:3px;">${r.assinatura ? r.assinatura.codigo_validacao : `ANG-REC-${r.id.toUpperCase()}`}</strong></span>
       </div>
     </div>`;
   },

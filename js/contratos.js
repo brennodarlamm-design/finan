@@ -1229,34 +1229,44 @@ const Contratos = {
       </div>
 
       <!-- Assinatura CONTRATADA (Angelim) -->
-      <div style="text-align:center;margin-bottom:50px;">
+      <div style="text-align:center;margin-bottom:40px;">
         ${c.assinatura_contratada?.imagem_base64 ? `<img src="${c.assinatura_contratada.imagem_base64}" alt="Assinatura" style="max-height:55px;display:block;margin:0 auto 2px auto;">` : ''}
         <div style="border-top:1.5px solid #000;width:82%;margin:0 auto 6px auto;"></div>
         <strong style="font-size:.92rem;color:#000;display:block;">${brandName}</strong>
         <span style="font-size:.84rem;color:#222;display:block;">Naira de Amorim da Silva</span>
         <span style="font-size:.75rem;font-weight:700;color:#444;text-transform:uppercase;">CONTRATADA</span>
-        ${c.assinatura_contratada ? Assinador.renderCarimboAssinatura(c.assinatura_contratada) : ''}
+        ${c.assinatura_contratada ? Assinador.renderCarimboAssinatura(c.assinatura_contratada, { docTipo: 'contrato', docId: c.id }) : ''}
       </div>
 
       <!-- Assinatura CONTRATANTE (Cliente) -->
-      <div style="text-align:center;margin-bottom:50px;">
+      <div style="text-align:center;margin-bottom:40px;">
         ${c.assinatura_contratante?.imagem_base64 ? `<img src="${c.assinatura_contratante.imagem_base64}" alt="Assinatura" style="max-height:55px;display:block;margin:0 auto 2px auto;">` : ''}
         <div style="border-top:1.5px solid #000;width:82%;margin:0 auto 6px auto;"></div>
         <strong style="font-size:.92rem;color:#000;display:block;">${c.contratante_nome.toUpperCase()}</strong>
         <span style="font-size:.75rem;font-weight:700;color:#444;text-transform:uppercase;">CONTRATANTE</span>
-        ${c.assinatura_contratante ? Assinador.renderCarimboAssinatura(c.assinatura_contratante) : ''}
+        ${c.assinatura_contratante ? Assinador.renderCarimboAssinatura(c.assinatura_contratante, { docTipo: 'contrato', docId: c.id }) : ''}
       </div>
 
       <!-- Testemunhas -->
-      <div style="width:75%;margin:0 auto 40px auto;">
+      <div style="width:75%;margin:0 auto 30px auto;">
         <div style="border-top:1px solid #000;margin-bottom:6px;"></div>
         <span style="font-size:.82rem;color:#000;">Testemunha 1 CPF:</span>
       </div>
 
-      <div style="width:75%;margin:0 auto 20px auto;">
+      <div style="width:75%;margin:0 auto 18px auto;">
         <div style="border-top:1px solid #000;margin-bottom:6px;"></div>
         <span style="font-size:.82rem;color:#000;">Testemunha 2 CPF:</span>
       </div>
+
+      <!-- Bloco de Validação Criptográfica e QR Code Oficial se assinado -->
+      ${(c.assinatura_contratada || c.assinatura_contratante) ? `
+      <div style="margin:16px 0 10px 0;background:#f0fdf4;border:1.5px solid #10b981;border-radius:6px;padding:10px 14px;display:flex;align-items:center;gap:14px;text-align:left;">
+        <img src="${Assinador.gerarQRCodeUrl(Assinador.gerarUrlValidacao(c.assinatura_contratada || c.assinatura_contratante, 'contrato', c.id), 120)}" alt="QR Code Validação" style="width:62px;height:62px;background:#fff;border:1px solid #10b981;padding:2px;border-radius:4px;flex-shrink:0;">
+        <div style="font-size:.7rem;color:#065f46;line-height:1.4;">
+          <strong style="font-size:.78rem;display:block;margin-bottom:2px;color:#047857;">VERIFICAÇÃO DE AUTENTICIDADE ELETRÔNICA &bull; LEI FEDERAL 14.063/2020</strong>
+          O presente contrato foi assinado eletronicamente sob proteção de integridade criptográfica SHA-256. A autenticidade e identificação dos signatários podem ser consultadas a qualquer momento apontando a câmera para o QR Code ou acessando <strong>finan-as-bay.vercel.app/validar.html</strong> informando o código: <strong style="font-family:monospace;background:#dcfce7;padding:1px 6px;border-radius:3px;color:#065f46;">${(c.assinatura_contratada || c.assinatura_contratante)?.codigo_validacao}</strong>.
+        </div>
+      </div>` : ''}
 
       <div style="margin-top:auto;text-align:right;font-size:.8rem;color:#444;">
         Página 6 de 6

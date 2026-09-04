@@ -381,6 +381,9 @@
 
 <script src="js/auth.js"></script>
 <script>
+  if (window.location.hash.startsWith('#validar') || window.location.search.includes('val=')) {
+    window.location.href = 'app.html' + window.location.hash + window.location.search;
+  }
   if (Auth.isLoggedIn()) { window.location.href = 'app.html'; }
 
   function selectQuickUser(u, p, label) {

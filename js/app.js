@@ -39,6 +39,17 @@ const App = {
   },
 
   async init() {
+    const rawHash = window.location.hash || '';
+    const rawSearch = window.location.search || '';
+
+    // Rota pública de validação de autenticidade (não exige login!)
+    if (rawHash.startsWith('#validar') || rawSearch.includes('val=') || rawHash.includes('val=')) {
+      if (typeof Assinador !== 'undefined' && typeof Assinador.renderTelaValidacaoPublica === 'function') {
+        Assinador.renderTelaValidacaoPublica();
+        return;
+      }
+    }
+
     if (!Auth.requireAuth()) return;
 
     // ── Mostrar loader de sincronização ────────────────────────────
@@ -122,6 +133,9 @@ const App = {
             <div class="nav-section">Sistema</div>
             ${this._navItem('contas','🏦','Contas Bancárias')}
             ${this._navItem('configuracoes','⚙️','Configurações')}
+            <a href="validar.html" target="_blank" class="nav-item" style="text-decoration:none;color:var(--accent2);margin-top:4px;border:1px dashed rgba(201,162,39,0.3);border-radius:6px;" title="Portal público para consultar autenticidade de documentos por código">
+              <span>🛡️</span><span>Validar Autenticidade ↗</span>
+            </a>
           </nav>
           <div class="sidebar-foot">
             <div class="user-card" onclick="App.showUserMenu()">
@@ -144,6 +158,11 @@ const App = {
               <div class="header-sub">${brandName} — Gestão Financeira</div>
             </div>
             <div class="hspacer"></div>
+            <!-- Botão Validador de Autenticidade -->
+            <a href="validar.html" target="_blank" class="header-search-btn" title="Consultar autenticidade de documentos por código ou QR Code" style="text-decoration:none;cursor:pointer;display:flex;align-items:center;gap:6px;background:rgba(201,162,39,.12);border:1px solid rgba(201,162,39,.4);border-radius:8px;padding:5px 11px;color:var(--accent2);transition:all .2s;">
+              <span style="font-size:.9rem;">🛡️</span>
+              <span style="font-size:.78rem;font-weight:700;">Validar Documento</span>
+            </a>
             <!-- Botão Busca Global -->
             <div class="header-search-btn" onclick="typeof BuscaGlobal !== 'undefined' && BuscaGlobal.abrir()" title="Busca Global em todo o sistema (Ctrl+K)" style="cursor:pointer;display:flex;align-items:center;gap:6px;background:rgba(255,255,255,.05);border:1px solid var(--border);border-radius:8px;padding:5px 10px;transition:all .2s;">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
@@ -194,7 +213,15 @@ const App = {
   },
 
   navigate(route) {
-    if (!this.routes[route]) route = 'dashboard';
+    if (route && (route.startsWith('validar') || route.includes('val='))) {
+      if (typeof Assinador !== 'undefined' && typeof Assinador.renderTelaValidacaoPublica === 'function') {
+        Assinador.renderTelaValidacaoPublica();
+        return;
+      }
+    }
+    const cleanRoute = (route || '').split('?')[0];
+    if (!this.routes[cleanRoute]) route = 'dashboard';
+    else route = cleanRoute;
     this.route = route;
     this._charts.forEach(c => { try { c.destroy(); } catch{} });
     this._charts = [];
