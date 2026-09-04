@@ -9,7 +9,12 @@ const Contratos = {
 
   getAll() {
     try {
-      return JSON.parse(localStorage.getItem(this._getKey()) || '[]');
+      const list = JSON.parse(localStorage.getItem(this._getKey()) || '[]');
+      return list.map(c => {
+        delete c.selo_govbr_contratada;
+        delete c.selo_govbr_contratante;
+        return c;
+      });
     } catch { return []; }
   },
 
@@ -30,10 +35,10 @@ const Contratos = {
       status: 'pendente',
       assinatura_contratante: null,
       assinatura_contratada: null,
-      selo_govbr_contratada: true, // Já vem com o selo Gov.br da Administradora Naira de Amorim por padrão
-      selo_govbr_contratante: false,
       ...contrato
     };
+    delete item.selo_govbr_contratada;
+    delete item.selo_govbr_contratante;
     lista.unshift(item);
     this.salvarLista(lista);
     return item;
@@ -44,9 +49,10 @@ const Contratos = {
     const idx = lista.findIndex(c => c.id === id);
     if (idx !== -1) {
       lista[idx] = { ...lista[idx], ...dados, atualizado_em: new Date().toISOString() };
+      delete lista[idx].selo_govbr_contratada;
+      delete lista[idx].selo_govbr_contratante;
       
-      if ((lista[idx].assinatura_contratante || lista[idx].selo_govbr_contratante) && 
-          (lista[idx].assinatura_contratada || lista[idx].selo_govbr_contratada)) {
+      if (lista[idx].assinatura_contratante && lista[idx].assinatura_contratada) {
         lista[idx].status = 'assinado';
       } else {
         lista[idx].status = 'pendente';
@@ -836,7 +842,7 @@ const Contratos = {
   },
 
   // ─────────────────────────────────────────────────────────────
-  // COLETAR ASSINATURA DIGITAL / TOGGLE DO SELO GOV.BR
+  // COLETAR ASSINATURA DIGITAL DAS PARTES
   // ─────────────────────────────────────────────────────────────
   assinarContrato(id, papelAlvo = 'contratante') {
     const c = this.getById(id);
@@ -848,7 +854,7 @@ const Contratos = {
 
     Assinador.abrirModal({
       titulo: `Assinatura de ${isContratante ? 'CONTRATANTE' : 'CONTRATADA (Angelim)'}`,
-      subtitulo: `Coleta de assinatura com validação eletrônica e carimbo Gov.br`,
+      subtitulo: `Coleta de assinatura eletrônica legal na tela`,
       papel: isContratante ? 'Contratante' : 'Contratada (Administradora)',
       nomePredefinido: nomePadrao,
       docPredefinido: docPadrao,
@@ -857,10 +863,8 @@ const Contratos = {
         const update = {};
         if (isContratante) {
           update.assinatura_contratante = sig;
-          update.selo_govbr_contratante = true;
         } else {
           update.assinatura_contratada = sig;
-          update.selo_govbr_contratada = true;
         }
 
         this.atualizar(id, update);
@@ -868,16 +872,6 @@ const Contratos = {
         this.visualizarContrato(id);
       }
     });
-  },
-
-  toggleSeloGovBr(id, parte) {
-    const c = this.getById(id);
-    if (!c) return;
-    const chave = parte === 'contratante' ? 'selo_govbr_contratante' : 'selo_govbr_contratada';
-    const novoValor = !c[chave];
-    this.atualizar(id, { [chave]: novoValor });
-    Utils.toast(`Selo Gov.br ${novoValor ? 'ativado' : 'desativado'} com sucesso!`, 'info');
-    this.visualizarContrato(id);
   },
 
   enviarWhatsApp(id) {
@@ -915,13 +909,13 @@ const Contratos = {
 
           <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
             <!-- Assinar Contratante -->
-            <button class="btn btn-sm btn-primary" onclick="Contratos.assinarContrato('${c.id}', 'contratante')" style="font-size:.75rem;background:#10b981;border-color:#10b981;color:#fff;">
-              ✍️ Assinar Cliente (${c.assinatura_contratante ? '✓ Assinado' : 'Pendente'})
+            <button class="btn btn-sm btn-primary" onclick="Contratos.assinarContrato('${c.id}', 'contratante')" style="font-size:.75rem;background:${c.assinatura_contratante ? '#10b981' : 'var(--primary)'};border-color:${c.assinatura_contratante ? '#10b981' : 'var(--primary)'};color:#fff;">
+              ✍️ ${c.assinatura_contratante ? '✓ Cliente (Reassinar)' : 'Assinar Cliente'}
             </button>
 
             <!-- Assinar Angelim -->
             <button class="btn btn-sm btn-secondary" onclick="Contratos.assinarContrato('${c.id}', 'contratada')" style="font-size:.75rem;">
-              ✍️ Assinar Angelim (${c.assinatura_contratada || c.selo_govbr_contratada ? '✓ Assinado' : 'Pendente'})
+              ✍️ ${c.assinatura_contratada ? '✓ Angelim (Reassinar)' : 'Assinar Angelim'}
             </button>
 
             <button class="btn btn-sm btn-secondary" onclick="Contratos.enviarWhatsApp('${c.id}')" style="color:#25d366;font-size:.75rem;">
@@ -1023,21 +1017,6 @@ const Contratos = {
         </div>
       </div>
     </div>`;
-
-    // ── SELOS GOV.BR E ASSINATURAS ────────────────────────────
-    const seloGovBrHtml = (nome, dataHora) => `
-      <div style="display:inline-flex;align-items:center;gap:10px;background:#ffffff;border:1px solid #94a3b8;padding:6px 12px;border-radius:4px;text-align:left;box-shadow:0 1px 4px rgba(0,0,0,0.06);margin-top:6px;">
-        <div style="font-size:1.35rem;font-weight:900;color:#003087;line-height:1;letter-spacing:-0.5px;">
-          gov<span style="color:#eab308;">.br</span>
-        </div>
-        <div style="font-size:.65rem;line-height:1.2;color:#1e293b;border-left:1px solid #cbd5e1;padding-left:8px;">
-          <strong style="color:#0f172a;display:block;">Documento assinado digitalmente</strong>
-          <span style="font-weight:700;color:#0284c7;display:block;">${nome.toUpperCase()}</span>
-          <span style="color:#64748b;display:block;">Data: ${dataHora}</span>
-          <span style="color:#0284c7;font-size:.6rem;">Verifique em https://validar.iti.br</span>
-        </div>
-      </div>
-    `;
 
     // ── 2. PÁGINA 2: PARTES E CLÁUSULA 01 ─────────────────────
     const pag2Html = `
@@ -1261,28 +1240,26 @@ const Contratos = {
       </div>
 
       <!-- Assinatura CONTRATADA (Angelim) -->
-      <div style="text-align:center;margin-bottom:40px;">
+      <div style="text-align:center;margin-bottom:50px;">
         ${c.assinatura_contratada?.imagem_base64 ? `<img src="${c.assinatura_contratada.imagem_base64}" alt="Assinatura" style="max-height:55px;display:block;margin:0 auto 2px auto;">` : ''}
         <div style="border-top:1.5px solid #000;width:82%;margin:0 auto 6px auto;"></div>
         <strong style="font-size:.92rem;color:#000;display:block;">${brandName}</strong>
         <span style="font-size:.84rem;color:#222;display:block;">Naira de Amorim da Silva</span>
         <span style="font-size:.75rem;font-weight:700;color:#444;text-transform:uppercase;">CONTRATADA</span>
-        <div style="margin-top:6px;">
-          ${seloGovBrHtml('CAMILY TULYANA LIMA AZEVEDO', dataHoraGovBr)}
-        </div>
+        ${c.assinatura_contratada ? Assinador.renderCarimboAssinatura(c.assinatura_contratada) : ''}
       </div>
 
       <!-- Assinatura CONTRATANTE (Cliente) -->
-      <div style="text-align:center;margin-bottom:45px;">
+      <div style="text-align:center;margin-bottom:50px;">
         ${c.assinatura_contratante?.imagem_base64 ? `<img src="${c.assinatura_contratante.imagem_base64}" alt="Assinatura" style="max-height:55px;display:block;margin:0 auto 2px auto;">` : ''}
         <div style="border-top:1.5px solid #000;width:82%;margin:0 auto 6px auto;"></div>
         <strong style="font-size:.92rem;color:#000;display:block;">${c.contratante_nome.toUpperCase()}</strong>
         <span style="font-size:.75rem;font-weight:700;color:#444;text-transform:uppercase;">CONTRATANTE</span>
-        ${seloCliente ? `<div style="margin-top:6px;">${seloCliente}</div>` : ''}
+        ${c.assinatura_contratante ? Assinador.renderCarimboAssinatura(c.assinatura_contratante) : ''}
       </div>
 
       <!-- Testemunhas -->
-      <div style="width:75%;margin:0 auto 35px auto;">
+      <div style="width:75%;margin:0 auto 40px auto;">
         <div style="border-top:1px solid #000;margin-bottom:6px;"></div>
         <span style="font-size:.82rem;color:#000;">Testemunha 1 CPF:</span>
       </div>
