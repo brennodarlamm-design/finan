@@ -212,41 +212,50 @@ const Lancamentos = {
     }
   },
 
+  _catRec: [
+    ['parcela_caixa','🏦 Parcela Caixa'],
+    ['entrada_propria','💵 Entrada Própria'],
+    ['aporte_financeiro','💼 Aporte Financeiro'],
+    ['emprestimo','🤝 Empréstimo'],
+    ['financiamento','🏗️ Financiamento'],
+    ['outro','📦 Outros']
+  ],
+  _catDesp: [
+    ['material','🧱 Material de Obra'],
+    ['mao_de_obra','👷 Mão de Obra'],
+    ['servico','🔧 Serviço'],
+    ['equipamento','🏗️ Equipamento'],
+    ['taxa','📋 Taxa/Imposto'],
+    ['energia','💡 Energia Elétrica (Sede)'],
+    ['agua','💧 Água e Esgoto (Sede)'],
+    ['internet_tel','🌐 Internet & Telefonia'],
+    ['imposto_simples','🏛️ DAS Simples Nacional'],
+    ['tributos_trabalhistas','📄 INSS / FGTS / Tributos'],
+    ['salario','👥 Salários / Folha'],
+    ['pro_labore','💼 Pró-Labore Sócios'],
+    ['aluguel_sede','🏢 Aluguel / Sede'],
+    ['contabilidade','⚖️ Contábil / Jurídico'],
+    ['software_ti','💻 Softwares & TI'],
+    ['material_escritorio','📦 Material Escritório & Copa'],
+    ['outro','📦 Outros']
+  ],
+  _statRec: [
+    ['recebido','✓ Recebido'],
+    ['a_receber','⏳ A Receber']
+  ],
+  _statDesp: [
+    ['pago','✓ Pago'],
+    ['a_pagar','⏳ A Pagar'],
+    ['em_atraso','⚠ Em Atraso']
+  ],
+
   showForm(tipo, id=null) {
     const l = id ? DB.getById('lancamentos',id)||{tipo} : {tipo};
     const isEdit = !!id;
+    const initialTipo = (l && l.tipo) ? l.tipo : (tipo || 'despesa');
     const notas = typeof DB !== 'undefined' ? (DB.getAll('notas') || []) : [];
-    const catRec = [
-      ['parcela_caixa','🏦 Parcela Caixa'],
-      ['entrada_propria','💵 Entrada Própria'],
-      ['aporte_financeiro','💼 Aporte Financeiro'],
-      ['emprestimo','🤝 Empréstimo'],
-      ['financiamento','🏗️ Financiamento'],
-      ['outro','📦 Outros']
-    ];
-    const catDesp = [
-      ['material','🧱 Material de Obra'],
-      ['mao_de_obra','👷 Mão de Obra'],
-      ['servico','🔧 Serviço'],
-      ['equipamento','🏗️ Equipamento'],
-      ['taxa','📋 Taxa/Imposto'],
-      ['energia','💡 Energia Elétrica (Sede)'],
-      ['agua','💧 Água e Esgoto (Sede)'],
-      ['internet_tel','🌐 Internet & Telefonia'],
-      ['imposto_simples','🏛️ DAS Simples Nacional'],
-      ['tributos_trabalhistas','📄 INSS / FGTS / Tributos'],
-      ['salario','👥 Salários / Folha'],
-      ['pro_labore','💼 Pró-Labore Sócios'],
-      ['aluguel_sede','🏢 Aluguel / Sede'],
-      ['contabilidade','⚖️ Contábil / Jurídico'],
-      ['software_ti','💻 Softwares & TI'],
-      ['material_escritorio','📦 Material Escritório & Copa'],
-      ['outro','📦 Outros']
-    ];
-    const cats = tipo==='receita' ? catRec : catDesp;
-    const statOpts = tipo==='receita'
-      ? [['recebido','✓ Recebido'],['a_receber','⏳ A Receber']]
-      : [['pago','✓ Pago'],['a_pagar','⏳ A Pagar'],['em_atraso','⚠ Em Atraso']];
+    const cats = initialTipo === 'receita' ? this._catRec : this._catDesp;
+    const statOpts = initialTipo === 'receita' ? this._statRec : this._statDesp;
     
     const contaAtual = l.conta_bancaria || '';
     const hoje = Utils.today();
@@ -255,12 +264,35 @@ const Lancamentos = {
     Utils.showModal(`
       <div class="modal" style="max-width:620px">
         <div class="modal-header">
-          <span class="modal-title" style="color:${tipo==='receita'?'var(--success)':'var(--danger)'}">${isEdit?'✏️ Editar Lançamento':tipo==='receita'?'↑ Nova Receita':'↓ Nova Despesa'}</span>
+          <span class="modal-title" id="lan-modal-title" style="color:${initialTipo==='receita'?'var(--success)':'var(--danger)'}">
+            ${isEdit ? '✏️ Editar Lançamento' : (initialTipo==='receita' ? '↑ Nova Receita' : '↓ Nova Despesa')}
+          </span>
           <button class="modal-close" onclick="Utils.closeModal()">✕</button>
         </div>
         <div class="modal-body">
           <form id="f-lan">
-            <input type="hidden" name="tipo" value="${l.tipo||tipo}">
+            <!-- SELETOR DE TIPO (DESPESA / RECEITA) -->
+            <div class="form-group" style="margin-bottom:16px;">
+              <label class="form-label" style="font-weight:700;font-size:.82rem;display:flex;justify-content:space-between;align-items:center;">
+                <span>Tipo de Lançamento *</span>
+                <span id="lan-tipo-hint" style="font-size:.73rem;font-weight:600;color:${initialTipo==='receita'?'var(--success)':'var(--danger)'};">
+                  ${initialTipo==='receita' ? '↑ Entrada Financeira / Crédito' : '↓ Saída Financeira / Débito'}
+                </span>
+              </label>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;background:var(--bg-secondary);padding:4px;border-radius:var(--r-md);border:1px solid var(--border-s);">
+                <button type="button" id="lan-btn-despesa" onclick="Lancamentos.setTipo('despesa', ${isEdit})"
+                  style="padding:10px 14px;border-radius:var(--r-sm);cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;font-size:.85rem;font-family:inherit;transition:all var(--t);border:${initialTipo==='despesa'?'1.5px solid var(--danger)':'1px solid transparent'};background:${initialTipo==='despesa'?'rgba(239,68,68,.18)':'transparent'};color:${initialTipo==='despesa'?'#fca5a5':'var(--text3)'};font-weight:${initialTipo==='despesa'?'700':'500'};box-shadow:${initialTipo==='despesa'?'0 2px 8px rgba(239,68,68,.25)':'none'};">
+                  <span style="font-size:1.05rem;">↓</span>
+                  <span>Despesa</span>
+                </button>
+                <button type="button" id="lan-btn-receita" onclick="Lancamentos.setTipo('receita', ${isEdit})"
+                  style="padding:10px 14px;border-radius:var(--r-sm);cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;font-size:.85rem;font-family:inherit;transition:all var(--t);border:${initialTipo==='receita'?'1.5px solid var(--success)':'1px solid transparent'};background:${initialTipo==='receita'?'rgba(16,185,129,.18)':'transparent'};color:${initialTipo==='receita'?'#6ee7b7':'var(--text3)'};font-weight:${initialTipo==='receita'?'700':'500'};box-shadow:${initialTipo==='receita'?'0 2px 8px rgba(16,185,129,.25)':'none'};">
+                  <span style="font-size:1.05rem;">↑</span>
+                  <span>Receita</span>
+                </button>
+              </div>
+              <input type="hidden" name="tipo" id="lan-tipo-input" value="${initialTipo}">
+            </div>
             
             <div class="form-row cols-2" style="margin-bottom:14px;">
               <div class="form-group"><label class="form-label">Obra / Centro de Custo *</label><select class="form-control" name="obra_id" required>${Utils.clienteOptions(l.obra_id||(App.obraId!=='todas'?App.obraId:''), 'Selecione centro...', true)}</select></div>
@@ -304,7 +336,9 @@ const Lancamentos = {
 
             <!-- CAMPO: DATA DE PAGAMENTO / RECEBIMENTO -->
             <div class="form-group" id="lan-data-pagamento-group" style="margin-bottom:14px;display:${isPagoOuRec?'block':'none'};background:rgba(16,185,129,.05);border:1px solid rgba(16,185,129,.2);border-radius:8px;padding:10px 12px;">
-              <label class="form-label" style="color:var(--success);font-weight:700;margin-bottom:4px;">✓ Data Efetiva do Pagamento / Recebimento</label>
+              <label class="form-label" id="lan-data-pagamento-label" style="color:var(--success);font-weight:700;margin-bottom:4px;">
+                ${initialTipo === 'receita' ? '✓ Data Efetiva do Recebimento' : '✓ Data Efetiva do Pagamento'}
+              </label>
               <input class="form-control" type="date" name="data_pagamento" id="lan-data-pagamento" value="${l.data_pagamento || (isPagoOuRec ? l.data : hoje)}" style="border-color:var(--success);background:var(--bg-card);">
               <span style="font-size:.72rem;color:var(--text3);margin-top:3px;display:block;">Data exata em que o valor foi pago ou recebido na conta</span>
             </div>
@@ -326,7 +360,13 @@ const Lancamentos = {
               <input class="form-control" name="codigo_barras" value="${l.codigo_barras||''}" placeholder="Ex: 34191.79001 01043.510047 91020.150008 5 98760000012000" style="font-family:monospace;font-size:.82rem;">
             </div>
 
-            ${tipo==='despesa'?`<div class="form-group" style="margin-bottom:14px;"><label class="form-label">Vincular Nota Fiscal</label><select class="form-control" name="nota_fiscal_id"><option value="">Nenhuma NF vinculada</option>${notas.filter(n=>n.tipo==='entrada').map(n=>`<option value="${n.id}" ${l.nota_fiscal_id===n.id?'selected':''}>NF ${n.numero_nf||'S/N'} &mdash; ${(n.emitente||'Sem emitente').slice(0,30)} (${Utils.fmt.currency(n.valor_bruto !== undefined ? n.valor_bruto : (n.valor_total || 0))})</option>`).join('')}</select></div>`:''}
+            <div class="form-group" id="lan-nf-group" style="margin-bottom:14px;display:${initialTipo==='despesa'?'block':'none'};">
+              <label class="form-label">Vincular Nota Fiscal</label>
+              <select class="form-control" name="nota_fiscal_id">
+                <option value="">Nenhuma NF vinculada</option>
+                ${notas.filter(n=>n.tipo==='entrada').map(n=>`<option value="${n.id}" ${l.nota_fiscal_id===n.id?'selected':''}>NF ${n.numero_nf||'S/N'} &mdash; ${(n.emitente||'Sem emitente').slice(0,30)} (${Utils.fmt.currency(n.valor_bruto !== undefined ? n.valor_bruto : (n.valor_total || 0))})</option>`).join('')}
+              </select>
+            </div>
 
             <div class="form-row cols-2" style="margin-bottom:14px;">
               <div class="form-group"><label class="form-label">Conciliado?</label><select class="form-control" name="conciliado"><option value="true" ${l.conciliado?'selected':''}>&#x2705; Sim</option><option value="false" ${!l.conciliado?'selected':''}>&#x23F3; N&atilde;o</option></select></div>
@@ -336,30 +376,31 @@ const Lancamentos = {
             <div class="form-group"><label class="form-label">Observa&ccedil;&otilde;es</label><textarea class="form-control" name="observacoes" rows="2" placeholder="Observações adicionais ou notas">${l.observacoes||''}</textarea></div>
 
             <!-- SEÇÃO DE ITENS / PRODUTOS -->
-            ${tipo === 'despesa' ? `
-            <div style="border:1px solid var(--border);border-radius:10px;margin-top:8px;overflow:hidden;">
-              <div style="background:var(--bg-secondary);padding:10px 14px;display:flex;justify-content:space-between;align-items:center;cursor:pointer" onclick="Lancamentos._toggleItens()">
-                <div style="font-weight:700;font-size:.85rem;color:var(--text);">📦 Itens / Produtos deste Lançamento <span style="font-size:.75rem;font-weight:400;color:var(--text3);">(opcional — para rastrear gastos por produto)</span></div>
-                <span id="itens-toggle-icon" style="font-size:.8rem;color:var(--accent2);">${l.itens?.length?'▲ Recolher':'▼ Expandir'}</span>
-              </div>
-              <div id="itens-section" style="display:${l.itens?.length?'block':'none'};padding:14px;">
-                <div id="itens-lista">
-                  ${(l.itens||[]).map(it => `
-                    <div class="item-row" style="display:grid;grid-template-columns:2fr .7fr .8fr 1fr auto;gap:6px;margin-bottom:8px;align-items:center;">
-                      <input class="form-control item-produto" placeholder="Produto (ex: Cimento CP-II)" value="${it.produto}" oninput="Lancamentos._recalcItem(this)" style="font-size:.82rem;">
-                      <input class="form-control item-qtd" type="number" placeholder="Qtd" step="0.01" min="0" value="${it.qtd}" oninput="Lancamentos._recalcItem(this)" style="font-size:.82rem;text-align:right;">
-                      <input class="form-control item-unidade" placeholder="Un (sc, m², kg)" value="${it.unidade}" style="font-size:.82rem;">
-                      <input class="form-control item-vunit" type="number" placeholder="Valor unit. R$" step="0.01" min="0" value="${it.valor_unit}" oninput="Lancamentos._recalcItem(this)" style="font-size:.82rem;text-align:right;">
-                      <button type="button" class="icon-btn" onclick="this.closest('.item-row').remove();Lancamentos._atualizarTotalItens()" title="Remover" style="color:var(--danger);font-size:15px;">🗑️</button>
-                    </div>
-                  `).join('')}
+            <div id="lan-itens-container" style="display:${initialTipo==='despesa'?'block':'none'};">
+              <div style="border:1px solid var(--border);border-radius:10px;margin-top:8px;overflow:hidden;">
+                <div style="background:var(--bg-secondary);padding:10px 14px;display:flex;justify-content:space-between;align-items:center;cursor:pointer" onclick="Lancamentos._toggleItens()">
+                  <div style="font-weight:700;font-size:.85rem;color:var(--text);">📦 Itens / Produtos deste Lançamento <span style="font-size:.75rem;font-weight:400;color:var(--text3);">(opcional — para rastrear gastos por produto)</span></div>
+                  <span id="itens-toggle-icon" style="font-size:.8rem;color:var(--accent2);">${l.itens?.length?'▲ Recolher':'▼ Expandir'}</span>
                 </div>
-                <button type="button" class="btn btn-secondary btn-sm" onclick="Lancamentos._addItem()" style="margin-top:8px;display:flex;align-items:center;gap:6px;">
-                  ➕ Adicionar Produto
-                </button>
-                <div id="itens-total-display" style="margin-top:10px;font-size:.82rem;color:var(--text3);">${l.itens?.length?`Total dos itens: ${Utils.fmt.currency(l.valor)}`:''}</div>
+                <div id="itens-section" style="display:${l.itens?.length?'block':'none'};padding:14px;">
+                  <div id="itens-lista">
+                    ${(l.itens||[]).map(it => `
+                      <div class="item-row" style="display:grid;grid-template-columns:2fr .7fr .8fr 1fr auto;gap:6px;margin-bottom:8px;align-items:center;">
+                        <input class="form-control item-produto" placeholder="Produto (ex: Cimento CP-II)" value="${it.produto}" oninput="Lancamentos._recalcItem(this)" style="font-size:.82rem;">
+                        <input class="form-control item-qtd" type="number" placeholder="Qtd" step="0.01" min="0" value="${it.qtd}" oninput="Lancamentos._recalcItem(this)" style="font-size:.82rem;text-align:right;">
+                        <input class="form-control item-unidade" placeholder="Un (sc, m², kg)" value="${it.unidade}" style="font-size:.82rem;">
+                        <input class="form-control item-vunit" type="number" placeholder="Valor unit. R$" step="0.01" min="0" value="${it.valor_unit}" oninput="Lancamentos._recalcItem(this)" style="font-size:.82rem;text-align:right;">
+                        <button type="button" class="icon-btn" onclick="this.closest('.item-row').remove();Lancamentos._atualizarTotalItens()" title="Remover" style="color:var(--danger);font-size:15px;">🗑️</button>
+                      </div>
+                    `).join('')}
+                  </div>
+                  <button type="button" class="btn btn-secondary btn-sm" onclick="Lancamentos._addItem()" style="margin-top:8px;display:flex;align-items:center;gap:6px;">
+                    ➕ Adicionar Produto
+                  </button>
+                  <div id="itens-total-display" style="margin-top:10px;font-size:.82rem;color:var(--text3);">${l.itens?.length?`Total dos itens: ${Utils.fmt.currency(l.valor)}`:''}</div>
+                </div>
               </div>
-            </div>` : ''}
+            </div>
 
             ${isEdit ? `
             <div style="background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--r-md);padding:12px;margin-top:14px;display:flex;justify-content:space-between;align-items:center;">
@@ -375,7 +416,7 @@ const Lancamentos = {
         </div>
         <div class="modal-footer" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
           <div>
-            ${!isEdit ? `<button type="button" class="btn btn-secondary btn-sm" onclick="Lancamentos.showParcelamento('${tipo}')" style="display:flex;align-items:center;gap:5px;border:1px dashed #f59e0b;color:#f59e0b;" title="Dividir em múltiplas parcelas mensais">📅 Parcelar</button>` : ''}
+            ${!isEdit ? `<button type="button" id="lan-btn-parcelar" class="btn btn-secondary btn-sm" onclick="Lancamentos.showParcelamento('${initialTipo}')" style="display:flex;align-items:center;gap:5px;border:1px dashed #f59e0b;color:#f59e0b;" title="Dividir em múltiplas parcelas mensais">📅 Parcelar</button>` : ''}
           </div>
           <div style="display:flex;gap:8px;">
             <button class="btn btn-secondary" onclick="Utils.closeModal()">Cancelar</button>
@@ -385,13 +426,126 @@ const Lancamentos = {
       </div>`);
   },
 
+  setTipo(novoTipo, isEdit = false) {
+    const input = document.getElementById('lan-tipo-input');
+    if (input) input.value = novoTipo;
+
+    const btnDesp = document.getElementById('lan-btn-despesa');
+    const btnRec  = document.getElementById('lan-btn-receita');
+    const hint    = document.getElementById('lan-tipo-hint');
+    const title   = document.getElementById('lan-modal-title');
+
+    // 1. Atualiza botões
+    if (novoTipo === 'despesa') {
+      if (btnDesp) {
+        btnDesp.style.border = '1.5px solid var(--danger)';
+        btnDesp.style.background = 'rgba(239,68,68,.18)';
+        btnDesp.style.color = '#fca5a5';
+        btnDesp.style.fontWeight = '700';
+        btnDesp.style.boxShadow = '0 2px 8px rgba(239,68,68,.25)';
+      }
+      if (btnRec) {
+        btnRec.style.border = '1px solid transparent';
+        btnRec.style.background = 'transparent';
+        btnRec.style.color = 'var(--text3)';
+        btnRec.style.fontWeight = '500';
+        btnRec.style.boxShadow = 'none';
+      }
+      if (hint) {
+        hint.style.color = 'var(--danger)';
+        hint.textContent = '↓ Saída Financeira / Débito';
+      }
+      if (title) {
+        title.style.color = 'var(--danger)';
+        if (!isEdit) title.textContent = '↓ Nova Despesa';
+      }
+    } else {
+      if (btnRec) {
+        btnRec.style.border = '1.5px solid var(--success)';
+        btnRec.style.background = 'rgba(16,185,129,.18)';
+        btnRec.style.color = '#6ee7b7';
+        btnRec.style.fontWeight = '700';
+        btnRec.style.boxShadow = '0 2px 8px rgba(16,185,129,.25)';
+      }
+      if (btnDesp) {
+        btnDesp.style.border = '1px solid transparent';
+        btnDesp.style.background = 'transparent';
+        btnDesp.style.color = 'var(--text3)';
+        btnDesp.style.fontWeight = '500';
+        btnDesp.style.boxShadow = 'none';
+      }
+      if (hint) {
+        hint.style.color = 'var(--success)';
+        hint.textContent = '↑ Entrada Financeira / Crédito';
+      }
+      if (title) {
+        title.style.color = 'var(--success)';
+        if (!isEdit) title.textContent = '↑ Nova Receita';
+      }
+    }
+
+    // 2. Atualiza Categorias
+    const catSel = document.querySelector('#f-lan [name="categoria"]');
+    if (catSel) {
+      const currentCat = catSel.value;
+      const cats = novoTipo === 'receita' ? this._catRec : this._catDesp;
+      catSel.innerHTML = cats.map(([v, t]) => `<option value="${v}">${t}</option>`).join('');
+      const exists = cats.some(([v]) => v === currentCat);
+      if (exists) {
+        catSel.value = currentCat;
+      } else {
+        catSel.value = cats[0][0];
+      }
+    }
+
+    // 3. Atualiza Status
+    const statusSel = document.getElementById('lan-status-sel');
+    if (statusSel) {
+      const prevStatus = statusSel.value;
+      let nextStatus = '';
+      if (novoTipo === 'receita') {
+        nextStatus = (prevStatus === 'pago') ? 'recebido' : 'a_receber';
+      } else {
+        nextStatus = (prevStatus === 'recebido') ? 'pago' : 'a_pagar';
+      }
+      const statOpts = novoTipo === 'receita' ? this._statRec : this._statDesp;
+      statusSel.innerHTML = statOpts.map(([v, t]) => `<option value="${v}">${t}</option>`).join('');
+      statusSel.value = nextStatus;
+      this._onStatusChange(nextStatus);
+    }
+
+    // 4. Atualiza campo de Nota Fiscal (apenas despesa)
+    const nfGroup = document.getElementById('lan-nf-group');
+    if (nfGroup) {
+      nfGroup.style.display = novoTipo === 'despesa' ? 'block' : 'none';
+    }
+
+    // 5. Atualiza seção de Itens/Produtos (apenas despesa)
+    const itensContainer = document.getElementById('lan-itens-container');
+    if (itensContainer) {
+      itensContainer.style.display = novoTipo === 'despesa' ? 'block' : 'none';
+    }
+
+    // 6. Atualiza botão Parcelar
+    const btnParcelar = document.getElementById('lan-btn-parcelar');
+    if (btnParcelar) {
+      btnParcelar.setAttribute('onclick', `Lancamentos.showParcelamento('${novoTipo}')`);
+    }
+  },
+
   _onStatusChange(status) {
     const grp = document.getElementById('lan-data-pagamento-group');
     const dtInput = document.getElementById('lan-data-pagamento');
+    const lbl = document.getElementById('lan-data-pagamento-label');
     if (!grp) return;
     if (status === 'pago' || status === 'recebido') {
       grp.style.display = 'block';
       if (dtInput && !dtInput.value) dtInput.value = Utils.today();
+      if (lbl) {
+        lbl.textContent = status === 'recebido'
+          ? '✓ Data Efetiva do Recebimento'
+          : '✓ Data Efetiva do Pagamento';
+      }
     } else {
       grp.style.display = 'none';
     }
@@ -456,6 +610,18 @@ const Lancamentos = {
     d.conciliado = d.conciliado==='true';
     d.data_vencimento = d.data_vencimento || d.data;
 
+    // Se tipo for receita, limpa nota fiscal vinculada e normaliza status
+    if (d.tipo === 'receita') {
+      delete d.nota_fiscal_id;
+      if (d.status === 'pago' || d.status === 'a_pagar' || d.status === 'em_atraso') {
+        d.status = d.status === 'pago' ? 'recebido' : 'a_receber';
+      }
+    } else {
+      if (d.status === 'recebido' || d.status === 'a_receber') {
+        d.status = d.status === 'recebido' ? 'pago' : 'a_pagar';
+      }
+    }
+
     // Tratar fornecedor selecionado do cadastro ou digitado manualmente
     const selForn = document.getElementById('lan-forn-sel')?.value;
     const manForn = document.getElementById('lan-forn-manual')?.value || '';
@@ -475,8 +641,8 @@ const Lancamentos = {
       });
     }
 
-    // Salvar itens de produto e vincular ao módulo Produtos
-    const itensRows = document.querySelectorAll('#itens-lista .item-row');
+    // Salvar itens de produto e vincular ao módulo Produtos (apenas se for despesa)
+    const itensRows = d.tipo === 'receita' ? [] : document.querySelectorAll('#itens-lista .item-row');
     const itens = [];
     itensRows.forEach(row => {
       const produto = row.querySelector('.item-produto')?.value?.trim();
@@ -566,7 +732,13 @@ const Lancamentos = {
       Utils.toast('📎 Documento original anexado automaticamente!', 'info');
     }
 
-    this._refresh();
+    if (typeof App !== 'undefined' && App.route === 'lancamentos') {
+      this._refresh();
+    } else if (typeof App !== 'undefined' && App.route && App.routes && App.routes[App.route]) {
+      App.navigate(App.route);
+    } else {
+      this._refresh();
+    }
   },
 
   marcarBaixa(id) {
