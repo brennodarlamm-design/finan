@@ -22,3 +22,6 @@ backend/auth_info_baileys/
 *.tmp
 *.bak
 bin/
+
+.vercel
+.env*

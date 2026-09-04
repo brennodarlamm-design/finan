@@ -8,3 +8,4 @@ scripts
 *.log
 *.tmp
 *.bak
+render.yaml
