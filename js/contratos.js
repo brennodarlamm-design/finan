@@ -1208,17 +1208,6 @@ const Contratos = {
     </div>`;
 
     // ── 6. PÁGINA 6: CLÁUSULAS 19, 20 E ASSINATURAS ───────────
-    const dataHoraGovBr = `${d}/${m}/${y} 19:47:00-0300`;
-
-    // Selos de Assinatura
-    const seloAngelim = c.selo_govbr_contratada || c.assinatura_contratada
-      ? seloGovBrHtml('CAMILY TULYANA LIMA AZEVEDO'/* ou Naira */, dataHoraGovBr)
-      : '';
-
-    const seloCliente = c.selo_govbr_contratante || c.assinatura_contratante
-      ? seloGovBrHtml(c.contratante_nome, dataHoraGovBr)
-      : '';
-
     const pag6Html = `
     <div class="contract-page" style="${pageStyle}">
       ${logoHeaderHtml}
