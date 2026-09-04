@@ -331,15 +331,13 @@ const App = {
 
     html += filtrados.map(c => {
       const isSel = this.obraId === c.id;
-      const statusClass = c.status === 'em_andamento' ? 'badge-info' : 'badge-success';
-      const statusTxt = c.status === 'em_andamento' ? '🔨 Em Andamento' : '✓ Concluída';
 
       return `
       <div class="obra-search-item ${isSel ? 'selected' : ''}" onclick="App.selecionarObra('${c.id}')" style="margin-bottom:8px;border-left:4px solid ${isSel ? 'var(--accent)' : 'var(--border)'};">
         <div style="flex:1;min-width:0;margin-right:12px;">
           <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;flex-wrap:wrap;">
             <strong style="font-size:.92rem;color:var(--text);">${c.nome}</strong>
-            <span class="badge ${statusClass}" style="font-size:.68rem;padding:2px 6px;">${statusTxt}</span>
+            ${Utils.badge(c.status || 'em_andamento')}
           </div>
           <div style="display:flex;gap:12px;font-size:.74rem;color:var(--text3);flex-wrap:wrap;">
             <span>📍 ${c.cidade}/${c.estado}</span>

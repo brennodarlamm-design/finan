@@ -17,8 +17,13 @@ const Clientes = {
       <div class="filter-group">
         <label class="filter-label">Status</label>
         <select class="form-control" id="f-status-cli" style="min-width:140px;">
-          <option value="">Todos</option><option value="em_andamento">Em Andamento</option>
-          <option value="concluida">Concluída</option><option value="pausada">Pausada</option>
+          <option value="">Todos</option>
+          <option value="em_andamento">Em Andamento</option>
+          <option value="documentacao">Documentação</option>
+          <option value="aprovada">Aprovada</option>
+          <option value="concluida">Concluída</option>
+          <option value="pausada">Pausada</option>
+          <option value="cancelada">Cancelada</option>
         </select>
       </div>
       <div class="filter-group">
@@ -119,6 +124,8 @@ const Clientes = {
               <div class="form-group"><label class="form-label">Status</label>
                 <select class="form-control" name="status">
                   <option value="em_andamento" ${(c.status||'em_andamento')==='em_andamento'?'selected':''}>Em Andamento</option>
+                  <option value="documentacao" ${c.status==='documentacao'?'selected':''}>Documentação</option>
+                  <option value="aprovada" ${c.status==='aprovada'?'selected':''}>Aprovada</option>
                   <option value="concluida" ${c.status==='concluida'?'selected':''}>Concluída</option>
                   <option value="pausada" ${c.status==='pausada'?'selected':''}>Pausada</option>
                   <option value="cancelada" ${c.status==='cancelada'?'selected':''}>Cancelada</option>
