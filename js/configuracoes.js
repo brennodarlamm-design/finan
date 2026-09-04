@@ -674,6 +674,7 @@ const Configuracoes = {
         return rest;
       });
       backup.recibos = typeof Recibos !== 'undefined' ? Recibos.getAll() : [];
+      backup.contratos = typeof Contratos !== 'undefined' ? Contratos.getAll() : [];
       backup.orcamentos_sinapi = JSON.parse(localStorage.getItem('orcamentos_sinapi') || '[]');
       backup.users = Auth.getUsers();
       backup.saved_at = new Date().toISOString();
@@ -694,6 +695,7 @@ const Configuracoes = {
     });
     backup.documentos = typeof Documentos !== 'undefined' ? Documentos.getAll() : [];
     backup.recibos = typeof Recibos !== 'undefined' ? Recibos.getAll() : [];
+    backup.contratos = typeof Contratos !== 'undefined' ? Contratos.getAll() : [];
     backup.orcamentos_sinapi = JSON.parse(localStorage.getItem('orcamentos_sinapi') || '[]');
     backup.users = Auth.getUsers();
     backup.exported_at = new Date().toISOString();
@@ -727,7 +729,10 @@ const Configuracoes = {
             localStorage.setItem('finobra_documentos', JSON.stringify(backup.documentos));
           }
           if (Array.isArray(backup.recibos) && typeof Recibos !== 'undefined') {
-            localStorage.setItem('finobra_recibos', JSON.stringify(backup.recibos));
+            localStorage.setItem(DB._ck ? DB._ck('finobra_recibos') : 'finobra_recibos', JSON.stringify(backup.recibos));
+          }
+          if (Array.isArray(backup.contratos) && typeof Contratos !== 'undefined') {
+            localStorage.setItem(DB._ck ? DB._ck('finobra_contratos') : 'finobra_contratos', JSON.stringify(backup.contratos));
           }
           if (Array.isArray(backup.orcamentos_sinapi)) {
             localStorage.setItem('orcamentos_sinapi', JSON.stringify(backup.orcamentos_sinapi));

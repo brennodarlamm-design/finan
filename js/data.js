@@ -6,7 +6,7 @@ const DB = {
     notas: 'finobra_notas', orcamentos: 'finobra_orcamentos',
     medicoes: 'finobra_medicoes', ofximports: 'finobra_ofximports',
     contas: 'finobra_contas', precompras: 'finobra_precompras',
-    fornecedores: 'finobra_fornecedores'
+    fornecedores: 'finobra_fornecedores', contratos: 'finobra_contratos'
   },
 
   _t() {
@@ -505,6 +505,10 @@ const DB = {
     if (localStorage.getItem(recKey) === null) {
       localStorage.setItem(recKey, '[]');
     }
+    const ctKey = this._ck('finobra_contratos');
+    if (localStorage.getItem(ctKey) === null) {
+      localStorage.setItem(ctKey, '[]');
+    }
     const sinapiKey = this._ck('orcamentos_sinapi');
     if (localStorage.getItem(sinapiKey) === null) {
       localStorage.setItem(sinapiKey, '[]');
@@ -602,6 +606,7 @@ const DB = {
     });
     localStorage.setItem(this._ck('finobra_documentos'), '[]');
     localStorage.setItem(this._ck('finobra_recibos'), '[]');
+    localStorage.setItem(this._ck('finobra_contratos'), '[]');
     localStorage.setItem(this._ck('orcamentos_sinapi'), '[]');
     localStorage.setItem(this._k('fornecedores'), '[]');
     localStorage.removeItem(this._ck('finobra_demo_v2'));

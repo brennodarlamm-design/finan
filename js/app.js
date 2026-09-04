@@ -10,6 +10,7 @@ const App = {
     escritorio: Escritorio,
     precompras: PreCompras,
     recibos: Recibos,
+    contratos: Contratos,
     ofx: OFX, notas: Notas, nfe: NFe, orcamentos: Orcamentos,
     medicoes: Medicoes, exportar: Exportar,
     contas: Contas, configuracoes: Configuracoes,
@@ -24,6 +25,7 @@ const App = {
     escritorio:{ icon:'🏢', label:'Despesas do Escritório' },
     precompras:{ icon:'🛒', label:'Ordens de Pré-Compra' },
     recibos:   { icon:'🧾', label:'Emissão de Recibos' },
+    contratos: { icon:'📜', label:'Contratos de Obra' },
     notas:     { icon:'📄', label:'Notas Fiscais' },
     nfe:       { icon:'🔎', label:'Busca NF-e' },
     ofx:       { icon:'🔄', label:'Importar OFX' },
@@ -108,6 +110,7 @@ const App = {
             ${this._navItem('escritorio','🏢','Despesas Escritório')}
             ${this._navItem('precompras','🛒','Pré-Compras',badgePre)}
             ${this._navItem('recibos','🧾','Recibos Oficiais')}
+            ${this._navItem('contratos','📜','Contratos de Obra')}
             ${this._navItem('notas','📄','Notas Fiscais')}
             ${this._navItem('nfe','🔎','Busca NF-e')}
             ${this._navItem('ofx','🔄','Importar OFX')}

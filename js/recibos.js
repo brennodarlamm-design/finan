@@ -1,16 +1,19 @@
 // js/recibos.js — Módulo Gerador e Emissor de Recibos Profissionais Angelim Construtora
+// Com suporte a Assinatura Digital Eletrônica na tela, WhatsApp e Gov.br
 
 const Recibos = {
-  _KEY: 'finobra_recibos',
+  _getKey() {
+    return (typeof DB !== 'undefined' && DB._ck) ? DB._ck('finobra_recibos') : 'finobra_recibos';
+  },
 
   getAll() {
     try {
-      return JSON.parse(localStorage.getItem(this._KEY) || '[]');
+      return JSON.parse(localStorage.getItem(this._getKey()) || '[]');
     } catch { return []; }
   },
 
   salvarLista(recibos) {
-    localStorage.setItem(this._KEY, JSON.stringify(recibos));
+    localStorage.setItem(this._getKey(), JSON.stringify(recibos));
   },
 
   getById(id) {
@@ -23,11 +26,23 @@ const Recibos = {
       id: 'rec_' + Date.now().toString(36) + Math.random().toString(36).substr(2, 4),
       numero: this._proximoNumero(),
       criado_em: new Date().toISOString(),
+      assinatura: null,
       ...recibo
     };
     recibos.unshift(item);
     this.salvarLista(recibos);
     return item;
+  },
+
+  atualizar(id, dados) {
+    const recibos = this.getAll();
+    const idx = recibos.findIndex(r => r.id === id);
+    if (idx !== -1) {
+      recibos[idx] = { ...recibos[idx], ...dados, atualizado_em: new Date().toISOString() };
+      this.salvarLista(recibos);
+      return recibos[idx];
+    }
+    return null;
   },
 
   remover(id) {
@@ -55,11 +70,14 @@ const Recibos = {
     const cs = DB.getAll('clientes');
     const filtrados = obraId && obraId !== 'todas' ? recibos.filter(r => r.obra_id === obraId) : recibos;
 
+    const totalValor = filtrados.reduce((acc, r) => acc + (parseFloat(r.valor) || 0), 0);
+    const assinadosQtd = filtrados.filter(r => !!r.assinatura).length;
+
     return `
     <div class="page-header">
       <div>
         <h1 class="page-title">🧾 Emissão de Recibos</h1>
-        <p class="page-sub">Gere recibos de pagamento de mão de obra, fornecedores e clientes com valor por extenso automático</p>
+        <p class="page-sub">Gere recibos de quitação com valor por extenso automático, assinatura digital na tela e validade jurídica</p>
       </div>
       <div class="page-actions">
         <button class="btn btn-primary" onclick="Recibos.novoReciboModal()">
@@ -68,10 +86,26 @@ const Recibos = {
       </div>
     </div>
 
+    <!-- Cards de Resumo Rápido -->
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px;margin-bottom:20px;">
+      <div class="card" style="padding:14px 18px;">
+        <div style="font-size:.72rem;color:var(--text3);text-transform:uppercase;font-weight:800;letter-spacing:0.5px;">Recibos Emitidos</div>
+        <div style="font-size:1.45rem;font-weight:900;color:var(--text);margin-top:2px;">${filtrados.length}</div>
+      </div>
+      <div class="card" style="padding:14px 18px;">
+        <div style="font-size:.72rem;color:var(--text3);text-transform:uppercase;font-weight:800;letter-spacing:0.5px;">Assinados Digitalmente</div>
+        <div style="font-size:1.45rem;font-weight:900;color:#10b981;margin-top:2px;">${assinadosQtd} <span style="font-size:.8rem;color:var(--text3);font-weight:600;">(${filtrados.length ? Math.round((assinadosQtd/filtrados.length)*100) : 0}%)</span></div>
+      </div>
+      <div class="card" style="padding:14px 18px;">
+        <div style="font-size:.72rem;color:var(--text3);text-transform:uppercase;font-weight:800;letter-spacing:0.5px;">Total Transacionado</div>
+        <div style="font-size:1.45rem;font-weight:900;color:var(--accent);margin-top:2px;">${Utils.fmt.currency(totalValor)}</div>
+      </div>
+    </div>
+
     <!-- Tabela de Histórico de Recibos Emitidos -->
     <div class="card" style="padding:0;">
-      <div class="card-header" style="padding:16px 20px;border-bottom:1px solid var(--border);">
-        <div class="card-title">📜 Recibos Emitidos (${filtrados.length})</div>
+      <div class="card-header" style="padding:16px 20px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;">
+        <div class="card-title">📜 Histórico de Recibos (${filtrados.length})</div>
       </div>
       <div class="tbl-wrap" style="border:none;border-radius:0 0 14px 14px;">
         <table>
@@ -79,6 +113,7 @@ const Recibos = {
             <tr>
               <th>Nº Recibo</th>
               <th>Data</th>
+              <th>Status</th>
               <th>Tipo</th>
               <th>Obra / Cliente</th>
               <th>Beneficiário / Recebedor</th>
@@ -90,7 +125,7 @@ const Recibos = {
           <tbody>
             ${filtrados.length ? filtrados.map(r => this._renderReciboRow(r)).join('') : `
             <tr>
-              <td colspan="8" style="text-align:center;padding:36px;color:var(--text3);">
+              <td colspan="9" style="text-align:center;padding:36px;color:var(--text3);">
                 Nenhum recibo emitido ainda. Clique em "+ Novo Recibo" ou emita diretamente na tela de Lançamentos.
               </td>
             </tr>`}
@@ -103,20 +138,32 @@ const Recibos = {
   _renderReciboRow(r) {
     const c = DB.getById('clientes', r.obra_id);
     const tipoLabel = r.tipo === 'pagamento' ? '<span class="badge badge-danger">Pagamento</span>' : '<span class="badge badge-success">Recebimento</span>';
+    const statusAssinatura = r.assinatura 
+      ? `<span class="badge badge-success" title="Assinado eletronicamente em ${r.assinatura.data_hora_fmt}">✓ Assinado</span>` 
+      : `<span class="badge" style="background:rgba(148,163,184,.15);color:var(--text3);">Pendente</span>`;
 
     return `
     <tr>
       <td style="font-weight:800;color:var(--accent);font-family:monospace;white-space:nowrap;">${r.numero}</td>
       <td style="white-space:nowrap;font-weight:600;">${Utils.fmt.date(r.data)}</td>
+      <td>${statusAssinatura}</td>
       <td>${tipoLabel}</td>
       <td style="color:var(--text2);font-weight:600;">${c?.nome || r.obra_nome || '&mdash;'}</td>
       <td><strong style="color:var(--text);">${r.beneficiario_nome}</strong>${r.beneficiario_doc ? `<div style="font-size:.72rem;color:var(--text3);">${r.beneficiario_doc}</div>` : ''}</td>
       <td style="max-width:240px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="${r.referente}">${r.referente}</td>
       <td style="text-align:right;font-weight:900;color:var(--text);white-space:nowrap;">${Utils.fmt.currency(r.valor)}</td>
       <td style="text-align:center;">
-        <div style="display:flex;gap:6px;justify-content:center;">
-          <button class="btn btn-sm btn-primary" onclick="Recibos.visualizarRecibo('${r.id}')" title="Visualizar e Imprimir Recibo">
-            👁️ Ver / Imprimir
+        <div style="display:flex;gap:6px;justify-content:center;align-items:center;">
+          ${!r.assinatura ? `
+            <button class="btn btn-sm btn-primary" onclick="Recibos.assinarRecibo('${r.id}')" title="Coletar assinatura digital com o dedo ou mouse" style="padding:4px 8px;font-size:.75rem;background:#10b981;border-color:#10b981;color:#fff;">
+              ✍️ Assinar
+            </button>
+          ` : ''}
+          <button class="btn btn-sm btn-secondary" onclick="Recibos.visualizarRecibo('${r.id}')" title="Visualizar e Imprimir Recibo" style="padding:4px 8px;font-size:.75rem;">
+            👁️ Ver
+          </button>
+          <button class="icon-btn btn-sm" onclick="Recibos.enviarWhatsApp('${r.id}')" title="Enviar comprovante via WhatsApp" style="color:#25d366;">
+            📲
           </button>
           <button class="icon-btn btn-sm" onclick="Recibos._confirmDel('${r.id}')" style="color:var(--danger);" title="Excluir recibo">
             🗑️
@@ -137,7 +184,7 @@ const Recibos = {
     const emp = DB.getEmpresa();
 
     Utils.showModal(`
-      <div class="modal" style="max-width:680px;">
+      <div class="modal" style="max-width:680px;width:95vw;">
         <div class="modal-header">
           <span class="modal-title">🧾 Emitir Recibo Oficial</span>
           <button class="modal-close" onclick="Utils.closeModal()">✕</button>
@@ -270,20 +317,24 @@ const Recibos = {
     Utils.closeModal();
 
     // Se vinculado a um lançamento, salvar automaticamente como anexo
-    if (d.lancamento_id && typeof Documentos !== 'undefined') {
-      const htmlRecibo = this.gerarHTMLRecibo(novoRecibo);
+    this._sincronizarComDocumentos(novoRecibo);
+
+    setTimeout(() => this.visualizarRecibo(novoRecibo.id), 200);
+  },
+
+  _sincronizarComDocumentos(r) {
+    if (r.lancamento_id && typeof Documentos !== 'undefined') {
+      const htmlRecibo = this.gerarHTMLRecibo(r);
       Documentos.adicionar({
         entidade_tipo: 'lancamento',
-        entidade_id: d.lancamento_id,
-        titulo: `Recibo Oficial ${novoRecibo.numero}`,
-        nome_arquivo: `Recibo_${novoRecibo.numero.replace('/','-')}.html`,
+        entidade_id: r.lancamento_id,
+        titulo: `Recibo Oficial ${r.numero} ${r.assinatura ? '(Assinado)' : ''}`,
+        nome_arquivo: `Recibo_${r.numero.replace('/','-')}.html`,
         tipo_mime: 'text/html',
         tamanho: htmlRecibo.length,
         data_base64: 'data:text/html;charset=utf-8,' + encodeURIComponent(htmlRecibo)
       });
     }
-
-    setTimeout(() => this.visualizarRecibo(novoRecibo.id), 200);
   },
 
   _confirmDel(id) {
@@ -295,6 +346,79 @@ const Recibos = {
   },
 
   // ─────────────────────────────────────────────────────────────
+  // COLETAR ASSINATURA DIGITAL NA TELA (TOUCH / MOUSE)
+  // ─────────────────────────────────────────────────────────────
+  assinarRecibo(id) {
+    const r = this.getById(id);
+    if (!r) return;
+
+    if (typeof Assinador === 'undefined') {
+      Utils.toast('Módulo Assinador não carregado.', 'error');
+      return;
+    }
+
+    Assinador.abrirModal({
+      titulo: `Assinar Recibo Nº ${r.numero}`,
+      subtitulo: `Coleta de assinatura eletrônica do recebedor/beneficiário`,
+      papel: 'Beneficiário / Recebedor',
+      nomePredefinido: r.beneficiario_nome || '',
+      docPredefinido: r.beneficiario_doc || '',
+      dadosDocumento: {
+        id: r.id,
+        numero: r.numero,
+        valor: r.valor,
+        tipo: 'recibo'
+      },
+      onSalvar: (objetoAssinatura) => {
+        this.atualizar(id, { assinatura: objetoAssinatura });
+        this._sincronizarComDocumentos(this.getById(id));
+        Utils.toast('✅ Recibo assinado com sucesso e validado eletronicamente!', 'success');
+        
+        // Se a rota for recibos, atualizar a tabela de fundo
+        if (App.route === 'recibos') {
+          App.navigate('recibos');
+        }
+        
+        // Abrir a visualização com a assinatura estampada
+        setTimeout(() => this.visualizarRecibo(id), 150);
+      }
+    });
+  },
+
+  // ─────────────────────────────────────────────────────────────
+  // COMPARTILHAR COMPROVANTE VIA WHATSAPP
+  // ─────────────────────────────────────────────────────────────
+  enviarWhatsApp(id) {
+    const r = this.getById(id);
+    if (!r) return;
+
+    const c = DB.getById('clientes', r.obra_id);
+    const obraNome = c ? `${c.nome} (${c.cidade}/${c.estado})` : (r.obra_nome || 'Geral');
+    const valorFmt = Utils.fmt.currency(r.valor);
+    const dataFmt = Utils.fmt.date(r.data);
+    const statusTxt = r.assinatura ? '✅ ASSINADO DIGITALMENTE' : '⏳ PENDENTE DE ASSINATURA';
+    const validacaoTxt = r.assinatura ? `\n*Código de Validação:* ${r.assinatura.codigo_validacao}\n*Data/Hora Assinatura:* ${r.assinatura.data_hora_fmt}` : '';
+
+    const emp = DB.getEmpresa();
+    const brandName = emp.nome_fantasia || emp.razao_social || 'Angelim Construtora';
+
+    const texto = `🧾 *COMPROVANTE DE RECIBO OFICIAL*\n*${brandName.toUpperCase()}*\n\n` +
+      `*Nº do Recibo:* ${r.numero}\n` +
+      `*Data:* ${dataFmt}\n` +
+      `*Status:* ${statusTxt}\n` +
+      `*Beneficiário:* ${r.beneficiario_nome}${r.beneficiario_doc ? ` (${r.beneficiario_doc})` : ''}\n` +
+      `*Valor:* ${valorFmt} (${r.valor_extenso})\n` +
+      `*Obra:* ${obraNome}\n` +
+      `*Referente a:* ${r.referente}\n` +
+      `*Forma de Pagamento:* ${r.forma_pagamento || 'PIX'}\n` +
+      validacaoTxt +
+      `\n_Documento emitido eletronicamente via Sistema FinObra._`;
+
+    const url = `https://api.whatsapp.com/send?text=${encodeURIComponent(texto)}`;
+    window.open(url, '_blank');
+  },
+
+  // ─────────────────────────────────────────────────────────────
   // VISUALIZAÇÃO E IMPRESSÃO DO RECIBO
   // ─────────────────────────────────────────────────────────────
   visualizarRecibo(id) {
@@ -303,18 +427,42 @@ const Recibos = {
     const htmlRecibo = this.gerarHTMLRecibo(r);
 
     Utils.showModal(`
-      <div class="modal" style="max-width:820px;width:95vw;">
-        <div class="modal-header">
-          <span class="modal-title">🧾 Recibo Oficial Nº ${r.numero}</span>
-          <div style="display:flex;gap:8px;align-items:center;">
-            <button class="btn btn-sm btn-primary" onclick="Recibos.imprimirRecibo('${r.id}')">
-              🖨️ Imprimir / Salvar PDF
+      <div class="modal" style="max-width:840px;width:96vw;">
+        <div class="modal-header" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
+          <div>
+            <span class="modal-title">🧾 Recibo Oficial Nº ${r.numero}</span>
+            ${r.assinatura ? `<span class="badge badge-success" style="margin-left:8px;">✓ Assinado Eletronicamente</span>` : `<span class="badge" style="background:rgba(148,163,184,.2);color:var(--text3);margin-left:8px;">Pendente de Assinatura</span>`}
+          </div>
+          
+          <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
+            ${!r.assinatura ? `
+              <button class="btn btn-sm btn-primary" onclick="Recibos.assinarRecibo('${r.id}')" style="background:#10b981;border-color:#10b981;color:#fff;">
+                ✍️ Assinar com Dedo/Mouse
+              </button>
+            ` : `
+              <button class="btn btn-sm btn-secondary" onclick="Recibos.assinarRecibo('${r.id}')" title="Substituir ou assinar novamente">
+                🔄 Reassinar
+              </button>
+            `}
+
+            <button class="btn btn-sm btn-secondary" onclick="Recibos.enviarWhatsApp('${r.id}')" style="color:#25d366;" title="Enviar texto e dados do recibo para WhatsApp">
+              📲 WhatsApp
             </button>
+
+            <button class="btn btn-sm btn-secondary" onclick="Assinador.modalGovBr({ nomeDocumento:'Recibo_${r.numero.replace('/','-')}', onBaixarPDF: () => Recibos.imprimirRecibo('${r.id}') })" style="color:#0284c7;" title="Como assinar oficialmente com o Gov.br ICP-Brasil">
+              🏛️ Gov.br
+            </button>
+
+            <button class="btn btn-sm btn-primary" onclick="Recibos.imprimirRecibo('${r.id}')">
+              🖨️ Imprimir / PDF
+            </button>
+            
             <button class="modal-close" onclick="Utils.closeModal()">✕</button>
           </div>
         </div>
-        <div class="modal-body" style="background:#334155;padding:24px;display:flex;justify-content:center;overflow-x:auto;">
-          <div style="background:#ffffff;color:#0f172a;width:100%;max-width:720px;padding:36px;border-radius:4px;box-shadow:0 10px 30px rgba(0,0,0,0.3);font-family:'Segoe UI',Roboto,sans-serif;">
+
+        <div class="modal-body" style="background:#334155;padding:20px;display:flex;justify-content:center;overflow-x:auto;">
+          <div style="background:#ffffff;color:#0f172a;width:100%;max-width:720px;padding:34px;border-radius:4px;box-shadow:0 10px 30px rgba(0,0,0,0.3);font-family:'Segoe UI',Roboto,sans-serif;">
             ${htmlRecibo}
           </div>
         </div>
@@ -327,16 +475,24 @@ const Recibos = {
     const c = DB.getById('clientes', r.obra_id);
     const obraNome = c ? `${c.nome} (${c.cidade}/${c.estado})` : (r.obra_nome || 'Geral');
     const valorFmt = Utils.fmt.currency(r.valor);
-    const dataFmt = Utils.fmt.date(r.data);
     const [y, m, d] = (Utils.cleanDate(r.data) || Utils.today()).split('-');
     const meses = ['','janeiro','fevereiro','março','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro'];
     const dataPorExtenso = `${parseInt(d, 10)} de ${meses[parseInt(m, 10)]} de ${y}`;
 
     const emp = DB.getEmpresa();
-    const brandName = (emp.nome_fantasia || emp.razao_social || 'Minha Construtora').toUpperCase();
+    const brandName = (emp.nome_fantasia || emp.razao_social || 'Angelim Construtora').toUpperCase();
     const logoHtml = emp.logo_url 
       ? `<img src="${emp.logo_url}" alt="${brandName}" style="max-width:60px;max-height:60px;border-radius:8px;border:1px solid #c9a227;object-fit:contain;">`
       : `<div style="width:48px;height:48px;border-radius:8px;background:#182713;border:1px solid #c9a227;display:flex;align-items:center;justify-content:center;font-size:1.5rem;">🏢</div>`;
+
+    // Renderização da Assinatura Digital sobre a Linha
+    let assinaturaVisual = '';
+    if (r.assinatura && r.assinatura.imagem_base64) {
+      assinaturaVisual = `
+        <div style="margin-bottom:-10px;">
+          <img src="${r.assinatura.imagem_base64}" alt="Assinatura Digital" style="max-height:65px;max-width:240px;display:block;margin:0 auto;object-fit:contain;">
+        </div>`;
+    }
 
     return `
     <div style="border:2px solid #0f172a;padding:28px;border-radius:8px;position:relative;background:#ffffff;color:#0f172a;">
@@ -380,23 +536,27 @@ const Recibos = {
       </div>
 
       <!-- Local e Data -->
-      <div style="text-align:right;font-size:.88rem;color:#0f172a;font-weight:700;margin-bottom:40px;">
+      <div style="text-align:right;font-size:.88rem;color:#0f172a;font-weight:700;margin-bottom:30px;">
         ${r.cidade_uf || 'Boa Vista - RR'}, ${dataPorExtenso}.
       </div>
 
       <!-- Área de Assinatura -->
       <div style="display:grid;grid-template-columns:1fr;max-width:380px;margin:0 auto;text-align:center;font-size:.82rem;">
-        <div style="border-top:1.5px solid #0f172a;padding-top:8px;">
+        <div style="border-top:1.5px solid #0f172a;padding-top:8px;position:relative;">
+          ${assinaturaVisual}
           <strong style="font-size:.9rem;color:#0f172a;display:block;">${r.beneficiario_nome}</strong>
           ${r.beneficiario_doc ? `<span style="color:#475569;font-size:.76rem;display:block;">CPF/CNPJ: ${r.beneficiario_doc}</span>` : ''}
           <span style="color:#64748b;font-size:.72rem;text-transform:uppercase;">Assinatura do Recebedor</span>
         </div>
       </div>
 
+      <!-- Selo de Assinatura Eletrônica e Integridade Jurídica -->
+      ${r.assinatura ? Assinador.renderCarimboAssinatura(r.assinatura) : ''}
+
       <!-- Rodapé -->
       <div style="margin-top:28px;border-top:1px dashed #cbd5e1;padding-top:8px;display:flex;justify-content:space-between;align-items:center;font-size:.68rem;color:#94a3b8;">
         <span>Documento emitido eletronicamente via Sistema FinObra</span>
-        <span>Autenticação: ANG-REC-${r.id.toUpperCase()}</span>
+        <span>Autenticação: ${r.assinatura ? r.assinatura.codigo_validacao : `ANG-REC-${r.id.toUpperCase()}`}</span>
       </div>
     </div>`;
   },
@@ -428,13 +588,13 @@ const Recibos = {
           <title>Recibo Nº ${r.numero} — Angelim Construtora</title>
           <meta charset="utf-8">
           <style>
-            @page { size: A4 portrait; margin: 20mm 15mm; }
+            @page { size: A4 portrait; margin: 15mm 15mm; }
             * { box-sizing: border-box; }
             body { font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; margin: 0; padding: 0; background: #fff; color: #0f172a; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
           </style>
         </head>
         <body>
-          <div style="max-width:720px;margin:0 auto;padding-top:20px;">
+          <div style="max-width:720px;margin:0 auto;padding-top:10px;">
             ${htmlRecibo}
           </div>
         </body>
@@ -448,3 +608,5 @@ const Recibos = {
     }, 400);
   }
 };
+
+window.Recibos = Recibos;
