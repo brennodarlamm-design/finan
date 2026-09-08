@@ -203,18 +203,6 @@ const Configuracoes = {
             <div style="color:var(--text3);font-size:.76rem;margin-top:8px;">
               CNPJ: ${emp.cnpj || '00.000.000/0000-00'} &middot; ${emp.cidade || 'Cidade'}/${emp.uf || 'UF'}
             </div>
-          <!-- CARD WHATSAPP -->
-          <div class="card" style="margin-top:16px;">
-            <div class="card-header"><div class="card-title">📲 Alertas de Boletos e Contas via WhatsApp</div></div>
-            <p style="color:var(--text2);font-size:.84rem;margin-bottom:10px;">Configure o número de telefone da empresa para receber o alerta matinal automático das contas e boletos a pagar.</p>
-            <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
-              <button type="button" class="btn btn-sm" onclick="typeof WhatsApp !== 'undefined' && WhatsApp.abrirModalConfig ? WhatsApp.abrirModalConfig() : Utils.toast('Módulo WhatsApp pronto.', 'info')" style="background:#25D366;color:#fff;font-weight:700;display:flex;align-items:center;gap:6px;border:none;padding:8px 14px;border-radius:6px;">
-                📲 Configurar Número &amp; Testar
-              </button>
-              <span style="font-size:.78rem;color:var(--text3);">
-                ${(typeof WhatsApp !== 'undefined' && WhatsApp.getTelefonePadrao && WhatsApp.getTelefonePadrao()) ? `Número ativo: <strong>${WhatsApp.getTelefonePadrao()}</strong>` : 'Nenhum número cadastrado'}
-              </span>
-            </div>
           </div>
         </div>
       </div>`;

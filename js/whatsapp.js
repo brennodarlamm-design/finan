@@ -227,8 +227,17 @@ const WhatsApp = {
     this.abrirEnvio(msg);
   },
 
-  // Modal para configurar o WhatsApp / Evolution API
+  // Modal para configurar o WhatsApp / Evolution API (Exclusivo para Desenvolvedor)
   abrirModalConfig() {
+    const isDev = (typeof Configuracoes !== 'undefined' && Configuracoes.canAccessSistema && Configuracoes.canAccessSistema())
+      || (typeof Auth !== 'undefined' && Auth.getUser()?.username === 'admin' && Auth.getUser()?.tenantId === 'angelim')
+      || localStorage.getItem('finobra_dev_mode') === 'true';
+
+    if (!isDev) {
+      Utils.toast('A configuração do servidor de WhatsApp é restrita à equipe técnica de desenvolvimento.', 'warning');
+      return;
+    }
+
     const tel = this.getTelefonePadrao();
     const url = this.getEvolutionUrl();
     const key = this.getEvolutionKey();

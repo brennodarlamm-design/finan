@@ -119,10 +119,9 @@ const Dashboard = {
             <span style="font-size:.72rem;color:var(--text3);font-weight:700;">Boletos &amp; Contas a Pagar</span>
           </div>
           <div style="display:flex;gap:6px;align-items:center;">
-            <button class="btn btn-sm" onclick="WhatsApp.enviarResumoDiario('${obraId}')" style="background:#25D366;color:#fff;font-weight:700;display:flex;align-items:center;gap:5px;height:28px;padding:0 10px;border-radius:20px;border:none;cursor:pointer;" title="Enviar resumo de boletos para o WhatsApp">
+            <button class="btn btn-sm" onclick="WhatsApp.enviarResumoDiario('${obraId}')" style="background:#25D366;color:#fff;font-weight:700;display:flex;align-items:center;gap:5px;height:28px;padding:0 12px;border-radius:20px;border:none;cursor:pointer;" title="Enviar resumo de boletos para o WhatsApp">
               📲 Resumo WhatsApp
             </button>
-            <button class="btn btn-ghost btn-sm" onclick="WhatsApp.abrirModalConfig()" title="Configurar Telefone do WhatsApp" style="padding:2px 6px;">⚙️</button>
           </div>
         </div>
         <div id="vencimentos" class="custom-scroll" style="max-height:245px;overflow-y:auto;padding-right:6px;">
