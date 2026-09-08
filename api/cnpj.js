@@ -14,12 +14,12 @@ export default async function handler(req, res) {
 
   try {
     const response = await fetch(`https://brasilapi.com.br/api/cnpj/v1/${cnpjLimpo}`, {
-      headers: { 'Accept': 'application/json', 'User-Agent': 'AngelimConstrutora/1.0' }
+      headers: { 'Accept': 'application/json', 'User-Agent': 'FinObra/1.0' }
     });
-    const data = await response.json();
+    const data = await response.json().catch(() => ({}));
     if (!response.ok) return res.status(response.status).json(data);
     return res.status(200).json(data);
   } catch (err) {
-    return res.status(502).json({ error: 'Erro ao consultar BrasilAPI', detail: err.message });
+    return res.status(502).json({ error: 'Erro ao consultar Receita Federal', detail: err.message });
   }
 }

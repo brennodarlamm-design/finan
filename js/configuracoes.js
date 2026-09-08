@@ -271,8 +271,11 @@ const Configuracoes = {
     Utils.toast('Consultando CNPJ na Receita Federal...', 'info');
     try {
       const res = await fetch(`/api/cnpj?cnpj=${raw}`);
-      if (!res.ok) throw new Error('Falha na consulta');
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        Utils.toast(data.message || data.error || 'CNPJ não encontrado na Receita Federal.', 'warning');
+        return;
+      }
       if (data.razao_social || data.nome_fantasia) {
         if (data.nome_fantasia && document.getElementById('cfg-emp-fantasia')) document.getElementById('cfg-emp-fantasia').value = data.nome_fantasia;
         if (data.razao_social && document.getElementById('cfg-emp-razao')) document.getElementById('cfg-emp-razao').value = data.razao_social;
@@ -283,10 +286,10 @@ const Configuracoes = {
         if (data.logradouro && document.getElementById('cfg-emp-end')) document.getElementById('cfg-emp-end').value = `${data.logradouro}, ${data.numero || ''} - ${data.bairro || ''}`;
         Utils.toast('Dados do CNPJ preenchidos automaticamente!', 'success');
       } else {
-        Utils.toast('CNPJ consultado mas sem dados adicionais.', 'info');
+        Utils.toast('CNPJ consultado mas sem dados cadastrais adicionais.', 'info');
       }
     } catch {
-      Utils.toast('Não foi possível consultar o CNPJ online.', 'warning');
+      Utils.toast('Não foi possível consultar o CNPJ online no momento.', 'warning');
     }
   },
 
@@ -655,6 +658,7 @@ const Configuracoes = {
 
   // ── SISTEMA ──────────────────────────────────────────
   _renderSistema() {
+    const emp = (typeof DB !== 'undefined' && DB.getEmpresa) ? DB.getEmpresa() : {};
     const isDemoLoaded = DB.isDemoLoaded();
     const totalClientes = DB.getAll('clientes').length;
     const totalLancamentos = DB.getAll('lancamentos').length;
