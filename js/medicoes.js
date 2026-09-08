@@ -1,4 +1,4 @@
-// js/medicoes.js — Caixa Measurements Module (Cronograma Físico-Financeiro)
+// js/medicoes.js — Caixa & General Works Measurements Module (Cronograma Físico-Financeiro)
 
 const Medicoes = {
   render(obraId) {
@@ -13,14 +13,14 @@ const Medicoes = {
 
     return `
     <div class="page-header">
-      <div><h1 class="page-title">🔨 Medições Caixa</h1><p class="page-sub">Cronograma físico-financeiro de liberação de parcelas</p></div>
+      <div><h1 class="page-title">🔨 Medições & Faturamento</h1><p class="page-sub">Cronograma físico-financeiro de medições e liberação de parcelas</p></div>
       <div class="page-actions"><button class="btn btn-primary" onclick="Medicoes.showForm()">+ Nova Medição</button></div>
     </div>
 
     <div class="g4" style="margin-bottom:16px;">
       <div class="kpi-card" style="padding:14px;"><div class="kpi-label">Total Medições</div><div class="kpi-value blue" style="font-size:1.2rem">${meds.length}</div></div>
-      <div class="kpi-card" style="padding:14px;"><div class="kpi-label">Valor Liberado</div><div class="kpi-value green" style="font-size:1.2rem">${Utils.fmt.currency(totalLib)}</div></div>
-      <div class="kpi-card" style="padding:14px;"><div class="kpi-label">Em Análise</div><div class="kpi-value yellow" style="font-size:1.2rem">${emAnalise.length}</div></div>
+      <div class="kpi-card" style="padding:14px;"><div class="kpi-label">Valor Liberado / Faturado</div><div class="kpi-value green" style="font-size:1.2rem">${Utils.fmt.currency(totalLib)}</div></div>
+      <div class="kpi-card" style="padding:14px;"><div class="kpi-label">Em Análise / Medição</div><div class="kpi-value yellow" style="font-size:1.2rem">${emAnalise.length}</div></div>
       <div class="kpi-card" style="padding:14px;"><div class="kpi-label">Total Solicitado</div><div class="kpi-value cyan" style="font-size:1.2rem">${Utils.fmt.currency(totalSolic)}</div></div>
     </div>
 
@@ -42,31 +42,37 @@ const Medicoes = {
   },
 
   _medCards(meds, obraId) {
-    if (!meds.length) return `<div class="empty-state"><h3>Nenhuma medição cadastrada</h3><p>Cadastre as medições do cronograma físico-financeiro da Caixa</p><button class="btn btn-primary" onclick="Medicoes.showForm()">+ Nova Medição</button></div>`;
+    if (!meds.length) return `<div class="empty-state"><h3>Nenhuma medição cadastrada</h3><p>Cadastre as medições do cronograma físico-financeiro das obras</p><button class="btn btn-primary" onclick="Medicoes.showForm()">+ Nova Medição</button></div>`;
     // Group by obra
     const byObra = {};
     meds.forEach(m => { if(!byObra[m.obra_id]) byObra[m.obra_id]=[]; byObra[m.obra_id].push(m); });
     return Object.entries(byObra).map(([obraId, obMeds]) => {
       const c = DB.getById('clientes', obraId);
+      const isCaixa = !c?.modalidade_obra || c?.modalidade_obra === 'caixa';
       const totalLib = obMeds.filter(m=>m.status==='liberada').reduce((s,m)=>s+(m.valor_liberado||0),0);
       const totalSol = obMeds.reduce((s,m)=>s+m.valor_solicitado,0);
       const financiado = c?.valor_financiado || 0;
       const pctLib = financiado>0 ? Math.min(100,(totalLib/financiado)*100) : 0;
+
+      const modInfo = isCaixa
+        ? `Contrato: ${c?.num_contrato_caixa||'—'} &nbsp;|&nbsp; Financiado Caixa: ${Utils.fmt.currency(financiado)} &nbsp;|&nbsp; Agência: ${c?.agencia_caixa||'—'}`
+        : `Modalidade: ${c?.modalidade_obra==='particular'?'Recursos Próprios':c?.modalidade_obra==='administracao'?'Administração Custo+Taxa':c?.modalidade_obra==='empreitada'?'Empreitada Global':c?.modalidade_obra==='reforma'?'Reforma Comercial':'Financiamento'} &nbsp;|&nbsp; Ref: ${c?.num_contrato_caixa||'Direto'} &nbsp;|&nbsp; Contratado: ${Utils.fmt.currency(financiado)}`;
+
       return `<div class="card" style="margin-bottom:16px;">
         <div class="card-header">
           <div>
             <div class="card-title">👤 ${c?.nome||'—'}</div>
-            <div style="font-size:.76rem;color:var(--text3);margin-top:3px">Contrato: ${c?.num_contrato_caixa||'—'} &nbsp;|&nbsp; Valor financiado: ${Utils.fmt.currency(financiado)} &nbsp;|&nbsp; Agência: ${c?.agencia_caixa||'—'}</div>
+            <div style="font-size:.76rem;color:var(--text3);margin-top:3px">${modInfo}</div>
           </div>
           <div style="text-align:right">
-            <div style="font-size:.72rem;color:var(--text3)">Liberado / Solicitado</div>
+            <div style="font-size:.72rem;color:var(--text3)">${isCaixa ? 'Liberado / Solicitado' : 'Faturado / Previsto'}</div>
             <div style="font-weight:900;font-size:1rem;color:var(--success)">${Utils.fmt.currency(totalLib)} <span style="color:var(--text3);font-weight:400">/ ${Utils.fmt.currency(totalSol)}</span></div>
           </div>
         </div>
 
         <div style="margin-bottom:18px;">
           <div style="display:flex;justify-content:space-between;margin-bottom:5px;">
-            <span style="font-size:.76rem;color:var(--text3)">Progresso de liberações vs. valor financiado</span>
+            <span style="font-size:.76rem;color:var(--text3)">${isCaixa ? 'Progresso de liberações vs. valor financiado' : 'Progresso de faturamento vs. valor contratado'}</span>
             <span style="font-size:.76rem;font-weight:800">${pctLib.toFixed(1)}%</span>
           </div>
           <div class="progress-bar"><div class="progress-fill green" style="width:${pctLib}%"></div></div>
@@ -92,7 +98,7 @@ const Medicoes = {
   _medRow(m) {
     const statusColor = { preparando:'var(--text3)', submetida:'var(--info)', em_analise:'var(--warning)', aprovada:'var(--success)', liberada:'var(--success)', rejeitada:'var(--danger)' };
     const docsClip = typeof Documentos !== 'undefined' 
-      ? Documentos.badgeClip('medicao', m.id, { titulo: `${m.numero_medicao}ª Medição Caixa`, showLabel: true })
+      ? Documentos.badgeClip('medicao', m.id, { titulo: `${m.numero_medicao}ª Medição`, showLabel: true })
       : (m.documentos_ok ? '<span class="badge badge-success">📎 Docs OK</span>' : '<span class="badge badge-warning">📎 Docs Pendentes</span>');
 
     return `<div class="card" style="margin-bottom:10px;padding:16px;border-left:4px solid ${statusColor[m.status]||'var(--border-d)'};">
@@ -107,7 +113,7 @@ const Medicoes = {
           <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px;font-size:.78rem">
             <div><span style="color:var(--text3)">Físico executado:</span> <strong>${m.percentual_fisico}%</strong></div>
             <div><span style="color:var(--text3)">Financeiro:</span> <strong>${m.percentual_financeiro}%</strong></div>
-            <div><span style="color:var(--text3)">Engenheiro:</span> ${m.engenheiro_responsavel||'—'}</div>
+            <div><span style="color:var(--text3)">Engenheiro / Técnico:</span> ${m.engenheiro_responsavel||'—'}</div>
             <div><span style="color:var(--text3)">Previsão:</span> ${Utils.fmt.date(m.data_previsao)}</div>
           </div>
           ${m.observacoes?`<div style="margin-top:8px;font-size:.75rem;color:var(--text3);padding:7px;background:var(--bg-secondary);border-radius:6px">💬 ${m.observacoes}</div>`:''}
@@ -116,7 +122,7 @@ const Medicoes = {
         <div style="min-width:200px">
           <div style="display:grid;gap:6px;font-size:.8rem">
             <div style="display:flex;justify-content:space-between;padding:6px 10px;background:var(--bg-secondary);border-radius:6px">
-              <span style="color:var(--text3)">📤 Solicitado:</span>
+              <span style="color:var(--text3)">📤 Solicitado / Previsto:</span>
               <strong style="color:var(--accent)">${Utils.fmt.currency(m.valor_solicitado)}</strong>
             </div>
             <div style="display:flex;justify-content:space-between;padding:6px 10px;background:var(--bg-secondary);border-radius:6px">
@@ -124,7 +130,7 @@ const Medicoes = {
               <strong style="color:${m.valor_aprovado?'var(--success)':'var(--text3)'}">${m.valor_aprovado?Utils.fmt.currency(m.valor_aprovado):'Aguardando'}</strong>
             </div>
             <div style="display:flex;justify-content:space-between;padding:6px 10px;background:var(--bg-secondary);border-radius:6px">
-              <span style="color:var(--text3)">💰 Liberado:</span>
+              <span style="color:var(--text3)">💰 Liberado / Faturado:</span>
               <strong style="color:${m.valor_liberado?'var(--success)':'var(--text3)'}">${m.valor_liberado?Utils.fmt.currency(m.valor_liberado):'Aguardando'}</strong>
             </div>
           </div>
@@ -163,7 +169,7 @@ const Medicoes = {
     const m = DB.getById('medicoes',id);
     Utils.showModal(`
       <div class="modal" style="max-width:400px">
-        <div class="modal-header"><span class="modal-title">💰 Liberar Parcela</span><button class="modal-close" onclick="Utils.closeModal()">✕</button></div>
+        <div class="modal-header"><span class="modal-title">💰 Liberar Parcela / Faturamento</span><button class="modal-close" onclick="Utils.closeModal()">✕</button></div>
         <div class="modal-body">
           <div class="form-group"><label class="form-label">Valor Liberado (R$)</label>
             <div class="input-prefix"><span class="input-pfx-txt">R$</span><input id="lib-val" type="number" value="${m.valor_aprovado||m.valor_solicitado}" step="0.01" min="0"></div>
@@ -184,19 +190,38 @@ const Medicoes = {
     // Create receita lancamento
     const m = DB.getById('medicoes',id);
     if (!m.lancamento_id) {
-      const lan = DB.add('lancamentos',{obra_id:m.obra_id,tipo:'receita',data:dt,descricao:`${m.numero_medicao}ª Parcela Caixa — Medição ${m.numero_medicao} (${m.percentual_fisico}%)`,categoria:'parcela_caixa',valor:val,status:'recebido',fornecedor_beneficiario:'Caixa Econômica Federal',origem:'medicao',conciliado:false,medicao_id:id});
+      const c = DB.getById('clientes', m.obra_id);
+      const isCaixa = !c?.modalidade_obra || c?.modalidade_obra === 'caixa';
+      const categoria = isCaixa ? 'parcela_caixa' : (c?.modalidade_obra === 'administracao' ? 'taxa_adm' : 'medicao_obra');
+      const beneficiario = isCaixa ? 'Caixa Econômica Federal' : (c?.nome || 'Cliente da Obra');
+      const desc = isCaixa
+        ? `${m.numero_medicao}ª Parcela Caixa — Medição ${m.numero_medicao} (${m.percentual_fisico}%)`
+        : `${m.numero_medicao}ª Medição / Faturamento — ${c?.nome || 'Obra'} (${m.percentual_fisico}%)`;
+      const lan = DB.add('lancamentos',{
+        obra_id:m.obra_id,
+        tipo:'receita',
+        data:dt,
+        descricao:desc,
+        categoria:categoria,
+        valor:val,
+        status:'recebido',
+        fornecedor_beneficiario:beneficiario,
+        origem:'medicao',
+        conciliado:false,
+        medicao_id:id
+      });
       DB.update('medicoes',id,{lancamento_id:lan.id});
     }
     Utils.closeModal();
     this._refresh();
-    Utils.toast('Parcela liberada e lançamento criado!','success');
+    Utils.toast('Medição liberada e receita registrada no financeiro!','success');
   },
 
   showForm(id=null) {
     const m = id?DB.getById('medicoes',id)||{}:{};
     Utils.showModal(`
       <div class="modal modal-lg">
-        <div class="modal-header"><span class="modal-title">${id?'✏️ Editar Medição':'🔨 Nova Medição Caixa'}</span><button class="modal-close" onclick="Utils.closeModal()">✕</button></div>
+        <div class="modal-header"><span class="modal-title">${id?'✏️ Editar Medição':'🔨 Nova Medição'}</span><button class="modal-close" onclick="Utils.closeModal()">✕</button></div>
         <div class="modal-body">
           <form id="f-med">
             <div class="form-row cols-3" style="margin-bottom:14px;">
@@ -228,7 +253,7 @@ const Medicoes = {
               <div class="form-group"><label class="form-label">Data Liberação</label><input class="form-control" type="date" name="data_liberacao" value="${m.data_liberacao||''}"></div>
             </div>
             <div class="form-row cols-2" style="margin-bottom:14px;">
-              <div class="form-group"><label class="form-label">Engenheiro Responsável</label><input class="form-control" name="engenheiro_responsavel" value="${m.engenheiro_responsavel||''}" placeholder="Nome e CREA"></div>
+              <div class="form-group"><label class="form-label">Engenheiro / Responsável Técnico</label><input class="form-control" name="engenheiro_responsavel" value="${m.engenheiro_responsavel||''}" placeholder="Nome e CREA/CAU"></div>
               <div class="form-group"><label class="form-label">Documentação</label><select class="form-control" name="documentos_ok">
                 <option value="true" ${m.documentos_ok?'selected':''}>✅ Completa</option>
                 <option value="false" ${!m.documentos_ok?'selected':''}>⏳ Pendente</option>

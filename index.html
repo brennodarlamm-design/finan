@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Angelim Construtora — Sistema Financeiro</title>
-  <meta name="description" content="Sistema financeiro completo da Angelim Construtora para gestão de obras financiadas pela Caixa Econômica Federal. Controle de receitas, despesas, notas fiscais e medições.">
+  <title>FinObra — Sistema de Gestão de Obras</title>
+  <meta name="description" content="FinObra — Sistema integrado de gestão de obras, controle financeiro, medições e custos para construtoras e engenharia civil.">
   <link rel="icon" type="image/x-icon" href="favicon.ico">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
@@ -173,54 +173,66 @@
     <div class="orb o3"></div>
     <div class="panel-left-content">
 
-      <div class="hero-logo" style="margin-bottom:30px;">
-        <img src="img/logo.png" alt="Angelim Construtora" style="width:140px;height:140px;border-radius:16px;box-shadow:0 8px 32px rgba(0,0,0,0.6);border:1px solid rgba(201,162,39,0.4);object-fit:cover;">
+      <div class="hero-logo" style="margin-bottom:24px;display:flex;align-items:center;gap:18px;">
+        <img src="img/finobra_logo.jpg" alt="FinObra Logo" style="width:84px;height:84px;border-radius:18px;box-shadow:0 8px 30px rgba(201,162,39,0.35);border:1.5px solid rgba(201,162,39,0.55);object-fit:cover;">
         <div class="hero-logo-text">
-          <div class="brand-name">ANGELIM</div>
-          <div class="brand-sub">CONSTRUTORA &middot; GEST&Atilde;O FINANCEIRA</div>
+          <div class="brand-name" style="font-size:2.35rem;font-weight:900;letter-spacing:.05em;background:linear-gradient(135deg,#F7E07C,#C9A227);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;">FINOBRA</div>
+          <div class="brand-sub" style="font-size:.76rem;font-weight:700;letter-spacing:.2em;color:var(--accent2);text-transform:uppercase;">SISTEMA DE GESTÃO DE OBRAS</div>
         </div>
       </div>
 
-      <div class="hero-tagline">
-        Sistema Financeiro de <strong>Alta Precisão</strong> para Gestão de Obras Financiadas Caixa
+      <div class="hero-tagline" style="font-size:1.12rem;line-height:1.5;color:var(--text);margin-bottom:26px;">
+        Tecnologia de <strong>Alta Precisão</strong> para Gestão Financeira, Custos e Medições de Obras
       </div>
 
-      <div class="features-list">
+      <div class="features-list" style="display:flex;flex-direction:column;gap:9px;">
+        <div class="feat">
+          <span class="feat-icon">🏗️</span>
+          <div class="feat-text">
+            <strong>Gestão Completa de Obras</strong>
+            <span>Obras Caixa (PCI / SBPE / MCMV), Particulares e Empreitadas</span>
+          </div>
+        </div>
         <div class="feat">
           <span class="feat-icon">💰</span>
           <div class="feat-text">
-            <strong>Lançamentos Financeiros</strong>
-            <span>Receitas, despesas, notas fiscais por obra</span>
+            <strong>Controle Financeiro & Custos</strong>
+            <span>Fluxo de caixa projetado, centros de custo por obra e DRE</span>
           </div>
         </div>
         <div class="feat">
-          <span class="feat-icon">🏦</span>
+          <span class="feat-icon">🔨</span>
           <div class="feat-text">
-            <strong>Medições Caixa</strong>
-            <span>Cronograma físico-financeiro e liberações</span>
+            <strong>Medições & Faturamento</strong>
+            <span>Cronograma físico-financeiro com avanço de obra e liberações</span>
           </div>
         </div>
         <div class="feat">
-          <span class="feat-icon">📊</span>
+          <span class="feat-icon">📑</span>
           <div class="feat-text">
-            <strong>Dashboard Analítico</strong>
-            <span>KPIs, gráficos e filtros em tempo real</span>
+            <strong>Contratos & Recibos Eletrônicos</strong>
+            <span>Assinatura digital criptográfica com QR Code de autenticidade</span>
           </div>
         </div>
         <div class="feat">
           <span class="feat-icon">🔄</span>
           <div class="feat-text">
-            <strong>Importação OFX</strong>
-            <span>Conciliação bancária automática</span>
+            <strong>Conciliação Bancária OFX</strong>
+            <span>Importação inteligente de extratos com conferência sem erros</span>
           </div>
         </div>
         <div class="feat">
-          <span class="feat-icon">📥</span>
+          <span class="feat-icon">🤖</span>
           <div class="feat-text">
-            <strong>Exportação Excel / PDF</strong>
-            <span>Relatórios completos por obra</span>
+            <strong>Auditoria & Leitura Fiscal (OCR)</strong>
+            <span>Reconhecimento automático de NF-e, boletos e comprovantes</span>
           </div>
         </div>
+      </div>
+
+      <div style="margin-top:24px;padding-top:14px;border-top:1px solid rgba(201,162,39,.18);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;font-size:.73rem;color:var(--text3);">
+        <span>🔒 Criptografia &middot; Nuvem Neon Serverless</span>
+        <span>FinObra &middot; Todos os direitos reservados &copy; 2026</span>
       </div>
     </div>
   </div>
@@ -228,16 +240,16 @@
   <!-- RIGHT -->
   <div class="panel-right">
     <div class="form-wrap">
-      <div class="logo-row" style="display:flex;align-items:center;gap:16px;margin-bottom:28px;">
-        <img src="img/logo.png" alt="Angelim Construtora" style="width:58px;height:58px;border-radius:10px;border:1px solid rgba(201,162,39,0.4);box-shadow:0 4px 16px rgba(0,0,0,0.4);object-fit:cover;">
+      <div class="logo-row" style="display:flex;align-items:center;gap:14px;margin-bottom:24px;">
+        <img src="img/finobra_logo.jpg" alt="FinObra" style="width:54px;height:54px;border-radius:12px;border:1.5px solid rgba(201,162,39,0.4);box-shadow:0 4px 16px rgba(201,162,39,0.25);object-fit:cover;">
         <div class="logo-box-text">
-          <h2>ANGELIM</h2>
-          <p>Construtora · Sistema Financeiro</p>
+          <h2 style="font-size:1.45rem;font-weight:900;letter-spacing:.05em;background:linear-gradient(135deg,#F7E07C,#C9A227);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;">FINOBRA</h2>
+          <p style="color:var(--text3);font-size:.72rem;margin-top:2px;letter-spacing:.08em;text-transform:uppercase;">Sistema de Gestão de Obras</p>
         </div>
       </div>
 
-      <h2 class="welcome-h" id="welcome-title">Bem-vindo de volta!</h2>
-      <p class="welcome-p" id="welcome-subtitle">Entre com suas credenciais para acessar o sistema</p>
+      <h2 class="welcome-h" id="welcome-title">Bem-vindo ao FinObra!</h2>
+      <p class="welcome-p" id="welcome-subtitle">Acesse o portal da sua construtora para gerenciar suas obras</p>
 
       <form id="login-form" autocomplete="on">
         <div class="fgroup">
@@ -270,10 +282,14 @@
             <polyline points="10 17 15 12 10 7"/>
             <line x1="15" y1="12" x2="3" y2="12"/>
           </svg>
-          <span id="btn-text">Entrar no Sistema</span>
+          <span id="btn-text">Entrar no FinObra</span>
         </button>
         <div class="err-box" id="err-box"></div>
       </form>
+
+      <div style="margin-top:24px;text-align:center;font-size:.76rem;color:var(--text3);border-top:1px solid rgba(201,162,39,.12);padding-top:12px;">
+        FinObra &middot; Todos os direitos reservados &copy; 2026
+      </div>
     </div>
   </div>
 </div>
@@ -283,9 +299,9 @@
   <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:16px;width:100%;max-width:460px;padding:32px;box-shadow:var(--shadow);position:relative;animation:modalIn .25s ease;">
     <button onclick="closeRegisterModal()" style="position:absolute;top:18px;right:18px;background:none;border:none;color:var(--text3);font-size:1.4rem;cursor:pointer;line-height:1;">&times;</button>
     <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;">
-      <div style="width:42px;height:42px;border-radius:10px;background:linear-gradient(135deg,#1C2D12,#243818);border:1px solid rgba(201,162,39,.4);display:flex;align-items:center;justify-content:center;font-size:1.3rem;">🏢</div>
+      <img src="img/finobra_logo.jpg" alt="FinObra" style="width:44px;height:44px;border-radius:10px;border:1px solid rgba(201,162,39,.4);object-fit:cover;">
       <div>
-        <h3 style="font-size:1.15rem;font-weight:800;color:var(--text);">Cadastrar Minha Empresa</h3>
+        <h3 style="font-size:1.15rem;font-weight:800;color:var(--text);">Cadastrar Minha Empresa no FinObra</h3>
         <p style="font-size:.78rem;color:var(--text2);margin-top:2px;">Inicie com um sistema 100% limpo e personalizado</p>
       </div>
     </div>

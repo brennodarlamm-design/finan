@@ -54,8 +54,11 @@ const Lancamentos = {
         <select class="form-control" id="f-cat" style="min-width:140px">
           <option value="">Todas</option>
           <optgroup label="💰 Receitas">
-            <option value="parcela_caixa">&#x1F3E6; Parcela Caixa</option>
-            <option value="entrada_propria">&#x1F4B5; Entrada Pr&oacute;pria</option>
+            <option value="parcela_caixa">🏦 Parcela Caixa (Financiamento)</option>
+            <option value="aporte_cliente">💰 Aporte Cliente / Parcela Particular</option>
+            <option value="medicao_obra">📋 Medição / Faturamento de Obra</option>
+            <option value="taxa_adm">💼 Taxa de Administração</option>
+            <option value="entrada_propria">💵 Entrada Própria</option>
             <option value="aporte_financeiro">💼 Aporte Financeiro</option>
             <option value="emprestimo">🤝 Empréstimo</option>
             <option value="financiamento">🏗️ Financiamento</option>
@@ -213,7 +216,10 @@ const Lancamentos = {
   },
 
   _catRec: [
-    ['parcela_caixa','🏦 Parcela Caixa'],
+    ['parcela_caixa','🏦 Parcela Caixa (Financiamento)'],
+    ['aporte_cliente','💰 Aporte do Cliente / Particular'],
+    ['medicao_obra','📋 Medição / Faturamento de Obra'],
+    ['taxa_adm','💼 Taxa de Administração de Obra'],
     ['entrada_propria','💵 Entrada Própria'],
     ['aporte_financeiro','💼 Aporte Financeiro'],
     ['emprestimo','🤝 Empréstimo'],

@@ -110,7 +110,10 @@ const Utils = {
   catLabel(c) {
     const m = {
       // Receitas e Obras
-      parcela_caixa:'🏦 Parcela Caixa',
+      parcela_caixa:'🏦 Parcela Caixa (Financiamento)',
+      aporte_cliente:'💰 Aporte do Cliente / Parcela Particular',
+      medicao_obra:'📋 Medição / Faturamento de Obra',
+      taxa_adm:'💼 Taxa de Administração de Obra',
       entrada_propria:'💵 Entrada Própria',
       aporte_financeiro:'💼 Aporte Financeiro',
       emprestimo:'🤝 Empréstimo',

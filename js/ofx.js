@@ -88,7 +88,7 @@ const OFX = {
 
         <div style="margin-top:16px;display:flex;gap:8px;align-items:center;justify-content:space-between;">
           <button class="btn btn-secondary" onclick="OFX.demoOFX()">📋 Carregar OFX Demo</button>
-          <button class="btn btn-primary" id="ofx-import-btn" onclick="OFX.processImport()" style="display:none;font-weight:700;">✔ Importar e Conciliar com Robô</button>
+          <button class="btn btn-primary" id="ofx-import-btn" onclick="OFX.processImport()" style="display:none;font-weight:700;">✔ Importar Extrato para Revisão</button>
         </div>
       </div>
 
@@ -319,11 +319,11 @@ const OFX = {
     const allLans = DB.getLancamentos(null);
     const unconciliatedLans = allLans.filter(l => !l.conciliado);
 
-    let autoMatchedCount = 0;
+    let sugestoesCount = 0;
     const matchedLanIds = new Set();
 
     const trns = this._importData.transacoes.map(t => {
-      // Busca melhor match disponível pelo Robô Inteligente
+      // Busca melhor match disponível pelo Robô Inteligente para sugerir ao usuário
       let bestMatch = null;
       for (const lan of unconciliatedLans) {
         if (matchedLanIds.has(lan.id)) continue;
@@ -336,19 +336,20 @@ const OFX = {
       }
 
       if (bestMatch) {
-        autoMatchedCount++;
+        sugestoesCount++;
         matchedLanIds.add(bestMatch.lancamento.id);
-        DB.update('lancamentos', bestMatch.lancamento.id, { conciliado: true });
+        // IMPORTANTE: NÃO concilia automaticamente no banco! Mantém pendente com sugestão pré-calculada
         return {
           ...t,
-          status: 'conciliada',
-          lancamento_id: bestMatch.lancamento.id,
-          match_score: bestMatch.score,
-          match_diff_valor: bestMatch.diffValor
+          status: 'pendente',
+          lancamento_id: null,
+          sugestao_lancamento_id: bestMatch.lancamento.id,
+          sugestao_score: bestMatch.score,
+          sugestao_diff_valor: bestMatch.diffValor
         };
       }
 
-      return { ...t, status: 'pendente', lancamento_id: null };
+      return { ...t, status: 'pendente', lancamento_id: null, sugestao_lancamento_id: null };
     });
 
     const importRec = {
@@ -371,7 +372,7 @@ const OFX = {
     const btnImp = document.getElementById('ofx-import-btn');
     if (btnImp) btnImp.style.display = 'none';
 
-    Utils.toast(`Extrato importado! Robô conciliou ${autoMatchedCount}/${trns.length} transações com base no filtro de aproximação.`, 'success');
+    Utils.toast(`Extrato importado com ${trns.length} transações pendentes! O robô calculou ${sugestoesCount} sugestões para sua conferência.`, 'success');
 
     // Refresh OFX screen
     const el = document.getElementById('route-content');
@@ -733,21 +734,46 @@ const OFX = {
         extraLans = allLans.filter(l => !l.conciliado && l.tipo === neededType && !scoredCandidates.some(c => c.lancamento.id === l.id)).slice(0, 10);
       }
 
-      candidateOptionsHtml = `
-        <select style="background:var(--bg-input);border:1px solid var(--border-d);color:var(--text);border-radius:6px;padding:6px;font-size:.75rem;width:100%;max-width:280px;" onchange="OFX.conciliar('${importId}','${t.id}',this.value)">
-          <option value="">➕ Vincular lançamento...</option>
-          ${scoredCandidates.length > 0 ? `<optgroup label="🤖 Sugestões do Robô (${scoredCandidates.length})">${scoredCandidates.map(c => {
-            const l = c.lancamento;
-            const obNome = l.obra_id === 'escritorio' ? '🏢 Sede' : (clientesMap[l.obra_id]?.nome || 'Obra');
-            const diffTxt = c.diffValor === 0 ? 'Exato' : `±${Utils.fmt.currency(c.diffValor)}`;
-            return `<option value="${l.id}">[${obNome}] ${l.descricao.slice(0, 24)} (${Utils.fmt.currency(l.valor)} · ${diffTxt} · ${c.score}%)</option>`;
-          }).join('')}</optgroup>` : ''}
-          ${extraLans.length > 0 ? `<optgroup label="📋 Outros Lançamentos">${extraLans.map(l => {
-            const obNome = l.obra_id === 'escritorio' ? '🏢 Sede' : (clientesMap[l.obra_id]?.nome || 'Obra');
-            return `<option value="${l.id}">[${obNome}] ${l.descricao.slice(0, 24)} (${Utils.fmt.currency(l.valor)} - ${Utils.fmt.date(l.data)})</option>`;
-          }).join('')}</optgroup>` : ''}
-        </select>
-      `;
+      if (scoredCandidates.length > 0) {
+        const topSug = scoredCandidates[0];
+        const topLan = topSug.lancamento;
+        const topObNome = topLan.obra_id === 'escritorio' ? '🏢 Sede' : (clientesMap[topLan.obra_id]?.nome || 'Obra');
+        const topDiffTxt = topSug.diffValor === 0 ? 'Exato' : `±${Utils.fmt.currency(topSug.diffValor)}`;
+
+        candidateOptionsHtml = `
+          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+            <div style="background:rgba(201,162,39,.08);border:1.5px solid rgba(201,162,39,.35);border-radius:6px;padding:3px 8px;font-size:.74rem;display:flex;align-items:center;gap:6px;">
+              <span style="color:var(--text);"><span style="color:var(--accent);font-weight:700;">💡 Sugestão:</span> [${topObNome}] ${topLan.descricao.slice(0, 22)} (${Utils.fmt.currency(topLan.valor)} · ${topDiffTxt} · ${topSug.score}%)</span>
+              <button class="btn btn-sm btn-success" style="padding:2px 8px;font-size:.72rem;font-weight:700;white-space:nowrap;" onclick="OFX.conciliar('${importId}','${t.id}','${topLan.id}')" title="Aprovar e conciliar esta correspondência">
+                ✔ Conciliar
+              </button>
+            </div>
+            <select style="background:var(--bg-input);border:1px solid var(--border-d);color:var(--text);border-radius:6px;padding:5px 6px;font-size:.74rem;max-width:200px;" onchange="if(this.value) OFX.conciliar('${importId}','${t.id}',this.value)">
+              <option value="">➕ Outro lançamento...</option>
+              <optgroup label="🤖 Sugestões do Robô (${scoredCandidates.length})">${scoredCandidates.map(c => {
+                const l = c.lancamento;
+                const obNome = l.obra_id === 'escritorio' ? '🏢 Sede' : (clientesMap[l.obra_id]?.nome || 'Obra');
+                const diffTxt = c.diffValor === 0 ? 'Exato' : `±${Utils.fmt.currency(c.diffValor)}`;
+                return `<option value="${l.id}">[${obNome}] ${l.descricao.slice(0, 20)} (${Utils.fmt.currency(l.valor)} · ${diffTxt} · ${c.score}%)</option>`;
+              }).join('')}</optgroup>
+              ${extraLans.length > 0 ? `<optgroup label="📋 Outros Lançamentos">${extraLans.map(l => {
+                const obNome = l.obra_id === 'escritorio' ? '🏢 Sede' : (clientesMap[l.obra_id]?.nome || 'Obra');
+                return `<option value="${l.id}">[${obNome}] ${l.descricao.slice(0, 20)} (${Utils.fmt.currency(l.valor)})</option>`;
+              }).join('')}</optgroup>` : ''}
+            </select>
+          </div>
+        `;
+      } else {
+        candidateOptionsHtml = `
+          <select style="background:var(--bg-input);border:1px solid var(--border-d);color:var(--text);border-radius:6px;padding:6px;font-size:.75rem;width:100%;max-width:280px;" onchange="if(this.value) OFX.conciliar('${importId}','${t.id}',this.value)">
+            <option value="">➕ Vincular lançamento...</option>
+            ${extraLans.length > 0 ? `<optgroup label="📋 Lançamentos">${extraLans.map(l => {
+              const obNome = l.obra_id === 'escritorio' ? '🏢 Sede' : (clientesMap[l.obra_id]?.nome || 'Obra');
+              return `<option value="${l.id}">[${obNome}] ${l.descricao.slice(0, 24)} (${Utils.fmt.currency(l.valor)} - ${Utils.fmt.date(l.data)})</option>`;
+            }).join('')}</optgroup>` : ''}
+          </select>
+        `;
+      }
     }
 
     let matchedHtml = '';
