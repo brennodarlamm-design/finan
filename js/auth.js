@@ -166,7 +166,7 @@ const Auth = {
   logout() {
     localStorage.removeItem(this.SESSION_KEY);
     sessionStorage.removeItem(this.SESSION_KEY);
-    window.location.href = 'index.html';
+    window.location.replace('/login');
   },
 
   getSession() {
@@ -180,7 +180,7 @@ const Auth = {
   isLoggedIn() { return !!this.getSession(); },
   getUser() { return this.getSession(); },
   requireAuth() {
-    if (!this.isLoggedIn()) { window.location.href = 'index.html'; return false; }
+    if (!this.isLoggedIn()) { window.location.replace('/login'); return false; }
     return true;
   }
 };

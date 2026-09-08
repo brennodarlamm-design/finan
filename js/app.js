@@ -5,45 +5,128 @@ const App = {
   obraId: 'todas',
   _charts: [],
 
+  get currentRoute() { return this.route; },
+  set currentRoute(v) { this.route = v; },
+  get currentObraId() { return this.obraId; },
+  set currentObraId(v) { this.obraId = v; },
+
+  routeAliases: {
+    'obras': ['clientes', 'obras'],
+    'lancamentos': ['lancamentos', 'financeiro'],
+    'escritorio': ['escritorio', 'sede'],
+    'pre-compras': ['pre-compras', 'precompras', 'compras'],
+    'recibos': ['recibos'],
+    'contratos': ['contratos'],
+    'notas-fiscais': ['notas-fiscais', 'notas', 'nfs'],
+    'consulta-nfe': ['consulta-nfe', 'nfe'],
+    'conciliacao-ofx': ['conciliacao-ofx', 'ofx'],
+    'orcamentos': ['orcamentos'],
+    'medicoes': ['medicoes'],
+    'relatorios': ['relatorios', 'exportar'],
+    'contas-bancarias': ['contas-bancarias', 'contas'],
+    'fornecedores': ['fornecedores'],
+    'produtos': ['produtos', 'materiais'],
+    'configuracoes': ['configuracoes', 'ajustes'],
+    'dashboard': ['dashboard', 'inicio', 'home']
+  },
+
+  _normalizeRoute(r) {
+    if (!r) return 'dashboard';
+    const clean = String(r).toLowerCase().trim().replace(/^#\/?/, '').replace(/\/$/, '');
+    for (const [canonical, aliases] of Object.entries(this.routeAliases)) {
+      if (canonical === clean || aliases.includes(clean)) {
+        return canonical;
+      }
+    }
+    return clean;
+  },
+
   routes: {
-    dashboard: Dashboard, clientes: Clientes, lancamentos: Lancamentos,
-    escritorio: Escritorio,
-    precompras: PreCompras,
-    recibos: Recibos,
-    contratos: Contratos,
-    ofx: OFX, notas: Notas, nfe: NFe, orcamentos: Orcamentos,
-    medicoes: Medicoes, exportar: Exportar,
-    contas: Contas, configuracoes: Configuracoes,
-    fornecedores: Fornecedores,
-    produtos: Produtos
+    'dashboard': Dashboard,
+    'obras': Clientes,
+    'clientes': Clientes,
+    'lancamentos': Lancamentos,
+    'financeiro': Lancamentos,
+    'escritorio': Escritorio,
+    'pre-compras': PreCompras,
+    'precompras': PreCompras,
+    'recibos': Recibos,
+    'contratos': Contratos,
+    'notas-fiscais': Notas,
+    'notas': Notas,
+    'consulta-nfe': NFe,
+    'nfe': NFe,
+    'conciliacao-ofx': OFX,
+    'ofx': OFX,
+    'orcamentos': Orcamentos,
+    'medicoes': Medicoes,
+    'relatorios': Exportar,
+    'exportar': Exportar,
+    'contas-bancarias': Contas,
+    'contas': Contas,
+    'configuracoes': Configuracoes,
+    'fornecedores': Fornecedores,
+    'produtos': Produtos
   },
 
   routeMeta: {
-    dashboard: { icon:'📊', label:'Dashboard' },
-    clientes:  { icon:'👥', label:'Clientes / Obras' },
-    lancamentos:{ icon:'💰', label:'Lançamentos' },
-    escritorio:{ icon:'🏢', label:'Despesas do Escritório' },
-    precompras:{ icon:'🛒', label:'Ordens de Pré-Compra' },
-    recibos:   { icon:'🧾', label:'Emissão de Recibos' },
-    contratos: { icon:'📜', label:'Contratos de Obra' },
-    notas:     { icon:'📄', label:'Notas Fiscais' },
-    nfe:       { icon:'🔎', label:'Busca NF-e' },
-    ofx:       { icon:'🔄', label:'Importar OFX' },
-    orcamentos:{ icon:'📋', label:'Orçamentos' },
-    medicoes:  { icon:'🔨', label:'Medições Caixa' },
-    exportar:  { icon:'📥', label:'Exportar' },
-    contas:    { icon:'🏦', label:'Contas Bancárias' },
-    configuracoes: { icon:'⚙️', label:'Configurações' },
-    fornecedores: { icon:'🏗️', label:'Fornecedores' },
-    produtos: { icon:'📦', label:'Produtos / Insumos' },
+    'dashboard':         { icon:'📊', label:'Dashboard' },
+    'obras':             { icon:'🏗️', label:'Obras & Clientes' },
+    'clientes':          { icon:'🏗️', label:'Obras & Clientes' },
+    'lancamentos':       { icon:'💰', label:'Lançamentos Financeiros' },
+    'financeiro':        { icon:'💰', label:'Lançamentos Financeiros' },
+    'escritorio':        { icon:'🏢', label:'Despesas Escritório' },
+    'pre-compras':       { icon:'🛒', label:'Ordens de Pré-Compra' },
+    'precompras':        { icon:'🛒', label:'Ordens de Pré-Compra' },
+    'recibos':           { icon:'🧾', label:'Recibos Oficiais' },
+    'contratos':         { icon:'📜', label:'Contratos de Obra' },
+    'notas-fiscais':     { icon:'📄', label:'Notas Fiscais' },
+    'notas':             { icon:'📄', label:'Notas Fiscais' },
+    'consulta-nfe':      { icon:'🔎', label:'Busca NF-e' },
+    'nfe':               { icon:'🔎', label:'Busca NF-e' },
+    'conciliacao-ofx':   { icon:'🔄', label:'Conciliação OFX' },
+    'ofx':               { icon:'🔄', label:'Conciliação OFX' },
+    'orcamentos':        { icon:'📋', label:'Orçamentos & SINAPI' },
+    'medicoes':          { icon:'🔨', label:'Medições & Faturamento' },
+    'relatorios':        { icon:'📥', label:'Relatórios & Exportação' },
+    'exportar':          { icon:'📥', label:'Relatórios & Exportação' },
+    'contas-bancarias':  { icon:'🏦', label:'Contas Bancárias' },
+    'contas':            { icon:'🏦', label:'Contas Bancárias' },
+    'fornecedores':      { icon:'🚛', label:'Fornecedores' },
+    'produtos':          { icon:'📦', label:'Produtos / Insumos' },
+    'configuracoes':     { icon:'⚙️', label:'Configurações' },
+  },
+
+  _getRouteFromUrl() {
+    // 1. Pathname (/app/obras, /app/notas-fiscais, etc.)
+    const path = window.location.pathname.replace(/\/$/, '');
+    if (path.startsWith('/app/')) {
+      const sub = path.substring(5).split('/')[0].split('?')[0];
+      if (sub) return this._normalizeRoute(sub);
+    } else if (path && path !== '/app' && path !== '/login' && path !== '/validar') {
+      const seg = path.replace(/^\//, '').split('/')[0].split('?')[0];
+      if (seg && (this.routes[seg] || this._normalizeRoute(seg) !== seg)) {
+        return this._normalizeRoute(seg);
+      }
+    }
+
+    // 2. Hash (#obras, #notas-fiscais, etc.)
+    const rawHash = (window.location.hash || '').replace(/^#\/?/, '').split('?')[0];
+    if (rawHash) {
+      const cleanHash = rawHash.startsWith('app/') ? rawHash.substring(4) : rawHash;
+      if (cleanHash) return this._normalizeRoute(cleanHash);
+    }
+
+    return 'dashboard';
   },
 
   async init() {
+    const rawPath = window.location.pathname || '';
     const rawHash = window.location.hash || '';
     const rawSearch = window.location.search || '';
 
     // Rota pública de validação de autenticidade (não exige login!)
-    if (rawHash.startsWith('#validar') || rawSearch.includes('val=') || rawHash.includes('val=')) {
+    if (rawPath.startsWith('/validar') || rawHash.startsWith('#validar') || rawSearch.includes('val=') || rawHash.includes('val=')) {
       if (typeof Assinador !== 'undefined' && typeof Assinador.renderTelaValidacaoPublica === 'function') {
         Assinador.renderTelaValidacaoPublica();
         return;
@@ -62,8 +145,19 @@ const App = {
     // ── Ocultar loader após renderizar ─────────────────────────────
     this._hideSyncLoader();
 
-    window.addEventListener('hashchange', () => this.navigate(location.hash.replace('#','')||'dashboard'));
-    this.navigate(location.hash.replace('#','')||'dashboard');
+    // Histórico e navegação limpa (popstate + hashchange)
+    window.addEventListener('popstate', (e) => {
+      const target = e.state?.route || this._getRouteFromUrl();
+      this.navigate(target, false);
+    });
+
+    window.addEventListener('hashchange', () => {
+      const target = this._getRouteFromUrl();
+      this.navigate(target, true);
+    });
+
+    const initialRoute = this._getRouteFromUrl();
+    this.navigate(initialRoute, true);
 
     if (typeof BuscaGlobal !== 'undefined') BuscaGlobal.init();
 
@@ -112,28 +206,28 @@ const App = {
             <button class="icon-btn mobile-close-btn" onclick="App.closeSidebar()" title="Fechar Menu" style="font-size:1.1rem;padding:4px 8px;">✕</button>
           </div>
           <nav class="sidebar-nav">
-            <div class="nav-section">Gestão Financeira</div>
+            <div class="nav-section">Operacional & Financeiro</div>
             ${this._navItem('dashboard','📊','Dashboard')}
-            ${this._navItem('clientes','👥','Clientes / Obras')}
-            ${this._navItem('fornecedores','🏗️','Fornecedores')}
-            ${this._navItem('produtos','📦','Produtos / Insumos')}
+            ${this._navItem('obras','🏗️','Obras & Clientes')}
             ${this._navItem('lancamentos','💰','Lançamentos')}
+            ${this._navItem('fornecedores','🚛','Fornecedores')}
+            ${this._navItem('produtos','📦','Produtos / Insumos')}
             ${this._navItem('escritorio','🏢','Despesas Escritório')}
-            ${this._navItem('precompras','🛒','Pré-Compras',badgePre)}
+            ${this._navItem('pre-compras','🛒','Pré-Compras',badgePre)}
             ${this._navItem('recibos','🧾','Recibos Oficiais')}
             ${this._navItem('contratos','📜','Contratos de Obra')}
-            ${this._navItem('notas','📄','Notas Fiscais')}
-            ${this._navItem('nfe','🔎','Busca NF-e')}
-            ${this._navItem('ofx','🔄','Importar OFX')}
+            ${this._navItem('notas-fiscais','📄','Notas Fiscais')}
+            ${this._navItem('consulta-nfe','🔎','Busca NF-e')}
+            ${this._navItem('conciliacao-ofx','🔄','Conciliação OFX')}
             <div class="nav-section">Planejamento</div>
             ${this._navItem('orcamentos','📋','Orçamentos')}
-            ${this._navItem('medicoes','🔨','Medições Caixa')}
+            ${this._navItem('medicoes','🔨','Medições & Faturamento')}
             <div class="nav-section">Relatórios</div>
-            ${this._navItem('exportar','📥','Exportar Dados')}
+            ${this._navItem('relatorios','📥','Exportar Relatórios')}
             <div class="nav-section">Sistema</div>
-            ${this._navItem('contas','🏦','Contas Bancárias')}
+            ${this._navItem('contas-bancarias','🏦','Contas Bancárias')}
             ${this._navItem('configuracoes','⚙️','Configurações')}
-            <a href="validar.html" target="_blank" class="nav-item" style="text-decoration:none;color:var(--accent2);margin-top:4px;border:1px dashed rgba(201,162,39,0.3);border-radius:6px;" title="Portal público para consultar autenticidade de documentos por código">
+            <a href="/validar" target="_blank" class="nav-item" style="text-decoration:none;color:var(--accent2);margin-top:4px;border:1px dashed rgba(201,162,39,0.3);border-radius:6px;" title="Portal público para consultar autenticidade de documentos por código">
               <span>🛡️</span><span>Validar Autenticidade ↗</span>
             </a>
           </nav>
@@ -159,7 +253,7 @@ const App = {
             </div>
             <div class="hspacer"></div>
             <!-- Botão Validador de Autenticidade -->
-            <a href="validar.html" target="_blank" class="header-search-btn" title="Consultar autenticidade de documentos por código ou QR Code" style="text-decoration:none;cursor:pointer;display:flex;align-items:center;gap:6px;background:rgba(201,162,39,.12);border:1px solid rgba(201,162,39,.4);border-radius:8px;padding:5px 11px;color:var(--accent2);transition:all .2s;">
+            <a href="/validar" target="_blank" class="header-search-btn" title="Consultar autenticidade de documentos por código ou QR Code" style="text-decoration:none;cursor:pointer;display:flex;align-items:center;gap:6px;background:rgba(201,162,39,.12);border:1px solid rgba(201,162,39,.4);border-radius:8px;padding:5px 11px;color:var(--accent2);transition:all .2s;">
               <span style="font-size:.9rem;">🛡️</span>
               <span style="font-size:.78rem;font-weight:700;">Validar Documento</span>
             </a>
@@ -207,41 +301,64 @@ const App = {
   },
 
   _navItem(route, icon, label, badgeHtml = '') {
-    return `<div class="nav-item${this.route===route?' active':''}" data-route="${route}" onclick="App.navigate('${route}');App.closeSidebar();">
+    const targetRoute = this._normalizeRoute(route);
+    const isAct = (this.route === targetRoute) || (this._normalizeRoute(this.route) === targetRoute);
+    return `<div class="nav-item${isAct?' active':''}" data-route="${targetRoute}" onclick="App.navigate('${targetRoute}');App.closeSidebar();">
       <span>${icon}</span><span>${label}</span>${badgeHtml}
     </div>`;
   },
 
-  navigate(route) {
+  navigate(route, updateHistory = true) {
     if (route && (route.startsWith('validar') || route.includes('val='))) {
       if (typeof Assinador !== 'undefined' && typeof Assinador.renderTelaValidacaoPublica === 'function') {
         Assinador.renderTelaValidacaoPublica();
         return;
       }
     }
-    const cleanRoute = (route || '').split('?')[0];
-    if (!this.routes[cleanRoute]) route = 'dashboard';
-    else route = cleanRoute;
-    this.route = route;
+    const cleanRoute = (route || '').split('?')[0].replace(/^#\/?/, '');
+    const normalized = this._normalizeRoute(cleanRoute);
+    const targetRoute = this.routes[normalized] ? normalized : 'dashboard';
+    this.route = targetRoute;
     this._charts.forEach(c => { try { c.destroy(); } catch{} });
     this._charts = [];
-    document.querySelectorAll('.nav-item').forEach(el => el.classList.toggle('active', el.dataset.route === route));
-    const meta = this.routeMeta[route];
-    if (meta) document.getElementById('h-title').textContent = `${meta.icon} ${meta.label}`;
+
+    // Atualiza itens ativos no menu lateral
+    document.querySelectorAll('.nav-item').forEach(el => {
+      const itemRoute = el.dataset.route;
+      const isActive = (itemRoute === targetRoute) || (this._normalizeRoute(itemRoute) === targetRoute);
+      el.classList.toggle('active', isActive);
+    });
+
+    // Atualiza cabeçalho e título da página na aba do navegador
+    const meta = this.routeMeta[targetRoute] || { icon: '📊', label: 'FinObra' };
+    const hTitle = document.getElementById('h-title');
+    if (hTitle) hTitle.textContent = `${meta.icon} ${meta.label}`;
+    document.title = `FinObra — ${meta.label}`;
+
+    // Renderiza a view correspondente
     const el = document.getElementById('route-content');
-    try {
-      el.innerHTML = this.routes[route].render(this.obraId);
-      if (typeof this.routes[route].init === 'function') {
-        this.routes[route].init(this.obraId);
+    if (el) {
+      try {
+        el.innerHTML = this.routes[targetRoute].render(this.obraId);
+        if (typeof this.routes[targetRoute].init === 'function') {
+          this.routes[targetRoute].init(this.obraId);
+        }
+      } catch(err) {
+        console.error(err);
+        el.innerHTML = `<div style="padding:40px;text-align:center;color:var(--text3)">
+          <h3 style="color:var(--accent);margin-bottom:8px">Erro ao carregar</h3>
+          <p style="font-size:.85rem">${err.message}</p>
+        </div>`;
       }
-    } catch(err) {
-      console.error(err);
-      el.innerHTML = `<div style="padding:40px;text-align:center;color:var(--text3)">
-        <h3 style="color:var(--accent);margin-bottom:8px">Erro ao carregar</h3>
-        <p style="font-size:.85rem">${err.message}</p>
-      </div>`;
     }
-    history.pushState(null,null,`#${route}`);
+
+    // Atualiza a URL na barra de endereços com History API de forma limpa e premium
+    if (updateHistory) {
+      const cleanUrl = `/app/${targetRoute}`;
+      if (window.location.pathname !== cleanUrl || window.location.hash) {
+        history.pushState({ route: targetRoute }, '', cleanUrl);
+      }
+    }
   },
 
   refreshObraSelector() {

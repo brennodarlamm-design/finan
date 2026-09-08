@@ -1264,7 +1264,7 @@ const Contratos = {
         <img src="${Assinador.gerarQRCodeUrl(Assinador.gerarUrlValidacao(c.assinatura_contratada || c.assinatura_contratante, 'contrato', c.id), 120)}" alt="QR Code Validação" style="width:62px;height:62px;background:#fff;border:1px solid #10b981;padding:2px;border-radius:4px;flex-shrink:0;">
         <div style="font-size:.7rem;color:#065f46;line-height:1.4;">
           <strong style="font-size:.78rem;display:block;margin-bottom:2px;color:#047857;">VERIFICAÇÃO DE AUTENTICIDADE ELETRÔNICA &bull; LEI FEDERAL 14.063/2020</strong>
-          O presente contrato foi assinado eletronicamente sob proteção de integridade criptográfica SHA-256. A autenticidade e identificação dos signatários podem ser consultadas a qualquer momento apontando a câmera para o QR Code ou acessando <strong>finobra.app.br/validar.html</strong> informando o código: <strong style="font-family:monospace;background:#dcfce7;padding:1px 6px;border-radius:3px;color:#065f46;">${(c.assinatura_contratada || c.assinatura_contratante)?.codigo_validacao}</strong>.
+          O presente contrato foi assinado eletronicamente sob proteção de integridade criptográfica SHA-256. A autenticidade e identificação dos signatários podem ser consultadas a qualquer momento apontando a câmera para o QR Code ou acessando <strong>finobra.app.br/validar</strong> informando o código: <strong style="font-family:monospace;background:#dcfce7;padding:1px 6px;border-radius:3px;color:#065f46;">${(c.assinatura_contratada || c.assinatura_contratante)?.codigo_validacao}</strong>.
         </div>
       </div>` : ''}
 

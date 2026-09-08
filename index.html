@@ -363,9 +363,9 @@
 <script src="js/auth.js"></script>
 <script>
   if (window.location.hash.startsWith('#validar') || window.location.search.includes('val=')) {
-    window.location.href = 'app.html' + window.location.hash + window.location.search;
+    window.location.href = '/validar' + window.location.search;
   }
-  if (Auth.isLoggedIn()) { window.location.href = 'app.html'; }
+  if (Auth.isLoggedIn()) { window.location.replace('/app'); }
 
 
 
@@ -405,7 +405,7 @@
     const loginResult = Auth.login(username, senha, true);
     if (loginResult.success) {
       btn.textContent = '✓ Conta criada com sucesso! Entrando...';
-      setTimeout(() => window.location.href = 'app.html', 500);
+      setTimeout(() => window.location.replace('/app'), 500);
     }
   });
 
@@ -423,7 +423,7 @@
       const result = Auth.login(u, p, r);
       if (result.success) {
         btn.innerHTML = '✓ Bem-vindo! Redirecionando...';
-        setTimeout(() => window.location.href = 'app.html', 350);
+        setTimeout(() => window.location.replace('/app'), 350);
       } else {
         const e2 = document.getElementById('err-box');
         e2.textContent = result.message;

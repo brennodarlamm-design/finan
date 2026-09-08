@@ -363,7 +363,7 @@ const Assinador = {
     if (docTipo) params.set('tipo', docTipo);
     if (docId) params.set('id', docId);
 
-    return `${origin}/validar.html?${params.toString()}`;
+    return `${origin}/validar?${params.toString()}`;
   },
 
   gerarQRCodeUrl(url, size = 150) {
@@ -407,7 +407,7 @@ const Assinador = {
           <strong>Hash SHA-256:</strong> ${hashCurto} &bull; <strong>ID:</strong> ${sig.codigo_validacao || ''}
         </div>
         <div style="font-size:.64rem;color:#475569;margin-top:4px;">
-          Verificação online: <strong>${originHost}/validar.html</strong> &bull; Código: <strong style="color:#047857;font-family:monospace;background:#ecfdf5;padding:1px 5px;border-radius:3px;border:1px solid #a7f3d0;">${sig.codigo_validacao || ''}</strong>
+          Verificação online: <strong>${originHost}/validar</strong> &bull; Código: <strong style="color:#047857;font-family:monospace;background:#ecfdf5;padding:1px 5px;border-radius:3px;border:1px solid #a7f3d0;">${sig.codigo_validacao || ''}</strong>
         </div>
       </div>
 
@@ -659,7 +659,7 @@ const Assinador = {
               <button onclick="navigator.clipboard.writeText(window.location.href);alert('Link de autenticação copiado para a área de transferência!');" style="background:#243818;border:1px solid rgba(201,162,39,0.4);color:#f0ead6;padding:10px 20px;border-radius:8px;font-weight:700;font-size:.85rem;cursor:pointer;display:inline-flex;align-items:center;gap:8px;">
                 🔗 Copiar Link de Validação
               </button>
-              <a href="app.html" style="background:#C9A227;border:1px solid #C9A227;color:#080F05;padding:10px 20px;border-radius:8px;font-weight:800;font-size:.85rem;text-decoration:none;display:inline-flex;align-items:center;gap:8px;">
+              <a href="/app" style="background:#C9A227;border:1px solid #C9A227;color:#080F05;padding:10px 20px;border-radius:8px;font-weight:800;font-size:.85rem;text-decoration:none;display:inline-flex;align-items:center;gap:8px;">
                 Ir ao Sistema FinObra ↗
               </a>
             </div>

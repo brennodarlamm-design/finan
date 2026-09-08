@@ -1,7 +1,14 @@
 {
   "outputDirectory": ".",
+  "cleanUrls": true,
+  "trailingSlash": false,
   "rewrites": [
-    { "source": "/api/(.*)", "destination": "/api/$1" }
+    { "source": "/api/(.*)", "destination": "/api/$1" },
+    { "source": "/login", "destination": "/index.html" },
+    { "source": "/validar", "destination": "/validar.html" },
+    { "source": "/validar/(.*)", "destination": "/validar.html" },
+    { "source": "/app", "destination": "/app.html" },
+    { "source": "/app/(.*)", "destination": "/app.html" }
   ],
   "functions": {
     "api/reconhecer-documento.js": {
