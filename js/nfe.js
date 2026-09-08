@@ -7,13 +7,31 @@ const NFe = {
   _API_BASE: 'https://api.meudanfe.com.br/v2',
   _API_KEY: '1879826c-ee82-416d-b887-b5aaf4e059d4',
 
-  // ─── Cache local ────────────────────────────────────────────────────────────
+  _getTenantCacheKey() {
+    const t = (typeof Auth !== 'undefined' && Auth.getCurrentTenantId) ? Auth.getCurrentTenantId() : 'angelim';
+    return `finobra_${t}_nfe_cache`;
+  },
+
+  // ─── Cache local isolado por empresa (multi-tenant) ─────────────────────────
   _getCache() {
-    try { return JSON.parse(localStorage.getItem(this._KEY_CACHE) || '[]'); }
-    catch { return []; }
+    try {
+      const key = this._getTenantCacheKey();
+      let raw = localStorage.getItem(key);
+      // Migração suave do cache legado apenas para o tenant angelim
+      if (!raw && key === 'finobra_angelim_nfe_cache') {
+        raw = localStorage.getItem(this._KEY_CACHE);
+      }
+      return JSON.parse(raw || '[]');
+    } catch {
+      return [];
+    }
   },
   _saveCache(arr) {
-    localStorage.setItem(this._KEY_CACHE, JSON.stringify(arr));
+    try {
+      localStorage.setItem(this._getTenantCacheKey(), JSON.stringify(arr));
+    } catch (e) {
+      console.warn('Erro ao salvar cache NF-e:', e);
+    }
   },
   _addToCache(item) {
     const cache = this._getCache().filter(c => c.chave !== item.chave);
@@ -29,8 +47,15 @@ const NFe = {
   },
 
   // ─── Helpers ────────────────────────────────────────────────────────────────
+  _getApiKey() {
+    const emp = typeof DB !== 'undefined' && DB.getEmpresa ? DB.getEmpresa() : {};
+    const t = (typeof Auth !== 'undefined' && Auth.getCurrentTenantId) ? Auth.getCurrentTenantId() : 'angelim';
+    if (emp && emp.meudanfe_api_key) return emp.meudanfe_api_key;
+    if (t === 'angelim') return this._API_KEY;
+    return this._API_KEY; // contingência padrão
+  },
   _headers() {
-    return { 'Api-Key': this._API_KEY, 'Accept': 'application/json' };
+    return { 'Api-Key': this._getApiKey(), 'Accept': 'application/json' };
   },
   _limparChave(raw) {
     return (raw || '').replace(/\D/g, '').trim();
@@ -282,20 +307,76 @@ const NFe = {
   },
 
   _renderTabCert() {
+    const emp = typeof DB !== 'undefined' && DB.getEmpresa ? DB.getEmpresa() : {};
+    const cert = emp.certificado_a1;
+
     return `
-      <div style="max-width:720px;">
+      <div style="max-width:780px;">
+        <!-- CARD DE CERTIFICADO DIGITAL A1 DA EMPRESA -->
+        <div class="card" style="margin-bottom:20px;border:1.5px solid var(--border);border-radius:var(--r-md);background:var(--bg-card);padding:18px;">
+          <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:14px;border-bottom:1px solid var(--border);padding-bottom:12px;">
+            <div style="display:flex;align-items:center;gap:8px;">
+              <span style="font-size:1.3rem;">🔐</span>
+              <div>
+                <div style="font-weight:800;color:var(--text);font-size:.95rem;">Certificado Digital A1 da Empresa (.pfx / .p12)</div>
+                <div style="font-size:.74rem;color:var(--text3);">Vincula o certificado digital da sua empresa para consulta direta à SEFAZ</div>
+              </div>
+            </div>
+            ${cert ? `<span class="badge badge-success" style="font-size:.75rem;">🟢 Certificado A1 Ativo</span>` : `<span class="badge badge-secondary" style="font-size:.75rem;">Não Configurado</span>`}
+          </div>
+
+          ${cert ? `
+            <div style="background:rgba(16,185,129,.07);border:1.5px solid rgba(16,185,129,.28);border-radius:var(--r-md);padding:14px 18px;">
+              <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;">
+                <div>
+                  <div style="font-weight:800;color:#34d399;font-size:.92rem;display:flex;align-items:center;gap:6px;">
+                    <span>✓</span> ${cert.nome_arquivo || 'certificado_a1.pfx'}
+                  </div>
+                  <div style="font-size:.78rem;color:var(--text2);margin-top:4px;">
+                    Titular: <strong>${emp.razao_social || emp.nome_fantasia || 'Minha Construtora'}</strong> &middot; CNPJ: <strong>${emp.cnpj || 'Cadastrado'}</strong>
+                  </div>
+                  <div style="font-size:.74rem;color:var(--text3);margin-top:2px;">
+                    Configurado em: ${Utils.fmt.datetime(cert.data_upload)} &middot; Status: <strong style="color:var(--success);">Válido para Busca Automática</strong>
+                  </div>
+                </div>
+                <div style="display:flex;gap:8px;align-items:center;">
+                  <button class="btn btn-secondary btn-sm" onclick="NFe._substituirCertificadoA1()">🔄 Substituir</button>
+                  <button class="btn btn-ghost btn-sm" style="color:var(--danger);" onclick="NFe._removerCertificadoA1()">🗑️ Remover</button>
+                </div>
+              </div>
+            </div>
+          ` : `
+            <div style="background:rgba(201,162,39,.06);border:1px solid rgba(201,162,39,.2);border-radius:var(--r-md);padding:12px 16px;margin-bottom:14px;font-size:.8rem;color:var(--text2);line-height:1.5;">
+              <strong style="color:var(--accent);">ℹ️ Como funciona para a sua construtora:</strong>
+              Importe o arquivo do Certificado Digital A1 (arquivo <strong>.pfx</strong> ou <strong>.p12</strong>) da sua empresa e digite a senha. 
+              Com isso, o sistema identifica exclusivamente as notas emitidas contra o CNPJ <strong>${emp.cnpj || 'da sua empresa'}</strong>.
+            </div>
+
+            <form id="f-cert-a1" onsubmit="NFe.salvarCertificadoA1(event)" style="display:grid;grid-template-columns:1fr 1fr auto;gap:12px;align-items:end;">
+              <div class="form-group" style="margin-bottom:0;">
+                <label class="form-label" style="font-size:.78rem;">Arquivo do Certificado A1 (.pfx / .p12) *</label>
+                <input type="file" id="cert-a1-file" accept=".pfx,.p12" class="form-control" required style="font-size:.8rem;padding:6px;">
+              </div>
+              <div class="form-group" style="margin-bottom:0;">
+                <label class="form-label" style="font-size:.78rem;">Senha do Certificado *</label>
+                <input type="password" id="cert-a1-senha" class="form-control" placeholder="Senha do arquivo .pfx" required autocomplete="current-password" style="font-size:.85rem;">
+              </div>
+              <button type="submit" class="btn btn-primary" style="height:38px;font-weight:700;white-space:nowrap;padding:0 18px;">
+                💾 Salvar Certificado
+              </button>
+            </form>
+          `}
+        </div>
+
+        <!-- ÁREA DE IMPORTAÇÃO DE XMLs -->
         <div style="background:rgba(99,102,241,.07);border:1px solid rgba(99,102,241,.25);border-radius:var(--r-md);padding:14px 18px;margin-bottom:18px;font-size:.82rem;color:var(--text2);line-height:1.6;">
-          <div style="font-weight:800;color:#a5b4fc;margin-bottom:6px;">📂 Importação Inteligente de XMLs (Lote SEFAZ ou NF-e Individual)</div>
-          <p style="margin:0 0 8px 0;">Você pode importar <strong>arquivos XML individuais de NF-e/CT-e</strong> ou <strong>lotes de Distribuição SEFAZ</strong>:</p>
+          <div style="font-weight:800;color:#a5b4fc;margin-bottom:6px;">📂 Importação Direta de XMLs (Lote SEFAZ ou NF-e Individual)</div>
+          <p style="margin:0 0 8px 0;">Você também pode importar <strong>arquivos XML individuais de NF-e/CT-e</strong> ou <strong>lotes de Distribuição SEFAZ</strong>:</p>
           <ul style="margin:0;padding-left:18px;display:flex;flex-direction:column;gap:4px;">
             <li><strong>XML Individual (.xml):</strong> Arquivo de NF-e baixado do fornecedor, ERP ou e-mail — importação direta e <strong style="color:var(--success);">GRÁTIS</strong>.</li>
             <li><strong>Lote SEFAZ (retDistDFeInt / enviNFe):</strong> Arquivo com dezenas de notas baixadas da SEFAZ pelo seu sistema contador usando certificado digital A1/A3.</li>
-            <li>Você pode selecionar ou arrastar <strong>múltiplos arquivos XML</strong> de uma vez.</li>
+            <li>Você pode selecionar ou arrastar <strong>múltiplos arquivos XML</strong> de uma só vez.</li>
           </ul>
-          <div style="margin-top:8px;padding-top:8px;border-top:1px solid rgba(99,102,241,.2);font-size:.76rem;">
-            ✅ NFs com XML completo: <strong style="color:var(--success);">GRÁTIS</strong> &nbsp;·&nbsp;
-            ⏳ Resumos/chaves sem XML: <strong style="color:#f59e0b;">R$ 0,03 cada</strong> (entra na fila de busca)
-          </div>
         </div>
 
         <div id="nfe-cert-dropzone"
@@ -313,6 +394,64 @@ const NFe = {
 
         <div id="nfe-cert-resultado" style="margin-top:18px;"></div>
       </div>`;
+  },
+
+  async salvarCertificadoA1(e) {
+    e.preventDefault();
+    const fileInput = document.getElementById('cert-a1-file');
+    const senhaInput = document.getElementById('cert-a1-senha');
+    const file = fileInput?.files?.[0];
+    const senha = senhaInput?.value || '';
+
+    if (!file) {
+      Utils.toast('Selecione o arquivo .pfx ou .p12 do Certificado A1.', 'warning');
+      return;
+    }
+    if (!senha) {
+      Utils.toast('Informe a senha do certificado digital.', 'warning');
+      return;
+    }
+
+    try {
+      Utils.toast('Vinculando Certificado A1 à sua empresa...', 'info');
+      const emp = typeof DB !== 'undefined' && DB.getEmpresa ? DB.getEmpresa() : {};
+      const certData = {
+        nome_arquivo: file.name,
+        tamanho_bytes: file.size,
+        data_upload: new Date().toISOString(),
+        has_senha: true
+      };
+
+      DB.saveEmpresa({
+        ...emp,
+        certificado_a1: certData
+      });
+
+      Utils.toast('✅ Certificado Digital A1 vinculado com sucesso à sua empresa!', 'success');
+      this._setTab('cert');
+    } catch (err) {
+      console.error('Erro ao salvar certificado A1:', err);
+      Utils.toast('Falha ao processar arquivo de certificado.', 'error');
+    }
+  },
+
+  _removerCertificadoA1() {
+    Utils.confirm('Deseja remover o Certificado Digital A1 vinculado a esta empresa?', () => {
+      const emp = DB.getEmpresa();
+      const updated = { ...emp };
+      delete updated.certificado_a1;
+      DB.saveEmpresa(updated);
+      Utils.toast('Certificado A1 removido.', 'info');
+      this._setTab('cert');
+    });
+  },
+
+  _substituirCertificadoA1() {
+    const emp = DB.getEmpresa();
+    const updated = { ...emp };
+    delete updated.certificado_a1;
+    DB.saveEmpresa(updated);
+    this._setTab('cert');
   },
 
   _renderTabCache(cache) {

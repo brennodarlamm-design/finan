@@ -145,49 +145,64 @@ const Configuracoes = {
         </form>
       </div>
 
-      <!-- PREVIEW CARD -->
-      <div class="card">
-        <div class="card-header">
-          <div class="card-title">&#x1F441;&#xFE0F; Pr&eacute;-visualiza&ccedil;&atilde;o da Marca</div>
+        <!-- PREVIEW CARD -->
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">&#x1F441;&#xFE0F; Pr&eacute;-visualiza&ccedil;&atilde;o da Marca</div>
+          </div>
+          <div style="background:var(--bg-secondary);border:1px solid var(--border);border-radius:12px;padding:20px;text-align:center;">
+            <div style="margin-bottom:16px;" id="cfg-logo-preview-box">
+              ${emp.logo_url ? `<img id="cfg-preview-logo-img" src="${emp.logo_url}" alt="Logo" style="max-width:140px;max-height:70px;border-radius:8px;border:1px solid rgba(201,162,39,.4);object-fit:contain;">` : `<div id="cfg-preview-logo-placeholder" style="width:64px;height:64px;border-radius:12px;background:linear-gradient(135deg,#1C2D12,#243818);border:1px solid rgba(201,162,39,.4);display:inline-flex;align-items:center;justify-content:center;font-size:2rem;">🏢</div>`}
+            </div>
+            <div style="font-size:1.2rem;font-weight:900;background:linear-gradient(135deg,var(--accent2),var(--accent));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;">
+              ${emp.nome_fantasia || 'Nome da Construtora'}
+            </div>
+            <div style="color:var(--text2);font-size:.82rem;margin-top:2px;">
+              ${emp.razao_social || 'Razão Social Não Informada'}
+            </div>
+            <div style="color:var(--text3);font-size:.76rem;margin-top:8px;">
+              CNPJ: ${emp.cnpj || '00.000.000/0000-00'} &middot; ${emp.cidade || 'Cidade'}/${emp.uf || 'UF'}
+            </div>
+            ${emp.responsavel ? `<div style="margin-top:12px;font-size:.76rem;color:var(--accent2);background:rgba(201,162,39,.08);padding:4px 10px;border-radius:6px;display:inline-block;">Responsável: ${emp.responsavel} ${emp.crea_cau ? `(${emp.crea_cau})` : ''}</div>` : ''}
+          </div>
         </div>
-        <div style="background:var(--bg-secondary);border:1px solid var(--border);border-radius:12px;padding:20px;text-align:center;">
-          <div style="margin-bottom:16px;">
-            ${emp.logo_url ? `<img src="${emp.logo_url}" alt="Logo" style="max-width:140px;max-height:70px;border-radius:8px;border:1px solid rgba(201,162,39,.4);object-fit:contain;">` : `<div style="width:64px;height:64px;border-radius:12px;background:linear-gradient(135deg,#1C2D12,#243818);border:1px solid rgba(201,162,39,.4);display:inline-flex;align-items:center;justify-content:center;font-size:2rem;">🏢</div>`}
-          </div>
-          <div style="font-size:1.2rem;font-weight:900;background:linear-gradient(135deg,var(--accent2),var(--accent));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;">
-            ${emp.nome_fantasia || 'Nome da Construtora'}
-          </div>
-          <div style="color:var(--text2);font-size:.82rem;margin-top:2px;">
-            ${emp.razao_social || 'Razão Social Não Informada'}
-          </div>
-          <div style="color:var(--text3);font-size:.76rem;margin-top:8px;">
-            CNPJ: ${emp.cnpj || '00.000.000/0000-00'} &middot; ${emp.cidade || 'Cidade'}/${emp.uf || 'UF'}
-          </div>
-          ${emp.responsavel ? `<div style="margin-top:12px;font-size:.76rem;color:var(--accent2);background:rgba(201,162,39,.08);padding:4px 10px;border-radius:6px;display:inline-block;">Responsável: ${emp.responsavel} ${emp.crea_cau ? `(${emp.crea_cau})` : ''}</div>` : ''}
-        </div>
-      </div>
-    </div>`;
-  },
+      </div>`;
+    },
 
-  handleLogoUpload(input) {
-    const file = input.files[0];
+  async handleLogoUpload(input) {
+    const file = input?.files?.[0];
     if (!file) return;
-    if (file.size > 2 * 1024 * 1024) {
-      Utils.toast('A imagem deve ter no máximo 2MB.', 'warning');
-      return;
-    }
-    const reader = new FileReader();
-    reader.onload = e => {
-      document.getElementById('cfg-emp-logo').value = e.target.result;
-      document.getElementById('cfg-logo-txt').textContent = `✓ ${file.name} carregado`;
+    try {
+      Utils.toast('Processando e otimizando imagem do logotipo...', 'info');
+      const res = await Utils.compressImage(file, 400, 200, 0.9);
+      
+      const hiddenInput = document.getElementById('cfg-emp-logo');
+      if (hiddenInput) hiddenInput.value = res.dataUrl;
+
+      const txt = document.getElementById('cfg-logo-txt');
+      if (txt) txt.textContent = `✓ ${res.name} (${Math.round(res.sizeBytes / 1024)} KB)`;
+
+      const box = document.getElementById('cfg-logo-preview-box');
+      if (box) {
+        box.innerHTML = `<img id="cfg-preview-logo-img" src="${res.dataUrl}" alt="Logo" style="max-width:140px;max-height:70px;border-radius:8px;border:1px solid rgba(201,162,39,.4);object-fit:contain;transition:all .2s ease;">`;
+      }
+      
       Utils.toast('Logotipo carregado! Clique em Salvar para aplicar.', 'success');
-    };
-    reader.readAsDataURL(file);
+    } catch (err) {
+      console.error('Erro no upload de logo:', err);
+      Utils.toast(err.message || 'Falha ao processar arquivo de imagem.', 'error');
+    }
   },
 
   removerLogo() {
-    document.getElementById('cfg-emp-logo').value = '';
-    document.getElementById('cfg-logo-txt').textContent = 'Logotipo removido';
+    const hiddenInput = document.getElementById('cfg-emp-logo');
+    if (hiddenInput) hiddenInput.value = '';
+    const txt = document.getElementById('cfg-logo-txt');
+    if (txt) txt.textContent = 'Logotipo removido';
+    const box = document.getElementById('cfg-logo-preview-box');
+    if (box) {
+      box.innerHTML = `<div id="cfg-preview-logo-placeholder" style="width:64px;height:64px;border-radius:12px;background:linear-gradient(135deg,#1C2D12,#243818);border:1px solid rgba(201,162,39,.4);display:inline-flex;align-items:center;justify-content:center;font-size:2rem;">🏢</div>`;
+    }
     Utils.toast('Logotipo removido. Clique em Salvar para aplicar.', 'info');
   },
 

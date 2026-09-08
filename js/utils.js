@@ -271,5 +271,44 @@ const Utils = {
     if (textoReais) return textoReais;
     if (textoCentavos) return textoCentavos;
     return 'zero reais';
+  },
+
+  compressImage(file, maxW = 400, maxH = 200, quality = 0.88) {
+    return new Promise((resolve, reject) => {
+      if (!file || !(file.type || '').startsWith('image/')) {
+        return reject(new Error('O arquivo selecionado não é uma imagem válida.'));
+      }
+      const reader = new FileReader();
+      reader.onerror = () => reject(new Error('Erro ao ler arquivo de imagem.'));
+      reader.onload = (e) => {
+        const img = new Image();
+        img.onerror = () => reject(new Error('Falha ao decodificar a imagem. Formato incompatível.'));
+        img.onload = () => {
+          let { width, height } = img;
+          if (width > maxW || height > maxH) {
+            const ratio = Math.min(maxW / width, maxH / height);
+            width = Math.max(1, Math.round(width * ratio));
+            height = Math.max(1, Math.round(height * ratio));
+          }
+          const canvas = document.createElement('canvas');
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, width, height);
+
+          const outputType = file.type === 'image/png' ? 'image/png' : 'image/jpeg';
+          const dataUrl = canvas.toDataURL(outputType, quality);
+          resolve({
+            dataUrl,
+            width,
+            height,
+            sizeBytes: Math.round((dataUrl.length * 3) / 4),
+            name: file.name
+          });
+        };
+        img.src = e.target.result;
+      };
+      reader.readAsDataURL(file);
+    });
   }
 };

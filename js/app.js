@@ -500,25 +500,28 @@ const App = {
     `);
   },
 
-  handleLogoUploadOnboarding(input) {
-    const file = input.files[0];
+  async handleLogoUploadOnboarding(input) {
+    const file = input?.files?.[0];
     if (!file) return;
-    if (file.size > 2 * 1024 * 1024) {
-      Utils.toast('A imagem deve ter no máximo 2MB.', 'warning');
-      return;
-    }
-    const reader = new FileReader();
-    reader.onload = e => {
-      document.getElementById('ob-logo-url').value = e.target.result;
-      document.getElementById('ob-logo-preview-txt').textContent = `✓ ${file.name} carregado`;
+    try {
+      Utils.toast('Processando e otimizando logotipo...', 'info');
+      const res = await Utils.compressImage(file, 400, 200, 0.9);
+      const urlInput = document.getElementById('ob-logo-url');
+      if (urlInput) urlInput.value = res.dataUrl;
+      const previewTxt = document.getElementById('ob-logo-preview-txt');
+      if (previewTxt) previewTxt.textContent = `✓ ${res.name} (${Math.round(res.sizeBytes / 1024)} KB)`;
       Utils.toast('Logotipo carregado com sucesso!', 'success');
-    };
-    reader.readAsDataURL(file);
+    } catch (err) {
+      console.error('Erro no upload de logo onboarding:', err);
+      Utils.toast(err.message || 'Falha ao carregar logotipo.', 'error');
+    }
   },
 
   removerLogoOnboarding() {
-    document.getElementById('ob-logo-url').value = '';
-    document.getElementById('ob-logo-preview-txt').textContent = 'Logotipo removido';
+    const urlInput = document.getElementById('ob-logo-url');
+    if (urlInput) urlInput.value = '';
+    const previewTxt = document.getElementById('ob-logo-preview-txt');
+    if (previewTxt) previewTxt.textContent = 'Logotipo removido';
     Utils.toast('Logotipo removido.', 'info');
   },
 

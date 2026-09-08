@@ -88,7 +88,17 @@ const DB = {
       configurada: true,
       updated_at: new Date().toISOString()
     };
-    localStorage.setItem(`finobra_${t}_empresa`, JSON.stringify(updated));
+    try {
+      localStorage.setItem(`finobra_${t}_empresa`, JSON.stringify(updated));
+    } catch (e) {
+      console.warn(`[Storage] Erro ao salvar dados da empresa ${t}:`, e);
+      if (this.purgeStorage) this.purgeStorage();
+      try {
+        localStorage.setItem(`finobra_${t}_empresa`, JSON.stringify(updated));
+      } catch (e2) {
+        console.error(`[Storage] Falha crítica ao persistir dados da empresa:`, e2);
+      }
+    }
     return updated;
   },
 
