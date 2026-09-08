@@ -1025,6 +1025,15 @@ const Lancamentos = {
   showFormOCR(dadosOCR, arquivo, base64) {
     const tipo = dadosOCR.tipo || 'despesa';
 
+    // Comprovantes bancários (PIX/TED), boletos e contas NUNCA devem ter produtos vinculados
+    const isNF = (typeof OCR !== 'undefined' && OCR.isNotaFiscal)
+      ? OCR.isNotaFiscal(dadosOCR.tipo_documento, dadosOCR)
+      : (['nfe', 'nfce', 'nfse'].includes(dadosOCR.tipo_documento) || !!dadosOCR.chave_acesso);
+
+    if (!isNF) {
+      dadosOCR.itens = [];
+    }
+
     // Abrir formulário normal
     this.showForm(tipo);
 

@@ -17,6 +17,7 @@ const Produtos = {
   // ────────────────────────────────────────────────────────────
   render(obraId) {
     this._limit = 30;
+    this.limparProdutosIndevidos();
     this.sincronizarComLancamentos();
     const produtos = DB.getAll('produtos');
     const analise  = this.getAnaliseGastos(obraId === 'todas' ? null : obraId);
@@ -529,8 +530,23 @@ const Produtos = {
       const prodsToUpdate = new Set();
 
       ultimosLancs.forEach(l => {
-        // 1. Se tem itens no lançamento, garante que todos estão em produtos
+        // 1. Se tem itens no lançamento, higieniza e garante que itens válidos estão em produtos
         if (Array.isArray(l.itens) && l.itens.length > 0) {
+          // Remove itens indevidos gerados a partir de comprovantes (PIX, TED, transferências)
+          const itensValidos = l.itens.filter(it => {
+            const nomeIt = (it.produto || '').trim();
+            const ehComprovante = /^(comprovante|pix\b|ted\b|doc\b|transfer[êe]ncia|pagamento\s+pix|pgto\s+pix|tarifa\s+pix)/i.test(nomeIt);
+            if (ehComprovante) {
+              updatedAny = true;
+              return false;
+            }
+            return true;
+          });
+
+          if (itensValidos.length !== l.itens.length) {
+            l.itens = itensValidos;
+          }
+
           l.itens.forEach(it => {
             if (it.produto && it.produto.trim()) {
               const prod = this.encontrarOuCriar(it.produto, it.unidade || 'un', l.categoria || 'material');
@@ -542,23 +558,29 @@ const Produtos = {
             }
           });
         }
-        // 2. Se não tem itens, mas tem descrição de compra/material (ex: OCR de NFC-e/NF-e)
+        // 2. Se não tem itens, NUNCA sintetizar se for comprovante bancário (PIX, TED, transferências, tarifas)
         else if (l.valor > 0 && l.descricao && l.descricao.trim()) {
           const desc = l.descricao.trim();
-          const cleanNome = desc.replace(/^(compra\s+de\s+|aquisição\s+de\s+|aquisicao\s+de\s+|pgto\s+de\s+|pagamento\s+de\s+|fornecimento\s+de\s+|nfce\s+-\s+|nfe\s+-\s+)/i, '').trim();
-          if (cleanNome.length >= 3 && (l.categoria === 'material' || l.origem === 'ocr' || /^(compra|aquisi|trilho|cimento|tinta|piso|bloco|areia|brita|tubo|cabo|ferro|aco|madeira)/i.test(desc))) {
-            const prod = this.encontrarOuCriar(cleanNome, 'un', l.categoria || 'material');
-            if (prod) {
-              l.itens = [{
-                produto: cleanNome,
-                produto_id: prod.id,
-                qtd: 1,
-                unidade: 'un',
-                valor_unit: l.valor,
-                total: l.valor
-              }];
-              prodsToUpdate.add(prod.id);
-              updatedAny = true;
+          const isComprovanteOuBancario = /^(comprovante|pix\b|ted\b|doc\b|transfer|transf|pgto|pagamento|tarifa|taxa|boleto|fatura|extrato)/i.test(desc);
+          const isNotaFiscal = Boolean(l.chave_nfe || (l.observacoes && /chave nf-?e/i.test(l.observacoes)) || l.origem === 'nfe' || (l.nota_fiscal_id && l.nota_fiscal_id !== ''));
+
+          // APENAS sintetiza se for comprovadamente uma Nota Fiscal de produto e NÃO for comprovante/tarifa
+          if (!isComprovanteOuBancario && isNotaFiscal) {
+            const cleanNome = desc.replace(/^(compra\s+de\s+|aquisição\s+de\s+|aquisicao\s+de\s+|pgto\s+de\s+|pagamento\s+de\s+|fornecimento\s+de\s+|nfce\s+-\s+|nfe\s+-\s+)/i, '').trim();
+            if (cleanNome.length >= 3 && !/^(comprovante|pix\b|ted\b|transfer)/i.test(cleanNome)) {
+              const prod = this.encontrarOuCriar(cleanNome, 'un', l.categoria || 'material');
+              if (prod) {
+                l.itens = [{
+                  produto: cleanNome,
+                  produto_id: prod.id,
+                  qtd: 1,
+                  unidade: 'un',
+                  valor_unit: l.valor,
+                  total: l.valor
+                }];
+                prodsToUpdate.add(prod.id);
+                updatedAny = true;
+              }
             }
           }
         }
@@ -584,15 +606,44 @@ const Produtos = {
     }
   },
 
+  // Remove produtos indevidos gerados acidentalmente a partir de comprovantes bancários (PIX, TED, transferências)
+  limparProdutosIndevidos() {
+    try {
+      if (typeof DB === 'undefined' || !DB.getAll) return 0;
+      const todos = DB.getAll('produtos') || [];
+      const regexIndevido = /^(comprovante|pix\b|ted\b|doc\b|transfer[êe]ncia|transf\b|pagamento\s+pix|pgto\s+pix|tarifa\s+pix|chave\s+pix|agendamento\s+pix|recibo\s+de\s+transfer)/i;
+      const indevidos = todos.filter(p => {
+        const nome = (p.nome || '').trim();
+        return regexIndevido.test(nome) || /comprovante\s+de\s+(transfer|pagamento|pix|ted)/i.test(nome);
+      });
+
+      if (indevidos.length > 0) {
+        indevidos.forEach(p => {
+          DB.remove('produtos', p.id);
+          if (DB.syncToCloud) {
+            DB.syncToCloud('delete', 'produtos', { id: p.id });
+          }
+        });
+        console.log(`[Produtos] Limpeza: ${indevidos.length} produto(s) indevido(s) de comprovantes foram removidos.`);
+        return indevidos.length;
+      }
+    } catch (e) {
+      console.warn('[Produtos] Erro na limpeza de produtos indevidos:', e);
+    }
+    return 0;
+  },
+
   init() {
+    this.limparProdutosIndevidos();
     this.sincronizarComLancamentos();
   }
 };
 
 if (typeof window !== 'undefined') {
   setTimeout(() => {
-    if (typeof Produtos !== 'undefined' && Produtos.sincronizarComLancamentos) {
-      Produtos.sincronizarComLancamentos();
+    if (typeof Produtos !== 'undefined') {
+      if (Produtos.limparProdutosIndevidos) Produtos.limparProdutosIndevidos();
+      if (Produtos.sincronizarComLancamentos) Produtos.sincronizarComLancamentos();
     }
   }, 150);
 }

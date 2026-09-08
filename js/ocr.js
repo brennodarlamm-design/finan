@@ -372,26 +372,36 @@ const OCR = {
     const contas = (typeof DB !== 'undefined' ? DB.getAll('contas') : []) || [];
     const defaultObraId = (typeof App !== 'undefined' && App.currentObraId && App.currentObraId !== 'todas') ? App.currentObraId : 'escritorio';
 
-    // Garantir que itens existam; se não vieram produtos explícitos na NFC-e/NF-e, sintetizar da descrição
-    let itens = Array.isArray(d.itens) && d.itens.length ? [...d.itens] : [];
-    if (!itens.length && d.valor && d.descricao_sugerida) {
-      const cleanNome = d.descricao_sugerida
-        .replace(/^(compra\s+de\s+|aquisição\s+de\s+|aquisicao\s+de\s+|pgto\s+de\s+|pagamento\s+de\s+|fornecimento\s+de\s+|nfce\s+-\s+|nfe\s+-\s+)/i, '')
-        .trim();
-      if (cleanNome) {
-        itens.push({
-          produto: cleanNome,
-          qtd: 1,
-          unidade: 'un',
-          valor_unit: d.valor,
-          total: d.valor
-        });
+    // Garantir que produtos sejam extraídos e cadastrados EXCLUSIVAMENTE quando for Nota Fiscal
+    const isNF = this.isNotaFiscal(d.tipo_documento, d);
+    const isComprovanteDoc = this.isComprovante(d.tipo_documento, d);
+    let itens = [];
+
+    if (isNF) {
+      itens = Array.isArray(d.itens) && d.itens.length ? [...d.itens] : [];
+      // Apenas se for comprovadamente NF-e/NFC-e e não veio tabela detalhada, pode sugerir item se for descrição de material
+      if (!itens.length && d.valor && d.descricao_sugerida) {
+        const cleanNome = d.descricao_sugerida
+          .replace(/^(compra\s+de\s+|aquisição\s+de\s+|aquisicao\s+de\s+|pgto\s+de\s+|pagamento\s+de\s+|fornecimento\s+de\s+|nfce\s+-\s+|nfe\s+-\s+)/i, '')
+          .trim();
+        if (cleanNome && !/comprovante|pix|ted|transfer|boleto|tarifa/i.test(cleanNome)) {
+          itens.push({
+            produto: cleanNome,
+            qtd: 1,
+            unidade: 'un',
+            valor_unit: d.valor,
+            total: d.valor
+          });
+        }
       }
+    } else {
+      // Se for Comprovante PIX, TED, transferência, boleto, conta de consumo etc., ITENS SEMPRE VAZIO!
+      itens = [];
     }
     d.itens = itens;
 
-    // Montar lista de itens
-    const itensHtml = d.itens && d.itens.length ? `
+    // Montar lista de itens APENAS se for Nota Fiscal e houver itens reais
+    const itensHtml = (isNF && d.itens && d.itens.length) ? `
       <div style="margin-top:14px;background:var(--bg-secondary);border:1px solid var(--border);border-radius:10px;padding:12px;">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
           <div style="font-size:.76rem;font-weight:800;color:var(--text);text-transform:uppercase;letter-spacing:.05em;">
@@ -444,6 +454,14 @@ const OCR = {
           🔄 Trocar
         </button>
       </div>
+
+      ${isComprovanteDoc ? `
+      <div style="margin-bottom:14px;padding:10px 14px;background:rgba(59,130,246,.08);border:1px solid rgba(59,130,246,.25);border-radius:10px;font-size:.78rem;color:var(--text);display:flex;align-items:center;gap:8px;">
+        <span style="font-size:1.1rem;">💸</span>
+        <div>
+          <strong>Comprovante Financeiro:</strong> Lançamento bancário identificado. O cadastro automático de produtos é restrito a <strong>Notas Fiscais (NF-e/NFC-e)</strong>.
+        </div>
+      </div>` : ''}
 
       <!-- Centro de Custo (Sede ou Obra) e Conta Bancária -->
       <div style="background:rgba(201,162,39,.1);border:1px solid rgba(201,162,39,.4);border-radius:10px;padding:12px 14px;margin-bottom:14px;">
@@ -688,40 +706,48 @@ const OCR = {
       fornecedorId = forn?.id || null;
     }
 
-    // 2. Prepara e cadastra os produtos/itens em Produtos
-    let itensParaSalvar = (this._dadosOCR?.itens && this._dadosOCR.itens.length)
-      ? [...this._dadosOCR.itens]
-      : [];
+    // 2. Prepara e cadastra os produtos/itens em Produtos EXCLUSIVAMENTE se for Nota Fiscal
+    const isNF = this.isNotaFiscal(this._dadosOCR?.tipo_documento, this._dadosOCR);
+    let itensParaSalvar = [];
 
-    if (!itensParaSalvar.length && valor > 0 && descricao) {
-      const cleanNome = descricao
-        .replace(/^(compra\s+de\s+|aquisição\s+de\s+|aquisicao\s+de\s+|pgto\s+de\s+|pagamento\s+de\s+|fornecimento\s+de\s+|nfce\s+-\s+|nfe\s+-\s+)/i, '')
-        .trim();
-      if (cleanNome) {
-        itensParaSalvar.push({
-          produto: cleanNome,
-          qtd: 1,
-          unidade: 'un',
-          valor_unit: valor,
-          total: valor
-        });
+    if (isNF) {
+      itensParaSalvar = (this._dadosOCR?.itens && this._dadosOCR.itens.length)
+        ? [...this._dadosOCR.itens]
+        : [];
+
+      if (!itensParaSalvar.length && valor > 0 && descricao && (this._dadosOCR?.tipo_documento === 'nfe' || this._dadosOCR?.tipo_documento === 'nfce')) {
+        const cleanNome = descricao
+          .replace(/^(compra\s+de\s+|aquisição\s+de\s+|aquisicao\s+de\s+|pgto\s+de\s+|pagamento\s+de\s+|fornecimento\s+de\s+|nfce\s+-\s+|nfe\s+-\s+)/i, '')
+          .trim();
+        if (cleanNome && !/comprovante|pix|ted|transfer|boleto|tarifa/i.test(cleanNome)) {
+          itensParaSalvar.push({
+            produto: cleanNome,
+            qtd: 1,
+            unidade: 'un',
+            valor_unit: valor,
+            total: valor
+          });
+        }
       }
-    }
 
-    let prodsCadastrados = [];
-    if (typeof Produtos !== 'undefined' && Produtos.encontrarOuCriar) {
-      itensParaSalvar.forEach(it => {
-        if (it.produto && it.produto.trim()) {
-          const prod = Produtos.encontrarOuCriar(it.produto, it.unidade || 'un', categoria);
-          if (prod) {
-            it.produto_id = prod.id;
-            prodsCadastrados.push(prod.nome);
-            if (Produtos.atualizarValorMedio) {
-              Produtos.atualizarValorMedio(prod.id);
+      let prodsCadastrados = [];
+      if (typeof Produtos !== 'undefined' && Produtos.encontrarOuCriar) {
+        itensParaSalvar.forEach(it => {
+          if (it.produto && it.produto.trim()) {
+            const prod = Produtos.encontrarOuCriar(it.produto, it.unidade || 'un', categoria);
+            if (prod) {
+              it.produto_id = prod.id;
+              prodsCadastrados.push(prod.nome);
+              if (Produtos.atualizarValorMedio) {
+                Produtos.atualizarValorMedio(prod.id);
+              }
             }
           }
-        }
-      });
+        });
+      }
+    } else {
+      // Comprovantes bancários (PIX, TED, DOC), boletos e contas NUNCA possuem produtos cadastrados
+      itensParaSalvar = [];
     }
 
     const tipo = this._dadosOCR?.tipo_lancamento === 'receita' ? 'receita' : 'despesa';
@@ -745,8 +771,9 @@ const OCR = {
       conciliado: false
     });
 
-    // 3. Cria nota fiscal se for documento fiscal
-    if (numDoc || this._dadosOCR?.chave_acesso || ['nfe','nfce','nfse'].includes(this._dadosOCR?.tipo_documento)) {
+    // 3. Cria nota fiscal se for expressamente documento fiscal (NF-e, NFC-e, NFS-e)
+    const isDocFiscalReal = isNF || ['nfe','nfce','nfse'].includes(this._dadosOCR?.tipo_documento) || (this._dadosOCR?.chave_acesso && this._dadosOCR.chave_acesso.length >= 44);
+    if (isDocFiscalReal && !this.isComprovante(this._dadosOCR?.tipo_documento, this._dadosOCR)) {
       try {
         DB.add('notas', {
           numero_nf: numDoc || 'S/N',
@@ -826,8 +853,28 @@ const OCR = {
     return String(v).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
   },
 
+  isComprovante(tipoDoc, dados = null) {
+    const t = (tipoDoc || dados?.tipo_documento || '').toLowerCase().trim();
+    if (t.includes('pix') || t.includes('ted') || t.includes('comprovante') || t.includes('transf')) return true;
+    const desc = (dados?.descricao_sugerida || dados?.descricao || '').toLowerCase();
+    if (/comprovante|transfer[êe]ncia|pix|ted|doc\b|pagamento\s+efetuado/i.test(desc)) return true;
+    const obs = (dados?.observacoes || '').toLowerCase();
+    if (/comprovante|transfer[êe]ncia|pix|ted/i.test(obs)) return true;
+    return false;
+  },
+
+  isNotaFiscal(tipoDoc, dados = null) {
+    if (this.isComprovante(tipoDoc, dados)) return false;
+    const t = (tipoDoc || dados?.tipo_documento || '').toLowerCase().trim();
+    if (['nfe', 'nfce', 'nfse', 'danfe', 'cupom_fiscal'].includes(t)) return true;
+    if (dados?.chave_acesso && String(dados.chave_acesso).replace(/\D/g, '').length >= 44) return true;
+    if (t.startsWith('nf')) return true;
+    return false;
+  },
+
   _iconeTipoDoc(tipo) {
     const m = {
+      comprovante_pix:'💸', comprovante_ted:'🏦', comprovante_transferencia:'🏦', comprovante:'🧾',
       boleto:'🏦', nfe:'📄', nfce:'🛒', nfse:'🔧',
       conta_energia:'💡', conta_agua:'💧', conta_gas:'🔥',
       conta_telefone:'🌐', das:'🏛️', gps:'📋', darf:'🏛️',
@@ -838,13 +885,15 @@ const OCR = {
 
   _labelTipoDoc(tipo) {
     const m = {
+      comprovante_pix:'Comprovante PIX', comprovante_ted:'Comprovante TED / DOC',
+      comprovante_transferencia:'Comprovante de Transferência', comprovante:'Comprovante de Pagamento',
       boleto:'Boleto Bancário', nfe:'Nota Fiscal NF-e', nfce:'Nota Fiscal NFC-e',
       nfse:'Nota Fiscal de Serviço', conta_energia:'Conta de Energia Elétrica',
       conta_agua:'Conta de Água/Esgoto', conta_gas:'Conta de Gás',
       conta_telefone:'Conta de Telefonia/Internet', das:'DAS Simples Nacional',
       gps:'GPS/FGTS', darf:'DARF', recibo:'Recibo', orcamento:'Orçamento', outro:'Outro Documento'
     };
-    return m[tipo] || 'Documento Fiscal';
+    return m[tipo] || 'Documento';
   },
 
   _catOptions(selecionada) {
