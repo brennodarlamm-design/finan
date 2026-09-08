@@ -3,13 +3,28 @@
 const Configuracoes = {
   _activeTab: 'empresa',
 
+  canAccessSistema() {
+    if (typeof Auth === 'undefined') return false;
+    const user = Auth.getUser();
+    // Apenas equipe de desenvolvimento / superadmin master tem acesso visível à aba Sistema
+    return (user?.username === 'admin' && user?.tenantId === 'angelim') || localStorage.getItem('finobra_dev_mode') === 'true';
+  },
+
   render(obraId) {
+    // Se a aba ativa for sistema mas o usuário for cliente comum, redireciona para empresa
+    if (this._activeTab === 'sistema' && !this.canAccessSistema()) {
+      this._activeTab = 'empresa';
+    }
+
     if (!document.getElementById('cfg-tab-styles')) {
       const s = document.createElement('style');
       s.id = 'cfg-tab-styles';
       s.textContent = '.cfg-tab{padding:10px 20px;border:none;background:transparent;color:var(--text3);font-family:inherit;font-size:.875rem;font-weight:600;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-2px;transition:color .2s,border-color .2s;}.cfg-tab:hover{color:var(--text);}.cfg-tab-active{color:var(--accent)!important;border-bottom-color:var(--accent)!important;}';
       document.head.appendChild(s);
     }
+
+    const showSistema = this.canAccessSistema();
+
     return `
     <div>
       <div style="display:flex;gap:0;border-bottom:2px solid var(--border);margin-bottom:24px;overflow-x:auto;">
@@ -25,9 +40,10 @@ const Configuracoes = {
         <button id="cfg-tab-categorias" class="cfg-tab${this._activeTab==='categorias'?' cfg-tab-active':''}" onclick="Configuracoes._switch('categorias')">
           &#x1F3F7;&#xFE0F; Categorias
         </button>
+        ${showSistema ? `
         <button id="cfg-tab-sistema" class="cfg-tab${this._activeTab==='sistema'?' cfg-tab-active':''}" onclick="Configuracoes._switch('sistema')">
-          &#x2699;&#xFE0F; Sistema
-        </button>
+          &#x2699;&#xFE0F; Sistema (Dev)
+        </button>` : ''}
       </div>
       <div id="cfg-content">
         ${this._renderTab(this._activeTab, obraId)}
@@ -36,6 +52,10 @@ const Configuracoes = {
   },
 
   _switch(tab) {
+    if (tab === 'sistema' && !this.canAccessSistema()) {
+      Utils.toast('Aba restrita ao suporte técnico e desenvolvedores.', 'info');
+      tab = 'empresa';
+    }
     this._activeTab = tab;
     document.querySelectorAll('.cfg-tab').forEach(el => el.classList.remove('cfg-tab-active'));
     const el = document.getElementById('cfg-tab-' + tab);
@@ -44,10 +64,30 @@ const Configuracoes = {
     if (content) content.innerHTML = this._renderTab(tab, App.obraId);
   },
 
+  toggleDevMode() {
+    const current = localStorage.getItem('finobra_dev_mode') === 'true';
+    if (current) {
+      localStorage.removeItem('finobra_dev_mode');
+      Utils.toast('🔒 Modo Sistema / Suporte ocultado com sucesso.', 'info');
+      this._activeTab = 'empresa';
+    } else {
+      localStorage.setItem('finobra_dev_mode', 'true');
+      Utils.toast('🔓 Modo Sistema / Suporte ativado para manutenção técnica.', 'success');
+      this._activeTab = 'sistema';
+    }
+    const content = document.getElementById('route-content');
+    if (content) {
+      content.innerHTML = this.render(App.obraId);
+    }
+  },
+
   _renderTab(tab, obraId) {
     if (tab === 'empresa') return this._renderEmpresa();
     if (tab === 'contas') return Contas._html(obraId);
-    if (tab === 'sistema') return this._renderSistema();
+    if (tab === 'sistema') {
+      if (!this.canAccessSistema()) return this._renderEmpresa();
+      return this._renderSistema();
+    }
     if (tab === 'categorias') return this._renderCategorias();
     return this._renderUsuarios();
   },
@@ -163,7 +203,18 @@ const Configuracoes = {
             <div style="color:var(--text3);font-size:.76rem;margin-top:8px;">
               CNPJ: ${emp.cnpj || '00.000.000/0000-00'} &middot; ${emp.cidade || 'Cidade'}/${emp.uf || 'UF'}
             </div>
-            ${emp.responsavel ? `<div style="margin-top:12px;font-size:.76rem;color:var(--accent2);background:rgba(201,162,39,.08);padding:4px 10px;border-radius:6px;display:inline-block;">Responsável: ${emp.responsavel} ${emp.crea_cau ? `(${emp.crea_cau})` : ''}</div>` : ''}
+          <!-- CARD WHATSAPP -->
+          <div class="card" style="margin-top:16px;">
+            <div class="card-header"><div class="card-title">📲 Alertas de Boletos e Contas via WhatsApp</div></div>
+            <p style="color:var(--text2);font-size:.84rem;margin-bottom:10px;">Configure o número de telefone da empresa para receber o alerta matinal automático das contas e boletos a pagar.</p>
+            <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+              <button type="button" class="btn btn-sm" onclick="typeof WhatsApp !== 'undefined' && WhatsApp.abrirModalConfig ? WhatsApp.abrirModalConfig() : Utils.toast('Módulo WhatsApp pronto.', 'info')" style="background:#25D366;color:#fff;font-weight:700;display:flex;align-items:center;gap:6px;border:none;padding:8px 14px;border-radius:6px;">
+                📲 Configurar Número &amp; Testar
+              </button>
+              <span style="font-size:.78rem;color:var(--text3);">
+                ${(typeof WhatsApp !== 'undefined' && WhatsApp.getTelefonePadrao && WhatsApp.getTelefonePadrao()) ? `Número ativo: <strong>${WhatsApp.getTelefonePadrao()}</strong>` : 'Nenhum número cadastrado'}
+              </span>
+            </div>
           </div>
         </div>
       </div>`;
@@ -670,8 +721,8 @@ const Configuracoes = {
     <div class="card" style="margin-top:16px;">
       <div class="card-header"><div class="card-title">&#x2139;&#xFE0F; Sobre o Sistema</div></div>
       <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:16px;font-size:.84rem;">
-        <div><div style="color:var(--text3);margin-bottom:4px;">Sistema</div><div style="font-weight:700;">Angelim Construtora</div></div>
-        <div><div style="color:var(--text3);margin-bottom:4px;">Vers&atilde;o</div><div style="font-weight:700;">2.3.0 (Com Neon PostgreSQL &amp; WhatsApp)</div></div>
+        <div><div style="color:var(--text3);margin-bottom:4px;">Sistema / Empresa</div><div style="font-weight:700;">${emp.nome_fantasia || emp.razao_social || 'FinObra Gestão'}</div></div>
+        <div><div style="color:var(--text3);margin-bottom:4px;">Vers&atilde;o</div><div style="font-weight:700;">2.4.0 (FinObra Cloud)</div></div>
         <div><div style="color:var(--text3);margin-bottom:4px;">Armazenamento</div><div style="font-weight:700;color:var(--success);">🐘 Neon PostgreSQL (Nuvem) + Offline Cache</div></div>
         <div><div style="color:var(--text3);margin-bottom:4px;">Status dos Dados</div><div style="font-weight:700;color:${isDemoLoaded?'var(--warning)':'var(--success)'}">${isDemoLoaded?'Demonstração':'Limpo / Produção'}</div></div>
       </div>
@@ -791,3 +842,19 @@ const Configuracoes = {
 
   init() {}
 };
+
+// ── ATALHO PARA EQUIPE DEV / SUPORTE TÉCNICO ──
+if (typeof window !== 'undefined' && !window._cfgDevShortcutInit) {
+  window._cfgDevShortcutInit = true;
+  window.FinObra = window.FinObra || {};
+  window.FinObra.ativarModoDev = () => Configuracoes.toggleDevMode();
+  window.FinObra.modoDev = () => Configuracoes.toggleDevMode();
+
+  document.addEventListener('keydown', (e) => {
+    // Atalho discreto: Ctrl + Alt + S
+    if (e.ctrlKey && e.altKey && (e.key === 's' || e.key === 'S')) {
+      e.preventDefault();
+      Configuracoes.toggleDevMode();
+    }
+  });
+}
