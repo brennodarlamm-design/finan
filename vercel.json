@@ -12,17 +12,10 @@
   ],
   "headers": [
     {
-      "source": "/favicon.ico",
+      "source": "/(.*)(favicon|apple-touch-icon)(.*)",
       "headers": [
         { "key": "Cache-Control", "value": "no-cache, no-store, must-revalidate" },
         { "key": "Pragma", "value": "no-cache" }
-      ]
-    },
-    {
-      "source": "/favicon.svg",
-      "headers": [
-        { "key": "Cache-Control", "value": "no-cache, no-store, must-revalidate" },
-        { "key": "Content-Type", "value": "image/svg+xml" }
       ]
     }
   ],
