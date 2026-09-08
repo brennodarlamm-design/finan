@@ -71,8 +71,8 @@ const App = {
     'produtos': Produtos,
     'master': {
       render() {
-        setTimeout(() => typeof MasterAdmin !== 'undefined' && MasterAdmin.render('route-content'), 0);
-        return '<div style="padding:40px;text-align:center;color:var(--text3)"><span style="font-size:1.5rem;display:block;margin-bottom:8px;">🛡️</span>Carregando Painel Dev Master...</div>';
+        window.location.replace('/master');
+        return '<div style="padding:40px;text-align:center;color:var(--text3)"><span style="font-size:1.5rem;display:block;margin-bottom:8px;">🛡️</span>Redirecionando para o Portal Master...</div>';
       }
     },
     'planos': {
@@ -240,8 +240,7 @@ const App = {
             ${this._navItem('medicoes','🔨','Medições & Faturamento')}
             <div class="nav-section">Relatórios</div>
             ${this._navItem('relatorios','📥','Exportar Relatórios')}
-            <div class="nav-section">Sistema &amp; SaaS</div>
-            ${(u?.username === 'admin' || u?.perfil === 'dev' || u?.perfil === 'superadmin') ? this._navItem('master','🛡️','Painel Dev Master') : ''}
+            <div class="nav-section">Assinatura &amp; Sistema</div>
             ${this._navItem('planos','💎','Planos &amp; Mensalidades')}
             ${this._navItem('contas-bancarias','🏦','Contas Bancárias')}
             ${this._navItem('configuracoes','⚙️','Configurações')}

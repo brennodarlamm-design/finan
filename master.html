@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FinObra — Portal Master do Desenvolvedor</title>
+  <meta name="robots" content="noindex, nofollow">
+  <link rel="icon" type="image/x-icon" href="/favicon.ico">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/style.css">
+  <style>
+    :root {
+      --bg-base: #070d05;
+      --bg-card: #0f1a0b;
+      --accent: #C9A227;
+      --accent2: #E8C84A;
+      --border: rgba(201,162,39,0.25);
+    }
+    body {
+      background: var(--bg-base);
+      color: #f0ead6;
+      font-family: 'Inter', sans-serif;
+      margin: 0;
+      padding: 0;
+      min-height: 100vh;
+    }
+    .master-header {
+      background: linear-gradient(135deg, #11200b, #1c2f13);
+      border-bottom: 1px solid var(--border);
+      padding: 16px 28px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 16px;
+      box-shadow: 0 4px 20px rgba(0,0,0,.5);
+    }
+    .badge-dev {
+      background: rgba(201,162,39,.15);
+      border: 1px solid var(--accent);
+      color: var(--accent2);
+      padding: 4px 12px;
+      border-radius: 20px;
+      font-size: .75rem;
+      font-weight: 800;
+      letter-spacing: .05em;
+    }
+    .btn-action {
+      background: rgba(255,255,255,.05);
+      border: 1px solid var(--border);
+      color: #f0ead6;
+      padding: 8px 16px;
+      border-radius: 8px;
+      font-size: .82rem;
+      font-weight: 700;
+      cursor: pointer;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: all .2s;
+    }
+    .btn-action:hover {
+      background: rgba(201,162,39,.15);
+      color: var(--accent2);
+      border-color: var(--accent);
+    }
+    .metric-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 20px 24px;
+      box-shadow: 0 8px 24px rgba(0,0,0,.3);
+    }
+    .table-container {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      overflow: hidden;
+      margin-bottom: 30px;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Verificação de Acesso / Bloqueio por Senha -->
+  <div id="master-auth-gate" style="display:none;min-height:100vh;align-items:center;justify-content:center;padding:20px;">
+    <div style="background:#0f1710;border:1px solid var(--accent);border-radius:14px;max-width:400px;width:100%;padding:32px;text-align:center;box-shadow:0 20px 50px rgba(0,0,0,.8);">
+      <div style="font-size:2.5rem;margin-bottom:12px;">🛡️</div>
+      <h2 style="font-size:1.3rem;font-weight:900;color:var(--accent2);margin-bottom:6px;">Acesso Restrito ao Dev Master</h2>
+      <p style="font-size:.82rem;color:#94a3b8;margin-bottom:20px;">Informe a senha de administrador do FinObra para gerenciar o SaaS.</p>
+      <input type="password" id="passcode-input" placeholder="Senha do Administrador" style="width:100%;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.2);border-radius:8px;padding:12px;color:#fff;font-size:.9rem;margin-bottom:14px;outline:none;" onkeydown="if(event.key==='Enter') verificarPasscode()">
+      <button onclick="verificarPasscode()" class="btn-primary" style="width:100%;padding:12px;border-radius:8px;font-weight:800;font-size:.9rem;">
+        Entrar no Portal Master ⚡
+      </button>
+      <div style="margin-top:16px;">
+        <a href="/login" style="color:#94a3b8;font-size:.78rem;text-decoration:none;">← Voltar para o Login do Sistema</a>
+      </div>
+    </div>
+  </div>
+
+  <!-- Conteúdo Principal do Painel Master -->
+  <div id="master-app" style="display:none;">
+    
+    <!-- Topbar -->
+    <header class="master-header">
+      <div style="display:flex;align-items:center;gap:14px;">
+        <div style="width:42px;height:42px;border-radius:10px;background:linear-gradient(135deg,#1C2D12,#243818);border:1px solid var(--accent);display:flex;align-items:center;justify-content:center;font-size:1.4rem;box-shadow:0 4px 12px rgba(201,162,39,.3);">
+          🏢
+        </div>
+        <div>
+          <div style="display:flex;align-items:center;gap:8px;">
+            <span style="font-weight:900;font-size:1.15rem;color:var(--accent2);letter-spacing:.02em;">FinObra Master Backoffice</span>
+            <span class="badge-dev">SUPER ADMIN DEV</span>
+          </div>
+          <div style="font-size:.75rem;color:#94a3b8;">Gestão Centralizada de Construtoras, MRR, Assinaturas e Suporte</div>
+        </div>
+      </div>
+
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+        <a href="/apresentacao" target="_blank" class="btn-action" title="Abrir Página de Vendas Externa">
+          <span>📢 Ver Landing Page Comercial</span>
+        </a>
+        <a href="/app" class="btn-action" title="Acessar o Sistema como Usuário">
+          <span>🏗️ Ir ao Sistema FinObra ↗</span>
+        </a>
+        <button onclick="sairMaster()" class="btn-action" style="color:#ef4444;border-color:rgba(239,68,68,.3);" title="Sair do Portal">
+          <span>Sair</span>
+        </button>
+      </div>
+    </header>
+
+    <main style="max-width:1260px;margin:0 auto;padding:26px 20px 60px;">
+      
+      <!-- Topo com Botão Nova Construtora -->
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:24px;flex-wrap:wrap;gap:14px;">
+        <div>
+          <h1 style="font-size:1.6rem;font-weight:900;color:#fff;margin-bottom:4px;">Visão Geral do Negócio SaaS</h1>
+          <div style="font-size:.85rem;color:#94a3b8;">Acompanhe o crescimento de empresas parceiras e faturamento recorrente.</div>
+        </div>
+
+        <div style="display:flex;align-items:center;gap:10px;">
+          <button onclick="MasterAdmin.abrirModalNovaEmpresa()" class="btn-primary" style="padding:10px 18px;border-radius:8px;font-weight:800;display:inline-flex;align-items:center;gap:8px;font-size:.85rem;">
+            <span>➕ Cadastrar Nova Construtora</span>
+          </button>
+        </div>
+      </div>
+
+      <div id="master-content-area">
+        <!-- Renderizado dinamicamente por MasterAdmin.render() -->
+      </div>
+
+    </main>
+
+  </div>
+
+  <!-- Scripts -->
+  <script src="/js/auth.js"></script>
+  <script src="/js/utils.js"></script>
+  <script src="/js/data.js"></script>
+  <script src="/js/suporte.js"></script>
+  <script src="/js/cobranca.js"></script>
+  <script src="/js/master.js"></script>
+
+  <script>
+    function verificarSessaoMaster() {
+      const u = Auth.getUser();
+      const passGravado = sessionStorage.getItem('finobra_master_pass_ok');
+
+      if (passGravado === 'true' || (u && (u.username === 'admin' || u.perfil === 'dev' || u.perfil === 'superadmin'))) {
+        document.getElementById('master-auth-gate').style.display = 'none';
+        document.getElementById('master-app').style.display = 'block';
+        MasterAdmin.render('master-content-area');
+      } else {
+        document.getElementById('master-auth-gate').style.display = 'flex';
+        document.getElementById('master-app').style.display = 'none';
+      }
+    }
+
+    function verificarPasscode() {
+      const p = document.getElementById('passcode-input').value.trim();
+      if (p === 'admin123' || p === 'master123' || p === 'finobra123') {
+        sessionStorage.setItem('finobra_master_pass_ok', 'true');
+        // Garante sessão como admin
+        if (!Auth.isLoggedIn()) {
+          Auth.login('admin', 'admin123', true);
+        }
+        verificarSessaoMaster();
+      } else {
+        alert('Senha incorreta! Digite a senha do administrador.');
+      }
+    }
+
+    function sairMaster() {
+      sessionStorage.removeItem('finobra_master_pass_ok');
+      window.location.href = '/login';
+    }
+
+    window.addEventListener('DOMContentLoaded', () => {
+      verificarSessaoMaster();
+    });
+  </script>
+</body>
+</html>
