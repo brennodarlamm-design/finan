@@ -84,19 +84,52 @@
 </head>
 <body>
 
-  <!-- Verificação de Acesso / Bloqueio por Senha -->
-  <div id="master-auth-gate" style="display:none;min-height:100vh;align-items:center;justify-content:center;padding:20px;">
-    <div style="background:#0f1710;border:1px solid var(--accent);border-radius:14px;max-width:400px;width:100%;padding:32px;text-align:center;box-shadow:0 20px 50px rgba(0,0,0,.8);">
-      <div style="font-size:2.5rem;margin-bottom:12px;">🛡️</div>
-      <h2 style="font-size:1.3rem;font-weight:900;color:var(--accent2);margin-bottom:6px;">Acesso Restrito ao Dev Master</h2>
-      <p style="font-size:.82rem;color:#94a3b8;margin-bottom:20px;">Informe a senha de administrador do FinObra para gerenciar o SaaS.</p>
-      <input type="password" id="passcode-input" placeholder="Senha do Administrador" style="width:100%;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.2);border-radius:8px;padding:12px;color:#fff;font-size:.9rem;margin-bottom:14px;outline:none;" onkeydown="if(event.key==='Enter') verificarPasscode()">
-      <button onclick="verificarPasscode()" class="btn-primary" style="width:100%;padding:12px;border-radius:8px;font-weight:800;font-size:.9rem;">
-        Entrar no Portal Master ⚡
-      </button>
-      <div style="margin-top:16px;">
-        <a href="/login" style="color:#94a3b8;font-size:.78rem;text-decoration:none;">← Voltar para o Login do Sistema</a>
+  <!-- Verificação de Acesso / Bloqueio por Usuário e Senha Master -->
+  <div id="master-auth-gate" style="display:flex;min-height:100vh;align-items:center;justify-content:center;padding:20px;background:radial-gradient(ellipse at center, #121F0D 0%, #060B04 80%);">
+    <div style="background:#0f1a0b;border:1px solid var(--accent);border-radius:16px;max-width:420px;width:100%;padding:36px 30px;box-shadow:0 24px 60px rgba(0,0,0,.85);position:relative;overflow:hidden;">
+      
+      <div style="position:absolute;top:0;left:0;right:0;height:4px;background:linear-gradient(90deg, #10b981, var(--accent), var(--accent2));"></div>
+
+      <div style="text-align:center;margin-bottom:24px;">
+        <div style="width:58px;height:58px;border-radius:14px;background:linear-gradient(135deg,#1C2D12,#243818);border:1px solid var(--accent);display:inline-flex;align-items:center;justify-content:center;font-size:1.8rem;margin-bottom:14px;box-shadow:0 8px 24px rgba(201,162,39,.25);">
+          🛡️
+        </div>
+        <h2 style="font-size:1.35rem;font-weight:900;color:var(--accent2);margin-bottom:4px;letter-spacing:.02em;">Portal Master Dev</h2>
+        <div style="font-size:.78rem;color:#94a3b8;text-transform:uppercase;letter-spacing:.08em;">Acesso Restrito &bull; FinObra SaaS</div>
       </div>
+
+      <div id="master-err-box" style="display:none;background:rgba(239,68,68,.12);border:1px solid rgba(239,68,68,.35);color:#fca5a5;padding:10px 14px;border-radius:8px;font-size:.82rem;margin-bottom:16px;text-align:center;"></div>
+
+      <form onsubmit="executarLoginMaster(event)" style="display:flex;flex-direction:column;gap:14px;">
+        <div>
+          <label style="display:block;font-size:.78rem;color:#cbd5e1;font-weight:700;margin-bottom:6px;">Usuário Master / Dev</label>
+          <div style="position:relative;">
+            <input type="text" id="master-user-input" required placeholder="Digite seu usuário master (ex: admin)" autocomplete="username" style="width:100%;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.18);border-radius:8px;padding:11px 14px 11px 36px;color:#fff;font-size:.88rem;outline:none;transition:border-color .2s;" onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='rgba(255,255,255,.18)'">
+            <span style="position:absolute;left:12px;top:50%;transform:translateY(-50%);font-size:.9rem;color:#94a3b8;pointer-events:none;">👤</span>
+          </div>
+        </div>
+
+        <div>
+          <label style="display:block;font-size:.78rem;color:#cbd5e1;font-weight:700;margin-bottom:6px;">Senha de Segurança</label>
+          <div style="position:relative;">
+            <input type="password" id="master-pass-input" required placeholder="Digite sua senha de acesso" autocomplete="current-password" style="width:100%;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.18);border-radius:8px;padding:11px 40px 11px 36px;color:#fff;font-size:.88rem;outline:none;transition:border-color .2s;" onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='rgba(255,255,255,.18)'">
+            <span style="position:absolute;left:12px;top:50%;transform:translateY(-50%);font-size:.9rem;color:#94a3b8;pointer-events:none;">🔒</span>
+            <button type="button" onclick="alternarVisibilidadeSenha()" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;color:#94a3b8;cursor:pointer;font-size:.9rem;padding:4px;" title="Mostrar / ocultar senha">👁️</button>
+          </div>
+        </div>
+
+        <button type="submit" class="btn-primary" style="margin-top:6px;width:100%;padding:13px;border-radius:8px;font-weight:800;font-size:.92rem;display:flex;align-items:center;justify-content:center;gap:8px;box-shadow:0 8px 24px rgba(201,162,39,.35);cursor:pointer;">
+          <span>Autenticar no Portal Master</span>
+          <span>🛡️</span>
+        </button>
+      </form>
+
+      <div style="margin-top:20px;text-align:center;border-top:1px solid rgba(255,255,255,.08);padding-top:16px;">
+        <a href="/login" style="color:#94a3b8;font-size:.8rem;text-decoration:none;transition:color .2s;">
+          ← Ir para a Área do Cliente
+        </a>
+      </div>
+
     </div>
   </div>
 
@@ -126,7 +159,7 @@
           <span>🏗️ Ir ao Sistema FinObra ↗</span>
         </a>
         <button onclick="sairMaster()" class="btn-action" style="color:#ef4444;border-color:rgba(239,68,68,.3);" title="Sair do Portal">
-          <span>Sair</span>
+          <span>Sair 🔒</span>
         </button>
       </div>
     </header>
@@ -165,36 +198,56 @@
 
   <script>
     function verificarSessaoMaster() {
-      const u = Auth.getUser();
-      const passGravado = sessionStorage.getItem('finobra_master_pass_ok');
+      const isLogged = sessionStorage.getItem('finobra_master_logged') === 'true';
 
-      if (passGravado === 'true' || (u && (u.username === 'admin' || u.perfil === 'dev' || u.perfil === 'superadmin'))) {
+      if (isLogged) {
         document.getElementById('master-auth-gate').style.display = 'none';
         document.getElementById('master-app').style.display = 'block';
         MasterAdmin.render('master-content-area');
       } else {
         document.getElementById('master-auth-gate').style.display = 'flex';
         document.getElementById('master-app').style.display = 'none';
+        setTimeout(() => {
+          const inp = document.getElementById('master-user-input');
+          if (inp) inp.focus();
+        }, 100);
       }
     }
 
-    function verificarPasscode() {
-      const p = document.getElementById('passcode-input').value.trim();
-      if (p === 'admin123' || p === 'master123' || p === 'finobra123') {
-        sessionStorage.setItem('finobra_master_pass_ok', 'true');
-        // Garante sessão como admin
+    function executarLoginMaster(e) {
+      if (e) e.preventDefault();
+      const uInput = (document.getElementById('master-user-input').value || '').trim();
+      const pInput = (document.getElementById('master-pass-input').value || '').trim();
+      const errBox = document.getElementById('master-err-box');
+
+      // Verifica credenciais master
+      // Aceita usuário admin (senha admin123) ou qualquer dev credenciado
+      const isMasterValido = (uInput.toLowerCase() === 'admin' && (pInput === 'admin123' || pInput === 'master123' || pInput === 'finobra123'))
+        || (Auth.login(uInput, pInput, false).success && (uInput.toLowerCase() === 'admin' || Auth.getUser()?.perfil === 'admin' || Auth.getUser()?.perfil === 'dev'));
+
+      if (isMasterValido) {
+        sessionStorage.setItem('finobra_master_logged', 'true');
         if (!Auth.isLoggedIn()) {
-          Auth.login('admin', 'admin123', true);
+          Auth.login(uInput, pInput, true);
         }
+        errBox.style.display = 'none';
         verificarSessaoMaster();
       } else {
-        alert('Senha incorreta! Digite a senha do administrador.');
+        errBox.style.display = 'block';
+        errBox.textContent = 'Usuário ou senha master incorretos. Acesso exclusivo do desenvolvedor.';
       }
+    }
+
+    function alternarVisibilidadeSenha() {
+      const inp = document.getElementById('master-pass-input');
+      if (!inp) return;
+      inp.type = inp.type === 'password' ? 'text' : 'password';
     }
 
     function sairMaster() {
-      sessionStorage.removeItem('finobra_master_pass_ok');
-      window.location.href = '/login';
+      sessionStorage.removeItem('finobra_master_logged');
+      document.getElementById('master-pass-input').value = '';
+      verificarSessaoMaster();
     }
 
     window.addEventListener('DOMContentLoaded', () => {
