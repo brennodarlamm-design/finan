@@ -2,12 +2,28 @@
 
 const WhatsApp = {
   getTelefonePadrao() {
-    return localStorage.getItem('finobra_whatsapp_telefone') || '5595991363678';
+    const salvo = localStorage.getItem('finobra_whatsapp_telefone');
+    if (salvo && salvo.trim()) return salvo.trim();
+    try {
+      if (typeof DB !== 'undefined' && DB.getEmpresa) {
+        const emp = DB.getEmpresa();
+        const telEmp = (emp?.whatsapp || emp?.telefone || '').replace(/\D/g, '');
+        if (telEmp) return telEmp;
+      }
+    } catch (_) {}
+    return '';
   },
 
   setTelefonePadrao(tel) {
     const limpo = (tel || '').replace(/\D/g, '');
     localStorage.setItem('finobra_whatsapp_telefone', limpo);
+    try {
+      if (typeof DB !== 'undefined' && DB.getEmpresa && DB.saveEmpresa) {
+        const emp = DB.getEmpresa() || {};
+        emp.whatsapp = limpo;
+        DB.saveEmpresa(emp);
+      }
+    } catch (_) {}
   },
 
   getEvolutionUrl() {
@@ -63,8 +79,8 @@ const WhatsApp = {
     const numFmt = tel ? (tel.startsWith('55') ? tel : `55${tel}`) : '';
 
     if (!numFmt) {
-      Utils.toast('⚠️ Por favor, informe um número de telefone com DDD.', 'warning');
-      this.abrirModalConfig();
+      Utils.toast('⚠️ Por favor, informe o número de WhatsApp para recebimento.', 'warning');
+      this.abrirModalTelefone();
       return;
     }
 
@@ -225,6 +241,77 @@ const WhatsApp = {
     msg += `👉 _Resumo automático gerado pelo Sistema Financeiro_`;
 
     this.abrirEnvio(msg);
+  },
+
+  // Modal simples e direto para o CLIENTE definir seu WhatsApp de recebimento de boletos
+  abrirModalTelefone() {
+    const telAtual = this.getTelefonePadrao();
+    Utils.showModal(`
+      <div class="modal" style="max-width:440px;">
+        <div class="modal-header">
+          <span class="modal-title">📲 WhatsApp para Alertas &amp; Boletos</span>
+          <button class="modal-close" onclick="Utils.closeModal()">✕</button>
+        </div>
+        <div class="modal-body">
+          <p style="font-size:.84rem;color:var(--text2);margin-bottom:14px;line-height:1.4;">
+            Informe o número de WhatsApp (com DDD) da sua construtora para receber os resumos diários de contas e alertas de vencimento de boletos.
+          </p>
+
+          <div class="form-group" style="margin-bottom:16px;">
+            <label class="form-label" style="font-weight:700;color:var(--accent);">Telefone / WhatsApp com DDD *</label>
+            <input type="text" id="cli-wa-phone" class="form-control"
+              placeholder="Ex: 95 99123-4567 ou 11 98765-4321"
+              value="${telAtual}"
+              style="font-size:1.05rem;font-weight:700;letter-spacing:.02em;"
+              autofocus>
+            <span style="font-size:.74rem;color:var(--text3);margin-top:4px;display:block;">
+              Informe o DDD e o número do celular onde os alertas e boletos serão entregues.
+            </span>
+          </div>
+
+          <div style="background:rgba(37,211,102,.08);border:1px solid rgba(37,211,102,.25);border-radius:var(--r-md);padding:12px;font-size:.8rem;color:var(--text);">
+            <div style="font-weight:700;color:#25d366;margin-bottom:3px;">⚡ Notificações Ativas:</div>
+            Ao clicar em <strong>📲 Resumo WhatsApp</strong> no Dashboard ou nos alertas de boletos, o relatório é enviado diretamente para este número!
+          </div>
+        </div>
+        <div class="modal-footer" style="display:flex;justify-content:space-between;">
+          <button class="btn btn-secondary" onclick="WhatsApp.testarEnvioCliente()">📲 Testar Envio</button>
+          <div style="display:flex;gap:8px;">
+            <button class="btn btn-secondary" onclick="Utils.closeModal()">Cancelar</button>
+            <button class="btn btn-primary" onclick="WhatsApp.salvarTelefoneCliente()">💾 Salvar Número</button>
+          </div>
+        </div>
+      </div>
+    `);
+  },
+
+  salvarTelefoneCliente() {
+    const val = document.getElementById('cli-wa-phone')?.value || '';
+    const limpo = val.replace(/\D/g, '');
+    if (!limpo || limpo.length < 10) {
+      Utils.toast('Por favor, informe um número válido com DDD (mínimo 10 dígitos).', 'warning');
+      return;
+    }
+    this.setTelefonePadrao(limpo);
+    Utils.toast('Número de WhatsApp atualizado com sucesso!', 'success');
+    Utils.closeModal();
+
+    const inputCfgTel = document.getElementById('cfg-emp-tel');
+    if (inputCfgTel) inputCfgTel.value = val;
+    const badgeTel = document.getElementById('cfg-wa-ativo-txt');
+    if (badgeTel) badgeTel.innerHTML = `Número ativo: <strong style="color:var(--success);">${limpo}</strong>`;
+  },
+
+  testarEnvioCliente() {
+    const val = document.getElementById('cli-wa-phone')?.value || '';
+    const limpo = val.replace(/\D/g, '');
+    if (!limpo || limpo.length < 10) {
+      Utils.toast('Por favor, informe um número válido com DDD antes de testar.', 'warning');
+      return;
+    }
+    this.setTelefonePadrao(limpo);
+    const msg = `*FinObra — Teste de Notificação*\n\n✅ Olá! Este número foi conectado com sucesso ao FinObra para o recebimento de alertas de boletos e resumos financeiros da construtora.`;
+    this.abrirEnvio(msg, limpo);
   },
 
   // Modal para configurar o WhatsApp / Evolution API (Exclusivo para Desenvolvedor)

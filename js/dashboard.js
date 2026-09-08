@@ -122,6 +122,9 @@ const Dashboard = {
             <button class="btn btn-sm" onclick="WhatsApp.enviarResumoDiario('${obraId}')" style="background:#25D366;color:#fff;font-weight:700;display:flex;align-items:center;gap:5px;height:28px;padding:0 12px;border-radius:20px;border:none;cursor:pointer;" title="Enviar resumo de boletos para o WhatsApp">
               📲 Resumo WhatsApp
             </button>
+            <button class="btn btn-ghost btn-sm" onclick="WhatsApp.abrirModalTelefone()" title="Definir número de WhatsApp que recebe os alertas" style="padding:2px 8px;font-size:.76rem;color:var(--text2);display:flex;align-items:center;gap:3px;cursor:pointer;">
+              📱 Número
+            </button>
           </div>
         </div>
         <div id="vencimentos" class="custom-scroll" style="max-height:245px;overflow-y:auto;padding-right:6px;">

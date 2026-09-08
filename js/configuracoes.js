@@ -203,6 +203,23 @@ const Configuracoes = {
             <div style="color:var(--text3);font-size:.76rem;margin-top:8px;">
               CNPJ: ${emp.cnpj || '00.000.000/0000-00'} &middot; ${emp.cidade || 'Cidade'}/${emp.uf || 'UF'}
             </div>
+
+            <!-- CARD TELEFONE WHATSAPP CLIENTE -->
+            <div class="card" style="margin-top:16px;background:rgba(255,255,255,.02);border:1px solid var(--border);">
+              <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
+                <div>
+                  <div class="card-title" style="font-size:.92rem;">📲 WhatsApp para Envio de Boletos &amp; Alertas</div>
+                  <div style="font-size:.76rem;color:var(--text3);margin-top:2px;">Número que recebe os resumos matinais e alertas de contas a pagar</div>
+                </div>
+                <button type="button" class="btn btn-sm btn-secondary" onclick="WhatsApp.abrirModalTelefone()" style="font-size:.76rem;display:flex;align-items:center;gap:5px;">
+                  ✏️ Alterar Telefone
+                </button>
+              </div>
+              <div style="font-size:.84rem;color:var(--text);display:flex;align-items:center;gap:8px;padding-top:4px;">
+                <span style="font-size:1.1rem;">📱</span>
+                <span id="cfg-wa-ativo-txt">Número ativo: <strong style="color:var(--success);">${(typeof WhatsApp !== 'undefined' && WhatsApp.getTelefonePadrao()) ? WhatsApp.getTelefonePadrao() : 'Nenhum número cadastrado'}</strong></span>
+              </div>
+            </div>
           </div>
         </div>
       </div>`;
@@ -292,6 +309,9 @@ const Configuracoes = {
       configurada: true
     };
     DB.saveEmpresa(empresaData);
+    if (empresaData.whatsapp && typeof WhatsApp !== 'undefined') {
+      WhatsApp.setTelefonePadrao(empresaData.whatsapp);
+    }
     Utils.toast('Dados da empresa salvos com sucesso!', 'success');
     App.renderShell();
     this._switch('empresa');
