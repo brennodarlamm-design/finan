@@ -4,11 +4,9 @@
   "trailingSlash": false,
   "rewrites": [
     { "source": "/api/(.*)", "destination": "/api/$1" },
-    { "source": "/login", "destination": "/index.html" },
-    { "source": "/validar", "destination": "/validar.html" },
-    { "source": "/validar/(.*)", "destination": "/validar.html" },
-    { "source": "/app", "destination": "/app.html" },
-    { "source": "/app/(.*)", "destination": "/app.html" }
+    { "source": "/login", "destination": "/" },
+    { "source": "/validar/(.*)", "destination": "/validar" },
+    { "source": "/app/(.*)", "destination": "/app" }
   ],
   "functions": {
     "api/reconhecer-documento.js": {
