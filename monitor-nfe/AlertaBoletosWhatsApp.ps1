@@ -57,7 +57,7 @@ function EnviarWhatsApp {
         
         $targetUrl = $url
         if (-not $targetUrl) {
-            $targetUrl = "https://finan-as-bay.vercel.app/api/send-whatsapp"
+            $targetUrl = "https://finobra.app.br/api/send-whatsapp"
         }
 
         $resp = Invoke-WebRequest -Uri $targetUrl -Method Post -Headers $headers -Body $body -UseBasicParsing -TimeoutSec 15
@@ -66,7 +66,7 @@ function EnviarWhatsApp {
     } catch {
         Log "Tentando envio via API Vercel de contingencia..." "WARN"
         try {
-            $vercelUrl = "https://finan-as-bay.vercel.app/api/send-whatsapp"
+            $vercelUrl = "https://finobra.app.br/api/send-whatsapp"
             $resp2 = Invoke-WebRequest -Uri $vercelUrl -Method Post -Headers @{ "Content-Type" = "application/json" } -Body $body -UseBasicParsing -TimeoutSec 15
             Log "Mensagem enviada via Vercel Proxy! HTTP $($resp2.StatusCode)"
             return $true
@@ -101,7 +101,7 @@ Log "Consultando contas a pagar com vencimento ate hoje ou pendentes..."
 # Consulta os lancamentos da nuvem
 $lancamentos = @()
 try {
-    $apiUrl = "https://finan-as-bay.vercel.app/api/db?table=all"
+    $apiUrl = "https://finobra.app.br/api/db?table=all"
     $response = Invoke-RestMethod -Uri $apiUrl -Method Get -TimeoutSec 15
     if ($response.success -and $response.data.lancamentos) {
         $lancamentos = $response.data.lancamentos

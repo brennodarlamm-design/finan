@@ -350,7 +350,7 @@ const Assinador = {
     if (!sig) return '';
     const origin = (typeof window !== 'undefined' && window.location && window.location.origin && window.location.origin !== 'null' && window.location.protocol.startsWith('http'))
       ? window.location.origin
-      : 'https://finan-as-bay.vercel.app';
+      : 'https://finobra.app.br';
 
     const params = new URLSearchParams();
     if (sig.codigo_validacao) params.set('val', sig.codigo_validacao);
@@ -382,7 +382,7 @@ const Assinador = {
     const docId = opts.docId || '';
     const urlValidacao = this.gerarUrlValidacao(sig, docTipo, docId);
     const qrUrl = this.gerarQRCodeUrl(urlValidacao, 160);
-    const originHost = (typeof window !== 'undefined' && window.location && window.location.host) ? window.location.host : 'finan-as-bay.vercel.app';
+    const originHost = (typeof window !== 'undefined' && window.location && window.location.host) ? window.location.host : 'finobra.app.br';
 
     return `
     <div style="margin-top:12px;background:#f8fafc;border:1.5px solid #10b981;border-radius:6px;padding:10px 14px;display:flex;align-items:center;justify-content:space-between;gap:14px;text-align:left;color:#0f172a;box-shadow:0 2px 6px rgba(16,185,129,0.12);">
