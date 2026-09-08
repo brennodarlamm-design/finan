@@ -27,6 +27,8 @@ const App = {
     'fornecedores': ['fornecedores'],
     'produtos': ['produtos', 'materiais'],
     'configuracoes': ['configuracoes', 'ajustes'],
+    'master': ['master', 'dev', 'admin-master', 'tenants', 'empresas'],
+    'planos': ['planos', 'cobranca', 'assinaturas', 'mensalidades'],
     'dashboard': ['dashboard', 'inicio', 'home']
   },
 
@@ -66,7 +68,19 @@ const App = {
     'contas': Contas,
     'configuracoes': Configuracoes,
     'fornecedores': Fornecedores,
-    'produtos': Produtos
+    'produtos': Produtos,
+    'master': {
+      render() {
+        setTimeout(() => typeof MasterAdmin !== 'undefined' && MasterAdmin.render('route-content'), 0);
+        return '<div style="padding:40px;text-align:center;color:var(--text3)"><span style="font-size:1.5rem;display:block;margin-bottom:8px;">🛡️</span>Carregando Painel Dev Master...</div>';
+      }
+    },
+    'planos': {
+      render() {
+        setTimeout(() => typeof Cobranca !== 'undefined' && Cobranca.renderTelaPlanos('route-content'), 0);
+        return '<div style="padding:40px;text-align:center;color:var(--text3)"><span style="font-size:1.5rem;display:block;margin-bottom:8px;">💎</span>Carregando Planos &amp; Mensalidades...</div>';
+      }
+    }
   },
 
   routeMeta: {
@@ -95,6 +109,8 @@ const App = {
     'fornecedores':      { icon:'🚛', label:'Fornecedores' },
     'produtos':          { icon:'📦', label:'Produtos / Insumos' },
     'configuracoes':     { icon:'⚙️', label:'Configurações' },
+    'master':            { icon:'🛡️', label:'Painel Dev Master' },
+    'planos':            { icon:'💎', label:'Planos & Mensalidades' },
   },
 
   _getRouteFromUrl() {
@@ -224,7 +240,9 @@ const App = {
             ${this._navItem('medicoes','🔨','Medições & Faturamento')}
             <div class="nav-section">Relatórios</div>
             ${this._navItem('relatorios','📥','Exportar Relatórios')}
-            <div class="nav-section">Sistema</div>
+            <div class="nav-section">Sistema &amp; SaaS</div>
+            ${(u?.username === 'admin' || u?.perfil === 'dev' || u?.perfil === 'superadmin') ? this._navItem('master','🛡️','Painel Dev Master') : ''}
+            ${this._navItem('planos','💎','Planos &amp; Mensalidades')}
             ${this._navItem('contas-bancarias','🏦','Contas Bancárias')}
             ${this._navItem('configuracoes','⚙️','Configurações')}
             <a href="/validar" target="_blank" class="nav-item" style="text-decoration:none;color:var(--accent2);margin-top:4px;border:1px dashed rgba(201,162,39,0.3);border-radius:6px;" title="Portal público para consultar autenticidade de documentos por código">
@@ -257,6 +275,8 @@ const App = {
               <span style="font-size:.9rem;">🛡️</span>
               <span style="font-size:.78rem;font-weight:700;">Validar Documento</span>
             </a>
+            <!-- Dropdown Suporte Técnico & Atendimento -->
+            ${typeof Suporte !== 'undefined' ? Suporte.renderHeaderDropdown() : ''}
             <!-- Botão Busca Global -->
             <div class="header-search-btn" onclick="typeof BuscaGlobal !== 'undefined' && BuscaGlobal.abrir()" title="Busca Global em todo o sistema (Ctrl+K)" style="cursor:pointer;display:flex;align-items:center;gap:6px;background:rgba(255,255,255,.05);border:1px solid var(--border);border-radius:8px;padding:5px 10px;transition:all .2s;">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
