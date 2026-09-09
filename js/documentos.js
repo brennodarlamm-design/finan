@@ -270,14 +270,14 @@ const Documentos = {
           <!-- Área de Upload / Dropzone -->
           <div style="border:2px dashed var(--border);border-radius:var(--r-md);padding:20px;text-align:center;background:var(--bg-card);margin-bottom:20px;">
             <div style="font-size:2rem;margin-bottom:6px;">📄</div>
-            <div style="font-weight:700;margin-bottom:4px;color:var(--text);">Adicionar Boleto, Comprovante ou Foto</div>
-            <div style="font-size:.76rem;color:var(--text3);margin-bottom:12px;">Formatos aceitos: PDF, PNG, JPG, JPEG (Máx. 5MB)</div>
+            <div style="font-weight:700;margin-bottom:4px;color:var(--text);">Adicionar Boleto, Comprovante, Foto ou Pacote</div>
+            <div style="font-size:.76rem;color:var(--text3);margin-bottom:12px;">Formatos aceitos: PDF, Imagens, ZIP, RAR, 7Z, DWG, DOCX (Máx. 20MB)</div>
             
             <div style="display:flex;gap:8px;max-width:420px;margin:0 auto;flex-wrap:wrap;justify-content:center;">
               <input type="text" id="doc-titulo-input" class="form-control form-control-sm" placeholder="Nome/Descrição do documento (opcional)" style="flex:1;min-width:180px;">
               <label class="btn btn-primary btn-sm" style="cursor:pointer;margin:0;">
                 📁 Escolher Arquivo
-                <input type="file" id="doc-file-input" accept="image/*,application/pdf" style="display:none;" onchange="Documentos._onUpload('${entidadeTipo}', '${entidadeId}', this)">
+                <input type="file" id="doc-file-input" accept="image/*,application/pdf,.zip,.rar,.7z,.tar,.gz,.dwg,.dxf,.doc,.docx,.xls,.xlsx,.odt,.txt" style="display:none;" onchange="Documentos._onUpload('${entidadeTipo}', '${entidadeId}', this)">
               </label>
             </div>
           </div>
@@ -302,9 +302,13 @@ const Documentos = {
   },
 
   _renderDocRow(d) {
-    const isPDF = d.tipo_mime === 'application/pdf' || (d.nome_arquivo || '').toLowerCase().endsWith('.pdf');
-    const icon = isPDF ? '📕' : '🖼️';
-    const tamKB = d.tamanho ? `${(d.tamanho / 1024).toFixed(1)} KB` : '';
+    const nome = (d.nome_arquivo || d.titulo || '').toLowerCase();
+    const isPDF = d.tipo_mime === 'application/pdf' || nome.endsWith('.pdf');
+    const isZip = nome.match(/\.(zip|rar|7z|tar|gz)$/i);
+    const isCAD = nome.match(/\.(dwg|dxf)$/i);
+    const isImg = (d.tipo_mime && d.tipo_mime.startsWith('image/')) || nome.match(/\.(png|jpg|jpeg|webp|svg)$/i);
+    const icon = isPDF ? '📕' : isZip ? '📦' : isCAD ? '📐' : isImg ? '🖼️' : '📎';
+    const tamKB = d.tamanho ? `${(d.tamanho / (1024 * (d.tamanho > 1024 * 1024 ? 1024 : 1))).toFixed(1)} ${d.tamanho > 1024 * 1024 ? 'MB' : 'KB'}` : '';
 
     return `
     <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--r-md);gap:12px;">
@@ -337,8 +341,8 @@ const Documentos = {
     const file = input.files?.[0];
     if (!file) return;
 
-    if (file.size > 5 * 1024 * 1024) {
-      Utils.toast('Arquivo muito grande! O limite máximo é de 5MB.', 'error');
+    if (file.size > 20 * 1024 * 1024) {
+      Utils.toast('Arquivo muito grande! O limite máximo é de 20MB.', 'error');
       input.value = '';
       return;
     }
@@ -411,8 +415,12 @@ const Documentos = {
       return;
     }
 
-    const isPDF = doc.tipo_mime === 'application/pdf' || (doc.nome_arquivo || '').toLowerCase().endsWith('.pdf');
-    const isHTML = doc.tipo_mime === 'text/html' || (doc.nome_arquivo || '').toLowerCase().endsWith('.html') || conteudo.startsWith('data:text/html');
+    const nomeNorm = (doc.nome_arquivo || doc.titulo || '').toLowerCase();
+    const isPDF = doc.tipo_mime === 'application/pdf' || nomeNorm.endsWith('.pdf');
+    const isHTML = doc.tipo_mime === 'text/html' || nomeNorm.endsWith('.html') || conteudo.startsWith('data:text/html');
+    const isImage = (doc.tipo_mime && doc.tipo_mime.startsWith('image/')) || nomeNorm.match(/\.(png|jpg|jpeg|webp|gif|svg)$/i) || conteudo.startsWith('data:image/');
+    const isZip = nomeNorm.match(/\.(zip|rar|7z|tar|gz)$/i);
+    const isCAD = nomeNorm.match(/\.(dwg|dxf)$/i);
 
     Utils.showModal(`
       <div class="modal" style="max-width:850px;width:95vw;height:85vh;display:flex;flex-direction:column;">
@@ -426,9 +434,21 @@ const Documentos = {
         <div class="modal-body" style="flex:1;padding:0;overflow:hidden;background:#0f172a;display:flex;align-items:center;justify-content:center;">
           ${isPDF || isHTML ? `
             <iframe src="${conteudo}" style="width:100%;height:100%;border:none;background:#ffffff;"></iframe>
-          ` : `
+          ` : isImage ? `
             <div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;padding:16px;overflow:auto;">
               <img src="${conteudo}" style="max-width:100%;max-height:100%;object-fit:contain;border-radius:4px;box-shadow:0 4px 20px rgba(0,0,0,0.5);" onerror="this.parentElement.innerHTML='<div style=\\'color:#fff;padding:20px;text-align:center;\\'>Não foi possível exibir a pré-visualização. Clique em Baixar para ver o arquivo.</div>'">
+            </div>
+          ` : `
+            <div style="width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:30px;text-align:center;">
+              <div style="font-size:4rem;margin-bottom:12px;">${isZip ? '📦' : isCAD ? '📐' : '📎'}</div>
+              <h3 style="font-size:1.15rem;font-weight:700;color:#fff;margin-bottom:8px;">${doc.titulo || doc.nome_arquivo}</h3>
+              <p style="font-size:.84rem;color:#94a3b8;max-width:440px;line-height:1.5;margin-bottom:20px;">
+                ${isZip ? 'Arquivo Compactado (ZIP/RAR/7Z).' : isCAD ? 'Projeto Técnico / Desenho CAD (DWG/DXF).' : 'Arquivo Binário.'}
+                <br>Este formato não pode ser visualizado diretamente no navegador. Baixe para abri-lo no seu computador.
+              </p>
+              <button class="btn btn-primary" onclick="Documentos.baixar('${doc.id}')" style="padding:10px 24px;font-size:.9rem;font-weight:700;">
+                ⬇️ Baixar Arquivo
+              </button>
             </div>
           `}
         </div>

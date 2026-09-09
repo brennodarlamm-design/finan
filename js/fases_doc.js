@@ -370,10 +370,10 @@ const FasesDoc = {
                  ondrop="event.preventDefault();this.classList.remove('drag-over');FasesDoc._handleDrop(event,'${obraId}','${docId}')">
               <div style="font-size:1.4rem;margin-bottom:5px">📁</div>
               <div style="font-size:.82rem;color:var(--text2);font-weight:600">Clique ou arraste o arquivo</div>
-              <div style="font-size:.71rem;color:var(--text3);margin-top:3px">PDF, PNG, JPG, DWG, DOC, XLSX</div>
+              <div style="font-size:.71rem;color:var(--text3);margin-top:3px">PDF, PNG, JPG, DWG, XLSX, ZIP, RAR</div>
             </div>
             <input type="file" id="fd-file-in-${docId}" style="display:none" multiple
-                   accept=".pdf,.png,.jpg,.jpeg,.dwg,.dxf,.doc,.docx,.xls,.xlsx,.odt"
+                   accept=".pdf,.png,.jpg,.jpeg,.dwg,.dxf,.doc,.docx,.xls,.xlsx,.odt,.zip,.rar,.7z,.tar,.gz"
                    onchange="FasesDoc._handleFileSelect(event,'${obraId}','${docId}')">
           </div>
         </div>
@@ -395,15 +395,17 @@ const FasesDoc = {
   _arqItemHtml(obraId, docId, aid) {
     const d = typeof Documentos !== 'undefined' ? Documentos.getById(aid) : null;
     const nome = d?.titulo || d?.nome || aid;
-    const icone = nome.match(/\.pdf$/i) ? '📄' : nome.match(/\.(png|jpg|jpeg)$/i) ? '🖼️' : nome.match(/\.(dwg|dxf)$/i) ? '📐' : '📎';
+    const icone = nome.match(/\.pdf$/i) ? '📄' : nome.match(/\.(png|jpg|jpeg|webp)$/i) ? '🖼️' : nome.match(/\.(dwg|dxf)$/i) ? '📐' : nome.match(/\.(zip|rar|7z|tar|gz)$/i) ? '📦' : '📎';
     return `<div class="rec-item" id="arq-row-${aid}" style="margin-bottom:6px">
       <span style="font-size:1rem">${icone}</span>
       <div style="flex:1;min-width:0;font-size:.8rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${nome}</div>
       <div style="display:flex;gap:5px;flex-shrink:0">
         <button class="btn btn-sm btn-ghost" style="padding:2px 8px;font-size:.72rem"
-                onclick="typeof Documentos!=='undefined'&&Documentos.visualizar('${aid}')">👁 Ver</button>
+                onclick="typeof Documentos!=='undefined'&&Documentos.visualizar('${aid}')" title="Visualizar ou Baixar">👁 Ver</button>
+        <button class="btn btn-sm btn-ghost" style="padding:2px 8px;font-size:.72rem"
+                onclick="typeof Documentos!=='undefined'&&Documentos.baixar('${aid}')" title="Baixar arquivo">⬇️</button>
         <button class="btn btn-sm btn-ghost" style="padding:2px 8px;font-size:.72rem;color:var(--danger)"
-                onclick="FasesDoc._removerArqModal('${obraId}','${docId}','${aid}')">🗑</button>
+                onclick="FasesDoc._removerArqModal('${obraId}','${docId}','${aid}')" title="Remover anexo">🗑</button>
       </div>
     </div>`;
   },
