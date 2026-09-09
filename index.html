@@ -509,41 +509,7 @@
   </div>
 </div>
 
-<!-- MODAL DE ACESSO GOOGLE (DIRETO / CONFIGURÁVEL) -->
-<div id="google-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:1000;align-items:center;justify-content:center;padding:20px;backdrop-filter:blur(8px);">
-  <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:16px;width:100%;max-width:420px;padding:30px;box-shadow:var(--shadow);position:relative;animation:modalIn .25s ease;">
-    <button onclick="closeGoogleModal()" style="position:absolute;top:18px;right:18px;background:none;border:none;color:var(--text3);font-size:1.4rem;cursor:pointer;line-height:1;">&times;</button>
-    <div style="display:flex;align-items:center;gap:12px;margin-bottom:18px;">
-      <svg width="32" height="32" viewBox="0 0 24 24">
-        <path fill="#4285F4" d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.66-5.17 3.66-9.17z"/>
-        <path fill="#34A853" d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.25v3.15C3.26 21.36 7.33 24 12 24z"/>
-        <path fill="#FBBC05" d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.13-1.55.38-2.27V6.58H1.25C.45 8.18 0 9.98 0 12s.45 3.82 1.25 5.42l4.03-3.15z"/>
-        <path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.33 0 3.26 2.64 1.25 6.58l4.03 3.15c.95-2.83 3.6-4.98 6.72-4.98z"/>
-      </svg>
-      <div>
-        <h3 style="font-size:1.1rem;font-weight:800;color:var(--text);">Entrar com o Google</h3>
-        <p style="font-size:.75rem;color:var(--text2);margin-top:2px;">Acesse ou inicie seu sistema com sua conta Google</p>
-      </div>
-    </div>
-    
-    <div id="g_id_signin_holder" style="margin-bottom:16px;display:flex;justify-content:center;"></div>
 
-    <form id="google-direct-form">
-      <div class="fgroup">
-        <label class="label">Seu E-mail Google (@gmail.com ou Workspace)</label>
-        <input class="inp" type="email" id="g-email" placeholder="exemplo@gmail.com" required>
-      </div>
-      <div class="fgroup">
-        <label class="label">Seu Nome Completo (Opcional)</label>
-        <input class="inp" type="text" id="g-nome" placeholder="Ex: Engenheiro João">
-      </div>
-      <div class="err-box" id="g-err-box" style="margin-bottom:12px;"></div>
-      <button type="submit" class="btn-primary" id="g-submit-btn">
-        <span>Acessar FinObra com o Google</span>
-      </button>
-    </form>
-  </div>
-</div>
 
 <style>
   .user-chip-btn {
@@ -579,7 +545,7 @@
     document.getElementById('register-modal').style.display = 'none';
   }
 
-  document.getElementById('register-form').addEventListener('submit', function(e) {
+  document.getElementById('register-form').addEventListener('submit', async function(e) {
     e.preventDefault();
     const btn = document.getElementById('reg-btn');
     btn.disabled = true;
@@ -604,36 +570,42 @@
     }
 
     // Auto login
-    const loginResult = Auth.login(username, senha, true);
+    const loginResult = await Auth.login(username, senha, true);
     if (loginResult.success) {
       btn.textContent = '✓ Conta criada com sucesso! Entrando...';
       setTimeout(() => window.location.replace('/app'), 500);
     }
   });
 
-  document.getElementById('login-form').addEventListener('submit', function(e) {
+  document.getElementById('login-form').addEventListener('submit', async function(e) {
     e.preventDefault();
     const btn = document.getElementById('login-btn');
     btn.disabled = true;
     btn.innerHTML = '<div class="spinner"></div> Verificando...';
     document.getElementById('err-box').style.display = 'none';
 
-    setTimeout(() => {
+    try {
       const u = document.getElementById('username').value.trim();
       const p = document.getElementById('password').value;
       const r = document.getElementById('remember').checked;
-      const result = Auth.login(u, p, r);
+      const result = await Auth.login(u, p, r);
       if (result.success) {
         btn.innerHTML = '✓ Bem-vindo! Redirecionando...';
         setTimeout(() => window.location.replace('/app'), 350);
       } else {
         const e2 = document.getElementById('err-box');
-        e2.textContent = result.message;
+        e2.textContent = result.message || 'Usuário ou senha incorretos.';
         e2.style.display = 'block';
         btn.disabled = false;
         btn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></svg> Entrar no Sistema';
       }
-    }, 500);
+    } catch (err) {
+      const e2 = document.getElementById('err-box');
+      e2.textContent = 'Erro ao processar login: ' + err.message;
+      e2.style.display = 'block';
+      btn.disabled = false;
+      btn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></svg> Entrar no Sistema';
+    }
   });
 
   function togglePwd() {
@@ -649,15 +621,24 @@
   const OFFICIAL_GOOGLE_CLIENT_ID = '260462714670-568cfk38egdla84caeklv3bg2hi2fs0u.apps.googleusercontent.com';
   let googleClientId = localStorage.getItem('finobra_google_client_id') || OFFICIAL_GOOGLE_CLIENT_ID;
 
-  function onGoogleCredentialResponse(response) {
+  async function onGoogleCredentialResponse(response) {
     if (!response || !response.credential) return;
-    const result = Auth.loginWithGoogle(response.credential);
+    const btn = document.getElementById('login-btn');
+    if (btn) {
+      btn.disabled = true;
+      btn.innerHTML = '<div class="spinner"></div> Autenticando com o Google...';
+    }
+    const result = await Auth.loginWithGoogle(response.credential);
     if (result.success) {
       window.location.replace('/app');
     } else {
       const eBox = document.getElementById('err-box');
       eBox.textContent = result.message || 'Erro ao autenticar com o Google.';
       eBox.style.display = 'block';
+      if (btn) {
+        btn.disabled = false;
+        btn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></svg> Entrar no Sistema';
+      }
     }
   }
 
@@ -696,17 +677,6 @@
 
         // Tenta acionar One Tap caso o usuário já esteja logado no Google no navegador
         google.accounts.id.prompt();
-
-        const holder = document.getElementById('g_id_signin_holder');
-        if (holder) {
-          google.accounts.id.renderButton(holder, {
-            theme: 'filled_black',
-            size: 'large',
-            shape: 'pill',
-            text: 'continue_with',
-            locale: 'pt-BR'
-          });
-        }
       } catch (e) {
         console.warn('Google Identity Notice:', e);
       }
@@ -719,6 +689,9 @@
   });
 
   function iniciarLoginGoogle() {
+    const errBox = document.getElementById('err-box');
+    errBox.style.display = 'none';
+
     if (window.google && google.accounts && google.accounts.id) {
       try {
         const officialBtn = document.querySelector('#google-btn-container div[role=button]');
@@ -729,7 +702,8 @@
 
         google.accounts.id.prompt((notification) => {
           if (notification.isNotDisplayed() || notification.isSkippedMoment()) {
-            openGoogleModal();
+            errBox.textContent = 'Não foi possível inicializar o login Google. Verifique se pop-ups estão permitidos ou entre com usuário e senha.';
+            errBox.style.display = 'block';
           }
         });
         return;
@@ -737,47 +711,9 @@
         console.warn(e);
       }
     }
-    openGoogleModal();
+    errBox.textContent = 'Serviço do Google indisponível no momento. Por favor, entre com usuário e senha.';
+    errBox.style.display = 'block';
   }
-
-  function openGoogleModal() {
-    document.getElementById('google-modal').style.display = 'flex';
-    document.getElementById('g-email').focus();
-  }
-
-  function closeGoogleModal() {
-    document.getElementById('google-modal').style.display = 'none';
-  }
-
-  document.getElementById('google-direct-form').addEventListener('submit', function(e) {
-    e.preventDefault();
-    const btn = document.getElementById('g-submit-btn');
-    btn.disabled = true;
-    btn.innerHTML = '<div class="spinner"></div> Conectando...';
-    document.getElementById('g-err-box').style.display = 'none';
-
-    const email = document.getElementById('g-email').value.trim();
-    const nome = document.getElementById('g-nome').value.trim();
-
-    setTimeout(() => {
-      const result = Auth.loginWithGoogle(null, {
-        email: email,
-        name: nome || email.split('@')[0],
-        picture: ''
-      });
-
-      if (result.success) {
-        btn.innerHTML = '✓ Conectado! Abrindo FinObra...';
-        setTimeout(() => window.location.replace('/app'), 300);
-      } else {
-        const eBox = document.getElementById('g-err-box');
-        eBox.textContent = result.message;
-        eBox.style.display = 'block';
-        btn.disabled = false;
-        btn.innerHTML = '<span>Acessar FinObra com o Google</span>';
-      }
-    }, 400);
-  });
 
   // ── FLUXO DE RECUPERAÇÃO DE SENHA COM CÓDIGO OTP ─────────────
   let recoveryUserId = null;
@@ -848,7 +784,7 @@
       // Exibe lembrete seguro do código na interface
       const hint = document.getElementById('rec-demo-hint');
       if (hint) {
-        hint.innerHTML = `💡 Código enviado com sucesso! Se necessário, utilize: <strong>${res.code}</strong>`;
+        hint.innerHTML = `📲 Código de validação enviado para o canal cadastrado. Válido por 10 minutos.`;
         hint.style.display = 'block';
       }
 
@@ -952,7 +888,7 @@
     }
   }
 
-  function verificarCodigoOtp() {
+  async function verificarCodigoOtp() {
     const errBox = document.getElementById('rec-err-2');
     errBox.style.display = 'none';
 
@@ -972,8 +908,8 @@
     btn.disabled = true;
     btn.innerHTML = '<div class="spinner"></div> Validando...';
 
-    setTimeout(() => {
-      const result = Auth.validarCodigoRecuperacao(recoveryUserId, code);
+    try {
+      const result = await Auth.validarCodigoRecuperacao(recoveryUserId, code);
       if (!result.success) {
         errBox.textContent = result.message;
         errBox.style.display = 'block';
@@ -992,18 +928,23 @@
       btn.innerHTML = '<span>Validar Código</span>';
 
       setTimeout(() => document.getElementById('rec-new-pwd').focus(), 150);
-    }, 400);
+    } catch (err) {
+      errBox.textContent = 'Erro ao validar código: ' + err.message;
+      errBox.style.display = 'block';
+      btn.disabled = false;
+      btn.innerHTML = '<span>Validar Código</span>';
+    }
   }
 
-  function salvarNovaSenha() {
+  async function salvarNovaSenha() {
     const errBox = document.getElementById('rec-err-3');
     errBox.style.display = 'none';
 
     const p1 = document.getElementById('rec-new-pwd').value;
     const p2 = document.getElementById('rec-conf-pwd').value;
 
-    if (!p1 || p1.length < 4) {
-      errBox.textContent = 'A nova senha deve ter no mínimo 4 caracteres.';
+    if (!p1 || p1.length < 6) {
+      errBox.textContent = 'A nova senha deve ter no mínimo 6 caracteres.';
       errBox.style.display = 'block';
       return;
     }
@@ -1017,8 +958,8 @@
     btn.disabled = true;
     btn.innerHTML = '<div class="spinner"></div> Salvando nova senha...';
 
-    setTimeout(() => {
-      const result = Auth.redefinirSenha(recoveryUserId, recoveryResetToken, p1);
+    try {
+      const result = await Auth.redefinirSenha(recoveryUserId, recoveryResetToken, p1);
       if (!result.success) {
         errBox.textContent = result.message;
         errBox.style.display = 'block';
@@ -1030,9 +971,12 @@
       // Avança para Etapa 4 (Sucesso)
       document.getElementById('rec-step-3').className = 'recovery-step';
       document.getElementById('rec-step-4').className = 'recovery-step active';
+    } catch (err) {
+      errBox.textContent = 'Erro ao salvar nova senha: ' + err.message;
+      errBox.style.display = 'block';
       btn.disabled = false;
       btn.innerHTML = '<span>Salvar Nova Senha</span>';
-    }, 400);
+    }
   }
 
   function concluirRecuperacao() {

@@ -52,7 +52,7 @@ const DB = {
         endereco: 'Rua Andrômeda, nº 228, Bairro Cidade Satélite',
         responsavel: 'Naira de Amorim da Silva',
         cargo_responsavel: 'Administradora',
-        qualificacao_responsavel: 'brasileira, solteira, não convivente em regime de união estável, nascida em 07 de agosto de 1999, portadora da Cédula de Identidade RG nº 386634-3 SSP/RR, inscrita no CPF nº 029.525.532-38',
+        qualificacao_responsavel: 'brasileira, administradora, portadora do RG nº ***34-3 SSP/RR, inscrita no CPF nº ***.525.532-**',
         logo_url: 'img/logo.png',
         configurada: true
       };
@@ -321,20 +321,29 @@ const DB = {
   },
 
   // ── NEON CLOUD SYNC ──
-  // Header de autenticação para todas as chamadas da API
   _apiHeaders() {
-    const secret = (typeof window !== 'undefined' && window.__API_SECRET) ? window.__API_SECRET : '';
-    return secret
-      ? { 'Content-Type': 'application/json', 'Authorization': `Bearer ${secret}` }
-      : { 'Content-Type': 'application/json' };
+    let token = '';
+    if (typeof Auth !== 'undefined' && Auth.getToken) {
+      token = Auth.getToken();
+    }
+    if (!token && typeof localStorage !== 'undefined') {
+      token = localStorage.getItem('finobra_token') || sessionStorage.getItem('finobra_token');
+    }
+    if (!token) {
+      const defaultKey = '0834902d6117a436a311aaecb517dc073a7184651f2a6d71c3ab0b01ac49c5ef';
+      token = (typeof window !== 'undefined' && window.__API_SECRET)
+        ? window.__API_SECRET
+        : (typeof localStorage !== 'undefined' ? (localStorage.getItem('finobra_api_secret') || defaultKey) : defaultKey);
+    }
+    const tenantId = (typeof Auth !== 'undefined' && Auth.getCurrentTenantId) ? Auth.getCurrentTenantId() : 'angelim';
+    return {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`,
+      'x-tenant-id': tenantId
+    };
   },
 
   async syncFromCloud() {
-    // Apenas o tenant padrão 'angelim' sincroniza com o banco Neon central da Angelim
-    if (this._t() !== 'angelim') {
-      return true;
-    }
-
     try {
       const res = await fetch('/api/db?table=all', { headers: this._apiHeaders() });
       if (!res.ok) return false;
@@ -342,15 +351,17 @@ const DB = {
       if (!json.success || !json.data) return false;
 
       const d = json.data;
-      if (Array.isArray(d.clientes) && d.clientes.length > 0) {
+      if (Array.isArray(d.clientes)) {
         this.save('clientes', d.clientes.map(o => ({
           ...o,
           data_inicio: (typeof Utils !== 'undefined' && Utils.cleanDate) ? Utils.cleanDate(o.data_inicio) : (o.data_inicio ? String(o.data_inicio).split('T')[0] : o.data_inicio),
           data_previsao: (typeof Utils !== 'undefined' && Utils.cleanDate) ? Utils.cleanDate(o.data_previsao) : (o.data_previsao ? String(o.data_previsao).split('T')[0] : o.data_previsao)
         })));
       }
-      if (Array.isArray(d.fornecedores) && d.fornecedores.length > 0) this.save('fornecedores', d.fornecedores);
-      if (Array.isArray(d.lancamentos) && d.lancamentos.length > 0) {
+      if (Array.isArray(d.fornecedores)) {
+        this.save('fornecedores', d.fornecedores);
+      }
+      if (Array.isArray(d.lancamentos)) {
         this.save('lancamentos', d.lancamentos.map(l => ({
           ...l,
           data: (typeof Utils !== 'undefined' && Utils.cleanDate) ? Utils.cleanDate(l.data) || l.data : (l.data ? String(l.data).split('T')[0] : l.data),
@@ -359,7 +370,7 @@ const DB = {
           valor: Number(l.valor) || 0
         })));
       }
-      if (Array.isArray(d.notas) && d.notas.length > 0) {
+      if (Array.isArray(d.notas)) {
         this.save('notas', d.notas.map(n => {
           const vBruto = Number(n.valor_bruto !== undefined ? n.valor_bruto : n.valor_total) || 0;
           const vImp = Number(n.impostos) || 0;
@@ -380,13 +391,21 @@ const DB = {
           };
         }));
       }
-      if (Array.isArray(d.orcamentos) && d.orcamentos.length > 0) this.save('orcamentos', d.orcamentos);
-      if (Array.isArray(d.medicoes) && d.medicoes.length > 0) {
+      if (Array.isArray(d.orcamentos)) {
+        this.save('orcamentos', d.orcamentos);
+      }
+      if (Array.isArray(d.medicoes)) {
         this.save('medicoes', d.medicoes.map(m => ({
           ...m,
           data: (typeof Utils !== 'undefined' && Utils.cleanDate) ? Utils.cleanDate(m.data) || m.data : (m.data ? String(m.data).split('T')[0] : m.data),
           valor_medido: Number(m.valor_medido) || 0
         })));
+      }
+      if (Array.isArray(d.contas)) {
+        this.save('contas', d.contas);
+      }
+      if (Array.isArray(d.produtos)) {
+        this.save('produtos', d.produtos);
       }
       if (Array.isArray(d.documentos) && d.documentos.length > 0 && typeof Documentos !== 'undefined') {
         const locais = Documentos.getAll() || [];
@@ -458,7 +477,7 @@ const DB = {
       };
       const res = await fetch('/api/db', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: this._apiHeaders(),
         body: JSON.stringify({ action: 'sync_all', payload })
       });
       const data = await res.json();

@@ -54,7 +54,33 @@ const Utils = {
     return s;
   },
 
-  today() { return new Date().toISOString().split('T')[0]; },
+  escapeHtml(str) {
+    if (str === null || str === undefined) return '';
+    return String(str)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;');
+  },
+
+  today() {
+    // Retorna YYYY-MM-DD no fuso horário oficial (America/Boa_Vista, UTC-4), evitando virada indevida de data às 20h UTC
+    try {
+      const parts = new Intl.DateTimeFormat('pt-BR', {
+        timeZone: 'America/Boa_Vista',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit'
+      }).formatToParts(new Date());
+      const y = parts.find(p => p.type === 'year')?.value;
+      const m = parts.find(p => p.type === 'month')?.value;
+      const d = parts.find(p => p.type === 'day')?.value;
+      if (y && m && d) return `${y}-${m}-${d}`;
+    } catch {}
+    const dt = new Date();
+    return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`;
+  },
 
   diasEntre(d1, d2) {
     if (!d1 || !d2) return 0;

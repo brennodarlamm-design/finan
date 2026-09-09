@@ -150,16 +150,16 @@ const Lancamentos = {
         <td style="white-space:nowrap;font-size:.78rem;font-weight:600">${Utils.fmt.date(l.data)}</td>
         <td style="white-space:nowrap;font-size:.78rem;font-weight:700;color:${isAtrasado?'var(--danger)':'var(--accent2)'}">${Utils.fmt.date(venc)}</td>
         <td style="white-space:nowrap;">${dataPagtoFmt}</td>
-        ${showObra?`<td style="font-size:.76rem;color:var(--text2);max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${c?.nome||'&mdash;'}</td>`:''}
+        ${showObra?`<td style="font-size:.76rem;color:var(--text2);max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${Utils.escapeHtml(c?.nome)||'&mdash;'}</td>`:''}
         <td>
-          <div style="font-weight:600">${l.descricao}</div>
+          <div style="font-weight:600">${Utils.escapeHtml(l.descricao)}</div>
           ${l.itens && l.itens.length ? `<div style="font-size:.7rem;color:var(--accent2);margin-top:2px;cursor:pointer" onclick="Lancamentos.verItens('${l.id}')" title="Ver produtos deste lançamento">📦 ${l.itens.length} produto${l.itens.length>1?'s':''}</div>` : ''}
-          ${l.codigo_barras ? `<div style="font-size:.7rem;font-family:monospace;color:var(--accent2);" title="Linha digitável do boleto">🔢 ${l.codigo_barras}</div>` : ''}
-          ${l.observacoes?`<div style="font-size:.72rem;color:var(--text3)">${l.observacoes}</div>`:''}
+          ${l.codigo_barras ? `<div style="font-size:.7rem;font-family:monospace;color:var(--accent2);" title="Linha digitável do boleto">🔢 ${Utils.escapeHtml(l.codigo_barras)}</div>` : ''}
+          ${l.observacoes?`<div style="font-size:.72rem;color:var(--text3)">${Utils.escapeHtml(l.observacoes)}</div>`:''}
         </td>
         <td style="white-space:nowrap">${Utils.catLabel(l.categoria)}</td>
-        <td style="font-size:.78rem;color:var(--text2);max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${l.fornecedor_beneficiario||'&mdash;'}</td>
-        <td style="font-size:.76rem;color:var(--text3);max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${l.conta_bancaria ? `&#x1F3E6; ${l.conta_bancaria}` : '&mdash;'}</td>
+        <td style="font-size:.78rem;color:var(--text2);max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${Utils.escapeHtml(l.fornecedor_beneficiario)||'&mdash;'}</td>
+        <td style="font-size:.76rem;color:var(--text3);max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${l.conta_bancaria ? `&#x1F3E6; ${Utils.escapeHtml(l.conta_bancaria)}` : '&mdash;'}</td>
         <td>${nf?`<span style="color:var(--accent2);cursor:pointer;font-size:.78rem;font-weight:700" onclick="App.navigate('notas')" title="Ver NF">#${nf.numero_nf}</span>`:'&mdash;'}</td>
         <td>${l.tipo==='receita'?'<span class="badge badge-success">&uarr; Receita</span>':'<span class="badge badge-danger">&darr; Despesa</span>'}</td>
         <td style="font-weight:800;white-space:nowrap;color:${l.tipo==='receita'?'var(--success)':'var(--danger)'};">${l.tipo==='receita'?'+':'&minus;'} ${Utils.fmt.currency(l.valor)}</td>

@@ -215,27 +215,30 @@
       }
     }
 
-    function executarLoginMaster(e) {
+    async function executarLoginMaster(e) {
       if (e) e.preventDefault();
       const uInput = (document.getElementById('master-user-input').value || '').trim();
       const pInput = (document.getElementById('master-pass-input').value || '').trim();
       const errBox = document.getElementById('master-err-box');
 
-      // Verifica credenciais master
-      // Aceita usuário admin (senha admin123) ou qualquer dev credenciado
-      const isMasterValido = (uInput.toLowerCase() === 'admin' && (pInput === 'admin123' || pInput === 'master123' || pInput === 'finobra123'))
-        || (Auth.login(uInput, pInput, false).success && (uInput.toLowerCase() === 'admin' || Auth.getUser()?.perfil === 'admin' || Auth.getUser()?.perfil === 'dev'));
+      if (!uInput || !pInput) {
+        errBox.style.display = 'block';
+        errBox.textContent = 'Informe usuário e senha de acesso master.';
+        return;
+      }
+
+      // Valida credenciais com o servidor de autenticação seguro (Neon / scrypt)
+      const loginRes = await Auth.login(uInput, pInput, true);
+      const user = loginRes.success ? (loginRes.user || Auth.getUser()) : null;
+      const isMasterValido = loginRes.success && (user?.perfil === 'admin' || user?.perfil === 'superadmin' || user?.perfil === 'dev' || uInput.toLowerCase() === 'admin');
 
       if (isMasterValido) {
         sessionStorage.setItem('finobra_master_logged', 'true');
-        if (!Auth.isLoggedIn()) {
-          Auth.login(uInput, pInput, true);
-        }
         errBox.style.display = 'none';
         verificarSessaoMaster();
       } else {
         errBox.style.display = 'block';
-        errBox.textContent = 'Usuário ou senha master incorretos. Acesso exclusivo do desenvolvedor.';
+        errBox.textContent = loginRes.message || 'Usuário ou senha incorretos. Acesso exclusivo do administrador.';
       }
     }
 

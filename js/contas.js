@@ -367,7 +367,8 @@ const Contas = {
   async sincronizarComNuvem() {
     Utils.toast('Sincronizando contas com o Neon PostgreSQL...', 'info');
     try {
-      const res = await fetch('/api/db?table=contas');
+      const headers = (typeof DB !== 'undefined' && DB._apiHeaders) ? DB._apiHeaders() : {};
+      const res = await fetch('/api/db?table=contas', { headers });
       if (res.ok) {
         const json = await res.json();
         if (json.success && Array.isArray(json.data) && json.data.length > 0) {

@@ -1,8 +1,9 @@
-// js/auth.js — Authentication Module & Multi-Tenant Scoping
+// js/auth.js — Authentication Module & Multi-Tenant Scoping (Server-Side & Local Fallback)
 
 const Auth = {
   USERS_KEY: 'finobra_users',
   SESSION_KEY: 'finobra_session',
+  TOKEN_KEY: 'finobra_token',
 
   defaultUsers: [
     {
@@ -10,7 +11,6 @@ const Auth = {
       username: 'admin',
       nome: 'Administrador (Angelim)',
       email: 'admin@finobra.com',
-      senha: 'admin123',
       perfil: 'admin',
       ativo: true,
       avatar: 'AD',
@@ -22,7 +22,6 @@ const Auth = {
       username: 'gestor',
       nome: 'Gestor Obras',
       email: 'gestor@finobra.com',
-      senha: 'gestor123',
       perfil: 'gestor',
       ativo: true,
       avatar: 'GO',
@@ -34,7 +33,6 @@ const Auth = {
       username: 'empresa',
       nome: 'Diretor / Construtor',
       email: 'contato@minhaempresa.com',
-      senha: 'empresa123',
       perfil: 'admin',
       ativo: true,
       avatar: 'ME',
@@ -42,6 +40,10 @@ const Auth = {
       empresaNome: 'Minha Empresa Construtora'
     }
   ],
+
+  getToken() {
+    return localStorage.getItem(this.TOKEN_KEY) || sessionStorage.getItem(this.TOKEN_KEY) || '';
+  },
 
   getUsers() {
     const s = localStorage.getItem(this.USERS_KEY);
@@ -53,7 +55,6 @@ const Auth = {
       let users = JSON.parse(s);
       if (!Array.isArray(users)) users = [...this.defaultUsers];
 
-      // Migração automática para garantir tenantId em todos os usuários
       let modified = false;
       users = users.map(u => {
         if (!u.tenantId) {
@@ -63,7 +64,6 @@ const Auth = {
         return u;
       });
 
-      // Garante que o usuário de sistema zerado 'empresa' exista na lista
       if (!users.some(u => u.username === 'empresa')) {
         users.push(this.defaultUsers.find(u => u.username === 'empresa'));
         modified = true;
@@ -79,31 +79,81 @@ const Auth = {
     }
   },
 
-  createSession(user, remember = false) {
+  createSession(user, remember = false, token = '') {
     const session = {
-      userId: user.id,
+      userId: user.id || user.userId,
       username: user.username,
       nome: user.nome,
       email: user.email || '',
       perfil: user.perfil || 'admin',
-      avatar: user.avatar || user.nome.slice(0, 2).toUpperCase(),
+      avatar: user.avatar || (user.nome ? user.nome.slice(0, 2).toUpperCase() : 'US'),
       tenantId: user.tenantId || (user.username === 'empresa' ? 'tenant_empresa_zerada' : 'angelim'),
       empresaNome: user.empresaNome || '',
       googleAuth: !!user.googleAuth,
       loginAt: new Date().toISOString(),
-      remember
+      remember: !!remember
     };
 
-    if (remember) localStorage.setItem(this.SESSION_KEY, JSON.stringify(session));
-    else sessionStorage.setItem(this.SESSION_KEY, JSON.stringify(session));
+    if (token) {
+      if (remember) {
+        localStorage.setItem(this.TOKEN_KEY, token);
+      } else {
+        sessionStorage.setItem(this.TOKEN_KEY, token);
+      }
+    }
+
+    if (remember) {
+      localStorage.setItem(this.SESSION_KEY, JSON.stringify(session));
+    } else {
+      sessionStorage.setItem(this.SESSION_KEY, JSON.stringify(session));
+    }
     return session;
   },
 
-  login(username, password, remember = false) {
+  // ── AUTENTICAÇÃO COM SERVIDOR NEON & FALLBACK OFFLINE ─────────────────────
+  async login(username, password, remember = false) {
+    if (!username || !password) {
+      return { success: false, message: 'Usuário e senha são obrigatórios.' };
+    }
+
+    // 1. Tenta autenticação server-side segura via /api/auth
+    try {
+      const resp = await fetch('/api/auth?action=login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password, remember })
+      });
+      const data = await resp.json().catch(() => ({}));
+      if (resp.ok && data.success && data.token) {
+        const session = this.createSession(data.user, remember, data.token);
+        return { success: true, user: session };
+      }
+      if (resp.status === 401 || resp.status === 403) {
+        return { success: false, message: data.message || 'Usuário ou senha incorretos.' };
+      }
+    } catch (err) {
+      console.warn('Servidor de autenticação inacessível, utilizando fallback local:', err.message);
+    }
+
+    // 2. Fallback offline local
+    return this._localLogin(username, password, remember);
+  },
+
+  _localLogin(username, password, remember = false) {
+    const clean = (username || '').trim().toLowerCase();
     const users = this.getUsers();
-    const user = users.find(u => (u.username.toLowerCase() === username.toLowerCase() || (u.email && u.email.toLowerCase() === username.toLowerCase())) && u.senha === password && u.ativo);
-    if (!user) return { success: false, message: 'Usuário ou senha incorretos. Verifique os dados e tente novamente.' };
+    const user = users.find(u => (u.username.toLowerCase() === clean || (u.email && u.email.toLowerCase() === clean)) && u.ativo);
     
+    // Validação compatível com senhas padrão caso offline
+    const isKnown = (clean === 'admin' && password === 'admin123') ||
+                    (clean === 'gestor' && password === 'gestor123') ||
+                    (clean === 'empresa' && password === 'empresa123') ||
+                    (user && user.senha && user.senha === password);
+
+    if (!user || !isKnown) {
+      return { success: false, message: 'Usuário ou senha incorretos. Verifique os dados e tente novamente.' };
+    }
+
     const session = this.createSession(user, remember);
     return { success: true, user: session };
   },
@@ -119,7 +169,28 @@ const Auth = {
     }
   },
 
-  loginWithGoogle(credentialJwt, manualProfile = null) {
+  async loginWithGoogle(credentialJwt, manualProfile = null) {
+    // 1. Tenta autenticação server-side segura no Neon
+    try {
+      const resp = await fetch('/api/auth?action=google', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ credentialJwt, manualProfile })
+      });
+      const data = await resp.json().catch(() => ({}));
+      if (resp.ok && data.success && data.token) {
+        const session = this.createSession(data.user, true, data.token);
+        return { success: true, user: session, isNew: !!data.isNew };
+      }
+    } catch (err) {
+      console.warn('Falha no login Google no servidor, utilizando fallback local:', err);
+    }
+
+    // 2. Fallback offline local
+    return this._localGoogleLogin(credentialJwt, manualProfile);
+  },
+
+  _localGoogleLogin(credentialJwt, manualProfile = null) {
     let payload = null;
     if (credentialJwt) {
       payload = this.decodeJwt(credentialJwt);
@@ -139,7 +210,6 @@ const Auth = {
     let user = users.find(u => (u.email && u.email.toLowerCase() === email) || (u.googleSub && u.googleSub === payload.sub));
 
     if (user) {
-      // Usuário existente: atualiza foto de perfil se aplicável
       if (picture && (!user.avatar || user.avatar.length <= 2)) {
         user.avatar = picture;
         localStorage.setItem(this.USERS_KEY, JSON.stringify(users));
@@ -148,7 +218,6 @@ const Auth = {
       return { success: true, user: session, isNew: false };
     }
 
-    // Novo usuário via Google: cria automaticamente novo tenant individual
     const newTenantId = 'tenant_google_' + Date.now().toString(36);
     const cleanUsername = email.split('@')[0].replace(/[^a-z0-9._-]/g, '') + '_' + Math.random().toString(36).substr(2, 3);
     const newUser = {
@@ -156,7 +225,6 @@ const Auth = {
       username: cleanUsername,
       nome: nome,
       email: email,
-      senha: 'google_oauth_' + Math.random().toString(36),
       perfil: 'admin',
       ativo: true,
       avatar: picture || nome.slice(0, 2).toUpperCase(),
@@ -169,187 +237,81 @@ const Auth = {
     users.push(newUser);
     localStorage.setItem(this.USERS_KEY, JSON.stringify(users));
 
-    const empresaData = {
-      id: newTenantId,
-      razao_social: nome + ' Construtora LTDA',
-      nome_fantasia: nome + ' Construtora',
-      cnpj: '',
-      telefone: '',
-      email: email,
-      cidade: '',
-      uf: '',
-      endereco: '',
-      responsavel: nome,
-      crea_cau: '',
-      logo_url: picture,
-      configurada: true,
-      created_at: new Date().toISOString()
-    };
-    localStorage.setItem(`finobra_${newTenantId}_empresa`, JSON.stringify(empresaData));
-    localStorage.setItem(`finobra_${newTenantId}_clean_mode`, 'true');
-
     const session = this.createSession(newUser, true);
     return { success: true, user: session, isNew: true };
   },
 
-  // ── RECUPERAÇÃO DE SENHA (FORGOT PASSWORD) ─────────────────────
+  // ── RECUPERAÇÃO DE SENHA (SERVER-SIDE OTP NO NEON) ─────────────────────────
   async solicitarCodigoRecuperacao(identificador) {
     if (!identificador || !identificador.trim()) {
       return { success: false, message: 'Informe seu usuário ou e-mail cadastrado.' };
     }
 
-    const clean = identificador.trim().toLowerCase();
-    const users = this.getUsers();
-    const user = users.find(u => u.username.toLowerCase() === clean || (u.email && u.email.toLowerCase() === clean));
-
-    if (!user) {
-      return { success: false, message: 'Nenhuma conta localizada com este usuário ou e-mail.' };
-    }
-
-    // Gera código seguro de 6 dígitos numéricos
-    const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
-    const recoveryData = {
-      userId: user.id,
-      email: user.email || '',
-      code: otpCode,
-      expiresAt: Date.now() + 10 * 60 * 1000, // 10 minutos de validade
-      tentativas: 0,
-      maxTentativas: 4
-    };
-
-    sessionStorage.setItem(`finobra_recup_${user.id}`, JSON.stringify(recoveryData));
-
-    // Obtém telefone cadastrado da empresa ou whatsapp
-    let destPhone = '';
     try {
-      if (typeof DB !== 'undefined' && DB.getEmpresa) {
-        const emp = DB.getEmpresa();
-        destPhone = (emp?.whatsapp || emp?.telefone || '').replace(/\D/g, '');
-      }
-    } catch (_) {}
-    if (!destPhone) {
-      destPhone = (localStorage.getItem('finobra_whatsapp_telefone') || '').replace(/\D/g, '');
-    }
-
-    // Tenta envio silencioso via WhatsApp
-    let whatsappNotified = false;
-    try {
-      const resp = await fetch('/api/recuperar-senha', {
+      const resp = await fetch('/api/auth?action=request_reset', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          phone: destPhone,
-          email: user.email,
-          code: otpCode,
-          userName: user.nome,
-          tenantName: user.empresaNome
-        })
+        body: JSON.stringify({ identificador: identificador.trim() })
       });
       const data = await resp.json().catch(() => ({}));
-      if (resp.ok && data.whatsappSent) {
-        whatsappNotified = true;
+      if (resp.ok && data.success) {
+        return {
+          success: true,
+          userId: data.userId,
+          userName: data.userName,
+          canalInfo: data.canalInfo,
+          whatsappNotified: !!data.whatsappSent
+        };
       }
-    } catch (_) {}
-
-    // Formata exibição amigável do destino para o usuário
-    let canalInfo = '';
-    if (destPhone && destPhone.length >= 8) {
-      const ddd = destPhone.slice(-11, -9) || destPhone.slice(0, 2);
-      const final = destPhone.slice(-4);
-      canalInfo = `WhatsApp (**${ddd}) *****-${final}`;
-    } else if (user.email) {
-      const parts = user.email.split('@');
-      const ini = parts[0].slice(0, 2);
-      canalInfo = `E-mail (${ini}***@${parts[1]})`;
-    } else {
-      canalInfo = 'WhatsApp cadastrado';
+      return { success: false, message: data.message || 'Nenhuma conta localizada com este usuário ou e-mail.' };
+    } catch (err) {
+      return { success: false, message: 'Erro ao contatar o servidor: ' + err.message };
     }
-
-    return {
-      success: true,
-      userId: user.id,
-      userName: user.nome,
-      canalInfo: canalInfo,
-      whatsappNotified,
-      code: otpCode // Disponível para agilidade e validação
-    };
   },
 
-  validarCodigoRecuperacao(userId, codigoDigitado) {
+  async validarCodigoRecuperacao(userId, codigoDigitado) {
     if (!userId || !codigoDigitado) {
       return { success: false, message: 'Código de verificação obrigatório.' };
     }
 
-    const raw = sessionStorage.getItem(`finobra_recup_${userId}`);
-    if (!raw) {
-      return { success: false, message: 'Nenhuma solicitação ativa. Peça um novo código.' };
+    const cleanCode = codigoDigitado.toString().trim().replace(/\D/g, '');
+    if (cleanCode.length !== 6) {
+      return { success: false, message: 'O código deve conter 6 dígitos numéricos.' };
     }
 
-    try {
-      const recovery = JSON.parse(raw);
-      if (Date.now() > recovery.expiresAt) {
-        sessionStorage.removeItem(`finobra_recup_${userId}`);
-        return { success: false, message: 'Este código expirou (validade de 10 min). Solicite outro.' };
-      }
-
-      if (recovery.tentativas >= recovery.maxTentativas) {
-        sessionStorage.removeItem(`finobra_recup_${userId}`);
-        return { success: false, message: 'Limite de tentativas excedido por segurança. Solicite um novo código.' };
-      }
-
-      const inputCode = codigoDigitado.toString().trim().replace(/\D/g, '');
-      if (inputCode !== recovery.code) {
-        recovery.tentativas += 1;
-        sessionStorage.setItem(`finobra_recup_${userId}`, JSON.stringify(recovery));
-        const restam = recovery.maxTentativas - recovery.tentativas;
-        return { success: false, message: `Código incorreto. Você ainda tem ${restam} tentativa(s).` };
-      }
-
-      // Código verificado com sucesso: gera token de autorização de troca de senha
-      const resetToken = 'rst_' + Date.now().toString(36) + Math.random().toString(36).substr(2, 6);
-      recovery.token = resetToken;
-      recovery.validado = true;
-      sessionStorage.setItem(`finobra_recup_${userId}`, JSON.stringify(recovery));
-
-      return { success: true, resetToken };
-    } catch {
-      return { success: false, message: 'Erro ao validar código. Tente novamente.' };
-    }
+    // Salva o código temporariamente para ser submetido com a nova senha de forma atômica
+    sessionStorage.setItem(`finobra_otp_${userId}`, cleanCode);
+    return { success: true, resetToken: cleanCode };
   },
 
-  redefinirSenha(userId, resetToken, novaSenha) {
-    if (!userId || !resetToken || !novaSenha) {
+  async redefinirSenha(userId, resetToken, novaSenha) {
+    if (!userId || !novaSenha) {
       return { success: false, message: 'Dados incompletos para redefinição de senha.' };
     }
 
-    if (novaSenha.length < 4) {
-      return { success: false, message: 'A nova senha deve possuir pelo menos 4 caracteres.' };
+    if (novaSenha.length < 6) {
+      return { success: false, message: 'A nova senha deve possuir pelo menos 6 caracteres.' };
     }
 
-    const raw = sessionStorage.getItem(`finobra_recup_${userId}`);
-    if (!raw) {
-      return { success: false, message: 'Sessão de redefinição expirada. Inicie o processo novamente.' };
+    const code = resetToken || sessionStorage.getItem(`finobra_otp_${userId}`);
+    if (!code) {
+      return { success: false, message: 'Sessão expirada. Solicite um novo código.' };
     }
 
     try {
-      const recovery = JSON.parse(raw);
-      if (!recovery.validado || recovery.token !== resetToken) {
-        return { success: false, message: 'Token de redefinição inválido ou não autorizado.' };
+      const resp = await fetch('/api/auth?action=verify_reset', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId, code, newPassword: novaSenha })
+      });
+      const data = await resp.json().catch(() => ({}));
+      if (resp.ok && data.success) {
+        sessionStorage.removeItem(`finobra_otp_${userId}`);
+        return { success: true, message: data.message || 'Senha redefinida com sucesso!' };
       }
-
-      const users = this.getUsers();
-      const user = users.find(u => u.id === userId);
-      if (!user) {
-        return { success: false, message: 'Usuário não localizado no sistema.' };
-      }
-
-      user.senha = novaSenha;
-      localStorage.setItem(this.USERS_KEY, JSON.stringify(users));
-      sessionStorage.removeItem(`finobra_recup_${userId}`);
-
-      return { success: true, username: user.username, message: 'Senha redefinida com sucesso!' };
-    } catch {
-      return { success: false, message: 'Erro ao salvar a nova senha.' };
+      return { success: false, message: data.message || 'Código incorreto ou expirado.' };
+    } catch (err) {
+      return { success: false, message: 'Erro ao salvar nova senha no servidor: ' + err.message };
     }
   },
 
@@ -361,8 +323,8 @@ const Auth = {
     if (cleanUsername.length < 3) {
       return { success: false, message: 'O nome de usuário deve ter pelo menos 3 caracteres alfanuméricos.' };
     }
-    if (senha.length < 4) {
-      return { success: false, message: 'A senha deve ter pelo menos 4 caracteres.' };
+    if (senha.length < 6) {
+      return { success: false, message: 'A senha deve ter pelo menos 6 caracteres.' };
     }
 
     const users = this.getUsers();
@@ -376,7 +338,6 @@ const Auth = {
       username: cleanUsername,
       nome: nome.trim(),
       email: (email || '').trim(),
-      senha: senha,
       perfil: 'admin',
       ativo: true,
       avatar: nome.trim().slice(0, 2).toUpperCase(),
@@ -387,7 +348,6 @@ const Auth = {
     users.push(newUser);
     localStorage.setItem(this.USERS_KEY, JSON.stringify(users));
 
-    // Inicializa os dados da empresa para este novo tenant
     const empresaData = {
       id: newTenantId,
       razao_social: (empresaNome || nome.trim() + ' Construtora').trim(),
@@ -418,6 +378,8 @@ const Auth = {
   logout() {
     localStorage.removeItem(this.SESSION_KEY);
     sessionStorage.removeItem(this.SESSION_KEY);
+    localStorage.removeItem(this.TOKEN_KEY);
+    sessionStorage.removeItem(this.TOKEN_KEY);
     window.location.replace('/login');
   },
 
@@ -436,4 +398,3 @@ const Auth = {
     return true;
   }
 };
-

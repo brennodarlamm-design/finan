@@ -152,10 +152,11 @@ const OCR = {
       // Prepara e comprime o documento (PDFs e fotos são convertidos no navegador para imagens de ~300KB a 500KB)
       const { base64, mimeType } = await this._prepararArquivoEBase64(file);
 
-      // Chamar API
+      // Chamar API de Reconhecimento com autenticação
+      const apiHeaders = (typeof DB !== 'undefined' && DB._apiHeaders) ? DB._apiHeaders() : { 'Content-Type': 'application/json' };
       const resp = await fetch('/api/reconhecer-documento', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: apiHeaders,
         body: JSON.stringify({ base64, mimeType })
       });
 
@@ -266,25 +267,18 @@ const OCR = {
     });
   },
 
-  // ── Renderiza páginas de PDF para imagem de alta resolução via PDF.js ──────
+  // ── Renderiza páginas de PDF para imagem de alta resolução via PDF.js 4.2.67 (Seguro) ──
   async _converterPdfParaImagem(file) {
     if (typeof window !== 'undefined' && !window.pdfjsLib) {
-      await new Promise((resolve, reject) => {
-        const s = document.createElement('script');
-        s.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
-        s.onload = () => {
-          if (window.pdfjsLib) {
-            window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-            resolve();
-          } else {
-            reject(new Error('PDF.js não disponível'));
-          }
-        };
-        s.onerror = () => reject(new Error('Falha ao carregar biblioteca PDF.js'));
-        document.head.appendChild(s);
-      });
+      try {
+        const pdfModule = await import('https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.2.67/pdf.min.mjs');
+        window.pdfjsLib = pdfModule;
+        window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.2.67/pdf.worker.min.mjs';
+      } catch (err) {
+        throw new Error('Falha ao carregar biblioteca segura PDF.js: ' + err.message);
+      }
     } else if (window.pdfjsLib && !window.pdfjsLib.GlobalWorkerOptions?.workerSrc) {
-      window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+      window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.2.67/pdf.worker.min.mjs';
     }
 
     const arrayBuffer = await file.arrayBuffer();
@@ -969,7 +963,8 @@ const OCR = {
 
   async sincronizarHistoricoNuvem() {
     try {
-      const res = await fetch('/api/db?table=ocr_historico');
+      const headers = (typeof DB !== 'undefined' && DB._apiHeaders) ? DB._apiHeaders() : {};
+      const res = await fetch('/api/db?table=ocr_historico', { headers });
       if (res.ok) {
         const json = await res.json();
         if (Array.isArray(json.data)) {

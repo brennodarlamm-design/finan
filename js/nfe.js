@@ -4,8 +4,7 @@
 
 const NFe = {
   _KEY_CACHE: 'finobra_nfe_cache',
-  _API_BASE: 'https://api.meudanfe.com.br/v2',
-  _API_KEY: '1879826c-ee82-416d-b887-b5aaf4e059d4',
+  _API_BASE: '/api/nfe',
 
   _getTenantCacheKey() {
     const t = (typeof Auth !== 'undefined' && Auth.getCurrentTenantId) ? Auth.getCurrentTenantId() : 'angelim';
@@ -47,15 +46,10 @@ const NFe = {
   },
 
   // ─── Helpers ────────────────────────────────────────────────────────────────
-  _getApiKey() {
-    const emp = typeof DB !== 'undefined' && DB.getEmpresa ? DB.getEmpresa() : {};
-    const t = (typeof Auth !== 'undefined' && Auth.getCurrentTenantId) ? Auth.getCurrentTenantId() : 'angelim';
-    if (emp && emp.meudanfe_api_key) return emp.meudanfe_api_key;
-    if (t === 'angelim') return this._API_KEY;
-    return this._API_KEY; // contingência padrão
-  },
   _headers() {
-    return { 'Api-Key': this._getApiKey(), 'Accept': 'application/json' };
+    return (typeof DB !== 'undefined' && DB._apiHeaders)
+      ? DB._apiHeaders()
+      : { 'Content-Type': 'application/json' };
   },
   _limparChave(raw) {
     return (raw || '').replace(/\D/g, '').trim();
@@ -77,17 +71,17 @@ const NFe = {
     return (chave || '').replace(/(\d{4})/g, '$1 ').trim();
   },
 
-  // ─── API calls ──────────────────────────────────────────────────────────────
+  // ─── API calls via Servidor Seguro (/api/nfe) ──────────────────────────────
   async buscarPorChave(chaveRaw) {
     const chave = this._limparChave(chaveRaw);
     if (!this._validarChave(chave)) throw new Error('Chave de acesso inválida (deve ter 44 dígitos).');
-    const res = await fetch(`${this._API_BASE}/fd/add/${chave}`, {
-      method: 'PUT',
+    const res = await fetch(`${this._API_BASE}?action=buscar&chave=${chave}`, {
+      method: 'POST',
       headers: this._headers()
     });
     if (!res.ok) {
       if (res.status === 402) throw new Error('Saldo insuficiente na conta MeuDanfe.');
-      if (res.status === 401) throw new Error('API Key inválida ou não informada.');
+      if (res.status === 401) throw new Error('Acesso não autorizado para consulta de NF-e.');
       if (res.status === 400) throw new Error('Chave de acesso inválida.');
       throw new Error(`Erro ${res.status}`);
     }
@@ -97,8 +91,9 @@ const NFe = {
   async consultarStatus(chave) {
     chave = this._limparChave(chave);
     try {
-      const res = await fetch(`${this._API_BASE}/fd/add/${chave}`, {
-        method: 'PUT', headers: this._headers()
+      const res = await fetch(`${this._API_BASE}?action=status&chave=${chave}`, {
+        method: 'POST',
+        headers: this._headers()
       });
       if (!res.ok) return null;
       return await res.json();
@@ -107,8 +102,9 @@ const NFe = {
 
   async baixarDanfePDF(chave) {
     chave = this._limparChave(chave);
-    const res = await fetch(`${this._API_BASE}/fd/get/da/${chave}`, {
-      method: 'GET', headers: this._headers()
+    const res = await fetch(`${this._API_BASE}?action=danfe&chave=${chave}`, {
+      method: 'GET',
+      headers: this._headers()
     });
     if (!res.ok) {
       if (res.status === 404) throw new Error('NF-e não encontrada na Área do Cliente. Busque-a primeiro.');
@@ -119,8 +115,9 @@ const NFe = {
 
   async baixarXML(chave) {
     chave = this._limparChave(chave);
-    const res = await fetch(`${this._API_BASE}/fd/get/xml/${chave}`, {
-      method: 'GET', headers: this._headers()
+    const res = await fetch(`${this._API_BASE}?action=xml&chave=${chave}`, {
+      method: 'GET',
+      headers: this._headers()
     });
     if (!res.ok) {
       if (res.status === 404) throw new Error('NF-e não encontrada na Área do Cliente. Busque-a primeiro.');
@@ -131,10 +128,11 @@ const NFe = {
 
   async listarMinhasNFes(after = '') {
     const params = new URLSearchParams();
+    params.set('action', 'minhas_nfes');
     if (after) params.set('after', after);
-    const qs = params.toString() ? `?${params.toString()}` : '';
-    const res = await fetch(`${this._API_BASE}/fd/my/NFE${qs}`, {
-      method: 'GET', headers: this._headers()
+    const res = await fetch(`${this._API_BASE}?${params.toString()}`, {
+      method: 'GET',
+      headers: this._headers()
     });
     if (!res.ok) return null;
     return await res.json();
@@ -151,10 +149,10 @@ const NFe = {
 
   // Envia arquivo retDistDFeInt ou enviNFe gerado pelo certificado digital
   async enviarSefazXml(xmlString) {
-    const res = await fetch(`${this._API_BASE}/fd/add/sefaz-xml`, {
-      method: 'PUT',
-      headers: { ...this._headers(), 'Content-Type': 'text/plain' },
-      body: xmlString
+    const res = await fetch(`${this._API_BASE}?action=sefaz_xml`, {
+      method: 'POST',
+      headers: this._headers(),
+      body: JSON.stringify({ xml: xmlString })
     });
     const data = await res.json().catch(() => null);
     if (!res.ok) {

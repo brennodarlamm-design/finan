@@ -19,9 +19,59 @@ dotenv.config({ path: '.env.local' });
 dotenv.config();
 
 const app = express();
-app.use(cors());
+
+const ALLOWED_ORIGINS = [
+  'https://finobra.app.br',
+  'https://www.finobra.app.br',
+  'http://localhost:3000',
+  'http://localhost:3333',
+  'http://localhost:5000',
+  'http://127.0.0.1:3000',
+  'http://127.0.0.1:3333',
+  'http://127.0.0.1:5000'
+];
+
+app.use(cors({
+  origin: (origin, callback) => {
+    if (!origin || ALLOWED_ORIGINS.includes(origin) || origin.endsWith('.vercel.app')) {
+      callback(null, true);
+    } else {
+      callback(null, false);
+    }
+  },
+  credentials: true
+}));
+
 app.use(express.json({ limit: '25mb' }));
 app.use(express.urlencoded({ extended: true, limit: '25mb' }));
+
+// Middleware de autenticação interna para proteger rotas críticas
+function requireAuth(req, res, next) {
+  const secret = (process.env.API_SECRET || process.env.VERCEL_API_SECRET || '').trim();
+  if (!secret) {
+    console.warn('⚠️ [Segurança] API_SECRET não configurado no backend Render. Configure nas variáveis de ambiente!');
+    return next();
+  }
+
+  const authHeader = req.headers.authorization || req.headers.Authorization || '';
+  if (authHeader.startsWith('Bearer ') && authHeader.substring(7).trim() === secret) {
+    return next();
+  }
+
+  const apiKey = req.headers['x-api-key'] || req.headers['apikey'] || '';
+  if (apiKey && apiKey.trim() === secret) {
+    return next();
+  }
+
+  const queryToken = req.query?.token || req.query?.secret || req.body?.token || req.body?.secret || '';
+  if (queryToken && queryToken.trim() === secret) {
+    return next();
+  }
+
+  return res.status(401).json({
+    error: 'Acesso não autorizado ao servidor WhatsApp. Forneça o cabeçalho Authorization: Bearer <API_SECRET>.'
+  });
+}
 
 const PORT = process.env.PORT || 3333;
 let rawDbUrl = process.env.DATABASE_URL || '';
@@ -400,6 +450,40 @@ app.get('/health', async (req, res) => {
 
 // 2. Página Web Visual do QR Code
 app.get('/qr', (req, res) => {
+  const secret = (process.env.API_SECRET || process.env.VERCEL_API_SECRET || '').trim();
+  const providedToken = (req.query.token || req.query.secret || '').trim();
+
+  if (secret && providedToken !== secret) {
+    return res.status(401).send(`
+      <!DOCTYPE html>
+      <html lang="pt-BR">
+      <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Acesso Restrito — QR Code WhatsApp</title>
+        <style>
+          body { font-family: system-ui, sans-serif; background: #0f172a; color: #f8fafc; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; }
+          .card { background: #1e293b; padding: 32px; border-radius: 16px; border: 1px solid #334155; text-align: center; max-width: 400px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
+          input { width: 100%; box-sizing: border-box; padding: 12px; border-radius: 8px; border: 1px solid #475569; background: #0f172a; color: white; margin: 16px 0; font-family: monospace; font-size: 0.9rem; }
+          button { background: #10b981; color: white; border: none; padding: 12px 20px; border-radius: 8px; font-weight: 700; cursor: pointer; width: 100%; font-size: 0.9rem; }
+        </style>
+      </head>
+      <body>
+        <div class="card">
+          <h2>🔒 Acesso Restrito</h2>
+          <p style="color:#94a3b8;font-size:0.9rem;">Informe a chave de segurança (API_SECRET) para visualizar o QR Code do WhatsApp:</p>
+          <form method="GET" action="/qr">
+            <input type="password" name="token" placeholder="Insira o API_SECRET" required autofocus />
+            <button type="submit">Desbloquear QR Code</button>
+          </form>
+        </div>
+      </body>
+      </html>
+    `);
+  }
+
+  const tokenParam = providedToken ? `?token=${encodeURIComponent(providedToken)}` : '';
+  const hiddenTokenInput = providedToken ? `<input type="hidden" name="token" value="${providedToken}" />` : '';
   if (connectionStatus === 'connected') {
     return res.send(`
       <!DOCTYPE html>
@@ -495,17 +579,18 @@ app.get('/qr', (req, res) => {
 });
 
 // 2.1 Rota de Reset Manual da Sessão
-app.all('/reset-auth', async (req, res) => {
+app.all('/reset-auth', requireAuth, async (req, res) => {
   console.log('🔄 [API] Requisição de reset de autenticação recebida.');
   await resetWhatsAppSession('Solicitado via API /reset-auth');
   
   if (req.headers.accept && req.headers.accept.includes('text/html')) {
+    const tokenParam = (req.query?.token || req.body?.token) ? `?token=${encodeURIComponent(req.query?.token || req.body?.token)}` : '';
     return res.send(`
       <!DOCTYPE html>
       <html lang="pt-BR">
       <head>
         <meta charset="UTF-8">
-        <meta http-equiv="refresh" content="3; url=/qr">
+        <meta http-equiv="refresh" content="3; url=/qr${tokenParam}">
         <title>Sessão Resetada</title>
         <style>
           body { font-family: system-ui, sans-serif; background: #0f172a; color: #f8fafc; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; text-align: center; }
@@ -515,7 +600,7 @@ app.all('/reset-auth', async (req, res) => {
         <div>
           <h2>✅ Sessão resetada com sucesso!</h2>
           <p style="color:#94a3b8;">Redirecionando para a tela do QR Code em 3 segundos...</p>
-          <a href="/qr" style="color:#38bdf8;">Clique aqui se não for redirecionado</a>
+          <a href="/qr${tokenParam}" style="color:#38bdf8;">Clique aqui se não for redirecionado</a>
         </div>
       </body>
       </html>
@@ -530,7 +615,7 @@ app.all('/reset-auth', async (req, res) => {
 });
 
 // 3. Disparo de Mensagem em Segundo Plano (Texto, Imagem ou Documento PDF)
-app.post('/send-message', async (req, res) => {
+app.post('/send-message', requireAuth, async (req, res) => {
   try {
     const { phone, message, text, base64, mimeType, fileName, caption } = req.body;
     const destPhone = phone || TARGET_PHONE;
@@ -585,7 +670,7 @@ app.post('/send-message', async (req, res) => {
 });
 
 // 4. Teste de Conexão com o Neon
-app.get('/test-neon', async (req, res) => {
+app.get('/test-neon', requireAuth, async (req, res) => {
   if (!sql) {
     return res.status(503).json({ success: false, error: 'DATABASE_URL não configurada ou inválida no servidor.' });
   }
@@ -687,7 +772,7 @@ cron.schedule('0 12 * * *', () => {
 });
 
 // Rota manual para disparar o resumo matinal imediatamente
-app.post('/cron/daily-summary', async (req, res) => {
+app.post('/cron/daily-summary', requireAuth, async (req, res) => {
   await executarResumoMatinal();
   return res.json({ success: true, message: 'Rotina matinal executada!' });
 });

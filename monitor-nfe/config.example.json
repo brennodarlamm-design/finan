@@ -1,20 +1,20 @@
 {
-  "_instrucoes": "Preencha todos os campos abaixo antes de rodar o script.",
+  "_instrucoes": "Copie este arquivo para config.json e preencha com seus dados reais.",
 
   "certificado": {
-    "caminho": "D:\\ANGELIM CONSTRUTORA LTDA65512273000160.pfx",
+    "caminho": "C:\\Certificados\\seu_certificado.pfx",
     "_caminho_hint": "Caminho completo para o arquivo .pfx do certificado A1",
-    "senha": "123456",
+    "senha": "SUA_SENHA_DO_CERTIFICADO_AQUI",
     "_senha_hint": "Senha do arquivo .pfx"
   },
 
   "empresa": {
-    "cnpj": "65512273000160",
+    "cnpj": "00000000000000",
     "_cnpj_hint": "CNPJ da empresa SEM pontos, tracos ou barras (so numeros, 14 digitos)",
-    "razao_social": "Angelim Construtora LTDA",
+    "razao_social": "Sua Razao Social LTDA",
     "uf": "RR",
     "cod_uf": "14",
-    "_cod_uf_hint": "Codigo IBGE da UF: RR=14 (Roraima)"
+    "_cod_uf_hint": "Codigo IBGE da UF: RR=14, SP=35, etc."
   },
 
   "sefaz": {
@@ -25,7 +25,7 @@
   },
 
   "meudanfe": {
-    "api_key": "1879826c-ee82-416d-b887-b5aaf4e059d4",
+    "api_key": "SUA_API_KEY_MEUDANFE_AQUI",
     "api_base": "https://api.meudanfe.com.br/v2"
   },
 
@@ -44,11 +44,12 @@
 
   "whatsapp": {
     "ativo": true,
-    "telefone_destino": "5595991363678",
+    "telefone_destino": "5599999999999",
     "_telefone_hint": "Telefone com DDD para onde o robô matinal enviará o resumo das contas",
     "webhook_url": "https://finobra.app.br/api/send-whatsapp",
-    "_webhook_hint": "Servidor local do WhatsApp (porta 3333) ou Evolution API / Z-API",
+    "_webhook_hint": "Endpoint da API Serverless ou Render",
     "api_token": "",
+    "api_secret": "0834902d6117a436a311aaecb517dc073a7184651f2a6d71c3ab0b01ac49c5ef",
     "horario_envio": "08:00",
     "notificar_windows_toast": true
   }

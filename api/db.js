@@ -1,6 +1,7 @@
-// api/db.js — API Serverless REST & Sincronização em Nuvem (Neon PostgreSQL)
+// api/db.js — API Serverless REST & Sincronização Multi-Tenant (Neon PostgreSQL)
 
 import { neon } from '@neondatabase/serverless';
+import { resolveAuthAndTenant } from './_auth.js';
 
 function getSql() {
   const conn = process.env.DATABASE_URL;
@@ -34,37 +35,69 @@ function cleanNum(n) {
   return isNaN(val) ? 0 : val;
 }
 
+const ALLOWED_ORIGINS = [
+  'https://finobra.app.br',
+  'https://www.finobra.app.br',
+  'http://localhost:3000',
+  'http://localhost:3333',
+  'http://localhost:5000',
+  'http://127.0.0.1:3000',
+  'http://127.0.0.1:3333',
+  'http://127.0.0.1:5000'
+];
+
 export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Credentials', true);
-  res.setHeader('Access-Control-Allow-Origin', '*');
+  const origin = req.headers.origin;
+  if (origin) {
+    const isAllowed = ALLOWED_ORIGINS.includes(origin) || origin.endsWith('.vercel.app');
+    if (isAllowed) {
+      res.setHeader('Access-Control-Allow-Origin', origin);
+      res.setHeader('Access-Control-Allow-Credentials', 'true');
+    }
+  } else {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+  }
+
   res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT');
-  res.setHeader('Access-Control-Allow-Headers', 'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version');
+  res.setHeader('Access-Control-Allow-Headers', 'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version, Authorization, apikey, x-api-key, x-tenant-id');
 
   if (req.method === 'OPTIONS') {
     return res.status(200).end();
   }
+
+  // Validação estrita de autenticação e resolução segura de tenant
+  const auth = resolveAuthAndTenant(req);
+  if (!auth.authenticated) {
+    return res.status(401).json({
+      success: false,
+      error: auth.error || 'Acesso não autorizado. Forneça Authorization: Bearer <token> ou x-api-key válido.'
+    });
+  }
+
+  const tenantId = auth.tenantId;
   const sql = getSql();
 
   try {
-    // ── GET: Consultar dados ───────────────────────────────────────────────────
+    // ── GET: Consultar dados isolados pelo Tenant ─────────────────────────────
     if (req.method === 'GET') {
       const { table, obra_id, id } = req.query || {};
 
       if (!table || table === 'all') {
         const [obras, fornecedores, lancamentos, notas, orcamentos, medicoes, documentos, produtos, contas] = await Promise.all([
-          sql`SELECT * FROM obras ORDER BY nome ASC;`,
-          sql`SELECT * FROM fornecedores ORDER BY nome ASC;`,
-          sql`SELECT * FROM lancamentos ORDER BY data DESC, created_at DESC;`,
-          sql`SELECT * FROM notas_fiscais ORDER BY data_emissao DESC;`,
-          sql`SELECT * FROM orcamentos ORDER BY created_at DESC;`,
-          sql`SELECT * FROM medicoes ORDER BY data DESC;`,
-          sql`SELECT id, tipo, referencia_id, titulo, categoria, nome_arquivo, tipo_arquivo, tamanho_bytes, created_at FROM documentos ORDER BY created_at DESC;`,
-          sql`SELECT * FROM produtos ORDER BY nome ASC;`,
-          sql`SELECT * FROM contas_bancarias ORDER BY created_at ASC;`
+          sql`SELECT * FROM obras WHERE tenant_id = ${tenantId} ORDER BY nome ASC;`,
+          sql`SELECT * FROM fornecedores WHERE tenant_id = ${tenantId} ORDER BY nome ASC;`,
+          sql`SELECT * FROM lancamentos WHERE tenant_id = ${tenantId} ORDER BY data DESC, created_at DESC;`,
+          sql`SELECT * FROM notas_fiscais WHERE tenant_id = ${tenantId} ORDER BY data_emissao DESC;`,
+          sql`SELECT * FROM orcamentos WHERE tenant_id = ${tenantId} ORDER BY created_at DESC;`,
+          sql`SELECT * FROM medicoes WHERE tenant_id = ${tenantId} ORDER BY data DESC;`,
+          sql`SELECT id, tipo, referencia_id, titulo, categoria, nome_arquivo, tipo_arquivo, tamanho_bytes, created_at FROM documentos WHERE tenant_id = ${tenantId} ORDER BY created_at DESC;`,
+          sql`SELECT * FROM produtos WHERE tenant_id = ${tenantId} ORDER BY nome ASC;`,
+          sql`SELECT * FROM contas_bancarias WHERE tenant_id = ${tenantId} ORDER BY created_at ASC;`
         ]);
 
         return res.status(200).json({
           success: true,
+          tenantId,
           data: {
             clientes: obras.map(o => ({
               ...o,
@@ -121,9 +154,9 @@ export default async function handler(req, res) {
       if (table === 'lancamentos') {
         let items;
         if (obra_id) {
-          items = await sql`SELECT * FROM lancamentos WHERE obra_id = ${obra_id} ORDER BY data DESC;`;
+          items = await sql`SELECT * FROM lancamentos WHERE tenant_id = ${tenantId} AND obra_id = ${obra_id} ORDER BY data DESC;`;
         } else {
-          items = await sql`SELECT * FROM lancamentos ORDER BY data DESC;`;
+          items = await sql`SELECT * FROM lancamentos WHERE tenant_id = ${tenantId} ORDER BY data DESC;`;
         }
         return res.status(200).json({
           success: true,
@@ -140,9 +173,9 @@ export default async function handler(req, res) {
       if (table === 'notas' || table === 'notas_fiscais') {
         let items;
         if (obra_id) {
-          items = await sql`SELECT * FROM notas_fiscais WHERE obra_id = ${obra_id} ORDER BY data_emissao DESC;`;
+          items = await sql`SELECT * FROM notas_fiscais WHERE tenant_id = ${tenantId} AND obra_id = ${obra_id} ORDER BY data_emissao DESC;`;
         } else {
-          items = await sql`SELECT * FROM notas_fiscais ORDER BY data_emissao DESC;`;
+          items = await sql`SELECT * FROM notas_fiscais WHERE tenant_id = ${tenantId} ORDER BY data_emissao DESC;`;
         }
         return res.status(200).json({
           success: true,
@@ -163,7 +196,7 @@ export default async function handler(req, res) {
       }
 
       if (table === 'obras' || table === 'clientes') {
-        const items = await sql`SELECT * FROM obras ORDER BY nome ASC;`;
+        const items = await sql`SELECT * FROM obras WHERE tenant_id = ${tenantId} ORDER BY nome ASC;`;
         return res.status(200).json({
           success: true,
           data: items.map(o => ({
@@ -175,19 +208,19 @@ export default async function handler(req, res) {
       }
 
       if (table === 'fornecedores') {
-        const items = await sql`SELECT * FROM fornecedores ORDER BY nome ASC;`;
+        const items = await sql`SELECT * FROM fornecedores WHERE tenant_id = ${tenantId} ORDER BY nome ASC;`;
         return res.status(200).json({ success: true, data: items });
       }
 
       if (table === 'produtos') {
-        const items = await sql`SELECT * FROM produtos ORDER BY nome ASC;`;
+        const items = await sql`SELECT * FROM produtos WHERE tenant_id = ${tenantId} ORDER BY nome ASC;`;
         return res.status(200).json({ success: true, data: items.map(p => ({ ...p, valor_medio: cleanNum(p.valor_medio) })) });
       }
 
       if (table === 'documento_conteudo') {
         const docId = id || req.query.id;
         if (!docId) return res.status(400).json({ error: 'ID do documento obrigatório' });
-        const rows = await sql`SELECT base64_data, tipo_arquivo, nome_arquivo FROM documentos WHERE id = ${docId} LIMIT 1;`;
+        const rows = await sql`SELECT base64_data, tipo_arquivo, nome_arquivo FROM documentos WHERE id = ${docId} AND tenant_id = ${tenantId} LIMIT 1;`;
         if (!rows.length || !rows[0].base64_data) {
           return res.status(404).json({ success: false, error: 'Conteúdo do arquivo não encontrado na nuvem' });
         }
@@ -200,7 +233,7 @@ export default async function handler(req, res) {
       }
 
       if (table === 'ocr_historico') {
-        const items = await sql`SELECT * FROM ocr_historico ORDER BY data_hora DESC LIMIT 50;`;
+        const items = await sql`SELECT * FROM ocr_historico WHERE tenant_id = ${tenantId} ORDER BY data_hora DESC LIMIT 50;`;
         return res.status(200).json({
           success: true,
           data: items.map(h => ({
@@ -213,18 +246,28 @@ export default async function handler(req, res) {
       }
 
       if (table === 'contas' || table === 'contas_bancarias') {
-        const items = await sql`SELECT * FROM contas_bancarias ORDER BY created_at ASC;`;
+        const items = await sql`SELECT * FROM contas_bancarias WHERE tenant_id = ${tenantId} ORDER BY created_at ASC;`;
         return res.status(200).json({ success: true, data: items });
       }
 
-      return res.status(200).json({ success: true, data: [], message: `Tabela '${table}' disponível localmente.` });
+      if (table === 'orcamentos') {
+        const items = await sql`SELECT * FROM orcamentos WHERE tenant_id = ${tenantId} ORDER BY created_at DESC;`;
+        return res.status(200).json({ success: true, data: items });
+      }
+
+      if (table === 'medicoes') {
+        const items = await sql`SELECT * FROM medicoes WHERE tenant_id = ${tenantId} ORDER BY data DESC;`;
+        return res.status(200).json({ success: true, data: items.map(m => ({ ...m, data: cleanDate(m.data), valor_medido: cleanNum(m.valor_medido) })) });
+      }
+
+      return res.status(200).json({ success: true, data: [], message: `Tabela '${table}' consultada.` });
     }
 
-    // ── POST: Gravação / Atualização / Exclusão / Sync ────────────────────────
+    // ── POST: Gravação / Atualização / Exclusão / Sync com Tenant Scoping ───────
     if (req.method === 'POST') {
       const { action, table, data, id, payload } = req.body || {};
 
-      // 1. Sincronização em Massa (Local -> Neon)
+      // 1. Sincronização em Massa (Local -> Neon com tenant_id)
       if (action === 'sync_all' && payload) {
         let totalCount = 0;
 
@@ -233,13 +276,14 @@ export default async function handler(req, res) {
           for (const o of payload.clientes) {
             if (!o.id || !o.nome) continue;
             await sql`
-              INSERT INTO obras (id, nome, cliente, endereco, orcamento_total, status, data_inicio, data_previsao)
+              INSERT INTO obras (id, tenant_id, nome, cliente, endereco, orcamento_total, status, data_inicio, data_previsao)
               VALUES (
-                ${o.id}, ${o.nome}, ${o.cliente || ''}, ${o.endereco || ''},
+                ${o.id}, ${tenantId}, ${o.nome}, ${o.cliente || ''}, ${o.endereco || ''},
                 ${cleanNum(o.orcamento_total || o.valor_contrato)}, ${o.status || 'em_andamento'},
                 ${cleanDate(o.data_inicio)}, ${cleanDate(o.data_previsao)}
               )
               ON CONFLICT (id) DO UPDATE SET
+                tenant_id = EXCLUDED.tenant_id,
                 nome = EXCLUDED.nome,
                 cliente = EXCLUDED.cliente,
                 endereco = EXCLUDED.endereco,
@@ -258,12 +302,13 @@ export default async function handler(req, res) {
             const razaoSocialFinal = (f.razao_social || f.nome_fantasia || f.nome || nomeFinal).trim();
             const cnpjCpfFinal = (f.cnpj_cpf || f.cnpj || f.cpf || '').replace(/\D/g, '');
             await sql`
-              INSERT INTO fornecedores (id, nome, razao_social, cnpj_cpf, telefone, email, categoria, chave_pix, banco_info)
+              INSERT INTO fornecedores (id, tenant_id, nome, razao_social, cnpj_cpf, telefone, email, categoria, chave_pix, banco_info)
               VALUES (
-                ${f.id}, ${nomeFinal}, ${razaoSocialFinal}, ${cnpjCpfFinal},
+                ${f.id}, ${tenantId}, ${nomeFinal}, ${razaoSocialFinal}, ${cnpjCpfFinal},
                 ${f.telefone || ''}, ${f.email || ''}, ${f.categoria || 'outros'}, ${f.chave_pix || ''}, ${f.banco_info || ''}
               )
               ON CONFLICT (id) DO UPDATE SET
+                tenant_id = EXCLUDED.tenant_id,
                 nome = EXCLUDED.nome,
                 razao_social = EXCLUDED.razao_social,
                 cnpj_cpf = EXCLUDED.cnpj_cpf,
@@ -284,17 +329,18 @@ export default async function handler(req, res) {
 
             await sql`
               INSERT INTO lancamentos (
-                id, data, data_vencimento, data_pagamento, descricao, categoria,
+                id, tenant_id, data, data_vencimento, data_pagamento, descricao, categoria,
                 fornecedor_beneficiario, conta_bancaria, tipo, valor, status,
                 obra_id, nota_fiscal_id, codigo_barras, chave_nfe, observacoes, conciliado, itens
               )
               VALUES (
-                ${l.id}, ${dataLanc}, ${dataVenc}, ${dataPag}, ${l.descricao}, ${l.categoria || 'Outros'},
+                ${l.id}, ${tenantId}, ${dataLanc}, ${dataVenc}, ${dataPag}, ${l.descricao}, ${l.categoria || 'Outros'},
                 ${l.fornecedor_beneficiario || ''}, ${l.conta_bancaria || ''}, ${l.tipo || 'despesa'}, ${cleanNum(l.valor)}, ${l.status || 'pendente'},
                 ${l.obra_id || null}, ${l.nota_fiscal_id || null}, ${l.codigo_barras || null}, ${l.chave_nfe || null}, ${l.observacoes || ''}, ${!!l.conciliado},
                 ${itensJson}
               )
               ON CONFLICT (id) DO UPDATE SET
+                tenant_id = EXCLUDED.tenant_id,
                 data = EXCLUDED.data,
                 data_vencimento = EXCLUDED.data_vencimento,
                 data_pagamento = EXCLUDED.data_pagamento,
@@ -321,12 +367,12 @@ export default async function handler(req, res) {
 
             await sql`
               INSERT INTO notas_fiscais (
-                id, numero_nf, serie, chave_acesso, chave_nfe, emitente, cnpj_emitente, destinatario,
+                id, tenant_id, numero_nf, serie, chave_acesso, chave_nfe, emitente, cnpj_emitente, destinatario,
                 data_emissao, data_vencimento, data_pagamento, valor_bruto, impostos, valor_liquido, valor_total,
                 tipo, categoria, status, lancamento_id, observacoes, obra_id, itens
               )
               VALUES (
-                ${n.id}, ${n.numero_nf || ''}, ${n.serie || ''}, ${n.chave_nfe || n.chave_acesso || null}, ${n.chave_nfe || n.chave_acesso || ''},
+                ${n.id}, ${tenantId}, ${n.numero_nf || ''}, ${n.serie || ''}, ${n.chave_nfe || n.chave_acesso || null}, ${n.chave_nfe || n.chave_acesso || ''},
                 ${n.emitente || ''}, ${n.cnpj_emitente || ''}, ${n.destinatario || ''},
                 ${cleanDate(n.data_emissao)}, ${cleanDate(n.data_vencimento)}, ${cleanDate(n.data_pagamento)},
                 ${vBruto}, ${vImp}, ${vLiq}, ${vTot},
@@ -335,6 +381,7 @@ export default async function handler(req, res) {
                 ${itensNotaJson}
               )
               ON CONFLICT (id) DO UPDATE SET
+                tenant_id = EXCLUDED.tenant_id,
                 numero_nf = EXCLUDED.numero_nf,
                 serie = EXCLUDED.serie,
                 chave_acesso = EXCLUDED.chave_acesso,
@@ -366,13 +413,14 @@ export default async function handler(req, res) {
           for (const c of payload.contas) {
             if (!c.id) continue;
             await sql`
-              INSERT INTO contas_bancarias (id, banco_codigo, banco_nome, agencia, numero, tipo, titular, apelido, obra_id, obs)
+              INSERT INTO contas_bancarias (id, tenant_id, banco_codigo, banco_nome, agencia, numero, tipo, titular, apelido, obra_id, obs)
               VALUES (
-                ${c.id}, ${c.banco_codigo || ''}, ${c.banco_nome || ''}, ${c.agencia || ''},
+                ${c.id}, ${tenantId}, ${c.banco_codigo || ''}, ${c.banco_nome || ''}, ${c.agencia || ''},
                 ${c.numero || ''}, ${c.tipo || 'corrente'}, ${c.titular || ''},
                 ${c.apelido || ''}, ${c.obra_id || null}, ${c.obs || ''}
               )
               ON CONFLICT (id) DO UPDATE SET
+                tenant_id = EXCLUDED.tenant_id,
                 banco_codigo = EXCLUDED.banco_codigo,
                 banco_nome = EXCLUDED.banco_nome,
                 agencia = EXCLUDED.agencia,
@@ -391,7 +439,7 @@ export default async function handler(req, res) {
         return res.status(200).json({ success: true, synced: totalCount, message: 'Dados sincronizados com o Neon PostgreSQL!' });
       }
 
-      // 2. Salvar Registro Individual (Upsert)
+      // 2. Salvar Registro Individual (Upsert com tenant_id)
       if (action === 'save' && data) {
         if (table === 'lancamentos') {
           const l = data;
@@ -401,16 +449,17 @@ export default async function handler(req, res) {
 
           await sql`
             INSERT INTO lancamentos (
-              id, data, data_vencimento, data_pagamento, descricao, categoria,
+              id, tenant_id, data, data_vencimento, data_pagamento, descricao, categoria,
               fornecedor_beneficiario, conta_bancaria, tipo, valor, status,
               obra_id, nota_fiscal_id, codigo_barras, chave_nfe, observacoes, conciliado
             )
             VALUES (
-              ${l.id}, ${dataLanc}, ${dataVenc}, ${dataPag}, ${l.descricao}, ${l.categoria || 'Outros'},
+              ${l.id}, ${tenantId}, ${dataLanc}, ${dataVenc}, ${dataPag}, ${l.descricao}, ${l.categoria || 'Outros'},
               ${l.fornecedor_beneficiario || ''}, ${l.conta_bancaria || ''}, ${l.tipo || 'despesa'}, ${cleanNum(l.valor)}, ${l.status || 'pendente'},
               ${l.obra_id || null}, ${l.nota_fiscal_id || null}, ${l.codigo_barras || null}, ${l.chave_nfe || null}, ${l.observacoes || ''}, ${!!l.conciliado}
             )
             ON CONFLICT (id) DO UPDATE SET
+              tenant_id = EXCLUDED.tenant_id,
               data = EXCLUDED.data,
               data_vencimento = EXCLUDED.data_vencimento,
               data_pagamento = EXCLUDED.data_pagamento,
@@ -440,12 +489,12 @@ export default async function handler(req, res) {
 
           await sql`
             INSERT INTO notas_fiscais (
-              id, numero_nf, serie, chave_acesso, chave_nfe, emitente, cnpj_emitente, destinatario,
+              id, tenant_id, numero_nf, serie, chave_acesso, chave_nfe, emitente, cnpj_emitente, destinatario,
               data_emissao, data_vencimento, data_pagamento, valor_bruto, impostos, valor_liquido, valor_total,
               tipo, categoria, status, lancamento_id, observacoes, obra_id
             )
             VALUES (
-              ${n.id}, ${n.numero_nf || ''}, ${n.serie || ''}, ${n.chave_nfe || n.chave_acesso || null}, ${n.chave_nfe || n.chave_acesso || ''},
+              ${n.id}, ${tenantId}, ${n.numero_nf || ''}, ${n.serie || ''}, ${n.chave_nfe || n.chave_acesso || null}, ${n.chave_nfe || n.chave_acesso || ''},
               ${n.emitente || ''}, ${n.cnpj_emitente || ''}, ${n.destinatario || ''},
               ${cleanDate(n.data_emissao)}, ${cleanDate(n.data_vencimento)}, ${cleanDate(n.data_pagamento)},
               ${vBruto}, ${vImp}, ${vLiq}, ${vTot},
@@ -453,6 +502,7 @@ export default async function handler(req, res) {
               ${n.lancamento_id || null}, ${n.observacoes || ''}, ${n.obra_id || null}
             )
             ON CONFLICT (id) DO UPDATE SET
+              tenant_id = EXCLUDED.tenant_id,
               numero_nf = EXCLUDED.numero_nf,
               serie = EXCLUDED.serie,
               chave_acesso = EXCLUDED.chave_acesso,
@@ -480,13 +530,14 @@ export default async function handler(req, res) {
         if (table === 'obras' || table === 'clientes') {
           const o = data;
           await sql`
-            INSERT INTO obras (id, nome, cliente, endereco, orcamento_total, status, data_inicio, data_previsao)
+            INSERT INTO obras (id, tenant_id, nome, cliente, endereco, orcamento_total, status, data_inicio, data_previsao)
             VALUES (
-              ${o.id}, ${o.nome}, ${o.cliente || ''}, ${o.endereco || ''},
+              ${o.id}, ${tenantId}, ${o.nome}, ${o.cliente || ''}, ${o.endereco || ''},
               ${cleanNum(o.orcamento_total || o.valor_contrato)}, ${o.status || 'em_andamento'},
               ${cleanDate(o.data_inicio)}, ${cleanDate(o.data_previsao)}
             )
             ON CONFLICT (id) DO UPDATE SET
+              tenant_id = EXCLUDED.tenant_id,
               nome = EXCLUDED.nome,
               cliente = EXCLUDED.cliente,
               endereco = EXCLUDED.endereco,
@@ -503,12 +554,13 @@ export default async function handler(req, res) {
           const cnpjCpfFinal = (f.cnpj_cpf || f.cnpj || f.cpf || '').replace(/\D/g, '');
 
           await sql`
-            INSERT INTO fornecedores (id, nome, razao_social, cnpj_cpf, telefone, email, categoria, chave_pix, banco_info)
+            INSERT INTO fornecedores (id, tenant_id, nome, razao_social, cnpj_cpf, telefone, email, categoria, chave_pix, banco_info)
             VALUES (
-              ${f.id}, ${nomeFinal}, ${razaoSocialFinal}, ${cnpjCpfFinal},
+              ${f.id}, ${tenantId}, ${nomeFinal}, ${razaoSocialFinal}, ${cnpjCpfFinal},
               ${f.telefone || ''}, ${f.email || ''}, ${f.categoria || 'outros'}, ${f.chave_pix || ''}, ${f.banco_info || ''}
             )
             ON CONFLICT (id) DO UPDATE SET
+              tenant_id = EXCLUDED.tenant_id,
               nome = EXCLUDED.nome,
               razao_social = EXCLUDED.razao_social,
               cnpj_cpf = EXCLUDED.cnpj_cpf,
@@ -525,16 +577,17 @@ export default async function handler(req, res) {
           const doc = data;
           await sql`
             INSERT INTO documentos (
-              id, tipo, referencia_id, titulo, categoria, nome_arquivo,
+              id, tenant_id, tipo, referencia_id, titulo, categoria, nome_arquivo,
               tipo_arquivo, tamanho_bytes, base64_data, created_at
             )
             VALUES (
-              ${doc.id}, ${doc.entidade_tipo || doc.tipo || 'geral'}, ${doc.entidade_id || doc.referencia_id || ''},
+              ${doc.id}, ${tenantId}, ${doc.entidade_tipo || doc.tipo || 'geral'}, ${doc.entidade_id || doc.referencia_id || ''},
               ${doc.titulo || doc.nome_arquivo || 'Documento'}, ${doc.categoria || ''}, ${doc.nome_arquivo || ''},
               ${doc.tipo_mime || doc.tipo_arquivo || 'application/octet-stream'}, ${cleanNum(doc.tamanho || doc.tamanho_bytes)},
               ${doc.data_base64 || doc.base64_data || null}, ${doc.criado_em || new Date().toISOString()}
             )
             ON CONFLICT (id) DO UPDATE SET
+              tenant_id = EXCLUDED.tenant_id,
               titulo = EXCLUDED.titulo,
               categoria = EXCLUDED.categoria,
               nome_arquivo = EXCLUDED.nome_arquivo,
@@ -546,12 +599,13 @@ export default async function handler(req, res) {
         if (table === 'produtos') {
           const p = data;
           await sql`
-            INSERT INTO produtos (id, nome, unidade, categoria, codigo, valor_medio, observacoes)
+            INSERT INTO produtos (id, tenant_id, nome, unidade, categoria, codigo, valor_medio, observacoes)
             VALUES (
-              ${p.id}, ${p.nome}, ${p.unidade || 'un'}, ${p.categoria || 'material'},
+              ${p.id}, ${tenantId}, ${p.nome}, ${p.unidade || 'un'}, ${p.categoria || 'material'},
               ${p.codigo || null}, ${cleanNum(p.valor_medio)}, ${p.observacoes || ''}
             )
             ON CONFLICT (id) DO UPDATE SET
+              tenant_id = EXCLUDED.tenant_id,
               nome = EXCLUDED.nome,
               unidade = EXCLUDED.unidade,
               categoria = EXCLUDED.categoria,
@@ -567,13 +621,14 @@ export default async function handler(req, res) {
           const h = data;
           const dadosJson = JSON.stringify(h.dados || {});
           await sql`
-            INSERT INTO ocr_historico (id, data_hora, nome_arquivo, tipo_documento, fornecedor, valor, data_vencimento, confianca, dados)
+            INSERT INTO ocr_historico (id, tenant_id, data_hora, nome_arquivo, tipo_documento, fornecedor, valor, data_vencimento, confianca, dados)
             VALUES (
-              ${h.id}, ${h.data_hora || new Date().toISOString()}, ${h.nome_arquivo || ''},
+              ${h.id}, ${tenantId}, ${h.data_hora || new Date().toISOString()}, ${h.nome_arquivo || ''},
               ${h.tipo_documento || 'outro'}, ${h.fornecedor || 'Não informado'}, ${cleanNum(h.valor)},
               ${h.data_vencimento || null}, ${cleanNum(h.confianca)}, ${dadosJson}
             )
             ON CONFLICT (id) DO UPDATE SET
+              tenant_id = EXCLUDED.tenant_id,
               data_hora = EXCLUDED.data_hora,
               nome_arquivo = EXCLUDED.nome_arquivo,
               tipo_documento = EXCLUDED.tipo_documento,
@@ -589,13 +644,14 @@ export default async function handler(req, res) {
         if (table === 'contas' || table === 'contas_bancarias') {
           const c = data;
           await sql`
-            INSERT INTO contas_bancarias (id, banco_codigo, banco_nome, agencia, numero, tipo, titular, apelido, obra_id, obs)
+            INSERT INTO contas_bancarias (id, tenant_id, banco_codigo, banco_nome, agencia, numero, tipo, titular, apelido, obra_id, obs)
             VALUES (
-              ${c.id}, ${c.banco_codigo || ''}, ${c.banco_nome || ''}, ${c.agencia || ''},
+              ${c.id}, ${tenantId}, ${c.banco_codigo || ''}, ${c.banco_nome || ''}, ${c.agencia || ''},
               ${c.numero || ''}, ${c.tipo || 'corrente'}, ${c.titular || ''},
               ${c.apelido || ''}, ${c.obra_id || null}, ${c.obs || ''}
             )
             ON CONFLICT (id) DO UPDATE SET
+              tenant_id = EXCLUDED.tenant_id,
               banco_codigo = EXCLUDED.banco_codigo,
               banco_nome = EXCLUDED.banco_nome,
               agencia = EXCLUDED.agencia,
@@ -609,44 +665,92 @@ export default async function handler(req, res) {
           `;
           return res.status(200).json({ success: true, id: c.id });
         }
+
+        if (table === 'orcamentos') {
+          const o = data;
+          const itensJson = JSON.stringify(Array.isArray(o.itens) ? o.itens : []);
+          await sql`
+            INSERT INTO orcamentos (id, tenant_id, obra_id, titulo, valor_total, itens)
+            VALUES (
+              ${o.id}, ${tenantId}, ${o.obra_id || null}, ${o.titulo || ''},
+              ${cleanNum(o.valor_total)}, ${itensJson}
+            )
+            ON CONFLICT (id) DO UPDATE SET
+              tenant_id = EXCLUDED.tenant_id,
+              obra_id = EXCLUDED.obra_id,
+              titulo = EXCLUDED.titulo,
+              valor_total = EXCLUDED.valor_total,
+              itens = EXCLUDED.itens;
+          `;
+          return res.status(200).json({ success: true, id: o.id });
+        }
+
+        if (table === 'medicoes') {
+          const m = data;
+          await sql`
+            INSERT INTO medicoes (id, tenant_id, obra_id, numero, data, valor_medido, status, observacoes)
+            VALUES (
+              ${m.id}, ${tenantId}, ${m.obra_id || null}, ${m.numero || 1},
+              ${cleanDate(m.data) || new Date().toISOString().split('T')[0]},
+              ${cleanNum(m.valor_medido)}, ${m.status || 'aprovada'}, ${m.observacoes || ''}
+            )
+            ON CONFLICT (id) DO UPDATE SET
+              tenant_id = EXCLUDED.tenant_id,
+              obra_id = EXCLUDED.obra_id,
+              numero = EXCLUDED.numero,
+              data = EXCLUDED.data,
+              valor_medido = EXCLUDED.valor_medido,
+              status = EXCLUDED.status,
+              observacoes = EXCLUDED.observacoes;
+          `;
+          return res.status(200).json({ success: true, id: m.id });
+        }
       }
 
-      // 3. Excluir Registro Individual
+      // 3. Excluir Registro Individual (Estritamente com tenant_id)
       if (action === 'delete' && id) {
         if (table === 'lancamentos') {
-          await sql`DELETE FROM lancamentos WHERE id = ${id};`;
+          await sql`DELETE FROM lancamentos WHERE id = ${id} AND tenant_id = ${tenantId};`;
           return res.status(200).json({ success: true, id });
         }
         if (table === 'notas' || table === 'notas_fiscais') {
-          await sql`DELETE FROM notas_fiscais WHERE id = ${id};`;
+          await sql`DELETE FROM notas_fiscais WHERE id = ${id} AND tenant_id = ${tenantId};`;
           return res.status(200).json({ success: true, id });
         }
         if (table === 'obras' || table === 'clientes') {
-          await sql`DELETE FROM obras WHERE id = ${id};`;
+          await sql`DELETE FROM obras WHERE id = ${id} AND tenant_id = ${tenantId};`;
           return res.status(200).json({ success: true, id });
         }
         if (table === 'fornecedores') {
-          await sql`DELETE FROM fornecedores WHERE id = ${id};`;
+          await sql`DELETE FROM fornecedores WHERE id = ${id} AND tenant_id = ${tenantId};`;
           return res.status(200).json({ success: true, id });
         }
         if (table === 'documentos') {
-          await sql`DELETE FROM documentos WHERE id = ${id};`;
+          await sql`DELETE FROM documentos WHERE id = ${id} AND tenant_id = ${tenantId};`;
           return res.status(200).json({ success: true, id });
         }
         if (table === 'produtos') {
-          await sql`DELETE FROM produtos WHERE id = ${id};`;
+          await sql`DELETE FROM produtos WHERE id = ${id} AND tenant_id = ${tenantId};`;
           return res.status(200).json({ success: true, id });
         }
         if (table === 'ocr_historico') {
           if (id === 'all') {
-            await sql`DELETE FROM ocr_historico;`;
+            await sql`DELETE FROM ocr_historico WHERE tenant_id = ${tenantId};`;
           } else {
-            await sql`DELETE FROM ocr_historico WHERE id = ${id};`;
+            await sql`DELETE FROM ocr_historico WHERE id = ${id} AND tenant_id = ${tenantId};`;
           }
           return res.status(200).json({ success: true, id });
         }
         if (table === 'contas' || table === 'contas_bancarias') {
-          await sql`DELETE FROM contas_bancarias WHERE id = ${id};`;
+          await sql`DELETE FROM contas_bancarias WHERE id = ${id} AND tenant_id = ${tenantId};`;
+          return res.status(200).json({ success: true, id });
+        }
+        if (table === 'orcamentos') {
+          await sql`DELETE FROM orcamentos WHERE id = ${id} AND tenant_id = ${tenantId};`;
+          return res.status(200).json({ success: true, id });
+        }
+        if (table === 'medicoes') {
+          await sql`DELETE FROM medicoes WHERE id = ${id} AND tenant_id = ${tenantId};`;
           return res.status(200).json({ success: true, id });
         }
       }

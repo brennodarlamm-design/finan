@@ -14,6 +14,9 @@ backend/auth_info_baileys/
 .env.local
 .env.*.local
 *.log
+monitor-nfe/config.json
+*.pfx
+*.p12
 
 # Vercel
 .vercel/

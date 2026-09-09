@@ -85,7 +85,8 @@ const Documentos = {
     }
     // Tenta buscar da nuvem (Neon) se o arquivo foi anexado por outro dispositivo (ex: celular)
     try {
-      const res = await fetch(`/api/db?table=documento_conteudo&id=${encodeURIComponent(id)}`);
+      const headers = (typeof DB !== 'undefined' && DB._apiHeaders) ? DB._apiHeaders() : {};
+      const res = await fetch(`/api/db?table=documento_conteudo&id=${encodeURIComponent(id)}`, { headers });
       if (res.ok) {
         const json = await res.json();
         if (json.base64) {
