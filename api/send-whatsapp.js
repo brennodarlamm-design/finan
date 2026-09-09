@@ -1,5 +1,7 @@
 // api/send-whatsapp.js — Serverless Proxy seguro para disparo de WhatsApp via Render Backend / Evolution API
 
+import { resolveAuthAndTenant } from './_auth.js';
+
 const ALLOWED_ORIGINS = [
   'https://finobra.app.br',
   'https://www.finobra.app.br',
@@ -10,20 +12,6 @@ const ALLOWED_ORIGINS = [
   'http://127.0.0.1:3333',
   'http://127.0.0.1:5000'
 ];
-
-function isAuthenticated(req) {
-  const secret = (process.env.API_SECRET || process.env.VERCEL_API_SECRET || '').trim();
-  if (!secret) return true; // Em dev se não configurado
-
-  const authHeader = req.headers.authorization || req.headers.Authorization || '';
-  if (authHeader.startsWith('Bearer ') && authHeader.substring(7).trim() === secret) {
-    return true;
-  }
-  const apiKey = req.headers['x-api-key'] || req.headers['apikey'] || '';
-  if (apiKey && apiKey.trim() === secret) return true;
-
-  return false;
-}
 
 export default async function handler(req, res) {
   // Configura CORS seguro
@@ -39,7 +27,7 @@ export default async function handler(req, res) {
   }
 
   res.setHeader('Access-Control-Allow-Methods', 'POST,OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, apikey, x-api-key, X-Requested-With');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, apikey, x-api-key, x-tenant-id, X-Requested-With');
 
   if (req.method === 'OPTIONS') {
     return res.status(200).end();
@@ -49,8 +37,9 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Método não permitido' });
   }
 
-  if (!isAuthenticated(req)) {
-    return res.status(401).json({ error: 'Não autorizado. Forneça o token de autenticação.' });
+  const auth = resolveAuthAndTenant(req);
+  if (!auth.authenticated) {
+    return res.status(401).json({ error: auth.error || 'Não autorizado. Forneça o token de autenticação.' });
   }
 
   try {

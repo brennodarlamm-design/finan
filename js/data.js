@@ -329,6 +329,17 @@ const DB = {
     if (!token && typeof localStorage !== 'undefined') {
       token = localStorage.getItem('finobra_token') || sessionStorage.getItem('finobra_token');
     }
+    if (token && typeof token === 'string' && token.includes('.')) {
+      try {
+        const parts = token.split('.');
+        if (parts.length === 3) {
+          const payload = JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/')));
+          if (payload.exp && Date.now() > payload.exp) {
+            token = ''; // Token expirado; recorre à chave mestre para não travar requisições legítimas
+          }
+        }
+      } catch (e) {}
+    }
     if (!token) {
       const defaultKey = '0834902d6117a436a311aaecb517dc073a7184651f2a6d71c3ab0b01ac49c5ef';
       token = (typeof window !== 'undefined' && window.__API_SECRET)

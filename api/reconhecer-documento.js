@@ -1,6 +1,8 @@
 // api/reconhecer-documento.js — Robô de Reconhecimento de Documentos Fiscais
 // Recebe PDF/imagem em base64, envia ao Google Gemini Vision e retorna dados estruturados
 
+import { resolveAuthAndTenant } from './_auth.js';
+
 export const config = {
   maxDuration: 60,
   api: {
@@ -21,20 +23,6 @@ const ALLOWED_ORIGINS = [
   'http://127.0.0.1:5000'
 ];
 
-function isAuthenticated(req) {
-  const secret = (process.env.API_SECRET || process.env.VERCEL_API_SECRET || '').trim();
-  if (!secret) return true; // Em ambiente dev se não configurado
-
-  const authHeader = req.headers.authorization || req.headers.Authorization || '';
-  if (authHeader.startsWith('Bearer ') && authHeader.substring(7).trim() === secret) {
-    return true;
-  }
-  const apiKey = req.headers['x-api-key'] || req.headers['apikey'] || '';
-  if (apiKey && apiKey.trim() === secret) return true;
-
-  return false;
-}
-
 export default async function handler(req, res) {
   const origin = req.headers.origin;
   if (origin) {
@@ -48,13 +36,14 @@ export default async function handler(req, res) {
   }
 
   res.setHeader('Access-Control-Allow-Methods', 'POST,OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, apikey, x-api-key, X-Requested-With');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, apikey, x-api-key, x-tenant-id, X-Requested-With');
 
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'POST') return res.status(405).json({ error: 'Método não permitido' });
 
-  if (!isAuthenticated(req)) {
-    return res.status(401).json({ error: 'Acesso não autorizado. Forneça o token de autenticação.' });
+  const auth = resolveAuthAndTenant(req);
+  if (!auth.authenticated) {
+    return res.status(401).json({ error: auth.error || 'Acesso não autorizado. Forneça o token de autenticação.' });
   }
 
   const apiKey = process.env.GEMINI_API_KEY;
@@ -113,8 +102,6 @@ REGRAS CRÍTICAS PARA 'itens' E 'tipo_documento':
 
   try {
     const models = [
-      'gemini-3.7-flash',
-      'gemini-3.5-flash',
       'gemini-flash-latest',
       'gemini-3.6-flash'
     ];
@@ -142,7 +129,7 @@ REGRAS CRÍTICAS PARA 'itens' E 'tipo_documento':
         const geminiRes = await fetch(geminiUrl, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          signal: AbortSignal.timeout(28000),
+          signal: AbortSignal.timeout(20000),
           body: JSON.stringify(payload)
         });
 
