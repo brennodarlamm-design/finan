@@ -788,15 +788,25 @@ const Configuracoes = {
         </div>
       </div>
       <div class="card">
-        <div class="card-header"><div class="card-title">📲 Integração com WhatsApp</div></div>
-        <p style="color:var(--text2);font-size:.84rem;margin-bottom:10px;">Configure o número padrão para envio de alertas de vencimento de boletos e resumos matinais de contas a pagar.</p>
-        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
-          <button class="btn btn-sm" onclick="WhatsApp.abrirModalConfig()" style="background:#25D366;color:#fff;font-weight:700;display:flex;align-items:center;gap:6px;border:none;">
-            📲 Configurar Número &amp; Testar Envio
-          </button>
-          <span style="font-size:.78rem;color:var(--text3);">
-            ${WhatsApp.getTelefonePadrao() ? `Número ativo: <strong>${WhatsApp.getTelefonePadrao()}</strong>` : 'Nenhum número cadastrado (abre lista de contatos)'}
+        <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;">
+          <div class="card-title">📲 Integração com WhatsApp</div>
+          <span id="cfg-wa-status-badge" style="font-size:.74rem;background:rgba(37,211,102,.1);color:#25D366;padding:4px 10px;border-radius:999px;font-weight:700;">
+            ⚡ Servidor Nuvem 24/7
           </span>
+        </div>
+        <p style="color:var(--text2);font-size:.84rem;margin-bottom:12px;line-height:1.5;">
+          Conecte o WhatsApp da sua construtora para envio silencioso e automático de relatórios, alertas de vencimento de boletos aos gestores e recibos de pagamento.
+        </p>
+        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:10px;">
+          <button class="btn btn-sm" onclick="WhatsApp.abrirModalConexao()" style="background:#25D366;color:#fff;font-weight:700;display:flex;align-items:center;gap:6px;border:none;padding:8px 14px;border-radius:8px;cursor:pointer;">
+            📲 Conectar / Gerenciar WhatsApp
+          </button>
+          <button class="btn btn-secondary btn-sm" onclick="WhatsApp.abrirModalTelefone()" style="font-size:.8rem;">
+            ⚙️ Número para Alertas
+          </button>
+        </div>
+        <div style="font-size:.78rem;color:var(--text3);" id="cfg-wa-ativo-txt">
+          ${WhatsApp.getTelefonePadrao() ? `Telefone para alertas: <strong style="color:var(--success);">${WhatsApp.formatarTelefone(WhatsApp.getTelefonePadrao())}</strong>` : 'Nenhum telefone para alertas cadastrado'}
         </div>
       </div>
     </div>

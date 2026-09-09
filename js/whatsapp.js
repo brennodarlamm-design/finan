@@ -100,9 +100,13 @@ const WhatsApp = {
 
     // 1. Tenta envio via Proxy Serverless da aplicação (evita qualquer bloqueio de CORS do navegador)
     try {
+      const authHeaders = (typeof Auth !== 'undefined' && Auth.getAuthHeaders)
+        ? Auth.getAuthHeaders()
+        : { 'Content-Type': 'application/json' };
+
       const resProxy = await fetch('/api/send-whatsapp', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: authHeaders,
         body: JSON.stringify({
           phone: numFmt,
           text: texto,
@@ -314,121 +318,381 @@ const WhatsApp = {
     this.abrirEnvio(msg, limpo);
   },
 
-  // Modal para configurar o WhatsApp / Evolution API (Exclusivo para Desenvolvedor)
-  abrirModalConfig() {
-    const isDev = (typeof Configuracoes !== 'undefined' && Configuracoes.canAccessSistema && Configuracoes.canAccessSistema())
-      || (typeof Auth !== 'undefined' && Auth.getUser()?.username === 'admin' && Auth.getUser()?.tenantId === 'angelim')
-      || localStorage.getItem('finobra_dev_mode') === 'true';
+  _pollTimer: null,
+  _currentSession: null,
 
-    if (!isDev) {
-      Utils.toast('A configuração do servidor de WhatsApp é restrita à equipe técnica de desenvolvimento.', 'warning');
-      return;
+  formatarTelefone(tel) {
+    if (!tel) return '';
+    const limpo = String(tel).replace(/\D/g, '');
+    if (limpo.length === 13 && limpo.startsWith('55')) {
+      return `+55 (${limpo.substring(2, 4)}) ${limpo.substring(4, 9)}-${limpo.substring(9)}`;
     }
-
-    const tel = this.getTelefonePadrao();
-    const url = this.getEvolutionUrl();
-    const key = this.getEvolutionKey();
-    const inst = this.getEvolutionInstance();
-    const modo = this.getModoEnvio();
-
-    Utils.showModal(`
-      <div class="modal" style="max-width:520px;">
-        <div class="modal-header">
-          <span class="modal-title">📲 Integração WhatsApp & Evolution API</span>
-          <button class="modal-close" onclick="Utils.closeModal()">✕</button>
-        </div>
-        <div class="modal-body">
-          <p style="font-size:.84rem;color:var(--text2);margin-bottom:14px;">
-            Configure o envio direto sem abrir novas abas no navegador.
-          </p>
-          
-          <div class="form-group" style="margin-bottom:12px;">
-            <label class="form-label" style="font-size:.78rem;font-weight:700;">Número de WhatsApp de Destino (com DDD)</label>
-            <input type="text" id="cfg-wa-phone" class="form-control"
-              placeholder="Ex: 5595991363678"
-              value="${tel}">
-          </div>
-
-          <div class="form-group" style="margin-bottom:14px;">
-            <label class="form-label" style="font-size:.78rem;font-weight:700;">Modo de Envio ao Clicar nos Botões</label>
-            <select id="cfg-wa-modo" class="form-control" style="font-size:.84rem;">
-              <option value="api" ${modo === 'api' ? 'selected' : ''}>⚡ Envio Silencioso em Segundo Plano (Sem abrir abas)</option>
-              <option value="web" ${modo === 'web' ? 'selected' : ''}>🌐 Abrir no WhatsApp Web (Abre nova aba)</option>
-            </select>
-          </div>
-
-          <div style="background:rgba(255,255,255,0.03);border:1px solid var(--border);border-radius:var(--r-md);padding:12px;margin-bottom:14px;">
-            <div style="font-size:.8rem;font-weight:700;color:var(--accent2);margin-bottom:8px;">⚡ Servidor / Evolution API v2:</div>
-            
-            <div class="form-group" style="margin-bottom:8px;">
-              <label class="form-label" style="font-size:.74rem;">URL da API / Endpoint</label>
-              <input type="text" id="cfg-wa-url" class="form-control"
-                placeholder="https://finan-wf12.onrender.com/send-message ou http://localhost:3333/send-message"
-                value="${url}">
-            </div>
-
-            <div class="g2" style="gap:8px;">
-              <div class="form-group">
-                <label class="form-label" style="font-size:.74rem;">API Key (Opcional)</label>
-                <input type="text" id="cfg-wa-key" class="form-control"
-                  placeholder="ANGELIM-FINANCAS-EVOLUTION-2026-KEY"
-                  value="${key}">
-              </div>
-              <div class="form-group">
-                <label class="form-label" style="font-size:.74rem;">Nome da Instância</label>
-                <input type="text" id="cfg-wa-inst" class="form-control"
-                  placeholder="angelim"
-                  value="${inst}">
-              </div>
-            </div>
-          </div>
-
-          <div style="background:rgba(16,185,129,.08);border:1px solid rgba(16,185,129,.25);border-radius:var(--r-md);padding:10px 14px;font-size:.78rem;color:var(--text);">
-            <div style="font-weight:700;color:var(--success);margin-bottom:2px;">🟢 Envio Silencioso Ativo:</div>
-            Ao clicar no botão <strong>📲 Resumo WhatsApp</strong> ou <strong>📲 WhatsApp</strong>, a mensagem é enviada instantaneamente em segundo plano sem abrir nenhuma aba nova!
-          </div>
-        </div>
-        <div class="modal-footer" style="display:flex;justify-content:space-between;">
-          <button class="btn btn-secondary" onclick="WhatsApp.testarEnvio()">📲 Testar Envio</button>
-          <div style="display:flex;gap:8px;">
-            <button class="btn btn-secondary" onclick="Utils.closeModal()">Cancelar</button>
-            <button class="btn btn-primary" onclick="WhatsApp.salvarConfig()">💾 Salvar</button>
-          </div>
-        </div>
-      </div>`);
+    if (limpo.length === 12 && limpo.startsWith('55')) {
+      return `+55 (${limpo.substring(2, 4)}) ${limpo.substring(4, 8)}-${limpo.substring(8)}`;
+    }
+    if (limpo.length === 11) {
+      return `(${limpo.substring(0, 2)}) ${limpo.substring(2, 7)}-${limpo.substring(7)}`;
+    }
+    if (limpo.length === 10) {
+      return `(${limpo.substring(0, 2)}) ${limpo.substring(2, 6)}-${limpo.substring(6)}`;
+    }
+    return limpo;
   },
 
-  salvarConfig() {
-    const tel = document.getElementById('cfg-wa-phone')?.value || '';
-    const url = document.getElementById('cfg-wa-url')?.value || '';
-    const key = document.getElementById('cfg-wa-key')?.value || '';
-    const inst = document.getElementById('cfg-wa-inst')?.value || '';
-    const modo = document.getElementById('cfg-wa-modo')?.value || 'api';
-
-    this.setTelefonePadrao(tel);
-    this.setEvolutionUrl(url);
-    this.setEvolutionKey(key);
-    this.setEvolutionInstance(inst);
-    this.setModoEnvio(modo);
-
-    Utils.toast('Configurações salvas com sucesso!', 'success');
+  fecharModalConexao() {
+    if (this._pollTimer) {
+      clearInterval(this._pollTimer);
+      this._pollTimer = null;
+    }
     Utils.closeModal();
   },
 
-  testarEnvio() {
-    const tel = document.getElementById('cfg-wa-phone')?.value || this.getTelefonePadrao();
-    const url = document.getElementById('cfg-wa-url')?.value || this.getEvolutionUrl();
-    const key = document.getElementById('cfg-wa-key')?.value || this.getEvolutionKey();
-    const inst = document.getElementById('cfg-wa-inst')?.value || this.getEvolutionInstance();
-    const modo = document.getElementById('cfg-wa-modo')?.value || 'api';
+  async consultarSessao() {
+    try {
+      const headers = (typeof Auth !== 'undefined' && Auth.getAuthHeaders)
+        ? Auth.getAuthHeaders()
+        : { 'Content-Type': 'application/json' };
 
-    this.setTelefonePadrao(tel);
-    this.setEvolutionUrl(url);
-    this.setEvolutionKey(key);
-    this.setEvolutionInstance(inst);
-    this.setModoEnvio(modo);
+      const res = await fetch('/api/whatsapp?action=session', {
+        method: 'GET',
+        headers: headers
+      });
 
-    const msg = `✅ *ANGELIM CONSTRUTORA*\n\nTeste de disparo silencioso em segundo plano realizado com sucesso! Sem abrir novas abas.`;
-    this.abrirEnvio(msg, tel);
+      if (!res.ok) {
+        throw new Error(`Servidor respondeu com status ${res.status}`);
+      }
+
+      const data = await res.json();
+      this._currentSession = data;
+      return data;
+    } catch (err) {
+      console.warn('⚠️ [WhatsApp] Falha ao consultar status da sessão:', err.message);
+      return {
+        success: false,
+        status: 'connecting',
+        connected: false,
+        connectedNumber: null,
+        qrDataUrl: null,
+        error: err.message
+      };
+    }
+  },
+
+  // Abre o Modal Principal de Conexão e Gerenciamento do WhatsApp para o Cliente
+  async abrirModalConexao() {
+    if (this._pollTimer) {
+      clearInterval(this._pollTimer);
+      this._pollTimer = null;
+    }
+
+    Utils.showModal(`
+      <div class="modal" id="wa-conexao-modal" style="max-width:500px;border-radius:16px;">
+        <div class="modal-header" style="border-bottom:1px solid var(--border);padding-bottom:12px;">
+          <div style="display:flex;align-items:center;gap:8px;">
+            <span style="font-size:1.3rem;">📲</span>
+            <div>
+              <span class="modal-title" style="font-size:1.05rem;font-weight:700;">Conexão com WhatsApp</span>
+              <div style="font-size:.74rem;color:var(--text3);">Disparo automático de boletos e relatórios diários</div>
+            </div>
+          </div>
+          <button class="modal-close" onclick="WhatsApp.fecharModalConexao()">✕</button>
+        </div>
+        <div class="modal-body" id="wa-conexao-modal-body" style="padding-top:16px;">
+          <div style="text-align:center;padding:36px 16px;">
+            <div class="spinner" style="width:40px;height:40px;border:3px solid rgba(37,211,102,0.2);border-top-color:#25D366;border-radius:50%;animation:spin 1s linear infinite;margin:0 auto 16px;"></div>
+            <h4 style="margin:0 0 6px;font-size:1rem;color:var(--text);">Verificando servidor de WhatsApp...</h4>
+            <p style="color:var(--text3);font-size:.82rem;margin:0;">Conectando ao serviço em nuvem...</p>
+          </div>
+        </div>
+      </div>
+    `);
+
+    // Inicia a primeira verificação imediata
+    const inicial = await this.consultarSessao();
+    this.renderModalEstado(inicial);
+
+    // Inicia polling a cada 2.5 segundos enquanto o modal estiver aberto
+    this._pollTimer = setInterval(async () => {
+      // Se o modal foi fechado pelo usuário, cancela o timer
+      if (!document.getElementById('wa-conexao-modal')) {
+        clearInterval(this._pollTimer);
+        this._pollTimer = null;
+        return;
+      }
+
+      const prevStatus = this._currentSession?.status;
+      const prevConnected = this._currentSession?.connected;
+      const prevQR = this._currentSession?.qrDataUrl;
+
+      const atual = await this.consultarSessao();
+
+      // Se conectou após a leitura do QR Code, avisa com toast e atualiza a tela
+      if (!prevConnected && atual.connected) {
+        Utils.toast('🎉 WhatsApp conectado com sucesso!', 'success');
+        this.renderModalEstado(atual);
+        // Atualiza indicadores na tela de configurações se estiver aberta
+        const badgeTel = document.getElementById('cfg-wa-ativo-txt');
+        if (badgeTel && atual.connectedNumber) {
+          badgeTel.innerHTML = `Número ativo: <strong style="color:var(--success);">${this.formatarTelefone(atual.connectedNumber)}</strong>`;
+        }
+      } else if (prevStatus !== atual.status || (atual.qrDataUrl && atual.qrDataUrl !== prevQR)) {
+        this.renderModalEstado(atual);
+      }
+    }, 2500);
+  },
+
+  renderModalEstado(session) {
+    const container = document.getElementById('wa-conexao-modal-body');
+    if (!container) return;
+
+    const status = session?.status || 'connecting';
+    const isConnected = !!session?.connected;
+    const connectedNum = session?.connectedNumber || '';
+    const qrDataUrl = session?.qrDataUrl;
+    const telPadrao = this.getTelefonePadrao();
+
+    // ── ESTADO 1: CONECTADO ──
+    if (isConnected) {
+      const numFmt = this.formatarTelefone(connectedNum || telPadrao);
+      let lastConFmt = 'Ativo agora';
+      if (session.lastConnectedAt) {
+        try {
+          const d = new Date(session.lastConnectedAt);
+          lastConFmt = d.toLocaleString('pt-BR');
+        } catch (_) {}
+      }
+
+      container.innerHTML = `
+        <div style="text-align:center;padding:4px 0 10px;">
+          <div style="width:64px;height:64px;border-radius:50%;background:rgba(16,185,129,0.12);border:2px solid #10b981;display:flex;align-items:center;justify-content:center;margin:0 auto 12px;font-size:28px;color:#10b981;">
+            ✓
+          </div>
+          <div style="display:inline-block;background:rgba(16,185,129,0.15);color:#10b981;font-weight:700;padding:4px 14px;border-radius:999px;font-size:0.75rem;letter-spacing:0.04em;margin-bottom:8px;">
+            🟢 100% CONECTADO E PRONTO
+          </div>
+          <h3 style="margin:0 0 6px;font-size:1.2rem;font-weight:700;">WhatsApp Conectado!</h3>
+          <p style="color:var(--text2);font-size:0.82rem;max-width:380px;margin:0 auto 16px;line-height:1.4;">
+            O servidor está online e enviando notificações de boletos, alertas de vencimento e resumos da construtora.
+          </p>
+
+          <div style="background:var(--bg2, #1e293b);border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:16px;text-align:left;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;padding-bottom:8px;border-bottom:1px solid rgba(255,255,255,0.06);">
+              <span style="font-size:0.78rem;color:var(--text3);">Aparelho Conectado:</span>
+              <span style="font-weight:700;color:var(--text);font-size:0.92rem;display:flex;align-items:center;gap:6px;">
+                <span>📱</span> ${numFmt || 'Identificado na Nuvem'}
+              </span>
+            </div>
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;padding-bottom:8px;border-bottom:1px solid rgba(255,255,255,0.06);">
+              <span style="font-size:0.78rem;color:var(--text3);">Servidor:</span>
+              <span style="font-weight:600;color:#10b981;font-size:0.8rem;">⚡ 24/7 Alta Disponibilidade (Render)</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;align-items:center;">
+              <span style="font-size:0.78rem;color:var(--text3);">Conectado desde:</span>
+              <span style="font-size:0.78rem;color:var(--text2);">${lastConFmt}</span>
+            </div>
+          </div>
+
+          <!-- Teste de Envio -->
+          <div style="background:rgba(255,255,255,0.02);border:1px dashed var(--border);border-radius:12px;padding:12px 14px;margin-bottom:16px;text-align:left;">
+            <label style="font-size:0.75rem;font-weight:700;color:var(--text2);display:block;margin-bottom:6px;">
+              📲 Disparar Mensagem de Teste:
+            </label>
+            <div style="display:flex;gap:8px;">
+              <input type="text" id="wa-teste-phone" class="form-control"
+                placeholder="DDD + Telefone (ex: 95 99136-3678)"
+                value="${connectedNum || telPadrao || ''}"
+                style="font-size:0.86rem;">
+              <button class="btn btn-sm" id="wa-btn-teste" onclick="WhatsApp.executarTesteConexao()" style="background:#25D366;color:#fff;font-weight:700;white-space:nowrap;display:flex;align-items:center;gap:6px;">
+                <span>🚀 Testar</span>
+              </button>
+            </div>
+          </div>
+
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-top:12px;">
+            <button class="btn btn-sm btn-danger" onclick="WhatsApp.confirmarDesconexao()" style="font-size:0.78rem;background:transparent;color:#ef4444;border:1px solid rgba(239,68,68,0.35);">
+              🔌 Desconectar Aparelho
+            </button>
+            <button class="btn btn-secondary btn-sm" onclick="WhatsApp.fecharModalConexao()">
+              Concluído
+            </button>
+          </div>
+        </div>
+      `;
+      return;
+    }
+
+    // ── ESTADO 2: QR CODE PRONTO ──
+    if (status === 'qr_ready' && qrDataUrl) {
+      container.innerHTML = `
+        <div style="text-align:center;padding:4px 0 10px;">
+          <div style="display:inline-block;background:rgba(245,158,11,0.12);color:#f59e0b;font-weight:700;padding:4px 12px;border-radius:999px;font-size:0.75rem;margin-bottom:8px;">
+            ⚡ QR CODE PRONTO PARA LEITURA
+          </div>
+          <h3 style="margin:0 0 4px;font-size:1.15rem;font-weight:700;">Aponte a Câmera do WhatsApp</h3>
+          <p style="color:var(--text2);font-size:0.82rem;max-width:380px;margin:0 auto 14px;line-height:1.4;">
+            Abra o WhatsApp no celular da construtora e aponte para a imagem abaixo:
+          </p>
+
+          <div style="display:inline-block;background:#ffffff;padding:12px;border-radius:16px;box-shadow:0 8px 24px rgba(0,0,0,0.3);margin-bottom:14px;border:3px solid #25D366;">
+            <img src="${qrDataUrl}" alt="QR Code WhatsApp" style="width:220px;height:220px;display:block;border-radius:6px;" />
+          </div>
+
+          <div style="background:var(--bg2, #1e293b);border:1px solid var(--border);border-radius:12px;padding:12px 16px;margin-bottom:16px;text-align:left;">
+            <div style="font-size:0.75rem;font-weight:700;color:var(--text3);text-transform:uppercase;margin-bottom:8px;letter-spacing:0.04em;">
+              Passo a passo rápido:
+            </div>
+            <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;font-size:0.82rem;color:var(--text);">
+              <span style="background:rgba(37,211,102,0.15);color:#25D366;font-weight:700;width:20px;height:20px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:0.7rem;flex-shrink:0;">1</span>
+              <span>Abra o <strong>WhatsApp</strong> no seu celular</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;font-size:0.82rem;color:var(--text);">
+              <span style="background:rgba(37,211,102,0.15);color:#25D366;font-weight:700;width:20px;height:20px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:0.7rem;flex-shrink:0;">2</span>
+              <span>Acesse <strong>Aparelhos Conectados</strong> (nos 3 pontinhos ou Configurações)</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:10px;font-size:0.82rem;color:var(--text);">
+              <span style="background:rgba(37,211,102,0.15);color:#25D366;font-weight:700;width:20px;height:20px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:0.7rem;flex-shrink:0;">3</span>
+              <span>Toque em <strong>Conectar Aparelho</strong> e aponte para o QR Code</span>
+            </div>
+          </div>
+
+          <div style="display:flex;justify-content:space-between;align-items:center;">
+            <button class="btn btn-sm btn-secondary" onclick="WhatsApp.forcarNovoQR()" style="font-size:0.78rem;display:flex;align-items:center;gap:6px;">
+              🔄 Atualizar QR Code
+            </button>
+            <button class="btn btn-secondary btn-sm" onclick="WhatsApp.fecharModalConexao()">
+              Cancelar
+            </button>
+          </div>
+        </div>
+      `;
+      return;
+    }
+
+    // ── ESTADO 3: INICIANDO / CONECTANDO ──
+    container.innerHTML = `
+      <div style="text-align:center;padding:36px 16px;">
+        <div class="spinner" style="width:44px;height:44px;border:3px solid rgba(37,211,102,0.2);border-top-color:#25D366;border-radius:50%;animation:spin 1s linear infinite;margin:0 auto 16px;"></div>
+        <h4 style="margin:0 0 6px;font-size:1.05rem;font-weight:700;color:var(--text);">Iniciando Motor do WhatsApp...</h4>
+        <p style="color:var(--text2);font-size:.84rem;max-width:320px;margin:0 auto 14px;line-height:1.4;">
+          Sincronizando com o servidor em nuvem. O QR Code aparecerá nesta tela em instantes.
+        </p>
+        <span style="font-size:.74rem;color:var(--text3);display:block;margin-bottom:20px;">
+          ⚡ Verificando automaticamente a cada 2 segundos...
+        </span>
+        <button class="btn btn-sm btn-secondary" onclick="WhatsApp.forcarNovoQR()" style="font-size:.76rem;">
+          🔄 Forçar Novo QR Code
+        </button>
+      </div>
+    `;
+  },
+
+  async forcarNovoQR() {
+    Utils.toast('🔄 Solicitando novo QR Code ao servidor...', 'info');
+    const container = document.getElementById('wa-conexao-modal-body');
+    if (container) {
+      container.innerHTML = `
+        <div style="text-align:center;padding:36px 16px;">
+          <div class="spinner" style="width:40px;height:40px;border:3px solid rgba(37,211,102,0.2);border-top-color:#25D366;border-radius:50%;animation:spin 1s linear infinite;margin:0 auto 16px;"></div>
+          <h4 style="margin:0 0 6px;font-size:1rem;color:var(--text);">Gerando novo QR Code...</h4>
+          <p style="color:var(--text3);font-size:.82rem;margin:0;">Limpando credenciais anteriores...</p>
+        </div>
+      `;
+    }
+
+    try {
+      const headers = (typeof Auth !== 'undefined' && Auth.getAuthHeaders)
+        ? Auth.getAuthHeaders()
+        : { 'Content-Type': 'application/json' };
+
+      await fetch('/api/whatsapp?action=disconnect', {
+        method: 'POST',
+        headers: headers
+      });
+
+      // Aguarda 1.5s e consulta novamente
+      setTimeout(async () => {
+        const data = await this.consultarSessao();
+        this.renderModalEstado(data);
+      }, 1500);
+    } catch (err) {
+      Utils.toast('Erro ao resetar: ' + err.message, 'error');
+    }
+  },
+
+  confirmarDesconexao() {
+    Utils.confirm('Deseja realmente desconectar este aparelho WhatsApp? O robô deixará de enviar mensagens até que outro aparelho seja conectado.', () => {
+      this.executarDesconexao();
+    });
+  },
+
+  async executarDesconexao() {
+    Utils.toast('🔌 Desconectando aparelho...', 'info');
+    try {
+      const headers = (typeof Auth !== 'undefined' && Auth.getAuthHeaders)
+        ? Auth.getAuthHeaders()
+        : { 'Content-Type': 'application/json' };
+
+      await fetch('/api/whatsapp?action=disconnect', {
+        method: 'POST',
+        headers: headers
+      });
+
+      Utils.toast('Aparelho desconectado. Gerando novo QR Code...', 'success');
+      this.forcarNovoQR();
+    } catch (err) {
+      Utils.toast('Falha ao desconectar: ' + err.message, 'error');
+    }
+  },
+
+  async executarTesteConexao() {
+    const input = document.getElementById('wa-teste-phone');
+    const raw = input?.value || this.getTelefonePadrao();
+    const limpo = String(raw).replace(/\D/g, '');
+
+    if (!limpo || limpo.length < 10) {
+      Utils.toast('Informe um número válido com DDD para o teste.', 'warning');
+      return;
+    }
+
+    const btn = document.getElementById('wa-btn-teste');
+    if (btn) {
+      btn.disabled = true;
+      btn.innerHTML = '<span>⏳ Enviando...</span>';
+    }
+
+    try {
+      const headers = (typeof Auth !== 'undefined' && Auth.getAuthHeaders)
+        ? Auth.getAuthHeaders()
+        : { 'Content-Type': 'application/json' };
+
+      const res = await fetch('/api/whatsapp?action=test', {
+        method: 'POST',
+        headers: headers,
+        body: JSON.stringify({
+          phone: limpo,
+          message: `*FinObra — Teste de Notificação*\n\n✅ Olá! Seu WhatsApp está conectado e pronto para enviar relatórios diários e alertas de boletos da construtora.`
+        })
+      });
+
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && data.success) {
+        Utils.toast('✅ Mensagem de teste enviada com sucesso para o WhatsApp!', 'success');
+      } else {
+        Utils.toast('⚠️ Erro ao enviar: ' + (data.error || 'Verifique o status do aparelho'), 'warning');
+      }
+    } catch (err) {
+      Utils.toast('Erro na conexão com o servidor: ' + err.message, 'error');
+    } finally {
+      if (btn) {
+        btn.disabled = false;
+        btn.innerHTML = '<span>🚀 Testar</span>';
+      }
+    }
+  },
+
+  // Alias para manter compatibilidade total com chamadas legadas
+  abrirModalConfig() {
+    this.abrirModalConexao();
   }
 };
+

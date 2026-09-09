@@ -447,6 +447,25 @@ app.get('/health', async (req, res) => {
   });
 });
 
+// 1.2 Sessão Estruturada do WhatsApp (API JSON para FinObra Web)
+function getConnectedWhatsAppNumber() {
+  if (!sock || !sock.user || !sock.user.id) return null;
+  const raw = sock.user.id.split(':')[0].replace(/\D/g, '');
+  return raw || null;
+}
+
+app.get('/whatsapp-session', requireAuth, (req, res) => {
+  const connectedNumber = getConnectedWhatsAppNumber();
+  res.json({
+    success: true,
+    status: connectionStatus,
+    connected: connectionStatus === 'connected',
+    connectedNumber,
+    qrDataUrl: connectionStatus === 'qr_ready' ? qrDataUrl : null,
+    lastConnectedAt
+  });
+});
+
 // 2. Página Web Visual do QR Code
 app.get('/qr', (req, res) => {
   const secret = (process.env.API_SECRET || process.env.VERCEL_API_SECRET || '').trim();

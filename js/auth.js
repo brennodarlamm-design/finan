@@ -45,6 +45,15 @@ const Auth = {
     return localStorage.getItem(this.TOKEN_KEY) || sessionStorage.getItem(this.TOKEN_KEY) || '';
   },
 
+  getAuthHeaders(customHeaders = {}) {
+    const token = this.getToken();
+    const headers = { 'Content-Type': 'application/json', ...customHeaders };
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+    return headers;
+  },
+
   getUsers() {
     const s = localStorage.getItem(this.USERS_KEY);
     if (!s) {
