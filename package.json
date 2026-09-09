@@ -4,7 +4,8 @@
   "description": "Sistema Financeiro & Gestão de Obras - Angelim Construtora",
   "type": "module",
   "scripts": {
-    "dev": "npx serve ."
+    "dev": "npx serve .",
+    "deploy": "node scripts/deploy.js"
   },
   "dependencies": {
     "@neondatabase/serverless": "^0.9.5",
