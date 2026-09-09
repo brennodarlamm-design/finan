@@ -312,14 +312,23 @@ const Documentos = {
 
           <!-- Área 2: Link do Google Drive / Nuvem -->
           <div id="doc-panel-link" style="display:none;border:1px dashed var(--border);border-radius:var(--r-md);padding:18px;background:var(--bg-card);margin-bottom:20px;">
-            <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
-              <span style="font-size:1.4rem;">📁</span>
-              <div>
-                <div style="font-weight:700;font-size:.85rem;color:var(--text);">Vincular Pasta ou Arquivo do Google Drive</div>
-                <div style="font-size:.74rem;color:var(--text3);">Cole o link de compartilhamento do Drive, OneDrive ou Dropbox (sem limite de tamanho).</div>
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;flex-wrap:wrap;gap:8px;">
+              <div style="display:flex;align-items:center;gap:8px;">
+                <span style="font-size:1.4rem;">📁</span>
+                <div>
+                  <div style="font-weight:700;font-size:.85rem;color:var(--text);">Google Drive &amp; Nuvem</div>
+                  <div style="font-size:.74rem;color:var(--text3);">Sem limite de tamanho para pastas ou arquivos compartilhados.</div>
+                </div>
               </div>
+              <button type="button" class="btn btn-sm" onclick="Documentos._abrirGooglePicker('${entidadeTipo}', '${entidadeId}')"
+                      style="background:#4285F4;color:#fff;border:none;font-weight:700;font-size:.75rem;padding:5px 12px;display:inline-flex;align-items:center;gap:5px;cursor:pointer;">
+                🔍 Selecionar do Meu Drive
+              </button>
             </div>
-            <div style="display:flex;flex-direction:column;gap:8px;margin-top:12px;">
+            <div style="font-size:.72rem;color:var(--text3);margin-bottom:10px;">
+              Escolha pelo botão acima ou cole o link compartilhado do Drive, OneDrive ou Dropbox abaixo:
+            </div>
+            <div style="display:flex;flex-direction:column;gap:8px;">
               <input type="url" id="doc-link-url" class="form-control form-control-sm" placeholder="https://drive.google.com/drive/folders/... ou link de arquivo">
               <div style="display:flex;gap:8px;">
                 <input type="text" id="doc-link-titulo" class="form-control form-control-sm" placeholder="Descrição do link (ex: Pasta de Projetos Complementares)">
@@ -379,6 +388,30 @@ const Documentos = {
     this.abrirModal(entidadeTipo, entidadeId);
     if (typeof Lancamentos !== 'undefined' && Lancamentos._refresh) Lancamentos._refresh();
     if (typeof Medicoes !== 'undefined' && Medicoes._refresh) Medicoes._refresh();
+  },
+
+  _abrirGooglePicker(entidadeTipo, entidadeId) {
+    if (typeof GDrive === 'undefined') return Utils.toast('Módulo Google Drive não carregado', 'error');
+    GDrive.abrirSeletor((pickedDocs) => {
+      let count = 0;
+      for (const p of pickedDocs) {
+        const url = p.url || `https://drive.google.com/file/d/${p.id}/view`;
+        const nome = p.name || 'Arquivo no Google Drive';
+        this.adicionarLink({
+          entidade_tipo: entidadeTipo,
+          entidade_id: entidadeId,
+          titulo: nome,
+          url
+        });
+        count++;
+      }
+      if (count > 0) {
+        Utils.toast(`${count} item(ns) do Google Drive vinculado(s)!`, 'success');
+        this.abrirModal(entidadeTipo, entidadeId);
+        if (typeof Lancamentos !== 'undefined' && Lancamentos._refresh) Lancamentos._refresh();
+        if (typeof Medicoes !== 'undefined' && Medicoes._refresh) Medicoes._refresh();
+      }
+    });
   },
 
   _renderDocRow(d) {

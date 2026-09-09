@@ -405,12 +405,18 @@ const FasesDoc = {
 
             <!-- Aba Link Google Drive -->
             <div id="fd-panel-link" style="display:none;margin-top:10px;background:var(--bg-card);border:1px dashed var(--border);border-radius:var(--r-md);padding:14px">
-              <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
-                <span style="font-size:1.2rem">📁</span>
-                <div style="font-size:.8rem;font-weight:700;color:var(--text)">Vincular Pasta ou Arquivo do Google Drive</div>
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;flex-wrap:wrap;gap:8px">
+                <div style="display:flex;align-items:center;gap:8px">
+                  <span style="font-size:1.2rem">📁</span>
+                  <div style="font-size:.8rem;font-weight:700;color:var(--text)">Google Drive &amp; Nuvem</div>
+                </div>
+                <button type="button" class="btn btn-sm" onclick="FasesDoc._abrirGooglePicker('${obraId}','${docId}')"
+                        style="background:#4285F4;color:#fff;border:none;font-weight:700;font-size:.75rem;padding:4px 10px;display:inline-flex;align-items:center;gap:5px;cursor:pointer">
+                  🔍 Selecionar do Meu Drive
+                </button>
               </div>
               <div style="font-size:.72rem;color:var(--text3);margin-bottom:10px">
-                Cole o link de compartilhamento do Drive ou OneDrive. Ideal para pastas inteiras ou projetos pesados.
+                Escolha arquivos ou pastas diretamente pelo botão acima, ou cole o link de compartilhamento do Drive/OneDrive abaixo:
               </div>
               <div style="display:flex;flex-direction:column;gap:8px">
                 <input type="url" id="fd-link-url" class="form-control form-control-sm" placeholder="https://drive.google.com/drive/folders/... ou link do arquivo" style="font-size:.8rem">
@@ -582,6 +588,38 @@ const FasesDoc = {
       const listEl = document.getElementById('fd-arq-list');
       if (listEl) listEl.innerHTML = this._buildArquivosHtml(obraId, docId, docAtual?.arquivos || []);
     }
+  },
+
+  _abrirGooglePicker(obraId, docId) {
+    if (typeof GDrive === 'undefined') return Utils.toast('Módulo Google Drive não carregado', 'error');
+    GDrive.abrirSeletor((pickedDocs) => {
+      let count = 0;
+      for (const p of pickedDocs) {
+        const url = p.url || `https://drive.google.com/file/d/${p.id}/view`;
+        const nome = p.name || 'Arquivo no Google Drive';
+        const item = Documentos.adicionarLink({
+          entidade_tipo: 'fases_doc',
+          entidade_id: `${obraId}_${docId}`,
+          titulo: nome,
+          url
+        });
+        if (item) {
+          DB.attachArquivoDocFase(obraId, docId, item.id);
+          count++;
+        }
+      }
+      if (count > 0) {
+        Utils.toast(`${count} item(ns) do Google Drive vinculado(s)!`, 'success');
+        const fases = DB.getDocFases(obraId);
+        let docAtual = null;
+        for (const docs of Object.values(fases)) {
+          const found = docs.find(d => d.id === docId);
+          if (found) { docAtual = found; break; }
+        }
+        const listEl = document.getElementById('fd-arq-list');
+        if (listEl) listEl.innerHTML = this._buildArquivosHtml(obraId, docId, docAtual?.arquivos || []);
+      }
+    });
   },
 
   // ===== SALVAR METADADOS =====
