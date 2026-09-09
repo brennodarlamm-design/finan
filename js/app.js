@@ -28,6 +28,7 @@ const App = {
     'fornecedores': ['fornecedores'],
     'produtos': ['produtos', 'materiais'],
     'configuracoes': ['configuracoes', 'ajustes'],
+    'obra-detalhe': ['obra-detalhe', 'obra', 'central-obra', 'dossie', 'cliente-detalhe'],
     'master': ['master', 'dev', 'admin-master', 'tenants', 'empresas'],
     'planos': ['planos', 'cobranca', 'assinaturas', 'mensalidades'],
     'dashboard': ['dashboard', 'inicio', 'home']
@@ -48,6 +49,7 @@ const App = {
     'dashboard': Dashboard,
     'obras': Clientes,
     'clientes': Clientes,
+    'obra-detalhe': typeof ObraDetalhe !== 'undefined' ? ObraDetalhe : Clientes,
     'lancamentos': Lancamentos,
     'financeiro': Lancamentos,
     'escritorio': Escritorio,
@@ -89,6 +91,7 @@ const App = {
     'dashboard':         { icon:'📊', label:'Dashboard' },
     'obras':             { icon:'🏗️', label:'Obras & Clientes' },
     'clientes':          { icon:'🏗️', label:'Obras & Clientes' },
+    'obra-detalhe':      { icon:'🏢', label:'Central da Obra' },
     'lancamentos':       { icon:'💰', label:'Lançamentos Financeiros' },
     'financeiro':        { icon:'💰', label:'Lançamentos Financeiros' },
     'escritorio':        { icon:'🏢', label:'Despesas Escritório' },

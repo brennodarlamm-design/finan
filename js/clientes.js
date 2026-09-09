@@ -75,14 +75,15 @@ const Clientes = {
       };
       const badgeMod = modBadges[c.modalidade_obra || 'caixa'] || modBadges.caixa;
 
-      return `<div class="card" style="position:relative;">
-        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px;">
+      return `<div class="card" style="position:relative;transition:transform .15s, border-color .15s;">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px;cursor:pointer;"
+             onclick="typeof ObraDetalhe!=='undefined'?ObraDetalhe.abrir('${c.id}'):null" title="Abrir Central da Obra">
           <div>
-            <div style="font-size:.98rem;font-weight:800;margin-bottom:4px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
-              <span>${c.nome}</span>
+            <div style="font-size:1.02rem;font-weight:900;margin-bottom:4px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+              <span style="color:var(--text);">${c.nome}</span>
               ${badgeMod}
             </div>
-            <div style="font-size:.76rem;color:var(--text3)">CPF/CNPJ: ${c.cpf_cnpj}</div>
+            <div style="font-size:.76rem;color:var(--text3)">CPF/CNPJ: ${c.cpf_cnpj || '—'}</div>
           </div>
           ${Utils.badge(c.status)}
         </div>
@@ -123,10 +124,13 @@ const Clientes = {
           <div style="text-align:center;"><div style="font-size:.63rem;text-transform:uppercase;color:var(--text3);margin-bottom:3px">Saldo</div><div style="font-size:.8rem;font-weight:800;color:${r.saldo>=0?'var(--accent)':'var(--danger)'}">${Utils.fmt.currency(r.saldo)}</div></div>
         </div>
         ${typeof FasesDoc !== 'undefined' ? FasesDoc.miniWidget(c.id) : ''}
-        <div style="display:flex;gap:7px;margin-top:10px">
-          <button class="btn btn-secondary btn-sm" style="flex:1" onclick="App.obraId='${c.id}';App.refreshObraSelector();App.navigate('lancamentos')">💰 Lançamentos</button>
-          <button class="btn btn-secondary btn-sm" style="flex:1" onclick="App.obraId='${c.id}';App.refreshObraSelector();App.navigate('medicoes')">🔨 Medições</button>
-          <button class="btn btn-secondary btn-sm" onclick="App.obraId='${c.id}';App.navigate('documentacao')" title="Percurso Documental" style="padding:4px 10px">📋</button>
+        <div style="display:flex;gap:7px;margin-top:12px;flex-wrap:wrap;">
+          <button class="btn btn-primary btn-sm" style="flex:2;font-weight:800;display:inline-flex;align-items:center;justify-content:center;gap:6px;"
+                  onclick="typeof ObraDetalhe!=='undefined'?ObraDetalhe.abrir('${c.id}'):null" title="Abrir Central da Obra">
+            🏢 Central da Obra
+          </button>
+          <button class="btn btn-secondary btn-sm" style="flex:1" onclick="typeof ObraDetalhe!=='undefined'?ObraDetalhe.abrir('${c.id}','lancamentos'):null" title="Ver lançamentos financeiros">💰 Extrato</button>
+          <button class="btn btn-secondary btn-sm" onclick="typeof ObraDetalhe!=='undefined'?ObraDetalhe.abrir('${c.id}','documentos'):null" title="Percurso Documental (43 docs)" style="padding:4px 10px">📋</button>
           <button class="icon-btn btn-sm" onclick="Clientes.showForm('${c.id}')" title="Editar">✏️</button>
           <button class="icon-btn btn-sm" style="color:var(--danger)" onclick="Clientes.del('${c.id}')" title="Excluir">🗑️</button>
         </div>
