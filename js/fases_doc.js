@@ -231,6 +231,19 @@ const FasesDoc = {
     }
     if (doc.responsavel) metaInfo += `<span style="color:var(--text3)">&nbsp;·&nbsp; ${doc.responsavel}</span>`;
 
+    let linkExternoUrl = null;
+    let linkExternoTipo = 'link';
+    if (typeof Documentos !== 'undefined' && (doc.arquivos || []).length > 0) {
+      for (const aid of doc.arquivos) {
+        const d = Documentos.getById(aid);
+        if (d && d.url_externa) {
+          linkExternoUrl = d.url_externa;
+          linkExternoTipo = d.tipo_servico || 'link';
+          break;
+        }
+      }
+    }
+
     return `
     <div style="display:flex;align-items:center;gap:12px;padding:9px 16px;border-bottom:1px solid var(--border-s);background:${st.bg};opacity:${na?'.4':'1'};transition:background .15s"
          id="docrow-${obraId}-${doc.id}">
@@ -239,7 +252,10 @@ const FasesDoc = {
         <div style="font-size:.845rem;font-weight:600;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
           ${doc.nome}
           ${qtdArq > 0 ? `<span style="font-size:.68rem;background:rgba(18,217,160,.15);color:var(--accent);border:1px solid rgba(18,217,160,.25);border-radius:5px;padding:1px 7px;cursor:pointer;font-weight:700"
-                               onclick="FasesDoc.showDocModal('${obraId}','${doc.id}')" title="${qtdArq} arquivo(s)">📎 ${qtdArq}</span>` : ''}
+                               onclick="FasesDoc.showDocModal('${obraId}','${doc.id}')" title="${qtdArq} anexo(s)">📎 ${qtdArq}</span>` : ''}
+          ${linkExternoUrl ? `<a href="${linkExternoUrl}" target="_blank" rel="noopener noreferrer"
+                                 style="font-size:.68rem;background:rgba(66,133,244,.15);color:#4285F4;border:1px solid rgba(66,133,244,.3);border-radius:5px;padding:1px 7px;text-decoration:none;font-weight:700;display:inline-flex;align-items:center;gap:3px"
+                                 title="Abrir pasta/arquivo no Google Drive ou Nuvem">📁 ${linkExternoTipo==='gdrive'?'Drive':linkExternoTipo==='onedrive'?'OneDrive':'Link'}</a>` : ''}
         </div>
         <div style="font-size:.72rem;color:var(--text3);margin-top:1px">
           ${doc.desc}${metaInfo}
@@ -361,20 +377,51 @@ const FasesDoc = {
             <textarea class="form-control" id="fd-obs" rows="2" placeholder="Pendências, informações adicionais...">${doc.observacoes||''}</textarea>
           </div>
           <div style="border-top:1px solid var(--border-s);padding-top:16px;margin-top:4px">
-            <div style="font-size:.8rem;font-weight:700;color:var(--text2);margin-bottom:10px">📎 Arquivos Anexados</div>
-            <div id="fd-arq-list">${arquivosHtml}</div>
-            <div class="drop-zone" style="padding:18px;text-align:center;cursor:pointer;margin-top:10px"
-                 onclick="document.getElementById('fd-file-in-${docId}').click()"
-                 ondragover="event.preventDefault();this.classList.add('drag-over')"
-                 ondragleave="this.classList.remove('drag-over')"
-                 ondrop="event.preventDefault();this.classList.remove('drag-over');FasesDoc._handleDrop(event,'${obraId}','${docId}')">
-              <div style="font-size:1.4rem;margin-bottom:5px">📁</div>
-              <div style="font-size:.82rem;color:var(--text2);font-weight:600">Clique ou arraste o arquivo</div>
-              <div style="font-size:.71rem;color:var(--text3);margin-top:3px">PDF, PNG, JPG, DWG, XLSX, ZIP, RAR</div>
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+              <div style="font-size:.8rem;font-weight:700;color:var(--text2)">📎 Anexos &amp; Links do Drive</div>
+              <div style="display:flex;gap:4px">
+                <button type="button" class="btn btn-sm" id="fd-tab-arq" style="padding:2px 10px;font-size:.72rem;background:var(--accent);color:#000;font-weight:700" onclick="FasesDoc._switchModalTab('arq')">📁 Upload</button>
+                <button type="button" class="btn btn-sm btn-ghost" id="fd-tab-link" style="padding:2px 10px;font-size:.72rem;color:var(--text2)" onclick="FasesDoc._switchModalTab('link')">🔗 Link Drive</button>
+              </div>
             </div>
-            <input type="file" id="fd-file-in-${docId}" style="display:none" multiple
-                   accept=".pdf,.png,.jpg,.jpeg,.dwg,.dxf,.doc,.docx,.xls,.xlsx,.odt,.zip,.rar,.7z,.tar,.gz"
-                   onchange="FasesDoc._handleFileSelect(event,'${obraId}','${docId}')">
+
+            <div id="fd-arq-list">${arquivosHtml}</div>
+
+            <!-- Aba Upload -->
+            <div id="fd-panel-upload" style="margin-top:10px">
+              <div class="drop-zone" style="padding:18px;text-align:center;cursor:pointer"
+                   onclick="document.getElementById('fd-file-in-${docId}').click()"
+                   ondragover="event.preventDefault();this.classList.add('drag-over')"
+                   ondragleave="this.classList.remove('drag-over')"
+                   ondrop="event.preventDefault();this.classList.remove('drag-over');FasesDoc._handleDrop(event,'${obraId}','${docId}')">
+                <div style="font-size:1.4rem;margin-bottom:5px">📁</div>
+                <div style="font-size:.82rem;color:var(--text2);font-weight:600">Clique ou arraste o arquivo</div>
+                <div style="font-size:.71rem;color:var(--text3);margin-top:3px">PDF, PNG, JPG, DWG, XLSX, ZIP, RAR</div>
+              </div>
+              <input type="file" id="fd-file-in-${docId}" style="display:none" multiple
+                     accept=".pdf,.png,.jpg,.jpeg,.dwg,.dxf,.doc,.docx,.xls,.xlsx,.odt,.zip,.rar,.7z,.tar,.gz"
+                     onchange="FasesDoc._handleFileSelect(event,'${obraId}','${docId}')">
+            </div>
+
+            <!-- Aba Link Google Drive -->
+            <div id="fd-panel-link" style="display:none;margin-top:10px;background:var(--bg-card);border:1px dashed var(--border);border-radius:var(--r-md);padding:14px">
+              <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+                <span style="font-size:1.2rem">📁</span>
+                <div style="font-size:.8rem;font-weight:700;color:var(--text)">Vincular Pasta ou Arquivo do Google Drive</div>
+              </div>
+              <div style="font-size:.72rem;color:var(--text3);margin-bottom:10px">
+                Cole o link de compartilhamento do Drive ou OneDrive. Ideal para pastas inteiras ou projetos pesados.
+              </div>
+              <div style="display:flex;flex-direction:column;gap:8px">
+                <input type="url" id="fd-link-url" class="form-control form-control-sm" placeholder="https://drive.google.com/drive/folders/... ou link do arquivo" style="font-size:.8rem">
+                <div style="display:flex;gap:6px">
+                  <input type="text" id="fd-link-titulo" class="form-control form-control-sm" placeholder="Descrição (ex: Pasta de Pranchas Executivas)" style="flex:1;font-size:.8rem">
+                  <button type="button" class="btn btn-sm btn-primary" onclick="FasesDoc._adicionarLinkModal('${obraId}','${docId}')" style="white-space:nowrap;font-size:.78rem">
+                    ➕ Vincular Link
+                  </button>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
         <div class="modal-footer">
@@ -394,6 +441,25 @@ const FasesDoc = {
 
   _arqItemHtml(obraId, docId, aid) {
     const d = typeof Documentos !== 'undefined' ? Documentos.getById(aid) : null;
+    if (d && d.url_externa) {
+      const isGDrive = d.tipo_servico === 'gdrive' || d.url_externa.includes('drive.google.com') || d.url_externa.includes('docs.google.com');
+      const isOneDrive = d.tipo_servico === 'onedrive' || d.url_externa.includes('onedrive.live.com') || d.url_externa.includes('sharepoint.com');
+      const icone = isGDrive ? '📁' : isOneDrive ? '☁️' : '🔗';
+      const badge = isGDrive ? 'Drive' : isOneDrive ? 'OneDrive' : 'Link';
+      const badgeBg = isGDrive ? '#4285F4' : isOneDrive ? '#0078D4' : 'var(--accent)';
+      return `<div class="rec-item" id="arq-row-${aid}" style="margin-bottom:6px">
+        <span style="font-size:1.1rem">${icone}</span>
+        <div style="flex:1;min-width:0;display:flex;align-items:center;gap:6px;">
+          <span style="font-size:.65rem;font-weight:800;background:${badgeBg};color:#fff;padding:1px 5px;border-radius:3px;">${badge}</span>
+          <div style="flex:1;min-width:0;font-size:.8rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text)">${d.titulo || d.url_externa}</div>
+        </div>
+        <div style="display:flex;gap:5px;flex-shrink:0">
+          <a href="${d.url_externa}" target="_blank" rel="noopener noreferrer" class="btn btn-sm btn-ghost" style="padding:2px 8px;font-size:.72rem;color:var(--accent);text-decoration:none;" title="Abrir link externo">🔗 Abrir</a>
+          <button class="btn btn-sm btn-ghost" style="padding:2px 8px;font-size:.72rem;color:var(--danger)"
+                  onclick="FasesDoc._removerArqModal('${obraId}','${docId}','${aid}')" title="Remover link">🗑</button>
+        </div>
+      </div>`;
+    }
     const nome = d?.titulo || d?.nome || aid;
     const icone = nome.match(/\.pdf$/i) ? '📄' : nome.match(/\.(png|jpg|jpeg|webp)$/i) ? '🖼️' : nome.match(/\.(dwg|dxf)$/i) ? '📐' : nome.match(/\.(zip|rar|7z|tar|gz)$/i) ? '📦' : '📎';
     return `<div class="rec-item" id="arq-row-${aid}" style="margin-bottom:6px">
@@ -458,12 +524,64 @@ const FasesDoc = {
   },
 
   _removerArqModal(obraId, docId, aid) {
-    if (!confirm('Remover este arquivo?')) return;
+    if (!confirm('Remover este item?')) return;
     if (typeof Documentos !== 'undefined') Documentos.remover(aid);
     DB.removeArquivoDocFase(obraId, docId, aid);
     const row = document.getElementById(`arq-row-${aid}`);
     if (row) row.remove();
-    Utils.toast('Arquivo removido', 'success');
+    Utils.toast('Item removido', 'success');
+  },
+
+  _switchModalTab(tab) {
+    const pUp = document.getElementById('fd-panel-upload');
+    const pLink = document.getElementById('fd-panel-link');
+    const tArq = document.getElementById('fd-tab-arq');
+    const tLink = document.getElementById('fd-tab-link');
+    if (tab === 'link') {
+      if (pUp) pUp.style.display = 'none';
+      if (pLink) pLink.style.display = 'block';
+      if (tArq) { tArq.style.background = 'transparent'; tArq.style.color = 'var(--text2)'; tArq.className = 'btn btn-sm btn-ghost'; }
+      if (tLink) { tLink.style.background = 'var(--accent)'; tLink.style.color = '#000'; tLink.className = 'btn btn-sm btn-primary'; }
+    } else {
+      if (pUp) pUp.style.display = 'block';
+      if (pLink) pLink.style.display = 'none';
+      if (tArq) { tArq.style.background = 'var(--accent)'; tArq.style.color = '#000'; tArq.className = 'btn btn-sm btn-primary'; }
+      if (tLink) { tLink.style.background = 'transparent'; tLink.style.color = 'var(--text2)'; tLink.className = 'btn btn-sm btn-ghost'; }
+    }
+  },
+
+  _adicionarLinkModal(obraId, docId) {
+    const urlInput = document.getElementById('fd-link-url');
+    const titInput = document.getElementById('fd-link-titulo');
+    const url = urlInput?.value.trim();
+    if (!url) return Utils.toast('Por favor, informe a URL do Google Drive ou link externo.', 'warning');
+
+    if (typeof Documentos === 'undefined') return Utils.toast('Módulo Documentos não disponível', 'error');
+
+    const titulo = titInput?.value.trim() || '';
+    const item = Documentos.adicionarLink({
+      entidade_tipo: 'fases_doc',
+      entidade_id: `${obraId}_${docId}`,
+      titulo,
+      url
+    });
+
+    if (item) {
+      DB.attachArquivoDocFase(obraId, docId, item.id);
+      Utils.toast('Link vinculado com sucesso!', 'success');
+      urlInput.value = '';
+      if (titInput) titInput.value = '';
+
+      // Atualiza lista de arquivos no modal
+      const fases = DB.getDocFases(obraId);
+      let docAtual = null;
+      for (const docs of Object.values(fases)) {
+        const found = docs.find(d => d.id === docId);
+        if (found) { docAtual = found; break; }
+      }
+      const listEl = document.getElementById('fd-arq-list');
+      if (listEl) listEl.innerHTML = this._buildArquivosHtml(obraId, docId, docAtual?.arquivos || []);
+    }
   },
 
   // ===== SALVAR METADADOS =====

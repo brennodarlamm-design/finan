@@ -189,6 +189,28 @@ const Documentos = {
     return item;
   },
 
+  adicionarLink({ entidade_tipo, entidade_id, titulo, url }) {
+    if (!url || !url.trim()) return null;
+    url = url.trim();
+    if (!url.startsWith('http://') && !url.startsWith('https://')) {
+      url = 'https://' + url;
+    }
+    const isGDrive = url.includes('drive.google.com') || url.includes('docs.google.com');
+    const isOneDrive = url.includes('onedrive.live.com') || url.includes('sharepoint.com') || url.includes('1drv.ms');
+    const isDropbox = url.includes('dropbox.com');
+    const tipo_servico = isGDrive ? 'gdrive' : isOneDrive ? 'onedrive' : isDropbox ? 'dropbox' : 'link';
+
+    return this.adicionar({
+      entidade_tipo,
+      entidade_id,
+      titulo: titulo || (isGDrive ? 'Pasta/Arquivo no Google Drive' : isOneDrive ? 'Pasta/Arquivo no OneDrive' : isDropbox ? 'Pasta/Arquivo no Dropbox' : 'Link Externo'),
+      nome_arquivo: url,
+      url_externa: url,
+      tipo_servico,
+      tipo_mime: 'application/x-url'
+    });
+  },
+
   remover(id) {
     this._memoryBlobs.delete(id);
     this._idbDelete(id);
@@ -267,8 +289,14 @@ const Documentos = {
         <div class="modal-body">
           ${infoEntidade}
 
-          <!-- Área de Upload / Dropzone -->
-          <div style="border:2px dashed var(--border);border-radius:var(--r-md);padding:20px;text-align:center;background:var(--bg-card);margin-bottom:20px;">
+          <!-- Abas de Tipo: Arquivo vs Link -->
+          <div style="display:flex;gap:6px;margin-bottom:14px;">
+            <button type="button" id="doc-tab-file-btn" class="btn btn-sm btn-primary" onclick="Documentos._switchTab('file')">📁 Upload de Arquivo</button>
+            <button type="button" id="doc-tab-link-btn" class="btn btn-sm btn-secondary" onclick="Documentos._switchTab('link')">🔗 Link Google Drive / Nuvem</button>
+          </div>
+
+          <!-- Área 1: Upload / Dropzone -->
+          <div id="doc-panel-file" style="border:2px dashed var(--border);border-radius:var(--r-md);padding:20px;text-align:center;background:var(--bg-card);margin-bottom:20px;">
             <div style="font-size:2rem;margin-bottom:6px;">📄</div>
             <div style="font-weight:700;margin-bottom:4px;color:var(--text);">Adicionar Boleto, Comprovante, Foto ou Pacote</div>
             <div style="font-size:.76rem;color:var(--text3);margin-bottom:12px;">Formatos aceitos: PDF, Imagens, ZIP, RAR, 7Z, DWG, DOCX (Máx. 20MB)</div>
@@ -279,6 +307,26 @@ const Documentos = {
                 📁 Escolher Arquivo
                 <input type="file" id="doc-file-input" accept="image/*,application/pdf,.zip,.rar,.7z,.tar,.gz,.dwg,.dxf,.doc,.docx,.xls,.xlsx,.odt,.txt" style="display:none;" onchange="Documentos._onUpload('${entidadeTipo}', '${entidadeId}', this)">
               </label>
+            </div>
+          </div>
+
+          <!-- Área 2: Link do Google Drive / Nuvem -->
+          <div id="doc-panel-link" style="display:none;border:1px dashed var(--border);border-radius:var(--r-md);padding:18px;background:var(--bg-card);margin-bottom:20px;">
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
+              <span style="font-size:1.4rem;">📁</span>
+              <div>
+                <div style="font-weight:700;font-size:.85rem;color:var(--text);">Vincular Pasta ou Arquivo do Google Drive</div>
+                <div style="font-size:.74rem;color:var(--text3);">Cole o link de compartilhamento do Drive, OneDrive ou Dropbox (sem limite de tamanho).</div>
+              </div>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:8px;margin-top:12px;">
+              <input type="url" id="doc-link-url" class="form-control form-control-sm" placeholder="https://drive.google.com/drive/folders/... ou link de arquivo">
+              <div style="display:flex;gap:8px;">
+                <input type="text" id="doc-link-titulo" class="form-control form-control-sm" placeholder="Descrição do link (ex: Pasta de Projetos Complementares)">
+                <button type="button" class="btn btn-primary btn-sm" onclick="Documentos._onAddLink('${entidadeTipo}', '${entidadeId}')" style="white-space:nowrap;">
+                  ➕ Vincular Link
+                </button>
+              </div>
             </div>
           </div>
 
@@ -301,7 +349,74 @@ const Documentos = {
     `);
   },
 
+  _switchTab(tab) {
+    const fPanel = document.getElementById('doc-panel-file');
+    const lPanel = document.getElementById('doc-panel-link');
+    const fBtn = document.getElementById('doc-tab-file-btn');
+    const lBtn = document.getElementById('doc-tab-link-btn');
+    if (tab === 'link') {
+      if (fPanel) fPanel.style.display = 'none';
+      if (lPanel) lPanel.style.display = 'block';
+      if (fBtn) fBtn.className = 'btn btn-sm btn-secondary';
+      if (lBtn) lBtn.className = 'btn btn-sm btn-primary';
+    } else {
+      if (fPanel) fPanel.style.display = 'block';
+      if (lPanel) lPanel.style.display = 'none';
+      if (fBtn) fBtn.className = 'btn btn-sm btn-primary';
+      if (lBtn) lBtn.className = 'btn btn-sm btn-secondary';
+    }
+  },
+
+  _onAddLink(entidadeTipo, entidadeId) {
+    const urlInput = document.getElementById('doc-link-url');
+    const titInput = document.getElementById('doc-link-titulo');
+    const url = urlInput?.value.trim();
+    if (!url) return Utils.toast('Informe a URL do Google Drive ou link externo.', 'warning');
+
+    const titulo = titInput?.value.trim() || '';
+    this.adicionarLink({ entidade_tipo: entidadeTipo, entidade_id: entidadeId, titulo, url });
+    Utils.toast('Link vinculado com sucesso!', 'success');
+    this.abrirModal(entidadeTipo, entidadeId);
+    if (typeof Lancamentos !== 'undefined' && Lancamentos._refresh) Lancamentos._refresh();
+    if (typeof Medicoes !== 'undefined' && Medicoes._refresh) Medicoes._refresh();
+  },
+
   _renderDocRow(d) {
+    if (d.url_externa) {
+      const isGDrive = d.tipo_servico === 'gdrive' || d.url_externa.includes('drive.google.com') || d.url_externa.includes('docs.google.com');
+      const isOneDrive = d.tipo_servico === 'onedrive' || d.url_externa.includes('onedrive.live.com') || d.url_externa.includes('sharepoint.com') || d.url_externa.includes('1drv.ms');
+      const isDropbox = d.tipo_servico === 'dropbox' || d.url_externa.includes('dropbox.com');
+      const icon = isGDrive ? '📁' : isOneDrive ? '☁️' : isDropbox ? '📦' : '🔗';
+      const labelBadge = isGDrive ? 'Google Drive' : isOneDrive ? 'OneDrive' : isDropbox ? 'Dropbox' : 'Link Externo';
+      const badgeColor = isGDrive ? '#4285F4' : isOneDrive ? '#0078D4' : isDropbox ? '#0061FF' : 'var(--accent)';
+
+      return `
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--r-md);gap:12px;">
+        <div style="display:flex;align-items:center;gap:10px;flex:1;min-width:0;">
+          <span style="font-size:1.4rem;">${icon}</span>
+          <div style="flex:1;min-width:0;">
+            <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+              <span style="font-size:.65rem;font-weight:800;color:#fff;background:${badgeColor};padding:1px 6px;border-radius:4px;">${labelBadge}</span>
+              <span style="font-weight:700;font-size:.84rem;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
+                ${d.titulo || d.url_externa}
+              </span>
+            </div>
+            <div style="font-size:.72rem;color:var(--text3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px;">
+              ${d.url_externa} &middot; Vinculado em ${Utils.fmt.datetime(d.criado_em)}
+            </div>
+          </div>
+        </div>
+        <div style="display:flex;gap:6px;align-items:center;">
+          <a href="${d.url_externa}" target="_blank" rel="noopener noreferrer" class="btn btn-sm btn-primary" style="text-decoration:none;display:inline-flex;align-items:center;gap:4px;" title="Abrir no Google Drive em nova aba">
+            🔗 Abrir
+          </a>
+          <button class="icon-btn btn-sm" onclick="Documentos._confirmDel('${d.id}')" style="color:var(--danger)" title="Excluir link">
+            🗑️
+          </button>
+        </div>
+      </div>`;
+    }
+
     const nome = (d.nome_arquivo || d.titulo || '').toLowerCase();
     const isPDF = d.tipo_mime === 'application/pdf' || nome.endsWith('.pdf');
     const isZip = nome.match(/\.(zip|rar|7z|tar|gz)$/i);
