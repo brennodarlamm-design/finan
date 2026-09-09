@@ -9,7 +9,8 @@
   <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png?v=3">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
-  <!-- Google Identity Services SDK -->
+  <!-- Google Identity Services SDK & Client ID -->
+  <meta name="google-signin-client_id" content="840690398459-6sjrbm8k6jgivkutftdrcd1726kmnq1a.apps.googleusercontent.com">
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
     *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
@@ -327,6 +328,8 @@
           <span>ou continue com</span>
         </div>
 
+        <div id="google-btn-container" style="display:flex;justify-content:center;margin-bottom:8px;width:100%;"></div>
+
         <button type="button" class="btn-google" id="btn-google-login" onclick="iniciarLoginGoogle()">
           <svg width="19" height="19" viewBox="0 0 24 24">
             <path fill="#4285F4" d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.66-5.17 3.66-9.17z"/>
@@ -633,7 +636,8 @@
   }
 
   // ── GOOGLE SIGN-IN INTEGRATION ──────────────────────────────
-  let googleClientId = localStorage.getItem('finobra_google_client_id') || '78294628492-mock.apps.googleusercontent.com';
+  const OFFICIAL_GOOGLE_CLIENT_ID = '840690398459-6sjrbm8k6jgivkutftdrcd1726kmnq1a.apps.googleusercontent.com';
+  let googleClientId = localStorage.getItem('finobra_google_client_id') || OFFICIAL_GOOGLE_CLIENT_ID;
 
   function onGoogleCredentialResponse(response) {
     if (!response || !response.credential) return;
@@ -653,8 +657,36 @@
         google.accounts.id.initialize({
           client_id: googleClientId,
           callback: onGoogleCredentialResponse,
-          auto_select: false
+          auto_select: false,
+          cancel_on_tap_outside: true
         });
+
+        const container = document.getElementById('google-btn-container');
+        const fallbackBtn = document.getElementById('btn-google-login');
+
+        if (container) {
+          google.accounts.id.renderButton(container, {
+            type: 'standard',
+            theme: 'filled_black',
+            size: 'large',
+            text: 'continue_with',
+            shape: 'rectangular',
+            logo_alignment: 'left',
+            width: 360,
+            locale: 'pt-BR'
+          });
+
+          // Se o botão oficial foi inserido, esconde o fallback
+          setTimeout(() => {
+            if (container.children && container.children.length > 0 && fallbackBtn) {
+              fallbackBtn.style.display = 'none';
+            }
+          }, 300);
+        }
+
+        // Tenta acionar One Tap caso o usuário já esteja logado no Google no navegador
+        google.accounts.id.prompt();
+
         const holder = document.getElementById('g_id_signin_holder');
         if (holder) {
           google.accounts.id.renderButton(holder, {
@@ -672,13 +704,19 @@
   }
 
   window.addEventListener('load', () => {
-    setTimeout(initGoogleIdentity, 600);
+    setTimeout(initGoogleIdentity, 300);
     setupOtpInputs();
   });
 
   function iniciarLoginGoogle() {
-    if (window.google && google.accounts && google.accounts.id && googleClientId && !googleClientId.includes('mock')) {
+    if (window.google && google.accounts && google.accounts.id) {
       try {
+        const officialBtn = document.querySelector('#google-btn-container div[role=button]');
+        if (officialBtn) {
+          officialBtn.click();
+          return;
+        }
+
         google.accounts.id.prompt((notification) => {
           if (notification.isNotDisplayed() || notification.isSkippedMoment()) {
             openGoogleModal();
