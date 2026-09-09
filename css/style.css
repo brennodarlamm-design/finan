@@ -469,9 +469,10 @@ textarea.form-control { resize:vertical; }
 
 /* ===== PRINT ===== */
 @media print {
-  body { background:#fff!important; color:#000!important; margin:0; padding:0; }
-  .sidebar, .main-header, .page-header, .g2, .card:not(#preview-panel), .btn, .icon-btn, .toast-container, .modal-overlay { display:none!important; }
+  body { background:#fff!important; color:#0f172a!important; margin:0; padding:0; }
+  .sidebar, .main-header, .page-header, .sidebar-overlay, .toast-container, .modal-overlay, .btn, .icon-btn { display:none!important; }
   .main-content { margin:0!important; padding:0!important; width:100%!important; }
+  .card { border:1px solid #e2e8f0!important; box-shadow:none!important; background:#fff!important; color:#0f172a!important; page-break-inside:avoid; margin-bottom:15px!important; }
   #preview-panel { border:none!important; box-shadow:none!important; padding:0!important; background:transparent!important; }
   #preview-panel .card-header { display:none!important; }
   #print-sheet-wrapper { background:transparent!important; padding:0!important; box-shadow:none!important; }
@@ -623,13 +624,13 @@ textarea.form-control { resize:vertical; }
 }
 
 @media print {
-  body * {
+  body.printing-folha * {
     visibility: hidden;
   }
-  #folha-ordem-compra, #folha-ordem-compra * {
+  body.printing-folha #folha-ordem-compra, body.printing-folha #folha-ordem-compra * {
     visibility: visible;
   }
-  #folha-ordem-compra {
+  body.printing-folha #folha-ordem-compra {
     position: absolute;
     left: 0;
     top: 0;

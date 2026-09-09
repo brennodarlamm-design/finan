@@ -134,7 +134,7 @@ const ObraDetalhe = {
           <button class="btn btn-secondary btn-sm" onclick="Clientes.showForm('${obra.id}')" title="Editar cadastro da obra">
             ✏️ Editar Obra
           </button>
-          <button class="btn btn-secondary btn-sm" onclick="window.print()" title="Imprimir dossiê executivo da obra">
+          <button class="btn btn-secondary btn-sm" onclick="ObraDetalhe.imprimirDossie('${obra.id}')" title="Imprimir dossiê executivo da obra">
             🖨️ Imprimir Dossiê
           </button>
         </div>
@@ -597,5 +597,518 @@ const ObraDetalhe = {
         </div>
       </div>
     </div>`;
+  },
+
+  // ===== IMPRESSÃO DO DOSSIÊ EXECUTIVO =====
+  imprimirDossie(obraId) {
+    const id = obraId || this.currentObraId;
+    if (!id) {
+      Utils.toast('Selecione uma obra para imprimir o dossiê.', 'warning');
+      return;
+    }
+    const obra = DB.getById('clientes', id);
+    if (!obra) {
+      Utils.toast('Obra não encontrada.', 'error');
+      return;
+    }
+
+    const htmlDossie = this.gerarHTMLDossie(id);
+
+    let printFrame = document.getElementById('angelim-print-frame');
+    if (!printFrame) {
+      printFrame = document.createElement('iframe');
+      printFrame.id = 'angelim-print-frame';
+      printFrame.style.position = 'fixed';
+      printFrame.style.right = '0';
+      printFrame.style.bottom = '0';
+      printFrame.style.width = '0';
+      printFrame.style.height = '0';
+      printFrame.style.border = '0';
+      document.body.appendChild(printFrame);
+    }
+
+    const doc = printFrame.contentWindow.document;
+    doc.open();
+    doc.write(`
+      <!DOCTYPE html>
+      <html lang="pt-BR">
+        <head>
+          <title>Dossiê Executivo — ${obra.nome} — FinObra</title>
+          <meta charset="utf-8">
+          <style>
+            @page {
+              size: A4 portrait;
+              margin: 10mm 10mm 12mm 10mm;
+            }
+            * { box-sizing: border-box; margin: 0; padding: 0; }
+            body {
+              font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+              background: #ffffff;
+              color: #0f172a;
+              font-size: 10px;
+              line-height: 1.4;
+              -webkit-print-color-adjust: exact;
+              print-color-adjust: exact;
+              padding: 0;
+            }
+            .page-break { page-break-before: always; }
+            .avoid-break { page-break-inside: avoid; }
+            table { width: 100%; border-collapse: collapse; page-break-inside: auto; margin-bottom: 10px; }
+            tr { page-break-inside: avoid; page-break-after: auto; }
+            th, td { padding: 5px 7px; text-align: left; font-size: 9.5px; }
+            th { background: #0f172a; color: #ffffff; font-weight: 700; text-transform: uppercase; font-size: 8.5px; letter-spacing: 0.4px; }
+            tbody tr:nth-child(even) { background: #f8fafc; }
+            tbody tr { border-bottom: 1px solid #e2e8f0; }
+            .section-header {
+              font-size: 11px;
+              font-weight: 800;
+              color: #0f172a;
+              text-transform: uppercase;
+              letter-spacing: 0.5px;
+              border-bottom: 2px solid #0f172a;
+              padding-bottom: 3px;
+              margin-top: 14px;
+              margin-bottom: 8px;
+              display: flex;
+              justify-content: space-between;
+              align-items: center;
+            }
+            .grid-kpis {
+              display: grid;
+              grid-template-columns: repeat(5, 1fr);
+              gap: 8px;
+              margin-bottom: 10px;
+            }
+            .kpi-card {
+              background: #f8fafc;
+              border: 1px solid #cbd5e1;
+              border-radius: 5px;
+              padding: 7px 8px;
+              text-align: center;
+            }
+            .kpi-title {
+              font-size: 8px;
+              font-weight: 700;
+              color: #64748b;
+              text-transform: uppercase;
+              margin-bottom: 2px;
+            }
+            .kpi-value {
+              font-size: 13px;
+              font-weight: 900;
+              color: #0f172a;
+            }
+            .badge-status {
+              display: inline-block;
+              padding: 2px 6px;
+              border-radius: 3px;
+              font-size: 8.5px;
+              font-weight: 700;
+              text-transform: uppercase;
+            }
+            .badge-concluido { background: #dcfce7; color: #166534; border: 1px solid #bbf7d0; }
+            .badge-andamento { background: #fef9c3; color: #854d0e; border: 1px solid #fef08a; }
+            .badge-pendente { background: #f1f5f9; color: #64748b; border: 1px solid #e2e8f0; }
+            .badge-dispensado { background: #e0f2fe; color: #075985; border: 1px solid #bae6fd; }
+          </style>
+        </head>
+        <body>
+          ${htmlDossie}
+        </body>
+      </html>
+    `);
+    doc.close();
+
+    if (typeof Utils !== 'undefined' && Utils.toast) {
+      Utils.toast('Gerando dossiê da obra para impressão...', 'info');
+    }
+
+    setTimeout(() => {
+      printFrame.contentWindow.focus();
+      printFrame.contentWindow.print();
+    }, 450);
+  },
+
+  gerarHTMLDossie(obraId) {
+    const obra = DB.getById('clientes', obraId);
+    if (!obra) return '<p>Obra não encontrada</p>';
+
+    const emp = (typeof DB !== 'undefined' && DB.getEmpresa) ? DB.getEmpresa() : {};
+    const r = DB.getResumo(obraId);
+    const orc = DB.getAll('orcamentos').find(o => o.obra_id === obraId);
+    
+    let pctFisico = 0;
+    let valorOrcado = obra.valor_total || obra.valor_contrato || 0;
+    if (orc && orc.etapas && orc.etapas.length) {
+      const tv = orc.etapas.reduce((s,e) => s + (e.valor_previsto||0), 0);
+      const tr = orc.etapas.reduce((s,e) => s + (e.valor_realizado||0), 0);
+      pctFisico = tv > 0 ? Math.min(100, (tr/tv)*100) : 0;
+      if (!valorOrcado) valorOrcado = tv;
+    }
+
+    const pctFinanceiro = valorOrcado > 0 ? Math.min(100, (r.totalDespesas / valorOrcado) * 100) : 0;
+    const meds = DB.getAll('medicoes').filter(m => m.obra_id === obraId).sort((a,b) => (a.numero_medicao||0) - (b.numero_medicao||0));
+    const fases = (typeof DB.getDocFases === 'function') ? DB.getDocFases(obraId) : { pre_obra: [], durante_obra: [], pos_obra: [] };
+    const docResumo = (typeof DB.getDocFasesResumo === 'function') ? DB.getDocFasesResumo(obraId) : null;
+    const lans = DB.getLancamentos(obraId);
+
+    const modMap = {
+      caixa: 'Caixa Econômica Federal',
+      particular: 'Recursos Próprios',
+      administracao: 'Administração',
+      empreitada: 'Empreitada Global',
+      reforma: 'Reforma / Comercial',
+      outros_bancos: 'Financiamento Bancário'
+    };
+    const modLabel = modMap[obra.modalidade_obra || 'caixa'] || 'Caixa Econômica Federal';
+
+    // Header Logo
+    const empNome = emp.nome_fantasia || emp.razao_social || 'Angelim Construtora';
+    const logoHtml = emp.logo_url 
+      ? `<img src="${emp.logo_url}" alt="${empNome}" style="max-height:48px;max-width:130px;object-fit:contain;">`
+      : `<div style="font-weight:900;font-size:16px;color:#0f172a;letter-spacing:-0.5px;">🏢 ${empNome.toUpperCase()}</div>`;
+
+    // Resumo fases docs
+    const preDocs = fases.pre_obra || [];
+    const durDocs = fases.durante_obra || [];
+    const posDocs = fases.pos_obra || [];
+
+    const countStatus = (list, st) => list.filter(d => d.status === st).length;
+    const preConc = countStatus(preDocs, 'concluido');
+    const durConc = countStatus(durDocs, 'concluido');
+    const posConc = countStatus(posDocs, 'concluido');
+
+    const totalDocs = preDocs.length + durDocs.length + posDocs.length;
+    const totalConc = preConc + durConc + posConc;
+    const totalPct = totalDocs > 0 ? Math.round((totalConc / totalDocs) * 100) : 0;
+
+    return `
+      <!-- CABEÇALHO CORPORATIVO -->
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2px solid #0f172a;padding-bottom:10px;margin-bottom:12px;">
+        <div style="display:flex;align-items:center;gap:12px;">
+          ${logoHtml}
+          <div>
+            <div style="font-size:13px;font-weight:800;color:#0f172a;line-height:1.2;">${empNome}</div>
+            <div style="font-size:9px;color:#475569;margin-top:2px;">
+              ${emp.cnpj ? `CNPJ: ${emp.cnpj} &bull; ` : ''}
+              ${emp.telefone ? `Tel: ${emp.telefone} &bull; ` : ''}
+              ${emp.email || ''}
+            </div>
+            <div style="font-size:8.5px;color:#64748b;">
+              ${emp.cidade ? `${emp.cidade}/${emp.estado || ''}` : 'Gestão de Engenharia & Construção'}
+            </div>
+          </div>
+        </div>
+        <div style="text-align:right;">
+          <div style="font-size:14px;font-weight:900;color:#0f172a;letter-spacing:-0.2px;">DOSSIÊ EXECUTIVO DA OBRA</div>
+          <div style="display:inline-block;margin-top:3px;padding:2px 8px;border-radius:4px;font-size:9px;font-weight:800;background:${obra.status==='concluida'?'#dcfce7':'#e0f2fe'};color:${obra.status==='concluida'?'#166534':'#075985'};border:1px solid ${obra.status==='concluida'?'#bbf7d0':'#bae6fd'};">
+            ${(obra.status || 'EM ANDAMENTO').toUpperCase().replace('_',' ')}
+          </div>
+          <div style="font-size:8.5px;color:#64748b;margin-top:4px;">
+            Emissão: <strong>${new Date().toLocaleDateString('pt-BR')}</strong> às ${new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+          </div>
+          <div style="font-size:8px;color:#94a3b8;">Cód. Referência: #${obra.id.substring(0,8)}</div>
+        </div>
+      </div>
+
+      <!-- SEÇÃO 1: DADOS CADASTRAIS & TÉCNICOS -->
+      <div class="avoid-break">
+        <div class="section-header">
+          <span>1. Identificação do Empreendimento & Contratante</span>
+          <span style="font-size:9px;font-weight:600;color:#64748b;">DADOS TÉCNICOS & CONTRATUAIS</span>
+        </div>
+        <table style="background:#f8fafc;border:1px solid #cbd5e1;border-radius:5px;margin-bottom:12px;">
+          <tbody>
+            <tr>
+              <td style="width:18%;font-weight:700;color:#475569;">Empreendimento:</td>
+              <td style="width:32%;font-weight:800;color:#0f172a;">${obra.nome}</td>
+              <td style="width:18%;font-weight:700;color:#475569;">Modalidade:</td>
+              <td style="width:32%;font-weight:800;color:#0f172a;">${modLabel}</td>
+            </tr>
+            <tr>
+              <td style="font-weight:700;color:#475569;">Cliente / Titular:</td>
+              <td style="color:#0f172a;">${obra.nome}</td>
+              <td style="font-weight:700;color:#475569;">CPF / CNPJ:</td>
+              <td style="color:#0f172a;">${obra.cpf_cnpj || 'Não informado'}</td>
+            </tr>
+            <tr>
+              <td style="font-weight:700;color:#475569;">Telefone / WhatsApp:</td>
+              <td style="color:#0f172a;">${obra.telefone || '—'}</td>
+              <td style="font-weight:700;color:#475569;">E-mail:</td>
+              <td style="color:#0f172a;">${obra.email || '—'}</td>
+            </tr>
+            <tr>
+              <td style="font-weight:700;color:#475569;">Local da Obra:</td>
+              <td style="color:#0f172a;" colspan="3">
+                ${obra.endereco ? obra.endereco + ', ' : ''}${obra.bairro ? obra.bairro + ' — ' : ''}${obra.cidade || '—'}/${obra.estado || '—'} ${obra.cep ? '&bull; CEP: ' + obra.cep : ''}
+              </td>
+            </tr>
+            <tr>
+              <td style="font-weight:700;color:#475569;">Responsável Técnico:</td>
+              <td style="color:#0f172a;">${obra.engenheiro_responsavel || obra.responsavel || empNome}</td>
+              <td style="font-weight:700;color:#475569;">Registro CREA / CAU:</td>
+              <td style="color:#0f172a;">${obra.crea_cau || '—'} ${obra.art_rrt ? ` &bull; ART: ${obra.art_rrt}` : ''}</td>
+            </tr>
+            <tr>
+              <td style="font-weight:700;color:#475569;">Área Construída:</td>
+              <td style="color:#0f172a;">${obra.area_construida ? obra.area_construida + ' m²' : '—'} &bull; ${obra.padrao_obra || obra.tipo || 'Padrão Residencial'}</td>
+              <td style="font-weight:700;color:#475569;">Contrato Bancário:</td>
+              <td style="color:#0f172a;">${obra.numero_contrato_caixa || obra.contrato_banco || 'Recursos Próprios / Direto'}${obra.agencia_caixa ? ` (Ag: ${obra.agencia_caixa})` : ''}</td>
+            </tr>
+            <tr>
+              <td style="font-weight:700;color:#475569;">Data de Início:</td>
+              <td style="color:#0f172a;">${Utils.fmt.date(obra.data_inicio) || '—'}</td>
+              <td style="font-weight:700;color:#475569;">Previsão de Término:</td>
+              <td style="color:#0f172a;">${Utils.fmt.date(obra.data_previsao_fim || obra.data_fim) || '—'} ${obra.prazo_meses ? `(${obra.prazo_meses} meses)` : ''}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- SEÇÃO 2: QUADRO RESUMO FINANCEIRO & FÍSICO -->
+      <div class="avoid-break">
+        <div class="section-header">
+          <span>2. Balanço Financeiro & Desempenho Operacional</span>
+          <span style="font-size:9px;font-weight:600;color:#64748b;">VALORES EM REAIS (R$)</span>
+        </div>
+        <div class="grid-kpis">
+          <div class="kpi-card">
+            <div class="kpi-title">Valor Contratado</div>
+            <div class="kpi-value">${Utils.fmt.currency(valorOrcado)}</div>
+            <div style="font-size:7.5px;color:#64748b;margin-top:2px;">Previsão Total</div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-title">Total Recebido</div>
+            <div class="kpi-value" style="color:#166534;">${Utils.fmt.currency(r.totalReceitas)}</div>
+            <div style="font-size:7.5px;color:#166534;margin-top:2px;">Faturado / Liberado</div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-title">Despesas Realizadas</div>
+            <div class="kpi-value" style="color:#991b1b;">${Utils.fmt.currency(r.totalDespesas)}</div>
+            <div style="font-size:7.5px;color:#991b1b;margin-top:2px;">Custo Total Pago</div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-title">Saldo da Obra</div>
+            <div class="kpi-value" style="color:${r.saldo>=0?'#166534':'#991b1b'};">${Utils.fmt.currency(r.saldo)}</div>
+            <div style="font-size:7.5px;color:#64748b;margin-top:2px;">Receitas &minus; Despesas</div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-title">Avanço Físico</div>
+            <div class="kpi-value" style="color:#0f766e;">${pctFisico.toFixed(1)}%</div>
+            <div style="font-size:7.5px;color:#0f766e;margin-top:2px;">Financeiro: ${pctFinanceiro.toFixed(1)}%</div>
+          </div>
+        </div>
+
+        <div style="display:flex;justify-content:space-between;background:#f1f5f9;border:1px solid #cbd5e1;padding:6px 10px;border-radius:4px;font-size:8.5px;margin-bottom:12px;">
+          <span>Contas a Pagar: <strong>${Utils.fmt.currency(r.aPagarValor)}</strong> (${r.aPagar} títulos)</span>
+          <span>Contas a Receber: <strong>${Utils.fmt.currency(r.aReceberValor)}</strong> (${r.aReceber} títulos)</span>
+          <span>Notas Fiscais Pendentes: <strong>${Utils.fmt.currency(r.nfPendentesValor)}</strong></span>
+        </div>
+      </div>
+
+      <!-- SEÇÃO 3: CRONOGRAMA DE MEDIÇÕES & FATURAMENTO FÍSICO -->
+      <div class="avoid-break">
+        <div class="section-header">
+          <span>3. Cronograma de Medições & Faturamento Físico (${meds.length})</span>
+          <span style="font-size:9px;font-weight:600;color:#64748b;">LIBERAÇÕES E VISTORIAS</span>
+        </div>
+        ${!meds.length ? `
+          <div style="padding:10px;border:1px dashed #cbd5e1;text-align:center;color:#64748b;font-size:9px;margin-bottom:12px;border-radius:4px;">
+            Nenhuma medição física formal cadastrada para esta obra até o momento.
+          </div>
+        ` : `
+          <table style="border:1px solid #cbd5e1;margin-bottom:12px;">
+            <thead>
+              <tr>
+                <th style="width:40px;text-align:center;">Nº</th>
+                <th>Etapa Executada</th>
+                <th style="width:75px;text-align:center;">Data Medição</th>
+                <th style="width:65px;text-align:center;">% Avanço</th>
+                <th style="width:90px;text-align:right;">Valor Solicitado</th>
+                <th style="width:90px;text-align:right;">Valor Liberado</th>
+                <th style="width:75px;text-align:center;">Data Liberação</th>
+                <th style="width:75px;text-align:center;">Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${meds.map(m => `
+                <tr>
+                  <td style="text-align:center;font-weight:800;color:#0f172a;">${m.numero_medicao}ª</td>
+                  <td>
+                    <div style="font-weight:700;color:#0f172a;">${m.etapa_descricao || 'Etapa da Obra'}</div>
+                    ${m.observacoes ? `<div style="font-size:8px;color:#64748b;">${m.observacoes}</div>` : ''}
+                  </td>
+                  <td style="text-align:center;color:#475569;">${Utils.fmt.date(m.data_medicao || m.data)}</td>
+                  <td style="text-align:center;font-weight:700;color:#0f766e;">${m.percentual_fisico || 0}%</td>
+                  <td style="text-align:right;color:#475569;">${Utils.fmt.currency(m.valor_solicitado)}</td>
+                  <td style="text-align:right;font-weight:800;color:#166534;">${Utils.fmt.currency(m.valor_liberado || m.valor_solicitado)}</td>
+                  <td style="text-align:center;color:#475569;">${m.data_liberacao ? Utils.fmt.date(m.data_liberacao) : '—'}</td>
+                  <td style="text-align:center;">
+                    <span class="badge-status ${m.status==='liberada'?'badge-concluido':m.status==='em_analise'||m.status==='submetida'?'badge-andamento':'badge-pendente'}">
+                      ${m.status === 'liberada' ? 'Liberada' : (m.status === 'em_analise' ? 'Em Análise' : (m.status || 'Pendente'))}
+                    </span>
+                  </td>
+                </tr>
+              `).join('')}
+            </tbody>
+            <tfoot>
+              <tr style="background:#f1f5f9;font-weight:800;">
+                <td colspan="4" style="text-align:right;padding:6px 8px;">TOTAIS DAS MEDIÇÕES:</td>
+                <td style="text-align:right;padding:6px 8px;">${Utils.fmt.currency(meds.reduce((s,m)=>s+(m.valor_solicitado||0),0))}</td>
+                <td style="text-align:right;padding:6px 8px;color:#166534;">${Utils.fmt.currency(meds.filter(m=>m.status==='liberada').reduce((s,m)=>s+(m.valor_liberado||0),0))}</td>
+                <td colspan="2"></td>
+              </tr>
+            </tfoot>
+          </table>
+        `}
+      </div>
+
+      <!-- SEÇÃO 4: MATRIZ DO PERCURSO DOCUMENTAL & REGULATÓRIO (43 ITENS) -->
+      <div class="avoid-break">
+        <div class="section-header">
+          <span>4. Matriz de Conformidade Documental & Licenciamento (${totalConc}/${totalDocs} &bull; ${totalPct}%)</span>
+          <span style="font-size:9px;font-weight:600;color:#64748b;">43 OBRIGAÇÕES REGULATÓRIAS</span>
+        </div>
+        
+        <div style="display:grid;grid-template-columns:repeat(3, 1fr);gap:8px;margin-bottom:10px;">
+          <div style="background:#f8fafc;border:1px solid #cbd5e1;padding:6px 8px;border-radius:4px;">
+            <div style="font-weight:800;font-size:9px;color:#0f172a;">Fase 1 &bull; Pré-Obra</div>
+            <div style="font-size:8.5px;color:#475569;">${preConc} de ${preDocs.length} concluídos (${preDocs.length ? Math.round(preConc/preDocs.length*100) : 0}%)</div>
+          </div>
+          <div style="background:#f8fafc;border:1px solid #cbd5e1;padding:6px 8px;border-radius:4px;">
+            <div style="font-weight:800;font-size:9px;color:#0f172a;">Fase 2 &bull; Durante Obra</div>
+            <div style="font-size:8.5px;color:#475569;">${durConc} de ${durDocs.length} concluídos (${durDocs.length ? Math.round(durConc/durDocs.length*100) : 0}%)</div>
+          </div>
+          <div style="background:#f8fafc;border:1px solid #cbd5e1;padding:6px 8px;border-radius:4px;">
+            <div style="font-weight:800;font-size:9px;color:#0f172a;">Fase 3 &bull; Pós-Obra</div>
+            <div style="font-size:8.5px;color:#475569;">${posConc} de ${posDocs.length} concluídos (${posDocs.length ? Math.round(posConc/posDocs.length*100) : 0}%)</div>
+          </div>
+        </div>
+
+        <table style="border:1px solid #cbd5e1;margin-bottom:12px;">
+          <thead>
+            <tr>
+              <th style="width:110px;">Fase</th>
+              <th style="width:210px;">Documento / Licença</th>
+              <th>Descrição Técnica / Finalidade</th>
+              <th style="width:80px;text-align:center;">Status</th>
+              <th style="width:130px;">Dados / Protocolo</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${[
+              ...preDocs.map(d => ({ ...d, faseNome: '1. Pré-Obra' })),
+              ...durDocs.map(d => ({ ...d, faseNome: '2. Durante Obra' })),
+              ...posDocs.map(d => ({ ...d, faseNome: '3. Pós-Obra' }))
+            ].map(d => {
+              const stClass = d.status === 'concluido' ? 'badge-concluido' : (d.status === 'em_andamento' ? 'badge-andamento' : (d.status === 'dispensado' ? 'badge-dispensado' : 'badge-pendente'));
+              const stText = d.status === 'concluido' ? 'Concluído' : (d.status === 'em_andamento' ? 'Em Andamento' : (d.status === 'dispensado' ? 'Dispensado' : 'Não Iniciado'));
+              const info = [
+                d.protocolo ? `Prot: ${d.protocolo}` : '',
+                d.orgao_emissor ? `Órgão: ${d.orgao_emissor}` : '',
+                d.data_validade ? `Val: ${Utils.fmt.date(d.data_validade)}` : ''
+              ].filter(Boolean).join(' &bull; ');
+
+              return `
+                <tr>
+                  <td style="font-weight:700;color:#475569;font-size:8.5px;">${d.faseNome}</td>
+                  <td style="font-weight:700;color:#0f172a;">${d.icone || '📄'} ${d.nome}</td>
+                  <td style="color:#475569;font-size:8.5px;">${d.desc || '—'}</td>
+                  <td style="text-align:center;">
+                    <span class="badge-status ${stClass}">${stText}</span>
+                  </td>
+                  <td style="font-size:8px;color:#64748b;">${info || '—'}</td>
+                </tr>
+              `;
+            }).join('')}
+          </tbody>
+        </table>
+      </div>
+
+      <!-- SEÇÃO 5: EXTRATO DAS MOVIMENTAÇÕES FINANCEIRAS -->
+      <div class="avoid-break">
+        <div class="section-header">
+          <span>5. Extrato Resumido dos Lançamentos Financeiros (Recentes)</span>
+          <span style="font-size:9px;font-weight:600;color:#64748b;">CONTROLE DE CAIXA</span>
+        </div>
+        ${!lans.length ? `
+          <div style="padding:10px;border:1px dashed #cbd5e1;text-align:center;color:#64748b;font-size:9px;margin-bottom:12px;border-radius:4px;">
+            Nenhum lançamento financeiro registrado nesta obra.
+          </div>
+        ` : `
+          <table style="border:1px solid #cbd5e1;margin-bottom:12px;">
+            <thead>
+              <tr>
+                <th style="width:75px;">Data</th>
+                <th>Descrição / Favorecido</th>
+                <th style="width:120px;">Categoria</th>
+                <th style="width:70px;text-align:center;">Tipo</th>
+                <th style="width:90px;text-align:right;">Valor (R$)</th>
+                <th style="width:75px;text-align:center;">Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${lans.slice(0, 20).map(l => `
+                <tr>
+                  <td style="color:#475569;">${Utils.fmt.date(l.data)}</td>
+                  <td style="font-weight:600;color:#0f172a;">${l.descricao}</td>
+                  <td style="color:#64748b;font-size:8.5px;">${l.categoria || 'Geral'}</td>
+                  <td style="text-align:center;font-weight:700;color:${l.tipo==='receita'?'#166534':'#991b1b'};">
+                    ${l.tipo === 'receita' ? '+ Receita' : '- Despesa'}
+                  </td>
+                  <td style="text-align:right;font-weight:800;color:${l.tipo==='receita'?'#166534':'#0f172a'};">
+                    ${Utils.fmt.currency(l.valor)}
+                  </td>
+                  <td style="text-align:center;">
+                    <span class="badge-status ${l.status==='recebido'||l.status==='pago'?'badge-concluido':l.status==='cancelado'?'badge-dispensado':'badge-andamento'}">
+                      ${l.status === 'pago' ? 'Pago' : (l.status === 'recebido' ? 'Recebido' : (l.status === 'a_pagar' ? 'A Pagar' : (l.status || 'Pendente')))}
+                    </span>
+                  </td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+          ${lans.length > 20 ? `<div style="font-size:8px;color:#64748b;text-align:right;margin-top:-6px;margin-bottom:10px;">Exibindo os 20 lançamentos mais recentes de um total de ${lans.length}.</div>` : ''}
+        `}
+      </div>
+
+      <!-- SEÇÃO 6: TERMO DE AUTENTICIDADE & ASSINATURAS -->
+      <div class="avoid-break" style="margin-top:16px;border-top:1px solid #cbd5e1;padding-top:12px;">
+        <div style="font-size:8.5px;color:#475569;text-align:justify;line-height:1.4;margin-bottom:30px;">
+          <strong>Declaração de Conformidade:</strong> Certificamos para todos os fins de direito que este 
+          <strong>Dossiê Executivo da Obra</strong> consolida fielmente a escrituração físico-financeira, as medições de engenharia 
+          e o percurso documental do empreendimento identificado acima até a presente data, servindo para prestação de contas, 
+          auditoria, acompanhamento bancário e controle de engenharia.
+        </div>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:40px;margin-bottom:20px;">
+          <!-- Assinatura Contratante -->
+          <div style="text-align:center;">
+            <div style="border-top:1px solid #0f172a;margin-bottom:6px;width:85%;margin-left:auto;margin-right:auto;"></div>
+            <div style="font-weight:800;font-size:10px;color:#0f172a;">${obra.nome}</div>
+            <div style="font-size:8.5px;color:#64748b;">Contratante / Proprietário(a)</div>
+            <div style="font-size:8px;color:#94a3b8;">${obra.cpf_cnpj ? `CPF/CNPJ: ${obra.cpf_cnpj}` : ''}</div>
+          </div>
+
+          <!-- Assinatura Responsável Técnico -->
+          <div style="text-align:center;">
+            <div style="border-top:1px solid #0f172a;margin-bottom:6px;width:85%;margin-left:auto;margin-right:auto;"></div>
+            <div style="font-weight:800;font-size:10px;color:#0f172a;">${obra.engenheiro_responsavel || obra.responsavel || empNome}</div>
+            <div style="font-size:8.5px;color:#64748b;">Responsável Técnico / Engenharia</div>
+            <div style="font-size:8px;color:#94a3b8;">
+              ${obra.crea_cau ? `CREA/CAU: ${obra.crea_cau}` : (emp.cnpj ? `CNPJ: ${emp.cnpj}` : '')}
+            </div>
+          </div>
+        </div>
+
+        <!-- Rodapé Final -->
+        <div style="display:flex;justify-content:space-between;align-items:center;border-top:1px solid #e2e8f0;padding-top:6px;font-size:7.5px;color:#94a3b8;">
+          <span>FinObra &bull; Sistema de Gestão Financeira & Percurso Documental</span>
+          <span>Impresso em ${new Date().toLocaleDateString('pt-BR')} ${new Date().toLocaleTimeString('pt-BR')} &bull; Documento Oficial</span>
+        </div>
+      </div>
+    `;
   }
 };
+
+window.ObraDetalhe = ObraDetalhe;
