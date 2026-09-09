@@ -2,7 +2,7 @@
  * FinObra — Módulo de Integração com Google Drive (Google Picker API)
  */
 const GDrive = {
-  API_KEY: 'AIzaSyAwuMOU2cQ0GsEy5JvIfYhDKRIXnfi-HpE',
+  API_KEY: 'AIzaSyAulsSIHM0kPq28qJwQtj1taNMG-0jZqGE',
   CLIENT_ID: '260462714670-568cfk38egdla84caeklv3bg2hi2fs0u.apps.googleusercontent.com',
   APP_ID: '260462714670',
   SCOPE: 'https://www.googleapis.com/auth/drive.readonly',
