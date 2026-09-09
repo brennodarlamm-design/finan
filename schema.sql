@@ -117,8 +117,27 @@ CREATE TABLE IF NOT EXISTS documentos (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
+-- 8. Contas Bancárias
+CREATE TABLE IF NOT EXISTS contas_bancarias (
+    id VARCHAR(100) PRIMARY KEY,
+    banco_codigo VARCHAR(20),
+    banco_nome VARCHAR(100),
+    agencia VARCHAR(50),
+    numero VARCHAR(50),
+    tipo VARCHAR(50),
+    titular VARCHAR(150),
+    apelido VARCHAR(150),
+    obra_id VARCHAR(100),
+    obs TEXT,
+    saldo_inicial NUMERIC(15, 2) DEFAULT 0,
+    saldo_atual NUMERIC(15, 2) DEFAULT 0,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
 -- Índices para alta performance
 CREATE INDEX IF NOT EXISTS idx_lancamentos_vencimento ON lancamentos(data_vencimento);
 CREATE INDEX IF NOT EXISTS idx_lancamentos_obra ON lancamentos(obra_id);
 CREATE INDEX IF NOT EXISTS idx_lancamentos_status ON lancamentos(status);
 CREATE INDEX IF NOT EXISTS idx_nfe_chave ON notas_fiscais(chave_acesso);
+CREATE INDEX IF NOT EXISTS idx_contas_obra ON contas_bancarias(obra_id);

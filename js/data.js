@@ -420,6 +420,10 @@ const DB = {
         this.save('produtos', Array.from(localMap.values()));
       }
 
+      if (Array.isArray(d.contas) && d.contas.length > 0) {
+        this.save('contas', d.contas);
+      }
+
       console.log('✅ Dados sincronizados com Neon PostgreSQL!');
       return true;
     } catch (e) {
@@ -431,7 +435,7 @@ const DB = {
   syncToCloud(action, table, data, id) {
     // Sincroniza com Neon apenas se for o tenant central da Angelim
     if (this._t() !== 'angelim') return;
-    const cloudTables = ['lancamentos', 'notas', 'notas_fiscais', 'obras', 'clientes', 'fornecedores', 'documentos', 'produtos', 'ocr_historico'];
+    const cloudTables = ['lancamentos', 'notas', 'notas_fiscais', 'obras', 'clientes', 'fornecedores', 'documentos', 'produtos', 'ocr_historico', 'contas', 'contas_bancarias'];
     if (!cloudTables.includes(table)) return;
     try {
       fetch('/api/db', {
@@ -449,7 +453,8 @@ const DB = {
         clientes: this.getAll('clientes'),
         fornecedores: this.getAll('fornecedores'),
         lancamentos: this.getAll('lancamentos'),
-        notas: this.getAll('notas')
+        notas: this.getAll('notas'),
+        contas: this.getAll('contas')
       };
       const res = await fetch('/api/db', {
         method: 'POST',

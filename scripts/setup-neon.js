@@ -149,11 +149,33 @@ async function main() {
     `;
     console.log('  ✓ Tabela documentos pronta');
 
+    // 8. Contas Bancárias
+    await sql`
+      CREATE TABLE IF NOT EXISTS contas_bancarias (
+        id VARCHAR(100) PRIMARY KEY,
+        banco_codigo VARCHAR(20),
+        banco_nome VARCHAR(100),
+        agencia VARCHAR(50),
+        numero VARCHAR(50),
+        tipo VARCHAR(50),
+        titular VARCHAR(150),
+        apelido VARCHAR(150),
+        obra_id VARCHAR(100),
+        obs TEXT,
+        saldo_inicial NUMERIC(15, 2) DEFAULT 0,
+        saldo_atual NUMERIC(15, 2) DEFAULT 0,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+    `;
+    console.log('  ✓ Tabela contas_bancarias pronta');
+
     // Índices
     await sql`CREATE INDEX IF NOT EXISTS idx_lancamentos_vencimento ON lancamentos(data_vencimento);`;
     await sql`CREATE INDEX IF NOT EXISTS idx_lancamentos_obra ON lancamentos(obra_id);`;
     await sql`CREATE INDEX IF NOT EXISTS idx_lancamentos_status ON lancamentos(status);`;
     await sql`CREATE INDEX IF NOT EXISTS idx_nfe_chave ON notas_fiscais(chave_acesso);`;
+    await sql`CREATE INDEX IF NOT EXISTS idx_contas_obra ON contas_bancarias(obra_id);`;
     console.log('  ✓ Índices de alta performance criados');
 
     // Lista tabelas criadas

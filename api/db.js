@@ -51,7 +51,7 @@ export default async function handler(req, res) {
       const { table, obra_id, id } = req.query || {};
 
       if (!table || table === 'all') {
-        const [obras, fornecedores, lancamentos, notas, orcamentos, medicoes, documentos, produtos] = await Promise.all([
+        const [obras, fornecedores, lancamentos, notas, orcamentos, medicoes, documentos, produtos, contas] = await Promise.all([
           sql`SELECT * FROM obras ORDER BY nome ASC;`,
           sql`SELECT * FROM fornecedores ORDER BY nome ASC;`,
           sql`SELECT * FROM lancamentos ORDER BY data DESC, created_at DESC;`,
@@ -59,7 +59,8 @@ export default async function handler(req, res) {
           sql`SELECT * FROM orcamentos ORDER BY created_at DESC;`,
           sql`SELECT * FROM medicoes ORDER BY data DESC;`,
           sql`SELECT id, tipo, referencia_id, titulo, categoria, nome_arquivo, tipo_arquivo, tamanho_bytes, created_at FROM documentos ORDER BY created_at DESC;`,
-          sql`SELECT * FROM produtos ORDER BY nome ASC;`
+          sql`SELECT * FROM produtos ORDER BY nome ASC;`,
+          sql`SELECT * FROM contas_bancarias ORDER BY created_at ASC;`
         ]);
 
         return res.status(200).json({
@@ -111,7 +112,8 @@ export default async function handler(req, res) {
               data: cleanDate(m.data),
               valor_medido: cleanNum(m.valor_medido)
             })),
-            documentos: documentos
+            documentos: documentos,
+            contas: contas || []
           }
         });
       }
@@ -208,6 +210,11 @@ export default async function handler(req, res) {
             dados: typeof h.dados === 'string' ? JSON.parse(h.dados) : (h.dados || {})
           }))
         });
+      }
+
+      if (table === 'contas' || table === 'contas_bancarias') {
+        const items = await sql`SELECT * FROM contas_bancarias ORDER BY created_at ASC;`;
+        return res.status(200).json({ success: true, data: items });
       }
 
       return res.status(200).json({ success: true, data: [], message: `Tabela '${table}' disponível localmente.` });
@@ -349,6 +356,33 @@ export default async function handler(req, res) {
                 observacoes = EXCLUDED.observacoes,
                 obra_id = EXCLUDED.obra_id,
                 itens = EXCLUDED.itens;
+            `;
+            totalCount++;
+          }
+        }
+
+        // Contas Bancárias
+        if (Array.isArray(payload.contas)) {
+          for (const c of payload.contas) {
+            if (!c.id) continue;
+            await sql`
+              INSERT INTO contas_bancarias (id, banco_codigo, banco_nome, agencia, numero, tipo, titular, apelido, obra_id, obs)
+              VALUES (
+                ${c.id}, ${c.banco_codigo || ''}, ${c.banco_nome || ''}, ${c.agencia || ''},
+                ${c.numero || ''}, ${c.tipo || 'corrente'}, ${c.titular || ''},
+                ${c.apelido || ''}, ${c.obra_id || null}, ${c.obs || ''}
+              )
+              ON CONFLICT (id) DO UPDATE SET
+                banco_codigo = EXCLUDED.banco_codigo,
+                banco_nome = EXCLUDED.banco_nome,
+                agencia = EXCLUDED.agencia,
+                numero = EXCLUDED.numero,
+                tipo = EXCLUDED.tipo,
+                titular = EXCLUDED.titular,
+                apelido = EXCLUDED.apelido,
+                obra_id = EXCLUDED.obra_id,
+                obs = EXCLUDED.obs,
+                updated_at = NOW();
             `;
             totalCount++;
           }
@@ -551,6 +585,30 @@ export default async function handler(req, res) {
           `;
           return res.status(200).json({ success: true, id: h.id });
         }
+
+        if (table === 'contas' || table === 'contas_bancarias') {
+          const c = data;
+          await sql`
+            INSERT INTO contas_bancarias (id, banco_codigo, banco_nome, agencia, numero, tipo, titular, apelido, obra_id, obs)
+            VALUES (
+              ${c.id}, ${c.banco_codigo || ''}, ${c.banco_nome || ''}, ${c.agencia || ''},
+              ${c.numero || ''}, ${c.tipo || 'corrente'}, ${c.titular || ''},
+              ${c.apelido || ''}, ${c.obra_id || null}, ${c.obs || ''}
+            )
+            ON CONFLICT (id) DO UPDATE SET
+              banco_codigo = EXCLUDED.banco_codigo,
+              banco_nome = EXCLUDED.banco_nome,
+              agencia = EXCLUDED.agencia,
+              numero = EXCLUDED.numero,
+              tipo = EXCLUDED.tipo,
+              titular = EXCLUDED.titular,
+              apelido = EXCLUDED.apelido,
+              obra_id = EXCLUDED.obra_id,
+              obs = EXCLUDED.obs,
+              updated_at = NOW();
+          `;
+          return res.status(200).json({ success: true, id: c.id });
+        }
       }
 
       // 3. Excluir Registro Individual
@@ -585,6 +643,10 @@ export default async function handler(req, res) {
           } else {
             await sql`DELETE FROM ocr_historico WHERE id = ${id};`;
           }
+          return res.status(200).json({ success: true, id });
+        }
+        if (table === 'contas' || table === 'contas_bancarias') {
+          await sql`DELETE FROM contas_bancarias WHERE id = ${id};`;
           return res.status(200).json({ success: true, id });
         }
       }
