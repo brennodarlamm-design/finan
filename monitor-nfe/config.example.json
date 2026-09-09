@@ -49,7 +49,7 @@
     "webhook_url": "https://finobra.app.br/api/send-whatsapp",
     "_webhook_hint": "Endpoint da API Serverless ou Render",
     "api_token": "",
-    "api_secret": "0834902d6117a436a311aaecb517dc073a7184651f2a6d71c3ab0b01ac49c5ef",
+    "api_secret": "SUA_CHAVE_API_SECRET_AQUI",
     "horario_envio": "08:00",
     "notificar_windows_toast": true
   }

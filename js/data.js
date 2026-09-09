@@ -335,23 +335,20 @@ const DB = {
         if (parts.length === 3) {
           const payload = JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/')));
           if (payload.exp && Date.now() > payload.exp) {
-            token = ''; // Token expirado; recorre à chave mestre para não travar requisições legítimas
+            token = '';
           }
         }
       } catch (e) {}
     }
-    if (!token) {
-      const defaultKey = '0834902d6117a436a311aaecb517dc073a7184651f2a6d71c3ab0b01ac49c5ef';
-      token = (typeof window !== 'undefined' && window.__API_SECRET)
-        ? window.__API_SECRET
-        : (typeof localStorage !== 'undefined' ? (localStorage.getItem('finobra_api_secret') || defaultKey) : defaultKey);
-    }
     const tenantId = (typeof Auth !== 'undefined' && Auth.getCurrentTenantId) ? Auth.getCurrentTenantId() : 'angelim';
-    return {
+    const headers = {
       'Content-Type': 'application/json',
-      'Authorization': `Bearer ${token}`,
       'x-tenant-id': tenantId
     };
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+    return headers;
   },
 
   async syncFromCloud() {
@@ -418,7 +415,7 @@ const DB = {
       if (Array.isArray(d.produtos)) {
         this.save('produtos', d.produtos);
       }
-      if (Array.isArray(d.documentos) && d.documentos.length > 0 && typeof Documentos !== 'undefined') {
+      if (Array.isArray(d.documentos) && typeof Documentos !== 'undefined') {
         const locais = Documentos.getAll() || [];
         const localMap = new Map(locais.map(x => [x.id, x]));
         const merged = d.documentos.map(cloudDoc => {
@@ -437,7 +434,11 @@ const DB = {
           };
         });
         locais.forEach(l => {
-          if (!merged.some(m => m.id === l.id)) merged.push(l);
+          const syncKey = 'finobra_cloud_uploaded_' + l.id;
+          const pendenteUpload = typeof localStorage !== 'undefined' && !localStorage.getItem(syncKey);
+          if (pendenteUpload && !merged.some(m => m.id === l.id)) {
+            merged.push(l);
+          }
         });
         Documentos.salvarLista(merged);
       }
@@ -464,8 +465,6 @@ const DB = {
   },
 
   syncToCloud(action, table, data, id) {
-    // Sincroniza com Neon apenas se for o tenant central da Angelim
-    if (this._t() !== 'angelim') return;
     const cloudTables = ['lancamentos', 'notas', 'notas_fiscais', 'obras', 'clientes', 'fornecedores', 'documentos', 'produtos', 'ocr_historico', 'contas', 'contas_bancarias'];
     if (!cloudTables.includes(table)) return;
     try {
@@ -478,7 +477,6 @@ const DB = {
   },
 
   async syncAllToCloud() {
-    if (this._t() !== 'angelim') return { success: true, message: 'Tenant local em operação isolada.' };
     try {
       const payload = {
         clientes: this.getAll('clientes'),

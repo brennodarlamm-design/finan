@@ -728,7 +728,7 @@ const Documentos = {
 
   // Sincroniza arquivos que já estão salvos localmente no celular diretamente para a nuvem
   async sincronizarPendentesParaNuvem() {
-    if (typeof DB === 'undefined' || !DB.syncToCloud || (DB._t && DB._t() !== 'angelim')) return;
+    if (typeof DB === 'undefined' || !DB.syncToCloud) return;
     const docs = this.getAll();
     if (!docs.length) return;
 

@@ -2,7 +2,10 @@
 
 import { neon } from '@neondatabase/serverless';
 import crypto from 'crypto';
+import { OAuth2Client } from 'google-auth-library';
 import { hashPassword, verifyPassword, signToken, resolveAuthAndTenant } from './_auth.js';
+
+const googleClient = new OAuth2Client();
 
 function getSql() {
   const conn = process.env.DATABASE_URL;
@@ -182,16 +185,135 @@ export default async function handler(req, res) {
       });
     }
 
-    // ── 3. POST /api/auth?action=google ─────────────────────────────────────────
+    // ── 3. POST /api/auth?action=register (Cadastro de novo Tenant SaaS no Neon) ─
+    if (req.method === 'POST' && action === 'register') {
+      const { nome, username, email, password, senha, empresaNome, cnpj, telefone, plano } = req.body || {};
+      const userPass = (password || senha || '').trim();
+      const rawNome = (nome || '').trim();
+      const rawUsername = (username || '').trim().toLowerCase().replace(/[^a-z0-9._-]/g, '');
+      const rawEmail = (email || '').trim().toLowerCase();
+
+      if (!rawNome || !rawUsername || !userPass) {
+        return res.status(400).json({ success: false, message: 'Nome, usuário e senha são obrigatórios.' });
+      }
+
+      if (rawUsername.length < 3) {
+        return res.status(400).json({ success: false, message: 'O nome de usuário deve ter pelo menos 3 caracteres alfanuméricos.' });
+      }
+
+      if (userPass.length < 6) {
+        return res.status(400).json({ success: false, message: 'A senha deve ter no mínimo 6 caracteres.' });
+      }
+
+      // Verifica se usuário ou e-mail já existe
+      const existing = await sql`
+        SELECT id, username, email FROM usuarios
+        WHERE LOWER(username) = ${rawUsername} OR (LOWER(email) = ${rawEmail} AND ${rawEmail} != '')
+        LIMIT 1;
+      `;
+
+      if (existing.length > 0) {
+        const isEmail = existing[0].email && existing[0].email.toLowerCase() === rawEmail;
+        return res.status(409).json({
+          success: false,
+          message: isEmail ? 'Este e-mail já está cadastrado.' : 'Este nome de usuário já está em uso. Escolha outro.'
+        });
+      }
+
+      // Cria Tenant e Usuário Isolados
+      const newTenantId = 'tenant_' + crypto.randomBytes(6).toString('hex');
+      const newUserId = 'usr_' + crypto.randomBytes(6).toString('hex');
+      const finalEmpresaNome = (empresaNome || rawNome + ' Empreendimentos').trim();
+      const passHash = hashPassword(userPass);
+
+      await sql`
+        INSERT INTO tenants (id, razao_social, nome_fantasia, email, telefone, cnpj, responsavel, plano, status)
+        VALUES (
+          ${newTenantId},
+          ${finalEmpresaNome},
+          ${finalEmpresaNome},
+          ${rawEmail || null},
+          ${(telefone || '').trim() || null},
+          ${(cnpj || '').trim() || null},
+          ${rawNome},
+          ${plano || 'pro'},
+          'ativo'
+        );
+      `;
+
+      await sql`
+        INSERT INTO usuarios (id, tenant_id, username, email, senha_hash, nome, perfil, avatar, ativo)
+        VALUES (
+          ${newUserId},
+          ${newTenantId},
+          ${rawUsername},
+          ${rawEmail || null},
+          ${passHash},
+          ${rawNome},
+          'admin',
+          ${rawNome.slice(0, 2).toUpperCase()},
+          TRUE
+        );
+      `;
+
+      const exp = Date.now() + 30 * 24 * 60 * 60 * 1000; // 30 dias
+      const payload = {
+        userId: newUserId,
+        username: rawUsername,
+        email: rawEmail,
+        nome: rawNome,
+        perfil: 'admin',
+        tenantId: newTenantId,
+        empresaNome: finalEmpresaNome,
+        avatar: rawNome.slice(0, 2).toUpperCase(),
+        exp
+      };
+
+      const token = signToken(payload, secret);
+
+      return res.status(201).json({
+        success: true,
+        token,
+        user: {
+          id: newUserId,
+          username: rawUsername,
+          email: rawEmail,
+          nome: rawNome,
+          perfil: 'admin',
+          avatar: rawNome.slice(0, 2).toUpperCase(),
+          tenantId: newTenantId,
+          empresaNome: finalEmpresaNome,
+          remember: true
+        }
+      });
+    }
+
+    // ── 4. POST /api/auth?action=google ─────────────────────────────────────────
     if (req.method === 'POST' && action === 'google') {
       const { credentialJwt } = req.body || {};
       if (!credentialJwt) {
         return res.status(400).json({ success: false, message: 'Token de autenticação Google obrigatório.' });
       }
 
-      const profile = decodeJwtPayload(credentialJwt);
-      if (!profile || !profile.email || !profile.sub) {
-        return res.status(400).json({ success: false, message: 'Token de credencial Google inválido ou malformado.' });
+      const googleClientId = (process.env.GOOGLE_CLIENT_ID || '').trim();
+      if (!googleClientId) {
+        return res.status(500).json({ success: false, message: 'GOOGLE_CLIENT_ID não configurado no servidor.' });
+      }
+
+      let profile;
+      try {
+        const ticket = await googleClient.verifyIdToken({
+          idToken: credentialJwt,
+          audience: googleClientId
+        });
+        profile = ticket.getPayload();
+      } catch (verifyErr) {
+        console.error('Falha na validação criptográfica do token Google:', verifyErr.message);
+        return res.status(401).json({ success: false, message: 'Credencial Google inválida ou expirada.' });
+      }
+
+      if (!profile || !profile.email || !profile.email_verified || !profile.sub) {
+        return res.status(401).json({ success: false, message: 'Token Google inválido ou e-mail não verificado pelo Google.' });
       }
 
       const email = profile.email.trim().toLowerCase();

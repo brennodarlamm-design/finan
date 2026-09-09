@@ -155,6 +155,7 @@ CREATE TABLE IF NOT EXISTS medicoes (
     data DATE,
     valor_medido NUMERIC(15, 2) DEFAULT 0,
     status VARCHAR(50) DEFAULT 'pendente',
+    observacoes TEXT,
     itens_json JSONB,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );

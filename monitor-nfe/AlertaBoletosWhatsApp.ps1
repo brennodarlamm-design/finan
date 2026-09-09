@@ -103,12 +103,15 @@ $lancamentos = @()
 try {
     $apiSecret = $waCfg.api_secret
     if (-not $apiSecret) { $apiSecret = $waCfg.api_token }
-    if (-not $apiSecret) { $apiSecret = "0834902d6117a436a311aaecb517dc073a7184651f2a6d71c3ab0b01ac49c5ef" }
-    $dbHeaders = @{ "Authorization" = "Bearer $apiSecret" }
-    $apiUrl = "https://finobra.app.br/api/db?table=all"
-    $response = Invoke-RestMethod -Uri $apiUrl -Method Get -Headers $dbHeaders -TimeoutSec 15
-    if ($response.success -and $response.data.lancamentos) {
-        $lancamentos = $response.data.lancamentos
+    if (-not $apiSecret) {
+        Log "Aviso: api_secret/api_token nao configurado no config.json. Consulta a nuvem ignorada." "WARN"
+    } else {
+        $dbHeaders = @{ "Authorization" = "Bearer $apiSecret" }
+        $apiUrl = "https://finobra.app.br/api/db?table=all"
+        $response = Invoke-RestMethod -Uri $apiUrl -Method Get -Headers $dbHeaders -TimeoutSec 15
+        if ($response.success -and $response.data.lancamentos) {
+            $lancamentos = $response.data.lancamentos
+        }
     }
 } catch {
     Log "Aviso: Nao foi possivel consultar API Vercel ($($_))." "WARN"

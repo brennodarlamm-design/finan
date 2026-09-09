@@ -315,7 +315,7 @@ const Auth = {
     }
   },
 
-  register({ nome, username, email, senha, empresaNome, cnpj = '' }) {
+  async register({ nome, username, email, senha, empresaNome, cnpj = '', telefone = '' }) {
     if (!nome || !username || !senha) {
       return { success: false, message: 'Preencha todos os campos obrigatórios (Nome, Usuário e Senha).' };
     }
@@ -327,47 +327,65 @@ const Auth = {
       return { success: false, message: 'A senha deve ter pelo menos 6 caracteres.' };
     }
 
-    const users = this.getUsers();
-    if (users.some(u => u.username.toLowerCase() === cleanUsername)) {
-      return { success: false, message: 'Este nome de usuário já está em uso. Escolha outro.' };
+    try {
+      const res = await fetch('/api/auth?action=register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          nome: nome.trim(),
+          username: cleanUsername,
+          email: (email || '').trim(),
+          senha,
+          empresaNome: (empresaNome || nome.trim() + ' Construtora').trim(),
+          cnpj: (cnpj || '').trim(),
+          telefone: (telefone || '').trim()
+        })
+      });
+
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.success) {
+        return { success: false, message: data.message || data.error || 'Erro ao registrar conta no servidor.' };
+      }
+
+      const user = data.user;
+      const token = data.token;
+
+      // Cria sessão autenticada com token JWT recebido
+      if (token) {
+        this.createSession(user, true, token);
+      }
+
+      // Inicializa metadados locais da empresa
+      const empresaData = {
+        id: user.tenantId,
+        razao_social: user.empresaNome || (empresaNome || nome.trim() + ' Construtora').trim(),
+        nome_fantasia: user.empresaNome || (empresaNome || nome.trim() + ' Construtora').trim(),
+        cnpj: cnpj ? cnpj.trim() : '',
+        telefone: telefone ? telefone.trim() : '',
+        email: (email || '').trim(),
+        cidade: '',
+        uf: '',
+        endereco: '',
+        responsavel: nome.trim(),
+        crea_cau: '',
+        logo_url: '',
+        configurada: true,
+        created_at: new Date().toISOString()
+      };
+      localStorage.setItem(`finobra_${user.tenantId}_empresa`, JSON.stringify(empresaData));
+      localStorage.setItem(`finobra_${user.tenantId}_clean_mode`, 'true');
+
+      // Salva usuário no cache local de usuários
+      const users = this.getUsers();
+      if (!users.some(u => u.username.toLowerCase() === cleanUsername)) {
+        users.push(user);
+        localStorage.setItem(this.USERS_KEY, JSON.stringify(users));
+      }
+
+      return { success: true, user, token };
+    } catch (err) {
+      return { success: false, message: 'Falha de comunicação com o servidor: ' + err.message };
     }
-
-    const newTenantId = 'tenant_' + Date.now().toString(36) + Math.random().toString(36).substr(2, 5);
-    const newUser = {
-      id: 'usr_' + Date.now().toString(36),
-      username: cleanUsername,
-      nome: nome.trim(),
-      email: (email || '').trim(),
-      perfil: 'admin',
-      ativo: true,
-      avatar: nome.trim().slice(0, 2).toUpperCase(),
-      tenantId: newTenantId,
-      empresaNome: (empresaNome || nome.trim() + ' Construtora').trim()
-    };
-
-    users.push(newUser);
-    localStorage.setItem(this.USERS_KEY, JSON.stringify(users));
-
-    const empresaData = {
-      id: newTenantId,
-      razao_social: (empresaNome || nome.trim() + ' Construtora').trim(),
-      nome_fantasia: (empresaNome || nome.trim() + ' Construtora').trim(),
-      cnpj: cnpj ? cnpj.trim() : '',
-      telefone: '',
-      email: (email || '').trim(),
-      cidade: '',
-      uf: '',
-      endereco: '',
-      responsavel: nome.trim(),
-      crea_cau: '',
-      logo_url: '',
-      configurada: true,
-      created_at: new Date().toISOString()
-    };
-    localStorage.setItem(`finobra_${newTenantId}_empresa`, JSON.stringify(empresaData));
-    localStorage.setItem(`finobra_${newTenantId}_clean_mode`, 'true');
-
-    return { success: true, user: newUser };
   },
 
   getCurrentTenantId() {

@@ -49,8 +49,8 @@ app.use(express.urlencoded({ extended: true, limit: '25mb' }));
 function requireAuth(req, res, next) {
   const secret = (process.env.API_SECRET || process.env.VERCEL_API_SECRET || '').trim();
   if (!secret) {
-    console.warn('⚠️ [Segurança] API_SECRET não configurado no backend Render. Configure nas variáveis de ambiente!');
-    return next();
+    console.error('❌ [Segurança] API_SECRET não configurado no backend. Bloqueando requisição por segurança.');
+    return res.status(500).json({ error: 'Configuração de segurança pendente no servidor.' });
   }
 
   const authHeader = req.headers.authorization || req.headers.Authorization || '';
@@ -86,7 +86,6 @@ if (!rawDbUrl) {
     console.log('✅ Cliente Neon PostgreSQL inicializado.');
   } catch (err) {
     console.error('❌ [Erro Neon] String de conexão inválida ou incompleta:', err.message);
-    console.error('   Valor recebido:', rawDbUrl);
   }
 }
 

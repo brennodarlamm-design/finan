@@ -12,6 +12,7 @@
   "dependencies": {
     "@neondatabase/serverless": "^0.9.5",
     "@vercel/blob": "^2.8.0",
-    "dotenv": "^16.4.5"
+    "dotenv": "^16.4.5",
+    "google-auth-library": "^11.0.2"
   }
 }

@@ -47,7 +47,13 @@ export default async function handler(req, res) {
   }
 
   // Chave protegida no servidor (ambiente .env)
-  const apiKey = (process.env.MEUDANFE_API_KEY || '1879826c-ee82-416d-b887-b5aaf4e059d4').trim();
+  const apiKey = (process.env.MEUDANFE_API_KEY || '').trim();
+  if (!apiKey) {
+    return res.status(500).json({
+      success: false,
+      error: 'Serviço de consulta de NF-e não configurado no servidor (MEUDANFE_API_KEY pendente).'
+    });
+  }
   const mdHeaders = {
     'Api-Key': apiKey,
     'Accept': 'application/json'
@@ -103,7 +109,15 @@ export default async function handler(req, res) {
     }
 
     // ── 4. LISTAR NF-ES CONSULTADAS (GET /fd/my/NFE) ─────────────────────────
-    if (action === 'minhas_nfes') {
+    if (action === 'minhas_nfes' || action === 'listar') {
+      const isSuperAdmin = auth.isSystem || (auth.user && auth.user.perfil === 'superadmin');
+      if (!isSuperAdmin) {
+        return res.status(403).json({
+          success: false,
+          error: 'A listagem global de NF-es é restrita a administradores do sistema.'
+        });
+      }
+
       const after = (req.query.after || (req.body && req.body.after) || '').toString().trim();
       const qs = after ? `?after=${encodeURIComponent(after)}` : '';
 

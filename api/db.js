@@ -139,11 +139,15 @@ export default async function handler(req, res) {
               ...p,
               valor_medio: cleanNum(p.valor_medio)
             })),
-            orcamentos: orcamentos,
+            orcamentos: orcamentos.map(o => ({
+              ...o,
+              itens: (typeof o.itens_json === 'string' ? JSON.parse(o.itens_json) : o.itens_json) || o.itens || []
+            })),
             medicoes: medicoes.map(m => ({
               ...m,
               data: cleanDate(m.data),
-              valor_medido: cleanNum(m.valor_medido)
+              valor_medido: cleanNum(m.valor_medido),
+              itens: (typeof m.itens_json === 'string' ? JSON.parse(m.itens_json) : m.itens_json) || m.itens || []
             })),
             documentos: documentos,
             contas: contas || []
@@ -258,12 +262,26 @@ export default async function handler(req, res) {
 
       if (table === 'orcamentos') {
         const items = await sql`SELECT * FROM orcamentos WHERE tenant_id = ${tenantId} ORDER BY created_at DESC;`;
-        return res.status(200).json({ success: true, data: items });
+        return res.status(200).json({
+          success: true,
+          data: items.map(o => ({
+            ...o,
+            itens: (typeof o.itens_json === 'string' ? JSON.parse(o.itens_json) : o.itens_json) || o.itens || []
+          }))
+        });
       }
 
       if (table === 'medicoes') {
         const items = await sql`SELECT * FROM medicoes WHERE tenant_id = ${tenantId} ORDER BY data DESC;`;
-        return res.status(200).json({ success: true, data: items.map(m => ({ ...m, data: cleanDate(m.data), valor_medido: cleanNum(m.valor_medido) })) });
+        return res.status(200).json({
+          success: true,
+          data: items.map(m => ({
+            ...m,
+            data: cleanDate(m.data),
+            valor_medido: cleanNum(m.valor_medido),
+            itens: (typeof m.itens_json === 'string' ? JSON.parse(m.itens_json) : m.itens_json) || m.itens || []
+          }))
+        });
       }
 
       return res.status(200).json({ success: true, data: [], message: `Tabela '${table}' consultada.` });
@@ -289,12 +307,12 @@ export default async function handler(req, res) {
                 ${cleanDate(o.data_inicio)}, ${cleanDate(o.data_previsao)}
               )
               ON CONFLICT (id) DO UPDATE SET
-                tenant_id = EXCLUDED.tenant_id,
                 nome = EXCLUDED.nome,
                 cliente = EXCLUDED.cliente,
                 endereco = EXCLUDED.endereco,
                 orcamento_total = EXCLUDED.orcamento_total,
-                status = EXCLUDED.status;
+                status = EXCLUDED.status
+              WHERE obras.tenant_id = ${tenantId};
             `;
             totalCount++;
           }
@@ -314,11 +332,11 @@ export default async function handler(req, res) {
                 ${f.telefone || ''}, ${f.email || ''}, ${f.categoria || 'outros'}, ${f.chave_pix || ''}, ${f.banco_info || ''}
               )
               ON CONFLICT (id) DO UPDATE SET
-                tenant_id = EXCLUDED.tenant_id,
                 nome = EXCLUDED.nome,
                 razao_social = EXCLUDED.razao_social,
                 cnpj_cpf = EXCLUDED.cnpj_cpf,
-                telefone = EXCLUDED.telefone;
+                telefone = EXCLUDED.telefone
+              WHERE fornecedores.tenant_id = ${tenantId};
             `;
             totalCount++;
           }
@@ -346,7 +364,6 @@ export default async function handler(req, res) {
                 ${itensJson}
               )
               ON CONFLICT (id) DO UPDATE SET
-                tenant_id = EXCLUDED.tenant_id,
                 data = EXCLUDED.data,
                 data_vencimento = EXCLUDED.data_vencimento,
                 data_pagamento = EXCLUDED.data_pagamento,
@@ -355,7 +372,8 @@ export default async function handler(req, res) {
                 status = EXCLUDED.status,
                 codigo_barras = EXCLUDED.codigo_barras,
                 conciliado = EXCLUDED.conciliado,
-                itens = EXCLUDED.itens;
+                itens = EXCLUDED.itens
+              WHERE lancamentos.tenant_id = ${tenantId};
             `;
             totalCount++;
           }
@@ -387,7 +405,6 @@ export default async function handler(req, res) {
                 ${itensNotaJson}
               )
               ON CONFLICT (id) DO UPDATE SET
-                tenant_id = EXCLUDED.tenant_id,
                 numero_nf = EXCLUDED.numero_nf,
                 serie = EXCLUDED.serie,
                 chave_acesso = EXCLUDED.chave_acesso,
@@ -408,7 +425,8 @@ export default async function handler(req, res) {
                 lancamento_id = EXCLUDED.lancamento_id,
                 observacoes = EXCLUDED.observacoes,
                 obra_id = EXCLUDED.obra_id,
-                itens = EXCLUDED.itens;
+                itens = EXCLUDED.itens
+              WHERE notas_fiscais.tenant_id = ${tenantId};
             `;
             totalCount++;
           }
@@ -426,7 +444,6 @@ export default async function handler(req, res) {
                 ${c.apelido || ''}, ${c.obra_id || null}, ${c.obs || ''}
               )
               ON CONFLICT (id) DO UPDATE SET
-                tenant_id = EXCLUDED.tenant_id,
                 banco_codigo = EXCLUDED.banco_codigo,
                 banco_nome = EXCLUDED.banco_nome,
                 agencia = EXCLUDED.agencia,
@@ -436,7 +453,8 @@ export default async function handler(req, res) {
                 apelido = EXCLUDED.apelido,
                 obra_id = EXCLUDED.obra_id,
                 obs = EXCLUDED.obs,
-                updated_at = NOW();
+                updated_at = NOW()
+              WHERE contas_bancarias.tenant_id = ${tenantId};
             `;
             totalCount++;
           }
@@ -465,7 +483,6 @@ export default async function handler(req, res) {
               ${l.obra_id || null}, ${l.nota_fiscal_id || null}, ${l.codigo_barras || null}, ${l.chave_nfe || null}, ${l.observacoes || ''}, ${!!l.conciliado}
             )
             ON CONFLICT (id) DO UPDATE SET
-              tenant_id = EXCLUDED.tenant_id,
               data = EXCLUDED.data,
               data_vencimento = EXCLUDED.data_vencimento,
               data_pagamento = EXCLUDED.data_pagamento,
@@ -481,7 +498,8 @@ export default async function handler(req, res) {
               codigo_barras = EXCLUDED.codigo_barras,
               chave_nfe = EXCLUDED.chave_nfe,
               observacoes = EXCLUDED.observacoes,
-              conciliado = EXCLUDED.conciliado;
+              conciliado = EXCLUDED.conciliado
+            WHERE lancamentos.tenant_id = ${tenantId};
           `;
           return res.status(200).json({ success: true, id: l.id });
         }
@@ -508,7 +526,6 @@ export default async function handler(req, res) {
               ${n.lancamento_id || null}, ${n.observacoes || ''}, ${n.obra_id || null}
             )
             ON CONFLICT (id) DO UPDATE SET
-              tenant_id = EXCLUDED.tenant_id,
               numero_nf = EXCLUDED.numero_nf,
               serie = EXCLUDED.serie,
               chave_acesso = EXCLUDED.chave_acesso,
@@ -528,7 +545,8 @@ export default async function handler(req, res) {
               status = EXCLUDED.status,
               lancamento_id = EXCLUDED.lancamento_id,
               observacoes = EXCLUDED.observacoes,
-              obra_id = EXCLUDED.obra_id;
+              obra_id = EXCLUDED.obra_id
+            WHERE notas_fiscais.tenant_id = ${tenantId};
           `;
           return res.status(200).json({ success: true, id: n.id });
         }
@@ -543,12 +561,12 @@ export default async function handler(req, res) {
               ${cleanDate(o.data_inicio)}, ${cleanDate(o.data_previsao)}
             )
             ON CONFLICT (id) DO UPDATE SET
-              tenant_id = EXCLUDED.tenant_id,
               nome = EXCLUDED.nome,
               cliente = EXCLUDED.cliente,
               endereco = EXCLUDED.endereco,
               orcamento_total = EXCLUDED.orcamento_total,
-              status = EXCLUDED.status;
+              status = EXCLUDED.status
+            WHERE obras.tenant_id = ${tenantId};
           `;
           return res.status(200).json({ success: true, id: o.id });
         }
@@ -566,7 +584,6 @@ export default async function handler(req, res) {
               ${f.telefone || ''}, ${f.email || ''}, ${f.categoria || 'outros'}, ${f.chave_pix || ''}, ${f.banco_info || ''}
             )
             ON CONFLICT (id) DO UPDATE SET
-              tenant_id = EXCLUDED.tenant_id,
               nome = EXCLUDED.nome,
               razao_social = EXCLUDED.razao_social,
               cnpj_cpf = EXCLUDED.cnpj_cpf,
@@ -574,7 +591,8 @@ export default async function handler(req, res) {
               email = EXCLUDED.email,
               categoria = EXCLUDED.categoria,
               chave_pix = EXCLUDED.chave_pix,
-              banco_info = EXCLUDED.banco_info;
+              banco_info = EXCLUDED.banco_info
+            WHERE fornecedores.tenant_id = ${tenantId};
           `;
           return res.status(200).json({ success: true, id: f.id });
         }
@@ -593,12 +611,12 @@ export default async function handler(req, res) {
               ${doc.url || null}, ${doc.data_base64 || doc.base64_data || null}, ${doc.criado_em || new Date().toISOString()}
             )
             ON CONFLICT (id) DO UPDATE SET
-              tenant_id = EXCLUDED.tenant_id,
               titulo = EXCLUDED.titulo,
               categoria = EXCLUDED.categoria,
               nome_arquivo = EXCLUDED.nome_arquivo,
               url = COALESCE(EXCLUDED.url, documentos.url),
-              base64_data = COALESCE(EXCLUDED.base64_data, documentos.base64_data);
+              base64_data = COALESCE(EXCLUDED.base64_data, documentos.base64_data)
+            WHERE documentos.tenant_id = ${tenantId};
           `;
           return res.status(200).json({ success: true, id: doc.id });
         }
@@ -612,14 +630,14 @@ export default async function handler(req, res) {
               ${p.codigo || null}, ${cleanNum(p.valor_medio)}, ${p.observacoes || ''}
             )
             ON CONFLICT (id) DO UPDATE SET
-              tenant_id = EXCLUDED.tenant_id,
               nome = EXCLUDED.nome,
               unidade = EXCLUDED.unidade,
               categoria = EXCLUDED.categoria,
               codigo = EXCLUDED.codigo,
               valor_medio = EXCLUDED.valor_medio,
               observacoes = EXCLUDED.observacoes,
-              updated_at = NOW();
+              updated_at = NOW()
+            WHERE produtos.tenant_id = ${tenantId};
           `;
           return res.status(200).json({ success: true, id: p.id });
         }
@@ -635,7 +653,6 @@ export default async function handler(req, res) {
               ${h.data_vencimento || null}, ${cleanNum(h.confianca)}, ${dadosJson}
             )
             ON CONFLICT (id) DO UPDATE SET
-              tenant_id = EXCLUDED.tenant_id,
               data_hora = EXCLUDED.data_hora,
               nome_arquivo = EXCLUDED.nome_arquivo,
               tipo_documento = EXCLUDED.tipo_documento,
@@ -643,7 +660,8 @@ export default async function handler(req, res) {
               valor = EXCLUDED.valor,
               data_vencimento = EXCLUDED.data_vencimento,
               confianca = EXCLUDED.confianca,
-              dados = EXCLUDED.dados;
+              dados = EXCLUDED.dados
+            WHERE ocr_historico.tenant_id = ${tenantId};
           `;
           return res.status(200).json({ success: true, id: h.id });
         }
@@ -658,7 +676,6 @@ export default async function handler(req, res) {
               ${c.apelido || ''}, ${c.obra_id || null}, ${c.obs || ''}
             )
             ON CONFLICT (id) DO UPDATE SET
-              tenant_id = EXCLUDED.tenant_id,
               banco_codigo = EXCLUDED.banco_codigo,
               banco_nome = EXCLUDED.banco_nome,
               agencia = EXCLUDED.agencia,
@@ -668,26 +685,27 @@ export default async function handler(req, res) {
               apelido = EXCLUDED.apelido,
               obra_id = EXCLUDED.obra_id,
               obs = EXCLUDED.obs,
-              updated_at = NOW();
+              updated_at = NOW()
+            WHERE contas_bancarias.tenant_id = ${tenantId};
           `;
           return res.status(200).json({ success: true, id: c.id });
         }
 
         if (table === 'orcamentos') {
           const o = data;
-          const itensJson = JSON.stringify(Array.isArray(o.itens) ? o.itens : []);
+          const itensJson = JSON.stringify(Array.isArray(o.itens) ? o.itens : (Array.isArray(o.itens_json) ? o.itens_json : []));
           await sql`
-            INSERT INTO orcamentos (id, tenant_id, obra_id, titulo, valor_total, itens)
+            INSERT INTO orcamentos (id, tenant_id, obra_id, titulo, valor_total, itens_json)
             VALUES (
               ${o.id}, ${tenantId}, ${o.obra_id || null}, ${o.titulo || ''},
               ${cleanNum(o.valor_total)}, ${itensJson}
             )
             ON CONFLICT (id) DO UPDATE SET
-              tenant_id = EXCLUDED.tenant_id,
               obra_id = EXCLUDED.obra_id,
               titulo = EXCLUDED.titulo,
               valor_total = EXCLUDED.valor_total,
-              itens = EXCLUDED.itens;
+              itens_json = EXCLUDED.itens_json
+            WHERE orcamentos.tenant_id = ${tenantId};
           `;
           return res.status(200).json({ success: true, id: o.id });
         }
@@ -702,13 +720,13 @@ export default async function handler(req, res) {
               ${cleanNum(m.valor_medido)}, ${m.status || 'aprovada'}, ${m.observacoes || ''}
             )
             ON CONFLICT (id) DO UPDATE SET
-              tenant_id = EXCLUDED.tenant_id,
               obra_id = EXCLUDED.obra_id,
               numero = EXCLUDED.numero,
               data = EXCLUDED.data,
               valor_medido = EXCLUDED.valor_medido,
               status = EXCLUDED.status,
-              observacoes = EXCLUDED.observacoes;
+              observacoes = EXCLUDED.observacoes
+            WHERE medicoes.tenant_id = ${tenantId};
           `;
           return res.status(200).json({ success: true, id: m.id });
         }

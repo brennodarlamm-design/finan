@@ -914,19 +914,30 @@ const Lancamentos = {
     if (!document.getElementById(prodsDatalistId)) {
       const dl = document.createElement('datalist');
       dl.id = prodsDatalistId;
-      dl.innerHTML = prods.map(p => `<option value="${p.nome}" data-unidade="${p.unidade||'un'}" data-valor="${p.valor_medio||0}" data-id="${p.id}">${p.nome} (${p.unidade||'un'})</option>`).join('');
+      dl.innerHTML = prods.map(p => {
+        const nEsc = Utils.escapeHtml(p.nome);
+        const uEsc = Utils.escapeHtml(p.unidade || 'un');
+        const vEsc = Utils.escapeHtml(p.valor_medio || 0);
+        const idEsc = Utils.escapeHtml(p.id || '');
+        return `<option value="${nEsc}" data-unidade="${uEsc}" data-valor="${vEsc}" data-id="${idEsc}">${nEsc} (${uEsc})</option>`;
+      }).join('');
       document.body.appendChild(dl);
     }
 
     const row = document.createElement('div');
     row.className = 'item-row';
     row.style.cssText = 'display:grid;grid-template-columns:2fr .7fr .8fr 1fr auto;gap:6px;margin-bottom:8px;align-items:center;';
+    const prodIdEsc = Utils.escapeHtml(item?.produto_id || '');
+    const prodEsc = Utils.escapeHtml(item?.produto || '');
+    const qtdEsc = Utils.escapeHtml(item?.qtd ?? '');
+    const unEsc = Utils.escapeHtml(item?.unidade || 'un');
+    const vunitEsc = Utils.escapeHtml(item?.valor_unit ?? '');
     row.innerHTML = `
-      <input type="hidden" class="item-produto-id" value="${item?.produto_id || ''}">
-      <input class="form-control item-produto" list="${prodsDatalistId}" placeholder="Produto (ex: Cimento CP-II)" value="${item?.produto||''}" oninput="Lancamentos._onProdutoInput(this)" style="font-size:.82rem;">
-      <input class="form-control item-qtd" type="number" placeholder="Qtd" step="0.01" min="0" value="${item?.qtd||''}" oninput="Lancamentos._recalcItem(this)" style="font-size:.82rem;text-align:right;">
-      <input class="form-control item-unidade" placeholder="Un (sc, m², kg)" value="${item?.unidade||'un'}" style="font-size:.82rem;">
-      <input class="form-control item-vunit" type="number" placeholder="Valor unit. R$" step="0.01" min="0" value="${item?.valor_unit||''}" oninput="Lancamentos._recalcItem(this)" style="font-size:.82rem;text-align:right;">
+      <input type="hidden" class="item-produto-id" value="${prodIdEsc}">
+      <input class="form-control item-produto" list="${prodsDatalistId}" placeholder="Produto (ex: Cimento CP-II)" value="${prodEsc}" oninput="Lancamentos._onProdutoInput(this)" style="font-size:.82rem;">
+      <input class="form-control item-qtd" type="number" placeholder="Qtd" step="0.01" min="0" value="${qtdEsc}" oninput="Lancamentos._recalcItem(this)" style="font-size:.82rem;text-align:right;">
+      <input class="form-control item-unidade" placeholder="Un (sc, m², kg)" value="${unEsc}" style="font-size:.82rem;">
+      <input class="form-control item-vunit" type="number" placeholder="Valor unit. R$" step="0.01" min="0" value="${vunitEsc}" oninput="Lancamentos._recalcItem(this)" style="font-size:.82rem;text-align:right;">
       <button type="button" class="icon-btn" onclick="this.closest('.item-row').remove();Lancamentos._atualizarTotalItens()" title="Remover" style="color:var(--danger);font-size:15px;">🗑️</button>
     `;
     lista.appendChild(row);
@@ -1074,14 +1085,20 @@ const Lancamentos = {
 
         const itensLista = document.getElementById('itens-lista');
         if (itensLista) {
-          itensLista.innerHTML = dadosOCR.itens.map(it => `
+          itensLista.innerHTML = dadosOCR.itens.map(it => {
+            const pEsc = Utils.escapeHtml(it.produto || '');
+            const qEsc = Utils.escapeHtml(it.qtd ?? '');
+            const uEsc = Utils.escapeHtml(it.unidade || 'un');
+            const vEsc = Utils.escapeHtml(it.valor_unit ?? '');
+            return `
             <div class="item-row" style="display:grid;grid-template-columns:2fr .7fr .8fr 1fr auto;gap:6px;margin-bottom:8px;align-items:center;">
-              <input class="form-control item-produto" placeholder="Produto" value="${(it.produto||'').replace(/"/g,'&quot;')}" oninput="Lancamentos._recalcItem(this)" style="font-size:.82rem;">
-              <input class="form-control item-qtd" type="number" placeholder="Qtd" step="0.01" min="0" value="${it.qtd||''}" oninput="Lancamentos._recalcItem(this)" style="font-size:.82rem;text-align:right;">
-              <input class="form-control item-unidade" placeholder="Un" value="${it.unidade||'un'}" style="font-size:.82rem;">
-              <input class="form-control item-vunit" type="number" placeholder="V. unit." step="0.01" min="0" value="${it.valor_unit||''}" oninput="Lancamentos._recalcItem(this)" style="font-size:.82rem;text-align:right;">
+              <input class="form-control item-produto" placeholder="Produto" value="${pEsc}" oninput="Lancamentos._recalcItem(this)" style="font-size:.82rem;">
+              <input class="form-control item-qtd" type="number" placeholder="Qtd" step="0.01" min="0" value="${qEsc}" oninput="Lancamentos._recalcItem(this)" style="font-size:.82rem;text-align:right;">
+              <input class="form-control item-unidade" placeholder="Un" value="${uEsc}" style="font-size:.82rem;">
+              <input class="form-control item-vunit" type="number" placeholder="V. unit." step="0.01" min="0" value="${vEsc}" oninput="Lancamentos._recalcItem(this)" style="font-size:.82rem;text-align:right;">
               <button type="button" class="icon-btn" onclick="this.closest('.item-row').remove();Lancamentos._atualizarTotalItens()" title="Remover" style="color:var(--danger);font-size:15px;">🗑️</button>
-            </div>`).join('');
+            </div>`;
+          }).join('');
           this._atualizarTotalItens();
         }
       }

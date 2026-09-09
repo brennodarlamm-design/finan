@@ -559,7 +559,7 @@
     const senha = document.getElementById('reg-senha').value;
     const email = document.getElementById('reg-email').value.trim();
 
-    const regResult = Auth.register({ nome, username, email, senha, empresaNome: empNome, cnpj });
+    const regResult = await Auth.register({ nome, username, email, senha, empresaNome: empNome, cnpj });
     if (!regResult.success) {
       const eBox = document.getElementById('reg-err-box');
       eBox.textContent = regResult.message;
@@ -569,12 +569,8 @@
       return;
     }
 
-    // Auto login
-    const loginResult = await Auth.login(username, senha, true);
-    if (loginResult.success) {
-      btn.textContent = '✓ Conta criada com sucesso! Entrando...';
-      setTimeout(() => window.location.replace('/app'), 500);
-    }
+    btn.textContent = '✓ Conta criada com sucesso! Entrando...';
+    setTimeout(() => window.location.replace('/app'), 500);
   });
 
   document.getElementById('login-form').addEventListener('submit', async function(e) {
