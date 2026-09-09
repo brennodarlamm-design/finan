@@ -533,7 +533,18 @@
   if (window.location.hash.startsWith('#validar') || window.location.search.includes('val=')) {
     window.location.href = '/validar' + window.location.search;
   }
-  if (Auth.isLoggedIn()) { window.location.replace('/app'); }
+  if (window.location.search.includes('expired=1')) {
+    Auth.logoutSilently();
+    window.addEventListener('DOMContentLoaded', () => {
+      const eBox = document.getElementById('err-box');
+      if (eBox) {
+        eBox.textContent = 'Sua sessão foi redefinida por segurança após atualização do servidor. Por favor, faça login novamente.';
+        eBox.style.display = 'block';
+      }
+    });
+  } else if (Auth.isLoggedIn()) {
+    window.location.replace('/app');
+  }
 
 
 

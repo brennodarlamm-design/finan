@@ -90,6 +90,12 @@ const Documentos = {
     try {
       const headers = (typeof DB !== 'undefined' && DB._apiHeaders) ? DB._apiHeaders() : {};
       const res = await fetch(`/api/db?table=documento_conteudo&id=${encodeURIComponent(id)}`, { headers });
+      if (res.status === 401) {
+        if (typeof Auth !== 'undefined' && Auth.handleSessionExpired) {
+          Auth.handleSessionExpired();
+        }
+        return null;
+      }
       if (res.ok) {
         const json = await res.json();
         if (json.url) {

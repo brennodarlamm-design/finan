@@ -394,11 +394,26 @@ const Auth = {
   },
 
   logout() {
+    this.logoutSilently();
+    window.location.replace('/login');
+  },
+
+  logoutSilently() {
     localStorage.removeItem(this.SESSION_KEY);
     sessionStorage.removeItem(this.SESSION_KEY);
     localStorage.removeItem(this.TOKEN_KEY);
     sessionStorage.removeItem(this.TOKEN_KEY);
-    window.location.replace('/login');
+  },
+
+  handleSessionExpired() {
+    this.logoutSilently();
+    if (typeof window !== 'undefined') {
+      const p = window.location.pathname;
+      const isLogin = p === '/' || p === '/login' || p.endsWith('index.html');
+      if (!isLogin) {
+        window.location.replace('/login?expired=1');
+      }
+    }
   },
 
   getSession() {
@@ -409,10 +424,34 @@ const Auth = {
     return null;
   },
 
-  isLoggedIn() { return !!this.getSession(); },
+  isLoggedIn() {
+    const session = this.getSession();
+    const token = this.getToken();
+    if (!session || !token) return false;
+    if (token.includes('.')) {
+      try {
+        const parts = token.split('.');
+        if (parts.length === 3) {
+          const payload = JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/')));
+          if (payload.exp && Date.now() > payload.exp) {
+            this.logoutSilently();
+            return false;
+          }
+        }
+      } catch {
+        this.logoutSilently();
+        return false;
+      }
+    }
+    return true;
+  },
+
   getUser() { return this.getSession(); },
   requireAuth() {
-    if (!this.isLoggedIn()) { window.location.replace('/login'); return false; }
+    if (!this.isLoggedIn()) {
+      this.handleSessionExpired();
+      return false;
+    }
     return true;
   }
 };

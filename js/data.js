@@ -354,6 +354,12 @@ const DB = {
   async syncFromCloud() {
     try {
       const res = await fetch('/api/db?table=all', { headers: this._apiHeaders() });
+      if (res.status === 401) {
+        if (typeof Auth !== 'undefined' && Auth.handleSessionExpired) {
+          Auth.handleSessionExpired();
+        }
+        return false;
+      }
       if (!res.ok) return false;
       const json = await res.json();
       if (!json.success || !json.data) return false;
@@ -472,6 +478,10 @@ const DB = {
         method: 'POST',
         headers: this._apiHeaders(),
         body: JSON.stringify({ action, table, data, id })
+      }).then(res => {
+        if (res.status === 401 && typeof Auth !== 'undefined' && Auth.handleSessionExpired) {
+          Auth.handleSessionExpired();
+        }
       }).catch(() => {});
     } catch {}
   },
