@@ -303,7 +303,7 @@ const WhatsApp = {
     const inputCfgTel = document.getElementById('cfg-emp-tel');
     if (inputCfgTel) inputCfgTel.value = val;
     const badgeTel = document.getElementById('cfg-wa-ativo-txt');
-    if (badgeTel) badgeTel.innerHTML = `Número ativo: <strong style="color:var(--success);">${limpo}</strong>`;
+    if (badgeTel) badgeTel.innerHTML = `Número ativo para alertas: <strong style="color:var(--success);">${this.formatarTelefone(limpo)}</strong>`;
   },
 
   testarEnvioCliente() {

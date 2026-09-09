@@ -266,20 +266,37 @@ const Configuracoes = {
               CNPJ: ${emp.cnpj || '00.000.000/0000-00'} &middot; ${emp.cidade || 'Cidade'}/${emp.uf || 'UF'}
             </div>
 
-            <!-- CARD TELEFONE WHATSAPP CLIENTE -->
-            <div class="card" style="margin-top:16px;background:rgba(255,255,255,.02);border:1px solid var(--border);">
-              <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
+            <!-- CARD INTEGRAÇÃO WHATSAPP & ALERTAS -->
+            <div class="card" style="margin-top:16px;background:rgba(255,255,255,.02);border:1px solid var(--border);border-radius:12px;padding:16px;">
+              <div class="card-header" style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:12px;padding:0 0 12px;border-bottom:1px solid rgba(255,255,255,0.06);">
                 <div>
-                  <div class="card-title" style="font-size:.92rem;">📲 WhatsApp para Envio de Boletos &amp; Alertas</div>
-                  <div style="font-size:.76rem;color:var(--text3);margin-top:2px;">Número que recebe os resumos matinais e alertas de contas a pagar</div>
+                  <div class="card-title" style="font-size:.95rem;display:flex;align-items:center;gap:6px;font-weight:700;">
+                    <span>📲</span> WhatsApp para Envio de Boletos &amp; Alertas
+                  </div>
+                  <div style="font-size:.76rem;color:var(--text3);margin-top:3px;line-height:1.4;">
+                    Conecte o WhatsApp da sua construtora para envio de relatórios diários e alertas automáticos de contas a pagar.
+                  </div>
                 </div>
-                <button type="button" class="btn btn-sm btn-secondary" onclick="WhatsApp.abrirModalTelefone()" style="font-size:.76rem;display:flex;align-items:center;gap:5px;">
-                  ✏️ Alterar Telefone
-                </button>
+                <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+                  <button type="button" class="btn btn-sm" onclick="WhatsApp.abrirModalConexao()" style="background:#25D366;color:#fff;font-weight:700;font-size:.78rem;display:flex;align-items:center;gap:6px;border:none;padding:7px 14px;border-radius:6px;cursor:pointer;box-shadow:0 2px 6px rgba(37,211,102,0.25);">
+                    📲 Conectar Aparelho (QR Code)
+                  </button>
+                  <button type="button" class="btn btn-sm btn-secondary" onclick="WhatsApp.abrirModalTelefone()" style="font-size:.76rem;display:flex;align-items:center;gap:5px;border-radius:6px;">
+                    ✏️ Alterar Telefone
+                  </button>
+                </div>
               </div>
-              <div style="font-size:.84rem;color:var(--text);display:flex;align-items:center;gap:8px;padding-top:4px;">
-                <span style="font-size:1.1rem;">📱</span>
-                <span id="cfg-wa-ativo-txt">Número ativo: <strong style="color:var(--success);">${(typeof WhatsApp !== 'undefined' && WhatsApp.getTelefonePadrao()) ? WhatsApp.getTelefonePadrao() : 'Nenhum número cadastrado'}</strong></span>
+              
+              <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;padding-top:10px;font-size:.84rem;">
+                <div style="display:flex;align-items:center;gap:8px;">
+                  <span style="font-size:1.1rem;">📱</span>
+                  <span id="cfg-wa-ativo-txt">
+                    Número ativo para alertas: <strong style="color:var(--success);">${(typeof WhatsApp !== 'undefined' && WhatsApp.getTelefonePadrao()) ? WhatsApp.formatarTelefone(WhatsApp.getTelefonePadrao()) : 'Nenhum número cadastrado'}</strong>
+                  </span>
+                </div>
+                <button type="button" class="btn btn-secondary btn-sm" onclick="WhatsApp.testarEnvioCliente()" style="font-size:.74rem;display:flex;align-items:center;gap:5px;border-radius:6px;">
+                  🚀 Testar Envio
+                </button>
               </div>
             </div>
           </div>
