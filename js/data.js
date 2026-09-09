@@ -432,6 +432,7 @@ const DB = {
             tipo_mime: cloudDoc.tipo_arquivo,
             tamanho: cloudDoc.tamanho_bytes,
             criado_em: cloudDoc.created_at,
+            url: cloudDoc.url || loc?.url || null,
             data_base64: loc?.data_base64 || loc?.base64_data || cloudDoc.base64_data || null
           };
         });

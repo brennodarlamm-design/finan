@@ -69,10 +69,13 @@ const Documentos = {
   },
 
   async obterConteudo(id) {
+    const doc = this.getById(id);
+    if (doc && doc.url) {
+      return doc.url;
+    }
     if (this._memoryBlobs.has(id)) {
       return this._memoryBlobs.get(id);
     }
-    const doc = this.getById(id);
     if (doc && (doc.data_base64 || doc.base64_data)) {
       const b = doc.data_base64 || doc.base64_data;
       this._memoryBlobs.set(id, b);
@@ -89,6 +92,13 @@ const Documentos = {
       const res = await fetch(`/api/db?table=documento_conteudo&id=${encodeURIComponent(id)}`, { headers });
       if (res.ok) {
         const json = await res.json();
+        if (json.url) {
+          if (doc) {
+            doc.url = json.url;
+            this.salvarLista(this.getAll().map(d => d.id === id ? { ...d, url: json.url } : d));
+          }
+          return json.url;
+        }
         if (json.base64) {
           this._memoryBlobs.set(id, json.base64);
           this._idbSet(id, json.base64);
@@ -174,20 +184,63 @@ const Documentos = {
     const item = {
       id,
       criado_em: doc.criado_em || new Date().toISOString(),
+      url: doc.url || null,
       ...lightDoc
     };
 
     docs.push(item);
     this.salvarLista(docs);
 
-    // Sincronizar com banco de dados Neon (incluindo base64 para que outros dispositivos tenham acesso ao arquivo)
+    // Sincronizar com banco de dados Neon
     if (typeof DB !== 'undefined' && DB.syncToCloud) {
       DB.syncToCloud('save', 'documentos', {
         ...item,
-        base64_data: base64
+        url: doc.url || null,
+        base64_data: base64 || null
       });
     }
+
+    // Se o documento ainda não tiver URL no Vercel Blob e houver base64, faz upload em segundo plano
+    if (!item.url && base64 && typeof fetch !== 'undefined') {
+      this._uploadBlobBackground(id, item.nome_arquivo || item.titulo || 'documento', base64, item.tipo_mime);
+    }
+
     return item;
+  },
+
+  async _uploadBlobBackground(id, filename, base64, contentType) {
+    try {
+      const headers = (typeof DB !== 'undefined' && DB._apiHeaders) ? DB._apiHeaders() : { 'Content-Type': 'application/json' };
+      const res = await fetch('/api/upload', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          filename: filename || 'documento',
+          contentType: contentType || 'application/octet-stream',
+          base64
+        })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success && data.url) {
+          const all = this.getAll();
+          const target = all.find(d => d.id === id);
+          if (target) {
+            target.url = data.url;
+            this.salvarLista(all);
+            if (typeof DB !== 'undefined' && DB.syncToCloud) {
+              DB.syncToCloud('save', 'documentos', {
+                ...target,
+                url: data.url,
+                base64_data: null
+              });
+            }
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('[Blob] Upload em background falhou:', e.message);
+    }
   },
 
   adicionarLink({ entidade_tipo, entidade_id, titulo, url }) {
@@ -213,10 +266,19 @@ const Documentos = {
   },
 
   remover(id) {
+    const doc = this.getById(id);
     this._memoryBlobs.delete(id);
     this._idbDelete(id);
     const docs = this.getAll().filter(d => d.id !== id);
     this.salvarLista(docs);
+
+    // Se o documento estiver no Vercel Blob, chamar endpoint para exclusão
+    if (doc && doc.url && doc.url.includes('blob.vercel-storage.com')) {
+      try {
+        const headers = (typeof DB !== 'undefined' && DB._apiHeaders) ? DB._apiHeaders() : {};
+        fetch(`/api/upload?url=${encodeURIComponent(doc.url)}`, { method: 'DELETE', headers }).catch(() => {});
+      } catch (e) {}
+    }
 
     // Remover do banco de dados Neon
     if (typeof DB !== 'undefined' && DB.syncToCloud) {
@@ -458,14 +520,18 @@ const Documentos = {
     const isImg = (d.tipo_mime && d.tipo_mime.startsWith('image/')) || nome.match(/\.(png|jpg|jpeg|webp|svg)$/i);
     const icon = isPDF ? '📕' : isZip ? '📦' : isCAD ? '📐' : isImg ? '🖼️' : '📎';
     const tamKB = d.tamanho ? `${(d.tamanho / (1024 * (d.tamanho > 1024 * 1024 ? 1024 : 1))).toFixed(1)} ${d.tamanho > 1024 * 1024 ? 'MB' : 'KB'}` : '';
+    const isBlob = !!(d.url && d.url.includes('blob.vercel-storage.com'));
 
     return `
     <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--r-md);gap:12px;">
       <div style="display:flex;align-items:center;gap:10px;flex:1;min-width:0;">
         <span style="font-size:1.4rem;">${icon}</span>
         <div style="flex:1;min-width:0;">
-          <div style="font-weight:700;font-size:.84rem;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
-            ${d.titulo || d.nome_arquivo}
+          <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+            <span style="font-weight:700;font-size:.84rem;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
+              ${d.titulo || d.nome_arquivo}
+            </span>
+            ${isBlob ? `<span style="font-size:.62rem;font-weight:700;color:#38bdf8;background:rgba(56,189,248,0.12);padding:1px 6px;border-radius:4px;border:1px solid rgba(56,189,248,0.25);white-space:nowrap;">☁️ Vercel Blob</span>` : ''}
           </div>
           <div style="font-size:.72rem;color:var(--text3);">
             ${d.nome_arquivo} ${tamKB ? `&middot; ${tamKB}` : ''} &middot; Anexado em ${Utils.fmt.datetime(d.criado_em)}
@@ -490,8 +556,8 @@ const Documentos = {
     const file = input.files?.[0];
     if (!file) return;
 
-    if (file.size > 20 * 1024 * 1024) {
-      Utils.toast('Arquivo muito grande! O limite máximo é de 20MB.', 'error');
+    if (file.size > 30 * 1024 * 1024) {
+      Utils.toast('Arquivo muito grande! O limite máximo é de 30MB.', 'error');
       input.value = '';
       return;
     }
@@ -500,9 +566,33 @@ const Documentos = {
     const titulo = tituloInput?.value.trim() || file.name;
 
     try {
-      Utils.toast('Processando arquivo...', 'info');
+      Utils.toast('Enviando para nuvem (Vercel Blob)...', 'info');
       const base64 = await this.lerArquivoBase64(file);
       
+      let blobUrl = null;
+      try {
+        const headers = (typeof DB !== 'undefined' && DB._apiHeaders) ? DB._apiHeaders() : { 'Content-Type': 'application/json' };
+        const res = await fetch('/api/upload', {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({
+            filename: file.name,
+            contentType: file.type || 'application/octet-stream',
+            base64
+          })
+        });
+        if (res.ok) {
+          const resData = await res.json();
+          if (resData.success && resData.url) {
+            blobUrl = resData.url;
+          }
+        } else {
+          console.warn('[Blob] Upload na API falhou com status', res.status);
+        }
+      } catch (errUpload) {
+        console.warn('[Blob] Falha de conexão ao enviar para Vercel Blob:', errUpload);
+      }
+
       this.adicionar({
         entidade_tipo: entidadeTipo,
         entidade_id: entidadeId,
@@ -510,10 +600,11 @@ const Documentos = {
         nome_arquivo: file.name,
         tipo_mime: file.type || 'application/octet-stream',
         tamanho: file.size,
-        data_base64: base64
+        url: blobUrl,
+        data_base64: blobUrl ? null : base64
       });
 
-      Utils.toast('Documento anexado com sucesso!', 'success');
+      Utils.toast(blobUrl ? 'Documento salvo no Vercel Blob!' : 'Documento salvo localmente!', 'success');
       this.abrirModal(entidadeTipo, entidadeId);
       
       // Atualizar a visualização na tabela se aplicável
@@ -612,6 +703,18 @@ const Documentos = {
     const conteudo = await this.obterConteudo(id);
     if (!conteudo) {
       Utils.toast('Arquivo pendente no celular. Abra o app no celular para sincronizar.', 'warning');
+      return;
+    }
+
+    if (typeof conteudo === 'string' && (conteudo.startsWith('http://') || conteudo.startsWith('https://'))) {
+      const link = document.createElement('a');
+      link.href = conteudo;
+      link.download = doc.nome_arquivo || 'documento';
+      link.target = '_blank';
+      link.rel = 'noopener noreferrer';
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
       return;
     }
 

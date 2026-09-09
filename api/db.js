@@ -90,7 +90,7 @@ export default async function handler(req, res) {
           sql`SELECT * FROM notas_fiscais WHERE tenant_id = ${tenantId} ORDER BY data_emissao DESC;`,
           sql`SELECT * FROM orcamentos WHERE tenant_id = ${tenantId} ORDER BY created_at DESC;`,
           sql`SELECT * FROM medicoes WHERE tenant_id = ${tenantId} ORDER BY data DESC;`,
-          sql`SELECT id, tipo, referencia_id, titulo, categoria, nome_arquivo, tipo_arquivo, tamanho_bytes, created_at FROM documentos WHERE tenant_id = ${tenantId} ORDER BY created_at DESC;`,
+          sql`SELECT id, tipo, referencia_id, titulo, categoria, nome_arquivo, tipo_arquivo, tamanho_bytes, url, created_at FROM documentos WHERE tenant_id = ${tenantId} ORDER BY created_at DESC;`,
           sql`SELECT * FROM produtos WHERE tenant_id = ${tenantId} ORDER BY nome ASC;`,
           sql`SELECT * FROM contas_bancarias WHERE tenant_id = ${tenantId} ORDER BY created_at ASC;`
         ]);
@@ -217,16 +217,22 @@ export default async function handler(req, res) {
         return res.status(200).json({ success: true, data: items.map(p => ({ ...p, valor_medio: cleanNum(p.valor_medio) })) });
       }
 
+      if (table === 'documentos') {
+        const items = await sql`SELECT id, tipo, referencia_id, titulo, categoria, nome_arquivo, tipo_arquivo, tamanho_bytes, url, created_at FROM documentos WHERE tenant_id = ${tenantId} ORDER BY created_at DESC;`;
+        return res.status(200).json({ success: true, data: items });
+      }
+
       if (table === 'documento_conteudo') {
         const docId = id || req.query.id;
         if (!docId) return res.status(400).json({ error: 'ID do documento obrigatório' });
-        const rows = await sql`SELECT base64_data, tipo_arquivo, nome_arquivo FROM documentos WHERE id = ${docId} AND tenant_id = ${tenantId} LIMIT 1;`;
-        if (!rows.length || !rows[0].base64_data) {
+        const rows = await sql`SELECT base64_data, url, tipo_arquivo, nome_arquivo FROM documentos WHERE id = ${docId} AND tenant_id = ${tenantId} LIMIT 1;`;
+        if (!rows.length || (!rows[0].base64_data && !rows[0].url)) {
           return res.status(404).json({ success: false, error: 'Conteúdo do arquivo não encontrado na nuvem' });
         }
         return res.status(200).json({
           success: true,
-          base64: rows[0].base64_data,
+          url: rows[0].url || null,
+          base64: rows[0].base64_data || null,
           tipo: rows[0].tipo_arquivo,
           nome: rows[0].nome_arquivo
         });
@@ -578,19 +584,20 @@ export default async function handler(req, res) {
           await sql`
             INSERT INTO documentos (
               id, tenant_id, tipo, referencia_id, titulo, categoria, nome_arquivo,
-              tipo_arquivo, tamanho_bytes, base64_data, created_at
+              tipo_arquivo, tamanho_bytes, url, base64_data, created_at
             )
             VALUES (
               ${doc.id}, ${tenantId}, ${doc.entidade_tipo || doc.tipo || 'geral'}, ${doc.entidade_id || doc.referencia_id || ''},
               ${doc.titulo || doc.nome_arquivo || 'Documento'}, ${doc.categoria || ''}, ${doc.nome_arquivo || ''},
               ${doc.tipo_mime || doc.tipo_arquivo || 'application/octet-stream'}, ${cleanNum(doc.tamanho || doc.tamanho_bytes)},
-              ${doc.data_base64 || doc.base64_data || null}, ${doc.criado_em || new Date().toISOString()}
+              ${doc.url || null}, ${doc.data_base64 || doc.base64_data || null}, ${doc.criado_em || new Date().toISOString()}
             )
             ON CONFLICT (id) DO UPDATE SET
               tenant_id = EXCLUDED.tenant_id,
               titulo = EXCLUDED.titulo,
               categoria = EXCLUDED.categoria,
               nome_arquivo = EXCLUDED.nome_arquivo,
+              url = COALESCE(EXCLUDED.url, documentos.url),
               base64_data = COALESCE(EXCLUDED.base64_data, documentos.base64_data);
           `;
           return res.status(200).json({ success: true, id: doc.id });
@@ -726,6 +733,12 @@ export default async function handler(req, res) {
           return res.status(200).json({ success: true, id });
         }
         if (table === 'documentos') {
+          try {
+            const rows = await sql`SELECT url FROM documentos WHERE id = ${id} AND tenant_id = ${tenantId} LIMIT 1;`;
+            if (rows.length && rows[0].url && rows[0].url.includes('blob.vercel-storage.com')) {
+              import('@vercel/blob').then(({ del }) => del(rows[0].url)).catch(() => {});
+            }
+          } catch (e) {}
           await sql`DELETE FROM documentos WHERE id = ${id} AND tenant_id = ${tenantId};`;
           return res.status(200).json({ success: true, id });
         }
