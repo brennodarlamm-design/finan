@@ -35,6 +35,29 @@ function cleanNum(n) {
   return isNaN(val) ? 0 : val;
 }
 
+// ── VALIDAÇÃO DE INTEGRIDADE REFERENCIAL MULTI-TENANT ────────────────────────
+async function validateObraTenant(sql, obraId, tenantId) {
+  if (!obraId) return null;
+  const clean = obraId.toString().trim();
+  if (clean === 'escritorio' || clean === 'geral') return clean;
+  const rows = await sql`SELECT id FROM obras WHERE id = ${clean} AND tenant_id = ${tenantId} LIMIT 1;`;
+  return rows.length > 0 ? clean : null;
+}
+
+async function validateFornecedorTenant(sql, fornecedorId, tenantId) {
+  if (!fornecedorId) return null;
+  const clean = fornecedorId.toString().trim();
+  const rows = await sql`SELECT id FROM fornecedores WHERE id = ${clean} AND tenant_id = ${tenantId} LIMIT 1;`;
+  return rows.length > 0 ? clean : null;
+}
+
+async function validateNotaFiscalTenant(sql, notaId, tenantId) {
+  if (!notaId) return null;
+  const clean = notaId.toString().trim();
+  const rows = await sql`SELECT id FROM notas_fiscais WHERE id = ${clean} AND tenant_id = ${tenantId} LIMIT 1;`;
+  return rows.length > 0 ? clean : null;
+}
+
 const ALLOWED_ORIGINS = [
   'https://finobra.app.br',
   'https://www.finobra.app.br',
@@ -342,7 +365,16 @@ export default async function handler(req, res) {
           }
         }
 
-        // Lançamentos
+        // Lançamentos (com validação estrita de tenant nos relacionamentos)
+        const [tenantObrasList, tenantFornecedoresList, tenantNotasList] = await Promise.all([
+          sql`SELECT id FROM obras WHERE tenant_id = ${tenantId};`,
+          sql`SELECT id FROM fornecedores WHERE tenant_id = ${tenantId};`,
+          sql`SELECT id FROM notas_fiscais WHERE tenant_id = ${tenantId};`
+        ]);
+        const validObrasSet = new Set(tenantObrasList.map(r => r.id));
+        const validFornecedoresSet = new Set(tenantFornecedoresList.map(r => r.id));
+        const validNotasSet = new Set(tenantNotasList.map(r => r.id));
+
         if (Array.isArray(payload.lancamentos)) {
           for (const l of payload.lancamentos) {
             if (!l.id || !l.descricao) continue;
@@ -350,6 +382,9 @@ export default async function handler(req, res) {
             const dataVenc = cleanDate(l.data_vencimento) || dataLanc;
             const dataPag = cleanDate(l.data_pagamento);
             const itensJson = JSON.stringify(Array.isArray(l.itens) ? l.itens : []);
+
+            const safeObraId = (l.obra_id && (l.obra_id === 'escritorio' || l.obra_id === 'geral' || validObrasSet.has(l.obra_id))) ? l.obra_id : null;
+            const safeNotaId = (l.nota_fiscal_id && validNotasSet.has(l.nota_fiscal_id)) ? l.nota_fiscal_id : null;
 
             await sql`
               INSERT INTO lancamentos (
@@ -360,7 +395,7 @@ export default async function handler(req, res) {
               VALUES (
                 ${l.id}, ${tenantId}, ${dataLanc}, ${dataVenc}, ${dataPag}, ${l.descricao}, ${l.categoria || 'Outros'},
                 ${l.fornecedor_beneficiario || ''}, ${l.conta_bancaria || ''}, ${l.tipo || 'despesa'}, ${cleanNum(l.valor)}, ${l.status || 'pendente'},
-                ${l.obra_id || null}, ${l.nota_fiscal_id || null}, ${l.codigo_barras || null}, ${l.chave_nfe || null}, ${l.observacoes || ''}, ${!!l.conciliado},
+                ${safeObraId}, ${safeNotaId}, ${l.codigo_barras || null}, ${l.chave_nfe || null}, ${l.observacoes || ''}, ${!!l.conciliado},
                 ${itensJson}
               )
               ON CONFLICT (id) DO UPDATE SET
@@ -388,6 +423,7 @@ export default async function handler(req, res) {
             const vLiq = cleanNum(n.valor_liquido !== undefined ? n.valor_liquido : (vBruto - vImp));
             const vTot = cleanNum(n.valor_total !== undefined ? n.valor_total : vBruto);
             const itensNotaJson = JSON.stringify(Array.isArray(n.itens) ? n.itens : []);
+            const safeNotaObraId = (n.obra_id && (n.obra_id === 'escritorio' || n.obra_id === 'geral' || validObrasSet.has(n.obra_id))) ? n.obra_id : null;
 
             await sql`
               INSERT INTO notas_fiscais (
@@ -401,7 +437,7 @@ export default async function handler(req, res) {
                 ${cleanDate(n.data_emissao)}, ${cleanDate(n.data_vencimento)}, ${cleanDate(n.data_pagamento)},
                 ${vBruto}, ${vImp}, ${vLiq}, ${vTot},
                 ${n.tipo || 'entrada'}, ${n.categoria || 'material'}, ${n.status || 'paga'},
-                ${n.lancamento_id || null}, ${n.observacoes || ''}, ${n.obra_id || null},
+                ${n.lancamento_id || null}, ${n.observacoes || ''}, ${safeNotaObraId},
                 ${itensNotaJson}
               )
               ON CONFLICT (id) DO UPDATE SET
@@ -470,6 +506,8 @@ export default async function handler(req, res) {
           const dataLanc = cleanDate(l.data) || new Date().toISOString().split('T')[0];
           const dataVenc = cleanDate(l.data_vencimento) || dataLanc;
           const dataPag = cleanDate(l.data_pagamento);
+          const safeObraId = await validateObraTenant(sql, l.obra_id, tenantId);
+          const safeNotaId = await validateNotaFiscalTenant(sql, l.nota_fiscal_id, tenantId);
 
           await sql`
             INSERT INTO lancamentos (
@@ -480,7 +518,7 @@ export default async function handler(req, res) {
             VALUES (
               ${l.id}, ${tenantId}, ${dataLanc}, ${dataVenc}, ${dataPag}, ${l.descricao}, ${l.categoria || 'Outros'},
               ${l.fornecedor_beneficiario || ''}, ${l.conta_bancaria || ''}, ${l.tipo || 'despesa'}, ${cleanNum(l.valor)}, ${l.status || 'pendente'},
-              ${l.obra_id || null}, ${l.nota_fiscal_id || null}, ${l.codigo_barras || null}, ${l.chave_nfe || null}, ${l.observacoes || ''}, ${!!l.conciliado}
+              ${safeObraId}, ${safeNotaId}, ${l.codigo_barras || null}, ${l.chave_nfe || null}, ${l.observacoes || ''}, ${!!l.conciliado}
             )
             ON CONFLICT (id) DO UPDATE SET
               data = EXCLUDED.data,
@@ -510,6 +548,7 @@ export default async function handler(req, res) {
           const vImp = cleanNum(n.impostos);
           const vLiq = cleanNum(n.valor_liquido !== undefined ? n.valor_liquido : (vBruto - vImp));
           const vTot = cleanNum(n.valor_total !== undefined ? n.valor_total : vBruto);
+          const safeNotaObraId = await validateObraTenant(sql, n.obra_id, tenantId);
 
           await sql`
             INSERT INTO notas_fiscais (
@@ -523,7 +562,7 @@ export default async function handler(req, res) {
               ${cleanDate(n.data_emissao)}, ${cleanDate(n.data_vencimento)}, ${cleanDate(n.data_pagamento)},
               ${vBruto}, ${vImp}, ${vLiq}, ${vTot},
               ${n.tipo || 'entrada'}, ${n.categoria || 'material'}, ${n.status || 'paga'},
-              ${n.lancamento_id || null}, ${n.observacoes || ''}, ${n.obra_id || null}
+              ${n.lancamento_id || null}, ${n.observacoes || ''}, ${safeNotaObraId}
             )
             ON CONFLICT (id) DO UPDATE SET
               numero_nf = EXCLUDED.numero_nf,
@@ -693,11 +732,12 @@ export default async function handler(req, res) {
 
         if (table === 'orcamentos') {
           const o = data;
+          const safeObraId = await validateObraTenant(sql, o.obra_id, tenantId);
           const itensJson = JSON.stringify(Array.isArray(o.itens) ? o.itens : (Array.isArray(o.itens_json) ? o.itens_json : []));
           await sql`
             INSERT INTO orcamentos (id, tenant_id, obra_id, titulo, valor_total, itens_json)
             VALUES (
-              ${o.id}, ${tenantId}, ${o.obra_id || null}, ${o.titulo || ''},
+              ${o.id}, ${tenantId}, ${safeObraId}, ${o.titulo || ''},
               ${cleanNum(o.valor_total)}, ${itensJson}
             )
             ON CONFLICT (id) DO UPDATE SET
@@ -712,10 +752,11 @@ export default async function handler(req, res) {
 
         if (table === 'medicoes') {
           const m = data;
+          const safeObraId = await validateObraTenant(sql, m.obra_id, tenantId);
           await sql`
             INSERT INTO medicoes (id, tenant_id, obra_id, numero, data, valor_medido, status, observacoes)
             VALUES (
-              ${m.id}, ${tenantId}, ${m.obra_id || null}, ${m.numero || 1},
+              ${m.id}, ${tenantId}, ${safeObraId}, ${m.numero || 1},
               ${cleanDate(m.data) || new Date().toISOString().split('T')[0]},
               ${cleanNum(m.valor_medido)}, ${m.status || 'aprovada'}, ${m.observacoes || ''}
             )

@@ -216,7 +216,7 @@
       // Valida credenciais com o servidor de autenticação seguro (Neon / scrypt)
       const loginRes = await Auth.login(uInput, pInput, true);
       const user = loginRes.success ? (loginRes.user || Auth.getUser()) : null;
-      const isMasterValido = loginRes.success && (user?.perfil === 'admin' || user?.perfil === 'superadmin' || user?.perfil === 'dev' || uInput.toLowerCase() === 'admin');
+      const isMasterValido = loginRes.success && (user?.perfil === 'superadmin' || user?.username === 'admin');
 
       if (isMasterValido) {
         sessionStorage.setItem('finobra_master_logged', 'true');
@@ -224,7 +224,9 @@
         verificarSessaoMaster();
       } else {
         errBox.style.display = 'block';
-        errBox.textContent = loginRes.message || 'Usuário ou senha incorretos. Acesso exclusivo do administrador.';
+        errBox.textContent = loginRes.success
+          ? 'Acesso negado. Apenas o Super Administrador da plataforma FinObra pode acessar este portal.'
+          : (loginRes.message || 'Usuário ou senha incorretos.');
       }
     }
 

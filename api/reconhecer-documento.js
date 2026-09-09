@@ -2,6 +2,7 @@
 // Recebe PDF/imagem em base64, envia ao Google Gemini Vision e retorna dados estruturados
 
 import { resolveAuthAndTenant } from './_auth.js';
+import { checkRateLimit, getClientIp } from './_ratelimit.js';
 
 export const config = {
   maxDuration: 60,
@@ -43,7 +44,16 @@ export default async function handler(req, res) {
 
   const auth = resolveAuthAndTenant(req);
   if (!auth.authenticated) {
-    return res.status(401).json({ error: auth.error || 'Acesso não autorizado. Forneça o token de autenticação.' });
+    return res.status(auth.status || 401).json({ error: auth.error || 'Acesso não autorizado. Forneça o token de autenticação.' });
+  }
+
+  // Rate Limiting para proteção contra abuso de custos no Gemini OCR
+  const tenantKey = auth.tenantId || getClientIp(req);
+  const rl = checkRateLimit(`ocr:${tenantKey}`, 30, 600000); // 30 requisições a cada 10 min por tenant
+  if (!rl.allowed) {
+    return res.status(429).json({
+      error: 'Limite de processamento OCR atingido para este período (máximo 30 a cada 10 minutos). Aguarde para enviar mais documentos.'
+    });
   }
 
   const apiKey = process.env.GEMINI_API_KEY;

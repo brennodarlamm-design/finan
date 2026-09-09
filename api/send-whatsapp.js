@@ -1,6 +1,7 @@
 // api/send-whatsapp.js — Serverless Proxy seguro para disparo de WhatsApp via Render Backend / Evolution API
 
 import { resolveAuthAndTenant } from './_auth.js';
+import { checkRateLimit, getClientIp } from './_ratelimit.js';
 
 const ALLOWED_ORIGINS = [
   'https://finobra.app.br',
@@ -39,7 +40,17 @@ export default async function handler(req, res) {
 
   const auth = resolveAuthAndTenant(req);
   if (!auth.authenticated) {
-    return res.status(401).json({ error: auth.error || 'Não autorizado. Forneça o token de autenticação.' });
+    return res.status(auth.status || 401).json({ error: auth.error || 'Não autorizado. Forneça o token de autenticação.' });
+  }
+
+  // Rate Limiting para envio de WhatsApp (máximo 20 disparos por minuto por tenant/IP)
+  const tenantKey = auth.tenantId || getClientIp(req);
+  const rl = checkRateLimit(`wa_send:${tenantKey}`, 20, 60000);
+  if (!rl.allowed) {
+    return res.status(429).json({
+      success: false,
+      error: 'Limite de disparos de WhatsApp atingido por minuto. Aguarde alguns instantes antes de enviar novamente.'
+    });
   }
 
   try {

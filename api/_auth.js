@@ -26,9 +26,9 @@ export function verifyPassword(password, storedHash) {
   try {
     const keyBuffer = Buffer.from(keyHex, 'hex');
     const derivedKey = crypto.scryptSync(password, salt, 64);
+    if (keyBuffer.length !== derivedKey.length) return false;
     return crypto.timingSafeEqual(keyBuffer, derivedKey);
   } catch (err) {
-    console.error('Erro ao verificar senha scrypt:', err);
     return false;
   }
 }
@@ -120,10 +120,23 @@ export function resolveAuthAndTenant(req) {
   // 3. Verifica se é um token de sessão HMAC assinado
   const payload = verifyToken(rawToken, secret);
   if (payload && payload.tenantId) {
+    if (payload.tenantStatus === 'bloqueado' || payload.tenantStatus === 'cancelado') {
+      return {
+        authenticated: false,
+        status: 403,
+        error: 'Acesso bloqueado para esta empresa. Contate o suporte FinObra.'
+      };
+    }
+
+    // Se o usuário autenticado for superadmin, permite inspecionar outro tenant quando explicitamente informado via 'x-tenant-id' (suporte / impersonate)
+    const isSuperAdminUser = payload.perfil === 'superadmin' || payload.username === 'admin';
+    const explicitTenant = (req.headers['x-tenant-id'] || (req.query && req.query.tenant_id) || '').toString().trim();
+    const effectiveTenantId = (isSuperAdminUser && explicitTenant) ? explicitTenant : payload.tenantId;
+
     return {
       authenticated: true,
       isSystem: false,
-      tenantId: payload.tenantId,
+      tenantId: effectiveTenantId,
       user: payload
     };
   }

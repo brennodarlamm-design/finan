@@ -3,44 +3,56 @@
 const MasterAdmin = {
   STORAGE_EMPRESAS_KEY: 'finobra_tenants_master',
 
-  getEmpresas() {
+  _empresas: null,
+  _isLoading: false,
+
+  async carregarEmpresas(force = false) {
+    if (this._empresas && !force) return this._empresas;
+    this._isLoading = true;
+    try {
+      const resp = await fetch('/api/admin?action=tenants', {
+        headers: (typeof Auth !== 'undefined' && Auth.getAuthHeaders) ? Auth.getAuthHeaders() : {}
+      });
+      if (resp.ok) {
+        const data = await resp.json();
+        if (data && Array.isArray(data.tenants)) {
+          this._empresas = data.tenants.map(t => ({
+            id: t.id,
+            nome_fantasia: t.nome_fantasia || t.nome || t.id,
+            razao_social: t.razao_social || t.nome || '',
+            cnpj: t.cnpj || '—',
+            responsavel: t.responsavel || '—',
+            email: t.email || '',
+            telefone: t.telefone || '',
+            plano: t.plano || 'pro',
+            status: t.status || 'ativo',
+            obrasQtd: parseInt(t.obrasQtd || 0, 10),
+            criadoEm: t.criado_em || t.criadoEm || '',
+            vencimento: t.vencimento ? t.vencimento.split('T')[0] : ''
+          }));
+          this.salvarEmpresas(this._empresas);
+          this._isLoading = false;
+          return this._empresas;
+        }
+      }
+    } catch (err) {
+      console.warn('Falha ao carregar tenants do Neon API:', err);
+    }
+    this._isLoading = false;
+    return this.getEmpresasLocal();
+  },
+
+  getEmpresasLocal() {
     try {
       const s = localStorage.getItem(this.STORAGE_EMPRESAS_KEY);
       if (s) return JSON.parse(s);
     } catch {}
+    return [];
+  },
 
-    const defaults = [
-      {
-        id: 'angelim',
-        nome_fantasia: 'Angelim Construtora',
-        razao_social: 'Angelim Engenharia e Construções LTDA',
-        cnpj: '65.512.273/0001-60',
-        responsavel: 'Brenno Darlam',
-        email: 'admin@finobra.com',
-        telefone: '95991363678',
-        plano: 'unlimited',
-        status: 'ativo', // 'ativo', 'trial', 'inadimplente', 'bloqueado'
-        obrasQtd: 12,
-        criadoEm: '2026-08-01',
-        vencimento: '2026-10-10'
-      },
-      {
-        id: 'tenant_empresa_zerada',
-        nome_fantasia: 'Minha Empresa Construtora',
-        razao_social: 'Nova Construtora Modelo LTDA',
-        cnpj: '12.345.678/0001-90',
-        responsavel: 'Diretor / Construtor',
-        email: 'contato@minhaempresa.com',
-        telefone: '95999998888',
-        plano: 'pro',
-        status: 'trial',
-        obrasQtd: 3,
-        criadoEm: '2026-09-01',
-        vencimento: '2026-09-20'
-      }
-    ];
-    this.salvarEmpresas(defaults);
-    return defaults;
+  getEmpresas() {
+    if (this._empresas) return this._empresas;
+    return this.getEmpresasLocal();
   },
 
   salvarEmpresas(lista) {
@@ -49,7 +61,7 @@ const MasterAdmin = {
 
   isSuperAdmin() {
     const u = (typeof Auth !== 'undefined' && Auth.getUser()) || {};
-    return u.username === 'admin' || u.perfil === 'dev' || u.perfil === 'superadmin';
+    return u.username === 'admin' || u.perfil === 'superadmin';
   },
 
   _activeTab: 'empresas',
@@ -69,11 +81,22 @@ const MasterAdmin = {
       el.innerHTML = `
         <div style="padding:60px 20px;text-align:center;color:#ef4444;">
           <div style="font-size:3rem;margin-bottom:12px;">🔒</div>
-          <h2 style="font-size:1.4rem;font-weight:800;color:#fff;">Acesso Restrito ao Desenvolvedor</h2>
-          <p style="color:#94a3b8;font-size:.9rem;margin-top:6px;">Apenas o usuário master (admin) tem permissão para gerenciar as empresas e o faturamento SaaS.</p>
+          <h2 style="font-size:1.4rem;font-weight:800;color:#fff;">Acesso Restrito ao Super Admin</h2>
+          <p style="color:#94a3b8;font-size:.9rem;margin-top:6px;">Apenas o superadministrador da plataforma tem permissão para gerenciar as empresas e o faturamento SaaS.</p>
           <button onclick="App.navigate('dashboard')" class="btn-primary" style="margin-top:20px;padding:8px 20px;">Voltar ao Dashboard</button>
         </div>
       `;
+      return;
+    }
+
+    if (!this._empresas && !this._isLoading) {
+      el.innerHTML = `
+        <div style="padding:80px 20px;text-align:center;color:#94a3b8;">
+          <div style="font-size:2rem;margin-bottom:12px;">⏳</div>
+          <p style="font-size:.95rem;font-weight:700;color:#fff;">Carregando empresas do banco de dados Neon...</p>
+        </div>
+      `;
+      this.carregarEmpresas().then(() => this.render(containerId));
       return;
     }
 
@@ -467,47 +490,60 @@ const MasterAdmin = {
     if (!emp) return;
 
     if (confirm(`Deseja alternar a visualização para a empresa "${emp.nome_fantasia}" para prestar suporte?`)) {
-      const users = (typeof Auth !== 'undefined' && Auth.getUsers()) || [];
-      const userEmp = users.find(u => u.tenantId === tenantId) || {
-        id: 'u_' + tenantId,
-        username: 'user_' + tenantId,
-        nome: emp.responsavel,
-        perfil: 'admin',
-        avatar: emp.nome_fantasia.slice(0, 2).toUpperCase(),
-        tenantId: emp.id,
-        empresaNome: emp.nome_fantasia
-      };
-
+      const currentToken = (typeof Auth !== 'undefined' && Auth.getToken()) || '';
       const session = {
-        userId: userEmp.id,
-        username: userEmp.username,
-        nome: userEmp.nome,
-        perfil: userEmp.perfil,
-        avatar: userEmp.avatar,
-        tenantId: userEmp.tenantId,
+        userId: 'u_support_' + tenantId,
+        username: 'master_admin',
+        nome: `Suporte Master (${emp.nome_fantasia})`,
+        perfil: 'superadmin',
+        avatar: (emp.nome_fantasia || 'SU').slice(0, 2).toUpperCase(),
+        tenantId: emp.id,
         empresaNome: emp.nome_fantasia,
-        impersonatedBy: 'admin',
+        impersonatedBy: 'superadmin',
         loginAt: new Date().toISOString()
       };
 
       localStorage.setItem('finobra_session', JSON.stringify(session));
       sessionStorage.setItem('finobra_session', JSON.stringify(session));
+      if (currentToken) {
+        localStorage.setItem('finobra_token', currentToken);
+        sessionStorage.setItem('finobra_token', currentToken);
+      }
       alert(`Você agora está visualizando como ${emp.nome_fantasia}.`);
       window.location.href = '/app/dashboard';
     }
   },
 
-  alterarStatusEmpresa(tenantId) {
+  async alterarStatusEmpresa(tenantId) {
     const empresas = this.getEmpresas();
     const emp = empresas.find(e => e.id === tenantId);
     if (!emp) return;
 
-    const novoStatus = prompt(`Alterar status de "${emp.nome_fantasia}":\nDigite: ativo, trial, inadimplente ou bloqueado`, emp.status);
-    if (novoStatus && ['ativo', 'trial', 'inadimplente', 'bloqueado'].includes(novoStatus.toLowerCase().trim())) {
-      emp.status = novoStatus.toLowerCase().trim();
-      this.salvarEmpresas(empresas);
-      this.render();
-      alert(`Status atualizado para ${emp.status.toUpperCase()}!`);
+    const novoStatus = prompt(`Alterar status de "${emp.nome_fantasia}":\nDigite: ativo, trial, inadimplente, bloqueado ou cancelado`, emp.status);
+    if (novoStatus && ['ativo', 'trial', 'inadimplente', 'bloqueado', 'cancelado'].includes(novoStatus.toLowerCase().trim())) {
+      const statusFinal = novoStatus.toLowerCase().trim();
+      try {
+        const res = await fetch('/api/admin?action=update_tenant', {
+          method: 'PATCH',
+          headers: (typeof Auth !== 'undefined' && Auth.getAuthHeaders) ? Auth.getAuthHeaders() : { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            tenantId,
+            status: statusFinal
+          })
+        });
+        const data = await res.json();
+        if (!res.ok || !data.ok) {
+          throw new Error(data.error || 'Erro ao atualizar status no servidor');
+        }
+
+        emp.status = statusFinal;
+        await this.carregarEmpresas(true);
+        const target = document.getElementById('master-content-area') ? 'master-content-area' : 'route-content';
+        this.render(target);
+        alert(`Status atualizado para ${statusFinal.toUpperCase()} com sucesso no banco de dados!`);
+      } catch (err) {
+        alert('Erro ao atualizar status: ' + err.message);
+      }
     }
   },
 
@@ -591,8 +627,14 @@ const MasterAdmin = {
     `;
   },
 
-  salvarNovaEmpresa(e) {
+  async salvarNovaEmpresa(e) {
     e.preventDefault();
+    const btnSubmit = e.target.querySelector('button[type="submit"]');
+    if (btnSubmit) {
+      btnSubmit.disabled = true;
+      btnSubmit.innerText = 'Salvando no Neon...';
+    }
+
     const nome = document.getElementById('ne-nome').value.trim();
     const cnpj = document.getElementById('ne-cnpj').value.trim();
     const plano = document.getElementById('ne-plano').value;
@@ -601,47 +643,41 @@ const MasterAdmin = {
     const email = document.getElementById('ne-email').value.trim();
     const senha = document.getElementById('ne-senha').value.trim();
 
-    const tenantId = 'tenant_' + Date.now();
+    try {
+      const res = await fetch('/api/admin?action=create_tenant', {
+        method: 'POST',
+        headers: (typeof Auth !== 'undefined' && Auth.getAuthHeaders) ? Auth.getAuthHeaders() : { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          nome,
+          cnpj,
+          plano,
+          responsavel: resp,
+          telefone: whats,
+          email,
+          senha,
+          status: 'ativo'
+        })
+      });
 
-    const novaEmp = {
-      id: tenantId,
-      nome_fantasia: nome,
-      razao_social: nome + ' LTDA',
-      cnpj: cnpj || '—',
-      responsavel: resp,
-      email: email,
-      telefone: whats,
-      plano: plano,
-      status: 'ativo',
-      obrasQtd: 0,
-      criadoEm: new Date().toISOString(),
-      vencimento: new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0]
-    };
+      const data = await res.json();
+      if (!res.ok || !data.ok) {
+        throw new Error(data.error || 'Erro ao criar construtora no banco de dados');
+      }
 
-    const empresas = this.getEmpresas();
-    empresas.unshift(novaEmp);
-    this.salvarEmpresas(empresas);
+      const modal = document.getElementById('master-nova-empresa-modal');
+      if (modal) modal.remove();
 
-    // Cria o usuário no auth
-    const users = (typeof Auth !== 'undefined' && Auth.getUsers()) || [];
-    users.push({
-      id: 'u_' + tenantId,
-      username: email.split('@')[0],
-      nome: resp,
-      email: email,
-      senha: senha,
-      perfil: 'admin',
-      ativo: true,
-      avatar: nome.slice(0, 2).toUpperCase(),
-      tenantId: tenantId,
-      empresaNome: nome
-    });
-    localStorage.setItem('finobra_users', JSON.stringify(users));
+      await this.carregarEmpresas(true);
+      const target = document.getElementById('master-content-area') ? 'master-content-area' : 'route-content';
+      this.render(target);
 
-    const modal = document.getElementById('master-nova-empresa-modal');
-    if (modal) modal.remove();
-
-    this.render();
-    alert(`✓ Construtora "${nome}" cadastrada com sucesso!\nLogin: ${email} ou ${email.split('@')[0]}\nSenha: ${senha}`);
+      alert(`✓ Construtora "${nome}" criada com sucesso no PostgreSQL!\nLogin: ${email}\nSenha: ${senha}`);
+    } catch (err) {
+      alert('Erro ao cadastrar construtora: ' + err.message);
+      if (btnSubmit) {
+        btnSubmit.disabled = false;
+        btnSubmit.innerText = 'Salvar e Criar Acesso 🚀';
+      }
+    }
   }
 };

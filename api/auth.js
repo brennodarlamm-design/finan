@@ -4,6 +4,7 @@ import { neon } from '@neondatabase/serverless';
 import crypto from 'crypto';
 import { OAuth2Client } from 'google-auth-library';
 import { hashPassword, verifyPassword, signToken, resolveAuthAndTenant } from './_auth.js';
+import { checkRateLimit, getClientIp } from './_ratelimit.js';
 
 const googleClient = new OAuth2Client();
 
@@ -48,7 +49,7 @@ function decodeJwtPayload(token) {
     const base64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
     const jsonStr = Buffer.from(base64, 'base64').toString('utf8');
     return JSON.parse(jsonStr);
-  } catch {
+  } catch (e) {
     return null;
   }
 }
@@ -121,6 +122,15 @@ export default async function handler(req, res) {
 
     // ── 2. POST /api/auth?action=login ──────────────────────────────────────────
     if (req.method === 'POST' && action === 'login') {
+      const clientIp = getClientIp(req);
+      const rl = checkRateLimit(`login:${clientIp}`, 10, 60000);
+      if (!rl.allowed) {
+        return res.status(429).json({
+          success: false,
+          message: 'Muitas tentativas consecutivas de login. Aguarde 1 minuto antes de tentar novamente.'
+        });
+      }
+
       const { username, password, remember } = req.body || {};
       if (!username || !password) {
         return res.status(400).json({ success: false, message: 'Usuário e senha são obrigatórios.' });
@@ -129,7 +139,7 @@ export default async function handler(req, res) {
       const cleanUser = username.trim().toLowerCase();
       const rows = await sql`
         SELECT u.id, u.username, u.email, u.senha_hash, u.nome, u.perfil, u.avatar, u.ativo, u.tenant_id,
-               t.razao_social, t.nome_fantasia, t.status as tenant_status
+               t.razao_social, t.nome_fantasia, t.status as tenant_status, t.created_at as tenant_created_at
         FROM usuarios u
         LEFT JOIN tenants t ON u.tenant_id = t.id
         WHERE LOWER(u.username) = ${cleanUser} OR LOWER(u.email) = ${cleanUser}
@@ -143,6 +153,30 @@ export default async function handler(req, res) {
       const user = rows[0];
       if (!user.ativo) {
         return res.status(403).json({ success: false, message: 'Conta de usuário inativa. Contate o administrador.' });
+      }
+
+      // Aplicação estrita de regras de status do SaaS
+      if (user.tenant_status === 'bloqueado') {
+        return res.status(403).json({
+          success: false,
+          message: 'Acesso bloqueado para esta empresa. Entre em contato com o suporte comercial FinObra.'
+        });
+      }
+      if (user.tenant_status === 'cancelado') {
+        return res.status(403).json({
+          success: false,
+          message: 'Assinatura cancelada. Regularize seu plano para restabelecer o acesso ao sistema.'
+        });
+      }
+      if (user.tenant_status === 'trial' && user.tenant_created_at) {
+        const trialDays = 15;
+        const diffMs = Date.now() - new Date(user.tenant_created_at).getTime();
+        if (diffMs > trialDays * 24 * 60 * 60 * 1000) {
+          return res.status(403).json({
+            success: false,
+            message: 'Seu período de teste gratuito de 15 dias expirou. Faça o upgrade de plano para continuar.'
+          });
+        }
       }
 
       const passwordMatches = verifyPassword(password, user.senha_hash);
@@ -161,6 +195,7 @@ export default async function handler(req, res) {
         nome: user.nome,
         perfil: user.perfil,
         tenantId: user.tenant_id,
+        tenantStatus: user.tenant_status || 'ativo',
         empresaNome: user.nome_fantasia || user.razao_social || 'Minha Empresa',
         avatar: user.avatar || user.nome.slice(0, 2).toUpperCase(),
         exp
@@ -187,14 +222,27 @@ export default async function handler(req, res) {
 
     // ── 3. POST /api/auth?action=register (Cadastro de novo Tenant SaaS no Neon) ─
     if (req.method === 'POST' && action === 'register') {
-      const { nome, username, email, password, senha, empresaNome, cnpj, telefone, plano } = req.body || {};
+      const clientIp = getClientIp(req);
+      const rl = checkRateLimit(`reg:${clientIp}`, 5, 3600000); // 5 cadastros por hora por IP
+      if (!rl.allowed) {
+        return res.status(429).json({
+          success: false,
+          message: 'Muitos cadastros a partir deste endereço IP. Aguarde antes de tentar novamente.'
+        });
+      }
+
+      const { nome, username, email, password, senha, empresaNome, cnpj, telefone } = req.body || {};
       const userPass = (password || senha || '').trim();
       const rawNome = (nome || '').trim();
       const rawUsername = (username || '').trim().toLowerCase().replace(/[^a-z0-9._-]/g, '');
       const rawEmail = (email || '').trim().toLowerCase();
 
-      if (!rawNome || !rawUsername || !userPass) {
-        return res.status(400).json({ success: false, message: 'Nome, usuário e senha são obrigatórios.' });
+      if (!rawNome || !rawUsername || !userPass || !rawEmail) {
+        return res.status(400).json({ success: false, message: 'Nome, usuário, e-mail e senha são obrigatórios.' });
+      }
+
+      if (!rawEmail.includes('@') || !rawEmail.includes('.')) {
+        return res.status(400).json({ success: false, message: 'Informe um endereço de e-mail válido.' });
       }
 
       if (rawUsername.length < 3) {
@@ -208,7 +256,7 @@ export default async function handler(req, res) {
       // Verifica se usuário ou e-mail já existe
       const existing = await sql`
         SELECT id, username, email FROM usuarios
-        WHERE LOWER(username) = ${rawUsername} OR (LOWER(email) = ${rawEmail} AND ${rawEmail} != '')
+        WHERE LOWER(username) = ${rawUsername} OR LOWER(email) = ${rawEmail}
         LIMIT 1;
       `;
 
@@ -226,18 +274,19 @@ export default async function handler(req, res) {
       const finalEmpresaNome = (empresaNome || rawNome + ' Empreendimentos').trim();
       const passHash = hashPassword(userPass);
 
+      // Trava de segurança SaaS: Cadastro público SEMPRE inicia como plano 'trial' e status 'trial'
       await sql`
         INSERT INTO tenants (id, razao_social, nome_fantasia, email, telefone, cnpj, responsavel, plano, status)
         VALUES (
           ${newTenantId},
           ${finalEmpresaNome},
           ${finalEmpresaNome},
-          ${rawEmail || null},
+          ${rawEmail},
           ${(telefone || '').trim() || null},
           ${(cnpj || '').trim() || null},
           ${rawNome},
-          ${plano || 'pro'},
-          'ativo'
+          'trial',
+          'trial'
         );
       `;
 
@@ -247,7 +296,7 @@ export default async function handler(req, res) {
           ${newUserId},
           ${newTenantId},
           ${rawUsername},
-          ${rawEmail || null},
+          ${rawEmail},
           ${passHash},
           ${rawNome},
           'admin',
@@ -264,6 +313,7 @@ export default async function handler(req, res) {
         nome: rawNome,
         perfil: 'admin',
         tenantId: newTenantId,
+        tenantStatus: 'trial',
         empresaNome: finalEmpresaNome,
         avatar: rawNome.slice(0, 2).toUpperCase(),
         exp
@@ -271,7 +321,7 @@ export default async function handler(req, res) {
 
       const token = signToken(payload, secret);
 
-      return res.status(201).json({
+      return res.status(200).json({
         success: true,
         token,
         user: {
@@ -280,7 +330,7 @@ export default async function handler(req, res) {
           email: rawEmail,
           nome: rawNome,
           perfil: 'admin',
-          avatar: rawNome.slice(0, 2).toUpperCase(),
+          avatar: payload.avatar,
           tenantId: newTenantId,
           empresaNome: finalEmpresaNome,
           remember: true
@@ -288,23 +338,18 @@ export default async function handler(req, res) {
       });
     }
 
-    // ── 4. POST /api/auth?action=google ─────────────────────────────────────────
+    // ── 3.1 POST /api/auth?action=google (Autenticação Google com Verificação Criptográfica RSA)
     if (req.method === 'POST' && action === 'google') {
       const { credentialJwt } = req.body || {};
       if (!credentialJwt) {
-        return res.status(400).json({ success: false, message: 'Token de autenticação Google obrigatório.' });
+        return res.status(400).json({ success: false, message: 'Token de credencial Google é obrigatório.' });
       }
 
-      const googleClientId = (process.env.GOOGLE_CLIENT_ID || '').trim();
-      if (!googleClientId) {
-        return res.status(500).json({ success: false, message: 'GOOGLE_CLIENT_ID não configurado no servidor.' });
-      }
-
-      let profile;
+      let profile = null;
       try {
         const ticket = await googleClient.verifyIdToken({
           idToken: credentialJwt,
-          audience: googleClientId
+          audience: process.env.GOOGLE_CLIENT_ID
         });
         profile = ticket.getPayload();
       } catch (verifyErr) {
@@ -323,7 +368,7 @@ export default async function handler(req, res) {
 
       // Verifica se usuário já existe
       const existing = await sql`
-        SELECT u.*, t.razao_social, t.nome_fantasia
+        SELECT u.*, t.razao_social, t.nome_fantasia, t.status as tenant_status
         FROM usuarios u
         LEFT JOIN tenants t ON u.tenant_id = t.id
         WHERE LOWER(u.email) = ${email} OR (u.google_sub IS NOT NULL AND u.google_sub = ${googleSub})
@@ -335,6 +380,12 @@ export default async function handler(req, res) {
 
       if (existing.length > 0) {
         userRecord = existing[0];
+        if (userRecord.tenant_status === 'bloqueado' || userRecord.tenant_status === 'cancelado') {
+          return res.status(403).json({
+            success: false,
+            message: 'Acesso da empresa bloqueado. Contate o suporte comercial FinObra.'
+          });
+        }
         if (picture && (!userRecord.avatar || userRecord.avatar.length <= 2)) {
           await sql`UPDATE usuarios SET avatar = ${picture}, updated_at = NOW() WHERE id = ${userRecord.id};`;
           userRecord.avatar = picture;
@@ -355,8 +406,8 @@ export default async function handler(req, res) {
             ${nome + ' Construtora'},
             ${email},
             ${nome},
-            'pro',
-            'ativo'
+            'trial',
+            'trial'
           );
         `;
 
@@ -385,6 +436,7 @@ export default async function handler(req, res) {
           perfil: 'admin',
           avatar: picture || nome.slice(0, 2).toUpperCase(),
           tenant_id: newTenantId,
+          tenant_status: 'trial',
           nome_fantasia: nome + ' Construtora'
         };
       }
@@ -397,6 +449,7 @@ export default async function handler(req, res) {
         nome: userRecord.nome,
         perfil: userRecord.perfil,
         tenantId: userRecord.tenant_id,
+        tenantStatus: userRecord.tenant_status || 'ativo',
         empresaNome: userRecord.nome_fantasia || userRecord.nome + ' Construtora',
         avatar: userRecord.avatar,
         exp
@@ -422,8 +475,17 @@ export default async function handler(req, res) {
       });
     }
 
-    // ── 4. POST /api/auth?action=request_reset (Gera OTP Seguro no Neon) ────────
+    // ── 4. POST /api/auth?action=request_reset (Gera OTP Seguro no Neon com Rate Limiting)
     if (req.method === 'POST' && action === 'request_reset') {
+      const clientIp = getClientIp(req);
+      const rlReset = checkRateLimit(`reset:${clientIp}`, 5, 60000);
+      if (!rlReset.allowed) {
+        return res.status(429).json({
+          success: false,
+          message: 'Muitas tentativas de recuperação a partir deste IP. Aguarde 1 minuto.'
+        });
+      }
+
       const { identificador } = req.body || {};
       if (!identificador || !identificador.trim()) {
         return res.status(400).json({ success: false, message: 'Informe seu usuário ou e-mail cadastrado.' });
@@ -444,6 +506,18 @@ export default async function handler(req, res) {
       }
 
       const user = rows[0];
+
+      // Limite rigoroso de tentativas por conta (máximo 3 em 15 minutos)
+      const recentOtpCount = await sql`
+        SELECT COUNT(*) as count FROM recuperacao_senhas
+        WHERE usuario_id = ${user.id} AND created_at > NOW() - INTERVAL '15 minutes';
+      `;
+      if (Number(recentOtpCount[0]?.count || 0) >= 3) {
+        return res.status(429).json({
+          success: false,
+          message: 'Limite de solicitações de código atingido para esta conta (máximo 3 a cada 15 minutos). Aguarde para tentar novamente.'
+        });
+      }
 
       // Invalida solicitações anteriores ainda ativas
       await sql`

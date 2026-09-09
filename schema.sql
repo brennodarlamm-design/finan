@@ -240,3 +240,10 @@ CREATE INDEX IF NOT EXISTS idx_ocr_tenant ON ocr_historico(tenant_id);
 CREATE INDEX IF NOT EXISTS idx_usuarios_tenant ON usuarios(tenant_id);
 CREATE INDEX IF NOT EXISTS idx_usuarios_username ON usuarios(username);
 CREATE INDEX IF NOT EXISTS idx_usuarios_email ON usuarios(email);
+
+-- Integridade relacional composta multi-tenant (garante unicidade de id por tenant)
+CREATE UNIQUE INDEX IF NOT EXISTS uq_obras_tenant_id ON obras(tenant_id, id);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_fornecedores_tenant_id ON fornecedores(tenant_id, id);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_notas_tenant_id ON notas_fiscais(tenant_id, id);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_lancamentos_tenant_id ON lancamentos(tenant_id, id);
+

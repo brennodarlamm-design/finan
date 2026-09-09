@@ -1,7 +1,16 @@
 // api/upload.js — Endpoint Serverless para Upload e Gerenciamento no Vercel Blob
 import { put, del } from '@vercel/blob';
 import { handleUpload } from '@vercel/blob/client';
+import { neon } from '@neondatabase/serverless';
 import { resolveAuthAndTenant } from './_auth.js';
+
+function getSql() {
+  const conn = process.env.DATABASE_URL;
+  if (!conn) {
+    throw new Error('DATABASE_URL não configurada no servidor.');
+  }
+  return neon(conn);
+}
 
 export const config = {
   maxDuration: 60,
@@ -56,24 +65,53 @@ export default async function handler(req, res) {
 
   const tenantId = auth.tenantId || 'angelim';
 
-  // ── DELETE: Excluir documento do Vercel Blob ────────────────────────────────
+  // ── DELETE: Excluir documento do Vercel Blob com Validação Estrita de Tenant ──
   if (req.method === 'DELETE') {
     try {
       const url = req.query.url || (req.body && req.body.url);
-      if (!url) {
-        return res.status(400).json({ success: false, error: 'URL do arquivo não informada.' });
+      const documentId = req.query.document_id || req.query.id || (req.body && (req.body.document_id || req.body.id));
+
+      if (!url && !documentId) {
+        return res.status(400).json({ success: false, error: 'URL ou ID do documento é obrigatório para exclusão.' });
       }
 
-      // Validação de segurança: apenas blobs do Vercel Blob Storage
-      if (!url.includes('blob.vercel-storage.com')) {
-        return res.status(400).json({ success: false, error: 'URL inválida para exclusão no Vercel Blob.' });
+      // 1. Validação de segurança e posse no banco Neon
+      const sql = getSql();
+      let docRows = [];
+      if (documentId) {
+        docRows = await sql`SELECT id, url, tenant_id FROM documentos WHERE id = ${documentId} AND tenant_id = ${tenantId} LIMIT 1;`;
+      } else if (url) {
+        docRows = await sql`SELECT id, url, tenant_id FROM documentos WHERE url = ${url} AND tenant_id = ${tenantId} LIMIT 1;`;
       }
 
-      await del(url);
-      return res.status(200).json({ success: true, message: 'Arquivo excluído do Vercel Blob com sucesso.' });
+      let finalUrl = url;
+      if (docRows.length > 0) {
+        finalUrl = docRows[0].url || url;
+      } else {
+        // Se não foi localizado na tabela pelo tenant, verifica se a URL contém o path explícito do tenant
+        const isTenantBlob = url && url.includes(`/${tenantId}/`);
+        if (!isTenantBlob && !auth.isSystem) {
+          return res.status(403).json({
+            success: false,
+            error: 'Permissão negada. O arquivo não pertence ao seu tenant ou já foi excluído.'
+          });
+        }
+      }
+
+      // 2. Exclusão no Vercel Blob
+      if (finalUrl && finalUrl.includes('blob.vercel-storage.com')) {
+        await del(finalUrl);
+      }
+
+      // 3. Remoção no banco de dados Neon
+      if (docRows.length > 0) {
+        await sql`DELETE FROM documentos WHERE id = ${docRows[0].id} AND tenant_id = ${tenantId};`;
+      }
+
+      return res.status(200).json({ success: true, message: 'Arquivo e registro excluídos com sucesso.' });
     } catch (err) {
       console.error('[Blob] Erro ao excluir arquivo:', err);
-      return res.status(500).json({ success: false, error: 'Erro ao excluir arquivo do Vercel Blob: ' + err.message });
+      return res.status(500).json({ success: false, error: 'Erro ao excluir arquivo: ' + err.message });
     }
   }
 

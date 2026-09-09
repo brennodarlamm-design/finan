@@ -119,13 +119,12 @@ const Auth = {
     return session;
   },
 
-  // ── AUTENTICAÇÃO COM SERVIDOR NEON & FALLBACK OFFLINE ─────────────────────
+  // ── AUTENTICAÇÃO COM SERVIDOR NEON (SEM FALLBACKS LOCAIS INSEGUROS) ───────
   async login(username, password, remember = false) {
     if (!username || !password) {
       return { success: false, message: 'Usuário e senha são obrigatórios.' };
     }
 
-    // 1. Tenta autenticação server-side segura via /api/auth
     try {
       const resp = await fetch('/api/auth?action=login', {
         method: 'POST',
@@ -137,117 +136,46 @@ const Auth = {
         const session = this.createSession(data.user, remember, data.token);
         return { success: true, user: session };
       }
-      if (resp.status === 401 || resp.status === 403) {
-        return { success: false, message: data.message || 'Usuário ou senha incorretos.' };
-      }
+      return {
+        success: false,
+        message: data.message || data.error || 'Usuário ou senha incorretos.'
+      };
     } catch (err) {
-      console.warn('Servidor de autenticação inacessível, utilizando fallback local:', err.message);
-    }
-
-    // 2. Fallback offline local
-    return this._localLogin(username, password, remember);
-  },
-
-  _localLogin(username, password, remember = false) {
-    const clean = (username || '').trim().toLowerCase();
-    const users = this.getUsers();
-    const user = users.find(u => (u.username.toLowerCase() === clean || (u.email && u.email.toLowerCase() === clean)) && u.ativo);
-    
-    // Validação compatível com senhas padrão caso offline
-    const isKnown = (clean === 'admin' && password === 'admin123') ||
-                    (clean === 'gestor' && password === 'gestor123') ||
-                    (clean === 'empresa' && password === 'empresa123') ||
-                    (user && user.senha && user.senha === password);
-
-    if (!user || !isKnown) {
-      return { success: false, message: 'Usuário ou senha incorretos. Verifique os dados e tente novamente.' };
-    }
-
-    const session = this.createSession(user, remember);
-    return { success: true, user: session };
-  },
-
-  decodeJwt(token) {
-    try {
-      const base64Url = token.split('.')[1];
-      const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
-      const jsonPayload = decodeURIComponent(atob(base64).split('').map(c => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2)).join(''));
-      return JSON.parse(jsonPayload);
-    } catch (e) {
-      return null;
+      console.error('Falha de conexão com o servidor de autenticação:', err);
+      return {
+        success: false,
+        message: 'Não foi possível conectar ao servidor de autenticação. Verifique sua conexão com a internet.'
+      };
     }
   },
 
-  async loginWithGoogle(credentialJwt, manualProfile = null) {
-    // 1. Tenta autenticação server-side segura no Neon
+  async loginWithGoogle(credentialJwt) {
+    if (!credentialJwt) {
+      return { success: false, message: 'Token de credencial Google não fornecido.' };
+    }
+
     try {
       const resp = await fetch('/api/auth?action=google', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ credentialJwt, manualProfile })
+        body: JSON.stringify({ credentialJwt })
       });
       const data = await resp.json().catch(() => ({}));
       if (resp.ok && data.success && data.token) {
         const session = this.createSession(data.user, true, data.token);
         return { success: true, user: session, isNew: !!data.isNew };
       }
+      return {
+        success: false,
+        message: data.message || data.error || 'Falha ao autenticar com Google no servidor.'
+      };
     } catch (err) {
-      console.warn('Falha no login Google no servidor, utilizando fallback local:', err);
+      console.error('Falha de conexão com o servidor de autenticação Google:', err);
+      return {
+        success: false,
+        message: 'Não foi possível validar o login Google no servidor. Tente novamente em instantes.'
+      };
     }
-
-    // 2. Fallback offline local
-    return this._localGoogleLogin(credentialJwt, manualProfile);
-  },
-
-  _localGoogleLogin(credentialJwt, manualProfile = null) {
-    let payload = null;
-    if (credentialJwt) {
-      payload = this.decodeJwt(credentialJwt);
-    } else if (manualProfile) {
-      payload = manualProfile;
-    }
-
-    if (!payload || !payload.email) {
-      return { success: false, message: 'Falha ao processar credenciais da conta Google.' };
-    }
-
-    const email = payload.email.trim().toLowerCase();
-    const nome = payload.name || payload.given_name || email.split('@')[0];
-    const picture = payload.picture || '';
-
-    const users = this.getUsers();
-    let user = users.find(u => (u.email && u.email.toLowerCase() === email) || (u.googleSub && u.googleSub === payload.sub));
-
-    if (user) {
-      if (picture && (!user.avatar || user.avatar.length <= 2)) {
-        user.avatar = picture;
-        localStorage.setItem(this.USERS_KEY, JSON.stringify(users));
-      }
-      const session = this.createSession(user, true);
-      return { success: true, user: session, isNew: false };
-    }
-
-    const newTenantId = 'tenant_google_' + Date.now().toString(36);
-    const cleanUsername = email.split('@')[0].replace(/[^a-z0-9._-]/g, '') + '_' + Math.random().toString(36).substr(2, 3);
-    const newUser = {
-      id: 'usr_g_' + Date.now().toString(36),
-      username: cleanUsername,
-      nome: nome,
-      email: email,
-      perfil: 'admin',
-      ativo: true,
-      avatar: picture || nome.slice(0, 2).toUpperCase(),
-      tenantId: newTenantId,
-      empresaNome: nome + ' Construtora',
-      googleAuth: true,
-      googleSub: payload.sub || ''
-    };
-
-    users.push(newUser);
-    localStorage.setItem(this.USERS_KEY, JSON.stringify(users));
-
-    const session = this.createSession(newUser, true);
-    return { success: true, user: session, isNew: true };
   },
 
   // ── RECUPERAÇÃO DE SENHA (SERVER-SIDE OTP NO NEON) ─────────────────────────
