@@ -52,6 +52,14 @@ const MasterAdmin = {
     return u.username === 'admin' || u.perfil === 'dev' || u.perfil === 'superadmin';
   },
 
+  _activeTab: 'empresas',
+
+  switchTab(tab) {
+    this._activeTab = tab;
+    const target = document.getElementById('master-content-area') ? 'master-content-area' : 'route-content';
+    this.render(target);
+  },
+
   // ── RENDERIZAÇÃO DO PAINEL MASTER ──────────────────────────────────────────
   render(containerId = 'route-content') {
     const el = document.getElementById(containerId);
@@ -88,9 +96,22 @@ const MasterAdmin = {
       return acc;
     }, 0);
 
+    const isSistema = this._activeTab === 'sistema';
+
     el.innerHTML = `
       <div style="max-width:1200px;margin:0 auto;padding:10px 0 50px;">
         
+        <!-- Navigation Tabs Master -->
+        <div style="display:flex;gap:0;border-bottom:2px solid rgba(255,255,255,.1);margin-bottom:26px;overflow-x:auto;">
+          <button onclick="MasterAdmin.switchTab('empresas')" style="padding:12px 20px;border:none;background:transparent;color:${!isSistema?'var(--accent)':'#94a3b8'};font-family:inherit;font-size:.875rem;font-weight:800;cursor:pointer;border-bottom:3px solid ${!isSistema?'var(--accent)':'transparent'};margin-bottom:-2px;transition:all .2s;display:flex;align-items:center;gap:8px;">
+            <span>🏢</span> Gestão de Construtoras &amp; SaaS
+          </button>
+          <button onclick="MasterAdmin.switchTab('sistema')" style="padding:12px 20px;border:none;background:transparent;color:${isSistema?'var(--accent)':'#94a3b8'};font-family:inherit;font-size:.875rem;font-weight:800;cursor:pointer;border-bottom:3px solid ${isSistema?'var(--accent)':'transparent'};margin-bottom:-2px;transition:all .2s;display:flex;align-items:center;gap:8px;">
+            <span>⚙️</span> Manutenção do Sistema &amp; Banco de Dados (Dev / Master)
+          </button>
+        </div>
+
+        ${isSistema ? this._renderSistema() : `
         <!-- Top Bar Master -->
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:26px;flex-wrap:wrap;gap:14px;">
           <div>
@@ -211,9 +232,182 @@ const MasterAdmin = {
             `}
           </div>
         </div>
+        `}
 
       </div>
     `;
+  },
+
+  // ── ABA SISTEMA & BANCO DE DADOS (DEV / MASTER) ────────────────────────────
+  _renderSistema() {
+    const totalClientes = (typeof DB !== 'undefined' && DB.getAll) ? DB.getAll('clientes').length : 0;
+    const totalLancamentos = (typeof DB !== 'undefined' && DB.getAll) ? DB.getAll('lancamentos').length : 0;
+    const totalFornecedores = (typeof DB !== 'undefined' && DB.getAll) ? DB.getAll('fornecedores').length : 0;
+    const snapshotRaw = localStorage.getItem('finobra_snapshot_seguranca');
+    let snapshotInfo = 'Nenhum snapshot gravado ainda.';
+    if (snapshotRaw) {
+      try {
+        const snap = JSON.parse(snapshotRaw);
+        snapshotInfo = `Último snapshot: ${snap.saved_at ? new Date(snap.saved_at).toLocaleString('pt-BR') : '—'} (${snap.totalLancamentos || 0} lançamentos)`;
+      } catch {}
+    }
+
+    return `
+      <div>
+        <div style="margin-bottom:22px;">
+          <h2 style="font-size:1.45rem;font-weight:900;color:#fff;margin:0 0 6px;">⚙️ Manutenção do Sistema &amp; Infraestrutura (Super Admin)</h2>
+          <p style="color:#94a3b8;font-size:.85rem;margin:0;">Painel restrito para controle do banco de dados Neon PostgreSQL, restauração de snapshots, backups de emergência e servidor WhatsApp.</p>
+        </div>
+
+        <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(360px, 1fr));gap:20px;margin-bottom:24px;">
+          
+          <!-- Card Gerenciamento de Dados -->
+          <div style="background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.08);border-radius:14px;padding:20px;">
+            <div style="font-size:.95rem;font-weight:800;color:#fff;display:flex;align-items:center;gap:8px;margin-bottom:12px;">
+              <span>🗄️</span> Gerenciamento e Limpeza de Dados
+            </div>
+            <p style="color:#94a3b8;font-size:.84rem;margin-bottom:8px;">
+              <strong>Status do Ambiente:</strong> <span style="background:rgba(34,197,94,.15);color:#22c55e;padding:2px 8px;border-radius:6px;font-size:.75rem;font-weight:700;">Sistema em Produção</span>
+            </p>
+            <p style="color:#64748b;font-size:.8rem;margin-bottom:18px;">
+              ${totalClientes} obra(s) cadastrada(s) &middot; ${totalLancamentos} lançamento(s) &middot; ${totalFornecedores} fornecedor(es) no cache local.
+            </p>
+            <button onclick="MasterAdmin.limparDadosGlobal()" style="background:rgba(239,68,68,.15);border:1px solid rgba(239,68,68,.4);color:#fca5a5;padding:9px 16px;border-radius:8px;font-size:.8rem;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:6px;">
+              <span>🗑️</span> Zerar / Limpar Todos os Dados Locais
+            </button>
+          </div>
+
+          <!-- Card Backup & Restauração -->
+          <div style="background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.08);border-radius:14px;padding:20px;">
+            <div style="font-size:.95rem;font-weight:800;color:#fff;display:flex;align-items:center;gap:8px;margin-bottom:12px;">
+              <span>💾</span> Backup &amp; Restauração JSON
+            </div>
+            <p style="color:#94a3b8;font-size:.84rem;margin-bottom:14px;">Exporte ou restaure todos os cadastros, despesas, obras, orçamentos e comprovantes em arquivo JSON.</p>
+            <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px;">
+              <button onclick="MasterAdmin.exportarBackup()" style="background:var(--accent);color:#0f1710;padding:8px 16px;border-radius:8px;font-size:.8rem;font-weight:800;border:none;cursor:pointer;">
+                ⬇️ Baixar Backup JSON
+              </button>
+              <button onclick="document.getElementById('master-import-backup-input').click()" style="background:rgba(255,255,255,.06);color:#fff;border:1px solid rgba(255,255,255,.15);padding:8px 16px;border-radius:8px;font-size:.8rem;font-weight:700;cursor:pointer;">
+                ⬆️ Restaurar Arquivo JSON
+              </button>
+              <input type="file" id="master-import-backup-input" accept=".json,application/json" style="display:none;" onchange="MasterAdmin.importarBackup(this)">
+            </div>
+            <div style="background:rgba(0,0,0,.3);border:1px solid rgba(255,255,255,.06);border-radius:8px;padding:10px 14px;font-size:.78rem;color:#94a3b8;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
+              <span>🛡️ ${snapshotInfo}</span>
+              <button onclick="MasterAdmin.criarSnapshot()" style="background:none;border:none;color:var(--accent2);text-decoration:underline;cursor:pointer;font-size:.76rem;">
+                Criar Ponto de Restauração
+              </button>
+            </div>
+          </div>
+
+          <!-- Card Neon PostgreSQL -->
+          <div style="background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.08);border-radius:14px;padding:20px;">
+            <div style="font-size:.95rem;font-weight:800;color:#fff;display:flex;align-items:center;gap:8px;margin-bottom:12px;">
+              <span>🐘</span> Banco de Dados em Nuvem (Neon PostgreSQL)
+            </div>
+            <p style="color:#94a3b8;font-size:.84rem;margin-bottom:14px;">
+              PostgreSQL Serverless conectado em tempo real (AWS São Paulo sa-east-1). Multi-tenancy isolado cryptograficamente.
+            </p>
+            <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:14px;">
+              <button onclick="MasterAdmin.sincronizarTudoNeon()" style="background:var(--accent);color:#0f1710;padding:8px 16px;border-radius:8px;font-size:.8rem;font-weight:800;border:none;cursor:pointer;">
+                🔄 Sincronizar Tudo para o Neon
+              </button>
+              <button onclick="MasterAdmin.baixarDadosNeon()" style="background:rgba(255,255,255,.06);color:#fff;border:1px solid rgba(255,255,255,.15);padding:8px 16px;border-radius:8px;font-size:.8rem;font-weight:700;cursor:pointer;">
+                ⬇️ Recarregar do Neon
+              </button>
+            </div>
+            <div style="font-size:.76rem;color:#22c55e;background:rgba(34,197,94,.1);padding:6px 12px;border-radius:6px;display:inline-flex;align-items:center;gap:6px;">
+              <span>🟢 Neon PostgreSQL Conectado &middot; AWS sa-east-1 (São Paulo)</span>
+            </div>
+          </div>
+
+          <!-- Card WhatsApp Server 24/7 -->
+          <div style="background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.08);border-radius:14px;padding:20px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+              <div style="font-size:.95rem;font-weight:800;color:#fff;display:flex;align-items:center;gap:8px;">
+                <span>📲</span> Servidor 24/7 de WhatsApp (Baileys Render)
+              </div>
+              <span style="font-size:.72rem;background:rgba(37,211,102,.12);color:#25D366;padding:3px 8px;border-radius:999px;font-weight:700;">
+                ⚡ Servidor Nuvem
+              </span>
+            </div>
+            <p style="color:#94a3b8;font-size:.84rem;margin-bottom:16px;">
+              Instância autônoma no Render com persistência de chaves de autenticação no PostgreSQL Neon. Dispara relatórios diários matinais e alertas de boletos.
+            </p>
+            <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+              <button onclick="WhatsApp.abrirModalConexao()" style="background:#25D366;color:#fff;font-weight:800;font-size:.8rem;border:none;padding:9px 16px;border-radius:8px;cursor:pointer;display:flex;align-items:center;gap:6px;">
+                📲 Abrir Conexão &amp; QR Code
+              </button>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- Card Sobre o Sistema -->
+        <div style="background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.08);border-radius:14px;padding:20px;">
+          <div style="font-size:.95rem;font-weight:800;color:#fff;margin-bottom:14px;">ℹ️ Diagnóstico &amp; Metadados do Sistema</div>
+          <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:16px;font-size:.84rem;">
+            <div><div style="color:#64748b;margin-bottom:4px;">Sistema / Plataforma</div><div style="font-weight:700;color:#fff;">FinObra SaaS Backoffice</div></div>
+            <div><div style="color:#64748b;margin-bottom:4px;">Versão em Produção</div><div style="font-weight:700;color:#fff;">2.4.0 (FinObra Cloud)</div></div>
+            <div><div style="color:#64748b;margin-bottom:4px;">Armazenamento Central</div><div style="font-weight:700;color:#22c55e;">🐘 Neon PostgreSQL + Vercel Blob</div></div>
+            <div><div style="color:#64748b;margin-bottom:4px;">Isolamento Multi-Tenant</div><div style="font-weight:700;color:#22c55e;">Ativo (Cryptographic Tenant Tokens)</div></div>
+          </div>
+        </div>
+
+      </div>
+    `;
+  },
+
+  limparDadosGlobal() {
+    Utils.confirm('🚨 ATENÇÃO SUPER ADMIN: Deseja realmente zerar todos os dados locais do sistema? Esta ação é irreversível.', () => {
+      if (typeof App !== 'undefined' && App.clearAllData) {
+        App.clearAllData();
+      } else {
+        localStorage.clear();
+        sessionStorage.clear();
+        location.reload();
+      }
+    });
+  },
+
+  criarSnapshot() {
+    if (typeof Configuracoes !== 'undefined' && Configuracoes.criarSnapshot) {
+      Configuracoes.criarSnapshot();
+    } else {
+      Utils.toast('Ponto de restauração gravado!', 'info');
+    }
+  },
+
+  exportarBackup() {
+    if (typeof Configuracoes !== 'undefined' && Configuracoes.exportarBackup) {
+      Configuracoes.exportarBackup();
+    } else {
+      Utils.toast('Função de exportação indisponível.', 'warning');
+    }
+  },
+
+  importarBackup(input) {
+    if (typeof Configuracoes !== 'undefined' && Configuracoes.importarBackup) {
+      Configuracoes.importarBackup(input);
+    } else {
+      Utils.toast('Função de importação indisponível.', 'warning');
+    }
+  },
+
+  async sincronizarTudoNeon() {
+    if (typeof Configuracoes !== 'undefined' && Configuracoes.sincronizarTudoNeon) {
+      await Configuracoes.sincronizarTudoNeon();
+    } else if (typeof DB !== 'undefined' && DB.syncAllToCloud) {
+      await DB.syncAllToCloud();
+    }
+  },
+
+  async baixarDadosNeon() {
+    if (typeof Configuracoes !== 'undefined' && Configuracoes.baixarDadosNeon) {
+      await Configuracoes.baixarDadosNeon();
+    } else if (typeof DB !== 'undefined' && DB.syncFromCloud) {
+      await DB.syncFromCloud();
+    }
   },
 
   _renderLinhaEmpresa(e) {

@@ -3,16 +3,8 @@
 const Configuracoes = {
   _activeTab: 'empresa',
 
-  canAccessSistema() {
-    if (typeof Auth === 'undefined') return false;
-    const user = Auth.getUser();
-    // Apenas equipe de desenvolvimento / superadmin master tem acesso visível à aba Sistema
-    return (user?.username === 'admin' && user?.tenantId === 'angelim') || localStorage.getItem('finobra_dev_mode') === 'true';
-  },
-
   render(obraId) {
-    // Se a aba ativa for sistema mas o usuário for cliente comum, redireciona para empresa
-    if (this._activeTab === 'sistema' && !this.canAccessSistema()) {
+    if (this._activeTab === 'sistema') {
       this._activeTab = 'empresa';
     }
 
@@ -22,8 +14,6 @@ const Configuracoes = {
       s.textContent = '.cfg-tab{padding:10px 20px;border:none;background:transparent;color:var(--text3);font-family:inherit;font-size:.875rem;font-weight:600;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-2px;transition:color .2s,border-color .2s;}.cfg-tab:hover{color:var(--text);}.cfg-tab-active{color:var(--accent)!important;border-bottom-color:var(--accent)!important;}';
       document.head.appendChild(s);
     }
-
-    const showSistema = this.canAccessSistema();
 
     return `
     <div>
@@ -40,10 +30,6 @@ const Configuracoes = {
         <button id="cfg-tab-categorias" class="cfg-tab${this._activeTab==='categorias'?' cfg-tab-active':''}" onclick="Configuracoes._switch('categorias')">
           &#x1F3F7;&#xFE0F; Categorias
         </button>
-        ${showSistema ? `
-        <button id="cfg-tab-sistema" class="cfg-tab${this._activeTab==='sistema'?' cfg-tab-active':''}" onclick="Configuracoes._switch('sistema')">
-          &#x2699;&#xFE0F; Sistema (Dev)
-        </button>` : ''}
       </div>
       <div id="cfg-content">
         ${this._renderTab(this._activeTab, obraId)}
@@ -52,8 +38,8 @@ const Configuracoes = {
   },
 
   _switch(tab) {
-    if (tab === 'sistema' && !this.canAccessSistema()) {
-      Utils.toast('Aba restrita ao suporte técnico e desenvolvedores.', 'info');
+    const validTabs = ['empresa', 'usuarios', 'contas', 'categorias'];
+    if (!validTabs.includes(tab)) {
       tab = 'empresa';
     }
     this._activeTab = tab;
@@ -64,32 +50,12 @@ const Configuracoes = {
     if (content) content.innerHTML = this._renderTab(tab, App.obraId);
   },
 
-  toggleDevMode() {
-    const current = localStorage.getItem('finobra_dev_mode') === 'true';
-    if (current) {
-      localStorage.removeItem('finobra_dev_mode');
-      Utils.toast('🔒 Modo Sistema / Suporte ocultado com sucesso.', 'info');
-      this._activeTab = 'empresa';
-    } else {
-      localStorage.setItem('finobra_dev_mode', 'true');
-      Utils.toast('🔓 Modo Sistema / Suporte ativado para manutenção técnica.', 'success');
-      this._activeTab = 'sistema';
-    }
-    const content = document.getElementById('route-content');
-    if (content) {
-      content.innerHTML = this.render(App.obraId);
-    }
-  },
-
   _renderTab(tab, obraId) {
     if (tab === 'empresa') return this._renderEmpresa();
     if (tab === 'contas') return Contas._html(obraId);
-    if (tab === 'sistema') {
-      if (!this.canAccessSistema()) return this._renderEmpresa();
-      return this._renderSistema();
-    }
     if (tab === 'categorias') return this._renderCategorias();
-    return this._renderUsuarios();
+    if (tab === 'usuarios') return this._renderUsuarios();
+    return this._renderEmpresa();
   },
 
   // ── MINHA EMPRESA / DADOS CADASTRAIS ───────────────────
@@ -743,100 +709,7 @@ const Configuracoes = {
     });
   },
 
-  // ── SISTEMA ──────────────────────────────────────────
-  _renderSistema() {
-    const emp = (typeof DB !== 'undefined' && DB.getEmpresa) ? DB.getEmpresa() : {};
-    const isDemoLoaded = DB.isDemoLoaded();
-    const totalClientes = DB.getAll('clientes').length;
-    const totalLancamentos = DB.getAll('lancamentos').length;
-    const totalFornecedores = DB.getAll('fornecedores').length;
-    const snapshotRaw = localStorage.getItem('finobra_snapshot_seguranca');
-    let snapshotInfo = 'Nenhum snapshot gravado ainda.';
-    if (snapshotRaw) {
-      try {
-        const snap = JSON.parse(snapshotRaw);
-        snapshotInfo = `Último snapshot: ${Utils.fmt.datetime(snap.saved_at)} (${snap.totalLancamentos} lançamentos)`;
-      } catch {}
-    }
 
-    return `
-    <div class="page-header">
-      <div><h1 class="page-title">&#x2699;&#xFE0F; Configura&ccedil;&otilde;es do Sistema</h1><p class="page-sub">Prefer&ecirc;ncias, gerenciamento de banco de dados e backup de segurança</p></div>
-    </div>
-    <div class="g2">
-      <div class="card">
-        <div class="card-header"><div class="card-title">&#x1F5C4;&#xFE0F; Gerenciamento de Dados</div></div>
-        <p style="color:var(--text2);font-size:.84rem;margin-bottom:8px;">
-          <strong>Status:</strong> <span class="badge badge-success">Sistema em Produção</span>
-        </p>
-        <p style="color:var(--text3);font-size:.8rem;margin-bottom:16px;">
-          ${totalClientes} obra(s) cadastrada(s) &middot; ${totalLancamentos} lançamento(s) &middot; ${totalFornecedores} fornecedor(es).
-        </p>
-        <div style="display:flex;gap:8px;flex-wrap:wrap;">
-          <button class="btn btn-danger btn-sm" onclick="App.clearAllData()">&#x1F5D1; Zerar / Limpar Todos os Dados</button>
-        </div>
-      </div>
-      <div class="card">
-        <div class="card-header"><div class="card-title">&#x1F4BE; Backup &amp; Restauração</div></div>
-        <p style="color:var(--text2);font-size:.84rem;margin-bottom:10px;">Exporte ou restaure todos os cadastros, despesas, obras, orçamentos e comprovantes em JSON.</p>
-        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;">
-          <button class="btn btn-primary btn-sm" onclick="Configuracoes.exportarBackup()">&#x2B07;&#xFE0F; Baixar Backup JSON</button>
-          <button class="btn btn-secondary btn-sm" onclick="document.getElementById('cfg-import-backup-input').click()">&#x2B06;&#xFE0F; Restaurar Arquivo JSON</button>
-          <input type="file" id="cfg-import-backup-input" accept=".json,application/json" style="display:none;" onchange="Configuracoes.importarBackup(this)">
-        </div>
-        <div style="background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--r-sm);padding:8px 12px;font-size:.76rem;color:var(--text3);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px;">
-          <span>🛡️ ${snapshotInfo}</span>
-          <button class="btn btn-ghost btn-sm" style="font-size:.72rem;padding:2px 6px;" onclick="Configuracoes.criarSnapshot()">Criar Ponto de Restauração</button>
-        </div>
-      </div>
-      <div class="card">
-        <div class="card-header"><div class="card-title">🐘 Banco de Dados em Nuvem (Neon PostgreSQL)</div></div>
-        <p style="color:var(--text2);font-size:.84rem;margin-bottom:10px;">PostgreSQL Serverless conectado em tempo real (AWS São Paulo sa-east-1). Seus dados sincronizam entre todos os dispositivos da construtora.</p>
-        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px;">
-          <button class="btn btn-primary btn-sm" onclick="Configuracoes.sincronizarTudoNeon()">
-            🔄 Sincronizar Tudo para o Neon
-          </button>
-          <button class="btn btn-secondary btn-sm" onclick="Configuracoes.baixarDadosNeon()">
-            ⬇️ Recarregar do Neon
-          </button>
-        </div>
-        <div style="font-size:.76rem;color:var(--success);background:rgba(16,185,129,.1);padding:6px 10px;border-radius:6px;display:inline-flex;align-items:center;gap:6px;">
-          <span>🟢 Neon PostgreSQL Conectado &middot; AWS sa-east-1 (São Paulo)</span>
-        </div>
-      </div>
-      <div class="card">
-        <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;">
-          <div class="card-title">📲 Integração com WhatsApp</div>
-          <span id="cfg-wa-status-badge" style="font-size:.74rem;background:rgba(37,211,102,.1);color:#25D366;padding:4px 10px;border-radius:999px;font-weight:700;">
-            ⚡ Servidor Nuvem 24/7
-          </span>
-        </div>
-        <p style="color:var(--text2);font-size:.84rem;margin-bottom:12px;line-height:1.5;">
-          Conecte o WhatsApp da sua construtora para envio silencioso e automático de relatórios, alertas de vencimento de boletos aos gestores e recibos de pagamento.
-        </p>
-        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:10px;">
-          <button class="btn btn-sm" onclick="WhatsApp.abrirModalConexao()" style="background:#25D366;color:#fff;font-weight:700;display:flex;align-items:center;gap:6px;border:none;padding:8px 14px;border-radius:8px;cursor:pointer;">
-            📲 Conectar / Gerenciar WhatsApp
-          </button>
-          <button class="btn btn-secondary btn-sm" onclick="WhatsApp.abrirModalTelefone()" style="font-size:.8rem;">
-            ⚙️ Número para Alertas
-          </button>
-        </div>
-        <div style="font-size:.78rem;color:var(--text3);" id="cfg-wa-ativo-txt">
-          ${WhatsApp.getTelefonePadrao() ? `Telefone para alertas: <strong style="color:var(--success);">${WhatsApp.formatarTelefone(WhatsApp.getTelefonePadrao())}</strong>` : 'Nenhum telefone para alertas cadastrado'}
-        </div>
-      </div>
-    </div>
-    <div class="card" style="margin-top:16px;">
-      <div class="card-header"><div class="card-title">&#x2139;&#xFE0F; Sobre o Sistema</div></div>
-      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:16px;font-size:.84rem;">
-        <div><div style="color:var(--text3);margin-bottom:4px;">Sistema / Empresa</div><div style="font-weight:700;">${emp.nome_fantasia || emp.razao_social || 'FinObra Gestão'}</div></div>
-        <div><div style="color:var(--text3);margin-bottom:4px;">Vers&atilde;o</div><div style="font-weight:700;">2.4.0 (FinObra Cloud)</div></div>
-        <div><div style="color:var(--text3);margin-bottom:4px;">Armazenamento</div><div style="font-weight:700;color:var(--success);">🐘 Neon PostgreSQL (Nuvem) + Offline Cache</div></div>
-        <div><div style="color:var(--text3);margin-bottom:4px;">Status dos Dados</div><div style="font-weight:700;color:${isDemoLoaded?'var(--warning)':'var(--success)'}">${isDemoLoaded?'Demonstração':'Limpo / Produção'}</div></div>
-      </div>
-    </div>`;
-  },
 
   criarSnapshot() {
     try {
@@ -952,18 +825,7 @@ const Configuracoes = {
   init() {}
 };
 
-// ── ATALHO PARA EQUIPE DEV / SUPORTE TÉCNICO ──
-if (typeof window !== 'undefined' && !window._cfgDevShortcutInit) {
-  window._cfgDevShortcutInit = true;
-  window.FinObra = window.FinObra || {};
-  window.FinObra.ativarModoDev = () => Configuracoes.toggleDevMode();
-  window.FinObra.modoDev = () => Configuracoes.toggleDevMode();
-
-  document.addEventListener('keydown', (e) => {
-    // Atalho discreto: Ctrl + Alt + S
-    if (e.ctrlKey && e.altKey && (e.key === 's' || e.key === 'S')) {
-      e.preventDefault();
-      Configuracoes.toggleDevMode();
-    }
-  });
-}
+// Limpa qualquer flag antiga de dev mode que possa ter ficado no browser
+try {
+  localStorage.removeItem('finobra_dev_mode');
+} catch (_) {}
