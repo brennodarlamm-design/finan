@@ -77,7 +77,7 @@ const GDrive = {
             onTokenReady();
           },
         });
-        this._tokenClient.requestAccessToken({ prompt: '' });
+        this._tokenClient.requestAccessToken();
       } else {
         onTokenReady();
       }
