@@ -206,7 +206,11 @@ const App = {
 
     const brandName = emp.nome_fantasia || emp.razao_social || 'Minha Empresa';
     const logoHtml = emp.logo_url
-      ? `<img src="${emp.logo_url}" alt="${brandName}" style="width:100%;max-width:130px;max-height:50px;border-radius:8px;border:1px solid rgba(201,162,39,.35);box-shadow:0 4px 16px rgba(0,0,0,.5);object-fit:contain;">`
+      ? `<div style="display:flex;align-items:center;min-width:0;max-width:calc(100% - 28px);overflow:hidden;">
+          <div style="display:inline-flex;align-items:center;justify-content:center;padding:2px;border-radius:8px;background:rgba(255,255,255,0.02);border:1px solid rgba(201,162,39,0.25);box-shadow:0 4px 12px rgba(0,0,0,0.35);flex-shrink:0;">
+            <img src="${emp.logo_url}" alt="${brandName}" style="max-height:48px;max-width:185px;width:auto;height:auto;object-fit:contain;border-radius:6px;display:block;">
+          </div>
+        </div>`
       : `<div style="display:flex;align-items:center;gap:10px;overflow:hidden;width:100%;">
           <div style="width:38px;height:38px;border-radius:8px;background:linear-gradient(135deg,#1C2D12,#243818);border:1px solid rgba(201,162,39,.5);display:flex;align-items:center;justify-content:center;font-size:1.2rem;flex-shrink:0;box-shadow:0 4px 12px rgba(201,162,39,.3);">🏢</div>
           <div style="min-width:0;overflow:hidden;flex:1;">
@@ -631,6 +635,9 @@ const App = {
               ${emp.logo_url ? `<button type="button" class="btn btn-ghost btn-sm" style="color:var(--danger);" onclick="App.removerLogoOnboarding()">🗑️ Remover Logo</button>` : ''}
               <span id="ob-logo-preview-txt" style="font-size:.78rem;color:var(--text3);">${emp.logo_url ? 'Logotipo atual salvo' : 'Nenhuma imagem selecionada'}</span>
             </div>
+            <div style="font-size:.72rem;color:var(--text3);margin-top:6px;line-height:1.4;">
+              💡 <strong>Recomendado:</strong> Formato horizontal retangular (~3:1 ou 4:1, ex: 300x100px) com fundo transparente em <strong>.PNG</strong> para perfeito encaixe no menu e relatórios.
+            </div>
             <input type="hidden" name="logo_url" id="ob-logo-url" value="${emp.logo_url || ''}">
           </div>
 
@@ -648,7 +655,7 @@ const App = {
     if (!file) return;
     try {
       Utils.toast('Processando e otimizando logotipo...', 'info');
-      const res = await Utils.compressImage(file, 400, 200, 0.9);
+      const res = await Utils.compressImage(file, 600, 240, 0.9);
       const urlInput = document.getElementById('ob-logo-url');
       if (urlInput) urlInput.value = res.dataUrl;
       const previewTxt = document.getElementById('ob-logo-preview-txt');

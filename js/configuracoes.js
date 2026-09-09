@@ -169,18 +169,59 @@ const Configuracoes = {
           </div>
 
           <div class="form-group">
-            <label class="form-label">Logotipo da Empresa</label>
-            <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+            <label class="form-label" style="font-weight:800;display:flex;align-items:center;gap:6px;">
+              <span>🏢 Logotipo Oficial da Empresa</span>
+            </label>
+            <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:12px;">
               <input type="file" id="cfg-logo-file" accept="image/*" style="display:none;" onchange="Configuracoes.handleLogoUpload(this)">
-              <button type="button" class="btn btn-secondary btn-sm" onclick="document.getElementById('cfg-logo-file').click()">📁 Selecionar Arquivo</button>
-              ${emp.logo_url ? `<button type="button" class="btn btn-ghost btn-sm" style="color:var(--danger);" onclick="Configuracoes.removerLogo()">🗑️ Remover Logo</button>` : ''}
-              <span id="cfg-logo-txt" style="font-size:.78rem;color:var(--text3);">${emp.logo_url ? 'Logotipo salvo no sistema' : 'Nenhuma imagem selecionada'}</span>
+              <button type="button" class="btn btn-secondary btn-sm" onclick="document.getElementById('cfg-logo-file').click()" style="font-weight:700;">
+                📁 Escolher Nova Imagem
+              </button>
+              ${emp.logo_url ? `<button type="button" class="btn btn-ghost btn-sm" style="color:var(--danger);font-weight:600;" onclick="Configuracoes.removerLogo()">🗑️ Remover Logo</button>` : ''}
+              <span id="cfg-logo-txt" style="font-size:.78rem;color:var(--text3);">${emp.logo_url ? '✓ Logotipo ativo no sistema' : 'Nenhuma imagem selecionada'}</span>
             </div>
+
+            <!-- QUADRO DE INSTRUÇÕES E RECOMENDAÇÕES PARA O USUÁRIO -->
+            <div style="background:rgba(18,217,160,0.03);border:1px solid rgba(18,217,160,0.22);border-radius:10px;padding:14px 16px;">
+              <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
+                <span style="font-size:1.1rem;">💡</span>
+                <strong style="font-size:.88rem;color:var(--accent);">Guia & Recomendações para o Logotipo Perfeito</strong>
+              </div>
+              <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(210px, 1fr));gap:10px;font-size:.78rem;line-height:1.45;">
+                <div style="background:rgba(0,0,0,0.25);padding:10px 12px;border-radius:8px;border:1px solid var(--border-s);">
+                  <div style="font-weight:700;color:var(--text);margin-bottom:3px;display:flex;align-items:center;gap:5px;">
+                    <span>📐</span> Proporção Ideal: Horizontal (3:1 a 4:1)
+                  </div>
+                  <div style="color:var(--text2);">
+                    Dimensões ideais de <strong>300x100px</strong> ou <strong>400x120px</strong>. Se sua marca for um símbolo/brasão quadrado (1:1), recomendamos usar a versão horizontal que inclua o nome da empresa ao lado.
+                  </div>
+                </div>
+
+                <div style="background:rgba(0,0,0,0.25);padding:10px 12px;border-radius:8px;border:1px solid var(--border-s);">
+                  <div style="font-weight:700;color:var(--text);margin-bottom:3px;display:flex;align-items:center;gap:5px;">
+                    <span>🎨</span> Fundo Transparente (.PNG)
+                  </div>
+                  <div style="color:var(--text2);">
+                    Dê preferência a imagens em <strong>.PNG com fundo transparente</strong>. Assim, o logo fica perfeito tanto no tema escuro do menu quanto no papel branco dos relatórios e dossiês impressos.
+                  </div>
+                </div>
+
+                <div style="background:rgba(0,0,0,0.25);padding:10px 12px;border-radius:8px;border:1px solid var(--border-s);">
+                  <div style="font-weight:700;color:var(--text);margin-bottom:3px;display:flex;align-items:center;gap:5px;">
+                    <span>🚀</span> Aplicações no FinObra
+                  </div>
+                  <div style="color:var(--text2);">
+                    Seu logotipo timbrado é inserido automaticamente no <strong>Menu Lateral</strong>, no <strong>Dossiê Executivo da Obra</strong>, em <strong>Recibos Oficiais</strong>, <strong>Ordens de Compra</strong> e <strong>Contratos</strong>.
+                  </div>
+                </div>
+              </div>
+            </div>
+
             <input type="hidden" name="logo_url" id="cfg-emp-logo" value="${emp.logo_url || ''}">
           </div>
 
           <button type="submit" class="btn btn-primary" style="margin-top:10px;">
-            &#x1F4BE; Salvar Altera&ccedil;&otilde;es da Empresa
+            💾 Salvar Alterações da Empresa
           </button>
         </form>
       </div>
@@ -188,12 +229,33 @@ const Configuracoes = {
         <!-- PREVIEW CARD -->
         <div class="card">
           <div class="card-header">
-            <div class="card-title">&#x1F441;&#xFE0F; Pr&eacute;-visualiza&ccedil;&atilde;o da Marca</div>
+            <div class="card-title">👁️ Pré-visualização da Marca</div>
           </div>
           <div style="background:var(--bg-secondary);border:1px solid var(--border);border-radius:12px;padding:20px;text-align:center;">
-            <div style="margin-bottom:16px;" id="cfg-logo-preview-box">
-              ${emp.logo_url ? `<img id="cfg-preview-logo-img" src="${emp.logo_url}" alt="Logo" style="max-width:140px;max-height:70px;border-radius:8px;border:1px solid rgba(201,162,39,.4);object-fit:contain;">` : `<div id="cfg-preview-logo-placeholder" style="width:64px;height:64px;border-radius:12px;background:linear-gradient(135deg,#1C2D12,#243818);border:1px solid rgba(201,162,39,.4);display:inline-flex;align-items:center;justify-content:center;font-size:2rem;">🏢</div>`}
+            
+            <!-- DUPLA PRÉ-VISUALIZAÇÃO: TEMA ESCURO (MENU) & TEMA CLARO (RELATÓRIOS/IMPRESSÃO) -->
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px;text-align:center;">
+              <!-- Visualização 1: Menu Escuro -->
+              <div style="background:#090C07;border:1px solid rgba(201,162,39,.3);border-radius:10px;padding:14px;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:95px;">
+                <div style="font-size:.68rem;text-transform:uppercase;letter-spacing:.06em;color:var(--text3);margin-bottom:8px;font-weight:700;">No Menu Lateral (Escuro)</div>
+                <div id="cfg-logo-preview-dark" style="display:inline-flex;align-items:center;justify-content:center;padding:2px;border-radius:8px;background:rgba(255,255,255,0.02);border:1px solid rgba(201,162,39,0.25);">
+                  ${emp.logo_url 
+                    ? `<img id="cfg-preview-logo-img-dark" src="${emp.logo_url}" alt="Logo" style="max-height:48px;max-width:180px;width:auto;height:auto;object-fit:contain;border-radius:6px;display:block;">` 
+                    : `<div style="width:42px;height:42px;border-radius:10px;background:linear-gradient(135deg,#1C2D12,#243818);border:1px solid rgba(201,162,39,.4);display:inline-flex;align-items:center;justify-content:center;font-size:1.4rem;">🏢</div>`}
+                </div>
+              </div>
+
+              <!-- Visualização 2: Papel Branco / Dossiê -->
+              <div style="background:#ffffff;border:1px solid #cbd5e1;border-radius:10px;padding:14px;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:95px;">
+                <div style="font-size:.68rem;text-transform:uppercase;letter-spacing:.06em;color:#64748b;margin-bottom:8px;font-weight:700;">No Dossiê / Papel A4 (Claro)</div>
+                <div id="cfg-logo-preview-light" style="display:inline-flex;align-items:center;justify-content:center;padding:2px;">
+                  ${emp.logo_url 
+                    ? `<img id="cfg-preview-logo-img-light" src="${emp.logo_url}" alt="Logo" style="max-height:48px;max-width:180px;width:auto;height:auto;object-fit:contain;border-radius:6px;display:block;">` 
+                    : `<div style="font-size:1rem;font-weight:900;color:#0f172a;">🏢 ${emp.nome_fantasia || 'Construtora'}</div>`}
+                </div>
+              </div>
             </div>
+
             <div style="font-size:1.2rem;font-weight:900;background:linear-gradient(135deg,var(--accent2),var(--accent));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;">
               ${emp.nome_fantasia || 'Nome da Construtora'}
             </div>
@@ -230,7 +292,7 @@ const Configuracoes = {
     if (!file) return;
     try {
       Utils.toast('Processando e otimizando imagem do logotipo...', 'info');
-      const res = await Utils.compressImage(file, 400, 200, 0.9);
+      const res = await Utils.compressImage(file, 600, 240, 0.9);
       
       const hiddenInput = document.getElementById('cfg-emp-logo');
       if (hiddenInput) hiddenInput.value = res.dataUrl;
@@ -238,12 +300,16 @@ const Configuracoes = {
       const txt = document.getElementById('cfg-logo-txt');
       if (txt) txt.textContent = `✓ ${res.name} (${Math.round(res.sizeBytes / 1024)} KB)`;
 
-      const box = document.getElementById('cfg-logo-preview-box');
-      if (box) {
-        box.innerHTML = `<img id="cfg-preview-logo-img" src="${res.dataUrl}" alt="Logo" style="max-width:140px;max-height:70px;border-radius:8px;border:1px solid rgba(201,162,39,.4);object-fit:contain;transition:all .2s ease;">`;
+      const darkBox = document.getElementById('cfg-logo-preview-dark');
+      if (darkBox) {
+        darkBox.innerHTML = `<img id="cfg-preview-logo-img-dark" src="${res.dataUrl}" alt="Logo" style="max-height:48px;max-width:180px;width:auto;height:auto;object-fit:contain;border-radius:6px;display:block;">`;
+      }
+      const lightBox = document.getElementById('cfg-logo-preview-light');
+      if (lightBox) {
+        lightBox.innerHTML = `<img id="cfg-preview-logo-img-light" src="${res.dataUrl}" alt="Logo" style="max-height:48px;max-width:180px;width:auto;height:auto;object-fit:contain;border-radius:6px;display:block;">`;
       }
       
-      Utils.toast('Logotipo carregado! Clique em Salvar para aplicar.', 'success');
+      Utils.toast('Logotipo carregado! Clique em Salvar Alterações para aplicar.', 'success');
     } catch (err) {
       console.error('Erro no upload de logo:', err);
       Utils.toast(err.message || 'Falha ao processar arquivo de imagem.', 'error');
@@ -255,11 +321,15 @@ const Configuracoes = {
     if (hiddenInput) hiddenInput.value = '';
     const txt = document.getElementById('cfg-logo-txt');
     if (txt) txt.textContent = 'Logotipo removido';
-    const box = document.getElementById('cfg-logo-preview-box');
-    if (box) {
-      box.innerHTML = `<div id="cfg-preview-logo-placeholder" style="width:64px;height:64px;border-radius:12px;background:linear-gradient(135deg,#1C2D12,#243818);border:1px solid rgba(201,162,39,.4);display:inline-flex;align-items:center;justify-content:center;font-size:2rem;">🏢</div>`;
+    const darkBox = document.getElementById('cfg-logo-preview-dark');
+    if (darkBox) {
+      darkBox.innerHTML = `<div style="width:42px;height:42px;border-radius:10px;background:linear-gradient(135deg,#1C2D12,#243818);border:1px solid rgba(201,162,39,.4);display:inline-flex;align-items:center;justify-content:center;font-size:1.4rem;">🏢</div>`;
     }
-    Utils.toast('Logotipo removido. Clique em Salvar para aplicar.', 'info');
+    const lightBox = document.getElementById('cfg-logo-preview-light');
+    if (lightBox) {
+      lightBox.innerHTML = `<div style="font-size:1rem;font-weight:900;color:#0f172a;">🏢 Construtora</div>`;
+    }
+    Utils.toast('Logotipo removido. Clique em Salvar Alterações para aplicar.', 'info');
   },
 
   async buscarCnpj() {
