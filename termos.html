@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Termos de Serviço — FinObra</title>
+  <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png?v=3">
+  <link rel="icon" type="image/x-icon" href="/favicon.ico?v=3">
+  <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png?v=3">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <style>
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    :root{
+      --bg-base:#080F05;--bg-card:#142210;--border:#243518;
+      --accent:#C9A227;--accent2:#E8C84A;--accent-glow:rgba(201,162,39,.28);
+      --text:#F0EAD6;--text2:#A8C090;--text3:#5A7048;
+    }
+    body{
+      font-family:'Inter',sans-serif;
+      background:var(--bg-base);
+      color:var(--text);
+      line-height:1.7;
+      min-height:100vh;
+      display:flex;
+      flex-direction:column;
+    }
+    header{
+      border-bottom:1px solid var(--border);
+      padding:20px 32px;
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      background:rgba(8,15,5,.85);
+      backdrop-filter:blur(10px);
+      position:sticky;
+      top:0;
+      z-index:10;
+    }
+    .brand{
+      display:flex;
+      align-items:center;
+      gap:14px;
+      text-decoration:none;
+    }
+    .brand img{
+      width:44px;
+      height:44px;
+      border-radius:10px;
+      border:1px solid rgba(201,162,39,.4);
+      object-fit:cover;
+    }
+    .brand-title{
+      font-size:1.35rem;
+      font-weight:900;
+      letter-spacing:.05em;
+      background:linear-gradient(135deg,#F7E07C,#C9A227);
+      -webkit-background-clip:text;
+      -webkit-text-fill-color:transparent;
+      background-clip:text;
+    }
+    .brand-sub{
+      font-size:.72rem;
+      color:var(--text3);
+      letter-spacing:.08em;
+      text-transform:uppercase;
+    }
+    .nav-link{
+      color:var(--accent2);
+      text-decoration:none;
+      font-size:.88rem;
+      font-weight:600;
+      padding:8px 16px;
+      border-radius:8px;
+      border:1px solid rgba(201,162,39,.3);
+      transition:all .2s;
+    }
+    .nav-link:hover{
+      background:rgba(201,162,39,.12);
+      border-color:var(--accent);
+    }
+    main{
+      flex:1;
+      max-width:880px;
+      margin:0 auto;
+      padding:48px 24px 80px;
+    }
+    .doc-header{
+      margin-bottom:40px;
+      border-bottom:1px solid var(--border);
+      padding-bottom:24px;
+    }
+    .doc-header h1{
+      font-size:2.2rem;
+      font-weight:900;
+      color:var(--text);
+      margin-bottom:10px;
+    }
+    .doc-header p{
+      color:var(--text2);
+      font-size:.9rem;
+    }
+    .badge-terms{
+      display:inline-flex;
+      align-items:center;
+      gap:6px;
+      background:rgba(201,162,39,.1);
+      border:1px solid rgba(201,162,39,.3);
+      color:var(--accent2);
+      font-size:.78rem;
+      font-weight:700;
+      padding:4px 12px;
+      border-radius:20px;
+      margin-bottom:14px;
+    }
+    section{
+      margin-bottom:36px;
+    }
+    h2{
+      font-size:1.35rem;
+      font-weight:800;
+      color:var(--accent2);
+      margin-bottom:14px;
+      display:flex;
+      align-items:center;
+      gap:10px;
+    }
+    p,li{
+      color:rgba(240,234,214,.88);
+      font-size:.95rem;
+      margin-bottom:12px;
+    }
+    ul{
+      margin-left:24px;
+      margin-bottom:14px;
+    }
+    li{margin-bottom:8px;}
+    .highlight-box{
+      background:rgba(201,162,39,.06);
+      border:1px solid rgba(201,162,39,.2);
+      border-radius:12px;
+      padding:20px;
+      margin:20px 0;
+    }
+    footer{
+      border-top:1px solid var(--border);
+      padding:24px;
+      text-align:center;
+      color:var(--text3);
+      font-size:.82rem;
+    }
+    footer a{
+      color:var(--text2);
+      text-decoration:none;
+      margin:0 10px;
+    }
+    footer a:hover{
+      color:var(--accent2);
+      text-decoration:underline;
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <a href="/" class="brand">
+      <img src="/img/finobra_logo.jpg" alt="FinObra">
+      <div>
+        <div class="brand-title">FINOBRA</div>
+        <div class="brand-sub">Sistema de Gestão de Obras</div>
+      </div>
+    </a>
+    <a href="/" class="nav-link">← Voltar ao Login</a>
+  </header>
+
+  <main>
+    <div class="doc-header">
+      <div class="badge-terms">⚖️ Termos Oficiais de Uso</div>
+      <h1>Termos de Serviço</h1>
+      <p>Última atualização: 08 de setembro de 2026 &middot; Versão 2.4</p>
+    </div>
+
+    <section>
+      <h2>1. Aceitação dos Termos</h2>
+      <p>
+        Ao acessar, cadastrar-se ou utilizar a plataforma <strong>FinObra</strong> ("FinObra", "Software" ou "Serviço"), disponível em <strong>https://finobra.app.br</strong>, você ("Usuário", "Cliente" ou "Construtora") concorda expressamente em vincular-se a estes Termos de Serviço e à nossa <a href="/privacidade" style="color:var(--accent2);text-decoration:underline;">Política de Privacidade</a>.
+      </p>
+      <p>
+        Caso não concorde com qualquer uma das disposições aqui estabelecidas, orientamos a não prosseguir com o uso do sistema.
+      </p>
+    </section>
+
+    <section>
+      <h2>2. Descrição do Software e Serviços</h2>
+      <p>
+        O <strong>FinObra</strong> é uma solução tecnológica em nuvem (SaaS) especializada na gestão operacional, física e financeira de obras civis, proporcionando funcionalidades como:
+      </p>
+      <ul>
+        <li>Controle e planejamento físico-financeiro de obras e medições de empreiteiros.</li>
+        <li>Fluxo de caixa projetado, conciliação de extratos bancários via arquivos OFX e auditoria fiscal de notas (OCR).</li>
+        <li>Emissão de contratos digitais de empreitada e recibos eletrônicos com assinatura digital e QR Code de autenticidade pública.</li>
+        <li>Gestão de obras financiadas (Caixa Econômica Federal / PCI / SBPE / MCMV) e obras particulares.</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>3. Cadastro, Contas e Acesso Seguro</h2>
+      <p>
+        Para utilizar os recursos do FinObra, é necessário cadastrar uma conta ou autenticar-se utilizando o recurso <strong>"Continuar com o Google"</strong> (Google Identity Services):
+      </p>
+      <ul>
+        <li>O usuário é o único responsável por manter a confidencialidade de suas credenciais de acesso e senha.</li>
+        <li>O usuário compromete-se a fornecer informações verdadeiras e atualizadas sobre a pessoa física ou jurídica titular da conta.</li>
+        <li>Qualquer atividade realizada por meio de sua conta será de sua inteira responsabilidade.</li>
+        <li>Em caso de perda de acesso, a plataforma disponibiliza verificação em duas etapas via código OTP de 6 dígitos enviado ao canal cadastrado (WhatsApp/E-mail).</li>
+      </ul>
+    </section>
+
+    <div class="highlight-box">
+      <h2>4. Propriedade Intelectual e Dados do Cliente</h2>
+      <p>
+        <strong>Os seus dados pertencem a você:</strong> Todo e qualquer dado inserido no FinObra pela sua construtora — incluindo dados de clientes, custos, orçamentos, contratos, notas fiscais e relatórios — é de propriedade exclusiva da sua empresa.
+      </p>
+      <p>
+        O FinObra não reivindica propriedade sobre o conteúdo ou documentos importados pelo usuário e compromete-se a não utilizar essas informações para qualquer finalidade alheia à prestação e melhoria contínua dos serviços contratados.
+      </p>
+    </div>
+
+    <section>
+      <h2>5. Uso Aceitável da Plataforma</h2>
+      <p>O usuário concorda em não utilizar a plataforma para:</p>
+      <ul>
+        <li>Praticar qualquer ato ilícito, fraudulento ou violador da legislação brasileira vigente.</li>
+        <li>Tentar violar a segurança, autenticação ou integridade do sistema ou de outros inquilinos (tenants).</li>
+        <li>Realizar engenharia reversa, descompilação ou cópia indevida da tecnologia do FinObra.</li>
+        <li>Disseminar vírus, malwares ou qualquer código malicioso.</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>6. Disponibilidade, Nível de Serviço (SLA) e Backup</h2>
+      <p>
+        Empregamos os melhores esforços técnicos e infraestrutura de alta disponibilidade em nuvem serverless para garantir a operação ininterrupta da plataforma. No entanto, o serviço pode sofrer interrupções programadas para manutenção preventiva ou atualizações de segurança, as quais serão comunicadas previamente aos administradores.
+      </p>
+    </section>
+
+    <section>
+      <h2>7. Rescisão e Encerramento de Contas</h2>
+      <p>
+        O usuário pode solicitar o encerramento da sua conta a qualquer momento mediante contato com o suporte. Em caso de encerramento, o usuário terá a faculdade de solicitar a exportação de seus dados operacionais no prazo legal.
+      </p>
+    </section>
+
+    <section>
+      <h2>8. Legislação Aplicável e Foro</h2>
+      <p>
+        Estes Termos são regidos e interpretados de acordo com as leis da República Federativa do Brasil. Fica eleito o foro da comarca da sede da empresa contratada para dirimir quaisquer litígios decorrentes destes termos.
+      </p>
+    </section>
+
+    <section>
+      <h2>9. Contato e Suporte</h2>
+      <p>
+        Para esclarecimentos ou dúvidas sobre estes Termos de Serviço:
+      </p>
+      <ul>
+        <li><strong>Suporte FinObra:</strong> <a href="mailto:contato@finobra.app.br" style="color:var(--accent2);">contato@finobra.app.br</a></li>
+        <li><strong>Portal Oficial:</strong> <a href="https://finobra.app.br" style="color:var(--accent2);">https://finobra.app.br</a></li>
+      </ul>
+    </section>
+  </main>
+
+  <footer>
+    <div style="margin-bottom:12px;">
+      <a href="/privacidade">Política de Privacidade</a> &middot;
+      <a href="/termos">Termos de Serviço</a> &middot;
+      <a href="/">Acessar FinObra</a>
+    </div>
+    <p>FinObra &middot; Todos os direitos reservados &copy; 2026</p>
+  </footer>
+
+</body>
+</html>
