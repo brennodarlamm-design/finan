@@ -93,6 +93,13 @@ export default async function handler(req, res) {
 
     if (response.ok) {
       return res.status(200).json({ success: true, to: numFmt, result: data });
+    } else if (response.status === 503) {
+      return res.status(200).json({
+        success: false,
+        notConnected: true,
+        error: data.error || 'WhatsApp ainda não está conectado no servidor.',
+        status: data.status || 'qr_ready'
+      });
     } else {
       return res.status(response.status).json({ success: false, error: data.error || 'Erro no envio pelo servidor WhatsApp', details: data });
     }

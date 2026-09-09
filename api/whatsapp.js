@@ -158,6 +158,13 @@ export default async function handler(req, res) {
       const data = await response.json().catch(() => ({ status: response.status }));
       if (response.ok) {
         return res.status(200).json({ success: true, message: 'Mensagem de teste enviada!', result: data });
+      } else if (response.status === 503) {
+        return res.status(200).json({
+          success: false,
+          notConnected: true,
+          error: data.error || 'WhatsApp ainda não está conectado no servidor.',
+          status: data.status || 'qr_ready'
+        });
       } else {
         return res.status(response.status).json({
           success: false,

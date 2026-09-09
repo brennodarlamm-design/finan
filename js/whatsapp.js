@@ -98,7 +98,7 @@ const WhatsApp = {
     const apiKey = this.getEvolutionKey();
     const instance = this.getEvolutionInstance();
 
-    // 1. Tenta envio via Proxy Serverless da aplicação (evita qualquer bloqueio de CORS do navegador)
+    // Disparo via Proxy Serverless Seguro da aplicação
     try {
       const authHeaders = (typeof Auth !== 'undefined' && Auth.getAuthHeaders)
         ? Auth.getAuthHeaders()
@@ -109,10 +109,7 @@ const WhatsApp = {
         headers: authHeaders,
         body: JSON.stringify({
           phone: numFmt,
-          text: texto,
-          apiUrl: apiUrl,
-          apiKey: apiKey,
-          instance: instance
+          text: texto
         })
       });
 
@@ -121,33 +118,22 @@ const WhatsApp = {
         Utils.toast('✅ Mensagem enviada com sucesso para o WhatsApp!', 'success');
         return;
       }
-    } catch (errProxy) {
-      console.log('Proxy falhou, tentando chamada direta ao backend Render...');
-    }
 
-    // 2. Fallback direto para o backend 24/7 do Render
-    try {
-      const cloudUrl = 'https://finan-wf12.onrender.com/send-message';
-      const resCloud = await fetch(cloudUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          phone: numFmt,
-          message: texto
-        })
-      });
-
-      const dataCloud = await resCloud.json().catch(() => ({}));
-      if (resCloud.ok && dataCloud.success) {
-        Utils.toast('✅ Mensagem enviada com sucesso para o WhatsApp!', 'success');
+      if (dataProxy.notConnected || resProxy.status === 503 || (dataProxy.error && dataProxy.error.includes('não está conectado'))) {
+        Utils.toast('⚠️ WhatsApp desconectado: Conecte o aparelho no menu para envio automático.', 'warning');
         return;
       }
-    } catch (errCloud) {
-      console.warn('Erro no envio direto Render:', errCloud);
+
+      if (dataProxy.error) {
+        Utils.toast(`⚠️ Falha no envio: ${dataProxy.error}`, 'warning');
+        return;
+      }
+    } catch (errProxy) {
+      console.warn('Proxy de envio indisponível:', errProxy);
     }
 
-    // 3. Fallback amigável: WhatsApp Web
-    Utils.toast('⚠️ Abrindo WhatsApp Web...', 'info');
+    // Fallback amigável: WhatsApp Web
+    Utils.toast('⚠️ Não foi possível enviar em segundo plano. Abrindo WhatsApp Web...', 'info');
     window.open(this.gerarLink(texto, telefone), '_blank');
   },
 
@@ -677,6 +663,9 @@ const WhatsApp = {
       const data = await res.json().catch(() => ({}));
       if (res.ok && data.success) {
         Utils.toast('✅ Mensagem de teste enviada com sucesso para o WhatsApp!', 'success');
+      } else if (data.notConnected || res.status === 503 || (data.error && data.error.includes('não está conectado'))) {
+        Utils.toast('⚠️ WhatsApp desconectado: Escaneie o QR Code para parear o aparelho.', 'warning');
+        this.forcarNovoQR();
       } else {
         Utils.toast('⚠️ Erro ao enviar: ' + (data.error || 'Verifique o status do aparelho'), 'warning');
       }
@@ -687,6 +676,44 @@ const WhatsApp = {
         btn.disabled = false;
         btn.innerHTML = '<span>🚀 Testar</span>';
       }
+    }
+  },
+
+  async testarEnvioCliente() {
+    const tel = this.getTelefonePadrao();
+    if (!tel) {
+      Utils.toast('Por favor, cadastre primeiro o número de telefone para alertas.', 'warning');
+      this.abrirModalTelefone();
+      return;
+    }
+
+    Utils.toast('📲 Disparando teste de notificação para ' + this.formatarTelefone(tel) + '...', 'info');
+
+    try {
+      const headers = (typeof Auth !== 'undefined' && Auth.getAuthHeaders)
+        ? Auth.getAuthHeaders()
+        : { 'Content-Type': 'application/json' };
+
+      const res = await fetch('/api/whatsapp?action=test', {
+        method: 'POST',
+        headers: headers,
+        body: JSON.stringify({
+          phone: tel,
+          message: `*FinObra — Teste de Notificação*\n\n✅ Olá! Seu WhatsApp está conectado e pronto para enviar relatórios diários e alertas de boletos da construtora.`
+        })
+      });
+
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && data.success) {
+        Utils.toast('✅ Mensagem de teste enviada com sucesso para o WhatsApp!', 'success');
+      } else if (data.notConnected || res.status === 503 || (data.error && data.error.includes('não está conectado'))) {
+        Utils.toast('⚠️ Aparelho desconectado: Escaneie o QR Code para ativar os envios.', 'warning');
+        this.abrirModalConexao();
+      } else {
+        Utils.toast('⚠️ Erro no envio: ' + (data.error || 'Verifique o número informado'), 'warning');
+      }
+    } catch (err) {
+      Utils.toast('Erro na conexão: ' + err.message, 'error');
     }
   },
 
