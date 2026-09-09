@@ -117,14 +117,16 @@ const Clientes = {
           <div style="display:flex;justify-content:space-between;margin-bottom:5px;"><span style="font-size:.75rem;color:var(--text3)">Progresso da obra</span><span style="font-size:.75rem;font-weight:800">${pct.toFixed(0)}%</span></div>
           <div class="progress-bar"><div class="progress-fill ${cl}" style="width:${pct}%"></div></div>
         </div>
-        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:0;margin-bottom:14px;padding:12px;background:var(--bg-secondary);border-radius:var(--r-md);">
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:0;margin-bottom:10px;padding:12px;background:var(--bg-secondary);border-radius:var(--r-md);">
           <div style="text-align:center;"><div style="font-size:.63rem;text-transform:uppercase;color:var(--text3);margin-bottom:3px">Recebido</div><div style="font-size:.8rem;font-weight:800;color:var(--success)">${Utils.fmt.currency(r.totalReceitas)}</div></div>
           <div style="text-align:center;border-left:1px solid var(--border-s);border-right:1px solid var(--border-s);"><div style="font-size:.63rem;text-transform:uppercase;color:var(--text3);margin-bottom:3px">Gasto</div><div style="font-size:.8rem;font-weight:800;color:var(--danger)">${Utils.fmt.currency(r.totalDespesas)}</div></div>
           <div style="text-align:center;"><div style="font-size:.63rem;text-transform:uppercase;color:var(--text3);margin-bottom:3px">Saldo</div><div style="font-size:.8rem;font-weight:800;color:${r.saldo>=0?'var(--accent)':'var(--danger)'}">${Utils.fmt.currency(r.saldo)}</div></div>
         </div>
-        <div style="display:flex;gap:7px;">
+        ${typeof FasesDoc !== 'undefined' ? FasesDoc.miniWidget(c.id) : ''}
+        <div style="display:flex;gap:7px;margin-top:10px">
           <button class="btn btn-secondary btn-sm" style="flex:1" onclick="App.obraId='${c.id}';App.refreshObraSelector();App.navigate('lancamentos')">💰 Lançamentos</button>
           <button class="btn btn-secondary btn-sm" style="flex:1" onclick="App.obraId='${c.id}';App.refreshObraSelector();App.navigate('medicoes')">🔨 Medições</button>
+          <button class="btn btn-secondary btn-sm" onclick="App.obraId='${c.id}';App.navigate('documentacao')" title="Percurso Documental" style="padding:4px 10px">📋</button>
           <button class="icon-btn btn-sm" onclick="Clientes.showForm('${c.id}')" title="Editar">✏️</button>
           <button class="icon-btn btn-sm" style="color:var(--danger)" onclick="Clientes.del('${c.id}')" title="Excluir">🗑️</button>
         </div>

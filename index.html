@@ -16,11 +16,11 @@
   <style>
     *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
     :root{
-      --bg-base:#080F05;--bg-card:#182713;--border:#243518;
-      --accent:#C9A227;--accent2:#E8C84A;--accent-glow:rgba(201,162,39,.28);
-      --success:#10b981;--warning:#f59e0b;--danger:#ef4444;
-      --text:#F0EAD6;--text2:#A8C090;--text3:#5A7048;
-      --radius:10px;--shadow:0 8px 40px rgba(0,0,0,.7);
+      --bg-base:#090C07;--bg-card:#1A2014;--border:#252C1E;
+      --accent:#12D9A0;--accent2:#3EE8B5;--accent-glow:rgba(18,217,160,.25);
+      --success:#12D9A0;--warning:#F5A623;--danger:#FF5C5C;
+      --text:#EEF0EA;--text2:#8C8983;--text3:#575B50;
+      --radius:10px;--shadow:0 8px 40px rgba(0,0,0,.75);
     }
     html,body{height:100%;font-family:'Inter',sans-serif;background:var(--bg-base);color:var(--text);}
     .page{display:flex;min-height:100vh;}
@@ -28,18 +28,18 @@
     /* ── LEFT PANEL ── */
     .panel-left{
       flex:1;position:relative;overflow:hidden;
-      background:linear-gradient(135deg,#060D04 0%,#0E1A09 50%,#142210 100%);
+      background:linear-gradient(145deg,#070A06 0%,#0D1409 35%,#111C0E 65%,#162215 100%);
       display:flex;align-items:center;justify-content:center;
     }
     .grid-bg{
       position:absolute;inset:0;
-      background-image:linear-gradient(rgba(201,162,39,.05) 1px,transparent 1px),linear-gradient(90deg,rgba(201,162,39,.05) 1px,transparent 1px);
+      background-image:linear-gradient(rgba(18,217,160,.04) 1px,transparent 1px),linear-gradient(90deg,rgba(18,217,160,.04) 1px,transparent 1px);
       background-size:44px 44px;
     }
     .orb{position:absolute;border-radius:50%;filter:blur(80px);animation:float 10s ease-in-out infinite;}
-    .o1{width:500px;height:500px;background:rgba(201,162,39,.08);top:-150px;left:-150px;}
-    .o2{width:350px;height:350px;background:rgba(100,140,60,.06);bottom:-80px;right:-80px;animation-delay:-5s;}
-    .o3{width:220px;height:220px;background:rgba(232,200,74,.07);top:42%;left:35%;animation-delay:-2.5s;}
+    .o1{width:500px;height:500px;background:rgba(18,217,160,.07);top:-150px;left:-150px;}
+    .o2{width:350px;height:350px;background:rgba(75,80,66,.12);bottom:-80px;right:-80px;animation-delay:-5s;}
+    .o3{width:220px;height:220px;background:rgba(62,232,181,.06);top:42%;left:35%;animation-delay:-2.5s;}
     @keyframes float{0%,100%{transform:translate(0,0) scale(1)}33%{transform:translate(25px,-25px) scale(1.06)}66%{transform:translate(-12px,12px) scale(.94)}}
 
     .panel-left-content{position:relative;z-index:1;max-width:520px;padding:48px;}
@@ -50,10 +50,10 @@
     }
     .hero-logo-icon{
       width:80px;height:80px;flex-shrink:0;
-      filter:drop-shadow(0 0 24px rgba(201,162,39,.5));
+      filter:drop-shadow(0 0 24px rgba(18,217,160,.45));
       animation:pulse 3s ease-in-out infinite;
     }
-    @keyframes pulse{0%,100%{filter:drop-shadow(0 0 24px rgba(201,162,39,.5))}50%{filter:drop-shadow(0 0 44px rgba(201,162,39,.85))}}
+    @keyframes pulse{0%,100%{filter:drop-shadow(0 0 20px rgba(18,217,160,.45))}50%{filter:drop-shadow(0 0 40px rgba(18,217,160,.85))}}
     .hero-logo-text .brand-name{
       font-size:2.2rem;font-weight:900;letter-spacing:.04em;
       background:linear-gradient(135deg,#E8C84A,#C9A227);
@@ -66,16 +66,16 @@
     }
 
     .hero-title{font-size:1.85rem;font-weight:800;line-height:1.2;margin-bottom:14px;color:var(--text);}
-    .hero-title span{background:linear-gradient(135deg,#E8C84A,#C9A227);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;}
-    .hero-desc{color:rgba(240,234,214,.5);font-size:.93rem;line-height:1.7;margin-bottom:40px;}
+    .hero-title span{background:linear-gradient(135deg,#3EE8B5,#12D9A0);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;}
+    .hero-desc{color:rgba(238,240,234,.5);font-size:.93rem;line-height:1.7;margin-bottom:40px;}
     .features{display:flex;flex-direction:column;gap:10px;}
     .feat{
       display:flex;align-items:center;gap:14px;
-      background:rgba(201,162,39,.04);border:1px solid rgba(201,162,39,.1);
+      background:rgba(18,217,160,.04);border:1px solid rgba(18,217,160,.1);
       border-radius:12px;padding:14px 18px;
       transition:border-color .2s,background .2s;
     }
-    .feat:hover{background:rgba(201,162,39,.08);border-color:rgba(201,162,39,.25);}
+    .feat:hover{background:rgba(18,217,160,.08);border-color:rgba(18,217,160,.28);}
     .feat-icon{font-size:22px;width:38px;text-align:center;flex-shrink:0;}
     .feat-text strong{display:block;font-size:.875rem;color:var(--text);margin-bottom:2px;}
     .feat-text span{font-size:.78rem;color:rgba(240,234,214,.4);}
@@ -83,7 +83,7 @@
     /* Divider dourado */
     .hero-divider{
       width:60px;height:2px;margin-bottom:28px;
-      background:linear-gradient(90deg,transparent,#C9A227,transparent);
+      background:linear-gradient(90deg,transparent,#12D9A0,transparent);
       border-radius:1px;
     }
 
@@ -93,20 +93,25 @@
       background:var(--bg-card);
       border-left:1px solid var(--border);
       display:flex;align-items:center;justify-content:center;padding:48px;
+      position:relative;
+    }
+    .panel-right::before{
+      content:'';position:absolute;top:0;left:0;right:0;height:2px;
+      background:linear-gradient(90deg,transparent,rgba(18,217,160,.6),transparent);
     }
     .form-wrap{width:100%;max-width:360px;}
 
     .logo-row{display:flex;align-items:center;gap:14px;margin-bottom:44px;}
     .logo-box{
       width:52px;height:52px;border-radius:13px;
-      background:linear-gradient(135deg,#1C2D12,#243818);
-      border:1px solid rgba(201,162,39,.3);
+      background:linear-gradient(135deg,#0D1E14,#152B1E);
+      border:1px solid rgba(18,217,160,.35);
       display:flex;align-items:center;justify-content:center;
-      box-shadow:0 6px 24px rgba(201,162,39,.3);
+      box-shadow:0 6px 24px rgba(18,217,160,.25);
     }
     .logo-box-text h2{
       font-size:1.35rem;font-weight:900;letter-spacing:.05em;
-      background:linear-gradient(135deg,#E8C84A,#C9A227);
+      background:linear-gradient(135deg,#3EE8B5,#12D9A0);
       -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
     }
     .logo-box-text p{color:var(--text3);font-size:.72rem;margin-top:2px;letter-spacing:.08em;text-transform:uppercase;}
@@ -135,13 +140,13 @@
 
     .btn-primary{
       width:100%;padding:14px;border:none;border-radius:var(--radius);
-      background:linear-gradient(135deg,#C9A227,#E8C84A);color:#1C2D12;
+      background:linear-gradient(135deg,#12D9A0,#3EE8B5);color:#060E09;
       font-size:.95rem;font-weight:800;font-family:inherit;cursor:pointer;
       display:flex;align-items:center;justify-content:center;gap:10px;
-      box-shadow:0 6px 24px rgba(201,162,39,.4);
+      box-shadow:0 6px 24px rgba(18,217,160,.38);
       transition:all .2s;margin-top:4px;
     }
-    .btn-primary:hover:not(:disabled){background:linear-gradient(135deg,#B8911E,#C9A227);box-shadow:0 8px 32px rgba(201,162,39,.55);transform:translateY(-1px);}
+    .btn-primary:hover:not(:disabled){background:linear-gradient(135deg,#0FB88A,#12D9A0);box-shadow:0 8px 32px rgba(18,217,160,.55);transform:translateY(-1px);}
     .btn-primary:disabled{opacity:.7;cursor:not-allowed;transform:none;}
 
     .demo-box{
@@ -172,14 +177,14 @@
     /* Botão Google */
     .btn-google{
       width:100%;padding:12px 16px;border-radius:var(--radius);
-      background:#0B1307;border:1px solid var(--border);
+      background:#111509;border:1px solid var(--border);
       color:var(--text);font-size:.89rem;font-weight:600;font-family:inherit;cursor:pointer;
       display:flex;align-items:center;justify-content:center;gap:12px;
-      transition:all .2s;box-shadow:0 3px 12px rgba(0,0,0,.3);
+      transition:all .2s;box-shadow:0 3px 12px rgba(0,0,0,.4);
     }
     .btn-google:hover{
-      background:#13210E;border-color:rgba(201,162,39,.45);
-      transform:translateY(-1px);box-shadow:0 6px 18px rgba(201,162,39,.18);
+      background:#1A2014;border-color:rgba(18,217,160,.4);
+      transform:translateY(-1px);box-shadow:0 6px 18px rgba(18,217,160,.15);
     }
     .btn-google:active{transform:translateY(0);}
 
@@ -188,12 +193,12 @@
     .otp-box{
       width:46px;height:52px;text-align:center;
       font-size:1.4rem;font-weight:800;color:var(--accent2);
-      background:#0C1408;border:1.5px solid var(--border);
+      background:#111509;border:1.5px solid var(--border);
       border-radius:10px;outline:none;transition:all .2s;font-family:inherit;
     }
     .otp-box:focus{
       border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-glow);
-      transform:scale(1.05);background:#121E0B;
+      transform:scale(1.05);background:#182015;
     }
     .recovery-step{display:none;}
     .recovery-step.active{display:block;animation:modalIn .2s ease;}
@@ -213,10 +218,10 @@
     <div class="panel-left-content">
 
       <div class="hero-logo" style="margin-bottom:24px;display:flex;align-items:center;gap:18px;">
-        <img src="img/finobra_logo.jpg" alt="FinObra Logo" style="width:84px;height:84px;border-radius:18px;box-shadow:0 8px 30px rgba(201,162,39,0.35);border:1.5px solid rgba(201,162,39,0.55);object-fit:cover;">
+        <img src="img/finobra_logo.jpg" alt="FinObra Logo" style="width:84px;height:84px;border-radius:18px;box-shadow:0 8px 30px rgba(18,217,160,0.3);border:1.5px solid rgba(18,217,160,0.45);object-fit:cover;">
         <div class="hero-logo-text">
-          <div class="brand-name" style="font-size:2.35rem;font-weight:900;letter-spacing:.05em;background:linear-gradient(135deg,#F7E07C,#C9A227);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;">FINOBRA</div>
-          <div class="brand-sub" style="font-size:.76rem;font-weight:700;letter-spacing:.2em;color:var(--accent2);text-transform:uppercase;">SISTEMA DE GESTÃO DE OBRAS</div>
+          <div class="brand-name" style="font-size:2.35rem;font-weight:900;letter-spacing:.05em;background:linear-gradient(135deg,#7AF5D4,#12D9A0,#0FB88A);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;">FINOBRA</div>
+          <div class="brand-sub" style="font-size:.76rem;font-weight:700;letter-spacing:.2em;color:rgba(18,217,160,.7);text-transform:uppercase;">SISTEMA DE GESTÃO DE OBRAS</div>
         </div>
       </div>
 
@@ -269,7 +274,7 @@
         </div>
       </div>
 
-      <div style="margin-top:24px;padding-top:14px;border-top:1px solid rgba(201,162,39,.18);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;font-size:.73rem;color:var(--text3);">
+      <div style="margin-top:24px;padding-top:14px;border-top:1px solid rgba(18,217,160,.15);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;font-size:.73rem;color:var(--text3);">
         <span>🔒 Criptografia &middot; Nuvem Neon Serverless</span>
         <span>FinObra &middot; Todos os direitos reservados &copy; 2026</span>
       </div>

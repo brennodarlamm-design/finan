@@ -180,6 +180,103 @@ const DB = {
   },
   uuid() { return Date.now().toString(36) + Math.random().toString(36).substr(2, 9); },
 
+  // ── FASES DE DOCUMENTAÇÃO DAS OBRAS ──
+  _fasesDocKey(obraId) {
+    return `${this._ck('finobra_fases_doc')}_${obraId}`;
+  },
+
+  getDocFases(obraId) {
+    let saved = {};
+    try { saved = JSON.parse(localStorage.getItem(this._fasesDocKey(obraId)) || '{}'); } catch {}
+    const template = (typeof FasesDoc !== 'undefined') ? FasesDoc.TEMPLATE : { pre_obra: [], durante_obra: [], pos_obra: [] };
+    const result = {};
+    for (const [fk, docs] of Object.entries(template)) {
+      result[fk] = docs.map(tmpl => {
+        const ex = (saved[fk] || []).find(d => d.id === tmpl.id) || {};
+        return {
+          id: tmpl.id, icone: tmpl.icone, nome: tmpl.nome, desc: tmpl.desc,
+          status: ex.status || 'nao_iniciado',
+          responsavel: ex.responsavel || '',
+          data_obtencao: ex.data_obtencao || null,
+          data_validade: ex.data_validade || null,
+          orgao_emissor: ex.orgao_emissor || '',
+          protocolo: ex.protocolo || '',
+          observacoes: ex.observacoes || '',
+          arquivos: ex.arquivos || [],
+          updated_at: ex.updated_at || null,
+        };
+      });
+    }
+    return result;
+  },
+
+  saveDocFase(obraId, docId, dados) {
+    let saved = {};
+    try { saved = JSON.parse(localStorage.getItem(this._fasesDocKey(obraId)) || '{}'); } catch {}
+    const template = (typeof FasesDoc !== 'undefined') ? FasesDoc.TEMPLATE : {};
+    let faseKey = null;
+    for (const [fk, docs] of Object.entries(template)) {
+      if (docs.find(d => d.id === docId)) { faseKey = fk; break; }
+    }
+    if (!faseKey) return;
+    if (!saved[faseKey]) saved[faseKey] = [];
+    const idx = saved[faseKey].findIndex(d => d.id === docId);
+    const existing = idx >= 0 ? saved[faseKey][idx] : {};
+    const updated = { ...existing, id: docId, ...dados, updated_at: new Date().toISOString() };
+    if (idx >= 0) saved[faseKey][idx] = updated;
+    else saved[faseKey].push(updated);
+    localStorage.setItem(this._fasesDocKey(obraId), JSON.stringify(saved));
+  },
+
+  attachArquivoDocFase(obraId, docId, arquivoId) {
+    let saved = {};
+    try { saved = JSON.parse(localStorage.getItem(this._fasesDocKey(obraId)) || '{}'); } catch {}
+    const template = (typeof FasesDoc !== 'undefined') ? FasesDoc.TEMPLATE : {};
+    let faseKey = null;
+    for (const [fk, docs] of Object.entries(template)) {
+      if (docs.find(d => d.id === docId)) { faseKey = fk; break; }
+    }
+    if (!faseKey) return;
+    if (!saved[faseKey]) saved[faseKey] = [];
+    const idx = saved[faseKey].findIndex(d => d.id === docId);
+    if (idx >= 0) {
+      if (!saved[faseKey][idx].arquivos) saved[faseKey][idx].arquivos = [];
+      if (!saved[faseKey][idx].arquivos.includes(arquivoId)) saved[faseKey][idx].arquivos.push(arquivoId);
+    } else {
+      saved[faseKey].push({ id: docId, status: 'nao_iniciado', arquivos: [arquivoId] });
+    }
+    localStorage.setItem(this._fasesDocKey(obraId), JSON.stringify(saved));
+  },
+
+  removeArquivoDocFase(obraId, docId, arquivoId) {
+    let saved = {};
+    try { saved = JSON.parse(localStorage.getItem(this._fasesDocKey(obraId)) || '{}'); } catch {}
+    for (const fk of Object.keys(saved)) {
+      const idx = (saved[fk] || []).findIndex(d => d.id === docId);
+      if (idx >= 0 && saved[fk][idx].arquivos) {
+        saved[fk][idx].arquivos = saved[fk][idx].arquivos.filter(id => id !== arquivoId);
+        localStorage.setItem(this._fasesDocKey(obraId), JSON.stringify(saved));
+        return;
+      }
+    }
+  },
+
+  getDocFasesResumo(obraId) {
+    const fases = this.getDocFases(obraId);
+    let total = 0, ok = 0, pendentes = 0, vencidos = 0;
+    Object.values(fases).forEach(fase => {
+      fase.forEach(d => {
+        if (d.status === 'nao_aplicavel') return;
+        total++;
+        if (d.status === 'ok') ok++;
+        else if (d.status === 'vencido') vencidos++;
+        else if (d.status === 'em_andamento') pendentes++;
+      });
+    });
+    return { total, ok, pendentes, vencidos, pct: total > 0 ? Math.round((ok/total)*100) : 0 };
+  },
+
+
   cleanAllDatesInStorage() {
     try {
       const lans = this.getAll('lancamentos');

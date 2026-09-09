@@ -22,6 +22,7 @@ const App = {
     'conciliacao-ofx': ['conciliacao-ofx', 'ofx'],
     'orcamentos': ['orcamentos'],
     'medicoes': ['medicoes'],
+    'documentacao': ['documentacao', 'docs', 'fases-doc', 'documentos-obra'],
     'relatorios': ['relatorios', 'exportar'],
     'contas-bancarias': ['contas-bancarias', 'contas'],
     'fornecedores': ['fornecedores'],
@@ -62,6 +63,7 @@ const App = {
     'ofx': OFX,
     'orcamentos': Orcamentos,
     'medicoes': Medicoes,
+    'documentacao': FasesDoc,
     'relatorios': Exportar,
     'exportar': Exportar,
     'contas-bancarias': Contas,
@@ -102,6 +104,7 @@ const App = {
     'ofx':               { icon:'🔄', label:'Conciliação OFX' },
     'orcamentos':        { icon:'📋', label:'Orçamentos & SINAPI' },
     'medicoes':          { icon:'🔨', label:'Medições & Faturamento' },
+    'documentacao':      { icon:'📋', label:'Documentação de Obras' },
     'relatorios':        { icon:'📥', label:'Relatórios & Exportação' },
     'exportar':          { icon:'📥', label:'Relatórios & Exportação' },
     'contas-bancarias':  { icon:'🏦', label:'Contas Bancárias' },
@@ -238,6 +241,7 @@ const App = {
             <div class="nav-section">Planejamento</div>
             ${this._navItem('orcamentos','📋','Orçamentos')}
             ${this._navItem('medicoes','🔨','Medições & Faturamento')}
+            ${this._navItem('documentacao','📋','Documentação de Obras')}
             <div class="nav-section">Relatórios</div>
             ${this._navItem('relatorios','📥','Exportar Relatórios')}
             <div class="nav-section">Assinatura &amp; Sistema</div>
