@@ -5,7 +5,9 @@
   "type": "module",
   "scripts": {
     "dev": "npx serve .",
-    "deploy": "node scripts/deploy.js"
+    "deploy": "node scripts/deploy.js",
+    "render:status": "node scripts/render-status.js",
+    "render:deploy": "node scripts/render-deploy.js"
   },
   "dependencies": {
     "@neondatabase/serverless": "^0.9.5",
