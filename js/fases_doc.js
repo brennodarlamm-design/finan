@@ -114,6 +114,14 @@ const FasesDoc = {
     </div>`;
   },
 
+  // ===== RENDER PÚBLICO POR OBRA =====
+  renderObra(obraOrId, expanded = true) {
+    const obra = typeof obraOrId === 'string' ? DB.getById('clientes', obraOrId) : obraOrId;
+    if (!obra) return '<div class="empty-state"><h3>Obra não encontrada</h3></div>';
+    if (expanded) this._collapsed[obra.id] = false;
+    return this._renderObra(obra);
+  },
+
   // ===== RENDER POR OBRA =====
   _renderObra(obra) {
     const fases = DB.getDocFases(obra.id);

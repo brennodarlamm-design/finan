@@ -30,6 +30,13 @@ const ObraDetalhe = {
     if (container && this.currentObraId) {
       container.innerHTML = this._getTabContent(tab, this.currentObraId);
       this._bindTabEvents(tab, this.currentObraId);
+      if (tab === 'documentos') {
+        setTimeout(() => {
+          if (typeof FasesDoc !== 'undefined' && typeof FasesDoc.expandAll === 'function') {
+            FasesDoc.expandAll();
+          }
+        }, 30);
+      }
     }
   },
 
@@ -81,7 +88,7 @@ const ObraDetalhe = {
 
     // Resumo documental
     const docResumo = typeof DB.getDocFasesResumo === 'function' ? DB.getDocFasesResumo(id) : null;
-    const docPct = docResumo ? docResumo.total.pct : 0;
+    const docPct = docResumo ? (docResumo.pct ?? 0) : 0;
 
     // Link do Google Drive se houver
     let driveLink = null;
@@ -389,7 +396,14 @@ const ObraDetalhe = {
 
   // ===== ABA 2: DOCUMENTAÇÃO (43 DOCS) =====
   _renderTabDocumentos(obraId) {
-    if (typeof FasesDoc !== 'undefined' && typeof FasesDoc.renderObra === 'function') {
+    if (typeof FasesDoc !== 'undefined') {
+      const obra = DB.getById('clientes', obraId);
+      if (!obra) return '<div class="empty-state"><h3>Obra não encontrada</h3></div>';
+
+      const docHtml = typeof FasesDoc.renderObra === 'function'
+        ? FasesDoc.renderObra(obra, true)
+        : (typeof FasesDoc._renderObra === 'function' ? FasesDoc._renderObra(obra) : (typeof FasesDoc.render === 'function' ? FasesDoc.render(obraId) : ''));
+
       return `
       <div>
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:10px;">
@@ -402,7 +416,7 @@ const ObraDetalhe = {
             <button class="btn btn-secondary btn-sm" onclick="FasesDoc.collapseAll()">Recolher</button>
           </div>
         </div>
-        ${FasesDoc.renderObra(obraId, true)}
+        ${docHtml}
       </div>`;
     }
     return `<div class="empty-state">Módulo de Documentação não encontrado.</div>`;
