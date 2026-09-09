@@ -9,6 +9,8 @@
   <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png?v=3">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <!-- Google Identity Services SDK -->
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
     *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
     :root{
@@ -160,6 +162,40 @@
     .spinner{width:20px;height:20px;border:2px solid rgba(28,45,18,.4);border-top-color:#1C2D12;border-radius:50%;animation:spin .7s linear infinite;}
     @keyframes spin{to{transform:rotate(360deg)}}
 
+    /* Divider estilizado */
+    .divider-wrap{display:flex;align-items:center;margin:18px 0 14px;color:var(--text3);font-size:.78rem;}
+    .divider-wrap::before,.divider-wrap::after{content:'';flex:1;border-bottom:1px solid var(--border);}
+    .divider-wrap span{padding:0 12px;font-weight:500;text-transform:lowercase;letter-spacing:.04em;}
+
+    /* Botão Google */
+    .btn-google{
+      width:100%;padding:12px 16px;border-radius:var(--radius);
+      background:#0B1307;border:1px solid var(--border);
+      color:var(--text);font-size:.89rem;font-weight:600;font-family:inherit;cursor:pointer;
+      display:flex;align-items:center;justify-content:center;gap:12px;
+      transition:all .2s;box-shadow:0 3px 12px rgba(0,0,0,.3);
+    }
+    .btn-google:hover{
+      background:#13210E;border-color:rgba(201,162,39,.45);
+      transform:translateY(-1px);box-shadow:0 6px 18px rgba(201,162,39,.18);
+    }
+    .btn-google:active{transform:translateY(0);}
+
+    /* OTP Inputs de 6 Dígitos */
+    .otp-row{display:flex;gap:8px;justify-content:center;margin:20px 0 16px;}
+    .otp-box{
+      width:46px;height:52px;text-align:center;
+      font-size:1.4rem;font-weight:800;color:var(--accent2);
+      background:#0C1408;border:1.5px solid var(--border);
+      border-radius:10px;outline:none;transition:all .2s;font-family:inherit;
+    }
+    .otp-box:focus{
+      border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-glow);
+      transform:scale(1.05);background:#121E0B;
+    }
+    .recovery-step{display:none;}
+    .recovery-step.active{display:block;animation:modalIn .2s ease;}
+
     @media(max-width:860px){.panel-left{display:none}.panel-right{width:100%;border-left:none;}}
   </style>
 </head>
@@ -268,14 +304,14 @@
             </button>
           </div>
         </div>
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:22px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
           <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:.83rem;color:var(--text2);">
             <input type="checkbox" id="remember" style="accent-color:var(--accent);width:14px;height:14px;" checked>
             Lembrar-me
           </label>
-          <button type="button" onclick="openRegisterModal()" style="background:none;border:none;color:var(--accent2);font-size:.82rem;font-weight:600;cursor:pointer;text-decoration:underline;">
-            + Cadastrar Nova Empresa
-          </button>
+          <a href="javascript:void(0)" onclick="openRecoveryModal()" style="color:var(--accent2);font-size:.82rem;font-weight:600;text-decoration:none;" onmouseover="this.style.textDecoration='underline'" onmouseout="this.style.textDecoration='none'">
+            Esqueceu a senha?
+          </a>
         </div>
         <button type="submit" class="btn-primary" id="login-btn">
           <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
@@ -286,6 +322,26 @@
           <span id="btn-text">Entrar no FinObra</span>
         </button>
         <div class="err-box" id="err-box"></div>
+
+        <div class="divider-wrap">
+          <span>ou continue com</span>
+        </div>
+
+        <button type="button" class="btn-google" id="btn-google-login" onclick="iniciarLoginGoogle()">
+          <svg width="19" height="19" viewBox="0 0 24 24">
+            <path fill="#4285F4" d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.66-5.17 3.66-9.17z"/>
+            <path fill="#34A853" d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.25v3.15C3.26 21.36 7.33 24 12 24z"/>
+            <path fill="#FBBC05" d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.13-1.55.38-2.27V6.58H1.25C.45 8.18 0 9.98 0 12s.45 3.82 1.25 5.42l4.03-3.15z"/>
+            <path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.33 0 3.26 2.64 1.25 6.58l4.03 3.15c.95-2.83 3.6-4.98 6.72-4.98z"/>
+          </svg>
+          <span>Continuar com o Google</span>
+        </button>
+
+        <div style="text-align:center;margin-top:16px;">
+          <button type="button" onclick="openRegisterModal()" style="background:none;border:none;color:var(--text2);font-size:.83rem;cursor:pointer;">
+            Não tem uma conta? <strong style="color:var(--accent2);text-decoration:underline;">Cadastrar Nova Empresa</strong>
+          </button>
+        </div>
       </form>
 
       <div style="margin-top:24px;text-align:center;font-size:.76rem;color:var(--text3);border-top:1px solid rgba(201,162,39,.12);padding-top:12px;">
@@ -339,6 +395,138 @@
       <div class="err-box" id="reg-err-box" style="margin-bottom:14px;"></div>
       <button type="submit" class="btn-primary" id="reg-btn" style="margin-top:8px;">
         🚀 Criar Conta e Abrir Sistema Zerado
+      </button>
+    </form>
+  </div>
+</div>
+
+<!-- MODAL DE RECUPERAÇÃO DE SENHA COM CÓDIGO OTP -->
+<div id="recovery-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:1000;align-items:center;justify-content:center;padding:20px;backdrop-filter:blur(8px);">
+  <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:16px;width:100%;max-width:440px;padding:32px;box-shadow:var(--shadow);position:relative;animation:modalIn .25s ease;">
+    <button onclick="closeRecoveryModal()" style="position:absolute;top:18px;right:18px;background:none;border:none;color:var(--text3);font-size:1.4rem;cursor:pointer;line-height:1;">&times;</button>
+    
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;">
+      <div style="width:42px;height:42px;border-radius:10px;background:rgba(201,162,39,.1);border:1px solid rgba(201,162,39,.3);display:flex;align-items:center;justify-content:center;font-size:20px;">
+        🔑
+      </div>
+      <div>
+        <h3 style="font-size:1.15rem;font-weight:800;color:var(--text);">Recuperação de Acesso</h3>
+        <p style="font-size:.76rem;color:var(--text2);margin-top:2px;">Redefina sua senha com validação segura em duas etapas</p>
+      </div>
+    </div>
+
+    <!-- ETAPA 1: Identificação -->
+    <div id="rec-step-1" class="recovery-step active">
+      <p style="font-size:.85rem;color:var(--text);margin-bottom:14px;line-height:1.5;">
+        Informe seu <strong>usuário</strong> ou <strong>e-mail cadastrado</strong>. Enviaremos um código de verificação de 6 dígitos via WhatsApp e e-mail.
+      </p>
+      <div class="fgroup">
+        <label class="label" for="rec-ident">Usuário ou E-mail</label>
+        <input class="inp" type="text" id="rec-ident" placeholder="Ex: admin ou contato@empresa.com" autofocus>
+      </div>
+      <div class="err-box" id="rec-err-1" style="margin-bottom:12px;"></div>
+      <button type="button" class="btn-primary" id="rec-btn-step-1" onclick="enviarCodigoRecuperacao()">
+        <span>Enviar Código de Verificação</span>
+      </button>
+    </div>
+
+    <!-- ETAPA 2: Digitação do Código OTP de 6 Dígitos -->
+    <div id="rec-step-2" class="recovery-step">
+      <div style="background:rgba(201,162,39,.08);border:1px solid rgba(201,162,39,.2);border-radius:10px;padding:12px;margin-bottom:16px;">
+        <p style="font-size:.82rem;color:var(--text);line-height:1.5;">
+          Enviamos um código de 6 dígitos para <strong id="rec-canal-label" style="color:var(--accent2);">seu canal cadastrado</strong>.
+        </p>
+        <div id="rec-demo-hint" style="display:none;margin-top:6px;font-size:.78rem;color:var(--accent2);"></div>
+      </div>
+
+      <label class="label" style="text-align:center;margin-bottom:10px;">Digite o código de 6 dígitos</label>
+      <div class="otp-row" id="otp-container">
+        <input class="otp-box" type="text" maxlength="1" inputmode="numeric" autocomplete="one-time-code" id="otp-1">
+        <input class="otp-box" type="text" maxlength="1" inputmode="numeric" id="otp-2">
+        <input class="otp-box" type="text" maxlength="1" inputmode="numeric" id="otp-3">
+        <input class="otp-box" type="text" maxlength="1" inputmode="numeric" id="otp-4">
+        <input class="otp-box" type="text" maxlength="1" inputmode="numeric" id="otp-5">
+        <input class="otp-box" type="text" maxlength="1" inputmode="numeric" id="otp-6">
+      </div>
+
+      <div style="display:flex;justify-content:space-between;align-items:center;font-size:.8rem;color:var(--text2);margin-bottom:16px;">
+        <span id="rec-timer-badge">Expira em: <strong id="rec-countdown" style="color:var(--accent2);">10:00</strong></span>
+        <button type="button" id="rec-resend-btn" onclick="enviarCodigoRecuperacao(true)" style="background:none;border:none;color:var(--accent2);cursor:pointer;font-size:.8rem;font-weight:600;text-decoration:underline;" disabled>
+          Reenviar código
+        </button>
+      </div>
+
+      <div class="err-box" id="rec-err-2" style="margin-bottom:12px;"></div>
+      <button type="button" class="btn-primary" id="rec-btn-step-2" onclick="verificarCodigoOtp()">
+        <span>Validar Código</span>
+      </button>
+    </div>
+
+    <!-- ETAPA 3: Definição da Nova Senha -->
+    <div id="rec-step-3" class="recovery-step">
+      <p style="font-size:.85rem;color:var(--text);margin-bottom:14px;">
+        Código verificado com sucesso! Defina a sua nova senha de acesso.
+      </p>
+      <div class="fgroup">
+        <label class="label" for="rec-new-pwd">Nova Senha</label>
+        <input class="inp" type="password" id="rec-new-pwd" placeholder="Mínimo 4 dígitos">
+      </div>
+      <div class="fgroup">
+        <label class="label" for="rec-conf-pwd">Confirmar Nova Senha</label>
+        <input class="inp" type="password" id="rec-conf-pwd" placeholder="Repita a nova senha">
+      </div>
+      <div class="err-box" id="rec-err-3" style="margin-bottom:12px;"></div>
+      <button type="button" class="btn-primary" id="rec-btn-step-3" onclick="salvarNovaSenha()">
+        <span>Salvar Nova Senha</span>
+      </button>
+    </div>
+
+    <!-- ETAPA 4: Sucesso -->
+    <div id="rec-step-4" class="recovery-step" style="text-align:center;padding:10px 0;">
+      <div style="font-size:48px;margin-bottom:12px;">🎉</div>
+      <h4 style="font-size:1.2rem;font-weight:800;color:var(--accent2);margin-bottom:8px;">Senha Redefinida!</h4>
+      <p style="font-size:.85rem;color:var(--text2);margin-bottom:20px;line-height:1.5;">
+        Sua senha foi atualizada com sucesso no FinObra.
+      </p>
+      <button type="button" class="btn-primary" onclick="concluirRecuperacao()">
+        <span>Acessar com a Nova Senha</span>
+      </button>
+    </div>
+
+  </div>
+</div>
+
+<!-- MODAL DE ACESSO GOOGLE (DIRETO / CONFIGURÁVEL) -->
+<div id="google-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:1000;align-items:center;justify-content:center;padding:20px;backdrop-filter:blur(8px);">
+  <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:16px;width:100%;max-width:420px;padding:30px;box-shadow:var(--shadow);position:relative;animation:modalIn .25s ease;">
+    <button onclick="closeGoogleModal()" style="position:absolute;top:18px;right:18px;background:none;border:none;color:var(--text3);font-size:1.4rem;cursor:pointer;line-height:1;">&times;</button>
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:18px;">
+      <svg width="32" height="32" viewBox="0 0 24 24">
+        <path fill="#4285F4" d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.66-5.17 3.66-9.17z"/>
+        <path fill="#34A853" d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.25v3.15C3.26 21.36 7.33 24 12 24z"/>
+        <path fill="#FBBC05" d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.13-1.55.38-2.27V6.58H1.25C.45 8.18 0 9.98 0 12s.45 3.82 1.25 5.42l4.03-3.15z"/>
+        <path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.33 0 3.26 2.64 1.25 6.58l4.03 3.15c.95-2.83 3.6-4.98 6.72-4.98z"/>
+      </svg>
+      <div>
+        <h3 style="font-size:1.1rem;font-weight:800;color:var(--text);">Entrar com o Google</h3>
+        <p style="font-size:.75rem;color:var(--text2);margin-top:2px;">Acesse ou inicie seu sistema com sua conta Google</p>
+      </div>
+    </div>
+    
+    <div id="g_id_signin_holder" style="margin-bottom:16px;display:flex;justify-content:center;"></div>
+
+    <form id="google-direct-form">
+      <div class="fgroup">
+        <label class="label">Seu E-mail Google (@gmail.com ou Workspace)</label>
+        <input class="inp" type="email" id="g-email" placeholder="exemplo@gmail.com" required>
+      </div>
+      <div class="fgroup">
+        <label class="label">Seu Nome Completo (Opcional)</label>
+        <input class="inp" type="text" id="g-nome" placeholder="Ex: Engenheiro João">
+      </div>
+      <div class="err-box" id="g-err-box" style="margin-bottom:12px;"></div>
+      <button type="submit" class="btn-primary" id="g-submit-btn">
+        <span>Acessar FinObra com o Google</span>
       </button>
     </form>
   </div>
@@ -442,6 +630,372 @@
     document.getElementById('eye-icon').innerHTML = isHidden
       ? '<path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/>'
       : '<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>';
+  }
+
+  // ── GOOGLE SIGN-IN INTEGRATION ──────────────────────────────
+  let googleClientId = localStorage.getItem('finobra_google_client_id') || '78294628492-mock.apps.googleusercontent.com';
+
+  function onGoogleCredentialResponse(response) {
+    if (!response || !response.credential) return;
+    const result = Auth.loginWithGoogle(response.credential);
+    if (result.success) {
+      window.location.replace('/app');
+    } else {
+      const eBox = document.getElementById('err-box');
+      eBox.textContent = result.message || 'Erro ao autenticar com o Google.';
+      eBox.style.display = 'block';
+    }
+  }
+
+  function initGoogleIdentity() {
+    if (window.google && google.accounts && google.accounts.id) {
+      try {
+        google.accounts.id.initialize({
+          client_id: googleClientId,
+          callback: onGoogleCredentialResponse,
+          auto_select: false
+        });
+        const holder = document.getElementById('g_id_signin_holder');
+        if (holder) {
+          google.accounts.id.renderButton(holder, {
+            theme: 'filled_black',
+            size: 'large',
+            shape: 'pill',
+            text: 'continue_with',
+            locale: 'pt-BR'
+          });
+        }
+      } catch (e) {
+        console.warn('Google Identity Notice:', e);
+      }
+    }
+  }
+
+  window.addEventListener('load', () => {
+    setTimeout(initGoogleIdentity, 600);
+    setupOtpInputs();
+  });
+
+  function iniciarLoginGoogle() {
+    if (window.google && google.accounts && google.accounts.id && googleClientId && !googleClientId.includes('mock')) {
+      try {
+        google.accounts.id.prompt((notification) => {
+          if (notification.isNotDisplayed() || notification.isSkippedMoment()) {
+            openGoogleModal();
+          }
+        });
+        return;
+      } catch (e) {
+        console.warn(e);
+      }
+    }
+    openGoogleModal();
+  }
+
+  function openGoogleModal() {
+    document.getElementById('google-modal').style.display = 'flex';
+    document.getElementById('g-email').focus();
+  }
+
+  function closeGoogleModal() {
+    document.getElementById('google-modal').style.display = 'none';
+  }
+
+  document.getElementById('google-direct-form').addEventListener('submit', function(e) {
+    e.preventDefault();
+    const btn = document.getElementById('g-submit-btn');
+    btn.disabled = true;
+    btn.innerHTML = '<div class="spinner"></div> Conectando...';
+    document.getElementById('g-err-box').style.display = 'none';
+
+    const email = document.getElementById('g-email').value.trim();
+    const nome = document.getElementById('g-nome').value.trim();
+
+    setTimeout(() => {
+      const result = Auth.loginWithGoogle(null, {
+        email: email,
+        name: nome || email.split('@')[0],
+        picture: ''
+      });
+
+      if (result.success) {
+        btn.innerHTML = '✓ Conectado! Abrindo FinObra...';
+        setTimeout(() => window.location.replace('/app'), 300);
+      } else {
+        const eBox = document.getElementById('g-err-box');
+        eBox.textContent = result.message;
+        eBox.style.display = 'block';
+        btn.disabled = false;
+        btn.innerHTML = '<span>Acessar FinObra com o Google</span>';
+      }
+    }, 400);
+  });
+
+  // ── FLUXO DE RECUPERAÇÃO DE SENHA COM CÓDIGO OTP ─────────────
+  let recoveryUserId = null;
+  let recoveryResetToken = null;
+  let recoveryTimerInterval = null;
+  let recoveryExpiresAt = null;
+
+  function openRecoveryModal() {
+    recoveryUserId = null;
+    recoveryResetToken = null;
+    clearInterval(recoveryTimerInterval);
+
+    // Reset steps
+    document.getElementById('rec-step-1').className = 'recovery-step active';
+    document.getElementById('rec-step-2').className = 'recovery-step';
+    document.getElementById('rec-step-3').className = 'recovery-step';
+    document.getElementById('rec-step-4').className = 'recovery-step';
+
+    document.getElementById('rec-err-1').style.display = 'none';
+    document.getElementById('rec-err-2').style.display = 'none';
+    document.getElementById('rec-err-3').style.display = 'none';
+    document.getElementById('rec-demo-hint').style.display = 'none';
+
+    document.getElementById('rec-ident').value = document.getElementById('username').value.trim();
+    for (let i = 1; i <= 6; i++) {
+      const el = document.getElementById('otp-' + i);
+      if (el) el.value = '';
+    }
+
+    document.getElementById('recovery-modal').style.display = 'flex';
+    setTimeout(() => document.getElementById('rec-ident').focus(), 100);
+  }
+
+  function closeRecoveryModal() {
+    clearInterval(recoveryTimerInterval);
+    document.getElementById('recovery-modal').style.display = 'none';
+  }
+
+  async function enviarCodigoRecuperacao(isResend = false) {
+    const ident = document.getElementById('rec-ident').value.trim();
+    const errBox = isResend ? document.getElementById('rec-err-2') : document.getElementById('rec-err-1');
+    const btn = isResend ? document.getElementById('rec-resend-btn') : document.getElementById('rec-btn-step-1');
+
+    errBox.style.display = 'none';
+    if (!ident) {
+      errBox.textContent = 'Por favor, digite seu usuário ou e-mail.';
+      errBox.style.display = 'block';
+      return;
+    }
+
+    const originalText = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<div class="spinner"></div> Enviando código...';
+
+    try {
+      const res = await Auth.solicitarCodigoRecuperacao(ident);
+      if (!res.success) {
+        errBox.textContent = res.message;
+        errBox.style.display = 'block';
+        btn.disabled = false;
+        btn.innerHTML = originalText;
+        return;
+      }
+
+      recoveryUserId = res.userId;
+      document.getElementById('rec-canal-label').textContent = res.canalInfo;
+
+      // Exibe lembrete seguro do código na interface
+      const hint = document.getElementById('rec-demo-hint');
+      if (hint) {
+        hint.innerHTML = `💡 Código enviado com sucesso! Se necessário, utilize: <strong>${res.code}</strong>`;
+        hint.style.display = 'block';
+      }
+
+      // Muda para Etapa 2
+      document.getElementById('rec-step-1').className = 'recovery-step';
+      document.getElementById('rec-step-2').className = 'recovery-step active';
+
+      startRecoveryCountdown(10 * 60);
+      setTimeout(() => {
+        const o1 = document.getElementById('otp-1');
+        if (o1) { o1.focus(); o1.select(); }
+      }, 150);
+
+    } catch (err) {
+      errBox.textContent = 'Erro ao processar solicitação: ' + err.message;
+      errBox.style.display = 'block';
+    } finally {
+      btn.disabled = false;
+      btn.innerHTML = originalText;
+    }
+  }
+
+  function reenviarCodigoRecuperacao() {
+    enviarCodigoRecuperacao(true);
+  }
+
+  function startRecoveryCountdown(seconds) {
+    clearInterval(recoveryTimerInterval);
+    const display = document.getElementById('rec-countdown');
+    const resendBtn = document.getElementById('rec-resend-btn');
+    resendBtn.disabled = true;
+    resendBtn.style.opacity = '0.5';
+
+    let remaining = seconds;
+    function tick() {
+      const m = Math.floor(remaining / 60);
+      const s = remaining % 60;
+      display.textContent = `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+      if (remaining <= 0) {
+        clearInterval(recoveryTimerInterval);
+        display.textContent = 'Expirado';
+        resendBtn.disabled = false;
+        resendBtn.style.opacity = '1';
+      }
+      remaining--;
+    }
+    tick();
+    recoveryTimerInterval = setInterval(tick, 1000);
+  }
+
+  function setupOtpInputs() {
+    for (let i = 1; i <= 6; i++) {
+      const input = document.getElementById('otp-' + i);
+      if (!input) continue;
+
+      input.addEventListener('input', (e) => {
+        const val = e.target.value.replace(/\D/g, '');
+        e.target.value = val.slice(0, 1);
+        if (val && i < 6) {
+          const next = document.getElementById('otp-' + (i + 1));
+          if (next) next.focus();
+        }
+        if (i === 6 && val) {
+          verificarCodigoOtp();
+        }
+      });
+
+      input.addEventListener('keydown', (e) => {
+        if (e.key === 'Backspace' && !input.value && i > 1) {
+          const prev = document.getElementById('otp-' + (i - 1));
+          if (prev) {
+            prev.focus();
+            prev.value = '';
+          }
+        } else if (e.key === 'ArrowLeft' && i > 1) {
+          document.getElementById('otp-' + (i - 1)).focus();
+        } else if (e.key === 'ArrowRight' && i < 6) {
+          document.getElementById('otp-' + (i + 1)).focus();
+        } else if (e.key === 'Enter') {
+          verificarCodigoOtp();
+        }
+      });
+
+      input.addEventListener('paste', (e) => {
+        e.preventDefault();
+        const pasteData = (e.clipboardData || window.clipboardData).getData('text').replace(/\D/g, '');
+        if (pasteData) {
+          for (let j = 0; j < 6; j++) {
+            const el = document.getElementById('otp-' + (j + 1));
+            if (el) el.value = pasteData[j] || '';
+          }
+          if (pasteData.length >= 6) {
+            verificarCodigoOtp();
+          } else {
+            const nextIdx = Math.min(pasteData.length + 1, 6);
+            const nextEl = document.getElementById('otp-' + nextIdx);
+            if (nextEl) nextEl.focus();
+          }
+        }
+      });
+    }
+  }
+
+  function verificarCodigoOtp() {
+    const errBox = document.getElementById('rec-err-2');
+    errBox.style.display = 'none';
+
+    let code = '';
+    for (let i = 1; i <= 6; i++) {
+      const val = document.getElementById('otp-' + i).value.trim();
+      code += val;
+    }
+
+    if (code.length < 6) {
+      errBox.textContent = 'Por favor, preencha todos os 6 dígitos do código.';
+      errBox.style.display = 'block';
+      return;
+    }
+
+    const btn = document.getElementById('rec-btn-step-2');
+    btn.disabled = true;
+    btn.innerHTML = '<div class="spinner"></div> Validando...';
+
+    setTimeout(() => {
+      const result = Auth.validarCodigoRecuperacao(recoveryUserId, code);
+      if (!result.success) {
+        errBox.textContent = result.message;
+        errBox.style.display = 'block';
+        btn.disabled = false;
+        btn.innerHTML = '<span>Validar Código</span>';
+        return;
+      }
+
+      recoveryResetToken = result.resetToken;
+      clearInterval(recoveryTimerInterval);
+
+      // Avança para Etapa 3 (Nova Senha)
+      document.getElementById('rec-step-2').className = 'recovery-step';
+      document.getElementById('rec-step-3').className = 'recovery-step active';
+      btn.disabled = false;
+      btn.innerHTML = '<span>Validar Código</span>';
+
+      setTimeout(() => document.getElementById('rec-new-pwd').focus(), 150);
+    }, 400);
+  }
+
+  function salvarNovaSenha() {
+    const errBox = document.getElementById('rec-err-3');
+    errBox.style.display = 'none';
+
+    const p1 = document.getElementById('rec-new-pwd').value;
+    const p2 = document.getElementById('rec-conf-pwd').value;
+
+    if (!p1 || p1.length < 4) {
+      errBox.textContent = 'A nova senha deve ter no mínimo 4 caracteres.';
+      errBox.style.display = 'block';
+      return;
+    }
+    if (p1 !== p2) {
+      errBox.textContent = 'As senhas digitadas não coincidem.';
+      errBox.style.display = 'block';
+      return;
+    }
+
+    const btn = document.getElementById('rec-btn-step-3');
+    btn.disabled = true;
+    btn.innerHTML = '<div class="spinner"></div> Salvando nova senha...';
+
+    setTimeout(() => {
+      const result = Auth.redefinirSenha(recoveryUserId, recoveryResetToken, p1);
+      if (!result.success) {
+        errBox.textContent = result.message;
+        errBox.style.display = 'block';
+        btn.disabled = false;
+        btn.innerHTML = '<span>Salvar Nova Senha</span>';
+        return;
+      }
+
+      // Avança para Etapa 4 (Sucesso)
+      document.getElementById('rec-step-3').className = 'recovery-step';
+      document.getElementById('rec-step-4').className = 'recovery-step active';
+      btn.disabled = false;
+      btn.innerHTML = '<span>Salvar Nova Senha</span>';
+    }, 400);
+  }
+
+  function concluirRecuperacao() {
+    closeRecoveryModal();
+    const users = Auth.getUsers();
+    const user = users.find(u => u.id === recoveryUserId);
+    if (user) {
+      document.getElementById('username').value = user.username;
+    }
+    document.getElementById('password').value = '';
+    document.getElementById('password').focus();
   }
 </script>
 </body>
