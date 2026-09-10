@@ -1,6 +1,7 @@
 // api/whatsapp.js — Serverless Proxy Seguro para Gerenciamento do WhatsApp no FinObra
 
 import { resolveAuthAndTenant } from './_auth.js';
+import { checkRateLimit, getClientIp } from './_ratelimit.js';
 
 const ALLOWED_ORIGINS = [
   'https://finobra.app.br',
@@ -50,7 +51,8 @@ export default async function handler(req, res) {
     });
   }
 
-  const action = req.query?.action || req.body?.action || 'session';
+  const isSendPayload = req.method === 'POST' && (req.body?.phone || req.body?.number) && (req.body?.message || req.body?.text || req.body?.base64 || req.body?.caption);
+  const action = req.query?.action || req.body?.action || (isSendPayload ? 'send' : 'session');
   const renderBase = getRenderBaseUrl();
   const internalSecret = (process.env.API_SECRET || process.env.VERCEL_API_SECRET || '').trim();
 
@@ -171,6 +173,62 @@ export default async function handler(req, res) {
           error: data.error || 'Erro ao enviar mensagem de teste',
           details: data
         });
+      }
+    }
+
+    // ── AÇÃO: ENVIO DE MENSAGEM / DOCUMENTO / MÍDIA ───────────────────────
+    if (action === 'send') {
+      const tenantKey = auth.tenantId || getClientIp(req);
+      const rl = checkRateLimit(`wa_send:${tenantKey}`, 20, 60000);
+      if (!rl.allowed) {
+        return res.status(429).json({
+          success: false,
+          error: 'Limite de disparos de WhatsApp atingido por minuto. Aguarde alguns instantes antes de enviar novamente.'
+        });
+      }
+
+      const { phone, number, text, message, base64, mimeType, fileName, caption } = req.body || {};
+      const destPhone = (phone || number || '').replace(/\D/g, '');
+      const msgText = text || message || caption || '';
+
+      if (!destPhone || (!msgText && !base64)) {
+        return res.status(400).json({ error: 'Telefone e mensagem/arquivo são obrigatórios.' });
+      }
+
+      const numFmt = destPhone.startsWith('55') ? destPhone : `55${destPhone}`;
+      const payloadObj = {
+        number: numFmt,
+        phone: numFmt,
+        to: numFmt,
+        text: msgText,
+        message: msgText,
+        caption: caption || msgText
+      };
+      if (base64) {
+        payloadObj.base64 = base64;
+        payloadObj.mimeType = mimeType;
+        payloadObj.fileName = fileName;
+      }
+
+      const response = await fetch(`${renderBase}/send-message`, {
+        method: 'POST',
+        headers: authHeaders,
+        body: JSON.stringify(payloadObj),
+        signal: AbortSignal.timeout(15000)
+      });
+
+      const data = await response.json().catch(() => ({ status: response.status }));
+      if (response.ok) {
+        return res.status(200).json({ success: true, to: numFmt, result: data });
+      } else if (response.status === 503) {
+        return res.status(200).json({
+          success: false,
+          notConnected: true,
+          error: data.error || 'WhatsApp ainda não está conectado no servidor.',
+          status: data.status || 'qr_ready'
+        });
+      } else {
+        return res.status(response.status).json({ success: false, error: data.error || 'Erro no envio pelo servidor WhatsApp', details: data });
       }
     }
 
