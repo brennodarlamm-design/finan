@@ -3,6 +3,7 @@ import crypto from 'crypto';
 import { neon } from '@neondatabase/serverless';
 import { resolveAuthAndTenant } from './_auth.js';
 import { checkRateLimit, getClientIp } from './_ratelimit.js';
+import { canUseFeature, planError } from './_plans.js';
 
 function getSql() {
   if (!process.env.DATABASE_URL) throw new Error('DATABASE_URL não configurada.');
@@ -103,6 +104,9 @@ export default async function handler(req, res) {
     if (req.method === 'POST') {
       const auth = await resolveAuthAndTenant(req);
       if (!auth.authenticated) return res.status(auth.status || 401).json({ success: false, error: auth.error || 'Não autorizado.' });
+      if (!auth.isSystem && auth.user?.perfil !== 'superadmin' && !canUseFeature(auth.user?.tenantPlan, 'signatures')) {
+        return res.status(403).json(planError('signatures', auth.user?.tenantPlan));
+      }
 
       const rl = checkRateLimit(`assinatura:write:${auth.tenantId}:${auth.user?.id || 'user'}`, 60, 60_000);
       if (!rl.allowed) return res.status(429).json({ success: false, error: 'Limite de registros atingido. Tente novamente em instantes.' });

@@ -2,6 +2,7 @@
 
 import { neon } from '@neondatabase/serverless';
 import { resolveAuthAndTenant } from './_auth.js';
+import { getPlanRule, isActiveObraStatus } from './_plans.js';
 
 function getSql() {
   const conn = process.env.DATABASE_URL;
@@ -42,6 +43,100 @@ function todayBoaVista() {
   }).formatToParts(new Date());
   const values = Object.fromEntries(parts.map(p => [p.type, p.value]));
   return `${values.year}-${values.month}-${values.day}`;
+}
+
+function parsePagination(query = {}) {
+  if (query.limit === undefined && query.offset === undefined) return null;
+  const rawLimit = Number.parseInt(query.limit, 10);
+  const rawOffset = Number.parseInt(query.offset, 10);
+  const limit = Math.min(Math.max(Number.isFinite(rawLimit) ? rawLimit : 250, 1), 500);
+  const offset = Math.max(Number.isFinite(rawOffset) ? rawOffset : 0, 0);
+  return { limit, offset };
+}
+
+function pageResponse(items, pagination) {
+  if (!pagination) return { success: true, data: items };
+  return {
+    success: true,
+    data: items,
+    pagination: {
+      limit: pagination.limit,
+      offset: pagination.offset,
+      count: items.length,
+      hasMore: items.length === pagination.limit,
+      nextOffset: pagination.offset + items.length
+    }
+  };
+}
+
+async function validateBulkObraPlanLimit(sql, tenantId, plan, obras) {
+  if (!Array.isArray(obras) || obras.length === 0) return { allowed: true };
+  const rule = getPlanRule(plan);
+  if (rule.maxActiveObras == null) return { allowed: true };
+
+  const rows = await sql`SELECT id, status FROM obras WHERE tenant_id = ${tenantId};`;
+  const projected = new Map(rows.map((r) => [String(r.id), r.status]));
+  let activeCount = rows.reduce((count, r) => count + (isActiveObraStatus(r.status) ? 1 : 0), 0);
+
+  for (const obra of obras) {
+    if (!obra?.id || !obra?.nome) continue;
+    const key = String(obra.id);
+    const previousActive = projected.has(key) && isActiveObraStatus(projected.get(key));
+    const nextActive = isActiveObraStatus(obra.status);
+
+    if (!previousActive && nextActive) activeCount += 1;
+    if (previousActive && !nextActive) activeCount -= 1;
+    projected.set(key, obra.status || 'em_andamento');
+
+    if (activeCount > rule.maxActiveObras) {
+      return {
+        allowed: false,
+        status: 409,
+        body: {
+          success: false,
+          code: 'PLAN_OBRA_LIMIT',
+          plan: rule.id,
+          limit: rule.maxActiveObras,
+          current: activeCount,
+          error: `Seu ${rule.label} permite até ${rule.maxActiveObras} obras ativas simultâneas. A sincronização foi recusada antes de gravar para evitar uma atualização parcial.`
+        }
+      };
+    }
+  }
+
+  return { allowed: true };
+}
+
+async function enforceObraPlanLimit(sql, tenantId, plan, obra) {
+  if (!obra?.id || !isActiveObraStatus(obra.status)) return { allowed: true };
+  const rule = getPlanRule(plan);
+  if (rule.maxActiveObras == null) return { allowed: true };
+
+  const existing = await sql`SELECT status FROM obras WHERE id = ${obra.id} AND tenant_id = ${tenantId} LIMIT 1;`;
+  if (existing.length && isActiveObraStatus(existing[0].status)) return { allowed: true };
+
+  const countRows = await sql`
+    SELECT COUNT(*)::int AS total
+    FROM obras
+    WHERE tenant_id = ${tenantId}
+      AND LOWER(COALESCE(status, 'em_andamento')) NOT IN ('concluida','concluído','concluido','cancelada','cancelado');
+  `;
+  const current = Number(countRows[0]?.total || 0);
+  if (current >= rule.maxActiveObras) {
+    return {
+      allowed: false,
+      status: 409,
+      body: {
+        success: false,
+        code: 'PLAN_OBRA_LIMIT',
+        plan: rule.id,
+        limit: rule.maxActiveObras,
+        current,
+        error: `Seu ${rule.label} permite até ${rule.maxActiveObras} obras ativas simultâneas. Conclua/cancele uma obra ou faça upgrade do plano para cadastrar outra.`
+      }
+    };
+  }
+  return { allowed: true };
 }
 
 // ── VALIDAÇÃO DE INTEGRIDADE REFERENCIAL MULTI-TENANT ────────────────────────
@@ -113,6 +208,25 @@ export default async function handler(req, res) {
     // ── GET: Consultar dados isolados pelo Tenant ─────────────────────────────
     if (req.method === 'GET') {
       const { table, obra_id, id } = req.query || {};
+      const pagination = parsePagination(req.query || {});
+
+      if (table === 'sync_manifest') {
+        const rows = await sql`
+          SELECT
+            (SELECT COUNT(*)::int FROM obras WHERE tenant_id = ${tenantId}) AS obras,
+            (SELECT COUNT(*)::int FROM fornecedores WHERE tenant_id = ${tenantId}) AS fornecedores,
+            (SELECT COUNT(*)::int FROM lancamentos WHERE tenant_id = ${tenantId}) AS lancamentos,
+            (SELECT COUNT(*)::int FROM notas_fiscais WHERE tenant_id = ${tenantId}) AS notas,
+            (SELECT COUNT(*)::int FROM orcamentos WHERE tenant_id = ${tenantId}) AS orcamentos,
+            (SELECT COUNT(*)::int FROM medicoes WHERE tenant_id = ${tenantId}) AS medicoes,
+            (SELECT COUNT(*)::int FROM documentos WHERE tenant_id = ${tenantId}) AS documentos,
+            (SELECT COUNT(*)::int FROM produtos WHERE tenant_id = ${tenantId}) AS produtos,
+            (SELECT COUNT(*)::int FROM contas_bancarias WHERE tenant_id = ${tenantId}) AS contas;
+        `;
+        const counts = rows[0] || {};
+        const normalized = Object.fromEntries(Object.entries(counts).map(([k,v]) => [k, Number(v) || 0]));
+        return res.status(200).json({ success: true, counts: normalized, total: Object.values(normalized).reduce((a,b) => a + b, 0) });
+      }
 
       if (!table || table === 'all') {
         const [obras, fornecedores, lancamentos, notas, orcamentos, medicoes, documentos, produtos, contas] = await Promise.all([
@@ -203,45 +317,49 @@ export default async function handler(req, res) {
       if (table === 'lancamentos') {
         let items;
         if (obra_id) {
-          items = await sql`SELECT * FROM lancamentos WHERE tenant_id = ${tenantId} AND obra_id = ${obra_id} ORDER BY data DESC;`;
+          items = pagination
+            ? await sql`SELECT * FROM lancamentos WHERE tenant_id = ${tenantId} AND obra_id = ${obra_id} ORDER BY data DESC, created_at DESC, id DESC LIMIT ${pagination.limit} OFFSET ${pagination.offset};`
+            : await sql`SELECT * FROM lancamentos WHERE tenant_id = ${tenantId} AND obra_id = ${obra_id} ORDER BY data DESC, created_at DESC, id DESC;`;
         } else {
-          items = await sql`SELECT * FROM lancamentos WHERE tenant_id = ${tenantId} ORDER BY data DESC;`;
+          items = pagination
+            ? await sql`SELECT * FROM lancamentos WHERE tenant_id = ${tenantId} ORDER BY data DESC, created_at DESC, id DESC LIMIT ${pagination.limit} OFFSET ${pagination.offset};`
+            : await sql`SELECT * FROM lancamentos WHERE tenant_id = ${tenantId} ORDER BY data DESC, created_at DESC, id DESC;`;
         }
-        return res.status(200).json({
-          success: true,
-          data: items.map(l => ({
-            ...l,
-            data: cleanDate(l.data) || todayBoaVista(),
-            data_vencimento: cleanDate(l.data_vencimento) || cleanDate(l.data),
-            data_pagamento: cleanDate(l.data_pagamento),
-            valor: cleanNum(l.valor)
-          }))
-        });
+        const normalized = items.map(l => ({
+          ...l,
+          data: cleanDate(l.data) || todayBoaVista(),
+          data_vencimento: cleanDate(l.data_vencimento) || cleanDate(l.data),
+          data_pagamento: cleanDate(l.data_pagamento),
+          valor: cleanNum(l.valor)
+        }));
+        return res.status(200).json(pageResponse(normalized, pagination));
       }
 
       if (table === 'notas' || table === 'notas_fiscais') {
         let items;
         if (obra_id) {
-          items = await sql`SELECT * FROM notas_fiscais WHERE tenant_id = ${tenantId} AND obra_id = ${obra_id} ORDER BY data_emissao DESC;`;
+          items = pagination
+            ? await sql`SELECT * FROM notas_fiscais WHERE tenant_id = ${tenantId} AND obra_id = ${obra_id} ORDER BY data_emissao DESC, created_at DESC, id DESC LIMIT ${pagination.limit} OFFSET ${pagination.offset};`
+            : await sql`SELECT * FROM notas_fiscais WHERE tenant_id = ${tenantId} AND obra_id = ${obra_id} ORDER BY data_emissao DESC, created_at DESC, id DESC;`;
         } else {
-          items = await sql`SELECT * FROM notas_fiscais WHERE tenant_id = ${tenantId} ORDER BY data_emissao DESC;`;
+          items = pagination
+            ? await sql`SELECT * FROM notas_fiscais WHERE tenant_id = ${tenantId} ORDER BY data_emissao DESC, created_at DESC, id DESC LIMIT ${pagination.limit} OFFSET ${pagination.offset};`
+            : await sql`SELECT * FROM notas_fiscais WHERE tenant_id = ${tenantId} ORDER BY data_emissao DESC, created_at DESC, id DESC;`;
         }
-        return res.status(200).json({
-          success: true,
-          data: items.map(n => ({
-            ...n,
-            data_emissao: cleanDate(n.data_emissao),
-            data_vencimento: cleanDate(n.data_vencimento),
-            data_pagamento: cleanDate(n.data_pagamento),
-            valor_bruto: cleanNum(n.valor_bruto !== undefined ? n.valor_bruto : n.valor_total),
-            impostos: cleanNum(n.impostos),
-            valor_liquido: cleanNum(n.valor_liquido !== undefined ? n.valor_liquido : (n.valor_bruto || n.valor_total)),
-            valor_total: cleanNum(n.valor_total !== undefined ? n.valor_total : n.valor_bruto),
-            categoria: n.categoria || 'material',
-            tipo: n.tipo || 'entrada',
-            chave_nfe: n.chave_nfe || n.chave_acesso || ''
-          }))
-        });
+        const normalized = items.map(n => ({
+          ...n,
+          data_emissao: cleanDate(n.data_emissao),
+          data_vencimento: cleanDate(n.data_vencimento),
+          data_pagamento: cleanDate(n.data_pagamento),
+          valor_bruto: cleanNum(n.valor_bruto !== undefined ? n.valor_bruto : n.valor_total),
+          impostos: cleanNum(n.impostos),
+          valor_liquido: cleanNum(n.valor_liquido !== undefined ? n.valor_liquido : (n.valor_bruto || n.valor_total)),
+          valor_total: cleanNum(n.valor_total !== undefined ? n.valor_total : n.valor_bruto),
+          categoria: n.categoria || 'material',
+          tipo: n.tipo || 'entrada',
+          chave_nfe: n.chave_nfe || n.chave_acesso || ''
+        }));
+        return res.status(200).json(pageResponse(normalized, pagination));
       }
 
       if (table === 'obras' || table === 'clientes') {
@@ -267,8 +385,10 @@ export default async function handler(req, res) {
       }
 
       if (table === 'documentos') {
-        const items = await sql`SELECT id, tipo, referencia_id, titulo, categoria, nome_arquivo, tipo_arquivo, tamanho_bytes, url, created_at FROM documentos WHERE tenant_id = ${tenantId} ORDER BY created_at DESC;`;
-        return res.status(200).json({ success: true, data: items });
+        const items = pagination
+          ? await sql`SELECT id, tipo, referencia_id, titulo, categoria, nome_arquivo, tipo_arquivo, tamanho_bytes, url, created_at FROM documentos WHERE tenant_id = ${tenantId} ORDER BY created_at DESC, id DESC LIMIT ${pagination.limit} OFFSET ${pagination.offset};`
+          : await sql`SELECT id, tipo, referencia_id, titulo, categoria, nome_arquivo, tipo_arquivo, tamanho_bytes, url, created_at FROM documentos WHERE tenant_id = ${tenantId} ORDER BY created_at DESC, id DESC;`;
+        return res.status(200).json(pageResponse(items, pagination));
       }
 
       if (table === 'documento_conteudo') {
@@ -306,10 +426,10 @@ export default async function handler(req, res) {
       }
 
       if (table === 'orcamentos') {
-        const items = await sql`SELECT * FROM orcamentos WHERE tenant_id = ${tenantId} ORDER BY created_at DESC;`;
-        return res.status(200).json({
-          success: true,
-          data: items.map(o => {
+        const items = pagination
+          ? await sql`SELECT * FROM orcamentos WHERE tenant_id = ${tenantId} ORDER BY created_at DESC, id DESC LIMIT ${pagination.limit} OFFSET ${pagination.offset};`
+          : await sql`SELECT * FROM orcamentos WHERE tenant_id = ${tenantId} ORDER BY created_at DESC, id DESC;`;
+        const normalized = items.map(o => {
             const parsedItens = (typeof o.itens_json === 'string' ? JSON.parse(o.itens_json) : o.itens_json) || o.itens || o.etapas || [];
             return {
               ...o,
@@ -320,15 +440,15 @@ export default async function handler(req, res) {
               itens: parsedItens,
               etapas: parsedItens
             };
-          })
-        });
+          });
+        return res.status(200).json(pageResponse(normalized, pagination));
       }
 
       if (table === 'medicoes') {
-        const items = await sql`SELECT * FROM medicoes WHERE tenant_id = ${tenantId} ORDER BY data DESC;`;
-        return res.status(200).json({
-          success: true,
-          data: items.map(m => ({
+        const items = pagination
+          ? await sql`SELECT * FROM medicoes WHERE tenant_id = ${tenantId} ORDER BY data DESC, created_at DESC, id DESC LIMIT ${pagination.limit} OFFSET ${pagination.offset};`
+          : await sql`SELECT * FROM medicoes WHERE tenant_id = ${tenantId} ORDER BY data DESC, created_at DESC, id DESC;`;
+        const normalized = items.map(m => ({
             ...m,
             data: cleanDate(m.data),
             data_medicao: cleanDate(m.data),
@@ -337,8 +457,8 @@ export default async function handler(req, res) {
             valor_medido: cleanNum(m.valor_medido),
             valor_solicitado: cleanNum(m.valor_solicitado || m.valor_medido),
             itens: (typeof m.itens_json === 'string' ? JSON.parse(m.itens_json) : m.itens_json) || m.itens || []
-          }))
-        });
+          }));
+        return res.status(200).json(pageResponse(normalized, pagination));
       }
 
       return res.status(200).json({ success: true, data: [], message: `Tabela '${table}' consultada.` });
@@ -352,8 +472,12 @@ export default async function handler(req, res) {
       if (action === 'sync_all' && payload) {
         let totalCount = 0;
 
-        // Obras
+        // Obras — valida o lote inteiro antes da primeira gravação para evitar sync parcial
         if (Array.isArray(payload.clientes)) {
+          if (!auth.isSystem && auth.user?.perfil !== 'superadmin') {
+            const planCheck = await validateBulkObraPlanLimit(sql, tenantId, auth.user?.tenantPlan, payload.clientes);
+            if (!planCheck.allowed) return res.status(planCheck.status).json(planCheck.body);
+          }
           for (const o of payload.clientes) {
             if (!o.id || !o.nome) continue;
             await sql`
@@ -638,6 +762,10 @@ export default async function handler(req, res) {
 
         if (table === 'obras' || table === 'clientes') {
           const o = data;
+          if (!auth.isSystem && auth.user?.perfil !== 'superadmin') {
+            const planCheck = await enforceObraPlanLimit(sql, tenantId, auth.user?.tenantPlan, o);
+            if (!planCheck.allowed) return res.status(planCheck.status).json(planCheck.body);
+          }
           await sql`
             INSERT INTO obras (id, tenant_id, nome, cliente, endereco, orcamento_total, status, data_inicio, data_previsao)
             VALUES (

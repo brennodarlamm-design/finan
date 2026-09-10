@@ -6,6 +6,12 @@ const OCR = {
 
   // ── Ponto de entrada: abre o modal de upload ─────────────────────────────
   abrirModal() {
+    const plano = String((typeof DB !== 'undefined' && DB.getEmpresa ? DB.getEmpresa()?.plano : '') || 'trial').toLowerCase();
+    if (plano === 'starter') {
+      Utils.toast('Leitura OCR com IA está disponível nos planos Profissional e Ilimitado.', 'warning');
+      if (typeof App !== 'undefined' && App.navigate) setTimeout(() => App.navigate('planos'), 300);
+      return;
+    }
     Utils.showModal(`
       <div class="modal" id="ocr-modal" style="max-width:680px;width:95vw;max-height:92vh;display:flex;flex-direction:column;overflow:hidden;">
         <div class="modal-header" style="background:linear-gradient(135deg,#1e1b4b 0%,#312e81 100%);border-radius:var(--r-lg) var(--r-lg) 0 0;flex-shrink:0;">

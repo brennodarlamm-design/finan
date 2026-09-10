@@ -257,6 +257,21 @@ const Clientes = {
     d.valor_financiado = parseFloat(d.valor_financiado)||0;
     d.valor_proprio = parseFloat(d.valor_proprio)||0;
     d.area_construida = parseFloat(d.area_construida)||0;
+
+    const ativo = st => !['concluida','concluído','concluido','cancelada','cancelado'].includes(String(st || 'em_andamento').toLowerCase());
+    const emp = (typeof DB !== 'undefined' && DB.getEmpresa) ? DB.getEmpresa() : {};
+    const plano = String(emp.plano || 'trial').toLowerCase();
+    const limites = { trial: 10, starter: 3, pro: 10, unlimited: Infinity };
+    const limite = limites[plano] ?? 10;
+    const atual = id ? DB.getById('clientes', id) : null;
+    const viraAtiva = ativo(d.status) && (!atual || !ativo(atual.status));
+    const ativas = DB.getAll('clientes').filter(c => ativo(c.status)).length;
+    if (viraAtiva && Number.isFinite(limite) && ativas >= limite) {
+      Utils.toast(`Seu plano permite até ${limite} obras ativas simultâneas. Conclua/cancele uma obra ou faça upgrade.`, 'warning');
+      if (typeof App !== 'undefined' && App.navigate) setTimeout(() => App.navigate('planos'), 250);
+      return;
+    }
+
     if (id) { DB.update('clientes',id,d); Utils.toast('Obra atualizada!','success'); }
     else { DB.add('clientes',d); Utils.toast('Obra cadastrada com sucesso!','success'); }
     Utils.closeModal();

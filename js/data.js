@@ -149,7 +149,7 @@ const DB = {
     this.save(key, this.getAll(key).filter(i => i.id !== id));
     this.syncToCloud('delete', key, null, id);
   },
-  uuid() { return Date.now().toString(36) + Math.random().toString(36).substr(2, 9); },
+  uuid() { return (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : (Date.now().toString(36) + Math.random().toString(36).substr(2, 9)); },
 
   // ── FASES DE DOCUMENTAÇÃO DAS OBRAS ──
   _fasesDocKey(obraId) {
@@ -332,21 +332,81 @@ const DB = {
     } catch {}
   },
 
+  async _fetchCloudPage(table, limit = 400, offset = 0) {
+    const params = new URLSearchParams({ table, limit: String(limit), offset: String(offset) });
+    const res = await fetch(`/api/db?${params.toString()}`, { headers: this._apiHeaders() });
+    if (res.status === 401 || res.status === 403) {
+      if (typeof Auth !== 'undefined' && Auth.handleSessionExpired) Auth.handleSessionExpired();
+      throw new Error('SESSION_EXPIRED');
+    }
+    if (!res.ok) throw new Error(`Falha ao sincronizar ${table}: HTTP ${res.status}`);
+    const json = await res.json();
+    if (!json.success || !Array.isArray(json.data)) throw new Error(`Resposta inválida ao sincronizar ${table}`);
+    return json;
+  },
+
+  async _fetchCloudTablePaged(table, limit = 400) {
+    const items = [];
+    let offset = 0;
+    for (let page = 0; page < 250; page++) {
+      const json = await this._fetchCloudPage(table, limit, offset);
+      items.push(...json.data);
+      const meta = json.pagination;
+      if (!meta || !meta.hasMore || json.data.length === 0) break;
+      offset = Number(meta.nextOffset ?? (offset + json.data.length));
+    }
+    return items;
+  },
+
+  async _fetchCloudSnapshot() {
+    let usePaged = false;
+    try {
+      const manifestRes = await fetch('/api/db?table=sync_manifest', { headers: this._apiHeaders() });
+      if (manifestRes.ok) {
+        const manifest = await manifestRes.json();
+        const c = manifest.counts || {};
+        usePaged = Number(manifest.total || 0) > 2500
+          || Number(c.lancamentos || 0) > 1200
+          || Number(c.notas || 0) > 800
+          || Number(c.documentos || 0) > 800
+          || Number(c.orcamentos || 0) > 800
+          || Number(c.medicoes || 0) > 800;
+      }
+    } catch (e) {
+      console.warn('[Sync] Manifesto indisponível; usando sincronização compatível:', e?.message || e);
+    }
+
+    if (!usePaged) {
+      const res = await fetch('/api/db?table=all', { headers: this._apiHeaders() });
+      if (res.status === 401 || res.status === 403) {
+        if (typeof Auth !== 'undefined' && Auth.handleSessionExpired) Auth.handleSessionExpired();
+        throw new Error('SESSION_EXPIRED');
+      }
+      if (!res.ok) throw new Error(`Falha no snapshot: HTTP ${res.status}`);
+      const json = await res.json();
+      if (!json.success || !json.data) throw new Error('Snapshot da nuvem inválido');
+      return json.data;
+    }
+
+    console.info('[Sync] Base grande detectada. Usando sincronização paginada.');
+    const [clientes, fornecedores, lancamentos, notas, orcamentos, medicoes, documentos, produtos, contas] = await Promise.all([
+      this._fetchCloudTablePaged('clientes'),
+      this._fetchCloudTablePaged('fornecedores'),
+      this._fetchCloudTablePaged('lancamentos'),
+      this._fetchCloudTablePaged('notas'),
+      this._fetchCloudTablePaged('orcamentos'),
+      this._fetchCloudTablePaged('medicoes'),
+      this._fetchCloudTablePaged('documentos'),
+      this._fetchCloudTablePaged('produtos'),
+      this._fetchCloudTablePaged('contas')
+    ]);
+    return { clientes, fornecedores, lancamentos, notas, orcamentos, medicoes, documentos, produtos, contas };
+  },
+
   async syncFromCloud() {
     this._emitSyncStatus('syncing');
     try {
-      const res = await fetch('/api/db?table=all', { headers: this._apiHeaders() });
-      if (res.status === 401) {
-        if (typeof Auth !== 'undefined' && Auth.handleSessionExpired) {
-          Auth.handleSessionExpired();
-        }
-        return false;
-      }
-      if (!res.ok) return false;
-      const json = await res.json();
-      if (!json.success || !json.data) return false;
-
-      const d = json.data;
+      const d = await this._fetchCloudSnapshot();
       if (Array.isArray(d.clientes)) {
         this.save('clientes', d.clientes.map(o => ({
           ...o,
@@ -518,6 +578,15 @@ const DB = {
           break;
         }
         if (!res.ok) {
+          const errorJson = await res.clone().json().catch(() => ({}));
+          if (String(errorJson.code || '').startsWith('PLAN_')) {
+            console.warn(`[Sync] Operação rejeitada pelo plano: ${errorJson.error || errorJson.code}`);
+            queue.shift();
+            this._saveSyncQueue(queue);
+            this._emitSyncStatus(queue.length ? 'pending' : 'synced', { rejected: true, code: errorJson.code });
+            if (typeof Utils !== 'undefined' && Utils.toast) Utils.toast(errorJson.error || 'Operação não permitida pelo plano atual.', 'warning');
+            continue;
+          }
           console.warn(`[Sync] Servidor recusou ${item.payload.action}/${item.payload.table}. Tentará novamente.`);
           this._scheduleSyncRetry(15000);
           break;

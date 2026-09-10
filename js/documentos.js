@@ -68,10 +68,31 @@ const Documentos = {
     } catch {}
   },
 
+  _isPrivateBlobUrl(url) {
+    return typeof url === 'string' && url.includes('.private.blob.vercel-storage.com');
+  },
+
+  async _resolverUrlProtegida(id) {
+    try {
+      const headers = (typeof DB !== 'undefined' && DB._apiHeaders) ? DB._apiHeaders() : {};
+      const res = await fetch(`/api/upload?document_id=${encodeURIComponent(id)}`, { headers });
+      if (res.status === 401 || res.status === 403) {
+        if (typeof Auth !== 'undefined' && Auth.handleSessionExpired) Auth.handleSessionExpired();
+        return null;
+      }
+      if (!res.ok) return null;
+      const json = await res.json();
+      return json.success && json.url ? json.url : null;
+    } catch (e) {
+      console.warn('[Documentos] Não foi possível gerar URL temporária:', e);
+      return null;
+    }
+  },
+
   async obterConteudo(id) {
     const doc = this.getById(id);
     if (doc && doc.url) {
-      return doc.url;
+      return this._isPrivateBlobUrl(doc.url) ? await this._resolverUrlProtegida(id) : doc.url;
     }
     if (this._memoryBlobs.has(id)) {
       return this._memoryBlobs.get(id);
@@ -103,7 +124,7 @@ const Documentos = {
             doc.url = json.url;
             this.salvarLista(this.getAll().map(d => d.id === id ? { ...d, url: json.url } : d));
           }
-          return json.url;
+          return this._isPrivateBlobUrl(json.url) ? await this._resolverUrlProtegida(id) : json.url;
         }
         if (json.base64) {
           this._memoryBlobs.set(id, json.base64);
@@ -654,7 +675,7 @@ const Documentos = {
           <div style="font-size:3rem;margin-bottom:12px;">📱 ➔ 💻</div>
           <h3 style="font-size:1.1rem;font-weight:800;margin-bottom:8px;color:var(--text);">Arquivo Gravado no Celular</h3>
           <p style="font-size:.85rem;color:var(--text2);line-height:1.5;margin-bottom:16px;text-align:left;background:var(--bg-secondary);padding:14px;border-radius:8px;border:1px solid var(--border);">
-            O arquivo deste comprovante (<strong>${doc.nome_arquivo || doc.titulo}</strong>) foi gerado no smartphone e ainda está pendente de sincronização com o banco de dados em nuvem.
+            O arquivo deste comprovante (<strong>${Utils.escapeHtml(doc.nome_arquivo || doc.titulo || '')}</strong>) foi gerado no smartphone e ainda está pendente de sincronização com o banco de dados em nuvem.
             <br><br>
             👉 <strong>Como sincronizar:</strong> Abra a página no celular e dê um <em>recarregar (F5/puxar para baixo)</em>. O aplicativo enviará o arquivo automaticamente para a nuvem e ele abrirá aqui no computador imediatamente!
           </p>
@@ -676,7 +697,7 @@ const Documentos = {
     Utils.showModal(`
       <div class="modal" style="max-width:850px;width:95vw;height:85vh;display:flex;flex-direction:column;">
         <div class="modal-header">
-          <span class="modal-title">👁️ ${doc.titulo || doc.nome_arquivo}</span>
+          <span class="modal-title">👁️ ${Utils.escapeHtml(doc.titulo || doc.nome_arquivo || '')}</span>
           <div style="display:flex;gap:8px;align-items:center;">
             <button class="btn btn-sm btn-primary" onclick="Documentos.baixar('${doc.id}')">⬇️ Baixar</button>
             <button class="modal-close" onclick="Utils.closeModal()">✕</button>
@@ -692,7 +713,7 @@ const Documentos = {
           ` : `
             <div style="width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:30px;text-align:center;">
               <div style="font-size:4rem;margin-bottom:12px;">${isZip ? '📦' : isCAD ? '📐' : '📎'}</div>
-              <h3 style="font-size:1.15rem;font-weight:700;color:#fff;margin-bottom:8px;">${doc.titulo || doc.nome_arquivo}</h3>
+              <h3 style="font-size:1.15rem;font-weight:700;color:#fff;margin-bottom:8px;">${Utils.escapeHtml(doc.titulo || doc.nome_arquivo || '')}</h3>
               <p style="font-size:.84rem;color:#94a3b8;max-width:440px;line-height:1.5;margin-bottom:20px;">
                 ${isZip ? 'Arquivo Compactado (ZIP/RAR/7Z).' : isCAD ? 'Projeto Técnico / Desenho CAD (DWG/DXF).' : 'Arquivo Binário.'}
                 <br>Este formato não pode ser visualizado diretamente no navegador. Baixe para abri-lo no seu computador.

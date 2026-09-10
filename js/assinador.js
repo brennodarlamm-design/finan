@@ -25,6 +25,12 @@ const Assinador = {
     dadosDocumento = {},
     onSalvar = null
   } = {}) {
+    const plano = String((typeof DB !== 'undefined' && DB.getEmpresa ? DB.getEmpresa()?.plano : '') || 'trial').toLowerCase();
+    if (plano === 'starter') {
+      Utils.toast('Assinatura eletrônica com validação está disponível nos planos Profissional e Ilimitado.', 'warning');
+      if (typeof App !== 'undefined' && App.navigate) setTimeout(() => App.navigate('planos'), 300);
+      return;
+    }
     this._onSalvarCallback = onSalvar;
     this._metadataDoc = dadosDocumento;
     this._paths = [];

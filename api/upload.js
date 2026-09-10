@@ -1,5 +1,5 @@
 // api/upload.js — Endpoint Serverless para Upload e Gerenciamento no Vercel Blob
-import { put, del } from '@vercel/blob';
+import { put, del, issueSignedToken, presignUrl } from '@vercel/blob';
 import { handleUpload } from '@vercel/blob/client';
 import { neon } from '@neondatabase/serverless';
 import { resolveAuthAndTenant } from './_auth.js';
@@ -10,6 +10,16 @@ function getSql() {
     throw new Error('DATABASE_URL não configurada no servidor.');
   }
   return neon(conn);
+}
+
+
+function getPrivateBlobOptions() {
+  const options = {};
+  const token = String(process.env.FINOBRA_BLOB_READ_WRITE_TOKEN || '').trim();
+  const storeId = String(process.env.FINOBRA_BLOB_STORE_ID || '').trim();
+  if (token) options.token = token;
+  if (storeId) options.storeId = storeId;
+  return options;
 }
 
 export const config = {
@@ -43,7 +53,7 @@ function setCors(req, res) {
   } else {
     res.setHeader('Access-Control-Allow-Origin', '*');
   }
-  res.setHeader('Access-Control-Allow-Methods', 'POST,DELETE,OPTIONS');
+  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,DELETE,OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, apikey, x-api-key, x-tenant-id, X-Requested-With');
 }
 
@@ -64,6 +74,59 @@ export default async function handler(req, res) {
   }
 
   const tenantId = auth.tenantId || 'angelim';
+  const configuredAccess = String(process.env.FINOBRA_BLOB_ACCESS || process.env.BLOB_ACCESS || 'public').trim().toLowerCase();
+  const blobAccess = configuredAccess === 'private' ? 'private' : 'public';
+
+  // ── GET: URL temporária para leitura de documento privado ───────────────────
+  if (req.method === 'GET') {
+    try {
+      const documentId = String(req.query?.document_id || req.query?.id || '').trim();
+      if (!documentId) return res.status(400).json({ success: false, error: 'ID do documento é obrigatório.' });
+
+      const sql = getSql();
+      const rows = await sql`SELECT id, url, nome_arquivo, tipo_arquivo FROM documentos WHERE id = ${documentId} AND tenant_id = ${tenantId} LIMIT 1;`;
+      if (!rows.length || !rows[0].url) {
+        return res.status(404).json({ success: false, error: 'Arquivo não encontrado para este tenant.' });
+      }
+
+      const blobUrl = String(rows[0].url);
+      const isPrivate = blobUrl.includes('.private.blob.vercel-storage.com');
+      if (!isPrivate) {
+        return res.status(200).json({ success: true, url: blobUrl, private: false });
+      }
+
+      let pathname = '';
+      try { pathname = new URL(blobUrl).pathname.replace(/^\/+/, ''); } catch {}
+      if (!pathname) return res.status(422).json({ success: false, error: 'Caminho do arquivo privado inválido.' });
+
+      const delegationUntil = Date.now() + 15 * 60 * 1000;
+      const urlUntil = Date.now() + 10 * 60 * 1000;
+      const signedToken = await issueSignedToken({
+        ...getPrivateBlobOptions(),
+        pathname,
+        operations: ['get'],
+        validUntil: delegationUntil
+      });
+      const { presignedUrl } = await presignUrl(signedToken, {
+        pathname,
+        operation: 'get',
+        access: 'private',
+        validUntil: urlUntil
+      });
+
+      return res.status(200).json({
+        success: true,
+        url: presignedUrl,
+        private: true,
+        expires_in_seconds: 600,
+        filename: rows[0].nome_arquivo || '',
+        contentType: rows[0].tipo_arquivo || 'application/octet-stream'
+      });
+    } catch (err) {
+      console.error('[Blob] Erro ao gerar URL privada:', err);
+      return res.status(500).json({ success: false, error: 'Não foi possível liberar o arquivo para leitura.' });
+    }
+  }
 
   // ── DELETE: Excluir documento do Vercel Blob com Validação Estrita de Tenant ──
   if (req.method === 'DELETE') {
@@ -100,7 +163,8 @@ export default async function handler(req, res) {
 
       // 2. Exclusão no Vercel Blob
       if (finalUrl && finalUrl.includes('blob.vercel-storage.com')) {
-        await del(finalUrl);
+        const deleteOptions = finalUrl.includes('.private.blob.vercel-storage.com') ? getPrivateBlobOptions() : undefined;
+        await del(finalUrl, deleteOptions);
       }
 
       // 3. Remoção no banco de dados Neon
@@ -121,8 +185,17 @@ export default async function handler(req, res) {
   }
 
   try {
-    // A. Suporte a Client-side Upload token (@vercel/blob/client handleUpload)
+    // A. Suporte a Client-side Upload token (@vercel/blob/client handleUpload).
+    // O fluxo legado é mantido apenas para store público. Em modo privado, o app atual
+    // usa upload server-side para não gerar acidentalmente um token de store público.
     if (req.body && req.body.type === 'blob.generate-client-token') {
+      if (blobAccess === 'private') {
+        return res.status(409).json({
+          success: false,
+          code: 'PRIVATE_BLOB_DIRECT_UPLOAD_ONLY',
+          error: 'Upload privado deve usar o fluxo autenticado do FinObra.'
+        });
+      }
       const jsonResponse = await handleUpload({
         body: req.body,
         request: req,
@@ -179,7 +252,8 @@ export default async function handler(req, res) {
     const pathname = `${tenantId}/documentos/${ano}/${mes}/${Date.now()}_${safeFilename}`;
 
     const blob = await put(pathname, buffer, {
-      access: 'public',
+      ...(blobAccess === 'private' ? getPrivateBlobOptions() : {}),
+      access: blobAccess,
       contentType: cleanMime
     });
 
@@ -188,7 +262,8 @@ export default async function handler(req, res) {
       url: blob.url,
       pathname: blob.pathname,
       size: buffer.length,
-      contentType: blob.contentType
+      contentType: blob.contentType,
+      access: blobAccess
     });
 
   } catch (err) {

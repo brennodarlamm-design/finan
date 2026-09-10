@@ -9,3 +9,11 @@ scripts
 *.tmp
 *.bak
 render.yaml
+
+# Pacotes e artefatos locais que não pertencem ao deploy
+node_modules
+scratch
+FINOBRA_PATCH_*
+*.zip
+*.rar
+*.7z

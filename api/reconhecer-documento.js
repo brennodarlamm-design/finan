@@ -3,6 +3,7 @@
 
 import { resolveAuthAndTenant } from './_auth.js';
 import { checkRateLimit, getClientIp } from './_ratelimit.js';
+import { canUseFeature, planError } from './_plans.js';
 
 export const config = {
   maxDuration: 60,
@@ -45,6 +46,10 @@ export default async function handler(req, res) {
   const auth = await resolveAuthAndTenant(req);
   if (!auth.authenticated) {
     return res.status(auth.status || 401).json({ error: auth.error || 'Acesso não autorizado. Forneça o token de autenticação.' });
+  }
+
+  if (!auth.isSystem && auth.user?.perfil !== 'superadmin' && !canUseFeature(auth.user?.tenantPlan, 'ocr')) {
+    return res.status(403).json(planError('ocr', auth.user?.tenantPlan));
   }
 
   // Rate Limiting para proteção contra abuso de custos no Gemini OCR

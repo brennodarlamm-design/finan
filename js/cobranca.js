@@ -99,6 +99,7 @@ const Cobranca = {
     const assAtual = this.getAssinaturaAtual();
     const u = (typeof Auth !== 'undefined' && Auth.getUser()) || {};
     const emp = (typeof DB !== 'undefined' && DB.getEmpresa()) || {};
+    const empresaNomeSeguro = Utils.escapeHtml(emp.nome_fantasia || emp.razao_social || u.empresaNome || 'sua construtora');
 
     el.innerHTML = `
       <div style="max-width:1100px;margin:0 auto;padding:10px 0 40px;">
@@ -112,7 +113,7 @@ const Cobranca = {
             Potencialize a gestão das suas obras
           </h2>
           <p style="color:#94a3b8;font-size:.9rem;max-width:620px;margin:0 auto;">
-            Escolha o plano ideal para a <strong>${emp.nome_fantasia || emp.razao_social || u.empresaNome || 'sua construtora'}</strong> e tenha controle total de obras, medições, notas fiscais e conciliação bancária.
+            Escolha o plano ideal para a <strong>${empresaNomeSeguro}</strong> e tenha controle total de obras, medições, notas fiscais e conciliação bancária.
           </p>
         </div>
 
@@ -141,6 +142,10 @@ const Cobranca = {
           </div>
         </div>
 
+        <div id="finobra-plan-usage" style="margin:-12px 0 26px;padding:12px 16px;border:1px solid rgba(255,255,255,.08);border-radius:10px;background:rgba(255,255,255,.025);font-size:.82rem;color:#94a3b8;">
+          Consultando uso atual do plano…
+        </div>
+
         <!-- Grid de Planos -->
         <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(300px, 1fr));gap:24px;align-items:stretch;">
           ${Object.values(this.PLANOS).map(p => this._renderCardPlano(p, assAtual.planoId === p.id)).join('')}
@@ -148,6 +153,28 @@ const Cobranca = {
 
       </div>
     `;
+    this._carregarUsoPlano();
+  },
+
+  async _carregarUsoPlano() {
+    const box = document.getElementById('finobra-plan-usage');
+    if (!box) return;
+    try {
+      const headers = (typeof DB !== 'undefined' && DB._apiHeaders) ? DB._apiHeaders() : {};
+      const res = await fetch('/api/plano', { headers });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok || !json.success || !json.plan) throw new Error(json.error || 'Falha ao consultar o plano');
+      const p = json.plan;
+      const limite = p.maxActiveObras == null ? 'Ilimitado' : `${p.maxActiveObras}`;
+      const restante = p.maxActiveObras == null ? 'sem limite' : `${p.usage.remainingActiveObras} restante(s)`;
+      box.innerHTML = `
+        <div style="display:flex;justify-content:space-between;gap:14px;align-items:center;flex-wrap:wrap;">
+          <span><strong style="color:#fff;">Uso real no servidor:</strong> ${Number(p.usage.activeObras)||0} obra(s) ativa(s) de ${limite}.</span>
+          <span style="color:${p.maxActiveObras != null && p.usage.remainingActiveObras === 0 ? '#f59e0b' : '#22c55e'};font-weight:800;">${restante}</span>
+        </div>`;
+    } catch (e) {
+      box.textContent = 'Não foi possível consultar o uso do plano agora.';
+    }
   },
 
   _renderCardPlano(plano, isAtual) {
