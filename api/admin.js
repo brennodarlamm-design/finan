@@ -78,6 +78,7 @@ export default async function handler(req, res) {
           t.responsavel,
           t.plano,
           t.status,
+          t.vencimento,
           t.created_at,
           COUNT(DISTINCT o.id) as obras_qtd,
           COUNT(DISTINCT l.id) as lancamentos_qtd,
@@ -90,21 +91,54 @@ export default async function handler(req, res) {
         ORDER BY t.created_at DESC;
       `;
 
-      const tenants = rows.map(r => ({
-        id: r.id,
-        nome_fantasia: r.nome_fantasia || r.razao_social || 'Construtora',
-        razao_social: r.razao_social || r.nome_fantasia || '',
-        cnpj: r.cnpj || '—',
-        responsavel: r.responsavel || 'Administrador',
-        email: r.email || '',
-        telefone: r.telefone || '',
-        plano: r.plano || 'trial',
-        status: r.status || 'ativo',
-        obrasQtd: Number(r.obras_qtd || 0),
-        lancamentosQtd: Number(r.lancamentos_qtd || 0),
-        usuariosQtd: Number(r.usuarios_qtd || 0),
-        criadoEm: r.created_at ? new Date(r.created_at).toISOString() : new Date().toISOString()
-      }));
+      const hoje = new Date();
+      hoje.setHours(0, 0, 0, 0);
+
+      const tenants = rows.map(r => {
+        let vencStr = '';
+        if (r.vencimento) {
+          const vDate = new Date(r.vencimento);
+          if (!isNaN(vDate.getTime())) {
+            vencStr = vDate.toISOString().split('T')[0];
+          }
+        }
+        if (!vencStr && r.created_at) {
+          const cDate = new Date(r.created_at);
+          if (!isNaN(cDate.getTime())) {
+            const addDays = (r.status === 'trial' || r.plano === 'trial') ? 15 : 30;
+            cDate.setDate(cDate.getDate() + addDays);
+            vencStr = cDate.toISOString().split('T')[0];
+          }
+        }
+
+        let diasRestantes = null;
+        let expirado = false;
+        if (vencStr) {
+          const target = new Date(vencStr + 'T00:00:00');
+          const diffMs = target.getTime() - hoje.getTime();
+          diasRestantes = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+          expirado = diasRestantes < 0;
+        }
+
+        return {
+          id: r.id,
+          nome_fantasia: r.nome_fantasia || r.razao_social || 'Construtora',
+          razao_social: r.razao_social || r.nome_fantasia || '',
+          cnpj: r.cnpj || '—',
+          responsavel: r.responsavel || 'Administrador',
+          email: r.email || '',
+          telefone: r.telefone || '',
+          plano: r.plano || 'trial',
+          status: r.status || 'ativo',
+          vencimento: vencStr,
+          diasRestantes,
+          expirado,
+          obrasQtd: Number(r.obras_qtd || 0),
+          lancamentosQtd: Number(r.lancamentos_qtd || 0),
+          usuariosQtd: Number(r.usuarios_qtd || 0),
+          criadoEm: r.created_at ? new Date(r.created_at).toISOString() : new Date().toISOString()
+        };
+      });
 
       return res.status(200).json({ success: true, tenants });
     }
@@ -164,9 +198,16 @@ export default async function handler(req, res) {
       const userId = 'usr_' + crypto.randomBytes(6).toString('hex');
       const passHash = hashPassword(finalSenha);
 
+      let finalVencimento = String(req.body?.vencimento || '').trim();
+      if (!finalVencimento || !/^\d{4}-\d{2}-\d{2}$/.test(finalVencimento)) {
+        const dt = new Date();
+        dt.setDate(dt.getDate() + (finalStatus === 'trial' ? 15 : 30));
+        finalVencimento = dt.toISOString().split('T')[0];
+      }
+
       // Cria Tenant no Neon
       await sql`
-        INSERT INTO tenants (id, razao_social, nome_fantasia, cnpj, telefone, email, responsavel, plano, status)
+        INSERT INTO tenants (id, razao_social, nome_fantasia, cnpj, telefone, email, responsavel, plano, status, vencimento)
         VALUES (
           ${tenantId},
           ${(razao_social || finalNome + ' LTDA').trim()},
@@ -176,7 +217,8 @@ export default async function handler(req, res) {
           ${finalEmail},
           ${(responsavel || 'Administrador').trim()},
           ${finalPlano},
-          ${finalStatus}
+          ${finalStatus},
+          ${finalVencimento}
         );
       `;
 
@@ -196,7 +238,7 @@ export default async function handler(req, res) {
         );
       `;
 
-      await writeAudit(sql, req, auth, { acao:'criar', entidade:'tenant', entidadeId:tenantId, depois:{ nome_fantasia:finalNome, email:finalEmail, plano:finalPlano, status:finalStatus } });
+      await writeAudit(sql, req, auth, { acao:'criar', entidade:'tenant', entidadeId:tenantId, depois:{ nome_fantasia:finalNome, email:finalEmail, plano:finalPlano, status:finalStatus, vencimento:finalVencimento } });
 
       return res.status(201).json({
         success: true,
@@ -206,14 +248,15 @@ export default async function handler(req, res) {
           nome_fantasia: finalNome,
           email: finalEmail,
           plano: finalPlano,
-          status: finalStatus
+          status: finalStatus,
+          vencimento: finalVencimento
         }
       });
     }
 
-    // ── 3. PATCH / POST ?action=update_tenant (Atualizar Status e Plano no Neon) ─
+    // ── 3. PATCH / POST ?action=update_tenant (Atualizar Status, Plano e Vencimento no Neon) ─
     if ((req.method === 'PATCH' || req.method === 'POST') && action === 'update_tenant') {
-      const { tenantId, status, plano } = req.body || {};
+      const { tenantId, status, plano, vencimento } = req.body || {};
       if (!tenantId) {
         return res.status(400).json({ success: false, error: 'Identificador do tenant não informado.' });
       }
@@ -227,32 +270,37 @@ export default async function handler(req, res) {
       if (plano && !allowedPlans.includes(String(plano).toLowerCase())) {
         return res.status(400).json({ success:false, error:'Plano inválido.' });
       }
-      const beforeRows = await sql`SELECT id, nome_fantasia, plano, status FROM tenants WHERE id=${tenantId} LIMIT 1;`;
-      if (!beforeRows.length) return res.status(404).json({ success:false, error:'Tenant não encontrado.' });
 
-      if (status && plano) {
-        await sql`
-          UPDATE tenants 
-          SET status = ${status.toLowerCase()}, plano = ${plano.toLowerCase()}, updated_at = NOW()
-          WHERE id = ${tenantId};
-        `;
-      } else if (status) {
-        await sql`
-          UPDATE tenants 
-          SET status = ${status.toLowerCase()}, updated_at = NOW()
-          WHERE id = ${tenantId};
-        `;
-      } else if (plano) {
-        await sql`
-          UPDATE tenants 
-          SET plano = ${plano.toLowerCase()}, updated_at = NOW()
-          WHERE id = ${tenantId};
-        `;
+      let cleanVenc = null;
+      if (vencimento !== undefined && vencimento !== null && vencimento !== '') {
+        const v = String(vencimento).trim();
+        if (/^\d{4}-\d{2}-\d{2}$/.test(v)) {
+          cleanVenc = v;
+        } else {
+          return res.status(400).json({ success: false, error: 'Data de vencimento inválida (formato esperado: YYYY-MM-DD).' });
+        }
       }
 
-      const afterRows = await sql`SELECT id, nome_fantasia, plano, status FROM tenants WHERE id=${tenantId} LIMIT 1;`;
+      const beforeRows = await sql`SELECT id, nome_fantasia, plano, status, vencimento FROM tenants WHERE id=${tenantId} LIMIT 1;`;
+      if (!beforeRows.length) return res.status(404).json({ success:false, error:'Tenant não encontrado.' });
+
+      const newStatus = status ? status.toLowerCase() : beforeRows[0].status;
+      const newPlano = plano ? plano.toLowerCase() : beforeRows[0].plano;
+      const newVenc = cleanVenc !== null ? cleanVenc : (beforeRows[0].vencimento ? new Date(beforeRows[0].vencimento).toISOString().split('T')[0] : null);
+
+      await sql`
+        UPDATE tenants 
+        SET status = ${newStatus}, plano = ${newPlano}, vencimento = ${newVenc}, updated_at = NOW()
+        WHERE id = ${tenantId};
+      `;
+
+      const afterRows = await sql`SELECT id, nome_fantasia, plano, status, vencimento FROM tenants WHERE id=${tenantId} LIMIT 1;`;
       await writeAudit(sql, req, auth, { acao:'atualizar', entidade:'tenant', entidadeId:tenantId, antes:beforeRows[0], depois:afterRows[0] });
-      return res.status(200).json({ success:true, message:'Dados da construtora atualizados com sucesso no Neon!' });
+      return res.status(200).json({
+        success: true,
+        message: 'Dados da construtora atualizados com sucesso no Neon!',
+        tenant: afterRows[0]
+      });
     }
 
     return res.status(400).json({ success: false, error: `Ação "${action}" desconhecida.` });

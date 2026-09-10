@@ -33,7 +33,9 @@ const MasterAdmin = {
             status: t.status || 'ativo',
             obrasQtd: parseInt(t.obrasQtd || 0, 10),
             criadoEm: t.criado_em || t.criadoEm || '',
-            vencimento: t.vencimento ? t.vencimento.split('T')[0] : ''
+            vencimento: t.vencimento ? String(t.vencimento).split('T')[0] : '',
+            diasRestantes: t.diasRestantes !== undefined ? t.diasRestantes : null,
+            expirado: Boolean(t.expirado)
           }));
           this.salvarEmpresas(this._empresas);
           this._isLoading = false;
@@ -454,7 +456,34 @@ const MasterAdmin = {
     const telDigits=String(e.telefone||'').replace(/\D/g,'');
     const wa=(telDigits ? (telDigits.startsWith('55')?telDigits:'55'+telDigits) : '5595991363678');
     const waText=encodeURIComponent(`Olá, ${e.responsavel||''}! Aqui é do FinObra referente à assinatura da ${e.nome_fantasia||''}.`);
-    const venc=e.vencimento ? (Utils.formatDate ? Utils.formatDate(e.vencimento) : this._esc(e.vencimento)) : '—';
+
+    let vencHtml = '<span style="color:#64748b;">—</span>';
+    if (e.vencimento) {
+      const parts = String(e.vencimento).split('-');
+      const fmtData = parts.length === 3 ? `${parts[2]}/${parts[1]}/${parts[0]}` : e.vencimento;
+      const dr = e.diasRestantes;
+      if (e.status === 'trial') {
+        if (dr > 0) {
+          vencHtml = `<div><span style="font-weight:700;color:#f59e0b;">${fmtData}</span></div><div style="font-size:.7rem;color:#fbbf24;">(restam ${dr} dia${dr>1?'s':''})</div>`;
+        } else if (dr === 0) {
+          vencHtml = `<div><span style="font-weight:700;color:#ef4444;">${fmtData}</span></div><div style="font-size:.7rem;color:#f87171;font-weight:700;">(vence hoje)</div>`;
+        } else {
+          const pass = Math.abs(dr);
+          vencHtml = `<div><span style="font-weight:700;color:#ef4444;">${fmtData}</span></div><div style="font-size:.7rem;color:#f87171;font-weight:700;">(expirado há ${pass}d)</div>`;
+        }
+      } else if (e.status === 'ativo') {
+        if (dr > 5) {
+          vencHtml = `<div><span style="font-weight:700;color:#22c55e;">${fmtData}</span></div><div style="font-size:.7rem;color:#86efac;">(em ${dr} dias)</div>`;
+        } else if (dr >= 0) {
+          vencHtml = `<div><span style="font-weight:700;color:#f59e0b;">${fmtData}</span></div><div style="font-size:.7rem;color:#fbbf24;">(renovação próxima)</div>`;
+        } else {
+          vencHtml = `<div><span style="font-weight:700;color:#ef4444;">${fmtData}</span></div><div style="font-size:.7rem;color:#f87171;">(vencido)</div>`;
+        }
+      } else {
+        vencHtml = `<div><span style="font-weight:700;color:#94a3b8;">${fmtData}</span></div>`;
+      }
+    }
+
     return `
       <tr style="border-bottom:1px solid rgba(255,255,255,.04);transition:background .15s;">
         <td style="padding:14px 18px;"><div style="font-weight:800;color:#fff;">${nome}</div><div style="font-size:.72rem;color:#94a3b8;">${razao}</div></td>
@@ -463,12 +492,12 @@ const MasterAdmin = {
         <td style="padding:14px 18px;font-weight:700;color:var(--accent2);font-size:.8rem;">${plano}</td>
         <td style="padding:14px 18px;font-weight:700;color:#fff;">${Number(e.obrasQtd||0)}</td>
         <td style="padding:14px 18px;">${badgeStatus[e.status] || this._esc(e.status||'—')}</td>
-        <td style="padding:14px 18px;font-size:.8rem;color:#cbd5e1;">${venc}</td>
+        <td style="padding:14px 18px;">${vencHtml}</td>
         <td style="padding:14px 18px;text-align:right;">
           <div style="display:inline-flex;gap:6px;">
             <button data-tenant-id="${this._esc(id)}" onclick="MasterAdmin.impersonarEmpresa(this.dataset.tenantId)" title="Acessar sistema como esta empresa para dar suporte" style="background:rgba(201,162,39,.15);border:1px solid var(--accent);color:var(--accent2);padding:4px 8px;border-radius:6px;font-size:.75rem;font-weight:700;cursor:pointer;">👁️ Acessar</button>
             <a href="https://wa.me/${wa}?text=${waText}" target="_blank" rel="noopener noreferrer" title="Conversar no WhatsApp" style="background:rgba(34,197,94,.15);border:1px solid #22c55e;color:#22c55e;padding:4px 8px;border-radius:6px;font-size:.75rem;font-weight:700;text-decoration:none;display:inline-flex;align-items:center;">💬 Cobrar</a>
-            <button data-tenant-id="${this._esc(id)}" onclick="MasterAdmin.alterarStatusEmpresa(this.dataset.tenantId)" title="Alterar status ou plano" style="background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.15);color:#cbd5e1;padding:4px 8px;border-radius:6px;font-size:.75rem;cursor:pointer;">✏️</button>
+            <button data-tenant-id="${this._esc(id)}" onclick="MasterAdmin.alterarStatusEmpresa(this.dataset.tenantId)" title="Alterar status, plano ou vencimento" style="background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.15);color:#cbd5e1;padding:4px 8px;border-radius:6px;font-size:.75rem;cursor:pointer;">✏️</button>
           </div>
         </td>
       </tr>`;
@@ -505,35 +534,135 @@ const MasterAdmin = {
     }
   },
 
-  async alterarStatusEmpresa(tenantId) {
+  alterarStatusEmpresa(tenantId) {
+    this.abrirModalEditarEmpresa(tenantId);
+  },
+
+  abrirModalEditarEmpresa(tenantId) {
     const empresas = this.getEmpresas();
     const emp = empresas.find(e => e.id === tenantId);
     if (!emp) return;
 
-    const novoStatus = prompt(`Alterar status de "${emp.nome_fantasia}":\nDigite: ativo, trial, inadimplente, bloqueado ou cancelado`, emp.status);
-    if (novoStatus && ['ativo', 'trial', 'inadimplente', 'bloqueado', 'cancelado'].includes(novoStatus.toLowerCase().trim())) {
-      const statusFinal = novoStatus.toLowerCase().trim();
-      try {
-        const res = await fetch('/api/admin?action=update_tenant', {
-          method: 'PATCH',
-          headers: (typeof Auth !== 'undefined' && Auth.getAuthHeaders) ? Auth.getAuthHeaders() : { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            tenantId,
-            status: statusFinal
-          })
-        });
-        const data = await res.json();
-        if (!res.ok || !data.success) {
-          throw new Error(data.error || 'Erro ao atualizar status no servidor');
-        }
+    let modal = document.getElementById('master-editar-empresa-modal');
+    if (!modal) {
+      modal = document.createElement('div');
+      modal.id = 'master-editar-empresa-modal';
+      modal.className = 'modal-backdrop';
+      modal.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.8);display:flex;align-items:center;justify-content:center;z-index:99999;backdrop-filter:blur(6px);padding:16px;';
+      document.body.appendChild(modal);
+    }
 
-        emp.status = statusFinal;
-        await this.carregarEmpresas(true);
-        const target = document.getElementById('master-content-area') ? 'master-content-area' : 'route-content';
-        this.render(target);
-        alert(`Status atualizado para ${statusFinal.toUpperCase()} com sucesso no banco de dados!`);
-      } catch (err) {
-        alert('Erro ao atualizar status: ' + err.message);
+    const vencAtual = emp.vencimento ? String(emp.vencimento).split('T')[0] : '';
+    const nome = this._esc(emp.nome_fantasia || emp.id);
+
+    modal.innerHTML = `
+      <div style="background:#0f1710;border:1px solid rgba(201,162,39,.4);border-radius:14px;width:100%;max-width:520px;box-shadow:0 24px 60px rgba(0,0,0,.85);overflow:hidden;color:#f0ead6;font-family:inherit;">
+        <div style="background:linear-gradient(135deg,#1C2D12,#243818);padding:16px 20px;border-bottom:1px solid rgba(201,162,39,.3);display:flex;align-items:center;justify-content:space-between;">
+          <div style="display:flex;align-items:center;gap:10px;">
+            <span style="font-size:1.3rem;">✏️</span>
+            <div>
+              <div style="font-weight:800;font-size:1rem;color:var(--accent2);">Gerenciar Construtora</div>
+              <div style="font-size:.75rem;color:#94a3b8;">${nome}</div>
+            </div>
+          </div>
+          <button onclick="document.getElementById('master-editar-empresa-modal').remove()" style="background:none;border:none;color:#94a3b8;font-size:1.2rem;cursor:pointer;padding:4px 8px;">✕</button>
+        </div>
+
+        <form id="form-editar-tenant" onsubmit="MasterAdmin.salvarEdicaoEmpresa(event, '${this._esc(emp.id)}')" style="padding:22px;display:flex;flex-direction:column;gap:14px;">
+          <div>
+            <label style="display:block;font-size:.78rem;color:#94a3b8;margin-bottom:4px;">Status da Assinatura *</label>
+            <select id="me-edit-status" style="width:100%;background:#182713;border:1px solid rgba(255,255,255,.15);border-radius:8px;padding:9px 12px;color:#fff;font-size:.85rem;">
+              <option value="trial" ${emp.status==='trial'?'selected':''}>🟡 Em Teste (Trial de 15 dias)</option>
+              <option value="ativo" ${emp.status==='ativo'?'selected':''}>🟢 Ativo (Assinante regular)</option>
+              <option value="inadimplente" ${emp.status==='inadimplente'?'selected':''}>🔴 Inadimplente (Fatura em aberto)</option>
+              <option value="bloqueado" ${emp.status==='bloqueado'?'selected':''}>⚪ Bloqueado (Acesso suspenso)</option>
+              <option value="cancelado" ${emp.status==='cancelado'?'selected':''}>⛔ Cancelado</option>
+            </select>
+          </div>
+
+          <div>
+            <label style="display:block;font-size:.78rem;color:#94a3b8;margin-bottom:4px;">Plano Contratado *</label>
+            <select id="me-edit-plano" style="width:100%;background:#182713;border:1px solid rgba(255,255,255,.15);border-radius:8px;padding:9px 12px;color:#fff;font-size:.85rem;">
+              <option value="trial" ${emp.plano==='trial'?'selected':''}>Trial (Gratuito 15 dias)</option>
+              <option value="starter" ${emp.plano==='starter'?'selected':''}>Básico (até 3 obras - R$ 79,90)</option>
+              <option value="pro" ${emp.plano==='pro'?'selected':''}>Profissional (até 10 obras - R$ 119,90)</option>
+              <option value="unlimited" ${emp.plano==='unlimited'?'selected':''}>Ilimitado (obras ilimitadas - R$ 159,90)</option>
+            </select>
+          </div>
+
+          <div>
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+              <label style="font-size:.78rem;color:#94a3b8;">Data de Vencimento do Plano / Trial *</label>
+              <div style="display:flex;gap:6px;">
+                <button type="button" onclick="MasterAdmin._adicionarDiasVencimento(15)" style="background:rgba(245,158,11,.15);border:1px solid rgba(245,158,11,.3);color:#fbbf24;padding:2px 8px;border-radius:4px;font-size:.7rem;cursor:pointer;">+15 dias</button>
+                <button type="button" onclick="MasterAdmin._adicionarDiasVencimento(30)" style="background:rgba(34,197,94,.15);border:1px solid rgba(34,197,94,.3);color:#4ade80;padding:2px 8px;border-radius:4px;font-size:.7rem;cursor:pointer;">+30 dias</button>
+              </div>
+            </div>
+            <input type="date" id="me-edit-vencimento" required value="${vencAtual}" style="width:100%;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.15);border-radius:8px;padding:9px 12px;color:#fff;font-size:.85rem;">
+            <div style="font-size:.7rem;color:#94a3b8;margin-top:4px;">Define o prazo do período trial ou a próxima fatura mensal.</div>
+          </div>
+
+          <div style="padding-top:10px;display:flex;justify-content:flex-end;gap:10px;">
+            <button type="button" onclick="document.getElementById('master-editar-empresa-modal').remove()" style="background:none;border:1px solid rgba(255,255,255,.2);color:#cbd5e1;padding:8px 16px;border-radius:8px;cursor:pointer;">
+              Cancelar
+            </button>
+            <button type="submit" class="btn-primary" style="padding:8px 20px;border-radius:8px;font-weight:800;">
+              Salvar Alterações 💾
+            </button>
+          </div>
+        </form>
+      </div>
+    `;
+  },
+
+  _adicionarDiasVencimento(dias) {
+    const input = document.getElementById('me-edit-vencimento');
+    if (!input) return;
+    const base = input.value ? new Date(input.value + 'T00:00:00') : new Date();
+    base.setDate(base.getDate() + dias);
+    input.value = base.toISOString().split('T')[0];
+  },
+
+  async salvarEdicaoEmpresa(e, tenantId) {
+    e.preventDefault();
+    const btnSubmit = e.target.querySelector('button[type="submit"]');
+    if (btnSubmit) {
+      btnSubmit.disabled = true;
+      btnSubmit.innerText = 'Salvando no Neon...';
+    }
+
+    const status = document.getElementById('me-edit-status').value;
+    const plano = document.getElementById('me-edit-plano').value;
+    const vencimento = document.getElementById('me-edit-vencimento').value;
+
+    try {
+      const res = await fetch('/api/admin?action=update_tenant', {
+        method: 'PATCH',
+        headers: (typeof Auth !== 'undefined' && Auth.getAuthHeaders) ? Auth.getAuthHeaders() : { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          tenantId,
+          status,
+          plano,
+          vencimento
+        })
+      });
+      const data = await res.json();
+      if (!data.success) {
+        throw new Error(data.error || 'Erro ao atualizar dados no servidor');
+      }
+
+      const modal = document.getElementById('master-editar-empresa-modal');
+      if (modal) modal.remove();
+
+      await this.carregarEmpresas(true);
+      const target = document.getElementById('master-content-area') ? 'master-content-area' : 'route-content';
+      this.render(target);
+      alert('Dados da construtora atualizados com sucesso no Neon!');
+    } catch (err) {
+      alert('Erro ao atualizar: ' + err.message);
+      if (btnSubmit) {
+        btnSubmit.disabled = false;
+        btnSubmit.innerText = 'Salvar Alterações 💾';
       }
     }
   },
