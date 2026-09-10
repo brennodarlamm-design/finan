@@ -55,7 +55,144 @@ function getSupportRenderBaseUrl() {
   return custom ? custom.replace(/\/send-message\/?$/, '').replace(/\/+$/, '') : 'https://finan-wf12.onrender.com';
 }
 
-async function notifySupportHuman({ tenantName, userName, conversationId, message }) {
+function escapeHtml(val) {
+  return String(val ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function getFormattedSupportTime() {
+  try {
+    return new Intl.DateTimeFormat('pt-BR', {
+      timeZone: 'America/Manaus',
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    }).format(new Date());
+  } catch {
+    return new Date().toLocaleString('pt-BR');
+  }
+}
+
+function renderSupportEmailHtml(vars) {
+  const empresa = escapeHtml(vars.EMPRESA);
+  const cliente = escapeHtml(vars.CLIENTE);
+  const emailCliente = escapeHtml(vars.EMAIL_CLIENTE);
+  const chamadoId = escapeHtml(vars.CHAMADO_ID);
+  const horario = escapeHtml(vars.HORARIO);
+  const mensagem = escapeHtml(vars.MENSAGEM).replace(/\r?\n/g, '<br>');
+  const urlAtendimento = encodeURI(vars.URL_ATENDIMENTO);
+
+  return `<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Novo atendimento no FinObra — ${empresa}</title>
+</head>
+<body style="margin:0;padding:0;background:#f4f6f8;font-family:Arial,Helvetica,sans-serif;color:#1f2937;">
+  <!-- Preview text / Preheader -->
+  <span style="display:none !important;visibility:hidden;font-size:1px;line-height:1px;max-height:0;max-width:0;opacity:0;overflow:hidden;">
+    ${cliente} solicitou atendimento humano no FinObra.
+  </span>
+
+  <div style="margin:0;padding:0;background:#f4f6f8;font-family:Arial,Helvetica,sans-serif;color:#1f2937;">
+    <div style="max-width:620px;margin:0 auto;padding:32px 16px;">
+      
+      <div style="background:#ffffff;border-radius:14px;overflow:hidden;border:1px solid #e5e7eb;">
+        
+        <div style="background:#111827;padding:24px 28px;">
+          <div style="font-size:22px;font-weight:700;color:#ffffff;">
+            FinObra
+          </div>
+          <div style="font-size:13px;color:#d1d5db;margin-top:4px;">
+            Central de Atendimento
+          </div>
+        </div>
+
+        <div style="padding:28px;">
+          
+          <div style="display:inline-block;background:#fee2e2;color:#b91c1c;font-size:12px;font-weight:700;padding:7px 12px;border-radius:999px;margin-bottom:18px;">
+            ATENDIMENTO AGUARDANDO
+          </div>
+
+          <h1 style="font-size:22px;margin:0 0 12px;color:#111827;">
+            Um cliente solicitou atendimento humano
+          </h1>
+
+          <p style="font-size:15px;line-height:1.6;margin:0 0 24px;color:#4b5563;">
+            O FinBot encaminhou uma conversa para a Central de Atendimento DEV.
+          </p>
+
+          <div style="background:#f9fafb;border-radius:10px;padding:18px;margin-bottom:22px;">
+            
+            <div style="margin-bottom:12px;">
+              <strong>Empresa:</strong><br>
+              ${empresa}
+            </div>
+
+            <div style="margin-bottom:12px;">
+              <strong>Cliente:</strong><br>
+              ${cliente}
+            </div>
+
+            <div style="margin-bottom:12px;">
+              <strong>E-mail:</strong><br>
+              ${emailCliente}
+            </div>
+
+            <div style="margin-bottom:12px;">
+              <strong>Chamado:</strong><br>
+              ${chamadoId}
+            </div>
+
+            <div>
+              <strong>Horário:</strong><br>
+              ${horario}
+            </div>
+
+          </div>
+
+          <div style="margin-bottom:24px;">
+            <div style="font-size:13px;font-weight:700;color:#6b7280;text-transform:uppercase;margin-bottom:8px;">
+              Última mensagem
+            </div>
+
+            <div style="background:#eef2ff;border-left:4px solid #4f46e5;padding:16px;border-radius:6px;font-size:15px;line-height:1.6;">
+              ${mensagem}
+            </div>
+          </div>
+
+          <div style="text-align:center;margin:30px 0;">
+            <a href="${urlAtendimento}"
+               style="display:inline-block;background:#111827;color:#ffffff;text-decoration:none;font-weight:700;font-size:15px;padding:14px 24px;border-radius:8px;">
+              Abrir Central de Atendimento
+            </a>
+          </div>
+
+          <p style="font-size:13px;color:#6b7280;line-height:1.5;margin:0;">
+            Este aviso foi gerado automaticamente pelo FinObra após o cliente solicitar atendimento humano.
+          </p>
+
+        </div>
+
+        <div style="background:#f9fafb;border-top:1px solid #e5e7eb;padding:18px 28px;text-align:center;font-size:12px;color:#9ca3af;">
+          FinObra • Gestão para Construção
+        </div>
+
+      </div>
+    </div>
+  </div>
+</body>
+</html>`;
+}
+
+async function notifySupportHuman({ tenantName, userName, userEmail, conversationId, message }) {
   const tasks = [];
   const notifyPhone = String(process.env.FINOBRA_SUPPORT_WHATSAPP || '5595991363678').replace(/\D/g, '');
   const internalSecret = String(process.env.API_SECRET || process.env.VERCEL_API_SECRET || '').trim();
@@ -70,16 +207,49 @@ async function notifySupportHuman({ tenantName, userName, conversationId, messag
   }
 
   const resendKey = String(process.env.RESEND_API_KEY || '').trim();
-  const emailFrom = String(process.env.FINOBRA_SUPPORT_EMAIL_FROM || '').trim();
+  const emailFrom = String(process.env.FINOBRA_SUPPORT_EMAIL_FROM || 'FinObra <onboarding@resend.dev>').trim();
   const emailTo = String(process.env.FINOBRA_SUPPORT_EMAIL || 'brennodarlam@gmail.com').trim();
+  const templateId = String(process.env.RESEND_SUPPORT_TEMPLATE_ID || '').trim();
+
   if (resendKey && emailFrom && emailTo) {
-    const html = `<h2>Novo atendimento FinObra</h2><p><strong>Empresa:</strong> ${String(tenantName || 'Cliente').replace(/[<>&]/g,'')}</p><p><strong>Usuário:</strong> ${String(userName || 'Usuário').replace(/[<>&]/g,'')}</p><p><strong>Chamado:</strong> ${conversationId}</p><p><strong>Mensagem:</strong> ${cleanSupportText(message, 1000).replace(/[<>&]/g,'')}</p><p>Abra o painel Master para responder.</p>`;
+    const vars = {
+      EMPRESA: String(tenantName || 'Cliente FinObra').trim(),
+      CLIENTE: String(userName || 'Cliente').trim(),
+      EMAIL_CLIENTE: String(userEmail || 'Não informado').trim(),
+      CHAMADO_ID: String(conversationId || 'Não informado').trim(),
+      HORARIO: getFormattedSupportTime(),
+      MENSAGEM: cleanSupportText(message, 1500) || 'Cliente solicitou atendimento.',
+      URL_ATENDIMENTO: String(process.env.FINOBRA_MASTER_URL || 'https://finobra.app.br/master.html').trim()
+    };
+
+    const payload = {
+      from: emailFrom,
+      to: [emailTo],
+      subject: `🔔 Novo atendimento no FinObra — ${vars.EMPRESA}`
+    };
+
+    if (templateId) {
+      payload.template = {
+        id: templateId,
+        variables: vars
+      };
+    } else {
+      payload.html = renderSupportEmailHtml(vars);
+    }
+
     tasks.push(fetch('https://api.resend.com/emails', {
-      method:'POST',
-      headers:{ 'Content-Type':'application/json', 'Authorization':`Bearer ${resendKey}`, 'Idempotency-Key':`support/${conversationId}` },
-      body:JSON.stringify({ from:emailFrom, to:[emailTo], subject:`FinObra: atendimento solicitado — ${tenantName || 'Cliente'}`, html }),
-      signal:AbortSignal.timeout(7000)
-    }).catch(() => null));
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${resendKey}`,
+        'Idempotency-Key': `support/${conversationId}`
+      },
+      body: JSON.stringify(payload),
+      signal: AbortSignal.timeout(7000)
+    }).catch(err => {
+      console.error('[Resend Support Email Error]', err?.message || err);
+      return null;
+    }));
   }
   if (tasks.length) await Promise.allSettled(tasks);
 }
@@ -184,7 +354,13 @@ export default async function handler(req, res) {
         conversation = await loadSupportConversation(sql, auth, conversation.id);
         if (conversation.status === 'waiting' && !conversation.notified_at) {
           const tenantRows = await sql`SELECT COALESCE(nome_fantasia,razao_social,id) AS nome FROM tenants WHERE id=${auth.tenantId} LIMIT 1;`;
-          await notifySupportHuman({ tenantName:tenantRows[0]?.nome, userName:auth.user.nome, conversationId:conversation.id, message:text });
+          await notifySupportHuman({
+            tenantName: tenantRows[0]?.nome,
+            userName: auth.user.nome,
+            userEmail: auth.user.email,
+            conversationId: conversation.id,
+            message: text
+          });
           await sql`UPDATE support_conversations SET notified_at=NOW() WHERE id=${conversation.id} AND notified_at IS NULL;`;
         }
         const messages = await loadSupportMessages(sql, auth, conversation.id);
@@ -203,7 +379,13 @@ export default async function handler(req, res) {
         if (!conversation.notified_at) {
           const tenantRows = await sql`SELECT COALESCE(nome_fantasia,razao_social,id) AS nome FROM tenants WHERE id=${auth.tenantId} LIMIT 1;`;
           const lastRows = await sql`SELECT body FROM support_messages WHERE conversation_id=${conversation.id} AND sender_type='client' ORDER BY created_at DESC LIMIT 1;`;
-          await notifySupportHuman({ tenantName:tenantRows[0]?.nome, userName:auth.user.nome, conversationId:conversation.id, message:lastRows[0]?.body || 'Cliente solicitou atendimento humano.' });
+          await notifySupportHuman({
+            tenantName: tenantRows[0]?.nome,
+            userName: auth.user.nome,
+            userEmail: auth.user.email,
+            conversationId: conversation.id,
+            message: lastRows[0]?.body || 'Cliente solicitou atendimento humano.'
+          });
           await sql`UPDATE support_conversations SET notified_at=NOW() WHERE id=${conversation.id} AND notified_at IS NULL;`;
         }
         const messages = await loadSupportMessages(sql, auth, conversation.id);
