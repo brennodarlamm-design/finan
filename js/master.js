@@ -90,7 +90,7 @@ const MasterAdmin = {
           <div style="font-size:3rem;margin-bottom:12px;">🔒</div>
           <h2 style="font-size:1.4rem;font-weight:800;color:#fff;">Acesso Restrito ao Super Admin</h2>
           <p style="color:#94a3b8;font-size:.9rem;margin-top:6px;">Apenas o superadministrador da plataforma tem permissão para gerenciar as empresas e o faturamento SaaS.</p>
-          <button onclick="App.navigate('dashboard')" class="btn-primary" style="margin-top:20px;padding:8px 20px;">Voltar ao Dashboard</button>
+          <button onclick="window.location.href='/app/dashboard'" class="btn-primary" style="margin-top:20px;padding:8px 20px;">Voltar ao Dashboard</button>
         </div>
       `;
       return;
@@ -156,7 +156,7 @@ const MasterAdmin = {
             <button onclick="MasterAdmin.abrirModalNovaEmpresa()" class="btn-primary" style="padding:10px 18px;border-radius:8px;font-weight:800;display:inline-flex;align-items:center;gap:8px;font-size:.85rem;">
               <span>➕ Nova Construtora</span>
             </button>
-            <button onclick="App.navigate('planos')" class="btn-clean" style="padding:10px 16px;border-radius:8px;background:rgba(255,255,255,.05);border:1px solid var(--border);color:#f0ead6;font-size:.85rem;font-weight:700;">
+            <button onclick="MasterAdmin.abrirModalPlanos()" class="btn-clean" style="padding:10px 16px;border-radius:8px;background:rgba(255,255,255,.05);border:1px solid var(--border);color:#f0ead6;font-size:.85rem;font-weight:700;cursor:pointer;">
               <span>💎 Tabela de Planos</span>
             </button>
           </div>
@@ -549,6 +549,73 @@ const MasterAdmin = {
     } catch (err) {
       alert('Erro de comunicação ao acessar a empresa: ' + err.message);
     }
+  },
+
+  abrirModalPlanos() {
+    const p = (typeof Cobranca !== 'undefined' && Cobranca.PLANOS) ? Cobranca.PLANOS : {
+      starter: { nome: 'Plano Básico', valorTexto: 'R$ 79,90 / mês', limiteObras: 3 },
+      pro: { nome: 'Plano Profissional', valorTexto: 'R$ 119,90 / mês', limiteObras: 10 },
+      unlimited: { nome: 'Construtora Ilimitado', valorTexto: 'R$ 159,90 / mês', limiteObras: 'Ilimitadas' }
+    };
+
+    Utils.showModal(`
+      <div class="modal" style="max-width:720px;background:#0f1a0b;border:1px solid var(--border);color:#f0ead6;">
+        <div class="modal-header" style="border-bottom:1px solid rgba(201,162,39,.25);">
+          <span class="modal-title" style="color:var(--accent2);font-weight:900;">💎 Tabela de Planos &amp; Mensalidades SaaS</span>
+          <button class="modal-close" onclick="Utils.closeModal()">✕</button>
+        </div>
+        <div class="modal-body" style="padding:20px;">
+          <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(200px, 1fr));gap:14px;">
+            
+            <div style="background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:16px;">
+              <div style="font-weight:800;font-size:1.05rem;color:#fff;">${p.starter.nome}</div>
+              <div style="font-size:1.25rem;font-weight:900;color:var(--accent2);margin:6px 0;">${p.starter.valorTexto}</div>
+              <div style="font-size:.78rem;color:#94a3b8;margin-bottom:12px;">Até ${p.starter.limiteObras} Obras Ativas simultâneas</div>
+              <ul style="font-size:.75rem;color:#cbd5e1;padding-left:18px;line-height:1.6;margin:0;">
+                <li>Financeiro de Receitas e Despesas</li>
+                <li>Medições e Cronograma</li>
+                <li>Conciliação Bancária OFX</li>
+                <li>Exportação de Relatórios</li>
+              </ul>
+            </div>
+
+            <div style="background:rgba(201,162,39,.06);border:1px solid var(--accent);border-radius:10px;padding:16px;position:relative;">
+              <div style="position:absolute;top:-10px;right:12px;background:var(--accent);color:#182713;font-size:.65rem;font-weight:900;padding:2px 8px;border-radius:10px;">MAIS POPULAR</div>
+              <div style="font-weight:800;font-size:1.05rem;color:#fff;">${p.pro.nome}</div>
+              <div style="font-size:1.25rem;font-weight:900;color:var(--accent2);margin:6px 0;">${p.pro.valorTexto}</div>
+              <div style="font-size:.78rem;color:#94a3b8;margin-bottom:12px;">Até ${p.pro.limiteObras} Obras Ativas simultâneas</div>
+              <ul style="font-size:.75rem;color:#cbd5e1;padding-left:18px;line-height:1.6;margin:0;">
+                <li>Tudo do Plano Básico</li>
+                <li>Leitura OCR de NF com IA</li>
+                <li>Assinatura Eletrônica com QR Code</li>
+                <li>Portal Público de Validação</li>
+                <li>Gestão de Ordens de Compra</li>
+              </ul>
+            </div>
+
+            <div style="background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:16px;">
+              <div style="font-weight:800;font-size:1.05rem;color:#fff;">${p.unlimited.nome}</div>
+              <div style="font-size:1.25rem;font-weight:900;color:var(--accent2);margin:6px 0;">${p.unlimited.valorTexto}</div>
+              <div style="font-size:.78rem;color:#94a3b8;margin-bottom:12px;">Obras e Clientes ILIMITADOS</div>
+              <ul style="font-size:.75rem;color:#cbd5e1;padding-left:18px;line-height:1.6;margin:0;">
+                <li>Tudo do Plano Profissional</li>
+                <li>Obras e Clientes sem limite</li>
+                <li>Multi-usuários com controle RBAC</li>
+                <li>Planilhas SINAPI / Caixa</li>
+                <li>Suporte Prioritário VIP</li>
+              </ul>
+            </div>
+
+          </div>
+        </div>
+        <div class="modal-footer" style="border-top:1px solid rgba(201,162,39,.2);justify-content:space-between;">
+          <a href="/app/planos" class="btn btn-secondary" style="font-size:.8rem;text-decoration:none;display:inline-flex;align-items:center;gap:4px;">
+            <span>Abrir Tela Completa no Sistema ↗</span>
+          </a>
+          <button type="button" class="btn btn-primary" onclick="Utils.closeModal()">Fechar</button>
+        </div>
+      </div>
+    `);
   },
 
   alterarStatusEmpresa(tenantId) {

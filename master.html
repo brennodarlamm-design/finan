@@ -184,6 +184,12 @@
   <script src="/js/master.js"></script>
 
   <script>
+    window.App = window.App || {
+      navigate: function(route) {
+        window.location.href = '/app/' + (route || 'dashboard');
+      }
+    };
+
     async function verificarSessaoMaster() {
       const flag = sessionStorage.getItem('finobra_master_logged') === 'true';
       let autorizado = false;
