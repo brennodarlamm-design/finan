@@ -37,6 +37,25 @@ export default async function handler(req, res) {
     return res.status(200).end();
   }
 
+  // ── 0. CONSULTA PÚBLICA DE CNPJ (BrasilAPI) ──────────────────────────────
+  const isCnpj = req.query?.action === 'cnpj' || req.query?.cnpj || (req.body && req.body.action === 'cnpj');
+  if (isCnpj) {
+    const cnpj = req.query?.cnpj || (req.body && req.body.cnpj);
+    if (!cnpj) return res.status(400).json({ error: 'CNPJ não informado' });
+    const cnpjLimpo = String(cnpj).replace(/\D/g, '');
+    if (cnpjLimpo.length !== 14) return res.status(400).json({ error: 'CNPJ inválido' });
+    try {
+      const response = await fetch(`https://brasilapi.com.br/api/cnpj/v1/${cnpjLimpo}`, {
+        headers: { 'Accept': 'application/json', 'User-Agent': 'FinObra/1.0' }
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) return res.status(response.status).json(data);
+      return res.status(200).json(data);
+    } catch (err) {
+      return res.status(502).json({ error: 'Erro ao consultar Receita Federal', detail: err.message });
+    }
+  }
+
   // 1. Exige autenticação rigorosa
   const auth = await resolveAuthAndTenant(req);
   if (!auth.authenticated) {

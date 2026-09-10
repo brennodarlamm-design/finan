@@ -3,6 +3,8 @@
   "trailingSlash": false,
   "rewrites": [
     { "source": "/api/send-whatsapp", "destination": "/api/whatsapp?action=send" },
+    { "source": "/api/cnpj", "destination": "/api/nfe?action=cnpj" },
+    { "source": "/api/tenant", "destination": "/api/users?target=tenant" },
     { "source": "/api/(.*)", "destination": "/api/$1" },
     { "source": "/login", "destination": "/" },
     { "source": "/privacidade", "destination": "/privacidade.html" },
