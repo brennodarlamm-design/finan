@@ -190,8 +190,9 @@ const Utils = {
     if (m[c]) return m[c];
     // Busca em categorias customizadas (despesas e fornecedores)
     try {
-      const customDesp = JSON.parse(localStorage.getItem('finobra_cats_despesa_custom') || '[]');
-      const customForn = JSON.parse(localStorage.getItem('finobra_categorias_custom') || '[]');
+      const scoped = (name) => (typeof DB !== 'undefined' && DB._ck) ? DB._ck(name) : name;
+      const customDesp = JSON.parse(localStorage.getItem(scoped('finobra_cats_despesa_custom')) || '[]');
+      const customForn = JSON.parse(localStorage.getItem(scoped('finobra_categorias_custom')) || '[]');
       const found = [...customDesp, ...customForn].find(x => x.value === c);
       if (found) return found.label;
     } catch(e) {}

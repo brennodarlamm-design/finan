@@ -3,14 +3,23 @@
 const Escritorio = {
   _activeGroup: 'todas',
 
-  // Chave localStorage para categorias customizadas de despesas
+  // Categorias personalizadas ficam isoladas por tenant e sincronizadas no Neon.
   CATS_KEY: 'finobra_cats_despesa_custom',
 
+  _catsStorageKey() {
+    return (typeof DB !== 'undefined' && DB._ck) ? DB._ck(this.CATS_KEY) : this.CATS_KEY;
+  },
+
   _getAllDespesaCats() {
-    try { return JSON.parse(localStorage.getItem(this.CATS_KEY) || '[]'); } catch(e) { return []; }
+    try {
+      const list = JSON.parse(localStorage.getItem(this._catsStorageKey()) || '[]');
+      return Array.isArray(list) ? list : [];
+    } catch(e) { return []; }
   },
   _saveDespesaCats(list) {
-    localStorage.setItem(this.CATS_KEY, JSON.stringify(list));
+    const safe = Array.isArray(list) ? list.slice(0, 100) : [];
+    try { localStorage.setItem(this._catsStorageKey(), JSON.stringify(safe)); } catch {}
+    if (typeof DB !== 'undefined' && DB.saveTenantPreferences) DB.saveTenantPreferences({ categorias_despesa: safe });
   },
 
   init(obraId) {
@@ -121,7 +130,7 @@ const Escritorio = {
           <option value="marketing">📣 Marketing</option>
           <option value="trafego_pago">🎯 Tráfego Pago</option>
           <option value="comercial">🤝 Comercial</option>
-          ${this._getAllDespesaCats().map(c => `<option value="${c.value}">${c.label}</option>`).join('')}
+          ${this._getAllDespesaCats().map(c => `<option value="${Utils.escapeHtml(String(c.value || ''))}">${Utils.escapeHtml(String(c.label || ''))}</option>`).join('')}
         </select>
       </div>
       <div class="filter-group">
@@ -349,7 +358,7 @@ const Escritorio = {
                   const custom = this._getAllDespesaCats();
                   if (!custom.length) return '';
                   return `<optgroup label="⭐ Categorias Personalizadas">${
-                    custom.map(c => `<option value="${c.value}" ${l?.categoria===c.value?'selected':''}>${c.label}</option>`).join('')
+                    custom.map(c => `<option value="${Utils.escapeHtml(String(c.value || ''))}" ${l?.categoria===c.value?'selected':''}>${Utils.escapeHtml(String(c.label || ''))}</option>`).join('')
                   }</optgroup>`;
                 })()}
               </select>

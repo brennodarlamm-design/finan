@@ -6,6 +6,15 @@ const Documentos = {
   _memoryBlobs: new Map(),
   _dbPromise: null,
 
+  _storageKey() {
+    return (typeof DB !== 'undefined' && DB._ck) ? DB._ck(this._KEY) : this._KEY;
+  },
+
+  _blobKey(id) {
+    const tenant = (typeof Auth !== 'undefined' && Auth.getCurrentTenantId) ? Auth.getCurrentTenantId() : 'angelim';
+    return tenant && tenant !== 'angelim' ? `${tenant}:${id}` : String(id || '');
+  },
+
   _getIdb() {
     if (this._dbPromise) return this._dbPromise;
     this._dbPromise = new Promise((resolve) => {
@@ -37,7 +46,7 @@ const Documentos = {
       if (!db) return false;
       return new Promise(resolve => {
         const tx = db.transaction('blobs', 'readwrite');
-        tx.objectStore('blobs').put({ id, data: base64, ts: Date.now() });
+        tx.objectStore('blobs').put({ id: this._blobKey(id), data: base64, ts: Date.now() });
         tx.oncomplete = () => resolve(true);
         tx.onerror = () => resolve(false);
       });
@@ -51,7 +60,7 @@ const Documentos = {
       if (!db) return null;
       return new Promise(resolve => {
         const tx = db.transaction('blobs', 'readonly');
-        const req = tx.objectStore('blobs').get(id);
+        const req = tx.objectStore('blobs').get(this._blobKey(id));
         req.onsuccess = () => resolve(req.result ? req.result.data : null);
         req.onerror = () => resolve(null);
       });
@@ -64,7 +73,7 @@ const Documentos = {
       const db = await this._getIdb();
       if (!db) return;
       const tx = db.transaction('blobs', 'readwrite');
-      tx.objectStore('blobs').delete(id);
+      tx.objectStore('blobs').delete(this._blobKey(id));
     } catch {}
   },
 
@@ -94,17 +103,17 @@ const Documentos = {
     if (doc && doc.url) {
       return this._isPrivateBlobUrl(doc.url) ? await this._resolverUrlProtegida(id) : doc.url;
     }
-    if (this._memoryBlobs.has(id)) {
-      return this._memoryBlobs.get(id);
+    if (this._memoryBlobs.has(this._blobKey(id))) {
+      return this._memoryBlobs.get(this._blobKey(id));
     }
     if (doc && (doc.data_base64 || doc.base64_data)) {
       const b = doc.data_base64 || doc.base64_data;
-      this._memoryBlobs.set(id, b);
+      this._memoryBlobs.set(this._blobKey(id), b);
       return b;
     }
     const fromIdb = await this._idbGet(id);
     if (fromIdb) {
-      this._memoryBlobs.set(id, fromIdb);
+      this._memoryBlobs.set(this._blobKey(id), fromIdb);
       return fromIdb;
     }
     // Tenta buscar da nuvem (Neon) se o arquivo foi anexado por outro dispositivo (ex: celular)
@@ -127,7 +136,7 @@ const Documentos = {
           return this._isPrivateBlobUrl(json.url) ? await this._resolverUrlProtegida(id) : json.url;
         }
         if (json.base64) {
-          this._memoryBlobs.set(id, json.base64);
+          this._memoryBlobs.set(this._blobKey(id), json.base64);
           this._idbSet(id, json.base64);
           return json.base64;
         }
@@ -140,7 +149,7 @@ const Documentos = {
 
   _migrarLocalStorage() {
     try {
-      const raw = localStorage.getItem(this._KEY);
+      const raw = localStorage.getItem(this._storageKey());
       if (!raw) return;
       const docs = JSON.parse(raw);
       if (Array.isArray(docs)) {
@@ -148,7 +157,7 @@ const Documentos = {
         docs.forEach(d => {
           const b64 = d.data_base64 || d.base64_data || d.base64;
           if (b64) {
-            this._memoryBlobs.set(d.id, b64);
+            this._memoryBlobs.set(this._blobKey(d.id), b64);
             this._idbSet(d.id, b64);
             migrou = true;
           }
@@ -164,7 +173,7 @@ const Documentos = {
 
   getAll() {
     try {
-      return JSON.parse(localStorage.getItem(this._KEY) || '[]');
+      return JSON.parse(localStorage.getItem(this._storageKey()) || '[]');
     } catch { return []; }
   },
 
@@ -175,13 +184,13 @@ const Documentos = {
     });
 
     try {
-      localStorage.setItem(this._KEY, JSON.stringify(light));
+      localStorage.setItem(this._storageKey(), JSON.stringify(light));
     } catch (e) {
       console.warn('[Documentos] Quota excedida ao gravar no localStorage. Executando limpeza preventiva...');
       try {
         const keysToClean = ['finobra_nfe_recents', 'finobra_temp_cache', 'finan_cache'];
         keysToClean.forEach(k => localStorage.removeItem(k));
-        localStorage.setItem(this._KEY, JSON.stringify(light));
+        localStorage.setItem(this._storageKey(), JSON.stringify(light));
       } catch (e2) {
         console.error('[Documentos] Falha ao persistir metadados dos documentos:', e2);
       }
@@ -203,7 +212,7 @@ const Documentos = {
     const base64 = doc.data_base64 || doc.base64 || doc.base64_data || '';
 
     if (base64) {
-      this._memoryBlobs.set(id, base64);
+      this._memoryBlobs.set(this._blobKey(id), base64);
       this._idbSet(id, base64);
     }
 
@@ -294,7 +303,7 @@ const Documentos = {
 
   remover(id) {
     const doc = this.getById(id);
-    this._memoryBlobs.delete(id);
+    this._memoryBlobs.delete(this._blobKey(id));
     this._idbDelete(id);
     const docs = this.getAll().filter(d => d.id !== id);
     this.salvarLista(docs);
@@ -766,11 +775,11 @@ const Documentos = {
 
     for (const d of docs) {
       try {
-        let b64 = this._memoryBlobs.get(d.id);
+        let b64 = this._memoryBlobs.get(this._blobKey(d.id));
         if (!b64) b64 = await this._idbGet(d.id);
 
         if (b64) {
-          const syncKey = 'finobra_cloud_uploaded_' + d.id;
+          const syncKey = (typeof DB !== 'undefined' && DB._ck) ? DB._ck('finobra_cloud_uploaded_' + d.id) : ('finobra_cloud_uploaded_' + d.id);
           if (!localStorage.getItem(syncKey)) {
             DB.syncToCloud('save', 'documentos', {
               ...d,

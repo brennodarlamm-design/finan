@@ -826,10 +826,12 @@ const Configuracoes = {
       });
       backup.recibos = typeof Recibos !== 'undefined' ? Recibos.getAll() : [];
       backup.contratos = typeof Contratos !== 'undefined' ? Contratos.getAll() : [];
-      backup.orcamentos_sinapi = JSON.parse(localStorage.getItem('orcamentos_sinapi') || '[]');
+      backup.orcamentos_sinapi = JSON.parse(localStorage.getItem(DB._ck ? DB._ck('orcamentos_sinapi') : 'orcamentos_sinapi') || '[]');
+      backup.preferencias = (DB._preferencesLocalSnapshot ? DB._preferencesLocalSnapshot() : {});
+      backup.doc_fases = (DB._collectLocalDocPhases ? DB._collectLocalDocPhases() : []);
       backup.saved_at = new Date().toISOString();
       backup.totalLancamentos = (backup.lancamentos || []).length;
-      localStorage.setItem('finobra_snapshot_seguranca', JSON.stringify(backup));
+      localStorage.setItem(DB._ck ? DB._ck('finobra_snapshot_seguranca') : 'finobra_snapshot_seguranca', JSON.stringify(backup));
       Utils.toast('🛡️ Ponto de restauração gravado!', 'success');
       this._switch('sistema');
     } catch (e) {
@@ -846,7 +848,9 @@ const Configuracoes = {
     backup.documentos = typeof Documentos !== 'undefined' ? Documentos.getAll() : [];
     backup.recibos = typeof Recibos !== 'undefined' ? Recibos.getAll() : [];
     backup.contratos = typeof Contratos !== 'undefined' ? Contratos.getAll() : [];
-    backup.orcamentos_sinapi = JSON.parse(localStorage.getItem('orcamentos_sinapi') || '[]');
+    backup.orcamentos_sinapi = JSON.parse(localStorage.getItem(DB._ck ? DB._ck('orcamentos_sinapi') : 'orcamentos_sinapi') || '[]');
+      backup.preferencias = (DB._preferencesLocalSnapshot ? DB._preferencesLocalSnapshot() : {});
+      backup.doc_fases = (DB._collectLocalDocPhases ? DB._collectLocalDocPhases() : []);
     backup.exported_at = new Date().toISOString();
     const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
     const a = document.createElement('a');
@@ -875,7 +879,7 @@ const Configuracoes = {
           });
 
           if (Array.isArray(backup.documentos) && typeof Documentos !== 'undefined') {
-            localStorage.setItem('finobra_documentos', JSON.stringify(backup.documentos));
+            Documentos.salvarLista(backup.documentos);
           }
           if (Array.isArray(backup.recibos) && typeof Recibos !== 'undefined') {
             localStorage.setItem(DB._ck ? DB._ck('finobra_recibos') : 'finobra_recibos', JSON.stringify(backup.recibos));
@@ -884,7 +888,21 @@ const Configuracoes = {
             localStorage.setItem(DB._ck ? DB._ck('finobra_contratos') : 'finobra_contratos', JSON.stringify(backup.contratos));
           }
           if (Array.isArray(backup.orcamentos_sinapi)) {
-            localStorage.setItem('orcamentos_sinapi', JSON.stringify(backup.orcamentos_sinapi));
+            localStorage.setItem(DB._ck ? DB._ck('orcamentos_sinapi') : 'orcamentos_sinapi', JSON.stringify(backup.orcamentos_sinapi));
+          }
+          if (backup.preferencias && typeof backup.preferencias === 'object' && DB._applyTenantPreferences) {
+            DB._applyTenantPreferences(backup.preferencias);
+          }
+          if (Array.isArray(backup.doc_fases) && DB._fasesDocKey) {
+            const grouped = new Map();
+            backup.doc_fases.forEach(d => {
+              if (!d?.obra_id || !d?.doc_id || !d?.fase_key) return;
+              if (!grouped.has(d.obra_id)) grouped.set(d.obra_id, {});
+              const obj = grouped.get(d.obra_id);
+              if (!Array.isArray(obj[d.fase_key])) obj[d.fase_key] = [];
+              obj[d.fase_key].push({ ...d, id:d.doc_id });
+            });
+            grouped.forEach((value, obraId) => localStorage.setItem(DB._fasesDocKey(obraId), JSON.stringify(value)));
           }
           Utils.toast('✅ Backup restaurado com sucesso!', 'success');
           setTimeout(() => location.reload(), 800);

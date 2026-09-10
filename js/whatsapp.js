@@ -1,8 +1,12 @@
 // js/whatsapp.js — Integração e Alertas de Boletos / Vencimentos no WhatsApp
 
 const WhatsApp = {
+  _prefKey(name) {
+    return (typeof DB !== 'undefined' && DB._ck) ? DB._ck(name) : name;
+  },
+
   getTelefonePadrao() {
-    const salvo = localStorage.getItem('finobra_whatsapp_telefone');
+    const salvo = localStorage.getItem(this._prefKey('finobra_whatsapp_telefone'));
     if (salvo && salvo.trim()) return salvo.trim();
     try {
       if (typeof DB !== 'undefined' && DB.getEmpresa) {
@@ -16,7 +20,8 @@ const WhatsApp = {
 
   setTelefonePadrao(tel) {
     const limpo = (tel || '').replace(/\D/g, '');
-    localStorage.setItem('finobra_whatsapp_telefone', limpo);
+    localStorage.setItem(this._prefKey('finobra_whatsapp_telefone'), limpo);
+    if (typeof DB !== 'undefined' && DB.saveTenantPreferences) DB.saveTenantPreferences({ whatsapp_telefone: limpo });
     try {
       if (typeof DB !== 'undefined' && DB.getEmpresa && DB.saveEmpresa) {
         const emp = DB.getEmpresa() || {};
@@ -28,11 +33,13 @@ const WhatsApp = {
 
 
   getModoEnvio() {
-    return localStorage.getItem('finobra_whatsapp_modo') || 'api'; // 'api' (silencioso) ou 'web' (abre aba)
+    return localStorage.getItem(this._prefKey('finobra_whatsapp_modo')) || 'api'; // 'api' (silencioso) ou 'web' (abre aba)
   },
 
   setModoEnvio(modo) {
-    localStorage.setItem('finobra_whatsapp_modo', modo);
+    const safeModo = ['api','web'].includes(modo) ? modo : 'api';
+    localStorage.setItem(this._prefKey('finobra_whatsapp_modo'), safeModo);
+    if (typeof DB !== 'undefined' && DB.saveTenantPreferences) DB.saveTenantPreferences({ whatsapp_modo: safeModo });
   },
 
   // Formata o link do WhatsApp Web/App

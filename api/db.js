@@ -49,6 +49,41 @@ function jsonPayload(row) {
   return { ...(parsed && typeof parsed === 'object' ? parsed : {}), id: row.id };
 }
 
+function docPhasePayload(row) {
+  if (!row) return {};
+  let parsed = row.payload;
+  if (typeof parsed === 'string') {
+    try { parsed = JSON.parse(parsed); } catch { parsed = {}; }
+  }
+  return {
+    ...(parsed && typeof parsed === 'object' ? parsed : {}),
+    cloud_id: row.id,
+    obra_id: row.obra_id,
+    doc_id: row.doc_id,
+    fase_key: row.fase_key || null
+  };
+}
+
+function validCloudId(value, max = 180) {
+  const v = String(value || '').trim();
+  return !!v && v.length <= max && /^[A-Za-z0-9_.:@-]+$/.test(v);
+}
+
+function sanitizeTenantPreferences(input) {
+  if (!input || typeof input !== 'object' || Array.isArray(input)) return {};
+  const cleanCats = (list) => (Array.isArray(list) ? list : []).slice(0, 100).map(item => ({
+    value: String(item?.value || '').replace(/[^a-z0-9_-]/gi, '').slice(0, 80),
+    label: String(item?.label || '').slice(0, 100),
+    emoji: String(item?.emoji || '').slice(0, 16)
+  })).filter(item => item.value && item.label);
+  const out = {};
+  if ('categorias_fornecedor' in input) out.categorias_fornecedor = cleanCats(input.categorias_fornecedor);
+  if ('categorias_despesa' in input) out.categorias_despesa = cleanCats(input.categorias_despesa);
+  if ('whatsapp_telefone' in input) out.whatsapp_telefone = String(input.whatsapp_telefone || '').replace(/\D/g, '').slice(0, 15);
+  if ('whatsapp_modo' in input) out.whatsapp_modo = ['api','web'].includes(String(input.whatsapp_modo)) ? String(input.whatsapp_modo) : 'api';
+  return out;
+}
+
 function todayBoaVista() {
   const parts = new Intl.DateTimeFormat('en-CA', {
     timeZone: 'America/Boa_Vista',
@@ -257,7 +292,9 @@ export default async function handler(req, res) {
             (SELECT COUNT(*)::int FROM contas_bancarias WHERE tenant_id = ${tenantId}) AS contas,
             (SELECT COUNT(*)::int FROM precompras WHERE tenant_id = ${tenantId}) AS precompras,
             (SELECT COUNT(*)::int FROM contratos WHERE tenant_id = ${tenantId}) AS contratos,
-            (SELECT COUNT(*)::int FROM recibos WHERE tenant_id = ${tenantId}) AS recibos;
+            (SELECT COUNT(*)::int FROM recibos WHERE tenant_id = ${tenantId}) AS recibos,
+            (SELECT COUNT(*)::int FROM orcamentos_sinapi WHERE tenant_id = ${tenantId}) AS orcamentos_sinapi,
+            (SELECT COUNT(*)::int FROM obra_doc_fases WHERE tenant_id = ${tenantId}) AS doc_fases;
         `;
         const counts = rows[0] || {};
         const normalized = Object.fromEntries(Object.entries(counts).map(([k,v]) => [k, Number(v) || 0]));
@@ -265,7 +302,7 @@ export default async function handler(req, res) {
       }
 
       if (!table || table === 'all') {
-        const [obras, fornecedores, lancamentos, notas, orcamentos, medicoes, documentos, produtos, contas, precompras, contratos, recibos] = await Promise.all([
+        const [obras, fornecedores, lancamentos, notas, orcamentos, medicoes, documentos, produtos, contas, precompras, contratos, recibos, orcamentosSinapi, docFases, preferenciasRows] = await Promise.all([
           sql`SELECT * FROM obras WHERE tenant_id = ${tenantId} ORDER BY nome ASC;`,
           sql`SELECT * FROM fornecedores WHERE tenant_id = ${tenantId} ORDER BY nome ASC;`,
           sql`SELECT * FROM lancamentos WHERE tenant_id = ${tenantId} ORDER BY data DESC, created_at DESC;`,
@@ -277,7 +314,10 @@ export default async function handler(req, res) {
           sql`SELECT * FROM contas_bancarias WHERE tenant_id = ${tenantId} ORDER BY created_at ASC;`,
           sql`SELECT * FROM precompras WHERE tenant_id = ${tenantId} ORDER BY data_solicitacao DESC NULLS LAST, updated_at DESC;`,
           sql`SELECT * FROM contratos WHERE tenant_id = ${tenantId} ORDER BY updated_at DESC;`,
-          sql`SELECT * FROM recibos WHERE tenant_id = ${tenantId} ORDER BY data DESC NULLS LAST, updated_at DESC;`
+          sql`SELECT * FROM recibos WHERE tenant_id = ${tenantId} ORDER BY data DESC NULLS LAST, updated_at DESC;`,
+          sql`SELECT * FROM orcamentos_sinapi WHERE tenant_id = ${tenantId} ORDER BY updated_at DESC;`,
+          sql`SELECT * FROM obra_doc_fases WHERE tenant_id = ${tenantId} ORDER BY updated_at DESC;`,
+          sql`SELECT preferences FROM tenant_preferences WHERE tenant_id = ${tenantId} LIMIT 1;`
         ]);
 
         return res.status(200).json({
@@ -351,7 +391,10 @@ export default async function handler(req, res) {
             contas: contas || [],
             precompras: (precompras || []).map(jsonPayload),
             contratos: (contratos || []).map(jsonPayload),
-            recibos: (recibos || []).map(jsonPayload)
+            recibos: (recibos || []).map(jsonPayload),
+            orcamentos_sinapi: (orcamentosSinapi || []).map(jsonPayload),
+            doc_fases: (docFases || []).map(docPhasePayload),
+            preferencias: preferenciasRows?.[0]?.preferences || {}
           }
         });
       }
@@ -486,6 +529,32 @@ export default async function handler(req, res) {
           ? await sql`SELECT * FROM recibos WHERE tenant_id=${tenantId} ORDER BY data DESC NULLS LAST, updated_at DESC, id DESC LIMIT ${pagination.limit} OFFSET ${pagination.offset};`
           : await sql`SELECT * FROM recibos WHERE tenant_id=${tenantId} ORDER BY data DESC NULLS LAST, updated_at DESC, id DESC;`;
         return res.status(200).json(pageResponse(items.map(jsonPayload), pagination));
+      }
+
+      if (table === 'orcamentos_sinapi') {
+        const items = pagination
+          ? await sql`SELECT * FROM orcamentos_sinapi WHERE tenant_id=${tenantId} ORDER BY updated_at DESC, id DESC LIMIT ${pagination.limit} OFFSET ${pagination.offset};`
+          : await sql`SELECT * FROM orcamentos_sinapi WHERE tenant_id=${tenantId} ORDER BY updated_at DESC, id DESC;`;
+        return res.status(200).json(pageResponse(items.map(jsonPayload), pagination));
+      }
+
+      if (table === 'doc_fases') {
+        let items;
+        if (obra_id) {
+          items = pagination
+            ? await sql`SELECT * FROM obra_doc_fases WHERE tenant_id=${tenantId} AND obra_id=${obra_id} ORDER BY updated_at DESC, id DESC LIMIT ${pagination.limit} OFFSET ${pagination.offset};`
+            : await sql`SELECT * FROM obra_doc_fases WHERE tenant_id=${tenantId} AND obra_id=${obra_id} ORDER BY updated_at DESC, id DESC;`;
+        } else {
+          items = pagination
+            ? await sql`SELECT * FROM obra_doc_fases WHERE tenant_id=${tenantId} ORDER BY updated_at DESC, id DESC LIMIT ${pagination.limit} OFFSET ${pagination.offset};`
+            : await sql`SELECT * FROM obra_doc_fases WHERE tenant_id=${tenantId} ORDER BY updated_at DESC, id DESC;`;
+        }
+        return res.status(200).json(pageResponse(items.map(docPhasePayload), pagination));
+      }
+
+      if (table === 'preferencias') {
+        const rows = await sql`SELECT preferences FROM tenant_preferences WHERE tenant_id=${tenantId} LIMIT 1;`;
+        return res.status(200).json({ success:true, data:rows[0]?.preferences || {} });
       }
 
       if (table === 'orcamentos') {
@@ -647,6 +716,50 @@ export default async function handler(req, res) {
             `;
             totalCount++;
           }
+        }
+
+        if (Array.isArray(payload.orcamentos_sinapi)) {
+          for (const o of payload.orcamentos_sinapi) {
+            if (!o?.id || !validCloudId(o.id, 80)) continue;
+            const safeObraId = await validateObraTenant(sql, o.obra_id, tenantId);
+            if (o.obra_id && !safeObraId) continue;
+            const rawJson = JSON.stringify(o);
+            const subtotal = (Array.isArray(o.itens) ? o.itens : []).reduce((sum, item) => sum + cleanNum(item?.total), 0);
+            const total = subtotal * (1 + cleanNum(o.bdi) / 100);
+            await sql`
+              INSERT INTO orcamentos_sinapi (tenant_id,id,obra_id,nome,status,valor_total,payload)
+              VALUES (${tenantId},${o.id},${safeObraId},${o.nome || 'Orçamento SINAPI'},${o.status || 'ativo'},${total},${rawJson}::jsonb)
+              ON CONFLICT (tenant_id,id) DO UPDATE SET obra_id=EXCLUDED.obra_id,nome=EXCLUDED.nome,status=EXCLUDED.status,valor_total=EXCLUDED.valor_total,payload=EXCLUDED.payload,updated_at=NOW();
+            `;
+            totalCount++;
+          }
+        }
+
+        if (Array.isArray(payload.doc_fases)) {
+          for (const d of payload.doc_fases) {
+            const cloudId = String(d?.cloud_id || d?.id || '').trim();
+            if (!validCloudId(cloudId, 180) || !d?.obra_id || !d?.doc_id) continue;
+            const safeObraId = await validateObraTenant(sql, d.obra_id, tenantId);
+            if (!safeObraId || ['escritorio','geral'].includes(safeObraId)) continue;
+            const rawJson = JSON.stringify({ ...d, id:d.doc_id });
+            await sql`
+              INSERT INTO obra_doc_fases (tenant_id,id,obra_id,doc_id,fase_key,payload)
+              VALUES (${tenantId},${cloudId},${safeObraId},${String(d.doc_id).slice(0,100)},${d.fase_key || null},${rawJson}::jsonb)
+              ON CONFLICT (tenant_id,id) DO UPDATE SET obra_id=EXCLUDED.obra_id,doc_id=EXCLUDED.doc_id,fase_key=EXCLUDED.fase_key,payload=EXCLUDED.payload,updated_at=NOW();
+            `;
+            totalCount++;
+          }
+        }
+
+        if (payload.preferencias && typeof payload.preferencias === 'object' && !Array.isArray(payload.preferencias)) {
+          const safePrefs = sanitizeTenantPreferences(payload.preferencias);
+          const prefJson = JSON.stringify(safePrefs);
+          await sql`
+            INSERT INTO tenant_preferences (tenant_id,preferences)
+            VALUES (${tenantId},${prefJson}::jsonb)
+            ON CONFLICT (tenant_id) DO UPDATE SET preferences=tenant_preferences.preferences || EXCLUDED.preferences,updated_at=NOW();
+          `;
+          totalCount++;
         }
 
         // Lançamentos (com validação estrita de tenant nos relacionamentos)
@@ -1027,6 +1140,51 @@ export default async function handler(req, res) {
           return res.status(200).json({ success:true, id:r.id });
         }
 
+        if (table === 'orcamentos_sinapi') {
+          const o = data || {};
+          if (!validCloudId(o.id, 80)) return res.status(400).json({ success:false, error:'ID de orçamento SINAPI inválido.' });
+          const safeObraId = await validateObraTenant(sql, o.obra_id, tenantId);
+          if (o.obra_id && !safeObraId) return res.status(400).json({ success:false, error:'A obra informada não pertence à empresa autenticada.' });
+          const rawJson = JSON.stringify(o);
+          const subtotal = (Array.isArray(o.itens) ? o.itens : []).reduce((sum, item) => sum + cleanNum(item?.total), 0);
+          const total = subtotal * (1 + cleanNum(o.bdi) / 100);
+          await sql`
+            INSERT INTO orcamentos_sinapi (tenant_id,id,obra_id,nome,status,valor_total,payload)
+            VALUES (${tenantId},${o.id},${safeObraId},${o.nome || 'Orçamento SINAPI'},${o.status || 'ativo'},${total},${rawJson}::jsonb)
+            ON CONFLICT (tenant_id,id) DO UPDATE SET obra_id=EXCLUDED.obra_id,nome=EXCLUDED.nome,status=EXCLUDED.status,valor_total=EXCLUDED.valor_total,payload=EXCLUDED.payload,updated_at=NOW();
+          `;
+          await auditDb(sql, req, auth, 'salvar', 'orcamentos_sinapi', o);
+          return res.status(200).json({ success:true, id:o.id });
+        }
+
+        if (table === 'doc_fases') {
+          const d = data || {};
+          const cloudId = String(d.cloud_id || d.id || '').trim();
+          if (!validCloudId(cloudId, 180) || !d.obra_id || !d.doc_id) return res.status(400).json({ success:false, error:'Dados da fase documental incompletos.' });
+          const safeObraId = await validateObraTenant(sql, d.obra_id, tenantId);
+          if (!safeObraId || ['escritorio','geral'].includes(safeObraId)) return res.status(400).json({ success:false, error:'A obra informada não pertence à empresa autenticada.' });
+          const rawJson = JSON.stringify({ ...d, id:d.doc_id });
+          await sql`
+            INSERT INTO obra_doc_fases (tenant_id,id,obra_id,doc_id,fase_key,payload)
+            VALUES (${tenantId},${cloudId},${safeObraId},${String(d.doc_id).slice(0,100)},${d.fase_key || null},${rawJson}::jsonb)
+            ON CONFLICT (tenant_id,id) DO UPDATE SET obra_id=EXCLUDED.obra_id,doc_id=EXCLUDED.doc_id,fase_key=EXCLUDED.fase_key,payload=EXCLUDED.payload,updated_at=NOW();
+          `;
+          await auditDb(sql, req, auth, 'salvar', 'doc_fases', d, cloudId);
+          return res.status(200).json({ success:true, id:cloudId });
+        }
+
+        if (table === 'preferencias') {
+          const prefs = sanitizeTenantPreferences(data?.preferences);
+          const prefJson = JSON.stringify(prefs);
+          await sql`
+            INSERT INTO tenant_preferences (tenant_id,preferences)
+            VALUES (${tenantId},${prefJson}::jsonb)
+            ON CONFLICT (tenant_id) DO UPDATE SET preferences=tenant_preferences.preferences || EXCLUDED.preferences,updated_at=NOW();
+          `;
+          await auditDb(sql, req, auth, 'salvar', 'preferencias', { id:tenantId, chaves:Object.keys(prefs).slice(0,20) });
+          return res.status(200).json({ success:true });
+        }
+
         if (table === 'ocr_historico') {
           const h = data;
           const dadosJson = JSON.stringify(h.dados || {});
@@ -1173,6 +1331,16 @@ export default async function handler(req, res) {
           if (tableName === 'contratos') await sql`DELETE FROM contratos WHERE tenant_id=${tenantId} AND id=${id};`;
           if (tableName === 'recibos') await sql`DELETE FROM recibos WHERE tenant_id=${tenantId} AND id=${id};`;
           await writeAudit(sql, req, auth, { acao:'excluir', entidade:tableName, entidadeId:id, antes:{ id } });
+          return res.status(200).json({ success:true, id });
+        }
+        if (table === 'orcamentos_sinapi') {
+          await sql`DELETE FROM orcamentos_sinapi WHERE tenant_id=${tenantId} AND id=${id};`;
+          await writeAudit(sql, req, auth, { acao:'excluir', entidade:'orcamentos_sinapi', entidadeId:id, antes:{ id } });
+          return res.status(200).json({ success:true, id });
+        }
+        if (table === 'doc_fases') {
+          await sql`DELETE FROM obra_doc_fases WHERE tenant_id=${tenantId} AND id=${id};`;
+          await writeAudit(sql, req, auth, { acao:'excluir', entidade:'doc_fases', entidadeId:id, antes:{ id } });
           return res.status(200).json({ success:true, id });
         }
         if (table === 'ocr_historico') {

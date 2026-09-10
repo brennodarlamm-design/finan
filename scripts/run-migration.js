@@ -29,6 +29,53 @@ if (!dbUrl) {
 console.log('🚀 Conectando ao Lakebase Postgres (Neon)...');
 const sql = neon(dbUrl);
 
+function splitSqlStatements(rawContent) {
+  const lines = rawContent.split('\n');
+  const cleanedLines = [];
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (trimmed.startsWith('--')) continue;
+    cleanedLines.push(line);
+  }
+  const cleanSql = cleanedLines.join('\n');
+
+  const statements = [];
+  let current = '';
+  let inDollarQuote = false;
+  let inSingleQuote = false;
+
+  for (let i = 0; i < cleanSql.length; i++) {
+    const char = cleanSql[i];
+    const nextChar = cleanSql[i + 1];
+
+    if (char === "'" && !inDollarQuote) {
+      if (cleanSql[i - 1] !== '\\') {
+        inSingleQuote = !inSingleQuote;
+      }
+    } else if (char === '$' && nextChar === '$' && !inSingleQuote) {
+      inDollarQuote = !inDollarQuote;
+      current += '$$';
+      i++;
+      continue;
+    }
+
+    if (char === ';' && !inDollarQuote && !inSingleQuote) {
+      const stmt = current.trim();
+      if (stmt && stmt.toUpperCase() !== 'BEGIN' && stmt.toUpperCase() !== 'COMMIT') {
+        statements.push(stmt);
+      }
+      current = '';
+    } else {
+      current += char;
+    }
+  }
+  const last = current.trim();
+  if (last && last.toUpperCase() !== 'BEGIN' && last.toUpperCase() !== 'COMMIT') {
+    statements.push(last);
+  }
+  return statements;
+}
+
 async function executeSqlFile(filePath) {
   const fileName = path.basename(filePath);
   console.log(`\n======================================================`);
@@ -36,12 +83,7 @@ async function executeSqlFile(filePath) {
   console.log(`======================================================`);
   
   const rawContent = fs.readFileSync(filePath, 'utf8');
-  // Strip line comments safely
-  const cleanedContent = rawContent.replace(/--.*$/gm, '');
-  const statements = cleanedContent
-    .split(';')
-    .map(s => s.trim())
-    .filter(s => s.length > 0 && s.toUpperCase() !== 'BEGIN' && s.toUpperCase() !== 'COMMIT');
+  const statements = splitSqlStatements(rawContent);
 
   console.log(`Instruções encontradas: ${statements.length}`);
 
@@ -118,12 +160,25 @@ async function run() {
     const checkIndexes = await sql`
       SELECT indexname, tablename
       FROM pg_indexes 
-      WHERE tablename IN ('audit_logs', 'lancamentos', 'notas_fiscais', 'fornecedores')
-        AND indexname LIKE 'idx_%'
+      WHERE tablename IN ('audit_logs', 'lancamentos', 'notas_fiscais', 'fornecedores', 'obras', 'orcamentos_sinapi', 'obra_doc_fases')
+        AND (indexname LIKE 'idx_%' OR indexname LIKE 'uq_%')
       ORDER BY tablename, indexname;
     `;
     console.log(`\n  Índices ativos verificados (${checkIndexes.length}):`);
     checkIndexes.forEach(idx => console.log(`   - [${idx.tablename}] ${idx.indexname}`));
+
+    // Check Patch 07 tables
+    const checkPatch07 = await sql`
+      SELECT table_name 
+      FROM information_schema.tables 
+      WHERE table_schema = 'public' 
+        AND table_name IN ('orcamentos_sinapi', 'obra_doc_fases', 'tenant_preferences');
+    `;
+    console.log(`\n  Tabelas do Patch 07 verificadas:`);
+    ['orcamentos_sinapi', 'obra_doc_fases', 'tenant_preferences'].forEach(tbl => {
+      const found = checkPatch07.some(r => r.table_name === tbl);
+      console.log(`   - ${tbl}: ${found ? '✅ PRESENTE' : '❌ AUSENTE'}`);
+    });
 
     console.log('\n🎉 Todas as migrações foram verificadas e aplicadas com 100% de sucesso no Neon!');
   } catch (err) {

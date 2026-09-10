@@ -178,7 +178,9 @@ const App = {
     this.navigate(initialRoute, true);
 
     // Atualiza em segundo plano. Após concluir, redesenha a tela atual com dados frescos.
-    Promise.resolve(DB.bootstrapCoreCloud ? DB.bootstrapCoreCloud() : true).then(() => {
+    Promise.resolve(DB.bootstrapCoreCloud ? DB.bootstrapCoreCloud() : true)
+      .then(() => DB.bootstrapCloudCompleteness ? DB.bootstrapCloudCompleteness() : true)
+      .then(() => {
       DB.syncFromCloud().then(async (ok) => {
         if (ok) {
           const current = this.route || initialRoute;

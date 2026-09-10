@@ -928,9 +928,13 @@ const OCR = {
   _dadosOCR:     null,
 
   // ── HISTÓRICO DE DOCUMENTOS LIDOS PELO OCR ────────────────────────────────
+  _historyKey() {
+    return (typeof DB !== 'undefined' && DB._ck) ? DB._ck('finobra_ocr_historico') : 'finobra_ocr_historico';
+  },
+
   obterHistorico() {
     try {
-      return JSON.parse(localStorage.getItem('finobra_ocr_historico') || '[]');
+      return JSON.parse(localStorage.getItem(this._historyKey()) || '[]');
     } catch {
       return [];
     }
@@ -940,7 +944,7 @@ const OCR = {
     try {
       const hist = this.obterHistorico();
       const novoItem = {
-        id: 'ocr_' + Date.now().toString(36) + Math.random().toString(36).substr(2,4),
+        id: 'ocr_' + ((typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : (Date.now().toString(36) + Math.random().toString(36).slice(2,10))),
         data_hora: new Date().toISOString(),
         nome_arquivo: nomeArquivo,
         dados: dados,
@@ -955,7 +959,7 @@ const OCR = {
       hist.unshift(novoItem);
       if (hist.length > 30) hist.pop();
 
-      localStorage.setItem('finobra_ocr_historico', JSON.stringify(hist));
+      localStorage.setItem(this._historyKey(), JSON.stringify(hist));
 
       // Sincroniza o histórico com a nuvem (Neon) para aparecer no PC e celular
       if (typeof DB !== 'undefined' && DB.syncToCloud) {
@@ -981,7 +985,7 @@ const OCR = {
           const mesclados = Array.from(mapa.values())
             .sort((a, b) => new Date(b.data_hora) - new Date(a.data_hora))
             .slice(0, 40);
-          localStorage.setItem('finobra_ocr_historico', JSON.stringify(mesclados));
+          localStorage.setItem(this._historyKey(), JSON.stringify(mesclados));
           return mesclados;
         }
       }
@@ -1020,14 +1024,14 @@ const OCR = {
                 <div style="flex:1;min-width:0;">
                   <div style="display:flex;align-items:center;gap:8px;">
                     <strong style="font-size:.85rem;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
-                      ${item.fornecedor}
+                      ${Utils.escapeHtml(String(item.fornecedor || 'Não informado'))}
                     </strong>
                     <span style="font-size:.68rem;background:rgba(79,70,229,.15);color:#818cf8;padding:1px 6px;border-radius:4px;font-weight:700;">
                       ${this._labelTipoDoc(item.tipo_documento)}
                     </span>
                   </div>
                   <div style="font-size:.74rem;color:var(--text3);margin-top:2px;display:flex;gap:10px;flex-wrap:wrap;">
-                    <span>📁 ${item.nome_arquivo}</span>
+                    <span>📁 ${Utils.escapeHtml(String(item.nome_arquivo || ''))}</span>
                     <span>🕒 ${dtFmt}</span>
                     ${item.data_vencimento ? `<span>📅 Venc: ${Utils.fmt.date(item.data_vencimento)}</span>` : ''}
                   </div>
@@ -1098,7 +1102,7 @@ const OCR = {
 
   limparHistorico() {
     if (!confirm('Deseja realmente limpar todo o histórico de leituras do OCR?')) return;
-    localStorage.removeItem('finobra_ocr_historico');
+    localStorage.removeItem(this._historyKey());
     if (typeof DB !== 'undefined' && DB.syncToCloud) {
       DB.syncToCloud('delete', 'ocr_historico', null, 'all');
     }

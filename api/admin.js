@@ -172,7 +172,7 @@ export default async function handler(req, res) {
       if (!rows.length) return res.status(404).json({ success:false, error:'Conversa não encontrada ou já encerrada.' });
       await sql`
         INSERT INTO support_messages (id,conversation_id,tenant_id,sender_type,sender_user_id,sender_name,body)
-        VALUES (${`smsg_${crypto.randomBytes(10).toString('hex')}`},${conversationId},${rows[0].tenant_id},'system',${auth.user.userId || auth.user.id},'FinObra',${`${auth.user.nome || 'Atendente'} entrou no atendimento.`});
+        VALUES (${`smsg_${crypto.randomBytes(10).toString('hex')}`},${conversationId},${rows[0].tenant_id},'system',${auth.user.userId || auth.user.id},'FinObra',${'Suporte entrou no atendimento.'});
       `;
       await writeAudit(sql, req, { ...auth, tenantId:rows[0].tenant_id }, { acao:'suporte_assumido', entidade:'support_conversation', entidadeId:conversationId, depois:{ atendente:auth.user.nome || auth.user.username } });
       return res.status(200).json({ success:true, conversation:rows[0] });
@@ -187,7 +187,7 @@ export default async function handler(req, res) {
       const conv = convRows[0];
       await sql`
         INSERT INTO support_messages (id,conversation_id,tenant_id,sender_type,sender_user_id,sender_name,body)
-        VALUES (${`smsg_${crypto.randomBytes(10).toString('hex')}`},${conversationId},${conv.tenant_id},'agent',${auth.user.userId || auth.user.id},${auth.user.nome || auth.user.username || 'Atendente'},${text});
+        VALUES (${`smsg_${crypto.randomBytes(10).toString('hex')}`},${conversationId},${conv.tenant_id},'agent',${auth.user.userId || auth.user.id},${'Suporte'},${text});
       `;
       await sql`
         UPDATE support_conversations SET status='assigned', assigned_to=${auth.user.userId || auth.user.id}, assigned_at=COALESCE(assigned_at,NOW()), last_message_at=NOW(), updated_at=NOW()

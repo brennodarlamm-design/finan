@@ -1,0 +1,69 @@
+FINOBRA — PATCH 07
+Cloud Completeness + Isolamento Local por Tenant
+
+BASE
+Este patch foi produzido sobre o FINANÇAS(10).zip e já incorpora o hotfix em que o cliente vê o atendente humano apenas como “Suporte”. Não aplique o HOTFIX_SUPORTE_NOME separado depois deste patch.
+
+ANTES DE PUBLICAR
+1. Faça backup do projeto e, preferencialmente, do banco Neon.
+2. No SQL Editor do Neon, execute UMA VEZ:
+   migrations/006_cloud_completeness.sql
+3. Somente depois copie todo o conteúdo deste patch para a raiz do projeto, substituindo os arquivos existentes.
+4. Faça novo deploy na Vercel.
+
+O QUE O PATCH 07 FAZ
+- Move Orçamentos SINAPI para persistência no Neon por tenant.
+- Move as fases/documentação operacional de cada obra para o Neon por tenant.
+- Cria preferências de tenant no Neon para categorias personalizadas e preferências de WhatsApp.
+- Isola metadados de Documentos no cache local por tenant.
+- Isola também os blobs locais no IndexedDB por tenant.
+- Isola histórico OCR por tenant.
+- Isola Orçamentos SINAPI por tenant no navegador e sincroniza com o Neon.
+- Isola categorias personalizadas de fornecedores e despesas por tenant e sincroniza com o Neon.
+- Isola preferências do WhatsApp por tenant.
+- Isola o registro/local pending de assinaturas por tenant.
+- Backup/restauração passa a respeitar dados e preferências do tenant atual.
+- A fila de sincronização passa a coalescer alterações repetidas do mesmo registro, preserva edições adicionadas enquanto uma requisição está em andamento e evita loop infinito em erros 4xx permanentes.
+- O cliente vê mensagens humanas apenas como “Suporte”; a auditoria administrativa continua identificando o ator real.
+- Não cria nova função serverless: reutiliza a API /api/db existente.
+
+MIGRAÇÃO DE DADOS LOCAIS
+No primeiro acesso após o deploy, o FinObra executa uma migração complementar antes da sincronização normal.
+
+Para cada empresa que ainda tenha dados antigos somente no navegador:
+- entre usando uma conta Administrador ou Gestor daquela empresa;
+- mantenha a aba aberta até o indicador mostrar “Sincronizado”.
+
+O sistema tenta subir Orçamentos SINAPI, fases/documentação e preferências para o Neon antes de aceitar a nuvem como fonte principal.
+
+PROTEÇÃO CONTRA MISTURA DE TENANTS
+Para tenants diferentes da base histórica Angelim, o Patch 07 NÃO copia cegamente caches globais antigos. Em SINAPI, por exemplo, um item legado só é associado ao tenant quando a obra referenciada realmente pertence àquele tenant. Essa decisão é intencional para evitar que um dado histórico de outra empresa seja “migrado” para o cliente errado.
+
+DOCUMENTOS LOCAIS ANTIGOS
+Documentos já existentes na nuvem serão reidratados normalmente para o tenant correto. Documentos que existam apenas em um cache global legado de navegador e cuja empresa de origem não possa ser determinada com segurança NÃO são copiados automaticamente para outro tenant. Isso evita vazamento de documentos entre empresas.
+
+RESEND / CENTRAL DE ATENDIMENTO
+O Patch 07 preserva a Central DEV do Patch 06 Revisado.
+Se você publicar o template do Resend, configure na Vercel:
+  RESEND_SUPPORT_TEMPLATE_ID=<ID_DO_TEMPLATE_PUBLICADO>
+
+Sem essa variável, o código mantém o fallback de e-mail HTML já existente.
+Mantenha também as demais variáveis de ambiente já configuradas. Nenhum segredo foi incluído neste patch.
+
+TESTE APÓS DEPLOY
+1. Master -> acesse uma empresa diferente da Angelim e confirme os números do Dashboard.
+2. Vá em Documentos e confirme que nenhum documento/cache de outra empresa aparece.
+3. Crie um orçamento SINAPI em uma empresa, troque de tenant e confirme o isolamento.
+4. Crie categorias personalizadas em uma empresa e confirme que outra não as recebe.
+5. Faça OCR em uma empresa e confira que o histórico é separado.
+6. Altere preferência de WhatsApp e confira que ela fica no tenant correto.
+7. No chat, uma resposta humana deve aparecer ao cliente apenas como “Suporte”.
+8. Feche/reabra em outro computador e confirme que SINAPI/fases/preferências reaparecem via Neon.
+
+TESTES INCLUÍDOS
+- npm test
+- npm run test:patch07
+- node scripts/check-all-syntax.js
+
+VERSÃO
+FinObra 2.5.0 / Patch 07

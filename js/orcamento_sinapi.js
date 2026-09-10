@@ -926,9 +926,17 @@ const OrcamentoSINAPI = {
 
   _KEY: 'orcamentos_sinapi',
 
+  _storageKey() {
+    return (typeof DB !== 'undefined' && DB._ck) ? DB._ck(this._KEY) : this._KEY;
+  },
+
+  _syncCloud(action, data=null, id=null) {
+    if (typeof DB !== 'undefined' && DB.syncToCloud) DB.syncToCloud(action, 'orcamentos_sinapi', data, id);
+  },
+
   _getAll(obraId) {
     try {
-      const all = JSON.parse(localStorage.getItem(this._KEY) || '[]');
+      const all = JSON.parse(localStorage.getItem(this._storageKey()) || '[]');
       if (!obraId || obraId === 'todas') return all;
       return all.filter(o => o.obra_id === obraId);
     } catch { return []; }
@@ -936,33 +944,39 @@ const OrcamentoSINAPI = {
 
   _getById(id) {
     try {
-      const all = JSON.parse(localStorage.getItem(this._KEY) || '[]');
+      const all = JSON.parse(localStorage.getItem(this._storageKey()) || '[]');
       return all.find(o => o.id === id) || null;
     } catch { return null; }
   },
 
   _add(orc) {
+    if (typeof DB !== 'undefined' && DB.canWriteLocal && !DB.canWriteLocal('write')) return DB._denyLocal('write');
     try {
-      const all = JSON.parse(localStorage.getItem(this._KEY) || '[]');
+      const all = JSON.parse(localStorage.getItem(this._storageKey()) || '[]');
       all.push(orc);
-      localStorage.setItem(this._KEY, JSON.stringify(all));
+      localStorage.setItem(this._storageKey(), JSON.stringify(all));
+      this._syncCloud('save', orc);
     } catch(e) { console.error('OrcamentoSINAPI._add', e); }
   },
 
   _save(orc) {
+    if (typeof DB !== 'undefined' && DB.canWriteLocal && !DB.canWriteLocal('write')) return DB._denyLocal('write');
     try {
-      const all = JSON.parse(localStorage.getItem(this._KEY) || '[]');
+      const all = JSON.parse(localStorage.getItem(this._storageKey()) || '[]');
       const idx = all.findIndex(o => o.id === orc.id);
       if (idx !== -1) all[idx] = orc;
       else all.push(orc);
-      localStorage.setItem(this._KEY, JSON.stringify(all));
+      localStorage.setItem(this._storageKey(), JSON.stringify(all));
+      this._syncCloud('save', orc);
     } catch(e) { console.error('OrcamentoSINAPI._save', e); }
   },
 
   _remove(id) {
+    if (typeof DB !== 'undefined' && DB.canWriteLocal && !DB.canWriteLocal('delete')) return DB._denyLocal('delete');
     try {
-      const all = JSON.parse(localStorage.getItem(this._KEY) || '[]').filter(o => o.id !== id);
-      localStorage.setItem(this._KEY, JSON.stringify(all));
+      const all = JSON.parse(localStorage.getItem(this._storageKey()) || '[]').filter(o => o.id !== id);
+      localStorage.setItem(this._storageKey(), JSON.stringify(all));
+      this._syncCloud('delete', null, id);
     } catch(e) { console.error('OrcamentoSINAPI._remove', e); }
   },
 

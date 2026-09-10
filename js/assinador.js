@@ -13,6 +13,10 @@ const Assinador = {
   _onSalvarCallback: null,
   _metadataDoc: null,
 
+  _registryKey() {
+    return (typeof DB !== 'undefined' && DB._ck) ? DB._ck('finobra_assinaturas_registry') : 'finobra_assinaturas_registry';
+  },
+
   // ─────────────────────────────────────────────────────────────
   // ABERTURA DO MODAL DE ASSINATURA NA TELA
   // ─────────────────────────────────────────────────────────────
@@ -302,7 +306,7 @@ const Assinador = {
 
     // Mantém cache local, mas a autenticidade pública depende exclusivamente do registro central no Neon.
     try {
-      const reg = JSON.parse(localStorage.getItem('finobra_assinaturas_registry') || '[]');
+      const reg = JSON.parse(localStorage.getItem(this._registryKey()) || '[]');
       reg.unshift({
         ...objetoAssinatura,
         criado_em: timestampISO,
@@ -310,7 +314,7 @@ const Assinador = {
         registro_central: false
       });
       if (reg.length > 200) reg.length = 200;
-      localStorage.setItem('finobra_assinaturas_registry', JSON.stringify(reg));
+      localStorage.setItem(this._registryKey(), JSON.stringify(reg));
     } catch (e) {
       console.warn('Erro ao salvar cache local da assinatura:', e);
     }
@@ -318,11 +322,11 @@ const Assinador = {
     const centralOk = await this._registrarAssinaturaCentral(objetoAssinatura);
     objetoAssinatura.registro_central = centralOk;
     try {
-      const reg = JSON.parse(localStorage.getItem('finobra_assinaturas_registry') || '[]');
+      const reg = JSON.parse(localStorage.getItem(this._registryKey()) || '[]');
       const idx = reg.findIndex(x => x.codigo_validacao === objetoAssinatura.codigo_validacao);
       if (idx >= 0) {
         reg[idx].registro_central = centralOk;
-        localStorage.setItem('finobra_assinaturas_registry', JSON.stringify(reg));
+        localStorage.setItem(this._registryKey(), JSON.stringify(reg));
       }
     } catch {}
     Utils.closeModal();
@@ -378,7 +382,7 @@ const Assinador = {
     if (typeof Auth === 'undefined' || !Auth.getCurrentTenantId) return 0;
     const tenantId = Auth.getCurrentTenantId();
     let reg = [];
-    try { reg = JSON.parse(localStorage.getItem('finobra_assinaturas_registry') || '[]'); } catch { return 0; }
+    try { reg = JSON.parse(localStorage.getItem(this._registryKey()) || '[]'); } catch { return 0; }
     let synced = 0;
     for (const item of reg.filter(x => x.tenant_id === tenantId && x.registro_central !== true).slice(0, 20)) {
       const ok = await this._registrarAssinaturaCentral(item);
@@ -388,7 +392,7 @@ const Assinador = {
       }
     }
     if (synced) {
-      try { localStorage.setItem('finobra_assinaturas_registry', JSON.stringify(reg)); } catch {}
+      try { localStorage.setItem(this._registryKey(), JSON.stringify(reg)); } catch {}
     }
     return synced;
   },

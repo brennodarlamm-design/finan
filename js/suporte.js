@@ -185,8 +185,7 @@ const Suporte = {
     const isHuman = status === 'assigned';
     const waiting = status === 'waiting';
     const closed = status === 'closed' || status === 'resolved';
-    const agentName = this.sessao.messages.slice().reverse().find(m => m.sender_type === 'agent')?.sender_name || 'Atendente FinObra';
-    const title = isHuman ? agentName : 'FinBot';
+    const title = isHuman ? 'Suporte' : 'FinBot';
     const safeCompany = this._esc(u.empresaNome || 'sua empresa');
 
     modal.innerHTML = `
@@ -233,7 +232,7 @@ const Suporte = {
     if (isSystem) return `<div style="align-self:center;max-width:90%;background:rgba(255,255,255,.045);border:1px solid rgba(255,255,255,.08);border-radius:14px;padding:6px 11px;font-size:.68rem;color:#94a3b8;text-align:center;">${this._esc(m.body || '')}</div>`;
     const isBot = sender === 'bot';
     const initials = isMe ? 'VC' : (isBot ? '🤖' : 'AT');
-    const name = isMe ? '' : this._esc(m.sender_name || (isBot ? 'FinBot' : 'Atendente'));
+    const name = isMe ? '' : (isBot ? 'FinBot' : 'Suporte');
     const text = this._esc(m.body || '').replace(/\n/g, '<br>');
     return `<div style="display:flex;gap:9px;align-items:flex-start;max-width:86%;${isMe?'align-self:flex-end;flex-direction:row-reverse;':''}">
       <div style="width:30px;height:30px;border-radius:50%;background:${isMe?'#243818':(isBot?'rgba(56,189,248,.16)':'rgba(34,197,94,.16)')};border:1px solid rgba(201,162,39,.25);display:flex;align-items:center;justify-content:center;font-size:${isBot?'1rem':'.65rem'};font-weight:900;flex-shrink:0;">${initials}</div>

@@ -17,23 +17,33 @@ const Fornecedores = {
     { value: 'outros',        label: '📦 Outros' },
   ],
 
-  // Chave do localStorage para categorias customizadas
+  // Categorias personalizadas ficam isoladas por tenant e sincronizadas no Neon.
   CATS_KEY: 'finobra_categorias_custom',
+
+  _catsStorageKey() {
+    return (typeof DB !== 'undefined' && DB._ck) ? DB._ck(this.CATS_KEY) : this.CATS_KEY;
+  },
 
   // Retorna todas as categorias: fixas + customizadas
   _getAllCategorias() {
-    const custom = JSON.parse(localStorage.getItem(this.CATS_KEY) || '[]');
-    return [...this.CATEGORIAS, ...custom];
+    let custom = [];
+    try { custom = JSON.parse(localStorage.getItem(this._catsStorageKey()) || '[]'); } catch {}
+    return [...this.CATEGORIAS, ...(Array.isArray(custom) ? custom : [])];
   },
 
   // Retorna apenas as categorias customizadas
   _getCustomCategorias() {
-    return JSON.parse(localStorage.getItem(this.CATS_KEY) || '[]');
+    try {
+      const list = JSON.parse(localStorage.getItem(this._catsStorageKey()) || '[]');
+      return Array.isArray(list) ? list : [];
+    } catch { return []; }
   },
 
-  // Salva as categorias customizadas
+  // Salva as categorias customizadas localmente e na preferência do tenant.
   _saveCustomCategorias(list) {
-    localStorage.setItem(this.CATS_KEY, JSON.stringify(list));
+    const safe = Array.isArray(list) ? list.slice(0, 100) : [];
+    try { localStorage.setItem(this._catsStorageKey(), JSON.stringify(safe)); } catch {}
+    if (typeof DB !== 'undefined' && DB.saveTenantPreferences) DB.saveTenantPreferences({ categorias_fornecedor: safe });
   },
 
   // ─────────────────────────────────────────────────────────────
@@ -101,7 +111,7 @@ const Fornecedores = {
         <label class="filter-label">Categoria</label>
         <select class="form-control" id="forn-cat" style="min-width:170px" onchange="Fornecedores.aplicarFiltros()">
           <option value="">Todas</option>
-          ${this._getAllCategorias().map(c=>`<option value="${c.value}">${c.label}</option>`).join('')}
+          ${this._getAllCategorias().map(c=>`<option value="${Utils.escapeHtml(String(c.value || ''))}">${Utils.escapeHtml(String(c.label || ''))}</option>`).join('')}
         </select>
       </div>
       <div class="filter-group">
@@ -323,7 +333,7 @@ const Fornecedores = {
                 <label class="form-label">Categoria *</label>
                 <select class="form-control" name="categoria" required>
                   <option value="">Selecione...</option>
-                  ${this._getAllCategorias().map(c=>`<option value="${c.value}" ${f?.categoria===c.value?'selected':''}>${c.label}</option>`).join('')}
+                  ${this._getAllCategorias().map(c=>`<option value="${Utils.escapeHtml(String(c.value || ''))}" ${f?.categoria===c.value?'selected':''}>${Utils.escapeHtml(String(c.label || ''))}</option>`).join('')}
                 </select>
               </div>
               <div class="form-group">

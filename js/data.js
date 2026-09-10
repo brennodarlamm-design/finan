@@ -27,6 +27,44 @@ const DB = {
     return `${name}_${t}`;
   },
 
+
+  // Preferências do tenant: cache local isolado + persistência no Neon.
+  _preferencesLocalSnapshot() {
+    const readJson = (key) => {
+      try { return JSON.parse(localStorage.getItem(this._ck(key)) || '[]'); } catch { return []; }
+    };
+    return {
+      categorias_fornecedor: readJson('finobra_categorias_custom'),
+      categorias_despesa: readJson('finobra_cats_despesa_custom'),
+      whatsapp_telefone: String(localStorage.getItem(this._ck('finobra_whatsapp_telefone')) || ''),
+      whatsapp_modo: String(localStorage.getItem(this._ck('finobra_whatsapp_modo')) || 'api')
+    };
+  },
+
+  _applyTenantPreferences(preferences = {}) {
+    if (!preferences || typeof preferences !== 'object' || Array.isArray(preferences)) return;
+    const writeJson = (key, value) => {
+      if (!Array.isArray(value)) return;
+      try { localStorage.setItem(this._ck(key), JSON.stringify(value)); } catch {}
+    };
+    if ('categorias_fornecedor' in preferences) writeJson('finobra_categorias_custom', preferences.categorias_fornecedor);
+    if ('categorias_despesa' in preferences) writeJson('finobra_cats_despesa_custom', preferences.categorias_despesa);
+    if ('whatsapp_telefone' in preferences) {
+      try { localStorage.setItem(this._ck('finobra_whatsapp_telefone'), String(preferences.whatsapp_telefone || '').replace(/\D/g, '')); } catch {}
+    }
+    if ('whatsapp_modo' in preferences) {
+      const modo = ['api','web'].includes(String(preferences.whatsapp_modo)) ? String(preferences.whatsapp_modo) : 'api';
+      try { localStorage.setItem(this._ck('finobra_whatsapp_modo'), modo); } catch {}
+    }
+  },
+
+  saveTenantPreferences(patch = {}) {
+    if (!patch || typeof patch !== 'object' || Array.isArray(patch)) return false;
+    this._applyTenantPreferences(patch);
+    this.syncToCloud('save', 'preferencias', { preferences: patch });
+    return true;
+  },
+
   // ── GESTÃO DA EMPRESA / CONSTRUTORA ──
   getEmpresa() {
     const t = this._t();
@@ -199,7 +237,19 @@ const DB = {
     return result;
   },
 
+  _syncDocFaseRecord(obraId, faseKey, doc) {
+    if (!obraId || !faseKey || !doc?.id) return;
+    this.syncToCloud('save', 'doc_fases', {
+      ...doc,
+      cloud_id: this._docPhaseCloudId(obraId, doc.id),
+      obra_id: obraId,
+      doc_id: doc.id,
+      fase_key: faseKey
+    });
+  },
+
   saveDocFase(obraId, docId, dados) {
+    if (!this.canWriteLocal('write')) return this._denyLocal('write');
     let saved = {};
     try { saved = JSON.parse(localStorage.getItem(this._fasesDocKey(obraId)) || '{}'); } catch {}
     const template = (typeof FasesDoc !== 'undefined') ? FasesDoc.TEMPLATE : {};
@@ -215,9 +265,11 @@ const DB = {
     if (idx >= 0) saved[faseKey][idx] = updated;
     else saved[faseKey].push(updated);
     localStorage.setItem(this._fasesDocKey(obraId), JSON.stringify(saved));
+    this._syncDocFaseRecord(obraId, faseKey, updated);
   },
 
   attachArquivoDocFase(obraId, docId, arquivoId) {
+    if (!this.canWriteLocal('write')) return this._denyLocal('write');
     let saved = {};
     try { saved = JSON.parse(localStorage.getItem(this._fasesDocKey(obraId)) || '{}'); } catch {}
     const template = (typeof FasesDoc !== 'undefined') ? FasesDoc.TEMPLATE : {};
@@ -235,16 +287,21 @@ const DB = {
       saved[faseKey].push({ id: docId, status: 'nao_iniciado', arquivos: [arquivoId] });
     }
     localStorage.setItem(this._fasesDocKey(obraId), JSON.stringify(saved));
+    const current = (saved[faseKey] || []).find(d => d.id === docId);
+    if (current) this._syncDocFaseRecord(obraId, faseKey, current);
   },
 
   removeArquivoDocFase(obraId, docId, arquivoId) {
+    if (!this.canWriteLocal('write')) return this._denyLocal('write');
     let saved = {};
     try { saved = JSON.parse(localStorage.getItem(this._fasesDocKey(obraId)) || '{}'); } catch {}
     for (const fk of Object.keys(saved)) {
       const idx = (saved[fk] || []).findIndex(d => d.id === docId);
       if (idx >= 0 && saved[fk][idx].arquivos) {
         saved[fk][idx].arquivos = saved[fk][idx].arquivos.filter(id => id !== arquivoId);
+        saved[fk][idx].updated_at = new Date().toISOString();
         localStorage.setItem(this._fasesDocKey(obraId), JSON.stringify(saved));
+        this._syncDocFaseRecord(obraId, fk, saved[fk][idx]);
         return;
       }
     }
@@ -391,7 +448,9 @@ const DB = {
           || Number(c.medicoes || 0) > 800
           || Number(c.precompras || 0) > 800
           || Number(c.contratos || 0) > 500
-          || Number(c.recibos || 0) > 800;
+          || Number(c.recibos || 0) > 800
+          || Number(c.orcamentos_sinapi || 0) > 500
+          || Number(c.doc_fases || 0) > 1000;
       }
     } catch (e) {
       console.warn('[Sync] Manifesto indisponível; usando sincronização compatível:', e?.message || e);
@@ -410,7 +469,7 @@ const DB = {
     }
 
     console.info('[Sync] Base grande detectada. Usando sincronização paginada.');
-    const [clientes, fornecedores, lancamentos, notas, orcamentos, medicoes, documentos, produtos, contas, precompras, contratos, recibos] = await Promise.all([
+    const [clientes, fornecedores, lancamentos, notas, orcamentos, medicoes, documentos, produtos, contas, precompras, contratos, recibos, orcamentos_sinapi, doc_fases, prefResp] = await Promise.all([
       this._fetchCloudTablePaged('clientes'),
       this._fetchCloudTablePaged('fornecedores'),
       this._fetchCloudTablePaged('lancamentos'),
@@ -422,9 +481,124 @@ const DB = {
       this._fetchCloudTablePaged('contas'),
       this._fetchCloudTablePaged('precompras'),
       this._fetchCloudTablePaged('contratos'),
-      this._fetchCloudTablePaged('recibos')
+      this._fetchCloudTablePaged('recibos'),
+      this._fetchCloudTablePaged('orcamentos_sinapi'),
+      this._fetchCloudTablePaged('doc_fases'),
+      fetch('/api/db?table=preferencias', { headers:this._apiHeaders() }).then(async r => {
+        if (!r.ok) throw new Error(`Falha ao sincronizar preferencias: HTTP ${r.status}`);
+        return r.json();
+      })
     ]);
-    return { clientes, fornecedores, lancamentos, notas, orcamentos, medicoes, documentos, produtos, contas, precompras, contratos, recibos };
+    return {
+      clientes, fornecedores, lancamentos, notas, orcamentos, medicoes, documentos, produtos, contas,
+      precompras, contratos, recibos, orcamentos_sinapi, doc_fases,
+      preferencias: prefResp?.data || {}
+    };
+  },
+
+  _cloudCompletenessBootstrapKey() {
+    return `finobra_${this._t()}_patch07_cloud_completeness_bootstrap`;
+  },
+
+  isCloudCompletenessBootstrapped() {
+    try { return localStorage.getItem(this._cloudCompletenessBootstrapKey()) === '1'; } catch { return false; }
+  },
+
+  _docPhaseCloudId(obraId, docId) {
+    const clean = (value, max) => String(value || '').replace(/[^A-Za-z0-9_.:@-]+/g, '_').slice(0, max);
+    return `${clean(obraId, 90)}:${clean(docId, 80)}`.slice(0, 180);
+  },
+
+  _collectLocalDocPhases() {
+    const out = [];
+    for (const obra of (this.getAll('clientes') || [])) {
+      if (!obra?.id) continue;
+      let saved = {};
+      try { saved = JSON.parse(localStorage.getItem(this._fasesDocKey(obra.id)) || '{}'); } catch {}
+      for (const [faseKey, docs] of Object.entries(saved || {})) {
+        for (const doc of (Array.isArray(docs) ? docs : [])) {
+          if (!doc?.id) continue;
+          out.push({
+            ...doc,
+            cloud_id: this._docPhaseCloudId(obra.id, doc.id),
+            obra_id: obra.id,
+            doc_id: doc.id,
+            fase_key: faseKey
+          });
+        }
+      }
+    }
+    return out;
+  },
+
+  _localSinapiForCurrentTenant() {
+    const scopedKey = this._ck('orcamentos_sinapi');
+    let scoped = [];
+    try { scoped = JSON.parse(localStorage.getItem(scopedKey) || '[]'); } catch {}
+    if (Array.isArray(scoped) && scoped.length) return scoped;
+
+    // Antes do Patch 07 o módulo SINAPI usava uma chave global. Para outro tenant,
+    // importa somente orçamentos cuja obra pertence claramente ao tenant atual.
+    if (scopedKey !== 'orcamentos_sinapi') {
+      let legacy = [];
+      try { legacy = JSON.parse(localStorage.getItem('orcamentos_sinapi') || '[]'); } catch {}
+      const obraIds = new Set((this.getAll('clientes') || []).map(o => String(o?.id || '')).filter(Boolean));
+      const filtered = (Array.isArray(legacy) ? legacy : []).filter(o => obraIds.has(String(o?.obra_id || '')));
+      if (filtered.length) {
+        try { localStorage.setItem(scopedKey, JSON.stringify(filtered)); } catch {}
+      }
+      return filtered;
+    }
+    return Array.isArray(scoped) ? scoped : [];
+  },
+
+  async bootstrapCloudCompleteness() {
+    if (this.isCloudCompletenessBootstrapped()) return true;
+    if (!this.canWriteLocal('write')) return false;
+
+    const payload = {
+      orcamentos_sinapi: this._localSinapiForCurrentTenant(),
+      doc_fases: this._collectLocalDocPhases(),
+      preferencias: this._preferencesLocalSnapshot()
+    };
+    const meaningfulPrefs = Object.values(payload.preferencias || {}).some(v => Array.isArray(v) ? v.length > 0 : Boolean(v && v !== 'api'));
+    const total = payload.orcamentos_sinapi.length + payload.doc_fases.length + (meaningfulPrefs ? 1 : 0);
+    if (!total) {
+      try { localStorage.setItem(this._cloudCompletenessBootstrapKey(), '1'); } catch {}
+      return true;
+    }
+
+    try {
+      const body = JSON.stringify({ action:'sync_all', payload });
+      if (body.length <= 1_500_000) {
+        const res = await fetch('/api/db', { method:'POST', headers:this._apiHeaders(), body });
+        const json = await res.json().catch(() => ({}));
+        if (!res.ok || !json.success) throw new Error(json.error || `HTTP ${res.status}`);
+      } else {
+        const entries = [
+          ...payload.orcamentos_sinapi.map(item => ({ table:'orcamentos_sinapi', item })),
+          ...payload.doc_fases.map(item => ({ table:'doc_fases', item }))
+        ];
+        for (let i = 0; i < entries.length; i += 4) {
+          await Promise.all(entries.slice(i, i + 4).map(async ({ table, item }) => {
+            const res = await fetch('/api/db', { method:'POST', headers:this._apiHeaders(), body:JSON.stringify({ action:'save', table, data:item }) });
+            const json = await res.json().catch(() => ({}));
+            if (!res.ok || !json.success) throw new Error(json.error || `${table}: HTTP ${res.status}`);
+          }));
+        }
+        if (meaningfulPrefs) {
+          const res = await fetch('/api/db', { method:'POST', headers:this._apiHeaders(), body:JSON.stringify({ action:'save', table:'preferencias', data:{ preferences:payload.preferencias } }) });
+          const json = await res.json().catch(() => ({}));
+          if (!res.ok || !json.success) throw new Error(json.error || `preferencias: HTTP ${res.status}`);
+        }
+      }
+      try { localStorage.setItem(this._cloudCompletenessBootstrapKey(), '1'); } catch {}
+      console.info(`[Patch 07] ${total} conjunto(s)/registro(s) locais migrados para a nuvem.`);
+      return true;
+    } catch (err) {
+      console.warn('[Patch 07] Migração complementar para nuvem adiada:', err?.message || err);
+      return false;
+    }
   },
 
   _coreCloudBootstrapKey() {
@@ -566,6 +740,50 @@ const DB = {
         const next = !coreBootstrapped && local.length ? mergeLegacy(d.recibos, local) : d.recibos;
         try { localStorage.setItem(this._ck('finobra_recibos'), JSON.stringify(next)); } catch (e) { console.warn('[Sync] Falha ao salvar recibos em cache:', e); }
       }
+
+      const completenessBootstrapped = this.isCloudCompletenessBootstrapped ? this.isCloudCompletenessBootstrapped() : true;
+      if (Array.isArray(d.orcamentos_sinapi)) {
+        const local = this._localSinapiForCurrentTenant ? this._localSinapiForCurrentTenant() : [];
+        const next = !completenessBootstrapped && local.length ? mergeLegacy(d.orcamentos_sinapi, local) : d.orcamentos_sinapi;
+        try { localStorage.setItem(this._ck('orcamentos_sinapi'), JSON.stringify(next)); } catch (e) { console.warn('[Sync] Falha ao salvar orçamentos SINAPI em cache:', e); }
+      }
+
+      if (Array.isArray(d.doc_fases)) {
+        const cloudByObra = new Map();
+        for (const row of d.doc_fases) {
+          const obraId = String(row?.obra_id || '');
+          const faseKey = String(row?.fase_key || '');
+          const docId = String(row?.doc_id || row?.id || '');
+          if (!obraId || !faseKey || !docId) continue;
+          if (!cloudByObra.has(obraId)) cloudByObra.set(obraId, {});
+          const grouped = cloudByObra.get(obraId);
+          if (!Array.isArray(grouped[faseKey])) grouped[faseKey] = [];
+          grouped[faseKey].push({ ...row, id:docId });
+        }
+        for (const obra of (this.getAll('clientes') || [])) {
+          if (!obra?.id) continue;
+          const key = this._fasesDocKey(obra.id);
+          const cloud = cloudByObra.get(String(obra.id)) || {};
+          let next = cloud;
+          if (!completenessBootstrapped) {
+            let local = {};
+            try { local = JSON.parse(localStorage.getItem(key) || '{}'); } catch {}
+            next = { ...cloud };
+            for (const [faseKey, docs] of Object.entries(local || {})) {
+              const map = new Map((Array.isArray(cloud[faseKey]) ? cloud[faseKey] : []).map(x => [String(x.id), x]));
+              (Array.isArray(docs) ? docs : []).forEach(x => x?.id && map.set(String(x.id), x));
+              next[faseKey] = Array.from(map.values());
+            }
+          }
+          try { localStorage.setItem(key, JSON.stringify(next)); } catch (e) { console.warn('[Sync] Falha ao salvar fases documentais:', e); }
+        }
+      }
+
+      if (d.preferencias && typeof d.preferencias === 'object' && !Array.isArray(d.preferencias)) {
+        const localPrefs = this._preferencesLocalSnapshot ? this._preferencesLocalSnapshot() : {};
+        const nextPrefs = completenessBootstrapped ? d.preferencias : { ...d.preferencias, ...localPrefs };
+        this._applyTenantPreferences(nextPrefs);
+      }
       if (Array.isArray(d.documentos) && typeof Documentos !== 'undefined') {
         const locais = Documentos.getAll() || [];
         const localMap = new Map(locais.map(x => [x.id, x]));
@@ -585,7 +803,7 @@ const DB = {
           };
         });
         locais.forEach(l => {
-          const syncKey = 'finobra_cloud_uploaded_' + l.id;
+          const syncKey = this._ck('finobra_cloud_uploaded_' + l.id);
           const pendenteUpload = typeof localStorage !== 'undefined' && !localStorage.getItem(syncKey);
           if (pendenteUpload && !merged.some(m => m.id === l.id)) {
             merged.push(l);
@@ -657,12 +875,27 @@ const DB = {
     }
   },
 
+  _ackSyncQueueItem(item, { force = false } = {}) {
+    const live = this._getSyncQueue();
+    const idx = live.findIndex(q => q?.queueId === item?.queueId);
+    if (idx < 0) return live.length;
+    const expected = String(item?.updatedAt || item?.createdAt || '');
+    const current = String(live[idx]?.updatedAt || live[idx]?.createdAt || '');
+    // Se o registro foi editado novamente enquanto a requisição estava em voo,
+    // mantém a versão nova na fila em vez de apagá-la junto com a confirmação antiga.
+    if (!force && expected !== current) return live.length;
+    live.splice(idx, 1);
+    this._saveSyncQueue(live);
+    return live.length;
+  },
+
   async _flushCloudQueue() {
     if (this._syncFlushing) return;
     this._syncFlushing = true;
     try {
-      let queue = this._getSyncQueue();
-      while (queue.length) {
+      while (true) {
+        const queue = this._getSyncQueue();
+        if (!queue.length) break;
         const item = queue[0];
         let res;
         try {
@@ -684,44 +917,72 @@ const DB = {
         if (!res.ok) {
           if (String(errorJson.code || '').startsWith('ROLE_')) {
             console.warn(`[Sync] Operação rejeitada pelo perfil: ${errorJson.error || errorJson.code}`);
-            queue.shift();
-            this._saveSyncQueue(queue);
-            this._emitSyncStatus(queue.length ? 'pending' : 'synced', { rejected: true, code: errorJson.code });
+            const pending = this._ackSyncQueueItem(item, { force:true });
+            this._emitSyncStatus(pending ? 'pending' : 'synced', { rejected: true, code: errorJson.code });
             if (typeof Utils !== 'undefined' && Utils.toast) Utils.toast(errorJson.error || 'Seu perfil não permite esta operação.', 'warning');
             continue;
           }
           if (String(errorJson.code || '').startsWith('PLAN_')) {
             console.warn(`[Sync] Operação rejeitada pelo plano: ${errorJson.error || errorJson.code}`);
-            queue.shift();
-            this._saveSyncQueue(queue);
-            this._emitSyncStatus(queue.length ? 'pending' : 'synced', { rejected: true, code: errorJson.code });
+            const pending = this._ackSyncQueueItem(item, { force:true });
+            this._emitSyncStatus(pending ? 'pending' : 'synced', { rejected: true, code: errorJson.code });
             if (typeof Utils !== 'undefined' && Utils.toast) Utils.toast(errorJson.error || 'Operação não permitida pelo plano atual.', 'warning');
             continue;
           }
+          if (res.status >= 400 && res.status < 500 && ![408, 429].includes(res.status)) {
+            console.warn(`[Sync] Operação inválida descartada (${res.status}):`, errorJson.error || `${item.payload.action}/${item.payload.table}`);
+            const pending = this._ackSyncQueueItem(item);
+            this._emitSyncStatus(pending ? 'pending' : 'synced', { rejected:true, code:errorJson.code || `HTTP_${res.status}` });
+            if (typeof Utils !== 'undefined' && Utils.toast) Utils.toast(errorJson.error || 'Uma alteração local foi rejeitada pelo servidor.', 'warning');
+            continue;
+          }
           console.warn(`[Sync] Servidor recusou ${item.payload.action}/${item.payload.table}. Tentará novamente.`);
-          this._scheduleSyncRetry(15000);
+          this._scheduleSyncRetry(res.status === 429 ? 30000 : 15000);
           break;
         }
 
-        queue.shift();
-        this._saveSyncQueue(queue);
-        this._emitSyncStatus(queue.length ? 'pending' : 'synced');
+        const pending = this._ackSyncQueueItem(item);
+        this._emitSyncStatus(pending ? 'pending' : 'synced');
       }
     } finally {
       this._syncFlushing = false;
+      if (this.getSyncPendingCount() > 0) this._scheduleSyncRetry(5000);
     }
   },
 
   syncToCloud(action, table, data, id) {
-    const cloudTables = ['lancamentos', 'notas', 'notas_fiscais', 'obras', 'clientes', 'fornecedores', 'documentos', 'produtos', 'ocr_historico', 'contas', 'contas_bancarias', 'precompras', 'contratos', 'recibos'];
+    const cloudTables = ['lancamentos', 'notas', 'notas_fiscais', 'obras', 'clientes', 'fornecedores', 'documentos', 'produtos', 'ocr_historico', 'contas', 'contas_bancarias', 'precompras', 'contratos', 'recibos', 'orcamentos_sinapi', 'doc_fases', 'preferencias'];
     if (!cloudTables.includes(table)) return;
     const payload = { action, table, data, id };
-    const queue = this._getSyncQueue();
-    queue.push({
-      queueId: (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : `${Date.now()}_${Math.random()}`,
-      createdAt: new Date().toISOString(),
-      payload
-    });
+    let queue = this._getSyncQueue();
+    const entityId = String(id || data?.cloud_id || data?.id || (table === 'preferencias' ? '__tenant_preferences__' : '') || '');
+
+    // Coalesce saves: enquanto offline, várias edições do mesmo registro viram apenas a versão mais recente.
+    if (action === 'save' && entityId) {
+      const idx = queue.findIndex(q => q?.payload?.action === 'save' && q?.payload?.table === table && String(q?.payload?.id || q?.payload?.data?.cloud_id || q?.payload?.data?.id || (table === 'preferencias' ? '__tenant_preferences__' : '')) === entityId);
+      if (idx >= 0) {
+        if (table === 'preferencias') {
+          const prev = queue[idx].payload?.data?.preferences || {};
+          payload.data = { preferences: { ...prev, ...(data?.preferences || {}) } };
+        }
+        queue[idx] = { ...queue[idx], updatedAt:new Date().toISOString(), payload };
+      } else {
+        queue.push({
+          queueId: (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : `${Date.now()}_${Math.random()}`,
+          createdAt: new Date().toISOString(),
+          payload
+        });
+      }
+    } else {
+      if (action === 'delete' && entityId) {
+        queue = queue.filter(q => !(q?.payload?.table === table && String(q?.payload?.id || q?.payload?.data?.cloud_id || q?.payload?.data?.id || '') === entityId));
+      }
+      queue.push({
+        queueId: (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : `${Date.now()}_${Math.random()}`,
+        createdAt: new Date().toISOString(),
+        payload
+      });
+    }
     this._saveSyncQueue(queue);
     this._emitSyncStatus('pending');
     this._flushCloudQueue();
@@ -737,15 +998,45 @@ const DB = {
         contas: this.getAll('contas'),
         precompras: this.getAll('precompras'),
         contratos: this.getAll('contratos'),
-        recibos: (() => { try { return JSON.parse(localStorage.getItem(this._ck('finobra_recibos')) || '[]'); } catch { return []; } })()
+        recibos: (() => { try { return JSON.parse(localStorage.getItem(this._ck('finobra_recibos')) || '[]'); } catch { return []; } })(),
+        orcamentos_sinapi: this._localSinapiForCurrentTenant ? this._localSinapiForCurrentTenant() : [],
+        doc_fases: this._collectLocalDocPhases ? this._collectLocalDocPhases() : [],
+        preferencias: this._preferencesLocalSnapshot ? this._preferencesLocalSnapshot() : {}
       };
-      const res = await fetch('/api/db', {
-        method: 'POST',
-        headers: this._apiHeaders(),
-        body: JSON.stringify({ action: 'sync_all', payload })
-      });
-      const data = await res.json();
-      return data;
+      const body = JSON.stringify({ action: 'sync_all', payload });
+      if (body.length <= 1_500_000) {
+        const res = await fetch('/api/db', { method:'POST', headers:this._apiHeaders(), body });
+        return await res.json();
+      }
+
+      let synced = 0;
+      const entries = [];
+      for (const [table, items] of Object.entries(payload)) {
+        if (table === 'preferencias') continue;
+        for (const item of (Array.isArray(items) ? items : [])) entries.push({ table, item });
+      }
+      for (let i = 0; i < entries.length; i += 4) {
+        const results = await Promise.all(entries.slice(i, i + 4).map(async ({ table, item }) => {
+          const res = await fetch('/api/db', {
+            method:'POST', headers:this._apiHeaders(),
+            body:JSON.stringify({ action:'save', table, data:item })
+          });
+          const json = await res.json().catch(() => ({}));
+          if (!res.ok || !json.success) throw new Error(json.error || `${table}: HTTP ${res.status}`);
+          return 1;
+        }));
+        synced += results.reduce((a,b) => a+b, 0);
+      }
+      if (payload.preferencias && typeof payload.preferencias === 'object') {
+        const res = await fetch('/api/db', {
+          method:'POST', headers:this._apiHeaders(),
+          body:JSON.stringify({ action:'save', table:'preferencias', data:{ preferences:payload.preferencias } })
+        });
+        const json = await res.json().catch(() => ({}));
+        if (!res.ok || !json.success) throw new Error(json.error || `preferencias: HTTP ${res.status}`);
+        synced++;
+      }
+      return { success:true, synced };
     } catch (e) {
       console.error('Erro ao sincronizar tudo para o Neon:', e);
       return { success: false, error: e.message };
