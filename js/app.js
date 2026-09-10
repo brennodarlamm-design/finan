@@ -192,7 +192,8 @@ const App = {
         }
         // Só decide onboarding depois de tentar carregar o tenant real do servidor.
         const empAtual = DB.getEmpresa();
-        if (!empAtual.configurada) setTimeout(() => this.showOnboardingEmpresa(), 350);
+        const isImpersonating = (typeof Auth !== 'undefined' && Auth.getUser) ? (Auth.getUser()?.impersonatedBy === 'superadmin' || Auth.getUser()?.isImpersonated) : false;
+        if (!empAtual.configurada && !isImpersonating) setTimeout(() => this.showOnboardingEmpresa(), 350);
       });
     });
 
@@ -310,6 +311,17 @@ const App = {
         </aside>
 
         <div style="flex:1;display:flex;flex-direction:column;min-width:0;">
+          ${(u?.impersonatedBy === 'superadmin' || u?.isImpersonated) ? `
+            <div style="background:linear-gradient(90deg, #b45309, #d97706);color:#fff;padding:8px 18px;display:flex;align-items:center;justify-content:space-between;font-size:.82rem;box-shadow:0 2px 8px rgba(0,0,0,.3);z-index:90;flex-wrap:wrap;gap:8px;">
+              <div style="display:flex;align-items:center;gap:8px;font-weight:700;">
+                <span style="font-size:1.1rem;">👁️</span>
+                <span>MODO SUPORTE MASTER: Visualizando como <strong>${brandName}</strong> (Dados 100% isolados)</span>
+              </div>
+              <button onclick="App.sairModoSuporte()" style="background:#fff;color:#78350f;border:none;padding:5px 12px;border-radius:6px;font-weight:800;font-size:.78rem;cursor:pointer;display:inline-flex;align-items:center;gap:6px;transition:opacity .15s;" onmouseover="this.style.opacity='.9'" onmouseout="this.style.opacity='1'">
+                <span>←</span><span>Voltar ao Painel Master</span>
+              </button>
+            </div>
+          ` : ''}
           <header class="main-header" id="main-header">
             <button class="icon-btn" id="mob-menu" onclick="App.toggleSidebar()" title="Recolher / Expandir Menu Lateral (Ctrl+B)">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
@@ -824,6 +836,21 @@ const App = {
   },
 
   registerChart(c) { this._charts.push(c); },
+
+  sairModoSuporte() {
+    const backupToken = sessionStorage.getItem('finobra_master_backup_token');
+    const backupSession = sessionStorage.getItem('finobra_master_backup_session');
+    if (backupToken && backupSession) {
+      localStorage.setItem('finobra_token', backupToken);
+      sessionStorage.setItem('finobra_token', backupToken);
+      localStorage.setItem('finobra_session', backupSession);
+      sessionStorage.setItem('finobra_session', backupSession);
+      sessionStorage.removeItem('finobra_master_backup_token');
+      sessionStorage.removeItem('finobra_master_backup_session');
+      sessionStorage.setItem('finobra_master_logged', 'true');
+    }
+    window.location.href = '/master.html';
+  },
 
   // ── Loader de Sincronização ────────────────────────────────────────────────
   _showSyncLoader() {

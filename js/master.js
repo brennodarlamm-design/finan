@@ -503,34 +503,51 @@ const MasterAdmin = {
       </tr>`;
   },
 
-  // ── IMPERSONATE: ACESSAR COMO A EMPRESA PARA SUPORTE ───────────────────────
-  impersonarEmpresa(tenantId) {
+  async impersonarEmpresa(tenantId) {
     const empresas = this.getEmpresas();
     const emp = empresas.find(e => e.id === tenantId);
-    if (!emp) return;
+    const nomeEmp = emp ? (emp.nome_fantasia || emp.razao_social) : tenantId;
 
-    if (confirm(`Deseja alternar a visualização para a empresa "${emp.nome_fantasia}" para prestar suporte?`)) {
-      const currentToken = (typeof Auth !== 'undefined' && Auth.getToken()) || '';
-      const session = {
-        userId: 'u_support_' + tenantId,
-        username: 'master_admin',
-        nome: `Suporte Master (${emp.nome_fantasia})`,
-        perfil: 'superadmin',
-        avatar: (emp.nome_fantasia || 'SU').slice(0, 2).toUpperCase(),
-        tenantId: emp.id,
-        empresaNome: emp.nome_fantasia,
-        impersonatedBy: 'superadmin',
-        loginAt: new Date().toISOString()
-      };
+    if (!confirm(`Deseja alternar a visualização para a empresa "${nomeEmp}" para prestar suporte?\n\nOs dados da tela serão isolados exclusivamente para esta empresa.`)) {
+      return;
+    }
 
-      localStorage.setItem('finobra_session', JSON.stringify(session));
-      sessionStorage.setItem('finobra_session', JSON.stringify(session));
-      if (currentToken) {
-        localStorage.setItem('finobra_token', currentToken);
-        sessionStorage.setItem('finobra_token', currentToken);
+    try {
+      if (typeof Utils !== 'undefined' && Utils.toast) {
+        Utils.toast('Alternando ambiente para a empresa...', 'info');
       }
-      alert(`Você agora está visualizando como ${emp.nome_fantasia}.`);
+
+      // 1. Guarda backup seguro da sessão master para retorno sem necessidade de relogar
+      const currentToken = (typeof Auth !== 'undefined' && Auth.getToken()) || '';
+      const currentSession = (typeof Auth !== 'undefined' && Auth.getSession()) || {};
+      if (currentToken) {
+        sessionStorage.setItem('finobra_master_backup_token', currentToken);
+        sessionStorage.setItem('finobra_master_backup_session', JSON.stringify(currentSession));
+      }
+
+      // 2. Solicita token oficial de suporte ao backend
+      const res = await fetch('/api/admin?action=impersonate', {
+        method: 'POST',
+        headers: (typeof Auth !== 'undefined' && Auth.getAuthHeaders) ? Auth.getAuthHeaders() : { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tenantId })
+      });
+
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.success) {
+        alert(data.error || 'Não foi possível acessar os dados da empresa solicitada.');
+        return;
+      }
+
+      // 3. Aplica o novo token e a sessão oficial autenticada
+      localStorage.setItem('finobra_token', data.token);
+      sessionStorage.setItem('finobra_token', data.token);
+      localStorage.setItem('finobra_session', JSON.stringify(data.session));
+      sessionStorage.setItem('finobra_session', JSON.stringify(data.session));
+
+      // 4. Redireciona para o dashboard com o escopo isolado
       window.location.href = '/app/dashboard';
+    } catch (err) {
+      alert('Erro de comunicação ao acessar a empresa: ' + err.message);
     }
   },
 

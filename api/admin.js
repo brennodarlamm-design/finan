@@ -3,7 +3,7 @@
 
 import { neon } from '@neondatabase/serverless';
 import crypto from 'crypto';
-import { hashPassword, resolveAuthAndTenant } from './_auth.js';
+import { hashPassword, resolveAuthAndTenant, signToken } from './_auth.js';
 import { writeAudit } from './_audit.js';
 
 function getSql() {
@@ -300,6 +300,65 @@ export default async function handler(req, res) {
         success: true,
         message: 'Dados da construtora atualizados com sucesso no Neon!',
         tenant: afterRows[0]
+      });
+    }
+
+    // ── 4. POST ?action=impersonate (Gerar Token Seguro para Visualização de Suporte) ──
+    if (req.method === 'POST' && action === 'impersonate') {
+      const { tenantId } = req.body || {};
+      if (!tenantId) {
+        return res.status(400).json({ success: false, error: 'Identificador do tenant não informado.' });
+      }
+
+      const tenantRows = await sql`
+        SELECT id, nome_fantasia, razao_social, plano, status, vencimento
+        FROM tenants
+        WHERE id = ${tenantId}
+        LIMIT 1;
+      `;
+      if (!tenantRows.length) {
+        return res.status(404).json({ success: false, error: 'Empresa solicitada não encontrada.' });
+      }
+
+      const target = tenantRows[0];
+      const secret = (process.env.API_SECRET || process.env.VERCEL_API_SECRET || '').trim();
+
+      const impersonatedToken = signToken({
+        userId: auth.user.id,
+        username: auth.user.username,
+        nome: auth.user.nome,
+        email: auth.user.email,
+        perfil: 'superadmin',
+        tenantId: target.id,
+        empresaNome: target.nome_fantasia || target.razao_social,
+        impersonated: true,
+        impersonatedBy: 'superadmin',
+        originalTenantId: auth.user.tenantId || auth.tenantId,
+        exp: Date.now() + (4 * 60 * 60 * 1000) // 4 horas
+      }, secret);
+
+      await writeAudit(sql, req, auth, {
+        acao: 'impersonate',
+        entidade: 'tenant',
+        entidadeId: target.id,
+        depois: { tenantId: target.id, empresa: target.nome_fantasia || target.razao_social }
+      });
+
+      return res.status(200).json({
+        success: true,
+        token: impersonatedToken,
+        session: {
+          userId: auth.user.id,
+          username: auth.user.username,
+          nome: auth.user.nome,
+          perfil: 'superadmin',
+          avatar: (target.nome_fantasia || 'SU').slice(0, 2).toUpperCase(),
+          tenantId: target.id,
+          empresaNome: target.nome_fantasia || target.razao_social,
+          impersonated: true,
+          impersonatedBy: 'superadmin',
+          loginAt: new Date().toISOString()
+        }
       });
     }
 

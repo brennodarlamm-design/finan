@@ -142,12 +142,40 @@ export async function resolveAuthAndTenant(req) {
     const requestedTenant = String(req.headers['x-tenant-id'] || '').trim();
     let effectiveTenantId = live.tenant_id;
 
+    if (isSuperAdmin && payload.impersonated && payload.tenantId) {
+      effectiveTenantId = payload.tenantId;
+    }
+
     if (isSuperAdmin && requestedTenant) {
       const target = await sql`SELECT id FROM tenants WHERE id = ${requestedTenant} LIMIT 1;`;
       if (!target.length) {
         return { authenticated: false, status: 404, error: 'Tenant solicitado não encontrado.' };
       }
       effectiveTenantId = requestedTenant;
+    }
+
+    let targetTenantInfo = {
+      nome_fantasia: live.nome_fantasia,
+      razao_social: live.razao_social,
+      plano: live.plano,
+      tenant_status: live.tenant_status
+    };
+
+    if (effectiveTenantId !== live.tenant_id) {
+      const targetRows = await sql`
+        SELECT nome_fantasia, razao_social, plano, status 
+        FROM tenants 
+        WHERE id = ${effectiveTenantId} 
+        LIMIT 1;
+      `;
+      if (targetRows.length) {
+        targetTenantInfo = {
+          nome_fantasia: targetRows[0].nome_fantasia,
+          razao_social: targetRows[0].razao_social,
+          plano: targetRows[0].plano,
+          tenant_status: targetRows[0].status
+        };
+      }
     }
 
     return {
@@ -163,10 +191,12 @@ export async function resolveAuthAndTenant(req) {
         nome: live.nome,
         perfil: live.perfil,
         avatar: live.avatar || (live.nome || 'US').slice(0, 2).toUpperCase(),
-        tenantId: live.tenant_id,
-        tenantStatus: live.tenant_status,
-        tenantPlan: live.plano,
-        empresaNome: live.nome_fantasia || live.razao_social || payload.empresaNome || 'Minha Empresa'
+        tenantId: effectiveTenantId,
+        realTenantId: live.tenant_id,
+        isImpersonated: effectiveTenantId !== live.tenant_id,
+        tenantStatus: targetTenantInfo.tenant_status,
+        tenantPlan: targetTenantInfo.plano,
+        empresaNome: targetTenantInfo.nome_fantasia || targetTenantInfo.razao_social || payload.empresaNome || 'Minha Empresa'
       }
     };
   } catch (err) {

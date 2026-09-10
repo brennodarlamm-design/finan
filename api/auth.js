@@ -96,6 +96,38 @@ export default async function handler(req, res) {
       }
 
       const u = users[0];
+      const effectiveTenantId = auth.tenantId || u.tenant_id;
+      let tenantData = {
+        id: u.tenant_id,
+        razao_social: u.razao_social,
+        nome_fantasia: u.nome_fantasia,
+        cnpj: u.cnpj,
+        telefone: u.telefone,
+        plano: u.plano,
+        status: u.tenant_status
+      };
+
+      if (effectiveTenantId !== u.tenant_id) {
+        const targetTenants = await sql`
+          SELECT id, razao_social, nome_fantasia, cnpj, telefone, plano, status
+          FROM tenants
+          WHERE id = ${effectiveTenantId}
+          LIMIT 1;
+        `;
+        if (targetTenants.length) {
+          const t = targetTenants[0];
+          tenantData = {
+            id: t.id,
+            razao_social: t.razao_social,
+            nome_fantasia: t.nome_fantasia,
+            cnpj: t.cnpj,
+            telefone: t.telefone,
+            plano: t.plano,
+            status: t.status
+          };
+        }
+      }
+
       return res.status(200).json({
         success: true,
         user: {
@@ -105,18 +137,12 @@ export default async function handler(req, res) {
           nome: u.nome,
           perfil: u.perfil,
           avatar: u.avatar || u.nome.slice(0, 2).toUpperCase(),
-          tenantId: u.tenant_id,
-          empresaNome: u.nome_fantasia || u.razao_social || 'Minha Empresa'
+          tenantId: effectiveTenantId,
+          realTenantId: u.tenant_id,
+          isImpersonated: effectiveTenantId !== u.tenant_id,
+          empresaNome: tenantData.nome_fantasia || tenantData.razao_social || 'Minha Empresa'
         },
-        tenant: {
-          id: u.tenant_id,
-          razao_social: u.razao_social,
-          nome_fantasia: u.nome_fantasia,
-          cnpj: u.cnpj,
-          telefone: u.telefone,
-          plano: u.plano,
-          status: u.tenant_status
-        }
+        tenant: tenantData
       });
     }
 

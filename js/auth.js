@@ -17,6 +17,10 @@ const Auth = {
     if (token) {
       headers['Authorization'] = `Bearer ${token}`;
     }
+    const tenantId = this.getCurrentTenantId();
+    if (tenantId && tenantId !== 'public') {
+      headers['x-tenant-id'] = tenantId;
+    }
     return headers;
   },
 
@@ -269,7 +273,18 @@ const Auth = {
 
   getCurrentTenantId() {
     const session = this.getSession();
-    return session?.tenantId || 'public';
+    if (session?.tenantId) return session.tenantId;
+    const token = this.getToken();
+    if (token && token.includes('.')) {
+      try {
+        const parts = token.split('.');
+        if (parts.length === 3) {
+          const payload = JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/')));
+          if (payload.tenantId) return payload.tenantId;
+        }
+      } catch {}
+    }
+    return 'angelim';
   },
 
   logout() {
