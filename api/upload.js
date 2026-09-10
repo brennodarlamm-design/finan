@@ -3,6 +3,7 @@ import { put, del, issueSignedToken, presignUrl } from '@vercel/blob';
 import { handleUpload } from '@vercel/blob/client';
 import { neon } from '@neondatabase/serverless';
 import { resolveAuthAndTenant } from './_auth.js';
+import { canWriteData, canDeleteData, permissionError } from './_permissions.js';
 
 function getSql() {
   const conn = process.env.DATABASE_URL;
@@ -73,7 +74,9 @@ export default async function handler(req, res) {
     });
   }
 
-  const tenantId = auth.tenantId || 'angelim';
+  const tenantId = auth.tenantId;
+  if (req.method === 'POST' && !canWriteData(auth)) return res.status(403).json(permissionError('ROLE_READ_ONLY'));
+  if (req.method === 'DELETE' && !canDeleteData(auth)) return res.status(403).json(permissionError('ROLE_DELETE_FORBIDDEN'));
   const configuredAccess = String(process.env.FINOBRA_BLOB_ACCESS || process.env.BLOB_ACCESS || 'public').trim().toLowerCase();
   const blobAccess = configuredAccess === 'private' ? 'private' : 'public';
 

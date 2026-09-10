@@ -3,10 +3,17 @@
 const Configuracoes = {
   _activeTab: 'empresa',
   _usersCache: null,
+  _auditCache: [],
+  _auditOffset: 0,
+  _auditHasMore: false,
 
   _esc(value) {
     if (typeof Utils !== 'undefined' && Utils.escapeHtml) return Utils.escapeHtml(String(value ?? ''));
     return String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  },
+
+  _perfilLabel(perfil) {
+    return ({ superadmin:'Superadministrador', admin:'Administrador', gestor:'Gestor', operador:'Operador', visualizador:'Visualizador' })[String(perfil || '').toLowerCase()] || 'Usuário';
   },
 
   async loadUsers() {
@@ -50,15 +57,22 @@ const Configuracoes = {
       document.head.appendChild(s);
     }
 
+    const session = Auth.getUser();
+    const isAdmin = ['admin','superadmin'].includes(session?.perfil);
+    if (!isAdmin && ['usuarios','auditoria'].includes(this._activeTab)) this._activeTab = 'empresa';
+
     return `
     <div>
       <div style="display:flex;gap:0;border-bottom:2px solid var(--border);margin-bottom:24px;overflow-x:auto;">
         <button id="cfg-tab-empresa" class="cfg-tab${this._activeTab==='empresa'?' cfg-tab-active':''}" onclick="Configuracoes._switch('empresa')">
           &#x1F3E2; Minha Empresa
         </button>
-        <button id="cfg-tab-usuarios" class="cfg-tab${this._activeTab==='usuarios'?' cfg-tab-active':''}" onclick="Configuracoes._switch('usuarios')">
+        ${isAdmin ? `<button id="cfg-tab-usuarios" class="cfg-tab${this._activeTab==='usuarios'?' cfg-tab-active':''}" onclick="Configuracoes._switch('usuarios')">
           &#x1F465; Usu&aacute;rios
-        </button>
+        </button>` : ''}
+        ${isAdmin ? `<button id="cfg-tab-auditoria" class="cfg-tab${this._activeTab==='auditoria'?' cfg-tab-active':''}" onclick="Configuracoes._switch('auditoria')">
+          &#x1F6E1;&#xFE0F; Auditoria
+        </button>` : ''}
         <button id="cfg-tab-contas" class="cfg-tab${this._activeTab==='contas'?' cfg-tab-active':''}" onclick="Configuracoes._switch('contas')">
           &#x1F3E6; Contas Banc&aacute;rias
         </button>
@@ -73,10 +87,9 @@ const Configuracoes = {
   },
 
   _switch(tab) {
-    const validTabs = ['empresa', 'usuarios', 'contas', 'categorias'];
-    if (!validTabs.includes(tab)) {
-      tab = 'empresa';
-    }
+    const isAdmin = ['admin','superadmin'].includes(Auth.getUser()?.perfil);
+    const validTabs = ['empresa', 'contas', 'categorias', ...(isAdmin ? ['usuarios','auditoria'] : [])];
+    if (!validTabs.includes(tab)) tab = 'empresa';
     this._activeTab = tab;
     document.querySelectorAll('.cfg-tab').forEach(el => el.classList.remove('cfg-tab-active'));
     const el = document.getElementById('cfg-tab-' + tab);
@@ -84,6 +97,7 @@ const Configuracoes = {
     const content = document.getElementById('cfg-content');
     if (content) content.innerHTML = this._renderTab(tab, App.obraId);
     if (tab === 'usuarios') this.loadUsers();
+    if (tab === 'auditoria') this.loadAudit(true);
     if (tab === 'empresa') this.loadEmpresaCloud();
   },
 
@@ -92,6 +106,7 @@ const Configuracoes = {
     if (tab === 'contas') return Contas._html(obraId);
     if (tab === 'categorias') return this._renderCategorias();
     if (tab === 'usuarios') return this._renderUsuarios();
+    if (tab === 'auditoria') return this._renderAuditoria();
     return this._renderEmpresa();
   },
 
@@ -533,8 +548,12 @@ const Configuracoes = {
   showMeuPerfil() {
     const session = Auth.getUser();
     const users = this._usersCache || Auth.getUsers();
-    const u = users.find(u => u.id === session?.userId || u.username === session?.username);
-    if (!u) return;
+    const u = users.find(u => u.id === session?.userId || u.username === session?.username) || {
+      id: session?.userId || session?.id,
+      username: session?.username || '', email: session?.email || '', nome: session?.nome || 'Usuário',
+      perfil: session?.perfil || 'visualizador', avatar: session?.avatar || 'US', ativo: true
+    };
+    if (!u.id) return;
     Utils.showModal(`
       <div class="modal" style="max-width:440px">
         <div class="modal-header">
@@ -545,7 +564,7 @@ const Configuracoes = {
           <div style="text-align:center;margin-bottom:20px;">
             <div class="user-av" style="width:64px;height:64px;font-size:1.5rem;margin:0 auto 12px;">${this._esc(u.avatar)}</div>
             <div style="font-weight:700;">${this._esc(u.nome)}</div>
-            <div style="color:var(--text3);font-size:.8rem;">${u.perfil === 'admin' ? 'Administrador' : 'Gestor'}</div>
+            <div style="color:var(--text3);font-size:.8rem;">${this._esc(this._perfilLabel(u.perfil))}</div>
           </div>
           <div class="form-group">
             <label class="form-label">Nome completo</label>
@@ -604,21 +623,103 @@ const Configuracoes = {
     el.innerHTML = users.map(u => this._userCard(u, session)).join('');
   },
 
+  // ── AUDITORIA ───────────────────────────────────────────
+  _renderAuditoria() {
+    return `
+    <div class="page-header">
+      <div>
+        <h1 class="page-title">🛡️ Auditoria</h1>
+        <p class="page-sub">Histórico de alterações administrativas e operacionais registradas no servidor</p>
+      </div>
+      <div class="page-actions"><button class="btn btn-secondary btn-sm" onclick="Configuracoes.loadAudit(true)">↻ Atualizar</button></div>
+    </div>
+    <div class="card" style="padding:0;overflow:hidden;">
+      <div id="audit-list" style="min-height:180px;padding:18px;color:var(--text3);">Carregando auditoria…</div>
+    </div>
+    <div style="display:flex;justify-content:center;margin-top:14px;">
+      <button id="audit-load-more" class="btn btn-secondary btn-sm" style="display:none" onclick="Configuracoes.loadAudit(false)">Carregar mais</button>
+    </div>`;
+  },
+
+  async loadAudit(reset = true) {
+    if (!['admin','superadmin'].includes(Auth.getUser()?.perfil)) return;
+    if (reset) { this._auditCache = []; this._auditOffset = 0; this._auditHasMore = false; }
+    const list = document.getElementById('audit-list');
+    if (list && reset) list.textContent = 'Carregando auditoria…';
+    try {
+      const res = await fetch(`/api/audit?limit=50&offset=${this._auditOffset}`, { headers: Auth.getAuthHeaders() });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.success || !Array.isArray(data.data)) throw new Error(data.error || 'Falha ao carregar auditoria.');
+      this._auditCache.push(...data.data);
+      this._auditOffset = Number(data.pagination?.nextOffset || this._auditCache.length);
+      this._auditHasMore = !!data.pagination?.hasMore;
+      this._refreshAudit();
+    } catch (err) {
+      if (list) list.textContent = err.message || 'Não foi possível carregar a auditoria.';
+    }
+  },
+
+  _refreshAudit() {
+    const el = document.getElementById('audit-list');
+    if (!el) return;
+    const rows = this._auditCache || [];
+    if (!rows.length) {
+      el.innerHTML = '<div style="padding:28px;text-align:center;color:var(--text3);">Nenhum evento de auditoria registrado ainda.</div>';
+    } else {
+      el.innerHTML = `<div class="tbl-wrap" style="border:none;"><table>
+        <thead><tr><th>Data</th><th>Usuário</th><th>Ação</th><th>Entidade</th><th>Registro</th><th>Origem</th><th></th></tr></thead>
+        <tbody>${rows.map(r => {
+          const id = this._esc(r.id || '');
+          const data = r.created_at ? new Date(r.created_at).toLocaleString('pt-BR') : '—';
+          return `<tr>
+            <td style="white-space:nowrap;font-size:.78rem;">${this._esc(data)}</td>
+            <td><strong>${this._esc(r.usuario_nome || 'Sistema')}</strong><div style="font-size:.7rem;color:var(--text3);">${this._esc(r.usuario_username || '')}</div></td>
+            <td><span class="badge badge-secondary">${this._esc(r.acao || '—')}</span></td>
+            <td>${this._esc(r.entidade || '—')}</td>
+            <td style="font-family:monospace;font-size:.72rem;max-width:160px;overflow:hidden;text-overflow:ellipsis;">${this._esc(r.entidade_id || '—')}</td>
+            <td style="font-size:.72rem;color:var(--text3);">${this._esc(r.ip || '—')}</td>
+            <td><button class="btn btn-ghost btn-sm" onclick="Configuracoes.showAuditDetail('${id}')">Detalhes</button></td>
+          </tr>`;
+        }).join('')}</tbody>
+      </table></div>`;
+    }
+    const more = document.getElementById('audit-load-more');
+    if (more) more.style.display = this._auditHasMore ? '' : 'none';
+  },
+
+  showAuditDetail(id) {
+    const r = (this._auditCache || []).find(x => String(x.id) === String(id));
+    if (!r) return;
+    const pretty = v => this._esc(JSON.stringify(v || {}, null, 2));
+    Utils.showModal(`<div class="modal" style="max-width:720px;">
+      <div class="modal-header"><span class="modal-title">🛡️ Detalhes da Auditoria</span><button class="modal-close" onclick="Utils.closeModal()">✕</button></div>
+      <div class="modal-body">
+        <div class="g2" style="margin-bottom:14px;"><div><strong>Ação:</strong> ${this._esc(r.acao)}</div><div><strong>Entidade:</strong> ${this._esc(r.entidade)}</div></div>
+        <div style="margin-bottom:8px;"><strong>Antes</strong></div><pre style="white-space:pre-wrap;background:var(--bg);padding:12px;border-radius:8px;max-height:220px;overflow:auto;font-size:.75rem;">${pretty(r.dados_anteriores)}</pre>
+        <div style="margin:14px 0 8px;"><strong>Depois</strong></div><pre style="white-space:pre-wrap;background:var(--bg);padding:12px;border-radius:8px;max-height:220px;overflow:auto;font-size:.75rem;">${pretty(r.dados_novos)}</pre>
+      </div>
+    </div>`);
+  },
+
   // ── CATEGORIAS ─────────────────────────────────────────
   _renderCategorias() {
     const EMOJIS = ['🏷️','🌟','⚡','🔑','📌','🎨','🛒','💼','🌿','🔩','📐','🎯','💡','🚀','🏆','📣','🤝','🔐','🧹','🏥','🎓','🌎','🏃'];
 
     const makeTable = (custom, tipo) => {
       if (!custom.length) return `<tr><td colspan="4" style="text-align:center;color:var(--text3);padding:16px;font-size:.82rem;">Nenhuma categoria personalizada criada ainda.</td></tr>`;
-      return custom.map(c => `
+      return custom.map(c => {
+        const safeValue = String(c.value || '');
+        const encodedValue = encodeURIComponent(safeValue);
+        return `
         <tr>
-          <td style="font-size:1.1rem;width:40px;text-align:center;">${c.emoji || '🏷️'}</td>
-          <td style="font-weight:600;">${c.label}</td>
-          <td style="font-family:monospace;font-size:.75rem;color:var(--text3);">${c.value}</td>
+          <td style="font-size:1.1rem;width:40px;text-align:center;">${this._esc(c.emoji || '🏷️')}</td>
+          <td style="font-weight:600;">${this._esc(c.label || '')}</td>
+          <td style="font-family:monospace;font-size:.75rem;color:var(--text3);">${this._esc(safeValue)}</td>
           <td style="text-align:center;">
-            <button class="icon-btn" onclick="Configuracoes.excluirCategoria('${c.value}','${tipo}')" title="Excluir" style="color:var(--danger);">🗑️</button>
+            <button class="icon-btn" onclick="Configuracoes.excluirCategoria(decodeURIComponent('${encodedValue}'),'${tipo}')" title="Excluir" style="color:var(--danger);">🗑️</button>
           </td>
-        </tr>`).join('');
+        </tr>`;
+      }).join('');
     };
 
     const makeEmojiSelect = (id) =>
@@ -818,7 +919,11 @@ const Configuracoes = {
     }
   },
 
-  init() {}
+  init() {
+    if (this._activeTab === 'usuarios') this.loadUsers();
+    else if (this._activeTab === 'auditoria') this.loadAudit(true);
+    else if (this._activeTab === 'empresa') this.loadEmpresaCloud();
+  }
 };
 
 // Limpa qualquer flag antiga de dev mode que possa ter ficado no browser

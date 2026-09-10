@@ -4,6 +4,8 @@ import { neon } from '@neondatabase/serverless';
 import { resolveAuthAndTenant } from './_auth.js';
 import { checkRateLimit, getClientIp } from './_ratelimit.js';
 import { canUseFeature, planError } from './_plans.js';
+import { canWriteData, permissionError } from './_permissions.js';
+import { writeAudit } from './_audit.js';
 
 function getSql() {
   if (!process.env.DATABASE_URL) throw new Error('DATABASE_URL não configurada.');
@@ -104,6 +106,7 @@ export default async function handler(req, res) {
     if (req.method === 'POST') {
       const auth = await resolveAuthAndTenant(req);
       if (!auth.authenticated) return res.status(auth.status || 401).json({ success: false, error: auth.error || 'Não autorizado.' });
+      if (!canWriteData(auth)) return res.status(403).json(permissionError('ROLE_READ_ONLY'));
       if (!auth.isSystem && auth.user?.perfil !== 'superadmin' && !canUseFeature(auth.user?.tenantPlan, 'signatures')) {
         return res.status(403).json(planError('signatures', auth.user?.tenantPlan));
       }
@@ -143,6 +146,10 @@ export default async function handler(req, res) {
         throw err;
       }
 
+      await writeAudit(sql, req, auth, {
+        acao: 'assinar', entidade: clean(b.doc_tipo,50) || 'documento', entidadeId: clean(b.doc_id,64) || codigo,
+        depois: { codigo_validacao: codigo, hash_sha256: hash, papel: clean(b.papel,120) || null, doc_numero: clean(b.doc_numero,100) || null }
+      });
       return res.status(201).json({ success: true, codigo_validacao: codigo });
     }
 

@@ -127,7 +127,22 @@ const DB = {
     }
   },
   getById(key, id) { return this.getAll(key).find(i => i.id === id) || null; },
+
+  canWriteLocal(action = 'write') {
+    const role = String((typeof Auth !== 'undefined' && Auth.getUser && Auth.getUser()?.perfil) || 'visualizador').toLowerCase();
+    if (['admin','superadmin','gestor'].includes(role)) return true;
+    if (role === 'operador') return action !== 'delete';
+    return false;
+  },
+
+  _denyLocal(action = 'write') {
+    const msg = action === 'delete' ? 'Seu perfil não permite excluir registros.' : 'Seu perfil é somente leitura e não permite alterar dados.';
+    if (typeof Utils !== 'undefined' && Utils.toast) Utils.toast(msg, 'warning');
+    return null;
+  },
+
   add(key, item) {
+    if (!this.canWriteLocal('write')) return this._denyLocal('write');
     const data = this.getAll(key);
     item.id = item.id || this.uuid();
     item.created_at = item.created_at || new Date().toISOString();
@@ -137,6 +152,7 @@ const DB = {
     return item;
   },
   update(key, id, updates) {
+    if (!this.canWriteLocal('write')) return this._denyLocal('write');
     const data = this.getAll(key);
     const idx = data.findIndex(i => i.id === id);
     if (idx === -1) return null;
@@ -146,8 +162,10 @@ const DB = {
     return data[idx];
   },
   remove(key, id) {
+    if (!this.canWriteLocal('delete')) return this._denyLocal('delete');
     this.save(key, this.getAll(key).filter(i => i.id !== id));
     this.syncToCloud('delete', key, null, id);
+    return true;
   },
   uuid() { return (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : (Date.now().toString(36) + Math.random().toString(36).substr(2, 9)); },
 
@@ -370,7 +388,10 @@ const DB = {
           || Number(c.notas || 0) > 800
           || Number(c.documentos || 0) > 800
           || Number(c.orcamentos || 0) > 800
-          || Number(c.medicoes || 0) > 800;
+          || Number(c.medicoes || 0) > 800
+          || Number(c.precompras || 0) > 800
+          || Number(c.contratos || 0) > 500
+          || Number(c.recibos || 0) > 800;
       }
     } catch (e) {
       console.warn('[Sync] Manifesto indisponível; usando sincronização compatível:', e?.message || e);
@@ -389,7 +410,7 @@ const DB = {
     }
 
     console.info('[Sync] Base grande detectada. Usando sincronização paginada.');
-    const [clientes, fornecedores, lancamentos, notas, orcamentos, medicoes, documentos, produtos, contas] = await Promise.all([
+    const [clientes, fornecedores, lancamentos, notas, orcamentos, medicoes, documentos, produtos, contas, precompras, contratos, recibos] = await Promise.all([
       this._fetchCloudTablePaged('clientes'),
       this._fetchCloudTablePaged('fornecedores'),
       this._fetchCloudTablePaged('lancamentos'),
@@ -398,9 +419,68 @@ const DB = {
       this._fetchCloudTablePaged('medicoes'),
       this._fetchCloudTablePaged('documentos'),
       this._fetchCloudTablePaged('produtos'),
-      this._fetchCloudTablePaged('contas')
+      this._fetchCloudTablePaged('contas'),
+      this._fetchCloudTablePaged('precompras'),
+      this._fetchCloudTablePaged('contratos'),
+      this._fetchCloudTablePaged('recibos')
     ]);
-    return { clientes, fornecedores, lancamentos, notas, orcamentos, medicoes, documentos, produtos, contas };
+    return { clientes, fornecedores, lancamentos, notas, orcamentos, medicoes, documentos, produtos, contas, precompras, contratos, recibos };
+  },
+
+  _coreCloudBootstrapKey() {
+    return `finobra_${this._t()}_patch05_core_cloud_bootstrap`;
+  },
+
+  isCoreCloudBootstrapped() {
+    try { return localStorage.getItem(this._coreCloudBootstrapKey()) === '1'; } catch { return false; }
+  },
+
+  async bootstrapCoreCloud() {
+    if (this.isCoreCloudBootstrapped()) return true;
+    if (!this.canWriteLocal('write')) return false;
+    const payload = {
+      precompras: this.getAll('precompras'),
+      contratos: this.getAll('contratos'),
+      recibos: (() => { try { return JSON.parse(localStorage.getItem(this._ck('finobra_recibos')) || '[]'); } catch { return []; } })()
+    };
+    const total = Object.values(payload).reduce((n, arr) => n + (Array.isArray(arr) ? arr.length : 0), 0);
+    if (!total) {
+      try { localStorage.setItem(this._coreCloudBootstrapKey(), '1'); } catch {}
+      return true;
+    }
+    try {
+      const bulkBody = JSON.stringify({ action: 'sync_all', payload });
+      // Vercel limita o corpo das funções. Assinaturas desenhadas podem deixar contratos grandes;
+      // acima de ~1,5 MB migra registro a registro para evitar falha por tamanho do payload.
+      if (bulkBody.length <= 1_500_000) {
+        const res = await fetch('/api/db', { method: 'POST', headers: this._apiHeaders(), body: bulkBody });
+        const json = await res.json().catch(() => ({}));
+        if (!res.ok || !json.success) throw new Error(json.error || `HTTP ${res.status}`);
+      } else {
+        const entries = [];
+        for (const [table, items] of Object.entries(payload)) {
+          for (const item of (Array.isArray(items) ? items : [])) entries.push({ table, item });
+        }
+        const concurrency = 4;
+        for (let i = 0; i < entries.length; i += concurrency) {
+          const batch = entries.slice(i, i + concurrency);
+          await Promise.all(batch.map(async ({ table, item }) => {
+            const res = await fetch('/api/db', {
+              method: 'POST', headers: this._apiHeaders(),
+              body: JSON.stringify({ action: 'save', table, data: item })
+            });
+            const json = await res.json().catch(() => ({}));
+            if (!res.ok || !json.success) throw new Error(json.error || `${table}: HTTP ${res.status}`);
+          }));
+        }
+      }
+      try { localStorage.setItem(this._coreCloudBootstrapKey(), '1'); } catch {}
+      console.info(`[Patch 05] ${total} registro(s) locais migrados para a nuvem.`);
+      return true;
+    } catch (err) {
+      console.warn('[Patch 05] Migração inicial para nuvem adiada:', err?.message || err);
+      return false;
+    }
   },
 
   async syncFromCloud() {
@@ -462,6 +542,29 @@ const DB = {
       }
       if (Array.isArray(d.produtos)) {
         this.save('produtos', d.produtos);
+      }
+      const coreBootstrapped = this.isCoreCloudBootstrapped();
+      const mergeLegacy = (cloud, local) => {
+        const map = new Map();
+        (Array.isArray(cloud) ? cloud : []).forEach(x => x?.id && map.set(String(x.id), x));
+        // Enquanto a migração inicial não terminou, o registro local vence no mesmo ID.
+        // Isso preserva edições legadas que ainda não chegaram ao servidor.
+        (Array.isArray(local) ? local : []).forEach(x => x?.id && map.set(String(x.id), x));
+        return Array.from(map.values());
+      };
+      if (Array.isArray(d.precompras)) {
+        const local = this.getAll('precompras');
+        this.save('precompras', !coreBootstrapped && local.length ? mergeLegacy(d.precompras, local) : d.precompras);
+      }
+      if (Array.isArray(d.contratos)) {
+        const local = this.getAll('contratos');
+        this.save('contratos', !coreBootstrapped && local.length ? mergeLegacy(d.contratos, local) : d.contratos);
+      }
+      if (Array.isArray(d.recibos)) {
+        let local = [];
+        try { local = JSON.parse(localStorage.getItem(this._ck('finobra_recibos')) || '[]'); } catch {}
+        const next = !coreBootstrapped && local.length ? mergeLegacy(d.recibos, local) : d.recibos;
+        try { localStorage.setItem(this._ck('finobra_recibos'), JSON.stringify(next)); } catch (e) { console.warn('[Sync] Falha ao salvar recibos em cache:', e); }
       }
       if (Array.isArray(d.documentos) && typeof Documentos !== 'undefined') {
         const locais = Documentos.getAll() || [];
@@ -573,12 +676,20 @@ const DB = {
           break;
         }
 
-        if (res.status === 401 || res.status === 403) {
+        const errorJson = !res.ok ? await res.clone().json().catch(() => ({})) : {};
+        if (res.status === 401 || (res.status === 403 && !String(errorJson.code || '').startsWith('ROLE_') && !String(errorJson.code || '').startsWith('PLAN_'))) {
           if (typeof Auth !== 'undefined' && Auth.handleSessionExpired) Auth.handleSessionExpired();
           break;
         }
         if (!res.ok) {
-          const errorJson = await res.clone().json().catch(() => ({}));
+          if (String(errorJson.code || '').startsWith('ROLE_')) {
+            console.warn(`[Sync] Operação rejeitada pelo perfil: ${errorJson.error || errorJson.code}`);
+            queue.shift();
+            this._saveSyncQueue(queue);
+            this._emitSyncStatus(queue.length ? 'pending' : 'synced', { rejected: true, code: errorJson.code });
+            if (typeof Utils !== 'undefined' && Utils.toast) Utils.toast(errorJson.error || 'Seu perfil não permite esta operação.', 'warning');
+            continue;
+          }
           if (String(errorJson.code || '').startsWith('PLAN_')) {
             console.warn(`[Sync] Operação rejeitada pelo plano: ${errorJson.error || errorJson.code}`);
             queue.shift();
@@ -602,7 +713,7 @@ const DB = {
   },
 
   syncToCloud(action, table, data, id) {
-    const cloudTables = ['lancamentos', 'notas', 'notas_fiscais', 'obras', 'clientes', 'fornecedores', 'documentos', 'produtos', 'ocr_historico', 'contas', 'contas_bancarias'];
+    const cloudTables = ['lancamentos', 'notas', 'notas_fiscais', 'obras', 'clientes', 'fornecedores', 'documentos', 'produtos', 'ocr_historico', 'contas', 'contas_bancarias', 'precompras', 'contratos', 'recibos'];
     if (!cloudTables.includes(table)) return;
     const payload = { action, table, data, id };
     const queue = this._getSyncQueue();
@@ -623,7 +734,10 @@ const DB = {
         fornecedores: this.getAll('fornecedores'),
         lancamentos: this.getAll('lancamentos'),
         notas: this.getAll('notas'),
-        contas: this.getAll('contas')
+        contas: this.getAll('contas'),
+        precompras: this.getAll('precompras'),
+        contratos: this.getAll('contratos'),
+        recibos: (() => { try { return JSON.parse(localStorage.getItem(this._ck('finobra_recibos')) || '[]'); } catch { return []; } })()
       };
       const res = await fetch('/api/db', {
         method: 'POST',

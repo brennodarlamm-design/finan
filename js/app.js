@@ -178,20 +178,22 @@ const App = {
     this.navigate(initialRoute, true);
 
     // Atualiza em segundo plano. Após concluir, redesenha a tela atual com dados frescos.
-    DB.syncFromCloud().then(async (ok) => {
-      if (ok) {
-        const current = this.route || initialRoute;
-        this.renderShell();
-        this._bindSyncStatus();
-        this.navigate(current, false);
-        this.refreshObraSelector();
-      }
-      if (typeof Assinador !== 'undefined' && Assinador.sincronizarAssinaturasPendentes) {
-        Assinador.sincronizarAssinaturasPendentes().catch(() => {});
-      }
-      // Só decide onboarding depois de tentar carregar o tenant real do servidor.
-      const empAtual = DB.getEmpresa();
-      if (!empAtual.configurada) setTimeout(() => this.showOnboardingEmpresa(), 350);
+    Promise.resolve(DB.bootstrapCoreCloud ? DB.bootstrapCoreCloud() : true).then(() => {
+      DB.syncFromCloud().then(async (ok) => {
+        if (ok) {
+          const current = this.route || initialRoute;
+          this.renderShell();
+          this._bindSyncStatus();
+          this.navigate(current, false);
+          this.refreshObraSelector();
+        }
+        if (typeof Assinador !== 'undefined' && Assinador.sincronizarAssinaturasPendentes) {
+          Assinador.sincronizarAssinaturasPendentes().catch(() => {});
+        }
+        // Só decide onboarding depois de tentar carregar o tenant real do servidor.
+        const empAtual = DB.getEmpresa();
+        if (!empAtual.configurada) setTimeout(() => this.showOnboardingEmpresa(), 350);
+      });
     });
 
     if (typeof BuscaGlobal !== 'undefined') BuscaGlobal.init();
@@ -583,19 +585,22 @@ const App = {
   showUserMenu() {
     const u = Auth.getUser();
     const emp = DB.getEmpresa();
+    const e = v => Utils.escapeHtml(String(v ?? ''));
+    const roleLabel = ({superadmin:'Superadministrador',admin:'Administrador',gestor:'Gestor',operador:'Operador',visualizador:'Visualizador'})[String(u?.perfil || '').toLowerCase()] || 'Usuário';
+    const canAdmin = ['admin','superadmin'].includes(String(u?.perfil || '').toLowerCase());
     Utils.showModal(`
       <div class="modal" style="max-width:360px">
         <div class="modal-header"><span class="modal-title">👤 Minha Conta</span><button class="modal-close" onclick="Utils.closeModal()">✕</button></div>
         <div class="modal-body" style="text-align:center;">
-          <div class="user-av" style="width:60px;height:60px;font-size:1.4rem;margin:0 auto 12px;">${u?.avatar}</div>
-          <div style="font-weight:800;font-size:1.05rem;">${u?.nome}</div>
-          <div style="color:var(--accent2);font-size:.84rem;margin-top:2px;font-weight:600;">${emp.nome_fantasia || emp.razao_social || 'Minha Empresa'}</div>
-          <div style="color:var(--text3);font-size:.75rem;margin-top:4px;margin-bottom:16px;">${u?.perfil==='admin'?'Administrador':'Gestor'} &middot; Logado: ${Utils.fmt.datetime(u?.loginAt)}</div>
+          <div class="user-av" style="width:60px;height:60px;font-size:1.4rem;margin:0 auto 12px;">${e(u?.avatar || 'US')}</div>
+          <div style="font-weight:800;font-size:1.05rem;">${e(u?.nome || 'Usuário')}</div>
+          <div style="color:var(--accent2);font-size:.84rem;margin-top:2px;font-weight:600;">${e(emp.nome_fantasia || emp.razao_social || 'Minha Empresa')}</div>
+          <div style="color:var(--text3);font-size:.75rem;margin-top:4px;margin-bottom:16px;">${e(roleLabel)} &middot; Logado: ${Utils.fmt.datetime(u?.loginAt)}</div>
           
           <div style="display:flex;flex-direction:column;gap:8px;text-align:left;">
-            <button class="btn btn-secondary btn-block" onclick="Utils.closeModal();App.showOnboardingEmpresa()">
+            ${canAdmin ? `<button class="btn btn-secondary btn-block" onclick="Utils.closeModal();App.showOnboardingEmpresa()">
               🏢 Dados &amp; Logotipo da Empresa
-            </button>
+            </button>` : ''}
             <button class="btn btn-secondary btn-block" onclick="Utils.closeModal();Configuracoes.showMeuPerfil()">
               👤 Meu Perfil / Alterar Senha
             </button>

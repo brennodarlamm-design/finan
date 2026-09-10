@@ -1,0 +1,82 @@
+FINOBRA — PATCH 05
+===================
+
+OBJETIVO
+--------
+Este patch fortalece o SaaS em quatro frentes:
+1) permissões reais por perfil no backend;
+2) auditoria visível para administradores;
+3) dashboard com snapshot leve calculado no Neon;
+4) persistência no Neon de Pré-Compras, Contratos e Recibos que antes dependiam do navegador.
+
+ORDEM DE APLICAÇÃO (IMPORTANTE)
+-------------------------------
+1. Faça backup do projeto e, de preferência, um snapshot/backup do banco Neon.
+2. ANTES do deploy, abra o SQL Editor do Neon e execute UMA VEZ:
+   migrations/004_core_records_cloud.sql
+3. Copie todo o conteúdo deste patch para a raiz do projeto FinObra.
+4. Confirme a substituição dos arquivos existentes.
+5. Faça o deploy normal na Vercel.
+6. No primeiro acesso após o deploy, entre como ADMINISTRADOR ou GESTOR no navegador/computador que contém os dados antigos locais de Pré-Compras, Contratos e Recibos.
+7. Aguarde o indicador de sincronização ficar como Sincronizado antes de fechar a aba.
+
+A migração SQL é não destrutiva: cria as tabelas precompras, contratos e recibos se elas ainda não existirem. Não apaga os dados atuais.
+
+MIGRAÇÃO AUTOMÁTICA DOS DADOS LOCAIS
+------------------------------------
+No primeiro acesso, o FinObra detecta Pré-Compras, Contratos e Recibos ainda existentes no cache local e os envia ao Neon antes de considerar a nuvem a fonte principal.
+
+Proteções adicionadas:
+- se a migração inicial falhar, os dados locais são preservados e mesclados com os dados da nuvem;
+- lotes grandes são enviados em registros menores para evitar limite de payload;
+- a marca de migração só é gravada após sucesso;
+- novos registros desses três módulos passam a sincronizar normalmente pela fila offline.
+
+PERFIS
+------
+Administrador: leitura, criação, edição, exclusão, usuários, empresa e auditoria.
+Gestor: leitura, criação, edição e exclusão operacional.
+Operador: leitura, criação e edição; não pode excluir.
+Visualizador: somente leitura.
+Superadmin: administração da plataforma.
+
+O backend aplica essas regras em operações de dados, documentos, assinaturas, OCR e WhatsApp. Reset/desconexão da sessão de WhatsApp é reservado a administrador.
+
+AUDITORIA
+---------
+Administradores passam a ver Configurações > Auditoria, com eventos do próprio tenant.
+São registrados eventos relevantes de dados, usuários, empresa e assinaturas.
+
+DASHBOARD
+---------
+Foi adicionada /api/dashboard para calcular KPIs e os últimos lançamentos diretamente no Neon, evitando depender somente do cache local para os principais números.
+
+PACOTE LIMPO
+------------
+Foi adicionado CRIAR-PACOTE-LIMPO.bat.
+No Windows, execute esse arquivo para gerar um ZIP compartilhável sem:
+- .env / .env.local;
+- config.json sensível;
+- .git / .vercel;
+- node_modules em qualquer subpasta;
+- scratch / bin / logs;
+- certificados e chaves (*.pfx, *.p12, *.pem, *.key);
+- ZIPs e backups temporários.
+
+TESTES
+------
+Após aplicar, na raiz do projeto você pode executar:
+  npm test
+
+Na preparação deste patch passaram:
+- Hardening: 8/8
+- Patch 02: 9/9
+- Patch 03: 16/16
+- Patch 04: 16/16
+- Patch 05: 27/27
+- 89 arquivos JavaScript: 0 erros de sintaxe
+- 5 scripts inline HTML: 0 erros de sintaxe
+
+OBSERVAÇÃO
+----------
+Os testes acima são estáticos/locais. Eles não fazem gravações reais no seu Neon, Vercel Blob, Gemini ou WhatsApp de produção.

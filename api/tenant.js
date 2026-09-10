@@ -2,6 +2,7 @@
 import { neon } from '@neondatabase/serverless';
 import { resolveAuthAndTenant } from './_auth.js';
 import { writeAudit } from './_audit.js';
+import { canManageTenant, permissionError } from './_permissions.js';
 
 function getSql(){ if(!process.env.DATABASE_URL) throw new Error('DATABASE_URL não configurada.'); return neon(process.env.DATABASE_URL); }
 function cors(req,res){
@@ -20,7 +21,7 @@ export default async function handler(req,res){
     if(!rows.length) return res.status(404).json({success:false,error:'Empresa não encontrada.'});
     if(req.method==='GET') return res.status(200).json({success:true,tenant:pick(rows[0])});
     if(req.method==='PATCH'){
-      if(!auth.isSystem && !['admin','superadmin'].includes(auth.user.perfil)) return res.status(403).json({success:false,error:'Somente administradores podem alterar os dados da empresa.'});
+      if(!canManageTenant(auth)) return res.status(403).json(permissionError('ROLE_MANAGE_TENANT_FORBIDDEN'));
       const b=req.body||{};
       const before=pick(rows[0]);
       const nome=String(b.nome_fantasia??before.nome_fantasia).trim();

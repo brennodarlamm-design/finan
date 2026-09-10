@@ -3,6 +3,8 @@
 import { neon } from '@neondatabase/serverless';
 import { resolveAuthAndTenant } from './_auth.js';
 import { getPlanRule, isActiveObraStatus } from './_plans.js';
+import { canWriteData, canDeleteData, permissionError } from './_permissions.js';
+import { writeAudit } from './_audit.js';
 
 function getSql() {
   const conn = process.env.DATABASE_URL;
@@ -36,6 +38,17 @@ function cleanNum(n) {
   return isNaN(val) ? 0 : val;
 }
 
+
+function jsonPayload(row) {
+  if (!row) return {};
+  const raw = row.payload;
+  let parsed = raw;
+  if (typeof raw === 'string') {
+    try { parsed = JSON.parse(raw); } catch { parsed = {}; }
+  }
+  return { ...(parsed && typeof parsed === 'object' ? parsed : {}), id: row.id };
+}
+
 function todayBoaVista() {
   const parts = new Intl.DateTimeFormat('en-CA', {
     timeZone: 'America/Boa_Vista',
@@ -52,6 +65,26 @@ function parsePagination(query = {}) {
   const limit = Math.min(Math.max(Number.isFinite(rawLimit) ? rawLimit : 250, 1), 500);
   const offset = Math.max(Number.isFinite(rawOffset) ? rawOffset : 0, 0);
   return { limit, offset };
+}
+
+
+function auditPreview(table, data) {
+  if (!data || typeof data !== 'object') return null;
+  const out = { id: data.id || null };
+  for (const k of ['nome','descricao','titulo','numero_nf','status','tipo','categoria','obra_id','valor','valor_total','nome_arquivo']) {
+    if (data[k] !== undefined && data[k] !== null && data[k] !== '') out[k] = data[k];
+  }
+  return out;
+}
+
+async function auditDb(sql, req, auth, acao, table, data, id = null) {
+  await writeAudit(sql, req, auth, {
+    acao,
+    entidade: String(table || 'dados').slice(0,80),
+    entidadeId: String(id || data?.id || '').slice(0,128) || null,
+    depois: acao === 'excluir' ? null : auditPreview(table, data),
+    antes: acao === 'excluir' ? auditPreview(table, data) : null
+  });
 }
 
 function pageResponse(items, pagination) {
@@ -221,7 +254,10 @@ export default async function handler(req, res) {
             (SELECT COUNT(*)::int FROM medicoes WHERE tenant_id = ${tenantId}) AS medicoes,
             (SELECT COUNT(*)::int FROM documentos WHERE tenant_id = ${tenantId}) AS documentos,
             (SELECT COUNT(*)::int FROM produtos WHERE tenant_id = ${tenantId}) AS produtos,
-            (SELECT COUNT(*)::int FROM contas_bancarias WHERE tenant_id = ${tenantId}) AS contas;
+            (SELECT COUNT(*)::int FROM contas_bancarias WHERE tenant_id = ${tenantId}) AS contas,
+            (SELECT COUNT(*)::int FROM precompras WHERE tenant_id = ${tenantId}) AS precompras,
+            (SELECT COUNT(*)::int FROM contratos WHERE tenant_id = ${tenantId}) AS contratos,
+            (SELECT COUNT(*)::int FROM recibos WHERE tenant_id = ${tenantId}) AS recibos;
         `;
         const counts = rows[0] || {};
         const normalized = Object.fromEntries(Object.entries(counts).map(([k,v]) => [k, Number(v) || 0]));
@@ -229,7 +265,7 @@ export default async function handler(req, res) {
       }
 
       if (!table || table === 'all') {
-        const [obras, fornecedores, lancamentos, notas, orcamentos, medicoes, documentos, produtos, contas] = await Promise.all([
+        const [obras, fornecedores, lancamentos, notas, orcamentos, medicoes, documentos, produtos, contas, precompras, contratos, recibos] = await Promise.all([
           sql`SELECT * FROM obras WHERE tenant_id = ${tenantId} ORDER BY nome ASC;`,
           sql`SELECT * FROM fornecedores WHERE tenant_id = ${tenantId} ORDER BY nome ASC;`,
           sql`SELECT * FROM lancamentos WHERE tenant_id = ${tenantId} ORDER BY data DESC, created_at DESC;`,
@@ -238,7 +274,10 @@ export default async function handler(req, res) {
           sql`SELECT * FROM medicoes WHERE tenant_id = ${tenantId} ORDER BY data DESC;`,
           sql`SELECT id, tipo, referencia_id, titulo, categoria, nome_arquivo, tipo_arquivo, tamanho_bytes, url, created_at FROM documentos WHERE tenant_id = ${tenantId} ORDER BY created_at DESC;`,
           sql`SELECT * FROM produtos WHERE tenant_id = ${tenantId} ORDER BY nome ASC;`,
-          sql`SELECT * FROM contas_bancarias WHERE tenant_id = ${tenantId} ORDER BY created_at ASC;`
+          sql`SELECT * FROM contas_bancarias WHERE tenant_id = ${tenantId} ORDER BY created_at ASC;`,
+          sql`SELECT * FROM precompras WHERE tenant_id = ${tenantId} ORDER BY data_solicitacao DESC NULLS LAST, updated_at DESC;`,
+          sql`SELECT * FROM contratos WHERE tenant_id = ${tenantId} ORDER BY updated_at DESC;`,
+          sql`SELECT * FROM recibos WHERE tenant_id = ${tenantId} ORDER BY data DESC NULLS LAST, updated_at DESC;`
         ]);
 
         return res.status(200).json({
@@ -309,7 +348,10 @@ export default async function handler(req, res) {
               itens: (typeof m.itens_json === 'string' ? JSON.parse(m.itens_json) : m.itens_json) || m.itens || []
             })),
             documentos: documentos,
-            contas: contas || []
+            contas: contas || [],
+            precompras: (precompras || []).map(jsonPayload),
+            contratos: (contratos || []).map(jsonPayload),
+            recibos: (recibos || []).map(jsonPayload)
           }
         });
       }
@@ -425,6 +467,27 @@ export default async function handler(req, res) {
         return res.status(200).json({ success: true, data: items });
       }
 
+      if (table === 'precompras') {
+        const items = pagination
+          ? await sql`SELECT * FROM precompras WHERE tenant_id=${tenantId} ORDER BY data_solicitacao DESC NULLS LAST, updated_at DESC, id DESC LIMIT ${pagination.limit} OFFSET ${pagination.offset};`
+          : await sql`SELECT * FROM precompras WHERE tenant_id=${tenantId} ORDER BY data_solicitacao DESC NULLS LAST, updated_at DESC, id DESC;`;
+        return res.status(200).json(pageResponse(items.map(jsonPayload), pagination));
+      }
+
+      if (table === 'contratos') {
+        const items = pagination
+          ? await sql`SELECT * FROM contratos WHERE tenant_id=${tenantId} ORDER BY updated_at DESC, id DESC LIMIT ${pagination.limit} OFFSET ${pagination.offset};`
+          : await sql`SELECT * FROM contratos WHERE tenant_id=${tenantId} ORDER BY updated_at DESC, id DESC;`;
+        return res.status(200).json(pageResponse(items.map(jsonPayload), pagination));
+      }
+
+      if (table === 'recibos') {
+        const items = pagination
+          ? await sql`SELECT * FROM recibos WHERE tenant_id=${tenantId} ORDER BY data DESC NULLS LAST, updated_at DESC, id DESC LIMIT ${pagination.limit} OFFSET ${pagination.offset};`
+          : await sql`SELECT * FROM recibos WHERE tenant_id=${tenantId} ORDER BY data DESC NULLS LAST, updated_at DESC, id DESC;`;
+        return res.status(200).json(pageResponse(items.map(jsonPayload), pagination));
+      }
+
       if (table === 'orcamentos') {
         const items = pagination
           ? await sql`SELECT * FROM orcamentos WHERE tenant_id = ${tenantId} ORDER BY created_at DESC, id DESC LIMIT ${pagination.limit} OFFSET ${pagination.offset};`
@@ -467,6 +530,13 @@ export default async function handler(req, res) {
     // ── POST: Gravação / Atualização / Exclusão / Sync com Tenant Scoping ───────
     if (req.method === 'POST') {
       const { action, table, data, id, payload } = req.body || {};
+
+      if ((action === 'sync_all' || action === 'save') && !canWriteData(auth)) {
+        return res.status(403).json(permissionError('ROLE_READ_ONLY'));
+      }
+      if (action === 'delete' && !canDeleteData(auth)) {
+        return res.status(403).json(permissionError('ROLE_DELETE_FORBIDDEN'));
+      }
 
       // 1. Sincronização em Massa (Local -> Neon com tenant_id)
       if (action === 'sync_all' && payload) {
@@ -530,6 +600,50 @@ export default async function handler(req, res) {
                 uf = EXCLUDED.uf,
                 ativo = EXCLUDED.ativo
               WHERE fornecedores.tenant_id = ${tenantId};
+            `;
+            totalCount++;
+          }
+        }
+
+        // Pré-Compras — payload completo com campos indexáveis
+        if (Array.isArray(payload.precompras)) {
+          for (const pc of payload.precompras) {
+            if (!pc?.id) continue;
+            const safeObraId = await validateObraTenant(sql, pc.obra_id, tenantId);
+            const rawJson = JSON.stringify(pc);
+            await sql`
+              INSERT INTO precompras (tenant_id,id,obra_id,numero_ordem,status,valor_total,data_solicitacao,payload)
+              VALUES (${tenantId},${pc.id},${safeObraId},${pc.numero_ordem || null},${pc.status || 'rascunho'},${cleanNum(pc.valor_total)},${cleanDate(pc.data_solicitacao)},${rawJson}::jsonb)
+              ON CONFLICT (tenant_id,id) DO UPDATE SET obra_id=EXCLUDED.obra_id,numero_ordem=EXCLUDED.numero_ordem,status=EXCLUDED.status,valor_total=EXCLUDED.valor_total,data_solicitacao=EXCLUDED.data_solicitacao,payload=EXCLUDED.payload,updated_at=NOW();
+            `;
+            totalCount++;
+          }
+        }
+
+        if (Array.isArray(payload.contratos)) {
+          for (const c of payload.contratos) {
+            if (!c?.id) continue;
+            const safeObraId = await validateObraTenant(sql, c.obra_id, tenantId);
+            const rawJson = JSON.stringify(c);
+            await sql`
+              INSERT INTO contratos (tenant_id,id,obra_id,numero,status,payload)
+              VALUES (${tenantId},${c.id},${safeObraId},${c.numero || null},${c.status || 'pendente'},${rawJson}::jsonb)
+              ON CONFLICT (tenant_id,id) DO UPDATE SET obra_id=EXCLUDED.obra_id,numero=EXCLUDED.numero,status=EXCLUDED.status,payload=EXCLUDED.payload,updated_at=NOW();
+            `;
+            totalCount++;
+          }
+        }
+
+        if (Array.isArray(payload.recibos)) {
+          for (const r of payload.recibos) {
+            if (!r?.id) continue;
+            const safeObraId = await validateObraTenant(sql, r.obra_id, tenantId);
+            const rawJson = JSON.stringify(r);
+            const recStatus = r.assinatura ? 'assinado' : (r.status || 'pendente');
+            await sql`
+              INSERT INTO recibos (tenant_id,id,obra_id,numero,tipo,valor,data,status,payload)
+              VALUES (${tenantId},${r.id},${safeObraId},${r.numero || null},${r.tipo || null},${cleanNum(r.valor)},${cleanDate(r.data)},${recStatus},${rawJson}::jsonb)
+              ON CONFLICT (tenant_id,id) DO UPDATE SET obra_id=EXCLUDED.obra_id,numero=EXCLUDED.numero,tipo=EXCLUDED.tipo,valor=EXCLUDED.valor,data=EXCLUDED.data,status=EXCLUDED.status,payload=EXCLUDED.payload,updated_at=NOW();
             `;
             totalCount++;
           }
@@ -666,6 +780,10 @@ export default async function handler(req, res) {
           }
         }
 
+        await writeAudit(sql, req, auth, {
+          acao: 'sincronizar', entidade: 'dados', entidadeId: null,
+          depois: { total: totalCount, colecoes: Object.keys(payload || {}).filter(k => Array.isArray(payload[k]) && payload[k].length > 0) }
+        });
         return res.status(200).json({ success: true, synced: totalCount, message: 'Dados sincronizados com o Neon PostgreSQL!' });
       }
 
@@ -709,6 +827,7 @@ export default async function handler(req, res) {
               conciliado = EXCLUDED.conciliado
             WHERE lancamentos.tenant_id = ${tenantId};
           `;
+          await auditDb(sql, req, auth, 'salvar', 'lancamentos', l);
           return res.status(200).json({ success: true, id: l.id });
         }
 
@@ -757,6 +876,7 @@ export default async function handler(req, res) {
               obra_id = EXCLUDED.obra_id
             WHERE notas_fiscais.tenant_id = ${tenantId};
           `;
+          await auditDb(sql, req, auth, 'salvar', 'notas_fiscais', n);
           return res.status(200).json({ success: true, id: n.id });
         }
 
@@ -781,6 +901,7 @@ export default async function handler(req, res) {
               status = EXCLUDED.status
             WHERE obras.tenant_id = ${tenantId};
           `;
+          await auditDb(sql, req, auth, 'salvar', table === 'clientes' ? 'obras' : table, o);
           return res.status(200).json({ success: true, id: o.id });
         }
 
@@ -815,6 +936,7 @@ export default async function handler(req, res) {
               ativo = EXCLUDED.ativo
             WHERE fornecedores.tenant_id = ${tenantId};
           `;
+          await auditDb(sql, req, auth, 'salvar', 'fornecedores', f);
           return res.status(200).json({ success: true, id: f.id });
         }
 
@@ -839,6 +961,7 @@ export default async function handler(req, res) {
               base64_data = COALESCE(EXCLUDED.base64_data, documentos.base64_data)
             WHERE documentos.tenant_id = ${tenantId};
           `;
+          await auditDb(sql, req, auth, 'salvar', 'documentos', doc);
           return res.status(200).json({ success: true, id: doc.id });
         }
 
@@ -860,7 +983,48 @@ export default async function handler(req, res) {
               updated_at = NOW()
             WHERE produtos.tenant_id = ${tenantId};
           `;
+          await auditDb(sql, req, auth, 'salvar', 'produtos', p);
           return res.status(200).json({ success: true, id: p.id });
+        }
+
+        if (table === 'precompras') {
+          const pc = data;
+          const safeObraId = await validateObraTenant(sql, pc.obra_id, tenantId);
+          const rawJson = JSON.stringify(pc);
+          await sql`
+            INSERT INTO precompras (tenant_id,id,obra_id,numero_ordem,status,valor_total,data_solicitacao,payload)
+            VALUES (${tenantId},${pc.id},${safeObraId},${pc.numero_ordem || null},${pc.status || 'rascunho'},${cleanNum(pc.valor_total)},${cleanDate(pc.data_solicitacao)},${rawJson}::jsonb)
+            ON CONFLICT (tenant_id,id) DO UPDATE SET obra_id=EXCLUDED.obra_id,numero_ordem=EXCLUDED.numero_ordem,status=EXCLUDED.status,valor_total=EXCLUDED.valor_total,data_solicitacao=EXCLUDED.data_solicitacao,payload=EXCLUDED.payload,updated_at=NOW();
+          `;
+          await auditDb(sql, req, auth, 'salvar', 'precompras', pc);
+          return res.status(200).json({ success:true, id:pc.id });
+        }
+
+        if (table === 'contratos') {
+          const c = data;
+          const safeObraId = await validateObraTenant(sql, c.obra_id, tenantId);
+          const rawJson = JSON.stringify(c);
+          await sql`
+            INSERT INTO contratos (tenant_id,id,obra_id,numero,status,payload)
+            VALUES (${tenantId},${c.id},${safeObraId},${c.numero || null},${c.status || 'pendente'},${rawJson}::jsonb)
+            ON CONFLICT (tenant_id,id) DO UPDATE SET obra_id=EXCLUDED.obra_id,numero=EXCLUDED.numero,status=EXCLUDED.status,payload=EXCLUDED.payload,updated_at=NOW();
+          `;
+          await auditDb(sql, req, auth, 'salvar', 'contratos', c);
+          return res.status(200).json({ success:true, id:c.id });
+        }
+
+        if (table === 'recibos') {
+          const r = data;
+          const safeObraId = await validateObraTenant(sql, r.obra_id, tenantId);
+          const rawJson = JSON.stringify(r);
+          const recStatus = r.assinatura ? 'assinado' : (r.status || 'pendente');
+          await sql`
+            INSERT INTO recibos (tenant_id,id,obra_id,numero,tipo,valor,data,status,payload)
+            VALUES (${tenantId},${r.id},${safeObraId},${r.numero || null},${r.tipo || null},${cleanNum(r.valor)},${cleanDate(r.data)},${recStatus},${rawJson}::jsonb)
+            ON CONFLICT (tenant_id,id) DO UPDATE SET obra_id=EXCLUDED.obra_id,numero=EXCLUDED.numero,tipo=EXCLUDED.tipo,valor=EXCLUDED.valor,data=EXCLUDED.data,status=EXCLUDED.status,payload=EXCLUDED.payload,updated_at=NOW();
+          `;
+          await auditDb(sql, req, auth, 'salvar', 'recibos', r);
+          return res.status(200).json({ success:true, id:r.id });
         }
 
         if (table === 'ocr_historico') {
@@ -884,6 +1048,7 @@ export default async function handler(req, res) {
               dados = EXCLUDED.dados
             WHERE ocr_historico.tenant_id = ${tenantId};
           `;
+          await auditDb(sql, req, auth, 'salvar', 'ocr_historico', h);
           return res.status(200).json({ success: true, id: h.id });
         }
 
@@ -909,6 +1074,7 @@ export default async function handler(req, res) {
               updated_at = NOW()
             WHERE contas_bancarias.tenant_id = ${tenantId};
           `;
+          await auditDb(sql, req, auth, 'salvar', 'contas_bancarias', c);
           return res.status(200).json({ success: true, id: c.id });
         }
 
@@ -932,6 +1098,7 @@ export default async function handler(req, res) {
               itens_json = EXCLUDED.itens_json
             WHERE orcamentos.tenant_id = ${tenantId};
           `;
+          await auditDb(sql, req, auth, 'salvar', table === 'clientes' ? 'obras' : table, o);
           return res.status(200).json({ success: true, id: o.id });
         }
 
@@ -957,6 +1124,7 @@ export default async function handler(req, res) {
               observacoes = EXCLUDED.observacoes
             WHERE medicoes.tenant_id = ${tenantId};
           `;
+          await auditDb(sql, req, auth, 'salvar', 'medicoes', m);
           return res.status(200).json({ success: true, id: m.id });
         }
       }
@@ -965,18 +1133,22 @@ export default async function handler(req, res) {
       if (action === 'delete' && id) {
         if (table === 'lancamentos') {
           await sql`DELETE FROM lancamentos WHERE id = ${id} AND tenant_id = ${tenantId};`;
+          await writeAudit(sql, req, auth, { acao:'excluir', entidade:'lancamentos', entidadeId:id, antes:{ id } });
           return res.status(200).json({ success: true, id });
         }
         if (table === 'notas' || table === 'notas_fiscais') {
           await sql`DELETE FROM notas_fiscais WHERE id = ${id} AND tenant_id = ${tenantId};`;
+          await writeAudit(sql, req, auth, { acao:'excluir', entidade:'notas_fiscais', entidadeId:id, antes:{ id } });
           return res.status(200).json({ success: true, id });
         }
         if (table === 'obras' || table === 'clientes') {
           await sql`DELETE FROM obras WHERE id = ${id} AND tenant_id = ${tenantId};`;
+          await writeAudit(sql, req, auth, { acao:'excluir', entidade:'obras', entidadeId:id, antes:{ id } });
           return res.status(200).json({ success: true, id });
         }
         if (table === 'fornecedores') {
           await sql`DELETE FROM fornecedores WHERE id = ${id} AND tenant_id = ${tenantId};`;
+          await writeAudit(sql, req, auth, { acao:'excluir', entidade:'fornecedores', entidadeId:id, antes:{ id } });
           return res.status(200).json({ success: true, id });
         }
         if (table === 'documentos') {
@@ -987,11 +1159,21 @@ export default async function handler(req, res) {
             }
           } catch (e) {}
           await sql`DELETE FROM documentos WHERE id = ${id} AND tenant_id = ${tenantId};`;
+          await writeAudit(sql, req, auth, { acao:'excluir', entidade:'documentos', entidadeId:id, antes:{ id } });
           return res.status(200).json({ success: true, id });
         }
         if (table === 'produtos') {
           await sql`DELETE FROM produtos WHERE id = ${id} AND tenant_id = ${tenantId};`;
+          await writeAudit(sql, req, auth, { acao:'excluir', entidade:'produtos', entidadeId:id, antes:{ id } });
           return res.status(200).json({ success: true, id });
+        }
+        if (table === 'precompras' || table === 'contratos' || table === 'recibos') {
+          const tableName = table;
+          if (tableName === 'precompras') await sql`DELETE FROM precompras WHERE tenant_id=${tenantId} AND id=${id};`;
+          if (tableName === 'contratos') await sql`DELETE FROM contratos WHERE tenant_id=${tenantId} AND id=${id};`;
+          if (tableName === 'recibos') await sql`DELETE FROM recibos WHERE tenant_id=${tenantId} AND id=${id};`;
+          await writeAudit(sql, req, auth, { acao:'excluir', entidade:tableName, entidadeId:id, antes:{ id } });
+          return res.status(200).json({ success:true, id });
         }
         if (table === 'ocr_historico') {
           if (id === 'all') {
@@ -999,18 +1181,22 @@ export default async function handler(req, res) {
           } else {
             await sql`DELETE FROM ocr_historico WHERE id = ${id} AND tenant_id = ${tenantId};`;
           }
+          await writeAudit(sql, req, auth, { acao:'excluir', entidade:'ocr_historico', entidadeId:id, antes:{ id } });
           return res.status(200).json({ success: true, id });
         }
         if (table === 'contas' || table === 'contas_bancarias') {
           await sql`DELETE FROM contas_bancarias WHERE id = ${id} AND tenant_id = ${tenantId};`;
+          await writeAudit(sql, req, auth, { acao:'excluir', entidade:'contas_bancarias', entidadeId:id, antes:{ id } });
           return res.status(200).json({ success: true, id });
         }
         if (table === 'orcamentos') {
           await sql`DELETE FROM orcamentos WHERE id = ${id} AND tenant_id = ${tenantId};`;
+          await writeAudit(sql, req, auth, { acao:'excluir', entidade:'orcamentos', entidadeId:id, antes:{ id } });
           return res.status(200).json({ success: true, id });
         }
         if (table === 'medicoes') {
           await sql`DELETE FROM medicoes WHERE id = ${id} AND tenant_id = ${tenantId};`;
+          await writeAudit(sql, req, auth, { acao:'excluir', entidade:'medicoes', entidadeId:id, antes:{ id } });
           return res.status(200).json({ success: true, id });
         }
       }

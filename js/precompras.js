@@ -11,7 +11,8 @@ const PreCompras = {
     const resumo = DB.getPreComprasResumo(obraId);
     const precompras = DB.getPreCompras(obraId);
     const user = Auth.getUser();
-    const isAdmin = user?.perfil === 'admin';
+    const isAdmin = ['admin','superadmin'].includes(String(user?.perfil || '').toLowerCase());
+    const canWrite = !DB.canWriteLocal || DB.canWriteLocal('write');
     const showObra = obraId === 'todas';
 
     return `
@@ -21,9 +22,9 @@ const PreCompras = {
         <p class="page-sub">Controle de requisições de compras, materiais e serviços com autorização da diretoria/administrador</p>
       </div>
       <div class="page-actions" style="display:flex;gap:10px;flex-wrap:wrap;">
-        <button class="btn btn-primary" onclick="PreCompras.showForm()">
+        ${canWrite ? `<button class="btn btn-primary" onclick="PreCompras.showForm()">
           + Nova Pré-Compra
-        </button>
+        </button>` : '<span class="badge badge-secondary">Somente leitura</span>'}
       </div>
     </div>
 
@@ -157,37 +158,41 @@ const PreCompras = {
 
     const cs = DB.getAll('clientes');
     const user = Auth.getUser();
-    const isAdmin = user?.perfil === 'admin';
+    const isAdmin = ['admin','superadmin'].includes(String(user?.perfil || '').toLowerCase());
+    const canWrite = !DB.canWriteLocal || DB.canWriteLocal('write');
+    const canDelete = !DB.canWriteLocal || DB.canWriteLocal('delete');
+    const esc = v => Utils.escapeHtml(String(v ?? ''));
 
     return list.map(p => {
       const c = cs.find(x => x.id === p.obra_id);
-      const clipBadge = typeof Documentos !== 'undefined' ? Documentos.badgeClip('precompra', p.id, { titulo: `Ordem ${p.numero_ordem} — ${p.descricao}` }) : '📎';
+      const clipBadge = typeof Documentos !== 'undefined' ? Documentos.badgeClip('precompra', p.id, { titulo: `Ordem ${esc(p.numero_ordem)} — ${esc(p.descricao)}` }) : '📎';
       const itensCount = p.itens ? p.itens.length : 0;
       const isPendente = p.status === 'pendente_aprovacao';
       const isAprovada = p.status === 'aprovada';
+      const safeId = encodeURIComponent(String(p.id || ''));
 
       return `
       <tr>
         <td style="font-weight:800;color:var(--accent2);font-family:monospace;white-space:nowrap;">
-          <a href="javascript:void(0)" onclick="PreCompras.visualizarOrdem('${p.id}')" title="Visualizar Ordem de Compra Completa" style="color:var(--accent2);text-decoration:underline;">
-            ${p.numero_ordem}
+          <a href="javascript:void(0)" onclick="PreCompras.visualizarOrdem(decodeURIComponent('${safeId}'))" title="Visualizar Ordem de Compra Completa" style="color:var(--accent2);text-decoration:underline;">
+            ${esc(p.numero_ordem)}
           </a>
         </td>
         <td style="white-space:nowrap;font-size:.78rem;font-weight:600;">${Utils.fmt.date(p.data_solicitacao)}</td>
         <td style="white-space:nowrap;font-size:.78rem;color:var(--text2);">${p.data_necessidade ? Utils.fmt.date(p.data_necessidade) : '—'}</td>
-        ${showObra ? `<td style="font-size:.76rem;color:var(--text2);max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${c?.nome||''}">${c?.nome||'—'}</td>` : ''}
+        ${showObra ? `<td style="font-size:.76rem;color:var(--text2);max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${esc(c?.nome||'')}">${esc(c?.nome||'—')}</td>` : ''}
         <td>
-          <div style="font-weight:700;color:var(--text);">${p.descricao}</div>
-          ${p.justificativa ? `<div style="font-size:.72rem;color:var(--text3);max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${p.justificativa}">🎯 ${p.justificativa}</div>` : ''}
-          ${p.motivo_recusa ? `<div style="font-size:.72rem;color:var(--danger);font-weight:600;">❌ Motivo recusa: ${p.motivo_recusa}</div>` : ''}
-          ${p.parecer_admin ? `<div style="font-size:.72rem;color:var(--success);font-weight:600;">💬 Admin: ${p.parecer_admin}</div>` : ''}
+          <div style="font-weight:700;color:var(--text);">${esc(p.descricao)}</div>
+          ${p.justificativa ? `<div style="font-size:.72rem;color:var(--text3);max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${esc(p.justificativa)}">🎯 ${esc(p.justificativa)}</div>` : ''}
+          ${p.motivo_recusa ? `<div style="font-size:.72rem;color:var(--danger);font-weight:600;">❌ Motivo recusa: ${esc(p.motivo_recusa)}</div>` : ''}
+          ${p.parecer_admin ? `<div style="font-size:.72rem;color:var(--success);font-weight:600;">💬 Admin: ${esc(p.parecer_admin)}</div>` : ''}
         </td>
-        <td style="white-space:nowrap;font-size:.78rem;">${Utils.catLabel(p.categoria)}</td>
+        <td style="white-space:nowrap;font-size:.78rem;">${esc(Utils.catLabel(p.categoria))}</td>
         <td style="font-size:.78rem;color:var(--text2);max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
-          <strong>${p.fornecedor_nome || '—'}</strong>
-          ${p.fornecedor_contato ? `<div style="font-size:.7rem;color:var(--text3);">${p.fornecedor_contato}</div>` : ''}
+          <strong>${esc(p.fornecedor_nome || '—')}</strong>
+          ${p.fornecedor_contato ? `<div style="font-size:.7rem;color:var(--text3);">${esc(p.fornecedor_contato)}</div>` : ''}
         </td>
-        <td style="font-size:.78rem;color:var(--text3);white-space:nowrap;">${p.solicitante_nome || 'Gestor'}</td>
+        <td style="font-size:.78rem;color:var(--text3);white-space:nowrap;">${esc(p.solicitante_nome || 'Gestor')}</td>
         <td style="text-align:center;font-weight:700;font-size:.82rem;">${itensCount}</td>
         <td style="text-align:right;font-weight:900;white-space:nowrap;color:var(--accent2);font-size:.9rem;">
           ${Utils.fmt.currency(p.valor_total)}
@@ -197,29 +202,29 @@ const PreCompras = {
         <td style="text-align:center;">${clipBadge}</td>
         <td style="text-align:center;white-space:nowrap;">
           <div style="display:flex;gap:4px;justify-content:center;align-items:center;">
-            <button class="icon-btn" onclick="PreCompras.visualizarOrdem('${p.id}')" title="Visualizar & Imprimir Folha de Ordem de Compra" style="font-size:14px;color:var(--accent2);">
+            <button class="icon-btn" onclick="PreCompras.visualizarOrdem(decodeURIComponent('${safeId}'))" title="Visualizar & Imprimir Folha de Ordem de Compra" style="font-size:14px;color:var(--accent2);">
               📄
             </button>
-            <button class="icon-btn" onclick="PreCompras.abrirAnexosNotaFiscal('${p.id}')" title="Anexar ou Visualizar Nota Fiscal / Documentos" style="font-size:14px;">
+            <button class="icon-btn" onclick="PreCompras.abrirAnexosNotaFiscal(decodeURIComponent('${safeId}'))" title="Anexar ou Visualizar Nota Fiscal / Documentos" style="font-size:14px;">
               📎
             </button>
             ${isAdmin && isPendente ? `
-            <button class="btn btn-sm btn-success" onclick="PreCompras.abrirModalAprovacao('${p.id}')" title="Aprovar esta pré-compra" style="font-size:.72rem;padding:3px 8px;">
+            <button class="btn btn-sm btn-success" onclick="PreCompras.abrirModalAprovacao(decodeURIComponent('${safeId}'))" title="Aprovar esta pré-compra" style="font-size:.72rem;padding:3px 8px;">
               ✓ Aprovar
             </button>
-            <button class="btn btn-sm btn-danger" onclick="PreCompras.abrirModalRejeicao('${p.id}')" title="Recusar pré-compra com justificativa" style="font-size:.72rem;padding:3px 8px;">
+            <button class="btn btn-sm btn-danger" onclick="PreCompras.abrirModalRejeicao(decodeURIComponent('${safeId}'))" title="Recusar pré-compra com justificativa" style="font-size:.72rem;padding:3px 8px;">
               ✕ Recusar
             </button>` : ''}
-            ${isAprovada ? `
-            <button class="btn btn-sm btn-primary" onclick="PreCompras.converterEmLancamentoModal('${p.id}')" title="Gerar Lançamento Financeiro / Despesa na Obra" style="font-size:.72rem;padding:3px 8px;background:linear-gradient(135deg,#0284c7,#0369a1);border:none;">
+            ${canWrite && isAprovada ? `
+            <button class="btn btn-sm btn-primary" onclick="PreCompras.converterEmLancamentoModal(decodeURIComponent('${safeId}'))" title="Gerar Lançamento Financeiro / Despesa na Obra" style="font-size:.72rem;padding:3px 8px;background:linear-gradient(135deg,#0284c7,#0369a1);border:none;">
               💰 Gerar Despesa
             </button>` : ''}
-            ${isPendente ? `
-            <button class="icon-btn" onclick="PreCompras.showForm('${p.id}')" title="Editar Pedido" style="font-size:13px;">
+            ${canWrite && isPendente ? `
+            <button class="icon-btn" onclick="PreCompras.showForm(decodeURIComponent('${safeId}'))" title="Editar Pedido" style="font-size:13px;">
               ✏️
             </button>` : ''}
-            ${isAdmin || isPendente ? `
-            <button class="icon-btn" onclick="PreCompras.excluir('${p.id}')" title="Excluir Ordem" style="font-size:13px;color:var(--danger);">
+            ${canDelete && (isAdmin || isPendente) ? `
+            <button class="icon-btn" onclick="PreCompras.excluir(decodeURIComponent('${safeId}'))" title="Excluir Ordem" style="font-size:13px;color:var(--danger);">
               🗑️
             </button>` : ''}
           </div>

@@ -3,6 +3,7 @@ import { neon } from '@neondatabase/serverless';
 import crypto from 'crypto';
 import { hashPassword, verifyPassword, resolveAuthAndTenant } from './_auth.js';
 import { writeAudit } from './_audit.js';
+import { canManageUsers, permissionError } from './_permissions.js';
 
 function getSql() {
   if (!process.env.DATABASE_URL) throw new Error('DATABASE_URL não configurada.');
@@ -34,21 +35,27 @@ export default async function handler(req, res) {
   if (auth.isSystem) return res.status(403).json({ success:false, error:'Use uma sessão de usuário para gerenciar usuários.' });
 
   const sql = getSql();
-  const actorIsAdmin = ['admin','superadmin'].includes(auth.user.perfil);
+  const actorIsAdmin = canManageUsers(auth);
   const action = req.query.action || req.body?.action || '';
 
   try {
     if (req.method === 'GET') {
-      const rows = await sql`
-        SELECT id, tenant_id, username, email, nome, perfil, avatar, ativo, google_auth, created_at
-        FROM usuarios WHERE tenant_id = ${auth.tenantId}
-        ORDER BY CASE WHEN id = ${auth.user.userId} THEN 0 ELSE 1 END, nome ASC;
-      `;
-      return res.status(200).json({ success:true, users:rows.map(safeUser) });
+      const rows = actorIsAdmin
+        ? await sql`
+            SELECT id, tenant_id, username, email, nome, perfil, avatar, ativo, google_auth, created_at
+            FROM usuarios WHERE tenant_id = ${auth.tenantId}
+            ORDER BY CASE WHEN id = ${auth.user.userId} THEN 0 ELSE 1 END, nome ASC;
+          `
+        : await sql`
+            SELECT id, tenant_id, username, email, nome, perfil, avatar, ativo, google_auth, created_at
+            FROM usuarios WHERE tenant_id = ${auth.tenantId} AND id = ${auth.user.userId}
+            LIMIT 1;
+          `;
+      return res.status(200).json({ success:true, users:rows.map(safeUser), limited:!actorIsAdmin });
     }
 
     if (req.method === 'POST') {
-      if (!actorIsAdmin) return res.status(403).json({ success:false, error:'Somente administradores podem criar usuários.' });
+      if (!actorIsAdmin) return res.status(403).json(permissionError('ROLE_MANAGE_USERS_FORBIDDEN'));
       const { nome, username, email, senha, perfil='gestor', avatar='' } = req.body || {};
       const n = String(nome || '').trim();
       const un = String(username || '').trim().toLowerCase().replace(/[^a-z0-9._-]/g,'');
@@ -100,6 +107,18 @@ export default async function handler(req, res) {
       if (!newNome || newUsername.length < 3 || !newEmail || !newEmail.includes('@')) return res.status(400).json({ success:false, error:'Dados de usuário inválidos.' });
       if (!allowedProfiles.includes(newPerfil)) return res.status(400).json({ success:false, error:'Perfil inválido.' });
       if (isSelf && !newAtivo) return res.status(400).json({ success:false, error:'Você não pode desativar sua própria conta.' });
+
+      // Evita deixar a empresa sem nenhum administrador ativo, o que bloquearia a gestão de usuários/empresa.
+      if (cur.perfil === 'admin' && cur.ativo && (newPerfil !== 'admin' || !newAtivo)) {
+        const otherAdmins = await sql`
+          SELECT COUNT(*)::int AS total
+          FROM usuarios
+          WHERE tenant_id=${auth.tenantId} AND id<>${targetId} AND perfil='admin' AND ativo=TRUE;
+        `;
+        if (Number(otherAdmins[0]?.total || 0) < 1) {
+          return res.status(409).json({ success:false, code:'LAST_ADMIN', error:'A empresa precisa manter pelo menos um administrador ativo. Crie ou promova outro administrador antes desta alteração.' });
+        }
+      }
 
       const dup = await sql`SELECT id FROM usuarios WHERE id<>${targetId} AND (LOWER(username)=${newUsername} OR LOWER(email)=${newEmail}) LIMIT 1;`;
       if (dup.length) return res.status(409).json({ success:false, error:'Usuário ou e-mail já utilizado.' });

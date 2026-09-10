@@ -13,10 +13,11 @@ const Dashboard = {
       : (isEscritorio
         ? '🏢 Sede / Escritório Central (Custos Administrativos e Fixos)'
         : `Obra: ${DB.getById('clientes',obraId)?.nome||''}`);
+    const lblSafe = Utils.escapeHtml ? Utils.escapeHtml(lbl) : lbl;
 
     return `
     <div class="page-header">
-      <div><h1 class="page-title">📊 Dashboard</h1><p class="page-sub">${lbl}</p></div>
+      <div><h1 class="page-title">📊 Dashboard</h1><p class="page-sub">${lblSafe}</p></div>
       <div class="page-actions" style="display:flex;gap:8px;">
         <button class="btn btn-primary btn-sm" onclick="Dashboard.abrirModalImpressao()" style="display:flex;align-items:center;gap:6px;">
           🖨️ Imprimir / Exportar
@@ -42,38 +43,38 @@ const Dashboard = {
       <div class="kpi-card">
         <div class="kpi-icon green"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg></div>
         <div class="kpi-label">Total Recebido</div>
-        <div class="kpi-value green">${Utils.fmt.currency(r.totalReceitas)}</div>
+        <div class="kpi-value green" id="kpi-total-receitas">${Utils.fmt.currency(r.totalReceitas)}</div>
         <div class="kpi-change">💰 Receitas confirmadas</div>
       </div>
       <div class="kpi-card">
         <div class="kpi-icon red"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg></div>
         <div class="kpi-label">Total Gasto</div>
-        <div class="kpi-value red">${Utils.fmt.currency(r.totalDespesas)}</div>
+        <div class="kpi-value red" id="kpi-total-despesas">${Utils.fmt.currency(r.totalDespesas)}</div>
         <div class="kpi-change">💸 Despesas pagas</div>
       </div>
       <div class="kpi-card">
         <div class="kpi-icon ${r.saldo>=0?'blue':'red'}"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg></div>
         <div class="kpi-label">Saldo Disponível</div>
-        <div class="kpi-value ${r.saldo>=0?'blue':'red'}">${Utils.fmt.currency(r.saldo)}</div>
+        <div class="kpi-value ${r.saldo>=0?'blue':'red'}" id="kpi-saldo">${Utils.fmt.currency(r.saldo)}</div>
         <div class="kpi-change">${r.saldo>=0?'✅ Positivo':'⚠ Atenção ao saldo'}</div>
       </div>
       <div class="kpi-card">
         <div class="kpi-icon yellow"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg></div>
         <div class="kpi-label">NFs Pendentes</div>
-        <div class="kpi-value yellow">${r.nfPendentes}</div>
-        <div class="kpi-change">${Utils.fmt.currency(r.nfPendentesValor)}</div>
+        <div class="kpi-value yellow" id="kpi-nf-pendentes">${r.nfPendentes}</div>
+        <div class="kpi-change" id="kpi-nf-pendentes-valor">${Utils.fmt.currency(r.nfPendentesValor)}</div>
       </div>
       <div class="kpi-card">
         <div class="kpi-icon cyan"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></div>
         <div class="kpi-label">A Pagar</div>
-        <div class="kpi-value cyan">${r.aPagar}</div>
-        <div class="kpi-change">${Utils.fmt.currency(r.aPagarValor)}</div>
+        <div class="kpi-value cyan" id="kpi-a-pagar">${r.aPagar}</div>
+        <div class="kpi-change" id="kpi-a-pagar-valor">${Utils.fmt.currency(r.aPagarValor)}</div>
       </div>
       <div class="kpi-card">
         <div class="kpi-icon green"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg></div>
         <div class="kpi-label">${isEscritorio ? 'Centro de Custo' : 'Obras Ativas'}</div>
-        <div class="kpi-value green" style="${isEscritorio?'font-size:1.15rem;':''}">${isEscritorio ? '🏢 Sede Central' : ativos}</div>
-        <div class="kpi-change">${isEscritorio ? `${DB.getDespesasEscritorio().length} despesas registradas` : `de ${cs.length} obras | ${medPend} medições em análise`}</div>
+        <div class="kpi-value green" id="kpi-obras-ativas" style="${isEscritorio?'font-size:1.15rem;':''}">${isEscritorio ? '🏢 Sede Central' : ativos}</div>
+        <div class="kpi-change" id="kpi-obras-sub">${isEscritorio ? `${DB.getDespesasEscritorio().length} despesas registradas` : `de ${cs.length} obras | ${medPend} medições em análise`}</div>
       </div>
     </div>
 
@@ -154,7 +155,7 @@ const Dashboard = {
             <th>Data</th>${obraId==='todas'?'<th>Obra</th>':''}
             <th>Descri&ccedil;&atilde;o</th><th>Categoria</th><th>Tipo</th><th>Valor</th><th>Status</th>
           </tr></thead>
-          <tbody>${this._recentRows(obraId)}</tbody>
+          <tbody id="dashboard-recent-body">${this._recentRows(obraId)}</tbody>
         </table>
       </div>
     </div>`;
@@ -309,7 +310,7 @@ const Dashboard = {
       const libPct = med.length ? Math.round((med.filter(m=>m.status==='liberada').length/med.length)*100) : 0;
       return `<div style="margin-bottom:18px;padding:0 2px;">
         <div style="display:flex;justify-content:space-between;margin-bottom:5px;">
-          <span style="font-size:.84rem;font-weight:700">${c.nome}</span>
+          <span style="font-size:.84rem;font-weight:700">${Utils.escapeHtml(c.nome || '')}</span>
           <span style="font-size:.78rem;color:var(--text3)">${pct.toFixed(0)}% realizado</span>
         </div>
         <div class="progress-bar" style="margin-bottom:6px;"><div class="progress-fill ${cl}" style="width:${pct}%"></div></div>
@@ -320,9 +321,9 @@ const Dashboard = {
 
   _vencimentos(obraId) {
     const today = Utils.today();
-    const future = new Date(); 
-    future.setDate(future.getDate() + 60);
-    const fStr = future.toISOString().split('T')[0];
+    const [ty, tm, td] = today.split('-').map(Number);
+    const future = new Date(Date.UTC(ty, tm - 1, td + 60));
+    const fStr = future.toISOString().slice(0, 10);
 
     const lans = DB.getLancamentos(obraId==='todas'?null:obraId).filter(l => {
       const venc = l.data_vencimento || l.data;
@@ -389,13 +390,13 @@ const Dashboard = {
           <span style="font-size:1.1rem;flex-shrink:0;">${it.tp}</span>
           <div style="min-width:0;flex:1;">
             <div style="font-size:.82rem;font-weight:700;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
-              ${it.desc}
+              ${Utils.escapeHtml(it.desc || '')}
             </div>
             <div style="display:flex;gap:8px;align-items:center;font-size:.7rem;color:var(--text3);flex-wrap:wrap;margin-top:2px;">
-              <span>👤 ${c?.nome || 'Geral'}</span>
+              <span>👤 ${Utils.escapeHtml(c?.nome || 'Geral')}</span>
               <span>&bull;</span>
               ${diasBadge}
-              ${it.codigo_barras ? `<span>&bull;</span> <span style="font-family:monospace;color:var(--accent2);cursor:pointer;" onclick="Dashboard.copiarLinhaDigitavel('${it.codigo_barras}')" title="Clique para copiar código de barras">🔢 Boleto [Copiar]</span>` : ''}
+              ${it.codigo_barras ? `<span>&bull;</span> <span style="font-family:monospace;color:var(--accent2);cursor:pointer;" onclick="Dashboard.copiarLinhaDigitavel(window._tempVencItems[${idx}]?.codigo_barras)" title="Clique para copiar código de barras">🔢 Boleto [Copiar]</span>` : ''}
             </div>
           </div>
         </div>
@@ -431,8 +432,8 @@ const Dashboard = {
       const c = l.obra_id === 'escritorio' ? { nome: '🏢 Sede / Escritório' } : cs.find(x=>x.id===l.obra_id);
       return `<tr>
         <td style="white-space:nowrap">${Utils.fmt.date(l.data)}</td>
-        ${obraId==='todas'?`<td style="font-size:.78rem;color:var(--text2)">${c?.nome||'—'}</td>`:''}
-        <td>${l.descricao}</td>
+        ${obraId==='todas'?`<td style="font-size:.78rem;color:var(--text2)">${Utils.escapeHtml(c?.nome||'—')}</td>`:''}
+        <td>${Utils.escapeHtml(l.descricao || '')}</td>
         <td>${Utils.catLabel(l.categoria)}</td>
         <td>${l.tipo==='receita'?'<span class="badge badge-success">↑ Receita</span>':'<span class="badge badge-danger">↓ Despesa</span>'}</td>
         <td style="font-weight:800;white-space:nowrap;color:${l.tipo==='receita'?'var(--success)':'var(--danger)'};">${l.tipo==='receita'?'+':'−'} ${Utils.fmt.currency(l.valor)}</td>
@@ -442,11 +443,57 @@ const Dashboard = {
   },
 
   init(obraId) {
+    this._loadCloudSnapshot(obraId).catch(() => {});
     setTimeout(() => {
       this._barChart(obraId);
       this._donutChart(obraId);
       this._fluxoCaixaChart(obraId);
     }, 60);
+  },
+
+  async _loadCloudSnapshot(obraId) {
+    if (typeof Auth === 'undefined' || !Auth.getAuthHeaders) return;
+    const q = obraId && obraId !== 'todas' ? `?obra_id=${encodeURIComponent(obraId)}` : '';
+    const res = await fetch('/api/dashboard' + q, { headers: Auth.getAuthHeaders() });
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok || !json.success || !json.snapshot) return;
+    const d = json.snapshot;
+    const set = (id, value) => { const el = document.getElementById(id); if (el) el.textContent = value; };
+    set('kpi-total-receitas', Utils.fmt.currency(d.totalReceitas));
+    set('kpi-total-despesas', Utils.fmt.currency(d.totalDespesas));
+    set('kpi-saldo', Utils.fmt.currency(d.saldo));
+    set('kpi-nf-pendentes', String(d.nfPendentes || 0));
+    set('kpi-nf-pendentes-valor', Utils.fmt.currency(d.nfPendentesValor));
+    set('kpi-a-pagar', String(d.aPagar || 0));
+    set('kpi-a-pagar-valor', Utils.fmt.currency(d.aPagarValor));
+    if (obraId !== 'escritorio') {
+      set('kpi-obras-ativas', String(d.obrasAtivas || 0));
+      set('kpi-obras-sub', `de ${d.obrasTotal || 0} obras | ${d.medicoesPendentes || 0} medições em análise`);
+    }
+    const saldo = document.getElementById('kpi-saldo');
+    if (saldo) {
+      saldo.classList.remove('blue','red');
+      saldo.classList.add(Number(d.saldo) >= 0 ? 'blue' : 'red');
+    }
+
+    const recentBody = document.getElementById('dashboard-recent-body');
+    if (recentBody && Array.isArray(d.recent)) {
+      const showObra = !obraId || obraId === 'todas';
+      if (!d.recent.length) {
+        recentBody.innerHTML = `<tr><td colspan="${showObra ? 7 : 6}" style="text-align:center;color:var(--text3);padding:30px">Nenhum lançamento encontrado neste centro de custo.</td></tr>`;
+      } else {
+        recentBody.innerHTML = d.recent.map(l => `
+          <tr>
+            <td style="white-space:nowrap">${Utils.fmt.date(l.data)}</td>
+            ${showObra ? `<td style="font-size:.78rem;color:var(--text2)">${Utils.escapeHtml(l.obra_nome || (l.obra_id === 'escritorio' ? '🏢 Sede / Escritório' : '—'))}</td>` : ''}
+            <td>${Utils.escapeHtml(l.descricao || '')}</td>
+            <td>${Utils.escapeHtml(Utils.catLabel(l.categoria))}</td>
+            <td>${l.tipo === 'receita' ? '<span class="badge badge-success">↑ Receita</span>' : '<span class="badge badge-danger">↓ Despesa</span>'}</td>
+            <td style="font-weight:800;white-space:nowrap;color:${l.tipo === 'receita' ? 'var(--success)' : 'var(--danger)'};">${l.tipo === 'receita' ? '+' : '−'} ${Utils.fmt.currency(l.valor)}</td>
+            <td>${Utils.badge(l.status)}</td>
+          </tr>`).join('');
+      }
+    }
   },
 
   _barChart(obraId) {

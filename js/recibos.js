@@ -21,9 +21,10 @@ const Recibos = {
   },
 
   adicionar(recibo) {
+    if (typeof DB !== 'undefined' && DB.canWriteLocal && !DB.canWriteLocal('write')) return DB._denyLocal('write');
     const recibos = this.getAll();
     const item = {
-      id: 'rec_' + Date.now().toString(36) + Math.random().toString(36).substr(2, 4),
+      id: 'rec_' + ((typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : (Date.now().toString(36) + Math.random().toString(36).substr(2, 8))),
       numero: this._proximoNumero(),
       criado_em: new Date().toISOString(),
       assinatura: null,
@@ -31,23 +32,28 @@ const Recibos = {
     };
     recibos.unshift(item);
     this.salvarLista(recibos);
+    if (typeof DB !== 'undefined' && DB.syncToCloud) DB.syncToCloud('save', 'recibos', item);
     return item;
   },
 
   atualizar(id, dados) {
+    if (typeof DB !== 'undefined' && DB.canWriteLocal && !DB.canWriteLocal('write')) return DB._denyLocal('write');
     const recibos = this.getAll();
     const idx = recibos.findIndex(r => r.id === id);
     if (idx !== -1) {
       recibos[idx] = { ...recibos[idx], ...dados, atualizado_em: new Date().toISOString() };
       this.salvarLista(recibos);
+      if (typeof DB !== 'undefined' && DB.syncToCloud) DB.syncToCloud('save', 'recibos', recibos[idx]);
       return recibos[idx];
     }
     return null;
   },
 
   remover(id) {
+    if (typeof DB !== 'undefined' && DB.canWriteLocal && !DB.canWriteLocal('delete')) return DB._denyLocal('delete');
     const recibos = this.getAll().filter(r => r.id !== id);
     this.salvarLista(recibos);
+    if (typeof DB !== 'undefined' && DB.syncToCloud) DB.syncToCloud('delete', 'recibos', null, id);
   },
 
   _proximoNumero() {

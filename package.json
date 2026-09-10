@@ -7,7 +7,9 @@
     "dev": "npx serve .",
     "deploy": "node scripts/deploy.js",
     "render:status": "node scripts/render-status.js",
-    "render:deploy": "node scripts/render-deploy.js"
+    "render:deploy": "node scripts/render-deploy.js",
+    "test": "node scripts/test-static-all.js",
+    "test:patch05": "node scripts/test-patch05-static.js"
   },
   "dependencies": {
     "@neondatabase/serverless": "^0.9.5",

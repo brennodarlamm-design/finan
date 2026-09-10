@@ -27,9 +27,10 @@ const Contratos = {
   },
 
   adicionar(contrato) {
+    if (typeof DB !== 'undefined' && DB.canWriteLocal && !DB.canWriteLocal('write')) return DB._denyLocal('write');
     const lista = this.getAll();
     const item = {
-      id: 'ct_' + Date.now().toString(36) + Math.random().toString(36).substr(2, 4),
+      id: 'ct_' + ((typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : (Date.now().toString(36) + Math.random().toString(36).substr(2, 8))),
       numero: this._proximoNumero(),
       criado_em: new Date().toISOString(),
       status: 'pendente',
@@ -41,10 +42,12 @@ const Contratos = {
     delete item.selo_govbr_contratante;
     lista.unshift(item);
     this.salvarLista(lista);
+    if (typeof DB !== 'undefined' && DB.syncToCloud) DB.syncToCloud('save', 'contratos', item);
     return item;
   },
 
   atualizar(id, dados) {
+    if (typeof DB !== 'undefined' && DB.canWriteLocal && !DB.canWriteLocal('write')) return DB._denyLocal('write');
     const lista = this.getAll();
     const idx = lista.findIndex(c => c.id === id);
     if (idx !== -1) {
@@ -59,14 +62,17 @@ const Contratos = {
       }
 
       this.salvarLista(lista);
+      if (typeof DB !== 'undefined' && DB.syncToCloud) DB.syncToCloud('save', 'contratos', lista[idx]);
       return lista[idx];
     }
     return null;
   },
 
   remover(id) {
+    if (typeof DB !== 'undefined' && DB.canWriteLocal && !DB.canWriteLocal('delete')) return DB._denyLocal('delete');
     const lista = this.getAll().filter(c => c.id !== id);
     this.salvarLista(lista);
+    if (typeof DB !== 'undefined' && DB.syncToCloud) DB.syncToCloud('delete', 'contratos', null, id);
   },
 
   _proximoNumero() {

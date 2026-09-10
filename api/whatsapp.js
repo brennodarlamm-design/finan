@@ -2,6 +2,7 @@
 
 import { resolveAuthAndTenant } from './_auth.js';
 import { checkRateLimit, getClientIp } from './_ratelimit.js';
+import { canWriteData, canManageTenant, permissionError } from './_permissions.js';
 
 const ALLOWED_ORIGINS = [
   'https://finobra.app.br',
@@ -53,6 +54,16 @@ export default async function handler(req, res) {
 
   const isSendPayload = req.method === 'POST' && (req.body?.phone || req.body?.number) && (req.body?.message || req.body?.text || req.body?.base64 || req.body?.caption);
   const action = req.query?.action || req.body?.action || (isSendPayload ? 'send' : 'session');
+
+  // Sessão/QR pode ser consultada por qualquer usuário autenticado.
+  // Alterar a sessão compartilhada é configuração administrativa; enviar/testar é operação de escrita.
+  if ((action === 'disconnect' || action === 'reset') && !canManageTenant(auth)) {
+    return res.status(403).json(permissionError('ROLE_MANAGE_TENANT_FORBIDDEN'));
+  }
+  if ((action === 'send' || action === 'test') && !canWriteData(auth)) {
+    return res.status(403).json(permissionError('ROLE_READ_ONLY'));
+  }
+
   const renderBase = getRenderBaseUrl();
   const internalSecret = (process.env.API_SECRET || process.env.VERCEL_API_SECRET || '').trim();
 
