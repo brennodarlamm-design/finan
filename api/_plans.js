@@ -5,24 +5,28 @@ export const PLAN_RULES = Object.freeze({
     id: 'trial',
     label: 'Teste gratuito',
     maxActiveObras: 10,
+    monthlyPriceCents: 0,
     features: Object.freeze({ ocr: true, signatures: true })
   }),
   starter: Object.freeze({
     id: 'starter',
     label: 'Plano Básico',
     maxActiveObras: 3,
+    monthlyPriceCents: 7990,
     features: Object.freeze({ ocr: false, signatures: false })
   }),
   pro: Object.freeze({
     id: 'pro',
     label: 'Plano Profissional',
     maxActiveObras: 10,
+    monthlyPriceCents: 11990,
     features: Object.freeze({ ocr: true, signatures: true })
   }),
   unlimited: Object.freeze({
     id: 'unlimited',
     label: 'Construtora Ilimitado',
     maxActiveObras: null,
+    monthlyPriceCents: 15990,
     features: Object.freeze({ ocr: true, signatures: true })
   })
 });

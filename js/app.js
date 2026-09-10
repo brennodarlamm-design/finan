@@ -260,6 +260,12 @@ const App = {
         </div>`;
 
     const isCollapsed = window.innerWidth > 768 && localStorage.getItem('finobra_sidebar_collapsed') === 'true';
+    const supportMode = Boolean(typeof Auth !== 'undefined' && Auth.isImpersonating && Auth.isImpersonating());
+    const supportBanner = supportMode ? `
+      <div style="background:#7c2d12;color:#fff4e6;border-bottom:1px solid #fb923c;padding:8px 14px;display:flex;align-items:center;justify-content:center;gap:12px;flex-wrap:wrap;font-size:.78rem;font-weight:800;">
+        <span>🛡️ MODO SUPORTE MASTER — visualizando ${brandName}</span>
+        <button onclick="Auth.stopImpersonation()" style="border:1px solid rgba(255,255,255,.5);background:rgba(255,255,255,.12);color:#fff;padding:4px 10px;border-radius:6px;font-weight:800;cursor:pointer;">Encerrar suporte e voltar ao Master</button>
+      </div>` : '';
 
     document.getElementById('app-root').innerHTML = `
       <div class="app ${isCollapsed ? 'sidebar-collapsed' : ''}" id="app-container">
@@ -340,7 +346,7 @@ const App = {
               <span style="font-size:.78rem;font-weight:700;">Validar Documento</span>
             </a>
             <!-- Dropdown Suporte Técnico & Atendimento -->
-            ${typeof Suporte !== 'undefined' ? Suporte.renderHeaderDropdown() : ''}
+            ${(u?.impersonatedBy === 'superadmin' || u?.isImpersonated) ? '' : (typeof Suporte !== 'undefined' ? Suporte.renderHeaderDropdown() : '')}
             <!-- Botão Busca Global -->
             <div class="header-search-btn" onclick="typeof BuscaGlobal !== 'undefined' && BuscaGlobal.abrir()" title="Busca Global em todo o sistema (Ctrl+K)" style="cursor:pointer;display:flex;align-items:center;gap:6px;background:rgba(255,255,255,.05);border:1px solid var(--border);border-radius:8px;padding:5px 10px;transition:all .2s;">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
@@ -360,6 +366,7 @@ const App = {
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
             </button>
           </header>
+          ${supportBanner}
           <main class="main-content" id="main-content">
             <div id="route-content"></div>
           </main>
@@ -838,16 +845,8 @@ const App = {
   registerChart(c) { this._charts.push(c); },
 
   sairModoSuporte() {
-    const backupToken = sessionStorage.getItem('finobra_master_backup_token');
-    const backupSession = sessionStorage.getItem('finobra_master_backup_session');
-    if (backupToken && backupSession) {
-      localStorage.setItem('finobra_token', backupToken);
-      sessionStorage.setItem('finobra_token', backupToken);
-      localStorage.setItem('finobra_session', backupSession);
-      sessionStorage.setItem('finobra_session', backupSession);
-      sessionStorage.removeItem('finobra_master_backup_token');
-      sessionStorage.removeItem('finobra_master_backup_session');
-      sessionStorage.setItem('finobra_master_logged', 'true');
+    if (typeof Auth !== 'undefined' && Auth.stopImpersonation) {
+      return Auth.stopImpersonation();
     }
     window.location.href = '/master.html';
   },

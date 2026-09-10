@@ -5,6 +5,8 @@ const MasterAdmin = {
 
   _empresas: null,
   _isLoading: false,
+  _billing: null,
+  _billingLoading: false,
 
   _esc(value) {
     if (typeof Utils !== 'undefined' && Utils.escapeHtml) return Utils.escapeHtml(String(value ?? ''));
@@ -47,6 +49,65 @@ const MasterAdmin = {
     }
     this._isLoading = false;
     return this.getEmpresasLocal();
+  },
+
+  async carregarCobrancas(force = false) {
+    if (this._billing && !force) return this._billing;
+    if (this._billingLoading) return this._billing || { invoices:[], summary:{} };
+    this._billingLoading = true;
+    try {
+      const resp = await fetch('/api/admin?action=billing', {
+        headers:(typeof Auth !== 'undefined' && Auth.getAuthHeaders) ? Auth.getAuthHeaders() : {}
+      });
+      const data = await resp.json().catch(() => ({}));
+      if (resp.ok && data.success) {
+        this._billing = { invoices:Array.isArray(data.invoices) ? data.invoices : [], summary:data.summary || {} };
+      }
+    } catch (err) {
+      console.warn('Falha ao carregar cobranças do SaaS:', err);
+    }
+    this._billingLoading = false;
+    if (!this._billing) this._billing = { invoices:[], summary:{} };
+    return this._billing;
+  },
+
+  async confirmarPagamento(invoiceId) {
+    const inv = (this._billing?.invoices || []).find(i => i.id === invoiceId);
+    if (!inv) return;
+    const nome = inv.tenant_nome || inv.tenant_id || 'empresa';
+    const valor = (Number(inv.amount_cents || 0) / 100).toFixed(2).replace('.', ',');
+    if (!confirm(`Confirmar recebimento de R$ ${valor} da ${nome}? O plano será ativado/renovado por 30 dias.`)) return;
+    try {
+      const resp = await fetch('/api/admin?action=confirm_payment', {
+        method:'POST',
+        headers:(typeof Auth !== 'undefined' ? Auth.getAuthHeaders() : { 'Content-Type':'application/json' }),
+        body:JSON.stringify({ invoiceId })
+      });
+      const data = await resp.json().catch(() => ({}));
+      if (!resp.ok || !data.success) throw new Error(data.error || 'Não foi possível confirmar o pagamento.');
+      await Promise.all([this.carregarCobrancas(true), this.carregarEmpresas(true)]);
+      alert(data.message || 'Pagamento confirmado com sucesso.');
+      this.render(document.getElementById('master-content-area') ? 'master-content-area' : 'route-content');
+    } catch (err) {
+      alert(err?.message || 'Falha ao confirmar pagamento.');
+    }
+  },
+
+  _renderCobrancas() {
+    const invoices = (this._billing?.invoices || []).slice(0, 20);
+    const pendentes = invoices.filter(i => i.status === 'pending');
+    const rows = invoices.length ? invoices.map(i => {
+      const id = this._esc(i.id);
+      const nome = this._esc(i.tenant_nome || i.tenant_id || '—');
+      const plano = this._esc(i.plan_id || '—');
+      const txid = this._esc(i.txid || '—');
+      const valor = (Number(i.amount_cents || 0) / 100).toFixed(2).replace('.', ',');
+      const statusMap = { pending:'🟡 Pendente', paid:'🟢 Pago', expired:'⚪ Expirado', canceled:'🔴 Cancelado' };
+      const status = this._esc(statusMap[i.status] || i.status || '—');
+      const dt = i.created_at ? new Date(i.created_at).toLocaleString('pt-BR') : '—';
+      return `<tr style="border-bottom:1px solid rgba(255,255,255,.06);"><td style="padding:11px 14px;font-weight:700;color:#fff;">${nome}</td><td style="padding:11px 14px;">${plano}</td><td style="padding:11px 14px;font-weight:800;">R$ ${valor}</td><td style="padding:11px 14px;font-family:monospace;font-size:.72rem;">${txid}</td><td style="padding:11px 14px;">${status}</td><td style="padding:11px 14px;color:#94a3b8;">${this._esc(dt)}</td><td style="padding:11px 14px;text-align:right;">${i.status==='pending' ? `<button data-invoice-id="${id}" onclick="MasterAdmin.confirmarPagamento(this.dataset.invoiceId)" style="background:#22c55e;color:#fff;border:none;border-radius:6px;padding:6px 10px;font-size:.75rem;font-weight:800;cursor:pointer;">✓ Confirmar</button>` : '—'}</td></tr>`;
+    }).join('') : `<tr><td colspan="7" style="padding:28px;text-align:center;color:#64748b;">Nenhuma cobrança registrada ainda.</td></tr>`;
+    return `<div style="background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.08);border-radius:14px;overflow:hidden;margin-bottom:34px;"><div style="padding:16px 20px;border-bottom:1px solid rgba(255,255,255,.08);display:flex;justify-content:space-between;align-items:center;"><h3 style="font-size:1.05rem;font-weight:800;color:#fff;">💳 Cobranças & Assinaturas</h3><span style="font-size:.78rem;color:${pendentes.length?'#f59e0b':'#22c55e'};font-weight:800;">${pendentes.length} pendente(s)</span></div><div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;text-align:left;font-size:.8rem;"><thead><tr style="background:rgba(255,255,255,.03);color:#94a3b8;font-size:.72rem;text-transform:uppercase;"><th style="padding:10px 14px;">Empresa</th><th style="padding:10px 14px;">Plano</th><th style="padding:10px 14px;">Valor</th><th style="padding:10px 14px;">TXID</th><th style="padding:10px 14px;">Status</th><th style="padding:10px 14px;">Criada</th><th style="padding:10px 14px;text-align:right;">Ação</th></tr></thead><tbody>${rows}</tbody></table></div></div>`;
   },
 
   getEmpresasLocal() {
@@ -108,19 +169,21 @@ const MasterAdmin = {
     }
 
     const empresas = this.getEmpresas();
-    const chamados = (typeof Suporte !== 'undefined' && Suporte.getHistoricoChat()) || [];
-    const chamadosMaster = JSON.parse(localStorage.getItem('finobra_suporte_chamados') || '[]');
+    if (!this._billing && !this._billingLoading) this.carregarCobrancas().then(() => this.render(containerId));
 
     // Cálculo das métricas globais
     const totalEmpresas = empresas.length;
     const ativas = empresas.filter(e => e.status === 'ativo').length;
     const trials = empresas.filter(e => e.status === 'trial').length;
     const totalObras = empresas.reduce((acc, e) => acc + (e.obrasQtd || 0), 0);
+    const billingSummary = this._billing?.summary || {};
+    const cobrancasPendentes = Number(billingSummary.pending_count || 0);
+    const valorPendente = Number(billingSummary.pending_cents || 0) / 100;
     
     // MRR estimado
     const precos = { starter: 79.90, pro: 119.90, unlimited: 159.90 };
     const mrr = empresas.reduce((acc, e) => {
-      if (e.status === 'ativo' || e.status === 'trial') {
+      if (e.status === 'ativo') {
         return acc + (precos[e.plano] || 119.90);
       }
       return acc;
@@ -180,13 +243,13 @@ const MasterAdmin = {
           <div style="background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:18px 20px;">
             <div style="font-size:.75rem;color:#94a3b8;text-transform:uppercase;letter-spacing:.05em;">MRR (Receita Recorrente)</div>
             <div style="font-size:1.8rem;font-weight:900;color:#22c55e;margin:8px 0 4px;">R$ ${mrr.toFixed(2).replace('.', ',')}</div>
-            <div style="font-size:.78rem;color:#94a3b8;">Previsão de faturamento mensal</div>
+            <div style="font-size:.78rem;color:#94a3b8;">Estimativa dos assinantes ativos</div>
           </div>
 
           <div style="background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:18px 20px;">
-            <div style="font-size:.75rem;color:#94a3b8;text-transform:uppercase;letter-spacing:.05em;">Suporte Técnico</div>
-            <div style="font-size:1.8rem;font-weight:900;color:#38bdf8;margin:8px 0 4px;">${chamadosMaster.length || (chamados.length > 0 ? 1 : 0)}</div>
-            <div style="font-size:.78rem;color:#94a3b8;">Atendimentos solicitados</div>
+            <div style="font-size:.75rem;color:#94a3b8;text-transform:uppercase;letter-spacing:.05em;">Cobranças Pendentes</div>
+            <div style="font-size:1.8rem;font-weight:900;color:#f59e0b;margin:8px 0 4px;">${cobrancasPendentes}</div>
+            <div style="font-size:.78rem;color:#94a3b8;">R$ ${valorPendente.toFixed(2).replace('.', ',')} aguardando confirmação</div>
           </div>
 
         </div>
@@ -222,50 +285,19 @@ const MasterAdmin = {
           </div>
         </div>
 
-        <!-- Seção de Chamados de Suporte e Atendimento -->
-        <div style="background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.08);border-radius:14px;overflow:hidden;">
-          <div style="padding:16px 20px;border-bottom:1px solid rgba(255,255,255,.08);display:flex;align-items:center;justify-content:space-between;">
-            <h3 style="font-size:1.05rem;font-weight:800;color:#fff;display:flex;align-items:center;gap:8px;">
-              <span>💬 Chamados de Suporte &amp; Chat dos Clientes</span>
-            </h3>
-            <button onclick="Suporte.abrirTelaAtendimento()" class="btn-clean" style="padding:4px 12px;border-radius:6px;font-size:.75rem;background:rgba(56,189,248,.15);color:#38bdf8;border:1px solid rgba(56,189,248,.3);">
-              Abrir Chat de Atendimento ↗
-            </button>
-          </div>
+        ${this._renderCobrancas()}
 
-          <div style="padding:20px;">
-            ${chamados.length === 0 ? `
-              <div style="text-align:center;padding:30px;color:#64748b;">
-                <div style="font-size:2rem;margin-bottom:8px;">🎧</div>
-                <div>Nenhum chamado de suporte pendente no momento.</div>
-                <div style="font-size:.78rem;margin-top:4px;">Quando um cliente solicitar suporte pelo dropdown no topo, a conversa aparecerá aqui.</div>
-              </div>
-            ` : `
-              <div style="display:flex;flex-direction:column;gap:10px;">
-                <div style="background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:14px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;">
-                  <div>
-                    <div style="font-weight:800;font-size:.9rem;color:#fff;">Chamado de Suporte Recente</div>
-                    <div style="font-size:.78rem;color:#94a3b8;margin-top:2px;">
-                      Última mensagem: "${chamados[chamados.length - 1]?.texto || 'Atendimento em andamento'}"
-                    </div>
-                  </div>
-                  <div style="display:flex;align-items:center;gap:10px;">
-                    <a href="https://wa.me/5595991363678?text=${encodeURIComponent('Olá! Sou do suporte técnico do FinObra.')}" target="_blank" style="background:#22c55e;color:#fff;padding:6px 12px;border-radius:6px;font-size:.78rem;font-weight:700;text-decoration:none;">
-                      Responder via WhatsApp ↗
-                    </a>
-                    <button onclick="Suporte.abrirTelaAtendimento()" style="background:var(--accent);color:#0f1710;padding:6px 12px;border-radius:6px;font-size:.78rem;font-weight:800;border:none;cursor:pointer;">
-                      Ver Chat no Sistema ↗
-                    </button>
-                  </div>
-                </div>
-              </div>
-            `}
+        <!-- Central de Atendimento exclusiva do DEV / Master -->
+        ${typeof SuporteDev !== 'undefined' ? SuporteDev.renderResumoCard() : `
+          <div style="background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.08);border-radius:14px;padding:20px;color:#94a3b8;">
+            💬 Central de Atendimento DEV carregando...
           </div>
-        </div>
+        `}
         `}
 
       </div>
     `;
+    if (typeof SuporteDev !== 'undefined') setTimeout(() => SuporteDev.initNotifications(), 50);
   },
 
   // ── ABA SISTEMA & BANCO DE DADOS (DEV / MASTER) ────────────────────────────
@@ -503,6 +535,7 @@ const MasterAdmin = {
       </tr>`;
   },
 
+  // ── IMPERSONATE: ACESSAR COMO A EMPRESA PARA SUPORTE ───────────────────────
   async impersonarEmpresa(tenantId) {
     const empresas = this.getEmpresas();
     const emp = empresas.find(e => e.id === tenantId);
@@ -517,15 +550,28 @@ const MasterAdmin = {
         Utils.toast('Alternando ambiente para a empresa...', 'info');
       }
 
-      // 1. Guarda backup seguro da sessão master para retorno sem necessidade de relogar
-      const currentToken = (typeof Auth !== 'undefined' && Auth.getToken()) || '';
-      const currentSession = (typeof Auth !== 'undefined' && Auth.getSession()) || {};
-      if (currentToken) {
-        sessionStorage.setItem('finobra_master_backup_token', currentToken);
-        sessionStorage.setItem('finobra_master_backup_session', JSON.stringify(currentSession));
+      // Mantém sessão/token Master originais para retorno seguro ao backoffice.
+      if (typeof Auth !== 'undefined' && Auth.backupSessionForImpersonation) {
+        Auth.backupSessionForImpersonation();
+      } else {
+        const currentToken = (typeof Auth !== 'undefined' && Auth.getToken()) || '';
+        const currentSession = (typeof Auth !== 'undefined' && Auth.getSession()) || {};
+        if (currentToken) {
+          sessionStorage.setItem('finobra_master_backup_token', currentToken);
+          sessionStorage.setItem('finobra_master_backup_session', JSON.stringify(currentSession));
+        }
       }
 
-      // 2. Solicita token oficial de suporte ao backend
+      // Registra a entrada no suporte antes de trocar o token.
+      try {
+        await fetch('/api/admin?action=support_start', {
+          method: 'POST',
+          headers: (typeof Auth !== 'undefined' && Auth.getAuthHeaders) ? Auth.getAuthHeaders() : { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ tenantId })
+        });
+      } catch {}
+
+      // O backend emite um token de curta duração já vinculado ao tenant selecionado.
       const res = await fetch('/api/admin?action=impersonate', {
         method: 'POST',
         headers: (typeof Auth !== 'undefined' && Auth.getAuthHeaders) ? Auth.getAuthHeaders() : { 'Content-Type': 'application/json' },
@@ -533,21 +579,18 @@ const MasterAdmin = {
       });
 
       const data = await res.json().catch(() => ({}));
-      if (!res.ok || !data.success) {
-        alert(data.error || 'Não foi possível acessar os dados da empresa solicitada.');
-        return;
+      if (!res.ok || !data.success || !data.token || !data.session) {
+        throw new Error(data.error || 'Não foi possível acessar os dados da empresa solicitada.');
       }
 
-      // 3. Aplica o novo token e a sessão oficial autenticada
       localStorage.setItem('finobra_token', data.token);
       sessionStorage.setItem('finobra_token', data.token);
       localStorage.setItem('finobra_session', JSON.stringify(data.session));
       sessionStorage.setItem('finobra_session', JSON.stringify(data.session));
 
-      // 4. Redireciona para o dashboard com o escopo isolado
       window.location.href = '/app/dashboard';
     } catch (err) {
-      alert('Erro de comunicação ao acessar a empresa: ' + err.message);
+      alert('Erro de comunicação ao acessar a empresa: ' + (err?.message || err));
     }
   },
 

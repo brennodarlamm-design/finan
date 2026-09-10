@@ -99,6 +99,7 @@ const Cobranca = {
     const assAtual = this.getAssinaturaAtual();
     const u = (typeof Auth !== 'undefined' && Auth.getUser()) || {};
     const emp = (typeof DB !== 'undefined' && DB.getEmpresa()) || {};
+    const canManageBilling = ['admin','superadmin'].includes(String(u.perfil || '').toLowerCase());
     const empresaNomeSeguro = Utils.escapeHtml(emp.nome_fantasia || emp.razao_social || u.empresaNome || 'sua construtora');
 
     el.innerHTML = `
@@ -136,9 +137,7 @@ const Cobranca = {
               <div style="font-size:.72rem;color:#94a3b8;">Próximo Vencimento:</div>
               <div style="font-weight:800;font-size:.92rem;color:#fff;">${assAtual.vencimento ? (Utils.formatDate ? Utils.formatDate(assAtual.vencimento) : assAtual.vencimento) : 'Definido pela assinatura'}</div>
             </div>
-            <button onclick="Cobranca.abrirModalPagamentoPix('${assAtual.planoId}')" class="btn-primary" style="padding:10px 18px;border-radius:8px;font-weight:800;display:inline-flex;align-items:center;gap:6px;font-size:.85rem;">
-              <span>⚡ Pagar Mensalidade via PIX</span>
-            </button>
+            ${canManageBilling ? `<button onclick="Cobranca.abrirModalPagamentoPix('${assAtual.planoId}')" class="btn-primary" style="padding:10px 18px;border-radius:8px;font-weight:800;display:inline-flex;align-items:center;gap:6px;font-size:.85rem;"><span>⚡ Pagar Mensalidade via PIX</span></button>` : `<span style="font-size:.78rem;color:#94a3b8;">Somente o administrador pode gerar cobranças.</span>`}
           </div>
         </div>
 
@@ -148,8 +147,9 @@ const Cobranca = {
 
         <!-- Grid de Planos -->
         <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(300px, 1fr));gap:24px;align-items:stretch;">
-          ${Object.values(this.PLANOS).map(p => this._renderCardPlano(p, assAtual.planoId === p.id)).join('')}
+          ${Object.values(this.PLANOS).map(p => this._renderCardPlano(p, assAtual.planoId === p.id, canManageBilling)).join('')}
         </div>
+        <div id="finobra-billing-history" style="margin-top:24px;"></div>
 
       </div>
     `;
@@ -161,7 +161,9 @@ const Cobranca = {
     if (!box) return;
     try {
       const headers = (typeof DB !== 'undefined' && DB._apiHeaders) ? DB._apiHeaders() : {};
-      const res = await fetch('/api/plano', { headers });
+      const u = (typeof Auth !== 'undefined' && Auth.getUser()) || {};
+      const canManageBilling = ['admin','superadmin'].includes(String(u.perfil || '').toLowerCase());
+      const res = canManageBilling ? await fetch('/api/plano?billing=1', { headers }) : await fetch('/api/plano', { headers });
       const json = await res.json().catch(() => ({}));
       if (!res.ok || !json.success || !json.plan) throw new Error(json.error || 'Falha ao consultar o plano');
       const p = json.plan;
@@ -172,12 +174,17 @@ const Cobranca = {
           <span><strong style="color:#fff;">Uso real no servidor:</strong> ${Number(p.usage.activeObras)||0} obra(s) ativa(s) de ${limite}.</span>
           <span style="color:${p.maxActiveObras != null && p.usage.remainingActiveObras === 0 ? '#f59e0b' : '#22c55e'};font-weight:800;">${restante}</span>
         </div>`;
+      const hist = document.getElementById('finobra-billing-history');
+      if (hist && Array.isArray(json.invoices)) {
+        const statusMap = { pending:'🟡 Pendente', paid:'🟢 Pago', expired:'⚪ Expirado', canceled:'🔴 Cancelado' };
+        hist.innerHTML = `<div style="font-weight:900;color:#fff;margin-bottom:10px;">Últimas cobranças</div>${json.invoices.length ? `<div style="display:flex;flex-direction:column;gap:8px;">${json.invoices.slice(0,6).map(i => `<div style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:10px 12px;border:1px solid rgba(255,255,255,.08);border-radius:8px;background:rgba(255,255,255,.02);font-size:.78rem;"><span>${Utils.escapeHtml(statusMap[i.status] || i.status || '—')} &bull; ${Utils.escapeHtml(String(i.plan_id || ''))}</span><span style="font-weight:800;color:#fff;">R$ ${(Number(i.amount_cents||0)/100).toFixed(2).replace('.', ',')}</span><span style="color:#94a3b8;font-family:monospace;">${Utils.escapeHtml(String(i.txid || ''))}</span></div>`).join('')}</div>` : `<div style="font-size:.8rem;color:#64748b;">Nenhuma cobrança registrada ainda.</div>`}`;
+      }
     } catch (e) {
       box.textContent = 'Não foi possível consultar o uso do plano agora.';
     }
   },
 
-  _renderCardPlano(plano, isAtual) {
+  _renderCardPlano(plano, isAtual, canManageBilling = false) {
     const isPro = plano.destaque;
     return `
       <div style="
@@ -218,11 +225,11 @@ const Cobranca = {
             <button disabled style="width:100%;padding:12px;border-radius:8px;background:rgba(201,162,39,.15);border:1px solid var(--accent);color:var(--accent2);font-weight:800;font-size:.85rem;cursor:default;">
               ✓ Seu Plano Atual
             </button>
-          ` : `
+          ` : canManageBilling ? `
             <button onclick="Cobranca.selecionarPlano('${plano.id}')" style="width:100%;padding:12px;border-radius:8px;background:${isPro ? 'var(--accent)' : 'rgba(255,255,255,.06)'};border:1px solid ${isPro ? 'var(--accent)' : 'rgba(255,255,255,.2)'};color:${isPro ? '#0f1710' : '#fff'};font-weight:900;font-size:.85rem;cursor:pointer;transition:all .2s;">
               Fazer Upgrade Agora ↗
             </button>
-          `}
+          ` : `<button disabled style="width:100%;padding:12px;border-radius:8px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);color:#64748b;font-weight:800;font-size:.82rem;">Administrador necessário</button>`}
         </div>
 
       </div>
@@ -236,7 +243,7 @@ const Cobranca = {
   },
 
   // ── MODAL: PAGAMENTO VIA PIX DINÂMICO ──────────────────────────────────────
-  abrirModalPagamentoPix(planoId) {
+  async abrirModalPagamentoPix(planoId) {
     const plano = this.PLANOS[planoId] || this.PLANOS['pro'];
     const emp = (typeof DB !== 'undefined' && DB.getEmpresa()) || {};
     const u = (typeof Auth !== 'undefined' && Auth.getUser()) || {};
@@ -250,64 +257,52 @@ const Cobranca = {
       document.body.appendChild(modal);
     }
 
-    const chavePix = '95991363678';
-    const codigoCopiaCola = `00020126360014BR.GOV.BCB.PIX0111${chavePix}520400005303986540${plano.valorMensal.toFixed(2)}5802BR5915FINOBRA SISTEMA6008BOAVISTA62070503***6304`;
+    modal.innerHTML = `<div style="background:#0f1710;border:1px solid rgba(201,162,39,.4);border-radius:14px;width:100%;max-width:540px;padding:34px;text-align:center;color:#f0ead6;"><div style="font-size:2rem;margin-bottom:10px;">⏳</div><div style="font-weight:800;">Gerando cobrança segura no servidor...</div></div>`;
 
-    modal.innerHTML = `
-      <div style="background:#0f1710;border:1px solid rgba(201,162,39,.4);border-radius:14px;width:100%;max-width:540px;box-shadow:0 24px 60px rgba(0,0,0,.85);overflow:hidden;color:#f0ead6;font-family:inherit;">
-        
-        <div style="background:linear-gradient(135deg,#1C2D12,#243818);padding:16px 20px;border-bottom:1px solid rgba(201,162,39,.3);display:flex;align-items:center;justify-content:space-between;">
-          <div style="display:flex;align-items:center;gap:10px;">
-            <span style="font-size:1.3rem;">⚡</span>
-            <div>
-              <div style="font-weight:800;font-size:1rem;color:var(--accent2);">Pagamento via PIX Instantâneo</div>
-              <div style="font-size:.75rem;color:#94a3b8;">${plano.nome} &bull; R$ ${plano.valorMensal.toFixed(2).replace('.', ',')}</div>
-            </div>
+    try {
+      const headers = (typeof DB !== 'undefined' && DB._apiHeaders) ? DB._apiHeaders() : (typeof Auth !== 'undefined' ? Auth.getAuthHeaders() : { 'Content-Type':'application/json' });
+      const resp = await fetch('/api/plano?action=create_invoice', {
+        method:'POST', headers, body:JSON.stringify({ plan_id:plano.id })
+      });
+      const data = await resp.json().catch(() => ({}));
+      if (!resp.ok || !data.success || !data.invoice) throw new Error(data.error || 'Não foi possível gerar a cobrança.');
+
+      const inv = data.invoice;
+      const amount = Number(inv.amount_cents || Math.round(plano.valorMensal * 100)) / 100;
+      const pixPayload = String(inv.pix_payload || '');
+      const txid = Utils.escapeHtml(String(inv.txid || ''));
+      const whatsapp = String(data.billingWhatsapp || '').replace(/\D/g, '');
+      const whatsappDisplay = whatsapp ? `+${whatsapp}` : 'Suporte FinObra';
+      const companyName = emp.nome_fantasia || emp.razao_social || u.empresaNome || 'minha construtora';
+      const waMessage = encodeURIComponent(`Olá! Realizei o pagamento PIX da assinatura FinObra (${plano.nome} - R$ ${amount.toFixed(2).replace('.', ',')}) para ${companyName}. TXID: ${inv.txid || ''}. Segue o comprovante:`);
+      const waHref = whatsapp ? `https://wa.me/${whatsapp}?text=${waMessage}` : '#';
+      const qrSrc = pixPayload ? `https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(pixPayload)}` : '';
+
+      modal.innerHTML = `
+        <div style="background:#0f1710;border:1px solid rgba(201,162,39,.4);border-radius:14px;width:100%;max-width:540px;box-shadow:0 24px 60px rgba(0,0,0,.85);overflow:hidden;color:#f0ead6;font-family:inherit;">
+          <div style="background:linear-gradient(135deg,#1C2D12,#243818);padding:16px 20px;border-bottom:1px solid rgba(201,162,39,.3);display:flex;align-items:center;justify-content:space-between;">
+            <div style="display:flex;align-items:center;gap:10px;"><span style="font-size:1.3rem;">⚡</span><div><div style="font-weight:800;font-size:1rem;color:var(--accent2);">Cobrança PIX FinObra</div><div style="font-size:.75rem;color:#94a3b8;">${Utils.escapeHtml(plano.nome)} &bull; R$ ${amount.toFixed(2).replace('.', ',')}</div></div></div>
+            <button onclick="document.getElementById('cobranca-pix-modal').remove()" style="background:none;border:none;color:#94a3b8;font-size:1.2rem;cursor:pointer;padding:4px 8px;">✕</button>
           </div>
-          <button onclick="document.getElementById('cobranca-pix-modal').remove()" style="background:none;border:none;color:#94a3b8;font-size:1.2rem;cursor:pointer;padding:4px 8px;">✕</button>
-        </div>
-
-        <div style="padding:22px;display:flex;flex-direction:column;align-items:center;gap:16px;text-align:center;">
-          
-          <div style="font-size:.85rem;color:#cbd5e1;max-width:440px;">
-            Abra o app do seu banco e escaneie o QR Code abaixo para pagar a assinatura do <strong>FinObra</strong>:
+          <div style="padding:22px;display:flex;flex-direction:column;align-items:center;gap:16px;text-align:center;">
+            <div style="font-size:.8rem;color:#94a3b8;">Cobrança registrada no servidor &bull; TXID <strong style="color:#fff;">${txid}</strong></div>
+            ${qrSrc ? `<div style="background:#fff;padding:12px;border-radius:12px;box-shadow:0 8px 24px rgba(0,0,0,.5);border:2px solid var(--accent);"><img src="${qrSrc}" alt="QR Code PIX" style="display:block;width:180px;height:180px;"></div>` : `<div style="padding:18px;border:1px solid #ef4444;border-radius:10px;color:#fecaca;background:rgba(239,68,68,.08);">PIX ainda não configurado no servidor. Entre em contato com o suporte.</div>`}
+            ${pixPayload ? `<div style="width:100%;max-width:440px;"><div style="font-size:.72rem;color:#94a3b8;margin-bottom:6px;text-align:left;">PIX Copia e Cola</div><div style="display:flex;gap:8px;"><input type="text" id="pix-copia-cola-input" readonly style="flex:1;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.15);border-radius:8px;padding:8px 12px;color:#cbd5e1;font-size:.75rem;font-family:monospace;"><button id="pix-copy-btn" style="background:var(--accent);border:none;color:#0f1710;padding:8px 14px;border-radius:8px;font-size:.78rem;font-weight:800;cursor:pointer;white-space:nowrap;">Copiar 📋</button></div></div>` : ''}
+            <div style="background:rgba(34,197,94,.08);border:1px solid rgba(34,197,94,.3);border-radius:8px;padding:10px 14px;font-size:.8rem;color:#22c55e;width:100%;max-width:440px;">✓ Após pagar, envie o comprovante ao suporte. A liberação será registrada pelo Master e renovará a assinatura.</div>
+            ${whatsapp ? `<a href="${waHref}" target="_blank" rel="noopener noreferrer" style="width:100%;max-width:440px;background:#22c55e;color:#fff;padding:12px;border-radius:8px;font-weight:800;font-size:.85rem;text-decoration:none;display:flex;align-items:center;justify-content:center;gap:6px;">💬 Enviar comprovante pelo WhatsApp (${Utils.escapeHtml(whatsappDisplay)})</a>` : ''}
           </div>
+        </div>`;
 
-          <!-- QR Code Simulado / Gerado com API de QR Code -->
-          <div style="background:#fff;padding:12px;border-radius:12px;box-shadow:0 8px 24px rgba(0,0,0,.5);border:2px solid var(--accent);">
-            <img src="https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(codigoCopiaCola)}" alt="QR Code PIX" style="display:block;width:180px;height:180px;">
-          </div>
-
-          <div>
-            <div style="font-size:.75rem;color:#94a3b8;margin-bottom:4px;">Chave PIX (Celular / WhatsApp):</div>
-            <div style="font-weight:900;font-size:1.1rem;color:var(--accent2);letter-spacing:.05em;">
-              (95) 99136-3678
-            </div>
-          </div>
-
-          <!-- Campo Copia e Cola -->
-          <div style="width:100%;max-width:440px;">
-            <div style="display:flex;gap:8px;">
-              <input type="text" id="pix-copia-cola-input" value="${codigoCopiaCola}" readonly style="flex:1;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.15);border-radius:8px;padding:8px 12px;color:#cbd5e1;font-size:.75rem;font-family:monospace;">
-              <button onclick="navigator.clipboard.writeText(document.getElementById('pix-copia-cola-input').value);alert('Código PIX Copia e Cola copiado com sucesso!');" style="background:var(--accent);border:none;color:#0f1710;padding:8px 14px;border-radius:8px;font-size:.78rem;font-weight:800;cursor:pointer;white-space:nowrap;">
-                Copiar Código 📋
-              </button>
-            </div>
-          </div>
-
-          <div style="background:rgba(34,197,94,.08);border:1px solid rgba(34,197,94,.3);border-radius:8px;padding:10px 14px;font-size:.8rem;color:#22c55e;width:100%;max-width:440px;">
-            ✓ Após o pagamento, envie o comprovante pelo WhatsApp <strong>(95) 99136-3678</strong> para liberação imediata.
-          </div>
-
-          <div style="display:flex;gap:10px;width:100%;max-width:440px;">
-            <a href="https://wa.me/5595991363678?text=${encodeURIComponent(`Olá! Acabei de realizar o pagamento PIX da assinatura do FinObra (${plano.nome} - R$ ${plano.valorMensal.toFixed(2)}) para a empresa ${emp.nome_fantasia || u.empresaNome || 'minha construtora'}. Segue o comprovante:`)}" target="_blank" style="flex:1;background:#22c55e;color:#fff;padding:12px;border-radius:8px;font-weight:800;font-size:.85rem;text-decoration:none;display:flex;align-items:center;justify-content:center;gap:6px;">
-              <span>💬 Enviar Comprovante no WhatsApp</span>
-            </a>
-          </div>
-
-        </div>
-
-      </div>
-    `;
-  }
-};
+      const input = document.getElementById('pix-copia-cola-input');
+      if (input) input.value = pixPayload;
+      const copyBtn = document.getElementById('pix-copy-btn');
+      if (copyBtn) copyBtn.onclick = async () => {
+        try { await navigator.clipboard.writeText(pixPayload); copyBtn.textContent = 'Copiado ✓'; }
+        catch { input?.select(); document.execCommand?.('copy'); copyBtn.textContent = 'Copiado ✓'; }
+      };
+    } catch (err) {
+      modal.innerHTML = `<div style="background:#0f1710;border:1px solid rgba(239,68,68,.45);border-radius:14px;width:100%;max-width:520px;padding:28px;color:#f0ead6;text-align:center;"><div style="font-size:2rem;margin-bottom:10px;">⚠️</div><div style="font-weight:900;color:#fff;margin-bottom:8px;">Não foi possível gerar a cobrança</div><div id="billing-error-text" style="color:#fca5a5;font-size:.86rem;"></div><button onclick="document.getElementById('cobranca-pix-modal').remove()" style="margin-top:18px;padding:9px 18px;border-radius:8px;border:1px solid rgba(255,255,255,.2);background:rgba(255,255,255,.05);color:#fff;cursor:pointer;">Fechar</button></div>`;
+      const msg = document.getElementById('billing-error-text');
+      if (msg) msg.textContent = err?.message || 'Erro de comunicação com o servidor.';
+    }
+  }};

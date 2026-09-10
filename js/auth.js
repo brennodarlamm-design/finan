@@ -4,6 +4,7 @@ const Auth = {
   USERS_KEY: 'finobra_users',
   SESSION_KEY: 'finobra_session',
   TOKEN_KEY: 'finobra_token',
+  IMPERSONATION_BACKUP_KEY: 'finobra_master_session_backup',
 
   defaultUsers: [],
 
@@ -44,6 +45,9 @@ const Auth = {
       avatar: user.avatar || (user.nome ? user.nome.slice(0, 2).toUpperCase() : 'US'),
       tenantId: user.tenantId || user.tenant_id || '',
       empresaNome: user.empresaNome || '',
+      realTenantId: user.realTenantId || user.real_tenant_id || '',
+      isImpersonated: !!user.isImpersonated,
+      impersonatedBy: user.impersonatedBy || '',
       googleAuth: !!user.googleAuth,
       loginAt: new Date().toISOString(),
       remember: !!remember
@@ -297,6 +301,7 @@ const Auth = {
     sessionStorage.removeItem(this.SESSION_KEY);
     localStorage.removeItem(this.TOKEN_KEY);
     sessionStorage.removeItem(this.TOKEN_KEY);
+    sessionStorage.removeItem(this.IMPERSONATION_BACKUP_KEY);
   },
 
   handleSessionExpired() {
@@ -341,6 +346,63 @@ const Auth = {
   },
 
   getUser() { return this.getSession(); },
+
+  isImpersonating() {
+    return Boolean(this.getSession()?.impersonatedBy === 'superadmin');
+  },
+
+  backupSessionForImpersonation() {
+    const backup = {
+      localSession: localStorage.getItem(this.SESSION_KEY) || '',
+      sessionSession: sessionStorage.getItem(this.SESSION_KEY) || '',
+      localToken: localStorage.getItem(this.TOKEN_KEY) || '',
+      sessionToken: sessionStorage.getItem(this.TOKEN_KEY) || ''
+    };
+    sessionStorage.setItem(this.IMPERSONATION_BACKUP_KEY, JSON.stringify(backup));
+    return backup;
+  },
+
+  async stopImpersonation() {
+    const current = this.getSession();
+    if (!current?.impersonatedBy && !current?.isImpersonated) return window.location.replace('/master');
+    try {
+      await fetch('/api/admin?action=support_end', {
+        method:'POST',
+        headers:this.getAuthHeaders(),
+        body:JSON.stringify({ tenantId:current.tenantId })
+      });
+    } catch {}
+
+    let backup = null;
+    try { backup = JSON.parse(sessionStorage.getItem(this.IMPERSONATION_BACKUP_KEY) || 'null'); } catch {}
+
+    localStorage.removeItem(this.SESSION_KEY);
+    sessionStorage.removeItem(this.SESSION_KEY);
+    localStorage.removeItem(this.TOKEN_KEY);
+    sessionStorage.removeItem(this.TOKEN_KEY);
+
+    if (backup?.localSession) localStorage.setItem(this.SESSION_KEY, backup.localSession);
+    if (backup?.sessionSession) sessionStorage.setItem(this.SESSION_KEY, backup.sessionSession);
+    if (backup?.localToken) localStorage.setItem(this.TOKEN_KEY, backup.localToken);
+    if (backup?.sessionToken) sessionStorage.setItem(this.TOKEN_KEY, backup.sessionToken);
+
+    // Compatibilidade com versões anteriores do modo suporte.
+    const legacyToken = sessionStorage.getItem('finobra_master_backup_token');
+    const legacySession = sessionStorage.getItem('finobra_master_backup_session');
+    if (!backup && legacyToken && legacySession) {
+      localStorage.setItem(this.TOKEN_KEY, legacyToken);
+      sessionStorage.setItem(this.TOKEN_KEY, legacyToken);
+      localStorage.setItem(this.SESSION_KEY, legacySession);
+      sessionStorage.setItem(this.SESSION_KEY, legacySession);
+    }
+
+    sessionStorage.removeItem(this.IMPERSONATION_BACKUP_KEY);
+    sessionStorage.removeItem('finobra_master_backup_token');
+    sessionStorage.removeItem('finobra_master_backup_session');
+    sessionStorage.setItem('finobra_master_logged', 'true');
+    window.location.replace('/master');
+  },
+
   requireAuth() {
     if (!this.isLoggedIn()) {
       this.handleSessionExpired();

@@ -59,7 +59,11 @@ function getCredential(req) {
   return typeof key === 'string' ? key.trim() : '';
 }
 
-function trialExpired(createdAt, trialDays = 15) {
+function trialExpired(createdAt, trialDays = 15, explicitDueDate = null) {
+  if (explicitDueDate) {
+    const due = new Date(String(explicitDueDate).slice(0, 10) + 'T23:59:59').getTime();
+    if (Number.isFinite(due)) return Date.now() > due;
+  }
   if (!createdAt) return false;
   const created = new Date(createdAt).getTime();
   if (!Number.isFinite(created)) return false;
@@ -116,7 +120,7 @@ export async function resolveAuthAndTenant(req) {
     const rows = await sql`
       SELECT
         u.id, u.username, u.email, u.nome, u.perfil, u.avatar, u.ativo, u.tenant_id,
-        t.nome_fantasia, t.razao_social, t.plano, t.status AS tenant_status, t.created_at AS tenant_created_at
+        t.nome_fantasia, t.razao_social, t.plano, t.status AS tenant_status, t.created_at AS tenant_created_at, t.vencimento AS tenant_vencimento
       FROM usuarios u
       JOIN tenants t ON t.id = u.tenant_id
       WHERE u.id = ${payload.userId}
@@ -134,7 +138,7 @@ export async function resolveAuthAndTenant(req) {
       if (live.tenant_status === 'bloqueado' || live.tenant_status === 'cancelado') {
         return { authenticated: false, status: 403, error: 'Acesso bloqueado para esta empresa. Contate o suporte FinObra.' };
       }
-      if (live.tenant_status === 'trial' && trialExpired(live.tenant_created_at, 15)) {
+      if (live.tenant_status === 'trial' && trialExpired(live.tenant_created_at, 15, live.tenant_vencimento)) {
         return { authenticated: false, status: 403, error: 'O período de teste gratuito de 15 dias expirou. Regularize o plano para continuar.' };
       }
     }
@@ -158,12 +162,13 @@ export async function resolveAuthAndTenant(req) {
       nome_fantasia: live.nome_fantasia,
       razao_social: live.razao_social,
       plano: live.plano,
-      tenant_status: live.tenant_status
+      tenant_status: live.tenant_status,
+      vencimento: live.tenant_vencimento
     };
 
     if (effectiveTenantId !== live.tenant_id) {
       const targetRows = await sql`
-        SELECT nome_fantasia, razao_social, plano, status 
+        SELECT nome_fantasia, razao_social, plano, status, vencimento
         FROM tenants 
         WHERE id = ${effectiveTenantId} 
         LIMIT 1;
@@ -173,7 +178,8 @@ export async function resolveAuthAndTenant(req) {
           nome_fantasia: targetRows[0].nome_fantasia,
           razao_social: targetRows[0].razao_social,
           plano: targetRows[0].plano,
-          tenant_status: targetRows[0].status
+          tenant_status: targetRows[0].status,
+          vencimento: targetRows[0].vencimento
         };
       }
     }
@@ -196,7 +202,8 @@ export async function resolveAuthAndTenant(req) {
         isImpersonated: effectiveTenantId !== live.tenant_id,
         tenantStatus: targetTenantInfo.tenant_status,
         tenantPlan: targetTenantInfo.plano,
-        empresaNome: targetTenantInfo.nome_fantasia || targetTenantInfo.razao_social || payload.empresaNome || 'Minha Empresa'
+        tenantVencimento: targetTenantInfo.vencimento ? String(targetTenantInfo.vencimento).slice(0, 10) : '',
+        empresaNome: targetTenantInfo.nome_fantasia || targetTenantInfo.razao_social || payload.empresaNome || 'Minha Empresa' 
       }
     };
   } catch (err) {

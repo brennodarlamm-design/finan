@@ -2,34 +2,92 @@
   "cleanUrls": true,
   "trailingSlash": false,
   "rewrites": [
-    { "source": "/api/send-whatsapp", "destination": "/api/whatsapp?action=send" },
-    { "source": "/api/cnpj", "destination": "/api/nfe?action=cnpj" },
-    { "source": "/api/tenant", "destination": "/api/users?target=tenant" },
-    { "source": "/api/(.*)", "destination": "/api/$1" },
-    { "source": "/login", "destination": "/" },
-    { "source": "/privacidade", "destination": "/privacidade.html" },
-    { "source": "/termos", "destination": "/termos.html" },
-    { "source": "/apresentacao", "destination": "/landing" },
-    { "source": "/comercial", "destination": "/landing" },
-    { "source": "/validar/(.*)", "destination": "/validar" },
-    { "source": "/app/(.*)", "destination": "/app" }
+    {
+      "source": "/api/send-whatsapp",
+      "destination": "/api/whatsapp?action=send"
+    },
+    {
+      "source": "/api/cnpj",
+      "destination": "/api/nfe?action=cnpj"
+    },
+    {
+      "source": "/api/support",
+      "destination": "/api/users?target=support"
+    },
+    {
+      "source": "/api/tenant",
+      "destination": "/api/users?target=tenant"
+    },
+    {
+      "source": "/api/(.*)",
+      "destination": "/api/$1"
+    },
+    {
+      "source": "/login",
+      "destination": "/"
+    },
+    {
+      "source": "/privacidade",
+      "destination": "/privacidade.html"
+    },
+    {
+      "source": "/termos",
+      "destination": "/termos.html"
+    },
+    {
+      "source": "/apresentacao",
+      "destination": "/landing"
+    },
+    {
+      "source": "/comercial",
+      "destination": "/landing"
+    },
+    {
+      "source": "/validar/(.*)",
+      "destination": "/validar"
+    },
+    {
+      "source": "/app/(.*)",
+      "destination": "/app"
+    }
   ],
   "headers": [
     {
       "source": "/(.*)",
       "headers": [
-        { "key": "X-Content-Type-Options", "value": "nosniff" },
-        { "key": "X-Frame-Options", "value": "SAMEORIGIN" },
-        { "key": "X-XSS-Protection", "value": "1; mode=block" },
-        { "key": "Referrer-Policy", "value": "strict-origin-when-cross-origin" },
-        { "key": "Permissions-Policy", "value": "camera=(), microphone=(), geolocation=()" }
+        {
+          "key": "X-Content-Type-Options",
+          "value": "nosniff"
+        },
+        {
+          "key": "X-Frame-Options",
+          "value": "SAMEORIGIN"
+        },
+        {
+          "key": "X-XSS-Protection",
+          "value": "1; mode=block"
+        },
+        {
+          "key": "Referrer-Policy",
+          "value": "strict-origin-when-cross-origin"
+        },
+        {
+          "key": "Permissions-Policy",
+          "value": "camera=(), microphone=(), geolocation=()"
+        }
       ]
     },
     {
       "source": "/(.*)(favicon|apple-touch-icon)(.*)",
       "headers": [
-        { "key": "Cache-Control", "value": "no-cache, no-store, must-revalidate" },
-        { "key": "Pragma", "value": "no-cache" }
+        {
+          "key": "Cache-Control",
+          "value": "no-cache, no-store, must-revalidate"
+        },
+        {
+          "key": "Pragma",
+          "value": "no-cache"
+        }
       ]
     }
   ],

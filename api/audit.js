@@ -47,7 +47,7 @@ export default async function handler(req, res) {
              COALESCE(u.nome, u.username, 'Sistema') AS usuario_nome,
              u.username AS usuario_username
       FROM audit_logs a
-      LEFT JOIN usuarios u ON u.id = a.user_id AND u.tenant_id = a.tenant_id
+      LEFT JOIN usuarios u ON u.id = a.user_id
       WHERE a.tenant_id = ${auth.tenantId}
         AND (${acao} = '' OR a.acao = ${acao})
         AND (${entidade} = '' OR a.entidade = ${entidade})
