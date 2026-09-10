@@ -13,8 +13,12 @@ const SINAPI = {
   // Verificações de estado
   // ─────────────────────────────────────────────────
 
+  // Cache em memória para busca instantânea
+  _cachedBase: {},
+
   hasBase(desonerado = false) {
     const key = desonerado ? this.KEYS.desonerado : this.KEYS.onerado;
+    if (this._cachedBase[key]?.composicoes?.length) return true;
     try {
       const raw = localStorage.getItem(key);
       if (!raw) return false;
@@ -24,41 +28,97 @@ const SINAPI = {
   },
 
   getMeta(desonerado = false) {
-    const key = desonerado ? this.KEYS.desonerado : this.KEYS.onerado;
-    try {
-      const raw = localStorage.getItem(key);
-      if (!raw) return null;
-      const base = JSON.parse(raw);
-      return { referencia: base.referencia, uf: base.uf, total: base.composicoes?.length || 0, importada_em: base.importada_em };
-    } catch { return null; }
+    const base = this.getBase(desonerado);
+    if (!base) return null;
+    return { referencia: base.referencia, uf: base.uf, total: base.composicoes?.length || 0, importada_em: base.importada_em };
   },
 
   getBase(desonerado = false) {
     const key = desonerado ? this.KEYS.desonerado : this.KEYS.onerado;
+    if (this._cachedBase[key]) return this._cachedBase[key];
     try {
       const raw = localStorage.getItem(key);
       if (!raw) return null;
-      return JSON.parse(raw);
+      const parsed = JSON.parse(raw);
+      this._cachedBase[key] = parsed;
+      return parsed;
     } catch { return null; }
   },
 
   clearBase(desonerado = false) {
     const key = desonerado ? this.KEYS.desonerado : this.KEYS.onerado;
+    delete this._cachedBase[key];
     localStorage.removeItem(key);
   },
 
   clearAll() {
+    this._cachedBase = {};
     localStorage.removeItem(this.KEYS.onerado);
     localStorage.removeItem(this.KEYS.desonerado);
   },
 
   // ─────────────────────────────────────────────────
-  // Importação do XLSX da Caixa
+  // Puxar Base Oficial Automaticamente (1-Clique)
   // ─────────────────────────────────────────────────
 
   /**
-   * Importa um arquivo XLSX do SINAPI.
-   * @param {File} arquivo — arquivo .xlsx selecionado pelo usuário
+   * Puxa a base oficial do SINAPI diretamente pelo sistema (sem upload manual).
+   * @param {boolean} desonerado — true = série desonerada
+   * @param {function} onProgress — callback(msg) para feedback de progresso
+   * @returns {Promise<{ok:boolean, total:number, msg:string}>}
+   */
+  async puxarOficial(desonerado = true, onProgress) {
+    onProgress?.('Conectando à base oficial SINAPI...');
+    try {
+      const file = desonerado ? 'sinapi_rr_desonerado.json' : 'sinapi_rr_onerado.json';
+      onProgress?.('Baixando composições sintéticas de Roraima (RR)...');
+      let res = await fetch(`/data/${file}`);
+      if (!res.ok) {
+        // Fallback para rota /api/sinapi
+        res = await fetch(`/api/sinapi`);
+      }
+      if (!res.ok) {
+        throw new Error(`Servidor respondeu com status ${res.status}`);
+      }
+
+      onProgress?.('Processando base de dados...');
+      const base = await res.json();
+      if (!base || !Array.isArray(base.composicoes) || base.composicoes.length === 0) {
+        throw new Error('Formato da base oficial inválido ou vazio.');
+      }
+
+      onProgress?.(`Salvando ${base.composicoes.length.toLocaleString('pt-BR')} composições...`);
+      const key = desonerado ? this.KEYS.desonerado : this.KEYS.onerado;
+      this._cachedBase[key] = base;
+
+      try {
+        localStorage.setItem(key, JSON.stringify(base));
+      } catch (storageErr) {
+        const baseReduzida = { ...base, composicoes: base.composicoes.slice(0, 5000) };
+        this._cachedBase[key] = baseReduzida;
+        localStorage.setItem(key, JSON.stringify(baseReduzida));
+        return { ok: true, total: baseReduzida.composicoes.length, msg: `Carregadas ${baseReduzida.composicoes.length.toLocaleString('pt-BR')} composições (base parcial por limite de armazenamento).` };
+      }
+
+      return {
+        ok: true,
+        total: base.composicoes.length,
+        msg: `Base oficial SINAPI (${base.uf} ${base.referencia} — ${base.composicoes.length.toLocaleString('pt-BR')} itens) carregada com sucesso!`
+      };
+    } catch (err) {
+      console.error('SINAPI.puxarOficial error:', err);
+      return { ok: false, msg: `Erro ao puxar tabela oficial: ${err.message}` };
+    }
+  },
+
+  // ─────────────────────────────────────────────────
+  // Importação do XLSX / ZIP da Caixa
+  // ─────────────────────────────────────────────────
+
+  /**
+   * Importa um arquivo XLSX ou ZIP do SINAPI.
+   * Suporta arquivos .zip oficiais da Caixa extraindo a planilha automaticamente.
+   * @param {File} arquivo — arquivo .xlsx ou .zip selecionado pelo usuário
    * @param {boolean} desonerado — true = série desonerada
    * @param {string} uf — UF selecionada (ex: 'RR')
    * @param {string} referencia — mês de referência (ex: '2025-07')
@@ -68,65 +128,102 @@ const SINAPI = {
   async importar(arquivo, desonerado, uf, referencia, onProgress) {
     onProgress?.('Lendo arquivo...');
 
-    return new Promise((resolve) => {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        try {
-          onProgress?.('Processando planilha...');
-          const data = new Uint8Array(e.target.result);
-          const wb = XLSX.read(data, { type: 'array' });
+    try {
+      let dataBuffer;
+      const isZip = (arquivo.name || '').toLowerCase().endsWith('.zip') || (arquivo.type || '').includes('zip');
 
-          // Detectar a aba correta de composições
-          const abaAlvo = this._detectarAba(wb.SheetNames, desonerado);
-          if (!abaAlvo) {
-            resolve({ ok: false, msg: 'Aba de composições não encontrada. Verifique se o arquivo é a planilha SINAPI correta (Composições Analíticas ou Sintéticas).' });
-            return;
-          }
+      if (isZip) {
+        onProgress?.('Arquivo ZIP da Caixa detectado! Descompactando...');
 
-          onProgress?.(`Aba encontrada: "${abaAlvo}". Extraindo dados...`);
-
-          const sheet = wb.Sheets[abaAlvo];
-          const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
-
-          const composicoes = this._parseRows(rows, onProgress);
-
-          if (composicoes.length === 0) {
-            resolve({ ok: false, msg: 'Nenhuma composição encontrada. Verifique se selecionou a planilha de Composições Sintéticas/Analíticas.' });
-            return;
-          }
-
-          onProgress?.(`Salvando ${composicoes.length.toLocaleString('pt-BR')} composições...`);
-
-          const base = {
-            referencia,
-            uf,
-            desonerado,
-            importada_em: new Date().toISOString().split('T')[0],
-            total_itens: composicoes.length,
-            composicoes,
-          };
-
-          const key = desonerado ? this.KEYS.desonerado : this.KEYS.onerado;
-          try {
-            localStorage.setItem(key, JSON.stringify(base));
-          } catch (storageErr) {
-            // localStorage cheio — tentar com base reduzida
-            const baseReduzida = { ...base, composicoes: composicoes.slice(0, 5000) };
-            localStorage.setItem(key, JSON.stringify(baseReduzida));
-            resolve({ ok: true, total: baseReduzida.composicoes.length, msg: `Importadas ${baseReduzida.composicoes.length.toLocaleString('pt-BR')} composições (limite de armazenamento atingido — base parcial).` });
-            return;
-          }
-
-          resolve({ ok: true, total: composicoes.length, msg: `${composicoes.length.toLocaleString('pt-BR')} composições importadas com sucesso!` });
-
-        } catch (err) {
-          console.error('SINAPI.importar error:', err);
-          resolve({ ok: false, msg: `Erro ao processar o arquivo: ${err.message}` });
+        // Garantir disponibilidade do JSZip
+        if (typeof JSZip === 'undefined') {
+          await new Promise((resolve, reject) => {
+            const s = document.createElement('script');
+            s.src = 'https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js';
+            s.onload = resolve;
+            s.onerror = () => reject(new Error('Falha ao carregar descompactador ZIP'));
+            document.head.appendChild(s);
+          });
         }
+
+        const zip = await JSZip.loadAsync(arquivo);
+        const entries = Object.values(zip.files).filter(f => !f.dir);
+
+        // Prioridade: Composicoes Sintetico -> Composicoes -> qualquer .xlsx
+        let target = entries.find(f => {
+          const n = f.name.toLowerCase();
+          return n.endsWith('.xlsx') && (n.includes('sintetico') || n.includes('sint'));
+        });
+        if (!target) {
+          target = entries.find(f => {
+            const n = f.name.toLowerCase();
+            return n.endsWith('.xlsx') && n.includes('comp');
+          });
+        }
+        if (!target) {
+          target = entries.find(f => f.name.toLowerCase().endsWith('.xlsx'));
+        }
+
+        if (!target) {
+          return { ok: false, msg: 'Nenhuma planilha XLSX encontrada dentro do arquivo ZIP da Caixa.' };
+        }
+
+        const cleanName = target.name.split('/').pop();
+        onProgress?.(`Planilha encontrada: "${cleanName}". Processando...`);
+        dataBuffer = await target.async('arraybuffer');
+      } else {
+        dataBuffer = await arquivo.arrayBuffer();
+      }
+
+      onProgress?.('Processando planilha Excel...');
+      const data = new Uint8Array(dataBuffer);
+      const wb = XLSX.read(data, { type: 'array' });
+
+      // Detectar a aba correta de composições
+      const abaAlvo = this._detectarAba(wb.SheetNames, desonerado);
+      if (!abaAlvo) {
+        return { ok: false, msg: 'Aba de composições não encontrada. Verifique se o arquivo é a planilha SINAPI correta (Composições Sintéticas ou Analíticas).' };
+      }
+
+      onProgress?.(`Aba encontrada: "${abaAlvo}". Extraindo dados...`);
+      const sheet = wb.Sheets[abaAlvo];
+      const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
+
+      const composicoes = this._parseRows(rows, onProgress);
+
+      if (composicoes.length === 0) {
+        return { ok: false, msg: 'Nenhuma composição encontrada. Verifique se selecionou a planilha de Composições Sintéticas/Analíticas.' };
+      }
+
+      onProgress?.(`Salvando ${composicoes.length.toLocaleString('pt-BR')} composições...`);
+
+      const base = {
+        referencia,
+        uf,
+        desonerado,
+        importada_em: new Date().toISOString().split('T')[0],
+        total_itens: composicoes.length,
+        composicoes,
       };
-      reader.onerror = () => resolve({ ok: false, msg: 'Erro ao ler o arquivo.' });
-      reader.readAsArrayBuffer(arquivo);
-    });
+
+      const key = desonerado ? this.KEYS.desonerado : this.KEYS.onerado;
+      this._cachedBase[key] = base;
+
+      try {
+        localStorage.setItem(key, JSON.stringify(base));
+      } catch (storageErr) {
+        const baseReduzida = { ...base, composicoes: composicoes.slice(0, 5000) };
+        this._cachedBase[key] = baseReduzida;
+        localStorage.setItem(key, JSON.stringify(baseReduzida));
+        return { ok: true, total: baseReduzida.composicoes.length, msg: `Importadas ${baseReduzida.composicoes.length.toLocaleString('pt-BR')} composições (limite de armazenamento atingido — base parcial).` };
+      }
+
+      return { ok: true, total: composicoes.length, msg: `${composicoes.length.toLocaleString('pt-BR')} composições importadas com sucesso!` };
+
+    } catch (err) {
+      console.error('SINAPI.importar error:', err);
+      return { ok: false, msg: `Erro ao processar o arquivo: ${err.message}` };
+    }
   },
 
   // Detecta qual aba do XLSX contém as composições sintéticas

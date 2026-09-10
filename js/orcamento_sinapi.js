@@ -295,16 +295,41 @@ const OrcamentoSINAPI = {
   _renderSemBase(orc) {
     const serie = orc.desonerado ? 'Sem Oneração (Desonerado)' : 'Com Oneração';
     return `
-    <div style="background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.3);border-radius:var(--r-md);padding:16px;display:flex;align-items:center;gap:14px;">
+    <div style="background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.3);border-radius:var(--r-md);padding:16px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;">
       <span style="font-size:1.8rem">⚠️</span>
-      <div style="flex:1">
-        <div style="font-weight:700;color:var(--warning);margin-bottom:4px;">Tabela SINAPI não importada</div>
+      <div style="flex:1;min-width:240px;">
+        <div style="font-weight:700;color:var(--warning);margin-bottom:4px;">Tabela SINAPI não carregada</div>
         <div style="font-size:.8rem;color:var(--text2);">
-          Este orçamento usa a série <strong>${serie}</strong>. Importe a tabela para buscar e adicionar serviços.
+          Este orçamento usa a série <strong>${serie}</strong>. Puxe a tabela oficial da Caixa com 1 clique ou importe manualmente.
         </div>
       </div>
-      <button class="btn btn-primary btn-sm" onclick="Utils.closeModal();OrcamentoSINAPI.showImportModal(${orc.desonerado})">📁 Importar Agora</button>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <button class="btn btn-primary btn-sm" id="btn-puxar-direto-${orc.id}" onclick="OrcamentoSINAPI.puxarDiretoNoEditor('${orc.id}', ${orc.desonerado})">⚡ Puxar Oficial Caixa (1-Clique)</button>
+        <button class="btn btn-secondary btn-sm" onclick="Utils.closeModal();OrcamentoSINAPI.showImportModal(${orc.desonerado})">📁 Importar Manualmente</button>
+      </div>
     </div>`;
+  },
+
+  async puxarDiretoNoEditor(orcId, desonerado) {
+    const btn = document.getElementById(`btn-puxar-direto-${orcId}`);
+    if (btn) {
+      btn.disabled = true;
+      btn.innerHTML = '<span>⏳</span> Baixando Caixa RR...';
+    }
+    Utils.toast('Puxando tabela oficial SINAPI da Caixa...', 'info');
+    const res = await SINAPI.puxarOficial(desonerado, (msg) => {
+      if (btn) btn.innerHTML = `<span>⏳</span> ${msg}`;
+    });
+    if (res.ok) {
+      Utils.toast(res.msg, 'success');
+      this.openEditor(orcId);
+    } else {
+      Utils.toast(res.msg, 'error');
+      if (btn) {
+        btn.disabled = false;
+        btn.innerHTML = '<span>⚡</span> Tentar Novamente';
+      }
+    }
   },
 
   _renderBusca(orc) {
@@ -549,20 +574,33 @@ const OrcamentoSINAPI = {
     const metaDes = SINAPI.getMeta(true);
 
     Utils.showModal(`
-      <div class="modal" style="max-width:600px">
+      <div class="modal" style="max-width:620px">
         <div class="modal-header">
-          <span class="modal-title">📁 Importar Tabela SINAPI</span>
+          <span class="modal-title">📁 Tabela SINAPI / Caixa Econômica</span>
           <button class="modal-close" onclick="Utils.closeModal()">✕</button>
         </div>
         <div class="modal-body">
 
-          <!-- Instrução -->
-          <div style="background:rgba(201,162,39,.06);border:1px solid rgba(201,162,39,.15);border-radius:var(--r-md);padding:14px;margin-bottom:18px;font-size:.82rem;color:var(--text2);line-height:1.7;">
-            <strong style="color:var(--accent);">Como obter a tabela:</strong><br>
-            1. Acesse <a href="https://www.caixa.gov.br/poder-publico/modernizacao-gestao/sinapi" target="_blank" style="color:var(--accent2);">portal.caixa.gov.br/sinapi</a><br>
-            2. Selecione o estado <strong>RR</strong> e o mês de referência<br>
-            3. Baixe o arquivo ZIP e extraia o <strong>.xlsx de Composições Sintéticas</strong><br>
-            4. Selecione a série (Com ou Sem Oneração) e importe abaixo
+          <!-- Card Automático 1-Clique Oficial -->
+          <div style="background:linear-gradient(135deg, rgba(201,162,39,.12), rgba(16,185,129,.08));border:1.5px solid var(--accent);border-radius:var(--r-md);padding:16px;margin-bottom:18px;">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+              <div style="font-weight:700;font-size:.95rem;color:var(--accent);display:flex;align-items:center;gap:6px;">
+                <span>⚡</span> Puxar Base Oficial Caixa (1-Clique)
+              </div>
+              <span style="background:var(--accent);color:#000;font-weight:700;font-size:.65rem;padding:2px 8px;border-radius:10px;text-transform:uppercase;letter-spacing:.5px;">Recomendado</span>
+            </div>
+            <div style="font-size:.82rem;color:var(--text2);margin-bottom:12px;line-height:1.5;">
+              Carregue instantaneamente as mais de <strong>7.800 composições oficiais</strong> da Caixa Econômica Federal (Roraima/RR) direto pelo sistema, sem precisar baixar nem descompactar planilhas manualmente.
+            </div>
+            <button class="btn btn-primary" id="btn-puxar-oficial" style="width:100%;font-weight:700;display:flex;align-items:center;justify-content:center;gap:8px;padding:10px 16px;font-size:.9rem;" onclick="OrcamentoSINAPI.puxarOficialAutomatico()">
+              <span>⚡</span> Puxar Tabela Oficial Caixa Agora (1-Clique)
+            </button>
+          </div>
+
+          <div style="display:flex;align-items:center;gap:12px;margin:16px 0;">
+            <div style="flex:1;height:1px;background:var(--border);"></div>
+            <span style="font-size:.72rem;color:var(--text3);text-transform:uppercase;letter-spacing:1px;font-weight:600;">ou selecione/importe arquivo manual</span>
+            <div style="flex:1;height:1px;background:var(--border);"></div>
           </div>
 
           <!-- Série -->
@@ -573,13 +611,13 @@ const OrcamentoSINAPI = {
                 <input type="radio" name="imp-serie" value="false" ${!desoneradoInicial?'checked':''} style="display:none">
                 <div style="font-weight:700;margin-bottom:4px;">🟢 Com Oneração</div>
                 <div style="font-size:.74rem;color:var(--text3);">Padrão — Contribuição previdenciária normal</div>
-                ${metaOn ? `<div style="font-size:.7rem;color:var(--success);margin-top:4px;">✓ Já importada: ${metaOn.uf} Ref.${metaOn.referencia} (${metaOn.total.toLocaleString('pt-BR')} itens)</div>` : ''}
+                ${metaOn ? `<div style="font-size:.7rem;color:var(--success);margin-top:4px;">✓ Já carregada: ${metaOn.uf} Ref.${metaOn.referencia} (${metaOn.total.toLocaleString('pt-BR')} itens)</div>` : ''}
               </label>
               <label id="card-desonerado" style="cursor:pointer;border:2px solid ${desoneradoInicial?'var(--accent)':'var(--border)'};border-radius:var(--r-md);padding:12px;background:${desoneradoInicial?'rgba(201,162,39,.08)':'transparent'};transition:all .2s;" onclick="OrcamentoSINAPI._selectSerie(true)">
                 <input type="radio" name="imp-serie" value="true" ${desoneradoInicial?'checked':''} style="display:none">
                 <div style="font-weight:700;margin-bottom:4px;">🟡 Sem Oneração</div>
                 <div style="font-size:.74rem;color:var(--text3);">Desonerado — Lei 12.546/2011</div>
-                ${metaDes ? `<div style="font-size:.7rem;color:var(--success);margin-top:4px;">✓ Já importada: ${metaDes.uf} Ref.${metaDes.referencia} (${metaDes.total.toLocaleString('pt-BR')} itens)</div>` : ''}
+                ${metaDes ? `<div style="font-size:.7rem;color:var(--success);margin-top:4px;">✓ Já carregada: ${metaDes.uf} Ref.${metaDes.referencia} (${metaDes.total.toLocaleString('pt-BR')} itens)</div>` : ''}
               </label>
             </div>
           </div>
@@ -598,15 +636,16 @@ const OrcamentoSINAPI = {
 
           <!-- Upload -->
           <div class="form-group" style="margin-bottom:8px;">
-            <label class="form-label">Arquivo XLSX (Composições Sintéticas)</label>
-            <div id="imp-drop-area" style="border:2px dashed var(--border);border-radius:var(--r-md);padding:28px;text-align:center;cursor:pointer;transition:border-color .2s;"
+            <label class="form-label">Arquivo XLSX ou ZIP da Caixa (Composições Sintéticas)</label>
+            <div id="imp-drop-area" style="border:2px dashed var(--border);border-radius:var(--r-md);padding:24px;text-align:center;cursor:pointer;transition:border-color .2s;"
               ondragover="event.preventDefault();this.style.borderColor='var(--accent)'"
               ondragleave="this.style.borderColor='var(--border)'"
               ondrop="OrcamentoSINAPI._onDrop(event)">
               <div style="font-size:2rem;margin-bottom:8px;">📂</div>
-              <div style="font-size:.85rem;color:var(--text2);">Arraste o arquivo .xlsx aqui ou</div>
-              <button class="btn btn-secondary btn-sm" style="margin-top:10px;" onclick="document.getElementById('imp-file-input').click()">Selecionar Arquivo</button>
-              <input type="file" id="imp-file-input" accept=".xlsx,.xls" style="display:none" onchange="OrcamentoSINAPI._onFileChange(this.files[0])">
+              <div style="font-size:.85rem;color:var(--text2);">Arraste a planilha <strong>.xlsx</strong> ou o arquivo <strong>.zip</strong> da Caixa aqui</div>
+              <div style="font-size:.74rem;color:var(--text3);margin-top:4px;">Extração automática de composições sintéticas integrada</div>
+              <button class="btn btn-secondary btn-sm" style="margin-top:10px;" onclick="document.getElementById('imp-file-input').click()">Selecionar Arquivo (.xlsx ou .zip)</button>
+              <input type="file" id="imp-file-input" accept=".xlsx,.xls,.zip" style="display:none" onchange="OrcamentoSINAPI._onFileChange(this.files[0])">
             </div>
             <div id="imp-file-name" style="margin-top:8px;font-size:.78rem;color:var(--text3);"></div>
           </div>
@@ -620,7 +659,7 @@ const OrcamentoSINAPI = {
         </div>
         <div class="modal-footer">
           <button class="btn btn-secondary" onclick="Utils.closeModal()">Fechar</button>
-          <button class="btn btn-primary" id="btn-imp-confirmar" onclick="OrcamentoSINAPI.executarImport()" disabled>📥 Importar</button>
+          <button class="btn btn-primary" id="btn-imp-confirmar" onclick="OrcamentoSINAPI.executarImport()" disabled>📥 Importar Arquivo</button>
         </div>
       </div>`);
 
@@ -661,8 +700,79 @@ const OrcamentoSINAPI = {
 
   _selectedFile: null,
 
+  async puxarOficialAutomatico() {
+    const desonerado = document.querySelector('input[name="imp-serie"]:checked')?.value === 'true';
+    const btnPuxar = document.getElementById('btn-puxar-oficial');
+    const btnConf  = document.getElementById('btn-imp-confirmar');
+    const progEl   = document.getElementById('imp-progress');
+    const progMsg  = document.getElementById('imp-progress-msg');
+    const resEl    = document.getElementById('imp-result');
+
+    if (btnPuxar) {
+      btnPuxar.disabled = true;
+      btnPuxar.innerHTML = '<span>⏳</span> Baixando Base Oficial da Caixa...';
+    }
+    if (btnConf) btnConf.disabled = true;
+    if (progEl) progEl.style.display = 'block';
+    if (resEl) resEl.style.display = 'none';
+
+    const resultado = await SINAPI.puxarOficial(
+      desonerado,
+      (msg) => {
+        if (progMsg) progMsg.textContent = msg;
+      }
+    );
+
+    if (progEl) progEl.style.display = 'none';
+    if (btnPuxar) {
+      btnPuxar.disabled = false;
+      btnPuxar.innerHTML = '<span>⚡</span> Puxar Tabela Oficial Caixa Agora (1-Clique)';
+    }
+
+    if (resultado.ok) {
+      if (resEl) {
+        resEl.style.display = 'block';
+        resEl.innerHTML = `
+          <div style="background:rgba(16,185,129,.08);border:1px solid rgba(16,185,129,.3);border-radius:var(--r-md);padding:14px;display:flex;align-items:center;gap:12px;">
+            <span style="font-size:1.5rem">✅</span>
+            <div>
+              <div style="font-weight:700;color:var(--success);">Tabela Oficial Carregada!</div>
+              <div style="font-size:.8rem;color:var(--text2);margin-top:3px;">${resultado.msg}</div>
+            </div>
+          </div>`;
+      }
+      Utils.toast(resultado.msg, 'success');
+
+      setTimeout(() => {
+        Utils.closeModal();
+        if (this._currentEditor) {
+          this.openEditor(this._currentEditor);
+        } else {
+          const listEl = document.getElementById('sinapi-orc-list');
+          if (listEl) {
+            const statusHtml = document.querySelector('#sinapi-editor') ? '' : this.render(App.obraId);
+            if (statusHtml) document.getElementById('route-content').innerHTML = statusHtml;
+          }
+        }
+      }, 1200);
+    } else {
+      if (resEl) {
+        resEl.style.display = 'block';
+        resEl.innerHTML = `
+          <div style="background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.3);border-radius:var(--r-md);padding:14px;display:flex;align-items:center;gap:12px;">
+            <span style="font-size:1.5rem">❌</span>
+            <div>
+              <div style="font-weight:700;color:var(--danger);">Erro ao carregar tabela oficial</div>
+              <div style="font-size:.8rem;color:var(--text2);margin-top:3px;">${resultado.msg}</div>
+            </div>
+          </div>`;
+      }
+      Utils.toast(resultado.msg || 'Falha ao carregar tabela oficial.', 'error');
+    }
+  },
+
   async executarImport() {
-    if (!this._selectedFile) { Utils.toast('Selecione um arquivo .xlsx primeiro.', 'warning'); return; }
+    if (!this._selectedFile) { Utils.toast('Selecione um arquivo .xlsx ou .zip primeiro.', 'warning'); return; }
 
     const desonerado = document.querySelector('input[name="imp-serie"]:checked')?.value === 'true';
     const uf  = document.getElementById('imp-uf').value;
@@ -696,13 +806,19 @@ const OrcamentoSINAPI = {
       Utils.toast(resultado.msg, 'success');
       this._selectedFile = null;
       document.getElementById('btn-imp-confirmar').disabled = true;
-      // Atualiza lista
-      const listEl = document.getElementById('sinapi-orc-list');
-      if (listEl) {
-        // Rerender status cards
-        const statusHtml = document.querySelector('#sinapi-editor') ? '' : this.render(App.obraId);
-        if (statusHtml) document.getElementById('route-content').innerHTML = statusHtml;
-      }
+      // Atualiza lista ou editor
+      setTimeout(() => {
+        Utils.closeModal();
+        if (this._currentEditor) {
+          this.openEditor(this._currentEditor);
+        } else {
+          const listEl = document.getElementById('sinapi-orc-list');
+          if (listEl) {
+            const statusHtml = document.querySelector('#sinapi-editor') ? '' : this.render(App.obraId);
+            if (statusHtml) document.getElementById('route-content').innerHTML = statusHtml;
+          }
+        }
+      }, 1200);
     } else {
       resEl.innerHTML = `
         <div style="background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.3);border-radius:var(--r-md);padding:14px;display:flex;align-items:center;gap:12px;">
