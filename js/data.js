@@ -936,6 +936,14 @@ const DB = {
             if (typeof Utils !== 'undefined' && Utils.toast) Utils.toast(errorJson.error || 'Uma alteração local foi rejeitada pelo servidor.', 'warning');
             continue;
           }
+          item._retries = (item._retries || 0) + 1;
+          if (item._retries >= 5) {
+            console.error(`[Sync] Operação descartada após ${item._retries} falhas consecutivas do servidor (HTTP ${res.status}):`, errorJson.error || `${item.payload?.action}/${item.payload?.table}`);
+            const pending = this._ackSyncQueueItem(item, { force: true });
+            this._emitSyncStatus(pending ? 'pending' : 'synced', { rejected: true, code: `HTTP_${res.status}_MAX_RETRIES` });
+            if (typeof Utils !== 'undefined' && Utils.toast) Utils.toast(errorJson.error || 'Uma alteração pendente foi descartada após falhas repetidas no servidor.', 'warning');
+            continue;
+          }
           console.warn(`[Sync] Servidor recusou ${item.payload.action}/${item.payload.table}. Tentará novamente.`);
           this._scheduleSyncRetry(res.status === 429 ? 30000 : 15000);
           break;

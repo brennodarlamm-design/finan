@@ -723,15 +723,20 @@ export default async function handler(req, res) {
             if (!o?.id || !validCloudId(o.id, 80)) continue;
             const safeObraId = await validateObraTenant(sql, o.obra_id, tenantId);
             if (o.obra_id && !safeObraId) continue;
+            const dbObraId = (!safeObraId || safeObraId === 'escritorio' || safeObraId === 'geral') ? null : safeObraId;
             const rawJson = JSON.stringify(o);
             const subtotal = (Array.isArray(o.itens) ? o.itens : []).reduce((sum, item) => sum + cleanNum(item?.total), 0);
             const total = subtotal * (1 + cleanNum(o.bdi) / 100);
-            await sql`
-              INSERT INTO orcamentos_sinapi (tenant_id,id,obra_id,nome,status,valor_total,payload)
-              VALUES (${tenantId},${o.id},${safeObraId},${o.nome || 'Orçamento SINAPI'},${o.status || 'ativo'},${total},${rawJson}::jsonb)
-              ON CONFLICT (tenant_id,id) DO UPDATE SET obra_id=EXCLUDED.obra_id,nome=EXCLUDED.nome,status=EXCLUDED.status,valor_total=EXCLUDED.valor_total,payload=EXCLUDED.payload,updated_at=NOW();
-            `;
-            totalCount++;
+            try {
+              await sql`
+                INSERT INTO orcamentos_sinapi (tenant_id,id,obra_id,nome,status,valor_total,payload)
+                VALUES (${tenantId},${o.id},${dbObraId},${o.nome || 'Orçamento SINAPI'},${o.status || 'ativo'},${total},${rawJson}::jsonb)
+                ON CONFLICT (tenant_id,id) DO UPDATE SET obra_id=EXCLUDED.obra_id,nome=EXCLUDED.nome,status=EXCLUDED.status,valor_total=EXCLUDED.valor_total,payload=EXCLUDED.payload,updated_at=NOW();
+              `;
+              totalCount++;
+            } catch (bulkErr) {
+              console.warn('[Sync All] Falha ao salvar orcamento_sinapi:', bulkErr.message);
+            }
           }
         }
 
@@ -1145,14 +1150,20 @@ export default async function handler(req, res) {
           if (!validCloudId(o.id, 80)) return res.status(400).json({ success:false, error:'ID de orçamento SINAPI inválido.' });
           const safeObraId = await validateObraTenant(sql, o.obra_id, tenantId);
           if (o.obra_id && !safeObraId) return res.status(400).json({ success:false, error:'A obra informada não pertence à empresa autenticada.' });
+          const dbObraId = (!safeObraId || safeObraId === 'escritorio' || safeObraId === 'geral') ? null : safeObraId;
           const rawJson = JSON.stringify(o);
           const subtotal = (Array.isArray(o.itens) ? o.itens : []).reduce((sum, item) => sum + cleanNum(item?.total), 0);
           const total = subtotal * (1 + cleanNum(o.bdi) / 100);
-          await sql`
-            INSERT INTO orcamentos_sinapi (tenant_id,id,obra_id,nome,status,valor_total,payload)
-            VALUES (${tenantId},${o.id},${safeObraId},${o.nome || 'Orçamento SINAPI'},${o.status || 'ativo'},${total},${rawJson}::jsonb)
-            ON CONFLICT (tenant_id,id) DO UPDATE SET obra_id=EXCLUDED.obra_id,nome=EXCLUDED.nome,status=EXCLUDED.status,valor_total=EXCLUDED.valor_total,payload=EXCLUDED.payload,updated_at=NOW();
-          `;
+          try {
+            await sql`
+              INSERT INTO orcamentos_sinapi (tenant_id,id,obra_id,nome,status,valor_total,payload)
+              VALUES (${tenantId},${o.id},${dbObraId},${o.nome || 'Orçamento SINAPI'},${o.status || 'ativo'},${total},${rawJson}::jsonb)
+              ON CONFLICT (tenant_id,id) DO UPDATE SET obra_id=EXCLUDED.obra_id,nome=EXCLUDED.nome,status=EXCLUDED.status,valor_total=EXCLUDED.valor_total,payload=EXCLUDED.payload,updated_at=NOW();
+            `;
+          } catch (dbErr) {
+            console.error('[API /api/db] Erro ao salvar orcamento_sinapi:', dbErr.message);
+            return res.status(400).json({ success:false, error:`Erro ao salvar orçamento SINAPI: ${dbErr.message}` });
+          }
           await auditDb(sql, req, auth, 'salvar', 'orcamentos_sinapi', o);
           return res.status(200).json({ success:true, id:o.id });
         }
