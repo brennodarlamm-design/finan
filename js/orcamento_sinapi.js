@@ -338,7 +338,7 @@ const OrcamentoSINAPI = {
 
     const resultados = SINAPI.buscar(termo, desonerado, 30);
     if (!resultados.length) {
-      el.innerHTML = `<div style="padding:10px;color:var(--text3);font-size:.82rem;">Nenhum resultado para "${termo}"</div>`;
+      el.innerHTML = `<div style="padding:10px;color:var(--text3);font-size:.82rem;">Nenhum resultado para "${Utils.escapeHtml(termo)}"</div>`;
       return;
     }
 

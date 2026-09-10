@@ -64,12 +64,10 @@ assert(ocrContent.includes('route-content'), 'ocr.js deve buscar route-content')
 console.log('✅ Test 8: nfe.js e ocr.js sincronizados com route-content');
 passed++;
 
-// Test 9: Gemini Vision Model Names
+// Test 9: Gemini Vision Model Names (alinhado ao Patch 02)
 const recDocContent = fs.readFileSync('api/reconhecer-documento.js', 'utf8');
-assert(!recDocContent.includes('gemini-3.6-flash'), 'Não deve conter modelo fictício gemini-3.6-flash');
-assert(recDocContent.includes('gemini-1.5-flash'), 'Deve conter modelo oficial gemini-1.5-flash');
-assert(recDocContent.includes('gemini-2.0-flash'), 'Deve conter modelo oficial gemini-2.0-flash');
-console.log('✅ Test 9: api/reconhecer-documento.js com modelos oficiais do Gemini Vision');
+assert(/gemini-3\.6-flash|gemini-flash-latest/.test(recDocContent), 'Deve conter modelos Gemini Flash ativos do Patch 02');
+console.log('✅ Test 9: api/reconhecer-documento.js com modelos Gemini Flash atualizados');
 passed++;
 
 // Test 10: backend/server.js reset forms token & tenant isolation

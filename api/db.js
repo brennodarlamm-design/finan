@@ -35,6 +35,15 @@ function cleanNum(n) {
   return isNaN(val) ? 0 : val;
 }
 
+function todayBoaVista() {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Boa_Vista',
+    year: 'numeric', month: '2-digit', day: '2-digit'
+  }).formatToParts(new Date());
+  const values = Object.fromEntries(parts.map(p => [p.type, p.value]));
+  return `${values.year}-${values.month}-${values.day}`;
+}
+
 // ── VALIDAÇÃO DE INTEGRIDADE REFERENCIAL MULTI-TENANT ────────────────────────
 async function validateObraTenant(sql, obraId, tenantId) {
   if (!obraId) return null;
@@ -132,13 +141,14 @@ export default async function handler(req, res) {
               cnpj: f.cnpj_cpf || f.cnpj || '',
               razao_social: f.razao_social || f.nome,
               nome_fantasia: f.nome,
-              municipio: f.banco_info && f.banco_info.includes('/') ? f.banco_info.split(',').pop().split('/')[0].trim() : 'Boa Vista',
-              uf: 'RR',
-              ativo: true
+              endereco: f.endereco || '',
+              municipio: f.municipio || '',
+              uf: f.uf || '',
+              ativo: f.ativo !== false
             })),
             lancamentos: lancamentos.map(l => ({
               ...l,
-              data: cleanDate(l.data) || new Date().toISOString().split('T')[0],
+              data: cleanDate(l.data) || todayBoaVista(),
               data_vencimento: cleanDate(l.data_vencimento) || cleanDate(l.data),
               data_pagamento: cleanDate(l.data_pagamento),
               valor: cleanNum(l.valor),
@@ -201,7 +211,7 @@ export default async function handler(req, res) {
           success: true,
           data: items.map(l => ({
             ...l,
-            data: cleanDate(l.data) || new Date().toISOString().split('T')[0],
+            data: cleanDate(l.data) || todayBoaVista(),
             data_vencimento: cleanDate(l.data_vencimento) || cleanDate(l.data),
             data_pagamento: cleanDate(l.data_pagamento),
             valor: cleanNum(l.valor)
@@ -373,16 +383,28 @@ export default async function handler(req, res) {
             const razaoSocialFinal = (f.razao_social || f.nome_fantasia || f.nome || nomeFinal).trim();
             const cnpjCpfFinal = (f.cnpj_cpf || f.cnpj || f.cpf || '').replace(/\D/g, '');
             await sql`
-              INSERT INTO fornecedores (id, tenant_id, nome, razao_social, cnpj_cpf, telefone, email, categoria, chave_pix, banco_info)
+              INSERT INTO fornecedores (
+                id, tenant_id, nome, razao_social, cnpj_cpf, telefone, email, categoria,
+                chave_pix, banco_info, endereco, municipio, uf, ativo
+              )
               VALUES (
                 ${f.id}, ${tenantId}, ${nomeFinal}, ${razaoSocialFinal}, ${cnpjCpfFinal},
-                ${f.telefone || ''}, ${f.email || ''}, ${f.categoria || 'outros'}, ${f.chave_pix || ''}, ${f.banco_info || ''}
+                ${f.telefone || ''}, ${f.email || ''}, ${f.categoria || 'outros'}, ${f.chave_pix || ''}, ${f.banco_info || ''},
+                ${f.endereco || ''}, ${f.municipio || ''}, ${(f.uf || '').toUpperCase().slice(0, 2)}, ${f.ativo !== false}
               )
               ON CONFLICT (id) DO UPDATE SET
                 nome = EXCLUDED.nome,
                 razao_social = EXCLUDED.razao_social,
                 cnpj_cpf = EXCLUDED.cnpj_cpf,
-                telefone = EXCLUDED.telefone
+                telefone = EXCLUDED.telefone,
+                email = EXCLUDED.email,
+                categoria = EXCLUDED.categoria,
+                chave_pix = EXCLUDED.chave_pix,
+                banco_info = EXCLUDED.banco_info,
+                endereco = EXCLUDED.endereco,
+                municipio = EXCLUDED.municipio,
+                uf = EXCLUDED.uf,
+                ativo = EXCLUDED.ativo
               WHERE fornecedores.tenant_id = ${tenantId};
             `;
             totalCount++;
@@ -402,7 +424,7 @@ export default async function handler(req, res) {
         if (Array.isArray(payload.lancamentos)) {
           for (const l of payload.lancamentos) {
             if (!l.id || !l.descricao) continue;
-            const dataLanc = cleanDate(l.data) || new Date().toISOString().split('T')[0];
+            const dataLanc = cleanDate(l.data) || todayBoaVista();
             const dataVenc = cleanDate(l.data_vencimento) || dataLanc;
             const dataPag = cleanDate(l.data_pagamento);
             const itensJson = JSON.stringify(Array.isArray(l.itens) ? l.itens : []);
@@ -527,7 +549,7 @@ export default async function handler(req, res) {
       if (action === 'save' && data) {
         if (table === 'lancamentos') {
           const l = data;
-          const dataLanc = cleanDate(l.data) || new Date().toISOString().split('T')[0];
+          const dataLanc = cleanDate(l.data) || todayBoaVista();
           const dataVenc = cleanDate(l.data_vencimento) || dataLanc;
           const dataPag = cleanDate(l.data_pagamento);
           const safeObraId = await validateObraTenant(sql, l.obra_id, tenantId);
@@ -641,10 +663,14 @@ export default async function handler(req, res) {
           const cnpjCpfFinal = (f.cnpj_cpf || f.cnpj || f.cpf || '').replace(/\D/g, '');
 
           await sql`
-            INSERT INTO fornecedores (id, tenant_id, nome, razao_social, cnpj_cpf, telefone, email, categoria, chave_pix, banco_info)
+            INSERT INTO fornecedores (
+              id, tenant_id, nome, razao_social, cnpj_cpf, telefone, email, categoria,
+              chave_pix, banco_info, endereco, municipio, uf, ativo
+            )
             VALUES (
               ${f.id}, ${tenantId}, ${nomeFinal}, ${razaoSocialFinal}, ${cnpjCpfFinal},
-              ${f.telefone || ''}, ${f.email || ''}, ${f.categoria || 'outros'}, ${f.chave_pix || ''}, ${f.banco_info || ''}
+              ${f.telefone || ''}, ${f.email || ''}, ${f.categoria || 'outros'}, ${f.chave_pix || ''}, ${f.banco_info || ''},
+              ${f.endereco || ''}, ${f.municipio || ''}, ${(f.uf || '').toUpperCase().slice(0, 2)}, ${f.ativo !== false}
             )
             ON CONFLICT (id) DO UPDATE SET
               nome = EXCLUDED.nome,
@@ -654,7 +680,11 @@ export default async function handler(req, res) {
               email = EXCLUDED.email,
               categoria = EXCLUDED.categoria,
               chave_pix = EXCLUDED.chave_pix,
-              banco_info = EXCLUDED.banco_info
+              banco_info = EXCLUDED.banco_info,
+              endereco = EXCLUDED.endereco,
+              municipio = EXCLUDED.municipio,
+              uf = EXCLUDED.uf,
+              ativo = EXCLUDED.ativo
             WHERE fornecedores.tenant_id = ${tenantId};
           `;
           return res.status(200).json({ success: true, id: f.id });
@@ -781,7 +811,7 @@ export default async function handler(req, res) {
           const m = data;
           const safeObraId = await validateObraTenant(sql, m.obra_id, tenantId);
           const numMed = m.numero || m.numero_medicao || 1;
-          const dataMed = cleanDate(m.data || m.data_medicao) || new Date().toISOString().split('T')[0];
+          const dataMed = cleanDate(m.data || m.data_medicao) || todayBoaVista();
           const valMed = cleanNum(m.valor_medido || m.valor_solicitado);
           await sql`
             INSERT INTO medicoes (id, tenant_id, obra_id, numero, data, valor_medido, status, observacoes)

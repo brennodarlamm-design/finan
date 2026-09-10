@@ -77,6 +77,10 @@ CREATE TABLE IF NOT EXISTS fornecedores (
     categoria VARCHAR(100),
     chave_pix VARCHAR(255),
     banco_info TEXT,
+    endereco TEXT,
+    municipio VARCHAR(120),
+    uf VARCHAR(2),
+    ativo BOOLEAN DEFAULT TRUE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 

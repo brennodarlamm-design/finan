@@ -266,7 +266,7 @@ const Clientes = {
 
   del(id) {
     const c = DB.getById('clientes',id);
-    Utils.confirm(`Excluir a obra de "<strong>${c?.nome}</strong>"? Todos os dados serão perdidos.`, () => {
+    Utils.confirm(`Excluir a obra de "<strong>${Utils.escapeHtml(c?.nome || '')}</strong>"? Todos os dados serão perdidos.`, () => {
       DB.remove('clientes',id);
       App.refreshObraSelector();
       document.getElementById('cli-grid').innerHTML = this._cards(DB.getAll('clientes'));

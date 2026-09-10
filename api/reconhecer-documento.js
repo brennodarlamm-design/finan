@@ -111,9 +111,10 @@ REGRAS CRÍTICAS PARA 'itens' E 'tipo_documento':
 4. valor = total do documento (numero). Datas ISO YYYY-MM-DD. Não invente dados - use null. Retorne APENAS o JSON.`;
 
   try {
+    // Modelos atuais. Mantemos aliases/estáveis recentes em ordem de preferência.
     const models = [
-      'gemini-1.5-flash',
-      'gemini-2.0-flash',
+      'gemini-3.6-flash',
+      'gemini-3.5-flash',
       'gemini-flash-latest'
     ];
 

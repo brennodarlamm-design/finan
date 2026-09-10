@@ -192,7 +192,17 @@ const Utils = {
     const icons = { success:'✓', warning:'⚠', error:'✕', info:'ℹ' };
     const t = document.createElement('div');
     t.className = `toast ${type}`;
-    t.innerHTML = `<span style="font-size:15px;flex-shrink:0">${icons[type]||'ℹ'}</span><span style="flex:1">${msg}</span>`;
+
+    // Não injeta mensagens em innerHTML: erros de API e nomes cadastrados podem conter texto não confiável.
+    const icon = document.createElement('span');
+    icon.style.fontSize = '15px';
+    icon.style.flexShrink = '0';
+    icon.textContent = icons[type] || 'ℹ';
+    const text = document.createElement('span');
+    text.style.flex = '1';
+    text.textContent = String(msg ?? '');
+    t.append(icon, text);
+
     c.appendChild(t);
     setTimeout(()=>{ t.style.opacity='0';t.style.transform='translateX(60px)';t.style.transition='all .25s'; setTimeout(()=>t.remove(),250); }, 3200);
   },

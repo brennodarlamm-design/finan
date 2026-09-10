@@ -6,7 +6,19 @@
 $OutputEncoding           = [System.Text.Encoding]::UTF8
 
 $EvolutionUrl = "http://localhost:8080"
-$ApiKey       = "ANGELIM-FINANCAS-EVOLUTION-2026-KEY"
+$ApiKey       = $env:EVOLUTION_API_KEY
+if ([string]::IsNullOrWhiteSpace($ApiKey)) {
+    $envFile = Join-Path $PSScriptRoot ".env"
+    if (Test-Path $envFile) {
+        $line = Get-Content $envFile | Where-Object { $_ -match '^\s*EVOLUTION_API_KEY\s*=' } | Select-Object -First 1
+        if ($line) { $ApiKey = ($line -split '=', 2)[1].Trim().Trim('"').Trim("'") }
+    }
+}
+if ([string]::IsNullOrWhiteSpace($ApiKey)) {
+    Write-Host "ERRO: defina EVOLUTION_API_KEY no ambiente ou em evolution-api/.env." -ForegroundColor Red
+    Write-Host "Use .env.example como modelo e nao envie o arquivo .env ao Git." -ForegroundColor Yellow
+    exit 1
+}
 $InstanceName = "angelim"
 
 Write-Host "=====================================================" -ForegroundColor Cyan

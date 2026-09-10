@@ -630,7 +630,7 @@ const Documentos = {
   _confirmDel(id) {
     const doc = this.getById(id);
     if (!doc) return;
-    Utils.confirm(`Excluir o anexo "${doc.titulo || doc.nome_arquivo}"?`, () => {
+    Utils.confirm(`Excluir o anexo "${Utils.escapeHtml(doc.titulo || doc.nome_arquivo || '')}"?`, () => {
       this.remover(id);
       Utils.toast('Anexo removido!', 'info');
       this.abrirModal(doc.entidade_tipo, doc.entidade_id);

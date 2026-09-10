@@ -643,7 +643,7 @@ const Escritorio = {
   excluir(id) {
     const l = DB.getById('lancamentos', id);
     if (!l) return;
-    Utils.confirm(`Deseja realmente excluir a despesa <strong>${l.descricao}</strong> (${Utils.fmt.currency(l.valor)})?`, () => {
+    Utils.confirm(`Deseja realmente excluir a despesa <strong>${Utils.escapeHtml(l.descricao || '')}</strong> (${Utils.fmt.currency(l.valor)})?`, () => {
       DB.remove('lancamentos', id);
       Utils.toast('Despesa removida!', 'info');
       App.navigate('escritorio');

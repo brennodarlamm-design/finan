@@ -170,7 +170,7 @@ const Fornecedores = {
           ${fant ? `<div style="font-size:.72rem;color:var(--text3);">${fant}</div>` : ''}
         </td>
         <td style="white-space:nowrap;font-size:.8rem;">${cat?.label || f.categoria || '—'}</td>
-        <td style="font-size:.78rem;color:var(--text2);">${[f.municipio, f.uf].filter(Boolean).join(' / ') || 'Boa Vista / RR'}</td>
+        <td style="font-size:.78rem;color:var(--text2);">${[f.municipio, f.uf].filter(Boolean).join(' / ') || '—'}</td>
         <td style="font-size:.78rem;white-space:nowrap;">${f.telefone || '—'}</td>
         <td style="font-size:.75rem;color:var(--text3);max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${f.email || '—'}</td>
         <td style="font-size:.78rem;text-align:center;">${f.prazo_pagamento ? `${f.prazo_pagamento}d` : '—'}</td>

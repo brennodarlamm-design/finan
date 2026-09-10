@@ -657,7 +657,7 @@ const PreCompras = {
   excluir(id) {
     const item = DB.getById('precompras', id);
     if (!item) return;
-    Utils.confirm(`Deseja realmente excluir a ordem de pré-compra <strong>${item.numero_ordem}</strong>?`, () => {
+    Utils.confirm(`Deseja realmente excluir a ordem de pré-compra <strong>${Utils.escapeHtml(item.numero_ordem || '')}</strong>?`, () => {
       DB.remove('precompras', id);
       Utils.toast('Ordem de pré-compra excluída!', 'info');
       App.navigate('precompras');

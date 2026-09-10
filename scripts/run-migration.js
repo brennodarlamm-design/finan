@@ -29,42 +29,66 @@ if (!dbUrl) {
 console.log('🚀 Conectando ao Lakebase Postgres (Neon)...');
 const sql = neon(dbUrl);
 
+async function executeSqlFile(filePath) {
+  const fileName = path.basename(filePath);
+  console.log(`\n======================================================`);
+  console.log(`📄 Executando migração: ${fileName}`);
+  console.log(`======================================================`);
+  
+  const rawContent = fs.readFileSync(filePath, 'utf8');
+  // Strip line comments safely
+  const cleanedContent = rawContent.replace(/--.*$/gm, '');
+  const statements = cleanedContent
+    .split(';')
+    .map(s => s.trim())
+    .filter(s => s.length > 0 && s.toUpperCase() !== 'BEGIN' && s.toUpperCase() !== 'COMMIT');
+
+  console.log(`Instruções encontradas: ${statements.length}`);
+
+  for (let i = 0; i < statements.length; i++) {
+    const cleaned = statements[i];
+    const firstLine = cleaned.split('\n')[0].slice(0, 65);
+    try {
+      await sql(cleaned);
+      console.log(`  [${i + 1}/${statements.length}] ✔ ${firstLine}...`);
+    } catch (err) {
+      console.error(`  [${i + 1}/${statements.length}] ❌ Erro na instrução:`, cleaned);
+      console.error(`     Detalhe: ${err.message}`);
+      throw err;
+    }
+  }
+  console.log(`✅ ${fileName} executado com sucesso!`);
+}
+
 async function run() {
   try {
     const test = await sql`SELECT current_database(), current_user, version();`;
     console.log(`✅ Conexão estabelecida com sucesso!`);
     console.log(`   Database: ${test[0].current_database}`);
     console.log(`   User: ${test[0].current_user}`);
-    console.log(`   Engine: ${test[0].version.split(',')[0]}\n`);
+    console.log(`   Engine: ${test[0].version.split(',')[0]}`);
 
-    const migrationPath = path.resolve(process.cwd(), 'migrations/001_saas_hardening.sql');
-    const rawContent = fs.readFileSync(migrationPath, 'utf8');
+    const targetArg = process.argv[2];
+    const migrationsDir = path.resolve(process.cwd(), 'migrations');
+    let filesToRun = [];
 
-    // Strip line comments safely
-    const cleanedContent = rawContent.replace(/--.*$/gm, '');
-    const statements = cleanedContent
-      .split(';')
-      .map(s => s.trim())
-      .filter(s => s.length > 0);
-
-    console.log(`📄 Executando ${statements.length} instruções de migração...\n`);
-
-    for (let i = 0; i < statements.length; i++) {
-      const cleaned = statements[i];
-      const firstLine = cleaned.split('\n')[0].slice(0, 65);
-      try {
-        await sql(cleaned);
-        console.log(`  [${i + 1}/${statements.length}] ✔ ${firstLine}...`);
-      } catch (retryErr) {
-        console.error(`  [${i + 1}/${statements.length}] ❌ Erro na instrução:`, cleaned);
-        console.error(`     Detalhe: ${retryErr.message}`);
-        throw retryErr;
-      }
+    if (targetArg) {
+      const p = path.resolve(process.cwd(), targetArg);
+      if (fs.existsSync(p)) filesToRun.push(p);
+      else throw new Error(`Arquivo de migração não encontrado: ${targetArg}`);
+    } else {
+      const allFiles = fs.readdirSync(migrationsDir).filter(f => f.endsWith('.sql')).sort();
+      filesToRun = allFiles.map(f => path.join(migrationsDir, f));
     }
 
-    // 3. Verification
-    console.log('\n🔍 Verificando integridade das tabelas e colunas aplicadas...');
+    for (const f of filesToRun) {
+      await executeSqlFile(f);
+    }
+
+    // Verification
+    console.log('\n🔍 Verificando integridade das tabelas, colunas e índices aplicados...');
     
+    // Check audit_logs table
     const checkAudit = await sql`
       SELECT table_name 
       FROM information_schema.tables 
@@ -72,6 +96,7 @@ async function run() {
     `;
     console.log(`  Tabela 'audit_logs': ${checkAudit.length ? '✅ PRESENTE' : '❌ AUSENTE'}`);
 
+    // Check crea_cau column in tenants
     const checkCrea = await sql`
       SELECT column_name, data_type 
       FROM information_schema.columns 
@@ -79,6 +104,17 @@ async function run() {
     `;
     console.log(`  Coluna 'tenants.crea_cau': ${checkCrea.length ? `✅ PRESENTE (${checkCrea[0].data_type})` : '❌ AUSENTE'}`);
 
+    // Check fornecedores columns (endereco, municipio, uf, ativo)
+    const checkFornCols = await sql`
+      SELECT column_name, data_type 
+      FROM information_schema.columns 
+      WHERE table_schema = 'public' AND table_name = 'fornecedores' 
+        AND column_name IN ('endereco', 'municipio', 'uf', 'ativo');
+    `;
+    console.log(`  Colunas em 'fornecedores' (Patch 02):`);
+    checkFornCols.forEach(col => console.log(`   - ${col.column_name}: ✅ PRESENTE (${col.data_type})`));
+
+    // Check all relevant indexes
     const checkIndexes = await sql`
       SELECT indexname, tablename
       FROM pg_indexes 
@@ -89,9 +125,9 @@ async function run() {
     console.log(`\n  Índices ativos verificados (${checkIndexes.length}):`);
     checkIndexes.forEach(idx => console.log(`   - [${idx.tablename}] ${idx.indexname}`));
 
-    console.log('\n🎉 Migração 001_saas_hardening.sql executada com 100% de sucesso no Neon!');
+    console.log('\n🎉 Todas as migrações foram verificadas e aplicadas com 100% de sucesso no Neon!');
   } catch (err) {
-    console.error('\n❌ Falha durante a execução da migração:', err.message);
+    console.error('\n❌ Falha durante a execução das migrações:', err.message);
     process.exit(1);
   }
 }
