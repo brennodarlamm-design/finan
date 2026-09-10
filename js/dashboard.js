@@ -326,12 +326,12 @@ const Dashboard = {
 
     const lans = DB.getLancamentos(obraId==='todas'?null:obraId).filter(l => {
       const venc = l.data_vencimento || l.data;
-      return l.tipo === 'despesa' && (l.status === 'a_pagar' || l.status === 'pendente') && venc >= today && venc <= fStr;
+      return l.tipo === 'despesa' && (l.status === 'a_pagar' || l.status === 'pendente' || l.status === 'em_atraso') && venc && venc <= fStr;
     });
 
     const nfItems = DB.getAll('notas').filter(n => {
       const venc = n.data_vencimento || n.data_emissao;
-      return (!obraId || obraId === 'todas' || n.obra_id === obraId) && n.status === 'pendente' && venc >= today && venc <= fStr;
+      return (!obraId || obraId === 'todas' || n.obra_id === obraId) && n.status === 'pendente' && venc && venc <= fStr;
     });
 
     const items = [
@@ -372,7 +372,8 @@ const Dashboard = {
       const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
       
       let diasBadge = '';
-      if (diffDays === 0) diasBadge = '<span style="color:#ef4444;font-weight:800;font-size:.68rem;background:rgba(239,68,68,.15);padding:2px 6px;border-radius:4px;">Hoje</span>';
+      if (diffDays < 0) diasBadge = `<span style="color:#ef4444;font-weight:800;font-size:.68rem;background:rgba(239,68,68,.2);padding:2px 6px;border-radius:4px;">Atrasado (${Math.abs(diffDays)}d)</span>`;
+      else if (diffDays === 0) diasBadge = '<span style="color:#ef4444;font-weight:800;font-size:.68rem;background:rgba(239,68,68,.15);padding:2px 6px;border-radius:4px;">Hoje</span>';
       else if (diffDays === 1) diasBadge = '<span style="color:#f59e0b;font-weight:800;font-size:.68rem;background:rgba(245,158,11,.15);padding:2px 6px;border-radius:4px;">Amanhã</span>';
       else if (diffDays <= 7) diasBadge = `<span style="color:#f59e0b;font-weight:800;font-size:.68rem;background:rgba(245,158,11,.15);padding:2px 6px;border-radius:4px;">Em ${diffDays} dias</span>`;
       else diasBadge = `<span style="color:var(--text3);font-size:.68rem;">Em ${diffDays} dias</span>`;

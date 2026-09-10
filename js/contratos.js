@@ -682,6 +682,19 @@ const Contratos = {
     }, 60);
   },
 
+  _onModeloSelect(modeloKey) {
+    if (!modeloKey) return;
+    const modelos = this.getModelos();
+    const m = modelos[modeloKey];
+    if (!m) return;
+    const titEl = document.getElementById('ct-titulo');
+    if (titEl && m.nome) titEl.value = m.nome;
+    if (m.clausulas && Array.isArray(m.clausulas)) {
+      this._clausulasTemporarias = JSON.parse(JSON.stringify(m.clausulas));
+      this._renderClausulasNoForm();
+    }
+  },
+
   _onObraChange(obraId) {
     if (!obraId) return;
     const c = DB.getById('clientes', obraId);
@@ -894,6 +907,10 @@ const Contratos = {
   // ─────────────────────────────────────────────────────────────
   // VISUALIZADOR DA MINUTA COMPLETA (EXATAMENTE COMO O MODELO PDF)
   // ─────────────────────────────────────────────────────────────
+  visualizar(id) {
+    this.visualizarContrato(id);
+  },
+
   visualizarContrato(id) {
     const c = this.getById(id);
     if (!c) return;

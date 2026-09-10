@@ -6,6 +6,11 @@ const MasterAdmin = {
   _empresas: null,
   _isLoading: false,
 
+  _esc(value) {
+    if (typeof Utils !== 'undefined' && Utils.escapeHtml) return Utils.escapeHtml(String(value ?? ''));
+    return String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  },
+
   async carregarEmpresas(force = false) {
     if (this._empresas && !force) return this._empresas;
     this._isLoading = true;
@@ -61,7 +66,7 @@ const MasterAdmin = {
 
   isSuperAdmin() {
     const u = (typeof Auth !== 'undefined' && Auth.getUser()) || {};
-    return u.username === 'admin' || u.perfil === 'superadmin';
+    return u.perfil === 'superadmin';
   },
 
   _activeTab: 'empresas',
@@ -438,49 +443,35 @@ const MasterAdmin = {
       'ativo': '<span style="background:rgba(34,197,94,.15);color:#22c55e;border:1px solid rgba(34,197,94,.3);padding:2px 8px;border-radius:10px;font-size:.72rem;font-weight:700;">🟢 Ativo</span>',
       'trial': '<span style="background:rgba(245,158,11,.15);color:#f59e0b;border:1px solid rgba(245,158,11,.3);padding:2px 8px;border-radius:10px;font-size:.72rem;font-weight:700;">🟡 Em Teste (Trial)</span>',
       'inadimplente': '<span style="background:rgba(239,68,68,.15);color:#ef4444;border:1px solid rgba(239,68,68,.3);padding:2px 8px;border-radius:10px;font-size:.72rem;font-weight:700;">🔴 Inadimplente</span>',
-      'bloqueado': '<span style="background:rgba(148,163,184,.15);color:#94a3b8;border:1px solid rgba(148,163,184,.3);padding:2px 8px;border-radius:10px;font-size:.72rem;font-weight:700;">⚪ Bloqueado</span>'
+      'bloqueado': '<span style="background:rgba(148,163,184,.15);color:#94a3b8;border:1px solid rgba(148,163,184,.3);padding:2px 8px;border-radius:10px;font-size:.72rem;font-weight:700;">⚪ Bloqueado</span>',
+      'cancelado': '<span style="background:rgba(239,68,68,.12);color:#f87171;border:1px solid rgba(239,68,68,.25);padding:2px 8px;border-radius:10px;font-size:.72rem;font-weight:700;">⛔ Cancelado</span>'
     };
-
-    const planosNome = {
-      'starter': 'Básico (R$ 79,90)',
-      'pro': 'Profissional (R$ 119,90)',
-      'unlimited': 'Ilimitado (R$ 159,90)'
-    };
-
+    const planosNome = { starter:'Básico (R$ 79,90)', pro:'Profissional (R$ 119,90)', unlimited:'Ilimitado (R$ 159,90)', trial:'Trial' };
+    const nome=this._esc(e.nome_fantasia), razao=this._esc(e.razao_social||''), cnpj=this._esc(e.cnpj||'—');
+    const resp=this._esc(e.responsavel||'—'), contato=this._esc(e.telefone||e.email||'—');
+    const plano=this._esc(planosNome[e.plano]||e.plano||'—');
+    const id=String(e.id||''); // IDs de tenant são gerados pelo servidor e não são texto livre.
+    const telDigits=String(e.telefone||'').replace(/\D/g,'');
+    const wa=(telDigits ? (telDigits.startsWith('55')?telDigits:'55'+telDigits) : '5595991363678');
+    const waText=encodeURIComponent(`Olá, ${e.responsavel||''}! Aqui é do FinObra referente à assinatura da ${e.nome_fantasia||''}.`);
+    const venc=e.vencimento ? (Utils.formatDate ? Utils.formatDate(e.vencimento) : this._esc(e.vencimento)) : '—';
     return `
       <tr style="border-bottom:1px solid rgba(255,255,255,.04);transition:background .15s;">
-        <td style="padding:14px 18px;">
-          <div style="font-weight:800;color:#fff;">${e.nome_fantasia}</div>
-          <div style="font-size:.72rem;color:#94a3b8;">${e.razao_social || ''}</div>
-        </td>
-        <td style="padding:14px 18px;font-family:monospace;font-size:.78rem;color:#cbd5e1;">${e.cnpj || '—'}</td>
-        <td style="padding:14px 18px;">
-          <div style="color:#e2e8f0;">${e.responsavel}</div>
-          <div style="font-size:.72rem;color:#94a3b8;">${e.telefone || e.email || '—'}</div>
-        </td>
-        <td style="padding:14px 18px;font-weight:700;color:var(--accent2);font-size:.8rem;">
-          ${planosNome[e.plano] || e.plano}
-        </td>
-        <td style="padding:14px 18px;font-weight:700;color:#fff;">${e.obrasQtd || 0}</td>
-        <td style="padding:14px 18px;">${badgeStatus[e.status] || e.status}</td>
-        <td style="padding:14px 18px;font-size:.8rem;color:#cbd5e1;">
-          ${Utils.formatDate ? Utils.formatDate(e.vencimento) : e.vencimento}
-        </td>
+        <td style="padding:14px 18px;"><div style="font-weight:800;color:#fff;">${nome}</div><div style="font-size:.72rem;color:#94a3b8;">${razao}</div></td>
+        <td style="padding:14px 18px;font-family:monospace;font-size:.78rem;color:#cbd5e1;">${cnpj}</td>
+        <td style="padding:14px 18px;"><div style="color:#e2e8f0;">${resp}</div><div style="font-size:.72rem;color:#94a3b8;">${contato}</div></td>
+        <td style="padding:14px 18px;font-weight:700;color:var(--accent2);font-size:.8rem;">${plano}</td>
+        <td style="padding:14px 18px;font-weight:700;color:#fff;">${Number(e.obrasQtd||0)}</td>
+        <td style="padding:14px 18px;">${badgeStatus[e.status] || this._esc(e.status||'—')}</td>
+        <td style="padding:14px 18px;font-size:.8rem;color:#cbd5e1;">${venc}</td>
         <td style="padding:14px 18px;text-align:right;">
           <div style="display:inline-flex;gap:6px;">
-            <button onclick="MasterAdmin.impersonarEmpresa('${e.id}')" title="Acessar sistema como esta empresa para dar suporte" style="background:rgba(201,162,39,.15);border:1px solid var(--accent);color:var(--accent2);padding:4px 8px;border-radius:6px;font-size:.75rem;font-weight:700;cursor:pointer;">
-              👁️ Acessar
-            </button>
-            <a href="https://wa.me/${e.telefone ? (e.telefone.startsWith('55') ? e.telefone : `55${e.telefone.replace(/\D/g,'')}`) : '5595991363678'}?text=${encodeURIComponent(`Olá, ${e.responsavel}! Aqui é do FinObra referente à assinatura da ${e.nome_fantasia}.`)}" target="_blank" title="Conversar no WhatsApp" style="background:rgba(34,197,94,.15);border:1px solid #22c55e;color:#22c55e;padding:4px 8px;border-radius:6px;font-size:.75rem;font-weight:700;text-decoration:none;display:inline-flex;align-items:center;">
-              💬 Cobrar
-            </a>
-            <button onclick="MasterAdmin.alterarStatusEmpresa('${e.id}')" title="Alterar status ou plano" style="background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.15);color:#cbd5e1;padding:4px 8px;border-radius:6px;font-size:.75rem;cursor:pointer;">
-              ✏️
-            </button>
+            <button data-tenant-id="${this._esc(id)}" onclick="MasterAdmin.impersonarEmpresa(this.dataset.tenantId)" title="Acessar sistema como esta empresa para dar suporte" style="background:rgba(201,162,39,.15);border:1px solid var(--accent);color:var(--accent2);padding:4px 8px;border-radius:6px;font-size:.75rem;font-weight:700;cursor:pointer;">👁️ Acessar</button>
+            <a href="https://wa.me/${wa}?text=${waText}" target="_blank" rel="noopener noreferrer" title="Conversar no WhatsApp" style="background:rgba(34,197,94,.15);border:1px solid #22c55e;color:#22c55e;padding:4px 8px;border-radius:6px;font-size:.75rem;font-weight:700;text-decoration:none;display:inline-flex;align-items:center;">💬 Cobrar</a>
+            <button data-tenant-id="${this._esc(id)}" onclick="MasterAdmin.alterarStatusEmpresa(this.dataset.tenantId)" title="Alterar status ou plano" style="background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.15);color:#cbd5e1;padding:4px 8px;border-radius:6px;font-size:.75rem;cursor:pointer;">✏️</button>
           </div>
         </td>
-      </tr>
-    `;
+      </tr>`;
   },
 
   // ── IMPERSONATE: ACESSAR COMO A EMPRESA PARA SUPORTE ───────────────────────
@@ -532,7 +523,7 @@ const MasterAdmin = {
           })
         });
         const data = await res.json();
-        if (!res.ok || !data.ok) {
+        if (!res.ok || !data.success) {
           throw new Error(data.error || 'Erro ao atualizar status no servidor');
         }
 
@@ -610,7 +601,7 @@ const MasterAdmin = {
             </div>
             <div>
               <label style="display:block;font-size:.78rem;color:#94a3b8;margin-bottom:4px;">Senha de Acesso *</label>
-              <input type="text" id="ne-senha" required value="obra123" style="width:100%;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.15);border-radius:8px;padding:9px 12px;color:#fff;font-size:.85rem;">
+              <input type="password" id="ne-senha" required minlength="8" placeholder="Mínimo 8 caracteres" style="width:100%;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.15);border-radius:8px;padding:9px 12px;color:#fff;font-size:.85rem;">
             </div>
           </div>
 
@@ -648,7 +639,8 @@ const MasterAdmin = {
         method: 'POST',
         headers: (typeof Auth !== 'undefined' && Auth.getAuthHeaders) ? Auth.getAuthHeaders() : { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          nome,
+          nome_fantasia: nome,
+          razao_social: nome,
           cnpj,
           plano,
           responsavel: resp,
@@ -660,7 +652,7 @@ const MasterAdmin = {
       });
 
       const data = await res.json();
-      if (!res.ok || !data.ok) {
+      if (!res.ok || !data.success) {
         throw new Error(data.error || 'Erro ao criar construtora no banco de dados');
       }
 

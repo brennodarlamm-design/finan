@@ -1,45 +1,11 @@
-// js/auth.js — Authentication Module & Multi-Tenant Scoping (Server-Side & Local Fallback)
+// js/auth.js — Authentication Module & Multi-Tenant Scoping (Server-Side)
 
 const Auth = {
   USERS_KEY: 'finobra_users',
   SESSION_KEY: 'finobra_session',
   TOKEN_KEY: 'finobra_token',
 
-  defaultUsers: [
-    {
-      id: 'u1',
-      username: 'admin',
-      nome: 'Administrador (Angelim)',
-      email: 'admin@finobra.com',
-      perfil: 'admin',
-      ativo: true,
-      avatar: 'AD',
-      tenantId: 'angelim',
-      empresaNome: 'Angelim Construtora'
-    },
-    {
-      id: 'u2',
-      username: 'gestor',
-      nome: 'Gestor Obras',
-      email: 'gestor@finobra.com',
-      perfil: 'gestor',
-      ativo: true,
-      avatar: 'GO',
-      tenantId: 'angelim',
-      empresaNome: 'Angelim Construtora'
-    },
-    {
-      id: 'u_empresa',
-      username: 'empresa',
-      nome: 'Diretor / Construtor',
-      email: 'contato@minhaempresa.com',
-      perfil: 'admin',
-      ativo: true,
-      avatar: 'ME',
-      tenantId: 'tenant_empresa_zerada',
-      empresaNome: 'Minha Empresa Construtora'
-    }
-  ],
+  defaultUsers: [],
 
   getToken() {
     return localStorage.getItem(this.TOKEN_KEY) || sessionStorage.getItem(this.TOKEN_KEY) || '';
@@ -55,36 +21,12 @@ const Auth = {
   },
 
   getUsers() {
-    const s = localStorage.getItem(this.USERS_KEY);
-    if (!s) {
-      localStorage.setItem(this.USERS_KEY, JSON.stringify(this.defaultUsers));
-      return this.defaultUsers;
-    }
     try {
-      let users = JSON.parse(s);
-      if (!Array.isArray(users)) users = [...this.defaultUsers];
-
-      let modified = false;
-      users = users.map(u => {
-        if (!u.tenantId) {
-          modified = true;
-          return { ...u, tenantId: u.username === 'empresa' ? 'tenant_empresa_zerada' : 'angelim' };
-        }
-        return u;
-      });
-
-      if (!users.some(u => u.username === 'empresa')) {
-        users.push(this.defaultUsers.find(u => u.username === 'empresa'));
-        modified = true;
-      }
-
-      if (modified) {
-        localStorage.setItem(this.USERS_KEY, JSON.stringify(users));
-      }
-      return users;
+      const raw = localStorage.getItem(this.USERS_KEY);
+      const users = raw ? JSON.parse(raw) : [];
+      return Array.isArray(users) ? users : [];
     } catch {
-      localStorage.setItem(this.USERS_KEY, JSON.stringify(this.defaultUsers));
-      return this.defaultUsers;
+      return [];
     }
   },
 
@@ -96,7 +38,7 @@ const Auth = {
       email: user.email || '',
       perfil: user.perfil || 'admin',
       avatar: user.avatar || (user.nome ? user.nome.slice(0, 2).toUpperCase() : 'US'),
-      tenantId: user.tenantId || (user.username === 'empresa' ? 'tenant_empresa_zerada' : 'angelim'),
+      tenantId: user.tenantId || user.tenant_id || '',
       empresaNome: user.empresaNome || '',
       googleAuth: !!user.googleAuth,
       loginAt: new Date().toISOString(),
@@ -327,7 +269,7 @@ const Auth = {
 
   getCurrentTenantId() {
     const session = this.getSession();
-    return session?.tenantId || 'angelim';
+    return session?.tenantId || 'public';
   },
 
   logout() {

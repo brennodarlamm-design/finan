@@ -814,16 +814,15 @@ const OCR = {
     Utils.toast(`✅ Lançamento de ${Utils.fmt.currency(valor)} registrado com sucesso!`, 'success');
 
     // Atualiza telas abertas
-    if (typeof Lancamentos !== 'undefined' && Lancamentos.render) {
-      const appContent = document.getElementById('app-content');
-      if (appContent && typeof App !== 'undefined' && App.currentRoute === 'lancamentos') {
-        appContent.innerHTML = Lancamentos.render(App.currentObraId);
-        if (Lancamentos.init) Lancamentos.init(App.currentObraId);
-      }
+    const appContent = document.getElementById('route-content') || document.getElementById('app-content');
+    const curRoute = (typeof App !== 'undefined') ? (App.route || App.currentRoute) : '';
+    const curObra = (typeof App !== 'undefined') ? (App.obraId || App.currentObraId) : null;
+    if (typeof Lancamentos !== 'undefined' && Lancamentos.render && appContent && curRoute === 'lancamentos') {
+      appContent.innerHTML = Lancamentos.render(curObra);
+      if (Lancamentos.init) Lancamentos.init(curObra);
     }
-    if (typeof Dashboard !== 'undefined' && typeof App !== 'undefined' && App.currentRoute === 'dashboard') {
-      const appContent = document.getElementById('app-content');
-      if (appContent) appContent.innerHTML = Dashboard.render(App.currentObraId);
+    if (typeof Dashboard !== 'undefined' && typeof App !== 'undefined' && appContent && curRoute === 'dashboard') {
+      appContent.innerHTML = Dashboard.render(curObra);
     }
   },
 

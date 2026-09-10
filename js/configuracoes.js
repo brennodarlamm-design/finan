@@ -2,6 +2,41 @@
 
 const Configuracoes = {
   _activeTab: 'empresa',
+  _usersCache: null,
+
+  _esc(value) {
+    if (typeof Utils !== 'undefined' && Utils.escapeHtml) return Utils.escapeHtml(String(value ?? ''));
+    return String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  },
+
+  async loadUsers() {
+    try {
+      const res = await fetch('/api/users', { headers: Auth.getAuthHeaders() });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.success || !Array.isArray(data.users)) throw new Error(data.error || 'Falha ao carregar usuários.');
+      this._usersCache = data.users;
+      localStorage.setItem(Auth.USERS_KEY, JSON.stringify(data.users)); // apenas cache de interface
+      this._refreshUsers();
+      return data.users;
+    } catch (err) {
+      console.warn('[Usuários] Não foi possível atualizar a lista:', err);
+      return this._usersCache || Auth.getUsers();
+    }
+  },
+
+  async loadEmpresaCloud() {
+    try {
+      const res = await fetch('/api/tenant', { headers: Auth.getAuthHeaders() });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && data.success && data.tenant) {
+        DB.saveEmpresa({ ...data.tenant, whatsapp: (data.tenant.telefone || '').replace(/\D/g, ''), configurada: true });
+        if (this._activeTab === 'empresa') {
+          const content = document.getElementById('cfg-content');
+          if (content) content.innerHTML = this._renderEmpresa();
+        }
+      }
+    } catch (err) { console.warn('[Empresa] Cache local mantido:', err); }
+  },
 
   render(obraId) {
     if (this._activeTab === 'sistema') {
@@ -48,6 +83,8 @@ const Configuracoes = {
     if (el) el.classList.add('cfg-tab-active');
     const content = document.getElementById('cfg-content');
     if (content) content.innerHTML = this._renderTab(tab, App.obraId);
+    if (tab === 'usuarios') this.loadUsers();
+    if (tab === 'empresa') this.loadEmpresaCloud();
   },
 
   _renderTab(tab, obraId) {
@@ -346,36 +383,36 @@ const Configuracoes = {
     }
   },
 
-  saveEmpresa(e) {
+  async saveEmpresa(e) {
     e.preventDefault();
     const fd = new FormData(e.target);
     const empresaData = {
       nome_fantasia: fd.get('nome_fantasia').trim(),
       razao_social: (fd.get('razao_social') || fd.get('nome_fantasia')).trim(),
-      cnpj: fd.get('cnpj').trim(),
-      telefone: fd.get('telefone').trim(),
-      whatsapp: fd.get('telefone').trim().replace(/\D/g, ''),
-      email: fd.get('email').trim(),
-      endereco: fd.get('endereco').trim(),
-      cidade: fd.get('cidade').trim(),
-      uf: fd.get('uf').trim().toUpperCase(),
-      responsavel: fd.get('responsavel').trim(),
-      crea_cau: fd.get('crea_cau').trim(),
-      logo_url: fd.get('logo_url') || '',
-      configurada: true
+      cnpj: fd.get('cnpj').trim(), telefone: fd.get('telefone').trim(),
+      email: fd.get('email').trim(), endereco: fd.get('endereco').trim(),
+      cidade: fd.get('cidade').trim(), uf: fd.get('uf').trim().toUpperCase(),
+      responsavel: fd.get('responsavel').trim(), crea_cau: fd.get('crea_cau').trim(),
+      logo_url: fd.get('logo_url') || ''
     };
-    DB.saveEmpresa(empresaData);
-    if (empresaData.whatsapp && typeof WhatsApp !== 'undefined') {
-      WhatsApp.setTelefonePadrao(empresaData.whatsapp);
+    try {
+      const res = await fetch('/api/tenant', { method:'PATCH', headers:Auth.getAuthHeaders(), body:JSON.stringify(empresaData) });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.success) throw new Error(data.error || 'Não foi possível salvar os dados da empresa.');
+      const saved = { ...data.tenant, whatsapp:(data.tenant.telefone || '').replace(/\D/g,''), configurada:true };
+      DB.saveEmpresa(saved);
+      if (saved.whatsapp && typeof WhatsApp !== 'undefined') WhatsApp.setTelefonePadrao(saved.whatsapp);
+      Utils.toast('Dados da empresa salvos e sincronizados com o servidor!', 'success');
+      App.renderShell();
+      this._switch('empresa');
+    } catch (err) {
+      Utils.toast(err.message || 'Erro ao salvar dados da empresa.', 'error');
     }
-    Utils.toast('Dados da empresa salvos com sucesso!', 'success');
-    App.renderShell();
-    this._switch('empresa');
   },
 
   // ── USUARIOS ──────────────────────────────────────────
   _renderUsuarios() {
-    const users = Auth.getUsers();
+    const users = this._usersCache || Auth.getUsers();
     const session = Auth.getUser();
     return `
     <div class="page-header">
@@ -390,32 +427,35 @@ const Configuracoes = {
   },
 
   _userCard(u, session) {
-    const perfis = { admin:'Administrador', gestor:'Gestor', visualizador:'Visualizador' };
-    const isMe = session?.username === u.username;
+    const perfis = { admin:'Administrador', gestor:'Gestor', visualizador:'Visualizador', operador:'Operador' };
+    const isMe = session?.userId === u.id || session?.username === u.username;
+    const nome = this._esc(u.nome), username = this._esc(u.username), email = this._esc(u.email || 'sem e-mail');
+    const avatar = this._esc(u.avatar || (u.nome || 'US').slice(0,2).toUpperCase());
+    const id = this._esc(u.id);
     return `
     <div class="card" style="margin-bottom:12px;">
       <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap;">
-        <div class="user-av" style="width:52px;height:52px;font-size:1.2rem;flex-shrink:0;${!u.ativo?'opacity:.4;':''}">${u.avatar||u.nome.slice(0,2).toUpperCase()}</div>
+        <div class="user-av" style="width:52px;height:52px;font-size:1.2rem;flex-shrink:0;${!u.ativo?'opacity:.4;':''}">${avatar}</div>
         <div style="flex:1;min-width:180px;">
-          <div style="font-weight:700;font-size:.95rem;">${u.nome} ${isMe?'<span style="font-size:.7rem;background:var(--accent-dim);color:var(--accent);padding:2px 8px;border-radius:20px;margin-left:6px;">Voc&ecirc;</span>':''}</div>
-          <div style="color:var(--text3);font-size:.78rem;margin-top:2px;">@${u.username} &middot; ${u.email||'sem e-mail'}</div>
+          <div style="font-weight:700;font-size:.95rem;">${nome} ${isMe?'<span style="font-size:.7rem;background:var(--accent-dim);color:var(--accent);padding:2px 8px;border-radius:20px;margin-left:6px;">Você</span>':''}</div>
+          <div style="color:var(--text3);font-size:.78rem;margin-top:2px;">@${username} &middot; ${email}</div>
           <div style="margin-top:6px;display:flex;gap:6px;align-items:center;">
-            <span class="badge ${u.perfil==='admin'?'badge-warning':u.perfil==='gestor'?'badge-success':'badge-secondary'}">${perfis[u.perfil]||u.perfil}</span>
+            <span class="badge ${u.perfil==='admin'?'badge-warning':u.perfil==='gestor'?'badge-success':'badge-secondary'}">${this._esc(perfis[u.perfil]||u.perfil)}</span>
             <span class="badge ${u.ativo?'badge-success':'badge-warning'}">${u.ativo?'Ativo':'Inativo'}</span>
           </div>
         </div>
         ${session?.perfil==='admin' ? `
         <div style="display:flex;gap:8px;flex-wrap:wrap;">
-          <button class="btn btn-secondary btn-sm" onclick="Configuracoes.showUserForm('${u.id}')">&#x270F;&#xFE0F; Editar</button>
-          ${!isMe ? `<button class="btn btn-sm ${u.ativo?'btn-warning':'btn-success'}" onclick="Configuracoes.toggleAtivo('${u.id}',${u.ativo})">${u.ativo?'Desativar':'Ativar'}</button>` : ''}
-          ${isMe ? `<button class="btn btn-primary btn-sm" onclick="Configuracoes.showMeuPerfil()">&#x1F464; Meu Perfil</button>` : ''}
-        </div>` : (isMe ? `<button class="btn btn-primary btn-sm" onclick="Configuracoes.showMeuPerfil()">&#x1F464; Meu Perfil</button>` : '')}
+          <button class="btn btn-secondary btn-sm" onclick="Configuracoes.showUserForm('${id}')">✏️ Editar</button>
+          ${!isMe ? `<button class="btn btn-sm ${u.ativo?'btn-warning':'btn-success'}" onclick="Configuracoes.toggleAtivo('${id}',${!!u.ativo})">${u.ativo?'Desativar':'Ativar'}</button>` : ''}
+          ${isMe ? `<button class="btn btn-primary btn-sm" onclick="Configuracoes.showMeuPerfil()">👤 Meu Perfil</button>` : ''}
+        </div>` : (isMe ? `<button class="btn btn-primary btn-sm" onclick="Configuracoes.showMeuPerfil()">👤 Meu Perfil</button>` : '')}
       </div>
     </div>`;
   },
 
   showUserForm(id) {
-    const u = id ? Auth.getUsers().find(u => u.id === id) : null;
+    const u = id ? (this._usersCache || []).find(u => u.id === id) : null;
     Utils.showModal(`
       <div class="modal" style="max-width:500px">
         <div class="modal-header">
@@ -426,17 +466,17 @@ const Configuracoes = {
           <div class="g2">
             <div class="form-group">
               <label class="form-label">Nome completo *</label>
-              <input class="form-control" name="nome" value="${u?.nome||''}" required placeholder="Nome do usu&aacute;rio">
+              <input class="form-control" name="nome" value="${this._esc(u?.nome||'')}" required placeholder="Nome do usu&aacute;rio">
             </div>
             <div class="form-group">
               <label class="form-label">Usu&aacute;rio (login) *</label>
-              <input class="form-control" name="username" value="${u?.username||''}" required placeholder="Ex: joao.silva">
+              <input class="form-control" name="username" value="${this._esc(u?.username||'')}" required placeholder="Ex: joao.silva">
             </div>
           </div>
           <div class="g2">
             <div class="form-group">
-              <label class="form-label">E-mail</label>
-              <input class="form-control" name="email" type="email" value="${u?.email||''}" placeholder="email@empresa.com">
+              <label class="form-label">E-mail *</label>
+              <input class="form-control" name="email" type="email" required value="${this._esc(u?.email||'')}" placeholder="email@empresa.com">
             </div>
             <div class="form-group">
               <label class="form-label">Perfil *</label>
@@ -444,6 +484,7 @@ const Configuracoes = {
                 <option value="admin" ${u?.perfil==='admin'?'selected':''}>Administrador</option>
                 <option value="gestor" ${u?.perfil==='gestor'||!u?'selected':''}>Gestor</option>
                 <option value="visualizador" ${u?.perfil==='visualizador'?'selected':''}>Visualizador</option>
+                <option value="operador" ${u?.perfil==='operador'?'selected':''}>Operador</option>
               </select>
             </div>
           </div>
@@ -454,7 +495,7 @@ const Configuracoes = {
             </div>
             <div class="form-group">
               <label class="form-label">Avatar (2 letras)</label>
-              <input class="form-control" name="avatar" maxlength="2" value="${u?.avatar||''}" placeholder="Ex: JS">
+              <input class="form-control" name="avatar" maxlength="2" value="${this._esc(u?.avatar||'')}" placeholder="Ex: JS">
             </div>
           </div>
           <div class="modal-footer">
@@ -465,54 +506,34 @@ const Configuracoes = {
       </div>`);
   },
 
-  saveUser(e, id) {
+  async saveUser(e, id) {
     e.preventDefault();
     const fd = new FormData(e.target);
-    const users = Auth.getUsers();
-    const nome = fd.get('nome').trim();
-    const username = fd.get('username').trim();
-    const email = fd.get('email').trim();
-    const perfil = fd.get('perfil');
-    const senhaRaw = fd.get('senha');
-    const avatar = fd.get('avatar').trim() || nome.slice(0,2).toUpperCase();
-
-    // Duplicate username check
-    const dup = users.find(u => u.username === username && u.id !== id);
-    if (dup) { Utils.toast('Nome de usu&aacute;rio j&aacute; existe!', 'warning'); return; }
-
-    if (id) {
-      const idx = users.findIndex(u => u.id === id);
-      if (idx !== -1) {
-        users[idx] = { ...users[idx], nome, username, email, perfil, avatar };
-        if (senhaRaw && senhaRaw.length >= 6) users[idx].senha = senhaRaw;
-        localStorage.setItem(Auth.USERS_KEY, JSON.stringify(users));
-        Utils.toast('Usu&aacute;rio atualizado!', 'success');
-      }
-    } else {
-      if (!senhaRaw || senhaRaw.length < 6) { Utils.toast('Senha deve ter pelo menos 6 caracteres!', 'warning'); return; }
-      users.push({ id: DB.uuid(), nome, username, email, perfil, senha: senhaRaw, avatar, ativo: true, created_at: new Date().toISOString() });
-      localStorage.setItem(Auth.USERS_KEY, JSON.stringify(users));
-      Utils.toast('Usu&aacute;rio criado!', 'success');
-    }
-    Utils.closeModal();
-    this._refreshUsers();
+    const body = { nome:fd.get('nome').trim(), username:fd.get('username').trim(), email:fd.get('email').trim(), perfil:fd.get('perfil'), avatar:fd.get('avatar').trim(), senha:fd.get('senha') || undefined };
+    if (!id && (!body.senha || body.senha.length < 6)) { Utils.toast('Senha deve ter pelo menos 6 caracteres!', 'warning'); return; }
+    if (id) body.id = id;
+    try {
+      const res = await fetch('/api/users', { method:id?'PATCH':'POST', headers:Auth.getAuthHeaders(), body:JSON.stringify(body) });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.success) throw new Error(data.error || 'Falha ao salvar usuário.');
+      Utils.toast(id ? 'Usuário atualizado no servidor!' : 'Usuário criado no servidor!', 'success');
+      Utils.closeModal(); await this.loadUsers();
+    } catch (err) { Utils.toast(err.message, 'error'); }
   },
 
-  toggleAtivo(id, ativo) {
-    const users = Auth.getUsers();
-    const idx = users.findIndex(u => u.id === id);
-    if (idx !== -1) {
-      users[idx].ativo = !ativo;
-      localStorage.setItem(Auth.USERS_KEY, JSON.stringify(users));
-      Utils.toast(ativo ? 'Usu&aacute;rio desativado.' : 'Usu&aacute;rio ativado!', 'info');
-      this._refreshUsers();
-    }
+  async toggleAtivo(id, ativo) {
+    try {
+      const res = await fetch('/api/users', { method:'PATCH', headers:Auth.getAuthHeaders(), body:JSON.stringify({ id, ativo:!ativo }) });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.success) throw new Error(data.error || 'Falha ao alterar usuário.');
+      Utils.toast(ativo ? 'Usuário desativado.' : 'Usuário ativado!', 'info'); await this.loadUsers();
+    } catch (err) { Utils.toast(err.message, 'error'); }
   },
 
   showMeuPerfil() {
     const session = Auth.getUser();
-    const users = Auth.getUsers();
-    const u = users.find(u => u.username === session?.username);
+    const users = this._usersCache || Auth.getUsers();
+    const u = users.find(u => u.id === session?.userId || u.username === session?.username);
     if (!u) return;
     Utils.showModal(`
       <div class="modal" style="max-width:440px">
@@ -522,21 +543,21 @@ const Configuracoes = {
         </div>
         <form class="modal-body" id="f-meu-perfil" onsubmit="Configuracoes.saveMeuPerfil(event,'${u.id}')">
           <div style="text-align:center;margin-bottom:20px;">
-            <div class="user-av" style="width:64px;height:64px;font-size:1.5rem;margin:0 auto 12px;">${u.avatar}</div>
-            <div style="font-weight:700;">${u.nome}</div>
+            <div class="user-av" style="width:64px;height:64px;font-size:1.5rem;margin:0 auto 12px;">${this._esc(u.avatar)}</div>
+            <div style="font-weight:700;">${this._esc(u.nome)}</div>
             <div style="color:var(--text3);font-size:.8rem;">${u.perfil === 'admin' ? 'Administrador' : 'Gestor'}</div>
           </div>
           <div class="form-group">
             <label class="form-label">Nome completo</label>
-            <input class="form-control" name="nome" value="${u.nome}" required>
+            <input class="form-control" name="nome" value="${this._esc(u.nome)}" required>
           </div>
           <div class="form-group">
             <label class="form-label">E-mail</label>
-            <input class="form-control" name="email" type="email" value="${u.email||''}">
+            <input class="form-control" name="email" type="email" value="${this._esc(u.email||'')}">
           </div>
           <div class="form-group">
             <label class="form-label">Avatar (2 letras)</label>
-            <input class="form-control" name="avatar" maxlength="2" value="${u.avatar||''}">
+            <input class="form-control" name="avatar" maxlength="2" value="${this._esc(u.avatar||'')}">
           </div>
           <hr style="border-color:var(--border);margin:16px 0;">
           <div style="color:var(--text3);font-size:.8rem;margin-bottom:10px;">Alterar senha (deixe em branco para manter a atual)</div>
@@ -558,46 +579,27 @@ const Configuracoes = {
       </div>`);
   },
 
-  saveMeuPerfil(e, id) {
+  async saveMeuPerfil(e, id) {
     e.preventDefault();
     const fd = new FormData(e.target);
-    const users = Auth.getUsers();
-    const idx = users.findIndex(u => u.id === id);
-    if (idx === -1) return;
-    const nome = fd.get('nome').trim();
-    const email = fd.get('email').trim();
-    const avatar = fd.get('avatar').trim() || nome.slice(0,2).toUpperCase();
-    const senhaAtual = fd.get('senha_atual');
-    const novaSenha = fd.get('nova_senha');
-    if (novaSenha) {
-      if (users[idx].senha !== senhaAtual) { Utils.toast('Senha atual incorreta!', 'warning'); return; }
-      if (novaSenha.length < 6) { Utils.toast('Nova senha deve ter pelo menos 6 caracteres!', 'warning'); return; }
-      users[idx].senha = novaSenha;
-    }
-    users[idx] = { ...users[idx], nome, email, avatar };
-    localStorage.setItem(Auth.USERS_KEY, JSON.stringify(users));
-    // Update session name
-    const sessionKey = Auth.SESSION_KEY;
-    const updateSession = (storage) => {
-      const raw = storage.getItem(sessionKey);
-      if (raw) { const s = JSON.parse(raw); s.nome = nome; s.avatar = avatar; storage.setItem(sessionKey, JSON.stringify(s)); }
-    };
-    updateSession(localStorage);
-    updateSession(sessionStorage);
-    Utils.toast('Perfil atualizado!', 'success');
-    Utils.closeModal();
-    // Refresh sidebar user display
-    const unEl = document.querySelector('.user-name');
-    const avEl = document.querySelector('.user-av');
-    if (unEl) unEl.textContent = nome;
-    if (avEl) avEl.textContent = avatar;
-    this._refreshUsers();
+    const body = { id, nome:fd.get('nome').trim(), email:fd.get('email').trim(), avatar:fd.get('avatar').trim(), senha_atual:fd.get('senha_atual') || undefined, senha:fd.get('nova_senha') || undefined };
+    if (body.senha && body.senha.length < 6) { Utils.toast('Nova senha deve ter pelo menos 6 caracteres!', 'warning'); return; }
+    try {
+      const res = await fetch('/api/users', { method:'PATCH', headers:Auth.getAuthHeaders(), body:JSON.stringify(body) });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.success) throw new Error(data.error || 'Falha ao atualizar perfil.');
+      const updated = data.user;
+      const updateSession = storage => { const raw=storage.getItem(Auth.SESSION_KEY); if(!raw)return; try{const sess=JSON.parse(raw); Object.assign(sess,{nome:updated.nome,email:updated.email,avatar:updated.avatar,username:updated.username}); storage.setItem(Auth.SESSION_KEY,JSON.stringify(sess));}catch{} };
+      updateSession(localStorage); updateSession(sessionStorage);
+      Utils.toast('Perfil atualizado no servidor!', 'success'); Utils.closeModal(); await this.loadUsers();
+      if (typeof App !== 'undefined' && App.renderShell) App.renderShell();
+    } catch (err) { Utils.toast(err.message, 'error'); }
   },
 
   _refreshUsers() {
     const el = document.getElementById('users-list');
     if (!el) return;
-    const users = Auth.getUsers();
+    const users = this._usersCache || Auth.getUsers();
     const session = Auth.getUser();
     el.innerHTML = users.map(u => this._userCard(u, session)).join('');
   },
@@ -724,7 +726,6 @@ const Configuracoes = {
       backup.recibos = typeof Recibos !== 'undefined' ? Recibos.getAll() : [];
       backup.contratos = typeof Contratos !== 'undefined' ? Contratos.getAll() : [];
       backup.orcamentos_sinapi = JSON.parse(localStorage.getItem('orcamentos_sinapi') || '[]');
-      backup.users = Auth.getUsers();
       backup.saved_at = new Date().toISOString();
       backup.totalLancamentos = (backup.lancamentos || []).length;
       localStorage.setItem('finobra_snapshot_seguranca', JSON.stringify(backup));
@@ -745,12 +746,11 @@ const Configuracoes = {
     backup.recibos = typeof Recibos !== 'undefined' ? Recibos.getAll() : [];
     backup.contratos = typeof Contratos !== 'undefined' ? Contratos.getAll() : [];
     backup.orcamentos_sinapi = JSON.parse(localStorage.getItem('orcamentos_sinapi') || '[]');
-    backup.users = Auth.getUsers();
     backup.exported_at = new Date().toISOString();
     const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
-    a.download = `angelim_backup_${new Date().toISOString().slice(0,10)}.json`;
+    a.download = `finobra_backup_${Auth.getCurrentTenantId()}_${new Date().toISOString().slice(0,10)}.json`;
     a.click();
     Utils.toast('Backup exportado com sucesso!', 'success');
   },
@@ -785,10 +785,6 @@ const Configuracoes = {
           if (Array.isArray(backup.orcamentos_sinapi)) {
             localStorage.setItem('orcamentos_sinapi', JSON.stringify(backup.orcamentos_sinapi));
           }
-          if (Array.isArray(backup.users)) {
-            localStorage.setItem(Auth.USERS_KEY, JSON.stringify(backup.users));
-          }
-
           Utils.toast('✅ Backup restaurado com sucesso!', 'success');
           setTimeout(() => location.reload(), 800);
         });

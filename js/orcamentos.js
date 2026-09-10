@@ -56,8 +56,9 @@ const Orcamentos = {
 
   _card(orc) {
     const cliente = DB.getById('clientes',orc.obra_id);
-    const totalPrev = orc.etapas.reduce((s,e)=>s+e.valor_previsto,0);
-    const totalReal = orc.etapas.reduce((s,e)=>s+e.valor_realizado,0);
+    const etapas = Array.isArray(orc.etapas) ? orc.etapas : (Array.isArray(orc.itens) ? orc.itens : []);
+    const totalPrev = etapas.reduce((s,e)=>s+(Number(e.valor_previsto)||0),0);
+    const totalReal = etapas.reduce((s,e)=>s+(Number(e.valor_realizado)||0),0);
     const variacaoVal = totalReal - totalPrev;
     const pctGeral = totalPrev>0?Math.min(100,(totalReal/totalPrev)*100):0;
     return `
@@ -101,7 +102,7 @@ const Orcamentos = {
         <table>
           <thead><tr><th>Etapa</th><th>Previsto</th><th>Realizado</th><th>Variação</th><th style="width:200px">Execução</th><th>Período</th><th></th></tr></thead>
           <tbody>
-            ${orc.etapas.map(e=>{
+            ${etapas.map(e=>{
               const v=e.valor_realizado-e.valor_previsto;
               const cl=e.percentual_execucao===100?'green':e.percentual_execucao>50?'yellow':'blue';
               return `<tr>
@@ -144,7 +145,7 @@ const Orcamentos = {
       {id:DB.uuid(),nome:'Acabamento',valor_previsto:0,valor_realizado:0,percentual_execucao:0,data_inicio:'',data_fim:'',observacoes:'',_cor:'green'},
       {id:DB.uuid(),nome:'Imprevistos',valor_previsto:0,valor_realizado:0,percentual_execucao:0,data_inicio:'',data_fim:'',observacoes:'',_cor:'blue'},
     ];
-    const etapas = orc.etapas||etapasDefault;
+    const etapas = (Array.isArray(orc.etapas) && orc.etapas.length ? orc.etapas : (Array.isArray(orc.itens) && orc.itens.length ? orc.itens : null)) || etapasDefault;
     Utils.showModal(`
       <div class="modal modal-xl">
         <div class="modal-header"><span class="modal-title">${id?'✏️ Editar Orçamento':'📋 Novo Orçamento'}</span><button class="modal-close" onclick="Utils.closeModal()">✕</button></div>
@@ -152,7 +153,7 @@ const Orcamentos = {
           <form id="f-orc">
             <div class="form-row cols-3" style="margin-bottom:14px;">
               <div class="form-group"><label class="form-label">Obra *</label><select class="form-control" name="obra_id" required>${Utils.clienteOptions(orc.obra_id||App.obraId!=='todas'?App.obraId:'')}</select></div>
-              <div class="form-group"><label class="form-label">Nome do Orçamento *</label><input class="form-control" name="nome" value="${orc.nome||''}" required placeholder="Orçamento Base"></div>
+              <div class="form-group"><label class="form-label">Nome do Orçamento *</label><input class="form-control" name="nome" value="${orc.nome||orc.titulo||''}" required placeholder="Orçamento Base"></div>
               <div class="form-group"><label class="form-label">Status</label><select class="form-control" name="status">
                 <option value="ativo" ${(orc.status||'ativo')==='ativo'?'selected':''}>✓ Ativo</option>
                 <option value="revisao" ${orc.status==='revisao'?'selected':''}>🔄 Em Revisão</option>

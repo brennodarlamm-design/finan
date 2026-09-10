@@ -42,9 +42,9 @@ export default async function handler(req, res) {
   }
 
   // 1. Validação de Autenticação do Usuário FinObra
-  const auth = resolveAuthAndTenant(req);
+  const auth = await resolveAuthAndTenant(req);
   if (!auth.authenticated) {
-    return res.status(401).json({
+    return res.status(auth.status || 401).json({
       success: false,
       error: auth.error || 'Acesso não autorizado. Efetue login no sistema.'
     });

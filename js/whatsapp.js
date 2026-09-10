@@ -26,35 +26,6 @@ const WhatsApp = {
     } catch (_) {}
   },
 
-  getEvolutionUrl() {
-    let saved = (localStorage.getItem('finobra_evolution_url') || '').trim();
-    // Limpa automaticamente túneis temporários mortos (trycloudflare, ngrok, loca.lt) ou localhost
-    if (!saved || saved.includes('trycloudflare.com') || saved.includes('loca.lt') || saved.includes('ngrok') || saved.includes('localhost:3333')) {
-      saved = 'https://finan-wf12.onrender.com/send-message';
-      localStorage.setItem('finobra_evolution_url', saved);
-    }
-    return saved;
-  },
-
-  setEvolutionUrl(url) {
-    localStorage.setItem('finobra_evolution_url', (url || '').trim());
-  },
-
-  getEvolutionKey() {
-    return localStorage.getItem('finobra_evolution_key') || 'ANGELIM-FINANCAS-EVOLUTION-2026-KEY';
-  },
-
-  setEvolutionKey(key) {
-    localStorage.setItem('finobra_evolution_key', (key || '').trim());
-  },
-
-  getEvolutionInstance() {
-    return localStorage.getItem('finobra_evolution_instance') || 'angelim';
-  },
-
-  setEvolutionInstance(inst) {
-    localStorage.setItem('finobra_evolution_instance', (inst || '').trim());
-  },
 
   getModoEnvio() {
     return localStorage.getItem('finobra_whatsapp_modo') || 'api'; // 'api' (silencioso) ou 'web' (abre aba)
@@ -93,10 +64,6 @@ const WhatsApp = {
 
     // MODO PADRÃO: Disparo 100% silencioso em segundo plano
     Utils.toast('📲 Enviando mensagem para o WhatsApp...', 'info');
-
-    const apiUrl = this.getEvolutionUrl();
-    const apiKey = this.getEvolutionKey();
-    const instance = this.getEvolutionInstance();
 
     // Disparo via Proxy Serverless Seguro da aplicação
     try {
@@ -145,7 +112,9 @@ const WhatsApp = {
     const hoje = Utils.today();
     const isHoje = (dados.data_vencimento || dados.data) === hoje;
 
-    let msg = `🚨 *ANGELIM CONSTRUTORA — AVISO DE VENCIMENTO* 🚨\n\n`;
+    const emp = typeof DB !== 'undefined' ? DB.getEmpresa() : null;
+    const nomeEmp = emp?.nome_fantasia || emp?.razao_social || 'Sua Empresa';
+    let msg = `🚨 *${nomeEmp.toUpperCase()} — AVISO DE VENCIMENTO* 🚨\n\n`;
     msg += `📄 *Boleto / Conta:* ${dados.descricao || dados.desc || 'Despesa'}\n`;
     msg += `🏢 *Obra / Centro de Custo:* ${nomeObra}\n`;
     if (dados.fornecedor || dados.fornecedor_beneficiario) {
@@ -162,9 +131,7 @@ const WhatsApp = {
       msg += `\n🧾 *Chave NF-e:*\n\`${dados.chave_nfe}\`\n`;
     }
 
-    const emp = typeof DB !== 'undefined' ? DB.getEmpresa() : null;
-    const nomeEmp = emp?.nome_fantasia || emp?.razao_social || 'Sistema Financeiro';
-    msg += `\n👉 _Notificação gerada pelo Sistema Financeiro ${nomeEmp}_`;
+    msg += `\n👉 _Notificação gerada pelo FinObra — ${nomeEmp}_`;
 
     this.abrirEnvio(msg);
   },
@@ -193,7 +160,9 @@ const WhatsApp = {
     const totalProx = proxItems.reduce((s, l) => s + (l.valor || 0), 0);
     const totalGeral = totalHoje + totalProx;
 
-    let msg = `☀️ *ANGELIM CONSTRUTORA — RESUMO DE CONTAS A PAGAR* ☀️\n`;
+    const emp = typeof DB !== 'undefined' ? DB.getEmpresa() : null;
+    const nomeEmp = emp?.nome_fantasia || emp?.razao_social || 'Sua Empresa';
+    let msg = `☀️ *${nomeEmp.toUpperCase()} — RESUMO DE CONTAS A PAGAR* ☀️\n`;
     msg += `📅 *Data:* ${Utils.fmt.date(today)}\n\n`;
 
     if (hojeItems.length) {
@@ -228,7 +197,7 @@ const WhatsApp = {
 
     msg += `💵 *TOTAL GERAL A PAGAR:* ${Utils.fmt.currency(totalGeral)}\n`;
     msg += `-------------------------------------------\n`;
-    msg += `👉 _Resumo automático gerado pelo Sistema Financeiro_`;
+    msg += `👉 _Resumo automático gerado pelo FinObra — ${nomeEmp}_`;
 
     this.abrirEnvio(msg);
   },

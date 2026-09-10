@@ -8,8 +8,8 @@ const Medicoes = {
 
     const liberadas = meds.filter(m=>m.status==='liberada');
     const emAnalise = meds.filter(m=>['em_analise','submetida'].includes(m.status));
-    const totalLib = liberadas.reduce((s,m)=>s+(m.valor_liberado||0),0);
-    const totalSolic = meds.reduce((s,m)=>s+m.valor_solicitado,0);
+    const totalLib = liberadas.reduce((s,m)=>s+(Number(m.valor_liberado)||0),0);
+    const totalSolic = meds.reduce((s,m)=>s+(Number(m.valor_solicitado || m.valor_medido)||0),0);
 
     return `
     <div class="page-header">
@@ -49,8 +49,8 @@ const Medicoes = {
     return Object.entries(byObra).map(([obraId, obMeds]) => {
       const c = DB.getById('clientes', obraId);
       const isCaixa = !c?.modalidade_obra || c?.modalidade_obra === 'caixa';
-      const totalLib = obMeds.filter(m=>m.status==='liberada').reduce((s,m)=>s+(m.valor_liberado||0),0);
-      const totalSol = obMeds.reduce((s,m)=>s+m.valor_solicitado,0);
+      const totalLib = obMeds.filter(m=>m.status==='liberada').reduce((s,m)=>s+(Number(m.valor_liberado)||0),0);
+      const totalSol = obMeds.reduce((s,m)=>s+(Number(m.valor_solicitado || m.valor_medido)||0),0);
       const financiado = c?.valor_financiado || 0;
       const pctLib = financiado>0 ? Math.min(100,(totalLib/financiado)*100) : 0;
 
@@ -215,6 +215,10 @@ const Medicoes = {
     Utils.closeModal();
     this._refresh();
     Utils.toast('Medição liberada e receita registrada no financeiro!','success');
+  },
+
+  edit(id) {
+    this.showForm(id);
   },
 
   showForm(id=null) {

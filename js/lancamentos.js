@@ -255,6 +255,11 @@ const Lancamentos = {
     ['em_atraso','⚠ Em Atraso']
   ],
 
+  edit(id) {
+    const l = typeof DB !== 'undefined' ? DB.getById('lancamentos', id) : null;
+    this.showForm(l ? l.tipo : null, id);
+  },
+
   showForm(tipo, id=null) {
     const l = id ? DB.getById('lancamentos',id)||{tipo} : {tipo};
     const isEdit = !!id;

@@ -38,43 +38,14 @@ const DB = {
       } catch {}
     }
 
-    if (t === 'angelim') {
-      return {
-        id: 'angelim',
-        razao_social: 'ANGELIM CONSTRUTORA LTDA',
-        nome_fantasia: 'Angelim Construtora',
-        cnpj: '65.512.273/0001-60',
-        telefone: '(95) 99142-3559',
-        whatsapp: '95991423559',
-        email: 'angelimconstrutora@gmail.com',
-        cidade: 'Boa Vista',
-        uf: 'RR',
-        endereco: 'Rua Andrômeda, nº 228, Bairro Cidade Satélite',
-        responsavel: 'Naira de Amorim da Silva',
-        cargo_responsavel: 'Administradora',
-        qualificacao_responsavel: 'brasileira, administradora, portadora do RG nº ***34-3 SSP/RR, inscrita no CPF nº ***.525.532-**',
-        logo_url: 'img/logo.png',
-        configurada: true
-      };
-    }
-
     const session = typeof Auth !== 'undefined' ? Auth.getUser() : null;
-    const nomeEmp = session?.empresaNome || (session?.nome ? session.nome + ' Construtora' : '');
+    const nomeEmp = session?.empresaNome || 'Minha Empresa';
     return {
       id: t,
-      razao_social: nomeEmp || '',
-      nome_fantasia: nomeEmp || '',
-      cnpj: '',
-      telefone: '',
-      whatsapp: '',
-      email: session?.email || '',
-      cidade: '',
-      uf: '',
-      endereco: '',
-      responsavel: session?.nome || '',
-      crea_cau: '',
-      logo_url: '',
-      configurada: !!(session?.empresaNome)
+      razao_social: nomeEmp,
+      nome_fantasia: nomeEmp,
+      cnpj: '', telefone: '', whatsapp: '', email: '', cidade: '', uf: '', endereco: '',
+      responsavel: session?.nome || '', crea_cau: '', logo_url: '', configurada: false
     };
   },
 
@@ -462,6 +433,21 @@ const DB = {
         this.save('contas', d.contas);
       }
 
+      // Mantém dados cadastrais da empresa sincronizados com o tenant real do servidor.
+      try {
+        const tenantRes = await fetch('/api/tenant', { headers: this._apiHeaders() });
+        const tenantJson = await tenantRes.json().catch(() => ({}));
+        if (tenantRes.ok && tenantJson.success && tenantJson.tenant) {
+          this.saveEmpresa({
+            ...tenantJson.tenant,
+            whatsapp: (tenantJson.tenant.telefone || '').replace(/\D/g, ''),
+            configurada: true
+          });
+        }
+      } catch (tenantErr) {
+        console.warn('[Tenant] Não foi possível atualizar os dados cadastrais:', tenantErr);
+      }
+
       console.log('✅ Dados sincronizados com Neon PostgreSQL!');
       return true;
     } catch (e) {
@@ -470,20 +456,80 @@ const DB = {
     }
   },
 
+  _syncQueueKey() {
+    return `finobra_${this._t()}_sync_queue`;
+  },
+
+  _getSyncQueue() {
+    try { return JSON.parse(localStorage.getItem(this._syncQueueKey()) || '[]'); } catch { return []; }
+  },
+
+  _saveSyncQueue(queue) {
+    try { localStorage.setItem(this._syncQueueKey(), JSON.stringify(queue)); } catch (e) { console.warn('[Sync] Falha ao persistir fila:', e); }
+  },
+
+  getSyncPendingCount() {
+    return this._getSyncQueue().length;
+  },
+
+  _scheduleSyncRetry(delay = 10000) {
+    clearTimeout(this._syncRetryTimer);
+    this._syncRetryTimer = setTimeout(() => this._flushCloudQueue(), delay);
+    if (!this._syncOnlineBound && typeof window !== 'undefined') {
+      this._syncOnlineBound = true;
+      window.addEventListener('online', () => this._flushCloudQueue());
+    }
+  },
+
+  async _flushCloudQueue() {
+    if (this._syncFlushing) return;
+    this._syncFlushing = true;
+    try {
+      let queue = this._getSyncQueue();
+      while (queue.length) {
+        const item = queue[0];
+        let res;
+        try {
+          res = await fetch('/api/db', {
+            method: 'POST',
+            headers: this._apiHeaders(),
+            body: JSON.stringify(item.payload)
+          });
+        } catch {
+          this._scheduleSyncRetry(10000);
+          break;
+        }
+
+        if (res.status === 401 || res.status === 403) {
+          if (typeof Auth !== 'undefined' && Auth.handleSessionExpired) Auth.handleSessionExpired();
+          break;
+        }
+        if (!res.ok) {
+          console.warn(`[Sync] Servidor recusou ${item.payload.action}/${item.payload.table}. Tentará novamente.`);
+          this._scheduleSyncRetry(15000);
+          break;
+        }
+
+        queue.shift();
+        this._saveSyncQueue(queue);
+      }
+    } finally {
+      this._syncFlushing = false;
+    }
+  },
+
   syncToCloud(action, table, data, id) {
     const cloudTables = ['lancamentos', 'notas', 'notas_fiscais', 'obras', 'clientes', 'fornecedores', 'documentos', 'produtos', 'ocr_historico', 'contas', 'contas_bancarias'];
     if (!cloudTables.includes(table)) return;
-    try {
-      fetch('/api/db', {
-        method: 'POST',
-        headers: this._apiHeaders(),
-        body: JSON.stringify({ action, table, data, id })
-      }).then(res => {
-        if (res.status === 401 && typeof Auth !== 'undefined' && Auth.handleSessionExpired) {
-          Auth.handleSessionExpired();
-        }
-      }).catch(() => {});
-    } catch {}
+    const payload = { action, table, data, id };
+    const queue = this._getSyncQueue();
+    queue.push({
+      queueId: (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : `${Date.now()}_${Math.random()}`,
+      createdAt: new Date().toISOString(),
+      payload
+    });
+    this._saveSyncQueue(queue);
+    this._flushCloudQueue();
   },
 
   async syncAllToCloud() {

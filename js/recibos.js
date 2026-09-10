@@ -176,6 +176,10 @@ const Recibos = {
   // ─────────────────────────────────────────────────────────────
   // MODAL PARA EMITIR NOVO RECIBO (AVULSO OU VIA LANÇAMENTO)
   // ─────────────────────────────────────────────────────────────
+  abrirModalNovo(dados = {}) {
+    this.novoReciboModal(typeof dados === 'string' ? { obra_id: dados } : (dados || {}));
+  },
+
   novoReciboModal(dadosPreenchidos = {}) {
     const cs = DB.getAll('clientes');
     const hoje = Utils.today();
@@ -421,6 +425,10 @@ const Recibos = {
   // ─────────────────────────────────────────────────────────────
   // VISUALIZAÇÃO E IMPRESSÃO DO RECIBO
   // ─────────────────────────────────────────────────────────────
+  visualizar(id) {
+    this.visualizarRecibo(id);
+  },
+
   visualizarRecibo(id) {
     const r = this.getById(id);
     if (!r) return;

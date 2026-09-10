@@ -269,21 +269,19 @@ function Main {
             break
         }
 
-        # 138 = Documento localizado para o NSU informado / fim da fila
+        # 138 = Documento(s) localizado(s) para o NSU informado
         if ($cStat -eq "138") {
-            Log "Fim da fila de documentos na SEFAZ." "INFO"
-            $continuarBusca = $false
-            break
+            Log "Documentos localizados na SEFAZ (cStat 138). Processando lote..." "INFO"
         }
 
-        # 137 = Nenhum documento localizado
+        # 137 = Nenhum documento localizado para o NSU informado (fim da fila)
         if ($cStat -eq "137") {
-            Log "Nenhum documento novo localizado na SEFAZ." "INFO"
+            Log "Nenhum documento novo localizado na SEFAZ (fim da fila)." "INFO"
             $continuarBusca = $false
             break
         }
 
-        # Outros codigos de erro
+        # Outros codigos de status/erro quando nao ha lote retornado
         if ($cStat -ne "138" -and $cStat -ne "137" -and $null -eq $ret.loteDistDFeInt) {
             Log "SEFAZ retornou status nao esperado: $cStat - $xMotivo" "WARN"
             $continuarBusca = $false

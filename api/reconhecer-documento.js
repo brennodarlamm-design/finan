@@ -42,7 +42,7 @@ export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'POST') return res.status(405).json({ error: 'Método não permitido' });
 
-  const auth = resolveAuthAndTenant(req);
+  const auth = await resolveAuthAndTenant(req);
   if (!auth.authenticated) {
     return res.status(auth.status || 401).json({ error: auth.error || 'Acesso não autorizado. Forneça o token de autenticação.' });
   }
@@ -112,8 +112,9 @@ REGRAS CRÍTICAS PARA 'itens' E 'tipo_documento':
 
   try {
     const models = [
-      'gemini-flash-latest',
-      'gemini-3.6-flash'
+      'gemini-1.5-flash',
+      'gemini-2.0-flash',
+      'gemini-flash-latest'
     ];
 
     const payload = {

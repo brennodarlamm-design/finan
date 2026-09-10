@@ -184,20 +184,26 @@
   <script src="/js/master.js"></script>
 
   <script>
-    function verificarSessaoMaster() {
-      const isLogged = sessionStorage.getItem('finobra_master_logged') === 'true';
+    async function verificarSessaoMaster() {
+      const flag = sessionStorage.getItem('finobra_master_logged') === 'true';
+      let autorizado = false;
+      if (flag && Auth.getToken()) {
+        try {
+          const r = await fetch('/api/auth?action=me', { headers: Auth.getAuthHeaders() });
+          const data = await r.json().catch(() => ({}));
+          autorizado = !!(r.ok && data.success && data.user?.perfil === 'superadmin');
+        } catch {}
+      }
 
-      if (isLogged) {
+      if (autorizado) {
         document.getElementById('master-auth-gate').style.display = 'none';
         document.getElementById('master-app').style.display = 'block';
         MasterAdmin.render('master-content-area');
       } else {
+        sessionStorage.removeItem('finobra_master_logged');
         document.getElementById('master-auth-gate').style.display = 'flex';
         document.getElementById('master-app').style.display = 'none';
-        setTimeout(() => {
-          const inp = document.getElementById('master-user-input');
-          if (inp) inp.focus();
-        }, 100);
+        setTimeout(() => { const inp = document.getElementById('master-user-input'); if (inp) inp.focus(); }, 100);
       }
     }
 
@@ -216,7 +222,7 @@
       // Valida credenciais com o servidor de autenticação seguro (Neon / scrypt)
       const loginRes = await Auth.login(uInput, pInput, true);
       const user = loginRes.success ? (loginRes.user || Auth.getUser()) : null;
-      const isMasterValido = loginRes.success && (user?.perfil === 'superadmin' || user?.username === 'admin');
+      const isMasterValido = loginRes.success && user?.perfil === 'superadmin';
 
       if (isMasterValido) {
         sessionStorage.setItem('finobra_master_logged', 'true');

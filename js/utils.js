@@ -36,6 +36,10 @@ const Utils = {
     num(v) { return new Intl.NumberFormat('pt-BR').format(v||0); },
   },
 
+  formatDate(d) {
+    return this.fmt.date(d);
+  },
+
   cleanDate(d) {
     if (!d || d === '—' || d === '-') return '';
     if (d instanceof Date) {

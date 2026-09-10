@@ -379,7 +379,7 @@ const ObraDetalhe = {
           ${clipBadge}
         </td>
         <td style="text-align:center;white-space:nowrap;">
-          <button class="icon-btn btn-sm" onclick="Lancamentos.edit('${l.id}')" title="Editar">✏️</button>
+          <button class="icon-btn btn-sm" onclick="Lancamentos.showForm ? Lancamentos.showForm('${l.tipo}','${l.id}') : Lancamentos.edit('${l.id}')" title="Editar">✏️</button>
           <button class="icon-btn btn-sm" style="color:var(--danger)" onclick="Lancamentos.del('${l.id}')" title="Excluir">🗑️</button>
         </td>
       </tr>`;
@@ -496,7 +496,7 @@ const ObraDetalhe = {
                       ${clip}
                     </td>
                     <td style="text-align:center;">
-                      <button class="icon-btn btn-sm" onclick="Medicoes.edit('${m.id}')" title="Editar">✏️</button>
+                      <button class="icon-btn btn-sm" onclick="Medicoes.showForm('${m.id}')" title="Editar">✏️</button>
                       <button class="icon-btn btn-sm" style="color:var(--danger)" onclick="Medicoes.del('${m.id}')" title="Excluir">🗑️</button>
                     </td>
                   </tr>`;
@@ -528,7 +528,7 @@ const ObraDetalhe = {
           Documentos fiscais, recibos assinados e contratos formalizados com o cliente.
         </div>
         <div style="display:flex;gap:8px;">
-          <button class="btn btn-primary btn-sm" onclick="Recibos.abrirModalNovo('${obraId}')" style="font-weight:800;">
+          <button class="btn btn-primary btn-sm" onclick="Recibos.novoReciboModal({ obra_id: '${obraId}' })" style="font-weight:800;">
             + Emitir Novo Recibo
           </button>
           <button class="btn btn-secondary btn-sm" onclick="App.obraId='${obraId}';App.navigate('contratos')" style="font-weight:700;">
@@ -557,7 +557,7 @@ const ObraDetalhe = {
                   </div>
                   <div style="text-align:right;">
                     <div style="font-weight:900;font-size:.88rem;color:var(--success);">${Utils.fmt.currency(r.valor)}</div>
-                    <button class="btn btn-sm btn-ghost" style="padding:2px 6px;font-size:.72rem;color:var(--accent);" onclick="Recibos.visualizar('${r.id}')">
+                    <button class="btn btn-sm btn-ghost" style="padding:2px 6px;font-size:.72rem;color:var(--accent);" onclick="Recibos.visualizarRecibo('${r.id}')">
                       👁️ Ver
                     </button>
                   </div>
@@ -587,7 +587,7 @@ const ObraDetalhe = {
                     <div style="font-weight:700;font-size:.82rem;color:var(--text);">${c.titulo || 'Contrato de Empreitada'}</div>
                     <div style="font-size:.72rem;color:var(--text3);">${Utils.fmt.date(c.criado_em)} &middot; ${c.tipo || 'Padrão'}</div>
                   </div>
-                  <button class="btn btn-sm btn-secondary" onclick="Contratos.visualizar('${c.id}')">
+                  <button class="btn btn-sm btn-secondary" onclick="Contratos.visualizarContrato('${c.id}')">
                     Abrir
                   </button>
                 </div>

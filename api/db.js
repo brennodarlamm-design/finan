@@ -89,9 +89,9 @@ export default async function handler(req, res) {
   }
 
   // Validação estrita de autenticação e resolução segura de tenant
-  const auth = resolveAuthAndTenant(req);
+  const auth = await resolveAuthAndTenant(req);
   if (!auth.authenticated) {
-    return res.status(401).json({
+    return res.status(auth.status || 401).json({
       success: false,
       error: auth.error || 'Acesso não autorizado. Forneça Authorization: Bearer <token> ou x-api-key válido.'
     });
@@ -162,14 +162,26 @@ export default async function handler(req, res) {
               ...p,
               valor_medio: cleanNum(p.valor_medio)
             })),
-            orcamentos: orcamentos.map(o => ({
-              ...o,
-              itens: (typeof o.itens_json === 'string' ? JSON.parse(o.itens_json) : o.itens_json) || o.itens || []
-            })),
+            orcamentos: orcamentos.map(o => {
+              const parsedItens = (typeof o.itens_json === 'string' ? JSON.parse(o.itens_json) : o.itens_json) || o.itens || o.etapas || [];
+              return {
+                ...o,
+                nome: o.nome || o.titulo || 'Orçamento',
+                titulo: o.titulo || o.nome || 'Orçamento',
+                valor_total: cleanNum(o.valor_total || o.valor_total_previsto),
+                valor_total_previsto: cleanNum(o.valor_total_previsto || o.valor_total),
+                itens: parsedItens,
+                etapas: parsedItens
+              };
+            }),
             medicoes: medicoes.map(m => ({
               ...m,
               data: cleanDate(m.data),
+              data_medicao: cleanDate(m.data),
+              numero: m.numero,
+              numero_medicao: m.numero_medicao || m.numero,
               valor_medido: cleanNum(m.valor_medido),
+              valor_solicitado: cleanNum(m.valor_solicitado || m.valor_medido),
               itens: (typeof m.itens_json === 'string' ? JSON.parse(m.itens_json) : m.itens_json) || m.itens || []
             })),
             documentos: documentos,
@@ -287,10 +299,18 @@ export default async function handler(req, res) {
         const items = await sql`SELECT * FROM orcamentos WHERE tenant_id = ${tenantId} ORDER BY created_at DESC;`;
         return res.status(200).json({
           success: true,
-          data: items.map(o => ({
-            ...o,
-            itens: (typeof o.itens_json === 'string' ? JSON.parse(o.itens_json) : o.itens_json) || o.itens || []
-          }))
+          data: items.map(o => {
+            const parsedItens = (typeof o.itens_json === 'string' ? JSON.parse(o.itens_json) : o.itens_json) || o.itens || o.etapas || [];
+            return {
+              ...o,
+              nome: o.nome || o.titulo || 'Orçamento',
+              titulo: o.titulo || o.nome || 'Orçamento',
+              valor_total: cleanNum(o.valor_total || o.valor_total_previsto),
+              valor_total_previsto: cleanNum(o.valor_total_previsto || o.valor_total),
+              itens: parsedItens,
+              etapas: parsedItens
+            };
+          })
         });
       }
 
@@ -301,7 +321,11 @@ export default async function handler(req, res) {
           data: items.map(m => ({
             ...m,
             data: cleanDate(m.data),
+            data_medicao: cleanDate(m.data),
+            numero: m.numero,
+            numero_medicao: m.numero_medicao || m.numero,
             valor_medido: cleanNum(m.valor_medido),
+            valor_solicitado: cleanNum(m.valor_solicitado || m.valor_medido),
             itens: (typeof m.itens_json === 'string' ? JSON.parse(m.itens_json) : m.itens_json) || m.itens || []
           }))
         });
@@ -733,12 +757,15 @@ export default async function handler(req, res) {
         if (table === 'orcamentos') {
           const o = data;
           const safeObraId = await validateObraTenant(sql, o.obra_id, tenantId);
-          const itensJson = JSON.stringify(Array.isArray(o.itens) ? o.itens : (Array.isArray(o.itens_json) ? o.itens_json : []));
+          const rawItens = o.etapas || o.itens || (typeof o.itens_json === 'string' ? JSON.parse(o.itens_json) : o.itens_json) || [];
+          const itensJson = JSON.stringify(Array.isArray(rawItens) ? rawItens : []);
+          const titulo = o.titulo || o.nome || '';
+          const valorTotal = cleanNum(o.valor_total || o.valor_total_previsto);
           await sql`
             INSERT INTO orcamentos (id, tenant_id, obra_id, titulo, valor_total, itens_json)
             VALUES (
-              ${o.id}, ${tenantId}, ${safeObraId}, ${o.titulo || ''},
-              ${cleanNum(o.valor_total)}, ${itensJson}
+              ${o.id}, ${tenantId}, ${safeObraId}, ${titulo},
+              ${valorTotal}, ${itensJson}
             )
             ON CONFLICT (id) DO UPDATE SET
               obra_id = EXCLUDED.obra_id,
@@ -753,12 +780,15 @@ export default async function handler(req, res) {
         if (table === 'medicoes') {
           const m = data;
           const safeObraId = await validateObraTenant(sql, m.obra_id, tenantId);
+          const numMed = m.numero || m.numero_medicao || 1;
+          const dataMed = cleanDate(m.data || m.data_medicao) || new Date().toISOString().split('T')[0];
+          const valMed = cleanNum(m.valor_medido || m.valor_solicitado);
           await sql`
             INSERT INTO medicoes (id, tenant_id, obra_id, numero, data, valor_medido, status, observacoes)
             VALUES (
-              ${m.id}, ${tenantId}, ${safeObraId}, ${m.numero || 1},
-              ${cleanDate(m.data) || new Date().toISOString().split('T')[0]},
-              ${cleanNum(m.valor_medido)}, ${m.status || 'aprovada'}, ${m.observacoes || ''}
+              ${m.id}, ${tenantId}, ${safeObraId}, ${numMed},
+              ${dataMed},
+              ${valMed}, ${m.status || 'aprovada'}, ${m.observacoes || ''}
             )
             ON CONFLICT (id) DO UPDATE SET
               obra_id = EXCLUDED.obra_id,

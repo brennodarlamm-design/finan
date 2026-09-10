@@ -1,23 +1,15 @@
-// api/_auth.js — Utilitários de Autenticação Segura, Hashing scrypt e Multi-Tenancy
+// api/_auth.js — Autenticação segura, hashing scrypt e autorização multi-tenant com validação online
 
 import crypto from 'crypto';
+import { neon } from '@neondatabase/serverless';
 
-/**
- * Gera um hash seguro para senha usando scrypt com salt aleatório de 16 bytes.
- * Formato retornado: <salt_hex>:<hash_hex>
- */
 export function hashPassword(password) {
-  if (!password || typeof password !== 'string') {
-    throw new Error('Senha inválida para hashing');
-  }
+  if (!password || typeof password !== 'string') throw new Error('Senha inválida para hashing');
   const salt = crypto.randomBytes(16).toString('hex');
   const derivedKey = crypto.scryptSync(password, salt, 64);
   return `${salt}:${derivedKey.toString('hex')}`;
 }
 
-/**
- * Valida uma senha em texto claro contra o hash scrypt armazenado de forma segura contra timing attacks.
- */
 export function verifyPassword(password, storedHash) {
   if (!password || !storedHash || typeof storedHash !== 'string') return false;
   const parts = storedHash.split(':');
@@ -28,118 +20,157 @@ export function verifyPassword(password, storedHash) {
     const derivedKey = crypto.scryptSync(password, salt, 64);
     if (keyBuffer.length !== derivedKey.length) return false;
     return crypto.timingSafeEqual(keyBuffer, derivedKey);
-  } catch (err) {
+  } catch {
     return false;
   }
 }
 
-/**
- * Assina um token de sessão HMAC-SHA256 (JWT-like) com chave secreta do servidor.
- */
 export function signToken(payload, secret) {
   const encHeader = Buffer.from(JSON.stringify({ alg: 'HS256', typ: 'JWT' })).toString('base64url');
   const encPayload = Buffer.from(JSON.stringify(payload)).toString('base64url');
-  const signature = crypto
-    .createHmac('sha256', secret)
-    .update(`${encHeader}.${encPayload}`)
-    .digest('base64url');
+  const signature = crypto.createHmac('sha256', secret).update(`${encHeader}.${encPayload}`).digest('base64url');
   return `${encHeader}.${encPayload}.${signature}`;
 }
 
-/**
- * Valida a assinatura de um token e seu tempo de expiração.
- */
 export function verifyToken(token, secret) {
   if (!token || typeof token !== 'string') return null;
   const parts = token.split('.');
   if (parts.length !== 3) return null;
   const [encHeader, encPayload, signature] = parts;
   try {
-    const expectedSig = crypto
-      .createHmac('sha256', secret)
-      .update(`${encHeader}.${encPayload}`)
-      .digest('base64url');
-
+    const expectedSig = crypto.createHmac('sha256', secret).update(`${encHeader}.${encPayload}`).digest('base64url');
     const sigBuf = Buffer.from(signature);
     const expBuf = Buffer.from(expectedSig);
-
-    if (sigBuf.length !== expBuf.length || !crypto.timingSafeEqual(sigBuf, expBuf)) {
-      return null;
-    }
-
+    if (sigBuf.length !== expBuf.length || !crypto.timingSafeEqual(sigBuf, expBuf)) return null;
     const payload = JSON.parse(Buffer.from(encPayload, 'base64url').toString('utf8'));
-    if (payload.exp && Date.now() > payload.exp) {
-      return null; // Token expirado
-    }
+    if (payload.exp && Date.now() > payload.exp) return null;
     return payload;
-  } catch (err) {
+  } catch {
     return null;
   }
 }
 
+function getCredential(req) {
+  const authHeader = req.headers.authorization || req.headers.Authorization || '';
+  if (typeof authHeader === 'string' && authHeader.startsWith('Bearer ')) {
+    return authHeader.substring(7).trim();
+  }
+  const key = req.headers['x-api-key'] || req.headers.apikey || '';
+  return typeof key === 'string' ? key.trim() : '';
+}
+
+function trialExpired(createdAt, trialDays = 15) {
+  if (!createdAt) return false;
+  const created = new Date(createdAt).getTime();
+  if (!Number.isFinite(created)) return false;
+  return Date.now() > created + trialDays * 24 * 60 * 60 * 1000;
+}
+
 /**
- * Resolve e valida autenticação e tenant do request:
- * - Se for API_SECRET direta (serviço interno / powershell / cron):
- *   Usa tenant do header 'x-tenant-id' ou 'angelim' como padrão.
- * - Se for token de sessão assinado:
- *   Extrai e valida tenantId cryptograficamente contido no token.
+ * Resolve autenticação e tenant com verificação ONLINE no Neon.
+ * Isso faz bloqueio, cancelamento, expiração de trial, desativação de usuário
+ * e alteração de perfil surtirem efeito imediatamente, sem esperar o token expirar.
+ *
+ * Segurança:
+ * - superadmin é definido EXCLUSIVAMENTE por perfil='superadmin' no banco;
+ * - username nunca concede privilégio;
+ * - tenant informado pelo cliente só é aceito para superadmin ou chave interna;
+ * - API_SECRET não é aceito por query string (evita vazamento em URL/logs).
  */
-export function resolveAuthAndTenant(req) {
+export async function resolveAuthAndTenant(req) {
   const secret = (process.env.API_SECRET || process.env.VERCEL_API_SECRET || '').trim();
   if (!secret) {
     console.error('🚨 [Segurança] API_SECRET não configurado no ambiente.');
-    return { authenticated: false, error: 'Configuração de segurança pendente no servidor.' };
+    return { authenticated: false, status: 500, error: 'Configuração de segurança pendente no servidor.' };
   }
 
-  // 1. Extrai credencial de headers ou query
-  let rawToken = '';
-  const authHeader = req.headers.authorization || req.headers.Authorization || '';
-  if (authHeader.startsWith('Bearer ')) {
-    rawToken = authHeader.substring(7).trim();
-  } else if (req.headers['x-api-key'] || req.headers['apikey']) {
-    rawToken = (req.headers['x-api-key'] || req.headers['apikey']).trim();
-  } else if (req.query && req.query.secret) {
-    rawToken = req.query.secret.trim();
-  }
-
+  const rawToken = getCredential(req);
   if (!rawToken) {
-    return { authenticated: false, error: 'Token ou chave de acesso não fornecida.' };
+    return { authenticated: false, status: 401, error: 'Token ou chave de acesso não fornecida.' };
   }
 
-  // 2. Verifica se é a chave mestra de sistema (API_SECRET)
+  // Chave interna para jobs/cron. Nunca deve existir no frontend.
   if (rawToken === secret) {
-    const explicitTenant = (req.headers['x-tenant-id'] || (req.query && req.query.tenant_id) || 'angelim').toString().trim();
+    const explicitTenant = String(req.headers['x-tenant-id'] || 'angelim').trim() || 'angelim';
     return {
       authenticated: true,
       isSystem: true,
-      tenantId: explicitTenant || 'angelim',
-      user: { id: 'system', username: 'system', perfil: 'superadmin', tenantId: explicitTenant || 'angelim' }
+      tenantId: explicitTenant,
+      user: { id: 'system', userId: 'system', username: 'system', perfil: 'superadmin', tenantId: explicitTenant }
     };
   }
 
-  // 3. Verifica se é um token de sessão HMAC assinado
   const payload = verifyToken(rawToken, secret);
-  if (payload && payload.tenantId) {
-    if (payload.tenantStatus === 'bloqueado' || payload.tenantStatus === 'cancelado') {
-      return {
-        authenticated: false,
-        status: 403,
-        error: 'Acesso bloqueado para esta empresa. Contate o suporte FinObra.'
-      };
+  if (!payload?.userId || !payload?.tenantId) {
+    return { authenticated: false, status: 401, error: 'Token de autenticação inválido ou expirado.' };
+  }
+
+  const conn = process.env.DATABASE_URL;
+  if (!conn) {
+    console.error('🚨 [Segurança] DATABASE_URL não configurada para validação da sessão.');
+    return { authenticated: false, status: 500, error: 'Banco de autenticação indisponível.' };
+  }
+
+  try {
+    const sql = neon(conn);
+    const rows = await sql`
+      SELECT
+        u.id, u.username, u.email, u.nome, u.perfil, u.avatar, u.ativo, u.tenant_id,
+        t.nome_fantasia, t.razao_social, t.plano, t.status AS tenant_status, t.created_at AS tenant_created_at
+      FROM usuarios u
+      JOIN tenants t ON t.id = u.tenant_id
+      WHERE u.id = ${payload.userId}
+      LIMIT 1;
+    `;
+
+    if (!rows.length || !rows[0].ativo) {
+      return { authenticated: false, status: 403, error: 'Usuário inexistente ou desativado.' };
     }
 
-    // Se o usuário autenticado for superadmin, permite inspecionar outro tenant quando explicitamente informado via 'x-tenant-id' (suporte / impersonate)
-    const isSuperAdminUser = payload.perfil === 'superadmin' || payload.username === 'admin';
-    const explicitTenant = (req.headers['x-tenant-id'] || (req.query && req.query.tenant_id) || '').toString().trim();
-    const effectiveTenantId = (isSuperAdminUser && explicitTenant) ? explicitTenant : payload.tenantId;
+    const live = rows[0];
+    const isSuperAdmin = live.perfil === 'superadmin';
+
+    if (!isSuperAdmin) {
+      if (live.tenant_status === 'bloqueado' || live.tenant_status === 'cancelado') {
+        return { authenticated: false, status: 403, error: 'Acesso bloqueado para esta empresa. Contate o suporte FinObra.' };
+      }
+      if (live.tenant_status === 'trial' && trialExpired(live.tenant_created_at, 15)) {
+        return { authenticated: false, status: 403, error: 'O período de teste gratuito de 15 dias expirou. Regularize o plano para continuar.' };
+      }
+    }
+
+    const requestedTenant = String(req.headers['x-tenant-id'] || '').trim();
+    let effectiveTenantId = live.tenant_id;
+
+    if (isSuperAdmin && requestedTenant) {
+      const target = await sql`SELECT id FROM tenants WHERE id = ${requestedTenant} LIMIT 1;`;
+      if (!target.length) {
+        return { authenticated: false, status: 404, error: 'Tenant solicitado não encontrado.' };
+      }
+      effectiveTenantId = requestedTenant;
+    }
 
     return {
       authenticated: true,
       isSystem: false,
       tenantId: effectiveTenantId,
-      user: payload
+      user: {
+        ...payload,
+        id: live.id,
+        userId: live.id,
+        username: live.username,
+        email: live.email,
+        nome: live.nome,
+        perfil: live.perfil,
+        avatar: live.avatar || (live.nome || 'US').slice(0, 2).toUpperCase(),
+        tenantId: live.tenant_id,
+        tenantStatus: live.tenant_status,
+        tenantPlan: live.plano,
+        empresaNome: live.nome_fantasia || live.razao_social || payload.empresaNome || 'Minha Empresa'
+      }
     };
+  } catch (err) {
+    console.error('[Auth] Falha ao validar sessão no banco:', err.message);
+    return { authenticated: false, status: 503, error: 'Não foi possível validar a sessão no momento.' };
   }
-
-  return { authenticated: false, error: 'Token de autenticação inválido ou expirado.' };
 }

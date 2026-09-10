@@ -69,9 +69,9 @@ export default async function handler(req, res) {
 
     // ── 1. GET /api/auth?action=me (Sessão atual do usuário autenticado) ─────────
     if (req.method === 'GET' && action === 'me') {
-      const auth = resolveAuthAndTenant(req);
+      const auth = await resolveAuthAndTenant(req);
       if (!auth.authenticated) {
-        return res.status(401).json({ success: false, error: auth.error });
+        return res.status(auth.status || 401).json({ success: false, error: auth.error });
       }
 
       if (auth.isSystem) {
@@ -368,7 +368,7 @@ export default async function handler(req, res) {
 
       // Verifica se usuário já existe
       const existing = await sql`
-        SELECT u.*, t.razao_social, t.nome_fantasia, t.status as tenant_status
+        SELECT u.*, t.razao_social, t.nome_fantasia, t.status as tenant_status, t.created_at as tenant_created_at
         FROM usuarios u
         LEFT JOIN tenants t ON u.tenant_id = t.id
         WHERE LOWER(u.email) = ${email} OR (u.google_sub IS NOT NULL AND u.google_sub = ${googleSub})
@@ -380,11 +380,20 @@ export default async function handler(req, res) {
 
       if (existing.length > 0) {
         userRecord = existing[0];
+        if (!userRecord.ativo) {
+          return res.status(403).json({ success:false, message:'Conta de usuário inativa. Contate o administrador.' });
+        }
         if (userRecord.tenant_status === 'bloqueado' || userRecord.tenant_status === 'cancelado') {
           return res.status(403).json({
             success: false,
             message: 'Acesso da empresa bloqueado. Contate o suporte comercial FinObra.'
           });
+        }
+        if (userRecord.tenant_status === 'trial' && userRecord.tenant_created_at) {
+          const trialMs = 15 * 24 * 60 * 60 * 1000;
+          if (Date.now() > new Date(userRecord.tenant_created_at).getTime() + trialMs) {
+            return res.status(403).json({ success:false, message:'Seu período de teste gratuito de 15 dias expirou. Faça o upgrade para continuar.' });
+          }
         }
         if (picture && (!userRecord.avatar || userRecord.avatar.length <= 2)) {
           await sql`UPDATE usuarios SET avatar = ${picture}, updated_at = NOW() WHERE id = ${userRecord.id};`;

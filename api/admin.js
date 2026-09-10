@@ -4,6 +4,7 @@
 import { neon } from '@neondatabase/serverless';
 import crypto from 'crypto';
 import { hashPassword, resolveAuthAndTenant } from './_auth.js';
+import { writeAudit } from './_audit.js';
 
 function getSql() {
   const conn = process.env.DATABASE_URL;
@@ -47,12 +48,12 @@ export default async function handler(req, res) {
   }
 
   // 1. Validação estrita de autorização: apenas SUPERADMIN ou Chave Mestra de Sistema
-  const auth = resolveAuthAndTenant(req);
+  const auth = await resolveAuthAndTenant(req);
   if (!auth.authenticated) {
-    return res.status(401).json({ success: false, error: auth.error || 'Acesso não autorizado.' });
+    return res.status(auth.status || 401).json({ success: false, error: auth.error || 'Acesso não autorizado.' });
   }
 
-  const isSuperAdmin = auth.isSystem || (auth.user && (auth.user.perfil === 'superadmin' || auth.user.username === 'admin'));
+  const isSuperAdmin = auth.isSystem || (auth.user && auth.user.perfil === 'superadmin');
   if (!isSuperAdmin) {
     return res.status(403).json({
       success: false,
@@ -142,6 +143,11 @@ export default async function handler(req, res) {
       }
 
       const rawUser = (username || finalEmail.split('@')[0]).trim().toLowerCase().replace(/[^a-z0-9._-]/g, '');
+      const allowedPlans = ['trial', 'starter', 'pro', 'unlimited'];
+      const finalPlano = String(plano || 'pro').toLowerCase();
+      const finalStatus = String(status || 'ativo').toLowerCase();
+      if (!allowedPlans.includes(finalPlano)) return res.status(400).json({ success:false, error:'Plano inválido.' });
+      if (!['ativo','trial','inadimplente','bloqueado','cancelado'].includes(finalStatus)) return res.status(400).json({ success:false, error:'Status inválido.' });
 
       // Verifica se o usuário ou email já existe
       const existing = await sql`
@@ -169,8 +175,8 @@ export default async function handler(req, res) {
           ${(telefone || '').trim() || null},
           ${finalEmail},
           ${(responsavel || 'Administrador').trim()},
-          ${plano || 'pro'},
-          ${status || 'ativo'}
+          ${finalPlano},
+          ${finalStatus}
         );
       `;
 
@@ -190,6 +196,8 @@ export default async function handler(req, res) {
         );
       `;
 
+      await writeAudit(sql, req, auth, { acao:'criar', entidade:'tenant', entidadeId:tenantId, depois:{ nome_fantasia:finalNome, email:finalEmail, plano:finalPlano, status:finalStatus } });
+
       return res.status(201).json({
         success: true,
         message: 'Construtora e usuário administrador criados com sucesso no Neon PostgreSQL!',
@@ -197,8 +205,8 @@ export default async function handler(req, res) {
           id: tenantId,
           nome_fantasia: finalNome,
           email: finalEmail,
-          plano: plano || 'pro',
-          status: status || 'ativo'
+          plano: finalPlano,
+          status: finalStatus
         }
       });
     }
@@ -211,9 +219,16 @@ export default async function handler(req, res) {
       }
 
       const allowedStatus = ['ativo', 'trial', 'inadimplente', 'bloqueado', 'cancelado'];
+      const allowedPlans = ['trial', 'starter', 'pro', 'unlimited'];
       if (status && !allowedStatus.includes(status.toLowerCase())) {
         return res.status(400).json({ success: false, error: `Status "${status}" inválido. Permitidos: ${allowedStatus.join(', ')}` });
       }
+
+      if (plano && !allowedPlans.includes(String(plano).toLowerCase())) {
+        return res.status(400).json({ success:false, error:'Plano inválido.' });
+      }
+      const beforeRows = await sql`SELECT id, nome_fantasia, plano, status FROM tenants WHERE id=${tenantId} LIMIT 1;`;
+      if (!beforeRows.length) return res.status(404).json({ success:false, error:'Tenant não encontrado.' });
 
       if (status && plano) {
         await sql`
@@ -235,10 +250,9 @@ export default async function handler(req, res) {
         `;
       }
 
-      return res.status(200).json({
-        success: true,
-        message: `Dados da construtora atualizados com sucesso no Neon!`
-      });
+      const afterRows = await sql`SELECT id, nome_fantasia, plano, status FROM tenants WHERE id=${tenantId} LIMIT 1;`;
+      await writeAudit(sql, req, auth, { acao:'atualizar', entidade:'tenant', entidadeId:tenantId, antes:beforeRows[0], depois:afterRows[0] });
+      return res.status(200).json({ success:true, message:'Dados da construtora atualizados com sucesso no Neon!' });
     }
 
     return res.status(400).json({ success: false, error: `Ação "${action}" desconhecida.` });

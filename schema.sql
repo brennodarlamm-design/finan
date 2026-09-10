@@ -15,6 +15,7 @@ CREATE TABLE IF NOT EXISTS tenants (
     endereco TEXT,
     responsavel VARCHAR(255),
     logo_url TEXT,
+    crea_cau VARCHAR(100),
     plano VARCHAR(50) DEFAULT 'pro',
     status VARCHAR(50) DEFAULT 'ativo',
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
@@ -247,3 +248,21 @@ CREATE UNIQUE INDEX IF NOT EXISTS uq_fornecedores_tenant_id ON fornecedores(tena
 CREATE UNIQUE INDEX IF NOT EXISTS uq_notas_tenant_id ON notas_fiscais(tenant_id, id);
 CREATE UNIQUE INDEX IF NOT EXISTS uq_lancamentos_tenant_id ON lancamentos(tenant_id, id);
 
+
+
+-- Auditoria de operações administrativas e cadastrais
+CREATE TABLE IF NOT EXISTS audit_logs (
+    id VARCHAR(64) PRIMARY KEY,
+    tenant_id VARCHAR(64),
+    user_id VARCHAR(64),
+    acao VARCHAR(80) NOT NULL,
+    entidade VARCHAR(80) NOT NULL,
+    entidade_id VARCHAR(128),
+    dados_anteriores JSONB,
+    dados_novos JSONB,
+    ip VARCHAR(80),
+    user_agent TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_audit_tenant_created ON audit_logs (tenant_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_audit_user_created ON audit_logs (user_id, created_at DESC);

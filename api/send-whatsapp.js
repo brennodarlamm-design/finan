@@ -38,7 +38,7 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Método não permitido' });
   }
 
-  const auth = resolveAuthAndTenant(req);
+  const auth = await resolveAuthAndTenant(req);
   if (!auth.authenticated) {
     return res.status(auth.status || 401).json({ error: auth.error || 'Não autorizado. Forneça o token de autenticação.' });
   }

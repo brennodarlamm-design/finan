@@ -1115,8 +1115,10 @@ const NFe = {
 
       if (typeof Lancamentos !== 'undefined' && Lancamentos._refresh) Lancamentos._refresh();
       if (typeof Notas !== 'undefined' && Notas.render) {
-        const appContent = document.getElementById('app-content');
-        if (appContent && App && App.currentRoute === 'notas') appContent.innerHTML = Notas.render(App.currentObraId);
+        const appContent = document.getElementById('route-content') || document.getElementById('app-content');
+        if (appContent && typeof App !== 'undefined' && (App.route === 'notas' || App.currentRoute === 'notas')) {
+          appContent.innerHTML = Notas.render(App.obraId || App.currentObraId);
+        }
       }
     } catch (err) {
       Utils.toast(`Erro ao gerar lançamento: ${err.message}`, 'error');

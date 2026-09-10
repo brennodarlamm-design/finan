@@ -693,7 +693,8 @@ const PreCompras = {
     const p = DB.getById('precompras', id);
     if (!p) return;
     if (typeof Documentos !== 'undefined') {
-      Documentos.showModalAnexos('precompra', p.id, {
+      const fn = Documentos.showModalAnexos || Documentos.abrirModal;
+      fn.call(Documentos, 'precompra', p.id, {
         titulo: 'Anexos da Ordem ' + p.numero_ordem + ' — ' + p.descricao,
         descricao: 'Anexe Notas Fiscais (NF-e/DANFE), propostas comerciais e orçamentos em PDF ou imagem.'
       });

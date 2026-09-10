@@ -38,9 +38,9 @@ export default async function handler(req, res) {
   }
 
   // 1. Exige autenticação rigorosa
-  const auth = resolveAuthAndTenant(req);
+  const auth = await resolveAuthAndTenant(req);
   if (!auth.authenticated) {
-    return res.status(401).json({
+    return res.status(auth.status || 401).json({
       success: false,
       error: auth.error || 'Acesso não autorizado para consulta de NF-e.'
     });

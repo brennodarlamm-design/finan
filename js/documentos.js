@@ -322,6 +322,11 @@ const Documentos = {
   },
 
   // Abre Modal de Gerenciamento de Anexos
+  showModalAnexos(entidadeTipo, entidadeId, options = {}) {
+    const titulo = typeof options === 'string' ? options : (options && options.titulo ? options.titulo : 'Anexos & Comprovantes');
+    return this.abrirModal(entidadeTipo, entidadeId, titulo);
+  },
+
   abrirModal(entidadeTipo, entidadeId, titulo = 'Anexos & Comprovantes') {
     const docs = this.listar(entidadeTipo, entidadeId);
     

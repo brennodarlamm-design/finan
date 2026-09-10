@@ -90,6 +90,7 @@ if (!rawDbUrl) {
 }
 
 const TARGET_PHONE = process.env.TARGET_PHONE || '5595991363678';
+const TARGET_TENANT_ID = (process.env.TARGET_TENANT_ID || process.env.DEFAULT_TENANT_ID || '').trim();
 const AUTH_DIR = path.resolve('auth_info_baileys');
 
 // ── ESTADO DO WHATSAPP ───────────────────────────────────────────────────────
@@ -525,7 +526,8 @@ app.get('/qr', (req, res) => {
           <div class="badge">🟢 100% CONECTADO</div>
           <h1>WhatsApp Conectado!</h1>
           <p>O robô 24/7 da <strong>Angelim Construtora</strong> está ativo e pronto para enviar mensagens e relatórios automáticos.</p>
-          <form action="/reset-auth" method="POST" onsubmit="return confirm('Deseja realmente desconectar e resetar a sessão?');">
+          <form action="/reset-auth${tokenParam}" method="POST" onsubmit="return confirm('Deseja realmente desconectar e resetar a sessão?');">
+            ${hiddenTokenInput}
             <button type="submit" class="btn-danger">🔌 Desconectar e Trocar de Aparelho</button>
           </form>
         </div>
@@ -561,7 +563,8 @@ app.get('/qr', (req, res) => {
             <img src="${qrDataUrl}" alt="QR Code WhatsApp" style="width: 260px; height: 260px; display: block;" />
           </div>
           <p style="font-size: 0.75rem; color: #64748b;">A página atualiza automaticamente a cada 15 segundos.</p>
-          <form action="/reset-auth" method="POST">
+          <form action="/reset-auth${tokenParam}" method="POST">
+            ${hiddenTokenInput}
             <button type="submit" class="btn-subtle">🔄 Limpar sessão e forçar novo QR Code</button>
           </form>
         </div>
@@ -587,7 +590,8 @@ app.get('/qr', (req, res) => {
       <div>
         <h2>⏳ Iniciando motor WhatsApp...</h2>
         <p style="color:#94a3b8;">Gerando novo QR Code em instantes...</p>
-        <form action="/reset-auth" method="POST">
+        <form action="/reset-auth${tokenParam}" method="POST">
+          ${hiddenTokenInput}
           <button type="submit" class="btn-subtle">⚠️ Forçar limpeza completa da sessão</button>
         </form>
       </div>
@@ -738,16 +742,27 @@ async function executarResumoMatinal() {
   try {
     const hoje = new Date().toISOString().split('T')[0];
 
-    // Busca contas a pagar vencendo hoje ou já vencidas (com casting de data robusto)
-    const boletos = await sql`
-      SELECT l.*, o.nome as obra_nome
-      FROM lancamentos l
-      LEFT JOIN obras o ON l.obra_id = o.id
-      WHERE l.tipo = 'despesa'
-        AND l.status IN ('a_pagar', 'pendente')
-        AND (DATE(COALESCE(l.data_vencimento, l.data)) <= ${hoje}::date)
-      ORDER BY COALESCE(l.data_vencimento, l.data) ASC;
-    `;
+    // Busca contas a pagar vencendo hoje ou já vencidas (com casting de data robusto e isolamento de tenant)
+    const boletos = TARGET_TENANT_ID
+      ? await sql`
+          SELECT l.*, o.nome as obra_nome
+          FROM lancamentos l
+          LEFT JOIN obras o ON l.obra_id = o.id
+          WHERE l.tipo = 'despesa'
+            AND l.tenant_id = ${TARGET_TENANT_ID}
+            AND l.status IN ('a_pagar', 'pendente', 'em_atraso')
+            AND (DATE(COALESCE(l.data_vencimento, l.data)) <= ${hoje}::date)
+          ORDER BY COALESCE(l.data_vencimento, l.data) ASC;
+        `
+      : await sql`
+          SELECT l.*, o.nome as obra_nome
+          FROM lancamentos l
+          LEFT JOIN obras o ON l.obra_id = o.id
+          WHERE l.tipo = 'despesa'
+            AND l.status IN ('a_pagar', 'pendente', 'em_atraso')
+            AND (DATE(COALESCE(l.data_vencimento, l.data)) <= ${hoje}::date)
+          ORDER BY COALESCE(l.data_vencimento, l.data) ASC;
+        `;
 
     if (!boletos || boletos.length === 0) {
       console.log('✅ [Cron] Nenhuma conta vencendo hoje ou pendente.');
