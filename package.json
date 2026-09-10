@@ -1,7 +1,7 @@
 {
-  "name": "financas-angelim",
+  "name": "finobra-saas",
   "version": "2.3.0",
-  "description": "Sistema Financeiro & Gestão de Obras - Angelim Construtora",
+  "description": "FinObra — SaaS de gestão financeira e operacional para construtoras",
   "type": "module",
   "scripts": {
     "dev": "npx serve .",

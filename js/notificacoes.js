@@ -49,9 +49,9 @@ const Notificacoes = {
     }
 
     // 3. Contas vencendo nos próximos 3 dias
-    const dMais3 = new Date();
-    dMais3.setDate(dMais3.getDate() + 3);
-    const dMais3Str = dMais3.toISOString().split('T')[0];
+    const baseHoje = new Date(`${hoje}T12:00:00`);
+    baseHoje.setDate(baseHoje.getDate() + 3);
+    const dMais3Str = `${baseHoje.getFullYear()}-${String(baseHoje.getMonth()+1).padStart(2,'0')}-${String(baseHoje.getDate()).padStart(2,'0')}`;
 
     const proximos = lans.filter(l => {
       const v = l.data_vencimento || l.data;
@@ -174,14 +174,14 @@ const Notificacoes = {
                   border:1px solid ${a.nivel === 'urgente' ? 'rgba(239,68,68,.3)' : (a.nivel === 'aviso' ? 'rgba(245,158,11,.3)' : 'rgba(59,130,246,.3)')};">
                   <div style="font-size:1.4rem;line-height:1;margin-top:2px;">${a.icone}</div>
                   <div style="flex:1;min-width:0;">
-                    <div style="font-size:.88rem;font-weight:800;color:var(--text);">${a.titulo}</div>
-                    <div style="font-size:.76rem;color:var(--text3);margin-top:2px;">${a.sub}</div>
+                    <div style="font-size:.88rem;font-weight:800;color:var(--text);">${Utils.escapeHtml(a.titulo)}</div>
+                    <div style="font-size:.76rem;color:var(--text3);margin-top:2px;">${Utils.escapeHtml(a.sub)}</div>
                   </div>
                   <button class="btn btn-sm" onclick="Notificacoes._alertasTemp[${idx}].acao()" style="
                     font-size:.74rem;font-weight:700;white-space:nowrap;align-self:center;
                     background:${a.nivel === 'urgente' ? '#ef4444' : (a.nivel === 'aviso' ? '#f59e0b' : '#3b82f6')};
                     color:#fff;border:none;">
-                    ${a.acaoTexto} →
+                    ${Utils.escapeHtml(a.acaoTexto)} →
                   </button>
                 </div>
               `).join('')}
@@ -212,7 +212,7 @@ const Notificacoes = {
       if (permission === 'granted') {
         Utils.toast('🔔 Notificações ativadas com sucesso!', 'success');
         this.enviarPushDesktop(
-          'Angelim Construtora — Sistema Financeiro',
+          `${(DB.getEmpresa()?.nome_fantasia || DB.getEmpresa()?.razao_social || 'FinObra')} — Sistema Financeiro`,
           'Notificações ativadas! Você será alertado quando houver boletos a vencer.'
         );
       } else {

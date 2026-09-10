@@ -157,15 +157,11 @@ const App = {
 
     if (!Auth.requireAuth()) return;
 
-    // ── Mostrar loader de sincronização ────────────────────────────
-    this._showSyncLoader();
-
+    // Inicialização otimista: usa o cache local imediatamente e sincroniza a nuvem em seguida.
+    // Isso reduz o tempo de tela bloqueada sem abrir mão da atualização dos dados.
     DB.init();
-    await DB.syncFromCloud();
     this.renderShell();
-
-    // ── Ocultar loader após renderizar ─────────────────────────────
-    this._hideSyncLoader();
+    this._bindSyncStatus();
 
     // Histórico e navegação limpa (popstate + hashchange)
     window.addEventListener('popstate', (e) => {
@@ -181,13 +177,24 @@ const App = {
     const initialRoute = this._getRouteFromUrl();
     this.navigate(initialRoute, true);
 
-    if (typeof BuscaGlobal !== 'undefined') BuscaGlobal.init();
+    // Atualiza em segundo plano. Após concluir, redesenha a tela atual com dados frescos.
+    DB.syncFromCloud().then(async (ok) => {
+      if (ok) {
+        const current = this.route || initialRoute;
+        this.renderShell();
+        this._bindSyncStatus();
+        this.navigate(current, false);
+        this.refreshObraSelector();
+      }
+      if (typeof Assinador !== 'undefined' && Assinador.sincronizarAssinaturasPendentes) {
+        Assinador.sincronizarAssinaturasPendentes().catch(() => {});
+      }
+      // Só decide onboarding depois de tentar carregar o tenant real do servidor.
+      const empAtual = DB.getEmpresa();
+      if (!empAtual.configurada) setTimeout(() => this.showOnboardingEmpresa(), 350);
+    });
 
-    // Onboarding automático para novo usuário cuja empresa ainda não foi configurada
-    const emp = DB.getEmpresa();
-    if (!emp.configurada && Auth.getCurrentTenantId() !== 'angelim') {
-      setTimeout(() => this.showOnboardingEmpresa(), 350);
-    }
+    if (typeof BuscaGlobal !== 'undefined') BuscaGlobal.init();
 
     // Atalho de teclado global Ctrl+B para recolher/expandir sidebar
     window.addEventListener('keydown', (e) => {
@@ -198,17 +205,47 @@ const App = {
     });
   },
 
+  _bindSyncStatus() {
+    if (this._syncStatusBound || typeof window === 'undefined') return;
+    this._syncStatusBound = true;
+    window.addEventListener('finobra:sync-status', (ev) => {
+      const d = ev?.detail || {};
+      this._setSyncStatus(d.status, d.pending || 0);
+    });
+    this._setSyncStatus(DB.getSyncPendingCount?.() ? 'pending' : 'cached', DB.getSyncPendingCount?.() || 0);
+  },
+
+  _setSyncStatus(status, pending = 0) {
+    const dot = document.getElementById('sync-status-dot');
+    const text = document.getElementById('sync-status-text');
+    const box = document.getElementById('sync-status-indicator');
+    if (!dot || !text || !box) return;
+    const states = {
+      syncing: ['↻', 'Sincronizando…'],
+      synced: ['●', 'Sincronizado'],
+      pending: ['●', `${pending || 1} pendente(s)`],
+      offline: ['●', 'Offline — cache local'],
+      cached: ['●', 'Cache local']
+    };
+    const [d, t] = states[status] || states.cached;
+    dot.textContent = d;
+    text.textContent = t;
+    box.dataset.status = status || 'cached';
+  },
+
   renderShell() {
     const u = Auth.getUser();
     const emp = DB.getEmpresa();
     const resumoPre = DB.getPreComprasResumo('todas');
     const badgePre = resumoPre.pendentesQtd > 0 ? `<span class="nav-badge" style="background:#f59e0b;color:#182713;font-weight:900;" title="${resumoPre.pendentesQtd} pedido(s) pendente(s)">${resumoPre.pendentesQtd}</span>` : '';
 
-    const brandName = emp.nome_fantasia || emp.razao_social || 'Minha Empresa';
-    const logoHtml = emp.logo_url
+    const brandNameRaw = emp.nome_fantasia || emp.razao_social || 'Minha Empresa';
+    const brandName = Utils.escapeHtml(brandNameRaw);
+    const safeLogoUrl = Utils.safeUrl(emp.logo_url);
+    const logoHtml = safeLogoUrl
       ? `<div style="display:flex;align-items:center;min-width:0;max-width:calc(100% - 28px);overflow:hidden;">
           <div style="display:inline-flex;align-items:center;justify-content:center;padding:2px;border-radius:8px;background:rgba(255,255,255,0.02);border:1px solid rgba(201,162,39,0.25);box-shadow:0 4px 12px rgba(0,0,0,0.35);flex-shrink:0;">
-            <img src="${emp.logo_url}" alt="${brandName}" style="max-height:48px;max-width:185px;width:auto;height:auto;object-fit:contain;border-radius:6px;display:block;">
+            <img src="${safeLogoUrl}" alt="${brandName}" style="max-height:48px;max-width:185px;width:auto;height:auto;object-fit:contain;border-radius:6px;display:block;">
           </div>
         </div>`
       : `<div style="display:flex;align-items:center;gap:10px;overflow:hidden;width:100%;">
@@ -261,9 +298,9 @@ const App = {
           </nav>
           <div class="sidebar-foot">
             <div class="user-card" onclick="App.showUserMenu()">
-              <div class="user-av">${u?.avatar||'AD'}</div>
+              <div class="user-av">${Utils.escapeHtml(u?.avatar || 'AD')}</div>
               <div class="user-info">
-                <div class="user-name">${u?.nome||'Administrador'}</div>
+                <div class="user-name">${Utils.escapeHtml(u?.nome || 'Administrador')}</div>
                 <div class="user-role">${brandName}</div>
               </div>
             </div>
@@ -280,6 +317,9 @@ const App = {
               <div class="header-sub">${brandName} — Gestão Financeira</div>
             </div>
             <div class="hspacer"></div>
+            <div id="sync-status-indicator" title="Status da sincronização com a nuvem" style="display:flex;align-items:center;gap:5px;font-size:.7rem;color:var(--text3);padding:4px 8px;border:1px solid var(--border);border-radius:999px;white-space:nowrap;">
+              <span id="sync-status-dot">●</span><span id="sync-status-text">Cache local</span>
+            </div>
             <!-- Botão Validador de Autenticidade -->
             <a href="/validar" target="_blank" class="header-search-btn" title="Consultar autenticidade de documentos por código ou QR Code" style="text-decoration:none;cursor:pointer;display:flex;align-items:center;gap:6px;background:rgba(201,162,39,.12);border:1px solid rgba(201,162,39,.4);border-radius:8px;padding:5px 11px;color:var(--accent2);transition:all .2s;">
               <span style="font-size:.9rem;">🛡️</span>
@@ -377,7 +417,7 @@ const App = {
         console.error(err);
         el.innerHTML = `<div style="padding:40px;text-align:center;color:var(--text3)">
           <h3 style="color:var(--accent);margin-bottom:8px">Erro ao carregar</h3>
-          <p style="font-size:.85rem">${err.message}</p>
+          <p style="font-size:.85rem">${Utils.escapeHtml(err?.message || 'Falha inesperada.')}</p>
         </div>`;
       }
     }
@@ -499,7 +539,7 @@ const App = {
     if (!filtrados.length) {
       html += `
       <div style="text-align:center;padding:30px;color:var(--text3);font-size:.85rem;">
-        Nenhuma obra encontrada com o termo "<strong>${termo}</strong>".
+        Nenhuma obra encontrada com o termo "<strong>${Utils.escapeHtml(termo)}</strong>".
       </div>`;
       return html;
     }

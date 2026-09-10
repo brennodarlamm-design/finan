@@ -1,6 +1,6 @@
-// js/contratos.js — Módulo Completo Premium de Emissão e Gestão de Contratos Angelim Construtora
+// js/contratos.js — Módulo de Emissão e Gestão de Contratos por Tenant
 // Modelo Oficial: Instrumento Particular de Proposta de Contratação de Serviços de Construção Civil (MCMV / Caixa)
-// Conforme layout institucional da Angelim Construtora (Capa, Cabeçalho, Cláusulas e Assinaturas Gov.br / Digital)
+// Layout institucional baseado nos dados cadastrais de cada empresa (tenant)
 
 const Contratos = {
   _getKey() {
@@ -95,13 +95,17 @@ const Contratos = {
   },
 
   // ─────────────────────────────────────────────────────────────
-  // TEMPLATES / MODELOS DE CONTRATO (OFICIAL ANGELIM CONSTRUTORA)
+  // TEMPLATES / MODELOS DE CONTRATO DO TENANT
   // ─────────────────────────────────────────────────────────────
   getModelos() {
+    const emp = (typeof DB !== 'undefined' && DB.getEmpresa) ? DB.getEmpresa() : {};
+    const empNome = emp.nome_fantasia || emp.razao_social || 'a CONTRATADA';
+    const foroCidade = emp.cidade || 'cidade da sede da CONTRATADA';
+    const foroUf = emp.uf ? `/${emp.uf}` : '';
     return {
       contrato_caixa_mcmv: {
         nome: 'Proposta de Construção Civil Residencial (Contrato Anterior à Caixa - MCMV)',
-        descricao: 'Modelo Oficial da Angelim Construtora: Proposta de contratação futura vinculada a financiamento Caixa Econômica Federal.',
+        descricao: `Modelo da ${empNome}: proposta de contratação futura vinculada a financiamento Caixa Econômica Federal.`,
         tipo: 'cliente_caixa',
         clausulas: [
           {
@@ -263,7 +267,7 @@ const Contratos = {
             secao: '',
             numero: 'CLÁUSULA 19',
             titulo: 'DO FORO DE ELEIÇÃO',
-            texto: 'Fica eleito o foro da Comarca de Boa Vista/RR, com renúncia expressa de qualquer outro, por mais privilegiado que seja.'
+            texto: `Fica eleito o foro da Comarca de ${foroCidade}${foroUf}, com renúncia expressa de qualquer outro, por mais privilegiado que seja.`
           },
           {
             id: 'cl_20',
@@ -306,7 +310,7 @@ const Contratos = {
             secao: 'DO FORO',
             numero: 'CLÁUSULA 04',
             titulo: 'DO FORO DE ELEIÇÃO',
-            texto: 'As partes elegem o foro da Comarca de Boa Vista/RR para dirimir quaisquer controvérsias.'
+            texto: `As partes elegem o foro da Comarca de ${foroCidade}${foroUf} para dirimir quaisquer controvérsias.`
           }
         ]
       }
@@ -318,6 +322,8 @@ const Contratos = {
   // ─────────────────────────────────────────────────────────────
   render(obraId) {
     const lista = this.getAll();
+    const emp = DB.getEmpresa();
+    const empresaNome = Utils.escapeHtml(emp.nome_fantasia || emp.razao_social || 'sua empresa');
     const cs = DB.getAll('clientes');
     const filtrados = obraId && obraId !== 'todas' ? lista.filter(c => c.obra_id === obraId) : lista;
 
@@ -329,7 +335,7 @@ const Contratos = {
     <div class="page-header">
       <div>
         <h1 class="page-title">📜 Contratos de Obras</h1>
-        <p class="page-sub">Emissão oficial de propostas e contratos habitacionais padrão Angelim Construtora (MCMV / Caixa) com assinaturas digitais e Gov.br</p>
+        <p class="page-sub">Emissão de propostas e contratos habitacionais da ${empresaNome} (MCMV / Caixa) com assinaturas digitais e Gov.br</p>
       </div>
       <div class="page-actions">
         <button class="btn btn-primary" onclick="Contratos.novoContratoModal()">
@@ -381,7 +387,7 @@ const Contratos = {
             ${filtrados.length ? filtrados.map(c => this._renderContratoRow(c)).join('') : `
             <tr>
               <td colspan="8" style="text-align:center;padding:40px;color:var(--text3);">
-                Nenhum contrato gerado ainda. Clique em "+ Novo Contrato de Obra" para emitir o modelo oficial da Angelim Construtora.
+                Nenhum contrato gerado ainda. Clique em "+ Novo Contrato de Obra" para emitir um contrato da ${empresaNome}.
               </td>
             </tr>`}
           </tbody>
@@ -391,8 +397,11 @@ const Contratos = {
   },
 
   _renderContratoRow(c) {
+    const e = Utils.escapeHtml.bind(Utils);
     const cli = DB.getById('clientes', c.obra_id);
-    const obraNome = cli ? `${cli.nome} (${cli.cidade}/${cli.estado})` : (c.obra_nome || 'Geral');
+    const obraNome = cli ? `${e(cli.nome)} (${e(cli.cidade)}/${e(cli.estado)})` : e(c.obra_nome || 'Geral');
+    const emp = DB.getEmpresa();
+    const contratadaLabel = e(emp.nome_fantasia || emp.razao_social || 'Contratada');
 
     const contratanteAssinou = !!(c.assinatura_contratante || c.selo_govbr_contratante);
     const contratadaAssinou = !!(c.assinatura_contratada || c.selo_govbr_contratada);
@@ -401,20 +410,20 @@ const Contratos = {
       ? '<span class="badge badge-success" title="Cliente Assinou">✓ Cliente</span>' 
       : '<span class="badge" style="background:rgba(148,163,184,.15);color:var(--text3);">Cliente ?</span>';
 
-    const sigAngelimBadge = contratadaAssinou 
-      ? '<span class="badge badge-success" title="Angelim Assinou">✓ Angelim</span>' 
-      : '<span class="badge" style="background:rgba(148,163,184,.15);color:var(--text3);">Angelim ?</span>';
+    const sigAngelimBadge = contratadaAssinou
+      ? `<span class="badge badge-success" title="Contratada assinou">✓ ${contratadaLabel}</span>`
+      : `<span class="badge" style="background:rgba(148,163,184,.15);color:var(--text3);">${contratadaLabel} ?</span>`;
 
     return `
     <tr>
-      <td style="font-weight:800;color:var(--accent);font-family:monospace;white-space:nowrap;">${c.numero}</td>
+      <td style="font-weight:800;color:var(--accent);font-family:monospace;white-space:nowrap;">${e(c.numero)}</td>
       <td style="white-space:nowrap;font-weight:600;">${Utils.fmt.date(c.data_emissao || c.criado_em)}</td>
       <td>
-        <strong style="color:var(--text);display:block;">${c.titulo || 'Contrato de Construção'}</strong>
-        <span style="font-size:.72rem;color:var(--text3);">${c.subtitulo || 'MCMV - Caixa'}</span>
+        <strong style="color:var(--text);display:block;">${e(c.titulo || 'Contrato de Construção')}</strong>
+        <span style="font-size:.72rem;color:var(--text3);">${e(c.subtitulo || 'MCMV - Caixa')}</span>
       </td>
       <td style="color:var(--text2);font-weight:600;">${obraNome}</td>
-      <td><strong style="color:var(--text);">${c.contratante_nome}</strong>${c.contratante_doc ? `<div style="font-size:.72rem;color:var(--text3);">${c.contratante_doc}</div>` : ''}</td>
+      <td><strong style="color:var(--text);">${e(c.contratante_nome)}</strong>${c.contratante_doc ? `<div style="font-size:.72rem;color:var(--text3);">${e(c.contratante_doc)}</div>` : ''}</td>
       <td style="text-align:right;font-weight:900;color:var(--text);white-space:nowrap;">${Utils.fmt.currency(c.valor)}</td>
       <td style="text-align:center;">
         <div style="display:flex;gap:4px;justify-content:center;">
@@ -461,6 +470,9 @@ const Contratos = {
     const emp = DB.getEmpresa();
     const modelos = this.getModelos();
     const isEdit = !!dados.id;
+    const e = Utils.escapeHtml.bind(Utils);
+    const empNome = emp.nome_fantasia || emp.razao_social || 'Minha Empresa';
+    const empEndereco = emp.endereco || [emp.cidade, emp.uf].filter(Boolean).join('/');
 
     const modeloKey = dados.modelo_key || 'contrato_caixa_mcmv';
     const modelo = modelos[modeloKey] || modelos.contrato_caixa_mcmv;
@@ -475,7 +487,7 @@ const Contratos = {
       <div class="modal" style="max-width:960px;width:96vw;max-height:94vh;display:flex;flex-direction:column;">
         <div class="modal-header" style="flex-shrink:0;">
           <div>
-            <span class="modal-title">📜 ${isEdit ? 'Editar Contrato' : 'Novo Contrato de Construção Civil — Angelim Construtora'}</span>
+            <span class="modal-title">📜 ${isEdit ? 'Editar Contrato' : 'Novo Contrato de Construção Civil — ${e(empNome)}'}</span>
             <div style="font-size:.76rem;color:var(--text3);margin-top:2px;">Modelo oficial pré-formatado com Capa, Qualificação das Partes, 20 Cláusulas e Assinaturas Gov.br</div>
           </div>
           <button class="modal-close" onclick="Utils.closeModal()">✕</button>
@@ -514,7 +526,7 @@ const Contratos = {
                 </div>
                 <div class="form-group">
                   <label class="form-label">Subtítulo da Capa</label>
-                  <input class="form-control" name="subtitulo" id="ct-subtitulo" value="${dados.subtitulo || 'MCMV — ANGELIM CONSTRUTORA'}">
+                  <input class="form-control" name="subtitulo" id="ct-subtitulo" value="${dados.subtitulo || `MCMV — ${empNome.toUpperCase()}`}">
                 </div>
               </div>
             </div>
@@ -528,7 +540,7 @@ const Contratos = {
               <div class="form-row cols-2" style="margin-bottom:10px;">
                 <div class="form-group">
                   <label class="form-label">Nome Completo *</label>
-                  <input class="form-control" name="contratante_nome" id="ct-cli-nome" value="${dados.contratante_nome || ''}" required placeholder="Ex: CAMILY TULYANA LIMA AZEVEDO">
+                  <input class="form-control" name="contratante_nome" id="ct-cli-nome" value="${dados.contratante_nome || ''}" required placeholder="Ex: Nome completo do contratante">
                 </div>
                 <div class="form-group">
                   <label class="form-label">CPF *</label>
@@ -539,7 +551,7 @@ const Contratos = {
               <div class="form-row cols-3" style="margin-bottom:10px;">
                 <div class="form-group">
                   <label class="form-label">RG / Órgão Emissor</label>
-                  <input class="form-control" name="contratante_rg" id="ct-cli-rg" value="${dados.contratante_rg || ''}" placeholder="Ex: 541284-6 SSP/RR">
+                  <input class="form-control" name="contratante_rg" id="ct-cli-rg" value="${dados.contratante_rg || ''}" placeholder="Ex: 123456 SSP/UF">
                 </div>
                 <div class="form-group">
                   <label class="form-label">Data de Nascimento</label>
@@ -558,14 +570,14 @@ const Contratos = {
                 </div>
                 <div class="form-group">
                   <label class="form-label">CEP / Cidade / UF</label>
-                  <input class="form-control" name="contratante_cidade_uf" id="ct-cli-cid" value="${dados.contratante_cidade_uf || 'CEP 69.316-020, Boa Vista/RR'}">
+                  <input class="form-control" name="contratante_cidade_uf" id="ct-cli-cid" value="${dados.contratante_cidade_uf || ''}">
                 </div>
               </div>
 
               <div class="form-row cols-2">
                 <div class="form-group">
                   <label class="form-label">Telefone / WhatsApp</label>
-                  <input class="form-control" name="contratante_telefone" id="ct-cli-tel" value="${dados.contratante_telefone || ''}" placeholder="(95) 90000-0000">
+                  <input class="form-control" name="contratante_telefone" id="ct-cli-tel" value="${dados.contratante_telefone || ''}" placeholder="(00) 90000-0000">
                 </div>
                 <div class="form-group">
                   <label class="form-label">E-mail</label>
@@ -574,31 +586,31 @@ const Contratos = {
               </div>
             </div>
 
-            <!-- Bloco 3: Qualificação da CONTRATADA (Angelim Construtora) -->
+            <!-- Bloco 3: Qualificação da CONTRATADA -->
             <div style="background:var(--bg-secondary);border:1px solid var(--border-s);border-radius:8px;padding:16px;margin-bottom:18px;">
               <div style="font-size:.82rem;font-weight:900;color:var(--accent);text-transform:uppercase;margin-bottom:12px;display:flex;align-items:center;gap:6px;">
-                <span>3.</span> Qualificação da CONTRATADA (Angelim Construtora)
+                <span>3.</span> Qualificação da CONTRATADA (${e(empNome)})
               </div>
 
               <div class="form-row cols-2" style="margin-bottom:10px;">
                 <div class="form-group">
                   <label class="form-label">Razão Social</label>
-                  <input class="form-control" name="contratada_nome" id="ct-emp-nome" value="${dados.contratada_nome || emp.razao_social || 'ANGELIM CONSTRUTORA LTDA'}" required>
+                  <input class="form-control" name="contratada_nome" id="ct-emp-nome" value="${dados.contratada_nome || emp.razao_social || emp.nome_fantasia || ''}" required>
                 </div>
                 <div class="form-group">
                   <label class="form-label">CNPJ</label>
-                  <input class="form-control" name="contratada_doc" id="ct-emp-cnpj" value="${dados.contratada_doc || emp.cnpj || '65.512.273/0001-60'}">
+                  <input class="form-control" name="contratada_doc" id="ct-emp-cnpj" value="${dados.contratada_doc || emp.cnpj || ''}">
                 </div>
               </div>
 
               <div class="form-group" style="margin-bottom:10px;">
                 <label class="form-label">Sede da Construtora</label>
-                <input class="form-control" name="contratada_endereco" id="ct-emp-end" value="${dados.contratada_endereco || 'Rua Andrômeda, nº 228, Bairro Cidade Satélite, Boa Vista/RR'}">
+                <input class="form-control" name="contratada_endereco" id="ct-emp-end" value="${dados.contratada_endereco || empEndereco || ''}">
               </div>
 
               <div class="form-group">
                 <label class="form-label">Representante Legal &amp; Qualificação</label>
-                <input class="form-control" name="contratada_rep" id="ct-emp-rep" value="${dados.contratada_rep || 'Naira de Amorim da Silva, brasileira, solteira, não convivente em regime de união estável, nascida em 07 de agosto de 1999, portadora da Cédula de Identidade RG nº 386634-3 SSP/RR, inscrita no CPF nº 029.525.532-38'}">
+                <input class="form-control" name="contratada_rep" id="ct-emp-rep" value="${dados.contratada_rep || emp.responsavel || ''}">
               </div>
             </div>
 
@@ -768,15 +780,15 @@ const Contratos = {
       <div class="card" style="padding:10px 14px;background:var(--bg-card);border:1px solid var(--border);border-radius:6px;" data-idx="${idx}">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;gap:8px;">
           <div style="display:flex;align-items:center;gap:8px;flex:1;">
-            <input class="form-control" style="font-weight:900;font-size:.76rem;color:var(--accent);width:130px;padding:2px 6px;" value="${cl.numero || `CLÁUSULA ${idx+1}`}" onchange="Contratos._atualizarClausula(${idx}, 'numero', this.value)">
-            ${cl.secao ? `<span style="font-size:.7rem;font-weight:800;color:var(--text3);text-transform:uppercase;">[${cl.secao}]</span>` : ''}
-            <input class="form-control" style="font-weight:700;font-size:.76rem;color:var(--text);flex:1;padding:2px 6px;" value="${cl.titulo || ''}" placeholder="Título" onchange="Contratos._atualizarClausula(${idx}, 'titulo', this.value)">
+            <input class="form-control" style="font-weight:900;font-size:.76rem;color:var(--accent);width:130px;padding:2px 6px;" value="${Utils.escapeHtml(cl.numero || `CLÁUSULA ${idx+1}`)}" onchange="Contratos._atualizarClausula(${idx}, 'numero', this.value)">
+            ${cl.secao ? `<span style="font-size:.7rem;font-weight:800;color:var(--text3);text-transform:uppercase;">[${Utils.escapeHtml(cl.secao)}]</span>` : ''}
+            <input class="form-control" style="font-weight:700;font-size:.76rem;color:var(--text);flex:1;padding:2px 6px;" value="${Utils.escapeHtml(cl.titulo || '')}" placeholder="Título" onchange="Contratos._atualizarClausula(${idx}, 'titulo', this.value)">
           </div>
           <div style="display:flex;gap:4px;">
             <button type="button" class="icon-btn btn-sm" onclick="Contratos._removerClausula(${idx})" title="Excluir" style="color:var(--danger);font-size:.75rem;">🗑️</button>
           </div>
         </div>
-        <textarea class="form-control" rows="2" style="font-size:.8rem;line-height:1.45;resize:vertical;" onchange="Contratos._atualizarClausula(${idx}, 'texto', this.value)">${cl.texto || ''}</textarea>
+        <textarea class="form-control" rows="2" style="font-size:.8rem;line-height:1.45;resize:vertical;" onchange="Contratos._atualizarClausula(${idx}, 'texto', this.value)">${Utils.escapeHtml(cl.texto || '')}</textarea>
       </div>
     `).join('');
   },
@@ -862,11 +874,12 @@ const Contratos = {
     if (!c) return;
 
     const isContratante = papelAlvo === 'contratante';
-    const nomePadrao = isContratante ? c.contratante_nome : (c.contratada_rep ? c.contratada_rep.split(',')[0].trim() : 'Naira de Amorim da Silva');
-    const docPadrao = isContratante ? c.contratante_doc : '029.525.532-38';
+    const emp = DB.getEmpresa();
+    const nomePadrao = isContratante ? c.contratante_nome : (c.contratada_rep ? c.contratada_rep.split(',')[0].trim() : (emp.responsavel || 'Representante da contratada'));
+    const docPadrao = isContratante ? c.contratante_doc : '';
 
     Assinador.abrirModal({
-      titulo: `Assinatura de ${isContratante ? 'CONTRATANTE' : 'CONTRATADA (Angelim)'}`,
+      titulo: `Assinatura de ${isContratante ? 'CONTRATANTE' : 'CONTRATADA'}`,
       subtitulo: `Coleta de assinatura eletrônica legal na tela`,
       papel: isContratante ? 'Contratante' : 'Contratada (Administradora)',
       nomePredefinido: nomePadrao,
@@ -892,7 +905,9 @@ const Contratos = {
     if (!c) return;
 
     const valorFmt = Utils.fmt.currency(c.valor);
-    const texto = `📜 *PROPOSTA DE CONTRATAÇÃO DE CONSTRUÇÃO CIVIL*\n*ANGELIM CONSTRUTORA*\n\n` +
+    const emp = DB.getEmpresa();
+    const empNome = emp.nome_fantasia || emp.razao_social || 'CONTRATADA';
+    const texto = `📜 *PROPOSTA DE CONTRATAÇÃO DE CONSTRUÇÃO CIVIL*\n*${empNome.toUpperCase()}*\n\n` +
       `*Contrato Nº:* ${c.numero}\n` +
       `*Cliente (Contratante):* ${c.contratante_nome}\n` +
       `*Valor Total da Obra:* ${valorFmt}\n` +
@@ -921,7 +936,7 @@ const Contratos = {
         <div class="modal-header" style="flex-shrink:0;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
           <div>
             <span class="modal-title">📜 Contrato Nº ${c.numero}</span>
-            <span class="badge badge-success" style="margin-left:8px;">Modelo Oficial Angelim (MCMV)</span>
+            <span class="badge badge-success" style="margin-left:8px;">Modelo da Contratada (MCMV)</span>
           </div>
 
           <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
@@ -930,9 +945,9 @@ const Contratos = {
               ✍️ ${c.assinatura_contratante ? '✓ Cliente (Reassinar)' : 'Assinar Cliente'}
             </button>
 
-            <!-- Assinar Angelim -->
+            <!-- Assinar Contratada -->
             <button class="btn btn-sm btn-secondary" onclick="Contratos.assinarContrato('${c.id}', 'contratada')" style="font-size:.75rem;">
-              ✍️ ${c.assinatura_contratada ? '✓ Angelim (Reassinar)' : 'Assinar Angelim'}
+              ✍️ ${c.assinatura_contratada ? '✓ Contratada (Reassinar)' : 'Assinar Contratada'}
             </button>
 
             <button class="btn btn-sm btn-secondary" onclick="Contratos.enviarWhatsApp('${c.id}')" style="color:#25d366;font-size:.75rem;">
@@ -963,15 +978,24 @@ const Contratos = {
   // ─────────────────────────────────────────────────────────────
   gerarHTMLContrato(c) {
     const emp = DB.getEmpresa();
-    const brandName = (emp.nome_fantasia || emp.razao_social || 'ANGELIM CONSTRUTORA').toUpperCase();
-    
-    // Logo SVG / PNG
-    const logoPngUrl = 'img/logo.png';
+    const e = Utils.escapeHtml.bind(Utils);
+    // Escapa campos textuais antes de gerar HTML persistente/impresso.
+    c = Object.fromEntries(Object.entries(c || {}).map(([k,v]) => [k, typeof v === 'string' ? e(v) : v]));
+    const brandName = e(emp.nome_fantasia || emp.razao_social || 'MINHA EMPRESA').toUpperCase();
+    const companyAddress = e(c.contratada_endereco || emp.endereco || [emp.cidade, emp.uf].filter(Boolean).join('/') || 'Endereço não informado');
+    const companyPhone = e(emp.telefone || '');
+    const companyEmail = e(emp.email || '');
+    const companyRep = e(c.contratada_rep || emp.responsavel || 'Representante legal não informado');
+    const localCidade = e(emp.cidade || 'Cidade');
+    const localUf = e(emp.uf || 'UF');
+
+    // Usa a logo cadastrada pelo tenant; fallback para o ícone padrão do FinObra.
+    const logoPngUrl = (typeof Utils.safeUrl === 'function' ? Utils.safeUrl(emp.logo_url) : '') || 'favicon-192x192.png';
     const logoHeaderHtml = `
       <div style="display:flex;align-items:center;justify-content:center;gap:12px;margin-bottom:28px;">
-        <img src="${logoPngUrl}" alt="Angelim Construtora" style="max-height:56px;max-width:280px;object-fit:contain;" onerror="this.style.display='none'">
+        <img src="${logoPngUrl}" alt="${brandName}" style="max-height:56px;max-width:280px;object-fit:contain;" onerror="this.style.display='none'">
         <div style="text-align:left;">
-          <div style="font-size:1.35rem;font-weight:900;color:#182713;letter-spacing:1px;line-height:1;">ANGELIM</div>
+          <div style="font-size:1.35rem;font-weight:900;color:#182713;letter-spacing:1px;line-height:1;">${brandName}</div>
           <div style="font-size:.68rem;font-weight:800;color:#c9a227;letter-spacing:2px;text-transform:uppercase;">CONSTRUTORA</div>
         </div>
       </div>
@@ -1002,10 +1026,10 @@ const Contratos = {
         ${logoHeaderHtml}
       </div>
 
-      <!-- Marca D'água Central Gigante da Angelim -->
+      <!-- Marca d'água da empresa -->
       <div style="position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;opacity:0.18;margin:60px 0;">
         <img src="${logoPngUrl}" alt="Marca D'água" style="max-width:320px;max-height:320px;object-fit:contain;">
-        <div style="font-size:2.8rem;font-weight:900;color:#555;letter-spacing:4px;margin-top:10px;">ANGELIM</div>
+        <div style="font-size:2.2rem;font-weight:900;color:#555;letter-spacing:2px;margin-top:10px;">${brandName}</div>
         <div style="font-size:1.1rem;font-weight:800;color:#777;letter-spacing:6px;">CONSTRUTORA</div>
       </div>
 
@@ -1027,10 +1051,10 @@ const Contratos = {
           ${brandName}
         </div>
         <div style="font-size:.78rem;color:#333;margin-bottom:4px;">
-          ${c.contratada_endereco || 'Rua Andrômeda, nº 228, bairro Cidade Satélite'}
+          ${companyAddress}
         </div>
         <div style="font-size:.78rem;color:#333;">
-          Contato: (95) 99142-3559 - email: angelimconstrutora@gmail.com
+          Contato: ${companyPhone || "não informado"} - e-mail: ${companyEmail || "não informado"}
         </div>
       </div>
     </div>`;
@@ -1053,7 +1077,7 @@ const Contratos = {
       </div>
 
       <div style="font-size:.88rem;line-height:1.8;text-align:justify;margin-bottom:18px;">
-        <strong>CONTRATANTE: ${c.contratante_nome.toUpperCase()}</strong>, ${c.contratante_estado_civil || 'brasileira, solteira'}, nascida em ${c.contratante_nascimento || '24 de setembro de 2004'}, portadora da Cédula de Identidade RG nº ${c.contratante_rg || '541284-6 SSP/RR'}, inscrita no CPF nº ${c.contratante_doc}, residente e domiciliada na ${c.contratante_endereco || 'Rua Estrela Bonita, nº 782, bairro Raiar do Sol'}, ${c.contratante_cidade_uf || 'CEP 69.316-020, na cidade de Boa Vista/RR'}, telefone ${c.contratante_telefone || '(95) 99921-8593'}, e-mail: ${c.contratante_email || 'camilytulyana9@gmail.com'}, doravante denominada simplesmente <strong>CONTRATANTE</strong>.
+        <strong>CONTRATANTE: ${c.contratante_nome.toUpperCase()}</strong>, ${c.contratante_estado_civil || 'qualificação não informada'}, nascida em ${c.contratante_nascimento || 'data de nascimento não informada'}, portadora da Cédula de Identidade RG nº ${c.contratante_rg || 'não informado'}, inscrita no CPF nº ${c.contratante_doc}, residente e domiciliada na ${c.contratante_endereco || 'endereço não informado'}, ${c.contratante_cidade_uf || 'cidade/UF não informados'}, telefone ${c.contratante_telefone || 'não informado'}, e-mail: ${c.contratante_email || 'não informado'}, doravante denominada simplesmente <strong>CONTRATANTE</strong>.
       </div>
 
       <div style="font-size:.88rem;font-weight:700;margin-bottom:14px;">
@@ -1061,7 +1085,7 @@ const Contratos = {
       </div>
 
       <div style="font-size:.88rem;line-height:1.8;text-align:justify;margin-bottom:24px;">
-        <strong>CONTRATADA: ${brandName} LTDA</strong>, devidamente inscrita no CNPJ de nº ${c.contratada_doc || '65.512.273/0001-60'}, com sede na ${c.contratada_endereco || 'Rua Andrômeda, nº 228, Bairro Cidade Satélite, Boa Vista/RR'}, neste ato representada por sua Administradora <strong>${c.contratada_rep || 'Naira de Amorim da Silva, brasileira, solteira, não convivente em regime de união estável, nascida em 07 de agosto de 1999, portadora da Cédula de Identidade RG nº 386634-3 SSP/RR, inscrita no CPF nº 029.525.532-38'}</strong>, doravante denominada simplesmente <strong>CONTRATADA</strong>.
+        <strong>CONTRATADA: ${brandName}</strong>, devidamente inscrita no CNPJ de nº ${c.contratada_doc || e(emp.cnpj || 'não informado')}, com sede na ${companyAddress}, neste ato representada por <strong>${companyRep}</strong>, doravante denominada simplesmente <strong>CONTRATADA</strong>.
       </div>
 
       <div style="font-size:.88rem;line-height:1.8;text-align:justify;margin-bottom:28px;">
@@ -1230,7 +1254,7 @@ const Contratos = {
       ${logoHeaderHtml}
 
       <div style="font-size:.88rem;line-height:1.8;text-align:justify;margin-bottom:18px;">
-        <strong>CLÁUSULA 19 –</strong> Fica eleito o foro da Comarca de Boa Vista/RR, com renúncia expressa de qualquer outro, por mais privilegiado que seja.
+        <strong>CLÁUSULA 19 –</strong> Fica eleito o foro da Comarca de ${localCidade}/${localUf}, com renúncia expressa de qualquer outro, por mais privilegiado que seja.
       </div>
 
       <div style="font-size:.88rem;line-height:1.8;text-align:justify;margin-bottom:28px;">
@@ -1242,15 +1266,15 @@ const Contratos = {
       </div>
 
       <div style="font-size:.9rem;font-weight:700;color:#000;margin-bottom:45px;">
-        Boa Vista/RR, ${dataExtenso}.
+        ${localCidade}/${localUf}, ${dataExtenso}.
       </div>
 
-      <!-- Assinatura CONTRATADA (Angelim) -->
+      <!-- Assinatura CONTRATADA -->
       <div style="text-align:center;margin-bottom:40px;">
         ${c.assinatura_contratada?.imagem_base64 ? `<img src="${c.assinatura_contratada.imagem_base64}" alt="Assinatura" style="max-height:55px;display:block;margin:0 auto 2px auto;">` : ''}
         <div style="border-top:1.5px solid #000;width:82%;margin:0 auto 6px auto;"></div>
         <strong style="font-size:.92rem;color:#000;display:block;">${brandName}</strong>
-        <span style="font-size:.84rem;color:#222;display:block;">Naira de Amorim da Silva</span>
+        <span style="font-size:.84rem;color:#222;display:block;">${companyRep}</span>
         <span style="font-size:.75rem;font-weight:700;color:#444;text-transform:uppercase;">CONTRATADA</span>
         ${c.assinatura_contratada ? Assinador.renderCarimboAssinatura(c.assinatura_contratada, { docTipo: 'contrato', docId: c.id }) : ''}
       </div>
@@ -1305,10 +1329,10 @@ const Contratos = {
     if (!c) return;
     const htmlContrato = this.gerarHTMLContrato(c);
 
-    let printFrame = document.getElementById('angelim-print-frame');
+    let printFrame = document.getElementById('finobra-contract-print-frame');
     if (!printFrame) {
       printFrame = document.createElement('iframe');
-      printFrame.id = 'angelim-print-frame';
+      printFrame.id = 'finobra-contract-print-frame';
       printFrame.style.position = 'fixed';
       printFrame.style.right = '0';
       printFrame.style.bottom = '0';
@@ -1324,7 +1348,7 @@ const Contratos = {
       <!DOCTYPE html>
       <html>
         <head>
-          <title>Contrato — ${c.contratante_nome} — Angelim Construtora</title>
+          <title>Contrato — ${c.contratante_nome} — ${Utils.escapeHtml(DB.getEmpresa().nome_fantasia || DB.getEmpresa().razao_social || 'FinObra')}</title>
           <meta charset="utf-8">
           <style>
             @page { size: A4 portrait; margin: 0; }

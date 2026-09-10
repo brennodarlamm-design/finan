@@ -63,11 +63,6 @@ function requireAuth(req, res, next) {
     return next();
   }
 
-  const queryToken = req.query?.token || req.query?.secret || req.body?.token || req.body?.secret || '';
-  if (queryToken && queryToken.trim() === secret) {
-    return next();
-  }
-
   return res.status(401).json({
     error: 'Acesso não autorizado ao servidor WhatsApp. Forneça o cabeçalho Authorization: Bearer <API_SECRET>.'
   });
@@ -89,7 +84,7 @@ if (!rawDbUrl) {
   }
 }
 
-const TARGET_PHONE = process.env.TARGET_PHONE || '5595991363678';
+const TARGET_PHONE = (process.env.TARGET_PHONE || '').trim();
 const TARGET_TENANT_ID = (process.env.TARGET_TENANT_ID || process.env.DEFAULT_TENANT_ID || '').trim();
 const AUTH_DIR = path.resolve('auth_info_baileys');
 
@@ -281,7 +276,7 @@ async function startWhatsApp(forceClean = false) {
       logger: pino({ level: 'silent' }),
       printQRInTerminal: false,
       auth: state,
-      browser: ['Angelim Construtora ERP', 'Chrome', '1.0.0'],
+      browser: ['FinObra ERP', 'Chrome', '1.0.0'],
       connectTimeoutMs: 60000,
       defaultQueryTimeoutMs: 60000,
       keepAliveIntervalMs: 25000
@@ -394,7 +389,7 @@ startWhatsApp();
 // 1. Status Geral
 app.get('/', (req, res) => {
   res.json({
-    name: 'Angelim Construtora — Backend 24/7 (Render)',
+    name: 'FinObra — Backend 24/7 (Render)',
     status: 'online',
     whatsapp: {
       status: connectionStatus,
@@ -510,7 +505,7 @@ app.get('/qr', (req, res) => {
       <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>WhatsApp Conectado — Angelim Construtora</title>
+        <title>WhatsApp Conectado — FinObra</title>
         <style>
           body { font-family: system-ui, sans-serif; background: #0f172a; color: #f8fafc; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; }
           .card { background: #1e293b; padding: 32px; border-radius: 16px; border: 1px solid #334155; text-align: center; max-width: 420px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
@@ -525,7 +520,7 @@ app.get('/qr', (req, res) => {
         <div class="card">
           <div class="badge">🟢 100% CONECTADO</div>
           <h1>WhatsApp Conectado!</h1>
-          <p>O robô 24/7 da <strong>Angelim Construtora</strong> está ativo e pronto para enviar mensagens e relatórios automáticos.</p>
+          <p>O serviço 24/7 do <strong>FinObra</strong> está ativo e pronto para enviar mensagens autorizadas e relatórios automáticos.</p>
           <form action="/reset-auth${tokenParam}" method="POST" onsubmit="return confirm('Deseja realmente desconectar e resetar a sessão?');">
             ${hiddenTokenInput}
             <button type="submit" class="btn-danger">🔌 Desconectar e Trocar de Aparelho</button>
@@ -544,7 +539,7 @@ app.get('/qr', (req, res) => {
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <meta http-equiv="refresh" content="15">
-        <title>Escanear QR Code — Angelim WhatsApp</title>
+        <title>Escanear QR Code — FinObra WhatsApp</title>
         <style>
           body { font-family: system-ui, sans-serif; background: #0f172a; color: #f8fafc; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; }
           .card { background: #1e293b; padding: 32px; border-radius: 16px; border: 1px solid #334155; text-align: center; max-width: 420px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
@@ -738,59 +733,66 @@ async function executarResumoMatinal() {
     console.warn('⚠️ [Cron] DATABASE_URL não disponível. Resumo matinal ignorado.');
     return;
   }
-  console.log('⏰ [Cron] Executando verificação matinal no Neon PostgreSQL...');
-  try {
-    const hoje = new Date().toISOString().split('T')[0];
+  if (!TARGET_TENANT_ID || !TARGET_PHONE) {
+    console.warn('⚠️ [Cron] TARGET_TENANT_ID e TARGET_PHONE são obrigatórios. Nenhum dado será consultado/enviado sem escopo explícito.');
+    return;
+  }
 
-    // Busca contas a pagar vencendo hoje ou já vencidas (com casting de data robusto e isolamento de tenant)
-    const boletos = TARGET_TENANT_ID
-      ? await sql`
-          SELECT l.*, o.nome as obra_nome
-          FROM lancamentos l
-          LEFT JOIN obras o ON l.obra_id = o.id
-          WHERE l.tipo = 'despesa'
-            AND l.tenant_id = ${TARGET_TENANT_ID}
-            AND l.status IN ('a_pagar', 'pendente', 'em_atraso')
-            AND (DATE(COALESCE(l.data_vencimento, l.data)) <= ${hoje}::date)
-          ORDER BY COALESCE(l.data_vencimento, l.data) ASC;
-        `
-      : await sql`
-          SELECT l.*, o.nome as obra_nome
-          FROM lancamentos l
-          LEFT JOIN obras o ON l.obra_id = o.id
-          WHERE l.tipo = 'despesa'
-            AND l.status IN ('a_pagar', 'pendente', 'em_atraso')
-            AND (DATE(COALESCE(l.data_vencimento, l.data)) <= ${hoje}::date)
-          ORDER BY COALESCE(l.data_vencimento, l.data) ASC;
-        `;
+  console.log(`⏰ [Cron] Executando verificação matinal do tenant ${TARGET_TENANT_ID}...`);
+  try {
+    const hoje = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'America/Boa_Vista', year: 'numeric', month: '2-digit', day: '2-digit'
+    }).format(new Date());
+
+    const tenantRows = await sql`
+      SELECT id, COALESCE(nome_fantasia, razao_social, id) AS nome
+      FROM tenants
+      WHERE id = ${TARGET_TENANT_ID}
+      LIMIT 1;
+    `;
+    if (!tenantRows?.length) {
+      console.warn(`⚠️ [Cron] Tenant ${TARGET_TENANT_ID} não encontrado. Resumo ignorado.`);
+      return;
+    }
+    const tenantNome = tenantRows[0].nome || 'Empresa';
+
+    const boletos = await sql`
+      SELECT l.*, o.nome as obra_nome
+      FROM lancamentos l
+      LEFT JOIN obras o
+        ON l.obra_id = o.id
+       AND l.tenant_id = o.tenant_id
+      WHERE l.tipo = 'despesa'
+        AND l.tenant_id = ${TARGET_TENANT_ID}
+        AND l.status IN ('a_pagar', 'pendente', 'em_atraso')
+        AND (DATE(COALESCE(l.data_vencimento, l.data)) <= ${hoje}::date)
+      ORDER BY COALESCE(l.data_vencimento, l.data) ASC;
+    `;
 
     if (!boletos || boletos.length === 0) {
-      console.log('✅ [Cron] Nenhuma conta vencendo hoje ou pendente.');
+      console.log('✅ [Cron] Nenhuma conta vencendo hoje ou pendente para o tenant configurado.');
       return;
     }
 
     let totalValor = 0;
     let listaTexto = '';
-
     boletos.forEach((b, idx) => {
       const v = Number(b.valor) || 0;
       totalValor += v;
       const vFmt = v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
       const dtVencFmt = formatDateBR(b.data_vencimento || b.data);
-      listaTexto += `\n${idx + 1}. *${b.fornecedor_beneficiario || b.descricao}*\n   💵 Valor: ${vFmt}\n   📅 Vencimento: ${dtVencFmt}\n`;
-      if (b.codigo_barras) {
-        listaTexto += `   🔢 Código: \`${b.codigo_barras}\`\n`;
-      }
+      listaTexto += `\n${idx + 1}. *${b.fornecedor_beneficiario || b.descricao || 'Conta'}*\n   💵 Valor: ${vFmt}\n   📅 Vencimento: ${dtVencFmt}\n`;
+      if (b.codigo_barras) listaTexto += `   🔢 Código: \`${b.codigo_barras}\`\n`;
     });
 
     const totalFmt = totalValor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-
-    const msg = `🏢 *ANGELIM CONSTRUTORA — RESUMO MATINAL*\n📅 *Data:* ${new Date().toLocaleDateString('pt-BR')}\n\n⚠️ *Atenção:* Você possui *${boletos.length} conta(s)* com vencimento hoje ou pendentes:\n${listaTexto}\n💰 *Total a pagar:* ${totalFmt}\n\n_Mensagem automática gerada pelo ERP Angelim na nuvem._`;
+    const dataLocal = new Date().toLocaleDateString('pt-BR', { timeZone: 'America/Boa_Vista' });
+    const msg = `🏢 *${tenantNome.toUpperCase()} — RESUMO MATINAL*\n📅 *Data:* ${dataLocal}\n\n⚠️ *Atenção:* Você possui *${boletos.length} conta(s)* com vencimento hoje ou pendentes:\n${listaTexto}\n💰 *Total a pagar:* ${totalFmt}\n\n_Mensagem automática gerada pelo FinObra._`;
 
     if (connectionStatus === 'connected' && sock) {
       const jid = await resolveWhatsAppJid(TARGET_PHONE);
       await sock.sendMessage(jid, { text: msg });
-      console.log(`✅ [Cron] Resumo matinal de R$ ${totalValor} enviado com sucesso para ${jid}!`);
+      console.log(`✅ [Cron] Resumo matinal de ${tenantNome} enviado com sucesso.`);
     } else {
       console.log('⚠️ [Cron] WhatsApp não conectado no momento do disparo matinal.');
     }
@@ -799,7 +801,7 @@ async function executarResumoMatinal() {
   }
 }
 
-// Agendado para todo dia às 08:00 AM (Horário de Boa Vista / UTC-4 -> 12:00 UTC)
+// Agendado para 08:00 no fuso America/Boa_Vista (12:00 UTC; sem horário de verão)
 cron.schedule('0 12 * * *', () => {
   executarResumoMatinal();
 });
@@ -824,7 +826,7 @@ cron.schedule('*/10 * * * *', async () => {
 // ── INICIALIZAÇÃO DO SERVIDOR ────────────────────────────────────────────────
 app.listen(PORT, () => {
   console.log(`\n======================================================`);
-  console.log(`🚀 SERVIDOR ANGELIM 24/7 INICIADO NA PORTA ${PORT}`);
+  console.log(`🚀 SERVIDOR FINOBRA 24/7 INICIADO NA PORTA ${PORT}`);
   console.log(`👉 Status: http://localhost:${PORT}/status`);
   console.log(`👉 QR Code Web: http://localhost:${PORT}/qr`);
   console.log(`👉 Teste Neon: http://localhost:${PORT}/test-neon`);

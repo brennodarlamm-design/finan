@@ -183,7 +183,7 @@ const Exportar = {
       <!DOCTYPE html>
       <html>
         <head>
-          <title>Relatório Angelim Construtora</title>
+          <title>Relatório ${Utils.escapeHtml(DB.getEmpresa().nome_fantasia || DB.getEmpresa().razao_social || "FinObra")}</title>
           <meta charset="utf-8">
           <style>
             body { font-family: 'Segoe UI', sans-serif; background: #f1f5f9; padding: 30px; margin: 0; display: flex; justify-content: center; }
@@ -296,7 +296,7 @@ const Exportar = {
           rows.push([
             o.nome,
             c?.nome || '',
-            o.uf || 'RR',
+            o.uf || DB.getEmpresa()?.uf || '',
             o.referencia_sinapi || '',
             o.desonerado ? 'Sim' : 'Não',
             o.bdi_percentual || 0,
@@ -335,7 +335,7 @@ const Exportar = {
       const imp  = todosLans.filter(l => l.tipo === 'despesa' && l.categoria === 'impostos').reduce((s,l) => s + l.valor, 0);
 
       const rows = [
-        ['DRE GERENCIAL — ANGELIM CONSTRUTORA','',''],
+        [`DRE GERENCIAL — ${(DB.getEmpresa()?.nome_fantasia || DB.getEmpresa()?.razao_social || 'MINHA EMPRESA').toUpperCase()}`,'',''],
         ['Obra / Centro de Custo:', safeNome, ''],
         ['Data de Emissão:', new Date().toLocaleDateString('pt-BR'), ''],
         ['','',''],

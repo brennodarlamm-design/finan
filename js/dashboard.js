@@ -865,10 +865,10 @@ const Dashboard = {
   },
 
   _dispararImpressaoFrame(htmlConteudo, tituloDoc) {
-    let printFrame = document.getElementById('angelim-print-frame');
+    let printFrame = document.getElementById('finobra-print-frame');
     if (!printFrame) {
       printFrame = document.createElement('iframe');
-      printFrame.id = 'angelim-print-frame';
+      printFrame.id = 'finobra-print-frame';
       printFrame.style.position = 'fixed';
       printFrame.style.right = '0';
       printFrame.style.bottom = '0';

@@ -68,6 +68,19 @@ const Utils = {
       .replace(/'/g, '&#039;');
   },
 
+  safeUrl(value) {
+    if (!value) return '';
+    const raw = String(value).trim();
+    if (/^data:image\/(?:png|jpe?g|webp|gif);base64,/i.test(raw)) return raw;
+    try {
+      const u = new URL(raw, window.location.origin);
+      if (!['http:', 'https:'].includes(u.protocol)) return '';
+      return this.escapeHtml(u.href);
+    } catch {
+      return '';
+    }
+  },
+
   today() {
     // Retorna YYYY-MM-DD no fuso horário oficial (America/Boa_Vista, UTC-4), evitando virada indevida de data às 20h UTC
     try {
@@ -124,7 +137,7 @@ const Utils = {
       paga:'<span class="badge badge-success">✓ Paga</span>',
       ativo:'<span class="badge badge-success">✓ Ativo</span>',
     };
-    return m[status] || `<span class="badge badge-secondary">${status}</span>`;
+    return m[status] || `<span class="badge badge-secondary">${this.escapeHtml(status || '')}</span>`;
   },
 
   prioridadeBadge(p) {
@@ -134,7 +147,7 @@ const Utils = {
       alta: '<span class="badge badge-warning">🟠 Alta</span>',
       urgente: '<span class="badge badge-danger" style="font-weight:800;border:1px solid rgba(239,68,68,.5)">🔴 Urgente</span>'
     };
-    return m[p] || `<span class="badge badge-secondary">${p||'Normal'}</span>`;
+    return m[p] || `<span class="badge badge-secondary">${this.escapeHtml(p || 'Normal')}</span>`;
   },
 
   catLabel(c) {
@@ -222,11 +235,13 @@ const Utils = {
     if (el) el.remove();
   },
 
-  confirm(msg, onYes) {
+  confirm(msg, onYes, options = {}) {
+    const allowHtml = options?.allowHtml === true;
+    const safeMsg = allowHtml ? String(msg ?? '') : this.escapeHtml(String(msg ?? ''));
     this.showModal(`
       <div class="modal" style="max-width:400px">
         <div class="modal-header"><span class="modal-title">⚠ Confirmar</span><button class="modal-close" onclick="Utils.closeModal()">✕</button></div>
-        <div class="modal-body"><p style="color:var(--text2);line-height:1.6">${msg}</p></div>
+        <div class="modal-body"><p style="color:var(--text2);line-height:1.6">${safeMsg}</p></div>
         <div class="modal-footer">
           <button class="btn btn-secondary" onclick="Utils.closeModal()">Cancelar</button>
           <button class="btn btn-danger" id="_confirm_btn">Confirmar</button>

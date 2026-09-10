@@ -157,7 +157,7 @@ const ObraDetalhe = {
               <span><strong>CPF/CNPJ:</strong> ${obra.cpf_cnpj || '—'}</span>
               <span><strong>Local:</strong> 📍 ${obra.cidade||'—'}/${obra.estado||'—'}</span>
               <span><strong>Área:</strong> 📐 ${obra.area_construida || '—'} m²</span>
-              <span><strong>Responsável Técnico:</strong> 👷 ${obra.engenheiro_responsavel || obra.responsavel || 'Angelim Construtora'}</span>
+              <span><strong>Responsável Técnico:</strong> 👷 ${obra.engenheiro_responsavel || obra.responsavel || DB.getEmpresa()?.responsavel || 'Não informado'}</span>
               <span><strong>${isCaixa ? 'Contrato Caixa' : 'Ref. Contrato'}:</strong> 📑 ${obra.num_contrato_caixa || 'Contrato Direto'}</span>
             </div>
           </div>
@@ -614,10 +614,10 @@ const ObraDetalhe = {
 
     const htmlDossie = this.gerarHTMLDossie(id);
 
-    let printFrame = document.getElementById('angelim-print-frame');
+    let printFrame = document.getElementById('finobra-print-frame');
     if (!printFrame) {
       printFrame = document.createElement('iframe');
-      printFrame.id = 'angelim-print-frame';
+      printFrame.id = 'finobra-print-frame';
       printFrame.style.position = 'fixed';
       printFrame.style.right = '0';
       printFrame.style.bottom = '0';
@@ -763,7 +763,7 @@ const ObraDetalhe = {
     const modLabel = modMap[obra.modalidade_obra || 'caixa'] || 'Caixa Econômica Federal';
 
     // Header Logo
-    const empNome = emp.nome_fantasia || emp.razao_social || 'Angelim Construtora';
+    const empNome = emp.nome_fantasia || emp.razao_social || 'Minha Empresa';
     const logoHtml = emp.logo_url 
       ? `<img src="${emp.logo_url}" alt="${empNome}" style="max-height:48px;max-width:130px;object-fit:contain;">`
       : `<div style="font-weight:900;font-size:16px;color:#0f172a;letter-spacing:-0.5px;">🏢 ${empNome.toUpperCase()}</div>`;

@@ -1,4 +1,4 @@
-// js/recibos.js — Módulo Gerador e Emissor de Recibos Profissionais Angelim Construtora
+// js/recibos.js — Módulo Gerador e Emissor de Recibos Profissionais por Tenant
 // Com suporte a Assinatura Digital Eletrônica na tela, WhatsApp e Gov.br
 
 const Recibos = {
@@ -186,6 +186,8 @@ const Recibos = {
     const valorPadrao = dadosPreenchidos.valor || '';
     const extensoPadrao = valorPadrao ? Utils.extenso(valorPadrao) : '';
     const emp = DB.getEmpresa();
+    const e = Utils.escapeHtml.bind(Utils);
+    const cidadeUfPadrao = [emp.cidade, emp.uf].filter(Boolean).join(' - ') || 'Cidade / UF';
 
     Utils.showModal(`
       <div class="modal" style="max-width:680px;width:95vw;">
@@ -195,7 +197,7 @@ const Recibos = {
         </div>
         <div class="modal-body">
           <form id="f-recibo">
-            <input type="hidden" name="lancamento_id" value="${dadosPreenchidos.lancamento_id || ''}">
+            <input type="hidden" name="lancamento_id" value="${e(dadosPreenchidos.lancamento_id || '')}">
 
             <div class="form-row cols-2" style="margin-bottom:14px;">
               <div class="form-group">
@@ -209,7 +211,7 @@ const Recibos = {
                 <label class="form-label">Obra Vinculada</label>
                 <select class="form-control" name="obra_id">
                   <option value="">Geral / Sem obra específica</option>
-                  ${cs.map(c => `<option value="${c.id}" ${c.id===(dadosPreenchidos.obra_id||App.obraId)?'selected':''}>${c.nome} &mdash; ${c.cidade}/${c.estado}</option>`).join('')}
+                  ${cs.map(c => `<option value="${e(c.id)}" ${c.id===(dadosPreenchidos.obra_id||App.obraId)?'selected':''}>${e(c.nome)} &mdash; ${e(c.cidade || '')}/${e(c.estado || '')}</option>`).join('')}
                 </select>
               </div>
             </div>
@@ -217,22 +219,22 @@ const Recibos = {
             <div class="form-row cols-2" style="margin-bottom:14px;">
               <div class="form-group">
                 <label class="form-label" id="lbl-rec-pagador">Pagador (Quem paga) *</label>
-                <input class="form-control" name="pagador_nome" id="rec-pagador-nome" value="${dadosPreenchidos.pagador_nome || emp.razao_social || emp.nome_fantasia || 'Minha Construtora'}" required>
+                <input class="form-control" name="pagador_nome" id="rec-pagador-nome" value="${e(dadosPreenchidos.pagador_nome || emp.razao_social || emp.nome_fantasia || 'Minha Construtora')}" required>
               </div>
               <div class="form-group">
                 <label class="form-label">CPF / CNPJ do Pagador</label>
-                <input class="form-control" name="pagador_doc" id="rec-pagador-doc" value="${dadosPreenchidos.pagador_doc || emp.cnpj || ''}" placeholder="00.000.000/0001-00">
+                <input class="form-control" name="pagador_doc" id="rec-pagador-doc" value="${e(dadosPreenchidos.pagador_doc || emp.cnpj || '')}" placeholder="00.000.000/0001-00">
               </div>
             </div>
 
             <div class="form-row cols-2" style="margin-bottom:14px;">
               <div class="form-group">
                 <label class="form-label" id="lbl-rec-beneficiario">Beneficiário (Quem recebe) *</label>
-                <input class="form-control" name="beneficiario_nome" id="rec-beneficiario-nome" value="${dadosPreenchidos.fornecedor_beneficiario || dadosPreenchidos.beneficiario_nome || ''}" required placeholder="Nome do profissional, pedreiro ou empresa">
+                <input class="form-control" name="beneficiario_nome" id="rec-beneficiario-nome" value="${e(dadosPreenchidos.fornecedor_beneficiario || dadosPreenchidos.beneficiario_nome || '')}" required placeholder="Nome do profissional, pedreiro ou empresa">
               </div>
               <div class="form-group">
                 <label class="form-label">CPF / CNPJ do Beneficiário</label>
-                <input class="form-control" name="beneficiario_doc" value="${dadosPreenchidos.beneficiario_doc || ''}" placeholder="000.000.000-00">
+                <input class="form-control" name="beneficiario_doc" value="${e(dadosPreenchidos.beneficiario_doc || '')}" placeholder="000.000.000-00">
               </div>
             </div>
 
@@ -252,18 +254,18 @@ const Recibos = {
 
             <div class="form-group" style="margin-bottom:14px;">
               <label class="form-label">Valor por Extenso (Gerado Automaticamente)</label>
-              <input class="form-control" name="valor_extenso" id="rec-extenso" value="${extensoPadrao}" readonly style="background:var(--bg-secondary);color:var(--accent);font-weight:700;">
+              <input class="form-control" name="valor_extenso" id="rec-extenso" value="${e(extensoPadrao)}" readonly style="background:var(--bg-secondary);color:var(--accent);font-weight:700;">
             </div>
 
             <div class="form-group" style="margin-bottom:14px;">
               <label class="form-label">Referente a (Descrição detalhada) *</label>
-              <textarea class="form-control" name="referente" rows="2" required placeholder="Ex: Serviços de alvenaria e reboco executados na etapa 02 da residência">${dadosPreenchidos.descricao || dadosPreenchidos.referente || ''}</textarea>
+              <textarea class="form-control" name="referente" rows="2" required placeholder="Ex: Serviços de alvenaria e reboco executados na etapa 02 da residência">${e(dadosPreenchidos.descricao || dadosPreenchidos.referente || '')}</textarea>
             </div>
 
             <div class="form-row cols-2" style="margin-bottom:14px;">
               <div class="form-group">
                 <label class="form-label">Cidade e Estado de Emissão *</label>
-                <input class="form-control" name="cidade_uf" value="${dadosPreenchidos.cidade_uf || 'Boa Vista - RR'}" required>
+                <input class="form-control" name="cidade_uf" value="${e(dadosPreenchidos.cidade_uf || cidadeUfPadrao)}" required>
               </div>
               <div class="form-group">
                 <label class="form-label">Forma de Pagamento</label>
@@ -404,7 +406,7 @@ const Recibos = {
     const validacaoTxt = r.assinatura ? `\n*Código de Validação:* ${r.assinatura.codigo_validacao}\n*Data/Hora Assinatura:* ${r.assinatura.data_hora_fmt}` : '';
 
     const emp = DB.getEmpresa();
-    const brandName = emp.nome_fantasia || emp.razao_social || 'Angelim Construtora';
+    const brandName = emp.nome_fantasia || emp.razao_social || 'Minha Empresa';
 
     const texto = `🧾 *COMPROVANTE DE RECIBO OFICIAL*\n*${brandName.toUpperCase()}*\n\n` +
       `*Nº do Recibo:* ${r.numero}\n` +
@@ -480,25 +482,41 @@ const Recibos = {
 
   // Gera o HTML do recibo formatado em padrão A4 institucional
   gerarHTMLRecibo(r) {
+    const e = Utils.escapeHtml.bind(Utils);
+    r = {
+      ...r,
+      numero: e(r.numero || ''),
+      pagador_nome: e(r.pagador_nome || ''),
+      pagador_doc: e(r.pagador_doc || ''),
+      valor_extenso: e(r.valor_extenso || ''),
+      referente: e(r.referente || ''),
+      forma_pagamento: e(r.forma_pagamento || ''),
+      cidade_uf: e(r.cidade_uf || ''),
+      beneficiario_nome: e(r.beneficiario_nome || ''),
+      beneficiario_doc: e(r.beneficiario_doc || ''),
+      obra_nome: e(r.obra_nome || '')
+    };
     const c = DB.getById('clientes', r.obra_id);
-    const obraNome = c ? `${c.nome} (${c.cidade}/${c.estado})` : (r.obra_nome || 'Geral');
+    const obraNome = c ? `${e(c.nome)} (${e(c.cidade || '')}/${e(c.estado || '')})` : (r.obra_nome || 'Geral');
     const valorFmt = Utils.fmt.currency(r.valor);
     const [y, m, d] = (Utils.cleanDate(r.data) || Utils.today()).split('-');
     const meses = ['','janeiro','fevereiro','março','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro'];
     const dataPorExtenso = `${parseInt(d, 10)} de ${meses[parseInt(m, 10)]} de ${y}`;
 
     const emp = DB.getEmpresa();
-    const brandName = (emp.nome_fantasia || emp.razao_social || 'Angelim Construtora').toUpperCase();
-    const logoHtml = emp.logo_url 
-      ? `<img src="${emp.logo_url}" alt="${brandName}" style="max-width:60px;max-height:60px;border-radius:8px;border:1px solid #c9a227;object-fit:contain;">`
+    const brandName = e((emp.nome_fantasia || emp.razao_social || 'Minha Empresa').toUpperCase());
+    const safeLogo = Utils.safeUrl(emp.logo_url);
+    const logoHtml = safeLogo 
+      ? `<img src="${safeLogo}" alt="${brandName}" style="max-width:60px;max-height:60px;border-radius:8px;border:1px solid #c9a227;object-fit:contain;">`
       : `<div style="width:48px;height:48px;border-radius:8px;background:#182713;border:1px solid #c9a227;display:flex;align-items:center;justify-content:center;font-size:1.5rem;">🏢</div>`;
 
     // Renderização da Assinatura Digital sobre a Linha
     let assinaturaVisual = '';
     if (r.assinatura && r.assinatura.imagem_base64) {
-      assinaturaVisual = `
+      const assinaturaUrl = Utils.safeUrl(r.assinatura.imagem_base64);
+      if (assinaturaUrl) assinaturaVisual = `
         <div style="margin-bottom:-10px;">
-          <img src="${r.assinatura.imagem_base64}" alt="Assinatura Digital" style="max-height:65px;max-width:240px;display:block;margin:0 auto;object-fit:contain;">
+          <img src="${assinaturaUrl}" alt="Assinatura Digital" style="max-height:65px;max-width:240px;display:block;margin:0 auto;object-fit:contain;">
         </div>`;
     }
 
@@ -545,7 +563,7 @@ const Recibos = {
 
       <!-- Local e Data -->
       <div style="text-align:right;font-size:.88rem;color:#0f172a;font-weight:700;margin-bottom:30px;">
-        ${r.cidade_uf || 'Boa Vista - RR'}, ${dataPorExtenso}.
+        ${r.cidade_uf || e([emp.cidade, emp.uf].filter(Boolean).join(' - ') || 'Cidade / UF')}, ${dataPorExtenso}.
       </div>
 
       <!-- Área de Assinatura -->
@@ -593,7 +611,7 @@ const Recibos = {
       <!DOCTYPE html>
       <html>
         <head>
-          <title>Recibo Nº ${r.numero} — Angelim Construtora</title>
+          <title>Recibo Nº ${Utils.escapeHtml(r.numero)} — ${Utils.escapeHtml(DB.getEmpresa().nome_fantasia || DB.getEmpresa().razao_social || 'FinObra')}</title>
           <meta charset="utf-8">
           <style>
             @page { size: A4 portrait; margin: 15mm 15mm; }

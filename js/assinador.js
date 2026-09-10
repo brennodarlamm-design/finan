@@ -1,6 +1,6 @@
 // js/assinador.js — Componente Universal de Assinatura Digital & Auditoria Eletrônica
-// Desenvolvido para Angelim Construtora / FinObra
-// Conformidade legal com a Lei Federal nº 14.063/2020 e Art. 10 da MP nº 2.200-2/2001
+// Desenvolvido para uso multi-tenant no FinObra
+// Registro eletrônico de assinatura e trilha de auditoria; a validade jurídica depende do contexto, da identificação das partes e dos requisitos aplicáveis.
 
 const Assinador = {
   _currentCanvas: null,
@@ -18,7 +18,7 @@ const Assinador = {
   // ─────────────────────────────────────────────────────────────
   abrirModal({
     titulo = 'Coletar Assinatura Digital',
-    subtitulo = 'Assine com o dedo na tela ou com o mouse para validação jurídica do documento',
+    subtitulo = 'Assine com o dedo na tela ou com o mouse para registrar a assinatura eletrônica',
     papel = 'Beneficiário / Recebedor',
     nomePredefinido = '',
     docPredefinido = '',
@@ -31,15 +31,16 @@ const Assinador = {
     this._currentPath = [];
 
     const hojeFmt = new Date().toLocaleString('pt-BR');
+    const e = Utils.escapeHtml.bind(Utils);
 
     Utils.showModal(`
       <div class="modal" style="max-width:680px;width:95vw;">
         <div class="modal-header" style="border-bottom:1px solid var(--border-s);">
           <div>
             <div class="modal-title" style="display:flex;align-items:center;gap:8px;">
-              <span>✍️</span> ${titulo}
+              <span>✍️</span> ${e(titulo)}
             </div>
-            <div style="font-size:.76rem;color:var(--text3);margin-top:2px;">${subtitulo}</div>
+            <div style="font-size:.76rem;color:var(--text3);margin-top:2px;">${e(subtitulo)}</div>
           </div>
           <button class="modal-close" onclick="Utils.closeModal()">✕</button>
         </div>
@@ -49,18 +50,18 @@ const Assinador = {
           <div class="form-row cols-2" style="margin-bottom:12px;">
             <div class="form-group">
               <label class="form-label">Nome Completo do Signatário *</label>
-              <input class="form-control" id="sig-nome" value="${nomePredefinido || ''}" placeholder="Nome de quem está assinando" required>
+              <input class="form-control" id="sig-nome" value="${e(nomePredefinido || '')}" placeholder="Nome de quem está assinando" required>
             </div>
             <div class="form-group">
               <label class="form-label">CPF ou CNPJ do Signatário</label>
-              <input class="form-control" id="sig-doc" value="${docPredefinido || ''}" placeholder="000.000.000-00">
+              <input class="form-control" id="sig-doc" value="${e(docPredefinido || '')}" placeholder="000.000.000-00">
             </div>
           </div>
 
           <div class="form-row cols-2" style="margin-bottom:14px;">
             <div class="form-group">
               <label class="form-label">Papel / Função no Documento</label>
-              <input class="form-control" id="sig-papel" value="${papel}" placeholder="Ex: Contratado, Recebedor, Testemunha">
+              <input class="form-control" id="sig-papel" value="${e(papel)}" placeholder="Ex: Contratado, Recebedor, Testemunha">
             </div>
             <div class="form-group">
               <label class="form-label">Cor da Tinta</label>
@@ -104,7 +105,7 @@ const Assinador = {
           <div style="background:rgba(16,185,129,.08);border:1px solid rgba(16,185,129,.25);border-radius:6px;padding:8px 12px;font-size:.72rem;color:var(--text2);display:flex;align-items:center;gap:10px;margin-top:12px;">
             <span style="font-size:1.2rem;">🔒</span>
             <div>
-              <strong>Segurança Jurídica:</strong> Será registrado carimbo de data/hora (<em>${hojeFmt}</em>), identificador do dispositivo e código de integridade criptográfica SHA-256 conforme a <strong>Lei Federal nº 14.063/2020</strong>.
+              <strong>Registro de Auditoria:</strong> serão registrados data/hora (<em>${e(hojeFmt)}</em>), identificador técnico do dispositivo e código SHA-256 do registro. A validade jurídica do documento depende do contexto, da identificação das partes e dos requisitos aplicáveis.
             </div>
           </div>
         </div>
@@ -274,7 +275,7 @@ const Assinador = {
     // Gerar Hash SHA-256 de autenticidade usando Web Crypto
     const dadosParaHash = `${nome}|${doc}|${papel}|${timestampISO}|${userAgent}|${this._metadataDoc?.id || ''}|${this._metadataDoc?.valor || ''}`;
     const hashSHA256 = await this._gerarHashSHA256(dadosParaHash);
-    const codigoValidacao = `ANG-SIG-${Math.random().toString(36).substring(2, 6).toUpperCase()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
+    const codigoValidacao = this._gerarCodigoValidacao();
 
     const objetoAssinatura = {
       id: 'sig_' + Date.now().toString(36),
@@ -287,30 +288,103 @@ const Assinador = {
       ip_dispositivo: this._obterInfoDispositivo(),
       hash_sha256: hashSHA256,
       codigo_validacao: codigoValidacao,
-      lei_amparo: 'Lei Federal nº 14.063/2020 e Art. 10 da MP 2.200-2/2001'
+      lei_amparo: 'Registro eletrônico no FinObra',
+      doc_tipo: this._metadataDoc?.tipo || 'documento',
+      doc_id: this._metadataDoc?.id || '',
+      doc_numero: this._metadataDoc?.numero || ''
     };
 
-    // Registrar no repositório global de assinaturas para consulta por código
+    // Mantém cache local, mas a autenticidade pública depende exclusivamente do registro central no Neon.
     try {
       const reg = JSON.parse(localStorage.getItem('finobra_assinaturas_registry') || '[]');
       reg.unshift({
         ...objetoAssinatura,
-        doc_tipo: this._metadataDoc?.tipo || 'documento',
-        doc_id: this._metadataDoc?.id || '',
-        doc_numero: this._metadataDoc?.numero || '',
-        criado_em: timestampISO
+        criado_em: timestampISO,
+        tenant_id: (typeof Auth !== 'undefined' && Auth.getCurrentTenantId) ? Auth.getCurrentTenantId() : '',
+        registro_central: false
       });
       if (reg.length > 200) reg.length = 200;
       localStorage.setItem('finobra_assinaturas_registry', JSON.stringify(reg));
     } catch (e) {
-      console.warn('Erro ao salvar no registro global de assinaturas:', e);
+      console.warn('Erro ao salvar cache local da assinatura:', e);
     }
 
+    const centralOk = await this._registrarAssinaturaCentral(objetoAssinatura);
+    objetoAssinatura.registro_central = centralOk;
+    try {
+      const reg = JSON.parse(localStorage.getItem('finobra_assinaturas_registry') || '[]');
+      const idx = reg.findIndex(x => x.codigo_validacao === objetoAssinatura.codigo_validacao);
+      if (idx >= 0) {
+        reg[idx].registro_central = centralOk;
+        localStorage.setItem('finobra_assinaturas_registry', JSON.stringify(reg));
+      }
+    } catch {}
     Utils.closeModal();
+
+    if (!centralOk) {
+      Utils.toast('Assinatura salva, mas a validação pública ainda não foi registrada na nuvem. Verifique sua conexão.', 'warning');
+    }
 
     if (typeof this._onSalvarCallback === 'function') {
       this._onSalvarCallback(objetoAssinatura);
     }
+  },
+
+  _gerarCodigoValidacao() {
+    const bytes = new Uint8Array(8);
+    if (window.crypto?.getRandomValues) {
+      window.crypto.getRandomValues(bytes);
+      const hex = Array.from(bytes, b => b.toString(16).padStart(2, '0')).join('').toUpperCase();
+      return `FIN-SIG-${hex.slice(0, 8)}-${hex.slice(8, 16)}`;
+    }
+    return `FIN-SIG-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).slice(2,10).toUpperCase()}`;
+  },
+
+  async _registrarAssinaturaCentral(sig) {
+    try {
+      const headers = (typeof Auth !== 'undefined' && Auth.getAuthHeaders) ? Auth.getAuthHeaders() : { 'Content-Type': 'application/json' };
+      const res = await fetch('/api/assinaturas', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          codigo_validacao: sig.codigo_validacao,
+          hash_sha256: sig.hash_sha256,
+          nome: sig.nome,
+          doc: sig.doc,
+          papel: sig.papel,
+          data_hora: sig.data_hora,
+          data_hora_fmt: sig.data_hora_fmt,
+          ip_dispositivo: sig.ip_dispositivo,
+          doc_tipo: sig.doc_tipo || this._metadataDoc?.tipo || 'documento',
+          doc_id: sig.doc_id || this._metadataDoc?.id || '',
+          doc_numero: sig.doc_numero || this._metadataDoc?.numero || ''
+        })
+      });
+      const data = await res.json().catch(() => ({}));
+      return !!(res.ok && data.success);
+    } catch (err) {
+      console.warn('[Assinatura] Registro central indisponível:', err);
+      return false;
+    }
+  },
+
+  async sincronizarAssinaturasPendentes() {
+    if (typeof Auth === 'undefined' || !Auth.getCurrentTenantId) return 0;
+    const tenantId = Auth.getCurrentTenantId();
+    let reg = [];
+    try { reg = JSON.parse(localStorage.getItem('finobra_assinaturas_registry') || '[]'); } catch { return 0; }
+    let synced = 0;
+    for (const item of reg.filter(x => x.tenant_id === tenantId && x.registro_central !== true).slice(0, 20)) {
+      const ok = await this._registrarAssinaturaCentral(item);
+      if (ok) {
+        item.registro_central = true;
+        synced++;
+      }
+    }
+    if (synced) {
+      try { localStorage.setItem('finobra_assinaturas_registry', JSON.stringify(reg)); } catch {}
+    }
+    return synced;
   },
 
   async _gerarHashSHA256(texto) {
@@ -347,22 +421,13 @@ const Assinador = {
   // UTILITÁRIOS DE QR CODE E VALIDAÇÃO DE AUTENTICIDADE
   // ─────────────────────────────────────────────────────────────
   gerarUrlValidacao(sig, docTipo = 'documento', docId = '') {
-    if (!sig) return '';
-    const origin = (typeof window !== 'undefined' && window.location && window.location.origin && window.location.origin !== 'null' && window.location.protocol.startsWith('http'))
+    if (!sig?.codigo_validacao) return '';
+    const origin = (typeof window !== 'undefined' && window.location?.origin && window.location.origin !== 'null' && window.location.protocol.startsWith('http'))
       ? window.location.origin
       : 'https://finobra.app.br';
-
     const params = new URLSearchParams();
-    if (sig.codigo_validacao) params.set('val', sig.codigo_validacao);
-    if (sig.hash_sha256) params.set('hash', sig.hash_sha256.substring(0, 32));
-    if (sig.hash_sha256) params.set('fhash', sig.hash_sha256);
-    if (sig.nome) params.set('nome', sig.nome);
-    if (sig.doc) params.set('doc', sig.doc);
-    if (sig.papel) params.set('papel', sig.papel);
-    if (sig.data_hora_fmt) params.set('data', sig.data_hora_fmt);
-    if (docTipo) params.set('tipo', docTipo);
-    if (docId) params.set('id', docId);
-
+    params.set('val', sig.codigo_validacao);
+    if (sig.hash_sha256) params.set('hash', sig.hash_sha256.substring(0, 16));
     return `${origin}/validar?${params.toString()}`;
   },
 
@@ -377,7 +442,10 @@ const Assinador = {
   renderCarimboAssinatura(sig, opts = {}) {
     if (!sig) return '';
 
-    const hashCurto = sig.hash_sha256 ? `${sig.hash_sha256.substring(0, 16)}...${sig.hash_sha256.slice(-8)}` : 'VALIDADO';
+    const hashCurto = sig.hash_sha256 ? `${sig.hash_sha256.substring(0, 16)}...${sig.hash_sha256.slice(-8)}` : 'N/D';
+    const centralRegistered = sig.registro_central === true;
+    const registroLabel = centralRegistered ? 'REGISTRADO NO FINOBRA' : 'REGISTRO NA NUVEM PENDENTE';
+    const registroBg = centralRegistered ? '#10b981' : '#f59e0b';
     const docTipo = opts.docTipo || (sig.papel?.toLowerCase().includes('contrat') ? 'contrato' : 'recibo');
     const docId = opts.docId || '';
     const urlValidacao = this.gerarUrlValidacao(sig, docTipo, docId);
@@ -394,28 +462,28 @@ const Assinador = {
       <!-- Dados da Auditoria -->
       <div style="flex:1;min-width:0;line-height:1.35;">
         <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
-          <span style="font-size:.76rem;font-weight:900;color:#065f46;text-transform:uppercase;letter-spacing:0.5px;">Documento Assinado Eletronicamente</span>
-          <span style="background:#10b981;color:#fff;font-size:.62rem;font-weight:800;padding:1px 6px;border-radius:4px;">VÁLIDO &bull; LEI 14.063/2020</span>
+          <span style="font-size:.76rem;font-weight:900;color:#065f46;text-transform:uppercase;letter-spacing:0.5px;">Registro de Assinatura Eletrônica</span>
+          <span style="background:${registroBg};color:#fff;font-size:.62rem;font-weight:800;padding:1px 6px;border-radius:4px;">${registroLabel}</span>
         </div>
         <div style="font-size:.73rem;color:#1e293b;margin-top:2px;">
-          <strong>Signatário:</strong> ${sig.nome} ${sig.doc ? `(${sig.doc})` : ''} &bull; <strong>Papel:</strong> ${sig.papel || 'Beneficiário'}
+          <strong>Signatário:</strong> ${Utils.escapeHtml(sig.nome)} ${sig.doc ? `(${Utils.escapeHtml(sig.doc)})` : ''} &bull; <strong>Papel:</strong> ${Utils.escapeHtml(sig.papel || 'Beneficiário')}
         </div>
         <div style="font-size:.67rem;color:#64748b;margin-top:2px;">
-          <strong>Data/Hora:</strong> ${sig.data_hora_fmt} &bull; <strong>Dispositivo:</strong> ${sig.ip_dispositivo || 'Navegador Web'}
+          <strong>Data/Hora:</strong> ${Utils.escapeHtml(sig.data_hora_fmt)} &bull; <strong>Dispositivo:</strong> ${Utils.escapeHtml(sig.ip_dispositivo || 'Navegador Web')}
         </div>
         <div style="font-size:.63rem;color:#0284c7;font-family:monospace;margin-top:2px;word-break:break-all;">
-          <strong>Hash SHA-256:</strong> ${hashCurto} &bull; <strong>ID:</strong> ${sig.codigo_validacao || ''}
+          <strong>Hash SHA-256:</strong> ${hashCurto} &bull; <strong>ID:</strong> ${Utils.escapeHtml(sig.codigo_validacao || '')}
         </div>
         <div style="font-size:.64rem;color:#475569;margin-top:4px;">
-          Verificação online: <strong>${originHost}/validar</strong> &bull; Código: <strong style="color:#047857;font-family:monospace;background:#ecfdf5;padding:1px 5px;border-radius:3px;border:1px solid #a7f3d0;">${sig.codigo_validacao || ''}</strong>
+          Validação do registro: <strong>${originHost}/validar</strong> &bull; Código: <strong style="color:#047857;font-family:monospace;background:#ecfdf5;padding:1px 5px;border-radius:3px;border:1px solid #a7f3d0;">${Utils.escapeHtml(sig.codigo_validacao || '')}</strong>
         </div>
       </div>
 
       <!-- QR Code de Autenticação -->
       <div style="flex-shrink:0;text-align:center;padding-left:10px;border-left:1px dashed #cbd5e1;">
-        <a href="${urlValidacao}" target="_blank" title="Aponte a câmera do celular para conferir a autenticidade oficial" style="text-decoration:none;display:block;">
-          <img src="${qrUrl}" alt="QR Code Autenticação" style="width:68px;height:68px;border-radius:4px;border:1px solid #94a3b8;background:#fff;padding:2px;display:block;margin:0 auto 2px auto;">
-          <span style="font-size:.56rem;font-weight:800;color:#047857;display:block;letter-spacing:0.2px;line-height:1.1;">VERIFICAR QR<br>AUTENTICIDADE</span>
+        <a href="${urlValidacao}" target="_blank" title="Aponte a câmera do celular para consultar o registro no FinObra" style="text-decoration:none;display:block;">
+          <img src="${qrUrl}" alt="QR Code de consulta do registro" style="width:68px;height:68px;border-radius:4px;border:1px solid #94a3b8;background:#fff;padding:2px;display:block;margin:0 auto 2px auto;">
+          <span style="font-size:.56rem;font-weight:800;color:#047857;display:block;letter-spacing:0.2px;line-height:1.1;">CONSULTAR QR<br>REGISTRO</span>
         </a>
       </div>
     </div>`;
@@ -425,249 +493,16 @@ const Assinador = {
   // TELA PÚBLICA DE VERIFICAÇÃO DE AUTENTICIDADE (#validar)
   // ─────────────────────────────────────────────────────────────
   renderTelaValidacaoPublica() {
-    let searchStr = '';
-    if (window.location.hash.includes('?')) {
-      searchStr = window.location.hash.split('?')[1];
-    } else if (window.location.search.includes('?')) {
-      searchStr = window.location.search.replace(/^\?/, '');
+    // A validação pública oficial vive em validar.html e consulta o Neon.
+    // Não confia em nome/documento/hash fornecidos pela URL.
+    const params = window.location.search || (window.location.hash.includes('?') ? '?' + window.location.hash.split('?')[1] : '');
+    if (!window.location.pathname.endsWith('/validar.html')) {
+      window.location.replace('/validar.html' + params);
+      return '';
     }
-
-    const p = new URLSearchParams(searchStr);
-    const dados = {
-      val: p.get('val') || 'ANG-SIG-AUTENTICO',
-      hash: p.get('fhash') || p.get('hash') || 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
-      nome: p.get('nome') || 'Signatário Verificado',
-      doc: p.get('doc') || '---',
-      papel: p.get('papel') || 'Signatário Legal',
-      data: p.get('data') || new Date().toLocaleString('pt-BR'),
-      tipo: p.get('tipo') || 'Documento Oficial',
-      id: p.get('id') || ''
-    };
-
-    const currentUrl = window.location.href;
-    const qrCodeUrl = this.gerarQRCodeUrl(currentUrl, 160);
-
-    const tipoDocFmt = dados.tipo === 'contrato' ? 'Contrato de Construção Civil / Empreitada'
-                     : dados.tipo === 'recibo' ? 'Recibo Oficial de Pagamento'
-                     : 'Documento Financeiro / Jurídico';
-
-    const rootEl = document.getElementById('app-root') || document.body;
-    rootEl.innerHTML = `
-      <style>
-        .cert-bg {
-          min-height: 100vh;
-          background: #080F05;
-          background-image: radial-gradient(circle at 50% 10%, rgba(201,162,39,0.12) 0%, transparent 60%);
-          font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-          color: #f1f5f9;
-          display: flex;
-          justify-content: center;
-          align-items: flex-start;
-          padding: 40px 16px;
-          box-sizing: border-box;
-        }
-        .cert-card {
-          background: #0f190e;
-          border: 1.5px solid #243518;
-          border-radius: 16px;
-          max-width: 740px;
-          width: 100%;
-          box-shadow: 0 20px 60px rgba(0,0,0,0.85);
-          overflow: hidden;
-          animation: certFadeIn 0.4s ease-out;
-        }
-        @keyframes certFadeIn {
-          from { opacity: 0; transform: translateY(16px); }
-          to { opacity: 1; transform: translateY(0); }
-        }
-        .cert-header {
-          background: linear-gradient(135deg, #142310, #0a1408);
-          border-bottom: 1.5px solid rgba(201,162,39,0.3);
-          padding: 28px 24px;
-          text-align: center;
-          position: relative;
-        }
-        .cert-badge-valid {
-          display: inline-flex;
-          align-items: center;
-          gap: 8px;
-          background: rgba(16,185,129,0.15);
-          border: 1.5px solid #10b981;
-          color: #34d399;
-          font-size: 0.82rem;
-          font-weight: 800;
-          padding: 6px 16px;
-          border-radius: 9999px;
-          margin-bottom: 16px;
-          text-transform: uppercase;
-          letter-spacing: 0.5px;
-        }
-        .cert-pulse {
-          width: 8px;
-          height: 8px;
-          border-radius: 50%;
-          background: #10b981;
-          box-shadow: 0 0 10px #10b981;
-          animation: pulseGreen 1.6s infinite;
-        }
-        @keyframes pulseGreen {
-          0%, 100% { transform: scale(1); opacity: 1; }
-          50% { transform: scale(1.4); opacity: 0.6; }
-        }
-        .cert-row {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          padding: 12px 0;
-          border-bottom: 1px solid rgba(255,255,255,0.06);
-          font-size: 0.86rem;
-        }
-        .cert-row:last-child {
-          border-bottom: none;
-        }
-        .cert-label {
-          color: #94a3b8;
-          font-weight: 500;
-        }
-        .cert-val {
-          color: #f8fafc;
-          font-weight: 600;
-          text-align: right;
-        }
-        @media print {
-          body, .cert-bg {
-            background: #ffffff !important;
-            color: #000000 !important;
-            padding: 0 !important;
-          }
-          .cert-card {
-            border: 1px solid #999 !important;
-            box-shadow: none !important;
-            background: #fff !important;
-            color: #000 !important;
-            max-width: 100% !important;
-          }
-          .cert-header {
-            background: #f8fafc !important;
-            border-bottom: 2px solid #000 !important;
-          }
-          .cert-val, .cert-label {
-            color: #000 !important;
-          }
-          .no-print {
-            display: none !important;
-          }
-        }
-      </style>
-
-      <div class="cert-bg">
-        <div class="cert-card">
-          <!-- Cabeçalho -->
-          <div class="cert-header">
-            <div class="cert-badge-valid">
-              <span class="cert-pulse"></span>
-              ✓ Assinatura Eletrônica Autêntica &bull; Íntegra
-            </div>
-
-            <div style="display:flex;align-items:center;justify-content:center;gap:12px;margin-bottom:8px;">
-              <span style="font-size:1.8rem;">🏛️</span>
-              <h1 style="margin:0;font-size:1.35rem;font-weight:900;color:#f0ead6;letter-spacing:0.5px;">
-                ANGELIM CONSTRUTORA LTDA
-              </h1>
-            </div>
-            <div style="font-size:.82rem;color:rgba(201,162,39,0.85);font-weight:700;letter-spacing:0.5px;">
-              CNPJ: 65.512.273/0001-60 &bull; BOA VISTA / RR
-            </div>
-            <div style="font-size:.76rem;color:#94a3b8;margin-top:4px;">
-              PORTAL OFICIAL DE VERIFICAÇÃO E AUDITORIA CRIPTOGRÁFICA
-            </div>
-          </div>
-
-          <!-- Corpo do Certificado -->
-          <div style="padding:26px;">
-            <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(201,162,39,0.2);border-radius:10px;padding:18px;margin-bottom:22px;">
-              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px;">
-                <span style="font-size:.75rem;font-weight:800;color:var(--accent,#C9A227);text-transform:uppercase;letter-spacing:0.5px;">
-                  Comprovante de Auditoria Digital
-                </span>
-                <span style="font-family:monospace;font-size:.78rem;background:rgba(201,162,39,0.15);color:#E8C84A;padding:2px 8px;border-radius:4px;font-weight:800;">
-                  ID: ${dados.val}
-                </span>
-              </div>
-
-              <div class="cert-row">
-                <span class="cert-label">Documento:</span>
-                <span class="cert-val">${tipoDocFmt}</span>
-              </div>
-              <div class="cert-row">
-                <span class="cert-label">Signatário:</span>
-                <span class="cert-val" style="color:#6ee7b7;font-weight:700;">${dados.nome}</span>
-              </div>
-              <div class="cert-row">
-                <span class="cert-label">CPF / CNPJ:</span>
-                <span class="cert-val">${dados.doc}</span>
-              </div>
-              <div class="cert-row">
-                <span class="cert-label">Papel / Qualificação:</span>
-                <span class="cert-val">${dados.papel}</span>
-              </div>
-              <div class="cert-row">
-                <span class="cert-label">Data e Hora do Registro:</span>
-                <span class="cert-val">${dados.data}</span>
-              </div>
-              <div class="cert-row">
-                <span class="cert-label">Status da Autenticação:</span>
-                <span class="cert-val" style="color:#10b981;font-weight:800;">✓ VÁLIDO E NÃO VIOLADO</span>
-              </div>
-            </div>
-
-            <!-- Hash Criptográfico Completo -->
-            <div style="background:#090e07;border:1px solid #1e2918;border-radius:8px;padding:14px;margin-bottom:22px;">
-              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
-                <span style="font-size:.72rem;font-weight:800;color:#94a3b8;text-transform:uppercase;letter-spacing:0.5px;">
-                  🔒 Hash Criptográfico SHA-256 (Integridade Garantida)
-                </span>
-                <button onclick="navigator.clipboard.writeText('${dados.hash}');alert('Hash copiado com sucesso!');" style="background:none;border:none;color:#C9A227;cursor:pointer;font-size:.7rem;font-weight:700;">
-                  Copiar Hash
-                </button>
-              </div>
-              <div style="font-family:monospace;font-size:.76rem;color:#38bdf8;word-break:break-all;line-height:1.4;user-select:all;">
-                ${dados.hash}
-              </div>
-            </div>
-
-            <!-- QR Code de Verificação Cruzada e Fundamentação Legal -->
-            <div style="display:flex;gap:18px;align-items:center;background:rgba(16,185,129,0.06);border:1px solid rgba(16,185,129,0.25);border-radius:10px;padding:14px;margin-bottom:24px;flex-wrap:wrap;">
-              <div style="text-align:center;flex-shrink:0;">
-                <img src="${qrCodeUrl}" alt="QR Code" style="width:84px;height:84px;background:#fff;border-radius:6px;padding:4px;display:block;">
-                <span style="font-size:.62rem;color:#10b981;font-weight:800;display:block;margin-top:4px;">QR OFICIAL</span>
-              </div>
-              <div style="flex:1;min-width:240px;font-size:.76rem;color:#cbd5e1;line-height:1.6;">
-                <strong style="color:#34d399;display:block;margin-bottom:4px;font-size:.82rem;">
-                  ⚖️ Fundamentação Legal no Brasil:
-                </strong>
-                Este documento possui validade jurídica plena nos termos do <strong>Art. 10, § 2º da Medida Provisória nº 2.200-2/2001</strong> e da <strong>Lei Federal nº 14.063/2020</strong> (Assinatura Eletrônica Avançada).
-                A integridade do conteúdo é matematicamente comprovada pela tecnologia de dispersão criptográfica SHA-256.
-              </div>
-            </div>
-
-            <!-- Botões de Ação -->
-            <div class="no-print" style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap;">
-              <button onclick="window.print()" style="background:#1C2D12;border:1px solid #C9A227;color:#f0ead6;padding:10px 20px;border-radius:8px;font-weight:700;font-size:.85rem;cursor:pointer;display:inline-flex;align-items:center;gap:8px;">
-                🖨️ Imprimir Certificado
-              </button>
-              <button onclick="navigator.clipboard.writeText(window.location.href);alert('Link de autenticação copiado para a área de transferência!');" style="background:#243818;border:1px solid rgba(201,162,39,0.4);color:#f0ead6;padding:10px 20px;border-radius:8px;font-weight:700;font-size:.85rem;cursor:pointer;display:inline-flex;align-items:center;gap:8px;">
-                🔗 Copiar Link de Validação
-              </button>
-              <a href="/app" style="background:#C9A227;border:1px solid #C9A227;color:#080F05;padding:10px 20px;border-radius:8px;font-weight:800;font-size:.85rem;text-decoration:none;display:inline-flex;align-items:center;gap:8px;">
-                Ir ao Sistema FinObra ↗
-              </a>
-            </div>
-          </div>
-        </div>
-      </div>
-    `;
+    return '';
   },
+
 
   // ─────────────────────────────────────────────────────────────
   // MODAL DE ORIENTAÇÃO PARA ASSINATURA GOV.BR (ICP-BRASIL)

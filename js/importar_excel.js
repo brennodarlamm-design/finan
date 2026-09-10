@@ -596,7 +596,7 @@ const ImportarExcel = {
       ["2026-08-20", "2026-08-20", "2026-08-20", "Receita", "João Carlos Ferreira", "Entrada Própria Recursos Cliente", "Entrada Própria", "João Carlos Ferreira", 35000.00, "Recebido", "BB — Movimento Principal", "", "Recursos próprios"],
       ["2026-08-22", "2026-08-28", "", "Despesa", "João Carlos Ferreira", "Cimento Portland CP-II (100 sacos)", "Material", "Materiais Para Construção XYZ", 3200.00, "A Pagar", "BB — Movimento Principal", "34191.79001 01043.510047 91020.150008 5 98760000320000", "Entrega canteiro"],
       ["2026-08-25", "2026-08-30", "", "Despesa", "Maria Aparecida Santos", "Mão de Obra — Alvenaria e Fundação", "Mão de Obra", "Empreiteira Lima & Filhos ME", 14000.00, "A Pagar", "BB — Movimento Principal", "", "Etapa 1"],
-      ["2026-08-15", "2026-08-20", "", "Despesa", "Sede / Escritório", "Conta de Energia Elétrica Sede Central", "Energia Elétrica", "Equatorial / Roraima Energia", 1280.00, "A Pagar", "BB — Movimento Principal", "83640.00001 28000.123456 78901.234567 1 99200000128000", "Competência 08/2026"],
+      ["2026-08-15", "2026-08-20", "", "Despesa", "Sede / Escritório", "Conta de Energia Elétrica Sede Central", "Energia Elétrica", "Concessionária de Energia", 1280.00, "A Pagar", "BB — Movimento Principal", "83640.00001 28000.123456 78901.234567 1 99200000128000", "Competência 08/2026"],
       ["2026-08-15", "2026-08-20", "", "Despesa", "Sede / Escritório", "Guia DAS — Simples Nacional", "DAS Simples Nacional", "Receita Federal do Brasil", 4850.00, "A Pagar", "BB — Movimento Principal", "85820.00004 85000.104050 12345.678901 3 99200000485000", "Apuração 07/2026"],
       ["2026-08-10", "2026-08-10", "2026-08-10", "Despesa", "Sede / Escritório", "Aluguel Comercial Sede", "Aluguel Sede", "Imobiliária Nova Era Ltda", 3500.00, "Pago", "BB — Movimento Principal", "", "Mês vigente"]
     ];
@@ -607,7 +607,7 @@ const ImportarExcel = {
     ];
 
     XLSX.utils.book_append_sheet(wb, ws, "Lancamentos");
-    XLSX.writeFile(wb, "Modelo_Importacao_Lancamentos_Angelim.xlsx");
+    XLSX.writeFile(wb, "Modelo_Importacao_Lancamentos_FinObra.xlsx");
     Utils.toast('Planilha modelo baixada com sucesso!', 'success');
   },
 
@@ -620,7 +620,7 @@ const ImportarExcel = {
       ["2026-08-20", "2026-08-25", "", "Despesa", "João Carlos Ferreira", "Cimento Portland CP-II (60 sacos)", "Material", "Materiais Para Construção XYZ", 1920.00, "A Pagar", "BB — Movimento Principal", "34191.79001 01043.510047 91020.150008 5 98760000192000", "Lote 4"],
       ["2026-08-21", "2026-08-21", "2026-08-21", "Receita", "João Carlos Ferreira", "Liberação 3ª Parcela Caixa Econômica", "Parcela Caixa", "Caixa Econômica Federal", 57000.00, "Recebido", "BB — Movimento Principal", "", "Medição 03 aprovada"],
       ["2026-08-22", "2026-08-27", "", "Despesa", "Maria Aparecida Santos", "Instalação Elétrica e Quadros", "Serviço", "Elétrica Silva ME", 6400.00, "A Pagar", "BB — Movimento Principal", "10491.82345 98765.432109 87654.321098 7 99000000640000", "Fase de acabamento"],
-      ["2026-08-23", "2026-08-28", "", "Despesa", "Sede / Escritório", "Conta de Energia Elétrica Sede", "Energia Elétrica", "Equatorial / Roraima Energia", 1280.00, "A Pagar", "BB — Movimento Principal", "83640.00001 28000.123456 78901.234567 1 99200000128000", "Fatura mensal"],
+      ["2026-08-23", "2026-08-28", "", "Despesa", "Sede / Escritório", "Conta de Energia Elétrica Sede", "Energia Elétrica", "Concessionária de Energia", 1280.00, "A Pagar", "BB — Movimento Principal", "83640.00001 28000.123456 78901.234567 1 99200000128000", "Fatura mensal"],
       ["2026-08-24", "2026-08-30", "", "Despesa", "Sede / Escritório", "Guia DAS — Simples Nacional", "DAS Simples Nacional", "Receita Federal do Brasil", 4850.00, "A Pagar", "BB — Movimento Principal", "85820.00004 85000.104050 12345.678901 3 99200000485000", "Apuração 07/2026"],
       ["2026-08-24", "2026-08-29", "", "Despesa", "Sede / Escritório", "Honorários Contábeis e Assessoria", "Contabilidade", "Meta Contabilidade", 1800.00, "A Pagar", "BB — Movimento Principal", "23793.38128 60000.123456 78000.654321 3 98900000180000", "Mensalidade"],
       ["2026-08-25", "2026-08-25", "2026-08-25", "Despesa", "Sede / Escritório", "Internet Fibra Óptica 500MB", "Internet & Telefonia", "Vivo / Telefônica Brasil", 249.90, "Pago", "BB — Movimento Principal", "", "Pago via débito"]

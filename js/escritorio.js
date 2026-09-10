@@ -647,7 +647,7 @@ const Escritorio = {
       DB.remove('lancamentos', id);
       Utils.toast('Despesa removida!', 'info');
       App.navigate('escritorio');
-    });
+    }, { allowHtml: true });
   },
 
   // ─────────────────────────────────────────────────────────────

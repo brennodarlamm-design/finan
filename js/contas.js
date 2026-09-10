@@ -18,57 +18,8 @@ const Contas = {
     { code:'999', name:'Outro', cor:'#94a3b8', bg:'rgba(148,163,184,.15)' }
   ],
 
-  // Contas oficiais e consolidadas da Angelim Construtora
-  DEFAULT_CONTAS: [
-    {
-      id: 'cta_sicredi_0812',
-      banco_codigo: '748',
-      banco_nome: 'Sicredi',
-      agencia: '0812',
-      numero: '60096-3',
-      tipo: 'corrente',
-      titular: 'ANGELIM CONSTRUTORA LTDA',
-      apelido: 'Sicredi Ag:0812 Cc:60096-3',
-      obra_id: null,
-      obs: 'Conta corrente principal Sicredi vinculada às movimentações e conciliação OFX da construtora'
-    },
-    {
-      id: 'cta_bb_principal',
-      banco_codigo: '001',
-      banco_nome: 'Banco do Brasil',
-      agencia: '0001',
-      numero: 'Principal',
-      tipo: 'corrente',
-      titular: 'ANGELIM CONSTRUTORA LTDA',
-      apelido: 'BB — Movimento Principal',
-      obra_id: null,
-      obs: 'Conta corrente Banco do Brasil — Movimentação geral de despesas e receitas da sede e obras'
-    },
-    {
-      id: 'cta_btg_invest',
-      banco_codigo: '208',
-      banco_nome: 'BTG Pactual',
-      agencia: '0001',
-      numero: 'Investimentos',
-      tipo: 'investimento',
-      titular: 'ANGELIM CONSTRUTORA LTDA',
-      apelido: 'BTG Pactual',
-      obra_id: null,
-      obs: 'Conta investimentos e aplicações de liquidez BTG Pactual'
-    },
-    {
-      id: 'cta_cef_obras',
-      banco_codigo: '104',
-      banco_nome: 'Caixa Econômica Federal',
-      agencia: '0501',
-      numero: '12345-6',
-      tipo: 'obras',
-      titular: 'ANGELIM CONSTRUTORA LTDA',
-      apelido: 'Caixa — Conta Obras CEF',
-      obra_id: null,
-      obs: 'Conta vinculada a recursos de financiamentos habitacionais da Caixa Econômica Federal'
-    }
-  ],
+  // Contas são específicas de cada tenant e nunca são pré-cadastradas com dados de outra empresa.
+  DEFAULT_CONTAS: [],
 
   render(obraId) {
     this.ensureSeed();
@@ -76,11 +27,8 @@ const Contas = {
   },
 
   ensureSeed() {
-    const contas = DB.getAll('contas');
-    if (!contas || contas.length === 0) {
-      console.log('[Contas] Restaurando contas bancárias no armazenamento local...');
-      this.DEFAULT_CONTAS.forEach(c => DB.add('contas', c));
-    }
+    // Não cria contas bancárias fictícias. Cada tenant cadastra as próprias contas.
+    return DB.getAll('contas') || [];
   },
 
   _html(obraId) {
@@ -107,7 +55,7 @@ const Contas = {
             <span style="width:6px;height:6px;background:#10b981;border-radius:50%;display:inline-block;"></span> Nuvem Neon Ativa
           </span>
         </div>
-        <p class="page-sub">Gerencie as contas bancárias da Angelim Construtora e das obras financiadas</p>
+        <p class="page-sub">Gerencie as contas bancárias da sua empresa e das obras financiadas</p>
       </div>
       <div class="page-actions" style="display:flex;gap:10px;">
         <button class="btn btn-secondary" onclick="Contas.sincronizarComNuvem()" title="Sincronizar contas agora com o banco Neon">&#x21BB; Atualizar Nuvem</button>
@@ -295,7 +243,7 @@ const Contas = {
           <div class="g2">
             <div class="form-group">
               <label class="form-label">Titular da Conta</label>
-              <input class="form-control" name="titular" placeholder="Ex: ANGELIM CONSTRUTORA LTDA" value="${conta?.titular || 'ANGELIM CONSTRUTORA LTDA'}">
+              <input class="form-control" name="titular" placeholder="Razão social / titular da conta" value="${Utils.escapeHtml(conta?.titular || DB.getEmpresa()?.razao_social || DB.getEmpresa()?.nome_fantasia || '')}">
             </div>
             <div class="form-group">
               <label class="form-label">Apelido / Identificação no Sistema</label>

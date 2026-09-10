@@ -1,7 +1,7 @@
 {
-  "name": "angelim-backend-render",
+  "name": "finobra-backend-render",
   "version": "1.0.1",
-  "description": "Backend 24/7 para Angelim Construtora no Render com Neon PostgreSQL e WhatsApp",
+  "description": "Backend 24/7 do FinObra no Render com Neon PostgreSQL e WhatsApp",
   "main": "server.js",
   "type": "module",
   "scripts": {

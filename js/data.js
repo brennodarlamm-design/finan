@@ -322,7 +322,18 @@ const DB = {
     return headers;
   },
 
+
+  _emitSyncStatus(status, detail = {}) {
+    if (typeof window === 'undefined' || typeof CustomEvent === 'undefined') return;
+    try {
+      window.dispatchEvent(new CustomEvent('finobra:sync-status', {
+        detail: { status, pending: this.getSyncPendingCount ? this.getSyncPendingCount() : 0, ...detail }
+      }));
+    } catch {}
+  },
+
   async syncFromCloud() {
+    this._emitSyncStatus('syncing');
     try {
       const res = await fetch('/api/db?table=all', { headers: this._apiHeaders() });
       if (res.status === 401) {
@@ -449,9 +460,11 @@ const DB = {
       }
 
       console.log('✅ Dados sincronizados com Neon PostgreSQL!');
+      this._emitSyncStatus('synced');
       return true;
     } catch (e) {
       console.warn('Neon Cloud Sync offline, usando cache local:', e);
+      this._emitSyncStatus('offline', { error: e?.message || 'offline' });
       return false;
     }
   },
@@ -512,6 +525,7 @@ const DB = {
 
         queue.shift();
         this._saveSyncQueue(queue);
+        this._emitSyncStatus(queue.length ? 'pending' : 'synced');
       }
     } finally {
       this._syncFlushing = false;
@@ -529,6 +543,7 @@ const DB = {
       payload
     });
     this._saveSyncQueue(queue);
+    this._emitSyncStatus('pending');
     this._flushCloudQueue();
   },
 

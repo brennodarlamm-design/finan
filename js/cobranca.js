@@ -60,55 +60,35 @@ const Cobranca = {
   },
 
   getAssinaturas() {
-    try {
-      const s = localStorage.getItem(this.STORAGE_ASSINATURAS_KEY);
-      if (s) return JSON.parse(s);
-    } catch {}
-
-    // Default: empresas cadastradas com suas assinaturas
-    const defaults = {
-      'angelim': {
-        tenantId: 'angelim',
-        planoId: 'unlimited',
-        status: 'ativo', // 'ativo', 'trial', 'inadimplente', 'bloqueado'
-        vencimento: '2026-10-10',
-        valorMensal: 159.90,
-        criadoEm: '2026-08-01'
-      },
-      'tenant_empresa_zerada': {
-        tenantId: 'tenant_empresa_zerada',
-        planoId: 'pro',
-        status: 'trial',
-        vencimento: '2026-09-20',
-        valorMensal: 119.90,
-        criadoEm: '2026-09-01'
-      }
-    };
-    this.salvarAssinaturas(defaults);
-    return defaults;
+    // Compatibilidade com versões antigas: não cria mais planos fictícios no navegador.
+    try { return JSON.parse(localStorage.getItem(this.STORAGE_ASSINATURAS_KEY) || '{}'); } catch { return {}; }
   },
 
   salvarAssinaturas(a) {
-    try { localStorage.setItem(this.STORAGE_ASSINATURAS_KEY, JSON.stringify(a)); } catch {}
+    try { localStorage.setItem(this.STORAGE_ASSINATURAS_KEY, JSON.stringify(a || {})); } catch {}
   },
 
   getAssinaturaAtual() {
-    const tenantId = (typeof Auth !== 'undefined' && Auth.getCurrentTenantId()) || 'angelim';
-    const assinaturas = this.getAssinaturas();
-    if (assinaturas[tenantId]) return assinaturas[tenantId];
-
-    // Cria assinatura padrão se não existir
-    const nova = {
+    const emp = (typeof DB !== 'undefined' && DB.getEmpresa) ? DB.getEmpresa() : {};
+    const tenantId = (typeof Auth !== 'undefined' && Auth.getCurrentTenantId()) || emp.id || 'tenant';
+    const planoId = ['starter','pro','unlimited'].includes(emp.plano) ? emp.plano : 'pro';
+    const status = emp.status || 'trial';
+    let vencimento = '';
+    if (status === 'trial' && emp.created_at) {
+      const dt = new Date(emp.created_at);
+      if (!Number.isNaN(dt.getTime())) {
+        dt.setDate(dt.getDate() + 15);
+        vencimento = `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')}`;
+      }
+    }
+    return {
       tenantId,
-      planoId: 'pro',
-      status: 'ativo',
-      vencimento: new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0],
-      valorMensal: 119.90,
-      criadoEm: new Date().toISOString()
+      planoId,
+      status,
+      vencimento,
+      valorMensal: this.PLANOS[planoId]?.valorMensal || 0,
+      criadoEm: emp.created_at || ''
     };
-    assinaturas[tenantId] = nova;
-    this.salvarAssinaturas(assinaturas);
-    return nova;
   },
 
   // ── RENDERIZAÇÃO DA TELA DE PLANOS E ASSINATURA (/app/planos) ────────────────
@@ -145,7 +125,7 @@ const Cobranca = {
             <div>
               <div style="font-size:.78rem;color:#94a3b8;text-transform:uppercase;letter-spacing:.05em;">Seu Plano Atual</div>
               <div style="font-size:1.15rem;font-weight:900;color:var(--accent2);">
-                ${this.PLANOS[assAtual.planoId]?.nome || 'Plano Profissional'} &bull; <span style="font-size:.85rem;color:#22c55e;">Ativo</span>
+                ${this.PLANOS[assAtual.planoId]?.nome || 'Plano Profissional'} &bull; <span style="font-size:.85rem;color:${assAtual.status === 'ativo' ? '#22c55e' : (assAtual.status === 'trial' ? '#f59e0b' : '#ef4444')};">${Utils.escapeHtml(assAtual.status || 'trial')}</span>
               </div>
             </div>
           </div>
@@ -153,7 +133,7 @@ const Cobranca = {
           <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;">
             <div style="text-align:right;">
               <div style="font-size:.72rem;color:#94a3b8;">Próximo Vencimento:</div>
-              <div style="font-weight:800;font-size:.92rem;color:#fff;">${Utils.formatDate ? Utils.formatDate(assAtual.vencimento) : assAtual.vencimento}</div>
+              <div style="font-weight:800;font-size:.92rem;color:#fff;">${assAtual.vencimento ? (Utils.formatDate ? Utils.formatDate(assAtual.vencimento) : assAtual.vencimento) : 'Definido pela assinatura'}</div>
             </div>
             <button onclick="Cobranca.abrirModalPagamentoPix('${assAtual.planoId}')" class="btn-primary" style="padding:10px 18px;border-radius:8px;font-weight:800;display:inline-flex;align-items:center;gap:6px;font-size:.85rem;">
               <span>⚡ Pagar Mensalidade via PIX</span>

@@ -751,7 +751,8 @@ const OrcamentoSINAPI = {
     doc.rect(0, 0, W, 38, 'F');
     doc.setFontSize(16); doc.setFont('helvetica','bold');
     doc.setTextColor(232, 200, 74);
-    doc.text('ANGELIM CONSTRUTORA', 15, 14);
+    const empNomePdf = (DB.getEmpresa()?.nome_fantasia || DB.getEmpresa()?.razao_social || 'MINHA EMPRESA').toUpperCase();
+    doc.text(empNomePdf, 15, 14);
     doc.setFontSize(9); doc.setFont('helvetica','normal'); doc.setTextColor(200, 200, 200);
     doc.text('Sistema de Orçamentos SINAPI', 15, 21);
 
@@ -828,7 +829,7 @@ const OrcamentoSINAPI = {
     for (let p = 1; p <= pages; p++) {
       doc.setPage(p);
       doc.setFontSize(6.5); doc.setFont('helvetica','normal'); doc.setTextColor(90,110,80);
-      doc.text(`Angelim Construtora — Orçamento SINAPI — ${serieLabel} — Ref. ${refLabel}`, 15, H - 7);
+      doc.text(`${empNomePdf} — Orçamento SINAPI — ${serieLabel} — Ref. ${refLabel}`, 15, H - 7);
       doc.text(`Pág. ${p}/${pages}`, W - 15, H - 7, { align:'right' });
     }
 
@@ -859,7 +860,7 @@ const OrcamentoSINAPI = {
     // Montar dados da planilha
     const wsData = [
       // Cabeçalho do documento
-      ['ANGELIM CONSTRUTORA', '', '', '', '', ''],
+      [(DB.getEmpresa()?.nome_fantasia || DB.getEmpresa()?.razao_social || 'MINHA EMPRESA').toUpperCase(), '', '', '', '', ''],
       ['Orçamento SINAPI', '', '', '', '', ''],
       [`Nome: ${orc.nome}`, '', '', '', '', ''],
       [`Obra: ${cliente?.nome || '—'}`, '', '', '', `Ref. SINAPI: ${refLabel}`, ''],
