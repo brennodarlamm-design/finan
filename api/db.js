@@ -230,7 +230,14 @@ async function enforceObraPlanLimit(sql, tenantId, plan, obra) {
 async function validateObraTenant(sql, obraId, tenantId) {
   if (!obraId) return null;
   const clean = obraId.toString().trim();
-  if (clean === 'escritorio' || clean === 'geral') return clean;
+  if (clean === 'escritorio' || clean === 'geral') {
+    await sql`
+      INSERT INTO obras (id, tenant_id, nome, cliente, status)
+      VALUES ('escritorio', ${tenantId}, 'Sede / Escritório Central', 'Administrativo', 'sistema')
+      ON CONFLICT (tenant_id, id) DO NOTHING;
+    `;
+    return 'escritorio';
+  }
   const rows = await sql`SELECT id FROM obras WHERE id = ${clean} AND tenant_id = ${tenantId} LIMIT 1;`;
   return rows.length > 0 ? clean : null;
 }
@@ -327,7 +334,7 @@ export default async function handler(req, res) {
 
       if (!table || table === 'all') {
         const [obras, fornecedores, lancamentos, notas, orcamentos, medicoes, documentos, produtos, contas, precompras, contratos, recibos, orcamentosSinapi, docFases, preferenciasRows] = await Promise.all([
-          sql`SELECT * FROM obras WHERE tenant_id = ${tenantId} ORDER BY nome ASC;`,
+          sql`SELECT * FROM obras WHERE tenant_id = ${tenantId} AND id NOT IN ('escritorio', 'geral') ORDER BY nome ASC;`,
           sql`SELECT * FROM fornecedores WHERE tenant_id = ${tenantId} ORDER BY nome ASC;`,
           sql`SELECT * FROM lancamentos WHERE tenant_id = ${tenantId} ORDER BY data DESC, created_at DESC;`,
           sql`SELECT * FROM notas_fiscais WHERE tenant_id = ${tenantId} ORDER BY data_emissao DESC;`,
@@ -472,7 +479,7 @@ export default async function handler(req, res) {
       }
 
       if (table === 'obras' || table === 'clientes') {
-        const items = await sql`SELECT * FROM obras WHERE tenant_id = ${tenantId} ORDER BY nome ASC;`;
+        const items = await sql`SELECT * FROM obras WHERE tenant_id = ${tenantId} AND id NOT IN ('escritorio', 'geral') ORDER BY nome ASC;`;
         return res.status(200).json({
           success: true,
           data: items.map(o => ({
@@ -830,6 +837,8 @@ export default async function handler(req, res) {
           sql`SELECT id FROM notas_fiscais WHERE tenant_id = ${tenantId};`
         ]);
         const validObrasSet = new Set(tenantObrasList.map(r => r.id));
+        validObrasSet.add('escritorio');
+        validObrasSet.add('geral');
         const validFornecedoresSet = new Set(tenantFornecedoresList.map(r => r.id));
         const validNotasSet = new Set(tenantNotasList.map(r => r.id));
 

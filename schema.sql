@@ -508,3 +508,20 @@ CREATE TABLE IF NOT EXISTS tenant_integrity_audit (
 CREATE INDEX IF NOT EXISTS idx_tenant_integrity_audit_checked ON tenant_integrity_audit(checked_at DESC);
 CREATE INDEX IF NOT EXISTS idx_tenant_integrity_audit_constraint ON tenant_integrity_audit(constraint_name,checked_at DESC);
 
+-- PATCH 11 / MIGRATION 011 — Obra de sistema 'escritorio' para despesas administrativas e integridade de FK
+CREATE OR REPLACE FUNCTION ensure_tenant_system_obras()
+RETURNS TRIGGER AS $$
+BEGIN
+  INSERT INTO obras (id, tenant_id, nome, cliente, status)
+  VALUES ('escritorio', NEW.id, 'Sede / Escritório Central', 'Administrativo', 'sistema')
+  ON CONFLICT (tenant_id, id) DO NOTHING;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trg_tenant_system_obras ON tenants;
+CREATE TRIGGER trg_tenant_system_obras
+AFTER INSERT ON tenants
+FOR EACH ROW EXECUTE FUNCTION ensure_tenant_system_obras();
+
+

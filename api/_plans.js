@@ -42,7 +42,7 @@ export function getPlanRule(plan) {
 
 export function isActiveObraStatus(status) {
   const s = String(status || 'em_andamento').trim().toLowerCase();
-  return !['concluida', 'concluída', 'concluido', 'concluído', 'cancelada', 'cancelado'].includes(s);
+  return !['concluida', 'concluída', 'concluido', 'concluído', 'cancelada', 'cancelado', 'sistema'].includes(s);
 }
 
 export function canUseFeature(plan, feature) {
