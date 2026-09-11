@@ -10,7 +10,7 @@ const DB = {
   },
 
   _t() {
-    return (typeof Auth !== 'undefined' && Auth.getCurrentTenantId) ? Auth.getCurrentTenantId() : 'angelim';
+    return (typeof Auth !== 'undefined' && Auth.getCurrentTenantId) ? Auth.getCurrentTenantId() : 'public';
   },
 
   _k(key) {
@@ -166,11 +166,25 @@ const DB = {
   },
   getById(key, id) { return this.getAll(key).find(i => i.id === id) || null; },
 
-  canWriteLocal(action = 'write') {
+  _moduleForKey(key) {
+    const map = {
+      clientes:'obras', obras:'obras', lancamentos:'financeiro', fornecedores:'fornecedores', produtos:'produtos',
+      precompras:'precompras', recibos:'recibos', contratos:'contratos', notas:'notas', notas_fiscais:'notas', ocr_historico:'notas',
+      orcamentos:'orcamentos', orcamentos_sinapi:'orcamentos', medicoes:'medicoes', documentos:'documentos', documento_conteudo:'documentos',
+      doc_fases:'documentos', contas:'contas', contas_bancarias:'contas', preferencias:'configuracoes'
+    };
+    return map[String(key || '').trim()] || null;
+  },
+
+  canWriteLocal(action = 'write', key = null) {
     const role = String((typeof Auth !== 'undefined' && Auth.getUser && Auth.getUser()?.perfil) || 'visualizador').toLowerCase();
-    if (['admin','superadmin','gestor'].includes(role)) return true;
-    if (role === 'operador') return action !== 'delete';
-    return false;
+    let base = false;
+    if (['admin','superadmin','gestor'].includes(role)) base = true;
+    else if (role === 'operador') base = action !== 'delete';
+    if (!base) return false;
+    const module = this._moduleForKey(key);
+    if (module && typeof Auth !== 'undefined' && typeof Auth.canModule === 'function') return Auth.canModule(module, action);
+    return true;
   },
 
   _denyLocal(action = 'write') {
@@ -180,7 +194,7 @@ const DB = {
   },
 
   add(key, item) {
-    if (!this.canWriteLocal('write')) return this._denyLocal('write');
+    if (!this.canWriteLocal('write', key)) return this._denyLocal('write');
     const data = this.getAll(key);
     item.id = item.id || this.uuid();
     item.created_at = item.created_at || new Date().toISOString();
@@ -190,7 +204,7 @@ const DB = {
     return item;
   },
   update(key, id, updates) {
-    if (!this.canWriteLocal('write')) return this._denyLocal('write');
+    if (!this.canWriteLocal('write', key)) return this._denyLocal('write');
     const data = this.getAll(key);
     const idx = data.findIndex(i => i.id === id);
     if (idx === -1) return null;
@@ -200,7 +214,7 @@ const DB = {
     return data[idx];
   },
   remove(key, id) {
-    if (!this.canWriteLocal('delete')) return this._denyLocal('delete');
+    if (!this.canWriteLocal('delete', key)) return this._denyLocal('delete');
     this.save(key, this.getAll(key).filter(i => i.id !== id));
     this.syncToCloud('delete', key, null, id);
     return true;
@@ -249,7 +263,7 @@ const DB = {
   },
 
   saveDocFase(obraId, docId, dados) {
-    if (!this.canWriteLocal('write')) return this._denyLocal('write');
+    if (!this.canWriteLocal('write', 'doc_fases')) return this._denyLocal('write');
     let saved = {};
     try { saved = JSON.parse(localStorage.getItem(this._fasesDocKey(obraId)) || '{}'); } catch {}
     const template = (typeof FasesDoc !== 'undefined') ? FasesDoc.TEMPLATE : {};
@@ -269,7 +283,7 @@ const DB = {
   },
 
   attachArquivoDocFase(obraId, docId, arquivoId) {
-    if (!this.canWriteLocal('write')) return this._denyLocal('write');
+    if (!this.canWriteLocal('write', 'doc_fases')) return this._denyLocal('write');
     let saved = {};
     try { saved = JSON.parse(localStorage.getItem(this._fasesDocKey(obraId)) || '{}'); } catch {}
     const template = (typeof FasesDoc !== 'undefined') ? FasesDoc.TEMPLATE : {};
@@ -292,7 +306,7 @@ const DB = {
   },
 
   removeArquivoDocFase(obraId, docId, arquivoId) {
-    if (!this.canWriteLocal('write')) return this._denyLocal('write');
+    if (!this.canWriteLocal('write', 'doc_fases')) return this._denyLocal('write');
     let saved = {};
     try { saved = JSON.parse(localStorage.getItem(this._fasesDocKey(obraId)) || '{}'); } catch {}
     for (const fk of Object.keys(saved)) {
@@ -386,11 +400,9 @@ const DB = {
         }
       } catch (e) {}
     }
-    const tenantId = (typeof Auth !== 'undefined' && Auth.getCurrentTenantId) ? Auth.getCurrentTenantId() : 'angelim';
-    const headers = {
-      'Content-Type': 'application/json',
-      'x-tenant-id': tenantId
-    };
+    const tenantId = (typeof Auth !== 'undefined' && Auth.getCurrentTenantId) ? Auth.getCurrentTenantId() : 'public';
+    const headers = { 'Content-Type': 'application/json' };
+    if (tenantId && tenantId !== 'public') headers['x-tenant-id'] = tenantId;
     if (token) {
       headers['Authorization'] = `Bearer ${token}`;
     }
@@ -561,6 +573,10 @@ const DB = {
       doc_fases: this._collectLocalDocPhases(),
       preferencias: this._preferencesLocalSnapshot()
     };
+    for (const key of Object.keys(payload)) {
+      const module = this._moduleForKey(key);
+      if (module && typeof Auth !== 'undefined' && !Auth.canModule(module,'write')) payload[key] = key === 'preferencias' ? {} : [];
+    }
     const meaningfulPrefs = Object.values(payload.preferencias || {}).some(v => Array.isArray(v) ? v.length > 0 : Boolean(v && v !== 'api'));
     const total = payload.orcamentos_sinapi.length + payload.doc_fases.length + (meaningfulPrefs ? 1 : 0);
     if (!total) {
@@ -617,6 +633,10 @@ const DB = {
       contratos: this.getAll('contratos'),
       recibos: (() => { try { return JSON.parse(localStorage.getItem(this._ck('finobra_recibos')) || '[]'); } catch { return []; } })()
     };
+    for (const key of Object.keys(payload)) {
+      const module = this._moduleForKey(key);
+      if (module && typeof Auth !== 'undefined' && !Auth.canModule(module,'write')) payload[key] = [];
+    }
     const total = Object.values(payload).reduce((n, arr) => n + (Array.isArray(arr) ? arr.length : 0), 0);
     if (!total) {
       try { localStorage.setItem(this._coreCloudBootstrapKey(), '1'); } catch {}
@@ -961,6 +981,8 @@ const DB = {
   syncToCloud(action, table, data, id) {
     const cloudTables = ['lancamentos', 'notas', 'notas_fiscais', 'obras', 'clientes', 'fornecedores', 'documentos', 'produtos', 'ocr_historico', 'contas', 'contas_bancarias', 'precompras', 'contratos', 'recibos', 'orcamentos_sinapi', 'doc_fases', 'preferencias'];
     if (!cloudTables.includes(table)) return;
+    const module = this._moduleForKey(table);
+    if (module && typeof Auth !== 'undefined' && typeof Auth.canModule === 'function' && !Auth.canModule(module, action === 'delete' ? 'delete' : 'write')) return;
     const payload = { action, table, data, id };
     let queue = this._getSyncQueue();
     const entityId = String(id || data?.cloud_id || data?.id || (table === 'preferencias' ? '__tenant_preferences__' : '') || '');
@@ -1011,6 +1033,10 @@ const DB = {
         doc_fases: this._collectLocalDocPhases ? this._collectLocalDocPhases() : [],
         preferencias: this._preferencesLocalSnapshot ? this._preferencesLocalSnapshot() : {}
       };
+      for (const key of Object.keys(payload)) {
+        const module = this._moduleForKey(key);
+        if (module && typeof Auth !== 'undefined' && !Auth.canModule(module,'write')) payload[key] = key === 'preferencias' ? {} : [];
+      }
       const body = JSON.stringify({ action: 'sync_all', payload });
       if (body.length <= 1_500_000) {
         const res = await fetch('/api/db', { method:'POST', headers:this._apiHeaders(), body });

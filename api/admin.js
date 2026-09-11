@@ -210,6 +210,28 @@ export default async function handler(req, res) {
     }
 
     // ── 1. GET ?action=tenants (Listar Construtoras com Métricas Reais do Neon) ──
+    if (req.method === 'GET' && action === 'client_errors') {
+      const limit = Math.min(Math.max(Number.parseInt(req.query?.limit || '100',10) || 100,1),200);
+      const rows = await sql`
+        SELECT e.id,e.tenant_id,e.user_id,e.route,e.message,e.source,e.line_no,e.col_no,e.stack,e.created_at,
+               COALESCE(t.nome_fantasia,t.razao_social,e.tenant_id,'Tenant') AS tenant_nome,
+               COALESCE(u.nome,u.username,'Usuário') AS usuario_nome
+        FROM client_error_logs e
+        LEFT JOIN tenants t ON t.id=e.tenant_id
+        LEFT JOIN usuarios u ON u.id=e.user_id
+        ORDER BY e.created_at DESC,e.id DESC
+        LIMIT ${limit};
+      `;
+      const summaryRows = await sql`
+        SELECT
+          COUNT(*) FILTER (WHERE created_at >= NOW() - INTERVAL '24 hours')::int AS last_24h,
+          COUNT(*) FILTER (WHERE created_at >= NOW() - INTERVAL '7 days')::int AS last_7d,
+          COUNT(DISTINCT tenant_id) FILTER (WHERE created_at >= NOW() - INTERVAL '24 hours')::int AS tenants_24h
+        FROM client_error_logs;
+      `;
+      return res.status(200).json({ success:true, errors:rows, summary:summaryRows[0] || {} });
+    }
+
     if (req.method === 'GET' && action === 'tenants') {
       const rows = await sql`
         SELECT 
@@ -548,6 +570,7 @@ export default async function handler(req, res) {
         impersonated: true,
         impersonatedBy: 'superadmin',
         originalTenantId: auth.user.tenantId || auth.tenantId,
+        sessionId: auth.user.sessionId || '',
         exp: Date.now() + (4 * 60 * 60 * 1000) // 4 horas
       }, secret);
 

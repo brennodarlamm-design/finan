@@ -416,7 +416,7 @@ const Contratos = {
       ? '<span class="badge badge-success" title="Cliente Assinou">✓ Cliente</span>' 
       : '<span class="badge" style="background:rgba(148,163,184,.15);color:var(--text3);">Cliente ?</span>';
 
-    const sigAngelimBadge = contratadaAssinou
+    const sigContratadaBadge = contratadaAssinou
       ? `<span class="badge badge-success" title="Contratada assinou">✓ ${contratadaLabel}</span>`
       : `<span class="badge" style="background:rgba(148,163,184,.15);color:var(--text3);">${contratadaLabel} ?</span>`;
 
@@ -434,7 +434,7 @@ const Contratos = {
       <td style="text-align:center;">
         <div style="display:flex;gap:4px;justify-content:center;">
           ${sigClienteBadge}
-          ${sigAngelimBadge}
+          ${sigContratadaBadge}
         </div>
       </td>
       <td style="text-align:center;">

@@ -362,7 +362,7 @@ const Notas = {
   confirmarPagamento(id) {
     const n = DB.getById('notas', id);
     if (!n) return;
-    const conta = document.getElementById('nf-baixa-conta')?.value || 'BB — Movimento Principal';
+    const conta = document.getElementById('nf-baixa-conta')?.value || '';
     const dataPag = document.getElementById('nf-baixa-data')?.value || Utils.today();
 
     DB.update('notas', id, {

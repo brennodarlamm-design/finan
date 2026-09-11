@@ -285,7 +285,7 @@ const ImportarExcel = {
         fornecedor_beneficiario: rawForn || (tipo === 'receita' ? 'Cliente' : 'Fornecedor'),
         valor: Math.abs(valor),
         status: status,
-        conta_bancaria: rawConta || 'BB — Movimento Principal',
+        conta_bancaria: rawConta || '',
         codigo_barras: rawCodigo,
         observacoes: rawObs
       };

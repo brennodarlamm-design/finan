@@ -3,8 +3,27 @@
 import { neon } from '@neondatabase/serverless';
 import { resolveAuthAndTenant } from './_auth.js';
 import { getPlanRule, isActiveObraStatus } from './_plans.js';
-import { canWriteData, canDeleteData, permissionError } from './_permissions.js';
+import { canWriteData, canDeleteData, canAccessTable, permissionError } from './_permissions.js';
 import { writeAudit } from './_audit.js';
+
+function tableAllowed(auth, table, action = 'read') {
+  return canAccessTable(auth, table, action);
+}
+
+const SYNC_COLLECTION_TABLE = Object.freeze({
+  clientes:'obras', fornecedores:'fornecedores', lancamentos:'lancamentos', notas:'notas',
+  contas:'contas', precompras:'precompras', contratos:'contratos', recibos:'recibos',
+  orcamentos_sinapi:'orcamentos_sinapi', doc_fases:'doc_fases', preferencias:'preferencias'
+});
+
+function deniedSyncCollection(auth, payload) {
+  for (const [key, table] of Object.entries(SYNC_COLLECTION_TABLE)) {
+    const value = payload?.[key];
+    const hasData = Array.isArray(value) ? value.length > 0 : (value && typeof value === 'object' && Object.keys(value).length > 0);
+    if (hasData && !tableAllowed(auth, table, 'write')) return { key, table };
+  }
+  return null;
+}
 
 function getSql() {
   const conn = process.env.DATABASE_URL;
@@ -277,6 +296,10 @@ export default async function handler(req, res) {
     if (req.method === 'GET') {
       const { table, obra_id, id } = req.query || {};
       const pagination = parsePagination(req.query || {});
+      const requestedTable = String(table || '').trim();
+      if (requestedTable && !['all','sync_manifest'].includes(requestedTable) && !tableAllowed(auth, requestedTable, 'read')) {
+        return res.status(403).json(permissionError('MODULE_READ_FORBIDDEN', requestedTable));
+      }
 
       if (table === 'sync_manifest') {
         const rows = await sql`
@@ -297,7 +320,8 @@ export default async function handler(req, res) {
             (SELECT COUNT(*)::int FROM obra_doc_fases WHERE tenant_id = ${tenantId}) AS doc_fases;
         `;
         const counts = rows[0] || {};
-        const normalized = Object.fromEntries(Object.entries(counts).map(([k,v]) => [k, Number(v) || 0]));
+        const manifestTable = { obras:'obras', fornecedores:'fornecedores', lancamentos:'lancamentos', notas:'notas', orcamentos:'orcamentos', medicoes:'medicoes', documentos:'documentos', produtos:'produtos', contas:'contas', precompras:'precompras', contratos:'contratos', recibos:'recibos', orcamentos_sinapi:'orcamentos_sinapi', doc_fases:'doc_fases' };
+        const normalized = Object.fromEntries(Object.entries(counts).map(([k,v]) => [k, tableAllowed(auth, manifestTable[k] || k, 'read') ? (Number(v) || 0) : 0]));
         return res.status(200).json({ success: true, counts: normalized, total: Object.values(normalized).reduce((a,b) => a + b, 0) });
       }
 
@@ -324,12 +348,12 @@ export default async function handler(req, res) {
           success: true,
           tenantId,
           data: {
-            clientes: obras.map(o => ({
+            clientes: tableAllowed(auth, 'obras', 'read') ? obras.map(o => ({
               ...o,
               data_inicio: cleanDate(o.data_inicio),
               data_previsao: cleanDate(o.data_previsao)
-            })),
-            fornecedores: fornecedores.map(f => ({
+            })) : [],
+            fornecedores: tableAllowed(auth, 'fornecedores', 'read') ? fornecedores.map(f => ({
               ...f,
               cnpj: f.cnpj_cpf || f.cnpj || '',
               razao_social: f.razao_social || f.nome,
@@ -338,16 +362,16 @@ export default async function handler(req, res) {
               municipio: f.municipio || '',
               uf: f.uf || '',
               ativo: f.ativo !== false
-            })),
-            lancamentos: lancamentos.map(l => ({
+            })) : [],
+            lancamentos: tableAllowed(auth, 'lancamentos', 'read') ? lancamentos.map(l => ({
               ...l,
               data: cleanDate(l.data) || todayBoaVista(),
               data_vencimento: cleanDate(l.data_vencimento) || cleanDate(l.data),
               data_pagamento: cleanDate(l.data_pagamento),
               valor: cleanNum(l.valor),
               itens: Array.isArray(l.itens) ? l.itens : (typeof l.itens === 'string' ? JSON.parse(l.itens || '[]') : [])
-            })),
-            notas: notas.map(n => ({
+            })) : [],
+            notas: tableAllowed(auth, 'notas', 'read') ? notas.map(n => ({
               ...n,
               data_emissao: cleanDate(n.data_emissao),
               data_vencimento: cleanDate(n.data_vencimento),
@@ -360,12 +384,12 @@ export default async function handler(req, res) {
               tipo: n.tipo || 'entrada',
               chave_nfe: n.chave_nfe || n.chave_acesso || '',
               itens: Array.isArray(n.itens) ? n.itens : (typeof n.itens === 'string' ? JSON.parse(n.itens || '[]') : [])
-            })),
-            produtos: (produtos || []).map(p => ({
+            })) : [],
+            produtos: tableAllowed(auth, 'produtos', 'read') ? (produtos || []).map(p => ({
               ...p,
               valor_medio: cleanNum(p.valor_medio)
-            })),
-            orcamentos: orcamentos.map(o => {
+            })) : [],
+            orcamentos: tableAllowed(auth, 'orcamentos', 'read') ? orcamentos.map(o => {
               const parsedItens = (typeof o.itens_json === 'string' ? JSON.parse(o.itens_json) : o.itens_json) || o.itens || o.etapas || [];
               return {
                 ...o,
@@ -376,8 +400,8 @@ export default async function handler(req, res) {
                 itens: parsedItens,
                 etapas: parsedItens
               };
-            }),
-            medicoes: medicoes.map(m => ({
+            }) : [],
+            medicoes: tableAllowed(auth, 'medicoes', 'read') ? medicoes.map(m => ({
               ...m,
               data: cleanDate(m.data),
               data_medicao: cleanDate(m.data),
@@ -386,15 +410,15 @@ export default async function handler(req, res) {
               valor_medido: cleanNum(m.valor_medido),
               valor_solicitado: cleanNum(m.valor_solicitado || m.valor_medido),
               itens: (typeof m.itens_json === 'string' ? JSON.parse(m.itens_json) : m.itens_json) || m.itens || []
-            })),
-            documentos: documentos,
-            contas: contas || [],
-            precompras: (precompras || []).map(jsonPayload),
-            contratos: (contratos || []).map(jsonPayload),
-            recibos: (recibos || []).map(jsonPayload),
-            orcamentos_sinapi: (orcamentosSinapi || []).map(jsonPayload),
-            doc_fases: (docFases || []).map(docPhasePayload),
-            preferencias: preferenciasRows?.[0]?.preferences || {}
+            })) : [],
+            documentos: tableAllowed(auth, 'documentos', 'read') ? documentos : [],
+            contas: tableAllowed(auth, 'contas', 'read') ? (contas || []) : [],
+            precompras: tableAllowed(auth, 'precompras', 'read') ? (precompras || []).map(jsonPayload) : [],
+            contratos: tableAllowed(auth, 'contratos', 'read') ? (contratos || []).map(jsonPayload) : [],
+            recibos: tableAllowed(auth, 'recibos', 'read') ? (recibos || []).map(jsonPayload) : [],
+            orcamentos_sinapi: tableAllowed(auth, 'orcamentos_sinapi', 'read') ? (orcamentosSinapi || []).map(jsonPayload) : [],
+            doc_fases: tableAllowed(auth, 'doc_fases', 'read') ? (docFases || []).map(docPhasePayload) : [],
+            preferencias: tableAllowed(auth, 'preferencias', 'read') ? (preferenciasRows?.[0]?.preferences || {}) : {}
           }
         });
       }
@@ -605,6 +629,16 @@ export default async function handler(req, res) {
       }
       if (action === 'delete' && !canDeleteData(auth)) {
         return res.status(403).json(permissionError('ROLE_DELETE_FORBIDDEN'));
+      }
+      if (action === 'save' && table && !tableAllowed(auth, table, 'write')) {
+        return res.status(403).json(permissionError('MODULE_WRITE_FORBIDDEN', String(table)));
+      }
+      if (action === 'delete' && table && !tableAllowed(auth, table, 'delete')) {
+        return res.status(403).json(permissionError('MODULE_DELETE_FORBIDDEN', String(table)));
+      }
+      if (action === 'sync_all' && payload) {
+        const denied = deniedSyncCollection(auth, payload);
+        if (denied) return res.status(403).json(permissionError('MODULE_WRITE_FORBIDDEN', denied.table));
       }
 
       // 1. Sincronização em Massa (Local -> Neon com tenant_id)

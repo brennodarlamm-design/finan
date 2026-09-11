@@ -1,11 +1,19 @@
 // js/orcamento_sinapi.js — UI completa do módulo de Orçamentos SINAPI
 // Suporta: criação, edição, busca SINAPI, cálculo com BDI, export PDF e Excel
-// UF padrão: RR | BDI padrão TCU edificações: 24,23%
+// UF vem da obra/empresa | BDI padrão de referência: 24,23%
 
 const OrcamentoSINAPI = {
 
   BDI_PADRAO: 24.23,
   _currentEditor: null, // id do orçamento aberto no editor
+  _lastSearchResults: [],
+
+  _defaultUF(obraId='') {
+    const id = obraId && obraId !== 'todas' ? obraId : ((typeof App !== 'undefined' && App.obraId !== 'todas') ? App.obraId : '');
+    const obra = id ? DB.getById('clientes', id) : null;
+    const emp = DB.getEmpresa ? DB.getEmpresa() : {};
+    return String(obra?.estado || obra?.uf || emp?.uf || '').trim().toUpperCase();
+  },
 
   // ─────────────────────────────────────────────────
   // Render: lista de orçamentos
@@ -71,6 +79,7 @@ const OrcamentoSINAPI = {
   },
 
   _card(orc) {
+    const e = Utils.escapeHtml.bind(Utils);
     const cliente = DB.getById('clientes', orc.obra_id);
     const subtotal = (orc.itens || []).reduce((s, i) => s + (i.total || 0), 0);
     const bdi = orc.bdi || this.BDI_PADRAO;
@@ -84,11 +93,11 @@ const OrcamentoSINAPI = {
     <div class="card" style="margin-bottom:16px;">
       <div class="card-header">
         <div>
-          <div class="card-title">${orc.nome}</div>
+          <div class="card-title">${e(orc.nome)}</div>
           <div style="font-size:.78rem;color:var(--text3);margin-top:4px;display:flex;align-items:center;gap:12px;">
-            <span>👤 ${cliente?.nome || '—'}</span>
+            <span>👤 ${e(cliente?.nome || '—')}</span>
             <span>📅 ${Utils.fmt.date(orc.data_criacao)}</span>
-            <span>📍 ${refLabel}</span>
+            <span>📍 ${e(refLabel)}</span>
             <span>${serieLabel}</span>
           </div>
         </div>
@@ -130,6 +139,8 @@ const OrcamentoSINAPI = {
     const anoAtual = new Date().getFullYear();
     const mesAtual = String(new Date().getMonth() + 1).padStart(2, '0');
     const refDefault = orc.referencia_sinapi || `${anoAtual}-${mesAtual}`;
+    const e = Utils.escapeHtml.bind(Utils);
+    const defaultUf = orc.uf || this._defaultUF(orc.obra_id);
 
     Utils.showModal(`
       <div class="modal" style="max-width:560px">
@@ -146,19 +157,19 @@ const OrcamentoSINAPI = {
               </div>
               <div class="form-group">
                 <label class="form-label">Nome do Orçamento *</label>
-                <input class="form-control" name="nome" value="${orc.nome || ''}" required placeholder="Ex: Orçamento Base — Casa 01">
+                <input class="form-control" name="nome" value="${e(orc.nome || '')}" required placeholder="Ex: Orçamento Base — Casa 01">
               </div>
             </div>
             <div class="form-row cols-3" style="margin-bottom:14px;">
               <div class="form-group">
                 <label class="form-label">UF (Estado)</label>
                 <select class="form-control" name="uf">
-                  ${Utils.stateOptions(orc.uf || 'RR')}
+                  ${Utils.stateOptions(defaultUf)}
                 </select>
               </div>
               <div class="form-group">
                 <label class="form-label">Referência SINAPI</label>
-                <input class="form-control" type="month" name="referencia_sinapi" value="${refDefault}">
+                <input class="form-control" type="month" name="referencia_sinapi" value="${e(refDefault)}">
               </div>
               <div class="form-group">
                 <label class="form-label">BDI (%)</label>
@@ -184,11 +195,11 @@ const OrcamentoSINAPI = {
             </div>
             <div class="form-group" style="margin-bottom:14px;">
               <label class="form-label">Descrição / Observações</label>
-              <textarea class="form-control" name="descricao" rows="2" placeholder="Descrição do orçamento...">${orc.descricao || ''}</textarea>
+              <textarea class="form-control" name="descricao" rows="2" placeholder="Descrição do orçamento...">${e(orc.descricao || '')}</textarea>
             </div>
             <div class="form-group">
               <label class="form-label">Data de Criação</label>
-              <input class="form-control" type="date" name="data_criacao" value="${orc.data_criacao || hoje}">
+              <input class="form-control" type="date" name="data_criacao" value="${e(orc.data_criacao || hoje)}">
             </div>
           </form>
         </div>
@@ -362,6 +373,7 @@ const OrcamentoSINAPI = {
     if (!termo || termo.trim().length < 2) { el.innerHTML = ''; return; }
 
     const resultados = SINAPI.buscar(termo, desonerado, 30);
+    this._lastSearchResults = resultados;
     if (!resultados.length) {
       el.innerHTML = `<div style="padding:10px;color:var(--text3);font-size:.82rem;">Nenhum resultado para "${Utils.escapeHtml(termo)}"</div>`;
       return;
@@ -382,13 +394,13 @@ const OrcamentoSINAPI = {
         <tbody>
           ${resultados.map((r, i) => `
           <tr style="border-top:1px solid var(--border);${i%2===0?'background:rgba(0,0,0,.1)':''}">
-            <td style="padding:6px 10px;font-family:monospace;color:var(--accent2);font-size:.75rem;">${r.codigo}</td>
-            <td style="padding:6px 10px;color:var(--text);max-width:300px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${r.descricao}">${r.descricao}</td>
-            <td style="padding:6px 10px;text-align:center;color:var(--text2);">${r.unidade}</td>
+            <td style="padding:6px 10px;font-family:monospace;color:var(--accent2);font-size:.75rem;">${Utils.escapeHtml(r.codigo)}</td>
+            <td style="padding:6px 10px;color:var(--text);max-width:300px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${Utils.escapeHtml(r.descricao)}">${Utils.escapeHtml(r.descricao)}</td>
+            <td style="padding:6px 10px;text-align:center;color:var(--text2);">${Utils.escapeHtml(r.unidade)}</td>
             <td style="padding:6px 10px;text-align:right;color:var(--success);font-weight:700;">${Utils.fmt.currency(r.preco_unitario)}</td>
             <td style="padding:6px 10px;text-align:center;">
               <button class="btn btn-primary btn-sm" style="font-size:.7rem;padding:3px 10px;"
-                onclick="OrcamentoSINAPI.showAddItem('${this._currentEditor}', ${JSON.stringify(r).replace(/'/g, "\\'").replace(/"/g, '&quot;')})">
+                onclick="OrcamentoSINAPI.showAddItem('${this._currentEditor}', OrcamentoSINAPI._lastSearchResults[${i}])">
                 + Add
               </button>
             </td>
@@ -572,11 +584,12 @@ const OrcamentoSINAPI = {
   showImportModal(desoneradoInicial = false) {
     const metaOn  = SINAPI.getMeta(false);
     const metaDes = SINAPI.getMeta(true);
+    const defaultUf = this._defaultUF();
 
     Utils.showModal(`
-      <div class="modal" style="max-width:620px">
+      <div class="modal" style="max-width:600px">
         <div class="modal-header">
-          <span class="modal-title">📁 Tabela SINAPI / Caixa Econômica</span>
+          <span class="modal-title">📁 Importar Tabela SINAPI</span>
           <button class="modal-close" onclick="Utils.closeModal()">✕</button>
         </div>
         <div class="modal-body">
@@ -611,13 +624,13 @@ const OrcamentoSINAPI = {
                 <input type="radio" name="imp-serie" value="false" ${!desoneradoInicial?'checked':''} style="display:none">
                 <div style="font-weight:700;margin-bottom:4px;">🟢 Com Oneração</div>
                 <div style="font-size:.74rem;color:var(--text3);">Padrão — Contribuição previdenciária normal</div>
-                ${metaOn ? `<div style="font-size:.7rem;color:var(--success);margin-top:4px;">✓ Já carregada: ${metaOn.uf} Ref.${metaOn.referencia} (${metaOn.total.toLocaleString('pt-BR')} itens)</div>` : ''}
+                ${metaOn ? `<div style="font-size:.7rem;color:var(--success);margin-top:4px;">✓ Já importada: ${metaOn.uf} Ref.${metaOn.referencia} (${metaOn.total.toLocaleString('pt-BR')} itens)</div>` : ''}
               </label>
               <label id="card-desonerado" style="cursor:pointer;border:2px solid ${desoneradoInicial?'var(--accent)':'var(--border)'};border-radius:var(--r-md);padding:12px;background:${desoneradoInicial?'rgba(201,162,39,.08)':'transparent'};transition:all .2s;" onclick="OrcamentoSINAPI._selectSerie(true)">
                 <input type="radio" name="imp-serie" value="true" ${desoneradoInicial?'checked':''} style="display:none">
                 <div style="font-weight:700;margin-bottom:4px;">🟡 Sem Oneração</div>
                 <div style="font-size:.74rem;color:var(--text3);">Desonerado — Lei 12.546/2011</div>
-                ${metaDes ? `<div style="font-size:.7rem;color:var(--success);margin-top:4px;">✓ Já carregada: ${metaDes.uf} Ref.${metaDes.referencia} (${metaDes.total.toLocaleString('pt-BR')} itens)</div>` : ''}
+                ${metaDes ? `<div style="font-size:.7rem;color:var(--success);margin-top:4px;">✓ Já importada: ${metaDes.uf} Ref.${metaDes.referencia} (${metaDes.total.toLocaleString('pt-BR')} itens)</div>` : ''}
               </label>
             </div>
           </div>
@@ -626,7 +639,7 @@ const OrcamentoSINAPI = {
           <div class="form-row cols-2" style="margin-bottom:14px;">
             <div class="form-group">
               <label class="form-label">Estado (UF)</label>
-              <select class="form-control" id="imp-uf">${Utils.stateOptions('RR')}</select>
+              <select class="form-control" id="imp-uf">${Utils.stateOptions(defaultUf)}</select>
             </div>
             <div class="form-group">
               <label class="form-label">Mês de Referência</label>
@@ -659,7 +672,7 @@ const OrcamentoSINAPI = {
         </div>
         <div class="modal-footer">
           <button class="btn btn-secondary" onclick="Utils.closeModal()">Fechar</button>
-          <button class="btn btn-primary" id="btn-imp-confirmar" onclick="OrcamentoSINAPI.executarImport()" disabled>📥 Importar Arquivo</button>
+          <button class="btn btn-primary" id="btn-imp-confirmar" onclick="OrcamentoSINAPI.executarImport()" disabled>📥 Importar</button>
         </div>
       </div>`);
 
@@ -806,19 +819,13 @@ const OrcamentoSINAPI = {
       Utils.toast(resultado.msg, 'success');
       this._selectedFile = null;
       document.getElementById('btn-imp-confirmar').disabled = true;
-      // Atualiza lista ou editor
-      setTimeout(() => {
-        Utils.closeModal();
-        if (this._currentEditor) {
-          this.openEditor(this._currentEditor);
-        } else {
-          const listEl = document.getElementById('sinapi-orc-list');
-          if (listEl) {
-            const statusHtml = document.querySelector('#sinapi-editor') ? '' : this.render(App.obraId);
-            if (statusHtml) document.getElementById('route-content').innerHTML = statusHtml;
-          }
-        }
-      }, 1200);
+      // Atualiza lista
+      const listEl = document.getElementById('sinapi-orc-list');
+      if (listEl) {
+        // Rerender status cards
+        const statusHtml = document.querySelector('#sinapi-editor') ? '' : this.render(App.obraId);
+        if (statusHtml) document.getElementById('route-content').innerHTML = statusHtml;
+      }
     } else {
       resEl.innerHTML = `
         <div style="background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.3);border-radius:var(--r-md);padding:14px;display:flex;align-items:center;gap:12px;">

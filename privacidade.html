@@ -202,6 +202,8 @@
         <li><strong>Autenticação com Google (Google Identity Services):</strong> Ao optar pelo login via Google ("Continuar com o Google"), coletamos seu nome, endereço de e-mail cadastrado na conta Google e URL da imagem de perfil (avatar). Não temos acesso à sua senha da conta Google.</li>
         <li><strong>Dados da Empresa / Construtora:</strong> Razão social, nome fantasia, CNPJ, inscrição estadual, endereço e número de registro técnico (CREA/CAU).</li>
         <li><strong>Dados Operacionais da Obra:</strong> Centros de custos, medições de contratos de empreitada, orçamentos, cronogramas físico-financeiros e arquivos fiscais (extratos OFX e notas fiscais XML/PDF importadas pelo usuário).</li>
+        <li><strong>Dados Técnicos e de Segurança:</strong> Endereço IP, tipo de navegador/dispositivo, datas de criação e última atividade da sessão e identificadores técnicos necessários para permitir que o próprio usuário visualize e encerre sessões ativas.</li>
+        <li><strong>Diagnóstico de Funcionamento:</strong> Quando ocorre uma falha no aplicativo, podemos registrar rota/tela, mensagem técnica e pilha de erro para diagnóstico. O sistema aplica filtros para reduzir o risco de armazenar credenciais ou segredos acidentalmente presentes nesses registros.</li>
       </ul>
     </section>
 
@@ -224,7 +226,7 @@
         <li>Autenticar o acesso de administradores e gestores aos módulos do sistema FinObra.</li>
         <li>Recuperação segura de senhas via código de validação OTP (One-Time Password) de 6 dígitos via WhatsApp e e-mail.</li>
         <li>Emissão de contratos de prestação de serviços, recibos de mão de obra com assinatura eletrônica e QR Code de autenticidade.</li>
-        <li>Isolamento e controle de acesso multi-inquilino (multi-tenant), assegurando que os dados de uma construtora permaneçam 100% inacessíveis a outras empresas.</li>
+        <li>Isolamento e controle de acesso multi-inquilino (multi-tenant), aplicando controles técnicos para impedir acesso entre empresas e reduzir o risco de exposição indevida de dados entre tenants.</li>
         <li>Cumprimento de obrigações legais, fiscais e auditorias de obras financiadas (Caixa Econômica Federal / PCI / SBPE / MCMV).</li>
       </ul>
     </section>
@@ -235,9 +237,9 @@
         Adotamos rigorosos padrões de segurança cibernética e infraestrutura de ponta:
       </p>
       <ul>
-        <li><strong>Criptografia em Trânsito:</strong> Todo o tráfego é criptografado utilizando protocolos TLS 1.3 / HTTPS com certificados digitais de alta segurança.</li>
-        <li><strong>Banco de Dados em Nuvem:</strong> Arquitetura serverless hospedada em infraestrutura de nuvem segura (Neon Cloud Postgres com criptografia AES-256 em repouso).</li>
-        <li><strong>Políticas de Acesso:</strong> Controle estrito de permissões baseado em funções (Admin, Gestor, Financeiro) e isolamento lógico por Tenant ID.</li>
+        <li><strong>Criptografia em Trânsito:</strong> O acesso à plataforma em produção utiliza HTTPS/TLS para proteger os dados durante a transmissão.</li>
+        <li><strong>Banco de Dados em Nuvem:</strong> A aplicação utiliza infraestrutura PostgreSQL gerenciada em nuvem, com controles de acesso e isolamento lógico por tenant.</li>
+        <li><strong>Políticas de Acesso:</strong> Controle de permissões por função (Administrador, Gestor, Operador e Visualizador), restrições opcionais por módulo e isolamento lógico por Tenant ID.</li>
       </ul>
     </section>
 

@@ -251,18 +251,21 @@ const Utils = {
     document.getElementById('_confirm_btn').onclick = () => { this.closeModal(); onYes(); };
   },
 
-  stateOptions(sel='SP') {
+  stateOptions(sel='') {
     const states=['AC','AL','AM','AP','BA','CE','DF','ES','GO','MA','MG','MS','MT','PA','PB','PE','PI','PR','RJ','RN','RO','RR','RS','SC','SE','SP','TO'];
-    return states.map(s=>`<option value="${s}" ${s===sel?'selected':''}>${s}</option>`).join('');
+    const selected = String(sel || '').trim().toUpperCase();
+    const placeholder = `<option value="" ${selected ? '' : 'selected'}>Selecione...</option>`;
+    return placeholder + states.map(s=>`<option value="${s}" ${s===selected?'selected':''}>${s}</option>`).join('');
   },
 
   clienteOptions(selectedId='', allText='Selecione o centro de custo / obra...', includeEscritorio = true) {
     const cs = DB.getAll('clientes');
-    let opts = `<option value="">${allText}</option>`;
+    const e = this.escapeHtml.bind(this);
+    let opts = `<option value="">${e(allText)}</option>`;
     if (includeEscritorio) {
       opts += `<option value="escritorio" ${selectedId==='escritorio'?'selected':''}>🏢 Sede / Escritório Central</option>`;
     }
-    opts += cs.map(c=>`<option value="${c.id}" ${c.id===selectedId?'selected':''}>${c.nome} — ${c.cidade}</option>`).join('');
+    opts += cs.map(c=>`<option value="${e(c.id)}" ${c.id===selectedId?'selected':''}>${e(c.nome)} — ${e(c.cidade)}</option>`).join('');
     return opts;
   },
 

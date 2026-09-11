@@ -44,7 +44,7 @@ async function run() {
   const tAuth = mockReqRes({
     method: 'GET',
     query: { action: 'danfe', chave: '00000000000000000000000000000000000000000000' },
-    headers: { authorization: `Bearer ${process.env.API_SECRET}` }
+    headers: { authorization: `Bearer ${process.env.API_SECRET}`, 'x-tenant-id': process.env.TARGET_TENANT_ID || 'TEST_TENANT_REQUIRED' }
   });
   await handler(tAuth.req, tAuth.res);
   const rAuth = tAuth.getResult();

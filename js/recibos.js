@@ -598,10 +598,10 @@ const Recibos = {
     if (!r) return;
     const htmlRecibo = this.gerarHTMLRecibo(r);
 
-    let printFrame = document.getElementById('angelim-print-frame');
+    let printFrame = document.getElementById('finobra-recibo-print-frame');
     if (!printFrame) {
       printFrame = document.createElement('iframe');
-      printFrame.id = 'angelim-print-frame';
+      printFrame.id = 'finobra-recibo-print-frame';
       printFrame.style.position = 'fixed';
       printFrame.style.right = '0';
       printFrame.style.bottom = '0';

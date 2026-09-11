@@ -7,7 +7,7 @@ const NFe = {
   _API_BASE: '/api/nfe',
 
   _getTenantCacheKey() {
-    const t = (typeof Auth !== 'undefined' && Auth.getCurrentTenantId) ? Auth.getCurrentTenantId() : 'angelim';
+    const t = (typeof Auth !== 'undefined' && Auth.getCurrentTenantId) ? Auth.getCurrentTenantId() : 'public';
     return `finobra_${t}_nfe_cache`;
   },
 

@@ -594,7 +594,7 @@ const Lancamentos = {
         if (contato) parts.push(`Contato: ${contato}`);
         if (parts.length) {
           info.style.display = 'block';
-          info.innerHTML = parts.join(' &nbsp;·&nbsp; ');
+          info.textContent = parts.join(' · ');
         } else {
           info.style.display = 'none';
         }
@@ -794,7 +794,7 @@ const Lancamentos = {
   confirmarBaixa(id) {
     const l = DB.getById('lancamentos', id);
     if (!l) return;
-    const conta = document.getElementById('baixa-conta')?.value || l.conta_bancaria || 'BB — Movimento Principal';
+    const conta = document.getElementById('baixa-conta')?.value || l.conta_bancaria || '';
     const dataBaixa = document.getElementById('baixa-data')?.value || Utils.today();
     const novoStatus = l.tipo === 'receita' ? 'recebido' : 'pago';
 

@@ -1,6 +1,7 @@
 // api/nfe.js — Proxy Serverless Seguro para Consulta de NF-e via API MeuDanfe
 
 import { resolveAuthAndTenant } from './_auth.js';
+import { canAccessModule, permissionError } from './_permissions.js';
 
 const ALLOWED_ORIGINS = [
   'https://finobra.app.br',
@@ -64,6 +65,7 @@ export default async function handler(req, res) {
       error: auth.error || 'Acesso não autorizado para consulta de NF-e.'
     });
   }
+  if (!canAccessModule(auth,'notas','read')) return res.status(403).json(permissionError('MODULE_READ_FORBIDDEN','notas'));
 
   // Chave protegida no servidor (ambiente .env)
   const apiKey = (process.env.MEUDANFE_API_KEY || '').trim();

@@ -6,6 +6,10 @@ const Configuracoes = {
   _auditCache: [],
   _auditOffset: 0,
   _auditHasMore: false,
+  _sessionsCache: [],
+  _errorsCache: [],
+  _errorsOffset: 0,
+  _errorsHasMore: false,
 
   _esc(value) {
     if (typeof Utils !== 'undefined' && Utils.escapeHtml) return Utils.escapeHtml(String(value ?? ''));
@@ -59,7 +63,7 @@ const Configuracoes = {
 
     const session = Auth.getUser();
     const isAdmin = ['admin','superadmin'].includes(session?.perfil);
-    if (!isAdmin && ['usuarios','auditoria'].includes(this._activeTab)) this._activeTab = 'empresa';
+    if (!isAdmin && ['usuarios','auditoria','diagnostico'].includes(this._activeTab)) this._activeTab = 'empresa';
 
     return `
     <div>
@@ -72,6 +76,12 @@ const Configuracoes = {
         </button>` : ''}
         ${isAdmin ? `<button id="cfg-tab-auditoria" class="cfg-tab${this._activeTab==='auditoria'?' cfg-tab-active':''}" onclick="Configuracoes._switch('auditoria')">
           &#x1F6E1;&#xFE0F; Auditoria
+        </button>` : ''}
+        <button id="cfg-tab-sessoes" class="cfg-tab${this._activeTab==='sessoes'?' cfg-tab-active':''}" onclick="Configuracoes._switch('sessoes')">
+          &#x1F4F1; Sess&otilde;es
+        </button>
+        ${isAdmin ? `<button id="cfg-tab-diagnostico" class="cfg-tab${this._activeTab==='diagnostico'?' cfg-tab-active':''}" onclick="Configuracoes._switch('diagnostico')">
+          &#x1F6E0;&#xFE0F; Diagn&oacute;stico
         </button>` : ''}
         <button id="cfg-tab-contas" class="cfg-tab${this._activeTab==='contas'?' cfg-tab-active':''}" onclick="Configuracoes._switch('contas')">
           &#x1F3E6; Contas Banc&aacute;rias
@@ -88,7 +98,7 @@ const Configuracoes = {
 
   _switch(tab) {
     const isAdmin = ['admin','superadmin'].includes(Auth.getUser()?.perfil);
-    const validTabs = ['empresa', 'contas', 'categorias', ...(isAdmin ? ['usuarios','auditoria'] : [])];
+    const validTabs = ['empresa', 'contas', 'categorias', 'sessoes', ...(isAdmin ? ['usuarios','auditoria','diagnostico'] : [])];
     if (!validTabs.includes(tab)) tab = 'empresa';
     this._activeTab = tab;
     document.querySelectorAll('.cfg-tab').forEach(el => el.classList.remove('cfg-tab-active'));
@@ -98,6 +108,8 @@ const Configuracoes = {
     if (content) content.innerHTML = this._renderTab(tab, App.obraId);
     if (tab === 'usuarios') this.loadUsers();
     if (tab === 'auditoria') this.loadAudit(true);
+    if (tab === 'sessoes') this.loadSessions();
+    if (tab === 'diagnostico') this.loadErrors(true);
     if (tab === 'empresa') this.loadEmpresaCloud();
   },
 
@@ -107,6 +119,8 @@ const Configuracoes = {
     if (tab === 'categorias') return this._renderCategorias();
     if (tab === 'usuarios') return this._renderUsuarios();
     if (tab === 'auditoria') return this._renderAuditoria();
+    if (tab === 'sessoes') return this._renderSessoes();
+    if (tab === 'diagnostico') return this._renderDiagnostico();
     return this._renderEmpresa();
   },
 
@@ -433,7 +447,7 @@ const Configuracoes = {
     <div class="page-header">
       <div><h1 class="page-title">&#x1F465; Usu&aacute;rios do Sistema</h1><p class="page-sub">Gerencie os perfis de acesso ao sistema</p></div>
       <div class="page-actions">
-        ${session?.perfil==='admin' ? '<button class="btn btn-primary" onclick="Configuracoes.showUserForm()">+ Novo Usu&aacute;rio</button>' : ''}
+        ${['admin','superadmin'].includes(session?.perfil) ? '<button class="btn btn-primary" onclick="Configuracoes.showUserForm()">+ Novo Usu&aacute;rio</button>' : ''}
       </div>
     </div>
     <div id="users-list">
@@ -459,7 +473,7 @@ const Configuracoes = {
             <span class="badge ${u.ativo?'badge-success':'badge-warning'}">${u.ativo?'Ativo':'Inativo'}</span>
           </div>
         </div>
-        ${session?.perfil==='admin' ? `
+        ${['admin','superadmin'].includes(session?.perfil) ? `
         <div style="display:flex;gap:8px;flex-wrap:wrap;">
           <button class="btn btn-secondary btn-sm" onclick="Configuracoes.showUserForm('${id}')">✏️ Editar</button>
           ${!isMe ? `<button class="btn btn-sm ${u.ativo?'btn-warning':'btn-success'}" onclick="Configuracoes.toggleAtivo('${id}',${!!u.ativo})">${u.ativo?'Desativar':'Ativar'}</button>` : ''}
@@ -469,10 +483,68 @@ const Configuracoes = {
     </div>`;
   },
 
+  _permissionModules() {
+    return [
+      ['dashboard','Dashboard'],['obras','Obras & Clientes'],['financeiro','Financeiro'],['fornecedores','Fornecedores'],['produtos','Produtos / Insumos'],
+      ['precompras','Pr&eacute;-Compras'],['recibos','Recibos'],['contratos','Contratos'],['notas','Notas / NF-e / OCR'],['orcamentos','Or&ccedil;amentos / SINAPI'],
+      ['medicoes','Medi&ccedil;&otilde;es'],['documentos','Documentos'],['relatorios','Relat&oacute;rios'],['contas','Contas Banc&aacute;rias'],['whatsapp','WhatsApp'],
+      ['assinatura','Assinatura'],['planos','Planos / Cobran&ccedil;a'],['configuracoes','Configura&ccedil;&otilde;es']
+    ];
+  },
+
+  _roleCaps(role) {
+    return (typeof Auth !== 'undefined' && Auth.ROLE_CAPS?.[role]) || {read:true,write:false,delete:false};
+  },
+
+  _permissionMatrix(role, permissions = {}) {
+    const caps = this._roleCaps(role);
+    const fullAdmin = ['admin','superadmin'].includes(String(role));
+    if (fullAdmin) return '<div style="padding:12px;border:1px solid var(--border);border-radius:8px;color:var(--text3);font-size:.8rem;">Administrador possui acesso integral. Para evitar bloqueio administrativo, restri&ccedil;&otilde;es por m&oacute;dulo s&atilde;o aplicadas aos perfis Gestor, Operador e Visualizador.</div>';
+    const rows = this._permissionModules().map(([key,label]) => {
+      const custom = permissions?.[key] || {};
+      const val = action => typeof custom?.[action] === 'boolean' ? custom[action] : !!caps[action];
+      const cb = action => `<input type="checkbox" data-perm-module="${key}" data-perm-action="${action}" onchange="Configuracoes.permissionChanged(this)" ${val(action)?'checked':''} ${!caps[action]?'disabled':''}>`;
+      return `<tr><td style="font-weight:600;">${label}</td><td style="text-align:center">${cb('read')}</td><td style="text-align:center">${cb('write')}</td><td style="text-align:center">${cb('delete')}</td></tr>`;
+    }).join('');
+    return `<div style="overflow:auto;max-height:320px;border:1px solid var(--border);border-radius:8px;"><table class="table" style="margin:0;font-size:.78rem;"><thead><tr><th>M&oacute;dulo</th><th style="text-align:center">Ver</th><th style="text-align:center">Editar</th><th style="text-align:center">Excluir</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+  },
+
+  permissionChanged(input) {
+    const module = input?.dataset?.permModule;
+    const action = input?.dataset?.permAction;
+    const form = input?.closest('form');
+    if (!module || !form) return;
+    const get = a => form.querySelector(`[data-perm-module="${module}"][data-perm-action="${a}"]`);
+    const read = get('read'), write = get('write'), del = get('delete');
+    if (action === 'read' && !input.checked) { if (write) write.checked=false; if (del) del.checked=false; }
+    if (action === 'write') { if (input.checked && read) read.checked=true; if (!input.checked && del) del.checked=false; }
+    if (action === 'delete' && input.checked) { if (read) read.checked=true; if (write && !write.disabled) write.checked=true; }
+  },
+
+  refreshPermissionMatrix(role) {
+    const el = document.getElementById('cfg-permission-matrix');
+    if (el) el.innerHTML = this._permissionMatrix(role, {});
+  },
+
+  _collectPermissionMatrix(form) {
+    const role = form?.querySelector('[name="perfil"]')?.value || 'visualizador';
+    if (['admin','superadmin'].includes(role)) return {};
+    const caps = this._roleCaps(role);
+    const out = {};
+    for (const [module] of this._permissionModules()) {
+      out[module] = {};
+      for (const action of ['read','write','delete']) {
+        const input = form?.querySelector(`[data-perm-module="${module}"][data-perm-action="${action}"]`);
+        out[module][action] = !!caps[action] && !!input?.checked;
+      }
+    }
+    return out;
+  },
+
   showUserForm(id) {
     const u = id ? (this._usersCache || []).find(u => u.id === id) : null;
     Utils.showModal(`
-      <div class="modal" style="max-width:500px">
+      <div class="modal" style="max-width:780px">
         <div class="modal-header">
           <span class="modal-title">&#x1F465; ${u ? 'Editar' : 'Novo'} Usu&aacute;rio</span>
           <button class="modal-close" onclick="Utils.closeModal()">&#x2715;</button>
@@ -495,7 +567,7 @@ const Configuracoes = {
             </div>
             <div class="form-group">
               <label class="form-label">Perfil *</label>
-              <select class="form-control" name="perfil" required>
+              <select class="form-control" name="perfil" required onchange="Configuracoes.refreshPermissionMatrix(this.value)">
                 <option value="admin" ${u?.perfil==='admin'?'selected':''}>Administrador</option>
                 <option value="gestor" ${u?.perfil==='gestor'||!u?'selected':''}>Gestor</option>
                 <option value="visualizador" ${u?.perfil==='visualizador'?'selected':''}>Visualizador</option>
@@ -513,6 +585,11 @@ const Configuracoes = {
               <input class="form-control" name="avatar" maxlength="2" value="${this._esc(u?.avatar||'')}" placeholder="Ex: JS">
             </div>
           </div>
+          <div class="form-group" style="margin-top:8px;">
+            <label class="form-label">Acesso por m&oacute;dulo</label>
+            <p style="font-size:.75rem;color:var(--text3);margin:0 0 10px;">As regras abaixo s&oacute; restringem o perfil. Elas nunca concedem uma permiss&atilde;o que o perfil n&atilde;o possui.</p>
+            <div id="cfg-permission-matrix">${this._permissionMatrix(u?.perfil || 'gestor', u?.permissions || {})}</div>
+          </div>
           <div class="modal-footer">
             <button type="button" class="btn btn-secondary" onclick="Utils.closeModal()">Cancelar</button>
             <button type="submit" class="btn btn-primary">&#x1F4BE; Salvar</button>
@@ -524,7 +601,7 @@ const Configuracoes = {
   async saveUser(e, id) {
     e.preventDefault();
     const fd = new FormData(e.target);
-    const body = { nome:fd.get('nome').trim(), username:fd.get('username').trim(), email:fd.get('email').trim(), perfil:fd.get('perfil'), avatar:fd.get('avatar').trim(), senha:fd.get('senha') || undefined };
+    const body = { nome:fd.get('nome').trim(), username:fd.get('username').trim(), email:fd.get('email').trim(), perfil:fd.get('perfil'), avatar:fd.get('avatar').trim(), senha:fd.get('senha') || undefined, permissions:this._collectPermissionMatrix(e.target) };
     if (!id && (!body.senha || body.senha.length < 6)) { Utils.toast('Senha deve ter pelo menos 6 caracteres!', 'warning'); return; }
     if (id) body.id = id;
     try {
@@ -621,6 +698,58 @@ const Configuracoes = {
     const users = this._usersCache || Auth.getUsers();
     const session = Auth.getUser();
     el.innerHTML = users.map(u => this._userCard(u, session)).join('');
+  },
+
+  // ── SESSÕES E DISPOSITIVOS ──────────────────────────────
+  _renderSessoes() {
+    return `<div class="page-header"><div><h1 class="page-title">&#x1F4F1; Sess&otilde;es & Dispositivos</h1><p class="page-sub">Veja onde sua conta est&aacute; conectada e encerre acessos que voc&ecirc; n&atilde;o reconhece.</p></div><div class="page-actions"><button class="btn btn-secondary btn-sm" onclick="Configuracoes.loadSessions()">↻ Atualizar</button><button class="btn btn-warning btn-sm" onclick="Configuracoes.revokeOtherSessions()">Encerrar outras sess&otilde;es</button></div></div><div id="sessions-list" class="card" style="padding:18px;color:var(--text3);">Carregando sess&otilde;es…</div>`;
+  },
+
+  async loadSessions() {
+    const el = document.getElementById('sessions-list');
+    try {
+      const data = await Auth.listSessions();
+      this._sessionsCache = Array.isArray(data.sessions) ? data.sessions : [];
+      if (!el) return;
+      if (!this._sessionsCache.length) { el.innerHTML='<div style="padding:18px;text-align:center">Nenhuma sess&atilde;o registrada.</div>'; return; }
+      el.innerHTML = this._sessionsCache.map(x => {
+        const id=this._esc(x.id), device=this._esc(x.device_name || 'Dispositivo'), ip=this._esc(x.ip || 'IP n&atilde;o informado');
+        const when=x.last_seen_at ? new Date(x.last_seen_at).toLocaleString('pt-BR') : '-';
+        const state=x.current?'Sess&atilde;o atual':(x.active?'Ativa':'Encerrada');
+        return `<div style="display:flex;gap:14px;align-items:center;padding:13px 0;border-bottom:1px solid var(--border);flex-wrap:wrap"><div style="font-size:1.4rem">${x.current?'&#x1F4BB;':'&#x1F4F1;'}</div><div style="flex:1;min-width:220px"><div style="font-weight:700;color:var(--text)">${device} ${x.current?'<span class="badge badge-success">Atual</span>':''}</div><div style="font-size:.75rem;color:var(--text3)">${ip} &middot; &uacute;ltima atividade ${this._esc(when)} &middot; ${state}</div></div>${x.active&&!x.current?`<button class="btn btn-warning btn-sm" onclick="Configuracoes.revokeSession('${id}')">Encerrar</button>`:''}</div>`;
+      }).join('');
+    } catch(err) { if(el) el.textContent=err.message || 'Falha ao carregar sessões.'; }
+  },
+
+  async revokeSession(id) {
+    try { await Auth.revokeSession(id); Utils.toast('Sess&atilde;o encerrada.','success'); await this.loadSessions(); }
+    catch(err) { Utils.toast(err.message || 'Falha ao encerrar sess&atilde;o.','error'); }
+  },
+
+  async revokeOtherSessions() {
+    try { await Auth.revokeOtherSessions(); Utils.toast('Outras sess&otilde;es encerradas.','success'); await this.loadSessions(); }
+    catch(err) { Utils.toast(err.message || 'Falha ao encerrar sess&otilde;es.','error'); }
+  },
+
+  // ── DIAGNÓSTICO DE ERROS ───────────────────────────────
+  _renderDiagnostico() {
+    return `<div class="page-header"><div><h1 class="page-title">&#x1F6E0;&#xFE0F; Diagn&oacute;stico</h1><p class="page-sub">Erros recentes capturados automaticamente nos navegadores desta empresa.</p></div><div class="page-actions"><button class="btn btn-secondary btn-sm" onclick="Configuracoes.loadErrors(true)">↻ Atualizar</button></div></div><div class="card"><div id="errors-list" style="min-height:160px;padding:18px;color:var(--text3);">Carregando diagn&oacute;stico…</div><div style="padding:0 18px 18px"><button id="errors-more" class="btn btn-secondary btn-sm" style="display:none" onclick="Configuracoes.loadErrors(false)">Carregar mais</button></div></div>`;
+  },
+
+  async loadErrors(reset=true) {
+    if (reset) { this._errorsOffset=0; this._errorsCache=[]; }
+    const list=document.getElementById('errors-list');
+    try {
+      const res=await fetch(`/api/audit?action=errors&limit=50&offset=${this._errorsOffset}`,{headers:Auth.getAuthHeaders()});
+      const data=await res.json().catch(()=>({}));
+      if(!res.ok||!data.success) throw new Error(data.error||'Falha ao carregar diagnóstico.');
+      this._errorsCache.push(...(data.data||[])); this._errorsOffset=data.pagination?.nextOffset||this._errorsCache.length; this._errorsHasMore=!!data.pagination?.hasMore;
+      if(list) {
+        if(!this._errorsCache.length) list.innerHTML='<div style="padding:24px;text-align:center">Nenhum erro de frontend registrado. &#x2705;</div>';
+        else list.innerHTML=`<div style="overflow:auto"><table class="table" style="font-size:.78rem"><thead><tr><th>Quando</th><th>Usu&aacute;rio</th><th>Tela</th><th>Erro</th></tr></thead><tbody>${this._errorsCache.map(e=>`<tr><td>${this._esc(new Date(e.created_at).toLocaleString('pt-BR'))}</td><td>${this._esc(e.usuario_nome||'-')}</td><td>${this._esc(e.route||'-')}</td><td title="${this._esc(e.stack||e.message)}"><strong>${this._esc(e.message||'Erro')}</strong><div style="color:var(--text3);font-size:.7rem">${this._esc(e.source||'')}</div></td></tr>`).join('')}</tbody></table></div>`;
+      }
+      const more=document.getElementById('errors-more'); if(more) more.style.display=this._errorsHasMore?'inline-flex':'none';
+    } catch(err) { if(list) list.textContent=err.message||'Falha ao carregar diagnóstico.'; }
   },
 
   // ── AUDITORIA ───────────────────────────────────────────

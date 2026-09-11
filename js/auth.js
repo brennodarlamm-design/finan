@@ -8,6 +8,20 @@ const Auth = {
 
   defaultUsers: [],
 
+  MODULES: ['dashboard','obras','financeiro','fornecedores','produtos','precompras','recibos','contratos','notas','orcamentos','medicoes','documentos','relatorios','contas','whatsapp','assinatura','planos','configuracoes'],
+  ROUTE_MODULES: {
+    dashboard:'dashboard', obras:'obras', clientes:'obras', 'obra-detalhe':'obras',
+    lancamentos:'financeiro', financeiro:'financeiro', escritorio:'financeiro', 'conciliacao-ofx':'financeiro', ofx:'financeiro',
+    fornecedores:'fornecedores', produtos:'produtos', 'pre-compras':'precompras', precompras:'precompras', recibos:'recibos', contratos:'contratos',
+    'notas-fiscais':'notas', notas:'notas', 'consulta-nfe':'notas', nfe:'notas',
+    orcamentos:'orcamentos', medicoes:'medicoes', documentacao:'documentos', relatorios:'relatorios', exportar:'relatorios',
+    'contas-bancarias':'contas', contas:'contas', planos:'planos', configuracoes:'configuracoes'
+  },
+  ROLE_CAPS: {
+    superadmin:{read:true,write:true,delete:true}, admin:{read:true,write:true,delete:true}, gestor:{read:true,write:true,delete:true},
+    operador:{read:true,write:true,delete:false}, visualizador:{read:true,write:false,delete:false}
+  },
+
   getToken() {
     return localStorage.getItem(this.TOKEN_KEY) || sessionStorage.getItem(this.TOKEN_KEY) || '';
   },
@@ -49,6 +63,8 @@ const Auth = {
       isImpersonated: !!user.isImpersonated,
       impersonatedBy: user.impersonatedBy || '',
       googleAuth: !!user.googleAuth,
+      permissions: (user.permissions && typeof user.permissions === 'object') ? user.permissions : {},
+      sessionId: user.sessionId || '',
       loginAt: new Date().toISOString(),
       remember: !!remember
     };
@@ -275,6 +291,49 @@ const Auth = {
     }
   },
 
+  canModule(module, action = 'read') {
+    const u = this.getUser() || {};
+    const role = String(u.perfil || 'visualizador').toLowerCase();
+    if (role === 'superadmin' || role === 'admin') return true;
+    const caps = this.ROLE_CAPS[role] || this.ROLE_CAPS.visualizador;
+    if (!caps[action]) return false;
+    const raw = u.permissions?.[module];
+    if (raw === undefined || raw === null) return true;
+    if (typeof raw === 'boolean') return raw ? (action === 'read' ? true : !!caps[action]) : false;
+    if (typeof raw !== 'object') return true;
+    if (raw.read === false) return false;
+    if (action === 'delete' && raw.write === false) return false;
+    return typeof raw[action] === 'boolean' ? !!raw[action] : true;
+  },
+
+  canRoute(route, action = 'read') {
+    const key = String(route || '').toLowerCase();
+    const module = this.ROUTE_MODULES[key];
+    return module ? this.canModule(module, action) : true;
+  },
+
+  async listSessions() {
+    const res = await fetch('/api/auth?action=sessions', { headers:this.getAuthHeaders() });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || !data.success) throw new Error(data.error || 'Não foi possível carregar as sessões.');
+    return data;
+  },
+
+  async revokeSession(sessionId) {
+    const res = await fetch('/api/auth?action=revoke_session', { method:'POST', headers:this.getAuthHeaders(), body:JSON.stringify({ sessionId }) });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || !data.success) throw new Error(data.error || 'Não foi possível encerrar a sessão.');
+    if (data.currentRevoked) this.handleSessionExpired();
+    return data;
+  },
+
+  async revokeOtherSessions() {
+    const res = await fetch('/api/auth?action=revoke_other_sessions', { method:'POST', headers:this.getAuthHeaders(), body:'{}' });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || !data.success) throw new Error(data.error || 'Não foi possível encerrar as outras sessões.');
+    return data;
+  },
+
   getCurrentTenantId() {
     const session = this.getSession();
     if (session?.tenantId) return session.tenantId;
@@ -288,10 +347,43 @@ const Auth = {
         }
       } catch {}
     }
-    return 'angelim';
+    return 'public';
+  },
+
+  async refreshSessionFromServer() {
+    const current = this.getSession();
+    if (!current || !this.getToken()) return { success:false, changed:false };
+    try {
+      const res = await fetch('/api/auth?action=me', { headers:this.getAuthHeaders() });
+      const data = await res.json().catch(() => ({}));
+      if (res.status === 401 || res.status === 403) { this.handleSessionExpired(); return { success:false, expired:true }; }
+      if (!res.ok || !data.success || !data.user) return { success:false, changed:false };
+      const next = {
+        ...current,
+        userId:data.user.id || data.user.userId || current.userId,
+        username:data.user.username || current.username, nome:data.user.nome || current.nome, email:data.user.email || current.email,
+        perfil:data.user.perfil || current.perfil, avatar:data.user.avatar || current.avatar,
+        tenantId:data.user.tenantId || current.tenantId, realTenantId:data.user.realTenantId || current.realTenantId,
+        empresaNome:data.user.empresaNome || current.empresaNome, permissions:data.user.permissions || {},
+        sessionId:data.user.sessionId || current.sessionId,
+        isImpersonated: current.isImpersonated || !!data.user.isImpersonated,
+        impersonatedBy: current.impersonatedBy || (data.user.isImpersonated ? 'superadmin' : '')
+      };
+      const changed = JSON.stringify({perfil:current.perfil,permissions:current.permissions,tenantId:current.tenantId,empresaNome:current.empresaNome}) !== JSON.stringify({perfil:next.perfil,permissions:next.permissions,tenantId:next.tenantId,empresaNome:next.empresaNome});
+      const storage = current.remember ? localStorage : sessionStorage;
+      storage.setItem(this.SESSION_KEY, JSON.stringify(next));
+      // O servidor pode atualizar um token legado para uma sessão revogável.
+      if (data.token) {
+        const tokenStorage = current.remember ? localStorage : sessionStorage;
+        tokenStorage.setItem(this.TOKEN_KEY, data.token);
+      }
+      return { success:true, changed, user:next, tokenRefreshed:!!data.token };
+    } catch { return { success:false, changed:false }; }
   },
 
   logout() {
+    const headers = this.getAuthHeaders();
+    fetch('/api/auth?action=logout', { method:'POST', headers, body:'{}', keepalive:true }).catch(() => {});
     this.logoutSilently();
     window.location.replace('/login');
   },

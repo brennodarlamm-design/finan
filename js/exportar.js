@@ -7,6 +7,9 @@ const Exportar = {
 
   render(obraId) {
     const cs = DB.getAll('clientes');
+    const esc = (v) => Utils.escapeHtml(String(v ?? ''));
+    const empresa = DB.getEmpresa ? DB.getEmpresa() : {};
+    const empresaNome = esc(empresa.nome_fantasia || empresa.razao_social || 'sua empresa');
     return `
     <div class="page-header">
       <div><h1 class="page-title">&#x1F4E5; Exportar &amp; Relat&oacute;rios</h1><p class="page-sub">Gere relat&oacute;rios executivos formatados e planilhas Excel</p></div>
@@ -21,7 +24,7 @@ const Exportar = {
           <label class="form-label">Selecionar Obra</label>
           <select class="form-control" id="exp-obra" onchange="Exportar.onObraChange()">
             <option value="todas">Todas as Obras (Vis&atilde;o Geral)</option>
-            ${cs.map(c=>`<option value="${c.id}" ${c.id===obraId?'selected':''}>${c.nome} &mdash; ${c.cidade}/${c.estado}</option>`).join('')}
+            ${cs.map(c=>`<option value="${esc(c.id)}" ${c.id===obraId?'selected':''}>${esc(c.nome)} &mdash; ${esc(c.cidade)}/${esc(c.estado)}</option>`).join('')}
           </select>
         </div>
         <div style="display:flex;flex-direction:column;gap:8px;">
@@ -47,7 +50,7 @@ const Exportar = {
       <!-- Card Impressão / PDF -->
       <div class="card">
         <div class="card-header"><div class="card-title">&#x1F5A8;&#xFE0F; Relat&oacute;rio Formatado (PDF / Impress&atilde;o)</div></div>
-        <p style="color:var(--text2);font-size:.84rem;margin-bottom:14px">Documento executivo com cabe&ccedil;alho institucional Angelim e dados da obra.</p>
+        <p style="color:var(--text2);font-size:.84rem;margin-bottom:14px">Documento executivo com cabe&ccedil;alho institucional de ${empresaNome} e dados da obra.</p>
         <div class="form-group" style="margin-bottom:14px;">
           <label class="form-label">Modelo do Relat&oacute;rio</label>
           <select class="form-control" id="exp-preview-type" onchange="Exportar.preview(this.value)">
@@ -127,10 +130,10 @@ const Exportar = {
     const htmlDoc = this.gerarHTMLDocumento(this._currentPreview);
     
     // Injetar frame invisível ou janela limpa
-    let printFrame = document.getElementById('angelim-print-frame');
+    let printFrame = document.getElementById('finobra-print-frame');
     if (!printFrame) {
       printFrame = document.createElement('iframe');
-      printFrame.id = 'angelim-print-frame';
+      printFrame.id = 'finobra-print-frame';
       printFrame.style.position = 'fixed';
       printFrame.style.right = '0';
       printFrame.style.bottom = '0';
@@ -386,9 +389,12 @@ const Exportar = {
       addSheet(rows, 'Fluxo de Caixa 90d');
     }
 
-    const dataIso = new Date().toISOString().slice(0, 10);
+    const dataIso = (typeof Utils !== 'undefined' && Utils.today) ? Utils.today() : new Date().toISOString().slice(0, 10);
     const tipoLabel = tipo === 'completo' ? 'Completo' : tipo.charAt(0).toUpperCase() + tipo.slice(1);
-    const nomeArq = `Angelim_${safeNome}_${tipoLabel}_${dataIso}.xlsx`;
+    const emp = DB.getEmpresa ? DB.getEmpresa() : {};
+    const empresaArq = String(emp.nome_fantasia || emp.razao_social || 'FinObra')
+      .normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-zA-Z0-9_-]/g, '_').replace(/_+/g,'_').slice(0, 35) || 'FinObra';
+    const nomeArq = `${empresaArq}_${safeNome}_${tipoLabel}_${dataIso}.xlsx`;
 
     // Download direto via Blob com nome garantido
     try {

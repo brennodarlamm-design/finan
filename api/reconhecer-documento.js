@@ -4,7 +4,7 @@
 import { resolveAuthAndTenant } from './_auth.js';
 import { checkRateLimit, getClientIp } from './_ratelimit.js';
 import { canUseFeature, planError } from './_plans.js';
-import { canWriteData, permissionError } from './_permissions.js';
+import { canWriteData, canAccessModule, permissionError } from './_permissions.js';
 
 export const config = {
   maxDuration: 60,
@@ -52,6 +52,8 @@ export default async function handler(req, res) {
   if (!canWriteData(auth)) {
     return res.status(403).json(permissionError('ROLE_READ_ONLY'));
   }
+
+  if (!canAccessModule(auth, 'notas', 'write')) return res.status(403).json(permissionError('MODULE_WRITE_FORBIDDEN','notas'));
 
   if (!auth.isSystem && auth.user?.perfil !== 'superadmin' && !canUseFeature(auth.user?.tenantPlan, 'ocr')) {
     return res.status(403).json(planError('ocr', auth.user?.tenantPlan));

@@ -61,7 +61,7 @@ function getCredential(req) {
 
 function trialExpired(createdAt, trialDays = 15, explicitDueDate = null) {
   if (explicitDueDate) {
-    const due = new Date(String(explicitDueDate).slice(0, 10) + 'T23:59:59').getTime();
+    const due = new Date(String(explicitDueDate).slice(0, 10) + 'T23:59:59-04:00').getTime();
     if (Number.isFinite(due)) return Date.now() > due;
   }
   if (!createdAt) return false;
@@ -95,7 +95,12 @@ export async function resolveAuthAndTenant(req) {
 
   // Chave interna para jobs/cron. Nunca deve existir no frontend.
   if (rawToken === secret) {
-    const explicitTenant = String(req.headers['x-tenant-id'] || 'angelim').trim() || 'angelim';
+    // Chaves internas nunca assumem uma empresa padrão. Isso evita que um job mal
+    // configurado leia/grave acidentalmente no tenant histórico da plataforma.
+    const explicitTenant = String(req.headers['x-tenant-id'] || '').trim();
+    if (!explicitTenant) {
+      return { authenticated:false, status:400, error:'Cabeçalho x-tenant-id obrigatório para acesso interno.' };
+    }
     return {
       authenticated: true,
       isSystem: true,
@@ -119,7 +124,7 @@ export async function resolveAuthAndTenant(req) {
     const sql = neon(conn);
     const rows = await sql`
       SELECT
-        u.id, u.username, u.email, u.nome, u.perfil, u.avatar, u.ativo, u.tenant_id,
+        u.id, u.username, u.email, u.nome, u.perfil, u.avatar, u.ativo, u.tenant_id, u.permissoes,
         t.nome_fantasia, t.razao_social, t.plano, t.status AS tenant_status, t.created_at AS tenant_created_at, t.vencimento AS tenant_vencimento
       FROM usuarios u
       JOIN tenants t ON t.id = u.tenant_id
@@ -133,6 +138,23 @@ export async function resolveAuthAndTenant(req) {
 
     const live = rows[0];
     const isSuperAdmin = live.perfil === 'superadmin';
+
+    // Patch 08: sessões novas são revogáveis por dispositivo. Tokens legados sem
+    // sessionId continuam válidos até expirar para não derrubar usuários no deploy.
+    if (payload.sessionId) {
+      const sessionRows = await sql`
+        SELECT id, revoked_at, expires_at
+        FROM auth_sessions
+        WHERE id=${payload.sessionId} AND user_id=${payload.userId}
+        LIMIT 1;
+      `;
+      const sess = sessionRows[0];
+      if (!sess || sess.revoked_at || !sess.expires_at || new Date(sess.expires_at).getTime() <= Date.now()) {
+        return { authenticated:false, status:401, error:'Esta sessão foi encerrada ou expirou. Entre novamente.' };
+      }
+      // Atualiza atividade no máximo a cada 15 minutos para reduzir escrita no Neon.
+      sql`UPDATE auth_sessions SET last_seen_at=NOW() WHERE id=${payload.sessionId} AND last_seen_at < NOW() - INTERVAL '15 minutes';`.catch(() => {});
+    }
 
     if (!isSuperAdmin) {
       if (live.tenant_status === 'bloqueado' || live.tenant_status === 'cancelado') {
@@ -203,7 +225,9 @@ export async function resolveAuthAndTenant(req) {
         tenantStatus: targetTenantInfo.tenant_status,
         tenantPlan: targetTenantInfo.plano,
         tenantVencimento: targetTenantInfo.vencimento ? String(targetTenantInfo.vencimento).slice(0, 10) : '',
-        empresaNome: targetTenantInfo.nome_fantasia || targetTenantInfo.razao_social || payload.empresaNome || 'Minha Empresa' 
+        empresaNome: targetTenantInfo.nome_fantasia || targetTenantInfo.razao_social || payload.empresaNome || 'Minha Empresa',
+        permissions: (live.permissoes && typeof live.permissoes === 'object') ? live.permissoes : {},
+        sessionId: payload.sessionId || ''
       }
     };
   } catch (err) {

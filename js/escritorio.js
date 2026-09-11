@@ -302,7 +302,7 @@ const Escritorio = {
     const l = id ? DB.getById('lancamentos', id) : null;
     const isEdit = !!l;
     const contas = DB.getAll('contas');
-    const mesAtual = new Date().toISOString().slice(0, 7);
+    const mesAtual = (typeof Utils !== 'undefined' && Utils.today) ? Utils.today().slice(0, 7) : new Date().toISOString().slice(0, 7);
 
     Utils.showModal(`
       <div class="modal" style="max-width:700px;width:95vw;">
@@ -471,7 +471,7 @@ const Escritorio = {
         if (contato) parts.push(`Contato: ${contato}`);
         if (parts.length) {
           info.style.display = 'block';
-          info.innerHTML = parts.join(' &nbsp;·&nbsp; ');
+          info.textContent = parts.join(' · ');
         } else {
           info.style.display = 'none';
         }
@@ -486,16 +486,16 @@ const Escritorio = {
     if (!descEl || descEl.value) return;
 
     const defaults = {
-      energia: { desc: 'Conta de Energia Elétrica — Sede', forn: 'Equatorial / Roraima Energia' },
-      agua: { desc: 'Conta de Água e Esgoto — Sede', forn: 'CAER Companhia de Águas' },
-      internet_tel: { desc: 'Internet Fibra Empresarial + Telefonia', forn: 'Vivo / Telefônica Brasil' },
+      energia: { desc: 'Conta de Energia Elétrica — Sede', forn: 'Concessionária de Energia' },
+      agua: { desc: 'Conta de Água e Esgoto — Sede', forn: 'Concessionária de Água / Esgoto' },
+      internet_tel: { desc: 'Internet / Telefonia Empresarial', forn: 'Operadora de Telecomunicações' },
       imposto_simples: { desc: 'Guia DAS — Simples Nacional', forn: 'Receita Federal do Brasil' },
       tributos_trabalhistas: { desc: 'Guia GPS / FGTS Folha Sede', forn: 'Caixa Econômica / Receita' },
       salario: { desc: 'Folha de Pagamento Funcionários Sede', forn: 'Colaboradores Sede' },
       pro_labore: { desc: 'Pró-Labore Sócios Administradores', forn: 'Sócios Administradores' },
       aluguel_sede: { desc: 'Aluguel Comercial Sede Escritório', forn: 'Imobiliária' },
-      contabilidade: { desc: 'Honorários Contábeis Mensais', forn: 'Meta Contabilidade' },
-      software_ti: { desc: 'Licenças Softwares AutoCAD / Cloud', forn: 'Autodesk / Google' }
+      contabilidade: { desc: 'Honorários Contábeis Mensais', forn: 'Escritório de Contabilidade' },
+      software_ti: { desc: 'Licenças de Software / Cloud', forn: 'Fornecedor de Software' }
     };
 
     if (defaults[cat]) {
@@ -663,19 +663,20 @@ const Escritorio = {
   // MODAL PARA LANÇAR EM LOTE OS CUSTOS FIXOS DO MÊS
   // ─────────────────────────────────────────────────────────────
   abrirModalLote() {
-    const mesAtual = new Date().toISOString().slice(0, 7);
+    const mesAtual = (typeof Utils !== 'undefined' && Utils.today) ? Utils.today().slice(0, 7) : new Date().toISOString().slice(0, 7);
 
+    // Modelos neutros: valores começam zerados para nunca criar despesas fictícias.
     const pacotePadrao = [
-      { id: 'fx_1', cat: 'aluguel_sede', desc: 'Aluguel Comercial — Sede Escritório', forn: 'Imobiliária Nova Era Ltda', valor: 3500, diaVenc: 10 },
-      { id: 'fx_2', cat: 'energia', desc: 'Conta de Energia Elétrica — Sede', forn: 'Equatorial / Roraima Energia', valor: 1280, diaVenc: 15 },
-      { id: 'fx_3', cat: 'agua', desc: 'Conta de Água e Esgoto — Sede', forn: 'CAER Companhia de Águas', valor: 340, diaVenc: 15 },
-      { id: 'fx_4', cat: 'internet_tel', desc: 'Internet Fibra 500MB + Telefonia', forn: 'Vivo / Telefônica Brasil', valor: 249.90, diaVenc: 20 },
-      { id: 'fx_5', cat: 'contabilidade', desc: 'Honorários Contábeis & Fiscais', forn: 'Meta Contabilidade & Consultoria', valor: 1800, diaVenc: 20 },
-      { id: 'fx_6', cat: 'imposto_simples', desc: 'Guia DAS — Simples Nacional', forn: 'Receita Federal do Brasil', valor: 4850, diaVenc: 20 },
-      { id: 'fx_7', cat: 'salario', desc: 'Folha de Pagamento Funcionários Sede', forn: 'Colaboradores da Empresa', valor: 14200, diaVenc: 5 },
-      { id: 'fx_8', cat: 'pro_labore', desc: 'Pró-Labore Sócios Administradores', forn: 'Sócios Administradores', valor: 10000, diaVenc: 5 },
-      { id: 'fx_9', cat: 'software_ti', desc: 'Licenças Softwares AutoCAD & Google Workspace', forn: 'Autodesk & Google Cloud', valor: 680, diaVenc: 15 },
-      { id: 'fx_10', cat: 'material_escritorio', desc: 'Material de Escritório, Papelaria & Café/Copa', forn: 'Papelaria Central', valor: 420, diaVenc: 25 }
+      { id: 'fx_1', cat: 'aluguel_sede', desc: 'Aluguel Comercial — Sede / Escritório', forn: 'Locador / Imobiliária', valor: 0, diaVenc: 10 },
+      { id: 'fx_2', cat: 'energia', desc: 'Conta de Energia Elétrica — Sede', forn: 'Concessionária de Energia', valor: 0, diaVenc: 15 },
+      { id: 'fx_3', cat: 'agua', desc: 'Conta de Água e Esgoto — Sede', forn: 'Concessionária de Água / Esgoto', valor: 0, diaVenc: 15 },
+      { id: 'fx_4', cat: 'internet_tel', desc: 'Internet / Telefonia Empresarial', forn: 'Operadora de Telecomunicações', valor: 0, diaVenc: 20 },
+      { id: 'fx_5', cat: 'contabilidade', desc: 'Honorários Contábeis & Fiscais', forn: 'Escritório de Contabilidade', valor: 0, diaVenc: 20 },
+      { id: 'fx_6', cat: 'imposto_simples', desc: 'Guia DAS — Simples Nacional', forn: 'Receita Federal do Brasil', valor: 0, diaVenc: 20 },
+      { id: 'fx_7', cat: 'salario', desc: 'Folha de Pagamento — Sede', forn: 'Colaboradores da Empresa', valor: 0, diaVenc: 5 },
+      { id: 'fx_8', cat: 'pro_labore', desc: 'Pró-Labore dos Sócios', forn: 'Sócios Administradores', valor: 0, diaVenc: 5 },
+      { id: 'fx_9', cat: 'software_ti', desc: 'Licenças de Software / Cloud', forn: 'Fornecedor de Software', valor: 0, diaVenc: 15 },
+      { id: 'fx_10', cat: 'material_escritorio', desc: 'Material de Escritório / Copa', forn: 'Fornecedor', valor: 0, diaVenc: 25 }
     ];
 
     Utils.showModal(`
@@ -797,6 +798,7 @@ const Escritorio = {
         const diaFmt = String(dia).padStart(2, '0');
         const dataVenc = `${comp}-${diaFmt}`;
 
+        if (!desc || valor <= 0) return;
         DB.add('lancamentos', {
           obra_id: 'escritorio',
           centro_custo: 'escritorio',
@@ -809,7 +811,7 @@ const Escritorio = {
           data: Utils.today(),
           data_vencimento: dataVenc,
           status: 'a_pagar',
-          conta_bancaria: 'BB — Movimento Principal',
+          conta_bancaria: '',
           origem: 'manual',
           conciliado: false
         });

@@ -54,6 +54,29 @@ function decodeJwtPayload(token) {
   }
 }
 
+function deviceNameFromUserAgent(ua='') {
+  const s = String(ua || '').slice(0, 500);
+  const os = /Windows/i.test(s) ? 'Windows' : /Android/i.test(s) ? 'Android' : /iPhone|iPad|iPod/i.test(s) ? 'iPhone/iPad' : /Mac OS|Macintosh/i.test(s) ? 'Mac' : /Linux/i.test(s) ? 'Linux' : 'Dispositivo';
+  const browser = /Edg\//i.test(s) ? 'Edge' : /OPR\//i.test(s) ? 'Opera' : /Chrome\//i.test(s) ? 'Chrome' : /Firefox\//i.test(s) ? 'Firefox' : /Safari\//i.test(s) ? 'Safari' : 'Navegador';
+  return `${browser} · ${os}`.slice(0, 160);
+}
+
+async function createAuthSession(sql, req, { userId, tenantId, remember, exp }) {
+  const id = 'sess_' + crypto.randomBytes(16).toString('hex');
+  const ua = String(req.headers['user-agent'] || '').slice(0, 1000);
+  const ip = getClientIp(req).slice(0, 80);
+  const expiresAt = new Date(exp).toISOString();
+  await sql`
+    INSERT INTO auth_sessions (id,user_id,tenant_id,device_name,user_agent,ip,remember,expires_at)
+    VALUES (${id},${userId},${tenantId},${deviceNameFromUserAgent(ua)},${ua || null},${ip || null},${!!remember},${expiresAt});
+  `;
+  return id;
+}
+
+function permissionsOf(row) {
+  return row?.permissoes && typeof row.permissoes === 'object' ? row.permissoes : {};
+}
+
 export default async function handler(req, res) {
   setCors(req, res);
 
@@ -61,10 +84,14 @@ export default async function handler(req, res) {
     return res.status(200).end();
   }
 
-  const sql = getSql();
   const secret = (process.env.API_SECRET || process.env.VERCEL_API_SECRET || '').trim();
+  if (!secret) {
+    console.error('🚨 [Auth] API_SECRET não configurado.');
+    return res.status(500).json({ success:false, error:'Configuração de segurança pendente no servidor.' });
+  }
 
   try {
+    const sql = getSql();
     const action = req.query.action || (req.body && req.body.action);
 
     // ── 1. GET /api/auth?action=me (Sessão atual do usuário autenticado) ─────────
@@ -83,7 +110,7 @@ export default async function handler(req, res) {
       }
 
       const users = await sql`
-        SELECT u.id, u.username, u.email, u.nome, u.perfil, u.avatar, u.tenant_id,
+        SELECT u.id, u.username, u.email, u.nome, u.perfil, u.avatar, u.tenant_id, u.permissoes,
                t.razao_social, t.nome_fantasia, t.cnpj, t.telefone, t.plano, t.status as tenant_status
         FROM usuarios u
         LEFT JOIN tenants t ON u.tenant_id = t.id
@@ -128,8 +155,32 @@ export default async function handler(req, res) {
         }
       }
 
+      // Patch 08: ao primeiro refresh, tokens legados ganham uma sessão revogável.
+      // Preserva o tenant efetivo (inclusive impersonação Master) e a expiração original.
+      let refreshedToken = '';
+      let effectiveSessionId = auth.user.sessionId || '';
+      if (!effectiveSessionId) {
+        const legacyExp = Number(auth.user.exp) > Date.now() ? Number(auth.user.exp) : Date.now() + 2 * 24 * 60 * 60 * 1000;
+        effectiveSessionId = await createAuthSession(sql, req, {
+          userId: u.id,
+          tenantId: u.tenant_id,
+          remember: legacyExp - Date.now() > 3 * 24 * 60 * 60 * 1000,
+          exp: legacyExp
+        });
+        refreshedToken = signToken({
+          ...auth.user,
+          userId: u.id,
+          username: u.username, email: u.email, nome: u.nome, perfil: u.perfil,
+          tenantId: effectiveTenantId, realTenantId: u.tenant_id,
+          empresaNome: tenantData.nome_fantasia || tenantData.razao_social || 'Minha Empresa',
+          avatar: u.avatar || u.nome.slice(0, 2).toUpperCase(),
+          permissions: permissionsOf(u), sessionId: effectiveSessionId, exp: legacyExp
+        }, secret);
+      }
+
       return res.status(200).json({
         success: true,
+        token: refreshedToken || undefined,
         user: {
           id: u.id,
           username: u.username,
@@ -140,7 +191,9 @@ export default async function handler(req, res) {
           tenantId: effectiveTenantId,
           realTenantId: u.tenant_id,
           isImpersonated: effectiveTenantId !== u.tenant_id,
-          empresaNome: tenantData.nome_fantasia || tenantData.razao_social || 'Minha Empresa'
+          empresaNome: tenantData.nome_fantasia || tenantData.razao_social || 'Minha Empresa',
+          permissions: permissionsOf(u),
+          sessionId: effectiveSessionId
         },
         tenant: tenantData
       });
@@ -164,8 +217,8 @@ export default async function handler(req, res) {
 
       const cleanUser = username.trim().toLowerCase();
       const rows = await sql`
-        SELECT u.id, u.username, u.email, u.senha_hash, u.nome, u.perfil, u.avatar, u.ativo, u.tenant_id,
-               t.razao_social, t.nome_fantasia, t.status as tenant_status, t.created_at as tenant_created_at
+        SELECT u.id, u.username, u.email, u.senha_hash, u.nome, u.perfil, u.avatar, u.ativo, u.tenant_id, u.permissoes,
+               t.razao_social, t.nome_fantasia, t.status as tenant_status, t.created_at as tenant_created_at, t.vencimento as tenant_vencimento
         FROM usuarios u
         LEFT JOIN tenants t ON u.tenant_id = t.id
         WHERE LOWER(u.username) = ${cleanUser} OR LOWER(u.email) = ${cleanUser}
@@ -194,14 +247,12 @@ export default async function handler(req, res) {
           message: 'Assinatura cancelada. Regularize seu plano para restabelecer o acesso ao sistema.'
         });
       }
-      if (user.tenant_status === 'trial' && user.tenant_created_at) {
-        const trialDays = 15;
-        const diffMs = Date.now() - new Date(user.tenant_created_at).getTime();
-        if (diffMs > trialDays * 24 * 60 * 60 * 1000) {
-          return res.status(403).json({
-            success: false,
-            message: 'Seu período de teste gratuito de 15 dias expirou. Faça o upgrade de plano para continuar.'
-          });
+      if (user.tenant_status === 'trial') {
+        const due = user.tenant_vencimento ? new Date(String(user.tenant_vencimento).slice(0,10) + 'T23:59:59-04:00').getTime() : null;
+        const created = user.tenant_created_at ? new Date(user.tenant_created_at).getTime() : null;
+        const fallbackDue = created ? created + 15 * 24 * 60 * 60 * 1000 : null;
+        if ((due && Date.now() > due) || (!due && fallbackDue && Date.now() > fallbackDue)) {
+          return res.status(403).json({ success:false, message:'Seu período de teste gratuito expirou. Faça o upgrade de plano para continuar.' });
         }
       }
 
@@ -213,6 +264,7 @@ export default async function handler(req, res) {
       // Expiração da sessão: 30 dias para "lembrar-me", 2 dias padrão
       const durationDays = remember ? 30 : 2;
       const exp = Date.now() + durationDays * 24 * 60 * 60 * 1000;
+      const sessionId = await createAuthSession(sql, req, { userId:user.id, tenantId:user.tenant_id, remember:!!remember, exp });
 
       const payload = {
         userId: user.id,
@@ -224,6 +276,8 @@ export default async function handler(req, res) {
         tenantStatus: user.tenant_status || 'ativo',
         empresaNome: user.nome_fantasia || user.razao_social || 'Minha Empresa',
         avatar: user.avatar || user.nome.slice(0, 2).toUpperCase(),
+        permissions: permissionsOf(user),
+        sessionId,
         exp
       };
 
@@ -241,6 +295,8 @@ export default async function handler(req, res) {
           avatar: payload.avatar,
           tenantId: user.tenant_id,
           empresaNome: payload.empresaNome,
+          permissions: payload.permissions,
+          sessionId,
           remember: !!remember
         }
       });
@@ -332,6 +388,7 @@ export default async function handler(req, res) {
       `;
 
       const exp = Date.now() + 30 * 24 * 60 * 60 * 1000; // 30 dias
+      const sessionId = await createAuthSession(sql, req, { userId:newUserId, tenantId:newTenantId, remember:true, exp });
       const payload = {
         userId: newUserId,
         username: rawUsername,
@@ -342,6 +399,8 @@ export default async function handler(req, res) {
         tenantStatus: 'trial',
         empresaNome: finalEmpresaNome,
         avatar: rawNome.slice(0, 2).toUpperCase(),
+        permissions: {},
+        sessionId,
         exp
       };
 
@@ -359,6 +418,8 @@ export default async function handler(req, res) {
           avatar: payload.avatar,
           tenantId: newTenantId,
           empresaNome: finalEmpresaNome,
+          permissions: {},
+          sessionId,
           remember: true
         }
       });
@@ -371,11 +432,17 @@ export default async function handler(req, res) {
         return res.status(400).json({ success: false, message: 'Token de credencial Google é obrigatório.' });
       }
 
+      const googleClientId = String(process.env.GOOGLE_CLIENT_ID || '').trim();
+      if (!googleClientId) {
+        console.error('🚨 [Google Auth] GOOGLE_CLIENT_ID não configurado.');
+        return res.status(500).json({ success:false, message:'Login Google temporariamente indisponível.' });
+      }
+
       let profile = null;
       try {
         const ticket = await googleClient.verifyIdToken({
           idToken: credentialJwt,
-          audience: process.env.GOOGLE_CLIENT_ID
+          audience: googleClientId
         });
         profile = ticket.getPayload();
       } catch (verifyErr) {
@@ -394,7 +461,7 @@ export default async function handler(req, res) {
 
       // Verifica se usuário já existe
       const existing = await sql`
-        SELECT u.*, t.razao_social, t.nome_fantasia, t.status as tenant_status, t.created_at as tenant_created_at
+        SELECT u.*, t.razao_social, t.nome_fantasia, t.status as tenant_status, t.created_at as tenant_created_at, t.vencimento as tenant_vencimento
         FROM usuarios u
         LEFT JOIN tenants t ON u.tenant_id = t.id
         WHERE LOWER(u.email) = ${email} OR (u.google_sub IS NOT NULL AND u.google_sub = ${googleSub})
@@ -415,10 +482,12 @@ export default async function handler(req, res) {
             message: 'Acesso da empresa bloqueado. Contate o suporte comercial FinObra.'
           });
         }
-        if (userRecord.tenant_status === 'trial' && userRecord.tenant_created_at) {
-          const trialMs = 15 * 24 * 60 * 60 * 1000;
-          if (Date.now() > new Date(userRecord.tenant_created_at).getTime() + trialMs) {
-            return res.status(403).json({ success:false, message:'Seu período de teste gratuito de 15 dias expirou. Faça o upgrade para continuar.' });
+        if (userRecord.tenant_status === 'trial') {
+          const due = userRecord.tenant_vencimento ? new Date(String(userRecord.tenant_vencimento).slice(0,10) + 'T23:59:59-04:00').getTime() : null;
+          const created = userRecord.tenant_created_at ? new Date(userRecord.tenant_created_at).getTime() : null;
+          const fallbackDue = created ? created + 15 * 24 * 60 * 60 * 1000 : null;
+          if ((due && Date.now() > due) || (!due && fallbackDue && Date.now() > fallbackDue)) {
+            return res.status(403).json({ success:false, message:'Seu período de teste gratuito expirou. Faça o upgrade para continuar.' });
           }
         }
         if (picture && (!userRecord.avatar || userRecord.avatar.length <= 2)) {
@@ -472,11 +541,13 @@ export default async function handler(req, res) {
           avatar: picture || nome.slice(0, 2).toUpperCase(),
           tenant_id: newTenantId,
           tenant_status: 'trial',
-          nome_fantasia: nome + ' Construtora'
+          nome_fantasia: nome + ' Construtora',
+          permissoes: {}
         };
       }
 
       const exp = Date.now() + 30 * 24 * 60 * 60 * 1000; // 30 dias
+      const sessionId = await createAuthSession(sql, req, { userId:userRecord.id, tenantId:userRecord.tenant_id, remember:true, exp });
       const payload = {
         userId: userRecord.id,
         username: userRecord.username,
@@ -487,6 +558,8 @@ export default async function handler(req, res) {
         tenantStatus: userRecord.tenant_status || 'ativo',
         empresaNome: userRecord.nome_fantasia || userRecord.nome + ' Construtora',
         avatar: userRecord.avatar,
+        permissions: permissionsOf(userRecord),
+        sessionId,
         exp
       };
 
@@ -505,9 +578,56 @@ export default async function handler(req, res) {
           avatar: userRecord.avatar,
           tenantId: userRecord.tenant_id,
           empresaNome: payload.empresaNome,
+          permissions: payload.permissions,
+          sessionId,
           remember: true
         }
       });
+    }
+
+    // ── 4. Sessões e dispositivos (Patch 08) ───────────────────────────────────
+    if (req.method === 'GET' && action === 'sessions') {
+      const auth = await resolveAuthAndTenant(req);
+      if (!auth.authenticated) return res.status(auth.status || 401).json({ success:false, error:auth.error || 'Não autorizado.' });
+      if (auth.isSystem) return res.status(200).json({ success:true, sessions:[] });
+      const rows = await sql`
+        SELECT id, device_name, ip, remember, created_at, last_seen_at, expires_at, revoked_at
+        FROM auth_sessions
+        WHERE user_id=${auth.user.userId}
+        ORDER BY created_at DESC
+        LIMIT 30;
+      `;
+      return res.status(200).json({
+        success:true,
+        currentSessionId: auth.user.sessionId || '',
+        sessions: rows.map(r => ({ ...r, current:r.id === auth.user.sessionId, active:!r.revoked_at && new Date(r.expires_at).getTime() > Date.now() }))
+      });
+    }
+
+    if (req.method === 'POST' && ['logout','revoke_session','revoke_other_sessions'].includes(action)) {
+      const auth = await resolveAuthAndTenant(req);
+      if (!auth.authenticated) {
+        // Logout deve ser idempotente: cliente pode limpar a sessão mesmo se ela já expirou.
+        if (action === 'logout') return res.status(200).json({ success:true });
+        return res.status(auth.status || 401).json({ success:false, error:auth.error || 'Não autorizado.' });
+      }
+      if (auth.isSystem) return res.status(200).json({ success:true });
+      const currentId = String(auth.user.sessionId || '');
+      if (action === 'logout') {
+        if (currentId) await sql`UPDATE auth_sessions SET revoked_at=COALESCE(revoked_at,NOW()) WHERE id=${currentId} AND user_id=${auth.user.userId};`;
+        return res.status(200).json({ success:true });
+      }
+      if (action === 'revoke_session') {
+        const targetId = String(req.body?.sessionId || '').trim();
+        if (!targetId) return res.status(400).json({ success:false, error:'Sessão não informada.' });
+        await sql`UPDATE auth_sessions SET revoked_at=COALESCE(revoked_at,NOW()) WHERE id=${targetId} AND user_id=${auth.user.userId};`;
+        return res.status(200).json({ success:true, currentRevoked:targetId === currentId });
+      }
+      await sql`
+        UPDATE auth_sessions SET revoked_at=COALESCE(revoked_at,NOW())
+        WHERE user_id=${auth.user.userId} AND revoked_at IS NULL AND (${currentId}='' OR id<>${currentId});
+      `;
+      return res.status(200).json({ success:true });
     }
 
     // ── 4. POST /api/auth?action=request_reset (Gera OTP Seguro no Neon com Rate Limiting)
@@ -671,6 +791,7 @@ export default async function handler(req, res) {
       await sql`UPDATE recuperacao_senhas SET usado = TRUE WHERE id = ${rec.id};`;
       const newHash = hashPassword(newPassword);
       await sql`UPDATE usuarios SET senha_hash = ${newHash}, updated_at = NOW() WHERE id = ${userId};`;
+      await sql`UPDATE auth_sessions SET revoked_at=COALESCE(revoked_at,NOW()) WHERE user_id=${userId} AND revoked_at IS NULL;`;
 
       return res.status(200).json({
         success: true,

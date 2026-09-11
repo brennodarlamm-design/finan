@@ -3,7 +3,7 @@ import { neon } from '@neondatabase/serverless';
 import crypto from 'crypto';
 import { hashPassword, verifyPassword, resolveAuthAndTenant } from './_auth.js';
 import { writeAudit } from './_audit.js';
-import { canManageUsers, canManageTenant, permissionError } from './_permissions.js';
+import { canManageUsers, canManageTenant, permissionError, sanitizePermissions } from './_permissions.js';
 import { checkRateLimit, getClientIp } from './_ratelimit.js';
 
 function getSql() {
@@ -24,6 +24,7 @@ const safeUser = u => ({
   id: u.id, username: u.username, email: u.email || '', nome: u.nome,
   perfil: u.perfil, avatar: u.avatar || (u.nome || 'US').slice(0,2).toUpperCase(),
   ativo: !!u.ativo, tenantId: u.tenant_id, googleAuth: !!u.google_auth,
+  permissions: (u.permissoes && typeof u.permissoes === 'object') ? u.permissoes : {},
   created_at: u.created_at
 });
 
@@ -32,22 +33,29 @@ const SUPPORT_STATUSES = new Set(['bot','waiting','assigned','resolved','closed'
 const cleanSupportText = (v, max=4000) => String(v ?? '').replace(/\0/g, '').trim().slice(0, max);
 const wantsHumanSupport = text => /\b(atendente|humano|pessoa|especialista|falar com algu[eé]m|suporte humano|chamar suporte|chamar atendente)\b/i.test(String(text || ''));
 
+const SUPPORT_KB = Object.freeze([
+  { topic:'notas', patterns:[/nota fiscal/i,/\bnf-?e\b/i,/\bnfce\b/i,/\bnfse\b/i,/\bxml\b/i,/\bocr\b/i], answer:'Para NF-e e OCR, abra o módulo de Notas Fiscais. Você pode importar XML, PDF ou imagem; o sistema identifica fornecedor, valores e itens. Se algo não for reconhecido, informe qual etapa apresentou erro.' },
+  { topic:'medicoes', patterns:[/mediç/i,/medicao/i,/medição/i,/caixa econômica/i,/caixa economica/i], answer:'No módulo Medições você registra o avanço da obra, percentuais e valores medidos. Depois é possível gerar o relatório/boletim da medição. Se quiser, informe o que você está tentando lançar.' },
+  { topic:'ofx', patterns:[/\bofx\b/i,/concilia/i,/extrato banc/i], answer:'Na Conciliação OFX, importe o arquivo .OFX gerado pelo banco. O FinObra cruza as transações com os lançamentos e sugere correspondências para conferência.' },
+  { topic:'obras', patterns:[/\bobra\b/i,/cliente/i,/nova obra/i], answer:'Para cadastrar uma obra, entre em Obras & Clientes e escolha Nova Obra. Informe cliente, datas, valor/contrato e demais dados. Os limites de obras ativas dependem do seu plano.' },
+  { topic:'fornecedores', patterns:[/fornecedor/i,/cnpj/i], answer:'Fornecedores podem ser cadastrados pelo módulo Fornecedores. Informe CNPJ/CPF, razão social, contato, endereço, município e UF. Depois eles ficam disponíveis nos lançamentos e notas.' },
+  { topic:'financeiro', patterns:[/lançamento/i,/lancamento/i,/receita/i,/despesa/i,/contas? a pagar/i,/contas? a receber/i], answer:'No Financeiro, use Novo Lançamento para registrar receita ou despesa, vencimento, fornecedor, obra/centro de custo e status. Se quiser, diga qual tipo de lançamento você precisa fazer.' },
+  { topic:'contratos', patterns:[/contrato/i,/recibo/i], answer:'Contratos e Recibos ficam salvos na nuvem da sua empresa. Você pode criar, editar, imprimir e, nos planos compatíveis, usar assinatura eletrônica e QR de validação.' },
+  { topic:'assinatura', patterns:[/assinatura/i,/qr code/i,/validar/i,/validação/i,/validacao/i], answer:'A assinatura eletrônica gera um código de validação registrado no servidor. O QR Code leva à página pública de validação, que consulta o registro real no FinObra.' },
+  { topic:'usuarios', patterns:[/usuário/i,/usuario/i,/perfil/i,/permiss/i,/acesso/i], answer:'Em Configurações > Usuários, o administrador pode criar usuários, escolher o perfil e restringir módulos específicos. As restrições por módulo nunca aumentam o poder do perfil; apenas reduzem acessos.' },
+  { topic:'planos', patterns:[/plano/i,/cobrança/i,/cobranca/i,/\bpix\b/i,/mensalidade/i,/pagamento/i], answer:'Abra Planos & Cobrança para consultar seu plano, limites e mensalidade. Cobranças PIX pendentes aparecem com valor, identificação e histórico próprios.' },
+  { topic:'whatsapp', patterns:[/whatsapp/i,/mensagem/i], answer:'O WhatsApp depende da sessão conectada no servidor. O acesso também pode ser restringido por módulo pelo administrador da empresa.' },
+  { topic:'sessoes', patterns:[/sessão/i,/sessao/i,/dispositivo/i,/celular conectado/i,/computador conectado/i], answer:'Em Configurações > Sessões você pode ver os dispositivos conectados à sua conta e encerrar sessões que não reconhece.' },
+  { topic:'erro', patterns:[/erro/i,/bug/i,/não funciona/i,/nao funciona/i,/travou/i,/problema/i], answer:'Posso tentar identificar o problema. Informe em qual tela aconteceu, o que você clicou e qual mensagem apareceu. O FinObra também registra erros técnicos para o administrador em Configurações > Diagnóstico. Se preferir atendimento humano, use “Chamar atendente”.' }
+]);
+
 function supportBotReply(text) {
-  const t = String(text || '').toLowerCase();
+  const t = String(text || '').trim();
   if (/(atendente|humano|pessoa|especialista|falar com algu[eé]m)/i.test(t)) return null;
-  if (/(nota fiscal|nfe|nf-e|xml|ocr)/i.test(t)) return 'Para NF-e e OCR, abra o módulo de Notas Fiscais. Você pode importar XML, PDF ou imagem; o sistema identifica fornecedor, valores e itens. Se algo não for reconhecido, me diga qual etapa apresentou erro.';
-  if (/(mediç|medicao|caixa econômica|caixa economica)/i.test(t)) return 'No módulo Medições você registra o avanço da obra, percentuais e valores medidos. Depois é possível gerar o relatório/boletim da medição. Se quiser, informe o que você está tentando lançar.';
-  if (/(ofx|concilia|extrato|banco)/i.test(t)) return 'Na Conciliação OFX, importe o arquivo .OFX gerado pelo banco. O FinObra cruza as transações com os lançamentos e sugere correspondências para conferência.';
-  if (/(obra|cliente|contrato da obra|nova obra)/i.test(t)) return 'Para cadastrar uma obra, entre em Obras & Clientes e escolha Nova Obra. Informe cliente, datas, valor/contrato e demais dados. Os limites de obras ativas dependem do seu plano.';
-  if (/(fornecedor|cnpj)/i.test(t)) return 'Fornecedores podem ser cadastrados pelo módulo Fornecedores. Informe CNPJ/CPF, razão social, contato, endereço, município e UF. Depois eles ficam disponíveis nos lançamentos e notas.';
-  if (/(lançamento|lancamento|receita|despesa|contas a pagar|conta a pagar)/i.test(t)) return 'No Financeiro, use Novo Lançamento para registrar receita ou despesa, vencimento, fornecedor, obra/centro de custo e status. Se quiser, me diga qual tipo de lançamento você precisa fazer.';
-  if (/(contrato|recibo)/i.test(t)) return 'Contratos e Recibos ficam salvos na nuvem do seu tenant. Você pode criar, editar, imprimir e, nos planos compatíveis, usar assinatura eletrônica e QR de validação.';
-  if (/(assinatura|qr code|validar|validação|validacao)/i.test(t)) return 'A assinatura eletrônica gera um código de validação registrado no servidor. O QR Code leva à página pública de validação, que consulta o registro real no FinObra.';
-  if (/(usuário|usuario|perfil|permiss|acesso)/i.test(t)) return 'Em Configurações > Usuários, o administrador pode criar usuários e definir perfis. Administrador tem gestão completa; Gestor opera dados; Operador não exclui; Visualizador é somente leitura.';
-  if (/(plano|cobrança|cobranca|pix|mensalidade|pagamento)/i.test(t)) return 'Abra Planos & Cobrança para consultar seu plano, limites e mensalidade. Se houver uma cobrança PIX pendente, ela aparece com valor e identificação próprios.';
-  if (/(whatsapp|mensagem)/i.test(t)) return 'O módulo WhatsApp depende da sessão conectada no servidor. Administradores podem gerenciar a conexão e usuários com permissão de escrita podem enviar mensagens permitidas pelo sistema.';
-  if (/(erro|bug|não funciona|nao funciona|travou|problema)/i.test(t)) return 'Posso tentar identificar o problema. Informe em qual tela aconteceu, o que você clicou e qual mensagem apareceu. Se preferir atendimento humano, use o botão “Chamar atendente”.';
-  return 'Posso ajudar com Obras, Financeiro, NF-e/OCR, Medições, OFX, Fornecedores, Contratos, Recibos, Usuários, Assinaturas, WhatsApp e Planos. Escreva sua dúvida ou clique em “Chamar atendente” para falar com uma pessoa.';
+  for (const item of SUPPORT_KB) {
+    if (item.patterns.some(re => re.test(t))) return item.answer;
+  }
+  return 'Posso ajudar com Obras, Financeiro, NF-e/OCR, Medições, OFX, Fornecedores, Contratos, Recibos, Usuários e Permissões, Sessões, Assinaturas, WhatsApp e Planos. Escreva sua dúvida ou clique em “Chamar atendente” para falar com uma pessoa.';
 }
 
 function getSupportRenderBaseUrl() {
@@ -469,12 +477,12 @@ export default async function handler(req, res) {
     if (req.method === 'GET') {
       const rows = actorIsAdmin
         ? await sql`
-            SELECT id, tenant_id, username, email, nome, perfil, avatar, ativo, google_auth, created_at
+            SELECT id, tenant_id, username, email, nome, perfil, avatar, ativo, google_auth, permissoes, created_at
             FROM usuarios WHERE tenant_id = ${auth.tenantId}
             ORDER BY CASE WHEN id = ${auth.user.userId} THEN 0 ELSE 1 END, nome ASC;
           `
         : await sql`
-            SELECT id, tenant_id, username, email, nome, perfil, avatar, ativo, google_auth, created_at
+            SELECT id, tenant_id, username, email, nome, perfil, avatar, ativo, google_auth, permissoes, created_at
             FROM usuarios WHERE tenant_id = ${auth.tenantId} AND id = ${auth.user.userId}
             LIMIT 1;
           `;
@@ -483,7 +491,7 @@ export default async function handler(req, res) {
 
     if (req.method === 'POST') {
       if (!actorIsAdmin) return res.status(403).json(permissionError('ROLE_MANAGE_USERS_FORBIDDEN'));
-      const { nome, username, email, senha, perfil='gestor', avatar='' } = req.body || {};
+      const { nome, username, email, senha, perfil='gestor', avatar='', permissions={} } = req.body || {};
       const n = String(nome || '').trim();
       const un = String(username || '').trim().toLowerCase().replace(/[^a-z0-9._-]/g,'');
       const em = String(email || '').trim().toLowerCase();
@@ -497,17 +505,19 @@ export default async function handler(req, res) {
       if (exists.length) return res.status(409).json({ success:false, error:'Usuário ou e-mail já cadastrado.' });
       const id = 'usr_' + crypto.randomBytes(8).toString('hex');
       const senhaHash = hashPassword(pw);
+      const cleanPermissions = ['admin','superadmin'].includes(String(perfil)) ? {} : sanitizePermissions(permissions);
+      const permissionsJson = JSON.stringify(cleanPermissions);
       const rows = await sql`
-        INSERT INTO usuarios (id,tenant_id,username,email,senha_hash,nome,perfil,avatar,ativo)
-        VALUES (${id},${auth.tenantId},${un},${em},${senhaHash},${n},${perfil},${String(avatar||'').trim() || n.slice(0,2).toUpperCase()},TRUE)
-        RETURNING id,tenant_id,username,email,nome,perfil,avatar,ativo,google_auth,created_at;
+        INSERT INTO usuarios (id,tenant_id,username,email,senha_hash,nome,perfil,avatar,ativo,permissoes)
+        VALUES (${id},${auth.tenantId},${un},${em},${senhaHash},${n},${perfil},${String(avatar||'').trim() || n.slice(0,2).toUpperCase()},TRUE,${permissionsJson}::jsonb)
+        RETURNING id,tenant_id,username,email,nome,perfil,avatar,ativo,google_auth,permissoes,created_at;
       `;
       await writeAudit(sql, req, auth, { acao:'criar', entidade:'usuario', entidadeId:id, depois:safeUser(rows[0]) });
       return res.status(201).json({ success:true, user:safeUser(rows[0]) });
     }
 
     if (req.method === 'PATCH') {
-      const { id, nome, username, email, perfil, avatar, ativo, senha, senha_atual } = req.body || {};
+      const { id, nome, username, email, perfil, avatar, ativo, senha, senha_atual, permissions } = req.body || {};
       const targetId = String(id || auth.user.userId);
       const isSelf = targetId === auth.user.userId;
       if (!isSelf && !actorIsAdmin) return res.status(403).json({ success:false, error:'Sem permissão para alterar outro usuário.' });
@@ -563,13 +573,26 @@ export default async function handler(req, res) {
         senhaHash = hashPassword(String(senha));
       }
 
+      const newPermissions = ['admin','superadmin'].includes(String(newPerfil)) ? {} : (actorIsAdmin && permissions !== undefined ? sanitizePermissions(permissions) : ((cur.permissoes && typeof cur.permissoes === 'object') ? cur.permissoes : {}));
+      const permissionsJson = JSON.stringify(newPermissions);
       const rows = await sql`
         UPDATE usuarios SET
           nome=${newNome}, username=${newUsername}, email=${newEmail}, perfil=${newPerfil},
-          avatar=${newAvatar}, ativo=${newAtivo}, senha_hash=${senhaHash}, updated_at=NOW()
+          avatar=${newAvatar}, ativo=${newAtivo}, senha_hash=${senhaHash}, permissoes=${permissionsJson}::jsonb, updated_at=NOW()
         WHERE id=${targetId} AND tenant_id=${auth.tenantId}
-        RETURNING id,tenant_id,username,email,nome,perfil,avatar,ativo,google_auth,created_at;
+        RETURNING id,tenant_id,username,email,nome,perfil,avatar,ativo,google_auth,permissoes,created_at;
       `;
+
+      // Troca de senha invalida sessões antigas. Na troca da própria senha,
+      // preserva apenas a sessão atual para não expulsar o usuário que acabou de confirmar a senha.
+      if (senha) {
+        if (isSelf && auth.user.sessionId) {
+          await sql`UPDATE auth_sessions SET revoked_at=NOW() WHERE user_id=${targetId} AND id<>${auth.user.sessionId} AND revoked_at IS NULL;`;
+        } else {
+          await sql`UPDATE auth_sessions SET revoked_at=NOW() WHERE user_id=${targetId} AND revoked_at IS NULL;`;
+        }
+      }
+
       await writeAudit(sql, req, auth, { acao:'atualizar', entidade:'usuario', entidadeId:targetId, antes:safeUser(cur), depois:safeUser(rows[0]) });
       return res.status(200).json({ success:true, user:safeUser(rows[0]) });
     }

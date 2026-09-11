@@ -492,7 +492,7 @@ const Fornecedores = {
     const colors = { loading:'var(--accent2)', success:'var(--success)', error:'var(--danger)', warn:'var(--warning)' };
     el.style.display = 'block';
     el.style.color = colors[type] || 'var(--text2)';
-    el.innerHTML = msg;
+    el.textContent = String(msg || '');
   },
 
   async consultarCnpj() {
@@ -518,7 +518,7 @@ const Fornecedores = {
       }
       const d = await res.json();
       this._preencherCampos(d, cnpj);
-      this._setStatus(`✅ Dados carregados com sucesso! <strong>${d.razao_social}</strong>`, 'success');
+      this._setStatus(`✅ Dados carregados com sucesso! ${d.razao_social || ''}`, 'success');
     } catch(err) {
       this._setStatus(`❌ Erro: ${err.message}`, 'error');
     } finally {

@@ -1,6 +1,7 @@
 // api/dashboard.js — Snapshot leve e atualizado do dashboard, calculado no Neon
 import { neon } from '@neondatabase/serverless';
 import { resolveAuthAndTenant } from './_auth.js';
+import { canAccessModule, permissionError } from './_permissions.js';
 
 function getSql() {
   if (!process.env.DATABASE_URL) throw new Error('DATABASE_URL não configurada.');
@@ -26,9 +27,14 @@ export default async function handler(req, res) {
 
   const auth = await resolveAuthAndTenant(req);
   if (!auth.authenticated) return res.status(auth.status || 401).json({ success: false, error: auth.error || 'Não autorizado.' });
+  if (!canAccessModule(auth, 'dashboard', 'read')) return res.status(403).json(permissionError('MODULE_READ_FORBIDDEN','dashboard'));
 
   try {
     const sql = getSql();
+    const showFinance = canAccessModule(auth,'financeiro','read');
+    const showNotas = canAccessModule(auth,'notas','read');
+    const showObras = canAccessModule(auth,'obras','read');
+    const showMedicoes = canAccessModule(auth,'medicoes','read');
     const rawObraId = String(req.query?.obra_id || '').trim();
     let obraId = rawObraId && rawObraId !== 'todas' ? rawObraId : '';
     if (obraId && !['escritorio', 'geral'].includes(obraId)) {
@@ -37,8 +43,9 @@ export default async function handler(req, res) {
     }
 
     const filter = obraId;
+    // Não consulta dados de módulos bloqueados: reduz custo no Neon e minimiza exposição interna.
     const [financeRows, nfRows, obraRows, medRows, recentRows] = await Promise.all([
-      sql`
+      showFinance ? sql`
         SELECT
           COALESCE(SUM(valor) FILTER (WHERE tipo='receita' AND status='recebido'),0)::numeric AS total_receitas,
           COALESCE(SUM(valor) FILTER (WHERE tipo='despesa' AND status='pago'),0)::numeric AS total_despesas,
@@ -49,28 +56,28 @@ export default async function handler(req, res) {
         FROM lancamentos
         WHERE tenant_id=${auth.tenantId}
           AND (${filter}='' OR obra_id=${filter});
-      `,
-      sql`
+      ` : Promise.resolve([{}]),
+      showNotas ? sql`
         SELECT COUNT(*)::int AS qtd,
                COALESCE(SUM(COALESCE(valor_total, valor_bruto, 0)),0)::numeric AS valor
         FROM notas_fiscais
         WHERE tenant_id=${auth.tenantId} AND status='pendente'
           AND (${filter}='' OR obra_id=${filter});
-      `,
-      sql`
+      ` : Promise.resolve([{}]),
+      showObras ? sql`
         SELECT
           COUNT(*)::int AS total,
           COUNT(*) FILTER (WHERE LOWER(COALESCE(status,'em_andamento')) NOT IN ('concluida','concluída','concluido','concluído','cancelada','cancelado'))::int AS ativas
         FROM obras WHERE tenant_id=${auth.tenantId};
-      `,
-      sql`
+      ` : Promise.resolve([{}]),
+      showMedicoes ? sql`
         SELECT COUNT(*)::int AS pendentes
         FROM medicoes
         WHERE tenant_id=${auth.tenantId}
           AND status IN ('em_analise','submetida')
           AND (${filter}='' OR obra_id=${filter});
-      `,
-      sql`
+      ` : Promise.resolve([{}]),
+      showFinance ? sql`
         SELECT l.id,l.data,l.descricao,l.categoria,l.tipo,l.valor,l.status,l.obra_id,o.nome AS obra_nome
         FROM lancamentos l
         LEFT JOIN obras o ON o.id=l.obra_id AND o.tenant_id=l.tenant_id
@@ -78,7 +85,7 @@ export default async function handler(req, res) {
           AND (${filter}='' OR l.obra_id=${filter})
         ORDER BY l.data DESC,l.created_at DESC,l.id DESC
         LIMIT 10;
-      `
+      ` : Promise.resolve([])
     ]);
 
     const f = financeRows[0] || {};
@@ -91,19 +98,19 @@ export default async function handler(req, res) {
     return res.status(200).json({
       success: true,
       snapshot: {
-        totalReceitas,
-        totalDespesas,
-        saldo: totalReceitas - totalDespesas,
-        nfPendentes: num(n.qtd),
-        nfPendentesValor: num(n.valor),
-        aPagar: num(f.a_pagar),
-        aPagarValor: num(f.a_pagar_valor),
-        aReceber: num(f.a_receber),
-        aReceberValor: num(f.a_receber_valor),
-        obrasAtivas: num(o.ativas),
-        obrasTotal: num(o.total),
-        medicoesPendentes: num(m.pendentes),
-        recent: recentRows.map(r => ({ ...r, valor: num(r.valor) }))
+        totalReceitas: showFinance ? totalReceitas : 0,
+        totalDespesas: showFinance ? totalDespesas : 0,
+        saldo: showFinance ? (totalReceitas - totalDespesas) : 0,
+        nfPendentes: showNotas ? num(n.qtd) : 0,
+        nfPendentesValor: showNotas ? num(n.valor) : 0,
+        aPagar: showFinance ? num(f.a_pagar) : 0,
+        aPagarValor: showFinance ? num(f.a_pagar_valor) : 0,
+        aReceber: showFinance ? num(f.a_receber) : 0,
+        aReceberValor: showFinance ? num(f.a_receber_valor) : 0,
+        obrasAtivas: showObras ? num(o.ativas) : 0,
+        obrasTotal: showObras ? num(o.total) : 0,
+        medicoesPendentes: showMedicoes ? num(m.pendentes) : 0,
+        recent: showFinance ? recentRows.map(r => ({ ...r, valor: num(r.valor) })) : []
       }
     });
   } catch (err) {

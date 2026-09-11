@@ -4,6 +4,9 @@ const App = {
   route: 'dashboard',
   obraId: 'todas',
   _charts: [],
+  _errorMonitorInstalled: false,
+  _errorFingerprints: new Map(),
+  _sessionRefreshTimer: null,
 
   get currentRoute() { return this.route; },
   set currentRoute(v) { this.route = v; },
@@ -156,6 +159,18 @@ const App = {
     }
 
     if (!Auth.requireAuth()) return;
+
+    this._installErrorMonitor();
+    if (typeof Auth.refreshSessionFromServer === 'function') {
+      Auth.refreshSessionFromServer().then(r => {
+        if (r?.changed) { this.renderShell(); this._bindSyncStatus(); this.navigate(this.route || this._getRouteFromUrl(), false); }
+      }).catch(() => {});
+      if (!this._sessionRefreshTimer) this._sessionRefreshTimer = setInterval(() => {
+        Auth.refreshSessionFromServer().then(r => {
+          if (r?.changed) { this.renderShell(); this._bindSyncStatus(); this.navigate(this.route || 'dashboard', false); }
+        }).catch(() => {});
+      }, 120000);
+    }
 
     // Inicialização otimista: usa o cache local imediatamente e sincroniza a nuvem em seguida.
     // Isso reduz o tempo de tela bloqueada sem abrir mão da atualização dos dados.
@@ -395,10 +410,45 @@ const App = {
 
   _navItem(route, icon, label, badgeHtml = '') {
     const targetRoute = this._normalizeRoute(route);
+    if (typeof Auth !== 'undefined' && Auth.canRoute && !Auth.canRoute(targetRoute, 'read')) return '';
     const isAct = (this.route === targetRoute) || (this._normalizeRoute(this.route) === targetRoute);
     return `<div class="nav-item${isAct?' active':''}" data-route="${targetRoute}" onclick="App.navigate('${targetRoute}');App.closeSidebar();">
       <span>${icon}</span><span>${label}</span>${badgeHtml}
     </div>`;
+  },
+
+  _firstAllowedRoute() {
+    const preferred = ['dashboard','obras','lancamentos','fornecedores','produtos','pre-compras','recibos','contratos','notas-fiscais','orcamentos','medicoes','documentacao','relatorios','planos','contas-bancarias','configuracoes'];
+    return preferred.find(r => !Auth?.canRoute || Auth.canRoute(r,'read')) || 'dashboard';
+  },
+
+  _installErrorMonitor() {
+    if (this._errorMonitorInstalled) return;
+    this._errorMonitorInstalled = true;
+    const report = (payload = {}) => {
+      try {
+        if (!Auth?.getToken?.()) return;
+        const message = String(payload.message || 'Erro JavaScript').slice(0,1500);
+        const source = String(payload.source || '').slice(0,500);
+        const fp = `${message}|${source}|${payload.line || ''}|${this.route || ''}`;
+        const now = Date.now();
+        const previous = this._errorFingerprints.get(fp) || 0;
+        if (now - previous < 30000) return;
+        this._errorFingerprints.set(fp, now);
+        if (this._errorFingerprints.size > 100) {
+          for (const [key, ts] of this._errorFingerprints) if (now - ts > 10 * 60 * 1000) this._errorFingerprints.delete(key);
+        }
+        fetch('/api/audit?action=client_error', {
+          method:'POST', headers:Auth.getAuthHeaders(), keepalive:true,
+          body:JSON.stringify({ ...payload, message, source, route:this.route || this._getRouteFromUrl() })
+        }).catch(() => {});
+      } catch {}
+    };
+    window.addEventListener('error', e => report({ message:e.message || e.error?.message, source:e.filename, line:e.lineno, col:e.colno, stack:e.error?.stack || '' }));
+    window.addEventListener('unhandledrejection', e => {
+      const reason = e.reason;
+      report({ message:reason?.message || String(reason || 'Promise rejeitada'), source:'unhandledrejection', stack:reason?.stack || '' });
+    });
   },
 
   navigate(route, updateHistory = true) {
@@ -410,7 +460,12 @@ const App = {
     }
     const cleanRoute = (route || '').split('?')[0].replace(/^#\/?/, '');
     const normalized = this._normalizeRoute(cleanRoute);
-    const targetRoute = this.routes[normalized] ? normalized : 'dashboard';
+    let targetRoute = this.routes[normalized] ? normalized : 'dashboard';
+    if (typeof Auth !== 'undefined' && Auth.canRoute && !Auth.canRoute(targetRoute,'read')) {
+      const fallback = this._firstAllowedRoute();
+      if (targetRoute !== fallback && typeof Utils !== 'undefined' && Utils.toast) Utils.toast('Seu usuário não possui acesso a este módulo.', 'warning');
+      targetRoute = fallback;
+    }
     this.route = targetRoute;
     this._charts.forEach(c => { try { c.destroy(); } catch{} });
     this._charts = [];

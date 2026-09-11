@@ -4,7 +4,7 @@ import { neon } from '@neondatabase/serverless';
 import { resolveAuthAndTenant } from './_auth.js';
 import { checkRateLimit, getClientIp } from './_ratelimit.js';
 import { canUseFeature, planError } from './_plans.js';
-import { canWriteData, permissionError } from './_permissions.js';
+import { canWriteData, canAccessModule, permissionError } from './_permissions.js';
 import { writeAudit } from './_audit.js';
 
 function getSql() {
@@ -107,6 +107,7 @@ export default async function handler(req, res) {
       const auth = await resolveAuthAndTenant(req);
       if (!auth.authenticated) return res.status(auth.status || 401).json({ success: false, error: auth.error || 'Não autorizado.' });
       if (!canWriteData(auth)) return res.status(403).json(permissionError('ROLE_READ_ONLY'));
+      if (!canAccessModule(auth,'assinatura','write')) return res.status(403).json(permissionError('MODULE_WRITE_FORBIDDEN','assinatura'));
       if (!auth.isSystem && auth.user?.perfil !== 'superadmin' && !canUseFeature(auth.user?.tenantPlan, 'signatures')) {
         return res.status(403).json(planError('signatures', auth.user?.tenantPlan));
       }

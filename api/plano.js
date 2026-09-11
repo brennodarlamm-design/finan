@@ -3,7 +3,7 @@ import crypto from 'crypto';
 import { neon } from '@neondatabase/serverless';
 import { resolveAuthAndTenant } from './_auth.js';
 import { getPlanRule, normalizePlan } from './_plans.js';
-import { canManageTenant, permissionError } from './_permissions.js';
+import { canManageTenant, canAccessModule, permissionError } from './_permissions.js';
 import { writeAudit } from './_audit.js';
 
 function getSql() {
@@ -84,6 +84,7 @@ export default async function handler(req, res) {
 
   const auth = await resolveAuthAndTenant(req);
   if (!auth.authenticated) return res.status(auth.status || 401).json({ success: false, error: auth.error || 'Não autorizado.' });
+  if (!canAccessModule(auth,'planos',req.method === 'POST' ? 'write' : 'read')) return res.status(403).json(permissionError(req.method === 'POST' ? 'MODULE_WRITE_FORBIDDEN' : 'MODULE_READ_FORBIDDEN','planos'));
 
   try {
     const sql = getSql();

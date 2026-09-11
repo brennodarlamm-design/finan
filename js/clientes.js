@@ -3,6 +3,7 @@
 const Clientes = {
   render(obraId) {
     const cs = DB.getAll('clientes');
+    const e = Utils.escapeHtml.bind(Utils);
     return `
     <div class="page-header">
       <div><h1 class="page-title">👥 Clientes / Obras</h1><p class="page-sub">${cs.length} obra(s) cadastrada(s)</p></div>
@@ -42,7 +43,7 @@ const Clientes = {
         <label class="filter-label">Cidade</label>
         <select class="form-control" id="f-cidade-cli" style="min-width:120px;">
           <option value="">Todas</option>
-          ${[...new Set(cs.map(c=>c.cidade).filter(Boolean))].map(c=>`<option>${c}</option>`).join('')}
+          ${[...new Set(cs.map(c=>c.cidade).filter(Boolean))].map(c=>`<option>${e(c)}</option>`).join('')}
         </select>
       </div>
     </div>
@@ -57,6 +58,7 @@ const Clientes = {
       <h3>Nenhuma obra cadastrada</h3><p>Clique em "Nova Obra" para começar</p>
       <button class="btn btn-primary" onclick="Clientes.showForm()">+ Nova Obra</button></div>`;
     return cs.map(c => {
+      const e = Utils.escapeHtml.bind(Utils);
       const r = DB.getResumo(c.id);
       const orc = DB.getAll('orcamentos').find(o=>o.obra_id===c.id);
       let pct = 0;
@@ -80,10 +82,10 @@ const Clientes = {
              onclick="typeof ObraDetalhe!=='undefined'?ObraDetalhe.abrir('${c.id}'):null" title="Abrir Central da Obra">
           <div>
             <div style="font-size:1.02rem;font-weight:900;margin-bottom:4px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
-              <span style="color:var(--text);">${c.nome}</span>
+              <span style="color:var(--text);">${e(c.nome)}</span>
               ${badgeMod}
             </div>
-            <div style="font-size:.76rem;color:var(--text3)">CPF/CNPJ: ${c.cpf_cnpj || '—'}</div>
+            <div style="font-size:.76rem;color:var(--text3)">CPF/CNPJ: ${e(c.cpf_cnpj || '—')}</div>
           </div>
           ${Utils.badge(c.status)}
         </div>
@@ -93,7 +95,7 @@ const Clientes = {
               ${isCaixa ? 'Contrato Caixa' : 'Ref. Contrato'}
             </div>
             <div style="color:var(--accent2);font-weight:700">
-              ${c.num_contrato_caixa || (isCaixa ? '—' : 'Contrato Direto')}
+              ${e(c.num_contrato_caixa || (isCaixa ? '—' : 'Contrato Direto'))}
             </div>
           </div>
           <div>
@@ -104,8 +106,8 @@ const Clientes = {
               ${Utils.fmt.currency(c.valor_financiado)}
             </div>
           </div>
-          <div><div style="color:var(--text3);font-size:.68rem;text-transform:uppercase;letter-spacing:.05em;margin-bottom:2px">Localização</div><div>📍 ${c.cidade}/${c.estado}</div></div>
-          <div><div style="color:var(--text3);font-size:.68rem;text-transform:uppercase;letter-spacing:.05em;margin-bottom:2px">Área Construída</div><div>📐 ${c.area_construida||'—'} m²</div></div>
+          <div><div style="color:var(--text3);font-size:.68rem;text-transform:uppercase;letter-spacing:.05em;margin-bottom:2px">Localização</div><div>📍 ${e(c.cidade)}/${e(c.estado)}</div></div>
+          <div><div style="color:var(--text3);font-size:.68rem;text-transform:uppercase;letter-spacing:.05em;margin-bottom:2px">Área Construída</div><div>📐 ${e(c.area_construida||'—')} m²</div></div>
           <div><div style="color:var(--text3);font-size:.68rem;text-transform:uppercase;letter-spacing:.05em;margin-bottom:2px">Início / Término</div><div>${Utils.fmt.date(c.data_inicio)} → ${Utils.fmt.date(c.data_previsao_termino)}</div></div>
           <div>
             <div style="color:var(--text3);font-size:.68rem;text-transform:uppercase;letter-spacing:.05em;margin-bottom:2px">
@@ -171,6 +173,8 @@ const Clientes = {
   showForm(id=null) {
     const c = id ? DB.getById('clientes',id)||{} : {};
     const isCaixa = !c.modalidade_obra || c.modalidade_obra === 'caixa';
+    const e = Utils.escapeHtml.bind(Utils);
+    const tenantUF = String((DB.getEmpresa && DB.getEmpresa()?.uf) || '').trim().toUpperCase();
 
     Utils.showModal(`
       <div class="modal modal-lg">
@@ -189,44 +193,44 @@ const Clientes = {
               </select>
             </div>
             <div class="form-row cols-2" style="margin-bottom:14px;">
-              <div class="form-group"><label class="form-label">Nome Completo / Proprietário *</label><input class="form-control" name="nome" value="${c.nome||''}" required placeholder="Nome do proprietário ou cliente"></div>
-              <div class="form-group"><label class="form-label">CPF/CNPJ *</label><input class="form-control" name="cpf_cnpj" value="${c.cpf_cnpj||''}" required placeholder="000.000.000-00"></div>
+              <div class="form-group"><label class="form-label">Nome Completo / Proprietário *</label><input class="form-control" name="nome" value="${e(c.nome||'')}" required placeholder="Nome do proprietário ou cliente"></div>
+              <div class="form-group"><label class="form-label">CPF/CNPJ *</label><input class="form-control" name="cpf_cnpj" value="${e(c.cpf_cnpj||'')}" required placeholder="000.000.000-00"></div>
             </div>
             <div class="form-row cols-2" style="margin-bottom:14px;">
-              <div class="form-group"><label class="form-label">Telefone</label><input class="form-control" name="telefone" value="${c.telefone||''}" placeholder="(00) 00000-0000"></div>
-              <div class="form-group"><label class="form-label">E-mail</label><input class="form-control" type="email" name="email" value="${c.email||''}" placeholder="email@exemplo.com"></div>
+              <div class="form-group"><label class="form-label">Telefone</label><input class="form-control" name="telefone" value="${e(c.telefone||'')}" placeholder="(00) 00000-0000"></div>
+              <div class="form-group"><label class="form-label">E-mail</label><input class="form-control" type="email" name="email" value="${e(c.email||'')}" placeholder="email@exemplo.com"></div>
             </div>
-            <div class="form-group" style="margin-bottom:14px;"><label class="form-label">Endereço da Obra</label><input class="form-control" name="endereco" value="${c.endereco||''}" placeholder="Rua, número, bairro"></div>
+            <div class="form-group" style="margin-bottom:14px;"><label class="form-label">Endereço da Obra</label><input class="form-control" name="endereco" value="${e(c.endereco||'')}" placeholder="Rua, número, bairro"></div>
             <div class="form-row cols-3" style="margin-bottom:14px;">
-              <div class="form-group"><label class="form-label">Cidade *</label><input class="form-control" name="cidade" value="${c.cidade||''}" required placeholder="Cidade"></div>
-              <div class="form-group"><label class="form-label">Estado</label><select class="form-control" name="estado">${Utils.stateOptions(c.estado||'RR')}</select></div>
-              <div class="form-group"><label class="form-label">CEP</label><input class="form-control" name="cep" value="${c.cep||''}" placeholder="00000-000"></div>
+              <div class="form-group"><label class="form-label">Cidade *</label><input class="form-control" name="cidade" value="${e(c.cidade||'')}" required placeholder="Cidade"></div>
+              <div class="form-group"><label class="form-label">Estado</label><select class="form-control" name="estado">${Utils.stateOptions(c.estado || tenantUF)}</select></div>
+              <div class="form-group"><label class="form-label">CEP</label><input class="form-control" name="cep" value="${e(c.cep||'')}" placeholder="00000-000"></div>
             </div>
             <div class="divider"></div>
             <div class="form-row cols-2" style="margin-bottom:14px;">
               <div class="form-group">
                 <label class="form-label" id="lbl-contrato">${isCaixa ? 'Nº Contrato Caixa *' : 'Nº do Contrato / Referência'}</label>
-                <input class="form-control" name="num_contrato_caixa" id="inp-contrato" value="${c.num_contrato_caixa||''}" ${isCaixa ? 'required' : ''} placeholder="${isCaixa ? '0000000-0/0000' : 'Ex: CTR-2026/01 ou Direto'}">
+                <input class="form-control" name="num_contrato_caixa" id="inp-contrato" value="${e(c.num_contrato_caixa||'')}" ${isCaixa ? 'required' : ''} placeholder="${isCaixa ? '0000000-0/0000' : 'Ex: CTR-2026/01 ou Direto'}">
               </div>
               <div class="form-group">
                 <label class="form-label" id="lbl-agencia">${isCaixa ? 'Agência Caixa' : 'Banco / Agência ou Local'}</label>
-                <input class="form-control" name="agencia_caixa" value="${c.agencia_caixa||''}" placeholder="${isCaixa ? '0000 — Nome Agência' : 'Ex: 0000 — Itaú / Direto'}">
+                <input class="form-control" name="agencia_caixa" value="${e(c.agencia_caixa||'')}" placeholder="${isCaixa ? '0000 — Nome Agência' : 'Ex: 0000 — Itaú / Direto'}">
               </div>
             </div>
             <div class="form-row cols-3" style="margin-bottom:14px;">
               <div class="form-group">
                 <label class="form-label" id="lbl-val-fin">${isCaixa ? 'Valor Financiado *' : 'Valor Contratado / Total *'}</label>
-                <div class="input-prefix"><span class="input-pfx-txt">R$</span><input name="valor_financiado" type="number" value="${c.valor_financiado||''}" step="0.01" min="0" required placeholder="0,00"></div>
+                <div class="input-prefix"><span class="input-pfx-txt">R$</span><input name="valor_financiado" type="number" value="${e(c.valor_financiado||'')}" step="0.01" min="0" required placeholder="0,00"></div>
               </div>
               <div class="form-group">
                 <label class="form-label" id="lbl-val-prop">${isCaixa ? 'Valor Próprio (Entrada)' : 'Aporte Inicial / Entrada'}</label>
-                <div class="input-prefix"><span class="input-pfx-txt">R$</span><input name="valor_proprio" type="number" value="${c.valor_proprio||''}" step="0.01" min="0" placeholder="0,00"></div>
+                <div class="input-prefix"><span class="input-pfx-txt">R$</span><input name="valor_proprio" type="number" value="${e(c.valor_proprio||'')}" step="0.01" min="0" placeholder="0,00"></div>
               </div>
-              <div class="form-group"><label class="form-label">Área Construída</label><div class="input-prefix"><span class="input-pfx-txt">m²</span><input name="area_construida" type="number" value="${c.area_construida||''}" min="0" placeholder="0"></div></div>
+              <div class="form-group"><label class="form-label">Área Construída</label><div class="input-prefix"><span class="input-pfx-txt">m²</span><input name="area_construida" type="number" value="${e(c.area_construida||'')}" min="0" placeholder="0"></div></div>
             </div>
             <div class="form-row cols-3" style="margin-bottom:14px;">
-              <div class="form-group"><label class="form-label">Data Início</label><input class="form-control" type="date" name="data_inicio" value="${c.data_inicio||''}"></div>
-              <div class="form-group"><label class="form-label">Previsão Término</label><input class="form-control" type="date" name="data_previsao_termino" value="${c.data_previsao_termino||''}"></div>
+              <div class="form-group"><label class="form-label">Data Início</label><input class="form-control" type="date" name="data_inicio" value="${e(c.data_inicio||'')}"></div>
+              <div class="form-group"><label class="form-label">Previsão Término</label><input class="form-control" type="date" name="data_previsao_termino" value="${e(c.data_previsao_termino||'')}"></div>
               <div class="form-group"><label class="form-label">Status</label>
                 <select class="form-control" name="status">
                   <option value="em_andamento" ${(c.status||'em_andamento')==='em_andamento'?'selected':''}>Em Andamento</option>
@@ -238,8 +242,8 @@ const Clientes = {
                 </select>
               </div>
             </div>
-            <div class="form-group" style="margin-bottom:14px;"><label class="form-label">Engenheiro / Responsável Técnico</label><input class="form-control" name="engenheiro_responsavel" value="${c.engenheiro_responsavel||''}" placeholder="Nome e CREA/CAU"></div>
-            <div class="form-group"><label class="form-label">Observações</label><textarea class="form-control" name="observacoes" rows="2">${c.observacoes||''}</textarea></div>
+            <div class="form-group" style="margin-bottom:14px;"><label class="form-label">Engenheiro / Responsável Técnico</label><input class="form-control" name="engenheiro_responsavel" value="${e(c.engenheiro_responsavel||'')}" placeholder="Nome e CREA/CAU"></div>
+            <div class="form-group"><label class="form-label">Observações</label><textarea class="form-control" name="observacoes" rows="2">${e(c.observacoes||'')}</textarea></div>
           </form>
         </div>
         <div class="modal-footer">

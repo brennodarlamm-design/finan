@@ -7,6 +7,8 @@ const MasterAdmin = {
   _isLoading: false,
   _billing: null,
   _billingLoading: false,
+  _errorsGlobal: null,
+  _errorsGlobalLoading: false,
 
   _esc(value) {
     if (typeof Utils !== 'undefined' && Utils.escapeHtml) return Utils.escapeHtml(String(value ?? ''));
@@ -69,6 +71,34 @@ const MasterAdmin = {
     this._billingLoading = false;
     if (!this._billing) this._billing = { invoices:[], summary:{} };
     return this._billing;
+  },
+
+  async carregarErrosSaaS(force = false) {
+    if (this._errorsGlobal && !force) return this._errorsGlobal;
+    if (this._errorsGlobalLoading) return this._errorsGlobal || { errors:[], summary:{} };
+    this._errorsGlobalLoading = true;
+    try {
+      const resp = await fetch('/api/admin?action=client_errors&limit=100', {
+        headers:(typeof Auth !== 'undefined' && Auth.getAuthHeaders) ? Auth.getAuthHeaders() : {}
+      });
+      const data = await resp.json().catch(() => ({}));
+      if (resp.ok && data.success) this._errorsGlobal = { errors:Array.isArray(data.errors)?data.errors:[], summary:data.summary||{} };
+    } catch (err) { console.warn('Falha ao carregar diagnóstico global:', err); }
+    this._errorsGlobalLoading = false;
+    if (!this._errorsGlobal) this._errorsGlobal = { errors:[], summary:{} };
+    return this._errorsGlobal;
+  },
+
+  _renderErrosSaaS() {
+    const bundle = this._errorsGlobal || { errors:[], summary:{} };
+    const recent = bundle.errors.slice(0,10);
+    const count24 = Number(bundle.summary?.last_24h || 0);
+    const tenants24 = Number(bundle.summary?.tenants_24h || 0);
+    const rows = recent.length ? recent.map(e => {
+      const when = e.created_at ? new Date(e.created_at).toLocaleString('pt-BR') : '—';
+      return `<tr style="border-bottom:1px solid rgba(255,255,255,.06);"><td style="padding:10px 12px;color:#94a3b8;white-space:nowrap">${this._esc(when)}</td><td style="padding:10px 12px;font-weight:700;color:#fff">${this._esc(e.tenant_nome||e.tenant_id||'—')}</td><td style="padding:10px 12px">${this._esc(e.usuario_nome||'—')}</td><td style="padding:10px 12px">${this._esc(e.route||'—')}</td><td style="padding:10px 12px;max-width:430px"><div style="font-weight:700;color:#fca5a5;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${this._esc(e.stack||e.message||'')}">${this._esc(e.message||'Erro')}</div><div style="font-size:.68rem;color:#64748b;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${this._esc(e.source||'')}</div></td></tr>`;
+    }).join('') : `<tr><td colspan="5" style="padding:26px;text-align:center;color:#64748b;">Nenhum erro de frontend registrado. ✅</td></tr>`;
+    return `<div style="background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.08);border-radius:14px;overflow:hidden;margin-bottom:34px;"><div style="padding:16px 20px;border-bottom:1px solid rgba(255,255,255,.08);display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap"><div><h3 style="font-size:1.05rem;font-weight:800;color:#fff;margin:0">🛠️ Saúde do Sistema</h3><div style="font-size:.72rem;color:#64748b;margin-top:3px">Erros capturados automaticamente nos navegadores dos clientes</div></div><div style="display:flex;gap:10px;align-items:center"><span style="font-size:.76rem;color:${count24?'#f59e0b':'#22c55e'};font-weight:800">${count24} erro(s) / 24h · ${tenants24} empresa(s)</span><button onclick="MasterAdmin.carregarErrosSaaS(true).then(()=>MasterAdmin.render('master-content-area'))" style="background:transparent;border:1px solid rgba(255,255,255,.15);color:#cbd5e1;border-radius:6px;padding:5px 8px;cursor:pointer">↻</button></div></div><div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;text-align:left;font-size:.78rem"><thead><tr style="background:rgba(255,255,255,.03);color:#94a3b8"><th style="padding:9px 12px">Quando</th><th style="padding:9px 12px">Empresa</th><th style="padding:9px 12px">Usuário</th><th style="padding:9px 12px">Tela</th><th style="padding:9px 12px">Erro</th></tr></thead><tbody>${rows}</tbody></table></div></div>`;
   },
 
   async confirmarPagamento(invoiceId) {
@@ -170,6 +200,7 @@ const MasterAdmin = {
 
     const empresas = this.getEmpresas();
     if (!this._billing && !this._billingLoading) this.carregarCobrancas().then(() => this.render(containerId));
+    if (!this._errorsGlobal && !this._errorsGlobalLoading) this.carregarErrosSaaS().then(() => this.render(containerId));
 
     // Cálculo das métricas globais
     const totalEmpresas = empresas.length;
@@ -286,6 +317,8 @@ const MasterAdmin = {
         </div>
 
         ${this._renderCobrancas()}
+
+        ${this._renderErrosSaaS()}
 
         <!-- Central de Atendimento exclusiva do DEV / Master -->
         ${typeof SuporteDev !== 'undefined' ? SuporteDev.renderResumoCard() : `

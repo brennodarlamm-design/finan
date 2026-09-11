@@ -11,7 +11,7 @@ const Documentos = {
   },
 
   _blobKey(id) {
-    const tenant = (typeof Auth !== 'undefined' && Auth.getCurrentTenantId) ? Auth.getCurrentTenantId() : 'angelim';
+    const tenant = (typeof Auth !== 'undefined' && Auth.getCurrentTenantId) ? Auth.getCurrentTenantId() : 'public';
     return tenant && tenant !== 'angelim' ? `${tenant}:${id}` : String(id || '');
   },
 
