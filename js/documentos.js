@@ -12,7 +12,15 @@ const Documentos = {
 
   _blobKey(id) {
     const tenant = (typeof Auth !== 'undefined' && Auth.getCurrentTenantId) ? Auth.getCurrentTenantId() : 'public';
-    return tenant && tenant !== 'angelim' ? `${tenant}:${id}` : String(id || '');
+    // Namespace histórico esperado: `${tenant}:${id}`. Agora sem exceção especial por empresa.
+    return `${tenant || 'public'}:${String(id || '')}`;
+  },
+
+  _ownsDocumentId(id) {
+    try {
+      const docs = (typeof DB !== 'undefined' && DB.getAll) ? DB.getAll('documentos') : [];
+      return Array.isArray(docs) && docs.some(d => String(d?.id || '') === String(id || ''));
+    } catch { return false; }
   },
 
   _getIdb() {
@@ -60,8 +68,27 @@ const Documentos = {
       if (!db) return null;
       return new Promise(resolve => {
         const tx = db.transaction('blobs', 'readonly');
-        const req = tx.objectStore('blobs').get(this._blobKey(id));
-        req.onsuccess = () => resolve(req.result ? req.result.data : null);
+        const store = tx.objectStore('blobs');
+        const scopedKey = this._blobKey(id);
+        const req = store.get(scopedKey);
+        req.onsuccess = () => {
+          if (req.result?.data) return resolve(req.result.data);
+          // Migração única do formato antigo (id sem tenant). Só reivindica o blob
+          // se o documento existe no cache do tenant atual.
+          if (!this._ownsDocumentId(id)) return resolve(null);
+          const legacy = store.get(String(id || ''));
+          legacy.onsuccess = () => {
+            if (!legacy.result?.data) return resolve(null);
+            try {
+              const wtx = db.transaction('blobs', 'readwrite');
+              const wstore = wtx.objectStore('blobs');
+              wstore.put({ id: scopedKey, data: legacy.result.data, ts: Date.now() });
+              wstore.delete(String(id || ''));
+            } catch {}
+            resolve(legacy.result.data);
+          };
+          legacy.onerror = () => resolve(null);
+        };
         req.onerror = () => resolve(null);
       });
     } catch { return null; }

@@ -472,7 +472,7 @@ const App = {
     this._errorMonitorInstalled = true;
     const report = (payload = {}) => {
       try {
-        if (!Auth?.getToken?.()) return;
+        if (!Auth?.getSession?.()) return;
         const message = String(payload.message || 'Erro JavaScript').slice(0,1500);
         const source = String(payload.source || '').slice(0,500);
         const fp = `${message}|${source}|${payload.line || ''}|${this.route || ''}`;
@@ -494,6 +494,11 @@ const App = {
       const reason = e.reason;
       report({ message:reason?.message || String(reason || 'Promise rejeitada'), source:'unhandledrejection', stack:reason?.stack || '' });
     });
+    window.addEventListener('securitypolicyviolation', e => report({
+      message:`CSP bloqueou ${e.violatedDirective || 'diretiva'}: ${e.blockedURI || 'inline'}`,
+      source:'csp', line:e.lineNumber || 0, col:e.columnNumber || 0,
+      stack:`effective=${e.effectiveDirective || ''}; disposition=${e.disposition || ''}`
+    }));
   },
 
   navigate(route, updateHistory = true) {

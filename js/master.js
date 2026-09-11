@@ -9,6 +9,8 @@ const MasterAdmin = {
   _billingLoading: false,
   _errorsGlobal: null,
   _errorsGlobalLoading: false,
+  _integrity: null,
+  _integrityLoading: false,
 
   _esc(value) {
     if (typeof Utils !== 'undefined' && Utils.escapeHtml) return Utils.escapeHtml(String(value ?? ''));
@@ -87,6 +89,37 @@ const MasterAdmin = {
     this._errorsGlobalLoading = false;
     if (!this._errorsGlobal) this._errorsGlobal = { errors:[], summary:{} };
     return this._errorsGlobal;
+  },
+
+  async carregarIntegridade(force = false) {
+    if (this._integrity && !force) return this._integrity;
+    if (this._integrityLoading) return this._integrity || null;
+    this._integrityLoading = true;
+    try {
+      const resp = await fetch('/api/admin?action=integrity_status', { headers:(typeof Auth !== 'undefined' && Auth.getAuthHeaders) ? Auth.getAuthHeaders() : {} });
+      const data = await resp.json().catch(() => ({}));
+      if (resp.ok && data.success) this._integrity = data;
+    } catch (err) { console.warn('Falha ao carregar integridade:', err); }
+    this._integrityLoading = false;
+    return this._integrity;
+  },
+
+  _renderIntegridade() {
+    const d = this._integrity;
+    if (!d) return `<div style="background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.08);border-radius:14px;padding:18px;color:#94a3b8;margin-bottom:20px;">🧩 Verificando integridade relacional…</div>`;
+    const constraints = Array.isArray(d.constraints) ? d.constraints : [];
+    const audit = Array.isArray(d.audit) ? d.audit : [];
+    const byName = new Map(audit.map(x => [x.constraint_name, x]));
+    const pending = constraints.filter(c => !c.validated);
+    const issues = audit.filter(x => Number(x.issue_count || 0) > 0);
+    const storagePrivate = d.storage?.configured_access === 'private' && d.storage?.private_ready;
+    const rows = constraints.map(c => {
+      const a = byName.get(c.constraint_name) || {};
+      const count = Number(a.issue_count || 0);
+      const ok = !!c.validated && count === 0;
+      return `<tr><td style="padding:8px 10px;color:#cbd5e1">${this._esc(c.constraint_name)}</td><td style="padding:8px 10px">${this._esc(c.table_name)}</td><td style="padding:8px 10px;color:${count?'#fca5a5':(ok?'#86efac':'#fbbf24')}">${count ? `${count} pendência(s)` : (ok?'Validada':'Aguardando validação')}</td></tr>`;
+    }).join('');
+    return `<div style="background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.08);border-radius:14px;overflow:hidden;margin-bottom:20px;"><div style="padding:16px 18px;border-bottom:1px solid rgba(255,255,255,.08);display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap"><div><div style="font-weight:900;color:#fff">🧩 Integridade Multi-Tenant</div><div style="font-size:.72rem;color:#64748b;margin-top:3px">Build ${this._esc(d.build || '—')} · Blob ${storagePrivate?'privado':'público/pendente'}</div></div><div style="font-size:.78rem;font-weight:800;color:${issues.length?'#ef4444':pending.length?'#f59e0b':'#22c55e'}">${issues.length ? `${issues.length} relação(ões) com legado inconsistente` : pending.length ? `${pending.length} constraint(s) aguardando validação` : 'Todas as constraints validadas'}</div></div><div style="overflow:auto;max-height:300px"><table style="width:100%;border-collapse:collapse;font-size:.75rem"><tbody>${rows || '<tr><td style="padding:14px;color:#64748b">Sem dados de auditoria ainda.</td></tr>'}</tbody></table></div></div>`;
   },
 
   _renderErrosSaaS() {
@@ -201,6 +234,7 @@ const MasterAdmin = {
     const empresas = this.getEmpresas();
     if (!this._billing && !this._billingLoading) this.carregarCobrancas().then(() => this.render(containerId));
     if (!this._errorsGlobal && !this._errorsGlobalLoading) this.carregarErrosSaaS().then(() => this.render(containerId));
+    if (!this._integrity && !this._integrityLoading) this.carregarIntegridade().then(() => this.render(containerId));
 
     // Cálculo das métricas globais
     const totalEmpresas = empresas.length;
@@ -353,6 +387,8 @@ const MasterAdmin = {
           <h2 style="font-size:1.45rem;font-weight:900;color:#fff;margin:0 0 6px;">⚙️ Manutenção do Sistema &amp; Infraestrutura (Super Admin)</h2>
           <p style="color:#94a3b8;font-size:.85rem;margin:0;">Painel restrito para controle do banco de dados Neon PostgreSQL, restauração de snapshots, backups de emergência e servidor WhatsApp.</p>
         </div>
+
+        ${this._renderIntegridade()}
 
         <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(360px, 1fr));gap:20px;margin-bottom:24px;">
           

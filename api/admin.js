@@ -242,6 +242,38 @@ export default async function handler(req, res) {
     }
 
     // ── 1. GET ?action=tenants (Listar Construtoras com Métricas Reais do Neon) ──
+    if (req.method === 'GET' && action === 'integrity_status') {
+      const constraintRows = await sql`
+        SELECT conname AS constraint_name, conrelid::regclass::text AS table_name, convalidated AS validated
+        FROM pg_constraint
+        WHERE conname = ANY(ARRAY[
+          'chk_obras_tenant_required','chk_fornecedores_tenant_required','chk_notas_fiscais_tenant_required',
+          'chk_lancamentos_tenant_required','chk_orcamentos_tenant_required','chk_medicoes_tenant_required',
+          'chk_documentos_tenant_required','chk_contas_bancarias_tenant_required','chk_produtos_tenant_required',
+          'chk_ocr_historico_tenant_required','fk_notas_obra_tenant','fk_lanc_fornecedor_tenant',
+          'fk_lanc_obra_tenant','fk_lanc_nota_tenant','fk_orcamentos_obra_tenant','fk_medicoes_obra_tenant'
+        ]::text[])
+        ORDER BY conname;
+      `;
+      let auditRows = [];
+      try {
+        auditRows = await sql`
+          SELECT DISTINCT ON (constraint_name) constraint_name,table_name,issue_count,validated,notes,checked_at
+          FROM tenant_integrity_audit
+          ORDER BY constraint_name,checked_at DESC,id DESC;
+        `;
+      } catch {}
+      const privateBlobReady = Boolean(String(process.env.FINOBRA_BLOB_READ_WRITE_TOKEN || '').trim() || String(process.env.FINOBRA_BLOB_STORE_ID || '').trim());
+      const configured = String(process.env.FINOBRA_BLOB_ACCESS || process.env.BLOB_ACCESS || '').trim().toLowerCase();
+      return res.status(200).json({
+        success:true,
+        build:'2026.09.11-p11',
+        constraints:constraintRows,
+        audit:auditRows,
+        storage:{ private_ready:privateBlobReady, configured_access:configured || (privateBlobReady ? 'private' : 'public') }
+      });
+    }
+
     if (req.method === 'GET' && action === 'client_errors') {
       const limit = Math.min(Math.max(Number.parseInt(req.query?.limit || '100',10) || 100,1),200);
       const rows = await sql`

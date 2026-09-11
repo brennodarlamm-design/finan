@@ -3,7 +3,7 @@
 const Auth = {
   USERS_KEY: 'finobra_users',
   SESSION_KEY: 'finobra_session',
-  TOKEN_KEY: 'finobra_token',
+  LEGACY_TOKEN_KEY: 'finobra_token',
   IMPERSONATION_BACKUP_KEY: 'finobra_master_session_backup',
 
   defaultUsers: [],
@@ -23,21 +23,18 @@ const Auth = {
   },
 
   getToken() {
-    // Compatibilidade apenas com sessões antigas / integrações legadas.
-    return localStorage.getItem(this.TOKEN_KEY) || sessionStorage.getItem(this.TOKEN_KEY) || '';
+    // Patch 11: o navegador não usa mais Bearer. Mantido apenas para evitar quebra
+    // de código legado que eventualmente consulte este método.
+    return '';
   },
 
   _purgeLegacyToken() {
-    localStorage.removeItem(this.TOKEN_KEY);
-    sessionStorage.removeItem(this.TOKEN_KEY);
+    localStorage.removeItem(this.LEGACY_TOKEN_KEY);
+    sessionStorage.removeItem(this.LEGACY_TOKEN_KEY);
   },
 
   getAuthHeaders(customHeaders = {}) {
-    const token = this.getToken();
     const headers = { 'Content-Type': 'application/json', ...customHeaders };
-    if (token) {
-      headers['Authorization'] = `Bearer ${token}`;
-    }
     const tenantId = this.getCurrentTenantId();
     if (tenantId && tenantId !== 'public') {
       headers['x-tenant-id'] = tenantId;
@@ -77,7 +74,7 @@ const Auth = {
 
     // Patch 10: a credencial fica exclusivamente no cookie HttpOnly emitido pelo servidor.
     // O navegador guarda apenas metadados de UI da sessão.
-    if (token) this._purgeLegacyToken();
+    this._purgeLegacyToken();
 
     if (remember) {
       localStorage.setItem(this.SESSION_KEY, JSON.stringify(session));
@@ -336,16 +333,6 @@ const Auth = {
   getCurrentTenantId() {
     const session = this.getSession();
     if (session?.tenantId) return session.tenantId;
-    const token = this.getToken();
-    if (token && token.includes('.')) {
-      try {
-        const parts = token.split('.');
-        if (parts.length === 3) {
-          const payload = JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/')));
-          if (payload.tenantId) return payload.tenantId;
-        }
-      } catch {}
-    }
     return 'public';
   },
 
@@ -388,8 +375,7 @@ const Auth = {
   logoutSilently() {
     localStorage.removeItem(this.SESSION_KEY);
     sessionStorage.removeItem(this.SESSION_KEY);
-    localStorage.removeItem(this.TOKEN_KEY);
-    sessionStorage.removeItem(this.TOKEN_KEY);
+    this._purgeLegacyToken();
     sessionStorage.removeItem(this.IMPERSONATION_BACKUP_KEY);
   },
 

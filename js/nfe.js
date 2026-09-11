@@ -15,11 +15,7 @@ const NFe = {
   _getCache() {
     try {
       const key = this._getTenantCacheKey();
-      let raw = localStorage.getItem(key);
-      // Migração suave do cache legado apenas para o tenant angelim
-      if (!raw && key === 'finobra_angelim_nfe_cache') {
-        raw = localStorage.getItem(this._KEY_CACHE);
-      }
+      const raw = localStorage.getItem(key);
       return JSON.parse(raw || '[]');
     } catch {
       return [];

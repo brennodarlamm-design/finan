@@ -24,24 +24,9 @@ const DB = {
   },
 
   _migrateLegacyTenantCache() {
-    // Migração explícita do cache histórico anterior ao multi-tenant.
-    // Só é executada para o tenant legado conhecido e apenas quando a chave
-    // nova ainda não existe; nunca usa esse tenant como fallback.
-    if (this._t() !== 'angelim') return;
-    const pairs = [];
-    for (const [logical, legacy] of Object.entries(this.K)) pairs.push([legacy, this._k(logical)]);
-    for (const name of [
-      'finobra_documentos','finobra_recibos','finobra_contratos','orcamentos_sinapi',
-      'finobra_categorias_custom','finobra_cats_despesa_custom','finobra_whatsapp_telefone',
-      'finobra_whatsapp_modo','finobra_clean_mode','finobra_snapshot_seguranca','finobra_backup_temp'
-    ]) pairs.push([name, this._ck(name)]);
-    for (const [legacy, scoped] of pairs) {
-      try {
-        if (localStorage.getItem(scoped) === null && localStorage.getItem(legacy) !== null) {
-          localStorage.setItem(scoped, localStorage.getItem(legacy));
-        }
-      } catch {}
-    }
+    // Patch 11: migração automática de chaves globais foi encerrada. A nuvem é a
+    // fonte oficial e nenhum tenant é presumido como dono de caches sem escopo.
+    return;
   },
 
 
@@ -399,30 +384,11 @@ const DB = {
 
   // ── NEON CLOUD SYNC ──
   _apiHeaders() {
-    let token = '';
-    if (typeof Auth !== 'undefined' && Auth.getToken) {
-      token = Auth.getToken();
-    }
-    if (!token && typeof localStorage !== 'undefined') {
-      token = localStorage.getItem('finobra_token') || sessionStorage.getItem('finobra_token');
-    }
-    if (token && typeof token === 'string' && token.includes('.')) {
-      try {
-        const parts = token.split('.');
-        if (parts.length === 3) {
-          const payload = JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/')));
-          if (payload.exp && Date.now() > payload.exp) {
-            token = '';
-          }
-        }
-      } catch (e) {}
-    }
+    // Cookie HttpOnly é a única credencial do navegador. x-tenant-id é apenas
+    // contexto; o backend nunca permite que um usuário comum troque de tenant.
     const tenantId = (typeof Auth !== 'undefined' && Auth.getCurrentTenantId) ? Auth.getCurrentTenantId() : 'public';
     const headers = { 'Content-Type': 'application/json' };
     if (tenantId && tenantId !== 'public') headers['x-tenant-id'] = tenantId;
-    if (token) {
-      headers['Authorization'] = `Bearer ${token}`;
-    }
     return headers;
   },
 

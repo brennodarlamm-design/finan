@@ -493,3 +493,18 @@ CREATE INDEX IF NOT EXISTS idx_api_rate_limits_expires_at ON api_rate_limits (ex
 -- PATCH 10 — Cookie HttpOnly, CSP e integridade relacional multi-tenant
 -- ==============================================================================
 -- Novas instalações já usam tenant obrigatório e FKs compostas nas tabelas acima.
+
+
+-- PATCH 11 — histórico de auditoria das constraints multi-tenant
+CREATE TABLE IF NOT EXISTS tenant_integrity_audit (
+  id BIGSERIAL PRIMARY KEY,
+  checked_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  constraint_name TEXT NOT NULL,
+  table_name TEXT NOT NULL,
+  issue_count INTEGER NOT NULL DEFAULT 0,
+  validated BOOLEAN NOT NULL DEFAULT FALSE,
+  notes TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_tenant_integrity_audit_checked ON tenant_integrity_audit(checked_at DESC);
+CREATE INDEX IF NOT EXISTS idx_tenant_integrity_audit_constraint ON tenant_integrity_audit(constraint_name,checked_at DESC);
+
