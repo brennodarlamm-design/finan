@@ -338,6 +338,9 @@ const Documentos = {
   // Retorna o botão com ícone de clipe para exibir nas tabelas
   badgeClip(entidadeTipo, entidadeId, options = {}) {
     const docs = this.listar(entidadeTipo, entidadeId);
+    const safeTipo = (typeof Utils !== 'undefined' && Utils.escapeJsAttr) ? Utils.escapeJsAttr(entidadeTipo) : '';
+    const safeId = (typeof Utils !== 'undefined' && Utils.escapeJsAttr) ? Utils.escapeJsAttr(entidadeId) : '';
+    const safeTitulo = (typeof Utils !== 'undefined' && Utils.escapeJsAttr) ? Utils.escapeJsAttr(options.titulo || 'Documentos Anexados') : 'Documentos Anexados';
     const qtd = docs.length;
     const hasDocs = qtd > 0;
     const label = options.showLabel ? ` 📎 ${qtd} ${qtd===1?'anexo':'anexos'}` : `📎${qtd > 0 ? ` <span style="font-size:.7rem;font-weight:800;background:var(--accent);color:#000;border-radius:10px;padding:1px 5px;">${qtd}</span>` : ''}`;
@@ -345,7 +348,7 @@ const Documentos = {
     return `
     <button class="btn btn-sm ${hasDocs ? 'btn-secondary' : 'btn-secondary'}" 
             style="padding:3px 8px;font-size:.75rem;white-space:nowrap;${hasDocs ? 'border-color:var(--accent);color:var(--accent);font-weight:700;' : 'opacity:.7;'}"
-            onclick="Documentos.abrirModal('${entidadeTipo}', '${entidadeId}', '${options.titulo || 'Documentos Anexados'}')" 
+            onclick="Documentos.abrirModal('${safeTipo}', '${safeId}', '${safeTitulo}')" 
             title="${hasDocs ? `${qtd} documento(s) anexado(s)` : 'Anexar boleto ou documento'}">
       ${label}
     </button>`;
@@ -519,6 +522,9 @@ const Documentos = {
   },
 
   _renderDocRow(d) {
+    const esc = (v) => (typeof Utils !== 'undefined' && Utils.escapeHtml) ? Utils.escapeHtml(v ?? '') : String(v ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;',"'":'&#039;'}[c]));
+    const escJs = (v) => (typeof Utils !== 'undefined' && Utils.escapeJsAttr) ? Utils.escapeJsAttr(v ?? '') : esc(v ?? '');
+    const safeUrl = (v) => (typeof Utils !== 'undefined' && Utils.safeUrl) ? Utils.safeUrl(v) : '';
     if (d.url_externa) {
       const isGDrive = d.tipo_servico === 'gdrive' || d.url_externa.includes('drive.google.com') || d.url_externa.includes('docs.google.com');
       const isOneDrive = d.tipo_servico === 'onedrive' || d.url_externa.includes('onedrive.live.com') || d.url_externa.includes('sharepoint.com') || d.url_externa.includes('1drv.ms');
@@ -535,19 +541,19 @@ const Documentos = {
             <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
               <span style="font-size:.65rem;font-weight:800;color:#fff;background:${badgeColor};padding:1px 6px;border-radius:4px;">${labelBadge}</span>
               <span style="font-weight:700;font-size:.84rem;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
-                ${d.titulo || d.url_externa}
+                ${esc(d.titulo || d.url_externa)}
               </span>
             </div>
             <div style="font-size:.72rem;color:var(--text3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px;">
-              ${d.url_externa} &middot; Vinculado em ${Utils.fmt.datetime(d.criado_em)}
+              ${esc(d.url_externa)} &middot; Vinculado em ${Utils.fmt.datetime(d.criado_em)}
             </div>
           </div>
         </div>
         <div style="display:flex;gap:6px;align-items:center;">
-          <a href="${d.url_externa}" target="_blank" rel="noopener noreferrer" class="btn btn-sm btn-primary" style="text-decoration:none;display:inline-flex;align-items:center;gap:4px;" title="Abrir no Google Drive em nova aba">
+          <a href="${safeUrl(d.url_externa)}" target="_blank" rel="noopener noreferrer" class="btn btn-sm btn-primary" style="text-decoration:none;display:inline-flex;align-items:center;gap:4px;" title="Abrir no Google Drive em nova aba">
             🔗 Abrir
           </a>
-          <button class="icon-btn btn-sm" onclick="Documentos._confirmDel('${d.id}')" style="color:var(--danger)" title="Excluir link">
+          <button class="icon-btn btn-sm" onclick="Documentos._confirmDel('${escJs(d.id)}')" style="color:var(--danger)" title="Excluir link">
             🗑️
           </button>
         </div>
@@ -570,23 +576,23 @@ const Documentos = {
         <div style="flex:1;min-width:0;">
           <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
             <span style="font-weight:700;font-size:.84rem;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
-              ${d.titulo || d.nome_arquivo}
+              ${esc(d.titulo || d.nome_arquivo)}
             </span>
             ${isBlob ? `<span style="font-size:.62rem;font-weight:700;color:#38bdf8;background:rgba(56,189,248,0.12);padding:1px 6px;border-radius:4px;border:1px solid rgba(56,189,248,0.25);white-space:nowrap;">☁️ Vercel Blob</span>` : ''}
           </div>
           <div style="font-size:.72rem;color:var(--text3);">
-            ${d.nome_arquivo} ${tamKB ? `&middot; ${tamKB}` : ''} &middot; Anexado em ${Utils.fmt.datetime(d.criado_em)}
+            ${esc(d.nome_arquivo)} ${tamKB ? `&middot; ${tamKB}` : ''} &middot; Anexado em ${Utils.fmt.datetime(d.criado_em)}
           </div>
         </div>
       </div>
       <div style="display:flex;gap:6px;align-items:center;">
-        <button class="btn btn-sm btn-secondary" onclick="Documentos.visualizar('${d.id}')" title="Visualizar documento">
+        <button class="btn btn-sm btn-secondary" onclick="Documentos.visualizar('${escJs(d.id)}')" title="Visualizar documento">
           👁️ Ver
         </button>
-        <button class="btn btn-sm btn-secondary" onclick="Documentos.baixar('${d.id}')" title="Baixar arquivo">
+        <button class="btn btn-sm btn-secondary" onclick="Documentos.baixar('${escJs(d.id)}')" title="Baixar arquivo">
           ⬇️
         </button>
-        <button class="icon-btn btn-sm" onclick="Documentos._confirmDel('${d.id}')" style="color:var(--danger)" title="Excluir anexo">
+        <button class="icon-btn btn-sm" onclick="Documentos._confirmDel('${escJs(d.id)}')" style="color:var(--danger)" title="Excluir anexo">
           🗑️
         </button>
       </div>

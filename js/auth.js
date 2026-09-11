@@ -23,7 +23,13 @@ const Auth = {
   },
 
   getToken() {
+    // Compatibilidade apenas com sessões antigas / integrações legadas.
     return localStorage.getItem(this.TOKEN_KEY) || sessionStorage.getItem(this.TOKEN_KEY) || '';
+  },
+
+  _purgeLegacyToken() {
+    localStorage.removeItem(this.TOKEN_KEY);
+    sessionStorage.removeItem(this.TOKEN_KEY);
   },
 
   getAuthHeaders(customHeaders = {}) {
@@ -69,13 +75,9 @@ const Auth = {
       remember: !!remember
     };
 
-    if (token) {
-      if (remember) {
-        localStorage.setItem(this.TOKEN_KEY, token);
-      } else {
-        sessionStorage.setItem(this.TOKEN_KEY, token);
-      }
-    }
+    // Patch 10: a credencial fica exclusivamente no cookie HttpOnly emitido pelo servidor.
+    // O navegador guarda apenas metadados de UI da sessão.
+    if (token) this._purgeLegacyToken();
 
     if (remember) {
       localStorage.setItem(this.SESSION_KEY, JSON.stringify(session));
@@ -98,8 +100,8 @@ const Auth = {
         body: JSON.stringify({ username, password, remember })
       });
       const data = await resp.json().catch(() => ({}));
-      if (resp.ok && data.success && data.token) {
-        const session = this.createSession(data.user, remember, data.token);
+      if (resp.ok && data.success && data.user) {
+        const session = this.createSession(data.user, remember);
         return { success: true, user: session };
       }
       return {
@@ -127,8 +129,8 @@ const Auth = {
         body: JSON.stringify({ credentialJwt })
       });
       const data = await resp.json().catch(() => ({}));
-      if (resp.ok && data.success && data.token) {
-        const session = this.createSession(data.user, true, data.token);
+      if (resp.ok && data.success && data.user) {
+        const session = this.createSession(data.user, true);
         return { success: true, user: session, isNew: !!data.isNew };
       }
       return {
@@ -251,12 +253,9 @@ const Auth = {
       }
 
       const user = data.user;
-      const token = data.token;
 
-      // Cria sessão autenticada com token JWT recebido
-      if (token) {
-        this.createSession(user, true, token);
-      }
+      // Cookie HttpOnly já foi emitido pelo servidor; persiste somente metadados locais.
+      this.createSession(user, true);
 
       // Inicializa metadados locais da empresa
       const empresaData = {
@@ -285,7 +284,7 @@ const Auth = {
         localStorage.setItem(this.USERS_KEY, JSON.stringify(users));
       }
 
-      return { success: true, user, token };
+      return { success: true, user };
     } catch (err) {
       return { success: false, message: 'Falha de comunicação com o servidor: ' + err.message };
     }
@@ -352,7 +351,7 @@ const Auth = {
 
   async refreshSessionFromServer() {
     const current = this.getSession();
-    if (!current || !this.getToken()) return { success:false, changed:false };
+    if (!current) return { success:false, changed:false };
     try {
       const res = await fetch('/api/auth?action=me', { headers:this.getAuthHeaders() });
       const data = await res.json().catch(() => ({}));
@@ -372,12 +371,10 @@ const Auth = {
       const changed = JSON.stringify({perfil:current.perfil,permissions:current.permissions,tenantId:current.tenantId,empresaNome:current.empresaNome}) !== JSON.stringify({perfil:next.perfil,permissions:next.permissions,tenantId:next.tenantId,empresaNome:next.empresaNome});
       const storage = current.remember ? localStorage : sessionStorage;
       storage.setItem(this.SESSION_KEY, JSON.stringify(next));
-      // O servidor pode atualizar um token legado para uma sessão revogável.
-      if (data.token) {
-        const tokenStorage = current.remember ? localStorage : sessionStorage;
-        tokenStorage.setItem(this.TOKEN_KEY, data.token);
-      }
-      return { success:true, changed, user:next, tokenRefreshed:!!data.token };
+      // Qualquer token legado usado para esta validação já foi promovido pelo servidor
+      // para cookie HttpOnly. Remove a cópia acessível a JavaScript.
+      this._purgeLegacyToken();
+      return { success:true, changed, user:next, cookieAuth:true };
     } catch { return { success:false, changed:false }; }
   },
 
@@ -416,25 +413,10 @@ const Auth = {
   },
 
   isLoggedIn() {
-    const session = this.getSession();
-    const token = this.getToken();
-    if (!session || !token) return false;
-    if (token.includes('.')) {
-      try {
-        const parts = token.split('.');
-        if (parts.length === 3) {
-          const payload = JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/')));
-          if (payload.exp && Date.now() > payload.exp) {
-            this.logoutSilently();
-            return false;
-          }
-        }
-      } catch {
-        this.logoutSilently();
-        return false;
-      }
-    }
-    return true;
+    // O cookie HttpOnly não é legível por JavaScript. A presença do snapshot local
+    // indica apenas que há uma sessão candidata; App.init valida online antes de
+    // carregar dados quando houver conectividade.
+    return !!this.getSession();
   },
 
   getUser() { return this.getSession(); },
@@ -446,9 +428,7 @@ const Auth = {
   backupSessionForImpersonation() {
     const backup = {
       localSession: localStorage.getItem(this.SESSION_KEY) || '',
-      sessionSession: sessionStorage.getItem(this.SESSION_KEY) || '',
-      localToken: localStorage.getItem(this.TOKEN_KEY) || '',
-      sessionToken: sessionStorage.getItem(this.TOKEN_KEY) || ''
+      sessionSession: sessionStorage.getItem(this.SESSION_KEY) || ''
     };
     sessionStorage.setItem(this.IMPERSONATION_BACKUP_KEY, JSON.stringify(backup));
     return backup;
@@ -457,36 +437,28 @@ const Auth = {
   async stopImpersonation() {
     const current = this.getSession();
     if (!current?.impersonatedBy && !current?.isImpersonated) return window.location.replace('/master');
-    try {
-      await fetch('/api/admin?action=support_end', {
-        method:'POST',
-        headers:this.getAuthHeaders(),
-        body:JSON.stringify({ tenantId:current.tenantId })
-      });
-    } catch {}
 
     let backup = null;
     try { backup = JSON.parse(sessionStorage.getItem(this.IMPERSONATION_BACKUP_KEY) || 'null'); } catch {}
 
+    try {
+      const res = await fetch('/api/admin?action=restore_master_session', {
+        method:'POST',
+        headers:this.getAuthHeaders(),
+        body:JSON.stringify({ tenantId:current.tenantId })
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.success) throw new Error(data.error || 'Não foi possível restaurar a sessão Master.');
+    } catch (err) {
+      if (typeof Utils !== 'undefined' && Utils.toast) Utils.toast(err.message || 'Falha ao encerrar modo suporte.', 'error');
+      return;
+    }
+
     localStorage.removeItem(this.SESSION_KEY);
     sessionStorage.removeItem(this.SESSION_KEY);
-    localStorage.removeItem(this.TOKEN_KEY);
-    sessionStorage.removeItem(this.TOKEN_KEY);
-
+    this._purgeLegacyToken();
     if (backup?.localSession) localStorage.setItem(this.SESSION_KEY, backup.localSession);
     if (backup?.sessionSession) sessionStorage.setItem(this.SESSION_KEY, backup.sessionSession);
-    if (backup?.localToken) localStorage.setItem(this.TOKEN_KEY, backup.localToken);
-    if (backup?.sessionToken) sessionStorage.setItem(this.TOKEN_KEY, backup.sessionToken);
-
-    // Compatibilidade com versões anteriores do modo suporte.
-    const legacyToken = sessionStorage.getItem('finobra_master_backup_token');
-    const legacySession = sessionStorage.getItem('finobra_master_backup_session');
-    if (!backup && legacyToken && legacySession) {
-      localStorage.setItem(this.TOKEN_KEY, legacyToken);
-      sessionStorage.setItem(this.TOKEN_KEY, legacyToken);
-      localStorage.setItem(this.SESSION_KEY, legacySession);
-      sessionStorage.setItem(this.SESSION_KEY, legacySession);
-    }
 
     sessionStorage.removeItem(this.IMPERSONATION_BACKUP_KEY);
     sessionStorage.removeItem('finobra_master_backup_token');

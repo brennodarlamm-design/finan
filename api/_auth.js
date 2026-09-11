@@ -63,17 +63,48 @@ function getCookie(req, name) {
   return '';
 }
 
+function allowedBrowserOrigins(req) {
+  const origins = new Set([
+    'https://finobra.app.br',
+    'https://www.finobra.app.br',
+    'http://localhost:3000',
+    'http://localhost:3333',
+    'http://localhost:5000',
+    'http://127.0.0.1:3000',
+    'http://127.0.0.1:3333',
+    'http://127.0.0.1:5000'
+  ]);
+  for (const v of [process.env.VERCEL_URL, process.env.VERCEL_BRANCH_URL, process.env.VERCEL_PROJECT_PRODUCTION_URL]) {
+    const host = String(v || '').trim().replace(/^https?:\/\//, '').replace(/\/$/, '');
+    if (host) origins.add(`https://${host}`);
+  }
+  const host = String(req.headers?.host || '').trim();
+  if (host) {
+    origins.add(`https://${host}`);
+    origins.add(`http://${host}`);
+  }
+  return origins;
+}
+
 function getCredential(req) {
-  // Durante a migração do Patch 09, Bearer continua prioritário para preservar
-  // impersonação Master e clientes antigos. O cookie HttpOnly passa a ser o
-  // caminho preferido quando não houver Authorization explícito.
+  // Patch 10: cookie HttpOnly é a credencial primária. Bearer/x-api-key permanecem
+  // somente para compatibilidade com integrações e sessões legadas.
   const authHeader = req.headers.authorization || req.headers.Authorization || '';
   if (typeof authHeader === 'string' && authHeader.startsWith('Bearer ')) {
-    return authHeader.substring(7).trim();
+    return { value: authHeader.substring(7).trim(), source: 'bearer' };
   }
   const key = req.headers['x-api-key'] || req.headers.apikey || '';
-  if (typeof key === 'string' && key.trim()) return key.trim();
-  return getCookie(req, 'finobra_session_token');
+  if (typeof key === 'string' && key.trim()) return { value: key.trim(), source: 'apikey' };
+  const cookie = getCookie(req, 'finobra_session_token');
+  return cookie ? { value: cookie, source: 'cookie' } : { value: '', source: 'none' };
+}
+
+function cookieMutationOriginAllowed(req) {
+  const method = String(req.method || 'GET').toUpperCase();
+  if (['GET','HEAD','OPTIONS'].includes(method)) return true;
+  const origin = String(req.headers?.origin || '').trim();
+  if (!origin) return false;
+  return allowedBrowserOrigins(req).has(origin);
 }
 
 function trialExpired(createdAt, trialDays = 15, explicitDueDate = null) {
@@ -105,9 +136,17 @@ export async function resolveAuthAndTenant(req) {
     return { authenticated: false, status: 500, error: 'Configuração de segurança pendente no servidor.' };
   }
 
-  const rawToken = getCredential(req);
+  const credential = getCredential(req);
+  const rawToken = credential.value;
   if (!rawToken) {
-    return { authenticated: false, status: 401, error: 'Token ou chave de acesso não fornecida.' };
+    return { authenticated: false, status: 401, error: 'Sessão ou chave de acesso não fornecida.' };
+  }
+
+  // Com autenticação por cookie, mutações exigem Origin same-site. Isso acrescenta
+  // uma camada explícita contra CSRF além de SameSite=Lax. Integrações Bearer/API key
+  // não dependem de Origin e continuam funcionando server-to-server.
+  if (credential.source === 'cookie' && !cookieMutationOriginAllowed(req)) {
+    return { authenticated:false, status:403, error:'Origem da requisição não autorizada.' };
   }
 
   // Chave interna para jobs/cron. Nunca deve existir no frontend.

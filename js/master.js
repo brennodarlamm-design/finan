@@ -587,12 +587,8 @@ const MasterAdmin = {
       if (typeof Auth !== 'undefined' && Auth.backupSessionForImpersonation) {
         Auth.backupSessionForImpersonation();
       } else {
-        const currentToken = (typeof Auth !== 'undefined' && Auth.getToken()) || '';
         const currentSession = (typeof Auth !== 'undefined' && Auth.getSession()) || {};
-        if (currentToken) {
-          sessionStorage.setItem('finobra_master_backup_token', currentToken);
-          sessionStorage.setItem('finobra_master_backup_session', JSON.stringify(currentSession));
-        }
+        sessionStorage.setItem('finobra_master_backup_session', JSON.stringify(currentSession));
       }
 
       // Registra a entrada no suporte antes de trocar o token.
@@ -612,14 +608,18 @@ const MasterAdmin = {
       });
 
       const data = await res.json().catch(() => ({}));
-      if (!res.ok || !data.success || !data.token || !data.session) {
+      if (!res.ok || !data.success || !data.session) {
         throw new Error(data.error || 'Não foi possível acessar os dados da empresa solicitada.');
       }
 
-      localStorage.setItem('finobra_token', data.token);
-      sessionStorage.setItem('finobra_token', data.token);
-      localStorage.setItem('finobra_session', JSON.stringify(data.session));
-      sessionStorage.setItem('finobra_session', JSON.stringify(data.session));
+      // O token de impersonação agora vive apenas em cookie HttpOnly. Remove o
+      // snapshot Master local e grava somente metadados da sessão visual de suporte.
+      localStorage.removeItem('finobra_session');
+      sessionStorage.removeItem('finobra_session');
+      localStorage.removeItem('finobra_token');
+      sessionStorage.removeItem('finobra_token');
+      if (typeof Auth !== 'undefined' && Auth.createSession) Auth.createSession(data.session, false);
+      else sessionStorage.setItem('finobra_session', JSON.stringify(data.session));
 
       window.location.href = '/app/dashboard';
     } catch (err) {

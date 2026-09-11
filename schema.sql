@@ -108,7 +108,7 @@ CREATE TABLE IF NOT EXISTS recuperacao_senhas (
 -- 1. Obras / Centros de Custo
 CREATE TABLE IF NOT EXISTS obras (
     id VARCHAR(64) PRIMARY KEY,
-    tenant_id VARCHAR(64) DEFAULT 'angelim',
+    tenant_id VARCHAR(64) NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
     nome VARCHAR(255) NOT NULL,
     cliente VARCHAR(255),
     endereco TEXT,
@@ -116,13 +116,14 @@ CREATE TABLE IF NOT EXISTS obras (
     status VARCHAR(50) DEFAULT 'em_andamento',
     data_inicio DATE,
     data_previsao DATE,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE (tenant_id, id)
 );
 
 -- 2. Fornecedores e Prestadores de Serviço
 CREATE TABLE IF NOT EXISTS fornecedores (
     id VARCHAR(64) PRIMARY KEY,
-    tenant_id VARCHAR(64) DEFAULT 'angelim',
+    tenant_id VARCHAR(64) NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
     nome VARCHAR(255) NOT NULL,
     razao_social VARCHAR(255),
     cnpj_cpf VARCHAR(32),
@@ -135,13 +136,14 @@ CREATE TABLE IF NOT EXISTS fornecedores (
     municipio VARCHAR(120),
     uf VARCHAR(2),
     ativo BOOLEAN DEFAULT TRUE,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE (tenant_id, id)
 );
 
 -- 3. Notas Fiscais (NF-e)
 CREATE TABLE IF NOT EXISTS notas_fiscais (
     id VARCHAR(64) PRIMARY KEY,
-    tenant_id VARCHAR(64) DEFAULT 'angelim',
+    tenant_id VARCHAR(64) NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
     numero_nf VARCHAR(64),
     serie VARCHAR(32),
     chave_acesso VARCHAR(64),
@@ -158,7 +160,7 @@ CREATE TABLE IF NOT EXISTS notas_fiscais (
     valor_total NUMERIC(15, 2) DEFAULT 0,
     tipo VARCHAR(20) DEFAULT 'entrada',
     categoria VARCHAR(100),
-    obra_id VARCHAR(64) REFERENCES obras(id) ON DELETE SET NULL,
+    obra_id VARCHAR(64),
     lancamento_id VARCHAR(64),
     status VARCHAR(50) DEFAULT 'paga',
     observacoes TEXT,
@@ -166,63 +168,70 @@ CREATE TABLE IF NOT EXISTS notas_fiscais (
     xml_data TEXT,
     itens JSONB,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP WITH TIME ZONE
+    updated_at TIMESTAMP WITH TIME ZONE,
+    UNIQUE (tenant_id, id),
+    FOREIGN KEY (tenant_id, obra_id) REFERENCES obras(tenant_id,id) ON DELETE SET NULL (obra_id)
 );
 
 -- 4. Lançamentos Financeiros (Contas a Pagar, Contas a Receber, Boletos)
 CREATE TABLE IF NOT EXISTS lancamentos (
     id VARCHAR(64) PRIMARY KEY,
-    tenant_id VARCHAR(64) DEFAULT 'angelim',
+    tenant_id VARCHAR(64) NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
     data DATE NOT NULL,
     data_vencimento DATE,
     data_pagamento DATE,
     descricao TEXT NOT NULL,
     categoria VARCHAR(100) NOT NULL,
     fornecedor_beneficiario VARCHAR(255),
-    fornecedor_id VARCHAR(64) REFERENCES fornecedores(id) ON DELETE SET NULL,
+    fornecedor_id VARCHAR(64),
     conta_bancaria VARCHAR(100),
     tipo VARCHAR(20) NOT NULL CHECK (tipo IN ('receita', 'despesa')),
     valor NUMERIC(15, 2) NOT NULL,
     status VARCHAR(50) DEFAULT 'pendente',
-    obra_id VARCHAR(64) REFERENCES obras(id) ON DELETE SET NULL,
-    nota_fiscal_id VARCHAR(64) REFERENCES notas_fiscais(id) ON DELETE SET NULL,
+    obra_id VARCHAR(64),
+    nota_fiscal_id VARCHAR(64),
     codigo_barras VARCHAR(120),
     chave_nfe VARCHAR(64),
     observacoes TEXT,
     conciliado BOOLEAN DEFAULT FALSE,
     itens JSONB,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (tenant_id, fornecedor_id) REFERENCES fornecedores(tenant_id,id) ON DELETE SET NULL (fornecedor_id),
+    FOREIGN KEY (tenant_id, obra_id) REFERENCES obras(tenant_id,id) ON DELETE SET NULL (obra_id),
+    FOREIGN KEY (tenant_id, nota_fiscal_id) REFERENCES notas_fiscais(tenant_id,id) ON DELETE SET NULL (nota_fiscal_id)
 );
 
 -- 5. Orçamentos da Obra
 CREATE TABLE IF NOT EXISTS orcamentos (
     id VARCHAR(64) PRIMARY KEY,
-    tenant_id VARCHAR(64) DEFAULT 'angelim',
-    obra_id VARCHAR(64) REFERENCES obras(id) ON DELETE CASCADE,
+    tenant_id VARCHAR(64) NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+    obra_id VARCHAR(64),
     titulo VARCHAR(255),
     valor_total NUMERIC(15, 2) DEFAULT 0,
     itens_json JSONB,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (tenant_id, obra_id) REFERENCES obras(tenant_id,id) ON DELETE CASCADE
 );
 
 -- 6. Medições de Obra
 CREATE TABLE IF NOT EXISTS medicoes (
     id VARCHAR(64) PRIMARY KEY,
-    tenant_id VARCHAR(64) DEFAULT 'angelim',
-    obra_id VARCHAR(64) REFERENCES obras(id) ON DELETE CASCADE,
+    tenant_id VARCHAR(64) NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+    obra_id VARCHAR(64),
     numero INT,
     data DATE,
     valor_medido NUMERIC(15, 2) DEFAULT 0,
     status VARCHAR(50) DEFAULT 'pendente',
     observacoes TEXT,
     itens_json JSONB,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (tenant_id, obra_id) REFERENCES obras(tenant_id,id) ON DELETE CASCADE
 );
 
 -- 7. Documentos e Comprovantes (GED)
 CREATE TABLE IF NOT EXISTS documentos (
     id VARCHAR(64) PRIMARY KEY,
-    tenant_id VARCHAR(64) DEFAULT 'angelim',
+    tenant_id VARCHAR(64) NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
     tipo VARCHAR(50) NOT NULL,
     referencia_id VARCHAR(64) NOT NULL,
     titulo VARCHAR(255) NOT NULL,
@@ -238,7 +247,7 @@ CREATE TABLE IF NOT EXISTS documentos (
 -- 8. Contas Bancárias
 CREATE TABLE IF NOT EXISTS contas_bancarias (
     id VARCHAR(100) PRIMARY KEY,
-    tenant_id VARCHAR(64) DEFAULT 'angelim',
+    tenant_id VARCHAR(64) NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
     banco_codigo VARCHAR(20),
     banco_nome VARCHAR(100),
     agencia VARCHAR(50),
@@ -257,7 +266,7 @@ CREATE TABLE IF NOT EXISTS contas_bancarias (
 -- 9. Produtos e Catálogo de Insumos
 CREATE TABLE IF NOT EXISTS produtos (
     id VARCHAR(64) PRIMARY KEY,
-    tenant_id VARCHAR(64) DEFAULT 'angelim',
+    tenant_id VARCHAR(64) NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
     nome VARCHAR(255) NOT NULL,
     unidade VARCHAR(50) DEFAULT 'un',
     categoria VARCHAR(100) DEFAULT 'material',
@@ -271,7 +280,7 @@ CREATE TABLE IF NOT EXISTS produtos (
 -- 10. Histórico de OCR e Documentos Fiscais Lidos
 CREATE TABLE IF NOT EXISTS ocr_historico (
     id VARCHAR(64) PRIMARY KEY,
-    tenant_id VARCHAR(64) DEFAULT 'angelim',
+    tenant_id VARCHAR(64) NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
     data_hora TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     nome_arquivo VARCHAR(255),
     tipo_documento VARCHAR(100),
@@ -478,3 +487,9 @@ CREATE TABLE IF NOT EXISTS api_rate_limits (
   expires_at TIMESTAMPTZ NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_api_rate_limits_expires_at ON api_rate_limits (expires_at);
+
+
+-- ==============================================================================
+-- PATCH 10 — Cookie HttpOnly, CSP e integridade relacional multi-tenant
+-- ==============================================================================
+-- Novas instalações já usam tenant obrigatório e FKs compostas nas tabelas acima.

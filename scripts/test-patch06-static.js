@@ -40,7 +40,7 @@ test('Tela de planos usa cobrança registrada no backend', cobranca.includes("/a
 
 // Impersonação / isolamento de tenant
 test('Token de impersonação é emitido pelo backend', adminApi.includes("action === 'impersonate'") && adminApi.includes('impersonated: true'));
-test('Master usa endpoint de impersonação em vez de trocar tenant localmente', master.includes("/api/admin?action=impersonate") && master.includes('data.token') && master.includes('data.session'));
+test('Master usa endpoint de impersonação em vez de trocar tenant localmente', master.includes("/api/admin?action=impersonate") && master.includes('data.session') && (master.includes('data.token') || master.includes('cookie HttpOnly')));
 test('Auth preserva e restaura sessão Master', auth.includes('backupSessionForImpersonation') && auth.includes('stopImpersonation'));
 test('App exibe modo suporte e oculta chat de cliente', app.includes('MODO SUPORTE MASTER') && app.includes("u?.impersonatedBy === 'superadmin'"));
 test('API de auth resolve tenant alvo do token de suporte', authApi.includes('effectiveTenantId') && authApi.includes('targetTenantInfo'));

@@ -10,7 +10,7 @@ function ok(name, cond){
 const app = read('js/app.js');
 const data = read('js/data.js');
 const ass = read('js/assinador.js');
-const val = read('validar.html');
+const val = read('validar.html') + '\n' + (fs.existsSync('js/validar_page.js') ? read('js/validar_page.js') : '');
 const apiSig = read('api/assinaturas.js');
 const migration = read('migrations/003_assinaturas_central.sql');
 const contas = read('js/contas.js');

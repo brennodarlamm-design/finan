@@ -3,7 +3,7 @@
 
 import { neon } from '@neondatabase/serverless';
 import crypto from 'crypto';
-import { hashPassword, resolveAuthAndTenant, signToken } from './_auth.js';
+import { hashPassword, resolveAuthAndTenant, signToken, verifyToken } from './_auth.js';
 import { writeAudit } from './_audit.js';
 
 function getSql() {
@@ -41,6 +41,38 @@ function setCors(req, res) {
 }
 
 const cleanSupportText = (v, max=4000) => String(v ?? '').replace(/\0/g, '').trim().slice(0, max);
+
+const SESSION_COOKIE = 'finobra_session_token';
+const MASTER_RESTORE_COOKIE = 'finobra_master_restore_token';
+
+function cookieSecure(req) {
+  const proto = String(req.headers['x-forwarded-proto'] || '').toLowerCase();
+  return proto === 'https' || Boolean(process.env.VERCEL);
+}
+function readCookie(req, name) {
+  const raw = String(req.headers?.cookie || '');
+  for (const part of raw.split(';')) {
+    const idx = part.indexOf('=');
+    if (idx < 0 || part.slice(0, idx).trim() !== name) continue;
+    try { return decodeURIComponent(part.slice(idx + 1).trim()); } catch { return part.slice(idx + 1).trim(); }
+  }
+  return '';
+}
+function requestCredential(req) {
+  const h = String(req.headers.authorization || req.headers.Authorization || '');
+  if (h.startsWith('Bearer ')) return h.slice(7).trim();
+  return readCookie(req, SESSION_COOKIE);
+}
+function cookieLine(req, name, value, maxAgeSeconds) {
+  const parts = [`${name}=${encodeURIComponent(value || '')}`, 'Path=/', 'HttpOnly', 'SameSite=Lax', `Max-Age=${Math.max(0, Math.floor(maxAgeSeconds || 0))}`];
+  if (cookieSecure(req)) parts.push('Secure');
+  return parts.join('; ');
+}
+function setCookies(res, lines) {
+  const current = res.getHeader('Set-Cookie');
+  const base = Array.isArray(current) ? current : (current ? [current] : []);
+  res.setHeader('Set-Cookie', [...base, ...lines]);
+}
 
 export default async function handler(req, res) {
   setCors(req, res);
@@ -574,6 +606,18 @@ export default async function handler(req, res) {
         exp: Date.now() + (4 * 60 * 60 * 1000) // 4 horas
       }, secret);
 
+      const originalCredential = requestCredential(req);
+      const originalPayload = originalCredential ? verifyToken(originalCredential, secret) : null;
+      if (!originalCredential || !originalPayload || originalPayload.userId !== auth.user.id) {
+        return res.status(401).json({ success:false, error:'Não foi possível preservar a sessão Master para retorno seguro.' });
+      }
+      const impExp = Date.now() + (4 * 60 * 60 * 1000);
+      const restoreSeconds = Math.max(60, Math.floor((Number(originalPayload.exp || impExp) - Date.now()) / 1000));
+      setCookies(res, [
+        cookieLine(req, MASTER_RESTORE_COOKIE, originalCredential, restoreSeconds),
+        cookieLine(req, SESSION_COOKIE, impersonatedToken, 4 * 60 * 60)
+      ]);
+
       await writeAudit(sql, req, auth, {
         acao: 'impersonate',
         entidade: 'tenant',
@@ -583,7 +627,7 @@ export default async function handler(req, res) {
 
       return res.status(200).json({
         success: true,
-        token: impersonatedToken,
+        cookieAuth: true,
         session: {
           userId: auth.user.id,
           username: auth.user.username,
@@ -597,6 +641,29 @@ export default async function handler(req, res) {
           loginAt: new Date().toISOString()
         }
       });
+    }
+
+    if (req.method === 'POST' && action === 'restore_master_session') {
+      const restoreToken = readCookie(req, MASTER_RESTORE_COOKIE);
+      const secret = (process.env.API_SECRET || process.env.VERCEL_API_SECRET || '').trim();
+      const payload = restoreToken ? verifyToken(restoreToken, secret) : null;
+      if (!payload || payload.userId !== auth.user.id) {
+        return res.status(401).json({ success:false, error:'Sessão Master de retorno ausente ou expirada.' });
+      }
+      const rows = await sql`SELECT perfil, ativo FROM usuarios WHERE id=${payload.userId} LIMIT 1;`;
+      if (!rows.length || !rows[0].ativo || rows[0].perfil !== 'superadmin') {
+        return res.status(403).json({ success:false, error:'A conta Master não está autorizada.' });
+      }
+      const remaining = Math.max(60, Math.floor((Number(payload.exp || Date.now()) - Date.now()) / 1000));
+      setCookies(res, [
+        cookieLine(req, SESSION_COOKIE, restoreToken, remaining),
+        cookieLine(req, MASTER_RESTORE_COOKIE, '', 0)
+      ]);
+      await writeAudit(sql, req, { ...auth, tenantId:auth.tenantId }, {
+        acao:'suporte_encerrado', entidade:'suporte_master', entidadeId:String(req.body?.tenantId || auth.tenantId || ''),
+        depois:{ restored:true, superadmin:auth.user?.username || auth.user?.email || 'superadmin' }
+      });
+      return res.status(200).json({ success:true, restored:true });
     }
 
     return res.status(400).json({ success: false, error: `Ação "${action}" desconhecida.` });

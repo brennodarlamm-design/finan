@@ -43,7 +43,7 @@ test('Auth aceita cookie como fallback', /getCookie\(req, 'finobra_session_token
 test('Bearer continua prioritário para compatibilidade', /Bearer[\s\S]*x-api-key[\s\S]*getCookie/i.test(authCore));
 test('Logout remove cookie no servidor', /clearSessionCookie/i.test(authApi) && /Max-Age=0/i.test(authApi));
 test('Resposta de autenticação não é cacheada', /Cache-Control', 'no-store/i.test(authApi));
-test('Login ainda retorna token durante fase de transição', /success:\s*true,\s*token,/i.test(authApi));
+test('Compatibilidade Bearer fica opt-in no Patch 10', authApi.includes('x-finobra-token-mode') && authApi.includes('tokenFieldForExplicitClient'));
 
 // SINAPI correto por contexto
 test('SINAPI declara snapshots com UF, competência e série', /OFFICIAL_SNAPSHOTS/i.test(sinapi) && /uf:'RR'/i.test(sinapi) && /referencia:'2024-12'/i.test(sinapi));

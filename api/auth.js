@@ -39,7 +39,7 @@ function setCors(req, res) {
     res.setHeader('Access-Control-Allow-Origin', '*');
   }
   res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, x-api-key, apikey, x-tenant-id');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, x-api-key, apikey, x-tenant-id, x-finobra-token-mode');
 }
 
 const SESSION_COOKIE = 'finobra_session_token';
@@ -64,15 +64,12 @@ function setSessionCookie(req, res, token, expMs) {
 }
 
 function clearSessionCookie(req, res) {
-  const parts = [
-    `${SESSION_COOKIE}=`,
-    'Path=/',
-    'HttpOnly',
-    'SameSite=Lax',
-    'Max-Age=0'
-  ];
-  if (cookieSecure(req)) parts.push('Secure');
-  res.setHeader('Set-Cookie', parts.join('; '));
+  const makeExpired = (name) => {
+    const parts = [`${name}=`, 'Path=/', 'HttpOnly', 'SameSite=Lax', 'Max-Age=0'];
+    if (cookieSecure(req)) parts.push('Secure');
+    return parts.join('; ');
+  };
+  res.setHeader('Set-Cookie', [makeExpired(SESSION_COOKIE), makeExpired('finobra_master_restore_token')]);
 }
 
 function decodeJwtPayload(token) {
@@ -110,6 +107,11 @@ function permissionsOf(row) {
   return row?.permissoes && typeof row.permissoes === 'object' ? row.permissoes : {};
 }
 
+function tokenFieldForExplicitClient(req, token) {
+  const mode = String(req.headers['x-finobra-token-mode'] || '').trim().toLowerCase();
+  return mode === 'bearer' && token ? { token } : {};
+}
+
 export default async function handler(req, res) {
   setCors(req, res);
   res.setHeader('Cache-Control', 'no-store');
@@ -133,6 +135,17 @@ export default async function handler(req, res) {
       const auth = await resolveAuthAndTenant(req);
       if (!auth.authenticated) {
         return res.status(auth.status || 401).json({ success: false, error: auth.error });
+      }
+
+      // Patch 10: ao validar uma sessão legada via Bearer, promove a mesma credencial
+      // para cookie HttpOnly. O frontend pode então apagar o token persistente.
+      const legacyAuthHeader = String(req.headers.authorization || req.headers.Authorization || '');
+      if (legacyAuthHeader.startsWith('Bearer ')) {
+        const legacyToken = legacyAuthHeader.slice(7).trim();
+        const legacyPayload = decodeJwtPayload(legacyToken);
+        if (legacyToken && legacyPayload?.exp && Number(legacyPayload.exp) > Date.now()) {
+          setSessionCookie(req, res, legacyToken, Number(legacyPayload.exp));
+        }
       }
 
       if (auth.isSystem) {
@@ -215,7 +228,7 @@ export default async function handler(req, res) {
       if (refreshedToken) setSessionCookie(req, res, refreshedToken, Number(auth.user.exp) > Date.now() ? Number(auth.user.exp) : Date.now() + 2 * 24 * 60 * 60 * 1000);
       return res.status(200).json({
         success: true,
-        token: refreshedToken || undefined,
+        ...tokenFieldForExplicitClient(req, refreshedToken),
         user: {
           id: u.id,
           username: u.username,
@@ -321,7 +334,7 @@ export default async function handler(req, res) {
 
       return res.status(200).json({
         success: true,
-        token,
+        ...tokenFieldForExplicitClient(req, token),
         user: {
           id: user.id,
           username: user.username,
@@ -445,7 +458,7 @@ export default async function handler(req, res) {
 
       return res.status(200).json({
         success: true,
-        token,
+        ...tokenFieldForExplicitClient(req, token),
         user: {
           id: newUserId,
           username: rawUsername,
@@ -610,7 +623,7 @@ export default async function handler(req, res) {
 
       return res.status(200).json({
         success: true,
-        token,
+        ...tokenFieldForExplicitClient(req, token),
         isNew,
         user: {
           id: userRecord.id,

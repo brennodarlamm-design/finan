@@ -70,7 +70,7 @@ test('Busca SINAPI escapa texto e não injeta JSON externo em onclick', /escapeH
 test('Auth falha fechado quando API_SECRET está ausente', /API_SECRET não configurado/i.test(authApi) && /Configuração de segurança pendente/i.test(authApi));
 test('Google exige GOOGLE_CLIENT_ID explícito', /googleClientId/i.test(authApi) && /GOOGLE_CLIENT_ID não configurado/i.test(authApi));
 test('Trial online usa fim do dia em UTC-4', /T23:59:59-04:00/i.test(authCore));
-test('Tokens legados são atualizados para sessão revogável', /tokens legados ganham uma sessão revogável/i.test(authApi) && /token: refreshedToken/i.test(authApi) && /tokenRefreshed/i.test(authJs));
+test('Tokens legados são atualizados para sessão revogável', /tokens legados ganham uma sessão revogável/i.test(authApi) && /tokenFieldForExplicitClient\(req, refreshedToken\)/i.test(authApi) && (/tokenRefreshed/i.test(authJs) || /_purgeLegacyToken/i.test(authJs)));
 test('Logout usa keepalive para concluir revogação', /keepalive:true/i.test(authJs));
 test('Troca administrativa de senha revoga sessões do usuário alvo', /if \(senha\)[\s\S]*UPDATE auth_sessions SET revoked_at=NOW\(\)/i.test(users));
 test('Diagnóstico remove possíveis segredos antes de persistir', /function redactSensitive/i.test(audit) && /Bearer \[REDACTED\]/i.test(audit) && /re_\)\[A-Za-z0-9/i.test(audit));

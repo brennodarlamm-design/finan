@@ -160,11 +160,15 @@ const App = {
 
     if (!Auth.requireAuth()) return;
 
+    // Patch 10: a credencial real vive em cookie HttpOnly. Antes de abrir dados locais
+    // em uma sessão online, confirma no servidor se a sessão continua válida/revogável.
+    if (typeof Auth.refreshSessionFromServer === 'function' && navigator.onLine !== false) {
+      const firstCheck = await Auth.refreshSessionFromServer();
+      if (firstCheck?.expired) return;
+    }
+
     this._installErrorMonitor();
     if (typeof Auth.refreshSessionFromServer === 'function') {
-      Auth.refreshSessionFromServer().then(r => {
-        if (r?.changed) { this.renderShell(); this._bindSyncStatus(); this.navigate(this.route || this._getRouteFromUrl(), false); }
-      }).catch(() => {});
       if (!this._sessionRefreshTimer) this._sessionRefreshTimer = setInterval(() => {
         Auth.refreshSessionFromServer().then(r => {
           if (r?.changed) { this.renderShell(); this._bindSyncStatus(); this.navigate(this.route || 'dashboard', false); }
