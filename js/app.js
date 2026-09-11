@@ -326,15 +326,23 @@ const App = {
         </div>`;
 
     const isCollapsed = window.innerWidth > 768 && localStorage.getItem('finobra_sidebar_collapsed') === 'true';
-    const supportMode = Boolean(typeof Auth !== 'undefined' && Auth.isImpersonating && Auth.isImpersonating());
-    const supportBanner = supportMode ? `
-      <div style="background:#7c2d12;color:#fff4e6;border-bottom:1px solid #fb923c;padding:8px 14px;display:flex;align-items:center;justify-content:center;gap:12px;flex-wrap:wrap;font-size:.78rem;font-weight:800;">
-        <span>🛡️ MODO SUPORTE MASTER — visualizando ${brandName}</span>
-        <button onclick="Auth.stopImpersonation()" style="border:1px solid rgba(255,255,255,.5);background:rgba(255,255,255,.12);color:#fff;padding:4px 10px;border-radius:6px;font-weight:800;cursor:pointer;">Encerrar suporte e voltar ao Master</button>
-      </div>` : '';
+    const isImpersonating = Boolean((u?.impersonatedBy === 'superadmin' || u?.isImpersonated) || (typeof Auth !== 'undefined' && Auth.isImpersonating && Auth.isImpersonating()));
 
     document.getElementById('app-root').innerHTML = `
-      <div class="app ${isCollapsed ? 'sidebar-collapsed' : ''}" id="app-container">
+      <div class="app ${isCollapsed ? 'sidebar-collapsed' : ''} ${isImpersonating ? 'has-impersonation' : ''}" id="app-container">
+        ${isImpersonating ? `
+          <aside class="impersonation-bar" id="impersonation-bar" role="alert" aria-label="Modo Suporte Master">
+            <div class="impersonation-info">
+              <span class="impersonation-badge">🛡️ MODO SUPORTE MASTER</span>
+              <span class="impersonation-text">Visualizando conta de: <strong>${brandName}</strong></span>
+              <span class="impersonation-pill">🔒 Dados 100% isolados</span>
+            </div>
+            <button type="button" class="impersonation-btn" onclick="App.sairModoSuporte()" title="Encerrar suporte e retornar ao painel administrativo Master">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
+              <span>Voltar ao Painel Master</span>
+            </button>
+          </aside>
+        ` : ''}
         <!-- Overlay Escuro para Mobile -->
         <div class="sidebar-overlay" id="sidebar-overlay" onclick="App.closeSidebar()"></div>
 
@@ -383,17 +391,6 @@ const App = {
         </aside>
 
         <div style="flex:1;display:flex;flex-direction:column;min-width:0;">
-          ${(u?.impersonatedBy === 'superadmin' || u?.isImpersonated) ? `
-            <div style="background:linear-gradient(90deg, #b45309, #d97706);color:#fff;padding:8px 18px;display:flex;align-items:center;justify-content:space-between;font-size:.82rem;box-shadow:0 2px 8px rgba(0,0,0,.3);z-index:90;flex-wrap:wrap;gap:8px;">
-              <div style="display:flex;align-items:center;gap:8px;font-weight:700;">
-                <span style="font-size:1.1rem;">👁️</span>
-                <span>MODO SUPORTE MASTER: Visualizando como <strong>${brandName}</strong> (Dados 100% isolados)</span>
-              </div>
-              <button onclick="App.sairModoSuporte()" style="background:#fff;color:#78350f;border:none;padding:5px 12px;border-radius:6px;font-weight:800;font-size:.78rem;cursor:pointer;display:inline-flex;align-items:center;gap:6px;transition:opacity .15s;" onmouseover="this.style.opacity='.9'" onmouseout="this.style.opacity='1'">
-                <span>←</span><span>Voltar ao Painel Master</span>
-              </button>
-            </div>
-          ` : ''}
           <header class="main-header" id="main-header">
             <button class="icon-btn" id="mob-menu" onclick="App.toggleSidebar()" title="Recolher / Expandir Menu Lateral (Ctrl+B)">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
@@ -412,7 +409,7 @@ const App = {
               <span style="font-size:.78rem;font-weight:700;">Validar Documento</span>
             </a>
             <!-- Dropdown Suporte Técnico & Atendimento -->
-            ${(u?.impersonatedBy === 'superadmin' || u?.isImpersonated) ? '' : (typeof Suporte !== 'undefined' ? Suporte.renderHeaderDropdown() : '')}
+            ${isImpersonating ? '' : (typeof Suporte !== 'undefined' ? Suporte.renderHeaderDropdown() : '')}
             <!-- Botão Busca Global -->
             <div class="header-search-btn" onclick="typeof BuscaGlobal !== 'undefined' && BuscaGlobal.abrir()" title="Busca Global em todo o sistema (Ctrl+K)" style="cursor:pointer;display:flex;align-items:center;gap:6px;background:rgba(255,255,255,.05);border:1px solid var(--border);border-radius:8px;padding:5px 10px;transition:all .2s;">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
@@ -432,7 +429,6 @@ const App = {
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
             </button>
           </header>
-          ${supportBanner}
           <main class="main-content" id="main-content">
             <div id="route-content"></div>
           </main>

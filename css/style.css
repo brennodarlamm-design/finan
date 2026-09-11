@@ -692,3 +692,150 @@ textarea.form-control { resize:vertical; }
   to { opacity: 1; transform: scale(1); }
 }
 
+/* ===== MODO SUPORTE / IMPERSONAÇÃO MASTER ===== */
+.impersonation-bar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 42px;
+  background: linear-gradient(90deg, #181105 0%, #291804 35%, #3d2105 70%, #1a1005 100%);
+  border-bottom: 1px solid rgba(245, 158, 11, 0.45);
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.5), inset 0 -1px 0 rgba(251, 191, 36, 0.2);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 20px;
+  z-index: 10000;
+  font-family: inherit;
+  color: #fff;
+  gap: 12px;
+}
+
+.impersonation-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.impersonation-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: linear-gradient(135deg, rgba(217, 119, 6, 0.4), rgba(180, 83, 9, 0.6));
+  border: 1px solid rgba(251, 191, 36, 0.6);
+  color: #fef3c7;
+  font-weight: 800;
+  font-size: 0.72rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 3px 10px;
+  border-radius: 6px;
+  white-space: nowrap;
+  box-shadow: 0 0 12px rgba(245, 158, 11, 0.25);
+}
+
+.impersonation-text {
+  font-size: 0.82rem;
+  color: #f3f4f6;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.impersonation-text strong {
+  color: #fbbf24;
+  font-weight: 700;
+}
+
+.impersonation-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: rgba(16, 185, 129, 0.15);
+  border: 1px solid rgba(16, 185, 129, 0.35);
+  color: #34d399;
+  font-size: 0.68rem;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+.impersonation-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  background: #ffffff;
+  color: #78350f;
+  border: 1px solid rgba(255, 255, 255, 0.8);
+  padding: 6px 14px;
+  border-radius: 8px;
+  font-weight: 800;
+  font-size: 0.78rem;
+  cursor: pointer;
+  white-space: nowrap;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+}
+
+.impersonation-btn:hover {
+  background: #fef3c7;
+  color: #92400e;
+  border-color: #fde68a;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 14px rgba(245, 158, 11, 0.4);
+}
+
+.impersonation-btn:active {
+  transform: translateY(0);
+}
+
+/* Quando impersonação está ativa, ajusta o topo da sidebar, header e conteúdo sem sobreposição */
+.app.has-impersonation .sidebar {
+  top: 42px !important;
+  height: calc(100vh - 42px) !important;
+}
+
+.app.has-impersonation .main-header {
+  top: 42px !important;
+}
+
+.app.has-impersonation .main-content {
+  margin-top: calc(var(--header-h) + 42px) !important;
+}
+
+@media(max-width: 768px) {
+  .impersonation-bar {
+    padding: 0 10px;
+    height: 42px;
+  }
+  .impersonation-pill {
+    display: none;
+  }
+  .impersonation-text {
+    font-size: 0.72rem;
+  }
+  .impersonation-badge {
+    font-size: 0.65rem;
+    padding: 2px 6px;
+  }
+  .impersonation-btn {
+    padding: 4px 8px;
+    font-size: 0.7rem;
+  }
+  .app.has-impersonation .sidebar {
+    top: 42px !important;
+    height: calc(100vh - 42px) !important;
+  }
+  .app.has-impersonation .main-header {
+    top: 42px !important;
+  }
+  .app.has-impersonation .main-content {
+    margin-top: calc(var(--header-h) + 42px) !important;
+  }
+}
+
