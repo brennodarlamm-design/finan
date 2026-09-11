@@ -181,17 +181,17 @@ const Orcamentos = {
 
   _etapaForm(e,i) {
     return `<div class="etapa-form-row" id="ef-${e.id}" style="background:var(--bg-secondary);border-radius:var(--r-md);padding:12px;margin-bottom:10px;position:relative;">
-      <input type="hidden" name="etapa_id_${i}" value="${e.id}">
+      <input type="hidden" name="etapa_id_${i}" value="${Utils.escapeHtml(e.id)}">
       <div class="form-row cols-4" style="margin-bottom:8px;">
-        <div class="form-group"><label class="form-label">Nome</label><input class="form-control" name="etapa_nome_${i}" value="${e.nome}" placeholder="Nome da etapa"></div>
-        <div class="form-group"><label class="form-label">Valor Previsto (R$)</label><div class="input-prefix"><span class="input-pfx-txt">R$</span><input name="etapa_prev_${i}" type="number" value="${e.valor_previsto}" step="0.01" min="0" placeholder="0,00"></div></div>
-        <div class="form-group"><label class="form-label">Valor Realizado (R$)</label><div class="input-prefix"><span class="input-pfx-txt">R$</span><input name="etapa_real_${i}" type="number" value="${e.valor_realizado}" step="0.01" min="0" placeholder="0,00"></div></div>
-        <div class="form-group"><label class="form-label">% Execução</label><div class="input-prefix"><span class="input-pfx-txt">%</span><input name="etapa_pct_${i}" type="number" value="${e.percentual_execucao}" min="0" max="100"></div></div>
+        <div class="form-group"><label class="form-label">Nome</label><input class="form-control" name="etapa_nome_${i}" value="${Utils.escapeHtml(e.nome)}" placeholder="Nome da etapa"></div>
+        <div class="form-group"><label class="form-label">Valor Previsto (R$)</label><div class="input-prefix"><span class="input-pfx-txt">R$</span><input name="etapa_prev_${i}" type="number" value="${Utils.escapeHtml(e.valor_previsto)}" step="0.01" min="0" placeholder="0,00"></div></div>
+        <div class="form-group"><label class="form-label">Valor Realizado (R$)</label><div class="input-prefix"><span class="input-pfx-txt">R$</span><input name="etapa_real_${i}" type="number" value="${Utils.escapeHtml(e.valor_realizado)}" step="0.01" min="0" placeholder="0,00"></div></div>
+        <div class="form-group"><label class="form-label">% Execução</label><div class="input-prefix"><span class="input-pfx-txt">%</span><input name="etapa_pct_${i}" type="number" value="${Utils.escapeHtml(e.percentual_execucao)}" min="0" max="100"></div></div>
       </div>
       <div class="form-row cols-3">
-        <div class="form-group"><label class="form-label">Data Início</label><input class="form-control" type="date" name="etapa_di_${i}" value="${e.data_inicio||''}"></div>
-        <div class="form-group"><label class="form-label">Data Fim</label><input class="form-control" type="date" name="etapa_df_${i}" value="${e.data_fim||''}"></div>
-        <div class="form-group"><label class="form-label">Observações</label><input class="form-control" name="etapa_obs_${i}" value="${e.observacoes||''}" placeholder="Obs."></div>
+        <div class="form-group"><label class="form-label">Data Início</label><input class="form-control" type="date" name="etapa_di_${i}" value="${Utils.escapeHtml(e.data_inicio||'')}"></div>
+        <div class="form-group"><label class="form-label">Data Fim</label><input class="form-control" type="date" name="etapa_df_${i}" value="${Utils.escapeHtml(e.data_fim||'')}"></div>
+        <div class="form-group"><label class="form-label">Observações</label><input class="form-control" name="etapa_obs_${i}" value="${Utils.escapeHtml(e.observacoes||'')}" placeholder="Obs."></div>
       </div>
       <button type="button" style="position:absolute;top:8px;right:8px;background:none;border:none;cursor:pointer;color:var(--danger);font-size:16px" onclick="this.parentElement.remove()">✕</button>
     </div>`;
@@ -234,19 +234,19 @@ const Orcamentos = {
     if(!e) return;
     Utils.showModal(`
       <div class="modal" style="max-width:500px">
-        <div class="modal-header"><span class="modal-title">✏️ Editar Etapa: ${e.nome}</span><button class="modal-close" onclick="Utils.closeModal()">✕</button></div>
+        <div class="modal-header"><span class="modal-title">✏️ Editar Etapa: ${Utils.escapeHtml(e.nome)}</span><button class="modal-close" onclick="Utils.closeModal()">✕</button></div>
         <div class="modal-body">
           <div class="form-row cols-2" style="margin-bottom:14px;">
-            <div class="form-group"><label class="form-label">Valor Previsto</label><div class="input-prefix"><span class="input-pfx-txt">R$</span><input id="ee-prev" type="number" value="${e.valor_previsto}" step="0.01" min="0"></div></div>
-            <div class="form-group"><label class="form-label">Valor Realizado</label><div class="input-prefix"><span class="input-pfx-txt">R$</span><input id="ee-real" type="number" value="${e.valor_realizado}" step="0.01" min="0"></div></div>
+            <div class="form-group"><label class="form-label">Valor Previsto</label><div class="input-prefix"><span class="input-pfx-txt">R$</span><input id="ee-prev" type="number" value="${Utils.escapeHtml(e.valor_previsto)}" step="0.01" min="0"></div></div>
+            <div class="form-group"><label class="form-label">Valor Realizado</label><div class="input-prefix"><span class="input-pfx-txt">R$</span><input id="ee-real" type="number" value="${Utils.escapeHtml(e.valor_realizado)}" step="0.01" min="0"></div></div>
           </div>
           <div class="form-group"><label class="form-label">% de Execução</label>
             <div style="display:flex;align-items:center;gap:12px">
-              <input type="range" id="ee-pct-range" min="0" max="100" value="${e.percentual_execucao}" style="flex:1;accent-color:var(--accent)" oninput="document.getElementById('ee-pct').value=this.value">
-              <div class="input-prefix" style="width:80px"><span class="input-pfx-txt">%</span><input id="ee-pct" type="number" value="${e.percentual_execucao}" min="0" max="100" oninput="document.getElementById('ee-pct-range').value=this.value"></div>
+              <input type="range" id="ee-pct-range" min="0" max="100" value="${Utils.escapeHtml(e.percentual_execucao)}" style="flex:1;accent-color:var(--accent)" oninput="document.getElementById('ee-pct').value=this.value">
+              <div class="input-prefix" style="width:80px"><span class="input-pfx-txt">%</span><input id="ee-pct" type="number" value="${Utils.escapeHtml(e.percentual_execucao)}" min="0" max="100" oninput="document.getElementById('ee-pct-range').value=this.value"></div>
             </div>
           </div>
-          <div class="form-group"><label class="form-label">Observações</label><textarea class="form-control" id="ee-obs" rows="2">${e.observacoes||''}</textarea></div>
+          <div class="form-group"><label class="form-label">Observações</label><textarea class="form-control" id="ee-obs" rows="2">${Utils.escapeHtml(e.observacoes||'')}</textarea></div>
         </div>
         <div class="modal-footer">
           <button class="btn btn-secondary" onclick="Utils.closeModal()">Cancelar</button>

@@ -50,13 +50,30 @@ export function verifyToken(token, secret) {
   }
 }
 
+function getCookie(req, name) {
+  const raw = String(req.headers?.cookie || '');
+  if (!raw) return '';
+  for (const part of raw.split(';')) {
+    const idx = part.indexOf('=');
+    if (idx < 0) continue;
+    const key = part.slice(0, idx).trim();
+    if (key !== name) continue;
+    try { return decodeURIComponent(part.slice(idx + 1).trim()); } catch { return part.slice(idx + 1).trim(); }
+  }
+  return '';
+}
+
 function getCredential(req) {
+  // Durante a migração do Patch 09, Bearer continua prioritário para preservar
+  // impersonação Master e clientes antigos. O cookie HttpOnly passa a ser o
+  // caminho preferido quando não houver Authorization explícito.
   const authHeader = req.headers.authorization || req.headers.Authorization || '';
   if (typeof authHeader === 'string' && authHeader.startsWith('Bearer ')) {
     return authHeader.substring(7).trim();
   }
   const key = req.headers['x-api-key'] || req.headers.apikey || '';
-  return typeof key === 'string' ? key.trim() : '';
+  if (typeof key === 'string' && key.trim()) return key.trim();
+  return getCookie(req, 'finobra_session_token');
 }
 
 function trialExpired(createdAt, trialDays = 15, explicitDueDate = null) {

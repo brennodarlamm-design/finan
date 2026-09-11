@@ -348,7 +348,7 @@ const FasesDoc = {
         </div>
         <div class="modal-body">
           <div style="font-size:.78rem;color:var(--text2);margin-bottom:18px">
-            📋 ${obra?.nome||obraId} &nbsp;·&nbsp; ${faseLabel} &nbsp;·&nbsp; <span style="color:var(--text3)">${tmpl.desc}</span>
+            📋 ${Utils.escapeHtml(obra?.nome||obraId)} &nbsp;·&nbsp; ${Utils.escapeHtml(faseLabel)} &nbsp;·&nbsp; <span style="color:var(--text3)">${Utils.escapeHtml(tmpl.desc)}</span>
           </div>
           <div class="form-row cols-2">
             <div class="form-group">
@@ -357,7 +357,7 @@ const FasesDoc = {
             </div>
             <div class="form-group">
               <label class="form-label">Responsável</label>
-              <input class="form-control" id="fd-responsavel" value="${doc.responsavel||''}" placeholder="Eng., Prefeitura, Cartório...">
+              <input class="form-control" id="fd-responsavel" value="${Utils.escapeHtml(doc.responsavel||'')}" placeholder="Eng., Prefeitura, Cartório...">
             </div>
           </div>
           <div class="form-row cols-2">
@@ -382,7 +382,7 @@ const FasesDoc = {
           </div>
           <div class="form-group">
             <label class="form-label">Observações</label>
-            <textarea class="form-control" id="fd-obs" rows="2" placeholder="Pendências, informações adicionais...">${doc.observacoes||''}</textarea>
+            <textarea class="form-control" id="fd-obs" rows="2" placeholder="Pendências, informações adicionais...">${Utils.escapeHtml(doc.observacoes||'')}</textarea>
           </div>
           <div style="border-top:1px solid var(--border-s);padding-top:16px;margin-top:4px">
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">

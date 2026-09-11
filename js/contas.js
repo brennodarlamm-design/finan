@@ -165,30 +165,30 @@ const Contas = {
         </div>
         <div style="flex:1;min-width:240px;">
           <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
-            <span style="font-weight:700;font-size:1.05rem;color:var(--text);">${conta.apelido || banco.name}</span>
+            <span style="font-weight:700;font-size:1.05rem;color:var(--text);">${Utils.escapeHtml(conta.apelido || banco.name)}</span>
             <span style="font-size:.72rem;background:${banco.bg};color:${banco.cor};padding:2px 8px;border-radius:12px;font-weight:700;border:1px solid ${banco.cor}33;">
               ${banco.name}
             </span>
             <span style="font-size:.72rem;background:rgba(255,255,255,.06);color:var(--text2);padding:2px 8px;border-radius:12px;">
-              ${tipos[conta.tipo] || conta.tipo}
+              ${Utils.escapeHtml(tipos[conta.tipo] || conta.tipo)}
             </span>
           </div>
           <div style="color:var(--text2);font-size:.82rem;margin-top:4px;display:flex;gap:12px;flex-wrap:wrap;">
-            <span><strong>Agência:</strong> ${conta.agencia || '—'}</span>
+            <span><strong>Agência:</strong> ${Utils.escapeHtml(conta.agencia || '—')}</span>
             <span>&middot;</span>
-            <span><strong>Conta:</strong> ${conta.numero || '—'}</span>
-            ${conta.titular ? `<span>&middot;</span><span><strong>Titular:</strong> ${conta.titular}</span>` : ''}
+            <span><strong>Conta:</strong> ${Utils.escapeHtml(conta.numero || '—')}</span>
+            ${conta.titular ? `<span>&middot;</span><span><strong>Titular:</strong> ${Utils.escapeHtml(conta.titular)}</span>` : ''}
           </div>
           <div style="display:flex;align-items:center;gap:12px;margin-top:8px;flex-wrap:wrap;font-size:.76rem;">
             <span style="color:${obra ? '#60a5fa' : '#34d399'};display:inline-flex;align-items:center;gap:4px;">
-              ${obra ? `&#x1F3E0; Vinculada a: <strong>${obra.nome}</strong>` : '&#x1F3E2; Disponível para <strong>Todas as Obras / Geral</strong>'}
+              ${obra ? `&#x1F3E0; Vinculada a: <strong>${Utils.escapeHtml(obra.nome)}</strong>` : '&#x1F3E2; Disponível para <strong>Todas as Obras / Geral</strong>'}
             </span>
             ${qtdLancamentos > 0 ? `
             <span style="background:rgba(167,139,250,.12);color:#c4b5fd;padding:2px 8px;border-radius:10px;font-weight:600;border:1px solid rgba(167,139,250,.25);">
               &#x1F4B3; ${qtdLancamentos} lançamentos vinculados
             </span>` : ''}
           </div>
-          ${conta.obs ? `<div style="font-size:.75rem;color:var(--text3);margin-top:6px;font-style:italic;">"${conta.obs}"</div>` : ''}
+          ${conta.obs ? `<div style="font-size:.75rem;color:var(--text3);margin-top:6px;font-style:italic;">"${Utils.escapeHtml(conta.obs)}"</div>` : ''}
         </div>
         <div style="display:flex;gap:8px;align-items:center;">
           <button class="btn btn-secondary btn-sm" onclick="Contas.showForm('${conta.id}')" title="Editar conta">

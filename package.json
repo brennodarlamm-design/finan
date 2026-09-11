@@ -12,7 +12,8 @@
     "test:patch05": "node scripts/test-patch05-static.js",
     "test:patch06": "node scripts/test-patch06-static.js",
     "test:patch07": "node scripts/test-patch07-static.js",
-    "test:patch08": "node scripts/test-patch08-static.js"
+    "test:patch08": "node scripts/test-patch08-static.js",
+    "test:patch09": "node scripts/test-patch09-static.js"
   },
   "dependencies": {
     "@neondatabase/serverless": "^0.9.5",

@@ -207,18 +207,18 @@ const Escritorio = {
         </td>
         <td style="white-space:nowrap;font-size:.78rem;color:var(--text3);">${Utils.fmt.date(l.data)}</td>
         <td style="white-space:nowrap;">${dtPagFmt}</td>
-        <td style="white-space:nowrap;font-size:.78rem;font-weight:700;color:var(--text2);">${l.competencia || '—'}</td>
+        <td style="white-space:nowrap;font-size:.78rem;font-weight:700;color:var(--text2);">${Utils.escapeHtml(l.competencia || '—')}</td>
         <td>
-          <div style="font-weight:700;color:var(--text);">${l.descricao}</div>
-          ${l.codigo_barras ? `<div style="font-size:.7rem;font-family:monospace;color:var(--accent2);" title="Linha digitável do boleto/guia">🔢 ${l.codigo_barras}</div>` : ''}
-          ${l.observacoes ? `<div style="font-size:.72rem;color:var(--text3);">${l.observacoes}</div>` : ''}
+          <div style="font-weight:700;color:var(--text);">${Utils.escapeHtml(l.descricao)}</div>
+          ${l.codigo_barras ? `<div style="font-size:.7rem;font-family:monospace;color:var(--accent2);" title="Linha digitável do boleto/guia">🔢 ${Utils.escapeHtml(l.codigo_barras)}</div>` : ''}
+          ${l.observacoes ? `<div style="font-size:.72rem;color:var(--text3);">${Utils.escapeHtml(l.observacoes)}</div>` : ''}
         </td>
         <td style="white-space:nowrap;font-size:.78rem;">${Utils.catLabel(l.categoria)}</td>
-        <td style="font-size:.78rem;color:var(--text2);max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${l.fornecedor_beneficiario||''}">
-          ${l.fornecedor_beneficiario || '—'}
+        <td style="font-size:.78rem;color:var(--text2);max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${Utils.escapeHtml(l.fornecedor_beneficiario||'')}">
+          ${Utils.escapeHtml(l.fornecedor_beneficiario || '—')}
         </td>
         <td style="font-size:.74rem;color:var(--text3);max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
-          ${l.conta_bancaria ? `🏦 ${l.conta_bancaria}` : '—'}
+          ${l.conta_bancaria ? `🏦 ${Utils.escapeHtml(l.conta_bancaria)}` : '—'}
         </td>
         <td style="text-align:right;font-weight:900;color:var(--danger);white-space:nowrap;font-size:.9rem;">
           -${Utils.fmt.currency(l.valor)}
@@ -417,12 +417,12 @@ const Escritorio = {
               <label class="form-label">Conta Bancária</label>
               <select class="form-control" name="conta_bancaria">
                 <option value="">Selecione a conta bancária...</option>
-                ${contas.map(c => `<option value="${c.apelido || c.banco_nome}" ${l?.conta_bancaria===(c.apelido||c.banco_nome)?'selected':''}>${c.apelido || c.banco_nome} (${c.agencia}/${c.numero})</option>`).join('')}
+                ${contas.map(c => `<option value="${Utils.escapeHtml(c.apelido || c.banco_nome)}" ${l?.conta_bancaria===(c.apelido||c.banco_nome)?'selected':''}>${Utils.escapeHtml(c.apelido || c.banco_nome)} (${Utils.escapeHtml(c.agencia || '')}/${Utils.escapeHtml(c.numero || '')})</option>`).join('')}
               </select>
             </div>
             <div class="form-group">
               <label class="form-label">Linha Digitável / Código de Barras / Pix</label>
-              <input class="form-control" name="codigo_barras" value="${l?.codigo_barras || ''}" placeholder="Cole a linha digitável do boleto ou chave Pix" style="font-family:monospace;font-size:.8rem;">
+              <input class="form-control" name="codigo_barras" value="${Utils.escapeHtml(l?.codigo_barras || '')}" placeholder="Cole a linha digitável do boleto ou chave Pix" style="font-family:monospace;font-size:.8rem;">
             </div>
           </div>
 
@@ -590,13 +590,13 @@ const Escritorio = {
           <button class="modal-close" onclick="Utils.closeModal()">✕</button>
         </div>
         <div class="modal-body" style="padding:16px 20px;">
-          <div style="font-weight:700;color:var(--text);margin-bottom:4px;">${l.descricao}</div>
+          <div style="font-weight:700;color:var(--text);margin-bottom:4px;">${Utils.escapeHtml(l.descricao)}</div>
           <div style="font-size:1.2rem;font-weight:900;color:var(--danger);margin-bottom:12px;">-${Utils.fmt.currency(l.valor)}</div>
           
           <div class="form-group" style="margin-bottom:12px;">
             <label class="form-label">Conta Bancária de Saída</label>
             <select id="pago-conta" class="form-control">
-              ${contas.map(c => `<option value="${c.apelido||c.banco_nome}">${c.apelido||c.banco_nome}</option>`).join('')}
+              ${contas.map(c => `<option value="${Utils.escapeHtml(c.apelido||c.banco_nome)}">${Utils.escapeHtml(c.apelido||c.banco_nome)}</option>`).join('')}
             </select>
           </div>
           <div class="form-group">

@@ -270,16 +270,16 @@ const OrcamentoSINAPI = {
     const meses = ['','Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
     const refLabel = `${orc.uf} — ${meses[parseInt(m)]||m}/${y}`;
     const serieLabel = orc.desonerado ? '🟡 Sem Oneração' : '🟢 Com Oneração';
-    const baseOk = SINAPI.hasBase(orc.desonerado);
+    const baseOk = SINAPI.hasBase(orc.desonerado, orc.uf, orc.referencia_sinapi);
 
     Utils.showModal(`
       <div class="modal modal-xl" id="sinapi-editor" style="max-width:1100px;width:95vw;max-height:90vh;display:flex;flex-direction:column;">
         <!-- Header -->
         <div class="modal-header" style="flex-shrink:0;">
           <div style="display:flex;flex-direction:column;gap:3px;">
-            <span class="modal-title">🏗️ ${orc.nome}</span>
+            <span class="modal-title">🏗️ ${Utils.escapeHtml(orc.nome || 'Orçamento SINAPI')}</span>
             <span style="font-size:.74rem;color:var(--text3);">
-              👤 ${cliente?.nome || '—'} &nbsp;|&nbsp; 📍 ${refLabel} &nbsp;|&nbsp; ${serieLabel} &nbsp;|&nbsp; BDI: ${orc.bdi}%
+              👤 ${Utils.escapeHtml(cliente?.nome || '—')} &nbsp;|&nbsp; 📍 ${Utils.escapeHtml(refLabel)} &nbsp;|&nbsp; ${serieLabel} &nbsp;|&nbsp; BDI: ${Number(orc.bdi || 0).toFixed(2)}%
             </span>
           </div>
           <div style="display:flex;gap:8px;align-items:center;">
@@ -305,31 +305,39 @@ const OrcamentoSINAPI = {
 
   _renderSemBase(orc) {
     const serie = orc.desonerado ? 'Sem Oneração (Desonerado)' : 'Com Oneração';
+    const uf = String(orc.uf || '').toUpperCase();
+    const ref = String(orc.referencia_sinapi || '');
+    const snap = SINAPI.snapshotFor(uf, ref, orc.desonerado);
+    const exact = Utils.escapeHtml(`${uf || 'UF não definida'} ${ref || 'sem referência'}`);
     return `
     <div style="background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.3);border-radius:var(--r-md);padding:16px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;">
       <span style="font-size:1.8rem">⚠️</span>
       <div style="flex:1;min-width:240px;">
-        <div style="font-weight:700;color:var(--warning);margin-bottom:4px;">Tabela SINAPI não carregada</div>
+        <div style="font-weight:700;color:var(--warning);margin-bottom:4px;">Base SINAPI ${exact} não carregada</div>
         <div style="font-size:.8rem;color:var(--text2);">
-          Este orçamento usa a série <strong>${serie}</strong>. Puxe a tabela oficial da Caixa com 1 clique ou importe manualmente.
+          Este orçamento usa <strong>${serie}</strong>. ${snap
+            ? 'Há um snapshot Caixa empacotado que corresponde exatamente à UF e competência deste orçamento.'
+            : 'Esta versão não possui snapshot 1-clique para esta UF/competência. Importe o XLSX/ZIP oficial da Caixa para evitar usar preços de outro estado ou mês.'}
         </div>
       </div>
       <div style="display:flex;gap:8px;align-items:center;">
-        <button class="btn btn-primary btn-sm" id="btn-puxar-direto-${orc.id}" onclick="OrcamentoSINAPI.puxarDiretoNoEditor('${orc.id}', ${orc.desonerado})">⚡ Puxar Oficial Caixa (1-Clique)</button>
-        <button class="btn btn-secondary btn-sm" onclick="Utils.closeModal();OrcamentoSINAPI.showImportModal(${orc.desonerado})">📁 Importar Manualmente</button>
+        ${snap ? `<button class="btn btn-primary btn-sm" id="btn-puxar-direto-${Utils.escapeHtml(orc.id)}" onclick="OrcamentoSINAPI.puxarDiretoNoEditor('${Utils.escapeHtml(orc.id)}')">⚡ Carregar snapshot ${snap.uf} ${snap.referencia}</button>` : ''}
+        <button class="btn btn-secondary btn-sm" onclick="Utils.closeModal();OrcamentoSINAPI.showImportModal(${orc.desonerado}, '${Utils.escapeHtml(uf)}', '${Utils.escapeHtml(ref)}')">📁 Importar tabela oficial</button>
       </div>
     </div>`;
   },
 
-  async puxarDiretoNoEditor(orcId, desonerado) {
+  async puxarDiretoNoEditor(orcId) {
+    const orc = this._getById(orcId);
+    if (!orc) return;
     const btn = document.getElementById(`btn-puxar-direto-${orcId}`);
     if (btn) {
       btn.disabled = true;
-      btn.innerHTML = '<span>⏳</span> Baixando Caixa RR...';
+      btn.textContent = `⏳ Carregando ${orc.uf} ${orc.referencia_sinapi}...`;
     }
-    Utils.toast('Puxando tabela oficial SINAPI da Caixa...', 'info');
-    const res = await SINAPI.puxarOficial(desonerado, (msg) => {
-      if (btn) btn.innerHTML = `<span>⏳</span> ${msg}`;
+    Utils.toast(`Carregando snapshot SINAPI ${orc.uf} ${orc.referencia_sinapi}...`, 'info');
+    const res = await SINAPI.puxarOficial(orc.desonerado, orc.uf, orc.referencia_sinapi, (msg) => {
+      if (btn) btn.textContent = `⏳ ${msg}`;
     });
     if (res.ok) {
       Utils.toast(res.msg, 'success');
@@ -338,13 +346,13 @@ const OrcamentoSINAPI = {
       Utils.toast(res.msg, 'error');
       if (btn) {
         btn.disabled = false;
-        btn.innerHTML = '<span>⚡</span> Tentar Novamente';
+        btn.textContent = '⚡ Tentar novamente';
       }
     }
   },
 
   _renderBusca(orc) {
-    const meta = SINAPI.getMeta(orc.desonerado);
+    const meta = SINAPI.getMeta(orc.desonerado, orc.uf, orc.referencia_sinapi);
     return `
     <div style="background:var(--bg-secondary);border-radius:var(--r-md);padding:14px;">
       <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
@@ -359,7 +367,7 @@ const OrcamentoSINAPI = {
           class="form-control"
           placeholder="Digite o código SINAPI ou palavras da descrição... (ex: 97642, alvenaria, piso)"
           style="flex:1"
-          oninput="OrcamentoSINAPI._onSearch(this.value, ${orc.desonerado})"
+          oninput="OrcamentoSINAPI._onSearch(this.value, '${Utils.escapeHtml(orc.id)}')"
           autocomplete="off"
         >
       </div>
@@ -367,12 +375,14 @@ const OrcamentoSINAPI = {
     </div>`;
   },
 
-  _onSearch(termo, desonerado) {
+  _onSearch(termo, orcId) {
+    const orc = this._getById(orcId);
+    if (!orc) return;
     const el = document.getElementById('sinapi-search-results');
     if (!el) return;
     if (!termo || termo.trim().length < 2) { el.innerHTML = ''; return; }
 
-    const resultados = SINAPI.buscar(termo, desonerado, 30);
+    const resultados = SINAPI.buscar(termo, orc.desonerado, 30, orc.uf, orc.referencia_sinapi);
     this._lastSearchResults = resultados;
     if (!resultados.length) {
       el.innerHTML = `<div style="padding:10px;color:var(--text3);font-size:.82rem;">Nenhum resultado para "${Utils.escapeHtml(termo)}"</div>`;
@@ -581,10 +591,11 @@ const OrcamentoSINAPI = {
   // Modal: Importar Tabela SINAPI
   // ─────────────────────────────────────────────────
 
-  showImportModal(desoneradoInicial = false) {
+  showImportModal(desoneradoInicial = false, ufInicial = '', refInicial = '') {
     const metaOn  = SINAPI.getMeta(false);
     const metaDes = SINAPI.getMeta(true);
-    const defaultUf = this._defaultUF();
+    const defaultUf = String(ufInicial || this._defaultUF() || '').toUpperCase();
+    const defaultRef = refInicial || `${new Date().getFullYear()}-${String(new Date().getMonth()+1).padStart(2,'0')}`;
 
     Utils.showModal(`
       <div class="modal" style="max-width:600px">
@@ -598,15 +609,15 @@ const OrcamentoSINAPI = {
           <div style="background:linear-gradient(135deg, rgba(201,162,39,.12), rgba(16,185,129,.08));border:1.5px solid var(--accent);border-radius:var(--r-md);padding:16px;margin-bottom:18px;">
             <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
               <div style="font-weight:700;font-size:.95rem;color:var(--accent);display:flex;align-items:center;gap:6px;">
-                <span>⚡</span> Puxar Base Oficial Caixa (1-Clique)
+                <span>⚡</span> Snapshot Caixa disponível no FinObra
               </div>
               <span style="background:var(--accent);color:#000;font-weight:700;font-size:.65rem;padding:2px 8px;border-radius:10px;text-transform:uppercase;letter-spacing:.5px;">Recomendado</span>
             </div>
             <div style="font-size:.82rem;color:var(--text2);margin-bottom:12px;line-height:1.5;">
-              Carregue instantaneamente as mais de <strong>7.800 composições oficiais</strong> da Caixa Econômica Federal (Roraima/RR) direto pelo sistema, sem precisar baixar nem descompactar planilhas manualmente.
+              O botão 1-clique só é habilitado quando existe um snapshot empacotado que corresponde <strong>exatamente</strong> à UF, competência e série selecionadas. Isso evita usar preços de outro estado ou de outro mês por engano.
             </div>
             <button class="btn btn-primary" id="btn-puxar-oficial" style="width:100%;font-weight:700;display:flex;align-items:center;justify-content:center;gap:8px;padding:10px 16px;font-size:.9rem;" onclick="OrcamentoSINAPI.puxarOficialAutomatico()">
-              <span>⚡</span> Puxar Tabela Oficial Caixa Agora (1-Clique)
+              <span>⚡</span> Verificar snapshot para a seleção
             </button>
           </div>
 
@@ -639,11 +650,11 @@ const OrcamentoSINAPI = {
           <div class="form-row cols-2" style="margin-bottom:14px;">
             <div class="form-group">
               <label class="form-label">Estado (UF)</label>
-              <select class="form-control" id="imp-uf">${Utils.stateOptions(defaultUf)}</select>
+              <select class="form-control" id="imp-uf" onchange="OrcamentoSINAPI._updateOfficialSnapshotAvailability()">${Utils.stateOptions(defaultUf)}</select>
             </div>
             <div class="form-group">
               <label class="form-label">Mês de Referência</label>
-              <input class="form-control" type="month" id="imp-ref" value="${new Date().getFullYear()}-${String(new Date().getMonth()+1).padStart(2,'0')}">
+              <input class="form-control" type="month" id="imp-ref" value="${Utils.escapeHtml(defaultRef)}" onchange="OrcamentoSINAPI._updateOfficialSnapshotAvailability()">
             </div>
           </div>
 
@@ -676,6 +687,8 @@ const OrcamentoSINAPI = {
         </div>
       </div>`);
 
+    setTimeout(() => this._updateOfficialSnapshotAvailability(), 0);
+
     // Adicionar keyframe de animação se não existir
     if (!document.getElementById('pulse-bar-style')) {
       const s = document.createElement('style');
@@ -695,6 +708,20 @@ const OrcamentoSINAPI = {
       el.style.background  = sel ? 'rgba(201,162,39,.08)' : 'transparent';
       el.querySelector('input').checked = sel;
     });
+    this._updateOfficialSnapshotAvailability();
+  },
+
+  _updateOfficialSnapshotAvailability() {
+    const desonerado = document.querySelector('input[name="imp-serie"]:checked')?.value === 'true';
+    const uf = String(document.getElementById('imp-uf')?.value || '').toUpperCase();
+    const ref = String(document.getElementById('imp-ref')?.value || '');
+    const btn = document.getElementById('btn-puxar-oficial');
+    if (!btn) return;
+    const snap = SINAPI.snapshotFor(uf, ref, desonerado);
+    btn.disabled = !snap;
+    btn.textContent = snap
+      ? `⚡ Carregar snapshot ${snap.uf} ${snap.referencia} (${desonerado ? 'sem oneração' : 'com oneração'})`
+      : `Sem snapshot 1-clique para ${uf || 'UF'} ${ref || 'competência'} — importe o arquivo da Caixa`;
   },
 
   _onDrop(e) {
@@ -715,6 +742,8 @@ const OrcamentoSINAPI = {
 
   async puxarOficialAutomatico() {
     const desonerado = document.querySelector('input[name="imp-serie"]:checked')?.value === 'true';
+    const uf = String(document.getElementById('imp-uf')?.value || '').toUpperCase();
+    const ref = String(document.getElementById('imp-ref')?.value || '');
     const btnPuxar = document.getElementById('btn-puxar-oficial');
     const btnConf  = document.getElementById('btn-imp-confirmar');
     const progEl   = document.getElementById('imp-progress');
@@ -730,7 +759,7 @@ const OrcamentoSINAPI = {
     if (resEl) resEl.style.display = 'none';
 
     const resultado = await SINAPI.puxarOficial(
-      desonerado,
+      desonerado, uf, ref,
       (msg) => {
         if (progMsg) progMsg.textContent = msg;
       }
@@ -739,7 +768,7 @@ const OrcamentoSINAPI = {
     if (progEl) progEl.style.display = 'none';
     if (btnPuxar) {
       btnPuxar.disabled = false;
-      btnPuxar.innerHTML = '<span>⚡</span> Puxar Tabela Oficial Caixa Agora (1-Clique)';
+      btnPuxar.innerHTML = '<span>⚡</span> Verificar snapshot para a seleção';
     }
 
     if (resultado.ok) {
@@ -750,7 +779,7 @@ const OrcamentoSINAPI = {
             <span style="font-size:1.5rem">✅</span>
             <div>
               <div style="font-weight:700;color:var(--success);">Tabela Oficial Carregada!</div>
-              <div style="font-size:.8rem;color:var(--text2);margin-top:3px;">${resultado.msg}</div>
+              <div style="font-size:.8rem;color:var(--text2);margin-top:3px;">${Utils.escapeHtml(resultado.msg || '')}</div>
             </div>
           </div>`;
       }
@@ -776,7 +805,7 @@ const OrcamentoSINAPI = {
             <span style="font-size:1.5rem">❌</span>
             <div>
               <div style="font-weight:700;color:var(--danger);">Erro ao carregar tabela oficial</div>
-              <div style="font-size:.8rem;color:var(--text2);margin-top:3px;">${resultado.msg}</div>
+              <div style="font-size:.8rem;color:var(--text2);margin-top:3px;">${Utils.escapeHtml(resultado.msg || '')}</div>
             </div>
           </div>`;
       }
@@ -813,7 +842,7 @@ const OrcamentoSINAPI = {
           <span style="font-size:1.5rem">✅</span>
           <div>
             <div style="font-weight:700;color:var(--success);">Importação concluída!</div>
-            <div style="font-size:.8rem;color:var(--text2);margin-top:3px;">${resultado.msg}</div>
+            <div style="font-size:.8rem;color:var(--text2);margin-top:3px;">${Utils.escapeHtml(resultado.msg || '')}</div>
           </div>
         </div>`;
       Utils.toast(resultado.msg, 'success');
@@ -832,7 +861,7 @@ const OrcamentoSINAPI = {
           <span style="font-size:1.5rem">❌</span>
           <div>
             <div style="font-weight:700;color:var(--danger);">Erro na importação</div>
-            <div style="font-size:.8rem;color:var(--text2);margin-top:3px;">${resultado.msg}</div>
+            <div style="font-size:.8rem;color:var(--text2);margin-top:3px;">${Utils.escapeHtml(resultado.msg || '')}</div>
           </div>
         </div>`;
       document.getElementById('btn-imp-confirmar').disabled = false;

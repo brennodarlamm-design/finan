@@ -42,6 +42,39 @@ function setCors(req, res) {
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, x-api-key, apikey, x-tenant-id');
 }
 
+const SESSION_COOKIE = 'finobra_session_token';
+
+function cookieSecure(req) {
+  const proto = String(req.headers['x-forwarded-proto'] || '').toLowerCase();
+  return proto === 'https' || Boolean(process.env.VERCEL);
+}
+
+function setSessionCookie(req, res, token, expMs) {
+  if (!token) return;
+  const maxAge = Math.max(60, Math.floor((Number(expMs) - Date.now()) / 1000));
+  const parts = [
+    `${SESSION_COOKIE}=${encodeURIComponent(token)}`,
+    'Path=/',
+    'HttpOnly',
+    'SameSite=Lax',
+    `Max-Age=${maxAge}`
+  ];
+  if (cookieSecure(req)) parts.push('Secure');
+  res.setHeader('Set-Cookie', parts.join('; '));
+}
+
+function clearSessionCookie(req, res) {
+  const parts = [
+    `${SESSION_COOKIE}=`,
+    'Path=/',
+    'HttpOnly',
+    'SameSite=Lax',
+    'Max-Age=0'
+  ];
+  if (cookieSecure(req)) parts.push('Secure');
+  res.setHeader('Set-Cookie', parts.join('; '));
+}
+
 function decodeJwtPayload(token) {
   try {
     const parts = token.split('.');
@@ -79,6 +112,7 @@ function permissionsOf(row) {
 
 export default async function handler(req, res) {
   setCors(req, res);
+  res.setHeader('Cache-Control', 'no-store');
 
   if (req.method === 'OPTIONS') {
     return res.status(200).end();
@@ -178,6 +212,7 @@ export default async function handler(req, res) {
         }, secret);
       }
 
+      if (refreshedToken) setSessionCookie(req, res, refreshedToken, Number(auth.user.exp) > Date.now() ? Number(auth.user.exp) : Date.now() + 2 * 24 * 60 * 60 * 1000);
       return res.status(200).json({
         success: true,
         token: refreshedToken || undefined,
@@ -202,7 +237,7 @@ export default async function handler(req, res) {
     // ── 2. POST /api/auth?action=login ──────────────────────────────────────────
     if (req.method === 'POST' && action === 'login') {
       const clientIp = getClientIp(req);
-      const rl = checkRateLimit(`login:${clientIp}`, 10, 60000);
+      const rl = await checkRateLimit(`login:${clientIp}`, 10, 60000);
       if (!rl.allowed) {
         return res.status(429).json({
           success: false,
@@ -282,6 +317,7 @@ export default async function handler(req, res) {
       };
 
       const token = signToken(payload, secret);
+      setSessionCookie(req, res, token, exp);
 
       return res.status(200).json({
         success: true,
@@ -305,7 +341,7 @@ export default async function handler(req, res) {
     // ── 3. POST /api/auth?action=register (Cadastro de novo Tenant SaaS no Neon) ─
     if (req.method === 'POST' && action === 'register') {
       const clientIp = getClientIp(req);
-      const rl = checkRateLimit(`reg:${clientIp}`, 5, 3600000); // 5 cadastros por hora por IP
+      const rl = await checkRateLimit(`reg:${clientIp}`, 5, 3600000); // 5 cadastros por hora por IP
       if (!rl.allowed) {
         return res.status(429).json({
           success: false,
@@ -405,6 +441,7 @@ export default async function handler(req, res) {
       };
 
       const token = signToken(payload, secret);
+      setSessionCookie(req, res, token, exp);
 
       return res.status(200).json({
         success: true,
@@ -427,6 +464,11 @@ export default async function handler(req, res) {
 
     // ── 3.1 POST /api/auth?action=google (Autenticação Google com Verificação Criptográfica RSA)
     if (req.method === 'POST' && action === 'google') {
+      const googleIp = getClientIp(req);
+      const googleRl = await checkRateLimit(`google:${googleIp}`, 20, 60000);
+      if (!googleRl.allowed) {
+        return res.status(429).json({ success:false, message:'Muitas tentativas de login Google. Aguarde um minuto.' });
+      }
       const { credentialJwt } = req.body || {};
       if (!credentialJwt) {
         return res.status(400).json({ success: false, message: 'Token de credencial Google é obrigatório.' });
@@ -564,6 +606,7 @@ export default async function handler(req, res) {
       };
 
       const token = signToken(payload, secret);
+      setSessionCookie(req, res, token, exp);
 
       return res.status(200).json({
         success: true,
@@ -608,13 +651,14 @@ export default async function handler(req, res) {
       const auth = await resolveAuthAndTenant(req);
       if (!auth.authenticated) {
         // Logout deve ser idempotente: cliente pode limpar a sessão mesmo se ela já expirou.
-        if (action === 'logout') return res.status(200).json({ success:true });
+        if (action === 'logout') { clearSessionCookie(req, res); return res.status(200).json({ success:true }); }
         return res.status(auth.status || 401).json({ success:false, error:auth.error || 'Não autorizado.' });
       }
-      if (auth.isSystem) return res.status(200).json({ success:true });
+      if (auth.isSystem) { if (action === 'logout') clearSessionCookie(req, res); return res.status(200).json({ success:true }); }
       const currentId = String(auth.user.sessionId || '');
       if (action === 'logout') {
         if (currentId) await sql`UPDATE auth_sessions SET revoked_at=COALESCE(revoked_at,NOW()) WHERE id=${currentId} AND user_id=${auth.user.userId};`;
+        clearSessionCookie(req, res);
         return res.status(200).json({ success:true });
       }
       if (action === 'revoke_session') {
@@ -633,7 +677,7 @@ export default async function handler(req, res) {
     // ── 4. POST /api/auth?action=request_reset (Gera OTP Seguro no Neon com Rate Limiting)
     if (req.method === 'POST' && action === 'request_reset') {
       const clientIp = getClientIp(req);
-      const rlReset = checkRateLimit(`reset:${clientIp}`, 5, 60000);
+      const rlReset = await checkRateLimit(`reset:${clientIp}`, 5, 60000);
       if (!rlReset.allowed) {
         return res.status(429).json({
           success: false,
@@ -752,6 +796,11 @@ export default async function handler(req, res) {
     // ── 5. POST /api/auth?action=verify_reset (Valida OTP e altera senha) ─────────
     if (req.method === 'POST' && action === 'verify_reset') {
       const { userId, code, newPassword } = req.body || {};
+      const verifyIp = getClientIp(req);
+      const verifyRl = await checkRateLimit(`verify-reset:${verifyIp}:${String(userId || '').slice(0,80)}`, 15, 10 * 60 * 1000);
+      if (!verifyRl.allowed) {
+        return res.status(429).json({ success:false, message:'Muitas tentativas de validação. Aguarde alguns minutos e tente novamente.' });
+      }
       if (!userId || !code || !newPassword) {
         return res.status(400).json({ success: false, message: 'Dados incompletos para redefinição de senha.' });
       }

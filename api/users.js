@@ -306,7 +306,7 @@ export default async function handler(req, res) {
 
       if (req.method !== 'POST') return res.status(405).json({ success:false, error:'Método não permitido.' });
 
-      const rl = checkRateLimit(`support:${auth.tenantId}:${auth.user.userId}:${getClientIp(req)}`, 40, 60000);
+      const rl = await checkRateLimit(`support:${auth.tenantId}:${auth.user.userId}:${getClientIp(req)}`, 40, 60000);
       if (!rl.allowed) return res.status(429).json({ success:false, error:'Muitas mensagens em pouco tempo. Aguarde alguns instantes.' });
 
       if (action === 'start') {

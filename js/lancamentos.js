@@ -368,7 +368,7 @@ const Lancamentos = {
 
             <div class="form-group" style="margin-bottom:14px;">
               <label class="form-label">Linha Digit&aacute;vel / C&oacute;digo de Barras do Boleto / Chave Pix</label>
-              <input class="form-control" name="codigo_barras" value="${l.codigo_barras||''}" placeholder="Ex: 34191.79001 01043.510047 91020.150008 5 98760000012000" style="font-family:monospace;font-size:.82rem;">
+              <input class="form-control" name="codigo_barras" value="${Utils.escapeHtml(l.codigo_barras||'')}" placeholder="Ex: 34191.79001 01043.510047 91020.150008 5 98760000012000" style="font-family:monospace;font-size:.82rem;">
             </div>
 
             <div class="form-group" id="lan-nf-group" style="margin-bottom:14px;display:${initialTipo==='despesa'?'block':'none'};">
@@ -384,7 +384,7 @@ const Lancamentos = {
               <div class="form-group"><label class="form-label">Origem</label><select class="form-control" name="origem"><option value="manual" ${(l.origem||'manual')==='manual'?'selected':''}>&#x270D; Manual</option><option value="ocr" ${l.origem==='ocr'?'selected':''}>🤖 Reconhecimento OCR</option><option value="ofx" ${l.origem==='ofx'?'selected':''}>&#x1F504; Importado OFX</option><option value="importacao_excel" ${l.origem==='importacao_excel'?'selected':''}>📊 Planilha Excel</option><option value="medicao" ${l.origem==='medicao'?'selected':''}>&#x1F4CB; Medi&ccedil;&atilde;o Caixa</option></select></div>
             </div>
 
-            <div class="form-group"><label class="form-label">Observa&ccedil;&otilde;es</label><textarea class="form-control" name="observacoes" rows="2" placeholder="Observações adicionais ou notas">${l.observacoes||''}</textarea></div>
+            <div class="form-group"><label class="form-label">Observa&ccedil;&otilde;es</label><textarea class="form-control" name="observacoes" rows="2" placeholder="Observações adicionais ou notas">${Utils.escapeHtml(l.observacoes||'')}</textarea></div>
 
             <!-- SEÇÃO DE ITENS / PRODUTOS -->
             <div id="lan-itens-container" style="display:${initialTipo==='despesa'?'block':'none'};">
@@ -765,7 +765,7 @@ const Lancamentos = {
           <button class="modal-close" onclick="Utils.closeModal()">✕</button>
         </div>
         <div class="modal-body" style="padding:16px 20px;">
-          <div style="font-weight:700;color:var(--text);margin-bottom:4px;">${l.descricao}</div>
+          <div style="font-weight:700;color:var(--text);margin-bottom:4px;">${Utils.escapeHtml(l.descricao)}</div>
           <div style="font-size:1.2rem;font-weight:900;color:${isRec?'var(--success)':'var(--danger)'};margin-bottom:12px;">
             ${isRec?'+':'-'}${Utils.fmt.currency(l.valor)}
           </div>
@@ -996,15 +996,15 @@ const Lancamentos = {
     if (!l || !l.itens?.length) return;
     const rows = l.itens.map((it, i) => `
       <tr style="background:${i%2===0?'var(--bg-card)':'var(--bg-secondary)'}">
-        <td style="padding:8px 12px;font-weight:700;color:var(--text);">${it.produto}</td>
-        <td style="padding:8px 12px;text-align:right;color:var(--text2);">${it.qtd} ${it.unidade}</td>
+        <td style="padding:8px 12px;font-weight:700;color:var(--text);">${Utils.escapeHtml(it.produto)}</td>
+        <td style="padding:8px 12px;text-align:right;color:var(--text2);">${Utils.escapeHtml(it.qtd)} ${Utils.escapeHtml(it.unidade)}</td>
         <td style="padding:8px 12px;text-align:right;color:var(--text2);">${Utils.fmt.currency(it.valor_unit)}</td>
         <td style="padding:8px 12px;text-align:right;font-weight:800;color:var(--danger);">- ${Utils.fmt.currency(it.total || (it.qtd * it.valor_unit))}</td>
       </tr>`).join('');
     Utils.showModal(`
       <div class="modal" style="max-width:560px;">
         <div class="modal-header">
-          <span class="modal-title">📦 Produtos — ${l.descricao}</span>
+          <span class="modal-title">📦 Produtos — ${Utils.escapeHtml(l.descricao)}</span>
           <button class="modal-close" onclick="Utils.closeModal()">✕</button>
         </div>
         <div class="modal-body">

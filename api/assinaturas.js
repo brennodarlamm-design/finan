@@ -48,7 +48,7 @@ export default async function handler(req, res) {
     // Consulta pública: valida somente registros realmente existentes no Neon.
     if (req.method === 'GET') {
       const ip = getClientIp(req);
-      const rl = checkRateLimit(`assinatura:public:${ip}`, 30, 60_000);
+      const rl = await checkRateLimit(`assinatura:public:${ip}`, 30, 60_000);
       if (!rl.allowed) return res.status(429).json({ success: false, error: 'Muitas consultas. Tente novamente em instantes.' });
 
       const code = clean(req.query?.code || req.query?.val, 80).toUpperCase();
@@ -112,7 +112,7 @@ export default async function handler(req, res) {
         return res.status(403).json(planError('signatures', auth.user?.tenantPlan));
       }
 
-      const rl = checkRateLimit(`assinatura:write:${auth.tenantId}:${auth.user?.id || 'user'}`, 60, 60_000);
+      const rl = await checkRateLimit(`assinatura:write:${auth.tenantId}:${auth.user?.id || 'user'}`, 60, 60_000);
       if (!rl.allowed) return res.status(429).json({ success: false, error: 'Limite de registros atingido. Tente novamente em instantes.' });
 
       const b = req.body || {};

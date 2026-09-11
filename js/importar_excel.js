@@ -381,13 +381,13 @@ const ImportarExcel = {
           <input type="checkbox" ${item.selected ? 'checked' : ''} onchange="ImportarExcel.toggleRow('${item.id_temp}', this.checked)">
         </td>
         <td>
-          <input type="date" class="form-control" style="padding:2px 4px;font-size:.76rem;" value="${item.data}" onchange="ImportarExcel.updateCell('${item.id_temp}', 'data', this.value)">
+          <input type="date" class="form-control" style="padding:2px 4px;font-size:.76rem;" value="${Utils.escapeHtml(item.data)}" onchange="ImportarExcel.updateCell('${item.id_temp}', 'data', this.value)">
         </td>
         <td>
-          <input type="date" class="form-control" style="padding:2px 4px;font-size:.76rem;" value="${item.data_vencimento}" onchange="ImportarExcel.updateCell('${item.id_temp}', 'data_vencimento', this.value)">
+          <input type="date" class="form-control" style="padding:2px 4px;font-size:.76rem;" value="${Utils.escapeHtml(item.data_vencimento)}" onchange="ImportarExcel.updateCell('${item.id_temp}', 'data_vencimento', this.value)">
         </td>
         <td>
-          <input type="date" class="form-control" style="padding:2px 4px;font-size:.76rem;border-color:var(--success);" value="${item.data_pagamento||''}" onchange="ImportarExcel.updateCell('${item.id_temp}', 'data_pagamento', this.value)">
+          <input type="date" class="form-control" style="padding:2px 4px;font-size:.76rem;border-color:var(--success);" value="${Utils.escapeHtml(item.data_pagamento||'')}" onchange="ImportarExcel.updateCell('${item.id_temp}', 'data_pagamento', this.value)">
         </td>
         <td>
           <select class="form-control" style="padding:2px 4px;font-size:.76rem;color:${isRec?'var(--success)':'var(--danger)'};font-weight:700;" onchange="ImportarExcel.updateCell('${item.id_temp}', 'tipo', this.value)">
@@ -401,11 +401,11 @@ const ImportarExcel = {
           </select>
         </td>
         <td>
-          <input type="text" class="form-control" style="padding:2px 6px;font-size:.78rem;" value="${item.descricao}" onchange="ImportarExcel.updateCell('${item.id_temp}', 'descricao', this.value)">
+          <input type="text" class="form-control" style="padding:2px 6px;font-size:.78rem;" value="${Utils.escapeHtml(item.descricao)}" onchange="ImportarExcel.updateCell('${item.id_temp}', 'descricao', this.value)">
         </td>
         <td>
           <select class="form-control" style="padding:2px 4px;font-size:.76rem;max-width:130px;" onchange="ImportarExcel.updateCell('${item.id_temp}', 'categoria', this.value)">
-            <option value="${item.categoria}" selected>${Utils.catLabel(item.categoria)}</option>
+            <option value="${Utils.escapeHtml(item.categoria)}" selected>${Utils.escapeHtml(Utils.catLabel(item.categoria))}</option>
             <optgroup label="💰 Receitas">
               <option value="parcela_caixa">🏦 Parcela Caixa</option>
               <option value="entrada_propria">💵 Entrada Própria</option>
@@ -437,10 +437,10 @@ const ImportarExcel = {
           </select>
         </td>
         <td>
-          <input type="text" class="form-control" style="padding:2px 6px;font-size:.78rem;" value="${item.fornecedor_beneficiario}" onchange="ImportarExcel.updateCell('${item.id_temp}', 'fornecedor_beneficiario', this.value)">
+          <input type="text" class="form-control" style="padding:2px 6px;font-size:.78rem;" value="${Utils.escapeHtml(item.fornecedor_beneficiario)}" onchange="ImportarExcel.updateCell('${item.id_temp}', 'fornecedor_beneficiario', this.value)">
         </td>
         <td>
-          <input type="number" step="0.01" class="form-control" style="padding:2px 6px;font-size:.78rem;text-align:right;font-weight:800;color:${isRec?'var(--success)':'var(--danger)'};" value="${item.valor}" oninput="ImportarExcel.updateCell('${item.id_temp}', 'valor', parseFloat(this.value)||0)">
+          <input type="number" step="0.01" class="form-control" style="padding:2px 6px;font-size:.78rem;text-align:right;font-weight:800;color:${isRec?'var(--success)':'var(--danger)'};" value="${Utils.escapeHtml(item.valor)}" oninput="ImportarExcel.updateCell('${item.id_temp}', 'valor', parseFloat(this.value)||0)">
         </td>
         <td>
           <select class="form-control" style="padding:2px 4px;font-size:.74rem;" onchange="ImportarExcel.updateCell('${item.id_temp}', 'status', this.value)">

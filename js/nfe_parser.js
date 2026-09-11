@@ -256,15 +256,15 @@ const NFeParser = {
               return `
               <tr>
                 <td>
-                  ${chave ? `<code style="font-size:.7rem;color:var(--text2);word-break:break-all;">${nfe._fmtChave(chave)}</code>` : `<span style="font-size:.78rem;color:var(--text3);">${item.arquivo || '—'}</span>`}
-                  ${item.arquivo && chave ? `<div style="font-size:.68rem;color:var(--text3);">${item.arquivo}</div>` : ''}
+                  ${chave ? `<code style="font-size:.7rem;color:var(--text2);word-break:break-all;">${nfe._fmtChave(chave)}</code>` : `<span style="font-size:.78rem;color:var(--text3);">${Utils.escapeHtml(item.arquivo || '—')}</span>`}
+                  ${item.arquivo && chave ? `<div style="font-size:.68rem;color:var(--text3);">${Utils.escapeHtml(item.arquivo)}</div>` : ''}
                 </td>
                 <td>
                   <span style="background:${st.color}22;color:${st.color};border:1px solid ${st.color}44;padding:3px 8px;border-radius:20px;font-size:.73rem;font-weight:700;white-space:nowrap;">
                     ${st.icon} ${st.label}
                   </span>
                 </td>
-                <td style="font-size:.75rem;color:var(--text3);max-width:220px;">${item.statusMessage || '—'}</td>
+                <td style="font-size:.75rem;color:var(--text3);max-width:220px;">${Utils.escapeHtml(item.statusMessage || '—')}</td>
                 <td style="text-align:right;">
                   <div style="display:flex;gap:5px;justify-content:flex-end;">
                     ${item.status === 'OK' && chave ? `
@@ -330,8 +330,8 @@ const NFeParser = {
         <div onclick="NFeParser.confirmarAnexo('${l.id}','${chave}',NFe)"
           style="padding:10px 14px;background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--r-md);cursor:pointer;"
           onmouseover="this.style.borderColor='var(--accent)'" onmouseout="this.style.borderColor='var(--border)'">
-          <div style="font-weight:700;font-size:.84rem;color:var(--text);">${l.descricao}</div>
-          <div style="font-size:.74rem;color:var(--text3);">${obra?.nome||'—'} · ${Utils.fmt.currency(l.valor)} · ${Utils.fmt.date(l.data||l.data_vencimento)}</div>
+          <div style="font-weight:700;font-size:.84rem;color:var(--text);">${Utils.escapeHtml(l.descricao || '')}</div>
+          <div style="font-size:.74rem;color:var(--text3);">${Utils.escapeHtml(obra?.nome || '—')} · ${Utils.fmt.currency(l.valor)} · ${Utils.fmt.date(l.data||l.data_vencimento)}</div>
         </div>`;
     }).join('');
   },

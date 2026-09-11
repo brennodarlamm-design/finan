@@ -54,7 +54,7 @@ export default async function handler(req, res) {
     // Qualquer usuário autenticado pode reportar um erro do próprio navegador.
     // O rate-limit evita que um loop de frontend lote a tabela.
     if (req.method === 'POST' && action === 'client_error') {
-      const rl = checkRateLimit(`client-error:${auth.user?.userId || getClientIp(req)}`, 30, 10 * 60 * 1000);
+      const rl = await checkRateLimit(`client-error:${auth.user?.userId || getClientIp(req)}`, 30, 10 * 60 * 1000);
       if (!rl.allowed) return res.status(202).json({ success:true, throttled:true });
 
       const b = req.body || {};

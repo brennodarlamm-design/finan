@@ -501,7 +501,7 @@ const Contratos = {
 
         <div class="modal-body" style="overflow-y:auto;padding:20px;flex:1;">
           <form id="f-contrato">
-            <input type="hidden" name="id" value="${dados.id || ''}">
+            <input type="hidden" name="id" value="${e(dados.id || '')}">
 
             <!-- Bloco 1: Vínculo da Obra e Modelo -->
             <div style="background:var(--bg-secondary);border:1px solid var(--border-s);border-radius:8px;padding:16px;margin-bottom:18px;">
@@ -514,13 +514,13 @@ const Contratos = {
                   <label class="form-label">Obra / Cliente Cadastrado *</label>
                   <select class="form-control" name="obra_id" id="ct-obra-select" onchange="Contratos._onObraChange(this.value)" required>
                     <option value="">Selecione uma Obra para Puxar os Dados...</option>
-                    ${cs.map(c => `<option value="${c.id}" ${c.id===(dados.obra_id||App.obraId)?'selected':''}>${c.nome} &mdash; ${c.cidade}/${c.estado} (Contrato Caixa: ${c.num_contrato_caixa||'—'})</option>`).join('')}
+                    ${cs.map(c => `<option value="${e(c.id)}" ${c.id===(dados.obra_id||App.obraId)?'selected':''}>${e(c.nome)} &mdash; ${e(c.cidade)}/${e(c.estado)} (Contrato Caixa: ${e(c.num_contrato_caixa||'—')})</option>`).join('')}
                   </select>
                 </div>
                 <div class="form-group">
                   <label class="form-label">Modelo Contratual *</label>
                   <select class="form-control" name="modelo_key" id="ct-modelo-select" onchange="Contratos._onModeloSelect(this.value)">
-                    ${Object.entries(modelos).map(([k, m]) => `<option value="${k}" ${k===modeloKey?'selected':''}>${m.nome}</option>`).join('')}
+                    ${Object.entries(modelos).map(([k, m]) => `<option value="${e(k)}" ${k===modeloKey?'selected':''}>${e(m.nome)}</option>`).join('')}
                   </select>
                 </div>
               </div>
@@ -528,11 +528,11 @@ const Contratos = {
               <div class="form-row cols-2">
                 <div class="form-group">
                   <label class="form-label">Título da Capa *</label>
-                  <input class="form-control" name="titulo" id="ct-titulo" value="${dados.titulo || 'CONTRATO DE PRESTAÇÃO DE SERVIÇO DE CONSTRUÇÃO'}" required>
+                  <input class="form-control" name="titulo" id="ct-titulo" value="${e(dados.titulo || 'CONTRATO DE PRESTAÇÃO DE SERVIÇO DE CONSTRUÇÃO')}" required>
                 </div>
                 <div class="form-group">
                   <label class="form-label">Subtítulo da Capa</label>
-                  <input class="form-control" name="subtitulo" id="ct-subtitulo" value="${dados.subtitulo || `MCMV — ${empNome.toUpperCase()}`}">
+                  <input class="form-control" name="subtitulo" id="ct-subtitulo" value="${e(dados.subtitulo || `MCMV — ${empNome.toUpperCase()}`)}">
                 </div>
               </div>
             </div>
@@ -546,48 +546,48 @@ const Contratos = {
               <div class="form-row cols-2" style="margin-bottom:10px;">
                 <div class="form-group">
                   <label class="form-label">Nome Completo *</label>
-                  <input class="form-control" name="contratante_nome" id="ct-cli-nome" value="${dados.contratante_nome || ''}" required placeholder="Ex: Nome completo do contratante">
+                  <input class="form-control" name="contratante_nome" id="ct-cli-nome" value="${e(dados.contratante_nome || '')}" required placeholder="Ex: Nome completo do contratante">
                 </div>
                 <div class="form-group">
                   <label class="form-label">CPF *</label>
-                  <input class="form-control" name="contratante_doc" id="ct-cli-doc" value="${dados.contratante_doc || ''}" required placeholder="000.000.000-00">
+                  <input class="form-control" name="contratante_doc" id="ct-cli-doc" value="${e(dados.contratante_doc || '')}" required placeholder="000.000.000-00">
                 </div>
               </div>
 
               <div class="form-row cols-3" style="margin-bottom:10px;">
                 <div class="form-group">
                   <label class="form-label">RG / Órgão Emissor</label>
-                  <input class="form-control" name="contratante_rg" id="ct-cli-rg" value="${dados.contratante_rg || ''}" placeholder="Ex: 123456 SSP/UF">
+                  <input class="form-control" name="contratante_rg" id="ct-cli-rg" value="${e(dados.contratante_rg || '')}" placeholder="Ex: 123456 SSP/UF">
                 </div>
                 <div class="form-group">
                   <label class="form-label">Data de Nascimento</label>
-                  <input class="form-control" name="contratante_nascimento" id="ct-cli-nasc" value="${dados.contratante_nascimento || ''}" placeholder="Ex: 24 de setembro de 2004">
+                  <input class="form-control" name="contratante_nascimento" id="ct-cli-nasc" value="${e(dados.contratante_nascimento || '')}" placeholder="Ex: 24 de setembro de 2004">
                 </div>
                 <div class="form-group">
                   <label class="form-label">Nacionalidade / Estado Civil</label>
-                  <input class="form-control" name="contratante_estado_civil" id="ct-cli-civil" value="${dados.contratante_estado_civil || 'brasileira, solteira'}" placeholder="brasileira, solteira">
+                  <input class="form-control" name="contratante_estado_civil" id="ct-cli-civil" value="${e(dados.contratante_estado_civil || 'brasileira, solteira')}" placeholder="brasileira, solteira">
                 </div>
               </div>
 
               <div class="form-row cols-2" style="margin-bottom:10px;">
                 <div class="form-group">
                   <label class="form-label">Endereço Residencial do Cliente</label>
-                  <input class="form-control" name="contratante_endereco" id="ct-cli-end" value="${dados.contratante_endereco || ''}" placeholder="Rua, número, bairro">
+                  <input class="form-control" name="contratante_endereco" id="ct-cli-end" value="${e(dados.contratante_endereco || '')}" placeholder="Rua, número, bairro">
                 </div>
                 <div class="form-group">
                   <label class="form-label">CEP / Cidade / UF</label>
-                  <input class="form-control" name="contratante_cidade_uf" id="ct-cli-cid" value="${dados.contratante_cidade_uf || ''}">
+                  <input class="form-control" name="contratante_cidade_uf" id="ct-cli-cid" value="${e(dados.contratante_cidade_uf || '')}">
                 </div>
               </div>
 
               <div class="form-row cols-2">
                 <div class="form-group">
                   <label class="form-label">Telefone / WhatsApp</label>
-                  <input class="form-control" name="contratante_telefone" id="ct-cli-tel" value="${dados.contratante_telefone || ''}" placeholder="(00) 90000-0000">
+                  <input class="form-control" name="contratante_telefone" id="ct-cli-tel" value="${e(dados.contratante_telefone || '')}" placeholder="(00) 90000-0000">
                 </div>
                 <div class="form-group">
                   <label class="form-label">E-mail</label>
-                  <input class="form-control" name="contratante_email" id="ct-cli-email" value="${dados.contratante_email || ''}" placeholder="cliente@email.com">
+                  <input class="form-control" name="contratante_email" id="ct-cli-email" value="${e(dados.contratante_email || '')}" placeholder="cliente@email.com">
                 </div>
               </div>
             </div>
@@ -601,22 +601,22 @@ const Contratos = {
               <div class="form-row cols-2" style="margin-bottom:10px;">
                 <div class="form-group">
                   <label class="form-label">Razão Social</label>
-                  <input class="form-control" name="contratada_nome" id="ct-emp-nome" value="${dados.contratada_nome || emp.razao_social || emp.nome_fantasia || ''}" required>
+                  <input class="form-control" name="contratada_nome" id="ct-emp-nome" value="${e(dados.contratada_nome || emp.razao_social || emp.nome_fantasia || '')}" required>
                 </div>
                 <div class="form-group">
                   <label class="form-label">CNPJ</label>
-                  <input class="form-control" name="contratada_doc" id="ct-emp-cnpj" value="${dados.contratada_doc || emp.cnpj || ''}">
+                  <input class="form-control" name="contratada_doc" id="ct-emp-cnpj" value="${e(dados.contratada_doc || emp.cnpj || '')}">
                 </div>
               </div>
 
               <div class="form-group" style="margin-bottom:10px;">
                 <label class="form-label">Sede da Construtora</label>
-                <input class="form-control" name="contratada_endereco" id="ct-emp-end" value="${dados.contratada_endereco || empEndereco || ''}">
+                <input class="form-control" name="contratada_endereco" id="ct-emp-end" value="${e(dados.contratada_endereco || empEndereco || '')}">
               </div>
 
               <div class="form-group">
                 <label class="form-label">Representante Legal &amp; Qualificação</label>
-                <input class="form-control" name="contratada_rep" id="ct-emp-rep" value="${dados.contratada_rep || emp.responsavel || ''}">
+                <input class="form-control" name="contratada_rep" id="ct-emp-rep" value="${e(dados.contratada_rep || emp.responsavel || '')}">
               </div>
             </div>
 
@@ -629,37 +629,37 @@ const Contratos = {
               <div class="form-row cols-3" style="margin-bottom:10px;">
                 <div class="form-group">
                   <label class="form-label">Valor Total da Obra (R$) *</label>
-                  <input class="form-control" type="number" step="0.01" name="valor" id="ct-valor" value="${dados.valor || '122000.00'}" required oninput="Contratos._recalcularValores()">
+                  <input class="form-control" type="number" step="0.01" name="valor" id="ct-valor" value="${e(dados.valor || '122000.00')}" required oninput="Contratos._recalcularValores()">
                 </div>
                 <div class="form-group">
                   <label class="form-label">Área Construída (m²) *</label>
-                  <input class="form-control" type="number" step="0.01" name="area_m2" id="ct-area" value="${dados.area_m2 || '40'}" required oninput="Contratos._recalcularValores()">
+                  <input class="form-control" type="number" step="0.01" name="area_m2" id="ct-area" value="${e(dados.area_m2 || '40')}" required oninput="Contratos._recalcularValores()">
                 </div>
                 <div class="form-group">
                   <label class="form-label">Valor por m² (R$/m²)</label>
-                  <input class="form-control" name="valor_m2" id="ct-valor-m2" value="${dados.valor_m2 || 'R$ 3.050,00'}" readonly style="background:var(--bg-card);font-weight:700;color:var(--accent);">
+                  <input class="form-control" name="valor_m2" id="ct-valor-m2" value="${e(dados.valor_m2 || 'R$ 3.050,00')}" readonly style="background:var(--bg-card);font-weight:700;color:var(--accent);">
                 </div>
               </div>
 
               <div class="form-row cols-2" style="margin-bottom:10px;">
                 <div class="form-group">
                   <label class="form-label">Valor da Entrada / Recursos Próprios (R$)</label>
-                  <input class="form-control" type="number" step="0.01" name="valor_entrada" id="ct-entrada" value="${dados.valor_entrada || '14504.52'}">
+                  <input class="form-control" type="number" step="0.01" name="valor_entrada" id="ct-entrada" value="${e(dados.valor_entrada || '14504.52')}">
                 </div>
                 <div class="form-group">
                   <label class="form-label">Parcela Paga na Assinatura da Caixa (R$)</label>
-                  <input class="form-control" name="parcela_entrada_caixa" id="ct-parc-caixa" value="${dados.parcela_entrada_caixa || 'R$ 10.978,13'}" placeholder="Ex: R$ 10.978,13">
+                  <input class="form-control" name="parcela_entrada_caixa" id="ct-parc-caixa" value="${e(dados.parcela_entrada_caixa || 'R$ 10.978,13')}" placeholder="Ex: R$ 10.978,13">
                 </div>
               </div>
 
               <div class="form-row cols-2">
                 <div class="form-group">
                   <label class="form-label">Prazo de Espera do Terreno (Dias)</label>
-                  <input class="form-control" type="number" name="dias_terreno" id="ct-dias-terreno" value="${dados.dias_terreno || '15'}">
+                  <input class="form-control" type="number" name="dias_terreno" id="ct-dias-terreno" value="${e(dados.dias_terreno || '15')}">
                 </div>
                 <div class="form-group">
                   <label class="form-label">Data de Emissão do Contrato</label>
-                  <input class="form-control" type="date" name="data_emissao" value="${dados.data_emissao || hoje}">
+                  <input class="form-control" type="date" name="data_emissao" value="${e(dados.data_emissao || hoje)}">
                 </div>
               </div>
             </div>

@@ -358,16 +358,16 @@ const ObraDetalhe = {
           ${Utils.fmt.date(l.data)}
         </td>
         <td>
-          <div style="font-weight:700;font-size:.85rem;color:var(--text);">${l.descricao}</div>
-          ${l.fornecedor ? `<div style="font-size:.72rem;color:var(--text3);">Fornecedor: ${l.fornecedor}</div>` : ''}
+          <div style="font-weight:700;font-size:.85rem;color:var(--text);">${Utils.escapeHtml(l.descricao)}</div>
+          ${l.fornecedor ? `<div style="font-size:.72rem;color:var(--text3);">Fornecedor: ${Utils.escapeHtml(l.fornecedor)}</div>` : ''}
         </td>
         <td>
           <span style="font-size:.75rem;color:var(--text2);background:var(--bg-secondary);padding:2px 8px;border-radius:4px;border:1px solid var(--border);">
-            ${l.categoria || 'Geral'}
+            ${Utils.escapeHtml(l.categoria || 'Geral')}
           </span>
         </td>
         <td style="font-size:.8rem;color:var(--text3);">
-          ${conta}
+          ${Utils.escapeHtml(conta)}
         </td>
         <td style="text-align:right;font-weight:900;font-size:.9rem;color:${isRec?'var(--success)':'var(--danger)'};white-space:nowrap;">
           ${isRec ? '+' : '-'} ${Utils.fmt.currency(l.valor)}
@@ -476,8 +476,8 @@ const ObraDetalhe = {
                   <tr>
                     <td style="font-weight:900;color:var(--accent);">${m.numero_medicao}ª</td>
                     <td>
-                      <div style="font-weight:700;color:var(--text);font-size:.85rem;">${m.etapa_descricao || 'Etapa da Obra'}</div>
-                      ${m.observacoes ? `<div style="font-size:.72rem;color:var(--text3);">${m.observacoes}</div>` : ''}
+                      <div style="font-weight:700;color:var(--text);font-size:.85rem;">${Utils.escapeHtml(m.etapa_descricao || 'Etapa da Obra')}</div>
+                      ${m.observacoes ? `<div style="font-size:.72rem;color:var(--text3);">${Utils.escapeHtml(m.observacoes)}</div>` : ''}
                     </td>
                     <td style="font-size:.8rem;color:var(--text2);">${Utils.fmt.date(m.data_medicao || m.data)}</td>
                     <td style="text-align:center;">
@@ -935,8 +935,8 @@ const ObraDetalhe = {
                 <tr>
                   <td style="text-align:center;font-weight:800;color:#0f172a;">${m.numero_medicao}ª</td>
                   <td>
-                    <div style="font-weight:700;color:#0f172a;">${m.etapa_descricao || 'Etapa da Obra'}</div>
-                    ${m.observacoes ? `<div style="font-size:8px;color:#64748b;">${m.observacoes}</div>` : ''}
+                    <div style="font-weight:700;color:#0f172a;">${Utils.escapeHtml(m.etapa_descricao || 'Etapa da Obra')}</div>
+                    ${m.observacoes ? `<div style="font-size:8px;color:#64748b;">${Utils.escapeHtml(m.observacoes)}</div>` : ''}
                   </td>
                   <td style="text-align:center;color:#475569;">${Utils.fmt.date(m.data_medicao || m.data)}</td>
                   <td style="text-align:center;font-weight:700;color:#0f766e;">${m.percentual_fisico || 0}%</td>
@@ -1051,8 +1051,8 @@ const ObraDetalhe = {
               ${lans.slice(0, 20).map(l => `
                 <tr>
                   <td style="color:#475569;">${Utils.fmt.date(l.data)}</td>
-                  <td style="font-weight:600;color:#0f172a;">${l.descricao}</td>
-                  <td style="color:#64748b;font-size:8.5px;">${l.categoria || 'Geral'}</td>
+                  <td style="font-weight:600;color:#0f172a;">${Utils.escapeHtml(l.descricao)}</td>
+                  <td style="color:#64748b;font-size:8.5px;">${Utils.escapeHtml(l.categoria || 'Geral')}</td>
                   <td style="text-align:center;font-weight:700;color:${l.tipo==='receita'?'#166534':'#991b1b'};">
                     ${l.tipo === 'receita' ? '+ Receita' : '- Despesa'}
                   </td>

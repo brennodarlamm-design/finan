@@ -230,7 +230,7 @@ const OFX = {
     <div style="padding:14px;background:var(--bg-secondary);border-radius:var(--r-md);border:1px solid var(--border-d)">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
         <div style="font-weight:700;color:var(--success);font-size:.9rem;">✅ OFX Analisado com Sucesso!</div>
-        ${data.org || data.acctId ? `<span class="badge badge-secondary" style="font-size:.72rem">🏦 ${data.org || ''} ${data.acctId ? '· ' + data.acctId : ''}</span>` : ''}
+        ${data.org || data.acctId ? `<span class="badge badge-secondary" style="font-size:.72rem">🏦 ${Utils.escapeHtml(data.org || '')} ${data.acctId ? '· ' + Utils.escapeHtml(data.acctId) : ''}</span>` : ''}
       </div>
       <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;font-size:.8rem">
         <div><div style="color:var(--text3);margin-bottom:2px">Transações</div><div style="font-weight:800;color:var(--accent);font-size:1.05rem;">${data.transacoes.length}</div></div>
@@ -545,6 +545,8 @@ const OFX = {
 
   // Modal com o relatório de sugestões do Robô Inteligente
   _abrirModalRobo(importId) {
+    const e = Utils.escapeHtml.bind(Utils);
+    const j = Utils.escapeJsAttr.bind(Utils);
     const imp = DB.getById('ofximports', importId);
     if (!imp) return;
 
@@ -626,7 +628,7 @@ const OFX = {
 
                     return `<tr>
                       <td style="font-size:.78rem;font-weight:600;">
-                        ${isCredit?'📈':'📉'} ${trn.memo.slice(0,28)}<br>
+                        ${isCredit?'📈':'📉'} ${e(trn.memo.slice(0,28))}<br>
                         <span style="font-size:.7rem;color:var(--text3);">📅 ${Utils.fmt.date(trn.data)}</span>
                       </td>
                       <td style="font-size:.82rem;font-weight:800;color:${isCredit?'var(--success)':'var(--danger)'};white-space:nowrap;">
@@ -636,17 +638,17 @@ const OFX = {
                         <span class="badge ${scoreBadgeCls}" style="font-size:.72rem;">${m.score}%</span>
                       </td>
                       <td style="font-size:.78rem;">
-                        <strong>${lan.descricao.slice(0,30)}</strong><br>
+                        <strong>${e(lan.descricao.slice(0,30))}</strong><br>
                         <span style="font-size:.7rem;color:var(--text3);">${Utils.fmt.date(lan.data)} · ${Utils.fmt.currency(lan.valor)}</span>
                       </td>
                       <td style="font-size:.76rem;color:var(--accent);">
-                        ${obNome}
+                        ${e(obNome)}
                       </td>
                       <td style="font-size:.75rem;white-space:nowrap;">
                         ${diffFmt}
                       </td>
                       <td style="text-align:right;white-space:nowrap;">
-                        <button class="btn btn-secondary btn-sm" onclick="OFX.conciliar('${importId}','${trn.id}','${lan.id}');OFX._abrirModalRobo('${importId}');" style="padding:3px 8px;font-size:.72rem;">✔ Conciliar</button>
+                        <button class="btn btn-secondary btn-sm" onclick="OFX.conciliar('${j(importId)}','${j(trn.id)}','${j(lan.id)}');OFX._abrirModalRobo('${j(importId)}');" style="padding:3px 8px;font-size:.72rem;">✔ Conciliar</button>
                       </td>
                     </tr>`;
                   }).join('')}
@@ -711,6 +713,8 @@ const OFX = {
   },
 
   _recItem(t, allLans, clientesMap, importId) {
+    const e = Utils.escapeHtml.bind(Utils);
+    const j = Utils.escapeJsAttr.bind(Utils);
     const isCredit = t.tipo === 'credito';
     const matched = t.lancamento_id ? allLans.find(l => l.id === t.lancamento_id) : null;
     const cls = t.status === 'conciliada' ? 'matched' : t.status === 'ignorada' ? 'ignored' : '';
@@ -743,33 +747,33 @@ const OFX = {
         candidateOptionsHtml = `
           <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
             <div style="background:rgba(201,162,39,.08);border:1.5px solid rgba(201,162,39,.35);border-radius:6px;padding:3px 8px;font-size:.74rem;display:flex;align-items:center;gap:6px;">
-              <span style="color:var(--text);"><span style="color:var(--accent);font-weight:700;">💡 Sugestão:</span> [${topObNome}] ${topLan.descricao.slice(0, 22)} (${Utils.fmt.currency(topLan.valor)} · ${topDiffTxt} · ${topSug.score}%)</span>
-              <button class="btn btn-sm btn-success" style="padding:2px 8px;font-size:.72rem;font-weight:700;white-space:nowrap;" onclick="OFX.conciliar('${importId}','${t.id}','${topLan.id}')" title="Aprovar e conciliar esta correspondência">
+              <span style="color:var(--text);"><span style="color:var(--accent);font-weight:700;">💡 Sugestão:</span> [${e(topObNome)}] ${e(topLan.descricao.slice(0, 22))} (${Utils.fmt.currency(topLan.valor)} · ${topDiffTxt} · ${topSug.score}%)</span>
+              <button class="btn btn-sm btn-success" style="padding:2px 8px;font-size:.72rem;font-weight:700;white-space:nowrap;" onclick="OFX.conciliar('${j(importId)}','${j(t.id)}','${j(topLan.id)}')" title="Aprovar e conciliar esta correspondência">
                 ✔ Conciliar
               </button>
             </div>
-            <select style="background:var(--bg-input);border:1px solid var(--border-d);color:var(--text);border-radius:6px;padding:5px 6px;font-size:.74rem;max-width:200px;" onchange="if(this.value) OFX.conciliar('${importId}','${t.id}',this.value)">
+            <select style="background:var(--bg-input);border:1px solid var(--border-d);color:var(--text);border-radius:6px;padding:5px 6px;font-size:.74rem;max-width:200px;" onchange="if(this.value) OFX.conciliar('${j(importId)}','${j(t.id)}',this.value)">
               <option value="">➕ Outro lançamento...</option>
               <optgroup label="🤖 Sugestões do Robô (${scoredCandidates.length})">${scoredCandidates.map(c => {
                 const l = c.lancamento;
                 const obNome = l.obra_id === 'escritorio' ? '🏢 Sede' : (clientesMap[l.obra_id]?.nome || 'Obra');
                 const diffTxt = c.diffValor === 0 ? 'Exato' : `±${Utils.fmt.currency(c.diffValor)}`;
-                return `<option value="${l.id}">[${obNome}] ${l.descricao.slice(0, 20)} (${Utils.fmt.currency(l.valor)} · ${diffTxt} · ${c.score}%)</option>`;
+                return `<option value="${e(l.id)}">[${e(obNome)}] ${e(l.descricao.slice(0, 20))} (${Utils.fmt.currency(l.valor)} · ${e(diffTxt)} · ${c.score}%)</option>`;
               }).join('')}</optgroup>
               ${extraLans.length > 0 ? `<optgroup label="📋 Outros Lançamentos">${extraLans.map(l => {
                 const obNome = l.obra_id === 'escritorio' ? '🏢 Sede' : (clientesMap[l.obra_id]?.nome || 'Obra');
-                return `<option value="${l.id}">[${obNome}] ${l.descricao.slice(0, 20)} (${Utils.fmt.currency(l.valor)})</option>`;
+                return `<option value="${e(l.id)}">[${e(obNome)}] ${e(l.descricao.slice(0, 20))} (${Utils.fmt.currency(l.valor)})</option>`;
               }).join('')}</optgroup>` : ''}
             </select>
           </div>
         `;
       } else {
         candidateOptionsHtml = `
-          <select style="background:var(--bg-input);border:1px solid var(--border-d);color:var(--text);border-radius:6px;padding:6px;font-size:.75rem;width:100%;max-width:280px;" onchange="if(this.value) OFX.conciliar('${importId}','${t.id}',this.value)">
+          <select style="background:var(--bg-input);border:1px solid var(--border-d);color:var(--text);border-radius:6px;padding:6px;font-size:.75rem;width:100%;max-width:280px;" onchange="if(this.value) OFX.conciliar('${j(importId)}','${j(t.id)}',this.value)">
             <option value="">➕ Vincular lançamento...</option>
             ${extraLans.length > 0 ? `<optgroup label="📋 Lançamentos">${extraLans.map(l => {
               const obNome = l.obra_id === 'escritorio' ? '🏢 Sede' : (clientesMap[l.obra_id]?.nome || 'Obra');
-              return `<option value="${l.id}">[${obNome}] ${l.descricao.slice(0, 24)} (${Utils.fmt.currency(l.valor)} - ${Utils.fmt.date(l.data)})</option>`;
+              return `<option value="${e(l.id)}">[${e(obNome)}] ${e(l.descricao.slice(0, 24))} (${Utils.fmt.currency(l.valor)} - ${Utils.fmt.date(l.data)})</option>`;
             }).join('')}</optgroup>` : ''}
           </select>
         `;
@@ -784,10 +788,10 @@ const OFX = {
       matchedHtml = `
         <div style="font-size:.76rem;color:var(--success);display:flex;flex-direction:column;">
           <div style="display:flex;align-items:center;gap:4px;">
-            <span style="font-weight:700;">✅ [${obNome}]</span>
+            <span style="font-weight:700;">✅ [${e(obNome)}]</span>
             ${diffLabel}
           </div>
-          <span style="color:var(--text);">${matched.descricao.slice(0, 32)} · ${Utils.fmt.currency(matched.valor)}</span>
+          <span style="color:var(--text);">${e(matched.descricao.slice(0, 32))} · ${Utils.fmt.currency(matched.valor)}</span>
         </div>
       `;
     } else if (t.status === 'ignorada') {
@@ -801,12 +805,12 @@ const OFX = {
       <div style="font-size:1.3rem;flex-shrink:0;">${isCredit ? '📈' : '📉'}</div>
       
       <div style="flex:1;min-width:0;">
-        <div style="font-size:.84rem;font-weight:700;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="${t.memo}">${t.memo}</div>
+        <div style="font-size:.84rem;font-weight:700;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="${e(t.memo)}">${e(t.memo)}</div>
         <div style="font-size:.74rem;color:var(--text3);display:flex;gap:8px;margin-top:2px;">
           <span>📅 ${Utils.fmt.date(t.data)}</span>
           <span>·</span>
           <span style="color:${isCredit?'var(--success)':'var(--danger)'};font-weight:600;">${isCredit ? 'Entrada / Crédito' : 'Saída / Débito'}</span>
-          ${t.id ? `<span style="color:var(--text3);font-size:.68rem;">(ID: ${String(t.id).slice(-8)})</span>` : ''}
+          ${t.id ? `<span style="color:var(--text3);font-size:.68rem;">(ID: ${e(String(t.id).slice(-8))})</span>` : ''}
         </div>
       </div>
 
@@ -820,12 +824,12 @@ const OFX = {
 
       <div style="display:flex;gap:4px;flex-shrink:0;">
         ${t.status === 'pendente' ? `
-          <button class="btn btn-primary btn-sm" onclick="OFX.criarLancamento('${importId}','${t.id}')" title="Criar novo lançamento para esta transação" style="padding:4px 8px;font-size:.75rem;font-weight:700;">+ Criar</button>
-          <button class="icon-btn btn-sm" onclick="OFX.ignorar('${importId}','${t.id}')" title="Ignorar transação" style="font-size:12px;color:var(--text3);">✕</button>
+          <button class="btn btn-primary btn-sm" onclick="OFX.criarLancamento('${j(importId)}','${j(t.id)}')" title="Criar novo lançamento para esta transação" style="padding:4px 8px;font-size:.75rem;font-weight:700;">+ Criar</button>
+          <button class="icon-btn btn-sm" onclick="OFX.ignorar('${j(importId)}','${j(t.id)}')" title="Ignorar transação" style="font-size:12px;color:var(--text3);">✕</button>
         ` : ''}
 
         ${t.status === 'conciliada' ? `
-          <button class="btn btn-secondary btn-sm" onclick="OFX.desconciliar('${importId}','${t.id}')" title="Desfazer conciliação" style="padding:4px 8px;font-size:.72rem;">↩ Desconciliar</button>
+          <button class="btn btn-secondary btn-sm" onclick="OFX.desconciliar('${j(importId)}','${j(t.id)}')" title="Desfazer conciliação" style="padding:4px 8px;font-size:.72rem;">↩ Desconciliar</button>
         ` : ''}
 
         ${t.status === 'ignorada' ? `

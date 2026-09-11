@@ -644,6 +644,15 @@ export default async function handler(req, res) {
       // 1. Sincronização em Massa (Local -> Neon com tenant_id)
       if (action === 'sync_all' && payload) {
         let totalCount = 0;
+        const failures = [];
+        const recordFailure = (table, item, error, code = 'SYNC_ITEM_FAILED') => {
+          failures.push({
+            table,
+            id: String(item?.cloud_id || item?.id || '').slice(0, 180) || null,
+            code,
+            error: String(error || 'Falha ao sincronizar registro.').slice(0, 500)
+          });
+        };
 
         // Obras — valida o lote inteiro antes da primeira gravação para evitar sync parcial
         if (Array.isArray(payload.clientes)) {
@@ -754,9 +763,15 @@ export default async function handler(req, res) {
 
         if (Array.isArray(payload.orcamentos_sinapi)) {
           for (const o of payload.orcamentos_sinapi) {
-            if (!o?.id || !validCloudId(o.id, 80)) continue;
+            if (!o?.id || !validCloudId(o.id, 80)) {
+              recordFailure('orcamentos_sinapi', o, 'ID de orçamento SINAPI inválido.', 'INVALID_ID');
+              continue;
+            }
             const safeObraId = await validateObraTenant(sql, o.obra_id, tenantId);
-            if (o.obra_id && !safeObraId) continue;
+            if (o.obra_id && !safeObraId) {
+              recordFailure('orcamentos_sinapi', o, 'A obra vinculada não pertence ao tenant autenticado.', 'INVALID_TENANT_RELATION');
+              continue;
+            }
             const dbObraId = (!safeObraId || safeObraId === 'escritorio' || safeObraId === 'geral') ? null : safeObraId;
             const rawJson = JSON.stringify(o);
             const subtotal = (Array.isArray(o.itens) ? o.itens : []).reduce((sum, item) => sum + cleanNum(item?.total), 0);
@@ -770,6 +785,7 @@ export default async function handler(req, res) {
               totalCount++;
             } catch (bulkErr) {
               console.warn('[Sync All] Falha ao salvar orcamento_sinapi:', bulkErr.message);
+              recordFailure('orcamentos_sinapi', o, bulkErr.message, 'DATABASE_WRITE_FAILED');
             }
           }
         }
@@ -777,9 +793,15 @@ export default async function handler(req, res) {
         if (Array.isArray(payload.doc_fases)) {
           for (const d of payload.doc_fases) {
             const cloudId = String(d?.cloud_id || d?.id || '').trim();
-            if (!validCloudId(cloudId, 180) || !d?.obra_id || !d?.doc_id) continue;
+            if (!validCloudId(cloudId, 180) || !d?.obra_id || !d?.doc_id) {
+              recordFailure('doc_fases', d, 'Fase documental com identificadores incompletos.', 'INVALID_ID');
+              continue;
+            }
             const safeObraId = await validateObraTenant(sql, d.obra_id, tenantId);
-            if (!safeObraId || ['escritorio','geral'].includes(safeObraId)) continue;
+            if (!safeObraId || ['escritorio','geral'].includes(safeObraId)) {
+              recordFailure('doc_fases', d, 'A obra da fase documental não pertence ao tenant autenticado.', 'INVALID_TENANT_RELATION');
+              continue;
+            }
             const rawJson = JSON.stringify({ ...d, id:d.doc_id });
             await sql`
               INSERT INTO obra_doc_fases (tenant_id,id,obra_id,doc_id,fase_key,payload)
@@ -936,7 +958,13 @@ export default async function handler(req, res) {
           acao: 'sincronizar', entidade: 'dados', entidadeId: null,
           depois: { total: totalCount, colecoes: Object.keys(payload || {}).filter(k => Array.isArray(payload[k]) && payload[k].length > 0) }
         });
-        return res.status(200).json({ success: true, synced: totalCount, message: 'Dados sincronizados com o Neon PostgreSQL!' });
+        if (failures.length) {
+          return res.status(207).json({
+            success: false, partial: true, synced: totalCount, failed: failures,
+            error: `${failures.length} registro(s) não foram confirmados. A migração permanecerá pendente para nova tentativa.`
+          });
+        }
+        return res.status(200).json({ success: true, synced: totalCount, failed: [], message: 'Dados sincronizados com o Neon PostgreSQL!' });
       }
 
       // 2. Salvar Registro Individual (Upsert com tenant_id)

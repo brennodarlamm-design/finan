@@ -68,6 +68,20 @@ const Utils = {
       .replace(/'/g, '&#039;');
   },
 
+  escapeJsAttr(value) {
+    // Valor seguro para uso dentro de string JS entre aspas simples em atributos HTML.
+    // Ex.: onclick="fn('...')". Prefira addEventListener quando possível.
+    const js = String(value ?? '')
+      .replace(/\\/g, '\\\\')
+      .replace(/'/g, "\\'")
+      .replace(/\r/g, '\\r')
+      .replace(/\n/g, '\\n')
+      .replace(/</g, '\\x3c')
+      .replace(/>/g, '\\x3e')
+      .replace(/&/g, '\\x26');
+    return this.escapeHtml(js);
+  },
+
   safeUrl(value) {
     if (!value) return '';
     const raw = String(value).trim();

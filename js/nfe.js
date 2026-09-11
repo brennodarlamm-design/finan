@@ -536,7 +536,7 @@ const NFe = {
       const data = await this.listarMinhasNFes(after);
       if (!data || data.status !== 'OK') {
         const msg = (data && data.statusMessage) ? data.statusMessage : 'Nenhuma NF-e encontrada na Área do Cliente MeuDanfe.';
-        container.innerHTML = `<div style="text-align:center;padding:24px;color:var(--text3);">${msg}</div>`;
+        container.innerHTML = `<div style="text-align:center;padding:24px;color:var(--text3);">${Utils.escapeHtml(msg)}</div>`;
         return;
       }
       const chaves = data.chaves || data.page?.keys || [];
@@ -572,7 +572,7 @@ const NFe = {
         `}
       `;
     } catch (err) {
-      container.innerHTML = `<div style="text-align:center;padding:24px;color:var(--danger);">Erro: ${err.message}</div>`;
+      container.innerHTML = `<div style="text-align:center;padding:24px;color:var(--danger);">Erro: ${Utils.escapeHtml(err?.message || 'Falha inesperada')}</div>`;
     }
   },
 
@@ -639,7 +639,7 @@ const NFe = {
 
     } catch (err) {
       Utils.toast(`Erro na sincronização: ${err.message}`, 'error');
-      if (progressDiv) progressDiv.innerHTML = `<div style="text-align:center;padding:24px;color:var(--danger);">Erro: ${err.message}</div>`;
+      if (progressDiv) progressDiv.innerHTML = `<div style="text-align:center;padding:24px;color:var(--danger);">Erro: ${Utils.escapeHtml(err?.message || 'Falha inesperada')}</div>`;
     } finally {
       btn.disabled = false;
       btn.innerHTML = '⬇️ Sincronizar Tudo para Cache';
@@ -729,15 +729,15 @@ const NFe = {
       } else {
         resultDiv.innerHTML = `
           <div style="padding:16px;background:rgba(239,68,68,.07);border:1px solid rgba(239,68,68,.25);border-radius:var(--r-md);">
-            <div style="font-weight:700;color:var(--danger);margin-bottom:4px;">⚠️ Status: ${resultado.status}</div>
-            <div style="font-size:.82rem;color:var(--text2);">${resultado.statusMessage || 'Tente novamente em instantes.'}</div>
+            <div style="font-weight:700;color:var(--danger);margin-bottom:4px;">⚠️ Status: ${Utils.escapeHtml(resultado.status || '—')}</div>
+            <div style="font-size:.82rem;color:var(--text2);">${Utils.escapeHtml(resultado.statusMessage || 'Tente novamente em instantes.')}</div>
           </div>`;
       }
     } catch (err) {
       resultDiv.innerHTML = `
         <div style="padding:16px;background:rgba(239,68,68,.07);border:1px solid rgba(239,68,68,.25);border-radius:var(--r-md);">
           <div style="font-weight:700;color:var(--danger);margin-bottom:4px;">❌ Erro na consulta</div>
-          <div style="font-size:.82rem;color:var(--text2);">${err.message}</div>
+          <div style="font-size:.82rem;color:var(--text2);">${Utils.escapeHtml(err?.message || 'Falha inesperada')}</div>
         </div>`;
     } finally {
       btn.disabled = false;
@@ -769,7 +769,7 @@ const NFe = {
           <button class="btn btn-secondary btn-sm" onclick="NFe.baixarXMLEAbrir('${chave}')">⬇️ Baixar XML</button>
           <button class="btn btn-secondary btn-sm" onclick="NFe.adicionarComoAnexo('${chave}')">📎 Anexar a Lançamento</button>
         </div>
-        ${data?.statusMessage ? `<div style="margin-top:10px;font-size:.76rem;color:var(--text3);">${data.statusMessage}</div>` : ''}
+        ${data?.statusMessage ? `<div style="margin-top:10px;font-size:.76rem;color:var(--text3);">${Utils.escapeHtml(data.statusMessage)}</div>` : ''}
       </div>`;
   },
 

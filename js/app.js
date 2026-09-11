@@ -230,12 +230,13 @@ const App = {
     this._syncStatusBound = true;
     window.addEventListener('finobra:sync-status', (ev) => {
       const d = ev?.detail || {};
-      this._setSyncStatus(d.status, d.pending || 0);
+      this._setSyncStatus(d.status, d.pending || 0, d.failed || 0);
     });
-    this._setSyncStatus(DB.getSyncPendingCount?.() ? 'pending' : 'cached', DB.getSyncPendingCount?.() || 0);
+    const failed = DB.getSyncFailedCount?.() || 0;
+    this._setSyncStatus(failed ? 'attention' : (DB.getSyncPendingCount?.() ? 'pending' : 'cached'), DB.getSyncPendingCount?.() || 0, failed);
   },
 
-  _setSyncStatus(status, pending = 0) {
+  _setSyncStatus(status, pending = 0, failed = 0) {
     const dot = document.getElementById('sync-status-dot');
     const text = document.getElementById('sync-status-text');
     const box = document.getElementById('sync-status-indicator');
@@ -245,12 +246,56 @@ const App = {
       synced: ['●', 'Sincronizado'],
       pending: ['●', `${pending || 1} pendente(s)`],
       offline: ['●', 'Offline — cache local'],
+      attention: ['⚠', `${failed || 1} requer(em) atenção`],
       cached: ['●', 'Cache local']
     };
     const [d, t] = states[status] || states.cached;
     dot.textContent = d;
     text.textContent = t;
     box.dataset.status = status || 'cached';
+  },
+
+  retrySyncIssues() {
+    const count = DB.getSyncFailedCount?.() || 0;
+    if (!count) {
+      if (typeof Utils !== 'undefined' && Utils.toast) Utils.toast('Não há sincronizações com erro.', 'info');
+      return;
+    }
+    const retried = DB.retryFailedSyncItems?.() || 0;
+    if (typeof Utils !== 'undefined' && Utils.toast) Utils.toast(`${retried} alteração(ões) reenviadas para sincronização.`, 'info');
+    Utils.closeModal?.();
+  },
+
+  showSyncIssues() {
+    const items = DB.getSyncFailedItems?.(50) || [];
+    if (!items.length) {
+      if (typeof Utils !== 'undefined' && Utils.toast) Utils.toast('Sincronização sem pendências críticas.', 'info');
+      return;
+    }
+    const esc = (v) => Utils.escapeHtml(String(v ?? ''));
+    const rows = items.map(i => `
+      <tr>
+        <td style="font-weight:700;">${esc(i.table)}</td>
+        <td>${esc(i.action)}</td>
+        <td style="font-family:monospace;font-size:.72rem;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${esc(i.entityId)}">${esc(i.entityId || '—')}</td>
+        <td style="color:var(--danger);max-width:320px;white-space:normal;">${esc(i.lastError)}</td>
+        <td style="text-align:center;">${esc(i.httpStatus || '—')}</td>
+      </tr>`).join('');
+    Utils.showModal(`
+      <div class="modal" style="max-width:900px;width:96vw;">
+        <div class="modal-header">
+          <span class="modal-title">⚠ Sincronizações que requerem atenção</span>
+          <button class="modal-close" onclick="Utils.closeModal()">✕</button>
+        </div>
+        <div class="modal-body">
+          <p style="font-size:.82rem;color:var(--text2);margin:0 0 14px;">Nenhuma alteração abaixo foi apagada. Você pode tentar reenviar quando a conexão ou o servidor estiver normalizado.</p>
+          <div class="table-wrap"><table class="table"><thead><tr><th>Dados</th><th>Ação</th><th>ID</th><th>Motivo</th><th>HTTP</th></tr></thead><tbody>${rows}</tbody></table></div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-secondary" onclick="Utils.closeModal()">Fechar</button>
+          <button class="btn btn-primary" onclick="App.retrySyncIssues()">↻ Tentar novamente</button>
+        </div>
+      </div>`);
   },
 
   renderShell() {
@@ -354,7 +399,7 @@ const App = {
               <div class="header-sub">${brandName} — Gestão Financeira</div>
             </div>
             <div class="hspacer"></div>
-            <div id="sync-status-indicator" title="Status da sincronização com a nuvem" style="display:flex;align-items:center;gap:5px;font-size:.7rem;color:var(--text3);padding:4px 8px;border:1px solid var(--border);border-radius:999px;white-space:nowrap;">
+            <div id="sync-status-indicator" title="Status da sincronização com a nuvem. Clique para tentar novamente itens que exigem atenção." onclick="App.showSyncIssues()" style="display:flex;align-items:center;gap:5px;font-size:.7rem;color:var(--text3);padding:4px 8px;border:1px solid var(--border);border-radius:999px;white-space:nowrap;">
               <span id="sync-status-dot">●</span><span id="sync-status-text">Cache local</span>
             </div>
             <!-- Botão Validador de Autenticidade -->

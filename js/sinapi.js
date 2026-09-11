@@ -3,111 +3,180 @@
 
 const SINAPI = {
 
-  // Chaves no localStorage
-  KEYS: {
-    onerado:    'sinapi_base_onerado',
-    desonerado: 'sinapi_base_desonerado',
-  },
+  // Patch 09 — Bases SINAPI isoladas por tenant + UF + referência + série.
+  // O pacote atual inclui somente snapshots RR/12-2024. Outras UFs/referências
+  // devem ser importadas a partir do XLSX/ZIP oficial da Caixa.
+  OFFICIAL_SNAPSHOTS: [
+    { uf:'RR', referencia:'2024-12', desonerado:false, file:'/data/sinapi_rr_onerado.json' },
+    { uf:'RR', referencia:'2024-12', desonerado:true,  file:'/data/sinapi_rr_desonerado.json' }
+  ],
 
-  // ─────────────────────────────────────────────────
-  // Verificações de estado
-  // ─────────────────────────────────────────────────
-
-  // Cache em memória para busca instantânea
   _cachedBase: {},
 
-  hasBase(desonerado = false) {
-    const key = desonerado ? this.KEYS.desonerado : this.KEYS.onerado;
-    if (this._cachedBase[key]?.composicoes?.length) return true;
+  _tenant() {
     try {
-      const raw = localStorage.getItem(key);
-      if (!raw) return false;
-      const base = JSON.parse(raw);
-      return Array.isArray(base.composicoes) && base.composicoes.length > 0;
-    } catch { return false; }
+      const t = (typeof DB !== 'undefined' && DB._t) ? DB._t() : ((typeof Auth !== 'undefined' && Auth.getCurrentTenantId) ? Auth.getCurrentTenantId() : 'public');
+      return String(t || 'public').replace(/[^A-Za-z0-9_.-]/g, '_').slice(0, 80) || 'public';
+    } catch { return 'public'; }
   },
 
-  getMeta(desonerado = false) {
-    const base = this.getBase(desonerado);
+  _cleanUf(uf='') { return String(uf || '').trim().toUpperCase().replace(/[^A-Z]/g, '').slice(0,2); },
+  _cleanRef(ref='') { return /^\d{4}-\d{2}$/.test(String(ref || '').trim()) ? String(ref).trim() : ''; },
+
+  _baseKey(desonerado, uf, referencia) {
+    const u = this._cleanUf(uf) || 'XX';
+    const r = this._cleanRef(referencia) || 'sem_ref';
+    return `finobra_${this._tenant()}_sinapi_base_${u}_${r}_${desonerado ? 'des' : 'on'}`;
+  },
+
+  _activeKey(desonerado) {
+    return `finobra_${this._tenant()}_sinapi_active_${desonerado ? 'des' : 'on'}`;
+  },
+
+  _setActive(desonerado, uf, referencia) {
+    const ctx = { uf:this._cleanUf(uf), referencia:this._cleanRef(referencia) };
+    if (!ctx.uf || !ctx.referencia) return;
+    try { localStorage.setItem(this._activeKey(desonerado), JSON.stringify(ctx)); } catch {}
+  },
+
+  _getActive(desonerado) {
+    try {
+      const ctx = JSON.parse(localStorage.getItem(this._activeKey(desonerado)) || 'null');
+      return ctx && this._cleanUf(ctx.uf) && this._cleanRef(ctx.referencia) ? { uf:this._cleanUf(ctx.uf), referencia:this._cleanRef(ctx.referencia) } : null;
+    } catch { return null; }
+  },
+
+  snapshotFor(uf, referencia, desonerado=false) {
+    const u=this._cleanUf(uf), r=this._cleanRef(referencia);
+    return this.OFFICIAL_SNAPSHOTS.find(x => x.uf===u && x.referencia===r && !!x.desonerado===!!desonerado) || null;
+  },
+
+  availableSnapshots() { return this.OFFICIAL_SNAPSHOTS.map(x => ({...x})); },
+
+  _legacyKey(desonerado=false) { return desonerado ? 'sinapi_base_desonerado' : 'sinapi_base_onerado'; },
+
+  _migrateLegacyBase(desonerado=false, wantedUf='', wantedRef='') {
+    try {
+      const oldKey=this._legacyKey(desonerado);
+      const raw=localStorage.getItem(oldKey);
+      if (!raw) return null;
+      const base=JSON.parse(raw);
+      const uf=this._cleanUf(base?.uf), ref=this._cleanRef(base?.referencia);
+      if (!uf || !ref || !Array.isArray(base?.composicoes) || !base.composicoes.length) return null;
+      if (wantedUf && this._cleanUf(wantedUf)!==uf) return null;
+      if (wantedRef && this._cleanRef(wantedRef)!==ref) return null;
+      const migrated=this._saveBase({ ...base, source:base.source || 'cache_legado' }, desonerado, uf, ref);
+      // Depois de confirmar a nova chave, remove apenas a cópia legada. A base
+      // referencial é pública e a nova chave é compartilhada por UF/competência.
+      localStorage.removeItem(oldKey);
+      return migrated;
+    } catch { return null; }
+  },
+
+  hasBase(desonerado = false, uf = '', referencia = '') {
+    return !!this.getBase(desonerado, uf, referencia)?.composicoes?.length;
+  },
+
+  getMeta(desonerado = false, uf = '', referencia = '') {
+    const base = this.getBase(desonerado, uf, referencia);
     if (!base) return null;
-    return { referencia: base.referencia, uf: base.uf, total: base.composicoes?.length || 0, importada_em: base.importada_em };
+    return {
+      referencia: this._cleanRef(base.referencia),
+      uf: this._cleanUf(base.uf),
+      total: base.composicoes?.length || 0,
+      importada_em: base.importada_em,
+      source: base.source || 'importado'
+    };
   },
 
-  getBase(desonerado = false) {
-    const key = desonerado ? this.KEYS.desonerado : this.KEYS.onerado;
+  getBase(desonerado = false, uf = '', referencia = '') {
+    let u=this._cleanUf(uf), r=this._cleanRef(referencia);
+    if (!u || !r) {
+      const active=this._getActive(desonerado);
+      if (active) { u=active.uf; r=active.referencia; }
+      else {
+        const legacy=this._migrateLegacyBase(desonerado);
+        if (legacy) return legacy;
+        return null;
+      }
+    }
+    const key=this._baseKey(desonerado,u,r);
     if (this._cachedBase[key]) return this._cachedBase[key];
     try {
-      const raw = localStorage.getItem(key);
-      if (!raw) return null;
-      const parsed = JSON.parse(raw);
-      this._cachedBase[key] = parsed;
+      const raw=localStorage.getItem(key);
+      if (!raw) return this._migrateLegacyBase(desonerado,u,r);
+      const parsed=JSON.parse(raw);
+      if (!parsed || !Array.isArray(parsed.composicoes)) return null;
+      this._cachedBase[key]=parsed;
       return parsed;
     } catch { return null; }
   },
 
-  clearBase(desonerado = false) {
-    const key = desonerado ? this.KEYS.desonerado : this.KEYS.onerado;
+  _saveBase(base, desonerado, uf, referencia) {
+    const u=this._cleanUf(uf), r=this._cleanRef(referencia);
+    if (!u || !r) throw new Error('UF e referência SINAPI são obrigatórias.');
+    const normalized={ ...base, uf:u, referencia:r, desonerado:!!desonerado };
+    const key=this._baseKey(desonerado,u,r);
+    this._cachedBase[key]=normalized;
+    this._setActive(desonerado,u,r);
+    try {
+      localStorage.setItem(key, JSON.stringify(normalized));
+      return normalized;
+    } catch {
+      const reduced={ ...normalized, composicoes:(normalized.composicoes || []).slice(0,5000), parcial:true };
+      this._cachedBase[key]=reduced;
+      localStorage.setItem(key, JSON.stringify(reduced));
+      return reduced;
+    }
+  },
+
+  clearBase(desonerado = false, uf = '', referencia = '') {
+    const u=this._cleanUf(uf), r=this._cleanRef(referencia);
+    const active=(!u || !r) ? this._getActive(desonerado) : null;
+    const finalUf=u || active?.uf, finalRef=r || active?.referencia;
+    if (!finalUf || !finalRef) return;
+    const key=this._baseKey(desonerado,finalUf,finalRef);
     delete this._cachedBase[key];
     localStorage.removeItem(key);
   },
 
   clearAll() {
-    this._cachedBase = {};
-    localStorage.removeItem(this.KEYS.onerado);
-    localStorage.removeItem(this.KEYS.desonerado);
+    const activePrefix=`finobra_${this._tenant()}_sinapi_active_`;
+    const basePrefix='finobra_sinapi_base_';
+    for (let i=localStorage.length-1;i>=0;i--) {
+      const k=localStorage.key(i);
+      if (k && (k.startsWith(activePrefix) || k.startsWith(basePrefix))) localStorage.removeItem(k);
+    }
+    for (const k of Object.keys(this._cachedBase)) if (k.startsWith(basePrefix)) delete this._cachedBase[k];
   },
 
-  // ─────────────────────────────────────────────────
-  // Puxar Base Oficial Automaticamente (1-Clique)
-  // ─────────────────────────────────────────────────
-
   /**
-   * Puxa a base oficial do SINAPI diretamente pelo sistema (sem upload manual).
-   * @param {boolean} desonerado — true = série desonerada
-   * @param {function} onProgress — callback(msg) para feedback de progresso
-   * @returns {Promise<{ok:boolean, total:number, msg:string}>}
+   * Carrega um snapshot empacotado no FinObra. Ele é oficial quanto à origem dos
+   * dados, mas NÃO é apresentado como tabela atual: UF e competência precisam
+   * coincidir exatamente com o snapshot disponível.
    */
-  async puxarOficial(desonerado = true, onProgress) {
-    onProgress?.('Conectando à base oficial SINAPI...');
+  async puxarOficial(desonerado = true, uf = '', referencia = '', onProgress) {
+    const u=this._cleanUf(uf), r=this._cleanRef(referencia);
+    const snapshot=this.snapshotFor(u,r,desonerado);
+    if (!snapshot) {
+      const list=this.OFFICIAL_SNAPSHOTS.filter(x => !!x.desonerado===!!desonerado).map(x => `${x.uf} ${x.referencia}`).join(', ') || 'nenhum';
+      return { ok:false, code:'SNAPSHOT_NOT_AVAILABLE', msg:`Não há snapshot 1-clique para ${u || 'UF não informada'} ${r || 'referência não informada'} nesta versão. Disponível: ${list}. Importe o XLSX/ZIP oficial da Caixa para usar outra UF ou competência.` };
+    }
+    onProgress?.(`Carregando snapshot Caixa ${snapshot.uf} ${snapshot.referencia}...`);
     try {
-      const file = desonerado ? 'sinapi_rr_desonerado.json' : 'sinapi_rr_onerado.json';
-      onProgress?.('Baixando composições sintéticas de Roraima (RR)...');
-      let res = await fetch(`/data/${file}`);
-      if (!res.ok) {
-        // Fallback para rota /api/sinapi
-        res = await fetch(`/api/sinapi`);
+      const res=await fetch(snapshot.file, { cache:'no-cache' });
+      if (!res.ok) throw new Error(`arquivo local indisponível (HTTP ${res.status})`);
+      onProgress?.('Validando composições e metadados...');
+      const base=await res.json();
+      if (!base || !Array.isArray(base.composicoes) || !base.composicoes.length) throw new Error('snapshot vazio ou inválido');
+      if (this._cleanUf(base.uf)!==snapshot.uf || this._cleanRef(base.referencia)!==snapshot.referencia || !!base.desonerado!==!!snapshot.desonerado) {
+        throw new Error('metadados do snapshot não correspondem à seleção');
       }
-      if (!res.ok) {
-        throw new Error(`Servidor respondeu com status ${res.status}`);
-      }
-
-      onProgress?.('Processando base de dados...');
-      const base = await res.json();
-      if (!base || !Array.isArray(base.composicoes) || base.composicoes.length === 0) {
-        throw new Error('Formato da base oficial inválido ou vazio.');
-      }
-
-      onProgress?.(`Salvando ${base.composicoes.length.toLocaleString('pt-BR')} composições...`);
-      const key = desonerado ? this.KEYS.desonerado : this.KEYS.onerado;
-      this._cachedBase[key] = base;
-
-      try {
-        localStorage.setItem(key, JSON.stringify(base));
-      } catch (storageErr) {
-        const baseReduzida = { ...base, composicoes: base.composicoes.slice(0, 5000) };
-        this._cachedBase[key] = baseReduzida;
-        localStorage.setItem(key, JSON.stringify(baseReduzida));
-        return { ok: true, total: baseReduzida.composicoes.length, msg: `Carregadas ${baseReduzida.composicoes.length.toLocaleString('pt-BR')} composições (base parcial por limite de armazenamento).` };
-      }
-
-      return {
-        ok: true,
-        total: base.composicoes.length,
-        msg: `Base oficial SINAPI (${base.uf} ${base.referencia} — ${base.composicoes.length.toLocaleString('pt-BR')} itens) carregada com sucesso!`
-      };
+      const stored=this._saveBase({ ...base, source:'snapshot_caixa_empacotado', importada_em:new Date().toISOString() }, desonerado, u, r);
+      return { ok:true, total:stored.composicoes.length, uf:u, referencia:r, msg:`Snapshot SINAPI Caixa ${u} ${r} (${stored.composicoes.length.toLocaleString('pt-BR')} itens) carregado. Confira sempre UF e competência antes de usar.` };
     } catch (err) {
       console.error('SINAPI.puxarOficial error:', err);
-      return { ok: false, msg: `Erro ao puxar tabela oficial: ${err.message}` };
+      return { ok:false, code:'SNAPSHOT_LOAD_ERROR', msg:`Erro ao carregar snapshot SINAPI: ${err.message}` };
     }
   },
 
@@ -198,27 +267,26 @@ const SINAPI = {
       onProgress?.(`Salvando ${composicoes.length.toLocaleString('pt-BR')} composições...`);
 
       const base = {
-        referencia,
-        uf,
-        desonerado,
-        importada_em: new Date().toISOString().split('T')[0],
+        referencia: this._cleanRef(referencia),
+        uf: this._cleanUf(uf),
+        desonerado: !!desonerado,
+        importada_em: new Date().toISOString(),
         total_itens: composicoes.length,
         composicoes,
+        source: 'arquivo_caixa_importado'
       };
-
-      const key = desonerado ? this.KEYS.desonerado : this.KEYS.onerado;
-      this._cachedBase[key] = base;
-
-      try {
-        localStorage.setItem(key, JSON.stringify(base));
-      } catch (storageErr) {
-        const baseReduzida = { ...base, composicoes: composicoes.slice(0, 5000) };
-        this._cachedBase[key] = baseReduzida;
-        localStorage.setItem(key, JSON.stringify(baseReduzida));
-        return { ok: true, total: baseReduzida.composicoes.length, msg: `Importadas ${baseReduzida.composicoes.length.toLocaleString('pt-BR')} composições (limite de armazenamento atingido — base parcial).` };
-      }
-
-      return { ok: true, total: composicoes.length, msg: `${composicoes.length.toLocaleString('pt-BR')} composições importadas com sucesso!` };
+      if (!base.uf || !base.referencia) return { ok:false, msg:'Informe a UF e o mês de referência antes de importar.' };
+      const stored = this._saveBase(base, desonerado, base.uf, base.referencia);
+      const partial = stored.composicoes.length < composicoes.length;
+      return {
+        ok:true,
+        total:stored.composicoes.length,
+        uf:base.uf,
+        referencia:base.referencia,
+        msg: partial
+          ? `Importadas ${stored.composicoes.length.toLocaleString('pt-BR')} composições de ${base.uf} ${base.referencia} (cache parcial por limite do navegador).`
+          : `${stored.composicoes.length.toLocaleString('pt-BR')} composições de ${base.uf} ${base.referencia} importadas com sucesso!`
+      };
 
     } catch (err) {
       console.error('SINAPI.importar error:', err);
@@ -326,8 +394,8 @@ const SINAPI = {
    * @param {boolean} desonerado — qual série usar
    * @param {number} limite — max resultados retornados
    */
-  buscar(termo, desonerado = false, limite = 50) {
-    const base = this.getBase(desonerado);
+  buscar(termo, desonerado = false, limite = 50, uf = '', referencia = '') {
+    const base = this.getBase(desonerado, uf, referencia);
     if (!base || !base.composicoes) return [];
 
     const t = (termo || '').trim().toLowerCase();
@@ -354,8 +422,8 @@ const SINAPI = {
     return desonerado ? 'Sem Oneração (Desonerado)' : 'Com Oneração';
   },
 
-  labelMeta(desonerado) {
-    const meta = this.getMeta(desonerado);
+  labelMeta(desonerado, uf = '', referencia = '') {
+    const meta = this.getMeta(desonerado, uf, referencia);
     if (!meta) return `${this.labelSerie(desonerado)} — não importada`;
     const [y, m] = (meta.referencia || '').split('-');
     const meses = ['','Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];

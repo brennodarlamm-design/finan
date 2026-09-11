@@ -1,0 +1,115 @@
+FINOBRA — PATCH 09 — SEGURANÇA, SINAPI E CONFIABILIDADE
+=========================================================
+Base usada: FINANÇAS(20260911-045327).zip
+
+IMPORTANTE
+---------
+1. Faça backup do projeto e do Neon.
+2. EXECUTE PRIMEIRO no SQL Editor do Neon:
+   migrations/008_security_reliability.sql
+3. Depois copie os arquivos deste patch para a raiz do projeto e substitua os existentes.
+4. Faça novo deploy na Vercel.
+5. Não reaplique patches antigos sobre esta versão.
+
+O QUE MUDA
+----------
+
+1) RATE LIMIT COMPARTILHADO
+- O rate limit deixa de depender somente da memória de uma instância Serverless.
+- A migration 008 cria api_rate_limits no Neon.
+- Login, cadastro, Google, validação de recuperação, suporte, OCR, WhatsApp,
+  auditoria e assinaturas usam contadores compartilhados.
+- Se o Neon estiver temporariamente indisponível para o rate limit, existe um
+  fallback local mais restritivo para não derrubar o sistema inteiro.
+
+2) SESSÃO HTTPONLY — MIGRAÇÃO GRADUAL
+- Login, registro e Google passam a emitir também o cookie finobra_session_token.
+- Cookie: HttpOnly + SameSite=Lax + Secure em HTTPS/Vercel.
+- APIs aceitam esse cookie quando não houver Authorization Bearer.
+- Logout expira o cookie no servidor.
+- Respostas de autenticação usam Cache-Control: no-store.
+- IMPORTANTE: o Bearer/localStorage AINDA NÃO foi removido neste patch. Ele
+  continua prioritário para preservar impersonação Master e compatibilidade.
+  Portanto este patch prepara a retirada futura do token do localStorage, mas
+  não deve ser interpretado como conclusão dessa migração.
+
+3) SINAPI SEM UF/COMPETÊNCIA ENGANOSA
+- O snapshot incluído no projeto é identificado explicitamente como RR / 2024-12.
+- O botão 1-clique só habilita quando UF + competência + série coincidem com um
+  snapshot realmente presente no pacote.
+- Para outra UF ou competência, a interface exige a importação do XLSX/ZIP
+  oficial correspondente.
+- Foi removido o rewrite/fallback /api/sinapi que apontava silenciosamente para RR.
+- A seleção ativa de SINAPI é isolada por tenant.
+- A base referencial, que é dado público, usa cache por UF + competência + série
+  e pode ser compartilhada entre tenants no mesmo navegador para evitar duplicar
+  milhares de composições.
+- Caches SINAPI antigos são migrados quando os metadados UF/referência forem válidos.
+
+4) SINCRONIZAÇÃO SEM PERDA SILENCIOSA
+- sync_all devolve HTTP 207 + lista failed quando parte do lote não é confirmada.
+- Bootstrap/migração não é marcado como concluído quando houver falha parcial.
+- O contador de retry é persistido no localStorage.
+- Depois de falhas temporárias repetidas, a alteração NÃO é apagada: vai para a
+  fila “Requer atenção”.
+- O indicador de sincronização abre uma tela com tabela, registro e motivo da
+  falha, e permite reenviar as alterações preservadas.
+- Edições sucessivas offline do mesmo registro continuam coalescidas para enviar
+  apenas a versão mais recente.
+
+5) REFORÇO XSS
+Foram reforçados pontos que exibem conteúdo externo ou persistente, incluindo:
+- NF-e e parser de NF-e;
+- OFX, inclusive memo/FITID importado e handlers inline;
+- contratos;
+- contas bancárias;
+- detalhe da obra;
+- escritório/lancamentos;
+- fases documentais;
+- importação Excel;
+- orçamento por etapas;
+- mensagens/status do SINAPI.
+
+6) HEADERS DE SEGURANÇA
+- Adicionado Strict-Transport-Security na configuração da Vercel.
+- Mantidos X-Content-Type-Options, X-Frame-Options, Referrer-Policy e
+  Permissions-Policy.
+
+SINAPI — SNAPSHOT DESTA VERSÃO
+------------------------------
+Disponível no pacote:
+- UF: RR
+- Competência: 2024-12
+- Séries: onerado e desonerado
+
+Para outra UF/competência:
+- importe o XLSX/ZIP oficial correspondente.
+- o Patch 09 NÃO afirma que o snapshot empacotado é a tabela atual da Caixa.
+
+TESTES RECOMENDADOS APÓS DEPLOY
+--------------------------------
+A. Login normal e logout.
+B. Login Google.
+C. Master -> acessar outro cliente -> validar tenant/dashboard correto.
+D. SINAPI RR/12-2024: snapshot deve ficar disponível.
+E. SINAPI outra UF/competência: botão deve exigir importação oficial.
+F. Desconecte a internet, edite um registro e reconecte.
+G. Se aparecer “Requer atenção”, abra o indicador e tente reenviar.
+H. Teste OCR e WhatsApp.
+I. Teste um arquivo OFX real e uma NF-e/XML para confirmar as telas reforçadas.
+
+VARIÁVEIS DE AMBIENTE
+---------------------
+Não há nova variável obrigatória.
+A migration 008 utiliza a DATABASE_URL já configurada.
+
+OBSERVAÇÃO SOBRE RATE LIMIT
+---------------------------
+O contador no Neon resolve a limitação de múltiplas instâncias Serverless. Para
+uma camada anti-DDoS/edge em escala maior, ainda é recomendável configurar
+proteção de borda/WAF na plataforma de hospedagem.
+
+ROLLBACK
+--------
+Os arquivos podem ser restaurados pelo backup anterior. A tabela api_rate_limits
+pode permanecer no Neon após rollback; ela não altera dados financeiros.

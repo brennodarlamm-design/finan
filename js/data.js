@@ -15,16 +15,33 @@ const DB = {
 
   _k(key) {
     const t = this._t();
-    if (t === 'angelim') {
-      return this.K[key] || `finobra_${key}`;
-    }
     return `finobra_${t}_${key}`;
   },
 
   _ck(name) {
     const t = this._t();
-    if (t === 'angelim') return name;
     return `${name}_${t}`;
+  },
+
+  _migrateLegacyTenantCache() {
+    // Migração explícita do cache histórico anterior ao multi-tenant.
+    // Só é executada para o tenant legado conhecido e apenas quando a chave
+    // nova ainda não existe; nunca usa esse tenant como fallback.
+    if (this._t() !== 'angelim') return;
+    const pairs = [];
+    for (const [logical, legacy] of Object.entries(this.K)) pairs.push([legacy, this._k(logical)]);
+    for (const name of [
+      'finobra_documentos','finobra_recibos','finobra_contratos','orcamentos_sinapi',
+      'finobra_categorias_custom','finobra_cats_despesa_custom','finobra_whatsapp_telefone',
+      'finobra_whatsapp_modo','finobra_clean_mode','finobra_snapshot_seguranca','finobra_backup_temp'
+    ]) pairs.push([name, this._ck(name)]);
+    for (const [legacy, scoped] of pairs) {
+      try {
+        if (localStorage.getItem(scoped) === null && localStorage.getItem(legacy) !== null) {
+          localStorage.setItem(scoped, localStorage.getItem(legacy));
+        }
+      } catch {}
+    }
   },
 
 
@@ -414,7 +431,7 @@ const DB = {
     if (typeof window === 'undefined' || typeof CustomEvent === 'undefined') return;
     try {
       window.dispatchEvent(new CustomEvent('finobra:sync-status', {
-        detail: { status, pending: this.getSyncPendingCount ? this.getSyncPendingCount() : 0, ...detail }
+        detail: { status, pending: this.getSyncPendingCount ? this.getSyncPendingCount() : 0, failed: this.getSyncFailedCount ? this.getSyncFailedCount() : 0, ...detail }
       }));
     } catch {}
   },
@@ -886,6 +903,87 @@ const DB = {
     return this._getSyncQueue().length;
   },
 
+  _syncFailedKey() {
+    return `finobra_${this._t()}_sync_attention`;
+  },
+
+  _getSyncFailed() {
+    try {
+      const list = JSON.parse(localStorage.getItem(this._syncFailedKey()) || '[]');
+      return Array.isArray(list) ? list : [];
+    } catch { return []; }
+  },
+
+  _saveSyncFailed(items) {
+    try { localStorage.setItem(this._syncFailedKey(), JSON.stringify(Array.isArray(items) ? items.slice(-200) : [])); } catch {}
+  },
+
+  getSyncFailedCount() {
+    return this._getSyncFailed().length;
+  },
+
+  getSyncFailedItems(limit = 50) {
+    const max = Math.max(1, Math.min(200, Number(limit) || 50));
+    return this._getSyncFailed().slice(-max).reverse().map(item => ({
+      table: String(item?.payload?.table || 'registro'),
+      action: String(item?.payload?.action || 'sync'),
+      entityId: String(item?.payload?.id || item?.payload?.data?.cloud_id || item?.payload?.data?.id || ''),
+      retries: Number(item?._retries || 0),
+      lastError: String(item?.lastError || 'Falha de sincronização'),
+      errorCode: String(item?.errorCode || ''),
+      httpStatus: item?.httpStatus || null,
+      attentionAt: item?.attentionAt || item?.updatedAt || item?.createdAt || ''
+    }));
+  },
+
+  _updateQueuedItem(item, patch = {}) {
+    const live = this._getSyncQueue();
+    const idx = live.findIndex(q => q?.queueId === item?.queueId);
+    if (idx < 0) return false;
+    live[idx] = { ...live[idx], ...patch, updatedAt: live[idx].updatedAt || new Date().toISOString() };
+    this._saveSyncQueue(live);
+    Object.assign(item, live[idx]);
+    return true;
+  },
+
+  _moveSyncItemToAttention(item, detail = {}) {
+    const failed = this._getSyncFailed();
+    const entityId = String(item?.payload?.id || item?.payload?.data?.cloud_id || item?.payload?.data?.id || '');
+    const existing = failed.findIndex(x => x?.payload?.table === item?.payload?.table && x?.payload?.action === item?.payload?.action && String(x?.payload?.id || x?.payload?.data?.cloud_id || x?.payload?.data?.id || '') === entityId && entityId);
+    const entry = {
+      ...item,
+      attentionAt: new Date().toISOString(),
+      lastError: String(detail.error || item?.lastError || 'Falha de sincronização').slice(0, 500),
+      errorCode: String(detail.code || item?.errorCode || '').slice(0, 100),
+      httpStatus: Number(detail.status || item?.httpStatus || 0) || null
+    };
+    if (existing >= 0) failed[existing] = entry; else failed.push(entry);
+    this._saveSyncFailed(failed);
+    const pending = this._ackSyncQueueItem(item, { force:true });
+    this._emitSyncStatus('attention', { pending, failed: failed.length });
+    return failed.length;
+  },
+
+  retryFailedSyncItems() {
+    const failed = this._getSyncFailed();
+    if (!failed.length) return 0;
+    const queue = this._getSyncQueue();
+    for (const item of failed) {
+      queue.push({
+        ...item,
+        queueId: (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : `${Date.now()}_${Math.random()}`,
+        _retries: 0,
+        lastError: '', errorCode:'', httpStatus:null,
+        createdAt: new Date().toISOString(), updatedAt: new Date().toISOString()
+      });
+    }
+    this._saveSyncFailed([]);
+    this._saveSyncQueue(queue);
+    this._emitSyncStatus('pending', { pending:queue.length, failed:0 });
+    this._flushCloudQueue();
+    return failed.length;
+  },
+
   _scheduleSyncRetry(delay = 10000) {
     clearTimeout(this._syncRetryTimer);
     this._syncRetryTimer = setTimeout(() => this._flushCloudQueue(), delay);
@@ -929,42 +1027,41 @@ const DB = {
           break;
         }
 
-        const errorJson = !res.ok ? await res.clone().json().catch(() => ({})) : {};
+        const responseJson = await res.clone().json().catch(() => ({}));
+        const errorJson = responseJson || {};
         if (res.status === 401 || (res.status === 403 && !String(errorJson.code || '').startsWith('ROLE_') && !String(errorJson.code || '').startsWith('PLAN_'))) {
           if (typeof Auth !== 'undefined' && Auth.handleSessionExpired) Auth.handleSessionExpired();
           break;
         }
-        if (!res.ok) {
-          if (String(errorJson.code || '').startsWith('ROLE_')) {
-            console.warn(`[Sync] Operação rejeitada pelo perfil: ${errorJson.error || errorJson.code}`);
-            const pending = this._ackSyncQueueItem(item, { force:true });
-            this._emitSyncStatus(pending ? 'pending' : 'synced', { rejected: true, code: errorJson.code });
-            if (typeof Utils !== 'undefined' && Utils.toast) Utils.toast(errorJson.error || 'Seu perfil não permite esta operação.', 'warning');
+
+        // HTTP 2xx também pode representar sincronização parcial (207) ou payload
+        // explicitamente marcado como partial/failed. Nunca confirmar silenciosamente.
+        const partialFailure = !!errorJson.partial || (Array.isArray(errorJson.failed) && errorJson.failed.length > 0) || (res.ok && errorJson.success === false);
+        if (!res.ok || partialFailure) {
+          const code = String(errorJson.code || (partialFailure ? 'SYNC_PARTIAL' : `HTTP_${res.status}`));
+          const message = String(errorJson.error || errorJson.message || (partialFailure ? 'Sincronização parcial; alguns registros não foram confirmados.' : `${item.payload?.action}/${item.payload?.table}`));
+
+          // Erros de permissão/plano/validação não somem: ficam em "Requer atenção"
+          // para auditoria e eventual retry após correção da causa.
+          const permanent4xx = res.status >= 400 && res.status < 500 && ![408, 429].includes(res.status);
+          if (partialFailure || permanent4xx || code.startsWith('ROLE_') || code.startsWith('PLAN_')) {
+            if (code.startsWith('ROLE_')) console.warn(`[Sync] Operação rejeitada pelo perfil e movida para atenção: ${message}`);
+            else if (code.startsWith('PLAN_')) console.warn(`[Sync] Operação rejeitada pelo plano e movida para atenção: ${message}`);
+            else console.warn(`[Sync] Operação movida para atenção (${code}): ${message}`);
+            this._moveSyncItemToAttention(item, { error:message, code, status:res.status });
+            if (typeof Utils !== 'undefined' && Utils.toast) Utils.toast(message, 'warning');
             continue;
           }
-          if (String(errorJson.code || '').startsWith('PLAN_')) {
-            console.warn(`[Sync] Operação rejeitada pelo plano: ${errorJson.error || errorJson.code}`);
-            const pending = this._ackSyncQueueItem(item, { force:true });
-            this._emitSyncStatus(pending ? 'pending' : 'synced', { rejected: true, code: errorJson.code });
-            if (typeof Utils !== 'undefined' && Utils.toast) Utils.toast(errorJson.error || 'Operação não permitida pelo plano atual.', 'warning');
+
+          const retries = Number(item._retries || 0) + 1;
+          this._updateQueuedItem(item, { _retries:retries, lastError:message, errorCode:code, httpStatus:res.status, lastAttemptAt:new Date().toISOString() });
+          if (retries >= 5) {
+            console.error(`[Sync] Operação requer atenção após ${retries} falhas do servidor:`, message);
+            this._moveSyncItemToAttention(item, { error:message, code:`${code}_MAX_RETRIES`, status:res.status });
+            if (typeof Utils !== 'undefined' && Utils.toast) Utils.toast('Uma alteração não foi perdida, mas requer atenção para sincronizar.', 'warning');
             continue;
           }
-          if (res.status >= 400 && res.status < 500 && ![408, 429].includes(res.status)) {
-            console.warn(`[Sync] Operação inválida descartada (${res.status}):`, errorJson.error || `${item.payload.action}/${item.payload.table}`);
-            const pending = this._ackSyncQueueItem(item);
-            this._emitSyncStatus(pending ? 'pending' : 'synced', { rejected:true, code:errorJson.code || `HTTP_${res.status}` });
-            if (typeof Utils !== 'undefined' && Utils.toast) Utils.toast(errorJson.error || 'Uma alteração local foi rejeitada pelo servidor.', 'warning');
-            continue;
-          }
-          item._retries = (item._retries || 0) + 1;
-          if (item._retries >= 5) {
-            console.error(`[Sync] Operação descartada após ${item._retries} falhas consecutivas do servidor (HTTP ${res.status}):`, errorJson.error || `${item.payload?.action}/${item.payload?.table}`);
-            const pending = this._ackSyncQueueItem(item, { force: true });
-            this._emitSyncStatus(pending ? 'pending' : 'synced', { rejected: true, code: `HTTP_${res.status}_MAX_RETRIES` });
-            if (typeof Utils !== 'undefined' && Utils.toast) Utils.toast(errorJson.error || 'Uma alteração pendente foi descartada após falhas repetidas no servidor.', 'warning');
-            continue;
-          }
-          console.warn(`[Sync] Servidor recusou ${item.payload.action}/${item.payload.table}. Tentará novamente.`);
+          console.warn(`[Sync] Servidor recusou ${item.payload.action}/${item.payload.table}. Tentativa ${retries}/5.`);
           this._scheduleSyncRetry(res.status === 429 ? 30000 : 15000);
           break;
         }
@@ -975,6 +1072,7 @@ const DB = {
     } finally {
       this._syncFlushing = false;
       if (this.getSyncPendingCount() > 0) this._scheduleSyncRetry(5000);
+      else if (this.getSyncFailedCount() > 0) this._emitSyncStatus('attention', { failed:this.getSyncFailedCount() });
     }
   },
 
@@ -1040,7 +1138,11 @@ const DB = {
       const body = JSON.stringify({ action: 'sync_all', payload });
       if (body.length <= 1_500_000) {
         const res = await fetch('/api/db', { method:'POST', headers:this._apiHeaders(), body });
-        return await res.json();
+        const json = await res.json().catch(() => ({}));
+        if (!res.ok || json.success === false || json.partial || (Array.isArray(json.failed) && json.failed.length)) {
+          return { success:false, partial:!!json.partial, synced:Number(json.synced||0), failed:json.failed || [], error:json.error || 'Sincronização parcial.' };
+        }
+        return json;
       }
 
       let synced = 0;
@@ -1209,6 +1311,7 @@ const DB = {
   },
 
   init() {
+    this._migrateLegacyTenantCache();
     this.purgeStorage();
     this.expurgarDadosDemo();
     // Garante que todas as coleções existam no LocalStorage como array vazio se inexistentes
@@ -1243,6 +1346,7 @@ const DB = {
       localStorage.removeItem(this._ck('finobra_demo_v2'));
       localStorage.removeItem(this._ck('finobra_demo'));
       localStorage.removeItem('sinapi_base_onerado');
+      localStorage.removeItem('sinapi_base_desonerado');
       localStorage.setItem(this._ck('finobra_clean_mode'), 'true');
 
       // 2. Limpa lançamentos demo

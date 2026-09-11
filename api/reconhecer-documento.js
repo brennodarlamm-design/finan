@@ -61,7 +61,7 @@ export default async function handler(req, res) {
 
   // Rate Limiting para proteção contra abuso de custos no Gemini OCR
   const tenantKey = auth.tenantId || getClientIp(req);
-  const rl = checkRateLimit(`ocr:${tenantKey}`, 30, 600000); // 30 requisições a cada 10 min por tenant
+  const rl = await checkRateLimit(`ocr:${tenantKey}`, 30, 600000); // 30 requisições a cada 10 min por tenant
   if (!rl.allowed) {
     return res.status(429).json({
       error: 'Limite de processamento OCR atingido para este período (máximo 30 a cada 10 minutos). Aguarde para enviar mais documentos.'

@@ -468,3 +468,13 @@ CREATE TABLE IF NOT EXISTS client_error_logs (
 );
 CREATE INDEX IF NOT EXISTS idx_client_errors_tenant_created ON client_error_logs (tenant_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_client_errors_user_created ON client_error_logs (user_id, created_at DESC);
+
+
+-- Patch 09: rate limiting distribuído entre instâncias serverless
+CREATE TABLE IF NOT EXISTS api_rate_limits (
+  bucket_key VARCHAR(64) PRIMARY KEY,
+  window_start TIMESTAMPTZ NOT NULL,
+  count INTEGER NOT NULL DEFAULT 0 CHECK (count >= 0),
+  expires_at TIMESTAMPTZ NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_api_rate_limits_expires_at ON api_rate_limits (expires_at);

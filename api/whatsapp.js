@@ -193,7 +193,7 @@ export default async function handler(req, res) {
     // ── AÇÃO: ENVIO DE MENSAGEM / DOCUMENTO / MÍDIA ───────────────────────
     if (action === 'send') {
       const tenantKey = auth.tenantId || getClientIp(req);
-      const rl = checkRateLimit(`wa_send:${tenantKey}`, 20, 60000);
+      const rl = await checkRateLimit(`wa_send:${tenantKey}`, 20, 60000);
       if (!rl.allowed) {
         return res.status(429).json({
           success: false,
