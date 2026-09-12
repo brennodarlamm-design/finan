@@ -265,6 +265,57 @@ const Utils = {
     document.getElementById('_confirm_btn').onclick = () => { this.closeModal(); onYes(); };
   },
 
+  prompt(title, onConfirm, defaultValue = '', placeholder = '') {
+    const safeTitle = this.escapeHtml(title || 'Informação');
+    const safeVal = this.escapeHtml(defaultValue || '');
+    const safePh = this.escapeHtml(placeholder || '');
+    const overlay = document.createElement('div');
+    overlay.id = 'modal-prompt-overlay';
+    overlay.className = 'modal-overlay';
+    overlay.style.zIndex = '99999';
+    overlay.innerHTML = `
+      <div class="modal" style="max-width:440px">
+        <div class="modal-header">
+          <span class="modal-title">${safeTitle}</span>
+          <button class="modal-close" id="_prompt_close">✕</button>
+        </div>
+        <div class="modal-body">
+          <input type="text" id="_prompt_input" class="form-control" value="${safeVal}" placeholder="${safePh}" style="width:100%;font-size:1rem;padding:10px 12px;" autofocus>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-secondary" id="_prompt_cancel">Cancelar</button>
+          <button class="btn btn-primary" id="_prompt_ok">Confirmar</button>
+        </div>
+      </div>
+    `;
+    const close = () => overlay.remove();
+    overlay.addEventListener('click', e => { if (e.target === overlay) close(); });
+    document.body.appendChild(overlay);
+
+    const input = document.getElementById('_prompt_input');
+    const btnOk = document.getElementById('_prompt_ok');
+    const btnCancel = document.getElementById('_prompt_cancel');
+    const btnClose = document.getElementById('_prompt_close');
+
+    btnClose.onclick = close;
+    btnCancel.onclick = close;
+    btnOk.onclick = () => {
+      const val = input.value;
+      close();
+      if (typeof onConfirm === 'function') onConfirm(val);
+    };
+    input.focus();
+    input.select();
+    input.onkeydown = (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        btnOk.click();
+      } else if (e.key === 'Escape') {
+        close();
+      }
+    };
+  },
+
   stateOptions(sel='') {
     const states=['AC','AL','AM','AP','BA','CE','DF','ES','GO','MA','MG','MS','MT','PA','PB','PE','PI','PR','RJ','RN','RO','RR','RS','SC','SE','SP','TO'];
     const selected = String(sel || '').trim().toUpperCase();

@@ -727,7 +727,7 @@ const Orcamentos = {
   },
 
   _promptCustomCategory() {
-    Utils.prompt('Nome da Nova Categoria Personalizada:', (nome) => {
+    const onAdd = (nome) => {
       if (!nome || !nome.trim()) return;
       this._addCategoryBlock({
         id: DB.uuid(),
@@ -735,7 +735,13 @@ const Orcamentos = {
         icone: '✨',
         cor: 'var(--accent)'
       });
-    });
+    };
+    if (typeof Utils !== 'undefined' && typeof Utils.prompt === 'function') {
+      Utils.prompt('Nome da Nova Categoria Personalizada:', onAdd, '', 'Ex: Esquadrias Especiais ou Paisagismo');
+    } else {
+      const nome = window.prompt('Nome da Nova Categoria Personalizada:');
+      onAdd(nome);
+    }
   },
 
   _addCategoryBlock(cat) {

@@ -37,11 +37,14 @@ assert(dbJs.includes('orcamentos: tableAllowed(auth, \'orcamentos\', \'read\') ?
 assert(dbJs.includes('const normalized = items.map(normalizeOrcamento)'), 'api/db.js mapeia orcamentos paginados com normalizeOrcamento');
 assert(dbJs.includes('INSERT INTO orcamentos (id, tenant_id, obra_id, titulo, valor_total, itens_json, status, descricao, data_criacao)'), 'api/db.js persiste status, descricao e data_criacao no banco');
 
-// 3. Data layer (js/data.js)
-console.log('\n[3] Frontend Data Layer (js/data.js)');
+// 3. Data layer & Utils
+console.log('\n[3] Frontend Data Layer & Utils');
 const dataJs = fs.readFileSync('js/data.js', 'utf8');
 assert(dataJs.includes('data_criacao: (typeof Utils !== \'undefined\' && Utils.cleanDate) ? Utils.cleanDate(o.data_criacao)'), 'js/data.js normaliza data_criacao no syncFromCloud');
 assert(dataJs.includes('categorias: Array.isArray(o.categorias) ? o.categorias : []'), 'js/data.js preserva array de categorias');
+
+const utilsJs = fs.readFileSync('js/utils.js', 'utf8');
+assert(utilsJs.includes('prompt(title, onConfirm'), 'js/utils.js implementa modal de prompt customizado');
 
 // 4. Módulo de Orçamentos (js/orcamentos.js)
 console.log('\n[4] Módulo de Orçamentos (js/orcamentos.js)');
