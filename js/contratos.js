@@ -344,7 +344,7 @@ const Contratos = {
         <p class="page-sub">Emissão de propostas e contratos habitacionais da ${empresaNome} (MCMV / Caixa) com assinaturas digitais e Gov.br</p>
       </div>
       <div class="page-actions">
-        <button class="btn btn-primary" onclick="Contratos.novoContratoModal()">
+        <button class="btn btn-primary" data-fb-click="Contratos.novoContratoModal" data-fb-click-n="0">
           + Novo Contrato de Obra
         </button>
       </div>
@@ -439,16 +439,16 @@ const Contratos = {
       </td>
       <td style="text-align:center;">
         <div style="display:flex;gap:6px;justify-content:center;align-items:center;">
-          <button class="btn btn-sm btn-primary" onclick="Contratos.visualizarContrato('${c.id}')" title="Visualizar documento completo e assinar" style="padding:4px 8px;font-size:.75rem;">
+          <button class="btn btn-sm btn-primary" data-fb-click="Contratos.visualizarContrato" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(c.id))}" title="Visualizar documento completo e assinar" style="padding:4px 8px;font-size:.75rem;">
             👁️ Ver / Assinar
           </button>
-          <button class="icon-btn btn-sm" onclick="Contratos.editarContratoModal('${c.id}')" title="Editar cláusulas e dados do contrato">
+          <button class="icon-btn btn-sm" data-fb-click="Contratos.editarContratoModal" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(c.id))}" title="Editar cláusulas e dados do contrato">
             ✏️
           </button>
-          <button class="icon-btn btn-sm" onclick="Contratos.enviarWhatsApp('${c.id}')" title="Compartilhar resumo e link no WhatsApp" style="color:#25d366;">
+          <button class="icon-btn btn-sm" data-fb-click="Contratos.enviarWhatsApp" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(c.id))}" title="Compartilhar resumo e link no WhatsApp" style="color:#25d366;">
             📲
           </button>
-          <button class="icon-btn btn-sm" onclick="Contratos._confirmDel('${c.id}')" style="color:var(--danger);" title="Excluir contrato">
+          <button class="icon-btn btn-sm" data-fb-click="Contratos._confirmDel" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(c.id))}" style="color:var(--danger);" title="Excluir contrato">
             🗑️
           </button>
         </div>
@@ -496,7 +496,7 @@ const Contratos = {
             <span class="modal-title">📜 ${isEdit ? 'Editar Contrato' : 'Novo Contrato de Construção Civil — ' + e(empNome)}</span>
             <div style="font-size:.76rem;color:var(--text3);margin-top:2px;">Modelo oficial pré-formatado com Capa, Qualificação das Partes, 20 Cláusulas e Assinaturas Gov.br</div>
           </div>
-          <button class="modal-close" onclick="Utils.closeModal()">✕</button>
+          <button class="modal-close" data-fb-click="Utils.closeModal" data-fb-click-n="0">✕</button>
         </div>
 
         <div class="modal-body" style="overflow-y:auto;padding:20px;flex:1;">
@@ -512,14 +512,14 @@ const Contratos = {
               <div class="form-row cols-2" style="margin-bottom:12px;">
                 <div class="form-group">
                   <label class="form-label">Obra / Cliente Cadastrado *</label>
-                  <select class="form-control" name="obra_id" id="ct-obra-select" onchange="Contratos._onObraChange(this.value)" required>
+                  <select class="form-control" name="obra_id" id="ct-obra-select" data-fb-change="Contratos._onObraChange" data-fb-change-n="1" data-fb-change-t0="value" required>
                     <option value="">Selecione uma Obra para Puxar os Dados...</option>
                     ${cs.map(c => `<option value="${e(c.id)}" ${c.id===(dados.obra_id||App.obraId)?'selected':''}>${e(c.nome)} &mdash; ${e(c.cidade)}/${e(c.estado)} (Contrato Caixa: ${e(c.num_contrato_caixa||'—')})</option>`).join('')}
                   </select>
                 </div>
                 <div class="form-group">
                   <label class="form-label">Modelo Contratual *</label>
-                  <select class="form-control" name="modelo_key" id="ct-modelo-select" onchange="Contratos._onModeloSelect(this.value)">
+                  <select class="form-control" name="modelo_key" id="ct-modelo-select" data-fb-change="Contratos._onModeloSelect" data-fb-change-n="1" data-fb-change-t0="value">
                     ${Object.entries(modelos).map(([k, m]) => `<option value="${e(k)}" ${k===modeloKey?'selected':''}>${e(m.nome)}</option>`).join('')}
                   </select>
                 </div>
@@ -629,11 +629,11 @@ const Contratos = {
               <div class="form-row cols-3" style="margin-bottom:10px;">
                 <div class="form-group">
                   <label class="form-label">Valor Total da Obra (R$) *</label>
-                  <input class="form-control" type="number" step="0.01" name="valor" id="ct-valor" value="${e(dados.valor || '122000.00')}" required oninput="Contratos._recalcularValores()">
+                  <input class="form-control" type="number" step="0.01" name="valor" id="ct-valor" value="${e(dados.valor || '122000.00')}" required data-fb-input="Contratos._recalcularValores" data-fb-input-n="0">
                 </div>
                 <div class="form-group">
                   <label class="form-label">Área Construída (m²) *</label>
-                  <input class="form-control" type="number" step="0.01" name="area_m2" id="ct-area" value="${e(dados.area_m2 || '40')}" required oninput="Contratos._recalcularValores()">
+                  <input class="form-control" type="number" step="0.01" name="area_m2" id="ct-area" value="${e(dados.area_m2 || '40')}" required data-fb-input="Contratos._recalcularValores" data-fb-input-n="0">
                 </div>
                 <div class="form-group">
                   <label class="form-label">Valor por m² (R$/m²)</label>
@@ -675,7 +675,7 @@ const Contratos = {
                     Todas as 20 cláusulas oficiais pré-configuradas. Você pode editar, adicionar ou personalizar qualquer texto.
                   </div>
                 </div>
-                <button type="button" class="btn btn-sm btn-primary" onclick="Contratos.adicionarClausula()" style="font-size:.75rem;">
+                <button type="button" class="btn btn-sm btn-primary" data-fb-click="Contratos.adicionarClausula" data-fb-click-n="0" style="font-size:.75rem;">
                   + Adicionar Cláusula
                 </button>
               </div>
@@ -686,8 +686,8 @@ const Contratos = {
         </div>
 
         <div class="modal-footer" style="flex-shrink:0;display:flex;justify-content:space-between;align-items:center;">
-          <button class="btn btn-secondary" onclick="Utils.closeModal()">Cancelar</button>
-          <button class="btn btn-primary" onclick="Contratos.salvarContratoSubmit()">
+          <button class="btn btn-secondary" data-fb-click="Utils.closeModal" data-fb-click-n="0">Cancelar</button>
+          <button class="btn btn-primary" data-fb-click="Contratos.salvarContratoSubmit" data-fb-click-n="0">
             📄 Gerar &amp; Visualizar Contrato Oficial
           </button>
         </div>
@@ -786,15 +786,15 @@ const Contratos = {
       <div class="card" style="padding:10px 14px;background:var(--bg-card);border:1px solid var(--border);border-radius:6px;" data-idx="${idx}">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;gap:8px;">
           <div style="display:flex;align-items:center;gap:8px;flex:1;">
-            <input class="form-control" style="font-weight:900;font-size:.76rem;color:var(--accent);width:130px;padding:2px 6px;" value="${Utils.escapeHtml(cl.numero || `CLÁUSULA ${idx+1}`)}" onchange="Contratos._atualizarClausula(${idx}, 'numero', this.value)">
+            <input class="form-control" style="font-weight:900;font-size:.76rem;color:var(--accent);width:130px;padding:2px 6px;" value="${Utils.escapeHtml(cl.numero || `CLÁUSULA ${idx+1}`)}" data-fb-change="Contratos._atualizarClausula" data-fb-change-n="3" data-fb-change-t0="auto" data-fb-change-v0="${encodeURIComponent(String(idx))}" data-fb-change-t1="string" data-fb-change-v1="numero" data-fb-change-t2="value">
             ${cl.secao ? `<span style="font-size:.7rem;font-weight:800;color:var(--text3);text-transform:uppercase;">[${Utils.escapeHtml(cl.secao)}]</span>` : ''}
-            <input class="form-control" style="font-weight:700;font-size:.76rem;color:var(--text);flex:1;padding:2px 6px;" value="${Utils.escapeHtml(cl.titulo || '')}" placeholder="Título" onchange="Contratos._atualizarClausula(${idx}, 'titulo', this.value)">
+            <input class="form-control" style="font-weight:700;font-size:.76rem;color:var(--text);flex:1;padding:2px 6px;" value="${Utils.escapeHtml(cl.titulo || '')}" placeholder="Título" data-fb-change="Contratos._atualizarClausula" data-fb-change-n="3" data-fb-change-t0="auto" data-fb-change-v0="${encodeURIComponent(String(idx))}" data-fb-change-t1="string" data-fb-change-v1="titulo" data-fb-change-t2="value">
           </div>
           <div style="display:flex;gap:4px;">
-            <button type="button" class="icon-btn btn-sm" onclick="Contratos._removerClausula(${idx})" title="Excluir" style="color:var(--danger);font-size:.75rem;">🗑️</button>
+            <button type="button" class="icon-btn btn-sm" data-fb-click="Contratos._removerClausula" data-fb-click-n="1" data-fb-click-t0="auto" data-fb-click-v0="${encodeURIComponent(String(idx))}" title="Excluir" style="color:var(--danger);font-size:.75rem;">🗑️</button>
           </div>
         </div>
-        <textarea class="form-control" rows="2" style="font-size:.8rem;line-height:1.45;resize:vertical;" onchange="Contratos._atualizarClausula(${idx}, 'texto', this.value)">${Utils.escapeHtml(cl.texto || '')}</textarea>
+        <textarea class="form-control" rows="2" style="font-size:.8rem;line-height:1.45;resize:vertical;" data-fb-change="Contratos._atualizarClausula" data-fb-change-n="3" data-fb-change-t0="auto" data-fb-change-v0="${encodeURIComponent(String(idx))}" data-fb-change-t1="string" data-fb-change-v1="texto" data-fb-change-t2="value">${Utils.escapeHtml(cl.texto || '')}</textarea>
       </div>
     `).join('');
   },
@@ -947,28 +947,28 @@ const Contratos = {
 
           <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
             <!-- Assinar Contratante -->
-            <button class="btn btn-sm btn-primary" onclick="Contratos.assinarContrato('${c.id}', 'contratante')" style="font-size:.75rem;background:${c.assinatura_contratante ? '#10b981' : 'var(--primary)'};border-color:${c.assinatura_contratante ? '#10b981' : 'var(--primary)'};color:#fff;">
+            <button class="btn btn-sm btn-primary" data-fb-click="Contratos.assinarContrato" data-fb-click-n="2" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(c.id))}" data-fb-click-t1="string" data-fb-click-v1="contratante" style="font-size:.75rem;background:${c.assinatura_contratante ? '#10b981' : 'var(--primary)'};border-color:${c.assinatura_contratante ? '#10b981' : 'var(--primary)'};color:#fff;">
               ✍️ ${c.assinatura_contratante ? '✓ Cliente (Reassinar)' : 'Assinar Cliente'}
             </button>
 
             <!-- Assinar Contratada -->
-            <button class="btn btn-sm btn-secondary" onclick="Contratos.assinarContrato('${c.id}', 'contratada')" style="font-size:.75rem;">
+            <button class="btn btn-sm btn-secondary" data-fb-click="Contratos.assinarContrato" data-fb-click-n="2" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(c.id))}" data-fb-click-t1="string" data-fb-click-v1="contratada" style="font-size:.75rem;">
               ✍️ ${c.assinatura_contratada ? '✓ Contratada (Reassinar)' : 'Assinar Contratada'}
             </button>
 
-            <button class="btn btn-sm btn-secondary" onclick="Contratos.enviarWhatsApp('${c.id}')" style="color:#25d366;font-size:.75rem;">
+            <button class="btn btn-sm btn-secondary" data-fb-click="Contratos.enviarWhatsApp" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(c.id))}" style="color:#25d366;font-size:.75rem;">
               📲 WhatsApp
             </button>
 
-            <button class="btn btn-sm btn-secondary" onclick="Assinador.modalGovBr({ nomeDocumento:'Contrato_${c.numero.replace('/','-')}', onBaixarPDF: () => Contratos.imprimirContrato('${c.id}') })" style="color:#0284c7;font-size:.75rem;">
+            <button class="btn btn-sm btn-secondary" data-fb-click="Patch26Actions.contratoGovBr" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(c.id))}" style="color:#0284c7;font-size:.75rem;">
               🏛️ Gov.br
             </button>
 
-            <button class="btn btn-sm btn-primary" onclick="Contratos.imprimirContrato('${c.id}')" style="font-size:.75rem;">
+            <button class="btn btn-sm btn-primary" data-fb-click="Contratos.imprimirContrato" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(c.id))}" style="font-size:.75rem;">
               🖨️ Imprimir / Salvar PDF
             </button>
 
-            <button class="modal-close" onclick="Utils.closeModal()">✕</button>
+            <button class="modal-close" data-fb-click="Utils.closeModal" data-fb-click-n="0">✕</button>
           </div>
         </div>
 

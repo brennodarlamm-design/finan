@@ -21,22 +21,22 @@ const Parcelamento = {
               <div style="font-size:.72rem;font-weight:400;color:#a5b4fc;">Divide compras, boletos ou recebimentos em N vezes com vencimentos automáticos</div>
             </div>
           </div>
-          <button class="modal-close" onclick="Utils.closeModal()" style="color:#a5b4fc;">✕</button>
+          <button class="modal-close" data-fb-click="Utils.closeModal" data-fb-click-n="0" style="color:#a5b4fc;">✕</button>
         </div>
 
         <div class="modal-body" style="padding:20px;max-height:75vh;overflow-y:auto;">
-          <form id="f-parcelas" onsubmit="event.preventDefault();Parcelamento.salvar();">
+          <form id="f-parcelas" data-fb-submit="Patch26Actions.parcelamentoSubmit" data-fb-submit-n="1" data-fb-submit-t0="event">
             <div class="form-row cols-3" style="margin-bottom:12px;">
               <div class="form-group">
                 <label class="form-label">Tipo *</label>
-                <select class="form-control" id="parc-tipo" onchange="Parcelamento._gerarPreview()">
+                <select class="form-control" id="parc-tipo" data-fb-change="Parcelamento._gerarPreview" data-fb-change-n="0">
                   <option value="despesa" ${tipoPadrao==='despesa'?'selected':''}>↓ Despesa / A Pagar</option>
                   <option value="receita" ${tipoPadrao==='receita'?'selected':''}>↑ Receita / A Receber</option>
                 </select>
               </div>
               <div class="form-group" style="grid-column:span 2;">
                 <label class="form-label">Descrição Base *</label>
-                <input class="form-control" id="parc-desc" placeholder="Ex: Compra de Aço e Vigas" required oninput="Parcelamento._gerarPreview()">
+                <input class="form-control" id="parc-desc" placeholder="Ex: Compra de Aço e Vigas" required data-fb-input="Parcelamento._gerarPreview" data-fb-input-n="0">
               </div>
             </div>
 
@@ -96,17 +96,17 @@ const Parcelamento = {
                 <div class="form-group">
                   <label class="form-label">Valor Total (R$) *</label>
                   <input class="form-control" id="parc-total" type="number" step="0.01" min="0.01" placeholder="0,00" required
-                    style="font-weight:800;font-size:1rem;color:var(--accent2);" oninput="Parcelamento._gerarPreview()">
+                    style="font-weight:800;font-size:1rem;color:var(--accent2);" data-fb-input="Parcelamento._gerarPreview" data-fb-input-n="0">
                 </div>
                 <div class="form-group">
                   <label class="form-label">Nº Parcelas *</label>
-                  <select class="form-control" id="parc-qtd" onchange="Parcelamento._gerarPreview()">
+                  <select class="form-control" id="parc-qtd" data-fb-change="Parcelamento._gerarPreview" data-fb-change-n="0">
                     ${[2,3,4,5,6,7,8,9,10,11,12,18,24,36].map(n => `<option value="${n}" ${n===3?'selected':''}>${n}x vezes</option>`).join('')}
                   </select>
                 </div>
                 <div class="form-group">
                   <label class="form-label">Intervalo</label>
-                  <select class="form-control" id="parc-intervalo" onchange="Parcelamento._gerarPreview()">
+                  <select class="form-control" id="parc-intervalo" data-fb-change="Parcelamento._gerarPreview" data-fb-change-n="0">
                     <option value="mensal" selected>Mensal (30 dias)</option>
                     <option value="quinzenal">Quinzenal (15 dias)</option>
                     <option value="semanal">Semanal (7 dias)</option>
@@ -114,7 +114,7 @@ const Parcelamento = {
                 </div>
                 <div class="form-group">
                   <label class="form-label">1º Vencimento *</label>
-                  <input class="form-control" id="parc-prim-venc" type="date" value="${hoje}" required onchange="Parcelamento._gerarPreview()">
+                  <input class="form-control" id="parc-prim-venc" type="date" value="${hoje}" required data-fb-change="Parcelamento._gerarPreview" data-fb-change-n="0">
                 </div>
               </div>
             </div>
@@ -145,7 +145,7 @@ const Parcelamento = {
             </div>
 
             <div class="modal-footer" style="padding:0;padding-top:14px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:8px;">
-              <button type="button" class="btn btn-secondary" onclick="Utils.closeModal()">Cancelar</button>
+              <button type="button" class="btn btn-secondary" data-fb-click="Utils.closeModal" data-fb-click-n="0">Cancelar</button>
               <button type="submit" class="btn btn-primary" id="btn-salvar-parcelas" style="font-weight:800;background:linear-gradient(135deg,#f59e0b,#d97706);color:#1e1b4b;border:none;">
                 ⚡ Gerar e Salvar Parcelas
               </button>

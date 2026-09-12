@@ -37,13 +37,13 @@ const Escritorio = {
         <p class="page-sub">Gestão de custos fixos, contas de consumo (água, energia, internet), tributos (DAS Simples Nacional), folha e sede administrativa</p>
       </div>
       <div class="page-actions" style="display:flex;gap:8px;flex-wrap:wrap;">
-        <button class="btn btn-secondary btn-sm" onclick="ImportarExcel.abrirModal('escritorio')" style="display:flex;align-items:center;gap:6px;">
+        <button class="btn btn-secondary btn-sm" data-fb-click="ImportarExcel.abrirModal" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="escritorio" style="display:flex;align-items:center;gap:6px;">
           📊 Importar Excel
         </button>
-        <button class="btn btn-secondary btn-sm" onclick="Escritorio.abrirModalLote()" style="display:flex;align-items:center;gap:6px;border:1px solid var(--accent);color:var(--accent2);">
+        <button class="btn btn-secondary btn-sm" data-fb-click="Escritorio.abrirModalLote" data-fb-click-n="0" style="display:flex;align-items:center;gap:6px;border:1px solid var(--accent);color:var(--accent2);">
           ⚡ Lançar Custos Fixos do Mês
         </button>
-        <button class="btn btn-primary btn-sm" onclick="Escritorio.showForm()" style="display:flex;align-items:center;gap:6px;">
+        <button class="btn btn-primary btn-sm" data-fb-click="Escritorio.showForm" data-fb-click-n="0" style="display:flex;align-items:center;gap:6px;">
           + Nova Despesa
         </button>
       </div>
@@ -80,22 +80,22 @@ const Escritorio = {
 
     <!-- ABAS RÁPIDAS POR GRUPO DE DESPESAS -->
     <div style="display:flex;gap:6px;border-bottom:1px solid var(--border);margin-bottom:16px;overflow-x:auto;padding-bottom:2px;">
-      <button class="btn btn-sm ${this._activeGroup==='todas'?'btn-primary':'btn-secondary'}" onclick="Escritorio.switchGroup('todas')">
+      <button class="btn btn-sm ${this._activeGroup==='todas'?'btn-primary':'btn-secondary'}" data-fb-click="Escritorio.switchGroup" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="todas">
         📋 Todas as Despesas (${DB.getDespesasEscritorio().length})
       </button>
-      <button class="btn btn-sm ${this._activeGroup==='consumo'?'btn-primary':'btn-secondary'}" onclick="Escritorio.switchGroup('consumo')">
+      <button class="btn btn-sm ${this._activeGroup==='consumo'?'btn-primary':'btn-secondary'}" data-fb-click="Escritorio.switchGroup" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="consumo">
         💡 Contas de Consumo (Luz / Água / Net)
       </button>
-      <button class="btn btn-sm ${this._activeGroup==='impostos'?'btn-primary':'btn-secondary'}" onclick="Escritorio.switchGroup('impostos')">
+      <button class="btn btn-sm ${this._activeGroup==='impostos'?'btn-primary':'btn-secondary'}" data-fb-click="Escritorio.switchGroup" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="impostos">
         🏛️ Impostos & Simples Nacional
       </button>
-      <button class="btn btn-sm ${this._activeGroup==='folha'?'btn-primary':'btn-secondary'}" onclick="Escritorio.switchGroup('folha')">
+      <button class="btn btn-sm ${this._activeGroup==='folha'?'btn-primary':'btn-secondary'}" data-fb-click="Escritorio.switchGroup" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="folha">
         👥 Folha de Pagamento & Sócios
       </button>
-      <button class="btn btn-sm ${this._activeGroup==='estrutura'?'btn-primary':'btn-secondary'}" onclick="Escritorio.switchGroup('estrutura')">
+      <button class="btn btn-sm ${this._activeGroup==='estrutura'?'btn-primary':'btn-secondary'}" data-fb-click="Escritorio.switchGroup" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="estrutura">
         🏢 Aluguel & Instalações
       </button>
-      <button class="btn btn-sm ${this._activeGroup==='servicos'?'btn-primary':'btn-secondary'}" onclick="Escritorio.switchGroup('servicos')">
+      <button class="btn btn-sm ${this._activeGroup==='servicos'?'btn-primary':'btn-secondary'}" data-fb-click="Escritorio.switchGroup" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="servicos">
         ⚖️ Contabilidade, TI & Softwares
       </button>
     </div>
@@ -106,12 +106,12 @@ const Escritorio = {
         <label class="filter-label">Buscar</label>
         <div class="search-bar">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
-          <input class="form-control" id="adm-search" placeholder="Descrição, fornecedor, código de barras..." oninput="Escritorio.aplicarFiltros()">
+          <input class="form-control" id="adm-search" placeholder="Descrição, fornecedor, código de barras..." data-fb-input="Escritorio.aplicarFiltros" data-fb-input-n="0">
         </div>
       </div>
       <div class="filter-group">
         <label class="filter-label">Categoria</label>
-        <select class="form-control" id="adm-cat" style="min-width:140px" onchange="Escritorio.aplicarFiltros()">
+        <select class="form-control" id="adm-cat" style="min-width:140px" data-fb-change="Escritorio.aplicarFiltros" data-fb-change-n="0">
           <option value="">Todas</option>
           <option value="energia">💡 Energia Elétrica</option>
           <option value="agua">💧 Água e Esgoto</option>
@@ -135,7 +135,7 @@ const Escritorio = {
       </div>
       <div class="filter-group">
         <label class="filter-label">Status</label>
-        <select class="form-control" id="adm-status" style="min-width:110px" onchange="Escritorio.aplicarFiltros()">
+        <select class="form-control" id="adm-status" style="min-width:110px" data-fb-change="Escritorio.aplicarFiltros" data-fb-change-n="0">
           <option value="">Todos</option>
           <option value="a_pagar">⏳ A Pagar</option>
           <option value="pago">✓ Pago</option>
@@ -145,11 +145,11 @@ const Escritorio = {
       <div class="filter-group">
         <label class="filter-label">Período Vencimento</label>
         <div style="display:flex;gap:5px">
-          <input class="form-control" type="date" id="adm-di" style="width:125px" title="Data inicial" onchange="Escritorio.aplicarFiltros()">
-          <input class="form-control" type="date" id="adm-df" style="width:125px" title="Data final" onchange="Escritorio.aplicarFiltros()">
+          <input class="form-control" type="date" id="adm-di" style="width:125px" title="Data inicial" data-fb-change="Escritorio.aplicarFiltros" data-fb-change-n="0">
+          <input class="form-control" type="date" id="adm-df" style="width:125px" title="Data final" data-fb-change="Escritorio.aplicarFiltros" data-fb-change-n="0">
         </div>
       </div>
-      <button class="btn btn-secondary btn-sm" onclick="Escritorio.limparFiltros()" style="align-self:flex-end">Limpar</button>
+      <button class="btn btn-secondary btn-sm" data-fb-click="Escritorio.limparFiltros" data-fb-click-n="0" style="align-self:flex-end">Limpar</button>
     </div>
 
     <!-- TABELA DE DESPESAS DO ESCRITÓRIO -->
@@ -228,16 +228,16 @@ const Escritorio = {
         <td style="text-align:center;white-space:nowrap;">
           <div style="display:flex;gap:4px;justify-content:center;align-items:center;">
             ${l.status === 'a_pagar' ? `
-            <button class="btn btn-sm btn-success" onclick="Escritorio.marcarPago('${l.id}')" title="Confirmar Pagamento Realizado" style="font-size:.72rem;padding:3px 8px;">
+            <button class="btn btn-sm btn-success" data-fb-click="Escritorio.marcarPago" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(l.id))}" title="Confirmar Pagamento Realizado" style="font-size:.72rem;padding:3px 8px;">
               ✓ Pagar
             </button>` : ''}
-            <button class="icon-btn" onclick="Escritorio.emitirRecibo('${l.id}')" title="Emitir Recibo Oficial de Pagamento" style="font-size:13px;">
+            <button class="icon-btn" data-fb-click="Escritorio.emitirRecibo" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(l.id))}" title="Emitir Recibo Oficial de Pagamento" style="font-size:13px;">
               🧾
             </button>
-            <button class="icon-btn" onclick="Escritorio.showForm('${l.id}')" title="Editar Lançamento" style="font-size:13px;">
+            <button class="icon-btn" data-fb-click="Escritorio.showForm" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(l.id))}" title="Editar Lançamento" style="font-size:13px;">
               ✏️
             </button>
-            <button class="icon-btn" onclick="Escritorio.excluir('${l.id}')" title="Excluir Lançamento" style="font-size:13px;color:var(--danger);">
+            <button class="icon-btn" data-fb-click="Escritorio.excluir" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(l.id))}" title="Excluir Lançamento" style="font-size:13px;color:var(--danger);">
               🗑️
             </button>
           </div>
@@ -314,15 +314,15 @@ const Escritorio = {
               <div style="font-size:.75rem;color:var(--text3);">Centro de Custo: Sede Central da Construtora</div>
             </div>
           </div>
-          <button class="modal-close" onclick="Utils.closeModal()">✕</button>
+          <button class="modal-close" data-fb-click="Utils.closeModal" data-fb-click-n="0">✕</button>
         </div>
 
-        <form id="form-adm-despesa" onsubmit="Escritorio.salvar(event, '${id || ''}')" style="padding:20px;">
+        <form id="form-adm-despesa" data-fb-submit="Escritorio.salvar" data-fb-submit-n="2" data-fb-submit-t0="event" data-fb-submit-t1="string" data-fb-submit-v1="${encodeURIComponent(String(id || ''))}" style="padding:20px;">
           
           <div class="g2" style="margin-bottom:14px;">
             <div class="form-group">
               <label class="form-label">Categoria Administrativa *</label>
-              <select class="form-control" name="categoria" id="adm-form-cat" required onchange="Escritorio._onCatChange(this.value)">
+              <select class="form-control" name="categoria" id="adm-form-cat" required data-fb-change="Escritorio._onCatChange" data-fb-change-n="1" data-fb-change-t0="value">
                 <optgroup label="💡 Contas de Consumo">
                   <option value="energia" ${l?.categoria==='energia'?'selected':''}>💡 Energia Elétrica (Luz)</option>
                   <option value="agua" ${l?.categoria==='agua'?'selected':''}>💧 Água e Esgoto</option>
@@ -374,10 +374,10 @@ const Escritorio = {
             <div class="form-group">
               <label class="form-label">Fornecedor / Concessionária / Órgão</label>
               <div style="display:flex;gap:8px;align-items:center;">
-                <select class="form-control" id="adm-forn-sel" onchange="Escritorio._onFornecedorChange(this)" style="flex:1;">
+                <select class="form-control" id="adm-forn-sel" data-fb-change="Escritorio._onFornecedorChange" data-fb-change-n="1" data-fb-change-t0="self" style="flex:1;">
                   ${typeof Fornecedores !== 'undefined' ? Fornecedores.fornecedorOptions(l?.fornecedor_beneficiario||'') : '<option value="">Sem fornecedores cadastrados</option>'}
                 </select>
-                <button type="button" class="btn btn-secondary btn-sm" onclick="Fornecedores.showForm()" title="Cadastrar novo fornecedor" style="white-space:nowrap;">
+                <button type="button" class="btn btn-secondary btn-sm" data-fb-click="Fornecedores.showForm" data-fb-click-n="0" title="Cadastrar novo fornecedor" style="white-space:nowrap;">
                   ➕ Novo
                 </button>
               </div>
@@ -433,7 +433,7 @@ const Escritorio = {
           </div>
 
           <div class="modal-footer" style="padding:14px 0 0;border-top:1px solid var(--border);justify-content:space-between;">
-            <button type="button" class="btn btn-secondary" onclick="Utils.closeModal()">Cancelar</button>
+            <button type="button" class="btn btn-secondary" data-fb-click="Utils.closeModal" data-fb-click-n="0">Cancelar</button>
             <button type="submit" class="btn btn-primary" style="font-weight:800;padding:10px 24px;">
               ${isEdit ? 'Salvar Alterações' : 'Cadastrar Despesa'}
             </button>
@@ -587,7 +587,7 @@ const Escritorio = {
       <div class="modal" style="max-width:420px;width:95vw;">
         <div class="modal-header">
           <span class="modal-title">✓ Confirmar Pagamento</span>
-          <button class="modal-close" onclick="Utils.closeModal()">✕</button>
+          <button class="modal-close" data-fb-click="Utils.closeModal" data-fb-click-n="0">✕</button>
         </div>
         <div class="modal-body" style="padding:16px 20px;">
           <div style="font-weight:700;color:var(--text);margin-bottom:4px;">${Utils.escapeHtml(l.descricao)}</div>
@@ -605,8 +605,8 @@ const Escritorio = {
           </div>
         </div>
         <div class="modal-footer">
-          <button class="btn btn-secondary" onclick="Utils.closeModal()">Cancelar</button>
-          <button class="btn btn-success" onclick="Escritorio.confirmarPagamento('${l.id}')" style="font-weight:800;">
+          <button class="btn btn-secondary" data-fb-click="Utils.closeModal" data-fb-click-n="0">Cancelar</button>
+          <button class="btn btn-success" data-fb-click="Escritorio.confirmarPagamento" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(l.id))}" style="font-weight:800;">
             ✓ Confirmar Baixa
           </button>
         </div>
@@ -689,7 +689,7 @@ const Escritorio = {
               <div style="font-size:.75rem;color:var(--text3);">Gere em lote todas as contas fixas do escritório para a competência desejada</div>
             </div>
           </div>
-          <button class="modal-close" onclick="Utils.closeModal()">✕</button>
+          <button class="modal-close" data-fb-click="Utils.closeModal" data-fb-click-n="0">✕</button>
         </div>
 
         <div class="modal-body" style="padding:20px;overflow-y:auto;flex:1;">
@@ -708,7 +708,7 @@ const Escritorio = {
             <table style="font-size:.82rem;">
               <thead>
                 <tr style="background:var(--bg-card);">
-                  <th style="width:36px;text-align:center;"><input type="checkbox" checked onchange="Escritorio._toggleAllLote(this.checked)"></th>
+                  <th style="width:36px;text-align:center;"><input type="checkbox" checked data-fb-change="Escritorio._toggleAllLote" data-fb-change-n="1" data-fb-change-t0="checked"></th>
                   <th>Despesa / Descrição</th>
                   <th>Categoria</th>
                   <th>Favorecido / Fornecedor</th>
@@ -736,7 +736,7 @@ const Escritorio = {
                       <input type="number" min="1" max="31" class="form-control lote-dia" value="${it.diaVenc}" style="font-size:.8rem;padding:4px 4px;text-align:center;">
                     </td>
                     <td>
-                      <input type="number" step="0.01" min="0" class="form-control lote-valor" value="${it.valor}" style="font-size:.8rem;padding:4px 6px;text-align:right;font-weight:800;color:var(--danger);" oninput="Escritorio._recalcLoteTotal()">
+                      <input type="number" step="0.01" min="0" class="form-control lote-valor" value="${it.valor}" style="font-size:.8rem;padding:4px 6px;text-align:right;font-weight:800;color:var(--danger);" data-fb-input="Escritorio._recalcLoteTotal" data-fb-input-n="0">
                     </td>
                   </tr>
                 `).join('')}
@@ -754,8 +754,8 @@ const Escritorio = {
         </div>
 
         <div class="modal-footer" style="padding:14px 20px;border-top:1px solid var(--border);justify-content:space-between;">
-          <button type="button" class="btn btn-secondary" onclick="Utils.closeModal()">Cancelar</button>
-          <button type="button" class="btn btn-primary" onclick="Escritorio.gerarLote()" style="font-weight:800;padding:10px 24px;">
+          <button type="button" class="btn btn-secondary" data-fb-click="Utils.closeModal" data-fb-click-n="0">Cancelar</button>
+          <button type="button" class="btn btn-primary" data-fb-click="Escritorio.gerarLote" data-fb-click-n="0" style="font-weight:800;padding:10px 24px;">
             ⚡ Gerar Contas Fixas do Mês
           </button>
         </div>

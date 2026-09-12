@@ -23,10 +23,10 @@ const OCR = {
             </div>
           </span>
           <div style="display:flex;align-items:center;gap:8px;">
-            <button class="btn btn-ghost btn-sm" onclick="OCR.abrirHistorico()" style="color:#a5b4fc;font-size:.76rem;display:flex;align-items:center;gap:5px;border:1px solid rgba(165,180,252,.3);border-radius:8px;padding:3px 8px;" title="Ver documentos lidos anteriormente">
+            <button class="btn btn-ghost btn-sm" data-fb-click="OCR.abrirHistorico" data-fb-click-n="0" style="color:#a5b4fc;font-size:.76rem;display:flex;align-items:center;gap:5px;border:1px solid rgba(165,180,252,.3);border-radius:8px;padding:3px 8px;" title="Ver documentos lidos anteriormente">
               📜 Histórico (${this.obterHistorico().length})
             </button>
-            <button class="modal-close" onclick="Utils.closeModal()" style="color:#a5b4fc;">✕</button>
+            <button class="modal-close" data-fb-click="Utils.closeModal" data-fb-click-n="0" style="color:#a5b4fc;">✕</button>
           </div>
         </div>
         <div class="modal-body" id="ocr-modal-body" style="padding:20px 24px;overflow-y:auto;flex:1;">
@@ -44,7 +44,7 @@ const OCR = {
               <span style="font-size:.88rem;font-weight:800;color:#10b981;">Tirar Foto</span>
               <span style="font-size:.7rem;color:var(--text3);">Câmera do celular</span>
               <input type="file" id="ocr-camera-input" accept="image/*" capture="environment"
-                style="display:none;" onchange="OCR._onFileSelected(this)">
+                style="display:none;" data-fb-change="OCR._onFileSelected" data-fb-change-n="1" data-fb-change-t0="self">
             </label>
 
             <!-- Escolher da Galeria / Arquivo -->
@@ -57,18 +57,16 @@ const OCR = {
               <span style="font-size:.88rem;font-weight:800;color:#818cf8;">Galeria / Arquivo</span>
               <span style="font-size:.7rem;color:var(--text3);">PDF (até 20MB) · Imagens</span>
               <input type="file" id="ocr-file-input" accept="image/*,application/pdf"
-                style="display:none;" onchange="OCR._onFileSelected(this)">
+                style="display:none;" data-fb-change="OCR._onFileSelected" data-fb-change-n="1" data-fb-change-t0="self">
             </label>
           </div>
 
           <!-- Dropzone drag-and-drop (desktop) -->
           <div id="ocr-dropzone"
             style="border:2px dashed rgba(79,70,229,.4);border-radius:12px;padding:16px;text-align:center;
-                   background:rgba(79,70,229,.04);cursor:pointer;transition:all .2s;"
-            onclick="document.getElementById('ocr-file-input').click()"
+                   background:rgba(79,70,229,.04);cursor:pointer;transition:all .2s;" data-fb-click="Patch26Actions.clickById" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="ocr-file-input"
             ondragover="OCR._onDragOver(event)"
-            ondragleave="OCR._onDragLeave(event)"
-            ondrop="OCR._onDrop(event)">
+            ondragleave="OCR._onDragLeave(event)" data-fb-drop="OCR._onDrop" data-fb-drop-n="1" data-fb-drop-t0="event">
             <div style="font-size:.78rem;color:var(--text3);">
               🖥️ Ou arraste um arquivo aqui (PDF, imagem)
             </div>
@@ -452,7 +450,7 @@ const OCR = {
             ${provedor === 'openai' ? '<span style="background:rgba(16,185,129,.15);color:#10b981;font-size:.68rem;padding:2px 6px;border-radius:4px;font-weight:800;border:1px solid rgba(16,185,129,.3);">🤖 ChatGPT Vision</span>' : provedor === 'gemini' ? '<span style="background:rgba(99,102,241,.15);color:#818cf8;font-size:.68rem;padding:2px 6px;border-radius:4px;font-weight:800;border:1px solid rgba(99,102,241,.3);">✨ Gemini Vision</span>' : ''}
           </div>
         </div>
-        <button class="btn btn-sm btn-secondary" onclick="OCR.abrirModal()" style="font-size:.72rem;">
+        <button class="btn btn-sm btn-secondary" data-fb-click="OCR.abrirModal" data-fb-click-n="0" style="font-size:.72rem;">
           🔄 Trocar
         </button>
       </div>
@@ -497,7 +495,7 @@ const OCR = {
             <label style="font-size:.74rem;color:var(--text3);font-weight:700;display:block;margin-bottom:4px;">
               Status do Lançamento
             </label>
-            <select id="ocr-status" class="form-control" style="font-size:.85rem;" onchange="OCR._onStatusChange(this.value)">
+            <select id="ocr-status" class="form-control" style="font-size:.85rem;" data-fb-change="OCR._onStatusChange" data-fb-change-n="1" data-fb-change-t0="value">
               <option value="a_pagar" selected>⏳ A Pagar (Previsão)</option>
               <option value="pago">✓ Já Pago (Efetivado)</option>
             </select>
@@ -603,8 +601,8 @@ const OCR = {
 
       <!-- Botão de Ação Destacado no Final do Formulário -->
       <div style="margin-top:20px;padding:14px 16px;background:var(--bg-secondary);border:1px solid var(--border);border-radius:10px;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;">
-        <button type="button" class="btn btn-secondary" onclick="Utils.closeModal()" style="font-weight:700;padding:10px 18px;">✕ Cancelar</button>
-        <button type="button" class="btn btn-success" onclick="OCR.confirmarESalvarLancamento()" style="display:flex;align-items:center;gap:8px;font-size:1rem;font-weight:900;padding:12px 26px;background:linear-gradient(135deg,#16a34a,#15803d);color:#fff;box-shadow:0 4px 14px rgba(22,163,74,.4);border:none;border-radius:8px;cursor:pointer;">
+        <button type="button" class="btn btn-secondary" data-fb-click="Utils.closeModal" data-fb-click-n="0" style="font-weight:700;padding:10px 18px;">✕ Cancelar</button>
+        <button type="button" class="btn btn-success" data-fb-click="OCR.confirmarESalvarLancamento" data-fb-click-n="0" style="display:flex;align-items:center;gap:8px;font-size:1rem;font-weight:900;padding:12px 26px;background:linear-gradient(135deg,#16a34a,#15803d);color:#fff;box-shadow:0 4px 14px rgba(22,163,74,.4);border:none;border-radius:8px;cursor:pointer;">
           ✓ Confirmar e Salvar Lançamento
         </button>
       </div>
@@ -620,8 +618,8 @@ const OCR = {
       footer.style.alignItems = 'center';
       footer.style.width = '100%';
       footer.innerHTML = `
-        <button class="btn btn-secondary" onclick="Utils.closeModal()">✕ Cancelar</button>
-        <button class="btn btn-success" onclick="OCR.confirmarESalvarLancamento()" style="display:flex;align-items:center;gap:8px;font-size:.95rem;font-weight:900;padding:10px 22px;background:linear-gradient(135deg,#16a34a,#15803d);color:#fff;box-shadow:0 3px 10px rgba(22,163,74,.35);border:none;border-radius:6px;cursor:pointer;">
+        <button class="btn btn-secondary" data-fb-click="Utils.closeModal" data-fb-click-n="0">✕ Cancelar</button>
+        <button class="btn btn-success" data-fb-click="OCR.confirmarESalvarLancamento" data-fb-click-n="0" style="display:flex;align-items:center;gap:8px;font-size:.95rem;font-weight:900;padding:10px 22px;background:linear-gradient(135deg,#16a34a,#15803d);color:#fff;box-shadow:0 3px 10px rgba(22,163,74,.35);border:none;border-radius:6px;cursor:pointer;">
           ✓ Confirmar e Salvar Lançamento
         </button>
       `;
@@ -650,8 +648,8 @@ const OCR = {
           ${mensagem || 'Não foi possível analisar o documento.'}
         </div>
         <div style="display:flex;gap:10px;justify-content:center;">
-          <button class="btn btn-secondary" onclick="OCR.abrirModal()">🔄 Tentar Novamente</button>
-          <button class="btn btn-secondary" onclick="Utils.closeModal()">Fechar</button>
+          <button class="btn btn-secondary" data-fb-click="OCR.abrirModal" data-fb-click-n="0">🔄 Tentar Novamente</button>
+          <button class="btn btn-secondary" data-fb-click="Utils.closeModal" data-fb-click-n="0">Fechar</button>
         </div>
       </div>
     `;
@@ -1044,7 +1042,7 @@ const OCR = {
                     ${confPct}% confiança
                   </div>
                 </div>
-                <button class="btn btn-secondary btn-sm" onclick="OCR.reutilizarHistorico('${item.id}')" style="font-size:.75rem;padding:4px 8px;font-weight:700;white-space:nowrap;" title="Abrir dados deste documento">
+                <button class="btn btn-secondary btn-sm" data-fb-click="OCR.reutilizarHistorico" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(item.id))}" style="font-size:.75rem;padding:4px 8px;font-weight:700;white-space:nowrap;" title="Abrir dados deste documento">
                   Abrir ➔
                 </button>
               </div>
@@ -1065,8 +1063,8 @@ const OCR = {
             </div>
           </div>
           <div style="display:flex;align-items:center;gap:6px;">
-            <button class="btn btn-ghost btn-sm" onclick="OCR.limparHistorico()" style="color:#f87171;font-size:.72rem;" title="Limpar todo o histórico">🗑️ Limpar</button>
-            <button class="modal-close" onclick="Utils.closeModal()" style="color:#a5b4fc;">✕</button>
+            <button class="btn btn-ghost btn-sm" data-fb-click="OCR.limparHistorico" data-fb-click-n="0" style="color:#f87171;font-size:.72rem;" title="Limpar todo o histórico">🗑️ Limpar</button>
+            <button class="modal-close" data-fb-click="Utils.closeModal" data-fb-click-n="0" style="color:#a5b4fc;">✕</button>
           </div>
         </div>
 
@@ -1075,8 +1073,8 @@ const OCR = {
         </div>
 
         <div class="modal-footer" style="padding:10px 16px;display:flex;justify-content:space-between;align-items:center;">
-          <button class="btn btn-secondary btn-sm" onclick="OCR.abrirModal()">← Voltar ao Escaneador</button>
-          <button class="btn btn-secondary btn-sm" onclick="Utils.closeModal()">Fechar</button>
+          <button class="btn btn-secondary btn-sm" data-fb-click="OCR.abrirModal" data-fb-click-n="0">← Voltar ao Escaneador</button>
+          <button class="btn btn-secondary btn-sm" data-fb-click="Utils.closeModal" data-fb-click-n="0">Fechar</button>
         </div>
       </div>
     `);

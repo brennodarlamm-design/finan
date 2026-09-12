@@ -64,7 +64,7 @@
               Certifique-se de que os números e letras foram digitados exatamente como impressos no carimbo ou recibo.<br>
               <em>Exemplo de formato: FIN-SIG-XXXXXXXX-XXXXXXXX</em>
             </div>
-            <button class="btn-action" onclick="document.getElementById('input-codigo').value='';document.getElementById('input-codigo').focus();">
+            <button class="btn-action" data-fb-click="Patch26Actions.resetAndFocusById" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="input-codigo">
               Limpar e Tentar Novamente
             </button>
           </div>
@@ -157,13 +157,13 @@
 
         <!-- Botões de Ação -->
         <div class="actions-row">
-          <button class="btn-action" onclick="window.print()">
+          <button class="btn-action" data-fb-click="Patch26Actions.print" data-fb-click-n="0">
             🖨️ Imprimir Consulta
           </button>
           <button class="btn-action" id="btn-copy-link">
             🔗 Copiar Link de Validação
           </button>
-          <button class="btn-action btn-action-primary" onclick="novaConsulta()">
+          <button class="btn-action btn-action-primary" data-fb-click="novaConsulta" data-fb-click-n="0">
             🔍 Nova Consulta
           </button>
         </div>
