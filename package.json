@@ -1,6 +1,6 @@
 {
   "name": "finobra-saas",
-  "version": "2.26.0",
+  "version": "2.26.1",
   "description": "FinObra — SaaS de gestão financeira e operacional para construtoras",
   "type": "module",
   "scripts": {
@@ -9,8 +9,8 @@
     "render:status": "node scripts/render-status.js",
     "render:deploy": "node scripts/render-deploy.js",
     "package:release": "node scripts/package-release.js",
-    "postinstall": "node apply-patch22-build.cjs && node apply-patch23-build.cjs && node apply-patch24-build.cjs && node prepare-patch25-build.cjs && node apply-patch25-build.cjs && node prepare-patch26-complex.cjs && node prepare-patch26-final.cjs && node apply-patch26-build.cjs",
-    "pretest": "node apply-patch22-build.cjs --full && node apply-patch23-build.cjs && node apply-patch24-build.cjs && node prepare-patch25-build.cjs && node apply-patch25-build.cjs && node scripts/apply-backend-build-patches.cjs && node prepare-patch26-complex.cjs && node prepare-patch26-final.cjs && node apply-patch26-build.cjs",
+    "postinstall": "node apply-patch22-build.cjs && node apply-patch23-build.cjs && node apply-patch24-build.cjs && node prepare-patch25-build.cjs && node apply-patch25-build.cjs && node prepare-patch26-complex.cjs && node prepare-patch26-final.cjs && node apply-patch26-build.cjs && node fix-patch26-lexical-roots.cjs",
+    "pretest": "node apply-patch22-build.cjs --full && node apply-patch23-build.cjs && node apply-patch24-build.cjs && node prepare-patch25-build.cjs && node apply-patch25-build.cjs && node scripts/apply-backend-build-patches.cjs && node prepare-patch26-complex.cjs && node prepare-patch26-final.cjs && node apply-patch26-build.cjs && node fix-patch26-lexical-roots.cjs",
     "test": "node scripts/test-static-all.js",
     "test:openai": "node scripts/test-openai-static.js",
     "test:patch05": "node scripts/test-patch05-static.js",
