@@ -209,9 +209,14 @@ CREATE TABLE IF NOT EXISTS orcamentos (
     titulo VARCHAR(255),
     valor_total NUMERIC(15, 2) DEFAULT 0,
     itens_json JSONB,
+    status VARCHAR(32) DEFAULT 'ativo',
+    descricao TEXT DEFAULT '',
+    data_criacao DATE DEFAULT CURRENT_DATE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (tenant_id, obra_id) REFERENCES obras(tenant_id,id) ON DELETE CASCADE
 );
+CREATE INDEX IF NOT EXISTS idx_orcamentos_tenant_status ON orcamentos(tenant_id, status);
+CREATE INDEX IF NOT EXISTS idx_orcamentos_tenant_obra_status ON orcamentos(tenant_id, obra_id, status);
 
 -- 6. Medições de Obra
 CREATE TABLE IF NOT EXISTS medicoes (

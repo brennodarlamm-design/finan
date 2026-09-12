@@ -725,7 +725,20 @@ const DB = {
 
       if (Array.isArray(d.orcamentos)) {
         const local = this.getAll('orcamentos') || [];
-        const next = (!coreBootstrapped && local.length) ? mergeLegacy(d.orcamentos, local) : d.orcamentos;
+        const mappedCloud = d.orcamentos.map(o => ({
+          ...o,
+          nome: o.nome || o.titulo || 'Orçamento',
+          titulo: o.titulo || o.nome || 'Orçamento',
+          status: o.status || 'ativo',
+          descricao: o.descricao || '',
+          data_criacao: (typeof Utils !== 'undefined' && Utils.cleanDate) ? Utils.cleanDate(o.data_criacao) || o.data_criacao : (o.data_criacao ? String(o.data_criacao).split('T')[0] : o.data_criacao),
+          valor_total: Number(o.valor_total !== undefined ? o.valor_total : o.valor_total_previsto) || 0,
+          valor_total_previsto: Number(o.valor_total_previsto !== undefined ? o.valor_total_previsto : o.valor_total) || 0,
+          etapas: Array.isArray(o.etapas) ? o.etapas : (Array.isArray(o.itens) ? o.itens : []),
+          itens: Array.isArray(o.itens) ? o.itens : (Array.isArray(o.etapas) ? o.etapas : []),
+          categorias: Array.isArray(o.categorias) ? o.categorias : []
+        }));
+        const next = (!coreBootstrapped && local.length) ? mergeLegacy(mappedCloud, local) : mappedCloud;
         this.save('orcamentos', next);
       }
       if (Array.isArray(d.medicoes)) {

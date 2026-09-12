@@ -197,6 +197,46 @@ function normalizeMedicao(m) {
   };
 }
 
+function normalizeOrcamento(o) {
+  if (!o) return null;
+  const rawParsed = (typeof o.itens_json === 'string' ? safeJsonParse(o.itens_json, []) : o.itens_json) || o.itens || o.etapas || [];
+  let itens = [];
+  let categorias = [];
+  let meta = {};
+
+  if (Array.isArray(rawParsed)) {
+    itens = rawParsed;
+  } else if (rawParsed && typeof rawParsed === 'object') {
+    itens = Array.isArray(rawParsed.itens) ? rawParsed.itens : (Array.isArray(rawParsed.etapas) ? rawParsed.etapas : []);
+    categorias = Array.isArray(rawParsed.categorias) ? rawParsed.categorias : [];
+    meta = rawParsed.meta || {};
+  }
+
+  const status = o.status || meta.status || rawParsed.status || 'ativo';
+  const descricao = o.descricao || meta.descricao || rawParsed.descricao || '';
+  const dataCriacao = cleanDate(o.data_criacao) || cleanDate(meta.data_criacao) || (o.created_at ? String(o.created_at).split('T')[0] : todayBoaVista());
+  const titulo = o.titulo || o.nome || meta.titulo || meta.nome || 'Orçamento';
+  const valorTotal = cleanNum(o.valor_total || o.valor_total_previsto || meta.valor_total);
+
+  return {
+    ...o,
+    id: o.id,
+    tenant_id: o.tenant_id,
+    obra_id: o.obra_id,
+    nome: titulo,
+    titulo: titulo,
+    status: status,
+    descricao: descricao,
+    data_criacao: dataCriacao,
+    created_at: o.created_at,
+    valor_total: valorTotal,
+    valor_total_previsto: valorTotal,
+    itens: itens,
+    etapas: itens,
+    categorias: categorias
+  };
+}
+
 async function validateBulkObraPlanLimit(sql, tenantId, plan, obras) {
   if (!Array.isArray(obras) || obras.length === 0) return { allowed: true };
   const rule = getPlanRule(plan);
@@ -437,18 +477,7 @@ export default async function handler(req, res) {
               ...p,
               valor_medio: cleanNum(p.valor_medio)
             })) : [],
-            orcamentos: tableAllowed(auth, 'orcamentos', 'read') ? orcamentos.map(o => {
-              const parsedItens = (typeof o.itens_json === 'string' ? safeJsonParse(o.itens_json, []) : o.itens_json) || o.itens || o.etapas || [];
-              return {
-                ...o,
-                nome: o.nome || o.titulo || 'Orçamento',
-                titulo: o.titulo || o.nome || 'Orçamento',
-                valor_total: cleanNum(o.valor_total || o.valor_total_previsto),
-                valor_total_previsto: cleanNum(o.valor_total_previsto || o.valor_total),
-                itens: parsedItens,
-                etapas: parsedItens
-              };
-            }) : [],
+            orcamentos: tableAllowed(auth, 'orcamentos', 'read') ? orcamentos.map(normalizeOrcamento) : [],
             medicoes: tableAllowed(auth, 'medicoes', 'read') ? medicoes.map(normalizeMedicao) : [],
             documentos: tableAllowed(auth, 'documentos', 'read') ? documentos : [],
             contas: tableAllowed(auth, 'contas', 'read') ? (contas || []) : [],
@@ -624,18 +653,7 @@ export default async function handler(req, res) {
         const items = pagination
           ? await sql`SELECT * FROM orcamentos WHERE tenant_id = ${tenantId} ORDER BY created_at DESC, id DESC LIMIT ${pagination.limit} OFFSET ${pagination.offset};`
           : await sql`SELECT * FROM orcamentos WHERE tenant_id = ${tenantId} ORDER BY created_at DESC, id DESC;`;
-        const normalized = items.map(o => {
-            const parsedItens = (typeof o.itens_json === 'string' ? safeJsonParse(o.itens_json, []) : o.itens_json) || o.itens || o.etapas || [];
-            return {
-              ...o,
-              nome: o.nome || o.titulo || 'Orçamento',
-              titulo: o.titulo || o.nome || 'Orçamento',
-              valor_total: cleanNum(o.valor_total || o.valor_total_previsto),
-              valor_total_previsto: cleanNum(o.valor_total_previsto || o.valor_total),
-              itens: parsedItens,
-              etapas: parsedItens
-            };
-          });
+        const normalized = items.map(normalizeOrcamento);
         return res.status(200).json(pageResponse(normalized, pagination));
       }
 
@@ -1059,18 +1077,36 @@ export default async function handler(req, res) {
             if (!o.id) continue;
             const safeOrcObraId = await validateObraTenant(sql, o.obra_id, tenantId);
             const rawItens = o.etapas || o.itens || (typeof o.itens_json === 'string' ? safeJsonParse(o.itens_json, []) : o.itens_json) || [];
-            const itensJson = JSON.stringify(Array.isArray(rawItens) ? rawItens : []);
-            const titulo = o.titulo || o.nome || '';
+            const rawCategorias = Array.isArray(o.categorias) ? o.categorias : (Array.isArray(rawItens?.categorias) ? rawItens.categorias : []);
+            const itensList = Array.isArray(rawItens) ? rawItens : (Array.isArray(rawItens?.itens) ? rawItens.itens : []);
+
+            const payloadJson = JSON.stringify({
+              itens: itensList,
+              categorias: rawCategorias,
+              meta: {
+                status: o.status || 'ativo',
+                descricao: o.descricao || '',
+                data_criacao: cleanDate(o.data_criacao) || todayBoaVista()
+              }
+            });
+
+            const titulo = (o.titulo || o.nome || 'Orçamento').slice(0, 255);
             const valorTotal = cleanNum(o.valor_total || o.valor_total_previsto);
+            const status = (o.status || 'ativo').slice(0, 32);
+            const descricao = o.descricao || '';
+            const dataCriacao = cleanDate(o.data_criacao) || todayBoaVista();
 
             await sql`
-              INSERT INTO orcamentos (id, tenant_id, obra_id, titulo, valor_total, itens_json)
-              VALUES (${o.id}, ${tenantId}, ${safeOrcObraId}, ${titulo}, ${valorTotal}, ${itensJson}::jsonb)
+              INSERT INTO orcamentos (id, tenant_id, obra_id, titulo, valor_total, itens_json, status, descricao, data_criacao)
+              VALUES (${o.id}, ${tenantId}, ${safeOrcObraId}, ${titulo}, ${valorTotal}, ${payloadJson}::jsonb, ${status}, ${descricao}, ${dataCriacao})
               ON CONFLICT (id) DO UPDATE SET
                 obra_id = EXCLUDED.obra_id,
                 titulo = EXCLUDED.titulo,
                 valor_total = EXCLUDED.valor_total,
-                itens_json = EXCLUDED.itens_json
+                itens_json = EXCLUDED.itens_json,
+                status = EXCLUDED.status,
+                descricao = EXCLUDED.descricao,
+                data_criacao = EXCLUDED.data_criacao
               WHERE orcamentos.tenant_id = ${tenantId};
             `;
             totalCount++;
@@ -1493,23 +1529,42 @@ export default async function handler(req, res) {
           const o = data;
           const safeObraId = await validateObraTenant(sql, o.obra_id, tenantId);
           const rawItens = o.etapas || o.itens || (typeof o.itens_json === 'string' ? safeJsonParse(o.itens_json, []) : o.itens_json) || [];
-          const itensJson = JSON.stringify(Array.isArray(rawItens) ? rawItens : []);
-          const titulo = o.titulo || o.nome || '';
+          const rawCategorias = Array.isArray(o.categorias) ? o.categorias : (Array.isArray(rawItens?.categorias) ? rawItens.categorias : []);
+          const itensList = Array.isArray(rawItens) ? rawItens : (Array.isArray(rawItens?.itens) ? rawItens.itens : []);
+
+          const payloadJson = JSON.stringify({
+            itens: itensList,
+            categorias: rawCategorias,
+            meta: {
+              status: o.status || 'ativo',
+              descricao: o.descricao || '',
+              data_criacao: cleanDate(o.data_criacao) || todayBoaVista()
+            }
+          });
+
+          const titulo = (o.titulo || o.nome || 'Orçamento').slice(0, 255);
           const valorTotal = cleanNum(o.valor_total || o.valor_total_previsto);
+          const status = (o.status || 'ativo').slice(0, 32);
+          const descricao = o.descricao || '';
+          const dataCriacao = cleanDate(o.data_criacao) || todayBoaVista();
+
           await sql`
-            INSERT INTO orcamentos (id, tenant_id, obra_id, titulo, valor_total, itens_json)
+            INSERT INTO orcamentos (id, tenant_id, obra_id, titulo, valor_total, itens_json, status, descricao, data_criacao)
             VALUES (
               ${o.id}, ${tenantId}, ${safeObraId}, ${titulo},
-              ${valorTotal}, ${itensJson}::jsonb
+              ${valorTotal}, ${payloadJson}::jsonb, ${status}, ${descricao}, ${dataCriacao}
             )
             ON CONFLICT (id) DO UPDATE SET
               obra_id = EXCLUDED.obra_id,
               titulo = EXCLUDED.titulo,
               valor_total = EXCLUDED.valor_total,
-              itens_json = EXCLUDED.itens_json
+              itens_json = EXCLUDED.itens_json,
+              status = EXCLUDED.status,
+              descricao = EXCLUDED.descricao,
+              data_criacao = EXCLUDED.data_criacao
             WHERE orcamentos.tenant_id = ${tenantId};
           `;
-          await auditDb(sql, req, auth, 'salvar', table === 'clientes' ? 'obras' : table, o);
+          await auditDb(sql, req, auth, 'salvar', 'orcamentos', o);
           return res.status(200).json({ success: true, id: o.id });
         }
 
