@@ -9,7 +9,7 @@
     "render:status": "node scripts/render-status.js",
     "render:deploy": "node scripts/render-deploy.js",
     "package:release": "node scripts/package-release.js",
-    "build:cloudflare": "node apply-patch22-build.cjs && node apply-patch23-build.cjs && node apply-patch24-build.cjs && node prepare-patch25-build.cjs && node apply-patch25-build.cjs && node prepare-patch26-complex.cjs && node prepare-patch26-final.cjs && node apply-patch26-build.cjs && node fix-patch26-lexical-roots.cjs && node scripts/build-cloudflare-pages.cjs",
+    "build:cloudflare": "node fix-patch26-lexical-roots.cjs && node scripts/build-cloudflare-pages.cjs",
     "postinstall": "node apply-patch22-build.cjs && node apply-patch23-build.cjs && node apply-patch24-build.cjs && node prepare-patch25-build.cjs && node apply-patch25-build.cjs && node prepare-patch26-complex.cjs && node prepare-patch26-final.cjs && node apply-patch26-build.cjs && node fix-patch26-lexical-roots.cjs",
     "pretest": "node apply-patch22-build.cjs --full && node apply-patch23-build.cjs && node apply-patch24-build.cjs && node prepare-patch25-build.cjs && node apply-patch25-build.cjs && node scripts/apply-backend-build-patches.cjs && node prepare-patch26-complex.cjs && node prepare-patch26-final.cjs && node apply-patch26-build.cjs && node fix-patch26-lexical-roots.cjs",
     "test": "node scripts/test-static-all.js",
