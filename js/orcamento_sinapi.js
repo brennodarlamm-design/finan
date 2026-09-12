@@ -31,10 +31,10 @@ const OrcamentoSINAPI = {
         <p class="page-sub">Orçamentos de obra civil com tabela referencial da Caixa</p>
       </div>
       <div class="page-actions" style="gap:10px;">
-        <button class="btn btn-secondary btn-sm" onclick="OrcamentoSINAPI.showImportModal()" id="btn-importar-sinapi">
+        <button class="btn btn-secondary btn-sm" data-fb-click="OrcamentoSINAPI.showImportModal" data-fb-click-n="0" id="btn-importar-sinapi">
           📁 Importar Tabela SINAPI
         </button>
-        <button class="btn btn-primary" onclick="OrcamentoSINAPI.showForm()">+ Novo Orçamento</button>
+        <button class="btn btn-primary" data-fb-click="OrcamentoSINAPI.showForm" data-fb-click-n="0">+ Novo Orçamento</button>
       </div>
     </div>
 
@@ -51,7 +51,7 @@ const OrcamentoSINAPI = {
         : `<div class="empty-state">
             <h3>Nenhum orçamento SINAPI</h3>
             <p>Importe a tabela SINAPI e crie seu primeiro orçamento</p>
-            <button class="btn btn-primary" onclick="OrcamentoSINAPI.showForm()">+ Novo Orçamento</button>
+            <button class="btn btn-primary" data-fb-click="OrcamentoSINAPI.showForm" data-fb-click-n="0">+ Novo Orçamento</button>
            </div>`}
     </div>`;
   },
@@ -72,7 +72,7 @@ const OrcamentoSINAPI = {
         <div style="font-weight:700;font-size:.85rem;color:${cor};margin-bottom:3px;">${label}</div>
         <div style="font-size:.75rem;color:var(--text3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${refLabel}</div>
       </div>
-      <button class="btn btn-secondary btn-sm" onclick="OrcamentoSINAPI.showImportModal(${desonerado})" style="flex-shrink:0;font-size:.72rem;">
+      <button class="btn btn-secondary btn-sm" data-fb-click="OrcamentoSINAPI.showImportModal" data-fb-click-n="1" data-fb-click-t0="auto" data-fb-click-v0="${encodeURIComponent(String(desonerado))}" style="flex-shrink:0;font-size:.72rem;">
         ${importada ? '🔄 Atualizar' : '📁 Importar'}
       </button>
     </div>`;
@@ -103,9 +103,9 @@ const OrcamentoSINAPI = {
         </div>
         <div style="display:flex;gap:8px;align-items:center">
           ${Utils.badge(orc.status || 'ativo')}
-          <button class="btn btn-secondary btn-sm" onclick="OrcamentoSINAPI.openEditor('${orc.id}')">🏗️ Abrir</button>
-          <button class="icon-btn btn-sm" onclick="OrcamentoSINAPI.showForm('${orc.id}')" title="Editar dados">✏️</button>
-          <button class="icon-btn btn-sm" style="color:var(--danger)" onclick="OrcamentoSINAPI.del('${orc.id}')" title="Excluir">🗑️</button>
+          <button class="btn btn-secondary btn-sm" data-fb-click="OrcamentoSINAPI.openEditor" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(orc.id))}">🏗️ Abrir</button>
+          <button class="icon-btn btn-sm" data-fb-click="OrcamentoSINAPI.showForm" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(orc.id))}" title="Editar dados">✏️</button>
+          <button class="icon-btn btn-sm" style="color:var(--danger)" data-fb-click="OrcamentoSINAPI.del" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(orc.id))}" title="Excluir">🗑️</button>
         </div>
       </div>
       <div class="g4" style="margin-top:14px;">
@@ -146,7 +146,7 @@ const OrcamentoSINAPI = {
       <div class="modal" style="max-width:560px">
         <div class="modal-header">
           <span class="modal-title">${id ? '✏️ Editar Orçamento' : '🏗️ Novo Orçamento SINAPI'}</span>
-          <button class="modal-close" onclick="Utils.closeModal()">✕</button>
+          <button class="modal-close" data-fb-click="Utils.closeModal" data-fb-click-n="0">✕</button>
         </div>
         <div class="modal-body">
           <form id="f-sinapi-orc">
@@ -204,8 +204,8 @@ const OrcamentoSINAPI = {
           </form>
         </div>
         <div class="modal-footer">
-          <button class="btn btn-secondary" onclick="Utils.closeModal()">Cancelar</button>
-          <button class="btn btn-primary" onclick="OrcamentoSINAPI.save('${id || ''}')">
+          <button class="btn btn-secondary" data-fb-click="Utils.closeModal" data-fb-click-n="0">Cancelar</button>
+          <button class="btn btn-primary" data-fb-click="OrcamentoSINAPI.save" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(id || ''))}">
             ${id ? '✔ Salvar Alterações' : '+ Criar Orçamento'}
           </button>
         </div>
@@ -283,9 +283,9 @@ const OrcamentoSINAPI = {
             </span>
           </div>
           <div style="display:flex;gap:8px;align-items:center;">
-            <button class="btn btn-secondary btn-sm" onclick="OrcamentoSINAPI.exportExcel('${id}')" title="Exportar Excel">📊 Excel</button>
-            <button class="btn btn-secondary btn-sm" onclick="OrcamentoSINAPI.exportPDF('${id}')" title="Exportar PDF">📄 PDF</button>
-            <button class="modal-close" onclick="Utils.closeModal()">✕</button>
+            <button class="btn btn-secondary btn-sm" data-fb-click="OrcamentoSINAPI.exportExcel" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(id))}" title="Exportar Excel">📊 Excel</button>
+            <button class="btn btn-secondary btn-sm" data-fb-click="OrcamentoSINAPI.exportPDF" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(id))}" title="Exportar PDF">📄 PDF</button>
+            <button class="modal-close" data-fb-click="Utils.closeModal" data-fb-click-n="0">✕</button>
           </div>
         </div>
 
@@ -321,8 +321,8 @@ const OrcamentoSINAPI = {
         </div>
       </div>
       <div style="display:flex;gap:8px;align-items:center;">
-        ${snap ? `<button class="btn btn-primary btn-sm" id="btn-puxar-direto-${Utils.escapeHtml(orc.id)}" onclick="OrcamentoSINAPI.puxarDiretoNoEditor('${Utils.escapeHtml(orc.id)}')">⚡ Carregar snapshot ${snap.uf} ${snap.referencia}</button>` : ''}
-        <button class="btn btn-secondary btn-sm" onclick="Utils.closeModal();OrcamentoSINAPI.showImportModal(${orc.desonerado}, '${Utils.escapeHtml(uf)}', '${Utils.escapeHtml(ref)}')">📁 Importar tabela oficial</button>
+        ${snap ? `<button class="btn btn-primary btn-sm" id="btn-puxar-direto-${Utils.escapeHtml(orc.id)}" data-fb-click="OrcamentoSINAPI.puxarDiretoNoEditor" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(Utils.escapeHtml(orc.id)))}">⚡ Carregar snapshot ${snap.uf} ${snap.referencia}</button>` : ''}
+        <button class="btn btn-secondary btn-sm" data-fb-click="Patch26Actions.sinapiReopenImport" data-fb-click-n="3" data-fb-click-t0="auto" data-fb-click-v0="${encodeURIComponent(String(orc.desonerado))}" data-fb-click-t1="string" data-fb-click-v1="${encodeURIComponent(String(Utils.escapeHtml(uf)))}" data-fb-click-t2="string" data-fb-click-v2="${encodeURIComponent(String(Utils.escapeHtml(ref)))}">📁 Importar tabela oficial</button>
       </div>
     </div>`;
   },
@@ -366,8 +366,7 @@ const OrcamentoSINAPI = {
           id="sinapi-search-input"
           class="form-control"
           placeholder="Digite o código SINAPI ou palavras da descrição... (ex: 97642, alvenaria, piso)"
-          style="flex:1"
-          oninput="OrcamentoSINAPI._onSearch(this.value, '${Utils.escapeHtml(orc.id)}')"
+          style="flex:1" data-fb-input="OrcamentoSINAPI._onSearch" data-fb-input-n="2" data-fb-input-t0="value" data-fb-input-t1="string" data-fb-input-v1="${encodeURIComponent(String(Utils.escapeHtml(orc.id)))}"
           autocomplete="off"
         >
       </div>
@@ -409,8 +408,7 @@ const OrcamentoSINAPI = {
             <td style="padding:6px 10px;text-align:center;color:var(--text2);">${Utils.escapeHtml(r.unidade)}</td>
             <td style="padding:6px 10px;text-align:right;color:var(--success);font-weight:700;">${Utils.fmt.currency(r.preco_unitario)}</td>
             <td style="padding:6px 10px;text-align:center;">
-              <button class="btn btn-primary btn-sm" style="font-size:.7rem;padding:3px 10px;"
-                onclick="OrcamentoSINAPI.showAddItem('${this._currentEditor}', OrcamentoSINAPI._lastSearchResults[${i}])">
+              <button class="btn btn-primary btn-sm" style="font-size:.7rem;padding:3px 10px;" data-fb-click="Patch26Actions.sinapiAddLastResult" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(i))}">
                 + Add
               </button>
             </td>
@@ -421,11 +419,12 @@ const OrcamentoSINAPI = {
   },
 
   showAddItem(orcId, item) {
+    this._pendingAddItem = item;
     Utils.showModal(`
       <div class="modal" style="max-width:420px">
         <div class="modal-header">
           <span class="modal-title">➕ Adicionar Item</span>
-          <button class="modal-close" onclick="OrcamentoSINAPI._reopenEditor('${orcId}')">✕</button>
+          <button class="modal-close" data-fb-click="OrcamentoSINAPI._reopenEditor" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(orcId))}">✕</button>
         </div>
         <div class="modal-body">
           <div style="background:var(--bg-secondary);border-radius:var(--r-sm);padding:12px;margin-bottom:16px;">
@@ -438,8 +437,7 @@ const OrcamentoSINAPI = {
           </div>
           <div class="form-group">
             <label class="form-label">Quantidade (${item.unidade})</label>
-            <input class="form-control" type="number" id="add-item-qtd" value="1" min="0.001" step="0.001" autofocus
-              oninput="OrcamentoSINAPI._calcPreview(${item.preco_unitario})">
+            <input class="form-control" type="number" id="add-item-qtd" value="1" min="0.001" step="0.001" autofocus data-fb-input="OrcamentoSINAPI._calcPreview" data-fb-input-n="1" data-fb-input-t0="auto" data-fb-input-v0="${encodeURIComponent(String(item.preco_unitario))}">
           </div>
           <div style="background:rgba(201,162,39,.06);border:1px solid rgba(201,162,39,.15);border-radius:var(--r-sm);padding:12px;margin-top:12px;">
             <div style="font-size:.78rem;color:var(--text3);">Total do item:</div>
@@ -447,12 +445,16 @@ const OrcamentoSINAPI = {
           </div>
         </div>
         <div class="modal-footer">
-          <button class="btn btn-secondary" onclick="OrcamentoSINAPI._reopenEditor('${orcId}')">Cancelar</button>
-          <button class="btn btn-primary" onclick="OrcamentoSINAPI.addItem('${orcId}', ${JSON.stringify(item).replace(/"/g, '&quot;')})">
+          <button class="btn btn-secondary" data-fb-click="OrcamentoSINAPI._reopenEditor" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(orcId))}">Cancelar</button>
+          <button class="btn btn-primary" data-fb-click="OrcamentoSINAPI.addPendingItem" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(orcId))}">
             ✔ Adicionar ao Orçamento
           </button>
         </div>
       </div>`);
+  },
+
+  addPendingItem(orcId) {
+    if (this._pendingAddItem) this.addItem(orcId, this._pendingAddItem);
   },
 
   _calcPreview(precoUnit) {
@@ -545,15 +547,12 @@ const OrcamentoSINAPI = {
       <td style="text-align:center;color:var(--text2);font-size:.8rem;">${item.unidade}</td>
       <td style="text-align:right;">
         <input type="number" value="${item.quantidade}" min="0" step="0.001"
-          style="width:80px;text-align:right;background:transparent;border:1px solid transparent;border-radius:4px;color:var(--text);font-family:inherit;font-size:.82rem;padding:2px 6px;"
-          onfocus="this.style.borderColor='var(--accent)';this.style.background='var(--bg-card)'"
-          onblur="this.style.borderColor='transparent';this.style.background='transparent';OrcamentoSINAPI.updateQtd('${orcId}','${item.id}',this.value)">
+          style="width:80px;text-align:right;background:transparent;border:1px solid transparent;border-radius:4px;color:var(--text);font-family:inherit;font-size:.82rem;padding:2px 6px;" data-fb-focus="Patch26Actions.sinapiFocus" data-fb-focus-n="1" data-fb-focus-t0="self" data-fb-blur="Patch26Actions.sinapiBlur" data-fb-blur-n="3" data-fb-blur-t0="self" data-fb-blur-t1="string" data-fb-blur-v1="${encodeURIComponent(String(orcId))}" data-fb-blur-t2="string" data-fb-blur-v2="${encodeURIComponent(String(item.id))}">
       </td>
       <td style="text-align:right;color:var(--text2);font-size:.82rem;">${Utils.fmt.currency(item.preco_unitario)}</td>
       <td style="text-align:right;font-weight:700;color:var(--success);">${Utils.fmt.currency(item.total)}</td>
       <td style="text-align:center;">
-        <button class="icon-btn btn-sm" style="color:var(--danger);font-size:12px;" title="Remover item"
-          onclick="OrcamentoSINAPI.removeItem('${orcId}','${item.id}')">🗑️</button>
+        <button class="icon-btn btn-sm" style="color:var(--danger);font-size:12px;" title="Remover item" data-fb-click="OrcamentoSINAPI.removeItem" data-fb-click-n="2" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(orcId))}" data-fb-click-t1="string" data-fb-click-v1="${encodeURIComponent(String(item.id))}">🗑️</button>
       </td>
     </tr>`;
   },
@@ -602,7 +601,7 @@ const OrcamentoSINAPI = {
       <div class="modal" style="max-width:600px">
         <div class="modal-header">
           <span class="modal-title">📁 Importar Tabela SINAPI</span>
-          <button class="modal-close" onclick="Utils.closeModal()">✕</button>
+          <button class="modal-close" data-fb-click="Utils.closeModal" data-fb-click-n="0">✕</button>
         </div>
         <div class="modal-body">
 
@@ -619,17 +618,17 @@ const OrcamentoSINAPI = {
             </div>
 
             <!-- Botão Principal de Ação 1-Clique -->
-            <button type="button" class="btn btn-primary" id="btn-puxar-oficial" style="width:100%;font-weight:700;display:flex;align-items:center;justify-content:center;gap:8px;padding:12px 16px;font-size:.92rem;cursor:pointer;" onclick="OrcamentoSINAPI.puxarOficialAutomatico()">
+            <button type="button" class="btn btn-primary" id="btn-puxar-oficial" style="width:100%;font-weight:700;display:flex;align-items:center;justify-content:center;gap:8px;padding:12px 16px;font-size:.92rem;cursor:pointer;" data-fb-click="OrcamentoSINAPI.puxarOficialAutomatico" data-fb-click-n="0">
               <span>⚡</span> Carregar Base Oficial Caixa RR 12/2024 (1-Clique)
             </button>
 
             <!-- Chips Rápidos das Bases Inclusas -->
             <div style="margin-top:12px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
               <span style="font-size:.72rem;color:var(--text3);font-weight:600">Bases empacotadas prontas:</span>
-              <button type="button" class="btn btn-secondary btn-sm" style="font-size:.72rem;padding:3px 8px;" onclick="OrcamentoSINAPI._useOfficialPreset('RR','2024-12',false)">
+              <button type="button" class="btn btn-secondary btn-sm" style="font-size:.72rem;padding:3px 8px;" data-fb-click="OrcamentoSINAPI._useOfficialPreset" data-fb-click-n="3" data-fb-click-t0="string" data-fb-click-v0="RR" data-fb-click-t1="string" data-fb-click-v1="2024-12" data-fb-click-t2="bool" data-fb-click-v2="false">
                 🟢 RR 12/2024 (Onerado)
               </button>
-              <button type="button" class="btn btn-secondary btn-sm" style="font-size:.72rem;padding:3px 8px;" onclick="OrcamentoSINAPI._useOfficialPreset('RR','2024-12',true)">
+              <button type="button" class="btn btn-secondary btn-sm" style="font-size:.72rem;padding:3px 8px;" data-fb-click="OrcamentoSINAPI._useOfficialPreset" data-fb-click-n="3" data-fb-click-t0="string" data-fb-click-v0="RR" data-fb-click-t1="string" data-fb-click-v1="2024-12" data-fb-click-t2="bool" data-fb-click-v2="true">
                 🟡 RR 12/2024 (Desonerado)
               </button>
             </div>
@@ -645,13 +644,13 @@ const OrcamentoSINAPI = {
           <div class="form-group" style="margin-bottom:14px;">
             <label class="form-label">Série de Oneração</label>
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;" id="serie-selector">
-              <label id="card-onerado" style="cursor:pointer;border:2px solid ${!desoneradoInicial?'var(--accent)':'var(--border)'};border-radius:var(--r-md);padding:12px;background:${!desoneradoInicial?'rgba(201,162,39,.08)':'transparent'};transition:all .2s;" onclick="OrcamentoSINAPI._selectSerie(false)">
+              <label id="card-onerado" style="cursor:pointer;border:2px solid ${!desoneradoInicial?'var(--accent)':'var(--border)'};border-radius:var(--r-md);padding:12px;background:${!desoneradoInicial?'rgba(201,162,39,.08)':'transparent'};transition:all .2s;" data-fb-click="OrcamentoSINAPI._selectSerie" data-fb-click-n="1" data-fb-click-t0="bool" data-fb-click-v0="false">
                 <input type="radio" name="imp-serie" value="false" ${!desoneradoInicial?'checked':''} style="display:none">
                 <div style="font-weight:700;margin-bottom:4px;">🟢 Com Oneração</div>
                 <div style="font-size:.74rem;color:var(--text3);">Padrão — Contribuição previdenciária normal</div>
                 ${metaOn ? `<div style="font-size:.7rem;color:var(--success);margin-top:4px;">✓ Já importada: ${metaOn.uf} Ref.${metaOn.referencia} (${metaOn.total.toLocaleString('pt-BR')} itens)</div>` : ''}
               </label>
-              <label id="card-desonerado" style="cursor:pointer;border:2px solid ${desoneradoInicial?'var(--accent)':'var(--border)'};border-radius:var(--r-md);padding:12px;background:${desoneradoInicial?'rgba(201,162,39,.08)':'transparent'};transition:all .2s;" onclick="OrcamentoSINAPI._selectSerie(true)">
+              <label id="card-desonerado" style="cursor:pointer;border:2px solid ${desoneradoInicial?'var(--accent)':'var(--border)'};border-radius:var(--r-md);padding:12px;background:${desoneradoInicial?'rgba(201,162,39,.08)':'transparent'};transition:all .2s;" data-fb-click="OrcamentoSINAPI._selectSerie" data-fb-click-n="1" data-fb-click-t0="bool" data-fb-click-v0="true">
                 <input type="radio" name="imp-serie" value="true" ${desoneradoInicial?'checked':''} style="display:none">
                 <div style="font-weight:700;margin-bottom:4px;">🟡 Sem Oneração</div>
                 <div style="font-size:.74rem;color:var(--text3);">Desonerado — Lei 12.546/2011</div>
@@ -664,11 +663,11 @@ const OrcamentoSINAPI = {
           <div class="form-row cols-2" style="margin-bottom:14px;">
             <div class="form-group">
               <label class="form-label">Estado (UF)</label>
-              <select class="form-control" id="imp-uf" onchange="OrcamentoSINAPI._updateOfficialSnapshotAvailability()">${Utils.stateOptions(defaultUf)}</select>
+              <select class="form-control" id="imp-uf" data-fb-change="OrcamentoSINAPI._updateOfficialSnapshotAvailability" data-fb-change-n="0">${Utils.stateOptions(defaultUf)}</select>
             </div>
             <div class="form-group">
               <label class="form-label">Mês de Referência</label>
-              <input class="form-control" type="month" id="imp-ref" value="${Utils.escapeHtml(defaultRef)}" onchange="OrcamentoSINAPI._updateOfficialSnapshotAvailability()">
+              <input class="form-control" type="month" id="imp-ref" value="${Utils.escapeHtml(defaultRef)}" data-fb-change="OrcamentoSINAPI._updateOfficialSnapshotAvailability" data-fb-change-n="0">
             </div>
           </div>
 
@@ -680,16 +679,14 @@ const OrcamentoSINAPI = {
                 <span>🔗</span> Baixar no Portal da Caixa ↗
               </a>
             </div>
-            <div id="imp-drop-area" style="border:2px dashed var(--border);border-radius:var(--r-md);padding:24px;text-align:center;cursor:pointer;transition:border-color .2s;"
-              onclick="document.getElementById('imp-file-input').click()"
+            <div id="imp-drop-area" style="border:2px dashed var(--border);border-radius:var(--r-md);padding:24px;text-align:center;cursor:pointer;transition:border-color .2s;" data-fb-click="Patch26Actions.clickById" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="imp-file-input"
               ondragover="event.preventDefault();this.style.borderColor='var(--accent)'"
-              ondragleave="this.style.borderColor='var(--border)'"
-              ondrop="OrcamentoSINAPI._onDrop(event)">
+              ondragleave="this.style.borderColor='var(--border)'" data-fb-drop="OrcamentoSINAPI._onDrop" data-fb-drop-n="1" data-fb-drop-t0="event">
               <div style="font-size:2rem;margin-bottom:8px;">📂</div>
               <div style="font-size:.85rem;color:var(--text2);">Arraste a planilha <strong>.xlsx</strong> ou o arquivo <strong>.zip</strong> da Caixa aqui</div>
               <div style="font-size:.74rem;color:var(--text3);margin-top:4px;">Extração automática de composições sintéticas integrada</div>
-              <button type="button" class="btn btn-secondary btn-sm" style="margin-top:10px;" onclick="event.stopPropagation();document.getElementById('imp-file-input').click()">Selecionar Arquivo (.xlsx ou .zip)</button>
-              <input type="file" id="imp-file-input" accept=".xlsx,.xls,.zip" style="display:none" onchange="OrcamentoSINAPI._onFileChange(this.files[0])">
+              <button type="button" class="btn btn-secondary btn-sm" style="margin-top:10px;" data-fb-click="Patch26Actions.clickByIdStop" data-fb-click-n="2" data-fb-click-t0="event" data-fb-click-t1="string" data-fb-click-v1="imp-file-input">Selecionar Arquivo (.xlsx ou .zip)</button>
+              <input type="file" id="imp-file-input" accept=".xlsx,.xls,.zip" style="display:none" data-fb-change="Patch26Actions.sinapiFile" data-fb-change-n="1" data-fb-change-t0="self">
             </div>
             <div id="imp-file-name" style="margin-top:8px;font-size:.78rem;color:var(--text3);"></div>
           </div>
@@ -702,8 +699,8 @@ const OrcamentoSINAPI = {
           <div id="imp-result" style="display:none;"></div>
         </div>
         <div class="modal-footer">
-          <button class="btn btn-secondary" onclick="Utils.closeModal()">Fechar</button>
-          <button class="btn btn-primary" id="btn-imp-confirmar" onclick="OrcamentoSINAPI.executarImport()" disabled>📥 Importar</button>
+          <button class="btn btn-secondary" data-fb-click="Utils.closeModal" data-fb-click-n="0">Fechar</button>
+          <button class="btn btn-primary" id="btn-imp-confirmar" data-fb-click="OrcamentoSINAPI.executarImport" data-fb-click-n="0" disabled>📥 Importar</button>
         </div>
       </div>`);
 
@@ -1198,7 +1195,7 @@ const OrcamentoSINAPI = {
         document.getElementById('sinapi-orc-list').innerHTML = (() => {
           const orcs = this._getAll(App.obraId);
           return orcs.length ? orcs.map(o => this._card(o)).join('') :
-            `<div class="empty-state"><h3>Nenhum orçamento SINAPI</h3><button class="btn btn-primary" onclick="OrcamentoSINAPI.showForm()">+ Novo Orçamento</button></div>`;
+            `<div class="empty-state"><h3>Nenhum orçamento SINAPI</h3><button class="btn btn-primary" data-fb-click="OrcamentoSINAPI.showForm" data-fb-click-n="0">+ Novo Orçamento</button></div>`;
         })();
       }
     }

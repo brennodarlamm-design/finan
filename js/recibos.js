@@ -86,7 +86,7 @@ const Recibos = {
         <p class="page-sub">Gere recibos de quitação com valor por extenso automático, assinatura digital na tela e validade jurídica</p>
       </div>
       <div class="page-actions">
-        <button class="btn btn-primary" onclick="Recibos.novoReciboModal()">
+        <button class="btn btn-primary" data-fb-click="Recibos.novoReciboModal" data-fb-click-n="0">
           + Novo Recibo Avulso
         </button>
       </div>
@@ -161,17 +161,17 @@ const Recibos = {
       <td style="text-align:center;">
         <div style="display:flex;gap:6px;justify-content:center;align-items:center;">
           ${!r.assinatura ? `
-            <button class="btn btn-sm btn-primary" onclick="Recibos.assinarRecibo('${r.id}')" title="Coletar assinatura digital com o dedo ou mouse" style="padding:4px 8px;font-size:.75rem;background:#10b981;border-color:#10b981;color:#fff;">
+            <button class="btn btn-sm btn-primary" data-fb-click="Recibos.assinarRecibo" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(r.id))}" title="Coletar assinatura digital com o dedo ou mouse" style="padding:4px 8px;font-size:.75rem;background:#10b981;border-color:#10b981;color:#fff;">
               ✍️ Assinar
             </button>
           ` : ''}
-          <button class="btn btn-sm btn-secondary" onclick="Recibos.visualizarRecibo('${r.id}')" title="Visualizar e Imprimir Recibo" style="padding:4px 8px;font-size:.75rem;">
+          <button class="btn btn-sm btn-secondary" data-fb-click="Recibos.visualizarRecibo" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(r.id))}" title="Visualizar e Imprimir Recibo" style="padding:4px 8px;font-size:.75rem;">
             👁️ Ver
           </button>
-          <button class="icon-btn btn-sm" onclick="Recibos.enviarWhatsApp('${r.id}')" title="Enviar comprovante via WhatsApp" style="color:#25d366;">
+          <button class="icon-btn btn-sm" data-fb-click="Recibos.enviarWhatsApp" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(r.id))}" title="Enviar comprovante via WhatsApp" style="color:#25d366;">
             📲
           </button>
-          <button class="icon-btn btn-sm" onclick="Recibos._confirmDel('${r.id}')" style="color:var(--danger);" title="Excluir recibo">
+          <button class="icon-btn btn-sm" data-fb-click="Recibos._confirmDel" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(r.id))}" style="color:var(--danger);" title="Excluir recibo">
             🗑️
           </button>
         </div>
@@ -199,7 +199,7 @@ const Recibos = {
       <div class="modal" style="max-width:680px;width:95vw;">
         <div class="modal-header">
           <span class="modal-title">🧾 Emitir Recibo Oficial</span>
-          <button class="modal-close" onclick="Utils.closeModal()">✕</button>
+          <button class="modal-close" data-fb-click="Utils.closeModal" data-fb-click-n="0">✕</button>
         </div>
         <div class="modal-body">
           <form id="f-recibo">
@@ -208,7 +208,7 @@ const Recibos = {
             <div class="form-row cols-2" style="margin-bottom:14px;">
               <div class="form-group">
                 <label class="form-label">Tipo de Recibo *</label>
-                <select class="form-control" name="tipo" id="rec-tipo" onchange="Recibos._onTipoChange(this.value)">
+                <select class="form-control" name="tipo" id="rec-tipo" data-fb-change="Recibos._onTipoChange" data-fb-change-n="1" data-fb-change-t0="value">
                   <option value="pagamento" ${dadosPreenchidos.tipo==='despesa'||dadosPreenchidos.tipo==='pagamento'?'selected':''}>Pagamento Efetuado (A Construtora pagou ao prestador/fornecedor)</option>
                   <option value="recebimento" ${dadosPreenchidos.tipo==='receita'||dadosPreenchidos.tipo==='recebimento'?'selected':''}>Recebimento (A Construtora recebeu do cliente)</option>
                 </select>
@@ -249,7 +249,7 @@ const Recibos = {
                 <label class="form-label">Valor (R$) *</label>
                 <div class="input-prefix">
                   <span class="input-pfx-txt">R$</span>
-                  <input class="form-control" type="number" step="0.01" min="0.01" name="valor" id="rec-valor" value="${valorPadrao}" required placeholder="0,00" oninput="Recibos._onValorInput(this.value)">
+                  <input class="form-control" type="number" step="0.01" min="0.01" name="valor" id="rec-valor" value="${valorPadrao}" required placeholder="0,00" data-fb-input="Recibos._onValorInput" data-fb-input-n="1" data-fb-input-t0="value">
                 </div>
               </div>
               <div class="form-group">
@@ -287,8 +287,8 @@ const Recibos = {
           </form>
         </div>
         <div class="modal-footer">
-          <button class="btn btn-secondary" onclick="Utils.closeModal()">Cancelar</button>
-          <button class="btn btn-primary" onclick="Recibos.gerarReciboSubmit()">
+          <button class="btn btn-secondary" data-fb-click="Utils.closeModal" data-fb-click-n="0">Cancelar</button>
+          <button class="btn btn-primary" data-fb-click="Recibos.gerarReciboSubmit" data-fb-click-n="0">
             📄 Gerar &amp; Visualizar Recibo
           </button>
         </div>
@@ -452,28 +452,28 @@ const Recibos = {
           
           <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
             ${!r.assinatura ? `
-              <button class="btn btn-sm btn-primary" onclick="Recibos.assinarRecibo('${r.id}')" style="background:#10b981;border-color:#10b981;color:#fff;">
+              <button class="btn btn-sm btn-primary" data-fb-click="Recibos.assinarRecibo" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(r.id))}" style="background:#10b981;border-color:#10b981;color:#fff;">
                 ✍️ Assinar com Dedo/Mouse
               </button>
             ` : `
-              <button class="btn btn-sm btn-secondary" onclick="Recibos.assinarRecibo('${r.id}')" title="Substituir ou assinar novamente">
+              <button class="btn btn-sm btn-secondary" data-fb-click="Recibos.assinarRecibo" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(r.id))}" title="Substituir ou assinar novamente">
                 🔄 Reassinar
               </button>
             `}
 
-            <button class="btn btn-sm btn-secondary" onclick="Recibos.enviarWhatsApp('${r.id}')" style="color:#25d366;" title="Enviar texto e dados do recibo para WhatsApp">
+            <button class="btn btn-sm btn-secondary" data-fb-click="Recibos.enviarWhatsApp" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(r.id))}" style="color:#25d366;" title="Enviar texto e dados do recibo para WhatsApp">
               📲 WhatsApp
             </button>
 
-            <button class="btn btn-sm btn-secondary" onclick="Assinador.modalGovBr({ nomeDocumento:'Recibo_${r.numero.replace('/','-')}', onBaixarPDF: () => Recibos.imprimirRecibo('${r.id}') })" style="color:#0284c7;" title="Como assinar oficialmente com o Gov.br ICP-Brasil">
+            <button class="btn btn-sm btn-secondary" data-fb-click="Patch26Actions.reciboGovBr" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(r.id))}" style="color:#0284c7;" title="Como assinar oficialmente com o Gov.br ICP-Brasil">
               🏛️ Gov.br
             </button>
 
-            <button class="btn btn-sm btn-primary" onclick="Recibos.imprimirRecibo('${r.id}')">
+            <button class="btn btn-sm btn-primary" data-fb-click="Recibos.imprimirRecibo" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(r.id))}">
               🖨️ Imprimir / PDF
             </button>
             
-            <button class="modal-close" onclick="Utils.closeModal()">✕</button>
+            <button class="modal-close" data-fb-click="Utils.closeModal" data-fb-click-n="0">✕</button>
           </div>
         </div>
 

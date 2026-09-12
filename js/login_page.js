@@ -192,13 +192,13 @@ if (window.location.hash.startsWith('#validar') || window.location.search.includ
   }
 
   // ── FLUXO DE RECUPERAÇÃO DE SENHA COM CÓDIGO OTP ─────────────
-  let recoveryUserId = null;
+  let recoveryRequestId = null;
   let recoveryResetToken = null;
   let recoveryTimerInterval = null;
   let recoveryExpiresAt = null;
 
   function openRecoveryModal() {
-    recoveryUserId = null;
+    recoveryRequestId = null;
     recoveryResetToken = null;
     clearInterval(recoveryTimerInterval);
 
@@ -254,8 +254,8 @@ if (window.location.hash.startsWith('#validar') || window.location.search.includ
         return;
       }
 
-      recoveryUserId = res.userId;
-      document.getElementById('rec-canal-label').textContent = res.canalInfo;
+      recoveryRequestId = res.requestId;
+      document.getElementById('rec-canal-label').textContent = res.canalInfo || 'canal cadastrado';
 
       // Exibe lembrete seguro do código na interface
       const hint = document.getElementById('rec-demo-hint');
@@ -385,7 +385,7 @@ if (window.location.hash.startsWith('#validar') || window.location.search.includ
     btn.innerHTML = '<div class="spinner"></div> Validando...';
 
     try {
-      const result = await Auth.validarCodigoRecuperacao(recoveryUserId, code);
+      const result = await Auth.validarCodigoRecuperacao(recoveryRequestId, code);
       if (!result.success) {
         errBox.textContent = result.message;
         errBox.style.display = 'block';
@@ -419,8 +419,8 @@ if (window.location.hash.startsWith('#validar') || window.location.search.includ
     const p1 = document.getElementById('rec-new-pwd').value;
     const p2 = document.getElementById('rec-conf-pwd').value;
 
-    if (!p1 || p1.length < 6) {
-      errBox.textContent = 'A nova senha deve ter no mínimo 6 caracteres.';
+    if (!p1 || p1.length < 8) {
+      errBox.textContent = 'A nova senha deve ter no mínimo 8 caracteres.';
       errBox.style.display = 'block';
       return;
     }
@@ -435,7 +435,7 @@ if (window.location.hash.startsWith('#validar') || window.location.search.includ
     btn.innerHTML = '<div class="spinner"></div> Salvando nova senha...';
 
     try {
-      const result = await Auth.redefinirSenha(recoveryUserId, recoveryResetToken, p1);
+      const result = await Auth.redefinirSenha(recoveryRequestId, recoveryResetToken, p1);
       if (!result.success) {
         errBox.textContent = result.message;
         errBox.style.display = 'block';
@@ -458,7 +458,7 @@ if (window.location.hash.startsWith('#validar') || window.location.search.includ
   function concluirRecuperacao() {
     closeRecoveryModal();
     const users = Auth.getUsers();
-    const user = users.find(u => u.id === recoveryUserId);
+    const user = null;
     if (user) {
       document.getElementById('username').value = user.username;
     }

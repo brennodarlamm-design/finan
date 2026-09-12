@@ -14,7 +14,7 @@ function getSql() {
 function cors(req, res) {
   const allowed = ['https://finobra.app.br','https://www.finobra.app.br','http://localhost:3000','http://localhost:3333','http://localhost:5000','http://127.0.0.1:3000','http://127.0.0.1:3333','http://127.0.0.1:5000'];
   const origin = req.headers.origin;
-  if (origin && (allowed.includes(origin) || origin.endsWith('.vercel.app'))) res.setHeader('Access-Control-Allow-Origin', origin);
+  if (origin && (allowed.includes(origin) || /^https:\/\/finan-as(?:-[a-z0-9-]+)?\.vercel\.app$/i.test(origin))) res.setHeader('Access-Control-Allow-Origin', origin);
   res.setHeader('Access-Control-Allow-Credentials', 'true');
   res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PATCH,OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, x-tenant-id');
@@ -559,8 +559,8 @@ export default async function handler(req, res) {
       const em = String(email || '').trim().toLowerCase();
       const pw = String(senha || '');
       const allowedProfiles = ['admin','gestor','visualizador','operador'];
-      if (!n || un.length < 3 || !em || !em.includes('@') || pw.length < 6) {
-        return res.status(400).json({ success:false, error:'Informe nome, usuário (mín. 3), e-mail válido e senha (mín. 6).' });
+      if (!n || un.length < 3 || !em || !em.includes('@') || pw.length < 8) {
+        return res.status(400).json({ success:false, error:'Informe nome, usuário (mín. 3), e-mail válido e senha (mín. 8).' });
       }
       if (!allowedProfiles.includes(perfil)) return res.status(400).json({ success:false, error:'Perfil inválido.' });
       const exists = await sql`SELECT id FROM usuarios WHERE LOWER(username)=${un} OR LOWER(email)=${em} LIMIT 1;`;
@@ -624,7 +624,7 @@ export default async function handler(req, res) {
 
       let senhaHash = cur.senha_hash;
       if (senha) {
-        if (String(senha).length < 6) return res.status(400).json({ success:false, error:'A nova senha deve ter no mínimo 6 caracteres.' });
+        if (String(senha).length < 8) return res.status(400).json({ success:false, error:'A nova senha deve ter no mínimo 8 caracteres.' });
         if (isSelf && !actorIsAdmin) {
           if (!senha_atual || !verifyPassword(String(senha_atual), cur.senha_hash)) return res.status(403).json({ success:false, error:'Senha atual incorreta.' });
         }

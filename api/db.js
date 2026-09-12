@@ -113,7 +113,63 @@ function sanitizeTenantPreferences(input) {
   if ('categorias_despesa' in input) out.categorias_despesa = cleanCats(input.categorias_despesa);
   if ('whatsapp_telefone' in input) out.whatsapp_telefone = String(input.whatsapp_telefone || '').replace(/\D/g, '').slice(0, 15);
   if ('whatsapp_modo' in input) out.whatsapp_modo = ['api','web'].includes(String(input.whatsapp_modo)) ? String(input.whatsapp_modo) : 'api';
+  if ('bdi_padrao' in input) out.bdi_padrao = sanitizeBdiConfig(input.bdi_padrao);
   return out;
+}
+
+function finitePercent(value, fallback = 0, max = 100) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return fallback;
+  return Math.max(0, Math.min(max, n));
+}
+
+function sanitizeBdiConfig(input) {
+  if (input == null) return null;
+  if (typeof input !== 'object' || Array.isArray(input)) return null;
+  const desonerado = !!input.desonerado;
+  const pis = 0.65;
+  const cofins = 3.00;
+  const cprb = desonerado ? 4.50 : 0;
+  const sg = finitePercent(input.sg, finitePercent(input.s, 0.8) + finitePercent(input.g, 0.4), 30);
+  const s = finitePercent(input.s, sg * 0.65, 30);
+  const g = finitePercent(input.g, Math.max(0, sg - s), 30);
+  const t = finitePercent(input.t, pis + cofins + finitePercent(input.iss, 3) + cprb, 50);
+  const iss = finitePercent(input.iss, Math.max(0, t - pis - cofins - cprb), 10);
+  return {
+    ac: finitePercent(input.ac, 4, 30),
+    sg, s, g,
+    r: finitePercent(input.r, 1.2, 30),
+    df: finitePercent(input.df, 1.23, 30),
+    l: finitePercent(input.l, 7.4, 50),
+    t, iss, desonerado,
+    updated_at: typeof input.updated_at === 'string' ? input.updated_at.slice(0, 40) : new Date().toISOString()
+  };
+}
+
+function sanitizeCronogramaConfig(input) {
+  if (input == null) return null;
+  if (typeof input !== 'object' || Array.isArray(input)) return null;
+  const totalMesesRaw = Number.parseInt(input.totalMeses, 10);
+  const totalMeses = Number.isFinite(totalMesesRaw) ? Math.max(3, Math.min(36, totalMesesRaw)) : 12;
+  const mesInicio = /^\d{4}-(0[1-9]|1[0-2])$/.test(String(input.mesInicio || '')) ? String(input.mesInicio) : null;
+  const modoRaw = String(input.modoDistribuicao || input.modeloCurva || 'gaussiana');
+  const modoDistribuicao = ['gaussiana','linear'].includes(modoRaw) ? modoRaw : 'gaussiana';
+  const etapas = {};
+  const source = Array.isArray(input.etapas)
+    ? input.etapas.map((item, index) => [String(item?.id || item?.codigo || index), item])
+    : Object.entries(input.etapas || {});
+  for (const [rawId, raw] of source.slice(0, 60)) {
+    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) continue;
+    const id = String(raw.id || raw.codigo || rawId || '').replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 80);
+    if (!id) continue;
+    const previsto = raw.previstoTotal ?? raw.valorPrevisto;
+    etapas[id] = {
+      ativo: raw.ativo !== undefined ? !!raw.ativo : (raw.ativa !== undefined ? !!raw.ativa : true),
+      previstoTotal: Math.max(0, cleanNum(previsto)),
+      meses: Array.isArray(raw.meses) ? raw.meses.slice(0, totalMeses).map(v => Math.max(0, finitePercent(v, 0, 1000))) : []
+    };
+  }
+  return { totalMeses, mesInicio, modoDistribuicao, modeloCurva: modoDistribuicao, etapas, updated_at: new Date().toISOString() };
 }
 
 function todayBoaVista() {
@@ -351,7 +407,7 @@ const ALLOWED_ORIGINS = [
 export default async function handler(req, res) {
   const origin = req.headers.origin;
   if (origin) {
-    const isAllowed = ALLOWED_ORIGINS.includes(origin) || origin.endsWith('.vercel.app');
+    const isAllowed = ALLOWED_ORIGINS.includes(origin) || /^https:\/\/finan-as(?:-[a-z0-9-]+)?\.vercel\.app$/i.test(origin);
     if (isAllowed) {
       res.setHeader('Access-Control-Allow-Origin', origin);
       res.setHeader('Access-Control-Allow-Credentials', 'true');
@@ -710,12 +766,15 @@ export default async function handler(req, res) {
           }
           for (const o of payload.clientes) {
             if (!o.id || !o.nome) continue;
+            const cronogramaJson = o.cronograma_config == null ? null : JSON.stringify(sanitizeCronogramaConfig(o.cronograma_config));
+            const bdiJson = o.bdi_config == null ? null : JSON.stringify(sanitizeBdiConfig(o.bdi_config));
             await sql`
-              INSERT INTO obras (id, tenant_id, nome, cliente, endereco, orcamento_total, status, data_inicio, data_previsao)
+              INSERT INTO obras (id, tenant_id, nome, cliente, endereco, orcamento_total, status, data_inicio, data_previsao, cronograma_config, bdi_config)
               VALUES (
                 ${o.id}, ${tenantId}, ${o.nome}, ${o.cliente || ''}, ${o.endereco || ''},
                 ${cleanNum(o.orcamento_total || o.valor_contrato)}, ${o.status || 'em_andamento'},
-                ${cleanDate(o.data_inicio)}, ${cleanDate(o.data_previsao)}
+                ${cleanDate(o.data_inicio)}, ${cleanDate(o.data_previsao)},
+                ${cronogramaJson}::jsonb, ${bdiJson}::jsonb
               )
               ON CONFLICT (tenant_id, id) DO UPDATE SET
                 nome = EXCLUDED.nome,
@@ -724,7 +783,9 @@ export default async function handler(req, res) {
                 orcamento_total = EXCLUDED.orcamento_total,
                 status = EXCLUDED.status,
                 data_inicio = EXCLUDED.data_inicio,
-                data_previsao = EXCLUDED.data_previsao;
+                data_previsao = EXCLUDED.data_previsao,
+                cronograma_config = EXCLUDED.cronograma_config,
+                bdi_config = EXCLUDED.bdi_config;
             `;
             totalCount++;
           }
@@ -1281,12 +1342,15 @@ export default async function handler(req, res) {
             const planCheck = await enforceObraPlanLimit(sql, tenantId, auth.user?.tenantPlan, o);
             if (!planCheck.allowed) return res.status(planCheck.status).json(planCheck.body);
           }
+          const cronogramaJson = o.cronograma_config == null ? null : JSON.stringify(sanitizeCronogramaConfig(o.cronograma_config));
+          const bdiJson = o.bdi_config == null ? null : JSON.stringify(sanitizeBdiConfig(o.bdi_config));
           await sql`
-            INSERT INTO obras (id, tenant_id, nome, cliente, endereco, orcamento_total, status, data_inicio, data_previsao)
+            INSERT INTO obras (id, tenant_id, nome, cliente, endereco, orcamento_total, status, data_inicio, data_previsao, cronograma_config, bdi_config)
             VALUES (
               ${o.id}, ${tenantId}, ${o.nome}, ${o.cliente || ''}, ${o.endereco || ''},
               ${cleanNum(o.orcamento_total || o.valor_contrato)}, ${o.status || 'em_andamento'},
-              ${cleanDate(o.data_inicio)}, ${cleanDate(o.data_previsao)}
+              ${cleanDate(o.data_inicio)}, ${cleanDate(o.data_previsao)},
+              ${cronogramaJson}::jsonb, ${bdiJson}::jsonb
             )
             ON CONFLICT (tenant_id, id) DO UPDATE SET
               nome = EXCLUDED.nome,
@@ -1295,7 +1359,9 @@ export default async function handler(req, res) {
               orcamento_total = EXCLUDED.orcamento_total,
               status = EXCLUDED.status,
               data_inicio = EXCLUDED.data_inicio,
-              data_previsao = EXCLUDED.data_previsao;
+              data_previsao = EXCLUDED.data_previsao,
+              cronograma_config = EXCLUDED.cronograma_config,
+              bdi_config = EXCLUDED.bdi_config;
           `;
           await auditDb(sql, req, auth, 'salvar', table === 'clientes' ? 'obras' : table, o);
           return res.status(200).json({ success: true, id: o.id });

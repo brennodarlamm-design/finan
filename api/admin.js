@@ -28,7 +28,7 @@ const ALLOWED_ORIGINS = [
 function setCors(req, res) {
   const origin = req.headers.origin;
   if (origin) {
-    const isAllowed = ALLOWED_ORIGINS.includes(origin) || origin.endsWith('.vercel.app');
+    const isAllowed = ALLOWED_ORIGINS.includes(origin) || /^https:\/\/finan-as(?:-[a-z0-9-]+)?\.vercel\.app$/i.test(origin);
     if (isAllowed) {
       res.setHeader('Access-Control-Allow-Origin', origin);
       res.setHeader('Access-Control-Allow-Credentials', 'true');
@@ -469,10 +469,10 @@ export default async function handler(req, res) {
         });
       }
 
-      if (finalSenha.length < 6) {
+      if (finalSenha.length < 8) {
         return res.status(400).json({
           success: false,
-          error: 'A senha inicial deve ter no mínimo 6 caracteres.'
+          error: 'A senha inicial deve ter no mínimo 8 caracteres.'
         });
       }
 
