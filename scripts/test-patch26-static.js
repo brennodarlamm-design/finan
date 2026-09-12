@@ -45,17 +45,17 @@ const globalHeaders = vercelConfig.headers?.find(h => h.source === '/(.*)')?.hea
 const activeCsp = globalHeaders.find(h => h.key === 'Content-Security-Policy')?.value || '';
 
 console.log('=== Patch 26 — CSP global enforcement ===\n');
-ok('bridge CSP-safe foi gerado', bridge.includes('FINOBRA_PATCH26_EVENT_BRIDGE'));
+ok('bridge CSP-safe foi materializado', bridge.includes('FINOBRA_PATCH26_EVENT_BRIDGE'));
 ok('bridge usa allowlist exata de ações', bridge.includes('const ALLOWED = new Set(') && bridge.includes('ALLOWED.has(path)'));
 ok('bridge não usa eval/new Function', !/\beval\s*\(|new\s+Function\s*\(/.test(bridge));
 ok('ações complexas são explícitas e também não usam eval/new Function', actions.includes('globalThis.Patch26Actions') && !/\beval\s*\(|new\s+Function\s*\(/.test(actions));
-ok('mais de 700 handlers foram migrados para data-fb-*', migrated >= 700);
-ok('nenhum event handler inline permanece no frontend entregue', remaining === 0);
-ok('nenhuma URL javascript: permanece no frontend entregue', javascriptUrls === 0);
+ok('mais de 700 handlers permanecem migrados para data-fb-*', migrated >= 700);
+ok('nenhum event handler inline permanece no frontend versionado', remaining === 0);
+ok('nenhuma URL javascript: permanece no frontend versionado', javascriptUrls === 0);
 ok('CSP ativa bloqueia atributos de script globalmente', activeCsp.includes("script-src-attr 'none'"));
 ok('CSP ativa não contém unsafe-inline em script-src-attr', !activeCsp.includes("script-src-attr 'unsafe-inline'"));
-ok('postinstall executa normalizadores e Patch 26', String(packageJson.scripts?.postinstall || '').includes('prepare-patch26-complex.cjs') && String(packageJson.scripts?.postinstall || '').includes('prepare-patch26-final.cjs') && String(packageJson.scripts?.postinstall || '').includes('apply-patch26-build.cjs'));
-ok('pretest executa normalizadores e Patch 26', String(packageJson.scripts?.pretest || '').includes('prepare-patch26-complex.cjs') && String(packageJson.scripts?.pretest || '').includes('prepare-patch26-final.cjs') && String(packageJson.scripts?.pretest || '').includes('apply-patch26-build.cjs'));
+const lifecycle = `${packageJson.scripts?.postinstall || ''} ${packageJson.scripts?.pretest || ''}`;
+ok('CSP materializada não depende de transformadores no lifecycle npm', !/prepare-patch26|apply-patch26|apply-patch25|apply-patch24|apply-patch23|apply-patch22/.test(lifecycle));
 
 for (const name of ['app.html', 'index.html', 'master.html', 'landing.html', 'validar.html']) {
   const src = fs.readFileSync(path.join(root, name), 'utf8');
