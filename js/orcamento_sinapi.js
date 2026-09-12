@@ -674,7 +674,12 @@ const OrcamentoSINAPI = {
 
           <!-- Upload -->
           <div class="form-group" style="margin-bottom:8px;">
-            <label class="form-label">Arquivo XLSX ou ZIP da Caixa (Composições Sintéticas)</label>
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+              <label class="form-label" style="margin:0">Arquivo XLSX ou ZIP da Caixa (Composições Sintéticas)</label>
+              <a href="https://www.caixa.gov.br/poder-publico/modernizacao-gestao/sinapi/paginas/default.aspx" target="_blank" rel="noopener noreferrer" style="font-size:.74rem;color:var(--accent);text-decoration:none;font-weight:600;display:flex;align-items:center;gap:4px;">
+                <span>🔗</span> Baixar no Portal da Caixa ↗
+              </a>
+            </div>
             <div id="imp-drop-area" style="border:2px dashed var(--border);border-radius:var(--r-md);padding:24px;text-align:center;cursor:pointer;transition:border-color .2s;"
               onclick="document.getElementById('imp-file-input').click()"
               ondragover="event.preventDefault();this.style.borderColor='var(--accent)'"
