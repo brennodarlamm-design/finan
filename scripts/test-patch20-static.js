@@ -7,7 +7,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const ROOT = path.resolve(__dirname, '..');
 
-console.log('=== Iniciando Testes Estáticos Patch 20 (Exportação Excel XLSX & Relatório PDF de Engenharia) ===\n');
+console.log('=== Iniciando Testes Estáticos Patch 20 (Exportação XLSX Multi-Aba & PDF Oficial de Engenharia) ===\n');
 
 const obraDetalheJs = fs.readFileSync(path.join(ROOT, 'js', 'obra_detalhe.js'), 'utf8');
 const exportarJs = fs.readFileSync(path.join(ROOT, 'js', 'exportar.js'), 'utf8');
@@ -73,7 +73,9 @@ test('Sub-aba de Cronograma possui botões de ação para Excel e PDF', () => {
 
 console.log('\n[4] Integração no Módulo Geral de Exportações');
 test('exportar.js inclui botão para Dossiê de Engenharia no card Excel', () => {
-  if (!exportarJs.includes("Exportar.exportarExcel('engenharia')")) throw new Error('Card Excel deve oferecer botão para Dossiê de Engenharia');
+  const oldInline = exportarJs.includes("Exportar.exportarExcel('engenharia')");
+  const cspSafe = exportarJs.includes('data-fb-click="Exportar.exportarExcel"') && exportarJs.includes('data-fb-click-v0="engenharia"');
+  if (!oldInline && !cspSafe) throw new Error('Card Excel deve oferecer botão para Dossiê de Engenharia');
 });
 test('exportar.js inclui opção "engenharia" no seletor de modelos de relatório PDF', () => {
   if (!exportarJs.includes('value="engenharia"')) throw new Error('Select de relatórios PDF deve conter opção para Dossiê de Engenharia');
