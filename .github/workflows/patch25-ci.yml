@@ -1,0 +1,28 @@
+name: Patch 25 CSP validation
+
+on:
+  push:
+    branches:
+      - patch25-csp-events-20260912
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Apply Patch 22
+        run: node apply-patch22-build.cjs --full
+      - name: Apply Patch 23
+        run: node apply-patch23-build.cjs
+      - name: Apply Patch 24
+        run: node apply-patch24-build.cjs
+      - name: Apply Patch 25
+        run: node apply-patch25-build.cjs
+      - name: JavaScript syntax
+        run: node scripts/check-all-syntax.js
+      - name: Patch 25 static checks
+        run: node scripts/test-patch25-static.js
