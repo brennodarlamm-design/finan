@@ -8,50 +8,64 @@ const ok = (name, cond) => {
 };
 
 const root = process.cwd();
-const htmlNames = ['app.html', 'index.html', 'master.html', 'landing.html', 'validar.html'];
-const eventAttr = /\bon(click|change|input|submit|mouseover|mouseout|mouseenter|mouseleave|keydown|keyup|keypress|focus|blur|dblclick|contextmenu|pointerdown|pointerup|mousedown|mouseup|touchstart|touchend|dragstart|drop)\s*=\s*"([^"]*)"/gi;
+const eventAttr = /\bon(click|change|input|submit|mouseover|mouseout|mouseenter|mouseleave|keydown|keyup|keypress|focus|blur|dblclick|contextmenu|pointerdown|pointerup|mousedown|mouseup|touchstart|touchend|dragstart|drop)\s*=\s*(['"])[\s\S]*?\2/gi;
 const dataAttr = /data-fb-(click|change|input|submit|mouseover|mouseout|mouseenter|mouseleave|keydown|keyup|keypress|focus|blur|dblclick|contextmenu|pointerdown|pointerup|mousedown|mouseup|touchstart|touchend|dragstart|drop)="/gi;
+const jsUrl = /(?:href|src)\s*=\s*(['"])\s*javascript\s*:/gi;
 
 const files = [];
-for (const name of htmlNames) {
-  const file = path.join(root, name);
-  if (fs.existsSync(file)) files.push(file);
+for (const name of fs.readdirSync(root)) {
+  if (name.endsWith('.html')) files.push(path.join(root, name));
 }
 const jsDir = path.join(root, 'js');
 for (const name of fs.readdirSync(jsDir)) {
-  if (!name.endsWith('.js') || name === 'obra_detalhe.js' || name === 'patch26-events.js') continue;
-  files.push(path.join(jsDir, name));
+  if (name.endsWith('.js')) files.push(path.join(jsDir, name));
 }
 
 let remaining = 0;
 let migrated = 0;
+let javascriptUrls = 0;
+const offenders = [];
 for (const file of files) {
   const src = fs.readFileSync(file, 'utf8');
-  remaining += [...src.matchAll(eventAttr)].length;
+  const inlineCount = [...src.matchAll(eventAttr)].length;
+  const jsUrlCount = [...src.matchAll(jsUrl)].length;
+  if (inlineCount || jsUrlCount) offenders.push(`${path.relative(root, file)}: handlers=${inlineCount}, javascriptUrls=${jsUrlCount}`);
+  remaining += inlineCount;
+  javascriptUrls += jsUrlCount;
   migrated += [...src.matchAll(dataAttr)].length;
 }
 
 const bridgePath = path.join(jsDir, 'patch26-events.js');
 const bridge = fs.existsSync(bridgePath) ? fs.readFileSync(bridgePath, 'utf8') : '';
-const vercel = fs.readFileSync(path.join(root, 'vercel.json'), 'utf8');
+const actionsPath = path.join(jsDir, 'patch26-actions.js');
+const actions = fs.existsSync(actionsPath) ? fs.readFileSync(actionsPath, 'utf8') : '';
+const vercelConfig = JSON.parse(fs.readFileSync(path.join(root, 'vercel.json'), 'utf8'));
 const packageJson = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'));
+const globalHeaders = vercelConfig.headers?.find(h => h.source === '/(.*)')?.headers || [];
+const activeCsp = globalHeaders.find(h => h.key === 'Content-Security-Policy')?.value || '';
 
-console.log('=== Patch 26 — CSP global Stage A ===\n');
+console.log('=== Patch 26 — CSP global enforcement ===\n');
 ok('bridge CSP-safe foi gerado', bridge.includes('FINOBRA_PATCH26_EVENT_BRIDGE'));
 ok('bridge usa allowlist exata de ações', bridge.includes('const ALLOWED = new Set(') && bridge.includes('ALLOWED.has(path)'));
 ok('bridge não usa eval/new Function', !/\beval\s*\(|new\s+Function\s*\(/.test(bridge));
-ok('mais de 500 handlers simples foram migrados para data-fb-*', migrated >= 500);
-ok('handlers complexos restantes ficaram abaixo de 160', remaining > 0 && remaining <= 160);
-ok('CSP estrita global ainda permanece somente em Report-Only durante a migração', vercel.includes("Content-Security-Policy-Report-Only") && vercel.includes("script-src-attr 'none'"));
-ok('CSP ativa ainda mantém compatibilidade até zerar os handlers restantes', vercel.includes("script-src-attr 'unsafe-inline'"));
-ok('postinstall executa Patch 26', String(packageJson.scripts?.postinstall || '').includes('apply-patch26-build.cjs'));
-ok('pretest executa Patch 26', String(packageJson.scripts?.pretest || '').includes('apply-patch26-build.cjs'));
+ok('ações complexas são explícitas e também não usam eval/new Function', actions.includes('globalThis.Patch26Actions') && !/\beval\s*\(|new\s+Function\s*\(/.test(actions));
+ok('mais de 700 handlers foram migrados para data-fb-*', migrated >= 700);
+ok('nenhum event handler inline permanece no frontend entregue', remaining === 0);
+ok('nenhuma URL javascript: permanece no frontend entregue', javascriptUrls === 0);
+ok('CSP ativa bloqueia atributos de script globalmente', activeCsp.includes("script-src-attr 'none'"));
+ok('CSP ativa não contém unsafe-inline em script-src-attr', !activeCsp.includes("script-src-attr 'unsafe-inline'"));
+ok('postinstall executa normalizadores e Patch 26', String(packageJson.scripts?.postinstall || '').includes('prepare-patch26-complex.cjs') && String(packageJson.scripts?.postinstall || '').includes('prepare-patch26-final.cjs') && String(packageJson.scripts?.postinstall || '').includes('apply-patch26-build.cjs'));
+ok('pretest executa normalizadores e Patch 26', String(packageJson.scripts?.pretest || '').includes('prepare-patch26-complex.cjs') && String(packageJson.scripts?.pretest || '').includes('prepare-patch26-final.cjs') && String(packageJson.scripts?.pretest || '').includes('apply-patch26-build.cjs'));
 
-for (const name of htmlNames) {
+for (const name of ['app.html', 'index.html', 'master.html', 'landing.html', 'validar.html']) {
   const src = fs.readFileSync(path.join(root, name), 'utf8');
-  ok(`${name} carrega o bridge externo do Patch 26`, src.includes('/js/patch26-events.js'));
+  ok(`${name} carrega ações nomeadas antes do bridge`, src.includes('/js/patch26-actions.js') && src.includes('/js/patch26-events.js') && src.indexOf('/js/patch26-actions.js') < src.indexOf('/js/patch26-events.js'));
 }
 
-console.log(`\nMigrados: ${migrated} | inline restantes: ${remaining}`);
-console.log(`Patch 26 Stage A: ${failed ? 'FALHOU' : 'OK'}\n`);
+if (offenders.length) {
+  console.error('\nSuperfícies CSP restantes:');
+  offenders.forEach(v => console.error(`  - ${v}`));
+}
+console.log(`\nMigrados: ${migrated} | inline restantes: ${remaining} | javascript: URLs: ${javascriptUrls}`);
+console.log(`Patch 26: ${failed ? 'FALHOU' : 'OK'}\n`);
 if (failed) process.exit(1);
