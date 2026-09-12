@@ -1,4 +1,4 @@
-// Patch 26 final normalizer — handles the last mixed-template DOM id and
+// Patch 26 final normalizer — handles final mixed-template/sequence handlers and
 // removes javascript: navigation before strict CSP enforcement.
 const fs = require('fs');
 const path = require('path');
@@ -13,12 +13,27 @@ fases = fases
   .join("onclick=\"Patch26Actions.fasesClickFile('${docId}')\"");
 fs.writeFileSync(fasesFile, fases);
 
+// OFX robot row used two statements in a single onclick. Convert them to one named
+// source-controlled action before the generic attribute compiler sees the handler.
+const ofxFile = path.join(root, 'js', 'ofx.js');
+let ofx = fs.readFileSync(ofxFile, 'utf8');
+ofx = ofx
+  .split("onclick=\"OFX.conciliar('${j(importId)}','${j(trn.id)}','${j(lan.id)}');OFX._abrirModalRobo('${j(importId)}');\"")
+  .join("onclick=\"Patch26Actions.ofxConciliarAndReopen('${j(importId)}','${j(trn.id)}','${j(lan.id)}')\"");
+fs.writeFileSync(ofxFile, ofx);
+
 const actionsFile = path.join(root, 'js', 'patch26-actions.js');
 let actions = fs.readFileSync(actionsFile, 'utf8');
 if (!actions.includes('fasesClickFile(docId) {')) {
   actions = actions.replace(
     '  fasesBackdropClose(ev, el) {',
     "  fasesClickFile(docId) { this.clickById(`fd-file-in-${String(docId || '')}`); },\n  fasesBackdropClose(ev, el) {"
+  );
+}
+if (!actions.includes('ofxConciliarAndReopen(importId, trnId, lanId) {')) {
+  actions = actions.replace(
+    '  ofxSetTolerance(kind, value) {',
+    "  ofxConciliarAndReopen(importId, trnId, lanId) {\n    OFX?.conciliar?.(importId, trnId, lanId);\n    OFX?._abrirModalRobo?.(importId);\n  },\n  ofxSetTolerance(kind, value) {"
   );
 }
 if (!actions.includes('FINOBRA_PATCH26_HASH_LINK_GUARD')) {
@@ -47,4 +62,4 @@ for (const rel of scanFiles) {
   }
 }
 
-console.log(`[Patch26 final] handler documental normalizado; ${replacedUrls} javascript: URL(s) removidas.`);
+console.log(`[Patch26 final] handlers finais normalizados; ${replacedUrls} javascript: URL(s) removidas.`);
