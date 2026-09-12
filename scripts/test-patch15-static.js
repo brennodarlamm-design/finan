@@ -76,8 +76,8 @@ assert(
   'api/auth.js integra envio real de OTP por e-mail com Resend (H-10)'
 );
 assert(
-  apiAuthCode.includes('emailSent') && apiAuthCode.includes('canaisUtilizados'),
-  'api/auth.js reporta no canalInfo apenas os canais que realmente receberam o código'
+  apiAuthCode.includes('genericResponse') && !apiAuthCode.includes('canaisUtilizados') && !apiAuthCode.includes('canalInfo ='),
+  'api/auth.js não revela canal nem status de entrega na resposta de recuperação'
 );
 
 // 5. Validando API de CEP em api/nfe.js e vercel.json

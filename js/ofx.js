@@ -32,10 +32,10 @@ const OFX = {
         <div class="form-group" style="margin-bottom:14px;">
           <label class="form-label">Conta Bancária de Origem</label>
           <div style="display:flex;gap:8px;align-items:center;">
-            <select class="form-control" id="ofx-conta-sel" onchange="OFX._onContaSel(this)" style="flex:1">
+            <select class="form-control" id="ofx-conta-sel" data-fb-change="OFX._onContaSel" data-fb-change-n="1" data-fb-change-t0="self" style="flex:1">
               ${Contas.contaOptions('')}
             </select>
-            <button type="button" class="btn btn-secondary btn-sm" onclick="App.navigate('configuracoes');Configuracoes._switch('contas')" title="Gerenciar contas bancárias" style="white-space:nowrap">➕ Nova Conta</button>
+            <button type="button" class="btn btn-secondary btn-sm" data-fb-click="App.navigate" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="configuracoes')%3BConfiguracoes._switch('contas" title="Gerenciar contas bancárias" style="white-space:nowrap">➕ Nova Conta</button>
           </div>
           <input class="form-control" id="ofx-conta" placeholder="Ex: Banco do Brasil Ag: 0501 Cc: 12345-6" style="margin-top:6px;display:none">
         </div>
@@ -49,7 +49,7 @@ const OFX = {
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
             <div>
               <label style="font-size:.72rem;color:var(--text2);display:block;margin-bottom:3px;font-weight:600;">Filtro por Aproximação de Valor</label>
-              <select class="form-control" id="ofx-tol-valor" style="font-size:.78rem;padding:5px 8px;" onchange="OFX._toleranciaValor = this.value">
+              <select class="form-control" id="ofx-tol-valor" style="font-size:.78rem;padding:5px 8px;" data-fb-change="Patch26Actions.ofxSetTolerance" data-fb-change-n="2" data-fb-change-t0="string" data-fb-change-v0="valor" data-fb-change-t1="value">
                 <option value="0">🎯 Exato (R$ 0,00)</option>
                 <option value="1">🤏 ± R$ 1,00 (Centavos)</option>
                 <option value="5">💵 ± R$ 5,00 (Pequenas tarifas)</option>
@@ -65,7 +65,7 @@ const OFX = {
             </div>
             <div>
               <label style="font-size:.72rem;color:var(--text2);display:block;margin-bottom:3px;font-weight:600;">Margem de Datas</label>
-              <select class="form-control" id="ofx-tol-dias" style="font-size:.78rem;padding:5px 8px;" onchange="OFX._toleranciaDias = parseInt(this.value)">
+              <select class="form-control" id="ofx-tol-dias" style="font-size:.78rem;padding:5px 8px;" data-fb-change="Patch26Actions.ofxSetTolerance" data-fb-change-n="2" data-fb-change-t0="string" data-fb-change-v0="dias" data-fb-change-t1="value">
                 <option value="0">📅 Mesmo dia (0 dias)</option>
                 <option value="3">📅 ± 3 dias</option>
                 <option value="7" selected>📅 ± 7 dias (Padrão)</option>
@@ -77,7 +77,7 @@ const OFX = {
           </div>
         </div>
 
-        <div class="drop-zone" id="ofx-drop" onclick="document.getElementById('ofx-file').click()" style="padding:28px 20px;">
+        <div class="drop-zone" id="ofx-drop" data-fb-click="Patch26Actions.clickById" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="ofx-file" style="padding:28px 20px;">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="width:38px;height:38px;margin:0 auto 10px;display:block;color:var(--accent)"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
           <p style="font-size:.92rem;font-weight:700;margin-bottom:4px">Arraste seu extrato bancário OFX aqui</p>
           <p style="font-size:.78rem;color:var(--text3)">Compatível com Caixa, BB, Bradesco, Itaú, Santander, Sicredi, Sicoob, Inter, Nubank (.ofx, .qfx)</p>
@@ -87,8 +87,8 @@ const OFX = {
         <div id="ofx-parse-result" style="margin-top:14px;display:none"></div>
 
         <div style="margin-top:16px;display:flex;gap:8px;align-items:center;justify-content:space-between;">
-          <button class="btn btn-secondary" onclick="OFX.demoOFX()">📋 Carregar OFX Demo</button>
-          <button class="btn btn-primary" id="ofx-import-btn" onclick="OFX.processImport()" style="display:none;font-weight:700;">✔ Importar Extrato para Revisão</button>
+          <button class="btn btn-secondary" data-fb-click="OFX.demoOFX" data-fb-click-n="0">📋 Carregar OFX Demo</button>
+          <button class="btn btn-primary" id="ofx-import-btn" data-fb-click="OFX.processImport" data-fb-click-n="0" style="display:none;font-weight:700;">✔ Importar Extrato para Revisão</button>
         </div>
       </div>
 
@@ -122,8 +122,8 @@ const OFX = {
                 </div>
               </td>
               <td style="text-align:right;white-space:nowrap">
-                <button class="btn btn-secondary btn-sm" onclick="OFX.viewImport('${i.id}')" title="Abrir Conciliação" style="padding:4px 8px;font-size:.75rem;">⚖ Conciliar</button>
-                <button class="icon-btn btn-sm" onclick="OFX.deleteImport('${i.id}')" title="Excluir este extrato" style="color:var(--danger);font-size:.8rem;margin-left:4px;">🗑️</button>
+                <button class="btn btn-secondary btn-sm" data-fb-click="OFX.viewImport" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(i.id))}" title="Abrir Conciliação" style="padding:4px 8px;font-size:.75rem;">⚖ Conciliar</button>
+                <button class="icon-btn btn-sm" data-fb-click="OFX.deleteImport" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(i.id))}" title="Excluir este extrato" style="color:var(--danger);font-size:.8rem;margin-left:4px;">🗑️</button>
               </td>
             </tr>`;
           }).join('')}
@@ -441,7 +441,7 @@ const OFX = {
               Período: <strong>${Utils.fmt.date(imp.periodo_inicio)} a ${Utils.fmt.date(imp.periodo_fim)}</strong> · Importado em ${Utils.fmt.datetime(imp.data_importacao)}
             </div>
           </div>
-          <button class="modal-close" onclick="Utils.closeModal()">✕</button>
+          <button class="modal-close" data-fb-click="Utils.closeModal" data-fb-click-n="0">✕</button>
         </div>
 
         <div class="modal-body" style="padding:16px 20px;overflow-y:auto;flex:1;">
@@ -464,7 +464,7 @@ const OFX = {
             <div style="display:flex;flex-wrap:wrap;align-items:center;gap:8px;">
               <div style="display:flex;align-items:center;gap:6px;">
                 <label style="font-size:.72rem;color:var(--text3);font-weight:600;white-space:nowrap;">Aproximação Valor:</label>
-                <select id="modal-tol-valor" class="form-control" style="font-size:.75rem;padding:4px 8px;width:auto;" onchange="OFX._onMudarToleranciaModal('${importId}', this.value, null)">
+                <select id="modal-tol-valor" class="form-control" style="font-size:.75rem;padding:4px 8px;width:auto;" data-fb-change="OFX._onMudarToleranciaModal" data-fb-change-n="3" data-fb-change-t0="string" data-fb-change-v0="${encodeURIComponent(String(importId))}" data-fb-change-t1="value" data-fb-change-t2="null">
                   <option value="0" ${OFX._toleranciaValor==='0'||OFX._toleranciaValor===0?'selected':''}>🎯 Exato (R$ 0)</option>
                   <option value="1" ${OFX._toleranciaValor==='1'||OFX._toleranciaValor===1?'selected':''}>🤏 ± R$ 1,00</option>
                   <option value="5" ${OFX._toleranciaValor==='5'||OFX._toleranciaValor===5?'selected':''}>💵 ± R$ 5,00</option>
@@ -481,7 +481,7 @@ const OFX = {
 
               <div style="display:flex;align-items:center;gap:6px;">
                 <label style="font-size:.72rem;color:var(--text3);font-weight:600;white-space:nowrap;">Datas:</label>
-                <select id="modal-tol-dias" class="form-control" style="font-size:.75rem;padding:4px 8px;width:auto;" onchange="OFX._onMudarToleranciaModal('${importId}', null, this.value)">
+                <select id="modal-tol-dias" class="form-control" style="font-size:.75rem;padding:4px 8px;width:auto;" data-fb-change="OFX._onMudarToleranciaModal" data-fb-change-n="3" data-fb-change-t0="string" data-fb-change-v0="${encodeURIComponent(String(importId))}" data-fb-change-t1="null" data-fb-change-t2="value">
                   <option value="0" ${OFX._toleranciaDias===0?'selected':''}>📅 Mesmo dia</option>
                   <option value="3" ${OFX._toleranciaDias===3?'selected':''}>📅 ± 3 dias</option>
                   <option value="7" ${OFX._toleranciaDias===7?'selected':''}>📅 ± 7 dias</option>
@@ -491,7 +491,7 @@ const OFX = {
                 </select>
               </div>
 
-              <button class="btn btn-primary btn-sm" onclick="OFX._abrirModalRobo('${importId}')" style="font-weight:700;padding:6px 12px;display:flex;align-items:center;gap:4px;box-shadow:var(--shadow-accent);">
+              <button class="btn btn-primary btn-sm" data-fb-click="OFX._abrirModalRobo" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(importId))}" style="font-weight:700;padding:6px 12px;display:flex;align-items:center;gap:4px;box-shadow:var(--shadow-accent);">
                 <span>⚡ Executar Robô</span>
               </button>
             </div>
@@ -500,22 +500,22 @@ const OFX = {
           <!-- Controls & Filter Tabs -->
           <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between;margin-bottom:16px;">
             <div style="display:flex;gap:6px;">
-              <button class="btn btn-sm ${tab==='todas'?'btn-primary':'btn-secondary'}" onclick="OFX.viewImport('${importId}','todas',document.getElementById('rec-search')?.value||'')">
+              <button class="btn btn-sm ${tab==='todas'?'btn-primary':'btn-secondary'}" data-fb-click="Patch26Actions.ofxViewImport" data-fb-click-n="2" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(importId))}" data-fb-click-t1="string" data-fb-click-v1="todas">
                 Todas (${trns.length})
               </button>
-              <button class="btn btn-sm ${tab==='pendentes'?'btn-warning':'btn-secondary'}" onclick="OFX.viewImport('${importId}','pendentes',document.getElementById('rec-search')?.value||'')">
+              <button class="btn btn-sm ${tab==='pendentes'?'btn-warning':'btn-secondary'}" data-fb-click="Patch26Actions.ofxViewImport" data-fb-click-n="2" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(importId))}" data-fb-click-t1="string" data-fb-click-v1="pendentes">
                 ⏳ Pendentes (${pendentes})
               </button>
-              <button class="btn btn-sm ${tab==='conciliadas'?'btn-success':'btn-secondary'}" onclick="OFX.viewImport('${importId}','conciliadas',document.getElementById('rec-search')?.value||'')">
+              <button class="btn btn-sm ${tab==='conciliadas'?'btn-success':'btn-secondary'}" data-fb-click="Patch26Actions.ofxViewImport" data-fb-click-n="2" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(importId))}" data-fb-click-t1="string" data-fb-click-v1="conciliadas">
                 ✅ Conciliadas (${conciliadas})
               </button>
-              <button class="btn btn-sm ${tab==='ignoradas'?'btn-primary':'btn-secondary'}" onclick="OFX.viewImport('${importId}','ignoradas',document.getElementById('rec-search')?.value||'')">
+              <button class="btn btn-sm ${tab==='ignoradas'?'btn-primary':'btn-secondary'}" data-fb-click="Patch26Actions.ofxViewImport" data-fb-click-n="2" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(importId))}" data-fb-click-t1="string" data-fb-click-v1="ignoradas">
                 ✕ Ignoradas (${ignoradas})
               </button>
             </div>
 
             <div style="min-width:220px;flex:1;max-width:320px;">
-              <input type="text" id="rec-search" class="form-control" placeholder="Buscar no extrato ou obra..." value="${search}" oninput="OFX.viewImport('${importId}','${tab}',this.value)" style="padding:5px 10px;font-size:.8rem;">
+              <input type="text" id="rec-search" class="form-control" placeholder="Buscar no extrato ou obra..." value="${search}" data-fb-input="OFX.viewImport" data-fb-input-n="3" data-fb-input-t0="string" data-fb-input-v0="${encodeURIComponent(String(importId))}" data-fb-input-t1="string" data-fb-input-v1="${encodeURIComponent(String(tab))}" data-fb-input-t2="value" style="padding:5px 10px;font-size:.8rem;">
             </div>
           </div>
 
@@ -532,7 +532,7 @@ const OFX = {
           <div style="font-size:.78rem;color:var(--text3);">
             Progresso: <strong>${conciliadas} de ${trns.length} transações conciliadas</strong> (${trns.length > 0 ? Math.round((conciliadas/trns.length)*100) : 0}%)
           </div>
-          <button class="btn btn-secondary btn-sm" onclick="Utils.closeModal()">Fechar</button>
+          <button class="btn btn-secondary btn-sm" data-fb-click="Utils.closeModal" data-fb-click-n="0">Fechar</button>
         </div>
       </div>`);
   },
@@ -592,14 +592,14 @@ const OFX = {
               O robô analisou as ${pendentes.length} transações pendentes e encontrou ${matchesEncontrados.length} correspondência(s).
             </div>
           </div>
-          <button class="modal-close" onclick="OFX.viewImport('${importId}')">✕</button>
+          <button class="modal-close" data-fb-click="OFX.viewImport" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(importId))}">✕</button>
         </div>
 
         <div class="modal-body" style="padding:16px 20px;overflow-y:auto;flex:1;">
           ${matchesEncontrados.length > 0 ? `
             <div style="margin-bottom:14px;display:flex;align-items:center;justify-content:space-between;">
               <span style="font-size:.82rem;color:var(--text2);">Revise as sugestões calculadas pelo robô:</span>
-              <button class="btn btn-primary btn-sm" onclick="OFX._confirmarTodosMatchesRobo('${importId}')" style="font-weight:700;">
+              <button class="btn btn-primary btn-sm" data-fb-click="OFX._confirmarTodosMatchesRobo" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(importId))}" style="font-weight:700;">
                 ⚡ Conciliar Todas (${matchesEncontrados.length})
               </button>
             </div>
@@ -648,7 +648,7 @@ const OFX = {
                         ${diffFmt}
                       </td>
                       <td style="text-align:right;white-space:nowrap;">
-                        <button class="btn btn-secondary btn-sm" onclick="OFX.conciliar('${j(importId)}','${j(trn.id)}','${j(lan.id)}');OFX._abrirModalRobo('${j(importId)}');" style="padding:3px 8px;font-size:.72rem;">✔ Conciliar</button>
+                        <button class="btn btn-secondary btn-sm" data-fb-click="Patch26Actions.ofxConciliarAndReopen" data-fb-click-n="3" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(j(importId)))}" data-fb-click-t1="string" data-fb-click-v1="${encodeURIComponent(String(j(trn.id)))}" data-fb-click-t2="string" data-fb-click-v2="${encodeURIComponent(String(j(lan.id)))}" style="padding:3px 8px;font-size:.72rem;">✔ Conciliar</button>
                       </td>
                     </tr>`;
                   }).join('')}
@@ -665,7 +665,7 @@ const OFX = {
         </div>
 
         <div class="modal-footer" style="padding:12px 20px;border-top:1px solid var(--border-s);justify-content:flex-end;">
-          <button class="btn btn-secondary btn-sm" onclick="OFX.viewImport('${importId}')">Voltar à Conciliação</button>
+          <button class="btn btn-secondary btn-sm" data-fb-click="OFX.viewImport" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(importId))}">Voltar à Conciliação</button>
         </div>
       </div>
     `);
@@ -748,11 +748,11 @@ const OFX = {
           <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
             <div style="background:rgba(201,162,39,.08);border:1.5px solid rgba(201,162,39,.35);border-radius:6px;padding:3px 8px;font-size:.74rem;display:flex;align-items:center;gap:6px;">
               <span style="color:var(--text);"><span style="color:var(--accent);font-weight:700;">💡 Sugestão:</span> [${e(topObNome)}] ${e(topLan.descricao.slice(0, 22))} (${Utils.fmt.currency(topLan.valor)} · ${topDiffTxt} · ${topSug.score}%)</span>
-              <button class="btn btn-sm btn-success" style="padding:2px 8px;font-size:.72rem;font-weight:700;white-space:nowrap;" onclick="OFX.conciliar('${j(importId)}','${j(t.id)}','${j(topLan.id)}')" title="Aprovar e conciliar esta correspondência">
+              <button class="btn btn-sm btn-success" style="padding:2px 8px;font-size:.72rem;font-weight:700;white-space:nowrap;" data-fb-click="OFX.conciliar" data-fb-click-n="3" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(j(importId)))}" data-fb-click-t1="string" data-fb-click-v1="${encodeURIComponent(String(j(t.id)))}" data-fb-click-t2="string" data-fb-click-v2="${encodeURIComponent(String(j(topLan.id)))}" title="Aprovar e conciliar esta correspondência">
                 ✔ Conciliar
               </button>
             </div>
-            <select style="background:var(--bg-input);border:1px solid var(--border-d);color:var(--text);border-radius:6px;padding:5px 6px;font-size:.74rem;max-width:200px;" onchange="if(this.value) OFX.conciliar('${j(importId)}','${j(t.id)}',this.value)">
+            <select style="background:var(--bg-input);border:1px solid var(--border-d);color:var(--text);border-radius:6px;padding:5px 6px;font-size:.74rem;max-width:200px;" data-fb-change="Patch26Actions.ofxConciliarIfValue" data-fb-change-n="3" data-fb-change-t0="string" data-fb-change-v0="${encodeURIComponent(String(j(importId)))}" data-fb-change-t1="string" data-fb-change-v1="${encodeURIComponent(String(j(t.id)))}" data-fb-change-t2="value">
               <option value="">➕ Outro lançamento...</option>
               <optgroup label="🤖 Sugestões do Robô (${scoredCandidates.length})">${scoredCandidates.map(c => {
                 const l = c.lancamento;
@@ -769,7 +769,7 @@ const OFX = {
         `;
       } else {
         candidateOptionsHtml = `
-          <select style="background:var(--bg-input);border:1px solid var(--border-d);color:var(--text);border-radius:6px;padding:6px;font-size:.75rem;width:100%;max-width:280px;" onchange="if(this.value) OFX.conciliar('${j(importId)}','${j(t.id)}',this.value)">
+          <select style="background:var(--bg-input);border:1px solid var(--border-d);color:var(--text);border-radius:6px;padding:6px;font-size:.75rem;width:100%;max-width:280px;" data-fb-change="Patch26Actions.ofxConciliarIfValue" data-fb-change-n="3" data-fb-change-t0="string" data-fb-change-v0="${encodeURIComponent(String(j(importId)))}" data-fb-change-t1="string" data-fb-change-v1="${encodeURIComponent(String(j(t.id)))}" data-fb-change-t2="value">
             <option value="">➕ Vincular lançamento...</option>
             ${extraLans.length > 0 ? `<optgroup label="📋 Lançamentos">${extraLans.map(l => {
               const obNome = l.obra_id === 'escritorio' ? '🏢 Sede' : (clientesMap[l.obra_id]?.nome || 'Obra');
@@ -824,16 +824,16 @@ const OFX = {
 
       <div style="display:flex;gap:4px;flex-shrink:0;">
         ${t.status === 'pendente' ? `
-          <button class="btn btn-primary btn-sm" onclick="OFX.criarLancamento('${j(importId)}','${j(t.id)}')" title="Criar novo lançamento para esta transação" style="padding:4px 8px;font-size:.75rem;font-weight:700;">+ Criar</button>
-          <button class="icon-btn btn-sm" onclick="OFX.ignorar('${j(importId)}','${j(t.id)}')" title="Ignorar transação" style="font-size:12px;color:var(--text3);">✕</button>
+          <button class="btn btn-primary btn-sm" data-fb-click="OFX.criarLancamento" data-fb-click-n="2" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(j(importId)))}" data-fb-click-t1="string" data-fb-click-v1="${encodeURIComponent(String(j(t.id)))}" title="Criar novo lançamento para esta transação" style="padding:4px 8px;font-size:.75rem;font-weight:700;">+ Criar</button>
+          <button class="icon-btn btn-sm" data-fb-click="OFX.ignorar" data-fb-click-n="2" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(j(importId)))}" data-fb-click-t1="string" data-fb-click-v1="${encodeURIComponent(String(j(t.id)))}" title="Ignorar transação" style="font-size:12px;color:var(--text3);">✕</button>
         ` : ''}
 
         ${t.status === 'conciliada' ? `
-          <button class="btn btn-secondary btn-sm" onclick="OFX.desconciliar('${j(importId)}','${j(t.id)}')" title="Desfazer conciliação" style="padding:4px 8px;font-size:.72rem;">↩ Desconciliar</button>
+          <button class="btn btn-secondary btn-sm" data-fb-click="OFX.desconciliar" data-fb-click-n="2" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(j(importId)))}" data-fb-click-t1="string" data-fb-click-v1="${encodeURIComponent(String(j(t.id)))}" title="Desfazer conciliação" style="padding:4px 8px;font-size:.72rem;">↩ Desconciliar</button>
         ` : ''}
 
         ${t.status === 'ignorada' ? `
-          <button class="btn btn-secondary btn-sm" onclick="OFX.reativar('${importId}','${t.id}')" title="Reativar para pendente" style="padding:4px 8px;font-size:.72rem;">↩ Reativar</button>
+          <button class="btn btn-secondary btn-sm" data-fb-click="OFX.reativar" data-fb-click-n="2" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(importId))}" data-fb-click-t1="string" data-fb-click-v1="${encodeURIComponent(String(t.id))}" title="Reativar para pendente" style="padding:4px 8px;font-size:.72rem;">↩ Reativar</button>
         ` : ''}
       </div>
     </div>`;

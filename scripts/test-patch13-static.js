@@ -11,6 +11,7 @@ const migration13 = read('migrations/013_schema_migrations_and_integrity.sql');
 const schema = read('schema.sql');
 const runMigration = read('scripts/run-migration.js');
 const authApi = read('api/auth.js');
+const requestResetBlock = authApi.slice(authApi.indexOf("action === 'request_reset'"), authApi.indexOf("action === 'verify_reset'"));
 const dbApi = read('api/db.js');
 const packageRelease = read('scripts/package-release.js');
 
@@ -53,21 +54,25 @@ ok('Auth register cria tenant, obra de sistema e usuário com rollback compensat
   authApi.includes('DELETE FROM tenants WHERE id = ${newTenantId}')
 );
 
-ok('Auth request_reset previne enumeração de contas respondendo com sucesso genérico',
-  authApi.includes('Prevenção contra Enumeração de Contas (H-09)') &&
-  authApi.includes('status(200).json({') &&
-  authApi.includes('Se o usuário ou e-mail informado estiver cadastrado')
+ok('Auth request_reset previne enumeração de contas com requestId opaco e resposta uniforme',
+  authApi.includes('genericResponse') &&
+  authApi.includes('requestId') &&
+  authApi.includes('Se a conta existir, enviaremos um código ao canal cadastrado') &&
+  !requestResetBlock.includes('userId: user.id') &&
+  !requestResetBlock.includes('userName:') &&
+  !requestResetBlock.includes('canalInfo')
 );
 
 ok('Auth verify_reset exige senha mínima de 8 caracteres',
-  authApi.includes('newPassword.length < 8') &&
+  authApi.includes('String(newPassword).length < 8') &&
   authApi.includes('A nova senha deve ter no mínimo 8 caracteres.')
 );
 
 ok('Auth verify_reset invalida OTP, atualiza senha e revoga sessões atomicamente',
   authApi.includes('UPDATE recuperacao_senhas SET usado = TRUE') &&
   authApi.includes('UPDATE usuarios SET senha_hash = ${newHash}') &&
-  authApi.includes('UPDATE auth_sessions SET revoked_at')
+  authApi.includes('UPDATE auth_sessions SET revoked_at') &&
+  authApi.includes('sql.transaction(queries)')
 );
 
 // 3. Consistência de Campos entre Save e Sync (H-02)

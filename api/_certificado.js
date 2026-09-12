@@ -21,7 +21,7 @@ const ALLOWED_ORIGINS = [
 function setCors(req, res) {
   const origin = req.headers.origin;
   if (origin) {
-    const isAllowed = ALLOWED_ORIGINS.includes(origin) || origin.endsWith('.vercel.app');
+    const isAllowed = ALLOWED_ORIGINS.includes(origin) || /^https:\/\/finan-as(?:-[a-z0-9-]+)?\.vercel\.app$/i.test(origin);
     if (isAllowed) {
       res.setHeader('Access-Control-Allow-Origin', origin);
       res.setHeader('Access-Control-Allow-Credentials', 'true');
@@ -33,14 +33,25 @@ function setCors(req, res) {
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, x-api-key, apikey, x-tenant-id');
 }
 
-function getEncryptionKey() {
-  const secret = (process.env.API_SECRET || process.env.VERCEL_API_SECRET || '').trim();
-  if (!secret) throw new Error('Chave de criptografia não configurada no servidor (API_SECRET pendente).');
-  return crypto.createHash('sha256').update(secret).digest();
+function deriveEncryptionKey(secret) {
+  return crypto.createHash('sha256').update(String(secret)).digest();
+}
+
+function getEncryptionSecrets() {
+  const dedicated = String(process.env.CERT_ENCRYPTION_KEY || '').trim();
+  const legacy = String(process.env.API_SECRET || process.env.VERCEL_API_SECRET || '').trim();
+  if (!dedicated && !legacy) {
+    throw new Error('Chave de criptografia do certificado não configurada no servidor.');
+  }
+  return {
+    primary: dedicated || legacy,
+    legacy: dedicated && legacy && dedicated !== legacy ? legacy : null
+  };
 }
 
 function encryptCertData(pfxBuffer, passphrase) {
-  const key = getEncryptionKey();
+  const { primary } = getEncryptionSecrets();
+  const key = deriveEncryptionKey(primary);
   const iv = crypto.randomBytes(12);
   const cipher = crypto.createCipheriv('aes-256-gcm', key, iv);
   const plainText = JSON.stringify({
@@ -57,14 +68,25 @@ function encryptCertData(pfxBuffer, passphrase) {
   };
 }
 
-export function decryptCertData(encBase64, ivHex, authTagHex) {
-  const key = getEncryptionKey();
+function decryptWithSecret(secret, encBase64, ivHex, authTagHex) {
+  const key = deriveEncryptionKey(secret);
   const iv = Buffer.from(ivHex, 'hex');
   const authTag = Buffer.from(authTagHex, 'hex');
   const decipher = crypto.createDecipheriv('aes-256-gcm', key, iv);
   decipher.setAuthTag(authTag);
   const decrypted = Buffer.concat([decipher.update(Buffer.from(encBase64, 'base64')), decipher.final()]);
   return JSON.parse(decrypted.toString('utf8'));
+}
+
+export function decryptCertData(encBase64, ivHex, authTagHex) {
+  const { primary, legacy } = getEncryptionSecrets();
+  try {
+    return decryptWithSecret(primary, encBase64, ivHex, authTagHex);
+  } catch (primaryErr) {
+    if (!legacy) throw primaryErr;
+    // Compatibilidade: certificados gravados antes do CERT_ENCRYPTION_KEY continuam legíveis.
+    return decryptWithSecret(legacy, encBase64, ivHex, authTagHex);
+  }
 }
 
 function extractX509FromPfx(buffer) {

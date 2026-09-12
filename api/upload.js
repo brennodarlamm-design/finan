@@ -27,7 +27,7 @@ export const config = {
   maxDuration: 60,
   api: {
     bodyParser: {
-      sizeLimit: '10mb'
+      sizeLimit: '22mb'
     }
   }
 };
@@ -46,7 +46,7 @@ const ALLOWED_ORIGINS = [
 function setCors(req, res) {
   const origin = req.headers.origin;
   if (origin) {
-    const isAllowed = ALLOWED_ORIGINS.includes(origin) || origin.endsWith('.vercel.app');
+    const isAllowed = ALLOWED_ORIGINS.includes(origin) || /^https:\/\/finan-as(?:-[a-z0-9-]+)?\.vercel\.app$/i.test(origin);
     if (isAllowed) {
       res.setHeader('Access-Control-Allow-Origin', origin);
       res.setHeader('Access-Control-Allow-Credentials', 'true');
@@ -200,7 +200,7 @@ export default async function handler(req, res) {
       return res.status(200).json({ success: true, message: 'Arquivo e registro excluídos com sucesso.' });
     } catch (err) {
       console.error('[Blob] Erro ao excluir arquivo:', err);
-      return res.status(500).json({ success: false, error: 'Erro ao excluir arquivo: ' + err.message });
+      return res.status(500).json({ success: false, error: 'Não foi possível excluir o arquivo.' });
     }
   }
 
@@ -234,14 +234,14 @@ export default async function handler(req, res) {
           return {
             allowedContentTypes: [
               'application/pdf',
-              'image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/svg+xml',
+              'image/jpeg', 'image/png', 'image/webp', 'image/gif',
               'application/zip', 'application/x-zip-compressed', 'application/x-rar-compressed', 'application/x-7z-compressed',
               'application/acad', 'application/x-acad', 'image/vnd.dwg', 'image/vnd.dxf',
               'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
               'application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
               'text/plain', 'text/csv', 'application/xml', 'text/xml'
             ],
-            maximumSizeInBytes: 30 * 1024 * 1024, // 30 MB
+            maximumSizeInBytes: 15 * 1024 * 1024, // 15 MB
             tokenPayload: JSON.stringify({ tenantId, targetPath })
           };
         },
@@ -339,7 +339,7 @@ export default async function handler(req, res) {
     console.error('[Blob] Erro no upload:', err);
     return res.status(500).json({
       success: false,
-      error: 'Falha ao processar upload no Vercel Blob: ' + err.message
+      error: 'Falha ao processar upload no armazenamento seguro.'
     });
   }
 }

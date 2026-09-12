@@ -58,8 +58,8 @@ const Contas = {
         <p class="page-sub">Gerencie as contas bancárias da sua empresa e das obras financiadas</p>
       </div>
       <div class="page-actions" style="display:flex;gap:10px;">
-        <button class="btn btn-secondary" onclick="Contas.sincronizarComNuvem()" title="Sincronizar contas agora com o banco Neon">&#x21BB; Atualizar Nuvem</button>
-        <button class="btn btn-primary" onclick="Contas.showForm()">+ Nova Conta</button>
+        <button class="btn btn-secondary" data-fb-click="Contas.sincronizarComNuvem" data-fb-click-n="0" title="Sincronizar contas agora com o banco Neon">&#x21BB; Atualizar Nuvem</button>
+        <button class="btn btn-primary" data-fb-click="Contas.showForm" data-fb-click-n="0">+ Nova Conta</button>
       </div>
     </div>
 
@@ -90,11 +90,11 @@ const Contas = {
     <!-- ABAS / FILTROS DE VISUALIZAÇÃO -->
     <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:16px;">
       <div style="display:flex;gap:8px;">
-        <button class="btn btn-sm ${this._filtro==='todas'?'btn-primary':'btn-secondary'}" onclick="Contas.setFiltro('todas')">
+        <button class="btn btn-sm ${this._filtro==='todas'?'btn-primary':'btn-secondary'}" data-fb-click="Contas.setFiltro" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="todas">
           &#x1F3E6; Todas as Contas (${contas.length})
         </button>
         ${obraAtiva ? `
-        <button class="btn btn-sm ${this._filtro==='obra'?'btn-primary':'btn-secondary'}" onclick="Contas.setFiltro('obra')">
+        <button class="btn btn-sm ${this._filtro==='obra'?'btn-primary':'btn-secondary'}" data-fb-click="Contas.setFiltro" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="obra">
           &#x1F3E0; Desta Obra &amp; Gerais (${contas.filter(c => c.obra_id === obraId || !c.obra_id).length})
         </button>` : ''}
       </div>
@@ -114,8 +114,8 @@ const Contas = {
           ${this._filtro === 'obra' ? 'Não há contas vinculadas exclusivamente a esta obra. Clique em "Todas as Contas" para ver as contas gerais da construtora.' : 'Cadastre as contas bancárias para conciliação OFX e controle financeiro.'}
         </p>
         <div style="display:flex;gap:10px;justify-content:center;">
-          ${this._filtro === 'obra' ? `<button class="btn btn-secondary" onclick="Contas.setFiltro('todas')">Ver Todas as Contas</button>` : ''}
-          <button class="btn btn-primary" onclick="Contas.showForm()">+ Nova Conta</button>
+          ${this._filtro === 'obra' ? `<button class="btn btn-secondary" data-fb-click="Contas.setFiltro" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="todas">Ver Todas as Contas</button>` : ''}
+          <button class="btn btn-primary" data-fb-click="Contas.showForm" data-fb-click-n="0">+ Nova Conta</button>
         </div>
       </div>`}
     </div>`;
@@ -191,10 +191,10 @@ const Contas = {
           ${conta.obs ? `<div style="font-size:.75rem;color:var(--text3);margin-top:6px;font-style:italic;">"${Utils.escapeHtml(conta.obs)}"</div>` : ''}
         </div>
         <div style="display:flex;gap:8px;align-items:center;">
-          <button class="btn btn-secondary btn-sm" onclick="Contas.showForm('${conta.id}')" title="Editar conta">
+          <button class="btn btn-secondary btn-sm" data-fb-click="Contas.showForm" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(conta.id))}" title="Editar conta">
             &#x270F;&#xFE0F; Editar
           </button>
-          <button class="icon-btn" onclick="Contas.excluir('${conta.id}')" title="Excluir conta" style="color:var(--danger);width:34px;height:34px;">
+          <button class="icon-btn" data-fb-click="Contas.excluir" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(conta.id))}" title="Excluir conta" style="color:var(--danger);width:34px;height:34px;">
             &#x1F5D1;
           </button>
         </div>
@@ -209,13 +209,13 @@ const Contas = {
       <div class="modal" style="max-width:580px">
         <div class="modal-header">
           <span class="modal-title">&#x1F3E6; ${conta ? 'Editar' : 'Nova'} Conta Bancária</span>
-          <button class="modal-close" onclick="Utils.closeModal()">&#x2715;</button>
+          <button class="modal-close" data-fb-click="Utils.closeModal" data-fb-click-n="0">&#x2715;</button>
         </div>
-        <form class="modal-body" id="f-conta" onsubmit="Contas.save(event,'${id||''}')">
+        <form class="modal-body" id="f-conta" data-fb-submit="Contas.save" data-fb-submit-n="2" data-fb-submit-t0="event" data-fb-submit-t1="string" data-fb-submit-v1="${encodeURIComponent(String(id||''))}">
           <div class="g2">
             <div class="form-group">
               <label class="form-label">Banco *</label>
-              <select class="form-control" name="banco_codigo" required onchange="Contas._onBancoChange(this)">
+              <select class="form-control" name="banco_codigo" required data-fb-change="Contas._onBancoChange" data-fb-change-n="1" data-fb-change-t0="self">
                 <option value="">Selecione o banco...</option>
                 ${this.BANCOS.map(b => `<option value="${b.code}" ${conta?.banco_codigo===b.code?'selected':''}>${b.code} &mdash; ${b.name}</option>`).join('')}
               </select>
@@ -262,7 +262,7 @@ const Contas = {
             <textarea class="form-control" name="obs" rows="2" placeholder="Informações adicionais para a conciliação bancária...">${Utils.escapeHtml(conta?.obs||'')}</textarea>
           </div>
           <div class="modal-footer">
-            <button type="button" class="btn btn-secondary" onclick="Utils.closeModal()">Cancelar</button>
+            <button type="button" class="btn btn-secondary" data-fb-click="Utils.closeModal" data-fb-click-n="0">Cancelar</button>
             <button type="submit" class="btn btn-primary">&#x1F4BE; Salvar Conta na Nuvem</button>
           </div>
         </form>
@@ -356,7 +356,7 @@ const Contas = {
       el.innerHTML = list.length ? list.map(c => this._card(c)).join('') : `
         <div class="empty-state">
           <h3>Nenhuma conta encontrada</h3>
-          <button class="btn btn-primary" onclick="Contas.showForm()">+ Nova Conta</button>
+          <button class="btn btn-primary" data-fb-click="Contas.showForm" data-fb-click-n="0">+ Nova Conta</button>
         </div>`;
     }
   },

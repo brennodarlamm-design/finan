@@ -19,7 +19,7 @@ const Dashboard = {
     <div class="page-header">
       <div><h1 class="page-title">📊 Dashboard</h1><p class="page-sub">${lblSafe}</p></div>
       <div class="page-actions" style="display:flex;gap:8px;">
-        <button class="btn btn-primary btn-sm" onclick="Dashboard.abrirModalImpressao()" style="display:flex;align-items:center;gap:6px;">
+        <button class="btn btn-primary btn-sm" data-fb-click="Dashboard.abrirModalImpressao" data-fb-click-n="0" style="display:flex;align-items:center;gap:6px;">
           🖨️ Imprimir / Exportar
         </button>
       </div>
@@ -34,7 +34,7 @@ const Dashboard = {
           <span style="color:var(--text);font-size:.85rem;margin-left:4px;">Existem <strong>${resumoPre.pendentesQtd} ordens de pré-compra</strong> aguardando autorização do Administrador (${Utils.fmt.currency(resumoPre.pendentesValor)}).</span>
         </div>
       </div>
-      <button class="btn btn-warning btn-sm" onclick="App.navigate('precompras');" style="font-weight:700;">
+      <button class="btn btn-warning btn-sm" data-fb-click="App.navigate" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="precompras" style="font-weight:700;">
         ⚡ Analisar Pedidos (${resumoPre.pendentesQtd}) →
       </button>
     </div>` : ''}
@@ -109,7 +109,7 @@ const Dashboard = {
       <div class="card">
         <div class="card-header">
           <div class="card-title">${isEscritorio ? '🏢 Custos Administrativos da Sede' : '🏗️ Progresso das Obras'}</div>
-          <button class="btn btn-ghost btn-sm" onclick="${isEscritorio ? "App.navigate('escritorio')" : "App.navigate('orcamentos')"}">
+          <button class="btn btn-ghost btn-sm" data-fb-click="App.navigate" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(isEscritorio ? 'escritorio' : 'orcamentos'))}">
             ${isEscritorio ? 'Ver Despesas Sede →' : 'Ver detalhes →'}
           </button>
         </div>
@@ -122,10 +122,10 @@ const Dashboard = {
             <span style="font-size:.72rem;color:var(--text3);font-weight:700;">Boletos &amp; Contas a Pagar</span>
           </div>
           <div style="display:flex;gap:6px;align-items:center;">
-            <button class="btn btn-sm" onclick="WhatsApp.enviarResumoDiario('${obraId}')" style="background:#25D366;color:#fff;font-weight:700;display:flex;align-items:center;gap:5px;height:28px;padding:0 12px;border-radius:20px;border:none;cursor:pointer;" title="Enviar resumo de boletos para o WhatsApp">
+            <button class="btn btn-sm" data-fb-click="WhatsApp.enviarResumoDiario" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(obraId))}" style="background:#25D366;color:#fff;font-weight:700;display:flex;align-items:center;gap:5px;height:28px;padding:0 12px;border-radius:20px;border:none;cursor:pointer;" title="Enviar resumo de boletos para o WhatsApp">
               📲 Resumo WhatsApp
             </button>
-            <button class="btn btn-ghost btn-sm" onclick="WhatsApp.abrirModalTelefone()" title="Definir número de WhatsApp que recebe os alertas" style="padding:2px 8px;font-size:.76rem;color:var(--text2);display:flex;align-items:center;gap:3px;cursor:pointer;">
+            <button class="btn btn-ghost btn-sm" data-fb-click="WhatsApp.abrirModalTelefone" data-fb-click-n="0" title="Definir número de WhatsApp que recebe os alertas" style="padding:2px 8px;font-size:.76rem;color:var(--text2);display:flex;align-items:center;gap:3px;cursor:pointer;">
               📱 Número
             </button>
           </div>
@@ -149,7 +149,7 @@ const Dashboard = {
     <div class="card" style="padding:0;">
       <div class="card-header" style="padding:18px 20px 0;">
         <div class="card-title">📝 &Uacute;ltimos Lan&ccedil;amentos</div>
-        <button class="btn btn-secondary btn-sm" onclick="${isEscritorio ? "App.navigate('escritorio')" : "App.navigate('lancamentos')"}">Ver todos</button>
+        <button class="btn btn-secondary btn-sm" data-fb-click="App.navigate" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(isEscritorio ? 'escritorio' : 'lancamentos'))}">Ver todos</button>
       </div>
       <div class="tbl-wrap" style="border:none;border-radius:0 0 14px 14px;">
         <table>
@@ -405,13 +405,13 @@ const Dashboard = {
           </div>
         </div>
         <div style="display:flex;gap:8px;align-items:center;">
-          <button class="btn btn-primary btn-sm" onclick="typeof ObraDetalhe !== 'undefined' ? ObraDetalhe.abrir('${obraId}', 'orcado-realizado') : App.navigate('orcamentos')" title="Abrir Central da Obra com Curva S e Cronograma">
+          <button class="btn btn-primary btn-sm" data-fb-click="Patch26Actions.dashboardOpenObra" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(obraId))}" title="Abrir Central da Obra com Curva S e Cronograma">
             📈 Curva S &amp; Cronograma
           </button>
-          <button class="btn btn-secondary btn-sm" onclick="App.navigate('orcamentos')" title="Abrir planilha orçamentária detalhada">
+          <button class="btn btn-secondary btn-sm" data-fb-click="App.navigate" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="orcamentos" title="Abrir planilha orçamentária detalhada">
             📋 Orçamentos
           </button>
-          <button class="btn btn-secondary btn-sm" onclick="App.navigate('medicoes')" title="Ver medições de campo">
+          <button class="btn btn-secondary btn-sm" data-fb-click="App.navigate" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="medicoes" title="Ver medições de campo">
             🔨 Medições (${comp.totalMedicoes})
           </button>
         </div>
@@ -539,14 +539,14 @@ const Dashboard = {
               <span>👤 ${Utils.escapeHtml(c?.nome || 'Geral')}</span>
               <span>&bull;</span>
               ${diasBadge}
-              ${it.codigo_barras ? `<span>&bull;</span> <span style="font-family:monospace;color:var(--accent2);cursor:pointer;" onclick="Dashboard.copiarLinhaDigitavel(window._tempVencItems[${idx}]?.codigo_barras)" title="Clique para copiar código de barras">🔢 Boleto [Copiar]</span>` : ''}
+              ${it.codigo_barras ? `<span>&bull;</span> <span style="font-family:monospace;color:var(--accent2);cursor:pointer;" data-fb-click="Patch26Actions.dashboardCopyVenc" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(idx))}" title="Clique para copiar código de barras">🔢 Boleto [Copiar]</span>` : ''}
             </div>
           </div>
         </div>
         <div style="text-align:right;flex-shrink:0;display:flex;flex-direction:column;align-items:flex-end;gap:4px;">
           <div style="font-size:.88rem;font-weight:900;color:var(--danger);">${Utils.fmt.currency(it.val)}</div>
           <div style="display:flex;gap:5px;align-items:center;">
-            <button onclick="WhatsApp.enviarAlertaVencimento(window._tempVencItems[${idx}])"
+            <button data-fb-click="Patch26Actions.dashboardWhatsAppVenc" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(idx))}"
               style="background:rgba(37,211,102,.12);color:#25D366;border:1px solid rgba(37,211,102,.3);padding:2px 7px;border-radius:12px;font-size:.68rem;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:3px;"
               title="Enviar alerta deste boleto no WhatsApp">
               📲 WhatsApp
@@ -886,7 +886,7 @@ const Dashboard = {
       <div class="modal" style="max-width:560px;">
         <div class="modal-header">
           <span class="modal-title">🖨️ Opções de Impressão do Dashboard</span>
-          <button class="modal-close" onclick="Utils.closeModal()">✕</button>
+          <button class="modal-close" data-fb-click="Utils.closeModal" data-fb-click-n="0">✕</button>
         </div>
         <div class="modal-body">
           <p style="font-size:.84rem;color:var(--text2);margin-bottom:16px;">
@@ -895,10 +895,7 @@ const Dashboard = {
 
           <div style="display:grid;grid-template-columns:1fr;gap:12px;">
             <!-- Opção 1: Painel Visual do Dashboard -->
-            <div style="border:1px solid var(--border);border-radius:var(--r-md);padding:16px;background:var(--bg-secondary);cursor:pointer;transition:all var(--t);display:flex;align-items:center;gap:14px;" 
-                 onmouseover="this.style.borderColor='var(--accent)'" 
-                 onmouseout="this.style.borderColor='var(--border)'"
-                 onclick="Dashboard.imprimirPainelDashboard()">
+            <div style="border:1px solid var(--border);border-radius:var(--r-md);padding:16px;background:var(--bg-secondary);cursor:pointer;transition:all var(--t);display:flex;align-items:center;gap:14px;" data-fb-mouseover="Patch26Actions.borderAccent" data-fb-mouseover-n="1" data-fb-mouseover-t0="self" data-fb-mouseout="Patch26Actions.borderDefault" data-fb-mouseout-n="1" data-fb-mouseout-t0="self" data-fb-click="Dashboard.imprimirPainelDashboard" data-fb-click-n="0">
               <div style="width:44px;height:44px;background:rgba(201,162,39,.15);border:1px solid var(--accent);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:1.4rem;flex-shrink:0;">
                 📊
               </div>
@@ -910,10 +907,7 @@ const Dashboard = {
             </div>
 
             <!-- Opção 2: Dados em Lista / Tabela -->
-            <div style="border:1px solid var(--border);border-radius:var(--r-md);padding:16px;background:var(--bg-secondary);cursor:pointer;transition:all var(--t);display:flex;align-items:center;gap:14px;" 
-                 onmouseover="this.style.borderColor='var(--accent)'" 
-                 onmouseout="this.style.borderColor='var(--border)'"
-                 onclick="Dashboard.imprimirDadosEmLista()">
+            <div style="border:1px solid var(--border);border-radius:var(--r-md);padding:16px;background:var(--bg-secondary);cursor:pointer;transition:all var(--t);display:flex;align-items:center;gap:14px;" data-fb-mouseover="Patch26Actions.borderAccent" data-fb-mouseover-n="1" data-fb-mouseover-t0="self" data-fb-mouseout="Patch26Actions.borderDefault" data-fb-mouseout-n="1" data-fb-mouseout-t0="self" data-fb-click="Dashboard.imprimirDadosEmLista" data-fb-click-n="0">
               <div style="width:44px;height:44px;background:rgba(16,185,129,.15);border:1px solid var(--success);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:1.4rem;flex-shrink:0;">
                 📋
               </div>
@@ -925,15 +919,14 @@ const Dashboard = {
             </div>
 
             <!-- Opção 3: Central Completa de Exportação -->
-            <div style="border:1px dashed var(--border);border-radius:var(--r-md);padding:12px 16px;background:var(--bg-card);cursor:pointer;display:flex;align-items:center;justify-content:space-between;" 
-                 onclick="Utils.closeModal();App.navigate('exportar');">
+            <div style="border:1px dashed var(--border);border-radius:var(--r-md);padding:12px 16px;background:var(--bg-card);cursor:pointer;display:flex;align-items:center;justify-content:space-between;" data-fb-click="Patch26Actions.closeModalNavigate" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="exportar">
               <span style="font-size:.82rem;color:var(--text2);">📥 Deseja baixar planilhas Excel ou outros modelos?</span>
               <span style="font-size:.82rem;color:var(--accent);font-weight:700;">Ir para Central &rarr;</span>
             </div>
           </div>
         </div>
         <div class="modal-footer">
-          <button class="btn btn-secondary" onclick="Utils.closeModal()">Fechar</button>
+          <button class="btn btn-secondary" data-fb-click="Utils.closeModal" data-fb-click-n="0">Fechar</button>
         </div>
       </div>
     `);

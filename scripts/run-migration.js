@@ -108,6 +108,12 @@ async function executeSqlFile(filePath, isManualTarget = false) {
   `;
 
   if (existing.length > 0 && !isManualTarget) {
+    const previousChecksum = String(existing[0].checksum || '');
+    const isBaseline = previousChecksum.startsWith('baseline_');
+    const isHashChecksum = /^[0-9a-f]{16}$/i.test(previousChecksum);
+    if (isHashChecksum && !isBaseline && previousChecksum !== checksum) {
+      throw new Error(`Checksum divergente para ${fileName}. A migration aplicada não deve ser alterada; crie uma nova migration.`);
+    }
     console.log(`⏩ [PULADA] ${fileName} (já aplicada em ${new Date(existing[0].applied_at).toLocaleString('pt-BR')})`);
     return false;
   }
@@ -120,33 +126,39 @@ async function executeSqlFile(filePath, isManualTarget = false) {
   console.log(`Instruções a executar: ${statements.length}`);
 
   const startMs = Date.now();
+  const durationForRegistry = 0; // atualizado logo após a transação em uma query curta
 
-  for (let i = 0; i < statements.length; i++) {
-    const cleaned = statements[i];
-    const firstLine = cleaned.split('\n')[0].slice(0, 65);
-    try {
-      await sql(cleaned);
-      console.log(`  [${i + 1}/${statements.length}] ✔ ${firstLine}...`);
-    } catch (err) {
-      console.error(`  [${i + 1}/${statements.length}] ❌ Erro na instrução:`, cleaned);
-      console.error(`     Detalhe: ${err.message}`);
-      throw err;
-    }
+  // Neon HTTP suporta transações não interativas: todas as instruções são
+  // confirmadas juntas ou integralmente revertidas pelo PostgreSQL.
+  // O registro da migration participa da MESMA transação, evitando schema
+  // parcialmente aplicado sem linha correspondente em schema_migrations.
+  try {
+    await sql.transaction(txn => [
+      ...statements.map(statement => txn(statement)),
+      txn`
+        INSERT INTO schema_migrations (version, applied_at, checksum, execution_time_ms)
+        VALUES (${fileName}, CURRENT_TIMESTAMP, ${checksum}, ${durationForRegistry})
+        ON CONFLICT (version) DO UPDATE SET
+          applied_at = CURRENT_TIMESTAMP,
+          checksum = EXCLUDED.checksum,
+          execution_time_ms = EXCLUDED.execution_time_ms
+      `
+    ]);
+  } catch (err) {
+    console.error(`  ❌ ${fileName} foi revertida integralmente pelo PostgreSQL.`);
+    console.error(`     Detalhe: ${err.message}`);
+    throw err;
   }
 
   const durationMs = Date.now() - startMs;
+  // Tempo de execução é telemetria; atualizar depois não altera o schema.
+  await sql`UPDATE schema_migrations SET execution_time_ms=${durationMs} WHERE version=${fileName};`;
+  statements.forEach((statement, i) => {
+    const firstLine = statement.split('\n')[0].slice(0, 65);
+    console.log(`  [${i + 1}/${statements.length}] ✔ ${firstLine}...`);
+  });
 
-  // Registra formalmente a migração em schema_migrations
-  await sql`
-    INSERT INTO schema_migrations (version, applied_at, checksum, execution_time_ms)
-    VALUES (${fileName}, CURRENT_TIMESTAMP, ${checksum}, ${durationMs})
-    ON CONFLICT (version) DO UPDATE SET
-      applied_at = CURRENT_TIMESTAMP,
-      checksum = EXCLUDED.checksum,
-      execution_time_ms = EXCLUDED.execution_time_ms;
-  `;
-
-  console.log(`✅ ${fileName} executado com sucesso em ${durationMs}ms e registrado em schema_migrations!`);
+  console.log(`✅ ${fileName} executado atomicamente em ${durationMs}ms e registrado em schema_migrations!`);
   return true;
 }
 

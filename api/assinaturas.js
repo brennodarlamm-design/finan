@@ -19,7 +19,7 @@ function cors(req, res) {
     'http://127.0.0.1:3000', 'http://127.0.0.1:3333', 'http://127.0.0.1:5000'
   ];
   const origin = req.headers.origin;
-  if (origin && (allowed.includes(origin) || origin.endsWith('.vercel.app'))) {
+  if (origin && (allowed.includes(origin) || /^https:\/\/finan-as(?:-[a-z0-9-]+)?\.vercel\.app$/i.test(origin))) {
     res.setHeader('Access-Control-Allow-Origin', origin);
   }
   res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');

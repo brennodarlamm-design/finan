@@ -17,7 +17,7 @@ const Suporte = {
   renderHeaderDropdown() {
     return `
       <div class="suporte-dropdown-wrapper" id="suporte-dropdown-wrapper" style="position:relative;display:inline-block;">
-        <button class="header-suporte-btn" onclick="Suporte.toggleDropdown(event)" title="Suporte Técnico e Treinamentos" style="
+        <button class="header-suporte-btn" data-fb-click="Suporte.toggleDropdown" data-fb-click-n="1" data-fb-click-t0="event" title="Suporte Técnico e Treinamentos" style="
           display:flex;align-items:center;gap:6px;background:rgba(201,162,39,.1);border:1px solid rgba(201,162,39,.4);
           color:var(--accent2);border-radius:8px;padding:6px 12px;font-size:.8rem;font-weight:700;cursor:pointer;
           transition:all .2s;font-family:inherit;">
@@ -37,32 +37,32 @@ const Suporte = {
           </div>
 
           <div style="padding:6px 0;">
-            <a href="javascript:void(0)" onclick="Suporte.abrirTelaAtendimento();Suporte.fecharDropdown();" class="suporte-menu-item" style="display:flex;align-items:center;gap:12px;padding:10px 16px;color:#f0ead6;text-decoration:none;font-size:.85rem;transition:background .2s;">
+            <a href="#" data-fb-click="Patch26Actions.suporteMenu" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="atendimento" class="suporte-menu-item" style="display:flex;align-items:center;gap:12px;padding:10px 16px;color:#f0ead6;text-decoration:none;font-size:.85rem;transition:background .2s;">
               <span style="font-size:1.05rem;color:#38bdf8;">💬</span>
               <span>Chat com FinBot / Atendente</span>
             </a>
 
-            <a href="javascript:void(0)" onclick="Suporte.abrirManual();Suporte.fecharDropdown();" class="suporte-menu-item" style="display:flex;align-items:center;gap:12px;padding:10px 16px;color:#f0ead6;text-decoration:none;font-size:.85rem;transition:background .2s;">
+            <a href="#" data-fb-click="Patch26Actions.suporteMenu" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="manual" class="suporte-menu-item" style="display:flex;align-items:center;gap:12px;padding:10px 16px;color:#f0ead6;text-decoration:none;font-size:.85rem;transition:background .2s;">
               <span style="font-size:1.05rem;color:#a3e635;">📖</span>
               <span>Manual do Sistema</span>
             </a>
 
-            <a href="javascript:void(0)" onclick="Suporte.abrirTutoriais();Suporte.fecharDropdown();" class="suporte-menu-item" style="display:flex;align-items:center;gap:12px;padding:10px 16px;color:#f0ead6;text-decoration:none;font-size:.85rem;transition:background .2s;">
+            <a href="#" data-fb-click="Patch26Actions.suporteMenu" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="tutoriais" class="suporte-menu-item" style="display:flex;align-items:center;gap:12px;padding:10px 16px;color:#f0ead6;text-decoration:none;font-size:.85rem;transition:background .2s;">
               <span style="font-size:1.05rem;color:#f43f5e;">🖥️</span>
               <span>Tutoriais do Sistema</span>
             </a>
 
-            <a href="javascript:void(0)" onclick="Suporte.abrirAgendamento();Suporte.fecharDropdown();" class="suporte-menu-item" style="display:flex;align-items:center;gap:12px;padding:10px 16px;color:#f0ead6;text-decoration:none;font-size:.85rem;transition:background .2s;">
+            <a href="#" data-fb-click="Patch26Actions.suporteMenu" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="agendamento" class="suporte-menu-item" style="display:flex;align-items:center;gap:12px;padding:10px 16px;color:#f0ead6;text-decoration:none;font-size:.85rem;transition:background .2s;">
               <span style="font-size:1.05rem;color:#fbbf24;">📅</span>
               <span>Agenda Treinamentos</span>
             </a>
 
-            <a href="javascript:void(0)" onclick="Suporte.abrirContatos();Suporte.fecharDropdown();" class="suporte-menu-item" style="display:flex;align-items:center;gap:12px;padding:10px 16px;color:#f0ead6;text-decoration:none;font-size:.85rem;transition:background .2s;">
+            <a href="#" data-fb-click="Patch26Actions.suporteMenu" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="contatos" class="suporte-menu-item" style="display:flex;align-items:center;gap:12px;padding:10px 16px;color:#f0ead6;text-decoration:none;font-size:.85rem;transition:background .2s;">
               <span style="font-size:1.05rem;color:#34d399;">📞</span>
               <span>Contatos Suporte</span>
             </a>
 
-            <a href="javascript:void(0)" onclick="Suporte.abrirTreinamentos();Suporte.fecharDropdown();" class="suporte-menu-item" style="display:flex;align-items:center;gap:12px;padding:10px 16px;color:#f0ead6;text-decoration:none;font-size:.85rem;transition:background .2s;">
+            <a href="#" data-fb-click="Patch26Actions.suporteMenu" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="treinamentos" class="suporte-menu-item" style="display:flex;align-items:center;gap:12px;padding:10px 16px;color:#f0ead6;text-decoration:none;font-size:.85rem;transition:background .2s;">
               <span style="font-size:1.05rem;color:#c084fc;">▶️</span>
               <span>Treinamentos</span>
             </a>
@@ -162,7 +162,7 @@ const Suporte = {
       this.renderTelaChat();
       this._startPolling();
     } catch (err) {
-      modal.innerHTML = `<div style="background:#0f1710;border:1px solid rgba(239,68,68,.35);border-radius:14px;width:min(560px,100%);padding:28px;color:#f0ead6;text-align:center;"><div style="font-size:1.7rem;">⚠️</div><div style="font-weight:800;margin:8px 0;">Não foi possível abrir o chat</div><div style="font-size:.82rem;color:#94a3b8;">${this._esc(err?.message || 'Tente novamente em instantes.')}</div><div style="display:flex;justify-content:center;gap:8px;margin-top:18px;"><button onclick="Suporte.abrirTelaAtendimento()" style="background:var(--accent);border:none;border-radius:8px;padding:9px 14px;font-weight:800;cursor:pointer;">Tentar novamente</button><button onclick="Suporte.desistirAtendimento()" style="background:transparent;border:1px solid rgba(255,255,255,.2);color:#fff;border-radius:8px;padding:9px 14px;cursor:pointer;">Fechar</button></div></div>`;
+      modal.innerHTML = `<div style="background:#0f1710;border:1px solid rgba(239,68,68,.35);border-radius:14px;width:min(560px,100%);padding:28px;color:#f0ead6;text-align:center;"><div style="font-size:1.7rem;">⚠️</div><div style="font-weight:800;margin:8px 0;">Não foi possível abrir o chat</div><div style="font-size:.82rem;color:#94a3b8;">${this._esc(err?.message || 'Tente novamente em instantes.')}</div><div style="display:flex;justify-content:center;gap:8px;margin-top:18px;"><button data-fb-click="Suporte.abrirTelaAtendimento" data-fb-click-n="0" style="background:var(--accent);border:none;border-radius:8px;padding:9px 14px;font-weight:800;cursor:pointer;">Tentar novamente</button><button data-fb-click="Suporte.desistirAtendimento" data-fb-click-n="0" style="background:transparent;border:1px solid rgba(255,255,255,.2);color:#fff;border-radius:8px;padding:9px 14px;cursor:pointer;">Fechar</button></div></div>`;
     } finally { this.sessao.loading = false; }
   },
 
@@ -196,8 +196,8 @@ const Suporte = {
             <div style="min-width:0;"><div style="font-weight:900;color:var(--accent2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${this._esc(title)}</div><div style="font-size:.72rem;color:${st.color};font-weight:700;">${st.icon} ${st.label} · ${safeCompany}</div></div>
           </div>
           <div style="display:flex;gap:7px;align-items:center;">
-            ${!closed ? `<button onclick="Suporte.encerrarChat()" style="background:none;border:1px solid rgba(255,255,255,.15);color:#94a3b8;padding:5px 9px;border-radius:6px;font-size:.7rem;cursor:pointer;">Encerrar</button>` : ''}
-            <button onclick="Suporte.desistirAtendimento()" style="background:none;border:none;color:#94a3b8;font-size:1.15rem;cursor:pointer;padding:3px 6px;" title="Fechar janela">✕</button>
+            ${!closed ? `<button data-fb-click="Suporte.encerrarChat" data-fb-click-n="0" style="background:none;border:1px solid rgba(255,255,255,.15);color:#94a3b8;padding:5px 9px;border-radius:6px;font-size:.7rem;cursor:pointer;">Encerrar</button>` : ''}
+            <button data-fb-click="Suporte.desistirAtendimento" data-fb-click-n="0" style="background:none;border:none;color:#94a3b8;font-size:1.15rem;cursor:pointer;padding:3px 6px;" title="Fechar janela">✕</button>
           </div>
         </div>
 
@@ -210,16 +210,16 @@ const Suporte = {
 
         ${!closed ? `<div style="padding:10px 14px;border-top:1px solid rgba(255,255,255,.08);background:rgba(0,0,0,.3);">
           ${status === 'bot' ? `<div style="display:flex;gap:6px;overflow-x:auto;padding-bottom:9px;">
-            <button onclick="Suporte.enviarMensagemRapida('Como cadastrar uma obra?')" style="white-space:nowrap;background:rgba(56,189,248,.09);border:1px solid rgba(56,189,248,.22);color:#bae6fd;border-radius:18px;padding:5px 10px;font-size:.68rem;cursor:pointer;">Obras</button>
-            <button onclick="Suporte.enviarMensagemRapida('Como usar NF-e e OCR?')" style="white-space:nowrap;background:rgba(56,189,248,.09);border:1px solid rgba(56,189,248,.22);color:#bae6fd;border-radius:18px;padding:5px 10px;font-size:.68rem;cursor:pointer;">NF-e / OCR</button>
-            <button onclick="Suporte.enviarMensagemRapida('Tenho uma dúvida no Financeiro')" style="white-space:nowrap;background:rgba(56,189,248,.09);border:1px solid rgba(56,189,248,.22);color:#bae6fd;border-radius:18px;padding:5px 10px;font-size:.68rem;cursor:pointer;">Financeiro</button>
-            <button onclick="Suporte.chamarAtendente()" style="white-space:nowrap;background:rgba(245,158,11,.14);border:1px solid rgba(245,158,11,.35);color:#fbbf24;border-radius:18px;padding:5px 11px;font-size:.68rem;font-weight:800;cursor:pointer;">👨‍💻 Chamar atendente</button>
+            <button data-fb-click="Suporte.enviarMensagemRapida" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="Como%20cadastrar%20uma%20obra%3F" style="white-space:nowrap;background:rgba(56,189,248,.09);border:1px solid rgba(56,189,248,.22);color:#bae6fd;border-radius:18px;padding:5px 10px;font-size:.68rem;cursor:pointer;">Obras</button>
+            <button data-fb-click="Suporte.enviarMensagemRapida" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="Como%20usar%20NF-e%20e%20OCR%3F" style="white-space:nowrap;background:rgba(56,189,248,.09);border:1px solid rgba(56,189,248,.22);color:#bae6fd;border-radius:18px;padding:5px 10px;font-size:.68rem;cursor:pointer;">NF-e / OCR</button>
+            <button data-fb-click="Suporte.enviarMensagemRapida" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="Tenho%20uma%20d%C3%BAvida%20no%20Financeiro" style="white-space:nowrap;background:rgba(56,189,248,.09);border:1px solid rgba(56,189,248,.22);color:#bae6fd;border-radius:18px;padding:5px 10px;font-size:.68rem;cursor:pointer;">Financeiro</button>
+            <button data-fb-click="Suporte.chamarAtendente" data-fb-click-n="0" style="white-space:nowrap;background:rgba(245,158,11,.14);border:1px solid rgba(245,158,11,.35);color:#fbbf24;border-radius:18px;padding:5px 11px;font-size:.68rem;font-weight:800;cursor:pointer;">👨‍💻 Chamar atendente</button>
           </div>` : ''}
           <div style="display:flex;align-items:center;gap:8px;">
-            <input type="text" id="suporte-chat-input" maxlength="4000" placeholder="Digite sua dúvida..." style="flex:1;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.15);border-radius:8px;padding:10px 13px;color:#fff;font-size:.84rem;outline:none;" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();Suporte.enviarMensagem();}">
-            <button id="suporte-chat-send" onclick="Suporte.enviarMensagem()" style="background:var(--accent);border:none;color:#0f1710;font-weight:900;padding:10px 14px;border-radius:8px;cursor:pointer;">Enviar ➤</button>
+            <input type="text" id="suporte-chat-input" maxlength="4000" placeholder="Digite sua dúvida..." style="flex:1;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.15);border-radius:8px;padding:10px 13px;color:#fff;font-size:.84rem;outline:none;" data-fb-keydown="Patch26Actions.suporteSendOnEnter" data-fb-keydown-n="1" data-fb-keydown-t0="event">
+            <button id="suporte-chat-send" data-fb-click="Suporte.enviarMensagem" data-fb-click-n="0" style="background:var(--accent);border:none;color:#0f1710;font-weight:900;padding:10px 14px;border-radius:8px;cursor:pointer;">Enviar ➤</button>
           </div>
-        </div>` : `<div style="padding:14px;text-align:center;border-top:1px solid rgba(255,255,255,.08);"><button onclick="Suporte.novaConversa()" style="background:var(--accent);border:none;border-radius:8px;padding:9px 16px;font-weight:900;cursor:pointer;">Iniciar novo atendimento</button></div>`}
+        </div>` : `<div style="padding:14px;text-align:center;border-top:1px solid rgba(255,255,255,.08);"><button data-fb-click="Suporte.novaConversa" data-fb-click-n="0" style="background:var(--accent);border:none;border-radius:8px;padding:9px 16px;font-weight:900;cursor:pointer;">Iniciar novo atendimento</button></div>`}
       </div>`;
 
     setTimeout(() => { this.scrollChatToBottom(); const input=document.getElementById('suporte-chat-input'); if(input) input.focus(); }, 30);
@@ -361,7 +361,7 @@ const Suporte = {
               <div style="font-size:.75rem;color:#94a3b8;">Guia rápido de operações e funcionalidades</div>
             </div>
           </div>
-          <button onclick="document.getElementById('suporte-manual-modal').remove()" style="background:none;border:none;color:#94a3b8;font-size:1.2rem;cursor:pointer;padding:4px 8px;">✕</button>
+          <button data-fb-click="Patch26Actions.removeById" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="suporte-manual-modal" style="background:none;border:none;color:#94a3b8;font-size:1.2rem;cursor:pointer;padding:4px 8px;">✕</button>
         </div>
 
         <div style="flex:1;overflow-y:auto;padding:22px;display:flex;flex-direction:column;gap:16px;">
@@ -404,7 +404,7 @@ const Suporte = {
         </div>
 
         <div style="padding:14px 20px;background:rgba(0,0,0,.3);border-top:1px solid rgba(255,255,255,.08);display:flex;justify-content:flex-end;">
-          <button onclick="document.getElementById('suporte-manual-modal').remove()" style="background:var(--accent);border:none;color:#0f1710;padding:8px 20px;border-radius:8px;font-weight:800;cursor:pointer;">Entendido</button>
+          <button data-fb-click="Patch26Actions.removeById" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="suporte-manual-modal" style="background:var(--accent);border:none;color:#0f1710;padding:8px 20px;border-radius:8px;font-weight:800;cursor:pointer;">Entendido</button>
         </div>
       </div>
     `;
@@ -432,7 +432,7 @@ const Suporte = {
               <div style="font-size:.75rem;color:#94a3b8;">Vídeos passo a passo para dominar a gestão de obras</div>
             </div>
           </div>
-          <button onclick="document.getElementById('suporte-tutoriais-modal').remove()" style="background:none;border:none;color:#94a3b8;font-size:1.2rem;cursor:pointer;padding:4px 8px;">✕</button>
+          <button data-fb-click="Patch26Actions.removeById" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="suporte-tutoriais-modal" style="background:none;border:none;color:#94a3b8;font-size:1.2rem;cursor:pointer;padding:4px 8px;">✕</button>
         </div>
 
         <div style="flex:1;overflow-y:auto;padding:22px;display:grid;grid-template-columns:1fr 1fr;gap:14px;">
@@ -443,7 +443,7 @@ const Suporte = {
               <div style="font-weight:800;font-size:.9rem;color:#fff;margin:4px 0;">Como Iniciar uma Obra e Cadastrar Etapas</div>
               <div style="font-size:.78rem;color:#94a3b8;">Aprenda a estruturar o contrato e prever os custos.</div>
             </div>
-            <button onclick="alert('Assistir tutorial: Redirecionando para o canal oficial...')" style="margin-top:12px;background:rgba(201,162,39,.15);border:1px solid var(--accent);color:var(--accent2);padding:6px 12px;border-radius:6px;font-size:.75rem;font-weight:700;cursor:pointer;">
+            <button data-fb-click="Patch26Actions.tutorialAlert" data-fb-click-n="0" style="margin-top:12px;background:rgba(201,162,39,.15);border:1px solid var(--accent);color:var(--accent2);padding:6px 12px;border-radius:6px;font-size:.75rem;font-weight:700;cursor:pointer;">
               Assistir Aula ▶
             </button>
           </div>
@@ -454,7 +454,7 @@ const Suporte = {
               <div style="font-weight:800;font-size:.9rem;color:#fff;margin:4px 0;">Importação Automática de NF-e e OCR</div>
               <div style="font-size:.78rem;color:#94a3b8;">Como escanear notas fiscais de materiais sem erro.</div>
             </div>
-            <button onclick="alert('Assistir tutorial: Redirecionando para o canal oficial...')" style="margin-top:12px;background:rgba(201,162,39,.15);border:1px solid var(--accent);color:var(--accent2);padding:6px 12px;border-radius:6px;font-size:.75rem;font-weight:700;cursor:pointer;">
+            <button data-fb-click="Patch26Actions.tutorialAlert" data-fb-click-n="0" style="margin-top:12px;background:rgba(201,162,39,.15);border:1px solid var(--accent);color:var(--accent2);padding:6px 12px;border-radius:6px;font-size:.75rem;font-weight:700;cursor:pointer;">
               Assistir Aula ▶
             </button>
           </div>
@@ -465,7 +465,7 @@ const Suporte = {
               <div style="font-weight:800;font-size:.9rem;color:#fff;margin:4px 0;">Boletim de Medição Caixa Econômica</div>
               <div style="font-size:.78rem;color:#94a3b8;">Passo a passo para gerar o espelho de medição de engenharia.</div>
             </div>
-            <button onclick="alert('Assistir tutorial: Redirecionando para o canal oficial...')" style="margin-top:12px;background:rgba(201,162,39,.15);border:1px solid var(--accent);color:var(--accent2);padding:6px 12px;border-radius:6px;font-size:.75rem;font-weight:700;cursor:pointer;">
+            <button data-fb-click="Patch26Actions.tutorialAlert" data-fb-click-n="0" style="margin-top:12px;background:rgba(201,162,39,.15);border:1px solid var(--accent);color:var(--accent2);padding:6px 12px;border-radius:6px;font-size:.75rem;font-weight:700;cursor:pointer;">
               Assistir Aula ▶
             </button>
           </div>
@@ -476,7 +476,7 @@ const Suporte = {
               <div style="font-weight:800;font-size:.9rem;color:#fff;margin:4px 0;">Conciliação OFX e Fechamento Mensal</div>
               <div style="font-size:.78rem;color:#94a3b8;">DRE, fluxo de caixa e batimento com a conta bancária.</div>
             </div>
-            <button onclick="alert('Assistir tutorial: Redirecionando para o canal oficial...')" style="margin-top:12px;background:rgba(201,162,39,.15);border:1px solid var(--accent);color:var(--accent2);padding:6px 12px;border-radius:6px;font-size:.75rem;font-weight:700;cursor:pointer;">
+            <button data-fb-click="Patch26Actions.tutorialAlert" data-fb-click-n="0" style="margin-top:12px;background:rgba(201,162,39,.15);border:1px solid var(--accent);color:var(--accent2);padding:6px 12px;border-radius:6px;font-size:.75rem;font-weight:700;cursor:pointer;">
               Assistir Aula ▶
             </button>
           </div>
@@ -485,7 +485,7 @@ const Suporte = {
 
         <div style="padding:14px 20px;background:rgba(0,0,0,.3);border-top:1px solid rgba(255,255,255,.08);display:flex;justify-content:space-between;align-items:center;">
           <span style="font-size:.8rem;color:#94a3b8;">Canal Oficial FinObra no YouTube</span>
-          <button onclick="document.getElementById('suporte-tutoriais-modal').remove()" style="background:var(--accent);border:none;color:#0f1710;padding:8px 20px;border-radius:8px;font-weight:800;cursor:pointer;">Fechar</button>
+          <button data-fb-click="Patch26Actions.removeById" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="suporte-tutoriais-modal" style="background:var(--accent);border:none;color:#0f1710;padding:8px 20px;border-radius:8px;font-weight:800;cursor:pointer;">Fechar</button>
         </div>
       </div>
     `;
@@ -515,7 +515,7 @@ const Suporte = {
               <div style="font-size:.75rem;color:#94a3b8;">Sessão ao vivo de implantação para sua equipe</div>
             </div>
           </div>
-          <button onclick="document.getElementById('suporte-agendamento-modal').remove()" style="background:none;border:none;color:#94a3b8;font-size:1.2rem;cursor:pointer;padding:4px 8px;">✕</button>
+          <button data-fb-click="Patch26Actions.removeById" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="suporte-agendamento-modal" style="background:none;border:none;color:#94a3b8;font-size:1.2rem;cursor:pointer;padding:4px 8px;">✕</button>
         </div>
 
         <div style="padding:22px;display:flex;flex-direction:column;gap:16px;">
@@ -558,7 +558,7 @@ const Suporte = {
               <div style="font-size:.75rem;color:#94a3b8;">Estamos prontos para atender sua construtora</div>
             </div>
           </div>
-          <button onclick="document.getElementById('suporte-contatos-modal').remove()" style="background:none;border:none;color:#94a3b8;font-size:1.2rem;cursor:pointer;padding:4px 8px;">✕</button>
+          <button data-fb-click="Patch26Actions.removeById" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="suporte-contatos-modal" style="background:none;border:none;color:#94a3b8;font-size:1.2rem;cursor:pointer;padding:4px 8px;">✕</button>
         </div>
 
         <div style="padding:22px;display:flex;flex-direction:column;gap:14px;">

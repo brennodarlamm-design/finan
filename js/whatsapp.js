@@ -216,7 +216,7 @@ const WhatsApp = {
       <div class="modal" style="max-width:440px;">
         <div class="modal-header">
           <span class="modal-title">📲 WhatsApp para Alertas &amp; Boletos</span>
-          <button class="modal-close" onclick="Utils.closeModal()">✕</button>
+          <button class="modal-close" data-fb-click="Utils.closeModal" data-fb-click-n="0">✕</button>
         </div>
         <div class="modal-body">
           <p style="font-size:.84rem;color:var(--text2);margin-bottom:14px;line-height:1.4;">
@@ -241,10 +241,10 @@ const WhatsApp = {
           </div>
         </div>
         <div class="modal-footer" style="display:flex;justify-content:space-between;">
-          <button class="btn btn-secondary" onclick="WhatsApp.testarEnvioCliente()">📲 Testar Envio</button>
+          <button class="btn btn-secondary" data-fb-click="WhatsApp.testarEnvioCliente" data-fb-click-n="0">📲 Testar Envio</button>
           <div style="display:flex;gap:8px;">
-            <button class="btn btn-secondary" onclick="Utils.closeModal()">Cancelar</button>
-            <button class="btn btn-primary" onclick="WhatsApp.salvarTelefoneCliente()">💾 Salvar Número</button>
+            <button class="btn btn-secondary" data-fb-click="Utils.closeModal" data-fb-click-n="0">Cancelar</button>
+            <button class="btn btn-primary" data-fb-click="WhatsApp.salvarTelefoneCliente" data-fb-click-n="0">💾 Salvar Número</button>
           </div>
         </div>
       </div>
@@ -357,7 +357,7 @@ const WhatsApp = {
               <div style="font-size:.74rem;color:var(--text3);">Disparo automático de boletos e relatórios diários</div>
             </div>
           </div>
-          <button class="modal-close" onclick="WhatsApp.fecharModalConexao()">✕</button>
+          <button class="modal-close" data-fb-click="WhatsApp.fecharModalConexao" data-fb-click-n="0">✕</button>
         </div>
         <div class="modal-body" id="wa-conexao-modal-body" style="padding-top:16px;">
           <div style="text-align:center;padding:36px 16px;">
@@ -464,17 +464,17 @@ const WhatsApp = {
                 placeholder="DDD + Telefone (ex: 95 99136-3678)"
                 value="${connectedNum || telPadrao || ''}"
                 style="font-size:0.86rem;">
-              <button class="btn btn-sm" id="wa-btn-teste" onclick="WhatsApp.executarTesteConexao()" style="background:#25D366;color:#fff;font-weight:700;white-space:nowrap;display:flex;align-items:center;gap:6px;">
+              <button class="btn btn-sm" id="wa-btn-teste" data-fb-click="WhatsApp.executarTesteConexao" data-fb-click-n="0" style="background:#25D366;color:#fff;font-weight:700;white-space:nowrap;display:flex;align-items:center;gap:6px;">
                 <span>🚀 Testar</span>
               </button>
             </div>
           </div>
 
           <div style="display:flex;justify-content:space-between;align-items:center;margin-top:12px;">
-            <button class="btn btn-sm btn-danger" onclick="WhatsApp.confirmarDesconexao()" style="font-size:0.78rem;background:transparent;color:#ef4444;border:1px solid rgba(239,68,68,0.35);">
+            <button class="btn btn-sm btn-danger" data-fb-click="WhatsApp.confirmarDesconexao" data-fb-click-n="0" style="font-size:0.78rem;background:transparent;color:#ef4444;border:1px solid rgba(239,68,68,0.35);">
               🔌 Desconectar Aparelho
             </button>
-            <button class="btn btn-secondary btn-sm" onclick="WhatsApp.fecharModalConexao()">
+            <button class="btn btn-secondary btn-sm" data-fb-click="WhatsApp.fecharModalConexao" data-fb-click-n="0">
               Concluído
             </button>
           </div>
@@ -518,10 +518,10 @@ const WhatsApp = {
           </div>
 
           <div style="display:flex;justify-content:space-between;align-items:center;">
-            <button class="btn btn-sm btn-secondary" onclick="WhatsApp.forcarNovoQR()" style="font-size:0.78rem;display:flex;align-items:center;gap:6px;">
+            <button class="btn btn-sm btn-secondary" data-fb-click="WhatsApp.forcarNovoQR" data-fb-click-n="0" style="font-size:0.78rem;display:flex;align-items:center;gap:6px;">
               🔄 Atualizar QR Code
             </button>
-            <button class="btn btn-secondary btn-sm" onclick="WhatsApp.fecharModalConexao()">
+            <button class="btn btn-secondary btn-sm" data-fb-click="WhatsApp.fecharModalConexao" data-fb-click-n="0">
               Cancelar
             </button>
           </div>
@@ -541,7 +541,7 @@ const WhatsApp = {
         <span style="font-size:.74rem;color:var(--text3);display:block;margin-bottom:20px;">
           ⚡ Verificando automaticamente a cada 2 segundos...
         </span>
-        <button class="btn btn-sm btn-secondary" onclick="WhatsApp.forcarNovoQR()" style="font-size:.76rem;">
+        <button class="btn btn-sm btn-secondary" data-fb-click="WhatsApp.forcarNovoQR" data-fb-click-n="0" style="font-size:.76rem;">
           🔄 Forçar Novo QR Code
         </button>
       </div>

@@ -70,7 +70,7 @@ const Utils = {
 
   escapeJsAttr(value) {
     // Valor seguro para uso dentro de string JS entre aspas simples em atributos HTML.
-    // Ex.: onclick="fn('...')". Prefira addEventListener quando possível.
+    // Ex.: data-fb-click="fn" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="...". Prefira addEventListener quando possível.
     const js = String(value ?? '')
       .replace(/\\/g, '\\\\')
       .replace(/'/g, "\\'")
@@ -255,10 +255,10 @@ const Utils = {
     const safeMsg = allowHtml ? String(msg ?? '') : this.escapeHtml(String(msg ?? ''));
     this.showModal(`
       <div class="modal" style="max-width:400px">
-        <div class="modal-header"><span class="modal-title">⚠ Confirmar</span><button class="modal-close" onclick="Utils.closeModal()">✕</button></div>
+        <div class="modal-header"><span class="modal-title">⚠ Confirmar</span><button class="modal-close" data-fb-click="Utils.closeModal" data-fb-click-n="0">✕</button></div>
         <div class="modal-body"><p style="color:var(--text2);line-height:1.6">${safeMsg}</p></div>
         <div class="modal-footer">
-          <button class="btn btn-secondary" onclick="Utils.closeModal()">Cancelar</button>
+          <button class="btn btn-secondary" data-fb-click="Utils.closeModal" data-fb-click-n="0">Cancelar</button>
           <button class="btn btn-danger" id="_confirm_btn">Confirmar</button>
         </div>
       </div>`);

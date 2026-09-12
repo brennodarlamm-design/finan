@@ -268,12 +268,12 @@ const NFeParser = {
                 <td style="text-align:right;">
                   <div style="display:flex;gap:5px;justify-content:flex-end;">
                     ${item.status === 'OK' && chave ? `
-                      <button class="btn btn-sm btn-success" onclick="NFe.gerarLancamentoDaNFe('${chave}')" style="font-weight:700;" title="Gerar despesa no financeiro">⚡ Lançar</button>
-                      <button class="btn btn-sm btn-primary" onclick="NFe.abrirDanfe('${chave}')">📄 DANFE</button>
-                      <button class="btn btn-sm btn-secondary" onclick="NFe.baixarXMLEAbrir('${chave}')">⬇️ XML</button>
-                      <button class="btn btn-sm btn-secondary" onclick="NFe.adicionarComoAnexo('${chave}')">📎 Anexar</button>
+                      <button class="btn btn-sm btn-success" data-fb-click="NFe.gerarLancamentoDaNFe" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(chave))}" style="font-weight:700;" title="Gerar despesa no financeiro">⚡ Lançar</button>
+                      <button class="btn btn-sm btn-primary" data-fb-click="NFe.abrirDanfe" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(chave))}">📄 DANFE</button>
+                      <button class="btn btn-sm btn-secondary" data-fb-click="NFe.baixarXMLEAbrir" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(chave))}">⬇️ XML</button>
+                      <button class="btn btn-sm btn-secondary" data-fb-click="NFe.adicionarComoAnexo" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(chave))}">📎 Anexar</button>
                     ` : item.status === 'WAITING' && chave ? `
-                      <button class="btn btn-sm btn-secondary" onclick="NFe.rebuscarChave('${chave}')">🔍 Verificar</button>
+                      <button class="btn btn-sm btn-secondary" data-fb-click="NFe.rebuscarChave" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(chave))}">🔍 Verificar</button>
                     ` : '—'}
                   </div>
                 </td>
@@ -283,7 +283,7 @@ const NFeParser = {
         </table>
       </div>
       <div style="margin-top:12px;text-align:right;">
-        <button class="btn btn-secondary btn-sm" onclick="NFe._setTab('cert')">🔄 Importar mais arquivos</button>
+        <button class="btn btn-secondary btn-sm" data-fb-click="NFe._setTab" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="cert">🔄 Importar mais arquivos</button>
       </div>`;
 
     if (dropzone) {
@@ -291,7 +291,7 @@ const NFeParser = {
         <div style="font-size:2.8rem;margin-bottom:8px;">✅</div>
         <div style="font-weight:700;color:var(--success);margin-bottom:4px;">${listaGeral.length} documento(s) processado(s)!</div>
         <div style="font-size:.78rem;color:var(--text3);">Arraste mais arquivos ou clique para selecionar outros XMLs</div>
-        <input type="file" id="nfe-cert-file" accept=".xml,text/xml,application/xml" multiple style="display:none;" onchange="NFe._onCertFileSelect(this)">`;
+        <input type="file" id="nfe-cert-file" accept=".xml,text/xml,application/xml" multiple style="display:none;" data-fb-change="NFe._onCertFileSelect" data-fb-change-n="1" data-fb-change-t0="self">`;
     }
   },
 
@@ -301,19 +301,18 @@ const NFeParser = {
       <div class="modal" style="max-width:500px;">
         <div class="modal-header">
           <span class="modal-title">📎 Anexar DANFE a um Lançamento</span>
-          <button class="modal-close" onclick="Utils.closeModal()">✕</button>
+          <button class="modal-close" data-fb-click="Utils.closeModal" data-fb-click-n="0">✕</button>
         </div>
         <div class="modal-body">
           <p style="font-size:.84rem;color:var(--text2);margin-bottom:12px;">Selecione o lançamento para receber o DANFE desta NF-e como anexo PDF:</p>
           <input type="text" id="nfe-lanc-search" class="form-control form-control-sm"
-            placeholder="🔍 Filtrar por descrição..." style="margin-bottom:10px;"
-            oninput="NFeParser.filtrarLancamentos(this.value,'${chave}',NFe)">
+            placeholder="🔍 Filtrar por descrição..." style="margin-bottom:10px;" data-fb-input="Patch26Actions.nfeParserFilter" data-fb-input-n="2" data-fb-input-t0="value" data-fb-input-t1="string" data-fb-input-v1="${encodeURIComponent(String(chave))}">
           <div id="nfe-lanc-list" style="max-height:320px;overflow-y:auto;display:flex;flex-direction:column;gap:6px;">
             ${this.renderListaLancamentos('', chave)}
           </div>
         </div>
         <div class="modal-footer">
-          <button class="btn btn-secondary" onclick="Utils.closeModal()">Cancelar</button>
+          <button class="btn btn-secondary" data-fb-click="Utils.closeModal" data-fb-click-n="0">Cancelar</button>
         </div>
       </div>`);
   },
@@ -327,9 +326,8 @@ const NFeParser = {
     return filtrados.map(l => {
       const obra = DB.getById('clientes', l.obra_id);
       return `
-        <div onclick="NFeParser.confirmarAnexo('${l.id}','${chave}',NFe)"
-          style="padding:10px 14px;background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--r-md);cursor:pointer;"
-          onmouseover="this.style.borderColor='var(--accent)'" onmouseout="this.style.borderColor='var(--border)'">
+        <div data-fb-click="Patch26Actions.nfeParserConfirm" data-fb-click-n="2" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(l.id))}" data-fb-click-t1="string" data-fb-click-v1="${encodeURIComponent(String(chave))}"
+          style="padding:10px 14px;background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--r-md);cursor:pointer;" data-fb-mouseover="Patch26Actions.borderAccent" data-fb-mouseover-n="1" data-fb-mouseover-t0="self" data-fb-mouseout="Patch26Actions.borderDefault" data-fb-mouseout-n="1" data-fb-mouseout-t0="self">
           <div style="font-weight:700;font-size:.84rem;color:var(--text);">${Utils.escapeHtml(l.descricao || '')}</div>
           <div style="font-size:.74rem;color:var(--text3);">${Utils.escapeHtml(obra?.nome || '—')} · ${Utils.fmt.currency(l.valor)} · ${Utils.fmt.date(l.data||l.data_vencimento)}</div>
         </div>`;
