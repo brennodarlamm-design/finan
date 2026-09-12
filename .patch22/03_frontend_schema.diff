@@ -1,0 +1,203 @@
+diff --git a/js/auth.js b/js/auth.js
+index e2fb29d..58e4976 100644
+--- a/js/auth.js
++++ b/js/auth.js
+@@ -159,10 +159,9 @@ const Auth = {
+       if (resp.ok && data.success) {
+         return {
+           success: true,
+-          userId: data.userId,
+-          userName: data.userName,
+-          canalInfo: data.canalInfo,
+-          whatsappNotified: !!data.whatsappSent
++          requestId: data.requestId,
++          canalInfo: 'canal cadastrado',
++          expiresInSeconds: Number(data.expiresInSeconds || 600)
+         };
+       }
+       return { success: false, message: data.message || 'Nenhuma conta localizada com este usuário ou e-mail.' };
+@@ -171,8 +170,8 @@ const Auth = {
+     }
+   },
+ 
+-  async validarCodigoRecuperacao(userId, codigoDigitado) {
+-    if (!userId || !codigoDigitado) {
++  async validarCodigoRecuperacao(requestId, codigoDigitado) {
++    if (!requestId || !codigoDigitado) {
+       return { success: false, message: 'Código de verificação obrigatório.' };
+     }
+ 
+@@ -182,20 +181,20 @@ const Auth = {
+     }
+ 
+     // Salva o código temporariamente para ser submetido com a nova senha de forma atômica
+-    sessionStorage.setItem(`finobra_otp_${userId}`, cleanCode);
++    sessionStorage.setItem(`finobra_otp_${requestId}`, cleanCode);
+     return { success: true, resetToken: cleanCode };
+   },
+ 
+-  async redefinirSenha(userId, resetToken, novaSenha) {
+-    if (!userId || !novaSenha) {
++  async redefinirSenha(requestId, resetToken, novaSenha) {
++    if (!requestId || !novaSenha) {
+       return { success: false, message: 'Dados incompletos para redefinição de senha.' };
+     }
+ 
+-    if (novaSenha.length < 6) {
+-      return { success: false, message: 'A nova senha deve possuir pelo menos 6 caracteres.' };
++    if (novaSenha.length < 8) {
++      return { success: false, message: 'A nova senha deve possuir pelo menos 8 caracteres.' };
+     }
+ 
+-    const code = resetToken || sessionStorage.getItem(`finobra_otp_${userId}`);
++    const code = resetToken || sessionStorage.getItem(`finobra_otp_${requestId}`);
+     if (!code) {
+       return { success: false, message: 'Sessão expirada. Solicite um novo código.' };
+     }
+@@ -204,11 +203,11 @@ const Auth = {
+       const resp = await fetch('/api/auth?action=verify_reset', {
+         method: 'POST',
+         headers: { 'Content-Type': 'application/json' },
+-        body: JSON.stringify({ userId, code, newPassword: novaSenha })
++        body: JSON.stringify({ requestId, code, newPassword: novaSenha })
+       });
+       const data = await resp.json().catch(() => ({}));
+       if (resp.ok && data.success) {
+-        sessionStorage.removeItem(`finobra_otp_${userId}`);
++        sessionStorage.removeItem(`finobra_otp_${requestId}`);
+         return { success: true, message: data.message || 'Senha redefinida com sucesso!' };
+       }
+       return { success: false, message: data.message || 'Código incorreto ou expirado.' };
+@@ -225,8 +224,8 @@ const Auth = {
+     if (cleanUsername.length < 3) {
+       return { success: false, message: 'O nome de usuário deve ter pelo menos 3 caracteres alfanuméricos.' };
+     }
+-    if (senha.length < 6) {
+-      return { success: false, message: 'A senha deve ter pelo menos 6 caracteres.' };
++    if (senha.length < 8) {
++      return { success: false, message: 'A senha deve ter pelo menos 8 caracteres.' };
+     }
+ 
+     try {
+diff --git a/js/configuracoes.js b/js/configuracoes.js
+index 1b6fa26..e085cca 100644
+--- a/js/configuracoes.js
++++ b/js/configuracoes.js
+@@ -601,7 +601,7 @@ const Configuracoes = {
+           <div class="g2">
+             <div class="form-group">
+               <label class="form-label">${u ? 'Nova Senha (deixe em branco para manter)' : 'Senha *'}</label>
+-              <input class="form-control" name="senha" type="password" placeholder="M&iacute;nimo 6 caracteres" ${u?'':'required'} minlength="6">
++              <input class="form-control" name="senha" type="password" placeholder="M&iacute;nimo 8 caracteres" ${u?'':'required'} minlength="8">
+             </div>
+             <div class="form-group">
+               <label class="form-label">Avatar (2 letras)</label>
+@@ -625,7 +625,7 @@ const Configuracoes = {
+     e.preventDefault();
+     const fd = new FormData(e.target);
+     const body = { nome:fd.get('nome').trim(), username:fd.get('username').trim(), email:fd.get('email').trim(), perfil:fd.get('perfil'), avatar:fd.get('avatar').trim(), senha:fd.get('senha') || undefined, permissions:this._collectPermissionMatrix(e.target) };
+-    if (!id && (!body.senha || body.senha.length < 6)) { Utils.toast('Senha deve ter pelo menos 6 caracteres!', 'warning'); return; }
++    if (!id && (!body.senha || body.senha.length < 8)) { Utils.toast('Senha deve ter pelo menos 8 caracteres!', 'warning'); return; }
+     if (id) body.id = id;
+     try {
+       const res = await fetch('/api/users', { method:id?'PATCH':'POST', headers:Auth.getAuthHeaders(), body:JSON.stringify(body) });
+@@ -687,7 +687,7 @@ const Configuracoes = {
+             </div>
+             <div class="form-group">
+               <label class="form-label">Nova senha</label>
+-              <input class="form-control" name="nova_senha" type="password" placeholder="M&iacute;nimo 6 caracteres">
++              <input class="form-control" name="nova_senha" type="password" placeholder="M&iacute;nimo 8 caracteres">
+             </div>
+           </div>
+           <div class="modal-footer">
+@@ -702,7 +702,7 @@ const Configuracoes = {
+     e.preventDefault();
+     const fd = new FormData(e.target);
+     const body = { id, nome:fd.get('nome').trim(), email:fd.get('email').trim(), avatar:fd.get('avatar').trim(), senha_atual:fd.get('senha_atual') || undefined, senha:fd.get('nova_senha') || undefined };
+-    if (body.senha && body.senha.length < 6) { Utils.toast('Nova senha deve ter pelo menos 6 caracteres!', 'warning'); return; }
++    if (body.senha && body.senha.length < 8) { Utils.toast('Nova senha deve ter pelo menos 8 caracteres!', 'warning'); return; }
+     try {
+       const res = await fetch('/api/users', { method:'PATCH', headers:Auth.getAuthHeaders(), body:JSON.stringify(body) });
+       const data = await res.json().catch(() => ({}));
+diff --git a/js/login_page.js b/js/login_page.js
+index 6f349ce..521dd50 100644
+--- a/js/login_page.js
++++ b/js/login_page.js
+@@ -192,13 +192,13 @@ if (window.location.hash.startsWith('#validar') || window.location.search.includ
+   }
+ 
+   // ── FLUXO DE RECUPERAÇÃO DE SENHA COM CÓDIGO OTP ─────────────
+-  let recoveryUserId = null;
++  let recoveryRequestId = null;
+   let recoveryResetToken = null;
+   let recoveryTimerInterval = null;
+   let recoveryExpiresAt = null;
+ 
+   function openRecoveryModal() {
+-    recoveryUserId = null;
++    recoveryRequestId = null;
+     recoveryResetToken = null;
+     clearInterval(recoveryTimerInterval);
+ 
+@@ -254,8 +254,8 @@ if (window.location.hash.startsWith('#validar') || window.location.search.includ
+         return;
+       }
+ 
+-      recoveryUserId = res.userId;
+-      document.getElementById('rec-canal-label').textContent = res.canalInfo;
++      recoveryRequestId = res.requestId;
++      document.getElementById('rec-canal-label').textContent = res.canalInfo || 'canal cadastrado';
+ 
+       // Exibe lembrete seguro do código na interface
+       const hint = document.getElementById('rec-demo-hint');
+@@ -385,7 +385,7 @@ if (window.location.hash.startsWith('#validar') || window.location.search.includ
+     btn.innerHTML = '<div class="spinner"></div> Validando...';
+ 
+     try {
+-      const result = await Auth.validarCodigoRecuperacao(recoveryUserId, code);
++      const result = await Auth.validarCodigoRecuperacao(recoveryRequestId, code);
+       if (!result.success) {
+         errBox.textContent = result.message;
+         errBox.style.display = 'block';
+@@ -419,8 +419,8 @@ if (window.location.hash.startsWith('#validar') || window.location.search.includ
+     const p1 = document.getElementById('rec-new-pwd').value;
+     const p2 = document.getElementById('rec-conf-pwd').value;
+ 
+-    if (!p1 || p1.length < 6) {
+-      errBox.textContent = 'A nova senha deve ter no mínimo 6 caracteres.';
++    if (!p1 || p1.length < 8) {
++      errBox.textContent = 'A nova senha deve ter no mínimo 8 caracteres.';
+       errBox.style.display = 'block';
+       return;
+     }
+@@ -435,7 +435,7 @@ if (window.location.hash.startsWith('#validar') || window.location.search.includ
+     btn.innerHTML = '<div class="spinner"></div> Salvando nova senha...';
+ 
+     try {
+-      const result = await Auth.redefinirSenha(recoveryUserId, recoveryResetToken, p1);
++      const result = await Auth.redefinirSenha(recoveryRequestId, recoveryResetToken, p1);
+       if (!result.success) {
+         errBox.textContent = result.message;
+         errBox.style.display = 'block';
+@@ -458,7 +458,7 @@ if (window.location.hash.startsWith('#validar') || window.location.search.includ
+   function concluirRecuperacao() {
+     closeRecoveryModal();
+     const users = Auth.getUsers();
+-    const user = users.find(u => u.id === recoveryUserId);
++    const user = null;
+     if (user) {
+       document.getElementById('username').value = user.username;
+     }
+diff --git a/schema.sql b/schema.sql
+index f1bb027..ae661e6 100644
+--- a/schema.sql
++++ b/schema.sql
+@@ -116,6 +116,8 @@ CREATE TABLE IF NOT EXISTS obras (
+     status VARCHAR(50) DEFAULT 'em_andamento',
+     data_inicio DATE,
+     data_previsao DATE,
++    cronograma_config JSONB,
++    bdi_config JSONB,
+     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+     PRIMARY KEY (tenant_id, id)
+ );
