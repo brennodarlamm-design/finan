@@ -1,4 +1,4 @@
-const DEFAULT_API_ORIGIN = 'https://finobra.app.br';
+const DEFAULT_API_ORIGIN = 'https://api.finobra.app.br';
 const DEFAULT_CANONICAL_ORIGIN = 'https://finobra.app.br';
 const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
 
@@ -106,8 +106,6 @@ async function proxyApi(request, env) {
     const rawBody = await request.arrayBuffer();
     let body = rawBody;
 
-    // Compatibilidade bidirecional entre contratos antigos (userId)
-    // e novos (requestId) do fluxo de recuperação de senha.
     if (isAuthAction(incoming, 'verify_reset') && rawBody.byteLength) {
       try {
         const text = new TextDecoder().decode(rawBody);
