@@ -3,7 +3,8 @@
 monitor-nfe
 backend
 bin
-scripts
+scripts/*
+!scripts/build-cloudflare-pages.cjs
 *.pfx
 *.log
 *.tmp
@@ -17,16 +18,3 @@ FINOBRA_PATCH_*
 *.zip
 *.rar
 *.7z
-
-# Patches de build precisam existir durante o build do Vercel
-!.patch22
-!.patch22/**
-!apply-patch22-build.cjs
-!.patch23
-!.patch23/**
-!apply-patch23-build.cjs
-!.patch24
-!.patch24/**
-!apply-patch24-build.cjs
-!prepare-patch25-build.cjs
-!apply-patch25-build.cjs

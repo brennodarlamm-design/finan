@@ -2,14 +2,13 @@ FROM node:20-slim
 
 WORKDIR /app
 
-# Dependências necessárias para certificados SSL e dependências Node.
-RUN apt-get update && apt-get install -y ca-certificates git && rm -rf /var/lib/apt/lists/*
+# Certificados SSL necessários para conexões HTTPS.
+RUN apt-get update && apt-get install -y ca-certificates && rm -rf /var/lib/apt/lists/*
 
 COPY package*.json ./
-RUN npm install --production
+RUN npm ci --omit=dev
 
-# Patch 27: o código de produção já é materializado e versionado no repositório.
-# O container não aplica diffs em server.js durante o build.
+# A fonte de produção já é materializada e versionada no repositório.
 COPY . .
 
 EXPOSE 3333
