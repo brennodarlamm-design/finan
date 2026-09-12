@@ -44,6 +44,7 @@ const Exportar = {
           </div>
           <button class="btn btn-secondary btn-sm btn-block" onclick="Exportar.exportarExcel('escritorio')">&#x1F3E2; Despesas Escrit&oacute;rio (.xlsx)</button>
           <button class="btn btn-secondary btn-sm btn-block" onclick="Exportar.exportarExcel('sinapi')">&#x1F3D7;&#xFE0F; Or&ccedil;amentos SINAPI (.xlsx)</button>
+          <button class="btn btn-secondary btn-sm btn-block" onclick="Exportar.exportarExcel('engenharia')" style="font-weight:700;border-color:var(--accent);color:var(--accent2);">🏗️ Dossiê de Engenharia (Cronograma + ABC + BDI) (.xlsx)</button>
         </div>
       </div>
 
@@ -55,6 +56,7 @@ const Exportar = {
           <label class="form-label">Modelo do Relat&oacute;rio</label>
           <select class="form-control" id="exp-preview-type" onchange="Exportar.preview(this.value)">
             <option value="completo">&#x1F4CA; Relat&oacute;rio Financeiro Executivo</option>
+            <option value="engenharia">🏗️ Dossiê de Engenharia (Cronograma, ABC &amp; BDI)</option>
             <option value="dre">📊 DRE Gerencial (Resultado &amp; Margens)</option>
             <option value="fluxo">📈 Projeção de Fluxo de Caixa (90 Dias)</option>
             <option value="lancamentos">&#x1F4B0; Extrato de Lan&ccedil;amentos</option>
@@ -217,6 +219,14 @@ const Exportar = {
   exportarExcel(tipo) {
     if (typeof XLSX === 'undefined') { Utils.toast('Biblioteca XLSX n&atilde;o carregada','error'); return; }
     const obraId = this.getObraId();
+
+    if (tipo === 'engenharia') {
+      if (typeof ObraDetalhe !== 'undefined' && ObraDetalhe.exportarExcelEngenharia) {
+        ObraDetalhe.exportarExcelEngenharia(obraId);
+        return;
+      }
+    }
+
     const wb = XLSX.utils.book_new();
     const clienteObj = DB.getById('clientes', obraId);
     const nome = clienteObj?.nome || 'Todas_as_Obras';

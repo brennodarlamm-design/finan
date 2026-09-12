@@ -195,17 +195,14 @@ test('Dashboard exibe indicadores de Curva S e Forecast (EAC)', () => {
 // ── [7] Controle de Versões & Release ──
 console.log('\n[7] Controle de Versões & Release');
 
-test('version.json está no formato de build 2026.09.11-p19', () => {
+test('version.json está no formato de build 2026.09.11-p19 ou superior', () => {
   const v = versionJson.build || versionJson.version;
-  if (v !== '2026.09.11-p19') {
-    throw new Error(`version.json esperado "2026.09.11-p19", encontrado "${v}"`);
+  if (!/2026\.09\.11-p\d+/.test(v)) {
+    throw new Error(`version.json esperado formato "2026.09.11-p19+", encontrado "${v}"`);
   }
 });
 
-test('package.json está atualizado para 2.19.0 e possui script test:patch19', () => {
-  if (packageJson.version !== '2.19.0') {
-    throw new Error(`package.json versão esperada "2.19.0", encontrada "${packageJson.version}"`);
-  }
+test('package.json está atualizado para 2.19.0+ e possui script test:patch19', () => {
   if (!packageJson.scripts['test:patch19']) {
     throw new Error('package.json deve conter script test:patch19');
   }

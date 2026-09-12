@@ -550,14 +550,17 @@ const ObraDetalhe = {
         </div>
 
         <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          <button class="btn btn-secondary btn-sm" onclick="ObraDetalhe.exportarExcelEngenharia('${obraId}')" style="display:inline-flex;align-items:center;gap:6px;font-weight:700;border:1px solid var(--accent);color:var(--accent2);" title="Exportar Dossiê Completo em Excel (.xlsx) com 4 abas">
+            📊 Exportar Excel (.xlsx)
+          </button>
+          <button class="btn btn-secondary btn-sm" onclick="ObraDetalhe.exportarPDFEngenharia('${obraId}')" style="display:inline-flex;align-items:center;gap:6px;font-weight:700;border:1px solid rgba(239,68,68,0.5);color:#ef4444;background:rgba(239,68,68,0.06);" title="Exportar Dossiê Completo em PDF Oficial A4">
+            📄 Exportar PDF (.pdf)
+          </button>
           <button class="btn btn-secondary btn-sm" onclick="App.navigate('orcamentos')" style="display:inline-flex;align-items:center;gap:6px;">
             📋 Orçamentos
           </button>
           <button class="btn btn-secondary btn-sm" onclick="App.navigate('sinapi')" style="display:inline-flex;align-items:center;gap:6px;">
             🏦 SINAPI
-          </button>
-          <button class="btn btn-secondary btn-sm" onclick="ObraDetalhe.imprimirOrcadoVsRealizado('${obraId}')" style="display:inline-flex;align-items:center;gap:6px;">
-            🖨️ Imprimir Dossiê
           </button>
           <button class="btn btn-danger btn-sm" onclick="App.obraId='${obraId}';Lancamentos.showForm('despesa')" style="font-weight:700;display:inline-flex;align-items:center;gap:6px;">
             + Lançar Custo
@@ -764,9 +767,12 @@ const ObraDetalhe = {
             Distribuição temporal do orçamento e desembolsos previstos ao longo dos ${crono.totalMeses} meses de contrato
           </div>
         </div>
-        <div>
-          <button class="btn btn-secondary btn-sm" onclick="ObraDetalhe.imprimirOrcadoVsRealizado('${obraId}')" style="font-size:.78rem;">
-            🖨️ Imprimir Cronograma A4
+        <div style="display:flex;gap:6px;flex-wrap:wrap;">
+          <button class="btn btn-secondary btn-sm" onclick="ObraDetalhe.exportarExcelEngenharia('${obraId}')" style="font-size:.78rem;font-weight:700;border:1px solid var(--accent);color:var(--accent2);">
+            📊 Baixar Excel (.xlsx)
+          </button>
+          <button class="btn btn-secondary btn-sm" onclick="ObraDetalhe.exportarPDFEngenharia('${obraId}')" style="font-size:.78rem;font-weight:700;">
+            📄 Imprimir / PDF A4
           </button>
         </div>
       </div>
@@ -902,10 +908,20 @@ const ObraDetalhe = {
       <!-- Tabela de Pareto Completa -->
       <div class="card" style="padding:0;overflow:hidden;border:1px solid var(--border);">
         <div style="padding:16px 20px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
-          <h3 style="font-size:1rem;font-weight:800;color:var(--text);margin:0;">
-            Classificação Analítica de Insumos &amp; Serviços (Pareto 80/20)
-          </h3>
-          <span style="font-size:.82rem;font-weight:700;color:var(--text2);">${abc.totalItens} itens classificados</span>
+          <div>
+            <h3 style="font-size:1rem;font-weight:800;color:var(--text);margin:0;">
+              Classificação Analítica de Insumos &amp; Serviços (Pareto 80/20)
+            </h3>
+            <div style="font-size:.78rem;color:var(--text3);margin-top:2px;">${abc.totalItens} itens classificados por ordem decrescente de impacto orçamentário</div>
+          </div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;">
+            <button class="btn btn-secondary btn-sm" onclick="ObraDetalhe.exportarExcelEngenharia('${obraId}')" style="font-size:.78rem;font-weight:700;border:1px solid var(--accent);color:var(--accent2);">
+              📊 Baixar Excel (.xlsx)
+            </button>
+            <button class="btn btn-secondary btn-sm" onclick="ObraDetalhe.exportarPDFEngenharia('${obraId}')" style="font-size:.78rem;font-weight:700;">
+              📄 Imprimir / PDF A4
+            </button>
+          </div>
         </div>
 
         <div class="table-wrap">
@@ -1114,24 +1130,236 @@ const ObraDetalhe = {
     `;
   },
 
+  // ── EXPORTAÇÃO EXCEL (.XLSX MULTI-ABA DE ENGENHARIA) ──
+  exportarExcelEngenharia(obraId) {
+    if (typeof XLSX === 'undefined') {
+      Utils.toast('Biblioteca XLSX não carregada no navegador.', 'danger');
+      return;
+    }
+
+    const comp = (typeof DB !== 'undefined' && DB.getOrcamentoVsRealizado)
+      ? DB.getOrcamentoVsRealizado(obraId)
+      : null;
+    if (!comp) {
+      Utils.toast('Dados da obra não disponíveis para exportação.', 'warning');
+      return;
+    }
+
+    const cs = DB.getCurvaS ? DB.getCurvaS(obraId) : null;
+    const crono = DB.getCronogramaFisicoFinanceiro ? DB.getCronogramaFisicoFinanceiro(obraId) : null;
+    const abc = DB.getCurvaABC ? DB.getCurvaABC(obraId) : null;
+    const isDeson = !!this.desoneradoLeisSociais;
+    const leis = DB.getLeisSociais ? DB.getLeisSociais(isDeson) : null;
+    const bdi = DB.getBDIConfig ? DB.getBDIConfig(obraId) : null;
+    const obra = DB.getById('clientes', obraId) || { nome: 'Todas as Obras / Geral' };
+    const emp = DB.getEmpresa() || {};
+    const empNome = emp.razao_social || emp.nome_fantasia || 'FINOBRA CONSTRUTORA';
+
+    const wb = XLSX.utils.book_new();
+
+    const addSheet = (data, name) => {
+      if (!data || !data.length) return;
+      const ws = XLSX.utils.aoa_to_sheet(data);
+      const wcol = data[0].map((_, i) => ({
+        wch: Math.min(50, Math.max(12, ...data.map(r => (r[i] !== null && r[i] !== undefined ? String(r[i]).length : 0)), name.length))
+      }));
+      ws['!cols'] = wcol;
+      XLSX.utils.book_append_sheet(wb, ws, name);
+    };
+
+    // ABA 1: CRONOGRAMA FÍSICO-FINANCEIRO MENSAL
+    if (crono && crono.linhas) {
+      const rowsCrono = [
+        [`CRONOGRAMA FÍSICO-FINANCEIRO MENSAL — ${empNome.toUpperCase()}`],
+        [`Obra: ${obra.nome} | Contrato Caixa: ${obra.num_contrato_caixa || 'N/A'} | Duração: ${crono.totalMeses} meses | Emissão: ${new Date().toLocaleDateString('pt-BR')}`],
+        [''],
+        ['Macro-Etapa de Obra', 'Total Previsto (R$)', ...crono.mesesLabels]
+      ];
+
+      crono.linhas.forEach(l => {
+        rowsCrono.push([
+          l.nome,
+          l.previstoTotal,
+          ...l.meses.map(m => m.valor)
+        ]);
+        rowsCrono.push([
+          `  └ % Etapa no Mês`,
+          '100.0%',
+          ...l.meses.map(m => (m.percentual > 0 ? `${m.percentual}%` : '0%'))
+        ]);
+      });
+
+      rowsCrono.push(['']);
+      rowsCrono.push([
+        'DESEMBOLSO MENSAL PREVISTO (R$)',
+        comp.totalOrcado,
+        ...crono.totaisMensais.map(t => t.previsto)
+      ]);
+      rowsCrono.push([
+        'DESEMBOLSO MENSAL REALIZADO (R$)',
+        comp.totalRealizado,
+        ...crono.totaisMensais.map(t => t.realizado)
+      ]);
+      rowsCrono.push([
+        'AVANÇO FÍSICO MENSAL (%)',
+        '100.0%',
+        ...crono.totaisAcumulados.map(t => `${t.percentualMensal}%`)
+      ]);
+      rowsCrono.push([
+        'AVANÇO FÍSICO ACUMULADO (CURVA S %)',
+        '100.0%',
+        ...crono.totaisAcumulados.map(t => `${t.percentualAcumulado}%`)
+      ]);
+
+      addSheet(rowsCrono, 'Cronograma Físico-Financ');
+    }
+
+    // ABA 2: CURVA ABC (PARETO 80/20)
+    if (abc && abc.itens) {
+      const rowsABC = [
+        [`CURVA ABC DE INSUMOS E SERVIÇOS (PARETO 80/20) — ${empNome.toUpperCase()}`],
+        [`Obra: ${obra.nome} | Itens Analisados: ${abc.totalItens} | Custo Global: ${Utils.fmt.currency(abc.totalValor)}`],
+        ['Resumo de Pareto:', `Classe A: ${abc.classeA.pct}% (${Utils.fmt.currency(abc.classeA.valor)})`, `Classe B: ${abc.classeB.pct}% (${Utils.fmt.currency(abc.classeB.valor)})`, `Classe C: ${abc.classeC.pct}% (${Utils.fmt.currency(abc.classeC.valor)})`],
+        [''],
+        ['Ranking', 'Insumo / Composição / Serviço', 'Categoria', 'Unid.', 'Qtd.', 'Custo Unitário (R$)', 'Valor Total (R$)', '% Individual', '% Acumulado', 'Classe ABC']
+      ];
+
+      abc.itens.forEach(it => {
+        rowsABC.push([
+          it.ranking,
+          it.descricao,
+          it.categoria,
+          it.unidade || 'UN',
+          it.quantidade || 1,
+          it.custoUnitario || it.valorTotal,
+          it.valorTotal,
+          `${it.pctIndividual}%`,
+          `${it.pctAcumulado}%`,
+          it.classe
+        ]);
+      });
+
+      addSheet(rowsABC, 'Curva ABC');
+    }
+
+    // ABA 3: ORÇADO VS REALIZADO & EVM
+    if (comp && comp.etapas) {
+      const rowsComp = [
+        [`ORÇADO VS REALIZADO & INDICADORES DE VALOR AGREGADO (EVM) — ${empNome.toUpperCase()}`],
+        [`Obra: ${obra.nome} | Emissão: ${new Date().toLocaleDateString('pt-BR')}`],
+        [''],
+        ['Macro-Etapa de Obra', 'Orçado Previsto (R$)', 'Realizado Executado (R$)', 'Saldo / Desvio (R$)', '% Executado', 'Status Executivo']
+      ];
+
+      comp.etapas.forEach(e => {
+        rowsComp.push([
+          e.nome,
+          e.orcado,
+          e.realizado,
+          e.saldo,
+          `${e.percentual}%`,
+          e.status.toUpperCase()
+        ]);
+      });
+
+      rowsComp.push([
+        'TOTAL GERAL DA OBRA',
+        comp.totalOrcado,
+        comp.totalRealizado,
+        comp.saldoGeral,
+        `${comp.percentualGeral}%`,
+        comp.statusGeral.toUpperCase()
+      ]);
+
+      if (cs) {
+        rowsComp.push(['']);
+        rowsComp.push(['GESTÃO DE VALOR AGREGADO (EVM)', 'Valor', 'Classificação / Unidade']);
+        rowsComp.push(['Custo Orçado no Término (BAC)', cs.bac, 'R$']);
+        rowsComp.push(['Valor Planejado Atual (PV)', cs.pv, 'R$']);
+        rowsComp.push(['Valor Agregado Físico (EV)', cs.ev, 'R$']);
+        rowsComp.push(['Custo Real Incorrido (AC)', cs.ac, 'R$']);
+        rowsComp.push(['Índice de Desempenho de Custo (CPI)', cs.cpi, cs.cpi >= 1 ? 'Econômico / Sob Controle' : 'Estouro de Custo']);
+        rowsComp.push(['Índice de Desempenho de Prazo (SPI)', cs.spi, cs.spi >= 1 ? 'No Prazo / Adiantado' : 'Atrasado']);
+        rowsComp.push(['Estimativa de Custo no Término (EAC)', cs.eac, 'R$ Projetado ao Final']);
+        rowsComp.push(['Variação Projetada no Término (VAC)', cs.vac, cs.vac >= 0 ? 'Economia Projetada (R$)' : 'Estouro Projetado (R$)']);
+      }
+
+      addSheet(rowsComp, 'Orçado vs Realizado');
+    }
+
+    // ABA 4: BDI E LEIS SOCIAIS
+    if (bdi && leis) {
+      const rowsBDI = [
+        [`COMPOSIÇÃO ANALÍTICA DO BDI & ENCARGOS SOCIAIS — ${empNome.toUpperCase()}`],
+        [`Obra: ${obra.nome} | Metodologia TCU Acórdão 2622/2013 | Regime CPRB: ${isDeson ? 'Desonerado' : 'Não Desonerado'}`],
+        [''],
+        ['PARÂMETROS DE CÁLCULO DO BDI', 'Taxa Aplicada (%)', 'Faixa de Referência TCU Acórdão 2622/2013'],
+        ['Administração Central (AC)', `${bdi.ac}%`, '3,00% a 5,50%'],
+        ['Seguro e Garantia (SG)', `${bdi.sg}%`, '0,80% a 1,00%'],
+        ['Risco e Imprevistos (R)', `${bdi.r}%`, '0,97% a 1,27%'],
+        ['Despesas Financeiras (DF)', `${bdi.df}%`, '0,59% a 1,23%'],
+        ['Lucro Operacional Bruto (L)', `${bdi.l}%`, '6,16% a 8,96%'],
+        ['Tributos e Impostos (T: PIS + COFINS + ISS)', `${bdi.t}%`, '4,65% a 8,65%'],
+        ['TAXA FINAL CALCULADA DE BDI', `${bdi.bdiCalculado}%`, 'Fórmula TCU Acórdão 2622/2013'],
+        [''],
+        ['ENCARGOS SOCIAIS DA CONSTRUÇÃO CIVIL (LEIS SOCIAIS)', 'Não Desonerado', 'Desonerado (CPRB)'],
+        ['Grupo A (Encargos Básicos / Previdenciários)', '22,80%', '4,50%'],
+        ['Grupo B (Descanso Remunerado, Férias, Feriados)', '46,30%', '46,30%'],
+        ['Grupo C (Aviso Prévio, Indenizações)', '4,44%', '4,44%'],
+        ['Grupo D (Reincidências do Grupo A sobre Grupo B)', '10,50%', '2,08%'],
+        ['TOTAL DE ENCARGOS SOCIAIS (%)', '84,04%', '57,32%']
+      ];
+
+      addSheet(rowsBDI, 'BDI e Leis Sociais');
+    }
+
+    const safeNome = (obra.nome || 'Obra')
+      .normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 25);
+    const dataIso = (typeof Utils !== 'undefined' && Utils.today) ? Utils.today() : new Date().toISOString().slice(0, 10);
+    const nomeArq = `Dossie_Engenharia_${safeNome}_${dataIso}.xlsx`;
+
+    try {
+      const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+      const blob = new Blob([wbout], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;charset=UTF-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = nomeArq;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(url), 2000);
+      Utils.toast(`✅ Planilha "${nomeArq}" baixada com sucesso!`, 'success');
+    } catch(err) {
+      console.warn('Fallback XLSX.writeFile:', err);
+      XLSX.writeFile(wb, nomeArq);
+    }
+  },
+
+  // ── EXPORTAÇÃO RELATÓRIO PDF OFICIAL (A4 LANDSCAPE) ──
+  exportarPDFEngenharia(obraId) {
+    this.imprimirOrcadoVsRealizado(obraId);
+  },
+
   imprimirOrcadoVsRealizado(obraId) {
     const comp = (typeof DB !== 'undefined' && DB.getOrcamentoVsRealizado)
       ? DB.getOrcamentoVsRealizado(obraId)
       : null;
     if (!comp) {
-      Utils.toast('Não foi possível carregar os dados comparativos para impressão.', 'danger');
+      Utils.toast('Não foi possível carregar os dados comparativos para emissão.', 'danger');
       return;
     }
 
     const cs = DB.getCurvaS ? DB.getCurvaS(obraId) : null;
     const abc = DB.getCurvaABC ? DB.getCurvaABC(obraId) : null;
     const crono = DB.getCronogramaFisicoFinanceiro ? DB.getCronogramaFisicoFinanceiro(obraId) : null;
-    const leis = DB.getLeisSociais ? DB.getLeisSociais(false) : null;
+    const leis = DB.getLeisSociais ? DB.getLeisSociais(this.desoneradoLeisSociais || false) : null;
     const bdi = DB.getBDIConfig ? DB.getBDIConfig(obraId) : null;
 
     const obra = DB.getById('clientes', obraId) || { nome: 'Todas as Obras / Geral' };
     const emp = DB.getEmpresa() || {};
     const empNome = emp.razao_social || emp.nome_fantasia || 'FINOBRA CONSTRUTORA';
+    const safeLogoUrl = Utils.safeUrl ? Utils.safeUrl(emp.logo_url) : emp.logo_url;
 
     const win = window.open('', '_blank');
     if (!win) {
@@ -1144,43 +1372,75 @@ const ObraDetalhe = {
       <html lang="pt-BR">
       <head>
         <meta charset="UTF-8">
-        <title>Dossiê de Engenharia de Custos - ${Utils.escapeHtml(obra.nome)}</title>
+        <title>Dossiê Executivo de Engenharia de Custos - ${Utils.escapeHtml(obra.nome)}</title>
         <style>
-          @page { size: A4 landscape; margin: 10mm; }
-          body { font-family: 'Segoe UI', Arial, sans-serif; font-size: 9px; color: #0f172a; margin: 0; padding: 10px; }
-          .header { display: flex; justify-content: space-between; border-bottom: 2px solid #0f172a; padding-bottom: 6px; margin-bottom: 10px; }
-          .title { font-size: 15px; font-weight: 900; }
+          @page { size: A4 landscape; margin: 8mm; }
+          * { box-sizing: border-box; }
+          body { font-family: 'Segoe UI', Arial, sans-serif; font-size: 8.5px; color: #0f172a; margin: 0; padding: 10px; background: #fff; }
+          @media print {
+            .no-print { display: none !important; }
+            body { padding: 0 !important; }
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+          }
+          .action-bar { background: #0f172a; color: #fff; padding: 8px 14px; border-radius: 6px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+          .header { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid #0f172a; padding-bottom: 8px; margin-bottom: 10px; }
+          .title { font-size: 14px; font-weight: 900; color: #0f172a; }
           .kpis { display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px; margin-bottom: 12px; }
           .kpi-card { border: 1px solid #cbd5e1; background: #f8fafc; padding: 6px 8px; border-radius: 4px; }
-          .kpi-title { font-size: 7.5px; text-transform: uppercase; font-weight: 700; color: #64748b; }
-          .kpi-val { font-size: 12px; font-weight: 900; margin-top: 2px; }
-          table { width: 100%; border-collapse: collapse; margin-top: 8px; }
-          th { background: #0f172a; color: #fff; font-weight: 700; padding: 5px 6px; text-align: left; font-size: 8px; }
-          td { padding: 4px 6px; border-bottom: 1px solid #e2e8f0; font-size: 8px; }
+          .kpi-title { font-size: 7px; text-transform: uppercase; font-weight: 700; color: #64748b; }
+          .kpi-val { font-size: 11.5px; font-weight: 900; margin-top: 2px; }
+          table { width: 100%; border-collapse: collapse; margin-top: 6px; font-size: 7.8px; }
+          th { background: #0f172a; color: #fff; font-weight: 700; padding: 4px 6px; text-align: left; }
+          td { padding: 3.5px 6px; border-bottom: 1px solid #e2e8f0; }
           tr:nth-child(even) td { background: #f8fafc; }
           .tfoot td { background: #e2e8f0; font-weight: 900; border-top: 2px solid #0f172a; }
-          .footer { margin-top: 20px; border-top: 1px solid #cbd5e1; padding-top: 6px; display: flex; justify-content: space-between; font-size: 7.5px; color: #64748b; }
+          .section-title { font-size: 9.5px; font-weight: 900; color: #0f172a; margin-top: 10px; margin-bottom: 2px; display: flex; align-items: center; gap: 4px; }
+          .signatures { display: grid; grid-template-columns: 1fr 1fr; gap: 30px; margin-top: 20px; padding-top: 14px; border-top: 1px dashed #cbd5e1; }
+          .sig-line { border-bottom: 1px solid #64748b; height: 26px; margin-bottom: 4px; }
+          .footer { margin-top: 14px; border-top: 1px solid #cbd5e1; padding-top: 5px; display: flex; justify-content: space-between; font-size: 7px; color: #64748b; }
         </style>
       </head>
       <body>
+        <div class="no-print action-bar">
+          <div style="font-weight:700;font-size:11px;display:flex;align-items:center;gap:8px;">
+            <span>📄 Dossiê Executivo de Engenharia de Custos (Visualização de Impressão A4)</span>
+          </div>
+          <div style="display:flex;gap:8px;">
+            <button onclick="window.print()" style="background:#10b981;color:#fff;border:none;padding:5px 12px;border-radius:4px;font-weight:700;cursor:pointer;font-size:10px;">
+              🖨️ Salvar como PDF / Imprimir
+            </button>
+            <button onclick="window.close()" style="background:#475569;color:#fff;border:none;padding:5px 10px;border-radius:4px;cursor:pointer;font-size:10px;">
+              ✖️ Fechar
+            </button>
+          </div>
+        </div>
+
         <div class="header">
-          <div>
-            <div style="font-size:13px;font-weight:900;color:#0f172a;">${Utils.escapeHtml(empNome)}</div>
-            <div style="color:#64748b;font-size:8.5px;">Engenharia de Custos, Planejamento &amp; Orçamentação Avançada</div>
+          <div style="display:flex;align-items:center;gap:10px;">
+            ${safeLogoUrl ? `<img src="${safeLogoUrl}" alt="${empNome}" style="max-height:38px;max-width:90px;object-fit:contain;">` : ''}
+            <div>
+              <div style="font-size:12px;font-weight:900;color:#0f172a;">${Utils.escapeHtml(empNome)}</div>
+              <div style="color:#64748b;font-size:8px;">Planejamento Físico-Financeiro, Curva ABC &amp; Engenharia de Custos</div>
+            </div>
           </div>
           <div style="text-align:right;">
-            <div class="title">RELATÓRIO ORÇADO × REALIZADO &amp; ENGENHARIA DE CUSTOS</div>
-            <div style="font-size:8.5px;color:#64748b;">Obra: <strong>${Utils.escapeHtml(obra.nome)}</strong> &bull; Emissão: ${new Date().toLocaleDateString('pt-BR')}</div>
+            <div class="title">DOSSIÊ EXECUTIVO DE ENGENHARIA DE CUSTOS &amp; RELATÓRIO ORÇADO × REALIZADO</div>
+            <div style="font-size:8px;color:#64748b;">
+              Obra: <strong>${Utils.escapeHtml(obra.nome)}</strong> &bull;
+              Contrato Caixa: <strong>${obra.num_contrato_caixa || 'N/A'}</strong> &bull;
+              Emissão: ${new Date().toLocaleDateString('pt-BR')} às ${new Date().toLocaleTimeString('pt-BR')}
+            </div>
           </div>
         </div>
 
         <div class="kpis">
           <div class="kpi-card">
-            <div class="kpi-title">Total Orçado (BAC)</div>
+            <div class="kpi-title">Orçamento Previsto (BAC)</div>
             <div class="kpi-val">${Utils.fmt.currency(comp.totalOrcado)}</div>
           </div>
           <div class="kpi-card">
-            <div class="kpi-title">Custo Real (AC)</div>
+            <div class="kpi-title">Custo Real Incorrido (AC)</div>
             <div class="kpi-val" style="color:#991b1b;">${Utils.fmt.currency(comp.totalRealizado)}</div>
           </div>
           <div class="kpi-card">
@@ -1188,94 +1448,138 @@ const ObraDetalhe = {
             <div class="kpi-val">${cs ? Utils.fmt.currency(cs.eac) : '—'}</div>
           </div>
           <div class="kpi-card">
-            <div class="kpi-title">Índice Custo (CPI)</div>
+            <div class="kpi-title">Índice de Custo (CPI/IDC)</div>
             <div class="kpi-val" style="color:${cs && cs.cpi>=1?'#166534':'#991b1b'};">${cs ? cs.cpi.toFixed(2) : '1.00'}</div>
           </div>
           <div class="kpi-card">
-            <div class="kpi-title">Índice Prazo (SPI)</div>
+            <div class="kpi-title">Índice de Prazo (SPI/IDP)</div>
             <div class="kpi-val" style="color:${cs && cs.spi>=1?'#166534':'#991b1b'};">${cs ? cs.spi.toFixed(2) : '1.00'}</div>
           </div>
           <div class="kpi-card">
-            <div class="kpi-title">BDI Calculado / Encargos</div>
+            <div class="kpi-title">BDI Aplicado / Encargos</div>
             <div class="kpi-val">${bdi ? bdi.bdiCalculado : 24.23}% / ${leis ? leis.totalGeral : 84.04}%</div>
           </div>
         </div>
 
         <!-- SEÇÃO 1: CRONOGRAMA FÍSICO-FINANCEIRO -->
-        <div style="margin-top:10px;">
-          <div style="font-size:10px;font-weight:800;color:#0f172a;margin-bottom:4px;">1. Cronograma Físico-Financeiro Mensal</div>
-          ${crono ? `
-            <table>
-              <thead>
+        <div class="section-title">1. Cronograma Físico-Financeiro Mensal da Obra</div>
+        ${crono ? `
+          <table>
+            <thead>
+              <tr>
+                <th style="min-width:180px;">Macro-Etapa</th>
+                <th style="text-align:right;width:95px;">Previsto Total</th>
+                ${crono.mesesLabels.slice(0, 12).map(l => `<th style="text-align:center;">${l}</th>`).join('')}
+              </tr>
+            </thead>
+            <tbody>
+              ${crono.linhas.map(l => `
                 <tr>
-                  <th style="min-width:180px;">Macro-Etapa</th>
-                  <th style="text-align:right;">Previsto Total</th>
-                  ${crono.mesesLabels.slice(0, 12).map(l => `<th style="text-align:center;">${l}</th>`).join('')}
-                </tr>
-              </thead>
-              <tbody>
-                ${crono.linhas.map(l => `
-                  <tr>
-                    <td style="font-weight:600;">${Utils.escapeHtml(l.nome)}</td>
-                    <td style="text-align:right;font-weight:700;">${Utils.fmt.currency(l.previstoTotal)}</td>
-                    ${l.meses.slice(0, 12).map(m => `
-                      <td style="text-align:center;">${m.percentual > 0 ? `${m.percentual}%` : '—'}</td>
-                    `).join('')}
-                  </tr>
-                `).join('')}
-              </tbody>
-              <tfoot>
-                <tr class="tfoot">
-                  <td>AVANÇO ACUMULADO</td>
-                  <td style="text-align:right;">100%</td>
-                  ${crono.totaisAcumulados.slice(0, 12).map(ta => `
-                    <td style="text-align:center;">${ta.percentualAcumulado}%</td>
+                  <td style="font-weight:600;">${Utils.escapeHtml(l.nome)}</td>
+                  <td style="text-align:right;font-weight:700;">${Utils.fmt.currency(l.previstoTotal)}</td>
+                  ${l.meses.slice(0, 12).map(m => `
+                    <td style="text-align:center;">
+                      ${m.percentual > 0 ? `<strong>${m.percentual}%</strong><br><span style="color:#64748b;font-size:7px;">${Utils.fmt.currency(m.valor)}</span>` : '—'}
+                    </td>
                   `).join('')}
                 </tr>
-              </tfoot>
-            </table>
-          ` : ''}
-        </div>
+              `).join('')}
+            </tbody>
+            <tfoot>
+              <tr class="tfoot">
+                <td>DESEMBOLSO PREVISTO NO MÊS</td>
+                <td style="text-align:right;">${Utils.fmt.currency(comp.totalOrcado)}</td>
+                ${crono.totaisMensais.slice(0, 12).map(tm => `
+                  <td style="text-align:center;">${Utils.fmt.currency(tm.previsto)}</td>
+                `).join('')}
+              </tr>
+              <tr class="tfoot">
+                <td>AVANÇO ACUMULADO (CURVA S)</td>
+                <td style="text-align:right;">100.0%</td>
+                ${crono.totaisAcumulados.slice(0, 12).map(ta => `
+                  <td style="text-align:center;color:#166534;"><strong>${ta.percentualAcumulado}%</strong></td>
+                `).join('')}
+              </tr>
+            </tfoot>
+          </table>
+        ` : ''}
 
         <!-- SEÇÃO 2: TOP ITENS CURVA ABC -->
-        <div style="margin-top:14px;">
-          <div style="font-size:10px;font-weight:800;color:#0f172a;margin-bottom:4px;">2. Curva ABC — Itens Críticos Classe A (80% do Custo)</div>
-          ${abc ? `
-            <table>
-              <thead>
-                <tr>
-                  <th style="width:40px;text-align:center;">#</th>
-                  <th>Insumo / Composição</th>
-                  <th>Categoria</th>
-                  <th style="text-align:right;">Valor Total</th>
-                  <th style="text-align:right;">% Total</th>
-                  <th style="text-align:right;">% Acumulado</th>
-                  <th style="text-align:center;">Classe</th>
-                </tr>
-              </thead>
-              <tbody>
-                ${abc.itens.slice(0, 10).map(i => `
+        <div style="display:grid;grid-template-columns:1.4fr 1fr;gap:12px;margin-top:8px;">
+          <div>
+            <div class="section-title">2. Curva ABC — Itens Críticos de Maior Custo (Pareto 80/20)</div>
+            ${abc ? `
+              <table>
+                <thead>
                   <tr>
-                    <td style="text-align:center;font-weight:700;">${i.ranking}</td>
-                    <td style="font-weight:600;">${Utils.escapeHtml(i.descricao)}</td>
-                    <td>${Utils.escapeHtml(i.categoria)}</td>
-                    <td style="text-align:right;font-weight:700;">${Utils.fmt.currency(i.valorTotal)}</td>
-                    <td style="text-align:right;">${i.pctIndividual}%</td>
-                    <td style="text-align:right;font-weight:700;color:#166534;">${i.pctAcumulado}%</td>
-                    <td style="text-align:center;font-weight:800;color:${i.classe==='A'?'#991b1b':'#0f172a'};">${i.classe}</td>
+                    <th style="width:30px;text-align:center;">#</th>
+                    <th>Insumo / Composição</th>
+                    <th style="width:80px;">Categoria</th>
+                    <th style="text-align:right;width:75px;">Valor Total</th>
+                    <th style="text-align:right;width:55px;">% Total</th>
+                    <th style="text-align:right;width:55px;">% Acum.</th>
+                    <th style="text-align:center;width:40px;">Classe</th>
                   </tr>
-                `).join('')}
-              </tbody>
-            </table>
-          ` : ''}
+                </thead>
+                <tbody>
+                  ${abc.itens.slice(0, 8).map(i => `
+                    <tr>
+                      <td style="text-align:center;font-weight:700;">${i.ranking}</td>
+                      <td style="font-weight:600;">${Utils.escapeHtml(i.descricao)}</td>
+                      <td>${Utils.escapeHtml(i.categoria)}</td>
+                      <td style="text-align:right;font-weight:700;">${Utils.fmt.currency(i.valorTotal)}</td>
+                      <td style="text-align:right;">${i.pctIndividual}%</td>
+                      <td style="text-align:right;font-weight:700;color:#166534;">${i.pctAcumulado}%</td>
+                      <td style="text-align:center;font-weight:800;color:${i.classe==='A'?'#991b1b':'#0f172a'};">${i.classe}</td>
+                    </tr>
+                  `).join('')}
+                </tbody>
+              </table>
+            ` : ''}
+          </div>
+
+          <div>
+            <div class="section-title">3. Parâmetros de BDI (TCU Acórdão 2622/2013) &amp; Leis Sociais</div>
+            <div style="border:1px solid #cbd5e1;border-radius:4px;padding:6px;background:#f8fafc;font-size:7.5px;">
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-bottom:6px;">
+                <div>Admin. Central (AC): <strong>${bdi ? bdi.ac : 4.00}%</strong></div>
+                <div>Seguro e Garantia (SG): <strong>${bdi ? bdi.sg : 0.80}%</strong></div>
+                <div>Risco/Contingência (R): <strong>${bdi ? bdi.r : 1.20}%</strong></div>
+                <div>Desp. Financeiras (DF): <strong>${bdi ? bdi.df : 1.23}%</strong></div>
+                <div>Lucro Bruto (L): <strong>${bdi ? bdi.l : 7.40}%</strong></div>
+                <div>Tributos (T: PIS/COF/ISS): <strong>${bdi ? bdi.t : 5.65}%</strong></div>
+              </div>
+              <div style="border-top:1px solid #cbd5e1;padding-top:4px;margin-top:4px;display:flex;justify-content:space-between;font-weight:800;color:#0f172a;">
+                <span>Taxa Final de BDI:</span>
+                <span style="color:#0284c7;">${bdi ? bdi.bdiCalculado : 24.23}%</span>
+              </div>
+              <div style="display:flex;justify-content:space-between;font-weight:800;color:#0f172a;margin-top:2px;">
+                <span>Encargos Sociais (${this.desoneradoLeisSociais ? 'Desonerado' : 'Não Desonerado'}):</span>
+                <span style="color:#166534;">${leis ? leis.totalGeral : 84.04}%</span>
+              </div>
+            </div>
+
+            <div style="margin-top:8px;background:#f8fafc;border:1px solid #cbd5e1;padding:6px;border-radius:4px;font-size:7.5px;">
+              <strong>Diagnóstico Técnico:</strong> ${Utils.escapeHtml(comp.alertaDesc || '')} &bull; ${cs ? Utils.escapeHtml(cs.diagnosticoTexto || '') : ''}
+            </div>
+          </div>
         </div>
 
-        <div style="margin-top:12px;background:#f8fafc;border:1px solid #cbd5e1;padding:6px 10px;border-radius:4px;font-size:8px;">
-          <strong>Diagnóstico Executivo:</strong> ${Utils.escapeHtml(comp.alertaDesc)} &bull; ${cs ? Utils.escapeHtml(cs.diagnosticoTexto) : ''}
+        <div class="signatures">
+          <div style="text-align:center;">
+            <div class="sig-line"></div>
+            <strong>${obra.engenheiro_responsavel || 'Engenheiro Responsável Técnico'}</strong><br>
+            <span style="color:#64748b;font-size:7px;">CREA / CAU: ${emp.crea_cau || 'Registro Profissional Homologado'}</span>
+          </div>
+          <div style="text-align:center;">
+            <div class="sig-line"></div>
+            <strong>${emp.razao_social || empNome}</strong><br>
+            <span style="color:#64748b;font-size:7px;">Gestão de Planejamento &amp; Engenharia de Custos</span>
+          </div>
         </div>
 
         <div class="footer">
-          <span>FinObra &bull; Relatório Executivo de Engenharia de Custos</span>
+          <span>FinObra &bull; Relatório Executivo de Engenharia de Custos &bull; Em conformidade com TCU 2622/2013 e Lei 14.133/2021</span>
           <span>Emitido em ${new Date().toLocaleDateString('pt-BR')} às ${new Date().toLocaleTimeString('pt-BR')}</span>
         </div>
       </body>

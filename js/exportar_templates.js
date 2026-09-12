@@ -101,6 +101,155 @@ const ExportarTemplates = {
     }
 
     // Conteúdo Específico por Tipo
+    if (type === 'engenharia') {
+      const targetObraId = obraId === 'todas' ? null : obraId;
+      const comp = DB.getOrcamentoVsRealizado ? DB.getOrcamentoVsRealizado(targetObraId) : null;
+      const cs = DB.getCurvaS ? DB.getCurvaS(targetObraId) : null;
+      const crono = DB.getCronogramaFisicoFinanceiro ? DB.getCronogramaFisicoFinanceiro(targetObraId) : null;
+      const abc = DB.getCurvaABC ? DB.getCurvaABC(targetObraId) : null;
+      const leis = DB.getLeisSociais ? DB.getLeisSociais(false) : null;
+      const bdi = DB.getBDIConfig ? DB.getBDIConfig(targetObraId) : null;
+
+      html += `
+      <div class="ang-section-header" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:8px;">
+        <h2 style="font-size:1.05rem;font-weight:900;color:#0f172a;margin:0;">🏗️ Dossiê Executivo de Engenharia de Custos &amp; Planejamento</h2>
+        <div style="font-size:.8rem;color:#475569;font-weight:700;">Conformidade TCU Acórdão 2622/2013 &amp; CEF</div>
+      </div>
+
+      <!-- Grid de KPIs EVM -->
+      <div class="ang-kpi-grid" style="display:grid;grid-template-columns:repeat(6,1fr);gap:10px;margin-bottom:18px;">
+        <div style="background:#f8fafc;padding:10px;border:1px solid #cbd5e1;border-radius:6px;text-align:center;">
+          <div style="font-size:.68rem;color:#475569;font-weight:800;text-transform:uppercase;">Previsto (BAC)</div>
+          <div style="font-size:1rem;font-weight:900;color:#0f172a;margin-top:2px;">${comp ? Utils.fmt.currency(comp.totalOrcado) : '—'}</div>
+        </div>
+        <div style="background:#f8fafc;padding:10px;border:1px solid #cbd5e1;border-radius:6px;text-align:center;">
+          <div style="font-size:.68rem;color:#475569;font-weight:800;text-transform:uppercase;">Realizado (AC)</div>
+          <div style="font-size:1rem;font-weight:900;color:#991b1b;margin-top:2px;">${comp ? Utils.fmt.currency(comp.totalRealizado) : '—'}</div>
+        </div>
+        <div style="background:#f8fafc;padding:10px;border:1px solid #cbd5e1;border-radius:6px;text-align:center;">
+          <div style="font-size:.68rem;color:#475569;font-weight:800;text-transform:uppercase;">Término (EAC)</div>
+          <div style="font-size:1rem;font-weight:900;color:#0f172a;margin-top:2px;">${cs ? Utils.fmt.currency(cs.eac) : '—'}</div>
+        </div>
+        <div style="background:#f8fafc;padding:10px;border:1px solid #cbd5e1;border-radius:6px;text-align:center;">
+          <div style="font-size:.68rem;color:#475569;font-weight:800;text-transform:uppercase;">Índice Custo (CPI)</div>
+          <div style="font-size:1rem;font-weight:900;color:${cs && cs.cpi>=1?'#15803d':'#991b1b'};margin-top:2px;">${cs ? cs.cpi.toFixed(2) : '1.00'}</div>
+        </div>
+        <div style="background:#f8fafc;padding:10px;border:1px solid #cbd5e1;border-radius:6px;text-align:center;">
+          <div style="font-size:.68rem;color:#475569;font-weight:800;text-transform:uppercase;">Índice Prazo (SPI)</div>
+          <div style="font-size:1rem;font-weight:900;color:${cs && cs.spi>=1?'#15803d':'#991b1b'};margin-top:2px;">${cs ? cs.spi.toFixed(2) : '1.00'}</div>
+        </div>
+        <div style="background:#f8fafc;padding:10px;border:1px solid #cbd5e1;border-radius:6px;text-align:center;">
+          <div style="font-size:.68rem;color:#475569;font-weight:800;text-transform:uppercase;">BDI / Encargos</div>
+          <div style="font-size:1rem;font-weight:900;color:#0284c7;margin-top:2px;">${bdi ? bdi.bdiCalculado : 24.23}% / ${leis ? leis.totalGeral : 84.04}%</div>
+        </div>
+      </div>
+
+      <!-- 1. Cronograma Físico-Financeiro -->
+      ${crono ? `
+      <div style="margin-bottom:18px;">
+        <div style="font-size:.88rem;font-weight:800;color:#0f172a;margin-bottom:6px;">1. Cronograma Físico-Financeiro Mensal (${crono.totalMeses} Meses)</div>
+        <div class="ang-tbl-wrap">
+          <table style="width:100%;border-collapse:collapse;font-size:.74rem;color:#0f172a;">
+            <thead>
+              <tr style="background:#0f172a;color:#fff;">
+                <th style="padding:7px 8px;min-width:180px;">Macro-Etapa de Obra</th>
+                <th style="padding:7px 8px;text-align:right;width:100px;">Total Previsto</th>
+                ${crono.mesesLabels.slice(0, 12).map(l => `<th style="padding:7px 8px;text-align:center;min-width:80px;">${l}</th>`).join('')}
+              </tr>
+            </thead>
+            <tbody>
+              ${crono.linhas.map((l, i) => `
+                <tr style="background:${i%2===0?'#fff':'#f8fafc'};border-bottom:1px solid #cbd5e1;">
+                  <td style="padding:6px 8px;font-weight:700;">${Utils.escapeHtml(l.nome)}</td>
+                  <td style="padding:6px 8px;text-align:right;font-weight:800;">${Utils.fmt.currency(l.previstoTotal)}</td>
+                  ${l.meses.slice(0, 12).map(m => `
+                    <td style="padding:6px 8px;text-align:center;">
+                      ${m.percentual > 0 ? `<strong>${m.percentual}%</strong><br><span style="font-size:.68rem;color:#64748b;">${Utils.fmt.currency(m.valor)}</span>` : '—'}
+                    </td>
+                  `).join('')}
+                </tr>
+              `).join('')}
+            </tbody>
+            <tfoot>
+              <tr style="background:#e2e8f0;font-weight:900;border-top:2px solid #0f172a;">
+                <td style="padding:7px 8px;">DESEMBOLSO MENSAL PREVISTO</td>
+                <td style="padding:7px 8px;text-align:right;">${comp ? Utils.fmt.currency(comp.totalOrcado) : '—'}</td>
+                ${crono.totaisMensais.slice(0, 12).map(tm => `<td style="padding:7px 8px;text-align:center;">${Utils.fmt.currency(tm.previsto)}</td>`).join('')}
+              </tr>
+              <tr style="background:#f1f5f9;font-weight:900;color:#15803d;">
+                <td style="padding:6px 8px;">AVANÇO ACUMULADO (CURVA S)</td>
+                <td style="padding:6px 8px;text-align:right;">100.0%</td>
+                ${crono.totaisAcumulados.slice(0, 12).map(ta => `<td style="padding:6px 8px;text-align:center;">${ta.percentualAcumulado}%</td>`).join('')}
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      </div>
+      ` : ''}
+
+      <!-- 2. Curva ABC e Memória BDI em 2 Colunas -->
+      <div style="display:grid;grid-template-columns:1.3fr 1fr;gap:14px;margin-bottom:18px;">
+        <!-- Curva ABC -->
+        <div>
+          <div style="font-size:.88rem;font-weight:800;color:#0f172a;margin-bottom:6px;">2. Curva ABC — Itens Críticos Classe A (Pareto 80/20)</div>
+          ${abc ? `
+          <div class="ang-tbl-wrap">
+            <table style="width:100%;border-collapse:collapse;font-size:.74rem;color:#0f172a;">
+              <thead>
+                <tr style="background:#0f172a;color:#fff;">
+                  <th style="padding:6px 8px;width:30px;text-align:center;">#</th>
+                  <th style="padding:6px 8px;">Insumo / Composição</th>
+                  <th style="padding:6px 8px;text-align:right;">Total</th>
+                  <th style="padding:6px 8px;text-align:right;">% Acum.</th>
+                  <th style="padding:6px 8px;text-align:center;">Classe</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${abc.itens.slice(0, 8).map((it, i) => `
+                  <tr style="background:${i%2===0?'#fff':'#f8fafc'};border-bottom:1px solid #cbd5e1;">
+                    <td style="padding:5px 8px;text-align:center;font-weight:700;">${it.ranking}</td>
+                    <td style="padding:5px 8px;font-weight:600;">${Utils.escapeHtml(it.descricao)}</td>
+                    <td style="padding:5px 8px;text-align:right;font-weight:800;">${Utils.fmt.currency(it.valorTotal)}</td>
+                    <td style="padding:5px 8px;text-align:right;font-weight:700;color:#15803d;">${it.pctAcumulado}%</td>
+                    <td style="padding:5px 8px;text-align:center;font-weight:900;color:${it.classe==='A'?'#991b1b':'#0f172a'};">${it.classe}</td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+          </div>
+          ` : ''}
+        </div>
+
+        <!-- BDI e Diagnóstico -->
+        <div>
+          <div style="font-size:.88rem;font-weight:800;color:#0f172a;margin-bottom:6px;">3. Parâmetros de BDI &amp; Leis Sociais</div>
+          <div style="border:1px solid #cbd5e1;border-radius:6px;padding:10px;background:#f8fafc;font-size:.75rem;">
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:8px;">
+              <div>Admin. Central: <strong>${bdi ? bdi.ac : 4.00}%</strong></div>
+              <div>Seguro/Garantia: <strong>${bdi ? bdi.sg : 0.80}%</strong></div>
+              <div>Risco: <strong>${bdi ? bdi.r : 1.20}%</strong></div>
+              <div>Desp. Financeira: <strong>${bdi ? bdi.df : 1.23}%</strong></div>
+              <div>Lucro Operacional: <strong>${bdi ? bdi.l : 7.40}%</strong></div>
+              <div>Tributos (T): <strong>${bdi ? bdi.t : 5.65}%</strong></div>
+            </div>
+            <div style="border-top:1px solid #cbd5e1;padding-top:6px;display:flex;justify-content:space-between;font-weight:900;">
+              <span>BDI Final Homologado:</span>
+              <span style="color:#0284c7;">${bdi ? bdi.bdiCalculado : 24.23}%</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;font-weight:900;margin-top:3px;">
+              <span>Encargos Sociais:</span>
+              <span style="color:#15803d;">${leis ? leis.totalGeral : 84.04}%</span>
+            </div>
+          </div>
+
+          <div style="margin-top:10px;background:#f8fafc;border:1px solid #cbd5e1;border-radius:6px;padding:8px 10px;font-size:.74rem;color:#334155;">
+            <strong>Diagnóstico Executivo:</strong> ${comp ? Utils.escapeHtml(comp.alertaDesc) : ''} &bull; ${cs ? Utils.escapeHtml(cs.diagnosticoTexto) : ''}
+          </div>
+        </div>
+      </div>
+      `;
+    }
+
     if (type === 'lancamentos') {
       const lans = DB.getLancamentos(obraId === 'todas' ? null : obraId);
       const totRec = lans.filter(l => l.tipo === 'receita').reduce((s, l) => s + l.valor, 0);
