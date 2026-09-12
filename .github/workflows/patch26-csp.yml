@@ -1,9 +1,13 @@
-name: Patch 26 CSP migration
+name: FinObra security regression
 
 on:
   push:
     branches:
+      - main
       - patch26-csp-global-20260912
+  pull_request:
+    branches:
+      - main
 
 permissions:
   contents: read
