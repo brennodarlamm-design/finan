@@ -12,7 +12,7 @@ console.log('=== Iniciando Testes Estáticos Integração OpenAI (ChatGPT) ===\n
 const ocrApi = read('./api/reconhecer-documento.js');
 const usersApi = read('./api/users.js');
 const ocrJs = read('./js/ocr.js');
-const envLocal = fs.existsSync('./.env.local') ? read('./.env.local') : '';
+const gitignore = fs.existsSync('./.gitignore') ? read('./.gitignore') : '';
 
 console.log('[1] Backend OCR (api/reconhecer-documento.js)');
 ok('api/reconhecer-documento.js lê OPENAI_API_KEY', /process\.env\.OPENAI_API_KEY/.test(ocrApi));
@@ -29,15 +29,14 @@ console.log('\n[3] Frontend OCR (js/ocr.js)');
 ok('js/ocr.js atualizou o cabeçalho para ChatGPT & Gemini Vision IA', /IA Vision \(ChatGPT & Gemini\)/.test(ocrJs));
 ok('js/ocr.js exibe badge de ChatGPT Vision quando provido por OpenAI', /ChatGPT Vision/.test(ocrJs));
 
-console.log('\n[4] Configuração de Ambiente');
-ok('.env.local contém OPENAI_API_KEY configurada', /OPENAI_API_KEY="sk-proj-/.test(envLocal));
+console.log('\n[4] Configuração Segura de Ambiente');
+ok('OPENAI_API_KEY é lida exclusivamente do ambiente e .env não precisa estar no repositório', /process\.env\.OPENAI_API_KEY/.test(ocrApi) && /process\.env\.OPENAI_API_KEY/.test(usersApi));
+ok('arquivos .env são ignorados pelo Git', /(^|\n)\.env(?:\*|\b)/m.test(gitignore) || /(^|\n)\.env\.local\b/m.test(gitignore));
 
+const total = 11;
 console.log('\n========================================');
-console.log(`Testes OpenAI: ${10 - fails} de 10 passaram.`);
+console.log(`Testes OpenAI: ${total - fails} de ${total} passaram.`);
 console.log('========================================\n');
 
-if (fails > 0) {
-  process.exit(1);
-} else {
-  console.log('🎉 Todos os testes de integração OpenAI passaram com sucesso!\n');
-}
+if (fails > 0) process.exit(1);
+console.log('🎉 Todos os testes estáticos da integração OpenAI passaram com sucesso!\n');
