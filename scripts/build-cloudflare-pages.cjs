@@ -1,0 +1,55 @@
+const fs = require('fs');
+const path = require('path');
+
+const root = path.resolve(__dirname, '..');
+const out = path.join(root, 'dist');
+
+const rootFiles = [
+  'index.html',
+  'app.html',
+  'landing.html',
+  'master.html',
+  'privacidade.html',
+  'termos.html',
+  'validar.html',
+  'version.json',
+  'favicon.ico',
+  'favicon.svg',
+  'favicon-32x32.png',
+  'favicon-192x192.png',
+  'apple-touch-icon.png'
+];
+
+const directories = ['css', 'js', 'img', 'data'];
+
+function copyRequired(src, dst) {
+  if (!fs.existsSync(src)) throw new Error(`Arquivo obrigatório ausente: ${path.relative(root, src)}`);
+  fs.cpSync(src, dst, { recursive: true });
+}
+
+fs.rmSync(out, { recursive: true, force: true });
+fs.mkdirSync(out, { recursive: true });
+
+for (const file of rootFiles) copyRequired(path.join(root, file), path.join(out, file));
+for (const dir of directories) copyRequired(path.join(root, dir), path.join(out, dir));
+
+copyRequired(path.join(root, 'cloudflare', '_headers'), path.join(out, '_headers'));
+copyRequired(path.join(root, 'cloudflare', '_redirects'), path.join(out, '_redirects'));
+copyRequired(path.join(root, 'cloudflare', '_routes.json'), path.join(out, '_routes.json'));
+
+const forbidden = ['api', 'backend', 'bin', 'migrations', 'monitor-nfe', 'node_modules', '.git', '.vercel'];
+for (const entry of forbidden) {
+  if (fs.existsSync(path.join(out, entry))) throw new Error(`Conteúdo servidor/privado vazou para dist: ${entry}`);
+}
+
+const appHtml = fs.readFileSync(path.join(out, 'app.html'), 'utf8');
+if (!appHtml.includes('/js/patch26-actions.js')) {
+  throw new Error('Build Cloudflare sem Patch 26/CSP carregado em app.html.');
+}
+
+const lexicalRoots = fs.readFileSync(path.join(out, 'js', 'clientes.js'), 'utf8');
+if (!lexicalRoots.includes('globalThis.Clientes = Clientes')) {
+  throw new Error('Hotfix 2.26.1 dos botões não foi aplicado antes do build Cloudflare.');
+}
+
+console.log('✅ Cloudflare Pages dist preparado com frontend-only, CSP e hotfix 2.26.1.');
