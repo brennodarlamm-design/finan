@@ -36,6 +36,15 @@ for (const dir of directories) copyRequired(path.join(root, dir), path.join(out,
 copyRequired(path.join(root, 'cloudflare', '_headers'), path.join(out, '_headers'));
 copyRequired(path.join(root, 'cloudflare', '_redirects'), path.join(out, '_redirects'));
 
+const indexPath = path.join(out, 'index.html');
+let indexHtml = fs.readFileSync(indexPath, 'utf8');
+const recoveryUxScript = '<script src="/js/recovery-account-ux.js"></script>';
+if (!indexHtml.includes(recoveryUxScript)) {
+  if (!indexHtml.includes('</body>')) throw new Error('index.html sem fechamento </body> para injetar UX de recuperação.');
+  indexHtml = indexHtml.replace('</body>', `  ${recoveryUxScript}\n</body>`);
+  fs.writeFileSync(indexPath, indexHtml, 'utf8');
+}
+
 const forbidden = ['api', 'backend', 'bin', 'migrations', 'monitor-nfe', 'node_modules', '.git', '.vercel'];
 for (const entry of forbidden) {
   if (fs.existsSync(path.join(out, entry))) throw new Error(`Conteúdo servidor/privado vazou para dist: ${entry}`);
@@ -55,4 +64,11 @@ if (/\beval\s*\(|new\s+Function\s*\(/.test(bridge)) {
   throw new Error('Bridge Cloudflare contém eval/new Function proibido.');
 }
 
-console.log('✅ Cloudflare Workers dist preparado a partir da fonte imutável Patch 27.');
+const recoveryUx = fs.readFileSync(path.join(out, 'js', 'recovery-account-ux.js'), 'utf8');
+if (!fs.readFileSync(indexPath, 'utf8').includes('/js/recovery-account-ux.js') ||
+    !recoveryUx.includes('Criar minha conta') ||
+    !recoveryUx.includes('hasRecoveryId')) {
+  throw new Error('Build Cloudflare sem tratamento de conta inexistente na recuperação.');
+}
+
+console.log('✅ Cloudflare Workers dist preparado a partir da fonte imutável Patch 27 com UX de recuperação.');
