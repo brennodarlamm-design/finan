@@ -37,6 +37,15 @@ copyRequired(path.join(root, 'cloudflare', '_headers'), path.join(out, '_headers
 copyRequired(path.join(root, 'cloudflare', '_redirects'), path.join(out, '_redirects'));
 copyRequired(path.join(root, 'cloudflare', '_routes.json'), path.join(out, '_routes.json'));
 
+const indexPath = path.join(out, 'index.html');
+let indexHtml = fs.readFileSync(indexPath, 'utf8');
+const recoveryUxScript = '<script src="/js/recovery-account-ux.js"></script>';
+if (!indexHtml.includes(recoveryUxScript)) {
+  if (!indexHtml.includes('</body>')) throw new Error('index.html sem fechamento </body> para injetar UX de recuperação.');
+  indexHtml = indexHtml.replace('</body>', `  ${recoveryUxScript}\n</body>`);
+  fs.writeFileSync(indexPath, indexHtml, 'utf8');
+}
+
 const forbidden = ['api', 'backend', 'bin', 'migrations', 'monitor-nfe', 'node_modules', '.git', '.vercel'];
 for (const entry of forbidden) {
   if (fs.existsSync(path.join(out, entry))) throw new Error(`Conteúdo servidor/privado vazou para dist: ${entry}`);
@@ -53,4 +62,11 @@ if (!bridge.includes('FINOBRA_PATCH26_LEXICAL_ROOTS_HOTFIX') ||
   throw new Error('Hotfix 2.26.1 dos botões não foi aplicado no bridge CSP antes do build Cloudflare.');
 }
 
-console.log('✅ Cloudflare Pages dist preparado com frontend-only, CSP e hotfix 2.26.1.');
+const recoveryUx = fs.readFileSync(path.join(out, 'js', 'recovery-account-ux.js'), 'utf8');
+if (!fs.readFileSync(indexPath, 'utf8').includes('/js/recovery-account-ux.js') ||
+    !recoveryUx.includes('Criar minha conta') ||
+    !recoveryUx.includes('hasRecoveryId')) {
+  throw new Error('Build Cloudflare sem tratamento de conta inexistente na recuperação.');
+}
+
+console.log('✅ Cloudflare Pages dist preparado com frontend-only, CSP, hotfix 2.26.1 e UX de recuperação.');
