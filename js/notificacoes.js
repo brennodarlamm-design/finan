@@ -113,7 +113,7 @@ const Notificacoes = {
     const temUrgente = this.obterAlertas().some(a => a.nivel === 'urgente');
 
     return `
-      <button class="icon-btn notif-bell-btn" onclick="Notificacoes.abrirPainel()" title="Central de Alertas e Notificações" style="position:relative;margin-right:2px;">
+      <button class="icon-btn notif-bell-btn" data-fb-click="Notificacoes.abrirPainel" data-fb-click-n="0" title="Central de Alertas e Notificações" style="position:relative;margin-right:2px;">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
           <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
@@ -151,10 +151,10 @@ const Notificacoes = {
             </div>
           </div>
           <div style="display:flex;align-items:center;gap:6px;">
-            <button class="btn btn-ghost btn-sm" onclick="Notificacoes.solicitarPush()" style="font-size:.72rem;color:#94a3b8;" title="Ativar Notificações do Navegador">
+            <button class="btn btn-ghost btn-sm" data-fb-click="Notificacoes.solicitarPush" data-fb-click-n="0" style="font-size:.72rem;color:#94a3b8;" title="Ativar Notificações do Navegador">
               📱 Ativar Push
             </button>
-            <button class="modal-close" onclick="Utils.closeModal()" style="color:#94a3b8;">✕</button>
+            <button class="modal-close" data-fb-click="Utils.closeModal" data-fb-click-n="0" style="color:#94a3b8;">✕</button>
           </div>
         </div>
 
@@ -177,7 +177,7 @@ const Notificacoes = {
                     <div style="font-size:.88rem;font-weight:800;color:var(--text);">${Utils.escapeHtml(a.titulo)}</div>
                     <div style="font-size:.76rem;color:var(--text3);margin-top:2px;">${Utils.escapeHtml(a.sub)}</div>
                   </div>
-                  <button class="btn btn-sm" onclick="Notificacoes._alertasTemp[${idx}].acao()" style="
+                  <button class="btn btn-sm" data-fb-click="Patch26Actions.notificacaoAction" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(idx))}" style="
                     font-size:.74rem;font-weight:700;white-space:nowrap;align-self:center;
                     background:${a.nivel === 'urgente' ? '#ef4444' : (a.nivel === 'aviso' ? '#f59e0b' : '#3b82f6')};
                     color:#fff;border:none;">
@@ -191,7 +191,7 @@ const Notificacoes = {
 
         <div class="modal-footer" style="padding:12px 16px;display:flex;justify-content:space-between;align-items:center;">
           <span style="font-size:.72rem;color:var(--text3);">Alertas atualizados em tempo real</span>
-          <button class="btn btn-secondary btn-sm" onclick="Utils.closeModal()">Fechar</button>
+          <button class="btn btn-secondary btn-sm" data-fb-click="Utils.closeModal" data-fb-click-n="0">Fechar</button>
         </div>
       </div>
     `);

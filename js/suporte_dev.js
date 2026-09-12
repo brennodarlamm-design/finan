@@ -118,7 +118,7 @@ const SuporteDev = {
     return `<div style="background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.08);border-radius:14px;overflow:hidden;">
       <div style="padding:16px 20px;border-bottom:1px solid rgba(255,255,255,.08);display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">
         <div><h3 style="font-size:1.05rem;font-weight:900;color:#fff;margin:0;">💬 Central de Atendimento DEV <span id="master-support-top-badge" style="display:none;margin-left:5px;background:#ef4444;color:#fff;border-radius:999px;min-width:20px;height:20px;align-items:center;justify-content:center;font-size:.68rem;"></span></h3><div style="font-size:.75rem;color:#94a3b8;margin-top:3px;">Fila real de clientes, FinBot e atendimento humano — sem entrar na tela do cliente.</div></div>
-        <button onclick="SuporteDev.abrirCentral()" style="background:rgba(56,189,248,.14);border:1px solid rgba(56,189,248,.35);color:#7dd3fc;border-radius:8px;padding:8px 13px;font-size:.76rem;font-weight:900;cursor:pointer;">Abrir Central de Atendimento ↗</button>
+        <button data-fb-click="SuporteDev.abrirCentral" data-fb-click-n="0" style="background:rgba(56,189,248,.14);border:1px solid rgba(56,189,248,.35);color:#7dd3fc;border-radius:8px;padding:8px 13px;font-size:.76rem;font-weight:900;cursor:pointer;">Abrir Central de Atendimento ↗</button>
       </div>
       <div style="padding:16px;display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;">
         ${this._metric('⏳','Aguardando','master-support-waiting-count','#f59e0b')}
@@ -145,7 +145,7 @@ const SuporteDev = {
     modal.innerHTML = `<div style="width:100%;max-width:1240px;height:min(860px,96vh);margin:auto;background:#0c140b;border:1px solid rgba(201,162,39,.3);border-radius:14px;overflow:hidden;display:flex;flex-direction:column;color:#f0ead6;box-shadow:0 28px 80px rgba(0,0,0,.8);">
       <div style="padding:14px 18px;border-bottom:1px solid rgba(255,255,255,.08);background:linear-gradient(135deg,#182811,#203516);display:flex;justify-content:space-between;align-items:center;gap:12px;">
         <div><div style="font-weight:950;color:var(--accent2);">💬 Central de Atendimento DEV</div><div style="font-size:.7rem;color:#94a3b8;">Você atende os clientes daqui. Esta não é a tela de chat do cliente.</div></div>
-        <button onclick="SuporteDev.fecharCentral()" style="background:none;border:1px solid rgba(255,255,255,.14);color:#cbd5e1;border-radius:7px;padding:6px 10px;cursor:pointer;">Fechar ✕</button>
+        <button data-fb-click="SuporteDev.fecharCentral" data-fb-click-n="0" style="background:none;border:1px solid rgba(255,255,255,.14);color:#cbd5e1;border-radius:7px;padding:6px 10px;cursor:pointer;">Fechar ✕</button>
       </div>
       <div style="padding:10px 12px;border-bottom:1px solid rgba(255,255,255,.06);display:flex;gap:6px;overflow-x:auto;">
         ${this._filterButton('active','Ativos')}${this._filterButton('waiting','⏳ Aguardando')}${this._filterButton('assigned','👨‍💻 Em atendimento')}${this._filterButton('bot','🤖 FinBot')}${this._filterButton('resolved','✓ Resolvidos')}
@@ -161,7 +161,7 @@ const SuporteDev = {
 
   _filterButton(value, label) {
     const active = this._filter === value;
-    return `<button onclick="SuporteDev.setFilter('${value}')" style="background:${active?'rgba(201,162,39,.16)':'rgba(255,255,255,.025)'};border:1px solid ${active?'rgba(201,162,39,.45)':'rgba(255,255,255,.08)'};color:${active?'var(--accent2)':'#94a3b8'};border-radius:7px;padding:6px 10px;font-size:.7rem;font-weight:800;cursor:pointer;white-space:nowrap;">${label}</button>`;
+    return `<button data-fb-click="SuporteDev.setFilter" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(value))}" style="background:${active?'rgba(201,162,39,.16)':'rgba(255,255,255,.025)'};border:1px solid ${active?'rgba(201,162,39,.45)':'rgba(255,255,255,.08)'};color:${active?'var(--accent2)':'#94a3b8'};border-radius:7px;padding:6px 10px;font-size:.7rem;font-weight:800;cursor:pointer;white-space:nowrap;">${label}</button>`;
   },
 
   async setFilter(filter) {
@@ -202,7 +202,7 @@ const SuporteDev = {
     el.innerHTML = this._list.map(c => {
       const selected = c.id === this._currentId;
       const time = c.ultima_mensagem_em || c.last_message_at || c.updated_at;
-      return `<button data-id="${this._esc(c.id)}" onclick="SuporteDev.abrirConversa(this.dataset.id)" style="width:100%;display:block;text-align:left;background:${selected?'rgba(201,162,39,.08)':'transparent'};border:none;border-bottom:1px solid rgba(255,255,255,.055);border-left:3px solid ${selected?'var(--accent)':'transparent'};padding:12px 13px;color:#fff;cursor:pointer;font-family:inherit;">
+      return `<button data-id="${this._esc(c.id)}" data-fb-click="SuporteDev.abrirConversa" data-fb-click-n="1" data-fb-click-t0="dataset" data-fb-click-v0="id" style="width:100%;display:block;text-align:left;background:${selected?'rgba(201,162,39,.08)':'transparent'};border:none;border-bottom:1px solid rgba(255,255,255,.055);border-left:3px solid ${selected?'var(--accent)':'transparent'};padding:12px 13px;color:#fff;cursor:pointer;font-family:inherit;">
         <div style="display:flex;justify-content:space-between;gap:8px;align-items:flex-start;"><div style="font-weight:900;font-size:.8rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${this._esc(c.tenant_nome || c.tenant_id)}</div>${this._statusBadge(c.status)}</div>
         <div style="font-size:.68rem;color:#94a3b8;margin-top:3px;">${this._esc(c.usuario_nome || 'Usuário')} · ${this._esc(this._fmtDate(time))}</div>
         <div style="font-size:.72rem;color:#cbd5e1;margin-top:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${this._esc(c.ultima_mensagem || 'Sem mensagem')}</div>
@@ -235,10 +235,10 @@ const SuporteDev = {
     const resolved = c.status === 'resolved' || c.status === 'closed';
     el.innerHTML = `<div style="padding:12px 15px;border-bottom:1px solid rgba(255,255,255,.07);display:flex;justify-content:space-between;gap:10px;align-items:center;flex-wrap:wrap;">
       <div><div style="font-weight:950;color:#fff;">${this._esc(c.tenant_nome || c.tenant_id)}</div><div style="font-size:.7rem;color:#94a3b8;">${this._esc(c.usuario_nome || 'Usuário')} ${c.usuario_email?`· ${this._esc(c.usuario_email)}`:''} · ${this._statusBadge(c.status)}</div></div>
-      <div style="display:flex;gap:6px;">${!resolved && c.status !== 'assigned' ? `<button onclick="SuporteDev.assumir()" style="background:#22c55e;border:none;color:#fff;border-radius:7px;padding:7px 10px;font-size:.7rem;font-weight:900;cursor:pointer;">👨‍💻 Assumir</button>`:''}${!resolved?`<button onclick="SuporteDev.resolver()" style="background:rgba(163,230,53,.1);border:1px solid rgba(163,230,53,.35);color:#bef264;border-radius:7px;padding:7px 10px;font-size:.7rem;font-weight:900;cursor:pointer;">✓ Resolver</button>`:''}</div>
+      <div style="display:flex;gap:6px;">${!resolved && c.status !== 'assigned' ? `<button data-fb-click="SuporteDev.assumir" data-fb-click-n="0" style="background:#22c55e;border:none;color:#fff;border-radius:7px;padding:7px 10px;font-size:.7rem;font-weight:900;cursor:pointer;">👨‍💻 Assumir</button>`:''}${!resolved?`<button data-fb-click="SuporteDev.resolver" data-fb-click-n="0" style="background:rgba(163,230,53,.1);border:1px solid rgba(163,230,53,.35);color:#bef264;border-radius:7px;padding:7px 10px;font-size:.7rem;font-weight:900;cursor:pointer;">✓ Resolver</button>`:''}</div>
     </div>
     <div id="suporte-dev-msgs" style="flex:1;overflow:auto;padding:16px;display:flex;flex-direction:column;gap:10px;min-height:0;">${this._messages.map(m=>this._renderMessage(m)).join('')}</div>
-    ${!resolved?`<div style="border-top:1px solid rgba(255,255,255,.07);padding:11px 13px;display:flex;gap:8px;"><textarea id="suporte-dev-input" rows="2" maxlength="4000" placeholder="Responder como atendente..." style="flex:1;resize:none;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.13);border-radius:8px;color:#fff;padding:9px 11px;font-family:inherit;font-size:.78rem;outline:none;"></textarea><button onclick="SuporteDev.enviar()" style="background:var(--accent);border:none;border-radius:8px;padding:8px 14px;font-weight:950;color:#111827;cursor:pointer;">Enviar ➤</button></div>`:''}`;
+    ${!resolved?`<div style="border-top:1px solid rgba(255,255,255,.07);padding:11px 13px;display:flex;gap:8px;"><textarea id="suporte-dev-input" rows="2" maxlength="4000" placeholder="Responder como atendente..." style="flex:1;resize:none;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.13);border-radius:8px;color:#fff;padding:9px 11px;font-family:inherit;font-size:.78rem;outline:none;"></textarea><button data-fb-click="SuporteDev.enviar" data-fb-click-n="0" style="background:var(--accent);border:none;border-radius:8px;padding:8px 14px;font-weight:950;color:#111827;cursor:pointer;">Enviar ➤</button></div>`:''}`;
     setTimeout(()=>{ const m=document.getElementById('suporte-dev-msgs'); if(m)m.scrollTop=m.scrollHeight; },20);
   },
 

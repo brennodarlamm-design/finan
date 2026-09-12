@@ -20,7 +20,7 @@ const PreComprasWorkflow = {
             <span style="font-size:1.3rem;">✅</span>
             <span class="modal-title">Autorizar Ordem de Pré-Compra</span>
           </div>
-          <button class="modal-close" onclick="Utils.closeModal()">✕</button>
+          <button class="modal-close" data-fb-click="Utils.closeModal" data-fb-click-n="0">✕</button>
         </div>
         <div class="modal-body" style="padding:20px;">
           <div style="background:var(--bg-secondary);border:1px solid var(--border);border-radius:10px;padding:14px;margin-bottom:16px;">
@@ -40,7 +40,7 @@ const PreComprasWorkflow = {
 
           <div style="background:rgba(2,132,199,.08);border:1px solid rgba(2,132,199,.25);border-radius:8px;padding:14px;margin-bottom:16px;">
             <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;">
-              <input type="checkbox" id="aprov-gerar-despesa" checked style="margin-top:3px;transform:scale(1.15);" onchange="PreCompras._toggleContaBancariaSelect(this.checked)">
+              <input type="checkbox" id="aprov-gerar-despesa" checked style="margin-top:3px;transform:scale(1.15);" data-fb-change="PreCompras._toggleContaBancariaSelect" data-fb-change-n="1" data-fb-change-t0="checked">
               <div>
                 <strong style="color:var(--text);font-size:.85rem;">Gerar Despesa Financeira em "Lançamentos" Imediatamente</strong>
                 <p style="font-size:.74rem;color:var(--text3);margin-top:2px;">
@@ -66,8 +66,8 @@ const PreComprasWorkflow = {
         </div>
 
         <div class="modal-footer" style="padding:12px 20px;border-top:1px solid var(--border);justify-content:flex-end;gap:10px;">
-          <button class="btn btn-secondary" onclick="Utils.closeModal()">Cancelar</button>
-          <button class="btn btn-success" onclick="PreCompras.confirmarAprovacao(decodeURIComponent('${safeId}'))" style="font-weight:800;padding:10px 20px;">
+          <button class="btn btn-secondary" data-fb-click="Utils.closeModal" data-fb-click-n="0">Cancelar</button>
+          <button class="btn btn-success" data-fb-click="PreCompras.confirmarAprovacao" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(decodeURIComponent(safeId)))}" style="font-weight:800;padding:10px 20px;">
             ✓ Confirmar Aprovação
           </button>
         </div>
@@ -135,7 +135,7 @@ const PreComprasWorkflow = {
             <span style="font-size:1.3rem;">❌</span>
             <span class="modal-title">Recusar Ordem de Pré-Compra</span>
           </div>
-          <button class="modal-close" onclick="Utils.closeModal()">✕</button>
+          <button class="modal-close" data-fb-click="Utils.closeModal" data-fb-click-n="0">✕</button>
         </div>
         <div class="modal-body" style="padding:20px;">
           <p style="font-size:.85rem;color:var(--text2);margin-bottom:14px;">
@@ -147,8 +147,8 @@ const PreComprasWorkflow = {
           </div>
         </div>
         <div class="modal-footer" style="padding:12px 20px;border-top:1px solid var(--border);justify-content:flex-end;gap:10px;">
-          <button class="btn btn-secondary" onclick="Utils.closeModal()">Cancelar</button>
-          <button class="btn btn-danger" onclick="PreCompras.confirmarRejeicao(decodeURIComponent('${safeId}'))" style="font-weight:800;">
+          <button class="btn btn-secondary" data-fb-click="Utils.closeModal" data-fb-click-n="0">Cancelar</button>
+          <button class="btn btn-danger" data-fb-click="PreCompras.confirmarRejeicao" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(decodeURIComponent(safeId)))}" style="font-weight:800;">
             ✕ Confirmar Recusa
           </button>
         </div>
@@ -190,7 +190,7 @@ const PreComprasWorkflow = {
             <span style="font-size:1.3rem;">💰</span>
             <span class="modal-title">Gerar Despesa Financeira</span>
           </div>
-          <button class="modal-close" onclick="Utils.closeModal()">✕</button>
+          <button class="modal-close" data-fb-click="Utils.closeModal" data-fb-click-n="0">✕</button>
         </div>
         <div class="modal-body" style="padding:20px;">
           <div style="background:var(--bg-secondary);border:1px solid var(--border);border-radius:10px;padding:14px;margin-bottom:16px;">
@@ -222,8 +222,8 @@ const PreComprasWorkflow = {
           </div>
         </div>
         <div class="modal-footer" style="padding:12px 20px;border-top:1px solid var(--border);justify-content:flex-end;gap:10px;">
-          <button class="btn btn-secondary" onclick="Utils.closeModal()">Cancelar</button>
-          <button class="btn btn-primary" onclick="PreCompras.executarConversaoLancamento(decodeURIComponent('${safeId}'))" style="font-weight:800;">
+          <button class="btn btn-secondary" data-fb-click="Utils.closeModal" data-fb-click-n="0">Cancelar</button>
+          <button class="btn btn-primary" data-fb-click="PreCompras.executarConversaoLancamento" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(decodeURIComponent(safeId)))}" style="font-weight:800;">
             ✓ Confirmar e Lançar
           </button>
         </div>
@@ -302,10 +302,10 @@ const PreComprasWorkflow = {
             <span class="modal-title">Ordem de Compra Oficial — ${this._esc(p.numero_ordem)}</span>
           </div>
           <div style="display:flex;gap:8px;align-items:center;">
-            <button class="btn btn-primary btn-sm" onclick="PreCompras.imprimirOrdem(decodeURIComponent('${safeId}'))">
+            <button class="btn btn-primary btn-sm" data-fb-click="PreCompras.imprimirOrdem" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(decodeURIComponent(safeId)))}">
               🖨️ Imprimir / Salvar PDF
             </button>
-            <button class="modal-close" onclick="Utils.closeModal()">✕</button>
+            <button class="modal-close" data-fb-click="Utils.closeModal" data-fb-click-n="0">✕</button>
           </div>
         </div>
 
@@ -453,7 +453,7 @@ const PreComprasWorkflow = {
         </div>
 
         <div class="modal-footer" style="padding:10px 20px;border-top:1px solid var(--border);justify-content:flex-end;">
-          <button class="btn btn-secondary" onclick="Utils.closeModal()">Fechar</button>
+          <button class="btn btn-secondary" data-fb-click="Utils.closeModal" data-fb-click-n="0">Fechar</button>
         </div>
       </div>
     `);

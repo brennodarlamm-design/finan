@@ -159,10 +159,9 @@ const Auth = {
       if (resp.ok && data.success) {
         return {
           success: true,
-          userId: data.userId,
-          userName: data.userName,
-          canalInfo: data.canalInfo,
-          whatsappNotified: !!data.whatsappSent
+          requestId: data.requestId,
+          canalInfo: 'canal cadastrado',
+          expiresInSeconds: Number(data.expiresInSeconds || 600)
         };
       }
       return { success: false, message: data.message || 'Nenhuma conta localizada com este usuário ou e-mail.' };
@@ -171,8 +170,8 @@ const Auth = {
     }
   },
 
-  async validarCodigoRecuperacao(userId, codigoDigitado) {
-    if (!userId || !codigoDigitado) {
+  async validarCodigoRecuperacao(requestId, codigoDigitado) {
+    if (!requestId || !codigoDigitado) {
       return { success: false, message: 'Código de verificação obrigatório.' };
     }
 
@@ -182,20 +181,20 @@ const Auth = {
     }
 
     // Salva o código temporariamente para ser submetido com a nova senha de forma atômica
-    sessionStorage.setItem(`finobra_otp_${userId}`, cleanCode);
+    sessionStorage.setItem(`finobra_otp_${requestId}`, cleanCode);
     return { success: true, resetToken: cleanCode };
   },
 
-  async redefinirSenha(userId, resetToken, novaSenha) {
-    if (!userId || !novaSenha) {
+  async redefinirSenha(requestId, resetToken, novaSenha) {
+    if (!requestId || !novaSenha) {
       return { success: false, message: 'Dados incompletos para redefinição de senha.' };
     }
 
-    if (novaSenha.length < 6) {
-      return { success: false, message: 'A nova senha deve possuir pelo menos 6 caracteres.' };
+    if (novaSenha.length < 8) {
+      return { success: false, message: 'A nova senha deve possuir pelo menos 8 caracteres.' };
     }
 
-    const code = resetToken || sessionStorage.getItem(`finobra_otp_${userId}`);
+    const code = resetToken || sessionStorage.getItem(`finobra_otp_${requestId}`);
     if (!code) {
       return { success: false, message: 'Sessão expirada. Solicite um novo código.' };
     }
@@ -204,11 +203,11 @@ const Auth = {
       const resp = await fetch('/api/auth?action=verify_reset', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId, code, newPassword: novaSenha })
+        body: JSON.stringify({ requestId, code, newPassword: novaSenha })
       });
       const data = await resp.json().catch(() => ({}));
       if (resp.ok && data.success) {
-        sessionStorage.removeItem(`finobra_otp_${userId}`);
+        sessionStorage.removeItem(`finobra_otp_${requestId}`);
         return { success: true, message: data.message || 'Senha redefinida com sucesso!' };
       }
       return { success: false, message: data.message || 'Código incorreto ou expirado.' };
@@ -225,8 +224,8 @@ const Auth = {
     if (cleanUsername.length < 3) {
       return { success: false, message: 'O nome de usuário deve ter pelo menos 3 caracteres alfanuméricos.' };
     }
-    if (senha.length < 6) {
-      return { success: false, message: 'A senha deve ter pelo menos 6 caracteres.' };
+    if (senha.length < 8) {
+      return { success: false, message: 'A senha deve ter pelo menos 8 caracteres.' };
     }
 
     try {

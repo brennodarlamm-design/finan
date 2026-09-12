@@ -102,11 +102,11 @@
 
       <div id="master-err-box" style="display:none;background:rgba(239,68,68,.12);border:1px solid rgba(239,68,68,.35);color:#fca5a5;padding:10px 14px;border-radius:8px;font-size:.82rem;margin-bottom:16px;text-align:center;"></div>
 
-      <form onsubmit="executarLoginMaster(event)" style="display:flex;flex-direction:column;gap:14px;">
+      <form data-fb-submit="executarLoginMaster" data-fb-submit-n="1" data-fb-submit-t0="event" style="display:flex;flex-direction:column;gap:14px;">
         <div>
           <label style="display:block;font-size:.78rem;color:#cbd5e1;font-weight:700;margin-bottom:6px;">Usuário Master / Dev</label>
           <div style="position:relative;">
-            <input type="text" id="master-user-input" required placeholder="Digite seu usuário master (ex: admin)" autocomplete="username" style="width:100%;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.18);border-radius:8px;padding:11px 14px 11px 36px;color:#fff;font-size:.88rem;outline:none;transition:border-color .2s;" onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='rgba(255,255,255,.18)'">
+            <input type="text" id="master-user-input" required placeholder="Digite seu usuário master (ex: admin)" autocomplete="username" style="width:100%;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.18);border-radius:8px;padding:11px 14px 11px 36px;color:#fff;font-size:.88rem;outline:none;transition:border-color .2s;" data-fb-focus="Patch26Actions.borderAccent" data-fb-focus-n="1" data-fb-focus-t0="self" data-fb-blur="Patch26Actions.borderMasterBlur" data-fb-blur-n="1" data-fb-blur-t0="self">
             <span style="position:absolute;left:12px;top:50%;transform:translateY(-50%);font-size:.9rem;color:#94a3b8;pointer-events:none;">👤</span>
           </div>
         </div>
@@ -114,9 +114,9 @@
         <div>
           <label style="display:block;font-size:.78rem;color:#cbd5e1;font-weight:700;margin-bottom:6px;">Senha de Segurança</label>
           <div style="position:relative;">
-            <input type="password" id="master-pass-input" required placeholder="Digite sua senha de acesso" autocomplete="current-password" style="width:100%;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.18);border-radius:8px;padding:11px 40px 11px 36px;color:#fff;font-size:.88rem;outline:none;transition:border-color .2s;" onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='rgba(255,255,255,.18)'">
+            <input type="password" id="master-pass-input" required placeholder="Digite sua senha de acesso" autocomplete="current-password" style="width:100%;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.18);border-radius:8px;padding:11px 40px 11px 36px;color:#fff;font-size:.88rem;outline:none;transition:border-color .2s;" data-fb-focus="Patch26Actions.borderAccent" data-fb-focus-n="1" data-fb-focus-t0="self" data-fb-blur="Patch26Actions.borderMasterBlur" data-fb-blur-n="1" data-fb-blur-t0="self">
             <span style="position:absolute;left:12px;top:50%;transform:translateY(-50%);font-size:.9rem;color:#94a3b8;pointer-events:none;">🔒</span>
-            <button type="button" onclick="alternarVisibilidadeSenha()" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;color:#94a3b8;cursor:pointer;font-size:.9rem;padding:4px;" title="Mostrar / ocultar senha">👁️</button>
+            <button type="button" data-fb-click="alternarVisibilidadeSenha" data-fb-click-n="0" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;color:#94a3b8;cursor:pointer;font-size:.9rem;padding:4px;" title="Mostrar / ocultar senha">👁️</button>
           </div>
         </div>
 
@@ -160,7 +160,7 @@
         <a href="/app" class="btn-action" title="Acessar o Sistema como Usuário">
           <span>🏗️ Ir ao Sistema FinObra ↗</span>
         </a>
-        <button onclick="sairMaster()" class="btn-action" style="color:#ef4444;border-color:rgba(239,68,68,.3);" title="Sair do Portal">
+        <button data-fb-click="sairMaster" data-fb-click-n="0" class="btn-action" style="color:#ef4444;border-color:rgba(239,68,68,.3);" title="Sair do Portal">
           <span>Sair 🔒</span>
         </button>
       </div>
@@ -186,5 +186,7 @@
   <script src="/js/master.js"></script>
 
   <script src="/js/master_page.js"></script>
+  <script src="/js/patch26-actions.js"></script>
+  <script src="/js/patch26-events.js"></script>
 </body>
 </html>

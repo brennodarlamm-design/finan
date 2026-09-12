@@ -15,7 +15,7 @@ const Medicoes = {
     return `
     <div class="page-header">
       <div><h1 class="page-title">🔨 Medições &amp; Faturamento</h1><p class="page-sub">Cronograma físico-financeiro de medições, retenções técnicas e liberação de parcelas</p></div>
-      <div class="page-actions"><button class="btn btn-primary" onclick="Medicoes.showForm()">+ Nova Medição</button></div>
+      <div class="page-actions"><button class="btn btn-primary" data-fb-click="Medicoes.showForm" data-fb-click-n="0">+ Nova Medição</button></div>
     </div>
 
     <div class="g4" style="margin-bottom:16px;">
@@ -43,7 +43,7 @@ const Medicoes = {
   },
 
   _medCards(meds, obraId) {
-    if (!meds.length) return `<div class="empty-state"><h3>Nenhuma medição cadastrada</h3><p>Cadastre as medições do cronograma físico-financeiro das obras</p><button class="btn btn-primary" onclick="Medicoes.showForm()">+ Nova Medição</button></div>`;
+    if (!meds.length) return `<div class="empty-state"><h3>Nenhuma medição cadastrada</h3><p>Cadastre as medições do cronograma físico-financeiro das obras</p><button class="btn btn-primary" data-fb-click="Medicoes.showForm" data-fb-click-n="0">+ Nova Medição</button></div>`;
     const esc = (v) => (typeof Utils !== 'undefined' && Utils.escapeHtml) ? Utils.escapeHtml(String(v ?? '')) : String(v ?? '');
     // Group by obra
     const byObra = {};
@@ -168,13 +168,13 @@ const Medicoes = {
         </div>
 
         <div style="display:flex;flex-direction:column;gap:6px">
-          <button class="btn btn-secondary btn-sm" onclick="Medicoes.showForm('${m.id}')">✏️ Editar</button>
-          <button class="btn btn-secondary btn-sm" onclick="Documentos.abrirModal('medicao', '${m.id}', 'Documentos da ${m.numero_medicao}ª Medição')">📎 Anexos (${typeof Documentos !== 'undefined' ? Documentos.listar('medicao', m.id).length : 0})</button>
-          ${m.status==='preparando'?`<button class="btn btn-warning btn-sm" onclick="Medicoes.avancarStatus('${m.id}','submetida')">📤 Submeter</button>`:''}
-          ${m.status==='submetida'?`<button class="btn btn-secondary btn-sm" onclick="Medicoes.avancarStatus('${m.id}','em_analise')">🔍 Em Análise</button>`:''}
-          ${m.status==='em_analise'?`<button class="btn btn-success btn-sm" onclick="Medicoes.avancarStatus('${m.id}','aprovada')">✅ Aprovar</button>`:''}
-          ${m.status==='aprovada'?`<button class="btn btn-success btn-sm" onclick="Medicoes.liberarValor('${m.id}')">💰 Liberar</button>`:''}
-          <button class="icon-btn btn-sm" onclick="Medicoes.del('${m.id}')" style="color:var(--danger)">🗑️</button>
+          <button class="btn btn-secondary btn-sm" data-fb-click="Medicoes.showForm" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(m.id))}">✏️ Editar</button>
+          <button class="btn btn-secondary btn-sm" data-fb-click="Patch26Actions.medicaoDocs" data-fb-click-n="2" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(m.id))}" data-fb-click-t1="string" data-fb-click-v1="${encodeURIComponent(String(m.numero_medicao))}">📎 Anexos (${typeof Documentos !== 'undefined' ? Documentos.listar('medicao', m.id).length : 0})</button>
+          ${m.status==='preparando'?`<button class="btn btn-warning btn-sm" data-fb-click="Medicoes.avancarStatus" data-fb-click-n="2" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(m.id))}" data-fb-click-t1="string" data-fb-click-v1="submetida">📤 Submeter</button>`:''}
+          ${m.status==='submetida'?`<button class="btn btn-secondary btn-sm" data-fb-click="Medicoes.avancarStatus" data-fb-click-n="2" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(m.id))}" data-fb-click-t1="string" data-fb-click-v1="em_analise">🔍 Em Análise</button>`:''}
+          ${m.status==='em_analise'?`<button class="btn btn-success btn-sm" data-fb-click="Medicoes.avancarStatus" data-fb-click-n="2" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(m.id))}" data-fb-click-t1="string" data-fb-click-v1="aprovada">✅ Aprovar</button>`:''}
+          ${m.status==='aprovada'?`<button class="btn btn-success btn-sm" data-fb-click="Medicoes.liberarValor" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(m.id))}">💰 Liberar</button>`:''}
+          <button class="icon-btn btn-sm" data-fb-click="Medicoes.del" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(m.id))}" style="color:var(--danger)">🗑️</button>
         </div>
       </div>
     </div>`;
@@ -191,7 +191,7 @@ const Medicoes = {
     const sugerido = m.valor_aprovado || m.valor_solicitado || m.valor_medido || 0;
     Utils.showModal(`
       <div class="modal" style="max-width:420px">
-        <div class="modal-header"><span class="modal-title">💰 Liberar Parcela / Faturamento</span><button class="modal-close" onclick="Utils.closeModal()">✕</button></div>
+        <div class="modal-header"><span class="modal-title">💰 Liberar Parcela / Faturamento</span><button class="modal-close" data-fb-click="Utils.closeModal" data-fb-click-n="0">✕</button></div>
         <div class="modal-body">
           <div class="form-group"><label class="form-label">Valor Bruto Aprovado (R$)</label>
             <div class="input-prefix"><span class="input-pfx-txt">R$</span><input id="lib-val" type="number" value="${sugerido}" step="0.01" min="0"></div>
@@ -207,8 +207,8 @@ const Medicoes = {
           <div class="form-group"><label class="form-label">Data de Liberação</label><input class="form-control" type="date" id="lib-dt" value="${Utils.today()}"></div>
         </div>
         <div class="modal-footer">
-          <button class="btn btn-secondary" onclick="Utils.closeModal()">Cancelar</button>
-          <button class="btn btn-success" onclick="Medicoes._confirmLiberar('${id}')">💰 Confirmar Liberação</button>
+          <button class="btn btn-secondary" data-fb-click="Utils.closeModal" data-fb-click-n="0">Cancelar</button>
+          <button class="btn btn-success" data-fb-click="Medicoes._confirmLiberar" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(id))}">💰 Confirmar Liberação</button>
         </div>
       </div>`);
   },
@@ -282,7 +282,7 @@ const Medicoes = {
     const m = id?DB.getById('medicoes',id)||{}:{};
     Utils.showModal(`
       <div class="modal modal-lg">
-        <div class="modal-header"><span class="modal-title">${id?'✏️ Editar Medição':'🔨 Nova Medição'}</span><button class="modal-close" onclick="Utils.closeModal()">✕</button></div>
+        <div class="modal-header"><span class="modal-title">${id?'✏️ Editar Medição':'🔨 Nova Medição'}</span><button class="modal-close" data-fb-click="Utils.closeModal" data-fb-click-n="0">✕</button></div>
         <div class="modal-body">
           <form id="f-med">
             <div class="form-row cols-3" style="margin-bottom:14px;">
@@ -328,8 +328,8 @@ const Medicoes = {
           </form>
         </div>
         <div class="modal-footer">
-          <button class="btn btn-secondary" onclick="Utils.closeModal()">Cancelar</button>
-          <button class="btn btn-primary" onclick="Medicoes.save('${id||''}')">${id?'✔ Salvar':'+ Cadastrar Medição'}</button>
+          <button class="btn btn-secondary" data-fb-click="Utils.closeModal" data-fb-click-n="0">Cancelar</button>
+          <button class="btn btn-primary" data-fb-click="Medicoes.save" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(id||''))}">${id?'✔ Salvar':'+ Cadastrar Medição'}</button>
         </div>
       </div>`);
   },

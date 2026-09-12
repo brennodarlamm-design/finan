@@ -68,25 +68,25 @@ const Configuracoes = {
     return `
     <div>
       <div style="display:flex;gap:0;border-bottom:2px solid var(--border);margin-bottom:24px;overflow-x:auto;">
-        <button id="cfg-tab-empresa" class="cfg-tab${this._activeTab==='empresa'?' cfg-tab-active':''}" onclick="Configuracoes._switch('empresa')">
+        <button id="cfg-tab-empresa" class="cfg-tab${this._activeTab==='empresa'?' cfg-tab-active':''}" data-fb-click="Configuracoes._switch" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="empresa">
           &#x1F3E2; Minha Empresa
         </button>
-        ${isAdmin ? `<button id="cfg-tab-usuarios" class="cfg-tab${this._activeTab==='usuarios'?' cfg-tab-active':''}" onclick="Configuracoes._switch('usuarios')">
+        ${isAdmin ? `<button id="cfg-tab-usuarios" class="cfg-tab${this._activeTab==='usuarios'?' cfg-tab-active':''}" data-fb-click="Configuracoes._switch" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="usuarios">
           &#x1F465; Usu&aacute;rios
         </button>` : ''}
-        ${isAdmin ? `<button id="cfg-tab-auditoria" class="cfg-tab${this._activeTab==='auditoria'?' cfg-tab-active':''}" onclick="Configuracoes._switch('auditoria')">
+        ${isAdmin ? `<button id="cfg-tab-auditoria" class="cfg-tab${this._activeTab==='auditoria'?' cfg-tab-active':''}" data-fb-click="Configuracoes._switch" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="auditoria">
           &#x1F6E1;&#xFE0F; Auditoria
         </button>` : ''}
-        <button id="cfg-tab-sessoes" class="cfg-tab${this._activeTab==='sessoes'?' cfg-tab-active':''}" onclick="Configuracoes._switch('sessoes')">
+        <button id="cfg-tab-sessoes" class="cfg-tab${this._activeTab==='sessoes'?' cfg-tab-active':''}" data-fb-click="Configuracoes._switch" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="sessoes">
           &#x1F4F1; Sess&otilde;es
         </button>
-        ${isAdmin ? `<button id="cfg-tab-diagnostico" class="cfg-tab${this._activeTab==='diagnostico'?' cfg-tab-active':''}" onclick="Configuracoes._switch('diagnostico')">
+        ${isAdmin ? `<button id="cfg-tab-diagnostico" class="cfg-tab${this._activeTab==='diagnostico'?' cfg-tab-active':''}" data-fb-click="Configuracoes._switch" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="diagnostico">
           &#x1F6E0;&#xFE0F; Diagn&oacute;stico
         </button>` : ''}
-        <button id="cfg-tab-contas" class="cfg-tab${this._activeTab==='contas'?' cfg-tab-active':''}" onclick="Configuracoes._switch('contas')">
+        <button id="cfg-tab-contas" class="cfg-tab${this._activeTab==='contas'?' cfg-tab-active':''}" data-fb-click="Configuracoes._switch" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="contas">
           &#x1F3E6; Contas Banc&aacute;rias
         </button>
-        <button id="cfg-tab-categorias" class="cfg-tab${this._activeTab==='categorias'?' cfg-tab-active':''}" onclick="Configuracoes._switch('categorias')">
+        <button id="cfg-tab-categorias" class="cfg-tab${this._activeTab==='categorias'?' cfg-tab-active':''}" data-fb-click="Configuracoes._switch" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="categorias">
           &#x1F3F7;&#xFE0F; Categorias
         </button>
       </div>
@@ -141,7 +141,7 @@ const Configuracoes = {
         <div class="card-header">
           <div class="card-title">&#x270F;&#xFE0F; Informa&ccedil;&otilde;es Cadastrais</div>
         </div>
-        <form id="cfg-empresa-form" onsubmit="Configuracoes.saveEmpresa(event)">
+        <form id="cfg-empresa-form" data-fb-submit="Configuracoes.saveEmpresa" data-fb-submit-n="1" data-fb-submit-t0="event">
           <div class="g2">
             <div class="form-group">
               <label class="form-label">Nome Fantasia *</label>
@@ -158,7 +158,7 @@ const Configuracoes = {
               <label class="form-label">CNPJ ou CPF</label>
               <div style="display:flex;gap:6px;">
                 <input class="form-control" name="cnpj" id="cfg-emp-cnpj" value="${this._esc(emp.cnpj || '')}" placeholder="00.000.000/0001-00">
-                <button type="button" class="btn btn-secondary btn-sm" onclick="Configuracoes.buscarCnpj()" title="Buscar dados do CNPJ na Receita">🔍</button>
+                <button type="button" class="btn btn-secondary btn-sm" data-fb-click="Configuracoes.buscarCnpj" data-fb-click-n="0" title="Buscar dados do CNPJ na Receita">🔍</button>
               </div>
             </div>
             <div class="form-group">
@@ -181,7 +181,7 @@ const Configuracoes = {
           <div class="g3">
             <div class="form-group">
               <label class="form-label">CEP</label>
-              <input class="form-control" name="cep" id="cfg-emp-cep" value="${this._esc(emp.cep || '')}" placeholder="00000-000" onblur="Configuracoes.buscarCep(this)">
+              <input class="form-control" name="cep" id="cfg-emp-cep" value="${this._esc(emp.cep || '')}" placeholder="00000-000" data-fb-blur="Configuracoes.buscarCep" data-fb-blur-n="1" data-fb-blur-t0="self">
             </div>
             <div class="form-group">
               <label class="form-label">Cidade</label>
@@ -209,11 +209,11 @@ const Configuracoes = {
               <span>🏢 Logotipo Oficial da Empresa</span>
             </label>
             <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:12px;">
-              <input type="file" id="cfg-logo-file" accept="image/*" style="display:none;" onchange="Configuracoes.handleLogoUpload(this)">
-              <button type="button" class="btn btn-secondary btn-sm" onclick="document.getElementById('cfg-logo-file').click()" style="font-weight:700;">
+              <input type="file" id="cfg-logo-file" accept="image/*" style="display:none;" data-fb-change="Configuracoes.handleLogoUpload" data-fb-change-n="1" data-fb-change-t0="self">
+              <button type="button" class="btn btn-secondary btn-sm" data-fb-click="Patch26Actions.clickById" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="cfg-logo-file" style="font-weight:700;">
                 📁 Escolher Nova Imagem
               </button>
-              ${emp.logo_url ? `<button type="button" class="btn btn-ghost btn-sm" style="color:var(--danger);font-weight:600;" onclick="Configuracoes.removerLogo()">🗑️ Remover Logo</button>` : ''}
+              ${emp.logo_url ? `<button type="button" class="btn btn-ghost btn-sm" style="color:var(--danger);font-weight:600;" data-fb-click="Configuracoes.removerLogo" data-fb-click-n="0">🗑️ Remover Logo</button>` : ''}
               <span id="cfg-logo-txt" style="font-size:.78rem;color:var(--text3);">${emp.logo_url ? '✓ Logotipo ativo no sistema' : 'Nenhuma imagem selecionada'}</span>
             </div>
 
@@ -314,10 +314,10 @@ const Configuracoes = {
                   </div>
                 </div>
                 <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
-                  <button type="button" class="btn btn-sm" onclick="WhatsApp.abrirModalConexao()" style="background:#25D366;color:#fff;font-weight:700;font-size:.78rem;display:flex;align-items:center;gap:6px;border:none;padding:7px 14px;border-radius:6px;cursor:pointer;box-shadow:0 2px 6px rgba(37,211,102,0.25);">
+                  <button type="button" class="btn btn-sm" data-fb-click="WhatsApp.abrirModalConexao" data-fb-click-n="0" style="background:#25D366;color:#fff;font-weight:700;font-size:.78rem;display:flex;align-items:center;gap:6px;border:none;padding:7px 14px;border-radius:6px;cursor:pointer;box-shadow:0 2px 6px rgba(37,211,102,0.25);">
                     📲 Conectar Aparelho (QR Code)
                   </button>
-                  <button type="button" class="btn btn-sm btn-secondary" onclick="WhatsApp.abrirModalTelefone()" style="font-size:.76rem;display:flex;align-items:center;gap:5px;border-radius:6px;">
+                  <button type="button" class="btn btn-sm btn-secondary" data-fb-click="WhatsApp.abrirModalTelefone" data-fb-click-n="0" style="font-size:.76rem;display:flex;align-items:center;gap:5px;border-radius:6px;">
                     ✏️ Alterar Telefone
                   </button>
                 </div>
@@ -330,7 +330,7 @@ const Configuracoes = {
                     Número ativo para alertas: <strong style="color:var(--success);">${(typeof WhatsApp !== 'undefined' && WhatsApp.getTelefonePadrao()) ? WhatsApp.formatarTelefone(WhatsApp.getTelefonePadrao()) : 'Nenhum número cadastrado'}</strong>
                   </span>
                 </div>
-                <button type="button" class="btn btn-secondary btn-sm" onclick="WhatsApp.testarEnvioCliente()" style="font-size:.74rem;display:flex;align-items:center;gap:5px;border-radius:6px;">
+                <button type="button" class="btn btn-secondary btn-sm" data-fb-click="WhatsApp.testarEnvioCliente" data-fb-click-n="0" style="font-size:.74rem;display:flex;align-items:center;gap:5px;border-radius:6px;">
                   🚀 Testar Envio
                 </button>
               </div>
@@ -470,7 +470,7 @@ const Configuracoes = {
     <div class="page-header">
       <div><h1 class="page-title">&#x1F465; Usu&aacute;rios do Sistema</h1><p class="page-sub">Gerencie os perfis de acesso ao sistema</p></div>
       <div class="page-actions">
-        ${['admin','superadmin'].includes(session?.perfil) ? '<button class="btn btn-primary" onclick="Configuracoes.showUserForm()">+ Novo Usu&aacute;rio</button>' : ''}
+        ${['admin','superadmin'].includes(session?.perfil) ? '<button class="btn btn-primary" data-fb-click="Configuracoes.showUserForm" data-fb-click-n="0">+ Novo Usu&aacute;rio</button>' : ''}
       </div>
     </div>
     <div id="users-list">
@@ -498,10 +498,10 @@ const Configuracoes = {
         </div>
         ${['admin','superadmin'].includes(session?.perfil) ? `
         <div style="display:flex;gap:8px;flex-wrap:wrap;">
-          <button class="btn btn-secondary btn-sm" onclick="Configuracoes.showUserForm('${id}')">✏️ Editar</button>
-          ${!isMe ? `<button class="btn btn-sm ${u.ativo?'btn-warning':'btn-success'}" onclick="Configuracoes.toggleAtivo('${id}',${!!u.ativo})">${u.ativo?'Desativar':'Ativar'}</button>` : ''}
-          ${isMe ? `<button class="btn btn-primary btn-sm" onclick="Configuracoes.showMeuPerfil()">👤 Meu Perfil</button>` : ''}
-        </div>` : (isMe ? `<button class="btn btn-primary btn-sm" onclick="Configuracoes.showMeuPerfil()">👤 Meu Perfil</button>` : '')}
+          <button class="btn btn-secondary btn-sm" data-fb-click="Configuracoes.showUserForm" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(id))}">✏️ Editar</button>
+          ${!isMe ? `<button class="btn btn-sm ${u.ativo?'btn-warning':'btn-success'}" data-fb-click="Configuracoes.toggleAtivo" data-fb-click-n="2" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(id))}" data-fb-click-t1="auto" data-fb-click-v1="${encodeURIComponent(String(!!u.ativo))}">${u.ativo?'Desativar':'Ativar'}</button>` : ''}
+          ${isMe ? `<button class="btn btn-primary btn-sm" data-fb-click="Configuracoes.showMeuPerfil" data-fb-click-n="0">👤 Meu Perfil</button>` : ''}
+        </div>` : (isMe ? `<button class="btn btn-primary btn-sm" data-fb-click="Configuracoes.showMeuPerfil" data-fb-click-n="0">👤 Meu Perfil</button>` : '')}
       </div>
     </div>`;
   },
@@ -526,7 +526,7 @@ const Configuracoes = {
     const rows = this._permissionModules().map(([key,label]) => {
       const custom = permissions?.[key] || {};
       const val = action => typeof custom?.[action] === 'boolean' ? custom[action] : !!caps[action];
-      const cb = action => `<input type="checkbox" data-perm-module="${key}" data-perm-action="${action}" onchange="Configuracoes.permissionChanged(this)" ${val(action)?'checked':''} ${!caps[action]?'disabled':''}>`;
+      const cb = action => `<input type="checkbox" data-perm-module="${key}" data-perm-action="${action}" data-fb-change="Configuracoes.permissionChanged" data-fb-change-n="1" data-fb-change-t0="self" ${val(action)?'checked':''} ${!caps[action]?'disabled':''}>`;
       return `<tr><td style="font-weight:600;">${label}</td><td style="text-align:center">${cb('read')}</td><td style="text-align:center">${cb('write')}</td><td style="text-align:center">${cb('delete')}</td></tr>`;
     }).join('');
     return `<div style="overflow:auto;max-height:320px;border:1px solid var(--border);border-radius:8px;"><table class="table" style="margin:0;font-size:.78rem;"><thead><tr><th>M&oacute;dulo</th><th style="text-align:center">Ver</th><th style="text-align:center">Editar</th><th style="text-align:center">Excluir</th></tr></thead><tbody>${rows}</tbody></table></div>`;
@@ -570,9 +570,9 @@ const Configuracoes = {
       <div class="modal" style="max-width:780px">
         <div class="modal-header">
           <span class="modal-title">&#x1F465; ${u ? 'Editar' : 'Novo'} Usu&aacute;rio</span>
-          <button class="modal-close" onclick="Utils.closeModal()">&#x2715;</button>
+          <button class="modal-close" data-fb-click="Utils.closeModal" data-fb-click-n="0">&#x2715;</button>
         </div>
-        <form class="modal-body" id="f-user" onsubmit="Configuracoes.saveUser(event,'${id||''}')">
+        <form class="modal-body" id="f-user" data-fb-submit="Configuracoes.saveUser" data-fb-submit-n="2" data-fb-submit-t0="event" data-fb-submit-t1="string" data-fb-submit-v1="${encodeURIComponent(String(id||''))}">
           <div class="g2">
             <div class="form-group">
               <label class="form-label">Nome completo *</label>
@@ -590,7 +590,7 @@ const Configuracoes = {
             </div>
             <div class="form-group">
               <label class="form-label">Perfil *</label>
-              <select class="form-control" name="perfil" required onchange="Configuracoes.refreshPermissionMatrix(this.value)">
+              <select class="form-control" name="perfil" required data-fb-change="Configuracoes.refreshPermissionMatrix" data-fb-change-n="1" data-fb-change-t0="value">
                 <option value="admin" ${u?.perfil==='admin'?'selected':''}>Administrador</option>
                 <option value="gestor" ${u?.perfil==='gestor'||!u?'selected':''}>Gestor</option>
                 <option value="visualizador" ${u?.perfil==='visualizador'?'selected':''}>Visualizador</option>
@@ -601,7 +601,7 @@ const Configuracoes = {
           <div class="g2">
             <div class="form-group">
               <label class="form-label">${u ? 'Nova Senha (deixe em branco para manter)' : 'Senha *'}</label>
-              <input class="form-control" name="senha" type="password" placeholder="M&iacute;nimo 6 caracteres" ${u?'':'required'} minlength="6">
+              <input class="form-control" name="senha" type="password" placeholder="M&iacute;nimo 8 caracteres" ${u?'':'required'} minlength="8">
             </div>
             <div class="form-group">
               <label class="form-label">Avatar (2 letras)</label>
@@ -614,7 +614,7 @@ const Configuracoes = {
             <div id="cfg-permission-matrix">${this._permissionMatrix(u?.perfil || 'gestor', u?.permissions || {})}</div>
           </div>
           <div class="modal-footer">
-            <button type="button" class="btn btn-secondary" onclick="Utils.closeModal()">Cancelar</button>
+            <button type="button" class="btn btn-secondary" data-fb-click="Utils.closeModal" data-fb-click-n="0">Cancelar</button>
             <button type="submit" class="btn btn-primary">&#x1F4BE; Salvar</button>
           </div>
         </form>
@@ -625,7 +625,7 @@ const Configuracoes = {
     e.preventDefault();
     const fd = new FormData(e.target);
     const body = { nome:fd.get('nome').trim(), username:fd.get('username').trim(), email:fd.get('email').trim(), perfil:fd.get('perfil'), avatar:fd.get('avatar').trim(), senha:fd.get('senha') || undefined, permissions:this._collectPermissionMatrix(e.target) };
-    if (!id && (!body.senha || body.senha.length < 6)) { Utils.toast('Senha deve ter pelo menos 6 caracteres!', 'warning'); return; }
+    if (!id && (!body.senha || body.senha.length < 8)) { Utils.toast('Senha deve ter pelo menos 8 caracteres!', 'warning'); return; }
     if (id) body.id = id;
     try {
       const res = await fetch('/api/users', { method:id?'PATCH':'POST', headers:Auth.getAuthHeaders(), body:JSON.stringify(body) });
@@ -658,9 +658,9 @@ const Configuracoes = {
       <div class="modal" style="max-width:440px">
         <div class="modal-header">
           <span class="modal-title">&#x1F464; Meu Perfil</span>
-          <button class="modal-close" onclick="Utils.closeModal()">&#x2715;</button>
+          <button class="modal-close" data-fb-click="Utils.closeModal" data-fb-click-n="0">&#x2715;</button>
         </div>
-        <form class="modal-body" id="f-meu-perfil" onsubmit="Configuracoes.saveMeuPerfil(event,'${u.id}')">
+        <form class="modal-body" id="f-meu-perfil" data-fb-submit="Configuracoes.saveMeuPerfil" data-fb-submit-n="2" data-fb-submit-t0="event" data-fb-submit-t1="string" data-fb-submit-v1="${encodeURIComponent(String(u.id))}">
           <div style="text-align:center;margin-bottom:20px;">
             <div class="user-av" style="width:64px;height:64px;font-size:1.5rem;margin:0 auto 12px;">${this._esc(u.avatar)}</div>
             <div style="font-weight:700;">${this._esc(u.nome)}</div>
@@ -687,11 +687,11 @@ const Configuracoes = {
             </div>
             <div class="form-group">
               <label class="form-label">Nova senha</label>
-              <input class="form-control" name="nova_senha" type="password" placeholder="M&iacute;nimo 6 caracteres">
+              <input class="form-control" name="nova_senha" type="password" placeholder="M&iacute;nimo 8 caracteres">
             </div>
           </div>
           <div class="modal-footer">
-            <button type="button" class="btn btn-secondary" onclick="Utils.closeModal()">Cancelar</button>
+            <button type="button" class="btn btn-secondary" data-fb-click="Utils.closeModal" data-fb-click-n="0">Cancelar</button>
             <button type="submit" class="btn btn-primary">&#x1F4BE; Salvar Perfil</button>
           </div>
         </form>
@@ -702,7 +702,7 @@ const Configuracoes = {
     e.preventDefault();
     const fd = new FormData(e.target);
     const body = { id, nome:fd.get('nome').trim(), email:fd.get('email').trim(), avatar:fd.get('avatar').trim(), senha_atual:fd.get('senha_atual') || undefined, senha:fd.get('nova_senha') || undefined };
-    if (body.senha && body.senha.length < 6) { Utils.toast('Nova senha deve ter pelo menos 6 caracteres!', 'warning'); return; }
+    if (body.senha && body.senha.length < 8) { Utils.toast('Nova senha deve ter pelo menos 8 caracteres!', 'warning'); return; }
     try {
       const res = await fetch('/api/users', { method:'PATCH', headers:Auth.getAuthHeaders(), body:JSON.stringify(body) });
       const data = await res.json().catch(() => ({}));
@@ -725,7 +725,7 @@ const Configuracoes = {
 
   // ── SESSÕES E DISPOSITIVOS ──────────────────────────────
   _renderSessoes() {
-    return `<div class="page-header"><div><h1 class="page-title">&#x1F4F1; Sess&otilde;es & Dispositivos</h1><p class="page-sub">Veja onde sua conta est&aacute; conectada e encerre acessos que voc&ecirc; n&atilde;o reconhece.</p></div><div class="page-actions"><button class="btn btn-secondary btn-sm" onclick="Configuracoes.loadSessions()">↻ Atualizar</button><button class="btn btn-warning btn-sm" onclick="Configuracoes.revokeOtherSessions()">Encerrar outras sess&otilde;es</button></div></div><div id="sessions-list" class="card" style="padding:18px;color:var(--text3);">Carregando sess&otilde;es…</div>`;
+    return `<div class="page-header"><div><h1 class="page-title">&#x1F4F1; Sess&otilde;es & Dispositivos</h1><p class="page-sub">Veja onde sua conta est&aacute; conectada e encerre acessos que voc&ecirc; n&atilde;o reconhece.</p></div><div class="page-actions"><button class="btn btn-secondary btn-sm" data-fb-click="Configuracoes.loadSessions" data-fb-click-n="0">↻ Atualizar</button><button class="btn btn-warning btn-sm" data-fb-click="Configuracoes.revokeOtherSessions" data-fb-click-n="0">Encerrar outras sess&otilde;es</button></div></div><div id="sessions-list" class="card" style="padding:18px;color:var(--text3);">Carregando sess&otilde;es…</div>`;
   },
 
   async loadSessions() {
@@ -739,7 +739,7 @@ const Configuracoes = {
         const id=this._esc(x.id), device=this._esc(x.device_name || 'Dispositivo'), ip=this._esc(x.ip || 'IP n&atilde;o informado');
         const when=x.last_seen_at ? new Date(x.last_seen_at).toLocaleString('pt-BR') : '-';
         const state=x.current?'Sess&atilde;o atual':(x.active?'Ativa':'Encerrada');
-        return `<div style="display:flex;gap:14px;align-items:center;padding:13px 0;border-bottom:1px solid var(--border);flex-wrap:wrap"><div style="font-size:1.4rem">${x.current?'&#x1F4BB;':'&#x1F4F1;'}</div><div style="flex:1;min-width:220px"><div style="font-weight:700;color:var(--text)">${device} ${x.current?'<span class="badge badge-success">Atual</span>':''}</div><div style="font-size:.75rem;color:var(--text3)">${ip} &middot; &uacute;ltima atividade ${this._esc(when)} &middot; ${state}</div></div>${x.active&&!x.current?`<button class="btn btn-warning btn-sm" onclick="Configuracoes.revokeSession('${id}')">Encerrar</button>`:''}</div>`;
+        return `<div style="display:flex;gap:14px;align-items:center;padding:13px 0;border-bottom:1px solid var(--border);flex-wrap:wrap"><div style="font-size:1.4rem">${x.current?'&#x1F4BB;':'&#x1F4F1;'}</div><div style="flex:1;min-width:220px"><div style="font-weight:700;color:var(--text)">${device} ${x.current?'<span class="badge badge-success">Atual</span>':''}</div><div style="font-size:.75rem;color:var(--text3)">${ip} &middot; &uacute;ltima atividade ${this._esc(when)} &middot; ${state}</div></div>${x.active&&!x.current?`<button class="btn btn-warning btn-sm" data-fb-click="Configuracoes.revokeSession" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(id))}">Encerrar</button>`:''}</div>`;
       }).join('');
     } catch(err) { if(el) el.textContent=err.message || 'Falha ao carregar sessões.'; }
   },
@@ -756,7 +756,7 @@ const Configuracoes = {
 
   // ── DIAGNÓSTICO DE ERROS ───────────────────────────────
   _renderDiagnostico() {
-    return `<div class="page-header"><div><h1 class="page-title">&#x1F6E0;&#xFE0F; Diagn&oacute;stico</h1><p class="page-sub">Erros recentes capturados automaticamente nos navegadores desta empresa.</p></div><div class="page-actions"><button class="btn btn-secondary btn-sm" onclick="Configuracoes.loadErrors(true)">↻ Atualizar</button></div></div><div class="card"><div id="errors-list" style="min-height:160px;padding:18px;color:var(--text3);">Carregando diagn&oacute;stico…</div><div style="padding:0 18px 18px"><button id="errors-more" class="btn btn-secondary btn-sm" style="display:none" onclick="Configuracoes.loadErrors(false)">Carregar mais</button></div></div>`;
+    return `<div class="page-header"><div><h1 class="page-title">&#x1F6E0;&#xFE0F; Diagn&oacute;stico</h1><p class="page-sub">Erros recentes capturados automaticamente nos navegadores desta empresa.</p></div><div class="page-actions"><button class="btn btn-secondary btn-sm" data-fb-click="Configuracoes.loadErrors" data-fb-click-n="1" data-fb-click-t0="bool" data-fb-click-v0="true">↻ Atualizar</button></div></div><div class="card"><div id="errors-list" style="min-height:160px;padding:18px;color:var(--text3);">Carregando diagn&oacute;stico…</div><div style="padding:0 18px 18px"><button id="errors-more" class="btn btn-secondary btn-sm" style="display:none" data-fb-click="Configuracoes.loadErrors" data-fb-click-n="1" data-fb-click-t0="bool" data-fb-click-v0="false">Carregar mais</button></div></div>`;
   },
 
   async loadErrors(reset=true) {
@@ -783,13 +783,13 @@ const Configuracoes = {
         <h1 class="page-title">🛡️ Auditoria</h1>
         <p class="page-sub">Histórico de alterações administrativas e operacionais registradas no servidor</p>
       </div>
-      <div class="page-actions"><button class="btn btn-secondary btn-sm" onclick="Configuracoes.loadAudit(true)">↻ Atualizar</button></div>
+      <div class="page-actions"><button class="btn btn-secondary btn-sm" data-fb-click="Configuracoes.loadAudit" data-fb-click-n="1" data-fb-click-t0="bool" data-fb-click-v0="true">↻ Atualizar</button></div>
     </div>
     <div class="card" style="padding:0;overflow:hidden;">
       <div id="audit-list" style="min-height:180px;padding:18px;color:var(--text3);">Carregando auditoria…</div>
     </div>
     <div style="display:flex;justify-content:center;margin-top:14px;">
-      <button id="audit-load-more" class="btn btn-secondary btn-sm" style="display:none" onclick="Configuracoes.loadAudit(false)">Carregar mais</button>
+      <button id="audit-load-more" class="btn btn-secondary btn-sm" style="display:none" data-fb-click="Configuracoes.loadAudit" data-fb-click-n="1" data-fb-click-t0="bool" data-fb-click-v0="false">Carregar mais</button>
     </div>`;
   },
 
@@ -830,7 +830,7 @@ const Configuracoes = {
             <td>${this._esc(r.entidade || '—')}</td>
             <td style="font-family:monospace;font-size:.72rem;max-width:160px;overflow:hidden;text-overflow:ellipsis;">${this._esc(r.entidade_id || '—')}</td>
             <td style="font-size:.72rem;color:var(--text3);">${this._esc(r.ip || '—')}</td>
-            <td><button class="btn btn-ghost btn-sm" onclick="Configuracoes.showAuditDetail('${id}')">Detalhes</button></td>
+            <td><button class="btn btn-ghost btn-sm" data-fb-click="Configuracoes.showAuditDetail" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(id))}">Detalhes</button></td>
           </tr>`;
         }).join('')}</tbody>
       </table></div>`;
@@ -844,7 +844,7 @@ const Configuracoes = {
     if (!r) return;
     const pretty = v => this._esc(JSON.stringify(v || {}, null, 2));
     Utils.showModal(`<div class="modal" style="max-width:720px;">
-      <div class="modal-header"><span class="modal-title">🛡️ Detalhes da Auditoria</span><button class="modal-close" onclick="Utils.closeModal()">✕</button></div>
+      <div class="modal-header"><span class="modal-title">🛡️ Detalhes da Auditoria</span><button class="modal-close" data-fb-click="Utils.closeModal" data-fb-click-n="0">✕</button></div>
       <div class="modal-body">
         <div class="g2" style="margin-bottom:14px;"><div><strong>Ação:</strong> ${this._esc(r.acao)}</div><div><strong>Entidade:</strong> ${this._esc(r.entidade)}</div></div>
         <div style="margin-bottom:8px;"><strong>Antes</strong></div><pre style="white-space:pre-wrap;background:var(--bg);padding:12px;border-radius:8px;max-height:220px;overflow:auto;font-size:.75rem;">${pretty(r.dados_anteriores)}</pre>
@@ -868,7 +868,7 @@ const Configuracoes = {
           <td style="font-weight:600;">${this._esc(c.label || '')}</td>
           <td style="font-family:monospace;font-size:.75rem;color:var(--text3);">${this._esc(safeValue)}</td>
           <td style="text-align:center;">
-            <button class="icon-btn" onclick="Configuracoes.excluirCategoria(decodeURIComponent('${encodedValue}'),'${tipo}')" title="Excluir" style="color:var(--danger);">🗑️</button>
+            <button class="icon-btn" data-fb-click="Configuracoes.excluirCategoria" data-fb-click-n="2" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(decodeURIComponent(encodedValue)))}" data-fb-click-t1="string" data-fb-click-v1="${encodeURIComponent(String(tipo))}" title="Excluir" style="color:var(--danger);">🗑️</button>
           </td>
         </tr>`;
       }).join('');
@@ -891,7 +891,7 @@ const Configuracoes = {
       <div style="display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap;padding:4px 0 8px;">
         <div class="form-group" style="margin-bottom:0;"><label class="form-label">Emoji</label>${makeEmojiSelect('cfg-cat-emoji-forn')}</div>
         <div class="form-group" style="flex:1;min-width:180px;margin-bottom:0;"><label class="form-label">Nome da Categoria *</label><input class="form-control" id="cfg-cat-nome-forn" placeholder="Ex: Segurança, Limpeza, RH..." maxlength="60"></div>
-        <button class="btn btn-primary" onclick="Configuracoes.saveCategoria('forn')">+ Criar</button>
+        <button class="btn btn-primary" data-fb-click="Configuracoes.saveCategoria" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="forn">+ Criar</button>
       </div>
     </div>
     <div class="card" style="margin-bottom:28px;padding:0;">
@@ -908,7 +908,7 @@ const Configuracoes = {
       <div style="display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap;padding:4px 0 8px;">
         <div class="form-group" style="margin-bottom:0;"><label class="form-label">Emoji</label>${makeEmojiSelect('cfg-cat-emoji-desp')}</div>
         <div class="form-group" style="flex:1;min-width:180px;margin-bottom:0;"><label class="form-label">Nome da Categoria *</label><input class="form-control" id="cfg-cat-nome-desp" placeholder="Ex: Farmácia, Alimentação, RH..." maxlength="60"></div>
-        <button class="btn btn-primary" onclick="Configuracoes.saveCategoria('desp')">+ Criar</button>
+        <button class="btn btn-primary" data-fb-click="Configuracoes.saveCategoria" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="desp">+ Criar</button>
       </div>
     </div>
     <div class="card" style="padding:0;">

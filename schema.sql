@@ -116,6 +116,8 @@ CREATE TABLE IF NOT EXISTS obras (
     status VARCHAR(50) DEFAULT 'em_andamento',
     data_inicio DATE,
     data_previsao DATE,
+    cronograma_config JSONB,
+    bdi_config JSONB,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (tenant_id, id)
 );

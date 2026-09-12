@@ -14,6 +14,7 @@ import makeWASocket, {
 import pino from 'pino';
 import fs from 'fs';
 import path from 'path';
+import crypto from 'crypto';
 
 dotenv.config({ path: '.env.local' });
 dotenv.config();
@@ -33,7 +34,8 @@ const ALLOWED_ORIGINS = [
 
 app.use(cors({
   origin: (origin, callback) => {
-    if (!origin || ALLOWED_ORIGINS.includes(origin) || origin.endsWith('.vercel.app')) {
+    const isFinobraVercel = /^https:\/\/finan-as(?:-[a-z0-9-]+)?\.vercel\.app$/i.test(origin || '');
+    if (!origin || ALLOWED_ORIGINS.includes(origin) || isFinobraVercel) {
       callback(null, true);
     } else {
       callback(null, false);
@@ -42,30 +44,73 @@ app.use(cors({
   credentials: true
 }));
 
-app.use(express.json({ limit: '25mb' }));
-app.use(express.urlencoded({ extended: true, limit: '25mb' }));
+app.use(express.json({ limit: '12mb' }));
+app.use(express.urlencoded({ extended: true, limit: '12mb' }));
 
-// Middleware de autenticação interna para proteger rotas críticas
+// Middleware de autenticação interna para proteger rotas críticas.
+// Segredos de API são aceitos SOMENTE em headers — nunca em query string.
+function getInternalSecret() {
+  return (process.env.API_SECRET || process.env.VERCEL_API_SECRET || '').trim();
+}
+
+function hasInternalApiAuth(req) {
+  const secret = getInternalSecret();
+  if (!secret) return false;
+  const authHeader = String(req.headers.authorization || req.headers.Authorization || '');
+  if (authHeader.startsWith('Bearer ') && authHeader.substring(7).trim() === secret) return true;
+  const apiKey = String(req.headers['x-api-key'] || req.headers['apikey'] || '');
+  return Boolean(apiKey && apiKey.trim() === secret);
+}
+
 function requireAuth(req, res, next) {
-  const secret = (process.env.API_SECRET || process.env.VERCEL_API_SECRET || '').trim();
-  if (!secret) {
+  if (!getInternalSecret()) {
     console.error('❌ [Segurança] API_SECRET não configurado no backend. Bloqueando requisição por segurança.');
     return res.status(500).json({ error: 'Configuração de segurança pendente no servidor.' });
   }
-
-  const authHeader = req.headers.authorization || req.headers.Authorization || '';
-  if (authHeader.startsWith('Bearer ') && authHeader.substring(7).trim() === secret) {
-    return next();
-  }
-
-  const apiKey = req.headers['x-api-key'] || req.headers['apikey'] || '';
-  if (apiKey && apiKey.trim() === secret) {
-    return next();
-  }
-
+  if (hasInternalApiAuth(req)) return next();
   return res.status(401).json({
-    error: 'Acesso não autorizado ao servidor WhatsApp. Forneça o cabeçalho Authorization: Bearer <API_SECRET>.'
+    error: 'Acesso não autorizado ao servidor WhatsApp. Forneça autenticação interna em header.'
   });
+}
+
+const QR_COOKIE = 'finobra_qr_access';
+function parseCookies(req) {
+  const out = {};
+  String(req.headers.cookie || '').split(';').forEach(part => {
+    const idx = part.indexOf('=');
+    if (idx < 0) return;
+    const k = part.slice(0, idx).trim();
+    const v = part.slice(idx + 1).trim();
+    if (k) out[k] = decodeURIComponent(v);
+  });
+  return out;
+}
+function signQrAccess(tenantId, ttlSeconds = 900) {
+  const secret = getInternalSecret();
+  const payload = `${cleanTenantId(tenantId)}.${Math.floor(Date.now() / 1000) + ttlSeconds}`;
+  const sig = crypto.createHmac('sha256', secret).update(payload).digest('base64url');
+  return `${payload}.${sig}`;
+}
+function verifyQrAccess(req, tenantId) {
+  const secret = getInternalSecret();
+  const token = parseCookies(req)[QR_COOKIE] || '';
+  const [tenant, expRaw, sig] = String(token).split('.');
+  const exp = Number(expRaw);
+  if (!secret || !tenant || !exp || !sig || tenant !== cleanTenantId(tenantId) || exp < Math.floor(Date.now() / 1000)) return false;
+  const payload = `${tenant}.${exp}`;
+  const expected = crypto.createHmac('sha256', secret).update(payload).digest('base64url');
+  const a = Buffer.from(sig);
+  const b = Buffer.from(expected);
+  return a.length === b.length && crypto.timingSafeEqual(a, b);
+}
+function setQrAccessCookie(res, tenantId) {
+  const token = signQrAccess(tenantId);
+  res.setHeader('Set-Cookie', `${QR_COOKIE}=${encodeURIComponent(token)}; Path=/; HttpOnly; SameSite=Strict; Max-Age=900; Secure`);
+}
+function requireQrOrApiAuth(req, res, next) {
+  const tenantId = extractTenantFromReq(req);
+  if (hasInternalApiAuth(req) || verifyQrAccess(req, tenantId)) return next();
+  return res.status(401).json({ error: 'Sessão de administração do WhatsApp expirada ou inválida.' });
 }
 
 const PORT = process.env.PORT || 3333;
@@ -441,6 +486,7 @@ process.on('uncaughtException', async (err) => {
     }
   } else {
     console.error('Stack:', err?.stack);
+    setTimeout(() => process.exit(1), 100).unref?.();
   }
 });
 
@@ -456,7 +502,7 @@ function extractTenantFromReq(req) {
 }
 
 // 1. Status Geral
-app.get('/', (req, res) => {
+app.get('/', requireAuth, (req, res) => {
   const summary = Array.from(sessions.values()).map(s => ({
     tenant_id: s.tenantId,
     status: s.connectionStatus,
@@ -474,7 +520,7 @@ app.get('/', (req, res) => {
   });
 });
 
-app.get('/status', (req, res) => {
+app.get('/status', requireAuth, (req, res) => {
   const tenantId = extractTenantFromReq(req);
   const session = getTenantSession(tenantId);
   res.json({
@@ -489,30 +535,11 @@ app.get('/status', (req, res) => {
 // 1.1 Health Check Monitor
 app.get('/health', async (req, res) => {
   let dbOk = false;
-  let dbLatencyMs = null;
   if (sql) {
-    try {
-      const t0 = Date.now();
-      await sql`SELECT 1;`;
-      dbLatencyMs = Date.now() - t0;
-      dbOk = true;
-    } catch {}
+    try { await sql`SELECT 1;`; dbOk = true; } catch {}
   }
-
-  const mem = process.memoryUsage();
-  res.json({
-    status: dbOk ? 'healthy' : 'degraded',
-    uptime_seconds: Math.round(process.uptime()),
-    sessoes_ativas: sessions.size,
-    database: {
-      connected: dbOk,
-      latency_ms: dbLatencyMs
-    },
-    memory: {
-      rss_mb: Math.round(mem.rss / 1024 / 1024),
-      heap_mb: Math.round(mem.heapUsed / 1024 / 1024)
-    }
-  });
+  const healthy = Boolean(sql && dbOk);
+  return res.status(healthy ? 200 : 503).json({ status: healthy ? 'healthy' : 'degraded' });
 });
 
 // 1.2 Sessão Estruturada do WhatsApp por Tenant
@@ -540,10 +567,12 @@ app.get('/whatsapp-session', requireAuth, (req, res) => {
 // 2. Página Web Visual do QR Code com Suporte Multi-Tenant e Sem Token em Query String (C-05/H-15)
 app.all('/qr', (req, res) => {
   const secret = (process.env.API_SECRET || process.env.VERCEL_API_SECRET || '').trim();
-  const providedToken = (req.body?.token || req.headers?.authorization?.replace(/^Bearer\s+/i, '') || req.headers?.['x-api-key'] || req.query?.token || '').trim();
+  const providedToken = String(req.body?.token || req.headers?.authorization?.replace(/^Bearer\s+/i, '') || req.headers?.['x-api-key'] || '').trim();
   const tenantId = extractTenantFromReq(req);
+  const cookieAuthorized = verifyQrAccess(req, tenantId);
+  const secretAuthorized = Boolean(secret && providedToken === secret);
 
-  if (secret && providedToken !== secret) {
+  if (secret && !secretAuthorized && !cookieAuthorized) {
     return res.status(401).send(`
       <!DOCTYPE html>
       <html lang="pt-BR">
@@ -573,12 +602,14 @@ app.all('/qr', (req, res) => {
     `);
   }
 
+  if (secretAuthorized) setQrAccessCookie(res, tenantId);
+
   const session = getTenantSession(tenantId);
   if (session.connectionStatus === 'disconnected' && !session.isStarting) {
     startWhatsApp(session.tenantId);
   }
 
-  const hiddenTokenInput = `<input type="hidden" name="token" value="${providedToken}" /><input type="hidden" name="tenant_id" value="${tenantId}" />`;
+  const hiddenTokenInput = `<input type="hidden" name="tenant_id" value="${tenantId}" />`;
 
   if (session.connectionStatus === 'connected') {
     const num = getConnectedWhatsAppNumber(session);
@@ -681,14 +712,13 @@ app.all('/qr', (req, res) => {
 });
 
 // 2.1 Rota de Reset Manual da Sessão
-app.all('/reset-auth', requireAuth, async (req, res) => {
+app.all('/reset-auth', requireQrOrApiAuth, async (req, res) => {
   const tenantId = extractTenantFromReq(req);
   const reason = req.body?.reason || req.query?.reason || 'Solicitado via API /reset-auth';
   console.log(`🔄 [API] Requisição de reset de autenticação recebida para tenant: ${tenantId}`);
   await resetWhatsAppSession(tenantId, reason);
 
   if (req.headers.accept && req.headers.accept.includes('text/html')) {
-    const token = req.body?.token || req.query?.token || '';
     return res.send(`
       <!DOCTYPE html>
       <html lang="pt-BR">
@@ -715,7 +745,7 @@ app.all('/reset-auth', requireAuth, async (req, res) => {
     success: true,
     tenantId,
     message: `Sessão do WhatsApp do tenant ${tenantId} limpa no Neon PostgreSQL e no servidor. Novo QR Code será gerado.`,
-    hint: `Acesse /qr?tenant_id=${tenantId} para escanear o novo QR Code.`
+    hint: 'Abra novamente a tela protegida de QR Code para conectar o aparelho.'
   });
 });
 
@@ -726,8 +756,12 @@ app.post('/send-message', requireAuth, async (req, res) => {
     const session = getTenantSession(tenantId);
 
     const { phone, message, text, base64, mimeType, fileName, caption } = req.body;
-    const destPhone = phone || TARGET_PHONE;
+    const destPhone = String(phone || '').replace(/\D/g, '');
     const msgText = message || text || caption || '';
+
+    if (!destPhone || destPhone.length < 10 || destPhone.length > 15) {
+      return res.status(400).json({ error: 'Campo \"phone\" é obrigatório e deve conter um número válido.' });
+    }
 
     if (!msgText && !base64) {
       return res.status(400).json({ error: 'Campo "message" ou "base64" é obrigatório.' });
@@ -746,11 +780,19 @@ app.post('/send-message', requireAuth, async (req, res) => {
     let sent;
 
     if (base64) {
-      const cleanB64 = base64.replace(/^data:[^;]+;base64,/, '');
+      const cleanB64 = String(base64).replace(/^data:[^;]+;base64,/, '');
       const buf = Buffer.from(cleanB64, 'base64');
-      const mime = mimeType || 'application/pdf';
+      const MAX_MEDIA_BYTES = 8 * 1024 * 1024;
+      if (buf.length === 0 || buf.length > MAX_MEDIA_BYTES) {
+        return res.status(413).json({ error: 'Arquivo inválido ou acima do limite de 8 MB.' });
+      }
+      const mime = String(mimeType || 'application/pdf').split(';')[0].trim().toLowerCase();
+      const forbiddenMime = /^(?:text\/html|image\/svg\+xml|application\/xhtml\+xml|text\/javascript|application\/javascript)$/i;
+      if (forbiddenMime.test(mime)) {
+        return res.status(400).json({ error: 'Tipo de mídia não permitido.' });
+      }
 
-      if (mime.startsWith('image/')) {
+      if (/^image\/(?:jpeg|png|webp)$/i.test(mime)) {
         console.log(`📤 [WhatsApp:${session.tenantId}] Enviando imagem para ${jid}...`);
         sent = await session.sock.sendMessage(jid, {
           image: buf,

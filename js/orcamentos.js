@@ -72,10 +72,10 @@ const Orcamentos = {
     return `
     <div>
       <div style="display:flex;gap:0;border-bottom:2px solid var(--border);margin-bottom:24px;">
-        <button id="tab-etapas" class="orc-tab${this._activeTab==='etapas'?' orc-tab-active':''}" onclick="Orcamentos._switchTab('etapas','${Utils.escapeHtml(this._filterObraId)}')">
+        <button id="tab-etapas" class="orc-tab${this._activeTab==='etapas'?' orc-tab-active':''}" data-fb-click="Orcamentos._switchTab" data-fb-click-n="2" data-fb-click-t0="string" data-fb-click-v0="etapas" data-fb-click-t1="string" data-fb-click-v1="${encodeURIComponent(String(Utils.escapeHtml(this._filterObraId)))}">
           📊 Previsto × Realizado por Categorias
         </button>
-        <button id="tab-sinapi" class="orc-tab${this._activeTab==='sinapi'?' orc-tab-active':''}" onclick="Orcamentos._switchTab('sinapi','${Utils.escapeHtml(this._filterObraId)}')">
+        <button id="tab-sinapi" class="orc-tab${this._activeTab==='sinapi'?' orc-tab-active':''}" data-fb-click="Orcamentos._switchTab" data-fb-click-n="2" data-fb-click-t0="string" data-fb-click-v0="sinapi" data-fb-click-t1="string" data-fb-click-v1="${encodeURIComponent(String(Utils.escapeHtml(this._filterObraId)))}">
           🏗️ Orçamentos SINAPI
         </button>
       </div>
@@ -131,7 +131,7 @@ const Orcamentos = {
         <p class="page-sub">Controle estruturado por macro-etapas, quantitativos e comparação Previsto × Realizado</p>
       </div>
       <div class="page-actions" style="display:flex;gap:10px;align-items:center;">
-        <button class="btn btn-primary" onclick="Orcamentos.showForm()">
+        <button class="btn btn-primary" data-fb-click="Orcamentos.showForm" data-fb-click-n="0">
           <span style="font-size:1.1rem;line-height:1">+</span> Novo Orçamento
         </button>
       </div>
@@ -172,16 +172,16 @@ const Orcamentos = {
     <!-- BARRA DE FILTROS RÁPIDOS -->
     <div style="display:flex;gap:12px;align-items:center;margin-bottom:20px;flex-wrap:wrap;background:var(--surface);padding:14px 18px;border-radius:var(--r-md);border:1px solid var(--border)">
       <div style="flex:1;min-width:200px;">
-        <input type="text" class="form-control" placeholder="🔍 Buscar por nome do orçamento ou etapa..." value="${Utils.escapeHtml(this._filterSearch)}" oninput="Orcamentos._onSearch(this.value)">
+        <input type="text" class="form-control" placeholder="🔍 Buscar por nome do orçamento ou etapa..." value="${Utils.escapeHtml(this._filterSearch)}" data-fb-input="Orcamentos._onSearch" data-fb-input-n="1" data-fb-input-t0="value">
       </div>
       <div style="min-width:180px;">
-        <select class="form-control" onchange="Orcamentos._filterByObra(this.value)">
+        <select class="form-control" data-fb-change="Orcamentos._filterByObra" data-fb-change-n="1" data-fb-change-t0="value">
           <option value="todas" ${activeObra === 'todas' ? 'selected' : ''}>🏢 Todas as Obras</option>
           ${(DB.getAll('clientes') || []).map(o => `<option value="${Utils.escapeHtml(o.id)}" ${String(activeObra) === String(o.id) ? 'selected' : ''}>${Utils.escapeHtml(o.nome || o.cliente || 'Sem nome')}</option>`).join('')}
         </select>
       </div>
       <div style="min-width:140px;">
-        <select class="form-control" onchange="Orcamentos._filterByStatus(this.value)">
+        <select class="form-control" data-fb-change="Orcamentos._filterByStatus" data-fb-change-n="1" data-fb-change-t0="value">
           <option value="todos" ${this._filterStatus === 'todos' ? 'selected' : ''}>Todos os status</option>
           <option value="ativo" ${this._filterStatus === 'ativo' ? 'selected' : ''}>✓ Ativos</option>
           <option value="revisao" ${this._filterStatus === 'revisao' ? 'selected' : ''}>🔄 Em Revisão</option>
@@ -201,7 +201,7 @@ const Orcamentos = {
             <p style="max-width:440px;margin:0 auto 18px;color:var(--text3)">
               Crie um orçamento estruturado com macro-etapas (Fundações, Estrutura, Instalações, etc.) para acompanhar quantitativos e custos da obra.
             </p>
-            <button class="btn btn-primary" onclick="Orcamentos.showForm()">+ Criar Novo Orçamento</button>
+            <button class="btn btn-primary" data-fb-click="Orcamentos.showForm" data-fb-click-n="0">+ Criar Novo Orçamento</button>
           </div>`
       }
     </div>`;
@@ -266,13 +266,13 @@ const Orcamentos = {
           ${orc.descricao ? `<div style="font-size:.82rem;color:var(--text2);margin-top:6px;font-style:italic;">📝 ${Utils.escapeHtml(orc.descricao)}</div>` : ''}
         </div>
         <div style="display:flex;gap:8px;align-items:center;">
-          <button class="btn btn-secondary btn-sm" onclick="Orcamentos.printOrcamento('${orc.id}')" title="Visualizar para Impressão">
+          <button class="btn btn-secondary btn-sm" data-fb-click="Orcamentos.printOrcamento" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(orc.id))}" title="Visualizar para Impressão">
             🖨️ Imprimir
           </button>
-          <button class="btn btn-secondary btn-sm" onclick="Orcamentos.showForm('${orc.id}')" title="Editar Orçamento">
+          <button class="btn btn-secondary btn-sm" data-fb-click="Orcamentos.showForm" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(orc.id))}" title="Editar Orçamento">
             ✏️ Editar
           </button>
-          <button class="icon-btn btn-sm" onclick="Orcamentos.del('${orc.id}')" style="color:var(--danger)" title="Excluir Orçamento">
+          <button class="icon-btn btn-sm" data-fb-click="Orcamentos.del" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(orc.id))}" style="color:var(--danger)" title="Excluir Orçamento">
             🗑️
           </button>
         </div>
@@ -311,7 +311,7 @@ const Orcamentos = {
           <span style="font-size:.8rem;font-weight:800;text-transform:uppercase;letter-spacing:.5px;color:var(--text3)">
             Categorias & Macro-Etapas
           </span>
-          <button class="btn btn-link btn-sm" onclick="Orcamentos._toggleAllCategories('${orc.id}')" style="font-size:.75rem;padding:0;">
+          <button class="btn btn-link btn-sm" data-fb-click="Orcamentos._toggleAllCategories" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(orc.id))}" style="font-size:.75rem;padding:0;">
             Expandir / Recolher Todas
           </button>
         </div>
@@ -360,7 +360,7 @@ const Orcamentos = {
 
     return `
     <div class="orc-cat-accordion ${openByDefault ? 'orc-cat-open' : ''}" id="cat-acc-${orc.id}-${cat.id}">
-      <div class="orc-cat-hdr" onclick="Orcamentos._toggleCategory('${orc.id}','${cat.id}')">
+      <div class="orc-cat-hdr" data-fb-click="Orcamentos._toggleCategory" data-fb-click-n="2" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(orc.id))}" data-fb-click-t1="string" data-fb-click-v1="${encodeURIComponent(String(cat.id))}">
         <div class="orc-cat-hdr-left">
           <span style="font-size:1.1rem">${cat.icone}</span>
           <span style="color:var(--text)">${Utils.escapeHtml(cat.nome)}</span>
@@ -425,7 +425,7 @@ const Orcamentos = {
                     </div>
                   </td>
                   <td>
-                    <button class="icon-btn btn-sm" onclick="Orcamentos.editEtapa('${orc.id}','${e.id}')" title="Ajustar Realizado / %">✏️</button>
+                    <button class="icon-btn btn-sm" data-fb-click="Orcamentos.editEtapa" data-fb-click-n="2" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(orc.id))}" data-fb-click-t1="string" data-fb-click-v1="${encodeURIComponent(String(e.id))}" title="Ajustar Realizado / %">✏️</button>
                   </td>
                 </tr>`;
               }).join('')}
@@ -501,11 +501,11 @@ const Orcamentos = {
               <span style="font-size:.78rem;color:var(--text3)">Configure as macro-etapas, quantitativos e custos previstos</span>
             </div>
           </div>
-          <button class="modal-close" onclick="Utils.closeModal()">✕</button>
+          <button class="modal-close" data-fb-click="Utils.closeModal" data-fb-click-n="0">✕</button>
         </div>
 
         <div class="modal-body" style="max-height:calc(85vh - 120px);overflow-y:auto;padding:24px;">
-          <form id="f-orc" onsubmit="event.preventDefault();">
+          <form id="f-orc" data-fb-submit="Patch26Actions.prevent" data-fb-submit-n="1" data-fb-submit-t0="event">
             <!-- SEÇÃO 1: CABEÇALHO DO ORÇAMENTO -->
             <div style="background:var(--bg-secondary);padding:18px;border-radius:var(--r-md);border:1px solid var(--border);margin-bottom:20px;">
               <div class="form-row cols-3" style="margin-bottom:12px;">
@@ -556,13 +556,13 @@ const Orcamentos = {
               <div style="display:flex;gap:8px;align-items:center;">
                 <!-- Seletor Rápido de Categorias Padrão -->
                 <div style="position:relative;">
-                  <select class="form-control btn-sm" id="sel-add-cat-padrao" onchange="Orcamentos._onSelectAddPadrao(this)" style="cursor:pointer;font-weight:600">
+                  <select class="form-control btn-sm" id="sel-add-cat-padrao" data-fb-change="Orcamentos._onSelectAddPadrao" data-fb-change-n="1" data-fb-change-t0="self" style="cursor:pointer;font-weight:600">
                     <option value="">+ Adicionar Categoria Padrão...</option>
                     ${this.CATEGORIAS_PADRAO.map(cp => `<option value="${cp.id}">${cp.icone} ${cp.nome}</option>`).join('')}
                   </select>
                 </div>
                 <!-- Botão Categoria Customizada -->
-                <button type="button" class="btn btn-secondary btn-sm" onclick="Orcamentos._promptCustomCategory()">
+                <button type="button" class="btn btn-secondary btn-sm" data-fb-click="Orcamentos._promptCustomCategory" data-fb-click-n="0">
                   ✨ Nova Categoria Personalizada
                 </button>
               </div>
@@ -596,8 +596,8 @@ const Orcamentos = {
         </div>
 
         <div class="modal-footer" style="padding:16px 24px;">
-          <button class="btn btn-secondary" onclick="Utils.closeModal()">Cancelar</button>
-          <button class="btn btn-primary" onclick="Orcamentos.save('${id || ''}')">
+          <button class="btn btn-secondary" data-fb-click="Utils.closeModal" data-fb-click-n="0">Cancelar</button>
+          <button class="btn btn-primary" data-fb-click="Orcamentos.save" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(id || ''))}">
             ${id ? '✔ Salvar Alterações' : '+ Criar Orçamento'}
           </button>
         </div>
@@ -624,10 +624,10 @@ const Orcamentos = {
           <span class="cat-subtotal-badge" id="csb-${catId}" style="font-size:.8rem;font-weight:700;color:var(--accent)">
             R$ 0,00
           </span>
-          <button type="button" class="btn btn-secondary btn-sm" onclick="Orcamentos._addItemToCategory('${catId}')" style="font-size:.76rem;padding:4px 10px;">
+          <button type="button" class="btn btn-secondary btn-sm" data-fb-click="Orcamentos._addItemToCategory" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(catId))}" style="font-size:.76rem;padding:4px 10px;">
             + Adicionar Item
           </button>
-          <button type="button" class="icon-btn btn-sm" onclick="Orcamentos._removeCategory('${catId}')" style="color:var(--danger)" title="Remover Categoria">
+          <button type="button" class="icon-btn btn-sm" data-fb-click="Orcamentos._removeCategory" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(catId))}" style="color:var(--danger)" title="Remover Categoria">
             🗑️
           </button>
         </div>
@@ -658,7 +658,7 @@ const Orcamentos = {
       <div class="form-row" style="grid-template-columns: 3fr 1fr 1fr 1.3fr 1.3fr 1fr 40px; gap:8px; align-items:flex-end;">
         <div class="form-group" style="margin:0">
           <label class="form-label" style="font-size:.7rem">Descrição do Item / Etapa *</label>
-          <input class="form-control item-nome" value="${Utils.escapeHtml(item.nome || '')}" placeholder="Ex: Porcelanato 80x80cm retificado" required oninput="Orcamentos._recalcModalTotals()">
+          <input class="form-control item-nome" value="${Utils.escapeHtml(item.nome || '')}" placeholder="Ex: Porcelanato 80x80cm retificado" required data-fb-input="Orcamentos._recalcModalTotals" data-fb-input-n="0">
         </div>
         <div class="form-group" style="margin:0">
           <label class="form-label" style="font-size:.7rem">Unidade</label>
@@ -668,31 +668,31 @@ const Orcamentos = {
         </div>
         <div class="form-group" style="margin:0">
           <label class="form-label" style="font-size:.7rem">Qtd.</label>
-          <input type="number" step="0.01" min="0" class="form-control item-qtd" value="${qtd}" oninput="Orcamentos._calcItemRow('${itemId}')">
+          <input type="number" step="0.01" min="0" class="form-control item-qtd" value="${qtd}" data-fb-input="Orcamentos._calcItemRow" data-fb-input-n="1" data-fb-input-t0="string" data-fb-input-v0="${encodeURIComponent(String(itemId))}">
         </div>
         <div class="form-group" style="margin:0">
           <label class="form-label" style="font-size:.7rem">Unitário (R$)</label>
           <div class="input-prefix">
             <span class="input-pfx-txt">R$</span>
-            <input type="number" step="0.01" min="0" class="form-control item-unit" value="${unit}" oninput="Orcamentos._calcItemRow('${itemId}')">
+            <input type="number" step="0.01" min="0" class="form-control item-unit" value="${unit}" data-fb-input="Orcamentos._calcItemRow" data-fb-input-n="1" data-fb-input-t0="string" data-fb-input-v0="${encodeURIComponent(String(itemId))}">
           </div>
         </div>
         <div class="form-group" style="margin:0">
           <label class="form-label" style="font-size:.7rem">Total Previsto (R$)</label>
           <div class="input-prefix">
             <span class="input-pfx-txt">R$</span>
-            <input type="number" step="0.01" min="0" class="form-control item-prev" value="${prev}" oninput="Orcamentos._recalcModalTotals()">
+            <input type="number" step="0.01" min="0" class="form-control item-prev" value="${prev}" data-fb-input="Orcamentos._recalcModalTotals" data-fb-input-n="0">
           </div>
         </div>
         <div class="form-group" style="margin:0">
           <label class="form-label" style="font-size:.7rem">Realizado (R$)</label>
           <div class="input-prefix">
             <span class="input-pfx-txt">R$</span>
-            <input type="number" step="0.01" min="0" class="form-control item-real" value="${real}" oninput="Orcamentos._onRealizadoChange('${itemId}')">
+            <input type="number" step="0.01" min="0" class="form-control item-real" value="${real}" data-fb-input="Orcamentos._onRealizadoChange" data-fb-input-n="1" data-fb-input-t0="string" data-fb-input-v0="${encodeURIComponent(String(itemId))}">
           </div>
         </div>
         <div style="margin-bottom:4px">
-          <button type="button" class="icon-btn btn-sm" style="color:var(--danger);font-size:16px" onclick="Orcamentos._removeItemRow('${itemId}')" title="Excluir item">✕</button>
+          <button type="button" class="icon-btn btn-sm" style="color:var(--danger);font-size:16px" data-fb-click="Orcamentos._removeItemRow" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(itemId))}" title="Excluir item">✕</button>
         </div>
       </div>
 
@@ -707,8 +707,8 @@ const Orcamentos = {
         </div>
         <div class="form-group" style="margin:0;display:flex;align-items:center;gap:8px;">
           <span style="font-size:.72rem;color:var(--text3);white-space:nowrap">% Exec.:</span>
-          <input type="range" class="item-pct-range" min="0" max="100" value="${pct}" style="flex:1;accent-color:var(--accent)" oninput="this.nextElementSibling.value=this.value;Orcamentos._recalcModalTotals()">
-          <input type="number" min="0" max="100" class="form-control item-pct" value="${pct}" style="width:55px;height:30px;font-size:.74rem;padding:2px 4px;text-align:center" oninput="this.previousElementSibling.value=this.value;Orcamentos._recalcModalTotals()">
+          <input type="range" class="item-pct-range" min="0" max="100" value="${pct}" style="flex:1;accent-color:var(--accent)" data-fb-input="Patch26Actions.orcamentosSyncNext" data-fb-input-n="1" data-fb-input-t0="self">
+          <input type="number" min="0" max="100" class="form-control item-pct" value="${pct}" style="width:55px;height:30px;font-size:.74rem;padding:2px 4px;text-align:center" data-fb-input="Patch26Actions.orcamentosSyncPrev" data-fb-input-n="1" data-fb-input-t0="self">
           <span style="font-size:.72rem;color:var(--text3)">%</span>
         </div>
       </div>
@@ -974,7 +974,7 @@ const Orcamentos = {
       <div class="modal" style="max-width:520px">
         <div class="modal-header">
           <span class="modal-title">✏️ Atualizar Medição / Execução</span>
-          <button class="modal-close" onclick="Utils.closeModal()">✕</button>
+          <button class="modal-close" data-fb-click="Utils.closeModal" data-fb-click-n="0">✕</button>
         </div>
         <div class="modal-body">
           <div style="font-weight:800;font-size:1.05rem;color:var(--text);margin-bottom:4px;">${Utils.escapeHtml(e.nome)}</div>
@@ -995,15 +995,7 @@ const Orcamentos = {
               <label class="form-label">Valor Realizado (R$)</label>
               <div class="input-prefix">
                 <span class="input-pfx-txt">R$</span>
-                <input id="ee-real" type="number" step="0.01" min="0" class="form-control" value="${Utils.escapeHtml(e.valor_realizado)}" oninput="
-                  const p = parseFloat(document.getElementById('ee-prev').value) || 0;
-                  const r = parseFloat(this.value) || 0;
-                  if (p > 0) {
-                    const auto = Math.min(100, Math.round((r/p)*100));
-                    document.getElementById('ee-pct').value = auto;
-                    document.getElementById('ee-pct-range').value = auto;
-                  }
-                ">
+                <input id="ee-real" type="number" step="0.01" min="0" class="form-control" value="${Utils.escapeHtml(e.valor_realizado)}" data-fb-input="Patch26Actions.orcamentosRealizadoInput" data-fb-input-n="1" data-fb-input-t0="self">
               </div>
             </div>
           </div>
@@ -1011,9 +1003,9 @@ const Orcamentos = {
           <div class="form-group" style="margin-bottom:14px;">
             <label class="form-label">% de Execução Física</label>
             <div style="display:flex;align-items:center;gap:12px">
-              <input type="range" id="ee-pct-range" min="0" max="100" value="${Utils.escapeHtml(e.percentual_execucao || 0)}" style="flex:1;accent-color:var(--accent)" oninput="document.getElementById('ee-pct').value=this.value">
+              <input type="range" id="ee-pct-range" min="0" max="100" value="${Utils.escapeHtml(e.percentual_execucao || 0)}" style="flex:1;accent-color:var(--accent)" data-fb-input="Patch26Actions.setValueByIdFromSelf" data-fb-input-n="2" data-fb-input-t0="string" data-fb-input-v0="ee-pct" data-fb-input-t1="self">
               <div class="input-prefix" style="width:85px">
-                <input id="ee-pct" type="number" class="form-control" value="${Utils.escapeHtml(e.percentual_execucao || 0)}" min="0" max="100" oninput="document.getElementById('ee-pct-range').value=this.value">
+                <input id="ee-pct" type="number" class="form-control" value="${Utils.escapeHtml(e.percentual_execucao || 0)}" min="0" max="100" data-fb-input="Patch26Actions.setValueByIdFromSelf" data-fb-input-n="2" data-fb-input-t0="string" data-fb-input-v0="ee-pct-range" data-fb-input-t1="self">
                 <span class="input-pfx-txt">%</span>
               </div>
             </div>
@@ -1025,8 +1017,8 @@ const Orcamentos = {
           </div>
         </div>
         <div class="modal-footer">
-          <button class="btn btn-secondary" onclick="Utils.closeModal()">Cancelar</button>
-          <button class="btn btn-primary" onclick="Orcamentos.saveEtapa('${orcId}','${etapaId}')">✔ Salvar Medição</button>
+          <button class="btn btn-secondary" data-fb-click="Utils.closeModal" data-fb-click-n="0">Cancelar</button>
+          <button class="btn btn-primary" data-fb-click="Orcamentos.saveEtapa" data-fb-click-n="2" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(orcId))}" data-fb-click-t1="string" data-fb-click-v1="${encodeURIComponent(String(etapaId))}">✔ Salvar Medição</button>
         </div>
       </div>`);
   },
@@ -1114,7 +1106,7 @@ const Orcamentos = {
       </head>
       <body>
         <div style="text-align:right;margin-bottom:12px;">
-          <button onclick="window.print()" style="padding:8px 16px;background:#0f172a;color:#fff;border:none;border-radius:6px;cursor:pointer;font-weight:700">Imprimir / Salvar PDF</button>
+          <button data-fb-click="Patch26Actions.print" data-fb-click-n="0" style="padding:8px 16px;background:#0f172a;color:#fff;border:none;border-radius:6px;cursor:pointer;font-weight:700">Imprimir / Salvar PDF</button>
         </div>
         <div class="header">
           <div>

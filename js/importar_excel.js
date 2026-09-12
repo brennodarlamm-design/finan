@@ -19,7 +19,7 @@ const ImportarExcel = {
               <div style="font-size:.75rem;color:var(--text3);">Cadastre dezenas de receitas e despesas de uma só vez a partir de arquivos .xlsx, .xls ou .csv</div>
             </div>
           </div>
-          <button class="modal-close" onclick="Utils.closeModal()">✕</button>
+          <button class="modal-close" data-fb-click="Utils.closeModal" data-fb-click-n="0">✕</button>
         </div>
 
         <div class="modal-body custom-scroll" style="padding:20px;overflow-y:auto;flex:1;">
@@ -32,16 +32,16 @@ const ImportarExcel = {
                 <span style="color:var(--text3);font-size:.78rem;">Baixe nosso modelo oficial do Excel já pré-formatado com cabeçalhos e exemplos de receitas, despesas de obras e custos da sede.</span>
               </div>
               <div style="display:flex;gap:8px;flex-wrap:wrap;">
-                <button class="btn btn-secondary btn-sm" onclick="ImportarExcel.usarExemploDemo()" style="border:1px solid var(--accent);color:var(--accent2);">
+                <button class="btn btn-secondary btn-sm" data-fb-click="ImportarExcel.usarExemploDemo" data-fb-click-n="0" style="border:1px solid var(--accent);color:var(--accent2);">
                   📋 Carregar Exemplo Demo
                 </button>
-                <button class="btn btn-success btn-sm" onclick="ImportarExcel.baixarModeloExcel()" style="font-weight:700;">
+                <button class="btn btn-success btn-sm" data-fb-click="ImportarExcel.baixarModeloExcel" data-fb-click-n="0" style="font-weight:700;">
                   📥 Baixar Modelo (.xlsx)
                 </button>
               </div>
             </div>
 
-            <div class="drop-zone" id="excel-drop-zone" onclick="document.getElementById('excel-file-input').click()" style="padding:36px 20px;border:2px dashed rgba(201,162,39,.4);border-radius:14px;background:rgba(201,162,39,.02);text-align:center;cursor:pointer;transition:all .2s;">
+            <div class="drop-zone" id="excel-drop-zone" data-fb-click="Patch26Actions.clickById" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="excel-file-input" style="padding:36px 20px;border:2px dashed rgba(201,162,39,.4);border-radius:14px;background:rgba(201,162,39,.02);text-align:center;cursor:pointer;transition:all .2s;">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="width:48px;height:48px;margin:0 auto 12px;display:block;color:var(--accent2);">
                 <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
                 <polyline points="14 2 14 8 20 8"/>
@@ -51,7 +51,7 @@ const ImportarExcel = {
               </svg>
               <p style="font-size:.95rem;font-weight:700;color:var(--text);margin-bottom:4px;">Arraste e solte sua planilha Excel aqui</p>
               <p style="font-size:.78rem;color:var(--text3);">ou clique para selecionar do seu computador (.xlsx, .xls, .csv)</p>
-              <input type="file" id="excel-file-input" accept=".xlsx,.xls,.csv" style="display:none" onchange="ImportarExcel.onFileSelect(event)">
+              <input type="file" id="excel-file-input" accept=".xlsx,.xls,.csv" style="display:none" data-fb-change="ImportarExcel.onFileSelect" data-fb-change-n="1" data-fb-change-t0="event">
             </div>
           </div>
 
@@ -76,7 +76,7 @@ const ImportarExcel = {
 
               <div style="display:flex;align-items:center;gap:10px;">
                 <label style="font-size:.78rem;color:var(--text2);font-weight:700;margin:0;">Vincular Obra Padrão:</label>
-                <select class="form-control" id="import-global-obra" style="width:200px;font-size:.8rem;padding:4px 8px;" onchange="ImportarExcel.aplicarObraGlobal(this.value)">
+                <select class="form-control" id="import-global-obra" style="width:200px;font-size:.8rem;padding:4px 8px;" data-fb-change="ImportarExcel.aplicarObraGlobal" data-fb-change-n="1" data-fb-change-t0="value">
                   ${Utils.clienteOptions(this._defaultObraId, 'Aplicar para linhas vazias...', true)}
                 </select>
               </div>
@@ -86,7 +86,7 @@ const ImportarExcel = {
               <table style="font-size:.8rem;">
                 <thead>
                   <tr style="background:var(--bg-card);position:sticky;top:0;z-index:2;">
-                    <th style="width:36px;text-align:center;"><input type="checkbox" checked id="import-chk-all" onchange="ImportarExcel.toggleSelectAll(this.checked)"></th>
+                    <th style="width:36px;text-align:center;"><input type="checkbox" checked id="import-chk-all" data-fb-change="ImportarExcel.toggleSelectAll" data-fb-change-n="1" data-fb-change-t0="checked"></th>
                     <th style="width:95px;">Data</th>
                     <th style="width:95px;">Vencimento</th>
                     <th style="width:85px;">Tipo</th>
@@ -108,13 +108,13 @@ const ImportarExcel = {
         </div>
 
         <div class="modal-footer" style="padding:14px 20px;border-top:1px solid var(--border);justify-content:space-between;">
-          <button type="button" class="btn btn-secondary" onclick="Utils.closeModal()">Cancelar</button>
+          <button type="button" class="btn btn-secondary" data-fb-click="Utils.closeModal" data-fb-click-n="0">Cancelar</button>
           
           <div style="display:flex;gap:10px;">
-            <button type="button" id="import-btn-voltar" class="btn btn-secondary" style="display:none;" onclick="ImportarExcel.voltarUpload()">
+            <button type="button" id="import-btn-voltar" class="btn btn-secondary" style="display:none;" data-fb-click="ImportarExcel.voltarUpload" data-fb-click-n="0">
               ← Escolher Outro Arquivo
             </button>
-            <button type="button" id="import-btn-confirmar" class="btn btn-primary" style="display:none;font-weight:800;padding:10px 24px;" onclick="ImportarExcel.processarGravacao()">
+            <button type="button" id="import-btn-confirmar" class="btn btn-primary" style="display:none;font-weight:800;padding:10px 24px;" data-fb-click="ImportarExcel.processarGravacao" data-fb-click-n="0">
               ⚡ Confirmar Importação (<span id="import-count-label">0</span>)
             </button>
           </div>
@@ -378,33 +378,33 @@ const ImportarExcel = {
       return `
       <tr id="row-${item.id_temp}" style="background:${item.selected ? 'transparent' : 'rgba(0,0,0,.2)'};">
         <td style="text-align:center;">
-          <input type="checkbox" ${item.selected ? 'checked' : ''} onchange="ImportarExcel.toggleRow('${item.id_temp}', this.checked)">
+          <input type="checkbox" ${item.selected ? 'checked' : ''} data-fb-change="ImportarExcel.toggleRow" data-fb-change-n="2" data-fb-change-t0="string" data-fb-change-v0="${encodeURIComponent(String(item.id_temp))}" data-fb-change-t1="checked">
         </td>
         <td>
-          <input type="date" class="form-control" style="padding:2px 4px;font-size:.76rem;" value="${Utils.escapeHtml(item.data)}" onchange="ImportarExcel.updateCell('${item.id_temp}', 'data', this.value)">
+          <input type="date" class="form-control" style="padding:2px 4px;font-size:.76rem;" value="${Utils.escapeHtml(item.data)}" data-fb-change="ImportarExcel.updateCell" data-fb-change-n="3" data-fb-change-t0="string" data-fb-change-v0="${encodeURIComponent(String(item.id_temp))}" data-fb-change-t1="string" data-fb-change-v1="data" data-fb-change-t2="value">
         </td>
         <td>
-          <input type="date" class="form-control" style="padding:2px 4px;font-size:.76rem;" value="${Utils.escapeHtml(item.data_vencimento)}" onchange="ImportarExcel.updateCell('${item.id_temp}', 'data_vencimento', this.value)">
+          <input type="date" class="form-control" style="padding:2px 4px;font-size:.76rem;" value="${Utils.escapeHtml(item.data_vencimento)}" data-fb-change="ImportarExcel.updateCell" data-fb-change-n="3" data-fb-change-t0="string" data-fb-change-v0="${encodeURIComponent(String(item.id_temp))}" data-fb-change-t1="string" data-fb-change-v1="data_vencimento" data-fb-change-t2="value">
         </td>
         <td>
-          <input type="date" class="form-control" style="padding:2px 4px;font-size:.76rem;border-color:var(--success);" value="${Utils.escapeHtml(item.data_pagamento||'')}" onchange="ImportarExcel.updateCell('${item.id_temp}', 'data_pagamento', this.value)">
+          <input type="date" class="form-control" style="padding:2px 4px;font-size:.76rem;border-color:var(--success);" value="${Utils.escapeHtml(item.data_pagamento||'')}" data-fb-change="ImportarExcel.updateCell" data-fb-change-n="3" data-fb-change-t0="string" data-fb-change-v0="${encodeURIComponent(String(item.id_temp))}" data-fb-change-t1="string" data-fb-change-v1="data_pagamento" data-fb-change-t2="value">
         </td>
         <td>
-          <select class="form-control" style="padding:2px 4px;font-size:.76rem;color:${isRec?'var(--success)':'var(--danger)'};font-weight:700;" onchange="ImportarExcel.updateCell('${item.id_temp}', 'tipo', this.value)">
+          <select class="form-control" style="padding:2px 4px;font-size:.76rem;color:${isRec?'var(--success)':'var(--danger)'};font-weight:700;" data-fb-change="ImportarExcel.updateCell" data-fb-change-n="3" data-fb-change-t0="string" data-fb-change-v0="${encodeURIComponent(String(item.id_temp))}" data-fb-change-t1="string" data-fb-change-v1="tipo" data-fb-change-t2="value">
             <option value="receita" ${isRec?'selected':''}>↑ Receita</option>
             <option value="despesa" ${!isRec?'selected':''}>↓ Despesa</option>
           </select>
         </td>
         <td>
-          <select class="form-control" style="padding:2px 4px;font-size:.76rem;max-width:160px;" onchange="ImportarExcel.updateCell('${item.id_temp}', 'obra_id', this.value)">
+          <select class="form-control" style="padding:2px 4px;font-size:.76rem;max-width:160px;" data-fb-change="ImportarExcel.updateCell" data-fb-change-n="3" data-fb-change-t0="string" data-fb-change-v0="${encodeURIComponent(String(item.id_temp))}" data-fb-change-t1="string" data-fb-change-v1="obra_id" data-fb-change-t2="value">
             ${Utils.clienteOptions(item.obra_id, 'Selecione centro...', true)}
           </select>
         </td>
         <td>
-          <input type="text" class="form-control" style="padding:2px 6px;font-size:.78rem;" value="${Utils.escapeHtml(item.descricao)}" onchange="ImportarExcel.updateCell('${item.id_temp}', 'descricao', this.value)">
+          <input type="text" class="form-control" style="padding:2px 6px;font-size:.78rem;" value="${Utils.escapeHtml(item.descricao)}" data-fb-change="ImportarExcel.updateCell" data-fb-change-n="3" data-fb-change-t0="string" data-fb-change-v0="${encodeURIComponent(String(item.id_temp))}" data-fb-change-t1="string" data-fb-change-v1="descricao" data-fb-change-t2="value">
         </td>
         <td>
-          <select class="form-control" style="padding:2px 4px;font-size:.76rem;max-width:130px;" onchange="ImportarExcel.updateCell('${item.id_temp}', 'categoria', this.value)">
+          <select class="form-control" style="padding:2px 4px;font-size:.76rem;max-width:130px;" data-fb-change="ImportarExcel.updateCell" data-fb-change-n="3" data-fb-change-t0="string" data-fb-change-v0="${encodeURIComponent(String(item.id_temp))}" data-fb-change-t1="string" data-fb-change-v1="categoria" data-fb-change-t2="value">
             <option value="${Utils.escapeHtml(item.categoria)}" selected>${Utils.escapeHtml(Utils.catLabel(item.categoria))}</option>
             <optgroup label="💰 Receitas">
               <option value="parcela_caixa">🏦 Parcela Caixa</option>
@@ -437,13 +437,13 @@ const ImportarExcel = {
           </select>
         </td>
         <td>
-          <input type="text" class="form-control" style="padding:2px 6px;font-size:.78rem;" value="${Utils.escapeHtml(item.fornecedor_beneficiario)}" onchange="ImportarExcel.updateCell('${item.id_temp}', 'fornecedor_beneficiario', this.value)">
+          <input type="text" class="form-control" style="padding:2px 6px;font-size:.78rem;" value="${Utils.escapeHtml(item.fornecedor_beneficiario)}" data-fb-change="ImportarExcel.updateCell" data-fb-change-n="3" data-fb-change-t0="string" data-fb-change-v0="${encodeURIComponent(String(item.id_temp))}" data-fb-change-t1="string" data-fb-change-v1="fornecedor_beneficiario" data-fb-change-t2="value">
         </td>
         <td>
-          <input type="number" step="0.01" class="form-control" style="padding:2px 6px;font-size:.78rem;text-align:right;font-weight:800;color:${isRec?'var(--success)':'var(--danger)'};" value="${Utils.escapeHtml(item.valor)}" oninput="ImportarExcel.updateCell('${item.id_temp}', 'valor', parseFloat(this.value)||0)">
+          <input type="number" step="0.01" class="form-control" style="padding:2px 6px;font-size:.78rem;text-align:right;font-weight:800;color:${isRec?'var(--success)':'var(--danger)'};" value="${Utils.escapeHtml(item.valor)}" data-fb-input="ImportarExcel.updateCell" data-fb-input-n="3" data-fb-input-t0="string" data-fb-input-v0="${encodeURIComponent(String(item.id_temp))}" data-fb-input-t1="string" data-fb-input-v1="valor" data-fb-input-t2="float">
         </td>
         <td>
-          <select class="form-control" style="padding:2px 4px;font-size:.74rem;" onchange="ImportarExcel.updateCell('${item.id_temp}', 'status', this.value)">
+          <select class="form-control" style="padding:2px 4px;font-size:.74rem;" data-fb-change="ImportarExcel.updateCell" data-fb-change-n="3" data-fb-change-t0="string" data-fb-change-v0="${encodeURIComponent(String(item.id_temp))}" data-fb-change-t1="string" data-fb-change-v1="status" data-fb-change-t2="value">
             ${isRec ? `
               <option value="recebido" ${item.status==='recebido'?'selected':''}>✓ Recebido</option>
               <option value="a_receber" ${item.status==='a_receber'?'selected':''}>⏳ A Receber</option>
@@ -454,7 +454,7 @@ const ImportarExcel = {
           </select>
         </td>
         <td style="text-align:center;">
-          <button class="icon-btn" onclick="ImportarExcel.removerLinha('${item.id_temp}')" title="Remover Linha" style="font-size:12px;color:var(--danger);padding:2px 4px;">
+          <button class="icon-btn" data-fb-click="ImportarExcel.removerLinha" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(item.id_temp))}" title="Remover Linha" style="font-size:12px;color:var(--danger);padding:2px 4px;">
             ✕
           </button>
         </td>

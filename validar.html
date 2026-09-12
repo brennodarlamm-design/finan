@@ -492,7 +492,7 @@
         Consulte se um registro de assinatura foi efetivamente cadastrado na base central do <strong>FinObra</strong>, informando o código de validação.
       </p>
 
-      <form class="form-group" id="form-busca" onsubmit="event.preventDefault(); executarBusca();">
+      <form class="form-group" id="form-busca" data-fb-submit="Patch26Actions.validarSubmit" data-fb-submit-n="1" data-fb-submit-t0="event">
         <div class="input-row">
           <input 
             type="text" 
@@ -529,5 +529,7 @@
   </footer>
 
   <script src="/js/validar_page.js"></script>
+  <script src="/js/patch26-actions.js"></script>
+  <script src="/js/patch26-events.js"></script>
 </body>
 </html>

@@ -309,15 +309,15 @@ const App = {
       <div class="modal" style="max-width:900px;width:96vw;">
         <div class="modal-header">
           <span class="modal-title">⚠ Sincronizações que requerem atenção</span>
-          <button class="modal-close" onclick="Utils.closeModal()">✕</button>
+          <button class="modal-close" data-fb-click="Utils.closeModal" data-fb-click-n="0">✕</button>
         </div>
         <div class="modal-body">
           <p style="font-size:.82rem;color:var(--text2);margin:0 0 14px;">Nenhuma alteração abaixo foi apagada. Você pode tentar reenviar quando a conexão ou o servidor estiver normalizado.</p>
           <div class="table-wrap"><table class="table"><thead><tr><th>Dados</th><th>Ação</th><th>ID</th><th>Motivo</th><th>HTTP</th></tr></thead><tbody>${rows}</tbody></table></div>
         </div>
         <div class="modal-footer">
-          <button class="btn btn-secondary" onclick="Utils.closeModal()">Fechar</button>
-          <button class="btn btn-primary" onclick="App.retrySyncIssues()">↻ Tentar novamente</button>
+          <button class="btn btn-secondary" data-fb-click="Utils.closeModal" data-fb-click-n="0">Fechar</button>
+          <button class="btn btn-primary" data-fb-click="App.retrySyncIssues" data-fb-click-n="0">↻ Tentar novamente</button>
         </div>
       </div>`);
   },
@@ -357,19 +357,19 @@ const App = {
               <span class="impersonation-text">Visualizando conta de: <strong>${brandName}</strong></span>
               <span class="impersonation-pill">🔒 Dados 100% isolados</span>
             </div>
-            <button type="button" class="impersonation-btn" onclick="App.sairModoSuporte()" title="Encerrar suporte e retornar ao painel administrativo Master">
+            <button type="button" class="impersonation-btn" data-fb-click="App.sairModoSuporte" data-fb-click-n="0" title="Encerrar suporte e retornar ao painel administrativo Master">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
               <span>Voltar ao Painel Master</span>
             </button>
           </aside>
         ` : ''}
         <!-- Overlay Escuro para Mobile -->
-        <div class="sidebar-overlay" id="sidebar-overlay" onclick="App.closeSidebar()"></div>
+        <div class="sidebar-overlay" id="sidebar-overlay" data-fb-click="App.closeSidebar" data-fb-click-n="0"></div>
 
         <aside class="sidebar" id="sidebar">
           <div class="sidebar-logo" style="padding:14px 16px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--border-s);min-height:70px;">
             ${logoHtml}
-            <button class="icon-btn mobile-close-btn" onclick="App.closeSidebar()" title="Fechar Menu" style="font-size:1.1rem;padding:4px 8px;">✕</button>
+            <button class="icon-btn mobile-close-btn" data-fb-click="App.closeSidebar" data-fb-click-n="0" title="Fechar Menu" style="font-size:1.1rem;padding:4px 8px;">✕</button>
           </div>
           <nav class="sidebar-nav">
             <div class="nav-section">Operacional & Financeiro</div>
@@ -400,7 +400,7 @@ const App = {
             </a>
           </nav>
           <div class="sidebar-foot">
-            <div class="user-card" onclick="App.showUserMenu()">
+            <div class="user-card" data-fb-click="App.showUserMenu" data-fb-click-n="0">
               <div class="user-av">${Utils.escapeHtml(u?.avatar || 'AD')}</div>
               <div class="user-info">
                 <div class="user-name">${Utils.escapeHtml(u?.nome || 'Administrador')}</div>
@@ -412,7 +412,7 @@ const App = {
 
         <div style="flex:1;display:flex;flex-direction:column;min-width:0;">
           <header class="main-header" id="main-header">
-            <button class="icon-btn" id="mob-menu" onclick="App.toggleSidebar()" title="Recolher / Expandir Menu Lateral (Ctrl+B)">
+            <button class="icon-btn" id="mob-menu" data-fb-click="App.toggleSidebar" data-fb-click-n="0" title="Recolher / Expandir Menu Lateral (Ctrl+B)">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
             </button>
             <div style="min-width:0;flex-shrink:1;">
@@ -420,7 +420,7 @@ const App = {
               <div class="header-sub">${brandName} — Gestão Financeira</div>
             </div>
             <div class="hspacer"></div>
-            <div id="sync-status-indicator" title="Status da sincronização com a nuvem. Clique para tentar novamente itens que exigem atenção." onclick="App.showSyncIssues()" style="display:flex;align-items:center;gap:5px;font-size:.7rem;color:var(--text3);padding:4px 8px;border:1px solid var(--border);border-radius:999px;white-space:nowrap;">
+            <div id="sync-status-indicator" title="Status da sincronização com a nuvem. Clique para tentar novamente itens que exigem atenção." data-fb-click="App.showSyncIssues" data-fb-click-n="0" style="display:flex;align-items:center;gap:5px;font-size:.7rem;color:var(--text3);padding:4px 8px;border:1px solid var(--border);border-radius:999px;white-space:nowrap;">
               <span id="sync-status-dot">●</span><span id="sync-status-text">Cache local</span>
             </div>
             <!-- Botão Validador de Autenticidade -->
@@ -431,7 +431,7 @@ const App = {
             <!-- Dropdown Suporte Técnico & Atendimento -->
             ${isImpersonating ? '' : (typeof Suporte !== 'undefined' ? Suporte.renderHeaderDropdown() : '')}
             <!-- Botão Busca Global -->
-            <div class="header-search-btn" onclick="typeof BuscaGlobal !== 'undefined' && BuscaGlobal.abrir()" title="Busca Global em todo o sistema (Ctrl+K)" style="cursor:pointer;display:flex;align-items:center;gap:6px;background:rgba(255,255,255,.05);border:1px solid var(--border);border-radius:8px;padding:5px 10px;transition:all .2s;">
+            <div class="header-search-btn" data-fb-click="Patch26Actions.globalSearchOpen" data-fb-click-n="0" title="Busca Global em todo o sistema (Ctrl+K)" style="cursor:pointer;display:flex;align-items:center;gap:6px;background:rgba(255,255,255,.05);border:1px solid var(--border);border-radius:8px;padding:5px 10px;transition:all .2s;">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
               <span style="font-size:.78rem;color:var(--text2);font-weight:600;">Buscar...</span>
               <kbd style="font-size:.65rem;color:var(--text3);background:rgba(255,255,255,.06);border:1px solid var(--border);border-radius:3px;padding:1px 4px;">Ctrl+K</kbd>
@@ -440,12 +440,12 @@ const App = {
             <div id="header-notif-container">
               ${typeof Notificacoes !== 'undefined' ? Notificacoes.renderBellBtn() : ''}
             </div>
-            <div class="obra-sel-btn" onclick="App.abrirBuscaObras()" title="Filtrar ou pesquisar obra">
+            <div class="obra-sel-btn" data-fb-click="App.abrirBuscaObras" data-fb-click-n="0" title="Filtrar ou pesquisar obra">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
               <span class="obra-sel-label" id="obra-sel-current-name">Todas as Obras</span>
               <span style="font-size:.68rem;color:var(--text3);background:rgba(255,255,255,0.06);padding:1px 4px;border-radius:4px;">🔍</span>
             </div>
-            <button class="icon-btn" onclick="Auth.logout()" title="Sair" style="color:var(--danger)">
+            <button class="icon-btn" data-fb-click="Auth.logout" data-fb-click-n="0" title="Sair" style="color:var(--danger)">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
             </button>
           </header>
@@ -477,7 +477,7 @@ const App = {
     const targetRoute = this._normalizeRoute(route);
     if (typeof Auth !== 'undefined' && Auth.canRoute && !Auth.canRoute(targetRoute, 'read')) return '';
     const isAct = (this.route === targetRoute) || (this._normalizeRoute(this.route) === targetRoute);
-    return `<div class="nav-item${isAct?' active':''}" data-route="${targetRoute}" onclick="App.navigate('${targetRoute}');App.closeSidebar();">
+    return `<div class="nav-item${isAct?' active':''}" data-route="${targetRoute}" data-fb-click="Patch26Actions.navigateCloseSidebar" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(targetRoute))}">
       <span>${icon}</span><span>${label}</span>${badgeHtml}
     </div>`;
   },
@@ -612,13 +612,13 @@ const App = {
             <span style="font-size:1.2rem;">🔍</span>
             <span class="modal-title">Selecionar &amp; Pesquisar Obra</span>
           </div>
-          <button class="modal-close" onclick="Utils.closeModal()">✕</button>
+          <button class="modal-close" data-fb-click="Utils.closeModal" data-fb-click-n="0">✕</button>
         </div>
         <div class="modal-body" style="padding:16px 20px;overflow-y:auto;flex:1;">
           
           <!-- Campo de Busca Instantânea -->
           <div style="position:relative;margin-bottom:16px;">
-            <input type="text" id="input-busca-obras" class="form-control" placeholder="Buscar por cliente, cidade, contrato Caixa, CPF ou status..." autofocus style="padding-left:38px;font-size:.92rem;background:var(--bg-secondary);border-color:var(--accent);" oninput="App._onSearchObraInput(this.value)">
+            <input type="text" id="input-busca-obras" class="form-control" placeholder="Buscar por cliente, cidade, contrato Caixa, CPF ou status..." autofocus style="padding-left:38px;font-size:.92rem;background:var(--bg-secondary);border-color:var(--accent);" data-fb-input="App._onSearchObraInput" data-fb-input-n="1" data-fb-input-t0="value">
             <span style="position:absolute;left:12px;top:50%;transform:translateY(-50%);font-size:1rem;color:var(--text3);pointer-events:none;">🔍</span>
           </div>
 
@@ -628,7 +628,7 @@ const App = {
         </div>
         <div class="modal-footer" style="padding:10px 20px;justify-content:space-between;border-top:1px solid var(--border);">
           <span style="font-size:.75rem;color:var(--text3);">Dica: Pressione <code>Ctrl + K</code> ou <code>/</code> a qualquer momento para buscar</span>
-          <button class="btn btn-secondary btn-sm" onclick="Utils.closeModal()">Fechar</button>
+          <button class="btn btn-secondary btn-sm" data-fb-click="Utils.closeModal" data-fb-click-n="0">Fechar</button>
         </div>
       </div>
     `);
@@ -661,7 +661,7 @@ const App = {
     // Opção "Todas as Obras"
     if (!termo || 'todas as obras visão geral consolidado'.includes(t)) {
       html += `
-      <div class="obra-search-item ${isTodas ? 'selected' : ''}" onclick="App.selecionarObra('todas')" style="margin-bottom:8px;border-left:4px solid ${isTodas ? 'var(--accent)' : 'var(--border)'};">
+      <div class="obra-search-item ${isTodas ? 'selected' : ''}" data-fb-click="App.selecionarObra" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="todas" style="margin-bottom:8px;border-left:4px solid ${isTodas ? 'var(--accent)' : 'var(--border)'};">
         <div style="display:flex;align-items:center;gap:12px;">
           <div style="width:38px;height:38px;background:rgba(201,162,39,.12);border:1px solid var(--accent);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:1.1rem;">
             🏢
@@ -678,7 +678,7 @@ const App = {
     // Opção "Sede / Escritório Central"
     if (!termo || 'sede escritorio administrativo central sede despesas fixas'.includes(t)) {
       html += `
-      <div class="obra-search-item ${isEscritorio ? 'selected' : ''}" onclick="App.selecionarObra('escritorio')" style="margin-bottom:10px;border-left:4px solid ${isEscritorio ? 'var(--accent)' : 'var(--border)'};">
+      <div class="obra-search-item ${isEscritorio ? 'selected' : ''}" data-fb-click="App.selecionarObra" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="escritorio" style="margin-bottom:10px;border-left:4px solid ${isEscritorio ? 'var(--accent)' : 'var(--border)'};">
         <div style="display:flex;align-items:center;gap:12px;">
           <div style="width:38px;height:38px;background:rgba(2,132,199,.12);border:1px solid #0284c7;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:1.1rem;">
             💼
@@ -706,7 +706,7 @@ const App = {
       const isSel = this.obraId === c.id;
 
       return `
-      <div class="obra-search-item ${isSel ? 'selected' : ''}" onclick="App.selecionarObra('${c.id}')" style="margin-bottom:8px;border-left:4px solid ${isSel ? 'var(--accent)' : 'var(--border)'};">
+      <div class="obra-search-item ${isSel ? 'selected' : ''}" data-fb-click="App.selecionarObra" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(c.id))}" style="margin-bottom:8px;border-left:4px solid ${isSel ? 'var(--accent)' : 'var(--border)'};">
         <div style="flex:1;min-width:0;margin-right:12px;">
           <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;flex-wrap:wrap;">
             <strong style="font-size:.92rem;color:var(--text);">${c.nome}</strong>
@@ -744,7 +744,7 @@ const App = {
     const canAdmin = ['admin','superadmin'].includes(String(u?.perfil || '').toLowerCase());
     Utils.showModal(`
       <div class="modal" style="max-width:360px">
-        <div class="modal-header"><span class="modal-title">👤 Minha Conta</span><button class="modal-close" onclick="Utils.closeModal()">✕</button></div>
+        <div class="modal-header"><span class="modal-title">👤 Minha Conta</span><button class="modal-close" data-fb-click="Utils.closeModal" data-fb-click-n="0">✕</button></div>
         <div class="modal-body" style="text-align:center;">
           <div class="user-av" style="width:60px;height:60px;font-size:1.4rem;margin:0 auto 12px;">${e(u?.avatar || 'US')}</div>
           <div style="font-weight:800;font-size:1.05rem;">${e(u?.nome || 'Usuário')}</div>
@@ -752,19 +752,19 @@ const App = {
           <div style="color:var(--text3);font-size:.75rem;margin-top:4px;margin-bottom:16px;">${e(roleLabel)} &middot; Logado: ${Utils.fmt.datetime(u?.loginAt)}</div>
           
           <div style="display:flex;flex-direction:column;gap:8px;text-align:left;">
-            ${canAdmin ? `<button class="btn btn-secondary btn-block" onclick="Utils.closeModal();App.showOnboardingEmpresa()">
+            ${canAdmin ? `<button class="btn btn-secondary btn-block" data-fb-click="Patch26Actions.closeModalOnboarding" data-fb-click-n="0">
               🏢 Dados &amp; Logotipo da Empresa
             </button>` : ''}
-            <button class="btn btn-secondary btn-block" onclick="Utils.closeModal();Configuracoes.showMeuPerfil()">
+            <button class="btn btn-secondary btn-block" data-fb-click="Patch26Actions.closeModalProfile" data-fb-click-n="0">
               👤 Meu Perfil / Alterar Senha
             </button>
-            <button class="btn btn-secondary btn-block" onclick="Utils.closeModal();App.navigate('configuracoes')">
+            <button class="btn btn-secondary btn-block" data-fb-click="Patch26Actions.closeModalConfig" data-fb-click-n="0">
               ⚙️ Gerenciar Usuários e Sistema
             </button>
           </div>
         </div>
         <div class="modal-footer" style="justify-content:center;">
-          <button class="btn btn-danger btn-block" onclick="Utils.closeModal();Auth.logout()">Sair do Sistema</button>
+          <button class="btn btn-danger btn-block" data-fb-click="Patch26Actions.closeModalLogout" data-fb-click-n="0">Sair do Sistema</button>
         </div>
       </div>`);
   },
@@ -776,9 +776,9 @@ const App = {
       <div class="modal" style="max-width:560px;">
         <div class="modal-header">
           <span class="modal-title">🏢 Cadastro da Minha Empresa</span>
-          <button class="modal-close" onclick="Utils.closeModal()">✕</button>
+          <button class="modal-close" data-fb-click="Utils.closeModal" data-fb-click-n="0">✕</button>
         </div>
-        <form class="modal-body" id="f-onboarding-empresa" onsubmit="App.saveOnboardingEmpresa(event)">
+        <form class="modal-body" id="f-onboarding-empresa" data-fb-submit="App.saveOnboardingEmpresa" data-fb-submit-n="1" data-fb-submit-t0="event">
           <div style="background:rgba(201,162,39,.08);border:1px solid rgba(201,162,39,.25);border-radius:12px;padding:12px 16px;margin-bottom:16px;display:flex;gap:12px;align-items:center;">
             <span style="font-size:1.8rem;">🚀</span>
             <div style="font-size:.82rem;line-height:1.4;color:var(--text);">
@@ -803,7 +803,7 @@ const App = {
               <label class="form-label">CNPJ ou CPF</label>
               <div style="display:flex;gap:6px;">
                 <input class="form-control" name="cnpj" id="ob-cnpj" value="${emp.cnpj || ''}" placeholder="00.000.000/0001-00">
-                <button type="button" class="btn btn-secondary btn-sm" onclick="App.consultarCnpjOnboarding()" title="Buscar CNPJ na Receita">🔍</button>
+                <button type="button" class="btn btn-secondary btn-sm" data-fb-click="App.consultarCnpjOnboarding" data-fb-click-n="0" title="Buscar CNPJ na Receita">🔍</button>
               </div>
             </div>
             <div class="form-group">
@@ -829,9 +829,9 @@ const App = {
           <div class="form-group">
             <label class="form-label">Logotipo da Empresa</label>
             <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
-              <input type="file" id="ob-logo-file" accept="image/*" style="display:none;" onchange="App.handleLogoUploadOnboarding(this)">
-              <button type="button" class="btn btn-secondary btn-sm" onclick="document.getElementById('ob-logo-file').click()">📁 Escolher Logotipo</button>
-              ${emp.logo_url ? `<button type="button" class="btn btn-ghost btn-sm" style="color:var(--danger);" onclick="App.removerLogoOnboarding()">🗑️ Remover Logo</button>` : ''}
+              <input type="file" id="ob-logo-file" accept="image/*" style="display:none;" data-fb-change="App.handleLogoUploadOnboarding" data-fb-change-n="1" data-fb-change-t0="self">
+              <button type="button" class="btn btn-secondary btn-sm" data-fb-click="Patch26Actions.clickById" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="ob-logo-file">📁 Escolher Logotipo</button>
+              ${emp.logo_url ? `<button type="button" class="btn btn-ghost btn-sm" style="color:var(--danger);" data-fb-click="App.removerLogoOnboarding" data-fb-click-n="0">🗑️ Remover Logo</button>` : ''}
               <span id="ob-logo-preview-txt" style="font-size:.78rem;color:var(--text3);">${emp.logo_url ? 'Logotipo atual salvo' : 'Nenhuma imagem selecionada'}</span>
             </div>
             <div style="font-size:.72rem;color:var(--text3);margin-top:6px;line-height:1.4;">
@@ -841,7 +841,7 @@ const App = {
           </div>
 
           <div class="modal-footer" style="padding-bottom:0;">
-            <button type="button" class="btn btn-secondary" onclick="Utils.closeModal()">Cancelar</button>
+            <button type="button" class="btn btn-secondary" data-fb-click="Utils.closeModal" data-fb-click-n="0">Cancelar</button>
             <button type="submit" class="btn btn-primary">💾 Salvar Dados da Empresa</button>
           </div>
         </form>
