@@ -6,6 +6,8 @@
   "scripts": {
     "dev": "npx serve .",
     "deploy": "node scripts/deploy.js",
+    "deploy:cloudflare": "npx wrangler deploy",
+    "build:cloudflare": "node scripts/build-cloudflare-pages.cjs",
     "render:status": "node scripts/render-status.js",
     "render:deploy": "node scripts/render-deploy.js",
     "package:release": "node scripts/package-release.js",
