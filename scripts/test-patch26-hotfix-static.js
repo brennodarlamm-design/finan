@@ -15,8 +15,9 @@ ok('bridge registra tabela ROOTS', bridge.includes('const ROOTS = Object.freeze'
 ok('Clientes const é resolvido por identificador léxico', bridge.includes("typeof Clientes !== 'undefined' ? Clientes"));
 ok('resolver usa ROOTS antes de globalThis', bridge.includes("Object.prototype.hasOwnProperty.call(ROOTS, parts[0]) ? ROOTS[parts[0]] : globalThis[parts[0]]"));
 ok('hotfix não usa eval/new Function', !/\beval\s*\(|new\s+Function\s*\(/.test(bridge));
-ok('postinstall executa hotfix depois do Patch 26', String(pkg.scripts?.postinstall || '').includes('apply-patch26-build.cjs && node fix-patch26-lexical-roots.cjs'));
-ok('pretest executa hotfix depois do Patch 26', String(pkg.scripts?.pretest || '').includes('apply-patch26-build.cjs && node fix-patch26-lexical-roots.cjs'));
+const lifecycle = `${pkg.scripts?.postinstall || ''} ${pkg.scripts?.pretest || ''}`;
+ok('Patch 27 mantém o hotfix materializado sem reaplicar Patch 26 no lifecycle', !/apply-patch26-build|fix-patch26-lexical-roots|prepare-patch26/.test(lifecycle));
+ok('build Cloudflare consome diretamente a fonte materializada', pkg.scripts?.['build:cloudflare'] === 'node scripts/build-cloudflare-pages.cjs');
 
 console.log(`\nPatch 26.1: ${failed ? 'FALHOU' : 'OK'}`);
 if (failed) process.exit(1);
