@@ -1,10 +1,5 @@
-/login /index.html 200
-/privacidade /privacidade.html 200
-/termos /termos.html 200
-/apresentacao /landing.html 200
-/comercial /landing.html 200
-/landing /landing.html 200
-/validar /validar.html 200
-/validar/* /validar.html 200
-/app /app.html 200
-/app/* /app.html 200
+/login / 200
+/apresentacao /landing 200
+/comercial /landing 200
+/validar/* /validar 200
+/app/* /app 200
