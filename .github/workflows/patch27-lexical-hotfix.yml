@@ -1,0 +1,33 @@
+name: Patch 27 lexical bridge materialization
+
+on:
+  push:
+    branches:
+      - patch27-materialize-build-20260912
+
+permissions:
+  contents: write
+
+jobs:
+  materialize-lexical-bridge:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: patch27-materialize-build-20260912
+          fetch-depth: 0
+      - name: Apply lexical-root bridge hotfix
+        run: node fix-patch26-lexical-roots.cjs
+      - name: Commit materialized bridge if changed
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git diff --quiet -- js/patch26-events.js; then
+            echo 'Bridge já materializado.'
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add js/patch26-events.js
+          git commit -m 'hotfix(patch27): materialize lexical-root bridge repair'
+          git push origin HEAD:patch27-materialize-build-20260912
