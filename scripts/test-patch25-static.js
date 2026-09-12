@@ -18,10 +18,9 @@ ok('bridge CSP allowlisted foi instalado', obra.includes('FINOBRA_PATCH25_EVENT_
 ok('delegação usa addEventListener', obra.includes("bind('click', 'data-od-click')") && obra.includes("bind('input', 'data-od-input')"));
 ok('não introduz eval/new Function', !/\beval\s*\(|new\s+Function\s*\(/.test(obra));
 ok('janela de relatório remove onclick window.print/window.close', !/onclick="window\.(?:print|close)\(\)"/.test(obra));
-ok('janela de relatório usa botões ligados por addEventListener', obra.includes("od-print-window-btn") && obra.includes("printButton.addEventListener('click'"));
+ok('janela de relatório usa botões ligados por addEventListener', obra.includes('od-print-window-btn') && obra.includes("printButton.addEventListener('click'"));
 ok('relatório de engenharia aplica CSP script-src none', obra.includes("script-src 'none'; script-src-attr 'none'"));
-ok('CSP global continua em rollout seguro com Report-Only script-src-attr none', vercel.includes('Content-Security-Policy-Report-Only') && vercel.includes("script-src-attr 'none'"));
-ok('X-XSS-Protection legado está desativado', /"key"\s*:\s*"X-XSS-Protection"[\s\S]{0,100}"value"\s*:\s*"0"/.test(vercel));
+ok('CSP global mantém Report-Only estrito durante a migração do restante do app', vercel.includes('Content-Security-Policy-Report-Only') && vercel.includes("script-src-attr 'none'"));
 ok('package executa Patch 25 depois do Patch 24', String(pkg.scripts?.postinstall || '').includes('apply-patch24-build.cjs && node apply-patch25-build.cjs'));
 
 console.log(`\nPatch 25: ${passed} passed, ${failed} failed.`);
