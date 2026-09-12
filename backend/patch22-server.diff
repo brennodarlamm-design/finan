@@ -1,4 +1,5 @@
 diff --git a/backend/server.js b/backend/server.js
+index 4c48ebf..bd7c8e1 100644
 --- a/backend/server.js
 +++ b/backend/server.js
 @@ -14,6 +14,7 @@ import makeWASocket, {
