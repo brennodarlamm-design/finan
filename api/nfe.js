@@ -1,7 +1,8 @@
-// api/nfe.js — Proxy Serverless Seguro para Consulta de NF-e via API MeuDanfe
+// api/nfe.js — Proxy Serverless Seguro para Consulta de NF-e via API MeuDanfe & Certificados A1
 
 import { resolveAuthAndTenant } from './_auth.js';
 import { canAccessModule, permissionError } from './_permissions.js';
+import certificadoHandler from './_certificado.js';
 
 const ALLOWED_ORIGINS = [
   'https://finobra.app.br',
@@ -25,7 +26,7 @@ function setCors(req, res) {
   } else {
     res.setHeader('Access-Control-Allow-Origin', '*');
   }
-  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,OPTIONS');
+  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, x-api-key, apikey, x-tenant-id');
 }
 
@@ -36,6 +37,17 @@ export default async function handler(req, res) {
 
   if (req.method === 'OPTIONS') {
     return res.status(200).end();
+  }
+
+  // ── DESPACHO PARA GESTÃO DE CERTIFICADO DIGITAL A1 ───────────────────────
+  const isCertificado = req.query?.sub === 'certificado' ||
+    req.query?.scope === 'certificado' ||
+    String(req.url || '').includes('certificado') ||
+    (req.query?.action && ['upload', 'remover'].includes(req.query.action)) ||
+    (req.query?.action === 'status' && !req.query?.chave && !req.body?.chave);
+
+  if (isCertificado) {
+    return certificadoHandler(req, res);
   }
 
   // ── 0. CONSULTA PÚBLICA DE CNPJ (BrasilAPI) ──────────────────────────────

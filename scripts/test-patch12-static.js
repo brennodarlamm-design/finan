@@ -7,7 +7,9 @@ function ok(name, cond) {
   else { console.error('❌ ' + name); fails++; }
 }
 
-const certApi = read('api/certificado.js');
+const certApi = fs.existsSync('api/_certificado.js') ? read('api/_certificado.js') : read('api/certificado.js');
+const nfeApi = read('api/nfe.js');
+const vercelJson = read('vercel.json');
 const nfeJs = read('js/nfe.js');
 const backend = read('backend/server.js');
 const whatsappApi = read('api/whatsapp.js');
@@ -91,6 +93,15 @@ ok('Interface NFe gerencia certificado via /api/certificado com badges dinâmico
   nfeJs.includes('/api/certificado?action=upload') &&
   nfeJs.includes('/api/certificado?action=remover') &&
   nfeJs.includes('dias restantes')
+);
+
+ok('Vercel não excede 12 Serverless Functions no plano Hobby',
+  fs.readdirSync('api').filter(f => f.endsWith('.js') && !f.startsWith('_')).length <= 12
+);
+
+ok('API de NF-e despacha para _certificado.js e vercel.json possui rewrite de /api/certificado',
+  nfeApi.includes('_certificado.js') &&
+  vercelJson.includes('/api/certificado')
 );
 
 // 3. WhatsApp Multi-Empresa

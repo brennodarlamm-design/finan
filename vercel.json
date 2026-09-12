@@ -19,6 +19,14 @@
       "destination": "/api/users?target=tenant"
     },
     {
+      "source": "/api/certificado",
+      "destination": "/api/nfe?sub=certificado"
+    },
+    {
+      "source": "/api/certificado/(.*)",
+      "destination": "/api/nfe?sub=certificado&$1"
+    },
+    {
       "source": "/api/(.*)",
       "destination": "/api/$1"
     },
