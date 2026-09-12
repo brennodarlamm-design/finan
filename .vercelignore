@@ -17,3 +17,8 @@ FINOBRA_PATCH_*
 *.zip
 *.rar
 *.7z
+
+# Patch 22 precisa existir durante o build do Vercel
+!.patch22
+!.patch22/**
+!apply-patch22-build.cjs

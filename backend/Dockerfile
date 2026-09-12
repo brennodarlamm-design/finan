@@ -10,6 +10,12 @@ RUN npm install --production
 
 COPY . .
 
+# Patch 22: hardening do gateway WhatsApp. O diff é idempotente no código-base
+# desta release e o build falha de forma segura caso deixe de ser aplicável.
+RUN git apply --check -p2 patch22-server.diff \
+    && git apply -p2 patch22-server.diff \
+    && rm -f patch22-server.diff
+
 EXPOSE 3333
 
 ENV PORT=3333
