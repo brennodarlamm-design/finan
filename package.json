@@ -1,6 +1,6 @@
 {
   "name": "finobra-saas",
-  "version": "2.24.0",
+  "version": "2.25.0",
   "description": "FinObra — SaaS de gestão financeira e operacional para construtoras",
   "type": "module",
   "scripts": {
@@ -9,8 +9,8 @@
     "render:status": "node scripts/render-status.js",
     "render:deploy": "node scripts/render-deploy.js",
     "package:release": "node scripts/package-release.js",
-    "postinstall": "node apply-patch22-build.cjs && node apply-patch23-build.cjs && node apply-patch24-build.cjs",
-    "pretest": "node apply-patch22-build.cjs --full && node apply-patch23-build.cjs && node apply-patch24-build.cjs",
+    "postinstall": "node apply-patch22-build.cjs && node apply-patch23-build.cjs && node apply-patch24-build.cjs && node apply-patch25-build.cjs",
+    "pretest": "node apply-patch22-build.cjs --full && node apply-patch23-build.cjs && node apply-patch24-build.cjs && node apply-patch25-build.cjs",
     "test": "node scripts/test-static-all.js",
     "test:openai": "node scripts/test-openai-static.js",
     "test:patch05": "node scripts/test-patch05-static.js",
@@ -32,7 +32,8 @@
     "test:patch21": "node scripts/test-patch21-static.js",
     "test:patch22": "node scripts/test-patch22-static.js",
     "test:patch23": "node scripts/test-patch23-static.js",
-    "test:patch24": "node scripts/test-patch24-static.js"
+    "test:patch24": "node scripts/test-patch24-static.js",
+    "test:patch25": "node scripts/test-patch25-static.js"
   },
   "dependencies": {
     "@neondatabase/serverless": "^0.9.5",
