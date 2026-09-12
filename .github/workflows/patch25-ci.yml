@@ -20,6 +20,8 @@ jobs:
         run: node apply-patch23-build.cjs
       - name: Apply Patch 24
         run: node apply-patch24-build.cjs
+      - name: Prepare Patch 25
+        run: node prepare-patch25-build.cjs
       - name: Apply Patch 25
         run: node apply-patch25-build.cjs
       - name: JavaScript syntax
