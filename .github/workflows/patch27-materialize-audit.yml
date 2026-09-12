@@ -28,3 +28,7 @@ jobs:
             exit 1
           fi
           echo 'Source tree remained byte-stable after the full test suite.'
+      - name: Build Cloudflare static assets
+        run: npm run build:cloudflare
+      - name: Validate Wrangler bundle without publishing
+        run: npx --yes wrangler@latest deploy --dry-run --outdir .wrangler-dryrun
