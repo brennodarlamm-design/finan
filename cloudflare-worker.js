@@ -1,6 +1,7 @@
 const DEFAULT_API_ORIGIN = 'https://finobra.app.br';
 const DEFAULT_CANONICAL_ORIGIN = 'https://finobra.app.br';
 const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
+const LEGACY_RECOVERY_PREFIX = 'legacy:';
 
 function sameOriginBrowserRequest(request) {
   const origin = String(request.headers.get('Origin') || '').trim();
@@ -26,6 +27,24 @@ function canonicalOrigin(env) {
   return url.origin;
 }
 
+function isAuthAction(url, action) {
+  return url.pathname === '/api/auth' && url.searchParams.get('action') === action;
+}
+
+function legacyRecoveryHandle(userId) {
+  return LEGACY_RECOVERY_PREFIX + encodeURIComponent(String(userId));
+}
+
+function legacyUserId(requestId) {
+  const value = String(requestId || '');
+  if (!value.startsWith(LEGACY_RECOVERY_PREFIX)) return '';
+  try {
+    return decodeURIComponent(value.slice(LEGACY_RECOVERY_PREFIX.length));
+  } catch {
+    return '';
+  }
+}
+
 async function proxyApi(request, env) {
   const method = String(request.method || 'GET').toUpperCase();
 
@@ -33,9 +52,10 @@ async function proxyApi(request, env) {
     return Response.json({ ok: false, error: 'Origem não autorizada.' }, { status: 403 });
   }
 
+  let incoming;
   let target;
   try {
-    const incoming = new URL(request.url);
+    incoming = new URL(request.url);
     target = new URL(incoming.pathname + incoming.search, upstreamOrigin(env));
   } catch (err) {
     console.error('[FinObra Cloudflare] configuração de API inválida:', err?.message || err);
@@ -44,7 +64,7 @@ async function proxyApi(request, env) {
 
   const headers = new Headers(request.headers);
   for (const name of [
-    'host', 'cf-connecting-ip', 'cf-ipcountry', 'cf-ray', 'cf-visitor',
+    'host', 'content-length', 'cf-connecting-ip', 'cf-ipcountry', 'cf-ray', 'cf-visitor',
     'x-forwarded-host', 'x-forwarded-proto', 'x-real-ip'
   ]) headers.delete(name);
 
@@ -52,13 +72,58 @@ async function proxyApi(request, env) {
   headers.set('X-FinObra-Edge', 'cloudflare-worker');
 
   const init = { method, headers, redirect: 'manual' };
-  if (!['GET', 'HEAD'].includes(method)) init.body = request.body;
+
+  if (!['GET', 'HEAD'].includes(method)) {
+    const rawBody = await request.arrayBuffer();
+    let body = rawBody;
+
+    // Compatibilidade temporária: o frontend Patch 27 usa requestId opaco,
+    // enquanto a API Vercel atualmente publicada ainda recebe userId.
+    if (isAuthAction(incoming, 'verify_reset') && rawBody.byteLength) {
+      try {
+        const text = new TextDecoder().decode(rawBody);
+        const payload = JSON.parse(text);
+        const userId = legacyUserId(payload?.requestId);
+        if (userId) {
+          payload.userId = userId;
+          delete payload.requestId;
+          body = JSON.stringify(payload);
+          headers.set('Content-Type', 'application/json');
+        }
+      } catch (err) {
+        console.warn('[FinObra Cloudflare] não foi possível normalizar verify_reset legado:', err?.message || err);
+      }
+    }
+
+    init.body = body;
+  }
 
   try {
     const upstream = await fetch(target.toString(), init);
     const responseHeaders = new Headers(upstream.headers);
     responseHeaders.set('X-Content-Type-Options', 'nosniff');
     responseHeaders.set('Referrer-Policy', 'strict-origin-when-cross-origin');
+
+    // Compatibilidade temporária inversa: transforma o userId retornado pela API
+    // antiga em um requestId marcado. O navegador nunca precisa conhecer o contrato legado.
+    if (isAuthAction(incoming, 'request_reset') && upstream.ok) {
+      const data = await upstream.clone().json().catch(() => null);
+      if (data && data.success && !data.requestId && data.userId) {
+        const normalized = {
+          ...data,
+          requestId: legacyRecoveryHandle(data.userId)
+        };
+        delete normalized.userId;
+        responseHeaders.delete('content-length');
+        responseHeaders.set('Content-Type', 'application/json; charset=utf-8');
+        return new Response(JSON.stringify(normalized), {
+          status: upstream.status,
+          statusText: upstream.statusText,
+          headers: responseHeaders
+        });
+      }
+    }
+
     return new Response(upstream.body, {
       status: upstream.status,
       statusText: upstream.statusText,
