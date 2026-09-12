@@ -1,5 +1,3 @@
-/login / 200
-/apresentacao /landing 200
-/comercial /landing 200
-/validar/* /validar 200
-/app/* /app 200
+/login / 302
+/apresentacao /landing 302
+/comercial /landing 302
