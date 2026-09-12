@@ -1,0 +1,33 @@
+name: Patch 27 materialization audit
+
+on:
+  push:
+    branches:
+      - patch27-materialize-build-20260912
+
+permissions:
+  contents: read
+
+jobs:
+  audit-materialized-tree:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build production-equivalent tree
+        run: npm test
+      - name: Syntax verification
+        run: node scripts/check-all-syntax.js
+      - name: Show build-time source drift
+        shell: bash
+        run: |
+          echo '=== Files changed by build overlays ==='
+          git status --short
+          echo
+          echo '=== Diff stat ==='
+          git diff --stat
+          echo
+          echo '=== Unexpected generated files ==='
+          if git status --porcelain | grep -E '(^| )node_modules/|(^| )\.env|(^| )\.vercel/'; then
+            echo 'Unsafe generated files detected.'
+            exit 1
+          fi
