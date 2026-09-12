@@ -1,0 +1,19 @@
+name: Patch 26 CSP migration
+
+on:
+  push:
+    branches:
+      - patch26-csp-global-20260912
+
+permissions:
+  contents: read
+
+jobs:
+  full-suite:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run full FinObra test suite
+        run: npm test
+      - name: Syntax verification
+        run: node scripts/check-all-syntax.js
