@@ -36,19 +36,32 @@ for (const dir of directories) copyRequired(path.join(root, dir), path.join(out,
 copyRequired(path.join(root, 'cloudflare', '_headers'), path.join(out, '_headers'));
 copyRequired(path.join(root, 'cloudflare', '_redirects'), path.join(out, '_redirects'));
 
-// Corrige o fluxo de recuperação diretamente no JS entregue pelo Cloudflare.
-// A API antiga responde success:true genericamente para conta inexistente, mas sem userId/requestId.
-// Nessa situação, não avançamos para OTP e oferecemos o cadastro da conta.
 const loginPagePath = path.join(out, 'js', 'login_page.js');
 let loginPage = fs.readFileSync(loginPagePath, 'utf8');
-const recoveryNeedle = `      const res = await Auth.solicitarCodigoRecuperacao(ident);\n      if (!res.success) {\n        errBox.textContent = res.message;\n        errBox.style.display = 'block';\n        btn.disabled = false;\n        btn.innerHTML = originalText;\n        return;\n      }\n\n      recoveryUserId = res.userId;`;
-const recoveryReplacement = `      const res = await Auth.solicitarCodigoRecuperacao(ident);\n      const recoveryId = res?.requestId || res?.userId || null;\n      const staleCta = document.getElementById('rec-create-account-cta');\n      if (staleCta) staleCta.remove();\n\n      if (!res.success || !recoveryId) {\n        const accountMissing = !!res.success && !recoveryId;\n        errBox.textContent = accountMissing\n          ? (ident.includes('@')\n              ? 'Não encontramos uma conta cadastrada com este e-mail.'\n              : 'Não encontramos uma conta cadastrada com este usuário ou e-mail.')\n          : (res.message || 'Não foi possível iniciar a recuperação.');\n        errBox.style.display = 'block';\n\n        if (accountMissing) {\n          const cta = document.createElement('button');\n          cta.type = 'button';\n          cta.id = 'rec-create-account-cta';\n          cta.className = 'btn-primary';\n          cta.textContent = 'Criar minha conta';\n          cta.style.marginTop = '10px';\n          cta.addEventListener('click', () => {\n            if (typeof closeRecoveryModal === 'function') closeRecoveryModal();\n            if (typeof openRegisterModal === 'function') openRegisterModal();\n            if (ident.includes('@')) {\n              const email = document.getElementById('reg-email');\n              if (email) email.value = ident;\n            } else {\n              const username = document.getElementById('reg-username');\n              if (username) username.value = ident;\n            }\n          });\n          errBox.insertAdjacentElement('afterend', cta);\n        }\n\n        btn.disabled = false;\n        btn.innerHTML = originalText;\n        return;\n      }\n\n      recoveryUserId = recoveryId;`;
 
-if (loginPage.includes(recoveryNeedle)) {
-  loginPage = loginPage.replace(recoveryNeedle, recoveryReplacement);
-} else if (!loginPage.includes("const recoveryId = res?.requestId || res?.userId || null;")) {
+function patchRecoveryFlow(source) {
+  const variants = [
+    {
+      variable: 'recoveryUserId',
+      needle: `      const res = await Auth.solicitarCodigoRecuperacao(ident);\n      if (!res.success) {\n        errBox.textContent = res.message;\n        errBox.style.display = 'block';\n        btn.disabled = false;\n        btn.innerHTML = originalText;\n        return;\n      }\n\n      recoveryUserId = res.userId;`
+    },
+    {
+      variable: 'recoveryRequestId',
+      needle: `      const res = await Auth.solicitarCodigoRecuperacao(ident);\n      if (!res.success) {\n        errBox.textContent = res.message;\n        errBox.style.display = 'block';\n        btn.disabled = false;\n        btn.innerHTML = originalText;\n        return;\n      }\n\n      recoveryRequestId = res.requestId;`
+    }
+  ];
+
+  for (const variant of variants) {
+    if (!source.includes(variant.needle)) continue;
+    const replacement = `      const res = await Auth.solicitarCodigoRecuperacao(ident);\n      const recoveryId = res?.requestId || res?.userId || null;\n      const staleCta = document.getElementById('rec-create-account-cta');\n      if (staleCta) staleCta.remove();\n\n      if (!res.success || !recoveryId) {\n        const accountMissing = !!res.success && !recoveryId;\n        errBox.textContent = accountMissing\n          ? (ident.includes('@')\n              ? 'Não encontramos uma conta cadastrada com este e-mail.'\n              : 'Não encontramos uma conta cadastrada com este usuário ou e-mail.')\n          : (res.message || 'Não foi possível iniciar a recuperação.');\n        errBox.style.display = 'block';\n\n        if (accountMissing) {\n          const cta = document.createElement('button');\n          cta.type = 'button';\n          cta.id = 'rec-create-account-cta';\n          cta.className = 'btn-primary';\n          cta.textContent = 'Criar minha conta';\n          cta.style.marginTop = '10px';\n          cta.addEventListener('click', () => {\n            if (typeof closeRecoveryModal === 'function') closeRecoveryModal();\n            if (typeof openRegisterModal === 'function') openRegisterModal();\n            if (ident.includes('@')) {\n              const email = document.getElementById('reg-email');\n              if (email) email.value = ident;\n            } else {\n              const username = document.getElementById('reg-username');\n              if (username) username.value = ident;\n            }\n          });\n          errBox.insertAdjacentElement('afterend', cta);\n        }\n\n        btn.disabled = false;\n        btn.innerHTML = originalText;\n        return;\n      }\n\n      ${variant.variable} = recoveryId;`;
+    return source.replace(variant.needle, replacement);
+  }
+
+  if (source.includes("const recoveryId = res?.requestId || res?.userId || null;")) return source;
   throw new Error('Não foi possível aplicar o tratamento de conta inexistente em login_page.js.');
 }
+
+loginPage = patchRecoveryFlow(loginPage);
 fs.writeFileSync(loginPagePath, loginPage, 'utf8');
 
 const forbidden = ['api', 'backend', 'bin', 'migrations', 'monitor-nfe', 'node_modules', '.git', '.vercel'];
