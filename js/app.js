@@ -497,11 +497,19 @@ const App = {
       const reason = e.reason;
       report({ message:reason?.message || String(reason || 'Promise rejeitada'), source:'unhandledrejection', stack:reason?.stack || '' });
     });
-    window.addEventListener('securitypolicyviolation', e => report({
-      message:`CSP bloqueou ${e.violatedDirective || 'diretiva'}: ${e.blockedURI || 'inline'}`,
-      source:'csp', line:e.lineNumber || 0, col:e.columnNumber || 0,
-      stack:`effective=${e.effectiveDirective || ''}; disposition=${e.disposition || ''}`
-    }));
+    window.addEventListener('securitypolicyviolation', e => {
+      // Se for Report-Only para script-src-attr (medição transitória de handlers inline do Patch 11),
+      // não polui o painel de erros críticos da construtora. Apenas bloqueios enforced ou outras diretivas geram alerta.
+      if (e.disposition === 'report' && (e.violatedDirective === 'script-src-attr' || e.effectiveDirective === 'script-src-attr')) {
+        return;
+      }
+      report({
+        message:`CSP ${e.disposition === 'report' ? 'mediu' : 'bloqueou'} ${e.violatedDirective || 'diretiva'}: ${e.blockedURI || 'inline'}`,
+        source: e.disposition === 'report' ? 'csp-report' : 'csp',
+        line:e.lineNumber || 0, col:e.columnNumber || 0,
+        stack:`effective=${e.effectiveDirective || ''}; disposition=${e.disposition || ''}`
+      });
+    });
   },
 
   navigate(route, updateHistory = true) {
