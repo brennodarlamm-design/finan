@@ -26,8 +26,12 @@ ok('backend materializado contém autenticação QR HttpOnly', backend.includes(
 ok('backend materializado contém limites de mídia Patch 23', backend.includes('MAX_MEDIA_BYTES = 8 * 1024 * 1024') && backend.includes('forbiddenMime'));
 ok('ObraDetalhe materializado contém bridge Patch 25', obra.includes('FINOBRA_PATCH25_EVENT_BRIDGE'));
 ok('bridge global Patch 26 está versionado', events.includes('FINOBRA_PATCH26_EVENT_BRIDGE') && events.includes('const ALLOWED = new Set('));
+ok('hotfix lexical do Patch 26 está materializado', events.includes('FINOBRA_PATCH26_LEXICAL_ROOTS_HOTFIX') && events.includes('const ROOTS = Object.freeze({'));
+ok('Clientes é resolvido pelo binding lexical antes de globalThis', events.includes("typeof Clientes !== 'undefined' ? Clientes : globalThis[\"Clientes\"]"));
+ok('resolver prefere ROOTS allowlisted antes de globalThis', events.includes('Object.prototype.hasOwnProperty.call(ROOTS, parts[0]) ? ROOTS[parts[0]] : globalThis[parts[0]]'));
 ok('app carrega bridge global materializado', app.includes('/js/patch26-actions.js') && app.includes('/js/patch26-events.js'));
 ok('fonte materializada não usa eval/new Function no bridge global', !/\beval\s*\(|new\s+Function\s*\(/.test(events));
+ok('build Cloudflare não depende dos overlays legados', pkg.scripts?.['build:cloudflare'] === 'node scripts/build-cloudflare-pages.cjs');
 
 console.log(`\nPatch 27: ${failed ? 'FALHOU' : 'OK'}\n`);
 if (failed) process.exit(1);
