@@ -58,6 +58,60 @@ function supportBotReply(text) {
   return 'Posso ajudar com Obras, Financeiro, NF-e/OCR, Medições, OFX, Fornecedores, Contratos, Recibos, Usuários e Permissões, Sessões, Assinaturas, WhatsApp e Planos. Escreva sua dúvida ou clique em “Chamar atendente” para falar com uma pessoa.';
 }
 
+async function getOpenAIBotReply(text) {
+  const apiKey = String(process.env.OPENAI_API_KEY || '').trim();
+  if (!apiKey) return null;
+  if (/(atendente|humano|pessoa|especialista|falar com algu[eé]m)/i.test(String(text || ''))) return null;
+
+  const systemPrompt = `Você é o FinBot, o assistente virtual de inteligência artificial do FinObra (SaaS de gestão financeira e obras para construtoras e engenharia civil).
+Responda de forma clara, educada, prática e objetiva em português do Brasil (máximo 2 a 3 parágrafos curtos).
+O FinObra possui os seguintes módulos e recursos:
+- Obras & Clientes (cadastro, contratos, fases, limites de obras ativas por plano)
+- Orçamentos de Obras (catálogo padrão da construção, planilha orçamentária, insumos, base SINAPI oficial da Caixa com BDI e Leis Sociais)
+- Cronograma Físico-Financeiro (13 macro-etapas de engenharia, distribuição percentual mensal, desembolso previsto vs real)
+- Curva S e Análise de Valor Agregado EVM (BAC, PV, EV, AC, CPI, SPI, estimativa no término EAC e desvio VAC)
+- Curva ABC de Insumos e Serviços (regra de Pareto 80-15-5)
+- BDI Oficial Interativo (fórmula do Acórdão 2622/2013 do TCU com taxas de administração central, seguro, risco e tributos)
+- Exportações Avançadas (Dossiê de Engenharia em Excel .xlsx com 4 abas e fórmulas, e Relatório Oficial de Engenharia em PDF A4 Paisagem para clientes, diretoria e Caixa Econômica, com opção de imprimir tudo junto ou separado)
+- Financeiro (contas a pagar, contas a receber, centro de custo por obra ou sede/escritório, fluxo de caixa, conciliação bancária OFX)
+- Robô de Reconhecimento OCR com IA (leitura automática de comprovantes PIX, TED, boletos, contas de consumo e Notas Fiscais NF-e/NFC-e com pré-cadastro de produtos e lançamentos)
+- Notas Fiscais (consulta SEFAZ, certificado A1 digital, XML, DANFE e vinculação a obras)
+- Medições de Obra (avanço físico, boletins de medição para bancos/Caixa, medições acumuladas)
+- Contratos e Recibos (assinatura eletrônica com QR Code de validação pública no servidor)
+- Pré-Compras e Ordens de Compra (fluxo de solicitação e aprovação para canteiro)
+- Configurações, Usuários (RBAC com perfis e permissões por módulo), Sessões e WhatsApp.
+Se o usuário quiser falar com uma pessoa da equipe ou o assunto for um problema técnico específico, instrua-o com gentileza a clicar no botão "Chamar atendente" na conversa.`;
+
+  try {
+    const res = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`
+      },
+      signal: AbortSignal.timeout(15000),
+      body: JSON.stringify({
+        model: 'gpt-4o-mini',
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: String(text).slice(0, 1000) }
+        ],
+        temperature: 0.3,
+        max_tokens: 500
+      })
+    });
+
+    if (res.ok) {
+      const data = await res.json();
+      const content = data?.choices?.[0]?.message?.content?.trim();
+      if (content) return content;
+    }
+  } catch (err) {
+    console.warn('[FinBot OpenAI] Falha ao consultar ChatGPT:', err.message);
+  }
+  return null;
+}
+
 function getSupportRenderBaseUrl() {
   const custom = String(process.env.RENDER_WHATSAPP_URL || '').trim();
   return custom ? custom.replace(/\/send-message\/?$/, '').replace(/\/+$/, '') : 'https://finan-wf12.onrender.com';
@@ -349,7 +403,15 @@ export default async function handler(req, res) {
             VALUES (${`smsg_${crypto.randomBytes(10).toString('hex')}`},${conversation.id},${auth.tenantId},'system','FinObra',${'Atendimento humano solicitado. Sua conversa entrou na fila do suporte.'});
           `;
         } else if (conversation.status === 'bot') {
-          const reply = supportBotReply(text);
+          let reply = null;
+          try {
+            reply = await getOpenAIBotReply(text);
+          } catch (eBot) {
+            console.warn('[FinBot] Erro ao consultar ChatGPT:', eBot.message);
+          }
+          if (!reply) {
+            reply = supportBotReply(text);
+          }
           if (reply) {
             await sql`
               INSERT INTO support_messages (id,conversation_id,tenant_id,sender_type,sender_name,body)

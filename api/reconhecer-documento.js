@@ -68,9 +68,11 @@ export default async function handler(req, res) {
     });
   }
 
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) {
-    return res.status(500).json({ error: 'GEMINI_API_KEY não configurada no servidor.' });
+  const openaiApiKey = String(process.env.OPENAI_API_KEY || '').trim();
+  const geminiApiKey = String(process.env.GEMINI_API_KEY || '').trim();
+
+  if (!openaiApiKey && !geminiApiKey) {
+    return res.status(500).json({ error: 'Nenhuma chave de IA (OPENAI_API_KEY ou GEMINI_API_KEY) configurada no servidor.' });
   }
 
   const { base64, mimeType } = req.body || {};
@@ -123,106 +125,191 @@ REGRAS CRÍTICAS PARA 'itens' E 'tipo_documento':
 4. valor = total do documento (numero). Datas ISO YYYY-MM-DD. Não invente dados - use null. Retorne APENAS o JSON.`;
 
   try {
-    // Modelos atuais. Mantemos aliases/estáveis recentes em ordem de preferência.
-    const models = [
-      'gemini-3.6-flash',
-      'gemini-3.5-flash',
-      'gemini-flash-latest'
-    ];
+    let ocrResult = null;
+    let provedorUsado = null;
+    let modeloUsado = null;
+    let openaiErrorDetail = null;
+    let geminiErrorDetail = null;
 
-    const payload = {
-      contents: [{
-        parts: [
-          { text: prompt },
-          { inline_data: { mime_type: cleanMime, data: cleanBase64 } }
-        ]
-      }],
-      generationConfig: {
-        temperature: 0.1,
-        maxOutputTokens: 8192,
-        responseMimeType: 'application/json'
-      }
-    };
-
-    let geminiData = null;
-    let lastError = null;
-
-    for (const model of models) {
+    // ── 1. PROVEDOR PRIMÁRIO: OpenAI ChatGPT Vision (gpt-4o-mini) ──
+    if (openaiApiKey) {
       try {
-        const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
-        const geminiRes = await fetch(geminiUrl, {
+        const openaiUrl = 'https://api.openai.com/v1/chat/completions';
+        const openaiPayload = {
+          model: 'gpt-4o-mini',
+          messages: [
+            {
+              role: 'user',
+              content: [
+                { type: 'text', text: prompt },
+                {
+                  type: 'image_url',
+                  image_url: {
+                    url: `data:${cleanMime};base64,${cleanBase64}`,
+                    detail: 'high'
+                  }
+                }
+              ]
+            }
+          ],
+          response_format: { type: 'json_object' },
+          temperature: 0.1,
+          max_tokens: 4096
+        };
+
+        const openaiRes = await fetch(openaiUrl, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          signal: AbortSignal.timeout(20000),
-          body: JSON.stringify(payload)
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${openaiApiKey}`
+          },
+          signal: AbortSignal.timeout(35000),
+          body: JSON.stringify(openaiPayload)
         });
 
-        if (geminiRes.ok) {
-          geminiData = await geminiRes.json();
-          break;
+        if (openaiRes.ok) {
+          const openaiData = await openaiRes.json();
+          const rawText = openaiData?.choices?.[0]?.message?.content || '';
+          if (rawText) {
+            ocrResult = repairJson(rawText);
+            provedorUsado = 'openai';
+            modeloUsado = 'gpt-4o-mini';
+          }
         } else {
-          const errTxt = await geminiRes.text();
-          lastError = `[${model}] HTTP ${geminiRes.status}: ${errTxt.slice(0, 150)}`;
-          console.warn('[OCR] Tentativa falhou com modelo', model, geminiRes.status);
+          const errTxt = await openaiRes.text();
+          let errJson = null;
+          try { errJson = JSON.parse(errTxt); } catch (_) {}
+          openaiErrorDetail = errJson?.error?.message || `HTTP ${openaiRes.status}: ${errTxt.slice(0, 160)}`;
+          console.warn('[OCR] OpenAI Vision respondeu com aviso:', openaiRes.status, openaiErrorDetail);
         }
-      } catch (errNet) {
-        lastError = `[${model}] ${errNet.message}`;
-        console.warn('[OCR] Tentativa falhou com modelo', model, errNet.message);
+      } catch (errNetOpenAI) {
+        openaiErrorDetail = errNetOpenAI.message;
+        console.warn('[OCR] Falha de conexão com OpenAI:', errNetOpenAI.message);
       }
     }
 
-    if (!geminiData) {
-      console.error('[OCR] Todos os modelos Gemini falharam:', lastError);
-      return res.status(502).json({ error: 'Erro na API do Gemini Vision', detalhe: lastError });
+    // ── 2. PROVEDOR SECUNDÁRIO / FALLBACK: Google Gemini Vision ──
+    if (!ocrResult && geminiApiKey) {
+      const models = [
+        'gemini-3.6-flash',
+        'gemini-3.5-flash',
+        'gemini-flash-latest'
+      ];
+
+      const geminiPayload = {
+        contents: [{
+          parts: [
+            { text: prompt },
+            { inline_data: { mime_type: cleanMime, data: cleanBase64 } }
+          ]
+        }],
+        generationConfig: {
+          temperature: 0.1,
+          maxOutputTokens: 8192,
+          responseMimeType: 'application/json'
+        }
+      };
+
+      for (const model of models) {
+        try {
+          const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${geminiApiKey}`;
+          const geminiRes = await fetch(geminiUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            signal: AbortSignal.timeout(20000),
+            body: JSON.stringify(geminiPayload)
+          });
+
+          if (geminiRes.ok) {
+            const geminiData = await geminiRes.json();
+            const parts = geminiData?.candidates?.[0]?.content?.parts || [];
+            let rawText = '';
+            for (const part of parts) {
+              if (part.text) rawText += part.text;
+            }
+            rawText = rawText.trim();
+            if (rawText) {
+              ocrResult = repairJson(rawText);
+              provedorUsado = 'gemini';
+              modeloUsado = model;
+              break;
+            }
+          } else {
+            const errTxt = await geminiRes.text();
+            geminiErrorDetail = `[${model}] HTTP ${geminiRes.status}: ${errTxt.slice(0, 150)}`;
+            console.warn('[OCR] Tentativa falhou com modelo Gemini', model, geminiRes.status);
+          }
+        } catch (errNetGemini) {
+          geminiErrorDetail = `[${model}] ${errNetGemini.message}`;
+          console.warn('[OCR] Tentativa falhou com modelo Gemini', model, errNetGemini.message);
+        }
+      }
     }
 
-    // Extrai o texto de todos os parts da resposta
-    const parts = geminiData?.candidates?.[0]?.content?.parts || [];
-    let rawText = '';
-    for (const part of parts) {
-      if (part.text) rawText += part.text;
-    }
-    rawText = rawText.trim();
-
-    let dadosOCR;
-    try {
-      dadosOCR = repairJson(rawText);
-    } catch (parseErr) {
-      console.error('[OCR] Falha ao parsear JSON do Gemini:', rawText);
-      return res.status(422).json({ error: 'Não foi possível interpretar a resposta da IA.', rawResponse: rawText.slice(0, 500) });
-    }
-
-    dadosOCR.valor     = typeof dadosOCR.valor === 'number' && !isNaN(dadosOCR.valor) ? dadosOCR.valor : null;
-    dadosOCR.itens     = Array.isArray(dadosOCR.itens) ? dadosOCR.itens : [];
-    dadosOCR.confianca = typeof dadosOCR.confianca === 'number' ? Math.min(1, Math.max(0, dadosOCR.confianca)) : 0.5;
-
-    // Normalização rigorosa de Comprovantes Bancários
-    const tipoDoc = (dadosOCR.tipo_documento || '').toLowerCase();
-    const descLower = (dadosOCR.descricao_sugerida || '').toLowerCase();
-    const obsLower = (dadosOCR.observacoes || '').toLowerCase();
-
-    if (/pix/i.test(descLower) || /pix/i.test(obsLower) || tipoDoc.includes('pix')) {
-      dadosOCR.tipo_documento = 'comprovante_pix';
-    } else if (/ted\b|doc\b|transfer[êe]ncia/i.test(descLower) || /ted\b|doc\b|transfer[êe]ncia/i.test(obsLower) || tipoDoc.includes('ted') || tipoDoc.includes('transf')) {
-      dadosOCR.tipo_documento = 'comprovante_ted';
-    } else if (/comprovante/i.test(descLower) || /comprovante/i.test(obsLower) || tipoDoc.includes('comprovante')) {
-      dadosOCR.tipo_documento = 'comprovante';
+    if (!ocrResult) {
+      const mensagens = [];
+      if (openaiErrorDetail) {
+        if (/credit_balance_exhausted|insufficient_quota/i.test(openaiErrorDetail)) {
+          mensagens.push('OpenAI ChatGPT: Créditos esgotados na sua conta OpenAI. Adicione créditos em platform.openai.com/settings/organization/billing.');
+        } else {
+          mensagens.push(`OpenAI ChatGPT: ${openaiErrorDetail}`);
+        }
+      }
+      if (geminiErrorDetail) {
+        mensagens.push(`Google Gemini: ${geminiErrorDetail}`);
+      }
+      const erroConsolidado = mensagens.join(' | ') || 'Nenhum dos provedores de IA conseguiu processar o arquivo.';
+      console.error('[OCR] Falha geral de OCR:', erroConsolidado);
+      return res.status(502).json({
+        error: 'Erro no reconhecimento do documento pelos motores de IA.',
+        detalhe: erroConsolidado,
+        openai: openaiErrorDetail || null,
+        gemini: geminiErrorDetail || null
+      });
     }
 
-    const tipoFinal = (dadosOCR.tipo_documento || '').toLowerCase();
-    const isNotaFiscal = ['nfe', 'nfce', 'nfse', 'danfe', 'cupom_fiscal'].includes(tipoFinal)
-      || Boolean(dadosOCR.chave_acesso && String(dadosOCR.chave_acesso).replace(/\D/g, '').length >= 44);
+    normalizarDadosOCR(ocrResult);
 
-    // Se NÃO for nota fiscal, 'itens' DEVE ser vazio (especialmente para PIX, TED, boletos e contas)
-    if (!isNotaFiscal) {
-      dadosOCR.itens = [];
-    }
-
-    return res.status(200).json({ ok: true, dados: dadosOCR });
+    return res.status(200).json({
+      ok: true,
+      provedor: provedorUsado,
+      modelo: modeloUsado,
+      dados: ocrResult
+    });
 
   } catch (err) {
     console.error('[OCR] Erro inesperado:', err);
     return res.status(500).json({ error: 'Erro interno ao processar o documento.', detalhe: err.message });
+  }
+}
+
+function normalizarDadosOCR(dadosOCR) {
+  if (!dadosOCR || typeof dadosOCR !== 'object') return;
+
+  dadosOCR.valor     = typeof dadosOCR.valor === 'number' && !isNaN(dadosOCR.valor) ? dadosOCR.valor : null;
+  dadosOCR.itens     = Array.isArray(dadosOCR.itens) ? dadosOCR.itens : [];
+  dadosOCR.confianca = typeof dadosOCR.confianca === 'number' ? Math.min(1, Math.max(0, dadosOCR.confianca)) : 0.5;
+
+  // Normalização rigorosa de Comprovantes Bancários
+  const tipoDoc   = (dadosOCR.tipo_documento || '').toLowerCase();
+  const descLower = (dadosOCR.descricao_sugerida || '').toLowerCase();
+  const obsLower  = (dadosOCR.observacoes || '').toLowerCase();
+
+  if (/pix/i.test(descLower) || /pix/i.test(obsLower) || tipoDoc.includes('pix')) {
+    dadosOCR.tipo_documento = 'comprovante_pix';
+  } else if (/ted\b|doc\b|transfer[êe]ncia/i.test(descLower) || /ted\b|doc\b|transfer[êe]ncia/i.test(obsLower) || tipoDoc.includes('ted') || tipoDoc.includes('transf')) {
+    dadosOCR.tipo_documento = 'comprovante_ted';
+  } else if (/comprovante/i.test(descLower) || /comprovante/i.test(obsLower) || tipoDoc.includes('comprovante')) {
+    dadosOCR.tipo_documento = 'comprovante';
+  }
+
+  const tipoFinal = (dadosOCR.tipo_documento || '').toLowerCase();
+  const isNotaFiscal = ['nfe', 'nfce', 'nfse', 'danfe', 'cupom_fiscal'].includes(tipoFinal)
+    || Boolean(dadosOCR.chave_acesso && String(dadosOCR.chave_acesso).replace(/\D/g, '').length >= 44);
+
+  // Se NÃO for nota fiscal, 'itens' DEVE ser vazio (especialmente para PIX, TED, boletos e contas)
+  if (!isNotaFiscal) {
+    dadosOCR.itens = [];
   }
 }
 

@@ -10,6 +10,7 @@
     "render:deploy": "node scripts/render-deploy.js",
     "package:release": "node scripts/package-release.js",
     "test": "node scripts/test-static-all.js",
+    "test:openai": "node scripts/test-openai-static.js",
     "test:patch05": "node scripts/test-patch05-static.js",
     "test:patch06": "node scripts/test-patch06-static.js",
     "test:patch07": "node scripts/test-patch07-static.js",
