@@ -17,8 +17,8 @@ test('Migração audita FKs compostas principais', /fk_lanc_obra_tenant/i.test(m
 test('Master API expõe integridade sem alterar dados', /action === 'integrity_status'/i.test(admin) && /tenant_integrity_audit/i.test(admin));
 test('Painel Master mostra integridade e Blob', /_renderIntegridade/i.test(master) && /Integridade Multi-Tenant/i.test(master));
 test('Monitor captura violações CSP', /securitypolicyviolation/i.test(app));
-test('CSP estrita roda em Report-Only', /Content-Security-Policy-Report-Only/i.test(vercel) && /script-src-attr 'none'/i.test(vercel));
-test('CSP ativa mantém compatibilidade enquanto mede handlers', /script-src-attr 'unsafe-inline'/i.test(vercel));
+test('CSP estrita permanece também em Report-Only para telemetria', /Content-Security-Policy-Report-Only/i.test(vercel) && /script-src-attr 'none'/i.test(vercel));
+test('CSP ativa promove bloqueio de handlers inline', /"key": "Content-Security-Policy"[\s\S]{0,1800}script-src-attr 'none'/i.test(vercel) && !/script-src-attr 'unsafe-inline'/i.test(vercel));
 let versionMeta = {};
 try { versionMeta = JSON.parse(version); } catch {}
 test('Version guard existe', /^20\d{2}\.\d{2}\.\d{2}-p\d+(?:[-._a-z0-9]*)?$/i.test(String(versionMeta.build || '')) && /FINOBRA_BUILD/i.test(guard) && /version\.json/i.test(guard));
