@@ -28,4 +28,5 @@ FINOBRA_PATCH_*
 !.patch24
 !.patch24/**
 !apply-patch24-build.cjs
+!prepare-patch25-build.cjs
 !apply-patch25-build.cjs
