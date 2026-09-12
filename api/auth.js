@@ -380,8 +380,8 @@ export default async function handler(req, res) {
         return res.status(400).json({ success: false, message: 'O nome de usuário deve ter pelo menos 3 caracteres alfanuméricos.' });
       }
 
-      if (userPass.length < 6) {
-        return res.status(400).json({ success: false, message: 'A senha deve ter no mínimo 6 caracteres.' });
+      if (userPass.length < 8) {
+        return res.status(400).json({ success: false, message: 'A senha deve ter no mínimo 8 caracteres.' });
       }
 
       // Verifica se usuário ou e-mail já existe
@@ -399,42 +399,59 @@ export default async function handler(req, res) {
         });
       }
 
-      // Cria Tenant e Usuário Isolados
+      // Criação Atômica de Tenant, Obra Sede e Usuário Administrador (H-13)
       const newTenantId = 'tenant_' + crypto.randomBytes(6).toString('hex');
       const newUserId = 'usr_' + crypto.randomBytes(6).toString('hex');
       const finalEmpresaNome = (empresaNome || rawNome + ' Empreendimentos').trim();
       const passHash = hashPassword(userPass);
 
-      // Trava de segurança SaaS: Cadastro público SEMPRE inicia como plano 'trial' e status 'trial'
-      await sql`
-        INSERT INTO tenants (id, razao_social, nome_fantasia, email, telefone, cnpj, responsavel, plano, status)
-        VALUES (
-          ${newTenantId},
-          ${finalEmpresaNome},
-          ${finalEmpresaNome},
-          ${rawEmail},
-          ${(telefone || '').trim() || null},
-          ${(cnpj || '').trim() || null},
-          ${rawNome},
-          'trial',
-          'trial'
-        );
-      `;
+      try {
+        // Trava de segurança SaaS: Cadastro público SEMPRE inicia como plano 'trial' e status 'trial'
+        await sql`
+          INSERT INTO tenants (id, razao_social, nome_fantasia, email, telefone, cnpj, responsavel, plano, status)
+          VALUES (
+            ${newTenantId},
+            ${finalEmpresaNome},
+            ${finalEmpresaNome},
+            ${rawEmail},
+            ${(telefone || '').trim() || null},
+            ${(cnpj || '').trim() || null},
+            ${rawNome},
+            'trial',
+            'trial'
+          );
+        `;
 
-      await sql`
-        INSERT INTO usuarios (id, tenant_id, username, email, senha_hash, nome, perfil, avatar, ativo)
-        VALUES (
-          ${newUserId},
-          ${newTenantId},
-          ${rawUsername},
-          ${rawEmail},
-          ${passHash},
-          ${rawNome},
-          'admin',
-          ${rawNome.slice(0, 2).toUpperCase()},
-          TRUE
-        );
-      `;
+        // Obra de sistema para integridade de lançamentos administrativos
+        await sql`
+          INSERT INTO obras (id, tenant_id, nome, cliente, status)
+          VALUES ('escritorio', ${newTenantId}, 'Sede / Escritório Central', 'Administrativo', 'sistema')
+          ON CONFLICT (tenant_id, id) DO NOTHING;
+        `;
+
+        await sql`
+          INSERT INTO usuarios (id, tenant_id, username, email, senha_hash, nome, perfil, avatar, ativo)
+          VALUES (
+            ${newUserId},
+            ${newTenantId},
+            ${rawUsername},
+            ${rawEmail},
+            ${passHash},
+            ${rawNome},
+            'admin',
+            ${rawNome.slice(0, 2).toUpperCase()},
+            TRUE
+          );
+        `;
+      } catch (atomicErr) {
+        // Rollback compensatório para evitar tenants ou obras órfãs
+        try {
+          await sql`DELETE FROM usuarios WHERE tenant_id = ${newTenantId};`;
+          await sql`DELETE FROM obras WHERE tenant_id = ${newTenantId};`;
+          await sql`DELETE FROM tenants WHERE id = ${newTenantId};`;
+        } catch {}
+        throw atomicErr;
+      }
 
       const exp = Date.now() + 30 * 24 * 60 * 60 * 1000; // 30 dias
       const sessionId = await createAuthSession(sql, req, { userId:newUserId, tenantId:newTenantId, remember:true, exp });
@@ -714,7 +731,13 @@ export default async function handler(req, res) {
       `;
 
       if (!rows.length) {
-        return res.status(404).json({ success: false, message: 'Nenhuma conta localizada com este usuário ou e-mail.' });
+        // Prevenção contra Enumeração de Contas (H-09): responde com status 200 genérico idêntico
+        return res.status(200).json({
+          success: true,
+          message: 'Se o usuário ou e-mail informado estiver cadastrado em nosso sistema, as instruções e o código de recuperação foram encaminhados com sucesso.',
+          canalInfo: 'Canal seguro cadastrado',
+          whatsappSent: false
+        });
       }
 
       const user = rows[0];
@@ -763,9 +786,11 @@ export default async function handler(req, res) {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
-              'x-api-key': secret
+              'x-api-key': secret,
+              'x-tenant-id': user.tenant_id
             },
             body: JSON.stringify({
+              tenantId: user.tenant_id,
               phone: numFmt,
               message: mensagemOtp
             })
@@ -818,8 +843,8 @@ export default async function handler(req, res) {
         return res.status(400).json({ success: false, message: 'Dados incompletos para redefinição de senha.' });
       }
 
-      if (newPassword.length < 6) {
-        return res.status(400).json({ success: false, message: 'A nova senha deve ter no mínimo 6 caracteres.' });
+      if (newPassword.length < 8) {
+        return res.status(400).json({ success: false, message: 'A nova senha deve ter no mínimo 8 caracteres.' });
       }
 
       const activeResets = await sql`
@@ -849,11 +874,17 @@ export default async function handler(req, res) {
         });
       }
 
-      // Código válido: marca como usado e atualiza senha com novo scrypt hash
-      await sql`UPDATE recuperacao_senhas SET usado = TRUE WHERE id = ${rec.id};`;
+      // Código válido: marca como usado, atualiza senha com novo scrypt hash e revoga sessões anteriores (H-12)
       const newHash = hashPassword(newPassword);
-      await sql`UPDATE usuarios SET senha_hash = ${newHash}, updated_at = NOW() WHERE id = ${userId};`;
-      await sql`UPDATE auth_sessions SET revoked_at=COALESCE(revoked_at,NOW()) WHERE user_id=${userId} AND revoked_at IS NULL;`;
+      await sql`
+        UPDATE recuperacao_senhas SET usado = TRUE WHERE id = ${rec.id};
+      `;
+      await sql`
+        UPDATE usuarios SET senha_hash = ${newHash}, updated_at = NOW() WHERE id = ${userId};
+      `;
+      await sql`
+        UPDATE auth_sessions SET revoked_at = COALESCE(revoked_at, NOW()) WHERE user_id = ${userId} AND revoked_at IS NULL;
+      `;
 
       return res.status(200).json({
         success: true,

@@ -19,5 +19,5 @@ test('Painel Master mostra integridade e Blob', /_renderIntegridade/i.test(maste
 test('Monitor captura violações CSP', /securitypolicyviolation/i.test(app));
 test('CSP estrita roda em Report-Only', /Content-Security-Policy-Report-Only/i.test(vercel) && /script-src-attr 'none'/i.test(vercel));
 test('CSP ativa mantém compatibilidade enquanto mede handlers', /script-src-attr 'unsafe-inline'/i.test(vercel));
-test('Version guard existe', /2026\.09\.11-p(11|12)/.test(version) && /FINOBRA_BUILD/i.test(guard) && /version\.json/i.test(guard));
+test('Version guard existe', /2026\.09\.11-p\d+/.test(version) && /FINOBRA_BUILD/i.test(guard) && /version\.json/i.test(guard));
 console.log(`\nPatch 11: ${passed} passou, ${failed} falhou.`); if(failed) process.exit(1);

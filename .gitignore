@@ -34,3 +34,5 @@ scratch/
 # Evolution API local
 monitor-nfe/evolution-api/.env
 monitor-nfe/xmls/
+*.zip
+.release_temp/

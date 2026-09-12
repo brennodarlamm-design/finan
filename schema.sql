@@ -573,5 +573,25 @@ CREATE TABLE IF NOT EXISTS tenant_whatsapp_auth (
 );
 CREATE INDEX IF NOT EXISTS idx_tenant_whatsapp_auth_tenant ON tenant_whatsapp_auth(tenant_id);
 
+-- ==============================================================================
+-- PATCH 13 — Governança de Migrações e Recuperação Segura de Senhas
+-- ==============================================================================
+CREATE TABLE IF NOT EXISTS schema_migrations (
+    version VARCHAR(64) PRIMARY KEY,
+    applied_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    checksum VARCHAR(64),
+    execution_time_ms INTEGER DEFAULT 0
+);
+CREATE INDEX IF NOT EXISTS idx_schema_migrations_applied_at ON schema_migrations(applied_at DESC);
 
-
+CREATE TABLE IF NOT EXISTS recuperacao_senhas (
+    id VARCHAR(64) PRIMARY KEY,
+    usuario_id VARCHAR(64) NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
+    codigo_hash VARCHAR(255) NOT NULL,
+    tentativas INTEGER DEFAULT 0,
+    max_tentativas INTEGER DEFAULT 3,
+    usado BOOLEAN DEFAULT FALSE,
+    expira_em TIMESTAMP WITH TIME ZONE NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_recuperacao_senhas_user ON recuperacao_senhas(usuario_id, usado, expira_em);

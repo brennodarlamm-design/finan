@@ -874,7 +874,7 @@ export default async function handler(req, res) {
                 ${l.id}, ${tenantId}, ${dataLanc}, ${dataVenc}, ${dataPag}, ${l.descricao}, ${l.categoria || 'Outros'},
                 ${l.fornecedor_beneficiario || ''}, ${l.conta_bancaria || ''}, ${l.tipo || 'despesa'}, ${cleanNum(l.valor)}, ${l.status || 'pendente'},
                 ${safeObraId}, ${safeNotaId}, ${l.codigo_barras || null}, ${l.chave_nfe || null}, ${l.observacoes || ''}, ${!!l.conciliado},
-                ${itensJson}
+                ${itensJson}::jsonb
               )
               ON CONFLICT (id) DO UPDATE SET
                 data = EXCLUDED.data,
@@ -924,7 +924,7 @@ export default async function handler(req, res) {
                 ${vBruto}, ${vImp}, ${vLiq}, ${vTot},
                 ${n.tipo || 'entrada'}, ${n.categoria || 'material'}, ${n.status || 'paga'},
                 ${n.lancamento_id || null}, ${n.observacoes || ''}, ${safeNotaObraId},
-                ${itensNotaJson}
+                ${itensNotaJson}::jsonb
               )
               ON CONFLICT (id) DO UPDATE SET
                 numero_nf = EXCLUDED.numero_nf,
