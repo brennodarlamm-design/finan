@@ -47,9 +47,10 @@ if (!appHtml.includes('/js/patch26-actions.js')) {
   throw new Error('Build Cloudflare sem Patch 26/CSP carregado em app.html.');
 }
 
-const lexicalRoots = fs.readFileSync(path.join(out, 'js', 'clientes.js'), 'utf8');
-if (!lexicalRoots.includes('globalThis.Clientes = Clientes')) {
-  throw new Error('Hotfix 2.26.1 dos botões não foi aplicado antes do build Cloudflare.');
+const bridge = fs.readFileSync(path.join(out, 'js', 'patch26-events.js'), 'utf8');
+if (!bridge.includes('FINOBRA_PATCH26_LEXICAL_ROOTS_HOTFIX') ||
+    !bridge.includes("typeof Clientes !== 'undefined' ? Clientes")) {
+  throw new Error('Hotfix 2.26.1 dos botões não foi aplicado no bridge CSP antes do build Cloudflare.');
 }
 
 console.log('✅ Cloudflare Pages dist preparado com frontend-only, CSP e hotfix 2.26.1.');
