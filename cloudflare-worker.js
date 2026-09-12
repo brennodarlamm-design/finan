@@ -38,6 +38,34 @@ function addRecoveryAliases(payload) {
   return next;
 }
 
+function healthResponse(request, env) {
+  let configuredApiOrigin = null;
+  let configuredCanonicalOrigin = null;
+  let configOk = true;
+  let loopRisk = false;
+  try {
+    configuredApiOrigin = upstreamOrigin(env);
+    configuredCanonicalOrigin = canonicalOrigin(env);
+    loopRisk = configuredApiOrigin === new URL(request.url).origin;
+  } catch {
+    configOk = false;
+  }
+
+  return Response.json({
+    ok: configOk && !loopRisk,
+    service: 'finobra-edge',
+    configuredApiOrigin,
+    configuredCanonicalOrigin,
+    loopRisk
+  }, {
+    status: configOk && !loopRisk ? 200 : 503,
+    headers: {
+      'Cache-Control': 'no-store',
+      'X-Content-Type-Options': 'nosniff'
+    }
+  });
+}
+
 async function proxyApi(request, env) {
   const method = String(request.method || 'GET').toUpperCase();
 
@@ -47,9 +75,17 @@ async function proxyApi(request, env) {
 
   let incoming;
   let target;
+  let apiOrigin;
   try {
     incoming = new URL(request.url);
-    target = new URL(incoming.pathname + incoming.search, upstreamOrigin(env));
+    apiOrigin = upstreamOrigin(env);
+
+    if (apiOrigin === incoming.origin) {
+      console.error('[FinObra Cloudflare] API upstream loop detected:', apiOrigin);
+      return Response.json({ ok: false, error: 'Gateway de API não configurado para este domínio.' }, { status: 503 });
+    }
+
+    target = new URL(incoming.pathname + incoming.search, apiOrigin);
   } catch (err) {
     console.error('[FinObra Cloudflare] configuração de API inválida:', err?.message || err);
     return Response.json({ ok: false, error: 'Gateway de API indisponível.' }, { status: 503 });
@@ -120,6 +156,9 @@ async function proxyApi(request, env) {
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
+    if (url.pathname === '/__finobra/health') {
+      return healthResponse(request, env);
+    }
     if (url.pathname === '/api' || url.pathname.startsWith('/api/')) {
       return proxyApi(request, env);
     }
