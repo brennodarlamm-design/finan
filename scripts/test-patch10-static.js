@@ -34,7 +34,7 @@ test('Master restaura sessão no servidor', /restore_master_session/i.test(admin
 test('Frontend Master não grava token de impersonação', !/setItem\(['"]finobra_token['"],\s*data\.token/i.test(master));
 
 test('CSP está habilitada', /Content-Security-Policy/i.test(vercel) && /object-src 'none'/i.test(vercel) && /frame-ancestors 'self'/i.test(vercel));
-test('CSP bloqueia script inline comum', /script-src 'self'[^;]*; script-src-attr 'unsafe-inline'/i.test(vercel) && !/script-src 'self'[^;]*'unsafe-inline'/i.test(vercel));
+test('CSP bloqueia script inline comum', /script-src 'self'[^;]*;/i.test(vercel) && !/script-src 'self'[^;]*'unsafe-inline'/i.test(vercel) && /script-src-attr 'none'/i.test(vercel));
 test('HTMLs principais não têm bloco script inline', !/<script(?![^>]*\bsrc=)[^>]*>\s*[^<\s]/i.test(htmls));
 test('Scripts de página foram externalizados', /\/js\/login_page\.js/i.test(htmls) && /\/js\/master_page\.js/i.test(htmls) && /\/js\/validar_page\.js/i.test(htmls));
 test('JS e HTML são revalidados após deploy', /\/js\/\(\.\*\)[\s\S]*must-revalidate/i.test(vercel));
