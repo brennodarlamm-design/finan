@@ -101,7 +101,7 @@ const Contas = {
       ${obraAtiva ? `
       <div style="font-size:.82rem;color:var(--text3);display:flex;align-items:center;gap:6px;">
         <span>Obra selecionada no topo:</span>
-        <strong style="color:var(--accent);">${obraAtiva.nome}</strong>
+        <strong style="color:var(--accent);">${Utils.escapeHtml(obraAtiva.nome)}</strong>
       </div>` : ''}
     </div>
 
@@ -233,11 +233,11 @@ const Contas = {
           <div class="g2">
             <div class="form-group">
               <label class="form-label">Agência *</label>
-              <input class="form-control" name="agencia" placeholder="Ex: 0812" value="${conta?.agencia||''}" required>
+              <input class="form-control" name="agencia" placeholder="Ex: 0812" value="${Utils.escapeHtml(conta?.agencia||'')}" required>
             </div>
             <div class="form-group">
               <label class="form-label">Número da Conta *</label>
-              <input class="form-control" name="numero" placeholder="Ex: 60096-3" value="${conta?.numero||''}" required>
+              <input class="form-control" name="numero" placeholder="Ex: 60096-3" value="${Utils.escapeHtml(conta?.numero||'')}" required>
             </div>
           </div>
           <div class="g2">
@@ -247,19 +247,19 @@ const Contas = {
             </div>
             <div class="form-group">
               <label class="form-label">Apelido / Identificação no Sistema</label>
-              <input class="form-control" name="apelido" id="f-conta-apelido" placeholder="Ex: Sicredi Ag:0812 Cc:60096-3" value="${conta?.apelido||''}">
+              <input class="form-control" name="apelido" id="f-conta-apelido" placeholder="Ex: Sicredi Ag:0812 Cc:60096-3" value="${Utils.escapeHtml(conta?.apelido||'')}">
             </div>
           </div>
           <div class="form-group">
             <label class="form-label">Obra Vinculada (opcional)</label>
             <select class="form-control" name="obra_id">
               <option value="">Todas as obras / Geral da Construtora</option>
-              ${clientes.map(c => `<option value="${c.id}" ${conta?.obra_id===c.id?'selected':''}>${c.nome} &mdash; ${c.cidade || ''}</option>`).join('')}
+              ${clientes.map(c => `<option value="${Utils.escapeHtml(c.id)}" ${conta?.obra_id===c.id?'selected':''}>${Utils.escapeHtml(c.nome)} &mdash; ${Utils.escapeHtml(c.cidade || '')}</option>`).join('')}
             </select>
           </div>
           <div class="form-group">
             <label class="form-label">Observações</label>
-            <textarea class="form-control" name="obs" rows="2" placeholder="Informações adicionais para a conciliação bancária...">${conta?.obs||''}</textarea>
+            <textarea class="form-control" name="obs" rows="2" placeholder="Informações adicionais para a conciliação bancária...">${Utils.escapeHtml(conta?.obs||'')}</textarea>
           </div>
           <div class="modal-footer">
             <button type="button" class="btn btn-secondary" onclick="Utils.closeModal()">Cancelar</button>

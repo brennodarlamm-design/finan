@@ -145,11 +145,11 @@ const Configuracoes = {
           <div class="g2">
             <div class="form-group">
               <label class="form-label">Nome Fantasia *</label>
-              <input class="form-control" name="nome_fantasia" id="cfg-emp-fantasia" value="${emp.nome_fantasia || ''}" required placeholder="Ex: Silva &amp; Souza Engenharia">
+              <input class="form-control" name="nome_fantasia" id="cfg-emp-fantasia" value="${this._esc(emp.nome_fantasia || '')}" required placeholder="Ex: Silva &amp; Souza Engenharia">
             </div>
             <div class="form-group">
               <label class="form-label">Raz&atilde;o Social</label>
-              <input class="form-control" name="razao_social" id="cfg-emp-razao" value="${emp.razao_social || emp.nome_fantasia || ''}" placeholder="Ex: Silva &amp; Souza Construtora LTDA">
+              <input class="form-control" name="razao_social" id="cfg-emp-razao" value="${this._esc(emp.razao_social || emp.nome_fantasia || '')}" placeholder="Ex: Silva &amp; Souza Construtora LTDA">
             </div>
           </div>
 
@@ -157,46 +157,46 @@ const Configuracoes = {
             <div class="form-group">
               <label class="form-label">CNPJ ou CPF</label>
               <div style="display:flex;gap:6px;">
-                <input class="form-control" name="cnpj" id="cfg-emp-cnpj" value="${emp.cnpj || ''}" placeholder="00.000.000/0001-00">
+                <input class="form-control" name="cnpj" id="cfg-emp-cnpj" value="${this._esc(emp.cnpj || '')}" placeholder="00.000.000/0001-00">
                 <button type="button" class="btn btn-secondary btn-sm" onclick="Configuracoes.buscarCnpj()" title="Buscar dados do CNPJ na Receita">🔍</button>
               </div>
             </div>
             <div class="form-group">
               <label class="form-label">Telefone / WhatsApp</label>
-              <input class="form-control" name="telefone" id="cfg-emp-tel" value="${emp.telefone || ''}" placeholder="(00) 90000-0000">
+              <input class="form-control" name="telefone" id="cfg-emp-tel" value="${this._esc(emp.telefone || '')}" placeholder="(00) 90000-0000">
             </div>
           </div>
 
           <div class="g2">
             <div class="form-group">
               <label class="form-label">E-mail Comercial</label>
-              <input class="form-control" name="email" id="cfg-emp-email" type="email" value="${emp.email || ''}" placeholder="contato@empresa.com">
+              <input class="form-control" name="email" id="cfg-emp-email" type="email" value="${this._esc(emp.email || '')}" placeholder="contato@empresa.com">
             </div>
             <div class="form-group">
               <label class="form-label">Endere&ccedil;o Completo</label>
-              <input class="form-control" name="endereco" id="cfg-emp-end" value="${emp.endereco || ''}" placeholder="Rua, N&uacute;mero, Bairro">
+              <input class="form-control" name="endereco" id="cfg-emp-end" value="${this._esc(emp.endereco || '')}" placeholder="Rua, N&uacute;mero, Bairro">
             </div>
           </div>
 
           <div class="g2">
             <div class="form-group">
               <label class="form-label">Cidade</label>
-              <input class="form-control" name="cidade" id="cfg-emp-cidade" value="${emp.cidade || ''}" placeholder="Cidade">
+              <input class="form-control" name="cidade" id="cfg-emp-cidade" value="${this._esc(emp.cidade || '')}" placeholder="Cidade">
             </div>
             <div class="form-group">
               <label class="form-label">UF (Estado)</label>
-              <input class="form-control" name="uf" id="cfg-emp-uf" value="${emp.uf || ''}" placeholder="UF" maxlength="2" style="text-transform:uppercase;">
+              <input class="form-control" name="uf" id="cfg-emp-uf" value="${this._esc(emp.uf || '')}" placeholder="UF" maxlength="2" style="text-transform:uppercase;">
             </div>
           </div>
 
           <div class="g2">
             <div class="form-group">
               <label class="form-label">Respons&aacute;vel T&eacute;cnico / Engenheiro</label>
-              <input class="form-control" name="responsavel" id="cfg-emp-resp" value="${emp.responsavel || ''}" placeholder="Nome do respons&aacute;vel">
+              <input class="form-control" name="responsavel" id="cfg-emp-resp" value="${this._esc(emp.responsavel || '')}" placeholder="Nome do respons&aacute;vel">
             </div>
             <div class="form-group">
               <label class="form-label">Registro Profissional (CREA / CAU)</label>
-              <input class="form-control" name="crea_cau" id="cfg-emp-crea" value="${emp.crea_cau || ''}" placeholder="Ex: CREA-SP 12345/D">
+              <input class="form-control" name="crea_cau" id="cfg-emp-crea" value="${this._esc(emp.crea_cau || '')}" placeholder="Ex: CREA-SP 12345/D">
             </div>
           </div>
 
@@ -249,7 +249,7 @@ const Configuracoes = {
               </div>
             </div>
 
-            <input type="hidden" name="logo_url" id="cfg-emp-logo" value="${emp.logo_url || ''}">
+            <input type="hidden" name="logo_url" id="cfg-emp-logo" value="${this._esc(emp.logo_url || '')}">
           </div>
 
           <button type="submit" class="btn btn-primary" style="margin-top:10px;">
@@ -272,7 +272,7 @@ const Configuracoes = {
                 <div style="font-size:.68rem;text-transform:uppercase;letter-spacing:.06em;color:var(--text3);margin-bottom:8px;font-weight:700;">No Menu Lateral (Escuro)</div>
                 <div id="cfg-logo-preview-dark" style="display:inline-flex;align-items:center;justify-content:center;padding:2px;border-radius:8px;background:rgba(255,255,255,0.02);border:1px solid rgba(201,162,39,0.25);">
                   ${emp.logo_url 
-                    ? `<img id="cfg-preview-logo-img-dark" src="${emp.logo_url}" alt="Logo" style="max-height:48px;max-width:180px;width:auto;height:auto;object-fit:contain;border-radius:6px;display:block;">` 
+                    ? `<img id="cfg-preview-logo-img-dark" src="${(typeof Utils !== 'undefined' && Utils.safeUrl) ? Utils.safeUrl(emp.logo_url) : emp.logo_url}" alt="Logo" style="max-height:48px;max-width:180px;width:auto;height:auto;object-fit:contain;border-radius:6px;display:block;">` 
                     : `<div style="width:42px;height:42px;border-radius:10px;background:linear-gradient(135deg,#1C2D12,#243818);border:1px solid rgba(201,162,39,.4);display:inline-flex;align-items:center;justify-content:center;font-size:1.4rem;">🏢</div>`}
                 </div>
               </div>
@@ -282,20 +282,20 @@ const Configuracoes = {
                 <div style="font-size:.68rem;text-transform:uppercase;letter-spacing:.06em;color:#64748b;margin-bottom:8px;font-weight:700;">No Dossiê / Papel A4 (Claro)</div>
                 <div id="cfg-logo-preview-light" style="display:inline-flex;align-items:center;justify-content:center;padding:2px;">
                   ${emp.logo_url 
-                    ? `<img id="cfg-preview-logo-img-light" src="${emp.logo_url}" alt="Logo" style="max-height:48px;max-width:180px;width:auto;height:auto;object-fit:contain;border-radius:6px;display:block;">` 
-                    : `<div style="font-size:1rem;font-weight:900;color:#0f172a;">🏢 ${emp.nome_fantasia || 'Construtora'}</div>`}
+                    ? `<img id="cfg-preview-logo-img-light" src="${(typeof Utils !== 'undefined' && Utils.safeUrl) ? Utils.safeUrl(emp.logo_url) : emp.logo_url}" alt="Logo" style="max-height:48px;max-width:180px;width:auto;height:auto;object-fit:contain;border-radius:6px;display:block;">` 
+                    : `<div style="font-size:1rem;font-weight:900;color:#0f172a;">🏢 ${this._esc(emp.nome_fantasia || 'Construtora')}</div>`}
                 </div>
               </div>
             </div>
 
             <div style="font-size:1.2rem;font-weight:900;background:linear-gradient(135deg,var(--accent2),var(--accent));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;">
-              ${emp.nome_fantasia || 'Nome da Construtora'}
+              ${this._esc(emp.nome_fantasia || 'Nome da Construtora')}
             </div>
             <div style="color:var(--text2);font-size:.82rem;margin-top:2px;">
-              ${emp.razao_social || 'Razão Social Não Informada'}
+              ${this._esc(emp.razao_social || 'Razão Social Não Informada')}
             </div>
             <div style="color:var(--text3);font-size:.76rem;margin-top:8px;">
-              CNPJ: ${emp.cnpj || '00.000.000/0000-00'} &middot; ${emp.cidade || 'Cidade'}/${emp.uf || 'UF'}
+              CNPJ: ${this._esc(emp.cnpj || '00.000.000/0000-00')} &middot; ${this._esc(emp.cidade || 'Cidade')}/${this._esc(emp.uf || 'UF')}
             </div>
 
             <!-- CARD INTEGRAÇÃO WHATSAPP & ALERTAS -->

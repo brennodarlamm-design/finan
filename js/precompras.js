@@ -302,6 +302,8 @@ const PreCompras = {
     const isEdit = !!item;
     const user = Auth.getUser();
     const obraIdPadrao = App.obraId !== 'todas' ? App.obraId : (item?.obra_id || '');
+    const esc = v => (typeof Utils !== 'undefined' && Utils.escapeHtml) ? Utils.escapeHtml(String(v ?? '')) : String(v ?? '');
+    const safeId = encodeURIComponent(String(id || ''));
 
     this._itensTemp = item?.itens ? JSON.parse(JSON.stringify(item.itens)) : [
       { id: 'it_' + Date.now(), descricao: '', unidade: 'un', quantidade: 1, valor_unitario: 0, subtotal: 0 }
@@ -320,14 +322,14 @@ const PreCompras = {
           <button class="modal-close" onclick="Utils.closeModal()">✕</button>
         </div>
 
-        <form id="form-precompra" onsubmit="PreCompras.salvar(event, '${id || ''}')" style="display:flex;flex-direction:column;flex:1;overflow:hidden;">
+        <form id="form-precompra" onsubmit="PreCompras.salvar(event, decodeURIComponent('${safeId}'))" style="display:flex;flex-direction:column;flex:1;overflow:hidden;">
           <div class="modal-body" style="padding:20px;overflow-y:auto;flex:1;">
             
             <!-- Linha 1: Número, Obra, Solicitante -->
             <div class="g3" style="margin-bottom:14px;">
               <div class="form-group">
                 <label class="form-label">Nº da Ordem</label>
-                <input class="form-control" name="numero_ordem" value="${item?.numero_ordem || this._proximoNumeroOrdem()}" readonly style="background:rgba(0,0,0,0.3);font-family:monospace;font-weight:800;color:var(--accent2);">
+                <input class="form-control" name="numero_ordem" value="${esc(item?.numero_ordem || this._proximoNumeroOrdem())}" readonly style="background:rgba(0,0,0,0.3);font-family:monospace;font-weight:800;color:var(--accent2);">
               </div>
               <div class="form-group">
                 <label class="form-label">Obra / Cliente *</label>
@@ -337,7 +339,7 @@ const PreCompras = {
               </div>
               <div class="form-group">
                 <label class="form-label">Solicitante</label>
-                <input class="form-control" name="solicitante_nome" value="${item?.solicitante_nome || user?.nome || 'Gestor'}" required>
+                <input class="form-control" name="solicitante_nome" value="${esc(item?.solicitante_nome || user?.nome || 'Gestor')}" required>
               </div>
             </div>
 
@@ -345,7 +347,7 @@ const PreCompras = {
             <div class="g3" style="margin-bottom:14px;">
               <div class="form-group" style="grid-column: span 1;">
                 <label class="form-label">Título / Descrição Resumida *</label>
-                <input class="form-control" name="descricao" value="${item?.descricao || ''}" placeholder="Ex: Compra de Aço para Vigamento" required>
+                <input class="form-control" name="descricao" value="${esc(item?.descricao || '')}" placeholder="Ex: Compra de Aço para Vigamento" required>
               </div>
               <div class="form-group">
                 <label class="form-label">Categoria *</label>
@@ -379,11 +381,11 @@ const PreCompras = {
                   </select>
                   <button type="button" class="btn btn-secondary btn-sm" onclick="Fornecedores.showForm()" title="Cadastrar novo" style="white-space:nowrap;font-size:.74rem;padding:6px 10px;">+ Novo</button>
                 </div>
-                <input class="form-control" name="fornecedor_nome" id="pc-forn-manual" value="${item?.fornecedor_nome||''}" placeholder="Ou digite o nome do fornecedor" style="margin-top:6px;display:${item?.fornecedor_nome && !(typeof Fornecedores !== 'undefined' && Fornecedores.getByNome(item?.fornecedor_nome)) ? 'block' : 'none'};">
+                <input class="form-control" name="fornecedor_nome" id="pc-forn-manual" value="${esc(item?.fornecedor_nome||'')}" placeholder="Ou digite o nome do fornecedor" style="margin-top:6px;display:${item?.fornecedor_nome && !(typeof Fornecedores !== 'undefined' && Fornecedores.getByNome(item?.fornecedor_nome)) ? 'block' : 'none'};">
               </div>
               <div class="form-group">
                 <label class="form-label">CNPJ / CPF Fornecedor</label>
-                <input class="form-control" name="fornecedor_cnpj" id="pc-forn-cnpj" value="${item?.fornecedor_cnpj || ''}" placeholder="00.000.000/0000-00">
+                <input class="form-control" name="fornecedor_cnpj" id="pc-forn-cnpj" value="${esc(item?.fornecedor_cnpj || '')}" placeholder="00.000.000/0000-00">
               </div>
               <div class="form-group">
                 <label class="form-label">Data Solicitação</label>
@@ -399,11 +401,11 @@ const PreCompras = {
             <div class="g2" style="margin-bottom:18px;">
               <div class="form-group">
                 <label class="form-label">Condição / Forma de Pagamento Prevista</label>
-                <input class="form-control" name="forma_pagamento" value="${item?.forma_pagamento || ''}" placeholder="Ex: Boleto 28 DDL, Pix à Vista, 3x no Cartão">
+                <input class="form-control" name="forma_pagamento" value="${esc(item?.forma_pagamento || '')}" placeholder="Ex: Boleto 28 DDL, Pix à Vista, 3x no Cartão">
               </div>
               <div class="form-group">
                 <label class="form-label">Justificativa / Aplicação na Obra</label>
-                <input class="form-control" name="justificativa" value="${item?.justificativa || ''}" placeholder="Ex: Execução da etapa 2 de fundação e pilares">
+                <input class="form-control" name="justificativa" value="${esc(item?.justificativa || '')}" placeholder="Ex: Execução da etapa 2 de fundação e pilares">
               </div>
             </div>
 
@@ -479,11 +481,12 @@ const PreCompras = {
     }
 
     const unidades = ['un', 'm', 'm²', 'm³', 'kg', 'sc', 'cx', 'barra', 'dz', 'dia', 'vb', 'h', 'l'];
+    const esc = v => (typeof Utils !== 'undefined' && Utils.escapeHtml) ? Utils.escapeHtml(String(v ?? '')) : String(v ?? '');
 
     return this._itensTemp.map((it, idx) => `
       <tr data-idx="${idx}">
         <td>
-          <input type="text" class="form-control" value="${it.descricao || ''}" placeholder="Ex: Cimento CP-II 50kg" oninput="PreCompras._atualizarItem(${idx}, 'descricao', this.value)" required style="padding:6px 8px;font-size:.8rem;">
+          <input type="text" class="form-control" value="${esc(it.descricao || '')}" placeholder="Ex: Cimento CP-II 50kg" oninput="PreCompras._atualizarItem(${idx}, 'descricao', this.value)" required style="padding:6px 8px;font-size:.8rem;">
         </td>
         <td>
           <select class="form-control" onchange="PreCompras._atualizarItem(${idx}, 'unidade', this.value)" style="padding:6px 4px;font-size:.8rem;">
@@ -697,10 +700,11 @@ const PreCompras = {
   abrirAnexosNotaFiscal(id) {
     const p = DB.getById('precompras', id);
     if (!p) return;
+    const esc = v => (typeof Utils !== 'undefined' && Utils.escapeHtml) ? Utils.escapeHtml(String(v ?? '')) : String(v ?? '');
     if (typeof Documentos !== 'undefined') {
       const fn = Documentos.showModalAnexos || Documentos.abrirModal;
       fn.call(Documentos, 'precompra', p.id, {
-        titulo: 'Anexos da Ordem ' + p.numero_ordem + ' — ' + p.descricao,
+        titulo: 'Anexos da Ordem ' + esc(p.numero_ordem) + ' — ' + esc(p.descricao),
         descricao: 'Anexe Notas Fiscais (NF-e/DANFE), propostas comerciais e orçamentos em PDF ou imagem.'
       });
     } else {

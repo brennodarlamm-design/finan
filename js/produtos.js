@@ -4,6 +4,11 @@ const Produtos = {
   _limit: 30,
   _lastSyncTime: 0,
 
+  _esc(v) {
+    if (typeof Utils !== 'undefined' && Utils.escapeHtml) return Utils.escapeHtml(String(v ?? ''));
+    return String(v ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  },
+
   CATEGORIAS: [
     { value: 'material',    label: '🧱 Material de Construção' },
     { value: 'mao_de_obra', label: '👷 Mão de Obra' },
@@ -157,22 +162,23 @@ const Produtos = {
     return lista.map((p, i) => {
       const a = analiseMap[p.id] || { total: 0, qtd_total: 0, compras: 0 };
       const catLabel = this.CATEGORIAS.find(c => c.value === p.categoria)?.label || p.categoria || '—';
+      const safeId = encodeURIComponent(String(p.id || ''));
       return `<tr style="background:${i%2===0?'var(--bg-card)':'var(--bg-secondary)'}">
-        <td style="font-family:monospace;font-size:.78rem;color:var(--text3);">${p.codigo || '—'}</td>
+        <td style="font-family:monospace;font-size:.78rem;color:var(--text3);">${this._esc(p.codigo || '—')}</td>
         <td>
-          <div style="font-weight:700;color:var(--text);">${p.nome}</div>
-          ${p.observacoes ? `<div style="font-size:.72rem;color:var(--text3);">${p.observacoes}</div>` : ''}
+          <div style="font-weight:700;color:var(--text);">${this._esc(p.nome)}</div>
+          ${p.observacoes ? `<div style="font-size:.72rem;color:var(--text3);">${this._esc(p.observacoes)}</div>` : ''}
         </td>
-        <td style="font-size:.82rem;">${catLabel}</td>
-        <td style="font-size:.82rem;color:var(--text2);">${p.unidade || 'un'}</td>
+        <td style="font-size:.82rem;">${this._esc(catLabel)}</td>
+        <td style="font-size:.82rem;color:var(--text2);">${this._esc(p.unidade || 'un')}</td>
         <td style="font-weight:600;color:var(--accent2);">${Utils.fmt.currency(p.valor_medio || 0)}</td>
-        <td style="text-align:right;font-weight:700;color:var(--text);">${(a.qtd_total || 0).toLocaleString('pt-BR', {maximumFractionDigits:2})} ${p.unidade || 'un'}</td>
+        <td style="text-align:right;font-weight:700;color:var(--text);">${(a.qtd_total || 0).toLocaleString('pt-BR', {maximumFractionDigits:2})} ${this._esc(p.unidade || 'un')}</td>
         <td style="text-align:right;font-weight:800;color:${a.total > 0 ? 'var(--danger)' : 'var(--text3)'};">${a.total > 0 ? Utils.fmt.currency(a.total) : '—'}</td>
         <td style="text-align:center;">
           <div style="display:flex;gap:4px;justify-content:center;">
-            ${a.compras > 0 ? `<button class="btn btn-sm btn-secondary" onclick="Produtos.verHistorico('${p.id}')" title="Ver histórico" style="font-size:.72rem;padding:3px 7px;">📋 ${a.compras}</button>` : ''}
-            <button class="icon-btn" onclick="Produtos.showForm('${p.id}')" title="Editar" style="font-size:13px;">✏️</button>
-            <button class="icon-btn" onclick="Produtos.del('${p.id}')" title="Excluir" style="font-size:13px;color:var(--danger);">🗑️</button>
+            ${a.compras > 0 ? `<button class="btn btn-sm btn-secondary" onclick="Produtos.verHistorico(decodeURIComponent('${safeId}'))" title="Ver histórico" style="font-size:.72rem;padding:3px 7px;">📋 ${a.compras}</button>` : ''}
+            <button class="icon-btn" onclick="Produtos.showForm(decodeURIComponent('${safeId}'))" title="Editar" style="font-size:13px;">✏️</button>
+            <button class="icon-btn" onclick="Produtos.del(decodeURIComponent('${safeId}'))" title="Excluir" style="font-size:13px;color:var(--danger);">🗑️</button>
           </div>
         </td>
       </tr>`;
@@ -185,6 +191,7 @@ const Produtos = {
   showForm(id = null) {
     const p = id ? DB.getById('produtos', id) || {} : {};
     const isEdit = !!id;
+    const safeId = encodeURIComponent(String(id || ''));
     Utils.showModal(`
       <div class="modal" style="max-width:520px;">
         <div class="modal-header">
@@ -196,11 +203,11 @@ const Produtos = {
             <div class="form-row cols-2" style="margin-bottom:14px;">
               <div class="form-group">
                 <label class="form-label">Nome / Descrição *</label>
-                <input class="form-control" name="nome" value="${p.nome || ''}" required placeholder="Ex: Cimento Portland CP-II 50kg">
+                <input class="form-control" name="nome" value="${this._esc(p.nome || '')}" required placeholder="Ex: Cimento Portland CP-II 50kg">
               </div>
               <div class="form-group">
                 <label class="form-label">Código Interno</label>
-                <input class="form-control" name="codigo" value="${p.codigo || ''}" placeholder="Ex: CIM001">
+                <input class="form-control" name="codigo" value="${this._esc(p.codigo || '')}" placeholder="Ex: CIM001">
               </div>
             </div>
             <div class="form-row cols-3" style="margin-bottom:14px;">
@@ -212,7 +219,7 @@ const Produtos = {
               </div>
               <div class="form-group">
                 <label class="form-label">Unidade *</label>
-                <input class="form-control" name="unidade" value="${p.unidade || 'un'}" required placeholder="sc, m², kg, un">
+                <input class="form-control" name="unidade" value="${this._esc(p.unidade || 'un')}" required placeholder="sc, m², kg, un">
               </div>
               <div class="form-group">
                 <label class="form-label">Valor Médio (R$)</label>
@@ -222,17 +229,17 @@ const Produtos = {
             </div>
             <div class="form-group" style="margin-bottom:14px;">
               <label class="form-label">Fornecedor Principal</label>
-              <input class="form-control" name="fornecedor_principal" value="${p.fornecedor_principal || ''}" placeholder="Fornecedor habitual">
+              <input class="form-control" name="fornecedor_principal" value="${this._esc(p.fornecedor_principal || '')}" placeholder="Fornecedor habitual">
             </div>
             <div class="form-group">
               <label class="form-label">Observações / Especificações</label>
-              <textarea class="form-control" name="observacoes" rows="2" placeholder="Marca, especificações técnicas...">${p.observacoes || ''}</textarea>
+              <textarea class="form-control" name="observacoes" rows="2" placeholder="Marca, especificações técnicas...">${this._esc(p.observacoes || '')}</textarea>
             </div>
           </form>
         </div>
         <div class="modal-footer">
           <button class="btn btn-secondary" onclick="Utils.closeModal()">Cancelar</button>
-          <button class="btn btn-primary" onclick="Produtos.save('${id || ''}')">${isEdit ? '✔ Salvar' : '+ Cadastrar'}</button>
+          <button class="btn btn-primary" onclick="Produtos.save(decodeURIComponent('${safeId}'))">${isEdit ? '✔ Salvar' : '+ Cadastrar'}</button>
         </div>
       </div>`);
   },
@@ -338,13 +345,13 @@ const Produtos = {
 
     const linhas = analise.map((p, i) => {
       const pct = totalGeral > 0 ? ((p.total / totalGeral) * 100).toFixed(1) : '0.0';
-      const obras = [...p.obras].join(', ');
+      const obras = [...p.obras].map(o => this._esc(o)).join(', ');
       const det = p.historico.sort((a, b) => (b.data || '').localeCompare(a.data || '')).slice(0, 5)
-        .map(h => `<li style="font-size:.72rem;color:var(--text3);">${Utils.fmt.date(h.data)} — ${h.desc} (${h.qtd} ${p.unidade} = ${Utils.fmt.currency(h.valor)}) <em>${h.fonte}</em></li>`).join('');
+        .map(h => `<li style="font-size:.72rem;color:var(--text3);">${Utils.fmt.date(h.data)} — ${this._esc(h.desc)} (${h.qtd} ${this._esc(p.unidade)} = ${Utils.fmt.currency(h.valor)}) <em>${this._esc(h.fonte)}</em></li>`).join('');
       return `
         <tr style="background:${i%2===0?'var(--bg-card)':'var(--bg-secondary)'};cursor:pointer;" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'table-row':'none'">
-          <td style="padding:10px 12px;"><div style="font-weight:700;color:var(--text);">${p.nome}</div><div style="font-size:.72rem;color:var(--text3);">${obras}</div></td>
-          <td style="padding:10px 12px;text-align:right;color:var(--text2);font-size:.82rem;">${p.qtd_total.toLocaleString('pt-BR',{maximumFractionDigits:2})} ${p.unidade}</td>
+          <td style="padding:10px 12px;"><div style="font-weight:700;color:var(--text);">${this._esc(p.nome)}</div><div style="font-size:.72rem;color:var(--text3);">${obras}</div></td>
+          <td style="padding:10px 12px;text-align:right;color:var(--text2);font-size:.82rem;">${p.qtd_total.toLocaleString('pt-BR',{maximumFractionDigits:2})} ${this._esc(p.unidade)}</td>
           <td style="padding:10px 12px;text-align:right;">
             <div style="font-weight:800;color:var(--danger);">${Utils.fmt.currency(p.total)}</div>
             <div style="height:4px;background:var(--border);border-radius:2px;margin-top:4px;"><div style="height:4px;background:var(--danger);border-radius:2px;width:${pct}%;"></div></div>
@@ -416,34 +423,35 @@ const Produtos = {
     const ordenados = (dados.historico || []).sort((a, b) => (b.data || '').localeCompare(a.data || ''));
     const totalHistorico = ordenados.length;
     const historicoVisivel = limit ? ordenados.slice(0, limit) : ordenados;
+    const safeProdId = encodeURIComponent(String(produtoId || ''));
 
     const linhas = historicoVisivel.map((h, i) => `
       <tr style="background:${i%2===0?'var(--bg-card)':'var(--bg-secondary)'}">
         <td style="padding:8px 12px;font-size:.78rem;">${Utils.fmt.date(h.data)}</td>
-        <td style="padding:8px 12px;font-size:.78rem;color:var(--text2);">${h.desc}</td>
-        <td style="padding:8px 12px;font-size:.78rem;color:var(--text2);">${h.obra}</td>
-        <td style="padding:8px 12px;text-align:right;font-weight:700;">${(h.qtd||0).toLocaleString('pt-BR',{maximumFractionDigits:2})} ${p.unidade}</td>
+        <td style="padding:8px 12px;font-size:.78rem;color:var(--text2);">${this._esc(h.desc)}</td>
+        <td style="padding:8px 12px;font-size:.78rem;color:var(--text2);">${this._esc(h.obra)}</td>
+        <td style="padding:8px 12px;text-align:right;font-weight:700;">${(h.qtd||0).toLocaleString('pt-BR',{maximumFractionDigits:2})} ${this._esc(p.unidade)}</td>
         <td style="padding:8px 12px;text-align:right;font-weight:800;color:var(--danger);">${Utils.fmt.currency(h.valor)}</td>
-        <td style="padding:8px 12px;"><span class="badge ${h.fonte==='Nota Fiscal'?'badge-info':'badge-accent'}" style="font-size:.68rem;">${h.fonte}</span></td>
+        <td style="padding:8px 12px;"><span class="badge ${h.fonte==='Nota Fiscal'?'badge-info':'badge-accent'}" style="font-size:.68rem;">${this._esc(h.fonte)}</span></td>
       </tr>`).join('');
 
     const footerAviso = totalHistorico > historicoVisivel.length
       ? `<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 18px;background:var(--bg-secondary);border-top:1px solid var(--border);font-size:.78rem;">
            <span style="color:var(--text3);">Exibindo os <strong>${historicoVisivel.length}</strong> mais recentes de <strong>${totalHistorico}</strong> lançamentos</span>
-           <button class="btn btn-secondary btn-sm" onclick="Produtos.verHistorico('${produtoId}', 0)" style="font-size:.74rem;">Ver todos (${totalHistorico})</button>
+           <button class="btn btn-secondary btn-sm" onclick="Produtos.verHistorico(decodeURIComponent('${safeProdId}'), 0)" style="font-size:.74rem;">Ver todos (${totalHistorico})</button>
          </div>`
       : '';
 
     Utils.showModal(`
       <div class="modal" style="max-width:700px;">
         <div class="modal-header">
-          <span class="modal-title">📋 Histórico — ${p.nome}</span>
+          <span class="modal-title">📋 Histórico — ${this._esc(p.nome)}</span>
           <button class="modal-close" onclick="Utils.closeModal()">✕</button>
         </div>
         <div class="modal-body" style="padding:0;">
           <div style="padding:12px 18px;background:var(--bg-secondary);border-bottom:1px solid var(--border);display:flex;gap:20px;flex-wrap:wrap;">
             <div><div style="font-size:.72rem;color:var(--text3);">TOTAL GASTO</div><div style="font-size:1.2rem;font-weight:900;color:var(--danger);">${Utils.fmt.currency(dados.total)}</div></div>
-            <div><div style="font-size:.72rem;color:var(--text3);">QTD TOTAL</div><div style="font-size:1.2rem;font-weight:900;color:var(--accent2);">${dados.qtd_total.toLocaleString('pt-BR',{maximumFractionDigits:2})} ${p.unidade}</div></div>
+            <div><div style="font-size:.72rem;color:var(--text3);">QTD TOTAL</div><div style="font-size:1.2rem;font-weight:900;color:var(--accent2);">${dados.qtd_total.toLocaleString('pt-BR',{maximumFractionDigits:2})} ${this._esc(p.unidade)}</div></div>
             <div><div style="font-size:.72rem;color:var(--text3);">Nº COMPRAS</div><div style="font-size:1.2rem;font-weight:900;color:var(--text);">${dados.compras}</div></div>
             <div><div style="font-size:.72rem;color:var(--text3);">VALOR MÉDIO UNIT.</div><div style="font-size:1.2rem;font-weight:900;color:var(--text);">${dados.qtd_total > 0 ? Utils.fmt.currency(dados.total / dados.qtd_total) : '—'}</div></div>
           </div>
@@ -504,9 +512,9 @@ const Produtos = {
     this.CATEGORIAS.forEach(cat => {
       const grupo = cats[cat.value];
       if (!grupo || !grupo.length) return;
-      html += `<optgroup label="${cat.label}">`;
+      html += `<optgroup label="${this._esc(cat.label)}">`;
       grupo.forEach(p => {
-        html += `<option value="${p.id}" data-unidade="${p.unidade || 'un'}" data-valor="${p.valor_medio || 0}" ${selectedId === p.id ? 'selected' : ''}>${p.nome} (${p.unidade || 'un'})</option>`;
+        html += `<option value="${this._esc(p.id)}" data-unidade="${this._esc(p.unidade || 'un')}" data-valor="${p.valor_medio || 0}" ${selectedId === p.id ? 'selected' : ''}>${this._esc(p.nome)} (${this._esc(p.unidade || 'un')})</option>`;
       });
       html += `</optgroup>`;
     });

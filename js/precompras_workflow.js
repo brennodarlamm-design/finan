@@ -1,11 +1,17 @@
 // js/precompras_workflow.js — Fluxos de Autorização, Rejeição, Conversão em Lançamento e Impressão de Pré-Compras
 
 const PreComprasWorkflow = {
+  _esc(v) {
+    if (typeof Utils !== 'undefined' && Utils.escapeHtml) return Utils.escapeHtml(String(v ?? ''));
+    return String(v ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  },
+
   abrirModalAprovacao(id) {
     const p = DB.getById('precompras', id);
     if (!p) return;
     const c = DB.getById('clientes', p.obra_id);
     const contas = DB.getAll('contas');
+    const safeId = encodeURIComponent(String(p.id || ''));
 
     Utils.showModal(`
       <div class="modal" style="max-width:600px;width:95vw;">
@@ -19,12 +25,12 @@ const PreComprasWorkflow = {
         <div class="modal-body" style="padding:20px;">
           <div style="background:var(--bg-secondary);border:1px solid var(--border);border-radius:10px;padding:14px;margin-bottom:16px;">
             <div style="display:flex;justify-content:space-between;margin-bottom:8px;">
-              <span style="font-family:monospace;font-weight:800;color:var(--accent2);">${p.numero_ordem}</span>
+              <span style="font-family:monospace;font-weight:800;color:var(--accent2);">${this._esc(p.numero_ordem)}</span>
               <span style="font-weight:900;color:var(--success);font-size:1.1rem;">${Utils.fmt.currency(p.valor_total)}</span>
             </div>
-            <div style="font-weight:700;color:var(--text);">${p.descricao}</div>
-            <div style="font-size:.78rem;color:var(--text3);margin-top:4px;">Obra: <strong>${c?.nome || '—'}</strong> | Solicitante: <strong>${p.solicitante_nome}</strong></div>
-            <div style="font-size:.78rem;color:var(--text3);margin-top:2px;">Fornecedor: <strong>${p.fornecedor_nome || '—'}</strong> (${p.itens?.length || 0} itens)</div>
+            <div style="font-weight:700;color:var(--text);">${this._esc(p.descricao)}</div>
+            <div style="font-size:.78rem;color:var(--text3);margin-top:4px;">Obra: <strong>${this._esc(c?.nome || '—')}</strong> | Solicitante: <strong>${this._esc(p.solicitante_nome)}</strong></div>
+            <div style="font-size:.78rem;color:var(--text3);margin-top:2px;">Fornecedor: <strong>${this._esc(p.fornecedor_nome || '—')}</strong> (${p.itens?.length || 0} itens)</div>
           </div>
 
           <div class="form-group" style="margin-bottom:16px;">
@@ -48,7 +54,7 @@ const PreComprasWorkflow = {
                 <label class="form-label" style="font-size:.72rem;">Conta Bancária Prevista</label>
                 <select id="aprov-conta" class="form-control" style="font-size:.8rem;">
                   <option value="">Selecione a conta...</option>
-                  ${contas.map(ct => `<option value="${ct.apelido || ct.banco_nome}">${ct.apelido || ct.banco_nome} (${ct.agencia}/${ct.numero})</option>`).join('')}
+                  ${contas.map(ct => `<option value="${this._esc(ct.apelido || ct.banco_nome)}">${this._esc(ct.apelido || ct.banco_nome)} (${this._esc(ct.agencia)}/${this._esc(ct.numero)})</option>`).join('')}
                 </select>
               </div>
               <div style="width:140px;">
@@ -61,7 +67,7 @@ const PreComprasWorkflow = {
 
         <div class="modal-footer" style="padding:12px 20px;border-top:1px solid var(--border);justify-content:flex-end;gap:10px;">
           <button class="btn btn-secondary" onclick="Utils.closeModal()">Cancelar</button>
-          <button class="btn btn-success" onclick="PreCompras.confirmarAprovacao('${p.id}')" style="font-weight:800;padding:10px 20px;">
+          <button class="btn btn-success" onclick="PreCompras.confirmarAprovacao(decodeURIComponent('${safeId}'))" style="font-weight:800;padding:10px 20px;">
             ✓ Confirmar Aprovação
           </button>
         </div>
@@ -120,6 +126,7 @@ const PreComprasWorkflow = {
   abrirModalRejeicao(id) {
     const p = DB.getById('precompras', id);
     if (!p) return;
+    const safeId = encodeURIComponent(String(p.id || ''));
 
     Utils.showModal(`
       <div class="modal" style="max-width:480px;width:95vw;">
@@ -132,7 +139,7 @@ const PreComprasWorkflow = {
         </div>
         <div class="modal-body" style="padding:20px;">
           <p style="font-size:.85rem;color:var(--text2);margin-bottom:14px;">
-            Informe a justificativa ou motivo da recusa da ordem <strong>${p.numero_ordem}</strong> (${Utils.fmt.currency(p.valor_total)}). O solicitante poderá visualizar a justificativa.
+            Informe a justificativa ou motivo da recusa da ordem <strong>${this._esc(p.numero_ordem)}</strong> (${Utils.fmt.currency(p.valor_total)}). O solicitante poderá visualizar a justificativa.
           </p>
           <div class="form-group">
             <label class="form-label">Motivo da Recusa / Justificativa *</label>
@@ -141,7 +148,7 @@ const PreComprasWorkflow = {
         </div>
         <div class="modal-footer" style="padding:12px 20px;border-top:1px solid var(--border);justify-content:flex-end;gap:10px;">
           <button class="btn btn-secondary" onclick="Utils.closeModal()">Cancelar</button>
-          <button class="btn btn-danger" onclick="PreCompras.confirmarRejeicao('${p.id}')" style="font-weight:800;">
+          <button class="btn btn-danger" onclick="PreCompras.confirmarRejeicao(decodeURIComponent('${safeId}'))" style="font-weight:800;">
             ✕ Confirmar Recusa
           </button>
         </div>
@@ -174,6 +181,7 @@ const PreComprasWorkflow = {
     if (!p) return;
     const c = DB.getById('clientes', p.obra_id);
     const contas = DB.getAll('contas');
+    const safeId = encodeURIComponent(String(p.id || ''));
 
     Utils.showModal(`
       <div class="modal" style="max-width:520px;width:95vw;">
@@ -186,8 +194,8 @@ const PreComprasWorkflow = {
         </div>
         <div class="modal-body" style="padding:20px;">
           <div style="background:var(--bg-secondary);border:1px solid var(--border);border-radius:10px;padding:14px;margin-bottom:16px;">
-            <div style="font-weight:800;color:var(--accent2);">${p.numero_ordem} — ${p.descricao}</div>
-            <div style="font-size:.8rem;color:var(--text3);margin-top:4px;">Obra: <strong>${c?.nome||'—'}</strong> | Fornecedor: <strong>${p.fornecedor_nome||'—'}</strong></div>
+            <div style="font-weight:800;color:var(--accent2);">${this._esc(p.numero_ordem)} — ${this._esc(p.descricao)}</div>
+            <div style="font-size:.8rem;color:var(--text3);margin-top:4px;">Obra: <strong>${this._esc(c?.nome||'—')}</strong> | Fornecedor: <strong>${this._esc(p.fornecedor_nome||'—')}</strong></div>
             <div style="font-size:1.2rem;font-weight:900;color:var(--success);margin-top:6px;">${Utils.fmt.currency(p.valor_total)}</div>
           </div>
 
@@ -195,7 +203,7 @@ const PreComprasWorkflow = {
             <label class="form-label">Conta Bancária de Pagamento</label>
             <select id="conv-conta" class="form-control">
               <option value="">Selecione a conta...</option>
-              ${contas.map(ct => `<option value="${ct.apelido || ct.banco_nome}">${ct.apelido || ct.banco_nome} (${ct.agencia}/${ct.numero})</option>`).join('')}
+              ${contas.map(ct => `<option value="${this._esc(ct.apelido || ct.banco_nome)}">${this._esc(ct.apelido || ct.banco_nome)} (${this._esc(ct.agencia)}/${this._esc(ct.numero)})</option>`).join('')}
             </select>
           </div>
 
@@ -215,7 +223,7 @@ const PreComprasWorkflow = {
         </div>
         <div class="modal-footer" style="padding:12px 20px;border-top:1px solid var(--border);justify-content:flex-end;gap:10px;">
           <button class="btn btn-secondary" onclick="Utils.closeModal()">Cancelar</button>
-          <button class="btn btn-primary" onclick="PreCompras.executarConversaoLancamento('${p.id}')" style="font-weight:800;">
+          <button class="btn btn-primary" onclick="PreCompras.executarConversaoLancamento(decodeURIComponent('${safeId}'))" style="font-weight:800;">
             ✓ Confirmar e Lançar
           </button>
         </div>
@@ -264,19 +272,20 @@ const PreComprasWorkflow = {
     if (!p) return;
     const c = DB.getById('clientes', p.obra_id);
     const docs = typeof Documentos !== 'undefined' ? Documentos.listar('precompra', p.id) : [];
+    const safeId = encodeURIComponent(String(p.id || ''));
 
     let seloStatus = '';
     if (p.status === 'aprovada' || p.status === 'convertida') {
       seloStatus = `
         <div style="border:3px solid #16a34a;color:#16a34a;padding:8px 16px;border-radius:8px;font-weight:900;text-transform:uppercase;letter-spacing:1px;text-align:center;font-size:1rem;transform:rotate(-4deg);box-shadow:0 2px 8px rgba(22,163,74,0.15);">
           ✓ AUTORIZADO
-          <div style="font-size:.65rem;font-weight:700;color:#15803d;margin-top:2px;">${p.aprovado_por || 'ADMINISTRAÇÃO'} &middot; ${Utils.fmt.date(p.aprovado_em?.split('T')[0])}</div>
+          <div style="font-size:.65rem;font-weight:700;color:#15803d;margin-top:2px;">${this._esc(p.aprovado_por || 'ADMINISTRAÇÃO')} &middot; ${Utils.fmt.date(p.aprovado_em?.split('T')[0])}</div>
         </div>`;
     } else if (p.status === 'rejeitada') {
       seloStatus = `
         <div style="border:3px solid #dc2626;color:#dc2626;padding:8px 16px;border-radius:8px;font-weight:900;text-transform:uppercase;letter-spacing:1px;text-align:center;font-size:1rem;transform:rotate(-4deg);">
           ✕ NÃO AUTORIZADO
-          <div style="font-size:.65rem;font-weight:700;color:#b91c1c;margin-top:2px;">${p.rejeitado_por || 'ADMINISTRAÇÃO'}</div>
+          <div style="font-size:.65rem;font-weight:700;color:#b91c1c;margin-top:2px;">${this._esc(p.rejeitado_por || 'ADMINISTRAÇÃO')}</div>
         </div>`;
     } else {
       seloStatus = `
@@ -290,10 +299,10 @@ const PreComprasWorkflow = {
         <div class="modal-header" style="border-bottom:1px solid var(--border);padding:14px 20px;">
           <div style="display:flex;align-items:center;gap:8px;">
             <span style="font-size:1.2rem;">📄</span>
-            <span class="modal-title">Ordem de Compra Oficial — ${p.numero_ordem}</span>
+            <span class="modal-title">Ordem de Compra Oficial — ${this._esc(p.numero_ordem)}</span>
           </div>
           <div style="display:flex;gap:8px;align-items:center;">
-            <button class="btn btn-primary btn-sm" onclick="PreCompras.imprimirOrdem('${p.id}')">
+            <button class="btn btn-primary btn-sm" onclick="PreCompras.imprimirOrdem(decodeURIComponent('${safeId}'))">
               🖨️ Imprimir / Salvar PDF
             </button>
             <button class="modal-close" onclick="Utils.closeModal()">✕</button>
@@ -303,9 +312,10 @@ const PreComprasWorkflow = {
         <div class="modal-body" style="padding:20px;overflow-y:auto;flex:1;background:#fff;color:#0f172a;border-radius:0 0 10px 10px;" id="folha-ordem-compra">
           ${(() => {
             const emp = DB.getEmpresa();
-            const brandName = (emp.nome_fantasia || emp.razao_social || 'Minha Construtora').toUpperCase();
-            const logoHtml = emp.logo_url
-              ? `<img src="${emp.logo_url}" alt="${brandName}" style="width:70px;height:70px;border-radius:8px;object-fit:contain;border:1px solid #cbd5e1;">`
+            const brandName = this._esc((emp.nome_fantasia || emp.razao_social || 'Minha Construtora').toUpperCase());
+            const safeLogoUrl = (typeof Utils.safeUrl === 'function' ? Utils.safeUrl(emp.logo_url) : '') || '';
+            const logoHtml = safeLogoUrl
+              ? `<img src="${safeLogoUrl}" alt="${brandName}" style="width:70px;height:70px;border-radius:8px;object-fit:contain;border:1px solid #cbd5e1;">`
               : `<div style="width:56px;height:56px;border-radius:8px;background:#182713;border:1px solid #c9a227;display:flex;align-items:center;justify-content:center;font-size:1.8rem;">🏢</div>`;
             return `
             <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:3px solid #1C2D12;padding-bottom:16px;margin-bottom:16px;">
@@ -314,7 +324,7 @@ const PreComprasWorkflow = {
                 <div>
                   <h1 style="margin:0;font-size:1.4rem;font-weight:900;color:#1C2D12;letter-spacing:0.5px;">${brandName}</h1>
                   <p style="margin:2px 0 0;font-size:.78rem;color:#475569;font-weight:600;">SISTEMA DE GESTÃO FINANCEIRA E CONTROLE DE OBRAS</p>
-                  <p style="margin:2px 0 0;font-size:.72rem;color:#64748b;">CNPJ: ${emp.cnpj || 'Não informado'} &middot; ${emp.cidade || ''}/${emp.uf || ''} &middot; Gestão Integrada</p>
+                  <p style="margin:2px 0 0;font-size:.72rem;color:#64748b;">CNPJ: ${this._esc(emp.cnpj || 'Não informado')} &middot; ${this._esc(emp.cidade || '')}/${this._esc(emp.uf || '')} &middot; Gestão Integrada</p>
                 </div>
               </div>
               <div>
@@ -330,7 +340,7 @@ const PreComprasWorkflow = {
             </div>
             <div style="text-align:right;">
               <div style="font-size:.75rem;font-weight:800;color:#64748b;">NÚMERO DO PEDIDO</div>
-              <div style="font-size:1.2rem;font-weight:900;color:#C9A227;font-family:monospace;">${p.numero_ordem}</div>
+              <div style="font-size:1.2rem;font-weight:900;color:#C9A227;font-family:monospace;">${this._esc(p.numero_ordem)}</div>
             </div>
           </div>
 
@@ -340,11 +350,11 @@ const PreComprasWorkflow = {
                 📍 Obra / Destino dos Materiais
               </div>
               <div style="line-height:1.5;color:#1e293b;">
-                <strong>Obra / Cliente:</strong> ${c?.nome || '—'}<br>
-                <strong>Cidade / UF:</strong> ${c?.cidade || '—'} / ${c?.estado || '—'}<br>
-                <strong>Endereço:</strong> ${c?.endereco || '—'}<br>
-                ${c?.num_contrato_caixa ? `<strong>Contrato Caixa:</strong> ${c.num_contrato_caixa}<br>` : ''}
-                <strong>Solicitante:</strong> ${p.solicitante_nome}
+                <strong>Obra / Cliente:</strong> ${this._esc(c?.nome || '—')}<br>
+                <strong>Cidade / UF:</strong> ${this._esc(c?.cidade || '—')} / ${this._esc(c?.estado || '—')}<br>
+                <strong>Endereço:</strong> ${this._esc(c?.endereco || '—')}<br>
+                ${c?.num_contrato_caixa ? `<strong>Contrato Caixa:</strong> ${this._esc(c.num_contrato_caixa)}<br>` : ''}
+                <strong>Solicitante:</strong> ${this._esc(p.solicitante_nome)}
               </div>
             </div>
 
@@ -353,19 +363,19 @@ const PreComprasWorkflow = {
                 🏢 Fornecedor / Empresa Sugerida
               </div>
               <div style="line-height:1.5;color:#1e293b;">
-                <strong>Fornecedor:</strong> ${p.fornecedor_nome || '—'}<br>
-                <strong>CNPJ / CPF:</strong> ${p.fornecedor_cnpj || 'Não informado'}<br>
-                <strong>Contato / Vendedor:</strong> ${p.fornecedor_contato || 'Não informado'}<br>
-                <strong>Forma de Pagamento:</strong> ${p.forma_pagamento || 'A combinar'}<br>
+                <strong>Fornecedor:</strong> ${this._esc(p.fornecedor_nome || '—')}<br>
+                <strong>CNPJ / CPF:</strong> ${this._esc(p.fornecedor_cnpj || 'Não informado')}<br>
+                <strong>Contato / Vendedor:</strong> ${this._esc(p.fornecedor_contato || 'Não informado')}<br>
+                <strong>Forma de Pagamento:</strong> ${this._esc(p.forma_pagamento || 'A combinar')}<br>
                 <strong>Previsão de Entrega:</strong> ${p.data_necessidade ? Utils.fmt.date(p.data_necessidade) : 'Imediata'}
               </div>
             </div>
           </div>
 
           <div style="background:#fff;border:1px solid #cbd5e1;border-radius:6px;padding:10px 14px;margin-bottom:16px;font-size:.8rem;color:#1e293b;">
-            <div style="margin-bottom:4px;"><strong>Finalidade / Objeto:</strong> ${p.descricao}</div>
-            ${p.justificativa ? `<div style="color:#475569;"><strong>Justificativa da Aplicação:</strong> ${p.justificativa}</div>` : ''}
-            ${p.parecer_admin ? `<div style="margin-top:4px;color:#15803d;font-weight:600;"><strong>Parecer da Diretoria:</strong> ${p.parecer_admin}</div>` : ''}
+            <div style="margin-bottom:4px;"><strong>Finalidade / Objeto:</strong> ${this._esc(p.descricao)}</div>
+            ${p.justificativa ? `<div style="color:#475569;"><strong>Justificativa da Aplicação:</strong> ${this._esc(p.justificativa)}</div>` : ''}
+            ${p.parecer_admin ? `<div style="margin-top:4px;color:#15803d;font-weight:600;"><strong>Parecer da Diretoria:</strong> ${this._esc(p.parecer_admin)}</div>` : ''}
           </div>
 
           <table style="width:100%;border-collapse:collapse;margin-bottom:16px;font-size:.82rem;">
@@ -383,8 +393,8 @@ const PreComprasWorkflow = {
               ${(p.itens || []).map((it, idx) => `
                 <tr style="background:${idx % 2 === 0 ? '#ffffff' : '#f8fafc'};">
                   <td style="padding:7px 10px;text-align:center;border:1px solid #cbd5e1;font-weight:700;color:#64748b;">${idx + 1}</td>
-                  <td style="padding:7px 10px;border:1px solid #cbd5e1;font-weight:600;color:#0f172a;">${it.descricao}</td>
-                  <td style="padding:7px 10px;text-align:center;border:1px solid #cbd5e1;color:#475569;">${it.unidade}</td>
+                  <td style="padding:7px 10px;border:1px solid #cbd5e1;font-weight:600;color:#0f172a;">${this._esc(it.descricao)}</td>
+                  <td style="padding:7px 10px;text-align:center;border:1px solid #cbd5e1;color:#475569;">${this._esc(it.unidade)}</td>
                   <td style="padding:7px 10px;text-align:right;border:1px solid #cbd5e1;font-weight:700;">${it.quantidade}</td>
                   <td style="padding:7px 10px;text-align:right;border:1px solid #cbd5e1;">${Utils.fmt.currency(it.valor_unitario)}</td>
                   <td style="padding:7px 10px;text-align:right;border:1px solid #cbd5e1;font-weight:800;color:#0f172a;">${Utils.fmt.currency(it.subtotal || (it.quantidade * it.valor_unitario))}</td>
@@ -412,33 +422,33 @@ const PreComprasWorkflow = {
           <div style="background:#f8fafc;border:1px solid #cbd5e1;border-radius:6px;padding:8px 12px;margin-bottom:16px;font-size:.75rem;color:#475569;">
             <strong>📎 Documentos / Notas Fiscais Anexadas (${docs.length}):</strong>
             <ul style="margin:4px 0 0 16px;padding:0;">
-              ${docs.map(d => `<li>${d.titulo} (${d.nome_arquivo})</li>`).join('')}
+              ${docs.map(d => `<li>${this._esc(d.titulo)} (${this._esc(d.nome_arquivo)})</li>`).join('')}
             </ul>
           </div>` : ''}
 
           <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:20px;margin-top:36px;padding-top:20px;font-size:.75rem;text-align:center;color:#334155;">
             <div>
               <div style="border-top:1px solid #64748b;padding-top:4px;margin-bottom:2px;">
-                <strong>${p.solicitante_nome}</strong>
+                <strong>${this._esc(p.solicitante_nome)}</strong>
               </div>
               <div>Solicitante / Gestor da Obra</div>
             </div>
             <div>
               <div style="border-top:1px solid #64748b;padding-top:4px;margin-bottom:2px;">
-                <strong>${p.aprovado_por || 'Administração Geral'}</strong>
+                <strong>${this._esc(p.aprovado_por || 'Administração Geral')}</strong>
               </div>
               <div>Diretoria / Administrador</div>
             </div>
             <div>
               <div style="border-top:1px solid #64748b;padding-top:4px;margin-bottom:2px;">
-                <strong>${p.fornecedor_nome || 'Fornecedor'}</strong>
+                <strong>${this._esc(p.fornecedor_nome || 'Fornecedor')}</strong>
               </div>
               <div>Aceite / Entrega do Fornecedor</div>
             </div>
           </div>
 
           <div style="margin-top:24px;text-align:center;font-size:.65rem;color:#94a3b8;border-top:1px solid #f1f5f9;padding-top:8px;">
-            Emitido via ${DB.getEmpresa().nome_fantasia || 'Sistema Financeiro'} &middot; Data de Emissão: ${new Date().toLocaleString('pt-BR')} &middot; Documento Interno de Controle
+            Emitido via ${this._esc(DB.getEmpresa().nome_fantasia || 'Sistema Financeiro')} &middot; Data de Emissão: ${new Date().toLocaleString('pt-BR')} &middot; Documento Interno de Controle
           </div>
         </div>
 

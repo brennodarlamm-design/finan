@@ -493,7 +493,7 @@ const Contratos = {
       <div class="modal" style="max-width:960px;width:96vw;max-height:94vh;display:flex;flex-direction:column;">
         <div class="modal-header" style="flex-shrink:0;">
           <div>
-            <span class="modal-title">📜 ${isEdit ? 'Editar Contrato' : 'Novo Contrato de Construção Civil — ${e(empNome)}'}</span>
+            <span class="modal-title">📜 ${isEdit ? 'Editar Contrato' : 'Novo Contrato de Construção Civil — ' + e(empNome)}</span>
             <div style="font-size:.76rem;color:var(--text3);margin-top:2px;">Modelo oficial pré-formatado com Capa, Qualificação das Partes, 20 Cláusulas e Assinaturas Gov.br</div>
           </div>
           <button class="modal-close" onclick="Utils.closeModal()">✕</button>

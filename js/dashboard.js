@@ -805,10 +805,17 @@ const Dashboard = {
     const obraAtual = obraId !== 'todas' ? cs.find(c=>c.id===obraId) : null;
     const emissao = new Date().toLocaleString('pt-BR');
     const emp = DB.getEmpresa();
-    const empNome = (emp.nome_fantasia || emp.razao_social || 'Minha Construtora').toUpperCase();
-    const logoHtml = emp.logo_url
-      ? `<img src="${emp.logo_url}" alt="${empNome}" style="max-width:54px;max-height:54px;border-radius:8px;border:1px solid #c9a227;object-fit:contain;">`
+    const esc = v => (typeof Utils !== 'undefined' && Utils.escapeHtml) ? Utils.escapeHtml(String(v ?? '')) : String(v ?? '');
+    const empNome = esc((emp.nome_fantasia || emp.razao_social || 'Minha Construtora').toUpperCase());
+    const safeLogoUrl = (typeof Utils !== 'undefined' && Utils.safeUrl) ? Utils.safeUrl(emp.logo_url) : emp.logo_url;
+    const logoHtml = safeLogoUrl
+      ? `<img src="${safeLogoUrl}" alt="${empNome}" style="max-width:54px;max-height:54px;border-radius:8px;border:1px solid #c9a227;object-fit:contain;">`
       : `<div style="width:46px;height:46px;border-radius:8px;background:#182713;border:1px solid #c9a227;display:flex;align-items:center;justify-content:center;font-size:1.4rem;">🏢</div>`;
+
+    const lans = (DB.getAll('lancamentos') || [])
+      .filter(l => obraId === 'todas' || l.obra_id === obraId)
+      .sort((a,b) => new Date(b.data) - new Date(a.data))
+      .slice(0, 15);
 
     const html = `
     <div style="font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#0f172a;background:#ffffff;padding:24px;max-width:820px;margin:0 auto;">
@@ -824,13 +831,38 @@ const Dashboard = {
         </div>
         <div style="text-align:right;font-size:.74rem;color:#334155;">
           <div><strong>Emiss&atilde;o:</strong> ${emissao}</div>
-          <div><strong>Escopo:</strong> ${obraAtual ? obraAtual.nome : 'Consolidado Geral'}</div>
+          <div><strong>Escopo:</strong> ${obraAtual ? esc(obraAtual.nome) : 'Consolidado Geral'}</div>
         </div>
       </div>
 
       <!-- Grade de KPIs -->
+      <div style="display:grid;grid-template-columns:repeat(4, 1fr);gap:10px;margin-bottom:20px;">
+        <div style="background:#f8fafc;border:1px solid #cbd5e1;border-radius:6px;padding:12px;text-align:center;">
+          <div style="font-size:.7rem;font-weight:800;color:#475569;text-transform:uppercase;">Total Receitas</div>
+          <div style="font-size:1.15rem;font-weight:900;color:#15803d;margin-top:2px;">${Utils.fmt.currency(resumo.totalReceitas)}</div>
+        </div>
+        <div style="background:#f8fafc;border:1px solid #cbd5e1;border-radius:6px;padding:12px;text-align:center;">
+          <div style="font-size:.7rem;font-weight:800;color:#475569;text-transform:uppercase;">Total Despesas</div>
+          <div style="font-size:1.15rem;font-weight:900;color:#b91c1c;margin-top:2px;">${Utils.fmt.currency(resumo.totalDespesas)}</div>
+        </div>
+        <div style="background:#f8fafc;border:1px solid #cbd5e1;border-radius:6px;padding:12px;text-align:center;">
+          <div style="font-size:.7rem;font-weight:800;color:#475569;text-transform:uppercase;">Saldo Atual</div>
+          <div style="font-size:1.15rem;font-weight:900;color:${resumo.saldo >= 0 ? '#15803d' : '#b91c1c'};margin-top:2px;">${Utils.fmt.currency(resumo.saldo)}</div>
+        </div>
+        <div style="background:#f8fafc;border:1px solid #cbd5e1;border-radius:6px;padding:12px;text-align:center;">
+          <div style="font-size:.7rem;font-weight:800;color:#475569;text-transform:uppercase;">A Pagar (Pendente)</div>
+          <div style="font-size:1.15rem;font-weight:900;color:#d97706;margin-top:2px;">${Utils.fmt.currency(resumo.aPagar)}</div>
+        </div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:repeat(3, 1fr);gap:10px;margin-bottom:20px;">
+        <div style="background:#f8fafc;border:1px solid #cbd5e1;border-radius:6px;padding:12px;text-align:center;">
+          <div style="font-size:.7rem;font-weight:800;color:#475569;text-transform:uppercase;">A Receber (Previsto)</div>
+          <div style="font-size:1.15rem;font-weight:900;color:#0284c7;margin-top:2px;">${Utils.fmt.currency(resumo.aReceber)}</div>
+        </div>
+        <div style="background:#f8fafc;border:1px solid #cbd5e1;border-radius:6px;padding:12px;text-align:center;">
           <div style="font-size:.7rem;font-weight:800;color:#475569;text-transform:uppercase;">NFs Pendentes</div>
-          <div style="font-size:1.15rem;font-weight:900;color:#0369a1;margin-top:2px;">${r.nfPendentes} (${Utils.fmt.currency(r.nfPendentesValor)})</div>
+          <div style="font-size:1.15rem;font-weight:900;color:#0369a1;margin-top:2px;">${resumo.nfPendentes} (${Utils.fmt.currency(resumo.nfPendentesValor)})</div>
         </div>
         <div style="background:#f8fafc;border:1px solid #cbd5e1;border-radius:6px;padding:12px;text-align:center;">
           <div style="font-size:.7rem;font-weight:800;color:#475569;text-transform:uppercase;">Obras Ativas</div>
@@ -856,11 +888,11 @@ const Dashboard = {
           <tbody>
             ${cs.map((c, i) => `
             <tr style="background:${i%2===0?'#ffffff':'#f8fafc'};border-bottom:1px solid #cbd5e1;">
-              <td style="padding:7px 10px;font-weight:800;color:#0f172a;">${c.nome}</td>
-              <td style="padding:7px 10px;color:#334155;">${c.cidade}/${c.estado}</td>
-              <td style="padding:7px 10px;color:#0284c7;font-weight:700;">${c.num_contrato_caixa||'&mdash;'}</td>
+              <td style="padding:7px 10px;font-weight:800;color:#0f172a;">${esc(c.nome)}</td>
+              <td style="padding:7px 10px;color:#334155;">${esc(c.cidade)}/${esc(c.estado)}</td>
+              <td style="padding:7px 10px;color:#0284c7;font-weight:700;">${esc(c.num_contrato_caixa||'—')}</td>
               <td style="padding:7px 10px;text-align:right;font-weight:800;color:#15803d;">${Utils.fmt.currency(c.valor_financiado)}</td>
-              <td style="padding:7px 10px;text-align:center;"><span style="display:inline-block;padding:2px 8px;border-radius:4px;font-size:.7rem;font-weight:800;background:#dcfce7;color:#15803d;">${c.status}</span></td>
+              <td style="padding:7px 10px;text-align:center;"><span style="display:inline-block;padding:2px 8px;border-radius:4px;font-size:.7rem;font-weight:800;background:#dcfce7;color:#15803d;">${esc(c.status)}</span></td>
             </tr>`).join('')}
           </tbody>
         </table>
@@ -885,10 +917,10 @@ const Dashboard = {
             ${lans.map((l, i) => `
             <tr style="background:${i%2===0?'#ffffff':'#f8fafc'};border-bottom:1px solid #cbd5e1;">
               <td style="padding:6px 10px;font-weight:700;white-space:nowrap;">${Utils.fmt.date(l.data)}</td>
-              <td style="padding:6px 10px;font-weight:700;color:#0f172a;">${l.descricao}</td>
-              <td style="padding:6px 10px;color:#334155;">${l.categoria}</td>
+              <td style="padding:6px 10px;font-weight:700;color:#0f172a;">${esc(l.descricao)}</td>
+              <td style="padding:6px 10px;color:#334155;">${esc(l.categoria)}</td>
               <td style="padding:6px 10px;text-align:right;font-weight:800;color:${l.tipo==='receita'?'#15803d':'#b91c1c'};">${l.tipo==='receita'?'+':'-'} ${Utils.fmt.currency(l.valor)}</td>
-              <td style="padding:6px 10px;text-align:center;"><span style="display:inline-block;padding:2px 6px;border-radius:4px;font-size:.68rem;font-weight:800;background:#f1f5f9;color:#0f172a;">${l.status}</span></td>
+              <td style="padding:6px 10px;text-align:center;"><span style="display:inline-block;padding:2px 6px;border-radius:4px;font-size:.68rem;font-weight:800;background:#f1f5f9;color:#0f172a;">${esc(l.status)}</span></td>
             </tr>`).join('')}
           </tbody>
         </table>
