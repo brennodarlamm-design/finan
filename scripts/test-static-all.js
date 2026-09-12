@@ -24,7 +24,8 @@ const tests = [
   'scripts/test-patch21-static.js',
   'scripts/test-openai-static.js',
   'scripts/test-patch22-static.js',
-  'scripts/test-patch23-static.js'
+  'scripts/test-patch23-static.js',
+  'scripts/test-patch24-static.js'
 ].filter(fs.existsSync);
 for (const file of tests) {
   console.log(`\n=== ${file} ===`);
