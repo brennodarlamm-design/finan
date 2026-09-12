@@ -66,7 +66,7 @@ test('Master possui saúde global do SaaS', /carregarErrosSaaS/i.test(master) &&
 test('FinBot usa base de conhecimento estruturada', /SUPPORT_KB/i.test(users) && /topic:'sessoes'/i.test(users));
 test('Status CNPJ não injeta HTML externo', /el\.textContent = String\(msg/i.test(fornecedores));
 test('Info de fornecedor em lançamento usa textContent', /info\.textContent = parts\.join/i.test(lancamentos));
-test('Busca SINAPI escapa texto e não injeta JSON externo em onclick', /escapeHtml\(r\.descricao\)/i.test(sinapi) && /_lastSearchResults\[\$\{i\}\]/i.test(sinapi));
+test('Busca SINAPI escapa texto e não injeta JSON externo em onclick', /escapeHtml\(r\.descricao\)/i.test(sinapi) && (/_lastSearchResults\[\$\{i\}\]/i.test(sinapi) || /data-fb-click="Patch26Actions\.sinapiAddLastResult"/i.test(sinapi)));
 test('Auth falha fechado quando API_SECRET está ausente', /API_SECRET não configurado/i.test(authApi) && /Configuração de segurança pendente/i.test(authApi));
 test('Google exige GOOGLE_CLIENT_ID explícito', /googleClientId/i.test(authApi) && /GOOGLE_CLIENT_ID não configurado/i.test(authApi));
 test('Trial online usa fim do dia em UTC-4', /T23:59:59-04:00/i.test(authCore));
