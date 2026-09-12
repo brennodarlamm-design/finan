@@ -1,0 +1,19 @@
+name: Patch 25 final full suite
+
+on:
+  push:
+    branches:
+      - patch25-csp-events-20260912
+
+permissions:
+  contents: read
+
+jobs:
+  full-suite:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run full FinObra test suite
+        run: npm test
+      - name: Syntax verification
+        run: node scripts/check-all-syntax.js
