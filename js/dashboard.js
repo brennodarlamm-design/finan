@@ -103,6 +103,8 @@ const Dashboard = {
       </div>
     </div>
 
+    ${!isEscritorio ? this._blocoOrcadoVsRealizado(obraId) : ''}
+
     <div class="g2" style="margin-bottom:14px;">
       <div class="card">
         <div class="card-header">
@@ -298,25 +300,158 @@ const Dashboard = {
     if (obraId && obraId !== 'todas') cs = cs.filter(c => c.id === obraId);
     if (!cs.length) return '<p style="color:var(--text3);padding:20px;text-align:center">Nenhuma obra cadastrada</p>';
     return cs.map(c => {
-      const orc = DB.getAll('orcamentos').find(o => o.obra_id === c.id);
-      let pct = 0;
-      if (orc && orc.etapas.length) {
-        const tv = orc.etapas.reduce((s,e)=>s+e.valor_previsto,0);
-        const tr = orc.etapas.reduce((s,e)=>s+e.valor_realizado,0);
-        pct = tv>0 ? Math.min(100,(tr/tv)*100) : 0;
-      }
-      const cl = pct<30?'red':pct<70?'yellow':'green';
+      const comp = (typeof DB !== 'undefined' && DB.getOrcamentoVsRealizado) ? DB.getOrcamentoVsRealizado(c.id) : null;
+      const pctFinanceiro = comp ? comp.percentualFinanceiro : 0;
+      const pctFisico = comp ? comp.percentualFisico : 0;
+      const cl = pctFinanceiro > 100 ? 'red' : (pctFinanceiro > 85 ? 'yellow' : 'green');
       const med = DB.getAll('medicoes').filter(m=>m.obra_id===c.id);
       const libPct = med.length ? Math.round((med.filter(m=>m.status==='liberada').length/med.length)*100) : 0;
       return `<div style="margin-bottom:18px;padding:0 2px;">
         <div style="display:flex;justify-content:space-between;margin-bottom:5px;">
           <span style="font-size:.84rem;font-weight:700">${Utils.escapeHtml(c.nome || '')}</span>
-          <span style="font-size:.78rem;color:var(--text3)">${pct.toFixed(0)}% realizado</span>
+          <span style="font-size:.78rem;color:var(--text3)">
+            <strong>${pctFinanceiro.toFixed(1)}%</strong> gasto &nbsp;|&nbsp; <strong>${pctFisico.toFixed(1)}%</strong> medido
+          </span>
         </div>
-        <div class="progress-bar" style="margin-bottom:6px;"><div class="progress-fill ${cl}" style="width:${pct}%"></div></div>
-        <div style="display:flex;align-items:center;gap:8px;">${Utils.badge(c.status)}<span style="font-size:.72rem;color:var(--text3)">${med.length} medições · ${libPct}% liberadas · ${Utils.fmt.currency(c.valor_financiado)}</span></div>
+        <div class="progress-bar" style="margin-bottom:6px;"><div class="progress-fill ${cl}" style="width:${Math.min(100, pctFinanceiro)}%"></div></div>
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;">
+          <div style="display:flex;align-items:center;gap:8px;">
+            ${Utils.badge(c.status)}
+            <span style="font-size:.72rem;color:var(--text3)">${med.length} medição(ões) · ${libPct}% liberadas</span>
+          </div>
+          <span style="font-size:.74rem;font-weight:700;color:var(--text2);">${Utils.fmt.currency(comp ? comp.totalRealizado : 0)} / ${Utils.fmt.currency(comp ? comp.totalOrcado : c.valor_financiado)}</span>
+        </div>
       </div>`;
     }).join('');
+  },
+
+  _blocoOrcadoVsRealizado(obraId) {
+    if (typeof DB === 'undefined' || !DB.getOrcamentoVsRealizado) return '';
+    const comp = DB.getOrcamentoVsRealizado(obraId);
+    if (!comp.temOrcamento && comp.totalRealizado === 0) return '';
+
+    const saudeConfig = {
+      saudavel: {
+        badge: '🟢 Obra Saudável',
+        borda: 'rgba(16,185,129,.35)',
+        bg: 'rgba(16,185,129,.06)',
+        cor: 'var(--success)'
+      },
+      atencao: {
+        badge: '🟡 Atenção ao Ritmo',
+        borda: 'rgba(245,158,11,.4)',
+        bg: 'rgba(245,158,11,.08)',
+        cor: 'var(--warning)'
+      },
+      estouro: {
+        badge: '🔴 Risco de Estouro',
+        borda: 'rgba(239,68,68,.4)',
+        bg: 'rgba(239,68,68,.08)',
+        cor: 'var(--danger)'
+      }
+    };
+    const s = saudeConfig[comp.statusSaude] || saudeConfig.saudavel;
+
+    const etapasHtml = comp.etapas.slice(0, 8).map(e => {
+      const barColor = e.status === 'estouro' ? 'red' : (e.status === 'alerta' ? 'yellow' : 'green');
+      const statusBadge = e.status === 'estouro'
+        ? `<span style="font-size:.65rem;font-weight:800;color:#ef4444;background:rgba(239,68,68,.15);padding:1px 6px;border-radius:4px;">Estouro (+${(e.percentual - 100).toFixed(1)}%)</span>`
+        : (e.status === 'alerta'
+          ? `<span style="font-size:.65rem;font-weight:800;color:#f59e0b;background:rgba(245,158,11,.15);padding:1px 6px;border-radius:4px;">No Limite</span>`
+          : `<span style="font-size:.65rem;font-weight:800;color:#10b981;background:rgba(16,185,129,.15);padding:1px 6px;border-radius:4px;">No Prazo</span>`);
+
+      return `
+      <div style="margin-bottom:12px;padding-bottom:10px;border-bottom:1px solid var(--border-s);">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;gap:8px;">
+          <div style="font-size:.8rem;font-weight:700;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="${Utils.escapeHtml(e.nome)}">
+            ${Utils.escapeHtml(e.nome)}
+          </div>
+          <div style="display:flex;align-items:center;gap:8px;flex-shrink:0;">
+            ${statusBadge}
+            <span style="font-size:.78rem;font-weight:800;color:var(--text);">${e.percentual.toFixed(1)}%</span>
+          </div>
+        </div>
+        <div class="progress-bar" style="height:6px;margin-bottom:4px;">
+          <div class="progress-fill ${barColor}" style="width:${Math.min(100, e.percentual)}%;"></div>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:.7rem;color:var(--text3);">
+          <span>Gasto: <strong>${Utils.fmt.currency(e.realizado)}</strong></span>
+          <span>Orçado: ${Utils.fmt.currency(e.previsto)}</span>
+          <span style="color:${e.saldo >= 0 ? 'var(--text3)' : 'var(--danger)'};">
+            ${e.saldo >= 0 ? 'Saldo: ' + Utils.fmt.currency(e.saldo) : 'Estouro: -' + Utils.fmt.currency(Math.abs(e.saldo))}
+          </span>
+        </div>
+      </div>`;
+    }).join('');
+
+    return `
+    <div class="card" style="margin-bottom:16px;border:1.5px solid ${s.borda};background:linear-gradient(180deg, var(--bg-card) 0%, ${s.bg} 100%);">
+      <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;">
+        <div style="display:flex;align-items:center;gap:10px;">
+          <span style="font-size:1.6rem;">🏗️</span>
+          <div>
+            <div class="card-title" style="display:flex;align-items:center;gap:8px;">
+              <span>Controle Orçamentário &amp; Avanço Físico-Financeiro</span>
+              <span style="font-size:.72rem;font-weight:800;padding:2px 8px;border-radius:12px;background:${s.cor}22;color:${s.cor};border:1px solid ${s.cor}50;">
+                ${s.badge}
+              </span>
+            </div>
+            <div style="font-size:.76rem;color:var(--text2);margin-top:2px;">
+              ${Utils.escapeHtml(comp.alertaDesc)}
+            </div>
+          </div>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <button class="btn btn-secondary btn-sm" onclick="App.navigate('orcamentos')" title="Abrir planilha orçamentária detalhada">
+            📋 Ver Orçamentos
+          </button>
+          <button class="btn btn-secondary btn-sm" onclick="App.navigate('medicoes')" title="Ver cronograma físico e medições">
+            🔨 Medições (${comp.totalMedicoes})
+          </button>
+        </div>
+      </div>
+
+      <!-- Grid dos 4 KPIs Físico-Financeiros -->
+      <div class="g4" style="margin-bottom:16px;">
+        <div style="padding:12px;background:var(--bg-secondary);border-radius:var(--r-md);text-align:center;">
+          <div style="font-size:.68rem;text-transform:uppercase;color:var(--text3);margin-bottom:3px;font-weight:700;">Total Orçado</div>
+          <div style="font-size:1.15rem;font-weight:900;color:var(--text);">${Utils.fmt.currency(comp.totalOrcado)}</div>
+          <div style="font-size:.68rem;color:var(--text3);margin-top:2px;">Previsto no projeto</div>
+        </div>
+        <div style="padding:12px;background:var(--bg-secondary);border-radius:var(--r-md);text-align:center;">
+          <div style="font-size:.68rem;text-transform:uppercase;color:var(--text3);margin-bottom:3px;font-weight:700;">Total Gasto Real</div>
+          <div style="font-size:1.15rem;font-weight:900;color:var(--danger);">${Utils.fmt.currency(comp.totalRealizado)}</div>
+          <div style="font-size:.68rem;color:var(--text3);margin-top:2px;">${comp.percentualFinanceiro.toFixed(1)}% do orçamento</div>
+        </div>
+        <div style="padding:12px;background:var(--bg-secondary);border-radius:var(--r-md);text-align:center;">
+          <div style="font-size:.68rem;text-transform:uppercase;color:var(--text3);margin-bottom:3px;font-weight:700;">Saldo Restante</div>
+          <div style="font-size:1.15rem;font-weight:900;color:${comp.saldoRestante >= 0 ? 'var(--success)' : 'var(--danger)'};">
+            ${Utils.fmt.currency(comp.saldoRestante)}
+          </div>
+          <div style="font-size:.68rem;color:var(--text3);margin-top:2px;">${comp.saldoRestante >= 0 ? 'Margem disponível' : 'Estouro financeiro'}</div>
+        </div>
+        <div style="padding:12px;background:rgba(201,162,39,.08);border:1px solid rgba(201,162,39,.25);border-radius:var(--r-md);text-align:center;">
+          <div style="font-size:.68rem;text-transform:uppercase;color:var(--accent);margin-bottom:3px;font-weight:700;">Físico vs Financeiro</div>
+          <div style="font-size:1.15rem;font-weight:900;color:var(--accent);">
+            ${comp.percentualFisico.toFixed(1)}% <span style="font-size:.75rem;color:var(--text3);font-weight:400;">/</span> ${comp.percentualFinanceiro.toFixed(1)}%
+          </div>
+          <div style="font-size:.68rem;color:${comp.desvio > 0 ? 'var(--danger)' : 'var(--success)'};margin-top:2px;font-weight:700;">
+            ${comp.desvio > 0 ? `Desvio: +${comp.desvio}% gasto` : `Economia de ritmo: ${Math.abs(comp.desvio)}%`}
+          </div>
+        </div>
+      </div>
+
+      <!-- Tabela / Lista de Etapas Orçadas -->
+      <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:var(--r-md);padding:14px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+          <div style="font-size:.82rem;font-weight:800;color:var(--text);">Detalhamento por Macro-Etapa da Obra</div>
+          <div style="font-size:.72rem;color:var(--text3);">${comp.totalEtapas} etapa(s) monitorada(s)</div>
+        </div>
+        <div>
+          ${etapasHtml || '<div style="text-align:center;color:var(--text3);padding:14px;">Nenhuma macro-etapa orçada nesta obra.</div>'}
+        </div>
+      </div>
+    </div>`;
   },
 
   _vencimentos(obraId) {

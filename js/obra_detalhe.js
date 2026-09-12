@@ -213,6 +213,10 @@ const ObraDetalhe = {
 
       <!-- Barra de Abas (Navegação Interna da Obra) -->
       <div style="display:flex;gap:8px;border-bottom:2px solid var(--border);margin-bottom:20px;overflow-x:auto;padding-bottom:2px;">
+        <button class="btn od-tab-btn ${this.activeTab==='orcado-realizado'?'active':''}" data-tab="orcado-realizado" onclick="ObraDetalhe.setTab('orcado-realizado')"
+                style="padding:10px 18px;font-size:.88rem;font-weight:800;border:none;border-bottom:3px solid ${this.activeTab==='orcado-realizado'?'var(--accent)':'transparent'};color:${this.activeTab==='orcado-realizado'?'var(--accent)':'var(--text2)'};border-radius:0;background:${this.activeTab==='orcado-realizado'?'rgba(18,217,160,0.08)':'transparent'};">
+          🏗️ Orçado × Realizado
+        </button>
         <button class="btn od-tab-btn ${this.activeTab==='lancamentos'?'active':''}" data-tab="lancamentos" onclick="ObraDetalhe.setTab('lancamentos')"
                 style="padding:10px 18px;font-size:.88rem;font-weight:800;border:none;border-bottom:3px solid ${this.activeTab==='lancamentos'?'var(--accent)':'transparent'};color:${this.activeTab==='lancamentos'?'var(--accent)':'var(--text2)'};border-radius:0;background:${this.activeTab==='lancamentos'?'rgba(18,217,160,0.08)':'transparent'};">
           💰 Extrato &amp; Lançamentos
@@ -239,6 +243,7 @@ const ObraDetalhe = {
   },
 
   _getTabContent(tab, obraId) {
+    if (tab === 'orcado-realizado') return this._renderTabOrcadoRealizado(obraId);
     if (tab === 'documentos') return this._renderTabDocumentos(obraId);
     if (tab === 'medicoes') return this._renderTabMedicoes(obraId);
     if (tab === 'recibos') return this._renderTabRecibos(obraId);
@@ -262,6 +267,451 @@ const ObraDetalhe = {
         };
       }
     }
+  },
+
+  // ===== ABA 0: ORÇADO × REALIZADO =====
+  _renderTabOrcadoRealizado(obraId) {
+    const comp = (typeof DB !== 'undefined' && DB.getOrcamentoVsRealizado)
+      ? DB.getOrcamentoVsRealizado(obraId)
+      : {
+          obraId: obraId || 'todas',
+          totalOrcado: 0,
+          totalRealizado: 0,
+          saldoRestante: 0,
+          percentualFinanceiro: 0,
+          percentualFisico: 0,
+          desvio: 0,
+          statusSaude: 'saudavel',
+          alertaDesc: '',
+          etapas: [],
+          totalEtapas: 0,
+          temOrcamento: false,
+          totalMedicoes: 0
+        };
+
+    const obra = (typeof DB !== 'undefined' && DB.getById) ? DB.getById('clientes', obraId) : null;
+
+    // Cores e Badges de status da saúde
+    const saudeConfig = {
+      saudavel: {
+        badge: '✅ Orçamento Sob Controle',
+        cor: 'var(--success)',
+        bg: 'rgba(34, 197, 94, 0.12)',
+        border: 'rgba(34, 197, 94, 0.35)'
+      },
+      atencao: {
+        badge: '⚠️ Atenção ao Ritmo de Gastos',
+        cor: '#f59e0b',
+        bg: 'rgba(245, 158, 11, 0.12)',
+        border: 'rgba(245, 158, 11, 0.35)'
+      },
+      estouro: {
+        badge: '🚨 Estouro Orçamentário / Desvio Crítico',
+        cor: 'var(--danger)',
+        bg: 'rgba(239, 68, 68, 0.12)',
+        border: 'rgba(239, 68, 68, 0.35)'
+      }
+    };
+    const saude = saudeConfig[comp.statusSaude] || saudeConfig.saudavel;
+
+    return `
+    <div>
+      <!-- Banner quando a obra não possui orçamento cadastrado -->
+      ${!comp.temOrcamento ? `
+      <div class="card" style="margin-bottom:20px;padding:16px 20px;border-left:4px solid var(--accent);background:linear-gradient(90deg, rgba(18,217,160,0.08) 0%, var(--bg-card) 100%);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:14px;">
+        <div style="flex:1;min-width:280px;">
+          <div style="display:flex;align-items:center;gap:8px;font-weight:800;font-size:1rem;color:var(--text);">
+            <span>📋</span>
+            <span>Nenhum Orçamento Detalhado Vinculado a Esta Obra</span>
+          </div>
+          <div style="font-size:.84rem;color:var(--text2);margin-top:4px;line-height:1.4;">
+            Os valores exibidos abaixo são baseados nos lançamentos e notas já realizados. Crie uma planilha orçamentária por etapas ou importe do SINAPI para ter o teto de gastos por macro-etapa.
+          </div>
+        </div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;">
+          <button class="btn btn-primary btn-sm" onclick="App.navigate('orcamentos')" style="font-weight:700;">
+            + Criar Orçamento Convencional
+          </button>
+          <button class="btn btn-secondary btn-sm" onclick="App.navigate('sinapi')" style="font-weight:700;">
+            🏦 Consultar Banco SINAPI
+          </button>
+        </div>
+      </div>
+      ` : ''}
+
+      <!-- Painel de Ações Rápidas do Módulo -->
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px;flex-wrap:wrap;gap:12px;">
+        <div style="display:flex;align-items:center;gap:10px;">
+          <span class="badge" style="background:${saude.bg};color:${saude.cor};border:1px solid ${saude.border};font-size:.85rem;padding:6px 12px;font-weight:800;border-radius:20px;">
+            ${saude.badge}
+          </span>
+          <span style="font-size:.82rem;color:var(--text3);">
+            ${comp.totalEtapas} ${comp.totalEtapas === 1 ? 'etapa ativa' : 'etapas ativas'} &bull; ${comp.totalMedicoes} ${comp.totalMedicoes === 1 ? 'medição registrada' : 'medições registradas'}
+          </span>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          <button class="btn btn-secondary btn-sm" onclick="App.navigate('orcamentos')" style="display:inline-flex;align-items:center;gap:6px;">
+            📋 Ver Orçamentos
+          </button>
+          <button class="btn btn-secondary btn-sm" onclick="App.navigate('sinapi')" style="display:inline-flex;align-items:center;gap:6px;">
+            🏦 Base SINAPI
+          </button>
+          <button class="btn btn-secondary btn-sm" onclick="ObraDetalhe.imprimirOrcadoVsRealizado('${obraId}')" style="display:inline-flex;align-items:center;gap:6px;">
+            🖨️ Imprimir Comparativo
+          </button>
+          <button class="btn btn-danger btn-sm" onclick="App.obraId='${obraId}';Lancamentos.showForm('despesa')" style="font-weight:700;display:inline-flex;align-items:center;gap:6px;">
+            + Lançar Custo
+          </button>
+        </div>
+      </div>
+
+      <!-- 4 KPIs de Alto Impacto -->
+      <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(210px, 1fr));gap:14px;margin-bottom:20px;">
+        <!-- Card 1: Orçado -->
+        <div class="card" style="margin:0;padding:16px;border:1px solid var(--border);">
+          <div style="font-size:.72rem;font-weight:800;text-transform:uppercase;color:var(--text3);letter-spacing:.05em;">Total Orçado (Teto)</div>
+          <div style="font-size:1.45rem;font-weight:900;color:var(--text);margin-top:6px;">
+            ${Utils.fmt.currency(comp.totalOrcado)}
+          </div>
+          <div style="font-size:.75rem;color:var(--text3);margin-top:4px;">
+            ${comp.temOrcamento ? 'Planilhas & Composições' : 'Base Contrato Global'}
+          </div>
+        </div>
+
+        <!-- Card 2: Realizado -->
+        <div class="card" style="margin:0;padding:16px;border:1px solid var(--border);">
+          <div style="font-size:.72rem;font-weight:800;text-transform:uppercase;color:var(--text3);letter-spacing:.05em;">Total Realizado (Gasto)</div>
+          <div style="font-size:1.45rem;font-weight:900;color:var(--danger);margin-top:6px;">
+            ${Utils.fmt.currency(comp.totalRealizado)}
+          </div>
+          <div style="font-size:.75rem;color:var(--text3);margin-top:4px;">
+            ${comp.percentualFinanceiro}% do teto consumido
+          </div>
+        </div>
+
+        <!-- Card 3: Saldo -->
+        <div class="card" style="margin:0;padding:16px;border:1px solid ${comp.saldoRestante >= 0 ? 'rgba(34,197,94,0.3)' : 'rgba(239,68,68,0.3)'};">
+          <div style="font-size:.72rem;font-weight:800;text-transform:uppercase;color:var(--text3);letter-spacing:.05em;">
+            ${comp.saldoRestante >= 0 ? 'Saldo Disponível' : 'Estouro de Verba'}
+          </div>
+          <div style="font-size:1.45rem;font-weight:900;color:${comp.saldoRestante >= 0 ? 'var(--success)' : 'var(--danger)'};margin-top:6px;">
+            ${Utils.fmt.currency(Math.abs(comp.saldoRestante))}
+          </div>
+          <div style="font-size:.75rem;color:${comp.saldoRestante >= 0 ? 'var(--text3)' : 'var(--danger)'};margin-top:4px;">
+            ${comp.saldoRestante >= 0 ? 'Margem orçamentária restante' : 'Valor acima do teto planejado'}
+          </div>
+        </div>
+
+        <!-- Card 4: Físico vs Financeiro -->
+        <div class="card" style="margin:0;padding:16px;border:1px solid var(--border);">
+          <div style="font-size:.72rem;font-weight:800;text-transform:uppercase;color:var(--text3);letter-spacing:.05em;">Desvio Físico × Financeiro</div>
+          <div style="display:flex;align-items:baseline;gap:8px;margin-top:6px;">
+            <div style="font-size:1.45rem;font-weight:900;color:${comp.desvio > 5 ? 'var(--danger)' : comp.desvio < -5 ? 'var(--accent)' : 'var(--text)'};">
+              ${comp.desvio > 0 ? '+' : ''}${comp.desvio}%
+            </div>
+            <div style="font-size:.78rem;font-weight:700;color:var(--text3);">
+              (Fin: ${comp.percentualFinanceiro}% | Fís: ${comp.percentualFisico}%)
+            </div>
+          </div>
+          <div style="font-size:.75rem;color:var(--text3);margin-top:4px;">
+            ${comp.desvio > 5 ? 'Gastos à frente das medições' : comp.desvio < -5 ? 'Economia ou adiantamento físico' : 'Evolução em equilíbrio'}
+          </div>
+        </div>
+      </div>
+
+      <!-- Card do Gráfico Comparativo e Diagnóstico -->
+      <div class="card" style="margin-bottom:20px;padding:20px;border:1px solid var(--border);">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:8px;">
+          <h3 style="font-size:1rem;font-weight:800;color:var(--text);margin:0;display:flex;align-items:center;gap:8px;">
+            <span>📊</span>
+            <span>Evolução da Obra: Avanço Físico Medido vs Desembolso Financeiro</span>
+          </h3>
+          <span style="font-size:.78rem;color:var(--text3);">Curva Físico-Financeira</span>
+        </div>
+
+        <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(280px, 1fr));gap:16px;margin-bottom:16px;">
+          <!-- Barra 1: Físico -->
+          <div style="background:var(--bg-secondary);padding:14px;border-radius:var(--r-md);border:1px solid var(--border);">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+              <span style="font-size:.82rem;font-weight:700;color:var(--text);display:flex;align-items:center;gap:6px;">
+                <span>📐</span> Avanço Físico (Medições de Engenharia)
+              </span>
+              <span style="font-size:1.1rem;font-weight:900;color:#3b82f6;">${comp.percentualFisico}%</span>
+            </div>
+            <div style="height:10px;background:var(--border);border-radius:5px;overflow:hidden;">
+              <div style="width:${Math.min(100, comp.percentualFisico)}%;height:100%;background:#3b82f6;border-radius:5px;transition:width .5s ease;"></div>
+            </div>
+            <div style="font-size:.72rem;color:var(--text3);margin-top:6px;">
+              ${comp.totalMedicoes > 0 ? `${comp.totalMedicoes} laudos de medição de campo considerados` : 'Nenhuma medição lançada ainda (0%)'}
+            </div>
+          </div>
+
+          <!-- Barra 2: Financeiro -->
+          <div style="background:var(--bg-secondary);padding:14px;border-radius:var(--r-md);border:1px solid var(--border);">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+              <span style="font-size:.82rem;font-weight:700;color:var(--text);display:flex;align-items:center;gap:6px;">
+                <span>💰</span> Avanço Financeiro (Despesas Realizadas)
+              </span>
+              <span style="font-size:1.1rem;font-weight:900;color:${comp.percentualFinanceiro > 100 ? 'var(--danger)' : comp.percentualFinanceiro >= 85 ? '#f59e0b' : 'var(--success)'};">
+                ${comp.percentualFinanceiro}%
+              </span>
+            </div>
+            <div style="height:10px;background:var(--border);border-radius:5px;overflow:hidden;">
+              <div style="width:${Math.min(100, comp.percentualFinanceiro)}%;height:100%;background:${comp.percentualFinanceiro > 100 ? 'var(--danger)' : comp.percentualFinanceiro >= 85 ? '#f59e0b' : 'var(--success)'};border-radius:5px;transition:width .5s ease;"></div>
+            </div>
+            <div style="font-size:.72rem;color:var(--text3);margin-top:6px;">
+              ${Utils.fmt.currency(comp.totalRealizado)} desembolsados de ${Utils.fmt.currency(comp.totalOrcado)}
+            </div>
+          </div>
+        </div>
+
+        <!-- Alerta e Diagnóstico -->
+        <div style="background:${saude.bg};border:1px solid ${saude.border};padding:12px 16px;border-radius:var(--r-md);display:flex;align-items:center;gap:12px;">
+          <div style="font-size:1.3rem;">${comp.statusSaude === 'estouro' ? '🚨' : comp.statusSaude === 'atencao' ? '⚠️' : '🎯'}</div>
+          <div style="font-size:.84rem;color:var(--text);line-height:1.4;">
+            <strong>Diagnóstico Executivo:</strong> ${Utils.escapeHtml(comp.alertaDesc)}
+          </div>
+        </div>
+      </div>
+
+      <!-- Tabela Analítica das Macro-Etapas da Obra -->
+      <div class="card" style="padding:0;overflow:hidden;border:1px solid var(--border);">
+        <div style="padding:16px 20px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
+          <div>
+            <h3 style="font-size:1rem;font-weight:800;color:var(--text);margin:0;">
+              Planilha de Acompanhamento por Macro-Etapas
+            </h3>
+            <div style="font-size:.78rem;color:var(--text3);margin-top:2px;">
+              Detalhamento de teto orçado, custos apurados, saldo e saúde de cada grupo de serviço
+            </div>
+          </div>
+          <div style="font-size:.82rem;font-weight:700;color:var(--text2);">
+            ${comp.etapas.length} macro-etapas com atividade
+          </div>
+        </div>
+
+        <div class="table-wrap">
+          <table class="table" style="margin:0;">
+            <thead>
+              <tr>
+                <th style="min-width:240px;">Macro-Etapa de Engenharia</th>
+                <th style="text-align:right;width:130px;">Orçado (R$)</th>
+                <th style="text-align:right;width:130px;">Realizado (R$)</th>
+                <th style="text-align:right;width:130px;">Saldo (R$)</th>
+                <th style="width:160px;text-align:center;">% Consumido</th>
+                <th style="width:140px;text-align:center;">Situação</th>
+                <th style="width:110px;text-align:center;">Ações</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${comp.etapas.length === 0 ? `
+              <tr>
+                <td colspan="7" style="text-align:center;padding:36px 16px;color:var(--text3);">
+                  <div style="font-size:2rem;margin-bottom:8px;">🏗️</div>
+                  <div style="font-weight:700;font-size:.95rem;color:var(--text);">Nenhuma despesa ou etapa orçada nesta obra</div>
+                  <div style="font-size:.82rem;margin-top:4px;">Vincule um orçamento ou cadastre lançamentos financeiros para iniciar o comparativo.</div>
+                </td>
+              </tr>
+              ` : comp.etapas.map(e => {
+                const statusBadge = e.status === 'estouro'
+                  ? `<span class="badge" style="background:rgba(239,68,68,0.15);color:#ef4444;border:1px solid rgba(239,68,68,0.3);font-size:.72rem;padding:3px 8px;font-weight:700;">🚨 Estouro</span>`
+                  : e.status === 'alerta'
+                  ? `<span class="badge" style="background:rgba(245,158,11,0.15);color:#f59e0b;border:1px solid rgba(245,158,11,0.3);font-size:.72rem;padding:3px 8px;font-weight:700;">⚠️ Atenção (&gt;85%)</span>`
+                  : `<span class="badge" style="background:rgba(34,197,94,0.15);color:#22c55e;border:1px solid rgba(34,197,94,0.3);font-size:.72rem;padding:3px 8px;font-weight:700;">✅ Sob Controle</span>`;
+
+                const barraCor = e.status === 'estouro' ? 'var(--danger)' : e.status === 'alerta' ? '#f59e0b' : 'var(--success)';
+
+                return `
+                <tr>
+                  <td>
+                    <div style="font-weight:700;color:var(--text);font-size:.88rem;">
+                      ${Utils.escapeHtml(e.nome)}
+                    </div>
+                    ${e.itensOrcados > 0 ? `
+                    <div style="font-size:.72rem;color:var(--text3);margin-top:2px;">
+                      ${e.itensOrcados} ${e.itensOrcados === 1 ? 'item orçado' : 'itens orçados'}
+                    </div>` : ''}
+                  </td>
+                  <td style="text-align:right;font-weight:700;color:var(--text);font-size:.88rem;">
+                    ${Utils.fmt.currency(e.previsto)}
+                  </td>
+                  <td style="text-align:right;font-weight:800;color:var(--danger);font-size:.88rem;">
+                    ${Utils.fmt.currency(e.realizado)}
+                  </td>
+                  <td style="text-align:right;font-weight:800;font-size:.88rem;color:${e.saldo >= 0 ? 'var(--success)' : 'var(--danger)'};">
+                    ${e.saldo < 0 ? '-' : ''}${Utils.fmt.currency(Math.abs(e.saldo))}
+                  </td>
+                  <td style="vertical-align:middle;">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px;font-size:.74rem;font-weight:700;color:var(--text2);">
+                      <span>Progresso</span>
+                      <span>${e.percentual}%</span>
+                    </div>
+                    <div style="height:6px;background:var(--border);border-radius:3px;overflow:hidden;">
+                      <div style="width:${Math.min(100, e.percentual)}%;height:100%;background:${barraCor};border-radius:3px;transition:width .4s;"></div>
+                    </div>
+                  </td>
+                  <td style="text-align:center;">
+                    ${statusBadge}
+                  </td>
+                  <td style="text-align:center;">
+                    <button class="btn btn-secondary btn-sm" onclick="App.obraId='${obraId}';Lancamentos.showForm('despesa')" style="font-size:.72rem;padding:3px 7px;" title="Lançar despesa nesta etapa">
+                      + Custo
+                    </button>
+                  </td>
+                </tr>
+                `;
+              }).join('')}
+            </tbody>
+            ${comp.etapas.length > 0 ? `
+            <tfoot>
+              <tr style="background:var(--bg-secondary);font-weight:900;border-top:2px solid var(--border);">
+                <td>TOTAIS CONSOLIDADOS</td>
+                <td style="text-align:right;color:var(--text);">${Utils.fmt.currency(comp.totalOrcado)}</td>
+                <td style="text-align:right;color:var(--danger);">${Utils.fmt.currency(comp.totalRealizado)}</td>
+                <td style="text-align:right;color:${comp.saldoRestante >= 0 ? 'var(--success)' : 'var(--danger)'};">
+                  ${comp.saldoRestante < 0 ? '-' : ''}${Utils.fmt.currency(Math.abs(comp.saldoRestante))}
+                </td>
+                <td style="text-align:center;">${comp.percentualFinanceiro}% Total</td>
+                <td style="text-align:center;">
+                  <span class="badge" style="background:${saude.bg};color:${saude.cor};border:1px solid ${saude.border};font-size:.72rem;">
+                    ${comp.statusSaude.toUpperCase()}
+                  </span>
+                </td>
+                <td></td>
+              </tr>
+            </tfoot>
+            ` : ''}
+          </table>
+        </div>
+      </div>
+    </div>
+    `;
+  },
+
+  imprimirOrcadoVsRealizado(obraId) {
+    const comp = (typeof DB !== 'undefined' && DB.getOrcamentoVsRealizado)
+      ? DB.getOrcamentoVsRealizado(obraId)
+      : null;
+    if (!comp) {
+      Utils.toast('Não foi possível carregar os dados comparativos para impressão.', 'danger');
+      return;
+    }
+
+    const obra = DB.getById('clientes', obraId) || { nome: 'Todas as Obras / Geral' };
+    const emp = DB.getEmpresa() || {};
+    const empNome = emp.razao_social || emp.nome_fantasia || 'FINOBRA CONSTRUTORA';
+
+    const win = window.open('', '_blank');
+    if (!win) {
+      Utils.toast('Permita popups no navegador para imprimir o relatório.', 'warning');
+      return;
+    }
+
+    win.document.write(`
+      <!DOCTYPE html>
+      <html lang="pt-BR">
+      <head>
+        <meta charset="UTF-8">
+        <title>Relatório Orçado vs Realizado - ${Utils.escapeHtml(obra.nome)}</title>
+        <style>
+          @page { size: A4 portrait; margin: 12mm 10mm; }
+          body { font-family: 'Segoe UI', Arial, sans-serif; font-size: 10px; color: #0f172a; margin: 0; padding: 15px; }
+          .header { display: flex; justify-content: space-between; border-bottom: 2px solid #0f172a; padding-bottom: 8px; margin-bottom: 12px; }
+          .title { font-size: 16px; font-weight: 900; }
+          .kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 14px; }
+          .kpi-card { border: 1px solid #cbd5e1; background: #f8fafc; padding: 8px; border-radius: 4px; }
+          .kpi-title { font-size: 8px; text-transform: uppercase; font-weight: 700; color: #64748b; }
+          .kpi-val { font-size: 13px; font-weight: 900; margin-top: 2px; }
+          table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+          th { background: #0f172a; color: #fff; font-weight: 700; padding: 6px 8px; text-align: left; font-size: 9px; }
+          td { padding: 5px 8px; border-bottom: 1px solid #e2e8f0; font-size: 9px; }
+          tr:nth-child(even) td { background: #f8fafc; }
+          .tfoot td { background: #e2e8f0; font-weight: 900; border-top: 2px solid #0f172a; }
+          .footer { margin-top: 25px; border-top: 1px solid #cbd5e1; padding-top: 8px; display: flex; justify-content: space-between; font-size: 8px; color: #64748b; }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <div>
+            <div style="font-size:14px;font-weight:900;color:#0f172a;">${Utils.escapeHtml(empNome)}</div>
+            <div style="color:#64748b;font-size:9px;">Gestão de Engenharia & Custos da Construção</div>
+          </div>
+          <div style="text-align:right;">
+            <div class="title">RELATÓRIO ORÇADO × REALIZADO</div>
+            <div style="font-size:9px;color:#64748b;">Obra: <strong>${Utils.escapeHtml(obra.nome)}</strong> &bull; Emissão: ${new Date().toLocaleDateString('pt-BR')}</div>
+          </div>
+        </div>
+
+        <div class="kpis">
+          <div class="kpi-card">
+            <div class="kpi-title">Total Orçado</div>
+            <div class="kpi-val">${Utils.fmt.currency(comp.totalOrcado)}</div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-title">Total Realizado</div>
+            <div class="kpi-val" style="color:#991b1b;">${Utils.fmt.currency(comp.totalRealizado)}</div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-title">Saldo Orçamentário</div>
+            <div class="kpi-val" style="color:${comp.saldoRestante>=0?'#166534':'#991b1b'};">${Utils.fmt.currency(comp.saldoRestante)}</div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-title">Avanço Físico / Financeiro</div>
+            <div class="kpi-val">${comp.percentualFisico}% / ${comp.percentualFinanceiro}%</div>
+          </div>
+        </div>
+
+        <table>
+          <thead>
+            <tr>
+              <th>Macro-Etapa de Engenharia</th>
+              <th style="text-align:right;">Orçado (R$)</th>
+              <th style="text-align:right;">Realizado (R$)</th>
+              <th style="text-align:right;">Saldo (R$)</th>
+              <th style="text-align:center;">% Consumido</th>
+              <th style="text-align:center;">Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${comp.etapas.map(e => `
+              <tr>
+                <td style="font-weight:600;">${Utils.escapeHtml(e.nome)}</td>
+                <td style="text-align:right;">${Utils.fmt.currency(e.previsto)}</td>
+                <td style="text-align:right;color:#991b1b;font-weight:700;">${Utils.fmt.currency(e.realizado)}</td>
+                <td style="text-align:right;font-weight:700;color:${e.saldo>=0?'#166534':'#991b1b'};">${Utils.fmt.currency(e.saldo)}</td>
+                <td style="text-align:center;font-weight:700;">${e.percentual}%</td>
+                <td style="text-align:center;font-size:8px;font-weight:700;color:${e.status==='estouro'?'#991b1b':e.status==='alerta'?'#b45309':'#166534'};">
+                  ${e.status === 'estouro' ? 'ESTOURO' : e.status === 'alerta' ? 'ALERTA' : 'OK'}
+                </td>
+              </tr>
+            `).join('')}
+          </tbody>
+          <tfoot>
+            <tr class="tfoot">
+              <td>TOTAIS</td>
+              <td style="text-align:right;">${Utils.fmt.currency(comp.totalOrcado)}</td>
+              <td style="text-align:right;color:#991b1b;">${Utils.fmt.currency(comp.totalRealizado)}</td>
+              <td style="text-align:right;color:${comp.saldoRestante>=0?'#166534':'#991b1b'};">${Utils.fmt.currency(comp.saldoRestante)}</td>
+              <td style="text-align:center;">${comp.percentualFinanceiro}%</td>
+              <td style="text-align:center;">${comp.statusSaude.toUpperCase()}</td>
+            </tr>
+          </tfoot>
+        </table>
+
+        <div style="margin-top:14px;background:#f8fafc;border:1px solid #cbd5e1;padding:8px 12px;border-radius:4px;font-size:8.5px;">
+          <strong>Diagnóstico Executivo:</strong> ${Utils.escapeHtml(comp.alertaDesc)}
+        </div>
+
+        <div class="footer">
+          <span>FinObra &bull; Relatório Executivo Orçado vs Realizado</span>
+          <span>Emitido em ${new Date().toLocaleDateString('pt-BR')} às ${new Date().toLocaleTimeString('pt-BR')}</span>
+        </div>
+      </body>
+      </html>
+    `);
+    win.document.close();
+    win.focus();
+    setTimeout(() => { win.print(); }, 400);
   },
 
   // ===== ABA 1: LANÇAMENTOS =====

@@ -29,6 +29,54 @@ const DB = {
     return;
   },
 
+  init() {
+    this._bindNetworkListeners();
+    this.expurgarDadosDemo();
+    const pending = this.getSyncPendingCount ? this.getSyncPendingCount() : 0;
+    const failed = this.getSyncFailedCount ? this.getSyncFailedCount() : 0;
+    if (failed > 0) {
+      this._emitSyncStatus('attention', { pending, failed });
+    } else if (pending > 0) {
+      this._emitSyncStatus('pending', { pending, failed: 0 });
+    } else if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      this._emitSyncStatus('offline');
+    } else {
+      this._emitSyncStatus('cached');
+    }
+  },
+
+  _bindNetworkListeners() {
+    if (this._networkListenersBound || typeof window === 'undefined') return;
+    this._networkListenersBound = true;
+
+    window.addEventListener('online', () => {
+      console.info('[Sync] 🌐 Conexão de rede restabelecida! Drenando fila offline...');
+      this._emitSyncStatus('syncing');
+      this._flushCloudQueue().then(async () => {
+        const remaining = this.getSyncPendingCount ? this.getSyncPendingCount() : 0;
+        if (remaining === 0) {
+          console.info('[Sync] Fila offline zerada. Atualizando dados com a nuvem...');
+          const ok = await this.syncFromCloud();
+          if (ok) {
+            this._emitSyncStatus('synced');
+            if (typeof window !== 'undefined' && window.App && typeof window.App.refreshCurrentRoute === 'function') {
+              window.App.refreshCurrentRoute();
+            }
+          }
+        } else {
+          this._emitSyncStatus('pending', { pending: remaining });
+        }
+      }).catch(err => {
+        console.warn('[Sync] Erro ao descarregar fila após reconexão:', err);
+      });
+    });
+
+    window.addEventListener('offline', () => {
+      console.warn('[Sync] 📴 Conexão perdida. Modo offline do canteiro de obras ativo.');
+      this._emitSyncStatus('offline');
+    });
+  },
+
 
   // Preferências do tenant: cache local isolado + persistência no Neon.
   _preferencesLocalSnapshot() {
@@ -670,31 +718,112 @@ const DB = {
     }
   },
 
+  /**
+   * Reconciliação consciente de fila offline (C-07 / Patch 17).
+   * 1. Descarta do snapshot da nuvem qualquer item que esteja marcado para exclusão offline (tombstone).
+   * 2. Preserva e prioriza a versão editada offline ('save' pendente) sobre o snapshot desatualizado.
+   * 3. Mantém no cache local itens novos criados offline que ainda não subiram ao Neon.
+   */
+  _reconcileCollection(table, cloudItems = [], localItems = []) {
+    const queue = (typeof this._getSyncQueue === 'function') ? this._getSyncQueue() : [];
+    const tableAliases = [table];
+    if (table === 'clientes') tableAliases.push('obras');
+    if (table === 'obras') tableAliases.push('clientes');
+    if (table === 'notas') tableAliases.push('notas_fiscais');
+    if (table === 'contas') tableAliases.push('contas_bancarias');
+
+    const relevantQueue = queue.filter(q => tableAliases.includes(q?.payload?.table));
+
+    // 1. Identificar registros excluídos offline (tombstones)
+    const pendingDeletes = new Set();
+    for (const q of relevantQueue) {
+      if (q?.payload?.action === 'delete') {
+        const id = String(q.payload.id || q.payload.data?.id || q.payload.data?.cloud_id || '');
+        if (id) pendingDeletes.add(id);
+      }
+    }
+
+    // 2. Identificar edições/saves pendentes offline (versão mais recente da fila)
+    const pendingSaves = new Map();
+    for (const q of relevantQueue) {
+      if (q?.payload?.action === 'save') {
+        const item = q.payload.data;
+        const id = String(q.payload.id || item?.id || item?.cloud_id || '');
+        if (id && !pendingDeletes.has(id)) {
+          pendingSaves.set(id, item);
+        }
+      }
+    }
+
+    // 3. Montar mapa inicial a partir do snapshot da nuvem (sem itens deletados offline)
+    const resultMap = new Map();
+    for (const cItem of (Array.isArray(cloudItems) ? cloudItems : [])) {
+      const id = String(cItem?.id || cItem?.cloud_id || '');
+      if (!id || pendingDeletes.has(id)) continue;
+
+      if (pendingSaves.has(id)) {
+        // Versão pendente offline prevalece
+        const localPending = pendingSaves.get(id);
+        resultMap.set(id, { ...cItem, ...localPending });
+      } else {
+        resultMap.set(id, cItem);
+      }
+    }
+
+    // 4. Preservar itens criados offline que ainda não existem no snapshot da nuvem
+    for (const lItem of (Array.isArray(localItems) ? localItems : [])) {
+      const id = String(lItem?.id || lItem?.cloud_id || '');
+      if (!id || pendingDeletes.has(id)) continue;
+
+      if (pendingSaves.has(id)) {
+        const pendingItem = pendingSaves.get(id);
+        resultMap.set(id, { ...(resultMap.get(id) || lItem), ...pendingItem });
+      } else if (!resultMap.has(id)) {
+        // Item local criado sem internet ainda não presente na nuvem
+        resultMap.set(id, lItem);
+      }
+    }
+
+    return Array.from(resultMap.values());
+  },
+
   async syncFromCloud() {
     this._emitSyncStatus('syncing');
     try {
       const d = await this._fetchCloudSnapshot();
+      const coreBootstrapped = this.isCoreCloudBootstrapped ? this.isCoreCloudBootstrapped() : true;
+      const mergeLegacy = (cloud, local) => (!coreBootstrapped && local.length ? this._reconcileCollection('legacy', cloud, local) : this._reconcileCollection('legacy', cloud, local));
+
       if (Array.isArray(d.clientes)) {
-        this.save('clientes', d.clientes.map(o => ({
+        const local = this.getAll('clientes') || [];
+        const normalizedCloud = d.clientes.map(o => ({
           ...o,
           data_inicio: (typeof Utils !== 'undefined' && Utils.cleanDate) ? Utils.cleanDate(o.data_inicio) : (o.data_inicio ? String(o.data_inicio).split('T')[0] : o.data_inicio),
           data_previsao: (typeof Utils !== 'undefined' && Utils.cleanDate) ? Utils.cleanDate(o.data_previsao) : (o.data_previsao ? String(o.data_previsao).split('T')[0] : o.data_previsao)
-        })));
+        }));
+        this.save('clientes', this._reconcileCollection('clientes', normalizedCloud, local));
       }
+
       if (Array.isArray(d.fornecedores)) {
-        this.save('fornecedores', d.fornecedores);
+        const local = this.getAll('fornecedores') || [];
+        this.save('fornecedores', this._reconcileCollection('fornecedores', d.fornecedores, local));
       }
+
       if (Array.isArray(d.lancamentos)) {
-        this.save('lancamentos', d.lancamentos.map(l => ({
+        const local = this.getAll('lancamentos') || [];
+        const normalizedCloud = d.lancamentos.map(l => ({
           ...l,
           data: (typeof Utils !== 'undefined' && Utils.cleanDate) ? Utils.cleanDate(l.data) || l.data : (l.data ? String(l.data).split('T')[0] : l.data),
           data_vencimento: (typeof Utils !== 'undefined' && Utils.cleanDate) ? Utils.cleanDate(l.data_vencimento) || Utils.cleanDate(l.data) || l.data : (l.data_vencimento ? String(l.data_vencimento).split('T')[0] : l.data),
           data_pagamento: (typeof Utils !== 'undefined' && Utils.cleanDate) ? Utils.cleanDate(l.data_pagamento) || null : (l.data_pagamento ? String(l.data_pagamento).split('T')[0] : null),
           valor: Number(l.valor) || 0
-        })));
+        }));
+        this.save('lancamentos', this._reconcileCollection('lancamentos', normalizedCloud, local));
       }
+
       if (Array.isArray(d.notas)) {
-        this.save('notas', d.notas.map(n => {
+        const local = this.getAll('notas') || [];
+        const normalizedCloud = d.notas.map(n => {
           const vBruto = Number(n.valor_bruto !== undefined ? n.valor_bruto : n.valor_total) || 0;
           const vImp = Number(n.impostos) || 0;
           const vLiq = Number(n.valor_liquido !== undefined ? n.valor_liquido : (vBruto - vImp)) || 0;
@@ -712,16 +841,9 @@ const DB = {
             tipo: n.tipo || 'entrada',
             chave_nfe: n.chave_nfe || n.chave_acesso || ''
           };
-        }));
+        });
+        this.save('notas', this._reconcileCollection('notas', normalizedCloud, local));
       }
-      const coreBootstrapped = this.isCoreCloudBootstrapped();
-      const mergeLegacy = (cloud, local) => {
-        const map = new Map();
-        (Array.isArray(cloud) ? cloud : []).forEach(x => x?.id && map.set(String(x.id), x));
-        // Preserva edições legadas/offline que ainda não subiram ao servidor
-        (Array.isArray(local) ? local : []).forEach(x => x?.id && map.set(String(x.id), { ...(map.get(String(x.id)) || {}), ...x }));
-        return Array.from(map.values());
-      };
 
       if (Array.isArray(d.orcamentos)) {
         const local = this.getAll('orcamentos') || [];
@@ -738,9 +860,9 @@ const DB = {
           itens: Array.isArray(o.itens) ? o.itens : (Array.isArray(o.etapas) ? o.etapas : []),
           categorias: Array.isArray(o.categorias) ? o.categorias : []
         }));
-        const next = (!coreBootstrapped && local.length) ? mergeLegacy(mappedCloud, local) : mappedCloud;
-        this.save('orcamentos', next);
+        this.save('orcamentos', this._reconcileCollection('orcamentos', mappedCloud, local));
       }
+
       if (Array.isArray(d.medicoes)) {
         const local = this.getAll('medicoes') || [];
         const mappedCloud = d.medicoes.map(m => ({
@@ -748,37 +870,43 @@ const DB = {
           data: (typeof Utils !== 'undefined' && Utils.cleanDate) ? Utils.cleanDate(m.data) || m.data : (m.data ? String(m.data).split('T')[0] : m.data),
           valor_medido: Number(m.valor_medido !== undefined ? m.valor_medido : m.valor_solicitado) || 0
         }));
-        const next = (!coreBootstrapped && local.length) ? mergeLegacy(mappedCloud, local) : mappedCloud;
-        this.save('medicoes', next);
+        this.save('medicoes', this._reconcileCollection('medicoes', mappedCloud, local));
       }
+
       if (Array.isArray(d.contas)) {
-        this.save('contas', d.contas);
+        const local = this.getAll('contas') || [];
+        this.save('contas', this._reconcileCollection('contas', d.contas, local));
       }
+
       if (Array.isArray(d.produtos)) {
-        this.save('produtos', d.produtos);
+        const local = this.getAll('produtos') || [];
+        this.save('produtos', this._reconcileCollection('produtos', d.produtos, local));
       }
+
       if (Array.isArray(d.precompras)) {
-        const local = this.getAll('precompras');
-        this.save('precompras', !coreBootstrapped && local.length ? mergeLegacy(d.precompras, local) : d.precompras);
+        const local = this.getAll('precompras') || [];
+        this.save('precompras', this._reconcileCollection('precompras', d.precompras, local));
       }
+
       if (Array.isArray(d.contratos)) {
-        const local = this.getAll('contratos');
-        this.save('contratos', !coreBootstrapped && local.length ? mergeLegacy(d.contratos, local) : d.contratos);
+        const local = this.getAll('contratos') || [];
+        this.save('contratos', this._reconcileCollection('contratos', d.contratos, local));
       }
+
       if (Array.isArray(d.recibos)) {
         let local = [];
         try { local = JSON.parse(localStorage.getItem(this._ck('finobra_recibos')) || '[]'); } catch {}
-        const next = !coreBootstrapped && local.length ? mergeLegacy(d.recibos, local) : d.recibos;
+        const next = this._reconcileCollection('recibos', d.recibos, local);
         try { localStorage.setItem(this._ck('finobra_recibos'), JSON.stringify(next)); } catch (e) { console.warn('[Sync] Falha ao salvar recibos em cache:', e); }
       }
 
-      const completenessBootstrapped = this.isCloudCompletenessBootstrapped ? this.isCloudCompletenessBootstrapped() : true;
       if (Array.isArray(d.orcamentos_sinapi)) {
         const local = this._localSinapiForCurrentTenant ? this._localSinapiForCurrentTenant() : [];
-        const next = !completenessBootstrapped && local.length ? mergeLegacy(d.orcamentos_sinapi, local) : d.orcamentos_sinapi;
+        const next = this._reconcileCollection('orcamentos_sinapi', d.orcamentos_sinapi, local);
         try { localStorage.setItem(this._ck('orcamentos_sinapi'), JSON.stringify(next)); } catch (e) { console.warn('[Sync] Falha ao salvar orçamentos SINAPI em cache:', e); }
       }
 
+      const completenessBootstrapped = this.isCloudCompletenessBootstrapped ? this.isCloudCompletenessBootstrapped() : true;
       if (Array.isArray(d.doc_fases)) {
         const cloudByObra = new Map();
         for (const row of d.doc_fases) {
@@ -815,6 +943,7 @@ const DB = {
         const nextPrefs = completenessBootstrapped ? d.preferencias : { ...d.preferencias, ...localPrefs };
         this._applyTenantPreferences(nextPrefs);
       }
+
       if (Array.isArray(d.documentos) && typeof Documentos !== 'undefined') {
         const locais = Documentos.getAll() || [];
         const localMap = new Map(locais.map(x => [x.id, x]));
@@ -840,20 +969,8 @@ const DB = {
             merged.push(l);
           }
         });
-        Documentos.salvarLista(merged);
-      }
-
-      if (Array.isArray(d.produtos) && d.produtos.length > 0) {
-        const locais = this.getAll('produtos') || [];
-        const localMap = new Map(locais.map(p => [p.id, p]));
-        d.produtos.forEach(cp => {
-          localMap.set(cp.id, { ...(localMap.get(cp.id) || {}), ...cp });
-        });
-        this.save('produtos', Array.from(localMap.values()));
-      }
-
-      if (Array.isArray(d.contas) && d.contas.length > 0) {
-        this.save('contas', d.contas);
+        const reconciledDocs = this._reconcileCollection('documentos', merged, locais);
+        Documentos.salvarLista(reconciledDocs);
       }
 
       // Mantém dados cadastrais da empresa sincronizados com o tenant real do servidor.
@@ -981,10 +1098,7 @@ const DB = {
   _scheduleSyncRetry(delay = 10000) {
     clearTimeout(this._syncRetryTimer);
     this._syncRetryTimer = setTimeout(() => this._flushCloudQueue(), delay);
-    if (!this._syncOnlineBound && typeof window !== 'undefined') {
-      this._syncOnlineBound = true;
-      window.addEventListener('online', () => this._flushCloudQueue());
-    }
+    this._bindNetworkListeners();
   },
 
   _ackSyncQueueItem(item, { force = false } = {}) {
@@ -1210,6 +1324,199 @@ const DB = {
       nfPendentes: nfItems.length, nfPendentesValor: nfItems.reduce((s,n)=>s+(n.valor_total||n.valor_bruto||0),0),
       aPagar: aPagar.length, aPagarValor: aPagar.reduce((s,l)=>s+l.valor,0),
       aReceber: aReceber.length, aReceberValor: aReceber.reduce((s,l)=>s+l.valor,0)
+    };
+  },
+
+  // ── CONTROLE ORÇADO × REALIZADO & CRONOGRAMA FÍSICO-FINANCEIRO ──
+  getOrcamentoVsRealizado(obraId) {
+    const isTodas = !obraId || obraId === 'todas';
+    const cs = this.getAll('clientes') || [];
+    const targetObras = isTodas ? cs : cs.filter(c => c.id === obraId);
+    const targetIds = new Set(targetObras.map(c => c.id));
+
+    // 1. Obter Orçamentos convencionais e SINAPI das obras alvo
+    const orcsConv = (this.getAll('orcamentos') || []).filter(o => isTodas || targetIds.has(o.obra_id));
+    const orcsSinapi = (this.getAll('orcamentos_sinapi') || []).filter(o => isTodas || targetIds.has(o.obra_id));
+
+    // Catálogo padronizado de Macro-Etapas
+    const MACRO_ETAPAS = [
+      { id: 'preliminares',  nome: '01. Serviços Preliminares & Canteiro' },
+      { id: 'fundacao',      nome: '02. Fundações & Estruturas' },
+      { id: 'alvenaria',     nome: '03. Alvenarias & Fechamentos' },
+      { id: 'cobertura',     nome: '04. Coberturas & Telhados' },
+      { id: 'eletrica',      nome: '05. Instalações Elétricas' },
+      { id: 'hidraulica',    nome: '06. Instalações Hidrossanitárias' },
+      { id: 'revestimentos', nome: '07. Revestimentos & Pisos' },
+      { id: 'esquadrias',    nome: '08. Esquadrias & Vidros' },
+      { id: 'pintura',       nome: '09. Pinturas & Acabamentos' },
+      { id: 'loucas',        nome: '10. Louças & Metais' },
+      { id: 'externa',       nome: '11. Área Externa & Paisagismo' },
+      { id: 'limpeza',       nome: '12. Limpeza Final & Entrega' },
+      { id: 'outros',        nome: '13. Outros / Gerais' }
+    ];
+
+    const etapaMap = new Map();
+    MACRO_ETAPAS.forEach(e => {
+      etapaMap.set(e.id, { id: e.id, nome: e.nome, previsto: 0, realizado: 0, itensOrcados: 0 });
+    });
+
+    let totalOrcado = 0;
+
+    // Consolidar Orçamentos Convencionais
+    orcsConv.forEach(orc => {
+      if (Array.isArray(orc.categorias) && orc.categorias.length > 0) {
+        orc.categorias.forEach(cat => {
+          const catId = String(cat.id || 'outros').toLowerCase();
+          const target = etapaMap.get(catId) || etapaMap.get('outros');
+          const val = Number(cat.total || cat.subtotal || 0);
+          target.previsto += val;
+          target.itensOrcados += (Array.isArray(cat.itens) ? cat.itens.length : 0);
+          totalOrcado += val;
+        });
+      } else if (Array.isArray(orc.etapas) && orc.etapas.length > 0) {
+        orc.etapas.forEach(et => {
+          const etId = String(et.id || et.categoria || 'outros').toLowerCase();
+          const target = etapaMap.get(etId) || etapaMap.get('outros');
+          const val = Number(et.valor_previsto || et.total || 0);
+          target.previsto += val;
+          totalOrcado += val;
+        });
+      } else if (orc.valor_total || orc.valor_total_previsto) {
+        const val = Number(orc.valor_total || orc.valor_total_previsto || 0);
+        etapaMap.get('outros').previsto += val;
+        totalOrcado += val;
+      }
+    });
+
+    // Consolidar Orçamentos SINAPI
+    orcsSinapi.forEach(orc => {
+      const subtotal = (orc.itens || []).reduce((s, i) => s + Number(i.total || 0), 0);
+      const bdi = Number(orc.bdi || 25);
+      const val = subtotal * (1 + bdi / 100);
+      etapaMap.get('outros').previsto += val;
+      etapaMap.get('outros').itensOrcados += (orc.itens || []).length;
+      totalOrcado += val;
+    });
+
+    // Fallback: se não tiver orçamento cadastrado, mas a obra tiver valor_financiado
+    if (totalOrcado === 0 && targetObras.length > 0) {
+      const somaContratos = targetObras.reduce((s, c) => s + Number(c.valor_financiado || 0), 0);
+      if (somaContratos > 0) {
+        totalOrcado = somaContratos;
+        etapaMap.get('outros').previsto = somaContratos;
+      }
+    }
+
+    // 2. Obter Gastos Reais (Lançamentos e Notas)
+    const lans = (this.getAll('lancamentos') || []).filter(l => {
+      if (l.tipo !== 'despesa' || l.status === 'cancelado') return false;
+      if (isTodas) return l.obra_id !== 'escritorio' && l.obra_id !== 'sede';
+      return l.obra_id === obraId;
+    });
+
+    const notas = (this.getAll('notas') || []).filter(n => {
+      if (n.status === 'cancelada') return false;
+      if (isTodas) return n.obra_id !== 'escritorio' && n.obra_id !== 'sede';
+      return n.obra_id === obraId;
+    });
+
+    let totalRealizado = 0;
+
+    // Helper para classificar despesa na etapa adequada
+    const classificarEtapa = (cat = '', desc = '') => {
+      const c = String(cat || '').toLowerCase();
+      const d = String(desc || '').toLowerCase();
+      if (c === 'preliminares' || d.includes('canteiro') || d.includes('locação') || d.includes('sondagem') || d.includes('topografia')) return 'preliminares';
+      if (c === 'fundacao' || d.includes('concreto') || d.includes('ferro') || d.includes('aço') || d.includes('sapata') || d.includes('viga') || d.includes('pilar') || d.includes('laje')) return 'fundacao';
+      if (c === 'alvenaria' || d.includes('tijolo') || d.includes('bloco') || d.includes('argamassa') || d.includes('reboco') || d.includes('chapisco')) return 'alvenaria';
+      if (c === 'cobertura' || d.includes('telha') || d.includes('madeiramento') || d.includes('calha') || d.includes('rufo') || d.includes('impermeabiliz')) return 'cobertura';
+      if (c === 'eletrica' || d.includes('fio') || d.includes('cabo') || d.includes('disjuntor') || d.includes('tomada') || d.includes('eletroduto') || d.includes('ilumina')) return 'eletrica';
+      if (c === 'hidraulica' || d.includes('tubo') || d.includes('conexão') || d.includes('esgoto') || d.includes('água') || d.includes('caixa d') || d.includes('registro')) return 'hidraulica';
+      if (c === 'revestimentos' || d.includes('piso') || d.includes('porcelanato') || d.includes('cerâmica') || d.includes('rejunte')) return 'revestimentos';
+      if (c === 'esquadrias' || d.includes('porta') || d.includes('janela') || d.includes('vidro') || d.includes('alumínio') || d.includes('fechadura')) return 'esquadrias';
+      if (c === 'pintura' || d.includes('tinta') || d.includes('massa corrida') || d.includes('selador') || d.includes('rolo') || d.includes('lixa')) return 'pintura';
+      if (c === 'loucas' || d.includes('bacia') || d.includes('vaso') || d.includes('cuba') || d.includes('torneira') || d.includes('chuveiro')) return 'loucas';
+      if (c === 'externa' || d.includes('grama') || d.includes('calçada') || d.includes('muro') || d.includes('portão')) return 'externa';
+      if (c === 'limpeza' || d.includes('limpeza') || d.includes('entulho') || d.includes('caçamba')) return 'limpeza';
+      return 'outros';
+    };
+
+    lans.forEach(l => {
+      const val = Number(l.valor || 0);
+      const etapaId = classificarEtapa(l.categoria, l.descricao);
+      const target = etapaMap.get(etapaId) || etapaMap.get('outros');
+      target.realizado += val;
+      totalRealizado += val;
+    });
+
+    notas.forEach(n => {
+      if (!n.lancamento_id) {
+        const val = Number(n.valor_total || n.valor_bruto || 0);
+        const etapaId = classificarEtapa(n.categoria, n.descricao || n.emitente);
+        const target = etapaMap.get(etapaId) || etapaMap.get('outros');
+        target.realizado += val;
+        totalRealizado += val;
+      }
+    });
+
+    // 3. Obter Avanço Físico das Medições
+    const meds = (this.getAll('medicoes') || []).filter(m => {
+      if (isTodas) return true;
+      return m.obra_id === obraId;
+    });
+
+    let percentualFisico = 0;
+    if (meds.length > 0) {
+      const medsLiberadas = meds.filter(m => m.status === 'liberada' || m.status === 'aprovada');
+      if (medsLiberadas.length > 0) {
+        percentualFisico = Math.min(100, Math.max(...medsLiberadas.map(m => Number(m.percentual_fisico || 0))));
+      } else {
+        percentualFisico = Math.min(100, Math.max(...meds.map(m => Number(m.percentual_fisico || 0))));
+      }
+    }
+
+    const saldoRestante = totalOrcado - totalRealizado;
+    const percentualFinanceiro = totalOrcado > 0 ? Math.min(999, Math.round((totalRealizado / totalOrcado) * 1000) / 10) : 0;
+    const desvio = Math.round((percentualFinanceiro - percentualFisico) * 10) / 10;
+
+    let statusSaude = 'saudavel';
+    let alertaDesc = 'Custos dentro do previsto para o avanço físico medido.';
+    if (totalOrcado > 0 && totalRealizado > totalOrcado) {
+      statusSaude = 'estouro';
+      alertaDesc = `Atenção: O orçamento total foi superado em ${Utils.fmt.currency(Math.abs(saldoRestante))} (${(percentualFinanceiro - 100).toFixed(1)}% acima do teto).`;
+    } else if (desvio > 10) {
+      statusSaude = 'estouro';
+      alertaDesc = `Risco de sobrecusto: O avanço financeiro (${percentualFinanceiro}%) está ${desvio}% acima do avanço físico medido (${percentualFisico}%).`;
+    } else if (desvio > 5) {
+      statusSaude = 'atencao';
+      alertaDesc = `Atenção ao ritmo: Gastos ligeiramente adiantados (+${desvio}% em relação à medição física).`;
+    }
+
+    const etapasRelatorio = Array.from(etapaMap.values())
+      .map(e => {
+        const saldo = e.previsto - e.realizado;
+        const pct = e.previsto > 0 ? Math.min(999, Math.round((e.realizado / e.previsto) * 1000) / 10) : (e.realizado > 0 ? 100 : 0);
+        let status = 'ok';
+        if (e.previsto > 0 && e.realizado > e.previsto) status = 'estouro';
+        else if (pct >= 85) status = 'alerta';
+        return { ...e, saldo, percentual: pct, status };
+      })
+      .filter(e => e.previsto > 0 || e.realizado > 0);
+
+    return {
+      obraId: obraId || 'todas',
+      totalOrcado,
+      totalRealizado,
+      saldoRestante,
+      percentualFinanceiro,
+      percentualFisico,
+      desvio,
+      statusSaude,
+      alertaDesc,
+      etapas: etapasRelatorio,
+      totalEtapas: etapasRelatorio.length,
+      temOrcamento: totalOrcado > 0,
+      totalMedicoes: meds.length
     };
   },
 

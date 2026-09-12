@@ -249,17 +249,34 @@ const App = {
     const box = document.getElementById('sync-status-indicator');
     if (!dot || !text || !box) return;
     const states = {
-      syncing: ['↻', 'Sincronizando…'],
-      synced: ['●', 'Sincronizado'],
-      pending: ['●', `${pending || 1} pendente(s)`],
-      offline: ['●', 'Offline — cache local'],
-      attention: ['⚠', `${failed || 1} requer(em) atenção`],
-      cached: ['●', 'Cache local']
+      syncing:   ['↻', 'Sincronizando…', '#38bdf8', 'rgba(56,189,248,.3)', 'rgba(56,189,248,.08)'],
+      synced:    ['●', 'Sincronizado', '#10b981', 'rgba(16,185,129,.3)', 'rgba(16,185,129,.06)'],
+      pending:   ['●', `${pending || 1} pendente(s)`, '#f59e0b', 'rgba(245,158,11,.35)', 'rgba(245,158,11,.08)'],
+      offline:   ['○', 'Offline — canteiro', '#94a3b8', 'rgba(148,163,184,.35)', 'rgba(148,163,184,.06)'],
+      attention: ['⚠', `${failed || 1} requer(em) atenção`, '#ef4444', 'rgba(239,68,68,.4)', 'rgba(239,68,68,.08)'],
+      cached:    ['●', 'Cache local', 'var(--text3)', 'var(--border)', 'transparent']
     };
-    const [d, t] = states[status] || states.cached;
+    const [d, t, cor, borda, bg] = states[status] || states.cached;
     dot.textContent = d;
+    dot.style.color = cor;
     text.textContent = t;
+    text.style.color = cor;
+    box.style.borderColor = borda;
+    box.style.background = bg;
     box.dataset.status = status || 'cached';
+  },
+
+  refreshCurrentRoute() {
+    const modalAberto = document.getElementById('modal-overlay');
+    if (modalAberto && modalAberto.classList.contains('active')) {
+      console.info('[App] Modal de edição aberto, mantendo tela atual.');
+      return;
+    }
+    const current = this.route || this._getRouteFromUrl();
+    if (current) {
+      this.navigate(current, false);
+      this.refreshObraSelector();
+    }
   },
 
   retrySyncIssues() {
