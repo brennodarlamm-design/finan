@@ -18,7 +18,10 @@ FINOBRA_PATCH_*
 *.rar
 *.7z
 
-# Patch 22 precisa existir durante o build do Vercel
+# Patches de build precisam existir durante o build do Vercel
 !.patch22
 !.patch22/**
 !apply-patch22-build.cjs
+!.patch23
+!.patch23/**
+!apply-patch23-build.cjs
