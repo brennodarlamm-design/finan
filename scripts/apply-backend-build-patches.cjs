@@ -1,43 +1,53 @@
 // Reproduz no npm test o mesmo resultado de hardening executado pelo Dockerfile do Render.
-// Patch 22 usa o diff original. Patch 23 é espelhado por substituições exatas/fail-closed
-// porque o diff legado foi gerado sobre um offset intermediário e não é portátil fora do Docker build.
+// Patch 22 usa o diff original, direcionado explicitamente para backend/ no worktree.
+// Patch 23 é espelhado por substituições exatas/fail-closed porque o diff legado foi
+// gerado sobre um offset intermediário e não é portátil fora do Docker build.
 const { spawnSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 
-const backendDir = path.resolve(__dirname, '..', 'backend');
+const root = path.resolve(__dirname, '..');
+const backendDir = path.join(root, 'backend');
 const serverFile = path.join(backendDir, 'server.js');
+const patch22File = path.join(backendDir, 'patch22-server.diff');
 
 function gitApply(args) {
   return spawnSync('git', ['apply', ...args], {
-    cwd: backendDir,
+    cwd: root,
     encoding: 'utf8',
     stdio: ['ignore', 'pipe', 'pipe']
   });
 }
 
-// 1) Patch 22 exatamente como o Docker.
-const patch22 = 'patch22-server.diff';
-const check22 = gitApply(['--check', '-p2', patch22]);
+// 1) Patch 22 exatamente sobre backend/server.js no worktree.
+const patch22Args = ['--directory=backend', '-p2', patch22File];
+const check22 = gitApply(['--check', ...patch22Args]);
 if (check22.status === 0) {
-  const apply22 = gitApply(['-p2', patch22]);
+  const apply22 = gitApply(patch22Args);
   if (apply22.status !== 0) {
-    console.error(apply22.stderr || apply22.stdout || `[Backend build] falha ao aplicar ${patch22}`);
+    console.error(apply22.stderr || apply22.stdout || '[Backend build] falha ao aplicar Patch 22');
     process.exit(apply22.status || 1);
   }
-  console.log(`[Backend build] aplicado: ${patch22}`);
+  console.log('[Backend build] aplicado: patch22-server.diff -> backend/server.js');
 } else {
-  const reverse22 = gitApply(['--reverse', '--check', '-p2', patch22]);
+  const reverse22 = gitApply(['--reverse', '--check', ...patch22Args]);
   if (reverse22.status !== 0) {
-    console.error(`[Backend build] ${patch22} é incompatível com backend/server.js atual.`);
+    console.error('[Backend build] patch22-server.diff é incompatível com backend/server.js atual.');
     console.error(check22.stderr || check22.stdout || 'git apply --check falhou');
     process.exit(1);
   }
-  console.log(`[Backend build] já aplicado: ${patch22}`);
+  console.log('[Backend build] Patch 22 já aplicado em backend/server.js');
+}
+
+let src = fs.readFileSync(serverFile, 'utf8');
+for (const marker of ['function signQrAccess(', "app.get('/status', requireAuth", 'crypto.timingSafeEqual']) {
+  if (!src.includes(marker)) {
+    console.error(`[Backend build] Patch 22 não materializou marcador obrigatório em backend/server.js: ${marker}`);
+    process.exit(1);
+  }
 }
 
 // 2) Espelha semanticamente o Patch 23 com âncoras exatas.
-let src = fs.readFileSync(serverFile, 'utf8');
 function replaceExact(label, before, after) {
   if (src.includes(after)) {
     console.log(`[Backend build] Patch 23 já contém: ${label}`);
@@ -87,7 +97,7 @@ for (const marker of ["limit: '12mb'", 'MAX_MEDIA_BYTES = 8 * 1024 * 1024', 'Cam
 }
 
 const syntax = spawnSync(process.execPath, ['--check', serverFile], {
-  cwd: backendDir,
+  cwd: root,
   encoding: 'utf8',
   stdio: ['ignore', 'pipe', 'pipe']
 });
