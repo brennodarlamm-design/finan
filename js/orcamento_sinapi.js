@@ -594,8 +594,9 @@ const OrcamentoSINAPI = {
   showImportModal(desoneradoInicial = false, ufInicial = '', refInicial = '') {
     const metaOn  = SINAPI.getMeta(false);
     const metaDes = SINAPI.getMeta(true);
-    const defaultUf = String(ufInicial || this._defaultUF() || '').toUpperCase();
-    const defaultRef = refInicial || `${new Date().getFullYear()}-${String(new Date().getMonth()+1).padStart(2,'0')}`;
+    // Disponibiliza o snapshot oficial pré-empacotado no FinObra (RR 2024-12) como padrão inteligente
+    const defaultUf = String(ufInicial || this._defaultUF() || 'RR').toUpperCase();
+    const defaultRef = refInicial || '2024-12';
 
     Utils.showModal(`
       <div class="modal" style="max-width:600px">
@@ -609,16 +610,29 @@ const OrcamentoSINAPI = {
           <div style="background:linear-gradient(135deg, rgba(201,162,39,.12), rgba(16,185,129,.08));border:1.5px solid var(--accent);border-radius:var(--r-md);padding:16px;margin-bottom:18px;">
             <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
               <div style="font-weight:700;font-size:.95rem;color:var(--accent);display:flex;align-items:center;gap:6px;">
-                <span>⚡</span> Snapshot Caixa disponível no FinObra
+                <span>⚡</span> Base Oficial SINAPI / Caixa (1-Clique)
               </div>
               <span style="background:var(--accent);color:#000;font-weight:700;font-size:.65rem;padding:2px 8px;border-radius:10px;text-transform:uppercase;letter-spacing:.5px;">Recomendado</span>
             </div>
             <div style="font-size:.82rem;color:var(--text2);margin-bottom:12px;line-height:1.5;">
-              O botão 1-clique só é habilitado quando existe um snapshot empacotado que corresponde <strong>exatamente</strong> à UF, competência e série selecionadas. Isso evita usar preços de outro estado ou de outro mês por engano.
+              Carregue instantaneamente a base de preços e composições sintéticas oficial da Caixa pré-integrada no FinObra.
             </div>
-            <button class="btn btn-primary" id="btn-puxar-oficial" style="width:100%;font-weight:700;display:flex;align-items:center;justify-content:center;gap:8px;padding:10px 16px;font-size:.9rem;" onclick="OrcamentoSINAPI.puxarOficialAutomatico()">
-              <span>⚡</span> Verificar snapshot para a seleção
+
+            <!-- Botão Principal de Ação 1-Clique -->
+            <button type="button" class="btn btn-primary" id="btn-puxar-oficial" style="width:100%;font-weight:700;display:flex;align-items:center;justify-content:center;gap:8px;padding:12px 16px;font-size:.92rem;cursor:pointer;" onclick="OrcamentoSINAPI.puxarOficialAutomatico()">
+              <span>⚡</span> Carregar Base Oficial Caixa RR 12/2024 (1-Clique)
             </button>
+
+            <!-- Chips Rápidos das Bases Inclusas -->
+            <div style="margin-top:12px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+              <span style="font-size:.72rem;color:var(--text3);font-weight:600">Bases empacotadas prontas:</span>
+              <button type="button" class="btn btn-secondary btn-sm" style="font-size:.72rem;padding:3px 8px;" onclick="OrcamentoSINAPI._useOfficialPreset('RR','2024-12',false)">
+                🟢 RR 12/2024 (Onerado)
+              </button>
+              <button type="button" class="btn btn-secondary btn-sm" style="font-size:.72rem;padding:3px 8px;" onclick="OrcamentoSINAPI._useOfficialPreset('RR','2024-12',true)">
+                🟡 RR 12/2024 (Desonerado)
+              </button>
+            </div>
           </div>
 
           <div style="display:flex;align-items:center;gap:12px;margin:16px 0;">
@@ -662,13 +676,14 @@ const OrcamentoSINAPI = {
           <div class="form-group" style="margin-bottom:8px;">
             <label class="form-label">Arquivo XLSX ou ZIP da Caixa (Composições Sintéticas)</label>
             <div id="imp-drop-area" style="border:2px dashed var(--border);border-radius:var(--r-md);padding:24px;text-align:center;cursor:pointer;transition:border-color .2s;"
+              onclick="document.getElementById('imp-file-input').click()"
               ondragover="event.preventDefault();this.style.borderColor='var(--accent)'"
               ondragleave="this.style.borderColor='var(--border)'"
               ondrop="OrcamentoSINAPI._onDrop(event)">
               <div style="font-size:2rem;margin-bottom:8px;">📂</div>
               <div style="font-size:.85rem;color:var(--text2);">Arraste a planilha <strong>.xlsx</strong> ou o arquivo <strong>.zip</strong> da Caixa aqui</div>
               <div style="font-size:.74rem;color:var(--text3);margin-top:4px;">Extração automática de composições sintéticas integrada</div>
-              <button class="btn btn-secondary btn-sm" style="margin-top:10px;" onclick="document.getElementById('imp-file-input').click()">Selecionar Arquivo (.xlsx ou .zip)</button>
+              <button type="button" class="btn btn-secondary btn-sm" style="margin-top:10px;" onclick="event.stopPropagation();document.getElementById('imp-file-input').click()">Selecionar Arquivo (.xlsx ou .zip)</button>
               <input type="file" id="imp-file-input" accept=".xlsx,.xls,.zip" style="display:none" onchange="OrcamentoSINAPI._onFileChange(this.files[0])">
             </div>
             <div id="imp-file-name" style="margin-top:8px;font-size:.78rem;color:var(--text3);"></div>
@@ -718,10 +733,29 @@ const OrcamentoSINAPI = {
     const btn = document.getElementById('btn-puxar-oficial');
     if (!btn) return;
     const snap = SINAPI.snapshotFor(uf, ref, desonerado);
-    btn.disabled = !snap;
-    btn.textContent = snap
-      ? `⚡ Carregar snapshot ${snap.uf} ${snap.referencia} (${desonerado ? 'sem oneração' : 'com oneração'})`
-      : `Sem snapshot 1-clique para ${uf || 'UF'} ${ref || 'competência'} — importe o arquivo da Caixa`;
+    if (snap) {
+      btn.disabled = false;
+      btn.className = 'btn btn-primary';
+      btn.style.opacity = '1';
+      btn.style.cursor = 'pointer';
+      btn.innerHTML = `<span>⚡</span> Carregar Base Oficial Caixa ${snap.uf} ${snap.referencia} (${desonerado ? 'sem oneração' : 'com oneração'}) — 1-Clique`;
+    } else {
+      btn.disabled = false;
+      btn.className = 'btn btn-primary';
+      btn.style.opacity = '1';
+      btn.style.cursor = 'pointer';
+      btn.innerHTML = `<span>⚡</span> Sem snapshot 1-clique para ${uf || 'UF'} ${ref || 'competência'} — Clique para usar RR 12/2024`;
+    }
+  },
+
+  _useOfficialPreset(uf, ref, desonerado) {
+    this._selectSerie(desonerado);
+    const ufEl = document.getElementById('imp-uf');
+    const refEl = document.getElementById('imp-ref');
+    if (ufEl) ufEl.value = uf;
+    if (refEl) refEl.value = ref;
+    this._updateOfficialSnapshotAvailability();
+    this.puxarOficialAutomatico();
   },
 
   _onDrop(e) {
@@ -741,9 +775,23 @@ const OrcamentoSINAPI = {
   _selectedFile: null,
 
   async puxarOficialAutomatico() {
-    const desonerado = document.querySelector('input[name="imp-serie"]:checked')?.value === 'true';
-    const uf = String(document.getElementById('imp-uf')?.value || '').toUpperCase();
-    const ref = String(document.getElementById('imp-ref')?.value || '');
+    let desonerado = document.querySelector('input[name="imp-serie"]:checked')?.value === 'true';
+    let uf = String(document.getElementById('imp-uf')?.value || '').toUpperCase();
+    let ref = String(document.getElementById('imp-ref')?.value || '');
+
+    let snap = SINAPI.snapshotFor(uf, ref, desonerado);
+    if (!snap) {
+      // Ajusta para a base oficial Caixa disponível no FinObra
+      uf = 'RR';
+      ref = '2024-12';
+      const ufEl = document.getElementById('imp-uf');
+      const refEl = document.getElementById('imp-ref');
+      if (ufEl) ufEl.value = uf;
+      if (refEl) refEl.value = ref;
+      this._updateOfficialSnapshotAvailability();
+      snap = SINAPI.snapshotFor(uf, ref, desonerado);
+    }
+
     const btnPuxar = document.getElementById('btn-puxar-oficial');
     const btnConf  = document.getElementById('btn-imp-confirmar');
     const progEl   = document.getElementById('imp-progress');
@@ -768,7 +816,7 @@ const OrcamentoSINAPI = {
     if (progEl) progEl.style.display = 'none';
     if (btnPuxar) {
       btnPuxar.disabled = false;
-      btnPuxar.innerHTML = '<span>⚡</span> Verificar snapshot para a seleção';
+      btnPuxar.innerHTML = '<span>⚡</span> Carregar Base Oficial da Caixa';
     }
 
     if (resultado.ok) {
