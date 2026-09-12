@@ -1740,15 +1740,100 @@ const DB = {
     };
   },
 
-  // ── CRONOGRAMA FÍSICO-FINANCEIRO ──
+  // ── GESTÃO DE CONFIGURAÇÃO DE CRONOGRAMA POR OBRA ──
+  getCronogramaConfig(obraId) {
+    if (!obraId || obraId === 'todas') return null;
+    const obra = this.getById('clientes', obraId);
+    return (obra && obra.cronograma_config) ? obra.cronograma_config : null;
+  },
+
+  saveCronogramaConfig(obraId, config) {
+    if (!obraId || obraId === 'todas') return false;
+    const obra = this.getById('clientes', obraId);
+    if (!obra) return false;
+    const saved = {
+      totalMeses: Number(config.totalMeses || 12),
+      mesInicio: config.mesInicio || null,
+      modoDistribuicao: config.modoDistribuicao || 'gaussiana',
+      etapas: config.etapas || {},
+      updated_at: new Date().toISOString()
+    };
+    this.update('clientes', obraId, { cronograma_config: saved });
+    return true;
+  },
+
+  // ── CRONOGRAMA FÍSICO-FINANCEIRO DINÂMICO & EDITÁVEL ──
   getCronogramaFisicoFinanceiro(obraId) {
+    const isTodas = !obraId || obraId === 'todas';
+    const obra = !isTodas ? this.getById('clientes', obraId) : null;
+    const customConfig = (obra && obra.cronograma_config) ? obra.cronograma_config : null;
     const cs = this.getCurvaS(obraId);
     const comp = this.getOrcamentoVsRealizado(obraId);
-    const totalMeses = cs.totalMeses;
-    const mesesKeys = cs.mesesKeys;
-    const mesesLabels = cs.mesesLabels;
 
-    // Perfis típicos de distribuição por macro-etapa (pesos normalizados ao longo do ciclo de vida da obra)
+    // 13 Macro-Etapas canônicas padronizadas da construção civil com pesos médios
+    const macroEtapasPadrao = [
+      { id: 'preliminares',  nome: '01. Serviços Preliminares & Canteiro', pesoPadrao: 0.04 },
+      { id: 'fundacao',      nome: '02. Fundações & Estrutura',           pesoPadrao: 0.22 },
+      { id: 'alvenaria',     nome: '03. Alvenarias & Fechamentos',        pesoPadrao: 0.12 },
+      { id: 'cobertura',     nome: '04. Cobertura & Impermeabilização',   pesoPadrao: 0.07 },
+      { id: 'eletrica',      nome: '05. Instalações Elétricas',           pesoPadrao: 0.08 },
+      { id: 'hidraulica',    nome: '06. Instalações Hidrossanitárias',    pesoPadrao: 0.08 },
+      { id: 'revestimentos', nome: '07. Revestimentos, Pisos & Azulejos', pesoPadrao: 0.14 },
+      { id: 'esquadrias',    nome: '08. Esquadrias, Vidros & Portas',     pesoPadrao: 0.07 },
+      { id: 'pintura',       nome: '09. Pintura & Acabamentos Finais',    pesoPadrao: 0.06 },
+      { id: 'loucas',        nome: '10. Louças, Metais & Bancadas',       pesoPadrao: 0.04 },
+      { id: 'externa',       nome: '11. Área Externa & Muros',            pesoPadrao: 0.04 },
+      { id: 'limpeza',       nome: '12. Limpeza Pós-Obra & Vistoria',     pesoPadrao: 0.02 },
+      { id: 'outros',        nome: '13. Administração da Obra & Outros',  pesoPadrao: 0.02 }
+    ];
+
+    // Duração e nomes dos meses
+    let totalMeses = (customConfig && Number(customConfig.totalMeses) >= 3) ? Number(customConfig.totalMeses) : cs.totalMeses;
+    totalMeses = Math.max(3, Math.min(36, totalMeses));
+
+    let mesesKeys = cs.mesesKeys;
+    let mesesLabels = cs.mesesLabels;
+
+    // Se a duração configurada diferir da Curva S, ajustar lista de meses
+    if (mesesKeys.length !== totalMeses) {
+      const hoje = new Date();
+      let dtIni = cs.menorInicio ? new Date(cs.menorInicio) : new Date(hoje.getFullYear(), hoje.getMonth() - 2, 1);
+      if (customConfig && customConfig.mesInicio) {
+        const parts = customConfig.mesInicio.split('-');
+        if (parts.length === 2) dtIni = new Date(Number(parts[0]), Number(parts[1]) - 1, 1);
+      }
+      mesesKeys = [];
+      mesesLabels = [];
+      const nomeMeses = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+      let curr = new Date(dtIni.getFullYear(), dtIni.getMonth(), 1);
+      for (let m = 0; m < totalMeses; m++) {
+        const y = curr.getFullYear();
+        const mm = String(curr.getMonth() + 1).padStart(2, '0');
+        mesesKeys.push(`${y}-${mm}`);
+        mesesLabels.push(`${nomeMeses[curr.getMonth()]}/${String(y).slice(2)}`);
+        curr.setMonth(curr.getMonth() + 1);
+      }
+    }
+
+    // Determinar Orçamento Base Total da Obra e Origem
+    let orcamentoBaseTotal = comp.totalOrcado;
+    let origem = 'orcamento_base';
+    if (customConfig && customConfig.etapas && Object.keys(customConfig.etapas).length > 0) {
+      origem = 'configuracao_usuario';
+    } else if (orcamentoBaseTotal <= 0 && obra) {
+      orcamentoBaseTotal = Number(obra.valor_financiado || 0) + Number(obra.valor_proprio || 0);
+      origem = 'estimativa_contrato';
+    }
+    if (orcamentoBaseTotal <= 0) {
+      orcamentoBaseTotal = comp.totalRealizado > 0 ? Math.round(comp.totalRealizado * 1.25) : 100000;
+      origem = 'estimativa_contrato';
+    }
+
+    // Mapa de valores orçados reais já existentes em comp.etapas
+    const compEtapaMap = new Map();
+    (comp.etapas || []).forEach(e => compEtapaMap.set(e.id, e));
+
+    // Perfis típicos de distribuição por macro-etapa ao longo dos meses
     const perfisEtapas = {
       preliminares:  [0.60, 0.40, 0.00, 0.00, 0.00, 0.00],
       fundacao:      [0.30, 0.50, 0.20, 0.00, 0.00, 0.00],
@@ -1760,25 +1845,53 @@ const DB = {
       esquadrias:    [0.00, 0.00, 0.00, 0.30, 0.50, 0.20],
       pintura:       [0.00, 0.00, 0.00, 0.10, 0.50, 0.40],
       loucas:        [0.00, 0.00, 0.00, 0.00, 0.40, 0.60],
-      externa:       [0.00, 0.00, 0.00, 0.10, 0.40, 0.50],
+      externa:       [0.00, 0.00, 0.10, 0.30, 0.40, 0.20],
       limpeza:       [0.00, 0.00, 0.00, 0.00, 0.20, 0.80],
       outros:        [0.15, 0.20, 0.25, 0.20, 0.15, 0.05]
     };
 
-    const etapasLinhas = comp.etapas.map(e => {
-      const perfilBase = perfisEtapas[e.id] || perfisEtapas.outros;
+    const etapasLinhas = macroEtapasPadrao.map(meta => {
+      const eComp = compEtapaMap.get(meta.id) || {};
+      const customEtapa = customConfig?.etapas?.[meta.id] || null;
+
+      // Se o usuário desativou explicitamente essa etapa
+      const ativa = customEtapa?.ativo !== undefined ? !!customEtapa.ativo : true;
+
+      // Determinar valor previsto da etapa
+      let previstoTotal = 0;
+      if (customEtapa && customEtapa.previstoTotal !== undefined && customEtapa.previstoTotal !== null && customEtapa.previstoTotal !== '') {
+        previstoTotal = Number(customEtapa.previstoTotal);
+      } else if (eComp.previsto > 0) {
+        previstoTotal = eComp.previsto;
+      } else if (ativa) {
+        previstoTotal = Math.round(orcamentoBaseTotal * meta.pesoPadrao);
+      }
+
+      const realizadoTotal = Number(eComp.realizado || 0);
+      const saldo = previstoTotal - realizadoTotal;
+      let status = 'planejado';
+      if (realizadoTotal > 0) {
+        status = realizadoTotal > previstoTotal && previstoTotal > 0 ? 'estouro' : 'em_andamento';
+      }
+
+      // Distribuição mensal
+      const perfilBase = perfisEtapas[meta.id] || perfisEtapas.outros;
       const mesesValores = [];
 
-      // Interpolar perfil base na quantidade de meses total da obra
+      // Interpolar perfil base na quantidade total de meses
       for (let m = 0; m < totalMeses; m++) {
-        const prog = totalMeses > 1 ? m / (totalMeses - 1) : 0;
-        const baseIdx = Math.min(perfilBase.length - 1, Math.floor(prog * perfilBase.length));
-        const peso = perfilBase[baseIdx] || 0.05;
-        mesesValores.push(peso);
+        if (customEtapa?.meses?.[m] !== undefined && customEtapa.meses[m] !== null) {
+          // Se o usuário digitou o percentual manualmente para este mês
+          mesesValores.push(Math.max(0, Number(customEtapa.meses[m])));
+        } else {
+          const prog = totalMeses > 1 ? m / (totalMeses - 1) : 0;
+          const baseIdx = Math.min(perfilBase.length - 1, Math.floor(prog * perfilBase.length));
+          const peso = perfilBase[baseIdx] || 0.02;
+          mesesValores.push(peso);
+        }
       }
 
       const somaPesos = mesesValores.reduce((s, p) => s + p, 0) || 1;
-      const previstoTotal = e.previsto || (comp.totalOrcado / Math.max(1, comp.totalEtapas));
 
       const mesesPrevistos = mesesValores.map(p => {
         const pctMes = Math.round((p / somaPesos) * 1000) / 10;
@@ -1786,60 +1899,75 @@ const DB = {
         return { percentual: pctMes, valor: valMes };
       });
 
-      // Ajustar último mês para fechar exatamente em 100%
-      const somaPct = mesesPrevistos.reduce((s, mp) => s + mp.percentual, 0);
-      const difPct = Math.round((100 - somaPct) * 10) / 10;
-      if (mesesPrevistos.length > 0) {
+      // Fechamento exato em 100%
+      if (mesesPrevistos.length > 0 && ativa && previstoTotal > 0) {
+        const somaPct = mesesPrevistos.reduce((s, mp) => s + mp.percentual, 0);
+        const difPct = Math.round((100 - somaPct) * 10) / 10;
         mesesPrevistos[mesesPrevistos.length - 1].percentual += difPct;
+        const somaVal = mesesPrevistos.reduce((s, mp) => s + mp.valor, 0);
+        mesesPrevistos[mesesPrevistos.length - 1].valor += (previstoTotal - somaVal);
       }
 
       return {
-        id: e.id,
-        nome: e.nome,
+        id: meta.id,
+        nome: meta.nome,
+        ativa,
         previstoTotal,
-        realizadoTotal: e.realizado,
-        saldo: e.saldo,
-        status: e.status,
+        realizadoTotal,
+        saldo,
+        status,
         meses: mesesPrevistos
       };
     });
 
-    // Totais mensais
+    // Totais de desembolso mensal previsto vs realizado
+    const totalOrcadoCalculado = etapasLinhas.reduce((s, l) => s + (l.ativa ? l.previstoTotal : 0), 0) || orcamentoBaseTotal;
+
     const totaisMensais = mesesKeys.map((k, mIdx) => {
       let valorPrevisto = 0;
       etapasLinhas.forEach(l => {
-        valorPrevisto += (l.meses[mIdx]?.valor || 0);
+        if (l.ativa) valorPrevisto += (l.meses[mIdx]?.valor || 0);
       });
-      const pctPrevisto = cs.bac > 0 ? Math.round((valorPrevisto / cs.bac) * 1000) / 10 : 0;
+      const pctPrevisto = totalOrcadoCalculado > 0 ? Math.round((valorPrevisto / totalOrcadoCalculado) * 1000) / 10 : 0;
       return {
         mesKey: k,
         label: mesesLabels[mIdx],
+        previsto: valorPrevisto,
         valorPrevisto,
+        realizado: cs.gastosPorMes ? (cs.gastosPorMes[k] || 0) : 0,
+        percentualMensal: pctPrevisto,
         percentualPrevisto: pctPrevisto
       };
     });
 
-    // Totais acumulados
+    // Totais acumulados (Curva S)
     let acumVal = 0;
     let acumPct = 0;
-    const totaisAcumulados = totaisMensais.map(tm => {
+    const totaisAcumulados = totaisMensais.map((tm, idx) => {
       acumVal += tm.valorPrevisto;
       acumPct += tm.percentualPrevisto;
+      const isUltimo = idx === totaisMensais.length - 1;
       return {
         valorAcumulado: acumVal,
-        percentualAcumulado: Math.min(100, Math.round(acumPct * 10) / 10)
+        percentualMensal: tm.percentualPrevisto,
+        percentualAcumulado: isUltimo ? 100.0 : Math.min(100, Math.round(acumPct * 10) / 10)
       };
     });
 
     return {
       obraId: obraId || 'todas',
+      origem,
       mesesKeys,
       mesesLabels,
       totalMeses,
+      macroEtapasPadrao,
       linhas: etapasLinhas,
       totaisMensais,
       totaisAcumulados,
-      bac: cs.bac
+      totalOrcadoPrevisto: totalOrcadoCalculado,
+      totalRealizado: comp.totalRealizado,
+      bac: totalOrcadoCalculado,
+      isPersonalizado: !!customConfig
     };
   },
 
@@ -2035,20 +2163,36 @@ const DB = {
 
   // ── MEMÓRIA DE CÁLCULO DE BDI OFICIAL (TCU ACÓRDÃO 2622/2013) ──
   getBDIConfig(obraId, customParams = {}) {
-    const isDesonerado = customParams.desonerado !== undefined ? !!customParams.desonerado : false;
+    const obra = (obraId && obraId !== 'todas') ? this.getById('clientes', obraId) : null;
+    const emp = this.getEmpresa ? this.getEmpresa() : {};
+    const baseSalva = (obra && obra.bdi_config) || emp.bdi_padrao || {};
+
+    const isDesonerado = customParams.desonerado !== undefined
+      ? !!customParams.desonerado
+      : (baseSalva.desonerado !== undefined ? !!baseSalva.desonerado : false);
+
+    const getParam = (key, def) => {
+      if (customParams[key] !== undefined && customParams[key] !== null && customParams[key] !== '') {
+        return Number(customParams[key]);
+      }
+      if (baseSalva[key] !== undefined && baseSalva[key] !== null && baseSalva[key] !== '') {
+        return Number(baseSalva[key]);
+      }
+      return def;
+    };
 
     // Parâmetros de referência (Valores médios recomendados pelo Acórdão 2622/2013 - TCU)
-    const ac  = Number(customParams.ac  !== undefined ? customParams.ac  : 4.00);  // Administração Central (3.00% a 5.50%)
-    const s   = Number(customParams.s   !== undefined ? customParams.s   : 0.80);  // Seguro (0.80% a 1.20%)
-    const r   = Number(customParams.r   !== undefined ? customParams.r   : 1.20);  // Risco (0.97% a 1.27%)
-    const g   = Number(customParams.g   !== undefined ? customParams.g   : 0.40);  // Garantia (0.40% a 0.74%)
-    const df  = Number(customParams.df  !== undefined ? customParams.df  : 1.23);  // Despesas Financeiras (0.59% a 1.39%)
-    const l   = Number(customParams.l   !== undefined ? customParams.l   : 7.40);  // Lucro Bruto Operacional (6.16% a 8.96%)
+    const ac  = getParam('ac', 4.00);  // Administração Central (3.00% a 5.50%)
+    const s   = getParam('s', 0.80);   // Seguro (0.80% a 1.20%)
+    const r   = getParam('r', 1.20);   // Risco (0.97% a 1.27%)
+    const g   = getParam('g', 0.40);   // Garantia (0.40% a 0.74%)
+    const df  = getParam('df', 1.23);  // Despesas Financeiras (0.59% a 1.39%)
+    const l   = getParam('l', 7.40);   // Lucro Bruto Operacional (6.16% a 8.96%)
+    const iss = getParam('iss', 3.00); // ISS municipal (2.00% a 5.00%)
 
     // Tributos: PIS (0.65%), COFINS (3.00%), ISS (2.00% a 5.00%), CPRB (4.50% se desonerado)
     const pis    = 0.65;
     const cofins = 3.00;
-    const iss    = Number(customParams.iss !== undefined ? customParams.iss : 3.00);
     const cprb   = isDesonerado ? 4.50 : 0.00;
     const i = pis + cofins + iss + cprb; // Total de tributos
 
@@ -2056,12 +2200,14 @@ const DB = {
     // BDI = [ ( (1 + (AC + S + R + G)/100) * (1 + DF/100) * (1 + L/100) ) / (1 - I/100) ] - 1
     const numerador = (1 + (ac + s + r + g) / 100) * (1 + df / 100) * (1 + l / 100);
     const denominador = 1 - (i / 100);
-    const bdiCalculado = Math.round(((numerador / denominador) - 1) * 10000) / 100;
+    const bdiCalculado = Math.round(((numerador / Math.max(0.01, denominador)) - 1) * 10000) / 100;
 
     return {
       formula: 'BDI = [ ( (1 + AC + S + R + G) * (1 + DF) * (1 + L) ) / (1 - I) ] - 1',
       bdiCalculado,
       desonerado: isDesonerado,
+      ac, s, r, g, df, l, iss, i,
+      isPersonalizado: !!(obra && obra.bdi_config),
       parametros: {
         ac: { valor: ac, nome: 'Administração Central', faixaTCU: '3,00% — 5,50%' },
         s:  { valor: s,  nome: 'Seguro', faixaTCU: '0,80% — 1,20%' },
@@ -2084,6 +2230,44 @@ const DB = {
         terceiroQuartil: 25.00
       }
     };
+  },
+
+  saveBDIConfig(obraId, config) {
+    if (!obraId || obraId === 'todas') {
+      return this.saveBDIEmpresaPadrao(config);
+    }
+    const obra = this.getById('clientes', obraId);
+    if (!obra) return false;
+    const bdiConfig = {
+      ac: Number(config.ac ?? 4.00),
+      s: Number(config.s ?? 0.80),
+      r: Number(config.r ?? 1.20),
+      g: Number(config.g ?? 0.40),
+      df: Number(config.df ?? 1.23),
+      l: Number(config.l ?? 7.40),
+      iss: Number(config.iss ?? 3.00),
+      desonerado: !!config.desonerado,
+      updated_at: new Date().toISOString()
+    };
+    this.update('clientes', obraId, { bdi_config: bdiConfig });
+    return true;
+  },
+
+  saveBDIEmpresaPadrao(config) {
+    const emp = this.getEmpresa ? this.getEmpresa() : {};
+    emp.bdi_padrao = {
+      ac: Number(config.ac ?? 4.00),
+      s: Number(config.s ?? 0.80),
+      r: Number(config.r ?? 1.20),
+      g: Number(config.g ?? 0.40),
+      df: Number(config.df ?? 1.23),
+      l: Number(config.l ?? 7.40),
+      iss: Number(config.iss ?? 3.00),
+      desonerado: !!config.desonerado,
+      updated_at: new Date().toISOString()
+    };
+    if (this.saveEmpresa) this.saveEmpresa(emp);
+    return true;
   },
 
   // ── PRÉ-COMPRAS QUERIES ──

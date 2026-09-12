@@ -1,6 +1,6 @@
 {
   "name": "finobra-saas",
-  "version": "2.20.0",
+  "version": "2.21.0",
   "description": "FinObra — SaaS de gestão financeira e operacional para construtoras",
   "type": "module",
   "scripts": {
@@ -25,7 +25,8 @@
     "test:patch17": "node scripts/test-patch17-static.js",
     "test:patch18": "node scripts/test-patch18-static.js",
     "test:patch19": "node scripts/test-patch19-static.js",
-    "test:patch20": "node scripts/test-patch20-static.js"
+    "test:patch20": "node scripts/test-patch20-static.js",
+    "test:patch21": "node scripts/test-patch21-static.js"
   },
   "dependencies": {
     "@neondatabase/serverless": "^0.9.5",

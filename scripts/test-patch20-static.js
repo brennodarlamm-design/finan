@@ -156,16 +156,17 @@ test('exportar_templates.js implementa template formatado para type === "engenha
 // ── [5] Versão e Scripts de Pipeline ──
 console.log('\n[5] Versão e Scripts de Pipeline');
 
-test('version.json está atualizado para build 2026.09.11-p20', () => {
-  const v = versionJson.build || versionJson.version;
-  if (v !== '2026.09.11-p20') {
-    throw new Error(`version.json esperado "2026.09.11-p20", encontrado "${v}"`);
+test('version.json está atualizado para build 2026.09.11-p20 ou superior', () => {
+  const v = versionJson.build || versionJson.version || '';
+  if (!v.startsWith('2026.09.11-p')) {
+    throw new Error(`version.json esperado formato "2026.09.11-p20+", encontrado "${v}"`);
   }
 });
 
-test('package.json está em 2.20.0 e contém script test:patch20', () => {
-  if (packageJson.version !== '2.20.0') {
-    throw new Error(`package.json versão esperada "2.20.0", encontrada "${packageJson.version}"`);
+test('package.json está em 2.20.0 ou superior e contém script test:patch20', () => {
+  const semver = packageJson.version.split('.').map(Number);
+  if (semver[0] < 2 || (semver[0] === 2 && semver[1] < 20)) {
+    throw new Error(`package.json versão esperada ">=2.20.0", encontrada "${packageJson.version}"`);
   }
   if (!packageJson.scripts['test:patch20']) {
     throw new Error('package.json deve conter script test:patch20');

@@ -549,12 +549,15 @@ const ObraDetalhe = {
           </button>
         </div>
 
-        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
           <button class="btn btn-secondary btn-sm" onclick="ObraDetalhe.exportarExcelEngenharia('${obraId}')" style="display:inline-flex;align-items:center;gap:6px;font-weight:700;border:1px solid var(--accent);color:var(--accent2);" title="Exportar Dossiê Completo em Excel (.xlsx) com 4 abas">
             📊 Exportar Excel (.xlsx)
           </button>
           <button class="btn btn-secondary btn-sm" onclick="ObraDetalhe.exportarPDFEngenharia('${obraId}')" style="display:inline-flex;align-items:center;gap:6px;font-weight:700;border:1px solid rgba(239,68,68,0.5);color:#ef4444;background:rgba(239,68,68,0.06);" title="Exportar Dossiê Completo em PDF Oficial A4">
             📄 Exportar PDF (.pdf)
+          </button>
+          <button class="btn btn-secondary btn-sm" onclick="ObraDetalhe.abrirMenuExportar('excel', '${obraId}')" style="font-weight:700;" title="Escolha se deseja exportar tudo junto ou arquivos separados">
+            📑 Opções (.xlsx / PDF) ▾
           </button>
           <button class="btn btn-secondary btn-sm" onclick="App.navigate('orcamentos')" style="display:inline-flex;align-items:center;gap:6px;">
             📋 Orçamentos
@@ -756,23 +759,38 @@ const ObraDetalhe = {
   _renderSubTabCronograma(obraId) {
     const crono = DB.getCronogramaFisicoFinanceiro(obraId);
 
+    const badgeFonte = crono.origem === 'orcamento_base'
+      ? `<span class="badge" style="background:rgba(16,185,129,0.15);color:#10b981;border:1px solid rgba(16,185,129,0.3);font-size:.74rem;padding:3px 8px;font-weight:700;">🟢 Fonte: Planilha Orçamentária Base da Obra</span>`
+      : crono.origem === 'configuracao_usuario'
+      ? `<span class="badge" style="background:rgba(59,130,246,0.15);color:#3b82f6;border:1px solid rgba(59,130,246,0.3);font-size:.74rem;padding:3px 8px;font-weight:700;">⭐ Fonte: Cronograma Customizado Salvo</span>`
+      : `<span class="badge" style="background:rgba(245,158,11,0.15);color:#f59e0b;border:1px solid rgba(245,158,11,0.3);font-size:.74rem;padding:3px 8px;font-weight:700;">ℹ️ Fonte: Estimativa Proporcional Contratual (Pesos SINAPI)</span>`;
+
     return `
     <div class="card" style="padding:0;overflow:hidden;border:1px solid var(--border);">
-      <div style="padding:16px 20px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
+      <div style="padding:16px 20px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;">
         <div>
-          <h3 style="font-size:1rem;font-weight:800;color:var(--text);margin:0;display:flex;align-items:center;gap:8px;">
-            <span>📅</span> Cronograma Físico-Financeiro Mensal da Obra
-          </h3>
-          <div style="font-size:.78rem;color:var(--text3);margin-top:2px;">
-            Distribuição temporal do orçamento e desembolsos previstos ao longo dos ${crono.totalMeses} meses de contrato
+          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+            <h3 style="font-size:1rem;font-weight:800;color:var(--text);margin:0;display:flex;align-items:center;gap:6px;">
+              <span>📅</span> Cronograma Físico-Financeiro Mensal da Obra
+            </h3>
+            ${badgeFonte}
+          </div>
+          <div style="font-size:.78rem;color:var(--text3);margin-top:4px;">
+            Distribuição temporal do orçamento e desembolsos previstos ao longo dos ${crono.totalMeses} meses &bull; Orçamento Base: <strong>${Utils.fmt.currency(crono.bac)}</strong>
           </div>
         </div>
-        <div style="display:flex;gap:6px;flex-wrap:wrap;">
-          <button class="btn btn-secondary btn-sm" onclick="ObraDetalhe.exportarExcelEngenharia('${obraId}')" style="font-size:.78rem;font-weight:700;border:1px solid var(--accent);color:var(--accent2);">
+        <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">
+          <button class="btn btn-primary btn-sm" onclick="ObraDetalhe.abrirModalConfigCronograma('${obraId}')" style="font-size:.78rem;font-weight:700;">
+            ✏️ Configurar / Editar Cronograma
+          </button>
+          <button class="btn btn-secondary btn-sm" onclick="ObraDetalhe.exportarExcelEngenharia('${obraId}')" style="font-size:.78rem;font-weight:700;border:1px solid var(--accent);color:var(--accent2);" title="Baixar planilha Excel (.xlsx)">
             📊 Baixar Excel (.xlsx)
           </button>
-          <button class="btn btn-secondary btn-sm" onclick="ObraDetalhe.exportarPDFEngenharia('${obraId}')" style="font-size:.78rem;font-weight:700;">
+          <button class="btn btn-secondary btn-sm" onclick="ObraDetalhe.exportarPDFEngenharia('${obraId}')" style="font-size:.78rem;font-weight:700;" title="Imprimir / PDF A4">
             📄 Imprimir / PDF A4
+          </button>
+          <button class="btn btn-secondary btn-sm" onclick="ObraDetalhe.exportarExcel('cronograma', '${obraId}')" style="font-size:.78rem;font-weight:700;" title="Baixar exclusivamente o cronograma">
+            📅 Só Cronograma (.xlsx)
           </button>
         </div>
       </div>
@@ -782,7 +800,7 @@ const ObraDetalhe = {
           <thead>
             <tr style="background:var(--bg-secondary);">
               <th style="min-width:240px;position:sticky;left:0;background:var(--bg-card);z-index:2;">Macro-Etapa de Obra</th>
-              <th style="text-align:right;width:120px;">Total Previsto</th>
+              <th style="text-align:right;width:125px;">Total Previsto</th>
               ${crono.mesesLabels.map(lbl => `
                 <th style="text-align:center;min-width:110px;">${lbl}</th>
               `).join('')}
@@ -817,8 +835,8 @@ const ObraDetalhe = {
               <td style="text-align:right;color:var(--accent);">${Utils.fmt.currency(crono.bac)}</td>
               ${crono.totaisMensais.map(tm => `
                 <td style="text-align:center;color:var(--accent);">
-                  <div>${Utils.fmt.currency(tm.valorPrevisto)}</div>
-                  <div style="font-size:.72rem;color:var(--text3);">${tm.percentualPrevisto}%</div>
+                  <div>${Utils.fmt.currency(tm.valorPrevisto || tm.previsto || 0)}</div>
+                  <div style="font-size:.72rem;color:var(--text3);">${tm.percentualPrevisto || 0}%</div>
                 </td>
               `).join('')}
             </tr>
@@ -914,12 +932,15 @@ const ObraDetalhe = {
             </h3>
             <div style="font-size:.78rem;color:var(--text3);margin-top:2px;">${abc.totalItens} itens classificados por ordem decrescente de impacto orçamentário</div>
           </div>
-          <div style="display:flex;gap:6px;flex-wrap:wrap;">
-            <button class="btn btn-secondary btn-sm" onclick="ObraDetalhe.exportarExcelEngenharia('${obraId}')" style="font-size:.78rem;font-weight:700;border:1px solid var(--accent);color:var(--accent2);">
-              📊 Baixar Excel (.xlsx)
+          <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">
+            <button class="btn btn-secondary btn-sm" onclick="ObraDetalhe.exportarExcel('curva-abc', '${obraId}')" style="font-size:.78rem;font-weight:700;border:1px solid var(--accent);color:var(--accent2);" title="Baixar exclusivamente a Curva ABC em Excel">
+              📊 Baixar Só Curva ABC (.xlsx)
             </button>
-            <button class="btn btn-secondary btn-sm" onclick="ObraDetalhe.exportarPDFEngenharia('${obraId}')" style="font-size:.78rem;font-weight:700;">
-              📄 Imprimir / PDF A4
+            <button class="btn btn-secondary btn-sm" onclick="ObraDetalhe.imprimir('curva-abc', '${obraId}')" style="font-size:.78rem;font-weight:700;" title="Imprimir exclusivamente a Curva ABC em PDF">
+              📄 Imprimir Só Curva ABC (PDF)
+            </button>
+            <button class="btn btn-secondary btn-sm" onclick="ObraDetalhe.exportarExcel('completo', '${obraId}')" style="font-size:.78rem;font-weight:700;" title="Dossiê Completo">
+              📚 Dossiê Completo
             </button>
           </div>
         </div>
@@ -975,23 +996,45 @@ const ObraDetalhe = {
     const leis = DB.getLeisSociais(isDesonerado);
     const bdi = DB.getBDIConfig(obraId, { desonerado: isDesonerado });
 
+    const acVal = (bdi.parametros.ac && bdi.parametros.ac.valor !== undefined) ? bdi.parametros.ac.valor : 4.0;
+    const sgVal = ((bdi.parametros.s ? bdi.parametros.s.valor : 0.8) + (bdi.parametros.g ? bdi.parametros.g.valor : 0.4));
+    const rVal = (bdi.parametros.r && bdi.parametros.r.valor !== undefined) ? bdi.parametros.r.valor : 1.2;
+    const dfVal = (bdi.parametros.df && bdi.parametros.df.valor !== undefined) ? bdi.parametros.df.valor : 1.23;
+    const lVal = (bdi.parametros.l && bdi.parametros.l.valor !== undefined) ? bdi.parametros.l.valor : 7.4;
+    const tVal = (bdi.parametros.tributos && bdi.parametros.tributos.total !== undefined) ? bdi.parametros.tributos.total : (isDesonerado ? 11.15 : 6.65);
+
     return `
     <div>
-      <!-- Seletor de Regime Tributário / Desoneração -->
+      <!-- Seletor de Regime Tributário / Desoneração e Exportação da Aba -->
       <div class="card" style="margin-bottom:20px;padding:16px 20px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:14px;border-left:4px solid var(--accent);">
         <div>
-          <div style="font-weight:800;font-size:1rem;color:var(--text);">Regime de Encargos Sociais da Mão de Obra</div>
+          <div style="font-weight:800;font-size:1rem;color:var(--text);display:flex;align-items:center;gap:8px;">
+            <span>⚖️</span> Regime Tributário e Encargos Sociais da Mão de Obra
+          </div>
           <div style="font-size:.84rem;color:var(--text2);margin-top:2px;">
             ${leis.observacao}
           </div>
         </div>
-        <div style="display:flex;gap:8px;background:var(--bg-secondary);padding:4px;border-radius:var(--r-md);border:1px solid var(--border);">
-          <button class="btn btn-sm ${!isDesonerado?'btn-primary':'btn-secondary'}" onclick="ObraDetalhe.setRegimeLeisSociais(false)" style="font-weight:700;">
-            Com Oneração (INSS 20%)
-          </button>
-          <button class="btn btn-sm ${isDesonerado?'btn-primary':'btn-secondary'}" onclick="ObraDetalhe.setRegimeLeisSociais(true)" style="font-weight:700;">
-            Sem Oneração (Desonerado)
-          </button>
+        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+          <div style="display:flex;gap:6px;background:var(--bg-secondary);padding:4px;border-radius:var(--r-md);border:1px solid var(--border);">
+            <button class="btn btn-sm ${!isDesonerado?'btn-primary':'btn-secondary'}" onclick="ObraDetalhe.setRegimeLeisSociais(false)" style="font-weight:700;">
+              Com Oneração (INSS 20%)
+            </button>
+            <button class="btn btn-sm ${isDesonerado?'btn-primary':'btn-secondary'}" onclick="ObraDetalhe.setRegimeLeisSociais(true)" style="font-weight:700;">
+              Sem Oneração (Desonerado)
+            </button>
+          </div>
+          <div style="display:flex;gap:6px;">
+            <button class="btn btn-secondary btn-sm" onclick="ObraDetalhe.exportarExcel('bdi', '${obraId}')" style="font-size:.78rem;font-weight:700;border:1px solid var(--accent);color:var(--accent2);" title="Baixar exclusivamente a memória de cálculo de BDI e Leis Sociais em Excel">
+              📊 Baixar BDI (.xlsx)
+            </button>
+            <button class="btn btn-secondary btn-sm" onclick="ObraDetalhe.imprimir('bdi', '${obraId}')" style="font-size:.78rem;font-weight:700;" title="Imprimir memória oficial de BDI em PDF">
+              📄 Imprimir BDI (PDF)
+            </button>
+            <button class="btn btn-secondary btn-sm" onclick="ObraDetalhe.exportarExcel('completo', '${obraId}')" style="font-size:.78rem;font-weight:700;" title="Dossiê Completo">
+              📚 Dossiê Completo
+            </button>
+          </div>
         </div>
       </div>
 
@@ -1073,55 +1116,122 @@ const ObraDetalhe = {
           </div>
         </div>
 
-        <!-- Card 2: Memória de Cálculo de BDI Oficial (TCU Acórdão 2622/2013) -->
+        <!-- Card 2: Memória de Cálculo de BDI Oficial INTERATIVA & EDITÁVEL (TCU Acórdão 2622/2013) -->
         <div class="card" style="padding:0;overflow:hidden;border:1px solid var(--border);">
-          <div style="padding:16px 20px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;">
+          <div style="padding:16px 20px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
             <div>
-              <h3 style="font-size:1rem;font-weight:800;color:var(--text);margin:0;">
-                BDI Oficial (Benefícios e Despesas Indiretas)
+              <h3 style="font-size:1rem;font-weight:800;color:var(--text);margin:0;display:flex;align-items:center;gap:6px;">
+                <span>🎯</span> BDI Oficial (Benefícios e Despesas Indiretas)
               </h3>
-              <div style="font-size:.76rem;color:var(--text3);margin-top:2px;">Fórmula Oficial do TCU — Acórdão 2622/2013</div>
+              <div style="font-size:.76rem;color:var(--text3);margin-top:2px;">Fórmula Oficial do TCU — Acórdão 2622/2013 (Editável)</div>
             </div>
-            <div style="font-size:1.5rem;font-weight:900;color:var(--success);">
+            <div id="od-bdi-val-display" style="font-size:1.6rem;font-weight:900;color:var(--success);text-shadow:0 2px 10px rgba(16,185,129,0.3);">
               ${bdi.bdiCalculado.toFixed(2)}%
             </div>
           </div>
 
           <div style="padding:16px 20px;">
-            <div style="background:var(--bg-secondary);border:1px solid var(--border);padding:10px 14px;border-radius:var(--r-md);font-family:monospace;font-size:.78rem;color:var(--text);margin-bottom:14px;text-align:center;">
+            <div style="background:var(--bg-secondary);border:1px solid var(--border);padding:8px 12px;border-radius:var(--r-md);font-family:monospace;font-size:.75rem;color:var(--text);margin-bottom:14px;text-align:center;">
               ${bdi.formula}
             </div>
 
-            <div style="display:grid;gap:8px;font-size:.82rem;">
-              <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border);">
-                <span>Administração Central (AC)</span>
-                <span style="font-weight:700;">${bdi.parametros.ac.valor.toFixed(2)}% <small style="color:var(--text3);">(${bdi.parametros.ac.faixaTCU})</small></span>
+            <!-- Campos Editáveis com recálculo instantâneo -->
+            <div style="display:grid;gap:10px;font-size:.82rem;">
+              <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--border);">
+                <div>
+                  <div style="font-weight:700;color:var(--text);">Administração Central (AC)</div>
+                  <div style="font-size:.72rem;color:var(--text3);">Faixa TCU: 3,00% a 5,50%</div>
+                </div>
+                <div style="display:flex;align-items:center;gap:4px;">
+                  <input type="number" step="0.01" min="0" max="30" id="od-bdi-ac" class="form-control form-control-sm"
+                         value="${acVal.toFixed(2)}" style="width:85px;text-align:right;font-weight:800;"
+                         oninput="ObraDetalhe.recalcularBDIInput('${obraId}')">
+                  <span style="font-weight:700;color:var(--text2);">%</span>
+                </div>
               </div>
-              <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border);">
-                <span>Seguro &amp; Garantia (S + G)</span>
-                <span style="font-weight:700;">${(bdi.parametros.s.valor + bdi.parametros.g.valor).toFixed(2)}%</span>
+
+              <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--border);">
+                <div>
+                  <div style="font-weight:700;color:var(--text);">Seguro &amp; Garantia (S + G)</div>
+                  <div style="font-size:.72rem;color:var(--text3);">Faixa TCU: 0,80% a 1,20%</div>
+                </div>
+                <div style="display:flex;align-items:center;gap:4px;">
+                  <input type="number" step="0.01" min="0" max="20" id="od-bdi-sg" class="form-control form-control-sm"
+                         value="${sgVal.toFixed(2)}" style="width:85px;text-align:right;font-weight:800;"
+                         oninput="ObraDetalhe.recalcularBDIInput('${obraId}')">
+                  <span style="font-weight:700;color:var(--text2);">%</span>
+                </div>
               </div>
-              <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border);">
-                <span>Risco do Empreendimento (R)</span>
-                <span style="font-weight:700;">${bdi.parametros.r.valor.toFixed(2)}% <small style="color:var(--text3);">(${bdi.parametros.r.faixaTCU})</small></span>
+
+              <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--border);">
+                <div>
+                  <div style="font-weight:700;color:var(--text);">Risco do Empreendimento (R)</div>
+                  <div style="font-size:.72rem;color:var(--text3);">Faixa TCU: 0,97% a 1,27%</div>
+                </div>
+                <div style="display:flex;align-items:center;gap:4px;">
+                  <input type="number" step="0.01" min="0" max="20" id="od-bdi-r" class="form-control form-control-sm"
+                         value="${rVal.toFixed(2)}" style="width:85px;text-align:right;font-weight:800;"
+                         oninput="ObraDetalhe.recalcularBDIInput('${obraId}')">
+                  <span style="font-weight:700;color:var(--text2);">%</span>
+                </div>
               </div>
-              <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border);">
-                <span>Despesas Financeiras (DF)</span>
-                <span style="font-weight:700;">${bdi.parametros.df.valor.toFixed(2)}% <small style="color:var(--text3);">(${bdi.parametros.df.faixaTCU})</small></span>
+
+              <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--border);">
+                <div>
+                  <div style="font-weight:700;color:var(--text);">Despesas Financeiras (DF)</div>
+                  <div style="font-size:.72rem;color:var(--text3);">Faixa TCU: 0,59% a 1,39%</div>
+                </div>
+                <div style="display:flex;align-items:center;gap:4px;">
+                  <input type="number" step="0.01" min="0" max="20" id="od-bdi-df" class="form-control form-control-sm"
+                         value="${dfVal.toFixed(2)}" style="width:85px;text-align:right;font-weight:800;"
+                         oninput="ObraDetalhe.recalcularBDIInput('${obraId}')">
+                  <span style="font-weight:700;color:var(--text2);">%</span>
+                </div>
               </div>
-              <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border);">
-                <span>Lucro Operacional Bruto (L)</span>
-                <span style="font-weight:700;">${bdi.parametros.l.valor.toFixed(2)}% <small style="color:var(--text3);">(${bdi.parametros.l.faixaTCU})</small></span>
+
+              <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--border);">
+                <div>
+                  <div style="font-weight:700;color:var(--text);">Lucro Operacional Bruto (L)</div>
+                  <div style="font-size:.72rem;color:var(--text3);">Faixa TCU: 6,16% a 8,96%</div>
+                </div>
+                <div style="display:flex;align-items:center;gap:4px;">
+                  <input type="number" step="0.01" min="0" max="30" id="od-bdi-l" class="form-control form-control-sm"
+                         value="${lVal.toFixed(2)}" style="width:85px;text-align:right;font-weight:800;"
+                         oninput="ObraDetalhe.recalcularBDIInput('${obraId}')">
+                  <span style="font-weight:700;color:var(--text2);">%</span>
+                </div>
               </div>
-              <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border);">
-                <span>Tributos Incidentes (PIS + COFINS + ISS ${isDesonerado?'+ CPRB':''})</span>
-                <span style="font-weight:700;color:var(--danger);">${bdi.parametros.tributos.total.toFixed(2)}%</span>
+
+              <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--border);">
+                <div>
+                  <div style="font-weight:700;color:var(--text);">Tributos Incidentes (PIS + COFINS + ISS ${isDesonerado?'+ CPRB':''})</div>
+                  <div style="font-size:.72rem;color:var(--text3);">Geralmente de 4,65% a 8,65% (até 13% em desoneração)</div>
+                </div>
+                <div style="display:flex;align-items:center;gap:4px;">
+                  <input type="number" step="0.01" min="0" max="35" id="od-bdi-t" class="form-control form-control-sm"
+                         value="${tVal.toFixed(2)}" style="width:85px;text-align:right;font-weight:800;color:var(--danger);"
+                         oninput="ObraDetalhe.recalcularBDIInput('${obraId}')">
+                  <span style="font-weight:700;color:var(--danger);">%</span>
+                </div>
               </div>
             </div>
 
-            <div style="margin-top:14px;padding:10px;background:rgba(18,217,160,0.06);border:1px solid rgba(18,217,160,0.2);border-radius:var(--r-md);font-size:.76rem;color:var(--text);">
-              <strong>Faixa de Aceitabilidade TCU para Construção de Edifícios:</strong><br>
-              1º Quartil: <strong>${bdi.faixaReferenciaTCU.primeiroQuartil}%</strong> &bull; Mediana: <strong>${bdi.faixaReferenciaTCU.mediana}%</strong> &bull; 3º Quartil: <strong>${bdi.faixaReferenciaTCU.terceiroQuartil}%</strong>.
+            <!-- Faixa de Aceitabilidade TCU Dinâmica -->
+            <div id="od-bdi-status-badge" style="margin-top:14px;padding:10px 12px;background:rgba(18,217,160,0.06);border:1px solid rgba(18,217,160,0.2);border-radius:var(--r-md);font-size:.76rem;color:var(--text);">
+              <strong>Faixa TCU Edifícios (Acórdão 2622/2013):</strong> 1º Quartil: <strong>20,34%</strong> &bull; Mediana: <strong>22,18%</strong> &bull; 3º Quartil: <strong>25,00%</strong>.
+            </div>
+
+            <!-- Botões de Persistência e Ação -->
+            <div style="margin-top:16px;display:flex;gap:8px;flex-wrap:wrap;">
+              <button class="btn btn-primary btn-sm" onclick="ObraDetalhe.salvarBDI('${obraId}')" style="font-weight:800;display:inline-flex;align-items:center;gap:6px;">
+                💾 Salvar BDI Desta Obra
+              </button>
+              <button class="btn btn-secondary btn-sm" onclick="ObraDetalhe.salvarBDIPadrao('${obraId}')" style="display:inline-flex;align-items:center;gap:6px;" title="Salva os parâmetros como padrão para novas obras">
+                🏢 Salvar Padrão Construtora
+              </button>
+              <button class="btn btn-secondary btn-sm" onclick="ObraDetalhe.restaurarBDITCU('${obraId}')" style="display:inline-flex;align-items:center;gap:6px;" title="Restaura os parâmetros para as medianas do TCU">
+                🔄 Restaurar Padrão TCU
+              </button>
             </div>
           </div>
         </div>
@@ -1130,28 +1240,366 @@ const ObraDetalhe = {
     `;
   },
 
-  // ── EXPORTAÇÃO EXCEL (.XLSX MULTI-ABA DE ENGENHARIA) ──
-  exportarExcelEngenharia(obraId) {
+  // ── MÉTODOS DE CONTROLE & PERSISTÊNCIA DO BDI ──
+  recalcularBDIInput(obraId) {
+    const ac = parseFloat(document.getElementById('od-bdi-ac')?.value) || 0;
+    const sg = parseFloat(document.getElementById('od-bdi-sg')?.value) || 0;
+    const r = parseFloat(document.getElementById('od-bdi-r')?.value) || 0;
+    const df = parseFloat(document.getElementById('od-bdi-df')?.value) || 0;
+    const l = parseFloat(document.getElementById('od-bdi-l')?.value) || 0;
+    const t = parseFloat(document.getElementById('od-bdi-t')?.value) || 0;
+
+    const tFrac = t / 100;
+    const divisor = Math.max(0.01, 1 - tFrac);
+    const numerador = (1 + (ac + sg + r) / 100) * (1 + df / 100) * (1 + l / 100);
+    const bdiCalculado = Math.max(0, ((numerador / divisor) - 1) * 100);
+
+    const valEl = document.getElementById('od-bdi-val-display');
+    if (valEl) {
+      valEl.textContent = `${bdiCalculado.toFixed(2)}%`;
+    }
+
+    const badgeEl = document.getElementById('od-bdi-status-badge');
+    if (badgeEl) {
+      if (bdiCalculado < 20.34) {
+        badgeEl.innerHTML = `<strong>Faixa TCU:</strong> <span style="color:#f59e0b;font-weight:700;">🟡 Abaixo do 1º Quartil (20,34%)</span> &bull; Mediana: 22,18% &bull; 3º Quartil: 25,00%. Margem conservadora / competitiva.`;
+      } else if (bdiCalculado > 25.00) {
+        badgeEl.innerHTML = `<strong>Faixa TCU:</strong> <span style="color:#ef4444;font-weight:700;">🟠 Acima do 3º Quartil (25,00%)</span> &bull; Mediana: 22,18%. Em licitações públicas exige justificativa formal.`;
+      } else {
+        badgeEl.innerHTML = `<strong>Faixa TCU:</strong> <span style="color:#10b981;font-weight:700;">🟢 Dentro da Faixa Ideal de Aceitabilidade (Mediana: 22,18%)</span> &bull; 1º Q: 20,34% &bull; 3º Q: 25,00%.`;
+      }
+    }
+  },
+
+  salvarBDI(obraId) {
+    const ac = parseFloat(document.getElementById('od-bdi-ac')?.value) || 0;
+    const sg = parseFloat(document.getElementById('od-bdi-sg')?.value) || 0;
+    const r = parseFloat(document.getElementById('od-bdi-r')?.value) || 0;
+    const df = parseFloat(document.getElementById('od-bdi-df')?.value) || 0;
+    const l = parseFloat(document.getElementById('od-bdi-l')?.value) || 0;
+    const t = parseFloat(document.getElementById('od-bdi-t')?.value) || 0;
+
+    const cfg = {
+      ac,
+      sg,
+      s: sg * 0.65,
+      g: sg * 0.35,
+      r,
+      df,
+      l,
+      t,
+      desonerado: !!this.desoneradoLeisSociais
+    };
+
+    DB.saveBDIConfig(obraId, cfg);
+    Utils.toast('✅ Parâmetros de BDI da obra salvos com sucesso!', 'success');
+  },
+
+  salvarBDIPadrao(obraId) {
+    const ac = parseFloat(document.getElementById('od-bdi-ac')?.value) || 0;
+    const sg = parseFloat(document.getElementById('od-bdi-sg')?.value) || 0;
+    const r = parseFloat(document.getElementById('od-bdi-r')?.value) || 0;
+    const df = parseFloat(document.getElementById('od-bdi-df')?.value) || 0;
+    const l = parseFloat(document.getElementById('od-bdi-l')?.value) || 0;
+    const t = parseFloat(document.getElementById('od-bdi-t')?.value) || 0;
+
+    const cfg = {
+      ac,
+      sg,
+      s: sg * 0.65,
+      g: sg * 0.35,
+      r,
+      df,
+      l,
+      t,
+      desonerado: !!this.desoneradoLeisSociais
+    };
+
+    DB.saveBDIEmpresaPadrao(cfg);
+    DB.saveBDIConfig(obraId, cfg);
+    Utils.toast('🏢 BDI padrão da construtora atualizado e aplicado a esta obra!', 'success');
+  },
+
+  restaurarBDITCU(obraId) {
+    const isDeson = !!this.desoneradoLeisSociais;
+    const defaultCfg = {
+      ac: 4.00,
+      sg: 1.20,
+      r: 1.20,
+      df: 1.23,
+      l: 7.40,
+      t: isDeson ? 11.15 : 6.65,
+      desonerado: isDeson
+    };
+    DB.saveBDIConfig(obraId, defaultCfg);
+    const container = document.getElementById('od-subtab-orcado-content');
+    if (container && this.currentObraId) {
+      container.innerHTML = this._renderSubTabOrcadoContent('leis-sociais', this.currentObraId);
+    }
+    Utils.toast('🔄 Parâmetros de BDI restaurados para os valores padrão do TCU Acórdão 2622/2013!', 'info');
+  },
+
+  // ── CONFIGURAÇÃO E EDIÇÃO DO CRONOGRAMA ──
+  abrirModalConfigCronograma(obraId) {
+    const crono = DB.getCronogramaFisicoFinanceiro(obraId);
+    const config = DB.getCronogramaConfig(obraId) || {};
+    const totalMeses = crono.totalMeses || 12;
+    const mesInicio = config.mesInicio || new Date().toISOString().slice(0, 7);
+    const modeloCurva = config.modeloCurva || 'gaussiana';
+
+    const modalHtml = `
+      <div class="modal" style="max-width:800px;width:95%;">
+        <div class="modal-header">
+          <span class="modal-title">✏️ Configurar Cronograma Físico-Financeiro</span>
+          <button class="modal-close" onclick="Utils.closeModal()">✕</button>
+        </div>
+        <div class="modal-body" style="max-height:75vh;overflow-y:auto;padding:20px;">
+          <div style="font-size:.84rem;color:var(--text2);margin-bottom:16px;line-height:1.4;">
+            Personalize a duração da obra em meses, o mês de início e o valor previsto de cada macro-etapa.
+            A distribuição mensal e a Curva S serão recalculadas com precisão de engenharia civil.
+          </div>
+
+          <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(210px, 1fr));gap:14px;margin-bottom:18px;background:var(--bg-secondary);padding:14px;border-radius:var(--r-md);border:1px solid var(--border);">
+            <div>
+              <label style="font-size:.76rem;font-weight:700;color:var(--text2);display:block;margin-bottom:4px;">Duração da Obra (Meses)</label>
+              <input type="number" id="od-cfg-meses" class="form-control" min="3" max="36" value="${totalMeses}">
+            </div>
+            <div>
+              <label style="font-size:.76rem;font-weight:700;color:var(--text2);display:block;margin-bottom:4px;">Mês Inicial de Obra</label>
+              <input type="month" id="od-cfg-inicio" class="form-control" value="${mesInicio}">
+            </div>
+            <div>
+              <label style="font-size:.76rem;font-weight:700;color:var(--text2);display:block;margin-bottom:4px;">Distribuição dos Desembolsos</label>
+              <select id="od-cfg-modelo" class="form-control">
+                <option value="gaussiana" ${modeloCurva==='gaussiana'?'selected':''}>Curva S Gaussiana (Padrão Engenharia)</option>
+                <option value="linear" ${modeloCurva==='linear'?'selected':''}>Distribuição Linear Equilibrada</option>
+              </select>
+            </div>
+          </div>
+
+          <div style="margin-bottom:8px;font-weight:800;font-size:.9rem;color:var(--text);display:flex;justify-content:space-between;align-items:center;">
+            <span>Macro-Etapas e Valores Previstos</span>
+            <span id="od-cfg-total-previsto" style="color:var(--accent);font-size:.95rem;">
+              Total Previsto: ${Utils.fmt.currency(crono.bac)}
+            </span>
+          </div>
+
+          <div style="border:1px solid var(--border);border-radius:var(--r-md);overflow:hidden;">
+            <table class="table" style="margin:0;font-size:.82rem;">
+              <thead>
+                <tr style="background:var(--bg-secondary);">
+                  <th style="width:55px;text-align:center;">Ativo</th>
+                  <th>Macro-Etapa de Obra</th>
+                  <th style="text-align:right;width:200px;">Valor Previsto Total (R$)</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${crono.linhas.map((l, idx) => `
+                  <tr>
+                    <td style="text-align:center;">
+                      <input type="checkbox" id="od-cfg-chk-${idx}" data-idx="${idx}" data-codigo="${l.codigo}" ${l.ativa !== false ? 'checked' : ''} style="cursor:pointer;" onchange="ObraDetalhe._atualizarSomaModalCronograma()">
+                    </td>
+                    <td style="font-weight:700;color:var(--text);">
+                      ${Utils.escapeHtml(l.nome)}
+                    </td>
+                    <td style="text-align:right;">
+                      <input type="number" step="0.01" min="0" id="od-cfg-val-${idx}" data-idx="${idx}" data-codigo="${l.codigo}" class="form-control form-control-sm od-cfg-step-val"
+                             value="${l.previstoTotal || 0}" style="text-align:right;font-weight:800;" oninput="ObraDetalhe._atualizarSomaModalCronograma()">
+                    </td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <div class="modal-footer" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
+          <button class="btn btn-secondary btn-sm" onclick="ObraDetalhe.restaurarConfigCronograma('${obraId}')">
+            🔄 Restaurar Distribuição Padrão
+          </button>
+          <div style="display:flex;gap:8px;">
+            <button class="btn btn-secondary" onclick="Utils.closeModal()">Cancelar</button>
+            <button class="btn btn-primary" onclick="ObraDetalhe.salvarConfigCronograma('${obraId}')" style="font-weight:800;">
+              💾 Salvar Cronograma Personalizado
+            </button>
+          </div>
+        </div>
+      </div>
+    `;
+
+    Utils.showModal(modalHtml);
+  },
+
+  _atualizarSomaModalCronograma() {
+    let soma = 0;
+    const inputs = document.querySelectorAll('.od-cfg-step-val');
+    inputs.forEach(inp => {
+      const idx = inp.dataset.idx;
+      const chk = document.getElementById(`od-cfg-chk-${idx}`);
+      if (!chk || chk.checked) {
+        soma += parseFloat(inp.value) || 0;
+      }
+    });
+    const el = document.getElementById('od-cfg-total-previsto');
+    if (el) el.textContent = `Total Previsto: ${Utils.fmt.currency(soma)}`;
+  },
+
+  salvarConfigCronograma(obraId) {
+    const totalMeses = parseInt(document.getElementById('od-cfg-meses')?.value, 10) || 12;
+    const mesInicio = document.getElementById('od-cfg-inicio')?.value || new Date().toISOString().slice(0, 7);
+    const modeloCurva = document.getElementById('od-cfg-modelo')?.value || 'gaussiana';
+
+    const etapas = [];
+    const inputs = document.querySelectorAll('.od-cfg-step-val');
+    inputs.forEach(inp => {
+      const idx = inp.dataset.idx;
+      const codigo = inp.dataset.codigo;
+      const chk = document.getElementById(`od-cfg-chk-${idx}`);
+      const ativa = chk ? chk.checked : true;
+      const valor = parseFloat(inp.value) || 0;
+      etapas.push({
+        codigo,
+        ativa,
+        valorPrevisto: valor
+      });
+    });
+
+    const config = {
+      totalMeses: Math.max(3, Math.min(36, totalMeses)),
+      mesInicio,
+      modeloCurva,
+      etapas
+    };
+
+    DB.saveCronogramaConfig(obraId, config);
+    Utils.closeModal();
+    this.setSubTabOrcado('cronograma');
+    Utils.toast('✅ Cronograma físico-financeiro personalizado salvo com sucesso!', 'success');
+  },
+
+  restaurarConfigCronograma(obraId) {
+    Utils.confirm('Deseja realmente restaurar o cronograma para os valores proporcionais técnicos padrão?', () => {
+      DB.saveCronogramaConfig(obraId, null);
+      Utils.closeModal();
+      this.setSubTabOrcado('cronograma');
+      Utils.toast('🔄 Cronograma restaurado para o padrão proporcional técnico.', 'info');
+    });
+  },
+
+  // ── MENU MODAL DE SELEÇÃO: EXPORTAR JUNTO OU SEPARADO ──
+  abrirMenuExportar(tipo, obraId) {
+    const id = obraId || this.currentObraId;
+    const isExcel = tipo === 'excel';
+    const titulo = isExcel ? '📊 Exportar Planilha Excel (.xlsx)' : '🖨️ Imprimir / Gerar PDF Oficial (A4)';
+    const desc = isExcel
+      ? 'Selecione se deseja baixar o Dossiê Completo com todas as abas consolidadas ou apenas uma planilha específica.'
+      : 'Selecione se deseja imprimir o Dossiê Executivo Completo ou emitir apenas uma prancha/relatório específico.';
+
+    const opcoes = [
+      {
+        modo: 'completo',
+        icone: isExcel ? '📚' : '📄',
+        titulo: 'Dossiê Completo de Engenharia (Tudo Junto)',
+        desc: isExcel
+          ? 'Gera arquivo .xlsx único contendo 4 abas: Cronograma Físico-Financeiro, Curva ABC, Orçado vs Realizado e BDI/Leis Sociais.'
+          : 'Emite o Dossiê Executivo Integrado A4 Paisagem com todas as 4 seções, gráficos e termo de autenticidade.'
+      },
+      {
+        modo: 'cronograma',
+        icone: '📅',
+        titulo: 'Apenas Cronograma Físico-Financeiro Mensal',
+        desc: isExcel
+          ? 'Planilha .xlsx dedicada com as 13 macro-etapas, desembolsos mensais previstos e Curva S.'
+          : 'Prancha técnica de Cronograma Físico-Financeiro em formato A4 Paisagem pronta para impressão.'
+      },
+      {
+        modo: 'curva-abc',
+        icone: '📊',
+        titulo: 'Apenas Curva ABC de Insumos & Serviços (Pareto 80/20)',
+        desc: isExcel
+          ? 'Planilha .xlsx dedicada com todos os insumos classificados por criticidade (Classes A, B e C).'
+          : 'Relatório A4 com resumo de Pareto, insumos críticos e concentrações de custo.'
+      },
+      {
+        modo: 'orcado-realizado',
+        icone: '📈',
+        titulo: 'Apenas Orçado × Realizado & Análise de Valor Agregado (EVM)',
+        desc: isExcel
+          ? 'Planilha .xlsx com macro-etapas, saldo financeiro, desvios e indicadores BAC, PV, EV, AC, CPI, SPI.'
+          : 'Relatório executivo A4 de comparativo orçamentário e índices de prazo e custo.'
+      },
+      {
+        modo: 'bdi',
+        icone: '⚖️',
+        titulo: 'Apenas Memória de BDI Oficial & Encargos Sociais',
+        desc: isExcel
+          ? 'Planilha .xlsx analítica com a fórmula do TCU Acórdão 2622/2013 e encargos Grupos A, B, C e D.'
+          : 'Relatório técnico oficial A4 detalhando as alíquotas de BDI e leis sociais para auditoria e órgãos financiadores.'
+      }
+    ];
+
+    const html = `
+      <div class="modal" style="max-width:620px;width:95%;">
+        <div class="modal-header">
+          <span class="modal-title">${titulo}</span>
+          <button class="modal-close" onclick="Utils.closeModal()">✕</button>
+        </div>
+        <div class="modal-body" style="padding:18px;">
+          <p style="font-size:.84rem;color:var(--text2);margin-bottom:16px;line-height:1.4;">${desc}</p>
+          <div style="display:grid;gap:10px;">
+            ${opcoes.map(op => `
+              <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 14px;background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--r-md);gap:12px;transition:border-color .2s;"
+                   onmouseenter="this.style.borderColor='var(--accent)'" onmouseleave="this.style.borderColor='var(--border)'">
+                <div style="flex:1;">
+                  <div style="font-weight:800;font-size:.88rem;color:var(--text);display:flex;align-items:center;gap:6px;">
+                    <span>${op.icone}</span> ${op.titulo}
+                  </div>
+                  <div style="font-size:.76rem;color:var(--text3);margin-top:2px;line-height:1.3;">
+                    ${op.desc}
+                  </div>
+                </div>
+                <div>
+                  <button class="btn btn-sm ${op.modo==='completo'?'btn-primary':'btn-secondary'}"
+                          onclick="Utils.closeModal(); ${isExcel ? `ObraDetalhe.exportarExcel('${op.modo}', '${id}')` : `ObraDetalhe.imprimir('${op.modo}', '${id}')`}"
+                          style="font-weight:700;white-space:nowrap;">
+                    ${isExcel ? 'Baixar .xlsx' : 'Imprimir / PDF'}
+                  </button>
+                </div>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-secondary" onclick="Utils.closeModal()">Fechar</button>
+        </div>
+      </div>
+    `;
+
+    Utils.showModal(html);
+  },
+
+  // ── MOTOR MODULAR DE EXPORTAÇÃO EXCEL (.XLSX) ──
+  exportarExcel(modo = 'completo', obraId = null) {
+    const id = obraId || this.currentObraId;
+    if (!id) {
+      Utils.toast('Selecione uma obra para exportar.', 'warning');
+      return;
+    }
+
     if (typeof XLSX === 'undefined') {
-      Utils.toast('Biblioteca XLSX não carregada no navegador.', 'danger');
+      Utils.toast('Biblioteca XLSX não disponível no navegador.', 'danger');
       return;
     }
 
     const comp = (typeof DB !== 'undefined' && DB.getOrcamentoVsRealizado)
-      ? DB.getOrcamentoVsRealizado(obraId)
+      ? DB.getOrcamentoVsRealizado(id)
       : null;
-    if (!comp) {
-      Utils.toast('Dados da obra não disponíveis para exportação.', 'warning');
-      return;
-    }
-
-    const cs = DB.getCurvaS ? DB.getCurvaS(obraId) : null;
-    const crono = DB.getCronogramaFisicoFinanceiro ? DB.getCronogramaFisicoFinanceiro(obraId) : null;
-    const abc = DB.getCurvaABC ? DB.getCurvaABC(obraId) : null;
+    const cs = DB.getCurvaS ? DB.getCurvaS(id) : null;
+    const crono = DB.getCronogramaFisicoFinanceiro ? DB.getCronogramaFisicoFinanceiro(id) : null;
+    const abc = DB.getCurvaABC ? DB.getCurvaABC(id) : null;
     const isDeson = !!this.desoneradoLeisSociais;
     const leis = DB.getLeisSociais ? DB.getLeisSociais(isDeson) : null;
-    const bdi = DB.getBDIConfig ? DB.getBDIConfig(obraId) : null;
-    const obra = DB.getById('clientes', obraId) || { nome: 'Todas as Obras / Geral' };
+    const bdi = DB.getBDIConfig ? DB.getBDIConfig(id, { desonerado: isDeson }) : null;
+    const obra = DB.getById('clientes', id) || { nome: 'Todas as Obras / Geral' };
     const emp = DB.getEmpresa() || {};
     const empNome = emp.razao_social || emp.nome_fantasia || 'FINOBRA CONSTRUTORA';
 
@@ -1160,18 +1608,33 @@ const ObraDetalhe = {
     const addSheet = (data, name) => {
       if (!data || !data.length) return;
       const ws = XLSX.utils.aoa_to_sheet(data);
-      const wcol = data[0].map((_, i) => ({
-        wch: Math.min(50, Math.max(12, ...data.map(r => (r[i] !== null && r[i] !== undefined ? String(r[i]).length : 0)), name.length))
-      }));
+      let maxCols = 0;
+      for (let r = 0; r < data.length; r++) {
+        if (Array.isArray(data[r]) && data[r].length > maxCols) {
+          maxCols = data[r].length;
+        }
+      }
+      const wcol = [];
+      for (let colIdx = 0; colIdx < maxCols; colIdx++) {
+        let maxLen = 10;
+        for (let rowIdx = 0; rowIdx < data.length; rowIdx++) {
+          const row = data[rowIdx];
+          if (row && row[colIdx] !== null && row[colIdx] !== undefined) {
+            const strLen = String(row[colIdx]).length;
+            if (strLen > maxLen) maxLen = strLen;
+          }
+        }
+        wcol.push({ wch: Math.min(60, Math.max(12, maxLen + 2)) });
+      }
       ws['!cols'] = wcol;
-      XLSX.utils.book_append_sheet(wb, ws, name);
+      XLSX.utils.book_append_sheet(wb, ws, name.slice(0, 31));
     };
 
-    // ABA 1: CRONOGRAMA FÍSICO-FINANCEIRO MENSAL
-    if (crono && crono.linhas) {
+    // 1. Cronograma
+    if ((modo === 'completo' || modo === 'cronograma') && crono && crono.linhas) {
       const rowsCrono = [
         [`CRONOGRAMA FÍSICO-FINANCEIRO MENSAL — ${empNome.toUpperCase()}`],
-        [`Obra: ${obra.nome} | Contrato Caixa: ${obra.num_contrato_caixa || 'N/A'} | Duração: ${crono.totalMeses} meses | Emissão: ${new Date().toLocaleDateString('pt-BR')}`],
+        [`Obra: ${obra.nome} | Contrato: ${obra.num_contrato_caixa || 'N/A'} | Duração: ${crono.totalMeses} meses | Emissão: ${new Date().toLocaleDateString('pt-BR')}`],
         [''],
         ['Macro-Etapa de Obra', 'Total Previsto (R$)', ...crono.mesesLabels]
       ];
@@ -1192,30 +1655,25 @@ const ObraDetalhe = {
       rowsCrono.push(['']);
       rowsCrono.push([
         'DESEMBOLSO MENSAL PREVISTO (R$)',
-        comp.totalOrcado,
-        ...crono.totaisMensais.map(t => t.previsto)
-      ]);
-      rowsCrono.push([
-        'DESEMBOLSO MENSAL REALIZADO (R$)',
-        comp.totalRealizado,
-        ...crono.totaisMensais.map(t => t.realizado)
+        crono.bac || (comp ? comp.totalOrcado : 0),
+        ...crono.totaisMensais.map(t => t.valorPrevisto || t.previsto || 0)
       ]);
       rowsCrono.push([
         'AVANÇO FÍSICO MENSAL (%)',
         '100.0%',
-        ...crono.totaisAcumulados.map(t => `${t.percentualMensal}%`)
+        ...crono.totaisMensais.map(t => `${t.percentualPrevisto || 0}%`)
       ]);
       rowsCrono.push([
         'AVANÇO FÍSICO ACUMULADO (CURVA S %)',
         '100.0%',
-        ...crono.totaisAcumulados.map(t => `${t.percentualAcumulado}%`)
+        ...crono.totaisAcumulados.map(t => `${t.percentualAcumulado || 0}%`)
       ]);
 
       addSheet(rowsCrono, 'Cronograma Físico-Financ');
     }
 
-    // ABA 2: CURVA ABC (PARETO 80/20)
-    if (abc && abc.itens) {
+    // 2. Curva ABC
+    if ((modo === 'completo' || modo === 'curva-abc') && abc && abc.itens) {
       const rowsABC = [
         [`CURVA ABC DE INSUMOS E SERVIÇOS (PARETO 80/20) — ${empNome.toUpperCase()}`],
         [`Obra: ${obra.nome} | Itens Analisados: ${abc.totalItens} | Custo Global: ${Utils.fmt.currency(abc.totalValor)}`],
@@ -1242,8 +1700,8 @@ const ObraDetalhe = {
       addSheet(rowsABC, 'Curva ABC');
     }
 
-    // ABA 3: ORÇADO VS REALIZADO & EVM
-    if (comp && comp.etapas) {
+    // 3. Orçado vs Realizado
+    if ((modo === 'completo' || modo === 'orcado-realizado') && comp && comp.etapas) {
       const rowsComp = [
         [`ORÇADO VS REALIZADO & INDICADORES DE VALOR AGREGADO (EVM) — ${empNome.toUpperCase()}`],
         [`Obra: ${obra.nome} | Emissão: ${new Date().toLocaleDateString('pt-BR')}`],
@@ -1254,11 +1712,11 @@ const ObraDetalhe = {
       comp.etapas.forEach(e => {
         rowsComp.push([
           e.nome,
-          e.orcado,
-          e.realizado,
-          e.saldo,
-          `${e.percentual}%`,
-          e.status.toUpperCase()
+          e.orcado || e.previsto || 0,
+          e.realizado || 0,
+          e.saldo || 0,
+          `${e.percentual || 0}%`,
+          (e.status || 'normal').toUpperCase()
         ]);
       });
 
@@ -1266,9 +1724,9 @@ const ObraDetalhe = {
         'TOTAL GERAL DA OBRA',
         comp.totalOrcado,
         comp.totalRealizado,
-        comp.saldoGeral,
-        `${comp.percentualGeral}%`,
-        comp.statusGeral.toUpperCase()
+        comp.saldoRestante || comp.saldoGeral || 0,
+        `${comp.percentualFinanceiro || comp.percentualGeral || 0}%`,
+        (comp.statusSaude || 'saudavel').toUpperCase()
       ]);
 
       if (cs) {
@@ -1287,27 +1745,27 @@ const ObraDetalhe = {
       addSheet(rowsComp, 'Orçado vs Realizado');
     }
 
-    // ABA 4: BDI E LEIS SOCIAIS
-    if (bdi && leis) {
+    // 4. BDI e Leis Sociais
+    if ((modo === 'completo' || modo === 'bdi') && bdi && leis) {
       const rowsBDI = [
         [`COMPOSIÇÃO ANALÍTICA DO BDI & ENCARGOS SOCIAIS — ${empNome.toUpperCase()}`],
         [`Obra: ${obra.nome} | Metodologia TCU Acórdão 2622/2013 | Regime CPRB: ${isDeson ? 'Desonerado' : 'Não Desonerado'}`],
         [''],
         ['PARÂMETROS DE CÁLCULO DO BDI', 'Taxa Aplicada (%)', 'Faixa de Referência TCU Acórdão 2622/2013'],
         ['Administração Central (AC)', `${bdi.ac}%`, '3,00% a 5,50%'],
-        ['Seguro e Garantia (SG)', `${bdi.sg}%`, '0,80% a 1,00%'],
+        ['Seguro e Garantia (SG)', `${bdi.sg}%`, '0,80% a 1,20%'],
         ['Risco e Imprevistos (R)', `${bdi.r}%`, '0,97% a 1,27%'],
-        ['Despesas Financeiras (DF)', `${bdi.df}%`, '0,59% a 1,23%'],
+        ['Despesas Financeiras (DF)', `${bdi.df}%`, '0,59% a 1,39%'],
         ['Lucro Operacional Bruto (L)', `${bdi.l}%`, '6,16% a 8,96%'],
         ['Tributos e Impostos (T: PIS + COFINS + ISS)', `${bdi.t}%`, '4,65% a 8,65%'],
         ['TAXA FINAL CALCULADA DE BDI', `${bdi.bdiCalculado}%`, 'Fórmula TCU Acórdão 2622/2013'],
         [''],
         ['ENCARGOS SOCIAIS DA CONSTRUÇÃO CIVIL (LEIS SOCIAIS)', 'Não Desonerado', 'Desonerado (CPRB)'],
-        ['Grupo A (Encargos Básicos / Previdenciários)', '22,80%', '4,50%'],
-        ['Grupo B (Descanso Remunerado, Férias, Feriados)', '46,30%', '46,30%'],
-        ['Grupo C (Aviso Prévio, Indenizações)', '4,44%', '4,44%'],
-        ['Grupo D (Reincidências do Grupo A sobre Grupo B)', '10,50%', '2,08%'],
-        ['TOTAL DE ENCARGOS SOCIAIS (%)', '84,04%', '57,32%']
+        ['Grupo A (Encargos Básicos / Previdenciários)', '36,80%', '16,80%'],
+        ['Grupo B (Descanso Remunerado, Férias, Feriados)', '44,76%', '44,76%'],
+        ['Grupo C (Aviso Prévio, Indenizações)', '9,97%', '9,97%'],
+        ['Grupo D (Reincidências do Grupo A sobre Grupo B)', '11,20%', '5,12%'],
+        ['TOTAL DE ENCARGOS SOCIAIS (%)', `${leis.totalGeral}%`, isDeson ? 'Desonerado' : 'Onerado']
       ];
 
       addSheet(rowsBDI, 'BDI e Leis Sociais');
@@ -1316,7 +1774,16 @@ const ObraDetalhe = {
     const safeNome = (obra.nome || 'Obra')
       .normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 25);
     const dataIso = (typeof Utils !== 'undefined' && Utils.today) ? Utils.today() : new Date().toISOString().slice(0, 10);
-    const nomeArq = `Dossie_Engenharia_${safeNome}_${dataIso}.xlsx`;
+
+    const prefixo = modo === 'cronograma' ? 'Cronograma_Fisico_Financeiro'
+      : modo === 'curva-abc' ? 'Curva_ABC_Pareto'
+      : modo === 'orcado-realizado' ? 'Orcado_vs_Realizado'
+      : modo === 'bdi' ? 'BDI_e_Leis_Sociais'
+      : 'Dossie_Engenharia';
+
+    const nomeArq = modo === 'completo'
+      ? `Dossie_Engenharia_${safeNome}_${dataIso}.xlsx`
+      : `${prefixo}_${safeNome}_${dataIso}.xlsx`;
 
     try {
       const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
@@ -1332,34 +1799,60 @@ const ObraDetalhe = {
       Utils.toast(`✅ Planilha "${nomeArq}" baixada com sucesso!`, 'success');
     } catch(err) {
       console.warn('Fallback XLSX.writeFile:', err);
-      XLSX.writeFile(wb, nomeArq);
+      try {
+        XLSX.writeFile(wb, nomeArq);
+        Utils.toast(`✅ Planilha "${nomeArq}" baixada via XLSX.writeFile!`, 'success');
+      } catch(err2) {
+        console.error('Erro na exportação Excel:', err2);
+        Utils.toast('Erro ao gerar arquivo Excel. Verifique permissões do navegador.', 'danger');
+      }
     }
   },
 
-  // ── EXPORTAÇÃO RELATÓRIO PDF OFICIAL (A4 LANDSCAPE) ──
+  exportarExcelEngenharia(obraId) {
+    this.exportarExcel('completo', obraId);
+  },
+
   exportarPDFEngenharia(obraId) {
-    this.imprimirOrcadoVsRealizado(obraId);
+    this.imprimir('completo', obraId);
   },
 
   imprimirOrcadoVsRealizado(obraId) {
+    this.imprimir('completo', obraId);
+  },
+
+  // ── MOTOR MODULAR DE IMPRESSÃO / PDF A4 (JUNTO OU SEPARADO) ──
+  imprimir(modo = 'completo', obraId = null) {
+    const id = obraId || this.currentObraId;
+    if (!id) {
+      Utils.toast('Selecione uma obra para imprimir.', 'warning');
+      return;
+    }
+
     const comp = (typeof DB !== 'undefined' && DB.getOrcamentoVsRealizado)
-      ? DB.getOrcamentoVsRealizado(obraId)
+      ? DB.getOrcamentoVsRealizado(id)
       : null;
     if (!comp) {
       Utils.toast('Não foi possível carregar os dados comparativos para emissão.', 'danger');
       return;
     }
 
-    const cs = DB.getCurvaS ? DB.getCurvaS(obraId) : null;
-    const abc = DB.getCurvaABC ? DB.getCurvaABC(obraId) : null;
-    const crono = DB.getCronogramaFisicoFinanceiro ? DB.getCronogramaFisicoFinanceiro(obraId) : null;
+    const cs = DB.getCurvaS ? DB.getCurvaS(id) : null;
+    const abc = DB.getCurvaABC ? DB.getCurvaABC(id) : null;
+    const crono = DB.getCronogramaFisicoFinanceiro ? DB.getCronogramaFisicoFinanceiro(id) : null;
     const leis = DB.getLeisSociais ? DB.getLeisSociais(this.desoneradoLeisSociais || false) : null;
-    const bdi = DB.getBDIConfig ? DB.getBDIConfig(obraId) : null;
+    const bdi = DB.getBDIConfig ? DB.getBDIConfig(id) : null;
 
-    const obra = DB.getById('clientes', obraId) || { nome: 'Todas as Obras / Geral' };
+    const obra = DB.getById('clientes', id) || { nome: 'Todas as Obras / Geral' };
     const emp = DB.getEmpresa() || {};
     const empNome = emp.razao_social || emp.nome_fantasia || 'FINOBRA CONSTRUTORA';
     const safeLogoUrl = Utils.safeUrl ? Utils.safeUrl(emp.logo_url) : emp.logo_url;
+
+    const tituloRelatorio = modo === 'cronograma' ? 'CRONOGRAMA FÍSICO-FINANCEIRO MENSAL OFICIAL'
+      : modo === 'curva-abc' ? 'CURVA ABC DE INSUMOS & SERVIÇOS (PARETO 80/20)'
+      : modo === 'orcado-realizado' ? 'RELATÓRIO ORÇADO × REALIZADO & ANÁLISE DE VALOR AGREGADO'
+      : modo === 'bdi' ? 'MEMÓRIA DE CÁLCULO OFICIAL DE BDI & ENCARGOS SOCIAIS'
+      : 'DOSSIÊ EXECUTIVO DE ENGENHARIA DE CUSTOS & RELATÓRIO ORÇADO × REALIZADO';
 
     const win = window.open('', '_blank');
     if (!win) {
@@ -1372,7 +1865,7 @@ const ObraDetalhe = {
       <html lang="pt-BR">
       <head>
         <meta charset="UTF-8">
-        <title>Dossiê Executivo de Engenharia de Custos - ${Utils.escapeHtml(obra.nome)}</title>
+        <title>${tituloRelatorio} - ${Utils.escapeHtml(obra.nome)}</title>
         <style>
           @page { size: A4 landscape; margin: 8mm; }
           * { box-sizing: border-box; }
@@ -1385,8 +1878,8 @@ const ObraDetalhe = {
           }
           .action-bar { background: #0f172a; color: #fff; padding: 8px 14px; border-radius: 6px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
           .header { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid #0f172a; padding-bottom: 8px; margin-bottom: 10px; }
-          .title { font-size: 14px; font-weight: 900; color: #0f172a; }
-          .kpis { display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px; margin-bottom: 12px; }
+          .title { font-size: 13px; font-weight: 900; color: #0f172a; }
+          .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 8px; margin-bottom: 12px; }
           .kpi-card { border: 1px solid #cbd5e1; background: #f8fafc; padding: 6px 8px; border-radius: 4px; }
           .kpi-title { font-size: 7px; text-transform: uppercase; font-weight: 700; color: #64748b; }
           .kpi-val { font-size: 11.5px; font-weight: 900; margin-top: 2px; }
@@ -1404,7 +1897,7 @@ const ObraDetalhe = {
       <body>
         <div class="no-print action-bar">
           <div style="font-weight:700;font-size:11px;display:flex;align-items:center;gap:8px;">
-            <span>📄 Dossiê Executivo de Engenharia de Custos (Visualização de Impressão A4)</span>
+            <span>📄 ${tituloRelatorio} (Visualização de Impressão A4)</span>
           </div>
           <div style="display:flex;gap:8px;">
             <button onclick="window.print()" style="background:#10b981;color:#fff;border:none;padding:5px 12px;border-radius:4px;font-weight:700;cursor:pointer;font-size:10px;">
@@ -1421,11 +1914,11 @@ const ObraDetalhe = {
             ${safeLogoUrl ? `<img src="${safeLogoUrl}" alt="${empNome}" style="max-height:38px;max-width:90px;object-fit:contain;">` : ''}
             <div>
               <div style="font-size:12px;font-weight:900;color:#0f172a;">${Utils.escapeHtml(empNome)}</div>
-              <div style="color:#64748b;font-size:8px;">Planejamento Físico-Financeiro, Curva ABC &amp; Engenharia de Custos</div>
+              <div style="color:#64748b;font-size:8px;">Planejamento Físico-Financeiro &amp; Engenharia de Custos</div>
             </div>
           </div>
           <div style="text-align:right;">
-            <div class="title">DOSSIÊ EXECUTIVO DE ENGENHARIA DE CUSTOS &amp; RELATÓRIO ORÇADO × REALIZADO</div>
+            <div class="title">${tituloRelatorio}</div>
             <div style="font-size:8px;color:#64748b;">
               Obra: <strong>${Utils.escapeHtml(obra.nome)}</strong> &bull;
               Contrato Caixa: <strong>${obra.num_contrato_caixa || 'N/A'}</strong> &bull;
@@ -1434,36 +1927,37 @@ const ObraDetalhe = {
           </div>
         </div>
 
+        <!-- KPIs Resumo Executivo -->
         <div class="kpis">
           <div class="kpi-card">
             <div class="kpi-title">Orçamento Previsto (BAC)</div>
-            <div class="kpi-val">${Utils.fmt.currency(comp.totalOrcado)}</div>
+            <div class="kpi-val">${Utils.fmt.currency(crono ? crono.bac : comp.totalOrcado)}</div>
           </div>
           <div class="kpi-card">
             <div class="kpi-title">Custo Real Incorrido (AC)</div>
             <div class="kpi-val" style="color:#991b1b;">${Utils.fmt.currency(comp.totalRealizado)}</div>
           </div>
           <div class="kpi-card">
-            <div class="kpi-title">Custo no Término (EAC)</div>
-            <div class="kpi-val">${cs ? Utils.fmt.currency(cs.eac) : '—'}</div>
-          </div>
-          <div class="kpi-card">
-            <div class="kpi-title">Índice de Custo (CPI/IDC)</div>
+            <div class="kpi-title">Índice Custo (CPI/IDC)</div>
             <div class="kpi-val" style="color:${cs && cs.cpi>=1?'#166534':'#991b1b'};">${cs ? cs.cpi.toFixed(2) : '1.00'}</div>
           </div>
           <div class="kpi-card">
-            <div class="kpi-title">Índice de Prazo (SPI/IDP)</div>
+            <div class="kpi-title">Índice Prazo (SPI/IDP)</div>
             <div class="kpi-val" style="color:${cs && cs.spi>=1?'#166534':'#991b1b'};">${cs ? cs.spi.toFixed(2) : '1.00'}</div>
           </div>
           <div class="kpi-card">
-            <div class="kpi-title">BDI Aplicado / Encargos</div>
-            <div class="kpi-val">${bdi ? bdi.bdiCalculado : 24.23}% / ${leis ? leis.totalGeral : 84.04}%</div>
+            <div class="kpi-title">BDI Aplicado</div>
+            <div class="kpi-val" style="color:#0284c7;">${bdi ? bdi.bdiCalculado : 24.23}%</div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-title">Encargos Sociais</div>
+            <div class="kpi-val">${leis ? leis.totalGeral : 84.04}%</div>
           </div>
         </div>
 
-        <!-- SEÇÃO 1: CRONOGRAMA FÍSICO-FINANCEIRO -->
-        <div class="section-title">1. Cronograma Físico-Financeiro Mensal da Obra</div>
-        ${crono ? `
+        <!-- SEÇÃO: CRONOGRAMA FÍSICO-FINANCEIRO (Se modo === 'cronograma' ou 'completo') -->
+        ${(modo === 'cronograma' || modo === 'completo') && crono ? `
+          <div class="section-title">📅 Cronograma Físico-Financeiro Mensal (${crono.totalMeses} Meses)</div>
           <table>
             <thead>
               <tr>
@@ -1488,9 +1982,9 @@ const ObraDetalhe = {
             <tfoot>
               <tr class="tfoot">
                 <td>DESEMBOLSO PREVISTO NO MÊS</td>
-                <td style="text-align:right;">${Utils.fmt.currency(comp.totalOrcado)}</td>
+                <td style="text-align:right;">${Utils.fmt.currency(crono.bac || comp.totalOrcado)}</td>
                 ${crono.totaisMensais.slice(0, 12).map(tm => `
-                  <td style="text-align:center;">${Utils.fmt.currency(tm.previsto)}</td>
+                  <td style="text-align:center;">${Utils.fmt.currency(tm.valorPrevisto || tm.previsto || 0)}</td>
                 `).join('')}
               </tr>
               <tr class="tfoot">
@@ -1504,66 +1998,108 @@ const ObraDetalhe = {
           </table>
         ` : ''}
 
-        <!-- SEÇÃO 2: TOP ITENS CURVA ABC -->
-        <div style="display:grid;grid-template-columns:1.4fr 1fr;gap:12px;margin-top:8px;">
-          <div>
-            <div class="section-title">2. Curva ABC — Itens Críticos de Maior Custo (Pareto 80/20)</div>
-            ${abc ? `
-              <table>
-                <thead>
-                  <tr>
-                    <th style="width:30px;text-align:center;">#</th>
-                    <th>Insumo / Composição</th>
-                    <th style="width:80px;">Categoria</th>
-                    <th style="text-align:right;width:75px;">Valor Total</th>
-                    <th style="text-align:right;width:55px;">% Total</th>
-                    <th style="text-align:right;width:55px;">% Acum.</th>
-                    <th style="text-align:center;width:40px;">Classe</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  ${abc.itens.slice(0, 8).map(i => `
-                    <tr>
-                      <td style="text-align:center;font-weight:700;">${i.ranking}</td>
-                      <td style="font-weight:600;">${Utils.escapeHtml(i.descricao)}</td>
-                      <td>${Utils.escapeHtml(i.categoria)}</td>
-                      <td style="text-align:right;font-weight:700;">${Utils.fmt.currency(i.valorTotal)}</td>
-                      <td style="text-align:right;">${i.pctIndividual}%</td>
-                      <td style="text-align:right;font-weight:700;color:#166534;">${i.pctAcumulado}%</td>
-                      <td style="text-align:center;font-weight:800;color:${i.classe==='A'?'#991b1b':'#0f172a'};">${i.classe}</td>
-                    </tr>
-                  `).join('')}
-                </tbody>
-              </table>
-            ` : ''}
-          </div>
-
-          <div>
-            <div class="section-title">3. Parâmetros de BDI (TCU Acórdão 2622/2013) &amp; Leis Sociais</div>
-            <div style="border:1px solid #cbd5e1;border-radius:4px;padding:6px;background:#f8fafc;font-size:7.5px;">
-              <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-bottom:6px;">
-                <div>Admin. Central (AC): <strong>${bdi ? bdi.ac : 4.00}%</strong></div>
-                <div>Seguro e Garantia (SG): <strong>${bdi ? bdi.sg : 0.80}%</strong></div>
-                <div>Risco/Contingência (R): <strong>${bdi ? bdi.r : 1.20}%</strong></div>
-                <div>Desp. Financeiras (DF): <strong>${bdi ? bdi.df : 1.23}%</strong></div>
-                <div>Lucro Bruto (L): <strong>${bdi ? bdi.l : 7.40}%</strong></div>
-                <div>Tributos (T: PIS/COF/ISS): <strong>${bdi ? bdi.t : 5.65}%</strong></div>
-              </div>
-              <div style="border-top:1px solid #cbd5e1;padding-top:4px;margin-top:4px;display:flex;justify-content:space-between;font-weight:800;color:#0f172a;">
-                <span>Taxa Final de BDI:</span>
-                <span style="color:#0284c7;">${bdi ? bdi.bdiCalculado : 24.23}%</span>
-              </div>
-              <div style="display:flex;justify-content:space-between;font-weight:800;color:#0f172a;margin-top:2px;">
-                <span>Encargos Sociais (${this.desoneradoLeisSociais ? 'Desonerado' : 'Não Desonerado'}):</span>
-                <span style="color:#166534;">${leis ? leis.totalGeral : 84.04}%</span>
-              </div>
+        <!-- SEÇÃO: CURVA ABC (Se modo === 'curva-abc' ou 'completo') -->
+        ${(modo === 'curva-abc' || modo === 'completo') && abc ? `
+          <div class="section-title" style="margin-top:12px;">📊 Curva ABC de Insumos &amp; Serviços (Pareto 80/20)</div>
+          <div style="display:flex;gap:10px;margin-bottom:6px;font-size:7.5px;">
+            <div style="border:1px solid #cbd5e1;padding:4px 8px;border-radius:4px;background:#f8fafc;">
+              <strong>Classe A (Críticos):</strong> ${abc.classeA.pct}% do custo (${Utils.fmt.currency(abc.classeA.valor)}) &bull; ${abc.classeA.qtd} itens
             </div>
-
-            <div style="margin-top:8px;background:#f8fafc;border:1px solid #cbd5e1;padding:6px;border-radius:4px;font-size:7.5px;">
-              <strong>Diagnóstico Técnico:</strong> ${Utils.escapeHtml(comp.alertaDesc || '')} &bull; ${cs ? Utils.escapeHtml(cs.diagnosticoTexto || '') : ''}
+            <div style="border:1px solid #cbd5e1;padding:4px 8px;border-radius:4px;background:#f8fafc;">
+              <strong>Classe B (Médios):</strong> ${abc.classeB.pct}% do custo (${Utils.fmt.currency(abc.classeB.valor)}) &bull; ${abc.classeB.qtd} itens
+            </div>
+            <div style="border:1px solid #cbd5e1;padding:4px 8px;border-radius:4px;background:#f8fafc;">
+              <strong>Classe C (Secundários):</strong> ${abc.classeC.pct}% do custo (${Utils.fmt.currency(abc.classeC.valor)}) &bull; ${abc.classeC.qtd} itens
             </div>
           </div>
-        </div>
+          <table>
+            <thead>
+              <tr>
+                <th style="width:30px;text-align:center;">#</th>
+                <th>Insumo / Composição</th>
+                <th style="width:90px;">Categoria</th>
+                <th style="text-align:right;width:80px;">Valor Total</th>
+                <th style="text-align:right;width:60px;">% Total</th>
+                <th style="text-align:right;width:60px;">% Acum.</th>
+                <th style="text-align:center;width:45px;">Classe</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${abc.itens.slice(0, modo === 'curva-abc' ? 25 : 10).map(i => `
+                <tr>
+                  <td style="text-align:center;font-weight:700;">${i.ranking}</td>
+                  <td style="font-weight:600;">${Utils.escapeHtml(i.descricao)}</td>
+                  <td>${Utils.escapeHtml(i.categoria)}</td>
+                  <td style="text-align:right;font-weight:700;">${Utils.fmt.currency(i.valorTotal)}</td>
+                  <td style="text-align:right;">${i.pctIndividual}%</td>
+                  <td style="text-align:right;font-weight:700;color:#166534;">${i.pctAcumulado}%</td>
+                  <td style="text-align:center;font-weight:800;color:${i.classe==='A'?'#991b1b':'#0f172a'};">${i.classe}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        ` : ''}
+
+        <!-- SEÇÃO: ORÇADO VS REALIZADO & EVM (Se modo === 'orcado-realizado' ou 'completo') -->
+        ${(modo === 'orcado-realizado' || modo === 'completo') && comp && comp.etapas ? `
+          <div class="section-title" style="margin-top:12px;">📈 Planilha de Acompanhamento Orçado × Realizado &amp; Desvios</div>
+          <table>
+            <thead>
+              <tr>
+                <th>Macro-Etapa</th>
+                <th style="text-align:right;width:110px;">Orçado (R$)</th>
+                <th style="text-align:right;width:110px;">Realizado (R$)</th>
+                <th style="text-align:right;width:110px;">Saldo (R$)</th>
+                <th style="text-align:right;width:80px;">% Consumido</th>
+                <th style="text-align:center;width:90px;">Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${comp.etapas.map(e => `
+                <tr>
+                  <td style="font-weight:600;">${Utils.escapeHtml(e.nome)}</td>
+                  <td style="text-align:right;">${Utils.fmt.currency(e.orcado || e.previsto || 0)}</td>
+                  <td style="text-align:right;color:#991b1b;font-weight:700;">${Utils.fmt.currency(e.realizado || 0)}</td>
+                  <td style="text-align:right;font-weight:700;color:${(e.saldo||0)>=0?'#166534':'#991b1b'};">
+                    ${(e.saldo||0)<0?'-':''}${Utils.fmt.currency(Math.abs(e.saldo || 0))}
+                  </td>
+                  <td style="text-align:right;">${e.percentual || 0}%</td>
+                  <td style="text-align:center;font-weight:700;">${(e.status||'normal').toUpperCase()}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+            <tfoot>
+              <tr class="tfoot">
+                <td>TOTAL GERAL DA OBRA</td>
+                <td style="text-align:right;">${Utils.fmt.currency(comp.totalOrcado)}</td>
+                <td style="text-align:right;color:#991b1b;">${Utils.fmt.currency(comp.totalRealizado)}</td>
+                <td style="text-align:right;color:${comp.saldoGeral>=0?'#166534':'#991b1b'};">${Utils.fmt.currency(comp.saldoGeral || comp.saldoRestante)}</td>
+                <td style="text-align:right;">${comp.percentualFinanceiro || comp.percentualGeral}%</td>
+                <td style="text-align:center;">${(comp.statusSaude || comp.statusGeral || 'saudavel').toUpperCase()}</td>
+              </tr>
+            </tfoot>
+          </table>
+        ` : ''}
+
+        <!-- SEÇÃO: BDI E ENCARGOS SOCIAIS (Se modo === 'bdi' ou 'completo') -->
+        ${(modo === 'bdi' || modo === 'completo') && bdi ? `
+          <div class="section-title" style="margin-top:12px;">⚖️ Parâmetros de BDI Oficial (TCU Acórdão 2622/2013) &amp; Encargos Sociais</div>
+          <div style="border:1px solid #cbd5e1;border-radius:4px;padding:8px;background:#f8fafc;font-size:7.8px;">
+            <div style="display:grid;grid-template-columns:repeat(3, 1fr);gap:6px;margin-bottom:8px;">
+              <div>Administração Central (AC): <strong>${bdi.ac}%</strong></div>
+              <div>Seguro e Garantia (SG): <strong>${bdi.sg}%</strong></div>
+              <div>Risco do Empreendimento (R): <strong>${bdi.r}%</strong></div>
+              <div>Despesas Financeiras (DF): <strong>${bdi.df}%</strong></div>
+              <div>Lucro Operacional Bruto (L): <strong>${bdi.l}%</strong></div>
+              <div>Tributos Incidentes (T): <strong>${bdi.t}%</strong></div>
+            </div>
+            <div style="border-top:1px solid #cbd5e1;padding-top:6px;display:flex;justify-content:space-between;font-size:8.5px;font-weight:900;">
+              <span>BDI Final Homologado: <span style="color:#0284c7;">${bdi.bdiCalculado}%</span></span>
+              <span>Encargos Sociais Mão de Obra (${this.desoneradoLeisSociais?'Desonerado':'Com Oneração'}): <span style="color:#166534;">${leis ? leis.totalGeral : 84.04}%</span></span>
+              <span>Referência TCU Edifícios: Mediana 22,18% (Faixa 20,34% a 25,00%)</span>
+            </div>
+          </div>
+        ` : ''}
 
         <div class="signatures">
           <div style="text-align:center;">
@@ -1579,7 +2115,7 @@ const ObraDetalhe = {
         </div>
 
         <div class="footer">
-          <span>FinObra &bull; Relatório Executivo de Engenharia de Custos &bull; Em conformidade com TCU 2622/2013 e Lei 14.133/2021</span>
+          <span>FinObra &bull; Relatório Executivo de Engenharia de Custos &bull; Em conformidade com TCU Acórdão 2622/2013 e Lei 14.133/2021</span>
           <span>Emitido em ${new Date().toLocaleDateString('pt-BR')} às ${new Date().toLocaleTimeString('pt-BR')}</span>
         </div>
       </body>
