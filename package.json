@@ -9,8 +9,8 @@
     "render:status": "node scripts/render-status.js",
     "render:deploy": "node scripts/render-deploy.js",
     "package:release": "node scripts/package-release.js",
-    "postinstall": "node apply-patch22-build.cjs && node apply-patch23-build.cjs && node apply-patch24-build.cjs && node prepare-patch25-build.cjs && node apply-patch25-build.cjs",
-    "pretest": "node apply-patch22-build.cjs --full && node apply-patch23-build.cjs && node apply-patch24-build.cjs && node prepare-patch25-build.cjs && node apply-patch25-build.cjs && node scripts/apply-backend-build-patches.cjs",
+    "postinstall": "node apply-patch22-build.cjs && node apply-patch23-build.cjs && node apply-patch24-build.cjs && node prepare-patch25-build.cjs && node apply-patch25-build.cjs && node apply-patch26-build.cjs",
+    "pretest": "node apply-patch22-build.cjs --full && node apply-patch23-build.cjs && node apply-patch24-build.cjs && node prepare-patch25-build.cjs && node apply-patch25-build.cjs && node scripts/apply-backend-build-patches.cjs && node apply-patch26-build.cjs",
     "test": "node scripts/test-static-all.js",
     "test:openai": "node scripts/test-openai-static.js",
     "test:patch05": "node scripts/test-patch05-static.js",
@@ -33,7 +33,8 @@
     "test:patch22": "node scripts/test-patch22-static.js",
     "test:patch23": "node scripts/test-patch23-static.js",
     "test:patch24": "node scripts/test-patch24-static.js",
-    "test:patch25": "node scripts/test-patch25-static.js"
+    "test:patch25": "node scripts/test-patch25-static.js",
+    "test:patch26": "node scripts/test-patch26-static.js"
   },
   "dependencies": {
     "@neondatabase/serverless": "^0.9.5",
