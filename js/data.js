@@ -405,9 +405,14 @@ const DB = {
   async _fetchCloudPage(table, limit = 400, offset = 0) {
     const params = new URLSearchParams({ table, limit: String(limit), offset: String(offset) });
     const res = await fetch(`/api/db?${params.toString()}`, { headers: this._apiHeaders() });
-    if (res.status === 401 || res.status === 403) {
+    if (res.status === 401) {
       if (typeof Auth !== 'undefined' && Auth.handleSessionExpired) Auth.handleSessionExpired();
       throw new Error('SESSION_EXPIRED');
+    }
+    if (res.status === 403) {
+      const errJson = await res.clone().json().catch(() => ({}));
+      console.warn(`[Sync] Permissão de leitura negada para ${table}:`, errJson.error || errJson.message || '403 Forbidden');
+      return { success: true, data: [], pagination: { hasMore: false }, forbidden: true };
     }
     if (!res.ok) throw new Error(`Falha ao sincronizar ${table}: HTTP ${res.status}`);
     const json = await res.json();
@@ -453,9 +458,14 @@ const DB = {
 
     if (!usePaged) {
       const res = await fetch('/api/db?table=all', { headers: this._apiHeaders() });
-      if (res.status === 401 || res.status === 403) {
+      if (res.status === 401) {
         if (typeof Auth !== 'undefined' && Auth.handleSessionExpired) Auth.handleSessionExpired();
         throw new Error('SESSION_EXPIRED');
+      }
+      if (res.status === 403) {
+        const errJson = await res.clone().json().catch(() => ({}));
+        console.warn('[Sync] Permissão negada no snapshot total, tentando modo seguro:', errJson.error || '403 Forbidden');
+        return { clientes: [], fornecedores: [], lancamentos: [], notas: [], orcamentos: [], medicoes: [], documentos: [], produtos: [], contas: [], precompras: [], contratos: [], recibos: [], orcamentos_sinapi: [], doc_fases: [], preferencias: {} };
       }
       if (!res.ok) throw new Error(`Falha no snapshot: HTTP ${res.status}`);
       const json = await res.json();
@@ -704,15 +714,29 @@ const DB = {
           };
         }));
       }
+      const coreBootstrapped = this.isCoreCloudBootstrapped();
+      const mergeLegacy = (cloud, local) => {
+        const map = new Map();
+        (Array.isArray(cloud) ? cloud : []).forEach(x => x?.id && map.set(String(x.id), x));
+        // Preserva edições legadas/offline que ainda não subiram ao servidor
+        (Array.isArray(local) ? local : []).forEach(x => x?.id && map.set(String(x.id), { ...(map.get(String(x.id)) || {}), ...x }));
+        return Array.from(map.values());
+      };
+
       if (Array.isArray(d.orcamentos)) {
-        this.save('orcamentos', d.orcamentos);
+        const local = this.getAll('orcamentos') || [];
+        const next = (!coreBootstrapped && local.length) ? mergeLegacy(d.orcamentos, local) : d.orcamentos;
+        this.save('orcamentos', next);
       }
       if (Array.isArray(d.medicoes)) {
-        this.save('medicoes', d.medicoes.map(m => ({
+        const local = this.getAll('medicoes') || [];
+        const mappedCloud = d.medicoes.map(m => ({
           ...m,
           data: (typeof Utils !== 'undefined' && Utils.cleanDate) ? Utils.cleanDate(m.data) || m.data : (m.data ? String(m.data).split('T')[0] : m.data),
-          valor_medido: Number(m.valor_medido) || 0
-        })));
+          valor_medido: Number(m.valor_medido !== undefined ? m.valor_medido : m.valor_solicitado) || 0
+        }));
+        const next = (!coreBootstrapped && local.length) ? mergeLegacy(mappedCloud, local) : mappedCloud;
+        this.save('medicoes', next);
       }
       if (Array.isArray(d.contas)) {
         this.save('contas', d.contas);
@@ -720,15 +744,6 @@ const DB = {
       if (Array.isArray(d.produtos)) {
         this.save('produtos', d.produtos);
       }
-      const coreBootstrapped = this.isCoreCloudBootstrapped();
-      const mergeLegacy = (cloud, local) => {
-        const map = new Map();
-        (Array.isArray(cloud) ? cloud : []).forEach(x => x?.id && map.set(String(x.id), x));
-        // Enquanto a migração inicial não terminou, o registro local vence no mesmo ID.
-        // Isso preserva edições legadas que ainda não chegaram ao servidor.
-        (Array.isArray(local) ? local : []).forEach(x => x?.id && map.set(String(x.id), x));
-        return Array.from(map.values());
-      };
       if (Array.isArray(d.precompras)) {
         const local = this.getAll('precompras');
         this.save('precompras', !coreBootstrapped && local.length ? mergeLegacy(d.precompras, local) : d.precompras);
@@ -1043,7 +1058,7 @@ const DB = {
   },
 
   syncToCloud(action, table, data, id) {
-    const cloudTables = ['lancamentos', 'notas', 'notas_fiscais', 'obras', 'clientes', 'fornecedores', 'documentos', 'produtos', 'ocr_historico', 'contas', 'contas_bancarias', 'precompras', 'contratos', 'recibos', 'orcamentos_sinapi', 'doc_fases', 'preferencias'];
+    const cloudTables = ['lancamentos', 'notas', 'notas_fiscais', 'obras', 'clientes', 'fornecedores', 'documentos', 'produtos', 'orcamentos', 'medicoes', 'ocr_historico', 'contas', 'contas_bancarias', 'precompras', 'contratos', 'recibos', 'orcamentos_sinapi', 'doc_fases', 'preferencias'];
     if (!cloudTables.includes(table)) return;
     const module = this._moduleForKey(table);
     if (module && typeof Auth !== 'undefined' && typeof Auth.canModule === 'function' && !Auth.canModule(module, action === 'delete' ? 'delete' : 'write')) return;
@@ -1089,6 +1104,8 @@ const DB = {
         fornecedores: this.getAll('fornecedores'),
         lancamentos: this.getAll('lancamentos'),
         notas: this.getAll('notas'),
+        orcamentos: this.getAll('orcamentos'),
+        medicoes: this.getAll('medicoes'),
         contas: this.getAll('contas'),
         precompras: this.getAll('precompras'),
         contratos: this.getAll('contratos'),

@@ -156,6 +156,34 @@ function pageResponse(items, pagination) {
   };
 }
 
+function normalizeMedicao(m) {
+  if (!m) return null;
+  return {
+    ...m,
+    data: cleanDate(m.data),
+    data_medicao: cleanDate(m.data),
+    numero: m.numero,
+    numero_medicao: m.numero_medicao || m.numero,
+    percentual_fisico: cleanNum(m.percentual_fisico),
+    percentual_financeiro: cleanNum(m.percentual_financeiro),
+    valor_medido: cleanNum(m.valor_medido),
+    valor_solicitado: cleanNum(m.valor_solicitado || m.valor_medido),
+    valor_aprovado: m.valor_aprovado !== null && m.valor_aprovado !== undefined ? cleanNum(m.valor_aprovado) : null,
+    valor_liberado: m.valor_liberado !== null && m.valor_liberado !== undefined ? cleanNum(m.valor_liberado) : null,
+    data_previsao: cleanDate(m.data_previsao),
+    data_submissao: cleanDate(m.data_submissao),
+    data_aprovacao: cleanDate(m.data_aprovacao),
+    data_liberacao: cleanDate(m.data_liberacao),
+    engenheiro_responsavel: m.engenheiro_responsavel || '',
+    etapa_descricao: m.etapa_descricao || '',
+    documentos_ok: Boolean(m.documentos_ok),
+    lancamento_id: m.lancamento_id || null,
+    retencao_tecnica: cleanNum(m.retencao_tecnica),
+    descontos: cleanNum(m.descontos),
+    itens: (typeof m.itens_json === 'string' ? JSON.parse(m.itens_json) : m.itens_json) || m.itens || []
+  };
+}
+
 async function validateBulkObraPlanLimit(sql, tenantId, plan, obras) {
   if (!Array.isArray(obras) || obras.length === 0) return { allowed: true };
   const rule = getPlanRule(plan);
@@ -408,16 +436,7 @@ export default async function handler(req, res) {
                 etapas: parsedItens
               };
             }) : [],
-            medicoes: tableAllowed(auth, 'medicoes', 'read') ? medicoes.map(m => ({
-              ...m,
-              data: cleanDate(m.data),
-              data_medicao: cleanDate(m.data),
-              numero: m.numero,
-              numero_medicao: m.numero_medicao || m.numero,
-              valor_medido: cleanNum(m.valor_medido),
-              valor_solicitado: cleanNum(m.valor_solicitado || m.valor_medido),
-              itens: (typeof m.itens_json === 'string' ? JSON.parse(m.itens_json) : m.itens_json) || m.itens || []
-            })) : [],
+            medicoes: tableAllowed(auth, 'medicoes', 'read') ? medicoes.map(normalizeMedicao) : [],
             documentos: tableAllowed(auth, 'documentos', 'read') ? documentos : [],
             contas: tableAllowed(auth, 'contas', 'read') ? (contas || []) : [],
             precompras: tableAllowed(auth, 'precompras', 'read') ? (precompras || []).map(jsonPayload) : [],
@@ -611,20 +630,11 @@ export default async function handler(req, res) {
         const items = pagination
           ? await sql`SELECT * FROM medicoes WHERE tenant_id = ${tenantId} ORDER BY data DESC, created_at DESC, id DESC LIMIT ${pagination.limit} OFFSET ${pagination.offset};`
           : await sql`SELECT * FROM medicoes WHERE tenant_id = ${tenantId} ORDER BY data DESC, created_at DESC, id DESC;`;
-        const normalized = items.map(m => ({
-            ...m,
-            data: cleanDate(m.data),
-            data_medicao: cleanDate(m.data),
-            numero: m.numero,
-            numero_medicao: m.numero_medicao || m.numero,
-            valor_medido: cleanNum(m.valor_medido),
-            valor_solicitado: cleanNum(m.valor_solicitado || m.valor_medido),
-            itens: (typeof m.itens_json === 'string' ? JSON.parse(m.itens_json) : m.itens_json) || m.itens || []
-          }));
+        const normalized = items.map(normalizeMedicao);
         return res.status(200).json(pageResponse(normalized, pagination));
       }
 
-      return res.status(200).json({ success: true, data: [], message: `Tabela '${table}' consultada.` });
+      return res.status(400).json({ success: false, error: `Tabela '${table}' desconhecida para consulta.`, code: 'UNKNOWN_TABLE' });
     }
 
     // ── POST: Gravação / Atualização / Exclusão / Sync com Tenant Scoping ───────
@@ -676,13 +686,14 @@ export default async function handler(req, res) {
                 ${cleanNum(o.orcamento_total || o.valor_contrato)}, ${o.status || 'em_andamento'},
                 ${cleanDate(o.data_inicio)}, ${cleanDate(o.data_previsao)}
               )
-              ON CONFLICT (id) DO UPDATE SET
+              ON CONFLICT (tenant_id, id) DO UPDATE SET
                 nome = EXCLUDED.nome,
                 cliente = EXCLUDED.cliente,
                 endereco = EXCLUDED.endereco,
                 orcamento_total = EXCLUDED.orcamento_total,
-                status = EXCLUDED.status
-              WHERE obras.tenant_id = ${tenantId};
+                status = EXCLUDED.status,
+                data_inicio = EXCLUDED.data_inicio,
+                data_previsao = EXCLUDED.data_previsao;
             `;
             totalCount++;
           }
@@ -870,9 +881,17 @@ export default async function handler(req, res) {
                 data_vencimento = EXCLUDED.data_vencimento,
                 data_pagamento = EXCLUDED.data_pagamento,
                 descricao = EXCLUDED.descricao,
+                categoria = EXCLUDED.categoria,
+                fornecedor_beneficiario = EXCLUDED.fornecedor_beneficiario,
+                conta_bancaria = EXCLUDED.conta_bancaria,
+                tipo = EXCLUDED.tipo,
                 valor = EXCLUDED.valor,
                 status = EXCLUDED.status,
+                obra_id = EXCLUDED.obra_id,
+                nota_fiscal_id = EXCLUDED.nota_fiscal_id,
                 codigo_barras = EXCLUDED.codigo_barras,
+                chave_nfe = EXCLUDED.chave_nfe,
+                observacoes = EXCLUDED.observacoes,
                 conciliado = EXCLUDED.conciliado,
                 itens = EXCLUDED.itens
               WHERE lancamentos.tenant_id = ${tenantId};
@@ -963,6 +982,136 @@ export default async function handler(req, res) {
           }
         }
 
+        // Medições
+        if (Array.isArray(payload.medicoes)) {
+          for (const m of payload.medicoes) {
+            if (!m.id) continue;
+            const safeMedObraId = await validateObraTenant(sql, m.obra_id, tenantId);
+            const numMed = parseInt(m.numero || m.numero_medicao) || 1;
+            const dataMed = cleanDate(m.data || m.data_medicao) || todayBoaVista();
+            const valMed = cleanNum(m.valor_medido || m.valor_solicitado);
+            const rawItens = m.itens || (typeof m.itens_json === 'string' ? JSON.parse(m.itens_json) : m.itens_json) || [];
+            const itensJson = JSON.stringify(Array.isArray(rawItens) ? rawItens : []);
+            const payloadJson = JSON.stringify(m);
+
+            await sql`
+              INSERT INTO medicoes (
+                id, tenant_id, obra_id, numero, data, valor_medido, status, observacoes, itens_json,
+                percentual_fisico, percentual_financeiro, valor_solicitado, valor_aprovado, valor_liberado,
+                data_previsao, data_submissao, data_aprovacao, data_liberacao, engenheiro_responsavel,
+                etapa_descricao, documentos_ok, lancamento_id, retencao_tecnica, descontos, payload
+              )
+              VALUES (
+                ${m.id}, ${tenantId}, ${safeMedObraId}, ${numMed}, ${dataMed}, ${valMed}, ${m.status || 'pendente'},
+                ${m.observacoes || ''}, ${itensJson}::jsonb, ${cleanNum(m.percentual_fisico)}, ${cleanNum(m.percentual_financeiro)},
+                ${cleanNum(m.valor_solicitado || valMed)}, ${m.valor_aprovado !== null && m.valor_aprovado !== undefined ? cleanNum(m.valor_aprovado) : null},
+                ${m.valor_liberado !== null && m.valor_liberado !== undefined ? cleanNum(m.valor_liberado) : null},
+                ${cleanDate(m.data_previsao)}, ${cleanDate(m.data_submissao)}, ${cleanDate(m.data_aprovacao)}, ${cleanDate(m.data_liberacao)},
+                ${m.engenheiro_responsavel || ''}, ${m.etapa_descricao || ''}, ${Boolean(m.documentos_ok)}, ${m.lancamento_id || null},
+                ${cleanNum(m.retencao_tecnica)}, ${cleanNum(m.descontos)}, ${payloadJson}::jsonb
+              )
+              ON CONFLICT (id) DO UPDATE SET
+                obra_id = EXCLUDED.obra_id,
+                numero = EXCLUDED.numero,
+                data = EXCLUDED.data,
+                valor_medido = EXCLUDED.valor_medido,
+                status = EXCLUDED.status,
+                observacoes = EXCLUDED.observacoes,
+                itens_json = EXCLUDED.itens_json,
+                percentual_fisico = EXCLUDED.percentual_fisico,
+                percentual_financeiro = EXCLUDED.percentual_financeiro,
+                valor_solicitado = EXCLUDED.valor_solicitado,
+                valor_aprovado = EXCLUDED.valor_aprovado,
+                valor_liberado = EXCLUDED.valor_liberado,
+                data_previsao = EXCLUDED.data_previsao,
+                data_submissao = EXCLUDED.data_submissao,
+                data_aprovacao = EXCLUDED.data_aprovacao,
+                data_liberacao = EXCLUDED.data_liberacao,
+                engenheiro_responsavel = EXCLUDED.engenheiro_responsavel,
+                etapa_descricao = EXCLUDED.etapa_descricao,
+                documentos_ok = EXCLUDED.documentos_ok,
+                lancamento_id = EXCLUDED.lancamento_id,
+                retencao_tecnica = EXCLUDED.retencao_tecnica,
+                descontos = EXCLUDED.descontos,
+                payload = EXCLUDED.payload
+              WHERE medicoes.tenant_id = ${tenantId};
+            `;
+            totalCount++;
+          }
+        }
+
+        // Orçamentos
+        if (Array.isArray(payload.orcamentos)) {
+          for (const o of payload.orcamentos) {
+            if (!o.id) continue;
+            const safeOrcObraId = await validateObraTenant(sql, o.obra_id, tenantId);
+            const rawItens = o.etapas || o.itens || (typeof o.itens_json === 'string' ? JSON.parse(o.itens_json) : o.itens_json) || [];
+            const itensJson = JSON.stringify(Array.isArray(rawItens) ? rawItens : []);
+            const titulo = o.titulo || o.nome || '';
+            const valorTotal = cleanNum(o.valor_total || o.valor_total_previsto);
+
+            await sql`
+              INSERT INTO orcamentos (id, tenant_id, obra_id, titulo, valor_total, itens_json)
+              VALUES (${o.id}, ${tenantId}, ${safeOrcObraId}, ${titulo}, ${valorTotal}, ${itensJson}::jsonb)
+              ON CONFLICT (id) DO UPDATE SET
+                obra_id = EXCLUDED.obra_id,
+                titulo = EXCLUDED.titulo,
+                valor_total = EXCLUDED.valor_total,
+                itens_json = EXCLUDED.itens_json
+              WHERE orcamentos.tenant_id = ${tenantId};
+            `;
+            totalCount++;
+          }
+        }
+
+        // Produtos
+        if (Array.isArray(payload.produtos)) {
+          for (const p of payload.produtos) {
+            if (!p.id || !p.nome) continue;
+            await sql`
+              INSERT INTO produtos (id, tenant_id, nome, unidade, categoria, codigo, valor_medio, observacoes)
+              VALUES (${p.id}, ${tenantId}, ${p.nome}, ${p.unidade || 'un'}, ${p.categoria || 'material'}, ${p.codigo || null}, ${cleanNum(p.valor_medio)}, ${p.observacoes || ''})
+              ON CONFLICT (id) DO UPDATE SET
+                nome = EXCLUDED.nome,
+                unidade = EXCLUDED.unidade,
+                categoria = EXCLUDED.categoria,
+                codigo = EXCLUDED.codigo,
+                valor_medio = EXCLUDED.valor_medio,
+                observacoes = EXCLUDED.observacoes,
+                updated_at = NOW()
+              WHERE produtos.tenant_id = ${tenantId};
+            `;
+            totalCount++;
+          }
+        }
+
+        // Documentos
+        if (Array.isArray(payload.documentos)) {
+          for (const doc of payload.documentos) {
+            if (!doc.id) continue;
+            await sql`
+              INSERT INTO documentos (
+                id, tenant_id, tipo, referencia_id, titulo, categoria, nome_arquivo,
+                tipo_arquivo, tamanho_bytes, url, base64_data, created_at
+              )
+              VALUES (
+                ${doc.id}, ${tenantId}, ${doc.entidade_tipo || doc.tipo || 'geral'}, ${doc.entidade_id || doc.referencia_id || ''},
+                ${doc.titulo || doc.nome_arquivo || 'Documento'}, ${doc.categoria || ''}, ${doc.nome_arquivo || ''},
+                ${doc.tipo_mime || doc.tipo_arquivo || 'application/octet-stream'}, ${cleanNum(doc.tamanho || doc.tamanho_bytes)},
+                ${doc.url || null}, ${doc.data_base64 || doc.base64_data || null}, ${doc.criado_em || new Date().toISOString()}
+              )
+              ON CONFLICT (id) DO UPDATE SET
+                titulo = EXCLUDED.titulo,
+                categoria = EXCLUDED.categoria,
+                nome_arquivo = EXCLUDED.nome_arquivo,
+                url = COALESCE(EXCLUDED.url, documentos.url),
+                base64_data = COALESCE(EXCLUDED.base64_data, documentos.base64_data)
+              WHERE documentos.tenant_id = ${tenantId};
+            `;
+            totalCount++;
+          }
+        }
+
         await writeAudit(sql, req, auth, {
           acao: 'sincronizar', entidade: 'dados', entidadeId: null,
           depois: { total: totalCount, colecoes: Object.keys(payload || {}).filter(k => Array.isArray(payload[k]) && payload[k].length > 0) }
@@ -986,16 +1135,19 @@ export default async function handler(req, res) {
           const safeObraId = await validateObraTenant(sql, l.obra_id, tenantId);
           const safeNotaId = await validateNotaFiscalTenant(sql, l.nota_fiscal_id, tenantId);
 
+          const itensLancJson = JSON.stringify(Array.isArray(l.itens) ? l.itens : []);
+
           await sql`
             INSERT INTO lancamentos (
               id, tenant_id, data, data_vencimento, data_pagamento, descricao, categoria,
               fornecedor_beneficiario, conta_bancaria, tipo, valor, status,
-              obra_id, nota_fiscal_id, codigo_barras, chave_nfe, observacoes, conciliado
+              obra_id, nota_fiscal_id, codigo_barras, chave_nfe, observacoes, conciliado, itens
             )
             VALUES (
               ${l.id}, ${tenantId}, ${dataLanc}, ${dataVenc}, ${dataPag}, ${l.descricao}, ${l.categoria || 'Outros'},
               ${l.fornecedor_beneficiario || ''}, ${l.conta_bancaria || ''}, ${l.tipo || 'despesa'}, ${cleanNum(l.valor)}, ${l.status || 'pendente'},
-              ${safeObraId}, ${safeNotaId}, ${l.codigo_barras || null}, ${l.chave_nfe || null}, ${l.observacoes || ''}, ${!!l.conciliado}
+              ${safeObraId}, ${safeNotaId}, ${l.codigo_barras || null}, ${l.chave_nfe || null}, ${l.observacoes || ''}, ${!!l.conciliado},
+              ${itensLancJson}::jsonb
             )
             ON CONFLICT (id) DO UPDATE SET
               data = EXCLUDED.data,
@@ -1013,7 +1165,8 @@ export default async function handler(req, res) {
               codigo_barras = EXCLUDED.codigo_barras,
               chave_nfe = EXCLUDED.chave_nfe,
               observacoes = EXCLUDED.observacoes,
-              conciliado = EXCLUDED.conciliado
+              conciliado = EXCLUDED.conciliado,
+              itens = EXCLUDED.itens
             WHERE lancamentos.tenant_id = ${tenantId};
           `;
           await auditDb(sql, req, auth, 'salvar', 'lancamentos', l);
@@ -1028,11 +1181,13 @@ export default async function handler(req, res) {
           const vTot = cleanNum(n.valor_total !== undefined ? n.valor_total : vBruto);
           const safeNotaObraId = await validateObraTenant(sql, n.obra_id, tenantId);
 
+          const itensNotaJson = JSON.stringify(Array.isArray(n.itens) ? n.itens : []);
+
           await sql`
             INSERT INTO notas_fiscais (
               id, tenant_id, numero_nf, serie, chave_acesso, chave_nfe, emitente, cnpj_emitente, destinatario,
               data_emissao, data_vencimento, data_pagamento, valor_bruto, impostos, valor_liquido, valor_total,
-              tipo, categoria, status, lancamento_id, observacoes, obra_id
+              tipo, categoria, status, lancamento_id, observacoes, obra_id, itens
             )
             VALUES (
               ${n.id}, ${tenantId}, ${n.numero_nf || ''}, ${n.serie || ''}, ${n.chave_nfe || n.chave_acesso || null}, ${n.chave_nfe || n.chave_acesso || ''},
@@ -1040,7 +1195,8 @@ export default async function handler(req, res) {
               ${cleanDate(n.data_emissao)}, ${cleanDate(n.data_vencimento)}, ${cleanDate(n.data_pagamento)},
               ${vBruto}, ${vImp}, ${vLiq}, ${vTot},
               ${n.tipo || 'entrada'}, ${n.categoria || 'material'}, ${n.status || 'paga'},
-              ${n.lancamento_id || null}, ${n.observacoes || ''}, ${safeNotaObraId}
+              ${n.lancamento_id || null}, ${n.observacoes || ''}, ${safeNotaObraId},
+              ${itensNotaJson}::jsonb
             )
             ON CONFLICT (id) DO UPDATE SET
               numero_nf = EXCLUDED.numero_nf,
@@ -1062,7 +1218,8 @@ export default async function handler(req, res) {
               status = EXCLUDED.status,
               lancamento_id = EXCLUDED.lancamento_id,
               observacoes = EXCLUDED.observacoes,
-              obra_id = EXCLUDED.obra_id
+              obra_id = EXCLUDED.obra_id,
+              itens = EXCLUDED.itens
             WHERE notas_fiscais.tenant_id = ${tenantId};
           `;
           await auditDb(sql, req, auth, 'salvar', 'notas_fiscais', n);
@@ -1082,13 +1239,14 @@ export default async function handler(req, res) {
               ${cleanNum(o.orcamento_total || o.valor_contrato)}, ${o.status || 'em_andamento'},
               ${cleanDate(o.data_inicio)}, ${cleanDate(o.data_previsao)}
             )
-            ON CONFLICT (id) DO UPDATE SET
+            ON CONFLICT (tenant_id, id) DO UPDATE SET
               nome = EXCLUDED.nome,
               cliente = EXCLUDED.cliente,
               endereco = EXCLUDED.endereco,
               orcamento_total = EXCLUDED.orcamento_total,
-              status = EXCLUDED.status
-            WHERE obras.tenant_id = ${tenantId};
+              status = EXCLUDED.status,
+              data_inicio = EXCLUDED.data_inicio,
+              data_previsao = EXCLUDED.data_previsao;
           `;
           await auditDb(sql, req, auth, 'salvar', table === 'clientes' ? 'obras' : table, o);
           return res.status(200).json({ success: true, id: o.id });
@@ -1345,15 +1503,28 @@ export default async function handler(req, res) {
         if (table === 'medicoes') {
           const m = data;
           const safeObraId = await validateObraTenant(sql, m.obra_id, tenantId);
-          const numMed = m.numero || m.numero_medicao || 1;
+          const numMed = parseInt(m.numero || m.numero_medicao) || 1;
           const dataMed = cleanDate(m.data || m.data_medicao) || todayBoaVista();
           const valMed = cleanNum(m.valor_medido || m.valor_solicitado);
+          const rawItens = m.itens || (typeof m.itens_json === 'string' ? JSON.parse(m.itens_json) : m.itens_json) || [];
+          const itensJson = JSON.stringify(Array.isArray(rawItens) ? rawItens : []);
+          const payloadJson = JSON.stringify(m);
+
           await sql`
-            INSERT INTO medicoes (id, tenant_id, obra_id, numero, data, valor_medido, status, observacoes)
+            INSERT INTO medicoes (
+              id, tenant_id, obra_id, numero, data, valor_medido, status, observacoes, itens_json,
+              percentual_fisico, percentual_financeiro, valor_solicitado, valor_aprovado, valor_liberado,
+              data_previsao, data_submissao, data_aprovacao, data_liberacao, engenheiro_responsavel,
+              etapa_descricao, documentos_ok, lancamento_id, retencao_tecnica, descontos, payload
+            )
             VALUES (
-              ${m.id}, ${tenantId}, ${safeObraId}, ${numMed},
-              ${dataMed},
-              ${valMed}, ${m.status || 'aprovada'}, ${m.observacoes || ''}
+              ${m.id}, ${tenantId}, ${safeObraId}, ${numMed}, ${dataMed}, ${valMed}, ${m.status || 'pendente'},
+              ${m.observacoes || ''}, ${itensJson}::jsonb, ${cleanNum(m.percentual_fisico)}, ${cleanNum(m.percentual_financeiro)},
+              ${cleanNum(m.valor_solicitado || valMed)}, ${m.valor_aprovado !== null && m.valor_aprovado !== undefined ? cleanNum(m.valor_aprovado) : null},
+              ${m.valor_liberado !== null && m.valor_liberado !== undefined ? cleanNum(m.valor_liberado) : null},
+              ${cleanDate(m.data_previsao)}, ${cleanDate(m.data_submissao)}, ${cleanDate(m.data_aprovacao)}, ${cleanDate(m.data_liberacao)},
+              ${m.engenheiro_responsavel || ''}, ${m.etapa_descricao || ''}, ${Boolean(m.documentos_ok)}, ${m.lancamento_id || null},
+              ${cleanNum(m.retencao_tecnica)}, ${cleanNum(m.descontos)}, ${payloadJson}::jsonb
             )
             ON CONFLICT (id) DO UPDATE SET
               obra_id = EXCLUDED.obra_id,
@@ -1361,7 +1532,24 @@ export default async function handler(req, res) {
               data = EXCLUDED.data,
               valor_medido = EXCLUDED.valor_medido,
               status = EXCLUDED.status,
-              observacoes = EXCLUDED.observacoes
+              observacoes = EXCLUDED.observacoes,
+              itens_json = EXCLUDED.itens_json,
+              percentual_fisico = EXCLUDED.percentual_fisico,
+              percentual_financeiro = EXCLUDED.percentual_financeiro,
+              valor_solicitado = EXCLUDED.valor_solicitado,
+              valor_aprovado = EXCLUDED.valor_aprovado,
+              valor_liberado = EXCLUDED.valor_liberado,
+              data_previsao = EXCLUDED.data_previsao,
+              data_submissao = EXCLUDED.data_submissao,
+              data_aprovacao = EXCLUDED.data_aprovacao,
+              data_liberacao = EXCLUDED.data_liberacao,
+              engenheiro_responsavel = EXCLUDED.engenheiro_responsavel,
+              etapa_descricao = EXCLUDED.etapa_descricao,
+              documentos_ok = EXCLUDED.documentos_ok,
+              lancamento_id = EXCLUDED.lancamento_id,
+              retencao_tecnica = EXCLUDED.retencao_tecnica,
+              descontos = EXCLUDED.descontos,
+              payload = EXCLUDED.payload
             WHERE medicoes.tenant_id = ${tenantId};
           `;
           await auditDb(sql, req, auth, 'salvar', 'medicoes', m);
@@ -1451,7 +1639,11 @@ export default async function handler(req, res) {
         }
       }
 
-      return res.status(200).json({ success: true, message: `Operação para tabela '${table}' registrada.` });
+      return res.status(400).json({
+        success: false,
+        error: `Ação '${action}' ou tabela '${table}' não reconhecida ou não suportada.`,
+        code: 'UNKNOWN_OPERATION'
+      });
     }
 
     return res.status(405).json({ error: 'Método não suportado' });

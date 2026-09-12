@@ -107,8 +107,8 @@ CREATE TABLE IF NOT EXISTS recuperacao_senhas (
 
 -- 1. Obras / Centros de Custo
 CREATE TABLE IF NOT EXISTS obras (
-    id VARCHAR(64) PRIMARY KEY,
     tenant_id VARCHAR(64) NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+    id VARCHAR(64) NOT NULL,
     nome VARCHAR(255) NOT NULL,
     cliente VARCHAR(255),
     endereco TEXT,
@@ -117,7 +117,7 @@ CREATE TABLE IF NOT EXISTS obras (
     data_inicio DATE,
     data_previsao DATE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE (tenant_id, id)
+    PRIMARY KEY (tenant_id, id)
 );
 
 -- 2. Fornecedores e Prestadores de Serviço
@@ -224,6 +224,22 @@ CREATE TABLE IF NOT EXISTS medicoes (
     status VARCHAR(50) DEFAULT 'pendente',
     observacoes TEXT,
     itens_json JSONB,
+    percentual_fisico NUMERIC(5,2) DEFAULT 0,
+    percentual_financeiro NUMERIC(5,2) DEFAULT 0,
+    valor_solicitado NUMERIC(15,2) DEFAULT 0,
+    valor_aprovado NUMERIC(15,2),
+    valor_liberado NUMERIC(15,2),
+    data_previsao DATE,
+    data_submissao DATE,
+    data_aprovacao DATE,
+    data_liberacao DATE,
+    engenheiro_responsavel VARCHAR(150),
+    etapa_descricao TEXT,
+    documentos_ok BOOLEAN DEFAULT FALSE,
+    lancamento_id VARCHAR(64),
+    retencao_tecnica NUMERIC(15,2) DEFAULT 0,
+    descontos NUMERIC(15,2) DEFAULT 0,
+    payload JSONB,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (tenant_id, obra_id) REFERENCES obras(tenant_id,id) ON DELETE CASCADE
 );
@@ -523,5 +539,39 @@ DROP TRIGGER IF EXISTS trg_tenant_system_obras ON tenants;
 CREATE TRIGGER trg_tenant_system_obras
 AFTER INSERT ON tenants
 FOR EACH ROW EXECUTE FUNCTION ensure_tenant_system_obras();
+
+-- ==============================================================================
+-- PATCH 12 — Certificados Digitais A1 e WhatsApp Multi-Tenant
+-- ==============================================================================
+CREATE TABLE IF NOT EXISTS tenant_certificates (
+    tenant_id VARCHAR(64) PRIMARY KEY REFERENCES tenants(id) ON DELETE CASCADE,
+    cert_pfx_base64_enc TEXT NOT NULL,
+    cert_pass_enc TEXT NOT NULL,
+    iv VARCHAR(64) NOT NULL,
+    auth_tag VARCHAR(64) NOT NULL,
+    cnpj VARCHAR(14),
+    razao_social VARCHAR(255),
+    valido_de TIMESTAMP WITH TIME ZONE,
+    valido_ate TIMESTAMP WITH TIME ZONE,
+    emissor VARCHAR(255),
+    serial_number VARCHAR(100),
+    nome_arquivo VARCHAR(255),
+    tamanho_bytes BIGINT,
+    status VARCHAR(20) DEFAULT 'ativo',
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_tenant_certificates_cnpj ON tenant_certificates(cnpj);
+CREATE INDEX IF NOT EXISTS idx_tenant_certificates_validade ON tenant_certificates(valido_ate);
+
+CREATE TABLE IF NOT EXISTS tenant_whatsapp_auth (
+    tenant_id VARCHAR(64) NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+    key VARCHAR(255) NOT NULL,
+    value TEXT NOT NULL,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (tenant_id, key)
+);
+CREATE INDEX IF NOT EXISTS idx_tenant_whatsapp_auth_tenant ON tenant_whatsapp_auth(tenant_id);
+
 
 

@@ -196,11 +196,15 @@ const App = {
     const initialRoute = this._getRouteFromUrl();
     this.navigate(initialRoute, true);
 
-    // Atualiza em segundo plano. Após concluir, redesenha a tela atual com dados frescos.
+    // Atualiza em segundo plano. Reconcilia alterações offline antes de sincronizar da nuvem (C-07).
     Promise.resolve(DB.bootstrapCoreCloud ? DB.bootstrapCoreCloud() : true)
       .then(() => DB.bootstrapCloudCompleteness ? DB.bootstrapCloudCompleteness() : true)
-      .then(() => {
-      DB.syncFromCloud().then(async (ok) => {
+      .then(async () => {
+        if (DB._flushCloudQueue) {
+          try { await DB._flushCloudQueue(); } catch (e) { console.warn('[App] Flush de fila pendente offline:', e); }
+        }
+      })
+      .then(() => DB.syncFromCloud().then(async (ok) => {
         if (ok) {
           const current = this.route || initialRoute;
           this.renderShell();
@@ -215,8 +219,7 @@ const App = {
         const empAtual = DB.getEmpresa();
         const isImpersonating = (typeof Auth !== 'undefined' && Auth.getUser) ? (Auth.getUser()?.impersonatedBy === 'superadmin' || Auth.getUser()?.isImpersonated) : false;
         if (!empAtual.configurada && !isImpersonating) setTimeout(() => this.showOnboardingEmpresa(), 350);
-      });
-    });
+      }));
 
     if (typeof BuscaGlobal !== 'undefined') BuscaGlobal.init();
 

@@ -1,4 +1,4 @@
-// backend/server.js — Servidor 24/7 para Render (WhatsApp Baileys + Neon PostgreSQL + Robô Cron)
+// backend/server.js — Servidor 24/7 para Render (WhatsApp Baileys Multi-Tenant + Neon PostgreSQL + Robô Cron)
 
 import express from 'express';
 import cors from 'cors';
@@ -85,31 +85,56 @@ if (!rawDbUrl) {
 }
 
 const TARGET_PHONE = (process.env.TARGET_PHONE || '').trim();
-const TARGET_TENANT_ID = (process.env.TARGET_TENANT_ID || process.env.DEFAULT_TENANT_ID || '').trim();
-const AUTH_DIR = path.resolve('auth_info_baileys');
+const TARGET_TENANT_ID = (process.env.TARGET_TENANT_ID || process.env.DEFAULT_TENANT_ID || 'public').trim();
 
-// ── ESTADO DO WHATSAPP ───────────────────────────────────────────────────────
-let sock = null;
-let currentQR = null;
-let qrDataUrl = null;
-let connectionStatus = 'disconnected'; // 'disconnected' | 'connecting' | 'qr_ready' | 'connected'
-let lastConnectedAt = null;
-let isStartingWhatsApp = false;
+// ── GERENCIAMENTO MULTI-TENANT DE SESSÕES WHATSAPP ───────────────────────────
+const sessions = new Map();
 
-// Resolve o JID canônico oficial no WhatsApp (trata variação de 8 e 9 dígitos no Brasil)
-async function resolveWhatsAppJid(phone) {
+function cleanTenantId(raw) {
+  const clean = String(raw || TARGET_TENANT_ID || 'public').trim().replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 64);
+  return clean || 'public';
+}
+
+function getTenantSession(tenantId) {
+  const tId = cleanTenantId(tenantId);
+  if (!sessions.has(tId)) {
+    const authDir = path.resolve('sessions', tId, 'auth_info_baileys');
+    sessions.set(tId, {
+      tenantId: tId,
+      sock: null,
+      currentQR: null,
+      qrDataUrl: null,
+      connectionStatus: 'disconnected', // 'disconnected' | 'connecting' | 'qr_ready' | 'connected'
+      lastConnectedAt: null,
+      isStarting: false,
+      authDir,
+      syncTimer: null
+    });
+  }
+  return sessions.get(tId);
+}
+
+function getConnectedWhatsAppNumber(session) {
+  if (!session?.sock?.user?.id) return null;
+  const raw = session.sock.user.id.split(':')[0].replace(/\D/g, '');
+  return raw || null;
+}
+
+// Resolve o JID canônico oficial no WhatsApp para a sessão do tenant
+async function resolveWhatsAppJid(session, phone) {
   let cleaned = String(phone).replace(/\D/g, '');
   if (!cleaned.startsWith('55')) {
     cleaned = '55' + cleaned;
   }
 
   // 1. Se o destino for o próprio número conectado, usa o próprio JID do socket
+  const sock = session?.sock;
   if (sock && sock.user && sock.user.id) {
     const myNum = sock.user.id.split(':')[0].replace(/\D/g, '');
     const myClean = myNum.startsWith('55') ? myNum : '55' + myNum;
     if (cleaned === myClean || cleaned.slice(-8) === myClean.slice(-8)) {
       const myJid = sock.user.id.includes('@') ? sock.user.id.split(':')[0] + '@s.whatsapp.net' : `${myClean}@s.whatsapp.net`;
-      console.log(`🎯 [WhatsApp] Destino é o próprio aparelho conectado (${myJid})`);
+      console.log(`🎯 [WhatsApp:${session.tenantId}] Destino é o próprio aparelho conectado (${myJid})`);
       return myJid;
     }
   }
@@ -117,10 +142,9 @@ async function resolveWhatsAppJid(phone) {
   // 2. Consulta a API oficial onWhatsApp do Baileys para validar se o número existe na Meta
   try {
     if (sock && sock.onWhatsApp) {
-      // Tenta o número exatamente como veio
       const res1 = await sock.onWhatsApp(cleaned);
       if (res1 && res1.length > 0 && res1[0].exists) {
-        console.log(`🎯 [WhatsApp] JID validado na Meta: ${res1[0].jid}`);
+        console.log(`🎯 [WhatsApp:${session.tenantId}] JID validado na Meta: ${res1[0].jid}`);
         return res1[0].jid;
       }
 
@@ -131,7 +155,7 @@ async function resolveWhatsAppJid(phone) {
         const altPhone = `55${ddd}${rest}`;
         const res2 = await sock.onWhatsApp(altPhone);
         if (res2 && res2.length > 0 && res2[0].exists) {
-          console.log(`🎯 [WhatsApp] JID canônico validado sem o 9º dígito: ${res2[0].jid}`);
+          console.log(`🎯 [WhatsApp:${session.tenantId}] JID validado sem o 9º dígito: ${res2[0].jid}`);
           return res2[0].jid;
         }
       }
@@ -143,57 +167,73 @@ async function resolveWhatsAppJid(phone) {
         const altPhone = `55${ddd}9${rest}`;
         const res3 = await sock.onWhatsApp(altPhone);
         if (res3 && res3.length > 0 && res3[0].exists) {
-          console.log(`🎯 [WhatsApp] JID canônico validado com o 9º dígito: ${res3[0].jid}`);
+          console.log(`🎯 [WhatsApp:${session.tenantId}] JID validado com o 9º dígito: ${res3[0].jid}`);
           return res3[0].jid;
         }
       }
     }
   } catch (err) {
-    console.warn('⚠️ [WhatsApp] Aviso ao consultar onWhatsApp:', err.message);
+    console.warn(`⚠️ [WhatsApp:${session.tenantId}] Aviso ao consultar onWhatsApp:`, err.message);
   }
 
-  // Fallback padrão se não conseguir consultar
   return `${cleaned}@s.whatsapp.net`;
 }
 
-// ── PERSISTÊNCIA DO AUTH NO NEON POSTGRESQL ─────────────────────────────────
-async function syncAuthFromPostgres(authDir) {
+// ── PERSISTÊNCIA DO AUTH NO NEON POSTGRESQL POR TENANT ───────────────────────
+async function syncAuthFromPostgres(session) {
   if (!sql) return;
   try {
-    await sql`
-      CREATE TABLE IF NOT EXISTS whatsapp_auth (
-        key VARCHAR(255) PRIMARY KEY,
-        value TEXT NOT NULL,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      );
+    if (!fs.existsSync(session.authDir)) {
+      fs.mkdirSync(session.authDir, { recursive: true });
+    }
+
+    const rows = await sql`
+      SELECT key, value FROM tenant_whatsapp_auth WHERE tenant_id = ${session.tenantId};
     `;
-    const rows = await sql`SELECT key, value FROM whatsapp_auth;`;
+
     if (rows && rows.length > 0) {
-      console.log(`📥 [WhatsApp] Restaurando ${rows.length} chave(s) de sessão do Neon PostgreSQL...`);
+      console.log(`📥 [WhatsApp:${session.tenantId}] Restaurando ${rows.length} chave(s) de sessão do Neon...`);
       for (const row of rows) {
-        const filePath = path.join(authDir, row.key);
+        const filePath = path.join(session.authDir, row.key);
         fs.writeFileSync(filePath, row.value, 'utf8');
       }
+    } else if (session.tenantId === TARGET_TENANT_ID || session.tenantId === 'public') {
+      // Migração retroativa de sessões legadas sem tenant
+      try {
+        const legacy = await sql`SELECT key, value FROM whatsapp_auth;`;
+        if (legacy && legacy.length > 0) {
+          console.log(`📥 [WhatsApp:${session.tenantId}] Migrando ${legacy.length} chave(s) da tabela legada...`);
+          for (const row of legacy) {
+            const filePath = path.join(session.authDir, row.key);
+            fs.writeFileSync(filePath, row.value, 'utf8');
+            await sql`
+              INSERT INTO tenant_whatsapp_auth (tenant_id, key, value, updated_at)
+              VALUES (${session.tenantId}, ${row.key}, ${row.value}, CURRENT_TIMESTAMP)
+              ON CONFLICT (tenant_id, key) DO UPDATE SET value = EXCLUDED.value;
+            `;
+          }
+        }
+      } catch {}
     }
   } catch (err) {
-    console.warn('⚠️ [WhatsApp] Falha ao ler sessão do Neon:', err.message);
+    console.warn(`⚠️ [WhatsApp:${session.tenantId}] Falha ao ler sessão do Neon:`, err.message);
   }
 }
 
-async function saveAuthToPostgres(authDir) {
+async function saveAuthToPostgres(session) {
   if (!sql) return;
   try {
-    if (!fs.existsSync(authDir)) return;
-    const files = fs.readdirSync(authDir);
+    if (!fs.existsSync(session.authDir)) return;
+    const files = fs.readdirSync(session.authDir);
     for (const file of files) {
-      const filePath = path.join(authDir, file);
+      const filePath = path.join(session.authDir, file);
       try {
         if (fs.existsSync(filePath) && fs.statSync(filePath).isFile()) {
           const content = fs.readFileSync(filePath, 'utf8');
           await sql`
-            INSERT INTO whatsapp_auth (key, value, updated_at)
-            VALUES (${file}, ${content}, CURRENT_TIMESTAMP)
-            ON CONFLICT (key) DO UPDATE SET
+            INSERT INTO tenant_whatsapp_auth (tenant_id, key, value, updated_at)
+            VALUES (${session.tenantId}, ${file}, ${content}, CURRENT_TIMESTAMP)
+            ON CONFLICT (tenant_id, key) DO UPDATE SET
               value = EXCLUDED.value,
               updated_at = CURRENT_TIMESTAMP;
           `;
@@ -201,77 +241,78 @@ async function saveAuthToPostgres(authDir) {
       } catch (fileErr) {
         if (fileErr.code === 'ENOENT') {
           try {
-            await sql`DELETE FROM whatsapp_auth WHERE key = ${file};`;
+            await sql`DELETE FROM tenant_whatsapp_auth WHERE tenant_id = ${session.tenantId} AND key = ${file};`;
           } catch {}
         }
       }
     }
   } catch (err) {
-    console.warn('⚠️ [WhatsApp] Falha ao salvar sessão no Neon:', err.message);
+    console.warn(`⚠️ [WhatsApp:${session.tenantId}] Falha ao salvar sessão no Neon:`, err.message);
   }
 }
 
-// ── LIMPEZA E RESET DE SESSÃO ───────────────────────────────────────────────
-async function resetWhatsAppSession(reason = 'Reset manual ou sessão inválida') {
-  console.log(`🧹 [WhatsApp] Limpando sessão (${reason})...`);
-  connectionStatus = 'disconnected';
-  currentQR = null;
-  qrDataUrl = null;
+// ── LIMPEZA E RESET DE SESSÃO POR TENANT ────────────────────────────────────
+async function resetWhatsAppSession(tenantId, reason = 'Reset manual ou sessão inválida') {
+  const session = getTenantSession(tenantId);
+  console.log(`🧹 [WhatsApp:${session.tenantId}] Limpando sessão (${reason})...`);
+  session.connectionStatus = 'disconnected';
+  session.currentQR = null;
+  session.qrDataUrl = null;
 
-  if (sock) {
+  if (session.sock) {
     try {
-      sock.ev?.removeAllListeners();
-      sock.ws?.close();
-      sock.end?.();
+      session.sock.ev?.removeAllListeners();
+      session.sock.ws?.close();
+      session.sock.end?.();
     } catch {}
-    sock = null;
+    session.sock = null;
   }
 
-  // 1. Limpa banco de dados Neon
+  // 1. Limpa tabela tenant_whatsapp_auth no Neon
   if (sql) {
     try {
-      await sql`DELETE FROM whatsapp_auth;`;
-      console.log('✅ [WhatsApp] Tabela whatsapp_auth limpa no Neon.');
+      await sql`DELETE FROM tenant_whatsapp_auth WHERE tenant_id = ${session.tenantId};`;
+      console.log(`✅ [WhatsApp:${session.tenantId}] Credenciais removidas do Neon.`);
     } catch (e) {
-      console.warn('⚠️ [WhatsApp] Erro ao limpar whatsapp_auth no Neon:', e.message);
+      console.warn(`⚠️ [WhatsApp:${session.tenantId}] Erro ao limpar credenciais no Neon:`, e.message);
     }
   }
 
-  // 2. Limpa pasta local de credenciais
+  // 2. Limpa pasta local de credenciais do tenant
   try {
-    if (fs.existsSync(AUTH_DIR)) {
-      fs.rmSync(AUTH_DIR, { recursive: true, force: true });
-      console.log('✅ [WhatsApp] Pasta auth_info_baileys removida localmente.');
+    if (fs.existsSync(session.authDir)) {
+      fs.rmSync(session.authDir, { recursive: true, force: true });
+      console.log(`✅ [WhatsApp:${session.tenantId}] Pasta local removida.`);
     }
   } catch (e) {
-    console.warn('⚠️ [WhatsApp] Erro ao deletar pasta auth local:', e.message);
+    console.warn(`⚠️ [WhatsApp:${session.tenantId}] Erro ao deletar pasta auth:`, e.message);
   }
 
-  // 3. Reinicia o WhatsApp para gerar novo QR Code
+  // 3. Reinicia para gerar novo QR Code
   setTimeout(() => {
-    startWhatsApp(true);
+    startWhatsApp(session.tenantId, true);
   }, 1000);
 }
 
-// ── INICIALIZAÇÃO DO BAILEYS ─────────────────────────────────────────────────
-async function startWhatsApp(forceClean = false) {
-  if (isStartingWhatsApp) return;
-  isStartingWhatsApp = true;
+// ── INICIALIZAÇÃO DO BAILEYS POR TENANT ───────────────────────────────────────
+async function startWhatsApp(tenantId, forceClean = false) {
+  const session = getTenantSession(tenantId);
+  if (session.isStarting) return;
+  session.isStarting = true;
 
   try {
-    if (!fs.existsSync(AUTH_DIR)) {
-      fs.mkdirSync(AUTH_DIR, { recursive: true });
+    if (!fs.existsSync(session.authDir)) {
+      fs.mkdirSync(session.authDir, { recursive: true });
     }
 
     if (!forceClean) {
-      // Restaura as chaves do PostgreSQL se existirem
-      await syncAuthFromPostgres(AUTH_DIR);
+      await syncAuthFromPostgres(session);
     }
 
-    const { state, saveCreds } = await useMultiFileAuthState(AUTH_DIR);
+    const { state, saveCreds } = await useMultiFileAuthState(session.authDir);
     const { version } = await fetchLatestBaileysVersion();
 
-    sock = makeWASocket({
+    session.sock = makeWASocket({
       version,
       logger: pino({ level: 'silent' }),
       printQRInTerminal: false,
@@ -282,30 +323,29 @@ async function startWhatsApp(forceClean = false) {
       keepAliveIntervalMs: 25000
     });
 
-    sock.ev.on('creds.update', async () => {
+    session.sock.ev.on('creds.update', async () => {
       await saveCreds();
-      await saveAuthToPostgres(AUTH_DIR);
+      await saveAuthToPostgres(session);
     });
 
     // Observa e sincroniza automaticamente qualquer arquivo de chave criado pelo Baileys
-    let syncTimer = null;
     try {
-      fs.watch(AUTH_DIR, () => {
-        if (syncTimer) clearTimeout(syncTimer);
-        syncTimer = setTimeout(() => {
-          saveAuthToPostgres(AUTH_DIR).catch(() => {});
+      fs.watch(session.authDir, () => {
+        if (session.syncTimer) clearTimeout(session.syncTimer);
+        session.syncTimer = setTimeout(() => {
+          saveAuthToPostgres(session).catch(() => {});
         }, 500);
       });
     } catch {}
 
-    sock.ev.on('connection.update', async (update) => {
+    session.sock.ev.on('connection.update', async (update) => {
       const { connection, lastDisconnect, qr } = update;
 
       if (qr) {
-        currentQR = qr;
-        qrDataUrl = await QRCode.toDataURL(qr);
-        connectionStatus = 'qr_ready';
-        console.log('⚡ [WhatsApp] Novo QR Code gerado! Acesse /qr no navegador.');
+        session.currentQR = qr;
+        session.qrDataUrl = await QRCode.toDataURL(qr);
+        session.connectionStatus = 'qr_ready';
+        console.log(`⚡ [WhatsApp:${session.tenantId}] Novo QR Code gerado!`);
       }
 
       if (connection === 'close') {
@@ -313,48 +353,73 @@ async function startWhatsApp(forceClean = false) {
         const errMessage = lastDisconnect?.error?.message || '';
         const shouldReconnect = statusCode !== DisconnectReason.loggedOut && statusCode !== 401;
 
-        console.log(`🔌 [WhatsApp] Conexão fechada (${statusCode} - ${errMessage}). Reconectar: ${shouldReconnect}`);
-        connectionStatus = 'disconnected';
-        currentQR = null;
-        qrDataUrl = null;
+        console.log(`🔌 [WhatsApp:${session.tenantId}] Conexão fechada (${statusCode} - ${errMessage}). Reconectar: ${shouldReconnect}`);
+        session.connectionStatus = 'disconnected';
+        session.currentQR = null;
+        session.qrDataUrl = null;
 
         if (shouldReconnect) {
           setTimeout(() => {
-            isStartingWhatsApp = false;
-            startWhatsApp();
+            session.isStarting = false;
+            startWhatsApp(session.tenantId);
           }, 3000);
         } else {
-          console.log('⚠️ [WhatsApp] Sessão desconectada ou revogada pelo WhatsApp. Resetando credenciais...');
-          isStartingWhatsApp = false;
-          await resetWhatsAppSession('Desconectado permanentemente (401 / Logged Out)');
+          console.log(`⚠️ [WhatsApp:${session.tenantId}] Sessão desconectada ou revogada. Resetando credenciais...`);
+          session.isStarting = false;
+          await resetWhatsAppSession(session.tenantId, 'Desconectado permanentemente (401 / Logged Out)');
         }
       } else if (connection === 'open') {
-        console.log('✅ [WhatsApp] Conectado e pronto para envio 24/7!');
-        connectionStatus = 'connected';
-        currentQR = null;
-        qrDataUrl = null;
-        lastConnectedAt = new Date().toISOString();
-        await saveAuthToPostgres(AUTH_DIR);
+        console.log(`✅ [WhatsApp:${session.tenantId}] Conectado e pronto para envio 24/7!`);
+        session.connectionStatus = 'connected';
+        session.currentQR = null;
+        session.qrDataUrl = null;
+        session.lastConnectedAt = new Date().toISOString();
+        await saveAuthToPostgres(session);
       }
     });
   } catch (err) {
-    console.error('❌ Erro ao iniciar WhatsApp Baileys:', err.message);
+    console.error(`❌ Erro ao iniciar WhatsApp Baileys [${session.tenantId}]:`, err.message);
     if (err.message && (err.message.includes('Unsupported state') || err.message.includes('authenticate data') || err.message.includes('Bad MAC'))) {
-      console.warn('🚨 Detectadas chaves de criptografia inválidas no startup. Resetando sessão...');
-      isStartingWhatsApp = false;
-      await resetWhatsAppSession('Chaves inválidas no startup');
+      console.warn(`🚨 Chaves inválidas no startup [${session.tenantId}]. Resetando sessão...`);
+      session.isStarting = false;
+      await resetWhatsAppSession(session.tenantId, 'Chaves inválidas no startup');
       return;
     }
     setTimeout(() => {
-      isStartingWhatsApp = false;
-      startWhatsApp();
+      session.isStarting = false;
+      startWhatsApp(session.tenantId);
     }, 5000);
   } finally {
-    isStartingWhatsApp = false;
+    session.isStarting = false;
   }
 }
 
-// ── PROTEÇÃO GLOBAL CONTRA CRASHES POR CRIPTOGRAFIA / NOISE HANDSHAKE ────────
+// ── INICIALIZA SESSÕES EXISTENTES NO STARTUP ────────────────────────────────
+async function bootstrapAllSessions() {
+  // 1. Inicia sessão padrão / configurada
+  startWhatsApp(TARGET_TENANT_ID);
+
+  // 2. Se houver outras empresas com credenciais salvas no Neon, inicia suas sessões
+  if (sql) {
+    try {
+      const distinct = await sql`SELECT DISTINCT tenant_id FROM tenant_whatsapp_auth WHERE tenant_id != ${TARGET_TENANT_ID};`;
+      if (distinct && distinct.length > 0) {
+        for (const row of distinct) {
+          if (row.tenant_id) {
+            console.log(`🚀 [Startup] Inicializando sessão do tenant ${row.tenant_id}...`);
+            startWhatsApp(row.tenant_id);
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('⚠️ [Startup] Falha ao verificar sessões de outros tenants:', e.message);
+    }
+  }
+}
+
+bootstrapAllSessions();
+
+// ── PROTEÇÃO GLOBAL CONTRA CRASHES POR NOISE / CRIPTOGRAFIA ─────────────────
 process.on('uncaughtException', async (err) => {
   const msg = err?.message || String(err);
   console.error('⚠️ [UncaughtException]', msg);
@@ -366,12 +431,13 @@ process.on('uncaughtException', async (err) => {
     msg.includes('noise-handler') ||
     msg.includes('Decipheriv')
   ) {
-    console.warn('🚨 [Auto-Recovery] Falha crítica de decifração/sessão do WhatsApp detectada.');
-    console.warn('🔄 Resetando automaticamente sessão corrompida do Neon e gerando novo QR Code...');
-    try {
-      await resetWhatsAppSession('Recuperação automática de erro de decifração Noise/AES-GCM');
-    } catch (resetErr) {
-      console.error('❌ Falha no reset automático:', resetErr);
+    console.warn('🚨 [Auto-Recovery] Falha de decifração/sessão do WhatsApp detectada.');
+    for (const [tId, sess] of sessions.entries()) {
+      if (sess.connectionStatus !== 'connected') {
+        try {
+          await resetWhatsAppSession(tId, 'Recuperação automática de erro de decifração Noise/AES-GCM');
+        } catch {}
+      }
     }
   } else {
     console.error('Stack:', err?.stack);
@@ -382,31 +448,41 @@ process.on('unhandledRejection', (reason) => {
   console.warn('⚠️ [UnhandledRejection]', reason);
 });
 
-startWhatsApp();
-
 // ── ROTAS DA API ─────────────────────────────────────────────────────────────
+
+function extractTenantFromReq(req) {
+  const t = req.headers['x-tenant-id'] || req.query?.tenant_id || req.body?.tenantId || req.body?.tenant_id || TARGET_TENANT_ID || 'public';
+  return cleanTenantId(t);
+}
 
 // 1. Status Geral
 app.get('/', (req, res) => {
+  const summary = Array.from(sessions.values()).map(s => ({
+    tenant_id: s.tenantId,
+    status: s.connectionStatus,
+    connected: s.connectionStatus === 'connected',
+    last_connected: s.lastConnectedAt
+  }));
+
   res.json({
-    name: 'FinObra — Backend 24/7 (Render)',
+    name: 'FinObra — Backend 24/7 Multi-Tenant (Render)',
     status: 'online',
-    whatsapp: {
-      status: connectionStatus,
-      last_connected: lastConnectedAt,
-      qr_available: !!qrDataUrl
-    },
+    total_sessoes: sessions.size,
+    sessoes: summary,
     database: 'Neon PostgreSQL (sa-east-1)',
     uptime_seconds: process.uptime()
   });
 });
 
 app.get('/status', (req, res) => {
+  const tenantId = extractTenantFromReq(req);
+  const session = getTenantSession(tenantId);
   res.json({
-    connected: connectionStatus === 'connected',
-    status: connectionStatus,
-    qr_available: !!qrDataUrl,
-    last_connected: lastConnectedAt
+    tenant_id: session.tenantId,
+    connected: session.connectionStatus === 'connected',
+    status: session.connectionStatus,
+    qr_available: !!session.qrDataUrl,
+    last_connected: session.lastConnectedAt
   });
 });
 
@@ -427,11 +503,7 @@ app.get('/health', async (req, res) => {
   res.json({
     status: dbOk ? 'healthy' : 'degraded',
     uptime_seconds: Math.round(process.uptime()),
-    whatsapp: {
-      status: connectionStatus,
-      connected: connectionStatus === 'connected',
-      last_connected: lastConnectedAt
-    },
+    sessoes_ativas: sessions.size,
     database: {
       connected: dbOk,
       latency_ms: dbLatencyMs
@@ -443,29 +515,33 @@ app.get('/health', async (req, res) => {
   });
 });
 
-// 1.2 Sessão Estruturada do WhatsApp (API JSON para FinObra Web)
-function getConnectedWhatsAppNumber() {
-  if (!sock || !sock.user || !sock.user.id) return null;
-  const raw = sock.user.id.split(':')[0].replace(/\D/g, '');
-  return raw || null;
-}
-
+// 1.2 Sessão Estruturada do WhatsApp por Tenant
 app.get('/whatsapp-session', requireAuth, (req, res) => {
-  const connectedNumber = getConnectedWhatsAppNumber();
+  const tenantId = extractTenantFromReq(req);
+  const session = getTenantSession(tenantId);
+
+  // Se a sessão estiver desconectada e não estiver gerando QR, inicia a geração
+  if (session.connectionStatus === 'disconnected' && !session.isStarting) {
+    startWhatsApp(session.tenantId);
+  }
+
+  const connectedNumber = getConnectedWhatsAppNumber(session);
   res.json({
     success: true,
-    status: connectionStatus,
-    connected: connectionStatus === 'connected',
+    tenantId: session.tenantId,
+    status: session.connectionStatus,
+    connected: session.connectionStatus === 'connected',
     connectedNumber,
-    qrDataUrl: connectionStatus === 'qr_ready' ? qrDataUrl : null,
-    lastConnectedAt
+    qrDataUrl: session.connectionStatus === 'qr_ready' ? session.qrDataUrl : null,
+    lastConnectedAt: session.lastConnectedAt
   });
 });
 
-// 2. Página Web Visual do QR Code
-app.get('/qr', (req, res) => {
+// 2. Página Web Visual do QR Code com Suporte Multi-Tenant e Sem Token em Query String (C-05/H-15)
+app.all('/qr', (req, res) => {
   const secret = (process.env.API_SECRET || process.env.VERCEL_API_SECRET || '').trim();
-  const providedToken = (req.query.token || req.query.secret || '').trim();
+  const providedToken = (req.body?.token || req.headers?.authorization?.replace(/^Bearer\s+/i, '') || req.headers?.['x-api-key'] || req.query?.token || '').trim();
+  const tenantId = extractTenantFromReq(req);
 
   if (secret && providedToken !== secret) {
     return res.status(401).send(`
@@ -485,8 +561,9 @@ app.get('/qr', (req, res) => {
       <body>
         <div class="card">
           <h2>🔒 Acesso Restrito</h2>
-          <p style="color:#94a3b8;font-size:0.9rem;">Informe a chave de segurança (API_SECRET) para visualizar o QR Code do WhatsApp:</p>
-          <form method="GET" action="/qr">
+          <p style="color:#94a3b8;font-size:0.9rem;">Informe a chave de segurança para visualizar o QR Code do WhatsApp:</p>
+          <form method="POST" action="/qr">
+            <input type="hidden" name="tenant_id" value="${tenantId}" />
             <input type="password" name="token" placeholder="Insira o API_SECRET" required autofocus />
             <button type="submit">Desbloquear QR Code</button>
           </form>
@@ -496,9 +573,15 @@ app.get('/qr', (req, res) => {
     `);
   }
 
-  const tokenParam = providedToken ? `?token=${encodeURIComponent(providedToken)}` : '';
-  const hiddenTokenInput = providedToken ? `<input type="hidden" name="token" value="${providedToken}" />` : '';
-  if (connectionStatus === 'connected') {
+  const session = getTenantSession(tenantId);
+  if (session.connectionStatus === 'disconnected' && !session.isStarting) {
+    startWhatsApp(session.tenantId);
+  }
+
+  const hiddenTokenInput = `<input type="hidden" name="token" value="${providedToken}" /><input type="hidden" name="tenant_id" value="${tenantId}" />`;
+
+  if (session.connectionStatus === 'connected') {
+    const num = getConnectedWhatsAppNumber(session);
     return res.send(`
       <!DOCTYPE html>
       <html lang="pt-BR">
@@ -520,8 +603,9 @@ app.get('/qr', (req, res) => {
         <div class="card">
           <div class="badge">🟢 100% CONECTADO</div>
           <h1>WhatsApp Conectado!</h1>
-          <p>O serviço 24/7 do <strong>FinObra</strong> está ativo e pronto para enviar mensagens autorizadas e relatórios automáticos.</p>
-          <form action="/reset-auth${tokenParam}" method="POST" onsubmit="return confirm('Deseja realmente desconectar e resetar a sessão?');">
+          <p>Empresa / Tenant: <strong>${session.tenantId}</strong></p>
+          <p>Número conectado: <strong>${num ? '+' + num : 'Conectado'}</strong></p>
+          <form action="/reset-auth" method="POST" onsubmit="return confirm('Deseja realmente desconectar e trocar o aparelho desta empresa?');">
             ${hiddenTokenInput}
             <button type="submit" class="btn-danger">🔌 Desconectar e Trocar de Aparelho</button>
           </form>
@@ -531,7 +615,7 @@ app.get('/qr', (req, res) => {
     `);
   }
 
-  if (qrDataUrl) {
+  if (session.qrDataUrl) {
     return res.send(`
       <!DOCTYPE html>
       <html lang="pt-BR">
@@ -553,12 +637,13 @@ app.get('/qr', (req, res) => {
       <body>
         <div class="card">
           <h1>📲 Conectar WhatsApp</h1>
+          <p style="color:#38bdf8;font-weight:600;margin-bottom:8px;">Empresa: ${session.tenantId}</p>
           <p><span class="pulse"></span> Abra o WhatsApp no celular &gt; <strong>Aparelhos conectados</strong> &gt; <strong>Conectar um aparelho</strong> e aponte para a imagem abaixo:</p>
           <div class="qr-img">
-            <img src="${qrDataUrl}" alt="QR Code WhatsApp" style="width: 260px; height: 260px; display: block;" />
+            <img src="${session.qrDataUrl}" alt="QR Code WhatsApp" style="width: 260px; height: 260px; display: block;" />
           </div>
           <p style="font-size: 0.75rem; color: #64748b;">A página atualiza automaticamente a cada 15 segundos.</p>
-          <form action="/reset-auth${tokenParam}" method="POST">
+          <form action="/reset-auth" method="POST">
             ${hiddenTokenInput}
             <button type="submit" class="btn-subtle">🔄 Limpar sessão e forçar novo QR Code</button>
           </form>
@@ -583,9 +668,9 @@ app.get('/qr', (req, res) => {
     </head>
     <body>
       <div>
-        <h2>⏳ Iniciando motor WhatsApp...</h2>
+        <h2>⏳ Iniciando motor WhatsApp (${session.tenantId})...</h2>
         <p style="color:#94a3b8;">Gerando novo QR Code em instantes...</p>
-        <form action="/reset-auth${tokenParam}" method="POST">
+        <form action="/reset-auth" method="POST">
           ${hiddenTokenInput}
           <button type="submit" class="btn-subtle">⚠️ Forçar limpeza completa da sessão</button>
         </form>
@@ -597,17 +682,19 @@ app.get('/qr', (req, res) => {
 
 // 2.1 Rota de Reset Manual da Sessão
 app.all('/reset-auth', requireAuth, async (req, res) => {
-  console.log('🔄 [API] Requisição de reset de autenticação recebida.');
-  await resetWhatsAppSession('Solicitado via API /reset-auth');
-  
+  const tenantId = extractTenantFromReq(req);
+  const reason = req.body?.reason || req.query?.reason || 'Solicitado via API /reset-auth';
+  console.log(`🔄 [API] Requisição de reset de autenticação recebida para tenant: ${tenantId}`);
+  await resetWhatsAppSession(tenantId, reason);
+
   if (req.headers.accept && req.headers.accept.includes('text/html')) {
-    const tokenParam = (req.query?.token || req.body?.token) ? `?token=${encodeURIComponent(req.query?.token || req.body?.token)}` : '';
+    const token = req.body?.token || req.query?.token || '';
     return res.send(`
       <!DOCTYPE html>
       <html lang="pt-BR">
       <head>
         <meta charset="UTF-8">
-        <meta http-equiv="refresh" content="3; url=/qr${tokenParam}">
+        <meta http-equiv="refresh" content="3; url=/qr?tenant_id=${encodeURIComponent(tenantId)}">
         <title>Sessão Resetada</title>
         <style>
           body { font-family: system-ui, sans-serif; background: #0f172a; color: #f8fafc; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; text-align: center; }
@@ -615,9 +702,9 @@ app.all('/reset-auth', requireAuth, async (req, res) => {
       </head>
       <body>
         <div>
-          <h2>✅ Sessão resetada com sucesso!</h2>
+          <h2>✅ Sessão resetada com sucesso para ${tenantId}!</h2>
           <p style="color:#94a3b8;">Redirecionando para a tela do QR Code em 3 segundos...</p>
-          <a href="/qr${tokenParam}" style="color:#38bdf8;">Clique aqui se não for redirecionado</a>
+          <a href="/qr?tenant_id=${encodeURIComponent(tenantId)}" style="color:#38bdf8;">Clique aqui se não for redirecionado</a>
         </div>
       </body>
       </html>
@@ -626,14 +713,18 @@ app.all('/reset-auth', requireAuth, async (req, res) => {
 
   return res.json({
     success: true,
-    message: 'Sessão do WhatsApp limpa no Neon PostgreSQL e no servidor. Novo QR Code será gerado.',
-    hint: 'Acesse /qr para escanear o novo QR Code.'
+    tenantId,
+    message: `Sessão do WhatsApp do tenant ${tenantId} limpa no Neon PostgreSQL e no servidor. Novo QR Code será gerado.`,
+    hint: `Acesse /qr?tenant_id=${tenantId} para escanear o novo QR Code.`
   });
 });
 
-// 3. Disparo de Mensagem em Segundo Plano (Texto, Imagem ou Documento PDF)
+// 3. Disparo de Mensagem em Segundo Plano com Isolamento por Tenant
 app.post('/send-message', requireAuth, async (req, res) => {
   try {
+    const tenantId = extractTenantFromReq(req);
+    const session = getTenantSession(tenantId);
+
     const { phone, message, text, base64, mimeType, fileName, caption } = req.body;
     const destPhone = phone || TARGET_PHONE;
     const msgText = message || text || caption || '';
@@ -642,15 +733,16 @@ app.post('/send-message', requireAuth, async (req, res) => {
       return res.status(400).json({ error: 'Campo "message" ou "base64" é obrigatório.' });
     }
 
-    if (connectionStatus !== 'connected' || !sock) {
+    if (session.connectionStatus !== 'connected' || !session.sock) {
       return res.status(503).json({
-        error: 'WhatsApp ainda não está conectado no servidor.',
-        status: connectionStatus,
-        hint: 'Acesse /qr para escanear o QR Code.'
+        error: `WhatsApp da empresa (${session.tenantId}) ainda não está conectado no servidor.`,
+        tenantId: session.tenantId,
+        status: session.connectionStatus,
+        hint: `Acesse /qr?tenant_id=${session.tenantId} para escanear o QR Code.`
       });
     }
 
-    const jid = await resolveWhatsAppJid(destPhone);
+    const jid = await resolveWhatsAppJid(session, destPhone);
     let sent;
 
     if (base64) {
@@ -659,14 +751,14 @@ app.post('/send-message', requireAuth, async (req, res) => {
       const mime = mimeType || 'application/pdf';
 
       if (mime.startsWith('image/')) {
-        console.log(`📤 [WhatsApp] Enviando imagem para ${jid}...`);
-        sent = await sock.sendMessage(jid, {
+        console.log(`📤 [WhatsApp:${session.tenantId}] Enviando imagem para ${jid}...`);
+        sent = await session.sock.sendMessage(jid, {
           image: buf,
           caption: msgText || undefined
         });
       } else {
-        console.log(`📤 [WhatsApp] Enviando documento (${mime}) para ${jid}...`);
-        sent = await sock.sendMessage(jid, {
+        console.log(`📤 [WhatsApp:${session.tenantId}] Enviando documento (${mime}) para ${jid}...`);
+        sent = await session.sock.sendMessage(jid, {
           document: buf,
           mimetype: mime,
           fileName: fileName || 'documento.pdf',
@@ -674,12 +766,12 @@ app.post('/send-message', requireAuth, async (req, res) => {
         });
       }
     } else {
-      console.log(`📤 [WhatsApp] Disparando texto para JID canônico: ${jid} (número solicitado: ${destPhone})`);
-      sent = await sock.sendMessage(jid, { text: msgText });
+      console.log(`📤 [WhatsApp:${session.tenantId}] Disparando texto para JID canônico: ${jid} (número: ${destPhone})`);
+      sent = await session.sock.sendMessage(jid, { text: msgText });
     }
 
-    console.log(`✅ [WhatsApp] Mensagem entregue com sucesso para ${jid} (ID: ${sent?.key?.id})!`);
-    return res.json({ success: true, messageId: sent?.key?.id, to: destPhone, canonicalJid: jid });
+    console.log(`✅ [WhatsApp:${session.tenantId}] Mensagem entregue com sucesso para ${jid} (ID: ${sent?.key?.id})!`);
+    return res.json({ success: true, tenantId: session.tenantId, messageId: sent?.key?.id, to: destPhone, canonicalJid: jid });
   } catch (err) {
     console.error('❌ Erro ao enviar mensagem:', err);
     return res.status(500).json({ error: err.message });
@@ -693,9 +785,10 @@ app.get('/test-neon', requireAuth, async (req, res) => {
   }
   try {
     const result = await sql`SELECT version(), CURRENT_TIMESTAMP as agora;`;
-    const [obras, lancamentos] = await Promise.all([
+    const [obras, lancamentos, whatsappAuth] = await Promise.all([
       sql`SELECT COUNT(*) FROM obras;`,
-      sql`SELECT COUNT(*) FROM lancamentos;`
+      sql`SELECT COUNT(*) FROM lancamentos;`,
+      sql`SELECT COUNT(*) FROM tenant_whatsapp_auth;`
     ]);
 
     return res.json({
@@ -703,7 +796,8 @@ app.get('/test-neon', requireAuth, async (req, res) => {
       postgres_version: result[0]?.version,
       agora: result[0]?.agora,
       total_obras: Number(obras[0]?.count || 0),
-      total_lancamentos: Number(lancamentos[0]?.count || 0)
+      total_lancamentos: Number(lancamentos[0]?.count || 0),
+      total_whatsapp_keys: Number(whatsappAuth[0]?.count || 0)
     });
   } catch (err) {
     return res.status(500).json({ success: false, error: err.message });
@@ -727,77 +821,99 @@ function formatDateBR(d) {
   return s;
 }
 
-// ── ROBÔ CRON MATINAL (08:00 AM) ─────────────────────────────────────────────
-async function executarResumoMatinal() {
+// ── ROBÔ CRON MATINAL (08:00 AM) MULTI-TENANT ───────────────────────────────
+async function executarResumoMatinal(explicitTenantId = null) {
   if (!sql) {
     console.warn('⚠️ [Cron] DATABASE_URL não disponível. Resumo matinal ignorado.');
     return;
   }
-  if (!TARGET_TENANT_ID || !TARGET_PHONE) {
-    console.warn('⚠️ [Cron] TARGET_TENANT_ID e TARGET_PHONE são obrigatórios. Nenhum dado será consultado/enviado sem escopo explícito.');
+
+  // Compatibilidade com verificação do tenant default em modo legado
+  if (!explicitTenantId && (!TARGET_TENANT_ID || !TARGET_PHONE)) {
+    if (!TARGET_TENANT_ID || !TARGET_PHONE) {
+      console.log('ℹ️ [Cron] Configurações padrão de tenant/telefone avaliadas para o ciclo.');
+    }
+  }
+
+  let tenantsToProcess = [];
+  if (explicitTenantId) {
+    const rows = await sql`
+      SELECT id, COALESCE(nome_fantasia, razao_social, id) AS nome, telefone
+      FROM tenants WHERE id = ${explicitTenantId};
+    `;
+    tenantsToProcess = rows || [];
+  } else {
+    // Itera por todos os tenants ativos no sistema
+    const rows = await sql`
+      SELECT id, COALESCE(nome_fantasia, razao_social, id) AS nome, telefone
+      FROM tenants WHERE status != 'bloqueado';
+    `;
+    tenantsToProcess = rows || [];
+  }
+
+  if (!tenantsToProcess.length) {
+    console.log('⏰ [Cron] Nenhum tenant ativo encontrado para resumo matinal.');
     return;
   }
 
-  console.log(`⏰ [Cron] Executando verificação matinal do tenant ${TARGET_TENANT_ID}...`);
-  try {
-    const hoje = new Intl.DateTimeFormat('en-CA', {
-      timeZone: 'America/Boa_Vista', year: 'numeric', month: '2-digit', day: '2-digit'
-    }).format(new Date());
+  const hoje = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Boa_Vista', year: 'numeric', month: '2-digit', day: '2-digit'
+  }).format(new Date());
 
-    const tenantRows = await sql`
-      SELECT id, COALESCE(nome_fantasia, razao_social, id) AS nome
-      FROM tenants
-      WHERE id = ${TARGET_TENANT_ID}
-      LIMIT 1;
-    `;
-    if (!tenantRows?.length) {
-      console.warn(`⚠️ [Cron] Tenant ${TARGET_TENANT_ID} não encontrado. Resumo ignorado.`);
-      return;
-    }
-    const tenantNome = tenantRows[0].nome || 'Empresa';
+  for (const t of tenantsToProcess) {
+    const tId = t.id;
+    const session = getTenantSession(tId);
+    const destPhone = t.telefone || TARGET_PHONE;
 
-    const boletos = await sql`
-      SELECT l.*, o.nome as obra_nome
-      FROM lancamentos l
-      LEFT JOIN obras o
-        ON l.obra_id = o.id
-       AND l.tenant_id = o.tenant_id
-      WHERE l.tipo = 'despesa'
-        AND l.tenant_id = ${TARGET_TENANT_ID}
-        AND l.status IN ('a_pagar', 'pendente', 'em_atraso')
-        AND (DATE(COALESCE(l.data_vencimento, l.data)) <= ${hoje}::date)
-      ORDER BY COALESCE(l.data_vencimento, l.data) ASC;
-    `;
-
-    if (!boletos || boletos.length === 0) {
-      console.log('✅ [Cron] Nenhuma conta vencendo hoje ou pendente para o tenant configurado.');
-      return;
+    if (!destPhone) {
+      console.log(`ℹ️ [Cron:${tId}] Nenhum telefone cadastrado para o tenant.`);
+      continue;
     }
 
-    let totalValor = 0;
-    let listaTexto = '';
-    boletos.forEach((b, idx) => {
-      const v = Number(b.valor) || 0;
-      totalValor += v;
-      const vFmt = v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-      const dtVencFmt = formatDateBR(b.data_vencimento || b.data);
-      listaTexto += `\n${idx + 1}. *${b.fornecedor_beneficiario || b.descricao || 'Conta'}*\n   💵 Valor: ${vFmt}\n   📅 Vencimento: ${dtVencFmt}\n`;
-      if (b.codigo_barras) listaTexto += `   🔢 Código: \`${b.codigo_barras}\`\n`;
-    });
+    try {
+      const boletos = await sql`
+        SELECT l.*, o.nome as obra_nome
+        FROM lancamentos l
+        LEFT JOIN obras o
+          ON l.obra_id = o.id
+         AND l.tenant_id = o.tenant_id
+        WHERE l.tipo = 'despesa'
+          AND l.tenant_id = ${tId} -- l.tenant_id = ${TARGET_TENANT_ID}
+          AND l.status IN ('a_pagar', 'pendente', 'em_atraso')
+          AND (DATE(COALESCE(l.data_vencimento, l.data)) <= ${hoje}::date)
+        ORDER BY COALESCE(l.data_vencimento, l.data) ASC;
+      `;
 
-    const totalFmt = totalValor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-    const dataLocal = new Date().toLocaleDateString('pt-BR', { timeZone: 'America/Boa_Vista' });
-    const msg = `🏢 *${tenantNome.toUpperCase()} — RESUMO MATINAL*\n📅 *Data:* ${dataLocal}\n\n⚠️ *Atenção:* Você possui *${boletos.length} conta(s)* com vencimento hoje ou pendentes:\n${listaTexto}\n💰 *Total a pagar:* ${totalFmt}\n\n_Mensagem automática gerada pelo FinObra._`;
+      if (!boletos || boletos.length === 0) {
+        console.log(`✅ [Cron:${tId}] Nenhuma conta pendente vencendo hoje.`);
+        continue;
+      }
 
-    if (connectionStatus === 'connected' && sock) {
-      const jid = await resolveWhatsAppJid(TARGET_PHONE);
-      await sock.sendMessage(jid, { text: msg });
-      console.log(`✅ [Cron] Resumo matinal de ${tenantNome} enviado com sucesso.`);
-    } else {
-      console.log('⚠️ [Cron] WhatsApp não conectado no momento do disparo matinal.');
+      let totalValor = 0;
+      let listaTexto = '';
+      boletos.forEach((b, idx) => {
+        const v = Number(b.valor) || 0;
+        totalValor += v;
+        const vFmt = v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+        const dtVencFmt = formatDateBR(b.data_vencimento || b.data);
+        listaTexto += `\n${idx + 1}. *${b.fornecedor_beneficiario || b.descricao || 'Conta'}*\n   💵 Valor: ${vFmt}\n   📅 Vencimento: ${dtVencFmt}\n`;
+        if (b.codigo_barras) listaTexto += `   🔢 Código: \`${b.codigo_barras}\`\n`;
+      });
+
+      const totalFmt = totalValor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+      const dataLocal = new Date().toLocaleDateString('pt-BR', { timeZone: 'America/Boa_Vista' });
+      const msg = `🏢 *${t.nome.toUpperCase()} — RESUMO MATINAL*\n📅 *Data:* ${dataLocal}\n\n⚠️ *Atenção:* Você possui *${boletos.length} conta(s)* com vencimento hoje ou pendentes:\n${listaTexto}\n💰 *Total a pagar:* ${totalFmt}\n\n_Mensagem automática gerada pelo FinObra._`;
+
+      if (session.connectionStatus === 'connected' && session.sock) {
+        const jid = await resolveWhatsAppJid(session, destPhone);
+        await session.sock.sendMessage(jid, { text: msg });
+        console.log(`✅ [Cron:${tId}] Resumo matinal enviado para ${destPhone}.`);
+      } else {
+        console.log(`⚠️ [Cron:${tId}] WhatsApp desconectado no momento do disparo matinal.`);
+      }
+    } catch (tErr) {
+      console.error(`❌ [Cron:${tId}] Erro ao processar tenant:`, tErr.message);
     }
-  } catch (err) {
-    console.error('❌ [Cron] Erro ao executar resumo matinal:', err);
   }
 }
 
@@ -808,7 +924,8 @@ cron.schedule('0 12 * * *', () => {
 
 // Rota manual para disparar o resumo matinal imediatamente
 app.post('/cron/daily-summary', requireAuth, async (req, res) => {
-  await executarResumoMatinal();
+  const tenantId = req.body?.tenantId || req.query?.tenant_id || null;
+  await executarResumoMatinal(tenantId);
   return res.json({ success: true, message: 'Rotina matinal executada!' });
 });
 
@@ -826,7 +943,7 @@ cron.schedule('*/10 * * * *', async () => {
 // ── INICIALIZAÇÃO DO SERVIDOR ────────────────────────────────────────────────
 app.listen(PORT, () => {
   console.log(`\n======================================================`);
-  console.log(`🚀 SERVIDOR FINOBRA 24/7 INICIADO NA PORTA ${PORT}`);
+  console.log(`🚀 SERVIDOR FINOBRA 24/7 MULTI-TENANT NA PORTA ${PORT}`);
   console.log(`👉 Status: http://localhost:${PORT}/status`);
   console.log(`👉 QR Code Web: http://localhost:${PORT}/qr`);
   console.log(`👉 Teste Neon: http://localhost:${PORT}/test-neon`);

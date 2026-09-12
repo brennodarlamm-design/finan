@@ -92,6 +92,7 @@ const Notas = {
   _rows(nfs, showObra) {
     const colsCount = showObra ? 15 : 14;
     if (!nfs.length) return `<tr><td colspan="${colsCount}" style="text-align:center;color:var(--text3);padding:32px">Nenhuma NF encontrada</td></tr>`;
+    const esc = (v) => (typeof Utils !== 'undefined' && Utils.escapeHtml) ? Utils.escapeHtml(String(v ?? '')) : String(v ?? '');
     return nfs.map(n => {
       const c = n.obra_id === 'escritorio' ? { nome: '🏢 Sede / Escritório' } : DB.getById('clientes',n.obra_id);
       const l = n.lancamento_id ? DB.getById('lancamentos',n.lancamento_id) : null;
@@ -111,14 +112,14 @@ const Notas = {
 
       return `<tr>
         <td style="font-weight:800;color:var(--accent2)">
-          ${n.numero_nf || '—'}
-          ${n.itens && n.itens.length ? `<div style="font-size:.7rem;color:var(--accent2);cursor:pointer;margin-top:2px;font-weight:400;" onclick="Notas.verItens('${n.id}')" title="Ver produtos desta NF">📦 ${n.itens.length} item(ns)</div>` : ''}
+          ${esc(n.numero_nf || '—')}
+          ${n.itens && n.itens.length ? `<div style="font-size:.7rem;color:var(--accent2);cursor:pointer;margin-top:2px;font-weight:400;" onclick="Notas.verItens('${esc(n.id)}')" title="Ver produtos desta NF">📦 ${n.itens.length} item(ns)</div>` : ''}
         </td>
         <td style="white-space:nowrap;font-size:.8rem">${Utils.fmt.date(n.data_emissao)}</td>
         <td style="white-space:nowrap;font-size:.8rem;color:${n.status==='vencida'?'var(--danger)':'inherit'}">${Utils.fmt.date(n.data_vencimento)}</td>
         <td style="white-space:nowrap;">${dtPagFmt}</td>
-        ${showObra?`<td style="font-size:.76rem;color:var(--text2)">${c?.nome||'—'}</td>`:''}
-        <td style="font-size:.78rem;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${n.emitente || ''}">${n.emitente || '—'}</td>
+        ${showObra?`<td style="font-size:.76rem;color:var(--text2)">${esc(c?.nome||'—')}</td>`:''}
+        <td style="font-size:.78rem;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(n.emitente || '')}">${esc(n.emitente || '—')}</td>
         <td>${Utils.catLabel(cat)}</td>
         <td>${!isSaida?'<span class="badge badge-info">↓ Entrada</span>':'<span class="badge badge-accent">↑ Saída</span>'}</td>
         <td style="font-weight:700">${Utils.fmt.currency(vBruto)}</td>
@@ -126,14 +127,14 @@ const Notas = {
         <td style="font-weight:700;color:var(--success)">${Utils.fmt.currency(vLiquido)}</td>
         <td>${Utils.badge(n.status || 'pendente')}</td>
         <td style="text-align:center;">${clipBadge}</td>
-        <td>${l?`<span style="font-size:.75rem;color:var(--text2)" title="${l.descricao}">✅ ${l.descricao.slice(0,20)}...</span>`:'<span style="font-size:.72rem;color:var(--text3)">Não vinculada</span>'}</td>
+        <td>${l?`<span style="font-size:.75rem;color:var(--text2)" title="${esc(l.descricao)}">✅ ${esc(l.descricao.slice(0,20))}...</span>`:'<span style="font-size:.72rem;color:var(--text3)">Não vinculada</span>'}</td>
         <td style="text-align:center;"><div style="display:flex;gap:4px;justify-content:center;align-items:center;">
           ${!isPaga ? `
-          <button class="btn btn-sm btn-success" onclick="Notas.marcarPaga('${n.id}')" title="Dar Baixa / Confirmar Pagamento da NF" style="font-size:.72rem;padding:3px 7px;">
+          <button class="btn btn-sm btn-success" onclick="Notas.marcarPaga('${esc(n.id)}')" title="Dar Baixa / Confirmar Pagamento da NF" style="font-size:.72rem;padding:3px 7px;">
             ✓ Pagar
           </button>` : ''}
-          <button class="icon-btn btn-sm" onclick="Notas.showForm('${n.id}')" style="font-size:12px">✏️</button>
-          <button class="icon-btn btn-sm" onclick="Notas.del('${n.id}')" style="font-size:12px;color:var(--danger)">🗑️</button>
+          <button class="icon-btn btn-sm" onclick="Notas.showForm('${esc(n.id)}')" style="font-size:12px">✏️</button>
+          <button class="icon-btn btn-sm" onclick="Notas.del('${esc(n.id)}')" style="font-size:12px;color:var(--danger)">🗑️</button>
         </div></td>
       </tr>`;
     }).join('');
@@ -143,10 +144,10 @@ const Notas = {
     const tb = nfs.reduce((s,n)=>s+(Number(n.valor_bruto !== undefined ? n.valor_bruto : n.valor_total) || 0), 0);
     const ti = nfs.reduce((s,n)=>s+(Number(n.impostos) || 0), 0);
     const tl = nfs.reduce((s,n)=>s+(Number(n.valor_liquido !== undefined ? n.valor_liquido : ((Number(n.valor_bruto !== undefined ? n.valor_bruto : n.valor_total) || 0) - (Number(n.impostos) || 0))) || 0), 0);
-    const cols = showObra ? 8 : 7;
-    return `<td colspan="${cols}" style="font-weight:700;color:var(--text3);font-size:.75rem">TOTAL (${nfs.length} NFs)</td>
-      <td style="font-weight:800">${Utils.fmt.currency(tb)}</td>
-      <td style="font-weight:800;color:var(--danger)">${Utils.fmt.currency(ti)}</td>
+    const cols = showObra ? 15 : 14;
+    return `<td colspan="${cols-7}" style="font-weight:700;color:var(--text3);font-size:.75rem">TOTAL (${nfs.length} NFs)</td>
+      <td style="font-weight:800;color:var(--text)">${Utils.fmt.currency(tb)}</td>
+      <td style="font-weight:700;color:var(--danger);font-size:.8rem">${Utils.fmt.currency(ti)}</td>
       <td style="font-weight:800;color:var(--success)">${Utils.fmt.currency(tl)}</td>
       <td colspan="4"></td>`;
   },
@@ -154,17 +155,18 @@ const Notas = {
   verItens(id) {
     const n = DB.getById('notas', id);
     if (!n || !n.itens?.length) return;
+    const esc = (v) => (typeof Utils !== 'undefined' && Utils.escapeHtml) ? Utils.escapeHtml(String(v ?? '')) : String(v ?? '');
     const rows = n.itens.map((it, i) => `
       <tr style="background:${i%2===0?'var(--bg-card)':'var(--bg-secondary)'}">
-        <td style="padding:8px 12px;font-weight:700;color:var(--text);">${it.produto}</td>
-        <td style="padding:8px 12px;text-align:right;color:var(--text2);">${it.qtd} ${it.unidade || 'un'}</td>
+        <td style="padding:8px 12px;font-weight:700;color:var(--text);">${esc(it.produto)}</td>
+        <td style="padding:8px 12px;text-align:right;color:var(--text2);">${Number(it.qtd) || 0} ${esc(it.unidade || 'un')}</td>
         <td style="padding:8px 12px;text-align:right;color:var(--text2);">${Utils.fmt.currency(it.valor_unit)}</td>
         <td style="padding:8px 12px;text-align:right;font-weight:800;color:var(--danger);">${Utils.fmt.currency(it.total || (it.qtd * it.valor_unit))}</td>
       </tr>`).join('');
     Utils.showModal(`
       <div class="modal" style="max-width:580px;">
         <div class="modal-header">
-          <span class="modal-title">📦 Itens — NF ${n.numero_nf} (${n.emitente})</span>
+          <span class="modal-title">📦 Itens — NF ${esc(n.numero_nf)} (${esc(n.emitente)})</span>
           <button class="modal-close" onclick="Utils.closeModal()">✕</button>
         </div>
         <div class="modal-body">

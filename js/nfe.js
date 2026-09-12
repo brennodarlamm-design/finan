@@ -293,19 +293,62 @@ const NFe = {
     if (tab === 'cache') {
       body.innerHTML = this._renderTabCache(this._getCache());
     } else if (tab === 'cert') {
-      body.innerHTML = this._renderTabCert();
+      body.innerHTML = '<div style="text-align:center;padding:28px;color:var(--text3);">Carregando informações do Certificado Digital...</div>';
+      this._carregarTabCert();
     } else {
       body.innerHTML = '<div style="text-align:center;padding:28px;color:var(--text3);">Carregando...</div>';
       this._carregarMinhasNFes();
     }
   },
 
+  _certOnline: null,
+  _certModoSubstituir: false,
+
+  async _carregarTabCert() {
+    try {
+      const res = await fetch('/api/certificado?action=status', { headers: this._headers() });
+      const json = await res.json().catch(() => ({}));
+      if (res.ok && json.success && json.configurado && json.certificado) {
+        this._certOnline = json.certificado;
+      } else {
+        this._certOnline = null;
+      }
+    } catch (err) {
+      console.warn('[NFe] Não foi possível consultar status online do certificado:', err);
+      // Fallback para cache da empresa
+      const emp = typeof DB !== 'undefined' && DB.getEmpresa ? DB.getEmpresa() : {};
+      this._certOnline = emp.certificado_a1 || null;
+    }
+    const body = document.getElementById('nfe-tab-body');
+    if (body && this._currentTab === 'cert') {
+      body.innerHTML = this._renderTabCert();
+    }
+  },
+
   _renderTabCert() {
     const emp = typeof DB !== 'undefined' && DB.getEmpresa ? DB.getEmpresa() : {};
-    const cert = emp.certificado_a1;
+    const cert = this._certOnline;
+    const substituir = this._certModoSubstituir;
+    const esc = (v) => (typeof Utils !== 'undefined' && Utils.escapeHtml) ? Utils.escapeHtml(String(v ?? '')) : String(v ?? '');
+    const fmtCnpj = (v) => {
+      const c = String(v || '').replace(/\D/g, '');
+      if (c.length === 14) return `${c.slice(0,2)}.${c.slice(2,5)}.${c.slice(5,8)}/${c.slice(8,12)}-${c.slice(12)}`;
+      return c || '—';
+    };
+
+    let badgeHtml = '<span class="badge badge-secondary" style="font-size:.75rem;">Não Configurado</span>';
+    if (cert) {
+      if (cert.vencido) {
+        badgeHtml = `<span class="badge" style="font-size:.75rem;background:#ef4444;color:#fff;font-weight:700;">🔴 Vencido há ${Math.abs(cert.dias_restantes)} dia(s)</span>`;
+      } else if (cert.expirando) {
+        badgeHtml = `<span class="badge" style="font-size:.75rem;background:#f59e0b;color:#182713;font-weight:800;">🟡 Expira em ${cert.dias_restantes} dia(s)</span>`;
+      } else {
+        badgeHtml = `<span class="badge" style="font-size:.75rem;background:#10b981;color:#fff;font-weight:700;">🟢 Ativo (${cert.dias_restantes} dias restantes)</span>`;
+      }
+    }
 
     return `
-      <div style="max-width:780px;">
+      <div style="max-width:820px;">
         <!-- CARD DE CERTIFICADO DIGITAL A1 DA EMPRESA -->
         <div class="card" style="margin-bottom:20px;border:1.5px solid var(--border);border-radius:var(--r-md);background:var(--bg-card);padding:18px;">
           <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:14px;border-bottom:1px solid var(--border);padding-bottom:12px;">
@@ -313,25 +356,33 @@ const NFe = {
               <span style="font-size:1.3rem;">🔐</span>
               <div>
                 <div style="font-weight:800;color:var(--text);font-size:.95rem;">Certificado Digital A1 da Empresa (.pfx / .p12)</div>
-                <div style="font-size:.74rem;color:var(--text3);">Vincula o certificado digital da sua empresa para consulta direta à SEFAZ</div>
+                <div style="font-size:.74rem;color:var(--text3);">Vincula o certificado digital da sua empresa para consulta direta e segura à SEFAZ</div>
               </div>
             </div>
-            ${cert ? `<span class="badge badge-success" style="font-size:.75rem;">🟢 Certificado A1 Ativo</span>` : `<span class="badge badge-secondary" style="font-size:.75rem;">Não Configurado</span>`}
+            ${badgeHtml}
           </div>
 
-          ${cert ? `
-            <div style="background:rgba(16,185,129,.07);border:1.5px solid rgba(16,185,129,.28);border-radius:var(--r-md);padding:14px 18px;">
-              <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;">
+          ${cert && !substituir ? `
+            <div style="background:${cert.vencido ? 'rgba(239,68,68,.08)' : (cert.expirando ? 'rgba(245,158,11,.08)' : 'rgba(16,185,129,.07)')};border:1.5px solid ${cert.vencido ? 'rgba(239,68,68,.3)' : (cert.expirando ? 'rgba(245,158,11,.3)' : 'rgba(16,185,129,.28)')};border-radius:var(--r-md);padding:16px 18px;">
+              <div style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:14px;">
                 <div>
-                  <div style="font-weight:800;color:#34d399;font-size:.92rem;display:flex;align-items:center;gap:6px;">
-                    <span>✓</span> ${cert.nome_arquivo || 'certificado_a1.pfx'}
+                  <div style="font-weight:800;color:${cert.vencido ? 'var(--danger)' : (cert.expirando ? '#f59e0b' : '#34d399')};font-size:.95rem;display:flex;align-items:center;gap:6px;">
+                    <span>${cert.vencido ? '⚠️' : '✓'}</span> ${esc(cert.nome_arquivo || 'certificado_a1.pfx')}
                   </div>
-                  <div style="font-size:.78rem;color:var(--text2);margin-top:4px;">
-                    Titular: <strong>${emp.razao_social || emp.nome_fantasia || 'Minha Construtora'}</strong> &middot; CNPJ: <strong>${emp.cnpj || 'Cadastrado'}</strong>
+                  <div style="font-size:.82rem;color:var(--text);margin-top:6px;font-weight:600;">
+                    Titular: <strong style="color:var(--accent);">${esc(cert.razao_social || emp.razao_social || emp.nome_fantasia || 'Minha Construtora')}</strong>
                   </div>
-                  <div style="font-size:.74rem;color:var(--text3);margin-top:2px;">
-                    Configurado em: ${Utils.fmt.datetime(cert.data_upload)} &middot; Status: <strong style="color:var(--success);">Válido para Busca Automática</strong>
+                  <div style="font-size:.78rem;color:var(--text2);margin-top:3px;">
+                    CNPJ do Certificado: <strong>${fmtCnpj(cert.cnpj || emp.cnpj)}</strong>
                   </div>
+                  <div style="font-size:.74rem;color:var(--text3);margin-top:3px;">
+                    Validade: ${cert.valido_de ? esc(String(cert.valido_de).slice(0, 10)) : '—'} até <strong style="color:${cert.vencido ? 'var(--danger)' : 'var(--text)'}">${cert.valido_ate ? esc(String(cert.valido_ate).slice(0, 10)) : '—'}</strong> &middot; Emissor: ${esc(cert.emissor || 'ICP-Brasil')}
+                  </div>
+                  ${cert.vencido ? `
+                    <div style="margin-top:8px;font-size:.76rem;color:var(--danger);font-weight:700;">
+                      🚨 Atenção: Este certificado está vencido. Substitua-o para continuar emitindo e consultando notas.
+                    </div>
+                  ` : ''}
                 </div>
                 <div style="display:flex;gap:8px;align-items:center;">
                   <button class="btn btn-secondary btn-sm" onclick="NFe._substituirCertificadoA1()">🔄 Substituir</button>
@@ -342,21 +393,22 @@ const NFe = {
           ` : `
             <div style="background:rgba(201,162,39,.06);border:1px solid rgba(201,162,39,.2);border-radius:var(--r-md);padding:12px 16px;margin-bottom:14px;font-size:.8rem;color:var(--text2);line-height:1.5;">
               <strong style="color:var(--accent);">ℹ️ Como funciona para a sua construtora:</strong>
-              Importe o arquivo do Certificado Digital A1 (arquivo <strong>.pfx</strong> ou <strong>.p12</strong>) da sua empresa e digite a senha. 
-              Com isso, o sistema identifica exclusivamente as notas emitidas contra o CNPJ <strong>${emp.cnpj || 'da sua empresa'}</strong>.
+              Importe o arquivo do Certificado Digital A1 (arquivo <strong>.pfx</strong> ou <strong>.p12</strong>) da sua empresa e digite a senha.
+              O arquivo é validado via criptografia OpenSSL e armazenado com criptografia em repouso AES-256-GCM exclusivo para o seu tenant.
+              ${substituir ? '<div style="margin-top:6px;"><button type="button" class="btn btn-ghost btn-sm" onclick="NFe._cancelarSubstituicao()">✕ Cancelar substituição</button></div>' : ''}
             </div>
 
             <form id="f-cert-a1" onsubmit="NFe.salvarCertificadoA1(event)" style="display:grid;grid-template-columns:1fr 1fr auto;gap:12px;align-items:end;">
               <div class="form-group" style="margin-bottom:0;">
                 <label class="form-label" style="font-size:.78rem;">Arquivo do Certificado A1 (.pfx / .p12) *</label>
-                <input type="file" id="cert-a1-file" accept=".pfx,.p12" class="form-control" required style="font-size:.8rem;padding:6px;">
+                <input type="file" id="cert-a1-file" accept=".pfx,.p12,application/x-pkcs12" class="form-control" required style="font-size:.8rem;padding:6px;">
               </div>
               <div class="form-group" style="margin-bottom:0;">
                 <label class="form-label" style="font-size:.78rem;">Senha do Certificado *</label>
                 <input type="password" id="cert-a1-senha" class="form-control" placeholder="Senha do arquivo .pfx" required autocomplete="current-password" style="font-size:.85rem;">
               </div>
-              <button type="submit" class="btn btn-primary" style="height:38px;font-weight:700;white-space:nowrap;padding:0 18px;">
-                💾 Salvar Certificado
+              <button type="submit" id="btn-save-cert" class="btn btn-primary" style="height:38px;font-weight:700;white-space:nowrap;padding:0 18px;">
+                💾 Validar &amp; Salvar
               </button>
             </form>
           `}
@@ -394,58 +446,138 @@ const NFe = {
     e.preventDefault();
     const fileInput = document.getElementById('cert-a1-file');
     const senhaInput = document.getElementById('cert-a1-senha');
+    const submitBtn = document.getElementById('btn-save-cert');
     const file = fileInput?.files?.[0];
     const senha = senhaInput?.value || '';
 
     if (!file) {
-      Utils.toast('Selecione o arquivo .pfx ou .p12 do Certificado A1.', 'warning');
+      if (typeof Utils !== 'undefined' && Utils.toast) Utils.toast('Selecione o arquivo .pfx ou .p12 do Certificado A1.', 'warning');
       return;
     }
     if (!senha) {
-      Utils.toast('Informe a senha do certificado digital.', 'warning');
+      if (typeof Utils !== 'undefined' && Utils.toast) Utils.toast('Informe a senha do certificado digital.', 'warning');
       return;
     }
 
-    try {
-      Utils.toast('Vinculando Certificado A1 à sua empresa...', 'info');
-      const emp = typeof DB !== 'undefined' && DB.getEmpresa ? DB.getEmpresa() : {};
-      const certData = {
-        nome_arquivo: file.name,
-        tamanho_bytes: file.size,
-        data_upload: new Date().toISOString(),
-        has_senha: true
-      };
+    const reader = new FileReader();
+    reader.onerror = () => {
+      if (typeof Utils !== 'undefined' && Utils.toast) Utils.toast('Erro ao ler arquivo do certificado localmente.', 'error');
+    };
 
-      DB.saveEmpresa({
-        ...emp,
-        certificado_a1: certData
-      });
+    reader.onload = async () => {
+      try {
+        if (submitBtn) {
+          submitBtn.disabled = true;
+          submitBtn.textContent = '⏳ Validando e criptografando...';
+        }
+        if (typeof Utils !== 'undefined' && Utils.toast) Utils.toast('Validando chaves criptográficas do Certificado A1...', 'info');
 
-      Utils.toast('✅ Certificado Digital A1 vinculado com sucesso à sua empresa!', 'success');
-      this._setTab('cert');
-    } catch (err) {
-      console.error('Erro ao salvar certificado A1:', err);
-      Utils.toast('Falha ao processar arquivo de certificado.', 'error');
+        const base64 = String(reader.result || '').split(',')[1];
+        if (!base64) throw new Error('Não foi possível codificar o arquivo.');
+
+        const res = await fetch('/api/certificado?action=upload', {
+          method: 'POST',
+          headers: this._headers(),
+          body: JSON.stringify({
+            pfx_base64: base64,
+            senha,
+            nome_arquivo: file.name
+          })
+        });
+
+        const json = await res.json().catch(() => ({}));
+        if (!res.ok || !json.success) {
+          throw new Error(json.error || `Falha na validação do certificado (HTTP ${res.status}).`);
+        }
+
+        this._certOnline = json.certificado;
+        this._certModoSubstituir = false;
+
+        // Mantém cache da empresa sincronizado
+        const emp = typeof DB !== 'undefined' && DB.getEmpresa ? DB.getEmpresa() : {};
+        if (typeof DB !== 'undefined' && DB.saveEmpresa) {
+          DB.saveEmpresa({
+            ...emp,
+            certificado_a1: json.certificado
+          });
+        }
+
+        if (typeof Utils !== 'undefined' && Utils.toast) {
+          Utils.toast(json.message || '✅ Certificado Digital A1 validado e vinculado com sucesso!', 'success');
+        }
+
+        const body = document.getElementById('nfe-tab-body');
+        if (body && this._currentTab === 'cert') {
+          body.innerHTML = this._renderTabCert();
+        }
+      } catch (err) {
+        console.error('[NFe] Erro ao salvar certificado A1:', err);
+        if (typeof Utils !== 'undefined' && Utils.toast) {
+          Utils.toast(err.message || 'Falha ao processar arquivo de certificado.', 'error');
+        }
+      } finally {
+        if (submitBtn) {
+          submitBtn.disabled = false;
+          submitBtn.textContent = '💾 Validar & Salvar';
+        }
+      }
+    };
+
+    reader.readAsDataURL(file);
+  },
+
+  _substituirCertificadoA1() {
+    this._certModoSubstituir = true;
+    const body = document.getElementById('nfe-tab-body');
+    if (body && this._currentTab === 'cert') {
+      body.innerHTML = this._renderTabCert();
+    }
+  },
+
+  _cancelarSubstituicao() {
+    this._certModoSubstituir = false;
+    const body = document.getElementById('nfe-tab-body');
+    if (body && this._currentTab === 'cert') {
+      body.innerHTML = this._renderTabCert();
     }
   },
 
   _removerCertificadoA1() {
-    Utils.confirm('Deseja remover o Certificado Digital A1 vinculado a esta empresa?', () => {
-      const emp = DB.getEmpresa();
-      const updated = { ...emp };
-      delete updated.certificado_a1;
-      DB.saveEmpresa(updated);
-      Utils.toast('Certificado A1 removido.', 'info');
-      this._setTab('cert');
-    });
-  },
+    const doRemove = async () => {
+      try {
+        if (typeof Utils !== 'undefined' && Utils.toast) Utils.toast('Removendo certificado...', 'info');
+        const res = await fetch('/api/certificado?action=remover', {
+          method: 'DELETE',
+          headers: this._headers()
+        });
+        const json = await res.json().catch(() => ({}));
+        if (!res.ok || !json.success) {
+          throw new Error(json.error || `Erro HTTP ${res.status}`);
+        }
 
-  _substituirCertificadoA1() {
-    const emp = DB.getEmpresa();
-    const updated = { ...emp };
-    delete updated.certificado_a1;
-    DB.saveEmpresa(updated);
-    this._setTab('cert');
+        this._certOnline = null;
+        this._certModoSubstituir = false;
+        const emp = typeof DB !== 'undefined' && DB.getEmpresa ? DB.getEmpresa() : {};
+        const updated = { ...emp };
+        delete updated.certificado_a1;
+        if (typeof DB !== 'undefined' && DB.saveEmpresa) DB.saveEmpresa(updated);
+
+        if (typeof Utils !== 'undefined' && Utils.toast) Utils.toast('Certificado A1 removido com sucesso.', 'info');
+        const body = document.getElementById('nfe-tab-body');
+        if (body && this._currentTab === 'cert') {
+          body.innerHTML = this._renderTabCert();
+        }
+      } catch (err) {
+        console.error('[NFe] Erro ao remover certificado:', err);
+        if (typeof Utils !== 'undefined' && Utils.toast) Utils.toast(`Erro ao remover: ${err.message}`, 'error');
+      }
+    };
+
+    if (typeof Utils !== 'undefined' && Utils.confirm) {
+      Utils.confirm('Deseja realmente remover o Certificado Digital A1 desta empresa? As consultas automáticas serão desativadas.', doRemove);
+    } else if (window.confirm('Deseja realmente remover o Certificado Digital A1 desta empresa?')) {
+      doRemove();
+    }
   },
 
   _renderTabCache(cache) {

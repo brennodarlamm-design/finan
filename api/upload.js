@@ -82,6 +82,13 @@ export default async function handler(req, res) {
   if (req.method === 'DELETE' && !canDeleteData(auth)) return res.status(403).json(permissionError('ROLE_DELETE_FORBIDDEN'));
   const privateBlobReady = Boolean(String(process.env.FINOBRA_BLOB_READ_WRITE_TOKEN || '').trim() || String(process.env.FINOBRA_BLOB_STORE_ID || '').trim());
   const configuredAccess = String(process.env.FINOBRA_BLOB_ACCESS || process.env.BLOB_ACCESS || (privateBlobReady ? 'private' : 'public')).trim().toLowerCase();
+  
+  if (configuredAccess === 'private' && !privateBlobReady && req.method === 'POST') {
+    return res.status(500).json({
+      success: false,
+      error: 'Armazenamento privado seguro não está pronto no servidor (FINOBRA_BLOB_READ_WRITE_TOKEN pendente). Upload bloqueado por segurança (fail-closed).'
+    });
+  }
   const blobAccess = configuredAccess === 'private' && privateBlobReady ? 'private' : 'public';
 
   // ── GET: URL temporária para leitura de documento privado ───────────────────
@@ -246,10 +253,27 @@ export default async function handler(req, res) {
 
     const cleanBase64 = base64.includes(',') ? base64.split(',')[1] : base64;
     const cleanMime = (contentType || 'application/octet-stream').includes(';')
-      ? contentType.split(';')[0]
-      : (contentType || 'application/octet-stream');
+      ? contentType.split(';')[0].toLowerCase().trim()
+      : (contentType || 'application/octet-stream').toLowerCase().trim();
+
+    const lowerExt = (filename.includes('.') ? filename.split('.').pop() : '').toLowerCase();
+    const disallowedExts = ['html', 'htm', 'svg', 'xhtml', 'exe', 'bat', 'cmd', 'sh', 'js', 'vbs', 'scr'];
+    const disallowedMimes = ['text/html', 'image/svg+xml', 'application/xhtml+xml', 'application/x-msdownload', 'text/javascript', 'application/javascript'];
+
+    if (disallowedExts.includes(lowerExt) || disallowedMimes.includes(cleanMime)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Tipo de arquivo não permitido por políticas de segurança.'
+      });
+    }
 
     const buffer = Buffer.from(cleanBase64, 'base64');
+    if (buffer.length > 25 * 1024 * 1024) {
+      return res.status(413).json({
+        success: false,
+        error: 'Arquivo excede o limite máximo permitido de 25 MB.'
+      });
+    }
 
     // Estrutura de pastas no Blob: <tenantId>/documentos/<ano>/<mes>/<timestamp>_<filename>
     const now = new Date();

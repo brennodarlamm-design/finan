@@ -69,11 +69,13 @@ export default async function handler(req, res) {
 
   const renderBase = getRenderBaseUrl();
   const internalSecret = (process.env.API_SECRET || process.env.VERCEL_API_SECRET || '').trim();
+  const tenantId = auth.tenantId || 'public';
 
   const authHeaders = {
     'Accept': 'application/json',
     'Content-Type': 'application/json',
-    'User-Agent': 'FinObra-WhatsApp-Proxy/1.0'
+    'User-Agent': 'FinObra-WhatsApp-Proxy/1.0',
+    'x-tenant-id': tenantId
   };
 
   if (internalSecret) {
@@ -85,7 +87,8 @@ export default async function handler(req, res) {
     // ── AÇÃO: CONSULTAR STATUS DA SESSÃO E QR CODE ──────────────────────────
     if (action === 'session' || action === 'status') {
       try {
-        const response = await fetch(`${renderBase}/whatsapp-session`, {
+        const sessionUrl = `${renderBase}/whatsapp-session?tenant_id=${encodeURIComponent(tenantId)}`;
+        const response = await fetch(sessionUrl, {
           method: 'GET',
           headers: authHeaders,
           signal: AbortSignal.timeout(10000)
@@ -137,7 +140,7 @@ export default async function handler(req, res) {
         const response = await fetch(`${renderBase}/reset-auth`, {
           method: 'POST',
           headers: authHeaders,
-          body: JSON.stringify({ reason: 'Desconexão solicitada pelo usuário no painel' }),
+          body: JSON.stringify({ tenantId, reason: 'Desconexão solicitada pelo usuário no painel' }),
           signal: AbortSignal.timeout(15000)
         });
 
@@ -164,6 +167,7 @@ export default async function handler(req, res) {
         method: 'POST',
         headers: authHeaders,
         body: JSON.stringify({
+          tenantId,
           phone: destPhone,
           message: testMsg,
           text: testMsg
@@ -211,6 +215,7 @@ export default async function handler(req, res) {
 
       const numFmt = destPhone.startsWith('55') ? destPhone : `55${destPhone}`;
       const payloadObj = {
+        tenantId,
         number: numFmt,
         phone: numFmt,
         to: numFmt,

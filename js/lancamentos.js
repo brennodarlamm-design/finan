@@ -160,7 +160,7 @@ const Lancamentos = {
         <td style="white-space:nowrap">${Utils.catLabel(l.categoria)}</td>
         <td style="font-size:.78rem;color:var(--text2);max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${Utils.escapeHtml(l.fornecedor_beneficiario)||'&mdash;'}</td>
         <td style="font-size:.76rem;color:var(--text3);max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${l.conta_bancaria ? `&#x1F3E6; ${Utils.escapeHtml(l.conta_bancaria)}` : '&mdash;'}</td>
-        <td>${nf?`<span style="color:var(--accent2);cursor:pointer;font-size:.78rem;font-weight:700" onclick="App.navigate('notas')" title="Ver NF">#${nf.numero_nf}</span>`:'&mdash;'}</td>
+        <td>${nf?`<span style="color:var(--accent2);cursor:pointer;font-size:.78rem;font-weight:700" onclick="App.navigate('notas')" title="Ver NF">#${Utils.escapeHtml(nf.numero_nf)}</span>`:'&mdash;'}</td>
         <td>${l.tipo==='receita'?'<span class="badge badge-success">&uarr; Receita</span>':'<span class="badge badge-danger">&darr; Despesa</span>'}</td>
         <td style="font-weight:800;white-space:nowrap;color:${l.tipo==='receita'?'var(--success)':'var(--danger)'};">${l.tipo==='receita'?'+':'&minus;'} ${Utils.fmt.currency(l.valor)}</td>
         <td>${statusBadge}</td>

@@ -208,9 +208,9 @@ const Utils = {
       const customDesp = JSON.parse(localStorage.getItem(scoped('finobra_cats_despesa_custom')) || '[]');
       const customForn = JSON.parse(localStorage.getItem(scoped('finobra_categorias_custom')) || '[]');
       const found = [...customDesp, ...customForn].find(x => x.value === c);
-      if (found) return found.label;
+      if (found) return this.escapeHtml(found.label);
     } catch(e) {}
-    return c;
+    return this.escapeHtml(c || '');
   },
 
 

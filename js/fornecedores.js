@@ -161,6 +161,7 @@ const Fornecedores = {
         <div style="font-size:.82rem;">Clique em "+ Novo Fornecedor" para começar</div>
       </td></tr>`;
     }
+    const esc = (v) => (typeof Utils !== 'undefined' && Utils.escapeHtml) ? Utils.escapeHtml(String(v ?? '')) : String(v ?? '');
     return list.map(f => {
       const cat = this._getAllCategorias().find(c=>c.value===f.categoria);
       const isAtivo = f.ativo !== false;
@@ -171,19 +172,22 @@ const Fornecedores = {
       const docBadge = f.tipo_pessoa === 'pf'
         ? `<span style="font-size:.62rem;background:rgba(99,102,241,.15);color:#818cf8;border-radius:4px;padding:1px 5px;margin-right:4px;">PF</span>`
         : `<span style="font-size:.62rem;background:rgba(201,162,39,.13);color:var(--accent2);border-radius:4px;padding:1px 5px;margin-right:4px;">PJ</span>`;
-      const razao = f.razao_social || f.nome || '—';
-      const fant = (f.nome_fantasia && f.nome_fantasia !== razao) ? f.nome_fantasia : (f.nome && f.nome !== razao ? f.nome : '');
+      const razao = esc(f.razao_social || f.nome || '—');
+      const fant = (f.nome_fantasia && f.nome_fantasia !== razao) ? esc(f.nome_fantasia) : (f.nome && f.nome !== razao ? esc(f.nome) : '');
+      const munUf = esc([f.municipio, f.uf].filter(Boolean).join(' / ') || '—');
+      const catLabel = esc(cat?.label || f.categoria || '—');
+
       return `<tr>
-        <td style="font-family:monospace;font-size:.78rem;color:var(--accent2);white-space:nowrap;">${docBadge}${docFmt || '—'}</td>
+        <td style="font-family:monospace;font-size:.78rem;color:var(--accent2);white-space:nowrap;">${docBadge}${esc(docFmt || '—')}</td>
         <td>
           <div style="font-weight:700;font-size:.88rem;">${razao}</div>
           ${fant ? `<div style="font-size:.72rem;color:var(--text3);">${fant}</div>` : ''}
         </td>
-        <td style="white-space:nowrap;font-size:.8rem;">${cat?.label || f.categoria || '—'}</td>
-        <td style="font-size:.78rem;color:var(--text2);">${[f.municipio, f.uf].filter(Boolean).join(' / ') || '—'}</td>
-        <td style="font-size:.78rem;white-space:nowrap;">${f.telefone || '—'}</td>
-        <td style="font-size:.75rem;color:var(--text3);max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${f.email || '—'}</td>
-        <td style="font-size:.78rem;text-align:center;">${f.prazo_pagamento ? `${f.prazo_pagamento}d` : '—'}</td>
+        <td style="white-space:nowrap;font-size:.8rem;">${catLabel}</td>
+        <td style="font-size:.78rem;color:var(--text2);">${munUf}</td>
+        <td style="font-size:.78rem;white-space:nowrap;">${esc(f.telefone || '—')}</td>
+        <td style="font-size:.75rem;color:var(--text3);max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(f.email || '—')}</td>
+        <td style="font-size:.78rem;text-align:center;">${f.prazo_pagamento ? `${Number(f.prazo_pagamento)}d` : '—'}</td>
         <td style="text-align:center;">
           ${isAtivo
             ? `<span class="badge badge-success">✅ Ativo</span>`
@@ -191,9 +195,9 @@ const Fornecedores = {
         </td>
         <td style="text-align:center;">
           <div style="display:flex;gap:4px;justify-content:center;">
-            <button class="icon-btn" onclick="Fornecedores.showForm('${f.id}')" title="Editar">✏️</button>
-            <button class="icon-btn" onclick="Fornecedores.toggleAtivo('${f.id}')" title="${isAtivo?'Desativar':'Ativar'}" style="color:${isAtivo?'var(--warning)':'var(--success)'};">${isAtivo?'⛔':'✅'}</button>
-            <button class="icon-btn" onclick="Fornecedores.excluir('${f.id}')" title="Excluir" style="color:var(--danger);">🗑️</button>
+            <button class="icon-btn" onclick="Fornecedores.showForm('${esc(f.id)}')" title="Editar">✏️</button>
+            <button class="icon-btn" onclick="Fornecedores.toggleAtivo('${esc(f.id)}')" title="${isAtivo?'Desativar':'Ativar'}" style="color:${isAtivo?'var(--warning)':'var(--success)'};">${isAtivo?'⛔':'✅'}</button>
+            <button class="icon-btn" onclick="Fornecedores.excluir('${esc(f.id)}')" title="Excluir" style="color:var(--danger);">🗑️</button>
           </div>
         </td>
       </tr>`;
