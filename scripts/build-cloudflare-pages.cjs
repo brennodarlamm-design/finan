@@ -36,14 +36,20 @@ for (const dir of directories) copyRequired(path.join(root, dir), path.join(out,
 copyRequired(path.join(root, 'cloudflare', '_headers'), path.join(out, '_headers'));
 copyRequired(path.join(root, 'cloudflare', '_redirects'), path.join(out, '_redirects'));
 
-const indexPath = path.join(out, 'index.html');
-let indexHtml = fs.readFileSync(indexPath, 'utf8');
-const recoveryUxScript = '<script src="/js/recovery-account-ux.js"></script>';
-if (!indexHtml.includes(recoveryUxScript)) {
-  if (!indexHtml.includes('</body>')) throw new Error('index.html sem fechamento </body> para injetar UX de recuperação.');
-  indexHtml = indexHtml.replace('</body>', `  ${recoveryUxScript}\n</body>`);
-  fs.writeFileSync(indexPath, indexHtml, 'utf8');
+// Corrige o fluxo de recuperação diretamente no JS entregue pelo Cloudflare.
+// A API antiga responde success:true genericamente para conta inexistente, mas sem userId/requestId.
+// Nessa situação, não avançamos para OTP e oferecemos o cadastro da conta.
+const loginPagePath = path.join(out, 'js', 'login_page.js');
+let loginPage = fs.readFileSync(loginPagePath, 'utf8');
+const recoveryNeedle = `      const res = await Auth.solicitarCodigoRecuperacao(ident);\n      if (!res.success) {\n        errBox.textContent = res.message;\n        errBox.style.display = 'block';\n        btn.disabled = false;\n        btn.innerHTML = originalText;\n        return;\n      }\n\n      recoveryUserId = res.userId;`;
+const recoveryReplacement = `      const res = await Auth.solicitarCodigoRecuperacao(ident);\n      const recoveryId = res?.requestId || res?.userId || null;\n      const staleCta = document.getElementById('rec-create-account-cta');\n      if (staleCta) staleCta.remove();\n\n      if (!res.success || !recoveryId) {\n        const accountMissing = !!res.success && !recoveryId;\n        errBox.textContent = accountMissing\n          ? (ident.includes('@')\n              ? 'Não encontramos uma conta cadastrada com este e-mail.'\n              : 'Não encontramos uma conta cadastrada com este usuário ou e-mail.')\n          : (res.message || 'Não foi possível iniciar a recuperação.');\n        errBox.style.display = 'block';\n\n        if (accountMissing) {\n          const cta = document.createElement('button');\n          cta.type = 'button';\n          cta.id = 'rec-create-account-cta';\n          cta.className = 'btn-primary';\n          cta.textContent = 'Criar minha conta';\n          cta.style.marginTop = '10px';\n          cta.addEventListener('click', () => {\n            if (typeof closeRecoveryModal === 'function') closeRecoveryModal();\n            if (typeof openRegisterModal === 'function') openRegisterModal();\n            if (ident.includes('@')) {\n              const email = document.getElementById('reg-email');\n              if (email) email.value = ident;\n            } else {\n              const username = document.getElementById('reg-username');\n              if (username) username.value = ident;\n            }\n          });\n          errBox.insertAdjacentElement('afterend', cta);\n        }\n\n        btn.disabled = false;\n        btn.innerHTML = originalText;\n        return;\n      }\n\n      recoveryUserId = recoveryId;`;
+
+if (loginPage.includes(recoveryNeedle)) {
+  loginPage = loginPage.replace(recoveryNeedle, recoveryReplacement);
+} else if (!loginPage.includes("const recoveryId = res?.requestId || res?.userId || null;")) {
+  throw new Error('Não foi possível aplicar o tratamento de conta inexistente em login_page.js.');
 }
+fs.writeFileSync(loginPagePath, loginPage, 'utf8');
 
 const forbidden = ['api', 'backend', 'bin', 'migrations', 'monitor-nfe', 'node_modules', '.git', '.vercel'];
 for (const entry of forbidden) {
@@ -64,11 +70,11 @@ if (/\beval\s*\(|new\s+Function\s*\(/.test(bridge)) {
   throw new Error('Bridge Cloudflare contém eval/new Function proibido.');
 }
 
-const recoveryUx = fs.readFileSync(path.join(out, 'js', 'recovery-account-ux.js'), 'utf8');
-if (!fs.readFileSync(indexPath, 'utf8').includes('/js/recovery-account-ux.js') ||
-    !recoveryUx.includes('Criar minha conta') ||
-    !recoveryUx.includes('hasRecoveryId')) {
-  throw new Error('Build Cloudflare sem tratamento de conta inexistente na recuperação.');
+const builtLoginPage = fs.readFileSync(loginPagePath, 'utf8');
+if (!builtLoginPage.includes("const recoveryId = res?.requestId || res?.userId || null;") ||
+    !builtLoginPage.includes('Não encontramos uma conta cadastrada com este e-mail.') ||
+    !builtLoginPage.includes("cta.textContent = 'Criar minha conta'")) {
+  throw new Error('Build Cloudflare sem bloqueio real de OTP para conta inexistente.');
 }
 
-console.log('✅ Cloudflare Workers dist preparado a partir da fonte imutável Patch 27 com UX de recuperação.');
+console.log('✅ Cloudflare Workers dist preparado a partir da fonte imutável Patch 27 com recuperação tratada.');
