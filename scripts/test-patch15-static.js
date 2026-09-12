@@ -111,19 +111,28 @@ assert(
 
 const fornCode = fs.readFileSync('js/fornecedores.js', 'utf8');
 assert(
-  fornCode.includes('onCepChange') && fornCode.includes('onblur="Fornecedores.onCepChange(this)"'),
+  fornCode.includes('onCepChange') && (
+    fornCode.includes('onblur="Fornecedores.onCepChange(this)"') ||
+    fornCode.includes('data-fb-blur="Fornecedores.onCepChange"')
+  ),
   'js/fornecedores.js implementa auto-preenchimento por CEP'
 );
 
 const cliCode = fs.readFileSync('js/clientes.js', 'utf8');
 assert(
-  cliCode.includes('onCepChange') && cliCode.includes('onblur="Clientes.onCepChange(this)"'),
+  cliCode.includes('onCepChange') && (
+    cliCode.includes('onblur="Clientes.onCepChange(this)"') ||
+    cliCode.includes('data-fb-blur="Clientes.onCepChange"')
+  ),
   'js/clientes.js implementa auto-preenchimento por CEP'
 );
 
 const cfgCode = fs.readFileSync('js/configuracoes.js', 'utf8');
 assert(
-  cfgCode.includes('buscarCep') && cfgCode.includes('onblur="Configuracoes.buscarCep(this)"'),
+  cfgCode.includes('buscarCep') && (
+    cfgCode.includes('onblur="Configuracoes.buscarCep(this)"') ||
+    cfgCode.includes('data-fb-blur="Configuracoes.buscarCep"')
+  ),
   'js/configuracoes.js implementa auto-preenchimento por CEP'
 );
 
