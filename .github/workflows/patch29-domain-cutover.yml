@@ -1,0 +1,29 @@
+name: Patch 29 domain cutover validation
+
+on:
+  push:
+    branches:
+      - patch29-domain-cutover-20260912
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Full regression suite
+        run: npm test
+      - name: Syntax verification
+        run: node scripts/check-all-syntax.js
+      - name: Build Cloudflare static assets
+        run: npm run build:cloudflare
+      - name: Validate Wrangler bundle
+        run: npx --yes wrangler deploy --dry-run
