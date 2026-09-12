@@ -1,4 +1,4 @@
-const DEFAULT_API_ORIGIN = 'https://finan-as.vercel.app';
+const DEFAULT_API_ORIGIN = 'https://finobra.app.br';
 const DEFAULT_CANONICAL_ORIGIN = 'https://finobra.app.br';
 const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
 
@@ -26,6 +26,18 @@ function canonicalOrigin(env) {
   return url.origin;
 }
 
+function isAuthAction(url, action) {
+  return url.pathname === '/api/auth' && url.searchParams.get('action') === action;
+}
+
+function addRecoveryAliases(payload) {
+  if (!payload || typeof payload !== 'object') return payload;
+  const next = { ...payload };
+  if (next.requestId && !next.userId) next.userId = next.requestId;
+  if (next.userId && !next.requestId) next.requestId = next.userId;
+  return next;
+}
+
 async function proxyApi(request, env) {
   const method = String(request.method || 'GET').toUpperCase();
 
@@ -33,9 +45,10 @@ async function proxyApi(request, env) {
     return Response.json({ ok: false, error: 'Origem não autorizada.' }, { status: 403 });
   }
 
+  let incoming;
   let target;
   try {
-    const incoming = new URL(request.url);
+    incoming = new URL(request.url);
     target = new URL(incoming.pathname + incoming.search, upstreamOrigin(env));
   } catch (err) {
     console.error('[FinObra Cloudflare] configuração de API inválida:', err?.message || err);
@@ -44,7 +57,7 @@ async function proxyApi(request, env) {
 
   const headers = new Headers(request.headers);
   for (const name of [
-    'host', 'cf-connecting-ip', 'cf-ipcountry', 'cf-ray', 'cf-visitor',
+    'host', 'content-length', 'cf-connecting-ip', 'cf-ipcountry', 'cf-ray', 'cf-visitor',
     'x-forwarded-host', 'x-forwarded-proto', 'x-real-ip'
   ]) headers.delete(name);
 
@@ -52,13 +65,47 @@ async function proxyApi(request, env) {
   headers.set('X-FinObra-Edge', 'cloudflare-worker');
 
   const init = { method, headers, redirect: 'manual' };
-  if (!['GET', 'HEAD'].includes(method)) init.body = request.body;
+
+  if (!['GET', 'HEAD'].includes(method)) {
+    const rawBody = await request.arrayBuffer();
+    let body = rawBody;
+
+    // Compatibilidade bidirecional entre contratos antigos (userId)
+    // e novos (requestId) do fluxo de recuperação de senha.
+    if (isAuthAction(incoming, 'verify_reset') && rawBody.byteLength) {
+      try {
+        const text = new TextDecoder().decode(rawBody);
+        const payload = addRecoveryAliases(JSON.parse(text));
+        body = JSON.stringify(payload);
+        headers.set('Content-Type', 'application/json');
+      } catch (err) {
+        console.warn('[FinObra Cloudflare] não foi possível normalizar verify_reset:', err?.message || err);
+      }
+    }
+
+    init.body = body;
+  }
 
   try {
     const upstream = await fetch(target.toString(), init);
     const responseHeaders = new Headers(upstream.headers);
     responseHeaders.set('X-Content-Type-Options', 'nosniff');
     responseHeaders.set('Referrer-Policy', 'strict-origin-when-cross-origin');
+
+    if (isAuthAction(incoming, 'request_reset') && upstream.ok) {
+      const data = await upstream.clone().json().catch(() => null);
+      if (data && data.success) {
+        const normalized = addRecoveryAliases(data);
+        responseHeaders.delete('content-length');
+        responseHeaders.set('Content-Type', 'application/json; charset=utf-8');
+        return new Response(JSON.stringify(normalized), {
+          status: upstream.status,
+          statusText: upstream.statusText,
+          headers: responseHeaders
+        });
+      }
+    }
+
     return new Response(upstream.body, {
       status: upstream.status,
       statusText: upstream.statusText,
