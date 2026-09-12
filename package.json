@@ -10,7 +10,7 @@
     "render:deploy": "node scripts/render-deploy.js",
     "package:release": "node scripts/package-release.js",
     "postinstall": "node apply-patch22-build.cjs && node apply-patch23-build.cjs && node apply-patch24-build.cjs && node prepare-patch25-build.cjs && node apply-patch25-build.cjs",
-    "pretest": "node apply-patch22-build.cjs --full && node apply-patch23-build.cjs && node apply-patch24-build.cjs && node prepare-patch25-build.cjs && node apply-patch25-build.cjs",
+    "pretest": "node apply-patch22-build.cjs --full && node apply-patch23-build.cjs && node apply-patch24-build.cjs && node prepare-patch25-build.cjs && node apply-patch25-build.cjs && node scripts/apply-backend-build-patches.cjs",
     "test": "node scripts/test-static-all.js",
     "test:openai": "node scripts/test-openai-static.js",
     "test:patch05": "node scripts/test-patch05-static.js",
