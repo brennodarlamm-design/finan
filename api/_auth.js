@@ -64,6 +64,7 @@ function getCookie(req, name) {
 }
 
 function allowedBrowserOrigins(req) {
+  // H-21: Lista canônica estrita de origens permitidas sem derivação cega do header Host não confiável
   const origins = new Set([
     'https://finobra.app.br',
     'https://www.finobra.app.br',
@@ -74,14 +75,9 @@ function allowedBrowserOrigins(req) {
     'http://127.0.0.1:3333',
     'http://127.0.0.1:5000'
   ]);
-  for (const v of [process.env.VERCEL_URL, process.env.VERCEL_BRANCH_URL, process.env.VERCEL_PROJECT_PRODUCTION_URL]) {
+  for (const v of [process.env.VERCEL_URL, process.env.VERCEL_BRANCH_URL, process.env.VERCEL_PROJECT_PRODUCTION_URL, process.env.APP_URL]) {
     const host = String(v || '').trim().replace(/^https?:\/\//, '').replace(/\/$/, '');
     if (host) origins.add(`https://${host}`);
-  }
-  const host = String(req.headers?.host || '').trim();
-  if (host) {
-    origins.add(`https://${host}`);
-    origins.add(`http://${host}`);
   }
   return origins;
 }
@@ -104,7 +100,13 @@ function cookieMutationOriginAllowed(req) {
   if (['GET','HEAD','OPTIONS'].includes(method)) return true;
   const origin = String(req.headers?.origin || '').trim();
   if (!origin) return false;
-  return allowedBrowserOrigins(req).has(origin);
+  const allowed = allowedBrowserOrigins(req);
+  if (allowed.has(origin)) return true;
+  // H-20: Permite apenas deployments Vercel pertencentes ao projeto FinObra
+  if (/^https:\/\/(finan|finobra)(-[a-z0-9]+)?\.vercel\.app$/i.test(origin)) {
+    return true;
+  }
+  return false;
 }
 
 function trialExpired(createdAt, trialDays = 15, explicitDueDate = null) {

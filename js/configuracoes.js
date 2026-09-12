@@ -178,7 +178,11 @@ const Configuracoes = {
             </div>
           </div>
 
-          <div class="g2">
+          <div class="g3">
+            <div class="form-group">
+              <label class="form-label">CEP</label>
+              <input class="form-control" name="cep" id="cfg-emp-cep" value="${this._esc(emp.cep || '')}" placeholder="00000-000" onblur="Configuracoes.buscarCep(this)">
+            </div>
             <div class="form-group">
               <label class="form-label">Cidade</label>
               <input class="form-control" name="cidade" id="cfg-emp-cidade" value="${this._esc(emp.cidade || '')}" placeholder="Cidade">
@@ -412,6 +416,24 @@ const Configuracoes = {
     }
   },
 
+  async buscarCep(inp) {
+    const raw = String(inp?.value || '').replace(/\D/g, '');
+    if (raw.length === 8) {
+      const data = await Utils.consultarCep(raw);
+      if (data) {
+        const setVal = (id, val) => {
+          const el = document.getElementById(id);
+          if (el && (!el.value || el.value.trim() === '')) el.value = val || '';
+        };
+        if (data.logradouro) setVal('cfg-emp-end', data.logradouro + (data.bairro ? ` — ${data.bairro}` : ''));
+        if (data.cidade) setVal('cfg-emp-cidade', data.cidade);
+        if (data.uf) setVal('cfg-emp-uf', data.uf);
+        inp.value = raw.replace(/^(\d{5})(\d{3})$/, '$1-$2');
+        Utils.toast('Endereço preenchido pelo CEP!', 'info');
+      }
+    }
+  },
+
   async saveEmpresa(e) {
     e.preventDefault();
     const fd = new FormData(e.target);
@@ -421,6 +443,7 @@ const Configuracoes = {
       cnpj: fd.get('cnpj').trim(), telefone: fd.get('telefone').trim(),
       email: fd.get('email').trim(), endereco: fd.get('endereco').trim(),
       cidade: fd.get('cidade').trim(), uf: fd.get('uf').trim().toUpperCase(),
+      cep: (fd.get('cep') || '').trim(),
       responsavel: fd.get('responsavel').trim(), crea_cau: fd.get('crea_cau').trim(),
       logo_url: fd.get('logo_url') || ''
     };

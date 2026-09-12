@@ -386,5 +386,35 @@ const Utils = {
       };
       reader.readAsDataURL(file);
     });
+  },
+
+  // Cache em memória para consultas de CEP
+  _cepCache: {},
+
+  async consultarCep(rawCep) {
+    if (!rawCep) return null;
+    const cep = String(rawCep).replace(/\D/g, '');
+    if (cep.length !== 8) return null;
+
+    if (this._cepCache && this._cepCache[cep]) {
+      return this._cepCache[cep];
+    }
+
+    try {
+      const res = await fetch(`/api/cep?cep=${cep}`, {
+        headers: { 'Accept': 'application/json' }
+      });
+      if (!res.ok) return null;
+      const data = await res.json().catch(() => null);
+      if (data && (data.success || data.cep)) {
+        if (!this._cepCache) this._cepCache = {};
+        this._cepCache[cep] = data;
+        return data;
+      }
+      return null;
+    } catch (e) {
+      console.warn('[Utils] Erro ao consultar CEP:', e);
+      return null;
+    }
   }
 };

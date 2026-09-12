@@ -204,7 +204,7 @@ const Clientes = {
             <div class="form-row cols-3" style="margin-bottom:14px;">
               <div class="form-group"><label class="form-label">Cidade *</label><input class="form-control" name="cidade" value="${e(c.cidade||'')}" required placeholder="Cidade"></div>
               <div class="form-group"><label class="form-label">Estado</label><select class="form-control" name="estado">${Utils.stateOptions(c.estado || tenantUF)}</select></div>
-              <div class="form-group"><label class="form-label">CEP</label><input class="form-control" name="cep" value="${e(c.cep||'')}" placeholder="00000-000"></div>
+              <div class="form-group"><label class="form-label">CEP</label><input class="form-control" name="cep" id="cli-cep" value="${e(c.cep||'')}" placeholder="00000-000" onblur="Clientes.onCepChange(this)"></div>
             </div>
             <div class="divider"></div>
             <div class="form-row cols-2" style="margin-bottom:14px;">
@@ -281,6 +281,26 @@ const Clientes = {
     Utils.closeModal();
     App.refreshObraSelector();
     document.getElementById('cli-grid').innerHTML = this._cards(DB.getAll('clientes'));
+  },
+
+  async onCepChange(inp) {
+    const raw = String(inp?.value || '').replace(/\D/g, '');
+    if (raw.length === 8) {
+      const data = await Utils.consultarCep(raw);
+      if (data) {
+        const form = inp.closest('form');
+        if (form) {
+          const setVal = (name, val) => {
+            const el = form.querySelector(`[name="${name}"]`);
+            if (el && (!el.value || el.value.trim() === '')) el.value = val || '';
+          };
+          if (data.logradouro) setVal('endereco', data.logradouro + (data.bairro ? ` — ${data.bairro}` : ''));
+          if (data.cidade) setVal('cidade', data.cidade);
+          if (data.uf) setVal('estado', data.uf);
+        }
+        inp.value = raw.replace(/^(\d{5})(\d{3})$/, '$1-$2');
+      }
+    }
   },
 
   del(id) {

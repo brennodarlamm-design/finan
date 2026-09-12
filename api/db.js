@@ -58,6 +58,19 @@ function cleanNum(n) {
 }
 
 
+function safeJsonParse(value, fallback = []) {
+  if (value === null || value === undefined) return fallback;
+  if (typeof value === 'object') return value;
+  if (typeof value !== 'string') return fallback;
+  try {
+    const parsed = JSON.parse(value);
+    return parsed !== null && parsed !== undefined ? parsed : fallback;
+  } catch (err) {
+    console.warn('[DB] safeJsonParse: falha ao interpretar JSON:', err.message);
+    return fallback;
+  }
+}
+
 function jsonPayload(row) {
   if (!row) return {};
   const raw = row.payload;
@@ -180,7 +193,7 @@ function normalizeMedicao(m) {
     lancamento_id: m.lancamento_id || null,
     retencao_tecnica: cleanNum(m.retencao_tecnica),
     descontos: cleanNum(m.descontos),
-    itens: (typeof m.itens_json === 'string' ? JSON.parse(m.itens_json) : m.itens_json) || m.itens || []
+    itens: (typeof m.itens_json === 'string' ? safeJsonParse(m.itens_json, []) : m.itens_json) || m.itens || []
   };
 }
 
@@ -404,7 +417,7 @@ export default async function handler(req, res) {
               data_vencimento: cleanDate(l.data_vencimento) || cleanDate(l.data),
               data_pagamento: cleanDate(l.data_pagamento),
               valor: cleanNum(l.valor),
-              itens: Array.isArray(l.itens) ? l.itens : (typeof l.itens === 'string' ? JSON.parse(l.itens || '[]') : [])
+              itens: Array.isArray(l.itens) ? l.itens : safeJsonParse(l.itens, [])
             })) : [],
             notas: tableAllowed(auth, 'notas', 'read') ? notas.map(n => ({
               ...n,
@@ -418,14 +431,14 @@ export default async function handler(req, res) {
               categoria: n.categoria || 'material',
               tipo: n.tipo || 'entrada',
               chave_nfe: n.chave_nfe || n.chave_acesso || '',
-              itens: Array.isArray(n.itens) ? n.itens : (typeof n.itens === 'string' ? JSON.parse(n.itens || '[]') : [])
+              itens: Array.isArray(n.itens) ? n.itens : safeJsonParse(n.itens, [])
             })) : [],
             produtos: tableAllowed(auth, 'produtos', 'read') ? (produtos || []).map(p => ({
               ...p,
               valor_medio: cleanNum(p.valor_medio)
             })) : [],
             orcamentos: tableAllowed(auth, 'orcamentos', 'read') ? orcamentos.map(o => {
-              const parsedItens = (typeof o.itens_json === 'string' ? JSON.parse(o.itens_json) : o.itens_json) || o.itens || o.etapas || [];
+              const parsedItens = (typeof o.itens_json === 'string' ? safeJsonParse(o.itens_json, []) : o.itens_json) || o.itens || o.etapas || [];
               return {
                 ...o,
                 nome: o.nome || o.titulo || 'Orçamento',
@@ -612,7 +625,7 @@ export default async function handler(req, res) {
           ? await sql`SELECT * FROM orcamentos WHERE tenant_id = ${tenantId} ORDER BY created_at DESC, id DESC LIMIT ${pagination.limit} OFFSET ${pagination.offset};`
           : await sql`SELECT * FROM orcamentos WHERE tenant_id = ${tenantId} ORDER BY created_at DESC, id DESC;`;
         const normalized = items.map(o => {
-            const parsedItens = (typeof o.itens_json === 'string' ? JSON.parse(o.itens_json) : o.itens_json) || o.itens || o.etapas || [];
+            const parsedItens = (typeof o.itens_json === 'string' ? safeJsonParse(o.itens_json, []) : o.itens_json) || o.itens || o.etapas || [];
             return {
               ...o,
               nome: o.nome || o.titulo || 'Orçamento',
@@ -990,7 +1003,7 @@ export default async function handler(req, res) {
             const numMed = parseInt(m.numero || m.numero_medicao) || 1;
             const dataMed = cleanDate(m.data || m.data_medicao) || todayBoaVista();
             const valMed = cleanNum(m.valor_medido || m.valor_solicitado);
-            const rawItens = m.itens || (typeof m.itens_json === 'string' ? JSON.parse(m.itens_json) : m.itens_json) || [];
+            const rawItens = m.itens || (typeof m.itens_json === 'string' ? safeJsonParse(m.itens_json, []) : m.itens_json) || [];
             const itensJson = JSON.stringify(Array.isArray(rawItens) ? rawItens : []);
             const payloadJson = JSON.stringify(m);
 
@@ -1045,7 +1058,7 @@ export default async function handler(req, res) {
           for (const o of payload.orcamentos) {
             if (!o.id) continue;
             const safeOrcObraId = await validateObraTenant(sql, o.obra_id, tenantId);
-            const rawItens = o.etapas || o.itens || (typeof o.itens_json === 'string' ? JSON.parse(o.itens_json) : o.itens_json) || [];
+            const rawItens = o.etapas || o.itens || (typeof o.itens_json === 'string' ? safeJsonParse(o.itens_json, []) : o.itens_json) || [];
             const itensJson = JSON.stringify(Array.isArray(rawItens) ? rawItens : []);
             const titulo = o.titulo || o.nome || '';
             const valorTotal = cleanNum(o.valor_total || o.valor_total_previsto);
@@ -1479,7 +1492,7 @@ export default async function handler(req, res) {
         if (table === 'orcamentos') {
           const o = data;
           const safeObraId = await validateObraTenant(sql, o.obra_id, tenantId);
-          const rawItens = o.etapas || o.itens || (typeof o.itens_json === 'string' ? JSON.parse(o.itens_json) : o.itens_json) || [];
+          const rawItens = o.etapas || o.itens || (typeof o.itens_json === 'string' ? safeJsonParse(o.itens_json, []) : o.itens_json) || [];
           const itensJson = JSON.stringify(Array.isArray(rawItens) ? rawItens : []);
           const titulo = o.titulo || o.nome || '';
           const valorTotal = cleanNum(o.valor_total || o.valor_total_previsto);
@@ -1487,7 +1500,7 @@ export default async function handler(req, res) {
             INSERT INTO orcamentos (id, tenant_id, obra_id, titulo, valor_total, itens_json)
             VALUES (
               ${o.id}, ${tenantId}, ${safeObraId}, ${titulo},
-              ${valorTotal}, ${itensJson}
+              ${valorTotal}, ${itensJson}::jsonb
             )
             ON CONFLICT (id) DO UPDATE SET
               obra_id = EXCLUDED.obra_id,
@@ -1506,7 +1519,7 @@ export default async function handler(req, res) {
           const numMed = parseInt(m.numero || m.numero_medicao) || 1;
           const dataMed = cleanDate(m.data || m.data_medicao) || todayBoaVista();
           const valMed = cleanNum(m.valor_medido || m.valor_solicitado);
-          const rawItens = m.itens || (typeof m.itens_json === 'string' ? JSON.parse(m.itens_json) : m.itens_json) || [];
+          const rawItens = m.itens || (typeof m.itens_json === 'string' ? safeJsonParse(m.itens_json, []) : m.itens_json) || [];
           const itensJson = JSON.stringify(Array.isArray(rawItens) ? rawItens : []);
           const payloadJson = JSON.stringify(m);
 

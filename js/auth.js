@@ -373,6 +373,41 @@ const Auth = {
   },
 
   logoutSilently() {
+    const session = this.getSession();
+    const tenantId = session?.tenantId || session?.tenant_id;
+
+    // H-16: Expurgo de dados financeiros e operacionais em cache local no logout
+    if (typeof localStorage !== 'undefined') {
+      try {
+        const keysToRemove = [];
+        for (let i = 0; i < localStorage.length; i++) {
+          const k = localStorage.key(i);
+          if (!k) continue;
+          // Preserva preferências agnósticas de UI (ex: tema claro/escuro)
+          if (k === 'finobra_theme' || k === 'finobra_color_theme') continue;
+
+          if (
+            (tenantId && (k.includes(`_${tenantId}_`) || k.includes(`finobra_${tenantId}`))) ||
+            k.startsWith('finobra_') ||
+            k.startsWith('finobra_sync_') ||
+            k.startsWith('finobra_data_') ||
+            k.startsWith('finobra_docs_') ||
+            k.startsWith('finobra_cache_') ||
+            k.startsWith('sinapi_') ||
+            k.startsWith('forn_cats_') ||
+            k.startsWith('ocr_')
+          ) {
+            keysToRemove.push(k);
+          }
+        }
+        keysToRemove.forEach(k => {
+          try { localStorage.removeItem(k); } catch {}
+        });
+      } catch (e) {
+        console.warn('[Auth] Erro ao expurgar cache no logout:', e);
+      }
+    }
+
     localStorage.removeItem(this.SESSION_KEY);
     sessionStorage.removeItem(this.SESSION_KEY);
     this._purgeLegacyToken();

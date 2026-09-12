@@ -807,18 +807,75 @@ export default async function handler(req, res) {
         }
       }
 
-      // Formata mensagem informativa amigável sem expor o código
-      let canalInfo = '';
-      if (destPhone && destPhone.length >= 8) {
+      // H-10: Envio real por e-mail via Resend (se configurado e usuário possuir e-mail)
+      const resendKey = (process.env.RESEND_API_KEY || '').trim();
+      let emailSent = false;
+      let emailError = null;
+
+      if (resendKey && user.email) {
+        try {
+          const fromEmail = (process.env.RESEND_FROM_EMAIL || 'FinObra <nao-responder@finobra.app.br>').trim();
+          const emailResp = await fetch('https://api.resend.com/emails', {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${resendKey}`,
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              from: fromEmail,
+              to: [user.email],
+              subject: 'FinObra — Código de Recuperação de Senha',
+              html: `
+                <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 500px; margin: 0 auto; padding: 24px; border: 1px solid #e2e8f0; border-radius: 8px; background: #ffffff;">
+                  <h2 style="color: #0f172a; margin-top: 0;">Código de Verificação</h2>
+                  <p style="color: #334155; font-size: 15px;">Olá, <strong>${user.nome}</strong>!</p>
+                  <p style="color: #334155; font-size: 15px;">Recebemos uma solicitação de redefinição de senha para sua conta no <strong>FinObra</strong>.</p>
+                  <div style="background: #f8fafc; border: 1px solid #cbd5e1; padding: 18px; border-radius: 8px; text-align: center; margin: 24px 0;">
+                    <span style="font-size: 32px; font-weight: 700; letter-spacing: 6px; color: #0284c7; font-family: monospace;">${otpCode}</span>
+                  </div>
+                  <p style="color: #64748b; font-size: 13px; line-height: 1.5;">Este código de segurança expira em <strong>10 minutos</strong>.<br>Se você não fez esta solicitação, desconsidere esta mensagem. Sua conta permanece segura.</p>
+                </div>
+              `
+            })
+          });
+
+          const emailData = await emailResp.json().catch(() => ({}));
+          if (emailResp.ok && emailData.id) {
+            emailSent = true;
+          } else {
+            emailError = emailData.message || 'Falha ao despachar via Resend';
+          }
+        } catch (errMail) {
+          emailError = errMail.message;
+        }
+      }
+
+      // Formata canalInfo refletindo EXCLUSIVAMENTE os canais que realmente receberam o código
+      const canaisUtilizados = [];
+      if (whatsappSent && destPhone && destPhone.length >= 8) {
         const ddd = destPhone.slice(-11, -9) || destPhone.slice(0, 2);
         const final = destPhone.slice(-4);
-        canalInfo = `WhatsApp (**${ddd}) *****-${final}`;
-      } else if (user.email) {
+        canaisUtilizados.push(`WhatsApp (**${ddd}) *****-${final}`);
+      }
+      if (emailSent && user.email) {
         const parts = user.email.split('@');
         const ini = parts[0].slice(0, 2);
-        canalInfo = `E-mail (${ini}***@${parts[1]})`;
-      } else {
-        canalInfo = 'WhatsApp cadastrado da sua empresa';
+        canaisUtilizados.push(`E-mail (${ini}***@${parts[1]})`);
+      }
+
+      let canalInfo = canaisUtilizados.join(' e ');
+      if (!canalInfo) {
+        if (destPhone) {
+          const ddd = destPhone.slice(-11, -9) || destPhone.slice(0, 2);
+          const final = destPhone.slice(-4);
+          canalInfo = `WhatsApp (**${ddd}) *****-${final}`;
+        } else if (user.email) {
+          const parts = user.email.split('@');
+          const ini = parts[0].slice(0, 2);
+          canalInfo = `E-mail (${ini}***@${parts[1]})`;
+        } else {
+          canalInfo = 'Canal de contato cadastrado';
+        }
       }
 
       return res.status(200).json({
@@ -827,7 +884,9 @@ export default async function handler(req, res) {
         userName: user.nome,
         canalInfo,
         whatsappSent,
-        whatsappError
+        whatsappError,
+        emailSent,
+        emailError
       });
     }
 

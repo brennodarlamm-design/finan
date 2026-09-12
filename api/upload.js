@@ -165,12 +165,23 @@ export default async function handler(req, res) {
       if (docRows.length > 0) {
         finalUrl = docRows[0].url || url;
       } else {
-        // Se não foi localizado na tabela pelo tenant, verifica se a URL contém o path explícito do tenant
-        const isTenantBlob = url && url.includes(`/${tenantId}/`);
-        if (!isTenantBlob && !auth.isSystem) {
+        // H-17: Validação estrita e canônica de pathname no Blob, sem fallback frágil de substring
+        let isCanonicalTenantBlob = false;
+        try {
+          if (url) {
+            const parsedUrl = new URL(url);
+            const cleanPath = parsedUrl.pathname.replace(/^\/+/, '');
+            // O caminho deve iniciar estritamente com "<tenantId>/"
+            isCanonicalTenantBlob = cleanPath.startsWith(`${tenantId}/`) || cleanPath.startsWith(`tenants/${tenantId}/`);
+          }
+        } catch {
+          isCanonicalTenantBlob = false;
+        }
+
+        if (!isCanonicalTenantBlob && !auth.isSystem) {
           return res.status(403).json({
             success: false,
-            error: 'Permissão negada. O arquivo não pertence ao seu tenant ou já foi excluído.'
+            error: 'Permissão negada. O arquivo não pertence ao seu tenant ou não foi localizado.'
           });
         }
       }
@@ -256,22 +267,49 @@ export default async function handler(req, res) {
       ? contentType.split(';')[0].toLowerCase().trim()
       : (contentType || 'application/octet-stream').toLowerCase().trim();
 
+    const ALLOWED_EXTENSIONS = [
+      'pdf', 'png', 'jpg', 'jpeg', 'webp', 'ofx', 'qfx', 'xml', 'xlsx', 'xls',
+      'csv', 'doc', 'docx', 'txt', 'dwg', 'dxf', 'zip', 'rar', '7z'
+    ];
+    const ALLOWED_MIMES = [
+      'application/pdf', 'image/jpeg', 'image/png', 'image/webp',
+      'application/xml', 'text/xml', 'text/plain', 'text/csv',
+      'application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'application/x-ofx', 'application/ofx',
+      'application/zip', 'application/x-zip-compressed', 'application/x-rar-compressed', 'application/x-7z-compressed',
+      'application/acad', 'application/x-acad', 'image/vnd.dwg', 'image/vnd.dxf',
+      'application/octet-stream'
+    ];
+
     const lowerExt = (filename.includes('.') ? filename.split('.').pop() : '').toLowerCase();
-    const disallowedExts = ['html', 'htm', 'svg', 'xhtml', 'exe', 'bat', 'cmd', 'sh', 'js', 'vbs', 'scr'];
+    const parts = filename.split('.');
+    if (parts.length > 2) {
+      const suspiciousExts = ['exe', 'bat', 'cmd', 'sh', 'js', 'vbs', 'scr', 'php', 'py', 'html', 'htm', 'jar'];
+      if (parts.some((p, idx) => idx < parts.length - 1 && suspiciousExts.includes(p.toLowerCase()))) {
+        return res.status(400).json({
+          success: false,
+          error: 'Nome de arquivo suspeito contendo extensão executável oculta.'
+        });
+      }
+    }
+
+    const disallowedExts = ['html', 'htm', 'svg', 'xhtml', 'exe', 'bat', 'cmd', 'sh', 'js', 'vbs', 'scr', 'php', 'py'];
     const disallowedMimes = ['text/html', 'image/svg+xml', 'application/xhtml+xml', 'application/x-msdownload', 'text/javascript', 'application/javascript'];
 
-    if (disallowedExts.includes(lowerExt) || disallowedMimes.includes(cleanMime)) {
+    if (disallowedExts.includes(lowerExt) || disallowedMimes.includes(cleanMime) || !ALLOWED_EXTENSIONS.includes(lowerExt) || !ALLOWED_MIMES.includes(cleanMime)) {
       return res.status(400).json({
         success: false,
-        error: 'Tipo de arquivo não permitido por políticas de segurança.'
+        error: 'Tipo de arquivo não permitido por políticas de segurança do FinObra.'
       });
     }
 
     const buffer = Buffer.from(cleanBase64, 'base64');
-    if (buffer.length > 25 * 1024 * 1024) {
+    const MAX_UPLOAD_BYTES = 15 * 1024 * 1024; // 15 MB
+    if (buffer.length > MAX_UPLOAD_BYTES) {
       return res.status(413).json({
         success: false,
-        error: 'Arquivo excede o limite máximo permitido de 25 MB.'
+        error: 'Arquivo excede o limite máximo permitido de 15 MB.'
       });
     }
 

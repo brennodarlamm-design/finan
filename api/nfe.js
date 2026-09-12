@@ -69,6 +69,73 @@ export default async function handler(req, res) {
     }
   }
 
+  // ── 0.1. CONSULTA DE CEP (BrasilAPI com Fallback ViaCEP) ─────────────────
+  const isCep = req.query?.action === 'cep' || (req.query?.cep && !req.query?.action) || (req.body && (req.body.action === 'cep' || req.body.cep));
+  if (isCep) {
+    const rawCep = req.query?.cep || (req.body && req.body.cep);
+    if (!rawCep) return res.status(400).json({ success: false, error: 'CEP não informado.' });
+    const cepLimpo = String(rawCep).replace(/\D/g, '');
+    if (cepLimpo.length !== 8) {
+      return res.status(400).json({ success: false, error: 'CEP inválido (deve conter 8 dígitos numéricos).' });
+    }
+
+    try {
+      let data = null;
+      // 1. Consulta primária via BrasilAPI
+      try {
+        const brResp = await fetch(`https://brasilapi.com.br/api/cep/v1/${cepLimpo}`, {
+          headers: { 'Accept': 'application/json', 'User-Agent': 'FinObra/1.0' },
+          signal: AbortSignal.timeout(5000)
+        });
+        if (brResp.ok) {
+          const brJson = await brResp.json().catch(() => null);
+          if (brJson && !brJson.errors) {
+            data = {
+              success: true,
+              cep: brJson.cep || cepLimpo,
+              logradouro: brJson.street || '',
+              bairro: brJson.neighborhood || '',
+              cidade: brJson.city || '',
+              uf: brJson.state || '',
+              provedor: 'brasilapi'
+            };
+          }
+        }
+      } catch {}
+
+      // 2. Fallback resiliente via ViaCEP
+      if (!data) {
+        const viaResp = await fetch(`https://viacep.com.br/ws/${cepLimpo}/json/`, {
+          headers: { 'Accept': 'application/json', 'User-Agent': 'FinObra/1.0' },
+          signal: AbortSignal.timeout(5000)
+        });
+        if (viaResp.ok) {
+          const viaJson = await viaResp.json().catch(() => null);
+          if (viaJson && !viaJson.erro) {
+            data = {
+              success: true,
+              cep: (viaJson.cep || cepLimpo).replace(/\D/g, ''),
+              logradouro: viaJson.logradouro || '',
+              bairro: viaJson.bairro || '',
+              cidade: viaJson.localidade || '',
+              uf: viaJson.uf || '',
+              ibge: viaJson.ibge || '',
+              provedor: 'viacep'
+            };
+          }
+        }
+      }
+
+      if (data) {
+        return res.status(200).json(data);
+      } else {
+        return res.status(404).json({ success: false, error: 'CEP não encontrado nas bases de dados.' });
+      }
+    } catch (errCep) {
+      return res.status(502).json({ success: false, error: 'Falha ao consultar serviço de CEP.', detail: errCep.message });
+    }
+  }
+
   // 1. Exige autenticação rigorosa
   const auth = await resolveAuthAndTenant(req);
   if (!auth.authenticated) {

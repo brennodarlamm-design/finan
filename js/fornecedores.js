@@ -386,7 +386,7 @@ const Fornecedores = {
                 <div class="form-group">
                   <label class="form-label">CEP</label>
                   <input class="form-control" id="forn-cep" name="cep"
-                    value="${f?.cep||''}" placeholder="00000-000">
+                    value="${f?.cep||''}" placeholder="00000-000" onblur="Fornecedores.onCepChange(this)">
                 </div>
               </div>
             </div>
@@ -550,6 +550,24 @@ const Fornecedores = {
     set('forn-municipio',  d.municipio || '');
     set('forn-uf-inp',     d.uf || '');
     set('forn-cep',        (d.cep||'').replace(/^(\d{5})(\d{3})$/, '$1-$2'));
+  },
+
+  async onCepChange(inp) {
+    const raw = String(inp?.value || '').replace(/\D/g, '');
+    if (raw.length === 8) {
+      const data = await Utils.consultarCep(raw);
+      if (data) {
+        const setVal = (id, val) => {
+          const el = document.getElementById(id);
+          if (el && (!el.value || el.value.trim() === '')) el.value = val || '';
+        };
+        if (data.logradouro) setVal('forn-end', data.logradouro);
+        if (data.bairro) setVal('forn-bairro', data.bairro);
+        if (data.cidade) setVal('forn-municipio', data.cidade);
+        if (data.uf) setVal('forn-uf-inp', data.uf);
+        inp.value = raw.replace(/^(\d{5})(\d{3})$/, '$1-$2');
+      }
+    }
   },
 
   // ─────────────────────────────────────────────────────────────
