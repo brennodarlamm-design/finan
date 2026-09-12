@@ -7,7 +7,7 @@ const root = __dirname;
 const patch = path.join(root, '.patch24/frontend-xss.diff');
 
 function run(args) {
-  return spawnSync('git', ['apply', ...args, patch], {
+  return spawnSync('git', ['apply', '--recount', ...args, patch], {
     cwd: root,
     encoding: 'utf8',
     stdio: ['ignore', 'pipe', 'pipe']
