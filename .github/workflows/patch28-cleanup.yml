@@ -1,0 +1,30 @@
+name: Patch 28 cleanup validation
+
+on:
+  push:
+    branches:
+      - patch28-cleanup-20260912
+
+permissions:
+  contents: read
+
+jobs:
+  validate-cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install root dependencies
+        run: npm ci
+      - name: Full regression suite
+        run: npm test
+      - name: Syntax verification
+        run: node scripts/check-all-syntax.js
+      - name: Patch 28 cleanup checks
+        run: node scripts/test-patch28-static.js
+      - name: Build Cloudflare static assets
+        run: npm run build:cloudflare
+      - name: Validate Wrangler bundle
+        run: npx --yes wrangler@latest deploy --dry-run --outdir .wrangler-dryrun
+      - name: Validate backend lockfile install
+        working-directory: backend
+        run: npm ci --omit=dev
