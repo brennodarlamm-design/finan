@@ -1,4 +1,4 @@
-name: Patch 27 materialize production tree
+name: Patch 27 immutable source validation
 
 on:
   push:
@@ -6,63 +6,25 @@ on:
       - patch27-materialize-build-20260912
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
-  materialize-production-tree:
-    if: github.actor != 'github-actions[bot]'
+  validate-materialized-source:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-      - name: Build production-equivalent tree
+      - name: Full regression suite
         run: npm test
       - name: Syntax verification
         run: node scripts/check-all-syntax.js
-      - name: Validate materialization allowlist
+      - name: Ensure tests do not mutate tracked source
         shell: bash
         run: |
           set -euo pipefail
-          echo '=== Files changed by build overlays ==='
-          git status --short
-          echo
-          echo '=== Diff stat ==='
-          git diff --stat
-
-          bad=0
-          while IFS= read -r line; do
-            [ -z "$line" ] && continue
-            path="${line:3}"
-            case "$path" in
-              api/*.js|backend/server.js|app.html|index.html|landing.html|master.html|validar.html|js/*.js|schema.sql|scripts/run-migration.js|scripts/test-patch13-static.js|scripts/test-patch15-static.js)
-                ;;
-              *)
-                echo "Unexpected build mutation: $path"
-                bad=1
-                ;;
-            esac
-          done < <(git status --porcelain)
-
-          if [ "$bad" -ne 0 ]; then
-            echo 'Materialization aborted because the build changed files outside the explicit allowlist.'
+          if [ -n "$(git status --porcelain)" ]; then
+            echo 'Source tree changed after npm test:'
+            git status --short
+            git diff --stat
             exit 1
           fi
-
-          if git status --porcelain | grep -E '(^| )node_modules/|(^| )\.env|(^| )\.vercel/'; then
-            echo 'Unsafe generated files detected.'
-            exit 1
-          fi
-      - name: Commit tested production-equivalent source
-        shell: bash
-        run: |
-          set -euo pipefail
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add api backend/server.js app.html index.html landing.html master.html validar.html js schema.sql scripts/run-migration.js scripts/test-patch13-static.js scripts/test-patch15-static.js
-          if git diff --cached --quiet; then
-            echo 'No materialization changes to commit.'
-            exit 0
-          fi
-          git commit -m 'refactor(patch27): materialize tested production build tree'
-          git push origin HEAD:patch27-materialize-build-20260912
+          echo 'Source tree remained byte-stable after the full test suite.'
