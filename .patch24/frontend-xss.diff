@@ -1,0 +1,144 @@
+diff --git a/js/obra_detalhe.js b/js/obra_detalhe.js
+--- a/js/obra_detalhe.js
++++ b/js/obra_detalhe.js
+@@ -7,6 +7,22 @@ const ObraDetalhe = {
+   desoneradoLeisSociais: false,
+   _filtroTipo: '',
+   _filtroBusca: '',
++
++  _safeHtmlRecord(record) {
++    if (!record || typeof record !== 'object') return record || {};
++    return Object.fromEntries(Object.entries(record).map(([key, value]) => [
++      key,
++      typeof value === 'string' ? Utils.escapeHtml(value) : value
++    ]));
++  },
++
++  _safeSpreadsheetCell(value) {
++    if (typeof value !== 'string') return value;
++    // Impede formula injection em CSV/XLSX (=, +, -, @), inclusive com espaços/tabs à esquerda.
++    if (/^[\t\r ]*[=+\-@]/.test(value)) return `'${value}`;
++    return value;
++  },
+ 
+   init(obraId) {
+@@ -85,7 +101,8 @@ const ObraDetalhe = {
+     }
+ 
+     this.currentObraId = id;
+-    const obra = DB.getById('clientes', id);
+-    if (!obra) {
++    const obraRaw = DB.getById('clientes', id);
++    if (!obraRaw) {
+       return `
+       <div class="empty-state">
+         <h3>Obra não encontrada</h3>
+@@ -93,6 +110,7 @@ const ObraDetalhe = {
+         <button class="btn btn-secondary" onclick="App.navigate('obras')">⬅️ Voltar para Obras</button>
+       </div>`;
+     }
++    const obra = this._safeHtmlRecord(obraRaw);
+ 
+     const r = DB.getResumo(id);
+@@ -119,6 +137,7 @@ const ObraDetalhe = {
+       outros_bancos: { label: '🏛️ Financiamento Bancário', cor: '#6366f1', bg: 'rgba(99,102,241,.15)' }
+     };
+     const mod = modMap[obra.modalidade_obra || 'caixa'] || modMap.caixa;
++    const empresaHtml = this._safeHtmlRecord((typeof DB.getEmpresa === 'function' ? DB.getEmpresa() : {}) || {});
+ 
+     // Resumo documental
+@@ -138,7 +157,7 @@ const ObraDetalhe = {
+           for (const aid of d.arquivos) {
+             const docObj = Documentos.getById(aid);
+             if (docObj && docObj.url_externa && (docObj.tipo_servico === 'gdrive' || docObj.url_externa.includes('drive.google.com'))) {
+-              driveLink = docObj.url_externa;
++              driveLink = Utils.safeUrl ? Utils.safeUrl(docObj.url_externa) : '';
+               break;
+             }
+           }
+@@ -190,7 +209,7 @@ const ObraDetalhe = {
+               <span><strong>CPF/CNPJ:</strong> ${obra.cpf_cnpj || '—'}</span>
+               <span><strong>Local:</strong> 📍 ${obra.cidade||'—'}/${obra.estado||'—'}</span>
+               <span><strong>Área:</strong> 📐 ${obra.area_construida || '—'} m²</span>
+-              <span><strong>Responsável Técnico:</strong> 👷 ${obra.engenheiro_responsavel || obra.responsavel || DB.getEmpresa()?.responsavel || 'Não informado'}</span>
++              <span><strong>Responsável Técnico:</strong> 👷 ${obra.engenheiro_responsavel || obra.responsavel || empresaHtml.responsavel || 'Não informado'}</span>
+               <span><strong>${isCaixa ? 'Contrato Caixa' : 'Ref. Contrato'}:</strong> 📑 ${obra.num_contrato_caixa || 'Contrato Direto'}</span>
+             </div>
+@@ -1578,8 +1597,9 @@ const ObraDetalhe = {
+ 
+     const addSheet = (data, name) => {
+       if (!data || !data.length) return;
+-      const ws = XLSX.utils.aoa_to_sheet(data);
++      const safeData = data.map(row => Array.isArray(row) ? row.map(cell => this._safeSpreadsheetCell(cell)) : row);
++      const ws = XLSX.utils.aoa_to_sheet(safeData);
+       let maxCols = 0;
+-      for (let r = 0; r < data.length; r++) {
+-        if (Array.isArray(data[r]) && data[r].length > maxCols) {
+-          maxCols = data[r].length;
++      for (let r = 0; r < safeData.length; r++) {
++        if (Array.isArray(safeData[r]) && safeData[r].length > maxCols) {
++          maxCols = safeData[r].length;
+         }
+       }
+       const wcol = [];
+@@ -1587,9 +1607,9 @@ const ObraDetalhe = {
+       for (let colIdx = 0; colIdx < maxCols; colIdx++) {
+         let maxLen = 10;
+-        for (let rowIdx = 0; rowIdx < data.length; rowIdx++) {
+-          const row = data[rowIdx];
++        for (let rowIdx = 0; rowIdx < safeData.length; rowIdx++) {
++          const row = safeData[rowIdx];
+           if (row && row[colIdx] !== null && row[colIdx] !== undefined) {
+             const strLen = String(row[colIdx]).length;
+@@ -1819,10 +1839,12 @@ const ObraDetalhe = {
+     const leis = DB.getLeisSociais ? DB.getLeisSociais(this.desoneradoLeisSociais || false) : null;
+     const bdi = DB.getBDIConfig ? DB.getBDIConfig(id) : null;
+ 
+-    const obra = DB.getById('clientes', id) || { nome: 'Todas as Obras / Geral' };
+-    const emp = DB.getEmpresa() || {};
++    const obraRaw = DB.getById('clientes', id) || { nome: 'Todas as Obras / Geral' };
++    const obra = this._safeHtmlRecord(obraRaw);
++    const empRaw = DB.getEmpresa() || {};
++    const emp = this._safeHtmlRecord(empRaw);
+     const empNome = emp.razao_social || emp.nome_fantasia || 'FINOBRA CONSTRUTORA';
+-    const safeLogoUrl = Utils.safeUrl ? Utils.safeUrl(emp.logo_url) : emp.logo_url;
++    const safeLogoUrl = Utils.safeUrl ? Utils.safeUrl(empRaw.logo_url) : '';
+ 
+     const tituloRelatorio = modo === 'cronograma' ? 'CRONOGRAMA FÍSICO-FINANCEIRO MENSAL OFICIAL'
+@@ -1842,7 +1864,7 @@ const ObraDetalhe = {
+       <html lang="pt-BR">
+       <head>
+         <meta charset="UTF-8">
+-        <title>${tituloRelatorio} - ${Utils.escapeHtml(obra.nome)}</title>
++        <title>${tituloRelatorio} - ${obra.nome}</title>
+@@ -1897,7 +1919,7 @@ const ObraDetalhe = {
+             <div class="title">${tituloRelatorio}</div>
+             <div style="font-size:8px;color:#64748b;">
+-              Obra: <strong>${Utils.escapeHtml(obra.nome)}</strong> &bull;
++              Obra: <strong>${obra.nome}</strong> &bull;
+               Contrato Caixa: <strong>${obra.num_contrato_caixa || 'N/A'}</strong> &bull;
+               Emissão: ${new Date().toLocaleDateString('pt-BR')} às ${new Date().toLocaleTimeString('pt-BR')}
+@@ -2599,11 +2621,14 @@ const ObraDetalhe = {
+   },
+ 
+   gerarHTMLDossie(obraId) {
+-    const obra = DB.getById('clientes', obraId);
+-    if (!obra) return '<p>Obra não encontrada</p>';
++    const obraRaw = DB.getById('clientes', obraId);
++    if (!obraRaw) return '<p>Obra não encontrada</p>';
++    const obra = this._safeHtmlRecord(obraRaw);
+ 
+-    const emp = (typeof DB !== 'undefined' && DB.getEmpresa) ? DB.getEmpresa() : {};
++    const empRaw = (typeof DB !== 'undefined' && DB.getEmpresa) ? (DB.getEmpresa() || {}) : {};
++    const emp = this._safeHtmlRecord(empRaw);
+     const r = DB.getResumo(obraId);
+@@ -2636,9 +2661,10 @@ const ObraDetalhe = {
+ 
+     // Header Logo
+     const empNome = emp.nome_fantasia || emp.razao_social || 'Minha Empresa';
+-    const logoHtml = emp.logo_url 
+-      ? `<img src="${emp.logo_url}" alt="${empNome}" style="max-height:48px;max-width:130px;object-fit:contain;">`
++    const safeLogoUrl = Utils.safeUrl ? Utils.safeUrl(empRaw.logo_url) : '';
++    const logoHtml = safeLogoUrl
++      ? `<img src="${safeLogoUrl}" alt="${empNome}" style="max-height:48px;max-width:130px;object-fit:contain;">`
+       : `<div style="font-weight:900;font-size:16px;color:#0f172a;letter-spacing:-0.5px;">🏢 ${empNome.toUpperCase()}</div>`;
