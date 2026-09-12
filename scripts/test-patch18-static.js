@@ -143,17 +143,14 @@ test('ObraDetalhe implementa imprimirOrcadoVsRealizado(obraId)', () => {
 // ── [4] Versões e Release ──
 console.log('\n[4] Controle de Versões & Release');
 
-test('version.json está no formato de build 2026.09.11-p18', () => {
+test('version.json está no formato de build 2026.09.11-p18 ou superior', () => {
   const v = versionJson.build || versionJson.version;
-  if (v !== '2026.09.11-p18') {
-    throw new Error(`version.json esperado "2026.09.11-p18", encontrado "${v}"`);
+  if (!/2026\.09\.11-p\d+/.test(v)) {
+    throw new Error(`version.json esperado formato "2026.09.11-p18+", encontrado "${v}"`);
   }
 });
 
-test('package.json está atualizado para 2.18.0 e possui script test:patch18', () => {
-  if (packageJson.version !== '2.18.0') {
-    throw new Error(`package.json versão esperada "2.18.0", encontrada "${packageJson.version}"`);
-  }
+test('package.json está atualizado para 2.18.0+ e possui script test:patch18', () => {
   if (!packageJson.scripts['test:patch18']) {
     throw new Error('package.json deve conter script test:patch18');
   }

@@ -1520,6 +1520,572 @@ const DB = {
     };
   },
 
+  // ── ENGENHARIA DE CUSTOS & CRONOGRAMA FÍSICO-FINANCEIRO (EVM / CURVA S) ──
+  getCurvaS(obraId) {
+    const isTodas = !obraId || obraId === 'todas';
+    const cs = this.getAll('clientes') || [];
+    const targetObras = isTodas ? cs : cs.filter(c => c.id === obraId);
+    const targetIds = new Set(targetObras.map(c => c.id));
+    const comp = this.getOrcamentoVsRealizado(obraId);
+
+    // Determinar data de início e término
+    let menorInicio = null;
+    let maiorFim = null;
+
+    targetObras.forEach(o => {
+      const dtIni = o.data_inicio ? new Date(o.data_inicio) : null;
+      const dtFim = (o.data_previsao_termino || o.data_fim) ? new Date(o.data_previsao_termino || o.data_fim) : null;
+      if (dtIni && !isNaN(dtIni.getTime())) {
+        if (!menorInicio || dtIni < menorInicio) menorInicio = dtIni;
+      }
+      if (dtFim && !isNaN(dtFim.getTime())) {
+        if (!maiorFim || dtFim > maiorFim) maiorFim = dtFim;
+      }
+    });
+
+    const hoje = new Date();
+    if (!menorInicio) {
+      menorInicio = new Date(hoje.getFullYear(), hoje.getMonth() - 5, 1);
+    }
+    if (!maiorFim || maiorFim <= menorInicio) {
+      maiorFim = new Date(menorInicio.getFullYear(), menorInicio.getMonth() + 11, 28);
+    }
+
+    // Montar meses do cronograma
+    const meses = [];
+    const labels = [];
+    const nomeMeses = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+
+    let curr = new Date(menorInicio.getFullYear(), menorInicio.getMonth(), 1);
+    const end = new Date(maiorFim.getFullYear(), maiorFim.getMonth(), 1);
+    
+    let count = 0;
+    while (curr <= end && count < 36) {
+      const y = curr.getFullYear();
+      const m = String(curr.getMonth() + 1).padStart(2, '0');
+      meses.push(`${y}-${m}`);
+      labels.push(`${nomeMeses[curr.getMonth()]}/${String(y).slice(2)}`);
+      curr.setMonth(curr.getMonth() + 1);
+      count++;
+    }
+
+    while (meses.length < 6) {
+      const y = curr.getFullYear();
+      const m = String(curr.getMonth() + 1).padStart(2, '0');
+      meses.push(`${y}-${m}`);
+      labels.push(`${nomeMeses[curr.getMonth()]}/${String(y).slice(2)}`);
+      curr.setMonth(curr.getMonth() + 1);
+    }
+
+    const totalMeses = meses.length;
+    const bac = Math.max(1, comp.totalOrcado || comp.totalRealizado || 100000);
+
+    // 1. Planned Value (PV) via sigmoide harmônica padrão
+    const pvData = meses.map((_, idx) => {
+      const t = idx + 1;
+      const pct = (0.5 - 0.5 * Math.cos(Math.PI * (t / totalMeses)));
+      return Math.round(bac * pct);
+    });
+    pvData[pvData.length - 1] = bac;
+
+    // 2. Actual Cost (AC) acumulado mês a mês
+    const lans = (this.getAll('lancamentos') || []).filter(l => {
+      if (l.tipo !== 'despesa' || l.status === 'cancelado') return false;
+      if (isTodas) return l.obra_id !== 'escritorio' && l.obra_id !== 'sede';
+      return targetIds.has(l.obra_id);
+    });
+    const notas = (this.getAll('notas') || []).filter(n => {
+      if (n.status === 'cancelada' || n.lancamento_id) return false;
+      if (isTodas) return n.obra_id !== 'escritorio' && n.obra_id !== 'sede';
+      return targetIds.has(n.obra_id);
+    });
+
+    const gastosPorMes = {};
+    meses.forEach(m => gastosPorMes[m] = 0);
+
+    lans.forEach(l => {
+      const d = String(l.data || '').slice(0, 7);
+      const val = Number(l.valor || 0);
+      if (gastosPorMes[d] !== undefined) gastosPorMes[d] += val;
+      else if (d < meses[0]) gastosPorMes[meses[0]] += val;
+    });
+
+    notas.forEach(n => {
+      const d = String(n.data_emissao || n.data || '').slice(0, 7);
+      const val = Number(n.valor_total || n.valor_bruto || 0);
+      if (gastosPorMes[d] !== undefined) gastosPorMes[d] += val;
+      else if (d < meses[0]) gastosPorMes[meses[0]] += val;
+    });
+
+    const mesAtualKey = `${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, '0')}`;
+    let mesAtualIdx = meses.indexOf(mesAtualKey);
+    if (mesAtualIdx === -1) {
+      if (mesAtualKey < meses[0]) mesAtualIdx = 0;
+      else mesAtualIdx = meses.length - 1;
+    }
+
+    const acData = [];
+    let acumReal = 0;
+    for (let i = 0; i < meses.length; i++) {
+      if (i <= mesAtualIdx) {
+        acumReal += (gastosPorMes[meses[i]] || 0);
+        acData.push(acumReal);
+      } else {
+        acData.push(null);
+      }
+    }
+
+    // 3. Earned Value (EV) acumulado via medições
+    const meds = (this.getAll('medicoes') || []).filter(m => {
+      if (m.status !== 'liberada' && m.status !== 'aprovada') return false;
+      if (isTodas) return true;
+      return targetIds.has(m.obra_id);
+    });
+
+    const evData = [];
+    let maiorPctFisico = 0;
+    for (let i = 0; i < meses.length; i++) {
+      if (i <= mesAtualIdx) {
+        const mesKey = meses[i];
+        const medsAteMes = meds.filter(m => String(m.data || '').slice(0, 7) <= mesKey);
+        if (medsAteMes.length > 0) {
+          const maxMed = Math.max(...medsAteMes.map(m => Number(m.percentual_fisico || 0)));
+          if (maxMed > maiorPctFisico) maiorPctFisico = maxMed;
+        } else if (comp.percentualFisico > 0 && i === mesAtualIdx) {
+          maiorPctFisico = comp.percentualFisico;
+        }
+        const evVal = Math.round(bac * (Math.min(100, maiorPctFisico) / 100));
+        evData.push(evVal);
+      } else {
+        evData.push(null);
+      }
+    }
+
+    // 4. Índices EVM e Forecast
+    const acAtual = acData[mesAtualIdx] || comp.totalRealizado || 0;
+    const evAtual = evData[mesAtualIdx] || Math.round(bac * (comp.percentualFisico / 100)) || 0;
+    const pvAtual = pvData[mesAtualIdx] || 0;
+
+    const cpi = acAtual > 0 ? Math.round((evAtual / acAtual) * 100) / 100 : 1.0;
+    const spi = pvAtual > 0 ? Math.round((evAtual / pvAtual) * 100) / 100 : 1.0;
+
+    const eac = cpi > 0 ? Math.round(bac / cpi) : bac;
+    const vac = bac - eac;
+
+    const forecastData = meses.map(() => null);
+    if (mesAtualIdx >= 0) {
+      forecastData[mesAtualIdx] = acAtual;
+      const mesesRestantes = totalMeses - 1 - mesAtualIdx;
+      if (mesesRestantes > 0) {
+        const deltaCusto = eac - acAtual;
+        for (let j = 1; j <= mesesRestantes; j++) {
+          const idx = mesAtualIdx + j;
+          const progress = j / mesesRestantes;
+          forecastData[idx] = Math.round(acAtual + deltaCusto * progress);
+        }
+      }
+    }
+
+    let mesesAdicionais = 0;
+    if (spi < 0.95 && spi > 0) {
+      const mesesFaltantes = Math.max(1, totalMeses - 1 - mesAtualIdx);
+      mesesAdicionais = Math.round((mesesFaltantes / spi) - mesesFaltantes);
+    }
+    const dataTerminoEstimada = new Date(maiorFim);
+    if (mesesAdicionais > 0) {
+      dataTerminoEstimada.setMonth(dataTerminoEstimada.getMonth() + mesesAdicionais);
+    }
+
+    let statusCusto = 'no_orcamento';
+    if (cpi < 0.95) statusCusto = 'sobrecusto';
+    else if (cpi > 1.05) statusCusto = 'economico';
+
+    let statusPrazo = 'no_prazo';
+    if (spi < 0.95) statusPrazo = 'atrasado';
+    else if (spi > 1.05) statusPrazo = 'adiantado';
+
+    let diagnosticoTexto = '';
+    if (statusCusto === 'sobrecusto') {
+      diagnosticoTexto = `Atenção: O Índice de Desempenho de Custos (CPI: ${cpi.toFixed(2)}) indica sobrecusto. Previsão de custo no término (EAC) em ${Utils.fmt.currency(eac)} (estouro projetado de ${Utils.fmt.currency(Math.abs(vac))}).`;
+    } else if (statusCusto === 'economico') {
+      diagnosticoTexto = `Excelente ritmo: O Índice de Desempenho de Custos (CPI: ${cpi.toFixed(2)}) indica economia em relação ao orçamento. Estimativa final (EAC) de ${Utils.fmt.currency(eac)} (saldo favorável projetado de ${Utils.fmt.currency(vac)}).`;
+    } else {
+      diagnosticoTexto = `Projeto dentro da meta: CPI de ${cpi.toFixed(2)} e SPI de ${spi.toFixed(2)}. Ritmo físico e desembolsos em equilíbrio com o planejado.`;
+    }
+
+    return {
+      obraId: obraId || 'todas',
+      dataInicio: menorInicio,
+      dataFimPrevista: maiorFim,
+      dataFimEstimada: dataTerminoEstimada,
+      totalMeses,
+      mesAtualIdx,
+      mesesLabels: labels,
+      mesesKeys: meses,
+      bac,
+      pvAtual,
+      acAtual,
+      evAtual,
+      cpi,
+      spi,
+      eac,
+      vac,
+      statusCusto,
+      statusPrazo,
+      diagnosticoTexto,
+      pvData,
+      acData,
+      evData,
+      forecastData
+    };
+  },
+
+  // ── CRONOGRAMA FÍSICO-FINANCEIRO ──
+  getCronogramaFisicoFinanceiro(obraId) {
+    const cs = this.getCurvaS(obraId);
+    const comp = this.getOrcamentoVsRealizado(obraId);
+    const totalMeses = cs.totalMeses;
+    const mesesKeys = cs.mesesKeys;
+    const mesesLabels = cs.mesesLabels;
+
+    // Perfis típicos de distribuição por macro-etapa (pesos normalizados ao longo do ciclo de vida da obra)
+    const perfisEtapas = {
+      preliminares:  [0.60, 0.40, 0.00, 0.00, 0.00, 0.00],
+      fundacao:      [0.30, 0.50, 0.20, 0.00, 0.00, 0.00],
+      alvenaria:     [0.00, 0.25, 0.50, 0.25, 0.00, 0.00],
+      cobertura:     [0.00, 0.00, 0.35, 0.45, 0.20, 0.00],
+      eletrica:      [0.05, 0.15, 0.30, 0.30, 0.20, 0.00],
+      hidraulica:    [0.10, 0.25, 0.35, 0.20, 0.10, 0.00],
+      revestimentos: [0.00, 0.00, 0.15, 0.45, 0.30, 0.10],
+      esquadrias:    [0.00, 0.00, 0.00, 0.30, 0.50, 0.20],
+      pintura:       [0.00, 0.00, 0.00, 0.10, 0.50, 0.40],
+      loucas:        [0.00, 0.00, 0.00, 0.00, 0.40, 0.60],
+      externa:       [0.00, 0.00, 0.00, 0.10, 0.40, 0.50],
+      limpeza:       [0.00, 0.00, 0.00, 0.00, 0.20, 0.80],
+      outros:        [0.15, 0.20, 0.25, 0.20, 0.15, 0.05]
+    };
+
+    const etapasLinhas = comp.etapas.map(e => {
+      const perfilBase = perfisEtapas[e.id] || perfisEtapas.outros;
+      const mesesValores = [];
+
+      // Interpolar perfil base na quantidade de meses total da obra
+      for (let m = 0; m < totalMeses; m++) {
+        const prog = totalMeses > 1 ? m / (totalMeses - 1) : 0;
+        const baseIdx = Math.min(perfilBase.length - 1, Math.floor(prog * perfilBase.length));
+        const peso = perfilBase[baseIdx] || 0.05;
+        mesesValores.push(peso);
+      }
+
+      const somaPesos = mesesValores.reduce((s, p) => s + p, 0) || 1;
+      const previstoTotal = e.previsto || (comp.totalOrcado / Math.max(1, comp.totalEtapas));
+
+      const mesesPrevistos = mesesValores.map(p => {
+        const pctMes = Math.round((p / somaPesos) * 1000) / 10;
+        const valMes = Math.round(previstoTotal * (pctMes / 100));
+        return { percentual: pctMes, valor: valMes };
+      });
+
+      // Ajustar último mês para fechar exatamente em 100%
+      const somaPct = mesesPrevistos.reduce((s, mp) => s + mp.percentual, 0);
+      const difPct = Math.round((100 - somaPct) * 10) / 10;
+      if (mesesPrevistos.length > 0) {
+        mesesPrevistos[mesesPrevistos.length - 1].percentual += difPct;
+      }
+
+      return {
+        id: e.id,
+        nome: e.nome,
+        previstoTotal,
+        realizadoTotal: e.realizado,
+        saldo: e.saldo,
+        status: e.status,
+        meses: mesesPrevistos
+      };
+    });
+
+    // Totais mensais
+    const totaisMensais = mesesKeys.map((k, mIdx) => {
+      let valorPrevisto = 0;
+      etapasLinhas.forEach(l => {
+        valorPrevisto += (l.meses[mIdx]?.valor || 0);
+      });
+      const pctPrevisto = cs.bac > 0 ? Math.round((valorPrevisto / cs.bac) * 1000) / 10 : 0;
+      return {
+        mesKey: k,
+        label: mesesLabels[mIdx],
+        valorPrevisto,
+        percentualPrevisto: pctPrevisto
+      };
+    });
+
+    // Totais acumulados
+    let acumVal = 0;
+    let acumPct = 0;
+    const totaisAcumulados = totaisMensais.map(tm => {
+      acumVal += tm.valorPrevisto;
+      acumPct += tm.percentualPrevisto;
+      return {
+        valorAcumulado: acumVal,
+        percentualAcumulado: Math.min(100, Math.round(acumPct * 10) / 10)
+      };
+    });
+
+    return {
+      obraId: obraId || 'todas',
+      mesesKeys,
+      mesesLabels,
+      totalMeses,
+      linhas: etapasLinhas,
+      totaisMensais,
+      totaisAcumulados,
+      bac: cs.bac
+    };
+  },
+
+  // ── CURVA ABC (PRINCÍPIO DE PARETO 80/20) ──
+  getCurvaABC(obraId) {
+    const isTodas = !obraId || obraId === 'todas';
+    const cs = this.getAll('clientes') || [];
+    const targetObras = isTodas ? cs : cs.filter(c => c.id === obraId);
+    const targetIds = new Set(targetObras.map(c => c.id));
+
+    // Coletar itens de orçamentos convencionais, SINAPI e lançamentos
+    const orcsConv = (this.getAll('orcamentos') || []).filter(o => isTodas || targetIds.has(o.obra_id));
+    const orcsSinapi = (this.getAll('orcamentos_sinapi') || []).filter(o => isTodas || targetIds.has(o.obra_id));
+    const lans = (this.getAll('lancamentos') || []).filter(l => {
+      if (l.tipo !== 'despesa' || l.status === 'cancelado') return false;
+      if (isTodas) return l.obra_id !== 'escritorio' && l.obra_id !== 'sede';
+      return targetIds.has(l.obra_id);
+    });
+
+    const itensMapeados = new Map();
+
+    // 1. Itens orçados convencionais
+    orcsConv.forEach(orc => {
+      (orc.categorias || []).forEach(cat => {
+        (cat.itens || []).forEach(i => {
+          const desc = String(i.descricao || 'Item orçado').trim();
+          const key = desc.toLowerCase();
+          const val = Number(i.total || (Number(i.quantidade||1) * Number(i.preco_unitario||0)) || 0);
+          if (val > 0) {
+            const cur = itensMapeados.get(key) || { descricao: desc, categoria: cat.nome || 'Geral', valor: 0, quantidade: 0, unidade: i.unidade || 'un' };
+            cur.valor += val;
+            cur.quantidade += Number(i.quantidade || 1);
+            itensMapeados.set(key, cur);
+          }
+        });
+      });
+    });
+
+    // 2. Itens orçados SINAPI
+    orcsSinapi.forEach(orc => {
+      const bdi = Number(orc.bdi || 24.23);
+      (orc.itens || []).forEach(i => {
+        const desc = String(i.descricao || i.codigo || 'Composição SINAPI').trim();
+        const key = desc.toLowerCase();
+        const sub = Number(i.total || 0);
+        const val = sub * (1 + bdi / 100);
+        if (val > 0) {
+          const cur = itensMapeados.get(key) || { descricao: desc, categoria: 'SINAPI', valor: 0, quantidade: 0, unidade: i.unidade || 'un' };
+          cur.valor += val;
+          cur.quantidade += Number(i.quantidade || 1);
+          itensMapeados.set(key, cur);
+        }
+      });
+    });
+
+    // 3. Se não houver itens orçados detalhados, usar despesas reais
+    if (itensMapeados.size === 0) {
+      lans.forEach(l => {
+        const desc = String(l.descricao || l.categoria || 'Despesa').trim();
+        const key = desc.toLowerCase();
+        const val = Number(l.valor || 0);
+        if (val > 0) {
+          const cur = itensMapeados.get(key) || { descricao: desc, categoria: l.categoria || 'Geral', valor: 0, quantidade: 1, unidade: 'un' };
+          cur.valor += val;
+          itensMapeados.set(key, cur);
+        }
+      });
+    }
+
+    // Se ainda vazio, montar fallback com macro-etapas
+    if (itensMapeados.size === 0) {
+      const comp = this.getOrcamentoVsRealizado(obraId);
+      comp.etapas.forEach(e => {
+        const val = e.previsto || e.realizado || 1000;
+        itensMapeados.set(e.id, { descricao: e.nome, categoria: 'Macro-Etapa', valor: val, quantidade: 1, unidade: 'vb' });
+      });
+    }
+
+    // Ordenar decrescente por valor total
+    const listaOrdenada = Array.from(itensMapeados.values())
+      .sort((a, b) => b.valor - a.valor);
+
+    const valorTotalGeral = listaOrdenada.reduce((s, i) => s + i.valor, 0) || 1;
+
+    let acum = 0;
+    let totalClasseA = { valor: 0, qtd: 0, pct: 0 };
+    let totalClasseB = { valor: 0, qtd: 0, pct: 0 };
+    let totalClasseC = { valor: 0, qtd: 0, pct: 0 };
+
+    const itensABC = listaOrdenada.map((item, idx) => {
+      const pctIndividual = Math.round((item.valor / valorTotalGeral) * 10000) / 100;
+      acum += item.valor;
+      const pctAcumulado = Math.min(100, Math.round((acum / valorTotalGeral) * 10000) / 100);
+
+      let classe = 'C';
+      if (pctAcumulado <= 80 || idx === 0) {
+        classe = 'A';
+        totalClasseA.valor += item.valor;
+        totalClasseA.qtd++;
+      } else if (pctAcumulado <= 95) {
+        classe = 'B';
+        totalClasseB.valor += item.valor;
+        totalClasseB.qtd++;
+      } else {
+        classe = 'C';
+        totalClasseC.valor += item.valor;
+        totalClasseC.qtd++;
+      }
+
+      return {
+        ranking: idx + 1,
+        descricao: item.descricao,
+        categoria: item.categoria,
+        unidade: item.unidade,
+        quantidade: item.quantidade,
+        valorTotal: item.valor,
+        pctIndividual,
+        pctAcumulado,
+        classe
+      };
+    });
+
+    totalClasseA.pct = Math.round((totalClasseA.valor / valorTotalGeral) * 1000) / 10;
+    totalClasseB.pct = Math.round((totalClasseB.valor / valorTotalGeral) * 1000) / 10;
+    totalClasseC.pct = Math.round((totalClasseC.valor / valorTotalGeral) * 1000) / 10;
+
+    return {
+      obraId: obraId || 'todas',
+      valorTotalGeral,
+      totalItens: itensABC.length,
+      classeA: totalClasseA,
+      classeB: totalClasseB,
+      classeC: totalClasseC,
+      itens: itensABC
+    };
+  },
+
+  // ── LEIS SOCIAIS & ENCARGOS TRABALHISTAS (MÃO DE OBRA) ──
+  getLeisSociais(desonerado = false) {
+    // Tabela padrão oficial da construção civil (SINAPI / CEF / IBGE)
+    const grupoA = [
+      { codigo: 'A1', descricao: 'INSS Patronal', percentual: desonerado ? 0.00 : 20.00 },
+      { codigo: 'A2', descricao: 'FGTS', percentual: 8.00 },
+      { codigo: 'A3', descricao: 'Salário Educação', percentual: 2.50 },
+      { codigo: 'A4', descricao: 'SESI', percentual: 1.50 },
+      { codigo: 'A5', descricao: 'SENAI', percentual: 1.00 },
+      { codigo: 'A6', descricao: 'SEBRAE', percentual: 0.60 },
+      { codigo: 'A7', descricao: 'INCRA', percentual: 0.20 },
+      { codigo: 'A8', descricao: 'Seguro Contra Acidentes de Trabalho (SAT/INSS)', percentual: 3.00 }
+    ];
+    const totalA = grupoA.reduce((s, i) => s + i.percentual, 0);
+
+    const grupoB = [
+      { codigo: 'B1', descricao: 'Repouso Semanal Remunerado (RSR)', percentual: 17.84 },
+      { codigo: 'B2', descricao: 'Feriados Oficiais e Facultativos', percentual: 3.71 },
+      { codigo: 'B3', descricao: 'Auxílio Enfermidade / Primeiros 15 dias', percentual: 0.85 },
+      { codigo: 'B4', descricao: '13º Salário', percentual: 10.82 },
+      { codigo: 'B5', descricao: 'Férias Anuais e 1/3 Constitucional', percentual: 10.98 },
+      { codigo: 'B6', descricao: 'Faltas Justificadas e Legais', percentual: 0.56 }
+    ];
+    const totalB = grupoB.reduce((s, i) => s + i.percentual, 0);
+
+    const grupoC = [
+      { codigo: 'C1', descricao: 'Aviso Prévio Indenizado', percentual: 5.52 },
+      { codigo: 'C2', descricao: 'Aviso Prévio Trabalhado', percentual: 0.13 },
+      { codigo: 'C3', descricao: 'Multa Rescisória do FGTS (Rescisões Sem Justa Causa)', percentual: 3.87 },
+      { codigo: 'C4', descricao: 'Indenização Adicional / Rescisória', percentual: 0.45 }
+    ];
+    const totalC = grupoC.reduce((s, i) => s + i.percentual, 0);
+
+    // Grupo D: Reincidências de Grupo A sobre Grupo B
+    const taxaD = desonerado ? 7.52 : 11.20;
+    const grupoD = [
+      { codigo: 'D1', descricao: 'Reincidência de Grupo A sobre Grupo B', percentual: taxaD }
+    ];
+    const totalD = taxaD;
+
+    const totalGeral = Math.round((totalA + totalB + totalC + totalD) * 100) / 100;
+
+    return {
+      regime: desonerado ? 'Desonerado (com CPRB 4.5%)' : 'Não Desonerado (com INSS 20%)',
+      desonerado,
+      totalGeral,
+      grupoA: { itens: grupoA, total: Math.round(totalA * 100) / 100 },
+      grupoB: { itens: grupoB, total: Math.round(totalB * 100) / 100 },
+      grupoC: { itens: grupoC, total: Math.round(totalC * 100) / 100 },
+      grupoD: { itens: grupoD, total: Math.round(totalD * 100) / 100 },
+      observacao: desonerado
+        ? 'No regime desonerado a cota patronal de 20% do INSS é zerada, incidindo a CPRB de 4,5% sobre a receita bruta no BDI.'
+        : 'No regime não desonerado incide a cota patronal integral do INSS de 20% sobre a folha de pagamento.'
+    };
+  },
+
+  // ── MEMÓRIA DE CÁLCULO DE BDI OFICIAL (TCU ACÓRDÃO 2622/2013) ──
+  getBDIConfig(obraId, customParams = {}) {
+    const isDesonerado = customParams.desonerado !== undefined ? !!customParams.desonerado : false;
+
+    // Parâmetros de referência (Valores médios recomendados pelo Acórdão 2622/2013 - TCU)
+    const ac  = Number(customParams.ac  !== undefined ? customParams.ac  : 4.00);  // Administração Central (3.00% a 5.50%)
+    const s   = Number(customParams.s   !== undefined ? customParams.s   : 0.80);  // Seguro (0.80% a 1.20%)
+    const r   = Number(customParams.r   !== undefined ? customParams.r   : 1.20);  // Risco (0.97% a 1.27%)
+    const g   = Number(customParams.g   !== undefined ? customParams.g   : 0.40);  // Garantia (0.40% a 0.74%)
+    const df  = Number(customParams.df  !== undefined ? customParams.df  : 1.23);  // Despesas Financeiras (0.59% a 1.39%)
+    const l   = Number(customParams.l   !== undefined ? customParams.l   : 7.40);  // Lucro Bruto Operacional (6.16% a 8.96%)
+
+    // Tributos: PIS (0.65%), COFINS (3.00%), ISS (2.00% a 5.00%), CPRB (4.50% se desonerado)
+    const pis    = 0.65;
+    const cofins = 3.00;
+    const iss    = Number(customParams.iss !== undefined ? customParams.iss : 3.00);
+    const cprb   = isDesonerado ? 4.50 : 0.00;
+    const i = pis + cofins + iss + cprb; // Total de tributos
+
+    // Fórmula oficial do TCU:
+    // BDI = [ ( (1 + (AC + S + R + G)/100) * (1 + DF/100) * (1 + L/100) ) / (1 - I/100) ] - 1
+    const numerador = (1 + (ac + s + r + g) / 100) * (1 + df / 100) * (1 + l / 100);
+    const denominador = 1 - (i / 100);
+    const bdiCalculado = Math.round(((numerador / denominador) - 1) * 10000) / 100;
+
+    return {
+      formula: 'BDI = [ ( (1 + AC + S + R + G) * (1 + DF) * (1 + L) ) / (1 - I) ] - 1',
+      bdiCalculado,
+      desonerado: isDesonerado,
+      parametros: {
+        ac: { valor: ac, nome: 'Administração Central', faixaTCU: '3,00% — 5,50%' },
+        s:  { valor: s,  nome: 'Seguro', faixaTCU: '0,80% — 1,20%' },
+        r:  { valor: r,  nome: 'Risco', faixaTCU: '0,97% — 1,27%' },
+        g:  { valor: g,  nome: 'Garantia', faixaTCU: '0,40% — 0,74%' },
+        df: { valor: df, nome: 'Despesas Financeiras', faixaTCU: '0,59% — 1,39%' },
+        l:  { valor: l,  nome: 'Lucro Bruto Operacional', faixaTCU: '6,16% — 8,96%' },
+        tributos: {
+          total: i,
+          pis,
+          cofins,
+          iss,
+          cprb,
+          nome: 'Tributos Incidentes (PIS + COFINS + ISS + CPRB)'
+        }
+      },
+      faixaReferenciaTCU: {
+        primeiroQuartil: 20.34,
+        mediana: 22.18,
+        terceiroQuartil: 25.00
+      }
+    };
+  },
+
   // ── PRÉ-COMPRAS QUERIES ──
   getPreCompras(obraId, filters = {}) {
     let items = this.getAll('precompras');

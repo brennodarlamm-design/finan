@@ -330,6 +330,9 @@ const Dashboard = {
     const comp = DB.getOrcamentoVsRealizado(obraId);
     if (!comp.temOrcamento && comp.totalRealizado === 0) return '';
 
+    const cs = DB.getCurvaS ? DB.getCurvaS(obraId) : null;
+    const abc = DB.getCurvaABC ? DB.getCurvaABC(obraId) : null;
+
     const saudeConfig = {
       saudavel: {
         badge: '🟢 Obra Saudável',
@@ -391,44 +394,49 @@ const Dashboard = {
           <span style="font-size:1.6rem;">🏗️</span>
           <div>
             <div class="card-title" style="display:flex;align-items:center;gap:8px;">
-              <span>Controle Orçamentário &amp; Avanço Físico-Financeiro</span>
+              <span>Engenharia de Custos, Cronograma &amp; Curva S</span>
               <span style="font-size:.72rem;font-weight:800;padding:2px 8px;border-radius:12px;background:${s.cor}22;color:${s.cor};border:1px solid ${s.cor}50;">
                 ${s.badge}
               </span>
             </div>
             <div style="font-size:.76rem;color:var(--text2);margin-top:2px;">
-              ${Utils.escapeHtml(comp.alertaDesc)}
+              ${Utils.escapeHtml(comp.alertaDesc)} ${cs ? `&bull; CPI: <strong>${cs.cpi.toFixed(2)}</strong> | SPI: <strong>${cs.spi.toFixed(2)}</strong>` : ''}
             </div>
           </div>
         </div>
         <div style="display:flex;gap:8px;align-items:center;">
-          <button class="btn btn-secondary btn-sm" onclick="App.navigate('orcamentos')" title="Abrir planilha orçamentária detalhada">
-            📋 Ver Orçamentos
+          <button class="btn btn-primary btn-sm" onclick="typeof ObraDetalhe !== 'undefined' ? ObraDetalhe.abrir('${obraId}', 'orcado-realizado') : App.navigate('orcamentos')" title="Abrir Central da Obra com Curva S e Cronograma">
+            📈 Curva S &amp; Cronograma
           </button>
-          <button class="btn btn-secondary btn-sm" onclick="App.navigate('medicoes')" title="Ver cronograma físico e medições">
+          <button class="btn btn-secondary btn-sm" onclick="App.navigate('orcamentos')" title="Abrir planilha orçamentária detalhada">
+            📋 Orçamentos
+          </button>
+          <button class="btn btn-secondary btn-sm" onclick="App.navigate('medicoes')" title="Ver medições de campo">
             🔨 Medições (${comp.totalMedicoes})
           </button>
         </div>
       </div>
 
-      <!-- Grid dos 4 KPIs Físico-Financeiros -->
+      <!-- Grid dos 4 KPIs Físico-Financeiros + Forecast -->
       <div class="g4" style="margin-bottom:16px;">
         <div style="padding:12px;background:var(--bg-secondary);border-radius:var(--r-md);text-align:center;">
-          <div style="font-size:.68rem;text-transform:uppercase;color:var(--text3);margin-bottom:3px;font-weight:700;">Total Orçado</div>
+          <div style="font-size:.68rem;text-transform:uppercase;color:var(--text3);margin-bottom:3px;font-weight:700;">Total Orçado (BAC)</div>
           <div style="font-size:1.15rem;font-weight:900;color:var(--text);">${Utils.fmt.currency(comp.totalOrcado)}</div>
           <div style="font-size:.68rem;color:var(--text3);margin-top:2px;">Previsto no projeto</div>
         </div>
         <div style="padding:12px;background:var(--bg-secondary);border-radius:var(--r-md);text-align:center;">
-          <div style="font-size:.68rem;text-transform:uppercase;color:var(--text3);margin-bottom:3px;font-weight:700;">Total Gasto Real</div>
+          <div style="font-size:.68rem;text-transform:uppercase;color:var(--text3);margin-bottom:3px;font-weight:700;">Custo Real (AC)</div>
           <div style="font-size:1.15rem;font-weight:900;color:var(--danger);">${Utils.fmt.currency(comp.totalRealizado)}</div>
-          <div style="font-size:.68rem;color:var(--text3);margin-top:2px;">${comp.percentualFinanceiro.toFixed(1)}% do orçamento</div>
+          <div style="font-size:.68rem;color:var(--text3);margin-top:2px;">${comp.percentualFinanceiro.toFixed(1)}% consumido</div>
         </div>
         <div style="padding:12px;background:var(--bg-secondary);border-radius:var(--r-md);text-align:center;">
-          <div style="font-size:.68rem;text-transform:uppercase;color:var(--text3);margin-bottom:3px;font-weight:700;">Saldo Restante</div>
-          <div style="font-size:1.15rem;font-weight:900;color:${comp.saldoRestante >= 0 ? 'var(--success)' : 'var(--danger)'};">
-            ${Utils.fmt.currency(comp.saldoRestante)}
+          <div style="font-size:.68rem;text-transform:uppercase;color:var(--text3);margin-bottom:3px;font-weight:700;">Custo no Término (EAC)</div>
+          <div style="font-size:1.15rem;font-weight:900;color:${cs && cs.vac >= 0 ? 'var(--success)' : 'var(--danger)'};">
+            ${cs ? Utils.fmt.currency(cs.eac) : Utils.fmt.currency(comp.totalOrcado)}
           </div>
-          <div style="font-size:.68rem;color:var(--text3);margin-top:2px;">${comp.saldoRestante >= 0 ? 'Margem disponível' : 'Estouro financeiro'}</div>
+          <div style="font-size:.68rem;color:${cs && cs.vac >= 0 ? 'var(--success)' : 'var(--danger)'};margin-top:2px;">
+            ${cs ? (cs.vac >= 0 ? `Economia: ${Utils.fmt.currency(cs.vac)}` : `Estouro: ${Utils.fmt.currency(Math.abs(cs.vac))}`) : 'Projeção EVM'}
+          </div>
         </div>
         <div style="padding:12px;background:rgba(201,162,39,.08);border:1px solid rgba(201,162,39,.25);border-radius:var(--r-md);text-align:center;">
           <div style="font-size:.68rem;text-transform:uppercase;color:var(--accent);margin-bottom:3px;font-weight:700;">Físico vs Financeiro</div>
