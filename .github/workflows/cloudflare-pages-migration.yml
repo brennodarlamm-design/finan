@@ -1,0 +1,42 @@
+name: Cloudflare Pages migration
+
+on:
+  push:
+    branches:
+      - cloudflare-pages-migration-20260912
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install dependencies and apply build transforms
+        run: npm ci
+      - name: Build Cloudflare Pages frontend
+        run: npm run build:cloudflare
+      - name: Validate Pages Function syntax
+        run: node --check 'functions/api/[[path]].js'
+      - name: Validate frontend-only dist
+        run: |
+          test -f dist/index.html
+          test -f dist/app.html
+          test -f dist/_headers
+          test -f dist/_redirects
+          test -f dist/_routes.json
+          test -f dist/js/clientes.js
+          grep -q 'globalThis.Clientes = Clientes' dist/js/clientes.js
+          test ! -e dist/api
+          test ! -e dist/backend
+          test ! -e dist/bin
+          test ! -e dist/.git
+          echo 'Cloudflare Pages build validated.'
