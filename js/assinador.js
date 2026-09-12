@@ -52,7 +52,7 @@ const Assinador = {
             </div>
             <div style="font-size:.76rem;color:var(--text3);margin-top:2px;">${e(subtitulo)}</div>
           </div>
-          <button class="modal-close" data-fb-click="Utils.closeModal" data-fb-click-n="0">✕</button>
+          <button class="modal-close" onclick="Utils.closeModal()">✕</button>
         </div>
 
         <div class="modal-body" style="padding:18px 20px;">
@@ -76,10 +76,10 @@ const Assinador = {
             <div class="form-group">
               <label class="form-label">Cor da Tinta</label>
               <div style="display:flex;gap:8px;margin-top:4px;">
-                <button type="button" class="btn btn-sm" id="btn-color-blue" data-fb-click="Assinador.setCor" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="%23002b66" style="background:#002b66;color:#fff;border:2px solid #3b82f6;flex:1;font-size:.78rem;">
+                <button type="button" class="btn btn-sm" id="btn-color-blue" onclick="Assinador.setCor('#002b66')" style="background:#002b66;color:#fff;border:2px solid #3b82f6;flex:1;font-size:.78rem;">
                   🖋️ Azul Caneta
                 </button>
-                <button type="button" class="btn btn-sm" id="btn-color-black" data-fb-click="Assinador.setCor" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="%230f172a" style="background:#0f172a;color:#fff;border:1px solid #475569;flex:1;font-size:.78rem;">
+                <button type="button" class="btn btn-sm" id="btn-color-black" onclick="Assinador.setCor('#0f172a')" style="background:#0f172a;color:#fff;border:1px solid #475569;flex:1;font-size:.78rem;">
                   🖋️ Preto Formal
                 </button>
               </div>
@@ -91,10 +91,10 @@ const Assinador = {
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
               <span style="font-size:.78rem;font-weight:700;color:var(--text2);">Área da Rubrica / Assinatura Manual (Touchscreen ou Mouse):</span>
               <div style="display:flex;gap:6px;">
-                <button type="button" class="btn btn-sm btn-secondary" data-fb-click="Assinador.desfazer" data-fb-click-n="0" title="Desfazer último traço" style="padding:3px 8px;font-size:.75rem;">
+                <button type="button" class="btn btn-sm btn-secondary" onclick="Assinador.desfazer()" title="Desfazer último traço" style="padding:3px 8px;font-size:.75rem;">
                   ↩️ Desfazer
                 </button>
-                <button type="button" class="btn btn-sm btn-secondary" data-fb-click="Assinador.limpar" data-fb-click-n="0" title="Limpar tudo e assinar novamente" style="padding:3px 8px;font-size:.75rem;color:var(--danger);">
+                <button type="button" class="btn btn-sm btn-secondary" onclick="Assinador.limpar()" title="Limpar tudo e assinar novamente" style="padding:3px 8px;font-size:.75rem;color:var(--danger);">
                   🧹 Limpar
                 </button>
               </div>
@@ -121,9 +121,9 @@ const Assinador = {
         </div>
 
         <div class="modal-footer" style="border-top:1px solid var(--border-s);display:flex;justify-content:space-between;align-items:center;">
-          <button class="btn btn-secondary" data-fb-click="Utils.closeModal" data-fb-click-n="0">Cancelar</button>
+          <button class="btn btn-secondary" onclick="Utils.closeModal()">Cancelar</button>
           <div style="display:flex;gap:8px;">
-            <button class="btn btn-primary" data-fb-click="Assinador.confirmarAssinatura" data-fb-click-n="0" style="font-weight:700;">
+            <button class="btn btn-primary" onclick="Assinador.confirmarAssinatura()" style="font-weight:700;">
               ✅ Confirmar &amp; Salvar Assinatura
             </button>
           </div>
@@ -517,20 +517,14 @@ const Assinador = {
   // ─────────────────────────────────────────────────────────────
   // MODAL DE ORIENTAÇÃO PARA ASSINATURA GOV.BR (ICP-BRASIL)
   // ─────────────────────────────────────────────────────────────
-  executarGovBrDownload() {
-    if (typeof this._govBrDownload === 'function') this._govBrDownload();
-    Utils.toast('PDF preparado para Gov.br!','info');
-  },
-
   modalGovBr({ nomeDocumento = 'Documento FinObra', onBaixarPDF = null } = {}) {
-    this._govBrDownload = typeof onBaixarPDF === 'function' ? onBaixarPDF : null;
     Utils.showModal(`
       <div class="modal" style="max-width:580px;width:95vw;">
         <div class="modal-header" style="background:#003087;color:#ffffff;border-radius:12px 12px 0 0;padding:16px 20px;">
           <div class="modal-title" style="display:flex;align-items:center;gap:10px;color:#fff;">
             <span style="font-size:1.4rem;">🏛️</span> Assinatura Oficial com Gov.br (Gratuita)
           </div>
-          <button class="modal-close" data-fb-click="Utils.closeModal" data-fb-click-n="0" style="color:#fff;">✕</button>
+          <button class="modal-close" onclick="Utils.closeModal()" style="color:#fff;">✕</button>
         </div>
         <div class="modal-body" style="padding:22px;">
           <p style="margin:0 0 14px 0;font-size:.88rem;color:var(--text);line-height:1.5;">
@@ -553,10 +547,10 @@ const Assinador = {
           </div>
         </div>
         <div class="modal-footer" style="display:flex;justify-content:space-between;align-items:center;">
-          <button class="btn btn-secondary" data-fb-click="Utils.closeModal" data-fb-click-n="0">Fechar</button>
+          <button class="btn btn-secondary" onclick="Utils.closeModal()">Fechar</button>
           <div style="display:flex;gap:8px;">
             ${onBaixarPDF ? `
-              <button class="btn btn-secondary" data-fb-click="Assinador.executarGovBrDownload" data-fb-click-n="0">
+              <button class="btn btn-secondary" onclick="(${onBaixarPDF.toString()})();Utils.toast('PDF preparado para Gov.br!','info');">
                 🖨️ Salvar PDF Agora
               </button>
             ` : ''}

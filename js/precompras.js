@@ -22,7 +22,7 @@ const PreCompras = {
         <p class="page-sub">Controle de requisições de compras, materiais e serviços com autorização da diretoria/administrador</p>
       </div>
       <div class="page-actions" style="display:flex;gap:10px;flex-wrap:wrap;">
-        ${canWrite ? `<button class="btn btn-primary" data-fb-click="PreCompras.showForm" data-fb-click-n="0">
+        ${canWrite ? `<button class="btn btn-primary" onclick="PreCompras.showForm()">
           + Nova Pré-Compra
         </button>` : '<span class="badge badge-secondary">Somente leitura</span>'}
       </div>
@@ -41,7 +41,7 @@ const PreCompras = {
           </div>
         </div>
       </div>
-      <button class="btn btn-warning btn-sm" data-fb-click="PreCompras.filtrarPendentes" data-fb-click-n="0" style="font-weight:700;">
+      <button class="btn btn-warning btn-sm" onclick="PreCompras.filtrarPendentes()" style="font-weight:700;">
         ⚡ Ver Pedidos Pendentes (${resumo.pendentesQtd})
       </button>
     </div>` : ''}
@@ -71,12 +71,12 @@ const PreCompras = {
         <label class="filter-label">Buscar Pedido</label>
         <div class="search-bar">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
-          <input class="form-control" id="pc-search" placeholder="Nº pedido, descrição, fornecedor, item..." data-fb-input="PreCompras.aplicarFiltros" data-fb-input-n="0">
+          <input class="form-control" id="pc-search" placeholder="Nº pedido, descrição, fornecedor, item..." oninput="PreCompras.aplicarFiltros()">
         </div>
       </div>
       <div class="filter-group">
         <label class="filter-label">Status</label>
-        <select class="form-control" id="pc-status" style="min-width:140px" data-fb-change="PreCompras.aplicarFiltros" data-fb-change-n="0">
+        <select class="form-control" id="pc-status" style="min-width:140px" onchange="PreCompras.aplicarFiltros()">
           <option value="">Todos</option>
           <option value="pendente_aprovacao">⏳ Aguardando Aprovação</option>
           <option value="aprovada">✓ Aprovada</option>
@@ -87,7 +87,7 @@ const PreCompras = {
       </div>
       <div class="filter-group">
         <label class="filter-label">Prioridade</label>
-        <select class="form-control" id="pc-prioridade" style="min-width:120px" data-fb-change="PreCompras.aplicarFiltros" data-fb-change-n="0">
+        <select class="form-control" id="pc-prioridade" style="min-width:120px" onchange="PreCompras.aplicarFiltros()">
           <option value="">Todas</option>
           <option value="urgente">🔴 Urgente</option>
           <option value="alta">🟠 Alta</option>
@@ -97,7 +97,7 @@ const PreCompras = {
       </div>
       <div class="filter-group">
         <label class="filter-label">Categoria</label>
-        <select class="form-control" id="pc-cat" style="min-width:130px" data-fb-change="PreCompras.aplicarFiltros" data-fb-change-n="0">
+        <select class="form-control" id="pc-cat" style="min-width:130px" onchange="PreCompras.aplicarFiltros()">
           <option value="">Todas</option>
           <option value="material">🧱 Material</option>
           <option value="mao_de_obra">👷 Mão de Obra</option>
@@ -110,11 +110,11 @@ const PreCompras = {
       <div class="filter-group">
         <label class="filter-label">Período</label>
         <div style="display:flex;gap:5px">
-          <input class="form-control" type="date" id="pc-di" style="width:125px" title="Data inicial" data-fb-change="PreCompras.aplicarFiltros" data-fb-change-n="0">
-          <input class="form-control" type="date" id="pc-df" style="width:125px" title="Data final" data-fb-change="PreCompras.aplicarFiltros" data-fb-change-n="0">
+          <input class="form-control" type="date" id="pc-di" style="width:125px" title="Data inicial" onchange="PreCompras.aplicarFiltros()">
+          <input class="form-control" type="date" id="pc-df" style="width:125px" title="Data final" onchange="PreCompras.aplicarFiltros()">
         </div>
       </div>
-      <button class="btn btn-secondary btn-sm" data-fb-click="PreCompras.limparFiltros" data-fb-click-n="0" style="align-self:flex-end">Limpar</button>
+      <button class="btn btn-secondary btn-sm" onclick="PreCompras.limparFiltros()" style="align-self:flex-end">Limpar</button>
     </div>
 
     <!-- Tabela de Pedidos -->
@@ -174,7 +174,7 @@ const PreCompras = {
       return `
       <tr>
         <td style="font-weight:800;color:var(--accent2);font-family:monospace;white-space:nowrap;">
-          <a href="#" data-fb-click="PreCompras.visualizarOrdem" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(decodeURIComponent(safeId)))}" title="Visualizar Ordem de Compra Completa" style="color:var(--accent2);text-decoration:underline;">
+          <a href="javascript:void(0)" onclick="PreCompras.visualizarOrdem(decodeURIComponent('${safeId}'))" title="Visualizar Ordem de Compra Completa" style="color:var(--accent2);text-decoration:underline;">
             ${esc(p.numero_ordem)}
           </a>
         </td>
@@ -202,29 +202,29 @@ const PreCompras = {
         <td style="text-align:center;">${clipBadge}</td>
         <td style="text-align:center;white-space:nowrap;">
           <div style="display:flex;gap:4px;justify-content:center;align-items:center;">
-            <button class="icon-btn" data-fb-click="PreCompras.visualizarOrdem" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(decodeURIComponent(safeId)))}" title="Visualizar & Imprimir Folha de Ordem de Compra" style="font-size:14px;color:var(--accent2);">
+            <button class="icon-btn" onclick="PreCompras.visualizarOrdem(decodeURIComponent('${safeId}'))" title="Visualizar & Imprimir Folha de Ordem de Compra" style="font-size:14px;color:var(--accent2);">
               📄
             </button>
-            <button class="icon-btn" data-fb-click="PreCompras.abrirAnexosNotaFiscal" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(decodeURIComponent(safeId)))}" title="Anexar ou Visualizar Nota Fiscal / Documentos" style="font-size:14px;">
+            <button class="icon-btn" onclick="PreCompras.abrirAnexosNotaFiscal(decodeURIComponent('${safeId}'))" title="Anexar ou Visualizar Nota Fiscal / Documentos" style="font-size:14px;">
               📎
             </button>
             ${isAdmin && isPendente ? `
-            <button class="btn btn-sm btn-success" data-fb-click="PreCompras.abrirModalAprovacao" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(decodeURIComponent(safeId)))}" title="Aprovar esta pré-compra" style="font-size:.72rem;padding:3px 8px;">
+            <button class="btn btn-sm btn-success" onclick="PreCompras.abrirModalAprovacao(decodeURIComponent('${safeId}'))" title="Aprovar esta pré-compra" style="font-size:.72rem;padding:3px 8px;">
               ✓ Aprovar
             </button>
-            <button class="btn btn-sm btn-danger" data-fb-click="PreCompras.abrirModalRejeicao" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(decodeURIComponent(safeId)))}" title="Recusar pré-compra com justificativa" style="font-size:.72rem;padding:3px 8px;">
+            <button class="btn btn-sm btn-danger" onclick="PreCompras.abrirModalRejeicao(decodeURIComponent('${safeId}'))" title="Recusar pré-compra com justificativa" style="font-size:.72rem;padding:3px 8px;">
               ✕ Recusar
             </button>` : ''}
             ${canWrite && isAprovada ? `
-            <button class="btn btn-sm btn-primary" data-fb-click="PreCompras.converterEmLancamentoModal" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(decodeURIComponent(safeId)))}" title="Gerar Lançamento Financeiro / Despesa na Obra" style="font-size:.72rem;padding:3px 8px;background:linear-gradient(135deg,#0284c7,#0369a1);border:none;">
+            <button class="btn btn-sm btn-primary" onclick="PreCompras.converterEmLancamentoModal(decodeURIComponent('${safeId}'))" title="Gerar Lançamento Financeiro / Despesa na Obra" style="font-size:.72rem;padding:3px 8px;background:linear-gradient(135deg,#0284c7,#0369a1);border:none;">
               💰 Gerar Despesa
             </button>` : ''}
             ${canWrite && isPendente ? `
-            <button class="icon-btn" data-fb-click="PreCompras.showForm" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(decodeURIComponent(safeId)))}" title="Editar Pedido" style="font-size:13px;">
+            <button class="icon-btn" onclick="PreCompras.showForm(decodeURIComponent('${safeId}'))" title="Editar Pedido" style="font-size:13px;">
               ✏️
             </button>` : ''}
             ${canDelete && (isAdmin || isPendente) ? `
-            <button class="icon-btn" data-fb-click="PreCompras.excluir" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(decodeURIComponent(safeId)))}" title="Excluir Ordem" style="font-size:13px;color:var(--danger);">
+            <button class="icon-btn" onclick="PreCompras.excluir(decodeURIComponent('${safeId}'))" title="Excluir Ordem" style="font-size:13px;color:var(--danger);">
               🗑️
             </button>` : ''}
           </div>
@@ -319,10 +319,10 @@ const PreCompras = {
               <div style="font-size:.75rem;color:var(--text3);">Ordem gerada para análise e autorização pelo Administrador</div>
             </div>
           </div>
-          <button class="modal-close" data-fb-click="Utils.closeModal" data-fb-click-n="0">✕</button>
+          <button class="modal-close" onclick="Utils.closeModal()">✕</button>
         </div>
 
-        <form id="form-precompra" data-fb-submit="PreCompras.salvar" data-fb-submit-n="2" data-fb-submit-t0="event" data-fb-submit-t1="string" data-fb-submit-v1="${encodeURIComponent(String(decodeURIComponent(safeId)))}" style="display:flex;flex-direction:column;flex:1;overflow:hidden;">
+        <form id="form-precompra" onsubmit="PreCompras.salvar(event, decodeURIComponent('${safeId}'))" style="display:flex;flex-direction:column;flex:1;overflow:hidden;">
           <div class="modal-body" style="padding:20px;overflow-y:auto;flex:1;">
             
             <!-- Linha 1: Número, Obra, Solicitante -->
@@ -376,10 +376,10 @@ const PreCompras = {
               <div class="form-group">
                 <label class="form-label">Fornecedor Sugerido</label>
                 <div style="display:flex;gap:6px;align-items:center;">
-                  <select class="form-control" id="pc-forn-sel" data-fb-change="PreCompras._onFornecedorChange" data-fb-change-n="1" data-fb-change-t0="self" style="flex:1;">
+                  <select class="form-control" id="pc-forn-sel" onchange="PreCompras._onFornecedorChange(this)" style="flex:1;">
                     ${typeof Fornecedores !== 'undefined' ? Fornecedores.fornecedorOptions(item?.fornecedor_nome||'') : '<option value="">Nenhum fornecedor</option>'}
                   </select>
-                  <button type="button" class="btn btn-secondary btn-sm" data-fb-click="Fornecedores.showForm" data-fb-click-n="0" title="Cadastrar novo" style="white-space:nowrap;font-size:.74rem;padding:6px 10px;">+ Novo</button>
+                  <button type="button" class="btn btn-secondary btn-sm" onclick="Fornecedores.showForm()" title="Cadastrar novo" style="white-space:nowrap;font-size:.74rem;padding:6px 10px;">+ Novo</button>
                 </div>
                 <input class="form-control" name="fornecedor_nome" id="pc-forn-manual" value="${esc(item?.fornecedor_nome||'')}" placeholder="Ou digite o nome do fornecedor" style="margin-top:6px;display:${item?.fornecedor_nome && !(typeof Fornecedores !== 'undefined' && Fornecedores.getByNome(item?.fornecedor_nome)) ? 'block' : 'none'};">
               </div>
@@ -416,7 +416,7 @@ const PreCompras = {
                   <strong style="font-size:.9rem;color:var(--text);">📋 Itens e Insumos do Pedido</strong>
                   <span style="font-size:.72rem;color:var(--text3);">(Quantidades e valores unitários estimados)</span>
                 </div>
-                <button type="button" class="btn btn-secondary btn-sm" data-fb-click="PreCompras.adicionarLinhaItem" data-fb-click-n="0" style="font-size:.76rem;">
+                <button type="button" class="btn btn-secondary btn-sm" onclick="PreCompras.adicionarLinhaItem()" style="font-size:.76rem;">
                   + Adicionar Item
                 </button>
               </div>
@@ -465,7 +465,7 @@ const PreCompras = {
           </div>
 
           <div class="modal-footer" style="padding:14px 20px;border-top:1px solid var(--border);justify-content:space-between;">
-            <button type="button" class="btn btn-secondary" data-fb-click="Utils.closeModal" data-fb-click-n="0">Cancelar</button>
+            <button type="button" class="btn btn-secondary" onclick="Utils.closeModal()">Cancelar</button>
             <button type="submit" class="btn btn-primary" style="font-weight:800;padding:10px 24px;">
               ${isEdit ? 'Salvar Alterações' : 'Criar Ordem de Pré-Compra'}
             </button>
@@ -486,24 +486,24 @@ const PreCompras = {
     return this._itensTemp.map((it, idx) => `
       <tr data-idx="${idx}">
         <td>
-          <input type="text" class="form-control" value="${esc(it.descricao || '')}" placeholder="Ex: Cimento CP-II 50kg" data-fb-input="PreCompras._atualizarItem" data-fb-input-n="3" data-fb-input-t0="auto" data-fb-input-v0="${encodeURIComponent(String(idx))}" data-fb-input-t1="string" data-fb-input-v1="descricao" data-fb-input-t2="value" required style="padding:6px 8px;font-size:.8rem;">
+          <input type="text" class="form-control" value="${esc(it.descricao || '')}" placeholder="Ex: Cimento CP-II 50kg" oninput="PreCompras._atualizarItem(${idx}, 'descricao', this.value)" required style="padding:6px 8px;font-size:.8rem;">
         </td>
         <td>
-          <select class="form-control" data-fb-change="PreCompras._atualizarItem" data-fb-change-n="3" data-fb-change-t0="auto" data-fb-change-v0="${encodeURIComponent(String(idx))}" data-fb-change-t1="string" data-fb-change-v1="unidade" data-fb-change-t2="value" style="padding:6px 4px;font-size:.8rem;">
+          <select class="form-control" onchange="PreCompras._atualizarItem(${idx}, 'unidade', this.value)" style="padding:6px 4px;font-size:.8rem;">
             ${unidades.map(u => `<option value="${u}" ${it.unidade === u ? 'selected' : ''}>${u}</option>`).join('')}
           </select>
         </td>
         <td>
-          <input type="number" step="any" min="0" class="form-control" value="${it.quantidade || 1}" data-fb-input="PreCompras._atualizarItem" data-fb-input-n="3" data-fb-input-t0="auto" data-fb-input-v0="${encodeURIComponent(String(idx))}" data-fb-input-t1="string" data-fb-input-v1="quantidade" data-fb-input-t2="float" required style="padding:6px 8px;font-size:.8rem;text-align:right;">
+          <input type="number" step="any" min="0" class="form-control" value="${it.quantidade || 1}" oninput="PreCompras._atualizarItem(${idx}, 'quantidade', parseFloat(this.value)||0)" required style="padding:6px 8px;font-size:.8rem;text-align:right;">
         </td>
         <td>
-          <input type="number" step="any" min="0" class="form-control" value="${it.valor_unitario || 0}" data-fb-input="PreCompras._atualizarItem" data-fb-input-n="3" data-fb-input-t0="auto" data-fb-input-v0="${encodeURIComponent(String(idx))}" data-fb-input-t1="string" data-fb-input-v1="valor_unitario" data-fb-input-t2="float" required style="padding:6px 8px;font-size:.8rem;text-align:right;">
+          <input type="number" step="any" min="0" class="form-control" value="${it.valor_unitario || 0}" oninput="PreCompras._atualizarItem(${idx}, 'valor_unitario', parseFloat(this.value)||0)" required style="padding:6px 8px;font-size:.8rem;text-align:right;">
         </td>
         <td style="text-align:right;font-weight:800;color:var(--text);font-family:monospace;white-space:nowrap;padding-right:8px;">
           ${Utils.fmt.currency(it.subtotal || (it.quantidade * it.valor_unitario))}
         </td>
         <td style="text-align:center;">
-          <button type="button" class="icon-btn" data-fb-click="PreCompras.removerLinhaItem" data-fb-click-n="1" data-fb-click-t0="auto" data-fb-click-v0="${encodeURIComponent(String(idx))}" title="Remover item" style="color:var(--danger);font-size:12px;padding:2px 4px;">
+          <button type="button" class="icon-btn" onclick="PreCompras.removerLinhaItem(${idx})" title="Remover item" style="color:var(--danger);font-size:12px;padding:2px 4px;">
             ✕
           </button>
         </td>

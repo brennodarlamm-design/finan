@@ -61,13 +61,6 @@ const Patch26Actions = {
   },
   closeModalNavigate(route) { Utils?.closeModal?.(); App?.navigate?.(route); },
 
-  ofxViewImport(importId, status) {
-    OFX?.viewImport?.(importId, status, document.getElementById('rec-search')?.value || '');
-  },
-  ofxConciliarAndReopen(importId, trnId, lanId) {
-    OFX?.conciliar?.(importId, trnId, lanId);
-    OFX?._abrirModalRobo?.(importId);
-  },
   ofxSetTolerance(kind, value) {
     if (kind === 'valor') OFX._toleranciaValor = value;
     if (kind === 'dias') OFX._toleranciaDias = parseInt(value, 10) || 0;
@@ -166,7 +159,6 @@ const Patch26Actions = {
   lancamentoRemoveItem(el) { el?.closest?.('.item-row')?.remove(); Lancamentos?._atualizarTotalItens?.(); },
   lancamentoCloseAndForm(tipo, id) { Utils?.closeModal?.(); Lancamentos?.showForm?.(tipo, id); },
 
-  fasesClickFile(docId) { this.clickById(`fd-file-in-${String(docId || '')}`); },
   fasesBackdropClose(ev, el) { if (ev?.target === el) FasesDoc?.closeModal?.(); },
   fasesDrop(ev, el, obraId, docId) {
     ev?.preventDefault?.();
@@ -210,9 +202,3 @@ const Patch26Actions = {
 };
 
 globalThis.Patch26Actions = Patch26Actions;
-
-/* FINOBRA_PATCH26_HASH_LINK_GUARD — javascript: URLs were replaced with #. */
-document.addEventListener('click', ev => {
-  const link = ev.target?.closest?.('a[href="#"][data-fb-click]');
-  if (link) ev.preventDefault();
-}, true);

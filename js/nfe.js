@@ -229,12 +229,14 @@ const NFe = {
           <div style="display:flex;gap:10px;align-items:flex-start;flex-wrap:wrap;">
             <div style="flex:1;min-width:240px;">
               <input type="text" id="nfe-chave-input" class="form-control"
-                placeholder="Digite ou cole a chave de acesso de 44 dígitos..." data-fb-input="NFe._onChaveInput" data-fb-input-n="1" data-fb-input-t0="self" data-fb-keydown="Patch26Actions.nfeSearchOnEnter" data-fb-keydown-n="1" data-fb-keydown-t0="event"
+                placeholder="Digite ou cole a chave de acesso de 44 dígitos..."
+                oninput="NFe._onChaveInput(this)"
+                onkeydown="if(event.key==='Enter') NFe.iniciarBusca()"
                 style="font-family:monospace;font-size:.85rem;letter-spacing:.03em;"
                 maxlength="60" autocomplete="off">
               <div id="nfe-chave-hint" style="font-size:.72rem;margin-top:4px;color:var(--text3);">Cole a chave de 44 dígitos (espaços e pontos são ignorados)</div>
             </div>
-            <button class="btn btn-primary" data-fb-click="NFe.iniciarBusca" data-fb-click-n="0" id="nfe-buscar-btn"
+            <button class="btn btn-primary" onclick="NFe.iniciarBusca()" id="nfe-buscar-btn"
               style="white-space:nowrap;height:42px;padding:0 22px;">
               🔍 Consultar NF-e
             </button>
@@ -246,15 +248,15 @@ const NFe = {
       <div class="card">
         <div class="card-header" style="padding-bottom:0;border-bottom:none;">
           <div style="display:flex;gap:0;border-bottom:1px solid var(--border);flex-wrap:wrap;">
-            <button id="tab-nfe-cache" data-fb-click="NFe._setTab" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="cache"
+            <button id="tab-nfe-cache" onclick="NFe._setTab('cache')"
               style="padding:8px 18px;border:none;background:none;color:var(--accent);font-weight:700;font-size:.85rem;cursor:pointer;border-bottom:2px solid var(--accent);font-family:inherit;">
               📋 Consultadas Recentemente (${cache.length})
             </button>
-            <button id="tab-nfe-cert" data-fb-click="NFe._setTab" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="cert"
+            <button id="tab-nfe-cert" onclick="NFe._setTab('cert')"
               style="padding:8px 18px;border:none;background:none;color:var(--text3);font-size:.85rem;cursor:pointer;border-bottom:2px solid transparent;font-family:inherit;">
               📂 Importar XML / Certificado
             </button>
-            <button id="tab-nfe-api" data-fb-click="NFe._setTab" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="api"
+            <button id="tab-nfe-api" onclick="NFe._setTab('api')"
               style="padding:8px 18px;border:none;background:none;color:var(--text3);font-size:.85rem;cursor:pointer;border-bottom:2px solid transparent;font-family:inherit;">
               ☁️ Minhas NFs na Nuvem
             </button>
@@ -383,8 +385,8 @@ const NFe = {
                   ` : ''}
                 </div>
                 <div style="display:flex;gap:8px;align-items:center;">
-                  <button class="btn btn-secondary btn-sm" data-fb-click="NFe._substituirCertificadoA1" data-fb-click-n="0">🔄 Substituir</button>
-                  <button class="btn btn-ghost btn-sm" style="color:var(--danger);" data-fb-click="NFe._removerCertificadoA1" data-fb-click-n="0">🗑️ Remover</button>
+                  <button class="btn btn-secondary btn-sm" onclick="NFe._substituirCertificadoA1()">🔄 Substituir</button>
+                  <button class="btn btn-ghost btn-sm" style="color:var(--danger);" onclick="NFe._removerCertificadoA1()">🗑️ Remover</button>
                 </div>
               </div>
             </div>
@@ -393,10 +395,10 @@ const NFe = {
               <strong style="color:var(--accent);">ℹ️ Como funciona para a sua construtora:</strong>
               Importe o arquivo do Certificado Digital A1 (arquivo <strong>.pfx</strong> ou <strong>.p12</strong>) da sua empresa e digite a senha.
               O arquivo é validado via criptografia OpenSSL e armazenado com criptografia em repouso AES-256-GCM exclusivo para o seu tenant.
-              ${substituir ? '<div style="margin-top:6px;"><button type="button" class="btn btn-ghost btn-sm" data-fb-click="NFe._cancelarSubstituicao" data-fb-click-n="0">✕ Cancelar substituição</button></div>' : ''}
+              ${substituir ? '<div style="margin-top:6px;"><button type="button" class="btn btn-ghost btn-sm" onclick="NFe._cancelarSubstituicao()">✕ Cancelar substituição</button></div>' : ''}
             </div>
 
-            <form id="f-cert-a1" data-fb-submit="NFe.salvarCertificadoA1" data-fb-submit-n="1" data-fb-submit-t0="event" style="display:grid;grid-template-columns:1fr 1fr auto;gap:12px;align-items:end;">
+            <form id="f-cert-a1" onsubmit="NFe.salvarCertificadoA1(event)" style="display:grid;grid-template-columns:1fr 1fr auto;gap:12px;align-items:end;">
               <div class="form-group" style="margin-bottom:0;">
                 <label class="form-label" style="font-size:.78rem;">Arquivo do Certificado A1 (.pfx / .p12) *</label>
                 <input type="file" id="cert-a1-file" accept=".pfx,.p12,application/x-pkcs12" class="form-control" required style="font-size:.8rem;padding:6px;">
@@ -424,14 +426,16 @@ const NFe = {
         </div>
 
         <div id="nfe-cert-dropzone"
-          style="border:2px dashed var(--border);border-radius:var(--r-md);padding:32px;text-align:center;background:var(--bg-secondary);cursor:pointer;transition:.2s all;" data-fb-click="Patch26Actions.clickById" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="nfe-cert-file"
+          style="border:2px dashed var(--border);border-radius:var(--r-md);padding:32px;text-align:center;background:var(--bg-secondary);cursor:pointer;transition:.2s all;"
+          onclick="document.getElementById('nfe-cert-file').click()"
           ondragover="event.preventDefault();this.style.borderColor='var(--accent)';this.style.background='rgba(201,162,39,.06)';"
-          ondragleave="this.style.borderColor='var(--border)';this.style.background='var(--bg-secondary)';" data-fb-drop="Patch26Actions.nfeDrop" data-fb-drop-n="2" data-fb-drop-t0="event" data-fb-drop-t1="self">
+          ondragleave="this.style.borderColor='var(--border)';this.style.background='var(--bg-secondary)';"
+          ondrop="event.preventDefault();this.style.borderColor='var(--border)';this.style.background='var(--bg-secondary)';NFe._onCertFileDrop(event);">
           <div style="font-size:2.8rem;margin-bottom:8px;">🗂️</div>
           <div style="font-weight:700;color:var(--text);margin-bottom:4px;">Arraste os arquivos XML aqui ou clique para selecionar</div>
           <div style="font-size:.78rem;color:var(--text3);">Aceita arquivos <strong>.xml</strong> individuais de NF-e ou arquivos de lote <strong>retDistDFeInt.xml</strong> / <strong>enviNFe.xml</strong> (suporta múltiplos arquivos)</div>
           <input type="file" id="nfe-cert-file" accept=".xml,text/xml,application/xml" multiple
-            style="display:none;" data-fb-change="NFe._onCertFileSelect" data-fb-change-n="1" data-fb-change-t0="self">
+            style="display:none;" onchange="NFe._onCertFileSelect(this)">
         </div>
 
         <div id="nfe-cert-resultado" style="margin-top:18px;"></div>
@@ -609,14 +613,14 @@ const NFe = {
                 <td style="text-align:right;">
                   <div style="display:flex;gap:6px;justify-content:flex-end;flex-wrap:wrap;">
                     ${c.status === 'OK' ? `
-                      <button class="btn btn-sm btn-success" data-fb-click="NFe.gerarLancamentoDaNFe" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(c.chave))}" style="font-weight:700;" title="Gerar despesa no financeiro">⚡ Lançar</button>
-                      <button class="btn btn-sm btn-primary" data-fb-click="NFe.abrirDanfe" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(c.chave))}">📄 DANFE</button>
-                      <button class="btn btn-sm btn-secondary" data-fb-click="NFe.baixarXMLEAbrir" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(c.chave))}">⬇️ XML</button>
-                      <button class="btn btn-sm btn-secondary" data-fb-click="NFe.adicionarComoAnexo" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(c.chave))}">📎 Anexar</button>
+                      <button class="btn btn-sm btn-success" onclick="NFe.gerarLancamentoDaNFe('${c.chave}')" style="font-weight:700;" title="Gerar despesa no financeiro">⚡ Lançar</button>
+                      <button class="btn btn-sm btn-primary" onclick="NFe.abrirDanfe('${c.chave}')">📄 DANFE</button>
+                      <button class="btn btn-sm btn-secondary" onclick="NFe.baixarXMLEAbrir('${c.chave}')">⬇️ XML</button>
+                      <button class="btn btn-sm btn-secondary" onclick="NFe.adicionarComoAnexo('${c.chave}')">📎 Anexar</button>
                     ` : `
-                      <button class="btn btn-sm btn-secondary" data-fb-click="NFe.rebuscarChave" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(c.chave))}">🔄 Rebuscar</button>
+                      <button class="btn btn-sm btn-secondary" onclick="NFe.rebuscarChave('${c.chave}')">🔄 Rebuscar</button>
                     `}
-                    <button class="icon-btn btn-sm" data-fb-click="NFe._removeFromCache" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(c.chave))}" style="color:var(--danger);" title="Remover">🗑️</button>
+                    <button class="icon-btn btn-sm" onclick="NFe._removeFromCache('${c.chave}')" style="color:var(--danger);" title="Remover">🗑️</button>
                   </div>
                 </td>
               </tr>`;
@@ -638,10 +642,10 @@ const NFe = {
           <div style="font-size:.76rem;color:var(--text3);margin-top:2px;">NF-es armazenadas na sua conta MeuDanfe prontas para visualização e download gratuito.</div>
         </div>
         <div style="display:flex;gap:8px;">
-          <button class="btn btn-secondary btn-sm" data-fb-click="NFe._carregarMinhasNFes" data-fb-click-n="0" style="height:36px;">
+          <button class="btn btn-secondary btn-sm" onclick="NFe._carregarMinhasNFes()" style="height:36px;">
             🔄 Atualizar
           </button>
-          <button class="btn btn-primary btn-sm" data-fb-click="NFe._sincronizarTudo" data-fb-click-n="0" id="nfe-sync-btn" style="height:36px;white-space:nowrap;">
+          <button class="btn btn-primary btn-sm" onclick="NFe._sincronizarTudo()" id="nfe-sync-btn" style="height:36px;white-space:nowrap;">
             ⬇️ Sincronizar Tudo para Cache
           </button>
         </div>
@@ -679,10 +683,10 @@ const NFe = {
                 <td><code style="font-size:.72rem;color:var(--text2);">${this._fmtChave(chave)}</code></td>
                 <td style="text-align:right;">
                   <div style="display:flex;gap:6px;justify-content:flex-end;">
-                    <button class="btn btn-sm btn-success" data-fb-click="NFe.gerarLancamentoDaNFe" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(chave))}" style="font-weight:700;" title="Gerar despesa no financeiro">⚡ Lançar</button>
-                    <button class="btn btn-sm btn-primary" data-fb-click="NFe.abrirDanfe" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(chave))}">📄 DANFE</button>
-                    <button class="btn btn-sm btn-secondary" data-fb-click="NFe.baixarXMLEAbrir" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(chave))}">⬇️ XML</button>
-                    <button class="btn btn-sm btn-secondary" data-fb-click="NFe.adicionarComoAnexo" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(chave))}">📎 Anexar</button>
+                    <button class="btn btn-sm btn-success" onclick="NFe.gerarLancamentoDaNFe('${chave}')" style="font-weight:700;" title="Gerar despesa no financeiro">⚡ Lançar</button>
+                    <button class="btn btn-sm btn-primary" onclick="NFe.abrirDanfe('${chave}')">📄 DANFE</button>
+                    <button class="btn btn-sm btn-secondary" onclick="NFe.baixarXMLEAbrir('${chave}')">⬇️ XML</button>
+                    <button class="btn btn-sm btn-secondary" onclick="NFe.adicionarComoAnexo('${chave}')">📎 Anexar</button>
                   </div>
                 </td>
               </tr>`).join('')}
@@ -691,7 +695,7 @@ const NFe = {
         </div>
         ${chaves.length >= 50 ? `
         <div style="display:flex;justify-content:center;gap:8px;margin-top:16px;">
-          <button class="btn btn-secondary btn-sm" data-fb-click="Patch26Actions.nfeRenderCloud" data-fb-click-n="2" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(chaves[chaves.length-1]))}" data-fb-click-t1="string" data-fb-click-v1="nfe-cloud-content">Carregar Mais NFs →</button>
+          <button class="btn btn-secondary btn-sm" onclick="NFe._renderPaginaCloud('${chaves[chaves.length-1]}', document.getElementById('nfe-cloud-content'))">Carregar Mais NFs →</button>
         </div>` : ''}
         `}
       `;
@@ -888,10 +892,10 @@ const NFe = {
           </span>
         </div>
         <div style="display:flex;gap:8px;flex-wrap:wrap;">
-          <button class="btn btn-success btn-sm" data-fb-click="NFe.gerarLancamentoDaNFe" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(chave))}" style="font-weight:700;">⚡ Gerar Lançamento</button>
-          <button class="btn btn-primary btn-sm" data-fb-click="NFe.abrirDanfe" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(chave))}">📄 Visualizar DANFE PDF</button>
-          <button class="btn btn-secondary btn-sm" data-fb-click="NFe.baixarXMLEAbrir" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(chave))}">⬇️ Baixar XML</button>
-          <button class="btn btn-secondary btn-sm" data-fb-click="NFe.adicionarComoAnexo" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(chave))}">📎 Anexar a Lançamento</button>
+          <button class="btn btn-success btn-sm" onclick="NFe.gerarLancamentoDaNFe('${chave}')" style="font-weight:700;">⚡ Gerar Lançamento</button>
+          <button class="btn btn-primary btn-sm" onclick="NFe.abrirDanfe('${chave}')">📄 Visualizar DANFE PDF</button>
+          <button class="btn btn-secondary btn-sm" onclick="NFe.baixarXMLEAbrir('${chave}')">⬇️ Baixar XML</button>
+          <button class="btn btn-secondary btn-sm" onclick="NFe.adicionarComoAnexo('${chave}')">📎 Anexar a Lançamento</button>
         </div>
         ${data?.statusMessage ? `<div style="margin-top:10px;font-size:.76rem;color:var(--text3);">${Utils.escapeHtml(data.statusMessage)}</div>` : ''}
       </div>`;
@@ -910,10 +914,10 @@ const NFe = {
           <div class="modal-header">
             <span class="modal-title">📄 DANFE — NF-e</span>
             <div style="display:flex;gap:8px;align-items:center;">
-              <button class="btn btn-sm btn-success" data-fb-click="Patch26Actions.nfeGenerateClose" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(chave))}" style="font-weight:700;">⚡ Gerar Despesa</button>
-              <button class="btn btn-sm btn-secondary" data-fb-click="Patch26Actions.nfeAttachClose" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(chave))}">📎 Anexar</button>
-              <button class="btn btn-sm btn-primary" data-fb-click="Patch26Actions.nfeDownload" data-fb-click-n="2" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(pdfSrc))}" data-fb-click-t1="string" data-fb-click-v1="${encodeURIComponent(String(chave))}">⬇️ Baixar PDF</button>
-              <button class="modal-close" data-fb-click="Utils.closeModal" data-fb-click-n="0">✕</button>
+              <button class="btn btn-sm btn-success" onclick="NFe.gerarLancamentoDaNFe('${chave}');Utils.closeModal();" style="font-weight:700;">⚡ Gerar Despesa</button>
+              <button class="btn btn-sm btn-secondary" onclick="NFe.adicionarComoAnexo('${chave}');Utils.closeModal();">📎 Anexar</button>
+              <button class="btn btn-sm btn-primary" onclick="(function(){var a=document.createElement('a');a.href='${pdfSrc}';a.download='DANFE_${chave}.pdf';document.body.appendChild(a);a.click();a.remove();})()">⬇️ Baixar PDF</button>
+              <button class="modal-close" onclick="Utils.closeModal()">✕</button>
             </div>
           </div>
           <div class="modal-body" style="flex:1;padding:0;overflow:hidden;">
@@ -1006,7 +1010,7 @@ const NFe = {
       <div class="modal" style="max-width:680px;max-height:92vh;display:flex;flex-direction:column;">
         <div class="modal-header">
           <span class="modal-title">⚡ Gerar Lançamento Financeiro via NF-e</span>
-          <button class="modal-close" data-fb-click="Utils.closeModal" data-fb-click-n="0">✕</button>
+          <button class="modal-close" onclick="Utils.closeModal()">✕</button>
         </div>
         <div class="modal-body" style="overflow-y:auto;padding:18px 24px;">
           <div style="background:rgba(201,162,39,.08);border:1px solid rgba(201,162,39,.25);border-radius:var(--r-md);padding:12px 16px;margin-bottom:16px;">
@@ -1029,7 +1033,7 @@ const NFe = {
             </details>` : ''}
           </div>
 
-          <form id="form-nfe-lancamento" data-fb-submit="Patch26Actions.nfeSubmit" data-fb-submit-n="2" data-fb-submit-t0="event" data-fb-submit-t1="string" data-fb-submit-v1="${encodeURIComponent(String(chave))}">
+          <form id="form-nfe-lancamento" onsubmit="event.preventDefault(); NFe._confirmarGeracaoLancamento('${chave}');">
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;">
               <div>
                 <label class="form-label" style="font-size:.78rem;font-weight:700;">Obra / Centro de Custo *</label>
@@ -1090,7 +1094,7 @@ const NFe = {
 
             <div style="margin-bottom:14px;">
               <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:.84rem;font-weight:700;color:var(--text);background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--r-md);padding:10px 14px;user-select:none;" id="nfe-ja-pago-label">
-                <input type="checkbox" id="nfe-ja-pago" style="width:18px;height:18px;accent-color:var(--success);cursor:pointer;" data-fb-change="NFe._toggleJaPago" data-fb-change-n="1" data-fb-change-t0="self">
+                <input type="checkbox" id="nfe-ja-pago" style="width:18px;height:18px;accent-color:var(--success);cursor:pointer;" onchange="NFe._toggleJaPago(this)">
                 <span>✅ Esta despesa <strong>já foi paga</strong> — informar data e conta do pagamento</span>
               </label>
               <div id="nfe-pagamento-section" style="display:none;margin-top:8px;padding:12px 14px;background:rgba(16,185,129,.07);border:1px solid rgba(16,185,129,.25);border-radius:var(--r-md);">
@@ -1121,7 +1125,7 @@ const NFe = {
             </div>
 
             <div style="display:flex;justify-content:flex-end;gap:10px;">
-              <button type="button" class="btn btn-secondary" data-fb-click="Utils.closeModal" data-fb-click-n="0">Cancelar</button>
+              <button type="button" class="btn btn-secondary" onclick="Utils.closeModal()">Cancelar</button>
               <button type="submit" class="btn btn-success" style="font-weight:700;padding:0 22px;">
                 ✅ Confirmar e Gerar Lançamento
               </button>

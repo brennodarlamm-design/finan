@@ -374,7 +374,8 @@ const Documentos = {
 
     return `
     <button class="btn btn-sm ${hasDocs ? 'btn-secondary' : 'btn-secondary'}" 
-            style="padding:3px 8px;font-size:.75rem;white-space:nowrap;${hasDocs ? 'border-color:var(--accent);color:var(--accent);font-weight:700;' : 'opacity:.7;'}" data-fb-click="Documentos.abrirModal" data-fb-click-n="3" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(safeTipo))}" data-fb-click-t1="string" data-fb-click-v1="${encodeURIComponent(String(safeId))}" data-fb-click-t2="string" data-fb-click-v2="${encodeURIComponent(String(safeTitulo))}" 
+            style="padding:3px 8px;font-size:.75rem;white-space:nowrap;${hasDocs ? 'border-color:var(--accent);color:var(--accent);font-weight:700;' : 'opacity:.7;'}"
+            onclick="Documentos.abrirModal('${safeTipo}', '${safeId}', '${safeTitulo}')" 
             title="${hasDocs ? `${qtd} documento(s) anexado(s)` : 'Anexar boleto ou documento'}">
       ${label}
     </button>`;
@@ -417,15 +418,15 @@ const Documentos = {
       <div class="modal" style="max-width:650px;">
         <div class="modal-header">
           <span class="modal-title">📎 ${titulo}</span>
-          <button class="modal-close" data-fb-click="Utils.closeModal" data-fb-click-n="0">✕</button>
+          <button class="modal-close" onclick="Utils.closeModal()">✕</button>
         </div>
         <div class="modal-body">
           ${infoEntidade}
 
           <!-- Abas de Tipo: Arquivo vs Link -->
           <div style="display:flex;gap:6px;margin-bottom:14px;">
-            <button type="button" id="doc-tab-file-btn" class="btn btn-sm btn-primary" data-fb-click="Documentos._switchTab" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="file">📁 Upload de Arquivo</button>
-            <button type="button" id="doc-tab-link-btn" class="btn btn-sm btn-secondary" data-fb-click="Documentos._switchTab" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="link">🔗 Link Google Drive / Nuvem</button>
+            <button type="button" id="doc-tab-file-btn" class="btn btn-sm btn-primary" onclick="Documentos._switchTab('file')">📁 Upload de Arquivo</button>
+            <button type="button" id="doc-tab-link-btn" class="btn btn-sm btn-secondary" onclick="Documentos._switchTab('link')">🔗 Link Google Drive / Nuvem</button>
           </div>
 
           <!-- Área 1: Upload / Dropzone -->
@@ -438,7 +439,7 @@ const Documentos = {
               <input type="text" id="doc-titulo-input" class="form-control form-control-sm" placeholder="Nome/Descrição do documento (opcional)" style="flex:1;min-width:180px;">
               <label class="btn btn-primary btn-sm" style="cursor:pointer;margin:0;">
                 📁 Escolher Arquivo
-                <input type="file" id="doc-file-input" accept="image/*,application/pdf,.zip,.rar,.7z,.tar,.gz,.dwg,.dxf,.doc,.docx,.xls,.xlsx,.odt,.txt" style="display:none;" data-fb-change="Documentos._onUpload" data-fb-change-n="3" data-fb-change-t0="string" data-fb-change-v0="${encodeURIComponent(String(entidadeTipo))}" data-fb-change-t1="string" data-fb-change-v1="${encodeURIComponent(String(entidadeId))}" data-fb-change-t2="self">
+                <input type="file" id="doc-file-input" accept="image/*,application/pdf,.zip,.rar,.7z,.tar,.gz,.dwg,.dxf,.doc,.docx,.xls,.xlsx,.odt,.txt" style="display:none;" onchange="Documentos._onUpload('${entidadeTipo}', '${entidadeId}', this)">
               </label>
             </div>
           </div>
@@ -453,7 +454,7 @@ const Documentos = {
                   <div style="font-size:.74rem;color:var(--text3);">Sem limite de tamanho para pastas ou arquivos compartilhados.</div>
                 </div>
               </div>
-              <button type="button" class="btn btn-sm" data-fb-click="Documentos._abrirGooglePicker" data-fb-click-n="2" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(entidadeTipo))}" data-fb-click-t1="string" data-fb-click-v1="${encodeURIComponent(String(entidadeId))}"
+              <button type="button" class="btn btn-sm" onclick="Documentos._abrirGooglePicker('${entidadeTipo}', '${entidadeId}')"
                       style="background:#4285F4;color:#fff;border:none;font-weight:700;font-size:.75rem;padding:5px 12px;display:inline-flex;align-items:center;gap:5px;cursor:pointer;">
                 🔍 Selecionar do Meu Drive
               </button>
@@ -465,7 +466,7 @@ const Documentos = {
               <input type="url" id="doc-link-url" class="form-control form-control-sm" placeholder="https://drive.google.com/drive/folders/... ou link de arquivo">
               <div style="display:flex;gap:8px;">
                 <input type="text" id="doc-link-titulo" class="form-control form-control-sm" placeholder="Descrição do link (ex: Pasta de Projetos Complementares)">
-                <button type="button" class="btn btn-primary btn-sm" data-fb-click="Documentos._onAddLink" data-fb-click-n="2" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(entidadeTipo))}" data-fb-click-t1="string" data-fb-click-v1="${encodeURIComponent(String(entidadeId))}" style="white-space:nowrap;">
+                <button type="button" class="btn btn-primary btn-sm" onclick="Documentos._onAddLink('${entidadeTipo}', '${entidadeId}')" style="white-space:nowrap;">
                   ➕ Vincular Link
                 </button>
               </div>
@@ -485,7 +486,7 @@ const Documentos = {
           </div>
         </div>
         <div class="modal-footer">
-          <button class="btn btn-secondary" data-fb-click="Utils.closeModal" data-fb-click-n="0">Fechar</button>
+          <button class="btn btn-secondary" onclick="Utils.closeModal()">Fechar</button>
         </div>
       </div>
     `);
@@ -579,7 +580,7 @@ const Documentos = {
           <a href="${safeUrl(d.url_externa)}" target="_blank" rel="noopener noreferrer" class="btn btn-sm btn-primary" style="text-decoration:none;display:inline-flex;align-items:center;gap:4px;" title="Abrir no Google Drive em nova aba">
             🔗 Abrir
           </a>
-          <button class="icon-btn btn-sm" data-fb-click="Documentos._confirmDel" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(escJs(d.id)))}" style="color:var(--danger)" title="Excluir link">
+          <button class="icon-btn btn-sm" onclick="Documentos._confirmDel('${escJs(d.id)}')" style="color:var(--danger)" title="Excluir link">
             🗑️
           </button>
         </div>
@@ -612,13 +613,13 @@ const Documentos = {
         </div>
       </div>
       <div style="display:flex;gap:6px;align-items:center;">
-        <button class="btn btn-sm btn-secondary" data-fb-click="Documentos.visualizar" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(escJs(d.id)))}" title="Visualizar documento">
+        <button class="btn btn-sm btn-secondary" onclick="Documentos.visualizar('${escJs(d.id)}')" title="Visualizar documento">
           👁️ Ver
         </button>
-        <button class="btn btn-sm btn-secondary" data-fb-click="Documentos.baixar" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(escJs(d.id)))}" title="Baixar arquivo">
+        <button class="btn btn-sm btn-secondary" onclick="Documentos.baixar('${escJs(d.id)}')" title="Baixar arquivo">
           ⬇️
         </button>
-        <button class="icon-btn btn-sm" data-fb-click="Documentos._confirmDel" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(escJs(d.id)))}" style="color:var(--danger)" title="Excluir anexo">
+        <button class="icon-btn btn-sm" onclick="Documentos._confirmDel('${escJs(d.id)}')" style="color:var(--danger)" title="Excluir anexo">
           🗑️
         </button>
       </div>
@@ -721,7 +722,7 @@ const Documentos = {
             👉 <strong>Como sincronizar:</strong> Abra a página no celular e dê um <em>recarregar (F5/puxar para baixo)</em>. O aplicativo enviará o arquivo automaticamente para a nuvem e ele abrirá aqui no computador imediatamente!
           </p>
           <div style="display:flex;gap:8px;justify-content:center;">
-            <button class="btn btn-primary" data-fb-click="Utils.closeModal" data-fb-click-n="0">OK, vou abrir no celular</button>
+            <button class="btn btn-primary" onclick="Utils.closeModal()">OK, vou abrir no celular</button>
           </div>
         </div>
       `);
@@ -740,8 +741,8 @@ const Documentos = {
         <div class="modal-header">
           <span class="modal-title">👁️ ${Utils.escapeHtml(doc.titulo || doc.nome_arquivo || '')}</span>
           <div style="display:flex;gap:8px;align-items:center;">
-            <button class="btn btn-sm btn-primary" data-fb-click="Documentos.baixar" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(doc.id))}">⬇️ Baixar</button>
-            <button class="modal-close" data-fb-click="Utils.closeModal" data-fb-click-n="0">✕</button>
+            <button class="btn btn-sm btn-primary" onclick="Documentos.baixar('${doc.id}')">⬇️ Baixar</button>
+            <button class="modal-close" onclick="Utils.closeModal()">✕</button>
           </div>
         </div>
         <div class="modal-body" style="flex:1;padding:0;overflow:hidden;background:#0f172a;display:flex;align-items:center;justify-content:center;">
@@ -759,7 +760,7 @@ const Documentos = {
                 ${isZip ? 'Arquivo Compactado (ZIP/RAR/7Z).' : isCAD ? 'Projeto Técnico / Desenho CAD (DWG/DXF).' : 'Arquivo Binário.'}
                 <br>Este formato não pode ser visualizado diretamente no navegador. Baixe para abri-lo no seu computador.
               </p>
-              <button class="btn btn-primary" data-fb-click="Documentos.baixar" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(doc.id))}" style="padding:10px 24px;font-size:.9rem;font-weight:700;">
+              <button class="btn btn-primary" onclick="Documentos.baixar('${doc.id}')" style="padding:10px 24px;font-size:.9rem;font-weight:700;">
                 ⬇️ Baixar Arquivo
               </button>
             </div>

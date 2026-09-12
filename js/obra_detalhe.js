@@ -82,7 +82,7 @@ const ObraDetalhe = {
         <div style="font-size:3rem;margin-bottom:12px;">🏗️</div>
         <h3>Nenhuma obra selecionada</h3>
         <p>Cadastre ou selecione uma obra para acessar o Dossiê 360°.</p>
-        <button class="btn btn-primary" data-od-click="Clientes.showForm()">+ Nova Obra</button>
+        <button class="btn btn-primary" onclick="Clientes.showForm()">+ Nova Obra</button>
       </div>`;
     }
 
@@ -92,7 +92,7 @@ const ObraDetalhe = {
       return `
       <div class="empty-state">
         <h3>Obra não encontrada</h3>
-        <button class="btn btn-secondary" data-od-click="App.navigate('obras')">⬅️ Voltar para Obras</button>
+        <button class="btn btn-secondary" onclick="App.navigate('obras')">⬅️ Voltar para Obras</button>
       </div>`;
     }
 
@@ -148,7 +148,7 @@ const ObraDetalhe = {
       <!-- Barra Superior / Breadcrumb & Ações -->
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:10px;">
         <div style="display:flex;align-items:center;gap:10px;">
-          <button class="btn btn-secondary btn-sm" data-od-click="App.navigate('obras')" style="padding:5px 12px;font-weight:700;">
+          <button class="btn btn-secondary btn-sm" onclick="App.navigate('obras')" style="padding:5px 12px;font-weight:700;">
             ⬅️ Voltar para Obras
           </button>
           <span style="color:var(--text3);font-size:.85rem;">/</span>
@@ -165,10 +165,10 @@ const ObraDetalhe = {
                class="btn btn-sm" style="background:#4285F4;color:#fff;font-weight:700;display:inline-flex;align-items:center;gap:5px;text-decoration:none;" title="Abrir pasta de projetos no Google Drive">
               📁 Pasta no Google Drive
             </a>` : ''}
-          <button class="btn btn-secondary btn-sm" data-od-click="Clientes.showForm('${obra.id}')" title="Editar cadastro da obra">
+          <button class="btn btn-secondary btn-sm" onclick="Clientes.showForm('${obra.id}')" title="Editar cadastro da obra">
             ✏️ Editar Obra
           </button>
-          <button class="btn btn-secondary btn-sm" data-od-click="ObraDetalhe.imprimirDossie('${obra.id}')" title="Imprimir dossiê executivo da obra">
+          <button class="btn btn-secondary btn-sm" onclick="ObraDetalhe.imprimirDossie('${obra.id}')" title="Imprimir dossiê executivo da obra">
             🖨️ Imprimir Dossiê
           </button>
         </div>
@@ -247,23 +247,23 @@ const ObraDetalhe = {
 
       <!-- Barra de Abas (Navegação Interna da Obra) -->
       <div style="display:flex;gap:8px;border-bottom:2px solid var(--border);margin-bottom:20px;overflow-x:auto;padding-bottom:2px;">
-        <button class="btn od-tab-btn ${this.activeTab==='orcado-realizado'?'active':''}" data-tab="orcado-realizado" data-od-click="ObraDetalhe.setTab('orcado-realizado')"
+        <button class="btn od-tab-btn ${this.activeTab==='orcado-realizado'?'active':''}" data-tab="orcado-realizado" onclick="ObraDetalhe.setTab('orcado-realizado')"
                 style="padding:10px 18px;font-size:.88rem;font-weight:800;border:none;border-bottom:3px solid ${this.activeTab==='orcado-realizado'?'var(--accent)':'transparent'};color:${this.activeTab==='orcado-realizado'?'var(--accent)':'var(--text2)'};border-radius:0;background:${this.activeTab==='orcado-realizado'?'rgba(18,217,160,0.08)':'transparent'};">
           🏗️ Orçado × Realizado
         </button>
-        <button class="btn od-tab-btn ${this.activeTab==='lancamentos'?'active':''}" data-tab="lancamentos" data-od-click="ObraDetalhe.setTab('lancamentos')"
+        <button class="btn od-tab-btn ${this.activeTab==='lancamentos'?'active':''}" data-tab="lancamentos" onclick="ObraDetalhe.setTab('lancamentos')"
                 style="padding:10px 18px;font-size:.88rem;font-weight:800;border:none;border-bottom:3px solid ${this.activeTab==='lancamentos'?'var(--accent)':'transparent'};color:${this.activeTab==='lancamentos'?'var(--accent)':'var(--text2)'};border-radius:0;background:${this.activeTab==='lancamentos'?'rgba(18,217,160,0.08)':'transparent'};">
           💰 Extrato &amp; Lançamentos
         </button>
-        <button class="btn od-tab-btn ${this.activeTab==='documentos'?'active':''}" data-tab="documentos" data-od-click="ObraDetalhe.setTab('documentos')"
+        <button class="btn od-tab-btn ${this.activeTab==='documentos'?'active':''}" data-tab="documentos" onclick="ObraDetalhe.setTab('documentos')"
                 style="padding:10px 18px;font-size:.88rem;font-weight:800;border:none;border-bottom:3px solid ${this.activeTab==='documentos'?'var(--accent)':'transparent'};color:${this.activeTab==='documentos'?'var(--accent)':'var(--text2)'};border-radius:0;background:${this.activeTab==='documentos'?'rgba(18,217,160,0.08)':'transparent'};">
           📋 Documentação (43 Docs)
         </button>
-        <button class="btn od-tab-btn ${this.activeTab==='medicoes'?'active':''}" data-tab="medicoes" data-od-click="ObraDetalhe.setTab('medicoes')"
+        <button class="btn od-tab-btn ${this.activeTab==='medicoes'?'active':''}" data-tab="medicoes" onclick="ObraDetalhe.setTab('medicoes')"
                 style="padding:10px 18px;font-size:.88rem;font-weight:800;border:none;border-bottom:3px solid ${this.activeTab==='medicoes'?'var(--accent)':'transparent'};color:${this.activeTab==='medicoes'?'var(--accent)':'var(--text2)'};border-radius:0;background:${this.activeTab==='medicoes'?'rgba(18,217,160,0.08)':'transparent'};">
           🔨 Medições &amp; Faturamento
         </button>
-        <button class="btn od-tab-btn ${this.activeTab==='recibos'?'active':''}" data-tab="recibos" data-od-click="ObraDetalhe.setTab('recibos')"
+        <button class="btn od-tab-btn ${this.activeTab==='recibos'?'active':''}" data-tab="recibos" onclick="ObraDetalhe.setTab('recibos')"
                 style="padding:10px 18px;font-size:.88rem;font-weight:800;border:none;border-bottom:3px solid ${this.activeTab==='recibos'?'var(--accent)':'transparent'};color:${this.activeTab==='recibos'?'var(--accent)':'var(--text2)'};border-radius:0;background:${this.activeTab==='recibos'?'rgba(18,217,160,0.08)':'transparent'};">
           🧾 Recibos &amp; Contratos
         </button>
@@ -518,10 +518,10 @@ const ObraDetalhe = {
           </div>
         </div>
         <div style="display:flex;gap:10px;flex-wrap:wrap;">
-          <button class="btn btn-primary btn-sm" data-od-click="App.navigate('orcamentos')" style="font-weight:700;">
+          <button class="btn btn-primary btn-sm" onclick="App.navigate('orcamentos')" style="font-weight:700;">
             + Criar Orçamento Convencional
           </button>
-          <button class="btn btn-secondary btn-sm" data-od-click="App.navigate('sinapi')" style="font-weight:700;">
+          <button class="btn btn-secondary btn-sm" onclick="App.navigate('sinapi')" style="font-weight:700;">
             🏦 Consultar Banco SINAPI
           </button>
         </div>
@@ -531,41 +531,41 @@ const ObraDetalhe = {
       <!-- Barra de Sub-Navegação de Engenharia de Custos -->
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px;flex-wrap:wrap;gap:12px;">
         <div style="display:flex;gap:8px;flex-wrap:wrap;background:var(--bg-secondary);padding:4px;border-radius:var(--r-md);border:1px solid var(--border);">
-          <button class="btn btn-sm od-subtab-btn ${currentSubTab==='curva-s'?'active':''}" data-subtab="curva-s" data-od-click="ObraDetalhe.setSubTabOrcado('curva-s')"
+          <button class="btn btn-sm od-subtab-btn ${currentSubTab==='curva-s'?'active':''}" data-subtab="curva-s" onclick="ObraDetalhe.setSubTabOrcado('curva-s')"
                   style="border-radius:6px;font-size:.82rem;font-weight:700;border:1px solid ${currentSubTab==='curva-s'?'var(--accent)':'transparent'};color:${currentSubTab==='curva-s'?'var(--accent)':'var(--text2)'};background:${currentSubTab==='curva-s'?'rgba(18,217,160,0.12)':'transparent'};">
             📈 Curva S &amp; Previsão EVM
           </button>
-          <button class="btn btn-sm od-subtab-btn ${currentSubTab==='cronograma'?'active':''}" data-subtab="cronograma" data-od-click="ObraDetalhe.setSubTabOrcado('cronograma')"
+          <button class="btn btn-sm od-subtab-btn ${currentSubTab==='cronograma'?'active':''}" data-subtab="cronograma" onclick="ObraDetalhe.setSubTabOrcado('cronograma')"
                   style="border-radius:6px;font-size:.82rem;font-weight:700;border:1px solid ${currentSubTab==='cronograma'?'var(--accent)':'transparent'};color:${currentSubTab==='cronograma'?'var(--accent)':'var(--text2)'};background:${currentSubTab==='cronograma'?'rgba(18,217,160,0.12)':'transparent'};">
             📅 Cronograma Físico-Financeiro
           </button>
-          <button class="btn btn-sm od-subtab-btn ${currentSubTab==='curva-abc'?'active':''}" data-subtab="curva-abc" data-od-click="ObraDetalhe.setSubTabOrcado('curva-abc')"
+          <button class="btn btn-sm od-subtab-btn ${currentSubTab==='curva-abc'?'active':''}" data-subtab="curva-abc" onclick="ObraDetalhe.setSubTabOrcado('curva-abc')"
                   style="border-radius:6px;font-size:.82rem;font-weight:700;border:1px solid ${currentSubTab==='curva-abc'?'var(--accent)':'transparent'};color:${currentSubTab==='curva-abc'?'var(--accent)':'var(--text2)'};background:${currentSubTab==='curva-abc'?'rgba(18,217,160,0.12)':'transparent'};">
             📊 Curva ABC (Pareto)
           </button>
-          <button class="btn btn-sm od-subtab-btn ${currentSubTab==='leis-sociais'?'active':''}" data-subtab="leis-sociais" data-od-click="ObraDetalhe.setSubTabOrcado('leis-sociais')"
+          <button class="btn btn-sm od-subtab-btn ${currentSubTab==='leis-sociais'?'active':''}" data-subtab="leis-sociais" onclick="ObraDetalhe.setSubTabOrcado('leis-sociais')"
                   style="border-radius:6px;font-size:.82rem;font-weight:700;border:1px solid ${currentSubTab==='leis-sociais'?'var(--accent)':'transparent'};color:${currentSubTab==='leis-sociais'?'var(--accent)':'var(--text2)'};background:${currentSubTab==='leis-sociais'?'rgba(18,217,160,0.12)':'transparent'};">
             ⚖️ Leis Sociais &amp; BDI
           </button>
         </div>
 
         <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
-          <button class="btn btn-secondary btn-sm" data-od-click="ObraDetalhe.exportarExcelEngenharia('${obraId}')" style="display:inline-flex;align-items:center;gap:6px;font-weight:700;border:1px solid var(--accent);color:var(--accent2);" title="Exportar Dossiê Completo em Excel (.xlsx) com 4 abas">
+          <button class="btn btn-secondary btn-sm" onclick="ObraDetalhe.exportarExcelEngenharia('${obraId}')" style="display:inline-flex;align-items:center;gap:6px;font-weight:700;border:1px solid var(--accent);color:var(--accent2);" title="Exportar Dossiê Completo em Excel (.xlsx) com 4 abas">
             📊 Exportar Excel (.xlsx)
           </button>
-          <button class="btn btn-secondary btn-sm" data-od-click="ObraDetalhe.exportarPDFEngenharia('${obraId}')" style="display:inline-flex;align-items:center;gap:6px;font-weight:700;border:1px solid rgba(239,68,68,0.5);color:#ef4444;background:rgba(239,68,68,0.06);" title="Exportar Dossiê Completo em PDF Oficial A4">
+          <button class="btn btn-secondary btn-sm" onclick="ObraDetalhe.exportarPDFEngenharia('${obraId}')" style="display:inline-flex;align-items:center;gap:6px;font-weight:700;border:1px solid rgba(239,68,68,0.5);color:#ef4444;background:rgba(239,68,68,0.06);" title="Exportar Dossiê Completo em PDF Oficial A4">
             📄 Exportar PDF (.pdf)
           </button>
-          <button class="btn btn-secondary btn-sm" data-od-click="ObraDetalhe.abrirMenuExportar('excel', '${obraId}')" style="font-weight:700;" title="Escolha se deseja exportar tudo junto ou arquivos separados">
+          <button class="btn btn-secondary btn-sm" onclick="ObraDetalhe.abrirMenuExportar('excel', '${obraId}')" style="font-weight:700;" title="Escolha se deseja exportar tudo junto ou arquivos separados">
             📑 Opções (.xlsx / PDF) ▾
           </button>
-          <button class="btn btn-secondary btn-sm" data-od-click="App.navigate('orcamentos')" style="display:inline-flex;align-items:center;gap:6px;">
+          <button class="btn btn-secondary btn-sm" onclick="App.navigate('orcamentos')" style="display:inline-flex;align-items:center;gap:6px;">
             📋 Orçamentos
           </button>
-          <button class="btn btn-secondary btn-sm" data-od-click="App.navigate('sinapi')" style="display:inline-flex;align-items:center;gap:6px;">
+          <button class="btn btn-secondary btn-sm" onclick="App.navigate('sinapi')" style="display:inline-flex;align-items:center;gap:6px;">
             🏦 SINAPI
           </button>
-          <button class="btn btn-danger btn-sm" data-od-click="App.obraId='${obraId}';Lancamentos.showForm('despesa')" style="font-weight:700;display:inline-flex;align-items:center;gap:6px;">
+          <button class="btn btn-danger btn-sm" onclick="App.obraId='${obraId}';Lancamentos.showForm('despesa')" style="font-weight:700;display:inline-flex;align-items:center;gap:6px;">
             + Lançar Custo
           </button>
         </div>
@@ -742,7 +742,7 @@ const ObraDetalhe = {
                   </td>
                   <td style="text-align:center;">${statusBadge}</td>
                   <td style="text-align:center;">
-                    <button class="btn btn-secondary btn-sm" data-od-click="App.obraId='${obraId}';Lancamentos.showForm('despesa')" style="font-size:.72rem;padding:3px 7px;">+ Custo</button>
+                    <button class="btn btn-secondary btn-sm" onclick="App.obraId='${obraId}';Lancamentos.showForm('despesa')" style="font-size:.72rem;padding:3px 7px;">+ Custo</button>
                   </td>
                 </tr>
                 `;
@@ -780,16 +780,16 @@ const ObraDetalhe = {
           </div>
         </div>
         <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">
-          <button class="btn btn-primary btn-sm" data-od-click="ObraDetalhe.abrirModalConfigCronograma('${obraId}')" style="font-size:.78rem;font-weight:700;">
+          <button class="btn btn-primary btn-sm" onclick="ObraDetalhe.abrirModalConfigCronograma('${obraId}')" style="font-size:.78rem;font-weight:700;">
             ✏️ Configurar / Editar Cronograma
           </button>
-          <button class="btn btn-secondary btn-sm" data-od-click="ObraDetalhe.exportarExcelEngenharia('${obraId}')" style="font-size:.78rem;font-weight:700;border:1px solid var(--accent);color:var(--accent2);" title="Baixar planilha Excel (.xlsx)">
+          <button class="btn btn-secondary btn-sm" onclick="ObraDetalhe.exportarExcelEngenharia('${obraId}')" style="font-size:.78rem;font-weight:700;border:1px solid var(--accent);color:var(--accent2);" title="Baixar planilha Excel (.xlsx)">
             📊 Baixar Excel (.xlsx)
           </button>
-          <button class="btn btn-secondary btn-sm" data-od-click="ObraDetalhe.exportarPDFEngenharia('${obraId}')" style="font-size:.78rem;font-weight:700;" title="Imprimir / PDF A4">
+          <button class="btn btn-secondary btn-sm" onclick="ObraDetalhe.exportarPDFEngenharia('${obraId}')" style="font-size:.78rem;font-weight:700;" title="Imprimir / PDF A4">
             📄 Imprimir / PDF A4
           </button>
-          <button class="btn btn-secondary btn-sm" data-od-click="ObraDetalhe.exportarExcel('cronograma', '${obraId}')" style="font-size:.78rem;font-weight:700;" title="Baixar exclusivamente o cronograma">
+          <button class="btn btn-secondary btn-sm" onclick="ObraDetalhe.exportarExcel('cronograma', '${obraId}')" style="font-size:.78rem;font-weight:700;" title="Baixar exclusivamente o cronograma">
             📅 Só Cronograma (.xlsx)
           </button>
         </div>
@@ -933,13 +933,13 @@ const ObraDetalhe = {
             <div style="font-size:.78rem;color:var(--text3);margin-top:2px;">${abc.totalItens} itens classificados por ordem decrescente de impacto orçamentário</div>
           </div>
           <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">
-            <button class="btn btn-secondary btn-sm" data-od-click="ObraDetalhe.exportarExcel('curva-abc', '${obraId}')" style="font-size:.78rem;font-weight:700;border:1px solid var(--accent);color:var(--accent2);" title="Baixar exclusivamente a Curva ABC em Excel">
+            <button class="btn btn-secondary btn-sm" onclick="ObraDetalhe.exportarExcel('curva-abc', '${obraId}')" style="font-size:.78rem;font-weight:700;border:1px solid var(--accent);color:var(--accent2);" title="Baixar exclusivamente a Curva ABC em Excel">
               📊 Baixar Só Curva ABC (.xlsx)
             </button>
-            <button class="btn btn-secondary btn-sm" data-od-click="ObraDetalhe.imprimir('curva-abc', '${obraId}')" style="font-size:.78rem;font-weight:700;" title="Imprimir exclusivamente a Curva ABC em PDF">
+            <button class="btn btn-secondary btn-sm" onclick="ObraDetalhe.imprimir('curva-abc', '${obraId}')" style="font-size:.78rem;font-weight:700;" title="Imprimir exclusivamente a Curva ABC em PDF">
               📄 Imprimir Só Curva ABC (PDF)
             </button>
-            <button class="btn btn-secondary btn-sm" data-od-click="ObraDetalhe.exportarExcel('completo', '${obraId}')" style="font-size:.78rem;font-weight:700;" title="Dossiê Completo">
+            <button class="btn btn-secondary btn-sm" onclick="ObraDetalhe.exportarExcel('completo', '${obraId}')" style="font-size:.78rem;font-weight:700;" title="Dossiê Completo">
               📚 Dossiê Completo
             </button>
           </div>
@@ -1017,21 +1017,21 @@ const ObraDetalhe = {
         </div>
         <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
           <div style="display:flex;gap:6px;background:var(--bg-secondary);padding:4px;border-radius:var(--r-md);border:1px solid var(--border);">
-            <button class="btn btn-sm ${!isDesonerado?'btn-primary':'btn-secondary'}" data-od-click="ObraDetalhe.setRegimeLeisSociais(false)" style="font-weight:700;">
+            <button class="btn btn-sm ${!isDesonerado?'btn-primary':'btn-secondary'}" onclick="ObraDetalhe.setRegimeLeisSociais(false)" style="font-weight:700;">
               Com Oneração (INSS 20%)
             </button>
-            <button class="btn btn-sm ${isDesonerado?'btn-primary':'btn-secondary'}" data-od-click="ObraDetalhe.setRegimeLeisSociais(true)" style="font-weight:700;">
+            <button class="btn btn-sm ${isDesonerado?'btn-primary':'btn-secondary'}" onclick="ObraDetalhe.setRegimeLeisSociais(true)" style="font-weight:700;">
               Sem Oneração (Desonerado)
             </button>
           </div>
           <div style="display:flex;gap:6px;">
-            <button class="btn btn-secondary btn-sm" data-od-click="ObraDetalhe.exportarExcel('bdi', '${obraId}')" style="font-size:.78rem;font-weight:700;border:1px solid var(--accent);color:var(--accent2);" title="Baixar exclusivamente a memória de cálculo de BDI e Leis Sociais em Excel">
+            <button class="btn btn-secondary btn-sm" onclick="ObraDetalhe.exportarExcel('bdi', '${obraId}')" style="font-size:.78rem;font-weight:700;border:1px solid var(--accent);color:var(--accent2);" title="Baixar exclusivamente a memória de cálculo de BDI e Leis Sociais em Excel">
               📊 Baixar BDI (.xlsx)
             </button>
-            <button class="btn btn-secondary btn-sm" data-od-click="ObraDetalhe.imprimir('bdi', '${obraId}')" style="font-size:.78rem;font-weight:700;" title="Imprimir memória oficial de BDI em PDF">
+            <button class="btn btn-secondary btn-sm" onclick="ObraDetalhe.imprimir('bdi', '${obraId}')" style="font-size:.78rem;font-weight:700;" title="Imprimir memória oficial de BDI em PDF">
               📄 Imprimir BDI (PDF)
             </button>
-            <button class="btn btn-secondary btn-sm" data-od-click="ObraDetalhe.exportarExcel('completo', '${obraId}')" style="font-size:.78rem;font-weight:700;" title="Dossiê Completo">
+            <button class="btn btn-secondary btn-sm" onclick="ObraDetalhe.exportarExcel('completo', '${obraId}')" style="font-size:.78rem;font-weight:700;" title="Dossiê Completo">
               📚 Dossiê Completo
             </button>
           </div>
@@ -1144,7 +1144,8 @@ const ObraDetalhe = {
                 </div>
                 <div style="display:flex;align-items:center;gap:4px;">
                   <input type="number" step="0.01" min="0" max="30" id="od-bdi-ac" class="form-control form-control-sm"
-                         value="${acVal.toFixed(2)}" style="width:85px;text-align:right;font-weight:800;" data-od-input="ObraDetalhe.recalcularBDIInput('${obraId}')">
+                         value="${acVal.toFixed(2)}" style="width:85px;text-align:right;font-weight:800;"
+                         oninput="ObraDetalhe.recalcularBDIInput('${obraId}')">
                   <span style="font-weight:700;color:var(--text2);">%</span>
                 </div>
               </div>
@@ -1156,7 +1157,8 @@ const ObraDetalhe = {
                 </div>
                 <div style="display:flex;align-items:center;gap:4px;">
                   <input type="number" step="0.01" min="0" max="20" id="od-bdi-sg" class="form-control form-control-sm"
-                         value="${sgVal.toFixed(2)}" style="width:85px;text-align:right;font-weight:800;" data-od-input="ObraDetalhe.recalcularBDIInput('${obraId}')">
+                         value="${sgVal.toFixed(2)}" style="width:85px;text-align:right;font-weight:800;"
+                         oninput="ObraDetalhe.recalcularBDIInput('${obraId}')">
                   <span style="font-weight:700;color:var(--text2);">%</span>
                 </div>
               </div>
@@ -1168,7 +1170,8 @@ const ObraDetalhe = {
                 </div>
                 <div style="display:flex;align-items:center;gap:4px;">
                   <input type="number" step="0.01" min="0" max="20" id="od-bdi-r" class="form-control form-control-sm"
-                         value="${rVal.toFixed(2)}" style="width:85px;text-align:right;font-weight:800;" data-od-input="ObraDetalhe.recalcularBDIInput('${obraId}')">
+                         value="${rVal.toFixed(2)}" style="width:85px;text-align:right;font-weight:800;"
+                         oninput="ObraDetalhe.recalcularBDIInput('${obraId}')">
                   <span style="font-weight:700;color:var(--text2);">%</span>
                 </div>
               </div>
@@ -1180,7 +1183,8 @@ const ObraDetalhe = {
                 </div>
                 <div style="display:flex;align-items:center;gap:4px;">
                   <input type="number" step="0.01" min="0" max="20" id="od-bdi-df" class="form-control form-control-sm"
-                         value="${dfVal.toFixed(2)}" style="width:85px;text-align:right;font-weight:800;" data-od-input="ObraDetalhe.recalcularBDIInput('${obraId}')">
+                         value="${dfVal.toFixed(2)}" style="width:85px;text-align:right;font-weight:800;"
+                         oninput="ObraDetalhe.recalcularBDIInput('${obraId}')">
                   <span style="font-weight:700;color:var(--text2);">%</span>
                 </div>
               </div>
@@ -1192,7 +1196,8 @@ const ObraDetalhe = {
                 </div>
                 <div style="display:flex;align-items:center;gap:4px;">
                   <input type="number" step="0.01" min="0" max="30" id="od-bdi-l" class="form-control form-control-sm"
-                         value="${lVal.toFixed(2)}" style="width:85px;text-align:right;font-weight:800;" data-od-input="ObraDetalhe.recalcularBDIInput('${obraId}')">
+                         value="${lVal.toFixed(2)}" style="width:85px;text-align:right;font-weight:800;"
+                         oninput="ObraDetalhe.recalcularBDIInput('${obraId}')">
                   <span style="font-weight:700;color:var(--text2);">%</span>
                 </div>
               </div>
@@ -1204,7 +1209,8 @@ const ObraDetalhe = {
                 </div>
                 <div style="display:flex;align-items:center;gap:4px;">
                   <input type="number" step="0.01" min="0" max="35" id="od-bdi-t" class="form-control form-control-sm"
-                         value="${tVal.toFixed(2)}" style="width:85px;text-align:right;font-weight:800;color:var(--danger);" data-od-input="ObraDetalhe.recalcularBDIInput('${obraId}')">
+                         value="${tVal.toFixed(2)}" style="width:85px;text-align:right;font-weight:800;color:var(--danger);"
+                         oninput="ObraDetalhe.recalcularBDIInput('${obraId}')">
                   <span style="font-weight:700;color:var(--danger);">%</span>
                 </div>
               </div>
@@ -1217,13 +1223,13 @@ const ObraDetalhe = {
 
             <!-- Botões de Persistência e Ação -->
             <div style="margin-top:16px;display:flex;gap:8px;flex-wrap:wrap;">
-              <button class="btn btn-primary btn-sm" data-od-click="ObraDetalhe.salvarBDI('${obraId}')" style="font-weight:800;display:inline-flex;align-items:center;gap:6px;">
+              <button class="btn btn-primary btn-sm" onclick="ObraDetalhe.salvarBDI('${obraId}')" style="font-weight:800;display:inline-flex;align-items:center;gap:6px;">
                 💾 Salvar BDI Desta Obra
               </button>
-              <button class="btn btn-secondary btn-sm" data-od-click="ObraDetalhe.salvarBDIPadrao('${obraId}')" style="display:inline-flex;align-items:center;gap:6px;" title="Salva os parâmetros como padrão para novas obras">
+              <button class="btn btn-secondary btn-sm" onclick="ObraDetalhe.salvarBDIPadrao('${obraId}')" style="display:inline-flex;align-items:center;gap:6px;" title="Salva os parâmetros como padrão para novas obras">
                 🏢 Salvar Padrão Construtora
               </button>
-              <button class="btn btn-secondary btn-sm" data-od-click="ObraDetalhe.restaurarBDITCU('${obraId}')" style="display:inline-flex;align-items:center;gap:6px;" title="Restaura os parâmetros para as medianas do TCU">
+              <button class="btn btn-secondary btn-sm" onclick="ObraDetalhe.restaurarBDITCU('${obraId}')" style="display:inline-flex;align-items:center;gap:6px;" title="Restaura os parâmetros para as medianas do TCU">
                 🔄 Restaurar Padrão TCU
               </button>
             </div>
@@ -1345,7 +1351,7 @@ const ObraDetalhe = {
       <div class="modal" style="max-width:800px;width:95%;">
         <div class="modal-header">
           <span class="modal-title">✏️ Configurar Cronograma Físico-Financeiro</span>
-          <button class="modal-close" data-od-click="Utils.closeModal()">✕</button>
+          <button class="modal-close" onclick="Utils.closeModal()">✕</button>
         </div>
         <div class="modal-body" style="max-height:75vh;overflow-y:auto;padding:20px;">
           <div style="font-size:.84rem;color:var(--text2);margin-bottom:16px;line-height:1.4;">
@@ -1391,14 +1397,14 @@ const ObraDetalhe = {
                 ${crono.linhas.map((l, idx) => `
                   <tr>
                     <td style="text-align:center;">
-                      <input type="checkbox" id="od-cfg-chk-${idx}" data-idx="${idx}" data-codigo="${l.codigo}" ${l.ativa !== false ? 'checked' : ''} style="cursor:pointer;" data-od-change="ObraDetalhe._atualizarSomaModalCronograma()">
+                      <input type="checkbox" id="od-cfg-chk-${idx}" data-idx="${idx}" data-codigo="${l.codigo}" ${l.ativa !== false ? 'checked' : ''} style="cursor:pointer;" onchange="ObraDetalhe._atualizarSomaModalCronograma()">
                     </td>
                     <td style="font-weight:700;color:var(--text);">
                       ${Utils.escapeHtml(l.nome)}
                     </td>
                     <td style="text-align:right;">
                       <input type="number" step="0.01" min="0" id="od-cfg-val-${idx}" data-idx="${idx}" data-codigo="${l.codigo}" class="form-control form-control-sm od-cfg-step-val"
-                             value="${l.previstoTotal || 0}" style="text-align:right;font-weight:800;" data-od-input="ObraDetalhe._atualizarSomaModalCronograma()">
+                             value="${l.previstoTotal || 0}" style="text-align:right;font-weight:800;" oninput="ObraDetalhe._atualizarSomaModalCronograma()">
                     </td>
                   </tr>
                 `).join('')}
@@ -1407,12 +1413,12 @@ const ObraDetalhe = {
           </div>
         </div>
         <div class="modal-footer" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
-          <button class="btn btn-secondary btn-sm" data-od-click="ObraDetalhe.restaurarConfigCronograma('${obraId}')">
+          <button class="btn btn-secondary btn-sm" onclick="ObraDetalhe.restaurarConfigCronograma('${obraId}')">
             🔄 Restaurar Distribuição Padrão
           </button>
           <div style="display:flex;gap:8px;">
-            <button class="btn btn-secondary" data-od-click="Utils.closeModal()">Cancelar</button>
-            <button class="btn btn-primary" data-od-click="ObraDetalhe.salvarConfigCronograma('${obraId}')" style="font-weight:800;">
+            <button class="btn btn-secondary" onclick="Utils.closeModal()">Cancelar</button>
+            <button class="btn btn-primary" onclick="ObraDetalhe.salvarConfigCronograma('${obraId}')" style="font-weight:800;">
               💾 Salvar Cronograma Personalizado
             </button>
           </div>
@@ -1535,13 +1541,14 @@ const ObraDetalhe = {
       <div class="modal" style="max-width:620px;width:95%;">
         <div class="modal-header">
           <span class="modal-title">${titulo}</span>
-          <button class="modal-close" data-od-click="Utils.closeModal()">✕</button>
+          <button class="modal-close" onclick="Utils.closeModal()">✕</button>
         </div>
         <div class="modal-body" style="padding:18px;">
           <p style="font-size:.84rem;color:var(--text2);margin-bottom:16px;line-height:1.4;">${desc}</p>
           <div style="display:grid;gap:10px;">
             ${opcoes.map(op => `
-              <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 14px;background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--r-md);gap:12px;transition:border-color .2s;" data-od-mouseenter="this.style.borderColor='var(--accent)'" data-od-mouseleave="this.style.borderColor='var(--border)'">
+              <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 14px;background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--r-md);gap:12px;transition:border-color .2s;"
+                   onmouseenter="this.style.borderColor='var(--accent)'" onmouseleave="this.style.borderColor='var(--border)'">
                 <div style="flex:1;">
                   <div style="font-weight:800;font-size:.88rem;color:var(--text);display:flex;align-items:center;gap:6px;">
                     <span>${op.icone}</span> ${op.titulo}
@@ -1552,7 +1559,7 @@ const ObraDetalhe = {
                 </div>
                 <div>
                   <button class="btn btn-sm ${op.modo==='completo'?'btn-primary':'btn-secondary'}"
-                          data-od-click="Utils.closeModal(); ${isExcel ? `ObraDetalhe.exportarExcel('${op.modo}', '${id}')` : `ObraDetalhe.imprimir('${op.modo}', '${id}')`}"
+                          onclick="Utils.closeModal(); ${isExcel ? `ObraDetalhe.exportarExcel('${op.modo}', '${id}')` : `ObraDetalhe.imprimir('${op.modo}', '${id}')`}"
                           style="font-weight:700;white-space:nowrap;">
                     ${isExcel ? 'Baixar .xlsx' : 'Imprimir / PDF'}
                   </button>
@@ -1562,7 +1569,7 @@ const ObraDetalhe = {
           </div>
         </div>
         <div class="modal-footer">
-          <button class="btn btn-secondary" data-od-click="Utils.closeModal()">Fechar</button>
+          <button class="btn btn-secondary" onclick="Utils.closeModal()">Fechar</button>
         </div>
       </div>
     `;
@@ -1858,7 +1865,6 @@ const ObraDetalhe = {
       <html lang="pt-BR">
       <head>
         <meta charset="UTF-8">
-        <meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src data: https:; style-src 'unsafe-inline'; font-src data: https:; script-src 'none'; script-src-attr 'none';">
         <title>${tituloRelatorio} - ${Utils.escapeHtml(obra.nome)}</title>
         <style>
           @page { size: A4 landscape; margin: 8mm; }
@@ -1894,10 +1900,10 @@ const ObraDetalhe = {
             <span>📄 ${tituloRelatorio} (Visualização de Impressão A4)</span>
           </div>
           <div style="display:flex;gap:8px;">
-            <button id="od-print-window-btn" style="background:#10b981;color:#fff;border:none;padding:5px 12px;border-radius:4px;font-weight:700;cursor:pointer;font-size:10px;">
+            <button onclick="window.print()" style="background:#10b981;color:#fff;border:none;padding:5px 12px;border-radius:4px;font-weight:700;cursor:pointer;font-size:10px;">
               🖨️ Salvar como PDF / Imprimir
             </button>
-            <button id="od-close-window-btn" style="background:#475569;color:#fff;border:none;padding:5px 10px;border-radius:4px;cursor:pointer;font-size:10px;">
+            <button onclick="window.close()" style="background:#475569;color:#fff;border:none;padding:5px 10px;border-radius:4px;cursor:pointer;font-size:10px;">
               ✖️ Fechar
             </button>
           </div>
@@ -2116,10 +2122,6 @@ const ObraDetalhe = {
       </html>
     `);
     win.document.close();
-    const printButton = win.document.getElementById('od-print-window-btn');
-    const closeButton = win.document.getElementById('od-close-window-btn');
-    if (printButton) printButton.addEventListener('click', () => win.print());
-    if (closeButton) closeButton.addEventListener('click', () => win.close());
     win.focus();
     setTimeout(() => { win.print(); }, 400);
   },
@@ -2142,16 +2144,16 @@ const ObraDetalhe = {
           </select>
         </div>
         <div style="display:flex;gap:8px;flex-wrap:wrap;">
-          <button class="btn btn-secondary btn-sm" data-od-click="ImportarExcel.abrirModal('${obraId}')" style="border:1px solid var(--accent);color:var(--accent2);">
+          <button class="btn btn-secondary btn-sm" onclick="ImportarExcel.abrirModal('${obraId}')" style="border:1px solid var(--accent);color:var(--accent2);">
             📊 Importar Excel
           </button>
-          <button class="btn btn-sm" data-od-click="OCR.abrirModal()" style="background:linear-gradient(135deg,#4f46e5,#7c3aed);color:#fff;border:none;font-weight:700;">
+          <button class="btn btn-sm" onclick="OCR.abrirModal()" style="background:linear-gradient(135deg,#4f46e5,#7c3aed);color:#fff;border:none;font-weight:700;">
             🤖 Ler com IA (OCR)
           </button>
-          <button class="btn btn-success btn-sm" data-od-click="App.obraId='${obraId}';Lancamentos.showForm('receita')" style="font-weight:800;">
+          <button class="btn btn-success btn-sm" onclick="App.obraId='${obraId}';Lancamentos.showForm('receita')" style="font-weight:800;">
             + Nova Receita
           </button>
-          <button class="btn btn-danger btn-sm" data-od-click="App.obraId='${obraId}';Lancamentos.showForm('despesa')" style="font-weight:800;">
+          <button class="btn btn-danger btn-sm" onclick="App.obraId='${obraId}';Lancamentos.showForm('despesa')" style="font-weight:800;">
             + Nova Despesa
           </button>
         </div>
@@ -2239,8 +2241,8 @@ const ObraDetalhe = {
           ${clipBadge}
         </td>
         <td style="text-align:center;white-space:nowrap;">
-          <button class="icon-btn btn-sm" data-od-click="Lancamentos.showForm ? Lancamentos.showForm('${l.tipo}','${l.id}') : Lancamentos.edit('${l.id}')" title="Editar">✏️</button>
-          <button class="icon-btn btn-sm" style="color:var(--danger)" data-od-click="Lancamentos.del('${l.id}')" title="Excluir">🗑️</button>
+          <button class="icon-btn btn-sm" onclick="Lancamentos.showForm ? Lancamentos.showForm('${l.tipo}','${l.id}') : Lancamentos.edit('${l.id}')" title="Editar">✏️</button>
+          <button class="icon-btn btn-sm" style="color:var(--danger)" onclick="Lancamentos.del('${l.id}')" title="Excluir">🗑️</button>
         </td>
       </tr>`;
     }).join('');
@@ -2272,8 +2274,8 @@ const ObraDetalhe = {
             <p style="font-size:.78rem;color:var(--text3);margin:2px 0 0;">43 documentos organizados por fase de obra com uploads locais e vínculos no Google Drive.</p>
           </div>
           <div style="display:flex;gap:8px;">
-            <button class="btn btn-secondary btn-sm" data-od-click="FasesDoc.expandAll()">Expandir Fases</button>
-            <button class="btn btn-secondary btn-sm" data-od-click="FasesDoc.collapseAll()">Recolher</button>
+            <button class="btn btn-secondary btn-sm" onclick="FasesDoc.expandAll()">Expandir Fases</button>
+            <button class="btn btn-secondary btn-sm" onclick="FasesDoc.collapseAll()">Recolher</button>
           </div>
         </div>
         ${docHtml}
@@ -2300,7 +2302,7 @@ const ObraDetalhe = {
             <span style="color:var(--text3);">${Utils.fmt.currency(totalSolic)} solicitado</span>
           </div>
         </div>
-        <button class="btn btn-primary btn-sm" data-od-click="App.obraId='${obraId}';Medicoes.showForm()" style="font-weight:800;">
+        <button class="btn btn-primary btn-sm" onclick="App.obraId='${obraId}';Medicoes.showForm()" style="font-weight:800;">
           + Nova Medição
         </button>
       </div>
@@ -2310,7 +2312,7 @@ const ObraDetalhe = {
           <div style="font-size:2.5rem;margin-bottom:8px;">🔨</div>
           <h3>Nenhuma medição registrada para esta obra</h3>
           <p style="font-size:.85rem;margin-bottom:14px;">Cadastre a primeira medição para acompanhar o avanço físico e faturamento.</p>
-          <button class="btn btn-primary btn-sm" data-od-click="App.obraId='${obraId}';Medicoes.showForm()">+ Cadastrar 1ª Medição</button>
+          <button class="btn btn-primary btn-sm" onclick="App.obraId='${obraId}';Medicoes.showForm()">+ Cadastrar 1ª Medição</button>
         </div>
       ` : `
         <div class="card" style="padding:0;overflow:hidden;">
@@ -2356,8 +2358,8 @@ const ObraDetalhe = {
                       ${clip}
                     </td>
                     <td style="text-align:center;">
-                      <button class="icon-btn btn-sm" data-od-click="Medicoes.showForm('${m.id}')" title="Editar">✏️</button>
-                      <button class="icon-btn btn-sm" style="color:var(--danger)" data-od-click="Medicoes.del('${m.id}')" title="Excluir">🗑️</button>
+                      <button class="icon-btn btn-sm" onclick="Medicoes.showForm('${m.id}')" title="Editar">✏️</button>
+                      <button class="icon-btn btn-sm" style="color:var(--danger)" onclick="Medicoes.del('${m.id}')" title="Excluir">🗑️</button>
                     </td>
                   </tr>`;
                 }).join('')}
@@ -2388,10 +2390,10 @@ const ObraDetalhe = {
           Documentos fiscais, recibos assinados e contratos formalizados com o cliente.
         </div>
         <div style="display:flex;gap:8px;">
-          <button class="btn btn-primary btn-sm" data-od-click="Recibos.novoReciboModal({ obra_id: '${obraId}' })" style="font-weight:800;">
+          <button class="btn btn-primary btn-sm" onclick="Recibos.novoReciboModal({ obra_id: '${obraId}' })" style="font-weight:800;">
             + Emitir Novo Recibo
           </button>
-          <button class="btn btn-secondary btn-sm" data-od-click="App.obraId='${obraId}';App.navigate('contratos')" style="font-weight:700;">
+          <button class="btn btn-secondary btn-sm" onclick="App.obraId='${obraId}';App.navigate('contratos')" style="font-weight:700;">
             📜 Gerar Contrato
           </button>
         </div>
@@ -2417,7 +2419,7 @@ const ObraDetalhe = {
                   </div>
                   <div style="text-align:right;">
                     <div style="font-weight:900;font-size:.88rem;color:var(--success);">${Utils.fmt.currency(r.valor)}</div>
-                    <button class="btn btn-sm btn-ghost" style="padding:2px 6px;font-size:.72rem;color:var(--accent);" data-od-click="Recibos.visualizarRecibo('${r.id}')">
+                    <button class="btn btn-sm btn-ghost" style="padding:2px 6px;font-size:.72rem;color:var(--accent);" onclick="Recibos.visualizarRecibo('${r.id}')">
                       👁️ Ver
                     </button>
                   </div>
@@ -2436,7 +2438,7 @@ const ObraDetalhe = {
             <div style="text-align:center;padding:24px 0;color:var(--text3);font-size:.82rem;">
               Nenhum contrato formal gerado ainda.
               <div style="margin-top:8px;">
-                <button class="btn btn-secondary btn-sm" data-od-click="App.obraId='${obraId}';App.navigate('contratos')">Gerar Modelo de Contrato</button>
+                <button class="btn btn-secondary btn-sm" onclick="App.obraId='${obraId}';App.navigate('contratos')">Gerar Modelo de Contrato</button>
               </div>
             </div>
           ` : `
@@ -2447,7 +2449,7 @@ const ObraDetalhe = {
                     <div style="font-weight:700;font-size:.82rem;color:var(--text);">${c.titulo || 'Contrato de Empreitada'}</div>
                     <div style="font-size:.72rem;color:var(--text3);">${Utils.fmt.date(c.criado_em)} &middot; ${c.tipo || 'Padrão'}</div>
                   </div>
-                  <button class="btn btn-sm btn-secondary" data-od-click="Contratos.visualizarContrato('${c.id}')">
+                  <button class="btn btn-sm btn-secondary" onclick="Contratos.visualizarContrato('${c.id}')">
                     Abrir
                   </button>
                 </div>
@@ -2972,132 +2974,3 @@ const ObraDetalhe = {
 };
 
 window.ObraDetalhe = ObraDetalhe;
-
-
-/* FINOBRA_PATCH25_EVENT_BRIDGE */
-(() => {
-  if (globalThis.__finobraObraDetalheEventBridge) return;
-  globalThis.__finobraObraDetalheEventBridge = true;
-
-  const allowed = {
-    'Clientes.showForm': (...a) => Clientes.showForm(...a),
-    'App.navigate': (...a) => App.navigate(...a),
-    'ObraDetalhe.imprimirDossie': (...a) => ObraDetalhe.imprimirDossie(...a),
-    'ObraDetalhe.setTab': (...a) => ObraDetalhe.setTab(...a),
-    'ObraDetalhe.setSubTabOrcado': (...a) => ObraDetalhe.setSubTabOrcado(...a),
-    'ObraDetalhe.exportarExcelEngenharia': (...a) => ObraDetalhe.exportarExcelEngenharia(...a),
-    'ObraDetalhe.exportarPDFEngenharia': (...a) => ObraDetalhe.exportarPDFEngenharia(...a),
-    'ObraDetalhe.abrirMenuExportar': (...a) => ObraDetalhe.abrirMenuExportar(...a),
-    'ObraDetalhe.abrirModalConfigCronograma': (...a) => ObraDetalhe.abrirModalConfigCronograma(...a),
-    'ObraDetalhe.exportarExcel': (...a) => ObraDetalhe.exportarExcel(...a),
-    'ObraDetalhe.imprimir': (...a) => ObraDetalhe.imprimir(...a),
-    'ObraDetalhe.setRegimeLeisSociais': (...a) => ObraDetalhe.setRegimeLeisSociais(...a),
-    'ObraDetalhe.salvarBDI': (...a) => ObraDetalhe.salvarBDI(...a),
-    'ObraDetalhe.salvarBDIPadrao': (...a) => ObraDetalhe.salvarBDIPadrao(...a),
-    'ObraDetalhe.restaurarBDITCU': (...a) => ObraDetalhe.restaurarBDITCU(...a),
-    'ObraDetalhe.restaurarConfigCronograma': (...a) => ObraDetalhe.restaurarConfigCronograma(...a),
-    'ObraDetalhe.salvarConfigCronograma': (...a) => ObraDetalhe.salvarConfigCronograma(...a),
-    'ObraDetalhe._atualizarSomaModalCronograma': (...a) => ObraDetalhe._atualizarSomaModalCronograma(...a),
-    'ObraDetalhe.recalcularBDIInput': (...a) => ObraDetalhe.recalcularBDIInput(...a),
-    'Utils.closeModal': (...a) => Utils.closeModal(...a),
-    'ImportarExcel.abrirModal': (...a) => ImportarExcel.abrirModal(...a),
-    'OCR.abrirModal': (...a) => OCR.abrirModal(...a),
-    'Lancamentos.showForm': (...a) => Lancamentos.showForm(...a),
-    'Lancamentos.edit': (...a) => Lancamentos.edit(...a),
-    'Lancamentos.del': (...a) => Lancamentos.del(...a),
-    'FasesDoc.expandAll': (...a) => FasesDoc.expandAll(...a),
-    'FasesDoc.collapseAll': (...a) => FasesDoc.collapseAll(...a),
-    'Medicoes.showForm': (...a) => Medicoes.showForm(...a),
-    'Medicoes.del': (...a) => Medicoes.del(...a),
-    'Recibos.novoReciboModal': (...a) => Recibos.novoReciboModal(...a),
-    'Recibos.visualizarRecibo': (...a) => Recibos.visualizarRecibo(...a),
-    'Contratos.visualizarContrato': (...a) => Contratos.visualizarContrato(...a)
-  };
-
-  function splitStatements(input) {
-    const out = []; let cur = ''; let quote = null; let esc = false; let depth = 0;
-    for (const ch of String(input || '')) {
-      if (esc) { cur += ch; esc = false; continue; }
-      if (ch === '\\') { cur += ch; esc = true; continue; }
-      if (quote) { cur += ch; if (ch === quote) quote = null; continue; }
-      if (ch === "'" || ch === '"') { quote = ch; cur += ch; continue; }
-      if (ch === '(' || ch === '{' || ch === '[') depth++;
-      if (ch === ')' || ch === '}' || ch === ']') depth--;
-      if (ch === ';' && depth === 0) { if (cur.trim()) out.push(cur.trim()); cur = ''; continue; }
-      cur += ch;
-    }
-    if (cur.trim()) out.push(cur.trim());
-    return out;
-  }
-
-  function parseArgs(raw) {
-    const s = String(raw || '').trim();
-    if (!s) return [];
-    const parts = []; let cur = ''; let quote = null; let esc = false; let depth = 0;
-    for (const ch of s) {
-      if (esc) { cur += ch; esc = false; continue; }
-      if (ch === '\\') { cur += ch; esc = true; continue; }
-      if (quote) { cur += ch; if (ch === quote) quote = null; continue; }
-      if (ch === "'" || ch === '"') { quote = ch; cur += ch; continue; }
-      if (ch === '{' || ch === '[' || ch === '(') depth++;
-      if (ch === '}' || ch === ']' || ch === ')') depth--;
-      if (ch === ',' && depth === 0) { parts.push(cur.trim()); cur = ''; continue; }
-      cur += ch;
-    }
-    if (cur.trim()) parts.push(cur.trim());
-    return parts.map(v => {
-      if ((v.startsWith("'") && v.endsWith("'")) || (v.startsWith('"') && v.endsWith('"'))) {
-        return v.slice(1, -1).replace(/\\'/g, "'").replace(/\\"/g, '"').replace(/\\n/g, '\n').replace(/\\r/g, '\r').replace(/\\\\/g, '\\');
-      }
-      if (v === 'true') return true;
-      if (v === 'false') return false;
-      if (v === 'null') return null;
-      if (/^-?\d+(?:\.\d+)?$/.test(v)) return Number(v);
-      throw new Error('Argumento CSP não permitido');
-    });
-  }
-
-  function runStatement(stmt, el) {
-    const hover = stmt.match(/^this\.style\.borderColor='(var\(--(?:accent|border)\))'$/);
-    if (hover) { el.style.borderColor = hover[1]; return; }
-
-    const assignObra = stmt.match(/^App\.obraId='([^']*)'$/);
-    if (assignObra) { App.obraId = assignObra[1]; return; }
-
-    const ternary = stmt.match(/^Lancamentos\.showForm \? Lancamentos\.showForm\('([^']*)','([^']*)'\) : Lancamentos\.edit\('([^']*)'\)$/);
-    if (ternary) {
-      if (typeof Lancamentos.showForm === 'function') Lancamentos.showForm(ternary[1], ternary[2]);
-      else Lancamentos.edit(ternary[3]);
-      return;
-    }
-
-    const receipt = stmt.match(/^Recibos\.novoReciboModal\(\{ obra_id: '([^']*)' \}\)$/);
-    if (receipt) { Recibos.novoReciboModal({ obra_id: receipt[1] }); return; }
-
-    const call = stmt.match(/^([A-Za-z_$][\w$]*\.[A-Za-z_$][\w$]*)\((.*)\)$/s);
-    if (!call || !allowed[call[1]]) throw new Error('Ação CSP não permitida');
-    allowed[call[1]](...parseArgs(call[2]));
-  }
-
-  function execute(el, command) {
-    try {
-      for (const stmt of splitStatements(command)) runStatement(stmt, el);
-    } catch (err) {
-      console.error('[Patch25 CSP] ação bloqueada:', err?.message || err);
-      if (typeof Utils !== 'undefined' && Utils.toast) Utils.toast('Ação bloqueada por política de segurança.', 'warning');
-    }
-  }
-
-  const bind = (domEvent, attr, opts = {}) => document.addEventListener(domEvent, (ev) => {
-    const el = ev.target && ev.target.closest ? ev.target.closest('[' + attr + ']') : null;
-    if (!el) return;
-    if (opts.boundary && ev.relatedTarget && el.contains(ev.relatedTarget)) return;
-    execute(el, el.getAttribute(attr));
-  }, true);
-
-  bind('click', 'data-od-click');
-  bind('change', 'data-od-change');
-  bind('input', 'data-od-input');
-  bind('mouseover', 'data-od-mouseenter', { boundary: true });
-  bind('mouseout', 'data-od-mouseleave', { boundary: true });
-})();

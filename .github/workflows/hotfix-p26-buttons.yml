@@ -1,0 +1,21 @@
+name: Patch 26.1 button hotfix
+
+on:
+  push:
+    branches:
+      - hotfix-p26-buttons-20260912
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Full regression suite
+        run: npm test
+      - name: Syntax verification
+        run: node scripts/check-all-syntax.js
+      - name: Verify lexical-root bridge
+        run: node scripts/test-patch26-hotfix-static.js

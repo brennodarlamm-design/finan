@@ -7,7 +7,7 @@ const Clientes = {
     return `
     <div class="page-header">
       <div><h1 class="page-title">👥 Clientes / Obras</h1><p class="page-sub">${cs.length} obra(s) cadastrada(s)</p></div>
-      <div class="page-actions"><button class="btn btn-primary" data-fb-click="Clientes.showForm" data-fb-click-n="0">+ Nova Obra</button></div>
+      <div class="page-actions"><button class="btn btn-primary" onclick="Clientes.showForm()">+ Nova Obra</button></div>
     </div>
     <div class="filters-bar">
       <div class="filter-group" style="flex:1">
@@ -56,7 +56,7 @@ const Clientes = {
     if (!cs.length) return `<div class="empty-state" style="grid-column:1/-1">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
       <h3>Nenhuma obra cadastrada</h3><p>Clique em "Nova Obra" para começar</p>
-      <button class="btn btn-primary" data-fb-click="Clientes.showForm" data-fb-click-n="0">+ Nova Obra</button></div>`;
+      <button class="btn btn-primary" onclick="Clientes.showForm()">+ Nova Obra</button></div>`;
     return cs.map(c => {
       const e = Utils.escapeHtml.bind(Utils);
       const r = DB.getResumo(c.id);
@@ -78,7 +78,8 @@ const Clientes = {
       const badgeMod = modBadges[c.modalidade_obra || 'caixa'] || modBadges.caixa;
 
       return `<div class="card" style="position:relative;transition:transform .15s, border-color .15s;">
-        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px;cursor:pointer;" data-fb-click="Patch26Actions.openObra" data-fb-click-n="2" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(c.id))}" data-fb-click-t1="string" data-fb-click-v1="" title="Abrir Central da Obra">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px;cursor:pointer;"
+             onclick="typeof ObraDetalhe!=='undefined'?ObraDetalhe.abrir('${c.id}'):null" title="Abrir Central da Obra">
           <div>
             <div style="font-size:1.02rem;font-weight:900;margin-bottom:4px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
               <span style="color:var(--text);">${e(c.nome)}</span>
@@ -126,13 +127,14 @@ const Clientes = {
         </div>
         ${typeof FasesDoc !== 'undefined' ? FasesDoc.miniWidget(c.id) : ''}
         <div style="display:flex;gap:7px;margin-top:12px;flex-wrap:wrap;">
-          <button class="btn btn-primary btn-sm" style="flex:2;font-weight:800;display:inline-flex;align-items:center;justify-content:center;gap:6px;" data-fb-click="Patch26Actions.openObra" data-fb-click-n="2" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(c.id))}" data-fb-click-t1="string" data-fb-click-v1="" title="Abrir Central da Obra">
+          <button class="btn btn-primary btn-sm" style="flex:2;font-weight:800;display:inline-flex;align-items:center;justify-content:center;gap:6px;"
+                  onclick="typeof ObraDetalhe!=='undefined'?ObraDetalhe.abrir('${c.id}'):null" title="Abrir Central da Obra">
             🏢 Central da Obra
           </button>
-          <button class="btn btn-secondary btn-sm" style="flex:1" data-fb-click="Patch26Actions.openObra" data-fb-click-n="2" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(c.id))}" data-fb-click-t1="string" data-fb-click-v1="lancamentos" title="Ver lançamentos financeiros">💰 Extrato</button>
-          <button class="btn btn-secondary btn-sm" data-fb-click="Patch26Actions.openObra" data-fb-click-n="2" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(c.id))}" data-fb-click-t1="string" data-fb-click-v1="documentos" title="Percurso Documental (43 docs)" style="padding:4px 10px">📋</button>
-          <button class="icon-btn btn-sm" data-fb-click="Clientes.showForm" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(c.id))}" title="Editar">✏️</button>
-          <button class="icon-btn btn-sm" style="color:var(--danger)" data-fb-click="Clientes.del" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(c.id))}" title="Excluir">🗑️</button>
+          <button class="btn btn-secondary btn-sm" style="flex:1" onclick="typeof ObraDetalhe!=='undefined'?ObraDetalhe.abrir('${c.id}','lancamentos'):null" title="Ver lançamentos financeiros">💰 Extrato</button>
+          <button class="btn btn-secondary btn-sm" onclick="typeof ObraDetalhe!=='undefined'?ObraDetalhe.abrir('${c.id}','documentos'):null" title="Percurso Documental (43 docs)" style="padding:4px 10px">📋</button>
+          <button class="icon-btn btn-sm" onclick="Clientes.showForm('${c.id}')" title="Editar">✏️</button>
+          <button class="icon-btn btn-sm" style="color:var(--danger)" onclick="Clientes.del('${c.id}')" title="Excluir">🗑️</button>
         </div>
       </div>`;
     }).join('');
@@ -176,12 +178,12 @@ const Clientes = {
 
     Utils.showModal(`
       <div class="modal modal-lg">
-        <div class="modal-header"><span class="modal-title">${id?'✏️ Editar Obra':'🏗️ Nova Obra'}</span><button class="modal-close" data-fb-click="Utils.closeModal" data-fb-click-n="0">✕</button></div>
+        <div class="modal-header"><span class="modal-title">${id?'✏️ Editar Obra':'🏗️ Nova Obra'}</span><button class="modal-close" onclick="Utils.closeModal()">✕</button></div>
         <div class="modal-body">
           <form id="f-cli">
             <div class="form-group" style="margin-bottom:14px;">
               <label class="form-label" style="font-weight:700;color:var(--accent);">Modalidade da Obra *</label>
-              <select class="form-control" name="modalidade_obra" id="cli-modalidade" data-fb-change="Clientes.onModalidadeChange" data-fb-change-n="1" data-fb-change-t0="value">
+              <select class="form-control" name="modalidade_obra" id="cli-modalidade" onchange="Clientes.onModalidadeChange(this.value)">
                 <option value="caixa" ${isCaixa?'selected':''}>🏦 Financiamento Caixa Econômica (PCI / SBPE / MCMV)</option>
                 <option value="particular" ${c.modalidade_obra==='particular'?'selected':''}>💼 Obra Particular / Recursos Próprios</option>
                 <option value="administracao" ${c.modalidade_obra==='administracao'?'selected':''}>📑 Administração de Obra (Custo + Taxa)</option>
@@ -202,7 +204,7 @@ const Clientes = {
             <div class="form-row cols-3" style="margin-bottom:14px;">
               <div class="form-group"><label class="form-label">Cidade *</label><input class="form-control" name="cidade" value="${e(c.cidade||'')}" required placeholder="Cidade"></div>
               <div class="form-group"><label class="form-label">Estado</label><select class="form-control" name="estado">${Utils.stateOptions(c.estado || tenantUF)}</select></div>
-              <div class="form-group"><label class="form-label">CEP</label><input class="form-control" name="cep" id="cli-cep" value="${e(c.cep||'')}" placeholder="00000-000" data-fb-blur="Clientes.onCepChange" data-fb-blur-n="1" data-fb-blur-t0="self"></div>
+              <div class="form-group"><label class="form-label">CEP</label><input class="form-control" name="cep" id="cli-cep" value="${e(c.cep||'')}" placeholder="00000-000" onblur="Clientes.onCepChange(this)"></div>
             </div>
             <div class="divider"></div>
             <div class="form-row cols-2" style="margin-bottom:14px;">
@@ -245,8 +247,8 @@ const Clientes = {
           </form>
         </div>
         <div class="modal-footer">
-          <button class="btn btn-secondary" data-fb-click="Utils.closeModal" data-fb-click-n="0">Cancelar</button>
-          <button class="btn btn-primary" data-fb-click="Clientes.save" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(id||''))}">${id?'✔ Salvar Alterações':'+ Cadastrar Obra'}</button>
+          <button class="btn btn-secondary" onclick="Utils.closeModal()">Cancelar</button>
+          <button class="btn btn-primary" onclick="Clientes.save('${id||''}')">${id?'✔ Salvar Alterações':'+ Cadastrar Obra'}</button>
         </div>
       </div>`);
   },

@@ -36,7 +36,8 @@ const BuscaGlobal = {
             <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
           </svg>
           <input id="busca-global-input" placeholder="Buscar lançamentos, obras, fornecedores, notas..." autocomplete="off"
-            style="flex:1;background:transparent;border:none;outline:none;font-size:1rem;color:var(--text);font-family:inherit;" data-fb-input="BuscaGlobal._pesquisar" data-fb-input-n="1" data-fb-input-t0="value">
+            style="flex:1;background:transparent;border:none;outline:none;font-size:1rem;color:var(--text);font-family:inherit;"
+            oninput="BuscaGlobal._pesquisar(this.value)">
           <kbd style="font-size:.7rem;color:var(--text3);border:1px solid var(--border);border-radius:4px;padding:2px 6px;">ESC</kbd>
         </div>
 
@@ -163,7 +164,7 @@ const BuscaGlobal = {
       html += `<div style="padding:8px 16px 4px;font-size:.68rem;font-weight:800;color:var(--text3);text-transform:uppercase;letter-spacing:.07em;">${label} (${items.length})</div>`;
       items.slice(0, 5).forEach(r => {
         html += `
-          <div class="busca-item" data-idx="${itemIdx}" style="padding:10px 16px;display:flex;align-items:center;gap:12px;" data-fb-click="Patch26Actions.buscaAction" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(itemIdx))}">
+          <div class="busca-item" data-idx="${itemIdx}" style="padding:10px 16px;display:flex;align-items:center;gap:12px;" onclick="BuscaGlobal._itens[${itemIdx}]?.acao()">
             <div style="width:32px;height:32px;border-radius:8px;background:${r.cor}22;border:1px solid ${r.cor}44;display:flex;align-items:center;justify-content:center;font-size:1rem;flex-shrink:0;">
               <span style="color:${r.cor};font-weight:900;font-size:.9rem;">${r.icone}</span>
             </div>

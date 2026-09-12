@@ -131,7 +131,7 @@ const MasterAdmin = {
       const when = e.created_at ? new Date(e.created_at).toLocaleString('pt-BR') : '—';
       return `<tr style="border-bottom:1px solid rgba(255,255,255,.06);"><td style="padding:10px 12px;color:#94a3b8;white-space:nowrap">${this._esc(when)}</td><td style="padding:10px 12px;font-weight:700;color:#fff">${this._esc(e.tenant_nome||e.tenant_id||'—')}</td><td style="padding:10px 12px">${this._esc(e.usuario_nome||'—')}</td><td style="padding:10px 12px">${this._esc(e.route||'—')}</td><td style="padding:10px 12px;max-width:430px"><div style="font-weight:700;color:#fca5a5;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${this._esc(e.stack||e.message||'')}">${this._esc(e.message||'Erro')}</div><div style="font-size:.68rem;color:#64748b;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${this._esc(e.source||'')}</div></td></tr>`;
     }).join('') : `<tr><td colspan="5" style="padding:26px;text-align:center;color:#64748b;">Nenhum erro de frontend registrado. ✅</td></tr>`;
-    return `<div style="background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.08);border-radius:14px;overflow:hidden;margin-bottom:34px;"><div style="padding:16px 20px;border-bottom:1px solid rgba(255,255,255,.08);display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap"><div><h3 style="font-size:1.05rem;font-weight:800;color:#fff;margin:0">🛠️ Saúde do Sistema</h3><div style="font-size:.72rem;color:#64748b;margin-top:3px">Erros capturados automaticamente nos navegadores dos clientes</div></div><div style="display:flex;gap:10px;align-items:center"><span style="font-size:.76rem;color:${count24?'#f59e0b':'#22c55e'};font-weight:800">${count24} erro(s) / 24h · ${tenants24} empresa(s)</span><button data-fb-click="Patch26Actions.masterReloadErrors" data-fb-click-n="0" style="background:transparent;border:1px solid rgba(255,255,255,.15);color:#cbd5e1;border-radius:6px;padding:5px 8px;cursor:pointer">↻</button></div></div><div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;text-align:left;font-size:.78rem"><thead><tr style="background:rgba(255,255,255,.03);color:#94a3b8"><th style="padding:9px 12px">Quando</th><th style="padding:9px 12px">Empresa</th><th style="padding:9px 12px">Usuário</th><th style="padding:9px 12px">Tela</th><th style="padding:9px 12px">Erro</th></tr></thead><tbody>${rows}</tbody></table></div></div>`;
+    return `<div style="background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.08);border-radius:14px;overflow:hidden;margin-bottom:34px;"><div style="padding:16px 20px;border-bottom:1px solid rgba(255,255,255,.08);display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap"><div><h3 style="font-size:1.05rem;font-weight:800;color:#fff;margin:0">🛠️ Saúde do Sistema</h3><div style="font-size:.72rem;color:#64748b;margin-top:3px">Erros capturados automaticamente nos navegadores dos clientes</div></div><div style="display:flex;gap:10px;align-items:center"><span style="font-size:.76rem;color:${count24?'#f59e0b':'#22c55e'};font-weight:800">${count24} erro(s) / 24h · ${tenants24} empresa(s)</span><button onclick="MasterAdmin.carregarErrosSaaS(true).then(()=>MasterAdmin.render('master-content-area'))" style="background:transparent;border:1px solid rgba(255,255,255,.15);color:#cbd5e1;border-radius:6px;padding:5px 8px;cursor:pointer">↻</button></div></div><div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;text-align:left;font-size:.78rem"><thead><tr style="background:rgba(255,255,255,.03);color:#94a3b8"><th style="padding:9px 12px">Quando</th><th style="padding:9px 12px">Empresa</th><th style="padding:9px 12px">Usuário</th><th style="padding:9px 12px">Tela</th><th style="padding:9px 12px">Erro</th></tr></thead><tbody>${rows}</tbody></table></div></div>`;
   },
 
   async confirmarPagamento(invoiceId) {
@@ -168,7 +168,7 @@ const MasterAdmin = {
       const statusMap = { pending:'🟡 Pendente', paid:'🟢 Pago', expired:'⚪ Expirado', canceled:'🔴 Cancelado' };
       const status = this._esc(statusMap[i.status] || i.status || '—');
       const dt = i.created_at ? new Date(i.created_at).toLocaleString('pt-BR') : '—';
-      return `<tr style="border-bottom:1px solid rgba(255,255,255,.06);"><td style="padding:11px 14px;font-weight:700;color:#fff;">${nome}</td><td style="padding:11px 14px;">${plano}</td><td style="padding:11px 14px;font-weight:800;">R$ ${valor}</td><td style="padding:11px 14px;font-family:monospace;font-size:.72rem;">${txid}</td><td style="padding:11px 14px;">${status}</td><td style="padding:11px 14px;color:#94a3b8;">${this._esc(dt)}</td><td style="padding:11px 14px;text-align:right;">${i.status==='pending' ? `<button data-invoice-id="${id}" data-fb-click="MasterAdmin.confirmarPagamento" data-fb-click-n="1" data-fb-click-t0="dataset" data-fb-click-v0="invoiceId" style="background:#22c55e;color:#fff;border:none;border-radius:6px;padding:6px 10px;font-size:.75rem;font-weight:800;cursor:pointer;">✓ Confirmar</button>` : '—'}</td></tr>`;
+      return `<tr style="border-bottom:1px solid rgba(255,255,255,.06);"><td style="padding:11px 14px;font-weight:700;color:#fff;">${nome}</td><td style="padding:11px 14px;">${plano}</td><td style="padding:11px 14px;font-weight:800;">R$ ${valor}</td><td style="padding:11px 14px;font-family:monospace;font-size:.72rem;">${txid}</td><td style="padding:11px 14px;">${status}</td><td style="padding:11px 14px;color:#94a3b8;">${this._esc(dt)}</td><td style="padding:11px 14px;text-align:right;">${i.status==='pending' ? `<button data-invoice-id="${id}" onclick="MasterAdmin.confirmarPagamento(this.dataset.invoiceId)" style="background:#22c55e;color:#fff;border:none;border-radius:6px;padding:6px 10px;font-size:.75rem;font-weight:800;cursor:pointer;">✓ Confirmar</button>` : '—'}</td></tr>`;
     }).join('') : `<tr><td colspan="7" style="padding:28px;text-align:center;color:#64748b;">Nenhuma cobrança registrada ainda.</td></tr>`;
     return `<div style="background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.08);border-radius:14px;overflow:hidden;margin-bottom:34px;"><div style="padding:16px 20px;border-bottom:1px solid rgba(255,255,255,.08);display:flex;justify-content:space-between;align-items:center;"><h3 style="font-size:1.05rem;font-weight:800;color:#fff;">💳 Cobranças & Assinaturas</h3><span style="font-size:.78rem;color:${pendentes.length?'#f59e0b':'#22c55e'};font-weight:800;">${pendentes.length} pendente(s)</span></div><div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;text-align:left;font-size:.8rem;"><thead><tr style="background:rgba(255,255,255,.03);color:#94a3b8;font-size:.72rem;text-transform:uppercase;"><th style="padding:10px 14px;">Empresa</th><th style="padding:10px 14px;">Plano</th><th style="padding:10px 14px;">Valor</th><th style="padding:10px 14px;">TXID</th><th style="padding:10px 14px;">Status</th><th style="padding:10px 14px;">Criada</th><th style="padding:10px 14px;text-align:right;">Ação</th></tr></thead><tbody>${rows}</tbody></table></div></div>`;
   },
@@ -214,7 +214,7 @@ const MasterAdmin = {
           <div style="font-size:3rem;margin-bottom:12px;">🔒</div>
           <h2 style="font-size:1.4rem;font-weight:800;color:#fff;">Acesso Restrito ao Super Admin</h2>
           <p style="color:#94a3b8;font-size:.9rem;margin-top:6px;">Apenas o superadministrador da plataforma tem permissão para gerenciar as empresas e o faturamento SaaS.</p>
-          <button data-fb-click="Patch26Actions.goAppDashboard" data-fb-click-n="0" class="btn-primary" style="margin-top:20px;padding:8px 20px;">Voltar ao Dashboard</button>
+          <button onclick="window.location.href='/app/dashboard'" class="btn-primary" style="margin-top:20px;padding:8px 20px;">Voltar ao Dashboard</button>
         </div>
       `;
       return;
@@ -261,10 +261,10 @@ const MasterAdmin = {
         
         <!-- Navigation Tabs Master -->
         <div style="display:flex;gap:0;border-bottom:2px solid rgba(255,255,255,.1);margin-bottom:26px;overflow-x:auto;">
-          <button data-fb-click="MasterAdmin.switchTab" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="empresas" style="padding:12px 20px;border:none;background:transparent;color:${!isSistema?'var(--accent)':'#94a3b8'};font-family:inherit;font-size:.875rem;font-weight:800;cursor:pointer;border-bottom:3px solid ${!isSistema?'var(--accent)':'transparent'};margin-bottom:-2px;transition:all .2s;display:flex;align-items:center;gap:8px;">
+          <button onclick="MasterAdmin.switchTab('empresas')" style="padding:12px 20px;border:none;background:transparent;color:${!isSistema?'var(--accent)':'#94a3b8'};font-family:inherit;font-size:.875rem;font-weight:800;cursor:pointer;border-bottom:3px solid ${!isSistema?'var(--accent)':'transparent'};margin-bottom:-2px;transition:all .2s;display:flex;align-items:center;gap:8px;">
             <span>🏢</span> Gestão de Construtoras &amp; SaaS
           </button>
-          <button data-fb-click="MasterAdmin.switchTab" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="sistema" style="padding:12px 20px;border:none;background:transparent;color:${isSistema?'var(--accent)':'#94a3b8'};font-family:inherit;font-size:.875rem;font-weight:800;cursor:pointer;border-bottom:3px solid ${isSistema?'var(--accent)':'transparent'};margin-bottom:-2px;transition:all .2s;display:flex;align-items:center;gap:8px;">
+          <button onclick="MasterAdmin.switchTab('sistema')" style="padding:12px 20px;border:none;background:transparent;color:${isSistema?'var(--accent)':'#94a3b8'};font-family:inherit;font-size:.875rem;font-weight:800;cursor:pointer;border-bottom:3px solid ${isSistema?'var(--accent)':'transparent'};margin-bottom:-2px;transition:all .2s;display:flex;align-items:center;gap:8px;">
             <span>⚙️</span> Manutenção do Sistema &amp; Banco de Dados (Dev / Master)
           </button>
         </div>
@@ -281,10 +281,10 @@ const MasterAdmin = {
           </div>
 
           <div style="display:flex;align-items:center;gap:10px;">
-            <button data-fb-click="MasterAdmin.abrirModalNovaEmpresa" data-fb-click-n="0" class="btn-primary" style="padding:10px 18px;border-radius:8px;font-weight:800;display:inline-flex;align-items:center;gap:8px;font-size:.85rem;">
+            <button onclick="MasterAdmin.abrirModalNovaEmpresa()" class="btn-primary" style="padding:10px 18px;border-radius:8px;font-weight:800;display:inline-flex;align-items:center;gap:8px;font-size:.85rem;">
               <span>➕ Nova Construtora</span>
             </button>
-            <button data-fb-click="MasterAdmin.abrirModalPlanos" data-fb-click-n="0" class="btn-clean" style="padding:10px 16px;border-radius:8px;background:rgba(255,255,255,.05);border:1px solid var(--border);color:#f0ead6;font-size:.85rem;font-weight:700;cursor:pointer;">
+            <button onclick="MasterAdmin.abrirModalPlanos()" class="btn-clean" style="padding:10px 16px;border-radius:8px;background:rgba(255,255,255,.05);border:1px solid var(--border);color:#f0ead6;font-size:.85rem;font-weight:700;cursor:pointer;">
               <span>💎 Tabela de Planos</span>
             </button>
           </div>
@@ -403,7 +403,7 @@ const MasterAdmin = {
             <p style="color:#64748b;font-size:.8rem;margin-bottom:18px;">
               ${totalClientes} obra(s) cadastrada(s) &middot; ${totalLancamentos} lançamento(s) &middot; ${totalFornecedores} fornecedor(es) no cache local.
             </p>
-            <button data-fb-click="MasterAdmin.limparDadosGlobal" data-fb-click-n="0" style="background:rgba(239,68,68,.15);border:1px solid rgba(239,68,68,.4);color:#fca5a5;padding:9px 16px;border-radius:8px;font-size:.8rem;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:6px;">
+            <button onclick="MasterAdmin.limparDadosGlobal()" style="background:rgba(239,68,68,.15);border:1px solid rgba(239,68,68,.4);color:#fca5a5;padding:9px 16px;border-radius:8px;font-size:.8rem;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:6px;">
               <span>🗑️</span> Zerar / Limpar Todos os Dados Locais
             </button>
           </div>
@@ -415,17 +415,17 @@ const MasterAdmin = {
             </div>
             <p style="color:#94a3b8;font-size:.84rem;margin-bottom:14px;">Exporte ou restaure todos os cadastros, despesas, obras, orçamentos e comprovantes em arquivo JSON.</p>
             <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px;">
-              <button data-fb-click="MasterAdmin.exportarBackup" data-fb-click-n="0" style="background:var(--accent);color:#0f1710;padding:8px 16px;border-radius:8px;font-size:.8rem;font-weight:800;border:none;cursor:pointer;">
+              <button onclick="MasterAdmin.exportarBackup()" style="background:var(--accent);color:#0f1710;padding:8px 16px;border-radius:8px;font-size:.8rem;font-weight:800;border:none;cursor:pointer;">
                 ⬇️ Baixar Backup JSON
               </button>
-              <button data-fb-click="Patch26Actions.clickById" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="master-import-backup-input" style="background:rgba(255,255,255,.06);color:#fff;border:1px solid rgba(255,255,255,.15);padding:8px 16px;border-radius:8px;font-size:.8rem;font-weight:700;cursor:pointer;">
+              <button onclick="document.getElementById('master-import-backup-input').click()" style="background:rgba(255,255,255,.06);color:#fff;border:1px solid rgba(255,255,255,.15);padding:8px 16px;border-radius:8px;font-size:.8rem;font-weight:700;cursor:pointer;">
                 ⬆️ Restaurar Arquivo JSON
               </button>
-              <input type="file" id="master-import-backup-input" accept=".json,application/json" style="display:none;" data-fb-change="MasterAdmin.importarBackup" data-fb-change-n="1" data-fb-change-t0="self">
+              <input type="file" id="master-import-backup-input" accept=".json,application/json" style="display:none;" onchange="MasterAdmin.importarBackup(this)">
             </div>
             <div style="background:rgba(0,0,0,.3);border:1px solid rgba(255,255,255,.06);border-radius:8px;padding:10px 14px;font-size:.78rem;color:#94a3b8;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
               <span>🛡️ ${snapshotInfo}</span>
-              <button data-fb-click="MasterAdmin.criarSnapshot" data-fb-click-n="0" style="background:none;border:none;color:var(--accent2);text-decoration:underline;cursor:pointer;font-size:.76rem;">
+              <button onclick="MasterAdmin.criarSnapshot()" style="background:none;border:none;color:var(--accent2);text-decoration:underline;cursor:pointer;font-size:.76rem;">
                 Criar Ponto de Restauração
               </button>
             </div>
@@ -440,10 +440,10 @@ const MasterAdmin = {
               PostgreSQL Serverless conectado em tempo real (AWS São Paulo sa-east-1). Multi-tenancy isolado cryptograficamente.
             </p>
             <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:14px;">
-              <button data-fb-click="MasterAdmin.sincronizarTudoNeon" data-fb-click-n="0" style="background:var(--accent);color:#0f1710;padding:8px 16px;border-radius:8px;font-size:.8rem;font-weight:800;border:none;cursor:pointer;">
+              <button onclick="MasterAdmin.sincronizarTudoNeon()" style="background:var(--accent);color:#0f1710;padding:8px 16px;border-radius:8px;font-size:.8rem;font-weight:800;border:none;cursor:pointer;">
                 🔄 Sincronizar Tudo para o Neon
               </button>
-              <button data-fb-click="MasterAdmin.baixarDadosNeon" data-fb-click-n="0" style="background:rgba(255,255,255,.06);color:#fff;border:1px solid rgba(255,255,255,.15);padding:8px 16px;border-radius:8px;font-size:.8rem;font-weight:700;cursor:pointer;">
+              <button onclick="MasterAdmin.baixarDadosNeon()" style="background:rgba(255,255,255,.06);color:#fff;border:1px solid rgba(255,255,255,.15);padding:8px 16px;border-radius:8px;font-size:.8rem;font-weight:700;cursor:pointer;">
                 ⬇️ Recarregar do Neon
               </button>
             </div>
@@ -466,7 +466,7 @@ const MasterAdmin = {
               Instância autônoma no Render com persistência de chaves de autenticação no PostgreSQL Neon. Dispara relatórios diários matinais e alertas de boletos.
             </p>
             <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
-              <button data-fb-click="WhatsApp.abrirModalConexao" data-fb-click-n="0" style="background:#25D366;color:#fff;font-weight:800;font-size:.8rem;border:none;padding:9px 16px;border-radius:8px;cursor:pointer;display:flex;align-items:center;gap:6px;">
+              <button onclick="WhatsApp.abrirModalConexao()" style="background:#25D366;color:#fff;font-weight:800;font-size:.8rem;border:none;padding:9px 16px;border-radius:8px;cursor:pointer;display:flex;align-items:center;gap:6px;">
                 📲 Abrir Conexão &amp; QR Code
               </button>
             </div>
@@ -596,9 +596,9 @@ const MasterAdmin = {
         <td style="padding:14px 18px;">${vencHtml}</td>
         <td style="padding:14px 18px;text-align:right;">
           <div style="display:inline-flex;gap:6px;">
-            <button data-tenant-id="${this._esc(id)}" data-fb-click="MasterAdmin.impersonarEmpresa" data-fb-click-n="1" data-fb-click-t0="dataset" data-fb-click-v0="tenantId" title="Acessar sistema como esta empresa para dar suporte" style="background:rgba(201,162,39,.15);border:1px solid var(--accent);color:var(--accent2);padding:4px 8px;border-radius:6px;font-size:.75rem;font-weight:700;cursor:pointer;">👁️ Acessar</button>
+            <button data-tenant-id="${this._esc(id)}" onclick="MasterAdmin.impersonarEmpresa(this.dataset.tenantId)" title="Acessar sistema como esta empresa para dar suporte" style="background:rgba(201,162,39,.15);border:1px solid var(--accent);color:var(--accent2);padding:4px 8px;border-radius:6px;font-size:.75rem;font-weight:700;cursor:pointer;">👁️ Acessar</button>
             <a href="https://wa.me/${wa}?text=${waText}" target="_blank" rel="noopener noreferrer" title="Conversar no WhatsApp" style="background:rgba(34,197,94,.15);border:1px solid #22c55e;color:#22c55e;padding:4px 8px;border-radius:6px;font-size:.75rem;font-weight:700;text-decoration:none;display:inline-flex;align-items:center;">💬 Cobrar</a>
-            <button data-tenant-id="${this._esc(id)}" data-fb-click="MasterAdmin.alterarStatusEmpresa" data-fb-click-n="1" data-fb-click-t0="dataset" data-fb-click-v0="tenantId" title="Alterar status, plano ou vencimento" style="background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.15);color:#cbd5e1;padding:4px 8px;border-radius:6px;font-size:.75rem;cursor:pointer;">✏️</button>
+            <button data-tenant-id="${this._esc(id)}" onclick="MasterAdmin.alterarStatusEmpresa(this.dataset.tenantId)" title="Alterar status, plano ou vencimento" style="background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.15);color:#cbd5e1;padding:4px 8px;border-radius:6px;font-size:.75rem;cursor:pointer;">✏️</button>
           </div>
         </td>
       </tr>`;
@@ -674,7 +674,7 @@ const MasterAdmin = {
       <div class="modal" style="max-width:720px;background:#0f1a0b;border:1px solid var(--border);color:#f0ead6;">
         <div class="modal-header" style="border-bottom:1px solid rgba(201,162,39,.25);">
           <span class="modal-title" style="color:var(--accent2);font-weight:900;">💎 Tabela de Planos &amp; Mensalidades SaaS</span>
-          <button class="modal-close" data-fb-click="Utils.closeModal" data-fb-click-n="0">✕</button>
+          <button class="modal-close" onclick="Utils.closeModal()">✕</button>
         </div>
         <div class="modal-body" style="padding:20px;">
           <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(200px, 1fr));gap:14px;">
@@ -724,7 +724,7 @@ const MasterAdmin = {
           <a href="/app/planos" class="btn btn-secondary" style="font-size:.8rem;text-decoration:none;display:inline-flex;align-items:center;gap:4px;">
             <span>Abrir Tela Completa no Sistema ↗</span>
           </a>
-          <button type="button" class="btn btn-primary" data-fb-click="Utils.closeModal" data-fb-click-n="0">Fechar</button>
+          <button type="button" class="btn btn-primary" onclick="Utils.closeModal()">Fechar</button>
         </div>
       </div>
     `);
@@ -761,10 +761,10 @@ const MasterAdmin = {
               <div style="font-size:.75rem;color:#94a3b8;">${nome}</div>
             </div>
           </div>
-          <button data-fb-click="Patch26Actions.removeById" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="master-editar-empresa-modal" style="background:none;border:none;color:#94a3b8;font-size:1.2rem;cursor:pointer;padding:4px 8px;">✕</button>
+          <button onclick="document.getElementById('master-editar-empresa-modal').remove()" style="background:none;border:none;color:#94a3b8;font-size:1.2rem;cursor:pointer;padding:4px 8px;">✕</button>
         </div>
 
-        <form id="form-editar-tenant" data-fb-submit="MasterAdmin.salvarEdicaoEmpresa" data-fb-submit-n="2" data-fb-submit-t0="event" data-fb-submit-t1="string" data-fb-submit-v1="${encodeURIComponent(String(this._esc(emp.id)))}" style="padding:22px;display:flex;flex-direction:column;gap:14px;">
+        <form id="form-editar-tenant" onsubmit="MasterAdmin.salvarEdicaoEmpresa(event, '${this._esc(emp.id)}')" style="padding:22px;display:flex;flex-direction:column;gap:14px;">
           <div>
             <label style="display:block;font-size:.78rem;color:#94a3b8;margin-bottom:4px;">Status da Assinatura *</label>
             <select id="me-edit-status" style="width:100%;background:#182713;border:1px solid rgba(255,255,255,.15);border-radius:8px;padding:9px 12px;color:#fff;font-size:.85rem;">
@@ -790,8 +790,8 @@ const MasterAdmin = {
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
               <label style="font-size:.78rem;color:#94a3b8;">Data de Vencimento do Plano / Trial *</label>
               <div style="display:flex;gap:6px;">
-                <button type="button" data-fb-click="MasterAdmin._adicionarDiasVencimento" data-fb-click-n="1" data-fb-click-t0="number" data-fb-click-v0="15" style="background:rgba(245,158,11,.15);border:1px solid rgba(245,158,11,.3);color:#fbbf24;padding:2px 8px;border-radius:4px;font-size:.7rem;cursor:pointer;">+15 dias</button>
-                <button type="button" data-fb-click="MasterAdmin._adicionarDiasVencimento" data-fb-click-n="1" data-fb-click-t0="number" data-fb-click-v0="30" style="background:rgba(34,197,94,.15);border:1px solid rgba(34,197,94,.3);color:#4ade80;padding:2px 8px;border-radius:4px;font-size:.7rem;cursor:pointer;">+30 dias</button>
+                <button type="button" onclick="MasterAdmin._adicionarDiasVencimento(15)" style="background:rgba(245,158,11,.15);border:1px solid rgba(245,158,11,.3);color:#fbbf24;padding:2px 8px;border-radius:4px;font-size:.7rem;cursor:pointer;">+15 dias</button>
+                <button type="button" onclick="MasterAdmin._adicionarDiasVencimento(30)" style="background:rgba(34,197,94,.15);border:1px solid rgba(34,197,94,.3);color:#4ade80;padding:2px 8px;border-radius:4px;font-size:.7rem;cursor:pointer;">+30 dias</button>
               </div>
             </div>
             <input type="date" id="me-edit-vencimento" required value="${vencAtual}" style="width:100%;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.15);border-radius:8px;padding:9px 12px;color:#fff;font-size:.85rem;">
@@ -799,7 +799,7 @@ const MasterAdmin = {
           </div>
 
           <div style="padding-top:10px;display:flex;justify-content:flex-end;gap:10px;">
-            <button type="button" data-fb-click="Patch26Actions.removeById" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="master-editar-empresa-modal" style="background:none;border:1px solid rgba(255,255,255,.2);color:#cbd5e1;padding:8px 16px;border-radius:8px;cursor:pointer;">
+            <button type="button" onclick="document.getElementById('master-editar-empresa-modal').remove()" style="background:none;border:1px solid rgba(255,255,255,.2);color:#cbd5e1;padding:8px 16px;border-radius:8px;cursor:pointer;">
               Cancelar
             </button>
             <button type="submit" class="btn-primary" style="padding:8px 20px;border-radius:8px;font-weight:800;">
@@ -884,10 +884,10 @@ const MasterAdmin = {
               <div style="font-size:.75rem;color:#94a3b8;">Criar tenant e liberar acesso à plataforma</div>
             </div>
           </div>
-          <button data-fb-click="Patch26Actions.removeById" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="master-nova-empresa-modal" style="background:none;border:none;color:#94a3b8;font-size:1.2rem;cursor:pointer;padding:4px 8px;">✕</button>
+          <button onclick="document.getElementById('master-nova-empresa-modal').remove()" style="background:none;border:none;color:#94a3b8;font-size:1.2rem;cursor:pointer;padding:4px 8px;">✕</button>
         </div>
 
-        <form data-fb-submit="MasterAdmin.salvarNovaEmpresa" data-fb-submit-n="1" data-fb-submit-t0="event" style="padding:22px;display:flex;flex-direction:column;gap:14px;">
+        <form onsubmit="MasterAdmin.salvarNovaEmpresa(event)" style="padding:22px;display:flex;flex-direction:column;gap:14px;">
           <div>
             <label style="display:block;font-size:.78rem;color:#94a3b8;margin-bottom:4px;">Nome Fantasia da Construtora *</label>
             <input type="text" id="ne-nome" required placeholder="Ex: Vanguard Engenharia" style="width:100%;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.15);border-radius:8px;padding:9px 12px;color:#fff;font-size:.85rem;">
@@ -931,7 +931,7 @@ const MasterAdmin = {
           </div>
 
           <div style="padding-top:10px;display:flex;justify-content:flex-end;gap:10px;">
-            <button type="button" data-fb-click="Patch26Actions.removeById" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="master-nova-empresa-modal" style="background:none;border:1px solid rgba(255,255,255,.2);color:#cbd5e1;padding:8px 16px;border-radius:8px;cursor:pointer;">
+            <button type="button" onclick="document.getElementById('master-nova-empresa-modal').remove()" style="background:none;border:1px solid rgba(255,255,255,.2);color:#cbd5e1;padding:8px 16px;border-radius:8px;cursor:pointer;">
               Cancelar
             </button>
             <button type="submit" class="btn-primary" style="padding:8px 20px;border-radius:8px;font-weight:800;">

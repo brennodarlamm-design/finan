@@ -13,20 +13,20 @@ const Lancamentos = {
     <div class="page-header">
       <div><h1 class="page-title">&#x1F4B0; Lan&ccedil;amentos</h1><p class="page-sub">Controle de receitas e despesas com vencimentos e contas banc&aacute;rias</p></div>
       <div class="page-actions" style="display:flex;gap:8px;flex-wrap:wrap;">
-        <button class="btn btn-secondary btn-sm" data-fb-click="ImportarExcel.abrirModal" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(obraId))}" style="display:flex;align-items:center;gap:6px;border:1px solid var(--accent);color:var(--accent2);">
+        <button class="btn btn-secondary btn-sm" onclick="ImportarExcel.abrirModal('${obraId}')" style="display:flex;align-items:center;gap:6px;border:1px solid var(--accent);color:var(--accent2);">
           📊 Importar Planilha Excel
         </button>
-        <button class="btn btn-secondary btn-sm" data-fb-click="Lancamentos.abrirAnaliseProdutos" data-fb-click-n="0" style="display:flex;align-items:center;gap:6px;">
+        <button class="btn btn-secondary btn-sm" onclick="Lancamentos.abrirAnaliseProdutos()" style="display:flex;align-items:center;gap:6px;">
           🔍 Gastos por Produto
         </button>
-        <button class="btn btn-sm" data-fb-click="OCR.abrirModal" data-fb-click-n="0" style="display:flex;align-items:center;gap:6px;background:linear-gradient(135deg,#4f46e5,#7c3aed);color:#fff;border:none;font-weight:700;box-shadow:0 2px 8px rgba(79,70,229,.35);" title="Reconhecer boleto, NF-e, NFC-e, NFS-e ou qualquer conta automaticamente com IA">
+        <button class="btn btn-sm" onclick="OCR.abrirModal()" style="display:flex;align-items:center;gap:6px;background:linear-gradient(135deg,#4f46e5,#7c3aed);color:#fff;border:none;font-weight:700;box-shadow:0 2px 8px rgba(79,70,229,.35);" title="Reconhecer boleto, NF-e, NFC-e, NFS-e ou qualquer conta automaticamente com IA">
           🤖 Ler Documento
         </button>
-        <button class="btn btn-secondary btn-sm" data-fb-click="Lancamentos.showParcelamento" data-fb-click-n="0" style="display:flex;align-items:center;gap:6px;border:1px solid rgba(245,158,11,.4);color:#f59e0b;font-weight:700;" title="Lançar conta parcelada em múltiplas vezes">
+        <button class="btn btn-secondary btn-sm" onclick="Lancamentos.showParcelamento()" style="display:flex;align-items:center;gap:6px;border:1px solid rgba(245,158,11,.4);color:#f59e0b;font-weight:700;" title="Lançar conta parcelada em múltiplas vezes">
           📅 Parcelar
         </button>
-        <button class="btn btn-success btn-sm" data-fb-click="Lancamentos.showForm" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="receita">&uarr; Nova Receita</button>
-        <button class="btn btn-danger btn-sm" data-fb-click="Lancamentos.showForm" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="despesa">&darr; Nova Despesa</button>
+        <button class="btn btn-success btn-sm" onclick="Lancamentos.showForm('receita')">&uarr; Nova Receita</button>
+        <button class="btn btn-danger btn-sm" onclick="Lancamentos.showForm('despesa')">&darr; Nova Despesa</button>
       </div>
     </div>
 
@@ -100,7 +100,7 @@ const Lancamentos = {
           <input class="form-control" type="date" id="f-df" style="width:130px" title="Data final">
         </div>
       </div>
-      <button class="btn btn-secondary btn-sm" data-fb-click="Lancamentos.clearFilters" data-fb-click-n="0" style="align-self:flex-end">Limpar</button>
+      <button class="btn btn-secondary btn-sm" onclick="Lancamentos.clearFilters()" style="align-self:flex-end">Limpar</button>
     </div>
 
     <div class="card" style="padding:0;overflow:hidden;">
@@ -153,14 +153,14 @@ const Lancamentos = {
         ${showObra?`<td style="font-size:.76rem;color:var(--text2);max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${Utils.escapeHtml(c?.nome)||'&mdash;'}</td>`:''}
         <td>
           <div style="font-weight:600">${Utils.escapeHtml(l.descricao)}</div>
-          ${l.itens && l.itens.length ? `<div style="font-size:.7rem;color:var(--accent2);margin-top:2px;cursor:pointer" data-fb-click="Lancamentos.verItens" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(l.id))}" title="Ver produtos deste lançamento">📦 ${l.itens.length} produto${l.itens.length>1?'s':''}</div>` : ''}
+          ${l.itens && l.itens.length ? `<div style="font-size:.7rem;color:var(--accent2);margin-top:2px;cursor:pointer" onclick="Lancamentos.verItens('${l.id}')" title="Ver produtos deste lançamento">📦 ${l.itens.length} produto${l.itens.length>1?'s':''}</div>` : ''}
           ${l.codigo_barras ? `<div style="font-size:.7rem;font-family:monospace;color:var(--accent2);" title="Linha digitável do boleto">🔢 ${Utils.escapeHtml(l.codigo_barras)}</div>` : ''}
           ${l.observacoes?`<div style="font-size:.72rem;color:var(--text3)">${Utils.escapeHtml(l.observacoes)}</div>`:''}
         </td>
         <td style="white-space:nowrap">${Utils.catLabel(l.categoria)}</td>
         <td style="font-size:.78rem;color:var(--text2);max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${Utils.escapeHtml(l.fornecedor_beneficiario)||'&mdash;'}</td>
         <td style="font-size:.76rem;color:var(--text3);max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${l.conta_bancaria ? `&#x1F3E6; ${Utils.escapeHtml(l.conta_bancaria)}` : '&mdash;'}</td>
-        <td>${nf?`<span style="color:var(--accent2);cursor:pointer;font-size:.78rem;font-weight:700" data-fb-click="App.navigate" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="notas" title="Ver NF">#${Utils.escapeHtml(nf.numero_nf)}</span>`:'&mdash;'}</td>
+        <td>${nf?`<span style="color:var(--accent2);cursor:pointer;font-size:.78rem;font-weight:700" onclick="App.navigate('notas')" title="Ver NF">#${Utils.escapeHtml(nf.numero_nf)}</span>`:'&mdash;'}</td>
         <td>${l.tipo==='receita'?'<span class="badge badge-success">&uarr; Receita</span>':'<span class="badge badge-danger">&darr; Despesa</span>'}</td>
         <td style="font-weight:800;white-space:nowrap;color:${l.tipo==='receita'?'var(--success)':'var(--danger)'};">${l.tipo==='receita'?'+':'&minus;'} ${Utils.fmt.currency(l.valor)}</td>
         <td>${statusBadge}</td>
@@ -169,13 +169,13 @@ const Lancamentos = {
         <td style="text-align:center;">
           <div style="display:flex;gap:4px;justify-content:center;align-items:center;">
             ${!isBaixado ? `
-            <button class="btn btn-sm btn-success" data-fb-click="Lancamentos.marcarBaixa" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(l.id))}" title="Dar Baixa (Confirmar Pagamento/Recebimento)" style="font-size:.72rem;padding:3px 7px;">
+            <button class="btn btn-sm btn-success" onclick="Lancamentos.marcarBaixa('${l.id}')" title="Dar Baixa (Confirmar Pagamento/Recebimento)" style="font-size:.72rem;padding:3px 7px;">
               ✓ Baixar
             </button>` : ''}
-            <button class="icon-btn" data-fb-click="Patch26Actions.lancamentoAlertById" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(l.id))}" title="Enviar Alerta no WhatsApp" style="font-size:13px;color:#25D366;">📲</button>
-            <button class="icon-btn" data-fb-click="Lancamentos.emitirRecibo" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(l.id))}" title="Emitir Recibo Oficial" style="font-size:13px">&#x1F9FE;</button>
-            <button class="icon-btn" data-fb-click="Lancamentos.showForm" data-fb-click-n="2" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(l.tipo))}" data-fb-click-t1="string" data-fb-click-v1="${encodeURIComponent(String(l.id))}" title="Editar" style="font-size:13px">&#x270F;&#xFE0F;</button>
-            <button class="icon-btn" data-fb-click="Lancamentos.del" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(l.id))}" title="Excluir" style="font-size:13px;color:var(--danger)">&#x1F5D1;&#xFE0F;</button>
+            <button class="icon-btn" onclick="WhatsApp.enviarAlertaVencimento(DB.getById('lancamentos','${l.id}'))" title="Enviar Alerta no WhatsApp" style="font-size:13px;color:#25D366;">📲</button>
+            <button class="icon-btn" onclick="Lancamentos.emitirRecibo('${l.id}')" title="Emitir Recibo Oficial" style="font-size:13px">&#x1F9FE;</button>
+            <button class="icon-btn" onclick="Lancamentos.showForm('${l.tipo}','${l.id}')" title="Editar" style="font-size:13px">&#x270F;&#xFE0F;</button>
+            <button class="icon-btn" onclick="Lancamentos.del('${l.id}')" title="Excluir" style="font-size:13px;color:var(--danger)">&#x1F5D1;&#xFE0F;</button>
           </div>
         </td>
       </tr>`;
@@ -278,7 +278,7 @@ const Lancamentos = {
           <span class="modal-title" id="lan-modal-title" style="color:${initialTipo==='receita'?'var(--success)':'var(--danger)'}">
             ${isEdit ? '✏️ Editar Lançamento' : (initialTipo==='receita' ? '↑ Nova Receita' : '↓ Nova Despesa')}
           </span>
-          <button class="modal-close" data-fb-click="Utils.closeModal" data-fb-click-n="0">✕</button>
+          <button class="modal-close" onclick="Utils.closeModal()">✕</button>
         </div>
         <div class="modal-body">
           <form id="f-lan">
@@ -291,12 +291,12 @@ const Lancamentos = {
                 </span>
               </label>
               <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;background:var(--bg-secondary);padding:4px;border-radius:var(--r-md);border:1px solid var(--border-s);">
-                <button type="button" id="lan-btn-despesa" data-fb-click="Lancamentos.setTipo" data-fb-click-n="2" data-fb-click-t0="string" data-fb-click-v0="despesa" data-fb-click-t1="auto" data-fb-click-v1="${encodeURIComponent(String(isEdit))}"
+                <button type="button" id="lan-btn-despesa" onclick="Lancamentos.setTipo('despesa', ${isEdit})"
                   style="padding:10px 14px;border-radius:var(--r-sm);cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;font-size:.85rem;font-family:inherit;transition:all var(--t);border:${initialTipo==='despesa'?'1.5px solid var(--danger)':'1px solid transparent'};background:${initialTipo==='despesa'?'rgba(239,68,68,.18)':'transparent'};color:${initialTipo==='despesa'?'#fca5a5':'var(--text3)'};font-weight:${initialTipo==='despesa'?'700':'500'};box-shadow:${initialTipo==='despesa'?'0 2px 8px rgba(239,68,68,.25)':'none'};">
                   <span style="font-size:1.05rem;">↓</span>
                   <span>Despesa</span>
                 </button>
-                <button type="button" id="lan-btn-receita" data-fb-click="Lancamentos.setTipo" data-fb-click-n="2" data-fb-click-t0="string" data-fb-click-v0="receita" data-fb-click-t1="auto" data-fb-click-v1="${encodeURIComponent(String(isEdit))}"
+                <button type="button" id="lan-btn-receita" onclick="Lancamentos.setTipo('receita', ${isEdit})"
                   style="padding:10px 14px;border-radius:var(--r-sm);cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;font-size:.85rem;font-family:inherit;transition:all var(--t);border:${initialTipo==='receita'?'1.5px solid var(--success)':'1px solid transparent'};background:${initialTipo==='receita'?'rgba(16,185,129,.18)':'transparent'};color:${initialTipo==='receita'?'#6ee7b7':'var(--text3)'};font-weight:${initialTipo==='receita'?'700':'500'};box-shadow:${initialTipo==='receita'?'0 2px 8px rgba(16,185,129,.25)':'none'};">
                   <span style="font-size:1.05rem;">↑</span>
                   <span>Receita</span>
@@ -329,10 +329,10 @@ const Lancamentos = {
             <div class="form-group" style="margin-bottom:14px;">
               <label class="form-label">Fornecedor / Beneficiário / Favorecido</label>
               <div style="display:flex;gap:8px;align-items:center;">
-                <select class="form-control" id="lan-forn-sel" data-fb-change="Lancamentos._onFornecedorChange" data-fb-change-n="1" data-fb-change-t0="self" style="flex:1;">
+                <select class="form-control" id="lan-forn-sel" onchange="Lancamentos._onFornecedorChange(this)" style="flex:1;">
                   ${typeof Fornecedores !== 'undefined' ? Fornecedores.fornecedorOptions(l.fornecedor_beneficiario||'') : '<option value="">Sem fornecedores cadastrados</option>'}
                 </select>
-                <button type="button" class="btn btn-secondary btn-sm" data-fb-click="Fornecedores.showForm" data-fb-click-n="0" title="Cadastrar novo fornecedor" style="white-space:nowrap;">
+                <button type="button" class="btn btn-secondary btn-sm" onclick="Fornecedores.showForm()" title="Cadastrar novo fornecedor" style="white-space:nowrap;">
                   &#x2795; Novo
                 </button>
               </div>
@@ -342,7 +342,7 @@ const Lancamentos = {
 
             <div class="form-row cols-2" style="margin-bottom:14px;">
               <div class="form-group"><label class="form-label">Categoria *</label><select class="form-control" name="categoria" required>${cats.map(([v,t])=>`<option value="${v}" ${l.categoria===v?'selected':''}>${t}</option>`).join('')}</select></div>
-              <div class="form-group"><label class="form-label">Status *</label><select class="form-control" name="status" id="lan-status-sel" data-fb-change="Lancamentos._onStatusChange" data-fb-change-n="1" data-fb-change-t0="value" required>${statOpts.map(([v,t])=>`<option value="${v}" ${(l.status||statOpts[0][0])===v?'selected':''}>${t}</option>`).join('')}</select></div>
+              <div class="form-group"><label class="form-label">Status *</label><select class="form-control" name="status" id="lan-status-sel" onchange="Lancamentos._onStatusChange(this.value)" required>${statOpts.map(([v,t])=>`<option value="${v}" ${(l.status||statOpts[0][0])===v?'selected':''}>${t}</option>`).join('')}</select></div>
             </div>
 
             <!-- CAMPO: DATA DE PAGAMENTO / RECEBIMENTO -->
@@ -358,10 +358,10 @@ const Lancamentos = {
             <div class="form-group" style="margin-bottom:14px;">
               <label class="form-label">Conta Banc&aacute;ria</label>
               <div style="display:flex;gap:8px;align-items:center;">
-                <select class="form-control" id="lan-conta-sel" data-fb-change="Lancamentos._onContaChange" data-fb-change-n="1" data-fb-change-t0="self" style="flex:1;">
+                <select class="form-control" id="lan-conta-sel" onchange="Lancamentos._onContaChange(this)" style="flex:1;">
                   ${typeof Contas !== 'undefined' ? Contas.contaOptions(contaAtual) : `<option value="">Nenhuma conta</option>`}
                 </select>
-                <button type="button" class="btn btn-secondary btn-sm" data-fb-click="App.navigate" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="contas" title="Cadastrar nova conta" style="white-space:nowrap;">&#x2795; Nova Conta</button>
+                <button type="button" class="btn btn-secondary btn-sm" onclick="App.navigate('contas')" title="Cadastrar nova conta" style="white-space:nowrap;">&#x2795; Nova Conta</button>
               </div>
               <input class="form-control" name="conta_bancaria_manual" id="lan-conta-manual" value="${contaAtual}" placeholder="Ou digite o nome/agência/conta" style="margin-top:6px;display:none;">
             </div>
@@ -389,7 +389,7 @@ const Lancamentos = {
             <!-- SEÇÃO DE ITENS / PRODUTOS -->
             <div id="lan-itens-container" style="display:${initialTipo==='despesa'?'block':'none'};">
               <div style="border:1px solid var(--border);border-radius:10px;margin-top:8px;overflow:hidden;">
-                <div style="background:var(--bg-secondary);padding:10px 14px;display:flex;justify-content:space-between;align-items:center;cursor:pointer" data-fb-click="Lancamentos._toggleItens" data-fb-click-n="0">
+                <div style="background:var(--bg-secondary);padding:10px 14px;display:flex;justify-content:space-between;align-items:center;cursor:pointer" onclick="Lancamentos._toggleItens()">
                   <div style="font-weight:700;font-size:.85rem;color:var(--text);">📦 Itens / Produtos deste Lançamento <span style="font-size:.75rem;font-weight:400;color:var(--text3);">(opcional — para rastrear gastos por produto)</span></div>
                   <span id="itens-toggle-icon" style="font-size:.8rem;color:var(--accent2);">${l.itens?.length?'▲ Recolher':'▼ Expandir'}</span>
                 </div>
@@ -397,15 +397,15 @@ const Lancamentos = {
                   <div id="itens-lista">
                     ${(l.itens||[]).map(it => `
                       <div class="item-row" style="display:grid;grid-template-columns:2fr .7fr .8fr 1fr auto;gap:6px;margin-bottom:8px;align-items:center;">
-                        <input class="form-control item-produto" placeholder="Produto (ex: Cimento CP-II)" value="${it.produto}" data-fb-input="Lancamentos._recalcItem" data-fb-input-n="1" data-fb-input-t0="self" style="font-size:.82rem;">
-                        <input class="form-control item-qtd" type="number" placeholder="Qtd" step="0.01" min="0" value="${it.qtd}" data-fb-input="Lancamentos._recalcItem" data-fb-input-n="1" data-fb-input-t0="self" style="font-size:.82rem;text-align:right;">
+                        <input class="form-control item-produto" placeholder="Produto (ex: Cimento CP-II)" value="${it.produto}" oninput="Lancamentos._recalcItem(this)" style="font-size:.82rem;">
+                        <input class="form-control item-qtd" type="number" placeholder="Qtd" step="0.01" min="0" value="${it.qtd}" oninput="Lancamentos._recalcItem(this)" style="font-size:.82rem;text-align:right;">
                         <input class="form-control item-unidade" placeholder="Un (sc, m², kg)" value="${it.unidade}" style="font-size:.82rem;">
-                        <input class="form-control item-vunit" type="number" placeholder="Valor unit. R$" step="0.01" min="0" value="${it.valor_unit}" data-fb-input="Lancamentos._recalcItem" data-fb-input-n="1" data-fb-input-t0="self" style="font-size:.82rem;text-align:right;">
-                        <button type="button" class="icon-btn" data-fb-click="Patch26Actions.lancamentoRemoveItem" data-fb-click-n="1" data-fb-click-t0="self" title="Remover" style="color:var(--danger);font-size:15px;">🗑️</button>
+                        <input class="form-control item-vunit" type="number" placeholder="Valor unit. R$" step="0.01" min="0" value="${it.valor_unit}" oninput="Lancamentos._recalcItem(this)" style="font-size:.82rem;text-align:right;">
+                        <button type="button" class="icon-btn" onclick="this.closest('.item-row').remove();Lancamentos._atualizarTotalItens()" title="Remover" style="color:var(--danger);font-size:15px;">🗑️</button>
                       </div>
                     `).join('')}
                   </div>
-                  <button type="button" class="btn btn-secondary btn-sm" data-fb-click="Lancamentos._addItem" data-fb-click-n="0" style="margin-top:8px;display:flex;align-items:center;gap:6px;">
+                  <button type="button" class="btn btn-secondary btn-sm" onclick="Lancamentos._addItem()" style="margin-top:8px;display:flex;align-items:center;gap:6px;">
                     ➕ Adicionar Produto
                   </button>
                   <div id="itens-total-display" style="margin-top:10px;font-size:.82rem;color:var(--text3);">${l.itens?.length?`Total dos itens: ${Utils.fmt.currency(l.valor)}`:''}</div>
@@ -419,7 +419,7 @@ const Lancamentos = {
                 <strong style="font-size:.82rem;color:var(--text);">📎 Documentos &amp; Comprovantes</strong>
                 <div style="font-size:.72rem;color:var(--text3);">Anexe PDFs de boletos, comprovantes de PIX ou recibos assinados</div>
               </div>
-              <button type="button" class="btn btn-secondary btn-sm" data-fb-click="Documentos.abrirModal" data-fb-click-n="3" data-fb-click-t0="string" data-fb-click-v0="lancamento" data-fb-click-t1="string" data-fb-click-v1="${encodeURIComponent(String(l.id))}" data-fb-click-t2="string" data-fb-click-v2="Documentos%20do%20Lan%C3%A7amento">
+              <button type="button" class="btn btn-secondary btn-sm" onclick="Documentos.abrirModal('lancamento', '${l.id}', 'Documentos do Lançamento')">
                 Gerenciar Anexos (${typeof Documentos !== 'undefined' ? Documentos.listar('lancamento', l.id).length : 0})
               </button>
             </div>` : ''}
@@ -427,11 +427,11 @@ const Lancamentos = {
         </div>
         <div class="modal-footer" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
           <div>
-            ${!isEdit ? `<button type="button" id="lan-btn-parcelar" class="btn btn-secondary btn-sm" data-fb-click="Lancamentos.showParcelamento" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(initialTipo))}" style="display:flex;align-items:center;gap:5px;border:1px dashed #f59e0b;color:#f59e0b;" title="Dividir em múltiplas parcelas mensais">📅 Parcelar</button>` : ''}
+            ${!isEdit ? `<button type="button" id="lan-btn-parcelar" class="btn btn-secondary btn-sm" onclick="Lancamentos.showParcelamento('${initialTipo}')" style="display:flex;align-items:center;gap:5px;border:1px dashed #f59e0b;color:#f59e0b;" title="Dividir em múltiplas parcelas mensais">📅 Parcelar</button>` : ''}
           </div>
           <div style="display:flex;gap:8px;">
-            <button class="btn btn-secondary" data-fb-click="Utils.closeModal" data-fb-click-n="0">Cancelar</button>
-            <button class="btn btn-primary" data-fb-click="Lancamentos.save" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(id||''))}">${isEdit?'&#x2714; Salvar Altera&ccedil;&otilde;es':'+ Adicionar Lan&ccedil;amento'}</button>
+            <button class="btn btn-secondary" onclick="Utils.closeModal()">Cancelar</button>
+            <button class="btn btn-primary" onclick="Lancamentos.save('${id||''}')">${isEdit?'&#x2714; Salvar Altera&ccedil;&otilde;es':'+ Adicionar Lan&ccedil;amento'}</button>
           </div>
         </div>
       </div>`);
@@ -762,7 +762,7 @@ const Lancamentos = {
       <div class="modal" style="max-width:420px;width:95vw;">
         <div class="modal-header">
           <span class="modal-title">${isRec ? '✓ Confirmar Recebimento' : '✓ Confirmar Pagamento'}</span>
-          <button class="modal-close" data-fb-click="Utils.closeModal" data-fb-click-n="0">✕</button>
+          <button class="modal-close" onclick="Utils.closeModal()">✕</button>
         </div>
         <div class="modal-body" style="padding:16px 20px;">
           <div style="font-weight:700;color:var(--text);margin-bottom:4px;">${Utils.escapeHtml(l.descricao)}</div>
@@ -782,8 +782,8 @@ const Lancamentos = {
           </div>
         </div>
         <div class="modal-footer">
-          <button class="btn btn-secondary" data-fb-click="Utils.closeModal" data-fb-click-n="0">Cancelar</button>
-          <button class="btn btn-success" data-fb-click="Lancamentos.confirmarBaixa" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(l.id))}" style="font-weight:800;">
+          <button class="btn btn-secondary" onclick="Utils.closeModal()">Cancelar</button>
+          <button class="btn btn-success" onclick="Lancamentos.confirmarBaixa('${l.id}')" style="font-weight:800;">
             ✓ Confirmar Baixa
           </button>
         </div>
@@ -855,10 +855,10 @@ const Lancamentos = {
         </span>
       </div>
       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
-        <button class="btn btn-secondary btn-sm" data-fb-click="Lancamentos.carregarMais" data-fb-click-n="1" data-fb-click-t0="number" data-fb-click-v0="30" style="font-weight:700;display:flex;align-items:center;gap:6px;border:1px solid var(--accent);color:var(--accent2);cursor:pointer;">
+        <button class="btn btn-secondary btn-sm" onclick="Lancamentos.carregarMais(30)" style="font-weight:700;display:flex;align-items:center;gap:6px;border:1px solid var(--accent);color:var(--accent2);cursor:pointer;">
           <span>➕ Carregar mais ${prox}</span>
         </button>
-        <button class="btn btn-primary btn-sm" data-fb-click="Lancamentos.carregarTodos" data-fb-click-n="0" style="font-weight:700;display:flex;align-items:center;gap:6px;cursor:pointer;">
+        <button class="btn btn-primary btn-sm" onclick="Lancamentos.carregarTodos()" style="font-weight:700;display:flex;align-items:center;gap:6px;cursor:pointer;">
           <span>⚡ Carregar restante (${restantes})</span>
         </button>
       </div>
@@ -939,11 +939,11 @@ const Lancamentos = {
     const vunitEsc = Utils.escapeHtml(item?.valor_unit ?? '');
     row.innerHTML = `
       <input type="hidden" class="item-produto-id" value="${prodIdEsc}">
-      <input class="form-control item-produto" list="${prodsDatalistId}" placeholder="Produto (ex: Cimento CP-II)" value="${prodEsc}" data-fb-input="Lancamentos._onProdutoInput" data-fb-input-n="1" data-fb-input-t0="self" style="font-size:.82rem;">
-      <input class="form-control item-qtd" type="number" placeholder="Qtd" step="0.01" min="0" value="${qtdEsc}" data-fb-input="Lancamentos._recalcItem" data-fb-input-n="1" data-fb-input-t0="self" style="font-size:.82rem;text-align:right;">
+      <input class="form-control item-produto" list="${prodsDatalistId}" placeholder="Produto (ex: Cimento CP-II)" value="${prodEsc}" oninput="Lancamentos._onProdutoInput(this)" style="font-size:.82rem;">
+      <input class="form-control item-qtd" type="number" placeholder="Qtd" step="0.01" min="0" value="${qtdEsc}" oninput="Lancamentos._recalcItem(this)" style="font-size:.82rem;text-align:right;">
       <input class="form-control item-unidade" placeholder="Un (sc, m², kg)" value="${unEsc}" style="font-size:.82rem;">
-      <input class="form-control item-vunit" type="number" placeholder="Valor unit. R$" step="0.01" min="0" value="${vunitEsc}" data-fb-input="Lancamentos._recalcItem" data-fb-input-n="1" data-fb-input-t0="self" style="font-size:.82rem;text-align:right;">
-      <button type="button" class="icon-btn" data-fb-click="Patch26Actions.lancamentoRemoveItem" data-fb-click-n="1" data-fb-click-t0="self" title="Remover" style="color:var(--danger);font-size:15px;">🗑️</button>
+      <input class="form-control item-vunit" type="number" placeholder="Valor unit. R$" step="0.01" min="0" value="${vunitEsc}" oninput="Lancamentos._recalcItem(this)" style="font-size:.82rem;text-align:right;">
+      <button type="button" class="icon-btn" onclick="this.closest('.item-row').remove();Lancamentos._atualizarTotalItens()" title="Remover" style="color:var(--danger);font-size:15px;">🗑️</button>
     `;
     lista.appendChild(row);
     if (item?.produto) this._atualizarTotalItens();
@@ -1005,7 +1005,7 @@ const Lancamentos = {
       <div class="modal" style="max-width:560px;">
         <div class="modal-header">
           <span class="modal-title">📦 Produtos — ${Utils.escapeHtml(l.descricao)}</span>
-          <button class="modal-close" data-fb-click="Utils.closeModal" data-fb-click-n="0">✕</button>
+          <button class="modal-close" onclick="Utils.closeModal()">✕</button>
         </div>
         <div class="modal-body">
           <table style="width:100%;border-collapse:collapse;font-size:.84rem;">
@@ -1023,8 +1023,8 @@ const Lancamentos = {
           </table>
         </div>
         <div class="modal-footer">
-          <button class="btn btn-secondary" data-fb-click="Utils.closeModal" data-fb-click-n="0">Fechar</button>
-          <button class="btn btn-primary" data-fb-click="Patch26Actions.lancamentoCloseAndForm" data-fb-click-n="2" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(l.tipo))}" data-fb-click-t1="string" data-fb-click-v1="${encodeURIComponent(String(l.id))}">✏️ Editar Lançamento</button>
+          <button class="btn btn-secondary" onclick="Utils.closeModal()">Fechar</button>
+          <button class="btn btn-primary" onclick="Utils.closeModal();Lancamentos.showForm('${l.tipo}','${l.id}')">✏️ Editar Lançamento</button>
         </div>
       </div>`);
   },
@@ -1097,11 +1097,11 @@ const Lancamentos = {
             const vEsc = Utils.escapeHtml(it.valor_unit ?? '');
             return `
             <div class="item-row" style="display:grid;grid-template-columns:2fr .7fr .8fr 1fr auto;gap:6px;margin-bottom:8px;align-items:center;">
-              <input class="form-control item-produto" placeholder="Produto" value="${pEsc}" data-fb-input="Lancamentos._recalcItem" data-fb-input-n="1" data-fb-input-t0="self" style="font-size:.82rem;">
-              <input class="form-control item-qtd" type="number" placeholder="Qtd" step="0.01" min="0" value="${qEsc}" data-fb-input="Lancamentos._recalcItem" data-fb-input-n="1" data-fb-input-t0="self" style="font-size:.82rem;text-align:right;">
+              <input class="form-control item-produto" placeholder="Produto" value="${pEsc}" oninput="Lancamentos._recalcItem(this)" style="font-size:.82rem;">
+              <input class="form-control item-qtd" type="number" placeholder="Qtd" step="0.01" min="0" value="${qEsc}" oninput="Lancamentos._recalcItem(this)" style="font-size:.82rem;text-align:right;">
               <input class="form-control item-unidade" placeholder="Un" value="${uEsc}" style="font-size:.82rem;">
-              <input class="form-control item-vunit" type="number" placeholder="V. unit." step="0.01" min="0" value="${vEsc}" data-fb-input="Lancamentos._recalcItem" data-fb-input-n="1" data-fb-input-t0="self" style="font-size:.82rem;text-align:right;">
-              <button type="button" class="icon-btn" data-fb-click="Patch26Actions.lancamentoRemoveItem" data-fb-click-n="1" data-fb-click-t0="self" title="Remover" style="color:var(--danger);font-size:15px;">🗑️</button>
+              <input class="form-control item-vunit" type="number" placeholder="V. unit." step="0.01" min="0" value="${vEsc}" oninput="Lancamentos._recalcItem(this)" style="font-size:.82rem;text-align:right;">
+              <button type="button" class="icon-btn" onclick="this.closest('.item-row').remove();Lancamentos._atualizarTotalItens()" title="Remover" style="color:var(--danger);font-size:15px;">🗑️</button>
             </div>`;
           }).join('');
           this._atualizarTotalItens();

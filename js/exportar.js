@@ -22,29 +22,29 @@ const Exportar = {
         <p style="color:var(--text2);font-size:.84rem;margin-bottom:14px">Exporta&ccedil;&atilde;o direta com nome personalizado e organiza&ccedil;&atilde;o em abas.</p>
         <div class="form-group" style="margin-bottom:14px;">
           <label class="form-label">Selecionar Obra</label>
-          <select class="form-control" id="exp-obra" data-fb-change="Exportar.onObraChange" data-fb-change-n="0">
+          <select class="form-control" id="exp-obra" onchange="Exportar.onObraChange()">
             <option value="todas">Todas as Obras (Vis&atilde;o Geral)</option>
             ${cs.map(c=>`<option value="${esc(c.id)}" ${c.id===obraId?'selected':''}>${esc(c.nome)} &mdash; ${esc(c.cidade)}/${esc(c.estado)}</option>`).join('')}
           </select>
         </div>
         <div style="display:flex;flex-direction:column;gap:8px;">
-          <button class="btn btn-success btn-lg btn-block" data-fb-click="Exportar.exportarExcel" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="completo" style="display:flex;align-items:center;justify-content:center;gap:8px;">
+          <button class="btn btn-success btn-lg btn-block" onclick="Exportar.exportarExcel('completo')" style="display:flex;align-items:center;justify-content:center;gap:8px;">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
             &#x1F4CA; Baixar Relat&oacute;rio Completo (.xlsx)
           </button>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
-            <button class="btn btn-secondary btn-sm" data-fb-click="Exportar.exportarExcel" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="lancamentos">&#x1F4B0; Lan&ccedil;amentos</button>
-            <button class="btn btn-secondary btn-sm" data-fb-click="Exportar.exportarExcel" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="notas">&#x1F9FE; Notas Fiscais</button>
-            <button class="btn btn-secondary btn-sm" data-fb-click="Exportar.exportarExcel" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="medicoes">&#x1F528; Medi&ccedil;&otilde;es Caixa</button>
-            <button class="btn btn-secondary btn-sm" data-fb-click="Exportar.exportarExcel" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="orcamentos">&#x1F4CB; Previsto &times; Real.</button>
+            <button class="btn btn-secondary btn-sm" onclick="Exportar.exportarExcel('lancamentos')">&#x1F4B0; Lan&ccedil;amentos</button>
+            <button class="btn btn-secondary btn-sm" onclick="Exportar.exportarExcel('notas')">&#x1F9FE; Notas Fiscais</button>
+            <button class="btn btn-secondary btn-sm" onclick="Exportar.exportarExcel('medicoes')">&#x1F528; Medi&ccedil;&otilde;es Caixa</button>
+            <button class="btn btn-secondary btn-sm" onclick="Exportar.exportarExcel('orcamentos')">&#x1F4CB; Previsto &times; Real.</button>
           </div>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
-            <button class="btn btn-secondary btn-sm" data-fb-click="Exportar.exportarExcel" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="dre">📊 DRE Gerencial (.xlsx)</button>
-            <button class="btn btn-secondary btn-sm" data-fb-click="Exportar.exportarExcel" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="fluxo">📈 Fluxo 90d (.xlsx)</button>
+            <button class="btn btn-secondary btn-sm" onclick="Exportar.exportarExcel('dre')">📊 DRE Gerencial (.xlsx)</button>
+            <button class="btn btn-secondary btn-sm" onclick="Exportar.exportarExcel('fluxo')">📈 Fluxo 90d (.xlsx)</button>
           </div>
-          <button class="btn btn-secondary btn-sm btn-block" data-fb-click="Exportar.exportarExcel" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="escritorio">&#x1F3E2; Despesas Escrit&oacute;rio (.xlsx)</button>
-          <button class="btn btn-secondary btn-sm btn-block" data-fb-click="Exportar.exportarExcel" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="sinapi">&#x1F3D7;&#xFE0F; Or&ccedil;amentos SINAPI (.xlsx)</button>
-          <button class="btn btn-secondary btn-sm btn-block" data-fb-click="Exportar.exportarExcel" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="engenharia" style="font-weight:700;border-color:var(--accent);color:var(--accent2);">🏗️ Dossiê de Engenharia (Cronograma + ABC + BDI) (.xlsx)</button>
+          <button class="btn btn-secondary btn-sm btn-block" onclick="Exportar.exportarExcel('escritorio')">&#x1F3E2; Despesas Escrit&oacute;rio (.xlsx)</button>
+          <button class="btn btn-secondary btn-sm btn-block" onclick="Exportar.exportarExcel('sinapi')">&#x1F3D7;&#xFE0F; Or&ccedil;amentos SINAPI (.xlsx)</button>
+          <button class="btn btn-secondary btn-sm btn-block" onclick="Exportar.exportarExcel('engenharia')" style="font-weight:700;border-color:var(--accent);color:var(--accent2);">🏗️ Dossiê de Engenharia (Cronograma + ABC + BDI) (.xlsx)</button>
         </div>
       </div>
 
@@ -54,7 +54,7 @@ const Exportar = {
         <p style="color:var(--text2);font-size:.84rem;margin-bottom:14px">Documento executivo com cabe&ccedil;alho institucional de ${empresaNome} e dados da obra.</p>
         <div class="form-group" style="margin-bottom:14px;">
           <label class="form-label">Modelo do Relat&oacute;rio</label>
-          <select class="form-control" id="exp-preview-type" data-fb-change="Exportar.preview" data-fb-change-n="1" data-fb-change-t0="value">
+          <select class="form-control" id="exp-preview-type" onchange="Exportar.preview(this.value)">
             <option value="completo">&#x1F4CA; Relat&oacute;rio Financeiro Executivo</option>
             <option value="engenharia">🏗️ Dossiê de Engenharia (Cronograma, ABC &amp; BDI)</option>
             <option value="dre">📊 DRE Gerencial (Resultado &amp; Margens)</option>
@@ -68,11 +68,11 @@ const Exportar = {
           </select>
         </div>
         <div style="display:flex;flex-direction:column;gap:8px;">
-          <button class="btn btn-primary btn-lg btn-block" data-fb-click="Exportar.imprimirRelatorio" data-fb-click-n="0" style="display:flex;align-items:center;justify-content:center;gap:8px;">
+          <button class="btn btn-primary btn-lg btn-block" onclick="Exportar.imprimirRelatorio()" style="display:flex;align-items:center;justify-content:center;gap:8px;">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
             &#x1F5A8;&#xFE0F; Imprimir / Salvar em PDF (A4)
           </button>
-          <button class="btn btn-secondary btn-sm btn-block" data-fb-click="Exportar.abrirEmNovaAba" data-fb-click-n="0">&#x1F517; Abrir Documento em Nova Guia</button>
+          <button class="btn btn-secondary btn-sm btn-block" onclick="Exportar.abrirEmNovaAba()">&#x1F517; Abrir Documento em Nova Guia</button>
         </div>
       </div>
     </div>
@@ -85,8 +85,8 @@ const Exportar = {
           <div style="font-size:.78rem;color:var(--text3);margin-top:2px;">Exatamente como ser&aacute; emitido em PDF / Impress&atilde;o</div>
         </div>
         <div style="display:flex;gap:8px;">
-          <button class="btn btn-sm btn-secondary" data-fb-click="Patch26Actions.exportarPreview" data-fb-click-n="0">&#x1F504; Atualizar</button>
-          <button class="btn btn-sm btn-primary" data-fb-click="Exportar.imprimirRelatorio" data-fb-click-n="0">&#x1F5A8;&#xFE0F; Imprimir Agora</button>
+          <button class="btn btn-sm btn-secondary" onclick="Exportar.preview(Exportar._currentPreview)">&#x1F504; Atualizar</button>
+          <button class="btn btn-sm btn-primary" onclick="Exportar.imprimirRelatorio()">&#x1F5A8;&#xFE0F; Imprimir Agora</button>
         </div>
       </div>
 

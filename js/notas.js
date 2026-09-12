@@ -12,12 +12,12 @@ const Notas = {
     <div class="page-header">
       <div><h1 class="page-title">🧾 Notas Fiscais</h1><p class="page-sub">${nfs.length} NFs cadastradas</p></div>
       <div class="page-actions">
-        <button class="btn btn-secondary" data-fb-click="Notas.triggerXmlImport" data-fb-click-n="0">
+        <button class="btn btn-secondary" onclick="Notas.triggerXmlImport()">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
           Importar XML NF-e
         </button>
-        <input type="file" id="xml-nfe-input" accept=".xml" multiple style="display:none" data-fb-change="Notas.handleXmlFiles" data-fb-change-n="1" data-fb-change-t0="event">
-        <button class="btn btn-primary" data-fb-click="Notas.showForm" data-fb-click-n="0">+ Nova NF</button>
+        <input type="file" id="xml-nfe-input" accept=".xml" multiple style="display:none" onchange="Notas.handleXmlFiles(event)">
+        <button class="btn btn-primary" onclick="Notas.showForm()">+ Nova NF</button>
       </div>
     </div>
 
@@ -113,7 +113,7 @@ const Notas = {
       return `<tr>
         <td style="font-weight:800;color:var(--accent2)">
           ${esc(n.numero_nf || '—')}
-          ${n.itens && n.itens.length ? `<div style="font-size:.7rem;color:var(--accent2);cursor:pointer;margin-top:2px;font-weight:400;" data-fb-click="Notas.verItens" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(esc(n.id)))}" title="Ver produtos desta NF">📦 ${n.itens.length} item(ns)</div>` : ''}
+          ${n.itens && n.itens.length ? `<div style="font-size:.7rem;color:var(--accent2);cursor:pointer;margin-top:2px;font-weight:400;" onclick="Notas.verItens('${esc(n.id)}')" title="Ver produtos desta NF">📦 ${n.itens.length} item(ns)</div>` : ''}
         </td>
         <td style="white-space:nowrap;font-size:.8rem">${Utils.fmt.date(n.data_emissao)}</td>
         <td style="white-space:nowrap;font-size:.8rem;color:${n.status==='vencida'?'var(--danger)':'inherit'}">${Utils.fmt.date(n.data_vencimento)}</td>
@@ -130,11 +130,11 @@ const Notas = {
         <td>${l?`<span style="font-size:.75rem;color:var(--text2)" title="${esc(l.descricao)}">✅ ${esc(l.descricao.slice(0,20))}...</span>`:'<span style="font-size:.72rem;color:var(--text3)">Não vinculada</span>'}</td>
         <td style="text-align:center;"><div style="display:flex;gap:4px;justify-content:center;align-items:center;">
           ${!isPaga ? `
-          <button class="btn btn-sm btn-success" data-fb-click="Notas.marcarPaga" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(esc(n.id)))}" title="Dar Baixa / Confirmar Pagamento da NF" style="font-size:.72rem;padding:3px 7px;">
+          <button class="btn btn-sm btn-success" onclick="Notas.marcarPaga('${esc(n.id)}')" title="Dar Baixa / Confirmar Pagamento da NF" style="font-size:.72rem;padding:3px 7px;">
             ✓ Pagar
           </button>` : ''}
-          <button class="icon-btn btn-sm" data-fb-click="Notas.showForm" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(esc(n.id)))}" style="font-size:12px">✏️</button>
-          <button class="icon-btn btn-sm" data-fb-click="Notas.del" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(esc(n.id)))}" style="font-size:12px;color:var(--danger)">🗑️</button>
+          <button class="icon-btn btn-sm" onclick="Notas.showForm('${esc(n.id)}')" style="font-size:12px">✏️</button>
+          <button class="icon-btn btn-sm" onclick="Notas.del('${esc(n.id)}')" style="font-size:12px;color:var(--danger)">🗑️</button>
         </div></td>
       </tr>`;
     }).join('');
@@ -167,7 +167,7 @@ const Notas = {
       <div class="modal" style="max-width:580px;">
         <div class="modal-header">
           <span class="modal-title">📦 Itens — NF ${esc(n.numero_nf)} (${esc(n.emitente)})</span>
-          <button class="modal-close" data-fb-click="Utils.closeModal" data-fb-click-n="0">✕</button>
+          <button class="modal-close" onclick="Utils.closeModal()">✕</button>
         </div>
         <div class="modal-body">
           <table style="width:100%;border-collapse:collapse;font-size:.84rem;">
@@ -185,8 +185,8 @@ const Notas = {
           </table>
         </div>
         <div class="modal-footer">
-          <button class="btn btn-secondary" data-fb-click="Utils.closeModal" data-fb-click-n="0">Fechar</button>
-          <button class="btn btn-primary" data-fb-click="Patch26Actions.notasCloseProducts" data-fb-click-n="0">Ver no Módulo Produtos</button>
+          <button class="btn btn-secondary" onclick="Utils.closeModal()">Fechar</button>
+          <button class="btn btn-primary" onclick="Utils.closeModal();App.navigate('produtos')">Ver no Módulo Produtos</button>
         </div>
       </div>`);
   },
@@ -201,7 +201,7 @@ const Notas = {
       <div class="modal" style="max-width:640px">
         <div class="modal-header">
           <span class="modal-title">${id?'✏️ Editar Nota Fiscal':'🧾 Nova Nota Fiscal'}</span>
-          <button class="modal-close" data-fb-click="Utils.closeModal" data-fb-click-n="0">✕</button>
+          <button class="modal-close" onclick="Utils.closeModal()">✕</button>
         </div>
         <div class="modal-body">
           <form id="f-nf">
@@ -220,8 +220,8 @@ const Notas = {
               <div class="form-group"><label class="form-label">Data Vencimento</label><input class="form-control" type="date" name="data_vencimento" value="${n.data_vencimento||''}"></div>
             </div>
             <div class="form-row cols-3" style="margin-bottom:14px;">
-              <div class="form-group"><label class="form-label">Valor Bruto *</label><div class="input-prefix"><span class="input-pfx-txt">R$</span><input name="valor_bruto" type="number" value="${n.valor_bruto||''}" step="0.01" min="0" required id="nf-vb" data-fb-input="Notas.calcLiq" data-fb-input-n="0"></div></div>
-              <div class="form-group"><label class="form-label">Impostos (R$)</label><div class="input-prefix"><span class="input-pfx-txt">R$</span><input name="impostos" type="number" value="${n.impostos||0}" step="0.01" min="0" id="nf-imp" data-fb-input="Notas.calcLiq" data-fb-input-n="0"></div></div>
+              <div class="form-group"><label class="form-label">Valor Bruto *</label><div class="input-prefix"><span class="input-pfx-txt">R$</span><input name="valor_bruto" type="number" value="${n.valor_bruto||''}" step="0.01" min="0" required id="nf-vb" oninput="Notas.calcLiq()"></div></div>
+              <div class="form-group"><label class="form-label">Impostos (R$)</label><div class="input-prefix"><span class="input-pfx-txt">R$</span><input name="impostos" type="number" value="${n.impostos||0}" step="0.01" min="0" id="nf-imp" oninput="Notas.calcLiq()"></div></div>
               <div class="form-group"><label class="form-label">Valor Líquido</label><div class="input-prefix"><span class="input-pfx-txt">R$</span><input name="valor_liquido" type="number" value="${n.valor_liquido||''}" step="0.01" id="nf-vl" readonly style="background:var(--bg-secondary)"></div></div>
             </div>
             <div class="form-row cols-3" style="margin-bottom:14px;">
@@ -235,7 +235,7 @@ const Notas = {
                 <option value="imposto_simples" ${n.categoria==='imposto_simples'?'selected':''}>🏛️ DAS Simples Nacional</option>
                 <option value="outro" ${n.categoria==='outro'?'selected':''}>📦 Outro</option>
               </select></div>
-              <div class="form-group"><label class="form-label">Status</label><select class="form-control" name="status" id="nf-status-sel" data-fb-change="Notas._onStatusChange" data-fb-change-n="1" data-fb-change-t0="value">
+              <div class="form-group"><label class="form-label">Status</label><select class="form-control" name="status" id="nf-status-sel" onchange="Notas._onStatusChange(this.value)">
                 <option value="pendente" ${(n.status||'pendente')==='pendente'?'selected':''}>⏳ Pendente</option>
                 <option value="paga" ${n.status==='paga'?'selected':''}>✓ Paga</option>
                 <option value="vencida" ${n.status==='vencida'?'selected':''}>⚠ Vencida</option>
@@ -260,8 +260,8 @@ const Notas = {
           </form>
         </div>
         <div class="modal-footer">
-          <button class="btn btn-secondary" data-fb-click="Utils.closeModal" data-fb-click-n="0">Cancelar</button>
-          <button class="btn btn-primary" data-fb-click="Notas.save" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(id||''))}">${id?'✔ Salvar':'+ Adicionar NF'}</button>
+          <button class="btn btn-secondary" onclick="Utils.closeModal()">Cancelar</button>
+          <button class="btn btn-primary" onclick="Notas.save('${id||''}')">${id?'✔ Salvar':'+ Adicionar NF'}</button>
         </div>
       </div>`);
     this.calcLiq();
@@ -332,7 +332,7 @@ const Notas = {
       <div class="modal" style="max-width:420px;width:95vw;">
         <div class="modal-header">
           <span class="modal-title">✓ Confirmar Pagamento da NF</span>
-          <button class="modal-close" data-fb-click="Utils.closeModal" data-fb-click-n="0">✕</button>
+          <button class="modal-close" onclick="Utils.closeModal()">✕</button>
         </div>
         <div class="modal-body" style="padding:16px 20px;">
           <div style="font-weight:700;color:var(--text);margin-bottom:4px;">NF ${n.numero_nf} &mdash; ${n.emitente}</div>
@@ -352,8 +352,8 @@ const Notas = {
           </div>
         </div>
         <div class="modal-footer">
-          <button class="btn btn-secondary" data-fb-click="Utils.closeModal" data-fb-click-n="0">Cancelar</button>
-          <button class="btn btn-success" data-fb-click="Notas.confirmarPagamento" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(n.id))}" style="font-weight:800;">
+          <button class="btn btn-secondary" onclick="Utils.closeModal()">Cancelar</button>
+          <button class="btn btn-success" onclick="Notas.confirmarPagamento('${n.id}')" style="font-weight:800;">
             ✓ Confirmar Pagamento
           </button>
         </div>
@@ -564,14 +564,13 @@ const Notas = {
     ok.forEach(r => { r.duplicate = r.data.chave_nfe && existingChaves.has(r.data.chave_nfe); });
 
     const toImport = ok.filter(r => !r.duplicate);
-    this._pendingXmlImport = toImport.map(r => r.data);
     const dups = ok.filter(r => r.duplicate);
 
     Utils.showModal(`
       <div class="modal modal-xl">
         <div class="modal-header">
           <span class="modal-title">📥 Importar XML NF-e — Prévia</span>
-          <button class="modal-close" data-fb-click="Utils.closeModal" data-fb-click-n="0">✕</button>
+          <button class="modal-close" onclick="Utils.closeModal()">✕</button>
         </div>
         <div class="modal-body">
           ${err.length ? `<div style="padding:12px 16px;background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.3);border-radius:8px;margin-bottom:14px;font-size:.82rem">
@@ -611,14 +610,10 @@ const Notas = {
           </div>`}
         </div>
         <div class="modal-footer">
-          <button class="btn btn-secondary" data-fb-click="Utils.closeModal" data-fb-click-n="0">Cancelar</button>
-          ${toImport.length > 0 ? `<button class="btn btn-primary" data-fb-click="Notas.confirmPendingXmlImport" data-fb-click-n="0">✅ Importar ${toImport.length} NF(s) e Cadastrar Produtos</button>` : ''}
+          <button class="btn btn-secondary" onclick="Utils.closeModal()">Cancelar</button>
+          ${toImport.length > 0 ? `<button class="btn btn-primary" onclick="Notas.confirmXmlImport(${JSON.stringify(toImport.map(r=>r.data)).replace(/"/g,'&quot;')})">✅ Importar ${toImport.length} NF(s) e Cadastrar Produtos</button>` : ''}
         </div>
       </div>`);
-  },
-
-  confirmPendingXmlImport() {
-    return this.confirmXmlImport(this._pendingXmlImport || []);
   },
 
   confirmXmlImport(nfsData) {

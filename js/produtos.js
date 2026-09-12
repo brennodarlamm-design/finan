@@ -37,10 +37,10 @@ const Produtos = {
         <p class="page-sub">Cadastro e rastreamento de consumo de materiais por obra</p>
       </div>
       <div class="page-actions" style="display:flex;gap:8px;flex-wrap:wrap;">
-        <button class="btn btn-secondary btn-sm" data-fb-click="Produtos.showAnalise" data-fb-click-n="0" style="display:flex;align-items:center;gap:6px;">
+        <button class="btn btn-secondary btn-sm" onclick="Produtos.showAnalise()" style="display:flex;align-items:center;gap:6px;">
           📊 Análise de Consumo
         </button>
-        <button class="btn btn-primary" data-fb-click="Produtos.showForm" data-fb-click-n="0">+ Novo Produto</button>
+        <button class="btn btn-primary" onclick="Produtos.showForm()">+ Novo Produto</button>
       </div>
     </div>
 
@@ -67,11 +67,11 @@ const Produtos = {
       <div class="filter-group" style="flex:1">
         <label class="filter-label">Buscar</label>
         <div class="search-bar"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
-        <input class="form-control" id="prod-srch" placeholder="Nome ou código..." data-fb-input="Produtos._refresh" data-fb-input-n="1" data-fb-input-t0="bool" data-fb-input-v0="true"></div>
+        <input class="form-control" id="prod-srch" placeholder="Nome ou código..." oninput="Produtos._refresh(true)"></div>
       </div>
       <div class="filter-group">
         <label class="filter-label">Categoria</label>
-        <select class="form-control" id="prod-cat" style="min-width:160px" data-fb-change="Produtos._refresh" data-fb-change-n="1" data-fb-change-t0="bool" data-fb-change-v0="true">
+        <select class="form-control" id="prod-cat" style="min-width:160px" onchange="Produtos._refresh(true)">
           <option value="">Todas</option>
           ${this.CATEGORIAS.map(c => `<option value="${c.value}">${c.label}</option>`).join('')}
         </select>
@@ -128,10 +128,10 @@ const Produtos = {
         </span>
       </div>
       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
-        <button class="btn btn-secondary btn-sm" data-fb-click="Produtos.carregarMais" data-fb-click-n="1" data-fb-click-t0="number" data-fb-click-v0="30" style="font-weight:700;display:flex;align-items:center;gap:6px;border:1px solid var(--accent);color:var(--accent2);cursor:pointer;">
+        <button class="btn btn-secondary btn-sm" onclick="Produtos.carregarMais(30)" style="font-weight:700;display:flex;align-items:center;gap:6px;border:1px solid var(--accent);color:var(--accent2);cursor:pointer;">
           <span>➕ Carregar mais ${prox}</span>
         </button>
-        <button class="btn btn-primary btn-sm" data-fb-click="Produtos.carregarTodos" data-fb-click-n="0" style="font-weight:700;display:flex;align-items:center;gap:6px;cursor:pointer;">
+        <button class="btn btn-primary btn-sm" onclick="Produtos.carregarTodos()" style="font-weight:700;display:flex;align-items:center;gap:6px;cursor:pointer;">
           <span>⚡ Carregar restante (${restantes})</span>
         </button>
       </div>
@@ -176,9 +176,9 @@ const Produtos = {
         <td style="text-align:right;font-weight:800;color:${a.total > 0 ? 'var(--danger)' : 'var(--text3)'};">${a.total > 0 ? Utils.fmt.currency(a.total) : '—'}</td>
         <td style="text-align:center;">
           <div style="display:flex;gap:4px;justify-content:center;">
-            ${a.compras > 0 ? `<button class="btn btn-sm btn-secondary" data-fb-click="Produtos.verHistorico" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(decodeURIComponent(safeId)))}" title="Ver histórico" style="font-size:.72rem;padding:3px 7px;">📋 ${a.compras}</button>` : ''}
-            <button class="icon-btn" data-fb-click="Produtos.showForm" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(decodeURIComponent(safeId)))}" title="Editar" style="font-size:13px;">✏️</button>
-            <button class="icon-btn" data-fb-click="Produtos.del" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(decodeURIComponent(safeId)))}" title="Excluir" style="font-size:13px;color:var(--danger);">🗑️</button>
+            ${a.compras > 0 ? `<button class="btn btn-sm btn-secondary" onclick="Produtos.verHistorico(decodeURIComponent('${safeId}'))" title="Ver histórico" style="font-size:.72rem;padding:3px 7px;">📋 ${a.compras}</button>` : ''}
+            <button class="icon-btn" onclick="Produtos.showForm(decodeURIComponent('${safeId}'))" title="Editar" style="font-size:13px;">✏️</button>
+            <button class="icon-btn" onclick="Produtos.del(decodeURIComponent('${safeId}'))" title="Excluir" style="font-size:13px;color:var(--danger);">🗑️</button>
           </div>
         </td>
       </tr>`;
@@ -196,7 +196,7 @@ const Produtos = {
       <div class="modal" style="max-width:520px;">
         <div class="modal-header">
           <span class="modal-title">${isEdit ? '✏️ Editar Produto' : '📦 Novo Produto'}</span>
-          <button class="modal-close" data-fb-click="Utils.closeModal" data-fb-click-n="0">✕</button>
+          <button class="modal-close" onclick="Utils.closeModal()">✕</button>
         </div>
         <div class="modal-body">
           <form id="f-prod">
@@ -238,8 +238,8 @@ const Produtos = {
           </form>
         </div>
         <div class="modal-footer">
-          <button class="btn btn-secondary" data-fb-click="Utils.closeModal" data-fb-click-n="0">Cancelar</button>
-          <button class="btn btn-primary" data-fb-click="Produtos.save" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(decodeURIComponent(safeId)))}">${isEdit ? '✔ Salvar' : '+ Cadastrar'}</button>
+          <button class="btn btn-secondary" onclick="Utils.closeModal()">Cancelar</button>
+          <button class="btn btn-primary" onclick="Produtos.save(decodeURIComponent('${safeId}'))">${isEdit ? '✔ Salvar' : '+ Cadastrar'}</button>
         </div>
       </div>`);
   },
@@ -349,7 +349,7 @@ const Produtos = {
       const det = p.historico.sort((a, b) => (b.data || '').localeCompare(a.data || '')).slice(0, 5)
         .map(h => `<li style="font-size:.72rem;color:var(--text3);">${Utils.fmt.date(h.data)} — ${this._esc(h.desc)} (${h.qtd} ${this._esc(p.unidade)} = ${Utils.fmt.currency(h.valor)}) <em>${this._esc(h.fonte)}</em></li>`).join('');
       return `
-        <tr style="background:${i%2===0?'var(--bg-card)':'var(--bg-secondary)'};cursor:pointer;" data-fb-click="Patch26Actions.toggleNextRow" data-fb-click-n="1" data-fb-click-t0="self">
+        <tr style="background:${i%2===0?'var(--bg-card)':'var(--bg-secondary)'};cursor:pointer;" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'table-row':'none'">
           <td style="padding:10px 12px;"><div style="font-weight:700;color:var(--text);">${this._esc(p.nome)}</div><div style="font-size:.72rem;color:var(--text3);">${obras}</div></td>
           <td style="padding:10px 12px;text-align:right;color:var(--text2);font-size:.82rem;">${p.qtd_total.toLocaleString('pt-BR',{maximumFractionDigits:2})} ${this._esc(p.unidade)}</td>
           <td style="padding:10px 12px;text-align:right;">
@@ -366,7 +366,7 @@ const Produtos = {
       <div class="modal" style="max-width:740px;">
         <div class="modal-header">
           <span class="modal-title">📊 Análise de Consumo por Produto</span>
-          <button class="modal-close" data-fb-click="Utils.closeModal" data-fb-click-n="0">✕</button>
+          <button class="modal-close" onclick="Utils.closeModal()">✕</button>
         </div>
         <div class="modal-body" style="padding:0;">
           <div style="padding:14px 18px;background:var(--bg-secondary);border-bottom:1px solid var(--border);display:flex;gap:12px;flex-wrap:wrap;">
@@ -375,7 +375,7 @@ const Produtos = {
             <div style="flex:1;min-width:130px;"><div style="font-size:.72rem;color:var(--text3);text-transform:uppercase;font-weight:700;">Total de Compras</div><div style="font-size:1.3rem;font-weight:900;color:var(--text);">${analise.reduce((s,p)=>s+p.compras,0)}</div></div>
           </div>
           <div style="padding:10px 18px;border-bottom:1px solid var(--border);">
-            <input class="form-control" placeholder="🔍 Filtrar produto..." data-fb-input="Produtos._filtrarAnalise" data-fb-input-n="1" data-fb-input-t0="value" style="max-width:280px;font-size:.84rem;">
+            <input class="form-control" placeholder="🔍 Filtrar produto..." oninput="Produtos._filtrarAnalise(this.value)" style="max-width:280px;font-size:.84rem;">
           </div>
           <div style="overflow-y:auto;max-height:400px;">
             <table style="width:100%;border-collapse:collapse;font-size:.84rem;">
@@ -394,8 +394,8 @@ const Produtos = {
           <div style="padding:8px 18px;font-size:.72rem;color:var(--text3);border-top:1px solid var(--border);">💡 Clique em um produto para ver o histórico detalhado.</div>
         </div>
         <div class="modal-footer">
-          <button class="btn btn-secondary" data-fb-click="Utils.closeModal" data-fb-click-n="0">Fechar</button>
-          <button class="btn btn-primary" data-fb-click="Patch26Actions.notasCloseProducts" data-fb-click-n="0">Gerenciar Produtos</button>
+          <button class="btn btn-secondary" onclick="Utils.closeModal()">Fechar</button>
+          <button class="btn btn-primary" onclick="Utils.closeModal();App.navigate('produtos')">Gerenciar Produtos</button>
         </div>
       </div>`);
   },
@@ -438,7 +438,7 @@ const Produtos = {
     const footerAviso = totalHistorico > historicoVisivel.length
       ? `<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 18px;background:var(--bg-secondary);border-top:1px solid var(--border);font-size:.78rem;">
            <span style="color:var(--text3);">Exibindo os <strong>${historicoVisivel.length}</strong> mais recentes de <strong>${totalHistorico}</strong> lançamentos</span>
-           <button class="btn btn-secondary btn-sm" data-fb-click="Produtos.verHistorico" data-fb-click-n="2" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(decodeURIComponent(safeProdId)))}" data-fb-click-t1="number" data-fb-click-v1="0" style="font-size:.74rem;">Ver todos (${totalHistorico})</button>
+           <button class="btn btn-secondary btn-sm" onclick="Produtos.verHistorico(decodeURIComponent('${safeProdId}'), 0)" style="font-size:.74rem;">Ver todos (${totalHistorico})</button>
          </div>`
       : '';
 
@@ -446,7 +446,7 @@ const Produtos = {
       <div class="modal" style="max-width:700px;">
         <div class="modal-header">
           <span class="modal-title">📋 Histórico — ${this._esc(p.nome)}</span>
-          <button class="modal-close" data-fb-click="Utils.closeModal" data-fb-click-n="0">✕</button>
+          <button class="modal-close" onclick="Utils.closeModal()">✕</button>
         </div>
         <div class="modal-body" style="padding:0;">
           <div style="padding:12px 18px;background:var(--bg-secondary);border-bottom:1px solid var(--border);display:flex;gap:20px;flex-wrap:wrap;">
@@ -466,7 +466,7 @@ const Produtos = {
           </div>
           ${footerAviso}
         </div>
-        <div class="modal-footer"><button class="btn btn-secondary" data-fb-click="Utils.closeModal" data-fb-click-n="0">Fechar</button></div>
+        <div class="modal-footer"><button class="btn btn-secondary" onclick="Utils.closeModal()">Fechar</button></div>
       </div>`);
   },
 

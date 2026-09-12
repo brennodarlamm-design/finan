@@ -137,7 +137,7 @@ const Cobranca = {
               <div style="font-size:.72rem;color:#94a3b8;">Próximo Vencimento:</div>
               <div style="font-weight:800;font-size:.92rem;color:#fff;">${assAtual.vencimento ? (Utils.formatDate ? Utils.formatDate(assAtual.vencimento) : assAtual.vencimento) : 'Definido pela assinatura'}</div>
             </div>
-            ${canManageBilling ? `<button data-fb-click="Cobranca.abrirModalPagamentoPix" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(assAtual.planoId))}" class="btn-primary" style="padding:10px 18px;border-radius:8px;font-weight:800;display:inline-flex;align-items:center;gap:6px;font-size:.85rem;"><span>⚡ Pagar Mensalidade via PIX</span></button>` : `<span style="font-size:.78rem;color:#94a3b8;">Somente o administrador pode gerar cobranças.</span>`}
+            ${canManageBilling ? `<button onclick="Cobranca.abrirModalPagamentoPix('${assAtual.planoId}')" class="btn-primary" style="padding:10px 18px;border-radius:8px;font-weight:800;display:inline-flex;align-items:center;gap:6px;font-size:.85rem;"><span>⚡ Pagar Mensalidade via PIX</span></button>` : `<span style="font-size:.78rem;color:#94a3b8;">Somente o administrador pode gerar cobranças.</span>`}
           </div>
         </div>
 
@@ -226,7 +226,7 @@ const Cobranca = {
               ✓ Seu Plano Atual
             </button>
           ` : canManageBilling ? `
-            <button data-fb-click="Cobranca.selecionarPlano" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(plano.id))}" style="width:100%;padding:12px;border-radius:8px;background:${isPro ? 'var(--accent)' : 'rgba(255,255,255,.06)'};border:1px solid ${isPro ? 'var(--accent)' : 'rgba(255,255,255,.2)'};color:${isPro ? '#0f1710' : '#fff'};font-weight:900;font-size:.85rem;cursor:pointer;transition:all .2s;">
+            <button onclick="Cobranca.selecionarPlano('${plano.id}')" style="width:100%;padding:12px;border-radius:8px;background:${isPro ? 'var(--accent)' : 'rgba(255,255,255,.06)'};border:1px solid ${isPro ? 'var(--accent)' : 'rgba(255,255,255,.2)'};color:${isPro ? '#0f1710' : '#fff'};font-weight:900;font-size:.85rem;cursor:pointer;transition:all .2s;">
               Fazer Upgrade Agora ↗
             </button>
           ` : `<button disabled style="width:100%;padding:12px;border-radius:8px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);color:#64748b;font-weight:800;font-size:.82rem;">Administrador necessário</button>`}
@@ -282,7 +282,7 @@ const Cobranca = {
         <div style="background:#0f1710;border:1px solid rgba(201,162,39,.4);border-radius:14px;width:100%;max-width:540px;box-shadow:0 24px 60px rgba(0,0,0,.85);overflow:hidden;color:#f0ead6;font-family:inherit;">
           <div style="background:linear-gradient(135deg,#1C2D12,#243818);padding:16px 20px;border-bottom:1px solid rgba(201,162,39,.3);display:flex;align-items:center;justify-content:space-between;">
             <div style="display:flex;align-items:center;gap:10px;"><span style="font-size:1.3rem;">⚡</span><div><div style="font-weight:800;font-size:1rem;color:var(--accent2);">Cobrança PIX FinObra</div><div style="font-size:.75rem;color:#94a3b8;">${Utils.escapeHtml(plano.nome)} &bull; R$ ${amount.toFixed(2).replace('.', ',')}</div></div></div>
-            <button data-fb-click="Patch26Actions.removeById" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="cobranca-pix-modal" style="background:none;border:none;color:#94a3b8;font-size:1.2rem;cursor:pointer;padding:4px 8px;">✕</button>
+            <button onclick="document.getElementById('cobranca-pix-modal').remove()" style="background:none;border:none;color:#94a3b8;font-size:1.2rem;cursor:pointer;padding:4px 8px;">✕</button>
           </div>
           <div style="padding:22px;display:flex;flex-direction:column;align-items:center;gap:16px;text-align:center;">
             <div style="font-size:.8rem;color:#94a3b8;">Cobrança registrada no servidor &bull; TXID <strong style="color:#fff;">${txid}</strong></div>
@@ -301,7 +301,7 @@ const Cobranca = {
         catch { input?.select(); document.execCommand?.('copy'); copyBtn.textContent = 'Copiado ✓'; }
       };
     } catch (err) {
-      modal.innerHTML = `<div style="background:#0f1710;border:1px solid rgba(239,68,68,.45);border-radius:14px;width:100%;max-width:520px;padding:28px;color:#f0ead6;text-align:center;"><div style="font-size:2rem;margin-bottom:10px;">⚠️</div><div style="font-weight:900;color:#fff;margin-bottom:8px;">Não foi possível gerar a cobrança</div><div id="billing-error-text" style="color:#fca5a5;font-size:.86rem;"></div><button data-fb-click="Patch26Actions.removeById" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="cobranca-pix-modal" style="margin-top:18px;padding:9px 18px;border-radius:8px;border:1px solid rgba(255,255,255,.2);background:rgba(255,255,255,.05);color:#fff;cursor:pointer;">Fechar</button></div>`;
+      modal.innerHTML = `<div style="background:#0f1710;border:1px solid rgba(239,68,68,.45);border-radius:14px;width:100%;max-width:520px;padding:28px;color:#f0ead6;text-align:center;"><div style="font-size:2rem;margin-bottom:10px;">⚠️</div><div style="font-weight:900;color:#fff;margin-bottom:8px;">Não foi possível gerar a cobrança</div><div id="billing-error-text" style="color:#fca5a5;font-size:.86rem;"></div><button onclick="document.getElementById('cobranca-pix-modal').remove()" style="margin-top:18px;padding:9px 18px;border-radius:8px;border:1px solid rgba(255,255,255,.2);background:rgba(255,255,255,.05);color:#fff;cursor:pointer;">Fechar</button></div>`;
       const msg = document.getElementById('billing-error-text');
       if (msg) msg.textContent = err?.message || 'Erro de comunicação com o servidor.';
     }

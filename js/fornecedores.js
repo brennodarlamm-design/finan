@@ -68,8 +68,8 @@ const Fornecedores = {
         <p class="page-sub">Cadastro integrado com consulta automática à Receita Federal via CNPJ</p>
       </div>
       <div class="page-actions" style="display:flex;gap:8px;flex-wrap:wrap;">
-        <button class="btn btn-secondary btn-sm" data-fb-click="Fornecedores.limparDuplicados" data-fb-click-n="0" title="Verificar e unificar registros com mesmo CNPJ ou nome">🧹 Unificar Duplicados</button>
-        <button class="btn btn-primary" data-fb-click="Fornecedores.showForm" data-fb-click-n="0">+ Novo Fornecedor</button>
+        <button class="btn btn-secondary btn-sm" onclick="Fornecedores.limparDuplicados()" title="Verificar e unificar registros com mesmo CNPJ ou nome">🧹 Unificar Duplicados</button>
+        <button class="btn btn-primary" onclick="Fornecedores.showForm()">+ Novo Fornecedor</button>
       </div>
     </div>
 
@@ -104,32 +104,32 @@ const Fornecedores = {
         <label class="filter-label">Buscar</label>
         <div class="search-bar">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
-          <input class="form-control" id="forn-search" placeholder="Razão social, fantasia, CNPJ, cidade..." data-fb-input="Fornecedores.aplicarFiltros" data-fb-input-n="0">
+          <input class="form-control" id="forn-search" placeholder="Razão social, fantasia, CNPJ, cidade..." oninput="Fornecedores.aplicarFiltros()">
         </div>
       </div>
       <div class="filter-group">
         <label class="filter-label">Categoria</label>
-        <select class="form-control" id="forn-cat" style="min-width:170px" data-fb-change="Fornecedores.aplicarFiltros" data-fb-change-n="0">
+        <select class="form-control" id="forn-cat" style="min-width:170px" onchange="Fornecedores.aplicarFiltros()">
           <option value="">Todas</option>
           ${this._getAllCategorias().map(c=>`<option value="${Utils.escapeHtml(String(c.value || ''))}">${Utils.escapeHtml(String(c.label || ''))}</option>`).join('')}
         </select>
       </div>
       <div class="filter-group">
         <label class="filter-label">UF</label>
-        <select class="form-control" id="forn-uf" style="min-width:80px" data-fb-change="Fornecedores.aplicarFiltros" data-fb-change-n="0">
+        <select class="form-control" id="forn-uf" style="min-width:80px" onchange="Fornecedores.aplicarFiltros()">
           <option value="">Todas</option>
           ${[...new Set(fornecedores.map(f=>f.uf).filter(Boolean))].sort().map(uf=>`<option value="${uf}">${uf}</option>`).join('')}
         </select>
       </div>
       <div class="filter-group">
         <label class="filter-label">Status</label>
-        <select class="form-control" id="forn-status" style="min-width:110px" data-fb-change="Fornecedores.aplicarFiltros" data-fb-change-n="0">
+        <select class="form-control" id="forn-status" style="min-width:110px" onchange="Fornecedores.aplicarFiltros()">
           <option value="">Todos</option>
           <option value="ativo">✅ Ativo</option>
           <option value="inativo">⛔ Inativo</option>
         </select>
       </div>
-      <button class="btn btn-secondary btn-sm" data-fb-click="Fornecedores.limparFiltros" data-fb-click-n="0" style="align-self:flex-end">Limpar</button>
+      <button class="btn btn-secondary btn-sm" onclick="Fornecedores.limparFiltros()" style="align-self:flex-end">Limpar</button>
     </div>
 
     <!-- Tabela -->
@@ -195,9 +195,9 @@ const Fornecedores = {
         </td>
         <td style="text-align:center;">
           <div style="display:flex;gap:4px;justify-content:center;">
-            <button class="icon-btn" data-fb-click="Fornecedores.showForm" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(esc(f.id)))}" title="Editar">✏️</button>
-            <button class="icon-btn" data-fb-click="Fornecedores.toggleAtivo" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(esc(f.id)))}" title="${isAtivo?'Desativar':'Ativar'}" style="color:${isAtivo?'var(--warning)':'var(--success)'};">${isAtivo?'⛔':'✅'}</button>
-            <button class="icon-btn" data-fb-click="Fornecedores.excluir" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(esc(f.id)))}" title="Excluir" style="color:var(--danger);">🗑️</button>
+            <button class="icon-btn" onclick="Fornecedores.showForm('${esc(f.id)}')" title="Editar">✏️</button>
+            <button class="icon-btn" onclick="Fornecedores.toggleAtivo('${esc(f.id)}')" title="${isAtivo?'Desativar':'Ativar'}" style="color:${isAtivo?'var(--warning)':'var(--success)'};">${isAtivo?'⛔':'✅'}</button>
+            <button class="icon-btn" onclick="Fornecedores.excluir('${esc(f.id)}')" title="Excluir" style="color:var(--danger);">🗑️</button>
           </div>
         </td>
       </tr>`;
@@ -254,7 +254,7 @@ const Fornecedores = {
               <div style="font-size:.74rem;color:var(--text3);">Pessoa Jurídica ou Pessoa Física</div>
             </div>
           </div>
-          <button class="modal-close" data-fb-click="Utils.closeModal" data-fb-click-n="0">✕</button>
+          <button class="modal-close" onclick="Utils.closeModal()">✕</button>
         </div>
 
         <div class="modal-body" style="padding:20px;overflow-y:auto;flex:1;">
@@ -262,14 +262,16 @@ const Fornecedores = {
 
             <!-- Toggle PJ / PF -->
             <div style="display:flex;gap:0;margin-bottom:18px;border:1px solid var(--border);border-radius:8px;overflow:hidden;">
-              <button type="button" id="btn-tipo-pj" data-fb-click="Fornecedores._onTipoChange" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="pj"
+              <button type="button" id="btn-tipo-pj"
+                onclick="Fornecedores._onTipoChange('pj')"
                 style="flex:1;padding:10px;font-size:.85rem;font-weight:700;border:none;cursor:pointer;
                   background:${isPF ? 'transparent' : 'var(--accent2)'};
                   color:${isPF ? 'var(--text2)' : '#0f172a'};
                   transition:all .2s;">
                 🏢 Pessoa Jurídica (PJ)
               </button>
-              <button type="button" id="btn-tipo-pf" data-fb-click="Fornecedores._onTipoChange" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="pf"
+              <button type="button" id="btn-tipo-pf"
+                onclick="Fornecedores._onTipoChange('pf')"
                 style="flex:1;padding:10px;font-size:.85rem;font-weight:700;border:none;cursor:pointer;
                   background:${isPF ? 'var(--accent2)' : 'transparent'};
                   color:${isPF ? '#0f172a' : 'var(--text2)'};
@@ -288,10 +290,12 @@ const Fornecedores = {
                   <input class="form-control" id="forn-cnpj-input" name="cnpj"
                     value="${f?.cnpj ? this._fmtCnpj(f.cnpj) : ''}"
                     placeholder="00.000.000/0000-00"
-                    style="font-family:monospace;font-size:1rem;letter-spacing:.05em;" data-fb-input="Fornecedores._onCnpjInput" data-fb-input-n="1" data-fb-input-t0="self"
+                    style="font-family:monospace;font-size:1rem;letter-spacing:.05em;"
+                    oninput="Fornecedores._onCnpjInput(this)"
                     maxlength="18">
                 </div>
-                <button type="button" class="btn btn-primary" id="btn-consultar-cnpj" data-fb-click="Fornecedores.consultarCnpj" data-fb-click-n="0"
+                <button type="button" class="btn btn-primary" id="btn-consultar-cnpj"
+                  onclick="Fornecedores.consultarCnpj()"
                   style="white-space:nowrap;padding:10px 18px;">
                   🔍 Consultar RF
                 </button>
@@ -307,7 +311,8 @@ const Fornecedores = {
                 <input class="form-control" id="forn-cpf-input" name="cpf"
                   value="${f?.cpf ? this._fmtCpf(f.cpf) : ''}"
                   placeholder="000.000.000-00"
-                  style="font-family:monospace;font-size:1rem;letter-spacing:.05em;" data-fb-input="Fornecedores._onCpfInput" data-fb-input-n="1" data-fb-input-t0="self"
+                  style="font-family:monospace;font-size:1rem;letter-spacing:.05em;"
+                  oninput="Fornecedores._onCpfInput(this)"
                   maxlength="14">
               </div>
             </div>
@@ -381,7 +386,7 @@ const Fornecedores = {
                 <div class="form-group">
                   <label class="form-label">CEP</label>
                   <input class="form-control" id="forn-cep" name="cep"
-                    value="${f?.cep||''}" placeholder="00000-000" data-fb-blur="Fornecedores.onCepChange" data-fb-blur-n="1" data-fb-blur-t0="self">
+                    value="${f?.cep||''}" placeholder="00000-000" onblur="Fornecedores.onCepChange(this)">
                 </div>
               </div>
             </div>
@@ -425,8 +430,8 @@ const Fornecedores = {
         </div>
 
         <div class="modal-footer">
-          <button class="btn btn-secondary" data-fb-click="Utils.closeModal" data-fb-click-n="0">Cancelar</button>
-          <button class="btn btn-primary" data-fb-click="Fornecedores.salvar" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(id||''))}">
+          <button class="btn btn-secondary" onclick="Utils.closeModal()">Cancelar</button>
+          <button class="btn btn-primary" onclick="Fornecedores.salvar('${id||''}')">
             ${isEdit ? '✔ Salvar Alterações' : '+ Cadastrar Fornecedor'}
           </button>
         </div>
