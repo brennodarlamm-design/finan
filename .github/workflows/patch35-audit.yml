@@ -34,14 +34,12 @@ jobs:
           npm run build:cloudflare
           npx --yes wrangler deploy --dry-run
       - name: Root dependency audit
-        continue-on-error: true
-        run: npm audit --omit=dev
+        run: npm audit --omit=dev --audit-level=moderate
       - name: Backend dependency audit
-        continue-on-error: true
         run: |
           cd backend
           npm ci
-          npm audit --omit=dev
+          npm audit --omit=dev --audit-level=moderate
       - name: Upload audit report
         uses: actions/upload-artifact@v4
         with:
