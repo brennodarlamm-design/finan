@@ -1,0 +1,134 @@
+name: Patch 36 cleanup regression - no deploy
+
+on:
+  push:
+    branches:
+      - patch36-product-experience
+    paths:
+      - .github/workflows/patch36-cleanup-regression.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: patch36-cleanup-regression
+  cancel-in-progress: true
+
+jobs:
+  cleanup-and-regress:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: patch36-product-experience
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Materialize final cleanup in working tree
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -f \
+            .github/workflows/patch36-block1.yml \
+            .github/workflows/patch36-block2.yml \
+            .github/workflows/patch36-block3.yml \
+            .github/workflows/patch36-block4.yml \
+            .github/workflows/patch36-block5.yml \
+            .github/workflows/patch36-final-validation.yml \
+            .github/workflows/patch36-cleanup-regression.yml \
+            scripts/patch36-block1.mjs \
+            scripts/patch36-block2.mjs \
+            scripts/patch36-block2-fix.mjs \
+            scripts/patch36-block4.mjs \
+            scripts/patch36-block5.mjs \
+            monitor-nfe/ultimo_nsu.txt
+          rm -rf monitor-nfe/whatsapp-server monitor-nfe/evolution-api
+          test ! -e monitor-nfe/whatsapp-server
+          test ! -e monitor-nfe/evolution-api
+          test ! -e monitor-nfe/ultimo_nsu.txt
+
+      - name: Verify branch ancestry and cleaned diff
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin main --no-tags
+          test "$(git merge-base origin/main HEAD)" = "$(git rev-parse origin/main)"
+          git diff --check
+          test ! -e .github/workflows/patch36-block1.yml
+          test ! -e scripts/patch36-block1.mjs
+
+      - name: Parse PowerShell monitor scripts
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $files = @(
+            'monitor-nfe/MonitorNFe.ps1',
+            'monitor-nfe/AlertaBoletosWhatsApp.ps1',
+            'monitor-nfe/InstalarTarefa.ps1',
+            'monitor-nfe/AgendarAlertaWhatsApp.ps1'
+          )
+          foreach ($file in $files) {
+            $tokens = $null
+            $errors = $null
+            [void][System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path $file), [ref]$tokens, [ref]$errors)
+            if ($errors.Count -gt 0) {
+              $errors | ForEach-Object { Write-Error "$file: $($_.Message)" }
+              exit 1
+            }
+            Write-Host "OK PowerShell: $file"
+          }
+
+      - name: Install root dependencies
+        run: npm ci
+
+      - name: Full regression suite on cleaned tree
+        run: npm test
+
+      - name: Patch 36 focused regression
+        run: node scripts/test-patch36-static.js
+
+      - name: Monitor NF-e focused regression
+        run: node scripts/test-monitor-nfe-static.js
+
+      - name: JavaScript syntax verification
+        run: node scripts/check-all-syntax.js
+
+      - name: Codebase audit
+        run: node scripts/audit-codebase.mjs
+
+      - name: Production dependency audits
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm audit --omit=dev --audit-level=high
+          npm --prefix backend ci
+          npm --prefix backend audit --omit=dev --audit-level=high
+
+      - name: Cloudflare static build
+        run: npm run build:cloudflare
+
+      - name: Wrangler bundle dry-run only
+        run: npx --yes wrangler deploy --dry-run
+
+      - name: Commit only validated tracked cleanup
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "finobra-patch-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add -u
+          git diff --cached --check
+          if git diff --cached --quiet; then
+            echo "No tracked cleanup changes to commit."
+            exit 0
+          fi
+          git commit -m "chore(patch36): remove temporary patch tooling and obsolete local WhatsApp stacks"
+          git push origin HEAD:patch36-product-experience
+
+      - name: Confirm no production deploy happened
+        run: echo "Cleanup regression completed with build/dry-run only. No production deploy command was executed."
