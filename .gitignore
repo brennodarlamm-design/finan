@@ -1,13 +1,10 @@
 # Dependências
 node_modules/
 backend/node_modules/
-monitor-nfe/whatsapp-server/node_modules/
 
-# Autenticação WhatsApp e Sessões locais
+# Autenticação WhatsApp e sessões locais do backend atual
 auth_info_baileys/
 backend/auth_info_baileys/
-.wwebjs_auth/
-.wwebjs_cache/
 
 # Variáveis locais e credenciais
 .env
@@ -17,6 +14,7 @@ backend/auth_info_baileys/
 monitor-nfe/logs/
 monitor-nfe/config.json
 monitor-nfe/ultimo_nsu.txt
+monitor-nfe/xmls/
 *.pfx
 *.p12
 
@@ -27,13 +25,6 @@ monitor-nfe/ultimo_nsu.txt
 *.tmp
 *.bak
 bin/
-
-.vercel
-.env*
 scratch/
-
-# Evolution API local
-monitor-nfe/evolution-api/.env
-monitor-nfe/xmls/
 *.zip
 .release_temp/
