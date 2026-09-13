@@ -6,6 +6,7 @@ on:
       - patch37-commercial-account-release
     paths:
       - 'scripts/patch37-block1.mjs'
+      - 'scripts/patch37-block1-fix.mjs'
       - '.github/workflows/patch37-block1.yml'
 
 permissions:
@@ -29,7 +30,9 @@ jobs:
       - name: Install dependencies
         run: npm ci
       - name: Apply Patch 37 block 1
-        run: node scripts/patch37-block1.mjs
+        run: |
+          node scripts/patch37-block1.mjs
+          node scripts/patch37-block1-fix.mjs
       - name: Full regression suite
         run: npm test
       - name: Syntax verification
