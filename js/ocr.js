@@ -19,7 +19,7 @@ const OCR = {
             <span style="font-size:1.5rem;">🤖</span>
             <div>
               <div>Reconhecimento Automático de Documento</div>
-              <div style="font-size:.72rem;font-weight:400;color:#a5b4fc;margin-top:1px;">IA Vision (ChatGPT & Gemini) · Boleto · NF-e · NFC-e · NFS-e · Contas</div>
+              <div style="font-size:.72rem;font-weight:400;color:#a5b4fc;margin-top:1px;">IA Vision Gemini · Boleto · NF-e · NFC-e · NFS-e · Contas</div>
             </div>
           </span>
           <div style="display:flex;align-items:center;gap:8px;">
@@ -447,7 +447,7 @@ const OCR = {
             <span>${this._labelTipoDoc(d.tipo_documento)}</span>
             <span>·</span>
             <span>Confiança: <strong style="color:${corConfianca};">${confiancaPct}%</strong></span>
-            ${provedor === 'openai' ? '<span style="background:rgba(16,185,129,.15);color:#10b981;font-size:.68rem;padding:2px 6px;border-radius:4px;font-weight:800;border:1px solid rgba(16,185,129,.3);">🤖 ChatGPT Vision</span>' : provedor === 'gemini' ? '<span style="background:rgba(99,102,241,.15);color:#818cf8;font-size:.68rem;padding:2px 6px;border-radius:4px;font-weight:800;border:1px solid rgba(99,102,241,.3);">✨ Gemini Vision</span>' : ''}
+            ${provedor === 'gemini' ? '<span style="background:rgba(99,102,241,.15);color:#818cf8;font-size:.68rem;padding:2px 6px;border-radius:4px;font-weight:800;border:1px solid rgba(99,102,241,.3);">✨ Gemini Vision</span>' : ''}
           </div>
         </div>
         <button class="btn btn-sm btn-secondary" data-fb-click="OCR.abrirModal" data-fb-click-n="0" style="font-size:.72rem;">

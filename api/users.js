@@ -34,19 +34,24 @@ const cleanSupportText = (v, max=4000) => String(v ?? '').replace(/\0/g, '').tri
 const wantsHumanSupport = text => /\b(atendente|humano|pessoa|especialista|falar com algu[eé]m|suporte humano|chamar suporte|chamar atendente)\b/i.test(String(text || ''));
 
 const SUPPORT_KB = Object.freeze([
-  { topic:'notas', patterns:[/nota fiscal/i,/\bnf-?e\b/i,/\bnfce\b/i,/\bnfse\b/i,/\bxml\b/i,/\bocr\b/i], answer:'Para NF-e e OCR, abra o módulo de Notas Fiscais. Você pode importar XML, PDF ou imagem; o sistema identifica fornecedor, valores e itens. Se algo não for reconhecido, informe qual etapa apresentou erro.' },
-  { topic:'medicoes', patterns:[/mediç/i,/medicao/i,/medição/i,/caixa econômica/i,/caixa economica/i], answer:'No módulo Medições você registra o avanço da obra, percentuais e valores medidos. Depois é possível gerar o relatório/boletim da medição. Se quiser, informe o que você está tentando lançar.' },
-  { topic:'ofx', patterns:[/\bofx\b/i,/concilia/i,/extrato banc/i], answer:'Na Conciliação OFX, importe o arquivo .OFX gerado pelo banco. O FinObra cruza as transações com os lançamentos e sugere correspondências para conferência.' },
-  { topic:'obras', patterns:[/\bobra\b/i,/cliente/i,/nova obra/i], answer:'Para cadastrar uma obra, entre em Obras & Clientes e escolha Nova Obra. Informe cliente, datas, valor/contrato e demais dados. Os limites de obras ativas dependem do seu plano.' },
-  { topic:'fornecedores', patterns:[/fornecedor/i,/cnpj/i], answer:'Fornecedores podem ser cadastrados pelo módulo Fornecedores. Informe CNPJ/CPF, razão social, contato, endereço, município e UF. Depois eles ficam disponíveis nos lançamentos e notas.' },
-  { topic:'financeiro', patterns:[/lançamento/i,/lancamento/i,/receita/i,/despesa/i,/contas? a pagar/i,/contas? a receber/i], answer:'No Financeiro, use Novo Lançamento para registrar receita ou despesa, vencimento, fornecedor, obra/centro de custo e status. Se quiser, diga qual tipo de lançamento você precisa fazer.' },
-  { topic:'contratos', patterns:[/contrato/i,/recibo/i], answer:'Contratos e Recibos ficam salvos na nuvem da sua empresa. Você pode criar, editar, imprimir e, nos planos compatíveis, usar assinatura eletrônica e QR de validação.' },
+  { topic:'notas', patterns:[/nota fiscal/i,/\bnf-?e\b/i,/\bnfce\b/i,/\bnfse\b/i,/\bxml\b/i,/\bocr\b/i,/danfe/i], answer:'Em Notas Fiscais você pode consultar e organizar NF-e/NFC-e/NFS-e, XML e DANFE. O reconhecimento de documentos usa Gemini Vision para ler PDF ou imagem e sugerir fornecedor, valores e itens quando o documento for uma nota fiscal.' },
+  { topic:'medicoes', patterns:[/mediç/i,/medicao/i,/medição/i,/boletim/i,/caixa econômica/i,/caixa economica/i], answer:'No módulo Medições você registra avanço físico, percentuais e valores medidos da obra. O FinObra mantém acumulados e permite preparar boletins para acompanhamento e financiamento.' },
+  { topic:'ofx', patterns:[/\bofx\b/i,/concilia/i,/extrato banc/i], answer:'Na Conciliação OFX, importe o arquivo .OFX do banco. O FinObra cruza as transações com os lançamentos e sugere correspondências para conferência antes da baixa.' },
+  { topic:'obras', patterns:[/\bobra\b/i,/cliente/i,/nova obra/i,/contrato caixa/i], answer:'Para cadastrar uma obra, entre em Obras & Clientes e escolha Nova Obra. Informe cliente, datas, valor/contrato e os demais dados. Os limites de obras ativas dependem do plano contratado.' },
+  { topic:'fornecedores', patterns:[/fornecedor/i,/cnpj/i], answer:'Fornecedores são cadastrados no módulo Fornecedores com CNPJ/CPF, razão social, contato, endereço, município e UF. Depois ficam disponíveis nos lançamentos, notas e compras.' },
+  { topic:'financeiro', patterns:[/lançamento/i,/lancamento/i,/receita/i,/despesa/i,/contas? a pagar/i,/contas? a receber/i,/fluxo de caixa/i], answer:'No Financeiro, use Novo Lançamento para registrar receita ou despesa, vencimento, fornecedor, obra/centro de custo, conta e status. O sistema também consolida fluxo de caixa e realizado por obra.' },
+  { topic:'orcamentos', patterns:[/orçamento/i,/orcamento/i,/planilha orçament/i,/insumo/i,/composição/i,/composicao/i], answer:'Em Orçamentos você monta a planilha da obra com categorias, itens, quantidades e preços. O FinObra calcula totais e permite comparar o orçamento com o realizado.' },
+  { topic:'sinapi', patterns:[/sinapi/i,/caixa.*insumo/i,/referência sinapi/i,/referencia sinapi/i], answer:'O orçamento SINAPI trabalha com UF, competência/referência e dados oficiais disponíveis para a seleção. O FinObra mantém o orçamento separado por obra e permite aplicar BDI e Leis Sociais.' },
+  { topic:'engenharia', patterns:[/curva s/i,/\bevm\b/i,/\bcpi\b/i,/\bspi\b/i,/\beac\b/i,/curva abc/i,/pareto/i,/\bbdi\b/i,/cronograma físico/i,/cronograma fisico/i], answer:'No Hub da Obra ficam os controles de engenharia: Cronograma Físico-Financeiro, Curva S, EVM (BAC/PV/EV/AC/CPI/SPI/EAC/VAC), Curva ABC e BDI. As configurações podem ser ajustadas por obra e exportadas em relatórios.' },
+  { topic:'precompras', patterns:[/pré-compra/i,/pre-compra/i,/pre compra/i,/ordem de compra/i,/solicitação de compra/i,/solicitacao de compra/i], answer:'Pré-Compras organiza solicitações e ordens de compra do canteiro, com itens, fornecedor e fluxo de aprovação antes da compra definitiva.' },
+  { topic:'relatorios', patterns:[/relatório/i,/relatorio/i,/exportar/i,/excel/i,/xlsx/i,/pdf/i,/dossiê/i,/dossie/i], answer:'O FinObra possui exportações de engenharia e relatórios em Excel/PDF. No Hub da Obra você pode exportar cronograma, Curva ABC, Orçado x Realizado, BDI ou o dossiê completo.' },
+  { topic:'contratos', patterns:[/contrato/i,/recibo/i], answer:'Contratos e Recibos ficam salvos na nuvem da empresa. Você pode criar, editar, imprimir e, nos planos compatíveis, usar assinatura eletrônica e QR de validação.' },
   { topic:'assinatura', patterns:[/assinatura/i,/qr code/i,/validar/i,/validação/i,/validacao/i], answer:'A assinatura eletrônica gera um código de validação registrado no servidor. O QR Code leva à página pública de validação, que consulta o registro real no FinObra.' },
-  { topic:'usuarios', patterns:[/usuário/i,/usuario/i,/perfil/i,/permiss/i,/acesso/i], answer:'Em Configurações > Usuários, o administrador pode criar usuários, escolher o perfil e restringir módulos específicos. As restrições por módulo nunca aumentam o poder do perfil; apenas reduzem acessos.' },
-  { topic:'planos', patterns:[/plano/i,/cobrança/i,/cobranca/i,/\bpix\b/i,/mensalidade/i,/pagamento/i], answer:'Abra Planos & Cobrança para consultar seu plano, limites e mensalidade. Cobranças PIX pendentes aparecem com valor, identificação e histórico próprios.' },
-  { topic:'whatsapp', patterns:[/whatsapp/i,/mensagem/i], answer:'O WhatsApp depende da sessão conectada no servidor. O acesso também pode ser restringido por módulo pelo administrador da empresa.' },
-  { topic:'sessoes', patterns:[/sessão/i,/sessao/i,/dispositivo/i,/celular conectado/i,/computador conectado/i], answer:'Em Configurações > Sessões você pode ver os dispositivos conectados à sua conta e encerrar sessões que não reconhece.' },
-  { topic:'erro', patterns:[/erro/i,/bug/i,/não funciona/i,/nao funciona/i,/travou/i,/problema/i], answer:'Posso tentar identificar o problema. Informe em qual tela aconteceu, o que você clicou e qual mensagem apareceu. O FinObra também registra erros técnicos para o administrador em Configurações > Diagnóstico. Se preferir atendimento humano, use “Chamar atendente”.' }
+  { topic:'usuarios', patterns:[/usuário/i,/usuario/i,/perfil/i,/permiss/i,/acesso/i], answer:'Em Configurações > Usuários, o administrador pode criar usuários, escolher perfis e restringir módulos. As permissões específicas reduzem acesso; não elevam o poder do perfil.' },
+  { topic:'planos', patterns:[/plano/i,/cobrança/i,/cobranca/i,/\bpix\b/i,/mensalidade/i,/pagamento/i], answer:'Abra Planos & Cobrança para consultar plano, limites e mensalidade. Cobranças PIX pendentes aparecem com valor, identificação e histórico.' },
+  { topic:'whatsapp', patterns:[/whatsapp/i,/mensagem/i,/qr.*whatsapp/i], answer:'O WhatsApp usa uma sessão própria da empresa no servidor. Quando necessário, conecte pelo QR Code e confira o status da sessão antes de enviar mensagens.' },
+  { topic:'sessoes', patterns:[/sessão/i,/sessao/i,/dispositivo/i,/celular conectado/i,/computador conectado/i], answer:'Em Configurações > Sessões você pode ver os dispositivos conectados à sua conta e encerrar acessos que não reconhece.' },
+  { topic:'erro', patterns:[/erro/i,/bug/i,/não funciona/i,/nao funciona/i,/travou/i,/problema/i], answer:'Informe em qual tela aconteceu, o que você estava fazendo e qual mensagem apareceu. O diagnóstico técnico fica com a equipe DEV/Suporte e não é exibido na tela do cliente. Se precisar, clique em “Chamar atendente”.' }
 ]);
 
 function supportBotReply(text) {
@@ -58,58 +63,58 @@ function supportBotReply(text) {
   return 'Posso ajudar com Obras, Financeiro, NF-e/OCR, Medições, OFX, Fornecedores, Contratos, Recibos, Usuários e Permissões, Sessões, Assinaturas, WhatsApp e Planos. Escreva sua dúvida ou clique em “Chamar atendente” para falar com uma pessoa.';
 }
 
-async function getOpenAIBotReply(text) {
-  const apiKey = String(process.env.OPENAI_API_KEY || '').trim();
-  if (!apiKey) return null;
-  if (/(atendente|humano|pessoa|especialista|falar com algu[eé]m)/i.test(String(text || ''))) return null;
+const SUPPORT_STOP_WORDS = new Set(['a','o','as','os','de','da','do','das','dos','e','em','no','na','nos','nas','um','uma','uns','umas','para','por','com','sem','que','como','eu','me','meu','minha','meus','minhas','voce','voces','isso','isto','essa','esse','ao','aos']);
 
-  const systemPrompt = `Você é o FinBot, o assistente virtual de inteligência artificial do FinObra (SaaS de gestão financeira e obras para construtoras e engenharia civil).
-Responda de forma clara, educada, prática e objetiva em português do Brasil (máximo 2 a 3 parágrafos curtos).
-O FinObra possui os seguintes módulos e recursos:
-- Obras & Clientes (cadastro, contratos, fases, limites de obras ativas por plano)
-- Orçamentos de Obras (catálogo padrão da construção, planilha orçamentária, insumos, base SINAPI oficial da Caixa com BDI e Leis Sociais)
-- Cronograma Físico-Financeiro (13 macro-etapas de engenharia, distribuição percentual mensal, desembolso previsto vs real)
-- Curva S e Análise de Valor Agregado EVM (BAC, PV, EV, AC, CPI, SPI, estimativa no término EAC e desvio VAC)
-- Curva ABC de Insumos e Serviços (regra de Pareto 80-15-5)
-- BDI Oficial Interativo (fórmula do Acórdão 2622/2013 do TCU com taxas de administração central, seguro, risco e tributos)
-- Exportações Avançadas (Dossiê de Engenharia em Excel .xlsx com 4 abas e fórmulas, e Relatório Oficial de Engenharia em PDF A4 Paisagem para clientes, diretoria e Caixa Econômica, com opção de imprimir tudo junto ou separado)
-- Financeiro (contas a pagar, contas a receber, centro de custo por obra ou sede/escritório, fluxo de caixa, conciliação bancária OFX)
-- Robô de Reconhecimento OCR com IA (leitura automática de comprovantes PIX, TED, boletos, contas de consumo e Notas Fiscais NF-e/NFC-e com pré-cadastro de produtos e lançamentos)
-- Notas Fiscais (consulta SEFAZ, certificado A1 digital, XML, DANFE e vinculação a obras)
-- Medições de Obra (avanço físico, boletins de medição para bancos/Caixa, medições acumuladas)
-- Contratos e Recibos (assinatura eletrônica com QR Code de validação pública no servidor)
-- Pré-Compras e Ordens de Compra (fluxo de solicitação e aprovação para canteiro)
-- Configurações, Usuários (RBAC com perfis e permissões por módulo), Sessões e WhatsApp.
-Se o usuário quiser falar com uma pessoa da equipe ou o assunto for um problema técnico específico, instrua-o com gentileza a clicar no botão "Chamar atendente" na conversa.`;
+function supportTokens(value) {
+  return String(value || '')
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9\s-]/g, ' ')
+    .split(/\s+/)
+    .map(x => x.trim())
+    .filter(x => x.length > 1 && !SUPPORT_STOP_WORDS.has(x));
+}
 
-  try {
-    const res = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey}`
-      },
-      signal: AbortSignal.timeout(15000),
-      body: JSON.stringify({
-        model: 'gpt-4o-mini',
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: String(text).slice(0, 1000) }
-        ],
-        temperature: 0.3,
-        max_tokens: 500
-      })
-    });
+function supportSimilarity(a, b) {
+  const aa = new Set(supportTokens(a));
+  const bb = new Set(supportTokens(b));
+  if (aa.size < 2 || bb.size < 2) return 0;
+  let intersection = 0;
+  for (const token of aa) if (bb.has(token)) intersection++;
+  const union = new Set([...aa, ...bb]).size || 1;
+  return intersection / union;
+}
 
-    if (res.ok) {
-      const data = await res.json();
-      const content = data?.choices?.[0]?.message?.content?.trim();
-      if (content) return content;
+async function findLearnedSupportAnswer(sql, tenantId, text) {
+  if (supportTokens(text).length < 2) return null;
+  // Aprendizado seguro: somente respostas HUMANAS anteriores do mesmo tenant.
+  // Evita auto-reforço de uma resposta automática errada e impede vazamento entre empresas.
+  const rows = await sql`
+    SELECT q.body AS question, a.body AS answer
+    FROM support_messages q
+    JOIN LATERAL (
+      SELECT body, created_at, id
+      FROM support_messages a
+      WHERE a.conversation_id=q.conversation_id
+        AND a.tenant_id=q.tenant_id
+        AND a.sender_type='agent'
+        AND (a.created_at > q.created_at OR (a.created_at=q.created_at AND a.id>q.id))
+      ORDER BY a.created_at ASC, a.id ASC
+      LIMIT 1
+    ) a ON TRUE
+    WHERE q.tenant_id=${tenantId} AND q.sender_type='client'
+    ORDER BY q.created_at DESC, q.id DESC
+    LIMIT 250;
+  `;
+
+  let best = null;
+  for (const row of rows) {
+    const score = supportSimilarity(text, row.question);
+    if (score >= 0.62 && (!best || score > best.score)) {
+      best = { score, answer: cleanSupportText(row.answer, 4000) };
     }
-  } catch (err) {
-    console.warn('[FinBot OpenAI] Falha ao consultar ChatGPT:', err.message);
   }
-  return null;
+  return best?.answer || null;
 }
 
 function getSupportRenderBaseUrl() {
@@ -405,9 +410,9 @@ export default async function handler(req, res) {
         } else if (conversation.status === 'bot') {
           let reply = null;
           try {
-            reply = await getOpenAIBotReply(text);
-          } catch (eBot) {
-            console.warn('[FinBot] Erro ao consultar ChatGPT:', eBot.message);
+            reply = await findLearnedSupportAnswer(sql, auth.tenantId, text);
+          } catch (eLearn) {
+            console.warn('[FinBot] Falha ao consultar memória aprendida:', eLearn?.message || eLearn);
           }
           if (!reply) {
             reply = supportBotReply(text);

@@ -59,12 +59,13 @@ assert(!whatsappApi.includes('details: data'), 'Proxy WhatsApp não devolve payl
 assert(!whatsappApi.includes('json({ success: false, error: err.message })'), 'Proxy WhatsApp não devolve err.message bruto.');
 assert((whatsappApi.match(/AbortSignal\.timeout\(/g) || []).length >= 5, 'Chamadas do proxy WhatsApp continuam limitadas por timeout.');
 
-assert(ocrApi.includes('AbortSignal.timeout(35000)'), 'OCR OpenAI possui timeout abaixo do limite da função.');
-assert(ocrApi.includes('AbortSignal.timeout(20000)'), 'Fallback Gemini possui timeout por tentativa.');
-assert(!ocrApi.includes('detalhe: erroConsolidado'), 'OCR não devolve erro consolidado bruto dos provedores.');
+assert(!ocrApi.includes('OPENAI_API_KEY') && !ocrApi.includes('api.openai.com') && !ocrApi.includes('gpt-4o-mini'), 'OCR não usa OpenAI nem gera custo por chamada OpenAI.');
+assert(ocrApi.includes('GEMINI_API_KEY') && ocrApi.includes('gemini-3.6-flash') && ocrApi.includes('gemini-3.5-flash'), 'OCR voltou ao fluxo Gemini-only anterior.');
+assert(ocrApi.includes('AbortSignal.timeout(20000)'), 'Gemini OCR possui timeout por tentativa.');
 assert(!ocrApi.includes('detalhe: err.message'), 'OCR não devolve exceção interna inesperada.');
-assert(ocrApi.includes('/credit_balance_exhausted|insufficient_quota/i'), 'OCR mantém detecção interna de limite de uso para mensagem amigável.');
-assert(usersApi.includes('AbortSignal.timeout(15000)'), 'FinBot ChatGPT possui timeout explícito e fallback local.');
+assert(!usersApi.includes('OPENAI_API_KEY') && !usersApi.includes('api.openai.com') && !usersApi.includes('getOpenAIBotReply'), 'FinBot não depende da OpenAI.');
+assert(usersApi.includes('findLearnedSupportAnswer') && usersApi.includes("a.sender_type='agent'") && usersApi.includes('q.tenant_id=${tenantId}'), 'FinBot aprende apenas com respostas humanas anteriores do mesmo tenant.');
+assert(usersApi.includes('supportSimilarity') && usersApi.includes('score >= 0.62'), 'FinBot usa similaridade conservadora para reaproveitar conhecimento aprendido.');
 
 assert(auditWorkflow.includes('workflow_dispatch:'), 'Auditoria grande continua somente manual.');
 assert(!auditWorkflow.includes('continue-on-error: true'), 'Auditorias de dependência são bloqueantes.');

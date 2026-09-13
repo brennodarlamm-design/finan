@@ -61,7 +61,7 @@ test('Configurações possui matriz de acesso por módulo', /_permissionMatrix/i
 test('Configurações possui gestão de sessões', /_renderSessoes/i.test(cfg) && /revokeOtherSessions/i.test(cfg));
 test('Frontend reporta erros de runtime autenticados', /_installErrorMonitor/i.test(app) && /client_error/i.test(app));
 test('API de auditoria recebe erros com rate limit', /action === 'client_error'/i.test(audit) && /checkRateLimit/i.test(audit));
-test('Admin vê diagnóstico do próprio tenant', /_renderDiagnostico/i.test(cfg) && /action=errors/i.test(cfg));
+test('Diagnóstico técnico não aparece na tela do cliente e permanece no DEV', !/_renderDiagnostico/i.test(cfg) && !/cfg-tab-diagnostico/i.test(cfg) && /carregarErrosSaaS/i.test(master) && /client_errors/i.test(master));
 test('Master possui saúde global do SaaS', /carregarErrosSaaS/i.test(master) && /Saúde do Sistema/i.test(master) && /client_errors/i.test(master));
 test('FinBot usa base de conhecimento estruturada', /SUPPORT_KB/i.test(users) && /topic:'sessoes'/i.test(users));
 test('Status CNPJ não injeta HTML externo', /el\.textContent = String\(msg/i.test(fornecedores));

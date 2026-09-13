@@ -22,7 +22,7 @@ const tests = [
   'scripts/test-patch19-static.js',
   'scripts/test-patch20-static.js',
   'scripts/test-patch21-static.js',
-  'scripts/test-openai-static.js',
+  'scripts/test-finbot-learning-static.js',
   'scripts/test-patch22-static.js',
   'scripts/test-patch23-static.js',
   'scripts/test-patch24-static.js',
