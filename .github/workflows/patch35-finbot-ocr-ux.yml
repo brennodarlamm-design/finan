@@ -46,7 +46,9 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -A
+          git checkout -- dist || true
+          git add api/reconhecer-documento.js api/users.js js/configuracoes.js js/ocr.js package.json scripts/test-patch08-static.js scripts/test-patch35-static.js scripts/test-finbot-learning-static.js scripts/test-static-all.js
+          git add -u scripts/test-openai-static.js
           git diff --cached --check
           git commit -m "feat(patch35): move diagnostics to DEV and add learned FinBot"
           git push origin HEAD:patch35-large-audit
