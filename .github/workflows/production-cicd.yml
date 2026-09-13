@@ -73,7 +73,11 @@ jobs:
           health=''
           for attempt in {1..12}; do
             health="$(curl --fail --silent --show-error https://finobra.app.br/__finobra/health || true)"
-            if [[ "$health" == *'"ok":true'* && "$health" == *'"securityMode":"nonce-csp"'* && "$health" == *'"loopRisk":false'* ]]; then
+            if [[ "$health" == *'"ok":true'* && \
+                  "$health" == *'"securityMode":"nonce-csp"'* && \
+                  "$health" == *'"loopRisk":false'* && \
+                  "$health" == *'"deploymentMetadataOk":true'* && \
+                  "$health" == *"\"commit\":\"$GITHUB_SHA\""* ]]; then
               break
             fi
             echo "Waiting for Cloudflare propagation (${attempt}/12)..."
@@ -83,6 +87,12 @@ jobs:
           [[ "$health" == *'"ok":true'* ]]
           [[ "$health" == *'"securityMode":"nonce-csp"'* ]]
           [[ "$health" == *'"loopRisk":false'* ]]
+          [[ "$health" == *'"deploymentMetadataOk":true'* ]]
+          [[ "$health" == *"\"commit\":\"$GITHUB_SHA\""* ]]
+
+          version="$(curl --fail --silent --show-error https://finobra.app.br/version.json)"
+          [[ "$version" == *"\"commit\":\"$GITHUB_SHA\""* ]]
+          [[ "$version" == *'"source":"github-actions"'* ]]
 
           final_url="$(curl --fail --silent --show-error --location --output /dev/null --write-out '%{url_effective}' https://www.finobra.app.br/)"
           [[ "$final_url" == 'https://finobra.app.br/' ]]
@@ -90,4 +100,4 @@ jobs:
           auth_status="$(curl --silent --output /dev/null --write-out '%{http_code}' 'https://finobra.app.br/api/auth?action=me')"
           [[ "$auth_status" == '401' ]]
 
-          echo "Production smoke test passed."
+          echo "Production smoke test passed for commit $GITHUB_SHA."
