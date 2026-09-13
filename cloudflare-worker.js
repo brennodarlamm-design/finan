@@ -133,18 +133,27 @@ async function fetchFrontendResponse(request, env) {
   const loginShell = shellMethod && isLoginShellPath(incoming.pathname);
   const landingShell = shellMethod && incoming.pathname === '/';
 
-  // Pass the original request directly to the Assets binding.
-  // Workers Assets (with Clean URLs) resolves /login → login.html with 200 internally.
-  // Do NOT rewrite to .html here — ASSETS would then redirect .html → /login
-  // and create an infinite loop.
-  let routeName = landingShell ? 'landing-shell' : null;
+  // With html_handling:"none", ASSETS.fetch('/login.html') returns 200 directly.
+  // We rewrite clean URLs to explicit .html so the binding locates the file.
+  let routeName = null;
+  let assetPath = incoming.pathname;
+
   if (appShell) {
+    assetPath = '/app.html';
     routeName = 'app-shell';
   } else if (loginShell) {
+    assetPath = '/login.html';
     routeName = incoming.pathname === '/cadastro' ? 'signup-shell' : 'login-shell';
+  } else if (landingShell) {
+    assetPath = '/index.html';
+    routeName = 'landing-shell';
   }
 
-  const assetResponse = await env.ASSETS.fetch(request);
+  const assetRequest = assetPath !== incoming.pathname
+    ? new Request(new URL(assetPath, incoming).toString(), { method, headers: request.headers })
+    : request;
+
+  const assetResponse = await env.ASSETS.fetch(assetRequest);
   const securedResponse = secureHtmlResponse(assetResponse);
   if (!routeName) return securedResponse;
 
@@ -161,6 +170,7 @@ async function fetchFrontendResponse(request, env) {
     headers
   });
 }
+
 
 function isAuthAction(url, action) {
   return url.pathname === '/api/auth' && url.searchParams.get('action') === action;
