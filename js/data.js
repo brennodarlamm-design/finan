@@ -468,17 +468,20 @@ const DB = {
     return json;
   },
 
-  async _fetchCloudTablePaged(table, limit = 400) {
+  async _fetchCloudTablePaged(table, limit = 400, requireAccess = false) {
     const items = [];
     let offset = 0;
     for (let page = 0; page < 250; page++) {
       const json = await this._fetchCloudPage(table, limit, offset);
+      if (requireAccess && json.forbidden) throw new Error('Sem permissão para consultar a versão salva.');
       items.push(...json.data);
       const meta = json.pagination;
-      if (!meta || !meta.hasMore || json.data.length === 0) break;
-      offset = Number(meta.nextOffset ?? (offset + json.data.length));
+      if (!meta || !meta.hasMore) return items;
+      const nextOffset = Number(meta.nextOffset ?? (offset + json.data.length));
+      if (!json.data.length || !Number.isFinite(nextOffset) || nextOffset <= offset) throw new Error('Paginação incompleta; cache preservado.');
+      offset = nextOffset;
     }
-    return items;
+    throw new Error('Limite de paginação atingido; cache preservado.');
   },
 
   async _fetchCloudSnapshot() {
@@ -725,7 +728,12 @@ const DB = {
    * 3. Mantém no cache local itens novos criados offline que ainda não subiram ao Neon.
    */
   _reconcileCollection(table, cloudItems = [], localItems = []) {
-    const queue = (typeof this._getSyncQueue === 'function') ? this._getSyncQueue() : [];
+    const queue = [
+      ...((typeof this._getSyncFailed === 'function') ? this._getSyncFailed().filter(item => item.payload?.action === 'save') : []),
+      ...((typeof this._getSyncQueue === 'function') ? this._getSyncQueue() : [])
+    ];
+    // Só remova cache ausente da nuvem após concluir a migração dos dados locais.
+    const preserveUnmigrated = !this.isCoreCloudBootstrapped() || !this.isCloudCompletenessBootstrapped();
     const tableAliases = [table];
     if (table === 'clientes') tableAliases.push('obras');
     if (table === 'obras') tableAliases.push('clientes');
@@ -778,19 +786,29 @@ const DB = {
       if (pendingSaves.has(id)) {
         const pendingItem = pendingSaves.get(id);
         resultMap.set(id, { ...(resultMap.get(id) || lItem), ...pendingItem });
-      } else if (!resultMap.has(id)) {
-        // Item local criado sem internet ainda não presente na nuvem
+      } else if (!resultMap.has(id) && (preserveUnmigrated || this._syncStorageFailure)) {
+        // Protege dados ainda não migrados e alterações cuja fila não pôde ser salva.
         resultMap.set(id, lItem);
       }
     }
 
+    // A fila também é uma cópia durável quando o cache foi limpo por falta de espaço.
+    for (const [id, item] of pendingSaves) {
+      if (!resultMap.has(id)) resultMap.set(id, item);
+    }
     return Array.from(resultMap.values());
   },
 
   async syncFromCloud() {
     this._emitSyncStatus('syncing');
     try {
+      const revision = this._localMutationRevision || 0;
       const d = await this._fetchCloudSnapshot();
+      // Uma edição ou confirmação durante a leitura invalida este snapshot.
+      if (revision !== (this._localMutationRevision || 0)) {
+        this._emitSyncStatus('pending');
+        return false;
+      }
       const coreBootstrapped = this.isCoreCloudBootstrapped ? this.isCoreCloudBootstrapped() : true;
       const mergeLegacy = (cloud, local) => (!coreBootstrapped && local.length ? this._reconcileCollection('legacy', cloud, local) : this._reconcileCollection('legacy', cloud, local));
 
@@ -1008,6 +1026,7 @@ const DB = {
       return Array.isArray(list) ? list : [];
     } catch (err) {
       console.warn('[Sync] Fila local inválida; mantendo operação em modo seguro:', err);
+      this._syncStorageFailure = true;
       return [];
     }
   },
@@ -1079,6 +1098,7 @@ const DB = {
   getSyncFailedItems(limit = 50) {
     const max = Math.max(1, Math.min(200, Number(limit) || 50));
     return this._getSyncFailed().slice(-max).reverse().map(item => ({
+      queueId: item.queueId,
       table: String(item?.payload?.table || 'registro'),
       action: String(item?.payload?.action || 'sync'),
       entityId: String(item?.payload?.id || item?.payload?.data?.cloud_id || item?.payload?.data?.id || ''),
@@ -1104,8 +1124,9 @@ const DB = {
     const failed = this._getSyncFailed();
     const entityId = String(item?.payload?.id || item?.payload?.data?.cloud_id || item?.payload?.data?.id || '');
     const existing = failed.findIndex(x => x?.payload?.table === item?.payload?.table && x?.payload?.action === item?.payload?.action && String(x?.payload?.id || x?.payload?.data?.cloud_id || x?.payload?.data?.id || '') === entityId && entityId);
+    const latest = this._getSyncQueue().find(entry => entry.queueId === item.queueId) || item;
     const entry = {
-      ...item,
+      ...latest,
       attentionAt: new Date().toISOString(),
       lastError: String(detail.error || item?.lastError || 'Falha de sincronização').slice(0, 500),
       errorCode: String(detail.code || item?.errorCode || '').slice(0, 100),
@@ -1160,11 +1181,13 @@ const DB = {
     if (idx < 0) return live.length;
     const expected = String(item?.updatedAt || item?.createdAt || '');
     const current = String(live[idx]?.updatedAt || live[idx]?.createdAt || '');
+    const content = entry => JSON.stringify({ ...entry.payload, data:{ ...entry.payload?.data, sync_version:null } });
     // Se o registro foi editado novamente enquanto a requisição estava em voo,
     // mantém a versão nova na fila em vez de apagá-la junto com a confirmação antiga.
-    if (!force && expected !== current) return live.length;
+    if (!force && (expected !== current || content(item) !== content(live[idx]))) return live.length;
     live.splice(idx, 1);
     this._saveSyncQueue(live);
+    this._localMutationRevision = (this._localMutationRevision || 0) + 1;
     return live.length;
   },
 
@@ -1229,6 +1252,7 @@ const DB = {
           break;
         }
 
+        this._acceptSyncVersion(item, responseJson.sync_version);
         const pending = this._ackSyncQueueItem(item);
         this._emitSyncStatus(pending ? 'pending' : 'synced');
       }
@@ -1239,9 +1263,49 @@ const DB = {
     }
   },
 
+  _acceptSyncVersion(item, version) {
+    if (item.payload?.table !== 'lancamentos' || !version) return;
+    const id = item.payload.data?.id;
+    const previous = item.payload.data?.sync_version;
+    const local = this.getAll('lancamentos');
+    const record = local.find(row => row.id === id);
+    if (record && record.sync_version === previous) {
+      record.sync_version = version;
+      this.save('lancamentos', local);
+    }
+    // Uma segunda edição feita durante o envio deve partir da versão confirmada.
+    const queue = this._getSyncQueue();
+    for (const entry of queue) {
+      if (entry.payload?.table === 'lancamentos' && entry.payload?.data?.id === id && entry.payload.data.sync_version === previous) {
+        entry.payload.data.sync_version = version;
+      }
+    }
+    this._saveSyncQueue(queue);
+  },
+
+  resolveSyncConflict(queueId, remote, keepLocal, reviewedData) {
+    const failed = this._getSyncFailed();
+    const item = failed.find(entry => entry.queueId === queueId && entry.errorCode === 'SYNC_CONFLICT');
+    if (!item || item.payload?.table !== 'lancamentos') throw new Error('Conflito não encontrado. Atualize a lista.');
+    if (reviewedData && JSON.stringify(reviewedData) !== JSON.stringify(item.payload.data)) throw new Error('A alteração local mudou. Abra a revisão novamente.');
+    const id = item.payload.data.id;
+    if (remote && remote.id !== id) throw new Error('Lançamento de revisão inválido.');
+    if (this._getSyncQueue().some(entry => entry.payload?.table === 'lancamentos' && entry.payload?.data?.id === id)) throw new Error('Aguarde a alteração pendente antes de revisar este lançamento.');
+    if (keepLocal && !remote?.sync_version) throw new Error('Este lançamento foi excluído na nuvem. Cadastre um novo lançamento se necessário.');
+    const record = keepLocal ? { ...item.payload.data, sync_version:remote.sync_version } : remote;
+    if (keepLocal && !this.syncToCloud('save', 'lancamentos', record)) throw new Error('Não foi possível salvar a alteração na fila.');
+    if (!this._saveSyncFailed(failed.filter(entry => entry.queueId !== queueId))) throw new Error('Não foi possível concluir a revisão local.');
+    const local = this.getAll('lancamentos').filter(entry => entry.id !== id);
+    if (record) local.push(record);
+    this.save('lancamentos', local);
+    this._localMutationRevision = (this._localMutationRevision || 0) + 1;
+    this._emitSyncStatus(this.getSyncPendingCount() ? 'pending' : this.getSyncFailedCount() ? 'attention' : 'synced');
+  },
+
   syncToCloud(action, table, data, id) {
     const cloudTables = ['lancamentos', 'notas', 'notas_fiscais', 'obras', 'clientes', 'fornecedores', 'documentos', 'produtos', 'orcamentos', 'medicoes', 'ocr_historico', 'contas', 'contas_bancarias', 'precompras', 'contratos', 'recibos', 'orcamentos_sinapi', 'doc_fases', 'preferencias'];
     if (!cloudTables.includes(table)) return;
+    this._localMutationRevision = (this._localMutationRevision || 0) + 1;
     const module = this._moduleForKey(table);
     if (module && typeof Auth !== 'undefined' && typeof Auth.canModule === 'function' && !Auth.canModule(module, action === 'delete' ? 'delete' : 'write')) return;
     const payload = { action, table, data, id };
@@ -1275,6 +1339,7 @@ const DB = {
       });
     }
     if (!this._saveSyncQueue(queue)) {
+      this._syncStorageFailure = true;
       this._emitSyncStatus('attention', { pending:this.getSyncPendingCount(), storageFailure:true });
       if (typeof Utils !== 'undefined' && Utils.toast) {
         Utils.toast('A alteração foi salva localmente, mas a fila offline não pôde ser persistida. Libere espaço no navegador antes de fechar esta aba.', 'warning');

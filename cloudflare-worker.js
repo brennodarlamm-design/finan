@@ -57,6 +57,14 @@ function canonicalRedirect(request, env) {
       changed = true;
     }
 
+    if (target.pathname === '/app.html') {
+      target.pathname = '/app';
+      changed = true;
+    } else if (target.pathname === '/login.html') {
+      target.pathname = '/login';
+      changed = true;
+    }
+
     const cadastro = target.searchParams.get('cadastro') === '1';
     const expired = target.searchParams.get('expired') === '1';
     if ((target.pathname === '/' || target.pathname === '/login') && cadastro) {

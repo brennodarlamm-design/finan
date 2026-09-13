@@ -12,65 +12,57 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/css/style.css?v=20260909_1">
   <!-- Chart.js -->
-  <script src="/js/vendor/chart.umd.min.js?v=4.4.0"></script>
-  <!-- SheetJS for Excel import/export -->
-  <script src="https://cdn.sheetjs.com/xlsx-0.20.0/package/dist/xlsx.full.min.js"></script>
-  <!-- JSZip for ZIP handling (Caixa SINAPI packages) -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
-  <!-- jsPDF for PDF export -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-  <!-- PDF.js 4.2.67 (Seguro contra CVE-2024-4367) -->
-  <script type="module" src="/js/pdfjs_bootstrap.js"></script>
-  <script src="/js/version_guard.js"></script>
+  <script defer src="/js/vendor/chart.umd.min.js?v=4.4.0"></script>
+  <!-- Excel, ZIP, PDF e módulos opcionais são carregados sob demanda. -->
+  <script defer src="/js/version_guard.js"></script>
+  <link rel="stylesheet" href="/css/premium.css?v=20260913" media="screen">
 </head>
-<body>
+<body class="ui-workspace">
   <div id="app-root"></div>
   <div id="toast-container" class="toast-container"></div>
 
   <!-- JS Modules (order matters) -->
-  <script src="/js/auth.js"></script>
-  <script src="/js/data.js?v=20260903_1"></script>
-  <script src="/js/data_demo.js?v=20260902_4"></script>
-  <script src="/js/utils.js?v=20260902_4"></script>
-  <script src="/js/assinador.js?v=20260904_1"></script>
-  <script src="/js/gdrive.js?v=20260909_2"></script>
-  <script src="/js/documentos.js?v=20260909_3"></script>
-  <script src="/js/whatsapp.js"></script>
-  <script src="/js/contas.js"></script>
-  <script src="/js/dashboard.js"></script>
-  <script src="/js/clientes.js"></script>
-  <script src="/js/ocr.js?v=20260903_2"></script>
-  <script src="/js/parcelamento.js"></script>
-  <script src="/js/lancamentos.js?v=20260903_1"></script>
-  <script src="/js/recibos.js?v=20260904_1"></script>
-  <script src="/js/contratos.js?v=20260904_1"></script>
-  <script src="/js/ofx.js"></script>
-  <script src="/js/notas.js"></script>
-  <script src="/js/sinapi.js"></script>
-  <script src="/js/orcamentos.js"></script>
-  <script src="/js/orcamento_sinapi.js"></script>
-  <script src="/js/medicoes.js"></script>
-  <script src="/js/precompras_workflow.js"></script>
-  <script src="/js/precompras.js"></script>
-  <script src="/js/escritorio.js"></script>
-  <script src="/js/importar_excel.js?v=20260902_4"></script>
-  <script src="/js/exportar_templates.js"></script>
-  <script src="/js/exportar.js"></script>
-  <script src="/js/configuracoes.js?v=20260909_1"></script>
-  <script src="/js/fornecedores.js?v=20260903_1"></script>
-  <script src="/js/produtos.js?v=20260902_3"></script>
-  <script src="/js/nfe_parser.js"></script>
-  <script src="/js/nfe.js"></script>
-  <script src="/js/busca.js"></script>
-  <script src="/js/notificacoes.js"></script>
-  <script src="/js/suporte.js?v=20260908_1"></script>
-  <script src="/js/cobranca.js?v=20260908_1"></script>
-  <script src="/js/master.js?v=20260908_1"></script>
-  <script src="/js/fases_doc.js?v=20260909_4"></script>
-  <script src="/js/obra_detalhe.js?v=20260909_3"></script>
-  <script src="/js/patch22.js?v=20260912_1"></script>
-  <script src="/js/app.js?v=20260909_2"></script>
-  <script src="/js/patch26-actions.js"></script>
-  <script src="/js/patch26-events.js"></script>
+  <script defer src="/js/assets.js"></script>
+  <script defer src="/js/ui.js"></script>
+  <script defer src="/js/auth.js"></script>
+  <script defer src="/js/data.js?v=20260903_1"></script>
+  <script defer src="/js/data_demo.js?v=20260902_4"></script>
+  <script defer src="/js/utils.js?v=20260902_4"></script>
+  <script defer src="/js/assinador.js?v=20260904_1"></script>
+  <script defer src="/js/gdrive.js?v=20260909_2"></script>
+  <script defer src="/js/documentos.js?v=20260909_3"></script>
+  <script defer src="/js/whatsapp.js"></script>
+  <script defer src="/js/contas.js"></script>
+  <script defer src="/js/dashboard.js"></script>
+  <script defer src="/js/clientes.js"></script>
+  <script defer src="/js/ocr.js?v=20260903_2"></script>
+  <script defer src="/js/parcelamento.js"></script>
+  <script defer src="/js/lancamentos.js?v=20260903_1"></script>
+  <script defer src="/js/recibos.js?v=20260904_1"></script>
+  <script defer src="/js/contratos.js?v=20260904_1"></script>
+  <script defer src="/js/ofx.js"></script>
+  <script defer src="/js/notas.js"></script>
+  <script defer src="/js/orcamentos.js"></script>
+  <script defer src="/js/medicoes.js"></script>
+  <script defer src="/js/precompras_workflow.js"></script>
+  <script defer src="/js/precompras.js"></script>
+  <script defer src="/js/escritorio.js"></script>
+  <script defer src="/js/importar_excel.js?v=20260902_4"></script>
+  <script defer src="/js/exportar.js"></script>
+  <script defer src="/js/configuracoes.js?v=20260909_1"></script>
+  <script defer src="/js/fornecedores.js?v=20260903_1"></script>
+  <script defer src="/js/produtos.js?v=20260902_3"></script>
+  <script defer src="/js/nfe_parser.js"></script>
+  <script defer src="/js/nfe.js"></script>
+  <script defer src="/js/busca.js"></script>
+  <script defer src="/js/notificacoes.js"></script>
+  <script defer src="/js/suporte.js?v=20260908_1"></script>
+  <script defer src="/js/cobranca.js?v=20260908_1"></script>
+  <script defer src="/js/fases_doc.js?v=20260909_4"></script>
+  <script defer src="/js/obra_detalhe.js?v=20260909_3"></script>
+  <script defer src="/js/patch22.js?v=20260912_1"></script>
+  <script defer src="/js/app.js?v=20260909_2"></script>
+  <script defer src="/js/patch26-actions.js"></script>
+  <script defer src="/js/patch26-events.js"></script>
 </body>
 </html>

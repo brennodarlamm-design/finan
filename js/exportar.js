@@ -118,9 +118,9 @@ const Exportar = {
   // ─────────────────────────────────────────────────────────────
   // GERAÇÃO DO DOCUMENTO EXECUTIVO PREMIUM (HTML PURO PARA A4)
   // ─────────────────────────────────────────────────────────────
-  gerarHTMLDocumento(type) {
+  gerarHTMLDocumento(type, obraId = this.getObraId()) {
     if (typeof ExportarTemplates !== 'undefined') {
-      return ExportarTemplates.gerar(type, this.getObraId());
+      return ExportarTemplates.gerar(type, obraId);
     }
     return '';
   },
@@ -128,8 +128,11 @@ const Exportar = {
   // ─────────────────────────────────────────────────────────────
   // MOTOR DE IMPRESSÃO (SEM ELEMENTOS DE TELA DO SISTEMA)
   // ─────────────────────────────────────────────────────────────
-  imprimirRelatorio() {
-    const htmlDoc = this.gerarHTMLDocumento(this._currentPreview);
+  async imprimirRelatorio() {
+    const type = this._currentPreview;
+    const obraId = this.getObraId();
+    if (!await FinObraAssets.require('reports')) return;
+    const htmlDoc = this.gerarHTMLDocumento(type, obraId);
     
     // Injetar frame invisível ou janela limpa
     let printFrame = document.getElementById('finobra-print-frame');
@@ -180,10 +183,14 @@ const Exportar = {
     }, 400);
   },
 
-  abrirEmNovaAba() {
-    const htmlDoc = this.gerarHTMLDocumento(this._currentPreview);
+  async abrirEmNovaAba() {
+    const type = this._currentPreview;
+    const obraId = this.getObraId();
     const w = window.open('', '_blank');
     if (!w) { Utils.toast('Permita popups para abrir em nova guia', 'warning'); return; }
+    if (!await FinObraAssets.require('reports')) { w.close(); return; }
+    if (w.closed) return;
+    const htmlDoc = this.gerarHTMLDocumento(type, obraId);
     w.document.write(`
       <!DOCTYPE html>
       <html>
@@ -216,9 +223,11 @@ const Exportar = {
   // ─────────────────────────────────────────────────────────────
   // EXPORTAÇÃO EXCEL (.XLSX COM NOME LIMPO)
   // ─────────────────────────────────────────────────────────────
-  exportarExcel(tipo) {
-    if (typeof XLSX === 'undefined') { Utils.toast('Biblioteca XLSX n&atilde;o carregada','error'); return; }
+  async exportarExcel(tipo) {
     const obraId = this.getObraId();
+    if (!await FinObraAssets.require('excel')) return;
+    if (!await FinObraAssets.require('sinapi')) return;
+    if (typeof XLSX === 'undefined') { Utils.toast('Biblioteca XLSX n&atilde;o carregada','error'); return; }
 
     if (tipo === 'engenharia') {
       if (typeof ObraDetalhe !== 'undefined' && ObraDetalhe.exportarExcelEngenharia) {

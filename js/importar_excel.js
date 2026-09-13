@@ -163,7 +163,8 @@ const ImportarExcel = {
     }
   },
 
-  processFile(file) {
+  async processFile(file) {
+    if (!await FinObraAssets.require('excel')) return;
     if (typeof XLSX === 'undefined') {
       Utils.toast('Biblioteca XLSX não carregada no navegador.', 'error');
       return;
@@ -584,7 +585,8 @@ const ImportarExcel = {
   // ─────────────────────────────────────────────────────────────
   // GERADOR E DOWNLOAD DO MODELO OFICIAL EXCEL
   // ─────────────────────────────────────────────────────────────
-  baixarModeloExcel() {
+  async baixarModeloExcel() {
+    if (!await FinObraAssets.require('excel')) return;
     if (typeof XLSX === 'undefined') {
       Utils.toast('Biblioteca XLSX não disponível.', 'error');
       return;

@@ -47,7 +47,7 @@ const Clientes = {
         </select>
       </div>
     </div>
-    <div id="cli-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(380px,1fr));gap:14px;">
+    <div id="cli-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,380px),1fr));gap:14px;">
       ${this._cards(cs)}
     </div>`;
   },

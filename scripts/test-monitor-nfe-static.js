@@ -1,4 +1,5 @@
 import fs from 'fs';
+import { execFileSync } from 'node:child_process';
 
 function assert(cond, msg) {
   if (!cond) {
@@ -15,9 +16,10 @@ const readme = fs.readFileSync('monitor-nfe/README.md', 'utf8');
 const ignore = fs.readFileSync('.gitignore', 'utf8');
 const render = fs.readFileSync('render.yaml', 'utf8');
 
-assert(!fs.existsSync('monitor-nfe/whatsapp-server'), 'Servidor local whatsapp-web.js obsoleto foi removido.');
-assert(!fs.existsSync('monitor-nfe/evolution-api'), 'Evolution API local obsoleta foi removida.');
-assert(!fs.existsSync('monitor-nfe/ultimo_nsu.txt'), 'Estado runtime ultimo_nsu.txt não permanece versionado.');
+const tracked = execFileSync('git', ['ls-files', '--', 'monitor-nfe'], { encoding:'utf8' }).split(/\r?\n/);
+assert(!tracked.some(file => file.startsWith('monitor-nfe/whatsapp-server/')), 'Servidor local whatsapp-web.js obsoleto não está versionado.');
+assert(!tracked.some(file => file.startsWith('monitor-nfe/evolution-api/')), 'Evolution API local obsoleta não está versionada.');
+assert(!tracked.includes('monitor-nfe/ultimo_nsu.txt'), 'Estado runtime ultimo_nsu.txt não permanece versionado.');
 assert(ignore.includes('monitor-nfe/ultimo_nsu.txt'), 'Estado NSU local está protegido pelo .gitignore.');
 
 assert(monitor.includes('System.Net.Http.HttpClientHandler'), 'SEFAZ usa HttpClient com certificado cliente.');

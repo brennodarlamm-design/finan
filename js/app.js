@@ -306,7 +306,7 @@ const App = {
         <td>${esc(i.action)}</td>
         <td style="font-family:monospace;font-size:.72rem;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${esc(i.entityId)}">${esc(i.entityId || '—')}</td>
         <td style="color:var(--danger);max-width:320px;white-space:normal;">${esc(i.lastError)}</td>
-        <td style="text-align:center;">${esc(i.httpStatus || '—')}</td>
+        <td style="text-align:center;">${i.errorCode === 'SYNC_CONFLICT' ? `<button class="btn btn-secondary" data-sync-review="${esc(i.queueId)}">Revisar conflito</button>` : esc(i.httpStatus || '—')}</td>
       </tr>`).join('');
     Utils.showModal(`
       <div class="modal" style="max-width:900px;width:96vw;">
@@ -323,6 +323,41 @@ const App = {
           <button class="btn btn-primary" data-fb-click="App.retrySyncIssues" data-fb-click-n="0">↻ Tentar novamente</button>
         </div>
       </div>`);
+    document.querySelectorAll('[data-sync-review]').forEach(button => {
+      button.addEventListener('click', () => this.reviewSyncConflict(button.dataset.syncReview));
+    });
+  },
+
+  async reviewSyncConflict(queueId) {
+    const tenant = DB._t();
+    const issue = DB._getSyncFailed().find(item => item.queueId === queueId);
+    if (!issue) return;
+    try {
+      const records = await DB._fetchCloudTablePaged('lancamentos', 400, true);
+      if (DB._t() !== tenant) return;
+      const local = issue.payload.data;
+      const remote = records.find(record => record.id === local.id) || null;
+      const esc = value => Utils.escapeHtml(String(value ?? '—'));
+      const fields = [['descricao','Descrição'], ['valor','Valor'], ['tipo','Tipo'], ['status','Status'], ['data','Data'], ['data_vencimento','Vencimento'], ['data_pagamento','Pagamento'], ['categoria','Categoria'], ['fornecedor_beneficiario','Favorecido'], ['conta_bancaria','Conta'], ['obra_id','Obra'], ['nota_fiscal_id','Nota fiscal'], ['codigo_barras','Código de barras'], ['chave_nfe','Chave NF-e'], ['observacoes','Observações'], ['conciliado','Conciliado'], ['itens','Itens']];
+      const display = value => value && typeof value === 'object' ? JSON.stringify(value) : value;
+      const rows = fields.filter(([key]) => JSON.stringify(local[key]) !== JSON.stringify(remote?.[key])).map(([key, label]) => `<tr><td>${esc(label)}</td><td>${esc(display(local[key]))}</td><td>${esc(display(remote?.[key]))}</td></tr>`).join('');
+      Utils.showModal(`<div class="modal" style="max-width:900px;width:96vw;">
+        <div class="modal-header"><span class="modal-title">Revisar lançamento</span><button class="modal-close" data-fb-click="Utils.closeModal" data-fb-click-n="0">✕</button></div>
+        <div class="modal-body"><p>${remote ? 'Compare as diferenças antes de escolher qual versão manter.' : 'Este lançamento foi excluído na nuvem. Sua alteração permanece guardada até concluir a revisão.'}</p><div class="table-wrap"><table class="table"><thead><tr><th>Campo</th><th>Minha alteração</th><th>Versão salva</th></tr></thead><tbody>${rows}</tbody></table></div></div>
+        <div class="modal-footer"><button class="btn btn-secondary" data-fb-click="Utils.closeModal" data-fb-click-n="0">Voltar depois</button><button class="btn btn-secondary" id="sync-keep-remote">${remote ? 'Manter versão salva' : 'Aceitar exclusão'}</button>${remote ? '<button class="btn btn-primary" id="sync-keep-local">Aplicar minha alteração</button>' : ''}</div>
+      </div>`);
+      const resolve = keepLocal => {
+        if (DB._t() !== tenant) return;
+        try {
+          DB.resolveSyncConflict(queueId, remote, keepLocal, local);
+          Utils.closeModal();
+          this.refreshCurrentRoute();
+          Utils.toast(keepLocal ? 'Alteração enviada para sincronização.' : 'Revisão concluída.', 'success');
+        } catch (error) { Utils.toast(error.message, 'warning'); }
+      };
+      document.getElementById('sync-keep-remote')?.addEventListener('click', () => resolve(false));
+      document.getElementById('sync-keep-local')?.addEventListener('click', () => resolve(true));
+    } catch (error) { Utils.toast(error.message || 'Não foi possível consultar o lançamento.', 'warning'); }
   },
 
   renderShell() {
@@ -340,13 +375,7 @@ const App = {
             <img src="${safeLogoUrl}" alt="${brandName}" style="max-height:48px;max-width:185px;width:auto;height:auto;object-fit:contain;border-radius:6px;display:block;">
           </div>
         </div>`
-      : `<div style="display:flex;align-items:center;gap:10px;overflow:hidden;width:100%;">
-          <div style="width:38px;height:38px;border-radius:8px;background:linear-gradient(135deg,#1C2D12,#243818);border:1px solid rgba(201,162,39,.5);display:flex;align-items:center;justify-content:center;font-size:1.2rem;flex-shrink:0;box-shadow:0 4px 12px rgba(201,162,39,.3);">🏢</div>
-          <div style="min-width:0;overflow:hidden;flex:1;">
-            <div style="font-weight:900;font-size:.9rem;background:linear-gradient(135deg,var(--accent2),var(--accent));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;white-space:nowrap;text-overflow:ellipsis;overflow:hidden;" title="${brandName}">${brandName}</div>
-            <div style="font-size:.65rem;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;">Gestão de Obras</div>
-          </div>
-        </div>`;
+      : `<div class="workspace-brand"><span class="workspace-brand-mark">${FinObraUI.icon('obras')}</span><div style="min-width:0"><div class="workspace-brand-name">FinObra</div><div class="workspace-brand-company" title="${brandName}">${brandName}</div></div></div>`;
 
     const isCollapsed = window.innerWidth > 768 && localStorage.getItem('finobra_sidebar_collapsed') === 'true';
     const isImpersonating = Boolean((u?.impersonatedBy === 'superadmin' || u?.isImpersonated) || (typeof Auth !== 'undefined' && Auth.isImpersonating && Auth.isImpersonating()));
@@ -403,19 +432,19 @@ const App = {
             </a>
           </nav>
           <div class="sidebar-foot">
-            <div class="user-card" data-fb-click="App.showUserMenu" data-fb-click-n="0">
+            <button type="button" class="user-card" aria-label="Abrir minha conta" data-fb-click="App.showUserMenu" data-fb-click-n="0">
               <div class="user-av">${Utils.escapeHtml(u?.avatar || 'AD')}</div>
               <div class="user-info">
                 <div class="user-name">${Utils.escapeHtml(u?.nome || 'Administrador')}</div>
                 <div class="user-role">${brandName}</div>
               </div>
-            </div>
+            </button>
           </div>
         </aside>
 
         <div style="flex:1;display:flex;flex-direction:column;min-width:0;">
           <header class="main-header" id="main-header">
-            <button class="icon-btn" id="mob-menu" data-fb-click="App.toggleSidebar" data-fb-click-n="0" title="Recolher / Expandir Menu Lateral (Ctrl+B)">
+            <button class="icon-btn" id="mob-menu" aria-label="Menu de navegação" aria-controls="sidebar" aria-expanded="false" data-fb-click="App.toggleSidebar" data-fb-click-n="0" title="Recolher / Expandir Menu Lateral (Ctrl+B)">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
             </button>
             <div style="min-width:0;flex-shrink:1;">
@@ -423,41 +452,38 @@ const App = {
               <div class="header-sub">${brandName} — Gestão Financeira</div>
             </div>
             <div class="hspacer"></div>
-            <div id="sync-status-indicator" title="Status da sincronização com a nuvem. Clique para tentar novamente itens que exigem atenção." data-fb-click="App.showSyncIssues" data-fb-click-n="0" style="display:flex;align-items:center;gap:5px;font-size:.7rem;color:var(--text3);padding:4px 8px;border:1px solid var(--border);border-radius:999px;white-space:nowrap;">
-              <span id="sync-status-dot">●</span><span id="sync-status-text">Cache local</span>
-            </div>
-            <!-- Botão Validador de Autenticidade -->
-            <a href="/validar" target="_blank" class="header-search-btn" title="Consultar autenticidade de documentos por código ou QR Code" style="text-decoration:none;cursor:pointer;display:flex;align-items:center;gap:6px;background:rgba(201,162,39,.12);border:1px solid rgba(201,162,39,.4);border-radius:8px;padding:5px 11px;color:var(--accent2);transition:all .2s;">
-              <span style="font-size:.9rem;">🛡️</span>
-              <span style="font-size:.78rem;font-weight:700;">Validar Documento</span>
-            </a>
             <!-- Dropdown Suporte Técnico & Atendimento -->
             ${isImpersonating ? '' : (typeof Suporte !== 'undefined' ? Suporte.renderHeaderDropdown() : '')}
             <!-- Botão Busca Global -->
-            <div class="header-search-btn" data-fb-click="Patch26Actions.globalSearchOpen" data-fb-click-n="0" title="Busca Global em todo o sistema (Ctrl+K)" style="cursor:pointer;display:flex;align-items:center;gap:6px;background:rgba(255,255,255,.05);border:1px solid var(--border);border-radius:8px;padding:5px 10px;transition:all .2s;">
+            <button type="button" class="header-search-btn header-global-search" aria-label="Buscar no sistema" data-fb-click="Patch26Actions.globalSearchOpen" data-fb-click-n="0" title="Busca Global em todo o sistema (Ctrl+K)" style="cursor:pointer;display:flex;align-items:center;gap:6px;background:rgba(255,255,255,.05);border:1px solid var(--border);border-radius:8px;padding:5px 10px;transition:all .2s;">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
               <span style="font-size:.78rem;color:var(--text2);font-weight:600;">Buscar...</span>
               <kbd style="font-size:.65rem;color:var(--text3);background:rgba(255,255,255,.06);border:1px solid var(--border);border-radius:3px;padding:1px 4px;">Ctrl+K</kbd>
-            </div>
+            </button>
             <!-- Central de Alertas Notificações -->
             <div id="header-notif-container">
               ${typeof Notificacoes !== 'undefined' ? Notificacoes.renderBellBtn() : ''}
             </div>
-            <div class="obra-sel-btn" data-fb-click="App.abrirBuscaObras" data-fb-click-n="0" title="Filtrar ou pesquisar obra">
+          </header>
+          <main class="main-content" id="main-content">
+            <div class="workspace-context"><span class="workspace-context-label">Filtrar por obra</span>
+            <button type="button" class="obra-sel-btn" data-fb-click="App.abrirBuscaObras" data-fb-click-n="0" title="Filtrar ou pesquisar obra">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
               <span class="obra-sel-label" id="obra-sel-current-name">Todas as Obras</span>
               <span style="font-size:.68rem;color:var(--text3);background:rgba(255,255,255,0.06);padding:1px 4px;border-radius:4px;">🔍</span>
-            </div>
-            <button class="icon-btn" data-fb-click="Auth.logout" data-fb-click-n="0" title="Sair" style="color:var(--danger)">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
             </button>
-          </header>
-          <main class="main-content" id="main-content">
+            <button type="button" id="sync-status-indicator" title="Status da sincronização com a nuvem. Clique para tentar novamente itens que exigem atenção." data-fb-click="App.showSyncIssues" data-fb-click-n="0" style="display:flex;align-items:center;gap:5px;font-size:.7rem;color:var(--text3);padding:4px 8px;border:1px solid var(--border);border-radius:999px;white-space:nowrap;">
+              <span id="sync-status-dot">●</span><span id="sync-status-text">Cache local</span>
+            </button>
+            </div>
             <div id="route-content"></div>
           </main>
         </div>
+      ${this._mobileNavigation()}
       </div>`;
 
+    const sidebar = document.getElementById('sidebar');
+    if (sidebar) sidebar.inert = window.innerWidth <= 768;
     this.refreshObraSelector();
     this._bindKeyboardShortcuts();
   },
@@ -476,20 +502,26 @@ const App = {
     document.addEventListener('keydown', this._onKeydownHandler);
   },
 
+  _mobileNavigation() {
+    const items = [['dashboard','Início'],['lancamentos','Financeiro'],['obras','Obras']];
+    return `<nav class="mobile-workspace-nav" aria-label="Navegação principal">${items.filter(([route]) => !Auth.canRoute || Auth.canRoute(route,'read')).map(([route,label]) => `<button type="button" class="mobile-nav-item${this.route===route?' active':''}" data-route="${route}" data-fb-click="Patch26Actions.navigateCloseSidebar" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${route}">${FinObraUI.icon(route)}<span>${label}</span></button>`).join('')}<button type="button" class="mobile-nav-item" aria-label="Abrir menu completo" data-fb-click="App.toggleSidebar" data-fb-click-n="0">${FinObraUI.icon('menu')}<span>Menu</span></button></nav>`;
+  },
+
   _navItem(route, icon, label, badgeHtml = '') {
+    icon = FinObraUI.icon(route);
     const targetRoute = this._normalizeRoute(route);
     if (typeof Auth !== 'undefined' && Auth.canRoute && !Auth.canRoute(targetRoute, 'read')) {
       if (Auth.isPlanRouteLocked?.(targetRoute)) {
-        return `<div class="nav-item" style="opacity:.72;border:1px dashed rgba(201,162,39,.22);" data-fb-click="Cobranca.showLockedModule" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(targetRoute))}" title="Disponível em outro plano">
+        return `<button type="button" class="nav-item" style="opacity:.72;border:1px dashed var(--border);" data-fb-click="Cobranca.showLockedModule" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(targetRoute))}" title="Disponível em outro plano">
           <span>${icon}</span><span style="flex:1">${label}</span><span style="font-size:.68rem;color:var(--accent2)">🔒</span>
-        </div>`;
+        </button>`;
       }
       return '';
     }
     const isAct = (this.route === targetRoute) || (this._normalizeRoute(this.route) === targetRoute);
-    return `<div class="nav-item${isAct?' active':''}" data-route="${targetRoute}" data-fb-click="Patch26Actions.navigateCloseSidebar" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(targetRoute))}">
+    return `<button type="button" class="nav-item${isAct?' active':''}" data-route="${targetRoute}" data-fb-click="Patch26Actions.navigateCloseSidebar" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(targetRoute))}">
       <span>${icon}</span><span>${label}</span>${badgeHtml}
-    </div>`;
+    </button>`;
   },
 
   _firstAllowedRoute() {
@@ -539,7 +571,7 @@ const App = {
     });
   },
 
-  navigate(route, updateHistory = true) {
+  async navigate(route, updateHistory = true) {
     if (route && (route.startsWith('validar') || route.includes('val='))) {
       if (typeof Assinador !== 'undefined' && typeof Assinador.renderTelaValidacaoPublica === 'function') {
         Assinador.renderTelaValidacaoPublica();
@@ -559,46 +591,59 @@ const App = {
       targetRoute = fallback;
     }
     this.route = targetRoute;
+    const navigation = this._navigationId = (this._navigationId || 0) + 1;
     this._charts.forEach(c => { try { c.destroy(); } catch{} });
     this._charts = [];
 
     // Atualiza itens ativos no menu lateral
-    document.querySelectorAll('.nav-item').forEach(el => {
+    document.querySelectorAll('.nav-item,.mobile-nav-item').forEach(el => {
       const itemRoute = el.dataset.route;
-      const isActive = (itemRoute === targetRoute) || (this._normalizeRoute(itemRoute) === targetRoute);
+      const isActive = !!itemRoute && ((itemRoute === targetRoute) || (this._normalizeRoute(itemRoute) === targetRoute));
       el.classList.toggle('active', isActive);
+      if (isActive) el.setAttribute('aria-current','page');
+      else el.removeAttribute('aria-current');
     });
 
     // Atualiza cabeçalho e título da página na aba do navegador
     const meta = this.routeMeta[targetRoute] || { icon: '📊', label: 'FinObra' };
     const hTitle = document.getElementById('h-title');
-    if (hTitle) hTitle.textContent = `${meta.icon} ${meta.label}`;
+    if (hTitle) hTitle.textContent = meta.label;
     document.title = `FinObra — ${meta.label}`;
 
-    // Renderiza a view correspondente
-    const el = document.getElementById('route-content');
-    if (el) {
-      try {
-        el.innerHTML = this.routes[targetRoute].render(this.obraId);
-        if (typeof this.routes[targetRoute].init === 'function') {
-          this.routes[targetRoute].init(this.obraId);
-        }
-      } catch(err) {
-        console.error(err);
-        el.innerHTML = `<div style="padding:40px;text-align:center;color:var(--text3)">
-          <h3 style="color:var(--accent);margin-bottom:8px">Erro ao carregar</h3>
-          <p style="font-size:.85rem">${Utils.escapeHtml(err?.message || 'Falha inesperada.')}</p>
-        </div>`;
-      }
-    }
-
-    // Atualiza a URL na barra de endereços com History API de forma limpa e premium
+    // A URL acompanha a intenção de navegação mesmo enquanto o módulo é baixado.
     if (updateHistory) {
       const cleanUrl = `/app/${targetRoute}`;
       if (window.location.pathname !== cleanUrl || window.location.hash) {
         history.pushState({ route: targetRoute }, '', cleanUrl);
       }
     }
+
+    // Renderiza a view correspondente
+    const el = document.getElementById('route-content');
+    if (el) {
+      try {
+        const resource = { orcamentos:'sinapi', relatorios:'reports' }[targetRoute];
+        if (resource && !FinObraAssets.ready(resource)) {
+          el.innerHTML = '<div role="status" style="padding:40px;text-align:center;color:var(--text3)">Carregando módulo…</div>';
+          await FinObraAssets.load(resource);
+          if (navigation !== this._navigationId || el !== document.getElementById('route-content')) return;
+        }
+        el.innerHTML = this.routes[targetRoute].render(this.obraId);
+        if (typeof this.routes[targetRoute].init === 'function') {
+          this.routes[targetRoute].init(this.obraId);
+        }
+      } catch(err) {
+        if (navigation !== this._navigationId) return;
+        console.error(err);
+        el.innerHTML = `<div style="padding:40px;text-align:center;color:var(--text3)">
+          <h3 style="color:var(--accent);margin-bottom:8px">Erro ao carregar</h3>
+          <p style="font-size:.85rem">${Utils.escapeHtml(err?.message || 'Falha inesperada.')}</p>
+          <button class="btn btn-secondary" id="route-retry">Tentar novamente</button>
+        </div>`;
+        document.getElementById('route-retry')?.addEventListener('click', () => this.navigate(targetRoute, false));
+      }
+    }
+
   },
 
   refreshObraSelector() {
@@ -964,6 +1009,8 @@ const App = {
     if (isMobile) {
       if (sb) {
         sb.classList.toggle('open');
+        sb.inert = !sb.classList.contains('open');
+        document.getElementById('mob-menu')?.setAttribute('aria-expanded', String(!sb.inert));
         if (ov) ov.classList.toggle('active', sb.classList.contains('open'));
       }
     } else {
@@ -986,7 +1033,8 @@ const App = {
     const sb = document.getElementById('sidebar');
     const ov = document.getElementById('sidebar-overlay');
     if (isMobile) {
-      if (sb) sb.classList.remove('open');
+      if (sb) { sb.classList.remove('open'); sb.inert = true; }
+      document.getElementById('mob-menu')?.setAttribute('aria-expanded','false');
       if (ov) ov.classList.remove('active');
     }
   },

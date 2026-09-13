@@ -18,8 +18,9 @@
     @media(max-width:700px){.wrap{width:min(100% - 28px,1160px)}.header-in{height:62px}.brand-mark{width:34px;height:34px}.hero{padding:54px 0 38px}.hero h1{font-size:clamp(2.15rem,12vw,3.25rem)}.hero p{font-size:.94rem}.hero-actions{display:grid;grid-template-columns:1fr;margin:24px auto 16px;max-width:390px}.hero-actions .btn{width:100%;padding:14px}.trust{gap:9px 14px;font-size:.7rem}.product-frame{margin-top:34px}.product-bar{height:38px}.product-body{padding:13px;gap:8px}.mini-kpi{padding:11px}.mini-kpi strong{font-size:1rem}.mini-wide{grid-template-columns:1fr}.mini-panel:last-child{display:none}.section{padding:58px 0}.section-head{text-align:left;margin-bottom:25px}.section-head h2{font-size:1.8rem}.module-groups{display:flex;overflow-x:auto;scroll-snap-type:x mandatory;gap:11px;padding:2px 2px 12px}.module-card{min-width:83vw;scroll-snap-align:center;min-height:180px}.swipe-hint{display:block}.plans{display:flex;overflow-x:auto;scroll-snap-type:x mandatory;gap:11px;padding:14px 2px 16px}.plan{min-width:87vw;scroll-snap-align:center}.plan.featured{order:-1}.compare-shell{display:none}.mobile-compare{display:block}.support-points{grid-template-columns:1fr}.cta{padding:50px 0}.cta-card{padding:32px 18px}.cta-card .hero-actions{margin-bottom:0}.footer-in{display:block}.footer-links{margin-top:15px}.float-wa{right:13px;bottom:13px;width:46px;height:46px}}
     @media(max-width:420px){.product-body{grid-template-columns:1fr}.mini-kpi:nth-child(n+3){display:none}.module-card{min-width:89vw}.plan{min-width:91vw}.plan-limits{grid-template-columns:1fr 1fr}.header-actions .btn-soft{display:none}}
   </style>
+  <link rel="stylesheet" href="/css/premium.css?v=20260913" media="screen">
 </head>
-<body>
+<body class="ui-marketing">
   <div class="bg"></div>
   <header class="header">
     <div class="wrap header-in">
@@ -43,18 +44,30 @@
 
   <main>
     <section class="hero">
-      <div class="wrap">
-        <div class="eyebrow"><span class="dot"></span> Gestão completa para construtoras</div>
-        <h1>Obras, financeiro e engenharia.<br><span class="gold">Tudo no mesmo lugar.</span></h1>
-        <p>O FinObra organiza do canteiro ao escritório: acompanhe custos, medições, compras, documentos e indicadores da obra sem depender de várias planilhas e sistemas separados.</p>
-        <div class="hero-actions"><a class="btn btn-primary" href="/cadastro">Começar 15 dias grátis →</a><a class="btn btn-green" href="https://wa.me/5595991363678?text=Olá! Quero conhecer o FinObra e entender qual plano atende minha construtora." target="_blank" rel="noopener noreferrer">Falar com Suporte / Comercial</a></div>
-        <div class="trust"><span>15 dias para testar</span><span>Sem taxa de implantação</span><span>Sem fidelidade</span><span>100% em nuvem</span></div>
-
-        <div class="product-frame" aria-label="Prévia do FinObra">
-          <div class="product-inner"><div class="product-bar"><i class="p-dot"></i><i class="p-dot"></i><i class="p-dot"></i><div class="fake-url">finobra.app.br/app/dashboard</div></div><div class="product-body">
-            <div class="mini-kpi"><small>Obras ativas</small><strong>8</strong></div><div class="mini-kpi"><small>Financeiro no mês</small><strong>R$ 184 mil</strong></div><div class="mini-kpi"><small>Avanço físico</small><strong>63%</strong></div><div class="mini-kpi"><small>Compras abertas</small><strong>12</strong></div>
-            <div class="mini-wide"><div class="mini-panel"><strong>Orçado x realizado</strong><div class="mini-lines"><div class="mini-line" style="--w:88%"></div><div class="mini-line" style="--w:71%"></div><div class="mini-line" style="--w:54%"></div></div></div><div class="mini-panel"><strong>Visão executiva</strong><p style="color:var(--muted);font-size:.72rem;margin:9px 0 0">Custos, prazo, compras e medições reunidos por obra.</p></div></div>
-          </div></div>
+      <div class="wrap hero-layout">
+        <div class="hero-copy">
+          <div class="eyebrow"><span class="dot"></span> Do canteiro ao escritório</div>
+          <h1>Sua obra sob controle.<br><span class="gold">Sua gestão um passo à frente.</span></h1>
+          <p>Financeiro, compras e engenharia conectados. Tenha clareza sobre cada custo e acompanhe suas obras em um só lugar.</p>
+          <div class="hero-actions"><a class="btn btn-primary" href="/cadastro">Testar grátis por 15 dias <span aria-hidden="true">↗</span></a><a class="btn btn-soft" href="#modulos">Conhecer os recursos</a></div>
+          <div class="trust"><span>15 dias para testar</span><span>Sem taxa de implantação</span><span>Sem fidelidade</span><span>Acesse de onde estiver</span></div>
+        </div>
+        <div class="product-frame" aria-label="Exemplo ilustrativo de indicadores no FinObra">
+          <div class="product-inner">
+            <div class="product-bar"><i class="p-dot"></i><i class="p-dot"></i><i class="p-dot"></i><div class="fake-url">finobra.app.br/app/dashboard</div></div>
+            <div class="product-heading"><div><strong>Visão geral das obras</strong><br><small>Os números que orientam sua próxima decisão.</small></div><span class="preview-label">Ilustrativo</span></div>
+            <div class="product-body">
+              <div class="mini-kpi"><small>Obras ativas</small><strong>8 obras</strong></div><div class="mini-kpi"><small>Total recebido</small><strong>R$ 184 mil</strong></div><div class="mini-kpi"><small>Avanço físico</small><strong>63%</strong></div>
+              <div class="preview-chart"><div class="preview-chart-head"><strong>Orçado × realizado</strong><span>Últimos 6 meses</span></div>
+                <svg viewBox="0 0 440 160" role="img" aria-label="Gráfico ilustrativo comparando valores orçados e realizados ao longo de seis meses">
+                  <g stroke="#e5ecdf" stroke-width="1"><path d="M0 30h440M0 70h440M0 110h440M0 150h440"/></g>
+                  <g fill="#d9e7c9"><rect x="20" y="93" width="20" height="57" rx="3"/><rect x="90" y="71" width="20" height="79" rx="3"/><rect x="160" y="82" width="20" height="68" rx="3"/><rect x="230" y="43" width="20" height="107" rx="3"/><rect x="300" y="31" width="20" height="119" rx="3"/><rect x="370" y="16" width="20" height="134" rx="3"/></g>
+                  <g fill="#377d58"><rect x="43" y="106" width="20" height="44" rx="3"/><rect x="113" y="87" width="20" height="63" rx="3"/><rect x="183" y="93" width="20" height="57" rx="3"/><rect x="253" y="62" width="20" height="88" rx="3"/><rect x="323" y="48" width="20" height="102" rx="3"/><rect x="393" y="32" width="20" height="118" rx="3"/></g>
+                </svg><div class="preview-chart-foot"><span>Abr</span><span>Mai</span><span>Jun</span><span>Jul</span><span>Ago</span><span>Set</span></div>
+              </div>
+              <div class="preview-project"><span aria-hidden="true">◈</span><strong>Residencial Horizonte</strong><span>Estrutura · Em andamento</span></div>
+            </div>
+          </div>
         </div>
       </div>
     </section>

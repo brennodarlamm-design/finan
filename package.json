@@ -46,5 +46,8 @@
     "@vercel/blob": "^2.8.0",
     "dotenv": "^16.4.5",
     "google-auth-library": "^11.0.2"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "^0.5.8"
   }
 }

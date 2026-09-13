@@ -942,9 +942,10 @@ const OrcamentoSINAPI = {
   // Exportação — PDF
   // ─────────────────────────────────────────────────
 
-  exportPDF(id) {
+  async exportPDF(id) {
     const orc = this._getById(id);
     if (!orc) return;
+    if (!await FinObraAssets.require('pdf')) return;
     if (!window.jspdf) { Utils.toast('Biblioteca PDF não carregada. Aguarde e tente novamente.', 'warning'); return; }
 
     const { jsPDF } = window.jspdf;
@@ -1062,9 +1063,10 @@ const OrcamentoSINAPI = {
   // Exportação — Excel (SheetJS)
   // ─────────────────────────────────────────────────
 
-  exportExcel(id) {
+  async exportExcel(id) {
     const orc = this._getById(id);
     if (!orc) return;
+    if (!await FinObraAssets.require('excel')) return;
     if (typeof XLSX === 'undefined') { Utils.toast('SheetJS não carregado.', 'warning'); return; }
 
     const cliente = DB.getById('clientes', orc.obra_id);

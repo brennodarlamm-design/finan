@@ -1608,13 +1608,14 @@ const ObraDetalhe = {
   },
 
   // ── MOTOR MODULAR DE EXPORTAÇÃO EXCEL (.XLSX) ──
-  exportarExcel(modo = 'completo', obraId = null) {
+  async exportarExcel(modo = 'completo', obraId = null) {
     const id = obraId || this.currentObraId;
     if (!id) {
       Utils.toast('Selecione uma obra para exportar.', 'warning');
       return;
     }
 
+    if (!await FinObraAssets.require('excel')) return;
     if (typeof XLSX === 'undefined') {
       Utils.toast('Biblioteca XLSX não disponível no navegador.', 'danger');
       return;

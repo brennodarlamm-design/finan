@@ -173,7 +173,7 @@ fs.writeFileSync(loginPagePath, loginPage, 'utf8');
 
 const builtHome = fs.readFileSync(path.join(out, 'index.html'), 'utf8');
 const builtLogin = fs.readFileSync(path.join(out, 'login.html'), 'utf8');
-if (!builtHome.includes('Obras, financeiro e engenharia.') || !builtLogin.includes('id="login-form"')) {
+if (!builtHome.includes('class="ui-marketing"') || !builtHome.includes('href="/cadastro"') || !builtLogin.includes('id="login-form"')) {
   throw new Error('Patch 37: landing/login não foram materializados corretamente no dist.');
 }
 

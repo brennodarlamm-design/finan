@@ -15,7 +15,7 @@ const redirects = fs.readFileSync('cloudflare/_redirects', 'utf8');
 assert(wrangler.includes('"/app/*"'), 'Wrangler deve executar o Worker antes dos assets em /app/*.');
 assert(worker.includes('function isAppShellPath(pathname)'), 'Worker deve identificar rotas do app shell.');
 assert(worker.includes("pathname.startsWith('/app/')"), 'Worker deve reconhecer rotas internas aninhadas do app.');
-assert(worker.includes("new URL('/app.html', incoming)"), 'Patch 38 deve resolver /app/* pelo arquivo app.html explícito para evitar fallback ambíguo para a landing.');
+assert(worker.includes("assetPath = '/app.html'"), 'Patch 38 deve resolver /app/* pelo arquivo app.html explícito para evitar fallback ambíguo para a landing.');
 assert(worker.includes("target.pathname === '/app.html'"), 'Acesso público direto a app.html deve canonicalizar para /app.');
 assert(redirects.includes('/app /app.html 200') && redirects.includes('/app/* /app.html 200'), 'Assets devem possuir rewrites explícitos de /app e /app/* para app.html.');
 assert(worker.includes("routeName = 'app-shell'") && worker.includes("headers.set('X-FinObra-Route', routeName)"), 'Resposta do app shell deve continuar identificável dentro do roteador multi-shell.');

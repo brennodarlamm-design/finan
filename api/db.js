@@ -484,7 +484,7 @@ export default async function handler(req, res) {
         const [obras, fornecedores, lancamentos, notas, orcamentos, medicoes, documentos, produtos, contas, precompras, contratos, recibos, orcamentosSinapi, docFases, preferenciasRows] = await Promise.all([
           sql`SELECT * FROM obras WHERE tenant_id = ${tenantId} AND id NOT IN ('escritorio', 'geral') ORDER BY nome ASC;`,
           sql`SELECT * FROM fornecedores WHERE tenant_id = ${tenantId} ORDER BY nome ASC;`,
-          sql`SELECT * FROM lancamentos WHERE tenant_id = ${tenantId} ORDER BY data DESC, created_at DESC;`,
+          sql`SELECT *, xmin::text AS sync_version FROM lancamentos WHERE tenant_id = ${tenantId} ORDER BY data DESC, created_at DESC;`,
           sql`SELECT * FROM notas_fiscais WHERE tenant_id = ${tenantId} ORDER BY data_emissao DESC;`,
           sql`SELECT * FROM orcamentos WHERE tenant_id = ${tenantId} ORDER BY created_at DESC;`,
           sql`SELECT * FROM medicoes WHERE tenant_id = ${tenantId} ORDER BY data DESC;`,
@@ -562,12 +562,12 @@ export default async function handler(req, res) {
         let items;
         if (obra_id) {
           items = pagination
-            ? await sql`SELECT * FROM lancamentos WHERE tenant_id = ${tenantId} AND obra_id = ${obra_id} ORDER BY data DESC, created_at DESC, id DESC LIMIT ${pagination.limit} OFFSET ${pagination.offset};`
-            : await sql`SELECT * FROM lancamentos WHERE tenant_id = ${tenantId} AND obra_id = ${obra_id} ORDER BY data DESC, created_at DESC, id DESC;`;
+            ? await sql`SELECT *, xmin::text AS sync_version FROM lancamentos WHERE tenant_id = ${tenantId} AND obra_id = ${obra_id} ORDER BY data DESC, created_at DESC, id DESC LIMIT ${pagination.limit} OFFSET ${pagination.offset};`
+            : await sql`SELECT *, xmin::text AS sync_version FROM lancamentos WHERE tenant_id = ${tenantId} AND obra_id = ${obra_id} ORDER BY data DESC, created_at DESC, id DESC;`;
         } else {
           items = pagination
-            ? await sql`SELECT * FROM lancamentos WHERE tenant_id = ${tenantId} ORDER BY data DESC, created_at DESC, id DESC LIMIT ${pagination.limit} OFFSET ${pagination.offset};`
-            : await sql`SELECT * FROM lancamentos WHERE tenant_id = ${tenantId} ORDER BY data DESC, created_at DESC, id DESC;`;
+            ? await sql`SELECT *, xmin::text AS sync_version FROM lancamentos WHERE tenant_id = ${tenantId} ORDER BY data DESC, created_at DESC, id DESC LIMIT ${pagination.limit} OFFSET ${pagination.offset};`
+            : await sql`SELECT *, xmin::text AS sync_version FROM lancamentos WHERE tenant_id = ${tenantId} ORDER BY data DESC, created_at DESC, id DESC;`;
         }
         const normalized = items.map(l => ({
           ...l,
@@ -969,17 +969,19 @@ export default async function handler(req, res) {
             const safeObraId = (l.obra_id && (l.obra_id === 'escritorio' || l.obra_id === 'geral' || validObrasSet.has(l.obra_id))) ? l.obra_id : null;
             const safeNotaId = (l.nota_fiscal_id && validNotasSet.has(l.nota_fiscal_id)) ? l.nota_fiscal_id : null;
 
-            await sql`
+            const saved = await sql`
               INSERT INTO lancamentos (
                 id, tenant_id, data, data_vencimento, data_pagamento, descricao, categoria,
                 fornecedor_beneficiario, conta_bancaria, tipo, valor, status,
                 obra_id, nota_fiscal_id, codigo_barras, chave_nfe, observacoes, conciliado, itens
               )
-              VALUES (
+              SELECT
                 ${l.id}, ${tenantId}, ${dataLanc}, ${dataVenc}, ${dataPag}, ${l.descricao}, ${l.categoria || 'Outros'},
                 ${l.fornecedor_beneficiario || ''}, ${l.conta_bancaria || ''}, ${l.tipo || 'despesa'}, ${cleanNum(l.valor)}, ${l.status || 'pendente'},
                 ${safeObraId}, ${safeNotaId}, ${l.codigo_barras || null}, ${l.chave_nfe || null}, ${l.observacoes || ''}, ${!!l.conciliado},
                 ${itensJson}::jsonb
+              WHERE ${String(l.sync_version || '')} = '' OR EXISTS (
+                SELECT 1 FROM lancamentos WHERE id = ${l.id} AND tenant_id = ${tenantId} FOR UPDATE
               )
               ON CONFLICT (id) DO UPDATE SET
                 data = EXCLUDED.data,
@@ -999,8 +1001,16 @@ export default async function handler(req, res) {
                 observacoes = EXCLUDED.observacoes,
                 conciliado = EXCLUDED.conciliado,
                 itens = EXCLUDED.itens
-              WHERE lancamentos.tenant_id = ${tenantId};
+              WHERE lancamentos.tenant_id = ${tenantId}
+                AND (lancamentos.xmin::text = ${String(l.sync_version || '')} OR
+                  ROW(lancamentos.data, lancamentos.data_vencimento, lancamentos.data_pagamento, lancamentos.descricao, lancamentos.categoria, lancamentos.fornecedor_beneficiario, lancamentos.conta_bancaria, lancamentos.tipo, lancamentos.valor, lancamentos.status, lancamentos.obra_id, lancamentos.nota_fiscal_id, lancamentos.codigo_barras, lancamentos.chave_nfe, lancamentos.observacoes, lancamentos.conciliado, lancamentos.itens)
+                  IS NOT DISTINCT FROM ROW(EXCLUDED.data, EXCLUDED.data_vencimento, EXCLUDED.data_pagamento, EXCLUDED.descricao, EXCLUDED.categoria, EXCLUDED.fornecedor_beneficiario, EXCLUDED.conta_bancaria, EXCLUDED.tipo, EXCLUDED.valor, EXCLUDED.status, EXCLUDED.obra_id, EXCLUDED.nota_fiscal_id, EXCLUDED.codigo_barras, EXCLUDED.chave_nfe, EXCLUDED.observacoes, EXCLUDED.conciliado, EXCLUDED.itens))
+              RETURNING id, xmin::text AS sync_version;
             `;
+            if (!saved.length) {
+              recordFailure('lancamentos', l, 'Lançamento alterado ou excluído em outro dispositivo. Atualize os dados e revise a alteração.', 'SYNC_CONFLICT');
+              continue;
+            }
             totalCount++;
           }
         }
@@ -1260,17 +1270,19 @@ export default async function handler(req, res) {
 
           const itensLancJson = JSON.stringify(Array.isArray(l.itens) ? l.itens : []);
 
-          await sql`
+          const saved = await sql`
             INSERT INTO lancamentos (
               id, tenant_id, data, data_vencimento, data_pagamento, descricao, categoria,
               fornecedor_beneficiario, conta_bancaria, tipo, valor, status,
               obra_id, nota_fiscal_id, codigo_barras, chave_nfe, observacoes, conciliado, itens
             )
-            VALUES (
+            SELECT
               ${l.id}, ${tenantId}, ${dataLanc}, ${dataVenc}, ${dataPag}, ${l.descricao}, ${l.categoria || 'Outros'},
               ${l.fornecedor_beneficiario || ''}, ${l.conta_bancaria || ''}, ${l.tipo || 'despesa'}, ${cleanNum(l.valor)}, ${l.status || 'pendente'},
               ${safeObraId}, ${safeNotaId}, ${l.codigo_barras || null}, ${l.chave_nfe || null}, ${l.observacoes || ''}, ${!!l.conciliado},
               ${itensLancJson}::jsonb
+            WHERE ${String(l.sync_version || '')} = '' OR EXISTS (
+              SELECT 1 FROM lancamentos WHERE id = ${l.id} AND tenant_id = ${tenantId} FOR UPDATE
             )
             ON CONFLICT (id) DO UPDATE SET
               data = EXCLUDED.data,
@@ -1290,10 +1302,15 @@ export default async function handler(req, res) {
               observacoes = EXCLUDED.observacoes,
               conciliado = EXCLUDED.conciliado,
               itens = EXCLUDED.itens
-            WHERE lancamentos.tenant_id = ${tenantId};
+            WHERE lancamentos.tenant_id = ${tenantId}
+              AND (lancamentos.xmin::text = ${String(l.sync_version || '')} OR
+                  ROW(lancamentos.data, lancamentos.data_vencimento, lancamentos.data_pagamento, lancamentos.descricao, lancamentos.categoria, lancamentos.fornecedor_beneficiario, lancamentos.conta_bancaria, lancamentos.tipo, lancamentos.valor, lancamentos.status, lancamentos.obra_id, lancamentos.nota_fiscal_id, lancamentos.codigo_barras, lancamentos.chave_nfe, lancamentos.observacoes, lancamentos.conciliado, lancamentos.itens)
+                  IS NOT DISTINCT FROM ROW(EXCLUDED.data, EXCLUDED.data_vencimento, EXCLUDED.data_pagamento, EXCLUDED.descricao, EXCLUDED.categoria, EXCLUDED.fornecedor_beneficiario, EXCLUDED.conta_bancaria, EXCLUDED.tipo, EXCLUDED.valor, EXCLUDED.status, EXCLUDED.obra_id, EXCLUDED.nota_fiscal_id, EXCLUDED.codigo_barras, EXCLUDED.chave_nfe, EXCLUDED.observacoes, EXCLUDED.conciliado, EXCLUDED.itens))
+            RETURNING id, xmin::text AS sync_version;
           `;
+          if (!saved.length) return res.status(409).json({ success:false, code:'SYNC_CONFLICT', error:'Lançamento alterado ou excluído em outro dispositivo. Atualize os dados e revise a alteração.' });
           await auditDb(sql, req, auth, 'salvar', 'lancamentos', l);
-          return res.status(200).json({ success: true, id: l.id });
+          return res.status(200).json({ success: true, id: l.id, sync_version: saved[0].sync_version });
         }
 
         if (table === 'notas' || table === 'notas_fiscais') {

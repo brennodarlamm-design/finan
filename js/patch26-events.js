@@ -29,7 +29,7 @@
     "Notificacoes": (typeof Notificacoes !== 'undefined' ? Notificacoes : globalThis["Notificacoes"]),
     "OCR": (typeof OCR !== 'undefined' ? OCR : globalThis["OCR"]),
     "OFX": (typeof OFX !== 'undefined' ? OFX : globalThis["OFX"]),
-    "OrcamentoSINAPI": (typeof OrcamentoSINAPI !== 'undefined' ? OrcamentoSINAPI : globalThis["OrcamentoSINAPI"]),
+    get OrcamentoSINAPI() { return (typeof OrcamentoSINAPI !== 'undefined' ? OrcamentoSINAPI : globalThis["OrcamentoSINAPI"]); },
     "Orcamentos": (typeof Orcamentos !== 'undefined' ? Orcamentos : globalThis["Orcamentos"]),
     "Parcelamento": (typeof Parcelamento !== 'undefined' ? Parcelamento : globalThis["Parcelamento"]),
     "Patch26Actions": (typeof Patch26Actions !== 'undefined' ? Patch26Actions : globalThis["Patch26Actions"]),

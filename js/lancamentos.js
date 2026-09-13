@@ -12,7 +12,7 @@ const Lancamentos = {
     return `
     <div class="page-header">
       <div><h1 class="page-title">&#x1F4B0; Lan&ccedil;amentos</h1><p class="page-sub">Controle de receitas e despesas com vencimentos e contas banc&aacute;rias</p></div>
-      <div class="page-actions" style="display:flex;gap:8px;flex-wrap:wrap;">
+      <div class="page-actions finance-actions" style="display:flex;gap:8px;flex-wrap:wrap;">
         <button class="btn btn-secondary btn-sm" data-fb-click="ImportarExcel.abrirModal" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(obraId))}" style="display:flex;align-items:center;gap:6px;border:1px solid var(--accent);color:var(--accent2);">
           📊 Importar Planilha Excel
         </button>
@@ -30,7 +30,7 @@ const Lancamentos = {
       </div>
     </div>
 
-    <div class="g4" style="margin-bottom:16px;">
+    <div class="g4 finance-kpis" style="margin-bottom:16px;">
       <div class="kpi-card" style="padding:14px;"><div class="kpi-label">Total Receitas</div><div class="kpi-value green" style="font-size:1.2rem">${Utils.fmt.currency(r.totalReceitas)}</div></div>
       <div class="kpi-card" style="padding:14px;"><div class="kpi-label">Total Despesas</div><div class="kpi-value red" style="font-size:1.2rem">${Utils.fmt.currency(r.totalDespesas)}</div></div>
       <div class="kpi-card" style="padding:14px;"><div class="kpi-label">Saldo</div><div class="kpi-value ${r.saldo>=0?'blue':'red'}" style="font-size:1.2rem">${Utils.fmt.currency(r.saldo)}</div></div>

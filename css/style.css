@@ -469,6 +469,7 @@ textarea.form-control { resize:vertical; }
 
 /* ===== PRINT ===== */
 @media print {
+  .workspace-context, .mobile-workspace-nav { display:none!important; }
   body { background:#fff!important; color:#0f172a!important; margin:0; padding:0; }
   .sidebar, .main-header, .page-header, .sidebar-overlay, .toast-container, .modal-overlay, .btn, .icon-btn { display:none!important; }
   .main-content { margin:0!important; padding:0!important; width:100%!important; }

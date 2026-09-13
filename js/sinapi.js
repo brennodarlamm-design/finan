@@ -198,6 +198,7 @@ const SINAPI = {
     onProgress?.('Lendo arquivo...');
 
     try {
+      await FinObraAssets.load('excel');
       let dataBuffer;
       const isZip = (arquivo.name || '').toLowerCase().endsWith('.zip') || (arquivo.type || '').includes('zip');
 
@@ -205,15 +206,7 @@ const SINAPI = {
         onProgress?.('Arquivo ZIP da Caixa detectado! Descompactando...');
 
         // Garantir disponibilidade do JSZip
-        if (typeof JSZip === 'undefined') {
-          await new Promise((resolve, reject) => {
-            const s = document.createElement('script');
-            s.src = 'https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js';
-            s.onload = resolve;
-            s.onerror = () => reject(new Error('Falha ao carregar descompactador ZIP'));
-            document.head.appendChild(s);
-          });
-        }
+        await FinObraAssets.load('zip');
 
         const zip = await JSZip.loadAsync(arquivo);
         const entries = Object.values(zip.files).filter(f => !f.dir);

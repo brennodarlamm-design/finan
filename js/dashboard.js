@@ -664,7 +664,7 @@ const Dashboard = {
         { label:'Receitas', data:keys.map(k=>months[k].rec), backgroundColor:'rgba(16,185,129,.75)', borderColor:'#10b981', borderWidth:1, borderRadius:4 },
         { label:'Despesas', data:keys.map(k=>months[k].desp), backgroundColor:'rgba(239,68,68,.75)', borderColor:'#ef4444', borderWidth:1, borderRadius:4 }
       ]},
-      options:{ responsive:true, maintainAspectRatio:false, plugins:{ legend:{labels:{color:'#94a3b8',font:{size:11}}}, tooltip:{callbacks:{label:c=>` ${c.dataset.label}: ${Utils.fmt.currency(c.raw)}`}} }, scales:{ x:{ticks:{color:'#4a5568'},grid:{color:'rgba(255,255,255,.03)'}}, y:{ticks:{color:'#4a5568',callback:v=>'R$'+(v/1000).toFixed(0)+'k'},grid:{color:'rgba(255,255,255,.05)'}} } }
+      options:{ responsive:true, maintainAspectRatio:false, plugins:{ legend:{labels:{color:'#94a3b8',font:{size:11}}}, tooltip:{callbacks:{label:c=>` ${c.dataset.label}: ${Utils.fmt.currency(c.raw)}`}} }, scales:{ x:{ticks:{color:'#a0b5bd'},grid:{color:'rgba(255,255,255,.03)'}}, y:{ticks:{color:'#a0b5bd',callback:v=>'R$'+(v/1000).toFixed(0)+'k'},grid:{color:'rgba(255,255,255,.05)'}} } }
     });
     App.registerChart(ch);
   },

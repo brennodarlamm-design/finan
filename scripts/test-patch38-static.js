@@ -28,8 +28,8 @@ const authCss = read('css/auth-patch38.css');
 const postbuild = read('scripts/patch38-postbuild.cjs');
 const pkg = JSON.parse(read('package.json'));
 
-assert(worker.includes("new URL('/app.html', incoming)"), 'o app-shell deve resolver o arquivo app.html explicitamente.');
-assert(worker.includes("new URL('/login.html', incoming)"), 'login/cadastro devem resolver o arquivo login.html explicitamente.');
+assert(worker.includes("assetPath = '/app.html'"), 'o app-shell deve resolver o arquivo app.html explicitamente.');
+assert(worker.includes("assetPath = '/login.html'"), 'login/cadastro devem resolver o arquivo login.html explicitamente.');
 assert(worker.includes("routeName = incoming.pathname === '/cadastro' ? 'signup-shell' : 'login-shell'"), 'login e cadastro precisam de identificadores de rota distintos.');
 assert(worker.includes("headers.set('X-Robots-Tag', 'noindex, nofollow')"), 'rotas privadas devem enviar X-Robots-Tag noindex.');
 assert(worker.includes("target.pathname === '/app.html'"), 'app.html deve possuir redirect canônico para /app.');
