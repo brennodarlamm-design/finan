@@ -3,450 +3,95 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>FinObra — Gestão de Obras &amp; Financeiro para Construtoras</title>
-  <meta name="description" content="FinObra é a plataforma definitiva de gestão de obras, controle financeiro, medições Caixa Econômica, leitura OCR de notas fiscais e conciliação bancária OFX. Teste 7 dias grátis.">
+  <title>FinObra — Gestão de Obras, Financeiro e Engenharia</title>
+  <meta name="description" content="FinObra reúne gestão de obras, financeiro, compras, documentos e engenharia em um só sistema. Teste grátis por 15 dias.">
   <meta name="google-site-verification" content="UsbTkevWB8EbCcBAij5Dmoa5_UA9DR0I6FZETGzhqBY">
   <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png?v=3">
   <link rel="icon" type="image/x-icon" href="/favicon.ico?v=3">
   <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png?v=3">
   <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&amp;family=Outfit:wght@700;800;900&amp;display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&amp;family=Outfit:wght@700;800;900&amp;display=swap" rel="stylesheet">
   <style>
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-    :root {
-      --bg-base: #050C04; --bg-deep: #030804; --bg-card: #0D1F09;
-      --border: rgba(212,168,50,0.18); --border-str: rgba(212,168,50,0.38);
-      --accent: #D4A832; --accent2: #F0CF5A; --accent3: #FFE08A;
-      --success: #22c55e; --text: #F2ECD8; --text-muted: #7B9C6B; --text-dim: #4A6A38;
-    }
-    html { scroll-behavior: smooth; }
-    body { background: var(--bg-base); color: var(--text); font-family: 'Inter', sans-serif; overflow-x: hidden; line-height: 1.6; }
-
-    /* ANIMATED BACKGROUND */
-    .bg-canvas { position: fixed; inset: 0; pointer-events: none; z-index: 0; overflow: hidden; }
-    .bg-canvas::before {
-      content: ''; position: absolute; top: -30%; left: -20%; width: 80%; height: 80%;
-      background: radial-gradient(ellipse, rgba(26,107,53,0.18) 0%, transparent 65%);
-      animation: drift1 18s ease-in-out infinite alternate;
-    }
-    .bg-canvas::after {
-      content: ''; position: absolute; bottom: -20%; right: -15%; width: 70%; height: 70%;
-      background: radial-gradient(ellipse, rgba(212,168,50,0.1) 0%, transparent 65%);
-      animation: drift2 22s ease-in-out infinite alternate;
-    }
-    @keyframes drift1 { from{transform:translate(0,0) scale(1)} to{transform:translate(8%,6%) scale(1.15)} }
-    @keyframes drift2 { from{transform:translate(0,0) scale(1)} to{transform:translate(-7%,-5%) scale(1.1)} }
-    .bg-grid {
-      position: fixed; inset: 0; pointer-events: none; z-index: 0;
-      background-image: linear-gradient(rgba(212,168,50,0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(212,168,50,0.03) 1px, transparent 1px);
-      background-size: 60px 60px;
-      mask-image: linear-gradient(to bottom, transparent, rgba(0,0,0,0.5) 20%, rgba(0,0,0,0.5) 80%, transparent);
-    }
-    header, section, footer, .stats-strip, .cta-final { position: relative; z-index: 1; }
-
-    /* HEADER */
-    .landing-header {
-      position: sticky; top: 0; z-index: 999;
-      background: rgba(5,12,4,0.82); backdrop-filter: blur(24px) saturate(180%);
-      border-bottom: 1px solid var(--border); padding: 14px 32px;
-      display: flex; align-items: center; justify-content: space-between; gap: 20px;
-      box-shadow: 0 1px 0 rgba(212,168,50,0.06);
-    }
-    .landing-logo { display: flex; align-items: center; gap: 14px; text-decoration: none; flex-shrink: 0; }
-    .logo-mark {
-      width: 44px; height: 44px; border-radius: 12px;
-      background: linear-gradient(135deg, #0D2B0A, #1E5518);
-      border: 1px solid rgba(212,168,50,0.45);
-      display: flex; align-items: center; justify-content: center;
-      box-shadow: 0 0 0 1px rgba(212,168,50,0.1), 0 4px 20px rgba(212,168,50,0.3);
-      overflow: hidden; position: relative;
-    }
-    .logo-mark::after { content: ''; position: absolute; inset: 0; background: linear-gradient(135deg, rgba(212,168,50,0.15), transparent); }
-    .logo-mark svg { position: relative; z-index: 1; }
-    .logo-name {
-      font-family: 'Outfit', sans-serif; font-weight: 900; font-size: 1.3rem;
-      background: linear-gradient(135deg, var(--accent3), var(--accent2), var(--accent));
-      -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; letter-spacing: .03em;
-    }
-    .logo-tagline { font-size: .62rem; color: var(--text-dim); text-transform: uppercase; letter-spacing: .1em; font-weight: 600; }
-    .nav-links { display: flex; align-items: center; gap: 28px; }
-    .nav-links a { color: var(--text-muted); text-decoration: none; font-size: .875rem; font-weight: 600; transition: color .2s; }
-    .nav-links a:hover { color: var(--accent2); }
-    .btn-login-hd {
-      background: rgba(212,168,50,0.1); border: 1px solid var(--border-str); color: var(--accent2);
-      padding: 9px 20px; border-radius: 9px; font-weight: 700; font-size: .84rem; text-decoration: none; transition: all .2s;
-    }
-    .btn-login-hd:hover { background: linear-gradient(135deg,var(--accent2),var(--accent)); color: #050C04; border-color: transparent; box-shadow: 0 4px 18px rgba(212,168,50,0.4); }
-
-    /* HERO */
-    .hero { padding: 100px 20px 80px; text-align: center; max-width: 1140px; margin: 0 auto; }
-    .hero-badge {
-      display: inline-flex; align-items: center; gap: 9px;
-      background: rgba(212,168,50,0.1); border: 1px solid var(--border-str); color: var(--accent2);
-      padding: 7px 20px; border-radius: 100px; font-size: .78rem; font-weight: 800; letter-spacing: .06em; text-transform: uppercase;
-      margin-bottom: 28px; box-shadow: 0 0 30px rgba(212,168,50,0.12); animation: fadeDown .6s ease both;
-    }
-    .badge-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--success); box-shadow: 0 0 8px var(--success); animation: pulseDot 2s infinite; }
-    @keyframes pulseDot { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.6;transform:scale(1.4)} }
-    .hero-title {
-      font-family: 'Outfit', sans-serif; font-size: clamp(2.4rem,5.5vw,4.2rem); font-weight: 900;
-      line-height: 1.1; margin-bottom: 22px; color: #fff; letter-spacing: -0.03em; animation: fadeUp .7s .1s ease both;
-    }
-    .hero-title .gold {
-      background: linear-gradient(135deg, var(--accent3) 10%, var(--accent2) 50%, var(--accent) 90%);
-      -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
-    }
-    .hero-sub { font-size: clamp(1rem,2vw,1.2rem); color: var(--text-muted); max-width: 780px; margin: 0 auto 40px; line-height: 1.7; animation: fadeUp .7s .2s ease both; }
-    .hero-actions { display: flex; align-items: center; justify-content: center; gap: 14px; flex-wrap: wrap; margin-bottom: 32px; animation: fadeUp .7s .3s ease both; }
-    .btn-cta-primary {
-      background: linear-gradient(135deg, var(--accent2), var(--accent)); color: #050C04; font-weight: 900; font-size: 1rem;
-      padding: 17px 34px; border-radius: 12px; text-decoration: none; display: inline-flex; align-items: center; gap: 10px;
-      box-shadow: 0 8px 32px rgba(212,168,50,0.4); transition: all .25s; position: relative; overflow: hidden;
-    }
-    .btn-cta-primary::before { content: ''; position: absolute; top: 0; left: -100%; width: 100%; height: 100%; background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent); transition: left .5s; }
-    .btn-cta-primary:hover::before { left: 100%; }
-    .btn-cta-primary:hover { transform: translateY(-2px); box-shadow: 0 14px 44px rgba(212,168,50,0.55); }
-    .btn-cta-whats {
-      background: rgba(34,197,94,0.1); border: 1px solid rgba(34,197,94,0.4); color: var(--success);
-      font-weight: 800; font-size: 1rem; padding: 17px 30px; border-radius: 12px; text-decoration: none;
-      display: inline-flex; align-items: center; gap: 10px; transition: all .22s;
-    }
-    .btn-cta-whats:hover { background: var(--success); color: #fff; box-shadow: 0 10px 32px rgba(34,197,94,0.35); transform: translateY(-2px); border-color: transparent; }
-    .hero-trust { display: flex; align-items: center; justify-content: center; gap: 20px; font-size: .82rem; flex-wrap: wrap; animation: fadeUp .7s .4s ease both; }
-    .hero-trust span { display: flex; align-items: center; gap: 6px; color: var(--text-muted); }
-    .ck-ico { color: var(--success); font-weight: 900; }
-
-    /* MOCKUP */
-    .mockup-wrap { max-width: 1040px; margin: 56px auto 0; animation: fadeUp .9s .5s ease both; }
-    .mockup-frame {
-      background: linear-gradient(145deg, rgba(212,168,50,0.35), rgba(212,168,50,0.06));
-      border-radius: 20px; padding: 2px; box-shadow: 0 30px 100px rgba(0,0,0,0.85);
-    }
-    .mockup-inner { background: #0A1A07; border-radius: 18px; overflow: hidden; }
-    .mockup-bar { background: #0F2209; border-bottom: 1px solid rgba(212,168,50,0.15); padding: 12px 18px; display: flex; align-items: center; gap: 12px; }
-    .mock-dots { display: flex; gap: 6px; }
-    .mock-dot { width: 10px; height: 10px; border-radius: 50%; }
-    .mock-dot.r{background:#ef4444}.mock-dot.y{background:#f59e0b}.mock-dot.g{background:#22c55e}
-    .mock-url { flex: 1; background: rgba(0,0,0,0.3); border: 1px solid rgba(212,168,50,0.1); border-radius: 6px; padding: 5px 12px; font-size: .75rem; color: var(--text-dim); font-family: monospace; display: flex; align-items: center; gap: 7px; }
-    .mock-status { background: rgba(34,197,94,0.12); color: var(--success); border: 1px solid rgba(34,197,94,0.25); padding: 3px 10px; border-radius: 10px; font-size: .7rem; font-weight: 700; white-space: nowrap; }
-    .mockup-body { padding: 24px; }
-    .mock-kpi-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px,1fr)); gap: 12px; margin-bottom: 18px; }
-    .mock-kpi { background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.07); border-radius: 10px; padding: 14px 16px; transition: all .25s; }
-    .mock-kpi:hover { border-color: rgba(212,168,50,0.25); background: rgba(212,168,50,0.04); }
-    .mock-kpi-label { font-size: .68rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: .06em; margin-bottom: 6px; }
-    .mock-kpi-val { font-size: 1.4rem; font-weight: 900; }
-    .mock-kpi-val.gold{color:var(--accent2)}.mock-kpi-val.white{color:#fff}.mock-kpi-val.blue{color:#38bdf8}.mock-kpi-val.green{color:var(--success)}
-    .mock-kpi-sub { font-size: .7rem; color: var(--text-dim); margin-top: 3px; }
-    .mock-alert { background: rgba(212,168,50,0.07); border: 1px dashed rgba(212,168,50,0.35); padding: 13px 18px; border-radius: 10px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; }
-    .mock-alert-txt { font-size: .83rem; color: var(--accent2); font-weight: 600; }
-    .mock-alert-btn { background: var(--accent); color: #050C04; padding: 6px 14px; border-radius: 7px; font-size: .73rem; font-weight: 800; text-decoration: none; }
-
-    /* SECTIONS */
-    .sw { max-width: 1160px; margin: 0 auto; padding: 90px 20px; }
-    .shd { text-align: center; margin-bottom: 60px; }
-    .stag { display: inline-flex; align-items: center; gap: 8px; font-size: .75rem; font-weight: 800; color: var(--accent2); text-transform: uppercase; letter-spacing: .12em; margin-bottom: 12px; }
-    .stag::before,.stag::after { content: ''; width: 30px; height: 1px; background: linear-gradient(90deg, transparent, var(--accent)); }
-    .stag::after { background: linear-gradient(90deg, var(--accent), transparent); }
-    .stit { font-family: 'Outfit', sans-serif; font-size: clamp(1.9rem,3.5vw,2.7rem); font-weight: 900; color: #fff; letter-spacing: -0.02em; line-height: 1.15; }
-    .stit .gold { background: linear-gradient(135deg,var(--accent2),var(--accent)); -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text; }
-    .ssub { color: var(--text-muted); font-size: .95rem; margin-top: 10px; max-width: 600px; margin-left: auto; margin-right: auto; }
-    .sdiv { height: 1px; background: linear-gradient(90deg, transparent, var(--border), transparent); margin: 0 20px; }
-
-    /* FEATURES */
-    .fgrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(330px,1fr)); gap: 22px; }
-    .fcard { background: var(--bg-card); border: 1px solid rgba(255,255,255,0.06); border-radius: 18px; padding: 32px 28px; transition: all .3s; position: relative; overflow: hidden; }
-    .fcard::before { content: ''; position: absolute; inset: 0; background: radial-gradient(ellipse at top left, rgba(212,168,50,0.06), transparent 60%); opacity: 0; transition: opacity .3s; }
-    .fcard:hover::before { opacity: 1; }
-    .fcard:hover { border-color: var(--border-str); transform: translateY(-5px); box-shadow: 0 16px 48px rgba(0,0,0,0.6), 0 0 0 1px rgba(212,168,50,0.12); }
-    .fico { width: 56px; height: 56px; border-radius: 14px; background: linear-gradient(135deg,rgba(212,168,50,0.15),rgba(212,168,50,0.05)); border: 1px solid var(--border-str); display: flex; align-items: center; justify-content: center; font-size: 1.7rem; margin-bottom: 22px; box-shadow: 0 4px 16px rgba(212,168,50,0.15); }
-    .ftit { font-size: 1.15rem; font-weight: 800; color: #fff; margin-bottom: 12px; }
-    .fdesc { font-size: .9rem; color: var(--text-muted); line-height: 1.65; }
-    .fbadge { display: inline-flex; align-items: center; gap: 5px; margin-top: 14px; font-size: .72rem; font-weight: 700; color: var(--success); background: rgba(34,197,94,0.1); padding: 3px 10px; border-radius: 100px; }
-
-    /* STATS */
-    .stats-strip { background: linear-gradient(135deg,#0D2009,#162D10); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); padding: 50px 20px; }
-    .stats-inner { max-width: 900px; margin: 0 auto; display: grid; grid-template-columns: repeat(auto-fit,minmax(200px,1fr)); gap: 40px; text-align: center; }
-    .snum { font-family: 'Outfit', sans-serif; font-size: 2.5rem; font-weight: 900; background: linear-gradient(135deg,var(--accent2),var(--accent)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; line-height: 1; margin-bottom: 8px; }
-    .slbl { font-size: .88rem; color: var(--text-muted); font-weight: 600; }
-
-    /* PRICING */
-    .pgrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(310px,1fr)); gap: 24px; align-items: stretch; }
-    .pcard { background: var(--bg-card); border: 1px solid rgba(255,255,255,0.07); border-radius: 22px; padding: 38px 30px 32px; display: flex; flex-direction: column; position: relative; transition: all .3s; }
-    .pcard:hover { border-color: var(--border); box-shadow: 0 20px 60px rgba(0,0,0,0.5); transform: translateY(-4px); }
-    .pcard.feat { background: linear-gradient(150deg,#132A0E,#1E4018,#132A0E); border: 1px solid var(--border-str); box-shadow: 0 20px 60px rgba(212,168,50,0.2); transform: scale(1.04); }
-    .pcard.feat:hover { transform: scale(1.04) translateY(-4px); }
-    .ribbon { position: absolute; top: -14px; left: 50%; transform: translateX(-50%); background: linear-gradient(135deg,var(--accent2),var(--accent)); color: #050C04; padding: 5px 18px; border-radius: 100px; font-size: .72rem; font-weight: 900; letter-spacing: .05em; text-transform: uppercase; white-space: nowrap; box-shadow: 0 4px 16px rgba(212,168,50,0.4); }
-    .pname { font-family: 'Outfit', sans-serif; font-size: 1.4rem; font-weight: 900; color: #fff; margin-bottom: 6px; }
-    .pname.gn { color: var(--accent2); }
-    .pdesc { font-size: .84rem; color: var(--text-muted); margin-bottom: 22px; line-height: 1.5; }
-    .pprice { display: flex; align-items: flex-end; gap: 4px; margin-bottom: 6px; }
-    .pcur { font-size: 1.1rem; font-weight: 700; color: var(--text-muted); padding-bottom: 8px; }
-    .pval { font-family: 'Outfit', sans-serif; font-size: 3.4rem; font-weight: 900; color: #fff; line-height: 1; }
-    .pval.gv { color: var(--accent2); }
-    .pmo { font-size: .85rem; color: var(--text-muted); padding-bottom: 8px; }
-    .pper { font-size: .78rem; color: var(--text-dim); margin-bottom: 28px; }
-    .plist { list-style: none; display: flex; flex-direction: column; gap: 11px; flex: 1; margin-bottom: 30px; }
-    .plist li { font-size: .87rem; color: #e2e8f0; display: flex; align-items: flex-start; gap: 9px; line-height: 1.45; }
-    .plist li .ck { color: var(--success); font-weight: 900; font-size: .95rem; margin-top: 1px; flex-shrink: 0; }
-    .pbtn { width: 100%; padding: 15px; border-radius: 12px; font-size: .9rem; font-weight: 800; text-align: center; text-decoration: none; display: flex; align-items: center; justify-content: center; gap: 8px; cursor: pointer; transition: all .22s; border: none; }
-    .pbtn-gold { background: linear-gradient(135deg,var(--accent2),var(--accent)); color: #050C04; box-shadow: 0 8px 24px rgba(212,168,50,0.4); }
-    .pbtn-gold:hover { box-shadow: 0 12px 36px rgba(212,168,50,0.6); transform: translateY(-1px); }
-    .pbtn-ghost { background: rgba(255,255,255,0.05); border: 1px solid var(--border); color: var(--text); }
-    .pbtn-ghost:hover { border-color: var(--border-str); background: rgba(212,168,50,0.08); color: var(--accent2); }
-
-    /* FAQ */
-    .faq-list { max-width: 800px; margin: 0 auto; }
-    .faq-item { background: var(--bg-card); border: 1px solid rgba(255,255,255,0.06); border-radius: 12px; margin-bottom: 10px; overflow: hidden; transition: border-color .2s; }
-    .faq-item:hover,.faq-item.open { border-color: var(--border); }
-    .faq-q { padding: 20px 24px; font-weight: 700; font-size: .94rem; color: #fff; cursor: pointer; display: flex; align-items: center; justify-content: space-between; user-select: none; gap: 14px; }
-    .fchev { width: 24px; height: 24px; border-radius: 50%; background: rgba(212,168,50,0.12); border: 1px solid var(--border); display: flex; align-items: center; justify-content: center; font-size: .8rem; color: var(--accent2); flex-shrink: 0; transition: transform .25s, background .2s; }
-    .faq-item.open .fchev { transform: rotate(180deg); background: rgba(212,168,50,0.2); }
-    .faq-a { max-height: 0; overflow: hidden; transition: max-height .35s ease; }
-    .faq-item.open .faq-a { max-height: 300px; }
-    .faq-ai { padding: 0 24px 20px; font-size: .88rem; color: var(--text-muted); line-height: 1.65; }
-
-    /* CTA FINAL */
-    .cta-final { background: linear-gradient(135deg,#0E2209,#1B3D12,#0E2209); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); padding: 80px 20px; text-align: center; overflow: hidden; }
-    .cta-final::before { content: ''; position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%); width: 600px; height: 300px; background: radial-gradient(ellipse,rgba(212,168,50,0.1),transparent 70%); pointer-events: none; }
-    .cta-inner { max-width: 700px; margin: 0 auto; position: relative; }
-    .cta-tit { font-family: 'Outfit', sans-serif; font-size: clamp(1.9rem,4vw,2.7rem); font-weight: 900; color: #fff; letter-spacing: -0.02em; margin-bottom: 14px; }
-    .cta-sub { color: var(--text-muted); font-size: 1rem; margin-bottom: 36px; line-height: 1.6; }
-
-    /* FOOTER */
-    footer { border-top: 1px solid rgba(255,255,255,0.05); background: var(--bg-deep); padding: 50px 20px 30px; text-align: center; }
-    .flogo { display: flex; align-items: center; justify-content: center; gap: 10px; margin-bottom: 16px; }
-    .fname { font-family: 'Outfit', sans-serif; font-weight: 900; font-size: 1.1rem; background: linear-gradient(135deg,var(--accent2),var(--accent)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
-    .flinks { display: flex; justify-content: center; gap: 24px; margin-bottom: 20px; flex-wrap: wrap; }
-    .flinks a { color: var(--text-dim); text-decoration: none; font-size: .84rem; font-weight: 600; transition: color .2s; }
-    .flinks a:hover { color: var(--accent2); }
-    .fcopy { font-size: .8rem; color: var(--text-dim); line-height: 1.8; }
-
-    /* FLOATING WA */
-    .float-wa { position: fixed; bottom: 24px; right: 24px; background: #22c55e; color: #fff; width: 60px; height: 60px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.8rem; text-decoration: none; box-shadow: 0 8px 32px rgba(34,197,94,0.5); z-index: 9999; transition: all .25s; animation: waPulse 2.5s infinite; }
-    .float-wa:hover { transform: scale(1.12); box-shadow: 0 12px 44px rgba(34,197,94,0.7); }
-    @keyframes waPulse { 0%,100%{box-shadow:0 8px 32px rgba(34,197,94,0.5)} 50%{box-shadow:0 8px 48px rgba(34,197,94,0.75),0 0 0 8px rgba(34,197,94,0.1)} }
-    @keyframes fadeDown { from{opacity:0;transform:translateY(-20px)} to{opacity:1;transform:translateY(0)} }
-    @keyframes fadeUp { from{opacity:0;transform:translateY(24px)} to{opacity:1;transform:translateY(0)} }
-    .reveal { opacity: 0; transform: translateY(30px); transition: opacity .6s ease, transform .6s ease; }
-    .reveal.visible { opacity: 1; transform: none; }
-    .reveal-d1{transition-delay:.1s}.reveal-d2{transition-delay:.2s}.reveal-d3{transition-delay:.3s}
-    @media(max-width:768px){
-      .nav-links{display:none} .landing-header{padding:12px 16px} .hero{padding:70px 16px 60px}
-      .mockup-body{padding:16px} .sw{padding:60px 16px} .pcard.feat{transform:none}
-      .pcard.feat:hover{transform:translateY(-4px)} .fgrid{grid-template-columns:1fr} .pgrid{grid-template-columns:1fr}
-    }
+    *,*::before,*::after{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;background:#050c04;color:#f3eedf;font-family:Inter,Arial,sans-serif;line-height:1.55;overflow-x:hidden}:root{--bg:#050c04;--surface:#0b1808;--surface2:#10240c;--border:rgba(226,184,70,.17);--border2:rgba(226,184,70,.38);--gold:#d9ad38;--gold2:#f3cf67;--green:#27c46a;--text:#f3eedf;--muted:#94a58c;--muted2:#64735f;--danger:#ef6b6b}.wrap{width:min(1160px,calc(100% - 40px));margin:0 auto}.bg{position:fixed;inset:0;pointer-events:none;z-index:-1;background:radial-gradient(circle at 15% 15%,rgba(48,133,55,.17),transparent 33%),radial-gradient(circle at 88% 20%,rgba(217,173,56,.10),transparent 30%),linear-gradient(rgba(217,173,56,.025) 1px,transparent 1px),linear-gradient(90deg,rgba(217,173,56,.025) 1px,transparent 1px);background-size:auto,auto,58px 58px,58px 58px}.header{position:sticky;top:0;z-index:50;background:rgba(5,12,4,.88);backdrop-filter:blur(18px);border-bottom:1px solid var(--border)}.header-in{height:72px;display:flex;align-items:center;gap:24px}.brand{display:flex;align-items:center;gap:10px;text-decoration:none;color:var(--text);min-width:max-content}.brand-mark{width:38px;height:38px;border:1px solid var(--border2);border-radius:11px;display:grid;place-items:center;background:linear-gradient(145deg,#0c2c10,#1d4c1b);box-shadow:0 8px 26px rgba(0,0,0,.25)}.brand-mark svg{width:24px;height:24px}.brand-name{font:900 1.15rem Outfit,sans-serif;letter-spacing:.02em;background:linear-gradient(135deg,#fff1b5,var(--gold2),var(--gold));-webkit-background-clip:text;background-clip:text;color:transparent}.nav{margin-left:auto;display:flex;align-items:center;gap:23px}.nav a{color:var(--muted);text-decoration:none;font-size:.84rem;font-weight:700}.nav a:hover{color:var(--gold2)}.header-actions{display:flex;align-items:center;gap:8px}.btn{border:0;border-radius:10px;padding:12px 18px;font:800 .84rem Inter,sans-serif;text-decoration:none;display:inline-flex;align-items:center;justify-content:center;gap:8px;cursor:pointer;transition:.2s transform,.2s box-shadow,.2s background}.btn:hover{transform:translateY(-1px)}.btn-primary{background:linear-gradient(135deg,var(--gold2),var(--gold));color:#101407;box-shadow:0 9px 26px rgba(217,173,56,.22)}.btn-soft{background:rgba(255,255,255,.04);color:var(--text);border:1px solid rgba(255,255,255,.09)}.btn-green{background:rgba(39,196,106,.11);color:#71e69f;border:1px solid rgba(39,196,106,.35)}.mobile-menu{display:none;margin-left:auto;position:relative}.mobile-menu summary{list-style:none;width:42px;height:42px;border:1px solid var(--border);border-radius:10px;display:grid;place-items:center;cursor:pointer;font-size:1.2rem}.mobile-menu summary::-webkit-details-marker{display:none}.mobile-pop{position:absolute;right:0;top:50px;width:min(290px,calc(100vw - 32px));padding:10px;background:#0a1708;border:1px solid var(--border2);border-radius:14px;box-shadow:0 20px 50px rgba(0,0,0,.55)}.mobile-pop a{display:block;padding:11px 12px;text-decoration:none;color:var(--text);font-weight:700;font-size:.88rem;border-radius:8px}.mobile-pop a:hover{background:rgba(255,255,255,.05)}.hero{padding:86px 0 54px;text-align:center}.eyebrow{display:inline-flex;gap:8px;align-items:center;padding:7px 14px;border:1px solid var(--border2);border-radius:999px;color:var(--gold2);background:rgba(217,173,56,.07);font-size:.72rem;font-weight:900;letter-spacing:.07em;text-transform:uppercase}.dot{width:7px;height:7px;border-radius:50%;background:#3fe17d;box-shadow:0 0 12px rgba(63,225,125,.8)}h1{font:900 clamp(2.35rem,6vw,4.65rem)/1.05 Outfit,sans-serif;letter-spacing:-.045em;margin:22px auto 18px;max-width:1000px}.gold{background:linear-gradient(135deg,#fff1b5,var(--gold2),var(--gold));-webkit-background-clip:text;background-clip:text;color:transparent}.hero p{max-width:780px;margin:0 auto;color:var(--muted);font-size:clamp(.98rem,2vw,1.14rem)}.hero-actions{display:flex;justify-content:center;gap:10px;flex-wrap:wrap;margin:29px 0 18px}.trust{display:flex;justify-content:center;gap:18px;flex-wrap:wrap;color:var(--muted);font-size:.77rem}.trust span::before{content:'✓';color:#4ddd83;font-weight:900;margin-right:6px}.product-frame{margin:52px auto 0;max-width:1030px;border:1px solid var(--border2);border-radius:20px;padding:2px;background:linear-gradient(135deg,rgba(217,173,56,.28),rgba(33,86,29,.18));box-shadow:0 28px 90px rgba(0,0,0,.56)}.product-inner{border-radius:18px;background:#091507;overflow:hidden;text-align:left}.product-bar{height:45px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px;padding:0 15px}.p-dot{width:9px;height:9px;border-radius:50%;background:#456043}.p-dot:nth-child(2){background:#9a7c2f}.p-dot:nth-child(3){background:#267b42}.fake-url{margin-left:7px;flex:1;background:rgba(0,0,0,.25);border:1px solid rgba(255,255,255,.05);border-radius:6px;color:var(--muted2);padding:5px 10px;font:500 .68rem monospace}.product-body{padding:22px;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}.mini-kpi{border:1px solid rgba(255,255,255,.07);background:rgba(255,255,255,.025);border-radius:11px;padding:14px}.mini-kpi small{display:block;color:var(--muted2);font-size:.64rem;text-transform:uppercase;letter-spacing:.06em}.mini-kpi strong{display:block;font-size:1.25rem;margin-top:5px}.mini-wide{grid-column:1/-1;display:grid;grid-template-columns:1.6fr 1fr;gap:12px}.mini-panel{min-height:108px;border:1px solid rgba(255,255,255,.07);border-radius:11px;padding:15px;background:rgba(255,255,255,.018)}.mini-lines{display:grid;gap:8px;margin-top:12px}.mini-line{height:8px;border-radius:10px;background:linear-gradient(90deg,rgba(217,173,56,.65),rgba(39,196,106,.28));width:var(--w)}.section{padding:82px 0}.section-head{text-align:center;max-width:760px;margin:0 auto 38px}.section-tag{color:var(--gold2);font-size:.72rem;font-weight:900;letter-spacing:.11em;text-transform:uppercase}.section h2{font:900 clamp(1.8rem,4vw,2.65rem)/1.12 Outfit,sans-serif;margin:10px 0 12px}.section-head p{margin:0;color:var(--muted);font-size:.94rem}.divider{height:1px;background:linear-gradient(90deg,transparent,var(--border2),transparent)}.module-groups{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}.module-card{border:1px solid var(--border);border-radius:15px;background:rgba(255,255,255,.022);padding:19px;min-height:190px}.module-icon{width:38px;height:38px;border-radius:10px;display:grid;place-items:center;background:rgba(217,173,56,.10);border:1px solid var(--border);font-size:1.05rem}.module-card h3{font-size:1rem;margin:13px 0 6px}.module-card p{color:var(--muted);font-size:.78rem;margin:0 0 12px}.module-list{display:flex;flex-wrap:wrap;gap:6px}.module-chip{padding:5px 8px;border:1px solid rgba(255,255,255,.07);border-radius:7px;color:#cdd8c8;background:rgba(255,255,255,.025);font-size:.68rem;font-weight:700}.plans{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:17px;align-items:stretch}.plan{border:1px solid var(--border);border-radius:18px;background:rgba(255,255,255,.022);padding:24px;display:flex;flex-direction:column;position:relative}.plan.featured{background:linear-gradient(145deg,#10220c,#1a3313);border-color:var(--gold);box-shadow:0 18px 48px rgba(0,0,0,.28)}.popular{position:absolute;top:-12px;left:50%;transform:translateX(-50%);background:var(--gold);color:#101407;border-radius:999px;padding:5px 12px;font-size:.62rem;font-weight:900;white-space:nowrap}.plan-kicker{color:var(--gold2);text-transform:uppercase;font-size:.65rem;font-weight:900;letter-spacing:.07em}.plan h3{font-size:1.2rem;margin:8px 0 3px}.plan-ideal{color:var(--muted);font-size:.75rem;min-height:38px}.price{font:900 2rem Outfit,sans-serif;margin:16px 0 2px}.price small{font:500 .73rem Inter,sans-serif;color:var(--muted)}.plan-limits{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin:13px 0 17px}.limit{padding:9px 10px;border-radius:9px;background:rgba(255,255,255,.035);border:1px solid rgba(255,255,255,.07)}.limit small{display:block;color:var(--muted2);font-size:.6rem;text-transform:uppercase}.limit strong{font-size:.82rem}.plan ul{list-style:none;padding:0;margin:0 0 22px;display:grid;gap:9px}.plan li{font-size:.76rem;color:#d9e0d6}.plan li::before{content:'✓';color:#45dc7d;font-weight:900;margin-right:7px}.plan .btn{margin-top:auto;width:100%}.swipe-hint{display:none;color:var(--muted2);font-size:.68rem;text-align:center;margin-bottom:9px}.compare-shell{border:1px solid var(--border);border-radius:17px;overflow:hidden;background:rgba(255,255,255,.018)}.compare{width:100%;border-collapse:collapse}.compare th,.compare td{padding:12px 15px;border-bottom:1px solid rgba(255,255,255,.055);font-size:.76rem;text-align:center}.compare th:first-child,.compare td:first-child{text-align:left}.compare thead th{background:rgba(217,173,56,.07);color:var(--gold2);font-weight:900}.yes{color:#43db7a;font-weight:900}.no{color:#63725e}.mobile-compare{display:none}.mobile-compare details{border:1px solid var(--border);border-radius:12px;background:rgba(255,255,255,.02);margin-bottom:9px;overflow:hidden}.mobile-compare summary{cursor:pointer;padding:13px 14px;font-weight:850;list-style:none}.mobile-compare summary::-webkit-details-marker{display:none}.mobile-compare summary::after{content:'+';float:right;color:var(--gold2)}.mobile-compare details[open] summary::after{content:'−'}.compare-items{padding:0 14px 13px;display:grid;gap:8px}.compare-item{display:grid;grid-template-columns:1fr auto;gap:10px;color:var(--muted);font-size:.77rem;padding-top:7px;border-top:1px solid rgba(255,255,255,.05)}.support-box{display:grid;grid-template-columns:1.1fr .9fr;gap:18px;align-items:stretch}.support-main,.support-side{border:1px solid var(--border);border-radius:17px;padding:24px;background:rgba(255,255,255,.02)}.support-main h3,.support-side h3{margin:0 0 8px}.support-main p,.support-side p{color:var(--muted);font-size:.82rem}.support-points{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:17px}.support-point{padding:11px;border-radius:10px;background:rgba(255,255,255,.025);border:1px solid rgba(255,255,255,.06);font-size:.75rem}.faq{max-width:860px;margin:0 auto;display:grid;gap:9px}.faq details{border:1px solid var(--border);border-radius:12px;background:rgba(255,255,255,.02);overflow:hidden}.faq summary{padding:15px 17px;cursor:pointer;font-weight:800;font-size:.86rem;list-style:none}.faq summary::-webkit-details-marker{display:none}.faq summary::after{content:'+';float:right;color:var(--gold2)}.faq details[open] summary::after{content:'−'}.faq div{padding:0 17px 16px;color:var(--muted);font-size:.8rem}.cta{padding:72px 0}.cta-card{text-align:center;border:1px solid var(--border2);border-radius:22px;padding:45px 24px;background:linear-gradient(145deg,rgba(33,86,29,.25),rgba(217,173,56,.08))}.cta-card h2{margin-top:0}.cta-card p{color:var(--muted);max-width:690px;margin:0 auto 20px}.footer{border-top:1px solid var(--border);padding:34px 0 28px;color:var(--muted2);font-size:.72rem}.footer-in{display:flex;justify-content:space-between;gap:20px;align-items:flex-start;flex-wrap:wrap}.footer-links{display:flex;gap:16px;flex-wrap:wrap}.footer a{color:var(--muted);text-decoration:none}.float-wa{position:fixed;right:18px;bottom:18px;width:50px;height:50px;border-radius:50%;display:grid;place-items:center;background:#24c766;color:white;text-decoration:none;box-shadow:0 10px 30px rgba(0,0,0,.38);z-index:45;font-size:1.25rem}
+    @media(max-width:900px){.nav{display:none}.desktop-commercial{display:none}.mobile-menu{display:block}.product-body{grid-template-columns:1fr 1fr}.module-groups{grid-template-columns:1fr 1fr}.plans{grid-template-columns:1fr}.support-box{grid-template-columns:1fr}}
+    @media(max-width:700px){.wrap{width:min(100% - 28px,1160px)}.header-in{height:62px}.brand-mark{width:34px;height:34px}.hero{padding:54px 0 38px}.hero h1{font-size:clamp(2.15rem,12vw,3.25rem)}.hero p{font-size:.94rem}.hero-actions{display:grid;grid-template-columns:1fr;margin:24px auto 16px;max-width:390px}.hero-actions .btn{width:100%;padding:14px}.trust{gap:9px 14px;font-size:.7rem}.product-frame{margin-top:34px}.product-bar{height:38px}.product-body{padding:13px;gap:8px}.mini-kpi{padding:11px}.mini-kpi strong{font-size:1rem}.mini-wide{grid-template-columns:1fr}.mini-panel:last-child{display:none}.section{padding:58px 0}.section-head{text-align:left;margin-bottom:25px}.section-head h2{font-size:1.8rem}.module-groups{display:flex;overflow-x:auto;scroll-snap-type:x mandatory;gap:11px;padding:2px 2px 12px}.module-card{min-width:83vw;scroll-snap-align:center;min-height:180px}.swipe-hint{display:block}.plans{display:flex;overflow-x:auto;scroll-snap-type:x mandatory;gap:11px;padding:14px 2px 16px}.plan{min-width:87vw;scroll-snap-align:center}.plan.featured{order:-1}.compare-shell{display:none}.mobile-compare{display:block}.support-points{grid-template-columns:1fr}.cta{padding:50px 0}.cta-card{padding:32px 18px}.cta-card .hero-actions{margin-bottom:0}.footer-in{display:block}.footer-links{margin-top:15px}.float-wa{right:13px;bottom:13px;width:46px;height:46px}}
+    @media(max-width:420px){.product-body{grid-template-columns:1fr}.mini-kpi:nth-child(n+3){display:none}.module-card{min-width:89vw}.plan{min-width:91vw}.plan-limits{grid-template-columns:1fr 1fr}.header-actions .btn-soft{display:none}}
   </style>
-  <script src="/js/version_guard.js"></script>
 </head>
 <body>
-  <div class="bg-canvas"></div>
-  <div class="bg-grid"></div>
-
-  <!-- HEADER -->
-  <header class="landing-header">
-    <a href="/apresentacao" class="landing-logo">
-      <div class="logo-mark">
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-          <rect x="2" y="10" width="4" height="11" rx="1" fill="#1A6B35"/>
-          <rect x="7" y="7" width="4" height="14" rx="1" fill="#1A6B35"/>
-          <rect x="12" y="4" width="4" height="17" rx="1" fill="#1A6B35"/>
-          <rect x="1" y="20" width="22" height="2" rx="1" fill="#0D4A22"/>
-          <polyline points="4,17 9,11 14,14 21,4" fill="none" stroke="#D4A832" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-          <polyline points="17,4 21,4 21,8" fill="none" stroke="#D4A832" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-        </svg>
+  <div class="bg"></div>
+  <header class="header">
+    <div class="wrap header-in">
+      <a class="brand" href="/landing" aria-label="FinObra">
+        <span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 32 32" fill="none"><path d="M5 23V13L16 5l11 8v10" stroke="#F3CF67" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/><path d="M11 25v-9h10v9M8 25h16" stroke="#F3CF67" stroke-width="2.4" stroke-linecap="round"/></svg></span>
+        <span class="brand-name">FinObra</span>
+      </a>
+      <nav class="nav" aria-label="Navegação principal">
+        <a href="#modulos">Módulos</a><a href="#planos">Planos</a><a href="#comparar">Comparar</a><a href="#faq">Dúvidas</a>
+      </nav>
+      <div class="header-actions">
+        <a class="btn btn-green desktop-commercial" href="https://wa.me/5595991363678?text=Olá! Gostaria de falar com o Suporte / Comercial do FinObra." target="_blank" rel="noopener noreferrer">Suporte / Comercial</a>
+        <a class="btn btn-soft" href="/login">Entrar</a>
       </div>
-      <div>
-        <div class="logo-name">FinObra</div>
-        <div class="logo-tagline">Gestão de Obras &amp; Financeiro</div>
-      </div>
-    </a>
-    <nav class="nav-links">
-      <a href="#recursos">Recursos</a>
-      <a href="#planos">Preços</a>
-      <a href="#faq">Perguntas Frequentes</a>
-      <a href="https://wa.me/5595991363678?text=Olá! Gostaria de uma demonstração do FinObra." target="_blank">Falar com Consultor</a>
-    </nav>
-    <div><a href="/login" class="btn-login-hd">Já sou cliente &rarr;</a></div>
+      <details class="mobile-menu">
+        <summary aria-label="Abrir menu">☰</summary>
+        <div class="mobile-pop"><a href="#modulos">Módulos</a><a href="#planos">Planos</a><a href="#comparar">Comparar planos</a><a href="#faq">Dúvidas</a><a href="https://wa.me/5595991363678?text=Olá! Gostaria de falar com o Suporte / Comercial do FinObra." target="_blank" rel="noopener noreferrer">Suporte / Comercial</a><a href="/login">Área do cliente</a></div>
+      </details>
+    </div>
   </header>
 
-  <!-- HERO -->
-  <section class="hero">
-    <div class="hero-badge"><span class="badge-dot"></span><span>SaaS N° 1 em Gestão de Obras &amp; Financeiro para Construtoras</span></div>
-    <h1 class="hero-title">O Controle Total das suas<br><span class="gold">Obras &amp; Custos</span> sem planilhas.</h1>
-    <p class="hero-sub">Elimine notas fiscais perdidas e retrabalho. O FinObra automatiza compras com leitura <strong style="color:var(--accent2)">OCR com IA</strong>, emite boletins de medição no padrão Caixa Econômica e faz conciliação bancária OFX em segundos.</p>
-    <div class="hero-actions">
-      <a href="#planos" class="btn-cta-primary"><span>&#9889;</span><span>Ver Planos &amp; Testar Grátis</span><span>&#8594;</span></a>
-      <a href="https://wa.me/5595991363678?text=Olá! Quero conhecer o sistema FinObra para a minha construtora." target="_blank" class="btn-cta-whats"><span>&#128172;</span><span>Demo via WhatsApp</span></a>
-    </div>
-    <div class="hero-trust">
-      <span><span class="ck-ico">&#10003;</span> Sem taxa de implantação</span>
-      <span><span class="ck-ico">&#10003;</span> Cancele quando quiser</span>
-      <span><span class="ck-ico">&#10003;</span> Suporte VIP: (95) 99136-3678</span>
-      <span><span class="ck-ico">&#10003;</span> 100% em Nuvem</span>
-    </div>
-    <div class="mockup-wrap">
-      <div class="mockup-frame"><div class="mockup-inner">
-        <div class="mockup-bar">
-          <div class="mock-dots"><div class="mock-dot r"></div><div class="mock-dot y"></div><div class="mock-dot g"></div></div>
-          <div class="mock-url"><span style="color:var(--success);font-size:.7rem">&#128274;</span><span>finobra.app.br/app/dashboard</span></div>
-          <div class="mock-status">&#9679; Sistema Ativo</div>
-        </div>
-        <div class="mockup-body">
-          <div class="mock-kpi-row">
-            <div class="mock-kpi"><div class="mock-kpi-label">Obras em Andamento</div><div class="mock-kpi-val white">12 Obras</div><div class="mock-kpi-sub">8 Caixa · 4 Particulares</div></div>
-            <div class="mock-kpi"><div class="mock-kpi-label">Volume Gerenciado</div><div class="mock-kpi-val gold">R$ 4.820.000</div><div class="mock-kpi-sub">100% orçado e auditado</div></div>
-            <div class="mock-kpi"><div class="mock-kpi-label">Notas Fiscais OCR</div><div class="mock-kpi-val blue">148 Lidas</div><div class="mock-kpi-sub">Extração automática de itens</div></div>
-            <div class="mock-kpi"><div class="mock-kpi-label">Conciliação OFX</div><div class="mock-kpi-val green">97% Conciliado</div><div class="mock-kpi-sub">Lançamentos batidos</div></div>
-          </div>
-          <div class="mock-alert">
-            <div class="mock-alert-txt">&#10003; Todas as obras com histórico de compras, medições e conciliação bancária sincronizadas em tempo real.</div>
-            <a href="/login" class="mock-alert-btn">Experimentar no Sistema &#8599;</a>
-          </div>
-        </div>
-      </div></div>
-    </div>
-  </section>
+  <main>
+    <section class="hero">
+      <div class="wrap">
+        <div class="eyebrow"><span class="dot"></span> Gestão completa para construtoras</div>
+        <h1>Obras, financeiro e engenharia.<br><span class="gold">Tudo no mesmo lugar.</span></h1>
+        <p>O FinObra organiza do canteiro ao escritório: acompanhe custos, medições, compras, documentos e indicadores da obra sem depender de várias planilhas e sistemas separados.</p>
+        <div class="hero-actions"><a class="btn btn-primary" href="/login?cadastro=1">Começar 15 dias grátis →</a><a class="btn btn-green" href="https://wa.me/5595991363678?text=Olá! Quero conhecer o FinObra e entender qual plano atende minha construtora." target="_blank" rel="noopener noreferrer">Falar com Suporte / Comercial</a></div>
+        <div class="trust"><span>15 dias para testar</span><span>Sem taxa de implantação</span><span>Sem fidelidade</span><span>100% em nuvem</span></div>
 
-  <!-- STATS -->
-  <div class="stats-strip">
-    <div class="stats-inner">
-      <div class="reveal"><div class="snum">100%</div><div class="slbl">Sistema em Nuvem &amp; Seguro</div></div>
-      <div class="reveal reveal-d1"><div class="snum">7 dias</div><div class="slbl">de Teste Gratuito sem cartão</div></div>
-      <div class="reveal reveal-d2"><div class="snum">SHA-256</div><div class="slbl">Assinatura criptográfica em documentos</div></div>
-      <div class="reveal reveal-d3"><div class="snum">OFX+OCR</div><div class="slbl">Conciliação bancária e leitura de NF-e</div></div>
-    </div>
-  </div>
-  <div class="sdiv"></div>
-
-  <!-- FEATURES -->
-  <section class="sw" id="recursos">
-    <div class="shd reveal">
-      <div class="stag">Funcionalidades Poderosas</div>
-      <h2 class="stit">Construído sob medida para<br><span class="gold">Engenheiros e Construtores</span></h2>
-      <p class="ssub">Tudo que sua construtora precisa em uma plataforma só, sem planilhas, sem retrabalho.</p>
-    </div>
-    <div class="fgrid">
-      <div class="fcard reveal"><div class="fico">&#127959;&#65039;</div><h3 class="ftit">Gestão de Obras &amp; Clientes</h3><p class="fdesc">Controle obras financiadas pela Caixa Econômica ou particulares. Defina contrato, valor global, cronograma de execução e visualize o saldo restante em tempo real.</p><span class="fbadge">&#10003; Multi-Obra</span></div>
-      <div class="fcard reveal reveal-d1"><div class="fico">&#128196;</div><h3 class="ftit">Leitura OCR com IA de Notas Fiscais</h3><p class="fdesc">Basta enviar o PDF ou foto da NF-e. O sistema lê fornecedor, chave de acesso de 44 dígitos e discrimina cada produto — eliminando a digitação manual de materiais.</p><span class="fbadge">&#10003; Inteligência Artificial</span></div>
-      <div class="fcard reveal reveal-d2"><div class="fico">&#128296;</div><h3 class="ftit">Boletins de Medição Caixa</h3><p class="fdesc">Lance percentuais físicos executados em campo. Gere o espelho oficial de medição pronto para envio ao engenheiro fiscal da Caixa Econômica ou contratante particular.</p><span class="fbadge">&#10003; Padrão CEF</span></div>
-      <div class="fcard reveal"><div class="fico">&#128260;</div><h3 class="ftit">Conciliação Bancária OFX</h3><p class="fdesc">Importe o arquivo OFX do banco da sua construtora. O sistema cruza transferências, débitos e PIX com as despesas das obras automaticamente com um clique.</p><span class="fbadge">&#10003; Todos os Bancos</span></div>
-      <div class="fcard reveal reveal-d1"><div class="fico">&#128737;&#65039;</div><h3 class="ftit">Contratos &amp; Assinatura SHA-256</h3><p class="fdesc">Emita recibos e contratos com integridade criptográfica SHA-256 e QR Code. Qualquer pessoa pode validar a autenticidade online pelo portal público FinObra.</p><span class="fbadge">&#10003; Validade Jurídica</span></div>
-      <div class="fcard reveal reveal-d2"><div class="fico">&#128722;</div><h3 class="ftit">Ordens de Compra &amp; Fornecedores</h3><p class="fdesc">Workflow completo para o canteiro: solicitação de pré-compra, cotação com fornecedores, aprovação do gestor e baixa automática no financeiro da obra.</p><span class="fbadge">&#10003; Workflow Completo</span></div>
-    </div>
-  </section>
-  <div class="sdiv"></div>
-
-  <!-- PRICING -->
-  <section class="sw" id="planos">
-    <div class="shd reveal">
-      <div class="stag">Planos Acessíveis</div>
-      <h2 class="stit">Escolha o plano ideal para<br><span class="gold">sua Construtora</span></h2>
-      <p class="ssub">Sem contratos de fidelidade. Teste 7 dias grátis e cancele quando quiser.</p>
-    </div>
-    <div class="pgrid">
-      <div class="pcard reveal">
-        <div class="ribbon" style="background:rgba(212,168,50,0.12);color:var(--accent2);border:1px solid var(--border-str);">3 OBRAS</div>
-        <div style="margin-top:8px">
-          <div class="pname">Plano Básico</div>
-          <div class="pdesc">Ideal para construtores autônomos e pequenas reformas.</div>
-          <div class="pprice"><span class="pcur">R$</span><span class="pval">79</span><span class="pmo">,90/mês</span></div>
-          <div class="pper">Cobrado mensalmente · Sem fidelidade</div>
+        <div class="product-frame" aria-label="Prévia do FinObra">
+          <div class="product-inner"><div class="product-bar"><i class="p-dot"></i><i class="p-dot"></i><i class="p-dot"></i><div class="fake-url">finobra.app.br/app/dashboard</div></div><div class="product-body">
+            <div class="mini-kpi"><small>Obras ativas</small><strong>8</strong></div><div class="mini-kpi"><small>Financeiro no mês</small><strong>R$ 184 mil</strong></div><div class="mini-kpi"><small>Avanço físico</small><strong>63%</strong></div><div class="mini-kpi"><small>Compras abertas</small><strong>12</strong></div>
+            <div class="mini-wide"><div class="mini-panel"><strong>Orçado x realizado</strong><div class="mini-lines"><div class="mini-line" style="--w:88%"></div><div class="mini-line" style="--w:71%"></div><div class="mini-line" style="--w:54%"></div></div></div><div class="mini-panel"><strong>Visão executiva</strong><p style="color:var(--muted);font-size:.72rem;margin:9px 0 0">Custos, prazo, compras e medições reunidos por obra.</p></div></div>
+          </div></div>
         </div>
-        <ul class="plist">
-          <li><span class="ck">&#10003;</span><span>Até <strong>3 Obras Ativas</strong> simultâneas</span></li>
-          <li><span class="ck">&#10003;</span><span>Receitas, Despesas e Saldo em tempo real</span></li>
-          <li><span class="ck">&#10003;</span><span>Medições de Obra &amp; Cronograma Físico</span></li>
-          <li><span class="ck">&#10003;</span><span>Conciliação Bancária OFX</span></li>
-          <li><span class="ck">&#10003;</span><span>Exportação de Relatórios Excel e PDF</span></li>
-          <li><span class="ck">&#10003;</span><span>Suporte Técnico via WhatsApp</span></li>
-        </ul>
-        <a href="https://wa.me/5595991363678?text=Olá! Gostaria de contratar o Plano Básico (R$ 79,90) do FinObra." target="_blank" class="pbtn pbtn-ghost">Contratar Plano Básico</a>
       </div>
-      <div class="pcard feat reveal reveal-d1">
-        <div class="ribbon">&#11088; 10 OBRAS · MAIS POPULAR</div>
-        <div style="margin-top:8px">
-          <div class="pname gn">Plano Profissional</div>
-          <div class="pdesc">Para construtoras e escritórios de engenharia em expansão.</div>
-          <div class="pprice"><span class="pcur">R$</span><span class="pval gv">119</span><span class="pmo">,90/mês</span></div>
-          <div class="pper">Cobrado mensalmente · Sem fidelidade</div>
-        </div>
-        <ul class="plist">
-          <li><span class="ck">&#10003;</span><span>Até <strong>10 Obras Ativas</strong> simultâneas</span></li>
-          <li><span class="ck">&#10003;</span><span><strong>Tudo do Plano Básico incluso</strong></span></li>
-          <li><span class="ck">&#10003;</span><span><strong>Leitura OCR de Notas Fiscais com IA</strong></span></li>
-          <li><span class="ck">&#10003;</span><span>Assinatura Digital SHA-256 com QR Code</span></li>
-          <li><span class="ck">&#10003;</span><span>Portal Público de Validação de Documentos</span></li>
-          <li><span class="ck">&#10003;</span><span>Ordens de Compra &amp; Gestão de Fornecedores</span></li>
-          <li><span class="ck">&#10003;</span><span>Suporte Técnico Prioritário</span></li>
-        </ul>
-        <a href="https://wa.me/5595991363678?text=Olá! Gostaria de contratar o Plano Profissional (R$ 119,90) do FinObra." target="_blank" class="pbtn pbtn-gold">&#9889; Assinar com 7 Dias Grátis</a>
-      </div>
-      <div class="pcard reveal reveal-d2">
-        <div class="ribbon" style="background:rgba(212,168,50,0.12);color:var(--accent2);border:1px solid var(--border-str);">OBRAS ILIMITADAS</div>
-        <div style="margin-top:8px">
-          <div class="pname">Construtora Ilimitado</div>
-          <div class="pdesc">Poder total para grandes construtoras e incorporadoras.</div>
-          <div class="pprice"><span class="pcur">R$</span><span class="pval">159</span><span class="pmo">,90/mês</span></div>
-          <div class="pper">Cobrado mensalmente · Sem fidelidade</div>
-        </div>
-        <ul class="plist">
-          <li><span class="ck">&#10003;</span><span><strong>Obras &amp; Clientes ILIMITADOS</strong></span></li>
-          <li><span class="ck">&#10003;</span><span><strong>Tudo do Plano Profissional incluso</strong></span></li>
-          <li><span class="ck">&#10003;</span><span>Multi-usuários com controle de permissões</span></li>
-          <li><span class="ck">&#10003;</span><span>Importação direta de orçamentos SINAPI</span></li>
-          <li><span class="ck">&#10003;</span><span>Onboarding e Treinamento VIP com Engenheiro</span></li>
-          <li><span class="ck">&#10003;</span><span>Linha Direta de Plantão no WhatsApp</span></li>
-        </ul>
-        <a href="https://wa.me/5595991363678?text=Olá! Gostaria de contratar o Plano Construtora Ilimitado (R$ 159,90) do FinObra." target="_blank" class="pbtn pbtn-ghost">Contratar Plano Ilimitado</a>
-      </div>
-    </div>
-  </section>
-  <div class="sdiv"></div>
+    </section>
 
-  <!-- FAQ -->
-  <section class="sw" id="faq" style="max-width:960px">
-    <div class="shd reveal">
-      <div class="stag">Tire suas Dúvidas</div>
-      <h2 class="stit">Perguntas <span class="gold">Frequentes</span></h2>
-    </div>
-    <div class="faq-list">
-      <div class="faq-item open reveal"><div class="faq-q" data-fb-click="Patch26Actions.toggleParentOpen" data-fb-click-n="1" data-fb-click-t0="self"><span>O sistema atende obras financiadas pela Caixa Econômica Federal?</span><span class="fchev">&#9660;</span></div><div class="faq-a"><div class="faq-ai">Sim! O FinObra conta com módulo especializado de medições com percentuais acumulados e espelho de medição de acordo com as exigências dos engenheiros fiscais da Caixa.</div></div></div>
-      <div class="faq-item reveal reveal-d1"><div class="faq-q" data-fb-click="Patch26Actions.toggleParentOpen" data-fb-click-n="1" data-fb-click-t0="self"><span>Como funciona a leitura automática de Notas Fiscais (OCR)?</span><span class="fchev">&#9660;</span></div><div class="faq-a"><div class="faq-ai">Basta tirar foto pelo celular ou anexar o PDF da nota fiscal. O sistema utiliza inteligência artificial para ler a chave de acesso, dados do fornecedor, valores e discriminar os materiais comprados diretamente na obra.</div></div></div>
-      <div class="faq-item reveal reveal-d2"><div class="faq-q" data-fb-click="Patch26Actions.toggleParentOpen" data-fb-click-n="1" data-fb-click-t0="self"><span>Preciso instalar algum programa no meu computador?</span><span class="fchev">&#9660;</span></div><div class="faq-a"><div class="faq-ai">Não! O FinObra é 100% em nuvem e funciona direto no navegador do computador, tablet ou celular, com sincronização segura e backup automático.</div></div></div>
-      <div class="faq-item reveal"><div class="faq-q" data-fb-click="Patch26Actions.toggleParentOpen" data-fb-click-n="1" data-fb-click-t0="self"><span>A assinatura eletrônica de contratos tem validade jurídica?</span><span class="fchev">&#9660;</span></div><div class="faq-a"><div class="faq-ai">Sim! Atende à Lei Federal 14.063/2020. Os documentos possuem código único de autenticação, hash criptográfico SHA-256 e QR Code para consulta pública instantânea no portal finobra.app.br/validar.</div></div></div>
-      <div class="faq-item reveal reveal-d1"><div class="faq-q" data-fb-click="Patch26Actions.toggleParentOpen" data-fb-click-n="1" data-fb-click-t0="self"><span>Como funciona o suporte técnico?</span><span class="fchev">&#9660;</span></div><div class="faq-a"><div class="faq-ai">Oferecemos atendimento via WhatsApp pelo número (95) 99136-3678 e central de chat integrada dentro do próprio sistema, além de tutoriais em vídeo e manual completo do usuário.</div></div></div>
-    </div>
-  </section>
+    <div class="divider"></div>
+    <section class="section" id="modulos"><div class="wrap"><div class="section-head"><div class="section-tag">Conheça os módulos</div><h2>Uma operação conectada do início ao fim</h2><p>Em vez de uma lista infinita de funcionalidades, organizamos o FinObra de acordo com o trabalho real da construtora.</p></div><div class="swipe-hint">Deslize para conhecer as áreas do sistema →</div><div class="module-groups">
+      <article class="module-card"><div class="module-icon">🏗️</div><h3>Gestão da Obra</h3><p>Centralize clientes, obras, avanço e acompanhamento operacional.</p><div class="module-list"><span class="module-chip">Obras & Clientes</span><span class="module-chip">Medições</span><span class="module-chip">Cronograma</span></div></article>
+      <article class="module-card"><div class="module-icon">💰</div><h3>Financeiro</h3><p>Enxergue receitas, despesas, contas e conciliação por obra.</p><div class="module-list"><span class="module-chip">Fluxo de caixa</span><span class="module-chip">OFX</span><span class="module-chip">Contas bancárias</span></div></article>
+      <article class="module-card"><div class="module-icon">🛒</div><h3>Compras & Fornecedores</h3><p>Organize insumos, fornecedores e solicitações antes da compra.</p><div class="module-list"><span class="module-chip">Fornecedores</span><span class="module-chip">Produtos</span><span class="module-chip">Pré-Compras</span></div></article>
+      <article class="module-card"><div class="module-icon">📄</div><h3>Fiscal & Documentos</h3><p>Centralize notas, contratos, recibos e documentos da empresa.</p><div class="module-list"><span class="module-chip">NF-e / OCR</span><span class="module-chip">Contratos</span><span class="module-chip">Assinatura</span></div></article>
+      <article class="module-card"><div class="module-icon">📐</div><h3>Engenharia</h3><p>Transforme orçamento e execução em indicadores para decisão.</p><div class="module-list"><span class="module-chip">SINAPI</span><span class="module-chip">Curva S / EVM</span><span class="module-chip">ABC / BDI</span></div></article>
+      <article class="module-card"><div class="module-icon">👥</div><h3>Gestão da Empresa</h3><p>Controle equipe, permissões, assinatura, cobrança e suporte.</p><div class="module-list"><span class="module-chip">Usuários</span><span class="module-chip">Sessões</span><span class="module-chip">Conta & Assinatura</span></div></article>
+    </div></div></section>
 
-  <!-- CTA FINAL -->
-  <div class="sdiv"></div>
-  <section class="cta-final">
-    <div class="cta-inner reveal">
-      <h2 class="cta-tit">Pronto para transformar a gestão da sua construtora?</h2>
-      <p class="cta-sub">Comece agora mesmo a gerenciar suas obras com precisão matemática e economia real. Sem burocracia, sem planilhas, sem retrabalho.</p>
-      <div style="display:flex;gap:14px;flex-wrap:wrap;justify-content:center">
-        <a href="https://wa.me/5595991363678?text=Olá! Quero ativar meu teste grátis no FinObra agora mesmo." target="_blank" class="btn-cta-primary" style="font-size:1.05rem;padding:18px 38px"><span>&#128172;</span><span>Iniciar pelo WhatsApp: (95) 99136-3678</span></a>
-        <a href="/login" class="btn-cta-whats" style="padding:18px 28px"><span>&#8594;</span><span>Acessar Sistema</span></a>
-      </div>
-    </div>
-  </section>
+    <div class="divider"></div>
+    <section class="section" id="planos"><div class="wrap"><div class="section-head"><div class="section-tag">Planos claros</div><h2>Escolha pelo tamanho da sua operação</h2><p>Usuários e obras aparecem primeiro. Depois você compara os módulos incluídos em cada nível.</p></div><div class="swipe-hint">Deslize para comparar os planos →</div><div class="plans">
+      <article class="plan"><div class="plan-kicker">Operação essencial</div><h3>Plano Básico</h3><div class="plan-ideal">Para profissionais e pequenas construtoras com equipe enxuta.</div><div class="price">R$ 79,90 <small>/ mês</small></div><div class="plan-limits"><div class="limit"><small>Usuários</small><strong>1 usuário</strong></div><div class="limit"><small>Obras</small><strong>3 ativas</strong></div></div><ul><li>Obras, financeiro e fornecedores</li><li>Produtos e insumos</li><li>Medições e cronograma</li><li>OFX, contas e relatórios</li><li>Suporte pelo sistema / WhatsApp</li></ul><a class="btn btn-soft" href="https://wa.me/5595991363678?text=Olá! Quero conhecer o Plano Básico do FinObra." target="_blank" rel="noopener noreferrer">Conhecer Básico</a></article>
+      <article class="plan featured"><div class="popular">MAIS ESCOLHIDO</div><div class="plan-kicker">Automação e crescimento</div><h3>Plano Profissional</h3><div class="plan-ideal">Para construtoras que querem automatizar compras, documentos e fiscal.</div><div class="price">R$ 119,90 <small>/ mês</small></div><div class="plan-limits"><div class="limit"><small>Usuários</small><strong>2 usuários</strong></div><div class="limit"><small>Obras</small><strong>10 ativas</strong></div></div><ul><li>Tudo do Plano Básico</li><li>Pré-Compras e contratos</li><li>NF-e e OCR com IA</li><li>Documentos e assinatura eletrônica</li><li>Suporte prioritário</li></ul><a class="btn btn-primary" href="/login?cadastro=1">Testar 15 dias grátis</a></article>
+      <article class="plan"><div class="plan-kicker">Operação completa</div><h3>Construtora Ilimitado</h3><div class="plan-ideal">Para equipes que precisam de engenharia avançada e escala.</div><div class="price">R$ 159,90 <small>/ mês</small></div><div class="plan-limits"><div class="limit"><small>Usuários</small><strong>5 usuários</strong></div><div class="limit"><small>Obras</small><strong>Ilimitadas</strong></div></div><ul><li>Tudo do Plano Profissional</li><li>SINAPI / Caixa</li><li>Curva S, EVM, Curva ABC e BDI</li><li>Permissões avançadas por módulo</li><li>Suporte prioritário / VIP</li></ul><a class="btn btn-soft" href="https://wa.me/5595991363678?text=Olá! Quero conhecer o Plano Construtora Ilimitado do FinObra." target="_blank" rel="noopener noreferrer">Conhecer Ilimitado</a></article>
+    </div></div></section>
 
-  <!-- FOOTER -->
-  <footer>
-    <div class="flogo">
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><rect x="2" y="10" width="4" height="11" rx="1" fill="#1A6B35"/><rect x="7" y="7" width="4" height="14" rx="1" fill="#1A6B35"/><rect x="12" y="4" width="4" height="17" rx="1" fill="#1A6B35"/><rect x="1" y="20" width="22" height="2" rx="1" fill="#0D4A22"/><polyline points="4,17 9,11 14,14 21,4" fill="none" stroke="#D4A832" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><polyline points="17,4 21,4 21,8" fill="none" stroke="#D4A832" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-      <span class="fname">FinObra</span>
-    </div>
-    <div class="flinks">
-      <a href="/login">Área do Cliente</a>
-      <a href="/validar" target="_blank">Validação de Documentos</a>
-      <a href="#planos">Planos &amp; Preços</a>
-      <a href="https://wa.me/5595991363678" target="_blank">Contato WhatsApp</a>
-    </div>
-    <div class="fcopy">CNPJ: 65.512.273/0001-60 · Boa Vista / Roraima · Suporte: (95) 99136-3678<br>&copy; 2026 FinObra. Todos os direitos reservados.</div>
-  </footer>
+    <section class="section" id="comparar"><div class="wrap"><div class="section-head"><div class="section-tag">Comparação</div><h2>O que muda de um plano para outro?</h2><p>A base da gestão continua simples. Os planos superiores adicionam automação, documentos e controles avançados de engenharia.</p></div>
+      <div class="compare-shell"><table class="compare"><thead><tr><th>Recurso</th><th>Básico</th><th>Profissional</th><th>Ilimitado</th></tr></thead><tbody>
+        <tr><td>Usuários ativos</td><td>1</td><td>2</td><td>5</td></tr><tr><td>Obras ativas</td><td>3</td><td>10</td><td>Ilimitadas</td></tr><tr><td>Obras, clientes e financeiro</td><td class="yes">✓</td><td class="yes">✓</td><td class="yes">✓</td></tr><tr><td>Fornecedores, produtos e medições</td><td class="yes">✓</td><td class="yes">✓</td><td class="yes">✓</td></tr><tr><td>OFX, contas e relatórios</td><td class="yes">✓</td><td class="yes">✓</td><td class="yes">✓</td></tr><tr><td>Pré-Compras e contratos</td><td class="no">—</td><td class="yes">✓</td><td class="yes">✓</td></tr><tr><td>NF-e / OCR com IA</td><td class="no">—</td><td class="yes">✓</td><td class="yes">✓</td></tr><tr><td>Documentos e assinatura eletrônica</td><td class="no">—</td><td class="yes">✓</td><td class="yes">✓</td></tr><tr><td>SINAPI / Caixa</td><td class="no">—</td><td class="no">—</td><td class="yes">✓</td></tr><tr><td>Curva S, EVM, ABC e BDI</td><td class="no">—</td><td class="no">—</td><td class="yes">✓</td></tr><tr><td>Permissões avançadas por módulo</td><td class="no">—</td><td class="no">—</td><td class="yes">✓</td></tr>
+      </tbody></table></div>
+      <div class="mobile-compare"><details open><summary>Limites da conta</summary><div class="compare-items"><div class="compare-item"><span>Básico</span><strong>1 usuário • 3 obras</strong></div><div class="compare-item"><span>Profissional</span><strong>2 usuários • 10 obras</strong></div><div class="compare-item"><span>Ilimitado</span><strong>5 usuários • obras ilimitadas</strong></div></div></details><details><summary>Gestão e Financeiro</summary><div class="compare-items"><div class="compare-item"><span>Obras, clientes, financeiro, fornecedores, produtos, medições, OFX e relatórios</span><strong class="yes">Todos</strong></div></div></details><details><summary>Automação e Documentos</summary><div class="compare-items"><div class="compare-item"><span>Básico</span><strong>Essencial</strong></div><div class="compare-item"><span>Profissional</span><strong>OCR, contratos, documentos, assinatura</strong></div><div class="compare-item"><span>Ilimitado</span><strong>Todos</strong></div></div></details><details><summary>Engenharia avançada</summary><div class="compare-items"><div class="compare-item"><span>Básico</span><strong>—</strong></div><div class="compare-item"><span>Profissional</span><strong>Orçamentos</strong></div><div class="compare-item"><span>Ilimitado</span><strong>SINAPI, Curva S, EVM, ABC e BDI</strong></div></div></details></div>
+    </div></section>
 
-  <a href="https://wa.me/5595991363678?text=Olá! Gostaria de tirar dúvidas sobre o FinObra." target="_blank" class="float-wa" title="Falar no WhatsApp">&#128172;</a>
+    <div class="divider"></div>
+    <section class="section"><div class="wrap"><div class="support-box"><div class="support-main"><div class="section-tag">Acompanhamento humano</div><h3>Suporte para usar o sistema, Comercial para escolher o plano</h3><p>Você não precisa decorar um número nem procurar quem atende o quê. O mesmo canal direciona dúvidas de uso, demonstração e contratação para a equipe responsável.</p><div class="support-points"><div class="support-point">💬 Central de chat dentro do FinObra</div><div class="support-point">🧑‍💼 Suporte / Comercial via WhatsApp</div><div class="support-point">📚 FinBot para dúvidas rápidas do sistema</div><div class="support-point">🚀 Orientação de implantação e uso</div></div></div><div class="support-side"><h3>Quer entender qual plano serve para você?</h3><p>Conte quantas obras e pessoas sua equipe possui. A equipe orienta a opção adequada sem você precisar interpretar uma tabela sozinho.</p><a class="btn btn-green" style="width:100%;margin-top:10px" href="https://wa.me/5595991363678?text=Olá! Quero ajuda para escolher o melhor plano do FinObra." target="_blank" rel="noopener noreferrer">Falar com Suporte / Comercial</a></div></div></div></section>
+
+    <section class="section" id="faq"><div class="wrap"><div class="section-head"><div class="section-tag">Perguntas frequentes</div><h2>Dúvidas antes de começar</h2></div><div class="faq"><details open><summary>Quantas pessoas podem acessar o FinObra?</summary><div>O limite é por pessoa/usuário ativo: 1 no Básico, 2 no Profissional e 5 no Ilimitado. Notebook, celular e outros dispositivos da mesma pessoa não contam como novos usuários do plano.</div></details><details><summary>O que acontece quando chego ao limite de usuários?</summary><div>O FinObra avisa de forma amigável e permite gerenciar os usuários atuais ou conhecer um plano com mais acessos. O limite não derruba dados nem transforma dispositivos em usuários extras.</div></details><details><summary>Posso testar antes de contratar?</summary><div>Sim. O período de teste é de 15 dias para você conhecer o fluxo do sistema antes de escolher o plano.</div></details><details><summary>Como funcionam os módulos bloqueados?</summary><div>O menu mostra o módulo com cadeado e explica em qual nível ele está disponível. A restrição também é validada no servidor; não é apenas um botão escondido na interface.</div></details><details><summary>O sistema funciona no celular?</summary><div>Sim. A interface é responsiva e os principais fluxos podem ser usados pelo navegador do celular, tablet ou computador.</div></details><details><summary>Como funciona o suporte?</summary><div>Clientes têm central de chat dentro do FinObra, FinBot para dúvidas rápidas e o canal Suporte / Comercial para falar com a equipe quando necessário.</div></details></div></div></section>
+
+    <section class="cta"><div class="wrap"><div class="cta-card"><div class="section-tag">Comece sem compromisso</div><h2>Veja o FinObra funcionando na sua rotina</h2><p>Teste por 15 dias e acompanhe obras, financeiro, compras e documentos antes de decidir qual plano faz sentido para sua construtora.</p><div class="hero-actions"><a class="btn btn-primary" href="/login?cadastro=1">Começar teste grátis</a><a class="btn btn-green" href="https://wa.me/5595991363678?text=Olá! Gostaria de falar com o Suporte / Comercial do FinObra." target="_blank" rel="noopener noreferrer">Suporte / Comercial</a></div></div></div></section>
+  </main>
+
+  <footer class="footer"><div class="wrap footer-in"><div><div class="brand-name" style="display:inline-block;margin-bottom:6px">FinObra</div><div>Gestão de obras, financeiro e engenharia em nuvem.<br>CNPJ: 65.512.273/0001-60 • Boa Vista / Roraima</div></div><div class="footer-links"><a href="/login">Área do Cliente</a><a href="/validar" target="_blank">Validar Documento</a><a href="/privacidade">Privacidade</a><a href="/termos">Termos</a><a href="https://wa.me/5595991363678?text=Olá! Gostaria de falar com o Suporte / Comercial do FinObra." target="_blank" rel="noopener noreferrer">Suporte / Comercial</a></div><div>© 2026 FinObra. Todos os direitos reservados.</div></div></footer>
+  <a class="float-wa" href="https://wa.me/5595991363678?text=Olá! Gostaria de falar com o Suporte / Comercial do FinObra." target="_blank" rel="noopener noreferrer" aria-label="Falar com Suporte / Comercial">💬</a>
 
   <script src="/js/landing_page.js"></script>
   <script src="/js/patch26-actions.js"></script>
