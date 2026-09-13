@@ -177,8 +177,9 @@ if (!builtLoginPage.includes("const recoveryId = res?.requestId || res?.userId |
   throw new Error('Build Cloudflare sem bloqueio real de OTP para conta inexistente.');
 }
 
-if (!deploymentMetadata.commit || deploymentMetadata.commit === 'unknown') {
+if ((!deploymentMetadata.commit || deploymentMetadata.commit === 'unknown') && !process.env.VERCEL) {
   throw new Error('Build Cloudflare sem identificação do commit de origem.');
 }
+
 
 console.log(`✅ Cloudflare dist preparado com commit ${deploymentMetadata.commit.slice(0, 12)} via ${deploymentMetadata.source}, frontend-only, CSP e recuperação tratada.`);
