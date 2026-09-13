@@ -22,7 +22,7 @@ const tests = [
   'scripts/test-patch19-static.js',
   'scripts/test-patch20-static.js',
   'scripts/test-patch21-static.js',
-  'scripts/test-openai-static.js',
+  'scripts/test-finbot-learning-static.js',
   'scripts/test-patch22-static.js',
   'scripts/test-patch23-static.js',
   'scripts/test-patch24-static.js',
@@ -36,7 +36,8 @@ const tests = [
   'scripts/test-patch31-static.js',
   'scripts/test-patch32-static.js',
   'scripts/test-patch33-static.js',
-  'scripts/test-patch34-static.js'
+  'scripts/test-patch34-static.js',
+  'scripts/test-patch35-static.js'
 ].filter(fs.existsSync);
 for (const file of tests) {
   console.log(`\n=== ${file} ===`);

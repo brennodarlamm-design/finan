@@ -28,14 +28,13 @@ const ALLOWED_ORIGINS = [
 
 export default async function handler(req, res) {
   const origin = req.headers.origin;
+  res.setHeader('Vary', 'Origin');
   if (origin) {
     const isAllowed = ALLOWED_ORIGINS.includes(origin) || /^https:\/\/finan-as(?:-[a-z0-9-]+)?\.vercel\.app$/i.test(origin);
     if (isAllowed) {
       res.setHeader('Access-Control-Allow-Origin', origin);
       res.setHeader('Access-Control-Allow-Credentials', 'true');
     }
-  } else {
-    res.setHeader('Access-Control-Allow-Origin', '*');
   }
 
   res.setHeader('Access-Control-Allow-Methods', 'POST,OPTIONS');
@@ -68,11 +67,10 @@ export default async function handler(req, res) {
     });
   }
 
-  const openaiApiKey = String(process.env.OPENAI_API_KEY || '').trim();
   const geminiApiKey = String(process.env.GEMINI_API_KEY || '').trim();
 
-  if (!openaiApiKey && !geminiApiKey) {
-    return res.status(500).json({ error: 'Nenhuma chave de IA (OPENAI_API_KEY ou GEMINI_API_KEY) configurada no servidor.' });
+  if (!geminiApiKey) {
+    return res.status(500).json({ error: 'GEMINI_API_KEY não configurada no servidor.' });
   }
 
   const { base64, mimeType } = req.body || {};
@@ -126,145 +124,68 @@ REGRAS CRÍTICAS PARA 'itens' E 'tipo_documento':
 
   try {
     let ocrResult = null;
-    let provedorUsado = null;
     let modeloUsado = null;
-    let openaiErrorDetail = null;
-    let geminiErrorDetail = null;
+    let lastError = null;
 
-    // ── 1. PROVEDOR PRIMÁRIO: OpenAI ChatGPT Vision (gpt-4o-mini) ──
-    if (openaiApiKey) {
+    // Fluxo sem OpenAI: restaura a família Gemini usada antes da integração ChatGPT.
+    const models = [
+      'gemini-3.6-flash',
+      'gemini-3.5-flash',
+      'gemini-flash-latest'
+    ];
+
+    const geminiPayload = {
+      contents: [{
+        parts: [
+          { text: prompt },
+          { inline_data: { mime_type: cleanMime, data: cleanBase64 } }
+        ]
+      }],
+      generationConfig: {
+        temperature: 0.1,
+        maxOutputTokens: 8192,
+        responseMimeType: 'application/json'
+      }
+    };
+
+    for (const model of models) {
       try {
-        const openaiUrl = 'https://api.openai.com/v1/chat/completions';
-        const openaiPayload = {
-          model: 'gpt-4o-mini',
-          messages: [
-            {
-              role: 'user',
-              content: [
-                { type: 'text', text: prompt },
-                {
-                  type: 'image_url',
-                  image_url: {
-                    url: `data:${cleanMime};base64,${cleanBase64}`,
-                    detail: 'high'
-                  }
-                }
-              ]
-            }
-          ],
-          response_format: { type: 'json_object' },
-          temperature: 0.1,
-          max_tokens: 4096
-        };
-
-        const openaiRes = await fetch(openaiUrl, {
+        const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${geminiApiKey}`;
+        const geminiRes = await fetch(geminiUrl, {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${openaiApiKey}`
-          },
-          signal: AbortSignal.timeout(35000),
-          body: JSON.stringify(openaiPayload)
+          headers: { 'Content-Type': 'application/json' },
+          signal: AbortSignal.timeout(20000),
+          body: JSON.stringify(geminiPayload)
         });
 
-        if (openaiRes.ok) {
-          const openaiData = await openaiRes.json();
-          const rawText = openaiData?.choices?.[0]?.message?.content || '';
+        if (geminiRes.ok) {
+          const geminiData = await geminiRes.json();
+          const parts = geminiData?.candidates?.[0]?.content?.parts || [];
+          let rawText = '';
+          for (const part of parts) {
+            if (part.text) rawText += part.text;
+          }
+          rawText = rawText.trim();
           if (rawText) {
             ocrResult = repairJson(rawText);
-            provedorUsado = 'openai';
-            modeloUsado = 'gpt-4o-mini';
+            modeloUsado = model;
+            break;
           }
         } else {
-          const errTxt = await openaiRes.text();
-          let errJson = null;
-          try { errJson = JSON.parse(errTxt); } catch (_) {}
-          openaiErrorDetail = errJson?.error?.message || `HTTP ${openaiRes.status}: ${errTxt.slice(0, 160)}`;
-          console.warn('[OCR] OpenAI Vision respondeu com aviso:', openaiRes.status, openaiErrorDetail);
+          const errTxt = await geminiRes.text();
+          lastError = `[${model}] HTTP ${geminiRes.status}: ${errTxt.slice(0, 150)}`;
+          console.warn('[OCR] Tentativa Gemini falhou:', model, geminiRes.status);
         }
-      } catch (errNetOpenAI) {
-        openaiErrorDetail = errNetOpenAI.message;
-        console.warn('[OCR] Falha de conexão com OpenAI:', errNetOpenAI.message);
-      }
-    }
-
-    // ── 2. PROVEDOR SECUNDÁRIO / FALLBACK: Google Gemini Vision ──
-    if (!ocrResult && geminiApiKey) {
-      const models = [
-        'gemini-3.6-flash',
-        'gemini-3.5-flash',
-        'gemini-flash-latest'
-      ];
-
-      const geminiPayload = {
-        contents: [{
-          parts: [
-            { text: prompt },
-            { inline_data: { mime_type: cleanMime, data: cleanBase64 } }
-          ]
-        }],
-        generationConfig: {
-          temperature: 0.1,
-          maxOutputTokens: 8192,
-          responseMimeType: 'application/json'
-        }
-      };
-
-      for (const model of models) {
-        try {
-          const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${geminiApiKey}`;
-          const geminiRes = await fetch(geminiUrl, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            signal: AbortSignal.timeout(20000),
-            body: JSON.stringify(geminiPayload)
-          });
-
-          if (geminiRes.ok) {
-            const geminiData = await geminiRes.json();
-            const parts = geminiData?.candidates?.[0]?.content?.parts || [];
-            let rawText = '';
-            for (const part of parts) {
-              if (part.text) rawText += part.text;
-            }
-            rawText = rawText.trim();
-            if (rawText) {
-              ocrResult = repairJson(rawText);
-              provedorUsado = 'gemini';
-              modeloUsado = model;
-              break;
-            }
-          } else {
-            const errTxt = await geminiRes.text();
-            geminiErrorDetail = `[${model}] HTTP ${geminiRes.status}: ${errTxt.slice(0, 150)}`;
-            console.warn('[OCR] Tentativa falhou com modelo Gemini', model, geminiRes.status);
-          }
-        } catch (errNetGemini) {
-          geminiErrorDetail = `[${model}] ${errNetGemini.message}`;
-          console.warn('[OCR] Tentativa falhou com modelo Gemini', model, errNetGemini.message);
-        }
+      } catch (errNetGemini) {
+        lastError = `[${model}] ${errNetGemini.message}`;
+        console.warn('[OCR] Tentativa Gemini falhou:', model, errNetGemini.message);
       }
     }
 
     if (!ocrResult) {
-      const mensagens = [];
-      if (openaiErrorDetail) {
-        if (/credit_balance_exhausted|insufficient_quota/i.test(openaiErrorDetail)) {
-          mensagens.push('OpenAI ChatGPT: Créditos esgotados na sua conta OpenAI. Adicione créditos em platform.openai.com/settings/organization/billing.');
-        } else {
-          mensagens.push(`OpenAI ChatGPT: ${openaiErrorDetail}`);
-        }
-      }
-      if (geminiErrorDetail) {
-        mensagens.push(`Google Gemini: ${geminiErrorDetail}`);
-      }
-      const erroConsolidado = mensagens.join(' | ') || 'Nenhum dos provedores de IA conseguiu processar o arquivo.';
-      console.error('[OCR] Falha geral de OCR:', erroConsolidado);
+      console.error('[OCR] Todos os modelos Gemini falharam:', lastError);
       return res.status(502).json({
-        error: 'Erro no reconhecimento do documento pelos motores de IA.',
-        detalhe: erroConsolidado,
-        openai: openaiErrorDetail || null,
-        gemini: geminiErrorDetail || null
+        error: 'O reconhecimento de documentos está temporariamente indisponível. Tente novamente.'
       });
     }
 
@@ -272,14 +193,14 @@ REGRAS CRÍTICAS PARA 'itens' E 'tipo_documento':
 
     return res.status(200).json({
       ok: true,
-      provedor: provedorUsado,
+      provedor: 'gemini',
       modelo: modeloUsado,
       dados: ocrResult
     });
 
   } catch (err) {
     console.error('[OCR] Erro inesperado:', err);
-    return res.status(500).json({ error: 'Erro interno ao processar o documento.', detalhe: err.message });
+    return res.status(500).json({ error: 'Erro interno ao processar o documento.' });
   }
 }
 

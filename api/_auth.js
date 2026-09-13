@@ -211,7 +211,9 @@ export async function resolveAuthAndTenant(req) {
         return { authenticated:false, status:401, error:'Esta sessão foi encerrada ou expirou. Entre novamente.' };
       }
       // Atualiza atividade no máximo a cada 15 minutos para reduzir escrita no Neon.
-      sql`UPDATE auth_sessions SET last_seen_at=NOW() WHERE id=${payload.sessionId} AND last_seen_at < NOW() - INTERVAL '15 minutes';`.catch(() => {});
+      sql`UPDATE auth_sessions SET last_seen_at=NOW() WHERE id=${payload.sessionId} AND last_seen_at < NOW() - INTERVAL '15 minutes';`.catch((err) => {
+        console.warn('[Auth] Falha ao atualizar last_seen da sessão:', err?.message || err);
+      });
     }
 
     if (!isSuperAdmin) {

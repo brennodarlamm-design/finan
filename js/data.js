@@ -1003,11 +1003,34 @@ const DB = {
   },
 
   _getSyncQueue() {
-    try { return JSON.parse(localStorage.getItem(this._syncQueueKey()) || '[]'); } catch { return []; }
+    try {
+      const list = JSON.parse(localStorage.getItem(this._syncQueueKey()) || '[]');
+      return Array.isArray(list) ? list : [];
+    } catch (err) {
+      console.warn('[Sync] Fila local inválida; mantendo operação em modo seguro:', err);
+      return [];
+    }
   },
 
   _saveSyncQueue(queue) {
-    try { localStorage.setItem(this._syncQueueKey(), JSON.stringify(queue)); } catch (e) { console.warn('[Sync] Falha ao persistir fila:', e); }
+    const normalized = Array.isArray(queue) ? queue : [];
+    const payload = JSON.stringify(normalized);
+    const persist = () => localStorage.setItem(this._syncQueueKey(), payload);
+    try {
+      persist();
+      return true;
+    } catch (err) {
+      console.warn('[Sync] Falha ao persistir fila. Liberando cache pesado e tentando novamente:', err);
+      if (this.purgeStorage) this.purgeStorage();
+      try {
+        persist();
+        return true;
+      } catch (retryErr) {
+        console.error('[Sync] Falha crítica ao persistir fila offline:', retryErr);
+        this._emitSyncStatus('attention', { storageFailure:true, error:'Fila offline sem espaço para persistência.' });
+        return false;
+      }
+    }
   },
 
   getSyncPendingCount() {
@@ -1022,11 +1045,31 @@ const DB = {
     try {
       const list = JSON.parse(localStorage.getItem(this._syncFailedKey()) || '[]');
       return Array.isArray(list) ? list : [];
-    } catch { return []; }
+    } catch (err) {
+      console.warn('[Sync] Fila de atenção local inválida:', err);
+      return [];
+    }
   },
 
   _saveSyncFailed(items) {
-    try { localStorage.setItem(this._syncFailedKey(), JSON.stringify(Array.isArray(items) ? items.slice(-200) : [])); } catch {}
+    const normalized = Array.isArray(items) ? items.slice(-200) : [];
+    const payload = JSON.stringify(normalized);
+    const persist = () => localStorage.setItem(this._syncFailedKey(), payload);
+    try {
+      persist();
+      return true;
+    } catch (err) {
+      console.warn('[Sync] Falha ao persistir fila de atenção. Liberando cache pesado e tentando novamente:', err);
+      if (this.purgeStorage) this.purgeStorage();
+      try {
+        persist();
+        return true;
+      } catch (retryErr) {
+        console.error('[Sync] Falha crítica ao persistir fila de atenção:', retryErr);
+        this._emitSyncStatus('attention', { storageFailure:true, error:'Fila de atenção sem espaço para persistência.' });
+        return false;
+      }
+    }
   },
 
   getSyncFailedCount() {
@@ -1052,7 +1095,7 @@ const DB = {
     const idx = live.findIndex(q => q?.queueId === item?.queueId);
     if (idx < 0) return false;
     live[idx] = { ...live[idx], ...patch, updatedAt: live[idx].updatedAt || new Date().toISOString() };
-    this._saveSyncQueue(live);
+    if (!this._saveSyncQueue(live)) return false;
     Object.assign(item, live[idx]);
     return true;
   },
@@ -1069,7 +1112,11 @@ const DB = {
       httpStatus: Number(detail.status || item?.httpStatus || 0) || null
     };
     if (existing >= 0) failed[existing] = entry; else failed.push(entry);
-    this._saveSyncFailed(failed);
+    if (!this._saveSyncFailed(failed)) {
+      const pending = this.getSyncPendingCount();
+      this._emitSyncStatus('attention', { pending, failed:this.getSyncFailedCount(), storageFailure:true });
+      return -1;
+    }
     const pending = this._ackSyncQueueItem(item, { force:true });
     this._emitSyncStatus('attention', { pending, failed: failed.length });
     return failed.length;
@@ -1088,8 +1135,14 @@ const DB = {
         createdAt: new Date().toISOString(), updatedAt: new Date().toISOString()
       });
     }
-    this._saveSyncFailed([]);
-    this._saveSyncQueue(queue);
+    if (!this._saveSyncQueue(queue)) {
+      this._emitSyncStatus('attention', { pending:this.getSyncPendingCount(), failed:failed.length, storageFailure:true });
+      return 0;
+    }
+    if (!this._saveSyncFailed([])) {
+      this._emitSyncStatus('attention', { pending:queue.length, failed:failed.length, storageFailure:true });
+      return 0;
+    }
     this._emitSyncStatus('pending', { pending:queue.length, failed:0 });
     this._flushCloudQueue();
     return failed.length;
@@ -1156,8 +1209,9 @@ const DB = {
             if (code.startsWith('ROLE_')) console.warn(`[Sync] Operação rejeitada pelo perfil e movida para atenção: ${message}`);
             else if (code.startsWith('PLAN_')) console.warn(`[Sync] Operação rejeitada pelo plano e movida para atenção: ${message}`);
             else console.warn(`[Sync] Operação movida para atenção (${code}): ${message}`);
-            this._moveSyncItemToAttention(item, { error:message, code, status:res.status });
+            const moved = this._moveSyncItemToAttention(item, { error:message, code, status:res.status });
             if (typeof Utils !== 'undefined' && Utils.toast) Utils.toast(message, 'warning');
+            if (moved < 0) { this._scheduleSyncRetry(15000); break; }
             continue;
           }
 
@@ -1165,8 +1219,9 @@ const DB = {
           this._updateQueuedItem(item, { _retries:retries, lastError:message, errorCode:code, httpStatus:res.status, lastAttemptAt:new Date().toISOString() });
           if (retries >= 5) {
             console.error(`[Sync] Operação requer atenção após ${retries} falhas do servidor:`, message);
-            this._moveSyncItemToAttention(item, { error:message, code:`${code}_MAX_RETRIES`, status:res.status });
+            const moved = this._moveSyncItemToAttention(item, { error:message, code:`${code}_MAX_RETRIES`, status:res.status });
             if (typeof Utils !== 'undefined' && Utils.toast) Utils.toast('Uma alteração não foi perdida, mas requer atenção para sincronizar.', 'warning');
+            if (moved < 0) { this._scheduleSyncRetry(15000); break; }
             continue;
           }
           console.warn(`[Sync] Servidor recusou ${item.payload.action}/${item.payload.table}. Tentativa ${retries}/5.`);
@@ -1219,9 +1274,16 @@ const DB = {
         payload
       });
     }
-    this._saveSyncQueue(queue);
+    if (!this._saveSyncQueue(queue)) {
+      this._emitSyncStatus('attention', { pending:this.getSyncPendingCount(), storageFailure:true });
+      if (typeof Utils !== 'undefined' && Utils.toast) {
+        Utils.toast('A alteração foi salva localmente, mas a fila offline não pôde ser persistida. Libere espaço no navegador antes de fechar esta aba.', 'warning');
+      }
+      return false;
+    }
     this._emitSyncStatus('pending');
     this._flushCloudQueue();
+    return true;
   },
 
   async syncAllToCloud() {

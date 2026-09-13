@@ -7,9 +7,6 @@ const Configuracoes = {
   _auditOffset: 0,
   _auditHasMore: false,
   _sessionsCache: [],
-  _errorsCache: [],
-  _errorsOffset: 0,
-  _errorsHasMore: false,
 
   _esc(value) {
     if (typeof Utils !== 'undefined' && Utils.escapeHtml) return Utils.escapeHtml(String(value ?? ''));
@@ -63,7 +60,7 @@ const Configuracoes = {
 
     const session = Auth.getUser();
     const isAdmin = ['admin','superadmin'].includes(session?.perfil);
-    if (!isAdmin && ['usuarios','auditoria','diagnostico'].includes(this._activeTab)) this._activeTab = 'empresa';
+    if (!isAdmin && ['usuarios','auditoria'].includes(this._activeTab)) this._activeTab = 'empresa';
 
     return `
     <div>
@@ -80,9 +77,6 @@ const Configuracoes = {
         <button id="cfg-tab-sessoes" class="cfg-tab${this._activeTab==='sessoes'?' cfg-tab-active':''}" data-fb-click="Configuracoes._switch" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="sessoes">
           &#x1F4F1; Sess&otilde;es
         </button>
-        ${isAdmin ? `<button id="cfg-tab-diagnostico" class="cfg-tab${this._activeTab==='diagnostico'?' cfg-tab-active':''}" data-fb-click="Configuracoes._switch" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="diagnostico">
-          &#x1F6E0;&#xFE0F; Diagn&oacute;stico
-        </button>` : ''}
         <button id="cfg-tab-contas" class="cfg-tab${this._activeTab==='contas'?' cfg-tab-active':''}" data-fb-click="Configuracoes._switch" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="contas">
           &#x1F3E6; Contas Banc&aacute;rias
         </button>
@@ -98,7 +92,7 @@ const Configuracoes = {
 
   _switch(tab) {
     const isAdmin = ['admin','superadmin'].includes(Auth.getUser()?.perfil);
-    const validTabs = ['empresa', 'contas', 'categorias', 'sessoes', ...(isAdmin ? ['usuarios','auditoria','diagnostico'] : [])];
+    const validTabs = ['empresa', 'contas', 'categorias', 'sessoes', ...(isAdmin ? ['usuarios','auditoria'] : [])];
     if (!validTabs.includes(tab)) tab = 'empresa';
     this._activeTab = tab;
     document.querySelectorAll('.cfg-tab').forEach(el => el.classList.remove('cfg-tab-active'));
@@ -109,7 +103,6 @@ const Configuracoes = {
     if (tab === 'usuarios') this.loadUsers();
     if (tab === 'auditoria') this.loadAudit(true);
     if (tab === 'sessoes') this.loadSessions();
-    if (tab === 'diagnostico') this.loadErrors(true);
     if (tab === 'empresa') this.loadEmpresaCloud();
   },
 
@@ -120,7 +113,6 @@ const Configuracoes = {
     if (tab === 'usuarios') return this._renderUsuarios();
     if (tab === 'auditoria') return this._renderAuditoria();
     if (tab === 'sessoes') return this._renderSessoes();
-    if (tab === 'diagnostico') return this._renderDiagnostico();
     return this._renderEmpresa();
   },
 
@@ -754,26 +746,6 @@ const Configuracoes = {
     catch(err) { Utils.toast(err.message || 'Falha ao encerrar sess&otilde;es.','error'); }
   },
 
-  // ── DIAGNÓSTICO DE ERROS ───────────────────────────────
-  _renderDiagnostico() {
-    return `<div class="page-header"><div><h1 class="page-title">&#x1F6E0;&#xFE0F; Diagn&oacute;stico</h1><p class="page-sub">Erros recentes capturados automaticamente nos navegadores desta empresa.</p></div><div class="page-actions"><button class="btn btn-secondary btn-sm" data-fb-click="Configuracoes.loadErrors" data-fb-click-n="1" data-fb-click-t0="bool" data-fb-click-v0="true">↻ Atualizar</button></div></div><div class="card"><div id="errors-list" style="min-height:160px;padding:18px;color:var(--text3);">Carregando diagn&oacute;stico…</div><div style="padding:0 18px 18px"><button id="errors-more" class="btn btn-secondary btn-sm" style="display:none" data-fb-click="Configuracoes.loadErrors" data-fb-click-n="1" data-fb-click-t0="bool" data-fb-click-v0="false">Carregar mais</button></div></div>`;
-  },
-
-  async loadErrors(reset=true) {
-    if (reset) { this._errorsOffset=0; this._errorsCache=[]; }
-    const list=document.getElementById('errors-list');
-    try {
-      const res=await fetch(`/api/audit?action=errors&limit=50&offset=${this._errorsOffset}`,{headers:Auth.getAuthHeaders()});
-      const data=await res.json().catch(()=>({}));
-      if(!res.ok||!data.success) throw new Error(data.error||'Falha ao carregar diagnóstico.');
-      this._errorsCache.push(...(data.data||[])); this._errorsOffset=data.pagination?.nextOffset||this._errorsCache.length; this._errorsHasMore=!!data.pagination?.hasMore;
-      if(list) {
-        if(!this._errorsCache.length) list.innerHTML='<div style="padding:24px;text-align:center">Nenhum erro de frontend registrado. &#x2705;</div>';
-        else list.innerHTML=`<div style="overflow:auto"><table class="table" style="font-size:.78rem"><thead><tr><th>Quando</th><th>Usu&aacute;rio</th><th>Tela</th><th>Erro</th></tr></thead><tbody>${this._errorsCache.map(e=>`<tr><td>${this._esc(new Date(e.created_at).toLocaleString('pt-BR'))}</td><td>${this._esc(e.usuario_nome||'-')}</td><td>${this._esc(e.route||'-')}</td><td title="${this._esc(e.stack||e.message)}"><strong>${this._esc(e.message||'Erro')}</strong><div style="color:var(--text3);font-size:.7rem">${this._esc(e.source||'')}</div></td></tr>`).join('')}</tbody></table></div>`;
-      }
-      const more=document.getElementById('errors-more'); if(more) more.style.display=this._errorsHasMore?'inline-flex':'none';
-    } catch(err) { if(list) list.textContent=err.message||'Falha ao carregar diagnóstico.'; }
-  },
 
   // ── AUDITORIA ───────────────────────────────────────────
   _renderAuditoria() {

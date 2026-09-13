@@ -26,14 +26,13 @@ function getRenderBaseUrl() {
 export default async function handler(req, res) {
   // CORS Seguro
   const origin = req.headers.origin;
+  res.setHeader('Vary', 'Origin');
   if (origin) {
     const isAllowed = ALLOWED_ORIGINS.includes(origin) || /^https:\/\/finan-as(?:-[a-z0-9-]+)?\.vercel\.app$/i.test(origin);
     if (isAllowed) {
       res.setHeader('Access-Control-Allow-Origin', origin);
       res.setHeader('Access-Control-Allow-Credentials', 'true');
     }
-  } else {
-    res.setHeader('Access-Control-Allow-Origin', '*');
   }
 
   res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
@@ -151,9 +150,10 @@ export default async function handler(req, res) {
           data
         });
       } catch (err) {
-        return res.status(500).json({
+        console.warn('[WhatsApp] Falha ao solicitar reset no Render:', err?.name || 'Error', err?.message || err);
+        return res.status(502).json({
           success: false,
-          error: 'Falha ao solicitar desconexão ao servidor Render: ' + err.message
+          error: 'Não foi possível desconectar o WhatsApp no momento. Tente novamente.'
         });
       }
     }
@@ -188,8 +188,7 @@ export default async function handler(req, res) {
       } else {
         return res.status(response.status).json({
           success: false,
-          error: data.error || 'Erro ao enviar mensagem de teste',
-          details: data
+          error: data.error || 'Erro ao enviar mensagem de teste'
         });
       }
     }
@@ -247,12 +246,17 @@ export default async function handler(req, res) {
           status: data.status || 'qr_ready'
         });
       } else {
-        return res.status(response.status).json({ success: false, error: data.error || 'Erro no envio pelo servidor WhatsApp', details: data });
+        return res.status(response.status).json({ success: false, error: data.error || 'Erro no envio pelo servidor WhatsApp' });
       }
     }
 
     return res.status(400).json({ error: `Ação "${action}" desconhecida.` });
   } catch (err) {
-    return res.status(500).json({ success: false, error: err.message });
+    console.error('[WhatsApp] Falha inesperada no proxy:', err);
+    const timedOut = err?.name === 'TimeoutError' || err?.name === 'AbortError';
+    return res.status(502).json({
+      success: false,
+      error: timedOut ? 'O servidor do WhatsApp demorou além do limite. Tente novamente.' : 'Não foi possível concluir a operação do WhatsApp.'
+    });
   }
 }

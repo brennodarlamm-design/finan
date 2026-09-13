@@ -378,10 +378,14 @@ async function startWhatsApp(tenantId, forceClean = false) {
       fs.watch(session.authDir, () => {
         if (session.syncTimer) clearTimeout(session.syncTimer);
         session.syncTimer = setTimeout(() => {
-          saveAuthToPostgres(session).catch(() => {});
+          saveAuthToPostgres(session).catch((err) => {
+            console.warn(`⚠️ [WhatsApp:${session.tenantId}] Falha na persistência agendada das credenciais:`, err?.message || err);
+          });
         }, 500);
       });
-    } catch {}
+    } catch (err) {
+      console.warn(`⚠️ [WhatsApp:${session.tenantId}] Não foi possível iniciar o watcher das credenciais:`, err?.message || err);
+    }
 
     session.sock.ev.on('connection.update', async (update) => {
       const { connection, lastDisconnect, qr } = update;
@@ -481,7 +485,9 @@ process.on('uncaughtException', async (err) => {
       if (sess.connectionStatus !== 'connected') {
         try {
           await resetWhatsAppSession(tId, 'Recuperação automática de erro de decifração Noise/AES-GCM');
-        } catch {}
+        } catch (resetErr) {
+          console.error(`❌ [Auto-Recovery:${tId}] Falha ao resetar sessão WhatsApp:`, resetErr?.message || resetErr);
+        }
       }
     }
   } else {
@@ -816,7 +822,7 @@ app.post('/send-message', requireAuth, async (req, res) => {
     return res.json({ success: true, tenantId: session.tenantId, messageId: sent?.key?.id, to: destPhone, canonicalJid: jid });
   } catch (err) {
     console.error('❌ Erro ao enviar mensagem:', err);
-    return res.status(500).json({ error: err.message });
+    return res.status(500).json({ error: 'Não foi possível enviar a mensagem pelo WhatsApp no momento.' });
   }
 });
 
@@ -842,7 +848,8 @@ app.get('/test-neon', requireAuth, async (req, res) => {
       total_whatsapp_keys: Number(whatsappAuth[0]?.count || 0)
     });
   } catch (err) {
-    return res.status(500).json({ success: false, error: err.message });
+    console.error('❌ [Neon] Falha no teste autenticado de conexão:', err);
+    return res.status(500).json({ success: false, error: 'Não foi possível consultar o banco de dados no momento.' });
   }
 });
 
@@ -959,16 +966,30 @@ async function executarResumoMatinal(explicitTenantId = null) {
   }
 }
 
-// Agendado para 08:00 no fuso America/Boa_Vista (12:00 UTC; sem horário de verão)
-cron.schedule('0 12 * * *', () => {
-  executarResumoMatinal();
+// Agendado para 08:00 no fuso explícito de Boa Vista.
+// Patch 35: evita sobreposição e captura rejeições assíncronas do ciclo completo.
+cron.schedule('0 8 * * *', async () => {
+  try {
+    await executarResumoMatinal();
+  } catch (err) {
+    console.error('❌ [Cron] Falha no resumo matinal:', err?.message || err);
+  }
+}, {
+  timezone: 'America/Boa_Vista',
+  noOverlap: true,
+  name: 'finobra-daily-summary'
 });
 
 // Rota manual para disparar o resumo matinal imediatamente
 app.post('/cron/daily-summary', requireAuth, async (req, res) => {
   const tenantId = req.body?.tenantId || req.query?.tenant_id || null;
-  await executarResumoMatinal(tenantId);
-  return res.json({ success: true, message: 'Rotina matinal executada!' });
+  try {
+    await executarResumoMatinal(tenantId);
+    return res.json({ success: true, message: 'Rotina matinal executada!' });
+  } catch (err) {
+    console.error('❌ [Cron] Falha na execução manual do resumo matinal:', err);
+    return res.status(500).json({ success: false, error: 'Não foi possível executar a rotina matinal no momento.' });
+  }
 });
 
 // ── KEEP-ALIVE SELF-PING (EVITA SLEEP NO RENDER FREE TIER) ─────────────────
@@ -980,6 +1001,9 @@ cron.schedule('*/10 * * * *', async () => {
   } catch (pingErr) {
     console.warn('⚠️ [Keep-Alive] Aviso no auto-ping:', pingErr.message);
   }
+}, {
+  noOverlap: true,
+  name: 'finobra-keep-alive'
 });
 
 // ── INICIALIZAÇÃO DO SERVIDOR ────────────────────────────────────────────────

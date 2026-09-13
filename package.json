@@ -13,7 +13,6 @@
     "render:deploy": "node scripts/render-deploy.js",
     "package:release": "node scripts/package-release.js",
     "test": "node scripts/test-static-all.js",
-    "test:openai": "node scripts/test-openai-static.js",
     "test:patch05": "node scripts/test-patch05-static.js",
     "test:patch06": "node scripts/test-patch06-static.js",
     "test:patch07": "node scripts/test-patch07-static.js",
@@ -39,7 +38,8 @@
     "test:patch27": "node scripts/test-patch27-static.js",
     "test:patch31": "node scripts/test-patch31-static.js",
     "test:patch32": "node scripts/test-patch32-static.js",
-    "test:patch33": "node scripts/test-patch33-static.js"
+    "test:patch33": "node scripts/test-patch33-static.js",
+    "test:finbot": "node scripts/test-finbot-learning-static.js"
   },
   "dependencies": {
     "@neondatabase/serverless": "^0.9.5",
