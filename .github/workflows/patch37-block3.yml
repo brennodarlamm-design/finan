@@ -29,7 +29,9 @@ jobs:
       - name: Install dependencies
         run: npm ci
       - name: Apply Patch 37 block 3
-        run: node scripts/patch37-block3.mjs
+        run: |
+          node scripts/patch37-block3.mjs
+          node scripts/patch37-block3-fix.mjs
       - name: Full regression suite
         run: npm test
       - name: Syntax verification
@@ -50,7 +52,7 @@ jobs:
           set -euo pipefail
           grep -q 'viewport-fit=cover' app.html
           grep -q 'FINOBRA_PATCH37_MOBILE_OPERATIONAL' css/style.css
-          grep -q 'cfg-audit-mobile' js/configuracoes.js
+          grep -q 'cfg-audit-mobile-render' js/configuracoes.js
           grep -q 'cfg-session-card' js/configuracoes.js
           grep -q 'FINOBRA_PATCH37_ACCOUNT_MOBILE' js/cobranca.js
       - name: Commit validated block
