@@ -33,7 +33,7 @@ assert(alert.includes('FINOBRA_API_SECRET'), 'Job financeiro prefere segredo do 
 assert(alert.includes('"x-tenant-id"') && alert.includes('"x-api-key"'), 'Job financeiro envia autenticação interna com escopo de tenant.');
 assert(alert.includes('$cfg.empresa.tenant_id'), 'Tenant do job vem da configuração explícita da empresa.');
 assert(cfg.includes('"tenant_id": "SEU_TENANT_ID_FINOBRA_AQUI"'), 'Configuração modelo exige tenant_id explícito.');
-assert(readme.includes('não é publicado no Render') && readme.includes('não é necessário executar um servidor WhatsApp local'), 'Documentação deixa clara a separação entre utilitário local e produção.');
+assert(/não é publicado no Render/i.test(readme) && /não é necessário executar um servidor WhatsApp local/i.test(readme), 'Documentação deixa clara a separação entre utilitário local e produção.');
 assert(/rootDir:\s*backend/.test(render), 'Render continua restrito ao backend de produção.');
 
 console.log('\n✅ Monitor NF-e: segurança, isolamento de tenant e arquitetura validados.');
