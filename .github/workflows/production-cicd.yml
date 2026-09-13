@@ -104,4 +104,9 @@ jobs:
           auth_status="$(curl --silent --output /dev/null --write-out '%{http_code}' 'https://finobra.app.br/api/auth?action=me')"
           [[ "$auth_status" == '401' ]]
 
+          app_headers="$(curl --fail --silent --show-error --head https://finobra.app.br/app/dashboard)"
+          [[ "$app_headers" == *'x-finobra-route: app-shell'* || "$app_headers" == *'X-FinObra-Route: app-shell'* ]]
+          app_shell="$(curl --fail --silent --show-error https://finobra.app.br/app/dashboard)"
+          [[ "$app_shell" == *'<div id="app-root"></div>'* ]]
+
           echo "Production smoke test passed for commit $GITHUB_SHA."
