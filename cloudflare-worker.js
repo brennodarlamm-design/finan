@@ -110,7 +110,32 @@ function addRecoveryAliases(payload) {
   return next;
 }
 
-function healthResponse(request, env) {
+async function readDeploymentMetadata(request, env) {
+  try {
+    const versionUrl = new URL('/version.json', request.url);
+    const response = await env.ASSETS.fetch(new Request(versionUrl.toString(), {
+      method: 'GET',
+      headers: { 'Cache-Control': 'no-cache' }
+    }));
+    if (!response.ok) return null;
+    const data = await response.json();
+    if (!data || typeof data !== 'object') return null;
+    return {
+      version: data.version || null,
+      build: data.build || null,
+      released_at: data.released_at || null,
+      commit: data.commit || null,
+      source: data.source || null,
+      run_id: data.run_id || null,
+      run_attempt: data.run_attempt || null
+    };
+  } catch (err) {
+    console.warn('[FinObra Cloudflare] metadados de deploy indisponíveis:', err?.message || err);
+    return null;
+  }
+}
+
+async function healthResponse(request, env) {
   let configuredApiOrigin = null;
   let configuredCanonicalOrigin = null;
   let configOk = true;
@@ -123,15 +148,21 @@ function healthResponse(request, env) {
     configOk = false;
   }
 
+  const deployment = await readDeploymentMetadata(request, env);
+  const deploymentMetadataOk = !!deployment?.commit && deployment.commit !== 'unknown';
+  const healthy = configOk && !loopRisk && deploymentMetadataOk;
+
   return Response.json({
-    ok: configOk && !loopRisk,
+    ok: healthy,
     service: 'finobra-edge',
     configuredApiOrigin,
     configuredCanonicalOrigin,
     loopRisk,
-    securityMode: 'nonce-csp'
+    securityMode: 'nonce-csp',
+    deploymentMetadataOk,
+    deployment
   }, {
-    status: configOk && !loopRisk ? 200 : 503,
+    status: healthy ? 200 : 503,
     headers: {
       'Cache-Control': 'no-store',
       'X-Content-Type-Options': 'nosniff'
