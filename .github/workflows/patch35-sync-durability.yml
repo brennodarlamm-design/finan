@@ -1,0 +1,100 @@
+name: Patch 35 sync durability hardening (no deploy)
+
+on:
+  push:
+    branches:
+      - patch35-large-audit
+    paths:
+      - .github/workflows/patch35-sync-durability.yml
+
+permissions:
+  contents: write
+
+jobs:
+  harden:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: patch35-large-audit
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install root dependencies
+        run: npm ci
+      - name: Harden offline queue persistence
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path('js/data.js')
+          text = path.read_text()
+
+          old = """  _getSyncQueue() {\n    try { return JSON.parse(localStorage.getItem(this._syncQueueKey()) || '[]'); } catch { return []; }\n  },\n\n  _saveSyncQueue(queue) {\n    try { localStorage.setItem(this._syncQueueKey(), JSON.stringify(queue)); } catch (e) { console.warn('[Sync] Falha ao persistir fila:', e); }\n  },"""
+          new = """  _getSyncQueue() {\n    try {\n      const list = JSON.parse(localStorage.getItem(this._syncQueueKey()) || '[]');\n      return Array.isArray(list) ? list : [];\n    } catch (err) {\n      console.warn('[Sync] Fila local inválida; mantendo operação em modo seguro:', err);\n      return [];\n    }\n  },\n\n  _saveSyncQueue(queue) {\n    const normalized = Array.isArray(queue) ? queue : [];\n    const payload = JSON.stringify(normalized);\n    const persist = () => localStorage.setItem(this._syncQueueKey(), payload);\n    try {\n      persist();\n      return true;\n    } catch (err) {\n      console.warn('[Sync] Falha ao persistir fila. Liberando cache pesado e tentando novamente:', err);\n      if (this.purgeStorage) this.purgeStorage();\n      try {\n        persist();\n        return true;\n      } catch (retryErr) {\n        console.error('[Sync] Falha crítica ao persistir fila offline:', retryErr);\n        this._emitSyncStatus('attention', { storageFailure:true, error:'Fila offline sem espaço para persistência.' });\n        return false;\n      }\n    }\n  },"""
+          if text.count(old) != 1:
+              raise SystemExit('Bloco _saveSyncQueue esperado não encontrado de forma única.')
+          text = text.replace(old, new, 1)
+
+          old = """  _getSyncFailed() {\n    try {\n      const list = JSON.parse(localStorage.getItem(this._syncFailedKey()) || '[]');\n      return Array.isArray(list) ? list : [];\n    } catch { return []; }\n  },\n\n  _saveSyncFailed(items) {\n    try { localStorage.setItem(this._syncFailedKey(), JSON.stringify(Array.isArray(items) ? items.slice(-200) : [])); } catch {}\n  },"""
+          new = """  _getSyncFailed() {\n    try {\n      const list = JSON.parse(localStorage.getItem(this._syncFailedKey()) || '[]');\n      return Array.isArray(list) ? list : [];\n    } catch (err) {\n      console.warn('[Sync] Fila de atenção local inválida:', err);\n      return [];\n    }\n  },\n\n  _saveSyncFailed(items) {\n    const normalized = Array.isArray(items) ? items.slice(-200) : [];\n    const payload = JSON.stringify(normalized);\n    const persist = () => localStorage.setItem(this._syncFailedKey(), payload);\n    try {\n      persist();\n      return true;\n    } catch (err) {\n      console.warn('[Sync] Falha ao persistir fila de atenção. Liberando cache pesado e tentando novamente:', err);\n      if (this.purgeStorage) this.purgeStorage();\n      try {\n        persist();\n        return true;\n      } catch (retryErr) {\n        console.error('[Sync] Falha crítica ao persistir fila de atenção:', retryErr);\n        this._emitSyncStatus('attention', { storageFailure:true, error:'Fila de atenção sem espaço para persistência.' });\n        return false;\n      }\n    }\n  },"""
+          if text.count(old) != 1:
+              raise SystemExit('Bloco _saveSyncFailed esperado não encontrado de forma única.')
+          text = text.replace(old, new, 1)
+
+          old = """    live[idx] = { ...live[idx], ...patch, updatedAt: live[idx].updatedAt || new Date().toISOString() };\n    this._saveSyncQueue(live);\n    Object.assign(item, live[idx]);\n    return true;"""
+          new = """    live[idx] = { ...live[idx], ...patch, updatedAt: live[idx].updatedAt || new Date().toISOString() };\n    if (!this._saveSyncQueue(live)) return false;\n    Object.assign(item, live[idx]);\n    return true;"""
+          if text.count(old) != 1:
+              raise SystemExit('Bloco _updateQueuedItem esperado não encontrado.')
+          text = text.replace(old, new, 1)
+
+          old = """    if (existing >= 0) failed[existing] = entry; else failed.push(entry);\n    this._saveSyncFailed(failed);\n    const pending = this._ackSyncQueueItem(item, { force:true });\n    this._emitSyncStatus('attention', { pending, failed: failed.length });\n    return failed.length;"""
+          new = """    if (existing >= 0) failed[existing] = entry; else failed.push(entry);\n    if (!this._saveSyncFailed(failed)) {\n      const pending = this.getSyncPendingCount();\n      this._emitSyncStatus('attention', { pending, failed:this.getSyncFailedCount(), storageFailure:true });\n      return -1;\n    }\n    const pending = this._ackSyncQueueItem(item, { force:true });\n    this._emitSyncStatus('attention', { pending, failed: failed.length });\n    return failed.length;"""
+          if text.count(old) != 1:
+              raise SystemExit('Bloco _moveSyncItemToAttention esperado não encontrado.')
+          text = text.replace(old, new, 1)
+
+          old = """    this._saveSyncFailed([]);\n    this._saveSyncQueue(queue);\n    this._emitSyncStatus('pending', { pending:queue.length, failed:0 });\n    this._flushCloudQueue();\n    return failed.length;"""
+          new = """    if (!this._saveSyncQueue(queue)) {\n      this._emitSyncStatus('attention', { pending:this.getSyncPendingCount(), failed:failed.length, storageFailure:true });\n      return 0;\n    }\n    if (!this._saveSyncFailed([])) {\n      this._emitSyncStatus('attention', { pending:queue.length, failed:failed.length, storageFailure:true });\n      return 0;\n    }\n    this._emitSyncStatus('pending', { pending:queue.length, failed:0 });\n    this._flushCloudQueue();\n    return failed.length;"""
+          if text.count(old) != 1:
+              raise SystemExit('Bloco retryFailedSyncItems esperado não encontrado.')
+          text = text.replace(old, new, 1)
+
+          old = """            this._moveSyncItemToAttention(item, { error:message, code, status:res.status });\n            if (typeof Utils !== 'undefined' && Utils.toast) Utils.toast(message, 'warning');\n            continue;"""
+          new = """            const moved = this._moveSyncItemToAttention(item, { error:message, code, status:res.status });\n            if (typeof Utils !== 'undefined' && Utils.toast) Utils.toast(message, 'warning');\n            if (moved < 0) { this._scheduleSyncRetry(15000); break; }\n            continue;"""
+          if text.count(old) != 1:
+              raise SystemExit('Bloco attention 4xx esperado não encontrado.')
+          text = text.replace(old, new, 1)
+
+          old = """            this._moveSyncItemToAttention(item, { error:message, code:`${code}_MAX_RETRIES`, status:res.status });\n            if (typeof Utils !== 'undefined' && Utils.toast) Utils.toast('Uma alteração não foi perdida, mas requer atenção para sincronizar.', 'warning');\n            continue;"""
+          new = """            const moved = this._moveSyncItemToAttention(item, { error:message, code:`${code}_MAX_RETRIES`, status:res.status });\n            if (typeof Utils !== 'undefined' && Utils.toast) Utils.toast('Uma alteração não foi perdida, mas requer atenção para sincronizar.', 'warning');\n            if (moved < 0) { this._scheduleSyncRetry(15000); break; }\n            continue;"""
+          if text.count(old) != 1:
+              raise SystemExit('Bloco attention retries esperado não encontrado.')
+          text = text.replace(old, new, 1)
+
+          old = """    this._saveSyncQueue(queue);\n    this._emitSyncStatus('pending');\n    this._flushCloudQueue();\n  },\n\n  async syncAllToCloud()"""
+          new = """    if (!this._saveSyncQueue(queue)) {\n      this._emitSyncStatus('attention', { pending:this.getSyncPendingCount(), storageFailure:true });\n      if (typeof Utils !== 'undefined' && Utils.toast) {\n        Utils.toast('A alteração foi salva localmente, mas a fila offline não pôde ser persistida. Libere espaço no navegador antes de fechar esta aba.', 'warning');\n      }\n      return false;\n    }\n    this._emitSyncStatus('pending');\n    this._flushCloudQueue();\n    return true;\n  },\n\n  async syncAllToCloud()"""
+          if text.count(old) != 1:
+              raise SystemExit('Final de syncToCloud esperado não encontrado.')
+          text = text.replace(old, new, 1)
+
+          path.write_text(text)
+          PY
+      - name: Validate full regression and syntax
+        run: |
+          npm test
+          node scripts/check-all-syntax.js
+      - name: Verify durable queue guards
+        run: |
+          grep -q "Falha crítica ao persistir fila offline" js/data.js
+          grep -q "if (!this._saveSyncFailed(failed))" js/data.js
+          grep -q "if (!this._saveSyncQueue(queue))" js/data.js
+          grep -q "if (moved < 0)" js/data.js
+      - name: Commit sync durability hardening
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add js/data.js
+          git diff --cached --check
+          git commit -m "fix(patch35): make offline sync queues fail safely"
+          git push origin HEAD:patch35-large-audit
