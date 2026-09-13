@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0C1F09"/>
+      <stop offset="100%" stop-color="#071408"/>
+    </linearGradient>
+    <linearGradient id="gold" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#E8C84A"/>
+      <stop offset="100%" stop-color="#C9A227"/>
+    </linearGradient>
+    <linearGradient id="green" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1A6B35"/>
+      <stop offset="100%" stop-color="#0D4A22"/>
+    </linearGradient>
+  </defs>
+  <!-- Background rounded rect -->
+  <rect width="32" height="32" rx="7" fill="url(#bg)"/>
+  <!-- Building columns (green) -->
+  <rect x="5" y="14" width="4" height="14" rx="1" fill="url(#green)"/>
+  <rect x="10" y="10" width="4" height="18" rx="1" fill="url(#green)"/>
+  <rect x="15" y="7" width="4" height="21" rx="1" fill="url(#green)"/>
+  <!-- Base line -->
+  <rect x="4" y="27" width="24" height="2" rx="1" fill="url(#green)"/>
+  <!-- Arrow (gold) -->
+  <polyline points="7,22 14,15 19,19 27,5" fill="none" stroke="url(#gold)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- Arrow head -->
+  <polyline points="22,5 27,5 27,10" fill="none" stroke="url(#gold)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>
