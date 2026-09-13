@@ -1,0 +1,41 @@
+name: Hotfix Patch 36 CSP Account
+
+on:
+  push:
+    branches: [hotfix-patch36-csp-account-actions]
+    paths:
+      - 'scripts/hotfix-patch36-csp-account-actions.mjs'
+      - '.github/workflows/hotfix-patch36-csp-account.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  validate-and-commit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: hotfix-patch36-csp-account-actions
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: node scripts/hotfix-patch36-csp-account-actions.mjs
+      - run: npm test
+      - run: node scripts/check-all-syntax.js
+      - run: npm run build:cloudflare
+      - run: npx wrangler deploy --dry-run
+      - name: Commit validated hotfix
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add js/patch26-events.js scripts/test-patch26-static.js
+          if git diff --cached --quiet; then
+            echo "No functional changes to commit"
+            exit 0
+          fi
+          git commit -m "fix(patch36): allow account CSP actions"
+          git push origin HEAD:hotfix-patch36-csp-account-actions
