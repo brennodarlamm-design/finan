@@ -10,6 +10,7 @@ function assert(condition, message) {
 
 const pkg = JSON.parse(fs.readFileSync('backend/package.json', 'utf8'));
 const server = fs.readFileSync('backend/server.js', 'utf8');
+const dataLayer = fs.readFileSync('js/data.js', 'utf8');
 const auditWorkflow = fs.readFileSync('.github/workflows/patch35-audit.yml', 'utf8');
 
 assert(/^\^?4\./.test(pkg.dependencies?.['node-cron'] || ''), 'Backend usa node-cron 4.x sem cadeia legada de uuid vulnerável.');
@@ -29,6 +30,14 @@ assert(server.includes("error: 'Não foi possível enviar a mensagem pelo WhatsA
 assert(server.includes("console.error('❌ [Neon] Falha no teste autenticado de conexão:'"), 'Detalhe de falha Neon permanece observável apenas no servidor.');
 assert(server.includes("console.error('❌ [Cron] Falha na execução manual do resumo matinal:'"), 'Execução manual do cron captura rejeições assíncronas.');
 assert(server.includes("error: 'Não foi possível executar a rotina matinal no momento.'"), 'Cron manual devolve falha pública controlada.');
+
+assert(dataLayer.includes("console.error('[Sync] Falha crítica ao persistir fila offline:'"), 'Fila offline faz retry e registra falha crítica de persistência.');
+assert(dataLayer.includes("console.error('[Sync] Falha crítica ao persistir fila de atenção:'"), 'Fila de atenção faz retry e registra falha crítica de persistência.');
+assert(dataLayer.includes("if (!this._saveSyncFailed(failed))"), 'Item não sai da fila pendente se Requer atenção não foi persistido.');
+assert((dataLayer.match(/if \(moved < 0\)/g) || []).length >= 2, 'Flush interrompe e agenda retry quando a fila de atenção não é durável.');
+assert(dataLayer.includes("if (!this._saveSyncQueue(queue))"), 'Enfileiramento verifica sucesso real da persistência offline.');
+assert(dataLayer.includes('Libere espaço no navegador antes de fechar esta aba.'), 'Usuário é avisado quando a fila offline não pode ser persistida.');
+assert(dataLayer.includes("storageFailure:true"), 'Estado de sincronização expõe falha de storage para a interface.');
 
 assert(auditWorkflow.includes('workflow_dispatch:'), 'Auditoria grande continua somente manual.');
 assert(!auditWorkflow.includes('continue-on-error: true'), 'Auditorias de dependência são bloqueantes.');
@@ -53,4 +62,4 @@ for (const file of corsFiles) {
   assert(source.includes("Access-Control-Allow-Credentials', 'true"), `${file} preserva credenciais somente no ramo allowlisted.`);
 }
 
-console.log('\n✅ Patch 35 blocos 1–3: dependências, cron, CORS e contenção de erros validados.');
+console.log('\n✅ Patch 35 blocos 1–4: dependências, cron, CORS, erros e fila offline validados.');
