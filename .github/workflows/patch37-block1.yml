@@ -7,6 +7,7 @@ on:
     paths:
       - 'scripts/patch37-block1.mjs'
       - 'scripts/patch37-block1-fix.mjs'
+      - 'scripts/patch37-block1-fix2.mjs'
       - '.github/workflows/patch37-block1.yml'
 
 permissions:
@@ -33,6 +34,7 @@ jobs:
         run: |
           node scripts/patch37-block1.mjs
           node scripts/patch37-block1-fix.mjs
+          node scripts/patch37-block1-fix2.mjs
       - name: Full regression suite
         run: npm test
       - name: Syntax verification
@@ -43,7 +45,7 @@ jobs:
         run: npm run build:cloudflare
       - name: Wrangler dry-run
         run: npx --yes wrangler deploy --dry-run
-      - name: Verify generated public shells
+      - name: Verify generated public shells and release health
         shell: bash
         run: |
           set -euo pipefail
@@ -51,6 +53,9 @@ jobs:
           grep -q 'id="login-form"' dist/login.html
           grep -q 'Cobranca.switchAccountTab' js/patch26-events.js
           grep -q 'Cobranca.goToPlans' js/patch26-events.js
+          grep -q "action === 'health'" api/auth.js
+          grep -q '/api/auth?action=health' vercel.json
+          test "$(find api -maxdepth 1 -type f -name '*.js' ! -name '_*' | wc -l)" -le 12
       - name: Commit validated block
         shell: bash
         run: |
