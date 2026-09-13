@@ -16,7 +16,7 @@ assert(worker.includes('function isAppShellPath(pathname)'), 'Worker deve identi
 assert(worker.includes("pathname.startsWith('/app/')"), 'Worker deve reconhecer rotas internas aninhadas do app.');
 assert(worker.includes("new URL('/app', incoming)"), 'Rotas /app/* devem resolver pelo clean URL /app no binding de assets.');
 assert(!worker.includes("new URL('/app.html', incoming)"), 'Worker não pode buscar /app.html, pois o clean URL da Cloudflare cria loop.');
-assert(worker.includes("headers.set('X-FinObra-Route', 'app-shell')"), 'Resposta do app shell deve ser identificável em produção.');
+assert(worker.includes("routeName = 'app-shell'") && worker.includes("headers.set('X-FinObra-Route', routeName)"), 'Resposta do app shell deve continuar identificável dentro do roteador multi-shell.');
 assert(worker.includes('return fetchFrontendResponse(request, env);'), 'Fluxo frontend deve passar pelo resolvedor do app shell.');
 assert(app.includes("if (path.startsWith('/app/'))"), 'Router cliente deve continuar lendo rotas limpas /app/*.');
 assert(app.includes("const sub = path.substring(5)"), 'Router cliente deve extrair a rota após /app/.');

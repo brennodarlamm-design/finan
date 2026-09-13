@@ -28,3 +28,6 @@ bin/
 scratch/
 *.zip
 .release_temp/
+
+# Artefatos gerados de frontend
+dist/

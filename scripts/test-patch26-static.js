@@ -10,6 +10,8 @@ const ok = (name, cond) => {
 const root = process.cwd();
 const eventAttr = /\bon(click|change|input|submit|mouseover|mouseout|mouseenter|mouseleave|keydown|keyup|keypress|focus|blur|dblclick|contextmenu|pointerdown|pointerup|mousedown|mouseup|touchstart|touchend|dragstart|drop)\s*=\s*(['"])[\s\S]*?\2/gi;
 const dataAttr = /data-fb-(click|change|input|submit|mouseover|mouseout|mouseenter|mouseleave|keydown|keyup|keypress|focus|blur|dblclick|contextmenu|pointerdown|pointerup|mousedown|mouseup|touchstart|touchend|dragstart|drop)="/gi;
+// FINOBRA_PATCH37_ALLOWLIST_COVERAGE
+const actionAttr = /data-fb-(?:click|change|input|submit|mouseover|mouseout|mouseenter|mouseleave|keydown|keyup|keypress|focus|blur|dblclick|contextmenu|pointerdown|pointerup|mousedown|mouseup|touchstart|touchend|dragstart|drop)=["']([^"']+)["']/gi;
 const jsUrl = /(?:href|src)\s*=\s*(['"])\s*javascript\s*:/gi;
 
 const files = [];
@@ -25,6 +27,7 @@ let remaining = 0;
 let migrated = 0;
 let javascriptUrls = 0;
 const offenders = [];
+const usedActions = new Set();
 for (const file of files) {
   const src = fs.readFileSync(file, 'utf8');
   const inlineCount = [...src.matchAll(eventAttr)].length;
@@ -33,12 +36,17 @@ for (const file of files) {
   remaining += inlineCount;
   javascriptUrls += jsUrlCount;
   migrated += [...src.matchAll(dataAttr)].length;
+  for (const match of src.matchAll(actionAttr)) usedActions.add(match[1]);
 }
 
 const bridgePath = path.join(jsDir, 'patch26-events.js');
 const bridge = fs.existsSync(bridgePath) ? fs.readFileSync(bridgePath, 'utf8') : '';
 const actionsPath = path.join(jsDir, 'patch26-actions.js');
 const actions = fs.existsSync(actionsPath) ? fs.readFileSync(actionsPath, 'utf8') : '';
+const allowMatch = bridge.match(/const ALLOWED = new Set\((\[[\s\S]*?\])\);/);
+let allowedActions = new Set();
+try { if (allowMatch) allowedActions = new Set(JSON.parse(allowMatch[1])); } catch {}
+const missingAllowedActions = [...usedActions].filter(a => !allowedActions.has(a)).sort();
 const vercelConfig = JSON.parse(fs.readFileSync(path.join(root, 'vercel.json'), 'utf8'));
 const packageJson = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'));
 const globalHeaders = vercelConfig.headers?.find(h => h.source === '/(.*)')?.headers || [];
@@ -47,6 +55,8 @@ const activeCsp = globalHeaders.find(h => h.key === 'Content-Security-Policy')?.
 console.log('=== Patch 26 — CSP global enforcement ===\n');
 ok('bridge CSP-safe foi materializado', bridge.includes('FINOBRA_PATCH26_EVENT_BRIDGE'));
 ok('bridge usa allowlist exata de ações', bridge.includes('const ALLOWED = new Set(') && bridge.includes('ALLOWED.has(path)'));
+ok('toda ação data-fb-* usada pelo frontend está na allowlist CSP', !!allowMatch && missingAllowedActions.length === 0);
+if (missingAllowedActions.length) console.error('Ações fora da allowlist CSP:', missingAllowedActions.join(', '));
 ok('bridge não usa eval/new Function', !/\beval\s*\(|new\s+Function\s*\(/.test(bridge));
 ok('ações complexas são explícitas e também não usam eval/new Function', actions.includes('globalThis.Patch26Actions') && !/\beval\s*\(|new\s+Function\s*\(/.test(actions));
 ok('mais de 700 handlers permanecem migrados para data-fb-*', migrated >= 700);
