@@ -4,7 +4,7 @@ import crypto from 'crypto';
 import { hashPassword, verifyPassword, resolveAuthAndTenant } from './_auth.js';
 import { writeAudit } from './_audit.js';
 import { canManageUsers, canManageTenant, permissionError, sanitizePermissions } from './_permissions.js';
-import { getPlanRule } from './_plans.js';
+import { getPlanRule, minimumPlanForUsers, upgradeDescriptor } from './_plans.js';
 import { checkRateLimit, getClientIp } from './_ratelimit.js';
 
 function getSql() {
@@ -50,13 +50,19 @@ async function getUserPlanUsage(sql, tenantId) {
 }
 
 function planUserLimitError(usage) {
+  const requiredPlan=minimumPlanForUsers(Number(usage.activeUsers||0)+1);
+  const upgrade=upgradeDescriptor(requiredPlan);
+  const message=`Seu time chegou ao limite do ${usage.planLabel}. Este plano inclui ${usage.maxUsers} usuário(s) ativo(s). Para adicionar outra pessoa, desative um acesso sem uso ou conheça ${upgrade.requiredPlanLabel}.`;
   return {
     success:false,
     code:'PLAN_USER_LIMIT',
     plan:usage.planId,
+    currentPlan:usage.planId,
     limit:usage.maxUsers,
     current:usage.activeUsers,
-    error:`Seu time chegou ao limite do ${usage.planLabel}. Este plano inclui ${usage.maxUsers} usuário(s) ativo(s). Para adicionar outra pessoa, gerencie os usuários atuais ou consulte um plano com mais acessos.`
+    ...upgrade,
+    userMessage:message,
+    error:message
   };
 }
 

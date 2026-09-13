@@ -9,8 +9,8 @@ export const PLAN_MODULE_CATALOG = Object.freeze({
   precompras: 'Pré-Compras',
   recibos: 'Recibos',
   contratos: 'Contratos',
-  notas: 'Notas / NF-e / OCR',
-  orcamentos: 'Orçamentos / SINAPI',
+  notas: 'Notas / NF-e',
+  orcamentos: 'Orçamentos',
   medicoes: 'Medições',
   documentos: 'Documentos',
   relatorios: 'Relatórios',
@@ -76,6 +76,32 @@ export const PLAN_RULES = Object.freeze({
   })
 });
 
+export const PAID_PLAN_ORDER = Object.freeze(['starter','pro','unlimited']);
+
+export function minimumPlanForModule(module) {
+  const key=String(module||'').trim();
+  return PAID_PLAN_ORDER.find(plan => PLAN_RULES[plan].modules.includes(key)) || null;
+}
+
+export function minimumPlanForFeature(feature) {
+  const key=String(feature||'').trim();
+  return PAID_PLAN_ORDER.find(plan => Boolean(PLAN_RULES[plan].features?.[key])) || null;
+}
+
+export function minimumPlanForUsers(userCount) {
+  const needed=Math.max(1, Number(userCount||1));
+  return PAID_PLAN_ORDER.find(plan => PLAN_RULES[plan].maxUsers == null || PLAN_RULES[plan].maxUsers >= needed) || null;
+}
+
+export function upgradeDescriptor(requiredPlan) {
+  const rule=requiredPlan ? PLAN_RULES[requiredPlan] : null;
+  return {
+    requiredPlan: rule?.id || null,
+    requiredPlanLabel: rule?.label || 'Plano sob consulta',
+    upgradePath: '/app/planos'
+  };
+}
+
 export function normalizePlan(plan) {
   const key = String(plan || 'trial').trim().toLowerCase();
   return PLAN_RULES[key] ? key : 'trial';
@@ -109,23 +135,42 @@ export function planError(feature, plan) {
     engineering: 'Controles avançados de engenharia',
     advancedPermissions: 'Permissões avançadas por módulo'
   };
+  const requiredPlan=minimumPlanForFeature(feature);
+  const upgrade=upgradeDescriptor(requiredPlan);
+  const resource=names[feature] || 'Este recurso';
+  const message=requiredPlan
+    ? `${resource} está disponível a partir do ${upgrade.requiredPlanLabel}. Seu ${rule.label} continua ativo normalmente.`
+    : `${resource} não está disponível na contratação atual. Fale com o Suporte / Comercial.`;
   return {
     success:false,
-    code:'PLAN_FEATURE_REQUIRED',
+    code:'PLAN_FEATURE_LOCKED',
+    legacyCode:'PLAN_FEATURE_REQUIRED',
     feature,
     plan:rule.id,
-    error:`${names[feature] || 'Este recurso'} não está incluído no ${rule.label}. Conheça os planos disponíveis para liberar este recurso.`
+    currentPlan:rule.id,
+    ...upgrade,
+    userMessage:message,
+    error:message
   };
 }
 
 export function planModuleError(module, plan) {
   const rule = getPlanRule(plan);
   const name = PLAN_MODULE_CATALOG[module] || 'Este módulo';
+  const requiredPlan=minimumPlanForModule(module);
+  const upgrade=upgradeDescriptor(requiredPlan);
+  const message=requiredPlan
+    ? `${name} está disponível a partir do ${upgrade.requiredPlanLabel}. Você pode continuar usando os demais módulos do ${rule.label}.`
+    : `${name} não está disponível na contratação atual. Fale com o Suporte / Comercial.`;
   return {
     success:false,
-    code:'PLAN_MODULE_REQUIRED',
+    code:'PLAN_MODULE_LOCKED',
+    legacyCode:'PLAN_MODULE_REQUIRED',
     module,
     plan:rule.id,
-    error:`${name} não está incluído no ${rule.label}. Você pode continuar usando os demais módulos do seu plano ou consultar uma opção superior.`
+    currentPlan:rule.id,
+    ...upgrade,
+    userMessage:message,
+    error:message
   };
 }

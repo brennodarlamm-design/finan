@@ -4,6 +4,9 @@ const Cobranca = {
   STORAGE_ASSINATURAS_KEY: 'finobra_assinaturas',
   STORAGE_FATURAS_KEY: 'finobra_faturas',
 
+  MODULE_MIN_PLAN: Object.freeze({ precompras:'pro', contratos:'pro', notas:'pro', orcamentos:'pro', documentos:'pro', assinatura:'pro' }),
+  FEATURE_MIN_PLAN: Object.freeze({ ocr:'pro', signatures:'pro', sinapi:'unlimited', engineering:'unlimited', advancedPermissions:'unlimited' }),
+
   PLANOS: {
     starter: { id:'starter', nome:'Plano Básico', limiteObras:3, limiteUsuarios:1, valorMensal:79.90, badge:'3 OBRAS • 1 USUÁRIO', destaque:false, ideal:'Operação enxuta e controle essencial', recursos:['3 obras ativas','1 usuário ativo','Obras, financeiro, fornecedores e produtos','Medições, OFX e relatórios','Suporte via sistema / WhatsApp'] },
     pro: { id:'pro', nome:'Plano Profissional', limiteObras:10, limiteUsuarios:2, valorMensal:119.90, badge:'10 OBRAS • 2 USUÁRIOS', destaque:true, ideal:'Construtoras em crescimento e automação', recursos:['10 obras ativas','2 usuários ativos','Tudo do Básico','Pré-Compras, contratos e documentos','NF-e / OCR com IA e assinatura eletrônica','Suporte prioritário'] },
@@ -63,12 +66,39 @@ const Cobranca = {
 
   goToPlans() { if (typeof Utils!=='undefined') Utils.closeModal?.(); if (typeof App!=='undefined') App.navigate('planos'); setTimeout(()=>this.switchAccountTab('planos'),30); },
 
+  _planLabel(id) { return this.PLANOS?.[id]?.nome || (id==='trial'?'Teste gratuito':'outro plano'); },
+
+  openSettingsTab(tab) {
+    if (typeof Utils!=='undefined') Utils.closeModal?.();
+    if (typeof App!=='undefined') App.navigate('configuracoes');
+    setTimeout(()=>{ if(typeof Configuracoes!=='undefined') Configuracoes._switch?.(tab); },80);
+  },
+
+  openSupport() {
+    if (typeof Utils!=='undefined') Utils.closeModal?.();
+    if (typeof Suporte!=='undefined' && typeof Suporte.toggleDropdown==='function') Suporte.toggleDropdown();
+  },
+
+  showPlanAccessError(payload={}) {
+    const code=String(payload.code||'');
+    if(code==='PLAN_USER_LIMIT') { if(typeof Configuracoes!=='undefined') Configuracoes.showUserLimitModal?.(payload); return true; }
+    if(!code.startsWith('PLAN_')) return false;
+    const required=payload.requiredPlanLabel || this._planLabel(payload.requiredPlan);
+    const title=payload.module ? 'Módulo disponível em outro plano' : 'Recurso disponível em outro plano';
+    const message=payload.userMessage || payload.error || (required ? `Disponível a partir do ${required}.` : 'Fale com o Suporte / Comercial para conhecer as opções.');
+    Utils.showModal(`<div class="modal" style="max-width:520px"><div class="modal-header"><span class="modal-title">🔒 ${Utils.escapeHtml(title)}</span><button class="modal-close" data-fb-click="Utils.closeModal" data-fb-click-n="0">✕</button></div><div class="modal-body"><p class="plan-locked-copy">${Utils.escapeHtml(message)}</p>${required?`<div style="margin-top:14px;padding:12px;border:1px solid rgba(201,162,39,.28);background:rgba(201,162,39,.07);border-radius:10px"><strong>Plano indicado:</strong> ${Utils.escapeHtml(required)}</div>`:''}</div><div class="modal-footer"><button class="btn btn-secondary" data-fb-click="Utils.closeModal" data-fb-click-n="0">Continuar no sistema</button><button class="btn btn-primary" data-fb-click="Cobranca.goToPlans" data-fb-click-n="0">Conhecer planos</button></div></div>`);
+    return true;
+  },
+
   showLockedModule(routeOrModule) {
     const module = Auth?.ROUTE_MODULES?.[String(routeOrModule||'')] || String(routeOrModule||'');
-    const labels={precompras:'Pré-Compras',contratos:'Contratos',notas:'Notas / NF-e / OCR',orcamentos:'Orçamentos',documentos:'Documentos',assinatura:'Assinatura eletrônica'};
+    const labels={precompras:'Pré-Compras',contratos:'Contratos',notas:'Notas / NF-e',orcamentos:'Orçamentos',documentos:'Documentos',assinatura:'Assinatura eletrônica'};
     const name=labels[module] || (App?.routeMeta?.[routeOrModule]?.label) || 'Este módulo';
     const p=Auth?.getPlanAccess?.() || {};
-    Utils.showModal(`<div class="modal" style="max-width:520px"><div class="modal-header"><span class="modal-title">🔒 Recurso disponível em outro plano</span><button class="modal-close" data-fb-click="Utils.closeModal" data-fb-click-n="0">✕</button></div><div class="modal-body"><h3 style="margin:0 0 8px">${Utils.escapeHtml(name)}</h3><p class="plan-locked-copy">O <strong>${Utils.escapeHtml(p.label || 'seu plano atual')}</strong> continua ativo normalmente, mas este módulo não faz parte da contratação atual. Nenhum dado foi perdido e os demais módulos seguem disponíveis.</p><div style="margin-top:14px;padding:12px;border:1px solid rgba(201,162,39,.28);background:rgba(201,162,39,.07);border-radius:10px;font-size:.8rem;color:var(--text2)">Você pode conhecer os planos superiores sem alterar sua assinatura agora.</div></div><div class="modal-footer"><button class="btn btn-secondary" data-fb-click="Utils.closeModal" data-fb-click-n="0">Continuar no sistema</button><button class="btn btn-primary" data-fb-click="Cobranca.goToPlans" data-fb-click-n="0">Conhecer planos</button></div></div>`);
+    const requiredId=this.MODULE_MIN_PLAN[module] || null;
+    const required=this._planLabel(requiredId);
+    const current=p.label || 'seu plano atual';
+    Utils.showModal(`<div class="modal" style="max-width:520px"><div class="modal-header"><span class="modal-title">🔒 Módulo disponível em outro plano</span><button class="modal-close" data-fb-click="Utils.closeModal" data-fb-click-n="0">✕</button></div><div class="modal-body"><h3 style="margin:0 0 8px">${Utils.escapeHtml(name)}</h3><p class="plan-locked-copy">O <strong>${Utils.escapeHtml(current)}</strong> continua ativo normalmente. ${requiredId?`Este módulo está disponível a partir do <strong>${Utils.escapeHtml(required)}</strong>.`:'Consulte o Suporte / Comercial para liberar este módulo.'} Nenhum dado foi perdido.</p></div><div class="modal-footer"><button class="btn btn-secondary" data-fb-click="Utils.closeModal" data-fb-click-n="0">Continuar no sistema</button><button class="btn btn-primary" data-fb-click="Cobranca.goToPlans" data-fb-click-n="0">Conhecer planos</button></div></div>`);
   },
 
 
@@ -86,7 +116,10 @@ const Cobranca = {
   showLockedFeature(feature, title, description='Este recurso não faz parte do plano atual.') {
     if(this.isFeatureAllowed(feature)) return true;
     const p=Auth?.getPlanAccess?.()||{};
-    Utils.showModal(`<div class="modal" style="max-width:520px"><div class="modal-header"><span class="modal-title">🔒 Recurso disponível em outro plano</span><button class="modal-close" data-fb-click="Utils.closeModal" data-fb-click-n="0">✕</button></div><div class="modal-body"><h3 style="margin:0 0 8px">${Utils.escapeHtml(title)}</h3><p class="plan-locked-copy">${Utils.escapeHtml(description)} O <strong>${Utils.escapeHtml(p.label||'seu plano')}</strong> continua ativo normalmente e nenhum dado foi perdido.</p></div><div class="modal-footer"><button class="btn btn-secondary" data-fb-click="Utils.closeModal" data-fb-click-n="0">Continuar</button><button class="btn btn-primary" data-fb-click="Cobranca.goToPlans" data-fb-click-n="0">Conhecer planos</button></div></div>`);
+    const requiredId=this.FEATURE_MIN_PLAN[feature] || null;
+    const required=this._planLabel(requiredId);
+    const extra=requiredId ? ` Disponível a partir do ${required}.` : ' Consulte o Suporte / Comercial.';
+    Utils.showModal(`<div class="modal" style="max-width:520px"><div class="modal-header"><span class="modal-title">🔒 Recurso disponível em outro plano</span><button class="modal-close" data-fb-click="Utils.closeModal" data-fb-click-n="0">✕</button></div><div class="modal-body"><h3 style="margin:0 0 8px">${Utils.escapeHtml(title)}</h3><p class="plan-locked-copy">${Utils.escapeHtml(description + extra)} O <strong>${Utils.escapeHtml(p.label||'seu plano')}</strong> continua ativo normalmente e nenhum dado foi perdido.</p></div><div class="modal-footer"><button class="btn btn-secondary" data-fb-click="Utils.closeModal" data-fb-click-n="0">Continuar</button><button class="btn btn-primary" data-fb-click="Cobranca.goToPlans" data-fb-click-n="0">Conhecer planos</button></div></div>`);
     return false;
   },
 
@@ -96,10 +129,12 @@ const Cobranca = {
     const nome=Utils.escapeHtml(emp.nome_fantasia||emp.razao_social||u.empresaNome||'sua empresa'); const plano=this.PLANOS[ass.planoId]||this.PLANOS.pro;
     el.innerHTML=`<div class="acc-shell"><div class="acc-head"><div><div class="acc-title">Conta & Assinatura</div><div class="acc-sub">Plano, cobranças, módulos e limites da ${nome} em um único lugar.</div></div></div>
       <div class="acc-hero"><div><div style="font-size:.7rem;color:#94a3b8;text-transform:uppercase;letter-spacing:.07em">Conta ativa</div><div class="acc-plan-name">${Utils.escapeHtml(plano.nome)}</div><div style="font-size:.8rem;color:#94a3b8;margin-top:4px" id="acc-plan-status">Consultando assinatura no servidor…</div></div><div class="acc-hero-actions" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">${canManage?'<button class="btn btn-primary" data-fb-click="Cobranca.switchAccountTab" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="planos">Alterar plano</button>':''}<button class="btn btn-secondary" data-fb-click="Cobranca.switchAccountTab" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="cobrancas">Ver cobranças</button></div></div>
-      <div class="acc-tabs"><button class="acc-tab active" data-tab="visao" data-fb-click="Cobranca.switchAccountTab" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="visao">Visão geral</button><button class="acc-tab" data-tab="cobrancas" data-fb-click="Cobranca.switchAccountTab" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="cobrancas">Cobranças</button><button class="acc-tab" data-tab="modulos" data-fb-click="Cobranca.switchAccountTab" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="modulos">Módulos</button><button class="acc-tab" data-tab="planos" data-fb-click="Cobranca.switchAccountTab" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="planos">Planos</button></div>
+      <div class="acc-tabs"><button class="acc-tab active" data-tab="visao" data-fb-click="Cobranca.switchAccountTab" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="visao">Visão geral</button><button class="acc-tab" data-tab="cobrancas" data-fb-click="Cobranca.switchAccountTab" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="cobrancas">Cobranças</button><button class="acc-tab" data-tab="modulos" data-fb-click="Cobranca.switchAccountTab" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="modulos">Meu Plano</button><button class="acc-tab" data-tab="equipe" data-fb-click="Cobranca.switchAccountTab" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="equipe">Equipe & Sessões</button><button class="acc-tab" data-tab="suporte" data-fb-click="Cobranca.switchAccountTab" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="suporte">Suporte</button><button class="acc-tab" data-tab="planos" data-fb-click="Cobranca.switchAccountTab" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="planos">Comparar Planos</button></div>
       <section class="acc-panel active" data-panel="visao"><div id="finobra-plan-usage" class="card">Consultando uso atual…</div></section>
       <section class="acc-panel" data-panel="cobrancas"><div id="finobra-billing-history" class="card">Consultando cobranças…</div></section>
       <section class="acc-panel" data-panel="modulos"><div id="finobra-module-list" class="card">Consultando módulos contratados…</div></section>
+      <section class="acc-panel" data-panel="equipe"><div id="finobra-account-team" class="card">Consultando equipe…</div></section>
+      <section class="acc-panel" data-panel="suporte"><div id="finobra-account-support" class="card">Consultando suporte…</div></section>
       <section class="acc-panel" data-panel="planos"><div class="acc-mobile-hint">Deslize para o lado para comparar os planos.</div><div class="acc-plans">${Object.values(this.PLANOS).map(p=>this._renderCardPlano(p,ass.planoId===p.id,canManage)).join('')}</div></section></div>`;
     this._carregarUsoPlano();
   },
@@ -113,8 +148,21 @@ const Cobranca = {
       const obrasMax=p.maxActiveObras==null?'Ilimitadas':p.maxActiveObras; const usersMax=p.maxUsers==null?'Ilimitados':p.maxUsers;
       const statusEl=document.getElementById('acc-plan-status'); if(statusEl) statusEl.textContent=`${p.label||'Plano'} • ${p.status||'ativo'}${p.vencimento?' • próxima referência '+(Utils.formatDate?Utils.formatDate(p.vencimento):p.vencimento):''}`;
       if(usageBox) usageBox.innerHTML=`<div class="acc-usage-grid"><div class="acc-kpi"><div class="acc-kpi-l">Usuários</div><div class="acc-kpi-v">${Number(p.usage?.activeUsers||0)} / ${usersMax}</div><div style="font-size:.72rem;color:var(--text3);margin-top:4px">Pessoas ativas no plano</div></div><div class="acc-kpi"><div class="acc-kpi-l">Obras ativas</div><div class="acc-kpi-v">${Number(p.usage?.activeObras||0)} / ${obrasMax}</div><div style="font-size:.72rem;color:var(--text3);margin-top:4px">Obras em andamento</div></div><div class="acc-kpi"><div class="acc-kpi-l">Suporte</div><div class="acc-kpi-v">${Utils.escapeHtml(p.supportLevel||'Padrão')}</div><div style="font-size:.72rem;color:var(--text3);margin-top:4px">Suporte / Comercial</div></div><div class="acc-kpi"><div class="acc-kpi-l">Mensalidade</div><div class="acc-kpi-v">R$ ${(Number(p.monthlyPriceCents||0)/100).toFixed(2).replace('.',',')}</div><div style="font-size:.72rem;color:var(--text3);margin-top:4px">Sem fidelidade</div></div></div>`;
-      this._renderBillingHistory(json.invoices||[]); this._renderModules(p);
+      this._renderBillingHistory(json.invoices||[]); this._renderModules(p); this._renderAccountTeam(p); this._renderAccountSupport(p);
     } catch(e) { if(usageBox) usageBox.textContent='Não foi possível consultar os dados da assinatura agora.'; }
+  },
+
+  _renderAccountTeam(p) {
+    const el=document.getElementById('finobra-account-team'); if(!el)return;
+    const active=Number(p?.usage?.activeUsers||0); const max=p?.maxUsers==null?'Ilimitados':Number(p.maxUsers||0);
+    const role=String(Auth?.getUser?.()?.perfil||'').toLowerCase(); const admin=['admin','superadmin'].includes(role);
+    el.innerHTML=`<div style="font-weight:900;font-size:1rem;margin-bottom:8px">Equipe & Sessões</div><p style="font-size:.8rem;color:var(--text3);line-height:1.55;margin:0 0 16px"><strong style="color:var(--text2)">Usuário é pessoa; sessão é dispositivo.</strong> Notebook, celular e navegadores da mesma pessoa aparecem como sessões de segurança e não aumentam o consumo do plano.</p><div class="acc-usage-grid" style="grid-template-columns:repeat(2,minmax(0,1fr));margin-bottom:16px"><div class="acc-kpi"><div class="acc-kpi-l">Usuários ativos</div><div class="acc-kpi-v">${active} / ${max}</div></div><div class="acc-kpi"><div class="acc-kpi-l">Permissões avançadas</div><div class="acc-kpi-v">${p?.features?.advancedPermissions?'Incluídas':'Por perfil'}</div></div></div><div style="display:flex;gap:8px;flex-wrap:wrap">${admin?'<button class="btn btn-primary" data-fb-click="Cobranca.openSettingsTab" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="usuarios">Gerenciar usuários</button>':''}<button class="btn btn-secondary" data-fb-click="Cobranca.openSettingsTab" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="sessoes">Ver sessões e dispositivos</button></div>`;
+  },
+
+  _renderAccountSupport(p) {
+    const el=document.getElementById('finobra-account-support'); if(!el)return;
+    const level=Utils.escapeHtml(p?.supportLevel||'Padrão');
+    el.innerHTML=`<div style="font-weight:900;font-size:1rem;margin-bottom:8px">Suporte / Comercial</div><p style="font-size:.82rem;color:var(--text3);line-height:1.55">Seu plano possui atendimento <strong style="color:var(--text2)">${level}</strong>. Para dúvidas de uso, problemas técnicos ou informações comerciais, use a central do FinObra. Diagnósticos internos ficam restritos à equipe DEV.</p><button class="btn btn-primary" data-fb-click="Cobranca.openSupport" data-fb-click-n="0">Abrir atendimento</button>`;
   },
 
   _renderBillingHistory(invoices=[]) {
