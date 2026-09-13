@@ -24,7 +24,7 @@ ok('Backend bloqueia obra acima do plano', db.includes('PLAN_OBRA_LIMIT') && db.
 ok('Bulk sync também respeita limite de obras', db.includes('validateBulkObraPlanLimit') && db.includes('recusada antes de gravar'));
 ok('OCR é protegido por feature do plano', ocrApi.includes("canUseFeature(auth.user?.tenantPlan, 'ocr')"));
 ok('Assinaturas são protegidas por feature do plano', sigApi.includes("canUseFeature(auth.user?.tenantPlan, 'signatures')"));
-ok('Plano atual expõe uso real do servidor', fs.existsSync('api/plano.js') && cobranca.includes("fetch('/api/plano'"));
+ok('Plano atual expõe uso real do servidor', fs.existsSync('api/plano.js') && cobranca.includes('/api/plano') && cobranca.includes('usage?.activeObras'));
 ok('API possui manifesto para bases grandes', db.includes("table === 'sync_manifest'"));
 ok('Sync troca automaticamente para paginação em base grande', data.includes('_fetchCloudTablePaged') && data.includes('Base grande detectada'));
 ok('Fila diferencia rejeição de plano de sessão expirada', data.includes("startsWith('PLAN_')"));
