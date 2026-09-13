@@ -16,6 +16,7 @@ backend/auth_info_baileys/
 *.log
 monitor-nfe/logs/
 monitor-nfe/config.json
+monitor-nfe/ultimo_nsu.txt
 *.pfx
 *.p12
 
