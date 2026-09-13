@@ -171,6 +171,16 @@ const App = {
       }
     }
 
+    // Rota pública do Portal de Transparência do Cliente (não exige login, sem menus laterais, 100% isolado!)
+    const searchParams = new URLSearchParams(rawSearch || (rawHash.includes('?') ? '?' + rawHash.split('?')[1] : ''));
+    const isPortalUrl = rawPath.startsWith('/portal') || rawHash.startsWith('#portal') || searchParams.has('portal_obra') || searchParams.has('pdata');
+    if (isPortalUrl) {
+      if (typeof PortalCliente !== 'undefined' && typeof PortalCliente.renderTelaPublica === 'function') {
+        PortalCliente.renderTelaPublica(searchParams);
+        return;
+      }
+    }
+
     if (!Auth.requireAuth()) return;
 
     // Patch 10: a credencial real vive em cookie HttpOnly. Antes de abrir dados locais

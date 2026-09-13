@@ -30,7 +30,9 @@
       "/login",
       "/cadastro",
       "/apresentacao",
-      "/comercial"
+      "/comercial",
+      "/portal",
+      "/portal/*"
     ]
   },
   "vars": {

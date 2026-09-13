@@ -73,6 +73,14 @@
     {
       "source": "/app/(.*)",
       "destination": "/app"
+    },
+    {
+      "source": "/portal/(.*)",
+      "destination": "/app"
+    },
+    {
+      "source": "/portal",
+      "destination": "/app"
     }
   ],
   "headers": [

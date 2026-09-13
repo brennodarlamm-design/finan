@@ -31,7 +31,7 @@ function isApiPath(pathname) {
 }
 
 function isAppShellPath(pathname) {
-  return pathname === '/app' || pathname === '/app.html' || pathname.startsWith('/app/');
+  return pathname === '/app' || pathname === '/app.html' || pathname.startsWith('/app/') || pathname === '/portal' || pathname.startsWith('/portal/');
 }
 
 function isLoginShellPath(pathname) {
