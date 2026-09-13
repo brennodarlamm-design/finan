@@ -23,6 +23,12 @@ assert(server.includes("name: 'finobra-keep-alive'"), 'Keep-alive possui identif
 assert((server.match(/noOverlap: true/g) || []).length >= 2, 'Crons críticos impedem execuções sobrepostas.');
 assert(server.includes('await executarResumoMatinal();'), 'Agendador aguarda o resumo matinal assíncrono.');
 assert(server.includes("console.error('❌ [Cron] Falha no resumo matinal:'"), 'Falha assíncrona do resumo matinal é observável e tratada.');
+assert(!server.includes('json({ error: err.message })'), 'Backend não devolve err.message bruto em respostas JSON.');
+assert(!server.includes('json({ success: false, error: err.message })'), 'Teste Neon não devolve detalhe interno bruto.');
+assert(server.includes("error: 'Não foi possível enviar a mensagem pelo WhatsApp no momento.'"), 'Falha de envio WhatsApp usa mensagem pública estável.');
+assert(server.includes("console.error('❌ [Neon] Falha no teste autenticado de conexão:'"), 'Detalhe de falha Neon permanece observável apenas no servidor.');
+assert(server.includes("console.error('❌ [Cron] Falha na execução manual do resumo matinal:'"), 'Execução manual do cron captura rejeições assíncronas.');
+assert(server.includes("error: 'Não foi possível executar a rotina matinal no momento.'"), 'Cron manual devolve falha pública controlada.');
 
 assert(auditWorkflow.includes('workflow_dispatch:'), 'Auditoria grande continua somente manual.');
 assert(!auditWorkflow.includes('continue-on-error: true'), 'Auditorias de dependência são bloqueantes.');
@@ -47,4 +53,4 @@ for (const file of corsFiles) {
   assert(source.includes("Access-Control-Allow-Credentials', 'true"), `${file} preserva credenciais somente no ramo allowlisted.`);
 }
 
-console.log('\n✅ Patch 35 blocos 1–2: dependências, cron, gates e CORS validados.');
+console.log('\n✅ Patch 35 blocos 1–3: dependências, cron, CORS e contenção de erros validados.');
