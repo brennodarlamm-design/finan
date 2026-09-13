@@ -1,0 +1,68 @@
+/* FinObra Patch 38 — autenticação e cadastro responsivos */
+@media (max-width: 600px) {
+  html, body { height: auto; min-height: 100%; }
+  .page { min-height: 100dvh; }
+  .panel-right {
+    width: 100%;
+    min-height: 100dvh;
+    align-items: flex-start;
+    padding: max(22px, env(safe-area-inset-top)) 18px max(28px, env(safe-area-inset-bottom));
+    overflow-y: auto;
+  }
+  .form-wrap { max-width: 100%; margin: 0 auto; }
+  .logo-row { margin-top: 4px !important; margin-bottom: 20px !important; }
+  .welcome-h { font-size: 1.2rem; }
+  .welcome-p { margin-bottom: 24px; line-height: 1.5; }
+  .fgroup { margin-bottom: 15px; }
+  .inp { min-height: 46px; font-size: 16px; }
+  .btn-primary, .btn-google { min-height: 48px; }
+
+  #register-modal,
+  #recovery-modal {
+    align-items: flex-end !important;
+    padding: 0 !important;
+  }
+  #register-modal > div,
+  #recovery-modal > div {
+    width: 100% !important;
+    max-width: none !important;
+    max-height: 92dvh;
+    overflow-y: auto;
+    border-radius: 18px 18px 0 0 !important;
+    padding: 26px 18px calc(24px + env(safe-area-inset-bottom)) !important;
+  }
+  #register-form > div[style*="grid-template-columns"] {
+    grid-template-columns: 1fr !important;
+    gap: 0 !important;
+  }
+  .otp-row {
+    width: 100%;
+    gap: 6px;
+    justify-content: space-between;
+  }
+  .otp-box {
+    width: calc((100vw - 76px) / 6);
+    min-width: 36px;
+    max-width: 46px;
+    height: 48px;
+    font-size: 1.2rem;
+  }
+}
+
+@media (max-width: 390px) {
+  .panel-right { padding-left: 14px; padding-right: 14px; }
+  .logo-row img { width: 48px !important; height: 48px !important; }
+  .logo-box-text h2 { font-size: 1.25rem !important; }
+  .logo-box-text p { font-size: .64rem !important; }
+  .otp-box {
+    width: calc((100vw - 62px) / 6);
+    min-width: 34px;
+    height: 46px;
+  }
+}
+
+@media (max-width: 360px) {
+  .panel-right { padding-left: 12px; padding-right: 12px; }
+  .otp-row { gap: 4px; }
+  .otp-box { min-width: 32px; height: 44px; }
+}

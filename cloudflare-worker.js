@@ -58,6 +58,9 @@ function canonicalRedirect(request, env) {
     } else if (target.pathname === '/login.html') {
       target.pathname = '/login';
       changed = true;
+    } else if (target.pathname === '/app.html') {
+      target.pathname = '/app';
+      changed = true;
     }
 
     const cadastro = target.searchParams.get('cadastro') === '1';
@@ -139,11 +142,11 @@ async function fetchFrontendResponse(request, env) {
   let assetRequest = request;
   let routeName = landingShell ? 'landing-shell' : null;
   if (appShell) {
-    const appUrl = new URL('/app', incoming);
+    const appUrl = new URL('/app.html', incoming);
     assetRequest = new Request(appUrl.toString(), { method, headers: request.headers, redirect: 'manual' });
     routeName = 'app-shell';
   } else if (loginShell) {
-    const loginUrl = new URL('/login', incoming);
+    const loginUrl = new URL('/login.html', incoming);
     assetRequest = new Request(loginUrl.toString(), { method, headers: request.headers, redirect: 'manual' });
     routeName = incoming.pathname === '/cadastro' ? 'signup-shell' : 'login-shell';
   }
@@ -155,6 +158,9 @@ async function fetchFrontendResponse(request, env) {
   const headers = new Headers(securedResponse.headers);
   headers.set('X-FinObra-Route', routeName);
   headers.set('Cache-Control', 'public, max-age=0, must-revalidate');
+  if (routeName === 'login-shell' || routeName === 'signup-shell' || routeName === 'app-shell') {
+    headers.set('X-Robots-Tag', 'noindex, nofollow');
+  }
 
   return new Response(securedResponse.body, {
     status: securedResponse.status,

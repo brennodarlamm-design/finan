@@ -1,3 +1,11 @@
-/login / 302
-/apresentacao /landing 302
-/comercial /landing 302
+/robots.txt /data/robots.txt 200
+/sitemap.xml /data/sitemap.xml 200
+/login /login.html 200
+/cadastro /login.html 200
+/app /app.html 200
+/app/* /app.html 200
+/privacidade /privacidade.html 200
+/termos /termos.html 200
+/validar /validar.html 200
+/apresentacao / 308
+/comercial / 308

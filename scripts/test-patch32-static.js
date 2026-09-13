@@ -33,8 +33,12 @@ assert(workflow.includes("'\"loopRisk\":false'"), 'Smoke test deve validar prote
 assert(workflow.includes('https://www.finobra.app.br/'), 'Smoke test deve verificar canonicalização do www.');
 assert(workflow.includes('auth_status'), 'Smoke test deve verificar rota de autenticação sem credenciais.');
 assert(workflow.includes("[[ \"$auth_status\" == '401' ]]"), 'Auth smoke test deve esperar 401 para usuário não autenticado.');
-assert(workflow.includes('app_status='), 'Smoke test deve validar deep link do app por GET.');
+const hasLegacyAppStatus = workflow.includes('app_status=');
+const hasStructuredAppCheck = workflow.includes('check_route') &&
+  workflow.includes("'https://finobra.app.br/app/dashboard' 'app-shell'") &&
+  workflow.includes("'<div id=\"app-root\"></div>'");
+assert(hasLegacyAppStatus || hasStructuredAppCheck, 'Smoke test deve validar deep link do app por GET, incluindo shell e conteúdo.');
 assert(!workflow.includes("if: steps.cloudflare.outputs.ready == 'true'"), 'Deploy não deve depender de fluxo automático por push.');
 assert(pkg.includes('"deploy:cloudflare": "npx wrangler deploy"'), 'Deploy deve reutilizar script Wrangler versionado no package.json.');
 
-console.log('✅ Patch 32/35: pushes validam sem publicar; deploy de produção é manual, confirmado e restrito ao main.');
+console.log('✅ Patch 32/38: pushes validam sem publicar; deploy de produção é manual/controlado e smoke cobre o deep link do app.');

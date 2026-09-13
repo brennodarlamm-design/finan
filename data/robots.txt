@@ -1,0 +1,11 @@
+User-agent: *
+Allow: /
+Disallow: /app
+Disallow: /login
+Disallow: /cadastro
+Disallow: /master
+Disallow: /api/
+Disallow: /__finobra/
+Disallow: /validar
+
+Sitemap: https://finobra.app.br/sitemap.xml
