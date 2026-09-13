@@ -1,0 +1,73 @@
+name: Patch 35 CORS normalization (no deploy)
+
+on:
+  push:
+    branches:
+      - patch35-large-audit
+    paths:
+      - .github/workflows/patch35-cors-normalize.yml
+
+permissions:
+  contents: write
+
+jobs:
+  normalize:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: patch35-large-audit
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install root dependencies
+        run: npm ci
+      - name: Normalize authenticated API CORS responses
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          files = [
+              'api/auth.js',
+              'api/reconhecer-documento.js',
+              'api/nfe.js',
+              'api/db.js',
+              'api/upload.js',
+              'api/whatsapp.js',
+              'api/_certificado.js',
+              'api/admin.js',
+          ]
+          origin_old = "  const origin = req.headers.origin;\n  if (origin) {"
+          origin_new = "  const origin = req.headers.origin;\n  res.setHeader('Vary', 'Origin');\n  if (origin) {"
+          wildcard = "  } else {\n    res.setHeader('Access-Control-Allow-Origin', '*');\n  }\n"
+
+          for name in files:
+              path = Path(name)
+              text = path.read_text()
+              if text.count(origin_old) != 1:
+                  raise SystemExit(f'{name}: bloco origin esperado não é único')
+              if text.count(wildcard) != 1:
+                  raise SystemExit(f'{name}: fallback wildcard esperado não é único')
+              text = text.replace(origin_old, origin_new, 1)
+              text = text.replace(wildcard, '  }\n', 1)
+              path.write_text(text)
+          PY
+      - name: Validate full regression and syntax
+        run: |
+          npm test
+          node scripts/check-all-syntax.js
+      - name: Ensure wildcard CORS fallback is gone from protected API
+        run: |
+          if grep -n "Access-Control-Allow-Origin.*'\\*'" api/auth.js api/reconhecer-documento.js api/nfe.js api/db.js api/upload.js api/whatsapp.js api/_certificado.js api/admin.js; then
+            echo 'Wildcard CORS fallback ainda presente.'
+            exit 1
+          fi
+      - name: Commit normalized CORS
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add api/auth.js api/reconhecer-documento.js api/nfe.js api/db.js api/upload.js api/whatsapp.js api/_certificado.js api/admin.js
+          git diff --cached --check
+          git commit -m "fix(patch35): normalize API CORS cache behavior"
+          git push origin HEAD:patch35-large-audit
