@@ -8,6 +8,16 @@ const OrcamentoSINAPI = {
   _currentEditor: null, // id do orçamento aberto no editor
   _lastSearchResults: [],
 
+  _hasPlanAccess() {
+    return typeof Cobranca === 'undefined' || Cobranca.isFeatureAllowed('sinapi');
+  },
+
+  _ensurePlanAccess() {
+    if (this._hasPlanAccess()) return true;
+    if (typeof Cobranca !== 'undefined') Cobranca.showLockedFeature('sinapi','SINAPI / Caixa','Importação de bases SINAPI, composições oficiais da Caixa e orçamentos referenciais estão disponíveis no plano Construtora Ilimitado.');
+    return false;
+  },
+
   _defaultUF(obraId='') {
     const id = obraId && obraId !== 'todas' ? obraId : ((typeof App !== 'undefined' && App.obraId !== 'todas') ? App.obraId : '');
     const obra = id ? DB.getById('clientes', id) : null;
@@ -20,6 +30,7 @@ const OrcamentoSINAPI = {
   // ─────────────────────────────────────────────────
 
   render(obraId) {
+    if (!this._hasPlanAccess()) return Cobranca.renderLockedFeature('SINAPI / Caixa','Importação de bases SINAPI, composições oficiais da Caixa e orçamentos referenciais estão disponíveis no plano Construtora Ilimitado.');
     const orcs = this._getAll(obraId);
     const statusOnerado   = SINAPI.hasBase(false);
     const statusDesonerado = SINAPI.hasBase(true);
@@ -134,6 +145,7 @@ const OrcamentoSINAPI = {
   // ─────────────────────────────────────────────────
 
   showForm(id = null) {
+    if (!this._ensurePlanAccess()) return;
     const orc = id ? (this._getById(id) || {}) : {};
     const hoje = Utils.today();
     const anoAtual = new Date().getFullYear();
@@ -213,6 +225,7 @@ const OrcamentoSINAPI = {
   },
 
   save(id) {
+    if (!this._ensurePlanAccess()) return;
     const f = document.getElementById('f-sinapi-orc');
     if (!f.checkValidity()) { f.reportValidity(); return; }
     const fd = new FormData(f);
@@ -250,6 +263,7 @@ const OrcamentoSINAPI = {
   },
 
   del(id) {
+    if (!this._ensurePlanAccess()) return;
     Utils.confirm('Excluir este orçamento SINAPI? Esta ação não pode ser desfeita.', () => {
       this._remove(id);
       this._refresh();
@@ -262,6 +276,7 @@ const OrcamentoSINAPI = {
   // ─────────────────────────────────────────────────
 
   openEditor(id) {
+    if (!this._ensurePlanAccess()) return;
     this._currentEditor = id;
     const orc = this._getById(id);
     if (!orc) return;
@@ -328,6 +343,7 @@ const OrcamentoSINAPI = {
   },
 
   async puxarDiretoNoEditor(orcId) {
+    if (!this._ensurePlanAccess()) return;
     const orc = this._getById(orcId);
     if (!orc) return;
     const btn = document.getElementById(`btn-puxar-direto-${orcId}`);
@@ -558,6 +574,7 @@ const OrcamentoSINAPI = {
   },
 
   updateQtd(orcId, itemId, novaQtd) {
+    if (!this._ensurePlanAccess()) return;
     const orc = this._getById(orcId);
     if (!orc) return;
     const item = orc.itens.find(i => i.id === itemId);
@@ -572,6 +589,7 @@ const OrcamentoSINAPI = {
   },
 
   removeItem(orcId, itemId) {
+    if (!this._ensurePlanAccess()) return;
     const orc = this._getById(orcId);
     if (!orc) return;
     orc.itens = orc.itens.filter(i => i.id !== itemId);
@@ -591,6 +609,7 @@ const OrcamentoSINAPI = {
   // ─────────────────────────────────────────────────
 
   showImportModal(desoneradoInicial = false, ufInicial = '', refInicial = '') {
+    if (!this._ensurePlanAccess()) return;
     const metaOn  = SINAPI.getMeta(false);
     const metaDes = SINAPI.getMeta(true);
     // Disponibiliza o snapshot oficial pré-empacotado no FinObra (RR 2024-12) como padrão inteligente

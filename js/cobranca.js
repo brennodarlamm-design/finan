@@ -71,6 +71,25 @@ const Cobranca = {
     Utils.showModal(`<div class="modal" style="max-width:520px"><div class="modal-header"><span class="modal-title">🔒 Recurso disponível em outro plano</span><button class="modal-close" data-fb-click="Utils.closeModal" data-fb-click-n="0">✕</button></div><div class="modal-body"><h3 style="margin:0 0 8px">${Utils.escapeHtml(name)}</h3><p class="plan-locked-copy">O <strong>${Utils.escapeHtml(p.label || 'seu plano atual')}</strong> continua ativo normalmente, mas este módulo não faz parte da contratação atual. Nenhum dado foi perdido e os demais módulos seguem disponíveis.</p><div style="margin-top:14px;padding:12px;border:1px solid rgba(201,162,39,.28);background:rgba(201,162,39,.07);border-radius:10px;font-size:.8rem;color:var(--text2)">Você pode conhecer os planos superiores sem alterar sua assinatura agora.</div></div><div class="modal-footer"><button class="btn btn-secondary" data-fb-click="Utils.closeModal" data-fb-click-n="0">Continuar no sistema</button><button class="btn btn-primary" data-fb-click="Cobranca.goToPlans" data-fb-click-n="0">Conhecer planos</button></div></div>`);
   },
 
+
+  isFeatureAllowed(feature) {
+    const role=String(Auth?.getUser?.()?.perfil||'').toLowerCase();
+    if(role==='superadmin') return true;
+    const features=Auth?.getPlanAccess?.()?.features;
+    return !features || features[feature] !== false;
+  },
+
+  renderLockedFeature(title, description='Este recurso está disponível em outro plano.') {
+    return `<div class="card" style="max-width:760px;margin:24px auto;padding:28px;text-align:center;border:1px solid rgba(201,162,39,.35);background:linear-gradient(145deg,rgba(201,162,39,.08),rgba(255,255,255,.02));"><div style="font-size:2rem;margin-bottom:8px">🔒</div><h2 style="font-size:1.25rem;margin:0 0 8px">${Utils.escapeHtml(title)}</h2><p style="color:var(--text3);font-size:.86rem;line-height:1.6;max-width:560px;margin:0 auto 18px">${Utils.escapeHtml(description)}</p><button class="btn btn-primary" data-fb-click="Cobranca.goToPlans" data-fb-click-n="0">Conhecer planos</button></div>`;
+  },
+
+  showLockedFeature(feature, title, description='Este recurso não faz parte do plano atual.') {
+    if(this.isFeatureAllowed(feature)) return true;
+    const p=Auth?.getPlanAccess?.()||{};
+    Utils.showModal(`<div class="modal" style="max-width:520px"><div class="modal-header"><span class="modal-title">🔒 Recurso disponível em outro plano</span><button class="modal-close" data-fb-click="Utils.closeModal" data-fb-click-n="0">✕</button></div><div class="modal-body"><h3 style="margin:0 0 8px">${Utils.escapeHtml(title)}</h3><p class="plan-locked-copy">${Utils.escapeHtml(description)} O <strong>${Utils.escapeHtml(p.label||'seu plano')}</strong> continua ativo normalmente e nenhum dado foi perdido.</p></div><div class="modal-footer"><button class="btn btn-secondary" data-fb-click="Utils.closeModal" data-fb-click-n="0">Continuar</button><button class="btn btn-primary" data-fb-click="Cobranca.goToPlans" data-fb-click-n="0">Conhecer planos</button></div></div>`);
+    return false;
+  },
+
   renderTelaPlanos(containerId = 'route-content') {
     const el=document.getElementById(containerId); if(!el)return; this._ensureAccountStyles();
     const ass=this.getAssinaturaAtual(); const u=Auth?.getUser?.()||{}; const emp=DB?.getEmpresa?.()||{}; const canManage=['admin','superadmin'].includes(String(u.perfil||'').toLowerCase());

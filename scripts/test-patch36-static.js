@@ -36,4 +36,13 @@ assert(landing.includes('.plans{display:flex;overflow-x:auto;scroll-snap-type:x 
 assert(landing.includes('mobile-compare') && landing.includes('module-groups'),'Landing possui comparação mobile e módulos organizados por área.');
 assert(landing.includes('wa.me/5595991363678'),'Contato continua operacional por WhatsApp sem número visível.');
 
-console.log('\n✅ Patch 36 blocos 1–3 validados.');
+
+const db=fs.readFileSync('api/db.js','utf8');
+const sinapi=fs.readFileSync('js/orcamento_sinapi.js','utf8');
+const obra=fs.readFileSync('js/obra_detalhe.js','utf8');
+assert(db.includes('planFeatureErrorForTable') && db.includes("table || '') === 'orcamentos_sinapi'") && db.includes("planError(feature"),'Backend diferencia SINAPI por feature e devolve erro de plano.');
+assert(db.includes('denied.planError || permissionError'),'Sync_all preserva bloqueio SINAPI server-side.');
+assert(sinapi.includes('_ensurePlanAccess') && sinapi.includes("showLockedFeature('sinapi'") && sinapi.includes("renderLockedFeature('SINAPI / Caixa'"),'SINAPI mostra bloqueio amigável e protege ações diretas.');
+assert(obra.includes('_hasEngineeringFeature') && obra.includes("['curva-s','curva-abc','leis-sociais']") && obra.includes("? (this.subTabOrcado || 'curva-s') : 'cronograma'"),'Engenharia avançada é separada do cronograma nos planos.');
+assert(obra.includes("showLockedFeature('engineering'") && obra.includes('if (!this._ensureEngineeringFeature()) return;'),'Ações de BDI também respeitam o plano.');
+console.log('\n✅ Patch 36 blocos 1–4 validados.');

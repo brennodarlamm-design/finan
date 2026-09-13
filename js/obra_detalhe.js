@@ -9,6 +9,22 @@ const ObraDetalhe = {
   _filtroTipo: '',
   _filtroBusca: '',
 
+  _hasEngineeringFeature() {
+    return typeof Cobranca === 'undefined' || Cobranca.isFeatureAllowed('engineering');
+  },
+
+  _ensureEngineeringFeature() {
+    if (this._hasEngineeringFeature()) return true;
+    if (typeof Cobranca !== 'undefined') Cobranca.showLockedFeature('engineering','Engenharia avançada','Curva S, EVM, Curva ABC e BDI avançado estão disponíveis no plano Construtora Ilimitado. O cronograma físico-financeiro continua disponível conforme o seu plano.');
+    return false;
+  },
+
+  _renderEngineeringFeatureLock() {
+    return typeof Cobranca !== 'undefined'
+      ? Cobranca.renderLockedFeature('Engenharia avançada','Curva S, EVM, Curva ABC e BDI avançado estão disponíveis no plano Construtora Ilimitado. O cronograma físico-financeiro continua disponível.')
+      : '';
+  },
+
   _safeHtmlRecord(record) {
     if (!record || typeof record !== 'object') return record || {};
     return Object.fromEntries(Object.entries(record).map(([key, value]) => [
@@ -42,6 +58,7 @@ const ObraDetalhe = {
   },
 
   setSubTabOrcado(subTab) {
+    if (['curva-s','curva-abc','leis-sociais'].includes(subTab) && !this._ensureEngineeringFeature()) return;
     this.subTabOrcado = subTab;
     document.querySelectorAll('.od-subtab-btn').forEach(b => {
       const isAct = b.dataset.subtab === subTab;
@@ -517,7 +534,7 @@ const ObraDetalhe = {
       ? DB.getOrcamentoVsRealizado(obraId)
       : { totalOrcado: 0, totalRealizado: 0, saldoRestante: 0, percentualFinanceiro: 0, percentualFisico: 0, desvio: 0, statusSaude: 'saudavel', alertaDesc: '', etapas: [], temOrcamento: false, totalMedicoes: 0 };
 
-    const currentSubTab = this.subTabOrcado || 'curva-s';
+    const currentSubTab = this._hasEngineeringFeature() ? (this.subTabOrcado || 'curva-s') : 'cronograma';
 
     return `
     <div>
@@ -549,7 +566,7 @@ const ObraDetalhe = {
         <div style="display:flex;gap:8px;flex-wrap:wrap;background:var(--bg-secondary);padding:4px;border-radius:var(--r-md);border:1px solid var(--border);">
           <button class="btn btn-sm od-subtab-btn ${currentSubTab==='curva-s'?'active':''}" data-subtab="curva-s" data-od-click="ObraDetalhe.setSubTabOrcado('curva-s')"
                   style="border-radius:6px;font-size:.82rem;font-weight:700;border:1px solid ${currentSubTab==='curva-s'?'var(--accent)':'transparent'};color:${currentSubTab==='curva-s'?'var(--accent)':'var(--text2)'};background:${currentSubTab==='curva-s'?'rgba(18,217,160,0.12)':'transparent'};">
-            📈 Curva S &amp; Previsão EVM
+            ${this._hasEngineeringFeature()?'📈':'🔒'} Curva S &amp; Previsão EVM
           </button>
           <button class="btn btn-sm od-subtab-btn ${currentSubTab==='cronograma'?'active':''}" data-subtab="cronograma" data-od-click="ObraDetalhe.setSubTabOrcado('cronograma')"
                   style="border-radius:6px;font-size:.82rem;font-weight:700;border:1px solid ${currentSubTab==='cronograma'?'var(--accent)':'transparent'};color:${currentSubTab==='cronograma'?'var(--accent)':'var(--text2)'};background:${currentSubTab==='cronograma'?'rgba(18,217,160,0.12)':'transparent'};">
@@ -557,11 +574,11 @@ const ObraDetalhe = {
           </button>
           <button class="btn btn-sm od-subtab-btn ${currentSubTab==='curva-abc'?'active':''}" data-subtab="curva-abc" data-od-click="ObraDetalhe.setSubTabOrcado('curva-abc')"
                   style="border-radius:6px;font-size:.82rem;font-weight:700;border:1px solid ${currentSubTab==='curva-abc'?'var(--accent)':'transparent'};color:${currentSubTab==='curva-abc'?'var(--accent)':'var(--text2)'};background:${currentSubTab==='curva-abc'?'rgba(18,217,160,0.12)':'transparent'};">
-            📊 Curva ABC (Pareto)
+            ${this._hasEngineeringFeature()?'📊':'🔒'} Curva ABC (Pareto)
           </button>
           <button class="btn btn-sm od-subtab-btn ${currentSubTab==='leis-sociais'?'active':''}" data-subtab="leis-sociais" data-od-click="ObraDetalhe.setSubTabOrcado('leis-sociais')"
                   style="border-radius:6px;font-size:.82rem;font-weight:700;border:1px solid ${currentSubTab==='leis-sociais'?'var(--accent)':'transparent'};color:${currentSubTab==='leis-sociais'?'var(--accent)':'var(--text2)'};background:${currentSubTab==='leis-sociais'?'rgba(18,217,160,0.12)':'transparent'};">
-            ⚖️ Leis Sociais &amp; BDI
+            ${this._hasEngineeringFeature()?'⚖️':'🔒'} Leis Sociais &amp; BDI
           </button>
         </div>
 
@@ -597,6 +614,7 @@ const ObraDetalhe = {
 
   _renderSubTabOrcadoContent(subTab, obraId) {
     if (subTab === 'cronograma') return this._renderSubTabCronograma(obraId);
+    if (['curva-s','curva-abc','leis-sociais'].includes(subTab) && !this._hasEngineeringFeature()) return this._renderEngineeringFeatureLock();
     if (subTab === 'curva-abc') return this._renderSubTabCurvaABC(obraId);
     if (subTab === 'leis-sociais') return this._renderSubTabLeisSociaisBDI(obraId);
     return this._renderSubTabCurvaS(obraId);
@@ -1282,6 +1300,7 @@ const ObraDetalhe = {
   },
 
   salvarBDI(obraId) {
+    if (!this._ensureEngineeringFeature()) return;
     const ac = parseFloat(document.getElementById('od-bdi-ac')?.value) || 0;
     const sg = parseFloat(document.getElementById('od-bdi-sg')?.value) || 0;
     const r = parseFloat(document.getElementById('od-bdi-r')?.value) || 0;
@@ -1306,6 +1325,7 @@ const ObraDetalhe = {
   },
 
   salvarBDIPadrao(obraId) {
+    if (!this._ensureEngineeringFeature()) return;
     const ac = parseFloat(document.getElementById('od-bdi-ac')?.value) || 0;
     const sg = parseFloat(document.getElementById('od-bdi-sg')?.value) || 0;
     const r = parseFloat(document.getElementById('od-bdi-r')?.value) || 0;
@@ -1331,6 +1351,7 @@ const ObraDetalhe = {
   },
 
   restaurarBDITCU(obraId) {
+    if (!this._ensureEngineeringFeature()) return;
     const isDeson = !!this.desoneradoLeisSociais;
     const defaultCfg = {
       ac: 4.00,
