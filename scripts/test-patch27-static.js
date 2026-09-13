@@ -18,6 +18,7 @@ const app = read('./app.html');
 console.log('=== Patch 27 — Fonte materializada / build imutável ===\n');
 
 const lifecycle = `${pkg.scripts?.postinstall || ''} ${pkg.scripts?.pretest || ''}`;
+const cloudflareBuild = String(pkg.scripts?.['build:cloudflare'] || '');
 ok('package está em 2.27.0 ou superior', Number(String(pkg.version).split('.')[1] || 0) >= 27);
 ok('version.json está alinhado com Patch 27', /^2\.(?:2[7-9]|[3-9]\d)\./.test(String(version.version)) && String(version.build).includes('p27'));
 ok('npm install/test não executa overlays Patch 22–26', !/(?:apply|prepare)-patch2[2-6]|apply-backend-build-patches/.test(lifecycle));
@@ -31,7 +32,11 @@ ok('Clientes é resolvido pelo binding lexical antes de globalThis', events.incl
 ok('resolver prefere ROOTS allowlisted antes de globalThis', events.includes('Object.prototype.hasOwnProperty.call(ROOTS, parts[0]) ? ROOTS[parts[0]] : globalThis[parts[0]]'));
 ok('app carrega bridge global materializado', app.includes('/js/patch26-actions.js') && app.includes('/js/patch26-events.js'));
 ok('fonte materializada não usa eval/new Function no bridge global', !/\beval\s*\(|new\s+Function\s*\(/.test(events));
-ok('build Cloudflare não depende dos overlays legados', pkg.scripts?.['build:cloudflare'] === 'node scripts/build-cloudflare-pages.cjs');
+ok(
+  'build Cloudflare parte da fonte materializada e não depende dos overlays legados',
+  cloudflareBuild.startsWith('node scripts/build-cloudflare-pages.cjs') &&
+    !/(?:apply|prepare)-patch2[2-6]|apply-backend-build-patches|fix-patch26-lexical-roots/.test(cloudflareBuild)
+);
 
 console.log(`\nPatch 27: ${failed ? 'FALHOU' : 'OK'}\n`);
 if (failed) process.exit(1);
