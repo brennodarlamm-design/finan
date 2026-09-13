@@ -5,6 +5,7 @@ backend
 bin
 scripts/*
 !scripts/build-cloudflare-pages.cjs
+!scripts/patch38-postbuild.cjs
 *.pfx
 *.log
 *.tmp
