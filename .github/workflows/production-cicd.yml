@@ -136,14 +136,72 @@ jobs:
           [[ "$version" == *"\"commit\":\"$GITHUB_SHA\""* ]]
           [[ "$version" == *'"source":"github-actions"'* ]]
 
+          api_health="$(curl --fail --silent --show-error 'https://api.finobra.app.br/api/auth?action=health')"
+          [[ "$api_health" == *'"ok":true'* ]]
+          [[ "$api_health" == *'"releaseReady":true'* ]]
+          [[ "$api_health" == *'"source":"vercel"'* ]]
+          [[ "$api_health" == *'"environment":"production"'* ]]
+          [[ "$api_health" == *"\"commit\":\"$GITHUB_SHA\""* ]]
+
           final_url="$(curl --fail --silent --show-error --location --output /dev/null --write-out '%{url_effective}' https://www.finobra.app.br/)"
           [[ "$final_url" == 'https://finobra.app.br/' ]]
 
           auth_status="$(curl --silent --output /dev/null --write-out '%{http_code}' 'https://finobra.app.br/api/auth?action=me')"
           [[ "$auth_status" == '401' ]]
 
-          app_status="$(curl --silent --output /tmp/finobra-app-shell.html --write-out '%{http_code}' https://finobra.app.br/app/dashboard)"
-          [[ "$app_status" == '200' ]]
-          grep -q '<div id="app-root"></div>' /tmp/finobra-app-shell.html
+          check_route() {
+            local url="$1"
+            local expected_route="$2"
+            local expected_text="$3"
+            local prefix="$4"
+            local status
 
-          echo "Production smoke test passed for commit $GITHUB_SHA."
+            status="$(curl --silent --show-error --dump-header "/tmp/${prefix}.headers" --output "/tmp/${prefix}.html" --write-out '%{http_code}' "$url")"
+            [[ "$status" == '200' ]]
+            tr -d '\r' < "/tmp/${prefix}.headers" | grep -qi "^x-finobra-route: ${expected_route}$"
+            grep -Fq "$expected_text" "/tmp/${prefix}.html"
+          }
+
+          check_document() {
+            local url="$1"
+            local expected_text="$2"
+            local prefix="$3"
+            local status
+
+            status="$(curl --silent --show-error --output "/tmp/${prefix}.html" --write-out '%{http_code}' "$url")"
+            [[ "$status" == '200' ]]
+            grep -Fq "$expected_text" "/tmp/${prefix}.html"
+          }
+
+          check_route 'https://finobra.app.br/' 'landing-shell' 'Obras, financeiro e engenharia.' 'finobra-home'
+          grep -Fq '<link rel="canonical" href="https://finobra.app.br/">' /tmp/finobra-home.html
+
+          check_route 'https://finobra.app.br/login' 'login-shell' 'id="login-form"' 'finobra-login'
+          tr -d '\r' < /tmp/finobra-login.headers | grep -qi '^x-robots-tag: noindex, nofollow$'
+          grep -Fq '/css/auth-patch38.css' /tmp/finobra-login.html
+          grep -Fq '/js/auth-route-patch38.js' /tmp/finobra-login.html
+
+          check_route 'https://finobra.app.br/cadastro' 'signup-shell' 'id="register-modal"' 'finobra-signup'
+          tr -d '\r' < /tmp/finobra-signup.headers | grep -qi '^x-robots-tag: noindex, nofollow$'
+
+          check_route 'https://finobra.app.br/app/dashboard' 'app-shell' '<div id="app-root"></div>' 'finobra-app'
+          tr -d '\r' < /tmp/finobra-app.headers | grep -qi '^x-robots-tag: noindex, nofollow$'
+
+          check_document 'https://finobra.app.br/privacidade' 'Política de Privacidade' 'finobra-privacy'
+          check_document 'https://finobra.app.br/termos' 'Termos de Serviço' 'finobra-terms'
+          check_document 'https://finobra.app.br/validar' 'Portal de Validação de Registros de Assinatura' 'finobra-validate'
+
+          robots="$(curl --fail --silent --show-error https://finobra.app.br/robots.txt)"
+          [[ "$robots" == *'Disallow: /login'* ]]
+          [[ "$robots" == *'Disallow: /cadastro'* ]]
+          [[ "$robots" == *'Sitemap: https://finobra.app.br/sitemap.xml'* ]]
+
+          sitemap="$(curl --fail --silent --show-error https://finobra.app.br/sitemap.xml)"
+          [[ "$sitemap" == *'<loc>https://finobra.app.br/</loc>'* ]]
+          [[ "$sitemap" == *'<loc>https://finobra.app.br/privacidade</loc>'* ]]
+          [[ "$sitemap" == *'<loc>https://finobra.app.br/termos</loc>'* ]]
+          [[ "$sitemap" != *'/login'* ]]
+          [[ "$sitemap" != *'/cadastro'* ]]
+          [[ "$sitemap" != *'/app'* ]]
+
+          echo "Production smoke test passed for commit $GITHUB_SHA with Patch 38 public-route contracts."
