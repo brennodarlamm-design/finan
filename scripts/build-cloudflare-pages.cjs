@@ -125,7 +125,7 @@ copyRequired(path.join(root, 'cloudflare', '_routes.json'), path.join(out, '_rou
 const deploymentMetadata = writeDeploymentMetadata();
 
 const loginPagePath = path.join(out, 'js', 'login_page.js');
-let loginPage = fs.readFileSync(loginPagePath, 'utf8');
+let loginPage = fs.readFileSync(loginPagePath, 'utf8').replace(/\r\n/g, '\n');
 
 function patchRecoveryFlow(source) {
   const variants = [
