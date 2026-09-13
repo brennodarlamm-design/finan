@@ -25,5 +25,15 @@ assert(auth.includes('refreshPlanAccess') && auth.includes('isPlanRouteLocked'),
 assert(appJs.includes('Cobranca.showLockedModule') && appJs.includes('Disponível em outro plano'),'Menu explica módulos de outro plano em vez de sumir silenciosamente.');
 assert(cfg.includes('Seu time chegou ao limite do plano') && cfg.includes('Dispositivos e sess&otilde;es n&atilde;o consomem'),'Limite de usuários tem tratamento amigável.');
 assert(cob.includes('Conta & Assinatura') && cob.includes('Histórico de cobranças') && cob.includes('acc-billing-cards'),'Central da Conta possui plano, cobranças e mobile cards.');
-assert(cob.includes('acc-plans{display:flex;overflow-x:auto;scroll-snap-type:x mandatory'),'Planos usam carrossel horizontal no celular em vez de pilha longa.');
-console.log('\n✅ Patch 36 blocos 1–2 validados.');
+assert(cob.includes('acc-plans{display:flex;overflow-x:auto;scroll-snap-type:x mandatory'),'Planos internos usam carrossel horizontal no celular em vez de pilha longa.');
+
+const landing=fs.readFileSync('landing.html','utf8');
+assert(landing.includes('15 dias') && !/7\s+dias/i.test(landing),'Landing padroniza teste gratuito em 15 dias.');
+assert(landing.includes('Suporte / Comercial') && !landing.includes('(95) 99136-3678'),'Landing usa Suporte / Comercial sem exibir telefone.');
+assert(landing.includes('1 usuário') && landing.includes('2 usuários') && landing.includes('5 usuários'),'Landing comunica limites de usuários 1/2/5.');
+assert(landing.includes('3 ativas') && landing.includes('10 ativas') && landing.includes('Ilimitadas'),'Landing comunica limites de obras por plano.');
+assert(landing.includes('.plans{display:flex;overflow-x:auto;scroll-snap-type:x mandatory'),'Planos da landing usam swipe horizontal no celular.');
+assert(landing.includes('mobile-compare') && landing.includes('module-groups'),'Landing possui comparação mobile e módulos organizados por área.');
+assert(landing.includes('wa.me/5595991363678'),'Contato continua operacional por WhatsApp sem número visível.');
+
+console.log('\n✅ Patch 36 blocos 1–3 validados.');
