@@ -56,7 +56,7 @@ const Configuracoes = {
     if (!document.getElementById('cfg-tab-styles')) {
       const s = document.createElement('style');
       s.id = 'cfg-tab-styles';
-      s.textContent = '.cfg-tab{padding:10px 20px;border:none;background:transparent;color:var(--text3);font-family:inherit;font-size:.875rem;font-weight:600;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-2px;transition:color .2s,border-color .2s;}.cfg-tab:hover{color:var(--text);}.cfg-tab-active{color:var(--accent)!important;border-bottom-color:var(--accent)!important;}';
+      s.textContent = '.cfg-tabs{display:flex;gap:0;border-bottom:2px solid var(--border);margin-bottom:24px;overflow-x:auto;scroll-snap-type:x proximity;scrollbar-width:none;-webkit-overflow-scrolling:touch}.cfg-tabs::-webkit-scrollbar{display:none}.cfg-tab{padding:10px 20px;border:none;background:transparent;color:var(--text3);font-family:inherit;font-size:.875rem;font-weight:600;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-2px;transition:color .2s,border-color .2s;white-space:nowrap;scroll-snap-align:start;min-height:44px}.cfg-tab:hover{color:var(--text);}.cfg-tab-active{color:var(--accent)!important;border-bottom-color:var(--accent)!important}.cfg-audit-mobile{display:none}.cfg-user-card,.cfg-session-card{min-width:0}.cfg-user-actions{display:flex;gap:8px;flex-wrap:wrap}.cfg-session-main{flex:1;min-width:220px}@media(max-width:768px){.cfg-tabs{margin-left:-14px;margin-right:-14px;padding:0 14px 2px;position:relative}.cfg-tab{padding:10px 14px}.cfg-user-card{padding:14px!important}.cfg-user-actions{width:100%;display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}.cfg-user-actions .btn{width:100%}.cfg-session-card{align-items:flex-start!important}.cfg-session-main{min-width:0;width:100%}.cfg-audit-desktop{display:none!important}.cfg-audit-mobile{display:flex;flex-direction:column;gap:10px}.cfg-audit-card{padding:14px;border:1px solid var(--border);border-radius:12px;background:rgba(255,255,255,.02)}.cfg-audit-card-head{display:flex;justify-content:space-between;gap:10px;align-items:flex-start;margin-bottom:9px}.cfg-audit-card-meta{font-size:.72rem;color:var(--text3);line-height:1.5}.cfg-audit-card .btn{margin-top:10px;width:100%}}@media(max-width:430px){.cfg-tabs{margin-left:-10px;margin-right:-10px;padding-left:10px;padding-right:10px}.cfg-user-actions{grid-template-columns:1fr}.cfg-user-card>div{align-items:flex-start!important}.cfg-session-card{display:grid!important;grid-template-columns:auto 1fr}.cfg-session-card>.btn{grid-column:1/-1;width:100%}}';
       document.head.appendChild(s);
     }
 
@@ -66,7 +66,7 @@ const Configuracoes = {
 
     return `
     <div>
-      <div style="display:flex;gap:0;border-bottom:2px solid var(--border);margin-bottom:24px;overflow-x:auto;">
+      <div class="cfg-tabs">
         <button id="cfg-tab-empresa" class="cfg-tab${this._activeTab==='empresa'?' cfg-tab-active':''}" data-fb-click="Configuracoes._switch" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="empresa">
           &#x1F3E2; Minha Empresa
         </button>
@@ -500,7 +500,7 @@ const Configuracoes = {
     const avatar = this._esc(u.avatar || (u.nome || 'US').slice(0,2).toUpperCase());
     const id = this._esc(u.id);
     return `
-    <div class="card" style="margin-bottom:12px;">
+    <div class="card cfg-user-card" style="margin-bottom:12px;">
       <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap;">
         <div class="user-av" style="width:52px;height:52px;font-size:1.2rem;flex-shrink:0;${!u.ativo?'opacity:.4;':''}">${avatar}</div>
         <div style="flex:1;min-width:180px;">
@@ -512,7 +512,7 @@ const Configuracoes = {
           </div>
         </div>
         ${['admin','superadmin'].includes(session?.perfil) ? `
-        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        <div class="cfg-user-actions">
           <button class="btn btn-secondary btn-sm" data-fb-click="Configuracoes.showUserForm" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(id))}">✏️ Editar</button>
           ${!isMe ? `<button class="btn btn-sm ${u.ativo?'btn-warning':'btn-success'}" data-fb-click="Configuracoes.toggleAtivo" data-fb-click-n="2" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(id))}" data-fb-click-t1="auto" data-fb-click-v1="${encodeURIComponent(String(!!u.ativo))}">${u.ativo?'Desativar':'Ativar'}</button>` : ''}
           ${isMe ? `<button class="btn btn-primary btn-sm" data-fb-click="Configuracoes.showMeuPerfil" data-fb-click-n="0">👤 Meu Perfil</button>` : ''}
@@ -770,7 +770,7 @@ const Configuracoes = {
         const id=this._esc(x.id), device=this._esc(x.device_name || 'Dispositivo'), ip=this._esc(x.ip || 'IP n&atilde;o informado');
         const when=x.last_seen_at ? new Date(x.last_seen_at).toLocaleString('pt-BR') : '-';
         const state=x.current?'Sess&atilde;o atual':(x.active?'Ativa':'Encerrada');
-        return `<div style="display:flex;gap:14px;align-items:center;padding:13px 0;border-bottom:1px solid var(--border);flex-wrap:wrap"><div style="font-size:1.4rem">${x.current?'&#x1F4BB;':'&#x1F4F1;'}</div><div style="flex:1;min-width:220px"><div style="font-weight:700;color:var(--text)">${device} ${x.current?'<span class="badge badge-success">Atual</span>':''}</div><div style="font-size:.75rem;color:var(--text3)">${ip} &middot; &uacute;ltima atividade ${this._esc(when)} &middot; ${state}</div></div>${x.active&&!x.current?`<button class="btn btn-warning btn-sm" data-fb-click="Configuracoes.revokeSession" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(id))}">Encerrar</button>`:''}</div>`;
+        return `<div class="cfg-session-card" style="display:flex;gap:14px;align-items:center;padding:13px 0;border-bottom:1px solid var(--border);flex-wrap:wrap"><div style="font-size:1.4rem">${x.current?'&#x1F4BB;':'&#x1F4F1;'}</div><div class="cfg-session-main"><div style="font-weight:700;color:var(--text)">${device} ${x.current?'<span class="badge badge-success">Atual</span>':''}</div><div style="font-size:.75rem;color:var(--text3)">${ip} &middot; &uacute;ltima atividade ${this._esc(when)} &middot; ${state}</div></div>${x.active&&!x.current?`<button class="btn btn-warning btn-sm" data-fb-click="Configuracoes.revokeSession" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(id))}">Encerrar</button>`:''}</div>`;
       }).join('');
     } catch(err) { if(el) el.textContent=err.message || 'Falha ao carregar sessões.'; }
   },
@@ -829,22 +829,36 @@ const Configuracoes = {
     if (!rows.length) {
       el.innerHTML = '<div style="padding:28px;text-align:center;color:var(--text3);">Nenhum evento de auditoria registrado ainda.</div>';
     } else {
-      el.innerHTML = `<div class="tbl-wrap" style="border:none;"><table>
+      const desktopRows = rows.map(r => {
+        const id = this._esc(r.id || '');
+        const data = r.created_at ? new Date(r.created_at).toLocaleString('pt-BR') : '—';
+        return `<tr>
+          <td style="white-space:nowrap;font-size:.78rem;">${this._esc(data)}</td>
+          <td><strong>${this._esc(r.usuario_nome || 'Sistema')}</strong><div style="font-size:.7rem;color:var(--text3);">${this._esc(r.usuario_username || '')}</div></td>
+          <td><span class="badge badge-secondary">${this._esc(r.acao || '—')}</span></td>
+          <td>${this._esc(r.entidade || '—')}</td>
+          <td style="font-family:monospace;font-size:.72rem;max-width:160px;overflow:hidden;text-overflow:ellipsis;">${this._esc(r.entidade_id || '—')}</td>
+          <td style="font-size:.72rem;color:var(--text3);">${this._esc(r.ip || '—')}</td>
+          <td><button class="btn btn-ghost btn-sm" data-fb-click="Configuracoes.showAuditDetail" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(id))}">Detalhes</button></td>
+        </tr>`;
+      }).join('');
+      const auditCards = rows.map(r => {
+        const id = this._esc(r.id || '');
+        const data = r.created_at ? new Date(r.created_at).toLocaleString('pt-BR') : '—';
+        return `<article class="cfg-audit-card">
+          <div class="cfg-audit-card-head">
+            <div><strong>${this._esc(r.acao || 'Evento')}</strong><div style="font-size:.72rem;color:var(--text3);margin-top:2px">${this._esc(data)}</div></div>
+            <span class="badge badge-secondary">${this._esc(r.entidade || '—')}</span>
+          </div>
+          <div class="cfg-audit-card-meta"><strong>Usuário:</strong> ${this._esc(r.usuario_nome || 'Sistema')}<br><strong>Registro:</strong> ${this._esc(r.entidade_id || '—')}<br><strong>Origem:</strong> ${this._esc(r.ip || '—')}</div>
+          <button class="btn btn-secondary btn-sm" data-fb-click="Configuracoes.showAuditDetail" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(id))}">Ver detalhes</button>
+        </article>`;
+      }).join('');
+      // cfg-audit-mobile-render: tabela no desktop, cards legíveis no celular.
+      el.innerHTML = `<div class="cfg-audit-desktop tbl-wrap" style="border:none;"><table>
         <thead><tr><th>Data</th><th>Usuário</th><th>Ação</th><th>Entidade</th><th>Registro</th><th>Origem</th><th></th></tr></thead>
-        <tbody>${rows.map(r => {
-          const id = this._esc(r.id || '');
-          const data = r.created_at ? new Date(r.created_at).toLocaleString('pt-BR') : '—';
-          return `<tr>
-            <td style="white-space:nowrap;font-size:.78rem;">${this._esc(data)}</td>
-            <td><strong>${this._esc(r.usuario_nome || 'Sistema')}</strong><div style="font-size:.7rem;color:var(--text3);">${this._esc(r.usuario_username || '')}</div></td>
-            <td><span class="badge badge-secondary">${this._esc(r.acao || '—')}</span></td>
-            <td>${this._esc(r.entidade || '—')}</td>
-            <td style="font-family:monospace;font-size:.72rem;max-width:160px;overflow:hidden;text-overflow:ellipsis;">${this._esc(r.entidade_id || '—')}</td>
-            <td style="font-size:.72rem;color:var(--text3);">${this._esc(r.ip || '—')}</td>
-            <td><button class="btn btn-ghost btn-sm" data-fb-click="Configuracoes.showAuditDetail" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(id))}">Detalhes</button></td>
-          </tr>`;
-        }).join('')}</tbody>
-      </table></div>`;
+        <tbody>${desktopRows}</tbody>
+      </table></div><div class="cfg-audit-mobile">${auditCards}</div>`;
     }
     const more = document.getElementById('audit-load-more');
     if (more) more.style.display = this._auditHasMore ? '' : 'none';
