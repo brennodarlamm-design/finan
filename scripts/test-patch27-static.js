@@ -19,8 +19,10 @@ console.log('=== Patch 27 — Fonte materializada / build imutável ===\n');
 
 const lifecycle = `${pkg.scripts?.postinstall || ''} ${pkg.scripts?.pretest || ''}`;
 const cloudflareBuild = String(pkg.scripts?.['build:cloudflare'] || '');
+const buildPatchMatch = String(version.build || '').match(/-p(\d+)(?:\b|$)/i);
+const buildPatch = Number(buildPatchMatch?.[1] || 0);
 ok('package está em 2.27.0 ou superior', Number(String(pkg.version).split('.')[1] || 0) >= 27);
-ok('version.json está alinhado com Patch 27', /^2\.(?:2[7-9]|[3-9]\d)\./.test(String(version.version)) && String(version.build).includes('p27'));
+ok('version.json está alinhado com Patch 27 ou superior', /^2\.(?:2[7-9]|[3-9]\d)\./.test(String(version.version)) && buildPatch >= 27);
 ok('npm install/test não executa overlays Patch 22–26', !/(?:apply|prepare)-patch2[2-6]|apply-backend-build-patches/.test(lifecycle));
 ok('Docker do Render não aplica git patch em produção', !/git\s+apply|patch22-server\.diff|patch23-server\.diff/.test(docker));
 ok('backend materializado contém autenticação QR HttpOnly', backend.includes('signQrAccess') && backend.includes('HttpOnly') && backend.includes("app.get('/status', requireAuth"));
