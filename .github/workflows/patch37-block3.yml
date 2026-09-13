@@ -32,6 +32,7 @@ jobs:
         run: |
           node scripts/patch37-block3.mjs
           node scripts/patch37-block3-fix.mjs
+          node scripts/patch37-block3-fix2.mjs
       - name: Full regression suite
         run: npm test
       - name: Syntax verification
