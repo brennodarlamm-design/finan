@@ -1,0 +1,35 @@
+name: Patch 36 block 3 - landing and mobile
+
+on:
+  push:
+    branches:
+      - patch36-product-experience
+    paths:
+      - landing.html
+      - scripts/test-patch36-static.js
+      - .github/workflows/patch36-block3.yml
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: patch36-product-experience
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Full regression suite
+        run: npm test
+      - name: Syntax verification
+        run: node scripts/check-all-syntax.js
+      - name: Cloudflare build dry validation
+        run: |
+          npm run build:cloudflare
+          npx --yes wrangler deploy --dry-run
