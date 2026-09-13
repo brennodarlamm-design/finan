@@ -10,6 +10,7 @@ function assert(condition, message) {
 
 const pkg = JSON.parse(fs.readFileSync('backend/package.json', 'utf8'));
 const server = fs.readFileSync('backend/server.js', 'utf8');
+const authCore = fs.readFileSync('api/_auth.js', 'utf8');
 const dataLayer = fs.readFileSync('js/data.js', 'utf8');
 const nfeApi = fs.readFileSync('api/nfe.js', 'utf8');
 const whatsappApi = fs.readFileSync('api/whatsapp.js', 'utf8');
@@ -34,6 +35,10 @@ assert(server.includes("error: 'Não foi possível enviar a mensagem pelo WhatsA
 assert(server.includes("console.error('❌ [Neon] Falha no teste autenticado de conexão:'"), 'Detalhe de falha Neon permanece observável apenas no servidor.');
 assert(server.includes("console.error('❌ [Cron] Falha na execução manual do resumo matinal:'"), 'Execução manual do cron captura rejeições assíncronas.');
 assert(server.includes("error: 'Não foi possível executar a rotina matinal no momento.'"), 'Cron manual devolve falha pública controlada.');
+assert(server.includes('Falha na persistência agendada das credenciais'), 'Persistência agendada das credenciais WhatsApp registra falhas.');
+assert(server.includes('Não foi possível iniciar o watcher das credenciais'), 'Falha ao iniciar watcher das credenciais WhatsApp é observável.');
+assert(server.includes('Falha ao resetar sessão WhatsApp'), 'Auto-recovery registra falha ao resetar sessão por tenant.');
+assert(authCore.includes('Falha ao atualizar last_seen da sessão'), 'Atualização best-effort de last_seen deixa rastro quando falha.');
 
 assert(dataLayer.includes("console.error('[Sync] Falha crítica ao persistir fila offline:'"), 'Fila offline faz retry e registra falha crítica de persistência.');
 assert(dataLayer.includes("console.error('[Sync] Falha crítica ao persistir fila de atenção:'"), 'Fila de atenção faz retry e registra falha crítica de persistência.');
@@ -85,4 +90,4 @@ for (const file of corsFiles) {
   assert(source.includes("Access-Control-Allow-Credentials', 'true"), `${file} preserva credenciais somente no ramo allowlisted.`);
 }
 
-console.log('\n✅ Patch 35 blocos 1–5: dependências, cron, CORS, erros, fila offline e upstreams validados.');
+console.log('\n✅ Patch 35 blocos 1–6: dependências, cron, CORS, erros, fila offline, upstreams e observabilidade de sessão validados.');
