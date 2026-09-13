@@ -150,9 +150,6 @@ if (window.location.hash.startsWith('#validar') || window.location.search.includ
             }
           }, 300);
         }
-
-        // Tenta acionar One Tap caso o usuário já esteja logado no Google no navegador
-        google.accounts.id.prompt();
       } catch (e) {
         console.warn('Google Identity Notice:', e);
       }
@@ -175,19 +172,11 @@ if (window.location.hash.startsWith('#validar') || window.location.search.includ
           officialBtn.click();
           return;
         }
-
-        google.accounts.id.prompt((notification) => {
-          if (notification.isNotDisplayed() || notification.isSkippedMoment()) {
-            errBox.textContent = 'Não foi possível inicializar o login Google. Verifique se pop-ups estão permitidos ou entre com usuário e senha.';
-            errBox.style.display = 'block';
-          }
-        });
-        return;
       } catch (e) {
         console.warn(e);
       }
     }
-    errBox.textContent = 'Serviço do Google indisponível no momento. Por favor, entre com usuário e senha.';
+    errBox.textContent = 'O botão do Google ainda não carregou. Aguarde alguns segundos e tente novamente, ou entre com usuário e senha.';
     errBox.style.display = 'block';
   }
 
