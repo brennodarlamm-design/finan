@@ -142,12 +142,8 @@ async function fetchFrontendResponse(request, env) {
   let assetRequest = request;
   let routeName = landingShell ? 'landing-shell' : null;
   if (appShell) {
-    const appUrl = new URL('/app.html', incoming);
-    assetRequest = new Request(appUrl.toString(), { method, headers: request.headers, redirect: 'manual' });
     routeName = 'app-shell';
   } else if (loginShell) {
-    const loginUrl = new URL('/login.html', incoming);
-    assetRequest = new Request(loginUrl.toString(), { method, headers: request.headers, redirect: 'manual' });
     routeName = incoming.pathname === '/cadastro' ? 'signup-shell' : 'login-shell';
   }
 
