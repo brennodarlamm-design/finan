@@ -843,12 +843,209 @@ const PortalCliente = {
     });
   },
 
-  // Suporte à renderização interna dentro do App (legado)
+  // ── CENTRAL DE GESTÃO DO PORTAL DO CLIENTE (VISÃO DA EMPRESA / INTERNA) ──
   render(obraId) {
-    const search = new URLSearchParams(window.location.search || '');
-    if (obraId) search.set('portal_obra', obraId);
-    this.renderTelaPublica(search);
-    return '';
+    if (typeof document !== 'undefined' && document.body) {
+      document.body.classList.remove('portal-public-mode');
+    }
+
+    const e = (typeof Utils !== 'undefined' && Utils.escapeHtml) ? Utils.escapeHtml.bind(Utils) : String;
+    const allObras = (typeof DB !== 'undefined' && DB.getAll) ? (DB.getAll('clientes') || []) : [];
+    
+    let obras = allObras;
+    if (obraId && obraId !== 'todas') {
+      const selected = allObras.filter(o => String(o.id) === String(obraId));
+      if (selected.length) obras = selected;
+    }
+
+    const allMedicoes = (typeof DB !== 'undefined' && DB.getAll) ? (DB.getAll('medicoes') || []) : [];
+    const allContratos = (typeof DB !== 'undefined' && DB.getAll) ? (DB.getAll('contratos') || []) : [];
+
+    const totalObras = allObras.length;
+    const totalContratosPendentes = allContratos.filter(c => !c.assinado_por_cliente).length;
+    const totalMedicoes = allMedicoes.length;
+
+    return `
+    <div class="page-header">
+      <div>
+        <h1 class="page-title">🌐 Portal do Cliente &middot; Central de Transparência</h1>
+        <p class="page-sub">Gere e envie links exclusivos e seguros para cada cliente acompanhar sua obra em tempo real, sem necessidade de login</p>
+      </div>
+      <div class="page-actions">
+        <button class="btn btn-secondary" data-fb-click="PortalCliente.abrirModalExplicativo" data-fb-click-n="0">
+          ℹ️ Como Funciona
+        </button>
+      </div>
+    </div>
+
+    <!-- BANNER DE ORIENTAÇÃO -->
+    <div style="background:linear-gradient(135deg, rgba(18,217,160,.1) 0%, rgba(59,130,246,.06) 100%);border:1px solid rgba(18,217,160,.25);border-radius:var(--r-md);padding:16px 20px;margin-bottom:20px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:14px;">
+      <div style="flex:1;min-width:280px;">
+        <div style="font-weight:800;font-size:.95rem;color:var(--text);display:flex;align-items:center;gap:8px;">
+          <span>🔒</span> Links Exclusivos por Obra &middot; Totalmente Travados
+        </div>
+        <div style="font-size:.8rem;color:var(--text2);margin-top:4px;line-height:1.4;">
+          Cada link dá acesso <strong>exclusivo e somente-leitura</strong> à obra correspondente. O cliente <strong>não tem acesso ao painel interno da empresa</strong>, nem às abas laterais, nem aos dados de outras obras.
+        </div>
+      </div>
+      <div style="display:flex;gap:8px;">
+        <span class="badge" style="background:rgba(18,217,160,.15);color:var(--accent);font-size:.76rem;font-weight:800;padding:6px 12px;border:1px solid rgba(18,217,160,.3);">
+          ✓ Sem Senha / Celular
+        </span>
+      </div>
+    </div>
+
+    <!-- KPIS -->
+    <div class="g4" style="margin-bottom:20px;">
+      <div class="kpi-card" style="padding:16px;">
+        <div class="kpi-label">Obras com Portal</div>
+        <div class="kpi-value cyan" style="font-size:1.4rem">${totalObras}</div>
+        <div style="font-size:.72rem;color:var(--text3);margin-top:4px;">Links disponíveis</div>
+      </div>
+      <div class="kpi-card" style="padding:16px;">
+        <div class="kpi-label">Contratos p/ Assinar</div>
+        <div class="kpi-value ${totalContratosPendentes > 0 ? 'yellow' : 'green'}" style="font-size:1.4rem">${totalContratosPendentes}</div>
+        <div style="font-size:.72rem;color:var(--text3);margin-top:4px;">Aguardando clientes</div>
+      </div>
+      <div class="kpi-card" style="padding:16px;">
+        <div class="kpi-label">Medições Realizadas</div>
+        <div class="kpi-value green" style="font-size:1.4rem">${totalMedicoes}</div>
+        <div style="font-size:.72rem;color:var(--text3);margin-top:4px;">Visíveis no portal</div>
+      </div>
+      <div class="kpi-card" style="padding:16px;">
+        <div class="kpi-label">Status do Módulo</div>
+        <div class="kpi-value blue" style="font-size:1.2rem">Ativo 🌐</div>
+        <div style="font-size:.72rem;color:var(--text3);margin-top:4px;">100% isolado</div>
+      </div>
+    </div>
+
+    ${!obras.length ? `
+      <div class="empty-state" style="padding:48px 20px;">
+        <div style="font-size:2.8rem;margin-bottom:12px;">🏗️</div>
+        <h3>Nenhuma obra cadastrada</h3>
+        <p style="color:var(--text3);max-width:460px;margin:0 auto 18px auto;">
+          Cadastre sua primeira obra em "Obras &amp; Clientes" para gerar automaticamente o link exclusivo do Portal de Transparência.
+        </p>
+        <button class="btn btn-primary" data-fb-click="App.navigate" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="obras">
+          + Ir para Obras &amp; Clientes
+        </button>
+      </div>
+    ` : `
+      <div style="display:grid;grid-template-columns:repeat(auto-fill, minmax(360px, 1fr));gap:16px;">
+        ${obras.map(o => {
+          const slas = o.processos_sla || ((typeof CronogramaSLA !== 'undefined') ? CronogramaSLA.getObraProcessos(o.id) : []);
+          const concluidas = slas.filter(s => s.status === 'concluido').length;
+          const atrasadas = slas.filter(s => s.status_sla === 'atrasado').length;
+          const pct = slas.length > 0 ? Math.round((concluidas / slas.length) * 100) : 0;
+          const medsObra = allMedicoes.filter(m => String(m.obra_id) === String(o.id));
+          const ctrsObra = allContratos.filter(c => String(c.obra_id) === String(o.id));
+          const ctrsPend = ctrsObra.filter(c => !c.assinado_por_cliente);
+          const urlPortal = this.getUrlPortal(o.id);
+          const tel = (o.telefone || o.whatsapp || '').replace(/\D/g, '');
+          const msgWhats = `Olá, ${o.cliente || o.nome}! Segue o link exclusivo para acompanhar a sua obra (${o.nome}) em tempo real pelo nosso Portal de Transparência:\n\n${urlPortal}\n\nLá você pode ver prazos, fotos, medições aprovadas, comprovantes e assinar contratos diretamente pelo celular.`;
+          const whatsUrl = tel
+            ? `https://wa.me/55${tel}?text=${encodeURIComponent(msgWhats)}`
+            : `https://wa.me/?text=${encodeURIComponent(msgWhats)}`;
+
+          return `
+          <div class="card" style="padding:20px;display:flex;flex-direction:column;justify-content:space-between;gap:16px;border:1px solid var(--border);transition:border-color .2s;background:var(--bg-card);">
+            <div>
+              <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin-bottom:8px;">
+                <div style="flex:1;min-width:0;">
+                  <span style="font-size:.7rem;font-weight:800;color:var(--accent);text-transform:uppercase;letter-spacing:.04em;">Obra / Cliente</span>
+                  <h3 style="font-size:1.05rem;font-weight:900;color:var(--text);margin:2px 0 0 0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
+                    ${e(o.nome)}
+                  </h3>
+                </div>
+                <span class="badge" style="background:${o.status === 'concluida' ? 'rgba(16,185,129,.15)' : 'rgba(59,130,246,.15)'};color:${o.status === 'concluida' ? 'var(--success)' : '#3b82f6'};font-size:.7rem;font-weight:800;padding:3px 8px;">
+                  ${o.status === 'concluida' ? 'Concluída' : 'Em Andamento'}
+                </span>
+              </div>
+
+              <div style="font-size:.78rem;color:var(--text2);margin-bottom:14px;line-height:1.4;">
+                <div>👤 <strong>Cliente:</strong> ${e(o.cliente || o.nome)}</div>
+                ${o.telefone || o.whatsapp ? `<div>📞 <strong>Contato:</strong> ${e(o.telefone || o.whatsapp)}</div>` : ''}
+                ${o.endereco ? `<div style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">📍 ${e(o.endereco)} &middot; ${e(o.cidade || '')}/${e(o.estado || '')}</div>` : ''}
+              </div>
+
+              <!-- RESUMO DOS ITENS COMPARTILHADOS -->
+              <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--r-sm);padding:10px 12px;margin-bottom:14px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;text-align:center;">
+                <div>
+                  <div style="font-size:.65rem;color:var(--text3);font-weight:700;text-transform:uppercase;">Avanço</div>
+                  <div style="font-size:.95rem;font-weight:900;color:var(--accent);">${pct}%</div>
+                </div>
+                <div>
+                  <div style="font-size:.65rem;color:var(--text3);font-weight:700;text-transform:uppercase;">Medições</div>
+                  <div style="font-size:.95rem;font-weight:900;color:var(--success);">${medsObra.length}</div>
+                </div>
+                <div>
+                  <div style="font-size:.65rem;color:var(--text3);font-weight:700;text-transform:uppercase;">Contratos</div>
+                  <div style="font-size:.95rem;font-weight:900;color:${ctrsPend.length ? '#f59e0b' : 'var(--text2)'};">${ctrsPend.length ? `${ctrsPend.length} pend.` : '✓ Ok'}</div>
+                </div>
+              </div>
+
+              <!-- SITUAÇÃO DO PRAZO -->
+              <div style="font-size:.72rem;display:flex;align-items:center;gap:6px;margin-bottom:14px;color:${atrasadas > 0 ? 'var(--danger)' : 'var(--success)'};font-weight:700;">
+                <span>${atrasadas > 0 ? '⚠️' : '🟢'}</span>
+                <span>${atrasadas > 0 ? `${atrasadas} fase(s) em atraso na obra` : 'Cronograma de etapas no prazo'}</span>
+              </div>
+            </div>
+
+            <!-- BOTÕES DE AÇÃO DIRETA -->
+            <div style="border-top:1px solid var(--border);padding-top:12px;display:flex;flex-direction:column;gap:8px;">
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+                <button class="btn btn-secondary btn-sm" data-fb-click="PortalCliente.copiarLinkDireto" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(o.id))}" style="font-size:.76rem;font-weight:700;padding:7px;display:inline-flex;align-items:center;justify-content:center;gap:6px;">
+                  📋 Copiar Link
+                </button>
+                <a href="${whatsUrl}" target="_blank" rel="noopener noreferrer" class="btn btn-sm" style="background:#25D366;color:#fff;border:none;font-weight:700;font-size:.76rem;padding:7px;display:inline-flex;align-items:center;justify-content:center;gap:6px;text-decoration:none;">
+                  📲 WhatsApp
+                </a>
+              </div>
+              <button class="btn btn-primary btn-sm" data-fb-click="PortalCliente.abrirVisualizacaoCliente" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(o.id))}" style="font-size:.78rem;font-weight:800;padding:8px;display:inline-flex;align-items:center;justify-content:center;gap:6px;">
+                👁️ Visualizar como Cliente
+              </button>
+            </div>
+          </div>`;
+        }).join('')}
+      </div>
+    `}
+    `;
+  },
+
+  copiarLinkDireto(obraId) {
+    const url = this.getUrlPortal(obraId);
+    if (!url) return Utils.toast('Obra não encontrada para gerar o link.', 'error');
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(url).then(() => {
+        Utils.toast('Link do portal copiado para a área de transferência!', 'success');
+      }).catch(() => {
+        Utils.toast('Link gerado: copie o endereço.', 'info');
+      });
+    } else {
+      Utils.toast('Link copiado!', 'success');
+    }
+  },
+
+  abrirModalExplicativo() {
+    Utils.showModal(`
+      <div class="modal" style="max-width:540px;">
+        <div class="modal-header">
+          <div class="modal-title">ℹ️ Como Funciona o Portal do Cliente</div>
+          <button class="modal-close" data-fb-click="Utils.closeModal" data-fb-click-n="0">✕</button>
+        </div>
+        <div class="modal-body" style="padding:20px;font-size:.85rem;line-height:1.5;color:var(--text2);">
+          <p>O <strong>Portal de Transparência</strong> é uma tela segura desenvolvida para você compartilhar com o proprietário da obra.</p>
+          <ul style="margin:12px 0 16px 20px;display:flex;flex-direction:column;gap:8px;">
+            <li><strong>Acesso sem login:</strong> O cliente não precisa cadastrar conta nem digitar senha. Basta clicar no link recebido.</li>
+            <li><strong>Isolamento total:</strong> O cliente só tem acesso aos dados da sua própria obra. Ele não vê abas laterais nem nenhuma informação financeira de outras empresas.</li>
+            <li><strong>O que o cliente vê:</strong> Linha do tempo dos prazos (SLAs), vistorias de medição realizadas, notas e comprovantes liberados, arquivos de projetos em PDF e contratos pendentes para assinatura digital pelo celular.</li>
+          </ul>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-primary" data-fb-click="Utils.closeModal" data-fb-click-n="0">Entendi</button>
+        </div>
+      </div>
+    `);
   }
 };
 
