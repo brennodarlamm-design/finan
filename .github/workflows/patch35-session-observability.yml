@@ -1,0 +1,76 @@
+name: Patch 35 session observability hardening (no deploy)
+
+on:
+  push:
+    branches:
+      - patch35-large-audit
+    paths:
+      - .github/workflows/patch35-session-observability.yml
+
+permissions:
+  contents: write
+
+jobs:
+  harden:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: patch35-large-audit
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Make session persistence failures observable
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          auth = Path('api/_auth.js')
+          text = auth.read_text()
+          old = """      sql`UPDATE auth_sessions SET last_seen_at=NOW() WHERE id=${payload.sessionId} AND last_seen_at < NOW() - INTERVAL '15 minutes';`.catch(() => {});"""
+          new = """      sql`UPDATE auth_sessions SET last_seen_at=NOW() WHERE id=${payload.sessionId} AND last_seen_at < NOW() - INTERVAL '15 minutes';`.catch((err) => {\n        console.warn('[Auth] Falha ao atualizar last_seen da sessão:', err?.message || err);\n      });"""
+          if text.count(old) != 1:
+              raise SystemExit('Atualização silenciosa de last_seen não encontrada de forma única.')
+          auth.write_text(text.replace(old, new, 1))
+
+          server = Path('backend/server.js')
+          text = server.read_text()
+
+          old = """        session.syncTimer = setTimeout(() => {\n          saveAuthToPostgres(session).catch(() => {});\n        }, 500);\n      });\n    } catch {}"""
+          new = """        session.syncTimer = setTimeout(() => {\n          saveAuthToPostgres(session).catch((err) => {\n            console.warn(`⚠️ [WhatsApp:${session.tenantId}] Falha na persistência agendada das credenciais:`, err?.message || err);\n          });\n        }, 500);\n      });\n    } catch (err) {\n      console.warn(`⚠️ [WhatsApp:${session.tenantId}] Não foi possível iniciar o watcher das credenciais:`, err?.message || err);\n    }"""
+          if text.count(old) != 1:
+              raise SystemExit('Watcher/persistência silenciosa do WhatsApp não encontrada de forma única.')
+          text = text.replace(old, new, 1)
+
+          old = """        try {\n          await resetWhatsAppSession(tId, 'Recuperação automática de erro de decifração Noise/AES-GCM');\n        } catch {}"""
+          new = """        try {\n          await resetWhatsAppSession(tId, 'Recuperação automática de erro de decifração Noise/AES-GCM');\n        } catch (resetErr) {\n          console.error(`❌ [Auto-Recovery:${tId}] Falha ao resetar sessão WhatsApp:`, resetErr?.message || resetErr);\n        }"""
+          if text.count(old) != 1:
+              raise SystemExit('Reset silencioso de auto-recovery não encontrado de forma única.')
+          server.write_text(text.replace(old, new, 1))
+          PY
+      - name: Validate full regression and syntax
+        run: |
+          npm test
+          node scripts/check-all-syntax.js
+      - name: Validate backend dependencies
+        run: |
+          cd backend
+          npm ci
+          npm audit --omit=dev --audit-level=moderate
+      - name: Verify new observability guards
+        run: |
+          grep -q "Falha ao atualizar last_seen da sessão" api/_auth.js
+          grep -q "Falha na persistência agendada das credenciais" backend/server.js
+          grep -q "Não foi possível iniciar o watcher das credenciais" backend/server.js
+          grep -q "Falha ao resetar sessão WhatsApp" backend/server.js
+      - name: Commit session observability hardening
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add api/_auth.js backend/server.js
+          git diff --cached --check
+          git commit -m "fix(patch35): surface session persistence failures"
+          git push origin HEAD:patch35-large-audit
