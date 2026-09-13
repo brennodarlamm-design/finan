@@ -43,6 +43,7 @@ function patchLogin() {
   html = html.replace('<meta name="robots" content="noindex,follow">', '<meta name="robots" content="noindex,nofollow">');
   html = ensureCanonical(html, 'https://finobra.app.br/login');
   html = injectBeforeHeadClose(html, '<link rel="stylesheet" href="/css/auth-patch38.css?v=20260913">');
+  html = injectBeforeHeadClose(html, '<script src="/js/auth-route-patch38.js?v=20260913" defer></script>');
   write('login.html', html);
 }
 
@@ -60,8 +61,10 @@ patchDocument('validar.html', 'https://finobra.app.br/validar');
 
 const builtLogin = read('login.html');
 const builtHome = read('index.html');
-if (!builtLogin.includes('/css/auth-patch38.css') || !builtLogin.includes('noindex,nofollow')) {
-  throw new Error('Patch 38: login final sem camada mobile/noindex esperada.');
+if (!builtLogin.includes('/css/auth-patch38.css') ||
+    !builtLogin.includes('/js/auth-route-patch38.js') ||
+    !builtLogin.includes('noindex,nofollow')) {
+  throw new Error('Patch 38: login final sem camada mobile/rota/noindex esperada.');
 }
 if (!builtHome.includes('href="/" aria-label="FinObra"') || !builtHome.includes('property="og:title"')) {
   throw new Error('Patch 38: landing final sem canonicalização/metadata esperada.');
