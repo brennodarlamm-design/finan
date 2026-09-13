@@ -11,6 +11,10 @@ function assert(condition, message) {
 const pkg = JSON.parse(fs.readFileSync('backend/package.json', 'utf8'));
 const server = fs.readFileSync('backend/server.js', 'utf8');
 const dataLayer = fs.readFileSync('js/data.js', 'utf8');
+const nfeApi = fs.readFileSync('api/nfe.js', 'utf8');
+const whatsappApi = fs.readFileSync('api/whatsapp.js', 'utf8');
+const ocrApi = fs.readFileSync('api/reconhecer-documento.js', 'utf8');
+const usersApi = fs.readFileSync('api/users.js', 'utf8');
 const auditWorkflow = fs.readFileSync('.github/workflows/patch35-audit.yml', 'utf8');
 
 assert(/^\^?4\./.test(pkg.dependencies?.['node-cron'] || ''), 'Backend usa node-cron 4.x sem cadeia legada de uuid vulnerável.');
@@ -39,6 +43,24 @@ assert(dataLayer.includes("if (!this._saveSyncQueue(queue))"), 'Enfileiramento v
 assert(dataLayer.includes('Libere espaço no navegador antes de fechar esta aba.'), 'Usuário é avisado quando a fila offline não pode ser persistida.');
 assert(dataLayer.includes("storageFailure:true"), 'Estado de sincronização expõe falha de storage para a interface.');
 
+assert(nfeApi.includes('AbortSignal.timeout(7000)'), 'Consulta pública de CNPJ possui timeout explícito.');
+assert((nfeApi.match(/AbortSignal\.timeout\(15000\)/g) || []).length >= 4, 'Operações de leitura/consulta MeuDanfe possuem timeout explícito.');
+assert(nfeApi.includes('AbortSignal.timeout(20000)'), 'Envio de XML para MeuDanfe possui timeout explícito.');
+assert(!/detail:\s*err(?:Cep)?\.message/.test(nfeApi), 'NF-e/CNPJ/CEP não devolvem exceções internas ao navegador.');
+assert(nfeApi.includes("const timedOut = err?.name === 'TimeoutError' || err?.name === 'AbortError'"), 'NF-e diferencia timeout de falha genérica sem expor stack interna.');
+
+assert(!whatsappApi.includes("error: 'Falha ao solicitar desconexão ao servidor Render: ' + err.message"), 'Proxy WhatsApp não concatena exceção interna na resposta de reset.');
+assert(!whatsappApi.includes('details: data'), 'Proxy WhatsApp não devolve payload bruto de erro do Render.');
+assert(!whatsappApi.includes('json({ success: false, error: err.message })'), 'Proxy WhatsApp não devolve err.message bruto.');
+assert((whatsappApi.match(/AbortSignal\.timeout\(/g) || []).length >= 5, 'Chamadas do proxy WhatsApp continuam limitadas por timeout.');
+
+assert(ocrApi.includes('AbortSignal.timeout(35000)'), 'OCR OpenAI possui timeout abaixo do limite da função.');
+assert(ocrApi.includes('AbortSignal.timeout(20000)'), 'Fallback Gemini possui timeout por tentativa.');
+assert(!ocrApi.includes('detalhe: erroConsolidado'), 'OCR não devolve erro consolidado bruto dos provedores.');
+assert(!ocrApi.includes('detalhe: err.message'), 'OCR não devolve exceção interna inesperada.');
+assert(ocrApi.includes('/credit_balance_exhausted|insufficient_quota/i'), 'OCR mantém detecção interna de limite de uso para mensagem amigável.');
+assert(usersApi.includes('AbortSignal.timeout(15000)'), 'FinBot ChatGPT possui timeout explícito e fallback local.');
+
 assert(auditWorkflow.includes('workflow_dispatch:'), 'Auditoria grande continua somente manual.');
 assert(!auditWorkflow.includes('continue-on-error: true'), 'Auditorias de dependência são bloqueantes.');
 assert((auditWorkflow.match(/npm audit --omit=dev --audit-level=moderate/g) || []).length === 2, 'Root e backend bloqueiam vulnerabilidades moderadas ou superiores.');
@@ -62,4 +84,4 @@ for (const file of corsFiles) {
   assert(source.includes("Access-Control-Allow-Credentials', 'true"), `${file} preserva credenciais somente no ramo allowlisted.`);
 }
 
-console.log('\n✅ Patch 35 blocos 1–4: dependências, cron, CORS, erros e fila offline validados.');
+console.log('\n✅ Patch 35 blocos 1–5: dependências, cron, CORS, erros, fila offline e upstreams validados.');
