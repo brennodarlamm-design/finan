@@ -378,10 +378,14 @@ async function startWhatsApp(tenantId, forceClean = false) {
       fs.watch(session.authDir, () => {
         if (session.syncTimer) clearTimeout(session.syncTimer);
         session.syncTimer = setTimeout(() => {
-          saveAuthToPostgres(session).catch(() => {});
+          saveAuthToPostgres(session).catch((err) => {
+            console.warn(`⚠️ [WhatsApp:${session.tenantId}] Falha na persistência agendada das credenciais:`, err?.message || err);
+          });
         }, 500);
       });
-    } catch {}
+    } catch (err) {
+      console.warn(`⚠️ [WhatsApp:${session.tenantId}] Não foi possível iniciar o watcher das credenciais:`, err?.message || err);
+    }
 
     session.sock.ev.on('connection.update', async (update) => {
       const { connection, lastDisconnect, qr } = update;
@@ -481,7 +485,9 @@ process.on('uncaughtException', async (err) => {
       if (sess.connectionStatus !== 'connected') {
         try {
           await resetWhatsAppSession(tId, 'Recuperação automática de erro de decifração Noise/AES-GCM');
-        } catch {}
+        } catch (resetErr) {
+          console.error(`❌ [Auto-Recovery:${tId}] Falha ao resetar sessão WhatsApp:`, resetErr?.message || resetErr);
+        }
       }
     }
   } else {
