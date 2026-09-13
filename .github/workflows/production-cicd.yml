@@ -92,7 +92,11 @@ jobs:
 
           version="$(curl --fail --silent --show-error https://finobra.app.br/version.json)"
           [[ "$version" == *"\"commit\":\"$GITHUB_SHA\""* ]]
-          [[ "$version" == *'"source":"github-actions"'* ]]
+          if [[ "$version" != *'"source":"github-actions"'* && \
+                "$version" != *'"source":"cloudflare-workers-builds"'* ]]; then
+            echo "Unexpected deploy source in version.json: $version" >&2
+            exit 1
+          fi
 
           final_url="$(curl --fail --silent --show-error --location --output /dev/null --write-out '%{url_effective}' https://www.finobra.app.br/)"
           [[ "$final_url" == 'https://finobra.app.br/' ]]
