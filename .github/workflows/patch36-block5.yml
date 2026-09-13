@@ -1,0 +1,59 @@
+name: Patch 36 block 5 - permissions sessions account consistency
+
+on:
+  push:
+    branches:
+      - patch36-product-experience
+    paths:
+      - scripts/patch36-block5.mjs
+      - .github/workflows/patch36-block5.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: patch36-block5
+  cancel-in-progress: true
+
+jobs:
+  apply-and-validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: patch36-product-experience
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Apply Patch 36 block 5
+        run: node scripts/patch36-block5.mjs
+      - name: Full regression suite
+        run: npm test
+      - name: Syntax verification
+        run: node scripts/check-all-syntax.js
+      - name: Codebase audit
+        run: node scripts/audit-codebase.mjs
+      - name: Dependency audit
+        run: npm audit --omit=dev --audit-level=high
+      - name: Cloudflare build dry validation
+        run: |
+          npm run build:cloudflare
+          npx --yes wrangler deploy --dry-run
+      - name: Commit validated block
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "finobra-patch-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add api/_permissions.js api/users.js js/configuracoes.js js/cobranca.js scripts/test-patch36-static.js
+          if git diff --cached --quiet; then
+            echo "No functional changes to commit."
+            exit 0
+          fi
+          git commit -m "feat(patch36): align permissions sessions and account UX with plans"
+          git push origin HEAD:patch36-product-experience
