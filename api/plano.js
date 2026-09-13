@@ -2,7 +2,7 @@
 import crypto from 'crypto';
 import { neon } from '@neondatabase/serverless';
 import { resolveAuthAndTenant } from './_auth.js';
-import { getPlanRule, normalizePlan } from './_plans.js';
+import { getPlanRule, normalizePlan, getPlanCyclePrice, PLAN_BILLING_CYCLES, PLAN_CYCLE_PRICING } from './_plans.js';
 import { canManageTenant, canAccessModule, permissionError } from './_permissions.js';
 import { writeAudit } from './_audit.js';
 
@@ -97,19 +97,22 @@ export default async function handler(req, res) {
       const planId = normalizePlan(req.body?.plan_id);
       if (planId === 'trial') return res.status(400).json({ success:false, error:'O plano Trial não gera cobrança.' });
       const rule = getPlanRule(planId);
-      const amountCents = Number(rule.monthlyPriceCents || 0);
-      if (!amountCents) return res.status(400).json({ success:false, error:'Plano sem valor mensal configurado.' });
+      const requestedCycle = String(req.body?.cycle || 'monthly').trim().toLowerCase();
+      const cycleInfo = getPlanCyclePrice(planId, requestedCycle);
+      const cycle = cycleInfo ? cycleInfo.cycle : 'monthly';
+      const amountCents = cycleInfo ? Number(cycleInfo.totalCents) : Number(rule.monthlyPriceCents || 0);
+      if (!amountCents) return res.status(400).json({ success:false, error:'Plano sem valor configurado.' });
 
       await sql`UPDATE billing_invoices SET status='expired', updated_at=NOW() WHERE tenant_id=${auth.tenantId} AND status='pending' AND expires_at IS NOT NULL AND expires_at < NOW();`;
       const existing = await sql`
-        SELECT id, tenant_id, plan_id, amount_cents, status, txid, pix_payload, expires_at, created_at
+        SELECT id, tenant_id, plan_id, COALESCE(cycle, 'monthly') AS cycle, amount_cents, status, txid, pix_payload, expires_at, created_at
         FROM billing_invoices
-        WHERE tenant_id=${auth.tenantId} AND plan_id=${planId} AND status='pending'
+        WHERE tenant_id=${auth.tenantId} AND plan_id=${planId} AND COALESCE(cycle, 'monthly')=${cycle} AND status='pending'
           AND (expires_at IS NULL OR expires_at > NOW())
         ORDER BY created_at DESC LIMIT 1;
       `;
       if (existing.length) {
-        return res.status(200).json({ success:true, invoice:existing[0], billingWhatsapp:billingWhatsapp(), reused:true });
+        return res.status(200).json({ success:true, invoice:existing[0], cycleInfo, billingWhatsapp:billingWhatsapp(), reused:true });
       }
 
       const id = 'inv_' + crypto.randomBytes(10).toString('hex');
@@ -117,12 +120,12 @@ export default async function handler(req, res) {
       const pixKey = String(process.env.FINOBRA_PIX_KEY || '+5595991363678').trim();
       const pixPayload = buildPixPayload({ key: pixKey, amountCents, txid });
       const rows = await sql`
-        INSERT INTO billing_invoices (id, tenant_id, plan_id, amount_cents, status, txid, pix_payload, created_by, expires_at)
-        VALUES (${id}, ${auth.tenantId}, ${planId}, ${amountCents}, 'pending', ${txid}, ${pixPayload || null}, ${auth.user?.userId || auth.user?.id || null}, NOW() + INTERVAL '1 day')
-        RETURNING id, tenant_id, plan_id, amount_cents, status, txid, pix_payload, expires_at, created_at;
+        INSERT INTO billing_invoices (id, tenant_id, plan_id, cycle, amount_cents, status, txid, pix_payload, created_by, expires_at)
+        VALUES (${id}, ${auth.tenantId}, ${planId}, ${cycle}, ${amountCents}, 'pending', ${txid}, ${pixPayload || null}, ${auth.user?.userId || auth.user?.id || null}, NOW() + INTERVAL '1 day')
+        RETURNING id, tenant_id, plan_id, cycle, amount_cents, status, txid, pix_payload, expires_at, created_at;
       `;
-      await writeAudit(sql, req, auth, { acao:'criar', entidade:'cobranca', entidadeId:id, depois:{ plan_id:planId, amount_cents:amountCents, txid } });
-      return res.status(201).json({ success:true, invoice:rows[0], billingWhatsapp:billingWhatsapp(), reused:false });
+      await writeAudit(sql, req, auth, { acao:'criar', entidade:'cobranca', entidadeId:id, depois:{ plan_id:planId, cycle, amount_cents:amountCents, txid } });
+      return res.status(201).json({ success:true, invoice:rows[0], cycleInfo, billingWhatsapp:billingWhatsapp(), reused:false });
     }
 
     const tenantRows = await sql`SELECT plano, status, created_at, vencimento FROM tenants WHERE id = ${auth.tenantId} LIMIT 1;`;
@@ -194,6 +197,8 @@ export default async function handler(req, res) {
         supportLevel: rule.supportLevel,
         modules: rule.modules,
         features: rule.features,
+        billingCycles: PLAN_BILLING_CYCLES,
+        pricingByCycle: PLAN_CYCLE_PRICING[rule.id] || null,
         usage: {
           activeObras: active,
           totalObras: total,
@@ -203,6 +208,8 @@ export default async function handler(req, res) {
           remainingUsers: rule.maxUsers == null ? null : Math.max(0, rule.maxUsers - activeUsers)
         }
       },
+      billingCycles: PLAN_BILLING_CYCLES,
+      allPlansPricing: PLAN_CYCLE_PRICING,
       ...(invoices ? { invoices } : {}),
       billingWhatsapp: billingWhatsapp()
     });

@@ -32,10 +32,10 @@ test('Migração cria mensagens de suporte', migration.includes('CREATE TABLE IF
 test('Schema inclui cobrança e suporte', schema.includes('CREATE TABLE IF NOT EXISTS billing_invoices') && schema.includes('CREATE TABLE IF NOT EXISTS support_conversations') && schema.includes('CREATE TABLE IF NOT EXISTS support_messages'));
 
 // Cobrança
-test('Preços dos planos ficam no backend', plans.includes('monthlyPriceCents: 7990') && plans.includes('monthlyPriceCents: 11990') && plans.includes('monthlyPriceCents: 15990'));
+test('Preços dos planos ficam no backend', plans.includes('monthlyPriceCents: 11990') && plans.includes('monthlyPriceCents: 27990') && plans.includes('monthlyPriceCents: 49990'));
 test('API cria cobrança usando preço do backend', planApi.includes('rule.monthlyPriceCents') && !planApi.includes('req.body?.amount'));
 test('PIX possui CRC16 e BR.GOV.BCB.PIX', planApi.includes('crc16Ccitt') && planApi.includes('BR.GOV.BCB.PIX'));
-test('Master confirma pagamento e renova vencimento', adminApi.includes("action === 'confirm_payment'") && adminApi.includes('+ 30)::date'));
+test('Master confirma pagamento e renova vencimento', adminApi.includes("action === 'confirm_payment'") && (adminApi.includes('+ 30)::date') || adminApi.includes('ELSE 30')));
 test('Tela de planos usa cobrança registrada no backend', cobranca.includes("/api/plano?action=create_invoice") && cobranca.includes('data.invoice'));
 
 // Impersonação / isolamento de tenant

@@ -47,7 +47,7 @@ export const PLAN_RULES = Object.freeze({
     idealFor: 'Profissionais e pequenas construtoras com operação enxuta',
     maxActiveObras: 3,
     maxUsers: 1,
-    monthlyPriceCents: 7990,
+    monthlyPriceCents: 11990,
     supportLevel: 'Padrão',
     modules: STARTER_MODULES,
     features: Object.freeze({ ocr:false, signatures:false, sinapi:false, engineering:false, advancedPermissions:false })
@@ -58,7 +58,7 @@ export const PLAN_RULES = Object.freeze({
     idealFor: 'Construtoras em crescimento que precisam automatizar documentos e compras',
     maxActiveObras: 10,
     maxUsers: 2,
-    monthlyPriceCents: 11990,
+    monthlyPriceCents: 27990,
     supportLevel: 'Prioritário',
     modules: PRO_MODULES,
     features: Object.freeze({ ocr:true, signatures:true, sinapi:false, engineering:false, advancedPermissions:false })
@@ -69,12 +69,54 @@ export const PLAN_RULES = Object.freeze({
     idealFor: 'Operações completas com engenharia, equipe e obras em escala',
     maxActiveObras: null,
     maxUsers: 5,
-    monthlyPriceCents: 15990,
+    monthlyPriceCents: 49990,
     supportLevel: 'Prioritário / VIP',
     modules: ALL_MODULES,
     features: Object.freeze({ ocr:true, signatures:true, sinapi:true, engineering:true, advancedPermissions:true })
   })
 });
+
+export const PLAN_BILLING_CYCLES = Object.freeze({
+  monthly: Object.freeze({ id: 'monthly', label: 'Mensal', months: 1, days: 30, discountLabel: 'Sem fidelidade' }),
+  quarterly: Object.freeze({ id: 'quarterly', label: 'Trimestral', months: 3, days: 90, discountLabel: 'Economia trimestral (~5,5% OFF)' }),
+  semiannual: Object.freeze({ id: 'semiannual', label: 'Semestral', months: 6, days: 180, discountLabel: 'Economia semestral (~11% OFF)' }),
+  annual: Object.freeze({ id: 'annual', label: 'Anual', months: 12, days: 365, discountLabel: '2 meses grátis (Pague 10, Leve 12)' })
+});
+
+export const PLAN_CYCLE_PRICING = Object.freeze({
+  starter: Object.freeze({
+    monthly: Object.freeze({ totalCents: 11990, monthlyEquivalentCents: 11990, savingsCents: 0, months: 1, days: 30 }),
+    quarterly: Object.freeze({ totalCents: 33990, monthlyEquivalentCents: 11330, savingsCents: 1980, months: 3, days: 90 }),
+    semiannual: Object.freeze({ totalCents: 63990, monthlyEquivalentCents: 10665, savingsCents: 7950, months: 6, days: 180 }),
+    annual: Object.freeze({ totalCents: 119900, monthlyEquivalentCents: 9991, savingsCents: 23980, months: 12, days: 365 })
+  }),
+  pro: Object.freeze({
+    monthly: Object.freeze({ totalCents: 27990, monthlyEquivalentCents: 27990, savingsCents: 0, months: 1, days: 30 }),
+    quarterly: Object.freeze({ totalCents: 78990, monthlyEquivalentCents: 26330, savingsCents: 4980, months: 3, days: 90 }),
+    semiannual: Object.freeze({ totalCents: 147990, monthlyEquivalentCents: 24665, savingsCents: 19950, months: 6, days: 180 }),
+    annual: Object.freeze({ totalCents: 279900, monthlyEquivalentCents: 23325, savingsCents: 55980, months: 12, days: 365 })
+  }),
+  unlimited: Object.freeze({
+    monthly: Object.freeze({ totalCents: 49990, monthlyEquivalentCents: 49990, savingsCents: 0, months: 1, days: 30 }),
+    quarterly: Object.freeze({ totalCents: 139990, monthlyEquivalentCents: 46663, savingsCents: 9980, months: 3, days: 90 }),
+    semiannual: Object.freeze({ totalCents: 264990, monthlyEquivalentCents: 44165, savingsCents: 34950, months: 6, days: 180 }),
+    annual: Object.freeze({ totalCents: 499900, monthlyEquivalentCents: 41658, savingsCents: 99980, months: 12, days: 365 })
+  })
+});
+
+export function getPlanCyclePrice(planId, cycle = 'monthly') {
+  const normPlan = normalizePlan(planId);
+  const normCycle = String(cycle || 'monthly').trim().toLowerCase();
+  const pricing = PLAN_CYCLE_PRICING[normPlan]?.[normCycle] || PLAN_CYCLE_PRICING[normPlan]?.monthly;
+  if (!pricing) return null;
+  return {
+    planId: normPlan,
+    cycle: (normCycle in (PLAN_CYCLE_PRICING[normPlan] || {})) ? normCycle : 'monthly',
+    ...pricing,
+    cycleLabel: PLAN_BILLING_CYCLES[normCycle]?.label || 'Mensal',
+    discountLabel: PLAN_BILLING_CYCLES[normCycle]?.discountLabel || ''
+  };
+}
 
 export const PAID_PLAN_ORDER = Object.freeze(['starter','pro','unlimited']);
 

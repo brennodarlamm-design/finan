@@ -139,7 +139,9 @@ const MasterAdmin = {
     if (!inv) return;
     const nome = inv.tenant_nome || inv.tenant_id || 'empresa';
     const valor = (Number(inv.amount_cents || 0) / 100).toFixed(2).replace('.', ',');
-    if (!confirm(`Confirmar recebimento de R$ ${valor} da ${nome}? O plano será ativado/renovado por 30 dias.`)) return;
+    const cycleNames = { monthly: '30 dias (Mensal)', quarterly: '90 dias (Trimestral)', semiannual: '180 dias (Semestral)', annual: '365 dias (Anual)' };
+    const cycleDesc = cycleNames[inv.cycle] || '30 dias';
+    if (!confirm(`Confirmar recebimento de R$ ${valor} da ${nome}? O plano será ativado/renovado por ${cycleDesc}.`)) return;
     try {
       const resp = await fetch('/api/admin?action=confirm_payment', {
         method:'POST',
@@ -167,8 +169,10 @@ const MasterAdmin = {
       const valor = (Number(i.amount_cents || 0) / 100).toFixed(2).replace('.', ',');
       const statusMap = { pending:'🟡 Pendente', paid:'🟢 Pago', expired:'⚪ Expirado', canceled:'🔴 Cancelado' };
       const status = this._esc(statusMap[i.status] || i.status || '—');
+      const cycleNames = { monthly:'Mensal', quarterly:'Trimestral', semiannual:'Semestral', annual:'Anual' };
+      const cycleLabel = cycleNames[i.cycle] || (i.cycle && i.cycle !== 'monthly' ? i.cycle : '');
       const dt = i.created_at ? new Date(i.created_at).toLocaleString('pt-BR') : '—';
-      return `<tr style="border-bottom:1px solid rgba(255,255,255,.06);"><td style="padding:11px 14px;font-weight:700;color:#fff;">${nome}</td><td style="padding:11px 14px;">${plano}</td><td style="padding:11px 14px;font-weight:800;">R$ ${valor}</td><td style="padding:11px 14px;font-family:monospace;font-size:.72rem;">${txid}</td><td style="padding:11px 14px;">${status}</td><td style="padding:11px 14px;color:#94a3b8;">${this._esc(dt)}</td><td style="padding:11px 14px;text-align:right;">${i.status==='pending' ? `<button data-invoice-id="${id}" data-fb-click="MasterAdmin.confirmarPagamento" data-fb-click-n="1" data-fb-click-t0="dataset" data-fb-click-v0="invoiceId" style="background:#22c55e;color:#fff;border:none;border-radius:6px;padding:6px 10px;font-size:.75rem;font-weight:800;cursor:pointer;">✓ Confirmar</button>` : '—'}</td></tr>`;
+      return `<tr style="border-bottom:1px solid rgba(255,255,255,.06);"><td style="padding:11px 14px;font-weight:700;color:#fff;">${nome}</td><td style="padding:11px 14px;">${plano}${cycleLabel?` <span style="font-size:.7rem;color:var(--accent2)">(${cycleLabel})</span>`:''}</td><td style="padding:11px 14px;font-weight:800;">R$ ${valor}</td><td style="padding:11px 14px;font-family:monospace;font-size:.72rem;">${txid}</td><td style="padding:11px 14px;">${status}</td><td style="padding:11px 14px;color:#94a3b8;">${this._esc(dt)}</td><td style="padding:11px 14px;text-align:right;">${i.status==='pending' ? `<button data-invoice-id="${id}" data-fb-click="MasterAdmin.confirmarPagamento" data-fb-click-n="1" data-fb-click-t0="dataset" data-fb-click-v0="invoiceId" style="background:#22c55e;color:#fff;border:none;border-radius:6px;padding:6px 10px;font-size:.75rem;font-weight:800;cursor:pointer;">✓ Confirmar</button>` : '—'}</td></tr>`;
     }).join('') : `<tr><td colspan="7" style="padding:28px;text-align:center;color:#64748b;">Nenhuma cobrança registrada ainda.</td></tr>`;
     return `<div style="background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.08);border-radius:14px;overflow:hidden;margin-bottom:34px;"><div style="padding:16px 20px;border-bottom:1px solid rgba(255,255,255,.08);display:flex;justify-content:space-between;align-items:center;"><h3 style="font-size:1.05rem;font-weight:800;color:#fff;">💳 Cobranças & Assinaturas</h3><span style="font-size:.78rem;color:${pendentes.length?'#f59e0b':'#22c55e'};font-weight:800;">${pendentes.length} pendente(s)</span></div><div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;text-align:left;font-size:.8rem;"><thead><tr style="background:rgba(255,255,255,.03);color:#94a3b8;font-size:.72rem;text-transform:uppercase;"><th style="padding:10px 14px;">Empresa</th><th style="padding:10px 14px;">Plano</th><th style="padding:10px 14px;">Valor</th><th style="padding:10px 14px;">TXID</th><th style="padding:10px 14px;">Status</th><th style="padding:10px 14px;">Criada</th><th style="padding:10px 14px;text-align:right;">Ação</th></tr></thead><tbody>${rows}</tbody></table></div></div>`;
   },
@@ -246,10 +250,10 @@ const MasterAdmin = {
     const valorPendente = Number(billingSummary.pending_cents || 0) / 100;
     
     // MRR estimado
-    const precos = { starter: 79.90, pro: 119.90, unlimited: 159.90 };
+    const precos = { starter: 119.90, pro: 279.90, unlimited: 499.90 };
     const mrr = empresas.reduce((acc, e) => {
       if (e.status === 'ativo') {
-        return acc + (precos[e.plano] || 119.90);
+        return acc + (precos[e.plano] || 279.90);
       }
       return acc;
     }, 0);
@@ -549,7 +553,7 @@ const MasterAdmin = {
       'bloqueado': '<span style="background:rgba(148,163,184,.15);color:#94a3b8;border:1px solid rgba(148,163,184,.3);padding:2px 8px;border-radius:10px;font-size:.72rem;font-weight:700;">⚪ Bloqueado</span>',
       'cancelado': '<span style="background:rgba(239,68,68,.12);color:#f87171;border:1px solid rgba(239,68,68,.25);padding:2px 8px;border-radius:10px;font-size:.72rem;font-weight:700;">⛔ Cancelado</span>'
     };
-    const planosNome = { starter:'Básico (R$ 79,90)', pro:'Profissional (R$ 119,90)', unlimited:'Ilimitado (R$ 159,90)', trial:'Trial' };
+    const planosNome = { starter:'Básico (R$ 119,90)', pro:'Profissional (R$ 279,90)', unlimited:'Ilimitado (R$ 499,90)', trial:'Trial' };
     const nome=this._esc(e.nome_fantasia), razao=this._esc(e.razao_social||''), cnpj=this._esc(e.cnpj||'—');
     const resp=this._esc(e.responsavel||'—'), contato=this._esc(e.telefone||e.email||'—');
     const plano=this._esc(planosNome[e.plano]||e.plano||'—');
@@ -665,9 +669,9 @@ const MasterAdmin = {
 
   abrirModalPlanos() {
     const p = (typeof Cobranca !== 'undefined' && Cobranca.PLANOS) ? Cobranca.PLANOS : {
-      starter: { nome: 'Plano Básico', valorTexto: 'R$ 79,90 / mês', limiteObras: 3 },
-      pro: { nome: 'Plano Profissional', valorTexto: 'R$ 119,90 / mês', limiteObras: 10 },
-      unlimited: { nome: 'Construtora Ilimitado', valorTexto: 'R$ 159,90 / mês', limiteObras: 'Ilimitadas' }
+      starter: { nome: 'Plano Básico', valorTexto: 'R$ 119,90 / mês', limiteObras: 3 },
+      pro: { nome: 'Plano Profissional', valorTexto: 'R$ 279,90 / mês', limiteObras: 10 },
+      unlimited: { nome: 'Construtora Ilimitado', valorTexto: 'R$ 499,90 / mês', limiteObras: 'Ilimitadas' }
     };
 
     Utils.showModal(`
@@ -780,9 +784,9 @@ const MasterAdmin = {
             <label style="display:block;font-size:.78rem;color:#94a3b8;margin-bottom:4px;">Plano Contratado *</label>
             <select id="me-edit-plano" style="width:100%;background:#182713;border:1px solid rgba(255,255,255,.15);border-radius:8px;padding:9px 12px;color:#fff;font-size:.85rem;">
               <option value="trial" ${emp.plano==='trial'?'selected':''}>Trial (Gratuito 15 dias)</option>
-              <option value="starter" ${emp.plano==='starter'?'selected':''}>Básico (até 3 obras - R$ 79,90)</option>
-              <option value="pro" ${emp.plano==='pro'?'selected':''}>Profissional (até 10 obras - R$ 119,90)</option>
-              <option value="unlimited" ${emp.plano==='unlimited'?'selected':''}>Ilimitado (obras ilimitadas - R$ 159,90)</option>
+              <option value="starter" ${emp.plano==='starter'?'selected':''}>Básico (até 3 obras - R$ 119,90)</option>
+              <option value="pro" ${emp.plano==='pro'?'selected':''}>Profissional (até 10 obras - R$ 279,90)</option>
+              <option value="unlimited" ${emp.plano==='unlimited'?'selected':''}>Ilimitado (obras ilimitadas - R$ 499,90)</option>
             </select>
           </div>
 
@@ -901,9 +905,9 @@ const MasterAdmin = {
             <div>
               <label style="display:block;font-size:.78rem;color:#94a3b8;margin-bottom:4px;">Plano SaaS *</label>
               <select id="ne-plano" style="width:100%;background:#182713;border:1px solid rgba(255,255,255,.15);border-radius:8px;padding:9px 12px;color:#fff;font-size:.85rem;">
-                <option value="starter">Básico (até 3 obras - R$ 79,90)</option>
-                <option value="pro" selected>Profissional (até 10 obras - R$ 119,90)</option>
-                <option value="unlimited">Ilimitado (obras ilimitadas - R$ 159,90)</option>
+                <option value="starter">Básico (até 3 obras - R$ 119,90)</option>
+                <option value="pro" selected>Profissional (até 10 obras - R$ 279,90)</option>
+                <option value="unlimited">Ilimitado (obras ilimitadas - R$ 499,90)</option>
               </select>
             </div>
           </div>

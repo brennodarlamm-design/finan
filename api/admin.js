@@ -404,18 +404,25 @@ export default async function handler(req, res) {
           UPDATE billing_invoices
           SET status='paid', paid_at=NOW(), paid_by=${auth.user?.userId || auth.user?.id || 'system'}, updated_at=NOW()
           WHERE id=${invoiceId} AND status IN ('pending','expired')
-          RETURNING id, tenant_id, plan_id, amount_cents, txid, paid_at
+          RETURNING id, tenant_id, plan_id, COALESCE(cycle, 'monthly') AS cycle, amount_cents, txid, paid_at
         ), tenant_upd AS (
           UPDATE tenants t
           SET plano=paid.plan_id,
               status='ativo',
-              vencimento=(CASE WHEN t.vencimento IS NOT NULL AND t.vencimento >= CURRENT_DATE THEN t.vencimento ELSE CURRENT_DATE END + 30)::date,
+              vencimento=(CASE WHEN t.vencimento IS NOT NULL AND t.vencimento >= CURRENT_DATE THEN t.vencimento ELSE CURRENT_DATE END + (
+                CASE
+                  WHEN paid.cycle = 'annual' THEN 365
+                  WHEN paid.cycle = 'semiannual' THEN 180
+                  WHEN paid.cycle = 'quarterly' THEN 90
+                  ELSE 30
+                END
+              ))::date,
               updated_at=NOW()
           FROM paid
           WHERE t.id=paid.tenant_id
           RETURNING t.id, t.nome_fantasia, t.plano, t.status, t.vencimento
         )
-        SELECT paid.id AS invoice_id, paid.tenant_id, paid.plan_id, paid.amount_cents, paid.txid, paid.paid_at,
+        SELECT paid.id AS invoice_id, paid.tenant_id, paid.plan_id, paid.cycle, paid.amount_cents, paid.txid, paid.paid_at,
                tenant_upd.nome_fantasia, tenant_upd.status, tenant_upd.vencimento
         FROM paid JOIN tenant_upd ON tenant_upd.id=paid.tenant_id;
       `;
@@ -423,9 +430,9 @@ export default async function handler(req, res) {
       const done = rows[0];
       await writeAudit(sql, req, { ...auth, tenantId:done.tenant_id }, {
         acao:'pagamento_confirmado', entidade:'cobranca', entidadeId:done.invoice_id,
-        depois:{ plan_id:done.plan_id, amount_cents:Number(done.amount_cents || 0), txid:done.txid, vencimento:done.vencimento }
+        depois:{ plan_id:done.plan_id, cycle:done.cycle, amount_cents:Number(done.amount_cents || 0), txid:done.txid, vencimento:done.vencimento }
       });
-      return res.status(200).json({ success:true, invoice:done, message:'Pagamento confirmado e assinatura renovada por 30 dias.' });
+      return res.status(200).json({ success:true, invoice:done, message:`Pagamento confirmado e assinatura renovada (${done.cycle || 'mensal'}).` });
     }
 
     // Auditoria explícita do modo suporte/impersonação do Super Admin.
