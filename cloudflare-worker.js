@@ -26,6 +26,78 @@ function canonicalOrigin(env) {
   return url.origin;
 }
 
+function isApiPath(pathname) {
+  return pathname === '/api' || pathname.startsWith('/api/');
+}
+
+function canonicalRedirect(request, env) {
+  const method = String(request.method || 'GET').toUpperCase();
+  if (!['GET', 'HEAD'].includes(method)) return null;
+
+  try {
+    const incoming = new URL(request.url);
+    const canonical = new URL(canonicalOrigin(env));
+    const wwwHost = `www.${canonical.hostname}`;
+
+    if (incoming.hostname !== wwwHost || isApiPath(incoming.pathname)) return null;
+
+    const target = new URL(incoming.pathname + incoming.search, canonical);
+    return new Response(null, {
+      status: 308,
+      headers: {
+        Location: target.toString(),
+        'Cache-Control': 'public, max-age=3600',
+        'X-Content-Type-Options': 'nosniff'
+      }
+    });
+  } catch (err) {
+    console.warn('[FinObra Cloudflare] não foi possível aplicar redirect canônico:', err?.message || err);
+    return null;
+  }
+}
+
+function buildContentSecurityPolicy(nonce) {
+  return [
+    "default-src 'self'",
+    "base-uri 'self'",
+    "object-src 'none'",
+    "frame-ancestors 'self'",
+    "form-action 'self'",
+    `script-src 'self' 'nonce-${nonce}' https://accounts.google.com https://apis.google.com https://cdn.jsdelivr.net https://cdn.sheetjs.com https://cdnjs.cloudflare.com https://static.cloudflareinsights.com`,
+    "script-src-attr 'none'",
+    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://accounts.google.com",
+    "font-src 'self' data: https://fonts.gstatic.com",
+    "img-src 'self' data: blob: https:",
+    "connect-src 'self' https://accounts.google.com https://apis.google.com https://www.googleapis.com https://content.googleapis.com https://generativelanguage.googleapis.com https://brasilapi.com.br https://viacep.com.br https://api.meudanfe.com.br https://finan-wf12.onrender.com https://*.blob.vercel-storage.com https://cloudflareinsights.com",
+    "frame-src 'self' blob: data: https://accounts.google.com https://drive.google.com https://docs.google.com",
+    "worker-src 'self' blob: https://cdnjs.cloudflare.com",
+    "manifest-src 'self'",
+    "media-src 'self' blob: https:",
+    'upgrade-insecure-requests'
+  ].join('; ');
+}
+
+function secureHtmlResponse(response) {
+  const contentType = String(response.headers.get('content-type') || '').toLowerCase();
+  if (!contentType.includes('text/html')) return response;
+
+  const nonce = crypto.randomUUID().replaceAll('-', '');
+  const headers = new Headers(response.headers);
+  headers.set('Content-Security-Policy', buildContentSecurityPolicy(nonce));
+  headers.set('X-Content-Type-Options', 'nosniff');
+  headers.set('X-Frame-Options', 'SAMEORIGIN');
+  headers.set('Referrer-Policy', 'strict-origin-when-cross-origin');
+  headers.set('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
+  headers.set('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+  headers.set('Cross-Origin-Opener-Policy', 'same-origin-allow-popups');
+
+  return new Response(response.body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers
+  });
+}
+
 function isAuthAction(url, action) {
   return url.pathname === '/api/auth' && url.searchParams.get('action') === action;
 }
@@ -56,7 +128,8 @@ function healthResponse(request, env) {
     service: 'finobra-edge',
     configuredApiOrigin,
     configuredCanonicalOrigin,
-    loopRisk
+    loopRisk,
+    securityMode: 'nonce-csp'
   }, {
     status: configOk && !loopRisk ? 200 : 503,
     headers: {
@@ -154,12 +227,18 @@ async function proxyApi(request, env) {
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
+
+    const redirect = canonicalRedirect(request, env);
+    if (redirect) return redirect;
+
     if (url.pathname === '/__finobra/health') {
       return healthResponse(request, env);
     }
-    if (url.pathname === '/api' || url.pathname.startsWith('/api/')) {
+    if (isApiPath(url.pathname)) {
       return proxyApi(request, env);
     }
-    return env.ASSETS.fetch(request);
+
+    const assetResponse = await env.ASSETS.fetch(request);
+    return secureHtmlResponse(assetResponse);
   }
 };
