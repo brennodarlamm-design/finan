@@ -1,9 +1,6 @@
 name: Patch 35 large audit (no deploy)
 
 on:
-  push:
-    branches:
-      - patch35-large-audit
   workflow_dispatch:
 
 permissions:
