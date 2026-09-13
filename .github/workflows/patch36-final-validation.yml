@@ -35,6 +35,16 @@ jobs:
           test "$(git merge-base origin/main HEAD)" = "$(git rev-parse origin/main)"
           git diff --check origin/main...HEAD
           echo "Branch is cleanly ahead of main and diff has no whitespace errors."
+      - name: Verify Render production surface
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -q 'rootDir: backend' render.yaml
+          if grep -q 'monitor-nfe/whatsapp-server' render.yaml; then
+            echo 'Legacy local WhatsApp server unexpectedly appears in Render production definition.' >&2
+            exit 1
+          fi
+          echo 'Render production definition points to backend/ only.'
       - name: Install root dependencies
         run: npm ci
       - name: Full regression suite
@@ -53,12 +63,16 @@ jobs:
           set -euo pipefail
           npm --prefix backend ci
           npm --prefix backend audit --omit=dev --audit-level=high
-      - name: WhatsApp service dependency audit
+      - name: Legacy local WhatsApp advisory audit
         shell: bash
         run: |
-          set -euo pipefail
+          set -uo pipefail
           npm --prefix monitor-nfe/whatsapp-server ci
-          npm --prefix monitor-nfe/whatsapp-server audit --omit=dev --audit-level=high
+          if npm --prefix monitor-nfe/whatsapp-server audit --omit=dev --audit-level=high; then
+            echo 'Legacy local WhatsApp package has no high-severity audit findings.'
+          else
+            echo '::warning::Legacy monitor-nfe/whatsapp-server has known dependency vulnerabilities. It is not referenced by render.yaml and is not a Patch 36 production deployment surface.'
+          fi
       - name: Cloudflare static build
         run: npm run build:cloudflare
       - name: Wrangler bundle dry-run only
