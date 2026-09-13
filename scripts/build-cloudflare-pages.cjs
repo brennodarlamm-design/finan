@@ -40,26 +40,72 @@ function resolveGitCommit() {
   }
 }
 
+function resolveBuildContext() {
+  const github = process.env.GITHUB_ACTIONS === 'true' || !!process.env.GITHUB_SHA;
+  const workersBuild = process.env.WORKERS_CI === '1' || !!process.env.WORKERS_CI_COMMIT_SHA;
+  const pagesBuild = !!process.env.CF_PAGES_COMMIT_SHA;
+
+  if (github) {
+    return {
+      source: 'github-actions',
+      commit: process.env.GITHUB_SHA || null,
+      run_id: process.env.GITHUB_RUN_ID || null,
+      run_attempt: process.env.GITHUB_RUN_ATTEMPT || null,
+      branch: process.env.GITHUB_REF_NAME || null,
+      build: process.env.GITHUB_RUN_NUMBER ? `github-${process.env.GITHUB_RUN_NUMBER}` : null
+    };
+  }
+
+  if (workersBuild) {
+    const buildUuid = process.env.WORKERS_CI_BUILD_UUID || null;
+    return {
+      source: 'cloudflare-workers-builds',
+      commit: process.env.WORKERS_CI_COMMIT_SHA || null,
+      run_id: buildUuid,
+      run_attempt: null,
+      branch: process.env.WORKERS_CI_BRANCH || null,
+      build: buildUuid ? `workers-${buildUuid.slice(0, 12)}` : null
+    };
+  }
+
+  if (pagesBuild) {
+    return {
+      source: 'cloudflare-pages',
+      commit: process.env.CF_PAGES_COMMIT_SHA || null,
+      run_id: null,
+      run_attempt: null,
+      branch: process.env.CF_PAGES_BRANCH || null,
+      build: process.env.CF_PAGES_COMMIT_SHA
+        ? `pages-${process.env.CF_PAGES_COMMIT_SHA.slice(0, 12)}`
+        : null
+    };
+  }
+
+  return {
+    source: 'local-build',
+    commit: resolveGitCommit(),
+    run_id: null,
+    run_attempt: null,
+    branch: null,
+    build: null
+  };
+}
+
 function writeDeploymentMetadata() {
   const sourcePath = path.join(root, 'version.json');
   const sourceVersion = JSON.parse(fs.readFileSync(sourcePath, 'utf8'));
-  const commit = String(
-    process.env.GITHUB_SHA ||
-    process.env.CF_PAGES_COMMIT_SHA ||
-    resolveGitCommit() ||
-    'unknown'
-  ).trim();
+  const context = resolveBuildContext();
+  const commit = String(context.commit || resolveGitCommit() || 'unknown').trim();
 
   const metadata = {
     version: sourceVersion.version || 'unknown',
-    build: process.env.GITHUB_RUN_NUMBER
-      ? `github-${process.env.GITHUB_RUN_NUMBER}`
-      : (sourceVersion.build || 'local'),
+    build: context.build || sourceVersion.build || 'local',
     released_at: new Date().toISOString(),
     commit,
-    source: process.env.GITHUB_ACTIONS === 'true' ? 'github-actions' : 'local-build',
-    run_id: process.env.GITHUB_RUN_ID || null,
-    run_attempt: process.env.GITHUB_RUN_ATTEMPT || null
+    source: context.source,
+    run_id: context.run_id,
+    run_attempt: context.run_attempt,
+    branch: context.branch
   };
 
   fs.writeFileSync(path.join(out, 'version.json'), `${JSON.stringify(metadata)}\n`, 'utf8');
@@ -135,4 +181,4 @@ if (!deploymentMetadata.commit || deploymentMetadata.commit === 'unknown') {
   throw new Error('Build Cloudflare sem identificação do commit de origem.');
 }
 
-console.log(`✅ Cloudflare dist preparado com commit ${deploymentMetadata.commit.slice(0, 12)}, frontend-only, CSP e recuperação tratada.`);
+console.log(`✅ Cloudflare dist preparado com commit ${deploymentMetadata.commit.slice(0, 12)} via ${deploymentMetadata.source}, frontend-only, CSP e recuperação tratada.`);
