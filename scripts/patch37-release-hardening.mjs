@@ -32,7 +32,12 @@ if (!workflow.includes('wait-vercel-api:')) {
   fs.writeFileSync('.github/workflows/production-cicd.yml', workflow.replace(marker, gate + marker).replace('    needs: validate\n    runs-on: ubuntu-latest\n    env:', '    needs: [validate, wait-vercel-api]\n    runs-on: ubuntu-latest\n    env:'));
 }
 
-// 3) Teste permanente do hardening.
+// 3) Ajusta teste histórico: o sessionId continua herdado, agora via variável validada.
+mustReplace('scripts/test-patch08-static.js',
+`test('Impersonação Master herda sessionId revogável', /sessionId: auth\\.user\\.sessionId/i.test(admin));`,
+`test('Impersonação Master herda sessionId revogável', /sessionId: (?:auth\\.user\\.sessionId|liveSessionId)/i.test(admin));`);
+
+// 4) Teste permanente do hardening.
 fs.writeFileSync('scripts/test-patch37-release-hardening-static.js', `import fs from 'fs';\nconst admin=fs.readFileSync('api/admin.js','utf8');\nconst ci=fs.readFileSync('.github/workflows/production-cicd.yml','utf8');\nfunction ok(v,m){if(!v) throw new Error(m); console.log('✅',m)}\nok(admin.includes('Encerre o modo suporte atual antes de acessar outra empresa.'),'impersonação aninhada bloqueada');\nok(admin.includes('Math.min(originalExp || maxSupportExp, maxSupportExp)'),'sessão suporte limitada pela validade da sessão Master');\nok(admin.includes("auth.user?.impersonated === true && auth.user?.impersonatedBy === 'superadmin'"),'fallback de retorno exige sessão impersonada explícita');\nok(admin.includes('SELECT perfil, ativo, tenant_id FROM usuarios'),'retorno valida tenant real do Master');\nok(ci.includes('wait-vercel-api:'),'CI possui gate Vercel antes do Cloudflare');\nok(ci.includes('needs: [validate, wait-vercel-api]'),'Cloudflare depende do gate Vercel');\nok(ci.includes("https://api.finobra.app.br/api/auth?action=health"),'gate consulta health público da API');\nok(ci.includes('Cloudflare deploy is blocked'),'falha do backend bloqueia rollout do frontend');\nconsole.log('\\n✅ Patch 37 release hardening validado.');\n`);
 
 const all='scripts/test-static-all.js';
