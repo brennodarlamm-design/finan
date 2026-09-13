@@ -5,9 +5,7 @@ on:
     branches:
       - patch37-commercial-account-release
     paths:
-      - 'scripts/patch37-block1.mjs'
-      - 'scripts/patch37-block1-fix.mjs'
-      - 'scripts/patch37-block1-fix2.mjs'
+      - 'scripts/patch37-block1*.mjs'
       - '.github/workflows/patch37-block1.yml'
 
 permissions:
@@ -35,6 +33,7 @@ jobs:
           node scripts/patch37-block1.mjs
           node scripts/patch37-block1-fix.mjs
           node scripts/patch37-block1-fix2.mjs
+          node scripts/patch37-block1-fix3.mjs
       - name: Full regression suite
         run: npm test
       - name: Syntax verification
