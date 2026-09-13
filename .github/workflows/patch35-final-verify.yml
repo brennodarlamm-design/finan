@@ -1,0 +1,50 @@
+name: Patch 35 exact final verification (no deploy)
+
+on:
+  push:
+    branches:
+      - patch35-large-audit
+    paths:
+      - .github/workflows/patch35-final-verify.yml
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install root dependencies
+        run: npm ci
+      - name: Verify audit has zero wildcard CORS hits
+        run: |
+          node scripts/audit-codebase.mjs
+          node - <<'NODE'
+          const report = require('./audit/patch35-codebase.json');
+          const wildcard = Number(report.pattern_totals?.wildcard_cors || 0);
+          if (wildcard !== 0) {
+            console.error(`Expected wildcard_cors=0, got ${wildcard}`);
+            process.exit(1);
+          }
+          console.log('✅ wildcard_cors = 0');
+          NODE
+      - name: Full regression suite
+        run: npm test
+      - name: Syntax verification
+        run: node scripts/check-all-syntax.js
+      - name: Root dependency gate
+        run: npm audit --omit=dev --audit-level=moderate
+      - name: Backend clean install and dependency gate
+        run: |
+          cd backend
+          npm ci
+          npm audit --omit=dev --audit-level=moderate
+      - name: Cloudflare build and dry-run only
+        run: |
+          npm run build:cloudflare
+          npx --yes wrangler deploy --dry-run
