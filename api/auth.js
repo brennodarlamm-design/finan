@@ -119,6 +119,33 @@ export default async function handler(req, res) {
     return res.status(200).end();
   }
 
+  const action = req.query.action || (req.body && req.body.action);
+
+  // Patch 37: health público de release, sem DB/sessão e sem nova Serverless Function.
+  if ((req.method === 'GET' || req.method === 'HEAD') && action === 'health') {
+    const commit = String(
+      process.env.FINOBRA_RELEASE_SHA ||
+      process.env.VERCEL_GIT_COMMIT_SHA ||
+      process.env.GITHUB_SHA ||
+      'unknown'
+    ).trim();
+    const deploymentId = process.env.VERCEL_DEPLOYMENT_ID || process.env.VERCEL_URL || null;
+    const releaseReady = !!commit && commit !== 'unknown';
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    if (req.method === 'HEAD') return res.status(200).end();
+    return res.status(200).json({
+      ok:true,
+      service:'finobra-api',
+      releaseReady,
+      release:{
+        commit,
+        deploymentId,
+        source: process.env.VERCEL === '1' ? 'vercel' : 'serverless',
+        environment: process.env.VERCEL_ENV || process.env.NODE_ENV || 'unknown'
+      }
+    });
+  }
+
   const secret = (process.env.API_SECRET || process.env.VERCEL_API_SECRET || '').trim();
   if (!secret) {
     console.error('🚨 [Auth] API_SECRET não configurado.');
@@ -127,7 +154,6 @@ export default async function handler(req, res) {
 
   try {
     const sql = getSql();
-    const action = req.query.action || (req.body && req.body.action);
 
     // ── 1. GET /api/auth?action=me (Sessão atual do usuário autenticado) ─────────
     if (req.method === 'GET' && action === 'me') {

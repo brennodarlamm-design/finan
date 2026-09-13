@@ -581,6 +581,60 @@ textarea.form-control { resize:vertical; }
   .obra-sel-label { max-width:70px; font-size:.75rem; }
 }
 
+/* FINOBRA_PATCH37_MOBILE_OPERATIONAL */
+@media(max-width:768px) {
+  html { -webkit-text-size-adjust:100%; }
+  body { padding-left:env(safe-area-inset-left);padding-right:env(safe-area-inset-right); }
+  .main-header { padding-left:max(12px,env(safe-area-inset-left));padding-right:max(12px,env(safe-area-inset-right)); }
+  .main-content { padding-bottom:max(18px,env(safe-area-inset-bottom)); }
+
+  /* Ações viram área de toque real, não uma fileira comprimida. */
+  .page-actions { width:100%;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px; }
+  .page-actions>.btn,.page-actions>button { width:100%;justify-content:center; }
+  .btn { min-height:44px;justify-content:center; }
+  .btn-sm { min-height:40px;padding:8px 12px; }
+  .icon-btn,.modal-close { min-width:40px;min-height:40px; }
+  .form-control,.input-prefix input { min-height:44px;font-size:16px; }
+  textarea.form-control { min-height:96px; }
+  .filters-bar { align-items:stretch; }
+  .filters-bar>.filter-group,.filters-bar>.search-bar { flex:1 1 100%;min-width:0; }
+
+  /* Bottom-sheet modal: cabeçalho/rodapé ficam acessíveis e corpo rola. */
+  .modal-overlay { padding:0;align-items:flex-end; }
+  .modal {
+    width:100vw!important;max-width:100vw!important;margin:0!important;
+    max-height:min(92dvh,900px);border-radius:20px 20px 0 0;
+    overflow:hidden;display:flex;flex-direction:column;
+  }
+  .modal-header { padding:14px 16px;flex:0 0 auto; }
+  .modal-body { padding:16px;overflow-y:auto;overscroll-behavior:contain;min-height:0; }
+  .modal-footer {
+    padding:12px 16px max(12px,env(safe-area-inset-bottom));flex:0 0 auto;
+    display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;
+    background:var(--bg-card);
+  }
+  .modal-footer>.btn,.modal-footer>button { width:100%;justify-content:center; }
+
+  /* Feedback não pode sair para fora da largura útil. */
+  .toast-container { left:10px;right:10px;top:calc(var(--header-h) + 10px); }
+  .toast { width:100%;min-width:0;max-width:none; }
+  .drop-zone { padding:28px 16px; }
+  .tbl-wrap { scroll-snap-type:x proximity;overscroll-behavior-x:contain; }
+}
+
+@media(max-width:430px) {
+  .main-content { padding:10px 10px max(16px,env(safe-area-inset-bottom)); }
+  .page-header { margin-bottom:16px; }
+  .page-title { font-size:1.1rem; }
+  .page-sub { font-size:.78rem;line-height:1.45; }
+  .page-actions { grid-template-columns:1fr; }
+  .modal { max-height:94dvh; }
+  .modal-footer { grid-template-columns:1fr; }
+  .modal-footer>.btn-secondary { order:2; }
+  .modal-title { font-size:.96rem; }
+  .card { padding:12px; }
+}
+
 /* ===== PAINEL DE IMPRESSÃO E PRÉ-VISUALIZAÇÃO A4 (LIGHT/HIGH CONTRAST) ===== */
 #print-sheet, #print-sheet * {
   color-scheme: light !important;

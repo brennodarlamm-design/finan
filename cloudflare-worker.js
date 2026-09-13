@@ -34,6 +34,10 @@ function isAppShellPath(pathname) {
   return pathname === '/app' || pathname === '/app.html' || pathname.startsWith('/app/');
 }
 
+function isLoginShellPath(pathname) {
+  return pathname === '/login' || pathname === '/login.html' || pathname === '/cadastro';
+}
+
 function canonicalRedirect(request, env) {
   const method = String(request.method || 'GET').toUpperCase();
   if (!['GET', 'HEAD'].includes(method)) return null;
@@ -42,10 +46,32 @@ function canonicalRedirect(request, env) {
     const incoming = new URL(request.url);
     const canonical = new URL(canonicalOrigin(env));
     const wwwHost = `www.${canonical.hostname}`;
+    if (isApiPath(incoming.pathname)) return null;
 
-    if (incoming.hostname !== wwwHost || isApiPath(incoming.pathname)) return null;
+    const forceCanonicalHost = incoming.hostname === wwwHost;
+    const target = new URL(incoming.pathname + incoming.search, forceCanonicalHost ? canonical : incoming.origin);
+    let changed = forceCanonicalHost;
 
-    const target = new URL(incoming.pathname + incoming.search, canonical);
+    if (['/landing', '/landing.html', '/index.html'].includes(target.pathname)) {
+      target.pathname = '/';
+      changed = true;
+    } else if (target.pathname === '/login.html') {
+      target.pathname = '/login';
+      changed = true;
+    }
+
+    const cadastro = target.searchParams.get('cadastro') === '1';
+    const expired = target.searchParams.get('expired') === '1';
+    if ((target.pathname === '/' || target.pathname === '/login') && cadastro) {
+      target.pathname = '/cadastro';
+      target.searchParams.delete('cadastro');
+      changed = true;
+    } else if (target.pathname === '/' && expired) {
+      target.pathname = '/login';
+      changed = true;
+    }
+
+    if (!changed) return null;
     return new Response(null, {
       status: 308,
       headers: {
@@ -105,25 +131,29 @@ function secureHtmlResponse(response) {
 async function fetchFrontendResponse(request, env) {
   const method = String(request.method || 'GET').toUpperCase();
   const incoming = new URL(request.url);
-  const appShell = ['GET', 'HEAD'].includes(method) && isAppShellPath(incoming.pathname);
+  const shellMethod = ['GET', 'HEAD'].includes(method);
+  const appShell = shellMethod && isAppShellPath(incoming.pathname);
+  const loginShell = shellMethod && isLoginShellPath(incoming.pathname);
+  const landingShell = shellMethod && incoming.pathname === '/';
 
   let assetRequest = request;
+  let routeName = landingShell ? 'landing-shell' : null;
   if (appShell) {
     const appUrl = new URL('/app', incoming);
-    assetRequest = new Request(appUrl.toString(), {
-      method,
-      headers: request.headers,
-      redirect: 'manual'
-    });
+    assetRequest = new Request(appUrl.toString(), { method, headers: request.headers, redirect: 'manual' });
+    routeName = 'app-shell';
+  } else if (loginShell) {
+    const loginUrl = new URL('/login', incoming);
+    assetRequest = new Request(loginUrl.toString(), { method, headers: request.headers, redirect: 'manual' });
+    routeName = incoming.pathname === '/cadastro' ? 'signup-shell' : 'login-shell';
   }
 
   const assetResponse = await env.ASSETS.fetch(assetRequest);
   const securedResponse = secureHtmlResponse(assetResponse);
-
-  if (!appShell) return securedResponse;
+  if (!routeName) return securedResponse;
 
   const headers = new Headers(securedResponse.headers);
-  headers.set('X-FinObra-Route', 'app-shell');
+  headers.set('X-FinObra-Route', routeName);
   headers.set('Cache-Control', 'public, max-age=0, must-revalidate');
 
   return new Response(securedResponse.body, {

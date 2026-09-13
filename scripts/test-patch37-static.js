@@ -1,0 +1,35 @@
+import fs from 'fs';
+function assert(cond,msg){ if(!cond){ console.error('❌ '+msg); process.exit(1); } console.log('✅ '+msg); }
+const worker=fs.readFileSync('cloudflare-worker.js','utf8');
+const build=fs.readFileSync('scripts/build-cloudflare-pages.cjs','utf8');
+const landing=fs.readFileSync('landing.html','utf8');
+const login=fs.readFileSync('index.html','utf8');
+const loginJs=fs.readFileSync('js/login_page.js','utf8');
+const auth=fs.readFileSync('js/auth.js','utf8');
+const guard=fs.readFileSync('js/version_guard.js','utf8');
+const apiAuth=fs.readFileSync('api/auth.js','utf8');
+const bridge=fs.readFileSync('js/patch26-events.js','utf8');
+const gitignore=fs.readFileSync('.gitignore','utf8');
+const wrangler=fs.readFileSync('wrangler.jsonc','utf8');
+const vercel=fs.readFileSync('vercel.json','utf8');
+assert(build.includes("landing.html'), path.join(out, 'index.html") && build.includes("index.html'), path.join(out, 'login.html"),'Build separa landing na raiz e login em /login.');
+assert(worker.includes("'landing-shell'") && worker.includes("'login-shell'") && worker.includes("'signup-shell'"),'Worker distingue landing, login e cadastro.');
+assert(worker.includes("['/landing', '/landing.html', '/index.html']") && worker.includes("target.pathname = '/cadastro'"),'Worker canonicaliza URLs públicas antigas.');
+assert(wrangler.includes('"/cadastro"') && wrangler.includes('"/login.html"'),'Wrangler executa worker nas novas rotas públicas.');
+assert(landing.includes('rel="canonical" href="https://finobra.app.br/"') && landing.includes('href="/cadastro"') && !landing.includes('/login?cadastro=1'),'Landing usa raiz canônica e rota limpa de cadastro.');
+assert(login.includes('noindex,follow') && login.includes('https://finobra.app.br/login'),'Login tem canonical próprio e não concorre com SEO da landing.');
+assert(loginJs.includes('FINOBRA_PATCH37_SIGNUP_ROUTE') && loginJs.includes("window.location.pathname === '/cadastro'"),'Cadastro abre automaticamente o formulário de criação de conta.');
+assert(auth.includes("p === '/cadastro'") && auth.includes("window.location.replace('/login?expired=1')"),'Sessão expirada usa /login e cadastro é reconhecido como shell de autenticação.');
+assert(guard.includes('/api/health') && guard.includes('FINOBRA_RELEASE_ALIGNED') && !guard.includes("CURRENT = '2026"),'Version guard compara releases reais de Edge/API.');
+assert(apiAuth.includes("action === 'health'") && apiAuth.includes("service:'finobra-api'") && apiAuth.includes('FINOBRA_RELEASE_SHA') && apiAuth.includes('VERCEL_GIT_COMMIT_SHA') && vercel.includes('/api/auth?action=health'),'API possui health público de release sem criar nova Serverless Function.');
+assert(build.includes("source: 'vercel'") && build.includes('FINOBRA_RELEASE_SHA'),'Build reconhece contexto Vercel e SHA explícito.');
+assert(!vercel.includes('cdn.jsdelivr.net'),'Vercel CSP também não depende mais de jsDelivr.');
+assert(gitignore.includes('dist/'),'dist é artefato ignorado, não fonte versionada.');
+const actionRegex=/data-fb-(?:click|change|input|submit|mouseover|mouseout|mouseenter|mouseleave|keydown|keyup|keypress|focus|blur|dblclick|contextmenu|pointerdown|pointerup|mousedown|mouseup|touchstart|touchend|dragstart|drop)=["']([^"']+)["']/g;
+const used=new Set();
+for(const f of [...fs.readdirSync('.').filter(x=>x.endsWith('.html')), ...fs.readdirSync('js').filter(x=>x.endsWith('.js')).map(x=>'js/'+x)]){ if(f==='js/patch26-events.js')continue; const src=fs.readFileSync(f,'utf8'); for(const m of src.matchAll(actionRegex)) used.add(m[1]); }
+const m=bridge.match(/const ALLOWED = new Set\((\[[\s\S]*?\])\);/);
+const allowed=m?new Set(JSON.parse(m[1])):new Set();
+const missing=[...used].filter(x=>!allowed.has(x));
+assert(missing.length===0,'Nenhuma ação data-fb-* fica fora da allowlist CSP: '+missing.join(', '));
+console.log('\n✅ Patch 37 bloco 1 validado.');

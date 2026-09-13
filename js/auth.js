@@ -445,7 +445,7 @@ const Auth = {
     this.logoutSilently();
     if (typeof window !== 'undefined') {
       const p = window.location.pathname;
-      const isLogin = p === '/' || p === '/login' || p.endsWith('index.html');
+      const isLogin = p === '/login' || p === '/login.html' || p === '/cadastro' || p.endsWith('index.html');
       if (!isLogin) {
         window.location.replace('/login?expired=1');
       }

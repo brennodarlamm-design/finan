@@ -21,5 +21,5 @@ test('CSP estrita permanece também em Report-Only para telemetria', /Content-Se
 test('CSP ativa promove bloqueio de handlers inline', /"key": "Content-Security-Policy"[\s\S]{0,1800}script-src-attr 'none'/i.test(vercel) && !/script-src-attr 'unsafe-inline'/i.test(vercel));
 let versionMeta = {};
 try { versionMeta = JSON.parse(version); } catch {}
-test('Version guard existe', /^20\d{2}\.\d{2}\.\d{2}-p\d+(?:[-._a-z0-9]*)?$/i.test(String(versionMeta.build || '')) && /FINOBRA_BUILD/i.test(guard) && /version\.json/i.test(guard));
+test('Version guard existe', /version\.json/i.test(guard) && /finobra_edge_release_commit/i.test(guard) && /FINOBRA_RELEASE_ALIGNED/i.test(guard) && /\/api\/health/i.test(guard));
 console.log(`\nPatch 11: ${passed} passou, ${failed} falhou.`); if(failed) process.exit(1);

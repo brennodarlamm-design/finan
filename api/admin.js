@@ -604,6 +604,9 @@ export default async function handler(req, res) {
 
     // ── 4. POST ?action=impersonate (Gerar Token Seguro para Visualização de Suporte) ──
     if (req.method === 'POST' && action === 'impersonate') {
+      if (auth.user?.impersonated === true || auth.user?.impersonatedBy || auth.user?.isImpersonated) {
+        return res.status(409).json({ success:false, error:'Encerre o modo suporte atual antes de acessar outra empresa.' });
+      }
       const { tenantId } = req.body || {};
       if (!tenantId) {
         return res.status(400).json({ success: false, error: 'Identificador do tenant não informado.' });
@@ -621,6 +624,23 @@ export default async function handler(req, res) {
 
       const target = tenantRows[0];
       const secret = (process.env.API_SECRET || process.env.VERCEL_API_SECRET || '').trim();
+      const originalCredential = requestCredential(req);
+      const originalPayload = originalCredential ? verifyToken(originalCredential, secret) : null;
+      const liveSessionId = String(auth.user?.sessionId || '');
+      const originalSessionId = String(originalPayload?.sessionId || '');
+      const originalTenantId = String(auth.user?.realTenantId || auth.user?.tenantId || auth.tenantId || '');
+      const originalIsMaster = originalPayload && originalPayload.userId === auth.user.id && originalPayload.perfil === 'superadmin' && !originalPayload.impersonated;
+      const sameSession = !liveSessionId || !originalSessionId || liveSessionId === originalSessionId;
+      if (!originalCredential || !originalIsMaster || !sameSession || String(originalPayload.tenantId || '') !== originalTenantId) {
+        return res.status(401).json({ success:false, error:'Não foi possível preservar a sessão Master para retorno seguro.' });
+      }
+
+      const maxSupportExp = Date.now() + (4 * 60 * 60 * 1000);
+      const originalExp = Number(originalPayload.exp || 0);
+      const impExp = Math.min(originalExp || maxSupportExp, maxSupportExp);
+      if (!Number.isFinite(impExp) || impExp <= Date.now() + 60_000) {
+        return res.status(401).json({ success:false, error:'Sua sessão Master está próxima de expirar. Entre novamente antes de iniciar o modo suporte.' });
+      }
 
       const impersonatedToken = signToken({
         userId: auth.user.id,
@@ -632,21 +652,16 @@ export default async function handler(req, res) {
         empresaNome: target.nome_fantasia || target.razao_social,
         impersonated: true,
         impersonatedBy: 'superadmin',
-        originalTenantId: auth.user.tenantId || auth.tenantId,
-        sessionId: auth.user.sessionId || '',
-        exp: Date.now() + (4 * 60 * 60 * 1000) // 4 horas
+        originalTenantId,
+        sessionId: liveSessionId,
+        exp: impExp
       }, secret);
 
-      const originalCredential = requestCredential(req);
-      const originalPayload = originalCredential ? verifyToken(originalCredential, secret) : null;
-      if (!originalCredential || !originalPayload || originalPayload.userId !== auth.user.id) {
-        return res.status(401).json({ success:false, error:'Não foi possível preservar a sessão Master para retorno seguro.' });
-      }
-      const impExp = Date.now() + (4 * 60 * 60 * 1000);
-      const restoreSeconds = Math.max(60, Math.floor((Number(originalPayload.exp || impExp) - Date.now()) / 1000));
+      const supportSeconds = Math.max(60, Math.floor((impExp - Date.now()) / 1000));
+      const restoreSeconds = Math.max(60, Math.floor((originalExp - Date.now()) / 1000));
       setCookies(res, [
         cookieLine(req, MASTER_RESTORE_COOKIE, originalCredential, restoreSeconds),
-        cookieLine(req, SESSION_COOKIE, impersonatedToken, 4 * 60 * 60)
+        cookieLine(req, SESSION_COOKIE, impersonatedToken, supportSeconds)
       ]);
 
       await writeAudit(sql, req, auth, {
@@ -680,13 +695,19 @@ export default async function handler(req, res) {
       let payload = restoreToken ? verifyToken(restoreToken, secret) : null;
       let recoveredFromImpersonatedSession = false;
 
-      // O cookie auxiliar pode ser descartado pelo navegador/proxy. A sessão impersonada
-      // continua sendo um JWT assinado de um superadmin real e uma sessão revogável já
-      // validada por resolveAuthAndTenant. Nesse caso recriamos uma sessão Master curta,
-      // sem depender de dados enviados pelo cliente.
-      if (!payload || payload.userId !== auth.user.id) {
-        const isImpersonatedMaster = auth.user?.perfil === 'superadmin' && Boolean(auth.user?.isImpersonated || auth.user?.impersonated || auth.user?.impersonatedBy);
-        const realTenantId = String(auth.user?.realTenantId || auth.user?.originalTenantId || '').trim();
+      // O cookie auxiliar pode ser descartado pelo navegador/proxy. O retorno só é
+      // reconstruído a partir de uma sessão impersonada assinada, vinculada ao mesmo
+      // superadmin e à mesma sessão revogável.
+      const currentSessionId = String(auth.user?.sessionId || '');
+      const restoreSessionId = String(payload?.sessionId || '');
+      const realTenantId = String(auth.user?.realTenantId || auth.user?.originalTenantId || '').trim();
+      const restoreCookieValid = Boolean(
+        payload && payload.userId === auth.user.id && payload.perfil === 'superadmin' &&
+        !payload.impersonated && String(payload.tenantId || '') === realTenantId &&
+        (!currentSessionId || !restoreSessionId || currentSessionId === restoreSessionId)
+      );
+      if (!restoreCookieValid) {
+        const isImpersonatedMaster = auth.user?.perfil === 'superadmin' && auth.user?.impersonated === true && auth.user?.impersonatedBy === 'superadmin' && Boolean(auth.user?.isImpersonated);
         if (!isImpersonatedMaster || !realTenantId) {
           return res.status(401).json({ success:false, error:'Não foi possível restaurar automaticamente a sessão Master. Entre novamente no painel Master.' });
         }
@@ -705,8 +726,8 @@ export default async function handler(req, res) {
         recoveredFromImpersonatedSession = true;
       }
 
-      const rows = await sql`SELECT perfil, ativo FROM usuarios WHERE id=${payload.userId} LIMIT 1;`;
-      if (!rows.length || !rows[0].ativo || rows[0].perfil !== 'superadmin') {
+      const rows = await sql`SELECT perfil, ativo, tenant_id FROM usuarios WHERE id=${payload.userId} LIMIT 1;`;
+      if (!rows.length || !rows[0].ativo || rows[0].perfil !== 'superadmin' || String(rows[0].tenant_id || '') !== String(payload.tenantId || '')) {
         return res.status(403).json({ success:false, error:'A conta Master não está autorizada.' });
       }
       const remaining = Math.max(60, Math.floor((Number(payload.exp || Date.now()) - Date.now()) / 1000));

@@ -15,6 +15,13 @@ if (window.location.hash.startsWith('#validar') || window.location.search.includ
     window.location.replace('/app');
   }
 
+  // FINOBRA_PATCH37_SIGNUP_ROUTE
+  const finobraLoginParams = new URLSearchParams(window.location.search);
+  const finobraSignupRoute = window.location.pathname === '/cadastro' || finobraLoginParams.get('cadastro') === '1';
+  if (finobraSignupRoute) {
+    window.addEventListener('DOMContentLoaded', () => openRegisterModal());
+  }
+
 
 
   function openRegisterModal() {
