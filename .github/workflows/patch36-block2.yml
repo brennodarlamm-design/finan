@@ -7,6 +7,7 @@ on:
     paths:
       - scripts/patch36-block2.mjs
       - scripts/patch36-block2-fix.mjs
+      - scripts/test-patch04-static.js
       - .github/workflows/patch36-block2.yml
 
 permissions:
