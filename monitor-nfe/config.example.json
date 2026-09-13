@@ -1,14 +1,17 @@
 {
-  "_instrucoes": "Copie este arquivo para config.json e preencha com seus dados reais.",
+  "_instrucoes": "Copie este arquivo para config.json e preencha com seus dados reais. Nunca versione config.json, certificados ou senhas.",
+  "_segredos_env_hint": "Prefira FINOBRA_CERT_PASSWORD, MEUDANFE_API_KEY e FINOBRA_API_SECRET nas variaveis de ambiente. Os campos abaixo existem apenas como fallback local.",
 
   "certificado": {
     "caminho": "C:\\Certificados\\seu_certificado.pfx",
     "_caminho_hint": "Caminho completo para o arquivo .pfx do certificado A1",
-    "senha": "SUA_SENHA_DO_CERTIFICADO_AQUI",
-    "_senha_hint": "Senha do arquivo .pfx"
+    "senha": "",
+    "_senha_hint": "Prefira FINOBRA_CERT_PASSWORD. Se necessario, informe a senha somente no config.json local ignorado pelo Git."
   },
 
   "empresa": {
+    "tenant_id": "SEU_TENANT_ID_FINOBRA_AQUI",
+    "_tenant_id_hint": "ID interno da empresa no FinObra. Obrigatorio para jobs autenticados com FINOBRA_API_SECRET.",
     "cnpj": "00000000000000",
     "_cnpj_hint": "CNPJ da empresa SEM pontos, tracos ou barras (so numeros, 14 digitos)",
     "razao_social": "Sua Razao Social LTDA",
@@ -25,7 +28,8 @@
   },
 
   "meudanfe": {
-    "api_key": "SUA_API_KEY_MEUDANFE_AQUI",
+    "api_key": "",
+    "_api_key_hint": "Prefira a variavel de ambiente MEUDANFE_API_KEY.",
     "api_base": "https://api.meudanfe.com.br/v2"
   },
 
@@ -47,9 +51,10 @@
     "telefone_destino": "5599999999999",
     "_telefone_hint": "Telefone com DDD para onde o robô matinal enviará o resumo das contas",
     "webhook_url": "https://finobra.app.br/api/send-whatsapp",
-    "_webhook_hint": "Endpoint da API Serverless ou Render",
+    "_webhook_hint": "Endpoint oficial do FinObra; não requer servidor WhatsApp local.",
     "api_token": "",
-    "api_secret": "SUA_CHAVE_API_SECRET_AQUI",
+    "api_secret": "",
+    "_api_secret_hint": "Prefira FINOBRA_API_SECRET. O job também envia x-tenant-id para manter o acesso isolado por empresa.",
     "horario_envio": "08:00",
     "notificar_windows_toast": true
   }

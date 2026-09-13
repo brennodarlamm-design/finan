@@ -1,9 +1,8 @@
 # ==============================================================================
 #  ANGELIM CONSTRUTORA — Robo Matinal de Alerta de Boletos no WhatsApp & Windows
 # ==============================================================================
-#  Este script consulta os boletos e contas a pagar do dia e envia o resumo
-#  automaticamente para o WhatsApp do Diretor/Financeiro e exibe notificacao
-#  na area de trabalho do Windows as 08:00 diariamente.
+#  Consulta as contas a pagar do tenant no FinObra e envia o resumo pelo backend
+#  oficial do FinObra. Nao depende de servidor WhatsApp local.
 # ==============================================================================
 
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
@@ -36,14 +35,36 @@ function ExibirNotificacaoWindows {
     } catch {}
 }
 
+function NovaAutenticacaoFinObra {
+    param([string]$segredo, [string]$tenantId)
+
+    if ([string]::IsNullOrWhiteSpace($segredo)) {
+        throw "FINOBRA_API_SECRET nao configurado."
+    }
+    if ([string]::IsNullOrWhiteSpace($tenantId) -or $tenantId -eq "SEU_TENANT_ID_FINOBRA_AQUI") {
+        throw "empresa.tenant_id nao configurado no config.json."
+    }
+
+    return @{
+        "Authorization" = "Bearer $segredo"
+        "x-api-key"     = $segredo
+        "x-tenant-id"   = $tenantId
+    }
+}
+
 function EnviarWhatsApp {
-    param([string]$url, [string]$telefone, [string]$mensagem, [string]$token = "")
+    param(
+        [string]$url,
+        [string]$telefone,
+        [string]$mensagem,
+        [hashtable]$authHeaders
+    )
+
     try {
-        $headers = @{ "Content-Type" = "application/json; charset=utf-8" }
-        if ($token) {
-            $headers["Authorization"] = "Bearer $token"
-            $headers["apikey"] = $token
+        $headers = @{
+            "Content-Type" = "application/json; charset=utf-8"
         }
+        foreach ($key in $authHeaders.Keys) { $headers[$key] = $authHeaders[$key] }
 
         $payload = @{
             number  = $telefone
@@ -54,26 +75,14 @@ function EnviarWhatsApp {
         } | ConvertTo-Json -Compress
 
         $body = [System.Text.Encoding]::UTF8.GetBytes($payload)
-        
-        $targetUrl = $url
-        if (-not $targetUrl) {
-            $targetUrl = "https://finobra.app.br/api/send-whatsapp"
-        }
+        $targetUrl = if ($url) { $url } else { "https://finobra.app.br/api/send-whatsapp" }
 
         $resp = Invoke-WebRequest -Uri $targetUrl -Method Post -Headers $headers -Body $body -UseBasicParsing -TimeoutSec 15
-        Log "Mensagem enviada com sucesso via WhatsApp Webhook! HTTP $($resp.StatusCode)"
+        Log "Mensagem enviada com sucesso pela API FinObra. HTTP $($resp.StatusCode)"
         return $true
     } catch {
-        Log "Tentando envio via API Vercel de contingencia..." "WARN"
-        try {
-            $vercelUrl = "https://finobra.app.br/api/send-whatsapp"
-            $resp2 = Invoke-WebRequest -Uri $vercelUrl -Method Post -Headers $headers -Body $body -UseBasicParsing -TimeoutSec 15
-            Log "Mensagem enviada via Vercel Proxy! HTTP $($resp2.StatusCode)"
-            return $true
-        } catch {
-            Log "Falha ao disparar WhatsApp: $_" "ERROR"
-            return $false
-        }
+        Log "Falha ao disparar WhatsApp pela API FinObra: $($_.Exception.Message)" "ERROR"
+        return $false
     }
 }
 
@@ -94,27 +103,32 @@ if (-not $waCfg -or -not $waCfg.ativo) {
     exit 0
 }
 
+$tenantId = [string]$cfg.empresa.tenant_id
+$apiSecret = [string]$env:FINOBRA_API_SECRET
+if ([string]::IsNullOrWhiteSpace($apiSecret)) { $apiSecret = [string]$waCfg.api_secret }
+if ([string]::IsNullOrWhiteSpace($apiSecret)) { $apiSecret = [string]$waCfg.api_token }
+
+try {
+    $authHeaders = NovaAutenticacaoFinObra $apiSecret $tenantId
+} catch {
+    Log $_.Exception.Message "ERROR"
+    exit 1
+}
+
 $hojeData = (Get-Date).ToString("yyyy-MM-dd")
 $hojeFmt  = (Get-Date).ToString("dd/MM/yyyy")
-Log "Consultando contas a pagar com vencimento ate hoje ou pendentes..."
+Log "Consultando contas a pagar do tenant configurado..."
 
-# Consulta os lancamentos da nuvem
+# Consulta os lancamentos da nuvem com escopo explicito de tenant.
 $lancamentos = @()
 try {
-    $apiSecret = $waCfg.api_secret
-    if (-not $apiSecret) { $apiSecret = $waCfg.api_token }
-    if (-not $apiSecret) {
-        Log "Aviso: api_secret/api_token nao configurado no config.json. Consulta a nuvem ignorada." "WARN"
-    } else {
-        $dbHeaders = @{ "Authorization" = "Bearer $apiSecret" }
-        $apiUrl = "https://finobra.app.br/api/db?table=all"
-        $response = Invoke-RestMethod -Uri $apiUrl -Method Get -Headers $dbHeaders -TimeoutSec 15
-        if ($response.success -and $response.data.lancamentos) {
-            $lancamentos = $response.data.lancamentos
-        }
+    $apiUrl = "https://finobra.app.br/api/db?table=all"
+    $response = Invoke-RestMethod -Uri $apiUrl -Method Get -Headers $authHeaders -TimeoutSec 15
+    if ($response.success -and $response.data.lancamentos) {
+        $lancamentos = $response.data.lancamentos
     }
 } catch {
-    Log "Aviso: Nao foi possivel consultar API Vercel ($($_))." "WARN"
+    Log "Nao foi possivel consultar a API FinObra: $($_.Exception.Message)" "WARN"
 }
 
 # Filtra contas a pagar
@@ -125,11 +139,10 @@ foreach ($l in $lancamentos) {
     if ($l.tipo -eq 'despesa' -and $l.status -eq 'a_pagar') {
         $dtVenc = $l.data_vencimento
         if (-not $dtVenc) { $dtVenc = $l.data }
-        
+
         if ($dtVenc -le $hojeData) {
             $boletosHoje += $l
-            $val = [double]($l.valor)
-            $totalValor += $val
+            $totalValor += [double]($l.valor)
         }
     }
 }
@@ -142,7 +155,7 @@ $msg += "Data: $hojeFmt`n"
 
 if ($boletosHoje.Count -gt 0) {
     $msg += "`nAtencao: Voce possui $($boletosHoje.Count) conta(s) com vencimento hoje ou pendentes:`n"
-    
+
     $idx = 1
     foreach ($b in $boletosHoje) {
         $vFmt = [string]::Format((New-Object System.Globalization.CultureInfo("pt-BR")), "{0:C}", [double]($b.valor))
@@ -154,7 +167,7 @@ if ($boletosHoje.Count -gt 0) {
         $msg += "`n"
         $idx++
     }
-    
+
     $totalFmt = [string]::Format((New-Object System.Globalization.CultureInfo("pt-BR")), "{0:C}", $totalValor)
     $msg += "`nTotal a pagar: *$totalFmt*`n"
 } else {
@@ -173,12 +186,12 @@ if ($waCfg.notificar_windows_toast) {
     ExibirNotificacaoWindows "Angelim Construtora - Resumo Matinal" $txtToast
 }
 
-# 2. Envio WhatsApp
+# 2. Envio WhatsApp pelo endpoint oficial do FinObra
 if ($waCfg.telefone_destino) {
-    EnviarWhatsApp $waCfg.webhook_url $waCfg.telefone_destino $msg $waCfg.api_token
+    $null = EnviarWhatsApp $waCfg.webhook_url $waCfg.telefone_destino $msg $authHeaders
 } else {
     Log "Telefone de destino nao configurado em config.json." "WARN"
 }
 
-Log "Robo matinal concluido com sucesso." "INFO"
+Log "Robo matinal concluido." "INFO"
 Log "========================================" "INFO"

@@ -5,58 +5,9 @@ const Cobranca = {
   STORAGE_FATURAS_KEY: 'finobra_faturas',
 
   PLANOS: {
-    'starter': {
-      id: 'starter',
-      nome: 'Plano Básico',
-      limiteObras: 3,
-      valorMensal: 79.90,
-      valorTexto: 'R$ 79,90 / mês',
-      badge: '3 OBRAS',
-      destaque: false,
-      recursos: [
-        'Até 3 Obras Ativas simultâneas',
-        'Controle Financeiro de Receitas e Despesas',
-        'Medições & Cronograma de Engenharia',
-        'Conciliação Bancária OFX',
-        'Exportação de Relatórios Excel/PDF',
-        'Suporte Técnico via WhatsApp e Sistema'
-      ]
-    },
-    'pro': {
-      id: 'pro',
-      nome: 'Plano Profissional',
-      limiteObras: 10,
-      valorMensal: 119.90,
-      valorTexto: 'R$ 119,90 / mês',
-      badge: '10 OBRAS • MAIS POPULAR',
-      destaque: true,
-      recursos: [
-        'Até 10 Obras Ativas simultâneas',
-        'Tudo do Plano Básico',
-        'Leitura OCR de Notas Fiscais com IA',
-        'Assinatura Eletrônica SHA-256 com QR Code',
-        'Portal Público de Validação de Documentos',
-        'Gestão de Fornecedores & Ordens de Compra',
-        'Suporte Prioritário'
-      ]
-    },
-    'unlimited': {
-      id: 'unlimited',
-      nome: 'Construtora Ilimitado',
-      limiteObras: 9999,
-      valorMensal: 159.90,
-      valorTexto: 'R$ 159,90 / mês',
-      badge: 'OBRAS ILIMITADAS • MASTER',
-      destaque: false,
-      recursos: [
-        'Obras e Clientes ILIMITADOS',
-        'Tudo do Plano Profissional',
-        'Multi-usuários com controle de permissões',
-        'Importação direta de Planilhas SINAPI / Caixa',
-        'Onboarding VIP com engenheiro especialista',
-        'WhatsApp de Plantão Direto (95) 99136-3678'
-      ]
-    }
+    starter: { id:'starter', nome:'Plano Básico', limiteObras:3, limiteUsuarios:1, valorMensal:79.90, badge:'3 OBRAS • 1 USUÁRIO', destaque:false, ideal:'Operação enxuta e controle essencial', recursos:['3 obras ativas','1 usuário ativo','Obras, financeiro, fornecedores e produtos','Medições, OFX e relatórios','Suporte via sistema / WhatsApp'] },
+    pro: { id:'pro', nome:'Plano Profissional', limiteObras:10, limiteUsuarios:2, valorMensal:119.90, badge:'10 OBRAS • 2 USUÁRIOS', destaque:true, ideal:'Construtoras em crescimento e automação', recursos:['10 obras ativas','2 usuários ativos','Tudo do Básico','Pré-Compras, contratos e documentos','NF-e / OCR com IA e assinatura eletrônica','Suporte prioritário'] },
+    unlimited: { id:'unlimited', nome:'Construtora Ilimitado', limiteObras:null, limiteUsuarios:5, valorMensal:159.90, badge:'OBRAS ILIMITADAS • 5 USUÁRIOS', destaque:false, ideal:'Engenharia e operação em escala', recursos:['Obras ilimitadas','5 usuários ativos','Tudo do Profissional','SINAPI / Caixa','Curva S, EVM, ABC e BDI','Permissões avançadas e suporte VIP'] }
   },
 
   getAssinaturas() {
@@ -91,149 +42,98 @@ const Cobranca = {
     };
   },
 
-  // ── RENDERIZAÇÃO DA TELA DE PLANOS E ASSINATURA (/app/planos) ────────────────
+  // ── CENTRAL DA CONTA / ASSINATURA ───────────────────────────────────────────
+  _accountData: null,
+  _accountTab: 'visao',
+
+  _ensureAccountStyles() {
+    if (document.getElementById('finobra-account-styles')) return;
+    const s=document.createElement('style'); s.id='finobra-account-styles'; s.textContent=`
+      .acc-shell{max-width:1180px;margin:0 auto;padding:6px 0 42px}.acc-head{display:flex;justify-content:space-between;align-items:flex-end;gap:18px;flex-wrap:wrap;margin-bottom:20px}.acc-title{font-size:1.7rem;font-weight:900}.acc-sub{color:var(--text3);font-size:.86rem;margin-top:4px}.acc-hero{background:linear-gradient(135deg,#172810,#233919);border:1px solid rgba(201,162,39,.35);border-radius:18px;padding:20px;display:flex;justify-content:space-between;gap:18px;flex-wrap:wrap;margin-bottom:16px}.acc-plan-name{font-size:1.2rem;font-weight:900;color:var(--accent2)}.acc-tabs{display:flex;gap:6px;overflow:auto;padding:5px;background:rgba(255,255,255,.025);border:1px solid var(--border);border-radius:12px;margin-bottom:18px}.acc-tab{white-space:nowrap;border:0;background:transparent;color:var(--text3);padding:9px 14px;border-radius:8px;font-weight:750;cursor:pointer}.acc-tab.active{background:rgba(201,162,39,.15);color:var(--accent2)}.acc-panel{display:none}.acc-panel.active{display:block}.acc-usage-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}.acc-kpi{padding:16px;border:1px solid var(--border);border-radius:14px;background:rgba(255,255,255,.025)}.acc-kpi-l{font-size:.7rem;color:var(--text3);text-transform:uppercase;letter-spacing:.06em}.acc-kpi-v{font-size:1.12rem;font-weight:900;margin-top:5px}.acc-plans{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px}.acc-plan-card{border:1px solid var(--border);border-radius:16px;padding:22px;display:flex;flex-direction:column;min-width:0;background:rgba(255,255,255,.02)}.acc-plan-card.featured{border-color:var(--accent);background:linear-gradient(145deg,#172810,#233919)}.acc-mod-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}.acc-mod{padding:12px;border:1px solid var(--border);border-radius:10px;display:flex;gap:9px;align-items:center;font-size:.82rem}.acc-billing-table{width:100%;border-collapse:collapse}.acc-billing-table th,.acc-billing-table td{padding:11px 10px;border-bottom:1px solid var(--border);text-align:left;font-size:.8rem}.acc-billing-cards{display:none}.acc-mobile-hint{display:none}.plan-locked-copy{color:var(--text3);font-size:.82rem;line-height:1.55}
+      @media(max-width:760px){.acc-shell{padding:0 2px 30px}.acc-head{align-items:flex-start}.acc-title{font-size:1.35rem}.acc-hero{padding:16px}.acc-tabs{margin-left:-2px;margin-right:-2px}.acc-usage-grid{grid-template-columns:1fr 1fr}.acc-plans{display:flex;overflow-x:auto;scroll-snap-type:x mandatory;gap:12px;padding:4px 4px 12px}.acc-plan-card{min-width:86vw;scroll-snap-align:center}.acc-mobile-hint{display:block;color:var(--text3);font-size:.72rem;margin-bottom:8px}.acc-mod-grid{grid-template-columns:1fr}.acc-billing-table{display:none}.acc-billing-cards{display:flex;flex-direction:column;gap:10px}.acc-kpi{padding:13px}.acc-tab{padding:9px 12px}.acc-hero-actions{width:100%}.acc-hero-actions .btn{width:100%;justify-content:center}}
+      @media(max-width:420px){.acc-usage-grid{grid-template-columns:1fr}.acc-plan-card{min-width:91vw}}
+    `; document.head.appendChild(s);
+  },
+
+  switchAccountTab(tab) {
+    this._accountTab = tab || 'visao';
+    document.querySelectorAll('.acc-tab').forEach(x=>x.classList.toggle('active',x.dataset.tab===this._accountTab));
+    document.querySelectorAll('.acc-panel').forEach(x=>x.classList.toggle('active',x.dataset.panel===this._accountTab));
+  },
+
+  goToPlans() { if (typeof Utils!=='undefined') Utils.closeModal?.(); if (typeof App!=='undefined') App.navigate('planos'); setTimeout(()=>this.switchAccountTab('planos'),30); },
+
+  showLockedModule(routeOrModule) {
+    const module = Auth?.ROUTE_MODULES?.[String(routeOrModule||'')] || String(routeOrModule||'');
+    const labels={precompras:'Pré-Compras',contratos:'Contratos',notas:'Notas / NF-e / OCR',orcamentos:'Orçamentos',documentos:'Documentos',assinatura:'Assinatura eletrônica'};
+    const name=labels[module] || (App?.routeMeta?.[routeOrModule]?.label) || 'Este módulo';
+    const p=Auth?.getPlanAccess?.() || {};
+    Utils.showModal(`<div class="modal" style="max-width:520px"><div class="modal-header"><span class="modal-title">🔒 Recurso disponível em outro plano</span><button class="modal-close" data-fb-click="Utils.closeModal" data-fb-click-n="0">✕</button></div><div class="modal-body"><h3 style="margin:0 0 8px">${Utils.escapeHtml(name)}</h3><p class="plan-locked-copy">O <strong>${Utils.escapeHtml(p.label || 'seu plano atual')}</strong> continua ativo normalmente, mas este módulo não faz parte da contratação atual. Nenhum dado foi perdido e os demais módulos seguem disponíveis.</p><div style="margin-top:14px;padding:12px;border:1px solid rgba(201,162,39,.28);background:rgba(201,162,39,.07);border-radius:10px;font-size:.8rem;color:var(--text2)">Você pode conhecer os planos superiores sem alterar sua assinatura agora.</div></div><div class="modal-footer"><button class="btn btn-secondary" data-fb-click="Utils.closeModal" data-fb-click-n="0">Continuar no sistema</button><button class="btn btn-primary" data-fb-click="Cobranca.goToPlans" data-fb-click-n="0">Conhecer planos</button></div></div>`);
+  },
+
+
+  isFeatureAllowed(feature) {
+    const role=String(Auth?.getUser?.()?.perfil||'').toLowerCase();
+    if(role==='superadmin') return true;
+    const features=Auth?.getPlanAccess?.()?.features;
+    return !features || features[feature] !== false;
+  },
+
+  renderLockedFeature(title, description='Este recurso está disponível em outro plano.') {
+    return `<div class="card" style="max-width:760px;margin:24px auto;padding:28px;text-align:center;border:1px solid rgba(201,162,39,.35);background:linear-gradient(145deg,rgba(201,162,39,.08),rgba(255,255,255,.02));"><div style="font-size:2rem;margin-bottom:8px">🔒</div><h2 style="font-size:1.25rem;margin:0 0 8px">${Utils.escapeHtml(title)}</h2><p style="color:var(--text3);font-size:.86rem;line-height:1.6;max-width:560px;margin:0 auto 18px">${Utils.escapeHtml(description)}</p><button class="btn btn-primary" data-fb-click="Cobranca.goToPlans" data-fb-click-n="0">Conhecer planos</button></div>`;
+  },
+
+  showLockedFeature(feature, title, description='Este recurso não faz parte do plano atual.') {
+    if(this.isFeatureAllowed(feature)) return true;
+    const p=Auth?.getPlanAccess?.()||{};
+    Utils.showModal(`<div class="modal" style="max-width:520px"><div class="modal-header"><span class="modal-title">🔒 Recurso disponível em outro plano</span><button class="modal-close" data-fb-click="Utils.closeModal" data-fb-click-n="0">✕</button></div><div class="modal-body"><h3 style="margin:0 0 8px">${Utils.escapeHtml(title)}</h3><p class="plan-locked-copy">${Utils.escapeHtml(description)} O <strong>${Utils.escapeHtml(p.label||'seu plano')}</strong> continua ativo normalmente e nenhum dado foi perdido.</p></div><div class="modal-footer"><button class="btn btn-secondary" data-fb-click="Utils.closeModal" data-fb-click-n="0">Continuar</button><button class="btn btn-primary" data-fb-click="Cobranca.goToPlans" data-fb-click-n="0">Conhecer planos</button></div></div>`);
+    return false;
+  },
+
   renderTelaPlanos(containerId = 'route-content') {
-    const el = document.getElementById(containerId);
-    if (!el) return;
-
-    const assAtual = this.getAssinaturaAtual();
-    const u = (typeof Auth !== 'undefined' && Auth.getUser()) || {};
-    const emp = (typeof DB !== 'undefined' && DB.getEmpresa()) || {};
-    const canManageBilling = ['admin','superadmin'].includes(String(u.perfil || '').toLowerCase());
-    const empresaNomeSeguro = Utils.escapeHtml(emp.nome_fantasia || emp.razao_social || u.empresaNome || 'sua construtora');
-
-    el.innerHTML = `
-      <div style="max-width:1100px;margin:0 auto;padding:10px 0 40px;">
-        
-        <!-- Header -->
-        <div style="text-align:center;margin-bottom:34px;">
-          <div style="display:inline-flex;align-items:center;gap:8px;background:rgba(201,162,39,.12);border:1px solid rgba(201,162,39,.35);padding:6px 16px;border-radius:20px;color:var(--accent2);font-size:.8rem;font-weight:700;margin-bottom:12px;">
-            <span>💎</span><span>Planos &amp; Mensalidades FinObra</span>
-          </div>
-          <h2 style="font-size:1.8rem;font-weight:900;color:#fff;margin-bottom:8px;">
-            Potencialize a gestão das suas obras
-          </h2>
-          <p style="color:#94a3b8;font-size:.9rem;max-width:620px;margin:0 auto;">
-            Escolha o plano ideal para a <strong>${empresaNomeSeguro}</strong> e tenha controle total de obras, medições, notas fiscais e conciliação bancária.
-          </p>
-        </div>
-
-        <!-- Status da Assinatura Atual -->
-        <div style="background:linear-gradient(135deg,#1C2D12,#243818);border:1px solid rgba(201,162,39,.4);border-radius:12px;padding:16px 24px;margin-bottom:30px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:16px;">
-          <div style="display:flex;align-items:center;gap:16px;">
-            <div style="width:48px;height:48px;border-radius:12px;background:rgba(201,162,39,.2);border:1px solid var(--accent);display:flex;align-items:center;justify-content:center;font-size:1.5rem;">
-              💳
-            </div>
-            <div>
-              <div style="font-size:.78rem;color:#94a3b8;text-transform:uppercase;letter-spacing:.05em;">Seu Plano Atual</div>
-              <div style="font-size:1.15rem;font-weight:900;color:var(--accent2);">
-                ${this.PLANOS[assAtual.planoId]?.nome || 'Plano Profissional'} &bull; <span style="font-size:.85rem;color:${assAtual.status === 'ativo' ? '#22c55e' : (assAtual.status === 'trial' ? '#f59e0b' : '#ef4444')};">${Utils.escapeHtml(assAtual.status || 'trial')}</span>
-              </div>
-            </div>
-          </div>
-
-          <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;">
-            <div style="text-align:right;">
-              <div style="font-size:.72rem;color:#94a3b8;">Próximo Vencimento:</div>
-              <div style="font-weight:800;font-size:.92rem;color:#fff;">${assAtual.vencimento ? (Utils.formatDate ? Utils.formatDate(assAtual.vencimento) : assAtual.vencimento) : 'Definido pela assinatura'}</div>
-            </div>
-            ${canManageBilling ? `<button data-fb-click="Cobranca.abrirModalPagamentoPix" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(assAtual.planoId))}" class="btn-primary" style="padding:10px 18px;border-radius:8px;font-weight:800;display:inline-flex;align-items:center;gap:6px;font-size:.85rem;"><span>⚡ Pagar Mensalidade via PIX</span></button>` : `<span style="font-size:.78rem;color:#94a3b8;">Somente o administrador pode gerar cobranças.</span>`}
-          </div>
-        </div>
-
-        <div id="finobra-plan-usage" style="margin:-12px 0 26px;padding:12px 16px;border:1px solid rgba(255,255,255,.08);border-radius:10px;background:rgba(255,255,255,.025);font-size:.82rem;color:#94a3b8;">
-          Consultando uso atual do plano…
-        </div>
-
-        <!-- Grid de Planos -->
-        <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(300px, 1fr));gap:24px;align-items:stretch;">
-          ${Object.values(this.PLANOS).map(p => this._renderCardPlano(p, assAtual.planoId === p.id, canManageBilling)).join('')}
-        </div>
-        <div id="finobra-billing-history" style="margin-top:24px;"></div>
-
-      </div>
-    `;
+    const el=document.getElementById(containerId); if(!el)return; this._ensureAccountStyles();
+    const ass=this.getAssinaturaAtual(); const u=Auth?.getUser?.()||{}; const emp=DB?.getEmpresa?.()||{}; const canManage=['admin','superadmin'].includes(String(u.perfil||'').toLowerCase());
+    const nome=Utils.escapeHtml(emp.nome_fantasia||emp.razao_social||u.empresaNome||'sua empresa'); const plano=this.PLANOS[ass.planoId]||this.PLANOS.pro;
+    el.innerHTML=`<div class="acc-shell"><div class="acc-head"><div><div class="acc-title">Conta & Assinatura</div><div class="acc-sub">Plano, cobranças, módulos e limites da ${nome} em um único lugar.</div></div></div>
+      <div class="acc-hero"><div><div style="font-size:.7rem;color:#94a3b8;text-transform:uppercase;letter-spacing:.07em">Conta ativa</div><div class="acc-plan-name">${Utils.escapeHtml(plano.nome)}</div><div style="font-size:.8rem;color:#94a3b8;margin-top:4px" id="acc-plan-status">Consultando assinatura no servidor…</div></div><div class="acc-hero-actions" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">${canManage?'<button class="btn btn-primary" data-fb-click="Cobranca.switchAccountTab" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="planos">Alterar plano</button>':''}<button class="btn btn-secondary" data-fb-click="Cobranca.switchAccountTab" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="cobrancas">Ver cobranças</button></div></div>
+      <div class="acc-tabs"><button class="acc-tab active" data-tab="visao" data-fb-click="Cobranca.switchAccountTab" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="visao">Visão geral</button><button class="acc-tab" data-tab="cobrancas" data-fb-click="Cobranca.switchAccountTab" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="cobrancas">Cobranças</button><button class="acc-tab" data-tab="modulos" data-fb-click="Cobranca.switchAccountTab" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="modulos">Módulos</button><button class="acc-tab" data-tab="planos" data-fb-click="Cobranca.switchAccountTab" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="planos">Planos</button></div>
+      <section class="acc-panel active" data-panel="visao"><div id="finobra-plan-usage" class="card">Consultando uso atual…</div></section>
+      <section class="acc-panel" data-panel="cobrancas"><div id="finobra-billing-history" class="card">Consultando cobranças…</div></section>
+      <section class="acc-panel" data-panel="modulos"><div id="finobra-module-list" class="card">Consultando módulos contratados…</div></section>
+      <section class="acc-panel" data-panel="planos"><div class="acc-mobile-hint">Deslize para o lado para comparar os planos.</div><div class="acc-plans">${Object.values(this.PLANOS).map(p=>this._renderCardPlano(p,ass.planoId===p.id,canManage)).join('')}</div></section></div>`;
     this._carregarUsoPlano();
   },
 
   async _carregarUsoPlano() {
-    const box = document.getElementById('finobra-plan-usage');
-    if (!box) return;
+    const usageBox=document.getElementById('finobra-plan-usage');
     try {
-      const headers = (typeof DB !== 'undefined' && DB._apiHeaders) ? DB._apiHeaders() : {};
-      const u = (typeof Auth !== 'undefined' && Auth.getUser()) || {};
-      const canManageBilling = ['admin','superadmin'].includes(String(u.perfil || '').toLowerCase());
-      const res = canManageBilling ? await fetch('/api/plano?billing=1', { headers }) : await fetch('/api/plano', { headers });
-      const json = await res.json().catch(() => ({}));
-      if (!res.ok || !json.success || !json.plan) throw new Error(json.error || 'Falha ao consultar o plano');
-      const p = json.plan;
-      const limite = p.maxActiveObras == null ? 'Ilimitado' : `${p.maxActiveObras}`;
-      const restante = p.maxActiveObras == null ? 'sem limite' : `${p.usage.remainingActiveObras} restante(s)`;
-      box.innerHTML = `
-        <div style="display:flex;justify-content:space-between;gap:14px;align-items:center;flex-wrap:wrap;">
-          <span><strong style="color:#fff;">Uso real no servidor:</strong> ${Number(p.usage.activeObras)||0} obra(s) ativa(s) de ${limite}.</span>
-          <span style="color:${p.maxActiveObras != null && p.usage.remainingActiveObras === 0 ? '#f59e0b' : '#22c55e'};font-weight:800;">${restante}</span>
-        </div>`;
-      const hist = document.getElementById('finobra-billing-history');
-      if (hist && Array.isArray(json.invoices)) {
-        const statusMap = { pending:'🟡 Pendente', paid:'🟢 Pago', expired:'⚪ Expirado', canceled:'🔴 Cancelado' };
-        hist.innerHTML = `<div style="font-weight:900;color:#fff;margin-bottom:10px;">Últimas cobranças</div>${json.invoices.length ? `<div style="display:flex;flex-direction:column;gap:8px;">${json.invoices.slice(0,6).map(i => `<div style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:10px 12px;border:1px solid rgba(255,255,255,.08);border-radius:8px;background:rgba(255,255,255,.02);font-size:.78rem;"><span>${Utils.escapeHtml(statusMap[i.status] || i.status || '—')} &bull; ${Utils.escapeHtml(String(i.plan_id || ''))}</span><span style="font-weight:800;color:#fff;">R$ ${(Number(i.amount_cents||0)/100).toFixed(2).replace('.', ',')}</span><span style="color:#94a3b8;font-family:monospace;">${Utils.escapeHtml(String(i.txid || ''))}</span></div>`).join('')}</div>` : `<div style="font-size:.8rem;color:#64748b;">Nenhuma cobrança registrada ainda.</div>`}`;
-      }
-    } catch (e) {
-      box.textContent = 'Não foi possível consultar o uso do plano agora.';
-    }
+      const headers=DB?._apiHeaders?.()||Auth.getAuthHeaders(); const u=Auth?.getUser?.()||{}; const canManage=['admin','superadmin'].includes(String(u.perfil||'').toLowerCase());
+      const res=await fetch(canManage?'/api/plano?billing=1':'/api/plano',{headers}); const json=await res.json().catch(()=>({})); if(!res.ok||!json.success||!json.plan) throw new Error(json.error||'Falha ao consultar plano');
+      const p=json.plan; this._accountData=json; if(Auth) Auth._planAccess=p;
+      const obrasMax=p.maxActiveObras==null?'Ilimitadas':p.maxActiveObras; const usersMax=p.maxUsers==null?'Ilimitados':p.maxUsers;
+      const statusEl=document.getElementById('acc-plan-status'); if(statusEl) statusEl.textContent=`${p.label||'Plano'} • ${p.status||'ativo'}${p.vencimento?' • próxima referência '+(Utils.formatDate?Utils.formatDate(p.vencimento):p.vencimento):''}`;
+      if(usageBox) usageBox.innerHTML=`<div class="acc-usage-grid"><div class="acc-kpi"><div class="acc-kpi-l">Usuários</div><div class="acc-kpi-v">${Number(p.usage?.activeUsers||0)} / ${usersMax}</div><div style="font-size:.72rem;color:var(--text3);margin-top:4px">Pessoas ativas no plano</div></div><div class="acc-kpi"><div class="acc-kpi-l">Obras ativas</div><div class="acc-kpi-v">${Number(p.usage?.activeObras||0)} / ${obrasMax}</div><div style="font-size:.72rem;color:var(--text3);margin-top:4px">Obras em andamento</div></div><div class="acc-kpi"><div class="acc-kpi-l">Suporte</div><div class="acc-kpi-v">${Utils.escapeHtml(p.supportLevel||'Padrão')}</div><div style="font-size:.72rem;color:var(--text3);margin-top:4px">Suporte / Comercial</div></div><div class="acc-kpi"><div class="acc-kpi-l">Mensalidade</div><div class="acc-kpi-v">R$ ${(Number(p.monthlyPriceCents||0)/100).toFixed(2).replace('.',',')}</div><div style="font-size:.72rem;color:var(--text3);margin-top:4px">Sem fidelidade</div></div></div>`;
+      this._renderBillingHistory(json.invoices||[]); this._renderModules(p);
+    } catch(e) { if(usageBox) usageBox.textContent='Não foi possível consultar os dados da assinatura agora.'; }
   },
 
-  _renderCardPlano(plano, isAtual, canManageBilling = false) {
-    const isPro = plano.destaque;
-    return `
-      <div style="
-        background:${isPro ? 'linear-gradient(145deg, #1C2D12, #2A3F1B)' : 'rgba(255,255,255,.02)'};
-        border:1px solid ${isPro ? 'var(--accent)' : 'rgba(255,255,255,.08)'};
-        border-radius:16px;padding:28px 24px;display:flex;flex-direction:column;justify-content:space-between;
-        position:relative;box-shadow:${isPro ? '0 12px 36px rgba(201,162,39,.15)' : 'none'};">
-        
-        ${plano.badge ? `
-          <div style="position:absolute;top:-12px;left:50%;transform:translateX(-50%);background:${isPro ? 'var(--accent)' : 'rgba(201,162,39,.2)'};color:${isPro ? '#0f1710' : 'var(--accent2)'};border:1px solid var(--accent);padding:3px 14px;border-radius:20px;font-size:.68rem;font-weight:900;letter-spacing:.06em;">
-            ${plano.badge}
-          </div>
-        ` : ''}
+  _renderBillingHistory(invoices=[]) {
+    const el=document.getElementById('finobra-billing-history'); if(!el)return; const status={pending:'Pendente',paid:'Pago',expired:'Expirado',canceled:'Cancelado'};
+    if(!invoices.length){el.innerHTML='<div style="padding:16px;text-align:center;color:var(--text3)">Nenhuma cobrança registrada ainda.</div>';return;}
+    const rows=invoices.map(i=>{const val='R$ '+(Number(i.amount_cents||0)/100).toFixed(2).replace('.',','); const venc=i.expires_at?new Date(i.expires_at).toLocaleDateString('pt-BR'):'—'; const pago=i.paid_at?new Date(i.paid_at).toLocaleDateString('pt-BR'):'—'; return {i,val,venc,pago,s:status[i.status]||i.status||'—'};});
+    el.innerHTML=`<div style="font-weight:900;font-size:1rem;margin-bottom:12px">Histórico de cobranças</div><div style="overflow:auto"><table class="acc-billing-table"><thead><tr><th>Competência</th><th>Vencimento</th><th>Valor</th><th>Status</th><th>Pagamento</th></tr></thead><tbody>${rows.map(r=>`<tr><td>${Utils.escapeHtml(r.i.competencia||'—')}</td><td>${r.venc}</td><td><strong>${r.val}</strong></td><td>${Utils.escapeHtml(r.s)}</td><td>${r.pago}</td></tr>`).join('')}</tbody></table></div><div class="acc-billing-cards">${rows.map(r=>`<div class="acc-kpi"><div style="display:flex;justify-content:space-between;gap:10px"><strong>${Utils.escapeHtml(r.i.competencia||'Cobrança')}</strong><span>${Utils.escapeHtml(r.s)}</span></div><div style="font-size:1.05rem;font-weight:900;margin:8px 0">${r.val}</div><div style="font-size:.74rem;color:var(--text3)">Vencimento: ${r.venc} • Pagamento: ${r.pago}</div></div>`).join('')}</div>`;
+  },
 
-        <div>
-          <h3 style="font-size:1.25rem;font-weight:900;color:${isPro ? 'var(--accent2)' : '#fff'};margin-bottom:6px;">
-            ${plano.nome}
-          </h3>
-          <div style="display:flex;align-items:baseline;gap:4px;margin:16px 0 20px;">
-            <span style="font-size:2.2rem;font-weight:900;color:#fff;">R$ ${plano.valorMensal.toFixed(2).replace('.', ',')}</span>
-            <span style="font-size:.85rem;color:#94a3b8;">/mês</span>
-          </div>
+  _renderModules(p) {
+    const el=document.getElementById('finobra-module-list'); if(!el)return;
+    const catalog={dashboard:'Dashboard',obras:'Obras & Clientes',financeiro:'Financeiro',fornecedores:'Fornecedores',produtos:'Produtos / Insumos',precompras:'Pré-Compras',recibos:'Recibos',contratos:'Contratos',notas:'Notas / NF-e / OCR',orcamentos:'Orçamentos',medicoes:'Medições',documentos:'Documentos',relatorios:'Relatórios',contas:'Contas Bancárias',whatsapp:'WhatsApp',assinatura:'Assinatura eletrônica',planos:'Conta & Assinatura',configuracoes:'Configurações'};
+    const allowed=new Set(p.modules||[]); const f=p.features||{};
+    const advanced=[['ocr','OCR com IA'],['signatures','Assinatura eletrônica + QR'],['sinapi','SINAPI / Caixa'],['engineering','Curva S, EVM, ABC e BDI'],['advancedPermissions','Permissões avançadas por módulo']];
+    el.innerHTML=`<div style="font-weight:900;font-size:1rem;margin-bottom:6px">Módulos do seu plano</div><div style="font-size:.78rem;color:var(--text3);margin-bottom:14px">Módulo contratado e recurso avançado são coisas diferentes. Por exemplo, Orçamentos pode estar incluído sem liberar SINAPI.</div><div class="acc-mod-grid">${Object.entries(catalog).map(([k,v])=>`<div class="acc-mod"><span style="color:${allowed.has(k)?'#22c55e':'#94a3b8'}">${allowed.has(k)?'✓':'🔒'}</span><span style="flex:1">${v}</span><span style="font-size:.68rem;color:var(--text3)">${allowed.has(k)?'Incluído':'Outro plano'}</span></div>`).join('')}</div><div style="font-weight:900;font-size:1rem;margin:22px 0 10px">Recursos avançados</div><div class="acc-mod-grid">${advanced.map(([k,v])=>`<div class="acc-mod"><span style="color:${f[k]?'#22c55e':'#94a3b8'}">${f[k]?'✓':'🔒'}</span><span style="flex:1">${v}</span><span style="font-size:.68rem;color:var(--text3)">${f[k]?'Incluído':'Outro plano'}</span></div>`).join('')}</div>`;
+  },
 
-          <div style="height:1px;background:rgba(255,255,255,.08);margin-bottom:20px;"></div>
-
-          <ul style="list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:12px;">
-            ${plano.recursos.map(r => `
-              <li style="display:flex;align-items:flex-start;gap:10px;font-size:.84rem;color:#e2e8f0;line-height:1.4;">
-                <span style="color:#22c55e;font-size:.9rem;flex-shrink:0;">✓</span>
-                <span>${r}</span>
-              </li>
-            `).join('')}
-          </ul>
-        </div>
-
-        <div style="margin-top:28px;">
-          ${isAtual ? `
-            <button disabled style="width:100%;padding:12px;border-radius:8px;background:rgba(201,162,39,.15);border:1px solid var(--accent);color:var(--accent2);font-weight:800;font-size:.85rem;cursor:default;">
-              ✓ Seu Plano Atual
-            </button>
-          ` : canManageBilling ? `
-            <button data-fb-click="Cobranca.selecionarPlano" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(plano.id))}" style="width:100%;padding:12px;border-radius:8px;background:${isPro ? 'var(--accent)' : 'rgba(255,255,255,.06)'};border:1px solid ${isPro ? 'var(--accent)' : 'rgba(255,255,255,.2)'};color:${isPro ? '#0f1710' : '#fff'};font-weight:900;font-size:.85rem;cursor:pointer;transition:all .2s;">
-              Fazer Upgrade Agora ↗
-            </button>
-          ` : `<button disabled style="width:100%;padding:12px;border-radius:8px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);color:#64748b;font-weight:800;font-size:.82rem;">Administrador necessário</button>`}
-        </div>
-
-      </div>
-    `;
+  _renderCardPlano(plano,isAtual,canManage=false) {
+    const feat=plano.destaque; const obras=plano.limiteObras==null?'Ilimitadas':plano.limiteObras; return `<article class="acc-plan-card ${feat?'featured':''}"><div><div style="font-size:.68rem;color:var(--accent2);font-weight:900;text-transform:uppercase;letter-spacing:.05em">${Utils.escapeHtml(plano.badge)}</div><h3 style="font-size:1.2rem;margin:8px 0 3px">${Utils.escapeHtml(plano.nome)}</h3><div style="font-size:.76rem;color:var(--text3);min-height:34px">${Utils.escapeHtml(plano.ideal)}</div><div style="font-size:2rem;font-weight:900;margin:16px 0">R$ ${plano.valorMensal.toFixed(2).replace('.',',')}<span style="font-size:.75rem;color:var(--text3);font-weight:500">/mês</span></div><div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px"><span class="badge badge-secondary">👥 ${plano.limiteUsuarios} usuário(s)</span><span class="badge badge-secondary">🏗️ ${obras} obras</span></div><ul style="list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:9px">${plano.recursos.map(r=>`<li style="font-size:.8rem;color:var(--text2)">✓ ${Utils.escapeHtml(r)}</li>`).join('')}</ul></div><div style="margin-top:20px">${isAtual?'<button class="btn btn-secondary" disabled style="width:100%">✓ Plano atual</button>':canManage?`<button class="btn btn-primary" style="width:100%" data-fb-click="Cobranca.selecionarPlano" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(plano.id)}">Escolher este plano</button>`:'<button class="btn btn-secondary" disabled style="width:100%">Administrador necessário</button>'}</div></article>`;
   },
 
   selecionarPlano(planoId) {

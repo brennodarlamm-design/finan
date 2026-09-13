@@ -2,11 +2,18 @@
 
 import { neon } from '@neondatabase/serverless';
 import { resolveAuthAndTenant } from './_auth.js';
-import { getPlanRule, isActiveObraStatus } from './_plans.js';
+import { getPlanRule, isActiveObraStatus, canUseFeature, planError } from './_plans.js';
 import { canWriteData, canDeleteData, canAccessTable, permissionError } from './_permissions.js';
 import { writeAudit } from './_audit.js';
 
+function planFeatureErrorForTable(auth, table) {
+  const feature = String(table || '') === 'orcamentos_sinapi' ? 'sinapi' : null;
+  if (!feature || auth?.isSystem || auth?.user?.perfil === 'superadmin') return null;
+  return canUseFeature(auth?.user?.tenantPlan, feature) ? null : planError(feature, auth?.user?.tenantPlan);
+}
+
 function tableAllowed(auth, table, action = 'read') {
+  if (planFeatureErrorForTable(auth, table)) return false;
   return canAccessTable(auth, table, action);
 }
 
@@ -20,7 +27,10 @@ function deniedSyncCollection(auth, payload) {
   for (const [key, table] of Object.entries(SYNC_COLLECTION_TABLE)) {
     const value = payload?.[key];
     const hasData = Array.isArray(value) ? value.length > 0 : (value && typeof value === 'object' && Object.keys(value).length > 0);
-    if (hasData && !tableAllowed(auth, table, 'write')) return { key, table };
+    if (!hasData) continue;
+    const planDenied = planFeatureErrorForTable(auth, table);
+    if (planDenied) return { key, table, planError: planDenied };
+    if (!tableAllowed(auth, table, 'write')) return { key, table };
   }
   return null;
 }
@@ -440,6 +450,8 @@ export default async function handler(req, res) {
       const { table, obra_id, id } = req.query || {};
       const pagination = parsePagination(req.query || {});
       const requestedTable = String(table || '').trim();
+      const requestedPlanError = requestedTable ? planFeatureErrorForTable(auth, requestedTable) : null;
+      if (requestedPlanError) return res.status(403).json(requestedPlanError);
       if (requestedTable && !['all','sync_manifest'].includes(requestedTable) && !tableAllowed(auth, requestedTable, 'read')) {
         return res.status(403).json(permissionError('MODULE_READ_FORBIDDEN', requestedTable));
       }
@@ -726,6 +738,8 @@ export default async function handler(req, res) {
     // ── POST: Gravação / Atualização / Exclusão / Sync com Tenant Scoping ───────
     if (req.method === 'POST') {
       const { action, table, data, id, payload } = req.body || {};
+      const directPlanError = table ? planFeatureErrorForTable(auth, table) : null;
+      if (directPlanError) return res.status(403).json(directPlanError);
 
       if ((action === 'sync_all' || action === 'save') && !canWriteData(auth)) {
         return res.status(403).json(permissionError('ROLE_READ_ONLY'));
@@ -741,7 +755,7 @@ export default async function handler(req, res) {
       }
       if (action === 'sync_all' && payload) {
         const denied = deniedSyncCollection(auth, payload);
-        if (denied) return res.status(403).json(permissionError('MODULE_WRITE_FORBIDDEN', denied.table));
+        if (denied) return res.status(403).json(denied.planError || permissionError('MODULE_WRITE_FORBIDDEN', denied.table));
       }
 
       // 1. Sincronização em Massa (Local -> Neon com tenant_id)

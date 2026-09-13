@@ -160,11 +160,18 @@ export default async function handler(req, res) {
     const active = Number(counts[0]?.obras_ativas || 0);
     const total = Number(counts[0]?.obras_total || 0);
     const max = rule.maxActiveObras;
+    const userCounts = await sql`
+      SELECT COUNT(*) FILTER (WHERE ativo=TRUE)::int AS usuarios_ativos, COUNT(*)::int AS usuarios_total
+      FROM usuarios WHERE tenant_id=${auth.tenantId};
+    `;
+    const activeUsers = Number(userCounts[0]?.usuarios_ativos || 0);
+    const totalUsers = Number(userCounts[0]?.usuarios_total || 0);
 
     let invoices = undefined;
     if (String(req.query?.billing || '') === '1' && canManageTenant(auth)) {
       invoices = await sql`
-        SELECT id, plan_id, amount_cents, status, txid, paid_at, expires_at, created_at
+        SELECT id, plan_id, amount_cents, status, txid, paid_at, expires_at, created_at,
+               TO_CHAR(created_at AT TIME ZONE 'America/Boa_Vista', 'MM/YYYY') AS competencia
         FROM billing_invoices
         WHERE tenant_id=${auth.tenantId}
         ORDER BY created_at DESC LIMIT 12;
@@ -182,8 +189,19 @@ export default async function handler(req, res) {
         diasRestantes,
         expirado,
         maxActiveObras: max,
+        maxUsers: rule.maxUsers,
+        idealFor: rule.idealFor,
+        supportLevel: rule.supportLevel,
+        modules: rule.modules,
         features: rule.features,
-        usage: { activeObras: active, totalObras: total, remainingActiveObras: max == null ? null : Math.max(0, max - active) }
+        usage: {
+          activeObras: active,
+          totalObras: total,
+          remainingActiveObras: max == null ? null : Math.max(0, max - active),
+          activeUsers,
+          totalUsers,
+          remainingUsers: rule.maxUsers == null ? null : Math.max(0, rule.maxUsers - activeUsers)
+        }
       },
       ...(invoices ? { invoices } : {}),
       billingWhatsapp: billingWhatsapp()

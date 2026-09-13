@@ -4,6 +4,7 @@ import crypto from 'crypto';
 import { hashPassword, verifyPassword, resolveAuthAndTenant } from './_auth.js';
 import { writeAudit } from './_audit.js';
 import { canManageUsers, canManageTenant, permissionError, sanitizePermissions } from './_permissions.js';
+import { getPlanRule } from './_plans.js';
 import { checkRateLimit, getClientIp } from './_ratelimit.js';
 
 function getSql() {
@@ -28,6 +29,37 @@ const safeUser = u => ({
   created_at: u.created_at
 });
 
+async function getUserPlanUsage(sql, tenantId) {
+  const tenantRows = await sql`SELECT plano FROM tenants WHERE id=${tenantId} LIMIT 1;`;
+  const rule = getPlanRule(tenantRows[0]?.plano || 'trial');
+  const countRows = await sql`
+    SELECT COUNT(*)::int AS total, COUNT(*) FILTER (WHERE ativo=TRUE)::int AS active
+    FROM usuarios WHERE tenant_id=${tenantId};
+  `;
+  const activeUsers = Number(countRows[0]?.active || 0);
+  const totalUsers = Number(countRows[0]?.total || 0);
+  return {
+    planId: rule.id,
+    planLabel: rule.label,
+    maxUsers: rule.maxUsers,
+    advancedPermissions: Boolean(rule.features?.advancedPermissions),
+    activeUsers,
+    totalUsers,
+    remainingUsers: rule.maxUsers == null ? null : Math.max(0, rule.maxUsers - activeUsers)
+  };
+}
+
+function planUserLimitError(usage) {
+  return {
+    success:false,
+    code:'PLAN_USER_LIMIT',
+    plan:usage.planId,
+    limit:usage.maxUsers,
+    current:usage.activeUsers,
+    error:`Seu time chegou ao limite do ${usage.planLabel}. Este plano inclui ${usage.maxUsers} usuário(s) ativo(s). Para adicionar outra pessoa, gerencie os usuários atuais ou consulte um plano com mais acessos.`
+  };
+}
+
 
 const SUPPORT_STATUSES = new Set(['bot','waiting','assigned','resolved','closed']);
 const cleanSupportText = (v, max=4000) => String(v ?? '').replace(/\0/g, '').trim().slice(0, max);
@@ -40,17 +72,17 @@ const SUPPORT_KB = Object.freeze([
   { topic:'obras', patterns:[/\bobra\b/i,/cliente/i,/nova obra/i,/contrato caixa/i], answer:'Para cadastrar uma obra, entre em Obras & Clientes e escolha Nova Obra. Informe cliente, datas, valor/contrato e os demais dados. Os limites de obras ativas dependem do plano contratado.' },
   { topic:'fornecedores', patterns:[/fornecedor/i,/cnpj/i], answer:'Fornecedores são cadastrados no módulo Fornecedores com CNPJ/CPF, razão social, contato, endereço, município e UF. Depois ficam disponíveis nos lançamentos, notas e compras.' },
   { topic:'financeiro', patterns:[/lançamento/i,/lancamento/i,/receita/i,/despesa/i,/contas? a pagar/i,/contas? a receber/i,/fluxo de caixa/i], answer:'No Financeiro, use Novo Lançamento para registrar receita ou despesa, vencimento, fornecedor, obra/centro de custo, conta e status. O sistema também consolida fluxo de caixa e realizado por obra.' },
-  { topic:'orcamentos', patterns:[/orçamento/i,/orcamento/i,/planilha orçament/i,/insumo/i,/composição/i,/composicao/i], answer:'Em Orçamentos você monta a planilha da obra com categorias, itens, quantidades e preços. O FinObra calcula totais e permite comparar o orçamento com o realizado.' },
-  { topic:'sinapi', patterns:[/sinapi/i,/caixa.*insumo/i,/referência sinapi/i,/referencia sinapi/i], answer:'O orçamento SINAPI trabalha com UF, competência/referência e dados oficiais disponíveis para a seleção. O FinObra mantém o orçamento separado por obra e permite aplicar BDI e Leis Sociais.' },
+  { topic:'orcamentos', patterns:[/orçamento/i,/orcamento/i,/planilha orçament/i,/insumo/i,/composição/i,/composicao/i], answer:'Em Orçamentos você monta a planilha da obra com categorias, itens, quantidades e preços. O FinObra calcula totais e compara orçamento com realizado. SINAPI e controles avançados de engenharia fazem parte do plano Construtora Ilimitado.' },
+  { topic:'sinapi', patterns:[/sinapi/i,/caixa.*insumo/i,/referência sinapi/i,/referencia sinapi/i], answer:'O SINAPI / Caixa está disponível no plano Construtora Ilimitado. Ele trabalha com UF e competência/referência, bases oficiais e composições por obra.' },
   { topic:'engenharia', patterns:[/curva s/i,/\bevm\b/i,/\bcpi\b/i,/\bspi\b/i,/\beac\b/i,/curva abc/i,/pareto/i,/\bbdi\b/i,/cronograma físico/i,/cronograma fisico/i], answer:'No Hub da Obra ficam os controles de engenharia: Cronograma Físico-Financeiro, Curva S, EVM (BAC/PV/EV/AC/CPI/SPI/EAC/VAC), Curva ABC e BDI. As configurações podem ser ajustadas por obra e exportadas em relatórios.' },
   { topic:'precompras', patterns:[/pré-compra/i,/pre-compra/i,/pre compra/i,/ordem de compra/i,/solicitação de compra/i,/solicitacao de compra/i], answer:'Pré-Compras organiza solicitações e ordens de compra do canteiro, com itens, fornecedor e fluxo de aprovação antes da compra definitiva.' },
   { topic:'relatorios', patterns:[/relatório/i,/relatorio/i,/exportar/i,/excel/i,/xlsx/i,/pdf/i,/dossiê/i,/dossie/i], answer:'O FinObra possui exportações de engenharia e relatórios em Excel/PDF. No Hub da Obra você pode exportar cronograma, Curva ABC, Orçado x Realizado, BDI ou o dossiê completo.' },
   { topic:'contratos', patterns:[/contrato/i,/recibo/i], answer:'Contratos e Recibos ficam salvos na nuvem da empresa. Você pode criar, editar, imprimir e, nos planos compatíveis, usar assinatura eletrônica e QR de validação.' },
   { topic:'assinatura', patterns:[/assinatura/i,/qr code/i,/validar/i,/validação/i,/validacao/i], answer:'A assinatura eletrônica gera um código de validação registrado no servidor. O QR Code leva à página pública de validação, que consulta o registro real no FinObra.' },
-  { topic:'usuarios', patterns:[/usuário/i,/usuario/i,/perfil/i,/permiss/i,/acesso/i], answer:'Em Configurações > Usuários, o administrador pode criar usuários, escolher perfis e restringir módulos. As permissões específicas reduzem acesso; não elevam o poder do perfil.' },
-  { topic:'planos', patterns:[/plano/i,/cobrança/i,/cobranca/i,/\bpix\b/i,/mensalidade/i,/pagamento/i], answer:'Abra Planos & Cobrança para consultar plano, limites e mensalidade. Cobranças PIX pendentes aparecem com valor, identificação e histórico.' },
+  { topic:'usuarios', patterns:[/usuário/i,/usuario/i,/perfil/i,/permiss/i,/acesso/i], answer:'Em Configurações > Usuários, o administrador gerencia as pessoas da equipe. O Básico inclui 1 usuário ativo, o Profissional 2 e o Ilimitado 5. Celular, notebook e outros dispositivos da mesma pessoa não contam como usuários extras. Permissões granulares por módulo ficam disponíveis no Ilimitado.' },
+  { topic:'planos', patterns:[/plano/i,/cobrança/i,/cobranca/i,/\bpix\b/i,/mensalidade/i,/pagamento/i], answer:'Abra Conta & Assinatura para consultar plano, usuários e obras em uso, módulos incluídos, cobranças por competência e opções de plano.' },
   { topic:'whatsapp', patterns:[/whatsapp/i,/mensagem/i,/qr.*whatsapp/i], answer:'O WhatsApp usa uma sessão própria da empresa no servidor. Quando necessário, conecte pelo QR Code e confira o status da sessão antes de enviar mensagens.' },
-  { topic:'sessoes', patterns:[/sessão/i,/sessao/i,/dispositivo/i,/celular conectado/i,/computador conectado/i], answer:'Em Configurações > Sessões você pode ver os dispositivos conectados à sua conta e encerrar acessos que não reconhece.' },
+  { topic:'sessoes', patterns:[/sessão/i,/sessao/i,/dispositivo/i,/celular conectado/i,/computador conectado/i], answer:'Em Configurações > Sessões você vê os dispositivos conectados à sua conta e pode encerrar acessos. Sessões de celular, notebook ou navegador não consomem usuários extras do plano.' },
   { topic:'erro', patterns:[/erro/i,/bug/i,/não funciona/i,/nao funciona/i,/travou/i,/problema/i], answer:'Informe em qual tela aconteceu, o que você estava fazendo e qual mensagem apareceu. O diagnóstico técnico fica com a equipe DEV/Suporte e não é exibido na tela do cliente. Se precisar, clique em “Chamar atendente”.' }
 ]);
 
@@ -553,7 +585,8 @@ export default async function handler(req, res) {
             FROM usuarios WHERE tenant_id = ${auth.tenantId} AND id = ${auth.user.userId}
             LIMIT 1;
           `;
-      return res.status(200).json({ success:true, users:rows.map(safeUser), limited:!actorIsAdmin });
+      const planUsage = await getUserPlanUsage(sql, auth.tenantId);
+      return res.status(200).json({ success:true, users:rows.map(safeUser), limited:!actorIsAdmin, planUsage });
     }
 
     if (req.method === 'POST') {
@@ -568,11 +601,15 @@ export default async function handler(req, res) {
         return res.status(400).json({ success:false, error:'Informe nome, usuário (mín. 3), e-mail válido e senha (mín. 8).' });
       }
       if (!allowedProfiles.includes(perfil)) return res.status(400).json({ success:false, error:'Perfil inválido.' });
+      const planUsage = await getUserPlanUsage(sql, auth.tenantId);
+      if (planUsage.maxUsers != null && planUsage.activeUsers >= planUsage.maxUsers) {
+        return res.status(409).json(planUserLimitError(planUsage));
+      }
       const exists = await sql`SELECT id FROM usuarios WHERE LOWER(username)=${un} OR LOWER(email)=${em} LIMIT 1;`;
       if (exists.length) return res.status(409).json({ success:false, error:'Usuário ou e-mail já cadastrado.' });
       const id = 'usr_' + crypto.randomBytes(8).toString('hex');
       const senhaHash = hashPassword(pw);
-      const cleanPermissions = ['admin','superadmin'].includes(String(perfil)) ? {} : sanitizePermissions(permissions);
+      const cleanPermissions = (!planUsage.advancedPermissions || ['admin','superadmin'].includes(String(perfil))) ? {} : sanitizePermissions(permissions);
       const permissionsJson = JSON.stringify(cleanPermissions);
       const rows = await sql`
         INSERT INTO usuarios (id,tenant_id,username,email,senha_hash,nome,perfil,avatar,ativo,permissoes)
@@ -624,6 +661,13 @@ export default async function handler(req, res) {
         }
       }
 
+      if (!cur.ativo && newAtivo) {
+        const planUsage = await getUserPlanUsage(sql, auth.tenantId);
+        if (planUsage.maxUsers != null && planUsage.activeUsers >= planUsage.maxUsers) {
+          return res.status(409).json(planUserLimitError(planUsage));
+        }
+      }
+
       const dup = await sql`SELECT id FROM usuarios WHERE id<>${targetId} AND (LOWER(username)=${newUsername} OR LOWER(email)=${newEmail}) LIMIT 1;`;
       if (dup.length) return res.status(409).json({ success:false, error:'Usuário ou e-mail já utilizado.' });
 
@@ -640,7 +684,8 @@ export default async function handler(req, res) {
         senhaHash = hashPassword(String(senha));
       }
 
-      const newPermissions = ['admin','superadmin'].includes(String(newPerfil)) ? {} : (actorIsAdmin && permissions !== undefined ? sanitizePermissions(permissions) : ((cur.permissoes && typeof cur.permissoes === 'object') ? cur.permissoes : {}));
+      const permissionPlanUsage = await getUserPlanUsage(sql, auth.tenantId);
+      const newPermissions = (!permissionPlanUsage.advancedPermissions || ['admin','superadmin'].includes(String(newPerfil))) ? {} : (actorIsAdmin && permissions !== undefined ? sanitizePermissions(permissions) : ((cur.permissoes && typeof cur.permissoes === 'object') ? cur.permissoes : {}));
       const permissionsJson = JSON.stringify(newPermissions);
       const rows = await sql`
         UPDATE usuarios SET

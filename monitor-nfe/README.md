@@ -1,125 +1,94 @@
 # Monitor NF-e — Angelim Construtora
-## Consulta automática de NF-es via certificado digital A1
+## Consulta automática de NF-e via certificado digital A1
 
----
+Este diretório contém **ferramentas locais de Windows** para consultar a distribuição de DF-e da SEFAZ, enviar os lotes ao MeuDanfe e disparar o resumo financeiro pelo **backend oficial do FinObra**.
 
-## 📁 Arquivos desta pasta
+> O Monitor NF-e **não é publicado no Render**. O serviço de produção do FinObra usa somente `backend/` e o WhatsApp de produção é atendido pelo backend Baileys do FinObra. Não é necessário executar um servidor WhatsApp local, Evolution API ou `whatsapp-web.js`.
 
-| Arquivo | Descrição |
+## Arquivos ativos
+
+| Arquivo | Função |
 |---|---|
-| `config.json` | ⚙️ **EDITE ESTE ARQUIVO PRIMEIRO** com seus dados |
-| `MonitorNFe.ps1` | Script principal — consulta SEFAZ e envia para MeuDanfe |
-| `InstalarTarefa.ps1` | Instala execução automática no Agendador de Tarefas |
-| `ultimo_nsu.txt` | Criado automaticamente — guarda o progresso das consultas |
-| `xmls/` | XMLs das NF-es baixadas ficam aqui |
-| `logs/` | Logs de execução ficam aqui |
+| `config.example.json` | Modelo sem segredos para gerar o `config.json` local |
+| `MonitorNFe.ps1` | Consulta SEFAZ por mTLS e envia o lote ao MeuDanfe |
+| `InstalarTarefa.ps1` | Agenda a consulta NF-e no Windows |
+| `AlertaBoletosWhatsApp.ps1` | Consulta contas do tenant no FinObra e envia o resumo via `/api/send-whatsapp` |
+| `AgendarAlertaWhatsApp.ps1` | Agenda o resumo financeiro diário às 08:00 |
+| `ultimo_nsu.txt` | Estado local criado/atualizado em execução; **não é versionado** |
+| `xmls/` e `logs/` | Saída local; **não são versionados** |
 
----
+## 1. Configuração
 
-## 🚀 Passo a passo de configuração
+Copie `config.example.json` para `config.json` e preencha os dados da empresa. O `config.json` é ignorado pelo Git.
 
-### 1. Edite o `config.json`
+Além do CNPJ/UF, informe `empresa.tenant_id`, que é o ID interno da empresa no FinObra. Ele é obrigatório para os jobs que usam a chave interna, pois todas as chamadas são isoladas por tenant.
 
-Abra o arquivo e preencha:
+### Segredos recomendados por variável de ambiente
 
-```json
-{
-  "certificado": {
-    "caminho": "C:\\Usuários\\Voce\\certificado.pfx",
-    "senha": "sua_senha_aqui"
-  },
-  "empresa": {
-    "cnpj": "12345678000190",
-    "razao_social": "Angelim Construtora LTDA",
-    "uf": "RR",
-    "cod_uf": "14"
-  }
-}
+Use preferencialmente estas variáveis no Windows/Agendador de Tarefas:
+
+```powershell
+$env:FINOBRA_CERT_PASSWORD = "senha-do-pfx"
+$env:MEUDANFE_API_KEY      = "chave-meudanfe"
+$env:FINOBRA_API_SECRET    = "segredo-interno-finobra"
 ```
 
-> ⚠️ O CNPJ deve ter **14 dígitos sem pontuação**.
-> O `cod_uf` de Roraima é **14** (código IBGE).
+Os campos equivalentes no `config.json` existem apenas como fallback local. Nunca envie `config.json`, `.pfx`, `.p12`, logs ou XMLs ao Git.
 
-### 2. Teste o script manualmente
+## 2. Monitor NF-e / SEFAZ
 
-Abra o PowerShell **como Administrador** e execute:
+Execute como usuário que tenha acesso ao certificado:
 
 ```powershell
 cd "d:\Projects\FINANÇAS\monitor-nfe"
 powershell -ExecutionPolicy Bypass -File MonitorNFe.ps1
 ```
 
-Verifique o log em `logs\monitor_nfe_AAAA-MM.log`.
+O fluxo é:
 
-### 3. Instale o agendamento automático (1x por hora)
+```text
+Agendador de Tarefas
+  -> MonitorNFe.ps1
+  -> certificado A1 carregado pelo processo
+  -> HTTPS/mTLS com validação TLS normal
+  -> SEFAZ DistDFeInt
+  -> parser XML com DTD/resolução externa desabilitados
+  -> MeuDanfe
+  -> XMLs/logs locais
+```
 
-Com o PowerShell **como Administrador**:
+O certificado não é marcado como exportável, a senha do PFX não é passada na linha de comando do sistema e a chamada à SEFAZ não usa `curl -k`.
+
+Para instalar o agendamento da consulta:
 
 ```powershell
-cd "d:\Projects\FINANÇAS\monitor-nfe"
 powershell -ExecutionPolicy Bypass -File InstalarTarefa.ps1
 ```
 
----
+## 3. Resumo de boletos por WhatsApp
 
-## 🔄 Como funciona o fluxo completo
+`AlertaBoletosWhatsApp.ps1` usa a API oficial do FinObra. As requisições internas enviam:
 
-```
-Agendador de Tarefas (a cada 1 hora)
-         ↓
-   MonitorNFe.ps1
-         ↓
-  Carrega certificado .pfx
-         ↓
-  Chama SEFAZ (DistDFeInt) com mTLS
-         ↓
-  Recebe até 50 NF-es (retDistDFeInt.xml)
-         ↓
-  Envia para API MeuDanfe (/fd/add/sefaz-xml)
-         ↓
-  Salva XMLs em ./xmls/
-         ↓
-  Registra em ./logs/
-         ↓
-  No sistema financeiro: aba ☁️ "Minhas NFs na Nuvem"
-  mostra todas as NFs importadas
-```
+- `Authorization: Bearer <FINOBRA_API_SECRET>`;
+- `x-api-key`;
+- `x-tenant-id` com `empresa.tenant_id`.
 
----
+Isso evita leitura acidental de outro tenant e é compatível com a autenticação atual do FinObra.
 
-## 📝 Código UF — Roraima
-
-| UF | Código IBGE |
-|----|-------------|
-| RR | **14** |
-
----
-
-## ⚠️ Avisos importantes
-
-- O script **não bloqueia** e não trava o computador — roda em background em segundos
-- A SEFAZ pode retornar até **50 documentos por consulta** — o script faz quantas consultas forem necessárias até esvaziar a fila
-- O arquivo `ultimo_nsu.txt` guarda o progresso — **não delete** esse arquivo, senão o script vai puxar todas as NFs desde o início
-- Cada NF nova consultada na SEFAZ custa **R$ 0,03** no MeuDanfe — NFs já na conta são gratuitas
-- Logs ficam em `logs\monitor_nfe_AAAA-MM.log` (um arquivo por mês)
-
----
-
-## 🔧 Comandos úteis
+Para agendar o resumo diário:
 
 ```powershell
-# Verificar se a tarefa está instalada
-Get-ScheduledTask -TaskName "Monitor NF-e Angelim"
-
-# Rodar manualmente agora
-Start-ScheduledTask -TaskName "Monitor NF-e Angelim"
-
-# Ver histórico de execuções
-Get-ScheduledTaskInfo -TaskName "Monitor NF-e Angelim"
-
-# Remover a tarefa agendada
-Unregister-ScheduledTask -TaskName "Monitor NF-e Angelim" -Confirm:$false
-
-# Ver último log
-Get-Content "logs\monitor_nfe_$(Get-Date -Format 'yyyy-MM').log" -Tail 30
+powershell -ExecutionPolicy Bypass -File AgendarAlertaWhatsApp.ps1
 ```
+
+## 4. Estado NSU
+
+`ultimo_nsu.txt` guarda o progresso local da distribuição de DF-e. Ele é criado/atualizado pelo monitor e agora fica fora do controle de versão. **Não apague o arquivo da máquina em uso** sem saber o impacto, pois reiniciar o NSU pode alterar o comportamento das consultas seguintes.
+
+## 5. Segurança operacional
+
+- Use somente o endpoint oficial configurado no `config.example.json`.
+- Não desative validação TLS para a SEFAZ.
+- Não compartilhe o certificado ou sua senha.
+- Mantenha o `FINOBRA_API_SECRET` apenas em ambiente seguro/local.
+- O diretório `monitor-nfe` é utilitário local; a infraestrutura de produção permanece em `backend/`, Vercel/API e Cloudflare.
