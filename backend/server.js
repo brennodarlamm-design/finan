@@ -959,9 +959,18 @@ async function executarResumoMatinal(explicitTenantId = null) {
   }
 }
 
-// Agendado para 08:00 no fuso America/Boa_Vista (12:00 UTC; sem horário de verão)
-cron.schedule('0 12 * * *', () => {
-  executarResumoMatinal();
+// Agendado para 08:00 no fuso explícito de Boa Vista.
+// Patch 35: evita sobreposição e captura rejeições assíncronas do ciclo completo.
+cron.schedule('0 8 * * *', async () => {
+  try {
+    await executarResumoMatinal();
+  } catch (err) {
+    console.error('❌ [Cron] Falha no resumo matinal:', err?.message || err);
+  }
+}, {
+  timezone: 'America/Boa_Vista',
+  noOverlap: true,
+  name: 'finobra-daily-summary'
 });
 
 // Rota manual para disparar o resumo matinal imediatamente
@@ -980,6 +989,9 @@ cron.schedule('*/10 * * * *', async () => {
   } catch (pingErr) {
     console.warn('⚠️ [Keep-Alive] Aviso no auto-ping:', pingErr.message);
   }
+}, {
+  noOverlap: true,
+  name: 'finobra-keep-alive'
 });
 
 // ── INICIALIZAÇÃO DO SERVIDOR ────────────────────────────────────────────────
