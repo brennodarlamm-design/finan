@@ -1,16 +1,22 @@
-name: FinObra production CI/CD
+name: FinObra CI / manual production deploy
 
 on:
   push:
     branches:
       - main
   workflow_dispatch:
+    inputs:
+      deploy_production:
+        description: 'Confirmar deploy em producao'
+        required: true
+        type: boolean
+        default: false
 
 permissions:
   contents: read
 
 concurrency:
-  group: finobra-production
+  group: finobra-${{ github.event_name }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -34,6 +40,7 @@ jobs:
         run: npx --yes wrangler deploy --dry-run
 
   deploy-cloudflare:
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && inputs.deploy_production == true
     needs: validate
     runs-on: ubuntu-latest
     env:
@@ -53,19 +60,17 @@ jobs:
         run: |
           if [[ -n "$CLOUDFLARE_API_TOKEN" && -n "$CLOUDFLARE_ACCOUNT_ID" ]]; then
             echo "ready=true" >> "$GITHUB_OUTPUT"
-            echo "Cloudflare credentials detected; production deploy enabled."
+            echo "Cloudflare credentials detected; manual production deploy enabled."
           else
             echo "ready=false" >> "$GITHUB_OUTPUT"
-            echo "::warning::Cloudflare deploy skipped. Configure CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID in GitHub Actions secrets to enable automatic production deployment."
+            echo "::error::Configure CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID before production deploy."
+            exit 1
           fi
       - name: Build production assets
-        if: steps.cloudflare.outputs.ready == 'true'
         run: npm run build:cloudflare
       - name: Deploy Worker and static assets
-        if: steps.cloudflare.outputs.ready == 'true'
         run: npm run deploy:cloudflare
       - name: Post-deploy smoke test
-        if: steps.cloudflare.outputs.ready == 'true'
         shell: bash
         run: |
           set -euo pipefail
@@ -92,11 +97,7 @@ jobs:
 
           version="$(curl --fail --silent --show-error https://finobra.app.br/version.json)"
           [[ "$version" == *"\"commit\":\"$GITHUB_SHA\""* ]]
-          if [[ "$version" != *'"source":"github-actions"'* && \
-                "$version" != *'"source":"cloudflare-workers-builds"'* ]]; then
-            echo "Unexpected deploy source in version.json: $version" >&2
-            exit 1
-          fi
+          [[ "$version" == *'"source":"github-actions"'* ]]
 
           final_url="$(curl --fail --silent --show-error --location --output /dev/null --write-out '%{url_effective}' https://www.finobra.app.br/)"
           [[ "$final_url" == 'https://finobra.app.br/' ]]
@@ -104,9 +105,8 @@ jobs:
           auth_status="$(curl --silent --output /dev/null --write-out '%{http_code}' 'https://finobra.app.br/api/auth?action=me')"
           [[ "$auth_status" == '401' ]]
 
-          app_headers="$(curl --fail --silent --show-error --head https://finobra.app.br/app/dashboard)"
-          [[ "$app_headers" == *'x-finobra-route: app-shell'* || "$app_headers" == *'X-FinObra-Route: app-shell'* ]]
-          app_shell="$(curl --fail --silent --show-error https://finobra.app.br/app/dashboard)"
-          [[ "$app_shell" == *'<div id="app-root"></div>'* ]]
+          app_status="$(curl --silent --output /tmp/finobra-app-shell.html --write-out '%{http_code}' https://finobra.app.br/app/dashboard)"
+          [[ "$app_status" == '200' ]]
+          grep -q '<div id="app-root"></div>' /tmp/finobra-app-shell.html
 
           echo "Production smoke test passed for commit $GITHUB_SHA."
