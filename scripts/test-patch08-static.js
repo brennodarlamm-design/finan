@@ -50,7 +50,7 @@ test('Auth server valida sessionId revogado/expirado', /FROM auth_sessions/i.tes
 test('Login cria sessão por dispositivo', /createAuthSession/i.test(authApi) && /deviceNameFromUserAgent/i.test(authApi));
 test('Usuário pode listar e revogar sessões', /action === 'sessions'/i.test(authApi) && /revoke_session/i.test(authApi) && /revoke_other_sessions/i.test(authApi));
 test('Troca de senha revoga sessões anteriores', /UPDATE auth_sessions SET revoked_at=.*NOW\(\)/i.test(authApi));
-test('Impersonação Master herda sessionId revogável', /sessionId: auth\.user\.sessionId/i.test(admin));
+test('Impersonação Master herda sessionId revogável', /sessionId: (?:auth\.user\.sessionId|liveSessionId)/i.test(admin));
 test('Frontend deixa de assumir Angelim sem sessão', /return 'public';/i.test(authJs));
 test('Frontend atualiza permissões ao vivo', /refreshSessionFromServer/i.test(authJs) && /120000/i.test(app));
 test('Menu e navegação respeitam módulos permitidos', /Auth\.canRoute/i.test(app) && /_firstAllowedRoute/i.test(app));
