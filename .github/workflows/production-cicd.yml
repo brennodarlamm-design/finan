@@ -40,7 +40,12 @@ jobs:
         run: npx --yes wrangler deploy --dry-run
 
   deploy-cloudflare:
-    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && inputs.deploy_production == true
+    if: >-
+      github.ref == 'refs/heads/main' &&
+      (
+        (github.event_name == 'workflow_dispatch' && inputs.deploy_production == true) ||
+        (github.event_name == 'push' && startsWith(github.event.head_commit.message, '[deploy-production]'))
+      )
     needs: validate
     runs-on: ubuntu-latest
     env:
