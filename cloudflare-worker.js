@@ -109,7 +109,7 @@ async function fetchFrontendResponse(request, env) {
 
   let assetRequest = request;
   if (appShell) {
-    const appUrl = new URL('/app.html', incoming);
+    const appUrl = new URL('/app', incoming);
     assetRequest = new Request(appUrl.toString(), {
       method,
       headers: request.headers,
