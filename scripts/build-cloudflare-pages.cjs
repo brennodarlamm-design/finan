@@ -1,5 +1,6 @@
 const fs = require('fs');
 const path = require('path');
+const { execFileSync } = require('child_process');
 
 const root = path.resolve(__dirname, '..');
 const out = path.join(root, 'dist');
@@ -27,6 +28,44 @@ function copyRequired(src, dst) {
   fs.cpSync(src, dst, { recursive: true });
 }
 
+function resolveGitCommit() {
+  try {
+    return execFileSync('git', ['rev-parse', 'HEAD'], {
+      cwd: root,
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'ignore']
+    }).trim();
+  } catch {
+    return null;
+  }
+}
+
+function writeDeploymentMetadata() {
+  const sourcePath = path.join(root, 'version.json');
+  const sourceVersion = JSON.parse(fs.readFileSync(sourcePath, 'utf8'));
+  const commit = String(
+    process.env.GITHUB_SHA ||
+    process.env.CF_PAGES_COMMIT_SHA ||
+    resolveGitCommit() ||
+    'unknown'
+  ).trim();
+
+  const metadata = {
+    version: sourceVersion.version || 'unknown',
+    build: process.env.GITHUB_RUN_NUMBER
+      ? `github-${process.env.GITHUB_RUN_NUMBER}`
+      : (sourceVersion.build || 'local'),
+    released_at: new Date().toISOString(),
+    commit,
+    source: process.env.GITHUB_ACTIONS === 'true' ? 'github-actions' : 'local-build',
+    run_id: process.env.GITHUB_RUN_ID || null,
+    run_attempt: process.env.GITHUB_RUN_ATTEMPT || null
+  };
+
+  fs.writeFileSync(path.join(out, 'version.json'), `${JSON.stringify(metadata)}\n`, 'utf8');
+  return metadata;
+}
+
 fs.rmSync(out, { recursive: true, force: true });
 fs.mkdirSync(out, { recursive: true });
 
@@ -36,6 +75,8 @@ for (const dir of directories) copyRequired(path.join(root, dir), path.join(out,
 copyRequired(path.join(root, 'cloudflare', '_headers'), path.join(out, '_headers'));
 copyRequired(path.join(root, 'cloudflare', '_redirects'), path.join(out, '_redirects'));
 copyRequired(path.join(root, 'cloudflare', '_routes.json'), path.join(out, '_routes.json'));
+
+const deploymentMetadata = writeDeploymentMetadata();
 
 const loginPagePath = path.join(out, 'js', 'login_page.js');
 let loginPage = fs.readFileSync(loginPagePath, 'utf8');
@@ -90,4 +131,8 @@ if (!builtLoginPage.includes("const recoveryId = res?.requestId || res?.userId |
   throw new Error('Build Cloudflare sem bloqueio real de OTP para conta inexistente.');
 }
 
-console.log('✅ Cloudflare dist preparado com frontend-only, CSP, hotfix 2.26.1 e recuperação tratada.');
+if (!deploymentMetadata.commit || deploymentMetadata.commit === 'unknown') {
+  throw new Error('Build Cloudflare sem identificação do commit de origem.');
+}
+
+console.log(`✅ Cloudflare dist preparado com commit ${deploymentMetadata.commit.slice(0, 12)}, frontend-only, CSP e recuperação tratada.`);
