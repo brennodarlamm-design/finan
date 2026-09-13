@@ -411,6 +411,17 @@ const Documentos = {
           <div style="color:var(--text3);margin-top:2px;">Obra: ${c?.nome || '&mdash;'} &middot; Etapa: ${m.etapa_descricao}</div>
         </div>`;
       }
+    } else if (entidadeTipo === 'orcamento') {
+      const orc = DB.getById('orcamentos', entidadeId);
+      if (orc) {
+        const c = DB.getById('clientes', orc.obra_id);
+        const total = orc.valor_total || orc.valor_total_previsto || 0;
+        infoEntidade = `
+        <div style="background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--r-md);padding:10px 14px;margin-bottom:16px;font-size:.82rem;">
+          <div><strong style="color:var(--text);">${Utils.escapeHtml(orc.nome || orc.titulo || 'Orçamento')}</strong> &middot; <span style="color:var(--accent);font-weight:800;">${Utils.fmt.currency(total)}</span></div>
+          <div style="color:var(--text3);margin-top:2px;">Obra: ${Utils.escapeHtml(c?.nome || c?.cliente || 'Geral')} &middot; Status: ${Utils.escapeHtml(orc.status || 'ativo')}</div>
+        </div>`;
+      }
     }
 
     Utils.showModal(`
@@ -521,6 +532,7 @@ const Documentos = {
     this.abrirModal(entidadeTipo, entidadeId);
     if (typeof Lancamentos !== 'undefined' && Lancamentos._refresh) Lancamentos._refresh();
     if (typeof Medicoes !== 'undefined' && Medicoes._refresh) Medicoes._refresh();
+    if (typeof Orcamentos !== 'undefined' && Orcamentos._refresh) Orcamentos._refresh();
   },
 
   _abrirGooglePicker(entidadeTipo, entidadeId) {
@@ -543,6 +555,7 @@ const Documentos = {
         this.abrirModal(entidadeTipo, entidadeId);
         if (typeof Lancamentos !== 'undefined' && Lancamentos._refresh) Lancamentos._refresh();
         if (typeof Medicoes !== 'undefined' && Medicoes._refresh) Medicoes._refresh();
+        if (typeof Orcamentos !== 'undefined' && Orcamentos._refresh) Orcamentos._refresh();
       }
     });
   },
@@ -683,6 +696,7 @@ const Documentos = {
       // Atualizar a visualização na tabela se aplicável
       if (typeof Lancamentos !== 'undefined' && Lancamentos._refresh) Lancamentos._refresh();
       if (typeof Medicoes !== 'undefined' && Medicoes._refresh) Medicoes._refresh();
+      if (typeof Orcamentos !== 'undefined' && Orcamentos._refresh) Orcamentos._refresh();
     } catch (e) {
       console.error(e);
       Utils.toast('Erro ao processar o arquivo.', 'error');
@@ -698,6 +712,7 @@ const Documentos = {
       this.abrirModal(doc.entidade_tipo, doc.entidade_id);
       if (typeof Lancamentos !== 'undefined' && Lancamentos._refresh) Lancamentos._refresh();
       if (typeof Medicoes !== 'undefined' && Medicoes._refresh) Medicoes._refresh();
+      if (typeof Orcamentos !== 'undefined' && Orcamentos._refresh) Orcamentos._refresh();
     });
   },
 

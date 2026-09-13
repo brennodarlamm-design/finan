@@ -198,6 +198,9 @@ const ObraDetalhe = {
                class="btn btn-sm" style="background:#4285F4;color:#fff;font-weight:700;display:inline-flex;align-items:center;gap:5px;text-decoration:none;" title="Abrir pasta de projetos no Google Drive">
               📁 Pasta no Google Drive
             </a>` : ''}
+          <button class="btn btn-sm" style="background:rgba(18,217,160,.15);color:var(--accent);border:1px solid rgba(18,217,160,.35);font-weight:800;display:inline-flex;align-items:center;gap:6px;" data-od-click="PortalCliente.abrirModalCompartilhar('${obra.id}')" title="Compartilhar Portal do Cliente via Link / WhatsApp">
+            🌐 Portal do Cliente
+          </button>
           <button class="btn btn-secondary btn-sm" data-od-click="Clientes.showForm('${obra.id}')" title="Editar cadastro da obra">
             ✏️ Editar Obra
           </button>
@@ -300,6 +303,10 @@ const ObraDetalhe = {
                 style="padding:10px 18px;font-size:.88rem;font-weight:800;border:none;border-bottom:3px solid ${this.activeTab==='recibos'?'var(--accent)':'transparent'};color:${this.activeTab==='recibos'?'var(--accent)':'var(--text2)'};border-radius:0;background:${this.activeTab==='recibos'?'rgba(18,217,160,0.08)':'transparent'};">
           🧾 Recibos &amp; Contratos
         </button>
+        <button class="btn od-tab-btn ${this.activeTab==='slas'?'active':''}" data-tab="slas" data-od-click="ObraDetalhe.setTab('slas')"
+                style="padding:10px 18px;font-size:.88rem;font-weight:800;border:none;border-bottom:3px solid ${this.activeTab==='slas'?'var(--accent)':'transparent'};color:${this.activeTab==='slas'?'var(--accent)':'var(--text2)'};border-radius:0;background:${this.activeTab==='slas'?'rgba(18,217,160,0.08)':'transparent'};">
+          ⏱️ Prazos &amp; SLAs (Cascata)
+        </button>
       </div>
 
       <!-- Container do Conteúdo da Aba -->
@@ -314,6 +321,7 @@ const ObraDetalhe = {
     if (tab === 'documentos') return this._renderTabDocumentos(obraId);
     if (tab === 'medicoes') return this._renderTabMedicoes(obraId);
     if (tab === 'recibos') return this._renderTabRecibos(obraId);
+    if (tab === 'slas') return typeof CronogramaSLA !== 'undefined' ? CronogramaSLA.renderLinhaTempo(obraId) : '<div class="empty-state">Módulo de SLAs indisponível.</div>';
     return this._renderTabLancamentos(obraId);
   },
 
@@ -3055,7 +3063,10 @@ window.ObraDetalhe = ObraDetalhe;
     'Medicoes.del': (...a) => Medicoes.del(...a),
     'Recibos.novoReciboModal': (...a) => Recibos.novoReciboModal(...a),
     'Recibos.visualizarRecibo': (...a) => Recibos.visualizarRecibo(...a),
-    'Contratos.visualizarContrato': (...a) => Contratos.visualizarContrato(...a)
+    'Contratos.visualizarContrato': (...a) => Contratos.visualizarContrato(...a),
+    'PortalCliente.abrirModalCompartilhar': (...a) => PortalCliente.abrirModalCompartilhar(...a),
+    'CronogramaSLA.abrirModalApontamento': (...a) => CronogramaSLA.abrirModalApontamento(...a),
+    'CronogramaSLA.abrirModalConfigObra': (...a) => CronogramaSLA.abrirModalConfigObra(...a)
   };
 
   function splitStatements(input) {

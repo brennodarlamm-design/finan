@@ -79,6 +79,9 @@ const Configuracoes = {
         <button id="cfg-tab-sessoes" class="cfg-tab${this._activeTab==='sessoes'?' cfg-tab-active':''}" data-fb-click="Configuracoes._switch" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="sessoes">
           &#x1F4F1; Sess&otilde;es
         </button>
+        <button id="cfg-tab-slas" class="cfg-tab${this._activeTab==='slas'?' cfg-tab-active':''}" data-fb-click="Configuracoes._switch" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="slas">
+          ⏱️ SLAs &amp; Prazos
+        </button>
         <button id="cfg-tab-contas" class="cfg-tab${this._activeTab==='contas'?' cfg-tab-active':''}" data-fb-click="Configuracoes._switch" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="contas">
           &#x1F3E6; Contas Banc&aacute;rias
         </button>
@@ -94,7 +97,7 @@ const Configuracoes = {
 
   _switch(tab) {
     const isAdmin = ['admin','superadmin'].includes(Auth.getUser()?.perfil);
-    const validTabs = ['empresa', 'contas', 'categorias', 'sessoes', ...(isAdmin ? ['usuarios','auditoria'] : [])];
+    const validTabs = ['empresa', 'slas', 'contas', 'categorias', 'sessoes', ...(isAdmin ? ['usuarios','auditoria'] : [])];
     if (!validTabs.includes(tab)) tab = 'empresa';
     this._activeTab = tab;
     document.querySelectorAll('.cfg-tab').forEach(el => el.classList.remove('cfg-tab-active'));
@@ -110,12 +113,101 @@ const Configuracoes = {
 
   _renderTab(tab, obraId) {
     if (tab === 'empresa') return this._renderEmpresa();
+    if (tab === 'slas') return this._renderSLAs();
     if (tab === 'contas') return Contas._html(obraId);
     if (tab === 'categorias') return this._renderCategorias();
     if (tab === 'usuarios') return this._renderUsuarios();
     if (tab === 'auditoria') return this._renderAuditoria();
     if (tab === 'sessoes') return this._renderSessoes();
     return this._renderEmpresa();
+  },
+
+  _renderSLAs() {
+    if (typeof CronogramaSLA === 'undefined') {
+      return '<div class="empty-state"><h3>Módulo de SLAs indisponível</h3></div>';
+    }
+    const slas = CronogramaSLA.getSlasPadrao();
+    const e = Utils.escapeHtml.bind(Utils);
+
+    const rows = slas.map(s => `
+      <tr>
+        <td style="font-weight:700;color:var(--text);">${e(s.nome)}</td>
+        <td><span class="badge" style="background:rgba(255,255,255,.06);">${e(s.departamento)}</span></td>
+        <td><span style="font-family:monospace;font-size:.78rem;color:var(--text3);">${e(s.predecessor || 'Início da Obra')}</span></td>
+        <td style="width:140px;">
+          <div style="display:flex;align-items:center;gap:6px;">
+            <input type="number" class="form-control" name="sla_dias_${s.id}" value="${s.diasSla}" min="1" max="365" style="width:75px;padding:4px 8px;text-align:right;">
+            <span style="font-size:.78rem;color:var(--text3);">dias</span>
+          </div>
+        </td>
+      </tr>
+    `).join('');
+
+    return `
+    <div class="page-header">
+      <div>
+        <h1 class="page-title">⏱️ SLAs &amp; Prazos Padrão da Construtora</h1>
+        <p class="page-sub">Configure os prazos padrão em dias corridos para cada etapa do ciclo de vida das obras. Novas obras herdarão estes SLAs automaticamente.</p>
+      </div>
+    </div>
+
+    <div class="card" style="max-width:960px;">
+      <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
+        <div>
+          <h3 class="card-title">Regras de SLAs e Cascata Operacional</h3>
+          <p style="font-size:.78rem;color:var(--text3);margin:2px 0 0;">O motor em cascata recalcula as previsões automaticamente caso ocorra atraso em etapas predecessoras.</p>
+        </div>
+        <button type="button" class="btn btn-secondary btn-sm" data-fb-click="Configuracoes.restaurarSlasPadrao" data-fb-click-n="0">
+          ↺ Restaurar Padrões Recomendados
+        </button>
+      </div>
+      <form id="form-slas-empresa">
+        <div class="table-wrap">
+          <table class="table">
+            <thead>
+              <tr>
+                <th>Macro-Etapa / Processo</th>
+                <th>Área Responsável</th>
+                <th>Predecessor (Gatilho)</th>
+                <th>SLA Padrão</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${rows}
+            </tbody>
+          </table>
+        </div>
+        <div class="card-footer" style="display:flex;justify-content:flex-end;gap:10px;padding:16px;">
+          <button type="button" class="btn btn-primary" data-fb-click="Configuracoes.salvarSlasEmpresa" data-fb-click-n="0">
+            💾 Salvar SLAs da Empresa
+          </button>
+        </div>
+      </form>
+    </div>`;
+  },
+
+  salvarSlasEmpresa() {
+    if (typeof CronogramaSLA === 'undefined') return;
+    const form = document.getElementById('form-slas-empresa');
+    if (!form) return;
+    const slas = CronogramaSLA.getSlasPadrao();
+    const atualizados = slas.map(s => {
+      const inp = form.querySelector(`[name="sla_dias_${s.id}"]`);
+      const val = inp ? parseInt(inp.value, 10) : s.diasSla;
+      return { ...s, diasSla: isNaN(val) || val < 1 ? s.diasSla : val };
+    });
+    CronogramaSLA.salvarSlasPadrao(atualizados);
+    Utils.toast('SLAs padrão atualizados com sucesso!', 'success');
+  },
+
+  restaurarSlasPadrao() {
+    if (typeof CronogramaSLA === 'undefined') return;
+    if (confirm('Deseja restaurar os prazos de SLAs para os valores padrão de engenharia?')) {
+      CronogramaSLA.restaurarSlasPadrao();
+      Utils.toast('SLAs restaurados para o padrão de fábrica!', 'success');
+      const content = document.getElementById('cfg-content');
+      if (content) content.innerHTML = this._renderSLAs();
+    }
   },
 
   // ── MINHA EMPRESA / DADOS CADASTRAIS ───────────────────

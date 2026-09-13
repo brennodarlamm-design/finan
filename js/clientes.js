@@ -124,11 +124,13 @@ const Clientes = {
           <div style="text-align:center;border-left:1px solid var(--border-s);border-right:1px solid var(--border-s);"><div style="font-size:.63rem;text-transform:uppercase;color:var(--text3);margin-bottom:3px">Gasto</div><div style="font-size:.8rem;font-weight:800;color:var(--danger)">${Utils.fmt.currency(r.totalDespesas)}</div></div>
           <div style="text-align:center;"><div style="font-size:.63rem;text-transform:uppercase;color:var(--text3);margin-bottom:3px">Saldo</div><div style="font-size:.8rem;font-weight:800;color:${r.saldo>=0?'var(--accent)':'var(--danger)'}">${Utils.fmt.currency(r.saldo)}</div></div>
         </div>
+        ${typeof CronogramaSLA !== 'undefined' ? CronogramaSLA.miniWidget(c.id) : ''}
         ${typeof FasesDoc !== 'undefined' ? FasesDoc.miniWidget(c.id) : ''}
         <div style="display:flex;gap:7px;margin-top:12px;flex-wrap:wrap;">
-          <button class="btn btn-primary btn-sm" style="flex:2;font-weight:800;display:inline-flex;align-items:center;justify-content:center;gap:6px;" data-fb-click="Patch26Actions.openObra" data-fb-click-n="2" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(c.id))}" data-fb-click-t1="string" data-fb-click-v1="" title="Abrir Central da Obra">
+          <button class="btn btn-primary btn-sm" style="flex:2;min-width:130px;font-weight:800;display:inline-flex;align-items:center;justify-content:center;gap:6px;" data-fb-click="Patch26Actions.openObra" data-fb-click-n="2" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(c.id))}" data-fb-click-t1="string" data-fb-click-v1="" title="Abrir Central da Obra">
             🏢 Central da Obra
           </button>
+          <button class="btn btn-secondary btn-sm" style="background:rgba(18,217,160,.12);color:var(--accent);border-color:rgba(18,217,160,.3);font-weight:700;" data-fb-click="PortalCliente.abrirModalCompartilhar" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(c.id))}" title="Compartilhar Portal do Cliente via Link / WhatsApp">🌐 Portal</button>
           <button class="btn btn-secondary btn-sm" style="flex:1" data-fb-click="Patch26Actions.openObra" data-fb-click-n="2" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(c.id))}" data-fb-click-t1="string" data-fb-click-v1="lancamentos" title="Ver lançamentos financeiros">💰 Extrato</button>
           <button class="btn btn-secondary btn-sm" data-fb-click="Patch26Actions.openObra" data-fb-click-n="2" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(c.id))}" data-fb-click-t1="string" data-fb-click-v1="documentos" title="Percurso Documental (43 docs)" style="padding:4px 10px">📋</button>
           <button class="icon-btn btn-sm" data-fb-click="Clientes.showForm" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(c.id))}" title="Editar">✏️</button>

@@ -34,6 +34,7 @@ const App = {
     'obra-detalhe': ['obra-detalhe', 'obra', 'central-obra', 'dossie', 'cliente-detalhe'],
     'master': ['master', 'dev', 'admin-master', 'tenants', 'empresas'],
     'planos': ['planos', 'cobranca', 'assinaturas', 'mensalidades'],
+    'portal-cliente': ['portal-cliente', 'portal', 'portal-obra', 'cliente-portal'],
     'dashboard': ['dashboard', 'inicio', 'home']
   },
 
@@ -76,6 +77,7 @@ const App = {
     'configuracoes': Configuracoes,
     'fornecedores': Fornecedores,
     'produtos': Produtos,
+    'portal-cliente': typeof PortalCliente !== 'undefined' ? PortalCliente : Clientes,
     'master': {
       render() {
         window.location.replace('/master');
@@ -118,11 +120,22 @@ const App = {
     'fornecedores':      { icon:'🚛', label:'Fornecedores' },
     'produtos':          { icon:'📦', label:'Produtos / Insumos' },
     'configuracoes':     { icon:'⚙️', label:'Configurações' },
+    'portal-cliente':    { icon:'🌐', label:'Portal do Cliente' },
     'master':            { icon:'🛡️', label:'Painel Dev Master' },
     'planos':            { icon:'💎', label:'Planos & Mensalidades' },
   },
 
   _getRouteFromUrl() {
+    // 0. Query parameter direto (?portal_obra=xyz)
+    try {
+      const search = new URLSearchParams(window.location.search || '');
+      const pObra = search.get('portal_obra');
+      if (pObra) {
+        this.obraId = pObra;
+        return 'portal-cliente';
+      }
+    } catch {}
+
     // 1. Pathname (/app/obras, /app/notas-fiscais, etc.)
     const path = window.location.pathname.replace(/\/$/, '');
     if (path.startsWith('/app/')) {
@@ -421,6 +434,7 @@ const App = {
             ${this._navItem('orcamentos','📋','Orçamentos')}
             ${this._navItem('medicoes','🔨','Medições & Faturamento')}
             ${this._navItem('documentacao','📋','Documentação de Obras')}
+            ${this._navItem('portal-cliente','🌐','Portal do Cliente')}
             <div class="nav-section">Relatórios</div>
             ${this._navItem('relatorios','📥','Exportar Relatórios')}
             <div class="nav-section">Assinatura &amp; Sistema</div>

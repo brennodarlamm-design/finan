@@ -5,6 +5,7 @@ const Orcamentos = {
   _filterObraId: null,
   _filterSearch: '',
   _filterStatus: 'todos',
+  _stagedAnexos: [],
 
   // ── CATÁLOGO OFICIAL DE CATEGORIAS DA CONSTRUÇÃO CIVIL ──
   CATEGORIAS_PADRAO: [
@@ -250,6 +251,10 @@ const Orcamentos = {
     // Agrupamento por Categorias
     const grouped = this._groupItensByCategoria(orc, itens);
 
+    // Contagem de documentos e anexos
+    const docs = (typeof Documentos !== 'undefined' && Documentos.listar) ? Documentos.listar('orcamento', orc.id) : [];
+    const anexosCount = Math.max(docs.length, (Array.isArray(orc.anexos) ? orc.anexos.length : 0));
+
     return `
     <div class="orc-budget-card" id="card-orc-${orc.id}">
       <div class="orc-card-top">
@@ -262,10 +267,14 @@ const Orcamentos = {
             <span>🏢 <strong>Obra:</strong> ${Utils.escapeHtml(cliente?.nome || cliente?.cliente || 'Geral / Não vinculada')}</span>
             <span>📅 <strong>Data:</strong> ${Utils.fmt.date(orc.data_criacao || orc.created_at)}</span>
             <span>📑 <strong>Itens:</strong> ${itens.length} etapa(s) em ${Object.keys(grouped).length} categoria(s)</span>
+            <span>📎 <strong>Anexos:</strong> ${anexosCount} arquivo(s)</span>
           </div>
           ${orc.descricao ? `<div style="font-size:.82rem;color:var(--text2);margin-top:6px;font-style:italic;">📝 ${Utils.escapeHtml(orc.descricao)}</div>` : ''}
         </div>
         <div style="display:flex;gap:8px;align-items:center;">
+          <button class="btn btn-secondary btn-sm" data-fb-click="Documentos.abrirModal" data-fb-click-n="3" data-fb-click-t0="string" data-fb-click-v0="orcamento" data-fb-click-t1="string" data-fb-click-v1="${encodeURIComponent(String(orc.id))}" data-fb-click-t2="string" data-fb-click-v2="${encodeURIComponent(String('Anexos — ' + (orc.nome || 'Orçamento')))}" title="Gerenciar Documentos e Anexos">
+            📎 ${anexosCount > 0 ? `${anexosCount} anexo(s)` : 'Anexar'}
+          </button>
           <button class="btn btn-secondary btn-sm" data-fb-click="Orcamentos.printOrcamento" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(orc.id))}" title="Visualizar para Impressão">
             🖨️ Imprimir
           </button>
@@ -491,6 +500,40 @@ const Orcamentos = {
       });
     }
 
+    // Anexos vinculados / staged
+    const existingDocs = id && typeof Documentos !== 'undefined' ? Documentos.listar('orcamento', id) : [];
+    const savedAnexos = Array.isArray(orc.anexos) ? orc.anexos : [];
+    const seenAnexos = new Set();
+    this._stagedAnexos = [];
+
+    existingDocs.forEach(d => {
+      seenAnexos.add(d.id);
+      this._stagedAnexos.push({
+        id: d.id,
+        nome: d.titulo || d.nome_arquivo || 'Documento',
+        url: d.url || d.url_externa || '',
+        url_externa: d.url_externa || '',
+        tipo: d.tipo_mime || d.tipo_servico || 'arquivo',
+        tamanho: d.tamanho || 0,
+        isSaved: true
+      });
+    });
+
+    savedAnexos.forEach(a => {
+      if (!seenAnexos.has(a.id)) {
+        seenAnexos.add(a.id);
+        this._stagedAnexos.push({
+          id: a.id || DB.uuid(),
+          nome: a.nome || 'Anexo',
+          url: a.url || '',
+          url_externa: a.url_externa || (a.url && a.url.startsWith('http') ? a.url : ''),
+          tipo: a.tipo || 'arquivo',
+          tamanho: a.tamanho || 0,
+          isSaved: true
+        });
+      }
+    });
+
     Utils.showModal(`
       <div class="modal modal-xl" style="max-width:980px;">
         <div class="modal-header">
@@ -544,6 +587,36 @@ const Orcamentos = {
                   <label class="form-label">Descrição / Observações Gerais</label>
                   <input class="form-control" name="descricao" id="orc-form-desc" value="${Utils.escapeHtml(orc.descricao || '')}" placeholder="Ex: Baseado no projeto executivo R02 e memorial descritivo">
                 </div>
+              </div>
+            </div>
+
+            <!-- SEÇÃO 1.5: ANEXOS & DOCUMENTOS DE APOIO -->
+            <div style="background:var(--bg-secondary);padding:18px;border-radius:var(--r-md);border:1px solid var(--border);margin-bottom:20px;">
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:10px;">
+                <div>
+                  <span style="font-size:1rem;font-weight:800;color:var(--text);display:inline-flex;align-items:center;gap:8px;">
+                    📎 Anexos e Documentos de Apoio
+                    <span id="orc-anexos-count" style="font-size:.72rem;background:var(--surface);padding:2px 8px;border-radius:10px;border:1px solid var(--border);color:var(--accent);font-weight:700;">
+                      ${this._stagedAnexos.length} anexo(s)
+                    </span>
+                  </span>
+                  <span style="font-size:.76rem;color:var(--text3);display:block">
+                    Anexe memorial descritivo, projetos em PDF/DWG, planilhas orçamentárias ou links do Google Drive
+                  </span>
+                </div>
+                <div style="display:flex;gap:8px;align-items:center;">
+                  <label class="btn btn-secondary btn-sm" style="cursor:pointer;margin:0;font-size:.76rem;padding:6px 12px;display:inline-flex;align-items:center;gap:6px;">
+                    📁 Anexar Arquivo
+                    <input type="file" id="orc-file-input" multiple accept="image/*,application/pdf,.zip,.rar,.7z,.dwg,.dxf,.doc,.docx,.xls,.xlsx,.csv,.txt" style="display:none;" data-fb-change="Orcamentos._onFileSelect" data-fb-change-n="1" data-fb-change-t0="self">
+                  </label>
+                  <button type="button" class="btn btn-secondary btn-sm" data-fb-click="Orcamentos._addLinkAttachment" data-fb-click-n="0" style="font-size:.76rem;padding:6px 12px;display:inline-flex;align-items:center;gap:6px;">
+                    🔗 Link Google Drive / Nuvem
+                  </button>
+                </div>
+              </div>
+
+              <div id="orc-anexos-container">
+                ${this._renderAnexosListHtml()}
               </div>
             </div>
 
@@ -852,6 +925,167 @@ const Orcamentos = {
     }
   },
 
+  // ── GERENCIAMENTO DE ANEXOS DO FORMULÁRIO ──
+  _renderAnexosListHtml() {
+    if (!this._stagedAnexos || !this._stagedAnexos.length) {
+      return `
+      <div style="text-align:center;padding:16px;border:1px dashed var(--border);border-radius:var(--r-md);background:var(--surface);color:var(--text3);font-size:.78rem;">
+        Nenhum documento ou link anexado ainda ao orçamento. Você pode anexar arquivos locais ou links do Google Drive/OneDrive.
+      </div>`;
+    }
+
+    return `
+    <div style="display:grid;grid-template-columns:repeat(auto-fill, minmax(260px, 1fr));gap:10px;">
+      ${this._stagedAnexos.map((att, idx) => {
+        const nome = String(att.nome || 'Documento').toLowerCase();
+        const isPDF = att.tipo === 'application/pdf' || nome.endsWith('.pdf');
+        const isZip = nome.match(/\.(zip|rar|7z|tar|gz)$/i);
+        const isCAD = nome.match(/\.(dwg|dxf)$/i);
+        const isImg = (att.tipo && att.tipo.startsWith('image/')) || nome.match(/\.(png|jpg|jpeg|webp|svg)$/i);
+        const isLink = att.tipo === 'link' || att.tipo === 'gdrive' || !!att.url_externa;
+        const icon = isLink ? '🔗' : isPDF ? '📕' : isZip ? '📦' : isCAD ? '📐' : isImg ? '🖼️' : '📎';
+
+        let tamFmt = '';
+        if (att.tamanho) {
+          tamFmt = att.tamanho > 1024 * 1024
+            ? `${(att.tamanho / (1024 * 1024)).toFixed(1)} MB`
+            : `${(att.tamanho / 1024).toFixed(0)} KB`;
+        } else if (isLink) {
+          tamFmt = 'Nuvem / Link';
+        }
+
+        const safeUrl = att.url_externa || att.url;
+
+        return `
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-md);gap:8px;">
+          <div style="display:flex;align-items:center;gap:8px;min-width:0;flex:1;">
+            <span style="font-size:1.2rem;">${icon}</span>
+            <div style="min-width:0;flex:1;">
+              <div style="font-size:.82rem;font-weight:700;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="${Utils.escapeHtml(att.nome)}">
+                ${Utils.escapeHtml(att.nome)}
+              </div>
+              <div style="font-size:.68rem;color:var(--text3);">
+                ${tamFmt ? Utils.escapeHtml(tamFmt) : (att.isSaved ? 'Salvo' : 'Pronto p/ salvar')}
+              </div>
+            </div>
+          </div>
+          <div style="display:flex;align-items:center;gap:4px;">
+            ${safeUrl ? `
+              <a href="${Utils.safeUrl ? Utils.safeUrl(safeUrl) : Utils.escapeHtml(safeUrl)}" target="_blank" rel="noopener noreferrer" class="btn btn-secondary btn-sm" style="padding:2px 6px;font-size:.7rem;text-decoration:none;" title="Abrir em nova aba">
+                ↗
+              </a>
+            ` : ''}
+            <button type="button" class="icon-btn btn-sm" style="color:var(--danger);font-size:13px;padding:2px 6px;" data-fb-click="Orcamentos._removeAttachment" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${idx}" title="Remover anexo">
+              ✕
+            </button>
+          </div>
+        </div>`;
+      }).join('')}
+    </div>`;
+  },
+
+  async _onFileSelect(inputEl) {
+    if (!inputEl || !inputEl.files || !inputEl.files.length) return;
+    const files = Array.from(inputEl.files);
+
+    for (const file of files) {
+      if (file.size > 30 * 1024 * 1024) {
+        Utils.toast(`Arquivo "${file.name}" excede o limite de 30MB.`, 'warning');
+        continue;
+      }
+      try {
+        const base64 = await new Promise((res, rej) => {
+          const reader = new FileReader();
+          reader.onload = () => res(reader.result);
+          reader.onerror = err => rej(err);
+          reader.readAsDataURL(file);
+        });
+
+        this._stagedAnexos.push({
+          id: DB.uuid(),
+          nome: file.name,
+          tipo: file.type || 'application/octet-stream',
+          tamanho: file.size,
+          base64: base64,
+          data: new Date().toISOString(),
+          isSaved: false
+        });
+      } catch (err) {
+        console.warn('[Orcamentos] Erro ao ler arquivo:', err);
+      }
+    }
+
+    inputEl.value = '';
+    this._refreshAnexosContainer();
+  },
+
+  _addLinkAttachment() {
+    const onUrlProvided = (url) => {
+      if (!url || !url.trim()) return;
+      let trimmed = url.trim();
+      if (!trimmed.startsWith('http://') && !trimmed.startsWith('https://')) {
+        trimmed = 'https://' + trimmed;
+      }
+      const isDrive = trimmed.includes('drive.google.com') || trimmed.includes('docs.google.com');
+      const defTitle = isDrive ? 'Pasta/Arquivo no Google Drive' : 'Link Externo';
+
+      const onTitleProvided = (tit) => {
+        const finalTitle = tit && tit.trim() ? tit.trim() : defTitle;
+        this._stagedAnexos.push({
+          id: DB.uuid(),
+          nome: finalTitle,
+          url_externa: trimmed,
+          url: trimmed,
+          tipo: isDrive ? 'gdrive' : 'link',
+          tamanho: 0,
+          data: new Date().toISOString(),
+          isSaved: false
+        });
+        this._refreshAnexosContainer();
+        Utils.toast('Link vinculado!', 'success');
+      };
+
+      if (typeof Utils !== 'undefined' && typeof Utils.prompt === 'function') {
+        Utils.prompt('Descrição ou título do link (opcional):', onTitleProvided, defTitle);
+      } else {
+        const tit = window.prompt('Descrição ou título do link (opcional):', defTitle);
+        onTitleProvided(tit);
+      }
+    };
+
+    if (typeof Utils !== 'undefined' && typeof Utils.prompt === 'function') {
+      Utils.prompt('Cole o link do Google Drive, OneDrive ou Nuvem:', onUrlProvided, '', 'https://drive.google.com/drive/folders/...');
+    } else {
+      const url = window.prompt('Cole o link do Google Drive, OneDrive ou Nuvem:');
+      onUrlProvided(url);
+    }
+  },
+
+  _removeAttachment(idxStr) {
+    const idx = parseInt(idxStr, 10);
+    if (isNaN(idx) || idx < 0 || idx >= this._stagedAnexos.length) return;
+
+    const target = this._stagedAnexos[idx];
+    if (target.isSaved && target.id && typeof Documentos !== 'undefined') {
+      Utils.confirm(`Deseja desvincular o anexo "${target.nome}"?`, () => {
+        Documentos.remover(target.id);
+        this._stagedAnexos.splice(idx, 1);
+        this._refreshAnexosContainer();
+        Utils.toast('Anexo removido!', 'info');
+      });
+    } else {
+      this._stagedAnexos.splice(idx, 1);
+      this._refreshAnexosContainer();
+    }
+  },
+
+  _refreshAnexosContainer() {
+    const cont = document.getElementById('orc-anexos-container');
+    const badge = document.getElementById('orc-anexos-count');
+    if (cont) cont.innerHTML = this._renderAnexosListHtml();
+    if (badge) badge.textContent = `${this._stagedAnexos.length} anexo(s)`;
+  },
+
   // ── SALVAMENTO RESILIENTE (NUNCA MAIS PERDE DADOS) ──
   save(id) {
     const obraSelect = document.getElementById('orc-form-obra');
@@ -928,8 +1162,47 @@ const Orcamentos = {
     }
 
     const valorTotalPrevisto = etapas.reduce((s, e) => s + (Number(e.valor_previsto) || 0), 0);
+    const orcId = id || DB.uuid();
+
+    // Salva anexos novos no módulo de Documentos
+    if (Array.isArray(this._stagedAnexos) && typeof Documentos !== 'undefined') {
+      for (const att of this._stagedAnexos) {
+        if (!att.isSaved) {
+          if (att.url_externa) {
+            Documentos.adicionarLink({
+              entidade_tipo: 'orcamento',
+              entidade_id: orcId,
+              titulo: att.nome,
+              url: att.url_externa
+            });
+            att.isSaved = true;
+          } else if (att.base64) {
+            Documentos.adicionar({
+              id: att.id,
+              entidade_tipo: 'orcamento',
+              entidade_id: orcId,
+              titulo: att.nome,
+              nome_arquivo: att.nome,
+              tipo_mime: att.tipo,
+              tamanho: att.tamanho,
+              base64: att.base64
+            });
+            att.isSaved = true;
+          }
+        }
+      }
+    }
+
+    const anexosSummary = (this._stagedAnexos || []).map(a => ({
+      id: a.id,
+      nome: a.nome,
+      tipo: a.tipo,
+      tamanho: a.tamanho,
+      url: a.url_externa || a.url || null
+    }));
 
     const orcPayload = {
+      id: orcId,
       obra_id: obraId,
       nome: nome,
       titulo: nome,
@@ -940,7 +1213,8 @@ const Orcamentos = {
       valor_total_previsto: valorTotalPrevisto,
       categorias: categorias,
       etapas: etapas,
-      itens: etapas
+      itens: etapas,
+      anexos: anexosSummary
     };
 
     if (id) {
@@ -1155,6 +1429,32 @@ const Orcamentos = {
             </tbody>
           </table>
         `).join('')}
+
+        ${(() => {
+          const docs = (typeof Documentos !== 'undefined' && Documentos.listar) ? Documentos.listar('orcamento', id) : [];
+          const printAnexos = docs.length ? docs : (Array.isArray(orc.anexos) ? orc.anexos : []);
+          if (!printAnexos.length) return '';
+          return `
+          <div class="cat-title" style="margin-top:24px;">📎 Documentos & Anexos Vinculados (${printAnexos.length})</div>
+          <table>
+            <thead>
+              <tr>
+                <th style="width:45%">Nome / Descrição</th>
+                <th style="width:25%">Tipo / Formato</th>
+                <th style="width:30%">Referência / Link</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${printAnexos.map(a => `
+                <tr>
+                  <td><strong>${Utils.escapeHtml(a.titulo || a.nome_arquivo || a.nome || 'Documento')}</strong></td>
+                  <td>${Utils.escapeHtml(a.tipo_servico || a.tipo_mime || a.tipo || 'Arquivo')}</td>
+                  <td style="font-size:11px;color:#64748b">${Utils.escapeHtml(a.url_externa || a.url || a.nome_arquivo || 'Anexo interno')}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>`;
+        })()}
 
         <div class="footer">
           <div>Assinatura do Responsável Técnico</div>
