@@ -1,0 +1,64 @@
+name: Patch 37 Final Release Validation
+
+on:
+  push:
+    branches:
+      - patch37-commercial-account-release
+    paths:
+      - '.github/workflows/patch37-final-release-validation.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  final-validation:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: patch37-commercial-account-release
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Verify branch is current and cleaned
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin main
+          behind="$(git rev-list --count HEAD..origin/main)"
+          ahead="$(git rev-list --count origin/main..HEAD)"
+          echo "Patch 37: ahead=$ahead behind=$behind"
+          [[ "$behind" == "0" ]]
+          git diff --check origin/main...HEAD
+          ! find .github/workflows -maxdepth 1 -type f -name 'patch37-block*.yml' | grep -q .
+          ! find .github/workflows -maxdepth 1 -type f -name 'patch37-release-hardening.yml' | grep -q .
+          ! find scripts -maxdepth 1 -type f \( -name 'patch37-block*.mjs' -o -name 'patch37-release-hardening.mjs' \) | grep -q .
+      - name: Install dependencies
+        run: npm ci
+      - name: Full regression suite
+        run: npm test
+      - name: Syntax verification
+        run: node scripts/check-all-syntax.js
+      - name: Dependency audits
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm audit --audit-level=high
+          npm --prefix backend audit --audit-level=high
+      - name: Build Cloudflare assets
+        run: npm run build:cloudflare
+      - name: Wrangler dry-run
+        run: npx --yes wrangler deploy --dry-run
+      - name: Final Patch 37 invariants
+        shell: bash
+        run: |
+          set -euo pipefail
+          node scripts/test-patch37-static.js
+          node scripts/test-patch37-block2-static.js
+          node scripts/test-patch37-block3-static.js
+          node scripts/test-patch37-release-hardening-static.js
+          grep -q 'wait-vercel-api:' .github/workflows/production-cicd.yml
+          grep -q 'needs: \[validate, wait-vercel-api\]' .github/workflows/production-cicd.yml
+          echo 'Patch 37 final cleaned release validation passed.'
