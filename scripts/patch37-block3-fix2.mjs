@@ -1,0 +1,11 @@
+import fs from 'fs';
+const file='js/configuracoes.js';
+let src=fs.readFileSync(file,'utf8');
+const start=src.indexOf('  _refreshAudit() {');
+const end=src.indexOf('  showAuditDetail(id) {',start);
+if(start<0||end<0) throw new Error('Patch37 bloco3: faixa de auditoria não encontrada para normalização.');
+let segment=src.slice(start,end);
+segment=segment.replaceAll('\\`','`').replaceAll('\\${','${');
+src=src.slice(0,start)+segment+src.slice(end);
+fs.writeFileSync(file,src,'utf8');
+console.log('✅ Templates da auditoria mobile materializados como JavaScript válido.');
