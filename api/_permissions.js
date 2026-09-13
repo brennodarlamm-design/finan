@@ -1,6 +1,6 @@
 // api/_permissions.js — RBAC central + restrições por módulo do FinObra
 // Perfis suportados: superadmin, admin, gestor, operador, visualizador.
-import { canUseModule } from './_plans.js';
+import { canUseModule, canUseFeature } from './_plans.js';
 
 export const ROLE_RULES = Object.freeze({
   superadmin: Object.freeze({ read: true, write: true, delete: true, manageUsers: true, manageTenant: true, audit: true }),
@@ -74,17 +74,18 @@ function customPermission(auth, module, action) {
 export function canAccessModule(auth, module, action = 'read') {
   if (auth?.isSystem) return true;
   const role = normalizeRole(auth?.user?.perfil);
+  const tenantPlan = auth?.user?.tenantPlan || auth?.user?.plano || 'trial';
 
   // Superadmin da plataforma precisa conseguir diagnosticar todos os módulos no modo suporte.
-  if (role !== 'superadmin') {
-    const tenantPlan = auth?.user?.tenantPlan || auth?.user?.plano || 'trial';
-    if (MODULES.includes(module) && !canUseModule(tenantPlan, module)) return false;
-  }
+  if (role !== 'superadmin' && MODULES.includes(module) && !canUseModule(tenantPlan, module)) return false;
 
   if (role === 'superadmin' || role === 'admin') return true;
   const base = Boolean(roleRule(role)?.[action]);
   if (!base) return false;
   if (!MODULES.includes(module)) return base;
+
+  // Planos sem permissões avançadas usam somente as capacidades do perfil.
+  if (!canUseFeature(tenantPlan, 'advancedPermissions')) return base;
 
   // Hierarquia de segurança: sem leitura não existe escrita/exclusão;
   // sem escrita não existe exclusão. A permissão customizada nunca eleva o perfil.

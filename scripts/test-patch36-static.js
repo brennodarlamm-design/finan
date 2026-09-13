@@ -45,4 +45,19 @@ assert(db.includes('denied.planError || permissionError'),'Sync_all preserva blo
 assert(sinapi.includes('_ensurePlanAccess') && sinapi.includes("showLockedFeature('sinapi'") && sinapi.includes("renderLockedFeature('SINAPI / Caixa'"),'SINAPI mostra bloqueio amigável e protege ações diretas.');
 assert(obra.includes('_hasEngineeringFeature') && obra.includes("['curva-s','curva-abc','leis-sociais']") && obra.includes("? (this.subTabOrcado || 'curva-s') : 'cronograma'"),'Engenharia avançada é separada do cronograma nos planos.');
 assert(obra.includes("showLockedFeature('engineering'") && obra.includes('if (!this._ensureEngineeringFeature()) return;'),'Ações de BDI também respeitam o plano.');
-console.log('\n✅ Patch 36 blocos 1–4 validados.');
+
+const apiPerms=fs.readFileSync('api/_permissions.js','utf8');
+const apiUsers=fs.readFileSync('api/users.js','utf8');
+const apiNfe=fs.readFileSync('api/nfe.js','utf8');
+const apiUpload=fs.readFileSync('api/upload.js','utf8');
+const apiWhatsapp=fs.readFileSync('api/whatsapp.js','utf8');
+const apiOcr=fs.readFileSync('api/reconhecer-documento.js','utf8');
+const apiSign=fs.readFileSync('api/assinaturas.js','utf8');
+assert(apiPerms.includes("canUseFeature(tenantPlan, 'advancedPermissions')"),'Permissão granular só é aplicada quando o plano inclui a feature.');
+assert(apiUsers.includes('advancedPermissions: Boolean(rule.features?.advancedPermissions)') && apiUsers.includes('!planUsage.advancedPermissions') && apiUsers.includes('!permissionPlanUsage.advancedPermissions'),'API de usuários ignora matriz granular fora do Ilimitado.');
+assert(cfg.includes('Dispositivo não é usuário') && cfg.includes('não consomem acessos adicionais do plano'),'Tela de Sessões diferencia dispositivos de usuários do plano.');
+assert(cob.includes('Recursos avançados') && cob.includes("['sinapi','SINAPI / Caixa']") && cob.includes("['engineering','Curva S, EVM, ABC e BDI']"),'Central da Conta separa módulos de recursos avançados.');
+for (const [name,src,module] of [['NF-e',apiNfe,'notas'],['Upload',apiUpload,'documentos'],['WhatsApp',apiWhatsapp,'whatsapp']]) assert(src.includes('canAccessModule') && src.includes("'"+module+"'"), name+' usa a camada central de módulos.');
+assert(apiOcr.includes("canUseFeature(auth.user?.tenantPlan, 'ocr')") && apiSign.includes("canUseFeature(auth.user?.tenantPlan, 'signatures')"),'OCR e assinatura mantêm gates de feature no servidor.');
+assert(apiUsers.includes('Sessões você vê os dispositivos') && apiUsers.includes('Básico inclui 1 usuário ativo'),'FinBot conhece limites e separação entre usuário e dispositivo.');
+console.log('\n✅ Patch 36 blocos 1–5 validados.');

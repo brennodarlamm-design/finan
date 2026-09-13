@@ -538,6 +538,7 @@ const Configuracoes = {
     const caps = this._roleCaps(role);
     const fullAdmin = ['admin','superadmin'].includes(String(role));
     if (fullAdmin) return '<div style="padding:12px;border:1px solid var(--border);border-radius:8px;color:var(--text3);font-size:.8rem;">Administrador possui acesso integral <strong>dentro dos módulos contratados no plano</strong>. O plano da empresa continua sendo aplicado pelo servidor.</div>';
+    if (Auth?.getPlanAccess?.()?.features?.advancedPermissions === false) return '<div style="padding:14px;border:1px solid rgba(201,162,39,.3);border-radius:10px;background:rgba(201,162,39,.06);color:var(--text2);font-size:.8rem;line-height:1.5;"><strong>Permissões por perfil</strong><br>Neste plano, Gestor, Operador e Visualizador seguem as permissões padrão de cada perfil. A personalização módulo por módulo está disponível no plano Construtora Ilimitado.</div>';
     const rows = this._permissionModules().map(([key,label]) => {
       const custom = permissions?.[key] || {};
       const val = action => typeof custom?.[action] === 'boolean' ? custom[action] : !!caps[action];
@@ -566,6 +567,7 @@ const Configuracoes = {
 
   _collectPermissionMatrix(form) {
     const role = form?.querySelector('[name="perfil"]')?.value || 'visualizador';
+    if (Auth?.getPlanAccess?.()?.features?.advancedPermissions === false) return {};
     if (['admin','superadmin'].includes(role)) return {};
     const caps = this._roleCaps(role);
     const out = {};
@@ -754,7 +756,7 @@ const Configuracoes = {
 
   // ── SESSÕES E DISPOSITIVOS ──────────────────────────────
   _renderSessoes() {
-    return `<div class="page-header"><div><h1 class="page-title">&#x1F4F1; Sess&otilde;es & Dispositivos</h1><p class="page-sub">Veja onde sua conta est&aacute; conectada e encerre acessos que voc&ecirc; n&atilde;o reconhece.</p></div><div class="page-actions"><button class="btn btn-secondary btn-sm" data-fb-click="Configuracoes.loadSessions" data-fb-click-n="0">↻ Atualizar</button><button class="btn btn-warning btn-sm" data-fb-click="Configuracoes.revokeOtherSessions" data-fb-click-n="0">Encerrar outras sess&otilde;es</button></div></div><div id="sessions-list" class="card" style="padding:18px;color:var(--text3);">Carregando sess&otilde;es…</div>`;
+    return `<div class="page-header"><div><h1 class="page-title">&#x1F4F1; Sess&otilde;es & Dispositivos</h1><p class="page-sub">Veja onde sua conta est&aacute; conectada e encerre acessos que voc&ecirc; n&atilde;o reconhece.</p></div><div class="page-actions"><button class="btn btn-secondary btn-sm" data-fb-click="Configuracoes.loadSessions" data-fb-click-n="0">↻ Atualizar</button><button class="btn btn-warning btn-sm" data-fb-click="Configuracoes.revokeOtherSessions" data-fb-click-n="0">Encerrar outras sess&otilde;es</button></div></div><div style="margin-bottom:14px;padding:13px 15px;border:1px solid rgba(18,217,160,.28);background:rgba(18,217,160,.05);border-radius:10px;font-size:.8rem;line-height:1.5;color:var(--text2);"><strong style="color:var(--accent)">Dispositivo não é usuário.</strong> Você pode usar a mesma conta no notebook e no celular. Essas sessões aparecem aqui por segurança, mas não consomem acessos adicionais do plano.</div><div id="sessions-list" class="card" style="padding:18px;color:var(--text3);">Carregando sess&otilde;es…</div>`;
   },
 
   async loadSessions() {
