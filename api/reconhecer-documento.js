@@ -246,24 +246,15 @@ REGRAS CRÍTICAS PARA 'itens' E 'tipo_documento':
     }
 
     if (!ocrResult) {
-      const mensagens = [];
-      if (openaiErrorDetail) {
-        if (/credit_balance_exhausted|insufficient_quota/i.test(openaiErrorDetail)) {
-          mensagens.push('OpenAI ChatGPT: Créditos esgotados na sua conta OpenAI. Adicione créditos em platform.openai.com/settings/organization/billing.');
-        } else {
-          mensagens.push(`OpenAI ChatGPT: ${openaiErrorDetail}`);
-        }
-      }
-      if (geminiErrorDetail) {
-        mensagens.push(`Google Gemini: ${geminiErrorDetail}`);
-      }
-      const erroConsolidado = mensagens.join(' | ') || 'Nenhum dos provedores de IA conseguiu processar o arquivo.';
-      console.error('[OCR] Falha geral de OCR:', erroConsolidado);
-      return res.status(502).json({
-        error: 'Erro no reconhecimento do documento pelos motores de IA.',
-        detalhe: erroConsolidado,
+      const quotaExceeded = /credit_balance_exhausted|insufficient_quota/i.test(String(openaiErrorDetail || ''));
+      console.error('[OCR] Falha geral de OCR:', {
         openai: openaiErrorDetail || null,
         gemini: geminiErrorDetail || null
+      });
+      return res.status(502).json({
+        error: quotaExceeded
+          ? 'O serviço de IA atingiu o limite de uso no momento. Tente novamente mais tarde.'
+          : 'Nenhum dos motores de IA conseguiu processar o documento no momento. Tente novamente.'
       });
     }
 
@@ -278,7 +269,7 @@ REGRAS CRÍTICAS PARA 'itens' E 'tipo_documento':
 
   } catch (err) {
     console.error('[OCR] Erro inesperado:', err);
-    return res.status(500).json({ error: 'Erro interno ao processar o documento.', detalhe: err.message });
+    return res.status(500).json({ error: 'Erro interno ao processar o documento.' });
   }
 }
 
