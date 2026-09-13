@@ -29,4 +29,22 @@ assert(!auditWorkflow.includes('continue-on-error: true'), 'Auditorias de depend
 assert((auditWorkflow.match(/npm audit --omit=dev --audit-level=moderate/g) || []).length === 2, 'Root e backend bloqueiam vulnerabilidades moderadas ou superiores.');
 assert(auditWorkflow.includes('wrangler deploy --dry-run'), 'Auditoria Cloudflare continua dry-run, sem publicar produção.');
 
-console.log('\n✅ Patch 35 bloco 1: dependências, cron e gates de segurança validados.');
+const corsFiles = [
+  'api/auth.js',
+  'api/reconhecer-documento.js',
+  'api/nfe.js',
+  'api/db.js',
+  'api/upload.js',
+  'api/whatsapp.js',
+  'api/_certificado.js',
+  'api/admin.js'
+];
+for (const file of corsFiles) {
+  const source = fs.readFileSync(file, 'utf8');
+  assert(!source.includes("Access-Control-Allow-Origin', '*"), `${file} não libera fallback CORS wildcard.`);
+  assert(source.includes("res.setHeader('Vary', 'Origin')"), `${file} varia cache por Origin.`);
+  assert(source.includes("res.setHeader('Access-Control-Allow-Origin', origin)"), `${file} continua refletindo apenas origem aprovada.`);
+  assert(source.includes("Access-Control-Allow-Credentials', 'true"), `${file} preserva credenciais somente no ramo allowlisted.`);
+}
+
+console.log('\n✅ Patch 35 blocos 1–2: dependências, cron, gates e CORS validados.');
