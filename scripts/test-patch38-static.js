@@ -23,6 +23,9 @@ const sitemap = read('data/sitemap.xml');
 const privacy = read('privacidade.html');
 const terms = read('termos.html');
 const validation = read('validar.html');
+const authCss = read('css/auth-patch38.css');
+const postbuild = read('scripts/patch38-postbuild.cjs');
+const pkg = JSON.parse(read('package.json'));
 
 assert(worker.includes("new URL('/app.html', incoming)"), 'o app-shell deve resolver o arquivo app.html explicitamente.');
 assert(worker.includes("new URL('/login.html', incoming)"), 'login/cadastro devem resolver o arquivo login.html explicitamente.');
@@ -32,6 +35,12 @@ assert(worker.includes("target.pathname === '/app.html'"), 'app.html deve possui
 
 assert(build.includes("copyRequired(path.join(root, 'landing.html'), path.join(out, 'index.html'))"), 'a raiz pública deve ser materializada a partir da landing.');
 assert(build.includes("copyRequired(path.join(root, 'index.html'), path.join(out, 'login.html'))"), 'o login deve ter arquivo dedicado no dist.');
+assert(pkg.scripts['build:cloudflare'].includes('patch38-postbuild.cjs'), 'build Cloudflare deve executar o pós-build do Patch 38.');
+assert(pkg.scripts.postinstall.includes('patch38-postbuild.cjs'), 'postinstall deve gerar o mesmo dist endurecido.');
+assert(postbuild.includes("patchDocument('privacidade.html'"), 'pós-build deve canonicalizar Privacidade.');
+assert(postbuild.includes("patchDocument('termos.html'"), 'pós-build deve canonicalizar Termos.');
+assert(postbuild.includes("patchDocument('validar.html'"), 'pós-build deve canonicalizar Validação.');
+assert(postbuild.includes('/css/auth-patch38.css'), 'pós-build deve incluir a folha mobile de autenticação.');
 
 assert(!redirects.includes('/login / 302'), 'o redirect legado /login -> / deve ter sido removido.');
 assert(redirects.includes('/login /login.html 200'), 'assets devem possuir fallback explícito de /login para login.html.');
@@ -53,6 +62,12 @@ assert(login.includes('id="login-form"'), 'o shell de autenticação precisa con
 assert(login.includes('id="register-modal"'), 'o shell de autenticação precisa conter o cadastro.');
 assert(loginPage.includes("window.location.pathname === '/cadastro'"), 'o cadastro deve abrir automaticamente ao acessar /cadastro.');
 assert(loginPage.includes("window.location.replace('/app')"), 'login/cadastro concluídos devem entrar no app-shell.');
+assert(authCss.includes('@media (max-width: 600px)'), 'autenticação deve possuir breakpoint mobile principal.');
+assert(authCss.includes('@media (max-width: 390px)'), 'autenticação deve ser revisada em 390px.');
+assert(authCss.includes('@media (max-width: 360px)'), 'autenticação deve ser revisada em 360px.');
+assert(authCss.includes('#register-modal > div'), 'modal de cadastro deve virar sheet responsiva no mobile.');
+assert(authCss.includes('#recovery-modal > div'), 'recuperação de senha deve virar sheet responsiva no mobile.');
+assert(authCss.includes('.otp-box'), 'OTP deve possuir dimensionamento responsivo.');
 
 assert(privacy.includes('<title>Política de Privacidade — FinObra</title>'), 'Privacidade deve possuir conteúdo e título próprios.');
 assert(terms.includes('<title>Termos de Serviço — FinObra</title>'), 'Termos deve possuir conteúdo e título próprios.');
@@ -70,4 +85,4 @@ assert(!sitemap.includes('/login'), 'sitemap não deve indexar login.');
 assert(!sitemap.includes('/cadastro'), 'sitemap não deve indexar cadastro.');
 assert(!sitemap.includes('/app'), 'sitemap não deve indexar área autenticada.');
 
-console.log('✅ Patch 38: roteamento público, SEO, legal, landing e invariantes de shell validados.');
+console.log('✅ Patch 38: roteamento público, SEO, legal, mobile auth e invariantes de shell validados.');
