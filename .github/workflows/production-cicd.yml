@@ -39,7 +39,7 @@ jobs:
       - name: Validate Wrangler bundle
         run: npx --yes wrangler deploy --dry-run
 
-  deploy-cloudflare:
+  wait-vercel-api:
     if: >-
       github.ref == 'refs/heads/main' &&
       (
@@ -47,6 +47,38 @@ jobs:
         (github.event_name == 'push' && startsWith(github.event.head_commit.message, '[deploy-production]'))
       )
     needs: validate
+    runs-on: ubuntu-latest
+    steps:
+      - name: Wait for Vercel API release
+        shell: bash
+        run: |
+          set -euo pipefail
+          health=''
+          for attempt in {1..40}; do
+            health="$(curl --fail --silent --show-error 'https://api.finobra.app.br/api/auth?action=health' || true)"
+            if [[ "$health" == *'"ok":true'* && \
+                  "$health" == *'"releaseReady":true'* && \
+                  "$health" == *'"source":"vercel"'* && \
+                  "$health" == *'"environment":"production"'* && \
+                  "$health" == *"\"commit\":\"$GITHUB_SHA\""* ]]; then
+              echo "Vercel API ready on $GITHUB_SHA"
+              exit 0
+            fi
+            echo "Waiting for Vercel API release $GITHUB_SHA ($attempt/40)..."
+            sleep 15
+          done
+          echo "::error::Vercel API did not reach release $GITHUB_SHA; Cloudflare deploy is blocked."
+          echo "Last health: $health"
+          exit 1
+
+  deploy-cloudflare:
+    if: >-
+      github.ref == 'refs/heads/main' &&
+      (
+        (github.event_name == 'workflow_dispatch' && inputs.deploy_production == true) ||
+        (github.event_name == 'push' && startsWith(github.event.head_commit.message, '[deploy-production]'))
+      )
+    needs: [validate, wait-vercel-api]
     runs-on: ubuntu-latest
     env:
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
