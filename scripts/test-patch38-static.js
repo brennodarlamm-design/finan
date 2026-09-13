@@ -17,6 +17,7 @@ const landing = read('landing.html');
 const landingPage = read('js/landing_page.js');
 const login = read('index.html');
 const loginPage = read('js/login_page.js');
+const authRoute = read('js/auth-route-patch38.js');
 const redirects = read('cloudflare/_redirects');
 const robots = read('data/robots.txt');
 const sitemap = read('data/sitemap.xml');
@@ -41,6 +42,7 @@ assert(postbuild.includes("patchDocument('privacidade.html'"), 'pós-build deve 
 assert(postbuild.includes("patchDocument('termos.html'"), 'pós-build deve canonicalizar Termos.');
 assert(postbuild.includes("patchDocument('validar.html'"), 'pós-build deve canonicalizar Validação.');
 assert(postbuild.includes('/css/auth-patch38.css'), 'pós-build deve incluir a folha mobile de autenticação.');
+assert(postbuild.includes('/js/auth-route-patch38.js'), 'pós-build deve incluir o comportamento específico das rotas de autenticação.');
 
 assert(!redirects.includes('/login / 302'), 'o redirect legado /login -> / deve ter sido removido.');
 assert(redirects.includes('/login /login.html 200'), 'assets devem possuir fallback explícito de /login para login.html.');
@@ -62,6 +64,13 @@ assert(login.includes('id="login-form"'), 'o shell de autenticação precisa con
 assert(login.includes('id="register-modal"'), 'o shell de autenticação precisa conter o cadastro.');
 assert(loginPage.includes("window.location.pathname === '/cadastro'"), 'o cadastro deve abrir automaticamente ao acessar /cadastro.');
 assert(loginPage.includes("window.location.replace('/app')"), 'login/cadastro concluídos devem entrar no app-shell.');
+assert(loginPage.includes('Auth.loginWithGoogle'), 'login com Google deve permanecer disponível.');
+assert(loginPage.includes('Auth.solicitarCodigoRecuperacao'), 'recuperação de senha deve permanecer disponível.');
+assert(loginPage.includes("window.location.search.includes('expired=1')"), 'sessão expirada deve continuar tratada na tela de login.');
+assert(authRoute.includes("document.title = 'Criar conta | FinObra'"), 'cadastro deve possuir título próprio.');
+assert(authRoute.includes("window.location.assign('/login')"), 'fechamento do cadastro dedicado deve retornar ao login.');
+assert(authRoute.includes("modal.setAttribute('aria-modal', 'true')"), 'modais de autenticação devem ser acessíveis.');
+assert(authRoute.includes("event.key !== 'Escape'"), 'modais devem tratar tecla Escape.');
 assert(authCss.includes('@media (max-width: 600px)'), 'autenticação deve possuir breakpoint mobile principal.');
 assert(authCss.includes('@media (max-width: 390px)'), 'autenticação deve ser revisada em 390px.');
 assert(authCss.includes('@media (max-width: 360px)'), 'autenticação deve ser revisada em 360px.');
@@ -85,4 +94,4 @@ assert(!sitemap.includes('/login'), 'sitemap não deve indexar login.');
 assert(!sitemap.includes('/cadastro'), 'sitemap não deve indexar cadastro.');
 assert(!sitemap.includes('/app'), 'sitemap não deve indexar área autenticada.');
 
-console.log('✅ Patch 38: roteamento público, SEO, legal, mobile auth e invariantes de shell validados.');
+console.log('✅ Patch 38: roteamento público, SEO, legal, auth, mobile e invariantes de shell validados.');
