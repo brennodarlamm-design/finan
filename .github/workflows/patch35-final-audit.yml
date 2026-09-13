@@ -1,0 +1,82 @@
+name: Patch 35 final closure audit (no deploy)
+
+on:
+  push:
+    branches:
+      - patch35-large-audit
+    paths:
+      - .github/workflows/patch35-final-audit.yml
+
+permissions:
+  contents: read
+
+jobs:
+  closure:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install root dependencies
+        run: npm ci
+      - name: Generate final codebase inventory
+        run: |
+          node scripts/audit-codebase.mjs
+          node - <<'NODE'
+          const fs = require('fs');
+          const r = JSON.parse(fs.readFileSync('audit/patch35-codebase.json','utf8'));
+          const baseline = {
+            files_scanned: 186,
+            source_lines: 60560,
+            javascript_files: 136,
+            javascript_lines: 47579,
+            frontend_files: 60,
+            frontend_lines: 36602,
+            api_files: 18,
+            api_lines: 6923,
+            migration_files: 16,
+            migration_lines: 1351
+          };
+          const patterns = {
+            console_error:137, silent_catch:84, wildcard_cors:8, console_warn:92,
+            todo_fixme_hack:41, fetch_calls:117, console_log:400, set_timeout:75,
+            sql_unsafe:8, inner_html:198, local_storage:166, set_interval:7,
+            window_location:44, session_storage:34, document_write:4,
+            adjacent_html:4, outer_html:1, hardcoded_secret_marker:1, child_process:13
+          };
+          console.log('\n=== PATCH 35 FINAL DELTA: INVENTORY ===');
+          for (const [k,v] of Object.entries(r.inventory || {})) {
+            const before = baseline[k];
+            console.log(`${k}: ${before ?? '-'} -> ${v}${before === undefined ? '' : ` (${v-before >= 0 ? '+' : ''}${v-before})`}`);
+          }
+          console.log('\n=== PATCH 35 FINAL DELTA: PATTERNS ===');
+          for (const [k,v] of Object.entries(r.pattern_totals || {})) {
+            const before = patterns[k];
+            console.log(`${k}: ${before ?? '-'} -> ${v}${before === undefined ? '' : ` (${v-before >= 0 ? '+' : ''}${v-before})`}`);
+          }
+          NODE
+      - name: Full regression suite
+        run: npm test
+      - name: Syntax verification
+        run: node scripts/check-all-syntax.js
+      - name: Cloudflare build and dry-run only
+        run: |
+          npm run build:cloudflare
+          npx --yes wrangler deploy --dry-run
+      - name: Root dependency security gate
+        run: npm audit --omit=dev --audit-level=moderate
+      - name: Backend clean install and security gate
+        run: |
+          cd backend
+          npm ci
+          npm audit --omit=dev --audit-level=moderate
+      - name: Patch 35 targeted closure checks
+        run: node scripts/test-patch35-static.js
+      - name: Upload final audit report
+        uses: actions/upload-artifact@v4
+        with:
+          name: patch35-final-audit
+          path: audit/patch35-codebase.json
+          retention-days: 14
