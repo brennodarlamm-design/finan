@@ -76,9 +76,10 @@ const corsFiles = [
   'api/_certificado.js',
   'api/admin.js'
 ];
+const wildcardCorsLiteral = "Access-Control-Allow-Origin', " + "'*";
 for (const file of corsFiles) {
   const source = fs.readFileSync(file, 'utf8');
-  assert(!source.includes("Access-Control-Allow-Origin', '*"), `${file} não libera fallback CORS wildcard.`);
+  assert(!source.includes(wildcardCorsLiteral), `${file} não libera fallback CORS wildcard.`);
   assert(source.includes("res.setHeader('Vary', 'Origin')"), `${file} varia cache por Origin.`);
   assert(source.includes("res.setHeader('Access-Control-Allow-Origin', origin)"), `${file} continua refletindo apenas origem aprovada.`);
   assert(source.includes("Access-Control-Allow-Credentials', 'true"), `${file} preserva credenciais somente no ramo allowlisted.`);
