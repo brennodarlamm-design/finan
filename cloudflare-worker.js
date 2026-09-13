@@ -55,12 +55,6 @@ function canonicalRedirect(request, env) {
     if (['/landing', '/landing.html', '/index.html'].includes(target.pathname)) {
       target.pathname = '/';
       changed = true;
-    } else if (target.pathname === '/login.html') {
-      target.pathname = '/login';
-      changed = true;
-    } else if (target.pathname === '/app.html') {
-      target.pathname = '/app';
-      changed = true;
     }
 
     const cadastro = target.searchParams.get('cadastro') === '1';
@@ -139,13 +133,21 @@ async function fetchFrontendResponse(request, env) {
   const loginShell = shellMethod && isLoginShellPath(incoming.pathname);
   const landingShell = shellMethod && incoming.pathname === '/';
 
-  let assetRequest = request;
+  // Rewrite clean URLs to explicit .html filenames so ASSETS.fetch serves
+  // the file directly (200) instead of issuing a redirect that the browser
+  // would follow back to the clean URL, causing an infinite redirect loop.
+  let assetUrl = incoming;
   let routeName = landingShell ? 'landing-shell' : null;
   if (appShell) {
+    assetUrl = new URL('/app.html', incoming);
     routeName = 'app-shell';
   } else if (loginShell) {
+    assetUrl = new URL('/login.html', incoming);
     routeName = incoming.pathname === '/cadastro' ? 'signup-shell' : 'login-shell';
   }
+  const assetRequest = assetUrl === incoming
+    ? request
+    : new Request(assetUrl.toString(), { method, headers: request.headers });
 
   const assetResponse = await env.ASSETS.fetch(assetRequest);
   const securedResponse = secureHtmlResponse(assetResponse);
