@@ -5,6 +5,7 @@ const Auth = {
   SESSION_KEY: 'finobra_session',
   LEGACY_TOKEN_KEY: 'finobra_token',
   IMPERSONATION_BACKUP_KEY: 'finobra_master_session_backup',
+  _planAccess: null,
 
   defaultUsers: [],
 
@@ -286,10 +287,36 @@ const Auth = {
     }
   },
 
+  getPlanAccess() { return this._planAccess; },
+
+  async refreshPlanAccess() {
+    const res = await fetch('/api/plano', { headers:this.getAuthHeaders() });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || !data.success || !data.plan) throw new Error(data.error || 'Não foi possível consultar o plano.');
+    this._planAccess = data.plan;
+    return data.plan;
+  },
+
+  isPlanModuleAllowed(module) {
+    const role = String(this.getUser()?.perfil || '').toLowerCase();
+    if (role === 'superadmin') return true;
+    const modules = this._planAccess?.modules;
+    if (!Array.isArray(modules) || !modules.length) return true;
+    return modules.includes(String(module || ''));
+  },
+
+  isPlanRouteLocked(route) {
+    const key = String(route || '').toLowerCase();
+    const module = this.ROUTE_MODULES[key];
+    return Boolean(module && !this.isPlanModuleAllowed(module));
+  },
+
   canModule(module, action = 'read') {
     const u = this.getUser() || {};
     const role = String(u.perfil || 'visualizador').toLowerCase();
-    if (role === 'superadmin' || role === 'admin') return true;
+    if (role === 'superadmin') return true;
+    if (!this.isPlanModuleAllowed(module)) return false;
+    if (role === 'admin') return true;
     const caps = this.ROLE_CAPS[role] || this.ROLE_CAPS.visualizador;
     if (!caps[action]) return false;
     const raw = u.permissions?.[module];
@@ -350,6 +377,7 @@ const Auth = {
         perfil:data.user.perfil || current.perfil, avatar:data.user.avatar || current.avatar,
         tenantId:data.user.tenantId || current.tenantId, realTenantId:data.user.realTenantId || current.realTenantId,
         empresaNome:data.user.empresaNome || current.empresaNome, permissions:data.user.permissions || {},
+        tenantPlan:data.user.tenantPlan || current.tenantPlan, tenantStatus:data.user.tenantStatus || current.tenantStatus,
         sessionId:data.user.sessionId || current.sessionId,
         isImpersonated: current.isImpersonated || !!data.user.isImpersonated,
         impersonatedBy: current.impersonatedBy || (data.user.isImpersonated ? 'superadmin' : '')

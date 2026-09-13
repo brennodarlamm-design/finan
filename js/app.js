@@ -166,6 +166,9 @@ const App = {
       const firstCheck = await Auth.refreshSessionFromServer();
       if (firstCheck?.expired) return;
     }
+    if (typeof Auth.refreshPlanAccess === 'function' && navigator.onLine !== false) {
+      try { await Auth.refreshPlanAccess(); } catch (e) { console.warn('[Plano] Interface usando acesso em cache até nova consulta:', e?.message || e); }
+    }
 
     this._installErrorMonitor();
     if (typeof Auth.refreshSessionFromServer === 'function') {
@@ -475,7 +478,14 @@ const App = {
 
   _navItem(route, icon, label, badgeHtml = '') {
     const targetRoute = this._normalizeRoute(route);
-    if (typeof Auth !== 'undefined' && Auth.canRoute && !Auth.canRoute(targetRoute, 'read')) return '';
+    if (typeof Auth !== 'undefined' && Auth.canRoute && !Auth.canRoute(targetRoute, 'read')) {
+      if (Auth.isPlanRouteLocked?.(targetRoute)) {
+        return `<div class="nav-item" style="opacity:.72;border:1px dashed rgba(201,162,39,.22);" data-fb-click="Cobranca.showLockedModule" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(targetRoute))}" title="Disponível em outro plano">
+          <span>${icon}</span><span style="flex:1">${label}</span><span style="font-size:.68rem;color:var(--accent2)">🔒</span>
+        </div>`;
+      }
+      return '';
+    }
     const isAct = (this.route === targetRoute) || (this._normalizeRoute(this.route) === targetRoute);
     return `<div class="nav-item${isAct?' active':''}" data-route="${targetRoute}" data-fb-click="Patch26Actions.navigateCloseSidebar" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(targetRoute))}">
       <span>${icon}</span><span>${label}</span>${badgeHtml}
@@ -540,6 +550,10 @@ const App = {
     const normalized = this._normalizeRoute(cleanRoute);
     let targetRoute = this.routes[normalized] ? normalized : 'dashboard';
     if (typeof Auth !== 'undefined' && Auth.canRoute && !Auth.canRoute(targetRoute,'read')) {
+      if (Auth.isPlanRouteLocked?.(targetRoute) && typeof Cobranca !== 'undefined' && Cobranca.showLockedModule) {
+        Cobranca.showLockedModule(targetRoute);
+        return;
+      }
       const fallback = this._firstAllowedRoute();
       if (targetRoute !== fallback && typeof Utils !== 'undefined' && Utils.toast) Utils.toast('Seu usuário não possui acesso a este módulo.', 'warning');
       targetRoute = fallback;

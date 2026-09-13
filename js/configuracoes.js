@@ -3,6 +3,7 @@
 const Configuracoes = {
   _activeTab: 'empresa',
   _usersCache: null,
+  _planUsage: null,
   _auditCache: [],
   _auditOffset: 0,
   _auditHasMore: false,
@@ -23,7 +24,8 @@ const Configuracoes = {
       const data = await res.json().catch(() => ({}));
       if (!res.ok || !data.success || !Array.isArray(data.users)) throw new Error(data.error || 'Falha ao carregar usuários.');
       this._usersCache = data.users;
-      localStorage.setItem(Auth.USERS_KEY, JSON.stringify(data.users)); // apenas cache de interface
+      this._planUsage = data.planUsage || null;
+      localStorage.setItem(Auth.USERS_KEY, JSON.stringify(data.users));
       this._refreshUsers();
       return data.users;
     } catch (err) {
@@ -458,15 +460,36 @@ const Configuracoes = {
   _renderUsuarios() {
     const users = this._usersCache || Auth.getUsers();
     const session = Auth.getUser();
+    const usage = this._planUsage;
+    const atLimit = usage?.maxUsers != null && Number(usage.activeUsers || 0) >= Number(usage.maxUsers || 0);
     return `
     <div class="page-header">
-      <div><h1 class="page-title">&#x1F465; Usu&aacute;rios do Sistema</h1><p class="page-sub">Gerencie os perfis de acesso ao sistema</p></div>
+      <div><h1 class="page-title">&#x1F465; Usu&aacute;rios do Sistema</h1><p class="page-sub">Cada pessoa da equipe ocupa 1 acesso do plano. Celular, notebook e outros dispositivos da mesma pessoa n&atilde;o contam como novos usu&aacute;rios.</p></div>
       <div class="page-actions">
-        ${['admin','superadmin'].includes(session?.perfil) ? '<button class="btn btn-primary" data-fb-click="Configuracoes.showUserForm" data-fb-click-n="0">+ Novo Usu&aacute;rio</button>' : ''}
+        ${['admin','superadmin'].includes(session?.perfil) ? (atLimit
+          ? '<button class="btn btn-secondary" data-fb-click="Configuracoes.showUserLimitModal" data-fb-click-n="0">Limite do plano atingido</button>'
+          : '<button class="btn btn-primary" data-fb-click="Configuracoes.showUserForm" data-fb-click-n="0">+ Novo Usu&aacute;rio</button>') : ''}
       </div>
     </div>
-    <div id="users-list">
+    ${this._renderUserPlanUsage()}
+    <div id="users-list-cards">
       ${users.map(u => this._userCard(u, session)).join('')}
+    </div>`;
+  },
+
+  _renderUserPlanUsage() {
+    const p = this._planUsage;
+    if (!p) return '<div class="card" style="margin-bottom:16px;color:var(--text3);font-size:.82rem;">Consultando limite de usuários do plano…</div>';
+    const max = p.maxUsers == null ? 'Ilimitado' : Number(p.maxUsers || 0);
+    const active = Number(p.activeUsers || 0);
+    const pct = p.maxUsers == null ? 30 : Math.min(100, Math.round((active / Math.max(1, Number(p.maxUsers))) * 100));
+    const full = p.maxUsers != null && active >= p.maxUsers;
+    return `<div class="card" style="margin-bottom:18px;border-color:${full?'rgba(245,158,11,.45)':'var(--border)'};">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;">
+        <div><div style="font-size:.72rem;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;">${this._esc(p.planLabel || 'Seu plano')}</div><div style="font-weight:850;font-size:1rem;margin-top:3px;">${active} de ${max} usuário(s) ativo(s)</div><div style="font-size:.75rem;color:var(--text3);margin-top:4px;">Dispositivos e sess&otilde;es n&atilde;o consomem acessos adicionais.</div></div>
+        ${full ? '<button class="btn btn-warning btn-sm" data-fb-click="Cobranca.goToPlans" data-fb-click-n="0">Ver planos com mais acessos</button>' : '<span class="badge badge-success">Acessos disponíveis</span>'}
+      </div>
+      <div style="height:6px;background:rgba(255,255,255,.06);border-radius:999px;margin-top:12px;overflow:hidden;"><div style="height:100%;width:${pct}%;background:${full?'#f59e0b':'var(--accent)'};border-radius:999px;"></div></div>
     </div>`;
   },
 
@@ -514,7 +537,7 @@ const Configuracoes = {
   _permissionMatrix(role, permissions = {}) {
     const caps = this._roleCaps(role);
     const fullAdmin = ['admin','superadmin'].includes(String(role));
-    if (fullAdmin) return '<div style="padding:12px;border:1px solid var(--border);border-radius:8px;color:var(--text3);font-size:.8rem;">Administrador possui acesso integral. Para evitar bloqueio administrativo, restri&ccedil;&otilde;es por m&oacute;dulo s&atilde;o aplicadas aos perfis Gestor, Operador e Visualizador.</div>';
+    if (fullAdmin) return '<div style="padding:12px;border:1px solid var(--border);border-radius:8px;color:var(--text3);font-size:.8rem;">Administrador possui acesso integral <strong>dentro dos módulos contratados no plano</strong>. O plano da empresa continua sendo aplicado pelo servidor.</div>';
     const rows = this._permissionModules().map(([key,label]) => {
       const custom = permissions?.[key] || {};
       const val = action => typeof custom?.[action] === 'boolean' ? custom[action] : !!caps[action];
@@ -558,6 +581,7 @@ const Configuracoes = {
 
   showUserForm(id) {
     const u = id ? (this._usersCache || []).find(u => u.id === id) : null;
+    if (!id && this._planUsage?.maxUsers != null && Number(this._planUsage.activeUsers || 0) >= Number(this._planUsage.maxUsers || 0)) { this.showUserLimitModal(); return; }
     Utils.showModal(`
       <div class="modal" style="max-width:780px">
         <div class="modal-header">
@@ -613,6 +637,13 @@ const Configuracoes = {
       </div>`);
   },
 
+  showUserLimitModal(data = this._planUsage || {}) {
+    const max = Number(data.limit ?? data.maxUsers ?? 0) || 'o limite contratado';
+    const current = Number(data.current ?? data.activeUsers ?? 0);
+    const label = this._esc(data.planLabel || data.plan || 'seu plano');
+    Utils.showModal(`<div class="modal" style="max-width:520px"><div class="modal-header"><span class="modal-title">👥 Seu time chegou ao limite do plano</span><button class="modal-close" data-fb-click="Utils.closeModal" data-fb-click-n="0">✕</button></div><div class="modal-body"><div style="padding:16px;border-radius:12px;background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.3);line-height:1.55;"><strong style="display:block;margin-bottom:6px;">${label}</strong>Você possui <strong>${current}</strong> usuário(s) ativo(s) e este plano inclui <strong>${max}</strong>. Celulares, computadores e outros dispositivos da mesma pessoa não consomem usuários extras.</div><p style="color:var(--text3);font-size:.84rem;margin:16px 0 0;">Para adicionar outra pessoa, você pode desativar um acesso que não é mais utilizado ou conhecer um plano com mais usuários.</p></div><div class="modal-footer"><button class="btn btn-secondary" data-fb-click="Utils.closeModal" data-fb-click-n="0">Gerenciar usuários</button><button class="btn btn-primary" data-fb-click="Cobranca.goToPlans" data-fb-click-n="0">Ver planos</button></div></div>`);
+  },
+
   async saveUser(e, id) {
     e.preventDefault();
     const fd = new FormData(e.target);
@@ -622,19 +653,25 @@ const Configuracoes = {
     try {
       const res = await fetch('/api/users', { method:id?'PATCH':'POST', headers:Auth.getAuthHeaders(), body:JSON.stringify(body) });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok || !data.success) throw new Error(data.error || 'Falha ao salvar usuário.');
+      if (!res.ok || !data.success) {
+        if (data.code === 'PLAN_USER_LIMIT') { Utils.closeModal(); this.showUserLimitModal(data); return; }
+        throw new Error(data.error || 'Falha ao salvar usuário.');
+      }
       Utils.toast(id ? 'Usuário atualizado no servidor!' : 'Usuário criado no servidor!', 'success');
       Utils.closeModal(); await this.loadUsers();
-    } catch (err) { Utils.toast(err.message, 'error'); }
+    } catch (err) { Utils.toast(err.message || 'Não foi possível salvar o usuário.', 'error'); }
   },
 
   async toggleAtivo(id, ativo) {
     try {
       const res = await fetch('/api/users', { method:'PATCH', headers:Auth.getAuthHeaders(), body:JSON.stringify({ id, ativo:!ativo }) });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok || !data.success) throw new Error(data.error || 'Falha ao alterar usuário.');
+      if (!res.ok || !data.success) {
+        if (data.code === 'PLAN_USER_LIMIT') { this.showUserLimitModal(data); return; }
+        throw new Error(data.error || 'Falha ao alterar usuário.');
+      }
       Utils.toast(ativo ? 'Usuário desativado.' : 'Usuário ativado!', 'info'); await this.loadUsers();
-    } catch (err) { Utils.toast(err.message, 'error'); }
+    } catch (err) { Utils.toast(err.message || 'Não foi possível alterar o usuário.', 'error'); }
   },
 
   showMeuPerfil() {
@@ -708,7 +745,7 @@ const Configuracoes = {
   },
 
   _refreshUsers() {
-    const el = document.getElementById('users-list');
+    const el = document.getElementById('users-list-cards');
     if (!el) return;
     const users = this._usersCache || Auth.getUsers();
     const session = Auth.getUser();
