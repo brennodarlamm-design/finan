@@ -118,7 +118,8 @@ jobs:
           grep -q "AbortSignal.timeout(7000)" api/nfe.js
           ! grep -q "detail: err.message\|detail: errCep.message" api/nfe.js
           ! grep -q "error: err.message\|details: data" api/whatsapp.js
-          ! grep -q "detalhe: err.message\|openai: openaiErrorDetail\|gemini: geminiErrorDetail" api/reconhecer-documento.js
+          ! grep -q "detalhe: err.message\|detalhe: erroConsolidado" api/reconhecer-documento.js
+          ! grep -q "mensagens.push(\`OpenAI ChatGPT:\|mensagens.push(\`Google Gemini:" api/reconhecer-documento.js
       - name: Commit upstream hardening
         run: |
           git config user.name "github-actions[bot]"
