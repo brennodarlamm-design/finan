@@ -17,7 +17,12 @@ ok('resolver usa ROOTS antes de globalThis', bridge.includes("Object.prototype.h
 ok('hotfix não usa eval/new Function', !/\beval\s*\(|new\s+Function\s*\(/.test(bridge));
 const lifecycle = `${pkg.scripts?.postinstall || ''} ${pkg.scripts?.pretest || ''}`;
 ok('Patch 27 mantém o hotfix materializado sem reaplicar Patch 26 no lifecycle', !/apply-patch26-build|fix-patch26-lexical-roots|prepare-patch26/.test(lifecycle));
-ok('build Cloudflare consome diretamente a fonte materializada', pkg.scripts?.['build:cloudflare'] === 'node scripts/build-cloudflare-pages.cjs');
+const cloudflareBuild = String(pkg.scripts?.['build:cloudflare'] || '');
+ok(
+  'build Cloudflare consome a fonte materializada antes de pós-processamentos versionados',
+  cloudflareBuild.startsWith('node scripts/build-cloudflare-pages.cjs') &&
+    !/apply-patch26-build|fix-patch26-lexical-roots|prepare-patch26/.test(cloudflareBuild)
+);
 
 console.log(`\nPatch 26.1: ${failed ? 'FALHOU' : 'OK'}`);
 if (failed) process.exit(1);
