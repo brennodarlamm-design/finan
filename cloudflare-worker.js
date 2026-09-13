@@ -30,6 +30,10 @@ function isApiPath(pathname) {
   return pathname === '/api' || pathname.startsWith('/api/');
 }
 
+function isAppShellPath(pathname) {
+  return pathname === '/app' || pathname === '/app.html' || pathname.startsWith('/app/');
+}
+
 function canonicalRedirect(request, env) {
   const method = String(request.method || 'GET').toUpperCase();
   if (!['GET', 'HEAD'].includes(method)) return null;
@@ -94,6 +98,37 @@ function secureHtmlResponse(response) {
   return new Response(response.body, {
     status: response.status,
     statusText: response.statusText,
+    headers
+  });
+}
+
+async function fetchFrontendResponse(request, env) {
+  const method = String(request.method || 'GET').toUpperCase();
+  const incoming = new URL(request.url);
+  const appShell = ['GET', 'HEAD'].includes(method) && isAppShellPath(incoming.pathname);
+
+  let assetRequest = request;
+  if (appShell) {
+    const appUrl = new URL('/app.html', incoming);
+    assetRequest = new Request(appUrl.toString(), {
+      method,
+      headers: request.headers,
+      redirect: 'manual'
+    });
+  }
+
+  const assetResponse = await env.ASSETS.fetch(assetRequest);
+  const securedResponse = secureHtmlResponse(assetResponse);
+
+  if (!appShell) return securedResponse;
+
+  const headers = new Headers(securedResponse.headers);
+  headers.set('X-FinObra-Route', 'app-shell');
+  headers.set('Cache-Control', 'public, max-age=0, must-revalidate');
+
+  return new Response(securedResponse.body, {
+    status: securedResponse.status,
+    statusText: securedResponse.statusText,
     headers
   });
 }
@@ -269,7 +304,6 @@ export default {
       return proxyApi(request, env);
     }
 
-    const assetResponse = await env.ASSETS.fetch(request);
-    return secureHtmlResponse(assetResponse);
+    return fetchFrontendResponse(request, env);
   }
 };
