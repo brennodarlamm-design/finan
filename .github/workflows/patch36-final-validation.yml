@@ -1,0 +1,67 @@
+name: Patch 36 final validation - no deploy
+
+on:
+  push:
+    branches:
+      - patch36-product-experience
+    paths:
+      - .github/workflows/patch36-final-validation.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: patch36-final-validation
+  cancel-in-progress: true
+
+jobs:
+  validate-final:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: patch36-product-experience
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Verify branch ancestry and whitespace
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin main --no-tags
+          test "$(git merge-base origin/main HEAD)" = "$(git rev-parse origin/main)"
+          git diff --check origin/main...HEAD
+          echo "Branch is cleanly ahead of main and diff has no whitespace errors."
+      - name: Install root dependencies
+        run: npm ci
+      - name: Full regression suite
+        run: npm test
+      - name: Patch 36 focused regression
+        run: node scripts/test-patch36-static.js
+      - name: Syntax verification
+        run: node scripts/check-all-syntax.js
+      - name: Codebase audit
+        run: node scripts/audit-codebase.mjs
+      - name: Root dependency audit
+        run: npm audit --omit=dev --audit-level=high
+      - name: Backend dependency audit
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm --prefix backend ci
+          npm --prefix backend audit --omit=dev --audit-level=high
+      - name: WhatsApp service dependency audit
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm --prefix monitor-nfe/whatsapp-server ci
+          npm --prefix monitor-nfe/whatsapp-server audit --omit=dev --audit-level=high
+      - name: Cloudflare static build
+        run: npm run build:cloudflare
+      - name: Wrangler bundle dry-run only
+        run: npx --yes wrangler deploy --dry-run
+      - name: Confirm no production deploy happened
+        run: echo "Validation completed in dry-run mode only. No production deployment command was executed."
