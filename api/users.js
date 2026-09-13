@@ -4,6 +4,7 @@ import crypto from 'crypto';
 import { hashPassword, verifyPassword, resolveAuthAndTenant } from './_auth.js';
 import { writeAudit } from './_audit.js';
 import { canManageUsers, canManageTenant, permissionError, sanitizePermissions } from './_permissions.js';
+import { getPlanRule } from './_plans.js';
 import { checkRateLimit, getClientIp } from './_ratelimit.js';
 
 function getSql() {
@@ -27,6 +28,36 @@ const safeUser = u => ({
   permissions: (u.permissoes && typeof u.permissoes === 'object') ? u.permissoes : {},
   created_at: u.created_at
 });
+
+async function getUserPlanUsage(sql, tenantId) {
+  const tenantRows = await sql`SELECT plano FROM tenants WHERE id=${tenantId} LIMIT 1;`;
+  const rule = getPlanRule(tenantRows[0]?.plano || 'trial');
+  const countRows = await sql`
+    SELECT COUNT(*)::int AS total, COUNT(*) FILTER (WHERE ativo=TRUE)::int AS active
+    FROM usuarios WHERE tenant_id=${tenantId};
+  `;
+  const activeUsers = Number(countRows[0]?.active || 0);
+  const totalUsers = Number(countRows[0]?.total || 0);
+  return {
+    planId: rule.id,
+    planLabel: rule.label,
+    maxUsers: rule.maxUsers,
+    activeUsers,
+    totalUsers,
+    remainingUsers: rule.maxUsers == null ? null : Math.max(0, rule.maxUsers - activeUsers)
+  };
+}
+
+function planUserLimitError(usage) {
+  return {
+    success:false,
+    code:'PLAN_USER_LIMIT',
+    plan:usage.planId,
+    limit:usage.maxUsers,
+    current:usage.activeUsers,
+    error:`Seu time chegou ao limite do ${usage.planLabel}. Este plano inclui ${usage.maxUsers} usuário(s) ativo(s). Para adicionar outra pessoa, gerencie os usuários atuais ou consulte um plano com mais acessos.`
+  };
+}
 
 
 const SUPPORT_STATUSES = new Set(['bot','waiting','assigned','resolved','closed']);
@@ -553,7 +584,8 @@ export default async function handler(req, res) {
             FROM usuarios WHERE tenant_id = ${auth.tenantId} AND id = ${auth.user.userId}
             LIMIT 1;
           `;
-      return res.status(200).json({ success:true, users:rows.map(safeUser), limited:!actorIsAdmin });
+      const planUsage = await getUserPlanUsage(sql, auth.tenantId);
+      return res.status(200).json({ success:true, users:rows.map(safeUser), limited:!actorIsAdmin, planUsage });
     }
 
     if (req.method === 'POST') {
@@ -568,6 +600,10 @@ export default async function handler(req, res) {
         return res.status(400).json({ success:false, error:'Informe nome, usuário (mín. 3), e-mail válido e senha (mín. 8).' });
       }
       if (!allowedProfiles.includes(perfil)) return res.status(400).json({ success:false, error:'Perfil inválido.' });
+      const planUsage = await getUserPlanUsage(sql, auth.tenantId);
+      if (planUsage.maxUsers != null && planUsage.activeUsers >= planUsage.maxUsers) {
+        return res.status(409).json(planUserLimitError(planUsage));
+      }
       const exists = await sql`SELECT id FROM usuarios WHERE LOWER(username)=${un} OR LOWER(email)=${em} LIMIT 1;`;
       if (exists.length) return res.status(409).json({ success:false, error:'Usuário ou e-mail já cadastrado.' });
       const id = 'usr_' + crypto.randomBytes(8).toString('hex');
@@ -621,6 +657,13 @@ export default async function handler(req, res) {
         `;
         if (Number(otherAdmins[0]?.total || 0) < 1) {
           return res.status(409).json({ success:false, code:'LAST_ADMIN', error:'A empresa precisa manter pelo menos um administrador ativo. Crie ou promova outro administrador antes desta alteração.' });
+        }
+      }
+
+      if (!cur.ativo && newAtivo) {
+        const planUsage = await getUserPlanUsage(sql, auth.tenantId);
+        if (planUsage.maxUsers != null && planUsage.activeUsers >= planUsage.maxUsers) {
+          return res.status(409).json(planUserLimitError(planUsage));
         }
       }
 

@@ -67,7 +67,7 @@ function buildContentSecurityPolicy(nonce) {
     "object-src 'none'",
     "frame-ancestors 'self'",
     "form-action 'self'",
-    `script-src 'self' 'nonce-${nonce}' https://accounts.google.com https://apis.google.com https://cdn.jsdelivr.net https://cdn.sheetjs.com https://cdnjs.cloudflare.com https://static.cloudflareinsights.com`,
+    `script-src 'self' 'nonce-${nonce}' https://accounts.google.com https://apis.google.com https://cdn.sheetjs.com https://cdnjs.cloudflare.com https://static.cloudflareinsights.com`,
     "script-src-attr 'none'",
     "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://accounts.google.com",
     "font-src 'self' data: https://fonts.gstatic.com",

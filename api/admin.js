@@ -675,12 +675,36 @@ export default async function handler(req, res) {
     }
 
     if (req.method === 'POST' && action === 'restore_master_session') {
-      const restoreToken = readCookie(req, MASTER_RESTORE_COOKIE);
       const secret = (process.env.API_SECRET || process.env.VERCEL_API_SECRET || '').trim();
-      const payload = restoreToken ? verifyToken(restoreToken, secret) : null;
+      let restoreToken = readCookie(req, MASTER_RESTORE_COOKIE);
+      let payload = restoreToken ? verifyToken(restoreToken, secret) : null;
+      let recoveredFromImpersonatedSession = false;
+
+      // O cookie auxiliar pode ser descartado pelo navegador/proxy. A sessão impersonada
+      // continua sendo um JWT assinado de um superadmin real e uma sessão revogável já
+      // validada por resolveAuthAndTenant. Nesse caso recriamos uma sessão Master curta,
+      // sem depender de dados enviados pelo cliente.
       if (!payload || payload.userId !== auth.user.id) {
-        return res.status(401).json({ success:false, error:'Sessão Master de retorno ausente ou expirada.' });
+        const isImpersonatedMaster = auth.user?.perfil === 'superadmin' && Boolean(auth.user?.isImpersonated || auth.user?.impersonated || auth.user?.impersonatedBy);
+        const realTenantId = String(auth.user?.realTenantId || auth.user?.originalTenantId || '').trim();
+        if (!isImpersonatedMaster || !realTenantId) {
+          return res.status(401).json({ success:false, error:'Não foi possível restaurar automaticamente a sessão Master. Entre novamente no painel Master.' });
+        }
+        const fallbackExp = Math.min(Number(auth.user?.exp || (Date.now() + 4 * 60 * 60 * 1000)), Date.now() + 4 * 60 * 60 * 1000);
+        restoreToken = signToken({
+          userId:auth.user.id,
+          username:auth.user.username,
+          nome:auth.user.nome,
+          email:auth.user.email,
+          perfil:'superadmin',
+          tenantId:realTenantId,
+          sessionId:auth.user.sessionId || '',
+          exp:fallbackExp
+        }, secret);
+        payload = verifyToken(restoreToken, secret);
+        recoveredFromImpersonatedSession = true;
       }
+
       const rows = await sql`SELECT perfil, ativo FROM usuarios WHERE id=${payload.userId} LIMIT 1;`;
       if (!rows.length || !rows[0].ativo || rows[0].perfil !== 'superadmin') {
         return res.status(403).json({ success:false, error:'A conta Master não está autorizada.' });
@@ -692,9 +716,9 @@ export default async function handler(req, res) {
       ]);
       await writeAudit(sql, req, { ...auth, tenantId:auth.tenantId }, {
         acao:'suporte_encerrado', entidade:'suporte_master', entidadeId:String(req.body?.tenantId || auth.tenantId || ''),
-        depois:{ restored:true, superadmin:auth.user?.username || auth.user?.email || 'superadmin' }
+        depois:{ restored:true, recoveredFromImpersonatedSession, superadmin:auth.user?.username || auth.user?.email || 'superadmin' }
       });
-      return res.status(200).json({ success:true, restored:true });
+      return res.status(200).json({ success:true, restored:true, recoveredFromImpersonatedSession });
     }
 
     return res.status(400).json({ success: false, error: `Ação "${action}" desconhecida.` });

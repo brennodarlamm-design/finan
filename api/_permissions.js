@@ -1,5 +1,6 @@
 // api/_permissions.js — RBAC central + restrições por módulo do FinObra
 // Perfis suportados: superadmin, admin, gestor, operador, visualizador.
+import { canUseModule } from './_plans.js';
 
 export const ROLE_RULES = Object.freeze({
   superadmin: Object.freeze({ read: true, write: true, delete: true, manageUsers: true, manageTenant: true, audit: true }),
@@ -73,6 +74,13 @@ function customPermission(auth, module, action) {
 export function canAccessModule(auth, module, action = 'read') {
   if (auth?.isSystem) return true;
   const role = normalizeRole(auth?.user?.perfil);
+
+  // Superadmin da plataforma precisa conseguir diagnosticar todos os módulos no modo suporte.
+  if (role !== 'superadmin') {
+    const tenantPlan = auth?.user?.tenantPlan || auth?.user?.plano || 'trial';
+    if (MODULES.includes(module) && !canUseModule(tenantPlan, module)) return false;
+  }
+
   if (role === 'superadmin' || role === 'admin') return true;
   const base = Boolean(roleRule(role)?.[action]);
   if (!base) return false;
