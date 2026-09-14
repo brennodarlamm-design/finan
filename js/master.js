@@ -79,17 +79,24 @@ const MasterAdmin = {
 
   async carregarErrosSaaS(force = false) {
     if (this._errorsGlobal && !force) return this._errorsGlobal;
-    if (this._errorsGlobalLoading) return this._errorsGlobal || { errors:[], summary:{} };
+    if (this._errorsGlobalLoading) return this._errorsGlobal || { errors:[], summary:{}, top_routes:[], clusters:[] };
     this._errorsGlobalLoading = true;
     try {
       const resp = await fetch('/api/admin?action=client_errors&limit=100', {
         headers:(typeof Auth !== 'undefined' && Auth.getAuthHeaders) ? Auth.getAuthHeaders() : {}
       });
       const data = await resp.json().catch(() => ({}));
-      if (resp.ok && data.success) this._errorsGlobal = { errors:Array.isArray(data.errors)?data.errors:[], summary:data.summary||{} };
+      if (resp.ok && data.success) {
+        this._errorsGlobal = {
+          errors: Array.isArray(data.errors) ? data.errors : [],
+          summary: data.summary || {},
+          top_routes: Array.isArray(data.top_routes) ? data.top_routes : [],
+          clusters: Array.isArray(data.clusters) ? data.clusters : []
+        };
+      }
     } catch (err) { console.warn('Falha ao carregar diagnóstico global:', err); }
     this._errorsGlobalLoading = false;
-    if (!this._errorsGlobal) this._errorsGlobal = { errors:[], summary:{} };
+    if (!this._errorsGlobal) this._errorsGlobal = { errors:[], summary:{}, top_routes:[], clusters:[] };
     return this._errorsGlobal;
   },
 
@@ -316,15 +323,315 @@ const MasterAdmin = {
   },
 
   _renderErrosSaaS() {
-    const bundle = this._errorsGlobal || { errors:[], summary:{} };
-    const recent = bundle.errors.slice(0,10);
-    const count24 = Number(bundle.summary?.last_24h || 0);
-    const tenants24 = Number(bundle.summary?.tenants_24h || 0);
-    const rows = recent.length ? recent.map(e => {
+    const bundle = this._errorsGlobal || { errors:[], summary:{}, top_routes:[], clusters:[] };
+    const summary = bundle.summary || {};
+    const count24 = Number(summary.last_24h || 0);
+    const count7d = Number(summary.last_7d || 0);
+    const tenants24 = Number(summary.tenants_24h || 0);
+    const anon24 = Number(summary.anonymous_24h || 0);
+
+    const topRoutes = bundle.top_routes || [];
+    const clusters = bundle.clusters || [];
+    const recent = (bundle.errors || []).slice(0, 15);
+
+    // Linhas de Clusters (Assinaturas Frequentes)
+    const clusterRows = clusters.length ? clusters.map(c => {
+      const sig = this._esc(c.signature || 'Erro Desconhecido');
+      const src = this._esc(c.source || '—');
+      const count = Number(c.count || 0);
+      const tenants = Number(c.affected_tenants || 0);
+      const lastSeen = c.last_seen ? new Date(c.last_seen).toLocaleString('pt-BR') : '—';
+      const sampleId = this._esc(c.sample_id || '');
+
+      return `
+        <tr style="border-bottom:1px solid rgba(255,255,255,.06);">
+          <td style="padding:10px 14px;font-weight:700;color:#fca5a5;max-width:350px;">
+            <div style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${sig}">${sig}</div>
+          </td>
+          <td style="padding:10px 14px;color:#94a3b8;font-size:.72rem;font-family:monospace;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
+            ${src}
+          </td>
+          <td style="padding:10px 14px;text-align:center;font-weight:900;color:#f87171;">
+            ${count}
+          </td>
+          <td style="padding:10px 14px;text-align:center;color:#38bdf8;font-weight:800;">
+            ${tenants}
+          </td>
+          <td style="padding:10px 14px;color:#94a3b8;font-size:.75rem;">
+            ${lastSeen}
+          </td>
+          <td style="padding:10px 14px;text-align:right;">
+            <button data-error-id="${sampleId}" data-fb-click="MasterAdmin.abrirDetalhesErro" data-fb-click-n="1" data-fb-click-t0="dataset" data-fb-click-v0="errorId" style="background:rgba(56,189,248,.15);border:1px solid #38bdf8;color:#7dd3fc;border-radius:6px;padding:4px 9px;font-size:.72rem;font-weight:800;cursor:pointer;">
+              🔍 Inspecionar
+            </button>
+          </td>
+        </tr>
+      `;
+    }).join('') : `<tr><td colspan="6" style="padding:22px;text-align:center;color:#64748b;">Nenhum cluster de erro identificado nos últimos 7 dias. ✨</td></tr>`;
+
+    // Linhas de Erros Recentes
+    const recentRows = recent.length ? recent.map(e => {
+      const id = this._esc(e.id);
       const when = e.created_at ? new Date(e.created_at).toLocaleString('pt-BR') : '—';
-      return `<tr style="border-bottom:1px solid rgba(255,255,255,.06);"><td style="padding:10px 12px;color:#94a3b8;white-space:nowrap">${this._esc(when)}</td><td style="padding:10px 12px;font-weight:700;color:#fff">${this._esc(e.tenant_nome||e.tenant_id||'—')}</td><td style="padding:10px 12px">${this._esc(e.usuario_nome||'—')}</td><td style="padding:10px 12px">${this._esc(e.route||'—')}</td><td style="padding:10px 12px;max-width:430px"><div style="font-weight:700;color:#fca5a5;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${this._esc(e.stack||e.message||'')}">${this._esc(e.message||'Erro')}</div><div style="font-size:.68rem;color:#64748b;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${this._esc(e.source||'')}</div></td></tr>`;
-    }).join('') : `<tr><td colspan="5" style="padding:26px;text-align:center;color:#64748b;">Nenhum erro de frontend registrado. ✅</td></tr>`;
-    return `<div style="background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.08);border-radius:14px;overflow:hidden;margin-bottom:34px;"><div style="padding:16px 20px;border-bottom:1px solid rgba(255,255,255,.08);display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap"><div><h3 style="font-size:1.05rem;font-weight:800;color:#fff;margin:0">🛠️ Saúde do Sistema</h3><div style="font-size:.72rem;color:#64748b;margin-top:3px">Erros capturados automaticamente nos navegadores dos clientes</div></div><div style="display:flex;gap:10px;align-items:center"><span style="font-size:.76rem;color:${count24?'#f59e0b':'#22c55e'};font-weight:800">${count24} erro(s) / 24h · ${tenants24} empresa(s)</span><button data-fb-click="Patch26Actions.masterReloadErrors" data-fb-click-n="0" style="background:transparent;border:1px solid rgba(255,255,255,.15);color:#cbd5e1;border-radius:6px;padding:5px 8px;cursor:pointer">↻</button></div></div><div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;text-align:left;font-size:.78rem"><thead><tr style="background:rgba(255,255,255,.03);color:#94a3b8"><th style="padding:9px 12px">Quando</th><th style="padding:9px 12px">Empresa</th><th style="padding:9px 12px">Usuário</th><th style="padding:9px 12px">Tela</th><th style="padding:9px 12px">Erro</th></tr></thead><tbody>${rows}</tbody></table></div></div>`;
+      const tenant = this._esc(e.tenant_nome || e.tenant_id || 'Anônimo');
+      const user = this._esc(e.usuario_nome || '—');
+      const route = this._esc(e.route || 'Geral');
+      const msg = this._esc(e.message || 'Erro');
+
+      let meta = e.metadata;
+      if (typeof meta === 'string') {
+        try { meta = JSON.parse(meta); } catch {}
+      }
+      const hasBreadcrumbs = Array.isArray(meta?.breadcrumbs) && meta.breadcrumbs.length > 0;
+
+      return `
+        <tr style="border-bottom:1px solid rgba(255,255,255,.06);">
+          <td style="padding:9px 12px;color:#94a3b8;white-space:nowrap;font-size:.75rem;">${this._esc(when)}</td>
+          <td style="padding:9px 12px;font-weight:700;color:#fff;">${tenant}</td>
+          <td style="padding:9px 12px;color:#cbd5e1;">${user}</td>
+          <td style="padding:9px 12px;color:#38bdf8;font-weight:800;">${route}</td>
+          <td style="padding:9px 12px;max-width:320px;">
+            <div style="font-weight:700;color:#fca5a5;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${this._esc(e.stack || msg)}">${msg}</div>
+            <div style="font-size:.68rem;color:#64748b;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${this._esc(e.source || '')}</div>
+          </td>
+          <td style="padding:9px 12px;text-align:right;white-space:nowrap;">
+            <button data-error-id="${id}" data-fb-click="MasterAdmin.abrirDetalhesErro" data-fb-click-n="1" data-fb-click-t0="dataset" data-fb-click-v0="errorId" style="background:${hasBreadcrumbs ? 'rgba(34,197,94,.15)' : 'rgba(255,255,255,.08)'};border:1px solid ${hasBreadcrumbs ? '#22c55e' : 'rgba(255,255,255,.2)'};color:${hasBreadcrumbs ? '#86efac' : '#cbd5e1'};border-radius:6px;padding:4px 8px;font-size:.72rem;font-weight:800;cursor:pointer;" title="${hasBreadcrumbs ? 'Ver ações anteriores e stack' : 'Ver stack trace'}">
+              ${hasBreadcrumbs ? '🎬 Replay' : '🔍 Stack'}
+            </button>
+          </td>
+        </tr>
+      `;
+    }).join('') : `<tr><td colspan="6" style="padding:22px;text-align:center;color:#64748b;">Nenhum erro de frontend registrado. ✅</td></tr>`;
+
+    // Badges de Top Rotas
+    const routeBadges = topRoutes.length ? topRoutes.map(r => `
+      <span style="display:inline-flex;align-items:center;gap:6px;padding:4px 10px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:12px;font-size:.72rem;color:#e2e8f0;">
+        <strong style="color:var(--accent2);">${this._esc(r.route)}:</strong> ${Number(r.count)}
+      </span>
+    `).join('') : '<span style="font-size:.72rem;color:#64748b;">Nenhuma rota com erros recorrentes</span>';
+
+    return `
+      <div style="background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.08);border-radius:14px;overflow:hidden;margin-bottom:34px;">
+        <div style="padding:16px 20px;border-bottom:1px solid rgba(255,255,255,.08);display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap;">
+          <div>
+            <h3 style="font-size:1.05rem;font-weight:800;color:#fff;margin:0;">🛠️ Observabilidade &amp; Saúde do Sistema (Frontend SaaS)</h3>
+            <div style="font-size:.72rem;color:#94a3b8;margin-top:3px;">Monitoramento de exceções em tempo real com captura de breadcrumbs e diagnóstico de falhas</div>
+          </div>
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+            <button data-fb-click="MasterAdmin.limparErrosAntigos" data-fb-click-n="0" style="background:rgba(239,68,68,.1);border:1px solid #ef4444;color:#fca5a5;border-radius:6px;padding:6px 12px;font-size:.75rem;font-weight:800;cursor:pointer;" title="Expurgar registros com mais de 30 dias">
+              🧹 Limpar &gt; 30d
+            </button>
+            <button data-fb-click="Patch26Actions.masterReloadErrors" data-fb-click-n="0" style="background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15);color:#cbd5e1;border-radius:6px;padding:6px 12px;font-size:.75rem;font-weight:800;cursor:pointer;display:inline-flex;align-items:center;gap:6px;">
+              <span>↻</span> Atualizar
+            </button>
+          </div>
+        </div>
+
+        <!-- 4 Cards de Métricas de Telemetria -->
+        <div style="padding:18px 20px;display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px;background:rgba(0,0,0,.15);border-bottom:1px solid rgba(255,255,255,.06);">
+          <div style="background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.06);border-radius:10px;padding:12px 14px;">
+            <div style="font-size:.7rem;color:#94a3b8;text-transform:uppercase;font-weight:700;">Erros (24h)</div>
+            <div style="font-size:1.5rem;font-weight:900;color:${count24 ? '#f87171' : '#22c55e'};margin-top:4px;">${count24}</div>
+            <div style="font-size:.68rem;color:#64748b;">Incidentes recentes</div>
+          </div>
+          <div style="background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.06);border-radius:10px;padding:12px 14px;">
+            <div style="font-size:.7rem;color:#94a3b8;text-transform:uppercase;font-weight:700;">Volume (7 dias)</div>
+            <div style="font-size:1.5rem;font-weight:900;color:#e2e8f0;margin-top:4px;">${count7d}</div>
+            <div style="font-size:.68rem;color:#64748b;">Total acumulado</div>
+          </div>
+          <div style="background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.06);border-radius:10px;padding:12px 14px;">
+            <div style="font-size:.7rem;color:#94a3b8;text-transform:uppercase;font-weight:700;">Empresas Impactadas</div>
+            <div style="font-size:1.5rem;font-weight:900;color:${tenants24 ? '#f59e0b' : '#22c55e'};margin-top:4px;">${tenants24}</div>
+            <div style="font-size:.68rem;color:#64748b;">Nas últimas 24 horas</div>
+          </div>
+          <div style="background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.06);border-radius:10px;padding:12px 14px;">
+            <div style="font-size:.7rem;color:#94a3b8;text-transform:uppercase;font-weight:700;">Pré-Auth / Anônimos</div>
+            <div style="font-size:1.5rem;font-weight:900;color:${anon24 ? '#fb923c' : '#22c55e'};margin-top:4px;">${anon24}</div>
+            <div style="font-size:.68rem;color:#64748b;">Login ou landing</div>
+          </div>
+        </div>
+
+        <!-- Distribuição por Rotas -->
+        <div style="padding:12px 20px;border-bottom:1px solid rgba(255,255,255,.06);display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+          <span style="font-size:.75rem;font-weight:800;color:#94a3b8;">Rotas com mais incidentes:</span>
+          ${routeBadges}
+        </div>
+
+        <!-- Clusters de Erros Frequentes -->
+        <div style="padding:14px 20px 6px;border-bottom:1px solid rgba(255,255,255,.06);">
+          <h4 style="font-size:.85rem;font-weight:800;color:#fff;margin:0 0 4px 0;">🎯 Assinaturas Agrupadas de Erros (Clusters 7d)</h4>
+          <div style="font-size:.7rem;color:#94a3b8;">Problemas consolidados por causa-raiz para priorização de correções</div>
+        </div>
+        <div style="overflow-x:auto;">
+          <table style="width:100%;border-collapse:collapse;text-align:left;font-size:.76rem;">
+            <thead>
+              <tr style="background:rgba(255,255,255,.02);color:#94a3b8;">
+                <th style="padding:9px 14px;">Assinatura / Mensagem</th>
+                <th style="padding:9px 14px;">Origem</th>
+                <th style="padding:9px 14px;text-align:center;">Qtd</th>
+                <th style="padding:9px 14px;text-align:center;">Empresas</th>
+                <th style="padding:9px 14px;">Última Ocorrência</th>
+                <th style="padding:9px 14px;text-align:right;">Ação</th>
+              </tr>
+            </thead>
+            <tbody>${clusterRows}</tbody>
+          </table>
+        </div>
+
+        <!-- Logs Recentes de Incidentes -->
+        <div style="padding:16px 20px 6px;border-top:1px solid rgba(255,255,255,.06);">
+          <h4 style="font-size:.85rem;font-weight:800;color:#fff;margin:0 0 4px 0;">📜 Ocorrências Recentes &amp; Breadcrumbs</h4>
+          <div style="font-size:.7rem;color:#94a3b8;">Eventos individuais com passos de navegação antes da falha</div>
+        </div>
+        <div style="overflow-x:auto;">
+          <table style="width:100%;border-collapse:collapse;text-align:left;font-size:.76rem;">
+            <thead>
+              <tr style="background:rgba(255,255,255,.02);color:#94a3b8;">
+                <th style="padding:9px 12px;">Quando</th>
+                <th style="padding:9px 12px;">Empresa</th>
+                <th style="padding:9px 12px;">Usuário</th>
+                <th style="padding:9px 12px;">Tela</th>
+                <th style="padding:9px 12px;">Erro</th>
+                <th style="padding:9px 12px;text-align:right;">Diagnóstico</th>
+              </tr>
+            </thead>
+            <tbody>${recentRows}</tbody>
+          </table>
+        </div>
+      </div>
+    `;
+  },
+
+  abrirDetalhesErro(errorId) {
+    const bundle = this._errorsGlobal || { errors: [] };
+    const errObj = (bundle.errors || []).find(e => e.id === errorId);
+    if (!errObj) {
+      alert('Registro de telemetria não encontrado.');
+      return;
+    }
+
+    let meta = errObj.metadata;
+    if (typeof meta === 'string') {
+      try { meta = JSON.parse(meta); } catch {}
+    }
+    meta = meta || {};
+
+    const breadcrumbs = Array.isArray(meta.breadcrumbs) ? meta.breadcrumbs : [];
+    const when = errObj.created_at ? new Date(errObj.created_at).toLocaleString('pt-BR') : '—';
+    const tenant = this._esc(errObj.tenant_nome || errObj.tenant_id || 'Anônimo');
+    const user = this._esc(errObj.usuario_nome || '—');
+    const route = this._esc(errObj.route || 'Geral');
+    const viewport = this._esc(meta.viewport || 'Não informada');
+    const url = this._esc(meta.url || '—');
+    const connection = this._esc(meta.connection || '—');
+    const online = meta.online !== false ? '🟢 Online' : '🔴 Offline';
+    const message = this._esc(errObj.message || 'Sem mensagem');
+    const stack = this._esc(errObj.stack || 'Stack trace não disponível.');
+
+    // Timeline dos passos
+    const timelineHtml = breadcrumbs.length ? breadcrumbs.map((b, idx) => {
+      const typeIcons = { click: '🖱️ Clique', navigation: '🧭 Navegação', action: '⚡ Ação', input: '⌨️ Entrada' };
+      const icon = typeIcons[b.type] || '📌 Evento';
+      const timeStr = b.t ? new Date(b.t).toLocaleTimeString('pt-BR') : `Passo ${idx + 1}`;
+      return `
+        <div style="display:flex;gap:12px;align-items:flex-start;padding:8px 0;border-left:2px solid var(--accent);margin-left:10px;padding-left:14px;position:relative;">
+          <div style="position:absolute;left:-6px;top:10px;width:10px;height:10px;border-radius:50%;background:var(--accent);"></div>
+          <div style="font-size:.72rem;color:#94a3b8;white-space:nowrap;min-width:60px;">${this._esc(timeStr)}</div>
+          <div>
+            <div style="font-size:.78rem;font-weight:800;color:#fff;">${icon} em <code style="color:var(--accent2);">${this._esc(b.target || 'elemento')}</code></div>
+            ${b.details ? `<div style="font-size:.72rem;color:#cbd5e1;margin-top:2px;">${this._esc(b.details)}</div>` : ''}
+          </div>
+        </div>
+      `;
+    }).join('') : '<div style="font-size:.75rem;color:#94a3b8;padding:10px 0;">Nenhum passo prévio registrado pelo navegador antes da falha.</div>';
+
+    // Remove modal anterior se houver
+    document.getElementById('modal-error-replay')?.remove();
+
+    const modalEl = document.createElement('div');
+    modalEl.id = 'modal-error-replay';
+    modalEl.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.75);backdrop-filter:blur(6px);z-index:99999;display:flex;align-items:center;justify-content:center;padding:20px;';
+
+    modalEl.innerHTML = `
+      <div style="background:#0f172a;border:1px solid rgba(255,255,255,.15);border-radius:16px;max-width:760px;width:100%;max-height:90vh;overflow-y:auto;box-shadow:0 25px 50px -12px rgba(0,0,0,.7);">
+        <div style="padding:18px 24px;border-bottom:1px solid rgba(255,255,255,.1);display:flex;justify-content:space-between;align-items:center;">
+          <div>
+            <h3 style="font-size:1.15rem;font-weight:900;color:#fff;margin:0 0 3px 0;">🎬 Diagnóstico de Telemetria &amp; Replay</h3>
+            <div style="font-size:.75rem;color:#94a3b8;">ID: ${this._esc(errObj.id)} · ${when}</div>
+          </div>
+          <button data-fb-click="MasterAdmin.fecharDetalhesErro" data-fb-click-n="0" style="background:transparent;border:none;color:#94a3b8;font-size:1.5rem;cursor:pointer;line-height:1;">&times;</button>
+        </div>
+
+        <div style="padding:20px 24px;">
+          <!-- Informações de Contexto -->
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:12px;margin-bottom:18px;font-size:.78rem;">
+            <div><span style="color:#94a3b8;">Empresa:</span> <strong style="color:#fff;">${tenant}</strong></div>
+            <div><span style="color:#94a3b8;">Usuário:</span> <strong style="color:#fff;">${user}</strong></div>
+            <div><span style="color:#94a3b8;">Tela / Rota:</span> <strong style="color:#38bdf8;">${route}</strong></div>
+            <div><span style="color:#94a3b8;">Resolução:</span> <strong style="color:#fff;">${viewport}</strong></div>
+            <div><span style="color:#94a3b8;">Conexão:</span> <strong style="color:#fff;">${online} (${connection})</strong></div>
+            <div style="grid-column:1/-1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"><span style="color:#94a3b8;">URL:</span> <code style="color:#cbd5e1;font-size:.72rem;">${url}</code></div>
+          </div>
+
+          <!-- Mensagem do Erro -->
+          <div style="margin-bottom:18px;">
+            <div style="font-size:.75rem;font-weight:800;color:#fca5a5;text-transform:uppercase;margin-bottom:6px;">Mensagem de Erro</div>
+            <div style="background:rgba(239,68,68,.1);border:1px solid #ef4444;border-radius:8px;padding:12px;font-family:monospace;font-size:.8rem;color:#fca5a5;word-break:break-word;">
+              ${message}
+            </div>
+          </div>
+
+          <!-- Linha do Tempo de Breadcrumbs -->
+          <div style="margin-bottom:18px;">
+            <div style="font-size:.75rem;font-weight:800;color:#38bdf8;text-transform:uppercase;margin-bottom:8px;">Passos Anteriores à Falha (Replay)</div>
+            <div style="background:rgba(0,0,0,.25);border:1px solid rgba(255,255,255,.06);border-radius:10px;padding:14px;">
+              ${timelineHtml}
+              <div style="display:flex;gap:12px;align-items:flex-start;padding:8px 0;margin-left:10px;padding-left:14px;position:relative;">
+                <div style="position:absolute;left:-6px;top:10px;width:10px;height:10px;border-radius:50%;background:#ef4444;"></div>
+                <div style="font-size:.72rem;color:#ef4444;font-weight:800;">💥 CRASH</div>
+                <div style="font-size:.78rem;font-weight:800;color:#fca5a5;">Exceção capturada pela telemetria</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Stack Trace -->
+          <div>
+            <div style="font-size:.75rem;font-weight:800;color:#94a3b8;text-transform:uppercase;margin-bottom:6px;">Rastreamento de Pilha (Stack Trace)</div>
+            <pre style="background:rgba(0,0,0,.4);border:1px solid rgba(255,255,255,.08);border-radius:8px;padding:12px;font-size:.72rem;color:#cbd5e1;overflow-x:auto;max-height:160px;margin:0;white-space:pre-wrap;word-break:break-word;">${stack}</pre>
+          </div>
+        </div>
+
+        <div style="padding:14px 24px;border-top:1px solid rgba(255,255,255,.1);text-align:right;">
+          <button data-fb-click="MasterAdmin.fecharDetalhesErro" data-fb-click-n="0" class="btn-primary" style="padding:8px 18px;border-radius:8px;font-weight:800;font-size:.82rem;">
+            Fechar Diagnóstico
+          </button>
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(modalEl);
+  },
+
+  fecharDetalhesErro() {
+    document.getElementById('modal-error-replay')?.remove();
+  },
+
+  async limparErrosAntigos() {
+    if (!confirm('Deseja realmente expurgar os registros de telemetria com mais de 30 dias?\n\nEssa ação é irreversível e ajuda a manter a base de dados enxuta.')) return;
+    try {
+      const resp = await fetch('/api/admin?action=clear_old_client_errors', {
+        method: 'POST',
+        headers: (typeof Auth !== 'undefined' ? Auth.getAuthHeaders() : { 'Content-Type': 'application/json' }),
+        body: JSON.stringify({ days: 30 })
+      });
+      const data = await resp.json().catch(() => ({}));
+      if (!resp.ok || !data.success) throw new Error(data.error || 'Falha ao limpar erros antigos.');
+      alert(`🧹 ${data.message || 'Registros expurgados com sucesso!'}`);
+      await this.carregarErrosSaaS(true);
+      this.render(document.getElementById('master-content-area') ? 'master-content-area' : 'route-content');
+    } catch (err) {
+      alert(err?.message || 'Falha ao executar limpeza de telemetria.');
+    }
   },
 
   async confirmarPagamento(invoiceId) {
@@ -620,7 +927,7 @@ const MasterAdmin = {
             💬 Central de Atendimento DEV carregando...
           </div>
         `}
-        `}
+        `)}
 
       </div>
     `;

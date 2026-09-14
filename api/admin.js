@@ -392,26 +392,80 @@ export default async function handler(req, res) {
       });
     }
 
+    // ── Telemetria e Observabilidade de Erros (PATCH 46) ───────────────────
     if (req.method === 'GET' && action === 'client_errors') {
-      const limit = Math.min(Math.max(Number.parseInt(req.query?.limit || '100',10) || 100,1),200);
+      const limit = Math.min(Math.max(Number.parseInt(req.query?.limit || '100', 10) || 100, 1), 200);
+      const tenantFilter = String(req.query?.tenantId || '').trim();
+
       const rows = await sql`
-        SELECT e.id,e.tenant_id,e.user_id,e.route,e.message,e.source,e.line_no,e.col_no,e.stack,e.created_at,
-               COALESCE(t.nome_fantasia,t.razao_social,e.tenant_id,'Tenant') AS tenant_nome,
-               COALESCE(u.nome,u.username,'Usuário') AS usuario_nome
+        SELECT e.id, e.tenant_id, e.user_id, e.route, e.message, e.source, e.line_no, e.col_no, e.stack,
+               e.metadata, e.status, e.user_agent, e.created_at,
+               COALESCE(t.nome_fantasia, t.razao_social, e.tenant_id, 'Anônimo / Visitante') AS tenant_nome,
+               COALESCE(u.nome, u.username, 'Usuário') AS usuario_nome
         FROM client_error_logs e
-        LEFT JOIN tenants t ON t.id=e.tenant_id
-        LEFT JOIN usuarios u ON u.id=e.user_id
-        ORDER BY e.created_at DESC,e.id DESC
+        LEFT JOIN tenants t ON t.id = e.tenant_id
+        LEFT JOIN usuarios u ON u.id = e.user_id
+        WHERE (${tenantFilter} = '' OR e.tenant_id = ${tenantFilter})
+        ORDER BY e.created_at DESC, e.id DESC
         LIMIT ${limit};
       `;
+
       const summaryRows = await sql`
         SELECT
           COUNT(*) FILTER (WHERE created_at >= NOW() - INTERVAL '24 hours')::int AS last_24h,
           COUNT(*) FILTER (WHERE created_at >= NOW() - INTERVAL '7 days')::int AS last_7d,
-          COUNT(DISTINCT tenant_id) FILTER (WHERE created_at >= NOW() - INTERVAL '24 hours')::int AS tenants_24h
+          COUNT(DISTINCT tenant_id) FILTER (WHERE tenant_id IS NOT NULL AND created_at >= NOW() - INTERVAL '24 hours')::int AS tenants_24h,
+          COUNT(*) FILTER (WHERE tenant_id IS NULL AND created_at >= NOW() - INTERVAL '24 hours')::int AS anonymous_24h
         FROM client_error_logs;
       `;
-      return res.status(200).json({ success:true, errors:rows, summary:summaryRows[0] || {} });
+
+      const topRoutes = await sql`
+        SELECT COALESCE(route, 'Geral') AS route, COUNT(*)::int AS count
+        FROM client_error_logs
+        WHERE created_at >= NOW() - INTERVAL '7 days'
+        GROUP BY route
+        ORDER BY count DESC
+        LIMIT 6;
+      `;
+
+      const clusters = await sql`
+        SELECT
+          MD5(CONCAT(LEFT(message, 120), ':', COALESCE(source, ''))) AS cluster_id,
+          LEFT(message, 140) AS signature,
+          COALESCE(source, '—') AS source,
+          COUNT(*)::int AS count,
+          COUNT(DISTINCT tenant_id)::int AS affected_tenants,
+          MAX(created_at) AS last_seen,
+          MIN(created_at) AS first_seen,
+          MAX(id) AS sample_id
+        FROM client_error_logs
+        WHERE created_at >= NOW() - INTERVAL '7 days'
+        GROUP BY signature, source
+        ORDER BY count DESC, last_seen DESC
+        LIMIT 15;
+      `;
+
+      return res.status(200).json({
+        success: true,
+        errors: rows,
+        summary: summaryRows[0] || {},
+        top_routes: topRoutes,
+        clusters
+      });
+    }
+
+    if (req.method === 'POST' && (action === 'clear_old_client_errors' || action === 'limpar_erros_antigos')) {
+      const days = Math.min(Math.max(Number.parseInt(req.body?.days || '30', 10) || 30, 1), 365);
+      const deleted = await sql`
+        DELETE FROM client_error_logs
+        WHERE created_at < NOW() - (${days} || ' days')::interval
+        RETURNING id;
+      `;
+      return res.status(200).json({
+        success: true,
+        deleted_count: deleted.length,
+        message: `${deleted.length} registro(s) de telemetria com mais de ${days} dias foram expurgados.`
+      });
     }
 
     if (req.method === 'GET' && action === 'tenants') {

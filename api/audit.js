@@ -44,34 +44,79 @@ export default async function handler(req, res) {
   res.setHeader('Cache-Control', 'no-store');
   if (req.method === 'OPTIONS') return res.status(200).end();
 
+  const action = String(req.query?.action || req.body?.action || '').trim().toLowerCase();
+
+  // Telemetria de Erros do Cliente (PATCH 46):
+  // Aceita tanto usuários logados quanto anônimos (ex: landing, login, onboarding),
+  // com rate-limit e sanitização rigorosa de credenciais e dados pessoais.
+  if (req.method === 'POST' && action === 'client_error') {
+    let auth = { authenticated: false };
+    try {
+      auth = await resolveAuthAndTenant(req);
+    } catch {}
+
+    const ip = getClientIp(req);
+    const rateKey = auth.authenticated ? `client-error:${auth.user?.userId || ip}` : `client-error:anon:${ip}`;
+    const rl = await checkRateLimit(rateKey, 30, 10 * 60 * 1000);
+    if (!rl.allowed) return res.status(202).json({ success: true, throttled: true });
+
+    const b = req.body || {};
+    const message = redactSensitive(b.message, 1500);
+    if (!message) return res.status(400).json({ success: false, error: 'Mensagem do erro não informada.' });
+
+    // Sanitiza e estrutura breadcrumbs
+    let breadcrumbs = [];
+    if (Array.isArray(b.breadcrumbs)) {
+      breadcrumbs = b.breadcrumbs.slice(-10).map(item => ({
+        t: Number(item?.t || 0),
+        type: clean(item?.type || 'action', 30),
+        target: redactSensitive(item?.target, 120),
+        details: redactSensitive(item?.details, 160)
+      }));
+    }
+
+    const metadata = {
+      breadcrumbs,
+      viewport: clean(b.viewport || '', 30),
+      url: redactSensitive(b.url || '', 250),
+      anonymous: !auth.authenticated,
+      connection: clean(b.connection || '', 30),
+      online: b.online !== false
+    };
+
+    try {
+      const sql = getSql();
+      const id = `err_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`;
+      await sql`
+        INSERT INTO client_error_logs (
+          id, tenant_id, user_id, route, message, source, line_no, col_no, stack, user_agent, metadata, status
+        ) VALUES (
+          ${id},
+          ${auth.authenticated ? auth.tenantId : null},
+          ${auth.authenticated ? (auth.user?.userId || null) : null},
+          ${redactSensitive(b.route, 120) || null},
+          ${message},
+          ${redactSensitive(b.source, 500) || null},
+          ${Number.isFinite(Number(b.line)) ? Number(b.line) : null},
+          ${Number.isFinite(Number(b.col)) ? Number(b.col) : null},
+          ${redactSensitive(b.stack, 5000) || null},
+          ${clean(req.headers['user-agent'], 1000) || null},
+          ${JSON.stringify(metadata)}::jsonb,
+          'open'
+        );
+      `;
+      return res.status(201).json({ success: true, id });
+    } catch (dbErr) {
+      console.error('[Telemetry] Falha ao persistir erro de cliente:', dbErr);
+      return res.status(500).json({ success: false, error: 'Erro interno ao registrar telemetria.' });
+    }
+  }
+
   const auth = await resolveAuthAndTenant(req);
   if (!auth.authenticated) return res.status(auth.status || 401).json({ success: false, error: auth.error || 'Não autorizado.' });
 
   try {
     const sql = getSql();
-    const action = String(req.query?.action || req.body?.action || '').trim().toLowerCase();
-
-    // Qualquer usuário autenticado pode reportar um erro do próprio navegador.
-    // O rate-limit evita que um loop de frontend lote a tabela.
-    if (req.method === 'POST' && action === 'client_error') {
-      const rl = await checkRateLimit(`client-error:${auth.user?.userId || getClientIp(req)}`, 30, 10 * 60 * 1000);
-      if (!rl.allowed) return res.status(202).json({ success:true, throttled:true });
-
-      const b = req.body || {};
-      const message = redactSensitive(b.message, 1500);
-      if (!message) return res.status(400).json({ success:false, error:'Mensagem do erro não informada.' });
-      const id = `err_${Date.now().toString(36)}_${Math.random().toString(36).slice(2,10)}`;
-      await sql`
-        INSERT INTO client_error_logs (id,tenant_id,user_id,route,message,source,line_no,col_no,stack,user_agent)
-        VALUES (
-          ${id}, ${auth.tenantId}, ${auth.user?.userId || null}, ${redactSensitive(b.route,120) || null}, ${message},
-          ${redactSensitive(b.source,500) || null}, ${Number.isFinite(Number(b.line)) ? Number(b.line) : null},
-          ${Number.isFinite(Number(b.col)) ? Number(b.col) : null}, ${redactSensitive(b.stack,5000) || null},
-          ${clean(req.headers['user-agent'],1000) || null}
-        );
-      `;
-      return res.status(201).json({ success:true, id });
-    }
 
     if (req.method !== 'GET') return res.status(405).json({ success: false, error: 'Método não permitido.' });
     if (!canViewAudit(auth)) return res.status(403).json(permissionError('ROLE_AUDIT_FORBIDDEN'));
@@ -81,7 +126,7 @@ export default async function handler(req, res) {
 
     if (action === 'errors') {
       const rows = await sql`
-        SELECT e.id,e.route,e.message,e.source,e.line_no,e.col_no,e.stack,e.user_agent,e.created_at,e.user_id,
+        SELECT e.id,e.route,e.message,e.source,e.line_no,e.col_no,e.stack,e.user_agent,e.metadata,e.status,e.created_at,e.user_id,
                COALESCE(u.nome,u.username,'Usuário') AS usuario_nome,u.username AS usuario_username
         FROM client_error_logs e
         LEFT JOIN usuarios u ON u.id=e.user_id

@@ -499,10 +499,13 @@ CREATE TABLE IF NOT EXISTS client_error_logs (
   tenant_id VARCHAR(64) REFERENCES tenants(id) ON DELETE CASCADE,
   user_id VARCHAR(64) REFERENCES usuarios(id) ON DELETE SET NULL,
   route VARCHAR(100), message TEXT NOT NULL, source TEXT, line_no INTEGER, col_no INTEGER, stack TEXT, user_agent TEXT,
+  metadata JSONB DEFAULT '{}'::jsonb,
+  status VARCHAR(20) DEFAULT 'open',
   created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 CREATE INDEX IF NOT EXISTS idx_client_errors_tenant_created ON client_error_logs (tenant_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_client_errors_user_created ON client_error_logs (user_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_client_error_logs_status_created ON client_error_logs (status, created_at DESC);
 
 
 -- Patch 09: rate limiting distribuído entre instâncias serverless

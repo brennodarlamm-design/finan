@@ -6,6 +6,7 @@ const App = {
   _charts: [],
   _errorMonitorInstalled: false,
   _errorFingerprints: new Map(),
+  _breadcrumbs: [],
   _sessionRefreshTimer: null,
 
   get currentRoute() { return this.route; },
@@ -553,14 +554,39 @@ const App = {
     return preferred.find(r => !Auth?.canRoute || Auth.canRoute(r,'read')) || 'dashboard';
   },
 
+  addBreadcrumb(type, target, details) {
+    if (!this._breadcrumbs) this._breadcrumbs = [];
+    this._breadcrumbs.push({
+      t: Date.now(),
+      type: String(type || 'action').slice(0, 30),
+      target: String(target || '').slice(0, 120),
+      details: String(details || '').slice(0, 160)
+    });
+    if (this._breadcrumbs.length > 10) this._breadcrumbs.shift();
+  },
+
   _installErrorMonitor() {
     if (this._errorMonitorInstalled) return;
     this._errorMonitorInstalled = true;
+
+    // Rastreia cliques relevantes do usuário como breadcrumbs
+    try {
+      document.addEventListener('click', (ev) => {
+        try {
+          const target = ev.target;
+          const el = target?.closest ? target.closest('button, a, [data-fb-click], input[type="submit"], input[type="button"]') : null;
+          if (el) {
+            const label = (el.innerText || el.getAttribute('title') || el.getAttribute('aria-label') || el.getAttribute('data-fb-click') || el.tagName).trim().slice(0, 50);
+            this.addBreadcrumb('click', el.tagName.toLowerCase(), label);
+          }
+        } catch {}
+      }, { passive: true, capture: true });
+    } catch {}
+
     const report = (payload = {}) => {
       try {
-        if (!Auth?.getSession?.()) return;
-        const message = String(payload.message || 'Erro JavaScript').slice(0,1500);
-        const source = String(payload.source || '').slice(0,500);
+        const message = String(payload.message || 'Erro JavaScript').slice(0, 1500);
+        const source = String(payload.source || '').slice(0, 500);
         const fp = `${message}|${source}|${payload.line || ''}|${this.route || ''}`;
         const now = Date.now();
         const previous = this._errorFingerprints.get(fp) || 0;
@@ -569,28 +595,45 @@ const App = {
         if (this._errorFingerprints.size > 100) {
           for (const [key, ts] of this._errorFingerprints) if (now - ts > 10 * 60 * 1000) this._errorFingerprints.delete(key);
         }
+
+        const hasAuth = Boolean(typeof Auth !== 'undefined' && Auth.getSession && Auth.getSession());
+        const headers = hasAuth ? Auth.getAuthHeaders() : { 'Content-Type': 'application/json' };
+        const bodyObj = {
+          ...payload,
+          message,
+          source,
+          route: this.route || (this._getRouteFromUrl ? this._getRouteFromUrl() : 'unknown'),
+          breadcrumbs: (this._breadcrumbs || []).slice(-10),
+          viewport: `${window.innerWidth || 0}x${window.innerHeight || 0}`,
+          url: window.location.href,
+          connection: navigator.connection?.effectiveType || '',
+          online: navigator.onLine !== false
+        };
+
+        const bodyStr = JSON.stringify(bodyObj);
         fetch('/api/audit?action=client_error', {
-          method:'POST', headers:Auth.getAuthHeaders(), keepalive:true,
-          body:JSON.stringify({ ...payload, message, source, route:this.route || this._getRouteFromUrl() })
+          method: 'POST',
+          headers,
+          keepalive: true,
+          body: bodyStr
         }).catch(() => {});
       } catch {}
     };
-    window.addEventListener('error', e => report({ message:e.message || e.error?.message, source:e.filename, line:e.lineno, col:e.colno, stack:e.error?.stack || '' }));
+
+    window.addEventListener('error', e => report({ message: e.message || e.error?.message, source: e.filename, line: e.lineno, col: e.colno, stack: e.error?.stack || '' }));
     window.addEventListener('unhandledrejection', e => {
       const reason = e.reason;
-      report({ message:reason?.message || String(reason || 'Promise rejeitada'), source:'unhandledrejection', stack:reason?.stack || '' });
+      report({ message: reason?.message || String(reason || 'Promise rejeitada'), source: 'unhandledrejection', stack: reason?.stack || '' });
     });
     window.addEventListener('securitypolicyviolation', e => {
-      // Se for Report-Only para script-src-attr (medição transitória de handlers inline do Patch 11),
-      // não polui o painel de erros críticos da construtora. Apenas bloqueios enforced ou outras diretivas geram alerta.
       if (e.disposition === 'report' && (e.violatedDirective === 'script-src-attr' || e.effectiveDirective === 'script-src-attr')) {
         return;
       }
       report({
-        message:`CSP ${e.disposition === 'report' ? 'mediu' : 'bloqueou'} ${e.violatedDirective || 'diretiva'}: ${e.blockedURI || 'inline'}`,
+        message: `CSP ${e.disposition === 'report' ? 'mediu' : 'bloqueou'} ${e.violatedDirective || 'diretiva'}: ${e.blockedURI || 'inline'}`,
         source: e.disposition === 'report' ? 'csp-report' : 'csp',
-        line:e.lineNumber || 0, col:e.columnNumber || 0,
-        stack:`effective=${e.effectiveDirective || ''}; disposition=${e.disposition || ''}`
+        line: e.lineNumber || 0, col: e.columnNumber || 0,
+        stack: `effective=${e.effectiveDirective || ''}; disposition=${e.disposition || ''}`
       });
     });
   },
@@ -615,6 +658,7 @@ const App = {
       targetRoute = fallback;
     }
     this.route = targetRoute;
+    this.addBreadcrumb('navigation', targetRoute, cleanRoute);
     const navigation = this._navigationId = (this._navigationId || 0) + 1;
     this._charts.forEach(c => { try { c.destroy(); } catch{} });
     this._charts = [];
