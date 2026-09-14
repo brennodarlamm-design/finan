@@ -73,6 +73,121 @@ function setCookies(res, lines) {
   res.setHeader('Set-Cookie', [...base, ...lines]);
 }
 
+function escapeHtmlAdmin(str) {
+  return String(str || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
+function renderBillingEmailHtml(vars) {
+  const empresa = escapeHtmlAdmin(vars.EMPRESA);
+  const responsavel = escapeHtmlAdmin(vars.RESPONSAVEL);
+  const plano = escapeHtmlAdmin(vars.PLANO);
+  const valor = escapeHtmlAdmin(vars.VALOR);
+  const vencimento = escapeHtmlAdmin(vars.VENCIMENTO);
+  const situacao = escapeHtmlAdmin(vars.SITUACAO);
+  const badgeStatus = escapeHtmlAdmin(vars.BADGE_STATUS);
+  const tituloAviso = escapeHtmlAdmin(vars.TITULO_AVISO);
+  const pixChave = escapeHtmlAdmin(vars.PIX_CHAVE);
+  const pixBeneficiario = escapeHtmlAdmin(vars.PIX_BENEFICIARIO);
+  const mensagemExtra = escapeHtmlAdmin(vars.MENSAGEM_EXTRA).replace(/\r?\n/g, '<br>');
+  const linkAcesso = encodeURI(vars.LINK_ACESSO || 'https://finobra.app.br/login');
+
+  return `<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Assinatura FinObra — ${empresa}</title>
+</head>
+<body style="margin:0;padding:0;background:#0f172a;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#1e293b;">
+  <span style="display:none !important;visibility:hidden;font-size:1px;line-height:1px;max-height:0;max-width:0;opacity:0;overflow:hidden;">
+    Aviso de assinatura FinObra: ${situacao} — ${empresa}.
+  </span>
+  <div style="background:#0f172a;padding:36px 16px;min-height:100vh;">
+    <div style="max-width:580px;margin:0 auto;background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 12px 36px rgba(0,0,0,0.35);">
+      <div style="background:linear-gradient(135deg, #09121d 0%, #152438 100%);padding:28px 32px;border-bottom:3px solid #c9a227;">
+        <table style="width:100%;border-collapse:collapse;">
+          <tr>
+            <td>
+              <div style="font-size:24px;font-weight:900;color:#ffffff;letter-spacing:-0.5px;">
+                Fin<span style="color:#c9a227;">Obra</span>
+              </div>
+              <div style="font-size:12px;color:#94a3b8;margin-top:4px;text-transform:uppercase;letter-spacing:0.08em;font-weight:600;">
+                Faturamento &amp; Assinaturas SaaS
+              </div>
+            </td>
+            <td style="text-align:right;">
+              <span style="display:inline-block;padding:6px 12px;background:rgba(201,162,39,0.18);border:1px solid rgba(201,162,39,0.45);border-radius:20px;font-size:11px;font-weight:800;color:#facc15;text-transform:uppercase;">
+                ${badgeStatus}
+              </span>
+            </td>
+          </tr>
+        </table>
+      </div>
+      <div style="padding:32px 32px 28px;">
+        <h1 style="margin:0 0 10px;font-size:20px;font-weight:800;color:#0f172a;line-height:1.35;">
+          ${tituloAviso}
+        </h1>
+        <p style="margin:0 0 20px;font-size:14px;line-height:1.6;color:#475569;">
+          Olá, <strong>${responsavel}</strong>! Seguem as informações referentes à renovação da assinatura da empresa <strong>${empresa}</strong> no FinObra:
+        </p>
+        <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:18px 20px;margin-bottom:24px;">
+          <table style="width:100%;border-collapse:collapse;font-size:13px;">
+            <tr>
+              <td style="padding:6px 0;color:#64748b;">Empresa:</td>
+              <td style="padding:6px 0;font-weight:700;color:#0f172a;text-align:right;">${empresa}</td>
+            </tr>
+            <tr>
+              <td style="padding:6px 0;color:#64748b;">Plano Contratado:</td>
+              <td style="padding:6px 0;font-weight:700;color:#0f172a;text-align:right;">${plano}</td>
+            </tr>
+            <tr>
+              <td style="padding:6px 0;color:#64748b;">Vencimento:</td>
+              <td style="padding:6px 0;font-weight:700;color:#2563eb;text-align:right;">${vencimento} (${situacao})</td>
+            </tr>
+            <tr style="border-top:1px dashed #cbd5e1;">
+              <td style="padding:10px 0 4px;font-size:14px;font-weight:700;color:#0f172a;">Valor da Assinatura:</td>
+              <td style="padding:10px 0 4px;font-size:18px;font-weight:900;color:#16a34a;text-align:right;">R$ ${valor}</td>
+            </tr>
+          </table>
+        </div>
+        <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:12px;padding:18px 20px;margin-bottom:24px;">
+          <div style="font-size:13px;font-weight:800;color:#166534;margin-bottom:8px;">
+            ⚡ Pagamento Prático via PIX
+          </div>
+          <div style="font-size:12px;color:#334155;margin-bottom:10px;line-height:1.5;">
+            Transfira o valor utilizando a chave PIX abaixo para renovação e manutenção dos acessos sem interrupção:
+          </div>
+          <div style="background:#ffffff;border:1px solid #86efac;border-radius:8px;padding:10px 14px;font-family:monospace;font-size:13px;font-weight:700;color:#0f172a;word-break:break-all;">
+            ${pixChave}
+          </div>
+          <div style="font-size:11px;color:#64748b;margin-top:6px;">
+            Beneficiário: <strong>${pixBeneficiario}</strong>
+          </div>
+        </div>
+        <div style="font-size:13px;color:#64748b;line-height:1.55;margin-bottom:24px;">
+          ${mensagemExtra}
+        </div>
+        <div style="text-align:center;margin:28px 0 10px;">
+          <a href="${linkAcesso}" target="_blank" rel="noopener noreferrer" style="display:inline-block;background:#0f172a;color:#ffffff;font-size:14px;font-weight:700;padding:12px 28px;border-radius:8px;text-decoration:none;">
+            Acessar Painel FinObra &rarr;
+          </a>
+        </div>
+      </div>
+      <div style="background:#f8fafc;padding:20px 32px;border-top:1px solid #e2e8f0;text-align:center;font-size:11px;color:#94a3b8;line-height:1.5;">
+        Este e-mail foi enviado automaticamente pelo FinObra ERP para o responsável cadastrado na plataforma.<br>
+        Em caso de dúvidas ou envio de comprovante, responda a este e-mail ou contate nosso suporte.
+      </div>
+    </div>
+  </div>
+</body>
+</html>`;
+}
+
 export default async function handler(req, res) {
   setCors(req, res);
 
@@ -447,6 +562,248 @@ export default async function handler(req, res) {
         depois:{ empresa:target[0].nome_fantasia || target[0].razao_social || tenantId, superadmin:auth.user?.username || auth.user?.email || 'superadmin' }
       });
       return res.status(200).json({ success:true, tenant:{ id:target[0].id, nome_fantasia:target[0].nome_fantasia || target[0].razao_social } });
+    }
+
+    // ── POST ?action=send_billing_notice (Notificação de Cobrança WhatsApp e E-mail SaaS) ──
+    if (req.method === 'POST' && action === 'send_billing_notice') {
+      const {
+        tenantId,
+        channel = 'both', // 'whatsapp' | 'email' | 'both' | 'preview'
+        templateType = 'reminder', // 'reminder' | 'due_today' | 'overdue' | 'trial_ending' | 'custom'
+        customMessage,
+        customSubject,
+        pixKey: userPixKey,
+        pixBeneficiary: userPixBeneficiary,
+        targetPhone: userPhone,
+        targetEmail: userEmail
+      } = req.body || {};
+
+      if (!tenantId) {
+        return res.status(400).json({ success: false, error: 'Empresa (tenantId) não informada.' });
+      }
+
+      const tenantRows = await sql`
+        SELECT id, razao_social, nome_fantasia, cnpj, telefone, email, responsavel, plano, status, vencimento
+        FROM tenants WHERE id = ${tenantId} LIMIT 1;
+      `;
+      if (!tenantRows.length) {
+        return res.status(404).json({ success: false, error: 'Empresa não encontrada no banco de dados.' });
+      }
+
+      const t = tenantRows[0];
+      const nomeEmpresa = t.nome_fantasia || t.razao_social || 'Sua Empresa';
+      const responsavel = t.responsavel || 'Gestor(a)';
+      const destPhone = String(userPhone || t.telefone || '').replace(/\D/g, '');
+      const destEmail = String(userEmail || t.email || '').trim();
+
+      const PLANOS_INFO = {
+        starter: { nome: 'Básico', valor: '119,90' },
+        pro: { nome: 'Profissional', valor: '279,90' },
+        unlimited: { nome: 'Ilimitado', valor: '499,90' },
+        trial: { nome: 'Trial (Período de Testes)', valor: '279,90' }
+      };
+      const planoInfo = PLANOS_INFO[t.plano] || { nome: String(t.plano || 'Profissional').toUpperCase(), valor: '279,90' };
+
+      const pixKey = String(userPixKey || process.env.FINOBRA_PIX_KEY || process.env.FINOBRA_SUPPORT_WHATSAPP || '5595991363678').trim();
+      const pixBeneficiary = String(userPixBeneficiary || process.env.FINOBRA_PIX_BENEFICIARY || 'FinObra Soluções Tecnológicas').trim();
+
+      // Cálculo de vencimento e dias restantes
+      let fmtVenc = 'A definir';
+      let diasRestantes = 0;
+      let situacaoTxt = '';
+      let badgeStatus = 'Aviso';
+
+      if (t.vencimento) {
+        const parts = String(t.vencimento).split('-');
+        fmtVenc = parts.length === 3 ? `${parts[2]}/${parts[1]}/${parts[0]}` : String(t.vencimento);
+        const vencDate = new Date(`${parts[0]}-${parts[1]}-${parts[2]}T00:00:00`);
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        diasRestantes = Math.round((vencDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+
+        if (diasRestantes > 1) {
+          situacaoTxt = `vence em ${diasRestantes} dias`;
+          badgeStatus = `Vence em ${diasRestantes}d`;
+        } else if (diasRestantes === 1) {
+          situacaoTxt = 'vence amanhã';
+          badgeStatus = 'Vence Amanhã';
+        } else if (diasRestantes === 0) {
+          situacaoTxt = 'vence hoje';
+          badgeStatus = 'Vence Hoje';
+        } else {
+          const pass = Math.abs(diasRestantes);
+          situacaoTxt = `vencido há ${pass} dia${pass > 1 ? 's' : ''}`;
+          badgeStatus = `Vencido há ${pass}d`;
+        }
+      }
+
+      // Monta textos padrão por template
+      let defaultSubject = `FinObra — Assinatura ${nomeEmpresa}`;
+      let defaultMessage = '';
+      let defaultTituloAviso = `Assinatura FinObra — ${nomeEmpresa}`;
+
+      if (templateType === 'reminder') {
+        defaultSubject = `🔔 FinObra — Lembrete de Renovação de Assinatura (${fmtVenc})`;
+        defaultTituloAviso = `Lembrete de Renovação — ${situacaoTxt || 'próximo vencimento'}`;
+        defaultMessage = `Olá, ${responsavel}! 👋\n\nPassando para lembrar que a assinatura do *FinObra* da empresa *${nomeEmpresa}* (Plano ${planoInfo.nome}) vence em *${fmtVenc}* (${situacaoTxt}).\n\n💰 *Valor:* R$ ${planoInfo.valor}\n🔑 *Chave PIX:* ${pixKey}\n👤 *Beneficiário:* ${pixBeneficiary}\n\nQualquer dúvida ou caso precise de emissão de NF, estamos à disposição!`;
+      } else if (templateType === 'due_today') {
+        defaultSubject = `⚠️ FinObra — Sua assinatura vence hoje (${fmtVenc})`;
+        defaultTituloAviso = `Sua assinatura vence hoje (${fmtVenc})`;
+        defaultMessage = `Olá, ${responsavel}! 🔔\n\nA assinatura do *FinObra* da empresa *${nomeEmpresa}* vence *hoje (${fmtVenc})*.\n\nPara garantir a continuidade dos acessos da sua equipe e sincronização das obras sem interrupção:\n\n💰 *Valor:* R$ ${planoInfo.valor}\n🔑 *Chave PIX:* ${pixKey}\n👤 *Beneficiário:* ${pixBeneficiary}\n\nApós o pagamento via PIX, a renovação é confirmada e os acessos continuam ativos normalmente.`;
+      } else if (templateType === 'overdue') {
+        defaultSubject = `🚨 FinObra — Aviso de Vencimento e Regularização de Acesso`;
+        defaultTituloAviso = `Aviso de Regularização — ${situacaoTxt || 'Assinatura Pendente'}`;
+        defaultMessage = `Olá, ${responsavel}! ⚠️\n\nIdentificamos que a assinatura do *FinObra* da empresa *${nomeEmpresa}* venceu em *${fmtVenc}* (${situacaoTxt}) e consta pendente.\n\nPara evitar o bloqueio preventivo dos acessos, emissão de relatórios e sincronização no canteiro de obras, solicitamos a regularização:\n\n💰 *Valor:* R$ ${planoInfo.valor}\n🔑 *Chave PIX:* ${pixKey}\n👤 *Beneficiário:* ${pixBeneficiary}\n\nSe já realizou o pagamento, por favor desconsidere este aviso ou nos envie o comprovante!`;
+      } else if (templateType === 'trial_ending') {
+        defaultSubject = `🚀 FinObra — Seu período de testes termina em ${fmtVenc}`;
+        defaultTituloAviso = `Seu período de testes está terminando em ${fmtVenc}`;
+        defaultMessage = `Olá, ${responsavel}! 🚀\n\nSeu período de teste gratuito do *FinObra* na empresa *${nomeEmpresa}* termina em *${fmtVenc}*.\n\nEsperamos que a plataforma esteja transformando a gestão das suas obras! Para continuar utilizando todos os recursos com a sua equipe:\n\n👉 Conheça os planos e assine: https://finobra.app.br/app.html#planos\n💰 *Valor de referência:* R$ ${planoInfo.valor}/mês (${planoInfo.nome})\n🔑 *Chave PIX:* ${pixKey}\n👤 *Beneficiário:* ${pixBeneficiary}\n\nEstamos à disposição para ajudar na escolha do melhor plano!`;
+      } else {
+        defaultSubject = `FinObra — Notificação de Assinatura (${nomeEmpresa})`;
+        defaultTituloAviso = `Notificação de Assinatura — ${nomeEmpresa}`;
+        defaultMessage = `Olá, ${responsavel}! Aqui é do FinObra referente à assinatura da empresa ${nomeEmpresa}.`;
+      }
+
+      const finalMessage = String(customMessage || defaultMessage).trim();
+      const finalSubject = String(customSubject || defaultSubject).trim();
+
+      // Se for apenas visualização/prévia
+      if (channel === 'preview') {
+        return res.status(200).json({
+          success: true,
+          preview: true,
+          tenant: { id: t.id, nome: nomeEmpresa, responsavel, plano: planoInfo.nome, valor: planoInfo.valor, vencimento: fmtVenc, situacao: situacaoTxt },
+          destPhone,
+          destEmail,
+          subject: finalSubject,
+          message: finalMessage,
+          pixKey,
+          pixBeneficiary
+        });
+      }
+
+      const results = {
+        whatsapp: { attempted: false, success: false },
+        email: { attempted: false, success: false },
+        waLink: destPhone ? `https://wa.me/${destPhone}?text=${encodeURIComponent(finalMessage)}` : null
+      };
+
+      // 1. Disparo por WhatsApp
+      if (channel === 'whatsapp' || channel === 'both') {
+        results.whatsapp.attempted = true;
+        if (!destPhone || destPhone.length < 10) {
+          results.whatsapp.error = 'Telefone do cliente inválido ou não cadastrado.';
+        } else {
+          try {
+            const renderBaseUrl = (process.env.RENDER_WHATSAPP_URL || 'https://finan-backend-9rxw.onrender.com').replace(/\/send-message\/?$/, '').replace(/\/+$/, '');
+            const secret = (process.env.API_SECRET || process.env.VERCEL_API_SECRET || '').trim();
+
+            const wpRes = await fetch(`${renderBaseUrl}/send-message`, {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${secret}`,
+                'x-api-key': secret,
+                'Content-Type': 'application/json',
+                'x-tenant-id': 'angelim'
+              },
+              body: JSON.stringify({
+                phone: destPhone,
+                message: finalMessage
+              }),
+              signal: AbortSignal.timeout(15000)
+            });
+
+            const wpData = await wpRes.json().catch(() => ({}));
+            if (wpRes.ok && (wpData.success || wpData.messageId)) {
+              results.whatsapp.success = true;
+              results.whatsapp.messageId = wpData.messageId;
+            } else {
+              results.whatsapp.error = wpData.error || `Servidor WhatsApp retornou status ${wpRes.status}`;
+            }
+          } catch (wpErr) {
+            results.whatsapp.error = `Não foi possível conectar ao robô de WhatsApp: ${wpErr.message}`;
+          }
+        }
+      }
+
+      // 2. Disparo por E-mail
+      if (channel === 'email' || channel === 'both') {
+        results.email.attempted = true;
+        const resendKey = String(process.env.RESEND_API_KEY || '').trim();
+        const emailFrom = String(process.env.FINOBRA_SUPPORT_EMAIL_FROM || 'FinObra <suporte@finobra.app.br>').trim();
+
+        if (!destEmail || !destEmail.includes('@')) {
+          results.email.error = 'E-mail da empresa inválido ou não cadastrado.';
+        } else if (!resendKey) {
+          results.email.error = 'Chave RESEND_API_KEY não configurada no servidor.';
+        } else {
+          try {
+            const emailHtml = renderBillingEmailHtml({
+              EMPRESA: nomeEmpresa,
+              RESPONSAVEL: responsavel,
+              PLANO: planoInfo.nome,
+              VALOR: planoInfo.valor,
+              VENCIMENTO: fmtVenc,
+              SITUACAO: situacaoTxt || 'Renovação',
+              BADGE_STATUS: badgeStatus,
+              TITULO_AVISO: defaultTituloAviso,
+              PIX_CHAVE: pixKey,
+              PIX_BENEFICIARIO: pixBeneficiary,
+              MENSAGEM_EXTRA: finalMessage,
+              LINK_ACESSO: 'https://finobra.app.br/login'
+            });
+
+            const emailRes = await fetch('https://api.resend.com/emails', {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${resendKey}`,
+                'Content-Type': 'application/json'
+              },
+              body: JSON.stringify({
+                from: emailFrom,
+                to: [destEmail],
+                subject: finalSubject,
+                html: emailHtml
+              }),
+              signal: AbortSignal.timeout(12000)
+            });
+
+            const emailData = await emailRes.json().catch(() => ({}));
+            if (emailRes.ok && emailData.id) {
+              results.email.success = true;
+              results.email.id = emailData.id;
+            } else {
+              results.email.error = emailData.message || `Resend retornou status ${emailRes.status}`;
+            }
+          } catch (emErr) {
+            results.email.error = `Falha ao disparar e-mail via Resend: ${emErr.message}`;
+          }
+        }
+      }
+
+      // Grava auditoria
+      await writeAudit(sql, req, { ...auth, tenantId }, {
+        acao: 'cobranca_notificacao_enviada',
+        entidade: 'tenant',
+        entidadeId: tenantId,
+        depois: {
+          canal: channel,
+          template: templateType,
+          destPhone,
+          destEmail,
+          whatsapp: results.whatsapp,
+          email: results.email
+        }
+      });
+
+      return res.status(200).json({
+        success: true,
+        tenantId,
+        nomeEmpresa,
+        channel,
+        results,
+        message: 'Processamento de cobrança concluído com sucesso.'
+      });
     }
 
     // ── 2. POST ?action=create_tenant (Criar Empresa e Usuário Admin no Neon) ──

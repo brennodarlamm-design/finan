@@ -601,7 +601,7 @@ const MasterAdmin = {
         <td style="padding:14px 18px;text-align:right;">
           <div style="display:inline-flex;gap:6px;">
             <button data-tenant-id="${this._esc(id)}" data-fb-click="MasterAdmin.impersonarEmpresa" data-fb-click-n="1" data-fb-click-t0="dataset" data-fb-click-v0="tenantId" title="Acessar sistema como esta empresa para dar suporte" style="background:rgba(201,162,39,.15);border:1px solid var(--accent);color:var(--accent2);padding:4px 8px;border-radius:6px;font-size:.75rem;font-weight:700;cursor:pointer;">👁️ Acessar</button>
-            <a href="https://wa.me/${wa}?text=${waText}" target="_blank" rel="noopener noreferrer" title="Conversar no WhatsApp" style="background:rgba(34,197,94,.15);border:1px solid #22c55e;color:#22c55e;padding:4px 8px;border-radius:6px;font-size:.75rem;font-weight:700;text-decoration:none;display:inline-flex;align-items:center;">💬 Cobrar</a>
+            <button data-tenant-id="${this._esc(id)}" data-fb-click="MasterAdmin.abrirModalCobranca" data-fb-click-n="1" data-fb-click-t0="dataset" data-fb-click-v0="tenantId" title="Cobrar / Notificar assinatura (WhatsApp e E-mail)" style="background:rgba(34,197,94,.15);border:1px solid #22c55e;color:#22c55e;padding:4px 8px;border-radius:6px;font-size:.75rem;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;">💬 Cobrar</button>
             <button data-tenant-id="${this._esc(id)}" data-fb-click="MasterAdmin.alterarStatusEmpresa" data-fb-click-n="1" data-fb-click-t0="dataset" data-fb-click-v0="tenantId" title="Alterar status, plano ou vencimento" style="background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.15);color:#cbd5e1;padding:4px 8px;border-radius:6px;font-size:.75rem;cursor:pointer;">✏️</button>
           </div>
         </td>
@@ -998,6 +998,316 @@ const MasterAdmin = {
       if (btnSubmit) {
         btnSubmit.disabled = false;
         btnSubmit.innerText = 'Salvar e Criar Acesso 🚀';
+      }
+    }
+  },
+
+  // ── MODAL: COBRANÇA E NOTIFICAÇÃO DE ASSINATURA SAAS ──────────────────────
+  abrirModalCobranca(tenantId) {
+    const empresas = this.getEmpresas();
+    const emp = empresas.find(e => String(e.id) === String(tenantId)) || { id: tenantId };
+    this._currentCobrancaEmpresa = emp;
+
+    let modal = document.getElementById('master-cobranca-modal');
+    if (!modal) {
+      modal = document.createElement('div');
+      modal.id = 'master-cobranca-modal';
+      modal.className = 'modal-backdrop';
+      modal.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.85);display:flex;align-items:center;justify-content:center;z-index:99999;backdrop-filter:blur(8px);padding:16px;';
+      document.body.appendChild(modal);
+    }
+
+    const nome = this._esc(emp.nome_fantasia || emp.razao_social || 'Empresa');
+    const resp = this._esc(emp.responsavel || 'Gestor(a)');
+    const tel = this._esc(emp.telefone || '');
+    const email = this._esc(emp.email || '');
+    const planosMap = { starter: 'Básico (R$ 119,90)', pro: 'Profissional (R$ 279,90)', unlimited: 'Ilimitado (R$ 499,90)', trial: 'Trial' };
+    const plano = planosMap[emp.plano] || emp.plano || 'Profissional';
+    const venc = emp.vencimento ? emp.vencimento.split('-').reverse().join('/') : 'A definir';
+    const dr = emp.diasRestantes;
+
+    let situacao = 'Vencimento em dia';
+    let defaultTemplate = 'reminder';
+    if (emp.status === 'trial') {
+      situacao = dr > 0 ? `Trial termina em ${dr} dia(s)` : 'Trial expirado';
+      defaultTemplate = 'trial_ending';
+    } else if (dr <= 0) {
+      situacao = dr === 0 ? 'Vence HOJE' : `Vencido há ${Math.abs(dr)} dia(s)`;
+      defaultTemplate = dr === 0 ? 'due_today' : 'overdue';
+    } else {
+      situacao = `Vence em ${dr} dia(s)`;
+      defaultTemplate = dr <= 3 ? 'due_today' : 'reminder';
+    }
+
+    modal.innerHTML = `
+      <div style="background:#0f1710;border:1px solid rgba(201,162,39,.45);border-radius:16px;width:100%;max-width:640px;box-shadow:0 24px 70px rgba(0,0,0,.9);overflow:hidden;color:#f0ead6;font-family:inherit;max-height:92vh;display:flex;flex-direction:column;">
+        
+        <!-- Cabeçalho -->
+        <div style="background:linear-gradient(135deg,#15250f,#1f3616);padding:16px 22px;border-bottom:1px solid rgba(201,162,39,.3);display:flex;align-items:center;justify-content:space-between;">
+          <div style="display:flex;align-items:center;gap:12px;">
+            <span style="font-size:1.4rem;">💳</span>
+            <div>
+              <div style="font-weight:900;font-size:1.05rem;color:var(--accent2);">Cobrança &amp; Notificação de Assinatura</div>
+              <div style="font-size:.76rem;color:#94a3b8;">Disparo multicanal: WhatsApp (Robô/Web) e E-mail Institucional (Resend)</div>
+            </div>
+          </div>
+          <button data-fb-click="Patch26Actions.removeById" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="master-cobranca-modal" style="background:none;border:none;color:#94a3b8;font-size:1.3rem;cursor:pointer;padding:4px 8px;">✕</button>
+        </div>
+
+        <!-- Conteúdo Scrollável -->
+        <div style="padding:20px 22px;overflow-y:auto;display:flex;flex-direction:column;gap:16px;">
+          
+          <!-- Card de Dados da Empresa -->
+          <div style="background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:14px 16px;display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;font-size:.82rem;">
+            <div><span style="color:#94a3b8;font-size:.72rem;display:block;">EMPRESA:</span><strong style="color:#fff;">${nome}</strong></div>
+            <div><span style="color:#94a3b8;font-size:.72rem;display:block;">RESPONSÁVEL:</span><span style="color:#cbd5e1;">${resp}</span></div>
+            <div><span style="color:#94a3b8;font-size:.72rem;display:block;">PLANO:</span><span style="color:var(--accent2);font-weight:700;">${plano}</span></div>
+            <div><span style="color:#94a3b8;font-size:.72rem;display:block;">VENCIMENTO:</span><span style="color:${dr<=0?'#ef4444':'#22c55e'};font-weight:800;">${venc} (${situacao})</span></div>
+          </div>
+
+          <!-- Seletor de Template -->
+          <div>
+            <label style="display:block;font-size:.78rem;font-weight:800;color:var(--accent2);margin-bottom:6px;text-transform:uppercase;letter-spacing:.05em;">1. Escolha o Template da Mensagem</label>
+            <select id="mc-template-type" data-fb-change="MasterAdmin.mudarTemplateCobranca" data-fb-change-n="1" data-fb-change-t0="self" style="width:100%;background:#182713;border:1px solid rgba(201,162,39,.35);border-radius:8px;padding:9px 12px;color:#fff;font-size:.86rem;font-weight:700;">
+              <option value="reminder" ${defaultTemplate==='reminder'?'selected':''}>⏳ Lembrete Prévio de Vencimento (Faltam dias)</option>
+              <option value="due_today" ${defaultTemplate==='due_today'?'selected':''}>🔔 Vencimento Hoje (Renovação imediata)</option>
+              <option value="overdue" ${defaultTemplate==='overdue'?'selected':''}>⚠️ Em Atraso (Aviso de regularização / suspensão)</option>
+              <option value="trial_ending" ${defaultTemplate==='trial_ending'?'selected':''}>🚀 Fim de Período de Testes (Trial)</option>
+              <option value="custom">✍️ Mensagem Personalizada / Livre</option>
+            </select>
+          </div>
+
+          <!-- Seletor de Canais -->
+          <div>
+            <label style="display:block;font-size:.78rem;font-weight:800;color:var(--accent2);margin-bottom:6px;text-transform:uppercase;letter-spacing:.05em;">2. Canal de Envio</label>
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px;">
+              <label style="display:flex;align-items:center;gap:6px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.12);border-radius:8px;padding:9px 10px;font-size:.8rem;cursor:pointer;">
+                <input type="radio" name="mc-channel" value="both" checked> ⚡ Ambos (Bot + E-mail)
+              </label>
+              <label style="display:flex;align-items:center;gap:6px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.12);border-radius:8px;padding:9px 10px;font-size:.8rem;cursor:pointer;">
+                <input type="radio" name="mc-channel" value="whatsapp"> 🤖 WhatsApp Direto (Bot)
+              </label>
+              <label style="display:flex;align-items:center;gap:6px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.12);border-radius:8px;padding:9px 10px;font-size:.8rem;cursor:pointer;">
+                <input type="radio" name="mc-channel" value="email"> 📧 E-mail (Resend)
+              </label>
+              <label style="display:flex;align-items:center;gap:6px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.12);border-radius:8px;padding:9px 10px;font-size:.8rem;cursor:pointer;">
+                <input type="radio" name="mc-channel" value="wa_web"> 📱 WhatsApp Web (wa.me)
+              </label>
+            </div>
+          </div>
+
+          <!-- Contatos e Chave PIX -->
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;">
+            <div>
+              <label style="display:block;font-size:.74rem;color:#94a3b8;margin-bottom:4px;">Telefone WhatsApp</label>
+              <input type="text" id="mc-phone" value="${tel}" placeholder="5595991234567" style="width:100%;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.15);border-radius:8px;padding:8px 10px;color:#fff;font-size:.82rem;">
+            </div>
+            <div>
+              <label style="display:block;font-size:.74rem;color:#94a3b8;margin-bottom:4px;">E-mail do Cliente</label>
+              <input type="email" id="mc-email" value="${email}" placeholder="cliente@empresa.com" style="width:100%;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.15);border-radius:8px;padding:8px 10px;color:#fff;font-size:.82rem;">
+            </div>
+            <div>
+              <label style="display:block;font-size:.74rem;color:#94a3b8;margin-bottom:4px;">Chave PIX de Recebimento</label>
+              <input type="text" id="mc-pix" value="5595991363678" placeholder="Chave PIX" style="width:100%;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.15);border-radius:8px;padding:8px 10px;color:#fff;font-size:.82rem;font-weight:700;">
+            </div>
+          </div>
+
+          <!-- Assunto do E-mail -->
+          <div id="mc-subject-wrap">
+            <label style="display:block;font-size:.74rem;color:#94a3b8;margin-bottom:4px;">Assunto do E-mail</label>
+            <input type="text" id="mc-subject" style="width:100%;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.15);border-radius:8px;padding:8px 10px;color:#fff;font-size:.82rem;">
+          </div>
+
+          <!-- Mensagem / Pré-visualização -->
+          <div>
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+              <label style="font-size:.74rem;color:#94a3b8;">Texto da Notificação / Mensagem de WhatsApp (Editável)</label>
+              <span style="font-size:.7rem;color:#64748b;">Você pode personalizar antes de disparar</span>
+            </div>
+            <textarea id="mc-message" rows="6" style="width:100%;background:rgba(0,0,0,.35);border:1px solid rgba(255,255,255,.15);border-radius:8px;padding:10px 12px;color:#fff;font-size:.82rem;line-height:1.5;font-family:monospace;resize:vertical;"></textarea>
+          </div>
+
+          <!-- Área de Feedback / Status -->
+          <div id="mc-feedback" style="display:none;padding:12px 14px;border-radius:8px;font-size:.82rem;line-height:1.4;"></div>
+
+        </div>
+
+        <!-- Rodapé e Ações -->
+        <div style="background:rgba(0,0,0,.25);padding:14px 22px;border-top:1px solid rgba(255,255,255,.08);display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;">
+          <button type="button" data-fb-click="Patch26Actions.removeById" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="master-cobranca-modal" style="background:transparent;border:1px solid rgba(255,255,255,.2);color:#cbd5e1;padding:8px 16px;border-radius:8px;cursor:pointer;font-size:.82rem;">
+            Fechar
+          </button>
+          <div style="display:flex;gap:8px;">
+            <button type="button" id="mc-btn-wa-web" data-fb-click="MasterAdmin.abrirWaWebDireto" data-fb-click-n="0" style="background:rgba(37,211,102,.15);border:1px solid #25D366;color:#25D366;padding:8px 14px;border-radius:8px;cursor:pointer;font-size:.82rem;font-weight:700;">
+              💬 Abrir WhatsApp Web
+            </button>
+            <button type="button" id="mc-btn-submit" data-fb-click="MasterAdmin.enviarNotificacaoCobranca" data-fb-click-n="0" class="btn-primary" style="padding:8px 20px;border-radius:8px;font-weight:900;font-size:.86rem;">
+              🚀 Disparar Notificação
+            </button>
+          </div>
+        </div>
+
+      </div>
+    `;
+
+    this.mudarTemplateCobranca(defaultTemplate);
+  },
+
+  mudarTemplateCobranca(arg) {
+    const type = typeof arg === 'string' ? arg : (document.getElementById('mc-template-type')?.value || 'reminder');
+    const emp = this._currentCobrancaEmpresa || {};
+    const nome = emp.nome_fantasia || emp.razao_social || 'Empresa';
+    const resp = emp.responsavel || 'Gestor(a)';
+    const dr = emp.diasRestantes;
+    const venc = emp.vencimento ? emp.vencimento.split('-').reverse().join('/') : 'A definir';
+    const pix = document.getElementById('mc-pix')?.value || '5595991363678';
+    
+    const planosMap = { starter: { n: 'Básico', v: '119,90' }, pro: { n: 'Profissional', v: '279,90' }, unlimited: { n: 'Ilimitado', v: '499,90' }, trial: { n: 'Trial', v: '279,90' } };
+    const pInfo = planosMap[emp.plano] || { n: 'Profissional', v: '279,90' };
+
+    let situacaoTxt = '';
+    if (dr > 1) situacaoTxt = `vence em ${dr} dias`;
+    else if (dr === 1) situacaoTxt = 'vence amanhã';
+    else if (dr === 0) situacaoTxt = 'vence hoje';
+    else if (dr < 0) situacaoTxt = `vencido há ${Math.abs(dr)} dia(s)`;
+    else situacaoTxt = 'renovação próxima';
+
+    let msg = '';
+    let subject = '';
+
+    if (type === 'reminder') {
+      subject = `🔔 FinObra — Lembrete de Renovação de Assinatura (${venc})`;
+      msg = `Olá, ${resp}! 👋\n\nPassando para lembrar que a assinatura do *FinObra* da empresa *${nome}* (Plano ${pInfo.n}) vence em *${venc}* (${situacaoTxt}).\n\n💰 *Valor:* R$ ${pInfo.v}\n🔑 *Chave PIX:* ${pix}\n👤 *Beneficiário:* FinObra Soluções Tecnológicas\n\nQualquer dúvida ou caso precise de emissão de NF, estamos à disposição!`;
+    } else if (type === 'due_today') {
+      subject = `⚠️ FinObra — Sua assinatura vence hoje (${venc})`;
+      msg = `Olá, ${resp}! 🔔\n\nA assinatura do *FinObra* da empresa *${nome}* vence *hoje (${venc})*.\n\nPara garantir a continuidade dos acessos da sua equipe e sincronização das obras sem interrupção:\n\n💰 *Valor:* R$ ${pInfo.v}\n🔑 *Chave PIX:* ${pix}\n👤 *Beneficiário:* FinObra Soluções Tecnológicas\n\nApós o pagamento via PIX, a renovação é confirmada e os acessos continuam ativos normalmente.`;
+    } else if (type === 'overdue') {
+      subject = `🚨 FinObra — Aviso de Vencimento e Regularização de Acesso`;
+      msg = `Olá, ${resp}! ⚠️\n\nIdentificamos que a assinatura do *FinObra* da empresa *${nome}* venceu em *${venc}* (${situacaoTxt}) e consta pendente.\n\nPara evitar o bloqueio preventivo dos acessos, emissão de relatórios e sincronização no canteiro de obras, solicitamos a regularização:\n\n💰 *Valor:* R$ ${pInfo.v}\n🔑 *Chave PIX:* ${pix}\n👤 *Beneficiário:* FinObra Soluções Tecnológicas\n\nSe já realizou o pagamento, desconsidere este aviso ou nos envie o comprovante por aqui!`;
+    } else if (type === 'trial_ending') {
+      subject = `🚀 FinObra — Seu período de testes termina em ${venc}`;
+      msg = `Olá, ${resp}! 🚀\n\nSeu período de teste gratuito do *FinObra* na empresa *${nome}* termina em *${venc}*.\n\nEsperamos que a plataforma esteja transformando a gestão das suas obras! Para continuar utilizando todos os recursos com a sua equipe:\n\n👉 Conheça os planos e assine: https://finobra.app.br/app.html#planos\n💰 *Valor de referência:* R$ ${pInfo.v}/mês (${pInfo.n})\n🔑 *Chave PIX:* ${pix}\n👤 *Beneficiário:* FinObra Soluções Tecnológicas\n\nEstamos à disposição para ajudar na escolha do melhor plano!`;
+    } else {
+      subject = `FinObra — Notificação de Assinatura (${nome})`;
+      msg = `Olá, ${resp}! Aqui é do FinObra referente à assinatura da empresa ${nome}.`;
+    }
+
+    const msgEl = document.getElementById('mc-message');
+    if (msgEl) msgEl.value = msg;
+    const subEl = document.getElementById('mc-subject');
+    if (subEl) subEl.value = subject;
+  },
+
+  abrirWaWebDireto() {
+    const phone = (document.getElementById('mc-phone')?.value || '').replace(/\D/g, '');
+    const msg = document.getElementById('mc-message')?.value || '';
+    if (!phone) {
+      alert('Informe um telefone válido com DDD para abrir o WhatsApp Web.');
+      return;
+    }
+    const fullPhone = phone.startsWith('55') ? phone : '55' + phone;
+    const url = `https://wa.me/${fullPhone}?text=${encodeURIComponent(msg)}`;
+    window.open(url, '_blank', 'noopener,noreferrer');
+  },
+
+  async enviarNotificacaoCobranca() {
+    const emp = this._currentCobrancaEmpresa;
+    if (!emp || !emp.id) {
+      alert('Empresa não identificada.');
+      return;
+    }
+
+    const templateType = document.getElementById('mc-template-type')?.value || 'reminder';
+    const channel = document.querySelector('input[name="mc-channel"]:checked')?.value || 'both';
+    const phone = (document.getElementById('mc-phone')?.value || '').replace(/\D/g, '');
+    const email = (document.getElementById('mc-email')?.value || '').trim();
+    const pix = (document.getElementById('mc-pix')?.value || '').trim();
+    const subject = (document.getElementById('mc-subject')?.value || '').trim();
+    const message = (document.getElementById('mc-message')?.value || '').trim();
+
+    if (channel === 'wa_web') {
+      this.abrirWaWebDireto();
+      return;
+    }
+
+    const fb = document.getElementById('mc-feedback');
+    const btn = document.getElementById('mc-btn-submit');
+    if (btn) {
+      btn.disabled = true;
+      btn.innerText = 'Enviando... ⏳';
+    }
+    if (fb) {
+      fb.style.display = 'block';
+      fb.style.background = 'rgba(59,130,246,.15)';
+      fb.style.border = '1px solid #3b82f6';
+      fb.style.color = '#93c5fd';
+      fb.innerHTML = 'Processando disparo de notificação no servidor...';
+    }
+
+    try {
+      const headers = (typeof Auth !== 'undefined' && Auth.getAuthHeaders) ? Auth.getAuthHeaders() : { 'Content-Type': 'application/json' };
+      const res = await fetch('/api/admin?action=send_billing_notice', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          tenantId: emp.id,
+          channel,
+          templateType,
+          customMessage: message,
+          customSubject: subject,
+          targetPhone: phone,
+          targetEmail: email,
+          pixKey: pix
+        })
+      });
+
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || `Erro ${res.status} ao disparar notificação`);
+      }
+
+      const results = data.results || {};
+      let relatorioHtml = `<div style="font-weight:800;margin-bottom:6px;color:#86efac;">✅ Notificação de cobrança processada:</div><ul style="margin:0;padding-left:18px;">`;
+      
+      if (results.whatsapp?.attempted) {
+        if (results.whatsapp.success) {
+          relatorioHtml += `<li><strong>WhatsApp:</strong> Entregue com sucesso pelo robô (ID: ${results.whatsapp.messageId})</li>`;
+        } else {
+          relatorioHtml += `<li style="color:#fca5a5;"><strong>WhatsApp:</strong> ${results.whatsapp.error} <a href="${results.waLink}" target="_blank" rel="noopener noreferrer" style="color:#38bdf8;text-decoration:underline;">[Abrir manualmente no WhatsApp Web]</a></li>`;
+        }
+      }
+
+      if (results.email?.attempted) {
+        if (results.email.success) {
+          relatorioHtml += `<li><strong>E-mail:</strong> Enviado com sucesso via Resend (ID: ${results.email.id})</li>`;
+        } else {
+          relatorioHtml += `<li style="color:#fca5a5;"><strong>E-mail:</strong> ${results.email.error}</li>`;
+        }
+      }
+      relatorioHtml += `</ul>`;
+
+      if (fb) {
+        fb.style.background = 'rgba(34,197,94,.15)';
+        fb.style.border = '1px solid #22c55e';
+        fb.style.color = '#f0ead6';
+        fb.innerHTML = relatorioHtml;
+      }
+
+      if (typeof Utils !== 'undefined' && Utils.toast) {
+        Utils.toast('Notificação de cobrança enviada com sucesso!', 'success');
+      }
+    } catch (err) {
+      if (fb) {
+        fb.style.background = 'rgba(239,68,68,.15)';
+        fb.style.border = '1px solid #ef4444';
+        fb.style.color = '#fca5a5';
+        fb.innerHTML = `<strong>Falha ao enviar:</strong> ${err.message}`;
+      }
+      alert('Erro no envio da cobrança: ' + err.message);
+    } finally {
+      if (btn) {
+        btn.disabled = false;
+        btn.innerText = '🚀 Disparar Notificação';
       }
     }
   }

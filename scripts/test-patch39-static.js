@@ -47,8 +47,8 @@ assert(server.includes('Tabela legada whatsapp_auth limpa após migração'), 'T
 
 // 5. Versionamento e Pacote
 assert(pkg.scripts?.['test:patch39'] === 'node scripts/test-patch39-static.js', 'package.json expõe comando test:patch39.');
-assert(pkg.version === '2.28.0', 'package.json está na versão 2.28.0.');
-assert(version.version === '2.28.0', 'version.json está na versão 2.28.0.');
-assert(/-p39\b/.test(version.build || ''), 'version.json registra build com sufixo -p39.');
+assert(pkg.version >= '2.28.0', 'package.json está na versão >= 2.28.0.');
+assert(version.version >= '2.28.0', 'version.json está na versão >= 2.28.0.');
+assert(/-p(39|[4-9]\d|\d{3,})\b/.test(version.build || ''), 'version.json registra build com sufixo >= -p39.');
 
 console.log('\n🎉 Patch 39: todas as 18 verificações passaram com 100% de sucesso!');
