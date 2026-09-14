@@ -20,6 +20,21 @@ import { createSinapiRouter, initSinapiDatabase } from './sinapi_robot.js';
 dotenv.config({ path: '.env.local' });
 dotenv.config();
 
+// Suprime logs ruidosos de decifração externa/Bad MAC do libsignal para não poluir os logs do Render
+const _rawConsoleError = console.error;
+console.error = (...args) => {
+  const msg = typeof args[0] === 'string' ? args[0] : (args[0]?.message || String(args[0] || ''));
+  if (
+    msg.includes('Bad MAC') ||
+    msg.includes('Failed to decrypt message with any known session') ||
+    msg.includes('Session error:Error: Bad MAC') ||
+    msg.includes('Session error: Error: Bad MAC')
+  ) {
+    return;
+  }
+  _rawConsoleError.apply(console, args);
+};
+
 const app = express();
 
 const ALLOWED_ORIGINS = [
@@ -439,9 +454,15 @@ async function startWhatsApp(tenantId, forceClean = false) {
       syncFullHistory: false, // Otimização crítica: não baixa histórico pesado de conversas
       markOnlineOnConnect: false, // Não publica status 'online' desnecessário
       shouldIgnoreJid: (jid) => {
-        // Ignora status/stories, canais/newsletters e grupos que consomem tráfego excessivo
+        // Ignora status/stories, canais/newsletters, grupos e LIDs que consomem tráfego excessivo
         if (!jid) return true;
-        return jid.endsWith('@broadcast') || jid.endsWith('@newsletter') || jid.endsWith('@g.us');
+        return (
+          jid.endsWith('@broadcast') ||
+          jid.endsWith('@newsletter') ||
+          jid.endsWith('@g.us') ||
+          jid.endsWith('@lid') ||
+          jid.includes('@call')
+        );
       },
       getMessage: async () => undefined, // Stub para evitar falhas em retry receipts do WhatsApp
       generateHighQualityLinkPreview: false
