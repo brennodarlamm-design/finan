@@ -69,8 +69,8 @@ assert(masterHtml.includes('name="robots" content="noindex, nofollow"'), 'master
 
 // 8. Versionamento e Pacote
 assert(pkg.scripts?.['test:patch40'] === 'node scripts/test-patch40-static.js', 'package.json expõe comando test:patch40.');
-assert(pkg.version === '2.29.0', 'package.json está na versão 2.29.0.');
-assert(version.version === '2.29.0', 'version.json está na versão 2.29.0.');
-assert(/-p40\b/.test(version.build || ''), 'version.json registra build com sufixo -p40.');
+assert(pkg.version >= '2.29.0', 'package.json está na versão >= 2.29.0.');
+assert(version.version >= '2.29.0', 'version.json está na versão >= 2.29.0.');
+assert(/-p(40|[4-9]\d|\d{3,})\b/.test(version.build || ''), 'version.json registra build com sufixo >= -p40.');
 
 console.log('\n🎉 Patch 40: todas as 28 verificações passaram com 100% de sucesso!');

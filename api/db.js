@@ -561,15 +561,46 @@ export default async function handler(req, res) {
       }
 
       if (table === 'lancamentos') {
+        const dataInicio = cleanDate(req.query.data_inicio || req.query.desde);
+        const dataFim = cleanDate(req.query.data_fim || req.query.ate);
+        const filterTipo = req.query.tipo ? String(req.query.tipo).toLowerCase().trim() : null;
         let items;
         if (obra_id) {
           items = pagination
-            ? await sql`SELECT *, xmin::text AS sync_version FROM lancamentos WHERE tenant_id = ${tenantId} AND obra_id = ${obra_id} ORDER BY data DESC, created_at DESC, id DESC LIMIT ${pagination.limit} OFFSET ${pagination.offset};`
-            : await sql`SELECT *, xmin::text AS sync_version FROM lancamentos WHERE tenant_id = ${tenantId} AND obra_id = ${obra_id} ORDER BY data DESC, created_at DESC, id DESC;`;
+            ? await sql`
+                SELECT *, xmin::text AS sync_version FROM lancamentos 
+                WHERE tenant_id = ${tenantId} 
+                  AND obra_id = ${obra_id}
+                  AND (${dataInicio}::date IS NULL OR data >= ${dataInicio}::date)
+                  AND (${dataFim}::date IS NULL OR data <= ${dataFim}::date)
+                  AND (${filterTipo}::text IS NULL OR tipo = ${filterTipo})
+                ORDER BY data DESC, created_at DESC, id DESC 
+                LIMIT ${pagination.limit} OFFSET ${pagination.offset};`
+            : await sql`
+                SELECT *, xmin::text AS sync_version FROM lancamentos 
+                WHERE tenant_id = ${tenantId} 
+                  AND obra_id = ${obra_id}
+                  AND (${dataInicio}::date IS NULL OR data >= ${dataInicio}::date)
+                  AND (${dataFim}::date IS NULL OR data <= ${dataFim}::date)
+                  AND (${filterTipo}::text IS NULL OR tipo = ${filterTipo})
+                ORDER BY data DESC, created_at DESC, id DESC;`;
         } else {
           items = pagination
-            ? await sql`SELECT *, xmin::text AS sync_version FROM lancamentos WHERE tenant_id = ${tenantId} ORDER BY data DESC, created_at DESC, id DESC LIMIT ${pagination.limit} OFFSET ${pagination.offset};`
-            : await sql`SELECT *, xmin::text AS sync_version FROM lancamentos WHERE tenant_id = ${tenantId} ORDER BY data DESC, created_at DESC, id DESC;`;
+            ? await sql`
+                SELECT *, xmin::text AS sync_version FROM lancamentos 
+                WHERE tenant_id = ${tenantId}
+                  AND (${dataInicio}::date IS NULL OR data >= ${dataInicio}::date)
+                  AND (${dataFim}::date IS NULL OR data <= ${dataFim}::date)
+                  AND (${filterTipo}::text IS NULL OR tipo = ${filterTipo})
+                ORDER BY data DESC, created_at DESC, id DESC 
+                LIMIT ${pagination.limit} OFFSET ${pagination.offset};`
+            : await sql`
+                SELECT *, xmin::text AS sync_version FROM lancamentos 
+                WHERE tenant_id = ${tenantId}
+                  AND (${dataInicio}::date IS NULL OR data >= ${dataInicio}::date)
+                  AND (${dataFim}::date IS NULL OR data <= ${dataFim}::date)
+                  AND (${filterTipo}::text IS NULL OR tipo = ${filterTipo})
+                ORDER BY data DESC, created_at DESC, id DESC;`;
         }
         const normalized = items.map(l => ({
           ...l,
@@ -582,15 +613,41 @@ export default async function handler(req, res) {
       }
 
       if (table === 'notas' || table === 'notas_fiscais') {
+        const dataInicio = cleanDate(req.query.data_inicio || req.query.desde);
+        const dataFim = cleanDate(req.query.data_fim || req.query.ate);
         let items;
         if (obra_id) {
           items = pagination
-            ? await sql`SELECT * FROM notas_fiscais WHERE tenant_id = ${tenantId} AND obra_id = ${obra_id} ORDER BY data_emissao DESC, created_at DESC, id DESC LIMIT ${pagination.limit} OFFSET ${pagination.offset};`
-            : await sql`SELECT * FROM notas_fiscais WHERE tenant_id = ${tenantId} AND obra_id = ${obra_id} ORDER BY data_emissao DESC, created_at DESC, id DESC;`;
+            ? await sql`
+                SELECT * FROM notas_fiscais 
+                WHERE tenant_id = ${tenantId} 
+                  AND obra_id = ${obra_id}
+                  AND (${dataInicio}::date IS NULL OR data_emissao >= ${dataInicio}::date)
+                  AND (${dataFim}::date IS NULL OR data_emissao <= ${dataFim}::date)
+                ORDER BY data_emissao DESC, created_at DESC, id DESC 
+                LIMIT ${pagination.limit} OFFSET ${pagination.offset};`
+            : await sql`
+                SELECT * FROM notas_fiscais 
+                WHERE tenant_id = ${tenantId} 
+                  AND obra_id = ${obra_id}
+                  AND (${dataInicio}::date IS NULL OR data_emissao >= ${dataInicio}::date)
+                  AND (${dataFim}::date IS NULL OR data_emissao <= ${dataFim}::date)
+                ORDER BY data_emissao DESC, created_at DESC, id DESC;`;
         } else {
           items = pagination
-            ? await sql`SELECT * FROM notas_fiscais WHERE tenant_id = ${tenantId} ORDER BY data_emissao DESC, created_at DESC, id DESC LIMIT ${pagination.limit} OFFSET ${pagination.offset};`
-            : await sql`SELECT * FROM notas_fiscais WHERE tenant_id = ${tenantId} ORDER BY data_emissao DESC, created_at DESC, id DESC;`;
+            ? await sql`
+                SELECT * FROM notas_fiscais 
+                WHERE tenant_id = ${tenantId}
+                  AND (${dataInicio}::date IS NULL OR data_emissao >= ${dataInicio}::date)
+                  AND (${dataFim}::date IS NULL OR data_emissao <= ${dataFim}::date)
+                ORDER BY data_emissao DESC, created_at DESC, id DESC 
+                LIMIT ${pagination.limit} OFFSET ${pagination.offset};`
+            : await sql`
+                SELECT * FROM notas_fiscais 
+                WHERE tenant_id = ${tenantId}
+                  AND (${dataInicio}::date IS NULL OR data_emissao >= ${dataInicio}::date)
+                  AND (${dataFim}::date IS NULL OR data_emissao <= ${dataFim}::date)
+                ORDER BY data_emissao DESC, created_at DESC, id DESC;`;
         }
         const normalized = items.map(n => ({
           ...n,

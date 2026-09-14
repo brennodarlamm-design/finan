@@ -23,7 +23,7 @@ VALUES ('fk_lanc_nota_tenant', 'lancamentos', 0, true, 'Legado inconsistente san
 DO $$
 BEGIN
   IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'schema_migrations') THEN
-    INSERT INTO schema_migrations (version, executed_at, checksum, execution_time_ms)
+    INSERT INTO schema_migrations (version, applied_at, checksum, execution_time_ms)
     VALUES ('017_remediate_fk_lanc_nota_tenant.sql', CURRENT_TIMESTAMP, 'patch40_integrity_remediation', 0)
     ON CONFLICT (version) DO NOTHING;
   END IF;
