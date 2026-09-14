@@ -1912,6 +1912,103 @@ const MasterAdmin = {
         Utils.toast('Erro na varredura: ' + err.message, 'error');
       }
     }
+  },
+
+  // PATCH 49: Gerenciamento de Segurança Master & 2FA
+  _lastBackupCodes: [],
+
+  async abrirModalMfa() {
+    const modal = document.getElementById('master-mfa-modal');
+    if (!modal) return;
+    modal.style.display = 'flex';
+    const regenPass = document.getElementById('mfa-regen-pass');
+    if (regenPass) regenPass.value = '';
+    const codesDisplay = document.getElementById('mfa-backup-codes-display');
+    if (codesDisplay) codesDisplay.style.display = 'none';
+  },
+
+  fecharModalMfa() {
+    const modal = document.getElementById('master-mfa-modal');
+    if (modal) modal.style.display = 'none';
+  },
+
+  copiarChaveMfa() {
+    const display = document.getElementById('master-secret-key-display');
+    const raw = display?.getAttribute('data-secret-raw') || display?.textContent || '';
+    if (!raw || raw === '...') return;
+    navigator.clipboard.writeText(raw).then(() => {
+      if (typeof Utils !== 'undefined' && Utils.toast) {
+        Utils.toast('Chave secreta copiada!', 'success');
+      } else {
+        alert('Chave secreta copiada com sucesso!');
+      }
+    }).catch(() => {
+      alert('Chave: ' + raw);
+    });
+  },
+
+  async regenerarBackupCodes() {
+    const passInp = document.getElementById('mfa-regen-pass');
+    const password = (passInp?.value || '').trim();
+    if (!password) {
+      alert('Informe sua senha master para confirmar a geração de novos códigos.');
+      if (passInp) passInp.focus();
+      return;
+    }
+
+    try {
+      const headers = (typeof Auth !== 'undefined' && Auth.getAuthHeaders)
+        ? { ...Auth.getAuthHeaders(), 'Content-Type': 'application/json' }
+        : { 'Content-Type': 'application/json' };
+
+      const res = await fetch('/api/admin?action=mfa_regenerate_backup_codes', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ password })
+      });
+      const data = await res.json().catch(() => ({}));
+
+      if (!res.ok || !data.success) {
+        alert(data.error || 'Erro ao gerar novos códigos de emergência.');
+        return;
+      }
+
+      this._lastBackupCodes = data.backup_codes || [];
+      const grid = document.getElementById('mfa-backup-codes-grid');
+      if (grid && Array.isArray(data.backup_codes)) {
+        grid.innerHTML = data.backup_codes.map(c => `<div style="padding:4px;background:rgba(255,255,255,.05);border-radius:4px;">${c}</div>`).join('');
+      }
+
+      const display = document.getElementById('mfa-backup-codes-display');
+      if (display) display.style.display = 'block';
+
+      if (passInp) passInp.value = '';
+
+      if (typeof Utils !== 'undefined' && Utils.toast) {
+        Utils.toast('Novos códigos de emergência gerados!', 'success');
+      } else {
+        alert('Novos códigos gerados com sucesso! Guarde-os em local seguro.');
+      }
+    } catch (err) {
+      alert('Falha de conexão: ' + err.message);
+    }
+  },
+
+  copiarNovosBackupCodes() {
+    if (!this._lastBackupCodes || !this._lastBackupCodes.length) {
+      alert('Nenhum código para copiar.');
+      return;
+    }
+    const text = this._lastBackupCodes.join('\n');
+    navigator.clipboard.writeText(text).then(() => {
+      if (typeof Utils !== 'undefined' && Utils.toast) {
+        Utils.toast('Códigos copiados!', 'success');
+      } else {
+        alert('Códigos de emergência copiados para a área de transferência!');
+      }
+    }).catch(() => {
+      alert('Códigos:\n' + text);
+    });
   }
 };
 

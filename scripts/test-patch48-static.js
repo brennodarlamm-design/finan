@@ -135,9 +135,9 @@ const ver = JSON.parse(fs.readFileSync(path.resolve('version.json'), 'utf8'));
 const testAll = fs.readFileSync(path.resolve('scripts/test-static-all.js'), 'utf8');
 
 test('package.json possui script "test:patch48"', pkg.scripts && pkg.scripts['test:patch48'] === 'node scripts/test-patch48-static.js');
-test('package.json atualizado para versão 2.37.0', pkg.version === '2.37.0');
-test('version.json atualizado para versão 2.37.0', ver.version === '2.37.0');
-test('version.json atualizado para build 2026.09.14-p48', ver.build === '2026.09.14-p48');
+test('package.json atualizado para versão >= 2.37.0', pkg.version >= '2.37.0');
+test('version.json atualizado para versão >= 2.37.0', ver.version >= '2.37.0');
+test('version.json atualizado para build compatível com Patch 48+', ver.build >= '2026.09.14-p48');
 test('test-static-all.js registra scripts/test-patch48-static.js', testAll.includes('scripts/test-patch48-static.js'));
 
 // 7. Conformidade Vercel Hobby Limit (<= 12 Serverless Functions)

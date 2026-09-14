@@ -3,8 +3,16 @@
 import { neon } from '@neondatabase/serverless';
 import crypto from 'crypto';
 import { OAuth2Client } from 'google-auth-library';
-import { hashPassword, verifyPassword, signToken, resolveAuthAndTenant } from './_auth.js';
+import { hashPassword, verifyPassword, signToken, verifyToken, resolveAuthAndTenant } from './_auth.js';
 import { checkRateLimit, getClientIp } from './_ratelimit.js';
+import {
+  generateTotpSecret,
+  verifyTotpCode,
+  generateTotpUri,
+  generateBackupCodes,
+  verifyBackupCode,
+  generateQrSvg
+} from './_totp.js';
 
 const googleClient = new OAuth2Client();
 
@@ -182,7 +190,7 @@ export default async function handler(req, res) {
       }
 
       const users = await sql`
-        SELECT u.id, u.username, u.email, u.nome, u.perfil, u.avatar, u.tenant_id, u.permissoes,
+        SELECT u.id, u.username, u.email, u.nome, u.perfil, u.avatar, u.tenant_id, u.permissoes, u.mfa_enabled,
                t.razao_social, t.nome_fantasia, t.cnpj, t.telefone, t.plano, t.status as tenant_status
         FROM usuarios u
         LEFT JOIN tenants t ON u.tenant_id = t.id
@@ -266,7 +274,9 @@ export default async function handler(req, res) {
           isImpersonated: effectiveTenantId !== u.tenant_id,
           empresaNome: tenantData.nome_fantasia || tenantData.razao_social || 'Minha Empresa',
           permissions: permissionsOf(u),
-          sessionId: effectiveSessionId
+          sessionId: effectiveSessionId,
+          mfa_enabled: Boolean(u.mfa_enabled),
+          mfa_verified: Boolean(auth.user?.mfa_verified)
         },
         tenant: tenantData
       });
@@ -291,6 +301,7 @@ export default async function handler(req, res) {
       const cleanUser = username.trim().toLowerCase();
       const rows = await sql`
         SELECT u.id, u.username, u.email, u.senha_hash, u.nome, u.perfil, u.avatar, u.ativo, u.tenant_id, u.permissoes,
+               u.mfa_secret, u.mfa_enabled, u.mfa_backup_codes, u.mfa_last_used_step,
                t.razao_social, t.nome_fantasia, t.status as tenant_status, t.created_at as tenant_created_at, t.vencimento as tenant_vencimento
         FROM usuarios u
         LEFT JOIN tenants t ON u.tenant_id = t.id
@@ -334,6 +345,83 @@ export default async function handler(req, res) {
         return res.status(401).json({ success: false, message: 'Usuário ou senha incorretos.' });
       }
 
+      // PATCH 49: Proteção MFA para Super Admin Master Backoffice
+      const isSuperAdmin = user.perfil === 'superadmin';
+      const totpCode = String(req.body.totp_code || req.body.mfa_code || '').trim();
+      const backupCode = String(req.body.backup_code || '').trim();
+
+      if (isSuperAdmin) {
+        if (!user.mfa_enabled) {
+          const setupToken = signToken({
+            userId: user.id,
+            username: user.username,
+            purpose: 'mfa_setup',
+            exp: Date.now() + 10 * 60 * 1000
+          }, secret);
+
+          return res.status(200).json({
+            success: true,
+            mfa_setup_required: true,
+            mfa_token: setupToken,
+            message: 'Configuração do Google Authenticator obrigatória para acesso ao Portal Master.'
+          });
+        }
+
+        // Se MFA está ativo e o código não foi enviado na primeira requisição
+        if (!totpCode && !backupCode) {
+          const pendingToken = signToken({
+            userId: user.id,
+            username: user.username,
+            purpose: 'mfa_pending',
+            remember: !!remember,
+            exp: Date.now() + 5 * 60 * 1000
+          }, secret);
+
+          return res.status(200).json({
+            success: true,
+            mfa_required: true,
+            mfa_token: pendingToken,
+            message: 'Insira o código do Google Authenticator para concluir a autenticação Master.'
+          });
+        }
+
+        // Código enviado diretamente no formulário de login
+        let mfaValid = false;
+        let usedBackup = false;
+        let newBackupCodes = user.mfa_backup_codes || [];
+        let newStep = user.mfa_last_used_step || 0;
+
+        if (backupCode) {
+          const backupRes = verifyBackupCode(backupCode, user.mfa_backup_codes || []);
+          if (backupRes.valid) {
+            mfaValid = true;
+            usedBackup = true;
+            newBackupCodes = backupRes.remainingHashedCodes;
+          }
+        } else if (totpCode) {
+          const totpRes = verifyTotpCode(user.mfa_secret, totpCode, {
+            lastUsedStep: user.mfa_last_used_step || 0
+          });
+          if (totpRes.valid) {
+            mfaValid = true;
+            newStep = totpRes.step;
+          }
+        }
+
+        if (!mfaValid) {
+          return res.status(401).json({
+            success: false,
+            message: backupCode ? 'Código de recuperação de emergência inválido.' : 'Código do Google Authenticator incorreto ou expirado.'
+          });
+        }
+
+        if (usedBackup) {
+          await sql`UPDATE usuarios SET mfa_backup_codes = ${JSON.stringify(newBackupCodes)}::jsonb WHERE id = ${user.id};`;
+        } else if (newStep > 0) {
+          await sql`UPDATE usuarios SET mfa_last_used_step = ${newStep} WHERE id = ${user.id};`;
+        }
+      }
+
       // Expiração da sessão: 30 dias para "lembrar-me", 2 dias padrão
       const durationDays = remember ? 30 : 2;
       const exp = Date.now() + durationDays * 24 * 60 * 60 * 1000;
@@ -351,6 +439,8 @@ export default async function handler(req, res) {
         avatar: user.avatar || user.nome.slice(0, 2).toUpperCase(),
         permissions: permissionsOf(user),
         sessionId,
+        mfa_enabled: Boolean(user.mfa_enabled),
+        mfa_verified: isSuperAdmin ? true : Boolean(user.mfa_enabled),
         exp
       };
 
@@ -371,9 +461,262 @@ export default async function handler(req, res) {
           empresaNome: payload.empresaNome,
           permissions: payload.permissions,
           sessionId,
-          remember: !!remember
+          remember: !!remember,
+          mfa_enabled: Boolean(user.mfa_enabled),
+          mfa_verified: payload.mfa_verified
         }
       });
+    }
+
+    // ── 2.1 POST /api/auth?action=mfa_verify ────────────────────────────────────
+    if (req.method === 'POST' && action === 'mfa_verify') {
+      const clientIp = getClientIp(req);
+      const rl = await checkRateLimit(`mfa:${clientIp}`, 8, 300000);
+      if (!rl.allowed) {
+        return res.status(429).json({ success: false, message: 'Muitas tentativas de código MFA. Aguarde 5 minutos.' });
+      }
+
+      const { mfa_token, totp_code, mfa_code, backup_code } = req.body || {};
+      const tokenToVerify = mfa_token || req.headers['x-mfa-token'];
+      if (!tokenToVerify) {
+        return res.status(400).json({ success: false, message: 'Token de desafio MFA não fornecido.' });
+      }
+
+      const decoded = verifyToken(tokenToVerify, secret);
+      if (!decoded || decoded.purpose !== 'mfa_pending' || !decoded.userId) {
+        return res.status(401).json({ success: false, message: 'Desafio MFA expirado ou inválido. Refaça o login.' });
+      }
+
+      const rows = await sql`
+        SELECT u.id, u.username, u.email, u.nome, u.perfil, u.avatar, u.ativo, u.tenant_id, u.permissoes,
+               u.mfa_secret, u.mfa_enabled, u.mfa_backup_codes, u.mfa_last_used_step,
+               t.razao_social, t.nome_fantasia, t.status as tenant_status
+        FROM usuarios u
+        LEFT JOIN tenants t ON u.tenant_id = t.id
+        WHERE u.id = ${decoded.userId}
+        LIMIT 1;
+      `;
+      if (!rows.length || !rows[0].ativo) {
+        return res.status(403).json({ success: false, message: 'Usuário não encontrado ou inativo.' });
+      }
+
+      const user = rows[0];
+      const code = String(totp_code || mfa_code || '').trim();
+      const bCode = String(backup_code || '').trim();
+
+      let mfaValid = false;
+      let usedBackup = false;
+      let newBackupCodes = user.mfa_backup_codes || [];
+      let newStep = user.mfa_last_used_step || 0;
+
+      if (bCode) {
+        const bRes = verifyBackupCode(bCode, user.mfa_backup_codes || []);
+        if (bRes.valid) {
+          mfaValid = true;
+          usedBackup = true;
+          newBackupCodes = bRes.remainingHashedCodes;
+        }
+      } else if (code) {
+        const totpRes = verifyTotpCode(user.mfa_secret, code, {
+          lastUsedStep: user.mfa_last_used_step || 0
+        });
+        if (totpRes.valid) {
+          mfaValid = true;
+          newStep = totpRes.step;
+        }
+      } else {
+        return res.status(400).json({ success: false, message: 'Código de autenticação ou de recuperação obrigatório.' });
+      }
+
+      if (!mfaValid) {
+        return res.status(401).json({
+          success: false,
+          message: bCode ? 'Código de recuperação de emergência inválido ou já utilizado.' : 'Código do Google Authenticator incorreto ou expirado.'
+        });
+      }
+
+      if (usedBackup) {
+        await sql`UPDATE usuarios SET mfa_backup_codes = ${JSON.stringify(newBackupCodes)}::jsonb WHERE id = ${user.id};`;
+      } else if (newStep > 0) {
+        await sql`UPDATE usuarios SET mfa_last_used_step = ${newStep} WHERE id = ${user.id};`;
+      }
+
+      const remember = Boolean(decoded.remember);
+      const durationDays = remember ? 30 : 2;
+      const exp = Date.now() + durationDays * 24 * 60 * 60 * 1000;
+      const sessionId = await createAuthSession(sql, req, { userId: user.id, tenantId: user.tenant_id, remember, exp });
+
+      const payload = {
+        userId: user.id,
+        username: user.username,
+        email: user.email,
+        nome: user.nome,
+        perfil: user.perfil,
+        tenantId: user.tenant_id,
+        tenantStatus: user.tenant_status || 'ativo',
+        empresaNome: user.nome_fantasia || user.razao_social || 'Minha Empresa',
+        avatar: user.avatar || user.nome.slice(0, 2).toUpperCase(),
+        permissions: permissionsOf(user),
+        sessionId,
+        mfa_enabled: true,
+        mfa_verified: true,
+        exp
+      };
+
+      const token = signToken(payload, secret);
+      setSessionCookie(req, res, token, exp);
+
+      return res.status(200).json({
+        success: true,
+        ...tokenFieldForExplicitClient(req, token),
+        user: {
+          id: user.id,
+          username: user.username,
+          email: user.email,
+          nome: user.nome,
+          perfil: user.perfil,
+          avatar: payload.avatar,
+          tenantId: user.tenant_id,
+          empresaNome: payload.empresaNome,
+          permissions: payload.permissions,
+          sessionId,
+          remember,
+          mfa_enabled: true,
+          mfa_verified: true
+        }
+      });
+    }
+
+    // ── 2.2 POST /api/auth?action=mfa_setup ─────────────────────────────────────
+    if (req.method === 'POST' && action === 'mfa_setup') {
+      const { mfa_token } = req.body || {};
+      let targetUserId = null;
+      let targetUsername = 'admin';
+
+      if (mfa_token) {
+        const decoded = verifyToken(mfa_token, secret);
+        if (!decoded || (decoded.purpose !== 'mfa_setup' && decoded.purpose !== 'mfa_pending') || !decoded.userId) {
+          return res.status(401).json({ success: false, message: 'Token de configuração MFA inválido ou expirado.' });
+        }
+        targetUserId = decoded.userId;
+        targetUsername = decoded.username || 'admin';
+      } else {
+        const auth = await resolveAuthAndTenant(req);
+        if (!auth.authenticated || auth.user?.perfil !== 'superadmin') {
+          return res.status(403).json({ success: false, message: 'Apenas superadmin pode configurar o MFA.' });
+        }
+        targetUserId = auth.user.userId;
+        targetUsername = auth.user.username;
+      }
+
+      const generatedSecret = generateTotpSecret(20);
+      const uri = generateTotpUri({ issuer: 'FinObra Master', account: targetUsername, secret: generatedSecret });
+      const qrSvg = generateQrSvg(uri, 220);
+      const backup = generateBackupCodes(6);
+
+      const confirmToken = signToken({
+        userId: targetUserId,
+        username: targetUsername,
+        temp_secret: generatedSecret,
+        backup_hashes: backup.hashedCodes,
+        purpose: 'mfa_confirm_activation',
+        exp: Date.now() + 15 * 60 * 1000
+      }, secret);
+
+      return res.status(200).json({
+        success: true,
+        secret: generatedSecret,
+        formatted_secret: generatedSecret.match(/.{1,4}/g)?.join(' ') || generatedSecret,
+        uri,
+        qr_svg: qrSvg,
+        backup_codes: backup.rawCodes,
+        setup_token: confirmToken
+      });
+    }
+
+    // ── 2.3 POST /api/auth?action=mfa_activate ──────────────────────────────────
+    if (req.method === 'POST' && action === 'mfa_activate') {
+      const { setup_token, totp_code, mfa_code } = req.body || {};
+      const code = String(totp_code || mfa_code || '').trim();
+
+      if (!setup_token || !code) {
+        return res.status(400).json({ success: false, message: 'Token de setup e código de 6 dígitos são obrigatórios.' });
+      }
+
+      const decoded = verifyToken(setup_token, secret);
+      if (!decoded || decoded.purpose !== 'mfa_confirm_activation' || !decoded.temp_secret || !decoded.userId) {
+        return res.status(401).json({ success: false, message: 'Token de setup expirado ou inválido. Inicie a configuração novamente.' });
+      }
+
+      const verifyRes = verifyTotpCode(decoded.temp_secret, code);
+      if (!verifyRes.valid) {
+        return res.status(400).json({ success: false, message: 'Código incorreto. Digite o código atual de 6 dígitos gerado pelo Google Authenticator.' });
+      }
+
+      // Persiste MFA ativado
+      await sql`
+        UPDATE usuarios
+        SET mfa_secret = ${decoded.temp_secret},
+            mfa_enabled = TRUE,
+            mfa_backup_codes = ${JSON.stringify(decoded.backup_hashes || [])}::jsonb,
+            mfa_last_used_step = ${verifyRes.step}
+        WHERE id = ${decoded.userId};
+      `;
+
+      const rows = await sql`
+        SELECT u.id, u.username, u.email, u.nome, u.perfil, u.avatar, u.tenant_id, u.permissoes,
+               t.razao_social, t.nome_fantasia, t.status as tenant_status
+        FROM usuarios u
+        LEFT JOIN tenants t ON u.tenant_id = t.id
+        WHERE u.id = ${decoded.userId}
+        LIMIT 1;
+      `;
+      const user = rows[0];
+
+      const durationDays = 2;
+      const exp = Date.now() + durationDays * 24 * 60 * 60 * 1000;
+      const sessionId = await createAuthSession(sql, req, { userId: user.id, tenantId: user.tenant_id, remember: false, exp });
+
+      const payload = {
+        userId: user.id,
+        username: user.username,
+        email: user.email,
+        nome: user.nome,
+        perfil: user.perfil,
+        tenantId: user.tenant_id,
+        tenantStatus: user.tenant_status || 'ativo',
+        empresaNome: user.nome_fantasia || user.razao_social || 'Minha Empresa',
+        avatar: user.avatar || user.nome.slice(0, 2).toUpperCase(),
+        permissions: permissionsOf(user),
+        sessionId,
+        mfa_enabled: true,
+        mfa_verified: true,
+        exp
+      };
+
+      const token = signToken(payload, secret);
+      setSessionCookie(req, res, token, exp);
+
+      return res.status(200).json({
+        success: true,
+        message: 'Google Authenticator configurado e ativado com sucesso!',
+        ...tokenFieldForExplicitClient(req, token),
+        user: {
+          id: user.id,
+          username: user.username,
+          email: user.email,
+          nome: user.nome,
+          perfil: user.perfil,
+          avatar: payload.avatar,
+          tenantId: user.tenant_id,
+          empresaNome: payload.empresaNome,
+          permissions: payload.permissions,
+          sessionId,
+          mfa_enabled: true,
+          mfa_verified: true
+        }
+      });
+    }
     }
 
     // ── 3. POST /api/auth?action=register (Cadastro de novo Tenant SaaS no Neon) ─

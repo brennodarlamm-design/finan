@@ -182,7 +182,7 @@ export async function resolveAuthAndTenant(req) {
     const sql = neon(conn);
     const rows = await sql`
       SELECT
-        u.id, u.username, u.email, u.nome, u.perfil, u.avatar, u.ativo, u.tenant_id, u.permissoes,
+        u.id, u.username, u.email, u.nome, u.perfil, u.avatar, u.ativo, u.tenant_id, u.permissoes, u.mfa_enabled,
         t.nome_fantasia, t.razao_social, t.plano, t.status AS tenant_status, t.created_at AS tenant_created_at, t.vencimento AS tenant_vencimento
       FROM usuarios u
       JOIN tenants t ON t.id = u.tenant_id
@@ -287,7 +287,9 @@ export async function resolveAuthAndTenant(req) {
         tenantVencimento: targetTenantInfo.vencimento ? String(targetTenantInfo.vencimento).slice(0, 10) : '',
         empresaNome: targetTenantInfo.nome_fantasia || targetTenantInfo.razao_social || payload.empresaNome || 'Minha Empresa',
         permissions: (live.permissoes && typeof live.permissoes === 'object') ? live.permissoes : {},
-        sessionId: payload.sessionId || ''
+        sessionId: payload.sessionId || '',
+        mfa_enabled: Boolean(live.mfa_enabled),
+        mfa_verified: Boolean(payload.mfa_verified)
       }
     };
   } catch (err) {

@@ -86,7 +86,7 @@ const Auth = {
   },
 
   // ── AUTENTICAÇÃO COM SERVIDOR NEON (SEM FALLBACKS LOCAIS INSEGUROS) ───────
-  async login(username, password, remember = false) {
+  async login(username, password, remember = false, extraBody = {}) {
     if (!username || !password) {
       return { success: false, message: 'Usuário e senha são obrigatórios.' };
     }
@@ -95,12 +95,15 @@ const Auth = {
       const resp = await fetch('/api/auth?action=login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, password, remember })
+        body: JSON.stringify({ username, password, remember, ...extraBody })
       });
       const data = await resp.json().catch(() => ({}));
       if (resp.ok && data.success && data.user) {
         const session = this.createSession(data.user, remember);
         return { success: true, user: session };
+      }
+      if (resp.ok && data.success && (data.mfa_required || data.mfa_setup_required)) {
+        return data;
       }
       return {
         success: false,
@@ -112,6 +115,65 @@ const Auth = {
         success: false,
         message: 'Não foi possível conectar ao servidor de autenticação. Verifique sua conexão com a internet.'
       };
+    }
+  },
+
+  async verifyMfa(mfaToken, totpCode, backupCode = '') {
+    try {
+      const resp = await fetch('/api/auth?action=mfa_verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mfa_token: mfaToken, totp_code: totpCode, backup_code: backupCode })
+      });
+      const data = await resp.json().catch(() => ({}));
+      if (resp.ok && data.success && data.user) {
+        const session = this.createSession(data.user, true);
+        return { success: true, user: session };
+      }
+      return {
+        success: false,
+        message: data.message || data.error || 'Código de autenticação incorreto ou expirado.'
+      };
+    } catch (err) {
+      console.error('Erro ao verificar MFA:', err);
+      return { success: false, message: 'Falha ao conectar com o servidor para autenticação 2FA.' };
+    }
+  },
+
+  async setupMfa(setupToken) {
+    try {
+      const resp = await fetch('/api/auth?action=mfa_setup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ setup_token: setupToken })
+      });
+      const data = await resp.json().catch(() => ({}));
+      return data;
+    } catch (err) {
+      console.error('Erro ao iniciar setup MFA:', err);
+      return { success: false, message: 'Falha ao conectar para configuração 2FA.' };
+    }
+  },
+
+  async activateMfa(setupToken, totpCode) {
+    try {
+      const resp = await fetch('/api/auth?action=mfa_activate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ setup_token: setupToken, totp_code: totpCode })
+      });
+      const data = await resp.json().catch(() => ({}));
+      if (resp.ok && data.success && data.user) {
+        const session = this.createSession(data.user, true);
+        return { success: true, user: session };
+      }
+      return {
+        success: false,
+        message: data.message || data.error || 'Código do autenticador incorreto.'
+      };
+    } catch (err) {
+      console.error('Erro ao ativar MFA:', err);
+      return { success: false, message: 'Falha ao ativar 2FA no servidor.' };
     }
   },
 

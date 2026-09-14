@@ -3,7 +3,8 @@
 
 import { neon } from '@neondatabase/serverless';
 import crypto from 'crypto';
-import { hashPassword, resolveAuthAndTenant, signToken, verifyToken } from './_auth.js';
+import { hashPassword, verifyPassword, resolveAuthAndTenant, signToken, verifyToken } from './_auth.js';
+import { generateBackupCodes } from './_totp.js';
 import { writeAudit } from './_audit.js';
 import { parseWebhookPayload, settlePixPayment, sendPaymentReceipt } from './_webhook_pix_core.js';
 
@@ -208,6 +209,17 @@ export default async function handler(req, res) {
       success: false,
       error: 'Acesso negado. Esta rota é restrita exclusivamente ao Super Administrador da plataforma.'
     });
+  }
+
+  // PATCH 49: Validação estrita de 2FA (Google Authenticator) para Super Admin
+  if (!auth.isSystem && auth.user && auth.user.perfil === 'superadmin') {
+    if (auth.user.mfa_enabled && !auth.user.mfa_verified) {
+      return res.status(403).json({
+        success: false,
+        mfa_required: true,
+        error: 'Autenticação de dois fatores (Google Authenticator) obrigatória para esta operação.'
+      });
+    }
   }
 
   const sql = getSql();
@@ -1421,6 +1433,51 @@ export default async function handler(req, res) {
         depois:{ restored:true, recoveredFromImpersonatedSession, superadmin:auth.user?.username || auth.user?.email || 'superadmin' }
       });
       return res.status(200).json({ success:true, restored:true, recoveredFromImpersonatedSession });
+    }
+
+    // PATCH 49: Status do 2FA do Super Admin
+    if (req.method === 'GET' && action === 'mfa_status') {
+      const userId = auth.user?.userId || auth.user?.id;
+      if (!userId) return res.status(400).json({ success: false, error: 'Usuário não identificado.' });
+      const rows = await sql`
+        SELECT id, username, email, mfa_enabled,
+               (mfa_backup_codes IS NOT NULL AND jsonb_array_length(mfa_backup_codes) > 0) as has_backup_codes,
+               COALESCE(jsonb_array_length(mfa_backup_codes), 0) as backup_codes_count
+        FROM usuarios WHERE id = ${userId} LIMIT 1;
+      `;
+      if (!rows.length) return res.status(404).json({ success: false, error: 'Usuário não encontrado.' });
+      const u = rows[0];
+      return res.status(200).json({
+        success: true,
+        mfa_enabled: Boolean(u.mfa_enabled),
+        has_backup_codes: Boolean(u.has_backup_codes),
+        backup_codes_count: Number(u.backup_codes_count || 0)
+      });
+    }
+
+    // PATCH 49: Regenerar códigos de emergência 2FA
+    if (req.method === 'POST' && action === 'mfa_regenerate_backup_codes') {
+      const userId = auth.user?.userId || auth.user?.id;
+      const password = String(req.body?.password || '').trim();
+      if (!password) {
+        return res.status(400).json({ success: false, error: 'Senha atual é obrigatória para gerar novos códigos de emergência.' });
+      }
+      const users = await sql`SELECT id, senha_hash, mfa_enabled FROM usuarios WHERE id = ${userId} LIMIT 1;`;
+      if (!users.length) return res.status(404).json({ success: false, error: 'Usuário não encontrado.' });
+      const u = users[0];
+      if (!verifyPassword(password, u.senha_hash)) {
+        return res.status(401).json({ success: false, error: 'Senha incorreta.' });
+      }
+      if (!u.mfa_enabled) {
+        return res.status(400).json({ success: false, error: '2FA não está ativo nesta conta.' });
+      }
+      const { codes, hashedCodes } = generateBackupCodes(8);
+      await sql`UPDATE usuarios SET mfa_backup_codes = ${JSON.stringify(hashedCodes)}::jsonb WHERE id = ${userId};`;
+      return res.status(200).json({
+        success: true,
+        backup_codes: codes,
+        message: 'Novos códigos de recuperação gerados com sucesso. Guarde-os em local seguro!'
+      });
     }
 
     return res.status(400).json({ success: false, error: `Ação "${action}" desconhecida.` });

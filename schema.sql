@@ -37,6 +37,10 @@ CREATE TABLE IF NOT EXISTS usuarios (
     google_auth BOOLEAN DEFAULT FALSE,
     google_sub VARCHAR(255),
     permissoes JSONB NOT NULL DEFAULT '{}'::jsonb,
+    mfa_secret VARCHAR(128),
+    mfa_enabled BOOLEAN DEFAULT FALSE,
+    mfa_backup_codes JSONB DEFAULT '[]'::jsonb,
+    mfa_last_used_step BIGINT DEFAULT 0,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
