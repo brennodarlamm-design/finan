@@ -15,9 +15,7 @@ const OrcamentoProposta = {
 
     const cliente = DB.getById('clientes', orc.obra_id);
     const empresa = DB.getEmpresa ? DB.getEmpresa() : {};
-    const subtotal = (orc.itens || []).reduce((s, i) => s + (i.total || 0), 0);
-    const bdi = orc.bdi || 24.23;
-    const totalGeral = subtotal * (1 + bdi / 100);
+    const { subtotal, bdi, totalGeral } = OrcamentoSINAPI.calcularTotais(orc);
 
     const proximaSeq = orc.proposta?.numero || '001';
     const dataEmissao = orc.proposta?.data || Utils.today();
@@ -87,7 +85,7 @@ const OrcamentoProposta = {
               </div>
               <div style="display:flex;justify-content:space-between;font-size:.82rem;color:#64748b;margin-bottom:6px;">
                 <span>Taxa de BDI (${bdi.toFixed(2)}%):</span>
-                <span style="font-weight:700;color:#d97706;">${Utils.fmt.currency(subtotal * bdi / 100)}</span>
+                <span style="font-weight:700;color:#d97706;">${Utils.fmt.currency(totalGeral - subtotal)}</span>
               </div>
               <div style="border-top:1px solid #e2e8f0;padding-top:8px;margin-top:8px;display:flex;justify-content:space-between;font-size:1.05rem;font-weight:900;">
                 <span style="color:#0f172a;">VALOR GLOBAL DA PROPOSTA:</span>
@@ -141,9 +139,7 @@ const OrcamentoProposta = {
     if (!orc) return;
 
     // Salva a proposta no orçamento
-    const subtotal = (orc.itens || []).reduce((s, i) => s + (i.total || 0), 0);
-    const bdi = orc.bdi || 24.23;
-    const totalGeral = subtotal * (1 + bdi / 100);
+    const { subtotal, bdi, totalGeral } = OrcamentoSINAPI.calcularTotais(orc);
 
     const dadosProposta = {
       numero: fd.get('numero') || '001',
@@ -182,9 +178,7 @@ const OrcamentoProposta = {
     const cliente = DB.getById('clientes', orc.obra_id) || {};
     const empresa = DB.getEmpresa ? DB.getEmpresa() : {};
     const itens = orc.itens || [];
-    const subtotal = itens.reduce((s, i) => s + (i.total || 0), 0);
-    const bdi = orc.bdi || 24.23;
-    const totalGeral = subtotal * (1 + bdi / 100);
+    const { subtotal, bdi, totalGeral } = OrcamentoSINAPI.calcularTotais(orc);
     const e = Utils.escapeHtml.bind(Utils);
 
     // Agrupa por etapas para resumo executivo da proposta
@@ -192,7 +186,7 @@ const OrcamentoProposta = {
     itens.forEach(it => {
       const etNome = it.etapa_nome || 'SERVIÇOS GERAIS';
       if (!etapasMap[etNome]) etapasMap[etNome] = 0;
-      etapasMap[etNome] += (it.total || 0) * (1 + bdi / 100);
+      etapasMap[etNome] += OrcamentoSINAPI.calcularTotais({ bdi, itens:[it] }).totalGeral;
     });
 
     const etapasResumo = Object.keys(etapasMap).map((nome, idx) => ({
@@ -350,9 +344,7 @@ const OrcamentoProposta = {
     const orc = typeof OrcamentoSINAPI !== 'undefined' ? OrcamentoSINAPI._getById(orcId) : null;
     if (!orc) return;
     const cliente = DB.getById('clientes', orc.obra_id) || {};
-    const subtotal = (orc.itens || []).reduce((s, i) => s + (i.total || 0), 0);
-    const bdi = orc.bdi || 24.23;
-    const totalGeral = subtotal * (1 + bdi / 100);
+    const { subtotal, bdi, totalGeral } = OrcamentoSINAPI.calcularTotais(orc);
     const prop = orc.proposta || { numero: '001', data: Utils.today(), validade_dias: 30 };
 
     const texto = `*PROPOSTA COMERCIAL Nº ${prop.numero}*\n` +

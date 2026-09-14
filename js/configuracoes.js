@@ -126,17 +126,17 @@ const Configuracoes = {
     if (typeof CronogramaSLA === 'undefined') {
       return '<div class="empty-state"><h3>Módulo de SLAs indisponível</h3></div>';
     }
-    const slas = CronogramaSLA.getSlasPadrao();
+    const slas = CronogramaSLA.getSlasEmpresa();
     const e = Utils.escapeHtml.bind(Utils);
 
     const rows = slas.map(s => `
       <tr>
         <td style="font-weight:700;color:var(--text);">${e(s.nome)}</td>
-        <td><span class="badge" style="background:rgba(255,255,255,.06);">${e(s.departamento)}</span></td>
-        <td><span style="font-family:monospace;font-size:.78rem;color:var(--text3);">${e(s.predecessor || 'Início da Obra')}</span></td>
+        <td><span class="badge" style="background:rgba(255,255,255,.06);">${e(s.tipoLabel)}</span></td>
+        <td><span style="font-family:monospace;font-size:.78rem;color:var(--text3);">${e(s.predecessor_id || 'Início da Obra')}</span></td>
         <td style="width:140px;">
           <div style="display:flex;align-items:center;gap:6px;">
-            <input type="number" class="form-control" name="sla_dias_${s.id}" value="${s.diasSla}" min="1" max="365" style="width:75px;padding:4px 8px;text-align:right;">
+            <input type="number" class="form-control" name="sla_dias_${s.id}" value="${s.dias_sla}" min="1" max="365" style="width:75px;padding:4px 8px;text-align:right;">
             <span style="font-size:.78rem;color:var(--text3);">dias</span>
           </div>
         </td>
@@ -190,13 +190,14 @@ const Configuracoes = {
     if (typeof CronogramaSLA === 'undefined') return;
     const form = document.getElementById('form-slas-empresa');
     if (!form) return;
-    const slas = CronogramaSLA.getSlasPadrao();
+    const slas = CronogramaSLA.getSlasEmpresa();
     const atualizados = slas.map(s => {
       const inp = form.querySelector(`[name="sla_dias_${s.id}"]`);
-      const val = inp ? parseInt(inp.value, 10) : s.diasSla;
-      return { ...s, diasSla: isNaN(val) || val < 1 ? s.diasSla : val };
+      const val = inp ? parseInt(inp.value, 10) : s.dias_sla;
+      return { ...s, dias_sla: isNaN(val) || val < 1 ? s.dias_sla : val };
     });
-    CronogramaSLA.salvarSlasPadrao(atualizados);
+    if (!form.reportValidity()) return;
+    if (!CronogramaSLA.saveSlasEmpresa(atualizados)) return Utils.toast('Não foi possível salvar os SLAs.', 'error');
     Utils.toast('SLAs padrão atualizados com sucesso!', 'success');
   },
 

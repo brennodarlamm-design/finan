@@ -71,8 +71,8 @@ const OrcamentoBancos = {
           id: b.id,
           nome: b.nome,
           estado: existente?.estado || b.estado,
-          uf: existente?.uf || b.uf,
-          ref: existente?.ref || b.ref,
+          uf: existente?.uf || (b.id === 'sinapi' ? orc?.uf : '') || b.uf,
+          ref: existente?.ref || (b.id === 'sinapi' && orc?.referencia_sinapi ? `${Number(orc.referencia_sinapi.slice(5))}/${orc.referencia_sinapi.slice(0,4)}` : '') || b.ref,
           checked: existente ? !!existente.checked : b.checked,
           multiUf: b.multiUf,
           opcoesRef: b.opcoesRef,
@@ -111,7 +111,7 @@ const OrcamentoBancos = {
           
           <!-- Banner Informativo (amarelo/alaranjado suave) -->
           <div style="background:#fffbeb;border:1px solid #fde68a;border-radius:6px;padding:12px 16px;color:#92400e;font-size:.875rem;margin-bottom:16px;font-weight:500;">
-            Em 'SALVAR' os preços dos insumos do orçamento serão atualizados conforme seleção.
+            Ao salvar, apenas itens encontrados na base SINAPI importada para a UF, competência e série selecionadas terão o preço atualizado. Os demais bancos ainda não possuem uma base de preços integrada; valores não encontrados serão preservados e sinalizados para revisão.
           </div>
 
           <!-- Barra de Busca, Contador e Filtro -->
@@ -325,6 +325,7 @@ const OrcamentoBancos = {
     // Salva globalmente
     this._salvarConfigLocal(configFinal);
 
+    let recalc = { updated:0, missing:0 };
     // Se estiver associado a um orçamento específico, atualiza o orçamento
     if (this._currentOrcId && typeof OrcamentoSINAPI !== 'undefined') {
       const orc = OrcamentoSINAPI._getById(this._currentOrcId);
@@ -343,12 +344,12 @@ const OrcamentoBancos = {
         OrcamentoSINAPI._save(orc);
 
         // Recalcula os itens do orçamento
-        this._recalcularItensDoOrcamento(orc);
+        recalc = this._recalcularItensDoOrcamento(orc);
       }
     }
 
     Utils.closeModal();
-    Utils.toast('Preços dos insumos do orçamento atualizados conforme seleção!', 'success');
+    Utils.toast(recalc.missing ? `Períodos salvos. ${recalc.missing} item(ns) sem preço na base selecionada; valores anteriores preservados. Importe a base correspondente antes de emitir a proposta.` : `Períodos salvos. ${recalc.updated} preço(s) atualizado(s) da base importada.`, recalc.missing ? 'warning' : 'success');
 
     // Se o editor estiver aberto, atualiza a tela
     if (this._currentOrcId && typeof OrcamentoSINAPI !== 'undefined' && OrcamentoSINAPI._currentEditor === this._currentOrcId) {
@@ -359,31 +360,34 @@ const OrcamentoBancos = {
   },
 
   _recalcularItensDoOrcamento(orc) {
-    const itens = orc.itens || [];
-    if (!itens.length) return;
-
-    // Aplica recálculo com base no BDI e nos novos coeficientes
-    const bdi = Number(orc.bdi || 0);
-    itens.forEach(item => {
-      const pUnit = Number(item.preco_unitario) || 0;
-      item.preco_com_bdi = Math.round((pUnit * (1 + bdi / 100)) * 100) / 100;
-      item.total = Math.round((Number(item.quantidade || 1) * item.preco_com_bdi) * 100) / 100;
-    });
-
+    const base = typeof SINAPI !== 'undefined' ? SINAPI.getBase(orc.desonerado, orc.uf, orc.referencia_sinapi) : null;
+    const bank = orc.bancos_config?.bancos?.find(b => b.id === 'sinapi');
+    const prices = new Map((base?.composicoes || []).map(item => [String(item.codigo), item]));
+    let updated = 0, missing = 0;
+    for (const item of orc.itens || []) {
+      const price = (!bank || bank.checked) && (item.banco || 'SINAPI') === 'SINAPI' ? prices.get(String(item.codigo_sinapi || item.codigo)) : null;
+      if (!price) { item.preco_pendente = true; missing++; continue; }
+      item.preco_unitario = Number(price.preco_unitario) || 0;
+      item.preco_pendente = false;
+      item.preco_com_bdi = Math.round(item.preco_unitario * (1 + Number(orc.bdi || 0) / 100) * 100) / 100;
+      item.total = Math.round(Number(item.quantidade ?? 0) * item.preco_com_bdi * 100) / 100;
+      updated++;
+    }
     OrcamentoSINAPI._save(orc);
+    return { updated, missing };
   },
 
   _KEY: 'finobra_periodos_bancos_config',
 
   _salvarConfigLocal(cfg) {
     try {
-      localStorage.setItem(this._KEY, JSON.stringify(cfg));
+      localStorage.setItem(DB._ck(this._KEY), JSON.stringify(cfg));
     } catch {}
   },
 
   _getConfigSalva() {
     try {
-      const raw = localStorage.getItem(this._KEY);
+      const raw = localStorage.getItem(DB._ck(this._KEY));
       return raw ? JSON.parse(raw) : null;
     } catch { return null; }
   },

@@ -379,6 +379,14 @@ button:disabled { cursor:not-allowed;opacity:.55; }
   .ui-portal main { padding:20px 14px!important; }
   .ui-portal [style*="grid-template-columns:repeat(4"],.ui-portal [style*="grid-template-columns: repeat(4"] { grid-template-columns:repeat(2,minmax(0,1fr))!important; }
 }
+@media(max-width:600px) {
+  .ui-workspace #sinapi-editor { width:100%!important;max-width:100%!important;overflow-y:auto!important;max-height:94dvh!important; }
+  .ui-workspace #sinapi-editor>div { flex-shrink:0!important;min-width:0;max-width:100%; }
+  .ui-workspace #sinapi-editor>.modal-body { flex:none!important;min-height:240px;max-height:55dvh;overflow:auto!important; }
+  .ui-workspace #sinapi-editor .sinapi-editor-totals { width:100%;gap:16px!important; }
+  .ui-workspace #sinapi-editor .sinapi-editor-totals>div { flex:1 1 130px; }
+  .ui-workspace #sinapi-editor .sinapi-editor-totals>button { width:100%; }
+}
 @media(prefers-reduced-motion:reduce) {
   *,*::before,*::after { scroll-behavior:auto!important;animation-duration:.01ms!important;transition-duration:.01ms!important;animation-iteration-count:1!important; }
 }

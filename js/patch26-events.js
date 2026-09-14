@@ -38,6 +38,7 @@
     "Parcelamento": (typeof Parcelamento !== 'undefined' ? Parcelamento : globalThis["Parcelamento"]),
     "Patch26Actions": (typeof Patch26Actions !== 'undefined' ? Patch26Actions : globalThis["Patch26Actions"]),
     "Produtos": (typeof Produtos !== 'undefined' ? Produtos : globalThis["Produtos"]),
+    "PreCompras": (typeof PreCompras !== 'undefined' ? PreCompras : globalThis["PreCompras"]),
     "Recibos": (typeof Recibos !== 'undefined' ? Recibos : globalThis["Recibos"]),
     "Suporte": (typeof Suporte !== 'undefined' ? Suporte : globalThis["Suporte"]),
     "SuporteDev": (typeof SuporteDev !== 'undefined' ? SuporteDev : globalThis["SuporteDev"]),
@@ -110,7 +111,7 @@
         if (result === false) ev.preventDefault();
       } catch (err) {
         console.error('[Patch26 CSP]', err?.message || err);
-        globalThis.Utils?.toast?.('Ação bloqueada por política de segurança.', 'warning');
+        ROOTS.Utils?.toast?.('Não foi possível executar esta ação. Tente novamente.', 'warning');
       }
     }, true);
   }

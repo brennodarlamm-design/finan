@@ -161,7 +161,7 @@ const CronogramaSLA = {
       const storageKey = (typeof DB !== 'undefined' && DB._ck) ? DB._ck(this._KEY_SLAS_PADRAO) : this._KEY_SLAS_PADRAO;
       localStorage.setItem(storageKey, JSON.stringify(novosSlas));
       if (typeof DB !== 'undefined' && DB.syncToCloud) {
-        DB.syncToCloud('save', 'preferencias', { slas_padrao: novosSlas });
+        DB.syncToCloud('save', 'preferencias', { preferences: { slas_padrao: novosSlas } });
       }
       return true;
     } catch (e) {
@@ -181,8 +181,9 @@ const CronogramaSLA = {
     if (!obra) return [];
 
     // Se a obra já tem processos customizados salvos, retorna
-    if (Array.isArray(obra.processos_sla) && obra.processos_sla.length) {
-      return this.calcularCascata(obra.processos_sla, obra.data_inicio);
+    const salvos = obra.cronograma_config?.processos_sla || obra.processos_sla;
+    if (Array.isArray(salvos) && salvos.length) {
+      return this.calcularCascata(salvos, obra.data_inicio);
     }
 
     // Caso contrário, herda do template padrão da empresa
@@ -214,14 +215,15 @@ const CronogramaSLA = {
     // Atualiza a obra com os processos e a nova data prevista de término
     const ultimaEtapa = recalculados[recalculados.length - 1];
     const updates = {
-      processos_sla: recalculados
+      processos_sla: recalculados,
+      cronograma_config: { ...(DB.getById('clientes', obraId)?.cronograma_config || {}), processos_sla: recalculados }
     };
     if (ultimaEtapa && ultimaEtapa.data_fim_prevista) {
       updates.data_previsao_termino = ultimaEtapa.data_fim_prevista;
+      updates.data_previsao = ultimaEtapa.data_fim_prevista;
     }
 
-    DB.update('clientes', obraId, updates);
-    return true;
+    return !!DB.update('clientes', obraId, updates);
   },
 
   // ── MOTOR DE RECÁLCULO EM CASCATA ──
@@ -617,7 +619,7 @@ const CronogramaSLA = {
       p.data_fim_real = Utils.today();
     }
 
-    this.salvarProcessosObra(obraId, processos);
+    if (!this.salvarProcessosObra(obraId, processos)) return Utils.toast('Não foi possível salvar os SLAs desta obra.', 'error');
     Utils.closeModal();
     Utils.toast('Cronograma recalculado em cascata!', 'success');
 
@@ -692,7 +694,7 @@ const CronogramaSLA = {
       }
     });
 
-    this.salvarProcessosObra(obraId, processos);
+    if (!this.salvarProcessosObra(obraId, processos)) return Utils.toast('Não foi possível salvar os SLAs desta obra.', 'error');
     Utils.closeModal();
     Utils.toast('Prazos de SLA atualizados e recalculados!', 'success');
 

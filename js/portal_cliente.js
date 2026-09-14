@@ -757,7 +757,7 @@ const PortalCliente = {
       <div class="empty-state">
         <div style="font-size:2.5rem;margin-bottom:8px">✍️</div>
         <h3>Nenhum documento pendente para assinatura</h3>
-        <p style="color:var(--text3)">Quando a construtora disponibilizar um contrato ou aditivo, você poderá assinar por aqui.</p>
+        <p style="color:var(--text3)">Os documentos disponibilizados pela construtora aparecerão aqui. A assinatura por link externo ainda não está disponível.</p>
       </div>`;
     }
 
@@ -783,8 +783,8 @@ const PortalCliente = {
                 ✓ Assinado com Sucesso
               </span>
             ` : `
-              <button class="btn btn-primary" data-fb-click="PortalCliente.assinarDocumentoCliente" data-fb-click-n="2" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(c.id))}" data-fb-click-t1="string" data-fb-click-v1="${encodeURIComponent(String(b.oid))}" style="font-weight:800;display:inline-flex;align-items:center;gap:6px;padding:8px 16px;">
-                ✍️ Assinar pelo Celular
+              <button disabled title="Solicite à construtora o procedimento de assinatura" class="btn btn-secondary" data-fb-click="PortalCliente.assinarDocumentoCliente" data-fb-click-n="2" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(c.id))}" data-fb-click-t1="string" data-fb-click-v1="${encodeURIComponent(String(b.oid))}" style="font-weight:800;display:inline-flex;align-items:center;gap:6px;padding:8px 16px;">
+                Assinatura externa indisponível
               </button>
             `}
           </div>
@@ -794,53 +794,8 @@ const PortalCliente = {
   },
 
   // ── AÇÃO DE ASSINATURA PELO CLIENTE ──
-  assinarDocumentoCliente(contratoId, obraId) {
-    const b = this._activeBundle;
-    const targetId = contratoId || (b && b.ctr && b.ctr[0] ? b.ctr[0].id : null);
-    const targetCtr = b && b.ctr ? b.ctr.find(c => c.id === targetId) : null;
-    const clienteNome = b?.o?.c || 'Cliente';
-    const clienteDoc = b?.o?.doc || '';
-
-    if (typeof Assinador === 'undefined') {
-      return Utils.toast('Módulo Assinador indisponível.', 'error');
-    }
-
-    Assinador.abrirModal({
-      titulo: `Assinar: ${targetCtr?.tit || 'Contrato da Obra'}`,
-      subtitulo: 'Sua assinatura eletrônica será vinculada com carimbo de tempo e hash de autenticidade',
-      papel: 'Cliente / Contratante',
-      nomePredefinido: clienteNome,
-      docPredefinido: clienteDoc,
-      dadosDocumento: {
-        contratoId: targetId,
-        obraId: obraId || b?.oid,
-        tipo: 'contrato'
-      },
-      onSalvar: (res) => {
-        // Atualiza no bundle ativo da página
-        if (targetCtr) {
-          targetCtr.ass = true;
-          targetCtr.dtAss = res.data_hora || new Date().toISOString();
-          targetCtr.signatario = res.signatario_nome || clienteNome;
-        }
-
-        // Se o DB estiver disponível localmente, atualiza
-        if (typeof DB !== 'undefined' && DB.update) {
-          try {
-            DB.update('contratos', targetId, {
-              assinado_por_cliente: true,
-              data_assinatura_cliente: res.data_hora || new Date().toISOString(),
-              assinatura_cliente_hash: res.hash_integridade || null,
-              assinatura_cliente_nome: res.signatario_nome || clienteNome,
-              assinatura_cliente_img: res.data_url || null
-            });
-          } catch {}
-        }
-
-        Utils.toast('Documento assinado eletronicamente com sucesso!', 'success');
-        this.setTab('assinaturas');
-      }
-    });
+  assinarDocumentoCliente() {
+    return Utils.toast('A assinatura por link externo ainda não está disponível. Solicite à construtora o procedimento de assinatura.', 'warning');
   },
 
   // ── CENTRAL DE GESTÃO DO PORTAL DO CLIENTE (VISÃO DA EMPRESA / INTERNA) ──

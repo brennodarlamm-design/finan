@@ -86,6 +86,7 @@ const DB = {
     return {
       categorias_fornecedor: readJson('finobra_categorias_custom'),
       categorias_despesa: readJson('finobra_cats_despesa_custom'),
+      slas_padrao: readJson('finobra_slas_padrao'),
       whatsapp_telefone: String(localStorage.getItem(this._ck('finobra_whatsapp_telefone')) || ''),
       whatsapp_modo: String(localStorage.getItem(this._ck('finobra_whatsapp_modo')) || 'api')
     };
@@ -99,6 +100,7 @@ const DB = {
     };
     if ('categorias_fornecedor' in preferences) writeJson('finobra_categorias_custom', preferences.categorias_fornecedor);
     if ('categorias_despesa' in preferences) writeJson('finobra_cats_despesa_custom', preferences.categorias_despesa);
+    if ('slas_padrao' in preferences) writeJson('finobra_slas_padrao', preferences.slas_padrao);
     if ('whatsapp_telefone' in preferences) {
       try { localStorage.setItem(this._ck('finobra_whatsapp_telefone'), String(preferences.whatsapp_telefone || '').replace(/\D/g, '')); } catch {}
     }
@@ -817,6 +819,8 @@ const DB = {
         const normalizedCloud = d.clientes.map(o => ({
           ...o,
           data_inicio: (typeof Utils !== 'undefined' && Utils.cleanDate) ? Utils.cleanDate(o.data_inicio) : (o.data_inicio ? String(o.data_inicio).split('T')[0] : o.data_inicio),
+          processos_sla: o.cronograma_config?.processos_sla || o.processos_sla || [],
+          data_previsao_termino: o.data_previsao || o.data_previsao_termino || '',
           data_previsao: (typeof Utils !== 'undefined' && Utils.cleanDate) ? Utils.cleanDate(o.data_previsao) : (o.data_previsao ? String(o.data_previsao).split('T')[0] : o.data_previsao)
         }));
         this.save('clientes', this._reconcileCollection('clientes', normalizedCloud, local));
@@ -1880,6 +1884,7 @@ const DB = {
     if (!obra) return false;
     const saved = {
       totalMeses: Number(config.totalMeses || 12),
+      processos_sla: config.processos_sla || obra.cronograma_config?.processos_sla || obra.processos_sla || [],
       mesInicio: config.mesInicio || null,
       modoDistribuicao: config.modoDistribuicao || 'gaussiana',
       etapas: config.etapas || {},

@@ -16,34 +16,78 @@ const OrcamentoSINAPI = {
   _filtroInsumos: true,
   _filtroComposicoes: true,
 
-  // Catálogo unificado multi-banco com insumos e composições em alta precisão
-  BANCO_UNIFICADO_ITENS: [
-    { tipo: 'COMP', banco: 'DER-PR', codigo: '510300', descricao: 'Decapagem pedreira e limpeza periódica p/ pav. poliédrico', unidade: 'm2', preco_unitario: 2.8500 },
-    { tipo: 'INSUMO', banco: 'ORSE', codigo: '12512', descricao: "Deck em madeira - régua de pau d' arco 10 x 2 cm, cantos abaulados", unidade: 'm', preco_unitario: 28.6100 },
-    { tipo: 'COMP', banco: 'ORSE', codigo: '11616', descricao: "Deck em madeira pau d' arco, com réguas cantos abaulados 10 x 2cm, protegidas duas demãos de sparlack cet...", unidade: 'm2l', preco_unitario: 488.4100 },
-    { tipo: 'INSUMO', banco: 'ORSE', codigo: '14257', descricao: 'Deck em madeira, espessura = 2 cm, largura = 8,5 cm, (comprimentos diversos), zero umidade, em eucalipto t...', unidade: 'm²', preco_unitario: 276.7200 },
-    { tipo: 'COMP', banco: 'ORSE', codigo: '13524', descricao: 'Deck em madeira, espessura = 2, largura = 8,5, (comprimento diversos) em eucalipto tratado, espécie saligna, ...', unidade: 'm2', preco_unitario: 458.0500 },
-    { tipo: 'INSUMO', banco: 'DER-PR', codigo: '101315', descricao: 'Defensa de contenção simples mod. H1AW3 15° (ABNT-15486 / 2016)', unidade: 'm', preco_unitario: 259.4400 },
-    { tipo: 'INSUMO', banco: 'DER-PR', codigo: '101415', descricao: 'Defensa de contenção simples mod. H1AW4 15° (ABNT-15486 / 2016)', unidade: 'm', preco_unitario: 181.7100 },
-    { tipo: 'COMP', banco: 'SICRO3', codigo: '7119710', descricao: 'Defensa de pneus para proteção do flutuante - confecção e instalação', unidade: 'un', preco_unitario: 740.1500 },
-    { tipo: 'COMP', banco: 'SINAPI', codigo: '98458', descricao: 'Tapume de chapa de madeira compensada resinada, e = 10mm', unidade: 'm²', preco_unitario: 85.4000 },
-    { tipo: 'COMP', banco: 'SINAPI', codigo: '99059', descricao: 'Locação convencional de obra através de gabarito de tábuas corridas', unidade: 'm', preco_unitario: 34.2000 },
-    { tipo: 'COMP', banco: 'SINAPI', codigo: '96523', descricao: 'Escavação manual de vala para viga baldrame com profundidade até 1,5m', unidade: 'm³', preco_unitario: 68.9000 },
-    { tipo: 'COMP', banco: 'SINAPI', codigo: '96546', descricao: 'Armação de bloco, viga baldrame ou sapata utilizando aço CA-50 de 10,0mm', unidade: 'kg', preco_unitario: 14.8000 },
-    { tipo: 'COMP', banco: 'SINAPI', codigo: '94970', descricao: 'Concreto fck=25MPa usinado, bombeado para fundações', unidade: 'm³', preco_unitario: 520.0000 },
-    { tipo: 'COMP', banco: 'SINAPI', codigo: '89985', descricao: 'Alvenaria de vedação de blocos cerâmicos furados 9x19x19cm com argamassa mista', unidade: 'm²', preco_unitario: 78.5000 },
-    { tipo: 'COMP', banco: 'SINAPI', codigo: '92778', descricao: 'Laje pré-moldada unidirecional para forro com vigota em concreto armado', unidade: 'm²', preco_unitario: 115.0000 },
-    { tipo: 'COMP', banco: 'SINAPI', codigo: '94210', descricao: 'Telhamento com telha cerâmica tipo colonial ou portuguesa', unidade: 'm²', preco_unitario: 88.0000 },
-    { tipo: 'COMP', banco: 'SINAPI', codigo: '87265', descricao: 'Revestimento cerâmico para piso retificado assentado com argamassa AC-II', unidade: 'm²', preco_unitario: 89.9000 },
-    { tipo: 'COMP', banco: 'SINAPI', codigo: '88489', descricao: 'Pintura látex acrílica premium em paredes internas, duas demãos', unidade: 'm²', preco_unitario: 32.5000 },
-    { tipo: 'COMP', banco: 'SEINFRA-CE', codigo: 'C0843', descricao: 'Concreto não estrutural preparado no canteiro fck=10MPa', unidade: 'm³', preco_unitario: 395.2000 },
-    { tipo: 'INSUMO', banco: 'SIURB', codigo: '01-01-02', descricao: 'Ajudante geral da construção civil horista', unidade: 'h', preco_unitario: 22.4000 },
-    { tipo: 'INSUMO', banco: 'SINAPI', codigo: '00000367', descricao: 'Areia média lavada para concreto e argamassa', unidade: 'm³', preco_unitario: 95.0000 },
-    { tipo: 'INSUMO', banco: 'SINAPI', codigo: '00001379', descricao: 'Cimento Portland composto CP II-E-32', unidade: 'kg', preco_unitario: 0.8500 }
-  ],
-
   _hasPlanAccess() {
     return typeof Cobranca === 'undefined' || Cobranca.isFeatureAllowed('sinapi');
+  },
+
+  calcularTotais(orc) {
+    const round = value => Math.round((value + Number.EPSILON) * 100) / 100;
+    const bdi = Number(orc.bdi ?? this.BDI_PADRAO);
+    let subtotal = 0, totalGeral = 0;
+    for (const item of orc.itens || []) {
+      const quantidade = Number(item.quantidade || 0), preco = Number(item.preco_unitario || 0);
+      subtotal += round(quantidade * preco);
+      totalGeral += round(quantidade * round(preco * (1 + bdi / 100)));
+    }
+    subtotal = round(subtotal); totalGeral = round(totalGeral);
+    return { subtotal, bdi, valorBDI:round(totalGeral-subtotal), totalGeral };
+  },
+
+  _showInfo(message) {
+    Utils.showModal(`<div class="modal" style="max-width:560px"><div class="modal-header"><span class="modal-title">Orçamento SINAPI</span><button class="modal-close" data-fb-click="Utils.closeModal" data-fb-click-n="0" aria-label="Fechar">✕</button></div><div class="modal-body" style="white-space:pre-line">${Utils.escapeHtml(message)}</div></div>`);
+  },
+
+  showImportModal(desonerado = false, uf = '', referencia = '') {
+    if (!this._ensurePlanAccess()) return;
+    this._importEditor = this._currentEditor;
+    const e = Utils.escapeHtml.bind(Utils);
+    Utils.showModal(`<div class="modal" style="max-width:620px">
+      <div class="modal-header"><span class="modal-title">Importar base SINAPI</span><button class="modal-close" aria-label="Fechar" data-fb-click="Utils.closeModal" data-fb-click-n="0">✕</button></div>
+      <div class="modal-body"><p>Selecione a planilha oficial de composições sintéticas ou analíticas, em XLSX ou ZIP. Informe a UF, a competência e a série do arquivo. A base ficará disponível neste navegador.</p>
+        <form id="sinapi-import-form"><div class="form-row cols-2">
+          <label class="form-group">UF<select id="imp-uf" class="form-control" required>${Utils.stateOptions(uf)}</select></label>
+          <label class="form-group">Competência<input id="imp-ref" class="form-control" type="month" value="${e(referencia)}" required></label>
+        </div><label class="form-group">Série<select id="imp-serie" class="form-control"><option value="false" ${!desonerado?'selected':''}>Onerado</option><option value="true" ${desonerado?'selected':''}>Desonerado</option></select></label>
+        <label class="form-group">Arquivo oficial<input id="imp-file" class="form-control" type="file" accept=".xlsx,.xls,.zip" required></label></form>
+        <p id="imp-progress-msg" role="status" aria-live="polite"></p>
+      </div><div class="modal-footer"><button class="btn btn-secondary" data-fb-click="Utils.closeModal" data-fb-click-n="0">Cancelar</button><button id="imp-run" class="btn btn-primary" data-fb-click="OrcamentoSINAPI.executarImport" data-fb-click-n="0">Importar base</button></div></div>`);
+  },
+
+  async executarImport() {
+    if (!this._ensurePlanAccess() || this._importRunning) return;
+    const form = document.getElementById('sinapi-import-form');
+    if (!form?.reportValidity()) return;
+    const file = document.getElementById('imp-file').files[0];
+    if (!file) return;
+    const uf = document.getElementById('imp-uf').value;
+    const referencia = document.getElementById('imp-ref').value;
+    const desonerado = document.getElementById('imp-serie').value === 'true';
+    const button = document.getElementById('imp-run');
+    const progress = document.getElementById('imp-progress-msg');
+    this._importRunning = true;
+    button.disabled = true;
+    try {
+      const result = await SINAPI.importar(file, desonerado, uf, referencia, message => { progress.textContent = message; });
+      progress.textContent = result.msg;
+      if (!result.ok) { Utils.toast(result.msg, 'error'); return; }
+      Utils.toast(result.msg, 'success');
+      const editor = this._getById(this._importEditor);
+      if (editor) {
+        editor.uf = uf; editor.referencia_sinapi = referencia; editor.desonerado = desonerado;
+        if (editor.bancos_config) {
+          editor.bancos_config.desonerado = desonerado;
+          const bank = editor.bancos_config.bancos?.find(b => b.id === 'sinapi');
+          if (bank) { bank.uf = uf; bank.ref = `${Number(referencia.slice(5))}/${referencia.slice(0,4)}`; bank.checked = true; }
+        }
+        this._save(editor);
+        if (typeof OrcamentoBancos !== 'undefined') OrcamentoBancos._recalcularItensDoOrcamento(editor);
+      }
+      // Não substitui outro diálogo que o usuário tenha aberto durante o processamento.
+      if (form.isConnected) { Utils.closeModal(); if (editor) this.openEditor(editor.id); }
+    } catch (error) {
+      progress.textContent = error.message || 'Não foi possível importar a base.';
+      Utils.toast(progress.textContent, 'error');
+    } finally { this._importRunning = false; button.disabled = false; }
   },
 
   _ensurePlanAccess() {
@@ -80,36 +124,7 @@ const OrcamentoSINAPI = {
       orcs = orcs.filter(o => !!o.proposta);
     }
 
-    // Se a base estiver vazia na primeira execução, cria o orçamento inicial de demonstração (Screenshot 5)
-    if (!orcs.length && !this._filterSearch && !localStorage.getItem('finobra_sinapi_initialized')) {
-      const defaultOrc = {
-        id: 'orc-0001-default',
-        numero: '0001',
-        obra_id: (DB.getAll('clientes')?.[0]?.id) || 'padrao',
-        nome: 'Conta de Energia Elétrica — Sede',
-        descricao: 'Conta de Energia Elétrica — Sede',
-        etiqueta: '—',
-        usa_ia: false,
-        bdi: 0.000,
-        desconto: 0.00,
-        encargos_sociais: '-',
-        uf: 'CE',
-        referencia_sinapi: '2023-04',
-        desonerado: false,
-        status: 'ativo',
-        data_criacao: Utils.today(),
-        data_alteracao: '13/09/2026 21:17',
-        itens: [],
-        proposta: {
-          numero: '001',
-          valor: 0.00,
-          data: '13/09/2026'
-        }
-      };
-      this._add(defaultOrc);
-      localStorage.setItem('finobra_sinapi_initialized', 'true');
-      orcs = [defaultOrc];
-    }
+
 
     return `
     <div class="page-container" style="padding:0;">
@@ -567,7 +582,7 @@ const OrcamentoSINAPI = {
               🛠️ Ferramentas ▾
             </button>
 
-            <button class="btn btn-secondary btn-sm" style="font-size:.78rem;background:#333842;color:#fff;border-color:#454d59;" data-fb-click="OrcamentoSINAPI.toggleAnalitico" data-fb-click-n="0">
+            <button class="btn btn-secondary btn-sm" style="font-size:.78rem;background:#333842;color:#fff;border-color:#454d59;" disabled aria-disabled="true" title="Recurso ainda não disponível" data-fb-click="OrcamentoSINAPI.toggleAnalitico" data-fb-click-n="0">
               👁️ Exibir ▾
             </button>
 
@@ -659,19 +674,19 @@ const OrcamentoSINAPI = {
             type="button"
             class="btn btn-secondary btn-sm"
             style="font-weight:600;font-size:.8rem;"
-            data-fb-click="OrcamentoSINAPI.ajustarItens"
+            title="Ajustar as quantidades dos itens visíveis por percentual" data-fb-click="OrcamentoSINAPI.ajustarItens"
             data-fb-click-n="1"
             data-fb-click-t0="string"
             data-fb-click-v0="${encodeURIComponent(orc.id)}"
           >
-            ⚙️ Ajustar itens
+            ⚙️ Ajustar quantidades
           </button>
 
           <button
             type="button"
             class="btn btn-secondary btn-sm"
             style="font-weight:600;font-size:.8rem;"
-            data-fb-click="OrcamentoSINAPI.filtroGrid"
+            title="Filtrar itens por código, descrição, banco ou etapa" data-fb-click="OrcamentoSINAPI.filtroGrid"
             data-fb-click-n="0"
           >
             🔍 Filtrar
@@ -798,6 +813,7 @@ const OrcamentoSINAPI = {
 
         <!-- GRID DE ITENS HIERÁRQUICO (Screenshot 3) -->
         <div class="modal-body" style="padding:0;overflow-y:auto;flex:1;background:#fff;">
+          ${(orc.itens || []).some(item => item.preco_pendente) ? '<div role="status" style="padding:14px;background:#fff3cd;color:#664d03">Há itens sem preço na base selecionada. Os valores anteriores foram preservados. Importe a base correta e revise os preços antes de emitir a proposta.</div>' : ''}
           ${this._renderGridItens(orc)}
         </div>
 
@@ -810,13 +826,10 @@ const OrcamentoSINAPI = {
           </div>
 
           <!-- Indicadores de Totais -->
-          <div style="display:flex;align-items:center;gap:24px;font-size:.85rem;">
+          <div class="sinapi-editor-totals" style="display:flex;align-items:center;gap:24px;font-size:.85rem;flex-wrap:wrap;min-width:0;">
             ${(() => {
               const itens = orc.itens || [];
-              const subtotal = itens.reduce((s, i) => s + ((Number(i.quantidade)||0) * (Number(i.preco_unitario)||0)), 0);
-              const bdi = Number(orc.bdi || 0);
-              const valorBdi = subtotal * (bdi / 100);
-              const totalGeral = subtotal + valorBdi;
+              const { subtotal, bdi, valorBDI:valorBdi, totalGeral } = this.calcularTotais(orc);
               const agora = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
 
               return `
@@ -858,11 +871,12 @@ const OrcamentoSINAPI = {
   },
 
   _renderGridItens(orc) {
-    const itens = orc.itens || [];
+    const filtro = this._gridFilters?.[orc.id] || '';
+    const itens = (orc.itens || []).filter(it => this._matchesGridFilter(it, filtro));
     const e = Utils.escapeHtml.bind(Utils);
 
     // Se não houver itens, mostra empty state com mensagem de etapa
-    if (!itens.length) {
+    if (!filtro && !itens.length && !(orc.etapas || []).length) {
       return `
         <div style="padding:60px 20px;text-align:center;color:#64748b;">
           <div style="font-size:1.05rem;font-weight:600;margin-bottom:14px;color:#334155;">
@@ -884,7 +898,8 @@ const OrcamentoSINAPI = {
     }
 
     // Agrupa itens por Etapa
-    const etapasMap = {};
+    const etapasMap = Object.create(null);
+    if (!filtro) (orc.etapas || []).forEach(nome => { etapasMap[nome] = []; });
     itens.forEach(it => {
       const etNome = it.etapa_nome || '1 - SERVIÇOS GERAIS';
       if (!etapasMap[etNome]) etapasMap[etNome] = [];
@@ -892,6 +907,7 @@ const OrcamentoSINAPI = {
     });
 
     return `
+      ${filtro ? `<div role="status" style="padding:12px;white-space:normal;overflow-wrap:anywhere;">Filtro: <strong>${e(filtro)}</strong> · ${itens.length} de ${(orc.itens || []).length} itens. Os totais gerais incluem todos os itens. Use Filtrar e deixe vazio para limpar.</div>` : ''}
       <table style="width:100%;border-collapse:collapse;font-size:.82rem;">
         <thead>
           <tr style="background:#3a3f47;color:#fff;font-size:.74rem;text-transform:uppercase;letter-spacing:.5px;">
@@ -911,7 +927,7 @@ const OrcamentoSINAPI = {
         <tbody>
           ${Object.keys(etapasMap).map((etNome, etIdx) => {
             const etItens = etapasMap[etNome];
-            const etSubtotal = etItens.reduce((s, i) => s + (Number(i.total) || 0), 0);
+            const etSubtotal = this.calcularTotais({ ...orc, itens:etItens }).totalGeral;
             return `
               <!-- Linha Cabeçalho da Etapa -->
               <tr style="background:#f1f5f9;border-top:1.5px solid #cbd5e1;border-bottom:1.5px solid #cbd5e1;">
@@ -920,7 +936,7 @@ const OrcamentoSINAPI = {
                   📁 ${e(etNome)}
                 </td>
                 <td colspan="${this._mostrarBdiItem ? 4 : 3}" style="padding:8px 14px;text-align:right;font-weight:800;color:#64748b;font-size:.8rem;">
-                  Subtotal Etapa:
+                  ${filtro ? 'Subtotal visível:' : 'Subtotal Etapa:'}
                 </td>
                 <td style="padding:8px 14px;text-align:right;font-weight:900;color:#0f172a;font-size:.92rem;">
                   ${Utils.fmt.currency(etSubtotal)}
@@ -931,8 +947,8 @@ const OrcamentoSINAPI = {
               ${etItens.map((it, itemIdx) => {
                 const pUnit = Number(it.preco_unitario) || 0;
                 const bdi = Number(orc.bdi || 0);
-                const pBdi = it.preco_com_bdi || (pUnit * (1 + bdi / 100));
-                const totalItem = it.total || ((Number(it.quantidade) || 0) * pBdi);
+                const pBdi = Math.round(pUnit * (1 + bdi / 100) * 100) / 100;
+                const totalItem = this.calcularTotais({ ...orc, itens:[it] }).totalGeral;
 
                 return `
                   <tr style="border-bottom:1px solid #f1f5f9;background:#fff;">
@@ -1006,6 +1022,8 @@ const OrcamentoSINAPI = {
     const dropdown = document.getElementById('sinapi-quick-dropdown');
     if (!dropdown) return;
 
+    this._lastSearchResults = [];
+    this._lastQuickResults = [];
     const q = (termo || '').trim().toLowerCase();
     if (q.length < 2) {
       dropdown.style.display = 'none';
@@ -1013,34 +1031,19 @@ const OrcamentoSINAPI = {
       return;
     }
 
-    // Filtra no catálogo unificado (insumos e/ou composições)
-    let resultados = this.BANCO_UNIFICADO_ITENS.filter(it => {
-      if (!this._filtroInsumos && it.tipo === 'INSUMO') return false;
-      if (!this._filtroComposicoes && it.tipo === 'COMP') return false;
-      return it.codigo.toLowerCase().includes(q) || it.descricao.toLowerCase().includes(q);
-    });
-
-    // Se a base local tiver poucos resultados, consulta também a base SINAPI importada
-    if (typeof SINAPI !== 'undefined' && SINAPI.buscar) {
-      const orc = this._getById(orcId);
-      if (orc) {
-        const extra = SINAPI.buscar(termo, orc.desonerado, 30, orc.uf, orc.referencia_sinapi);
-        if (extra && extra.length) {
-          extra.forEach(ex => {
-            if (!resultados.some(r => r.codigo === ex.codigo)) {
-              resultados.push({
-                tipo: 'COMP',
-                banco: 'SINAPI',
-                codigo: ex.codigo,
-                descricao: ex.descricao,
-                unidade: ex.unidade,
-                preco_unitario: ex.preco_unitario
-              });
-            }
-          });
-        }
-      }
-    }
+    const orc = this._getById(orcId);
+    const selected = orc?.bancos_config?.bancos?.find(b => b.id === 'sinapi');
+    const enabled = !selected || selected.checked;
+    const resultados = (enabled && (this._filtroComposicoes || this._filtroInsumos) && orc && typeof SINAPI !== 'undefined')
+      ? SINAPI.buscar(termo, orc.desonerado, 30, orc.uf, orc.referencia_sinapi)
+          .filter(item => {
+            const tipo = item.tipo || 'COMP';
+            if (tipo === 'INSUMO' && !this._filtroInsumos) return false;
+            if (tipo === 'COMP' && !this._filtroComposicoes) return false;
+            return true;
+          })
+          .map(item => ({ ...item, tipo: item.tipo || 'COMP', banco: item.banco || 'SINAPI', preco_unitario: Number(item.preco_unitario) || 0 }))
+      : [];
 
     if (!resultados.length) {
       dropdown.style.display = 'block';
@@ -1111,8 +1114,8 @@ const OrcamentoSINAPI = {
     if (!orc) return;
 
     // Se não houver etapas criadas, define etapa padrão
-    let etapaAlvo = '1 - SERVIÇOS PRELIMINARES';
-    if (orc.itens && orc.itens.length > 0) {
+    let etapaAlvo = orc.etapa_ativa || '1 - SERVIÇOS PRELIMINARES';
+    if (!orc.etapa_ativa && orc.itens && orc.itens.length > 0) {
       etapaAlvo = orc.itens[orc.itens.length - 1].etapa_nome || etapaAlvo;
     }
 
@@ -1138,6 +1141,8 @@ const OrcamentoSINAPI = {
     orc.itens = [...(orc.itens || []), novoItem];
     this._save(orc);
 
+    this._lastSearchResults = [];
+    this._lastQuickResults = [];
     // Fecha dropdown e limpa input
     const dropdown = document.getElementById('sinapi-quick-dropdown');
     if (dropdown) dropdown.style.display = 'none';
@@ -1172,9 +1177,15 @@ const OrcamentoSINAPI = {
     const orc = this._getById(orcId);
     if (!orc) return;
 
-    Utils.prompt('Nome da Nova Etapa:', '1 - Serviços Preliminares', (nomeEtapa) => {
+    Utils.prompt('Nome da Nova Etapa:', (nomeEtapa) => {
       if (!nomeEtapa) return;
       
+      nomeEtapa = nomeEtapa.trim();
+      if (!nomeEtapa) return;
+      orc.etapas = [...new Set([...(orc.etapas || []), nomeEtapa])];
+      orc.etapa_ativa = nomeEtapa;
+      this._save(orc);
+      this.openEditor(orcId);
       // Abre o quick search com foco
       const input = document.getElementById('sinapi-quick-add-input');
       if (input) {
@@ -1183,7 +1194,7 @@ const OrcamentoSINAPI = {
       }
       
       Utils.toast(`Etapa "${nomeEtapa}" selecionada! Adicione os itens na barra de busca.`, 'info');
-    });
+    }, '1 - Serviços Preliminares');
   },
 
   alterarQuantidadeItem(orcId, itemId, novaQtd) {
@@ -1205,15 +1216,26 @@ const OrcamentoSINAPI = {
   },
 
   menuFerramentas() {
-    Utils.toast('Menu de ferramentas: Ajustar BDI, Inverter encargos e Curva ABC disponíveis.', 'info');
+    this.infoAjuda();
   },
 
   toggleAnalitico() {
-    Utils.toast('Visualização analítica de composições ativada.', 'info');
+    Utils.toast('A base importada contém preços sintéticos. A composição analítica ainda não está disponível.', 'warning');
   },
 
   filtroGrid() {
-    Utils.toast('Filtro por palavra-chave ou código ativo no grid.', 'info');
+    const id = this._currentEditor;
+    if (!this._getById(id)) return;
+    Utils.prompt('Filtrar itens por código, descrição, banco ou etapa. Deixe vazio para mostrar todos.', valor => {
+      this._gridFilters ||= Object.create(null);
+      this._gridFilters[id] = String(valor ?? '').trim().slice(0, 200);
+      this.openEditor(id);
+    }, this._gridFilters?.[id] || '');
+  },
+
+  _matchesGridFilter(item, filtro) {
+    const normalize = value => String(value ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+    return normalize([item.codigo, item.codigo_sinapi, item.descricao, item.banco, item.etapa_nome].join(' ')).includes(normalize(filtro));
   },
 
   focarBusca() {
@@ -1221,11 +1243,11 @@ const OrcamentoSINAPI = {
   },
 
   legendaBdi() {
-    Utils.alert('Legenda:\n[COMP] Composição de Serviço\n[INSUMO] Insumo de Material / Equipamento / Mão de Obra\nCálculo de Preço C/ BDI = Preço Unitário × (1 + BDI%)');
+    this._showInfo('Legenda:\n[COMP] Composição de Serviço\n[INSUMO] Insumo de Material / Equipamento / Mão de Obra\nCálculo de Preço C/ BDI = Preço Unitário × (1 + BDI%)');
   },
 
   infoAjuda() {
-    Utils.alert('Sistema de Orçamentos SINAPI & Multi-Bancos:\n- Use MODELOS PRONTOS para clonar orçamentos pré-configurados.\n- No editor, acesse PERÍODO para trocar estado, mês e desoneração.\n- Gere relatórios Excel ou Propostas em PDF com 1 clique.');
+    this._showInfo('Sistema de Orçamentos SINAPI & Multi-Bancos:\n- Use MODELOS PRONTOS para clonar orçamentos pré-configurados.\n- No editor, acesse PERÍODO para trocar estado, mês e desoneração.\n- Gere relatórios Excel ou Propostas em PDF com 1 clique.');
   },
 
   removerItemDoEditor(orcId, itemId) {
@@ -1242,13 +1264,13 @@ const OrcamentoSINAPI = {
     const orc = this._getById(orcId);
     if (!orc) return;
 
-    Utils.prompt('Nome do Orçamento:', orc.nome, (novoNome) => {
+    Utils.prompt('Nome do Orçamento:', (novoNome) => {
       if (!novoNome) return;
       orc.nome = novoNome;
       this._save(orc);
       this.openEditor(orcId);
       Utils.toast('Nome atualizado!', 'success');
-    });
+    }, orc.nome);
   },
 
   editarParametro(orcId, param) {
@@ -1256,24 +1278,23 @@ const OrcamentoSINAPI = {
     if (!orc) return;
 
     if (param === 'bdi') {
-      Utils.prompt('Taxa de BDI (%) do Orçamento:', String(orc.bdi || 24.23), (val) => {
+      Utils.prompt('Taxa de BDI (%) do Orçamento:', (val) => {
         if (val === null) return;
-        orc.bdi = parseFloat(val) || 0;
+        const percent = Number(String(val).replace(',', '.'));
+        if (!Number.isFinite(percent) || percent < 0 || percent > 100) return Utils.toast('Informe um BDI entre 0 e 100%.', 'warning');
+        orc.bdi = percent;
+        this._save(orc);
         this.recalcularOrcamento(orcId);
-      });
+      }, String(orc.bdi ?? this.BDI_PADRAO));
     } else if (param === 'desconto') {
-      Utils.prompt('Desconto / Acréscimo (%):', String(orc.desconto || 0), (val) => {
-        if (val === null) return;
-        orc.desconto = parseFloat(val) || 0;
-        this.recalcularOrcamento(orcId);
-      });
+      Utils.toast('Desconto global ainda não está disponível. Nenhum valor foi alterado.', 'warning');
     } else if (param === 'encargos') {
-      Utils.prompt('Encargos Sociais:', orc.encargos_sociais || '84,04%', (val) => {
+      Utils.prompt('Encargos Sociais:', (val) => {
         if (val === null) return;
         orc.encargos_sociais = val;
         this._save(orc);
         this.openEditor(orcId);
-      });
+      }, orc.encargos_sociais || '');
     }
   },
 
@@ -1295,7 +1316,51 @@ const OrcamentoSINAPI = {
   },
 
   ajustarItens(orcId) {
-    Utils.toast('Ajuste em lote de quantidades e percentuais disponível.', 'info');
+    const original = this._getById(orcId);
+    if (!original) return;
+    const filtro = this._gridFilters?.[orcId] || '';
+    const quantidade = (original.itens || []).filter(item => this._matchesGridFilter(item, filtro)).length;
+    if (!quantidade) return Utils.toast('Não há itens visíveis para ajustar. Limpe ou altere o filtro.', 'warning');
+    Utils.prompt(`Ajustar quantidades de ${quantidade} itens ${filtro ? 'filtrados' : 'do orçamento'}. Informe o percentual: 10 aumenta 10%; -10 reduz 10%. Preços unitários não serão alterados.`, valor => {
+      const texto = String(valor ?? '').trim().replace(',', '.');
+      const percentual = Number(texto);
+      if (!texto || !Number.isFinite(percentual) || percentual < -100 || percentual > 1000) {
+        this.openEditor(orcId);
+        return Utils.toast('Informe um percentual entre -100 e 1000.', 'warning');
+      }
+      const preview = this._previewQuantityAdjustment(original, filtro, percentual);
+      if (!preview.changed) {
+        this.openEditor(orcId);
+        return Utils.toast('Nenhuma quantidade será alterada.', 'info');
+      }
+      Utils.confirm(`Alterar ${preview.changed} itens em ${percentual}%? Quantidades arredondadas a 3 casas decimais. Total do orçamento: ${Utils.fmt.currency(this.calcularTotais(original).totalGeral)} → ${Utils.fmt.currency(this.calcularTotais(preview.orc).totalGeral)}.`, () => {
+        const atual = this._getById(orcId);
+        if (JSON.stringify(atual) !== JSON.stringify(original)) {
+          if (atual) this.openEditor(orcId);
+          return Utils.toast('O orçamento mudou durante a prévia. Revise e tente novamente.', 'warning');
+        }
+        this._save(preview.orc);
+        this.openEditor(orcId);
+        Utils.toast(`${preview.changed} quantidades ajustadas.`, 'success');
+      });
+    }, '0');
+  },
+
+  _previewQuantityAdjustment(orc, filtro, percentual) {
+    if (!Number.isFinite(percentual) || percentual < -100 || percentual > 1000) throw new Error('Percentual inválido');
+    let changed = 0;
+    const itens = (orc.itens || []).map(item => {
+      if (!this._matchesGridFilter(item, filtro)) return { ...item };
+      const anterior = Number(item.quantidade) || 0;
+      const quantidade = Math.round(anterior * (1 + percentual / 100) * 1000) / 1000;
+      if (!Number.isFinite(quantidade)) throw new Error('Quantidade inválida');
+      if (quantidade === anterior) return { ...item };
+      changed++;
+      const updated = { ...item, quantidade };
+      updated.total = this.calcularTotais({ ...orc, itens:[updated] }).totalGeral;
+      return updated;
+    });
+    return { orc:{ ...orc, itens }, changed };
   },
 
   removerItensVazios(orcId) {
@@ -1349,7 +1414,7 @@ const OrcamentoSINAPI = {
               </div>
               <div class="form-group">
                 <label class="form-label" style="font-weight:700;">BDI (%)</label>
-                <input class="form-control" type="number" name="bdi" value="${orc.bdi || this.BDI_PADRAO}" step="0.001" min="0" max="100">
+                <input class="form-control" type="number" name="bdi" value="${orc.bdi ?? this.BDI_PADRAO}" step="0.001" min="0" max="100">
               </div>
             </div>
             <div class="form-row cols-2" style="margin-bottom:14px;">
@@ -1396,7 +1461,7 @@ const OrcamentoSINAPI = {
       nome: d.nome,
       uf: d.uf,
       referencia_sinapi: d.referencia_sinapi,
-      bdi: parseFloat(d.bdi) || this.BDI_PADRAO,
+      bdi: Number.isFinite(parseFloat(d.bdi)) ? parseFloat(d.bdi) : this.BDI_PADRAO,
       desonerado: d.desonerado === 'true',
       status: d.status,
       descricao: d.descricao || '',
@@ -1407,6 +1472,10 @@ const OrcamentoSINAPI = {
     if (id) {
       const existing = this._getById(id);
       saved = { ...existing, ...payload };
+      saved.itens = (saved.itens || []).map(item => {
+        const preco = Math.round(Number(item.preco_unitario || 0) * (1 + saved.bdi / 100) * 100) / 100;
+        return { ...item, preco_com_bdi:preco, total:Math.round(Number(item.quantidade || 0) * preco * 100) / 100 };
+      });
       this._save(saved);
       Utils.toast('Orçamento atualizado!', 'success');
     } else {
@@ -1450,10 +1519,7 @@ const OrcamentoSINAPI = {
 
     const cliente = DB.getById('clientes', orc.obra_id);
     const itens = orc.itens || [];
-    const subtotal = itens.reduce((s, i) => s + (i.total || 0), 0);
-    const bdi = orc.bdi || this.BDI_PADRAO;
-    const valorBDI = subtotal * bdi / 100;
-    const total = subtotal + valorBDI;
+    const { subtotal, bdi, valorBDI, totalGeral:total } = this.calcularTotais(orc);
 
     const wsData = [
       [(DB.getEmpresa()?.nome_fantasia || DB.getEmpresa()?.razao_social || 'FINOBRA ENGENHARIA').toUpperCase(), '', '', '', '', '', ''],
@@ -1474,7 +1540,7 @@ const OrcamentoSINAPI = {
         it.unidade,
         it.quantidade,
         it.preco_unitario,
-        it.total
+        Number(it.quantidade || 0) * Number(it.preco_unitario || 0)
       ]);
     });
 

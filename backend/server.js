@@ -49,7 +49,7 @@ app.use(express.json({ limit: '12mb' }));
 app.use(express.urlencoded({ extended: true, limit: '12mb' }));
 
 // Micro-API SINAPI e Bancos de Preço Referenciais
-app.use('/api/sinapi', createSinapiRouter());
+app.use('/api/sinapi', createSinapiRouter({ authorizeRobot: requireAuth }));
 initSinapiDatabase().catch(e => console.warn('Aviso initSinapiDatabase:', e.message));
 
 // Middleware de autenticação interna para proteger rotas críticas.

@@ -1,3 +1,4 @@
+import { sanitizeSlaProcesses } from './_sla.js';
 // api/db.js — API Serverless REST & Sincronização Multi-Tenant (Neon PostgreSQL)
 
 import { neon } from '@neondatabase/serverless';
@@ -119,6 +120,7 @@ function sanitizeTenantPreferences(input) {
     emoji: String(item?.emoji || '').slice(0, 16)
   })).filter(item => item.value && item.label);
   const out = {};
+  if ('slas_padrao' in input) out.slas_padrao = sanitizeSlaProcesses(input.slas_padrao);
   if ('categorias_fornecedor' in input) out.categorias_fornecedor = cleanCats(input.categorias_fornecedor);
   if ('categorias_despesa' in input) out.categorias_despesa = cleanCats(input.categorias_despesa);
   if ('whatsapp_telefone' in input) out.whatsapp_telefone = String(input.whatsapp_telefone || '').replace(/\D/g, '').slice(0, 15);
@@ -179,7 +181,7 @@ function sanitizeCronogramaConfig(input) {
       meses: Array.isArray(raw.meses) ? raw.meses.slice(0, totalMeses).map(v => Math.max(0, finitePercent(v, 0, 1000))) : []
     };
   }
-  return { totalMeses, mesInicio, modoDistribuicao, modeloCurva: modoDistribuicao, etapas, updated_at: new Date().toISOString() };
+  return { processos_sla: sanitizeSlaProcesses(input.processos_sla), totalMeses, mesInicio, modoDistribuicao, modeloCurva: modoDistribuicao, etapas, updated_at: new Date().toISOString() };
 }
 
 function todayBoaVista() {
@@ -779,7 +781,7 @@ export default async function handler(req, res) {
           }
           for (const o of payload.clientes) {
             if (!o.id || !o.nome) continue;
-            const cronogramaJson = o.cronograma_config == null ? null : JSON.stringify(sanitizeCronogramaConfig(o.cronograma_config));
+            const cronogramaJson = o.cronograma_config == null && !Array.isArray(o.processos_sla) ? null : JSON.stringify(sanitizeCronogramaConfig({ ...(o.cronograma_config || {}), processos_sla:o.cronograma_config?.processos_sla || o.processos_sla }));
             const bdiJson = o.bdi_config == null ? null : JSON.stringify(sanitizeBdiConfig(o.bdi_config));
             await sql`
               INSERT INTO obras (id, tenant_id, nome, cliente, endereco, orcamento_total, status, data_inicio, data_previsao, cronograma_config, bdi_config)
@@ -1372,7 +1374,7 @@ export default async function handler(req, res) {
             const planCheck = await enforceObraPlanLimit(sql, tenantId, auth.user?.tenantPlan, o);
             if (!planCheck.allowed) return res.status(planCheck.status).json(planCheck.body);
           }
-          const cronogramaJson = o.cronograma_config == null ? null : JSON.stringify(sanitizeCronogramaConfig(o.cronograma_config));
+          const cronogramaJson = o.cronograma_config == null && !Array.isArray(o.processos_sla) ? null : JSON.stringify(sanitizeCronogramaConfig({ ...(o.cronograma_config || {}), processos_sla:o.cronograma_config?.processos_sla || o.processos_sla }));
           const bdiJson = o.bdi_config == null ? null : JSON.stringify(sanitizeBdiConfig(o.bdi_config));
           await sql`
             INSERT INTO obras (id, tenant_id, nome, cliente, endereco, orcamento_total, status, data_inicio, data_previsao, cronograma_config, bdi_config)

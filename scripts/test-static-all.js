@@ -2,6 +2,8 @@ import { spawnSync } from 'child_process';
 import fs from 'fs';
 const tests = [
   'scripts/test-assets-behavior.js',
+  'scripts/test-audit-regressions.js',
+  'scripts/test-sinapi-official.js',
   'scripts/test-sync-behavior.js',
   'scripts/test-hardening-static.js',
   'scripts/test-patch02-static.js',

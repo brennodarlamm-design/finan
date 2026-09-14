@@ -7,6 +7,12 @@ const SINAPI = {
   // O pacote atual inclui somente snapshots RR/12-2024. Outras UFs/referências
   // devem ser importadas a partir do XLSX/ZIP oficial da Caixa.
   OFFICIAL_SNAPSHOTS: [
+    { uf:'SP', referencia:'2026-08', desonerado:false, file:'/data/sinapi_sp_2026_08_onerado.json' },
+    { uf:'SP', referencia:'2026-08', desonerado:true,  file:'/data/sinapi_sp_2026_08_desonerado.json' },
+    { uf:'SC', referencia:'2026-08', desonerado:false, file:'/data/sinapi_sc_2026_08_onerado.json' },
+    { uf:'SC', referencia:'2026-08', desonerado:true,  file:'/data/sinapi_sc_2026_08_desonerado.json' },
+    { uf:'RR', referencia:'2026-08', desonerado:false, file:'/data/sinapi_rr_2026_08_onerado.json' },
+    { uf:'RR', referencia:'2026-08', desonerado:true,  file:'/data/sinapi_rr_2026_08_desonerado.json' },
     { uf:'RR', referencia:'2024-12', desonerado:false, file:'/data/sinapi_rr_onerado.json' },
     { uf:'RR', referencia:'2024-12', desonerado:true,  file:'/data/sinapi_rr_desonerado.json' }
   ],
@@ -211,15 +217,27 @@ const SINAPI = {
         const zip = await JSZip.loadAsync(arquivo);
         const entries = Object.values(zip.files).filter(f => !f.dir);
 
-        // Prioridade: Composicoes Sintetico -> Composicoes -> qualquer .xlsx
+        // Prioridade: Referência -> Composicoes Sintetico -> Composicoes -> qualquer .xlsx (exceto familias/manutencoes)
         let target = entries.find(f => {
           const n = f.name.toLowerCase();
-          return n.endsWith('.xlsx') && (n.includes('sintetico') || n.includes('sint'));
+          return n.endsWith('.xlsx') && (n.includes('referência') || n.includes('referencia'));
         });
         if (!target) {
           target = entries.find(f => {
             const n = f.name.toLowerCase();
+            return n.endsWith('.xlsx') && (n.includes('sintetico') || n.includes('sint'));
+          });
+        }
+        if (!target) {
+          target = entries.find(f => {
+            const n = f.name.toLowerCase();
             return n.endsWith('.xlsx') && n.includes('comp');
+          });
+        }
+        if (!target) {
+          target = entries.find(f => {
+            const n = f.name.toLowerCase();
+            return n.endsWith('.xlsx') && !n.includes('familia') && !n.includes('manuten');
           });
         }
         if (!target) {
@@ -241,23 +259,121 @@ const SINAPI = {
       const data = new Uint8Array(dataBuffer);
       const wb = XLSX.read(data, { type: 'array' });
 
-      // Detectar a aba correta de composições
-      const abaAlvo = this._detectarAba(wb.SheetNames, desonerado);
-      if (!abaAlvo) {
-        return { ok: false, msg: 'Aba de composições não encontrada. Verifique se o arquivo é a planilha SINAPI correta (Composições Sintéticas ou Analíticas).' };
+      const targetUf = this._cleanUf(uf);
+      let composicoes = [];
+
+      // Verifica se a planilha possui a estrutura oficial multi-UF da Caixa (CSD/CCD e ISD/ICD)
+      const isOfficialMultiUf = !!(wb.Sheets['CSD'] || wb.Sheets['CCD']);
+
+      if (isOfficialMultiUf && targetUf) {
+        onProgress?.(`Detectado pacote oficial Caixa com 27 UFs. Extraindo dados para ${targetUf}...`);
+        const compSheetName = desonerado ? 'CCD' : 'CSD';
+        const insumoSheetName = desonerado ? 'ICD' : 'ISD';
+
+        const compSheet = wb.Sheets[compSheetName] || wb.Sheets[desonerado ? 'CSD' : 'CCD'];
+        if (compSheet) {
+          onProgress?.(`Extraindo composições (${compSheetName}) para ${targetUf}...`);
+          const compRows = XLSX.utils.sheet_to_json(compSheet, { header: 1, defval: '' });
+          // Linha 4 (índice 3) contém as siglas das 27 UFs
+          const ufRow = compRows[3] || [];
+          let compPriceCol = -1;
+          for (let c = 0; c < ufRow.length; c++) {
+            if (String(ufRow[c]).trim().toUpperCase() === targetUf) {
+              compPriceCol = c;
+              break;
+            }
+          }
+
+          if (compPriceCol !== -1) {
+            const range = XLSX.utils.decode_range(compSheet['!ref'] || 'A1:ZZ10000');
+            for (let r = 10; r <= range.e.r; r++) {
+              const cellB = compSheet[XLSX.utils.encode_cell({ r, c: 1 })]; // Código
+              const cellC = compSheet[XLSX.utils.encode_cell({ r, c: 2 })]; // Descrição
+              const cellD = compSheet[XLSX.utils.encode_cell({ r, c: 3 })]; // Unidade
+              const cellP = compSheet[XLSX.utils.encode_cell({ r, c: compPriceCol })]; // Preço
+
+              if (!cellC || !cellC.v) continue;
+
+              let cod = '';
+              if (cellB) {
+                if (cellB.f) {
+                  const m = String(cellB.f).match(/MATCH\(([0-9]+)/) || String(cellB.f).match(/,\s*([0-9]+)\s*\)$/);
+                  if (m) cod = m[1];
+                }
+                if (!cod && cellB.v && cellB.v !== 0) cod = String(cellB.v).trim();
+              }
+              if (!cod) continue;
+
+              const preco = this._parsePreco(cellP ? cellP.v : 0);
+              composicoes.push({
+                codigo: cod,
+                tipo: 'COMP',
+                descricao: String(cellC.v).trim(),
+                unidade: String(cellD?.v || 'UN').trim().toUpperCase(),
+                preco_unitario: preco
+              });
+            }
+          }
+        }
+
+        // Insumos oficiais (ISD/ICD)
+        const insumoSheet = wb.Sheets[insumoSheetName] || wb.Sheets[desonerado ? 'ISD' : 'ICD'];
+        if (insumoSheet) {
+          onProgress?.(`Extraindo insumos (${insumoSheetName}) para ${targetUf}...`);
+          const insumoRows = XLSX.utils.sheet_to_json(insumoSheet, { header: 1, defval: '' });
+          const ufRow = insumoRows[3] || [];
+          let insumoPriceCol = -1;
+          for (let c = 0; c < ufRow.length; c++) {
+            if (String(ufRow[c]).trim().toUpperCase() === targetUf) {
+              insumoPriceCol = c;
+              break;
+            }
+          }
+
+          if (insumoPriceCol !== -1) {
+            const range = XLSX.utils.decode_range(insumoSheet['!ref'] || 'A1:ZZ10000');
+            for (let r = 10; r <= range.e.r; r++) {
+              const cellB = insumoSheet[XLSX.utils.encode_cell({ r, c: 1 })]; // Código
+              const cellC = insumoSheet[XLSX.utils.encode_cell({ r, c: 2 })]; // Descrição
+              const cellD = insumoSheet[XLSX.utils.encode_cell({ r, c: 3 })]; // Unidade
+              const cellP = insumoSheet[XLSX.utils.encode_cell({ r, c: insumoPriceCol })]; // Preço
+
+              if (!cellC || !cellC.v) continue;
+
+              const cod = cellB?.v ? String(cellB.v).trim() : '';
+              if (!cod || !/^\d+$/.test(cod)) continue;
+
+              const preco = this._parsePreco(cellP ? cellP.v : 0);
+              composicoes.push({
+                codigo: cod,
+                tipo: 'INSUMO',
+                descricao: String(cellC.v).trim(),
+                unidade: String(cellD?.v || 'UN').trim().toUpperCase(),
+                preco_unitario: preco
+              });
+            }
+          }
+        }
       }
 
-      onProgress?.(`Aba encontrada: "${abaAlvo}". Extraindo dados...`);
-      const sheet = wb.Sheets[abaAlvo];
-      const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
+      // Fallback para planilhas avulsas / convencionais
+      if (composicoes.length === 0) {
+        const abaAlvo = this._detectarAba(wb.SheetNames, desonerado);
+        if (!abaAlvo) {
+          return { ok: false, msg: 'Aba de composições não encontrada. Verifique se o arquivo é a planilha SINAPI correta (Composições Sintéticas ou Analíticas).' };
+        }
 
-      const composicoes = this._parseRows(rows, onProgress);
+        onProgress?.(`Aba encontrada: "${abaAlvo}". Extraindo dados...`);
+        const sheet = wb.Sheets[abaAlvo];
+        const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
+        composicoes = this._parseRows(rows, onProgress);
+      }
 
       if (composicoes.length === 0) {
         return { ok: false, msg: 'Nenhuma composição encontrada. Verifique se selecionou a planilha de Composições Sintéticas/Analíticas.' };
       }
 
-      onProgress?.(`Salvando ${composicoes.length.toLocaleString('pt-BR')} composições...`);
+      onProgress?.(`Salvando ${composicoes.length.toLocaleString('pt-BR')} itens...`);
 
       const base = {
         referencia: this._cleanRef(referencia),
@@ -277,8 +393,8 @@ const SINAPI = {
         uf:base.uf,
         referencia:base.referencia,
         msg: partial
-          ? `Importadas ${stored.composicoes.length.toLocaleString('pt-BR')} composições de ${base.uf} ${base.referencia} (cache parcial por limite do navegador).`
-          : `${stored.composicoes.length.toLocaleString('pt-BR')} composições de ${base.uf} ${base.referencia} importadas com sucesso!`
+          ? `Importados ${stored.composicoes.length.toLocaleString('pt-BR')} itens de ${base.uf} ${base.referencia} (cache parcial por limite do navegador).`
+          : `${stored.composicoes.length.toLocaleString('pt-BR')} itens de ${base.uf} ${base.referencia} importados com sucesso!`
       };
 
     } catch (err) {
@@ -290,27 +406,34 @@ const SINAPI = {
   // Detecta qual aba do XLSX contém as composições sintéticas
   _detectarAba(sheetNames, desonerado) {
     const nomes = sheetNames.map(n => n.toUpperCase());
+    const ignorar = ['ANALÍTICO', 'ANALITICO', 'BUSCA', 'MENU', 'COEFICIENTES', 'FAMILIAS', 'MANUTENÇÕES', 'MANUTENCOES', 'MAO DE OBRA'];
 
-    // Prioridade: composições sintéticas (preço final por item)
-    const candidatos = [
-      desonerado ? 'CST_DESONERA' : 'CST',           // Custo Sintético
-      desonerado ? 'COMP_DESONERA' : 'COMP',          // Composições
-      desonerado ? 'CST DESONERADO' : 'CST SEM DESONERAÇÃO',
-      'SINTÉTICO',  'SINTETICO',
-      'COMPOSIÇÕES', 'COMPOSICOES',
-      'COMP_DES', 'COMP_SEM',
-      'CUSTO',
-    ];
+    // Prioridade 1: Siglas oficiais de composições Caixa
+    const prioritarias = desonerado
+      ? ['CCD', 'CST_DESONERA', 'COMP_DES', 'COMP_DESONERA', 'CST DESONERADO']
+      : ['CSD', 'CST', 'COMP_SEM', 'COMP', 'CST SEM DESONERAÇÃO', 'SINTÉTICO', 'SINTETICO'];
 
-    for (const c of candidatos) {
-      const idx = nomes.findIndex(n => n.includes(c));
+    for (const p of prioritarias) {
+      const idx = nomes.findIndex(n => n === p || (n.includes(p) && !ignorar.some(ig => n.includes(ig))));
       if (idx !== -1) return sheetNames[idx];
     }
 
-    // Fallback: retornar a primeira aba com mais de 100 linhas
-    for (const name of sheetNames) {
-      // heurística: abas com dados tendem a ter nomes mais curtos
-      if (name.length < 40) return name;
+    // Prioridade 2: termos genéricos de composições sintéticas
+    const candidatos = [
+      desonerado ? 'DESONER' : 'SEM DESONER',
+      'COMPOSIÇÕES', 'COMPOSICOES',
+      'CUSTO'
+    ];
+
+    for (const c of candidatos) {
+      const idx = nomes.findIndex(n => n.includes(c) && !ignorar.some(ig => n.includes(ig)));
+      if (idx !== -1) return sheetNames[idx];
+    }
+
+    // Fallback: retornar a primeira aba com mais de 100 linhas que não seja de controle
+    for (let i = 0; i < sheetNames.length; i++) {
+      const n = nomes[i];
+      if (!ignorar.some(ig => n.includes(ig)) && n.length < 40) return sheetNames[i];
     }
 
     return sheetNames[0] || null;
@@ -349,16 +472,19 @@ const SINAPI = {
       const row = rows[i];
       if (!row || row.every(c => c === '' || c === null || c === undefined)) continue;
 
-      const codigo    = String(row[colCodigo] ?? '').trim();
+      let codigo = String(row[colCodigo] ?? '').trim();
+      const m = codigo.match(/MATCH\(([0-9]+)/) || codigo.match(/,\s*([0-9]+)\s*\)$/);
+      if (m) codigo = m[1];
+
       const descricao = String(row[colDescricao] ?? '').trim();
       const unidade   = String(row[colUnidade] ?? '').trim().toUpperCase();
       const precoRaw  = row[colPreco];
       const preco     = this._parsePreco(precoRaw);
 
-      if (!codigo || !descricao || codigo.length < 2) continue;
+      if (!codigo || !descricao || codigo.length < 2 || codigo === '0') continue;
       if (isNaN(preco) || preco < 0) continue;
 
-      composicoes.push({ codigo, descricao, unidade: unidade || 'UN', preco_unitario: preco });
+      composicoes.push({ codigo, tipo: 'COMP', descricao, unidade: unidade || 'UN', preco_unitario: preco });
       processadas++;
 
       if (processadas % 1000 === 0) {
@@ -397,8 +523,8 @@ const SINAPI = {
     const resultados = [];
     for (const c of base.composicoes) {
       const match =
-        c.codigo.toLowerCase().includes(t) ||
-        c.descricao.toLowerCase().includes(t);
+        String(c.codigo || '').toLowerCase().includes(t) ||
+        String(c.descricao || '').toLowerCase().includes(t);
       if (match) {
         resultados.push(c);
         if (resultados.length >= limite) break;
