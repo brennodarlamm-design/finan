@@ -1,6 +1,6 @@
 // api/_totp.js — Motor Criptográfico de Autenticação Multifator (TOTP RFC 6238 e RFC 4648 Base32)
 // Compatível com Google Authenticator, Microsoft Authenticator, 1Password e Authy.
-// 100% Nativo sem dependências npm externas (Zero-dependency).
+// 100% nativo para geração/validação TOTP. O enrollment visual usa fallback manual seguro.
 
 import crypto from 'crypto';
 
@@ -45,7 +45,7 @@ export function base32Decode(input) {
 
   for (let i = 0; i < cleanInput.length; i++) {
     const val = BASE32_ALPHABET.indexOf(cleanInput[i]);
-    if (val === -1) continue; // Ignora caracteres fora do alfabeto
+    if (val === -1) continue;
 
     value = (value << 5) | val;
     bits += 5;
@@ -105,7 +105,6 @@ export function generateTotpToken(secret, timestampMs = Date.now()) {
 
 /**
  * Verifica um código TOTP com tolerância de janela (default window = 1 => step-1, step, step+1)
- * Retorna o step correspondente se válido, ou null se inválido.
  */
 export function verifyTotpCode(secret, code, options = {}) {
   if (!secret || !code) return { valid: false };
@@ -115,13 +114,13 @@ export function verifyTotpCode(secret, code, options = {}) {
 
   const window = options.window ?? 1;
   const timestampMs = options.timestampMs || Date.now();
-  const currentStep = getCurrentTimeStep(timestampMs, options.timeStepSeconds || 30);
+  const currentStep = getCurrentTimeStep(timestampMs, options.timeStepSeconds || options.timeStepSec || 30);
   const lastUsedStep = Number(options.lastUsedStep || 0);
 
   for (let i = -window; i <= window; i++) {
     const step = currentStep + i;
 
-    // Proteção contra replay: o step verificado não pode ser igual ou anterior ao último já utilizado
+    // Proteção contra replay: o step verificado não pode ser igual ou anterior ao último já utilizado.
     if (step <= lastUsedStep) continue;
 
     const expectedCode = calculateHotp(secret, step);
@@ -147,20 +146,20 @@ export function generateTotpUri(optionsOrSecret, maybeAccount, maybeIssuer) {
     account = maybeAccount || account;
     issuer = maybeIssuer || issuer;
   }
+
   const cleanSecret = String(secret || '').replace(/\s/g, '').toUpperCase();
   const label = `${encodeURIComponent(issuer)}:${encodeURIComponent(account)}`;
   return `otpauth://totp/${label}?secret=${cleanSecret}&issuer=${encodeURIComponent(issuer)}&algorithm=SHA1&digits=6&period=30`;
 }
 
 /**
- * Gera 6 códigos de recuperação de emergência (backup codes) e seus respectivos hashes SHA-256
+ * Gera códigos de recuperação de emergência e seus respectivos hashes SHA-256
  */
 export function generateBackupCodes(count = 6) {
   const rawCodes = [];
   const hashedCodes = [];
 
   for (let i = 0; i < count; i++) {
-    // Código de 8 caracteres alfanuméricos em blocos de 4 (ex: 4a2f-89bc)
     const part1 = crypto.randomBytes(2).toString('hex');
     const part2 = crypto.randomBytes(2).toString('hex');
     const raw = `${part1}-${part2}`.toUpperCase();
@@ -186,7 +185,6 @@ export function verifyBackupCode(enteredCode, hashedCodesList = []) {
 
   const idx = hashedCodesList.findIndex(h => h === enteredHash);
   if (idx !== -1) {
-    // Código de uso único: consome o código utilizado
     const remaining = [...hashedCodesList];
     remaining.splice(idx, 1);
     return { valid: true, remainingHashedCodes: remaining };
@@ -195,145 +193,40 @@ export function verifyBackupCode(enteredCode, hashedCodesList = []) {
   return { valid: false, remainingHashedCodes: hashedCodesList };
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Gerador Nativo de QR Code SVG Vetorial (Puro JS, sem CDN ou bibliotecas)
-// Suporta URLs de otpauth gerando matriz bidimensional e exportando SVG limpo.
-// ─────────────────────────────────────────────────────────────────────────────
-
-/**
- * Compactador de bits e gerador de matriz para QR Code
- */
-class SimpleQrCode {
-  constructor(text) {
-    this.text = text;
-  }
-
-  // Gera uma representação SVG vetorial otimizada da chave TOTP
-  toSvg(size = 220) {
-    // Em QR Code de autenticação, codificamos o texto em matriz padrão.
-    // Para garantir visualização perfeita sem bibliotecas pesadas de 500KB,
-    // construímos um modelo visual elegante com a logo e dados da chave.
-    const modules = this._generateMatrix(this.text);
-    const modCount = modules.length;
-    const margin = 2;
-    const viewBoxSize = modCount + margin * 2;
-
-    let paths = '';
-    for (let r = 0; r < modCount; r++) {
-      for (let c = 0; c < modCount; c++) {
-        if (modules[r][c]) {
-          paths += `M${c + margin},${r + margin}h1v1h-1z `;
-        }
-      }
-    }
-
-    return `
-      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${viewBoxSize} ${viewBoxSize}" width="${size}" height="${size}" shape-rendering="crispEdges" style="background:#091208;border-radius:12px;padding:8px;border:1px solid rgba(201,162,39,0.4);box-shadow:0 8px 24px rgba(0,0,0,0.6);">
-        <rect width="${viewBoxSize}" height="${viewBoxSize}" fill="#091208" />
-        <path d="${paths.trim()}" fill="#e8c84a" />
-      </svg>
-    `.trim();
-  }
-
-  _generateMatrix(text) {
-    // Matriz tamanho 33x33 (QR Versão 4)
-    const size = 33;
-    const matrix = Array.from({ length: size }, () => Array(size).fill(0));
-
-    // 1. Finder patterns (cantos)
-    this._addFinderPattern(matrix, 0, 0);
-    this._addFinderPattern(matrix, size - 7, 0);
-    this._addFinderPattern(matrix, 0, size - 7);
-
-    // 2. Alignment pattern (centro inferior)
-    this._addAlignmentPattern(matrix, 24, 24);
-
-    // 3. Timing patterns
-    for (let i = 8; i < size - 8; i++) {
-      const bit = i % 2 === 0 ? 1 : 0;
-      matrix[6][i] = bit;
-      matrix[i][6] = bit;
-    }
-
-    // 4. Ingestão pseudo-determinística dos dados (hash SHA-256 + hash da URL)
-    const hash = crypto.createHash('sha256').update(text).digest();
-    const hash2 = crypto.createHash('sha1').update(text).digest();
-    const combined = Buffer.concat([hash, hash2]);
-
-    let byteIdx = 0;
-    let bitIdx = 0;
-
-    for (let col = size - 1; col > 0; col -= 2) {
-      if (col === 6) col--; // Pula timing
-      for (let row = 0; row < size; row++) {
-        for (let c = 0; c < 2; c++) {
-          const currentCol = col - c;
-          if (this._isReserved(currentCol, row, size)) continue;
-
-          const currentByte = combined[byteIdx % combined.length];
-          const bit = (currentByte >>> (7 - bitIdx)) & 1;
-          // Máscara xor suave para boa distribuição visual
-          const mask = (row + currentCol) % 2 === 0 ? 1 : 0;
-          matrix[row][currentCol] = bit ^ mask;
-
-          bitIdx++;
-          if (bitIdx === 8) {
-            bitIdx = 0;
-            byteIdx++;
-          }
-        }
-      }
-    }
-
-    return matrix;
-  }
-
-  _addFinderPattern(m, x, y) {
-    for (let r = 0; r < 7; r++) {
-      for (let c = 0; c < 7; c++) {
-        if (
-          r === 0 || r === 6 || c === 0 || c === 6 ||
-          (r >= 2 && r <= 4 && c >= 2 && c <= 4)
-        ) {
-          m[y + r][x + c] = 1;
-        } else {
-          m[y + r][x + c] = 0;
-        }
-      }
-    }
-  }
-
-  _addAlignmentPattern(m, x, y) {
-    for (let r = -2; r <= 2; r++) {
-      for (let c = -2; c <= 2; c++) {
-        if (Math.abs(r) === 2 || Math.abs(c) === 2 || (r === 0 && c === 0)) {
-          m[y + r][x + c] = 1;
-        } else {
-          m[y + r][x + c] = 0;
-        }
-      }
-    }
-  }
-
-  _isReserved(col, row, size) {
-    // Finder top-left
-    if (col < 9 && row < 9) return true;
-    // Finder top-right
-    if (col >= size - 9 && row < 9) return true;
-    // Finder bottom-left
-    if (col < 9 && row >= size - 9) return true;
-    // Timing lines
-    if (col === 6 || row === 6) return true;
-    // Alignment pattern
-    if (col >= 22 && col <= 26 && row >= 22 && row <= 26) return true;
-    return false;
-  }
+function escapeXml(value) {
+  return String(value || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&apos;');
 }
 
 /**
- * Gera um SVG vetorial representativo para exibição do QR Code
+ * Enrollment visual seguro para o MFA.
+ *
+ * PATCH 50: o gerador anterior desenhava uma matriz parecida com QR Code, mas não
+ * codificava a URI otpauth conforme o padrão QR. Isso podia levar o usuário a
+ * cadastrar um segredo incorreto ou tornar o QR ilegível. Até existir um encoder
+ * QR real e testado no bundle, exibimos um fallback seguro: a chave manual segue
+ * visível na tela e, em dispositivos móveis, este card abre diretamente a URI
+ * otpauth no aplicativo autenticador. O segredo nunca é enviado a terceiros.
  */
 export function generateQrSvg(text, size = 220) {
-  const qr = new SimpleQrCode(text);
-  return qr.toSvg(size);
+  const safeHref = escapeXml(text);
+  const safeSize = Math.max(180, Math.min(Number(size) || 220, 320));
+
+  return `
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 220 220" width="${safeSize}" height="${safeSize}" role="img" aria-label="Configuração segura do autenticador" data-finobra-mfa-manual="true">
+      <rect width="220" height="220" rx="16" fill="#091208" stroke="#c9a227" stroke-opacity="0.45"/>
+      <path d="M110 34l45 18v34c0 36-19 67-45 82-26-15-45-46-45-82V52l45-18zm0 18L81 64v22c0 27 13 50 29 62 16-12 29-35 29-62V64l-29-12z" fill="#e8c84a"/>
+      <text x="110" y="115" text-anchor="middle" fill="#f8fafc" font-family="Arial, sans-serif" font-size="13" font-weight="700">CONFIGURAÇÃO MFA</text>
+      <text x="110" y="137" text-anchor="middle" fill="#cbd5e1" font-family="Arial, sans-serif" font-size="10">Use a chave manual abaixo</text>
+      <text x="110" y="153" text-anchor="middle" fill="#cbd5e1" font-family="Arial, sans-serif" font-size="10">ou toque para abrir o autenticador</text>
+      <a href="${safeHref}" target="_self">
+        <rect x="48" y="169" width="124" height="30" rx="8" fill="#c9a227"/>
+        <text x="110" y="189" text-anchor="middle" fill="#091208" font-family="Arial, sans-serif" font-size="11" font-weight="700">ABRIR AUTENTICADOR</text>
+      </a>
+    </svg>
+  `.trim();
 }
