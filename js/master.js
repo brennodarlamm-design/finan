@@ -158,6 +158,63 @@ const MasterAdmin = {
     }
   },
 
+  async simularWebhookPix(invoiceId) {
+    const inv = (this._billing?.invoices || []).find(i => i.id === invoiceId);
+    if (!inv) return;
+    const nome = inv.tenant_nome || inv.tenant_id || 'empresa';
+    const valor = (Number(inv.amount_cents || 0) / 100).toFixed(2).replace('.', ',');
+    if (!confirm(`Simular recebimento de Webhook PIX de R$ ${valor} para a empresa "${nome}"?\n\nO sistema executará a liquidação automática, renovará o acesso e disparará o comprovante no WhatsApp.`)) return;
+
+    try {
+      const resp = await fetch('/api/admin?action=simulate_webhook_pix', {
+        method: 'POST',
+        headers: (typeof Auth !== 'undefined' ? Auth.getAuthHeaders() : { 'Content-Type': 'application/json' }),
+        body: JSON.stringify({
+          invoiceId: inv.id,
+          txid: inv.txid,
+          tenantId: inv.tenant_id,
+          amount_cents: inv.amount_cents,
+          gateway: 'simulated_master'
+        })
+      });
+      const data = await resp.json().catch(() => ({}));
+      if (!resp.ok || !data.success) throw new Error(data.error || 'Falha ao processar simulação do webhook PIX.');
+      await Promise.all([this.carregarCobrancas(true), this.carregarEmpresas(true)]);
+      const wpStatus = data.receipt?.whatsapp?.success ? '✅ Enviado' : 'ℹ️ ' + (data.receipt?.whatsapp?.error || 'Não disparado');
+      alert(`🎉 Webhook PIX processado com sucesso!\n\nEmpresa: ${data.invoice?.nome_fantasia || nome}\nNovo Vencimento: ${data.invoice?.vencimento || 'Atualizado'}\nWhatsApp Comprovante: ${wpStatus}`);
+      this.render(document.getElementById('master-content-area') ? 'master-content-area' : 'route-content');
+    } catch (err) {
+      alert(err?.message || 'Falha ao simular webhook PIX.');
+    }
+  },
+
+  async abrirSimuladorWebhookPix() {
+    const empresas = this.getEmpresasLocal();
+    const opcoes = empresas.slice(0, 15).map(e => `• ${e.id} (${e.nome_fantasia || e.razao_social || e.id})`).join('\n');
+    const tenantId = prompt(`Informe o Tenant ID da empresa para simular o Webhook PIX:\n\nExemplos de empresas:\n${opcoes || 'Nenhuma empresa listada'}`);
+    if (!tenantId || !tenantId.trim()) return;
+
+    try {
+      const resp = await fetch('/api/admin?action=simulate_webhook_pix', {
+        method: 'POST',
+        headers: (typeof Auth !== 'undefined' ? Auth.getAuthHeaders() : { 'Content-Type': 'application/json' }),
+        body: JSON.stringify({
+          tenantId: tenantId.trim(),
+          amount: 279.90,
+          gateway: 'simulated_master'
+        })
+      });
+      const data = await resp.json().catch(() => ({}));
+      if (!resp.ok || !data.success) throw new Error(data.error || 'Falha ao simular recebimento.');
+      await Promise.all([this.carregarCobrancas(true), this.carregarEmpresas(true)]);
+      const wpStatus = data.receipt?.whatsapp?.success ? '✅ Enviado' : 'ℹ️ ' + (data.receipt?.whatsapp?.error || 'Não disparado');
+      alert(`🎉 Webhook PIX recebido e liquidado com sucesso!\n\nEmpresa: ${data.invoice?.nome_fantasia || tenantId}\nNovo Vencimento: ${data.invoice?.vencimento || 'Atualizado'}\nWhatsApp Comprovante: ${wpStatus}`);
+      this.render(document.getElementById('master-content-area') ? 'master-content-area' : 'route-content');
+    } catch (err) {
+      alert(err?.message || 'Falha ao simular webhook PIX.');
+    }
+  },
+
   _renderCobrancas() {
     const invoices = (this._billing?.invoices || []).slice(0, 20);
     const pendentes = invoices.filter(i => i.status === 'pending');
@@ -172,9 +229,9 @@ const MasterAdmin = {
       const cycleNames = { monthly:'Mensal', quarterly:'Trimestral', semiannual:'Semestral', annual:'Anual' };
       const cycleLabel = cycleNames[i.cycle] || (i.cycle && i.cycle !== 'monthly' ? i.cycle : '');
       const dt = i.created_at ? new Date(i.created_at).toLocaleString('pt-BR') : '—';
-      return `<tr style="border-bottom:1px solid rgba(255,255,255,.06);"><td style="padding:11px 14px;font-weight:700;color:#fff;">${nome}</td><td style="padding:11px 14px;">${plano}${cycleLabel?` <span style="font-size:.7rem;color:var(--accent2)">(${cycleLabel})</span>`:''}</td><td style="padding:11px 14px;font-weight:800;">R$ ${valor}</td><td style="padding:11px 14px;font-family:monospace;font-size:.72rem;">${txid}</td><td style="padding:11px 14px;">${status}</td><td style="padding:11px 14px;color:#94a3b8;">${this._esc(dt)}</td><td style="padding:11px 14px;text-align:right;">${i.status==='pending' ? `<button data-invoice-id="${id}" data-fb-click="MasterAdmin.confirmarPagamento" data-fb-click-n="1" data-fb-click-t0="dataset" data-fb-click-v0="invoiceId" style="background:#22c55e;color:#fff;border:none;border-radius:6px;padding:6px 10px;font-size:.75rem;font-weight:800;cursor:pointer;">✓ Confirmar</button>` : '—'}</td></tr>`;
+      return `<tr style="border-bottom:1px solid rgba(255,255,255,.06);"><td style="padding:11px 14px;font-weight:700;color:#fff;">${nome}</td><td style="padding:11px 14px;">${plano}${cycleLabel?` <span style="font-size:.7rem;color:var(--accent2)">(${cycleLabel})</span>`:''}</td><td style="padding:11px 14px;font-weight:800;">R$ ${valor}</td><td style="padding:11px 14px;font-family:monospace;font-size:.72rem;">${txid}</td><td style="padding:11px 14px;">${status}</td><td style="padding:11px 14px;color:#94a3b8;">${this._esc(dt)}</td><td style="padding:11px 14px;text-align:right;">${i.status==='pending' ? `<button data-invoice-id="${id}" data-fb-click="MasterAdmin.simularWebhookPix" data-fb-click-n="1" data-fb-click-t0="dataset" data-fb-click-v0="invoiceId" style="background:#0284c7;color:#fff;border:none;border-radius:6px;padding:6px 10px;font-size:.75rem;font-weight:800;cursor:pointer;margin-right:6px;" title="Simular Webhook PIX desta fatura">⚡ Webhook</button><button data-invoice-id="${id}" data-fb-click="MasterAdmin.confirmarPagamento" data-fb-click-n="1" data-fb-click-t0="dataset" data-fb-click-v0="invoiceId" style="background:#22c55e;color:#fff;border:none;border-radius:6px;padding:6px 10px;font-size:.75rem;font-weight:800;cursor:pointer;">✓ Confirmar</button>` : '—'}</td></tr>`;
     }).join('') : `<tr><td colspan="7" style="padding:28px;text-align:center;color:#64748b;">Nenhuma cobrança registrada ainda.</td></tr>`;
-    return `<div style="background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.08);border-radius:14px;overflow:hidden;margin-bottom:34px;"><div style="padding:16px 20px;border-bottom:1px solid rgba(255,255,255,.08);display:flex;justify-content:space-between;align-items:center;"><h3 style="font-size:1.05rem;font-weight:800;color:#fff;">💳 Cobranças & Assinaturas</h3><span style="font-size:.78rem;color:${pendentes.length?'#f59e0b':'#22c55e'};font-weight:800;">${pendentes.length} pendente(s)</span></div><div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;text-align:left;font-size:.8rem;"><thead><tr style="background:rgba(255,255,255,.03);color:#94a3b8;font-size:.72rem;text-transform:uppercase;"><th style="padding:10px 14px;">Empresa</th><th style="padding:10px 14px;">Plano</th><th style="padding:10px 14px;">Valor</th><th style="padding:10px 14px;">TXID</th><th style="padding:10px 14px;">Status</th><th style="padding:10px 14px;">Criada</th><th style="padding:10px 14px;text-align:right;">Ação</th></tr></thead><tbody>${rows}</tbody></table></div></div>`;
+    return `<div style="background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.08);border-radius:14px;overflow:hidden;margin-bottom:34px;"><div style="padding:16px 20px;border-bottom:1px solid rgba(255,255,255,.08);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;"><div style="display:flex;align-items:center;gap:12px;"><h3 style="font-size:1.05rem;font-weight:800;color:#fff;margin:0;">💳 Cobranças & Assinaturas</h3><span style="font-size:.78rem;color:${pendentes.length?'#f59e0b':'#22c55e'};font-weight:800;">${pendentes.length} pendente(s)</span></div><button data-fb-click="MasterAdmin.abrirSimuladorWebhookPix" data-fb-click-n="0" style="background:rgba(2,132,199,.15);border:1px solid #0284c7;color:#38bdf8;border-radius:6px;padding:6px 12px;font-size:.75rem;font-weight:800;cursor:pointer;display:inline-flex;align-items:center;gap:6px;" title="Simular recebimento de pagamento via Webhook PIX">⚡ Testar Webhook PIX</button></div><div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;text-align:left;font-size:.8rem;"><thead><tr style="background:rgba(255,255,255,.03);color:#94a3b8;font-size:.72rem;text-transform:uppercase;"><th style="padding:10px 14px;">Empresa</th><th style="padding:10px 14px;">Plano</th><th style="padding:10px 14px;">Valor</th><th style="padding:10px 14px;">TXID</th><th style="padding:10px 14px;">Status</th><th style="padding:10px 14px;">Criada</th><th style="padding:10px 14px;text-align:right;">Ação</th></tr></thead><tbody>${rows}</tbody></table></div></div>`;
   },
 
   getEmpresasLocal() {

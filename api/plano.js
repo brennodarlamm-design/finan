@@ -5,6 +5,7 @@ import { resolveAuthAndTenant } from './_auth.js';
 import { getPlanRule, normalizePlan, getPlanCyclePrice, PLAN_BILLING_CYCLES, PLAN_CYCLE_PRICING } from './_plans.js';
 import { canManageTenant, canAccessModule, permissionError } from './_permissions.js';
 import { writeAudit } from './_audit.js';
+import webhookPixHandler from './_webhook_pix.js';
 
 function getSql() {
   if (!process.env.DATABASE_URL) throw new Error('DATABASE_URL não configurada.');
@@ -81,6 +82,16 @@ export default async function handler(req, res) {
   res.setHeader('Cache-Control', 'no-store');
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (!['GET','POST'].includes(req.method)) return res.status(405).json({ success: false, error: 'Método não permitido.' });
+
+  // ── DESPACHO PARA WEBHOOK PIX E BAIXA AUTOMÁTICA SAAS ──────────────────
+  const isWebhookPix = req.query?.sub === 'webhook_pix' ||
+    req.query?.scope === 'webhook_pix' ||
+    req.query?.action === 'webhook_pix' ||
+    String(req.url || '').includes('webhook-pix');
+
+  if (isWebhookPix) {
+    return webhookPixHandler(req, res);
+  }
 
   const auth = await resolveAuthAndTenant(req);
   if (!auth.authenticated) return res.status(auth.status || 401).json({ success: false, error: auth.error || 'Não autorizado.' });

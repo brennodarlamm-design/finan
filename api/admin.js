@@ -5,6 +5,7 @@ import { neon } from '@neondatabase/serverless';
 import crypto from 'crypto';
 import { hashPassword, resolveAuthAndTenant, signToken, verifyToken } from './_auth.js';
 import { writeAudit } from './_audit.js';
+import { parseWebhookPayload, settlePixPayment, sendPaymentReceipt } from './_webhook_pix_core.js';
 
 function getSql() {
   const conn = process.env.DATABASE_URL;
@@ -551,6 +552,49 @@ export default async function handler(req, res) {
         depois:{ plan_id:done.plan_id, cycle:done.cycle, amount_cents:Number(done.amount_cents || 0), txid:done.txid, vencimento:done.vencimento }
       });
       return res.status(200).json({ success:true, invoice:done, message:`Pagamento confirmado e assinatura renovada (${done.cycle || 'mensal'}).` });
+    }
+
+    // ── POST ?action=simulate_webhook_pix (Simulação de Webhook PIX pelo Super Admin) ──
+    if (req.method === 'POST' && (action === 'simulate_webhook_pix' || action === 'webhook_pix')) {
+      const payload = parseWebhookPayload(req.body || {});
+      payload.simulated = true;
+      const settleResult = await settlePixPayment(sql, payload, { source: 'superadmin_master_simulator' });
+      if (settleResult.already_processed) {
+        return res.status(200).json({
+          success: true,
+          already_processed: true,
+          message: settleResult.message,
+          invoiceId: settleResult.invoiceId,
+          tenantId: settleResult.tenantId,
+          paidAt: settleResult.paidAt
+        });
+      }
+      if (!settleResult.success) {
+        return res.status(422).json({ success: false, error: settleResult.error || 'Falha ao processar liquidação da cobrança.' });
+      }
+      const data = settleResult.data;
+      await writeAudit(sql, req, { ...auth, tenantId: data.tenant_id }, {
+        acao: 'pagamento_pix_simulado',
+        entidade: 'cobranca',
+        entidadeId: data.invoice_id,
+        depois: {
+          tenantId: data.tenant_id,
+          empresa: data.nome_fantasia || data.razao_social,
+          plano: data.plan_id,
+          ciclo: data.cycle,
+          amount_cents: data.amount_cents,
+          txid: data.txid,
+          vencimento: data.vencimento
+        }
+      });
+      const receipt = await sendPaymentReceipt(data);
+      return res.status(200).json({
+        success: true,
+        processed: true,
+        invoice: data,
+        receipt,
+        message: `Webhook PIX processado com sucesso! Assinatura da empresa ${data.nome_fantasia || data.razao_social} renovada até ${data.vencimento}.`
+      });
     }
 
     // Auditoria explícita do modo suporte/impersonação do Super Admin.

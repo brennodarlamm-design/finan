@@ -48,7 +48,9 @@ CREATE TABLE IF NOT EXISTS billing_invoices (
     plan_id VARCHAR(32) NOT NULL,
     amount_cents INTEGER NOT NULL CHECK (amount_cents >= 0),
     status VARCHAR(24) NOT NULL DEFAULT 'pending',
-    txid VARCHAR(35) NOT NULL,
+    txid VARCHAR(128) NOT NULL,
+    gateway VARCHAR(32) DEFAULT 'pix_manual',
+    webhook_payload JSONB DEFAULT '{}'::jsonb,
     pix_payload TEXT,
     created_by VARCHAR(64),
     paid_by VARCHAR(64),
@@ -61,6 +63,7 @@ CREATE TABLE IF NOT EXISTS billing_invoices (
 CREATE UNIQUE INDEX IF NOT EXISTS uq_billing_invoices_txid ON billing_invoices (txid);
 CREATE INDEX IF NOT EXISTS idx_billing_tenant_status_created ON billing_invoices (tenant_id, status, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_billing_status_created ON billing_invoices (status, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_billing_invoices_txid_status ON billing_invoices (txid, status);
 
 -- 0.18 Central de Atendimento DEV / FinBot
 CREATE TABLE IF NOT EXISTS support_conversations (

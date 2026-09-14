@@ -39,6 +39,14 @@
       "destination": "/api/nfe?sub=certificado&$1"
     },
     {
+      "source": "/api/webhook-pix",
+      "destination": "/api/plano?sub=webhook_pix"
+    },
+    {
+      "source": "/api/webhook-pix/(.*)",
+      "destination": "/api/plano?sub=webhook_pix&$1"
+    },
+    {
       "source": "/api/(.*)",
       "destination": "/api/$1"
     },
