@@ -14,5 +14,7 @@ services:
         sync: false
       - key: TARGET_PHONE
         value: 5595991363678
+      - key: TARGET_TENANT_ID
+        value: angelim
       - key: API_SECRET
         sync: false

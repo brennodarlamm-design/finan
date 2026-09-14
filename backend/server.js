@@ -135,7 +135,7 @@ if (!rawDbUrl) {
 }
 
 const TARGET_PHONE = (process.env.TARGET_PHONE || '').trim();
-const TARGET_TENANT_ID = (process.env.TARGET_TENANT_ID || process.env.DEFAULT_TENANT_ID || 'public').trim();
+const TARGET_TENANT_ID = (process.env.TARGET_TENANT_ID || process.env.DEFAULT_TENANT_ID || 'angelim').trim();
 
 // ── GERENCIAMENTO MULTI-TENANT DE SESSÕES WHATSAPP ───────────────────────────
 const sessions = new Map();
@@ -158,7 +158,12 @@ function getTenantSession(tenantId) {
       lastConnectedAt: null,
       isStarting: false,
       authDir,
-      syncTimer: null
+      syncTimer: null,
+      persistedHashes: new Map(), // chave -> hash MD5 do conteúdo gravado no Neon
+      pendingSaves: new Set(),    // arquivos com alteração pendente
+      isSaving: false,
+      reconnectAttempts: 0,
+      reconnectTimer: null
     });
   }
   return sessions.get(tId);
@@ -246,9 +251,11 @@ async function syncAuthFromPostgres(session) {
       for (const row of rows) {
         const filePath = path.join(session.authDir, row.key);
         fs.writeFileSync(filePath, row.value, 'utf8');
+        const hash = crypto.createHash('md5').update(row.value).digest('hex');
+        session.persistedHashes.set(row.key, hash);
       }
-    } else if (session.tenantId === TARGET_TENANT_ID || session.tenantId === 'public') {
-      // Migração retroativa de sessões legadas sem tenant
+    } else if (session.tenantId === TARGET_TENANT_ID && session.tenantId !== 'public') {
+      // Migração retroativa única de sessões legadas sem tenant (apenas para o tenant principal real)
       try {
         const legacy = await sql`SELECT key, value FROM whatsapp_auth;`;
         if (legacy && legacy.length > 0) {
@@ -256,12 +263,19 @@ async function syncAuthFromPostgres(session) {
           for (const row of legacy) {
             const filePath = path.join(session.authDir, row.key);
             fs.writeFileSync(filePath, row.value, 'utf8');
+            const hash = crypto.createHash('md5').update(row.value).digest('hex');
+            session.persistedHashes.set(row.key, hash);
             await sql`
               INSERT INTO tenant_whatsapp_auth (tenant_id, key, value, updated_at)
               VALUES (${session.tenantId}, ${row.key}, ${row.value}, CURRENT_TIMESTAMP)
               ON CONFLICT (tenant_id, key) DO UPDATE SET value = EXCLUDED.value;
             `;
           }
+          // Limpa tabela legada para impedir loop de dupla inicialização
+          try {
+            await sql`DELETE FROM whatsapp_auth;`;
+            console.log(`🧹 [WhatsApp:${session.tenantId}] Tabela legada whatsapp_auth limpa após migração.`);
+          } catch {}
         }
       } catch {}
     }
@@ -270,34 +284,78 @@ async function syncAuthFromPostgres(session) {
   }
 }
 
-async function saveAuthToPostgres(session) {
+async function saveAuthToPostgres(session, specificFile = null) {
   if (!sql) return;
+  if (session.isSaving) {
+    if (session.syncTimer) clearTimeout(session.syncTimer);
+    session.syncTimer = setTimeout(() => saveAuthToPostgres(session), 2000);
+    return;
+  }
+  session.isSaving = true;
+
   try {
     if (!fs.existsSync(session.authDir)) return;
-    const files = fs.readdirSync(session.authDir);
-    for (const file of files) {
+
+    let filesToCheck;
+    if (specificFile) {
+      filesToCheck = [specificFile];
+    } else if (session.pendingSaves.size > 0) {
+      filesToCheck = Array.from(session.pendingSaves);
+      session.pendingSaves.clear();
+    } else {
+      filesToCheck = fs.readdirSync(session.authDir);
+    }
+
+    const dirtyEntries = [];
+    const deletedKeys = [];
+
+    for (const file of filesToCheck) {
       const filePath = path.join(session.authDir, file);
       try {
         if (fs.existsSync(filePath) && fs.statSync(filePath).isFile()) {
           const content = fs.readFileSync(filePath, 'utf8');
-          await sql`
-            INSERT INTO tenant_whatsapp_auth (tenant_id, key, value, updated_at)
-            VALUES (${session.tenantId}, ${file}, ${content}, CURRENT_TIMESTAMP)
-            ON CONFLICT (tenant_id, key) DO UPDATE SET
-              value = EXCLUDED.value,
-              updated_at = CURRENT_TIMESTAMP;
-          `;
+          const hash = crypto.createHash('md5').update(content).digest('hex');
+          if (session.persistedHashes.get(file) !== hash) {
+            dirtyEntries.push({ file, content, hash });
+          }
+        } else if (!fs.existsSync(filePath) && session.persistedHashes.has(file)) {
+          deletedKeys.push(file);
         }
       } catch (fileErr) {
-        if (fileErr.code === 'ENOENT') {
-          try {
-            await sql`DELETE FROM tenant_whatsapp_auth WHERE tenant_id = ${session.tenantId} AND key = ${file};`;
-          } catch {}
+        if (fileErr.code === 'ENOENT' && session.persistedHashes.has(file)) {
+          deletedKeys.push(file);
         }
       }
     }
+
+    // Economia de rede: se nenhuma chave mudou, evita 100% de chamadas ao banco Neon
+    if (dirtyEntries.length === 0 && deletedKeys.length === 0) {
+      return;
+    }
+
+    // Grava apenas os arquivos que realmente foram modificados
+    for (const entry of dirtyEntries) {
+      await sql`
+        INSERT INTO tenant_whatsapp_auth (tenant_id, key, value, updated_at)
+        VALUES (${session.tenantId}, ${entry.file}, ${entry.content}, CURRENT_TIMESTAMP)
+        ON CONFLICT (tenant_id, key) DO UPDATE SET
+          value = EXCLUDED.value,
+          updated_at = CURRENT_TIMESTAMP;
+      `;
+      session.persistedHashes.set(entry.file, entry.hash);
+    }
+
+    // Remove chaves apagadas
+    for (const delKey of deletedKeys) {
+      try {
+        await sql`DELETE FROM tenant_whatsapp_auth WHERE tenant_id = ${session.tenantId} AND key = ${delKey};`;
+      } catch {}
+      session.persistedHashes.delete(delKey);
+    }
   } catch (err) {
     console.warn(`⚠️ [WhatsApp:${session.tenantId}] Falha ao salvar sessão no Neon:`, err.message);
+  } finally {
+    session.isSaving = false;
   }
 }
 
@@ -308,6 +366,13 @@ async function resetWhatsAppSession(tenantId, reason = 'Reset manual ou sessão 
   session.connectionStatus = 'disconnected';
   session.currentQR = null;
   session.qrDataUrl = null;
+  session.persistedHashes.clear();
+  session.pendingSaves.clear();
+  session.reconnectAttempts = 0;
+  if (session.reconnectTimer) {
+    clearTimeout(session.reconnectTimer);
+    session.reconnectTimer = null;
+  }
 
   if (session.sock) {
     try {
@@ -370,23 +435,33 @@ async function startWhatsApp(tenantId, forceClean = false) {
       browser: ['FinObra ERP', 'Chrome', '1.0.0'],
       connectTimeoutMs: 60000,
       defaultQueryTimeoutMs: 60000,
-      keepAliveIntervalMs: 25000
+      keepAliveIntervalMs: 25000,
+      syncFullHistory: false, // Otimização crítica: não baixa histórico pesado de conversas
+      markOnlineOnConnect: false, // Não publica status 'online' desnecessário
+      shouldIgnoreJid: (jid) => {
+        // Ignora status/stories, canais/newsletters e grupos que consomem tráfego excessivo
+        if (!jid) return true;
+        return jid.endsWith('@broadcast') || jid.endsWith('@newsletter') || jid.endsWith('@g.us');
+      },
+      getMessage: async () => undefined, // Stub para evitar falhas em retry receipts do WhatsApp
+      generateHighQualityLinkPreview: false
     });
 
     session.sock.ev.on('creds.update', async () => {
       await saveCreds();
-      await saveAuthToPostgres(session);
+      await saveAuthToPostgres(session, 'creds.json');
     });
 
     // Observa e sincroniza automaticamente qualquer arquivo de chave criado pelo Baileys
     try {
-      fs.watch(session.authDir, () => {
+      fs.watch(session.authDir, (eventType, filename) => {
+        if (filename) session.pendingSaves.add(filename);
         if (session.syncTimer) clearTimeout(session.syncTimer);
         session.syncTimer = setTimeout(() => {
           saveAuthToPostgres(session).catch((err) => {
             console.warn(`⚠️ [WhatsApp:${session.tenantId}] Falha na persistência agendada das credenciais:`, err?.message || err);
           });
-        }, 500);
+        }, 1500);
       });
     } catch (err) {
       console.warn(`⚠️ [WhatsApp:${session.tenantId}] Não foi possível iniciar o watcher das credenciais:`, err?.message || err);
@@ -413,10 +488,15 @@ async function startWhatsApp(tenantId, forceClean = false) {
         session.qrDataUrl = null;
 
         if (shouldReconnect) {
-          setTimeout(() => {
+          const attempts = session.reconnectAttempts || 0;
+          session.reconnectAttempts = attempts + 1;
+          const delay = Math.min(5000 * Math.pow(1.4, attempts), 60000);
+          console.log(`⏳ [WhatsApp:${session.tenantId}] Reconexão agendada em ${Math.round(delay / 1000)}s (tentativa ${session.reconnectAttempts})...`);
+          if (session.reconnectTimer) clearTimeout(session.reconnectTimer);
+          session.reconnectTimer = setTimeout(() => {
             session.isStarting = false;
             startWhatsApp(session.tenantId);
-          }, 3000);
+          }, delay);
         } else {
           console.log(`⚠️ [WhatsApp:${session.tenantId}] Sessão desconectada ou revogada. Resetando credenciais...`);
           session.isStarting = false;
@@ -425,6 +505,11 @@ async function startWhatsApp(tenantId, forceClean = false) {
       } else if (connection === 'open') {
         console.log(`✅ [WhatsApp:${session.tenantId}] Conectado e pronto para envio 24/7!`);
         session.connectionStatus = 'connected';
+        session.reconnectAttempts = 0;
+        if (session.reconnectTimer) {
+          clearTimeout(session.reconnectTimer);
+          session.reconnectTimer = null;
+        }
         session.currentQR = null;
         session.qrDataUrl = null;
         session.lastConnectedAt = new Date().toISOString();
@@ -433,16 +518,19 @@ async function startWhatsApp(tenantId, forceClean = false) {
     });
   } catch (err) {
     console.error(`❌ Erro ao iniciar WhatsApp Baileys [${session.tenantId}]:`, err.message);
-    if (err.message && (err.message.includes('Unsupported state') || err.message.includes('authenticate data') || err.message.includes('Bad MAC'))) {
+    if (err.message && (err.message.includes('Unsupported state') || err.message.includes('authenticate data'))) {
       console.warn(`🚨 Chaves inválidas no startup [${session.tenantId}]. Resetando sessão...`);
       session.isStarting = false;
       await resetWhatsAppSession(session.tenantId, 'Chaves inválidas no startup');
       return;
     }
+    const attempts = session.reconnectAttempts || 0;
+    session.reconnectAttempts = attempts + 1;
+    const delay = Math.min(5000 * Math.pow(1.4, attempts), 60000);
     setTimeout(() => {
       session.isStarting = false;
       startWhatsApp(session.tenantId);
-    }, 5000);
+    }, delay);
   } finally {
     session.isStarting = false;
   }
@@ -453,10 +541,17 @@ async function bootstrapAllSessions() {
   // 1. Inicia sessão padrão / configurada
   startWhatsApp(TARGET_TENANT_ID);
 
-  // 2. Se houver outras empresas com credenciais salvas no Neon, inicia suas sessões
+  // 2. Se houver outras empresas reais ativas com credenciais salvas no Neon, inicia suas sessões
   if (sql) {
     try {
-      const distinct = await sql`SELECT DISTINCT tenant_id FROM tenant_whatsapp_auth WHERE tenant_id != ${TARGET_TENANT_ID};`;
+      const distinct = await sql`
+        SELECT DISTINCT a.tenant_id 
+        FROM tenant_whatsapp_auth a
+        INNER JOIN tenants t ON t.id = a.tenant_id
+        WHERE a.tenant_id != ${TARGET_TENANT_ID}
+          AND a.tenant_id != 'public'
+          AND t.status != 'bloqueado';
+      `;
       if (distinct && distinct.length > 0) {
         for (const row of distinct) {
           if (row.tenant_id) {
@@ -493,6 +588,8 @@ process.on('uncaughtException', async (err) => {
         } catch (resetErr) {
           console.error(`❌ [Auto-Recovery:${tId}] Falha ao resetar sessão WhatsApp:`, resetErr?.message || resetErr);
         }
+      } else {
+        console.warn(`⚠️ [WhatsApp:${tId}] Mensagem recebida com falha de decifração/Bad MAC ignorada.`);
       }
     }
   } else {
