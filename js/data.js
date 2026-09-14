@@ -212,6 +212,37 @@ const DB = {
           localStorage.setItem(docsKey, JSON.stringify(lightDocs));
         }
       }
+
+      // 3. Remove base64 de anexos em fases de obras (Patch 43)
+      if (typeof localStorage !== 'undefined' && typeof localStorage.key === 'function') {
+        for (let i = 0; i < (localStorage.length || 0); i++) {
+          const k = localStorage.key(i);
+          if (k && k.includes('fases_doc')) {
+            try {
+              const val = JSON.parse(localStorage.getItem(k) || '{}');
+              let modified = false;
+              for (const fk of Object.keys(val || {})) {
+                if (Array.isArray(val[fk])) {
+                  val[fk] = val[fk].map(doc => {
+                    if (Array.isArray(doc.arquivos)) {
+                      doc.arquivos = doc.arquivos.map(a => {
+                        if (a && (a.base64 || a.data_base64)) {
+                          modified = true;
+                          const { base64, data_base64, ...cleanA } = a;
+                          return cleanA;
+                        }
+                        return a;
+                      });
+                    }
+                    return doc;
+                  });
+                }
+              }
+              if (modified) localStorage.setItem(k, JSON.stringify(val));
+            } catch {}
+          }
+        }
+      }
     } catch (err) {
       console.warn('[Storage] Erro ao limpar cache pesado:', err);
     }
@@ -1195,13 +1226,46 @@ const DB = {
     return live.length;
   },
 
+  _getDependencyPriority(item) {
+    const table = String(item?.payload?.table || '').toLowerCase();
+    const action = String(item?.payload?.action || '').toLowerCase();
+
+    // Na exclusão, entidades filhas devem ser deletadas antes dos pais
+    if (action === 'delete') {
+      if (['lancamentos', 'notas', 'notas_fiscais', 'medicoes', 'precompras', 'contratos', 'recibos', 'documentos', 'doc_fases'].includes(table)) return 1;
+      if (['orcamentos', 'orcamentos_sinapi', 'produtos'].includes(table)) return 2;
+      if (['obras', 'clientes', 'fornecedores', 'contas', 'contas_bancarias'].includes(table)) return 3;
+      return 4;
+    }
+
+    // Na criação/edição (save), entidades pai fundamentais sobem primeiro para evitar FK violations no Neon
+    if (['obras', 'clientes', 'fornecedores', 'contas', 'contas_bancarias'].includes(table)) return 1;
+    if (['orcamentos', 'orcamentos_sinapi', 'produtos'].includes(table)) return 2;
+    if (['lancamentos', 'notas', 'notas_fiscais', 'medicoes', 'precompras', 'contratos', 'recibos'].includes(table)) return 3;
+    if (['documentos', 'documento_conteudo', 'doc_fases', 'preferencias'].includes(table)) return 4;
+    return 5;
+  },
+
+  _sortQueueByDependency(queue) {
+    if (!Array.isArray(queue) || queue.length <= 1) return queue;
+    return [...queue].sort((a, b) => {
+      const pA = this._getDependencyPriority(a);
+      const pB = this._getDependencyPriority(b);
+      if (pA !== pB) return pA - pB;
+      const tA = String(a?.createdAt || a?.updatedAt || '');
+      const tB = String(b?.createdAt || b?.updatedAt || '');
+      return tA.localeCompare(tB);
+    });
+  },
+
   async _flushCloudQueue() {
     if (this._syncFlushing) return;
     this._syncFlushing = true;
     try {
       while (true) {
-        const queue = this._getSyncQueue();
-        if (!queue.length) break;
+        const rawQueue = this._getSyncQueue();
+        if (!rawQueue.length) break;
+        const queue = this._sortQueueByDependency(rawQueue);
         const item = queue[0];
         let res;
         try {
