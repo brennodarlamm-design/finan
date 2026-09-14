@@ -37,7 +37,7 @@ export const BANCOS_CATALOGO = [
   { id: 'secid_pr', nome: 'SECID-PR', estado: 'Parana', refPadrao: '2/2025', tipo: 'estadual', ufs: ['PR'], emUso: false },
   { id: 'saneago', nome: 'SANEAGO', estado: 'Goiás', refPadrao: '10/2023', tipo: 'estadual', ufs: ['GO'], emUso: false },
   { id: 'sudecap', nome: 'SUDECAP', estado: 'Belo Horizonte', refPadrao: '4/2026', tipo: 'municipal', ufs: ['MG'], emUso: true },
-  { id: 'proprio', nome: 'PRÓPRIO', estado: 'São Paulo', refPadrao: '(Insumos Próprios da Empresa)', tipo: 'proprio', ufs: ['SP'], emUso: true }
+  { id: 'proprio', nome: 'PRÓPRIO', estado: 'São Paulo', refPadrao: '(Insumos Próprios da Empresa)', tipo: 'proprio', ufs: UFS_BRASIL, emUso: true }
 ];
 
 // Estado do Robô em execução

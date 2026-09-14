@@ -44,7 +44,7 @@ const OrcamentoBancos = {
     { id: 'secid_pr', nome: 'SECID-PR', estado: 'Parana', uf: 'PR', ref: '2/2025', checked: false, opcoesRef: ['2/2025', '1/2025', '12/2024', '10/2024'] },
     { id: 'saneago', nome: 'SANEAGO', estado: 'Goiás', uf: 'GO', ref: '10/2023', checked: false, opcoesRef: ['10/2023', '8/2023', '6/2023', '4/2023'] },
     { id: 'sudecap', nome: 'SUDECAP', estado: 'Belo Horizonte', uf: 'MG', ref: '4/2026', checked: true, opcoesRef: ['4/2026', '3/2026', '2/2026', '1/2026'] },
-    { id: 'proprio', nome: 'PRÓPRIO', estado: 'São Paulo', uf: 'SP', ref: '(Insumos Próprios)', checked: true, desc: '(Usado para determinar o estado de insumos próprios)', opcoesRef: ['(Insumos Próprios)', 'Tabela Base Matriz', 'Tabela Base Filial'] }
+    { id: 'proprio', nome: 'PRÓPRIO', estado: 'São Paulo', uf: 'SP', ref: '(Insumos Próprios)', checked: true, multiUf: true, desc: '(Usado para determinar o estado de insumos próprios)', opcoesRef: ['(Insumos Próprios)', 'Tabela Base Matriz', 'Tabela Base Filial'] }
   ],
 
   _tempConfig: null,
@@ -203,7 +203,7 @@ const OrcamentoBancos = {
                       data-fb-change-t1="value"
                     >
                       ${b.multiUf ? OrcamentoBancos.UFS.map(uf => `
-                        <option value="${uf}" ${(b.uf||'AC')===uf ? 'selected' : ''}>
+                        <option value="${uf}" ${(b.uf || (b.id==='proprio'?'SP':'AC'))===uf ? 'selected' : ''}>
                           ${OrcamentoBancos.NOME_UFS[uf] || uf}
                         </option>
                       `).join('') : `
@@ -399,5 +399,16 @@ const OrcamentoBancos = {
     const extraLabel = outrosAtivos.length > 0 ? ` + ${outrosAtivos[0].nome}: ${outrosAtivos[0].uf} ${outrosAtivos[0].ref}...` : '';
 
     return `${statusDeson} | SINAPI: ${sinapi.uf} ${sinapi.ref}${extraLabel}`;
+  },
+
+  // Retorna o estado e UF configurados para insumos próprios da empresa (suporta todas as 27 UFs)
+  getEstadoInsumoProprio(orc) {
+    const cfg = orc?.bancos_config || this._getConfigSalva();
+    const proprio = cfg?.bancos?.find(b => b.id === 'proprio');
+    const uf = proprio?.uf || 'SP';
+    return {
+      uf,
+      estado: proprio?.estado || this.NOME_UFS[uf] || 'São Paulo'
+    };
   }
 };
