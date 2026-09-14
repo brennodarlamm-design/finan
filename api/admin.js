@@ -377,11 +377,14 @@ export default async function handler(req, res) {
           ORDER BY constraint_name,checked_at DESC,id DESC;
         `;
       } catch {}
-      const privateBlobReady = Boolean(String(process.env.FINOBRA_BLOB_READ_WRITE_TOKEN || '').trim() || String(process.env.FINOBRA_BLOB_STORE_ID || '').trim());
+      const privateBlobReady = Boolean(String(process.env.FINOBRA_BLOB_READ_WRITE_TOKEN || process.env.BLOB_READ_WRITE_TOKEN || '').trim() || String(process.env.FINOBRA_BLOB_STORE_ID || '').trim());
       const configured = String(process.env.FINOBRA_BLOB_ACCESS || process.env.BLOB_ACCESS || '').trim().toLowerCase();
+      const currentBuild = process.env.VERCEL_GIT_COMMIT_SHA
+        ? `2026.09.14-p40 (${process.env.VERCEL_GIT_COMMIT_SHA.slice(0,7)})`
+        : '2026.09.14-p40';
       return res.status(200).json({
         success:true,
-        build:'2026.09.11-p11',
+        build: currentBuild,
         constraints:constraintRows,
         audit:auditRows,
         storage:{ private_ready:privateBlobReady, configured_access:configured || (privateBlobReady ? 'private' : 'public') }

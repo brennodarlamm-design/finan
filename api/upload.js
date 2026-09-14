@@ -16,7 +16,7 @@ function getSql() {
 
 function getPrivateBlobOptions() {
   const options = {};
-  const token = String(process.env.FINOBRA_BLOB_READ_WRITE_TOKEN || '').trim();
+  const token = String(process.env.FINOBRA_BLOB_READ_WRITE_TOKEN || process.env.BLOB_READ_WRITE_TOKEN || '').trim();
   const storeId = String(process.env.FINOBRA_BLOB_STORE_ID || '').trim();
   if (token) options.token = token;
   if (storeId) options.storeId = storeId;
@@ -79,13 +79,13 @@ export default async function handler(req, res) {
   if (req.method === 'DELETE' && !canAccessModule(auth,'documentos','delete')) return res.status(403).json(permissionError('MODULE_DELETE_FORBIDDEN','documentos'));
   if (req.method === 'POST' && !canWriteData(auth)) return res.status(403).json(permissionError('ROLE_READ_ONLY'));
   if (req.method === 'DELETE' && !canDeleteData(auth)) return res.status(403).json(permissionError('ROLE_DELETE_FORBIDDEN'));
-  const privateBlobReady = Boolean(String(process.env.FINOBRA_BLOB_READ_WRITE_TOKEN || '').trim() || String(process.env.FINOBRA_BLOB_STORE_ID || '').trim());
+  const privateBlobReady = Boolean(String(process.env.FINOBRA_BLOB_READ_WRITE_TOKEN || process.env.BLOB_READ_WRITE_TOKEN || '').trim() || String(process.env.FINOBRA_BLOB_STORE_ID || '').trim());
   const configuredAccess = String(process.env.FINOBRA_BLOB_ACCESS || process.env.BLOB_ACCESS || (privateBlobReady ? 'private' : 'public')).trim().toLowerCase();
   
   if (configuredAccess === 'private' && !privateBlobReady && req.method === 'POST') {
     return res.status(500).json({
       success: false,
-      error: 'Armazenamento privado seguro não está pronto no servidor (FINOBRA_BLOB_READ_WRITE_TOKEN pendente). Upload bloqueado por segurança (fail-closed).'
+      error: 'Armazenamento privado seguro não está pronto no servidor (BLOB_READ_WRITE_TOKEN pendente). Upload bloqueado por segurança (fail-closed).'
     });
   }
   const blobAccess = configuredAccess === 'private' && privateBlobReady ? 'private' : 'public';
