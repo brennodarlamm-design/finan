@@ -29,10 +29,14 @@ try {
     process.exit(1);
   }
 
-  const deploy = await res.json();
-  console.log('✅ Deploy disparado com sucesso!');
-  console.log(`📋 Deploy ID: ${deploy.id}`);
-  console.log(`⏱️ Status: ${deploy.status}`);
+  let deploy = {};
+  const text = await res.text();
+  if (text) {
+    try { deploy = JSON.parse(text); } catch {}
+  }
+  console.log('✅ Deploy disparado com sucesso no Render!');
+  if (deploy.id) console.log(`📋 Deploy ID: ${deploy.id}`);
+  if (deploy.status) console.log(`⏱️ Status: ${deploy.status}`);
   console.log(`🔗 Dashboard: https://dashboard.render.com/web/${SERVICE_ID}`);
 } catch (err) {
   console.error('❌ Erro inesperado ao disparar deploy no Render:', err.message);
