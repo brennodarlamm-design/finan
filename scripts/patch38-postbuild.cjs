@@ -58,6 +58,7 @@ patchLogin();
 patchDocument('privacidade.html', 'https://finobra.app.br/privacidade');
 patchDocument('termos.html', 'https://finobra.app.br/termos');
 patchDocument('validar.html', 'https://finobra.app.br/validar');
+patchDocument('master.html', 'https://finobra.app.br/master');
 
 const builtLogin = read('login.html');
 const builtHome = read('index.html');

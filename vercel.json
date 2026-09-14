@@ -51,6 +51,10 @@
       "destination": "/"
     },
     {
+      "source": "/master",
+      "destination": "/master.html"
+    },
+    {
       "source": "/privacidade",
       "destination": "/privacidade.html"
     },

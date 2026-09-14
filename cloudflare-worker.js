@@ -38,6 +38,10 @@ function isLoginShellPath(pathname) {
   return pathname === '/login' || pathname === '/login.html' || pathname === '/cadastro';
 }
 
+function isMasterShellPath(pathname) {
+  return pathname === '/master' || pathname === '/master.html';
+}
+
 function canonicalRedirect(request, env) {
   const method = String(request.method || 'GET').toUpperCase();
   if (!['GET', 'HEAD'].includes(method)) return null;
@@ -62,6 +66,9 @@ function canonicalRedirect(request, env) {
       changed = true;
     } else if (target.pathname === '/login.html') {
       target.pathname = '/login';
+      changed = true;
+    } else if (target.pathname === '/master.html') {
+      target.pathname = '/master';
       changed = true;
     }
 
@@ -139,6 +146,7 @@ async function fetchFrontendResponse(request, env) {
   const shellMethod = ['GET', 'HEAD'].includes(method);
   const appShell = shellMethod && isAppShellPath(incoming.pathname);
   const loginShell = shellMethod && isLoginShellPath(incoming.pathname);
+  const masterShell = shellMethod && isMasterShellPath(incoming.pathname);
   const landingShell = shellMethod && incoming.pathname === '/';
 
   // With html_handling:"none", ASSETS.fetch('/login.html') returns 200 directly.
@@ -152,6 +160,9 @@ async function fetchFrontendResponse(request, env) {
   } else if (loginShell) {
     assetPath = '/login.html';
     routeName = incoming.pathname === '/cadastro' ? 'signup-shell' : 'login-shell';
+  } else if (masterShell) {
+    assetPath = '/master.html';
+    routeName = 'master-shell';
   } else if (landingShell) {
     assetPath = '/index.html';
     routeName = 'landing-shell';
@@ -168,7 +179,7 @@ async function fetchFrontendResponse(request, env) {
   const headers = new Headers(securedResponse.headers);
   headers.set('X-FinObra-Route', routeName);
   headers.set('Cache-Control', 'public, max-age=0, must-revalidate');
-  if (routeName === 'login-shell' || routeName === 'signup-shell' || routeName === 'app-shell') {
+  if (routeName === 'login-shell' || routeName === 'signup-shell' || routeName === 'app-shell' || routeName === 'master-shell') {
     headers.set('X-Robots-Tag', 'noindex, nofollow');
   }
 

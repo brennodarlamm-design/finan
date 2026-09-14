@@ -12,6 +12,10 @@ const adminJs = fs.readFileSync('api/admin.js', 'utf8');
 const masterJs = fs.readFileSync('js/master.js', 'utf8');
 const patch26Js = fs.readFileSync('js/patch26-events.js', 'utf8');
 const emailTpl = fs.readFileSync('templates/email-cobranca-assinatura.html', 'utf8');
+const workerJs = fs.readFileSync('cloudflare-worker.js', 'utf8');
+const redirects = fs.readFileSync('cloudflare/_redirects', 'utf8');
+const masterHtml = fs.readFileSync('master.html', 'utf8');
+const vercelJson = fs.readFileSync('vercel.json', 'utf8');
 const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
 const version = JSON.parse(fs.readFileSync('version.json', 'utf8'));
 
@@ -53,10 +57,20 @@ assert(
   'Allowlist CSP (Patch 26) autoriza as ações do modal de cobrança.'
 );
 
-// 7. Versionamento e Pacote
+// 7. Roteamento Edge e Canonical de /master
+assert(workerJs.includes('function isMasterShellPath(pathname)'), 'Edge reconhece /master e /master.html como rotas do portal master.');
+assert(workerJs.includes("assetPath = '/master.html'"), 'Edge resolve /master através do arquivo master.html explícito.');
+assert(workerJs.includes("routeName = 'master-shell'"), 'Edge identifica a rota como master-shell.');
+assert(workerJs.includes("target.pathname === '/master.html'"), 'Edge canonicaliza /master.html para /master.');
+assert(redirects.includes('/master /master.html 200'), 'Assets Cloudflare possuem fallback explícito de /master para master.html.');
+assert(vercelJson.includes('"source": "/master"') && vercelJson.includes('"destination": "/master.html"'), 'Vercel possui rewrite explícito de /master para master.html.');
+assert(masterHtml.includes('rel="canonical" href="https://finobra.app.br/master"'), 'master.html possui canonical apontando para /master.');
+assert(masterHtml.includes('name="robots" content="noindex, nofollow"'), 'master.html bloqueia indexação de motores de busca.');
+
+// 8. Versionamento e Pacote
 assert(pkg.scripts?.['test:patch40'] === 'node scripts/test-patch40-static.js', 'package.json expõe comando test:patch40.');
 assert(pkg.version === '2.29.0', 'package.json está na versão 2.29.0.');
 assert(version.version === '2.29.0', 'version.json está na versão 2.29.0.');
 assert(/-p40\b/.test(version.build || ''), 'version.json registra build com sufixo -p40.');
 
-console.log('\n🎉 Patch 40: todas as 20 verificações passaram com 100% de sucesso!');
+console.log('\n🎉 Patch 40: todas as 28 verificações passaram com 100% de sucesso!');

@@ -4,6 +4,7 @@
 /cadastro /login.html 200
 /app /app.html 200
 /app/* /app.html 200
+/master /master.html 200
 /privacidade /privacidade.html 200
 /termos /termos.html 200
 /validar /validar.html 200
