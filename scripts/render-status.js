@@ -8,7 +8,7 @@ if (!apiKey) {
   process.exit(1);
 }
 
-const SERVICE_ID = 'srv-daad9ghsrm7s73ekn020';
+const SERVICE_ID = 'srv-dak05l8jo6nc73fh98cg'; // finan-backend-9rxw
 
 console.log('🔍 Consultando status do serviço no Render...');
 
@@ -20,7 +20,7 @@ try {
     fetch(`https://api.render.com/v1/services/${SERVICE_ID}/deploys?limit=1`, {
       headers: { Authorization: `Bearer ${apiKey}` }
     }).then(r => r.json()),
-    fetch('https://finan-wf12.onrender.com/health').then(r => r.json()).catch(e => ({ error: e.message }))
+    fetch('https://finan-backend-9rxw.onrender.com/health').then(r => r.json()).catch(e => ({ error: e.message }))
   ]);
 
   console.log('----------------------------------------------------');

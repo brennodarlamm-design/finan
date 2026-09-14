@@ -20,7 +20,7 @@ function getRenderBaseUrl() {
   if (custom) {
     return custom.replace(/\/send-message\/?$/, '').replace(/\/+$/, '');
   }
-  return 'https://finan-wf12.onrender.com';
+  return 'https://finan-backend-9rxw.onrender.com';
 }
 
 export default async function handler(req, res) {

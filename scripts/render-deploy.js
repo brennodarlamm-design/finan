@@ -8,9 +8,9 @@ if (!apiKey) {
   process.exit(1);
 }
 
-const SERVICE_ID = 'srv-daad9ghsrm7s73ekn020'; // finan-wf12
+const SERVICE_ID = 'srv-dak05l8jo6nc73fh98cg'; // finan-backend-9rxw
 
-console.log('🚀 Disparando novo deploy no Render (serviço finan-wf12)...');
+console.log('🚀 Disparando novo deploy no Render (serviço finan-backend-9rxw)...');
 
 try {
   const res = await fetch(`https://api.render.com/v1/services/${SERVICE_ID}/deploys`, {
