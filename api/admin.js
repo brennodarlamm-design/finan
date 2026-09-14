@@ -429,17 +429,26 @@ export default async function handler(req, res) {
       `;
 
       const clusters = await sql`
+        WITH grouped AS (
+          SELECT
+            LEFT(message, 140) AS signature,
+            COALESCE(source, '—') AS source,
+            id,
+            tenant_id,
+            created_at
+          FROM client_error_logs
+          WHERE created_at >= NOW() - INTERVAL '7 days'
+        )
         SELECT
-          MD5(CONCAT(LEFT(message, 120), ':', COALESCE(source, ''))) AS cluster_id,
-          LEFT(message, 140) AS signature,
-          COALESCE(source, '—') AS source,
+          MD5(CONCAT(signature, ':', source)) AS cluster_id,
+          signature,
+          source,
           COUNT(*)::int AS count,
           COUNT(DISTINCT tenant_id)::int AS affected_tenants,
           MAX(created_at) AS last_seen,
           MIN(created_at) AS first_seen,
           MAX(id) AS sample_id
-        FROM client_error_logs
-        WHERE created_at >= NOW() - INTERVAL '7 days'
+        FROM grouped
         GROUP BY signature, source
         ORDER BY count DESC, last_seen DESC
         LIMIT 15;
