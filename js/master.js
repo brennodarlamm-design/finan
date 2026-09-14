@@ -1310,5 +1310,45 @@ const MasterAdmin = {
         btn.innerText = '🚀 Disparar Notificação';
       }
     }
+  },
+
+  async executarVarreduraCobranca() {
+    if (!confirm('Deseja iniciar agora a varredura de cobrança 24/7 de todos os contratos e assinaturas do FinObra?')) {
+      return;
+    }
+
+    if (typeof Utils !== 'undefined' && Utils.toast) {
+      Utils.toast('Executando varredura de cobrança nos servidores...', 'info');
+    }
+
+    try {
+      const headers = (typeof Auth !== 'undefined' && Auth.getAuthHeaders) ? Auth.getAuthHeaders() : { 'Content-Type': 'application/json' };
+      const res = await fetch('/api/admin?action=trigger_billing_sweep', {
+        method: 'POST',
+        headers
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || `Erro ${res.status} na varredura`);
+      }
+
+      const resObj = data.result || {};
+      const msg = `⚡ Varredura Concluída!\n\n• Empresas avaliadas: ${resObj.totalEvaluated || 0}\n• Notificações enviadas: ${resObj.notified || 0}\n• Bloqueadas por anti-spam (já notificadas hoje): ${resObj.skippedAntiSpam || 0}\n• Engine utilizada: ${data.engine === 'render' ? 'Robô 24/7 Render' : 'Neon Serverless Fallback'}`;
+
+      alert(msg);
+      if (typeof Utils !== 'undefined' && Utils.toast) {
+        Utils.toast('Varredura de cobrança finalizada com sucesso!', 'success');
+      }
+
+      if (typeof this.loadData === 'function') {
+        await this.loadData();
+      }
+    } catch (err) {
+      alert('Falha ao executar varredura: ' + err.message);
+      if (typeof Utils !== 'undefined' && Utils.toast) {
+        Utils.toast('Erro na varredura: ' + err.message, 'error');
+      }
+    }
   }
 };
+

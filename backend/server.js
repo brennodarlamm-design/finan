@@ -1115,6 +1115,439 @@ app.post('/cron/daily-summary', requireAuth, async (req, res) => {
   }
 });
 
+// ── AUTOMAÇÃO DE COBRANÇA DE ASSINATURAS SAAS (PATCH 42) ───────────────────
+
+function escapeHtmlServer(str) {
+  return String(str || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
+function renderBillingEmailHtmlServer(vars) {
+  const empresa = escapeHtmlServer(vars.EMPRESA);
+  const responsavel = escapeHtmlServer(vars.RESPONSAVEL);
+  const plano = escapeHtmlServer(vars.PLANO);
+  const valor = escapeHtmlServer(vars.VALOR);
+  const vencimento = escapeHtmlServer(vars.VENCIMENTO);
+  const situacao = escapeHtmlServer(vars.SITUACAO);
+  const badgeStatus = escapeHtmlServer(vars.BADGE_STATUS);
+  const tituloAviso = escapeHtmlServer(vars.TITULO_AVISO);
+  const pixChave = escapeHtmlServer(vars.PIX_CHAVE);
+  const pixBeneficiario = escapeHtmlServer(vars.PIX_BENEFICIARIO);
+  const mensagemExtra = escapeHtmlServer(vars.MENSAGEM_EXTRA).replace(/\r?\n/g, '<br>');
+  const linkAcesso = encodeURI(vars.LINK_ACESSO || 'https://finobra.app.br/login');
+
+  return `<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Assinatura FinObra — ${empresa}</title>
+</head>
+<body style="margin:0;padding:0;background:#0f172a;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#1e293b;">
+  <div style="background:#0f172a;padding:36px 16px;min-height:100vh;">
+    <div style="max-width:580px;margin:0 auto;background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 12px 36px rgba(0,0,0,0.35);">
+      <div style="background:linear-gradient(135deg, #09121d 0%, #152438 100%);padding:28px 32px;border-bottom:3px solid #c9a227;">
+        <table style="width:100%;border-collapse:collapse;">
+          <tr>
+            <td>
+              <div style="font-size:24px;font-weight:900;color:#ffffff;letter-spacing:-0.5px;">
+                Fin<span style="color:#c9a227;">Obra</span>
+              </div>
+              <div style="font-size:12px;color:#94a3b8;margin-top:4px;text-transform:uppercase;letter-spacing:0.08em;font-weight:600;">
+                Faturamento &amp; Assinaturas SaaS
+              </div>
+            </td>
+            <td style="text-align:right;">
+              <span style="display:inline-block;padding:6px 12px;background:rgba(201,162,39,0.18);border:1px solid rgba(201,162,39,0.45);border-radius:20px;font-size:11px;font-weight:800;color:#facc15;text-transform:uppercase;">
+                ${badgeStatus}
+              </span>
+            </td>
+          </tr>
+        </table>
+      </div>
+      <div style="padding:32px 32px 28px;">
+        <h1 style="margin:0 0 10px;font-size:20px;font-weight:800;color:#0f172a;line-height:1.35;">
+          ${tituloAviso}
+        </h1>
+        <p style="margin:0 0 20px;font-size:14px;line-height:1.6;color:#475569;">
+          Olá, <strong>${responsavel}</strong>! Seguem as informações referentes à renovação da assinatura da empresa <strong>${empresa}</strong> no FinObra:
+        </p>
+        <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:18px 20px;margin-bottom:24px;">
+          <table style="width:100%;border-collapse:collapse;font-size:13px;">
+            <tr>
+              <td style="padding:6px 0;color:#64748b;">Empresa:</td>
+              <td style="padding:6px 0;font-weight:700;color:#0f172a;text-align:right;">${empresa}</td>
+            </tr>
+            <tr>
+              <td style="padding:6px 0;color:#64748b;">Plano Contratado:</td>
+              <td style="padding:6px 0;font-weight:700;color:#0f172a;text-align:right;">${plano}</td>
+            </tr>
+            <tr>
+              <td style="padding:6px 0;color:#64748b;">Vencimento:</td>
+              <td style="padding:6px 0;font-weight:700;color:#2563eb;text-align:right;">${vencimento} (${situacao})</td>
+            </tr>
+            <tr>
+              <td style="padding:6px 0;color:#64748b;">Valor da Mensalidade:</td>
+              <td style="padding:6px 0;font-weight:800;color:#059669;font-size:16px;text-align:right;">R$ ${valor}</td>
+            </tr>
+          </table>
+        </div>
+        <div style="background:#fefce8;border:2px dashed #ca8a04;border-radius:12px;padding:20px;margin-bottom:24px;text-align:center;">
+          <div style="font-size:11px;font-weight:800;color:#854d0e;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:6px;">
+            Pagamento Instantâneo via PIX
+          </div>
+          <div style="font-family:monospace;font-size:15px;font-weight:800;color:#0f172a;background:#ffffff;padding:10px 14px;border-radius:8px;border:1px solid #e2e8f0;display:inline-block;margin:6px 0;word-break:break-all;">
+            ${pixChave}
+          </div>
+          <div style="font-size:12px;color:#713f12;margin-top:6px;">
+            Beneficiário: <strong>${pixBeneficiario}</strong>
+          </div>
+        </div>
+        <div style="text-align:center;margin:28px 0 10px;">
+          <a href="${linkAcesso}" style="display:inline-block;background:#0f172a;color:#ffffff;font-size:14px;font-weight:700;text-decoration:none;padding:14px 28px;border-radius:10px;box-shadow:0 4px 14px rgba(15,23,42,0.35);">
+            Acessar Painel FinObra &rarr;
+          </a>
+        </div>
+      </div>
+      <div style="background:#f1f5f9;padding:18px 32px;border-top:1px solid #e2e8f0;font-size:11px;color:#64748b;text-align:center;line-height:1.5;">
+        FinObra — Sistema de Gestão Financeira para Construção Civil.<br>
+        Em caso de dúvidas ou emissão de NF, responda a este e-mail ou entre em contato pelo WhatsApp oficial.
+      </div>
+    </div>
+  </div>
+</body>
+</html>`;
+}
+
+function isWithinBusinessHours() {
+  const now = new Date();
+  const hour = Number(new Intl.DateTimeFormat('pt-BR', { timeZone: 'America/Boa_Vista', hour: 'numeric', hourCycle: 'h23' }).format(now));
+  const weekday = new Intl.DateTimeFormat('en-US', { timeZone: 'America/Boa_Vista', weekday: 'short' }).format(now);
+  if (weekday === 'Sun') return false;
+  const startHour = Number(process.env.BILLING_WINDOW_START_HOUR || 9);
+  const endHour = Number(process.env.BILLING_WINDOW_END_HOUR || 18);
+  return hour >= startHour && hour < endHour;
+}
+
+async function executarVarreduraCobranca({ manualTrigger = false, forcedTenantId = null } = {}) {
+  if (!sql) {
+    console.warn('⚠️ [BillingCron] Banco Neon não inicializado.');
+    return { success: false, error: 'Database not initialized' };
+  }
+
+  if (!manualTrigger && !isWithinBusinessHours()) {
+    console.log('⏰ [BillingCron] Fora do horário comercial permitido (09h às 18h seg-sáb). Varredura automática suspensa.');
+    return { executed: false, reason: 'outside_business_hours' };
+  }
+
+  const hoje = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Boa_Vista', year: 'numeric', month: '2-digit', day: '2-digit'
+  }).format(new Date());
+
+  console.log(`\n======================================================`);
+  console.log(`🤖 [BillingCron] INICIANDO VARREDURA DE COBRANÇAS (${hoje})`);
+  console.log(`Modo: ${manualTrigger ? 'MANUAL / TESTE' : 'AUTOMÁTICO 24/7'}`);
+  console.log(`======================================================`);
+
+  let tenants = [];
+  if (forcedTenantId) {
+    tenants = await sql`
+      SELECT id, razao_social, nome_fantasia, telefone, email, responsavel, plano, status, vencimento
+      FROM tenants WHERE id = ${forcedTenantId};
+    `;
+  } else {
+    tenants = await sql`
+      SELECT id, razao_social, nome_fantasia, telefone, email, responsavel, plano, status, vencimento
+      FROM tenants 
+      WHERE status NOT IN ('cancelado', 'arquivado') AND vencimento IS NOT NULL
+      ORDER BY vencimento ASC;
+    `;
+  }
+
+  const summary = {
+    totalEvaluated: tenants.length,
+    notified: 0,
+    skippedAntiSpam: 0,
+    ignoredNoMatch: 0,
+    errors: 0,
+    details: []
+  };
+
+  const PLANOS_INFO = {
+    starter: { nome: 'Básico', valor: '119,90' },
+    pro: { nome: 'Profissional', valor: '279,90' },
+    unlimited: { nome: 'Ilimitado', valor: '499,90' },
+    trial: { nome: 'Trial (Período de Testes)', valor: '279,90' }
+  };
+
+  const pixKey = String(process.env.FINOBRA_PIX_KEY || process.env.FINOBRA_SUPPORT_WHATSAPP || '5595991363678').trim();
+  const pixBeneficiary = String(process.env.FINOBRA_PIX_BENEFICIARY || 'FinObra Soluções Tecnológicas').trim();
+  const resendKey = String(process.env.RESEND_API_KEY || '').trim();
+  const emailFrom = String(process.env.FINOBRA_SUPPORT_EMAIL_FROM || 'FinObra <suporte@finobra.app.br>').trim();
+
+  // Sessão WhatsApp de disparo (Master/Angelim)
+  const masterSession = getTenantSession('angelim') || (TARGET_TENANT_ID ? getTenantSession(TARGET_TENANT_ID) : null);
+  const whatsappReady = Boolean(masterSession && masterSession.connectionStatus === 'connected' && masterSession.sock);
+
+  for (const t of tenants) {
+    const nomeEmpresa = t.nome_fantasia || t.razao_social || t.id;
+    const responsavel = t.responsavel || 'Gestor(a)';
+    const destPhone = String(t.telefone || '').replace(/\D/g, '');
+    const destEmail = String(t.email || '').trim();
+    const planoInfo = PLANOS_INFO[t.plano] || { nome: String(t.plano || 'Profissional').toUpperCase(), valor: '279,90' };
+
+    // Cálculo de dias
+    const parts = String(t.vencimento).split('-');
+    const fmtVenc = parts.length === 3 ? `${parts[2]}/${parts[1]}/${parts[0]}` : String(t.vencimento);
+    const vencDate = new Date(`${parts[0]}-${parts[1]}-${parts[2]}T00:00:00`);
+    const todayDate = new Date(`${hoje}T00:00:00`);
+    const diasRestantes = Math.round((vencDate.getTime() - todayDate.getTime()) / (1000 * 60 * 60 * 24));
+
+    let stage = null;
+    let templateType = null;
+    let situacaoTxt = '';
+    let badgeStatus = 'Aviso';
+
+    if (t.plano === 'trial' && diasRestantes <= 2 && diasRestantes >= 0) {
+      stage = 'trial_ending';
+      templateType = 'trial_ending';
+      situacaoTxt = diasRestantes === 0 ? 'termina hoje' : `termina em ${diasRestantes} dia(s)`;
+      badgeStatus = 'Fim do Trial';
+    } else if (diasRestantes === 10) {
+      stage = 'reminder_10d';
+      templateType = 'reminder';
+      situacaoTxt = 'vence em 10 dias';
+      badgeStatus = 'Vence em 10d';
+    } else if (diasRestantes === 3) {
+      stage = 'reminder_3d';
+      templateType = 'reminder';
+      situacaoTxt = 'vence em 3 dias';
+      badgeStatus = 'Vence em 3d';
+    } else if (diasRestantes === 0) {
+      stage = 'due_today';
+      templateType = 'due_today';
+      situacaoTxt = 'vence hoje';
+      badgeStatus = 'Vence Hoje';
+    } else if (diasRestantes === -1) {
+      stage = 'overdue_1d';
+      templateType = 'overdue';
+      situacaoTxt = 'vencido há 1 dia';
+      badgeStatus = 'Vencido há 1d';
+    } else if (diasRestantes === -5) {
+      stage = 'overdue_5d';
+      templateType = 'overdue';
+      situacaoTxt = 'vencido há 5 dias';
+      badgeStatus = 'Vencido há 5d';
+    }
+
+    if (!stage) {
+      summary.ignoredNoMatch++;
+      continue;
+    }
+
+    // ── CHECK ANTI-SPAM / IDEMPOTÊNCIA ──────────────────────────────
+    const alreadySent = await sql`
+      SELECT id FROM billing_notifications_sent
+      WHERE tenant_id = ${t.id} AND stage = ${stage} AND sent_date = ${hoje}::date
+      LIMIT 1;
+    `;
+
+    if (alreadySent.length > 0 && !manualTrigger) {
+      console.log(`ℹ️ [BillingCron:${t.id}] Já notificado hoje sobre estágio "${stage}". Anti-spam ativado.`);
+      summary.skippedAntiSpam++;
+      summary.details.push({ tenant_id: t.id, stage, status: 'skipped_anti_spam' });
+      continue;
+    }
+
+    // Monta texto das mensagens
+    let defaultSubject = `FinObra — Assinatura ${nomeEmpresa}`;
+    let finalMessage = '';
+    let defaultTituloAviso = `Assinatura FinObra — ${nomeEmpresa}`;
+
+    if (templateType === 'reminder') {
+      defaultSubject = `🔔 FinObra — Lembrete de Renovação de Assinatura (${fmtVenc})`;
+      defaultTituloAviso = `Lembrete de Renovação — ${situacaoTxt}`;
+      finalMessage = `Olá, ${responsavel}! 👋\n\nPassando para lembrar que a assinatura do *FinObra* da empresa *${nomeEmpresa}* (Plano ${planoInfo.nome}) vence em *${fmtVenc}* (${situacaoTxt}).\n\n💰 *Valor:* R$ ${planoInfo.valor}\n🔑 *Chave PIX:* ${pixKey}\n👤 *Beneficiário:* ${pixBeneficiary}\n\nQualquer dúvida ou caso precise de emissão de NF, estamos à disposição!`;
+    } else if (templateType === 'due_today') {
+      defaultSubject = `⚠️ FinObra — Sua assinatura vence hoje (${fmtVenc})`;
+      defaultTituloAviso = `Sua assinatura vence hoje (${fmtVenc})`;
+      finalMessage = `Olá, ${responsavel}! 🔔\n\nA assinatura do *FinObra* da empresa *${nomeEmpresa}* vence *hoje (${fmtVenc})*.\n\nPara garantir a continuidade dos acessos da sua equipe e sincronização das obras sem interrupção:\n\n💰 *Valor:* R$ ${planoInfo.valor}\n🔑 *Chave PIX:* ${pixKey}\n👤 *Beneficiário:* ${pixBeneficiary}\n\nApós o pagamento via PIX, a renovação é confirmada e os acessos continuam ativos normalmente.`;
+    } else if (templateType === 'overdue') {
+      defaultSubject = `🚨 FinObra — Aviso de Vencimento e Regularização de Acesso`;
+      defaultTituloAviso = `Aviso de Regularização — ${situacaoTxt}`;
+      finalMessage = `Olá, ${responsavel}! ⚠️\n\nIdentificamos que a assinatura do *FinObra* da empresa *${nomeEmpresa}* venceu em *${fmtVenc}* (${situacaoTxt}) e consta pendente.\n\nPara evitar o bloqueio preventivo dos acessos, emissão de relatórios e sincronização no canteiro de obras, solicitamos a regularização:\n\n💰 *Valor:* R$ ${planoInfo.valor}\n🔑 *Chave PIX:* ${pixKey}\n👤 *Beneficiário:* ${pixBeneficiary}\n\nSe já realizou o pagamento, por favor desconsidere este aviso ou nos envie o comprovante!`;
+    } else if (templateType === 'trial_ending') {
+      defaultSubject = `🚀 FinObra — Seu período de testes termina em ${fmtVenc}`;
+      defaultTituloAviso = `Seu período de testes está terminando em ${fmtVenc}`;
+      finalMessage = `Olá, ${responsavel}! 🚀\n\nSeu período de teste gratuito do *FinObra* na empresa *${nomeEmpresa}* termina em *${fmtVenc}*.\n\nEsperamos que a plataforma esteja transformando a gestão das suas obras! Para continuar utilizando todos os recursos com a sua equipe:\n\n👉 Conheça os planos e assine: https://finobra.app.br/app.html#planos\n💰 *Valor de referência:* R$ ${planoInfo.valor}/mês (${planoInfo.nome})\n🔑 *Chave PIX:* ${pixKey}\n👤 *Beneficiário:* ${pixBeneficiary}\n\nEstamos à disposição para ajudar na escolha do melhor plano!`;
+    }
+
+    let channelUsed = 'none';
+    let wpSuccess = false;
+    let emailSuccess = false;
+
+    // Disparo WhatsApp
+    if (destPhone && destPhone.length >= 10 && whatsappReady) {
+      try {
+        const jid = await resolveWhatsAppJid(masterSession, destPhone);
+        await masterSession.sock.sendMessage(jid, { text: finalMessage });
+        wpSuccess = true;
+        channelUsed = 'whatsapp';
+        console.log(`✅ [BillingCron:${t.id}] WhatsApp enviado para ${destPhone} (estágio: ${stage})`);
+      } catch (wpErr) {
+        console.warn(`⚠️ [BillingCron:${t.id}] Falha ao enviar WhatsApp:`, wpErr.message);
+      }
+    }
+
+    // Disparo E-mail
+    if (destEmail && destEmail.includes('@') && resendKey) {
+      try {
+        const html = renderBillingEmailHtmlServer({
+          EMPRESA: nomeEmpresa,
+          RESPONSAVEL: responsavel,
+          PLANO: planoInfo.nome,
+          VALOR: planoInfo.valor,
+          VENCIMENTO: fmtVenc,
+          SITUACAO: situacaoTxt,
+          BADGE_STATUS: badgeStatus,
+          TITULO_AVISO: defaultTituloAviso,
+          PIX_CHAVE: pixKey,
+          PIX_BENEFICIARIO: pixBeneficiary,
+          MENSAGEM_EXTRA: finalMessage,
+          LINK_ACESSO: 'https://finobra.app.br/login'
+        });
+
+        const res = await fetch('https://api.resend.com/emails', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${resendKey}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            from: emailFrom,
+            to: [destEmail],
+            subject: defaultSubject,
+            html
+          })
+        });
+        if (res.ok) {
+          emailSuccess = true;
+          channelUsed = wpSuccess ? 'both' : 'email';
+          console.log(`✅ [BillingCron:${t.id}] E-mail enviado para ${destEmail} (estágio: ${stage})`);
+        } else {
+          const errText = await res.text().catch(() => '');
+          console.warn(`⚠️ [BillingCron:${t.id}] Falha no envio de e-mail (${res.status}):`, errText);
+        }
+      } catch (emErr) {
+        console.warn(`⚠️ [BillingCron:${t.id}] Erro de rede no Resend:`, emErr.message);
+      }
+    }
+
+    // Grava registro de idempotência e auditoria
+    if (wpSuccess || emailSuccess) {
+      try {
+        await sql`
+          INSERT INTO billing_notifications_sent (
+            tenant_id, stage, channel, sent_date, recipient_phone, recipient_email, status, metadata
+          ) VALUES (
+            ${t.id}, ${stage}, ${channelUsed}, ${hoje}::date, ${destPhone}, ${destEmail}, 'sent',
+            ${JSON.stringify({ diasRestantes, plano: t.plano, vencimento: t.vencimento, wpSuccess, emailSuccess })}::jsonb
+          ) ON CONFLICT (tenant_id, stage, sent_date) DO UPDATE SET
+            status = 'sent',
+            channel = EXCLUDED.channel,
+            metadata = EXCLUDED.metadata;
+        `;
+
+        await sql`
+          INSERT INTO audit_logs (tenant_id, user_email, action, details, ip_address)
+          VALUES (
+            ${t.id}, 'billing-cron@finobra.app.br', 'cobranca_automatica_enviada',
+            ${JSON.stringify({ stage, channel: channelUsed, diasRestantes, empresa: nomeEmpresa, destPhone, destEmail })}::jsonb,
+            '127.0.0.1'
+          );
+        `;
+        summary.notified++;
+        summary.details.push({ tenant_id: t.id, stage, channel: channelUsed, status: 'notified' });
+      } catch (dbErr) {
+        console.error(`❌ [BillingCron:${t.id}] Erro ao gravar registro de cobrança:`, dbErr.message);
+        summary.errors++;
+      }
+    } else {
+      summary.errors++;
+      summary.details.push({ tenant_id: t.id, stage, status: 'failed_dispatch' });
+    }
+  }
+
+  console.log(`🏁 [BillingCron] Varredura finalizada. Notificados: ${summary.notified}, Ignorados: ${summary.ignoredNoMatch}, Anti-Spam: ${summary.skippedAntiSpam}, Erros: ${summary.errors}`);
+  return { success: true, ...summary };
+}
+
+// Agendado para segunda a sexta às 09:30 no fuso de Boa Vista / Brasília
+cron.schedule('30 9 * * 1-5', async () => {
+  if (process.env.BILLING_CRON_ENABLED === 'false') {
+    console.log('ℹ️ [BillingCron] Automação de cobrança desativada via BILLING_CRON_ENABLED=false');
+    return;
+  }
+  try {
+    await executarVarreduraCobranca();
+  } catch (err) {
+    console.error('❌ [BillingCron] Falha no cron diário de cobrança:', err?.message || err);
+  }
+}, {
+  timezone: 'America/Boa_Vista',
+  noOverlap: true,
+  name: 'finobra-billing-sweep'
+});
+
+// Endpoint para disparo manual e teste sob demanda pelo SuperAdmin
+app.post('/cron/billing-sweep', requireAuth, async (req, res) => {
+  const forcedTenantId = req.body?.tenantId || req.query?.tenant_id || null;
+  try {
+    const result = await executarVarreduraCobranca({ manualTrigger: true, forcedTenantId });
+    return res.json({ success: true, ...result });
+  } catch (err) {
+    console.error('❌ [BillingCron] Falha na execução manual da varredura:', err);
+    return res.status(500).json({ success: false, error: 'Não foi possível executar a varredura de cobrança no momento.' });
+  }
+});
+
+// Endpoint para consulta do status do robô de cobrança e histórico do dia
+app.get('/cron/billing-status', requireAuth, async (req, res) => {
+  if (!sql) return res.status(500).json({ success: false, error: 'Database not initialized' });
+  try {
+    const hoje = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'America/Boa_Vista', year: 'numeric', month: '2-digit', day: '2-digit'
+    }).format(new Date());
+
+    const sentToday = await sql`
+      SELECT b.*, COALESCE(t.nome_fantasia, t.razao_social, b.tenant_id) as empresa_nome
+      FROM billing_notifications_sent b
+      LEFT JOIN tenants t ON t.id = b.tenant_id
+      WHERE b.sent_date = ${hoje}::date
+      ORDER BY b.created_at DESC;
+    `;
+
+    return res.json({
+      success: true,
+      active: process.env.BILLING_CRON_ENABLED !== 'false',
+      schedule: '09:30 (Seg-Sex, America/Boa_Vista)',
+      date: hoje,
+      within_business_hours: isWithinBusinessHours(),
+      total_sent_today: sentToday.length,
+      notifications_today: sentToday
+    });
+  } catch (err) {
+    console.error('❌ [BillingCron] Falha na consulta de status da cobrança:', err);
+    return res.status(500).json({ success: false, error: 'Não foi possível consultar o status da cobrança no momento.' });
+  }
+});
+
+
+
 // ── KEEP-ALIVE SELF-PING (EVITA SLEEP NO RENDER FREE TIER) ─────────────────
 const RENDER_EXTERNAL_URL = process.env.RENDER_EXTERNAL_URL || 'https://finan-wf12.onrender.com';
 cron.schedule('*/10 * * * *', async () => {

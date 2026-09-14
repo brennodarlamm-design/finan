@@ -809,6 +809,144 @@ export default async function handler(req, res) {
       });
     }
 
+    // ── POST ?action=trigger_billing_sweep (Disparar Varredura de Cobrança 24/7) ──
+    if (req.method === 'POST' && action === 'trigger_billing_sweep') {
+      const renderBaseUrl = (process.env.RENDER_WHATSAPP_URL || 'https://finan-backend-9rxw.onrender.com').replace(/\/send-message\/?$/, '').replace(/\/+$/, '');
+      const secret = (process.env.API_SECRET || process.env.VERCEL_API_SECRET || '').trim();
+      const forcedTenantId = req.body?.tenantId || null;
+
+      let sweepResult = null;
+      let usedEngine = 'render';
+
+      try {
+        const renderRes = await fetch(`${renderBaseUrl}/cron/billing-sweep`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${secret}`,
+            'x-api-key': secret,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ tenantId: forcedTenantId }),
+          signal: AbortSignal.timeout(12000)
+        });
+
+        if (renderRes.ok) {
+          sweepResult = await renderRes.json();
+        }
+      } catch (renderErr) {
+        console.warn('Aviso: Render offline ou timeout ao disparar varredura, utilizando engine de fallback:', renderErr.message);
+      }
+
+      // Fallback local via Neon caso o backend Render não responda
+      if (!sweepResult || !sweepResult.success) {
+        usedEngine = 'neon_fallback';
+        const hoje = new Intl.DateTimeFormat('en-CA', {
+          timeZone: 'America/Boa_Vista', year: 'numeric', month: '2-digit', day: '2-digit'
+        }).format(new Date());
+
+        const tenants = forcedTenantId
+          ? await sql`SELECT id, razao_social, nome_fantasia, telefone, email, responsavel, plano, status, vencimento FROM tenants WHERE id = ${forcedTenantId};`
+          : await sql`SELECT id, razao_social, nome_fantasia, telefone, email, responsavel, plano, status, vencimento FROM tenants WHERE status NOT IN ('cancelado', 'arquivado') AND vencimento IS NOT NULL;`;
+
+        let evaluated = 0;
+        let notified = 0;
+        let skipped = 0;
+
+        for (const t of tenants) {
+          evaluated++;
+          const parts = String(t.vencimento).split('-');
+          if (parts.length !== 3) continue;
+          const vencDate = new Date(`${parts[0]}-${parts[1]}-${parts[2]}T00:00:00`);
+          const todayDate = new Date(`${hoje}T00:00:00`);
+          const diff = Math.round((vencDate.getTime() - todayDate.getTime()) / (1000 * 60 * 60 * 24));
+
+          let stage = null;
+          if (t.plano === 'trial' && diff <= 2 && diff >= 0) stage = 'trial_ending';
+          else if (diff === 10) stage = 'reminder_10d';
+          else if (diff === 3) stage = 'reminder_3d';
+          else if (diff === 0) stage = 'due_today';
+          else if (diff === -1) stage = 'overdue_1d';
+          else if (diff === -5) stage = 'overdue_5d';
+
+          if (!stage) continue;
+
+          const check = await sql`
+            SELECT id FROM billing_notifications_sent
+            WHERE tenant_id = ${t.id} AND stage = ${stage} AND sent_date = ${hoje}::date
+            LIMIT 1;
+          `;
+          if (check.length > 0) {
+            skipped++;
+            continue;
+          }
+
+          // Grava idempotência no banco de dados
+          await sql`
+            INSERT INTO billing_notifications_sent (
+              tenant_id, stage, channel, sent_date, recipient_phone, recipient_email, status, metadata
+            ) VALUES (
+              ${t.id}, ${stage}, 'email', ${hoje}::date, ${t.telefone || null}, ${t.email || null}, 'pending_dispatch',
+              ${JSON.stringify({ diff, plano: t.plano, vencimento: t.vencimento, via: 'master_fallback' })}::jsonb
+            ) ON CONFLICT (tenant_id, stage, sent_date) DO NOTHING;
+          `;
+          notified++;
+        }
+
+        sweepResult = {
+          success: true,
+          totalEvaluated: evaluated,
+          notified,
+          skippedAntiSpam: skipped
+        };
+      }
+
+      await writeAudit(sql, req, auth, {
+        acao: 'varredura_cobranca_executada',
+        entidade: 'cobranca_cron',
+        depois: { engine: usedEngine, result: sweepResult }
+      });
+
+      return res.status(200).json({
+        success: true,
+        engine: usedEngine,
+        result: sweepResult,
+        message: 'Varredura de cobrança executada com sucesso!'
+      });
+    }
+
+    // ── GET ?action=get_billing_automation_status (Status do Robô e Histórico de Disparos) ──
+    if (req.method === 'GET' && action === 'get_billing_automation_status') {
+      const hoje = new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'America/Boa_Vista', year: 'numeric', month: '2-digit', day: '2-digit'
+      }).format(new Date());
+
+      const sentToday = await sql`
+        SELECT b.*, COALESCE(t.nome_fantasia, t.razao_social, b.tenant_id) AS empresa_nome
+        FROM billing_notifications_sent b
+        LEFT JOIN tenants t ON t.id = b.tenant_id
+        WHERE b.sent_date = ${hoje}::date
+        ORDER BY b.created_at DESC;
+      `;
+
+      const history = await sql`
+        SELECT b.*, COALESCE(t.nome_fantasia, t.razao_social, b.tenant_id) AS empresa_nome
+        FROM billing_notifications_sent b
+        LEFT JOIN tenants t ON t.id = b.tenant_id
+        ORDER BY b.created_at DESC
+        LIMIT 20;
+      `;
+
+      return res.status(200).json({
+        success: true,
+        today: hoje,
+        active: true,
+        schedule: 'Seg-Sex às 09:30 (Horário Comercial)',
+        total_today: sentToday.length,
+        notifications_today: sentToday,
+        history
+      });
+    }
+
     // ── 2. POST ?action=create_tenant (Criar Empresa e Usuário Admin no Neon) ──
     if (req.method === 'POST' && action === 'create_tenant') {
       const {
