@@ -717,7 +717,6 @@ export default async function handler(req, res) {
         }
       });
     }
-    }
 
     // ── 3. POST /api/auth?action=register (Cadastro de novo Tenant SaaS no Neon) ─
     if (req.method === 'POST' && action === 'register') {
