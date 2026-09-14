@@ -1,7 +1,7 @@
 // js/orcamentos.js — Módulo de Orçamentos Premium (Previsto × Realizado por Categorias & SINAPI)
 
 const Orcamentos = {
-  _activeTab: 'etapas',
+  _activeTab: 'sinapi',
   _filterObraId: null,
   _filterSearch: '',
   _filterStatus: 'todos',
@@ -73,13 +73,24 @@ const Orcamentos = {
     this._filterObraId = obraId || App.obraId || 'todas';
     return `
     <div>
-      <div style="display:flex;gap:0;border-bottom:2px solid var(--border);margin-bottom:24px;">
-        <button id="tab-etapas" class="orc-tab${this._activeTab==='etapas'?' orc-tab-active':''}" data-fb-click="Orcamentos._switchTab" data-fb-click-n="2" data-fb-click-t0="string" data-fb-click-v0="etapas" data-fb-click-t1="string" data-fb-click-v1="${encodeURIComponent(String(Utils.escapeHtml(this._filterObraId)))}">
-          📊 Previsto × Realizado por Categorias
-        </button>
-        <button id="tab-sinapi" class="orc-tab${this._activeTab==='sinapi'?' orc-tab-active':''}" data-fb-click="Orcamentos._switchTab" data-fb-click-n="2" data-fb-click-t0="string" data-fb-click-v0="sinapi" data-fb-click-t1="string" data-fb-click-v1="${encodeURIComponent(String(Utils.escapeHtml(this._filterObraId)))}">
-          🏗️ Orçamentos SINAPI
-        </button>
+      <div style="display:flex;align-items:center;justify-content:space-between;border-bottom:2px solid var(--border);margin-bottom:24px;flex-wrap:wrap;gap:12px;">
+        <div style="display:flex;gap:0;">
+          <button id="tab-sinapi" class="orc-tab${this._activeTab==='sinapi'?' orc-tab-active':''}" data-fb-click="Orcamentos._switchTab" data-fb-click-n="2" data-fb-click-t0="string" data-fb-click-v0="sinapi" data-fb-click-t1="string" data-fb-click-v1="${encodeURIComponent(String(Utils.escapeHtml(this._filterObraId)))}">
+            🏗️ Orçamentos SINAPI &amp; Multi-Bancos
+          </button>
+          <button id="tab-etapas" class="orc-tab${this._activeTab==='etapas'?' orc-tab-active':''}" data-fb-click="Orcamentos._switchTab" data-fb-click-n="2" data-fb-click-t0="string" data-fb-click-v0="etapas" data-fb-click-t1="string" data-fb-click-v1="${encodeURIComponent(String(Utils.escapeHtml(this._filterObraId)))}">
+            📊 Previsto × Realizado por Categorias
+          </button>
+        </div>
+
+        <div style="display:flex;gap:8px;padding-bottom:6px;">
+          <button type="button" class="btn btn-secondary btn-sm" style="font-weight:700;font-size:.8rem;display:flex;align-items:center;gap:6px;" data-fb-click="OrcamentoTemplates.abrirModalCatalogo" data-fb-click-n="0">
+            🌟 Modelos Prontos
+          </button>
+          <button type="button" class="btn btn-secondary btn-sm" style="font-weight:700;font-size:.8rem;display:flex;align-items:center;gap:6px;" data-fb-click="OrcamentoBancos.abrirModal" data-fb-click-n="0">
+            ⚙️ Períodos Utilizados
+          </button>
+        </div>
       </div>
       <div id="orc-tab-content">
         ${this._renderTab(this._activeTab, this._filterObraId)}

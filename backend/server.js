@@ -15,6 +15,7 @@ import pino from 'pino';
 import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
+import { createSinapiRouter, initSinapiDatabase } from './sinapi_robot.js';
 
 dotenv.config({ path: '.env.local' });
 dotenv.config();
@@ -46,6 +47,10 @@ app.use(cors({
 
 app.use(express.json({ limit: '12mb' }));
 app.use(express.urlencoded({ extended: true, limit: '12mb' }));
+
+// Micro-API SINAPI e Bancos de Preço Referenciais
+app.use('/api/sinapi', createSinapiRouter());
+initSinapiDatabase().catch(e => console.warn('Aviso initSinapiDatabase:', e.message));
 
 // Middleware de autenticação interna para proteger rotas críticas.
 // Segredos de API são aceitos SOMENTE em headers — nunca em query string.
