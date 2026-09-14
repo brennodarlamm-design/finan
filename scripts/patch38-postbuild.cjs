@@ -71,4 +71,8 @@ if (!builtHome.includes('href="/" aria-label="FinObra"') || !builtHome.includes(
   throw new Error('Patch 38: landing final sem canonicalização/metadata esperada.');
 }
 
-console.log('✅ Patch 38 pós-build: SEO, canonical e mobile auth aplicados ao dist.');
+if (!fs.existsSync(path.join(dist, 'robots.txt')) || !fs.existsSync(path.join(dist, 'sitemap.xml'))) {
+  throw new Error('Patch 48: dist sem robots.txt ou sitemap.xml.');
+}
+
+console.log('✅ Patch 38 pós-build: SEO, canonical, mobile auth, robots.txt e sitemap.xml aplicados ao dist.');

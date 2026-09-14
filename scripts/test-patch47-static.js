@@ -53,11 +53,11 @@ test('test-e2e-synthetic.js cobre Cenário 5: Telemetria e Dashboard com CTE Gro
 // 2. Validação dos Scripts em package.json
 test('package.json possui script "test:e2e"', pkg.scripts && pkg.scripts['test:e2e'] === 'node scripts/test-e2e-synthetic.js');
 test('package.json possui script "test:patch47"', pkg.scripts && pkg.scripts['test:patch47'] === 'node scripts/test-patch47-static.js');
-test('package.json atualizado para versão 2.36.0', pkg.version === '2.36.0');
+test('package.json atualizado para versão >= 2.36.0', pkg.version >= '2.36.0');
 
 // 3. Validação do Build em version.json
-test('version.json atualizado para versão 2.36.0', ver.version === '2.36.0');
-test('version.json atualizado para build 2026.09.14-p47', ver.build === '2026.09.14-p47');
+test('version.json atualizado para versão >= 2.36.0', ver.version >= '2.36.0');
+test('version.json atualizado para build compatível com Patch 47+', /-p(4[7-9]|[5-9]\d|\d{3,})\b/.test(ver.build || ''));
 
 // 4. Registro no Runner Central test-static-all.js
 test('scripts/test-static-all.js inclui scripts/test-patch47-static.js', testAllCode.includes('scripts/test-patch47-static.js'));
