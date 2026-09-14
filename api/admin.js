@@ -515,6 +515,75 @@ export default async function handler(req, res) {
       return res.status(200).json({ success:true, invoices:rows, summary:summaryRows[0] || {} });
     }
 
+    // ── Gestão de Contas Bancárias e Conciliação Multi-Tenant ─────────────────
+    if (req.method === 'GET' && (action === 'bank_accounts_overview' || action === 'contas_bancarias_overview')) {
+      const tenantFilter = String(req.query?.tenantId || '').trim();
+
+      // 1. Contas detalhadas
+      const accounts = await sql`
+        SELECT
+          c.id, c.tenant_id, c.banco_nome, c.banco_codigo, c.agencia, c.numero,
+          c.tipo, c.titular, c.apelido, c.obra_id,
+          COALESCE(c.saldo_inicial, 0)::numeric AS saldo_inicial,
+          COALESCE(c.saldo_atual, 0)::numeric AS saldo_atual,
+          c.created_at, c.updated_at,
+          COALESCE(t.nome_fantasia, t.razao_social, c.tenant_id) AS tenant_nome,
+          t.plano AS tenant_plano,
+          t.status AS tenant_status,
+          o.nome AS obra_nome
+        FROM contas_bancarias c
+        LEFT JOIN tenants t ON t.id = c.tenant_id
+        LEFT JOIN obras o ON o.id = c.obra_id AND o.tenant_id = c.tenant_id
+        WHERE (${tenantFilter} = '' OR c.tenant_id = ${tenantFilter})
+        ORDER BY t.nome_fantasia ASC, c.banco_nome ASC;
+      `;
+
+      // 2. Estatísticas de conciliação agrupadas por construtora
+      const tenantStats = await sql`
+        SELECT
+          t.id AS tenant_id,
+          COALESCE(t.nome_fantasia, t.razao_social, t.id) AS tenant_nome,
+          t.plano AS tenant_plano,
+          t.status AS tenant_status,
+          COUNT(DISTINCT c.id)::int AS total_contas,
+          COALESCE(SUM(c.saldo_atual), 0)::numeric AS saldo_total_contas,
+          COUNT(l.id)::int AS total_lancamentos,
+          COUNT(l.id) FILTER (WHERE l.conciliado = true)::int AS lancamentos_conciliados,
+          COUNT(l.id) FILTER (WHERE l.conciliado = false OR l.conciliado IS NULL)::int AS lancamentos_pendentes,
+          ROUND(
+            (COUNT(l.id) FILTER (WHERE l.conciliado = true)::numeric / NULLIF(COUNT(l.id), 0)) * 100,
+            1
+          )::float AS taxa_conciliacao_pct
+        FROM tenants t
+        LEFT JOIN contas_bancarias c ON c.tenant_id = t.id
+        LEFT JOIN lancamentos l ON l.tenant_id = t.id
+        WHERE (${tenantFilter} = '' OR t.id = ${tenantFilter})
+        GROUP BY t.id, t.nome_fantasia, t.razao_social, t.plano, t.status
+        ORDER BY total_contas DESC, t.id ASC;
+      `;
+
+      // 3. Resumo Global SaaS
+      const totalAccounts = accounts.length;
+      const totalBalance = accounts.reduce((acc, a) => acc + Number(a.saldo_atual || 0), 0);
+      const totalLancamentos = tenantStats.reduce((acc, s) => acc + Number(s.total_lancamentos || 0), 0);
+      const totalConciliados = tenantStats.reduce((acc, s) => acc + Number(s.lancamentos_conciliados || 0), 0);
+      const globalConciliationPct = totalLancamentos > 0 ? Math.round((totalConciliados / totalLancamentos) * 1000) / 10 : 0;
+
+      return res.status(200).json({
+        success: true,
+        summary: {
+          total_contas: totalAccounts,
+          saldo_consolidado: totalBalance,
+          total_lancamentos: totalLancamentos,
+          lancamentos_conciliados: totalConciliados,
+          taxa_global_pct: globalConciliationPct,
+          tenants_com_contas: tenantStats.filter(s => s.total_contas > 0).length
+        },
+        accounts,
+        tenant_stats: tenantStats
+      });
+    }
+
     if (req.method === 'POST' && action === 'confirm_payment') {
       const invoiceId = String(req.body?.invoiceId || '').trim();
       if (!invoiceId) return res.status(400).json({ success:false, error:'Cobrança não informada.' });

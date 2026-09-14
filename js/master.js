@@ -11,6 +11,8 @@ const MasterAdmin = {
   _errorsGlobalLoading: false,
   _integrity: null,
   _integrityLoading: false,
+  _bankAccounts: null,
+  _bankAccountsLoading: false,
 
   _esc(value) {
     if (typeof Utils !== 'undefined' && Utils.escapeHtml) return Utils.escapeHtml(String(value ?? ''));
@@ -104,6 +106,36 @@ const MasterAdmin = {
     return this._integrity;
   },
 
+  async carregarContasBancarias(force = false) {
+    if (this._bankAccounts && !force) return this._bankAccounts;
+    if (this._bankAccountsLoading) return this._bankAccounts || { accounts: [], tenant_stats: [], summary: {} };
+    this._bankAccountsLoading = true;
+    try {
+      const resp = await fetch('/api/admin?action=bank_accounts_overview', {
+        headers: (typeof Auth !== 'undefined' && Auth.getAuthHeaders) ? Auth.getAuthHeaders() : {}
+      });
+      const data = await resp.json().catch(() => ({}));
+      if (resp.ok && data.success) {
+        this._bankAccounts = {
+          accounts: Array.isArray(data.accounts) ? data.accounts : [],
+          tenant_stats: Array.isArray(data.tenant_stats) ? data.tenant_stats : [],
+          summary: data.summary || {}
+        };
+      }
+    } catch (err) {
+      console.warn('Falha ao carregar visão de contas bancárias:', err);
+    }
+    this._bankAccountsLoading = false;
+    if (!this._bankAccounts) this._bankAccounts = { accounts: [], tenant_stats: [], summary: {} };
+    return this._bankAccounts;
+  },
+
+  async recarregarContasBancarias() {
+    await this.carregarContasBancarias(true);
+    const target = document.getElementById('master-content-area') ? 'master-content-area' : 'route-content';
+    this.render(target);
+  },
+
   _renderIntegridade() {
     const d = this._integrity;
     if (!d) return `<div style="background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.08);border-radius:14px;padding:18px;color:#94a3b8;margin-bottom:20px;">🧩 Verificando integridade relacional…</div>`;
@@ -120,6 +152,167 @@ const MasterAdmin = {
       return `<tr><td style="padding:8px 10px;color:#cbd5e1">${this._esc(c.constraint_name)}</td><td style="padding:8px 10px">${this._esc(c.table_name)}</td><td style="padding:8px 10px;color:${count?'#fca5a5':(ok?'#86efac':'#fbbf24')}">${count ? `${count} pendência(s)` : (ok?'Validada':'Aguardando validação')}</td></tr>`;
     }).join('');
     return `<div style="background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.08);border-radius:14px;overflow:hidden;margin-bottom:20px;"><div style="padding:16px 18px;border-bottom:1px solid rgba(255,255,255,.08);display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap"><div><div style="font-weight:900;color:#fff">🧩 Integridade Multi-Tenant</div><div style="font-size:.72rem;color:#64748b;margin-top:3px">Build ${this._esc(d.build || '—')} · Blob ${storagePrivate?'privado':'público/pendente'}</div></div><div style="font-size:.78rem;font-weight:800;color:${issues.length?'#ef4444':pending.length?'#f59e0b':'#22c55e'}">${issues.length ? `${issues.length} relação(ões) com legado inconsistente` : pending.length ? `${pending.length} constraint(s) aguardando validação` : 'Todas as constraints validadas'}</div></div><div style="overflow:auto;max-height:300px"><table style="width:100%;border-collapse:collapse;font-size:.75rem"><tbody>${rows || '<tr><td style="padding:14px;color:#64748b">Sem dados de auditoria ainda.</td></tr>'}</tbody></table></div></div>`;
+  },
+
+  _renderContasBancariasSaaS() {
+    const bundle = this._bankAccounts || { accounts: [], tenant_stats: [], summary: {} };
+    const summary = bundle.summary || {};
+    const accounts = bundle.accounts || [];
+    const stats = bundle.tenant_stats || [];
+
+    const totalAccounts = Number(summary.total_contas || 0);
+    const saldoConsolidado = (Number(summary.saldo_consolidado || 0)).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const taxaGlobal = Number(summary.taxa_global_pct || 0);
+    const totalLanc = Number(summary.total_lancamentos || 0);
+    const concLanc = Number(summary.lancamentos_conciliados || 0);
+    const tenantsComContas = Number(summary.tenants_com_contas || 0);
+
+    // Linhas de estatísticas por construtora
+    const statsRows = stats.length ? stats.map(s => {
+      const nome = this._esc(s.tenant_nome || s.tenant_id);
+      const plano = this._esc(String(s.tenant_plano || 'pro').toUpperCase());
+      const contas = Number(s.total_contas || 0);
+      const saldo = (Number(s.saldo_total_contas || 0)).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      const total = Number(s.total_lancamentos || 0);
+      const conc = Number(s.lancamentos_conciliados || 0);
+      const pend = Number(s.lancamentos_pendentes || 0);
+      const pct = s.taxa_conciliacao_pct !== null && s.taxa_conciliacao_pct !== undefined ? Number(s.taxa_conciliacao_pct) : (total > 0 ? Math.round((conc / total) * 100) : 0);
+      const badgeColor = pct >= 90 ? '#22c55e' : pct >= 50 ? '#f59e0b' : pct > 0 ? '#f97316' : '#94a3b8';
+      const badgeBg = pct >= 90 ? 'rgba(34,197,94,.12)' : pct >= 50 ? 'rgba(245,158,11,.12)' : pct > 0 ? 'rgba(249,115,22,.12)' : 'rgba(148,163,184,.12)';
+
+      return `
+        <tr style="border-bottom:1px solid rgba(255,255,255,.06);">
+          <td style="padding:12px 16px;font-weight:700;color:#fff;">
+            <div>${nome}</div>
+            <div style="font-size:.72rem;color:#64748b;font-family:monospace;">${this._esc(s.tenant_id)} · <span style="color:var(--accent2);">${plano}</span></div>
+          </td>
+          <td style="padding:12px 16px;font-weight:800;color:${contas ? '#38bdf8' : '#64748b'};text-align:center;">${contas} conta(s)</td>
+          <td style="padding:12px 16px;font-weight:800;color:#fff;text-align:right;">R$ ${saldo}</td>
+          <td style="padding:12px 16px;text-align:center;">
+            <span style="display:inline-block;padding:4px 10px;border-radius:12px;font-size:.75rem;font-weight:800;color:${badgeColor};background:${badgeBg};">
+              ${pct}% (${conc}/${total})
+            </span>
+          </td>
+          <td style="padding:12px 16px;color:${pend ? '#fca5a5' : '#86efac'};font-size:.8rem;text-align:center;">
+            ${pend ? `⚠️ ${pend} pendente(s)` : '✅ 0 pendências'}
+          </td>
+        </tr>
+      `;
+    }).join('') : `<tr><td colspan="5" style="padding:32px;text-align:center;color:#64748b;">Nenhuma construtora com lançamentos encontrada.</td></tr>`;
+
+    // Linhas de contas detalhadas
+    const accountRows = accounts.length ? accounts.map(a => {
+      const nomeEmpresa = this._esc(a.tenant_nome || a.tenant_id);
+      const banco = this._esc(a.banco_nome || (a.banco_codigo ? `Banco ${a.banco_codigo}` : 'Banco'));
+      const agencia = this._esc(a.agencia || '—');
+      const numero = this._esc(a.numero || '—');
+      const titular = this._esc(a.titular || a.apelido || '—');
+      const obra = this._esc(a.obra_nome || (a.obra_id ? `Obra ${a.obra_id}` : 'Geral (Sem vínculo)'));
+      const saldo = (Number(a.saldo_atual || 0)).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      const saldoPositivo = Number(a.saldo_atual || 0) >= 0;
+
+      return `
+        <tr style="border-bottom:1px solid rgba(255,255,255,.06);">
+          <td style="padding:12px 16px;font-weight:700;color:#fff;">${nomeEmpresa}</td>
+          <td style="padding:12px 16px;">
+            <div style="font-weight:700;color:#e2e8f0;">${banco}</div>
+            <div style="font-size:.7rem;color:#64748b;text-transform:uppercase;">${this._esc(a.tipo || 'Corrente')}</div>
+          </td>
+          <td style="padding:12px 16px;font-family:monospace;font-size:.78rem;color:#cbd5e1;">Ag. ${agencia} / CC ${numero}</td>
+          <td style="padding:12px 16px;color:#94a3b8;font-size:.8rem;">${titular}</td>
+          <td style="padding:12px 16px;font-size:.8rem;color:#cbd5e1;">${obra}</td>
+          <td style="padding:12px 16px;font-weight:800;color:${saldoPositivo ? '#4ade80' : '#f87171'};text-align:right;">R$ ${saldo}</td>
+        </tr>
+      `;
+    }).join('') : `<tr><td colspan="6" style="padding:32px;text-align:center;color:#64748b;">Nenhuma conta bancária cadastrada no banco de dados ainda.</td></tr>`;
+
+    return `
+      <div>
+        <!-- Top Title & Metrics -->
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:24px;flex-wrap:wrap;gap:14px;">
+          <div>
+            <h2 style="font-size:1.5rem;font-weight:900;color:#fff;margin:0 0 6px 0;">🏦 Contas Bancárias &amp; Conciliação Multi-Tenant</h2>
+            <p style="font-size:.82rem;color:#94a3b8;margin:0;">Diagnóstico em tempo real de contas ativas, saldos consolidados e taxa de conciliação das construtoras</p>
+          </div>
+          <button data-fb-click="MasterAdmin.recarregarContasBancarias" data-fb-click-n="0" class="btn-clean" style="padding:9px 15px;background:rgba(255,255,255,.06);border:1px solid var(--border);border-radius:8px;color:#fff;font-weight:700;font-size:.8rem;display:inline-flex;align-items:center;gap:6px;cursor:pointer;">
+            <span>↻</span> Atualizar Indicadores
+          </button>
+        </div>
+
+        <!-- 4 Metric Cards -->
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px;margin-bottom:28px;">
+          <div style="background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);border-radius:14px;padding:20px;">
+            <div style="font-size:.75rem;color:#94a3b8;font-weight:700;text-transform:uppercase;letter-spacing:.05em;">Contas Ativas no SaaS</div>
+            <div style="font-size:1.8rem;font-weight:900;color:#38bdf8;margin:8px 0 4px 0;">${totalAccounts}</div>
+            <div style="font-size:.75rem;color:#64748b;">Distribuídas em ${tenantsComContas} construtora(s)</div>
+          </div>
+          <div style="background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);border-radius:14px;padding:20px;">
+            <div style="font-size:.75rem;color:#94a3b8;font-weight:700;text-transform:uppercase;letter-spacing:.05em;">Saldo Consolidado em Contas</div>
+            <div style="font-size:1.8rem;font-weight:900;color:#22c55e;margin:8px 0 4px 0;">R$ ${saldoConsolidado}</div>
+            <div style="font-size:.75rem;color:#64748b;">Soma dos saldos atuais no Neon</div>
+          </div>
+          <div style="background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);border-radius:14px;padding:20px;">
+            <div style="font-size:.75rem;color:#94a3b8;font-weight:700;text-transform:uppercase;letter-spacing:.05em;">Índice Global de Conciliação</div>
+            <div style="font-size:1.8rem;font-weight:900;color:${taxaGlobal>=80?'#22c55e':taxaGlobal>=50?'#f59e0b':'#f97316'};margin:8px 0 4px 0;">${taxaGlobal}%</div>
+            <div style="font-size:.75rem;color:#64748b;">${concLanc} de ${totalLanc} lançamentos conciliados</div>
+          </div>
+          <div style="background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);border-radius:14px;padding:20px;">
+            <div style="font-size:.75rem;color:#94a3b8;font-weight:700;text-transform:uppercase;letter-spacing:.05em;">Auditoria Bancária Multi-Tenant</div>
+            <div style="font-size:1.8rem;font-weight:900;color:var(--accent2);margin:8px 0 4px 0;">Ativa 🛡️</div>
+            <div style="font-size:.75rem;color:#64748b;">Isolamento estrito por tenant_id</div>
+          </div>
+        </div>
+
+        <!-- Section 1: Conciliação por Construtora -->
+        <div style="background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.08);border-radius:14px;overflow:hidden;margin-bottom:32px;">
+          <div style="padding:16px 20px;border-bottom:1px solid rgba(255,255,255,.08);display:flex;justify-content:space-between;align-items:center;">
+            <div>
+              <h3 style="font-size:1.05rem;font-weight:800;color:#fff;margin:0 0 4px 0;">⚖️ Taxa de Conciliação por Empresa</h3>
+              <div style="font-size:.75rem;color:#94a3b8;">Acompanhamento da integridade contábil dos lançamentos frente aos extratos bancários</div>
+            </div>
+          </div>
+          <div style="overflow-x:auto;">
+            <table style="width:100%;border-collapse:collapse;text-align:left;font-size:.82rem;">
+              <thead>
+                <tr style="background:rgba(255,255,255,.03);color:#94a3b8;font-size:.72rem;text-transform:uppercase;">
+                  <th style="padding:11px 16px;">Empresa</th>
+                  <th style="padding:11px 16px;text-align:center;">Contas</th>
+                  <th style="padding:11px 16px;text-align:right;">Saldo em Contas</th>
+                  <th style="padding:11px 16px;text-align:center;">Taxa de Conciliação</th>
+                  <th style="padding:11px 16px;text-align:center;">Status</th>
+                </tr>
+              </thead>
+              <tbody>${statsRows}</tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Section 2: Contas Bancárias Cadastradas -->
+        <div style="background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.08);border-radius:14px;overflow:hidden;">
+          <div style="padding:16px 20px;border-bottom:1px solid rgba(255,255,255,.08);display:flex;justify-content:space-between;align-items:center;">
+            <div>
+              <h3 style="font-size:1.05rem;font-weight:800;color:#fff;margin:0 0 4px 0;">💳 Contas Bancárias Cadastradas no SaaS</h3>
+              <div style="font-size:.75rem;color:#94a3b8;">Relação de contas correntes e aplicações cadastradas pelas construtoras</div>
+            </div>
+          </div>
+          <div style="overflow-x:auto;">
+            <table style="width:100%;border-collapse:collapse;text-align:left;font-size:.82rem;">
+              <thead>
+                <tr style="background:rgba(255,255,255,.03);color:#94a3b8;font-size:.72rem;text-transform:uppercase;">
+                  <th style="padding:11px 16px;">Empresa</th>
+                  <th style="padding:11px 16px;">Banco / Tipo</th>
+                  <th style="padding:11px 16px;">Agência &amp; Conta</th>
+                  <th style="padding:11px 16px;">Titular / Apelido</th>
+                  <th style="padding:11px 16px;">Obra Vinculada</th>
+                  <th style="padding:11px 16px;text-align:right;">Saldo Atual</th>
+                </tr>
+              </thead>
+              <tbody>${accountRows}</tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    `;
   },
 
   _renderErrosSaaS() {
@@ -296,6 +489,7 @@ const MasterAdmin = {
     if (!this._billing && !this._billingLoading) this.carregarCobrancas().then(() => this.render(containerId));
     if (!this._errorsGlobal && !this._errorsGlobalLoading) this.carregarErrosSaaS().then(() => this.render(containerId));
     if (!this._integrity && !this._integrityLoading) this.carregarIntegridade().then(() => this.render(containerId));
+    if (!this._bankAccounts && !this._bankAccountsLoading) this.carregarContasBancarias().then(() => this.render(containerId));
 
     // Cálculo das métricas globais
     const totalEmpresas = empresas.length;
@@ -316,21 +510,26 @@ const MasterAdmin = {
     }, 0);
 
     const isSistema = this._activeTab === 'sistema';
+    const isContas = this._activeTab === 'contas';
+    const isEmpresas = !isSistema && !isContas;
 
     el.innerHTML = `
       <div style="max-width:1200px;margin:0 auto;padding:10px 0 50px;">
         
         <!-- Navigation Tabs Master -->
         <div style="display:flex;gap:0;border-bottom:2px solid rgba(255,255,255,.1);margin-bottom:26px;overflow-x:auto;">
-          <button data-fb-click="MasterAdmin.switchTab" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="empresas" style="padding:12px 20px;border:none;background:transparent;color:${!isSistema?'var(--accent)':'#94a3b8'};font-family:inherit;font-size:.875rem;font-weight:800;cursor:pointer;border-bottom:3px solid ${!isSistema?'var(--accent)':'transparent'};margin-bottom:-2px;transition:all .2s;display:flex;align-items:center;gap:8px;">
+          <button data-fb-click="MasterAdmin.switchTab" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="empresas" style="padding:12px 20px;border:none;background:transparent;color:${isEmpresas?'var(--accent)':'#94a3b8'};font-family:inherit;font-size:.875rem;font-weight:800;cursor:pointer;border-bottom:3px solid ${isEmpresas?'var(--accent)':'transparent'};margin-bottom:-2px;transition:all .2s;display:flex;align-items:center;gap:8px;">
             <span>🏢</span> Gestão de Construtoras &amp; SaaS
+          </button>
+          <button data-fb-click="MasterAdmin.switchTab" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="contas" style="padding:12px 20px;border:none;background:transparent;color:${isContas?'var(--accent)':'#94a3b8'};font-family:inherit;font-size:.875rem;font-weight:800;cursor:pointer;border-bottom:3px solid ${isContas?'var(--accent)':'transparent'};margin-bottom:-2px;transition:all .2s;display:flex;align-items:center;gap:8px;">
+            <span>🏦</span> Contas Bancárias &amp; Conciliação
           </button>
           <button data-fb-click="MasterAdmin.switchTab" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="sistema" style="padding:12px 20px;border:none;background:transparent;color:${isSistema?'var(--accent)':'#94a3b8'};font-family:inherit;font-size:.875rem;font-weight:800;cursor:pointer;border-bottom:3px solid ${isSistema?'var(--accent)':'transparent'};margin-bottom:-2px;transition:all .2s;display:flex;align-items:center;gap:8px;">
             <span>⚙️</span> Manutenção do Sistema &amp; Banco de Dados (Dev / Master)
           </button>
         </div>
 
-        ${isSistema ? this._renderSistema() : `
+        ${isContas ? this._renderContasBancariasSaaS() : (isSistema ? this._renderSistema() : `
         <!-- Top Bar Master -->
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:26px;flex-wrap:wrap;gap:14px;">
           <div>
