@@ -21,7 +21,8 @@ const Orcamentos = {
     { id: 'cat-pintura', nome: '10. Pintura e Texturas', icone: '🎨', cor: '#f97316' },
     { id: 'cat-loucas', nome: '11. Louças, Metais e Acessórios', icone: '🚰', cor: '#84cc16' },
     { id: 'cat-limpeza', nome: '12. Limpeza Final e Entrega', icone: '🧹', cor: '#64748b' },
-    { id: 'cat-imprevistos', nome: '13. Administração e Imprevistos', icone: '🛡️', cor: '#ef4444' }
+    { id: 'cat-imprevistos', nome: '13. Administração e Imprevistos', icone: '🛡️', cor: '#ef4444' },
+    { id: 'cat-governanca', nome: '14. Governança, Fiscalização & Gestão Técnica', icone: '⚖️', cor: '#c9a227' }
   ],
 
   UNIDADES_PADRAO: ['m²', 'm³', 'm', 'un', 'kg', 'vb', 'h', 'cj', 'sc', 'pt', 'gl', 'ton'],
@@ -119,7 +120,11 @@ const Orcamentos = {
       orcs = orcs.filter(o => (o.nome || o.titulo || '').toLowerCase().includes(q) || (o.descricao || '').toLowerCase().includes(q));
     }
     if (this._filterStatus && this._filterStatus !== 'todos') {
-      orcs = orcs.filter(o => (o.status || 'ativo') === this._filterStatus);
+      orcs = orcs.filter(o => {
+        const s = o.status || 'a_revisar';
+        if (this._filterStatus === 'a_revisar') return s === 'a_revisar' || s === 'revisao';
+        return s === this._filterStatus;
+      });
     }
 
     // Totais globais
@@ -181,13 +186,14 @@ const Orcamentos = {
           ${(DB.getAll('clientes') || []).map(o => `<option value="${Utils.escapeHtml(o.id)}" ${String(activeObra) === String(o.id) ? 'selected' : ''}>${Utils.escapeHtml(o.nome || o.cliente || 'Sem nome')}</option>`).join('')}
         </select>
       </div>
-      <div style="min-width:140px;">
+      <div style="min-width:160px;">
         <select class="form-control" data-fb-change="Orcamentos._filterByStatus" data-fb-change-n="1" data-fb-change-t0="value">
           <option value="todos" ${this._filterStatus === 'todos' ? 'selected' : ''}>Todos os status</option>
-          <option value="ativo" ${this._filterStatus === 'ativo' ? 'selected' : ''}>✓ Ativos</option>
-          <option value="revisao" ${this._filterStatus === 'revisao' ? 'selected' : ''}>🔄 Em Revisão</option>
+          <option value="a_revisar" ${this._filterStatus === 'a_revisar' ? 'selected' : ''}>🟡 A Revisar</option>
+          <option value="aprovado" ${this._filterStatus === 'aprovado' ? 'selected' : ''}>🟢 Aprovados</option>
+          <option value="ativo" ${this._filterStatus === 'ativo' ? 'selected' : ''}>🔵 Em Execução / Ativos</option>
           <option value="concluido" ${this._filterStatus === 'concluido' ? 'selected' : ''}>🏆 Concluídos</option>
-          <option value="cancelado" ${this._filterStatus === 'cancelado' ? 'selected' : ''}>✕ Cancelados</option>
+          <option value="cancelado" ${this._filterStatus === 'cancelado' ? 'selected' : ''}>🔴 Cancelados</option>
         </select>
       </div>
     </div>
@@ -261,7 +267,8 @@ const Orcamentos = {
         <div>
           <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
             <h2 style="font-size:1.25rem;font-weight:800;color:var(--text);margin:0">${Utils.escapeHtml(orc.nome || orc.titulo || 'Orçamento')}</h2>
-            ${Utils.badge(orc.status || 'ativo')}
+            ${Utils.badge(orc.status || 'a_revisar')}
+            ${orc.despesas_geradas ? '<span class="badge" style="background:rgba(201,162,39,.18);color:var(--accent2);border:1px solid rgba(201,162,39,.4);font-weight:700;">💰 Despesas Geradas</span>' : ''}
           </div>
           <div style="font-size:.82rem;color:var(--text3);margin-top:6px;display:flex;gap:14px;flex-wrap:wrap;">
             <span>🏢 <strong>Obra:</strong> ${Utils.escapeHtml(cliente?.nome || cliente?.cliente || 'Geral / Não vinculada')}</span>
@@ -271,7 +278,40 @@ const Orcamentos = {
           </div>
           ${orc.descricao ? `<div style="font-size:.82rem;color:var(--text2);margin-top:6px;font-style:italic;">📝 ${Utils.escapeHtml(orc.descricao)}</div>` : ''}
         </div>
-        <div style="display:flex;gap:8px;align-items:center;">
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+          <!-- WORKFLOW DE STATUS & AÇÕES RÁPIDAS -->
+          ${((orc.status || 'a_revisar') === 'a_revisar' || orc.status === 'revisao') ? `
+            <button class="btn btn-success btn-sm" data-fb-click="Orcamentos.aprovar" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(orc.id))}" title="Aprovar e autorizar este orçamento" style="font-weight:800;">
+              ✓ Aprovar
+            </button>
+            <button class="btn btn-danger btn-sm" data-fb-click="Orcamentos.cancelar" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(orc.id))}" title="Cancelar orçamento">
+              ✕ Cancelar
+            </button>
+          ` : orc.status === 'aprovado' ? `
+            <button class="btn btn-primary btn-sm" data-fb-click="Orcamentos.abrirModalGerarDespesa" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(orc.id))}" title="Gerar lançamentos de despesa financeira na obra" style="font-weight:800;background:linear-gradient(135deg,#c9a227,#eab308);border:none;color:#000;">
+              💰 Gerar Despesas
+            </button>
+            <button class="btn btn-secondary btn-sm" data-fb-click="Orcamentos.colocarEmRevisao" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(orc.id))}" title="Colocar de volta em revisão">
+              🔄 A Revisar
+            </button>
+            <button class="btn btn-danger btn-sm" data-fb-click="Orcamentos.cancelar" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(orc.id))}" title="Cancelar orçamento">
+              ✕ Cancelar
+            </button>
+          ` : orc.status === 'cancelado' ? `
+            <button class="btn btn-secondary btn-sm" data-fb-click="Orcamentos.colocarEmRevisao" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(orc.id))}" title="Reabrir orçamento para revisão">
+              🔄 Reabrir p/ Revisão
+            </button>
+          ` : `
+            <button class="btn btn-primary btn-sm" data-fb-click="Orcamentos.abrirModalGerarDespesa" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(orc.id))}" title="Gerar despesas financeiras">
+              💰 Gerar Despesas
+            </button>
+            <button class="btn btn-secondary btn-sm" data-fb-click="Orcamentos.colocarEmRevisao" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(orc.id))}">
+              🔄 A Revisar
+            </button>
+          `}
+
+          <span style="display:inline-block;width:1px;height:24px;background:var(--border);margin:0 2px;"></span>
+
           <button class="btn btn-secondary btn-sm" data-fb-click="Documentos.abrirModal" data-fb-click-n="3" data-fb-click-t0="string" data-fb-click-v0="orcamento" data-fb-click-t1="string" data-fb-click-v1="${encodeURIComponent(String(orc.id))}" data-fb-click-t2="string" data-fb-click-v2="${encodeURIComponent(String('Anexos — ' + (orc.nome || 'Orçamento')))}" title="Gerenciar Documentos e Anexos">
             📎 ${anexosCount > 0 ? `${anexosCount} anexo(s)` : 'Anexar'}
           </button>
@@ -339,7 +379,15 @@ const Orcamentos = {
     // Preenche categorias já registradas
     categoriasSalvas.forEach(c => {
       const id = c.id || c.nome;
-      map[id] = { id, nome: c.nome, icone: c.icone || '📁', cor: c.cor || 'var(--accent)', itens: [] };
+      map[id] = {
+        id,
+        nome: c.nome,
+        icone: c.icone || '📁',
+        cor: c.cor || 'var(--accent)',
+        fornecedor_id: c.fornecedor_id || '',
+        fornecedor_nome: c.fornecedor_nome || '',
+        itens: []
+      };
     });
 
     // Agrupa itens
@@ -352,8 +400,14 @@ const Orcamentos = {
           nome: item.categoria_nome || matchingPadrao?.nome || (catKey === 'outros' ? 'Etapas Gerais' : catKey),
           icone: matchingPadrao?.icone || '📋',
           cor: matchingPadrao?.cor || 'var(--accent)',
+          fornecedor_id: item.fornecedor_id || '',
+          fornecedor_nome: item.fornecedor_nome || '',
           itens: []
         };
+      }
+      if (!map[catKey].fornecedor_nome && item.fornecedor_nome) {
+        map[catKey].fornecedor_nome = item.fornecedor_nome;
+        map[catKey].fornecedor_id = item.fornecedor_id || '';
       }
       map[catKey].itens.push(item);
     });
@@ -370,12 +424,19 @@ const Orcamentos = {
     return `
     <div class="orc-cat-accordion ${openByDefault ? 'orc-cat-open' : ''}" id="cat-acc-${orc.id}-${cat.id}">
       <div class="orc-cat-hdr" data-fb-click="Orcamentos._toggleCategory" data-fb-click-n="2" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(orc.id))}" data-fb-click-t1="string" data-fb-click-v1="${encodeURIComponent(String(cat.id))}">
-        <div class="orc-cat-hdr-left">
+        <div class="orc-cat-hdr-left" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
           <span style="font-size:1.1rem">${cat.icone}</span>
-          <span style="color:var(--text)">${Utils.escapeHtml(cat.nome)}</span>
+          <span style="color:var(--text);font-weight:700">${Utils.escapeHtml(cat.nome)}</span>
           <span style="font-size:.72rem;background:var(--surface);padding:2px 8px;border-radius:10px;border:1px solid var(--border);color:var(--text3)">
             ${cat.itens.length} item(ns)
           </span>
+          ${cat.fornecedor_nome ? `
+            <span style="font-size:.72rem;background:rgba(201,162,39,.12);color:var(--accent2);border:1px solid rgba(201,162,39,.3);padding:2px 8px;border-radius:12px;font-weight:700;">
+              🏢 ${Utils.escapeHtml(cat.fornecedor_nome)}
+            </span>
+          ` : `
+            <span style="font-size:.7rem;color:var(--text3);font-style:italic;">(Sem fornecedor definido)</span>
+          `}
         </div>
         <div class="orc-cat-hdr-right">
           <div style="font-size:.8rem;font-weight:700">
@@ -393,13 +454,14 @@ const Orcamentos = {
           <table>
             <thead>
               <tr>
-                <th style="width:32%">Item / Serviço</th>
-                <th style="width:10%">Unid.</th>
+                <th style="width:26%">Item / Serviço</th>
+                <th style="width:16%">Fornecedor</th>
+                <th style="width:8%">Unid.</th>
                 <th style="width:12%">Qtd × Unit.</th>
-                <th style="width:14%">Previsto</th>
-                <th style="width:14%">Realizado</th>
-                <th style="width:12%">Avanço</th>
-                <th style="width:6%"></th>
+                <th style="width:13%">Previsto</th>
+                <th style="width:13%">Realizado</th>
+                <th style="width:8%">Avanço</th>
+                <th style="width:4%"></th>
               </tr>
             </thead>
             <tbody>
@@ -416,6 +478,11 @@ const Orcamentos = {
                   <td>
                     <div style="font-weight:700;color:var(--text)">${Utils.escapeHtml(e.nome || 'Sem descrição')}</div>
                     ${e.observacoes ? `<div style="font-size:.72rem;color:var(--text3);margin-top:2px;">${Utils.escapeHtml(e.observacoes)}</div>` : ''}
+                  </td>
+                  <td>
+                    <span style="font-size:.76rem;color:var(--text2);font-weight:600;">
+                      ${Utils.escapeHtml(e.fornecedor_nome || cat.fornecedor_nome || '—')}
+                    </span>
                   </td>
                   <td><span style="background:var(--bg-secondary);padding:2px 6px;border-radius:4px;font-size:.72rem;font-weight:700">${Utils.escapeHtml(e.unidade || 'un')}</span></td>
                   <td style="font-size:.8rem;color:var(--text2)">
@@ -486,7 +553,8 @@ const Orcamentos = {
         this.CATEGORIAS_PADRAO[1], // Fundações
         this.CATEGORIAS_PADRAO[2], // Estrutura
         this.CATEGORIAS_PADRAO[3], // Alvenaria
-        this.CATEGORIAS_PADRAO[7]  // Revestimentos
+        this.CATEGORIAS_PADRAO[7], // Revestimentos
+        this.CATEGORIAS_PADRAO[13] // Governança, Fiscalização & Gestão Técnica
       ];
     } else if (itens.length && !categorias.length) {
       // Reconstitui categorias a partir dos itens legados
@@ -495,7 +563,7 @@ const Orcamentos = {
         const cNome = it.categoria_nome || 'Etapas Gerais';
         if (!seen.has(cNome)) {
           seen.add(cNome);
-          categorias.push({ id: it.categoria_id || DB.uuid(), nome: cNome, icone: '📋', cor: '#3b82f6' });
+          categorias.push({ id: it.categoria_id || DB.uuid(), nome: cNome, icone: '📋', cor: '#3b82f6', fornecedor_id: it.fornecedor_id || '', fornecedor_nome: it.fornecedor_nome || '' });
         }
       });
     }
@@ -541,7 +609,7 @@ const Orcamentos = {
             <span style="font-size:1.4rem">📋</span>
             <div>
               <span class="modal-title" style="display:block">${id ? 'Editar Orçamento' : 'Novo Orçamento de Obra'}</span>
-              <span style="font-size:.78rem;color:var(--text3)">Configure as macro-etapas, quantitativos e custos previstos</span>
+              <span style="font-size:.78rem;color:var(--text3)">Configure as macro-etapas, fornecedores de cada etapa, quantitativos e custos</span>
             </div>
           </div>
           <button class="modal-close" data-fb-click="Utils.closeModal" data-fb-click-n="0">✕</button>
@@ -570,10 +638,11 @@ const Orcamentos = {
                 <div class="form-group">
                   <label class="form-label">Status do Orçamento</label>
                   <select class="form-control" name="status" id="orc-form-status">
-                    <option value="ativo" ${(orc.status || 'ativo') === 'ativo' ? 'selected' : ''}>✓ Ativo / Em Execução</option>
-                    <option value="revisao" ${orc.status === 'revisao' ? 'selected' : ''}>🔄 Em Revisão / Estudo</option>
+                    <option value="a_revisar" ${(orc.status || 'a_revisar') === 'a_revisar' || orc.status === 'revisao' ? 'selected' : ''}>🟡 A Revisar / Em Estudo</option>
+                    <option value="aprovado" ${orc.status === 'aprovado' ? 'selected' : ''}>🟢 Aprovado / Autorizado</option>
+                    <option value="ativo" ${orc.status === 'ativo' ? 'selected' : ''}>🔵 Em Execução / Ativo</option>
                     <option value="concluido" ${orc.status === 'concluido' ? 'selected' : ''}>🏆 Concluído</option>
-                    <option value="cancelado" ${orc.status === 'cancelado' ? 'selected' : ''}>✕ Cancelado</option>
+                    <option value="cancelado" ${orc.status === 'cancelado' ? 'selected' : ''}>🔴 Cancelado</option>
                   </select>
                 </div>
               </div>
@@ -685,10 +754,13 @@ const Orcamentos = {
     const catId = cat.id || DB.uuid();
     const catNome = cat.nome || 'Nova Categoria';
     const catIcone = cat.icone || '📁';
+    const fornecedores = DB.getAll('fornecedores') || [];
+    const defaultFornId = cat.fornecedor_id || '';
+    const defaultFornNome = cat.fornecedor_nome || '';
 
     return `
     <div class="orc-cat-block" id="cb-${catId}" data-cat-id="${catId}" data-cat-nome="${Utils.escapeHtml(catNome)}" data-cat-icone="${catIcone}" style="background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--r-md);padding:16px;margin-bottom:16px;">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;border-bottom:1px solid var(--border);padding-bottom:10px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;border-bottom:1px solid var(--border);padding-bottom:10px;flex-wrap:wrap;gap:8px;">
         <div style="display:flex;align-items:center;gap:8px;">
           <span style="font-size:1.2rem">${catIcone}</span>
           <input class="form-control orc-cat-title-input" value="${Utils.escapeHtml(catNome)}" style="font-weight:700;font-size:.92rem;border:none;background:transparent;padding:2px 6px;width:auto;min-width:240px" title="Clique para renomear">
@@ -706,6 +778,26 @@ const Orcamentos = {
         </div>
       </div>
 
+      <!-- SELEÇÃO DE FORNECEDOR DA ETAPA -->
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;flex-wrap:wrap;background:var(--surface);padding:8px 12px;border-radius:var(--r-sm);border:1px solid var(--border);">
+        <div style="display:flex;align-items:center;gap:8px;flex:1;min-width:280px;">
+          <span style="font-size:.78rem;font-weight:700;color:var(--text);white-space:nowrap;">🏢 Fornecedor / Empreiteiro:</span>
+          <select class="form-control orc-cat-forn" data-cat-id="${catId}" data-fb-change="Orcamentos._onCatFornecedorChange" data-fb-change-n="1" data-fb-change-t0="self" style="font-size:.78rem;padding:4px 8px;height:32px;flex:1;">
+            <option value="">Selecione o fornecedor padrão desta etapa...</option>
+            ${fornecedores.map(f => {
+              const fn = f.nome || f.razao_social || 'Sem nome';
+              const isSel = (defaultFornId && String(defaultFornId) === String(f.id)) || (defaultFornNome && defaultFornNome === fn);
+              return `<option value="${Utils.escapeHtml(f.id)}" data-nome="${Utils.escapeHtml(fn)}" ${isSel ? 'selected' : ''}>${Utils.escapeHtml(fn)}</option>`;
+            }).join('')}
+            <option value="__manual__" ${(!defaultFornId && defaultFornNome && !fornecedores.some(f => (f.nome||f.razao_social) === defaultFornNome)) ? 'selected' : ''}>✏️ Outro (digitar manualmente)...</option>
+          </select>
+          <input type="text" class="form-control orc-cat-forn-manual" data-cat-id="${catId}" value="${Utils.escapeHtml(defaultFornNome || '')}" placeholder="Digite o nome do fornecedor..." style="font-size:.78rem;padding:4px 8px;height:32px;max-width:220px;display:${(!defaultFornId && defaultFornNome && !fornecedores.some(f => (f.nome||f.razao_social) === defaultFornNome)) ? 'block' : 'none'};">
+        </div>
+        <div style="font-size:.72rem;color:var(--text3);font-style:italic;">
+          (Vincula as despesas desta etapa ao fornecedor)
+        </div>
+      </div>
+
       <!-- ITENS DA CATEGORIA -->
       <div class="orc-cat-items-container" id="items-${catId}">
         ${itens.length
@@ -714,6 +806,22 @@ const Orcamentos = {
         }
       </div>
     </div>`;
+  },
+
+  _onCatFornecedorChange(sel) {
+    if (!sel) return;
+    const catId = sel.dataset.catId;
+    const block = document.getElementById(`cb-${catId}`);
+    if (!block) return;
+    const manualInput = block.querySelector('.orc-cat-forn-manual');
+    if (manualInput) {
+      if (sel.value === '__manual__') {
+        manualInput.style.display = 'block';
+        manualInput.focus();
+      } else {
+        manualInput.style.display = 'none';
+      }
+    }
   },
 
   // Linha de um Item/Etapa dentro do formulário
@@ -770,18 +878,21 @@ const Orcamentos = {
       </div>
 
       <!-- Detalhes complementares expansíveis (opcional) -->
-      <div class="form-row cols-3" style="margin-top:8px;padding-top:6px;border-top:1px dashed rgba(255,255,255,.06);gap:8px;">
+      <div class="form-row" style="grid-template-columns: 2fr 1.5fr 1.5fr 1.2fr; margin-top:8px;padding-top:6px;border-top:1px dashed rgba(255,255,255,.06);gap:8px;align-items:center;">
         <div class="form-group" style="margin:0">
-          <input class="form-control item-obs" value="${Utils.escapeHtml(item.observacoes || '')}" placeholder="Observações (especificação, fornecedor, etc.)" style="font-size:.76rem;height:30px">
+          <input class="form-control item-obs" value="${Utils.escapeHtml(item.observacoes || '')}" placeholder="Observações e especificações técnicas..." style="font-size:.76rem;height:30px">
         </div>
-        <div class="form-group" style="margin:0;display:flex;gap:6px">
-          <input type="date" class="form-control item-di" value="${Utils.escapeHtml(item.data_inicio || '')}" title="Início Previsto" style="font-size:.74rem;height:30px">
-          <input type="date" class="form-control item-df" value="${Utils.escapeHtml(item.data_fim || '')}" title="Término Previsto" style="font-size:.74rem;height:30px">
+        <div class="form-group" style="margin:0">
+          <input class="form-control item-forn-custom" value="${Utils.escapeHtml(item.fornecedor_nome || '')}" placeholder="Fornecedor do item (ou da etapa)" style="font-size:.76rem;height:30px" title="Fornecedor específico deste item (opcional)">
         </div>
-        <div class="form-group" style="margin:0;display:flex;align-items:center;gap:8px;">
-          <span style="font-size:.72rem;color:var(--text3);white-space:nowrap">% Exec.:</span>
+        <div class="form-group" style="margin:0;display:flex;gap:4px">
+          <input type="date" class="form-control item-di" value="${Utils.escapeHtml(item.data_inicio || '')}" title="Início Previsto" style="font-size:.72rem;height:30px">
+          <input type="date" class="form-control item-df" value="${Utils.escapeHtml(item.data_fim || '')}" title="Término Previsto" style="font-size:.72rem;height:30px">
+        </div>
+        <div class="form-group" style="margin:0;display:flex;align-items:center;gap:6px;">
+          <span style="font-size:.72rem;color:var(--text3);white-space:nowrap">%:</span>
           <input type="range" class="item-pct-range" min="0" max="100" value="${pct}" style="flex:1;accent-color:var(--accent)" data-fb-input="Patch26Actions.orcamentosSyncNext" data-fb-input-n="1" data-fb-input-t0="self">
-          <input type="number" min="0" max="100" class="form-control item-pct" value="${pct}" style="width:55px;height:30px;font-size:.74rem;padding:2px 4px;text-align:center" data-fb-input="Patch26Actions.orcamentosSyncPrev" data-fb-input-n="1" data-fb-input-t0="self">
+          <input type="number" min="0" max="100" class="form-control item-pct" value="${pct}" style="width:48px;height:30px;font-size:.74rem;padding:2px 4px;text-align:center" data-fb-input="Patch26Actions.orcamentosSyncPrev" data-fb-input-n="1" data-fb-input-t0="self">
           <span style="font-size:.72rem;color:var(--text3)">%</span>
         </div>
       </div>
@@ -1107,7 +1218,7 @@ const Orcamentos = {
 
     const obraId = obraSelect.value;
     const nome = nomeInput.value.trim();
-    const status = statusSelect?.value || 'ativo';
+    const status = statusSelect?.value || (id ? 'ativo' : 'a_revisar');
     const dataCriacao = dataInput?.value || Utils.today();
     const descricao = descInput?.value.trim() || '';
 
@@ -1115,12 +1226,32 @@ const Orcamentos = {
     const catBlocks = document.querySelectorAll('.orc-cat-block');
     const categorias = [];
     const etapas = [];
+    const fornecedores = DB.getAll('fornecedores') || [];
 
     catBlocks.forEach(catEl => {
       const catId = catEl.dataset.catId || DB.uuid();
       const catNome = catEl.querySelector('.orc-cat-title-input')?.value.trim() || catEl.dataset.catNome || 'Categoria';
       const catIcone = catEl.dataset.catIcone || '📁';
-      categorias.push({ id: catId, nome: catNome, icone: catIcone });
+
+      const fornSel = catEl.querySelector('.orc-cat-forn');
+      const fornManual = catEl.querySelector('.orc-cat-forn-manual');
+      let catFornId = fornSel?.value || '';
+      let catFornNome = '';
+      if (catFornId === '__manual__') {
+        catFornId = '';
+        catFornNome = fornManual?.value.trim() || '';
+      } else if (catFornId) {
+        const found = fornecedores.find(f => String(f.id) === String(catFornId));
+        catFornNome = found ? (found.nome || found.razao_social) : (fornSel.options[fornSel.selectedIndex]?.text || '');
+      }
+
+      categorias.push({
+        id: catId,
+        nome: catNome,
+        icone: catIcone,
+        fornecedor_id: catFornId,
+        fornecedor_nome: catFornNome
+      });
 
       const itemRows = catEl.querySelectorAll('.orc-item-row');
       itemRows.forEach(row => {
@@ -1137,6 +1268,10 @@ const Orcamentos = {
         const di = row.querySelector('.item-di')?.value || '';
         const df = row.querySelector('.item-df')?.value || '';
         const obs = row.querySelector('.item-obs')?.value.trim() || '';
+        const itemFornCustom = row.querySelector('.item-forn-custom')?.value.trim() || '';
+
+        const itemFornNome = itemFornCustom || catFornNome;
+        const itemFornId = itemFornCustom ? '' : catFornId;
 
         etapas.push({
           id: itemId,
@@ -1151,7 +1286,9 @@ const Orcamentos = {
           percentual_execucao: pct,
           data_inicio: di,
           data_fim: df,
-          observacoes: obs
+          observacoes: obs,
+          fornecedor_id: itemFornId,
+          fornecedor_nome: itemFornNome
         });
       });
     });
@@ -1328,6 +1465,259 @@ const Orcamentos = {
     Utils.toast('Item atualizado!', 'success');
   },
 
+  // ── WORKFLOW DE STATUS (A REVISAR, APROVAR, CANCELAR) ──
+  aprovar(id) {
+    const orc = DB.getById('orcamentos', id);
+    if (!orc) return;
+    DB.update('orcamentos', id, {
+      status: 'aprovado',
+      data_aprovacao: Utils.today()
+    });
+    Utils.toast('Orçamento aprovado com sucesso! Agora você pode gerar as despesas financeiras.', 'success');
+    this._refresh();
+  },
+
+  cancelar(id) {
+    const orc = DB.getById('orcamentos', id);
+    if (!orc) return;
+    Utils.confirm(`Tem certeza que deseja cancelar o orçamento <strong>${Utils.escapeHtml(orc.nome || orc.titulo || '')}</strong>?`, () => {
+      DB.update('orcamentos', id, {
+        status: 'cancelado',
+        data_cancelamento: Utils.today()
+      });
+      Utils.toast('Orçamento cancelado.', 'info');
+      this._refresh();
+    });
+  },
+
+  colocarEmRevisao(id) {
+    const orc = DB.getById('orcamentos', id);
+    if (!orc) return;
+    DB.update('orcamentos', id, {
+      status: 'a_revisar'
+    });
+    Utils.toast('Orçamento colocado em revisão.', 'info');
+    this._refresh();
+  },
+
+  // ── GERAÇÃO DE DESPESAS FINANCEIRAS POR ETAPA / FORNECEDOR ──
+  abrirModalGerarDespesa(id) {
+    const orc = DB.getById('orcamentos', id);
+    if (!orc) return;
+    const cliente = DB.getById('clientes', orc.obra_id);
+    const contas = DB.getAll('contas') || [];
+    const fornecedores = DB.getAll('fornecedores') || [];
+    const itens = Array.isArray(orc.etapas) ? orc.etapas : (Array.isArray(orc.itens) ? orc.itens : []);
+    const grouped = this._groupItensByCategoria(orc, itens);
+    const catList = Object.values(grouped);
+    const safeId = encodeURIComponent(String(orc.id));
+
+    Utils.showModal(`
+      <div class="modal modal-lg" style="max-width:840px;width:95vw;">
+        <div class="modal-header" style="border-bottom:1px solid var(--border);padding:16px 20px;">
+          <div style="display:flex;align-items:center;gap:10px;">
+            <span style="font-size:1.4rem;">💰</span>
+            <div>
+              <span class="modal-title" style="display:block">Gerar Despesas Financeiras do Orçamento</span>
+              <span style="font-size:.76rem;color:var(--text3)">Crie os lançamentos a pagar/pagos por etapa com seus respectivos fornecedores</span>
+            </div>
+          </div>
+          <button class="modal-close" data-fb-click="Utils.closeModal" data-fb-click-n="0">✕</button>
+        </div>
+
+        <div class="modal-body" style="padding:20px;max-height:calc(85vh - 120px);overflow-y:auto;">
+          <!-- RESUMO DO ORÇAMENTO -->
+          <div style="background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--r-md);padding:16px;margin-bottom:20px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;">
+              <div>
+                <h3 style="margin:0;font-size:1.15rem;font-weight:800;color:var(--text);">${Utils.escapeHtml(orc.nome || orc.titulo || 'Orçamento')}</h3>
+                <div style="font-size:.8rem;color:var(--text3);margin-top:4px;">
+                  🏢 <strong>Obra:</strong> ${Utils.escapeHtml(cliente?.nome || cliente?.cliente || 'Obra Geral')} | 
+                  📅 <strong>Data:</strong> ${Utils.fmt.date(orc.data_criacao || Utils.today())}
+                </div>
+              </div>
+              <div style="text-align:right;">
+                <div style="font-size:.7rem;text-transform:uppercase;color:var(--text3);font-weight:700">Total Previsto</div>
+                <div style="font-size:1.3rem;font-weight:900;color:var(--accent)">${Utils.fmt.currency(orc.valor_total_previsto || orc.valor_total || 0)}</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- PARÂMETROS GERAIS -->
+          <div class="form-row cols-3" style="margin-bottom:18px;">
+            <div class="form-group">
+              <label class="form-label">Conta Bancária de Saída *</label>
+              <select id="gen-desp-conta" class="form-control" required>
+                <option value="">Selecione a conta bancária...</option>
+                ${contas.map(ct => `<option value="${Utils.escapeHtml(ct.apelido || ct.banco_nome || 'Conta')}">${Utils.escapeHtml(ct.apelido || ct.banco_nome)} (${Utils.escapeHtml(ct.agencia || '—')}/${Utils.escapeHtml(ct.numero || '—')})</option>`).join('')}
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Data de Vencimento Inicial</label>
+              <input type="date" id="gen-desp-vencimento" class="form-control" value="${Utils.today()}">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Status Inicial dos Lançamentos</label>
+              <select id="gen-desp-status" class="form-control">
+                <option value="a_pagar">⏳ A Pagar (Contas a Pagar)</option>
+                <option value="pago">✓ Pago (Já Liquidado)</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- SELEÇÃO DAS ETAPAS -->
+          <div style="margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;">
+            <span style="font-size:.82rem;font-weight:800;color:var(--text);text-transform:uppercase;letter-spacing:.5px;">
+              Macro-Etapas a Lançar (${catList.length})
+            </span>
+            <label style="font-size:.76rem;color:var(--accent);cursor:pointer;display:flex;align-items:center;gap:6px;user-select:none;margin:0;">
+              <input type="checkbox" id="gen-desp-check-all" checked data-fb-change="Orcamentos._toggleSelectAllDespesas" data-fb-change-n="1" data-fb-change-t0="self">
+              Selecionar Todas
+            </label>
+          </div>
+
+          <div class="tbl-wrap" style="border:1px solid var(--border);border-radius:var(--r-md);overflow:hidden;">
+            <table style="width:100%;margin:0;">
+              <thead>
+                <tr style="background:var(--bg-secondary);">
+                  <th style="width:40px;text-align:center;">#</th>
+                  <th style="width:28%">Macro-Etapa</th>
+                  <th style="width:34%">Fornecedor da Despesa</th>
+                  <th style="width:22%;text-align:right;">Valor da Despesa (R$)</th>
+                </tr>
+              </thead>
+              <tbody id="gen-desp-tbody">
+                ${catList.map((cat, idx) => {
+                  const subPrev = cat.itens.reduce((s, e) => s + (Number(e.valor_previsto) || 0), 0);
+                  const defaultFornId = cat.fornecedor_id || '';
+                  const defaultFornNome = cat.fornecedor_nome || (cat.itens.find(i => i.fornecedor_nome)?.fornecedor_nome || '');
+
+                  return `
+                  <tr class="gen-desp-row" data-cat-id="${cat.id}">
+                    <td style="text-align:center;">
+                      <input type="checkbox" class="gen-desp-chk" checked data-idx="${idx}">
+                    </td>
+                    <td>
+                      <div style="font-weight:700;color:var(--text);display:flex;align-items:center;gap:6px;">
+                        <span>${cat.icone || '📋'}</span>
+                        <span>${Utils.escapeHtml(cat.nome)}</span>
+                      </div>
+                      <div style="font-size:.72rem;color:var(--text3);">${cat.itens.length} item(ns) orçado(s)</div>
+                    </td>
+                    <td>
+                      <select class="form-control gen-desp-forn" style="font-size:.78rem;padding:4px 8px;height:32px;">
+                        <option value="">Selecione o fornecedor...</option>
+                        ${fornecedores.map(f => {
+                          const fn = f.nome || f.razao_social || 'Sem nome';
+                          const isSel = (defaultFornId && String(defaultFornId) === String(f.id)) || (defaultFornNome && defaultFornNome === fn);
+                          return `<option value="${Utils.escapeHtml(f.id)}" data-nome="${Utils.escapeHtml(fn)}" ${isSel ? 'selected' : ''}>${Utils.escapeHtml(fn)}</option>`;
+                        }).join('')}
+                        ${defaultFornNome && !fornecedores.some(f => (f.nome||f.razao_social) === defaultFornNome) ? `
+                          <option value="__custom__" data-nome="${Utils.escapeHtml(defaultFornNome)}" selected>${Utils.escapeHtml(defaultFornNome)}</option>
+                        ` : ''}
+                      </select>
+                    </td>
+                    <td style="text-align:right;">
+                      <div class="input-prefix" style="max-width:140px;margin-left:auto;">
+                        <span class="input-pfx-txt" style="font-size:.75rem;">R$</span>
+                        <input type="number" step="0.01" min="0" class="form-control gen-desp-val" value="${subPrev.toFixed(2)}" style="font-size:.8rem;height:32px;text-align:right;font-weight:700;">
+                      </div>
+                    </td>
+                  </tr>`;
+                }).join('')}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="modal-footer" style="padding:14px 20px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:10px;">
+          <button class="btn btn-secondary" data-fb-click="Utils.closeModal" data-fb-click-n="0">Cancelar</button>
+          <button class="btn btn-primary" data-fb-click="Orcamentos.confirmarGerarDespesaSubmit" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${safeId}" style="font-weight:800;background:linear-gradient(135deg,#c9a227,#eab308);border:none;color:#000;">
+            ✓ Confirmar e Lançar Despesas
+          </button>
+        </div>
+      </div>
+    `);
+  },
+
+  _toggleSelectAllDespesas(chk) {
+    const isChecked = !!chk?.checked;
+    document.querySelectorAll('.gen-desp-chk').forEach(c => c.checked = isChecked);
+  },
+
+  confirmarGerarDespesaSubmit(id) {
+    const orc = DB.getById('orcamentos', id);
+    if (!orc) return;
+
+    const contaBancaria = document.getElementById('gen-desp-conta')?.value || '';
+    const vencimento = document.getElementById('gen-desp-vencimento')?.value || Utils.today();
+    const statusLanc = document.getElementById('gen-desp-status')?.value || 'a_pagar';
+
+    const fornecedores = DB.getAll('fornecedores') || [];
+    const rows = document.querySelectorAll('.gen-desp-row');
+    const lancamentosCriados = [];
+
+    rows.forEach(row => {
+      const chk = row.querySelector('.gen-desp-chk');
+      if (!chk || !chk.checked) return;
+
+      const catId = row.dataset.catId;
+      const cat = (orc.categorias || []).find(c => c.id === catId) || {};
+      const catNome = cat.nome || 'Etapa do Orçamento';
+
+      const fornSel = row.querySelector('.gen-desp-forn');
+      let fornId = fornSel?.value || '';
+      let fornNome = '';
+
+      if (fornId && fornId !== '__custom__') {
+        const found = fornecedores.find(f => String(f.id) === String(fornId));
+        fornNome = found ? (found.nome || found.razao_social) : (fornSel.options[fornSel.selectedIndex]?.text || '');
+      } else if (fornSel && fornSel.selectedIndex >= 0) {
+        fornNome = fornSel.options[fornSel.selectedIndex]?.dataset?.nome || fornSel.options[fornSel.selectedIndex]?.text || '';
+        fornId = '';
+      }
+
+      const val = parseFloat(row.querySelector('.gen-desp-val')?.value) || 0;
+      if (val <= 0) return;
+
+      const novoLanc = DB.add('lancamentos', {
+        obra_id: orc.obra_id,
+        tipo: 'despesa',
+        data: Utils.today(),
+        data_vencimento: vencimento,
+        descricao: `[Orçamento: ${orc.nome || orc.titulo || 'Obra'}] ${catNome}`,
+        categoria: 'servico',
+        categoria_obra: catNome,
+        valor: val,
+        status: statusLanc,
+        fornecedor_beneficiario: fornNome || 'Fornecedor da Etapa',
+        fornecedor_id: fornId || '',
+        conta_bancaria: contaBancaria,
+        observacoes: `Gerado a partir do Orçamento "${orc.nome || orc.titulo}" aprovado. Etapa: ${catNome}`,
+        origem: 'orcamento',
+        orcamento_id: orc.id,
+        conciliado: false
+      });
+
+      lancamentosCriados.push(novoLanc.id);
+    });
+
+    if (!lancamentosCriados.length) {
+      Utils.toast('Selecione pelo menos uma etapa com valor para gerar despesa.', 'warning');
+      return;
+    }
+
+    DB.update('orcamentos', id, {
+      despesas_geradas: true,
+      despesas_geradas_em: new Date().toISOString(),
+      despesas_lancamentos_ids: lancamentosCriados
+    });
+
+    Utils.closeModal();
+    Utils.toast(`Sucesso! ${lancamentosCriados.length} lançamento(s) de despesa gerado(s) no Financeiro.`, 'success');
+    this._refresh();
+  },
+
   del(id) {
     Utils.confirm('Tem certeza que deseja excluir este orçamento permanentemente?', () => {
       DB.remove('orcamentos', id);
@@ -1401,23 +1791,28 @@ const Orcamentos = {
         </div>
 
         ${Object.values(grouped).map(cat => `
-          <div class="cat-title">${Utils.escapeHtml(cat.nome)}</div>
+          <div class="cat-title" style="display:flex;justify-content:space-between;align-items:center;">
+            <span>${Utils.escapeHtml(cat.nome)}</span>
+            ${cat.fornecedor_nome ? `<span style="font-size:12px;font-weight:600;color:#64748b">Fornecedor: ${Utils.escapeHtml(cat.fornecedor_nome)}</span>` : ''}
+          </div>
           <table>
             <thead>
               <tr>
                 <th>Item / Descrição</th>
-                <th style="width:60px">Unid.</th>
-                <th class="num" style="width:70px">Qtd.</th>
-                <th class="num" style="width:110px">Unitário</th>
-                <th class="num" style="width:120px">Previsto (R$)</th>
-                <th class="num" style="width:120px">Realizado (R$)</th>
-                <th class="num" style="width:70px">% Exec.</th>
+                <th style="width:130px">Fornecedor</th>
+                <th style="width:50px">Unid.</th>
+                <th class="num" style="width:60px">Qtd.</th>
+                <th class="num" style="width:90px">Unitário</th>
+                <th class="num" style="width:110px">Previsto (R$)</th>
+                <th class="num" style="width:110px">Realizado (R$)</th>
+                <th class="num" style="width:60px">% Exec.</th>
               </tr>
             </thead>
             <tbody>
               ${cat.itens.map(e => `
                 <tr>
                   <td><strong>${Utils.escapeHtml(e.nome)}</strong> ${e.observacoes ? `<br><small style="color:#64748b">${Utils.escapeHtml(e.observacoes)}</small>` : ''}</td>
+                  <td>${Utils.escapeHtml(e.fornecedor_nome || cat.fornecedor_nome || '—')}</td>
                   <td>${Utils.escapeHtml(e.unidade || 'un')}</td>
                   <td class="num">${e.quantidade || 1}</td>
                   <td class="num">${Utils.fmt.currency(e.valor_unitario)}</td>

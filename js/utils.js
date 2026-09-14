@@ -150,6 +150,11 @@ const Utils = {
       rejeitada:'<span class="badge badge-danger">✕ Rejeitada</span>',
       paga:'<span class="badge badge-success">✓ Paga</span>',
       ativo:'<span class="badge badge-success">✓ Ativo</span>',
+      a_revisar:'<span class="badge" style="background:rgba(245,158,11,.18);color:#f59e0b;border:1px solid rgba(245,158,11,.4);font-weight:700;">🟡 A Revisar</span>',
+      revisao:'<span class="badge" style="background:rgba(245,158,11,.18);color:#f59e0b;border:1px solid rgba(245,158,11,.4);font-weight:700;">🟡 A Revisar</span>',
+      aprovado:'<span class="badge badge-success" style="background:rgba(16,185,129,.18);color:#34d399;border:1px solid rgba(16,185,129,.4);font-weight:700;">🟢 Aprovado</span>',
+      cancelado:'<span class="badge badge-danger" style="background:rgba(239,68,68,.18);color:#f87171;border:1px solid rgba(239,68,68,.4);font-weight:700;">🔴 Cancelado</span>',
+      despesa_gerada:'<span class="badge" style="background:rgba(201,162,39,.18);color:var(--accent2);border:1px solid rgba(201,162,39,.4);font-weight:700;">💰 Despesas Geradas</span>',
     };
     return m[status] || `<span class="badge badge-secondary">${this.escapeHtml(status || '')}</span>`;
   },
