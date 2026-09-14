@@ -589,12 +589,13 @@ export default async function handler(req, res) {
 
     // ── 2.2 POST /api/auth?action=mfa_setup ─────────────────────────────────────
     if (req.method === 'POST' && action === 'mfa_setup') {
-      const { mfa_token } = req.body || {};
+      const { mfa_token, setup_token } = req.body || {};
+      const rawSetupToken = mfa_token || setup_token; // aceita ambos os nomes de campo
       let targetUserId = null;
       let targetUsername = 'admin';
 
-      if (mfa_token) {
-        const decoded = verifyToken(mfa_token, secret);
+      if (rawSetupToken) {
+        const decoded = verifyToken(rawSetupToken, secret);
         if (!decoded || (decoded.purpose !== 'mfa_setup' && decoded.purpose !== 'mfa_pending') || !decoded.userId) {
           return res.status(401).json({ success: false, message: 'Token de configuração MFA inválido ou expirado.' });
         }
@@ -623,14 +624,17 @@ export default async function handler(req, res) {
         exp: Date.now() + 15 * 60 * 1000
       }, secret);
 
+      const formattedSecret = generatedSecret.match(/.{1,4}/g)?.join(' ') || generatedSecret;
       return res.status(200).json({
         success: true,
         secret: generatedSecret,
-        formatted_secret: generatedSecret.match(/.{1,4}/g)?.join(' ') || generatedSecret,
+        secret_formatted: formattedSecret,   // campo esperado pelo frontend
+        formatted_secret: formattedSecret,   // alias de compatibilidade
         uri,
         qr_svg: qrSvg,
         backup_codes: backup.rawCodes,
-        setup_token: confirmToken
+        setup_token: confirmToken,
+        mfa_token: confirmToken              // alias para o frontend usar no activate
       });
     }
 

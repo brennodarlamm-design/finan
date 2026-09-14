@@ -119,6 +119,10 @@ async function iniciarEtapaSetupMfa(setupToken) {
     return;
   }
 
+  // Atualiza o token para o de confirmação retornado pelo servidor
+  const confirmToken = setupData.setup_token || setupData.mfa_token;
+  if (confirmToken) currentSetupToken = confirmToken;
+
   if (qrContainer && setupData.qr_svg) {
     qrContainer.innerHTML = setupData.qr_svg;
   }
