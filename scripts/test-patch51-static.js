@@ -57,6 +57,7 @@ assert(patch.includes('Soma dos SLAs'), 'Central possui componente de soma total
 assert(followup.includes("document.getElementById('od-tab-content')"), 'Soma dos SLAs usa o container real da Central de Obras');
 assert(followup.includes('WORKFLOW_FIRST_STAGE_UNASSIGNED') && followup.includes('Configurações > SLAs'), 'Criação de obra avisa quando falta responsável na primeira etapa');
 assert(followup.includes('Prazo estimado') && followup.includes('p51-task-complete'), 'Fila Minhas Etapas exibe prazo estimado e vencimento');
+assert(followup.includes('📝 Orientação:') && followup.includes('task.observacoes'), 'Fila Minhas Etapas mostra a orientação específica deixada pelo gestor');
 assert(followup.includes('Central de Alertas e Demandas') && followup.includes("id:`workflow_${task.obra_id}_${task.etapa_id}`"), 'Demandas do workflow entram na Central de Alertas');
 assert(followup.includes('FinObra — Nova etapa atribuída'), 'Nova atribuição pode gerar notificação nativa quando já autorizada');
 
