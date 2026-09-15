@@ -311,10 +311,18 @@
             <input class="inp" type="password" id="password" name="password" value="" placeholder="Digite sua senha" autocomplete="current-password" required>
             <button type="button" class="eye-btn" id="eye-btn" data-fb-click="togglePwd" data-fb-click-n="0" title="Mostrar/Ocultar senha">
               <svg id="eye-icon" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>
+                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8z"/><circle cx="12" cy="12" r="3"/>
               </svg>
             </button>
           </div>
+        </div>
+        <div class="fgroup">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+            <label class="label" for="accessKey" style="margin-bottom:0;">Chave da Empresa</label>
+            <span style="font-size:.72rem;color:var(--accent2);font-weight:600;">Obrigatória para clientes</span>
+          </div>
+          <input class="inp" type="text" id="accessKey" name="accessKey" value="" placeholder="Ex: FO-ABC123-DEF456-..." autocomplete="organization" required style="font-family:monospace;letter-spacing:1px;text-transform:uppercase;">
+          <div style="font-size:.72rem;color:var(--text3);margin-top:4px;">Chave exclusiva fornecida à sua construtora para acesso seguro.</div>
         </div>
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
           <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:.83rem;color:var(--text2);">
@@ -353,7 +361,7 @@
 
         <div style="text-align:center;margin-top:16px;">
           <button type="button" data-fb-click="openRegisterModal" data-fb-click-n="0" style="background:none;border:none;color:var(--text2);font-size:.83rem;cursor:pointer;">
-            Não tem uma conta? <strong style="color:var(--accent2);text-decoration:underline;">Cadastrar Nova Empresa</strong>
+            Deseja implantar o FinObra na sua construtora? <strong style="color:var(--accent2);text-decoration:underline;">Solicitar Acesso Comercial</strong>
           </button>
         </div>
       </form>
@@ -369,15 +377,15 @@
   </div>
 </div>
 
-<!-- MODAL DE CADASTRO DE NOVA EMPRESA / CONTA -->
+<!-- MODAL DE SOLICITAÇÃO DE ACESSO COMERCIAL -->
 <div id="register-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:999;align-items:center;justify-content:center;padding:20px;backdrop-filter:blur(8px);">
-  <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:16px;width:100%;max-width:460px;padding:32px;box-shadow:var(--shadow);position:relative;animation:modalIn .25s ease;">
+  <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:16px;width:100%;max-width:480px;padding:32px;box-shadow:var(--shadow);position:relative;animation:modalIn .25s ease;">
     <button data-fb-click="closeRegisterModal" data-fb-click-n="0" style="position:absolute;top:18px;right:18px;background:none;border:none;color:var(--text3);font-size:1.4rem;cursor:pointer;line-height:1;">&times;</button>
     <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;">
       <img src="img/finobra_logo.jpg" alt="FinObra" style="width:44px;height:44px;border-radius:10px;border:1px solid rgba(201,162,39,.4);object-fit:cover;">
       <div>
-        <h3 style="font-size:1.15rem;font-weight:800;color:var(--text);">Cadastrar Minha Empresa no FinObra</h3>
-        <p style="font-size:.78rem;color:var(--text2);margin-top:2px;">Inicie com um sistema 100% limpo e personalizado</p>
+        <h3 style="font-size:1.15rem;font-weight:800;color:var(--text);">Solicitar Acesso ao FinObra</h3>
+        <p style="font-size:.78rem;color:var(--text2);margin-top:2px;">Preencha os dados ou fale diretamente com nosso comercial</p>
       </div>
     </div>
 
@@ -392,28 +400,34 @@
           <input class="inp" type="text" id="reg-nome" placeholder="Ex: Carlos Silva" required>
         </div>
         <div class="fgroup">
-          <label class="label">CNPJ ou CPF (Opcional)</label>
+          <label class="label">CNPJ ou Cidade/UF</label>
           <input class="inp" type="text" id="reg-cnpj" placeholder="00.000.000/0001-00">
         </div>
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
         <div class="fgroup">
-          <label class="label">Nome de Usuário (Login) *</label>
-          <input class="inp" type="text" id="reg-username" placeholder="ex: carlossilva" required>
+          <label class="label">WhatsApp com DDD *</label>
+          <input class="inp" type="text" id="reg-whats" placeholder="Ex: 95 99123-4567" required>
         </div>
         <div class="fgroup">
-          <label class="label">Senha de Acesso *</label>
-          <input class="inp" type="password" id="reg-senha" placeholder="Mínimo 6 caracteres" minlength="6" required>
+          <label class="label">E-mail Comercial *</label>
+          <input class="inp" type="email" id="reg-email" placeholder="contato@minhaempresa.com" required>
         </div>
       </div>
       <div class="fgroup">
-        <label class="label">E-mail de Contato *</label>
-        <input class="inp" type="email" id="reg-email" placeholder="contato@minhaempresa.com" required>
+        <label class="label">Mensagem ou Quantidade de Obras (Opcional)</label>
+        <input class="inp" type="text" id="reg-msg" placeholder="Ex: Tenho 4 obras em andamento e gostaria de conhecer a plataforma">
       </div>
       <div class="err-box" id="reg-err-box" style="margin-bottom:14px;"></div>
-      <button type="submit" class="btn-primary" id="reg-btn" style="margin-top:8px;">
-        🚀 Criar Conta e Abrir Sistema Zerado
+      <div id="reg-ok-box" style="display:none;background:rgba(34,197,94,.12);border:1px solid rgba(34,197,94,.35);color:#86efac;padding:12px;border-radius:8px;font-size:.82rem;line-height:1.4;margin-bottom:14px;"></div>
+      <button type="submit" class="btn-primary" id="reg-btn" style="margin-top:4px;">
+        📋 Enviar Solicitação Comercial
       </button>
+
+      <div style="text-align:center;margin:12px 0 8px;font-size:.76rem;color:var(--text3);">ou atendimento imediato:</div>
+      <a href="https://wa.me/5595991363678?text=Ol%C3%A1!%20Gostaria%20de%20solicitar%20acesso%20ao%20FinObra%20para%20minha%20construtora." target="_blank" rel="noopener noreferrer" style="display:flex;align-items:center;justify-content:center;gap:8px;text-decoration:none;background:#25D366;color:#fff;font-weight:700;padding:10px 16px;border-radius:8px;font-size:.84rem;">
+        💬 Conversar pelo WhatsApp Comercial
+      </a>
     </form>
   </div>
 </div>

@@ -36,28 +36,42 @@ if (window.location.hash.startsWith('#validar') || window.location.search.includ
     e.preventDefault();
     const btn = document.getElementById('reg-btn');
     btn.disabled = true;
-    btn.textContent = 'Criando conta e preparando sistema...';
+    btn.textContent = 'Enviando solicitação...';
     document.getElementById('reg-err-box').style.display = 'none';
+    const okBox = document.getElementById('reg-ok-box');
+    if (okBox) okBox.style.display = 'none';
 
-    const empNome = document.getElementById('reg-empresa').value.trim();
-    const nome = document.getElementById('reg-nome').value.trim();
-    const cnpj = document.getElementById('reg-cnpj').value.trim();
-    const username = document.getElementById('reg-username').value.trim();
-    const senha = document.getElementById('reg-senha').value;
-    const email = document.getElementById('reg-email').value.trim();
+    const empNome = (document.getElementById('reg-empresa') || {}).value?.trim() || '';
+    const nome = (document.getElementById('reg-nome') || {}).value?.trim() || '';
+    const cnpj = (document.getElementById('reg-cnpj') || {}).value?.trim() || '';
+    const whats = (document.getElementById('reg-whats') || {}).value?.trim() || '';
+    const email = (document.getElementById('reg-email') || {}).value?.trim() || '';
+    const msg = (document.getElementById('reg-msg') || {}).value?.trim() || '';
 
-    const regResult = await Auth.register({ nome, username, email, senha, empresaNome: empNome, cnpj });
-    if (!regResult.success) {
+    try {
+      const resp = await fetch('/api/auth?action=register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ nome, email, telefone: whats, empresaNome: empNome, cnpj, mensagem: msg })
+      });
+      const data = await resp.json().catch(() => ({}));
+      if (data.success && data.commercial_request) {
+        if (okBox) {
+          okBox.textContent = data.message || 'Solicitação enviada! Nossa equipe entrará em contato em breve.';
+          okBox.style.display = 'block';
+        }
+        btn.textContent = '✓ Solicitação enviada!';
+        setTimeout(() => closeRegisterModal(), 3500);
+      } else {
+        throw new Error(data.message || 'Erro ao enviar solicitação. Tente via WhatsApp.');
+      }
+    } catch (err) {
       const eBox = document.getElementById('reg-err-box');
-      eBox.textContent = regResult.message;
+      eBox.textContent = err.message;
       eBox.style.display = 'block';
       btn.disabled = false;
-      btn.textContent = '🚀 Criar Conta e Abrir Sistema Zerado';
-      return;
+      btn.textContent = '📋 Enviar Solicitação Comercial';
     }
-
-    btn.textContent = '✓ Conta criada com sucesso! Entrando...';
-    setTimeout(() => window.location.replace('/app'), 500);
   });
 
   document.getElementById('login-form').addEventListener('submit', async function(e) {
@@ -71,7 +85,8 @@ if (window.location.hash.startsWith('#validar') || window.location.search.includ
       const u = document.getElementById('username').value.trim();
       const p = document.getElementById('password').value;
       const r = document.getElementById('remember').checked;
-      const result = await Auth.login(u, p, r);
+      const ak = (document.getElementById('accessKey') || {}).value?.trim() || '';
+      const result = await Auth.login(u, p, r, { accessKey: ak });
       if (result.success) {
         btn.innerHTML = '✓ Bem-vindo! Redirecionando...';
         setTimeout(() => window.location.replace('/app'), 350);

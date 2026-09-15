@@ -827,143 +827,55 @@ export default async function handler(req, res) {
     }
 
     // ── 3. POST /api/auth?action=register (Cadastro de novo Tenant SaaS no Neon) ─
-    if (req.method === 'POST' && action === 'register') {
+    if (req.method === 'POST' && (action === 'register' || action === 'solicitar_acesso' || action === 'request_access')) {
       const clientIp = getClientIp(req);
-      const rl = await checkRateLimit(`reg:${clientIp}`, 5, 3600000); // 5 cadastros por hora por IP
+      const rl = await checkRateLimit(`reg:${clientIp}`, 5, 3600000); // 5 solicitações por hora por IP
       if (!rl.allowed) {
         return res.status(429).json({
           success: false,
-          message: 'Muitos cadastros a partir deste endereço IP. Aguarde antes de tentar novamente.'
+          message: 'Muitas solicitações a partir deste endereço IP. Aguarde antes de tentar novamente.'
         });
       }
 
-      const { nome, username, email, password, senha, empresaNome, cnpj, telefone } = req.body || {};
-      const userPass = (password || senha || '').trim();
+      const { nome, email, telefone, empresaNome, cnpj, mensagem } = req.body || {};
       const rawNome = (nome || '').trim();
-      const rawUsername = (username || '').trim().toLowerCase().replace(/[^a-z0-9._-]/g, '');
       const rawEmail = (email || '').trim().toLowerCase();
+      const rawTelefone = (telefone || '').trim();
+      const rawEmpresa = (empresaNome || '').trim();
+      const rawCnpj = (cnpj || '').trim();
+      const rawMsg = (mensagem || '').trim();
 
-      if (!rawNome || !rawUsername || !userPass || !rawEmail) {
-        return res.status(400).json({ success: false, message: 'Nome, usuário, e-mail e senha são obrigatórios.' });
+      if (!rawNome || !rawEmail) {
+        return res.status(400).json({ success: false, message: 'Nome e e-mail de contato são obrigatórios.' });
       }
 
       if (!rawEmail.includes('@') || !rawEmail.includes('.')) {
         return res.status(400).json({ success: false, message: 'Informe um endereço de e-mail válido.' });
       }
 
-      if (rawUsername.length < 3) {
-        return res.status(400).json({ success: false, message: 'O nome de usuário deve ter pelo menos 3 caracteres alfanuméricos.' });
-      }
-
-      if (userPass.length < 8) {
-        return res.status(400).json({ success: false, message: 'A senha deve ter no mínimo 8 caracteres.' });
-      }
-
-      // Verifica se usuário ou e-mail já existe
-      const existing = await sql`
-        SELECT id, username, email FROM usuarios
-        WHERE LOWER(username) = ${rawUsername} OR LOWER(email) = ${rawEmail}
-        LIMIT 1;
-      `;
-
-      if (existing.length > 0) {
-        const isEmail = existing[0].email && existing[0].email.toLowerCase() === rawEmail;
-        return res.status(409).json({
-          success: false,
-          message: isEmail ? 'Este e-mail já está cadastrado.' : 'Este nome de usuário já está em uso. Escolha outro.'
-        });
-      }
-
-      // Criação Atômica de Tenant, Obra Sede e Usuário Administrador (H-13)
-      const newTenantId = 'tenant_' + crypto.randomBytes(6).toString('hex');
-      const newUserId = 'usr_' + crypto.randomBytes(6).toString('hex');
-      const finalEmpresaNome = (empresaNome || rawNome + ' Empreendimentos').trim();
-      const passHash = hashPassword(userPass);
-
+      const reqId = 'req_' + crypto.randomBytes(6).toString('hex');
       try {
-        // Trava de segurança SaaS: Cadastro público SEMPRE inicia como plano 'trial' e status 'trial'
         await sql`
-          INSERT INTO tenants (id, razao_social, nome_fantasia, email, telefone, cnpj, responsavel, plano, status)
+          INSERT INTO access_requests (id, nome, email, telefone, empresa_nome, cnpj, mensagem, ip)
           VALUES (
-            ${newTenantId},
-            ${finalEmpresaNome},
-            ${finalEmpresaNome},
-            ${rawEmail},
-            ${(telefone || '').trim() || null},
-            ${(cnpj || '').trim() || null},
+            ${reqId},
             ${rawNome},
-            'trial',
-            'trial'
+            ${rawEmail},
+            ${rawTelefone || null},
+            ${rawEmpresa || null},
+            ${rawCnpj || null},
+            ${rawMsg || null},
+            ${clientIp}
           );
         `;
-
-        // Obra de sistema para integridade de lançamentos administrativos
-        await sql`
-          INSERT INTO obras (id, tenant_id, nome, cliente, status)
-          VALUES ('escritorio', ${newTenantId}, 'Sede / Escritório Central', 'Administrativo', 'sistema')
-          ON CONFLICT (tenant_id, id) DO NOTHING;
-        `;
-
-        await sql`
-          INSERT INTO usuarios (id, tenant_id, username, email, senha_hash, nome, perfil, avatar, ativo)
-          VALUES (
-            ${newUserId},
-            ${newTenantId},
-            ${rawUsername},
-            ${rawEmail},
-            ${passHash},
-            ${rawNome},
-            'admin',
-            ${rawNome.slice(0, 2).toUpperCase()},
-            TRUE
-          );
-        `;
-      } catch (atomicErr) {
-        // Rollback compensatório para evitar tenants ou obras órfãs
-        try {
-          await sql`DELETE FROM usuarios WHERE tenant_id = ${newTenantId};`;
-          await sql`DELETE FROM obras WHERE tenant_id = ${newTenantId};`;
-          await sql`DELETE FROM tenants WHERE id = ${newTenantId};`;
-        } catch {}
-        throw atomicErr;
+      } catch (insertErr) {
+        console.error('Erro ao gravar solicitação de acesso:', insertErr.message);
       }
-
-      const exp = Date.now() + 30 * 24 * 60 * 60 * 1000; // 30 dias
-      const sessionId = await createAuthSession(sql, req, { userId:newUserId, tenantId:newTenantId, remember:true, exp });
-      const payload = {
-        userId: newUserId,
-        username: rawUsername,
-        email: rawEmail,
-        nome: rawNome,
-        perfil: 'admin',
-        tenantId: newTenantId,
-        tenantStatus: 'trial',
-        empresaNome: finalEmpresaNome,
-        avatar: rawNome.slice(0, 2).toUpperCase(),
-        permissions: {},
-        sessionId,
-        exp
-      };
-
-      const token = signToken(payload, secret);
-      setSessionCookie(req, res, token, exp);
 
       return res.status(200).json({
         success: true,
-        ...tokenFieldForExplicitClient(req, token),
-        user: {
-          id: newUserId,
-          username: rawUsername,
-          email: rawEmail,
-          nome: rawNome,
-          perfil: 'admin',
-          avatar: payload.avatar,
-          tenantId: newTenantId,
-          empresaNome: finalEmpresaNome,
-          permissions: {},
-          sessionId,
-          remember: true
-        }
+        commercial_request: true,
+        message: 'Sua solicitação de acesso foi recebida com sucesso! Nossa equipe comercial entrará em contato para ativar sua construtora no FinObra.'
       });
     }
 
@@ -1042,55 +954,11 @@ export default async function handler(req, res) {
           userRecord.avatar = picture;
         }
       } else {
-        // Provisiona novo Tenant isolado para novo usuário Google
-        isNew = true;
-        const newTenantId = 'tenant_g_' + crypto.randomBytes(6).toString('hex');
-        const newUserId = 'usr_g_' + crypto.randomBytes(6).toString('hex');
-        const cleanUser = email.split('@')[0].replace(/[^a-z0-9._-]/g, '') + '_' + crypto.randomBytes(2).toString('hex');
-        const randomPassHash = hashPassword(crypto.randomBytes(32).toString('hex'));
-
-        await sql`
-          INSERT INTO tenants (id, razao_social, nome_fantasia, email, responsavel, plano, status)
-          VALUES (
-            ${newTenantId},
-            ${nome + ' Construtora LTDA'},
-            ${nome + ' Construtora'},
-            ${email},
-            ${nome},
-            'trial',
-            'trial'
-          );
-        `;
-
-        await sql`
-          INSERT INTO usuarios (id, tenant_id, username, email, senha_hash, nome, perfil, avatar, ativo, google_auth, google_sub)
-          VALUES (
-            ${newUserId},
-            ${newTenantId},
-            ${cleanUser},
-            ${email},
-            ${randomPassHash},
-            ${nome},
-            'admin',
-            ${picture || nome.slice(0, 2).toUpperCase()},
-            TRUE,
-            TRUE,
-            ${googleSub}
-          );
-        `;
-
-        userRecord = {
-          id: newUserId,
-          username: cleanUser,
-          email,
-          nome,
-          perfil: 'admin',
-          avatar: picture || nome.slice(0, 2).toUpperCase(),
-          tenant_id: newTenantId,
-          tenant_status: 'trial',
-          nome_fantasia: nome + ' Construtora',
-          permissoes: {}
-        };
+        return res.status(403).json({
+          success: false,
+          not_registered: true,
+          message: 'Esta conta Google não está vinculada a nenhuma construtora cadastrada no FinObra. Solicite acesso ao administrador da sua empresa ou à nossa equipe comercial.'
+        });
       }
 
       const exp = Date.now() + 30 * 24 * 60 * 60 * 1000; // 30 dias
