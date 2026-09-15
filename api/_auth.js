@@ -132,11 +132,13 @@ function trialExpired(createdAt, trialDays = 15, explicitDueDate = null) {
  * - API_SECRET não é aceito por query string (evita vazamento em URL/logs).
  */
 export function getSessionSigningSecret() {
-  return String(process.env.SESSION_SIGNING_SECRET || process.env.API_SECRET || process.env.VERCEL_API_SECRET || '').trim();
+  // Requer SESSION_SIGNING_SECRET dedicado — sem fallback para evitar mistura com chave interna.
+  return String(process.env.SESSION_SIGNING_SECRET || '').trim();
 }
 
 export function getInternalApiSecret() {
-  return String(process.env.INTERNAL_API_SECRET || process.env.API_SECRET || process.env.VERCEL_API_SECRET || '').trim();
+  // Requer INTERNAL_API_SECRET dedicado — sem fallback para evitar que vire chave de sessão.
+  return String(process.env.INTERNAL_API_SECRET || '').trim();
 }
 
 export async function resolveAuthAndTenant(req) {
@@ -176,7 +178,10 @@ export async function resolveAuthAndTenant(req) {
     };
   }
 
-  const payload = verifyToken(rawToken, sessionSecret) || (sessionSecret !== internalSecret && internalSecret ? verifyToken(rawToken, internalSecret) : null);
+  // PATCH 50: Tokens de usuário são verificados APENAS com sessionSecret.
+  // Cross-validation com internalSecret foi removida: se a chave interna vazar,
+  // ela não pode ser usada como chave de sessão.
+  const payload = verifyToken(rawToken, sessionSecret);
   if (!payload?.userId || !payload?.tenantId) {
     return { authenticated: false, status: 401, error: 'Token de autenticação inválido ou expirado.' };
   }

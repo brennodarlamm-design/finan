@@ -5,30 +5,50 @@ import crypto from 'crypto';
 
 /**
  * Validação de Assinatura e Token de Autenticação do Webhook
+ *
+ * PATCH 50 — três correções de segurança:
+ *   1. Exige PIX_WEBHOOK_SECRET dedicado; não aceita fallback para API_SECRET genérico.
+ *   2. Usa crypto.timingSafeEqual em todas as comparações (previne timing attacks).
+ *   3. Remove aceitação de segredo via query string (?key=, ?secret=, ?apiKey=),
+ *      que podia vazar em logs de servidor, proxy e CDN.
+ *
+ * Métodos aceitos:
+ *   - Header x-webhook-secret
+ *   - Header asaas-access-token  (Asaas)
+ *   - Header Authorization: Bearer <secret>
+ *   - Header x-api-key / apikey
  */
 export function isWebhookAuthorized(req) {
-  const webhookSecret = (
-    process.env.PIX_WEBHOOK_SECRET ||
-    process.env.WEBHOOK_SECRET ||
-    process.env.API_SECRET ||
-    process.env.VERCEL_API_SECRET ||
-    ''
-  ).trim();
+  const webhookSecret = String(process.env.PIX_WEBHOOK_SECRET || '').trim();
+  if (!webhookSecret) {
+    console.error('🚨 [Webhook PIX] PIX_WEBHOOK_SECRET não configurado. Todas as requisições serão rejeitadas.');
+    return { authorized: false, error: 'Configuração de segurança do webhook pendente no servidor.' };
+  }
 
-  const asaasToken = (
-    process.env.ASAAS_WEBHOOK_TOKEN ||
-    webhookSecret
-  ).trim();
+  const asaasToken = String(process.env.ASAAS_WEBHOOK_TOKEN || webhookSecret).trim();
 
-  // 1. Cabeçalho explícito x-webhook-secret
+  /** Comparação em tempo constante: evita timing side-channel */
+  function safeCompare(a, b) {
+    if (!a || !b) return false;
+    const bufA = Buffer.from(String(a));
+    const bufB = Buffer.from(String(b));
+    if (bufA.length !== bufB.length) {
+      // Ainda executamos timingSafeEqual para não revelar o comprimento esperado via tempo
+      crypto.timingSafeEqual(bufA, Buffer.alloc(bufA.length));
+      return false;
+    }
+    return crypto.timingSafeEqual(bufA, bufB);
+  }
+
+  // 1. Header x-webhook-secret
   const headerSecret = String(req.headers?.['x-webhook-secret'] || '').trim();
-  if (headerSecret && webhookSecret && headerSecret === webhookSecret) {
+  if (headerSecret && safeCompare(headerSecret, webhookSecret)) {
     return { authorized: true, source: 'x-webhook-secret' };
   }
 
-  // 2. Cabeçalho Asaas asaas-access-token
+  // 2. Header asaas-access-token
   const asaasHeader = String(req.headers?.['asaas-access-token'] || '').trim();
-  if (asaasHeader && asaasToken && asaasHeader === asaasToken) {
+  if (asaasHeader && safeCompare(asaasHeader, asaasToken)) {
     return { authorized: true, source: 'asaas-access-token' };
   }
 
@@ -36,28 +56,25 @@ export function isWebhookAuthorized(req) {
   const authHeader = String(req.headers?.authorization || req.headers?.Authorization || '').trim();
   if (authHeader.startsWith('Bearer ')) {
     const bearer = authHeader.substring(7).trim();
-    if (bearer && webhookSecret && bearer === webhookSecret) {
+    if (bearer && safeCompare(bearer, webhookSecret)) {
       return { authorized: true, source: 'bearer-secret' };
     }
   }
 
-  // 4. Cabeçalho x-api-key / apikey
+  // 4. Header x-api-key / apikey
   const apiKey = String(req.headers?.['x-api-key'] || req.headers?.apikey || '').trim();
-  if (apiKey && webhookSecret && apiKey === webhookSecret) {
+  if (apiKey && safeCompare(apiKey, webhookSecret)) {
     return { authorized: true, source: 'x-api-key' };
   }
 
-  // 5. Query param apiKey (apenas em dev/homologação caso nenhum header seja enviado)
-  const queryKey = String(req.query?.key || req.query?.secret || req.query?.apiKey || '').trim();
-  if (queryKey && webhookSecret && queryKey === webhookSecret) {
-    return { authorized: true, source: 'query-secret' };
-  }
+  // Query string foi REMOVIDA intencionalmente (PATCH 50): segredos em URL vazam em logs.
 
   return {
     authorized: false,
     error: 'Não autorizado: Token, assinatura ou segredo de webhook inválido ou não fornecido.'
   };
 }
+
 
 /**
  * Normalizador de payloads de múltiplos gateways de pagamento
@@ -386,7 +403,7 @@ export async function sendPaymentReceipt(record) {
         process.env.RENDER_WHATSAPP_URL || 'https://finan-backend-9rxw.onrender.com'
       ).replace(/\/send-message\/?$/, '').replace(/\/+$/, '');
 
-      const secret = (process.env.API_SECRET || process.env.VERCEL_API_SECRET || '').trim();
+      const secret = (process.env.INTERNAL_API_SECRET || '').trim();
 
       const wpRes = await fetch(`${renderBaseUrl}/send-message`, {
         method: 'POST',

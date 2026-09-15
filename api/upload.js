@@ -320,9 +320,13 @@ export default async function handler(req, res) {
       });
     }
 
-    // Validação estrita de Magic Bytes para prevenir disfarce de extensão (RCE/XSS/Bypass)
-    const magicHex = buffer.slice(0, 8).toString('hex').toUpperCase();
-    const isExeOrScript = magicHex.startsWith('4D5A') || magicHex.startsWith('7F454C46') || buffer.slice(0, 30).toString('utf8').toLowerCase().includes('<html') || buffer.slice(0, 10).toString('utf8').startsWith('#!/');
+    // ── PATCH 50: Validação cruzada extensão × MIME × magic bytes ───────────────
+    // Leitura prévia dos magic bytes (primeiros 12 bytes) antes da tabela
+    const magicHex = buffer.slice(0, 12).toString('hex').toUpperCase();
+    // Bloquear imediatamente executáveis e scripts (PE, ELF, HTML, shebang)
+    const isExeOrScript = magicHex.startsWith('4D5A') || magicHex.startsWith('7F454C46')
+      || buffer.slice(0, 30).toString('utf8').toLowerCase().includes('<html')
+      || buffer.slice(0, 10).toString('utf8').startsWith('#!/');
     if (isExeOrScript) {
       return res.status(400).json({
         success: false,
@@ -330,20 +334,60 @@ export default async function handler(req, res) {
       });
     }
 
-    if (cleanMime === 'application/octet-stream') {
-      const isKnownMagic = magicHex.startsWith('25504446') || magicHex.startsWith('89504E47') || magicHex.startsWith('FFD8FF') || magicHex.startsWith('504B0304') || magicHex.startsWith('52494646');
-      if (!isKnownMagic) {
-        return res.status(400).json({
-          success: false,
-          error: 'Tipo genérico octet-stream sem assinatura binária reconhecida é proibido.'
-        });
-      }
-    } else if (!ALLOWED_MIMES.includes(cleanMime)) {
+    // Tabela declarativa: cada extensão tem um MIME canônico esperado e um prefixo binário.
+    // textOnly = true: arquivos de texto puro sem magic bytes fixos;
+    //                  verificamos apenas que não são binários executáveis/markup.
+    const MIME_MAGIC_TABLE = [
+      { exts: ['pdf'],         mime: ['application/pdf'],                                                   magic: ['25504446'] },          // %PDF
+      { exts: ['png'],         mime: ['image/png'],                                                         magic: ['89504E47'] },          // PNG
+      { exts: ['jpg','jpeg'],  mime: ['image/jpeg'],                                                        magic: ['FFD8FF'] },            // JPEG SOI
+      { exts: ['webp'],        mime: ['image/webp'],                                                        magic: ['52494646'] },          // RIFF....WEBP
+      { exts: ['zip'],         mime: ['application/zip','application/x-zip-compressed'],                    magic: ['504B0304','504B0506','504B0708'] },
+      { exts: ['xlsx'],        mime: ['application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'], magic: ['504B0304'] },          // OOXML = ZIP
+      { exts: ['docx'],        mime: ['application/vnd.openxmlformats-officedocument.wordprocessingml.document'], magic: ['504B0304'] },
+      { exts: ['xls'],         mime: ['application/vnd.ms-excel'],                                         magic: ['D0CF11E0'] },          // OLE2
+      { exts: ['doc'],         mime: ['application/msword'],                                                magic: ['D0CF11E0'] },
+      { exts: ['dwg'],         mime: ['application/acad','application/x-acad','image/vnd.dwg'],             magic: ['41433130','41433131','41433132','41433133','41433134','41433135'] }, // AC10-AC15+
+      { exts: ['rar'],         mime: ['application/x-rar-compressed'],                                     magic: ['526172211A07'] },      // Rar!..
+      { exts: ['7z'],          mime: ['application/x-7z-compressed'],                                      magic: ['377ABCAF271C'] },      // 7z
+      // Texto puro: sem magic bytes fixos — verificação mínima de não-executável
+      { exts: ['txt','csv','xml','ofx','qfx','dxf'], textOnly: true,
+        mime: ['text/plain','text/csv','application/xml','text/xml','application/x-ofx','application/ofx','image/vnd.dxf'] },
+    ];
+
+    // Encontrar a entrada da tabela pelo lowerExt
+    const mimeEntry = MIME_MAGIC_TABLE.find(e => e.exts.includes(lowerExt));
+    if (!mimeEntry) {
       return res.status(400).json({
         success: false,
-        error: 'Tipo MIME do arquivo não permitido.'
+        error: 'Tipo de arquivo não permitido por políticas de segurança do FinObra.'
       });
     }
+
+    // Verificar MIME declarado contra os MIMEs canônicos da extensão
+    const mimeAllowed = mimeEntry.mime
+      ? (mimeEntry.mime.includes(cleanMime) || cleanMime === 'application/octet-stream')
+      : true;
+    if (!mimeAllowed) {
+      return res.status(400).json({
+        success: false,
+        error: `MIME "${cleanMime}" não é compatível com a extensão ".${lowerExt}".`
+      });
+    }
+
+    // Verificar magic bytes (prefixo binário)
+    if (mimeEntry.magic) {
+      const magicMatch = mimeEntry.magic.some(prefix => magicHex.startsWith(prefix));
+      if (!magicMatch) {
+        return res.status(400).json({
+          success: false,
+          error: 'Conteúdo binário do arquivo não corresponde à extensão declarada. Upload rejeitado por segurança.'
+        });
+      }
+    }
+
+    // Para arquivos de texto puro: apenas garantir que não são PE/ELF/HTML
+    // (isExeOrScript já foi verificado acima, antes deste bloco)
 
     // Estrutura de pastas no Blob: <tenantId>/documentos/<ano>/<mes>/<timestamp>_<filename>
     const now = new Date();

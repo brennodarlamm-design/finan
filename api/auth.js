@@ -877,6 +877,12 @@ export default async function handler(req, res) {
         `;
       } catch (insertErr) {
         console.error('Erro ao gravar solicitação de acesso:', insertErr.message);
+        // PATCH 50: não silenciar falha de INSERT — o lead precisa ser registrado.
+        // Retornar 503 para o cliente tentar novamente em vez de perder o lead.
+        return res.status(503).json({
+          success: false,
+          message: 'Não foi possível registrar sua solicitação no momento. Por favor, tente novamente em instantes ou entre em contato diretamente pelo WhatsApp.'
+        });
       }
 
       return res.status(200).json({
@@ -925,12 +931,14 @@ export default async function handler(req, res) {
       const picture = profile.picture || '';
       const googleSub = profile.sub || '';
 
-      // Verifica se usuário já existe
+      // Verifica se usuário já existe.
+      // PATCH 50: excluído superadmin da busca — conta Master nunca deve ser acessível via Google.
       const existing = await sql`
         SELECT u.*, t.razao_social, t.nome_fantasia, t.status as tenant_status, t.created_at as tenant_created_at, t.vencimento as tenant_vencimento
         FROM usuarios u
         LEFT JOIN tenants t ON u.tenant_id = t.id
-        WHERE LOWER(u.email) = ${email} OR (u.google_sub IS NOT NULL AND u.google_sub = ${googleSub})
+        WHERE (LOWER(u.email) = ${email} OR (u.google_sub IS NOT NULL AND u.google_sub = ${googleSub}))
+          AND u.perfil <> 'superadmin'
         LIMIT 1;
       `;
 
@@ -1065,7 +1073,10 @@ export default async function handler(req, res) {
         });
       }
 
-      const { identificador } = req.body || {};
+      // PATCH 50: reset multi-tenant — busca em duas etapas:
+      // 1. Tentar superadmin primeiro (sem Chave da Empresa, igual ao login Master).
+      // 2. Se não for superadmin, exigir company_key para isolar o tenant correto.
+      const { identificador, company_key: resetCompanyKey } = req.body || {};
       if (!identificador || !identificador.trim()) {
         return res.status(400).json({ success: false, message: 'Informe seu usuário ou e-mail cadastrado.' });
       }
@@ -1079,14 +1090,42 @@ export default async function handler(req, res) {
       const fakeRequestId = () => 'rec_' + crypto.randomBytes(8).toString('hex');
 
       const clean = identificador.trim().toLowerCase();
-      const rows = await sql`
+
+      // Etapa 1: busca Master (superadmin) — não requer Chave da Empresa
+      const masterResetRows = await sql`
         SELECT u.id, u.username, u.email, u.nome, u.tenant_id,
                t.telefone as tenant_telefone, t.nome_fantasia
         FROM usuarios u
         LEFT JOIN tenants t ON u.tenant_id = t.id
-        WHERE (LOWER(u.username) = ${clean} OR LOWER(u.email) = ${clean}) AND u.ativo = TRUE
+        WHERE (LOWER(u.username) = ${clean} OR LOWER(u.email) = ${clean})
+          AND u.perfil = 'superadmin'
+          AND u.ativo = TRUE
         LIMIT 1;
       `;
+
+      let rows;
+      if (masterResetRows.length) {
+        rows = masterResetRows;
+      } else {
+        // Etapa 2: usuário de tenant — exige Chave da Empresa para isolar o tenant correto.
+        // Se company_key ausente, retornar resposta genérica (sem revelar que é obrigatória).
+        const rawResetKey = String(resetCompanyKey || '').trim();
+        if (!rawResetKey) {
+          return genericResponse(fakeRequestId());
+        }
+        if (!isTenantAccessKeyShapeValid(rawResetKey)) {
+          return genericResponse(fakeRequestId());
+        }
+        const resetTenant = await resolveTenantByAccessKey(sql, rawResetKey);
+        if (!resetTenant) {
+          return genericResponse(fakeRequestId());
+        }
+        const tenantUser = await resolveTenantUserByLogin(sql, resetTenant.id, clean);
+        if (!tenantUser) {
+          return genericResponse(fakeRequestId());
+        }
+        rows = [tenantUser];
+      }
 
       if (!rows.length) {
         return genericResponse(fakeRequestId());

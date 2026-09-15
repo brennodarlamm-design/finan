@@ -216,13 +216,14 @@ export default async function handler(req, res) {
     });
   }
 
-  // PATCH 49: Validação estrita de 2FA (Google Authenticator) para Super Admin
+  // PATCH 50: Validação MFA fail-closed — superadmin só acessa se MFA estiver habilitado E verificado.
+  // Antes verificava apenas se mfa_enabled && !mfa_verified (fail-open para contas sem MFA configurado).
   if (!auth.isSystem && auth.user && auth.user.perfil === 'superadmin') {
-    if (auth.user.mfa_enabled && !auth.user.mfa_verified) {
+    if (!auth.user.mfa_enabled || !auth.user.mfa_verified) {
       return res.status(403).json({
         success: false,
         mfa_required: true,
-        error: 'Autenticação de dois fatores (Google Authenticator) obrigatória para esta operação.'
+        error: 'Autenticação de dois fatores (Google Authenticator) obrigatória para esta operação. Configure o MFA antes de acessar o Portal Master.'
       });
     }
   }
