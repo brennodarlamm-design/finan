@@ -7,6 +7,11 @@ import { hashPassword, verifyPassword, resolveAuthAndTenant, signToken, verifyTo
 import { generateBackupCodes } from './_totp.js';
 import { writeAudit } from './_audit.js';
 import { parseWebhookPayload, settlePixPayment, sendPaymentReceipt } from './_webhook_pix_core.js';
+import {
+  generateTenantAccessKey,
+  hashTenantAccessKey,
+  tenantAccessKeyLast4
+} from './_tenant-access-key.js';
 
 function getSql() {
   const conn = process.env.DATABASE_URL;
@@ -503,6 +508,8 @@ export default async function handler(req, res) {
           t.status,
           t.vencimento,
           t.created_at,
+          t.access_key_last4,
+          t.access_key_created_at,
           COUNT(DISTINCT o.id) as obras_qtd,
           COUNT(DISTINCT l.id) as lancamentos_qtd,
           COUNT(DISTINCT u.id) as usuarios_qtd
@@ -559,6 +566,8 @@ export default async function handler(req, res) {
           obrasQtd: Number(r.obras_qtd || 0),
           lancamentosQtd: Number(r.lancamentos_qtd || 0),
           usuariosQtd: Number(r.usuarios_qtd || 0),
+          access_key_last4: r.access_key_last4 || null,
+          access_key_created_at: r.access_key_created_at ? new Date(r.access_key_created_at).toISOString() : null,
           criadoEm: r.created_at ? new Date(r.created_at).toISOString() : new Date().toISOString()
         };
       });
@@ -1197,9 +1206,14 @@ export default async function handler(req, res) {
         finalVencimento = dt.toISOString().split('T')[0];
       }
 
+      // Gera Chave de Acesso exclusiva da construtora (P50)
+      const rawAccessKey = generateTenantAccessKey();
+      const keyHash = hashTenantAccessKey(rawAccessKey);
+      const last4 = tenantAccessKeyLast4(rawAccessKey);
+
       // Cria Tenant no Neon
       await sql`
-        INSERT INTO tenants (id, razao_social, nome_fantasia, cnpj, telefone, email, responsavel, plano, status, vencimento)
+        INSERT INTO tenants (id, razao_social, nome_fantasia, cnpj, telefone, email, responsavel, plano, status, vencimento, access_key_hash, access_key_last4, access_key_created_at)
         VALUES (
           ${tenantId},
           ${(razao_social || finalNome + ' LTDA').trim()},
@@ -1210,7 +1224,10 @@ export default async function handler(req, res) {
           ${(responsavel || 'Administrador').trim()},
           ${finalPlano},
           ${finalStatus},
-          ${finalVencimento}
+          ${finalVencimento},
+          ${keyHash},
+          ${last4},
+          NOW()
         );
       `;
 
@@ -1230,7 +1247,19 @@ export default async function handler(req, res) {
         );
       `;
 
-      await writeAudit(sql, req, auth, { acao:'criar', entidade:'tenant', entidadeId:tenantId, depois:{ nome_fantasia:finalNome, email:finalEmail, plano:finalPlano, status:finalStatus, vencimento:finalVencimento } });
+      await writeAudit(sql, req, auth, {
+        acao: 'criar',
+        entidade: 'tenant',
+        entidadeId: tenantId,
+        depois: {
+          nome_fantasia: finalNome,
+          email: finalEmail,
+          plano: finalPlano,
+          status: finalStatus,
+          vencimento: finalVencimento,
+          access_key_last4: last4
+        }
+      });
 
       return res.status(201).json({
         success: true,
@@ -1241,7 +1270,9 @@ export default async function handler(req, res) {
           email: finalEmail,
           plano: finalPlano,
           status: finalStatus,
-          vencimento: finalVencimento
+          vencimento: finalVencimento,
+          accessKey: rawAccessKey, // EXIBIDA UMA ÚNICA VEZ NO CADASTRO
+          access_key_last4: last4
         }
       });
     }
@@ -1292,6 +1323,65 @@ export default async function handler(req, res) {
         success: true,
         message: 'Dados da construtora atualizados com sucesso no Neon!',
         tenant: afterRows[0]
+      });
+    }
+
+    // ── 3.1 POST ?action=generate_tenant_access_key ou rotate_tenant_access_key ─────
+    if (req.method === 'POST' && (action === 'generate_tenant_access_key' || action === 'rotate_tenant_access_key')) {
+      const tenantId = String(req.body?.tenantId || '').trim();
+      if (!tenantId) {
+        return res.status(400).json({ success: false, error: 'Identificador do tenant não informado.' });
+      }
+
+      const rows = await sql`
+        SELECT id, nome_fantasia, razao_social, access_key_last4, access_key_created_at
+        FROM tenants
+        WHERE id = ${tenantId}
+        LIMIT 1;
+      `;
+      if (!rows.length) {
+        return res.status(404).json({ success: false, error: 'Construtora não encontrada.' });
+      }
+
+      const isRotation = Boolean(rows[0].access_key_last4);
+      const rawAccessKey = generateTenantAccessKey();
+      const keyHash = hashTenantAccessKey(rawAccessKey);
+      const last4 = tenantAccessKeyLast4(rawAccessKey);
+      const nowIso = new Date().toISOString();
+
+      await sql`
+        UPDATE tenants
+        SET access_key_hash = ${keyHash},
+            access_key_last4 = ${last4},
+            access_key_created_at = NOW(),
+            updated_at = NOW()
+        WHERE id = ${tenantId};
+      `;
+
+      // Auditoria segura: armazena somente os últimos 4 dígitos, NUNCA a chave em texto puro ou hash
+      await writeAudit(sql, req, auth, {
+        acao: isRotation ? 'rotacionar_chave_acesso' : 'gerar_chave_acesso',
+        entidade: 'tenant',
+        entidadeId: tenantId,
+        antes: {
+          access_key_last4: rows[0].access_key_last4,
+          access_key_created_at: rows[0].access_key_created_at
+        },
+        depois: {
+          access_key_last4: last4,
+          access_key_created_at: nowIso
+        }
+      });
+
+      return res.status(200).json({
+        success: true,
+        message: isRotation
+          ? 'Chave da Empresa rotacionada com sucesso! Guarde a nova chave agora, pois ela só é exibida uma única vez.'
+          : 'Chave da Empresa gerada com sucesso! Guarde a chave agora, pois ela só é exibida uma única vez.',
+        tenantId,
+        accessKey: rawAccessKey, // EXIBIDA UMA ÚNICA VEZ
+        access_key_last4: last4,
+        access_key_created_at: nowIso
       });
     }
 
