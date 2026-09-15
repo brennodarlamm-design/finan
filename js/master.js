@@ -1231,10 +1231,33 @@ const MasterAdmin = {
   },
 
   abrirModalPlanos() {
-    const p = (typeof Cobranca !== 'undefined' && Cobranca.PLANOS) ? Cobranca.PLANOS : {
-      starter: { nome: 'Plano Básico', valorTexto: 'R$ 119,90 / mês', limiteObras: 3 },
-      pro: { nome: 'Plano Profissional', valorTexto: 'R$ 279,90 / mês', limiteObras: 10 },
-      unlimited: { nome: 'Construtora Ilimitado', valorTexto: 'R$ 499,90 / mês', limiteObras: 'Ilimitadas' }
+    const rawPlans = (typeof Cobranca !== 'undefined' && Cobranca.PLANOS) ? Cobranca.PLANOS : {};
+    const formatPrice = (plan, fallback) => {
+      if (plan && plan.valorTexto) return plan.valorTexto;
+      if (plan && typeof plan.valorMensal === 'number') {
+        return (typeof Utils !== 'undefined' && Utils.formatCurrency
+          ? Utils.formatCurrency(plan.valorMensal)
+          : `R$ ${plan.valorMensal.toFixed(2).replace('.', ',')}`) + ' / mês';
+      }
+      return fallback;
+    };
+
+    const p = {
+      starter: {
+        nome: rawPlans.starter?.nome || 'Plano Básico',
+        valorTexto: formatPrice(rawPlans.starter, 'R$ 119,90 / mês'),
+        limiteObras: rawPlans.starter?.limiteObras ?? 3
+      },
+      pro: {
+        nome: rawPlans.pro?.nome || 'Plano Profissional',
+        valorTexto: formatPrice(rawPlans.pro, 'R$ 279,90 / mês'),
+        limiteObras: rawPlans.pro?.limiteObras ?? 10
+      },
+      unlimited: {
+        nome: rawPlans.unlimited?.nome || 'Construtora Ilimitado',
+        valorTexto: formatPrice(rawPlans.unlimited, 'R$ 499,90 / mês'),
+        limiteObras: rawPlans.unlimited?.limiteObras || 'ILIMITADAS'
+      }
     };
 
     Utils.showModal(`

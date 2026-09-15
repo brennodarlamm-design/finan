@@ -30,19 +30,32 @@ const SuporteDev = {
     if (body) opts.body = JSON.stringify(body);
     const resp = await fetch(`/api/admin?${q.toString()}`, opts);
     const data = await resp.json().catch(() => ({}));
-    if (!resp.ok || !data.success) throw new Error(data.error || 'Falha na Central de Atendimento.');
+    if (!resp.ok || !data.success) {
+      const err = new Error(data.error || 'Falha na Central de Atendimento.');
+      err.status = resp.status;
+      err.mfa_required = !!data.mfa_required;
+      throw err;
+    }
     return data;
   },
 
   _isAuthorized() {
     const u = (typeof Auth !== 'undefined' && Auth.getUser) ? Auth.getUser() : null;
-    return !!u && u.perfil === 'superadmin' && !u.isImpersonated && !u.impersonatedBy;
+    if (!u || u.perfil !== 'superadmin' || u.isImpersonated || u.impersonatedBy) return false;
+    if (typeof window !== 'undefined') {
+      const p = window.location.pathname || '';
+      if (p.includes('/master') || p.includes('master.html')) {
+        if (sessionStorage.getItem('finobra_master_logged') !== 'true') return false;
+      }
+    }
+    return true;
   },
 
   async initNotifications() {
     if (this._started || !this._isAuthorized()) return;
     this._started = true;
     await this.refreshNotifications(true);
+    if (!this._started) return;
     this._poll = setInterval(() => this.refreshNotifications(true), 12000);
   },
 
@@ -55,7 +68,10 @@ const SuporteDev = {
   },
 
   async refreshNotifications(silent=true) {
-    if (!this._isAuthorized()) return;
+    if (!this._isAuthorized()) {
+      this.stopNotifications();
+      return;
+    }
     try {
       const data = await this._api('support_list', 'GET', null, { status:'active' });
       const previousWaiting = new Set((this._active || []).filter(c => c.status === 'waiting').map(c => c.id));
@@ -75,6 +91,9 @@ const SuporteDev = {
         this._renderList();
       }
     } catch (err) {
+      if (err?.status === 401 || err?.status === 403 || err?.mfa_required) {
+        this.stopNotifications();
+      }
       if (!silent) alert(err?.message || 'Não foi possível atualizar os atendimentos.');
     }
   },

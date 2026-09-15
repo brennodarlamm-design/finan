@@ -8,9 +8,9 @@ const Cobranca = {
   FEATURE_MIN_PLAN: Object.freeze({ ocr:'pro', signatures:'pro', sinapi:'unlimited', engineering:'unlimited', advancedPermissions:'unlimited' }),
 
   PLANOS: {
-    starter: { id:'starter', nome:'Plano Básico', limiteObras:3, limiteUsuarios:1, valorMensal:119.90, badge:'3 OBRAS • 1 USUÁRIO', destaque:false, ideal:'Operação enxuta e controle essencial', recursos:['3 obras ativas','1 usuário ativo','Obras, financeiro, fornecedores e produtos','Medições, OFX e relatórios','Suporte via sistema / WhatsApp'] },
-    pro: { id:'pro', nome:'Plano Profissional', limiteObras:10, limiteUsuarios:2, valorMensal:279.90, badge:'10 OBRAS • 2 USUÁRIOS', destaque:true, ideal:'Construtoras em crescimento e automação', recursos:['10 obras ativas','2 usuários ativos','Tudo do Básico','Pré-Compras, contratos e documentos','NF-e / OCR com IA e assinatura eletrônica','Suporte prioritário'] },
-    unlimited: { id:'unlimited', nome:'Construtora Ilimitado', limiteObras:null, limiteUsuarios:5, valorMensal:499.90, badge:'OBRAS ILIMITADAS • 5 USUÁRIOS', destaque:false, ideal:'Engenharia e operação em escala', recursos:['Obras ilimitadas','5 usuários ativos','Tudo do Profissional','SINAPI / Caixa','Curva S, EVM, ABC e BDI','Permissões avançadas e suporte VIP'] }
+    starter: { id:'starter', nome:'Plano Básico', limiteObras:3, limiteUsuarios:1, valorMensal:119.90, valorTexto:'R$ 119,90 / mês', badge:'3 OBRAS • 1 USUÁRIO', destaque:false, ideal:'Operação enxuta e controle essencial', recursos:['3 obras ativas','1 usuário ativo','Obras, financeiro, fornecedores e produtos','Medições, OFX e relatórios','Suporte via sistema / WhatsApp'] },
+    pro: { id:'pro', nome:'Plano Profissional', limiteObras:10, limiteUsuarios:2, valorMensal:279.90, valorTexto:'R$ 279,90 / mês', badge:'10 OBRAS • 2 USUÁRIOS', destaque:true, ideal:'Construtoras em crescimento e automação', recursos:['10 obras ativas','2 usuários ativos','Tudo do Básico','Pré-Compras, contratos e documentos','NF-e / OCR com IA e assinatura eletrônica','Suporte prioritário'] },
+    unlimited: { id:'unlimited', nome:'Construtora Ilimitado', limiteObras:null, limiteUsuarios:5, valorMensal:499.90, valorTexto:'R$ 499,90 / mês', badge:'OBRAS ILIMITADAS • 5 USUÁRIOS', destaque:false, ideal:'Engenharia e operação em escala', recursos:['Obras ilimitadas','5 usuários ativos','Tudo do Profissional','SINAPI / Caixa','Curva S, EVM, ABC e BDI','Permissões avançadas e suporte VIP'] }
   },
 
   CYCLE_PRICING: {
