@@ -7,6 +7,7 @@ const assert = (ok, msg) => { if (!ok) { console.error(`❌ ${msg}`); process.ex
 const patch = read('js/patch51.js');
 const hardening = read('js/patch51-hardening.js');
 const followup = read('js/patch51-followup.js');
+const slaSync = read('js/patch51-sla-sync.js');
 const workflow = read('api/_workflow.js');
 const complete = read('api/_workflow-complete.js');
 const meta = read('api/_workflow-meta.js');
@@ -16,12 +17,12 @@ const sla = read('api/_sla.js');
 const migration = read('migrations/028_patch51_workflow_obras.sql');
 const app = read('app.html');
 
-for (const file of ['js/patch51.js','js/patch51-hardening.js','js/patch51-followup.js','api/_workflow.js','api/_workflow-complete.js','api/_workflow-meta.js','api/_workflow-users.js','api/audit.js','api/_sla.js']) {
+for (const file of ['js/patch51.js','js/patch51-hardening.js','js/patch51-followup.js','js/patch51-sla-sync.js','api/_workflow.js','api/_workflow-complete.js','api/_workflow-meta.js','api/_workflow-users.js','api/audit.js','api/_sla.js']) {
   const r = spawnSync(process.execPath, ['--check', file], { encoding:'utf8' });
   assert(r.status === 0, `${file} possui sintaxe JavaScript válida${r.stderr ? `: ${r.stderr.trim()}` : ''}`);
 }
 
-assert(app.includes('/js/patch51.js?v=') && app.includes('/js/patch51-hardening.js?v=') && app.includes('/js/patch51-followup.js?v='), 'Patch 51 e camadas de hardening são carregados pelo app principal');
+assert(app.includes('/js/patch51.js?v=') && app.includes('/js/patch51-hardening.js?v=') && app.includes('/js/patch51-followup.js?v=') && app.includes('/js/patch51-sla-sync.js?v='), 'Patch 51 e camadas de hardening/sincronização são carregados pelo app principal');
 assert(audit.includes("workflowAction === 'complete'") && audit.includes('workflowCompleteHandler'), 'Conclusão de workflow usa helper atômico dedicado sem nova função Vercel');
 assert(audit.includes("workflowAction === 'meta_save'") && audit.includes('workflowMetaHandler'), 'Cadastro Geral usa handler endurecido sem criar nova função Vercel');
 assert(audit.includes("workflowAction === 'users'") && audit.includes('workflowUsersHandler'), 'Workflow possui lista mínima de responsáveis sem reutilizar gestão de contas');
@@ -58,6 +59,9 @@ assert(followup.includes("document.getElementById('od-tab-content')"), 'Soma dos
 assert(followup.includes('syncWorkflowSla') && followup.includes("Patch51.api('stage_update'") && followup.includes('applyForecastLocal'), 'Ajustes de SLA da obra sincronizam workflow e previsão automática');
 assert(followup.includes('dataEntregaEstimada:previsaoOficial') && followup.includes('addDays(obra?.data_inicio, totalDias)'), 'Previsão oficial é normalizada para início da obra + soma dos SLAs');
 assert(followup.includes('Status controlado pelo Workflow') && followup.includes('select.disabled = true'), 'Apontamento de SLA não cria um segundo caminho paralelo para concluir etapas');
+assert(slaSync.includes('legacyGetObraProcessos') && slaSync.includes("Patch51._workflow.get(String(obraId || ''))"), 'Linha do tempo de SLA projeta o estado oficial do workflow sem duplicar persistência');
+assert(slaSync.includes("bloqueado:'pendente'") && slaSync.includes('completed_at'), 'Timeline converte bloqueio para estado visual pendente e reflete conclusão do workflow');
+assert(slaSync.includes("Patch51.loadWorkflow(obraId, { initialize:true })") && slaSync.includes("currentSetTab('slas')"), 'Abrir Prazos & SLAs atualiza o workflow antes de consolidar a timeline');
 assert(followup.includes('WORKFLOW_FIRST_STAGE_UNASSIGNED') && followup.includes('Configurações > SLAs'), 'Criação de obra avisa quando falta responsável na primeira etapa');
 assert(followup.includes('Prazo estimado') && followup.includes('p51-task-complete'), 'Fila Minhas Etapas exibe prazo estimado e vencimento');
 assert(followup.includes('📝 Orientação:') && followup.includes('task.observacoes'), 'Fila Minhas Etapas mostra a orientação específica deixada pelo gestor');
