@@ -43,7 +43,9 @@ const MasterAdmin = {
             criadoEm: t.criado_em || t.criadoEm || '',
             vencimento: t.vencimento ? String(t.vencimento).split('T')[0] : '',
             diasRestantes: t.diasRestantes !== undefined ? t.diasRestantes : null,
-            expirado: Boolean(t.expirado)
+            expirado: Boolean(t.expirado),
+            access_key_last4: t.access_key_last4 || null,
+            access_key_created_at: t.access_key_created_at || null
           }));
           this.salvarEmpresas(this._empresas);
           this._isLoading = false;
@@ -764,6 +766,238 @@ const MasterAdmin = {
     this.render(target);
   },
 
+  // ── DICIONÁRIO DE CHAVES DE 6 NÚMEROS PROVISIONADAS (DEV / MASTER) ─────────
+  _PROVISIONED_DEV_KEYS: {
+    'angelim': '360406',
+    'tenant_empresa_zerada': '853919',
+    'tenant_g_65791ccb3e2b': '510876',
+    'tenant_g_3ec02ffb5c67': '326350',
+    'tenant_g_5a5f9bedc7a3': '766942',
+    'tenant_c45b3e4cb8b6': '469125'
+  },
+
+  _DEFAULT_DEV_TENANTS: [
+    { id: 'angelim', nome_fantasia: 'Angelim Construtora', razao_social: 'Construtora Angelim Ltda', status: 'ativo', access_key_last4: '0406' },
+    { id: 'tenant_empresa_zerada', nome_fantasia: 'Minha Empresa Construtora', razao_social: 'Construtora Padrão Ltda', status: 'ativo', access_key_last4: '3919' },
+    { id: 'tenant_g_65791ccb3e2b', nome_fantasia: 'BRENNO DARALAM Construtora', razao_social: 'BRENNO DARALAM', status: 'trial', access_key_last4: '0876' },
+    { id: 'tenant_g_3ec02ffb5c67', nome_fantasia: 'Brenno Darlam Construtora', razao_social: 'Brenno Darlam', status: 'trial', access_key_last4: '6350' },
+    { id: 'tenant_g_5a5f9bedc7a3', nome_fantasia: 'Rafael Aleixo Pereira Construtora', razao_social: 'Rafael Aleixo Pereira', status: 'trial', access_key_last4: '6942' },
+    { id: 'tenant_c45b3e4cb8b6', nome_fantasia: 'Universidade Estadual De Roraima (UERR)', razao_social: 'Universidade Estadual De Roraima', status: 'trial', access_key_last4: '9125' }
+  ],
+
+  _getChaveDev(tenantId) {
+    if (!tenantId) return null;
+    try {
+      const local = JSON.parse(localStorage.getItem('finobra_dev_tenant_keys') || '{}');
+      if (local && local[tenantId]) return String(local[tenantId]).trim();
+    } catch {}
+    return this._PROVISIONED_DEV_KEYS[tenantId] || null;
+  },
+
+  _salvarChaveDev(tenantId, chave) {
+    if (!tenantId || !chave) return;
+    try {
+      const local = JSON.parse(localStorage.getItem('finobra_dev_tenant_keys') || '{}');
+      local[tenantId] = String(chave).trim();
+      localStorage.setItem('finobra_dev_tenant_keys', JSON.stringify(local));
+    } catch {}
+  },
+
+  async copiarChaveDev(chave) {
+    if (!chave) return;
+    const str = String(chave).trim();
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(str);
+      } else {
+        const t = document.createElement('textarea');
+        t.value = str;
+        t.style.position = 'fixed';
+        t.style.opacity = '0';
+        document.body.appendChild(t);
+        t.select();
+        document.execCommand('copy');
+        t.remove();
+      }
+      if (typeof Utils !== 'undefined' && Utils.toast) {
+        Utils.toast(`Chave ${str} copiada para a área de transferência!`, 'success');
+      } else {
+        alert(`Chave ${str} copiada!`);
+      }
+    } catch {
+      prompt('Copie a chave manualmente:', str);
+    }
+  },
+
+  async copiarMsgWhatsAppDev(nome, chave) {
+    if (!chave) return;
+    const nomeEmp = (nome && nome !== 'undefined') ? String(nome).trim() : 'sua construtora';
+    const chaveStr = String(chave).trim();
+    const msg = `Olá! Segue a Chave da Empresa FinObra para acesso de ${nomeEmp}:\n\n🔑 Chave da Empresa: *${chaveStr}*\n\nInsira esses 6 números na tela de login junto com seu e-mail e senha cadastrados.\n\nAcesse: https://finobra.app.br/login`;
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(msg);
+      } else {
+        const t = document.createElement('textarea');
+        t.value = msg;
+        t.style.position = 'fixed';
+        t.style.opacity = '0';
+        document.body.appendChild(t);
+        t.select();
+        document.execCommand('copy');
+        t.remove();
+      }
+      if (typeof Utils !== 'undefined' && Utils.toast) {
+        Utils.toast('Mensagem de WhatsApp copiada com sucesso!', 'success');
+      } else {
+        alert('Mensagem copiada para envio no WhatsApp!');
+      }
+    } catch {
+      prompt('Copie a mensagem para WhatsApp:', msg);
+    }
+  },
+
+  async copiarTabelaMarkdownDev() {
+    const rawList = (this._empresas && this._empresas.length) ? this._empresas : this.getEmpresasLocal();
+    const empresas = (rawList && rawList.length) ? rawList : this._DEFAULT_DEV_TENANTS;
+
+    let md = '| Tenant ID | Empresa | Status | Chave (6 dígitos) | Final Audit |\n| :--- | :--- | :--- | :--- | :--- |\n';
+    for (const e of empresas) {
+      const id = String(e.id || '');
+      const key = this._getChaveDev(id) || ('••••' + (e.access_key_last4 || '????'));
+      const nome = e.nome_fantasia || e.razao_social || id;
+      const status = (e.status === 'ativo' ? 'Ativo' : 'Trial');
+      const last4 = e.access_key_last4 || (key && !key.startsWith('•') ? key.slice(-4) : '—');
+      md += `| \`${id}\` | ${nome} | ${status} | **\`${key}\`** | \`${last4}\` |\n`;
+    }
+
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(md);
+      } else {
+        const t = document.createElement('textarea');
+        t.value = md;
+        t.style.position = 'fixed';
+        t.style.opacity = '0';
+        document.body.appendChild(t);
+        t.select();
+        document.execCommand('copy');
+        t.remove();
+      }
+      if (typeof Utils !== 'undefined' && Utils.toast) {
+        Utils.toast('Tabela Markdown copiada para a área de transferência!', 'success');
+      } else {
+        alert('Tabela Markdown copiada!');
+      }
+    } catch {
+      prompt('Copie a tabela Markdown:', md);
+    }
+  },
+
+  _renderChavesEmpresasDev() {
+    const rawList = (this._empresas && this._empresas.length) ? this._empresas : this.getEmpresasLocal();
+    const empresas = (rawList && rawList.length) ? rawList : this._DEFAULT_DEV_TENANTS;
+
+    const rows = empresas.map(e => {
+      const id = String(e.id || '');
+      const nome = this._esc(e.nome_fantasia || e.razao_social || id);
+      const razao = this._esc(e.razao_social || '');
+      const status = e.status || 'ativo';
+      const key = this._getChaveDev(id);
+      const last4 = e.access_key_last4 || (key ? key.slice(-4) : '—');
+      const isTrial = status === 'trial';
+      const badgeStatus = isTrial
+        ? '<span style="background:rgba(245,158,11,.15);color:#f59e0b;border:1px solid rgba(245,158,11,.3);padding:2px 8px;border-radius:10px;font-size:.72rem;font-weight:700;">🟡 Trial</span>'
+        : '<span style="background:rgba(34,197,94,.15);color:#22c55e;border:1px solid rgba(34,197,94,.3);padding:2px 8px;border-radius:10px;font-size:.72rem;font-weight:700;">🟢 Ativo</span>';
+
+      const keyDisplay = key
+        ? `<span style="font-family:monospace;font-size:1.05rem;font-weight:900;letter-spacing:.1em;color:var(--accent2);background:rgba(201,162,39,.12);border:1px solid rgba(201,162,39,.35);padding:4px 10px;border-radius:6px;display:inline-flex;align-items:center;gap:6px;" title="Chave de 6 números ativa para login">
+             🔑 ${key}
+           </span>`
+        : `<span style="font-family:monospace;font-size:.85rem;color:#94a3b8;background:rgba(255,255,255,.05);padding:4px 8px;border-radius:6px;" title="Chave segura no banco (hash SHA-256)">
+             ••••${this._esc(last4)}
+           </span>`;
+
+      return `
+        <tr style="border-bottom:1px solid rgba(255,255,255,.04);transition:background .15s;">
+          <td style="padding:12px 16px;">
+            <code style="background:rgba(255,255,255,.06);color:#38bdf8;padding:3px 8px;border-radius:6px;font-size:.78rem;font-weight:700;">${this._esc(id)}</code>
+          </td>
+          <td style="padding:12px 16px;">
+            <div style="font-weight:800;color:#fff;font-size:.88rem;">${nome}</div>
+            ${razao && razao !== nome ? `<div style="font-size:.72rem;color:#94a3b8;">${razao}</div>` : ''}
+          </td>
+          <td style="padding:12px 16px;">
+            ${badgeStatus}
+          </td>
+          <td style="padding:12px 16px;">
+            ${keyDisplay}
+          </td>
+          <td style="padding:12px 16px;font-family:monospace;font-size:.8rem;color:#cbd5e1;">
+            ${last4 ? `...${this._esc(last4)}` : '—'}
+          </td>
+          <td style="padding:12px 16px;text-align:right;">
+            <div style="display:inline-flex;gap:6px;align-items:center;flex-wrap:wrap;justify-content:flex-end;">
+              ${key ? `
+                <button type="button" data-fb-click="MasterAdmin.copiarChaveDev" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(key)}" style="background:rgba(201,162,39,.15);border:1px solid var(--accent);color:var(--accent2);padding:5px 10px;border-radius:6px;font-size:.75rem;font-weight:800;cursor:pointer;display:inline-flex;align-items:center;gap:4px;" title="Copiar chave de 6 dígitos">
+                  📋 Copiar
+                </button>
+                <button type="button" data-fb-click="MasterAdmin.copiarMsgWhatsAppDev" data-fb-click-n="2" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(nome)}" data-fb-click-t1="string" data-fb-click-v1="${encodeURIComponent(key)}" style="background:rgba(37,211,102,.15);border:1px solid #25D366;color:#4ade80;padding:5px 10px;border-radius:6px;font-size:.75rem;font-weight:800;cursor:pointer;display:inline-flex;align-items:center;gap:4px;" title="Copiar texto pronto para envio no WhatsApp do cliente">
+                  💬 WhatsApp
+                </button>
+              ` : ''}
+              <button type="button" data-fb-click="MasterAdmin.gerarChaveEmpresa" data-fb-click-n="2" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(id)}" data-fb-click-t1="string" data-fb-click-v1="${encodeURIComponent(nome)}" style="background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.15);color:#cbd5e1;padding:5px 10px;border-radius:6px;font-size:.75rem;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:4px;" title="Gerar ou rotacionar chave">
+                🔄 Rotacionar
+              </button>
+            </div>
+          </td>
+        </tr>
+      `;
+    }).join('');
+
+    return `
+      <div style="background:rgba(255,255,255,.02);border:1px solid rgba(201,162,39,.3);border-radius:14px;overflow:hidden;margin-bottom:34px;box-shadow:0 8px 32px rgba(0,0,0,.35);">
+        <div style="padding:16px 20px;background:linear-gradient(135deg, rgba(201,162,39,.08), rgba(0,0,0,.2));border-bottom:1px solid rgba(201,162,39,.2);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;">
+          <div>
+            <div style="display:inline-flex;align-items:center;gap:6px;background:rgba(201,162,39,.18);border:1px solid var(--accent);color:var(--accent2);padding:2px 10px;border-radius:12px;font-size:.72rem;font-weight:800;margin-bottom:6px;">
+              <span>🔑</span><span>CONFERÊNCIA DEV / SUPORTE</span>
+            </div>
+            <h3 style="font-size:1.1rem;font-weight:900;color:#fff;margin:0 0 4px;display:flex;align-items:center;gap:8px;">
+              Tabela de Chaves de Acesso das Empresas (6 Dígitos)
+              <span style="font-size:.75rem;background:rgba(34,197,94,.15);color:#22c55e;border:1px solid rgba(34,197,94,.3);padding:2px 8px;border-radius:12px;font-weight:700;">${empresas.length} cadastradas</span>
+            </h3>
+            <p style="font-size:.78rem;color:#94a3b8;margin:0;line-height:1.4;">
+              Chaves numéricas de 6 dígitos para conferência do desenvolvedor e envio aos clientes. No banco de dados Neon, apenas o hash SHA-256 e os 4 dígitos finais ficam armazenados para segurança máxima.
+            </p>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px;">
+            <button type="button" data-fb-click="MasterAdmin.copiarTabelaMarkdownDev" data-fb-click-n="0" style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);color:#f0ead6;padding:7px 12px;border-radius:8px;font-size:.78rem;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:6px;" title="Copiar tabela completa formatada em Markdown para o chat ou documentação">
+              📋 Copiar Tabela Markdown
+            </button>
+          </div>
+        </div>
+
+        <div style="overflow-x:auto;">
+          <table style="width:100%;border-collapse:collapse;text-align:left;font-size:.85rem;">
+            <thead>
+              <tr style="background:rgba(255,255,255,.03);border-bottom:1px solid rgba(255,255,255,.06);color:#94a3b8;font-size:.72rem;text-transform:uppercase;letter-spacing:.05em;">
+                <th style="padding:10px 16px;">Tenant ID</th>
+                <th style="padding:10px 16px;">Empresa / Construtora</th>
+                <th style="padding:10px 16px;">Status</th>
+                <th style="padding:10px 16px;">Chave (6 dígitos)</th>
+                <th style="padding:10px 16px;">Final (Audit DB)</th>
+                <th style="padding:10px 16px;text-align:right;">Ações Rápidas</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${rows}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    `;
+  },
+
   // ── RENDERIZAÇÃO DO PAINEL MASTER ──────────────────────────────────────────
   render(containerId = 'route-content') {
     const el = document.getElementById(containerId);
@@ -917,6 +1151,8 @@ const MasterAdmin = {
           </div>
         </div>
 
+        ${this._renderChavesEmpresasDev()}
+
         ${this._renderCobrancas()}
 
         ${this._renderErrosSaaS()}
@@ -1040,6 +1276,8 @@ const MasterAdmin = {
           </div>
 
         </div>
+
+        ${this._renderChavesEmpresasDev()}
 
         <!-- Card Sobre o Sistema -->
         <div style="background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.08);border-radius:14px;padding:20px;">
@@ -1500,6 +1738,8 @@ const MasterAdmin = {
         throw new Error(data.error || 'Erro ao gerar chave da empresa');
       }
 
+      this._salvarChaveDev(tid, data.accessKey);
+
       const modal = document.getElementById('master-editar-empresa-modal');
       if (modal) modal.remove();
 
@@ -1695,6 +1935,7 @@ const MasterAdmin = {
       this.render(target);
 
       if (data.tenant?.accessKey) {
+        this._salvarChaveDev(data.tenant.id, data.tenant.accessKey);
         this.exibirModalChaveGerada(nome, data.tenant.accessKey, data.tenant.access_key_last4);
       } else {
         alert(`✓ Construtora "${nome}" criada com sucesso no PostgreSQL!\nLogin: ${email}\nSenha: ${senha}`);
