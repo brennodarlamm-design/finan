@@ -188,16 +188,21 @@
           </div>
         </div>
 
-        <div style="background:rgba(255,255,255,.05);border:1px dashed rgba(255,255,255,.15);border-radius:8px;padding:8px 12px;margin-bottom:12px;font-size:.74rem;color:#cbd5e1;text-align:center;">
-          <div style="font-size:.68rem;color:#94a3b8;margin-bottom:4px;">Chave manual caso a câmera não leia:</div>
+        <div style="background:rgba(255,255,255,.04);border:1px dashed rgba(255,255,255,.15);border-radius:8px;padding:8px 12px;margin-bottom:12px;font-size:.74rem;color:#cbd5e1;text-align:center;">
+          <div style="font-size:.68rem;color:#94a3b8;margin-bottom:4px;">Chave manual (caso prefira digitar no aplicativo):</div>
           <div style="display:flex;align-items:center;justify-content:center;gap:8px;">
             <code id="master-secret-key-display" style="font-family:monospace;font-weight:800;color:var(--accent2);letter-spacing:.05em;font-size:.82rem;">...</code>
             <button type="button" data-fb-click="MasterAdmin.copiarChaveMfa" data-fb-click-n="0" style="background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.2);color:#fff;padding:3px 8px;border-radius:4px;font-size:.68rem;cursor:pointer;">Copiar</button>
           </div>
         </div>
 
-        <div style="margin-bottom:12px;">
-          <div style="font-size:.72rem;font-weight:700;color:#fde047;margin-bottom:4px;">💾 Guarde seus códigos de emergência:</div>
+        <div style="margin-bottom:12px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);border-radius:8px;padding:10px;">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
+            <div style="font-size:.72rem;font-weight:700;color:#fde047;">💾 Códigos de emergência (descartáveis):</div>
+          </div>
+          <p style="font-size:.68rem;color:#94a3b8;line-height:1.35;margin:0 0 8px;">
+            Guarde-os em local seguro. Cada código é de uso único caso perca o celular, e só será ativado após você confirmar os 6 dígitos abaixo:
+          </p>
           <div id="master-setup-backup-codes" style="background:#060B04;border:1px solid rgba(255,255,255,.1);border-radius:6px;padding:8px;display:grid;grid-template-columns:1fr 1fr;gap:4px;font-family:monospace;font-size:.72rem;color:#6ee7b7;text-align:center;">
             <!-- Preenchido dinamicamente -->
           </div>
