@@ -8,7 +8,8 @@ const read = p => fs.readFileSync(path.join(root, p), 'utf8');
 
 const master = read('js/master.js');
 const devKeys = read('js/dev-tenant-keys.js');
-const api = read('api/dev-tenant-keys.js');
+const api = read('api/_dev-tenant-keys.js');
+const auditMux = read('api/audit.js');
 const app = read('app.html');
 const build = read('scripts/build-cloudflare-pages.cjs');
 const migration = read('migrations/027_dev_tenant_key_vault.sql');
@@ -16,9 +17,13 @@ const migration = read('migrations/027_dev_tenant_key_vault.sql');
 assert(!master.includes('_PROVISIONED_DEV_KEYS'), 'master.js não pode conter dicionário de chaves em plaintext.');
 assert(!master.includes('finobra_dev_tenant_keys'), 'master.js não pode persistir chaves DEV em localStorage.');
 assert(!devKeys.includes('localStorage.setItem'), 'dev-tenant-keys.js não deve persistir chaves completas em localStorage.');
-assert(devKeys.includes('/api/dev-tenant-keys?action=list'), 'Tabela DEV deve puxar metadados das chaves pelo backend.');
-assert(devKeys.includes('/api/dev-tenant-keys?action=reveal'), 'Revelação deve ocorrer por chamada individual autenticada.');
-assert(devKeys.includes("/api/dev-tenant-keys?action=rotate"), 'Rotação deve ocorrer pelo cofre server-side.');
+assert(devKeys.includes('/api/audit?action=dev_tenant_keys_list'), 'Tabela DEV deve puxar metadados das chaves pelo backend compartilhado.');
+assert(devKeys.includes('/api/audit?action=dev_tenant_keys_reveal'), 'Revelação deve ocorrer por chamada individual autenticada.');
+assert(devKeys.includes("/api/audit?action=dev_tenant_keys_rotate"), 'Rotação deve ocorrer pelo cofre server-side.');
+
+assert(auditMux.includes("import devTenantKeysHandler from './_dev-tenant-keys.js'"), 'Rota de auditoria deve multiplexar o cofre DEV sem criar função Vercel extra.');
+assert(auditMux.includes("const prefix = 'dev_tenant_keys_'"), 'Multiplexador deve isolar explicitamente as ações do cofre DEV.');
+assert(!fs.existsSync(path.join(root, 'api/dev-tenant-keys.js')), 'Cofre DEV não deve criar uma 13ª Serverless Function no plano Hobby.');
 
 assert(api.includes("crypto.createCipheriv('aes-256-gcm'"), 'Cofre deve cifrar chaves com AES-256-GCM.');
 assert(api.includes("auth.user?.perfil !== 'superadmin'"), 'Cofre deve exigir perfil superadmin.');
