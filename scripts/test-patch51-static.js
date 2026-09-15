@@ -39,6 +39,11 @@ assert(meta.includes("payload='{}'::jsonb") || meta.includes("'{}'::jsonb"), 'Ca
 assert(!meta.includes('rg:meta.rg') && !meta.includes('data_nascimento:meta.data_nascimento'), 'Auditoria não registra RG ou data de nascimento em claro');
 assert(hardening.includes('internalEl.required = internal') && hardening.includes('externalReg.required = !internal'), 'Frontend exige responsável interno ou nome/CREA do externo conforme o tipo');
 assert(hardening.includes('try {') && hardening.includes('o SLA só pode ser aumentado'), 'Redução de SLA é tratada sem exceção escapar da interface');
+assert(hardening.includes('p51-workflow-board') && hardening.includes('Visão do Processo'), 'Workflow possui visão Kanban compacta por status');
+assert(hardening.includes('p51-workflow-history') && hardening.includes('Histórico do Workflow'), 'Workflow exibe timeline de movimentações');
+assert(hardening.includes('deadlineFor') && hardening.includes('📅 Prazo'), 'Workflow mostra prazo estimado por etapa');
+assert(hardening.includes('p51-stage-note') && hardening.includes('observacoes:note'), 'Gestor pode registrar orientações/observações por etapa');
+assert(hardening.includes('p51-stage-docs') && hardening.includes("ObraDetalhe.setTab('documentos')"), 'Cada etapa oferece acesso contextual à documentação da obra');
 
 assert(patch.includes("['em_andamento','documentacao']"), 'Nova Obra limita status inicial a Em Andamento e Documentação');
 assert(patch.includes('[name="data_previsao_termino"]'), 'Nova Obra remove o campo manual de previsão de término');
