@@ -18,3 +18,10 @@ services:
         value: angelim
       - key: API_SECRET
         sync: false
+      # PATCH 50 — Secrets dedicados (migration de API_SECRET)
+      - key: SESSION_SIGNING_SECRET
+        sync: false
+      - key: INTERNAL_API_SECRET
+        sync: false
+      - key: PIX_WEBHOOK_SECRET
+        sync: false
