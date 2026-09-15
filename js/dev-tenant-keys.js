@@ -131,7 +131,7 @@
     state.lastError = '';
     render();
     try {
-      const resp = await fetch('/api/dev-tenant-keys?action=list', { headers: authHeaders(), cache: 'no-store' });
+      const resp = await fetch('/api/audit?action=dev_tenant_keys_list', { headers: authHeaders(), cache: 'no-store' });
       const data = await resp.json().catch(() => ({}));
       if (!resp.ok || !data.success) throw new Error(data.error || 'Falha ao carregar cofre DEV.');
       state.rows = Array.isArray(data.keys) ? data.keys : [];
@@ -151,7 +151,7 @@
       return;
     }
     try {
-      const resp = await fetch(`/api/dev-tenant-keys?action=reveal&tenantId=${encodeURIComponent(tenantId)}`, {
+      const resp = await fetch(`/api/audit?action=dev_tenant_keys_reveal&tenantId=${encodeURIComponent(tenantId)}`, {
         headers: authHeaders(),
         cache: 'no-store'
       });
@@ -170,7 +170,7 @@
     if (!confirm(`Rotacionar a Chave da Empresa de "${nome}"?\n\nA chave anterior deixará de funcionar imediatamente. A nova chave ficará armazenada no cofre DEV e poderá ser consultada somente pelo Master com MFA.`)) return null;
 
     try {
-      const resp = await fetch('/api/dev-tenant-keys?action=rotate', {
+      const resp = await fetch('/api/audit?action=dev_tenant_keys_rotate', {
         method: 'POST',
         headers: authHeaders(),
         body: JSON.stringify({ tenantId })
