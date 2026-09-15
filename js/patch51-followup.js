@@ -18,6 +18,15 @@
     return d;
   };
 
+  const addDays = (value, days) => {
+    if (!value) return null;
+    const clean = String(value).slice(0, 10);
+    const d = new Date(`${clean}T12:00:00Z`);
+    if (Number.isNaN(d.getTime())) return null;
+    d.setUTCDate(d.getUTCDate() + (Number(days) || 0));
+    return d.toISOString().slice(0, 10);
+  };
+
   // O container real da Central é #od-tab-content. Corrige a soma dos SLAs
   // sem depender do seletor legado #obra-tab-content.
   Patch51.enhanceSlaSummary = function() {
@@ -76,6 +85,20 @@
   };
 
   if (typeof CronogramaSLA !== 'undefined') {
+    // A previsão oficial solicitada no Patch 51 é Data de Início + soma dos SLAs.
+    // O motor legado acrescenta dias de transição entre etapas; por isso o KPI final
+    // é normalizado aqui para não divergir do workflow e da data salva na obra.
+    const currentResumoObra = CronogramaSLA.getResumoObra.bind(CronogramaSLA);
+    CronogramaSLA.getResumoObra = function(obraId) {
+      const resumo = currentResumoObra(obraId);
+      const obra = typeof DB !== 'undefined' ? DB.getById('clientes', obraId) : null;
+      const workflow = Patch51._workflow.get(String(obraId || ''));
+      const processos = workflow?.stages?.length ? workflow.stages : (this.getObraProcessos(obraId) || []);
+      const totalDias = processos.reduce((sum, item) => sum + (Number(item?.dias_sla) || 0), 0);
+      const previsaoOficial = addDays(obra?.data_inicio, totalDias);
+      return { ...resumo, dataEntregaEstimada:previsaoOficial || resumo.dataEntregaEstimada || null, totalDiasSla:totalDias };
+    };
+
     const currentConfigSubmit = CronogramaSLA.salvarConfigObraSubmit.bind(CronogramaSLA);
     CronogramaSLA.salvarConfigObraSubmit = function(obraId) {
       const result = currentConfigSubmit(obraId);
@@ -89,6 +112,36 @@
       const result = currentApontamento(obraId, processoId);
       const processo = (CronogramaSLA.getObraProcessos(obraId) || []).find(item => String(item.id) === String(processoId));
       if (processo) Promise.resolve().then(() => syncWorkflowSla(obraId, [processo]));
+      return result;
+    };
+
+    // O status operacional passa a ser controlado pelo Workflow. O modal de SLA
+    // continua servindo para datas, observações e aumento de prazo, mas não cria
+    // um segundo caminho paralelo para concluir/retroceder etapas.
+    const currentOpenApontamento = CronogramaSLA.abrirModalApontamento.bind(CronogramaSLA);
+    CronogramaSLA.abrirModalApontamento = function(obraId, processoId) {
+      const result = currentOpenApontamento(obraId, processoId);
+      const applyWorkflowStatus = stages => {
+        const stage = (stages || []).find(item => String(item.etapa_id) === String(processoId));
+        const select = document.getElementById('sla-status-sel');
+        if (!stage || !select) return;
+        const map = { pendente:'pendente', bloqueado:'pendente', em_andamento:'em_andamento', concluido:'concluido' };
+        select.value = map[stage.status] || 'pendente';
+        select.disabled = true;
+        select.setAttribute('aria-disabled', 'true');
+        const group = select.closest('.form-group');
+        if (group && !group.querySelector('.p51-workflow-status-note')) {
+          const note = document.createElement('span');
+          note.className = 'p51-workflow-status-note';
+          note.style.cssText = 'display:block;margin-top:5px;font-size:.72rem;color:var(--text3);line-height:1.4;';
+          note.textContent = 'Status controlado pelo Workflow. Para concluir esta etapa, use “Marcar como pronto” no Workflow ou em Minhas Etapas.';
+          group.appendChild(note);
+        }
+      };
+
+      const cached = Patch51._workflow.get(String(obraId || ''));
+      if (cached?.stages?.length) applyWorkflowStatus(cached.stages);
+      else Patch51.loadWorkflow(obraId, { initialize:true }).then(data => applyWorkflowStatus(data?.stages || [])).catch(() => {});
       return result;
     };
   }
