@@ -67,11 +67,11 @@ const tests = [
   'scripts/test-p50-admin-secret-boundaries.js'
 ].filter(fs.existsSync);
 
-// P40/P42/P44/P45/P46 foram escritos antes de api/admin.js e api/audit.js virarem
-// multiplexadores finos. Nesses testes, readFileSync recebe a implementação pública
-// concatenada ao helper interno real, preservando a intenção da suíte sem inflar o
-// número de Serverless Functions do plano Hobby.
+// Suítes anteriores à arquitetura wrapper+helper inspecionam api/admin.js/api/audit.js
+// como texto. Para elas, o preload devolve a fonte composta (wrapper + implementação
+// interna real), preservando a intenção do teste sem criar novas funções serverless.
 const composedApiTests = new Set([
+  'scripts/test-patch05-static.js',
   'scripts/test-patch40-static.js',
   'scripts/test-patch42-static.js',
   'scripts/test-patch44-static.js',
