@@ -3,8 +3,15 @@
 import { neon } from '@neondatabase/serverless';
 import crypto from 'crypto';
 import { OAuth2Client } from 'google-auth-library';
-import { hashPassword, verifyPassword, signToken, verifyToken, resolveAuthAndTenant } from './_auth.js';
+import { hashPassword, verifyPassword, signToken, verifyToken, resolveAuthAndTenant, getSessionSigningSecret, getInternalApiSecret } from './_auth.js';
 import { checkRateLimit, getClientIp } from './_ratelimit.js';
+import { writeAudit } from './_audit.js';
+import {
+  resolveTenantByAccessKey,
+  resolveTenantUserByLogin,
+  normalizeTenantAccessKey,
+  isTenantAccessKeyShapeValid
+} from './_tenant-access-key.js';
 import {
   generateTotpSecret,
   verifyTotpCode,
@@ -154,9 +161,9 @@ export default async function handler(req, res) {
     });
   }
 
-  const secret = (process.env.API_SECRET || process.env.VERCEL_API_SECRET || '').trim();
+  const secret = getSessionSigningSecret();
   if (!secret) {
-    console.error('🚨 [Auth] API_SECRET não configurado.');
+    console.error('🚨 [Auth] Segredo de assinatura de sessão não configurado.');
     return res.status(500).json({ success:false, error:'Configuração de segurança pendente no servidor.' });
   }
 
@@ -285,47 +292,148 @@ export default async function handler(req, res) {
     // ── 2. POST /api/auth?action=login ──────────────────────────────────────────
     if (req.method === 'POST' && action === 'login') {
       const clientIp = getClientIp(req);
-      const rl = await checkRateLimit(`login:${clientIp}`, 10, 60000);
-      if (!rl.allowed) {
+
+      // Camada 1 — Rate limit por IP (5 tentativas/minuto)
+      const ipLimit = await checkRateLimit(`login:ip:${clientIp}`, 5, 60000);
+      if (!ipLimit.allowed) {
         return res.status(429).json({
           success: false,
-          message: 'Muitas tentativas consecutivas de login. Aguarde 1 minuto antes de tentar novamente.'
+          message: 'Muitas tentativas de login. Aguarde 1 minuto antes de tentar novamente.'
         });
       }
 
-      const { username, password, remember } = req.body || {};
+      const {
+        username,
+        password,
+        remember,
+        company_key,
+        access_key,
+        accessKey
+      } = req.body || {};
+
+      const companyKey = String(access_key || company_key || accessKey || '').trim();
+
       if (!username || !password) {
         return res.status(400).json({ success: false, message: 'Usuário e senha são obrigatórios.' });
       }
 
-      const cleanUser = username.trim().toLowerCase();
-      const rows = await sql`
-        SELECT u.id, u.username, u.email, u.senha_hash, u.nome, u.perfil, u.avatar, u.ativo, u.tenant_id, u.permissoes,
-               u.mfa_secret, u.mfa_enabled, u.mfa_backup_codes, u.mfa_last_used_step,
-               t.razao_social, t.nome_fantasia, t.status as tenant_status, t.created_at as tenant_created_at, t.vencimento as tenant_vencimento
+      const cleanUser = String(username || '').trim().toLowerCase();
+
+      // Fingerprint da chave para o rate limiter — nunca a chave em texto puro.
+      // Usa normalizeTenantAccessKey para consistência com o hash armazenado no banco.
+      const normalizedKey = companyKey ? normalizeTenantAccessKey(companyKey) : '';
+      const companyKeyFingerprint = normalizedKey
+        ? crypto.createHash('sha256').update(normalizedKey).digest('hex').slice(0, 16)
+        : 'master';
+
+      // Camada 2 — Rate limit por IP + usuário + empresa (5 tentativas/minuto)
+      const credentialLimit = await checkRateLimit(
+        `login:credential:${clientIp}:${companyKeyFingerprint}:${cleanUser}`,
+        5,
+        60000
+      );
+      if (!credentialLimit.allowed) {
+        return res.status(429).json({
+          success: false,
+          message: 'Muitas tentativas de login. Aguarde 1 minuto antes de tentar novamente.'
+        });
+      }
+
+      // ── Resolução Master-first ────────────────────────────────────────────────
+      // Superadmin não pertence a uma empresa cliente; não exige Chave da Empresa.
+      const masterRows = await sql`
+        SELECT
+          u.id,
+          u.username,
+          u.email,
+          u.senha_hash,
+          u.nome,
+          u.perfil,
+          u.avatar,
+          u.ativo,
+          u.tenant_id,
+          u.permissoes,
+          u.mfa_secret,
+          u.mfa_enabled,
+          u.mfa_backup_codes,
+          u.mfa_last_used_step,
+          t.razao_social,
+          t.nome_fantasia,
+          t.status      AS tenant_status,
+          t.created_at  AS tenant_created_at,
+          t.vencimento  AS tenant_vencimento
         FROM usuarios u
         LEFT JOIN tenants t ON u.tenant_id = t.id
-        WHERE LOWER(u.username) = ${cleanUser} OR LOWER(u.email) = ${cleanUser}
+        WHERE
+          u.perfil = 'superadmin'
+          AND (
+            LOWER(u.username) = ${cleanUser}
+            OR LOWER(u.email)  = ${cleanUser}
+          )
         LIMIT 1;
       `;
 
+      let rows;
+
+      if (masterRows.length) {
+        // Conta Master encontrada — segue pelo pipeline existente (senha + MFA)
+        rows = masterRows;
+      } else {
+        // ── Fluxo empresarial: Chave da Empresa obrigatória ───────────────────
+        if (!companyKey) {
+          return res.status(400).json({
+            success: false,
+            message: 'Chave da Empresa é obrigatória.'
+          });
+        }
+
+        // Rejeita formato inválido imediatamente (sem bater no banco)
+        if (!isTenantAccessKeyShapeValid(companyKey)) {
+          return res.status(401).json({
+            success: false,
+            message: 'Credenciais de acesso inválidas.'
+          });
+        }
+
+        const tenant = await resolveTenantByAccessKey(sql, companyKey);
+        if (!tenant) {
+          return res.status(401).json({
+            success: false,
+            message: 'Credenciais de acesso inválidas.'
+          });
+        }
+
+        const tenantUser = await resolveTenantUserByLogin(sql, tenant.id, cleanUser);
+        if (!tenantUser) {
+          return res.status(401).json({
+            success: false,
+            message: 'Credenciais de acesso inválidas.'
+          });
+        }
+
+        rows = [tenantUser];
+      }
+
       if (!rows.length) {
-        return res.status(401).json({ success: false, message: 'Usuário ou senha incorretos.' });
+        return res.status(401).json({ success: false, message: 'Credenciais de acesso inválidas.' });
       }
 
       const user = rows[0];
       if (!user.ativo) {
+        await writeAudit(sql, req, { tenantId: user.tenant_id, user: { id: user.id } }, { acao: 'login_bloqueado', entidade: 'auth', entidadeId: user.id, depois: { motivo: 'user_inactive', ip: clientIp } });
         return res.status(403).json({ success: false, message: 'Conta de usuário inativa. Contate o administrador.' });
       }
 
       // Aplicação estrita de regras de status do SaaS
       if (user.tenant_status === 'bloqueado') {
+        await writeAudit(sql, req, { tenantId: user.tenant_id, user: { id: user.id } }, { acao: 'login_bloqueado', entidade: 'auth', entidadeId: user.id, depois: { motivo: 'tenant_blocked', ip: clientIp } });
         return res.status(403).json({
           success: false,
           message: 'Acesso bloqueado para esta empresa. Entre em contato com o suporte comercial FinObra.'
         });
       }
       if (user.tenant_status === 'cancelado') {
+        await writeAudit(sql, req, { tenantId: user.tenant_id, user: { id: user.id } }, { acao: 'login_bloqueado', entidade: 'auth', entidadeId: user.id, depois: { motivo: 'tenant_canceled', ip: clientIp } });
         return res.status(403).json({
           success: false,
           message: 'Assinatura cancelada. Regularize seu plano para restabelecer o acesso ao sistema.'
@@ -336,13 +444,16 @@ export default async function handler(req, res) {
         const created = user.tenant_created_at ? new Date(user.tenant_created_at).getTime() : null;
         const fallbackDue = created ? created + 15 * 24 * 60 * 60 * 1000 : null;
         if ((due && Date.now() > due) || (!due && fallbackDue && Date.now() > fallbackDue)) {
+          await writeAudit(sql, req, { tenantId: user.tenant_id, user: { id: user.id } }, { acao: 'login_bloqueado', entidade: 'auth', entidadeId: user.id, depois: { motivo: 'trial_expired', ip: clientIp } });
           return res.status(403).json({ success:false, message:'Seu período de teste gratuito expirou. Faça o upgrade de plano para continuar.' });
         }
       }
 
       const passwordMatches = verifyPassword(password, user.senha_hash);
       if (!passwordMatches) {
-        return res.status(401).json({ success: false, message: 'Usuário ou senha incorretos.' });
+        await writeAudit(sql, req, { tenantId: user.tenant_id, user: { id: user.id } }, { acao: 'login_bloqueado', entidade: 'auth', entidadeId: user.id, depois: { motivo: 'invalid_password', ip: clientIp } });
+        // Mensagem genérica — não revela se é usuário ou senha o problema (anti-enumeração)
+        return res.status(401).json({ success: false, message: 'Credenciais de acesso inválidas.' });
       }
 
       // PATCH 49: Proteção MFA para Super Admin Master Backoffice
@@ -529,6 +640,7 @@ export default async function handler(req, res) {
       }
 
       if (!mfaValid) {
+        await writeAudit(sql, req, { tenantId: user.tenant_id, user: { id: user.id } }, { acao: 'mfa_invalido', entidade: 'auth', entidadeId: user.id, depois: { ip: clientIp, type: bCode ? 'backup_code' : 'totp' } });
         return res.status(401).json({
           success: false,
           message: bCode ? 'Código de recuperação de emergência inválido ou já utilizado.' : 'Código do Google Authenticator incorreto ou expirado.'
@@ -723,143 +835,61 @@ export default async function handler(req, res) {
     }
 
     // ── 3. POST /api/auth?action=register (Cadastro de novo Tenant SaaS no Neon) ─
-    if (req.method === 'POST' && action === 'register') {
+    if (req.method === 'POST' && (action === 'register' || action === 'solicitar_acesso' || action === 'request_access')) {
       const clientIp = getClientIp(req);
-      const rl = await checkRateLimit(`reg:${clientIp}`, 5, 3600000); // 5 cadastros por hora por IP
+      const rl = await checkRateLimit(`reg:${clientIp}`, 5, 3600000); // 5 solicitações por hora por IP
       if (!rl.allowed) {
         return res.status(429).json({
           success: false,
-          message: 'Muitos cadastros a partir deste endereço IP. Aguarde antes de tentar novamente.'
+          message: 'Muitas solicitações a partir deste endereço IP. Aguarde antes de tentar novamente.'
         });
       }
 
-      const { nome, username, email, password, senha, empresaNome, cnpj, telefone } = req.body || {};
-      const userPass = (password || senha || '').trim();
+      const { nome, email, telefone, empresaNome, cnpj, mensagem } = req.body || {};
       const rawNome = (nome || '').trim();
-      const rawUsername = (username || '').trim().toLowerCase().replace(/[^a-z0-9._-]/g, '');
       const rawEmail = (email || '').trim().toLowerCase();
+      const rawTelefone = (telefone || '').trim();
+      const rawEmpresa = (empresaNome || '').trim();
+      const rawCnpj = (cnpj || '').trim();
+      const rawMsg = (mensagem || '').trim();
 
-      if (!rawNome || !rawUsername || !userPass || !rawEmail) {
-        return res.status(400).json({ success: false, message: 'Nome, usuário, e-mail e senha são obrigatórios.' });
+      if (!rawNome || !rawEmail) {
+        return res.status(400).json({ success: false, message: 'Nome e e-mail de contato são obrigatórios.' });
       }
 
       if (!rawEmail.includes('@') || !rawEmail.includes('.')) {
         return res.status(400).json({ success: false, message: 'Informe um endereço de e-mail válido.' });
       }
 
-      if (rawUsername.length < 3) {
-        return res.status(400).json({ success: false, message: 'O nome de usuário deve ter pelo menos 3 caracteres alfanuméricos.' });
-      }
-
-      if (userPass.length < 8) {
-        return res.status(400).json({ success: false, message: 'A senha deve ter no mínimo 8 caracteres.' });
-      }
-
-      // Verifica se usuário ou e-mail já existe
-      const existing = await sql`
-        SELECT id, username, email FROM usuarios
-        WHERE LOWER(username) = ${rawUsername} OR LOWER(email) = ${rawEmail}
-        LIMIT 1;
-      `;
-
-      if (existing.length > 0) {
-        const isEmail = existing[0].email && existing[0].email.toLowerCase() === rawEmail;
-        return res.status(409).json({
+      const reqId = 'req_' + crypto.randomBytes(6).toString('hex');
+      try {
+        await sql`
+          INSERT INTO access_requests (id, nome, email, telefone, empresa_nome, cnpj, mensagem, ip)
+          VALUES (
+            ${reqId},
+            ${rawNome},
+            ${rawEmail},
+            ${rawTelefone || null},
+            ${rawEmpresa || null},
+            ${rawCnpj || null},
+            ${rawMsg || null},
+            ${clientIp}
+          );
+        `;
+      } catch (insertErr) {
+        console.error('Erro ao gravar solicitação de acesso:', insertErr.message);
+        // PATCH 50: não silenciar falha de INSERT — o lead precisa ser registrado.
+        // Retornar 503 para o cliente tentar novamente em vez de perder o lead.
+        return res.status(503).json({
           success: false,
-          message: isEmail ? 'Este e-mail já está cadastrado.' : 'Este nome de usuário já está em uso. Escolha outro.'
+          message: 'Não foi possível registrar sua solicitação no momento. Por favor, tente novamente em instantes ou entre em contato diretamente pelo WhatsApp.'
         });
       }
 
-      // Criação Atômica de Tenant, Obra Sede e Usuário Administrador (H-13)
-      const newTenantId = 'tenant_' + crypto.randomBytes(6).toString('hex');
-      const newUserId = 'usr_' + crypto.randomBytes(6).toString('hex');
-      const finalEmpresaNome = (empresaNome || rawNome + ' Empreendimentos').trim();
-      const passHash = hashPassword(userPass);
-
-      try {
-        // Trava de segurança SaaS: Cadastro público SEMPRE inicia como plano 'trial' e status 'trial'
-        await sql`
-          INSERT INTO tenants (id, razao_social, nome_fantasia, email, telefone, cnpj, responsavel, plano, status)
-          VALUES (
-            ${newTenantId},
-            ${finalEmpresaNome},
-            ${finalEmpresaNome},
-            ${rawEmail},
-            ${(telefone || '').trim() || null},
-            ${(cnpj || '').trim() || null},
-            ${rawNome},
-            'trial',
-            'trial'
-          );
-        `;
-
-        // Obra de sistema para integridade de lançamentos administrativos
-        await sql`
-          INSERT INTO obras (id, tenant_id, nome, cliente, status)
-          VALUES ('escritorio', ${newTenantId}, 'Sede / Escritório Central', 'Administrativo', 'sistema')
-          ON CONFLICT (tenant_id, id) DO NOTHING;
-        `;
-
-        await sql`
-          INSERT INTO usuarios (id, tenant_id, username, email, senha_hash, nome, perfil, avatar, ativo)
-          VALUES (
-            ${newUserId},
-            ${newTenantId},
-            ${rawUsername},
-            ${rawEmail},
-            ${passHash},
-            ${rawNome},
-            'admin',
-            ${rawNome.slice(0, 2).toUpperCase()},
-            TRUE
-          );
-        `;
-      } catch (atomicErr) {
-        // Rollback compensatório para evitar tenants ou obras órfãs
-        try {
-          await sql`DELETE FROM usuarios WHERE tenant_id = ${newTenantId};`;
-          await sql`DELETE FROM obras WHERE tenant_id = ${newTenantId};`;
-          await sql`DELETE FROM tenants WHERE id = ${newTenantId};`;
-        } catch {}
-        throw atomicErr;
-      }
-
-      const exp = Date.now() + 30 * 24 * 60 * 60 * 1000; // 30 dias
-      const sessionId = await createAuthSession(sql, req, { userId:newUserId, tenantId:newTenantId, remember:true, exp });
-      const payload = {
-        userId: newUserId,
-        username: rawUsername,
-        email: rawEmail,
-        nome: rawNome,
-        perfil: 'admin',
-        tenantId: newTenantId,
-        tenantStatus: 'trial',
-        empresaNome: finalEmpresaNome,
-        avatar: rawNome.slice(0, 2).toUpperCase(),
-        permissions: {},
-        sessionId,
-        exp
-      };
-
-      const token = signToken(payload, secret);
-      setSessionCookie(req, res, token, exp);
-
       return res.status(200).json({
         success: true,
-        ...tokenFieldForExplicitClient(req, token),
-        user: {
-          id: newUserId,
-          username: rawUsername,
-          email: rawEmail,
-          nome: rawNome,
-          perfil: 'admin',
-          avatar: payload.avatar,
-          tenantId: newTenantId,
-          empresaNome: finalEmpresaNome,
-          permissions: {},
-          sessionId,
-          remember: true
-        }
+        commercial_request: true,
+        message: 'Sua solicitação de acesso foi recebida com sucesso! Nossa equipe comercial entrará em contato para ativar sua construtora no FinObra.'
       });
     }
 
@@ -902,12 +932,45 @@ export default async function handler(req, res) {
       const picture = profile.picture || '';
       const googleSub = profile.sub || '';
 
-      // Verifica se usuário já existe
+      // PATCH 50.2: Google OAuth multi-tenant com Chave da Empresa obrigatória (fail-closed antes de query SQL).
+      // A arquitetura exige: chave -> tenant -> usuário vinculado àquele tenant.
+      // Superadmin nunca é acessível via Google.
+      const rawGoogleCompanyKey = String(req.body?.access_key || req.body?.company_key || req.body?.accessKey || '').trim();
+      if (!rawGoogleCompanyKey) {
+        return res.status(403).json({
+          success: false,
+          not_registered: true,
+          google_needs_company_key: true,
+          message: 'Para entrar com Google, informe a Chave da Empresa (6 dígitos) fornecida pelo administrador da sua construtora.'
+        });
+      }
+
+      if (!isTenantAccessKeyShapeValid(rawGoogleCompanyKey)) {
+        return res.status(403).json({
+          success: false,
+          not_registered: true,
+          message: 'Chave da Empresa inválida. Verifique a chave de 6 dígitos fornecida pelo administrador.'
+        });
+      }
+
+      const googleTenant = await resolveTenantByAccessKey(sql, rawGoogleCompanyKey);
+      if (!googleTenant) {
+        return res.status(403).json({
+          success: false,
+          not_registered: true,
+          message: 'Chave da Empresa não encontrada ou empresa com acesso bloqueado.'
+        });
+      }
+      const googleTenantId = googleTenant.id;
+
+      // Busca usuário existente estritamente vinculado ao tenant resolvido pela chave
       const existing = await sql`
         SELECT u.*, t.razao_social, t.nome_fantasia, t.status as tenant_status, t.created_at as tenant_created_at, t.vencimento as tenant_vencimento
         FROM usuarios u
         LEFT JOIN tenants t ON u.tenant_id = t.id
-        WHERE LOWER(u.email) = ${email} OR (u.google_sub IS NOT NULL AND u.google_sub = ${googleSub})
+        WHERE (LOWER(u.email) = ${email} OR (u.google_sub IS NOT NULL AND u.google_sub = ${googleSub}))
+          AND u.perfil <> 'superadmin'
+          AND u.tenant_id = ${googleTenantId}
         LIMIT 1;
       `;
 
@@ -938,55 +1001,11 @@ export default async function handler(req, res) {
           userRecord.avatar = picture;
         }
       } else {
-        // Provisiona novo Tenant isolado para novo usuário Google
-        isNew = true;
-        const newTenantId = 'tenant_g_' + crypto.randomBytes(6).toString('hex');
-        const newUserId = 'usr_g_' + crypto.randomBytes(6).toString('hex');
-        const cleanUser = email.split('@')[0].replace(/[^a-z0-9._-]/g, '') + '_' + crypto.randomBytes(2).toString('hex');
-        const randomPassHash = hashPassword(crypto.randomBytes(32).toString('hex'));
-
-        await sql`
-          INSERT INTO tenants (id, razao_social, nome_fantasia, email, responsavel, plano, status)
-          VALUES (
-            ${newTenantId},
-            ${nome + ' Construtora LTDA'},
-            ${nome + ' Construtora'},
-            ${email},
-            ${nome},
-            'trial',
-            'trial'
-          );
-        `;
-
-        await sql`
-          INSERT INTO usuarios (id, tenant_id, username, email, senha_hash, nome, perfil, avatar, ativo, google_auth, google_sub)
-          VALUES (
-            ${newUserId},
-            ${newTenantId},
-            ${cleanUser},
-            ${email},
-            ${randomPassHash},
-            ${nome},
-            'admin',
-            ${picture || nome.slice(0, 2).toUpperCase()},
-            TRUE,
-            TRUE,
-            ${googleSub}
-          );
-        `;
-
-        userRecord = {
-          id: newUserId,
-          username: cleanUser,
-          email,
-          nome,
-          perfil: 'admin',
-          avatar: picture || nome.slice(0, 2).toUpperCase(),
-          tenant_id: newTenantId,
-          tenant_status: 'trial',
-          nome_fantasia: nome + ' Construtora',
-          permissoes: {}
-        };
+        return res.status(403).json({
+          success: false,
+          not_registered: true,
+          message: 'Esta conta Google não está vinculada a nenhuma construtora cadastrada no FinObra. Solicite acesso ao administrador da sua empresa ou à nossa equipe comercial.'
+        });
       }
 
       const exp = Date.now() + 30 * 24 * 60 * 60 * 1000; // 30 dias
@@ -1086,7 +1105,15 @@ export default async function handler(req, res) {
         });
       }
 
-      const { identificador } = req.body || {};
+      // PATCH 50: reset multi-tenant — busca em duas etapas:
+      // 1. Tentar superadmin primeiro (sem Chave da Empresa, igual ao login Master).
+      // 2. Se não for superadmin, exigir company_key para isolar o tenant correto.
+      const {
+        identificador,
+        company_key: resetCompanyKey,
+        access_key: resetAccessKey,
+        accessKey: resetCamelKey
+      } = req.body || {};
       if (!identificador || !identificador.trim()) {
         return res.status(400).json({ success: false, message: 'Informe seu usuário ou e-mail cadastrado.' });
       }
@@ -1100,14 +1127,42 @@ export default async function handler(req, res) {
       const fakeRequestId = () => 'rec_' + crypto.randomBytes(8).toString('hex');
 
       const clean = identificador.trim().toLowerCase();
-      const rows = await sql`
+
+      // Etapa 1: busca Master (superadmin) — não requer Chave da Empresa
+      const masterResetRows = await sql`
         SELECT u.id, u.username, u.email, u.nome, u.tenant_id,
                t.telefone as tenant_telefone, t.nome_fantasia
         FROM usuarios u
         LEFT JOIN tenants t ON u.tenant_id = t.id
-        WHERE (LOWER(u.username) = ${clean} OR LOWER(u.email) = ${clean}) AND u.ativo = TRUE
+        WHERE (LOWER(u.username) = ${clean} OR LOWER(u.email) = ${clean})
+          AND u.perfil = 'superadmin'
+          AND u.ativo = TRUE
         LIMIT 1;
       `;
+
+      let rows;
+      if (masterResetRows.length) {
+        rows = masterResetRows;
+      } else {
+        // Etapa 2: usuário de tenant — exige Chave da Empresa para isolar o tenant correto.
+        // Se access_key / company_key ausente, retornar resposta genérica (sem revelar que é obrigatória).
+        const rawResetKey = String(resetAccessKey || resetCompanyKey || resetCamelKey || '').trim();
+        if (!rawResetKey) {
+          return genericResponse(fakeRequestId());
+        }
+        if (!isTenantAccessKeyShapeValid(rawResetKey)) {
+          return genericResponse(fakeRequestId());
+        }
+        const resetTenant = await resolveTenantByAccessKey(sql, rawResetKey);
+        if (!resetTenant) {
+          return genericResponse(fakeRequestId());
+        }
+        const tenantUser = await resolveTenantUserByLogin(sql, resetTenant.id, clean);
+        if (!tenantUser) {
+          return genericResponse(fakeRequestId());
+        }
+        rows = [tenantUser];
+      }
 
       if (!rows.length) {
         return genericResponse(fakeRequestId());
@@ -1150,7 +1205,8 @@ export default async function handler(req, res) {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
-              'x-api-key': secret,
+              // PATCH 50.1: usa INTERNAL_API_SECRET dedicado, não SESSION_SIGNING_SECRET.
+              'x-api-key': getInternalApiSecret(),
               'x-tenant-id': user.tenant_id
             },
             body: JSON.stringify({ tenantId: user.tenant_id, phone: numFmt, message: mensagemOtp })
@@ -1251,6 +1307,6 @@ export default async function handler(req, res) {
     return res.status(400).json({ success: false, error: `Ação '${action}' inválida para /api/auth.` });
   } catch (err) {
     console.error('Erro na API de autenticação:', err);
-    return res.status(500).json({ success: false, error: 'Erro interno ao processar autenticação.', detail: err.message });
+    return res.status(500).json({ success: false, error: 'Erro interno ao processar autenticação.' });
   }
 }

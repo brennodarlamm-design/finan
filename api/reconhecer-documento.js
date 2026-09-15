@@ -58,12 +58,21 @@ export default async function handler(req, res) {
     return res.status(403).json(planError('ocr', auth.user?.tenantPlan));
   }
 
-  // Rate Limiting para proteção contra abuso de custos no Gemini OCR
-  const tenantKey = auth.tenantId || getClientIp(req);
-  const rl = await checkRateLimit(`ocr:${tenantKey}`, 30, 600000); // 30 requisições a cada 10 min por tenant
+  // Proteção Multi-Camada contra Abuso de Custos e DoS no OCR
+  const clientIp = getClientIp(req);
+  const userKey = auth.user?.userId || clientIp;
+  const userRl = await checkRateLimit(`ocr:user:${userKey}`, 10, 300000); // Max 10 requisições a cada 5 min por usuário/IP
+  if (!userRl.allowed) {
+    return res.status(429).json({
+      error: 'Limite individual de leituras OCR atingido (máximo 10 a cada 5 minutos). Aguarde para tentar novamente.'
+    });
+  }
+
+  const tenantKey = auth.tenantId || clientIp;
+  const rl = await checkRateLimit(`ocr:tenant:${tenantKey}`, 30, 600000); // Max 30 requisições a cada 10 min por tenant
   if (!rl.allowed) {
     return res.status(429).json({
-      error: 'Limite de processamento OCR atingido para este período (máximo 30 a cada 10 minutos). Aguarde para enviar mais documentos.'
+      error: 'Limite de processamento OCR do tenant atingido (máximo 30 a cada 10 minutos). Aguarde para enviar mais documentos.'
     });
   }
 
@@ -79,7 +88,31 @@ export default async function handler(req, res) {
   }
 
   const cleanBase64 = base64.includes(',') ? base64.split(',')[1] : base64;
-  const cleanMime   = mimeType.includes(';') ? mimeType.split(';')[0] : mimeType;
+  const cleanMime   = mimeType.includes(';') ? mimeType.split(';')[0].toLowerCase().trim() : mimeType.toLowerCase().trim();
+
+  // Fail-early check por tamanho max de 10MB no payload base64
+  const approxBytes = Math.ceil(cleanBase64.length * 0.75);
+  if (approxBytes > 10 * 1024 * 1024) {
+    return res.status(413).json({ error: 'Arquivo excede o limite máximo de 10 MB para leitura OCR.' });
+  }
+
+  const buffer = Buffer.from(cleanBase64, 'base64');
+  if (buffer.length > 10 * 1024 * 1024) {
+    return res.status(413).json({ error: 'Arquivo excede o limite máximo de 10 MB para leitura OCR.' });
+  }
+
+  // Validação estrita de Magic Bytes (Somente PDF, JPEG, PNG, WEBP)
+  const magicHex = buffer.slice(0, 8).toString('hex').toUpperCase();
+  const isPdf  = magicHex.startsWith('25504446');
+  const isPng  = magicHex.startsWith('89504E47');
+  const isJpg  = magicHex.startsWith('FFD8FF');
+  const isWebp = magicHex.startsWith('52494646') && buffer.length >= 12 && buffer.slice(8, 12).toString('ascii') === 'WEBP';
+
+  if (!isPdf && !isPng && !isJpg && !isWebp) {
+    return res.status(400).json({
+      error: 'Assinatura binária do documento inválida. O OCR aceita estritamente arquivos PDF e imagens JPEG, PNG ou WEBP.'
+    });
+  }
 
   const prompt = `Você é um especialista em documentos fiscais e bancários brasileiros. Analise a imagem ou PDF fornecido e extraia as informações relevantes.
 

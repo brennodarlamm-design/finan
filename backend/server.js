@@ -20,7 +20,7 @@ import { createSinapiRouter, initSinapiDatabase } from './sinapi_robot.js';
 dotenv.config({ path: '.env.local' });
 dotenv.config();
 
-// Suprime logs ruidosos de decifração externa/Bad MAC do libsignal para não poluir os logs do Render
+// Suprime logs ruidosos de decifração externa/Bad MAC/Reconexão do libsignal para não poluir os logs do Render
 const _rawConsoleError = console.error;
 console.error = (...args) => {
   const msg = typeof args[0] === 'string' ? args[0] : (args[0]?.message || String(args[0] || ''));
@@ -28,7 +28,11 @@ console.error = (...args) => {
     msg.includes('Bad MAC') ||
     msg.includes('Failed to decrypt message with any known session') ||
     msg.includes('Session error:Error: Bad MAC') ||
-    msg.includes('Session error: Error: Bad MAC')
+    msg.includes('Session error: Error: Bad MAC') ||
+    msg.includes('Closing session:') ||
+    msg.includes('Connection Closed') ||
+    msg.includes('Stream Errored') ||
+    msg.includes('pre-key')
   ) {
     return;
   }
@@ -70,7 +74,7 @@ initSinapiDatabase().catch(e => console.warn('Aviso initSinapiDatabase:', e.mess
 // Middleware de autenticação interna para proteger rotas críticas.
 // Segredos de API são aceitos SOMENTE em headers — nunca em query string.
 function getInternalSecret() {
-  return (process.env.API_SECRET || process.env.VERCEL_API_SECRET || '').trim();
+  return (process.env.INTERNAL_API_SECRET || '').trim();
 }
 
 function hasInternalApiAuth(req) {
@@ -84,7 +88,7 @@ function hasInternalApiAuth(req) {
 
 function requireAuth(req, res, next) {
   if (!getInternalSecret()) {
-    console.error('❌ [Segurança] API_SECRET não configurado no backend. Bloqueando requisição por segurança.');
+    console.error('❌ [Segurança] INTERNAL_API_SECRET não configurado no backend. Bloqueando requisição por segurança.');
     return res.status(500).json({ error: 'Configuração de segurança pendente no servidor.' });
   }
   if (hasInternalApiAuth(req)) return next();
@@ -661,6 +665,11 @@ app.get('/status', requireAuth, (req, res) => {
   });
 });
 
+// 1.0 Health Check ultra-rápido sem query no DB para sondagem de alta frequência (Render/Cloudflare)
+app.get('/healthz', (req, res) => {
+  return res.status(200).json({ status: 'ok', service: 'finan-backend', timestamp: new Date().toISOString() });
+});
+
 // 1.1 Health Check Monitor
 app.get('/health', async (req, res) => {
   let dbOk = false;
@@ -695,7 +704,7 @@ app.get('/whatsapp-session', requireAuth, (req, res) => {
 
 // 2. Página Web Visual do QR Code com Suporte Multi-Tenant e Sem Token em Query String (C-05/H-15)
 app.all('/qr', (req, res) => {
-  const secret = (process.env.API_SECRET || process.env.VERCEL_API_SECRET || '').trim();
+  const secret = getInternalSecret();
   const providedToken = String(req.body?.token || req.headers?.authorization?.replace(/^Bearer\s+/i, '') || req.headers?.['x-api-key'] || '').trim();
   const tenantId = extractTenantFromReq(req);
   const cookieAuthorized = verifyQrAccess(req, tenantId);
@@ -722,7 +731,7 @@ app.all('/qr', (req, res) => {
           <p style="color:#94a3b8;font-size:0.9rem;">Informe a chave de segurança para visualizar o QR Code do WhatsApp:</p>
           <form method="POST" action="/qr">
             <input type="hidden" name="tenant_id" value="${tenantId}" />
-            <input type="password" name="token" placeholder="Insira o API_SECRET" required autofocus />
+            <input type="password" name="token" placeholder="Insira a chave de segurança interna" required autofocus />
             <button type="submit">Desbloquear QR Code</button>
           </form>
         </div>

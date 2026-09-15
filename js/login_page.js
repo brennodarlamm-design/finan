@@ -36,28 +36,42 @@ if (window.location.hash.startsWith('#validar') || window.location.search.includ
     e.preventDefault();
     const btn = document.getElementById('reg-btn');
     btn.disabled = true;
-    btn.textContent = 'Criando conta e preparando sistema...';
+    btn.textContent = 'Enviando solicitação...';
     document.getElementById('reg-err-box').style.display = 'none';
+    const okBox = document.getElementById('reg-ok-box');
+    if (okBox) okBox.style.display = 'none';
 
-    const empNome = document.getElementById('reg-empresa').value.trim();
-    const nome = document.getElementById('reg-nome').value.trim();
-    const cnpj = document.getElementById('reg-cnpj').value.trim();
-    const username = document.getElementById('reg-username').value.trim();
-    const senha = document.getElementById('reg-senha').value;
-    const email = document.getElementById('reg-email').value.trim();
+    const empNome = (document.getElementById('reg-empresa') || {}).value?.trim() || '';
+    const nome = (document.getElementById('reg-nome') || {}).value?.trim() || '';
+    const cnpj = (document.getElementById('reg-cnpj') || {}).value?.trim() || '';
+    const whats = (document.getElementById('reg-whats') || {}).value?.trim() || '';
+    const email = (document.getElementById('reg-email') || {}).value?.trim() || '';
+    const msg = (document.getElementById('reg-msg') || {}).value?.trim() || '';
 
-    const regResult = await Auth.register({ nome, username, email, senha, empresaNome: empNome, cnpj });
-    if (!regResult.success) {
+    try {
+      const resp = await fetch('/api/auth?action=register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ nome, email, telefone: whats, empresaNome: empNome, cnpj, mensagem: msg })
+      });
+      const data = await resp.json().catch(() => ({}));
+      if (data.success && data.commercial_request) {
+        if (okBox) {
+          okBox.textContent = data.message || 'Solicitação enviada! Nossa equipe entrará em contato em breve.';
+          okBox.style.display = 'block';
+        }
+        btn.textContent = '✓ Solicitação enviada!';
+        setTimeout(() => closeRegisterModal(), 3500);
+      } else {
+        throw new Error(data.message || 'Erro ao enviar solicitação. Tente via WhatsApp.');
+      }
+    } catch (err) {
       const eBox = document.getElementById('reg-err-box');
-      eBox.textContent = regResult.message;
+      eBox.textContent = err.message;
       eBox.style.display = 'block';
       btn.disabled = false;
-      btn.textContent = '🚀 Criar Conta e Abrir Sistema Zerado';
-      return;
+      btn.textContent = '📋 Enviar Solicitação Comercial';
     }
-
-    btn.textContent = '✓ Conta criada com sucesso! Entrando...';
-    setTimeout(() => window.location.replace('/app'), 500);
   });
 
   document.getElementById('login-form').addEventListener('submit', async function(e) {
@@ -71,7 +85,8 @@ if (window.location.hash.startsWith('#validar') || window.location.search.includ
       const u = document.getElementById('username').value.trim();
       const p = document.getElementById('password').value;
       const r = document.getElementById('remember').checked;
-      const result = await Auth.login(u, p, r);
+      const ak = (document.getElementById('accessKey') || {}).value?.trim() || '';
+      const result = await Auth.login(u, p, r, { access_key: ak });
       if (result.success) {
         btn.innerHTML = '✓ Bem-vindo! Redirecionando...';
         setTimeout(() => window.location.replace('/app'), 350);
@@ -106,12 +121,24 @@ if (window.location.hash.startsWith('#validar') || window.location.search.includ
 
   async function onGoogleCredentialResponse(response) {
     if (!response || !response.credential) return;
+    const ak = (document.getElementById('accessKey') || {}).value?.trim() || '';
+    if (!ak) {
+      const eBox = document.getElementById('err-box');
+      if (eBox) {
+        eBox.textContent = 'Informe a Chave da Empresa (6 dígitos) para entrar com o Google.';
+        eBox.style.display = 'block';
+      }
+      const akInput = document.getElementById('accessKey');
+      if (akInput) akInput.focus();
+      return;
+    }
+
     const btn = document.getElementById('login-btn');
     if (btn) {
       btn.disabled = true;
       btn.innerHTML = '<div class="spinner"></div> Autenticando com o Google...';
     }
-    const result = await Auth.loginWithGoogle(response.credential);
+    const result = await Auth.loginWithGoogle(response.credential, { access_key: ak });
     if (result.success) {
       window.location.replace('/app');
     } else {
@@ -121,6 +148,10 @@ if (window.location.hash.startsWith('#validar') || window.location.search.includ
       if (btn) {
         btn.disabled = false;
         btn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></svg> Entrar no Sistema';
+      }
+      if (result.google_needs_company_key) {
+        const akInput = document.getElementById('accessKey');
+        if (akInput) akInput.focus();
       }
     }
   }
@@ -172,6 +203,15 @@ if (window.location.hash.startsWith('#validar') || window.location.search.includ
     const errBox = document.getElementById('err-box');
     errBox.style.display = 'none';
 
+    const ak = (document.getElementById('accessKey') || {}).value?.trim() || '';
+    if (!ak) {
+      errBox.textContent = 'Digite a Chave da Empresa (6 dígitos) antes de continuar com o Google.';
+      errBox.style.display = 'block';
+      const akInput = document.getElementById('accessKey');
+      if (akInput) akInput.focus();
+      return;
+    }
+
     if (window.google && google.accounts && google.accounts.id) {
       try {
         const officialBtn = document.querySelector('#google-btn-container div[role=button]');
@@ -210,6 +250,10 @@ if (window.location.hash.startsWith('#validar') || window.location.search.includ
     document.getElementById('rec-demo-hint').style.display = 'none';
 
     document.getElementById('rec-ident').value = document.getElementById('username').value.trim();
+    const recKeyInput = document.getElementById('rec-company-key');
+    if (recKeyInput) {
+      recKeyInput.value = (document.getElementById('accessKey') || {}).value?.trim() || '';
+    }
     for (let i = 1; i <= 6; i++) {
       const el = document.getElementById('otp-' + i);
       if (el) el.value = '';
@@ -236,12 +280,15 @@ if (window.location.hash.startsWith('#validar') || window.location.search.includ
       return;
     }
 
+    const recKeyInput = document.getElementById('rec-company-key');
+    const ak = (recKeyInput ? recKeyInput.value : (document.getElementById('accessKey') || {}).value || '').trim();
+
     const originalText = btn.innerHTML;
     btn.disabled = true;
     btn.innerHTML = '<div class="spinner"></div> Enviando código...';
 
     try {
-      const res = await Auth.solicitarCodigoRecuperacao(ident);
+      const res = await Auth.solicitarCodigoRecuperacao(ident, { access_key: ak });
       if (!res.success) {
         errBox.textContent = res.message;
         errBox.style.display = 'block';

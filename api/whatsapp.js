@@ -1,6 +1,6 @@
 // api/whatsapp.js — Serverless Proxy Seguro para Gerenciamento do WhatsApp no FinObra
 
-import { resolveAuthAndTenant } from './_auth.js';
+import { resolveAuthAndTenant, getInternalApiSecret } from './_auth.js';
 import { checkRateLimit, getClientIp } from './_ratelimit.js';
 import { canWriteData, canManageTenant, canAccessModule, permissionError } from './_permissions.js';
 
@@ -67,7 +67,7 @@ export default async function handler(req, res) {
   if ((action === 'send' || action === 'test') && !canAccessModule(auth,'whatsapp','write')) return res.status(403).json(permissionError('MODULE_WRITE_FORBIDDEN','whatsapp'));
 
   const renderBase = getRenderBaseUrl();
-  const internalSecret = (process.env.API_SECRET || process.env.VERCEL_API_SECRET || '').trim();
+  const internalSecret = getInternalApiSecret();
   const tenantId = auth.tenantId || 'public';
 
   const authHeaders = {

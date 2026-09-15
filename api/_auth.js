@@ -131,11 +131,27 @@ function trialExpired(createdAt, trialDays = 15, explicitDueDate = null) {
  * - tenant informado pelo cliente só é aceito para superadmin ou chave interna;
  * - API_SECRET não é aceito por query string (evita vazamento em URL/logs).
  */
+export function getSessionSigningSecret() {
+  // Requer SESSION_SIGNING_SECRET dedicado — sem fallback para evitar mistura com chave interna.
+  return String(process.env.SESSION_SIGNING_SECRET || '').trim();
+}
+
+export function getInternalApiSecret() {
+  // Requer INTERNAL_API_SECRET dedicado — sem fallback para evitar que vire chave de sessão.
+  return String(process.env.INTERNAL_API_SECRET || '').trim();
+}
+
 export async function resolveAuthAndTenant(req) {
-  const secret = (process.env.API_SECRET || process.env.VERCEL_API_SECRET || '').trim();
-  if (!secret) {
-    console.error('🚨 [Segurança] API_SECRET não configurado no ambiente.');
+  const sessionSecret = getSessionSigningSecret();
+  const internalSecret = getInternalApiSecret();
+  if (!sessionSecret && !internalSecret) {
+    console.error('🚨 [Segurança] Nenhum segredo de autenticação configurado no ambiente.');
     return { authenticated: false, status: 500, error: 'Configuração de segurança pendente no servidor.' };
+  }
+  if (!sessionSecret) {
+    // PATCH 50.1: sessionSecret vazio é detectado aqui também para log antecipado.
+    // O bloqueio definitivo para requisições de usuário acontece em seguida, após a rota interna.
+    console.warn('⚠️  [Segurança] SESSION_SIGNING_SECRET ausente — apenas acesso interno via INTERNAL_API_SECRET será aceito.');
   }
 
   const credential = getCredential(req);
@@ -152,7 +168,7 @@ export async function resolveAuthAndTenant(req) {
   }
 
   // Chave interna para jobs/cron. Nunca deve existir no frontend.
-  if (rawToken === secret) {
+  if (internalSecret && rawToken === internalSecret) {
     // Chaves internas nunca assumem uma empresa padrão. Isso evita que um job mal
     // configurado leia/grave acidentalmente no tenant histórico da plataforma.
     const explicitTenant = String(req.headers['x-tenant-id'] || '').trim();
@@ -167,7 +183,14 @@ export async function resolveAuthAndTenant(req) {
     };
   }
 
-  const payload = verifyToken(rawToken, secret);
+  // PATCH 50: Tokens de usuário são verificados APENAS com sessionSecret.
+  // PATCH 50.1: Se SESSION_SIGNING_SECRET estiver ausente após excluir a rota interna,
+  // falhar com 500 imediatamente — nunca chamar verifyToken(..., '') com chave vazia.
+  if (!sessionSecret) {
+    console.error('🚨 [Segurança] SESSION_SIGNING_SECRET não configurado. Tokens de usuário não podem ser validados.');
+    return { authenticated: false, status: 500, error: 'Configuração de segurança pendente no servidor.' };
+  }
+  const payload = verifyToken(rawToken, sessionSecret);
   if (!payload?.userId || !payload?.tenantId) {
     return { authenticated: false, status: 401, error: 'Token de autenticação inválido ou expirado.' };
   }

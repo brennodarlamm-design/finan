@@ -43,15 +43,15 @@ ok('Migration runner calcula checksum e registra tempo de execução',
   runMigration.includes('execution_time_ms')
 );
 
-// 2. Atômico / Transacional no Cadastro e Reset de Senhas (H-12 / H-13 / H-14 / H-09)
-ok('Auth register exige senha mínima de 8 caracteres',
-  authApi.includes('userPass.length < 8') &&
-  authApi.includes('A senha deve ter no mínimo 8 caracteres.')
+// 2. Atômico / Transacional no Cadastro Monitorado e Reset de Senhas (H-12 / H-13 / H-14 / H-09)
+ok('Auth register redireciona cadastro público para solicitação comercial access_requests',
+  authApi.includes('access_requests') &&
+  authApi.includes('commercial_request') &&
+  /Solicitação de acesso.*com sucesso/i.test(authApi)
 );
 
-ok('Auth register cria tenant, obra de sistema e usuário com rollback compensatório',
-  authApi.includes('escritorio') &&
-  authApi.includes('DELETE FROM tenants WHERE id = ${newTenantId}')
+ok('Auth register não provisiona tenant automaticamente no cadastro público',
+  !authApi.includes('INSERT INTO tenants (id, razao_social, nome_fantasia')
 );
 
 ok('Auth request_reset previne enumeração de contas com requestId opaco e resposta uniforme',

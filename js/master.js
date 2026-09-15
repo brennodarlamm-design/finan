@@ -1152,9 +1152,13 @@ const MasterAdmin = {
       }
     }
 
+    const keyBadge = e.access_key_last4
+      ? `<span style="display:inline-block;margin-top:4px;font-size:.68rem;padding:2px 6px;border-radius:4px;background:rgba(201,162,39,.12);color:var(--accent2);border:1px solid rgba(201,162,39,.25);font-family:monospace;" title="Chave da Empresa ativa">🔑 ...${this._esc(e.access_key_last4)}</span>`
+      : `<span style="display:inline-block;margin-top:4px;font-size:.68rem;padding:2px 6px;border-radius:4px;background:rgba(239,68,68,.12);color:#fca5a5;border:1px solid rgba(239,68,68,.25);" title="Sem Chave de Acesso configurada">⚠️ Sem Chave</span>`;
+
     return `
       <tr style="border-bottom:1px solid rgba(255,255,255,.04);transition:background .15s;">
-        <td style="padding:14px 18px;"><div style="font-weight:800;color:#fff;">${nome}</div><div style="font-size:.72rem;color:#94a3b8;">${razao}</div></td>
+        <td style="padding:14px 18px;"><div style="font-weight:800;color:#fff;">${nome}</div><div style="font-size:.72rem;color:#94a3b8;">${razao}</div>${keyBadge}</td>
         <td style="padding:14px 18px;font-family:monospace;font-size:.78rem;color:#cbd5e1;">${cnpj}</td>
         <td style="padding:14px 18px;"><div style="color:#e2e8f0;">${resp}</div><div style="font-size:.72rem;color:#94a3b8;">${contato}</div></td>
         <td style="padding:14px 18px;font-weight:700;color:var(--accent2);font-size:.8rem;">${plano}</td>
@@ -1388,6 +1392,27 @@ const MasterAdmin = {
             <div style="font-size:.7rem;color:#94a3b8;margin-top:4px;">Define o prazo do período trial ou a próxima fatura mensal.</div>
           </div>
 
+          <div style="background:rgba(201,162,39,0.06);border:1px solid rgba(201,162,39,0.25);border-radius:10px;padding:14px;display:flex;flex-direction:column;gap:8px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;">
+              <div style="font-weight:700;font-size:.82rem;color:var(--accent2);display:flex;align-items:center;gap:6px;">
+                🔑 Chave da Empresa (P50 Access Key)
+              </div>
+              <span style="font-size:.72rem;padding:2px 8px;border-radius:12px;${emp.access_key_last4 ? 'background:rgba(34,197,94,.15);color:#4ade80;' : 'background:rgba(239,68,68,.15);color:#f87171;'}">
+                ${emp.access_key_last4 ? 'Ativa (Final ' + emp.access_key_last4 + ')' : 'Não Configurada'}
+              </span>
+            </div>
+            <div style="font-size:.73rem;color:#94a3b8;line-height:1.4;">
+              ${emp.access_key_last4
+                ? 'Os usuários desta construtora utilizam a Chave da Empresa para login seguro. A chave completa não fica exposta no banco de dados.'
+                : 'Esta empresa ainda não possui Chave de Acesso gerada. Gere uma chave para habilitar o login empresarial dos usuários.'}
+            </div>
+            <div style="display:flex;gap:8px;margin-top:4px;">
+              <button type="button" data-fb-click="MasterAdmin.gerarChaveEmpresa" data-fb-click-n="2" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(this._esc(emp.id)))}" data-fb-click-t1="string" data-fb-click-v1="${encodeURIComponent(String(this._esc(nome)))}" style="background:rgba(201,162,39,0.15);border:1px solid rgba(201,162,39,0.4);color:var(--accent2);padding:6px 12px;border-radius:6px;font-size:.76rem;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:6px;">
+                🔑 ${emp.access_key_last4 ? 'Rotacionar Chave da Empresa' : 'Gerar Chave de Acesso'}
+              </button>
+            </div>
+          </div>
+
           <div style="padding-top:10px;display:flex;justify-content:flex-end;gap:10px;">
             <button type="button" data-fb-click="Patch26Actions.removeById" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="master-editar-empresa-modal" style="background:none;border:1px solid rgba(255,255,255,.2);color:#cbd5e1;padding:8px 16px;border-radius:8px;cursor:pointer;">
               Cancelar
@@ -1450,6 +1475,97 @@ const MasterAdmin = {
         btnSubmit.disabled = false;
         btnSubmit.innerText = 'Salvar Alterações 💾';
       }
+    }
+  },
+
+  async gerarChaveEmpresa(tenantIdEnc, tenantNomeEnc) {
+    const tid = decodeURIComponent(tenantIdEnc || '');
+    const nome = decodeURIComponent(tenantNomeEnc || 'Construtora');
+    if (!tid) return;
+
+    const confirmed = confirm(
+      `Deseja gerar/rotacionar a Chave da Empresa para "${nome}"?\n\n` +
+      `⚠️ ATENÇÃO: A nova chave será exibida UMA ÚNICA VEZ na tela. Se a empresa já possuía uma chave anterior, ela deixará de funcionar imediatamente.`
+    );
+    if (!confirmed) return;
+
+    try {
+      const res = await fetch('/api/admin?action=generate_tenant_access_key', {
+        method: 'POST',
+        headers: (typeof Auth !== 'undefined' && Auth.getAuthHeaders) ? Auth.getAuthHeaders() : { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tenantId: tid })
+      });
+      const data = await res.json();
+      if (!data.success) {
+        throw new Error(data.error || 'Erro ao gerar chave da empresa');
+      }
+
+      const modal = document.getElementById('master-editar-empresa-modal');
+      if (modal) modal.remove();
+
+      await this.carregarEmpresas(true);
+      const target = document.getElementById('master-content-area') ? 'master-content-area' : 'route-content';
+      this.render(target);
+
+      this.exibirModalChaveGerada(nome, data.accessKey, data.access_key_last4);
+    } catch (err) {
+      alert('Erro ao gerar chave da empresa: ' + err.message);
+    }
+  },
+
+  exibirModalChaveGerada(nome, accessKey, last4) {
+    let modal = document.getElementById('master-chave-gerada-modal');
+    if (modal) modal.remove();
+
+    modal = document.createElement('div');
+    modal.id = 'master-chave-gerada-modal';
+    modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.85);backdrop-filter:blur(8px);z-index:999999;display:flex;align-items:center;justify-content:center;padding:16px;';
+    modal.innerHTML = `
+      <div style="background:#0f1d0a;border:1.5px solid var(--accent);border-radius:14px;max-width:540px;width:100%;box-shadow:0 12px 48px rgba(0,0,0,.9);overflow:hidden;">
+        <div style="padding:20px;border-bottom:1px solid rgba(255,255,255,.1);display:flex;align-items:center;gap:12px;">
+          <div style="width:40px;height:40px;border-radius:10px;background:rgba(201,162,39,.15);border:1px solid var(--accent);display:flex;align-items:center;justify-content:center;font-size:1.3rem;">
+            🔑
+          </div>
+          <div>
+            <div style="font-weight:800;font-size:1.1rem;color:var(--accent2);">Chave da Empresa Gerada com Sucesso!</div>
+            <div style="font-size:.78rem;color:#94a3b8;">${this._esc(nome)} (Final ${this._esc(last4 || '')})</div>
+          </div>
+        </div>
+        <div style="padding:22px;display:flex;flex-direction:column;gap:16px;">
+          <div style="background:rgba(239,68,68,.12);border:1px solid rgba(239,68,68,.3);border-radius:8px;padding:12px;font-size:.78rem;color:#fca5a5;line-height:1.4;">
+            ⚠️ <strong>ATENÇÃO:</strong> Esta chave é exibida <strong>UMA ÚNICA VEZ</strong> por motivos de segurança criptográfica. Copie-a e envie ao administrador da construtora antes de fechar esta janela.
+          </div>
+          <div>
+            <label style="display:block;font-size:.78rem;color:#94a3b8;margin-bottom:6px;">Chave da Empresa (P50 Access Key):</label>
+            <div style="display:flex;gap:8px;">
+              <input type="text" id="input-chave-gerada" readonly value="${this._esc(accessKey)}" style="flex:1;background:#060d04;border:1px solid var(--accent);border-radius:8px;padding:12px;color:#fff;font-family:monospace;font-size:.95rem;font-weight:700;letter-spacing:1px;text-align:center;">
+              <button type="button" data-fb-click="MasterAdmin.copiarChaveGerada" data-fb-click-n="0" id="btn-copiar-chave-p50" style="background:var(--accent);color:#000;border:none;border-radius:8px;padding:0 18px;font-weight:800;font-size:.82rem;cursor:pointer;">Copiar 📋</button>
+            </div>
+          </div>
+          <div style="display:flex;justify-content:flex-end;">
+            <button type="button" data-fb-click="Patch26Actions.removeById" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="master-chave-gerada-modal" style="background:none;border:1px solid rgba(255,255,255,.2);color:#cbd5e1;padding:8px 20px;border-radius:8px;cursor:pointer;font-size:.85rem;">
+              Fechar
+            </button>
+          </div>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(modal);
+  },
+
+  copiarChaveGerada() {
+    const inp = document.getElementById('input-chave-gerada');
+    const btn = document.getElementById('btn-copiar-chave-p50');
+    if (inp) {
+      inp.select();
+      navigator.clipboard.writeText(inp.value).then(() => {
+        if (btn) btn.innerText = 'Copiado! ✓';
+        setTimeout(() => { if (btn) btn.innerText = 'Copiar 📋'; }, 2500);
+      }).catch(() => {
+        document.execCommand('copy');
+        if (btn) btn.innerText = 'Copiado! ✓';
+        setTimeout(() => { if (btn) btn.innerText = 'Copiar 📋'; }, 2500);
+      });
     }
   },
 
@@ -1578,7 +1694,11 @@ const MasterAdmin = {
       const target = document.getElementById('master-content-area') ? 'master-content-area' : 'route-content';
       this.render(target);
 
-      alert(`✓ Construtora "${nome}" criada com sucesso no PostgreSQL!\nLogin: ${email}\nSenha: ${senha}`);
+      if (data.tenant?.accessKey) {
+        this.exibirModalChaveGerada(nome, data.tenant.accessKey, data.tenant.access_key_last4);
+      } else {
+        alert(`✓ Construtora "${nome}" criada com sucesso no PostgreSQL!\nLogin: ${email}\nSenha: ${senha}`);
+      }
     } catch (err) {
       alert('Erro ao cadastrar construtora: ' + err.message);
       if (btnSubmit) {

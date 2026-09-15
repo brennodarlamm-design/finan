@@ -1,5 +1,7 @@
 import { spawnSync } from 'child_process';
 import fs from 'fs';
+import path from 'path';
+
 const tests = [
   'scripts/test-assets-behavior.js',
   'scripts/test-audit-regressions.js',
@@ -59,11 +61,31 @@ const tests = [
   'scripts/test-patch46-static.js',
   'scripts/test-patch47-static.js',
   'scripts/test-patch48-static.js',
-  'scripts/test-patch49-static.js'
+  'scripts/test-patch49-static.js',
+  'scripts/test-patch50-security.js',
+  'scripts/test-p50-dev-key-vault.js',
+  'scripts/test-p50-admin-secret-boundaries.js'
 ].filter(fs.existsSync);
+
+// Até o P49, as suítes foram escritas quando api/admin.js e api/audit.js eram arquivos
+// monolíticos. No P50 eles viraram wrappers finos para manter 12 funções na Vercel.
+// O preload faz os testes legados enxergarem wrapper + helper interno real. As suítes
+// P50 leem os arquivos físicos sem composição para validar a nova fronteira de segurança.
+const p50NativeSourceTests = new Set([
+  'scripts/test-patch50-security.js',
+  'scripts/test-p50-dev-key-vault.js',
+  'scripts/test-p50-admin-secret-boundaries.js'
+]);
+const preload = path.resolve('scripts/test-api-wrapper-preload.cjs');
+
 for (const file of tests) {
   console.log(`\n=== ${file} ===`);
-  const r = spawnSync(process.execPath, [file], { stdio: 'inherit' });
+  const env = { ...process.env };
+  if (!p50NativeSourceTests.has(file)) {
+    const prior = String(env.NODE_OPTIONS || '').trim();
+    env.NODE_OPTIONS = `${prior}${prior ? ' ' : ''}--require=${preload}`;
+  }
+  const r = spawnSync(process.execPath, [file], { stdio: 'inherit', env });
   if (r.status !== 0) process.exit(r.status || 1);
 }
 console.log('\n✅ Todas as verificações estáticas passaram.');
