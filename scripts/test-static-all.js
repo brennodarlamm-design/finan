@@ -1,5 +1,7 @@
 import { spawnSync } from 'child_process';
 import fs from 'fs';
+import path from 'path';
+
 const tests = [
   'scripts/test-assets-behavior.js',
   'scripts/test-audit-regressions.js',
@@ -64,9 +66,28 @@ const tests = [
   'scripts/test-p50-dev-key-vault.js',
   'scripts/test-p50-admin-secret-boundaries.js'
 ].filter(fs.existsSync);
+
+// P40/P42/P44/P45/P46 foram escritos antes de api/admin.js e api/audit.js virarem
+// multiplexadores finos. Nesses testes, readFileSync recebe a implementação pública
+// concatenada ao helper interno real, preservando a intenção da suíte sem inflar o
+// número de Serverless Functions do plano Hobby.
+const composedApiTests = new Set([
+  'scripts/test-patch40-static.js',
+  'scripts/test-patch42-static.js',
+  'scripts/test-patch44-static.js',
+  'scripts/test-patch45-static.js',
+  'scripts/test-patch46-static.js'
+]);
+const preload = path.resolve('scripts/test-api-wrapper-preload.cjs');
+
 for (const file of tests) {
   console.log(`\n=== ${file} ===`);
-  const r = spawnSync(process.execPath, [file], { stdio: 'inherit' });
+  const env = { ...process.env };
+  if (composedApiTests.has(file)) {
+    const prior = String(env.NODE_OPTIONS || '').trim();
+    env.NODE_OPTIONS = `${prior}${prior ? ' ' : ''}--require=${preload}`;
+  }
+  const r = spawnSync(process.execPath, [file], { stdio: 'inherit', env });
   if (r.status !== 0) process.exit(r.status || 1);
 }
 console.log('\n✅ Todas as verificações estáticas passaram.');
