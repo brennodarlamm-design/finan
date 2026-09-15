@@ -75,6 +75,7 @@ export async function resolveTenantUserByLogin(sql, tenantId, usernameOrEmail) {
       u.mfa_last_used_step,
       t.razao_social,
       t.nome_fantasia,
+      t.telefone      AS tenant_telefone,
       t.status        AS tenant_status,
       t.created_at    AS tenant_created_at,
       t.vencimento    AS tenant_vencimento

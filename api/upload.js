@@ -341,7 +341,13 @@ export default async function handler(req, res) {
       { exts: ['pdf'],         mime: ['application/pdf'],                                                   magic: ['25504446'] },          // %PDF
       { exts: ['png'],         mime: ['image/png'],                                                         magic: ['89504E47'] },          // PNG
       { exts: ['jpg','jpeg'],  mime: ['image/jpeg'],                                                        magic: ['FFD8FF'] },            // JPEG SOI
-      { exts: ['webp'],        mime: ['image/webp'],                                                        magic: ['52494646'] },          // RIFF....WEBP
+      // PATCH 50.1: WEBP = RIFF nos bytes 0-3 + 'WEBP' nos bytes 8-11.
+      // Verificar apenas RIFF permitiria AVI, WAV e outros RIFF mascarados como .webp.
+      { exts: ['webp'], mime: ['image/webp'],
+        magicValidator: (buf) =>
+          buf.slice(0,4).toString('hex').toUpperCase() === '52494646' &&
+          buf.slice(8,12).toString('ascii') === 'WEBP'
+      },
       { exts: ['zip'],         mime: ['application/zip','application/x-zip-compressed'],                    magic: ['504B0304','504B0506','504B0708'] },
       { exts: ['xlsx'],        mime: ['application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'], magic: ['504B0304'] },          // OOXML = ZIP
       { exts: ['docx'],        mime: ['application/vnd.openxmlformats-officedocument.wordprocessingml.document'], magic: ['504B0304'] },
@@ -375,8 +381,16 @@ export default async function handler(req, res) {
       });
     }
 
-    // Verificar magic bytes (prefixo binário)
-    if (mimeEntry.magic) {
+    // Verificar magic bytes: suporta prefixo hex (magic[]) ou validador completo (magicValidator).
+    if (mimeEntry.magicValidator) {
+      // Validador customizado recebe o buffer completo (ex.: WEBP precisa checar bytes 8-11)
+      if (!mimeEntry.magicValidator(buffer)) {
+        return res.status(400).json({
+          success: false,
+          error: 'Conteúdo binário do arquivo não corresponde à extensão declarada. Upload rejeitado por segurança.'
+        });
+      }
+    } else if (mimeEntry.magic) {
       const magicMatch = mimeEntry.magic.some(prefix => magicHex.startsWith(prefix));
       if (!magicMatch) {
         return res.status(400).json({

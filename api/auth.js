@@ -931,16 +931,52 @@ export default async function handler(req, res) {
       const picture = profile.picture || '';
       const googleSub = profile.sub || '';
 
+      // PATCH 50.1: Google OAuth multi-tenant com Chave da Empresa.
+      // A arquitetura exige: company_key → tenant → usuário vinculado àquele tenant.
+      // Sem a chave, não há como determinar de qual empresa o usuário é — retornar not_registered.
+      const rawGoogleCompanyKey = String(req.body?.company_key || req.body?.access_key || '').trim();
+      let googleTenantId = null;
+      if (rawGoogleCompanyKey) {
+        if (!isTenantAccessKeyShapeValid(rawGoogleCompanyKey)) {
+          return res.status(403).json({
+            success: false,
+            not_registered: true,
+            message: 'Chave da Empresa inválida. Verifique a Chave da Empresa fornecida pelo administrador.'
+          });
+        }
+        const googleTenant = await resolveTenantByAccessKey(sql, rawGoogleCompanyKey);
+        if (!googleTenant) {
+          return res.status(403).json({
+            success: false,
+            not_registered: true,
+            message: 'Chave da Empresa não encontrada ou empresa bloqueada.'
+          });
+        }
+        googleTenantId = googleTenant.id;
+      }
+
       // Verifica se usuário já existe.
       // PATCH 50: excluído superadmin da busca — conta Master nunca deve ser acessível via Google.
+      // PATCH 50.1: se company_key foi fornecida, restringe a busca ao tenant resolvido.
       const existing = await sql`
         SELECT u.*, t.razao_social, t.nome_fantasia, t.status as tenant_status, t.created_at as tenant_created_at, t.vencimento as tenant_vencimento
         FROM usuarios u
         LEFT JOIN tenants t ON u.tenant_id = t.id
         WHERE (LOWER(u.email) = ${email} OR (u.google_sub IS NOT NULL AND u.google_sub = ${googleSub}))
           AND u.perfil <> 'superadmin'
+          ${googleTenantId ? sql`AND u.tenant_id = ${googleTenantId}` : sql``}
         LIMIT 1;
       `;
+
+      // Se company_key não foi fornecida e não encontrou usuário: exigir a chave.
+      if (!existing.length && !rawGoogleCompanyKey) {
+        return res.status(403).json({
+          success: false,
+          not_registered: true,
+          google_needs_company_key: true,
+          message: 'Para entrar com Google, informe a Chave da Empresa fornecida pelo administrador da sua construtora.'
+        });
+      }
 
       let userRecord = null;
       let isNew = false;
@@ -1168,7 +1204,8 @@ export default async function handler(req, res) {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
-              'x-api-key': secret,
+              // PATCH 50.1: usa INTERNAL_API_SECRET dedicado, não SESSION_SIGNING_SECRET.
+              'x-api-key': getInternalApiSecret(),
               'x-tenant-id': user.tenant_id
             },
             body: JSON.stringify({ tenantId: user.tenant_id, phone: numFmt, message: mensagemOtp })

@@ -148,6 +148,11 @@ export async function resolveAuthAndTenant(req) {
     console.error('🚨 [Segurança] Nenhum segredo de autenticação configurado no ambiente.');
     return { authenticated: false, status: 500, error: 'Configuração de segurança pendente no servidor.' };
   }
+  if (!sessionSecret) {
+    // PATCH 50.1: sessionSecret vazio é detectado aqui também para log antecipado.
+    // O bloqueio definitivo para requisições de usuário acontece em seguida, após a rota interna.
+    console.warn('⚠️  [Segurança] SESSION_SIGNING_SECRET ausente — apenas acesso interno via INTERNAL_API_SECRET será aceito.');
+  }
 
   const credential = getCredential(req);
   const rawToken = credential.value;
@@ -179,8 +184,12 @@ export async function resolveAuthAndTenant(req) {
   }
 
   // PATCH 50: Tokens de usuário são verificados APENAS com sessionSecret.
-  // Cross-validation com internalSecret foi removida: se a chave interna vazar,
-  // ela não pode ser usada como chave de sessão.
+  // PATCH 50.1: Se SESSION_SIGNING_SECRET estiver ausente após excluir a rota interna,
+  // falhar com 500 imediatamente — nunca chamar verifyToken(..., '') com chave vazia.
+  if (!sessionSecret) {
+    console.error('🚨 [Segurança] SESSION_SIGNING_SECRET não configurado. Tokens de usuário não podem ser validados.');
+    return { authenticated: false, status: 500, error: 'Configuração de segurança pendente no servidor.' };
+  }
   const payload = verifyToken(rawToken, sessionSecret);
   if (!payload?.userId || !payload?.tenantId) {
     return { authenticated: false, status: 401, error: 'Token de autenticação inválido ou expirado.' };

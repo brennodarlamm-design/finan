@@ -1,6 +1,7 @@
 services:
+  # Serviço principal de backend (Node.js / API WhatsApp)
   - type: web
-    name: angelim-backend
+    name: finan-backend
     runtime: node
     plan: free
     region: ohio
@@ -19,6 +20,32 @@ services:
       - key: API_SECRET
         sync: false
       # PATCH 50 — Secrets dedicados (migration de API_SECRET)
+      - key: SESSION_SIGNING_SECRET
+        sync: false
+      - key: INTERNAL_API_SECRET
+        sync: false
+      - key: PIX_WEBHOOK_SECRET
+        sync: false
+
+  # Serviço WhatsApp forwarder (finan-wf12)
+  - type: web
+    name: finan-wf12
+    runtime: node
+    plan: free
+    region: ohio
+    rootDir: backend
+    buildCommand: npm install
+    startCommand: node server.js
+    envVars:
+      - key: PORT
+        value: 3333
+      - key: DATABASE_URL
+        sync: false
+      - key: TARGET_PHONE
+        value: 5595991363678
+      - key: API_SECRET
+        sync: false
+      # PATCH 50 — Secrets dedicados
       - key: SESSION_SIGNING_SECRET
         sync: false
       - key: INTERNAL_API_SECRET

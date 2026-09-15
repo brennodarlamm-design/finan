@@ -41,21 +41,34 @@ const certContent = fs.readFileSync(path.resolve('api/_certificado.js'), 'utf8')
 assert(!certContent.includes('detail: err.message'), '_certificado.js não deve expor detail: err.message.');
 console.log('  ✓ Vazamento de erros de banco/runtime contido com sucesso!\n');
 
-// 3. Separação de Segredos
-console.log('3. Verificando suporte aos novos segredos com fallback...');
+// 3. Separação de Segredos — PATCH 50: sem fallback para API_SECRET
+console.log('3. Verificando separação estrita de secrets (sem fallback para API_SECRET)...');
 import { getSessionSigningSecret, getInternalApiSecret } from '../api/_auth.js';
 
+// Salvar estado anterior
+const _prevSession = process.env.SESSION_SIGNING_SECRET;
+const _prevInternal = process.env.INTERNAL_API_SECRET;
+const _prevApi = process.env.API_SECRET;
+
+// Com as vars dedicadas presentes, deve retornar os valores corretos
 process.env.SESSION_SIGNING_SECRET = 'test_session_secret_123';
 process.env.INTERNAL_API_SECRET = 'test_internal_secret_456';
+process.env.API_SECRET = 'legacy_secret_should_be_ignored';
 assert.strictEqual(getSessionSigningSecret(), 'test_session_secret_123', 'getSessionSigningSecret deve retornar a variável dedicada.');
 assert.strictEqual(getInternalApiSecret(), 'test_internal_secret_456', 'getInternalApiSecret deve retornar a variável dedicada.');
 
+// PATCH 50: com a var dedicada ausente, deve retornar '' — NÃO o API_SECRET legado.
 delete process.env.SESSION_SIGNING_SECRET;
 delete process.env.INTERNAL_API_SECRET;
-process.env.API_SECRET = 'legacy_secret_789';
-assert.strictEqual(getSessionSigningSecret(), 'legacy_secret_789', 'getSessionSigningSecret deve fazer fallback para API_SECRET se a dedicada não existir.');
-assert.strictEqual(getInternalApiSecret(), 'legacy_secret_789', 'getInternalApiSecret deve fazer fallback para API_SECRET se a dedicada não existir.');
-console.log('  ✓ Separação de secrets e fallbacks validados com sucesso!\n');
+assert.strictEqual(getSessionSigningSecret(), '', 'getSessionSigningSecret NÃO deve fazer fallback para API_SECRET (PATCH 50).');
+assert.strictEqual(getInternalApiSecret(), '', 'getInternalApiSecret NÃO deve fazer fallback para API_SECRET (PATCH 50).');
+
+// Restaurar
+if (_prevSession !== undefined) process.env.SESSION_SIGNING_SECRET = _prevSession;
+if (_prevInternal !== undefined) process.env.INTERNAL_API_SECRET = _prevInternal;
+if (_prevApi !== undefined) process.env.API_SECRET = _prevApi; else delete process.env.API_SECRET;
+
+console.log('  ✓ Separação estrita de secrets (sem fallback) validada com sucesso!\n');
 
 // 4. Hardening de Upload & OCR
 console.log('4. Verificando regras de segurança em Upload e OCR...');
