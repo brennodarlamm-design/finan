@@ -10,6 +10,7 @@ const followup = read('js/patch51-followup.js');
 const slaSync = read('js/patch51-sla-sync.js');
 const workflow = read('api/_workflow.js');
 const complete = read('api/_workflow-complete.js');
+const stageUpdate = read('api/_workflow-stage-update.js');
 const meta = read('api/_workflow-meta.js');
 const users = read('api/_workflow-users.js');
 const audit = read('api/audit.js');
@@ -17,7 +18,7 @@ const sla = read('api/_sla.js');
 const migration = read('migrations/028_patch51_workflow_obras.sql');
 const app = read('app.html');
 
-for (const file of ['js/patch51.js','js/patch51-hardening.js','js/patch51-followup.js','js/patch51-sla-sync.js','api/_workflow.js','api/_workflow-complete.js','api/_workflow-meta.js','api/_workflow-users.js','api/audit.js','api/_sla.js']) {
+for (const file of ['js/patch51.js','js/patch51-hardening.js','js/patch51-followup.js','js/patch51-sla-sync.js','api/_workflow.js','api/_workflow-complete.js','api/_workflow-stage-update.js','api/_workflow-meta.js','api/_workflow-users.js','api/audit.js','api/_sla.js']) {
   const r = spawnSync(process.execPath, ['--check', file], { encoding:'utf8' });
   assert(r.status === 0, `${file} possui sintaxe JavaScript válida${r.stderr ? `: ${r.stderr.trim()}` : ''}`);
 }
@@ -26,13 +27,18 @@ assert(app.includes('/js/patch51.js?v=') && app.includes('/js/patch51-hardening.
 assert(audit.includes("workflowAction === 'complete'") && audit.includes('workflowCompleteHandler'), 'Conclusão de workflow usa helper atômico dedicado sem nova função Vercel');
 assert(audit.includes("workflowAction === 'meta_save'") && audit.includes('workflowMetaHandler'), 'Cadastro Geral usa handler endurecido sem criar nova função Vercel');
 assert(audit.includes("workflowAction === 'users'") && audit.includes('workflowUsersHandler'), 'Workflow possui lista mínima de responsáveis sem reutilizar gestão de contas');
+assert(audit.includes("workflowAction === 'stage_update'") && audit.includes('workflowStageUpdateHandler'), 'Ajuste de etapa usa helper endurecido sem criar nova função Vercel');
 assert(users.includes('tenant_id=${auth.tenantId}') && users.includes('ativo=TRUE'), 'Lista de responsáveis é limitada a usuários ativos do mesmo tenant');
 assert(!users.includes('email') && !users.includes('senha_hash'), 'Endpoint de responsáveis não expõe e-mail ou credenciais');
 assert(hardening.includes("this.api('users')"), 'Frontend do workflow usa o endpoint mínimo de responsáveis');
 assert(complete.includes('WITH current_stage AS') && complete.includes('next_candidate AS MATERIALIZED') && complete.includes('history_next AS'), 'Conclusão e transferência de etapa ocorrem em um único statement PostgreSQL');
 assert(complete.includes('WORKFLOW_NOT_ASSIGNED'), 'Usuário não pode concluir etapa atribuída a outra pessoa');
+assert(stageUpdate.includes("current.status === 'em_andamento' && !responsibleId") && stageUpdate.includes("? 'bloqueado'"), 'Etapa ativa sem responsável passa para Bloqueada');
+assert(stageUpdate.includes("current.status === 'bloqueado' && responsibleId") && stageUpdate.includes("? 'em_andamento'"), 'Etapa bloqueada volta a Em andamento quando recebe responsável');
+assert(stageUpdate.includes('WORKFLOW_STAGE_COMPLETED'), 'Etapa concluída não pode ser reconfigurada pelo endpoint de ajuste');
+assert(stageUpdate.includes('SLA_DECREASE_NOT_ALLOWED'), 'Helper de ajuste também rejeita redução de SLA');
 assert(workflow.includes('WORKFLOW_FIRST_STAGE_UNASSIGNED'), 'Workflow não inicia sem responsável na primeira etapa');
-assert(workflow.includes('SLA_DECREASE_NOT_ALLOWED'), 'Backend rejeita redução de SLA');
+assert(workflow.includes('SLA_DECREASE_NOT_ALLOWED'), 'Backend legado de fallback também rejeita redução de SLA');
 assert(sla.includes('responsavel_user_id') && sla.includes('responsavel_perfil'), 'Template de SLA preserva responsável da etapa');
 
 assert(meta.includes('AND ativo=TRUE') && meta.includes('tenant_id=${tenantId}'), 'Responsável técnico interno precisa ser usuário ativo do mesmo tenant');
