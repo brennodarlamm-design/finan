@@ -17,7 +17,14 @@ export function sanitizeSlaProcesses(input) {
       descricao:text(raw.descricao, 2000), observacoes:text(raw.observacoes, 4000),
       status:['pendente','em_andamento','concluido'].includes(raw.status) ? raw.status : 'pendente',
       percentual:Math.max(0, Math.min(100, Number(raw.percentual) || 0)),
-      data_inicio_real:date(raw.data_inicio_real), data_fim_real:date(raw.data_fim_real)
+      data_inicio_real:date(raw.data_inicio_real), data_fim_real:date(raw.data_fim_real),
+      cargo_responsavel:text(raw.cargo_responsavel, 100),
+      responsavel_usuario_id:raw.responsavel_usuario_id ? text(raw.responsavel_usuario_id, 80).replace(/[^a-zA-Z0-9_-]/g, '') : null,
+      motivo_atraso:text(raw.motivo_atraso, 100),
+      motivo_atraso_detalhe:text(raw.motivo_atraso_detalhe, 500),
+      checklist_status:text(raw.checklist_status, 40),
+      transferida_em:date(raw.transferida_em),
+      checklist:Array.isArray(raw.checklist) ? raw.checklist.slice(0, 50).map(item => (typeof item === 'object' && item !== null ? {id:text(item.id, 40), descricao:text(item.descricao || item.texto, 255), concluido:!!item.concluido} : text(item, 255))) : []
     }];
   });
 }

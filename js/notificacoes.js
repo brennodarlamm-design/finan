@@ -99,6 +99,53 @@ const Notificacoes = {
       });
     }
 
+    // 6. Workflow & Etapas de Obras (Patch 52)
+    if (typeof CronogramaSLA !== 'undefined') {
+      const u = typeof Auth !== 'undefined' ? Auth.getUser() : null;
+      if (u && u.id) {
+        const demandas = CronogramaSLA.getDemandas(u.id);
+        const atrasadasWf = demandas.filter(d => d.status_sla === 'atrasado');
+        if (atrasadasWf.length > 0) {
+          alertas.push({
+            id: 'wf_atrasadas',
+            nivel: 'urgente',
+            icone: '🔴',
+            titulo: `${atrasadasWf.length} etapa(s) de obra em atraso!`,
+            sub: `Atenção: ${atrasadasWf.slice(0, 2).map(d => d.nome).join(', ')}${atrasadasWf.length > 2 ? '...' : ''}`,
+            acaoTexto: 'Minhas Demandas',
+            acao: () => { Utils.closeModal(); App.navigate('minhas-demandas'); }
+          });
+        }
+
+        const hojeWf = hoje;
+        const vencendoHojeWf = demandas.filter(d => d.status_sla !== 'atrasado' && d.data_fim_prevista === hojeWf && d.status !== 'pendente');
+        if (vencendoHojeWf.length > 0) {
+          alertas.push({
+            id: 'wf_hoje',
+            nivel: 'urgente',
+            icone: '⏰',
+            titulo: `${vencendoHojeWf.length} etapa(s) vencendo HOJE`,
+            sub: vencendoHojeWf.map(d => `${d.obra_nome}: ${d.nome}`).join(' · '),
+            acaoTexto: 'Ver Demandas',
+            acao: () => { Utils.closeModal(); App.navigate('minhas-demandas'); }
+          });
+        }
+
+        const proximasWf = demandas.filter(d => d.status_sla !== 'atrasado' && d.data_fim_prevista > hojeWf && d.data_fim_prevista <= dMais3Str && d.status !== 'pendente');
+        if (proximasWf.length > 0) {
+          alertas.push({
+            id: 'wf_proximas',
+            nivel: 'aviso',
+            icone: '📋',
+            titulo: `${proximasWf.length} etapa(s) de obra vencendo em até 3 dias`,
+            sub: proximasWf.map(d => `${d.nome} (${d.obra_nome})`).join(', '),
+            acaoTexto: 'Minhas Demandas',
+            acao: () => { Utils.closeModal(); App.navigate('minhas-demandas'); }
+          });
+        }
+      }
+    }
+
     return alertas;
   },
 
@@ -146,8 +193,8 @@ const Notificacoes = {
           <div class="modal-title" style="color:#fff;display:flex;align-items:center;gap:8px;">
             <span style="font-size:1.3rem;">🔔</span>
             <div>
-              <div style="font-size:1rem;font-weight:800;">Central de Alertas Financeiros</div>
-              <div style="font-size:.72rem;font-weight:400;color:#94a3b8;">${alertas.length} aviso(s) ativo(s) no sistema</div>
+              <div style="font-size:1rem;font-weight:800;">Central de Alertas &amp; Notificações</div>
+              <div style="font-size:.72rem;font-weight:400;color:#94a3b8;">${alertas.length} aviso(s) ativo(s) no sistema (Financeiro &amp; Workflow)</div>
             </div>
           </div>
           <div style="display:flex;align-items:center;gap:6px;">
@@ -163,7 +210,7 @@ const Notificacoes = {
             <div style="text-align:center;padding:40px 20px;color:var(--text3);">
               <div style="font-size:3rem;margin-bottom:12px;">🎉</div>
               <div style="font-size:1rem;font-weight:800;color:var(--text);margin-bottom:4px;">Tudo em dia!</div>
-              <div style="font-size:.82rem;">Nenhuma conta atrasada ou pré-compra pendente de aprovação.</div>
+              <div style="font-size:.82rem;">Nenhuma conta atrasada, pré-compra pendente ou etapa de obra vencida.</div>
             </div>
           ` : `
             <div style="display:flex;flex-direction:column;gap:10px;">

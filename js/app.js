@@ -36,7 +36,10 @@ const App = {
     'master': ['master', 'dev', 'admin-master', 'tenants', 'empresas'],
     'planos': ['planos', 'cobranca', 'assinaturas', 'mensalidades'],
     'portal-cliente': ['portal-cliente', 'portal', 'portal-obra', 'cliente-portal'],
-    'dashboard': ['dashboard', 'inicio', 'home']
+    'dashboard': ['dashboard', 'inicio', 'home'],
+    // Patch 52 — Gestão Operacional
+    'minhas-demandas': ['minhas-demandas', 'demandas', 'meu-trabalho'],
+    'central-gestor': ['central-gestor', 'gestor', 'painel-gestor'],
   },
 
   _normalizeRoute(r) {
@@ -90,7 +93,10 @@ const App = {
         setTimeout(() => typeof Cobranca !== 'undefined' && Cobranca.renderTelaPlanos('route-content'), 0);
         return '<div style="padding:40px;text-align:center;color:var(--text3)"><span style="font-size:1.5rem;display:block;margin-bottom:8px;">💎</span>Carregando Planos &amp; Mensalidades...</div>';
       }
-    }
+    },
+    // Patch 52 — Gestão Operacional
+    'minhas-demandas': typeof MinhasDemandas !== 'undefined' ? MinhasDemandas : null,
+    'central-gestor':  typeof CentralGestor  !== 'undefined' ? CentralGestor  : null,
   },
 
   routeMeta: {
@@ -124,6 +130,9 @@ const App = {
     'portal-cliente':    { icon:'🌐', label:'Portal do Cliente', title:'Portal da Transparência do Cliente | FinObra' },
     'master':            { icon:'🛡️', label:'Painel Dev Master', title:'Painel Master Administrativo | FinObra' },
     'planos':            { icon:'💎', label:'Planos & Mensalidades', title:'Planos & Assinatura | FinObra' },
+    // Patch 52
+    'minhas-demandas':   { icon:'👤', label:'Minhas Demandas', title:'Minhas Demandas & Etapas | FinObra' },
+    'central-gestor':    { icon:'🏢', label:'Central do Gestor', title:'Central do Gestor de Obras | FinObra' },
   },
 
   _getRouteFromUrl() {
@@ -428,8 +437,10 @@ const App = {
             <button class="icon-btn mobile-close-btn" data-fb-click="App.closeSidebar" data-fb-click-n="0" title="Fechar Menu" style="font-size:1.1rem;padding:4px 8px;">✕</button>
           </div>
           <nav class="sidebar-nav">
-            <div class="nav-section">Operacional & Financeiro</div>
+            <div class="nav-section">Operacional &amp; Financeiro</div>
             ${this._navItem('dashboard','📊','Dashboard')}
+            ${(() => { const cnt = typeof MinhasDemandas !== 'undefined' ? MinhasDemandas.getBadgeCount() : 0; const badge = cnt > 0 ? `<span class="nav-badge" style="background:var(--danger);color:#fff;font-weight:900;">${cnt}</span>` : ''; return this._navItem('minhas-demandas','👤','Minhas Demandas',badge); })()}
+            ${this._navItem('central-gestor','🏢','Central do Gestor')}
             ${this._navItem('obras','🏗️','Obras & Clientes')}
             ${this._navItem('lancamentos','💰','Lançamentos')}
             ${this._navItem('fornecedores','🚛','Fornecedores')}

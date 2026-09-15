@@ -181,16 +181,28 @@ const Clientes = {
         <div class="modal-header"><span class="modal-title">${id?'✏️ Editar Obra':'🏗️ Nova Obra'}</span><button class="modal-close" data-fb-click="Utils.closeModal" data-fb-click-n="0">✕</button></div>
         <div class="modal-body">
           <form id="f-cli">
-            <div class="form-group" style="margin-bottom:14px;">
-              <label class="form-label" style="font-weight:700;color:var(--accent);">Modalidade da Obra *</label>
-              <select class="form-control" name="modalidade_obra" id="cli-modalidade" data-fb-change="Clientes.onModalidadeChange" data-fb-change-n="1" data-fb-change-t0="value">
-                <option value="caixa" ${isCaixa?'selected':''}>🏦 Financiamento Caixa Econômica (PCI / SBPE / MCMV)</option>
-                <option value="particular" ${c.modalidade_obra==='particular'?'selected':''}>💼 Obra Particular / Recursos Próprios</option>
-                <option value="administracao" ${c.modalidade_obra==='administracao'?'selected':''}>📑 Administração de Obra (Custo + Taxa)</option>
-                <option value="empreitada" ${c.modalidade_obra==='empreitada'?'selected':''}>🏗️ Empreitada Global / Preço Fechado</option>
-                <option value="reforma" ${c.modalidade_obra==='reforma'?'selected':''}>🔨 Reforma Comercial / Residencial</option>
-                <option value="outros_bancos" ${c.modalidade_obra==='outros_bancos'?'selected':''}>🏛️ Financiamento Outros Bancos</option>
-              </select>
+            <div class="form-row cols-2" style="margin-bottom:14px;">
+              <div class="form-group">
+                <label class="form-label" style="font-weight:700;color:var(--accent);">Modalidade da Obra *</label>
+                <select class="form-control" name="modalidade_obra" id="cli-modalidade" data-fb-change="Clientes.onModalidadeChange" data-fb-change-n="1" data-fb-change-t0="value">
+                  <option value="caixa" ${isCaixa?'selected':''}>🏦 Financiamento Caixa Econômica (PCI / SBPE / MCMV)</option>
+                  <option value="particular" ${c.modalidade_obra==='particular'?'selected':''}>💼 Obra Particular / Recursos Próprios</option>
+                  <option value="administracao" ${c.modalidade_obra==='administracao'?'selected':''}>📑 Administração de Obra (Custo + Taxa)</option>
+                  <option value="empreitada" ${c.modalidade_obra==='empreitada'?'selected':''}>🏗️ Empreitada Global / Preço Fechado</option>
+                  <option value="reforma" ${c.modalidade_obra==='reforma'?'selected':''}>🔨 Reforma Comercial / Residencial</option>
+                  <option value="outros_bancos" ${c.modalidade_obra==='outros_bancos'?'selected':''}>🏛️ Financiamento Outros Bancos</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label class="form-label" style="font-weight:700;color:var(--accent2);">Template de Workflow (SLA)</label>
+                <select class="form-control" name="tipo_workflow" id="cli-workflow">
+                  <option value="">⚙️ Automático pela modalidade</option>
+                  <option value="casa_caixa" ${c.tipo_workflow==='casa_caixa'?'selected':''}>🏦 Casa Caixa (MCMV / SBPE)</option>
+                  <option value="obra_particular" ${c.tipo_workflow==='obra_particular'?'selected':''}>💼 Obra Particular / Padrão</option>
+                  <option value="reforma" ${c.tipo_workflow==='reforma'?'selected':''}>🔨 Reforma / Retrofit</option>
+                  <option value="projeto_arq" ${c.tipo_workflow==='projeto_arq'?'selected':''}>📐 Projeto Arquitetônico</option>
+                </select>
+              </div>
             </div>
             <div class="form-row cols-2" style="margin-bottom:14px;">
               <div class="form-group"><label class="form-label">Nome Completo / Proprietário *</label><input class="form-control" name="nome" value="${e(c.nome||'')}" required placeholder="Nome do proprietário ou cliente"></div>
@@ -258,6 +270,7 @@ const Clientes = {
     if (!f.checkValidity()) { f.reportValidity(); return; }
     const d = Object.fromEntries(new FormData(f));
     d.modalidade_obra = d.modalidade_obra || 'caixa';
+    d.tipo_workflow = d.tipo_workflow || null;
     d.valor_financiado = parseFloat(d.valor_financiado)||0;
     d.valor_proprio = parseFloat(d.valor_proprio)||0;
     d.area_construida = parseFloat(d.area_construida)||0;
