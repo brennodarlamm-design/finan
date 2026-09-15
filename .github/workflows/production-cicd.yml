@@ -173,7 +173,7 @@ jobs:
             grep -Fq "$expected_text" "/tmp/${prefix}.html"
           }
 
-          check_route 'https://finobra.app.br/' 'landing-shell' 'Obras, financeiro e engenharia.' 'finobra-home'
+          check_route 'https://finobra.app.br/' 'landing-shell' 'Sua obra sob controle.' 'finobra-home'
           grep -Fq '<link rel="canonical" href="https://finobra.app.br/">' /tmp/finobra-home.html
 
           check_route 'https://finobra.app.br/login' 'login-shell' 'id="login-form"' 'finobra-login'
@@ -186,6 +186,11 @@ jobs:
 
           check_route 'https://finobra.app.br/app/dashboard' 'app-shell' '<div id="app-root"></div>' 'finobra-app'
           tr -d '\r' < /tmp/finobra-app.headers | grep -qi '^x-robots-tag: noindex, nofollow$'
+
+          check_route 'https://finobra.app.br/master' 'master-shell' 'FinObra Master Backoffice' 'finobra-master'
+          tr -d '\r' < /tmp/finobra-master.headers | grep -qi '^x-robots-tag: noindex, nofollow$'
+          check_document 'https://finobra.app.br/js/master_page.js' 'ensureDevTenantKeysModule' 'finobra-master-page-js'
+          check_document 'https://finobra.app.br/js/dev-tenant-keys.js' 'Chaves das Empresas — DEV / Master' 'finobra-dev-tenant-keys-js'
 
           check_document 'https://finobra.app.br/privacidade' 'Política de Privacidade' 'finobra-privacy'
           check_document 'https://finobra.app.br/termos' 'Termos de Serviço' 'finobra-terms'
@@ -204,4 +209,4 @@ jobs:
           [[ "$sitemap" != *'/cadastro'* ]]
           [[ "$sitemap" != *'/app'* ]]
 
-          echo "Production smoke test passed for commit $GITHUB_SHA with Patch 38 public-route contracts."
+          echo "Production smoke test passed for commit $GITHUB_SHA with Patch 50 security and Master vault contracts."
