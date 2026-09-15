@@ -26,67 +26,54 @@ const {
   generateQrSvg
 } = totpModule;
 
-// Base32 encode / decode
 const testBuf = Buffer.from('FinObra Master Test 2026', 'utf8');
 const encB32 = base32Encode(testBuf);
 assert.ok(/^[A-Z2-7]+$/.test(encB32), 'Base32 deve conter apenas caracteres A-Z e 2-7');
 const decBuf = base32Decode(encB32);
 assert.strictEqual(decBuf.toString('utf8'), 'FinObra Master Test 2026', 'Base32 round-trip deve preservar o buffer original');
 
-// Geração de segredo
 const secret = generateTotpSecret(20);
 assert.strictEqual(secret.length, 32, 'Segredo de 20 bytes deve ter 32 caracteres Base32');
 assert.ok(/^[A-Z2-7]+$/.test(secret), 'Segredo deve ser Base32 válido');
 
-// Geração e validação de token TOTP
 const nowSec = Math.floor(Date.now() / 1000);
 const code = generateTotpToken(secret, nowSec);
 assert.strictEqual(code.length, 6, 'Código TOTP deve ter exatamente 6 dígitos');
 assert.ok(/^\d{6}$/.test(code), 'Código TOTP deve ser numérico');
 
-// Verificação imediata
 const verifyOk = verifyTotpCode(secret, code, { timeStepSec: 30, window: 1, lastUsedStep: 0 });
 assert.strictEqual(verifyOk.valid, true, 'Código gerado agora deve ser válido');
 assert.ok(verifyOk.step > 0, 'Step retornado deve ser maior que 0');
 
-// Proteção contra Replay Attack
 const replayCheck = verifyTotpCode(secret, code, { timeStepSec: 30, window: 1, lastUsedStep: verifyOk.step });
 assert.strictEqual(replayCheck.valid, false, 'Código não pode ser reutilizado no mesmo step (Anti-Replay Attack)');
 
-// Tolerância de janela de tempo (-1 e +1)
 const codePast = generateTotpToken(secret, nowSec - 25);
 const verifyPast = verifyTotpCode(secret, codePast, { timeStepSec: 30, window: 1, lastUsedStep: 0 });
 assert.strictEqual(verifyPast.valid, true, 'Janela de tolerância anterior (-1) deve ser aceita');
 
-// Código inválido
 const verifyInvalid = verifyTotpCode(secret, '000000', { timeStepSec: 30, window: 1, lastUsedStep: 0 });
-// Se coincidentemente o código não for 000000:
 if (code !== '000000') {
   assert.strictEqual(verifyInvalid.valid, false, 'Código incorreto deve ser rejeitado');
 }
 
-// Códigos de Backup (Emergência)
 const { codes: backupList, hashedCodes: backupHashed } = generateBackupCodes(8);
 assert.strictEqual(backupList.length, 8, 'Devem ser gerados 8 códigos de backup');
 assert.strictEqual(backupHashed.length, 8, 'Devem ser gerados 8 hashes de backup');
 assert.ok(/^[0-9A-F]{4}-[0-9A-F]{4}$/.test(backupList[0]), 'Formato do código deve ser XXXX-XXXX');
 
-// Validação de código de backup
 const firstBackup = backupList[0];
 const backupRes = verifyBackupCode(firstBackup, backupHashed);
 assert.strictEqual(backupRes.valid, true, 'Código de backup válido deve ser aceito');
 assert.strictEqual(backupRes.remainingHashedCodes.length, 7, 'Código de backup usado deve ser consumido');
 
-// Tentativa de reutilizar o código consumido
 const backupReuse = verifyBackupCode(firstBackup, backupRes.remainingHashedCodes);
 assert.strictEqual(backupReuse.valid, false, 'Código de backup consumido não pode ser reutilizado');
 
-// URI otpauth
 const uri = generateTotpUri(secret, 'admin', 'FinObra SaaS');
 assert.ok(uri.startsWith('otpauth://totp/FinObra%20SaaS:admin?'), 'URI otpauth deve ter prefixo e parâmetros corretos');
 assert.ok(uri.includes(`secret=${secret}`), 'URI deve conter o segredo');
 
-// Renderizador QR Code SVG em JS puro
 const svg = generateQrSvg(uri, 180);
 assert.ok(svg.includes('<svg'), 'QR Code deve gerar tag <svg');
 assert.ok(svg.includes('xmlns="http://www.w3.org/2000/svg"'), 'SVG deve conter namespace XML');
@@ -109,19 +96,27 @@ assert.ok(schemaSql.includes('mfa_secret'), 'schema.sql deve conter mfa_secret')
 assert.ok(schemaSql.includes('mfa_enabled'), 'schema.sql deve conter mfa_enabled');
 console.log('✅ [2/6] Estrutura do Neon PostgreSQL validada.');
 
-// 3. Testar Endpoints Serverless (api/auth.js e api/admin.js)
+// 3. Testar Endpoints Serverless (api/auth.js e arquitetura wrapper de api/admin.js)
 console.log('👉 [3/6] Verificando integração de 2FA em api/auth.js e api/admin.js...');
 const authApiCode = fs.readFileSync(path.join(rootDir, 'api', 'auth.js'), 'utf8');
-assert.ok(authApiCode.includes('action === \'mfa_verify\''), 'api/auth.js deve conter rota mfa_verify');
-assert.ok(authApiCode.includes('action === \'mfa_setup\''), 'api/auth.js deve conter rota mfa_setup');
-assert.ok(authApiCode.includes('action === \'mfa_activate\''), 'api/auth.js deve conter rota mfa_activate');
+assert.ok(authApiCode.includes("action === 'mfa_verify'"), 'api/auth.js deve conter rota mfa_verify');
+assert.ok(authApiCode.includes("action === 'mfa_setup'"), 'api/auth.js deve conter rota mfa_setup');
+assert.ok(authApiCode.includes("action === 'mfa_activate'"), 'api/auth.js deve conter rota mfa_activate');
 assert.ok(authApiCode.includes('mfa_setup_required'), 'api/auth.js deve sinalizar mfa_setup_required');
 assert.ok(authApiCode.includes('mfa_required'), 'api/auth.js deve sinalizar mfa_required');
 
-const adminApiCode = fs.readFileSync(path.join(rootDir, 'api', 'admin.js'), 'utf8');
-assert.ok(adminApiCode.includes('!auth.user.mfa_enabled || !auth.user.mfa_verified') || adminApiCode.includes('auth.user.mfa_enabled && !auth.user.mfa_verified'), 'api/admin.js deve bloquear superadmin sem mfa_verified');
-assert.ok(adminApiCode.includes('action === \'mfa_status\''), 'api/admin.js deve suportar mfa_status');
-assert.ok(adminApiCode.includes('action === \'mfa_regenerate_backup_codes\''), 'api/admin.js deve suportar mfa_regenerate_backup_codes');
+const adminPublicCode = fs.readFileSync(path.join(rootDir, 'api', 'admin.js'), 'utf8');
+const adminInternalPath = path.join(rootDir, 'api', '_admin-route.js');
+const adminInternalCode = fs.existsSync(adminInternalPath) ? fs.readFileSync(adminInternalPath, 'utf8') : '';
+const adminApiCode = `${adminPublicCode}\n${adminInternalCode}`;
+assert.ok(
+  adminApiCode.includes('!auth.user.mfa_enabled || !auth.user.mfa_verified') ||
+  adminApiCode.includes('!auth.user?.mfa_enabled || !auth.user?.mfa_verified'),
+  'api/admin.js deve bloquear superadmin sem MFA verificado (fail-closed)'
+);
+assert.ok(adminApiCode.includes("action === 'mfa_status'"), 'Admin deve suportar mfa_status.');
+assert.ok(adminApiCode.includes("action === 'mfa_regenerate_backup_codes'"), 'Admin deve suportar mfa_regenerate_backup_codes.');
+assert.ok(adminPublicCode.includes("import originalAdminHandler from './_admin-route.js'"), 'Wrapper público deve delegar ações não sensíveis ao handler interno.');
 console.log('✅ [3/6] Endpoints serverless validados.');
 
 // 4. Testar Limite Serverless do Vercel Hobby (<= 12 funções)
