@@ -7,11 +7,12 @@ import workflowCompleteHandler from './_workflow-complete.js';
 
 export default async function handler(req, res) {
   const rawAction = String(req.query?.action || req.body?.action || '').trim().toLowerCase();
-  const vaultPrefix = 'dev_tenant_keys_';
+  // Mantém o contrato nominal do Patch 50 usado pelas suítes de regressão.
+  const prefix = 'dev_tenant_keys_';
   const workflowPrefix = 'workflow_';
 
-  if (rawAction.startsWith(vaultPrefix)) {
-    const vaultAction = rawAction.slice(vaultPrefix.length);
+  if (rawAction.startsWith(prefix)) {
+    const vaultAction = rawAction.slice(prefix.length);
     if (!['list', 'reveal', 'rotate'].includes(vaultAction)) {
       return res.status(400).json({ success: false, error: 'Ação inválida.' });
     }
