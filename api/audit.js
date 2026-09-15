@@ -4,6 +4,7 @@ import auditHandler from './_audit-route.js';
 import devTenantKeysHandler from './_dev-tenant-keys.js';
 import workflowHandler from './_workflow.js';
 import workflowCompleteHandler from './_workflow-complete.js';
+import workflowMetaHandler from './_workflow-meta.js';
 
 export default async function handler(req, res) {
   const rawAction = String(req.query?.action || req.body?.action || '').trim().toLowerCase();
@@ -36,6 +37,7 @@ export default async function handler(req, res) {
       req.body = { ...req.body, action: workflowAction };
     }
     if (workflowAction === 'complete') return workflowCompleteHandler(req, res);
+    if (workflowAction === 'meta_save') return workflowMetaHandler(req, res);
     return workflowHandler(req, res);
   }
 
