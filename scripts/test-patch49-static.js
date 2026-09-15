@@ -119,7 +119,7 @@ assert.ok(authApiCode.includes('mfa_setup_required'), 'api/auth.js deve sinaliza
 assert.ok(authApiCode.includes('mfa_required'), 'api/auth.js deve sinalizar mfa_required');
 
 const adminApiCode = fs.readFileSync(path.join(rootDir, 'api', 'admin.js'), 'utf8');
-assert.ok(adminApiCode.includes('auth.user.mfa_enabled && !auth.user.mfa_verified'), 'api/admin.js deve bloquear superadmin sem mfa_verified');
+assert.ok(adminApiCode.includes('!auth.user.mfa_enabled || !auth.user.mfa_verified') || adminApiCode.includes('auth.user.mfa_enabled && !auth.user.mfa_verified'), 'api/admin.js deve bloquear superadmin sem mfa_verified');
 assert.ok(adminApiCode.includes('action === \'mfa_status\''), 'api/admin.js deve suportar mfa_status');
 assert.ok(adminApiCode.includes('action === \'mfa_regenerate_backup_codes\''), 'api/admin.js deve suportar mfa_regenerate_backup_codes');
 console.log('✅ [3/6] Endpoints serverless validados.');

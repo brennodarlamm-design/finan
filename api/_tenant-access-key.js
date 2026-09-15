@@ -1,17 +1,12 @@
 import crypto from 'crypto';
 
-const KEY_PREFIX = 'FO';
-const KEY_BYTES = 24;
-
 export function normalizeTenantAccessKey(value = '') {
-  return String(value || '').trim().toUpperCase().replace(/\s+/g, '');
+  return String(value || '').trim().replace(/[\s-]+/g, '').toUpperCase();
 }
 
 export function generateTenantAccessKey() {
-  const raw = crypto.randomBytes(KEY_BYTES).toString('base64url').toUpperCase();
-  // padEnd garante mínimo de 18 chars alfanuméricos (3 segmentos de 6) mesmo em edge cases de entropia
-  const compact = (raw.replace(/[^A-Z0-9]/g, '') + '0'.repeat(18)).slice(0, 30);
-  return `${KEY_PREFIX}-${compact.match(/.{1,6}/g).join('-')}`;
+  // PATCH 50.2: Chave de 6 dígitos numéricos (100000 a 999999) para máxima simplicidade do cliente
+  return String(crypto.randomInt(100000, 1000000));
 }
 
 export function hashTenantAccessKey(value) {
@@ -21,13 +16,14 @@ export function hashTenantAccessKey(value) {
 }
 
 export function tenantAccessKeyLast4(value) {
-  const normalized = normalizeTenantAccessKey(value).replace(/[^A-Z0-9]/g, '');
+  const normalized = normalizeTenantAccessKey(value);
   return normalized.slice(-4);
 }
 
 export function isTenantAccessKeyShapeValid(value) {
   const normalized = normalizeTenantAccessKey(value);
-  return /^FO-[A-Z0-9]{6}(?:-[A-Z0-9]{1,6}){3,5}$/.test(normalized);
+  // Aceita 6 dígitos numéricos (padrão FinObra) e suporta legado FO-XXXXXX-...
+  return /^\d{6}$/.test(normalized) || /^FO-[A-Z0-9]{6}(?:-[A-Z0-9]{1,6}){3,5}$/.test(normalized);
 }
 
 export function timingSafeHashEqual(leftHash, rightHash) {

@@ -3,7 +3,7 @@
 import { neon } from '@neondatabase/serverless';
 import crypto from 'crypto';
 import { OAuth2Client } from 'google-auth-library';
-import { hashPassword, verifyPassword, signToken, verifyToken, resolveAuthAndTenant, getSessionSigningSecret } from './_auth.js';
+import { hashPassword, verifyPassword, signToken, verifyToken, resolveAuthAndTenant, getSessionSigningSecret, getInternalApiSecret } from './_auth.js';
 import { checkRateLimit, getClientIp } from './_ratelimit.js';
 import { writeAudit } from './_audit.js';
 import {
@@ -307,10 +307,11 @@ export default async function handler(req, res) {
         password,
         remember,
         company_key,
-        access_key
+        access_key,
+        accessKey
       } = req.body || {};
 
-      const companyKey = String(company_key || access_key || '').trim();
+      const companyKey = String(access_key || company_key || accessKey || '').trim();
 
       if (!username || !password) {
         return res.status(400).json({ success: false, message: 'Usuário e senha são obrigatórios.' });
@@ -931,52 +932,47 @@ export default async function handler(req, res) {
       const picture = profile.picture || '';
       const googleSub = profile.sub || '';
 
-      // PATCH 50.1: Google OAuth multi-tenant com Chave da Empresa.
-      // A arquitetura exige: company_key → tenant → usuário vinculado àquele tenant.
-      // Sem a chave, não há como determinar de qual empresa o usuário é — retornar not_registered.
-      const rawGoogleCompanyKey = String(req.body?.company_key || req.body?.access_key || '').trim();
-      let googleTenantId = null;
-      if (rawGoogleCompanyKey) {
-        if (!isTenantAccessKeyShapeValid(rawGoogleCompanyKey)) {
-          return res.status(403).json({
-            success: false,
-            not_registered: true,
-            message: 'Chave da Empresa inválida. Verifique a Chave da Empresa fornecida pelo administrador.'
-          });
-        }
-        const googleTenant = await resolveTenantByAccessKey(sql, rawGoogleCompanyKey);
-        if (!googleTenant) {
-          return res.status(403).json({
-            success: false,
-            not_registered: true,
-            message: 'Chave da Empresa não encontrada ou empresa bloqueada.'
-          });
-        }
-        googleTenantId = googleTenant.id;
+      // PATCH 50.2: Google OAuth multi-tenant com Chave da Empresa obrigatória (fail-closed antes de query SQL).
+      // A arquitetura exige: chave -> tenant -> usuário vinculado àquele tenant.
+      // Superadmin nunca é acessível via Google.
+      const rawGoogleCompanyKey = String(req.body?.access_key || req.body?.company_key || req.body?.accessKey || '').trim();
+      if (!rawGoogleCompanyKey) {
+        return res.status(403).json({
+          success: false,
+          not_registered: true,
+          google_needs_company_key: true,
+          message: 'Para entrar com Google, informe a Chave da Empresa (6 dígitos) fornecida pelo administrador da sua construtora.'
+        });
       }
 
-      // Verifica se usuário já existe.
-      // PATCH 50: excluído superadmin da busca — conta Master nunca deve ser acessível via Google.
-      // PATCH 50.1: se company_key foi fornecida, restringe a busca ao tenant resolvido.
+      if (!isTenantAccessKeyShapeValid(rawGoogleCompanyKey)) {
+        return res.status(403).json({
+          success: false,
+          not_registered: true,
+          message: 'Chave da Empresa inválida. Verifique a chave de 6 dígitos fornecida pelo administrador.'
+        });
+      }
+
+      const googleTenant = await resolveTenantByAccessKey(sql, rawGoogleCompanyKey);
+      if (!googleTenant) {
+        return res.status(403).json({
+          success: false,
+          not_registered: true,
+          message: 'Chave da Empresa não encontrada ou empresa com acesso bloqueado.'
+        });
+      }
+      const googleTenantId = googleTenant.id;
+
+      // Busca usuário existente estritamente vinculado ao tenant resolvido pela chave
       const existing = await sql`
         SELECT u.*, t.razao_social, t.nome_fantasia, t.status as tenant_status, t.created_at as tenant_created_at, t.vencimento as tenant_vencimento
         FROM usuarios u
         LEFT JOIN tenants t ON u.tenant_id = t.id
         WHERE (LOWER(u.email) = ${email} OR (u.google_sub IS NOT NULL AND u.google_sub = ${googleSub}))
           AND u.perfil <> 'superadmin'
-          ${googleTenantId ? sql`AND u.tenant_id = ${googleTenantId}` : sql``}
+          AND u.tenant_id = ${googleTenantId}
         LIMIT 1;
       `;
-
-      // Se company_key não foi fornecida e não encontrou usuário: exigir a chave.
-      if (!existing.length && !rawGoogleCompanyKey) {
-        return res.status(403).json({
-          success: false,
-          not_registered: true,
-          google_needs_company_key: true,
-          message: 'Para entrar com Google, informe a Chave da Empresa fornecida pelo administrador da sua construtora.'
-        });
-      }
 
       let userRecord = null;
       let isNew = false;
@@ -1112,7 +1108,12 @@ export default async function handler(req, res) {
       // PATCH 50: reset multi-tenant — busca em duas etapas:
       // 1. Tentar superadmin primeiro (sem Chave da Empresa, igual ao login Master).
       // 2. Se não for superadmin, exigir company_key para isolar o tenant correto.
-      const { identificador, company_key: resetCompanyKey } = req.body || {};
+      const {
+        identificador,
+        company_key: resetCompanyKey,
+        access_key: resetAccessKey,
+        accessKey: resetCamelKey
+      } = req.body || {};
       if (!identificador || !identificador.trim()) {
         return res.status(400).json({ success: false, message: 'Informe seu usuário ou e-mail cadastrado.' });
       }
@@ -1144,8 +1145,8 @@ export default async function handler(req, res) {
         rows = masterResetRows;
       } else {
         // Etapa 2: usuário de tenant — exige Chave da Empresa para isolar o tenant correto.
-        // Se company_key ausente, retornar resposta genérica (sem revelar que é obrigatória).
-        const rawResetKey = String(resetCompanyKey || '').trim();
+        // Se access_key / company_key ausente, retornar resposta genérica (sem revelar que é obrigatória).
+        const rawResetKey = String(resetAccessKey || resetCompanyKey || resetCamelKey || '').trim();
         if (!rawResetKey) {
           return genericResponse(fakeRequestId());
         }

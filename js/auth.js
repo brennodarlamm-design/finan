@@ -91,11 +91,20 @@ const Auth = {
       return { success: false, message: 'Usuário e senha são obrigatórios.' };
     }
 
+    const key = (extraBody.access_key || extraBody.company_key || extraBody.accessKey || '').trim();
+    const payload = {
+      username,
+      password,
+      remember,
+      ...extraBody,
+      ...(key ? { access_key: key, company_key: key } : {})
+    };
+
     try {
       const resp = await fetch('/api/auth?action=login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, password, remember, ...extraBody })
+        body: JSON.stringify(payload)
       });
       const data = await resp.json().catch(() => ({}));
       if (resp.ok && data.success && data.user) {
@@ -177,16 +186,23 @@ const Auth = {
     }
   },
 
-  async loginWithGoogle(credentialJwt) {
+  async loginWithGoogle(credentialJwt, extraBody = {}) {
     if (!credentialJwt) {
       return { success: false, message: 'Token de credencial Google não fornecido.' };
     }
+
+    const key = typeof extraBody === 'string'
+      ? extraBody.trim()
+      : (extraBody.access_key || extraBody.company_key || extraBody.accessKey || '').trim();
 
     try {
       const resp = await fetch('/api/auth?action=google', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ credentialJwt })
+        body: JSON.stringify({
+          credentialJwt,
+          ...(key ? { access_key: key, company_key: key } : {})
+        })
       });
       const data = await resp.json().catch(() => ({}));
       if (resp.ok && data.success && data.user) {
@@ -195,6 +211,7 @@ const Auth = {
       }
       return {
         success: false,
+        google_needs_company_key: !!data.google_needs_company_key,
         message: data.message || data.error || 'Falha ao autenticar com Google no servidor.'
       };
     } catch (err) {
@@ -207,16 +224,23 @@ const Auth = {
   },
 
   // ── RECUPERAÇÃO DE SENHA (SERVER-SIDE OTP NO NEON) ─────────────────────────
-  async solicitarCodigoRecuperacao(identificador) {
+  async solicitarCodigoRecuperacao(identificador, extraBody = '') {
     if (!identificador || !identificador.trim()) {
       return { success: false, message: 'Informe seu usuário ou e-mail cadastrado.' };
     }
+
+    const key = typeof extraBody === 'string'
+      ? extraBody.trim()
+      : (extraBody?.access_key || extraBody?.company_key || extraBody?.accessKey || '').trim();
 
     try {
       const resp = await fetch('/api/auth?action=request_reset', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ identificador: identificador.trim() })
+        body: JSON.stringify({
+          identificador: identificador.trim(),
+          ...(key ? { access_key: key, company_key: key } : {})
+        })
       });
       const data = await resp.json().catch(() => ({}));
       if (resp.ok && data.success) {

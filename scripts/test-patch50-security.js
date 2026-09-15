@@ -97,7 +97,60 @@ console.log('6. Verificando rota /healthz e supressão de logs no backend...');
 const serverContent = fs.readFileSync(path.resolve('backend/server.js'), 'utf8');
 assert(serverContent.includes("/healthz"), 'backend/server.js deve implementar a rota /healthz.');
 assert(serverContent.includes("msg.includes('Closing session:')"), 'backend/server.js deve filtrar mensagens de reconexão do Baileys.');
+assert(!serverContent.includes('process.env.API_SECRET || process.env.VERCEL_API_SECRET'), 'backend/server.js não deve ter fallback para API_SECRET legado.');
 console.log('  ✓ Hardening do Render verificado com sucesso!\n');
+
+// 7. Chave da Empresa de 6 Números (PATCH 50.2)
+console.log('7. Verificando Chave da Empresa de 6 números...');
+import {
+  generateTenantAccessKey,
+  isTenantAccessKeyShapeValid,
+  normalizeTenantAccessKey,
+  hashTenantAccessKey,
+  tenantAccessKeyLast4
+} from '../api/_tenant-access-key.js';
+
+const generatedKey = generateTenantAccessKey();
+assert(/^\d{6}$/.test(generatedKey), `Chave gerada deve conter exatamente 6 dígitos numéricos: ${generatedKey}`);
+assert(isTenantAccessKeyShapeValid(generatedKey), 'Shape de chave de 6 dígitos deve ser válido.');
+assert(isTenantAccessKeyShapeValid('123456'), 'Chave numérica 123456 deve ser válida.');
+assert(isTenantAccessKeyShapeValid('123-456'), 'Chave formatada 123-456 deve ser válida.');
+assert(!isTenantAccessKeyShapeValid('12345'), 'Chave de 5 dígitos deve ser rejeitada.');
+assert(!isTenantAccessKeyShapeValid('1234567'), 'Chave de 7 dígitos deve ser rejeitada.');
+assert(!isTenantAccessKeyShapeValid('ABCDEF'), 'Chave não numérica sem prefixo deve ser rejeitada.');
+
+const normalized6 = normalizeTenantAccessKey(' 849-201 ');
+assert.strictEqual(normalized6, '849201', 'Normalização deve remover espaços e traços.');
+assert.strictEqual(tenantAccessKeyLast4('849201'), '9201', 'Last4 deve extrair os 4 dígitos finais.');
+console.log('  ✓ Chave da Empresa de 6 dígitos validada com sucesso!\n');
+
+// 8. Import de getInternalApiSecret em api/auth.js
+console.log('8. Verificando importações e chamadas em api/auth.js...');
+assert(authContent.includes('getInternalApiSecret'), 'api/auth.js deve importar getInternalApiSecret.');
+assert(authContent.includes("import { hashPassword, verifyPassword, signToken, verifyToken, resolveAuthAndTenant, getSessionSigningSecret, getInternalApiSecret } from './_auth.js'"), 'api/auth.js deve ter getInternalApiSecret no import do topo.');
+console.log('  ✓ Importação de getInternalApiSecret validada com sucesso!\n');
+
+// 9. Google OAuth Fail-Closed antes de qualquer query SQL
+console.log('9. Verificando Google OAuth Fail-Closed com Chave da Empresa...');
+const googleKeyIndex = authContent.indexOf('rawGoogleCompanyKey');
+const googleNeedsKeyIndex = authContent.indexOf('google_needs_company_key: true');
+const googleSqlIndex = authContent.indexOf('SELECT u.*, t.razao_social, t.nome_fantasia, t.status as tenant_status');
+assert(googleKeyIndex > -1, 'auth.js deve ler rawGoogleCompanyKey.');
+assert(googleNeedsKeyIndex > -1, 'auth.js deve ter verificação de chave antes da query.');
+assert(googleNeedsKeyIndex < googleSqlIndex, 'auth.js deve bloquear falta de chave ANTES de executar a query de usuários do Google (Fail-Closed).');
+assert(authContent.includes('AND u.tenant_id = ${googleTenantId}'), 'auth.js deve restringir usuário do Google estritamente ao tenant_id resolvido.');
+console.log('  ✓ Google OAuth Fail-Closed validado com sucesso!\n');
+
+// 10. Frontend: Envio de access_key e compatibilidade
+console.log('10. Verificando padronização de access_key no frontend...');
+const loginPageContent = fs.readFileSync(path.resolve('js/login_page.js'), 'utf8');
+assert(loginPageContent.includes('Auth.login(u, p, r, { access_key: ak })'), 'login_page.js deve enviar access_key: ak no login.');
+assert(loginPageContent.includes('Auth.loginWithGoogle(response.credential, { access_key: ak })'), 'login_page.js deve enviar access_key no Google login.');
+assert(loginPageContent.includes('Auth.solicitarCodigoRecuperacao(ident, { access_key: ak })'), 'login_page.js deve enviar access_key na recuperação de senha.');
+
+const frontendAuthContent = fs.readFileSync(path.resolve('js/auth.js'), 'utf8');
+assert(frontendAuthContent.includes('access_key: key'), 'js/auth.js deve empacotar access_key no payload.');
+console.log('  ✓ Frontend padronizado com access_key validado com sucesso!\n');
 
 console.log('===================================================');
 console.log('🚀 TODOS OS TESTES DA SEQUÊNCIA P50 PASSARAM!');

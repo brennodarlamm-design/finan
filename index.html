@@ -321,8 +321,8 @@
             <label class="label" for="accessKey" style="margin-bottom:0;">Chave da Empresa</label>
             <span style="font-size:.72rem;color:var(--accent2);font-weight:600;">Obrigatória para clientes</span>
           </div>
-          <input class="inp" type="text" id="accessKey" name="accessKey" value="" placeholder="Ex: FO-ABC123-DEF456-..." autocomplete="organization" required style="font-family:monospace;letter-spacing:1px;text-transform:uppercase;">
-          <div style="font-size:.72rem;color:var(--text3);margin-top:4px;">Chave exclusiva fornecida à sua construtora para acesso seguro.</div>
+          <input class="inp" type="text" id="accessKey" name="accessKey" value="" placeholder="Ex: 123456" autocomplete="organization" required maxlength="6" inputmode="numeric" style="font-family:monospace;letter-spacing:2px;">
+          <div style="font-size:.72rem;color:var(--text3);margin-top:4px;">Chave de 6 números fornecida à sua construtora para acesso seguro.</div>
         </div>
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
           <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:.83rem;color:var(--text2);">
@@ -455,6 +455,13 @@
       <div class="fgroup">
         <label class="label" for="rec-ident">Usuário ou E-mail</label>
         <input class="inp" type="text" id="rec-ident" placeholder="Ex: admin ou contato@empresa.com" autofocus>
+      </div>
+      <div class="fgroup">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+          <label class="label" for="rec-company-key" style="margin-bottom:0;">Chave da Empresa (6 números)</label>
+          <span style="font-size:.7rem;color:var(--text3);">Não obrigatória para superadmin</span>
+        </div>
+        <input class="inp" type="text" id="rec-company-key" placeholder="Ex: 123456" maxlength="6" inputmode="numeric" style="font-family:monospace;letter-spacing:2px;">
       </div>
       <div class="err-box" id="rec-err-1" style="margin-bottom:12px;"></div>
       <button type="button" class="btn-primary" id="rec-btn-step-1" data-fb-click="enviarCodigoRecuperacao" data-fb-click-n="0">
