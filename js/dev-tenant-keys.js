@@ -33,7 +33,8 @@
 
   function ensurePanel() {
     const anchor = findSystemAnchor();
-    if (!anchor) return null;
+    const root = document.getElementById('master-content-area');
+    if (!anchor && !root) return null;
 
     let panel = document.getElementById('dev-tenant-keys-panel');
     if (panel && document.contains(panel)) return panel;
@@ -42,9 +43,16 @@
     panel.id = 'dev-tenant-keys-panel';
     panel.style.cssText = 'background:rgba(255,255,255,.02);border:1px solid rgba(201,162,39,.32);border-radius:14px;overflow:hidden;margin:0 0 22px 0;box-shadow:0 8px 30px rgba(0,0,0,.25);';
 
-    const intro = anchor.parentElement;
-    if (intro?.parentElement) intro.insertAdjacentElement('afterend', panel);
-    else anchor.insertAdjacentElement('afterend', panel);
+    if (anchor) {
+      const intro = anchor.parentElement;
+      if (intro?.parentElement) intro.insertAdjacentElement('afterend', panel);
+      else anchor.insertAdjacentElement('afterend', panel);
+    } else {
+      // O layout Master evoluiu e nem toda aba possui o heading legado
+      // "Manutenção do Sistema". Nesse caso, o cofre deve continuar visível
+      // no topo da área autenticada em vez de falhar silenciosamente.
+      root.prepend(panel);
+    }
 
     render();
     if (!state.rows.length && !state.loading) load();
