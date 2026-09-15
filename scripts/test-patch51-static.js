@@ -9,12 +9,13 @@ const hardening = read('js/patch51-hardening.js');
 const workflow = read('api/_workflow.js');
 const complete = read('api/_workflow-complete.js');
 const meta = read('api/_workflow-meta.js');
+const users = read('api/_workflow-users.js');
 const audit = read('api/audit.js');
 const sla = read('api/_sla.js');
 const migration = read('migrations/028_patch51_workflow_obras.sql');
 const app = read('app.html');
 
-for (const file of ['js/patch51.js','js/patch51-hardening.js','api/_workflow.js','api/_workflow-complete.js','api/_workflow-meta.js','api/audit.js','api/_sla.js']) {
+for (const file of ['js/patch51.js','js/patch51-hardening.js','api/_workflow.js','api/_workflow-complete.js','api/_workflow-meta.js','api/_workflow-users.js','api/audit.js','api/_sla.js']) {
   const r = spawnSync(process.execPath, ['--check', file], { encoding:'utf8' });
   assert(r.status === 0, `${file} possui sintaxe JavaScript válida${r.stderr ? `: ${r.stderr.trim()}` : ''}`);
 }
@@ -22,6 +23,10 @@ for (const file of ['js/patch51.js','js/patch51-hardening.js','api/_workflow.js'
 assert(app.includes('/js/patch51.js?v=') && app.includes('/js/patch51-hardening.js?v='), 'Patch 51 e hardening são carregados pelo app principal');
 assert(audit.includes("workflowAction === 'complete'") && audit.includes('workflowCompleteHandler'), 'Conclusão de workflow usa helper atômico dedicado sem nova função Vercel');
 assert(audit.includes("workflowAction === 'meta_save'") && audit.includes('workflowMetaHandler'), 'Cadastro Geral usa handler endurecido sem criar nova função Vercel');
+assert(audit.includes("workflowAction === 'users'") && audit.includes('workflowUsersHandler'), 'Workflow possui lista mínima de responsáveis sem reutilizar gestão de contas');
+assert(users.includes('tenant_id=${auth.tenantId}') && users.includes('ativo=TRUE'), 'Lista de responsáveis é limitada a usuários ativos do mesmo tenant');
+assert(!users.includes('email') && !users.includes('senha_hash'), 'Endpoint de responsáveis não expõe e-mail ou credenciais');
+assert(hardening.includes("this.api('users')"), 'Frontend do workflow usa o endpoint mínimo de responsáveis');
 assert(complete.includes('WITH current_stage AS') && complete.includes('next_candidate AS MATERIALIZED') && complete.includes('history_next AS'), 'Conclusão e transferência de etapa ocorrem em um único statement PostgreSQL');
 assert(complete.includes('WORKFLOW_NOT_ASSIGNED'), 'Usuário não pode concluir etapa atribuída a outra pessoa');
 assert(workflow.includes('WORKFLOW_FIRST_STAGE_UNASSIGNED'), 'Workflow não inicia sem responsável na primeira etapa');
