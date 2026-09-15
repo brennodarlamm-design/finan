@@ -9,7 +9,8 @@ export function normalizeTenantAccessKey(value = '') {
 
 export function generateTenantAccessKey() {
   const raw = crypto.randomBytes(KEY_BYTES).toString('base64url').toUpperCase();
-  const compact = raw.replace(/[^A-Z0-9]/g, '').slice(0, 30);
+  // padEnd garante mínimo de 18 chars alfanuméricos (3 segmentos de 6) mesmo em edge cases de entropia
+  const compact = (raw.replace(/[^A-Z0-9]/g, '') + '0'.repeat(18)).slice(0, 30);
   return `${KEY_PREFIX}-${compact.match(/.{1,6}/g).join('-')}`;
 }
 
@@ -44,6 +45,7 @@ export async function resolveTenantByAccessKey(sql, accessKey) {
            created_at, vencimento, access_key_hash, access_key_last4, access_key_created_at
     FROM tenants
     WHERE access_key_hash = ${keyHash}
+      AND status NOT IN ('cancelado', 'bloqueado')
     LIMIT 1;
   `;
   if (!rows.length) return null;
