@@ -392,8 +392,7 @@ export default async function handler(req, res) {
     console.error('🚨 [Certificado] Erro:', err);
     return res.status(500).json({
       success: false,
-      error: 'Erro interno no processamento do certificado digital.',
-      detail: err.message
+      error: 'Erro interno no processamento do certificado digital.'
     });
   }
 }

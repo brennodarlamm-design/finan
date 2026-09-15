@@ -67,7 +67,7 @@ test('FinBot usa base de conhecimento estruturada', /SUPPORT_KB/i.test(users) &&
 test('Status CNPJ não injeta HTML externo', /el\.textContent = String\(msg/i.test(fornecedores));
 test('Info de fornecedor em lançamento usa textContent', /info\.textContent = parts\.join/i.test(lancamentos));
 test('Busca SINAPI escapa texto e não injeta JSON externo em onclick', /escapeHtml\(r\.descricao\)/i.test(sinapi) && (/_lastSearchResults\[\$\{i\}\]/i.test(sinapi) || /data-fb-click="Patch26Actions\.sinapiAddLastResult"/i.test(sinapi)));
-test('Auth falha fechado quando API_SECRET está ausente', /API_SECRET não configurado/i.test(authApi) && /Configuração de segurança pendente/i.test(authApi));
+test('Auth falha fechado quando API_SECRET está ausente', /(?:API_SECRET|segredo de.*) não configurado/i.test(authApi) && /Configuração de segurança pendente/i.test(authApi));
 test('Google exige GOOGLE_CLIENT_ID explícito', /googleClientId/i.test(authApi) && /GOOGLE_CLIENT_ID não configurado/i.test(authApi));
 test('Trial online usa fim do dia em UTC-4', /T23:59:59-04:00/i.test(authCore));
 test('Tokens legados são atualizados para sessão revogável', /tokens legados ganham uma sessão revogável/i.test(authApi) && /tokenFieldForExplicitClient\(req, refreshedToken\)/i.test(authApi) && (/tokenRefreshed/i.test(authJs) || /_purgeLegacyToken/i.test(authJs)));

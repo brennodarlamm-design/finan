@@ -100,8 +100,10 @@ export function canAccessModule(auth, module, action = 'read') {
 }
 
 export function canAccessTable(auth, table, action = 'read') {
+  if (auth?.isSystem) return true;
   const module = TABLE_MODULES[String(table || '').trim()] || null;
-  return module ? canAccessModule(auth, module, action) : Boolean(roleRule(auth?.user?.perfil)?.[action] || auth?.isSystem);
+  if (!module) return false;
+  return canAccessModule(auth, module, action);
 }
 
 export function canWriteData(auth) {

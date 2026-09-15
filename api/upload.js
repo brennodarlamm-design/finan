@@ -277,8 +277,7 @@ export default async function handler(req, res) {
       'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
       'application/x-ofx', 'application/ofx',
       'application/zip', 'application/x-zip-compressed', 'application/x-rar-compressed', 'application/x-7z-compressed',
-      'application/acad', 'application/x-acad', 'image/vnd.dwg', 'image/vnd.dxf',
-      'application/octet-stream'
+      'application/acad', 'application/x-acad', 'image/vnd.dwg', 'image/vnd.dxf'
     ];
 
     const lowerExt = (filename.includes('.') ? filename.split('.').pop() : '').toLowerCase();
@@ -296,19 +295,53 @@ export default async function handler(req, res) {
     const disallowedExts = ['html', 'htm', 'svg', 'xhtml', 'exe', 'bat', 'cmd', 'sh', 'js', 'vbs', 'scr', 'php', 'py'];
     const disallowedMimes = ['text/html', 'image/svg+xml', 'application/xhtml+xml', 'application/x-msdownload', 'text/javascript', 'application/javascript'];
 
-    if (disallowedExts.includes(lowerExt) || disallowedMimes.includes(cleanMime) || !ALLOWED_EXTENSIONS.includes(lowerExt) || !ALLOWED_MIMES.includes(cleanMime)) {
+    if (disallowedExts.includes(lowerExt) || disallowedMimes.includes(cleanMime) || !ALLOWED_EXTENSIONS.includes(lowerExt)) {
       return res.status(400).json({
         success: false,
         error: 'Tipo de arquivo não permitido por políticas de segurança do FinObra.'
       });
     }
 
-    const buffer = Buffer.from(cleanBase64, 'base64');
+    // Fail-early check por tamanho da string base64 antes de alocar buffer em memória
+    const approxBytes = Math.ceil(cleanBase64.length * 0.75);
     const MAX_UPLOAD_BYTES = 15 * 1024 * 1024; // 15 MB
+    if (approxBytes > MAX_UPLOAD_BYTES) {
+      return res.status(413).json({
+        success: false,
+        error: 'Arquivo excede o limite máximo permitido de 15 MB.'
+      });
+    }
+
+    const buffer = Buffer.from(cleanBase64, 'base64');
     if (buffer.length > MAX_UPLOAD_BYTES) {
       return res.status(413).json({
         success: false,
         error: 'Arquivo excede o limite máximo permitido de 15 MB.'
+      });
+    }
+
+    // Validação estrita de Magic Bytes para prevenir disfarce de extensão (RCE/XSS/Bypass)
+    const magicHex = buffer.slice(0, 8).toString('hex').toUpperCase();
+    const isExeOrScript = magicHex.startsWith('4D5A') || magicHex.startsWith('7F454C46') || buffer.slice(0, 30).toString('utf8').toLowerCase().includes('<html') || buffer.slice(0, 10).toString('utf8').startsWith('#!/');
+    if (isExeOrScript) {
+      return res.status(400).json({
+        success: false,
+        error: 'Assinatura binária do arquivo rejeitada (contém conteúdo executável ou script).'
+      });
+    }
+
+    if (cleanMime === 'application/octet-stream') {
+      const isKnownMagic = magicHex.startsWith('25504446') || magicHex.startsWith('89504E47') || magicHex.startsWith('FFD8FF') || magicHex.startsWith('504B0304') || magicHex.startsWith('52494646');
+      if (!isKnownMagic) {
+        return res.status(400).json({
+          success: false,
+          error: 'Tipo genérico octet-stream sem assinatura binária reconhecida é proibido.'
+        });
+      }
+    } else if (!ALLOWED_MIMES.includes(cleanMime)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Tipo MIME do arquivo não permitido.'
       });
     }
 

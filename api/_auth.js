@@ -131,10 +131,19 @@ function trialExpired(createdAt, trialDays = 15, explicitDueDate = null) {
  * - tenant informado pelo cliente só é aceito para superadmin ou chave interna;
  * - API_SECRET não é aceito por query string (evita vazamento em URL/logs).
  */
+export function getSessionSigningSecret() {
+  return String(process.env.SESSION_SIGNING_SECRET || process.env.API_SECRET || process.env.VERCEL_API_SECRET || '').trim();
+}
+
+export function getInternalApiSecret() {
+  return String(process.env.INTERNAL_API_SECRET || process.env.API_SECRET || process.env.VERCEL_API_SECRET || '').trim();
+}
+
 export async function resolveAuthAndTenant(req) {
-  const secret = (process.env.API_SECRET || process.env.VERCEL_API_SECRET || '').trim();
-  if (!secret) {
-    console.error('🚨 [Segurança] API_SECRET não configurado no ambiente.');
+  const sessionSecret = getSessionSigningSecret();
+  const internalSecret = getInternalApiSecret();
+  if (!sessionSecret && !internalSecret) {
+    console.error('🚨 [Segurança] Nenhum segredo de autenticação configurado no ambiente.');
     return { authenticated: false, status: 500, error: 'Configuração de segurança pendente no servidor.' };
   }
 
@@ -152,7 +161,7 @@ export async function resolveAuthAndTenant(req) {
   }
 
   // Chave interna para jobs/cron. Nunca deve existir no frontend.
-  if (rawToken === secret) {
+  if (internalSecret && rawToken === internalSecret) {
     // Chaves internas nunca assumem uma empresa padrão. Isso evita que um job mal
     // configurado leia/grave acidentalmente no tenant histórico da plataforma.
     const explicitTenant = String(req.headers['x-tenant-id'] || '').trim();
@@ -167,7 +176,7 @@ export async function resolveAuthAndTenant(req) {
     };
   }
 
-  const payload = verifyToken(rawToken, secret);
+  const payload = verifyToken(rawToken, sessionSecret) || (sessionSecret !== internalSecret && internalSecret ? verifyToken(rawToken, internalSecret) : null);
   if (!payload?.userId || !payload?.tenantId) {
     return { authenticated: false, status: 401, error: 'Token de autenticação inválido ou expirado.' };
   }

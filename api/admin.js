@@ -1573,6 +1573,6 @@ export default async function handler(req, res) {
     return res.status(400).json({ success: false, error: `Ação "${action}" desconhecida.` });
   } catch (err) {
     console.error('Erro na API Master Admin:', err);
-    return res.status(500).json({ success: false, error: 'Erro interno no servidor Master: ' + err.message });
+    return res.status(500).json({ success: false, error: 'Erro interno no servidor Master.' });
   }
 }

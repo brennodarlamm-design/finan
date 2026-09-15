@@ -3,8 +3,9 @@
 import { neon } from '@neondatabase/serverless';
 import crypto from 'crypto';
 import { OAuth2Client } from 'google-auth-library';
-import { hashPassword, verifyPassword, signToken, verifyToken, resolveAuthAndTenant } from './_auth.js';
+import { hashPassword, verifyPassword, signToken, verifyToken, resolveAuthAndTenant, getSessionSigningSecret } from './_auth.js';
 import { checkRateLimit, getClientIp } from './_ratelimit.js';
+import { writeAudit } from './_audit.js';
 import {
   resolveTenantByAccessKey,
   resolveTenantUserByLogin,
@@ -160,9 +161,9 @@ export default async function handler(req, res) {
     });
   }
 
-  const secret = (process.env.API_SECRET || process.env.VERCEL_API_SECRET || '').trim();
+  const secret = getSessionSigningSecret();
   if (!secret) {
-    console.error('🚨 [Auth] API_SECRET não configurado.');
+    console.error('🚨 [Auth] Segredo de assinatura de sessão não configurado.');
     return res.status(500).json({ success:false, error:'Configuração de segurança pendente no servidor.' });
   }
 
@@ -418,17 +419,20 @@ export default async function handler(req, res) {
 
       const user = rows[0];
       if (!user.ativo) {
+        await writeAudit(sql, req, { tenantId: user.tenant_id, user: { id: user.id } }, { acao: 'login_bloqueado', entidade: 'auth', entidadeId: user.id, depois: { motivo: 'user_inactive', ip: clientIp } });
         return res.status(403).json({ success: false, message: 'Conta de usuário inativa. Contate o administrador.' });
       }
 
       // Aplicação estrita de regras de status do SaaS
       if (user.tenant_status === 'bloqueado') {
+        await writeAudit(sql, req, { tenantId: user.tenant_id, user: { id: user.id } }, { acao: 'login_bloqueado', entidade: 'auth', entidadeId: user.id, depois: { motivo: 'tenant_blocked', ip: clientIp } });
         return res.status(403).json({
           success: false,
           message: 'Acesso bloqueado para esta empresa. Entre em contato com o suporte comercial FinObra.'
         });
       }
       if (user.tenant_status === 'cancelado') {
+        await writeAudit(sql, req, { tenantId: user.tenant_id, user: { id: user.id } }, { acao: 'login_bloqueado', entidade: 'auth', entidadeId: user.id, depois: { motivo: 'tenant_canceled', ip: clientIp } });
         return res.status(403).json({
           success: false,
           message: 'Assinatura cancelada. Regularize seu plano para restabelecer o acesso ao sistema.'
@@ -439,12 +443,14 @@ export default async function handler(req, res) {
         const created = user.tenant_created_at ? new Date(user.tenant_created_at).getTime() : null;
         const fallbackDue = created ? created + 15 * 24 * 60 * 60 * 1000 : null;
         if ((due && Date.now() > due) || (!due && fallbackDue && Date.now() > fallbackDue)) {
+          await writeAudit(sql, req, { tenantId: user.tenant_id, user: { id: user.id } }, { acao: 'login_bloqueado', entidade: 'auth', entidadeId: user.id, depois: { motivo: 'trial_expired', ip: clientIp } });
           return res.status(403).json({ success:false, message:'Seu período de teste gratuito expirou. Faça o upgrade de plano para continuar.' });
         }
       }
 
       const passwordMatches = verifyPassword(password, user.senha_hash);
       if (!passwordMatches) {
+        await writeAudit(sql, req, { tenantId: user.tenant_id, user: { id: user.id } }, { acao: 'login_bloqueado', entidade: 'auth', entidadeId: user.id, depois: { motivo: 'invalid_password', ip: clientIp } });
         // Mensagem genérica — não revela se é usuário ou senha o problema (anti-enumeração)
         return res.status(401).json({ success: false, message: 'Credenciais de acesso inválidas.' });
       }
@@ -633,6 +639,7 @@ export default async function handler(req, res) {
       }
 
       if (!mfaValid) {
+        await writeAudit(sql, req, { tenantId: user.tenant_id, user: { id: user.id } }, { acao: 'mfa_invalido', entidade: 'auth', entidadeId: user.id, depois: { ip: clientIp, type: bCode ? 'backup_code' : 'totp' } });
         return res.status(401).json({
           success: false,
           message: bCode ? 'Código de recuperação de emergência inválido ou já utilizado.' : 'Código do Google Authenticator incorreto ou expirado.'
@@ -1223,6 +1230,6 @@ export default async function handler(req, res) {
     return res.status(400).json({ success: false, error: `Ação '${action}' inválida para /api/auth.` });
   } catch (err) {
     console.error('Erro na API de autenticação:', err);
-    return res.status(500).json({ success: false, error: 'Erro interno ao processar autenticação.', detail: err.message });
+    return res.status(500).json({ success: false, error: 'Erro interno ao processar autenticação.' });
   }
 }

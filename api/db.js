@@ -967,7 +967,7 @@ export default async function handler(req, res) {
               totalCount++;
             } catch (bulkErr) {
               console.warn('[Sync All] Falha ao salvar orcamento_sinapi:', bulkErr.message);
-              recordFailure('orcamentos_sinapi', o, bulkErr.message, 'DATABASE_WRITE_FAILED');
+              recordFailure('orcamentos_sinapi', o, 'Falha de escrita no banco de dados.', 'DATABASE_WRITE_FAILED');
             }
           }
         }
@@ -1595,7 +1595,7 @@ export default async function handler(req, res) {
             `;
           } catch (dbErr) {
             console.error('[API /api/db] Erro ao salvar orcamento_sinapi:', dbErr.message);
-            return res.status(400).json({ success:false, error:`Erro ao salvar orçamento SINAPI: ${dbErr.message}` });
+            return res.status(500).json({ success:false, error: 'Erro ao salvar orçamento SINAPI no banco de dados.' });
           }
           await auditDb(sql, req, auth, 'salvar', 'orcamentos_sinapi', o);
           return res.status(200).json({ success:true, id:o.id });
@@ -1872,6 +1872,6 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Método não suportado' });
   } catch (err) {
     console.error('Erro na API Neon DB:', err);
-    return res.status(500).json({ success: false, error: err.message });
+    return res.status(500).json({ success: false, error: 'Erro interno ao processar operação no banco de dados.' });
   }
 }
