@@ -6,6 +6,7 @@ const assert = (ok, msg) => { if (!ok) { console.error(`❌ ${msg}`); process.ex
 
 const patch = read('js/patch51.js');
 const hardening = read('js/patch51-hardening.js');
+const followup = read('js/patch51-followup.js');
 const workflow = read('api/_workflow.js');
 const complete = read('api/_workflow-complete.js');
 const meta = read('api/_workflow-meta.js');
@@ -15,12 +16,12 @@ const sla = read('api/_sla.js');
 const migration = read('migrations/028_patch51_workflow_obras.sql');
 const app = read('app.html');
 
-for (const file of ['js/patch51.js','js/patch51-hardening.js','api/_workflow.js','api/_workflow-complete.js','api/_workflow-meta.js','api/_workflow-users.js','api/audit.js','api/_sla.js']) {
+for (const file of ['js/patch51.js','js/patch51-hardening.js','js/patch51-followup.js','api/_workflow.js','api/_workflow-complete.js','api/_workflow-meta.js','api/_workflow-users.js','api/audit.js','api/_sla.js']) {
   const r = spawnSync(process.execPath, ['--check', file], { encoding:'utf8' });
   assert(r.status === 0, `${file} possui sintaxe JavaScript válida${r.stderr ? `: ${r.stderr.trim()}` : ''}`);
 }
 
-assert(app.includes('/js/patch51.js?v=') && app.includes('/js/patch51-hardening.js?v='), 'Patch 51 e hardening são carregados pelo app principal');
+assert(app.includes('/js/patch51.js?v=') && app.includes('/js/patch51-hardening.js?v=') && app.includes('/js/patch51-followup.js?v='), 'Patch 51 e camadas de hardening são carregados pelo app principal');
 assert(audit.includes("workflowAction === 'complete'") && audit.includes('workflowCompleteHandler'), 'Conclusão de workflow usa helper atômico dedicado sem nova função Vercel');
 assert(audit.includes("workflowAction === 'meta_save'") && audit.includes('workflowMetaHandler'), 'Cadastro Geral usa handler endurecido sem criar nova função Vercel');
 assert(audit.includes("workflowAction === 'users'") && audit.includes('workflowUsersHandler'), 'Workflow possui lista mínima de responsáveis sem reutilizar gestão de contas');
@@ -52,10 +53,16 @@ assert(patch.includes('name="rg"') && patch.includes('name="orgao_expedidor"') &
 assert(patch.includes('Minhas Etapas') && patch.includes('p51-task-complete'), 'Usuário possui fila Minhas Etapas e ação de marcar como pronto');
 assert(patch.includes("[data-route=\"documentacao\"]") && patch.includes("[data-route=\"portal-cliente\"]"), 'Documentação e Portal do Cliente são removidos da navegação lateral');
 assert(patch.includes("data-tab=\"slas\"") && patch.includes("data-tab=\"orcado-realizado\""), 'Patch reposiciona SLA antes de Orçado x Realizado na Central');
-assert(patch.includes('Soma dos SLAs'), 'Central mostra a soma total dos dias de SLA');
+assert(patch.includes('Soma dos SLAs'), 'Central possui componente de soma total dos dias de SLA');
+assert(followup.includes("document.getElementById('od-tab-content')"), 'Soma dos SLAs usa o container real da Central de Obras');
+assert(followup.includes('WORKFLOW_FIRST_STAGE_UNASSIGNED') && followup.includes('Configurações > SLAs'), 'Criação de obra avisa quando falta responsável na primeira etapa');
+assert(followup.includes('Prazo estimado') && followup.includes('p51-task-complete'), 'Fila Minhas Etapas exibe prazo estimado e vencimento');
+assert(followup.includes('Central de Alertas e Demandas') && followup.includes("id:`workflow_${task.obra_id}_${task.etapa_id}`"), 'Demandas do workflow entram na Central de Alertas');
+assert(followup.includes('FinObra — Nova etapa atribuída'), 'Nova atribuição pode gerar notificação nativa quando já autorizada');
 
 assert(patch.includes('cub_modo') && patch.includes('cub_valor'), 'Configurações suportam CUB fixo/volante');
 assert(patch.includes('cub * area'), 'Valor total do contrato é calculado por CUB × metragem');
+assert(followup.includes('Informe um CUB maior que zero') && followup.includes('Informe uma metragem maior que zero'), 'Contrato não é gerado com CUB ou metragem zerados');
 assert(patch.includes('subtitle.readOnly = true') && patch.includes('obra.subtitulo_capa'), 'Subtítulo da capa é vinculado ao Cadastro Geral');
 assert(patch.includes('Salvar cláusulas como padrão da empresa'), 'Gerador permite centralizar cláusulas padrão da empresa');
 assert(workflow.includes('contract_clause_versions'), 'Alterações gerais de cláusulas são versionadas');
