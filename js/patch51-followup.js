@@ -43,6 +43,56 @@
     cards.appendChild(card);
   };
 
+  // Mantém o editor legado de Prazos & SLAs e o workflow persistido no servidor
+  // usando a mesma quantidade de dias. Só envia aumentos; reduções continuam bloqueadas.
+  const syncWorkflowSla = async (obraId, processos) => {
+    if (!obraId || !Patch51.isManager() || !Array.isArray(processos) || !processos.length) return;
+    try {
+      const listed = await Patch51.api('list', { params:{ obraId } });
+      const stages = Array.isArray(listed.stages) ? listed.stages : [];
+      if (!stages.length) return;
+      let changed = false;
+      let lastResult = null;
+      for (const processo of processos) {
+        const stage = stages.find(item => String(item.etapa_id) === String(processo.id || processo.etapa_id));
+        if (!stage) continue;
+        const nextDays = Number(processo.dias_sla || 0);
+        const currentDays = Number(stage.dias_sla || 0);
+        if (!Number.isFinite(nextDays) || nextDays <= currentDays) continue;
+        lastResult = await Patch51.api('stage_update', {
+          method:'POST',
+          body:{ obraId, etapaId:stage.etapa_id, dias_sla:nextDays }
+        });
+        changed = true;
+      }
+      if (lastResult) Patch51.applyForecastLocal(obraId, lastResult.data_previsao, lastResult.total_dias);
+      if (changed) {
+        await Patch51.loadWorkflow(obraId, { initialize:false });
+        if (typeof Utils !== 'undefined' && Utils.toast) Utils.toast('SLAs sincronizados com o workflow e a nova previsão.', 'success');
+      }
+    } catch (err) {
+      if (typeof Utils !== 'undefined' && Utils.toast) Utils.toast(err?.message || 'Não foi possível sincronizar os SLAs com o workflow.', 'warning');
+    }
+  };
+
+  if (typeof CronogramaSLA !== 'undefined') {
+    const currentConfigSubmit = CronogramaSLA.salvarConfigObraSubmit.bind(CronogramaSLA);
+    CronogramaSLA.salvarConfigObraSubmit = function(obraId) {
+      const result = currentConfigSubmit(obraId);
+      const processos = CronogramaSLA.getObraProcessos(obraId) || [];
+      Promise.resolve().then(() => syncWorkflowSla(obraId, processos));
+      return result;
+    };
+
+    const currentApontamento = CronogramaSLA.salvarApontamento.bind(CronogramaSLA);
+    CronogramaSLA.salvarApontamento = function(obraId, processoId) {
+      const result = currentApontamento(obraId, processoId);
+      const processo = (CronogramaSLA.getObraProcessos(obraId) || []).find(item => String(item.id) === String(processoId));
+      if (processo) Promise.resolve().then(() => syncWorkflowSla(obraId, [processo]));
+      return result;
+    };
+  }
+
   // Quando a obra é criada sem responsável na primeira etapa, não deixa o erro
   // silencioso: orienta o usuário a configurar o responsável antes do fluxo iniciar.
   const originalInitializeWorkflow = Patch51.initializeWorkflow.bind(Patch51);
