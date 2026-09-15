@@ -6,6 +6,7 @@ import workflowHandler from './_workflow.js';
 import workflowCompleteHandler from './_workflow-complete.js';
 import workflowMetaHandler from './_workflow-meta.js';
 import workflowUsersHandler from './_workflow-users.js';
+import workflowStageUpdateHandler from './_workflow-stage-update.js';
 
 export default async function handler(req, res) {
   const rawAction = String(req.query?.action || req.body?.action || '').trim().toLowerCase();
@@ -40,6 +41,7 @@ export default async function handler(req, res) {
     if (workflowAction === 'complete') return workflowCompleteHandler(req, res);
     if (workflowAction === 'meta_save') return workflowMetaHandler(req, res);
     if (workflowAction === 'users') return workflowUsersHandler(req, res);
+    if (workflowAction === 'stage_update') return workflowStageUpdateHandler(req, res);
     return workflowHandler(req, res);
   }
 
