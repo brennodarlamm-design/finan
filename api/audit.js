@@ -5,6 +5,7 @@ import devTenantKeysHandler from './_dev-tenant-keys.js';
 import workflowHandler from './_workflow.js';
 import workflowCompleteHandler from './_workflow-complete.js';
 import workflowMetaHandler from './_workflow-meta.js';
+import workflowUsersHandler from './_workflow-users.js';
 
 export default async function handler(req, res) {
   const rawAction = String(req.query?.action || req.body?.action || '').trim().toLowerCase();
@@ -27,7 +28,7 @@ export default async function handler(req, res) {
 
   if (rawAction.startsWith(workflowPrefix)) {
     const workflowAction = rawAction.slice(workflowPrefix.length);
-    const allowed = new Set(['meta_list', 'meta_save', 'list', 'my', 'initialize', 'complete', 'stage_update', 'settings', 'settings_save']);
+    const allowed = new Set(['meta_list', 'meta_save', 'users', 'list', 'my', 'initialize', 'complete', 'stage_update', 'settings', 'settings_save']);
     if (!allowed.has(workflowAction)) {
       return res.status(400).json({ success:false, error:'Ação de workflow inválida.' });
     }
@@ -38,6 +39,7 @@ export default async function handler(req, res) {
     }
     if (workflowAction === 'complete') return workflowCompleteHandler(req, res);
     if (workflowAction === 'meta_save') return workflowMetaHandler(req, res);
+    if (workflowAction === 'users') return workflowUsersHandler(req, res);
     return workflowHandler(req, res);
   }
 
