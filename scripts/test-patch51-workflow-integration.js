@@ -167,12 +167,41 @@ await step('próxima etapa sem responsável fica bloqueada e gera evento de espe
   assert.equal(history.rows[0].evento, 'aguardando_responsavel');
 });
 
-await step('fila Minhas Etapas retorna somente etapa ativa do usuário autenticado', async () => {
+await step('retirar responsável bloqueia a etapa ativa e reatribuir retoma o andamento', async () => {
   await db.exec(`
     UPDATE workflow_etapas
-    SET responsavel_user_id='usr_a2', responsavel_nome='Engenheiro Alpha', responsavel_perfil='gestor', status='em_andamento', started_at=NOW()
+    SET responsavel_user_id='usr_a2', responsavel_nome='Engenheiro Alpha', responsavel_perfil='gestor',
+        status=CASE WHEN status='bloqueado' THEN 'em_andamento' ELSE status END,
+        started_at=COALESCE(started_at,NOW()), updated_at=NOW()
     WHERE tenant_id='tenant_alpha' AND obra_id='obra_1' AND etapa_id='etapa_3';
   `);
+  let row = await db.query(`SELECT status,responsavel_user_id FROM workflow_etapas WHERE tenant_id='tenant_alpha' AND obra_id='obra_1' AND etapa_id='etapa_3'`);
+  assert.equal(row.rows[0].status, 'em_andamento');
+  assert.equal(row.rows[0].responsavel_user_id, 'usr_a2');
+
+  await db.exec(`
+    UPDATE workflow_etapas
+    SET responsavel_user_id=NULL, responsavel_nome=NULL, responsavel_perfil=NULL,
+        status=CASE WHEN status='em_andamento' THEN 'bloqueado' ELSE status END, updated_at=NOW()
+    WHERE tenant_id='tenant_alpha' AND obra_id='obra_1' AND etapa_id='etapa_3';
+  `);
+  row = await db.query(`SELECT status,responsavel_user_id FROM workflow_etapas WHERE tenant_id='tenant_alpha' AND obra_id='obra_1' AND etapa_id='etapa_3'`);
+  assert.equal(row.rows[0].status, 'bloqueado');
+  assert.equal(row.rows[0].responsavel_user_id, null);
+
+  await db.exec(`
+    UPDATE workflow_etapas
+    SET responsavel_user_id='usr_a2', responsavel_nome='Engenheiro Alpha', responsavel_perfil='gestor',
+        status=CASE WHEN status='bloqueado' THEN 'em_andamento' ELSE status END,
+        started_at=COALESCE(started_at,NOW()), updated_at=NOW()
+    WHERE tenant_id='tenant_alpha' AND obra_id='obra_1' AND etapa_id='etapa_3';
+  `);
+  row = await db.query(`SELECT status,responsavel_user_id FROM workflow_etapas WHERE tenant_id='tenant_alpha' AND obra_id='obra_1' AND etapa_id='etapa_3'`);
+  assert.equal(row.rows[0].status, 'em_andamento');
+  assert.equal(row.rows[0].responsavel_user_id, 'usr_a2');
+});
+
+await step('fila Minhas Etapas retorna somente etapa ativa do usuário autenticado', async () => {
   const mine = await db.query(`
     SELECT w.etapa_id,o.nome obra_nome
     FROM workflow_etapas w
