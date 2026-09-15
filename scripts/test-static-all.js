@@ -67,23 +67,21 @@ const tests = [
   'scripts/test-p50-admin-secret-boundaries.js'
 ].filter(fs.existsSync);
 
-// Suítes anteriores à arquitetura wrapper+helper inspecionam api/admin.js/api/audit.js
-// como texto. Para elas, o preload devolve a fonte composta (wrapper + implementação
-// interna real), preservando a intenção do teste sem criar novas funções serverless.
-const composedApiTests = new Set([
-  'scripts/test-patch05-static.js',
-  'scripts/test-patch40-static.js',
-  'scripts/test-patch42-static.js',
-  'scripts/test-patch44-static.js',
-  'scripts/test-patch45-static.js',
-  'scripts/test-patch46-static.js'
+// Até o P49, as suítes foram escritas quando api/admin.js e api/audit.js eram arquivos
+// monolíticos. No P50 eles viraram wrappers finos para manter 12 funções na Vercel.
+// O preload faz os testes legados enxergarem wrapper + helper interno real. As suítes
+// P50 leem os arquivos físicos sem composição para validar a nova fronteira de segurança.
+const p50NativeSourceTests = new Set([
+  'scripts/test-patch50-security.js',
+  'scripts/test-p50-dev-key-vault.js',
+  'scripts/test-p50-admin-secret-boundaries.js'
 ]);
 const preload = path.resolve('scripts/test-api-wrapper-preload.cjs');
 
 for (const file of tests) {
   console.log(`\n=== ${file} ===`);
   const env = { ...process.env };
-  if (composedApiTests.has(file)) {
+  if (!p50NativeSourceTests.has(file)) {
     const prior = String(env.NODE_OPTIONS || '').trim();
     env.NODE_OPTIONS = `${prior}${prior ? ' ' : ''}--require=${preload}`;
   }
