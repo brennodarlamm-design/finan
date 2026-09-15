@@ -6,6 +6,12 @@ import { OAuth2Client } from 'google-auth-library';
 import { hashPassword, verifyPassword, signToken, verifyToken, resolveAuthAndTenant } from './_auth.js';
 import { checkRateLimit, getClientIp } from './_ratelimit.js';
 import {
+  resolveTenantByAccessKey,
+  resolveTenantUserByLogin,
+  normalizeTenantAccessKey,
+  isTenantAccessKeyShapeValid
+} from './_tenant-access-key.js';
+import {
   generateTotpSecret,
   verifyTotpCode,
   generateTotpUri,
@@ -285,32 +291,129 @@ export default async function handler(req, res) {
     // ── 2. POST /api/auth?action=login ──────────────────────────────────────────
     if (req.method === 'POST' && action === 'login') {
       const clientIp = getClientIp(req);
-      const rl = await checkRateLimit(`login:${clientIp}`, 10, 60000);
-      if (!rl.allowed) {
+
+      // Camada 1 — Rate limit por IP (5 tentativas/minuto)
+      const ipLimit = await checkRateLimit(`login:ip:${clientIp}`, 5, 60000);
+      if (!ipLimit.allowed) {
         return res.status(429).json({
           success: false,
-          message: 'Muitas tentativas consecutivas de login. Aguarde 1 minuto antes de tentar novamente.'
+          message: 'Muitas tentativas de login. Aguarde 1 minuto antes de tentar novamente.'
         });
       }
 
-      const { username, password, remember } = req.body || {};
+      const {
+        username,
+        password,
+        remember,
+        company_key,
+        access_key
+      } = req.body || {};
+
+      const companyKey = String(company_key || access_key || '').trim();
+
       if (!username || !password) {
         return res.status(400).json({ success: false, message: 'Usuário e senha são obrigatórios.' });
       }
 
-      const cleanUser = username.trim().toLowerCase();
-      const rows = await sql`
-        SELECT u.id, u.username, u.email, u.senha_hash, u.nome, u.perfil, u.avatar, u.ativo, u.tenant_id, u.permissoes,
-               u.mfa_secret, u.mfa_enabled, u.mfa_backup_codes, u.mfa_last_used_step,
-               t.razao_social, t.nome_fantasia, t.status as tenant_status, t.created_at as tenant_created_at, t.vencimento as tenant_vencimento
+      const cleanUser = String(username || '').trim().toLowerCase();
+
+      // Fingerprint da chave para o rate limiter — nunca a chave em texto puro.
+      // Usa normalizeTenantAccessKey para consistência com o hash armazenado no banco.
+      const normalizedKey = companyKey ? normalizeTenantAccessKey(companyKey) : '';
+      const companyKeyFingerprint = normalizedKey
+        ? crypto.createHash('sha256').update(normalizedKey).digest('hex').slice(0, 16)
+        : 'master';
+
+      // Camada 2 — Rate limit por IP + usuário + empresa (5 tentativas/minuto)
+      const credentialLimit = await checkRateLimit(
+        `login:credential:${clientIp}:${companyKeyFingerprint}:${cleanUser}`,
+        5,
+        60000
+      );
+      if (!credentialLimit.allowed) {
+        return res.status(429).json({
+          success: false,
+          message: 'Muitas tentativas de login. Aguarde 1 minuto antes de tentar novamente.'
+        });
+      }
+
+      // ── Resolução Master-first ────────────────────────────────────────────────
+      // Superadmin não pertence a uma empresa cliente; não exige Chave da Empresa.
+      const masterRows = await sql`
+        SELECT
+          u.id,
+          u.username,
+          u.email,
+          u.senha_hash,
+          u.nome,
+          u.perfil,
+          u.avatar,
+          u.ativo,
+          u.tenant_id,
+          u.permissoes,
+          u.mfa_secret,
+          u.mfa_enabled,
+          u.mfa_backup_codes,
+          u.mfa_last_used_step,
+          t.razao_social,
+          t.nome_fantasia,
+          t.status      AS tenant_status,
+          t.created_at  AS tenant_created_at,
+          t.vencimento  AS tenant_vencimento
         FROM usuarios u
         LEFT JOIN tenants t ON u.tenant_id = t.id
-        WHERE LOWER(u.username) = ${cleanUser} OR LOWER(u.email) = ${cleanUser}
+        WHERE
+          u.perfil = 'superadmin'
+          AND (
+            LOWER(u.username) = ${cleanUser}
+            OR LOWER(u.email)  = ${cleanUser}
+          )
         LIMIT 1;
       `;
 
+      let rows;
+
+      if (masterRows.length) {
+        // Conta Master encontrada — segue pelo pipeline existente (senha + MFA)
+        rows = masterRows;
+      } else {
+        // ── Fluxo empresarial: Chave da Empresa obrigatória ───────────────────
+        if (!companyKey) {
+          return res.status(400).json({
+            success: false,
+            message: 'Chave da Empresa é obrigatória.'
+          });
+        }
+
+        // Rejeita formato inválido imediatamente (sem bater no banco)
+        if (!isTenantAccessKeyShapeValid(companyKey)) {
+          return res.status(401).json({
+            success: false,
+            message: 'Credenciais de acesso inválidas.'
+          });
+        }
+
+        const tenant = await resolveTenantByAccessKey(sql, companyKey);
+        if (!tenant) {
+          return res.status(401).json({
+            success: false,
+            message: 'Credenciais de acesso inválidas.'
+          });
+        }
+
+        const tenantUser = await resolveTenantUserByLogin(sql, tenant.id, cleanUser);
+        if (!tenantUser) {
+          return res.status(401).json({
+            success: false,
+            message: 'Credenciais de acesso inválidas.'
+          });
+        }
+
+        rows = [tenantUser];
+      }
+
       if (!rows.length) {
-        return res.status(401).json({ success: false, message: 'Usuário ou senha incorretos.' });
+        return res.status(401).json({ success: false, message: 'Credenciais de acesso inválidas.' });
       }
 
       const user = rows[0];
@@ -342,7 +445,8 @@ export default async function handler(req, res) {
 
       const passwordMatches = verifyPassword(password, user.senha_hash);
       if (!passwordMatches) {
-        return res.status(401).json({ success: false, message: 'Usuário ou senha incorretos.' });
+        // Mensagem genérica — não revela se é usuário ou senha o problema (anti-enumeração)
+        return res.status(401).json({ success: false, message: 'Credenciais de acesso inválidas.' });
       }
 
       // PATCH 49: Proteção MFA para Super Admin Master Backoffice

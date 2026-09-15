@@ -56,12 +56,35 @@ export async function resolveTenantUserByLogin(sql, tenantId, usernameOrEmail) {
   const cleanUser = String(usernameOrEmail || '').trim().toLowerCase();
   if (!tenantId || !cleanUser) return null;
   const rows = await sql`
-    SELECT u.id, u.username, u.email, u.senha_hash, u.nome, u.perfil, u.avatar, u.ativo,
-           u.tenant_id, u.permissoes, u.mfa_secret, u.mfa_enabled, u.mfa_backup_codes,
-           u.mfa_last_used_step
+    SELECT
+      u.id,
+      u.username,
+      u.email,
+      u.senha_hash,
+      u.nome,
+      u.perfil,
+      u.avatar,
+      u.ativo,
+      u.tenant_id,
+      u.permissoes,
+      u.mfa_secret,
+      u.mfa_enabled,
+      u.mfa_backup_codes,
+      u.mfa_last_used_step,
+      t.razao_social,
+      t.nome_fantasia,
+      t.status        AS tenant_status,
+      t.created_at    AS tenant_created_at,
+      t.vencimento    AS tenant_vencimento
     FROM usuarios u
-    WHERE u.tenant_id = ${tenantId}
-      AND (LOWER(u.username) = ${cleanUser} OR LOWER(u.email) = ${cleanUser})
+    LEFT JOIN tenants t ON u.tenant_id = t.id
+    WHERE
+      u.tenant_id = ${tenantId}
+      AND u.perfil <> 'superadmin'
+      AND (
+        LOWER(u.username) = ${cleanUser}
+        OR LOWER(u.email)  = ${cleanUser}
+      )
     LIMIT 1;
   `;
   return rows[0] || null;
