@@ -64,7 +64,7 @@
     }
   };
 
-  // Exibe prazo também em "Minhas Etapas", que é a fila operacional do usuário.
+  // Exibe prazo e orientação também em "Minhas Etapas", que é a fila operacional do usuário.
   const originalOpenMyTasks = Patch51.openMyTasks.bind(Patch51);
   Patch51.openMyTasks = async function() {
     const result = await originalOpenMyTasks();
@@ -82,6 +82,13 @@
       info.style.cssText = `font-size:.74rem;margin-top:6px;${overdue ? 'color:var(--danger);font-weight:800;' : 'color:var(--text2);'}`;
       info.textContent = deadline ? `📅 Prazo estimado: ${dateFmt(deadline)}${overdue ? ' — VENCIDA' : ''}` : '📅 Prazo estimado: não disponível';
       details.appendChild(info);
+      const guidance = String(task.observacoes || '').trim();
+      if (guidance) {
+        const note = document.createElement('div');
+        note.style.cssText = 'font-size:.74rem;margin-top:6px;padding:7px 9px;border:1px solid var(--border);border-radius:7px;background:var(--bg-secondary);color:var(--text2);line-height:1.4;';
+        note.textContent = `📝 Orientação: ${guidance}`;
+        details.appendChild(note);
+      }
     });
     return result;
   };
@@ -109,7 +116,7 @@
       const workflowAlerts = tasks.map(task => {
         const deadline = deadlineFor(task);
         const overdue = deadline && deadline.getTime() < Date.now();
-        const instruction = String(task.descricao || task.observacoes || 'Abra a etapa para visualizar as orientações.').trim();
+        const instruction = String(task.observacoes || task.descricao || 'Abra a etapa para visualizar as orientações.').trim();
         return {
           id:`workflow_${task.obra_id}_${task.etapa_id}`,
           nivel:overdue ? 'urgente' : 'info',
