@@ -30,6 +30,7 @@ function clean(value, max = 1000) {
 
 function redactSensitive(value, max = 1000) {
   let text = clean(value, max * 2);
+  // Evita persistir credenciais acidentalmente presentes em mensagens/stack/URLs.
   text = text
     .replace(/Bearer\s+[A-Za-z0-9._~-]+/gi, 'Bearer [REDACTED]')
     .replace(/(re_)[A-Za-z0-9_-]{12,}/gi, '$1[REDACTED]')
@@ -45,6 +46,9 @@ export default async function handler(req, res) {
 
   const action = String(req.query?.action || req.body?.action || '').trim().toLowerCase();
 
+  // Telemetria de Erros do Cliente (PATCH 46):
+  // Aceita tanto usuários logados quanto anônimos (ex: landing, login, onboarding),
+  // com rate-limit e sanitização rigorosa de credenciais e dados pessoais.
   if (req.method === 'POST' && action === 'client_error') {
     let auth = { authenticated: false };
     try {
@@ -60,6 +64,7 @@ export default async function handler(req, res) {
     const message = redactSensitive(b.message, 1500);
     if (!message) return res.status(400).json({ success: false, error: 'Mensagem do erro não informada.' });
 
+    // Sanitiza e estrutura breadcrumbs
     let breadcrumbs = [];
     if (Array.isArray(b.breadcrumbs)) {
       breadcrumbs = b.breadcrumbs.slice(-10).map(item => ({
