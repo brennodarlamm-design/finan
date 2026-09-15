@@ -2,6 +2,19 @@
 (() => {
   if (typeof Patch51 === 'undefined') return;
 
+  // /api/users limita a listagem para usuários sem gestão de contas. O workflow,
+  // porém, precisa da lista mínima de responsáveis ativos do tenant para atribuição.
+  Patch51.loadUsers = async function() {
+    try {
+      const data = await this.api('users');
+      this._users = Array.isArray(data.users) ? data.users : [];
+    } catch (err) {
+      console.warn('[Patch51] Responsáveis indisponíveis:', err?.message || err);
+      this._users = this._users || [];
+    }
+    return this._users;
+  };
+
   // Responsável técnico: interno = seleção obrigatória de usuário ativo;
   // externo = nome + CREA/CAU obrigatórios. O backend repete as validações.
   const originalEnhanceObraForm = Patch51.enhanceObraForm.bind(Patch51);
