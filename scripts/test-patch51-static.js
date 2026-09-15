@@ -55,6 +55,7 @@ assert(patch.includes("[data-route=\"documentacao\"]") && patch.includes("[data-
 assert(patch.includes("data-tab=\"slas\"") && patch.includes("data-tab=\"orcado-realizado\""), 'Patch reposiciona SLA antes de Orçado x Realizado na Central');
 assert(patch.includes('Soma dos SLAs'), 'Central possui componente de soma total dos dias de SLA');
 assert(followup.includes("document.getElementById('od-tab-content')"), 'Soma dos SLAs usa o container real da Central de Obras');
+assert(followup.includes('syncWorkflowSla') && followup.includes("Patch51.api('stage_update'") && followup.includes('applyForecastLocal'), 'Ajustes de SLA da obra sincronizam workflow e previsão automática');
 assert(followup.includes('WORKFLOW_FIRST_STAGE_UNASSIGNED') && followup.includes('Configurações > SLAs'), 'Criação de obra avisa quando falta responsável na primeira etapa');
 assert(followup.includes('Prazo estimado') && followup.includes('p51-task-complete'), 'Fila Minhas Etapas exibe prazo estimado e vencimento');
 assert(followup.includes('📝 Orientação:') && followup.includes('task.observacoes'), 'Fila Minhas Etapas mostra a orientação específica deixada pelo gestor');
