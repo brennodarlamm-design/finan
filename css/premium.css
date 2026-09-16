@@ -1,5 +1,6 @@
 /* FinObra — identidade compartilhada, hierarquia e layout responsivo. */
-:root {
+/* AUDIT FIX 1.1: Tokens scoped to app contexts only — não contamina landing/marketing */
+.ui-workspace, .ui-portal, .ui-auth, .ui-public {
   --bg-base:#0d1519; --bg-primary:#101b20; --bg-secondary:#172329;
   --bg-card:#19262c; --bg-card-hover:#1e2e35; --bg-input:#101d23;
   --border:#304047; --border-s:#283a41; --border-d:#3b5058; --border-str:#547078;

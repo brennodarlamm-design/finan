@@ -237,7 +237,10 @@ const Utils = {
     t.append(icon, text);
 
     c.appendChild(t);
-    setTimeout(()=>{ t.style.opacity='0';t.style.transform='translateX(60px)';t.style.transition='all .25s'; setTimeout(()=>t.remove(),250); }, 3200);
+    setTimeout(() => {
+      t.classList.add('exiting');
+      setTimeout(() => t.remove(), 200);
+    }, 3200);
   },
 
   showModal(html) {

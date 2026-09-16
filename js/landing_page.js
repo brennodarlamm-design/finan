@@ -10,6 +10,31 @@ const io = new IntersectionObserver(entries => {
 }, { threshold: 0.12 });
 revealEls.forEach(el => io.observe(el));
 
+// Audit Fix 2.5: Scroll Reveal para seções e cards da landing
+(function initScrollReveal() {
+  const targets = document.querySelectorAll(
+    '.section, .module-card, .plan, .cta-card, .faq details, .support-main, .support-side, .compare-shell'
+  );
+  if (!targets.length) return;
+  targets.forEach(el => el.classList.add('reveal-on-scroll'));
+
+  if (!('IntersectionObserver' in window)) {
+    targets.forEach(el => el.classList.add('revealed'));
+    return;
+  }
+
+  const scrollIo = new IntersectionObserver(entries => {
+    entries.forEach(e => {
+      if (e.isIntersecting) {
+        e.target.classList.add('revealed');
+        scrollIo.unobserve(e.target);
+      }
+    });
+  }, { threshold: 0.08, rootMargin: '0px 0px -40px 0px' });
+
+  targets.forEach(el => scrollIo.observe(el));
+})();
+
 // Patch 38: mantém a home canônica em / e evita salto desnecessário via /landing.
 const brandHomeLink = document.querySelector('a.brand[href="/landing"]');
 if (brandHomeLink) brandHomeLink.setAttribute('href', '/');
