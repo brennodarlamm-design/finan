@@ -4,63 +4,28 @@
 const AgendaEventos = {
   _tabAtiva: 'proximos',
 
-  _eventosPadrao: [
-    {
-      id: 'evt_1',
-      titulo: 'Live Dev: Automação de Workflow em Cascata & Alertas WhatsApp',
-      tipo: 'live', // live | workshop | update
-      data: '2026-09-22',
-      hora: '19:30',
-      duracao: '60 min',
-      instrutor: 'Eng. Dev FinObra & Especialista em Processos',
-      link: 'https://meet.google.com/finobra-live-workflow',
-      gravado: false,
-      descricao: 'Demonstração prática da configuração de cargos, SLAs dinâmicos e disparo automático de notificações por WhatsApp na conclusão de etapas.'
-    },
-    {
-      id: 'evt_2',
-      titulo: 'Workshop Prático: Orçamentos com Base Oficial SINAPI da Caixa & BDI',
-      tipo: 'workshop',
-      data: '2026-09-29',
-      hora: '19:00',
-      duracao: '90 min',
-      instrutor: 'Equipe de Engenharia de Custos',
-      link: 'https://youtube.com/live/finobra-sinapi-masterclass',
-      gravado: false,
-      descricao: 'Como estruturar orçamentos analíticos e sintéticos sem desoneração, aplicando BDI diferenciado de materiais e serviços para aprovação bancária.'
-    },
-    {
-      id: 'evt_3',
-      titulo: 'Aulão Gravado: Conciliação Bancária OFX & Fechamento Financeiro',
-      tipo: 'workshop',
-      data: '2026-09-10',
-      hora: '18:00',
-      duracao: '45 min',
-      instrutor: 'Dev Core FinObra',
-      link: 'https://youtube.com/watch?v=finobra-ofx-fechamento',
-      gravado: true,
-      descricao: 'Passo a passo da importação de extratos OFX multi-banco, resolução de divergências e alocação automática por centro de custo de obra.'
-    },
-    {
-      id: 'evt_4',
-      titulo: 'Plantão Dev: Tira-Dúvidas de Implantação e Novidades v2.38',
-      tipo: 'update',
-      data: '2026-10-06',
-      hora: '17:00',
-      duracao: '60 min',
-      instrutor: 'Time de Produto FinObra',
-      link: 'https://meet.google.com/finobra-plantao-duvidas',
-      gravado: false,
-      descricao: 'Espaço aberto para dúvidas sobre novas features, segurança CSP, double-bezel e integração com API de clientes.'
-    }
-  ],
+  _eventosPadrao: [],
+
+  isDevUser() {
+    try {
+      const u = (typeof Auth !== 'undefined' && Auth.getUser && Auth.getUser()) || {};
+      if (u.perfil === 'superadmin') return true;
+      if (typeof window !== 'undefined' && window.location && (window.location.pathname.includes('/master') || window.location.pathname.includes('master.html'))) return true;
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('finobra_dev_mode') === 'true') return true;
+    } catch {}
+    return false;
+  },
 
   getEventos() {
     try {
       const raw = localStorage.getItem('finobra_agenda_eventos');
       if (raw) {
-        const parsed = JSON.parse(raw);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        let parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) {
+          // Purga mocks estáticos legados
+          parsed = parsed.filter(e => !/^evt_[1-4]$/.test(String(e.id || '')));
+          return parsed;
+        }
       }
     } catch {}
     return this._eventosPadrao;
@@ -92,6 +57,8 @@ const AgendaEventos = {
   },
 
   abrirModal(tab = 'proximos') {
+    const isDev = this.isDevUser();
+    if (tab === 'novo' && !isDev) tab = 'proximos';
     this._tabAtiva = tab;
     const bodyHtml = this._renderConteudoTab(tab);
 
@@ -118,10 +85,12 @@ const AgendaEventos = {
               data-fb-click="AgendaEventos.setTab" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="gravados">
               🎥 Aulas Gravadas
             </button>
-            <button type="button" class="agenda-tab-btn ${this._tabAtiva === 'novo' ? 'active' : ''}"
-              data-fb-click="AgendaEventos.setTab" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="novo">
-              ➕ Agendar Evento
-            </button>
+            ${isDev ? `
+              <button type="button" class="agenda-tab-btn ${this._tabAtiva === 'novo' ? 'active' : ''}"
+                data-fb-click="AgendaEventos.setTab" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="novo">
+                ➕ Agendar Evento
+              </button>
+            ` : ''}
           </div>
 
           <div id="agenda-tab-content">
@@ -137,6 +106,7 @@ const AgendaEventos = {
   },
 
   setTab(tab) {
+    if (tab === 'novo' && !this.isDevUser()) tab = 'proximos';
     this._tabAtiva = tab;
     const content = document.getElementById('agenda-tab-content');
     if (content) {
@@ -249,12 +219,20 @@ const AgendaEventos = {
             <span class="agenda-tag ${tagClass}">${tagLabel}</span>
             <span class="tabular-nums" style="font-size:.75rem;color:var(--accent);font-weight:700;">📅 ${dataFmt} às ${esc(e.hora)} (${esc(e.duracao)})</span>
           </div>
-          ${!isGravado ? `
-            <button type="button" class="btn btn-secondary btn-sm" style="font-size:.7rem;padding:3px 8px;" title="Adicionar ao Google Calendar"
-              data-fb-click="AgendaEventos.adicionarAoGoogleCalendar" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(e.id)}">
-              📆 Google Agenda
-            </button>
-          ` : ''}
+          <div style="display:flex;align-items:center;gap:6px;">
+            ${!isGravado ? `
+              <button type="button" class="btn btn-secondary btn-sm" style="font-size:.7rem;padding:3px 8px;" title="Adicionar ao Google Calendar"
+                data-fb-click="AgendaEventos.adicionarAoGoogleCalendar" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(e.id)}">
+                📆 Google Agenda
+              </button>
+            ` : ''}
+            ${this.isDevUser() ? `
+              <button type="button" class="btn btn-secondary btn-sm" style="font-size:.7rem;padding:3px 8px;color:#fca5a5;border-color:rgba(239,68,68,.3);" title="Excluir Evento (Dev)"
+                data-fb-click="AgendaEventos.excluirEvento" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(e.id)}">
+                🗑️ Excluir
+              </button>
+            ` : ''}
+          </div>
         </div>
         <h4 style="font-size:.92rem;font-weight:800;color:var(--text);margin:0 0 6px;">${esc(e.titulo)}</h4>
         <p style="font-size:.78rem;color:var(--text2);margin:0 0 12px;line-height:1.4;">${esc(e.descricao)}</p>
@@ -268,6 +246,19 @@ const AgendaEventos = {
           </a>
         </div>
       </div>`;
+  },
+
+  excluirEvento(encodedId) {
+    if (!this.isDevUser()) return;
+    const id = decodeURIComponent(encodedId || '');
+    if (!id) return;
+    if (typeof confirm === 'function' && !confirm('Deseja realmente remover esta programação da agenda?')) return;
+    const lista = this.getEventos().filter(e => e.id !== id);
+    this.saveEventos(lista);
+    if (typeof Utils !== 'undefined' && Utils.toast) {
+      Utils.toast('Programação removida com sucesso.', 'info');
+    }
+    this.setTab(this._tabAtiva);
   },
 
   salvarNovoEventoSubmit(ev) {
