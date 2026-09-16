@@ -10,8 +10,13 @@ const MinhasDemandas = {
 
   setModoVisualizacao(modo) {
     this._modo = modo;
-    if (typeof App !== 'undefined' && App.route === 'minhas_demandas') {
-      App.navigate('minhas_demandas');
+    const container = document.getElementById('route-content');
+    if (container) {
+      container.innerHTML = this.render();
+      return;
+    }
+    if (typeof App !== 'undefined' && typeof App.navigate === 'function') {
+      App.navigate('minhas-demandas', false);
     }
   },
 
@@ -140,7 +145,16 @@ const MinhasDemandas = {
         { titulo: '⏳ Aguardando', cor: 'var(--text3)', items: grupos.aguardando },
       ];
 
+      const emptyBanner = !demandas.length ? `
+        <div style="background:var(--bg-secondary);border:1px dashed var(--border);border-radius:var(--r-md);padding:14px 18px;margin-bottom:18px;display:flex;align-items:center;gap:12px;">
+          <span style="font-size:1.5rem;">💡</span>
+          <div style="font-size:.82rem;color:var(--text2);line-height:1.4;">
+            <strong>Modo Kanban ativo:</strong> Nenhuma etapa operacional está atribuída a você no momento. Configure os cargos em <strong>Configurações → Workflow → Cargos</strong> e atribua você a um cargo para que os cards apareçam nas colunas abaixo.
+          </div>
+        </div>` : '';
+
       return `
+        ${emptyBanner}
         <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(250px, 1fr));gap:14px;align-items:start;">
           ${colunas.map(col => `
             <div style="background:var(--bg-card);border:1px solid var(--border);border-top:3px solid ${col.cor};border-radius:var(--r-md);padding:12px;">
@@ -148,8 +162,8 @@ const MinhasDemandas = {
                 <h4 style="font-size:.85rem;font-weight:800;color:var(--text);margin:0;">${col.titulo}</h4>
                 <span style="font-size:.72rem;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:2px 8px;font-weight:700;color:var(--text3);">${col.items.length}</span>
               </div>
-              <div>
-                ${col.items.length ? col.items.map(renderKanbanCard).join('') : '<div style="font-size:.75rem;color:var(--text3);text-align:center;padding:20px 0;">Nenhuma etapa</div>'}
+              <div style="min-height:80px;">
+                ${col.items.length ? col.items.map(renderKanbanCard).join('') : '<div style="font-size:.75rem;color:var(--text3);text-align:center;padding:22px 8px;border:1px dashed var(--border-s);border-radius:var(--r-sm);margin-top:4px;">Nenhuma etapa nesta coluna</div>'}
               </div>
             </div>
           `).join('')}
@@ -191,12 +205,12 @@ const MinhasDemandas = {
         ${kpiCard('⏳', 'Aguardando', grupos.aguardando.length, 'var(--text3)')}
       </div>
 
-      ${!demandas.length ? `
+      ${modo === 'kanban' ? renderKanban() : (!demandas.length ? `
         <div class="empty-state">
           <div style="font-size:3rem;margin-bottom:12px;">✅</div>
           <h3>Nenhuma etapa atribuída a você</h3>
           <p>Configure os cargos em <strong>Configurações → Workflow → Cargos</strong> e atribua você a um cargo para ver suas demandas aqui.</p>
-        </div>` : (modo === 'kanban' ? renderKanban() : `
+        </div>` : `
         ${renderGrupo('Vencidas', '🔴', grupos.atrasadas)}
         ${renderGrupo('Próximas do Vencimento (≤ 5 dias)', '🟡', grupos.proximas)}
         ${renderGrupo('Em Andamento', '🔄', grupos.andamento)}
