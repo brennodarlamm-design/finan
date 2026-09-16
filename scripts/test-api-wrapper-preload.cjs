@@ -33,5 +33,13 @@ fs.readFileSync = function patchedReadFileSync(file, options) {
     const helper = originalReadFileSync(path.join(root, 'api', '_audit-route.js'), 'utf8');
     return `${base}\n/* COMPOSED INTERNAL AUDIT HANDLER FOR STATIC TESTS */\n${helper}`;
   }
+  const dbPath = norm(path.join(root, 'api', 'db.js'));
+  if (resolved === dbPath) {
+    const normMod = originalReadFileSync(path.join(root, 'api', '_db-normalizers.js'), 'utf8');
+    const qMod = originalReadFileSync(path.join(root, 'api', '_db-queries.js'), 'utf8');
+    const mMod = originalReadFileSync(path.join(root, 'api', '_db-mutations.js'), 'utf8');
+    const sMod = originalReadFileSync(path.join(root, 'api', '_db-sync.js'), 'utf8');
+    return `${base}\n/* COMPOSED DB IMPLEMENTATION FOR LEGACY STATIC TESTS */\n${normMod}\n${qMod}\n${mMod}\n${sMod}`;
+  }
   return base;
 };

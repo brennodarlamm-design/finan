@@ -72,17 +72,19 @@ const tests = [
   'scripts/test-segmentation-agenda.js',
   'scripts/test-sync-optimization.js',
   'scripts/test-storage-reliability.js',
-  'scripts/test-trigger-integration.js'
+  'scripts/test-trigger-integration.js',
+  'scripts/test-backend-architecture.js'
 ].filter(fs.existsSync);
 
 // Até o P49, as suítes foram escritas quando api/admin.js e api/audit.js eram arquivos
 // monolíticos. No P50 eles viraram wrappers finos para manter 12 funções na Vercel.
 // O preload faz os testes legados enxergarem wrapper + helper interno real. As suítes
-// P50 leem os arquivos físicos sem composição para validar a nova fronteira de segurança.
+// P50 e arquitetura backend leem os arquivos físicos sem composição para validar a nova fronteira de segurança.
 const p50NativeSourceTests = new Set([
   'scripts/test-patch50-security.js',
   'scripts/test-p50-dev-key-vault.js',
-  'scripts/test-p50-admin-secret-boundaries.js'
+  'scripts/test-p50-admin-secret-boundaries.js',
+  'scripts/test-backend-architecture.js'
 ]);
 const preload = path.resolve('scripts/test-api-wrapper-preload.cjs');
 

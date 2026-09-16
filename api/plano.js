@@ -5,6 +5,7 @@ import { resolveAuthAndTenant } from './_auth.js';
 import { getPlanRule, normalizePlan, getPlanCyclePrice, PLAN_BILLING_CYCLES, PLAN_CYCLE_PRICING } from './_plans.js';
 import { canManageTenant, canAccessModule, permissionError } from './_permissions.js';
 import { writeAudit } from './_audit.js';
+import { setEdgeCacheHeaders } from './_http.js';
 import webhookPixHandler from './_webhook_pix.js';
 
 function getSql() {
@@ -91,6 +92,16 @@ export default async function handler(req, res) {
 
   if (isWebhookPix) {
     return webhookPixHandler(req, res);
+  }
+
+  // ── CATÁLOGO PÚBLICO DE PREÇOS COM EDGE CACHING ──────────────────────────
+  if (req.method === 'GET' && req.query?.action === 'pricing') {
+    setEdgeCacheHeaders(res, { sMaxAge: 3600, staleWhileRevalidate: 86400, isPublic: true });
+    return res.status(200).json({
+      success: true,
+      billingCycles: PLAN_BILLING_CYCLES,
+      pricing: PLAN_CYCLE_PRICING
+    });
   }
 
   const auth = await resolveAuthAndTenant(req);
