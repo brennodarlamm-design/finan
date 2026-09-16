@@ -4,8 +4,13 @@ const FinObraAssets = (() => {
     excel: { src:'https://cdn.sheetjs.com/xlsx-0.20.0/package/dist/xlsx.full.min.js', ready:() => typeof XLSX !== 'undefined' },
     zip: { src:'https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js', ready:() => typeof JSZip !== 'undefined' },
     pdf: { src:'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js', ready:() => !!window.jspdf?.jsPDF },
+    charts: { src:'/js/vendor/chart.umd.min.js?v=4.4.0', ready:() => typeof Chart !== 'undefined' },
+    ofx: { src:'/js/ofx.js', ready:() => typeof OFX !== 'undefined' },
+    budgetBanks: { src:'/js/orcamento_bancos.js', ready:() => typeof OrcamentoBancos !== 'undefined' },
+    budgetTemplates: { src:'/js/orcamento_templates.js', ready:() => typeof OrcamentoTemplates !== 'undefined' },
+    budgetProposal: { src:'/js/orcamento_proposta.js', ready:() => typeof OrcamentoProposta !== 'undefined' },
     sinapiData: { src:'/js/sinapi.js', ready:() => typeof SINAPI !== 'undefined' },
-    sinapi: { src:'/js/orcamento_sinapi.js', dependencies:['sinapiData'], ready:() => typeof OrcamentoSINAPI !== 'undefined' },
+    sinapi: { src:'/js/orcamento_sinapi.js', dependencies:['sinapiData','budgetBanks','budgetTemplates','budgetProposal'], ready:() => typeof OrcamentoSINAPI !== 'undefined' },
     reports: { src:'/js/exportar_templates.js', dependencies:['sinapi'], ready:() => typeof ExportarTemplates !== 'undefined' }
   });
   const pending = new Map();

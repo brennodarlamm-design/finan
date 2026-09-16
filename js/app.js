@@ -69,8 +69,8 @@ const App = {
     'notas': Notas,
     'consulta-nfe': typeof NFe !== 'undefined' ? NFe : null,
     'nfe': typeof NFe !== 'undefined' ? NFe : null,
-    'conciliacao-ofx': typeof OFX !== 'undefined' ? OFX : null,
-    'ofx': typeof OFX !== 'undefined' ? OFX : null,
+    get 'conciliacao-ofx'() { return typeof OFX !== 'undefined' ? OFX : {}; },
+    get 'ofx'() { return typeof OFX !== 'undefined' ? OFX : {}; },
     'orcamentos': Orcamentos,
     'medicoes': Medicoes,
     'documentacao': FasesDoc,
@@ -169,6 +169,7 @@ const App = {
   },
 
   async init() {
+    window.FinObraStartup?.mark('app-init');
     const rawPath = window.location.pathname || '';
     const rawHash = window.location.hash || '';
     const rawSearch = window.location.search || '';
@@ -177,6 +178,7 @@ const App = {
     if (rawPath.startsWith('/validar') || rawHash.startsWith('#validar') || rawSearch.includes('val=') || rawHash.includes('val=')) {
       if (typeof Assinador !== 'undefined' && typeof Assinador.renderTelaValidacaoPublica === 'function') {
         Assinador.renderTelaValidacaoPublica();
+        window.FinObraStartup?.ready();
         return;
       }
     }
@@ -187,6 +189,7 @@ const App = {
     if (isPortalUrl) {
       if (typeof PortalCliente !== 'undefined' && typeof PortalCliente.renderTelaPublica === 'function') {
         PortalCliente.renderTelaPublica(searchParams);
+        window.FinObraStartup?.ready();
         return;
       }
     }
@@ -198,9 +201,20 @@ const App = {
     if (typeof Auth.refreshSessionFromServer === 'function' && navigator.onLine !== false) {
       const firstCheck = await Auth.refreshSessionFromServer();
       if (firstCheck?.expired) return;
-    }
-    if (typeof Auth.refreshPlanAccess === 'function' && navigator.onLine !== false) {
-      try { await Auth.refreshPlanAccess(); } catch (e) { console.warn('[Plano] Interface usando acesso em cache até nova consulta:', e?.message || e); }
+      if (!firstCheck?.success) {
+        window.FinObraStartup?.fail('Não foi possível validar sua sessão. Verifique sua conexão e tente novamente.');
+        return;
+      }
+      // Compatibilidade durante rollout: APIs antigas ainda não devolvem o plano em /me.
+      if (!firstCheck.plan && typeof Auth.refreshPlanAccess === 'function') {
+        try { await Auth.refreshPlanAccess(); }
+        catch {
+          window.FinObraStartup?.fail('Não foi possível verificar os acessos da empresa. Tente novamente.');
+          return;
+        }
+      }
+      window.FinObraStartup?.mark('session-end');
+      window.FinObraStartup?.measure('session-access', 'session-start', 'session-end');
     }
 
     this._installErrorMonitor();
@@ -216,6 +230,7 @@ const App = {
     // Isso reduz o tempo de tela bloqueada sem abrir mão da atualização dos dados.
     DB.init();
     this.renderShell();
+    window.FinObraStartup?.ready();
     this._bindSyncStatus();
 
     // Histórico e navegação limpa (popstate + hashchange)
@@ -230,7 +245,10 @@ const App = {
     });
 
     const initialRoute = this._getRouteFromUrl();
-    this.navigate(initialRoute, true);
+    this.navigate(initialRoute, true).then(() => {
+      window.FinObraStartup?.mark('initial-route');
+      window.FinObraStartup?.measure('navigation-to-route', null, 'initial-route');
+    });
 
     // Atualiza em segundo plano. Reconcilia alterações offline antes de sincronizar da nuvem (C-07).
     Promise.resolve(DB.bootstrapCoreCloud ? DB.bootstrapCoreCloud() : true)
@@ -865,7 +883,7 @@ const App = {
     const el = document.getElementById('route-content');
     if (el) {
       try {
-        const resource = { orcamentos:'sinapi', relatorios:'reports' }[targetRoute];
+        const resource = { dashboard:'charts', 'obra-detalhe':'charts', 'conciliacao-ofx':'ofx', orcamentos:'sinapi', relatorios:'reports' }[targetRoute];
         if (resource && !FinObraAssets.ready(resource)) {
           el.innerHTML = '<div role="status" style="padding:40px;text-align:center;color:var(--text3)">Carregando módulo…</div>';
           await FinObraAssets.load(resource);
@@ -1338,4 +1356,7 @@ const App = {
   }
 };
 
-window.addEventListener('DOMContentLoaded', () => App.init());
+window.addEventListener('DOMContentLoaded', () => App.init().catch(error => {
+  console.error('[App] Falha na inicialização:', error);
+  window.FinObraStartup?.fail();
+}));

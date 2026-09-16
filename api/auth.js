@@ -6,6 +6,7 @@ import { OAuth2Client } from 'google-auth-library';
 import { hashPassword, verifyPassword, signToken, verifyToken, resolveAuthAndTenant, getSessionSigningSecret, getInternalApiSecret } from './_auth.js';
 import { checkRateLimit, getClientIp } from './_ratelimit.js';
 import { writeAudit } from './_audit.js';
+import { getPlanRule } from './_plans.js';
 import {
   resolveTenantByAccessKey,
   resolveTenantUserByLogin,
@@ -285,7 +286,12 @@ export default async function handler(req, res) {
           mfa_enabled: Boolean(u.mfa_enabled),
           mfa_verified: Boolean(auth.user?.mfa_verified)
         },
-        tenant: tenantData
+        tenant: tenantData,
+        // Abertura usa somente regras de acesso; contagens e cobrança ficam em /api/plano.
+        plan: {
+          ...getPlanRule(tenantData.plano),
+          status: tenantData.status || 'trial'
+        }
       });
     }
 

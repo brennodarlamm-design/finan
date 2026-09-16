@@ -89,7 +89,7 @@ if (window.location.hash.startsWith('#validar') || window.location.search.includ
       const result = await Auth.login(u, p, r, { access_key: ak });
       if (result.success) {
         btn.innerHTML = '✓ Bem-vindo! Redirecionando...';
-        setTimeout(() => window.location.replace('/app'), 350);
+        window.location.replace('/app');
       } else {
         const e2 = document.getElementById('err-box');
         e2.textContent = result.message || 'Usuário ou senha incorretos.';

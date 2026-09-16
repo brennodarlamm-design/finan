@@ -34,9 +34,12 @@ scripts.at(-1).onload();
 await retry;
 const reports = assets.load('reports');
 await tick();
-assert.equal(scripts.at(-1).src, '/js/sinapi.js');
-vm.runInContext('const SINAPI = {};', context);
-scripts.at(-1).onload();
+for (const [file, name] of [['sinapi.js','SINAPI'], ['orcamento_bancos.js','OrcamentoBancos'], ['orcamento_templates.js','OrcamentoTemplates'], ['orcamento_proposta.js','OrcamentoProposta']]) {
+  const script = scripts.find(item => item.src === `/js/${file}`);
+  assert.ok(script, `${file} é dependência do orçamento`);
+  vm.runInContext(`const ${name} = {};`, context);
+  script.onload();
+}
 await tick();
 assert.equal(scripts.at(-1).src, '/js/orcamento_sinapi.js');
 vm.runInContext('const OrcamentoSINAPI = {};', context);
@@ -56,16 +59,19 @@ vm.runInContext(fs.readFileSync('js/patch26-events.js', 'utf8'), bridge);
 vm.runInContext('const OrcamentoSINAPI = { showForm() { globalThis.clicked = true; } };', bridge);
 listeners.click({ target:{ closest:() => ({ getAttribute:name => name === 'data-fb-click' ? 'OrcamentoSINAPI.showForm' : '0' }) } });
 assert.equal(bridge.clicked, true);
+vm.runInContext('const OFX = { demoOFX() { globalThis.ofxClicked = true; } };', bridge);
+listeners.click({ target:{ closest:() => ({ getAttribute:name => name === 'data-fb-click' ? 'OFX.demoOFX' : '0' }) } });
+assert.equal(bridge.ofxClicked, true, 'Ações OFX continuam disponíveis depois do carregamento tardio');
 
 let finish;
 const content = { innerHTML:'' };
 const history = [];
 const appContext = vm.createContext({
   console, Auth:{ canRoute:() => true }, Utils:{ escapeHtml:value => String(value) },
-  FinObraAssets:{ ready:() => false, load:() => new Promise(resolve => { finish = resolve; }) },
+  FinObraAssets:{ ready:name => name === 'charts', load:() => new Promise(resolve => { finish = resolve; }) },
   window:{ location:{ pathname:'/app/dashboard', hash:'' }, addEventListener() {} },
   history:{ pushState:(_state, _title, path) => history.push(path) },
-  document:{ querySelectorAll:() => [], getElementById:id => id === 'route-content' ? content : null }
+  document:{ querySelectorAll:() => [], querySelector:() => null, getElementById:id => id === 'route-content' ? content : null }
 });
 for (const name of ['Dashboard','Clientes','Lancamentos','Escritorio','PreCompras','Recibos','Contratos','Notas','NFe','OFX','Orcamentos','Medicoes','FasesDoc','Exportar','Contas','Configuracoes','Fornecedores','Produtos']) {
   appContext[name] = { render:() => name };

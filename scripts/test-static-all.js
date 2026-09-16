@@ -3,6 +3,7 @@ import fs from 'fs';
 import path from 'path';
 
 const tests = [
+  'scripts/test-startup-behavior.js',
   'scripts/test-assets-behavior.js',
   'scripts/test-audit-regressions.js',
   'scripts/test-sinapi-official.js',

@@ -32,7 +32,7 @@
     "Notas": (typeof Notas !== 'undefined' ? Notas : globalThis["Notas"]),
     "Notificacoes": (typeof Notificacoes !== 'undefined' ? Notificacoes : globalThis["Notificacoes"]),
     "OCR": (typeof OCR !== 'undefined' ? OCR : globalThis["OCR"]),
-    "OFX": (typeof OFX !== 'undefined' ? OFX : globalThis["OFX"]),
+    get OFX() { return (typeof OFX !== 'undefined' ? OFX : globalThis["OFX"]); },
     get OrcamentoBancos() { return (typeof OrcamentoBancos !== 'undefined' ? OrcamentoBancos : globalThis["OrcamentoBancos"]); },
     get OrcamentoTemplates() { return (typeof OrcamentoTemplates !== 'undefined' ? OrcamentoTemplates : globalThis["OrcamentoTemplates"]); },
     get OrcamentoProposta() { return (typeof OrcamentoProposta !== 'undefined' ? OrcamentoProposta : globalThis["OrcamentoProposta"]); },
