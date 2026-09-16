@@ -485,11 +485,81 @@ const CronogramaSLA = {
     </div>`;
   },
 
-  // ── RENDERIZAÇÃO DA LINHA DO TEMPO COMPLETA COM CASCATA ──
+  _modoVisualizacao: {},
+
+  getModoVisualizacao(obraId) {
+    if (!obraId) return 'linha_tempo';
+    return (this._modoVisualizacao && this._modoVisualizacao[obraId]) || 'linha_tempo';
+  },
+
+  setModoVisualizacao(obraId, modo) {
+    if (!obraId) return;
+    this._modoVisualizacao = this._modoVisualizacao || {};
+    this._modoVisualizacao[obraId] = modo;
+
+    const container = document.getElementById('sla-visualizacao-container');
+    if (container) {
+      const processos = this.getObraProcessos(obraId);
+      if (modo === 'kanban') {
+        container.innerHTML = this._renderKanban(obraId, processos);
+      } else if (modo === 'gantt') {
+        container.innerHTML = this._renderGantt(obraId, processos);
+      } else {
+        container.innerHTML = this._renderTimelineList(obraId, processos);
+      }
+      document.querySelectorAll('.sla-modo-btn').forEach(btn => {
+        const isAct = btn.dataset.modo === modo;
+        btn.style.background = isAct ? 'var(--accent)' : 'var(--bg-secondary)';
+        btn.style.color = isAct ? '#000' : 'var(--text2)';
+        btn.style.fontWeight = isAct ? '800' : '600';
+      });
+    } else if (typeof ObraDetalhe !== 'undefined' && ObraDetalhe.activeTab === 'slas') {
+      ObraDetalhe.setTab('slas');
+    }
+  },
+
+  iniciarEtapaRapido(obraId, processoId) {
+    const processos = this.getObraProcessos(obraId);
+    const p = processos.find(item => item.id === processoId);
+    if (!p) return;
+    const hoje = Utils.today();
+    const prevStatus = p.status;
+    p.status = 'em_andamento';
+    if (!p.data_inicio_real) p.data_inicio_real = hoje;
+
+    if (!Array.isArray(p.historico)) p.historico = [];
+    const userName = (typeof Auth !== 'undefined' && Auth.getUser && Auth.getUser()?.nome) || 'Usuário';
+    p.historico.push({
+      data: new Date().toISOString(),
+      autor: userName,
+      de_status: prevStatus,
+      para_status: 'em_andamento',
+      texto: 'Etapa iniciada via ação rápida.'
+    });
+
+    // Atualiza status da obra se estava em planejamento/pendente
+    const obra = DB.getById('clientes', obraId);
+    if (obra && ['pendente', 'planejamento', 'orcamento'].includes(obra.status)) {
+      DB.update('clientes', obraId, { status: 'em_andamento' });
+    }
+
+    if (!this.salvarProcessosObra(obraId, processos)) {
+      return Utils.toast('Erro ao iniciar etapa.', 'error');
+    }
+    Utils.toast('Etapa iniciada com sucesso!', 'success');
+    if (typeof ObraDetalhe !== 'undefined' && ObraDetalhe.activeTab === 'slas') {
+      ObraDetalhe.setTab('slas');
+    } else if (typeof App !== 'undefined' && App.route === 'obras') {
+      App.navigate('obras');
+    }
+  },
+
+  // ── RENDERIZAÇÃO DA LINHA DO TEMPO COMPLETA COM CASCATA (Patch 53: Modos + WhatsApp) ──
   renderLinhaTempo(obraId, { somenteLeitura = false } = {}) {
     const obra = DB.getById('clientes', obraId) || {};
     const processos = this.getObraProcessos(obraId);
     const resumo = this.getResumoObra(obraId);
+    const modo = this.getModoVisualizacao(obraId);
     const e = Utils.escapeHtml.bind(Utils);
 
     const corStatus = resumo.statusGeral === 'atrasado'
@@ -497,6 +567,15 @@ const CronogramaSLA = {
       : resumo.statusGeral === 'atencao'
         ? '#f59e0b'
         : 'var(--success)';
+
+    let contentHtml = '';
+    if (modo === 'kanban') {
+      contentHtml = this._renderKanban(obraId, processos, { somenteLeitura });
+    } else if (modo === 'gantt') {
+      contentHtml = this._renderGantt(obraId, processos, { somenteLeitura });
+    } else {
+      contentHtml = this._renderTimelineList(obraId, processos, { somenteLeitura });
+    }
 
     return `
     <div class="sla-timeline-wrapper" style="margin-bottom:24px;">
@@ -516,32 +595,53 @@ const CronogramaSLA = {
               Atrasos em fases de projetos ou licenças recalculam automaticamente a data final de entrega da obra.
             </p>
           </div>
-          ${!somenteLeitura ? `
-            <div style="display:flex;gap:8px;align-items:center;">
-              <button class="btn btn-secondary btn-sm" data-fb-click="CronogramaSLA.abrirModalConfigObra" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(obraId))}">
-                ⚙️ Ajustar Prazos da Obra
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+            <!-- SELETOR DE MODO DE VISUALIZAÇÃO (Patch 53) -->
+            <div style="display:flex;background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--r-md);padding:3px;gap:3px;">
+              <button class="btn btn-sm sla-modo-btn" data-modo="linha_tempo" style="font-size:.75rem;padding:4px 10px;border:none;border-radius:4px;background:${modo === 'linha_tempo' ? 'var(--accent)' : 'transparent'};color:${modo === 'linha_tempo' ? '#000' : 'var(--text2)'};font-weight:${modo === 'linha_tempo' ? '800' : '600'};"
+                data-fb-click="CronogramaSLA.setModoVisualizacao" data-fb-click-n="2" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(obraId))}" data-fb-click-t1="string" data-fb-click-v1="linha_tempo">
+                📋 Linha do Tempo
+              </button>
+              <button class="btn btn-sm sla-modo-btn" data-modo="kanban" style="font-size:.75rem;padding:4px 10px;border:none;border-radius:4px;background:${modo === 'kanban' ? 'var(--accent)' : 'transparent'};color:${modo === 'kanban' ? '#000' : 'var(--text2)'};font-weight:${modo === 'kanban' ? '800' : '600'};"
+                data-fb-click="CronogramaSLA.setModoVisualizacao" data-fb-click-n="2" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(obraId))}" data-fb-click-t1="string" data-fb-click-v1="kanban">
+                📊 Kanban
+              </button>
+              <button class="btn btn-sm sla-modo-btn" data-modo="gantt" style="font-size:.75rem;padding:4px 10px;border:none;border-radius:4px;background:${modo === 'gantt' ? 'var(--accent)' : 'transparent'};color:${modo === 'gantt' ? '#000' : 'var(--text2)'};font-weight:${modo === 'gantt' ? '800' : '600'};"
+                data-fb-click="CronogramaSLA.setModoVisualizacao" data-fb-click-n="2" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(obraId))}" data-fb-click-t1="string" data-fb-click-v1="gantt">
+                📈 Gantt
               </button>
             </div>
-          ` : ''}
+
+            <!-- BOTÃO WHATSAPP RESUMO DA OBRA (Patch 53) -->
+            <button class="btn btn-secondary btn-sm" title="Enviar Resumo de Prazos via WhatsApp" data-fb-click="WhatsApp.enviarResumoWorkflowObra" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(obraId))}">
+              💬 Resumo WhatsApp
+            </button>
+
+            ${!somenteLeitura ? `
+              <button class="btn btn-secondary btn-sm" data-fb-click="CronogramaSLA.abrirModalConfigObra" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(obraId))}">
+                ⚙️ Ajustar Prazos
+              </button>
+            ` : ''}
+          </div>
         </div>
 
-        <!-- 4 CARDS DE INDICADORES -->
-        <div class="g4" style="gap:12px;">
-          <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--r-md);padding:12px;text-align:center;">
-            <div style="font-size:.68rem;font-weight:700;text-transform:uppercase;color:var(--text3)">Início da Obra</div>
-            <div style="font-size:1.05rem;font-weight:900;color:var(--text);margin-top:2px">${Utils.fmt.date(obra.data_inicio) || 'Não definido'}</div>
+        <!-- 4 CARDS DE INDICADORES (Tailwind Specialist & KPI Dashboard Design) -->
+        <div class="kpi-grid-dashboard" style="margin-bottom:14px;">
+          <div class="haptic-card" style="background:var(--bg-card);border:1px solid var(--border-s);border-radius:var(--r-lg);padding:16px 14px;text-align:center;box-shadow:var(--shadow-soft-sm);">
+            <div style="font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:0.04em;color:var(--text3)">Início da Obra</div>
+            <div class="tabular-nums" style="font-size:1.15rem;font-weight:900;color:var(--text);margin-top:4px">${Utils.fmt.date(obra.data_inicio) || 'Não definido'}</div>
           </div>
-          <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--r-md);padding:12px;text-align:center;">
-            <div style="font-size:.68rem;font-weight:700;text-transform:uppercase;color:var(--text3)">Previsão de Entrega</div>
-            <div style="font-size:1.05rem;font-weight:900;color:var(--accent);margin-top:2px">${Utils.fmt.date(resumo.dataEntregaEstimada) || '—'}</div>
+          <div class="haptic-card" style="background:var(--bg-card);border:1px solid var(--border-s);border-radius:var(--r-lg);padding:16px 14px;text-align:center;box-shadow:var(--shadow-soft-sm);">
+            <div style="font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:0.04em;color:var(--text3)">Previsão de Entrega</div>
+            <div class="tabular-nums" style="font-size:1.15rem;font-weight:900;color:var(--accent);margin-top:4px">${Utils.fmt.date(resumo.dataEntregaEstimada) || '—'}</div>
           </div>
-          <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--r-md);padding:12px;text-align:center;">
-            <div style="font-size:.68rem;font-weight:700;text-transform:uppercase;color:var(--text3)">Fases Concluídas</div>
-            <div style="font-size:1.05rem;font-weight:900;color:var(--success);margin-top:2px">${resumo.concluidos} de ${resumo.totalProcessos} (${resumo.pctGeral}%)</div>
+          <div class="haptic-card" style="background:var(--bg-card);border:1px solid var(--border-s);border-radius:var(--r-lg);padding:16px 14px;text-align:center;box-shadow:var(--shadow-soft-sm);">
+            <div style="font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:0.04em;color:var(--text3)">Fases Concluídas</div>
+            <div class="tabular-nums" style="font-size:1.15rem;font-weight:900;color:var(--success);margin-top:4px">${resumo.concluidos} de ${resumo.totalProcessos} (${resumo.pctGeral}%)</div>
           </div>
-          <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--r-md);padding:12px;text-align:center;">
-            <div style="font-size:.68rem;font-weight:700;text-transform:uppercase;color:var(--text3)">Variação de Prazo</div>
-            <div style="font-size:1.05rem;font-weight:900;color:${corStatus};margin-top:2px">
+          <div class="haptic-card" style="background:var(--bg-card);border:1px solid var(--border-s);border-radius:var(--r-lg);padding:16px 14px;text-align:center;box-shadow:var(--shadow-soft-sm);">
+            <div style="font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:0.04em;color:var(--text3)">Variação de Prazo</div>
+            <div class="tabular-nums" style="font-size:1.15rem;font-weight:900;color:${corStatus};margin-top:4px">
               ${resumo.diasAtrasoAcumulado > 0 ? `+${resumo.diasAtrasoAcumulado} dias` : '0 dias (no prazo)'}
             </div>
           </div>
@@ -552,12 +652,21 @@ const CronogramaSLA = {
         </div>
       </div>
 
-      <!-- LISTA DE ETAPAS / FLUXO EM CASCATA -->
+      <!-- CONTAINER DINÂMICO DE VISUALIZAÇÃO -->
+      <div id="sla-visualizacao-container">
+        ${contentHtml}
+      </div>
+    </div>`;
+  },
+
+  // ── MODO 1: LISTA CRONOLÓGICA (Linha do Tempo) ──
+  _renderTimelineList(obraId, processos, { somenteLeitura = false } = {}) {
+    const e = Utils.escapeHtml.bind(Utils);
+    return `
       <div style="display:flex;flex-direction:column;gap:10px;">
         ${processos.map((p, idx) => {
           const isDone = p.status === 'concluido';
           const isInProgress = p.status === 'em_andamento';
-          const isPending = p.status === 'pendente';
 
           const badgeSlaColor = p.status_sla === 'atrasado'
             ? 'var(--danger)'
@@ -571,10 +680,12 @@ const CronogramaSLA = {
               ? '🟡 Em Atenção'
               : '🟢 No Prazo';
 
+          const resp = p.responsavel_resolvido;
+
           return `
           <div style="background:var(--surface);border:1px solid ${isInProgress ? 'var(--accent)' : 'var(--border)'};border-radius:var(--r-md);padding:14px 18px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;transition:border-color .2s;">
             <div style="display:flex;align-items:center;gap:14px;flex:1;min-width:260px;">
-              <div style="font-size:1.6rem;width:40px;height:40px;border-radius:50%;background:var(--bg-secondary);display:flex;align-items:center;justify-content:center;border:1px solid var(--border);">
+              <div style="font-size:1.6rem;width:40px;height:40px;border-radius:50%;background:var(--bg-secondary);display:flex;align-items:center;justify-content:center;border:1px solid var(--border);flex-shrink:0;">
                 ${p.icone || '📋'}
               </div>
               <div style="flex:1;min-width:0;">
@@ -583,6 +694,7 @@ const CronogramaSLA = {
                   <strong style="font-size:.92rem;color:var(--text);">${e(p.nome)}</strong>
                   <span style="font-size:.68rem;background:rgba(201,162,39,.1);color:var(--accent);padding:1px 8px;border-radius:10px;font-weight:700;">⏱️ SLA ${p.dias_sla} dias</span>
                   <span style="font-size:.68rem;color:${badgeSlaColor};font-weight:800;background:${badgeSlaColor}15;padding:1px 8px;border-radius:10px;">${badgeSlaText}</span>
+                  ${resp ? `<span style="font-size:.68rem;color:var(--accent2);font-weight:700;background:rgba(201,162,39,.08);padding:1px 8px;border-radius:10px;">${e(resp.icone || '👤')} ${e(resp.nome)}</span>` : ''}
                 </div>
                 <div style="font-size:.75rem;color:var(--text3);margin-top:4px;display:flex;gap:16px;flex-wrap:wrap;">
                   <span>📅 Início: <strong>${Utils.fmt.date(p.data_inicio_real || p.data_inicio_prevista)}</strong></span>
@@ -593,10 +705,15 @@ const CronogramaSLA = {
               </div>
             </div>
 
-            <div style="display:flex;align-items:center;gap:10px;">
+            <div style="display:flex;align-items:center;gap:8px;">
               <span class="badge" style="background:${isDone ? 'rgba(16,185,129,.15)' : isInProgress ? 'rgba(59,130,246,.15)' : 'var(--bg-secondary)'};color:${isDone ? 'var(--success)' : isInProgress ? '#3b82f6' : 'var(--text3)'};font-size:.74rem;font-weight:700;padding:4px 10px;">
                 ${isDone ? '✓ Concluído' : isInProgress ? '🔄 Em Andamento' : '⏳ Pendente'}
               </span>
+
+              <!-- WhatsApp botão de notificação rápida (Patch 53) -->
+              <button class="btn btn-secondary btn-sm" style="font-size:.75rem;padding:4px 8px;" title="Notificar via WhatsApp" data-fb-click="WhatsApp.abrirModalNotificacaoEtapa" data-fb-click-n="2" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(obraId))}" data-fb-click-t1="string" data-fb-click-v1="${encodeURIComponent(String(p.id))}">
+                💬
+              </button>
 
               ${!somenteLeitura ? `
                 <button class="btn btn-secondary btn-sm" style="font-size:.75rem;padding:4px 10px;" data-fb-click="CronogramaSLA.abrirModalApontamento" data-fb-click-n="2" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(obraId))}" data-fb-click-t1="string" data-fb-click-v1="${encodeURIComponent(String(p.id))}">
@@ -606,11 +723,184 @@ const CronogramaSLA = {
             </div>
           </div>`;
         }).join('')}
-      </div>
-    </div>`;
+      </div>`;
   },
 
-  // ── MODAL DE APONTAMENTO DE STATUS DA ETAPA (Patch 52) ──
+  // ── MODO 2: KANBAN DO WORKFLOW (Patch 53) ──
+  _renderKanban(obraId, processos, { somenteLeitura = false } = {}) {
+    const e = Utils.escapeHtml.bind(Utils);
+    const cols = {
+      pendente: { titulo: '⏳ Pendente', cor: 'var(--text3)', items: processos.filter(p => p.status === 'pendente') },
+      em_andamento: { titulo: '🔄 Em Andamento', cor: '#3b82f6', items: processos.filter(p => p.status === 'em_andamento') },
+      concluido: { titulo: '✅ Concluído', cor: 'var(--success)', items: processos.filter(p => p.status === 'concluido') },
+    };
+
+    const renderCard = (p) => {
+      const isAtrasado = p.status_sla === 'atrasado';
+      const isAtencao = p.status_sla === 'atencao';
+      const corBadge = isAtrasado ? 'var(--danger)' : isAtencao ? '#f59e0b' : 'var(--success)';
+      const resp = p.responsavel_resolvido;
+      const chkTotal = Array.isArray(p.checklist) ? p.checklist.length : 0;
+      const chkDone = chkTotal > 0 ? Object.values(p.checklist_status || {}).filter(Boolean).length : 0;
+
+      return `
+        <div style="background:var(--surface);border:1px solid ${isAtrasado ? 'rgba(239,68,68,.4)' : 'var(--border)'};border-radius:var(--r-md);padding:12px;margin-bottom:10px;box-shadow:0 1px 3px rgba(0,0,0,.08);transition:transform .15s, box-shadow .15s;">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:6px;margin-bottom:6px;">
+            <span style="font-size:.65rem;font-weight:800;background:var(--bg-secondary);border:1px solid var(--border);padding:1px 5px;border-radius:4px;color:var(--text3);">${e(p.codigo)}</span>
+            <span style="font-size:.65rem;font-weight:800;color:${corBadge};background:${corBadge}15;padding:1px 6px;border-radius:8px;">
+              ${isAtrasado ? `🔴 +${p.dias_atraso}d` : isAtencao ? '🟡 Atenção' : '🟢 No prazo'}
+            </span>
+          </div>
+
+          <div style="font-weight:800;font-size:.85rem;color:var(--text);line-height:1.3;margin-bottom:6px;">
+            ${e(p.icone || '📋')} ${e(p.nome)}
+          </div>
+
+          <div style="font-size:.72rem;color:var(--text3);margin-bottom:8px;display:flex;flex-direction:column;gap:2px;">
+            <div>📅 Prazo: <strong>${Utils.fmt.date(p.data_fim_prevista)}</strong> (SLA ${p.dias_sla}d)</div>
+            ${p.data_inicio_real ? `<div>🚀 Início: ${Utils.fmt.date(p.data_inicio_real)}</div>` : ''}
+            ${p.data_fim_real ? `<div>🏁 Término: ${Utils.fmt.date(p.data_fim_real)}</div>` : ''}
+          </div>
+
+          ${chkTotal > 0 ? `
+            <div style="font-size:.68rem;color:var(--text3);margin-bottom:8px;display:flex;align-items:center;gap:6px;">
+              <span>Checklist: ${chkDone}/${chkTotal}</span>
+              <div style="flex:1;background:var(--bg-secondary);height:4px;border-radius:2px;overflow:hidden;">
+                <div style="width:${(chkDone/chkTotal)*100}%;height:100%;background:var(--success);"></div>
+              </div>
+            </div>` : ''}
+
+          ${resp ? `
+            <div style="font-size:.7rem;color:var(--accent2);font-weight:700;margin-bottom:10px;display:flex;align-items:center;gap:4px;">
+              <span>${e(resp.icone || '👤')}</span>
+              <span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${e(resp.nome)}</span>
+            </div>` : ''}
+
+          <div style="display:flex;justify-content:flex-end;align-items:center;gap:6px;border-top:1px solid var(--border);padding-top:8px;">
+            <button class="btn btn-secondary btn-sm" style="font-size:.7rem;padding:3px 7px;" title="Notificar via WhatsApp"
+              data-fb-click="WhatsApp.abrirModalNotificacaoEtapa" data-fb-click-n="2" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(obraId))}" data-fb-click-t1="string" data-fb-click-v1="${encodeURIComponent(String(p.id))}">
+              💬
+            </button>
+
+            ${!somenteLeitura && p.status === 'pendente' ? `
+              <button class="btn btn-secondary btn-sm" style="font-size:.7rem;padding:3px 8px;color:#3b82f6;" title="Iniciar etapa agora"
+                data-fb-click="CronogramaSLA.iniciarEtapaRapido" data-fb-click-n="2" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(obraId))}" data-fb-click-t1="string" data-fb-click-v1="${encodeURIComponent(String(p.id))}">
+                ▶️ Iniciar
+              </button>
+            ` : ''}
+
+            ${!somenteLeitura ? `
+              <button class="btn btn-secondary btn-sm" style="font-size:.7rem;padding:3px 8px;"
+                data-fb-click="CronogramaSLA.abrirModalApontamento" data-fb-click-n="2" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(obraId))}" data-fb-click-t1="string" data-fb-click-v1="${encodeURIComponent(String(p.id))}">
+                ✏️ Apontar
+              </button>
+            ` : ''}
+          </div>
+        </div>`;
+    };
+
+    return `
+      <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(280px, 1fr));gap:16px;align-items:start;">
+        ${Object.entries(cols).map(([statusKey, col]) => `
+          <div class="haptic-card" style="background:var(--bg-card);border:1px solid var(--border-s);border-top:3px solid ${col.cor};border-radius:var(--r-lg);padding:16px;box-shadow:var(--shadow-soft-sm);">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+              <h3 style="font-size:.88rem;font-weight:800;color:var(--text);margin:0;">${col.titulo}</h3>
+              <span class="tabular-nums" style="font-size:.72rem;background:var(--bg-secondary);border:1px solid var(--border-s);border-radius:9999px;padding:2px 8px;font-weight:700;color:var(--text2);">${col.items.length}</span>
+            </div>
+            <div style="display:flex;flex-direction:column;">
+              ${col.items.length ? col.items.map(renderCard).join('') : '<div style="font-size:.75rem;color:var(--text3);text-align:center;padding:24px 0;">Nenhuma etapa nesta coluna</div>'}
+            </div>
+          </div>
+        `).join('')}
+      </div>`;
+  },
+
+  // ── MODO 3: VISÃO GANTT PROPORCIONAL (Patch 53) ──
+  _renderGantt(obraId, processos, { somenteLeitura = false } = {}) {
+    if (!processos.length) return '<div class="empty-state">Sem etapas para exibir no gráfico Gantt.</div>';
+    const e = Utils.escapeHtml.bind(Utils);
+    const hoje = Utils.today();
+
+    // Calcula balizas de data mínima e máxima
+    let minDate = processos[0].data_inicio_real || processos[0].data_inicio_prevista || hoje;
+    let maxDate = processos[processos.length - 1].data_fim_prevista || hoje;
+
+    for (const p of processos) {
+      const ini = p.data_inicio_real || p.data_inicio_prevista;
+      const fim = p.data_fim_real || p.data_fim_prevista;
+      if (ini && ini < minDate) minDate = ini;
+      if (fim && fim > maxDate) maxDate = fim;
+    }
+
+    const totalDias = Math.max(1, this._diffDias(maxDate, minDate));
+    const hojeOffset = this._diffDias(hoje, minDate);
+    const hojePct = Math.min(100, Math.max(0, Math.round((hojeOffset / totalDias) * 100)));
+
+    return `
+      <div style="background:var(--bg-card);border:1px solid var(--border-s);border-radius:var(--r-lg);padding:18px;overflow-x:auto;box-shadow:var(--shadow-soft-sm);">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+          <div>
+            <h3 style="font-size:.92rem;font-weight:800;color:var(--text);margin:0;">📈 Diagrama de Gantt &amp; Linha do Tempo Visual</h3>
+            <div style="font-size:.72rem;color:var(--text3);margin-top:2px;">
+              Período global: <strong>${Utils.fmt.date(minDate)}</strong> até <strong>${Utils.fmt.date(maxDate)}</strong> (${totalDias} dias)
+            </div>
+          </div>
+          <div style="display:flex;align-items:center;gap:12px;font-size:.72rem;">
+            <span style="display:flex;align-items:center;gap:4px;"><span style="width:10px;height:10px;border-radius:2px;background:var(--success);display:inline-block;"></span> Concluído</span>
+            <span style="display:flex;align-items:center;gap:4px;"><span style="width:10px;height:10px;border-radius:2px;background:#3b82f6;display:inline-block;"></span> Em Andamento</span>
+            <span style="display:flex;align-items:center;gap:4px;"><span style="width:10px;height:10px;border-radius:2px;background:var(--danger);display:inline-block;"></span> Atrasado</span>
+            <span style="display:flex;align-items:center;gap:4px;"><span style="width:10px;height:10px;border-radius:2px;background:var(--border);display:inline-block;"></span> Pendente</span>
+          </div>
+        </div>
+
+        <div style="min-width:680px;position:relative;">
+          <!-- Barra de datas de baliza -->
+          <div style="display:flex;justify-content:space-between;font-size:.68rem;color:var(--text3);border-bottom:1px solid var(--border);padding-bottom:6px;margin-bottom:8px;margin-left:220px;">
+            <span>${Utils.fmt.date(minDate)}</span>
+            <span>Hoje (${Utils.fmt.date(hoje)})</span>
+            <span>${Utils.fmt.date(maxDate)}</span>
+          </div>
+
+          <!-- Linha vertical "Hoje" -->
+          <div style="position:absolute;top:24px;bottom:0;left:calc(220px + (100% - 220px) * ${hojePct} / 100);width:2px;background:var(--danger);z-index:2;opacity:0.7;pointer-events:none;" title="Hoje: ${Utils.fmt.date(hoje)}"></div>
+
+          <!-- Linhas do Gantt -->
+          <div style="display:flex;flex-direction:column;gap:6px;">
+            ${processos.map((p) => {
+              const ini = p.data_inicio_real || p.data_inicio_prevista || minDate;
+              const fim = p.data_fim_real || p.data_fim_prevista || ini;
+              const offsetDias = Math.max(0, this._diffDias(ini, minDate));
+              const duracaoDias = Math.max(1, this._diffDias(fim, ini));
+              const leftPct = Math.min(99, Math.max(0, (offsetDias / totalDias) * 100));
+              const widthPct = Math.min(100 - leftPct, Math.max(1.5, (duracaoDias / totalDias) * 100));
+
+              let barColor = 'var(--border)';
+              if (p.status === 'concluido') barColor = 'var(--success)';
+              else if (p.status === 'em_andamento') {
+                barColor = p.status_sla === 'atrasado' ? 'var(--danger)' : p.status_sla === 'atencao' ? '#f59e0b' : '#3b82f6';
+              }
+
+              return `
+                <div style="display:flex;align-items:center;gap:10px;height:32px;">
+                  <div style="width:210px;flex-shrink:0;font-size:.75rem;font-weight:700;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer;"
+                    data-fb-click="CronogramaSLA.abrirModalApontamento" data-fb-click-n="2" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(obraId))}" data-fb-click-t1="string" data-fb-click-v1="${encodeURIComponent(String(p.id))}">
+                    ${e(p.icone || '📋')} ${e(p.nome)}
+                  </div>
+                  <div style="flex:1;position:relative;height:100%;background:var(--bg-secondary);border-radius:4px;overflow:hidden;">
+                    <div style="position:absolute;left:${leftPct.toFixed(1)}%;width:${widthPct.toFixed(1)}%;top:4px;bottom:4px;background:${barColor};border-radius:4px;cursor:pointer;display:flex;align-items:center;padding:0 6px;transition:filter .15s;"
+                      title="${e(p.nome)} (${duracaoDias} dias) - ${Utils.fmt.date(ini)} a ${Utils.fmt.date(fim)}"
+                      data-fb-click="CronogramaSLA.abrirModalApontamento" data-fb-click-n="2" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(obraId))}" data-fb-click-t1="string" data-fb-click-v1="${encodeURIComponent(String(p.id))}">
+                      <span style="font-size:.65rem;font-weight:800;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${p.dias_sla}d</span>
+                    </div>
+                  </div>
+                </div>`;
+            }).join('')}
+          </div>
+        </div>
+      </div>`;
+  },
+
+  // ── MODAL DE APONTAMENTO DE STATUS DA ETAPA (Patch 52 + Patch 53: Histórico & Notificação) ──
   abrirModalApontamento(obraId, processoId) {
     const processos = this.getObraProcessos(obraId);
     const p = processos.find(item => item.id === processoId);
@@ -672,11 +962,35 @@ const CronogramaSLA = {
         </div>
       </div>` : '';
 
+    // Histórico de transições e comentários (Patch 53)
+    const historicoList = Array.isArray(p.historico) && p.historico.length > 0
+      ? `<div style="background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--r-md);padding:12px;margin-bottom:14px;">
+          <div style="font-weight:700;font-size:.8rem;color:var(--text);margin-bottom:8px;">📜 Histórico de Apontamentos &amp; Transições</div>
+          <div style="display:flex;flex-direction:column;gap:8px;max-height:160px;overflow-y:auto;">
+            ${p.historico.slice().reverse().map(h => `
+              <div style="font-size:.73rem;border-left:2px solid var(--accent);padding-left:8px;">
+                <div style="color:var(--text2);display:flex;justify-content:space-between;">
+                  <strong>${e(h.autor || 'Usuário')}</strong>
+                  <span style="color:var(--text3);font-size:.68rem;">${Utils.fmt.datetime ? Utils.fmt.datetime(h.data) : h.data}</span>
+                </div>
+                ${h.de_status && h.para_status ? `<div style="color:var(--text3);margin-top:1px;">Transição: <em>${e(h.de_status)}</em> &rarr; <em>${e(h.para_status)}</em></div>` : ''}
+                ${h.texto ? `<div style="color:var(--text);margin-top:2px;">💬 ${e(h.texto)}</div>` : ''}
+              </div>
+            `).join('')}
+          </div>
+        </div>`
+      : '';
+
     Utils.showModal(`
       <div class="modal" style="max-width:560px;">
-        <div class="modal-header">
+        <div class="modal-header" style="display:flex;justify-content:space-between;align-items:center;">
           <span class="modal-title">${e(p.icone || '📋')} ${e(p.nome)}</span>
-          <button class="modal-close" data-fb-click="Utils.closeModal" data-fb-click-n="0">&#x2715;</button>
+          <div style="display:flex;align-items:center;gap:8px;">
+            <button class="btn btn-secondary btn-sm" title="Notificar via WhatsApp" data-fb-click="WhatsApp.abrirModalNotificacaoEtapa" data-fb-click-n="2" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(obraId))}" data-fb-click-t1="string" data-fb-click-v1="${encodeURIComponent(String(p.id))}">
+              💬 Notificar WhatsApp
+            </button>
+            <button class="modal-close" data-fb-click="Utils.closeModal" data-fb-click-n="0">&#x2715;</button>
+          </div>
         </div>
         <div class="modal-body" style="max-height:calc(80vh - 130px);overflow-y:auto;">
           <div style="background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--r-md);padding:10px 14px;margin-bottom:14px;font-size:.82rem;">
@@ -727,10 +1041,12 @@ const CronogramaSLA = {
           ${checklistHtml}
           ${motivoHtml}
 
-          <div class="form-group">
-            <label class="form-label">Observações de Campo / Justificativa</label>
-            <textarea class="form-control" id="sla-obs-val" rows="2" placeholder="Ex: Atraso na análise pela prefeitura">${e(p.observacoes || '')}</textarea>
+          <div class="form-group" style="margin-bottom:14px;">
+            <label class="form-label">Novo Comentário / Observação</label>
+            <textarea class="form-control" id="sla-comentario-input" rows="2" placeholder="Descreva o andamento, pendências ou justificativa..."></textarea>
           </div>
+
+          ${historicoList}
         </div>
         <div class="modal-footer">
           <button class="btn btn-secondary" data-fb-click="Utils.closeModal" data-fb-click-n="0">Cancelar</button>
@@ -738,7 +1054,8 @@ const CronogramaSLA = {
             &#x2714; Salvar &amp; Recalcular Cascata
           </button>
         </div>
-      `);
+      </div>
+    `);
 
     // Bind status change and checklist toggle
     const statusEl = document.getElementById('sla-status-sel');
@@ -773,19 +1090,22 @@ const CronogramaSLA = {
 
   salvarApontamento(obraId, processoId) {
     const processos = this.getObraProcessos(obraId);
-    const p = processos.find(item => item.id === processoId);
-    if (!p) return;
+    const pIdx = processos.findIndex(item => item.id === processoId);
+    if (pIdx === -1) return;
+    const p = processos[pIdx];
 
     const statusSel = document.getElementById('sla-status-sel');
     const dataIniInput = document.getElementById('sla-data-ini');
     const dataFimInput = document.getElementById('sla-data-fim');
     const diasInput = document.getElementById('sla-dias-val');
-    const obsInput = document.getElementById('sla-obs-val');
+    const comentarioInput = document.getElementById('sla-comentario-input');
     const cargoSel = document.getElementById('sla-cargo-sel');
     const motivoSel = document.getElementById('sla-motivo-sel');
     const motivoDetalhe = document.getElementById('sla-motivo-detalhe');
 
+    const prevStatus = p.status;
     const newStatus = statusSel ? statusSel.value : p.status;
+    const novoComentario = comentarioInput ? comentarioInput.value.trim() : '';
 
     // Valida motivo de atraso quando está atrasado
     if (newStatus === 'em_andamento' && p.status_sla === 'atrasado') {
@@ -810,7 +1130,6 @@ const CronogramaSLA = {
     p.data_inicio_real = dataIniInput ? dataIniInput.value : p.data_inicio_real;
     p.data_fim_real = dataFimInput ? dataFimInput.value : p.data_fim_real;
     p.dias_sla = diasInput ? (parseInt(diasInput.value, 10) || p.dias_sla) : p.dias_sla;
-    p.observacoes = obsInput ? obsInput.value.trim() : p.observacoes;
     p.cargo_responsavel = cargoSel ? (cargoSel.value || p.cargo_responsavel) : p.cargo_responsavel;
     p.motivo_atraso = motivoSel ? (motivoSel.value || p.motivo_atraso) : p.motivo_atraso;
     p.motivo_atraso_detalhe = motivoDetalhe ? motivoDetalhe.value.trim() : p.motivo_atraso_detalhe;
@@ -818,6 +1137,49 @@ const CronogramaSLA = {
 
     if (p.status === 'concluido' && !p.data_fim_real) {
       p.data_fim_real = Utils.today();
+    }
+
+    // Histórico de auditoria / anotações (Patch 53)
+    if (!Array.isArray(p.historico)) p.historico = [];
+    if (newStatus !== prevStatus || novoComentario) {
+      const userName = (typeof Auth !== 'undefined' && Auth.getUser && Auth.getUser()?.nome) || 'Usuário';
+      p.historico.push({
+        data: new Date().toISOString(),
+        autor: userName,
+        de_status: prevStatus,
+        para_status: newStatus,
+        texto: novoComentario || (newStatus !== prevStatus ? `Status alterado de ${prevStatus} para ${newStatus}` : '')
+      });
+      if (novoComentario) p.observacoes = novoComentario;
+    }
+
+    // ── AUTOMAÇÃO DE TRANSIÇÃO EM CASCATA (Patch 53) ──
+    // Ao concluir esta etapa, inicia automaticamente a etapa sucessora se pendente
+    if (newStatus === 'concluido') {
+      const sucessor = processos.find(proc => proc.predecessor_id === p.id) || (pIdx + 1 < processos.length ? processos[pIdx + 1] : null);
+      if (sucessor && sucessor.status === 'pendente') {
+        sucessor.status = 'em_andamento';
+        sucessor.data_inicio_real = Utils.today();
+        if (!Array.isArray(sucessor.historico)) sucessor.historico = [];
+        sucessor.historico.push({
+          data: new Date().toISOString(),
+          autor: 'Sistema (Cascata Automática)',
+          de_status: 'pendente',
+          para_status: 'em_andamento',
+          texto: `Iniciada automaticamente após conclusão de: ${p.nome}`
+        });
+      }
+    }
+
+    // ── SMART TRIGGERS DE STATUS DA OBRA (Patch 53) ──
+    const obra = DB.getById('clientes', obraId);
+    if (obra) {
+      const todasConcluidas = processos.every(proc => proc.status === 'concluido');
+      if (todasConcluidas && obra.status !== 'concluida') {
+        DB.update('clientes', obraId, { status: 'concluida' });
+      } else if (['pendente', 'planejamento', 'orcamento'].includes(obra.status) && (newStatus === 'em_andamento' || newStatus === 'concluido')) {
+        DB.update('clientes', obraId, { status: 'em_andamento' });
+      }
     }
 
     if (!this.salvarProcessosObra(obraId, processos)) return Utils.toast('Não foi possível salvar os SLAs desta obra.', 'error');

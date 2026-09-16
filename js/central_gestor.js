@@ -43,10 +43,10 @@ const CentralGestor = {
     const totalSemResponsavel = dadosObras.filter(d => d.etapaAtual && !d.respResolvido).length;
 
     const kpiCard = (icon, label, count, cor) => `
-      <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--r-md);padding:16px;text-align:center;">
-        <div style="font-size:1.4rem;margin-bottom:4px;">${icon}</div>
-        <div style="font-size:1.8rem;font-weight:900;color:${cor};">${count}</div>
-        <div style="font-size:.68rem;color:var(--text3);font-weight:700;text-transform:uppercase;margin-top:2px;">${label}</div>
+      <div class="haptic-card" style="background:var(--bg-card);border:1px solid var(--border-s);border-radius:var(--r-lg);padding:18px 16px;text-align:center;box-shadow:var(--shadow-soft-sm);">
+        <div style="font-size:1.6rem;margin-bottom:6px;">${icon}</div>
+        <div class="tabular-nums" style="font-size:2rem;font-weight:900;color:${cor};line-height:1.1;">${count}</div>
+        <div style="font-size:.7rem;color:var(--text3);font-weight:700;text-transform:uppercase;letter-spacing:0.04em;margin-top:6px;">${label}</div>
       </div>`;
 
     const pctColor = pct => pct >= 70 ? 'var(--success)' : pct >= 30 ? '#f59e0b' : 'var(--danger)';
@@ -55,12 +55,12 @@ const CentralGestor = {
     const renderLinha = (d) => {
       const { obra, total, concluidos, pct, etapaAtual, respResolvido, atrasados, diasAtrasoTotal } = d;
       const statusGeral = atrasados.length > 0 ? 'atrasado' : 'no_prazo';
-      const bordaCor = atrasados.length > 0 ? 'rgba(239,68,68,.4)' : 'var(--border)';
+      const bordaCor = atrasados.length > 0 ? 'rgba(244,63,94,.5)' : 'var(--border-s)';
 
       return `
         <tr style="border-left:3px solid ${bordaCor};cursor:pointer;" data-fb-click="Patch26Actions.openObra" data-fb-click-n="3" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(obra.id)}" data-fb-click-t1="string" data-fb-click-v1="" data-fb-click-t2="string" data-fb-click-v2="slas">
           <td>
-            <div style="font-weight:800;font-size:.85rem;color:var(--text);">${e(obra.nome)}</div>
+            <div style="font-weight:800;font-size:.88rem;color:var(--text);">${e(obra.nome)}</div>
             <div style="font-size:.7rem;color:var(--text3);">${e(obra.cidade || '')} ${e(obra.modalidade_obra || '')}</div>
           </td>
           <td style="text-align:center;">
@@ -68,14 +68,14 @@ const CentralGestor = {
               <div style="flex:1;max-width:80px;background:var(--bg-secondary);border-radius:4px;height:6px;overflow:hidden;">
                 <div style="height:100%;width:${pct}%;background:${pctColor(pct)};border-radius:4px;transition:width .4s;"></div>
               </div>
-              <span style="font-size:.78rem;font-weight:800;color:${pctColor(pct)};">${pct}%</span>
+              <span class="tabular-nums" style="font-size:.8rem;font-weight:800;color:${pctColor(pct)};">${pct}%</span>
             </div>
-            <div style="font-size:.68rem;color:var(--text3);margin-top:2px;">${concluidos}/${total} etapas</div>
+            <div class="tabular-nums" style="font-size:.68rem;color:var(--text3);margin-top:2px;">${concluidos}/${total} etapas</div>
           </td>
           <td style="max-width:200px;">
             ${etapaAtual ? `
               <div style="font-size:.78rem;font-weight:700;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${e(etapaAtual.icone||'📋')} ${e(etapaAtual.nome)}</div>
-              ${etapaAtual.data_fim_prevista ? `<div style="font-size:.68rem;color:var(--text3);">📅 Prazo: ${typeof Utils !== 'undefined' ? Utils.fmt.date(etapaAtual.data_fim_prevista) : etapaAtual.data_fim_prevista}</div>` : ''}
+              ${etapaAtual.data_fim_prevista ? `<div class="tabular-nums" style="font-size:.68rem;color:var(--text3);">📅 Prazo: ${typeof Utils !== 'undefined' ? Utils.fmt.date(etapaAtual.data_fim_prevista) : etapaAtual.data_fim_prevista}</div>` : ''}
             ` : '<span style="font-size:.75rem;color:var(--text3);">—</span>'}
           </td>
           <td>
@@ -86,15 +86,23 @@ const CentralGestor = {
           </td>
           <td style="text-align:center;">
             ${atrasados.length > 0
-              ? `<span style="color:var(--danger);font-weight:800;font-size:.82rem;">🔴 ${atrasados.length} atr. (+${diasAtrasoTotal}d)</span>`
-              : `<span style="color:var(--success);font-weight:700;font-size:.78rem;">🟢 No prazo</span>`
+              ? `<span class="kpi-badge-pill danger tabular-nums">🔴 ${atrasados.length} atr. (+${diasAtrasoTotal}d)</span>`
+              : `<span class="kpi-badge-pill success">🟢 No prazo</span>`
             }
           </td>
           <td style="text-align:center;">
-            <button class="btn btn-secondary btn-sm" style="font-size:.72rem;padding:4px 10px;"
-              data-fb-click="Patch26Actions.openObra" data-fb-click-n="3" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(obra.id)}" data-fb-click-t1="string" data-fb-click-v1="" data-fb-click-t2="string" data-fb-click-v2="slas">
-              📊 SLAs
-            </button>
+            <div style="display:flex;align-items:center;justify-content:center;gap:6px;">
+              ${etapaAtual ? `
+                <button class="btn btn-secondary btn-sm haptic-press" style="font-size:.72rem;padding:4px 8px;" title="Cobrar / Notificar responsável via WhatsApp"
+                  data-fb-click="CentralGestor.cobrarWhatsApp" data-fb-click-n="2" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(obra.id)}" data-fb-click-t1="string" data-fb-click-v1="${encodeURIComponent(etapaAtual.id)}">
+                  💬
+                </button>
+              ` : ''}
+              <button class="btn btn-secondary btn-sm haptic-press" style="font-size:.72rem;padding:4px 10px;font-weight:700;"
+                data-fb-click="Patch26Actions.openObra" data-fb-click-n="3" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(obra.id)}" data-fb-click-t1="string" data-fb-click-v1="" data-fb-click-t2="string" data-fb-click-v2="slas">
+                📊 SLAs
+              </button>
+            </div>
           </td>
         </tr>`;
     };
@@ -112,7 +120,7 @@ const CentralGestor = {
         </div>
       </div>
 
-      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:28px;">
+      <div class="kpi-grid-dashboard">
         ${kpiCard('🏗️', 'Obras Ativas', totalObras, 'var(--accent2)')}
         ${kpiCard('🔴', 'Obras com Atraso', obrasAtrasadas, obrasAtrasadas > 0 ? 'var(--danger)' : 'var(--success)')}
         ${kpiCard('⚠', 'Etapas Atrasadas', totalEtapasAtrasadas, totalEtapasAtrasadas > 0 ? 'var(--danger)' : 'var(--success)')}
@@ -127,12 +135,18 @@ const CentralGestor = {
           </div>
           <div style="display:flex;flex-direction:column;gap:6px;">
             ${gargalos.map(p => `
-              <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 10px;background:rgba(239,68,68,.06);border-radius:6px;font-size:.8rem;">
+              <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 10px;background:rgba(239,68,68,.06);border-radius:6px;font-size:.8rem;gap:8px;">
                 <div>
                   <span style="font-weight:700;color:var(--text);">${e(p.icone||'📋')} ${e(p.nome)}</span>
                   <span style="color:var(--text3);margin-left:6px;">· ${e(p.obra_nome)}</span>
                 </div>
-                <span style="color:var(--danger);font-weight:800;">+${p.dias_atraso || 0}d atrasado</span>
+                <div style="display:flex;align-items:center;gap:8px;">
+                  <span style="color:var(--danger);font-weight:800;">+${p.dias_atraso || 0}d atrasado</span>
+                  <button class="btn btn-secondary btn-sm" style="font-size:.7rem;padding:2px 8px;" title="Cobrar responsável via WhatsApp"
+                    data-fb-click="CentralGestor.cobrarWhatsApp" data-fb-click-n="2" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(p.obra_id)}" data-fb-click-t1="string" data-fb-click-v1="${encodeURIComponent(p.id)}">
+                    💬 Cobrar
+                  </button>
+                </div>
               </div>
             `).join('')}
           </div>
@@ -161,6 +175,14 @@ const CentralGestor = {
           </table>
         </div>
       </div>`;
+  },
+
+  cobrarWhatsApp(obraId, etapaId) {
+    if (typeof WhatsApp !== 'undefined' && WhatsApp.abrirModalNotificacaoEtapa) {
+      WhatsApp.abrirModalNotificacaoEtapa(obraId, etapaId);
+    } else {
+      Utils.toast('Módulo WhatsApp não disponível.', 'warning');
+    }
   },
 };
 

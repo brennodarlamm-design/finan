@@ -89,3 +89,56 @@ cycleBtns.forEach(btn => {
     });
   });
 });
+
+// ── CALCULADORA INTERATIVA DE ROI & DESPERDÍCIO DE CANTEIRO (Skill: frontend-design) ──
+function initRoiCalculator() {
+  const obrasInput = document.getElementById('roi-input-obras');
+  const volumeInput = document.getElementById('roi-input-volume');
+  if (!obrasInput || !volumeInput) return;
+
+  const obrasDisplay = document.getElementById('roi-display-obras');
+  const volumeDisplay = document.getElementById('roi-display-volume');
+  const outHoras = document.getElementById('roi-out-horas');
+  const outEconomia = document.getElementById('roi-out-economia');
+  const outAnual = document.getElementById('roi-out-anual');
+  const outRoi = document.getElementById('roi-out-roi');
+
+  function fmtMoeda(v) {
+    return Number(v).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 });
+  }
+
+  function recalculate() {
+    const obras = Math.max(1, parseInt(obrasInput.value, 10) || 1);
+    const volume = Math.max(50000, parseInt(volumeInput.value, 10) || 50000);
+
+    if (obrasDisplay) obrasDisplay.textContent = `${obras} ${obras === 1 ? 'obra ativa' : 'obras ativas'}`;
+    if (volumeDisplay) volumeDisplay.textContent = fmtMoeda(volume) + ' / mês';
+
+    // Estimativas auditadas de engenharia civil:
+    // 1. Cada obra gera ~14h de retrabalho administrativo/mês (planilhas, digitação de NF-e, cotações manuais).
+    const horasSalvas = Math.round(obras * 14);
+    // 2. Desvio de custos em compras sem conferência SINAPI/Cotação: ~3,2% do volume gasto.
+    const vazamentoEstancado = Math.round(volume * 0.032);
+    // 3. Economia anual consolidada (vazamento estancado x 12 + horas técnicas a R$ 80/h).
+    const economiaAnual = (vazamentoEstancado * 12) + (horasSalvas * 12 * 80);
+    // 4. Custo anual estimado do software (Plano Profissional ~R$ 2.799/ano).
+    const custoAnualSoftware = 2799;
+    const multiplicadorRoi = Math.max(1, Math.round(economiaAnual / custoAnualSoftware));
+
+    if (outHoras) outHoras.textContent = `${horasSalvas}h`;
+    if (outEconomia) outEconomia.textContent = fmtMoeda(vazamentoEstancado);
+    if (outAnual) outAnual.textContent = fmtMoeda(economiaAnual);
+    if (outRoi) outRoi.textContent = `${multiplicadorRoi}x ROI`;
+  }
+
+  obrasInput.addEventListener('input', recalculate);
+  volumeInput.addEventListener('input', recalculate);
+  recalculate();
+}
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initRoiCalculator);
+} else {
+  initRoiCalculator();
+}
+

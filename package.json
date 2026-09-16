@@ -52,6 +52,8 @@
     "test:patch48": "node scripts/test-patch48-static.js",
     "test:patch49": "node scripts/test-patch49-static.js",
     "test:patch52": "node scripts/test-patch52-static.js",
+    "test:patch53": "node scripts/test-patch53-static.js",
+    "test:improvement": "node scripts/test-master-improvement.js",
     "test:e2e": "node scripts/test-e2e-synthetic.js"
   },
   "dependencies": {

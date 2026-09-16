@@ -4,13 +4,13 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>FinObra — Sistema de Gestão Financeira e Obras para Construtoras</title>
-  <meta name="description" content="Software de gestão de obras e controle financeiro completo para pequenas e médias construtoras. Gestão de custos, medições de obra, orçamentos SINAPI, notas fiscais, compras e conciliação bancária. Teste grátis por 15 dias.">
-  <meta name="keywords" content="sistema para construtora, software de gestão de obras, controle financeiro construção civil, software engenharia civil, medição de obras, orçamento de obras sinapi, fluxo de caixa construtora, curva abc obras, gestão de compras construção civil, sistema canteiro de obras, conciliação bancária construtora, emissor nota fiscal construtora">
+  <meta name="description" content="Software de gestão de obras e controle financeiro completo para construtoras e incorporadoras. Gestão de custos, medições com retenções técnicas, orçamentos SINAPI oficiais, NF-e SEFAZ A1 e cronograma em cascata. Teste grátis por 15 dias.">
+  <meta name="keywords" content="sistema para construtora, software de gestão de obras, controle financeiro construção civil, software engenharia civil, medição de obras, orçamento de obras sinapi, fluxo de caixa construtora, curva abc obras, gestão de compras construção civil, sistema canteiro de obras, conciliação bancária construtora, emissor nota fiscal construtora, retenções tributárias obras">
   <link rel="canonical" href="https://finobra.app.br/">
   <meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1,max-video-preview:-1">
   <meta name="author" content="FinObra Tecnologia">
   <meta name="application-name" content="FinObra">
-  <meta name="theme-color" content="#050c04">
+  <meta name="theme-color" content="#040804">
   <meta name="geo.region" content="BR">
   <meta name="geo.placename" content="Brasil">
   
@@ -26,7 +26,7 @@
   <meta property="og:locale" content="pt_BR">
 
   <!-- Twitter Cards -->
-  <meta name="twitter:card" content="summary">
+  <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="FinObra — Sistema de Gestão Financeira e Obras para Construtoras">
   <meta name="twitter:description" content="Do canteiro ao escritório: gestão de obras, compras, medições, financeiro e engenharia conectados.">
   <meta name="twitter:image" content="https://finobra.app.br/favicon-192x192.png">
@@ -48,7 +48,7 @@
         "description": "Sistema SaaS para construtoras e empreiteiras gerenciarem obras, custos, medições, compras, notas fiscais e conciliação bancária.",
         "offers": {
           "@type": "Offer",
-          "price": "149.00",
+          "price": "119.90",
           "priceCurrency": "BRL",
           "priceValidUntil": "2027-12-31",
           "availability": "https://schema.org/InStock"
@@ -56,11 +56,12 @@
         "featureList": [
           "Gestão e Diário de Obras",
           "Controle de Custos e Fluxo de Caixa",
-          "Medições Físico-Financeiras",
-          "Orçamentos SINAPI e BDI",
+          "Medições Físico-Financeiras com Retenções",
+          "Orçamentos Oficiais SINAPI e BDI",
           "Leitor OCR de Notas Fiscais e Comprovantes",
           "Conciliação Bancária OFX e PIX Automático",
-          "Controle de Ordens de Compra e Cotações"
+          "Controle de Ordens de Compra e Cotações",
+          "Workflow com Gestão de Prazos e SLAs em Cascata"
         ]
       },
       {
@@ -116,116 +117,1941 @@
     ]
   }
   </script>
+
   <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png?v=3">
   <link rel="icon" type="image/x-icon" href="/favicon.ico?v=3">
   <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png?v=3">
   <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&amp;family=Outfit:wght@700;800;900&amp;display=swap" rel="stylesheet">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Outfit:wght@600;700;800;900&display=swap" rel="stylesheet">
+
   <style>
-    *,*::before,*::after{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;background:#050c04;color:#f3eedf;font-family:Inter,Arial,sans-serif;line-height:1.55;overflow-x:hidden}:root{--bg:#050c04;--surface:#0b1808;--surface2:#10240c;--border:rgba(226,184,70,.17);--border2:rgba(226,184,70,.38);--gold:#d9ad38;--gold2:#f3cf67;--green:#27c46a;--text:#f3eedf;--muted:#94a58c;--muted2:#64735f;--danger:#ef6b6b}.wrap{width:min(1160px,calc(100% - 40px));margin:0 auto}.bg{position:fixed;inset:0;pointer-events:none;z-index:-1;background:radial-gradient(circle at 15% 15%,rgba(48,133,55,.17),transparent 33%),radial-gradient(circle at 88% 20%,rgba(217,173,56,.10),transparent 30%),linear-gradient(rgba(217,173,56,.025) 1px,transparent 1px),linear-gradient(90deg,rgba(217,173,56,.025) 1px,transparent 1px);background-size:auto,auto,58px 58px,58px 58px}.header{position:sticky;top:0;z-index:50;background:rgba(5,12,4,.88);backdrop-filter:blur(18px);border-bottom:1px solid var(--border)}.header-in{height:72px;display:flex;align-items:center;gap:24px}.brand{display:flex;align-items:center;gap:10px;text-decoration:none;color:var(--text);min-width:max-content}.brand-mark{width:38px;height:38px;border:1px solid var(--border2);border-radius:11px;display:grid;place-items:center;background:linear-gradient(145deg,#0c2c10,#1d4c1b);box-shadow:0 8px 26px rgba(0,0,0,.25)}.brand-mark svg{width:24px;height:24px}.brand-name{font:900 1.15rem Outfit,sans-serif;letter-spacing:.02em;background:linear-gradient(135deg,#fff1b5,var(--gold2),var(--gold));-webkit-background-clip:text;background-clip:text;color:transparent}.nav{margin-left:auto;display:flex;align-items:center;gap:23px}.nav a{color:var(--muted);text-decoration:none;font-size:.84rem;font-weight:700}.nav a:hover{color:var(--gold2)}.header-actions{display:flex;align-items:center;gap:8px}.btn{border:0;border-radius:10px;padding:12px 18px;font:800 .84rem Inter,sans-serif;text-decoration:none;display:inline-flex;align-items:center;justify-content:center;gap:8px;cursor:pointer;transition:.2s transform,.2s box-shadow,.2s background}.btn:hover{transform:translateY(-1px)}.btn-primary{background:linear-gradient(135deg,var(--gold2),var(--gold));color:#101407;box-shadow:0 9px 26px rgba(217,173,56,.22)}.btn-soft{background:rgba(255,255,255,.04);color:var(--text);border:1px solid rgba(255,255,255,.09)}.btn-green{background:rgba(39,196,106,.11);color:#71e69f;border:1px solid rgba(39,196,106,.35)}.mobile-menu{display:none;margin-left:auto;position:relative}.mobile-menu summary{list-style:none;width:42px;height:42px;border:1px solid var(--border);border-radius:10px;display:grid;place-items:center;cursor:pointer;font-size:1.2rem}.mobile-menu summary::-webkit-details-marker{display:none}.mobile-pop{position:absolute;right:0;top:50px;width:min(290px,calc(100vw - 32px));padding:10px;background:#0a1708;border:1px solid var(--border2);border-radius:14px;box-shadow:0 20px 50px rgba(0,0,0,.55)}.mobile-pop a{display:block;padding:11px 12px;text-decoration:none;color:var(--text);font-weight:700;font-size:.88rem;border-radius:8px}.mobile-pop a:hover{background:rgba(255,255,255,.05)}.hero{padding:86px 0 54px;text-align:center}.eyebrow{display:inline-flex;gap:8px;align-items:center;padding:7px 14px;border:1px solid var(--border2);border-radius:999px;color:var(--gold2);background:rgba(217,173,56,.07);font-size:.72rem;font-weight:900;letter-spacing:.07em;text-transform:uppercase}.dot{width:7px;height:7px;border-radius:50%;background:#3fe17d;box-shadow:0 0 12px rgba(63,225,125,.8)}h1{font:900 clamp(2.35rem,6vw,4.65rem)/1.05 Outfit,sans-serif;letter-spacing:-.045em;margin:22px auto 18px;max-width:1000px}.gold{background:linear-gradient(135deg,#fff1b5,var(--gold2),var(--gold));-webkit-background-clip:text;background-clip:text;color:transparent}.hero p{max-width:780px;margin:0 auto;color:var(--muted);font-size:clamp(.98rem,2vw,1.14rem)}.hero-actions{display:flex;justify-content:center;gap:10px;flex-wrap:wrap;margin:29px 0 18px}.trust{display:flex;justify-content:center;gap:18px;flex-wrap:wrap;color:var(--muted);font-size:.77rem}.trust span::before{content:'✓';color:#4ddd83;font-weight:900;margin-right:6px}.product-frame{margin:52px auto 0;max-width:1030px;border:1px solid var(--border2);border-radius:20px;padding:2px;background:linear-gradient(135deg,rgba(217,173,56,.28),rgba(33,86,29,.18));box-shadow:0 28px 90px rgba(0,0,0,.56)}.product-inner{border-radius:18px;background:#091507;overflow:hidden;text-align:left}.product-bar{height:45px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px;padding:0 15px}.p-dot{width:9px;height:9px;border-radius:50%;background:#456043}.p-dot:nth-child(2){background:#9a7c2f}.p-dot:nth-child(3){background:#267b42}.fake-url{margin-left:7px;flex:1;background:rgba(0,0,0,.25);border:1px solid rgba(255,255,255,.05);border-radius:6px;color:var(--muted2);padding:5px 10px;font:500 .68rem monospace}.product-body{padding:22px;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}.mini-kpi{border:1px solid rgba(255,255,255,.07);background:rgba(255,255,255,.025);border-radius:11px;padding:14px}.mini-kpi small{display:block;color:var(--muted2);font-size:.64rem;text-transform:uppercase;letter-spacing:.06em}.mini-kpi strong{display:block;font-size:1.25rem;margin-top:5px}.mini-wide{grid-column:1/-1;display:grid;grid-template-columns:1.6fr 1fr;gap:12px}.mini-panel{min-height:108px;border:1px solid rgba(255,255,255,.07);border-radius:11px;padding:15px;background:rgba(255,255,255,.018)}.mini-lines{display:grid;gap:8px;margin-top:12px}.mini-line{height:8px;border-radius:10px;background:linear-gradient(90deg,rgba(217,173,56,.65),rgba(39,196,106,.28));width:var(--w)}.section{padding:82px 0}.section-head{text-align:center;max-width:760px;margin:0 auto 38px}.section-tag{color:var(--gold2);font-size:.72rem;font-weight:900;letter-spacing:.11em;text-transform:uppercase}.section h2{font:900 clamp(1.8rem,4vw,2.65rem)/1.12 Outfit,sans-serif;margin:10px 0 12px}.section-head p{margin:0;color:var(--muted);font-size:.94rem}.divider{height:1px;background:linear-gradient(90deg,transparent,var(--border2),transparent)}.module-groups{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}.module-card{border:1px solid var(--border);border-radius:15px;background:rgba(255,255,255,.022);padding:19px;min-height:190px}.module-icon{width:38px;height:38px;border-radius:10px;display:grid;place-items:center;background:rgba(217,173,56,.10);border:1px solid var(--border);font-size:1.05rem}.module-card h3{font-size:1rem;margin:13px 0 6px}.module-card p{color:var(--muted);font-size:.78rem;margin:0 0 12px}.module-list{display:flex;flex-wrap:wrap;gap:6px}.module-chip{padding:5px 8px;border:1px solid rgba(255,255,255,.07);border-radius:7px;color:#cdd8c8;background:rgba(255,255,255,.025);font-size:.68rem;font-weight:700}.plans{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:17px;align-items:stretch}.plan{border:1px solid var(--border);border-radius:18px;background:rgba(255,255,255,.022);padding:24px;display:flex;flex-direction:column;position:relative}.plan.featured{background:linear-gradient(145deg,#10220c,#1a3313);border-color:var(--gold);box-shadow:0 18px 48px rgba(0,0,0,.28)}.popular{position:absolute;top:-12px;left:50%;transform:translateX(-50%);background:var(--gold);color:#101407;border-radius:999px;padding:5px 12px;font-size:.62rem;font-weight:900;white-space:nowrap}.plan-kicker{color:var(--gold2);text-transform:uppercase;font-size:.65rem;font-weight:900;letter-spacing:.07em}.plan h3{font-size:1.2rem;margin:8px 0 3px}.plan-ideal{color:var(--muted);font-size:.75rem;min-height:38px}.price{font:900 2rem Outfit,sans-serif;margin:16px 0 2px}.price small{font:500 .73rem Inter,sans-serif;color:var(--muted)}.plan-limits{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin:13px 0 17px}.limit{padding:9px 10px;border-radius:9px;background:rgba(255,255,255,.035);border:1px solid rgba(255,255,255,.07)}.limit small{display:block;color:var(--muted2);font-size:.6rem;text-transform:uppercase}.limit strong{font-size:.82rem}.plan ul{list-style:none;padding:0;margin:0 0 22px;display:grid;gap:9px}.plan li{font-size:.76rem;color:#d9e0d6}.plan li::before{content:'✓';color:#45dc7d;font-weight:900;margin-right:7px}.plan .btn{margin-top:auto;width:100%}.swipe-hint{display:none;color:var(--muted2);font-size:.68rem;text-align:center;margin-bottom:9px}.compare-shell{border:1px solid var(--border);border-radius:17px;overflow:hidden;background:rgba(255,255,255,.018)}.compare{width:100%;border-collapse:collapse}.compare th,.compare td{padding:12px 15px;border-bottom:1px solid rgba(255,255,255,.055);font-size:.76rem;text-align:center}.compare th:first-child,.compare td:first-child{text-align:left}.compare thead th{background:rgba(217,173,56,.07);color:var(--gold2);font-weight:900}.yes{color:#43db7a;font-weight:900}.no{color:#63725e}.mobile-compare{display:none}.mobile-compare details{border:1px solid var(--border);border-radius:12px;background:rgba(255,255,255,.02);margin-bottom:9px;overflow:hidden}.mobile-compare summary{cursor:pointer;padding:13px 14px;font-weight:850;list-style:none}.mobile-compare summary::-webkit-details-marker{display:none}.mobile-compare summary::after{content:'+';float:right;color:var(--gold2)}.mobile-compare details[open] summary::after{content:'−'}.compare-items{padding:0 14px 13px;display:grid;gap:8px}.compare-item{display:grid;grid-template-columns:1fr auto;gap:10px;color:var(--muted);font-size:.77rem;padding-top:7px;border-top:1px solid rgba(255,255,255,.05)}.support-box{display:grid;grid-template-columns:1.1fr .9fr;gap:18px;align-items:stretch}.support-main,.support-side{border:1px solid var(--border);border-radius:17px;padding:24px;background:rgba(255,255,255,.02)}.support-main h3,.support-side h3{margin:0 0 8px}.support-main p,.support-side p{color:var(--muted);font-size:.82rem}.support-points{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:17px}.support-point{padding:11px;border-radius:10px;background:rgba(255,255,255,.025);border:1px solid rgba(255,255,255,.06);font-size:.75rem}.faq{max-width:860px;margin:0 auto;display:grid;gap:9px}.faq details{border:1px solid var(--border);border-radius:12px;background:rgba(255,255,255,.02);overflow:hidden}.faq summary{padding:15px 17px;cursor:pointer;font-weight:800;font-size:.86rem;list-style:none}.faq summary::-webkit-details-marker{display:none}.faq summary::after{content:'+';float:right;color:var(--gold2)}.faq details[open] summary::after{content:'−'}.faq div{padding:0 17px 16px;color:var(--muted);font-size:.8rem}.cta{padding:72px 0}.cta-card{text-align:center;border:1px solid var(--border2);border-radius:22px;padding:45px 24px;background:linear-gradient(145deg,rgba(33,86,29,.25),rgba(217,173,56,.08))}.cta-card h2{margin-top:0}.cta-card p{color:var(--muted);max-width:690px;margin:0 auto 20px}.footer{border-top:1px solid var(--border);padding:34px 0 28px;color:var(--muted2);font-size:.72rem}.footer-in{display:flex;justify-content:space-between;gap:20px;align-items:flex-start;flex-wrap:wrap}.footer-links{display:flex;gap:16px;flex-wrap:wrap}.footer a{color:var(--muted);text-decoration:none}.float-wa{position:fixed;right:18px;bottom:18px;width:50px;height:50px;border-radius:50%;display:grid;place-items:center;background:#24c766;color:white;text-decoration:none;box-shadow:0 10px 30px rgba(0,0,0,.38);z-index:45;font-size:1.25rem}
-    .billing-switcher-wrap{display:flex;justify-content:center;margin:-6px 0 30px}.billing-switcher{display:inline-flex;background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:999px;padding:5px;gap:5px;box-shadow:0 8px 24px rgba(0,0,0,.3);max-width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch}.cycle-btn{background:transparent;border:0;color:var(--muted);padding:8px 16px;border-radius:999px;font:700 .82rem Inter,sans-serif;cursor:pointer;display:inline-flex;align-items:center;gap:7px;transition:.2s all;white-space:nowrap}.cycle-btn:hover{color:var(--text);background:rgba(255,255,255,.05)}.cycle-btn.active{background:linear-gradient(135deg,var(--gold2),var(--gold));color:#101407;font-weight:900;box-shadow:0 4px 14px rgba(217,173,56,.3)}.discount-pill{font-size:.62rem;font-weight:900;padding:2px 7px;border-radius:999px;background:rgba(39,196,106,.15);color:#47df82;border:1px solid rgba(39,196,106,.35)}.cycle-btn.active .discount-pill{background:#101407;color:var(--gold2);border-color:rgba(0,0,0,.25)}.discount-pill.gold{background:rgba(217,173,56,.2);color:var(--gold2);border-color:rgba(217,173,56,.45)}.cycle-total{font-size:.74rem;color:var(--muted);min-height:22px;margin:2px 0 10px;line-height:1.4}.cycle-total strong{color:#45dc7d}
-    @media(max-width:900px){.nav{display:none}.desktop-commercial{display:none}.mobile-menu{display:block}.product-body{grid-template-columns:1fr 1fr}.module-groups{grid-template-columns:1fr 1fr}.plans{grid-template-columns:1fr}.support-box{grid-template-columns:1fr}}
-    @media(max-width:700px){.wrap{width:min(100% - 28px,1160px)}.header-in{height:62px}.brand-mark{width:34px;height:34px}.hero{padding:54px 0 38px}.hero h1{font-size:clamp(2.15rem,12vw,3.25rem)}.hero p{font-size:.94rem}.hero-actions{display:grid;grid-template-columns:1fr;margin:24px auto 16px;max-width:390px}.hero-actions .btn{width:100%;padding:14px}.trust{gap:9px 14px;font-size:.7rem}.product-frame{margin-top:34px}.product-bar{height:38px}.product-body{padding:13px;gap:8px}.mini-kpi{padding:11px}.mini-kpi strong{font-size:1rem}.mini-wide{grid-template-columns:1fr}.mini-panel:last-child{display:none}.section{padding:58px 0}.section-head{text-align:left;margin-bottom:25px}.section-head h2{font-size:1.8rem}.module-groups{display:flex;overflow-x:auto;scroll-snap-type:x mandatory;gap:11px;padding:2px 2px 12px}.module-card{min-width:83vw;scroll-snap-align:center;min-height:180px}.swipe-hint{display:block}.plans{display:flex;overflow-x:auto;scroll-snap-type:x mandatory;gap:11px;padding:14px 2px 16px}.plan{min-width:87vw;scroll-snap-align:center}.plan.featured{order:-1}.compare-shell{display:none}.mobile-compare{display:block}.support-points{grid-template-columns:1fr}.cta{padding:50px 0}.cta-card{padding:32px 18px}.cta-card .hero-actions{margin-bottom:0}.footer-in{display:block}.footer-links{margin-top:15px}.float-wa{right:13px;bottom:13px;width:46px;height:46px}.billing-switcher{gap:3px;padding:4px}.cycle-btn{padding:7px 11px;font-size:.76rem}}
-    @media(max-width:420px){.product-body{grid-template-columns:1fr}.mini-kpi:nth-child(n+3){display:none}.module-card{min-width:89vw}.plan{min-width:91vw}.plan-limits{grid-template-columns:1fr 1fr}.header-actions .btn-soft{display:none}.billing-switcher{width:100%;justify-content:space-between}.cycle-btn{padding:6px 9px;font-size:.72rem}.discount-pill{display:none}}
+    /* =========================================================================
+       FINOBRA — INDUSTRIAL ARCHITECTURAL PRECISION & EXECUTIVE BRUTALISM (v2.38)
+       Skill: frontend-design | Tokens, Double-Bezel, Haptic & Tabular Typography
+       ========================================================================= */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; font-size: 15px; }
+
+    :root {
+      /* Deep Obsidian & Carbon Palettes */
+      --bg-void: #030603;
+      --bg-base: #060B05;
+      --bg-surface: #0B1309;
+      --bg-surface-elevated: #111C0E;
+      --bg-glass: rgba(9, 16, 8, 0.78);
+
+      /* Precision Metals & Semantic Colors */
+      --accent-mint: #12D9A0;
+      --accent-mint-bright: #3EE8B5;
+      --accent-mint-dim: rgba(18, 217, 160, 0.14);
+      --accent-mint-glow: rgba(18, 217, 160, 0.35);
+
+      --gold-champagne: #F3CF67;
+      --gold-deep: #D9AD38;
+      --gold-glow: rgba(243, 207, 103, 0.25);
+
+      --alert-coral: #FB7185;
+      --warning-amber: #FBBF24;
+      --info-cyan: #38BDF8;
+
+      /* Drafting Borders & Hairlines */
+      --border-hairline: rgba(255, 255, 255, 0.07);
+      --border-subtle: rgba(255, 255, 255, 0.12);
+      --border-accent: rgba(18, 217, 160, 0.28);
+      --border-gold: rgba(243, 207, 103, 0.32);
+
+      /* Typography Tokens */
+      --font-display: 'Outfit', -apple-system, sans-serif;
+      --font-mono-numbers: 'Inter', -apple-system, sans-serif;
+
+      --text-white: #FFFFFF;
+      --text-main: #EEF2EB;
+      --text-muted: #95A391;
+      --text-dim: #606E5D;
+
+      /* Layout & Spacing Rhythm (Base 4px/8px) */
+      --max-width: 1200px;
+      --space-xs: 6px;
+      --space-sm: 12px;
+      --space-md: 20px;
+      --space-lg: 32px;
+      --space-xl: 56px;
+      --space-2xl: 88px;
+
+      /* Radii */
+      --r-sm: 8px;
+      --r-md: 14px;
+      --r-lg: 20px;
+      --r-pill: 9999px;
+
+      /* Shadows & Kinetic Easing */
+      --shadow-ambient: 0 20px 60px -15px rgba(0, 0, 0, 0.85);
+      --shadow-mint-glow: 0 0 40px -8px var(--accent-mint-glow);
+      --ease-spring: cubic-bezier(0.32, 0.72, 0, 1);
+      --t-spring: 180ms var(--ease-spring);
+    }
+
+    body {
+      background-color: var(--bg-void);
+      color: var(--text-main);
+      font-family: var(--font-mono-numbers);
+      line-height: 1.6;
+      overflow-x: hidden;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* Tabular Numeric Precision */
+    .tabular-nums {
+      font-variant-numeric: tabular-nums;
+      font-feature-settings: "tnum" 1;
+    }
+
+    /* Architectural Drafting Grid Background */
+    .cad-blueprint-bg {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: -1;
+      background-color: var(--bg-void);
+      background-image: 
+        radial-gradient(circle at 18% 12%, rgba(18, 217, 160, 0.10), transparent 42%),
+        radial-gradient(circle at 85% 25%, rgba(243, 207, 103, 0.08), transparent 38%),
+        radial-gradient(circle at 50% 75%, rgba(18, 217, 160, 0.05), transparent 48%),
+        linear-gradient(rgba(255, 255, 255, 0.024) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255, 255, 255, 0.024) 1px, transparent 1px);
+      background-size: auto, auto, auto, 48px 48px, 48px 48px;
+    }
+
+    .wrap {
+      width: min(var(--max-width), calc(100% - 44px));
+      margin: 0 auto;
+    }
+
+    /* =========================================================================
+       DOUBLE-BEZEL ARCHITECTURE (Machined Physical Chassis)
+       ========================================================================= */
+    .bezel-shell {
+      background: rgba(15, 23, 14, 0.65);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--r-lg);
+      padding: 6px;
+      box-shadow: var(--shadow-ambient);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+    }
+
+    .bezel-core {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-hairline);
+      border-radius: calc(var(--r-lg) - 5px);
+      box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.06);
+    }
+
+    /* =========================================================================
+       HAPTIC INTERACTIVITY & BUTTONS
+       ========================================================================= */
+    .haptic-press {
+      transition: transform var(--t-spring), opacity var(--t-spring), box-shadow var(--t-spring), background var(--t-spring);
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .haptic-press:active {
+      transform: scale(0.97) !important;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 9px;
+      padding: 13px 24px;
+      border-radius: var(--r-md);
+      font-family: var(--font-display);
+      font-weight: 800;
+      font-size: 0.88rem;
+      letter-spacing: 0.01em;
+      text-decoration: none;
+      border: 1px solid transparent;
+      white-space: nowrap;
+    }
+
+    .btn-mint {
+      background: linear-gradient(135deg, var(--accent-mint-bright), var(--accent-mint));
+      color: #03140D;
+      box-shadow: 0 4px 20px var(--accent-mint-glow);
+    }
+
+    .btn-mint:hover {
+      box-shadow: 0 6px 28px rgba(18, 217, 160, 0.5);
+      transform: translateY(-1px);
+    }
+
+    .btn-gold {
+      background: linear-gradient(135deg, var(--gold-champagne), var(--gold-deep));
+      color: #121508;
+      box-shadow: 0 4px 20px var(--gold-glow);
+    }
+
+    .btn-gold:hover {
+      box-shadow: 0 6px 28px rgba(243, 207, 103, 0.45);
+      transform: translateY(-1px);
+    }
+
+    .btn-ghost {
+      background: rgba(255, 255, 255, 0.04);
+      color: var(--text-main);
+      border-color: var(--border-subtle);
+    }
+
+    .btn-ghost:hover {
+      background: rgba(255, 255, 255, 0.08);
+      border-color: rgba(255, 255, 255, 0.22);
+      color: var(--text-white);
+      transform: translateY(-1px);
+    }
+
+    /* Nested Island Trailing Arrow */
+    .btn-icon-pill {
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      background: rgba(0, 0, 0, 0.18);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.75rem;
+      margin-left: 2px;
+      transition: transform var(--t-spring);
+    }
+
+    .btn:hover .btn-icon-pill {
+      transform: translateX(3px) translateY(-1px);
+    }
+
+    /* =========================================================================
+       FLUID ISLAND DETACHED HEADER
+       ========================================================================= */
+    .header-island {
+      position: sticky;
+      top: 16px;
+      z-index: 100;
+      width: min(var(--max-width), calc(100% - 32px));
+      margin: 0 auto;
+      background: rgba(8, 14, 7, 0.82);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--r-pill);
+      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.65);
+      padding: 8px 18px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 18px;
+    }
+
+    .brand-group {
+      display: flex;
+      align-items: center;
+      gap: 11px;
+      text-decoration: none;
+      color: var(--text-white);
+    }
+
+    .brand-emblem {
+      width: 36px;
+      height: 36px;
+      border-radius: 10px;
+      background: linear-gradient(135deg, #0A2617, #133D26);
+      border: 1px solid var(--border-accent);
+      display: grid;
+      place-items: center;
+      box-shadow: 0 0 16px rgba(18, 217, 160, 0.3);
+    }
+
+    .brand-emblem svg {
+      width: 22px;
+      height: 22px;
+    }
+
+    .brand-title {
+      font-family: var(--font-display);
+      font-weight: 900;
+      font-size: 1.15rem;
+      letter-spacing: -0.02em;
+      background: linear-gradient(135deg, #FFFFFF, var(--accent-mint-bright));
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+    }
+
+    .nav-links {
+      display: flex;
+      align-items: center;
+      gap: 24px;
+    }
+
+    .nav-link {
+      color: var(--text-muted);
+      text-decoration: none;
+      font-size: 0.82rem;
+      font-weight: 700;
+      letter-spacing: 0.01em;
+      transition: color var(--t-spring);
+    }
+
+    .nav-link:hover {
+      color: var(--accent-mint-bright);
+    }
+
+    .header-cta-group {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    /* Mobile Menu Drawer */
+    .mobile-menu-details {
+      display: none;
+      position: relative;
+    }
+
+    .mobile-menu-summary {
+      list-style: none;
+      width: 38px;
+      height: 38px;
+      border-radius: var(--r-sm);
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--border-subtle);
+      display: grid;
+      place-items: center;
+      cursor: pointer;
+      color: var(--text-main);
+      font-size: 1.1rem;
+    }
+
+    .mobile-menu-summary::-webkit-details-marker { display: none; }
+
+    .mobile-drawer-pop {
+      position: absolute;
+      right: 0;
+      top: 48px;
+      width: 260px;
+      background: var(--bg-surface-elevated);
+      border: 1px solid var(--border-accent);
+      border-radius: var(--r-md);
+      padding: 10px;
+      box-shadow: var(--shadow-ambient);
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .mobile-drawer-pop a {
+      color: var(--text-main);
+      text-decoration: none;
+      padding: 10px 14px;
+      font-weight: 700;
+      font-size: 0.85rem;
+      border-radius: var(--r-sm);
+    }
+
+    .mobile-drawer-pop a:hover {
+      background: rgba(18, 217, 160, 0.1);
+      color: var(--accent-mint-bright);
+    }
+
+    /* =========================================================================
+       HERO SECTION — INDUSTRIAL ARCHITECTURAL MONUMENT
+       ========================================================================= */
+    .hero-section {
+      padding: 72px 0 54px;
+      text-align: center;
+      position: relative;
+    }
+
+    .telemetry-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 9px;
+      padding: 6px 16px;
+      background: rgba(18, 217, 160, 0.08);
+      border: 1px solid var(--border-accent);
+      border-radius: var(--r-pill);
+      color: var(--accent-mint-bright);
+      font-size: 0.72rem;
+      font-weight: 800;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      margin-bottom: 24px;
+    }
+
+    .pulse-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--accent-mint);
+      box-shadow: 0 0 10px var(--accent-mint);
+      animation: beacon 2s infinite ease-in-out;
+    }
+
+    @keyframes beacon {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.4; transform: scale(1.3); }
+    }
+
+    .hero-title {
+      font-family: var(--font-display);
+      font-weight: 900;
+      font-size: clamp(2.4rem, 5.5vw, 4.4rem);
+      line-height: 1.05;
+      letter-spacing: -0.04em;
+      max-width: 980px;
+      margin: 0 auto 20px;
+      color: var(--text-white);
+    }
+
+    .hero-title-highlight {
+      background: linear-gradient(135deg, #FFFFFF 20%, var(--accent-mint-bright) 70%, var(--accent-mint) 100%);
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+      display: inline-block;
+    }
+
+    .hero-subtitle {
+      max-width: 740px;
+      margin: 0 auto 34px;
+      font-size: clamp(1rem, 1.8vw, 1.18rem);
+      color: var(--text-muted);
+      line-height: 1.6;
+    }
+
+    .hero-cta-bar {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 14px;
+      flex-wrap: wrap;
+      margin-bottom: 28px;
+    }
+
+    .hero-trust-bar {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 20px;
+      flex-wrap: wrap;
+      font-size: 0.75rem;
+      color: var(--text-muted);
+    }
+
+    .hero-trust-item {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .hero-trust-item::before {
+      content: '✓';
+      color: var(--accent-mint);
+      font-weight: 900;
+    }
+
+    /* =========================================================================
+       TERMINAL DE ENGENHARIA & CASCATA DE SLA (Live Preview Chassis)
+       ========================================================================= */
+    .terminal-container {
+      margin: 48px auto 0;
+      max-width: 1040px;
+    }
+
+    .terminal-header {
+      padding: 12px 18px;
+      border-bottom: 1px solid var(--border-hairline);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      background: rgba(0, 0, 0, 0.25);
+    }
+
+    .terminal-dots {
+      display: flex;
+      gap: 6px;
+    }
+
+    .terminal-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: #233421;
+    }
+
+    .terminal-dot.active { background: var(--accent-mint); box-shadow: 0 0 8px var(--accent-mint); }
+    .terminal-dot.amber { background: var(--warning-amber); }
+
+    .terminal-url-pill {
+      flex: 1;
+      max-width: 320px;
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid var(--border-hairline);
+      border-radius: 6px;
+      padding: 4px 12px;
+      font-size: 0.7rem;
+      color: var(--text-dim);
+      font-family: monospace;
+      text-align: left;
+    }
+
+    .terminal-badge-live {
+      font-size: 0.68rem;
+      font-weight: 800;
+      color: var(--accent-mint-bright);
+      background: rgba(18, 217, 160, 0.12);
+      border: 1px solid var(--border-accent);
+      border-radius: var(--r-pill);
+      padding: 2px 10px;
+    }
+
+    .terminal-body {
+      padding: 24px;
+      text-align: left;
+    }
+
+    /* Telemetry KPI Strip */
+    .telemetry-strip {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 12px;
+      margin-bottom: 20px;
+    }
+
+    .telemetry-cell {
+      background: rgba(255, 255, 255, 0.02);
+      border: 1px solid var(--border-hairline);
+      border-radius: var(--r-md);
+      padding: 14px 16px;
+    }
+
+    .telemetry-label {
+      font-size: 0.68rem;
+      color: var(--text-dim);
+      text-transform: uppercase;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+    }
+
+    .telemetry-value {
+      font-size: 1.3rem;
+      font-weight: 900;
+      color: var(--text-white);
+      margin-top: 2px;
+      line-height: 1.1;
+    }
+
+    .telemetry-delta {
+      font-size: 0.68rem;
+      font-weight: 700;
+      color: var(--accent-mint);
+      margin-top: 4px;
+    }
+
+    /* Workflow Cascading Matrix */
+    .cascade-matrix {
+      background: rgba(0, 0, 0, 0.2);
+      border: 1px solid var(--border-hairline);
+      border-radius: var(--r-md);
+      padding: 18px;
+    }
+
+    .cascade-title {
+      font-size: 0.8rem;
+      font-weight: 800;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      margin-bottom: 14px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .cascade-steps {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 10px;
+    }
+
+    .cascade-step {
+      background: var(--bg-surface-elevated);
+      border: 1px solid var(--border-hairline);
+      border-radius: var(--r-sm);
+      padding: 12px;
+      position: relative;
+    }
+
+    .cascade-step.completed { border-color: rgba(18, 217, 160, 0.35); }
+    .cascade-step.running { border-color: var(--accent-mint); box-shadow: 0 0 16px rgba(18, 217, 160, 0.18); }
+    .cascade-step.pending { opacity: 0.65; }
+
+    .step-badge {
+      font-size: 0.62rem;
+      font-weight: 800;
+      padding: 2px 7px;
+      border-radius: var(--r-pill);
+      display: inline-block;
+      margin-bottom: 6px;
+    }
+
+    .step-badge.green { background: rgba(18, 217, 160, 0.15); color: var(--accent-mint); }
+    .step-badge.blue { background: rgba(56, 189, 248, 0.15); color: var(--info-cyan); }
+    .step-badge.muted { background: rgba(255, 255, 255, 0.06); color: var(--text-dim); }
+
+    .step-name {
+      font-size: 0.82rem;
+      font-weight: 800;
+      color: var(--text-white);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .step-sla {
+      font-size: 0.68rem;
+      color: var(--text-dim);
+      margin-top: 4px;
+    }
+
+    /* =========================================================================
+       ASYMMETRICAL BENTO GRID — A MÁQUINA OPERACIONAL
+       ========================================================================= */
+    .section-wrap {
+      padding: var(--space-2xl) 0;
+    }
+
+    .section-header {
+      text-align: center;
+      max-width: 760px;
+      margin: 0 auto 48px;
+    }
+
+    .section-kicker {
+      font-size: 0.72rem;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--accent-mint-bright);
+      margin-bottom: 8px;
+    }
+
+    .section-title {
+      font-family: var(--font-display);
+      font-weight: 900;
+      font-size: clamp(1.8rem, 3.8vw, 2.7rem);
+      line-height: 1.12;
+      letter-spacing: -0.03em;
+      color: var(--text-white);
+      margin-bottom: 12px;
+    }
+
+    .section-desc {
+      color: var(--text-muted);
+      font-size: 0.96rem;
+      line-height: 1.6;
+    }
+
+    .bento-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 18px;
+    }
+
+    .bento-card {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-hairline);
+      border-radius: var(--r-lg);
+      padding: 26px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      position: relative;
+      overflow: hidden;
+      transition: border-color var(--t-spring), transform var(--t-spring);
+    }
+
+    .bento-card:hover {
+      border-color: var(--border-subtle);
+      transform: translateY(-2px);
+    }
+
+    .bento-card.span-2 {
+      grid-column: span 2;
+    }
+
+    .bento-icon {
+      width: 44px;
+      height: 44px;
+      border-radius: 12px;
+      background: rgba(18, 217, 160, 0.08);
+      border: 1px solid var(--border-accent);
+      display: grid;
+      place-items: center;
+      font-size: 1.3rem;
+      margin-bottom: 18px;
+    }
+
+    .bento-card h3 {
+      font-family: var(--font-display);
+      font-size: 1.25rem;
+      font-weight: 800;
+      color: var(--text-white);
+      margin-bottom: 8px;
+      letter-spacing: -0.01em;
+    }
+
+    .bento-card p {
+      font-size: 0.84rem;
+      color: var(--text-muted);
+      line-height: 1.55;
+      margin-bottom: 18px;
+    }
+
+    .bento-chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+
+    .bento-chip {
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid var(--border-hairline);
+      border-radius: var(--r-sm);
+      padding: 4px 10px;
+      font-size: 0.7rem;
+      font-weight: 700;
+      color: var(--text-main);
+    }
+
+    /* =========================================================================
+       CALCULADORA INTERATIVA DE ROI & DESPERDÍCIO (Differentiation Anchor)
+       ========================================================================= */
+    .calculator-box {
+      background: linear-gradient(145deg, #091408, #0E1F0D);
+      border: 1px solid var(--border-accent);
+      border-radius: var(--r-lg);
+      padding: 40px 36px;
+      box-shadow: var(--shadow-ambient);
+    }
+
+    .calc-layout {
+      display: grid;
+      grid-template-columns: 1.1fr 1fr;
+      gap: 36px;
+      align-items: center;
+    }
+
+    .calc-controls {
+      display: flex;
+      flex-direction: column;
+      gap: 26px;
+    }
+
+    .calc-control-group {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .calc-label-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 0.84rem;
+      font-weight: 700;
+      color: var(--text-main);
+    }
+
+    .calc-display-val {
+      font-size: 1rem;
+      font-weight: 900;
+      color: var(--accent-mint-bright);
+    }
+
+    .calc-slider {
+      width: 100%;
+      height: 8px;
+      border-radius: 4px;
+      background: rgba(255, 255, 255, 0.1);
+      outline: none;
+      -webkit-appearance: none;
+      appearance: none;
+      cursor: pointer;
+    }
+
+    .calc-slider::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      background: var(--accent-mint);
+      border: 2px solid var(--bg-void);
+      box-shadow: 0 0 12px var(--accent-mint);
+      cursor: pointer;
+      transition: transform var(--t-spring);
+    }
+
+    .calc-slider::-webkit-slider-thumb:hover {
+      transform: scale(1.15);
+    }
+
+    .calc-results {
+      background: rgba(0, 0, 0, 0.35);
+      border: 1px solid var(--border-hairline);
+      border-radius: var(--r-md);
+      padding: 26px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .calc-result-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid var(--border-hairline);
+      padding-bottom: 12px;
+    }
+
+    .calc-metric-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+    }
+
+    .calc-metric-card {
+      background: rgba(255, 255, 255, 0.02);
+      border: 1px solid var(--border-hairline);
+      border-radius: var(--r-sm);
+      padding: 12px 14px;
+    }
+
+    .calc-metric-card.hero-metric {
+      grid-column: span 2;
+      background: rgba(18, 217, 160, 0.05);
+      border-color: var(--border-accent);
+    }
+
+    .calc-metric-label {
+      font-size: 0.68rem;
+      color: var(--text-dim);
+      font-weight: 700;
+      text-transform: uppercase;
+    }
+
+    .calc-metric-val {
+      font-size: 1.4rem;
+      font-weight: 900;
+      color: var(--text-white);
+      margin-top: 2px;
+    }
+
+    .calc-metric-card.hero-metric .calc-metric-val {
+      font-size: 1.9rem;
+      color: var(--accent-mint-bright);
+    }
+
+    /* =========================================================================
+       PLANOS & PRICING
+       ========================================================================= */
+    .billing-switcher-wrap {
+      display: flex;
+      justify-content: center;
+      margin-bottom: 36px;
+    }
+
+    .billing-switcher {
+      display: inline-flex;
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--r-pill);
+      padding: 5px;
+      gap: 5px;
+      box-shadow: 0 8px 30px rgba(0, 0, 0, 0.4);
+      max-width: 100%;
+      overflow-x: auto;
+    }
+
+    .cycle-btn {
+      background: transparent;
+      border: 0;
+      color: var(--text-muted);
+      padding: 8px 18px;
+      border-radius: var(--r-pill);
+      font-family: var(--font-display);
+      font-weight: 700;
+      font-size: 0.82rem;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      transition: all var(--t-spring);
+      white-space: nowrap;
+    }
+
+    .cycle-btn:hover {
+      color: var(--text-white);
+      background: rgba(255, 255, 255, 0.06);
+    }
+
+    .cycle-btn.active {
+      background: linear-gradient(135deg, var(--gold-champagne), var(--gold-deep));
+      color: #0E1208;
+      font-weight: 900;
+      box-shadow: 0 4px 14px var(--gold-glow);
+    }
+
+    .discount-pill {
+      font-size: 0.62rem;
+      font-weight: 900;
+      padding: 2px 7px;
+      border-radius: var(--r-pill);
+      background: rgba(18, 217, 160, 0.15);
+      color: var(--accent-mint-bright);
+      border: 1px solid var(--border-accent);
+    }
+
+    .cycle-btn.active .discount-pill {
+      background: #0E1208;
+      color: var(--gold-champagne);
+      border-color: rgba(0, 0, 0, 0.3);
+    }
+
+    .plans-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 20px;
+      align-items: stretch;
+    }
+
+    .plan-card {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-hairline);
+      border-radius: var(--r-lg);
+      padding: 30px;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+    }
+
+    .plan-card.featured {
+      background: linear-gradient(145deg, #0C1E0F, #142E18);
+      border-color: var(--border-gold);
+      box-shadow: 0 16px 50px rgba(0, 0, 0, 0.5);
+    }
+
+    .featured-badge {
+      position: absolute;
+      top: -12px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: linear-gradient(135deg, var(--gold-champagne), var(--gold-deep));
+      color: #0E1208;
+      border-radius: var(--r-pill);
+      padding: 4px 14px;
+      font-size: 0.65rem;
+      font-weight: 900;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      white-space: nowrap;
+    }
+
+    .plan-tag {
+      font-size: 0.68rem;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--gold-champagne);
+    }
+
+    .plan-title {
+      font-family: var(--font-display);
+      font-size: 1.35rem;
+      font-weight: 900;
+      color: var(--text-white);
+      margin: 6px 0 2px;
+    }
+
+    .plan-ideal {
+      font-size: 0.76rem;
+      color: var(--text-muted);
+      min-height: 38px;
+    }
+
+    .plan-price-block {
+      margin: 18px 0 4px;
+    }
+
+    .price-value {
+      font-family: var(--font-display);
+      font-weight: 900;
+      font-size: 2.2rem;
+      color: var(--text-white);
+      line-height: 1;
+    }
+
+    .price-value small {
+      font-size: 0.8rem;
+      font-weight: 500;
+      color: var(--text-muted);
+    }
+
+    .plan-cycle-summary {
+      font-size: 0.74rem;
+      color: var(--text-dim);
+      min-height: 22px;
+      margin-bottom: 16px;
+    }
+
+    .plan-cycle-summary strong { color: var(--accent-mint-bright); }
+
+    .plan-quotas {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-bottom: 22px;
+    }
+
+    .quota-box {
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid var(--border-hairline);
+      border-radius: var(--r-sm);
+      padding: 8px 10px;
+    }
+
+    .quota-label {
+      font-size: 0.6rem;
+      color: var(--text-dim);
+      text-transform: uppercase;
+      font-weight: 700;
+    }
+
+    .quota-num {
+      font-size: 0.88rem;
+      font-weight: 800;
+      color: var(--text-white);
+    }
+
+    .plan-features {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      margin-bottom: 26px;
+    }
+
+    .plan-feature-item {
+      font-size: 0.78rem;
+      color: var(--text-main);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .plan-feature-item::before {
+      content: '✓';
+      color: var(--accent-mint);
+      font-weight: 900;
+      flex-shrink: 0;
+    }
+
+    .plan-card .btn {
+      margin-top: auto;
+      width: 100%;
+    }
+
+    /* =========================================================================
+       TABELA COMPARATIVA EDITORIAL
+       ========================================================================= */
+    .compare-container {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-hairline);
+      border-radius: var(--r-lg);
+      overflow: hidden;
+      box-shadow: var(--shadow-ambient);
+    }
+
+    .compare-table {
+      width: 100%;
+      border-collapse: collapse;
+      text-align: center;
+      font-size: 0.8rem;
+    }
+
+    .compare-table th, .compare-table td {
+      padding: 14px 18px;
+      border-bottom: 1px solid var(--border-hairline);
+    }
+
+    .compare-table th:first-child, .compare-table td:first-child {
+      text-align: left;
+      font-weight: 700;
+    }
+
+    .compare-table thead th {
+      background: rgba(243, 207, 103, 0.08);
+      color: var(--gold-champagne);
+      font-family: var(--font-display);
+      font-weight: 900;
+      font-size: 0.85rem;
+    }
+
+    .check-yes { color: var(--accent-mint); font-weight: 900; }
+    .check-no { color: var(--text-dim); }
+
+    /* =========================================================================
+       FAQ EDITORIAL & ACCORDION
+       ========================================================================= */
+    .faq-stack {
+      max-width: 860px;
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .faq-item {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-hairline);
+      border-radius: var(--r-md);
+      overflow: hidden;
+      transition: border-color var(--t-spring);
+    }
+
+    .faq-item[open] {
+      border-color: var(--border-accent);
+    }
+
+    .faq-item summary {
+      padding: 18px 22px;
+      font-family: var(--font-display);
+      font-weight: 800;
+      font-size: 0.95rem;
+      cursor: pointer;
+      list-style: none;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      user-select: none;
+    }
+
+    .faq-item summary::-webkit-details-marker { display: none; }
+
+    .faq-item summary::after {
+      content: '+';
+      color: var(--accent-mint);
+      font-size: 1.2rem;
+      font-weight: 400;
+      transition: transform var(--t-spring);
+    }
+
+    .faq-item[open] summary::after {
+      content: '−';
+      color: var(--gold-champagne);
+    }
+
+    .faq-content {
+      padding: 0 22px 20px;
+      font-size: 0.86rem;
+      color: var(--text-muted);
+      line-height: 1.6;
+    }
+
+    /* =========================================================================
+       FINAL MONUMENTAL CTA & FOOTER
+       ========================================================================= */
+    .cta-banner {
+      background: linear-gradient(145deg, #09190D, #122915);
+      border: 1px solid var(--border-accent);
+      border-radius: var(--r-lg);
+      padding: 56px 36px;
+      text-align: center;
+      box-shadow: var(--shadow-ambient);
+    }
+
+    .cta-banner h2 {
+      font-family: var(--font-display);
+      font-size: clamp(2rem, 4vw, 3rem);
+      font-weight: 900;
+      color: var(--text-white);
+      margin-bottom: 14px;
+      letter-spacing: -0.03em;
+    }
+
+    .cta-banner p {
+      max-width: 640px;
+      margin: 0 auto 30px;
+      color: var(--text-muted);
+      font-size: 1.05rem;
+    }
+
+    .footer {
+      border-top: 1px solid var(--border-hairline);
+      padding: 48px 0 36px;
+      color: var(--text-dim);
+      font-size: 0.78rem;
+    }
+
+    .footer-content {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 32px;
+      flex-wrap: wrap;
+    }
+
+    .footer-links {
+      display: flex;
+      gap: 20px;
+      flex-wrap: wrap;
+    }
+
+    .footer-links a {
+      color: var(--text-muted);
+      text-decoration: none;
+      transition: color var(--t-spring);
+    }
+
+    .footer-links a:hover {
+      color: var(--accent-mint-bright);
+    }
+
+    .float-wa {
+      position: fixed;
+      right: 22px;
+      bottom: 22px;
+      width: 52px;
+      height: 52px;
+      border-radius: 50%;
+      display: grid;
+      place-items: center;
+      background: #24C766;
+      color: #FFFFFF;
+      text-decoration: none;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+      z-index: 90;
+      font-size: 1.35rem;
+    }
+
+    /* =========================================================================
+       RESPONSIVE BREAKPOINTS (Mobile-First Collapse)
+       ========================================================================= */
+    .mobile-compare { display: none; }
+
+    @media (max-width: 960px) {
+      .nav-links { display: none; }
+      .mobile-menu-details { display: block; }
+      .telemetry-strip { grid-template-columns: repeat(2, 1fr); }
+      .cascade-steps { grid-template-columns: repeat(2, 1fr); }
+      .bento-grid { grid-template-columns: 1fr; }
+      .bento-card.span-2 { grid-column: span 1; }
+      .calc-layout { grid-template-columns: 1fr; }
+      .plans-grid { grid-template-columns: 1fr; }
+    }
+
+    @media (max-width: 768px) {
+      .plans{display:flex;overflow-x:auto;scroll-snap-type:x mandatory;gap:16px;padding:12px 4px 20px;}
+      .plans-grid{display:flex;overflow-x:auto;scroll-snap-type:x mandatory;gap:16px;padding:12px 4px 20px;}
+      .plan-card, .plan{min-width:85vw;scroll-snap-align:center;}
+      .compare-shell, .compare-container{display:none;}
+      .mobile-compare{display:block;margin-top:20px;}
+    }
+
+    @media (max-width: 640px) {
+      .header-island { top: 10px; padding: 6px 14px; }
+      .header-cta-group .btn-ghost { display: none; }
+      .hero-title { font-size: 2.2rem; }
+      .telemetry-strip { grid-template-columns: 1fr; }
+      .cascade-steps { grid-template-columns: 1fr; }
+      .calc-metric-grid { grid-template-columns: 1fr; }
+      .calc-metric-card.hero-metric { grid-column: span 1; }
+      .compare-container { overflow-x: auto; }
+      .compare-table { min-width: 540px; }
+    }
   </style>
-  <link rel="stylesheet" href="/css/premium.css?v=20260913" media="screen">
 </head>
-<body class="ui-marketing">
-  <div class="bg"></div>
-  <header class="header">
-    <div class="wrap header-in">
-      <a class="brand" href="/landing" aria-label="FinObra">
-        <span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 32 32" fill="none"><path d="M5 23V13L16 5l11 8v10" stroke="#F3CF67" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/><path d="M11 25v-9h10v9M8 25h16" stroke="#F3CF67" stroke-width="2.4" stroke-linecap="round"/></svg></span>
-        <span class="brand-name">FinObra</span>
-      </a>
-      <nav class="nav" aria-label="Navegação principal">
-        <a href="#modulos">Módulos</a><a href="#planos">Planos</a><a href="#comparar">Comparar</a><a href="#faq">Dúvidas</a>
-      </nav>
-      <div class="header-actions">
-        <a class="btn btn-green desktop-commercial" href="https://wa.me/5595991363678?text=Olá! Gostaria de falar com o Suporte / Comercial do FinObra." target="_blank" rel="noopener noreferrer">Suporte / Comercial</a>
-        <a class="btn btn-soft" href="/login">Entrar</a>
+<body>
+  <!-- Architectural CAD Background Grid -->
+  <div class="cad-blueprint-bg"></div>
+
+  <!-- Fluid Island Header -->
+  <header class="header-island">
+    <a class="brand-group" href="/" aria-label="FinObra — Início">
+      <div class="brand-emblem" aria-hidden="true">
+        <svg viewBox="0 0 32 32" fill="none">
+          <path d="M5 23V13L16 5l11 8v10" stroke="#12D9A0" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M11 25v-9h10v9M8 25h16" stroke="#3EE8B5" stroke-width="2.2" stroke-linecap="round"/>
+        </svg>
       </div>
-      <details class="mobile-menu">
-        <summary aria-label="Abrir menu">☰</summary>
-        <div class="mobile-pop"><a href="#modulos">Módulos</a><a href="#planos">Planos</a><a href="#comparar">Comparar planos</a><a href="#faq">Dúvidas</a><a href="https://wa.me/5595991363678?text=Olá! Gostaria de falar com o Suporte / Comercial do FinObra." target="_blank" rel="noopener noreferrer">Suporte / Comercial</a><a href="/login">Área do cliente</a></div>
+      <span class="brand-title">FinObra</span>
+    </a>
+
+    <nav class="nav-links" aria-label="Navegação Principal">
+      <a class="nav-link" href="#modulos">Módulos</a>
+      <a class="nav-link" href="#roi">Simulador de ROI</a>
+      <a class="nav-link" href="#planos">Planos</a>
+      <a class="nav-link" href="#comparar">Comparativo</a>
+      <a class="nav-link" href="#faq">Dúvidas</a>
+    </nav>
+
+    <div class="header-cta-group">
+      <a class="btn btn-ghost haptic-press" href="/login">Área do Cliente</a>
+      <a class="btn btn-mint haptic-press" href="/cadastro">
+        <span>Testar Grátis</span>
+        <span class="btn-icon-pill">↗</span>
+      </a>
+
+      <details class="mobile-menu-details">
+        <summary class="mobile-menu-summary" aria-label="Abrir Menu">☰</summary>
+        <div class="mobile-drawer-pop">
+          <a href="#modulos">Módulos do Sistema</a>
+          <a href="#roi">Simulador de ROI</a>
+          <a href="#planos">Planos & Preços</a>
+          <a href="#comparar">Comparativo de Recursos</a>
+          <a href="#faq">Dúvidas Frequentes</a>
+          <a href="https://wa.me/5595991363678?text=Olá! Gostaria de falar com o Suporte / Comercial do FinObra." target="_blank" rel="noopener noreferrer">Suporte WhatsApp</a>
+          <a href="/login">Entrar no Sistema</a>
+        </div>
       </details>
     </div>
   </header>
 
   <main>
-    <section class="hero">
-      <div class="wrap hero-layout">
-        <div class="hero-copy">
-          <div class="eyebrow"><span class="dot"></span> Do canteiro ao escritório</div>
-          <h1>Sua obra sob controle.<br><span class="gold">Sua gestão um passo à frente.</span></h1>
-          <p>Financeiro, compras e engenharia conectados. Tenha clareza sobre cada custo e acompanhe suas obras em um só lugar.</p>
-          <div class="hero-actions"><a class="btn btn-primary" href="/cadastro">Testar grátis por 15 dias <span aria-hidden="true">↗</span></a><a class="btn btn-soft" href="#modulos">Conhecer os recursos</a></div>
-          <div class="trust"><span>15 dias para testar</span><span>Sem taxa de implantação</span><span>Sem fidelidade</span><span>Acesse de onde estiver</span></div>
+    <!-- =====================================================================
+         HERO SECTION
+         ===================================================================== -->
+    <section class="hero-section">
+      <div class="wrap">
+        <div class="telemetry-badge">
+          <span class="pulse-dot"></span>
+          <span>SISTEMA OPERACIONAL DA CONSTRUÇÃO CIVIL • v2.38</span>
         </div>
-        <div class="product-frame" aria-label="Exemplo ilustrativo de indicadores no FinObra">
-          <div class="product-inner">
-            <div class="product-bar"><i class="p-dot"></i><i class="p-dot"></i><i class="p-dot"></i><div class="fake-url">finobra.app.br/app/dashboard</div></div>
-            <div class="product-heading"><div><strong>Visão geral das obras</strong><br><small>Os números que orientam sua próxima decisão.</small></div><span class="preview-label">Ilustrativo</span></div>
-            <div class="product-body">
-              <div class="mini-kpi"><small>Obras ativas</small><strong>8 obras</strong></div><div class="mini-kpi"><small>Total recebido</small><strong>R$ 184 mil</strong></div><div class="mini-kpi"><small>Avanço físico</small><strong>63%</strong></div>
-              <div class="preview-chart"><div class="preview-chart-head"><strong>Orçado × realizado</strong><span>Últimos 6 meses</span></div>
-                <svg viewBox="0 0 440 160" role="img" aria-label="Gráfico ilustrativo comparando valores orçados e realizados ao longo de seis meses">
-                  <g stroke="#e5ecdf" stroke-width="1"><path d="M0 30h440M0 70h440M0 110h440M0 150h440"/></g>
-                  <g fill="#d9e7c9"><rect x="20" y="93" width="20" height="57" rx="3"/><rect x="90" y="71" width="20" height="79" rx="3"/><rect x="160" y="82" width="20" height="68" rx="3"/><rect x="230" y="43" width="20" height="107" rx="3"/><rect x="300" y="31" width="20" height="119" rx="3"/><rect x="370" y="16" width="20" height="134" rx="3"/></g>
-                  <g fill="#377d58"><rect x="43" y="106" width="20" height="44" rx="3"/><rect x="113" y="87" width="20" height="63" rx="3"/><rect x="183" y="93" width="20" height="57" rx="3"/><rect x="253" y="62" width="20" height="88" rx="3"/><rect x="323" y="48" width="20" height="102" rx="3"/><rect x="393" y="32" width="20" height="118" rx="3"/></g>
-                </svg><div class="preview-chart-foot"><span>Abr</span><span>Mai</span><span>Jun</span><span>Jul</span><span>Ago</span><span>Set</span></div>
+
+        <h1 class="hero-title">
+          ENGENHARIA & CAIXA CONECTADOS.<br>
+          <span class="hero-title-highlight">CONTROLE MILIMÉTRICO DO CANTEIRO AO ESCRITÓRIO.</span>
+        </h1>
+
+        <p class="hero-subtitle">
+          Gestão financeira multitenant, base oficial <strong>SINAPI/Caixa Econômica</strong>, medições com retenções técnicas e motor de <strong>prazos em cascata</strong>. Estanque o vazamento oculto de custos da sua obra.
+        </p>
+
+        <div class="hero-cta-bar">
+          <a class="btn btn-mint haptic-press" href="/cadastro">
+            <span>Iniciar Teste Grátis de 15 Dias</span>
+            <span class="btn-icon-pill">↗</span>
+          </a>
+          <a class="btn btn-ghost haptic-press" href="#roi">
+            <span>⚡ Simular Economia da Obra</span>
+          </a>
+        </div>
+
+        <div class="hero-trust-bar">
+          <span class="hero-trust-item">15 dias sem cartão de crédito</span>
+          <span class="hero-trust-item">Sem taxa de implantação</span>
+          <span class="hero-trust-item">Padrão SINAPI / Caixa</span>
+          <span class="hero-trust-item">Retenções ISS, INSS e IRRF na fonte</span>
+        </div>
+
+        <!-- Terminal de Engenharia & Workflow em Cascata -->
+        <div class="terminal-container bezel-shell">
+          <div class="terminal-header">
+            <div class="terminal-dots">
+              <span class="terminal-dot"></span>
+              <span class="terminal-dot amber"></span>
+              <span class="terminal-dot active"></span>
+            </div>
+            <div class="terminal-url-pill">finobra.app.br/central-gestor/telemetria</div>
+            <span class="terminal-badge-live">● TELEMETRIA ATIVA</span>
+          </div>
+
+          <div class="terminal-body bezel-core">
+            <!-- Telemetry KPI Strip -->
+            <div class="telemetry-strip">
+              <div class="telemetry-cell">
+                <div class="telemetry-label">Obras Ativas</div>
+                <div class="telemetry-value tabular-nums">8 Obras</div>
+                <div class="telemetry-delta">▲ 100% monitoradas</div>
               </div>
-              <div class="preview-project"><span aria-hidden="true">◈</span><strong>Residencial Horizonte</strong><span>Estrutura · Em andamento</span></div>
+              <div class="telemetry-cell">
+                <div class="telemetry-label">Cumprimento de SLA</div>
+                <div class="telemetry-value tabular-nums">98.4%</div>
+                <div class="telemetry-delta">🟢 No prazo contratual</div>
+              </div>
+              <div class="telemetry-cell">
+                <div class="telemetry-label">Volume sob Gestão</div>
+                <div class="telemetry-value tabular-nums">R$ 2.450.000</div>
+                <div class="telemetry-delta">▲ Conciliado via OFX</div>
+              </div>
+              <div class="telemetry-cell">
+                <div class="telemetry-label">Retenções Técnicas</div>
+                <div class="telemetry-value tabular-nums">R$ 84.120</div>
+                <div class="telemetry-delta">🔒 Retidas na fonte</div>
+              </div>
+            </div>
+
+            <!-- Workflow Cascading Live Matrix -->
+            <div class="cascade-matrix">
+              <div class="cascade-title">
+                <span>Motor de Prazos em Cascata — Obra Exemplo: Residencial Horizonte</span>
+                <span style="color:var(--accent-mint-bright);">SLA Dinâmico Ativo</span>
+              </div>
+              <div class="cascade-steps">
+                <div class="cascade-step completed">
+                  <span class="step-badge green">✓ Concluído</span>
+                  <div class="step-name">1. Sondagem & Fundações</div>
+                  <div class="step-sla tabular-nums">SLA: 25d • Entregue em 23d</div>
+                </div>
+                <div class="cascade-step running">
+                  <span class="step-badge green">⚡ Em Andamento (68%)</span>
+                  <div class="step-name">2. Estrutura & Alvenaria</div>
+                  <div class="step-sla tabular-nums">SLA: 40d • Restam 12d</div>
+                </div>
+                <div class="cascade-step pending">
+                  <span class="step-badge blue">⏳ Próxima na Cascata</span>
+                  <div class="step-name">3. Instalações & Medição 3</div>
+                  <div class="step-sla tabular-nums">Auto-início na conclusão da etapa 2</div>
+                </div>
+                <div class="cascade-step pending">
+                  <span class="step-badge muted">🔒 Bloqueada</span>
+                  <div class="step-name">4. Vistoria CEF & Habite-se</div>
+                  <div class="step-sla tabular-nums">Previsão calculada em tempo real</div>
+                </div>
+              </div>
             </div>
           </div>
         </div>
       </div>
     </section>
 
-    <div class="divider"></div>
-    <section class="section" id="modulos"><div class="wrap"><div class="section-head"><div class="section-tag">Conheça os módulos</div><h2>Uma operação conectada do início ao fim</h2><p>Em vez de uma lista infinita de funcionalidades, organizamos o FinObra de acordo com o trabalho real da construtora.</p></div><div class="swipe-hint">Deslize para conhecer as áreas do sistema →</div><div class="module-groups">
-      <article class="module-card"><div class="module-icon">🏗️</div><h3>Gestão da Obra</h3><p>Centralize clientes, obras, avanço e acompanhamento operacional.</p><div class="module-list"><span class="module-chip">Obras & Clientes</span><span class="module-chip">Medições</span><span class="module-chip">Cronograma</span></div></article>
-      <article class="module-card"><div class="module-icon">💰</div><h3>Financeiro</h3><p>Enxergue receitas, despesas, contas e conciliação por obra.</p><div class="module-list"><span class="module-chip">Fluxo de caixa</span><span class="module-chip">OFX</span><span class="module-chip">Contas bancárias</span></div></article>
-      <article class="module-card"><div class="module-icon">🛒</div><h3>Compras & Fornecedores</h3><p>Organize insumos, fornecedores e solicitações antes da compra.</p><div class="module-list"><span class="module-chip">Fornecedores</span><span class="module-chip">Produtos</span><span class="module-chip">Pré-Compras</span></div></article>
-      <article class="module-card"><div class="module-icon">📄</div><h3>Fiscal & Documentos</h3><p>Centralize notas, contratos, recibos e documentos da empresa.</p><div class="module-list"><span class="module-chip">NF-e / OCR</span><span class="module-chip">Contratos</span><span class="module-chip">Assinatura</span></div></article>
-      <article class="module-card"><div class="module-icon">📐</div><h3>Engenharia</h3><p>Transforme orçamento e execução em indicadores para decisão.</p><div class="module-list"><span class="module-chip">SINAPI</span><span class="module-chip">Curva S / EVM</span><span class="module-chip">ABC / BDI</span></div></article>
-      <article class="module-card"><div class="module-icon">👥</div><h3>Gestão da Empresa</h3><p>Controle equipe, permissões, assinatura, cobrança e suporte.</p><div class="module-list"><span class="module-chip">Usuários</span><span class="module-chip">Sessões</span><span class="module-chip">Conta & Assinatura</span></div></article>
-    </div></div></section>
+    <!-- =====================================================================
+         BENTO GRID — A MÁQUINA OPERACIONAL
+         ===================================================================== -->
+    <section class="section-wrap" id="modulos">
+      <div class="wrap">
+        <div class="section-header">
+          <div class="section-kicker">Engenharia de Ponta a Ponta</div>
+          <h2 class="section-title">A Máquina Operacional da Sua Construtora</h2>
+          <p class="section-desc">Chega de colar fórmulas em planilhas que se perdem no WhatsApp. O FinObra integra custos, compras, fiscal e canteiro com governança rigorosa.</p>
+        </div>
 
-    <div class="divider"></div>
-    <section class="section" id="planos"><div class="wrap"><div class="section-head"><div class="section-tag">Planos claros</div><h2>Escolha pelo tamanho da sua operação</h2><p>Usuários e obras aparecem primeiro. Escolha a periodicidade com desconto e compare os módulos incluídos.</p></div>
-      <div class="billing-switcher-wrap">
-        <div class="billing-switcher" role="tablist" aria-label="Periodicidade de cobrança">
-          <button type="button" class="cycle-btn active" data-cycle="monthly" role="tab" aria-selected="true">Mensal</button>
-          <button type="button" class="cycle-btn" data-cycle="quarterly" role="tab" aria-selected="false">Trimestral <span class="discount-pill">5,5% OFF</span></button>
-          <button type="button" class="cycle-btn" data-cycle="semiannual" role="tab" aria-selected="false">Semestral <span class="discount-pill">11% OFF</span></button>
-          <button type="button" class="cycle-btn" data-cycle="annual" role="tab" aria-selected="false">Anual <span class="discount-pill gold">2 meses grátis</span></button>
+        <div class="bento-grid module-groups">
+          <!-- Bento 1: Grand Hero Card (2 colunas) -->
+          <article class="bento-card span-2">
+            <div>
+              <div class="bento-icon">⏱️</div>
+              <h3>Workflow em Cascata & Gestão de SLAs</h3>
+              <p>O primeiro motor do Brasil onde o atraso em um projeto ou aprovação de prefeitura recalcula automaticamente a data de entrega final e os alertas de toda a equipe. Visões em Linha do Tempo, Kanban e Gráfico de Gantt proporcional.</p>
+            </div>
+            <div class="bento-chips">
+              <span class="bento-chip">Sucessão Automática</span>
+              <span class="bento-chip">Painel Minhas Demandas</span>
+              <span class="bento-chip">Central do Gestor</span>
+              <span class="bento-chip">Templates Caixa/Reforma</span>
+            </div>
+          </article>
+
+          <!-- Bento 2: SINAPI Oficial -->
+          <article class="bento-card">
+            <div>
+              <div class="bento-icon">🏛️</div>
+              <h3>SINAPI Oficial da Caixa</h3>
+              <p>Base analítica e sintética oficial da CEF/IBGE atualizada com snapshots por estado. Suporte a regimes Desonerado e Não Desonerado, leis sociais e BDI diferenciado para materiais e serviços.</p>
+            </div>
+            <div class="bento-chips">
+              <span class="bento-chip">Snapshots Oficiais</span>
+              <span class="bento-chip">Cálculo de BDI</span>
+              <span class="bento-chip">Curva ABC</span>
+            </div>
+          </article>
+
+          <!-- Bento 3: NF-e SEFAZ A1 -->
+          <article class="bento-card">
+            <div>
+              <div class="bento-icon">📄</div>
+              <h3>Monitor SEFAZ com Certificado A1</h3>
+              <p>Conexão mTLS segura que varre a Receita Federal e traz todas as notas emitidas contra o CNPJ da construtora. Importação instantânea de XML para Contas a Pagar sem digitação manual.</p>
+            </div>
+            <div class="bento-chips">
+              <span class="bento-chip">Certificado A1</span>
+              <span class="bento-chip">Varredura SEFAZ</span>
+              <span class="bento-chip">Leitor OCR IA</span>
+            </div>
+          </article>
+
+          <!-- Bento 4: OFX Bancário -->
+          <article class="bento-card">
+            <div>
+              <div class="bento-icon">🏦</div>
+              <h3>Conciliação OFX & Fluxo de Caixa</h3>
+              <p>Extrato unificado de múltiplos bancos com detecção inteligente de duplicidades. Vincule pagamentos ao centro de custo de cada obra e acompanhe o DRE Gerencial em tempo real.</p>
+            </div>
+            <div class="bento-chips">
+              <span class="bento-chip">Conciliação Automática</span>
+              <span class="bento-chip">DRE em Tempo Real</span>
+              <span class="bento-chip">Multi-Banco</span>
+            </div>
+          </article>
+
+          <!-- Bento 5: Medições & Retenções -->
+          <article class="bento-card">
+            <div>
+              <div class="bento-icon">📐</div>
+              <h3>Boletins de Medição com Retenções</h3>
+              <p>Controle acumulado físico e financeiro com dedução automática de ISS, INSS e IRRF na fonte. Emita contratos com assinatura digital ICP-Brasil e recibos de quitação blindados.</p>
+            </div>
+            <div class="bento-chips">
+              <span class="bento-chip">Retenções Técnicas</span>
+              <span class="bento-chip">Assinatura Digital</span>
+              <span class="bento-chip">Validador SHA-256</span>
+            </div>
+          </article>
         </div>
       </div>
-      <div class="swipe-hint">Deslize para comparar os planos →</div><div class="plans">
-      <article class="plan" data-plan="starter"><div class="plan-kicker">Operação essencial</div><h3>Plano Básico</h3><div class="plan-ideal">Para profissionais e pequenas construtoras com equipe enxuta.</div><div class="price" id="landing-price-starter">R$ 119,90 <small>/ mês</small></div><div class="cycle-total" id="landing-total-starter">Cobrança mensal sem fidelidade</div><div class="plan-limits"><div class="limit"><small>Usuários</small><strong>1 usuário</strong></div><div class="limit"><small>Obras</small><strong>3 ativas</strong></div></div><ul><li>Obras, financeiro e fornecedores</li><li>Produtos e insumos</li><li>Medições e cronograma</li><li>OFX, contas e relatórios</li><li>Suporte pelo sistema / WhatsApp</li></ul><a class="btn btn-soft" id="landing-btn-starter" href="https://wa.me/5595991363678?text=Olá! Quero conhecer o Plano Básico Mensal do FinObra." target="_blank" rel="noopener noreferrer">Conhecer Básico</a></article>
-      <article class="plan featured" data-plan="pro"><div class="popular">MAIS ESCOLHIDO</div><div class="plan-kicker">Automação e crescimento</div><h3>Plano Profissional</h3><div class="plan-ideal">Para construtoras que querem automatizar compras, documentos e fiscal.</div><div class="price" id="landing-price-pro">R$ 279,90 <small>/ mês</small></div><div class="cycle-total" id="landing-total-pro">Cobrança mensal sem fidelidade</div><div class="plan-limits"><div class="limit"><small>Usuários</small><strong>2 usuários</strong></div><div class="limit"><small>Obras</small><strong>10 ativas</strong></div></div><ul><li>Tudo do Plano Básico</li><li>Pré-Compras e contratos</li><li>NF-e e OCR com IA</li><li>Documentos e assinatura eletrônica</li><li>Suporte prioritário</li></ul><a class="btn btn-primary" id="landing-btn-pro" href="/cadastro">Testar 15 dias grátis</a></article>
-      <article class="plan" data-plan="unlimited"><div class="plan-kicker">Operação completa</div><h3>Construtora Ilimitado</h3><div class="plan-ideal">Para equipes que precisam de engenharia avançada e escala.</div><div class="price" id="landing-price-unlimited">R$ 499,90 <small>/ mês</small></div><div class="cycle-total" id="landing-total-unlimited">Cobrança mensal sem fidelidade</div><div class="plan-limits"><div class="limit"><small>Usuários</small><strong>5 usuários</strong></div><div class="limit"><small>Obras</small><strong>Ilimitadas</strong></div></div><ul><li>Tudo do Plano Profissional</li><li>SINAPI / Caixa</li><li>Curva S, EVM, Curva ABC e BDI</li><li>Permissões avançadas por módulo</li><li>Suporte prioritário / VIP</li></ul><a class="btn btn-soft" id="landing-btn-unlimited" href="https://wa.me/5595991363678?text=Olá! Quero conhecer o Plano Construtora Ilimitado Mensal do FinObra." target="_blank" rel="noopener noreferrer">Conhecer Ilimitado</a></article>
-    </div></div></section>
+    </section>
 
-    <section class="section" id="comparar"><div class="wrap"><div class="section-head"><div class="section-tag">Comparação</div><h2>O que muda de um plano para outro?</h2><p>A base da gestão continua simples. Os planos superiores adicionam automação, documentos e controles avançados de engenharia.</p></div>
-      <div class="compare-shell"><table class="compare"><thead><tr><th>Recurso</th><th>Básico</th><th>Profissional</th><th>Ilimitado</th></tr></thead><tbody>
-        <tr><td>Usuários ativos</td><td>1</td><td>2</td><td>5</td></tr><tr><td>Obras ativas</td><td>3</td><td>10</td><td>Ilimitadas</td></tr><tr><td>Obras, clientes e financeiro</td><td class="yes">✓</td><td class="yes">✓</td><td class="yes">✓</td></tr><tr><td>Fornecedores, produtos e medições</td><td class="yes">✓</td><td class="yes">✓</td><td class="yes">✓</td></tr><tr><td>OFX, contas e relatórios</td><td class="yes">✓</td><td class="yes">✓</td><td class="yes">✓</td></tr><tr><td>Pré-Compras e contratos</td><td class="no">—</td><td class="yes">✓</td><td class="yes">✓</td></tr><tr><td>NF-e / OCR com IA</td><td class="no">—</td><td class="yes">✓</td><td class="yes">✓</td></tr><tr><td>Documentos e assinatura eletrônica</td><td class="no">—</td><td class="yes">✓</td><td class="yes">✓</td></tr><tr><td>SINAPI / Caixa</td><td class="no">—</td><td class="no">—</td><td class="yes">✓</td></tr><tr><td>Curva S, EVM, ABC e BDI</td><td class="no">—</td><td class="no">—</td><td class="yes">✓</td></tr><tr><td>Permissões avançadas por módulo</td><td class="no">—</td><td class="no">—</td><td class="yes">✓</td></tr>
-      </tbody></table></div>
-      <div class="mobile-compare"><details open><summary>Limites da conta</summary><div class="compare-items"><div class="compare-item"><span>Básico</span><strong>1 usuário • 3 obras</strong></div><div class="compare-item"><span>Profissional</span><strong>2 usuários • 10 obras</strong></div><div class="compare-item"><span>Ilimitado</span><strong>5 usuários • obras ilimitadas</strong></div></div></details><details><summary>Gestão e Financeiro</summary><div class="compare-items"><div class="compare-item"><span>Obras, clientes, financeiro, fornecedores, produtos, medições, OFX e relatórios</span><strong class="yes">Todos</strong></div></div></details><details><summary>Automação e Documentos</summary><div class="compare-items"><div class="compare-item"><span>Básico</span><strong>Essencial</strong></div><div class="compare-item"><span>Profissional</span><strong>OCR, contratos, documentos, assinatura</strong></div><div class="compare-item"><span>Ilimitado</span><strong>Todos</strong></div></div></details><details><summary>Engenharia avançada</summary><div class="compare-items"><div class="compare-item"><span>Básico</span><strong>—</strong></div><div class="compare-item"><span>Profissional</span><strong>Orçamentos</strong></div><div class="compare-item"><span>Ilimitado</span><strong>SINAPI, Curva S, EVM, ABC e BDI</strong></div></div></details></div>
-    </div></section>
+    <!-- =====================================================================
+         CALCULADORA DE ROI (Differentiation Anchor)
+         ===================================================================== -->
+    <section class="section-wrap" id="roi">
+      <div class="wrap">
+        <div class="calculator-box">
+          <div class="calc-layout">
+            <div class="calc-controls">
+              <div>
+                <div class="section-kicker">Simulador de Produtividade</div>
+                <h2 style="font-family:var(--font-display);font-size:1.85rem;font-weight:900;color:var(--text-white);letter-spacing:-0.02em;margin-bottom:8px;">
+                  Simule o Impacto do FinObra na Sua Construtora
+                </h2>
+                <p style="font-size:0.86rem;color:var(--text-muted);">
+                  Ajuste o número de canteiros e o volume de compras para estimar horas de retrabalho poupadas e vazamentos de custos estancados.
+                </p>
+              </div>
 
-    <div class="divider"></div>
-    <section class="section"><div class="wrap"><div class="support-box"><div class="support-main"><div class="section-tag">Acompanhamento humano</div><h3>Suporte para usar o sistema, Comercial para escolher o plano</h3><p>Você não precisa decorar um número nem procurar quem atende o quê. O mesmo canal direciona dúvidas de uso, demonstração e contratação para a equipe responsável.</p><div class="support-points"><div class="support-point">💬 Central de chat dentro do FinObra</div><div class="support-point">🧑‍💼 Suporte / Comercial via WhatsApp</div><div class="support-point">📚 FinBot para dúvidas rápidas do sistema</div><div class="support-point">🚀 Orientação de implantação e uso</div></div></div><div class="support-side"><h3>Quer entender qual plano serve para você?</h3><p>Conte quantas obras e pessoas sua equipe possui. A equipe orienta a opção adequada sem você precisar interpretar uma tabela sozinho.</p><a class="btn btn-green" style="width:100%;margin-top:10px" href="https://wa.me/5595991363678?text=Olá! Quero ajuda para escolher o melhor plano do FinObra." target="_blank" rel="noopener noreferrer">Falar com Suporte / Comercial</a></div></div></div></section>
+              <!-- Slider 1: Obras Ativas -->
+              <div class="calc-control-group">
+                <div class="calc-label-row">
+                  <span>Obras Simultâneas</span>
+                  <span class="calc-display-val tabular-nums" id="roi-display-obras">4 obras ativas</span>
+                </div>
+                <input type="range" class="calc-slider" id="roi-input-obras" min="1" max="15" value="4" step="1">
+              </div>
 
-    <section class="section" id="faq"><div class="wrap"><div class="section-head"><div class="section-tag">Perguntas frequentes</div><h2>Dúvidas antes de começar</h2></div><div class="faq"><details open><summary>Quantas pessoas podem acessar o FinObra?</summary><div>O limite é por pessoa/usuário ativo: 1 no Básico, 2 no Profissional e 5 no Ilimitado. Notebook, celular e outros dispositivos da mesma pessoa não contam como novos usuários do plano.</div></details><details><summary>O que acontece quando chego ao limite de usuários?</summary><div>O FinObra avisa de forma amigável e permite gerenciar os usuários atuais ou conhecer um plano com mais acessos. O limite não derruba dados nem transforma dispositivos em usuários extras.</div></details><details><summary>Posso testar antes de contratar?</summary><div>Sim. O período de teste é de 15 dias para você conhecer o fluxo do sistema antes de escolher o plano.</div></details><details><summary>Como funcionam os módulos bloqueados?</summary><div>O menu mostra o módulo com cadeado e explica em qual nível ele está disponível. A restrição também é validada no servidor; não é apenas um botão escondido na interface.</div></details><details><summary>O sistema funciona no celular?</summary><div>Sim. A interface é responsiva e os principais fluxos podem ser usados pelo navegador do celular, tablet ou computador.</div></details><details><summary>Como funciona o suporte?</summary><div>Clientes têm central de chat dentro do FinObra, FinBot para dúvidas rápidas e o canal Suporte / Comercial para falar com a equipe quando necessário.</div></details></div></div></section>
+              <!-- Slider 2: Volume Mensal de Compras/Despesas -->
+              <div class="calc-control-group">
+                <div class="calc-label-row">
+                  <span>Volume Mensal de Compras / Caixa</span>
+                  <span class="calc-display-val tabular-nums" id="roi-display-volume">R$ 350.000 / mês</span>
+                </div>
+                <input type="range" class="calc-slider" id="roi-input-volume" min="50000" max="2000000" value="350000" step="25000">
+              </div>
+            </div>
 
-    <section class="cta"><div class="wrap"><div class="cta-card"><div class="section-tag">Comece sem compromisso</div><h2>Veja o FinObra funcionando na sua rotina</h2><p>Teste por 15 dias e acompanhe obras, financeiro, compras e documentos antes de decidir qual plano faz sentido para sua construtora.</p><div class="hero-actions"><a class="btn btn-primary" href="/cadastro">Começar teste grátis</a><a class="btn btn-green" href="https://wa.me/5595991363678?text=Olá! Gostaria de falar com o Suporte / Comercial do FinObra." target="_blank" rel="noopener noreferrer">Suporte / Comercial</a></div></div></div></section>
+            <!-- Display de Resultados -->
+            <div class="calc-results">
+              <div class="calc-result-header">
+                <span style="font-size:0.75rem;font-weight:800;text-transform:uppercase;color:var(--accent-mint-bright);">Projeção em Tempo Real</span>
+                <span class="step-badge green tabular-nums" id="roi-out-roi">36x ROI</span>
+              </div>
+
+              <div class="calc-metric-grid">
+                <div class="calc-metric-card">
+                  <div class="calc-metric-label">Horas Poupadas / Mês</div>
+                  <div class="calc-metric-val tabular-nums" id="roi-out-horas">56h</div>
+                </div>
+                <div class="calc-metric-card">
+                  <div class="calc-metric-label">Vazamento Estancado / Mês</div>
+                  <div class="calc-metric-val tabular-nums" id="roi-out-economia">R$ 11.200</div>
+                </div>
+                <div class="calc-metric-card hero-metric">
+                  <div class="calc-metric-label">Economia Anual Projetada</div>
+                  <div class="calc-metric-val tabular-nums" id="roi-out-anual">R$ 188.160</div>
+                  <div style="font-size:0.7rem;color:var(--text-dim);margin-top:4px;">
+                    Considera desvios médios de canteiro evitados (3,2%) + hora técnica de engenharia (R$ 80/h).
+                  </div>
+                </div>
+              </div>
+
+              <a class="btn btn-mint haptic-press" style="width:100%;margin-top:6px;" href="/cadastro">
+                <span>Estancar Custos — Testar 15 Dias Grátis</span>
+                <span class="btn-icon-pill">↗</span>
+              </a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- =====================================================================
+         PLANOS & INVESTIMENTO
+         ===================================================================== -->
+    <section class="section-wrap" id="planos">
+      <div class="wrap">
+        <div class="section-header">
+          <div class="section-kicker">Investimento Transparente</div>
+          <h2 class="section-title">Escolha Conforme a Escala da Sua Construtora</h2>
+          <p class="section-desc">Planos dimensionados por quantidade de obras ativas e operadores. Sem fidelidade forçada, sem taxa oculta de implantação.</p>
+        </div>
+
+        <!-- Seletor de Periodicidade -->
+        <div class="billing-switcher-wrap">
+          <div class="billing-switcher" role="tablist" aria-label="Periodicidade de cobrança">
+            <button type="button" class="cycle-btn active haptic-press" data-cycle="monthly" role="tab" aria-selected="true">Mensal</button>
+            <button type="button" class="cycle-btn haptic-press" data-cycle="quarterly" role="tab" aria-selected="false">Trimestral <span class="discount-pill">5,5% OFF</span></button>
+            <button type="button" class="cycle-btn haptic-press" data-cycle="semiannual" role="tab" aria-selected="false">Semestral <span class="discount-pill">11% OFF</span></button>
+            <button type="button" class="cycle-btn haptic-press" data-cycle="annual" role="tab" aria-selected="false">Anual <span class="discount-pill">2 meses grátis</span></button>
+          </div>
+        </div>
+
+        <div class="plans-grid plans">
+          <!-- Plano 1: Básico -->
+          <article class="plan-card" data-plan="starter">
+            <div class="plan-tag">Operação Essencial</div>
+            <h3 class="plan-title">Plano Básico</h3>
+            <div class="plan-ideal">Para engenheiros autônomos e empreiteiros com equipe enxuta.</div>
+
+            <div class="plan-price-block">
+              <div class="price-value tabular-nums" id="landing-price-starter">R$ 119,90 <small>/ mês</small></div>
+            </div>
+            <div class="plan-cycle-summary" id="landing-total-starter">Cobrança mensal sem fidelidade</div>
+
+            <div class="plan-quotas">
+              <div class="quota-box">
+                <div class="quota-label">Usuários</div>
+                <div class="quota-num">1 usuário</div>
+              </div>
+              <div class="quota-box">
+                <div class="quota-label">Obras Ativas</div>
+                <div class="quota-num">3 ativas</div>
+              </div>
+            </div>
+
+            <ul class="plan-features">
+              <li class="plan-feature-item">Gestão de Obras, Clientes e Financeiro</li>
+              <li class="plan-feature-item">Boletins de Medição e Cronograma SLA</li>
+              <li class="plan-feature-item">Conciliação OFX e Contas Bancárias</li>
+              <li class="plan-feature-item">Relatórios Financeiros e DRE</li>
+              <li class="plan-feature-item">Suporte via Chat e WhatsApp</li>
+            </ul>
+
+            <a class="btn btn-ghost haptic-press" id="landing-btn-starter" href="https://wa.me/5595991363678?text=Olá! Quero conhecer o Plano Básico Mensal do FinObra." target="_blank" rel="noopener noreferrer">
+              Conhecer Básico
+            </a>
+          </article>
+
+          <!-- Plano 2: Profissional (Destaque) -->
+          <article class="plan-card featured" data-plan="pro">
+            <div class="featured-badge">MAIS ESCOLHIDO</div>
+            <div class="plan-tag">Automação & Fiscal</div>
+            <h3 class="plan-title">Plano Profissional</h3>
+            <div class="plan-ideal">Para construtoras que exigem automação de compras, SEFAZ e contratos.</div>
+
+            <div class="plan-price-block">
+              <div class="price-value tabular-nums" id="landing-price-pro">R$ 279,90 <small>/ mês</small></div>
+            </div>
+            <div class="plan-cycle-summary" id="landing-total-pro">Cobrança mensal sem fidelidade</div>
+
+            <div class="plan-quotas">
+              <div class="quota-box">
+                <div class="quota-label">Usuários</div>
+                <div class="quota-num">2 usuários</div>
+              </div>
+              <div class="quota-box">
+                <div class="quota-label">Obras Ativas</div>
+                <div class="quota-num">10 ativas</div>
+              </div>
+            </div>
+
+            <ul class="plan-features">
+              <li class="plan-feature-item">Tudo incluso no Plano Básico</li>
+              <li class="plan-feature-item">Pré-Compras, Cotações e Fornecedores</li>
+              <li class="plan-feature-item">Varredura NF-e SEFAZ e OCR com IA</li>
+              <li class="plan-feature-item">Contratos com Assinatura Eletrônica</li>
+              <li class="plan-feature-item">Suporte Prioritário</li>
+            </ul>
+
+            <a class="btn btn-gold haptic-press" id="landing-btn-pro" href="/cadastro">
+              <span>Testar 15 Dias Grátis</span>
+              <span class="btn-icon-pill">↗</span>
+            </a>
+          </article>
+
+          <!-- Plano 3: Ilimitado -->
+          <article class="plan-card" data-plan="unlimited">
+            <div class="plan-tag">Engenharia Completa</div>
+            <h3 class="plan-title">Construtora Ilimitado</h3>
+            <div class="plan-ideal">Para incorporadoras e médias construtoras com orçamentação SINAPI.</div>
+
+            <div class="plan-price-block">
+              <div class="price-value tabular-nums" id="landing-price-unlimited">R$ 499,90 <small>/ mês</small></div>
+            </div>
+            <div class="plan-cycle-summary" id="landing-total-unlimited">Cobrança mensal sem fidelidade</div>
+
+            <div class="plan-quotas">
+              <div class="quota-box">
+                <div class="quota-label">Usuários</div>
+                <div class="quota-num">5 usuários</div>
+              </div>
+              <div class="quota-box">
+                <div class="quota-label">Obras Ativas</div>
+                <div class="quota-num">Ilimitadas</div>
+              </div>
+            </div>
+
+            <ul class="plan-features">
+              <li class="plan-feature-item">Tudo incluso no Plano Profissional</li>
+              <li class="plan-feature-item">Base Oficial SINAPI da Caixa Econômica</li>
+              <li class="plan-feature-item">Curva S, EVM, Curva ABC e BDI Diferenciado</li>
+              <li class="plan-feature-item">Matriz de Permissões Avançadas por Cargo</li>
+              <li class="plan-feature-item">Suporte VIP / Concierge Dedicado</li>
+            </ul>
+
+            <a class="btn btn-ghost haptic-press" id="landing-btn-unlimited" href="https://wa.me/5595991363678?text=Olá! Quero conhecer o Plano Construtora Ilimitado Mensal do FinObra." target="_blank" rel="noopener noreferrer">
+              Conhecer Ilimitado
+            </a>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <!-- =====================================================================
+         TABELA COMPARATIVA EDITORIAL
+         ===================================================================== -->
+    <section class="section-wrap" id="comparar">
+      <div class="wrap">
+        <div class="section-header">
+          <div class="section-kicker">Matriz de Recursos</div>
+          <h2 class="section-title">Comparativo Técnico de Recursos</h2>
+          <p class="section-desc">Transparência total sobre as funcionalidades de cada camada do FinObra.</p>
+        </div>
+
+        <div class="compare-container">
+          <table class="compare-table">
+            <thead>
+              <tr>
+                <th>Recursos & Módulos</th>
+                <th>Básico</th>
+                <th>Profissional</th>
+                <th>Ilimitado</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Usuários Ativos</td>
+                <td class="tabular-nums">1 usuário</td>
+                <td class="tabular-nums">2 usuários</td>
+                <td class="tabular-nums">5 usuários</td>
+              </tr>
+              <tr>
+                <td>Canteiros de Obra Ativos</td>
+                <td class="tabular-nums">3 ativas</td>
+                <td class="tabular-nums">10 ativas</td>
+                <td class="tabular-nums">Ilimitadas</td>
+              </tr>
+              <tr>
+                <td>Gestão Financeira, Caixa & DRE</td>
+                <td class="check-yes">✓</td>
+                <td class="check-yes">✓</td>
+                <td class="check-yes">✓</td>
+              </tr>
+              <tr>
+                <td>Boletins de Medição & Retenções</td>
+                <td class="check-yes">✓</td>
+                <td class="check-yes">✓</td>
+                <td class="check-yes">✓</td>
+              </tr>
+              <tr>
+                <td>Conciliação OFX Multi-Banco</td>
+                <td class="check-yes">✓</td>
+                <td class="check-yes">✓</td>
+                <td class="check-yes">✓</td>
+              </tr>
+              <tr>
+                <td>Pré-Compras & Gestão de Cotações</td>
+                <td class="check-no">—</td>
+                <td class="check-yes">✓</td>
+                <td class="check-yes">✓</td>
+              </tr>
+              <tr>
+                <td>Monitor SEFAZ A1 & Leitor OCR</td>
+                <td class="check-no">—</td>
+                <td class="check-yes">✓</td>
+                <td class="check-yes">✓</td>
+              </tr>
+              <tr>
+                <td>Contratos com Assinatura Eletrônica</td>
+                <td class="check-no">—</td>
+                <td class="check-yes">✓</td>
+                <td class="check-yes">✓</td>
+              </tr>
+              <tr>
+                <td>Base Oficial SINAPI da Caixa</td>
+                <td class="check-no">—</td>
+                <td class="check-no">—</td>
+                <td class="check-yes">✓</td>
+              </tr>
+              <tr>
+                <td>Curva S, EVM, Curva ABC & BDI</td>
+                <td class="check-no">—</td>
+                <td class="check-no">—</td>
+                <td class="check-yes">✓</td>
+              </tr>
+              <tr>
+                <td>Permissões por Cargo & Auditoria 2FA</td>
+                <td class="check-no">—</td>
+                <td class="check-no">—</td>
+                <td class="check-yes">✓</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="mobile-compare">
+          <details class="faq-item" open style="margin-bottom:12px;">
+            <summary>Limites da conta</summary>
+            <div class="faq-content" style="padding:14px 18px;">
+              <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border-hairline);"><span>Básico</span><strong>1 usuário • 3 ativas</strong></div>
+              <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border-hairline);"><span>Profissional</span><strong>2 usuários • 10 ativas</strong></div>
+              <div style="display:flex;justify-content:space-between;padding:8px 0;"><span>Ilimitado</span><strong>5 usuários • Ilimitadas</strong></div>
+            </div>
+          </details>
+          <details class="faq-item" style="margin-bottom:12px;">
+            <summary>Gestão e Financeiro</summary>
+            <div class="faq-content" style="padding:14px 18px;">
+              <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border-hairline);"><span>Básico</span><strong>Medições, Cronograma SLA, Conciliação OFX e DRE</strong></div>
+              <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border-hairline);"><span>Profissional</span><strong>Pré-Compras, Cotações, NF-e SEFAZ e OCR</strong></div>
+              <div style="display:flex;justify-content:space-between;padding:8px 0;"><span>Ilimitado</span><strong>Todos os módulos e conciliações</strong></div>
+            </div>
+          </details>
+          <details class="faq-item">
+            <summary>Engenharia Avançada e Governança</summary>
+            <div class="faq-content" style="padding:14px 18px;">
+              <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border-hairline);"><span>Básico</span><strong>Cronograma essencial</strong></div>
+              <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border-hairline);"><span>Profissional</span><strong>Contratos digitais e medições com retenções</strong></div>
+              <div style="display:flex;justify-content:space-between;padding:8px 0;"><span>Ilimitado</span><strong>SINAPI Oficial CEF, Curva S, EVM, ABC, BDI e Permissões por Cargo</strong></div>
+            </div>
+          </details>
+        </div>
+      </div>
+    </section>
+
+    <!-- =====================================================================
+         FAQ EDITORIAL
+         ===================================================================== -->
+    <section class="section-wrap" id="faq">
+      <div class="wrap">
+        <div class="section-header">
+          <div class="section-kicker">Respostas Claras</div>
+          <h2 class="section-title">Dúvidas Frequentes</h2>
+        </div>
+
+        <div class="faq-stack">
+          <details class="faq-item" open>
+            <summary>Como funciona o teste grátis de 15 dias?</summary>
+            <div class="faq-content">
+              Você cria sua conta em menos de 1 minuto e tem acesso irrestrito às funcionalidades do plano para testar com suas obras reais. Não pedimos número de cartão de crédito e não cobramos taxa de implantação.
+            </div>
+          </details>
+
+          <details class="faq-item">
+            <summary>Como funciona o limite de usuários ativos?</summary>
+            <div class="faq-content">
+              O limite é contado por pessoas da sua equipe com login próprio (1 no Básico, 2 no Profissional e 5 no Ilimitado). Se a mesma pessoa acessar do notebook do escritório e do celular no canteiro, conta como apenas 1 usuário.
+            </div>
+          </details>
+
+          <details class="faq-item">
+            <summary>O sistema funciona no canteiro de obras pelo celular?</summary>
+            <div class="faq-content">
+              Sim! Toda a interface foi desenhada com responsividade total para celulares e tablets. Mestres de obra e engenheiros de campo podem registrar apontamentos de fases, fotos e medições diretamente pelo smartphone.
+            </div>
+          </details>
+
+          <details class="faq-item">
+            <summary>A base do SINAPI é oficial e atualizada?</summary>
+            <div class="faq-content">
+              Sim. Conectamos snapshots oficiais mensais publicados pela Caixa Econômica Federal e pelo IBGE para cada UF do Brasil, garantindo orçamentos desonerados e não desonerados em total conformidade pública e bancária.
+            </div>
+          </details>
+
+          <details class="faq-item">
+            <summary>Como é feito o suporte e atendimento?</summary>
+            <div class="faq-content">
+              Disponibilizamos chat interno em tempo real dentro do sistema, canal direto com nossa equipe via WhatsApp e o assistente de engenharia FinBot para esclarecimento imediato de procedimentos operacionais.
+            </div>
+          </details>
+        </div>
+      </div>
+    </section>
+
+    <!-- =====================================================================
+         FINAL CALL TO ACTION
+         ===================================================================== -->
+    <section class="section-wrap">
+      <div class="wrap">
+        <div class="cta-banner">
+          <h2>Assuma o Controle Cirúrgico das Suas Obras</h2>
+          <p>Experimente o FinObra por 15 dias sem compromisso e veja a diferença de ter custos, compras, medições e prazos em um ecossistema unificado.</p>
+          <div class="hero-cta-bar" style="margin-bottom:0;">
+            <a class="btn btn-mint haptic-press" href="/cadastro">
+              <span>Criar Conta Gratuita em 1 Minuto</span>
+              <span class="btn-icon-pill">↗</span>
+            </a>
+            <a class="btn btn-ghost haptic-press" href="https://wa.me/5595991363678?text=Olá! Gostaria de falar com o Suporte / Comercial do FinObra." target="_blank" rel="noopener noreferrer">
+              Falar com Consultor
+            </a>
+          </div>
+        </div>
+      </div>
+    </section>
   </main>
 
-  <footer class="footer"><div class="wrap footer-in"><div><div class="brand-name" style="display:inline-block;margin-bottom:6px">FinObra</div><div>Gestão de obras, financeiro e engenharia em nuvem.<br>CNPJ: 65.512.273/0001-60 • Boa Vista / Roraima</div></div><div class="footer-links"><a href="/login">Área do Cliente</a><a href="/validar" target="_blank">Validar Documento</a><a href="/privacidade">Privacidade</a><a href="/termos">Termos</a><a href="https://wa.me/5595991363678?text=Olá! Gostaria de falar com o Suporte / Comercial do FinObra." target="_blank" rel="noopener noreferrer">Suporte / Comercial</a></div><div>© 2026 FinObra. Todos os direitos reservados.</div></div></footer>
-  <a class="float-wa" href="https://wa.me/5595991363678?text=Olá! Gostaria de falar com o Suporte / Comercial do FinObra." target="_blank" rel="noopener noreferrer" aria-label="Falar com Suporte / Comercial">💬</a>
+  <!-- =====================================================================
+       CORPORATE FOOTER
+       ===================================================================== -->
+  <footer class="footer">
+    <div class="wrap footer-content">
+      <div>
+        <div class="brand-title" style="margin-bottom:6px;">FinObra</div>
+        <div style="line-height:1.6;">
+          Sistema SaaS de Gestão Financeira e Operacional para Construtoras.<br>
+          CNPJ: 65.512.273/0001-60 • Boa Vista / Roraima — Brasil
+        </div>
+      </div>
 
+      <div class="footer-links">
+        <a href="/login">Área do Cliente</a>
+        <a href="/validar" target="_blank">Validar Documento ICP</a>
+        <a href="/privacidade">Privacidade & LGPD</a>
+        <a href="/termos">Termos de Uso</a>
+        <a href="/llms.txt" target="_blank">llms.txt</a>
+        <a href="https://wa.me/5595991363678?text=Olá! Gostaria de falar com o Suporte / Comercial do FinObra." target="_blank" rel="noopener noreferrer">Suporte WhatsApp</a>
+      </div>
+
+      <div>
+        © 2026 FinObra Tecnologia. Todos os direitos reservados.
+      </div>
+    </div>
+  </footer>
+
+  <!-- Floating WhatsApp Quick Button -->
+  <a class="float-wa haptic-press" href="https://wa.me/5595991363678?text=Olá! Gostaria de falar com o Suporte / Comercial do FinObra." target="_blank" rel="noopener noreferrer" aria-label="Falar com Suporte e Comercial via WhatsApp">
+    💬
+  </a>
+
+  <!-- SCRIPTS & EVENT BRIDGE (Conforme CSP script-src-attr none) -->
   <script src="/js/landing_page.js"></script>
   <script src="/js/patch26-actions.js"></script>
   <script src="/js/patch26-events.js"></script>

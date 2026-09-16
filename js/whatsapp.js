@@ -209,6 +209,138 @@ const WhatsApp = {
     this.abrirEnvio(msg);
   },
 
+  // ── WORKFLOW & ETAPAS DE OBRA (Patch 53) ──────────────────────────────────
+  gerarMensagemEtapa(obraId, processoId) {
+    if (typeof CronogramaSLA === 'undefined' || typeof DB === 'undefined') return '';
+    const obra = DB.getById('clientes', obraId);
+    if (!obra) return '';
+    const processos = CronogramaSLA.getObraProcessos(obraId);
+    const p = processos.find(x => x.id === processoId);
+    if (!p) return '';
+
+    const resp = p.responsavel_resolvido || CronogramaSLA.getResponsavelEtapa(p);
+    const isAtrasado = p.status_sla === 'atrasado';
+    const isAtencao = p.status_sla === 'atencao';
+    const statusIcon = isAtrasado ? '🔴 ATRASADA' : isAtencao ? '🟡 EM ATENÇÃO' : (p.status === 'concluido' ? '✅ CONCLUÍDA' : '🟢 NO PRAZO');
+
+    const emp = typeof DB !== 'undefined' ? DB.getEmpresa() : null;
+    const nomeEmp = emp?.nome_fantasia || emp?.razao_social || 'FinObra';
+
+    let msg = `🏗️ *${nomeEmp.toUpperCase()} — WORKFLOW DE OBRA*\n`;
+    msg += `-------------------------------------------\n`;
+    msg += `🏢 *Obra:* ${obra.nome}\n`;
+    msg += `📌 *Etapa:* ${p.nome} (${p.codigo || 'SLA'})\n`;
+    msg += `👤 *Responsável:* ${resp ? `${resp.nome} (${resp.cargo || 'Equipe'})` : 'Não atribuído'}\n`;
+    msg += `⏱️ *SLA:* ${p.dias_sla} dias\n`;
+    msg += `📅 *Prazo:* ${typeof Utils !== 'undefined' ? Utils.fmt.date(p.data_fim_prevista) : p.data_fim_prevista}\n`;
+    msg += `🚦 *Status:* ${statusIcon}${isAtrasado ? ` (+${p.dias_atraso}d)` : ''}\n`;
+
+    if (p.motivo_atraso) {
+      msg += `⚠️ *Motivo do atraso:* ${p.motivo_atraso}${p.motivo_atraso_detalhe ? ` - ${p.motivo_atraso_detalhe}` : ''}\n`;
+    }
+
+    if (Array.isArray(p.checklist) && p.checklist.length > 0) {
+      const concluidos = p.checklist.filter(i => p.checklist_status?.[i] === true).length;
+      msg += `✅ *Checklist:* ${concluidos}/${p.checklist.length} itens concluídos\n`;
+    }
+
+    msg += `-------------------------------------------\n`;
+    msg += `👉 _Acesse o sistema para consultar ou apontar o progresso._`;
+    return msg;
+  },
+
+  abrirModalNotificacaoEtapa(obraId, processoId) {
+    if (typeof DB === 'undefined' || typeof CronogramaSLA === 'undefined') return;
+    const obra = DB.getById('clientes', obraId);
+    if (!obra) return;
+    const processos = CronogramaSLA.getObraProcessos(obraId);
+    const p = processos.find(x => x.id === processoId);
+    if (!p) return;
+
+    const resp = p.responsavel_resolvido || CronogramaSLA.getResponsavelEtapa(p);
+    let telSugerido = '';
+    if (resp && resp.id) {
+      const users = (typeof Auth !== 'undefined' && Auth.getUsers) ? Auth.getUsers() : [];
+      const u = users.find(x => x.id === resp.id);
+      telSugerido = u?.telefone || '';
+    }
+    if (!telSugerido) telSugerido = obra.telefone || this.getTelefonePadrao();
+
+    const msg = this.gerarMensagemEtapa(obraId, processoId);
+    const e = Utils.escapeHtml.bind(Utils);
+
+    Utils.showModal(`
+      <div class="modal" style="max-width:480px;">
+        <div class="modal-header">
+          <span class="modal-title">📲 Notificar Responsável no WhatsApp</span>
+          <button class="modal-close" data-fb-click="Utils.closeModal" data-fb-click-n="0">✕</button>
+        </div>
+        <div class="modal-body">
+          <div class="form-group" style="margin-bottom:12px;">
+            <label class="form-label" style="font-weight:700;">Telefone WhatsApp (com DDD) *</label>
+            <input type="tel" class="form-control" id="sla-wa-tel" value="${e(telSugerido)}" placeholder="(11) 99999-9999">
+          </div>
+          <div class="form-group" style="margin-bottom:12px;">
+            <label class="form-label" style="font-size:.78rem;color:var(--text3);">Prévia da Mensagem</label>
+            <div style="background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--r-md);padding:10px 12px;font-size:.76rem;font-family:monospace;white-space:pre-wrap;max-height:160px;overflow-y:auto;color:var(--text);">
+              ${e(msg)}
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-secondary" data-fb-click="Utils.closeModal" data-fb-click-n="0">Cancelar</button>
+          <button class="btn btn-primary" style="background:#25D366;border-color:#25D366;color:#fff;font-weight:800;"
+            data-fb-click="WhatsApp.enviarNotificacaoEtapaSubmit" data-fb-click-n="3"
+            data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(obraId))}"
+            data-fb-click-t1="string" data-fb-click-v1="${encodeURIComponent(String(processoId))}"
+            data-fb-click-t2="domvalue" data-fb-click-v2="sla-wa-tel">
+            🚀 Enviar WhatsApp
+          </button>
+        </div>
+      </div>
+    `);
+  },
+
+  enviarNotificacaoEtapaSubmit(obraId, processoId, telefone) {
+    const msg = this.gerarMensagemEtapa(obraId, processoId);
+    if (!msg) return Utils.toast('Não foi possível gerar a mensagem da etapa.', 'error');
+    const tel = (telefone || '').replace(/\D/g, '');
+    if (!tel) {
+      Utils.toast('Informe um número de telefone com DDD válido.', 'warning');
+      document.getElementById('sla-wa-tel')?.focus();
+      return;
+    }
+    Utils.closeModal();
+    this.abrirEnvio(msg, tel);
+    Utils.toast('Notificação enviada com sucesso!', 'success');
+  },
+
+  enviarResumoWorkflowObra(obraId, telefone = '') {
+    if (typeof DB === 'undefined' || typeof CronogramaSLA === 'undefined') return;
+    const obra = DB.getById('clientes', obraId);
+    if (!obra) return;
+    const resumo = CronogramaSLA.getResumoObra(obraId);
+    if (!resumo) return;
+
+    const emp = typeof DB !== 'undefined' ? DB.getEmpresa() : null;
+    const nomeEmp = emp?.nome_fantasia || emp?.razao_social || 'FinObra';
+
+    let msg = `☀️ *${nomeEmp.toUpperCase()} — STATUS DE WORKFLOW DA OBRA* ☀️\n`;
+    msg += `-------------------------------------------\n`;
+    msg += `🏢 *Obra:* ${obra.nome}\n`;
+    msg += `📊 *Progresso:* ${resumo.percentualConcluido}% (${resumo.totalConcluidos}/${resumo.totalProcessos} etapas concluídas)\n`;
+    if (resumo.etapaAtual) {
+      msg += `📌 *Etapa Atual:* ${resumo.etapaAtual.nome}\n`;
+      msg += `⏱️ *SLA:* ${resumo.etapaAtual.dias_sla}d | 📅 *Prazo:* ${Utils.fmt.date(resumo.etapaAtual.data_fim_prevista)}\n`;
+    }
+    msg += `🚦 *Situação dos Prazos:* ${resumo.totalAtrasados > 0 ? `🔴 ${resumo.totalAtrasados} etapa(s) em atraso` : '🟢 Cronograma 100% no prazo'}\n`;
+    msg += `-------------------------------------------\n`;
+    msg += `👉 _Acompanhe os detalhes completos no FinObra._`;
+
+    const telFinal = (telefone || obra.telefone || this.getTelefonePadrao() || '').replace(/\D/g, '');
+    this.abrirEnvio(msg, telFinal);
+  },
+
   // Modal simples e direto para o CLIENTE definir seu WhatsApp de recebimento de boletos
   abrirModalTelefone() {
     const telAtual = this.getTelefonePadrao();
@@ -696,6 +828,277 @@ const WhatsApp = {
   // Alias para manter compatibilidade total com chamadas legadas
   abrirModalConfig() {
     this.abrirModalConexao();
+  },
+
+  // ── TEMPLATES DE MENSAGEM DE WORKFLOW (Patch 53) ──
+  gerarMensagemEtapa(tipoNotificacao, dados = {}) {
+    const { etapa = {}, obra = {}, responsavel = {}, diasAtraso = 0, motivo = '' } = dados;
+    const nomeObra = obra.nome || 'Obra';
+    const nomeEtapa = etapa.nome || 'Etapa';
+    const codigoEtapa = etapa.codigo || 'FASE';
+    const nomeResp = responsavel.nome || 'Equipe';
+    const prazoFmt = etapa.data_fim_prevista ? (typeof Utils !== 'undefined' && Utils.fmt?.date ? Utils.fmt.date(etapa.data_fim_prevista) : etapa.data_fim_prevista) : 'A definir';
+    const inicioFmt = (etapa.data_inicio_real || etapa.data_inicio_prevista) ? (typeof Utils !== 'undefined' && Utils.fmt?.date ? Utils.fmt.date(etapa.data_inicio_real || etapa.data_inicio_prevista) : (etapa.data_inicio_real || etapa.data_inicio_prevista)) : 'Hoje';
+
+    switch (tipoNotificacao) {
+      case 'inicio':
+        return `*FinObra — Início de Etapa*\n\n` +
+          `Olá, *${nomeResp}*!\n\n` +
+          `A seguinte fase da obra *${nomeObra}* foi iniciada:\n` +
+          `📌 *Etapa:* ${codigoEtapa} — ${nomeEtapa}\n` +
+          `📅 *Início:* ${inicioFmt}\n` +
+          `🏁 *Prazo Final (SLA):* ${prazoFmt} (${etapa.dias_sla || 15} dias)\n\n` +
+          `Favor acompanhar os apontamentos no sistema FinObra. Bom trabalho!`;
+
+      case 'conclusao':
+        return `*FinObra — Etapa Concluída com Sucesso!*\n\n` +
+          `Informamos que uma nova etapa foi concluída na obra *${nomeObra}*:\n` +
+          `✅ *Etapa:* ${codigoEtapa} — ${nomeEtapa}\n` +
+          `👤 *Responsável:* ${nomeResp}\n` +
+          `🏁 *Data de Conclusão:* ${etapa.data_fim_real ? (typeof Utils !== 'undefined' && Utils.fmt?.date ? Utils.fmt.date(etapa.data_fim_real) : etapa.data_fim_real) : 'Hoje'}\n\n` +
+          `O cronograma da obra foi atualizado e as próximas etapas já estão em andamento.`;
+
+      case 'atraso':
+        return `*FinObra — Alerta de Prazo / Atraso de SLA*\n\n` +
+          `Atenção *${nomeResp}*!\n\n` +
+          `A etapa *${codigoEtapa} — ${nomeEtapa}* da obra *${nomeObra}* excedeu o prazo previsto de SLA.\n` +
+          `🔴 *Atraso:* +${diasAtraso || etapa.dias_atraso || 1} dias\n` +
+          `🏁 *Prazo Previsto:* ${prazoFmt}\n` +
+          (motivo ? `📝 *Motivo Registrado:* ${motivo}\n` : '') +
+          `\nPor favor, atualize o status ou revise as pendências de campo no FinObra para recalcular o cronograma.`;
+
+      case 'cobranca':
+      default:
+        return `*FinObra — Cobrança de Status / Prazos*\n\n` +
+          `Olá, *${nomeResp}*!\n\n` +
+          `Gostaríamos de um alinhamento sobre o andamento da fase na obra *${nomeObra}*:\n` +
+          `📋 *Etapa:* ${codigoEtapa} — ${nomeEtapa}\n` +
+          `🏁 *Prazo Limite:* ${prazoFmt}\n` +
+          (diasAtraso > 0 ? `⚠️ *Situação:* +${diasAtraso} dias de atraso\n` : `⏱️ *Situação:* Em andamento dentro do SLA\n`) +
+          `\nPoderia nos enviar uma previsão ou registrar o apontamento no sistema? Obrigado!`;
+    }
+  },
+
+  abrirWhatsAppWeb(phone, message) {
+    const limpo = String(phone || '').replace(/\D/g, '');
+    const num = limpo ? (limpo.startsWith('55') ? limpo : '55' + limpo) : '';
+    const url = num
+      ? `https://wa.me/${num}?text=${encodeURIComponent(message)}`
+      : `https://wa.me/?text=${encodeURIComponent(message)}`;
+    window.open(url, '_blank', 'noopener,noreferrer');
+  },
+
+  abrirModalNotificacaoEtapa(obraId, etapaId, preTipo = 'cobranca') {
+    const obra = (typeof DB !== 'undefined') ? DB.getById('clientes', obraId) || {} : {};
+    const processos = (typeof CronogramaSLA !== 'undefined') ? CronogramaSLA.getObraProcessos(obraId) : [];
+    const p = processos.find(x => x.id === etapaId) || {};
+    const resp = (typeof CronogramaSLA !== 'undefined') ? CronogramaSLA.getResponsavelEtapa(p) : null;
+    const e = (typeof Utils !== 'undefined' && Utils.escapeHtml) ? Utils.escapeHtml.bind(Utils) : String;
+
+    let telSugerido = obra.telefone || '';
+    if (resp && resp.id && typeof Auth !== 'undefined' && Auth.getUsers) {
+      const u = Auth.getUsers().find(user => user.id === resp.id);
+      if (u && u.telefone) telSugerido = u.telefone;
+    }
+
+    const defaultTipo = p.status_sla === 'atrasado' ? 'atraso' : p.status === 'concluido' ? 'conclusao' : preTipo;
+    const msgInicial = this.gerarMensagemEtapa(defaultTipo, {
+      etapa: p,
+      obra,
+      responsavel: resp || { nome: p.cargo_responsavel || 'Equipe' },
+      diasAtraso: p.dias_atraso || 0,
+      motivo: p.motivo_atraso_detalhe || p.motivo_atraso || ''
+    });
+
+    Utils.showModal(`
+      <div class="modal" style="max-width:540px;">
+        <div class="modal-header">
+          <span class="modal-title">💬 Notificar Etapa via WhatsApp</span>
+          <button class="modal-close" data-fb-click="Utils.closeModal" data-fb-click-n="0">&#x2715;</button>
+        </div>
+        <div class="modal-body" style="max-height:calc(80vh - 120px);overflow-y:auto;">
+          <div style="background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--r-md);padding:10px 14px;margin-bottom:14px;font-size:.82rem;">
+            <div style="font-weight:800;color:var(--text);">${e(p.icone || '📋')} ${e(p.nome || 'Etapa')}</div>
+            <div style="color:var(--text3);margin-top:2px;">Obra: <strong>${e(obra.nome || '')}</strong> &middot; Resp: <strong>${e(resp?.nome || 'Não atribuído')}</strong></div>
+          </div>
+
+          <div class="form-row cols-2" style="margin-bottom:12px;">
+            <div class="form-group">
+              <label class="form-label">Modelo de Mensagem</label>
+              <select class="form-control" id="wa-etp-tipo-sel">
+                <option value="cobranca" ${defaultTipo === 'cobranca' ? 'selected' : ''}>📋 Cobrança / Alinhamento</option>
+                <option value="atraso" ${defaultTipo === 'atraso' ? 'selected' : ''}>🔴 Alerta de Atraso de SLA</option>
+                <option value="inicio" ${defaultTipo === 'inicio' ? 'selected' : ''}>🚀 Início da Etapa</option>
+                <option value="conclusao" ${defaultTipo === 'conclusao' ? 'selected' : ''}>✅ Conclusão da Etapa</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Telefone Destinatário</label>
+              <input type="text" class="form-control" id="wa-etp-dest-phone" placeholder="DDD + Telefone" value="${e(telSugerido)}">
+            </div>
+          </div>
+
+          <div class="form-group" style="margin-bottom:12px;">
+            <label class="form-label">Mensagem (Editável)</label>
+            <textarea class="form-control" id="wa-etp-msg" rows="7" style="font-size:.82rem;font-family:inherit;">${e(msgInicial)}</textarea>
+          </div>
+        </div>
+        <div class="modal-footer" style="display:flex;justify-content:space-between;align-items:center;">
+          <button class="btn btn-secondary" data-fb-click="Utils.closeModal" data-fb-click-n="0">Cancelar</button>
+          <div style="display:flex;gap:8px;">
+            <button class="btn btn-primary" style="background:#25D366;border-color:#25D366;color:#fff;font-weight:700;"
+              data-fb-click="WhatsApp.enviarNotificacaoEtapaSubmit" data-fb-click-n="2" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(obraId))}" data-fb-click-t1="string" data-fb-click-v1="${encodeURIComponent(String(etapaId))}">
+              📲 Enviar WhatsApp
+            </button>
+          </div>
+        </div>
+      </div>
+    `);
+
+    const selTipo = document.getElementById('wa-etp-tipo-sel');
+    if (selTipo) {
+      selTipo.addEventListener('change', () => {
+        const msgEl = document.getElementById('wa-etp-msg');
+        if (msgEl) {
+          msgEl.value = this.gerarMensagemEtapa(selTipo.value, {
+            etapa: p,
+            obra,
+            responsavel: resp || { nome: p.cargo_responsavel || 'Equipe' },
+            diasAtraso: p.dias_atraso || 0,
+            motivo: p.motivo_atraso_detalhe || p.motivo_atraso || ''
+          });
+        }
+      });
+    }
+  },
+
+  async enviarNotificacaoEtapaSubmit(obraId, etapaId) {
+    const phoneInput = document.getElementById('wa-etp-dest-phone');
+    const msgInput = document.getElementById('wa-etp-msg');
+    const rawPhone = phoneInput ? phoneInput.value : '';
+    const message = msgInput ? msgInput.value.trim() : '';
+
+    if (!message) {
+      Utils.toast('Mensagem não pode estar vazia.', 'warning');
+      return;
+    }
+
+    const limpo = String(rawPhone).replace(/\D/g, '');
+    const session = await this.consultarSessao();
+
+    if (session && session.connected && limpo.length >= 10) {
+      Utils.toast('📲 Enviando notificação via servidor WhatsApp...', 'info');
+      try {
+        const headers = (typeof Auth !== 'undefined' && Auth.getAuthHeaders)
+          ? Auth.getAuthHeaders()
+          : { 'Content-Type': 'application/json' };
+
+        const res = await fetch('/api/whatsapp?action=test', {
+          method: 'POST',
+          headers: headers,
+          body: JSON.stringify({ phone: limpo, message })
+        });
+        const data = await res.json().catch(() => ({}));
+        if (res.ok && data.success) {
+          Utils.toast('✅ Notificação enviada com sucesso via WhatsApp!', 'success');
+          Utils.closeModal();
+          return;
+        }
+      } catch (e) {
+        console.warn('[WhatsApp] Fallback para WhatsApp Web:', e);
+      }
+    }
+
+    // Fallback gracioso: abre wa.me diretamente no navegador/app
+    this.abrirWhatsAppWeb(limpo, message);
+    Utils.toast('WhatsApp Web aberto com a mensagem pronta!', 'success');
+    Utils.closeModal();
+  },
+
+  enviarResumoWorkflowObra(obraId) {
+    const obra = (typeof DB !== 'undefined') ? DB.getById('clientes', obraId) || {} : {};
+    const resumo = (typeof CronogramaSLA !== 'undefined') ? CronogramaSLA.getResumoObra(obraId) : {};
+    const e = (typeof Utils !== 'undefined' && Utils.escapeHtml) ? Utils.escapeHtml.bind(Utils) : String;
+
+    const dataEntrega = resumo.dataEntregaEstimada ? (Utils.fmt?.date ? Utils.fmt.date(resumo.dataEntregaEstimada) : resumo.dataEntregaEstimada) : 'A definir';
+    const statusMsg = resumo.statusGeral === 'atrasado'
+      ? `🔴 Atrasado (+${resumo.diasAtrasoAcumulado} dias)`
+      : resumo.statusGeral === 'atencao'
+        ? `🟡 Em Atenção`
+        : `🟢 No Prazo`;
+
+    const texto = `*FinObra — Status e Prazos do Projeto*\n\n` +
+      `Obra: *${obra.nome || 'Obra'}*\n` +
+      `Situação do Cronograma: *${statusMsg}*\n` +
+      `Fases Concluídas: *${resumo.concluidos || 0} de ${resumo.totalProcessos || 0}* (${resumo.pctGeral || 0}%)\n` +
+      `Previsão Atual de Entrega: *${dataEntrega}*\n` +
+      (resumo.etapaAtual ? `Fase Atual em Execução: *${resumo.etapaAtual.nome}*\n` : '') +
+      `\nRelatório gerado via FinObra Gestão de Obras.`;
+
+    const telSugerido = obra.telefone || '';
+
+    Utils.showModal(`
+      <div class="modal" style="max-width:540px;">
+        <div class="modal-header">
+          <span class="modal-title">📊 Resumo do Cronograma para WhatsApp</span>
+          <button class="modal-close" data-fb-click="Utils.closeModal" data-fb-click-n="0">&#x2715;</button>
+        </div>
+        <div class="modal-body">
+          <div class="form-group" style="margin-bottom:12px;">
+            <label class="form-label">Telefone do Destinatário</label>
+            <input type="text" class="form-control" id="wa-resumo-phone" placeholder="DDD + Telefone (ex: 95 99136-3678)" value="${e(telSugerido)}">
+          </div>
+          <div class="form-group" style="margin-bottom:12px;">
+            <label class="form-label">Texto da Mensagem</label>
+            <textarea class="form-control" id="wa-resumo-texto" rows="8" style="font-size:.82rem;font-family:inherit;">${e(texto)}</textarea>
+          </div>
+        </div>
+        <div class="modal-footer" style="display:flex;justify-content:space-between;align-items:center;">
+          <button class="btn btn-secondary" data-fb-click="Utils.closeModal" data-fb-click-n="0">Cancelar</button>
+          <button class="btn btn-primary" style="background:#25D366;border-color:#25D366;color:#fff;font-weight:700;"
+            id="wa-btn-resumo-enviar">
+            📲 Enviar no WhatsApp
+          </button>
+        </div>
+      </div>
+    `);
+
+    const btnEnviar = document.getElementById('wa-btn-resumo-enviar');
+    if (btnEnviar) {
+      btnEnviar.addEventListener('click', async () => {
+        const phone = document.getElementById('wa-resumo-phone')?.value || '';
+        const msg = document.getElementById('wa-resumo-texto')?.value || texto;
+        const limpo = String(phone).replace(/\D/g, '');
+        const session = await WhatsApp.consultarSessao();
+
+        if (session && session.connected && limpo.length >= 10) {
+          Utils.toast('📲 Enviando resumo via servidor WhatsApp...', 'info');
+          try {
+            const headers = (typeof Auth !== 'undefined' && Auth.getAuthHeaders)
+              ? Auth.getAuthHeaders()
+              : { 'Content-Type': 'application/json' };
+
+            const res = await fetch('/api/whatsapp?action=test', {
+              method: 'POST',
+              headers: headers,
+              body: JSON.stringify({ phone: limpo, message: msg })
+            });
+            const data = await res.json().catch(() => ({}));
+            if (res.ok && data.success) {
+              Utils.toast('✅ Resumo enviado com sucesso!', 'success');
+              Utils.closeModal();
+              return;
+            }
+          } catch (e) {
+            console.warn('[WhatsApp] Fallback:', e);
+          }
+        }
+
+        WhatsApp.abrirWhatsAppWeb(limpo, msg);
+        Utils.toast('WhatsApp Web aberto com o resumo!', 'success');
+        Utils.closeModal();
+      });
+    }
   }
 };
 

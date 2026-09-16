@@ -24,7 +24,79 @@ export function sanitizeSlaProcesses(input) {
       motivo_atraso_detalhe:text(raw.motivo_atraso_detalhe, 500),
       checklist_status:text(raw.checklist_status, 40),
       transferida_em:date(raw.transferida_em),
-      checklist:Array.isArray(raw.checklist) ? raw.checklist.slice(0, 50).map(item => (typeof item === 'object' && item !== null ? {id:text(item.id, 40), descricao:text(item.descricao || item.texto, 255), concluido:!!item.concluido} : text(item, 255))) : []
+      checklist:Array.isArray(raw.checklist) ? raw.checklist.slice(0, 50).map(item => (typeof item === 'object' && item !== null ? {id:text(item.id, 40), descricao:text(item.descricao || item.texto, 255), concluido:!!item.concluido} : text(item, 255))) : [],
+      historico:Array.isArray(raw.historico) ? raw.historico.slice(0, 50).flatMap(h => {
+        if (!h || typeof h !== 'object') return [];
+        return [{
+          data: text(h.data, 30),
+          autor: text(h.autor, 120),
+          de_status: text(h.de_status || h.status_anterior, 40),
+          para_status: text(h.para_status || h.status_novo, 40),
+          texto: text(h.texto || h.comentario, 1000),
+          motivo: text(h.motivo, 100)
+        }];
+      }) : []
     }];
   });
 }
+
+/**
+ * Envelope padronizado de resposta RESTful (Skill: api-design-principles)
+ */
+export function formatApiResponse(data, { success = true, meta = null } = {}) {
+  const payload = {
+    success: Boolean(success),
+    data: data ?? null,
+    timestamp: new Date().toISOString()
+  };
+  if (meta && typeof meta === 'object') {
+    payload.meta = meta;
+  }
+  return payload;
+}
+
+/**
+ * Envelope padronizado de erro RESTful (Skill: api-design-principles)
+ */
+export function formatApiError(message, { code = 'BAD_REQUEST', status = 400 } = {}) {
+  return {
+    success: false,
+    error: String(message || 'Erro inesperado'),
+    code: String(code),
+    status: Number(status) || 400,
+    timestamp: new Date().toISOString()
+  };
+}
+
+/**
+ * Projeta processos com egress otimizado, omitindo logs extensos quando não solicitados (Skill: neon-postgres-egress-optimizer)
+ */
+export function projectSlaSummary(processos, { includeHistorico = false, maxHistorico = 10 } = {}) {
+  if (!Array.isArray(processos)) return [];
+  return processos.map(p => {
+    const proj = {
+      id: p.id,
+      nome: p.nome,
+      codigo: p.codigo,
+      tipo: p.tipo,
+      tipoLabel: p.tipoLabel,
+      icone: p.icone,
+      dias_sla: p.dias_sla,
+      predecessor_id: p.predecessor_id,
+      status: p.status,
+      percentual: p.percentual,
+      data_inicio_real: p.data_inicio_real,
+      data_fim_real: p.data_fim_real,
+      cargo_responsavel: p.cargo_responsavel,
+      responsavel_usuario_id: p.responsavel_usuario_id,
+      motivo_atraso: p.motivo_atraso,
+      total_checklist: Array.isArray(p.checklist) ? p.checklist.length : 0,
+      total_historico: Array.isArray(p.historico) ? p.historico.length : 0
+    };
+    if (includeHistorico && Array.isArray(p.historico)) {
+      proj.historico = p.historico.slice(0, maxHistorico);
+    }
+    return proj;
+  });
+}
+
