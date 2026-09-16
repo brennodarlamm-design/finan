@@ -1,6 +1,13 @@
 {
   "cleanUrls": true,
   "trailingSlash": false,
+  "redirects": [
+    {
+      "source": "/",
+      "destination": "/landing",
+      "permanent": false
+    }
+  ],
   "rewrites": [
     {
       "source": "/api/health",
