@@ -21,6 +21,7 @@ import {
   verifyBackupCode,
   generateQrSvg
 } from './_totp.js';
+import { triggerEmail, isTriggerConfigured } from './_trigger-client.js';
 
 const googleClient = new OAuth2Client();
 
@@ -1223,31 +1224,51 @@ export default async function handler(req, res) {
       }
 
       const resendKey = (process.env.RESEND_API_KEY || '').trim();
-      if (resendKey && user.email) {
+      if ((resendKey || isTriggerConfigured()) && user.email) {
         try {
           const fromEmail = (process.env.RESEND_FROM_EMAIL || 'FinObra <nao-responder@finobra.app.br>').trim();
-          await fetch('https://api.resend.com/emails', {
-            method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${resendKey}`,
-              'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
+          const emailSubject = 'FinObra — Código de Recuperação de Senha';
+          const emailHtml = `
+            <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 500px; margin: 0 auto; padding: 24px; border: 1px solid #e2e8f0; border-radius: 8px; background: #ffffff;">
+              <h2 style="color: #0f172a; margin-top: 0;">Código de Verificação</h2>
+              <p style="color: #334155; font-size: 15px;">Recebemos uma solicitação de redefinição de senha para sua conta no <strong>FinObra</strong>.</p>
+              <div style="background: #f8fafc; border: 1px solid #cbd5e1; padding: 18px; border-radius: 8px; text-align: center; margin: 24px 0;">
+                <span style="font-size: 32px; font-weight: 700; letter-spacing: 6px; color: #0284c7; font-family: monospace;">${otpCode}</span>
+              </div>
+              <p style="color: #64748b; font-size: 13px; line-height: 1.5;">Este código de segurança expira em <strong>10 minutos</strong>.<br>Se você não fez esta solicitação, desconsidere esta mensagem.</p>
+            </div>
+          `;
+
+          let dispatchedViaTrigger = false;
+          if (isTriggerConfigured()) {
+            const trigRes = await triggerEmail({
               from: fromEmail,
-              to: [user.email],
-              subject: 'FinObra — Código de Recuperação de Senha',
-              html: `
-                <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 500px; margin: 0 auto; padding: 24px; border: 1px solid #e2e8f0; border-radius: 8px; background: #ffffff;">
-                  <h2 style="color: #0f172a; margin-top: 0;">Código de Verificação</h2>
-                  <p style="color: #334155; font-size: 15px;">Recebemos uma solicitação de redefinição de senha para sua conta no <strong>FinObra</strong>.</p>
-                  <div style="background: #f8fafc; border: 1px solid #cbd5e1; padding: 18px; border-radius: 8px; text-align: center; margin: 24px 0;">
-                    <span style="font-size: 32px; font-weight: 700; letter-spacing: 6px; color: #0284c7; font-family: monospace;">${otpCode}</span>
-                  </div>
-                  <p style="color: #64748b; font-size: 13px; line-height: 1.5;">Este código de segurança expira em <strong>10 minutos</strong>.<br>Se você não fez esta solicitação, desconsidere esta mensagem.</p>
-                </div>
-              `
-            })
-          });
+              to: user.email,
+              subject: emailSubject,
+              html: emailHtml
+            }, {
+              idempotencyKey: `otp-reset-${resetId}`
+            });
+            if (trigRes.success) {
+              dispatchedViaTrigger = true;
+            }
+          }
+
+          if (!dispatchedViaTrigger && resendKey) {
+            await fetch('https://api.resend.com/emails', {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${resendKey}`,
+                'Content-Type': 'application/json'
+              },
+              body: JSON.stringify({
+                from: fromEmail,
+                to: [user.email],
+                subject: emailSubject,
+                html: emailHtml
+              })
+            });
+          }
         } catch (errMail) {
           console.warn('[Auth] Falha ao enviar OTP por e-mail:', errMail?.message || errMail);
         }

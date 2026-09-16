@@ -2,7 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import { execSync } from 'child_process';
 
-const dirs = ['api', 'backend', 'js', 'scripts'];
+const dirs = ['api', 'backend', 'js', 'scripts', 'trigger'];
 let errors = 0;
 let checked = 0;
 

@@ -2,6 +2,7 @@
 // Compatível com Asaas, OpenPix, Efí / Gerencianet, Mercado Pago e Chamada Direta / Simulação
 
 import crypto from 'crypto';
+import { triggerEmail, isTriggerConfigured } from './_trigger-client.js';
 
 /**
  * Validação de Assinatura e Token de Autenticação do Webhook
@@ -467,6 +468,27 @@ export async function sendPaymentReceipt(record) {
         </div>
       `;
 
+      // Prioridade: Trigger.dev com retries resilientes e enfileiramento desacoplado
+      if (isTriggerConfigured()) {
+        const trigRes = await triggerEmail({
+          from: emailFrom,
+          to: email,
+          subject,
+          html: emailHtml,
+          tenantId: tenant?.id || null
+        }, {
+          idempotencyKey: `pix-receipt-${record.txid || record.id || Date.now()}`
+        });
+
+        if (trigRes.success) {
+          results.email.success = true;
+          results.email.id = trigRes.runId;
+          results.email.via = 'trigger_dev';
+          return;
+        }
+      }
+
+      // Fallback: Disparo HTTP direto ao Resend
       const emailRes = await fetch('https://api.resend.com/emails', {
         method: 'POST',
         headers: {
@@ -486,6 +508,7 @@ export async function sendPaymentReceipt(record) {
       if (emailRes.ok && emailData.id) {
         results.email.success = true;
         results.email.id = emailData.id;
+        results.email.via = 'resend_direct';
       } else {
         results.email.error = emailData.message || `HTTP ${emailRes.status}`;
       }

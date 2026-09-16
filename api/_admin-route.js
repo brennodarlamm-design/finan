@@ -12,6 +12,7 @@ import {
   hashTenantAccessKey,
   tenantAccessKeyLast4
 } from './_tenant-access-key.js';
+import { triggerBillingSweep, isTriggerConfigured } from './_trigger-client.js';
 
 function getSql() {
   const conn = process.env.DATABASE_URL;
@@ -1016,23 +1017,48 @@ export default async function handler(req, res) {
       let sweepResult = null;
       let usedEngine = 'render';
 
-      try {
-        const renderRes = await fetch(`${renderBaseUrl}/cron/billing-sweep`, {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${secret}`,
-            'x-api-key': secret,
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({ tenantId: forcedTenantId }),
-          signal: AbortSignal.timeout(12000)
-        });
+      // 1. Prioridade Máxima: Trigger.dev Background Job Cloud
+      if (isTriggerConfigured()) {
+        try {
+          const trigRes = await triggerBillingSweep({
+            tenantId: forcedTenantId,
+            triggeredBy: auth.user?.email || auth.user?.userId || 'admin'
+          });
 
-        if (renderRes.ok) {
-          sweepResult = await renderRes.json();
+          if (trigRes.success) {
+            usedEngine = 'trigger_dev';
+            sweepResult = {
+              success: true,
+              runId: trigRes.runId,
+              message: 'Varredura de cobrança enfileirada no Trigger.dev com sucesso.'
+            };
+          }
+        } catch (errTrig) {
+          console.warn('[Admin] Trigger.dev indisponível para varredura, tentando Render:', errTrig?.message || errTrig);
         }
-      } catch (renderErr) {
-        console.warn('Aviso: Render offline ou timeout ao disparar varredura, utilizando engine de fallback:', renderErr.message);
+      }
+
+      // 2. Fallback: Backend Render WhatsApp/Cron
+      if (!sweepResult || !sweepResult.success) {
+        try {
+          const renderRes = await fetch(`${renderBaseUrl}/cron/billing-sweep`, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${secret}`,
+              'x-api-key': secret,
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ tenantId: forcedTenantId }),
+            signal: AbortSignal.timeout(12000)
+          });
+
+          if (renderRes.ok) {
+            sweepResult = await renderRes.json();
+            usedEngine = 'render';
+          }
+        } catch (renderErr) {
+          console.warn('Aviso: Render offline ou timeout ao disparar varredura, utilizando engine de fallback:', renderErr.message);
+        }
       }
 
       // Fallback local via Neon caso o backend Render não responda

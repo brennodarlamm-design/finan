@@ -71,7 +71,8 @@ const tests = [
   'scripts/test-master-improvement.js',
   'scripts/test-segmentation-agenda.js',
   'scripts/test-sync-optimization.js',
-  'scripts/test-storage-reliability.js'
+  'scripts/test-storage-reliability.js',
+  'scripts/test-trigger-integration.js'
 ].filter(fs.existsSync);
 
 // Até o P49, as suítes foram escritas quando api/admin.js e api/audit.js eram arquivos
