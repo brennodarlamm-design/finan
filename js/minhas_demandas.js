@@ -131,11 +131,6 @@ const MinhasDemandas = {
           </div>
         </div>`;
     };
-              ✏️ Apontar
-            </button>
-          </div>
-        </div>`;
-    };
 
     const renderKanban = () => {
       const colunas = [
