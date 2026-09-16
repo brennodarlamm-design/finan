@@ -821,26 +821,15 @@ const MasterAdmin = {
     const isAgenda = this._activeTab === 'agenda';
     const isEmpresas = !isSistema && !isContas && !isAgenda;
 
-    el.innerHTML = `
-      <div style="max-width:1200px;margin:0 auto;padding:10px 0 50px;">
-        
-        <!-- Navigation Tabs Master -->
-        <div style="display:flex;gap:0;border-bottom:2px solid rgba(255,255,255,.1);margin-bottom:26px;overflow-x:auto;">
-          <button data-fb-click="MasterAdmin.switchTab" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="empresas" style="padding:12px 20px;border:none;background:transparent;color:${isEmpresas?'var(--accent)':'#94a3b8'};font-family:inherit;font-size:.875rem;font-weight:800;cursor:pointer;border-bottom:3px solid ${isEmpresas?'var(--accent)':'transparent'};margin-bottom:-2px;transition:all .2s;display:flex;align-items:center;gap:8px;">
-            <span>🏢</span> Gestão de Construtoras &amp; SaaS
-          </button>
-          <button data-fb-click="MasterAdmin.switchTab" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="contas" style="padding:12px 20px;border:none;background:transparent;color:${isContas?'var(--accent)':'#94a3b8'};font-family:inherit;font-size:.875rem;font-weight:800;cursor:pointer;border-bottom:3px solid ${isContas?'var(--accent)':'transparent'};margin-bottom:-2px;transition:all .2s;display:flex;align-items:center;gap:8px;">
-            <span>🏦</span> Contas Bancárias &amp; Conciliação
-          </button>
-          <button data-fb-click="MasterAdmin.switchTab" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="agenda" style="padding:12px 20px;border:none;background:transparent;color:${isAgenda?'var(--accent)':'#94a3b8'};font-family:inherit;font-size:.875rem;font-weight:800;cursor:pointer;border-bottom:3px solid ${isAgenda?'var(--accent)':'transparent'};margin-bottom:-2px;transition:all .2s;display:flex;align-items:center;gap:8px;">
-            <span>📅</span> Agenda &amp; Lives Dev
-          </button>
-          <button data-fb-click="MasterAdmin.switchTab" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="sistema" style="padding:12px 20px;border:none;background:transparent;color:${isSistema?'var(--accent)':'#94a3b8'};font-family:inherit;font-size:.875rem;font-weight:800;cursor:pointer;border-bottom:3px solid ${isSistema?'var(--accent)':'transparent'};margin-bottom:-2px;transition:all .2s;display:flex;align-items:center;gap:8px;">
-            <span>⚙️</span> Manutenção do Sistema &amp; Banco de Dados (Dev / Master)
-          </button>
-        </div>
-
-        ${isAgenda ? this._renderAgendaDev() : (isContas ? this._renderContasBancariasSaaS() : (isSistema ? this._renderSistema() : `
+    let tabContent = '';
+    if (isAgenda) {
+      tabContent = this._renderAgendaDev();
+    } else if (isContas) {
+      tabContent = this._renderContasBancariasSaaS();
+    } else if (isSistema) {
+      tabContent = this._renderSistema();
+    } else {
+      tabContent = `
         <!-- Top Bar Master -->
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:26px;flex-wrap:wrap;gap:14px;">
           <div>
@@ -931,7 +920,29 @@ const MasterAdmin = {
             💬 Central de Atendimento DEV carregando...
           </div>
         `}
-        `)}
+      `;
+    }
+
+    el.innerHTML = `
+      <div style="max-width:1200px;margin:0 auto;padding:10px 0 50px;">
+        
+        <!-- Navigation Tabs Master -->
+        <div style="display:flex;gap:0;border-bottom:2px solid rgba(255,255,255,.1);margin-bottom:26px;overflow-x:auto;">
+          <button data-fb-click="MasterAdmin.switchTab" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="empresas" style="padding:12px 20px;border:none;background:transparent;color:${isEmpresas?'var(--accent)':'#94a3b8'};font-family:inherit;font-size:.875rem;font-weight:800;cursor:pointer;border-bottom:3px solid ${isEmpresas?'var(--accent)':'transparent'};margin-bottom:-2px;transition:all .2s;display:flex;align-items:center;gap:8px;">
+            <span>🏢</span> Gestão de Construtoras &amp; SaaS
+          </button>
+          <button data-fb-click="MasterAdmin.switchTab" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="contas" style="padding:12px 20px;border:none;background:transparent;color:${isContas?'var(--accent)':'#94a3b8'};font-family:inherit;font-size:.875rem;font-weight:800;cursor:pointer;border-bottom:3px solid ${isContas?'var(--accent)':'transparent'};margin-bottom:-2px;transition:all .2s;display:flex;align-items:center;gap:8px;">
+            <span>🏦</span> Contas Bancárias &amp; Conciliação
+          </button>
+          <button data-fb-click="MasterAdmin.switchTab" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="agenda" style="padding:12px 20px;border:none;background:transparent;color:${isAgenda?'var(--accent)':'#94a3b8'};font-family:inherit;font-size:.875rem;font-weight:800;cursor:pointer;border-bottom:3px solid ${isAgenda?'var(--accent)':'transparent'};margin-bottom:-2px;transition:all .2s;display:flex;align-items:center;gap:8px;">
+            <span>📅</span> Agenda &amp; Lives Dev
+          </button>
+          <button data-fb-click="MasterAdmin.switchTab" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="sistema" style="padding:12px 20px;border:none;background:transparent;color:${isSistema?'var(--accent)':'#94a3b8'};font-family:inherit;font-size:.875rem;font-weight:800;cursor:pointer;border-bottom:3px solid ${isSistema?'var(--accent)':'transparent'};margin-bottom:-2px;transition:all .2s;display:flex;align-items:center;gap:8px;">
+            <span>⚙️</span> Manutenção do Sistema &amp; Banco de Dados (Dev / Master)
+          </button>
+        </div>
+
+        ${tabContent}
 
       </div>
     `;
