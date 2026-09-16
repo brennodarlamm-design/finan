@@ -9,6 +9,17 @@ const DB = {
     fornecedores: 'finobra_fornecedores', contratos: 'finobra_contratos'
   },
 
+  _memCache: new Map(),
+  _memHydrated: false,
+  _crossTabBound: false,
+  _crossTabChannel: null,
+
+  _circuitState: 'CLOSED', // 'CLOSED' | 'OPEN' | 'HALF_OPEN'
+  _circuitFailureCount: 0,
+  _circuitNextAttemptAt: 0,
+  _circuitCooldownMs: 30000,
+  _circuitFailureThreshold: 5,
+
   _t() {
     return (typeof Auth !== 'undefined' && Auth.getCurrentTenantId) ? Auth.getCurrentTenantId() : 'public';
   },
@@ -29,9 +40,174 @@ const DB = {
     return;
   },
 
+  _initMemoryCache() {
+    if (!this._memCache) this._memCache = new Map();
+    if (typeof localStorage === 'undefined') return;
+    try {
+      const len = localStorage.length || 0;
+      const tenantPrefix = `finobra_${this._t()}_`;
+      for (let i = 0; i < len; i++) {
+        const k = localStorage.key(i);
+        if (k && (k.startsWith(tenantPrefix) || k.startsWith('finobra_'))) {
+          try {
+            const raw = localStorage.getItem(k);
+            if (raw) this._memCache.set(k, JSON.parse(raw));
+          } catch {}
+        }
+      }
+    } catch (err) {
+      console.warn('[Storage] Falha ao pré-carregar cache em memória:', err);
+    }
+  },
+
+  async _hydrateFromIndexedDB() {
+    if (this._memHydrated) return;
+    if (typeof IDBStorage === 'undefined' || !IDBStorage.isAvailable()) return;
+    try {
+      const keys = await IDBStorage.getAllKeys();
+      const tenantPrefix = `finobra_${this._t()}_`;
+      let hydratedCount = 0;
+      for (const k of keys) {
+        if (typeof k === 'string' && (k.startsWith(tenantPrefix) || k.startsWith('finobra_'))) {
+          const idbVal = await IDBStorage.getItem(k);
+          if (idbVal !== null && idbVal !== undefined) {
+            const current = this._memCache.get(k);
+            if (!current || (Array.isArray(idbVal) && Array.isArray(current) && idbVal.length > current.length)) {
+              this._memCache.set(k, idbVal);
+              try { localStorage.setItem(k, JSON.stringify(idbVal)); } catch {}
+              hydratedCount++;
+            }
+          }
+        }
+      }
+      this._memHydrated = true;
+      if (hydratedCount > 0) {
+        console.info(`[Storage] 📦 ${hydratedCount} coleções sincronizadas do IndexedDB para a memória.`);
+      }
+    } catch (err) {
+      console.warn('[Storage] Falha ao hidratar do IndexedDB:', err);
+    }
+  },
+
+  _bindCrossTabChannel() {
+    if (this._crossTabBound || typeof window === 'undefined') return;
+    this._crossTabBound = true;
+
+    if (typeof BroadcastChannel !== 'undefined') {
+      try {
+        this._crossTabChannel = new BroadcastChannel('finobra_tab_sync');
+        this._crossTabChannel.onmessage = (event) => {
+          this._handleCrossTabMessage(event?.data);
+        };
+      } catch (err) {
+        console.warn('[CrossTab] BroadcastChannel indisponível:', err);
+      }
+    }
+
+    window.addEventListener('storage', (e) => {
+      if (!e.key) return;
+      const tenant = this._t();
+      if (e.key.startsWith(`finobra_${tenant}_`)) {
+        const table = e.key.replace(`finobra_${tenant}_`, '');
+        this._handleCrossTabMutation(table);
+      }
+    });
+  },
+
+  _broadcastMutation(table) {
+    if (this._crossTabChannel && typeof this._crossTabChannel.postMessage === 'function') {
+      try {
+        this._crossTabChannel.postMessage({
+          type: 'MUTATION',
+          tenantId: this._t(),
+          table: table,
+          timestamp: Date.now()
+        });
+      } catch (err) {
+        console.warn('[CrossTab] Erro ao enviar mensagem no canal:', err);
+      }
+    }
+  },
+
+  _handleCrossTabMessage(msg) {
+    if (!msg || typeof msg !== 'object') return;
+    if (msg.tenantId && msg.tenantId !== this._t()) return;
+    if (msg.type === 'MUTATION' && msg.table) {
+      this._handleCrossTabMutation(msg.table);
+    }
+  },
+
+  async _handleCrossTabMutation(table) {
+    const storageKey = this._k(table);
+    let updatedData = null;
+    if (typeof IDBStorage !== 'undefined' && IDBStorage.isAvailable()) {
+      try {
+        updatedData = await IDBStorage.getItem(storageKey);
+      } catch {}
+    }
+    if (!updatedData) {
+      try {
+        const raw = localStorage.getItem(storageKey);
+        if (raw) updatedData = JSON.parse(raw);
+      } catch {}
+    }
+    if (Array.isArray(updatedData) && this._memCache) {
+      this._memCache.set(storageKey, updatedData);
+    }
+    this._emitCrossTabEvent('mutation', { table });
+  },
+
+  _emitCrossTabEvent(type, detail = {}) {
+    if (typeof window !== 'undefined' && typeof window.dispatchEvent === 'function') {
+      window.dispatchEvent(new CustomEvent('finobra:cross-tab-mutation', { detail: { type, ...detail } }));
+    }
+  },
+
+  _calculateBackoff(attempt = 1) {
+    const base = 2000;
+    const max = 60000;
+    const exp = Math.min(max, base * Math.pow(1.5, Math.min(Math.max(1, attempt), 8)));
+    const jitter = 0.6 + Math.random() * 0.4;
+    return Math.floor(exp * jitter);
+  },
+
+  _isCircuitOpen() {
+    if (this._circuitState === 'OPEN') {
+      if (Date.now() >= this._circuitNextAttemptAt) {
+        this._circuitState = 'HALF_OPEN';
+        console.info('[CircuitBreaker] Disjuntor em estado de teste HALF_OPEN.');
+        return false;
+      }
+      return true;
+    }
+    return false;
+  },
+
+  _recordNetworkSuccess() {
+    if (this._circuitState !== 'CLOSED') {
+      console.info('[CircuitBreaker] Conexão restabelecida com sucesso. Disjuntor FECHADO (CLOSED).');
+    }
+    this._circuitState = 'CLOSED';
+    this._circuitFailureCount = 0;
+    this._circuitNextAttemptAt = 0;
+  },
+
+  _recordNetworkFailure(is5xxOrNetwork = true) {
+    if (!is5xxOrNetwork) return;
+    this._circuitFailureCount++;
+    if (this._circuitFailureCount >= this._circuitFailureThreshold) {
+      this._circuitState = 'OPEN';
+      this._circuitNextAttemptAt = Date.now() + this._circuitCooldownMs;
+      console.warn(`[CircuitBreaker] ⚠️ ${this._circuitFailureCount} falhas consecutivas de rede/servidor. Disjuntor ABERTO por ${this._circuitCooldownMs / 1000}s.`);
+    }
+  },
+
   init() {
+    this._initMemoryCache();
     this._bindNetworkListeners();
+    this._bindCrossTabChannel();
     this.expurgarDadosDemo();
+    this._hydrateFromIndexedDB();
     const pending = this.getSyncPendingCount ? this.getSyncPendingCount() : 0;
     const failed = this.getSyncFailedCount ? this.getSyncFailedCount() : 0;
     if (failed > 0) {
@@ -120,11 +296,19 @@ const DB = {
   // ── GESTÃO DA EMPRESA / CONSTRUTORA ──
   getEmpresa() {
     const t = this._t();
-    const raw = localStorage.getItem(`finobra_${t}_empresa`);
+    const storageKey = `finobra_${t}_empresa`;
+    if (this._memCache && this._memCache.has(storageKey)) {
+      const cached = this._memCache.get(storageKey);
+      if (cached && typeof cached === 'object') return cached;
+    }
+    const raw = localStorage.getItem(storageKey);
     if (raw) {
       try {
         const obj = JSON.parse(raw);
-        if (obj && typeof obj === 'object') return obj;
+        if (obj && typeof obj === 'object') {
+          if (this._memCache) this._memCache.set(storageKey, obj);
+          return obj;
+        }
       } catch {}
     }
 
@@ -141,6 +325,7 @@ const DB = {
 
   saveEmpresa(empresaData) {
     const t = this._t();
+    const storageKey = `finobra_${t}_empresa`;
     const current = this.getEmpresa();
     const updated = {
       ...current,
@@ -149,23 +334,37 @@ const DB = {
       configurada: true,
       updated_at: new Date().toISOString()
     };
+    if (this._memCache) this._memCache.set(storageKey, updated);
+    if (typeof IDBStorage !== 'undefined' && IDBStorage.setItem) {
+      IDBStorage.setItem(storageKey, updated).catch(() => {});
+    }
     try {
-      localStorage.setItem(`finobra_${t}_empresa`, JSON.stringify(updated));
+      localStorage.setItem(storageKey, JSON.stringify(updated));
     } catch (e) {
       console.warn(`[Storage] Erro ao salvar dados da empresa ${t}:`, e);
       if (this.purgeStorage) this.purgeStorage();
       try {
-        localStorage.setItem(`finobra_${t}_empresa`, JSON.stringify(updated));
+        localStorage.setItem(storageKey, JSON.stringify(updated));
       } catch (e2) {
         console.error(`[Storage] Falha crítica ao persistir dados da empresa:`, e2);
       }
     }
+    this._broadcastMutation('empresa');
     return updated;
   },
 
   getAll(key) {
+    const storageKey = this._k(key);
+    if (this._memCache && this._memCache.has(storageKey)) {
+      const cached = this._memCache.get(storageKey);
+      return Array.isArray(cached) ? cached : [];
+    }
     try {
-      return JSON.parse(localStorage.getItem(this._k(key)) || '[]');
+      const raw = localStorage.getItem(storageKey);
+      const parsed = raw ? JSON.parse(raw) : [];
+      const list = Array.isArray(parsed) ? parsed : [];
+      if (this._memCache) this._memCache.set(storageKey, list);
+      return list;
     } catch {
       return [];
     }
@@ -173,17 +372,31 @@ const DB = {
 
   save(key, data) {
     const storageKey = this._k(key);
+    const normalized = Array.isArray(data) ? data : [];
+    if (this._memCache) this._memCache.set(storageKey, normalized);
+
+    // Persistência assíncrona robusta no IndexedDB (sem limite de 5MB do LocalStorage)
+    if (typeof IDBStorage !== 'undefined' && IDBStorage.setItem) {
+      IDBStorage.setItem(storageKey, normalized).catch(err => {
+        console.warn(`[Storage] Falha ao persistir no IndexedDB (${key}):`, err);
+      });
+    }
+
+    // Persistência síncrona de melhor esforço no LocalStorage
     try {
-      localStorage.setItem(storageKey, JSON.stringify(data));
+      localStorage.setItem(storageKey, JSON.stringify(normalized));
     } catch (e) {
       console.warn(`[Storage] Quota excedida ao salvar ${key}. Liberando espaço no LocalStorage...`);
       this.purgeStorage();
       try {
-        localStorage.setItem(storageKey, JSON.stringify(data));
+        localStorage.setItem(storageKey, JSON.stringify(normalized));
       } catch (e2) {
-        console.error(`[Storage] Falha ao persistir ${key} no cache local:`, e2);
+        console.warn(`[Storage] LocalStorage cheio para ${key}; dados preservados com segurança no IndexedDB e na memória.`);
       }
     }
+
+    // Notifica outras abas ativas
+    this._broadcastMutation(key);
   },
 
   purgeStorage() {
@@ -1290,9 +1503,17 @@ const DB = {
   },
 
   _getSyncQueue() {
+    const key = this._syncQueueKey();
+    if (this._memCache && this._memCache.has(key)) {
+      const cached = this._memCache.get(key);
+      if (Array.isArray(cached)) return cached;
+    }
     try {
-      const list = JSON.parse(localStorage.getItem(this._syncQueueKey()) || '[]');
-      return Array.isArray(list) ? list : [];
+      const raw = localStorage.getItem(key);
+      const list = raw ? JSON.parse(raw) : [];
+      const res = Array.isArray(list) ? list : [];
+      if (this._memCache) this._memCache.set(key, res);
+      return res;
     } catch (err) {
       console.warn('[Sync] Fila local inválida; mantendo operação em modo seguro:', err);
       this._syncStorageFailure = true;
@@ -1302,8 +1523,13 @@ const DB = {
 
   _saveSyncQueue(queue) {
     const normalized = Array.isArray(queue) ? queue : [];
+    const key = this._syncQueueKey();
+    if (this._memCache) this._memCache.set(key, normalized);
+    if (typeof IDBStorage !== 'undefined' && IDBStorage.setItem) {
+      IDBStorage.setItem(key, normalized).catch(() => {});
+    }
     const payload = JSON.stringify(normalized);
-    const persist = () => localStorage.setItem(this._syncQueueKey(), payload);
+    const persist = () => localStorage.setItem(key, payload);
     try {
       persist();
       return true;
@@ -1330,9 +1556,17 @@ const DB = {
   },
 
   _getSyncFailed() {
+    const key = this._syncFailedKey();
+    if (this._memCache && this._memCache.has(key)) {
+      const cached = this._memCache.get(key);
+      if (Array.isArray(cached)) return cached;
+    }
     try {
-      const list = JSON.parse(localStorage.getItem(this._syncFailedKey()) || '[]');
-      return Array.isArray(list) ? list : [];
+      const raw = localStorage.getItem(key);
+      const list = raw ? JSON.parse(raw) : [];
+      const res = Array.isArray(list) ? list : [];
+      if (this._memCache) this._memCache.set(key, res);
+      return res;
     } catch (err) {
       console.warn('[Sync] Fila de atenção local inválida:', err);
       return [];
@@ -1341,8 +1575,13 @@ const DB = {
 
   _saveSyncFailed(items) {
     const normalized = Array.isArray(items) ? items.slice(-200) : [];
+    const key = this._syncFailedKey();
+    if (this._memCache) this._memCache.set(key, normalized);
+    if (typeof IDBStorage !== 'undefined' && IDBStorage.setItem) {
+      IDBStorage.setItem(key, normalized).catch(() => {});
+    }
     const payload = JSON.stringify(normalized);
-    const persist = () => localStorage.setItem(this._syncFailedKey(), payload);
+    const persist = () => localStorage.setItem(key, payload);
     try {
       persist();
       return true;
@@ -1438,9 +1677,10 @@ const DB = {
     return failed.length;
   },
 
-  _scheduleSyncRetry(delay = 10000) {
+  _scheduleSyncRetry(delay) {
+    const finalDelay = (typeof delay === 'number' && delay > 0) ? delay : this._calculateBackoff(1);
     clearTimeout(this._syncRetryTimer);
-    this._syncRetryTimer = setTimeout(() => this._flushCloudQueue(), delay);
+    this._syncRetryTimer = setTimeout(() => this._flushCloudQueue(), finalDelay);
     this._bindNetworkListeners();
   },
 
@@ -1494,6 +1734,12 @@ const DB = {
 
   async _flushCloudQueue() {
     if (this._syncFlushing) return;
+    if (this._isCircuitOpen()) {
+      const waitMs = Math.max(2000, this._circuitNextAttemptAt - Date.now());
+      console.warn(`[Sync] Disjuntor de rede aberto. Aguardando ${Math.ceil(waitMs / 1000)}s antes da próxima sondagem.`);
+      this._scheduleSyncRetry(waitMs);
+      return;
+    }
     this._syncFlushing = true;
     try {
       while (true) {
@@ -1511,7 +1757,9 @@ const DB = {
             body: JSON.stringify(item.payload)
           });
         } catch {
-          this._scheduleSyncRetry(10000);
+          this._recordNetworkFailure(true);
+          const retries = Number(item._retries || 0) + 1;
+          this._scheduleSyncRetry(this._calculateBackoff(retries));
           break;
         }
 
@@ -1526,6 +1774,9 @@ const DB = {
         // explicitamente marcado como partial/failed. Nunca confirmar silenciosamente.
         const partialFailure = !!errorJson.partial || (Array.isArray(errorJson.failed) && errorJson.failed.length > 0) || (res.ok && errorJson.success === false);
         if (!res.ok || partialFailure) {
+          const isServerError = res.status >= 500 || res.status === 429;
+          this._recordNetworkFailure(isServerError);
+
           const code = String(errorJson.code || (partialFailure ? 'SYNC_PARTIAL' : `HTTP_${res.status}`));
           const message = String(errorJson.error || errorJson.message || (partialFailure ? 'Sincronização parcial; alguns registros não foram confirmados.' : `${item.payload?.action}/${item.payload?.table}`));
 
@@ -1538,7 +1789,7 @@ const DB = {
             else console.warn(`[Sync] Operação movida para atenção (${code}): ${message}`);
             const moved = this._moveSyncItemToAttention(item, { error:message, code, status:res.status });
             if (typeof Utils !== 'undefined' && Utils.toast) Utils.toast(message, 'warning');
-            if (moved < 0) { this._scheduleSyncRetry(15000); break; }
+            if (moved < 0) { this._scheduleSyncRetry(this._calculateBackoff(item._retries || 1)); break; }
             continue;
           }
 
@@ -1548,14 +1799,15 @@ const DB = {
             console.error(`[Sync] Operação requer atenção após ${retries} falhas do servidor:`, message);
             const moved = this._moveSyncItemToAttention(item, { error:message, code:`${code}_MAX_RETRIES`, status:res.status });
             if (typeof Utils !== 'undefined' && Utils.toast) Utils.toast('Uma alteração não foi perdida, mas requer atenção para sincronizar.', 'warning');
-            if (moved < 0) { this._scheduleSyncRetry(15000); break; }
+            if (moved < 0) { this._scheduleSyncRetry(this._calculateBackoff(retries)); break; }
             continue;
           }
           console.warn(`[Sync] Servidor recusou ${item.payload.action}/${item.payload.table}. Tentativa ${retries}/5.`);
-          this._scheduleSyncRetry(res.status === 429 ? 30000 : 15000);
+          this._scheduleSyncRetry(res.status === 429 ? 30000 : this._calculateBackoff(retries));
           break;
         }
 
+        this._recordNetworkSuccess();
         this._acceptSyncVersion(item, responseJson.sync_version);
         const pending = this._ackSyncQueueItem(item);
         this._emitSyncStatus(pending ? 'pending' : 'synced');
@@ -1568,19 +1820,20 @@ const DB = {
   },
 
   _acceptSyncVersion(item, version) {
-    if (item.payload?.table !== 'lancamentos' || !version) return;
+    const table = item.payload?.table;
+    if (!table || !version) return;
     const id = item.payload.data?.id;
     const previous = item.payload.data?.sync_version;
-    const local = this.getAll('lancamentos');
+    const local = this.getAll(table);
     const record = local.find(row => row.id === id);
     if (record && record.sync_version === previous) {
       record.sync_version = version;
-      this.save('lancamentos', local);
+      this.save(table, local);
     }
     // Uma segunda edição feita durante o envio deve partir da versão confirmada.
     const queue = this._getSyncQueue();
     for (const entry of queue) {
-      if (entry.payload?.table === 'lancamentos' && entry.payload?.data?.id === id && entry.payload.data.sync_version === previous) {
+      if (entry.payload?.table === table && entry.payload?.data?.id === id && entry.payload.data.sync_version === previous) {
         entry.payload.data.sync_version = version;
       }
     }
@@ -1590,18 +1843,19 @@ const DB = {
   resolveSyncConflict(queueId, remote, keepLocal, reviewedData) {
     const failed = this._getSyncFailed();
     const item = failed.find(entry => entry.queueId === queueId && entry.errorCode === 'SYNC_CONFLICT');
-    if (!item || item.payload?.table !== 'lancamentos') throw new Error('Conflito não encontrado. Atualize a lista.');
+    if (!item) throw new Error('Conflito não encontrado. Atualize a lista.');
+    const table = item.payload?.table || 'lancamentos';
     if (reviewedData && JSON.stringify(reviewedData) !== JSON.stringify(item.payload.data)) throw new Error('A alteração local mudou. Abra a revisão novamente.');
-    const id = item.payload.data.id;
-    if (remote && remote.id !== id) throw new Error('Lançamento de revisão inválido.');
-    if (this._getSyncQueue().some(entry => entry.payload?.table === 'lancamentos' && entry.payload?.data?.id === id)) throw new Error('Aguarde a alteração pendente antes de revisar este lançamento.');
-    if (keepLocal && !remote?.sync_version) throw new Error('Este lançamento foi excluído na nuvem. Cadastre um novo lançamento se necessário.');
+    const id = item.payload.data?.id;
+    if (remote && remote.id !== id) throw new Error('Registro de revisão inválido.');
+    if (this._getSyncQueue().some(entry => (entry.payload?.table || 'lancamentos') === table && entry.payload?.data?.id === id)) throw new Error('Aguarde a alteração pendente antes de revisar este registro.');
+    if (keepLocal && !remote?.sync_version) throw new Error('Este registro foi excluído na nuvem. Cadastre um novo registro se necessário.');
     const record = keepLocal ? { ...item.payload.data, sync_version:remote.sync_version } : remote;
-    if (keepLocal && !this.syncToCloud('save', 'lancamentos', record)) throw new Error('Não foi possível salvar a alteração na fila.');
+    if (keepLocal && !this.syncToCloud('save', table, record)) throw new Error('Não foi possível salvar a alteração na fila.');
     if (!this._saveSyncFailed(failed.filter(entry => entry.queueId !== queueId))) throw new Error('Não foi possível concluir a revisão local.');
-    const local = this.getAll('lancamentos').filter(entry => entry.id !== id);
+    const local = this.getAll(table).filter(entry => entry.id !== id);
     if (record) local.push(record);
-    this.save('lancamentos', local);
+    this.save(table, local);
     this._localMutationRevision = (this._localMutationRevision || 0) + 1;
     this._emitSyncStatus(this.getSyncPendingCount() ? 'pending' : this.getSyncFailedCount() ? 'attention' : 'synced');
   },

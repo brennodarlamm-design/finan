@@ -233,6 +233,18 @@ const App = {
     window.FinObraStartup?.ready();
     this._bindSyncStatus();
 
+    // Sincronização multi-aba em tempo real: reflete alterações de outras abas sem reload
+    window.addEventListener('finobra:cross-tab-mutation', (e) => {
+      const table = e.detail?.table;
+      console.info(`[App] 🔄 Alteração detectada em outra aba (${table}). Atualizando tela atual...`);
+      const modalAberto = document.getElementById('modal-overlay');
+      const isModalActive = modalAberto && modalAberto.classList.contains('active');
+      const isTyping = ['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement?.tagName);
+      if (!isModalActive && !isTyping) {
+        this.refreshCurrentRoute();
+      }
+    });
+
     // Histórico e navegação limpa (popstate + hashchange)
     window.addEventListener('popstate', (e) => {
       const target = e.state?.route || this._getRouteFromUrl();
@@ -390,18 +402,39 @@ const App = {
     const tenant = DB._t();
     const issue = DB._getSyncFailed().find(item => item.queueId === queueId);
     if (!issue) return;
+    const table = issue.payload?.table || 'lancamentos';
     try {
-      const records = await DB._fetchCloudTablePaged('lancamentos', 400, true);
+      const records = await DB._fetchCloudTablePaged(table, 400, true);
       if (DB._t() !== tenant) return;
-      const local = issue.payload.data;
-      const remote = records.find(record => record.id === local.id) || null;
+      const local = issue.payload.data || {};
+      const remote = (records || []).find(record => record.id === local.id) || null;
       const esc = value => Utils.escapeHtml(String(value ?? '—'));
-      const fields = [['descricao','Descrição'], ['valor','Valor'], ['tipo','Tipo'], ['status','Status'], ['data','Data'], ['data_vencimento','Vencimento'], ['data_pagamento','Pagamento'], ['categoria','Categoria'], ['fornecedor_beneficiario','Favorecido'], ['conta_bancaria','Conta'], ['obra_id','Obra'], ['nota_fiscal_id','Nota fiscal'], ['codigo_barras','Código de barras'], ['chave_nfe','Chave NF-e'], ['observacoes','Observações'], ['conciliado','Conciliado'], ['itens','Itens']];
+
+      const fieldLabels = {
+        lancamentos: [['descricao','Descrição'], ['valor','Valor'], ['tipo','Tipo'], ['status','Status'], ['data','Data'], ['data_vencimento','Vencimento'], ['data_pagamento','Pagamento'], ['categoria','Categoria'], ['fornecedor_beneficiario','Favorecido'], ['conta_bancaria','Conta'], ['obra_id','Obra'], ['nota_fiscal_id','Nota fiscal'], ['codigo_barras','Código de barras'], ['chave_nfe','Chave NF-e'], ['observacoes','Observações'], ['conciliado','Conciliado'], ['itens','Itens']],
+        obras: [['nome','Nome da Obra'], ['cliente','Cliente'], ['status','Status'], ['orcamento_total','Orçamento Total'], ['data_inicio','Início'], ['previsao_termino','Previsão de Término'], ['endereco','Endereço'], ['bdi_padrao','BDI Padrão'], ['responsavel','Responsável']],
+        clientes: [['nome','Nome da Obra/Cliente'], ['status','Status'], ['orcamento_total','Orçamento Total'], ['data_inicio','Início'], ['previsao_termino','Previsão de Término'], ['endereco','Endereço']],
+        notas: [['numero','Número'], ['fornecedor_nome','Fornecedor'], ['valor_total','Valor Total'], ['data_emissao','Emissão'], ['status','Status'], ['chave_nfe','Chave NF-e'], ['obra_id','Obra']],
+        fornecedores: [['nome','Nome/Razão Social'], ['documento','CPF/CNPJ'], ['telefone','Telefone'], ['email','E-mail'], ['categoria','Categoria']],
+        orcamentos: [['nome','Nome'], ['tipo','Tipo'], ['valor_total','Valor Total'], ['bdi','BDI'], ['status','Status']],
+        medicoes: [['numero','Número'], ['periodo_inicio','Início'], ['periodo_fim','Fim'], ['valor_medido','Valor Medido'], ['status','Status']],
+        contas: [['nome','Nome da Conta'], ['banco','Banco'], ['saldo_inicial','Saldo Inicial'], ['tipo','Tipo']]
+      };
+
+      const ignoredKeys = new Set(['id', 'sync_version', 'created_at', 'updated_at', 'tenant_id', 'client_mutation_id']);
+      let fields = fieldLabels[table];
+      if (!fields) {
+        const allKeys = new Set([...Object.keys(local), ...(remote ? Object.keys(remote) : [])]);
+        fields = Array.from(allKeys).filter(k => !ignoredKeys.has(k)).map(k => [k, k.replace(/_/g, ' ').toUpperCase()]);
+      }
+
       const display = value => value && typeof value === 'object' ? JSON.stringify(value) : value;
       const rows = fields.filter(([key]) => JSON.stringify(local[key]) !== JSON.stringify(remote?.[key])).map(([key, label]) => `<tr><td>${esc(label)}</td><td>${esc(display(local[key]))}</td><td>${esc(display(remote?.[key]))}</td></tr>`).join('');
+      const entityName = table === 'lancamentos' ? 'lançamento' : (table === 'obras' || table === 'clientes' ? 'obra' : (table === 'notas' ? 'nota fiscal' : 'registro'));
+
       Utils.showModal(`<div class="modal" style="max-width:900px;width:96vw;">
-        <div class="modal-header"><span class="modal-title">Revisar lançamento</span><button class="modal-close" data-fb-click="Utils.closeModal" data-fb-click-n="0">✕</button></div>
-        <div class="modal-body"><p>${remote ? 'Compare as diferenças antes de escolher qual versão manter.' : 'Este lançamento foi excluído na nuvem. Sua alteração permanece guardada até concluir a revisão.'}</p><div class="table-wrap"><table class="table"><thead><tr><th>Campo</th><th>Minha alteração</th><th>Versão salva</th></tr></thead><tbody>${rows}</tbody></table></div></div>
+        <div class="modal-header"><span class="modal-title">Revisar ${entityName}</span><button class="modal-close" data-fb-click="Utils.closeModal" data-fb-click-n="0">✕</button></div>
+        <div class="modal-body"><p>${remote ? 'Compare as diferenças antes de escolher qual versão manter.' : `Este ${entityName} foi excluído na nuvem. Sua alteração permanece guardada até concluir a revisão.`}</p><div class="table-wrap"><table class="table"><thead><tr><th>Campo</th><th>Minha alteração</th><th>Versão salva</th></tr></thead><tbody>${rows || '<tr><td colspan="3" style="text-align:center;">Nenhuma divergência de campos encontrada.</td></tr>'}</tbody></table></div></div>
         <div class="modal-footer"><button class="btn btn-secondary" data-fb-click="Utils.closeModal" data-fb-click-n="0">Voltar depois</button><button class="btn btn-secondary" id="sync-keep-remote">${remote ? 'Manter versão salva' : 'Aceitar exclusão'}</button>${remote ? '<button class="btn btn-primary" id="sync-keep-local">Aplicar minha alteração</button>' : ''}</div>
       </div>`);
       const resolve = keepLocal => {
@@ -415,7 +448,7 @@ const App = {
       };
       document.getElementById('sync-keep-remote')?.addEventListener('click', () => resolve(false));
       document.getElementById('sync-keep-local')?.addEventListener('click', () => resolve(true));
-    } catch (error) { Utils.toast(error.message || 'Não foi possível consultar o lançamento.', 'warning'); }
+    } catch (error) { Utils.toast(error.message || 'Não foi possível consultar o registro.', 'warning'); }
   },
 
   renderShell() {
