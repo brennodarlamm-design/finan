@@ -21,6 +21,18 @@ function showMasterError(msg) {
   }
 }
 
+function ensureDevTenantKeysModule() {
+  if (globalThis.__finobraDevTenantKeysLoaded) return;
+  if (document.querySelector('script[data-finobra-dev-tenant-keys="1"]')) return;
+
+  const script = document.createElement('script');
+  script.src = '/js/dev-tenant-keys.js?v=20260915_2';
+  script.dataset.finobraDevTenantKeys = '1';
+  script.async = true;
+  script.onerror = () => console.error('[Master] Falha ao carregar módulo seguro de Chaves das Empresas.');
+  document.head.appendChild(script);
+}
+
 async function verificarSessaoMaster() {
   const flag = sessionStorage.getItem('finobra_master_logged') === 'true';
   let autorizado = false;
@@ -36,6 +48,7 @@ async function verificarSessaoMaster() {
     document.getElementById('master-auth-gate').style.display = 'none';
     document.getElementById('master-app').style.display = 'block';
     MasterAdmin.render('master-content-area');
+    ensureDevTenantKeysModule();
   } else {
     sessionStorage.removeItem('finobra_master_logged');
     document.getElementById('master-auth-gate').style.display = 'flex';

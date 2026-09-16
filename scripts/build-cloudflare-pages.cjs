@@ -146,31 +146,19 @@ const deploymentMetadata = writeDeploymentMetadata();
 const loginPagePath = path.join(out, 'js', 'login_page.js');
 let loginPage = fs.readFileSync(loginPagePath, 'utf8').replace(/\r\n/g, '\n');
 
-function patchRecoveryFlow(source) {
-  const variants = [
-    {
-      variable: 'recoveryUserId',
-      field: 'userId',
-      needle: `      const res = await Auth.solicitarCodigoRecuperacao(ident);\n      if (!res.success) {\n        errBox.textContent = res.message;\n        errBox.style.display = 'block';\n        btn.disabled = false;\n        btn.innerHTML = originalText;\n        return;\n      }\n\n      recoveryUserId = res.userId;`
-    },
-    {
-      variable: 'recoveryRequestId',
-      field: 'requestId',
-      needle: `      const res = await Auth.solicitarCodigoRecuperacao(ident);\n      if (!res.success) {\n        errBox.textContent = res.message;\n        errBox.style.display = 'block';\n        btn.disabled = false;\n        btn.innerHTML = originalText;\n        return;\n      }\n\n      recoveryRequestId = res.requestId;`
-    }
-  ];
+function validateRecoveryFlow(source) {
+  const hasScopedRequest = source.includes("Auth.solicitarCodigoRecuperacao(ident, { access_key: ak })");
+  const keepsOpaqueRequestId = source.includes('recoveryRequestId = res.requestId;');
+  const leaksExistenceCopy = source.includes('Não encontramos uma conta cadastrada com este e-mail.') ||
+    source.includes('Não encontramos uma conta cadastrada com este usuário ou e-mail.');
 
-  for (const variant of variants) {
-    if (!source.includes(variant.needle)) continue;
-    const replacement = `      const res = await Auth.solicitarCodigoRecuperacao(ident);\n      const recoveryId = res?.requestId || res?.userId || null;\n      const staleCta = document.getElementById('rec-create-account-cta');\n      if (staleCta) staleCta.remove();\n\n      if (!res.success || !recoveryId) {\n        const accountMissing = !!res.success && !recoveryId;\n        errBox.textContent = accountMissing\n          ? (ident.includes('@')\n              ? 'Não encontramos uma conta cadastrada com este e-mail.'\n              : 'Não encontramos uma conta cadastrada com este usuário ou e-mail.')\n          : (res.message || 'Não foi possível iniciar a recuperação.');\n        errBox.style.display = 'block';\n\n        if (accountMissing) {\n          const cta = document.createElement('button');\n          cta.type = 'button';\n          cta.id = 'rec-create-account-cta';\n          cta.className = 'btn-primary';\n          cta.textContent = 'Criar minha conta';\n          cta.style.marginTop = '10px';\n          cta.addEventListener('click', () => {\n            if (typeof closeRecoveryModal === 'function') closeRecoveryModal();\n            if (typeof openRegisterModal === 'function') openRegisterModal();\n            if (ident.includes('@')) {\n              const email = document.getElementById('reg-email');\n              if (email) email.value = ident;\n            } else {\n              const username = document.getElementById('reg-username');\n              if (username) username.value = ident;\n            }\n          });\n          errBox.insertAdjacentElement('afterend', cta);\n        }\n\n        btn.disabled = false;\n        btn.innerHTML = originalText;\n        return;\n      }\n\n      ${variant.variable} = recoveryId;`;
-    return source.replace(variant.needle, replacement);
+  if (!hasScopedRequest || !keepsOpaqueRequestId || leaksExistenceCopy) {
+    throw new Error('Fluxo de recuperação multi-tenant não está no formato seguro esperado em login_page.js.');
   }
-
-  if (source.includes("const recoveryId = res?.requestId || res?.userId || null;")) return source;
-  throw new Error('Não foi possível aplicar o tratamento de conta inexistente em login_page.js.');
+  return source;
 }
 
-loginPage = patchRecoveryFlow(loginPage);
+loginPage = validateRecoveryFlow(loginPage);
 fs.writeFileSync(loginPagePath, loginPage, 'utf8');
 
 const builtHome = fs.readFileSync(path.join(out, 'index.html'), 'utf8');
@@ -196,15 +184,14 @@ if (!bridge.includes('FINOBRA_PATCH26_LEXICAL_ROOTS_HOTFIX') ||
 }
 
 const builtLoginPage = fs.readFileSync(loginPagePath, 'utf8');
-if (!builtLoginPage.includes("const recoveryId = res?.requestId || res?.userId || null;") ||
-    !builtLoginPage.includes('Não encontramos uma conta cadastrada com este e-mail.') ||
-    !builtLoginPage.includes("cta.textContent = 'Criar minha conta'")) {
-  throw new Error('Build Cloudflare sem bloqueio real de OTP para conta inexistente.');
+if (!builtLoginPage.includes("Auth.solicitarCodigoRecuperacao(ident, { access_key: ak })") ||
+    !builtLoginPage.includes('recoveryRequestId = res.requestId;') ||
+    builtLoginPage.includes('Não encontramos uma conta cadastrada com este e-mail.')) {
+  throw new Error('Build Cloudflare sem recuperação multi-tenant opaca por Chave da Empresa.');
 }
 
 if ((!deploymentMetadata.commit || deploymentMetadata.commit === 'unknown') && !process.env.VERCEL) {
   throw new Error('Build Cloudflare sem identificação do commit de origem.');
 }
 
-
-console.log(`✅ Cloudflare dist preparado com commit ${deploymentMetadata.commit.slice(0, 12)} via ${deploymentMetadata.source}, frontend-only, CSP e recuperação tratada.`);
+console.log(`✅ Cloudflare dist preparado com commit ${deploymentMetadata.commit.slice(0, 12)} via ${deploymentMetadata.source}, frontend-only, CSP e recuperação multi-tenant validada.`);
