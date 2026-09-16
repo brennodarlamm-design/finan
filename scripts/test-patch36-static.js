@@ -31,11 +31,12 @@ const landing=fs.readFileSync('landing.html','utf8');
 assert(landing.includes('15 dias') && !/7\s+dias/i.test(landing),'Landing padroniza teste gratuito em 15 dias.');
 assert(landing.includes('Suporte / Comercial') && !landing.includes('(95) 99136-3678'),'Landing usa Suporte / Comercial sem exibir telefone.');
 assert(landing.includes('1 usuário') && landing.includes('2 usuários') && landing.includes('5 usuários'),'Landing comunica limites de usuários 1/2/5.');
-assert(landing.includes('3 ativas') && landing.includes('10 ativas') && landing.includes('Ilimitadas'),'Landing comunica limites de obras por plano.');
-assert(landing.includes('.plans{display:flex;overflow-x:auto;scroll-snap-type:x mandatory'),'Planos da landing usam swipe horizontal no celular.');
-assert(landing.includes('mobile-compare') && landing.includes('module-groups'),'Landing possui comparação mobile e módulos organizados por área.');
+assert(landing.includes('3 obras') && landing.includes('10 obras') && landing.includes('Ilimitadas'),'Landing comunica limites de obras por plano.');
+// Patch 52 redesenha a landing empresarial: no mobile os planos viram uma coluna responsiva,
+// enquanto os planos internos do app continuam usando o carrossel validado acima.
+assert(landing.includes('@media(max-width:980px)') && landing.includes('.plans{grid-template-columns:1fr}'),'Planos da landing possuem adaptação responsiva explícita para telas menores.');
+assert(landing.includes('resource-grid') && landing.includes('billing-switcher'),'Landing empresarial mantém recursos organizados e comparação de ciclos dos planos.');
 assert(landing.includes('wa.me/5595991363678'),'Contato continua operacional por WhatsApp sem número visível.');
-
 
 const db=fs.readFileSync('api/db.js','utf8');
 const sinapi=fs.readFileSync('js/orcamento_sinapi.js','utf8');
