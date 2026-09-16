@@ -1381,6 +1381,30 @@
       .compare-container { overflow-x: auto; }
       .compare-table { min-width: 540px; }
     }
+
+    /* Scroll Reveal (Audit 2.5) — Smooth entrance for marketing elements */
+    .reveal-on-scroll {
+      opacity: 0;
+      transform: translateY(22px);
+      filter: blur(5px);
+      transition: opacity 620ms cubic-bezier(0.32, 0.72, 0, 1),
+                  transform 620ms cubic-bezier(0.32, 0.72, 0, 1),
+                  filter 620ms cubic-bezier(0.32, 0.72, 0, 1);
+    }
+    .reveal-on-scroll.revealed {
+      opacity: 1;
+      transform: translateY(0);
+      filter: blur(0);
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .reveal-on-scroll,
+      .reveal-on-scroll.revealed {
+        transition: none;
+        opacity: 1;
+        transform: none;
+        filter: none;
+      }
+    }
   </style>
 </head>
 <body class="ui-marketing">
@@ -2055,35 +2079,5 @@
   <script src="/js/landing_page.js"></script>
   <script src="/js/patch26-actions.js"></script>
   <script src="/js/patch26-events.js"></script>
-
-  <!-- AUDIT FIX 2.5: Scroll Reveal — seções entram com motion premium -->
-  <script>
-  (function() {
-    var CSS = '.reveal-on-scroll{opacity:0;transform:translateY(22px);filter:blur(5px);transition:opacity 620ms cubic-bezier(0.32,0.72,0,1),transform 620ms cubic-bezier(0.32,0.72,0,1),filter 620ms cubic-bezier(0.32,0.72,0,1)}.reveal-on-scroll.revealed{opacity:1;transform:translateY(0);filter:blur(0)}@media(prefers-reduced-motion:reduce){.reveal-on-scroll,.reveal-on-scroll.revealed{transition:none;opacity:1;transform:none;filter:none}}';
-    var s = document.createElement('style'); s.textContent = CSS; document.head.appendChild(s);
-
-    // Adiciona classe nos elementos que devem revelar ao scroll
-    var targets = document.querySelectorAll(
-      '.section, .module-card, .plan, .cta-card, .faq details, .support-main, .support-side, .compare-shell'
-    );
-    targets.forEach(function(el) { el.classList.add('reveal-on-scroll'); });
-
-    if (!('IntersectionObserver' in window)) {
-      targets.forEach(function(el) { el.classList.add('revealed'); });
-      return;
-    }
-
-    var io = new IntersectionObserver(function(entries) {
-      entries.forEach(function(e) {
-        if (e.isIntersecting) {
-          e.target.classList.add('revealed');
-          io.unobserve(e.target);
-        }
-      });
-    }, { threshold: 0.08, rootMargin: '0px 0px -40px 0px' });
-
-    targets.forEach(function(el) { io.observe(el); });
-  })();
-  </script>
 </body>
 </html>
