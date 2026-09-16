@@ -80,7 +80,10 @@ const Configuracoes = {
           &#x1F4F1; Sess&otilde;es
         </button>
         <button id="cfg-tab-slas" class="cfg-tab${this._activeTab==='slas'?' cfg-tab-active':''}" data-fb-click="Configuracoes._switch" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="slas">
-          ⏱️ SLAs &amp; Prazos
+          &#x23F1;&#xFE0F; SLAs &amp; Prazos
+        </button>
+        <button id="cfg-tab-workflow" class="cfg-tab${this._activeTab==='workflow'?' cfg-tab-active':''}" data-fb-click="Configuracoes._switch" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="workflow">
+          &#x1F6A7; Workflow &amp; Cargos
         </button>
         <button id="cfg-tab-contas" class="cfg-tab${this._activeTab==='contas'?' cfg-tab-active':''}" data-fb-click="Configuracoes._switch" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="contas">
           &#x1F3E6; Contas Banc&aacute;rias
@@ -97,7 +100,7 @@ const Configuracoes = {
 
   _switch(tab) {
     const isAdmin = ['admin','superadmin'].includes(Auth.getUser()?.perfil);
-    const validTabs = ['empresa', 'slas', 'contas', 'categorias', 'sessoes', ...(isAdmin ? ['usuarios','auditoria'] : [])];
+    const validTabs = ['empresa', 'slas', 'workflow', 'contas', 'categorias', 'sessoes', ...(isAdmin ? ['usuarios','auditoria'] : [])];
     if (!validTabs.includes(tab)) tab = 'empresa';
     this._activeTab = tab;
     document.querySelectorAll('.cfg-tab').forEach(el => el.classList.remove('cfg-tab-active'));
@@ -114,12 +117,133 @@ const Configuracoes = {
   _renderTab(tab, obraId) {
     if (tab === 'empresa') return this._renderEmpresa();
     if (tab === 'slas') return this._renderSLAs();
+    if (tab === 'workflow') return this._renderWorkflow();
     if (tab === 'contas') return Contas._html(obraId);
     if (tab === 'categorias') return this._renderCategorias();
     if (tab === 'usuarios') return this._renderUsuarios();
     if (tab === 'auditoria') return this._renderAuditoria();
     if (tab === 'sessoes') return this._renderSessoes();
     return this._renderEmpresa();
+  },
+
+  // ── WORKFLOW & CARGOS (Patch 52) ──────────────────────────────────────────
+  _renderWorkflow() {
+    if (typeof CronogramaSLA === 'undefined') {
+      return '<div class="empty-state"><h3>Módulo de Workflow indisponível</h3></div>';
+    }
+    const e = this._esc.bind(this);
+    const cargos = CronogramaSLA.getCargos();
+    const templates = CronogramaSLA.getTemplates();
+    const users = typeof Auth !== 'undefined' && Auth.getUsers ? Auth.getUsers() : [];
+    const userOptions = (sel) => [{ id:'', nome:'-- Não atribuído --' }, ...users].map(u => `<option value="${e(u.id)}" ${sel===u.id?'selected':''}>${e(u.nome || u.id)}</option>`).join('');
+
+    const cargoRows = cargos.map((c, idx) => `
+      <tr>
+        <td style="font-size:1.1rem;text-align:center;">${e(c.icone||'👤')}</td>
+        <td><input type="text" class="form-control" style="padding:4px 8px;font-size:.82rem;" id="cargo-nome-${idx}" value="${e(c.nome)}" placeholder="Nome do cargo"></td>
+        <td><select class="form-control" style="padding:4px 8px;font-size:.82rem;" id="cargo-usuario-${idx}">${userOptions(c.usuario_id || '')}</select></td>
+        <td style="text-align:center;"><button class="btn btn-secondary btn-sm" style="font-size:.72rem;padding:3px 8px;color:var(--danger);" data-fb-click="Configuracoes._removerCargo" data-fb-click-n="1" data-fb-click-t0="number" data-fb-click-v0="${idx}">✕</button></td>
+      </tr>`).join('');
+
+    const templateCards = Object.entries(templates).map(([key, tmpl]) => `
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--r-md);padding:14px 16px;display:flex;align-items:center;justify-content:space-between;gap:12px;">
+        <div style="display:flex;align-items:center;gap:10px;">
+          <span style="font-size:1.3rem;">${e(tmpl.icone||'📋')}</span>
+          <div>
+            <div style="font-weight:700;font-size:.88rem;color:var(--text);">${e(tmpl.nome)}</div>
+            <div style="font-size:.72rem;color:var(--text3);">${tmpl.processos?.length || 0} etapas${tmpl.builtin ? ' · Padrão' : ' · Customizado'}</div>
+          </div>
+        </div>
+        <div style="display:flex;gap:8px;">
+          ${!tmpl.builtin ? `<button class="btn btn-secondary btn-sm" style="font-size:.72rem;color:var(--danger);" data-fb-click="Configuracoes._removerTemplate" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(key)}">Remover</button>` : ''}
+          <span style="font-size:.72rem;color:var(--text3);background:var(--bg-secondary);padding:3px 8px;border-radius:6px;">${e(key)}</span>
+        </div>
+      </div>`).join('');
+
+    return `
+      <div>
+        <div class="card" style="margin-bottom:24px;">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+            <div>
+              <h3 style="font-size:.95rem;font-weight:800;color:var(--text);margin:0;">💼 Cargos &amp; Funções da Empresa</h3>
+              <p style="font-size:.78rem;color:var(--text3);margin:4px 0 0;">Atribua usuários a cargos para que as etapas do workflow encontrem automaticamente o responsável certo.</p>
+            </div>
+            <button class="btn btn-secondary" style="font-size:.78rem;white-space:nowrap;" data-fb-click="Configuracoes._addCargo" data-fb-click-n="0">+ Novo Cargo</button>
+          </div>
+          <div class="table-wrap">
+            <table class="table" style="width:100%;">
+              <thead><tr><th style="width:40px;font-size:.72rem;">Ícone</th><th style="font-size:.72rem;">Nome do Cargo</th><th style="font-size:.72rem;">Usuário Responsável</th><th style="width:50px;"></th></tr></thead>
+              <tbody id="cfg-cargos-body">${cargoRows}</tbody>
+            </table>
+          </div>
+          <div style="display:flex;justify-content:flex-end;margin-top:12px;">
+            <button class="btn btn-primary" style="font-size:.8rem;" data-fb-click="Configuracoes._salvarCargos" data-fb-click-n="0">✔ Salvar Cargos</button>
+          </div>
+        </div>
+        <div class="card">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+            <div>
+              <h3 style="font-size:.95rem;font-weight:800;color:var(--text);margin:0;">📋 Templates de Workflow por Tipo de Obra</h3>
+              <p style="font-size:.78rem;color:var(--text3);margin:4px 0 0;">Templates padrão são aplicados automaticamente pela modalidade da obra. Obras novas receberão as etapas configuradas no template correspondente.</p>
+            </div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:16px;">${templateCards}</div>
+          <div style="background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--r-md);padding:12px;font-size:.78rem;color:var(--text3);">
+            <strong style="color:var(--accent2);">Mapeamento automático:</strong> Caixa → <code>casa_caixa</code> · Reforma → <code>reforma</code> · Demais → <code>obra_particular</code>
+          </div>
+        </div>
+      </div>`;
+  },
+
+  _addCargo() {
+    if (typeof CronogramaSLA === 'undefined') return;
+    const cargos = CronogramaSLA.getCargos();
+    cargos.push({ id: 'cargo_' + Date.now(), nome: 'Novo Cargo', icone: '👤', cor: null, usuario_id: null, usuario_nome: '' });
+    CronogramaSLA.saveCargos(cargos);
+    const content = document.getElementById('cfg-content');
+    if (content) content.innerHTML = this._renderWorkflow();
+    Utils.toast('Cargo adicionado. Configure o nome e o responsável.', 'info');
+  },
+
+  _removerCargo(idx) {
+    if (typeof CronogramaSLA === 'undefined') return;
+    Utils.confirm('Remover este cargo?', () => {
+      const cargos = CronogramaSLA.getCargos();
+      cargos.splice(idx, 1);
+      CronogramaSLA.saveCargos(cargos);
+      const content = document.getElementById('cfg-content');
+      if (content) content.innerHTML = this._renderWorkflow();
+      Utils.toast('Cargo removido.', 'info');
+    });
+  },
+
+  _salvarCargos() {
+    if (typeof CronogramaSLA === 'undefined') return;
+    const cargos = CronogramaSLA.getCargos();
+    const users = typeof Auth !== 'undefined' && Auth.getUsers ? Auth.getUsers() : [];
+    cargos.forEach((c, idx) => {
+      const nomeEl = document.getElementById('cargo-nome-' + idx);
+      const userEl = document.getElementById('cargo-usuario-' + idx);
+      if (nomeEl) c.nome = nomeEl.value.trim() || c.nome;
+      if (userEl) { c.usuario_id = userEl.value || null; const u = users.find(x => x.id === c.usuario_id); c.usuario_nome = u ? u.nome : ''; }
+    });
+    CronogramaSLA.saveCargos(cargos);
+    Utils.toast('Cargos salvos com sucesso!', 'success');
+    if (typeof App !== 'undefined') App.renderShell();
+  },
+
+  _removerTemplate(key) {
+    if (typeof CronogramaSLA === 'undefined') return;
+    Utils.confirm(`Remover o template ${key}?`, () => {
+      const templates = CronogramaSLA.getTemplates();
+      if (templates[key] && !templates[key].builtin) {
+        delete templates[key];
+        CronogramaSLA.saveTemplates(templates);
+        const content = document.getElementById('cfg-content');
+        if (content) content.innerHTML = this._renderWorkflow();
+        Utils.toast('Template removido.', 'info');
+      }
+    });
   },
 
   _renderSLAs() {
@@ -131,7 +255,7 @@ const Configuracoes = {
 
     const rows = slas.map(s => `
       <tr>
-        <td style="font-weight:700;color:var(--text);">${e(s.nome)}</td>
+        <td style="font-weight:700;color:var(--text);">${e(s.icone||'📋')} ${e(s.nome)}</td>
         <td><span class="badge" style="background:rgba(255,255,255,.06);">${e(s.tipoLabel)}</span></td>
         <td><span style="font-family:monospace;font-size:.78rem;color:var(--text3);">${e(s.predecessor_id || 'Início da Obra')}</span></td>
         <td style="width:140px;">
@@ -147,7 +271,7 @@ const Configuracoes = {
     <div class="page-header">
       <div>
         <h1 class="page-title">⏱️ SLAs &amp; Prazos Padrão da Construtora</h1>
-        <p class="page-sub">Configure os prazos padrão em dias corridos para cada etapa do ciclo de vida das obras. Novas obras herdarão estes SLAs automaticamente.</p>
+        <p class="page-sub">Configure os prazos padrão em dias corridos para cada etapa. Novas obras herdarão estes SLAs automaticamente.</p>
       </div>
     </div>
 
@@ -211,7 +335,7 @@ const Configuracoes = {
     }
   },
 
-  // ── MINHA EMPRESA / DADOS CADASTRAIS ───────────────────
+
   _renderEmpresa() {
     const emp = DB.getEmpresa();
     return `

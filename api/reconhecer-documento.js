@@ -5,6 +5,7 @@ import { resolveAuthAndTenant } from './_auth.js';
 import { checkRateLimit, getClientIp } from './_ratelimit.js';
 import { canUseFeature, planError } from './_plans.js';
 import { canWriteData, canAccessModule, permissionError } from './_permissions.js';
+import { triggerOcr, isTriggerConfigured } from './_trigger-client.js';
 
 export const config = {
   maxDuration: 60,
@@ -112,6 +113,33 @@ export default async function handler(req, res) {
     return res.status(400).json({
       error: 'Assinatura binária do documento inválida. O OCR aceita estritamente arquivos PDF e imagens JPEG, PNG ou WEBP.'
     });
+  }
+
+  // Desvio para processamento assíncrono em background via Trigger.dev (elimina timeout de 10s da Vercel Hobby)
+  if (req.body?.async === true || req.body?.modo === 'async') {
+    if (isTriggerConfigured()) {
+      try {
+        const trigJob = await triggerOcr({
+          base64: cleanBase64,
+          mimeType: cleanMime,
+          tenantId: auth.tenantId,
+          userId: auth.user?.userId,
+          obraId: req.body?.obraId || null,
+          documentId: req.body?.documentId || null
+        });
+
+        if (trigJob.success) {
+          return res.status(202).json({
+            ok: true,
+            queued: true,
+            runId: trigJob.runId,
+            message: 'Documento enfileirado para processamento assíncrono via Trigger.dev.'
+          });
+        }
+      } catch (trigErr) {
+        console.warn('[OCR] Falha ao despachar para Trigger.dev, prosseguindo com execução síncrona:', trigErr.message);
+      }
+    }
   }
 
   const prompt = `Você é um especialista em documentos fiscais e bancários brasileiros. Analise a imagem ou PDF fornecido e extraia as informações relevantes.

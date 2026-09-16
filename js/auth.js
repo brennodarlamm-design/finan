@@ -375,9 +375,18 @@ const Auth = {
 
   getPlanAccess() { return this._planAccess; },
 
+  async _fetchAccessJson(url, timeoutMs = 12000) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      const res = await fetch(url, { headers:this.getAuthHeaders(), signal:controller.signal });
+      const data = await res.json().catch(() => ({}));
+      return { res, data };
+    } finally { clearTimeout(timer); }
+  },
+
   async refreshPlanAccess() {
-    const res = await fetch('/api/plano', { headers:this.getAuthHeaders() });
-    const data = await res.json().catch(() => ({}));
+    const { res, data } = await this._fetchAccessJson('/api/plano');
     if (!res.ok || !data.success || !data.plan) throw new Error(data.error || 'Não foi possível consultar o plano.');
     this._planAccess = data.plan;
     return data.plan;
@@ -449,11 +458,16 @@ const Auth = {
   },
 
   async refreshSessionFromServer() {
+    if (this._startupSessionPromise) {
+      const pending = this._startupSessionPromise;
+      this._startupSessionPromise = null;
+      return pending;
+    }
     const current = this.getSession();
     if (!current) return { success:false, changed:false };
+    if (typeof window !== 'undefined') window.FinObraStartup?.mark('session-start');
     try {
-      const res = await fetch('/api/auth?action=me', { headers:this.getAuthHeaders() });
-      const data = await res.json().catch(() => ({}));
+      const { res, data } = await this._fetchAccessJson('/api/auth?action=me');
       if (res.status === 401 || res.status === 403) { this.handleSessionExpired(); return { success:false, expired:true }; }
       if (!res.ok || !data.success || !data.user) return { success:false, changed:false };
       const next = {
@@ -463,7 +477,7 @@ const Auth = {
         perfil:data.user.perfil || current.perfil, avatar:data.user.avatar || current.avatar,
         tenantId:data.user.tenantId || current.tenantId, realTenantId:data.user.realTenantId || current.realTenantId,
         empresaNome:data.user.empresaNome || current.empresaNome, permissions:data.user.permissions || {},
-        tenantPlan:data.user.tenantPlan || current.tenantPlan, tenantStatus:data.user.tenantStatus || current.tenantStatus,
+        tenantPlan:data.plan?.id || data.user.tenantPlan || current.tenantPlan, tenantStatus:data.plan?.status || data.user.tenantStatus || current.tenantStatus,
         sessionId:data.user.sessionId || current.sessionId,
         isImpersonated: current.isImpersonated || !!data.user.isImpersonated,
         impersonatedBy: current.impersonatedBy || (data.user.isImpersonated ? 'superadmin' : '')
@@ -474,7 +488,9 @@ const Auth = {
       // Qualquer token legado usado para esta validação já foi promovido pelo servidor
       // para cookie HttpOnly. Remove a cópia acessível a JavaScript.
       this._purgeLegacyToken();
-      return { success:true, changed, user:next, cookieAuth:true };
+      const planChanged = data.plan && JSON.stringify(this._planAccess) !== JSON.stringify(data.plan);
+      if (data.plan) this._planAccess = data.plan;
+      return { success:true, changed:changed || Boolean(planChanged), user:next, cookieAuth:true, plan:data.plan || null };
     } catch { return { success:false, changed:false }; }
   },
 
@@ -609,3 +625,12 @@ const Auth = {
     return true;
   }
 };
+
+// Inicia a validação enquanto os demais scripts defer ainda estão carregando.
+// A primeira inicialização consome a mesma promessa, sem repetir a requisição.
+if (typeof window !== 'undefined' && /^\/app(?:\/|\.html$|$)/.test(window.location?.pathname || '') &&
+    !/^#(?:portal|validar)/.test(window.location?.hash || '') &&
+    !/[?&](?:portal_obra|pdata|val)=/.test((window.location?.search || '') + (window.location?.hash || '')) &&
+    typeof navigator !== 'undefined' && navigator.onLine !== false && Auth.getSession()) {
+  Auth._startupSessionPromise = Auth.refreshSessionFromServer();
+}

@@ -36,7 +36,10 @@ const App = {
     'master': ['master', 'dev', 'admin-master', 'tenants', 'empresas'],
     'planos': ['planos', 'cobranca', 'assinaturas', 'mensalidades'],
     'portal-cliente': ['portal-cliente', 'portal', 'portal-obra', 'cliente-portal'],
-    'dashboard': ['dashboard', 'inicio', 'home']
+    'dashboard': ['dashboard', 'inicio', 'home'],
+    // Patch 52 — Gestão Operacional
+    'minhas-demandas': ['minhas-demandas', 'demandas', 'meu-trabalho'],
+    'central-gestor': ['central-gestor', 'gestor', 'painel-gestor'],
   },
 
   _normalizeRoute(r) {
@@ -66,8 +69,8 @@ const App = {
     'notas': Notas,
     'consulta-nfe': typeof NFe !== 'undefined' ? NFe : null,
     'nfe': typeof NFe !== 'undefined' ? NFe : null,
-    'conciliacao-ofx': typeof OFX !== 'undefined' ? OFX : null,
-    'ofx': typeof OFX !== 'undefined' ? OFX : null,
+    get 'conciliacao-ofx'() { return typeof OFX !== 'undefined' ? OFX : {}; },
+    get 'ofx'() { return typeof OFX !== 'undefined' ? OFX : {}; },
     'orcamentos': Orcamentos,
     'medicoes': Medicoes,
     'documentacao': FasesDoc,
@@ -90,7 +93,10 @@ const App = {
         setTimeout(() => typeof Cobranca !== 'undefined' && Cobranca.renderTelaPlanos('route-content'), 0);
         return '<div style="padding:40px;text-align:center;color:var(--text3)"><span style="font-size:1.5rem;display:block;margin-bottom:8px;">💎</span>Carregando Planos &amp; Mensalidades...</div>';
       }
-    }
+    },
+    // Patch 52 — Gestão Operacional
+    'minhas-demandas': typeof MinhasDemandas !== 'undefined' ? MinhasDemandas : null,
+    'central-gestor':  typeof CentralGestor  !== 'undefined' ? CentralGestor  : null,
   },
 
   routeMeta: {
@@ -124,6 +130,9 @@ const App = {
     'portal-cliente':    { icon:'🌐', label:'Portal do Cliente', title:'Portal da Transparência do Cliente | FinObra' },
     'master':            { icon:'🛡️', label:'Painel Dev Master', title:'Painel Master Administrativo | FinObra' },
     'planos':            { icon:'💎', label:'Planos & Mensalidades', title:'Planos & Assinatura | FinObra' },
+    // Patch 52
+    'minhas-demandas':   { icon:'👤', label:'Minhas Demandas', title:'Minhas Demandas & Etapas | FinObra' },
+    'central-gestor':    { icon:'🏢', label:'Central do Gestor', title:'Central do Gestor de Obras | FinObra' },
   },
 
   _getRouteFromUrl() {
@@ -160,6 +169,7 @@ const App = {
   },
 
   async init() {
+    window.FinObraStartup?.mark('app-init');
     const rawPath = window.location.pathname || '';
     const rawHash = window.location.hash || '';
     const rawSearch = window.location.search || '';
@@ -168,6 +178,7 @@ const App = {
     if (rawPath.startsWith('/validar') || rawHash.startsWith('#validar') || rawSearch.includes('val=') || rawHash.includes('val=')) {
       if (typeof Assinador !== 'undefined' && typeof Assinador.renderTelaValidacaoPublica === 'function') {
         Assinador.renderTelaValidacaoPublica();
+        window.FinObraStartup?.ready();
         return;
       }
     }
@@ -178,6 +189,7 @@ const App = {
     if (isPortalUrl) {
       if (typeof PortalCliente !== 'undefined' && typeof PortalCliente.renderTelaPublica === 'function') {
         PortalCliente.renderTelaPublica(searchParams);
+        window.FinObraStartup?.ready();
         return;
       }
     }
@@ -189,9 +201,20 @@ const App = {
     if (typeof Auth.refreshSessionFromServer === 'function' && navigator.onLine !== false) {
       const firstCheck = await Auth.refreshSessionFromServer();
       if (firstCheck?.expired) return;
-    }
-    if (typeof Auth.refreshPlanAccess === 'function' && navigator.onLine !== false) {
-      try { await Auth.refreshPlanAccess(); } catch (e) { console.warn('[Plano] Interface usando acesso em cache até nova consulta:', e?.message || e); }
+      if (!firstCheck?.success) {
+        window.FinObraStartup?.fail('Não foi possível validar sua sessão. Verifique sua conexão e tente novamente.');
+        return;
+      }
+      // Compatibilidade durante rollout: APIs antigas ainda não devolvem o plano em /me.
+      if (!firstCheck.plan && typeof Auth.refreshPlanAccess === 'function') {
+        try { await Auth.refreshPlanAccess(); }
+        catch {
+          window.FinObraStartup?.fail('Não foi possível verificar os acessos da empresa. Tente novamente.');
+          return;
+        }
+      }
+      window.FinObraStartup?.mark('session-end');
+      window.FinObraStartup?.measure('session-access', 'session-start', 'session-end');
     }
 
     this._installErrorMonitor();
@@ -207,7 +230,20 @@ const App = {
     // Isso reduz o tempo de tela bloqueada sem abrir mão da atualização dos dados.
     DB.init();
     this.renderShell();
+    window.FinObraStartup?.ready();
     this._bindSyncStatus();
+
+    // Sincronização multi-aba em tempo real: reflete alterações de outras abas sem reload
+    window.addEventListener('finobra:cross-tab-mutation', (e) => {
+      const table = e.detail?.table;
+      console.info(`[App] 🔄 Alteração detectada em outra aba (${table}). Atualizando tela atual...`);
+      const modalAberto = document.getElementById('modal-overlay');
+      const isModalActive = modalAberto && modalAberto.classList.contains('active');
+      const isTyping = ['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement?.tagName);
+      if (!isModalActive && !isTyping) {
+        this.refreshCurrentRoute();
+      }
+    });
 
     // Histórico e navegação limpa (popstate + hashchange)
     window.addEventListener('popstate', (e) => {
@@ -221,7 +257,10 @@ const App = {
     });
 
     const initialRoute = this._getRouteFromUrl();
-    this.navigate(initialRoute, true);
+    this.navigate(initialRoute, true).then(() => {
+      window.FinObraStartup?.mark('initial-route');
+      window.FinObraStartup?.measure('navigation-to-route', null, 'initial-route');
+    });
 
     // Atualiza em segundo plano. Reconcilia alterações offline antes de sincronizar da nuvem (C-07).
     Promise.resolve(DB.bootstrapCoreCloud ? DB.bootstrapCoreCloud() : true)
@@ -231,22 +270,29 @@ const App = {
           try { await DB._flushCloudQueue(); } catch (e) { console.warn('[App] Flush de fila pendente offline:', e); }
         }
       })
-      .then(() => DB.syncFromCloud().then(async (ok) => {
-        if (ok) {
-          const current = this.route || initialRoute;
-          this.renderShell();
-          this._bindSyncStatus();
-          this.navigate(current, false);
-          this.refreshObraSelector();
+      .then(async () => {
+        if (typeof DB.syncRoute === 'function') {
+          try { await DB.syncRoute(initialRoute); } catch (e) { console.warn('[App] syncRoute inicial:', e); }
         }
-        if (typeof Assinador !== 'undefined' && Assinador.sincronizarAssinaturasPendentes) {
-          Assinador.sincronizarAssinaturasPendentes().catch(() => {});
-        }
-        // Só decide onboarding depois de tentar carregar o tenant real do servidor.
-        const empAtual = DB.getEmpresa();
-        const isImpersonating = (typeof Auth !== 'undefined' && Auth.getUser) ? (Auth.getUser()?.impersonatedBy === 'superadmin' || Auth.getUser()?.isImpersonated) : false;
-        if (!empAtual.configurada && !isImpersonating) setTimeout(() => this.showOnboardingEmpresa(), 350);
-      }));
+        // Executa sync delta incremental ou fallback DB.syncFromCloud().then
+        const syncPromise = (typeof DB.syncDelta === 'function') ? DB.syncDelta() : DB.syncFromCloud();
+        return syncPromise.then(async (ok) => {
+          if (ok) {
+            const current = this.route || initialRoute;
+            this.renderShell();
+            this._bindSyncStatus();
+            this.navigate(current, false);
+            this.refreshObraSelector();
+          }
+          if (typeof Assinador !== 'undefined' && Assinador.sincronizarAssinaturasPendentes) {
+            Assinador.sincronizarAssinaturasPendentes().catch(() => {});
+          }
+          // Só decide onboarding depois de tentar carregar o tenant real do servidor.
+          const empAtual = DB.getEmpresa();
+          const isImpersonating = (typeof Auth !== 'undefined' && Auth.getUser) ? (Auth.getUser()?.impersonatedBy === 'superadmin' || Auth.getUser()?.isImpersonated) : false;
+          if (!empAtual.configurada && !isImpersonating) setTimeout(() => this.showOnboardingEmpresa(), 350);
+        });
+      });
 
     if (typeof BuscaGlobal !== 'undefined') BuscaGlobal.init();
 
@@ -356,18 +402,39 @@ const App = {
     const tenant = DB._t();
     const issue = DB._getSyncFailed().find(item => item.queueId === queueId);
     if (!issue) return;
+    const table = issue.payload?.table || 'lancamentos';
     try {
-      const records = await DB._fetchCloudTablePaged('lancamentos', 400, true);
+      const records = await DB._fetchCloudTablePaged(table, 400, true);
       if (DB._t() !== tenant) return;
-      const local = issue.payload.data;
-      const remote = records.find(record => record.id === local.id) || null;
+      const local = issue.payload.data || {};
+      const remote = (records || []).find(record => record.id === local.id) || null;
       const esc = value => Utils.escapeHtml(String(value ?? '—'));
-      const fields = [['descricao','Descrição'], ['valor','Valor'], ['tipo','Tipo'], ['status','Status'], ['data','Data'], ['data_vencimento','Vencimento'], ['data_pagamento','Pagamento'], ['categoria','Categoria'], ['fornecedor_beneficiario','Favorecido'], ['conta_bancaria','Conta'], ['obra_id','Obra'], ['nota_fiscal_id','Nota fiscal'], ['codigo_barras','Código de barras'], ['chave_nfe','Chave NF-e'], ['observacoes','Observações'], ['conciliado','Conciliado'], ['itens','Itens']];
+
+      const fieldLabels = {
+        lancamentos: [['descricao','Descrição'], ['valor','Valor'], ['tipo','Tipo'], ['status','Status'], ['data','Data'], ['data_vencimento','Vencimento'], ['data_pagamento','Pagamento'], ['categoria','Categoria'], ['fornecedor_beneficiario','Favorecido'], ['conta_bancaria','Conta'], ['obra_id','Obra'], ['nota_fiscal_id','Nota fiscal'], ['codigo_barras','Código de barras'], ['chave_nfe','Chave NF-e'], ['observacoes','Observações'], ['conciliado','Conciliado'], ['itens','Itens']],
+        obras: [['nome','Nome da Obra'], ['cliente','Cliente'], ['status','Status'], ['orcamento_total','Orçamento Total'], ['data_inicio','Início'], ['previsao_termino','Previsão de Término'], ['endereco','Endereço'], ['bdi_padrao','BDI Padrão'], ['responsavel','Responsável']],
+        clientes: [['nome','Nome da Obra/Cliente'], ['status','Status'], ['orcamento_total','Orçamento Total'], ['data_inicio','Início'], ['previsao_termino','Previsão de Término'], ['endereco','Endereço']],
+        notas: [['numero','Número'], ['fornecedor_nome','Fornecedor'], ['valor_total','Valor Total'], ['data_emissao','Emissão'], ['status','Status'], ['chave_nfe','Chave NF-e'], ['obra_id','Obra']],
+        fornecedores: [['nome','Nome/Razão Social'], ['documento','CPF/CNPJ'], ['telefone','Telefone'], ['email','E-mail'], ['categoria','Categoria']],
+        orcamentos: [['nome','Nome'], ['tipo','Tipo'], ['valor_total','Valor Total'], ['bdi','BDI'], ['status','Status']],
+        medicoes: [['numero','Número'], ['periodo_inicio','Início'], ['periodo_fim','Fim'], ['valor_medido','Valor Medido'], ['status','Status']],
+        contas: [['nome','Nome da Conta'], ['banco','Banco'], ['saldo_inicial','Saldo Inicial'], ['tipo','Tipo']]
+      };
+
+      const ignoredKeys = new Set(['id', 'sync_version', 'created_at', 'updated_at', 'tenant_id', 'client_mutation_id']);
+      let fields = fieldLabels[table];
+      if (!fields) {
+        const allKeys = new Set([...Object.keys(local), ...(remote ? Object.keys(remote) : [])]);
+        fields = Array.from(allKeys).filter(k => !ignoredKeys.has(k)).map(k => [k, k.replace(/_/g, ' ').toUpperCase()]);
+      }
+
       const display = value => value && typeof value === 'object' ? JSON.stringify(value) : value;
       const rows = fields.filter(([key]) => JSON.stringify(local[key]) !== JSON.stringify(remote?.[key])).map(([key, label]) => `<tr><td>${esc(label)}</td><td>${esc(display(local[key]))}</td><td>${esc(display(remote?.[key]))}</td></tr>`).join('');
+      const entityName = table === 'lancamentos' ? 'lançamento' : (table === 'obras' || table === 'clientes' ? 'obra' : (table === 'notas' ? 'nota fiscal' : 'registro'));
+
       Utils.showModal(`<div class="modal" style="max-width:900px;width:96vw;">
-        <div class="modal-header"><span class="modal-title">Revisar lançamento</span><button class="modal-close" data-fb-click="Utils.closeModal" data-fb-click-n="0">✕</button></div>
-        <div class="modal-body"><p>${remote ? 'Compare as diferenças antes de escolher qual versão manter.' : 'Este lançamento foi excluído na nuvem. Sua alteração permanece guardada até concluir a revisão.'}</p><div class="table-wrap"><table class="table"><thead><tr><th>Campo</th><th>Minha alteração</th><th>Versão salva</th></tr></thead><tbody>${rows}</tbody></table></div></div>
+        <div class="modal-header"><span class="modal-title">Revisar ${entityName}</span><button class="modal-close" data-fb-click="Utils.closeModal" data-fb-click-n="0">✕</button></div>
+        <div class="modal-body"><p>${remote ? 'Compare as diferenças antes de escolher qual versão manter.' : `Este ${entityName} foi excluído na nuvem. Sua alteração permanece guardada até concluir a revisão.`}</p><div class="table-wrap"><table class="table"><thead><tr><th>Campo</th><th>Minha alteração</th><th>Versão salva</th></tr></thead><tbody>${rows || '<tr><td colspan="3" style="text-align:center;">Nenhuma divergência de campos encontrada.</td></tr>'}</tbody></table></div></div>
         <div class="modal-footer"><button class="btn btn-secondary" data-fb-click="Utils.closeModal" data-fb-click-n="0">Voltar depois</button><button class="btn btn-secondary" id="sync-keep-remote">${remote ? 'Manter versão salva' : 'Aceitar exclusão'}</button>${remote ? '<button class="btn btn-primary" id="sync-keep-local">Aplicar minha alteração</button>' : ''}</div>
       </div>`);
       const resolve = keepLocal => {
@@ -381,7 +448,7 @@ const App = {
       };
       document.getElementById('sync-keep-remote')?.addEventListener('click', () => resolve(false));
       document.getElementById('sync-keep-local')?.addEventListener('click', () => resolve(true));
-    } catch (error) { Utils.toast(error.message || 'Não foi possível consultar o lançamento.', 'warning'); }
+    } catch (error) { Utils.toast(error.message || 'Não foi possível consultar o registro.', 'warning'); }
   },
 
   renderShell() {
@@ -428,33 +495,7 @@ const App = {
             <button class="icon-btn mobile-close-btn" data-fb-click="App.closeSidebar" data-fb-click-n="0" title="Fechar Menu" style="font-size:1.1rem;padding:4px 8px;">✕</button>
           </div>
           <nav class="sidebar-nav">
-            <div class="nav-section">Operacional & Financeiro</div>
-            ${this._navItem('dashboard','📊','Dashboard')}
-            ${this._navItem('obras','🏗️','Obras & Clientes')}
-            ${this._navItem('lancamentos','💰','Lançamentos')}
-            ${this._navItem('fornecedores','🚛','Fornecedores')}
-            ${this._navItem('produtos','📦','Produtos / Insumos')}
-            ${this._navItem('escritorio','🏢','Despesas Escritório')}
-            ${this._navItem('pre-compras','🛒','Pré-Compras',badgePre)}
-            ${this._navItem('recibos','🧾','Recibos Oficiais')}
-            ${this._navItem('contratos','📜','Contratos de Obra')}
-            ${this._navItem('notas-fiscais','📄','Notas Fiscais')}
-            ${this._navItem('consulta-nfe','🔎','Busca NF-e')}
-            ${this._navItem('conciliacao-ofx','🔄','Conciliação OFX')}
-            <div class="nav-section">Planejamento</div>
-            ${this._navItem('orcamentos','📋','Orçamentos')}
-            ${this._navItem('medicoes','🔨','Medições & Faturamento')}
-            ${this._navItem('documentacao','📋','Documentação de Obras')}
-            ${this._navItem('portal-cliente','🌐','Portal do Cliente')}
-            <div class="nav-section">Relatórios</div>
-            ${this._navItem('relatorios','📥','Exportar Relatórios')}
-            <div class="nav-section">Assinatura &amp; Sistema</div>
-            ${this._navItem('planos','💎','Planos &amp; Mensalidades')}
-            ${this._navItem('contas-bancarias','🏦','Contas Bancárias')}
-            ${this._navItem('configuracoes','⚙️','Configurações')}
-            <a href="/validar" target="_blank" class="nav-item" style="text-decoration:none;color:var(--accent2);margin-top:4px;border:1px dashed rgba(201,162,39,0.3);border-radius:6px;" title="Portal público para consultar autenticidade de documentos por código">
-              <span>🛡️</span><span>Validar Autenticidade ↗</span>
-            </a>
+            ${this._renderSidebarNav(badgePre)}
           </nav>
           <div class="sidebar-foot">
             <button type="button" class="user-card" aria-label="Abrir minha conta" data-fb-click="App.showUserMenu" data-fb-click-n="0">
@@ -479,6 +520,8 @@ const App = {
             <div class="hspacer"></div>
             <!-- Dropdown Suporte Técnico & Atendimento -->
             ${isImpersonating ? '' : (typeof Suporte !== 'undefined' ? Suporte.renderHeaderDropdown() : '')}
+            <!-- Agenda Dev & Capacitação Técnica -->
+            ${typeof AgendaEventos !== 'undefined' ? AgendaEventos.renderHeaderBtn() : ''}
             <!-- Botão Busca Global -->
             <button type="button" class="header-search-btn header-global-search" aria-label="Buscar no sistema" data-fb-click="Patch26Actions.globalSearchOpen" data-fb-click-n="0" title="Busca Global em todo o sistema (Ctrl+K)" style="cursor:pointer;display:flex;align-items:center;gap:6px;background:rgba(255,255,255,.05);border:1px solid var(--border);border-radius:8px;padding:5px 10px;transition:all .2s;">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
@@ -525,6 +568,175 @@ const App = {
       }
     };
     document.addEventListener('keydown', this._onKeydownHandler);
+  },
+
+  _navSections: [
+    {
+      id: 'gestao',
+      label: 'Visão Geral & Gestão',
+      icone: '🏠',
+      rotas: ['dashboard', 'minhas-demandas', 'central-gestor']
+    },
+    {
+      id: 'obras',
+      label: 'Obras & Canteiro',
+      icone: '🏗️',
+      rotas: ['obras', 'medicoes', 'documentacao', 'portal-cliente']
+    },
+    {
+      id: 'financeiro',
+      label: 'Financeiro & Caixa',
+      icone: '💰',
+      rotas: ['lancamentos', 'escritorio', 'contas-bancarias', 'conciliacao-ofx', 'recibos']
+    },
+    {
+      id: 'suprimentos',
+      label: 'Suprimentos & Compras',
+      icone: '🛒',
+      rotas: ['pre-compras', 'contratos', 'fornecedores', 'produtos']
+    },
+    {
+      id: 'fiscal',
+      label: 'Fiscal & SEFAZ',
+      icone: '📄',
+      rotas: ['notas-fiscais', 'consulta-nfe']
+    },
+    {
+      id: 'planejamento',
+      label: 'Engenharia & SINAPI',
+      icone: '📐',
+      rotas: ['orcamentos', 'relatorios']
+    },
+    {
+      id: 'sistema',
+      label: 'Sistema & Configurações',
+      icone: '⚙️',
+      rotas: ['planos', 'configuracoes', 'validar']
+    }
+  ],
+
+  _getExpandedSections() {
+    try {
+      const raw = localStorage.getItem('finobra_expanded_nav_sections');
+      if (raw) return JSON.parse(raw);
+    } catch {}
+    return { gestao: true, obras: true, financeiro: true, suprimentos: true, fiscal: true, planejamento: true, sistema: true };
+  },
+
+  isSectionExpanded(sectionId) {
+    const states = this._getExpandedSections();
+    if (typeof states[sectionId] === 'boolean') {
+      return states[sectionId];
+    }
+    return true;
+  },
+
+  toggleNavSection(encodedSectionId) {
+    const sectionId = decodeURIComponent(encodedSectionId || '');
+    const header = document.querySelector(`[data-section-header="${sectionId}"]`);
+    const body = document.getElementById(`nav-sec-body-${sectionId}`);
+    
+    // Determina o estado atual olhando a classe 'expanded' do elemento no DOM
+    const isCurrentlyExp = body 
+      ? body.classList.contains('expanded') 
+      : this.isSectionExpanded(sectionId);
+
+    const willBeOpen = !isCurrentlyExp;
+    const states = this._getExpandedSections();
+    states[sectionId] = willBeOpen;
+    try {
+      localStorage.setItem('finobra_expanded_nav_sections', JSON.stringify(states));
+    } catch {}
+
+    if (header && body) {
+      header.setAttribute('aria-expanded', String(willBeOpen));
+      body.classList.toggle('expanded', willBeOpen);
+      body.classList.toggle('collapsed', !willBeOpen);
+    }
+  },
+
+  _renderSidebarNav(badgePre) {
+    const badgeDemandas = (() => {
+      const cnt = typeof MinhasDemandas !== 'undefined' ? MinhasDemandas.getBadgeCount() : 0;
+      return cnt > 0 ? `<span class="nav-badge" style="background:var(--danger);color:#fff;font-weight:900;">${cnt}</span>` : '';
+    })();
+
+    const activeRoute = this._normalizeRoute(this.route || this._getRouteFromUrl());
+
+    return this._navSections.map(sec => {
+      const isExpanded = this.isSectionExpanded(sec.id);
+      const isCurrentInSec = sec.rotas.includes(activeRoute);
+
+      let itemsHtml = '';
+      if (sec.id === 'gestao') {
+        itemsHtml = `
+          ${this._navItem('dashboard','📊','Dashboard')}
+          ${this._navItem('minhas-demandas','👤','Minhas Demandas',badgeDemandas)}
+          ${this._navItem('central-gestor','🏢','Central do Gestor')}
+        `;
+      } else if (sec.id === 'obras') {
+        itemsHtml = `
+          ${this._navItem('obras','🏗️','Obras & Clientes')}
+          ${this._navItem('medicoes','🔨','Medições & Faturamento')}
+          ${this._navItem('documentacao','📁','Documentação de Obras')}
+          ${this._navItem('portal-cliente','🌐','Portal do Cliente')}
+        `;
+      } else if (sec.id === 'financeiro') {
+        itemsHtml = `
+          ${this._navItem('lancamentos','💰','Lançamentos')}
+          ${this._navItem('escritorio','🏢','Despesas Escritório')}
+          ${this._navItem('contas-bancarias','🏦','Contas Bancárias')}
+          ${this._navItem('conciliacao-ofx','🔄','Conciliação OFX')}
+          ${this._navItem('recibos','🧾','Recibos Oficiais')}
+        `;
+      } else if (sec.id === 'suprimentos') {
+        itemsHtml = `
+          ${this._navItem('pre-compras','🛒','Pré-Compras',badgePre)}
+          ${this._navItem('contratos','📜','Contratos de Obra')}
+          ${this._navItem('fornecedores','🚛','Fornecedores')}
+          ${this._navItem('produtos','📦','Produtos / Insumos')}
+        `;
+      } else if (sec.id === 'fiscal') {
+        itemsHtml = `
+          ${this._navItem('notas-fiscais','📄','Notas Fiscais')}
+          ${this._navItem('consulta-nfe','🔎','Busca NF-e')}
+        `;
+      } else if (sec.id === 'planejamento') {
+        itemsHtml = `
+          ${this._navItem('orcamentos','📋','Orçamentos')}
+          ${this._navItem('relatorios','📥','Exportar Relatórios')}
+        `;
+      } else if (sec.id === 'sistema') {
+        itemsHtml = `
+          ${this._navItem('planos','💎','Planos & Mensalidades')}
+          ${this._navItem('configuracoes','⚙️','Configurações')}
+          <a href="/validar" target="_blank" class="nav-item" style="text-decoration:none;color:var(--accent2);margin-top:2px;border:1px dashed rgba(201,162,39,0.3);border-radius:6px;" title="Portal público para consultar autenticidade de documentos por código">
+            <span>🛡️</span><span>Validar Autenticidade ↗</span>
+          </a>
+        `;
+      }
+
+      return `
+        <div class="nav-accordion-group" data-section="${sec.id}">
+          <button type="button" class="nav-accordion-header ${isCurrentInSec ? 'active-segment' : ''}"
+            data-section-header="${sec.id}"
+            aria-expanded="${isExpanded ? 'true' : 'false'}"
+            aria-controls="nav-sec-body-${sec.id}"
+            data-fb-click="App.toggleNavSection" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(sec.id)}">
+            <span class="nav-accordion-title">
+              <span>${sec.icone}</span>
+              <span>${sec.label}</span>
+            </span>
+            <span class="nav-accordion-chevron">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+            </span>
+          </button>
+          <div class="nav-accordion-body ${isExpanded ? 'expanded' : 'collapsed'}" id="nav-sec-body-${sec.id}">
+            ${itemsHtml}
+          </div>
+        </div>
+      `;
+    }).join('');
   },
 
   _mobileNavigation() {
@@ -672,6 +884,27 @@ const App = {
       else el.removeAttribute('aria-current');
     });
 
+    // Auto-expande o accordion da sidebar que contém o item ativo
+    const activeNavEl = document.querySelector(`.nav-item.active[data-route="${targetRoute}"]`);
+    const parentNavSec = activeNavEl?.closest('.nav-accordion-body');
+    if (parentNavSec && parentNavSec.classList.contains('collapsed')) {
+      parentNavSec.classList.remove('collapsed');
+      parentNavSec.classList.add('expanded');
+      const secKey = parentNavSec.id?.replace('nav-sec-body-', '');
+      if (secKey) {
+        const secHdr = document.querySelector(`[data-section-header="${secKey}"]`);
+        if (secHdr) {
+          secHdr.setAttribute('aria-expanded', 'true');
+          secHdr.classList.add('active-segment');
+        }
+        try {
+          const states = this._getExpandedSections();
+          states[secKey] = true;
+          localStorage.setItem('finobra_expanded_nav_sections', JSON.stringify(states));
+        } catch {}
+      }
+    }
+
     // Atualiza cabeçalho e título da página na aba do navegador
     const meta = this.routeMeta[targetRoute] || { icon: '📊', label: 'FinObra' };
     const hTitle = document.getElementById('h-title');
@@ -690,7 +923,7 @@ const App = {
     const el = document.getElementById('route-content');
     if (el) {
       try {
-        const resource = { orcamentos:'sinapi', relatorios:'reports' }[targetRoute];
+        const resource = { dashboard:'charts', 'obra-detalhe':'charts', 'conciliacao-ofx':'ofx', orcamentos:'sinapi', relatorios:'reports' }[targetRoute];
         if (resource && !FinObraAssets.ready(resource)) {
           el.innerHTML = '<div role="status" style="padding:40px;text-align:center;color:var(--text3)">Carregando módulo…</div>';
           await FinObraAssets.load(resource);
@@ -699,6 +932,20 @@ const App = {
         el.innerHTML = this.routes[targetRoute].render(this.obraId);
         if (typeof this.routes[targetRoute].init === 'function') {
           this.routes[targetRoute].init(this.obraId);
+        }
+
+        if (typeof DB !== 'undefined' && typeof DB.syncRoute === 'function') {
+          DB.syncRoute(targetRoute).then(updated => {
+            if (updated && this.route === targetRoute && navigation === this._navigationId) {
+              const contentEl = document.getElementById('route-content');
+              if (contentEl && this.routes[targetRoute]) {
+                contentEl.innerHTML = this.routes[targetRoute].render(this.obraId);
+                if (typeof this.routes[targetRoute].init === 'function') {
+                  this.routes[targetRoute].init(this.obraId);
+                }
+              }
+            }
+          }).catch(() => {});
         }
       } catch(err) {
         if (navigation !== this._navigationId) return;
@@ -1163,4 +1410,7 @@ const App = {
   }
 };
 
-window.addEventListener('DOMContentLoaded', () => App.init());
+window.addEventListener('DOMContentLoaded', () => App.init().catch(error => {
+  console.error('[App] Falha na inicialização:', error);
+  window.FinObraStartup?.fail();
+}));

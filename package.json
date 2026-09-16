@@ -51,10 +51,17 @@
     "test:patch47": "node scripts/test-patch47-static.js",
     "test:patch48": "node scripts/test-patch48-static.js",
     "test:patch49": "node scripts/test-patch49-static.js",
+    "test:patch52": "node scripts/test-patch52-static.js",
+    "test:patch53": "node scripts/test-patch53-static.js",
+    "test:improvement": "node scripts/test-master-improvement.js",
+    "test:segmentation": "node scripts/test-segmentation-agenda.js",
+    "test:trigger": "node scripts/test-trigger-integration.js",
+    "test:architecture": "node scripts/test-backend-architecture.js",
     "test:e2e": "node scripts/test-e2e-synthetic.js"
   },
   "dependencies": {
     "@neondatabase/serverless": "^0.9.5",
+    "@trigger.dev/sdk": "^4.6.2",
     "@vercel/blob": "^2.8.0",
     "dotenv": "^16.4.5",
     "google-auth-library": "^11.0.2",

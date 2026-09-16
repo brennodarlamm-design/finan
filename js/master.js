@@ -818,25 +818,18 @@ const MasterAdmin = {
 
     const isSistema = this._activeTab === 'sistema';
     const isContas = this._activeTab === 'contas';
-    const isEmpresas = !isSistema && !isContas;
+    const isAgenda = this._activeTab === 'agenda';
+    const isEmpresas = !isSistema && !isContas && !isAgenda;
 
-    el.innerHTML = `
-      <div style="max-width:1200px;margin:0 auto;padding:10px 0 50px;">
-        
-        <!-- Navigation Tabs Master -->
-        <div style="display:flex;gap:0;border-bottom:2px solid rgba(255,255,255,.1);margin-bottom:26px;overflow-x:auto;">
-          <button data-fb-click="MasterAdmin.switchTab" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="empresas" style="padding:12px 20px;border:none;background:transparent;color:${isEmpresas?'var(--accent)':'#94a3b8'};font-family:inherit;font-size:.875rem;font-weight:800;cursor:pointer;border-bottom:3px solid ${isEmpresas?'var(--accent)':'transparent'};margin-bottom:-2px;transition:all .2s;display:flex;align-items:center;gap:8px;">
-            <span>🏢</span> Gestão de Construtoras &amp; SaaS
-          </button>
-          <button data-fb-click="MasterAdmin.switchTab" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="contas" style="padding:12px 20px;border:none;background:transparent;color:${isContas?'var(--accent)':'#94a3b8'};font-family:inherit;font-size:.875rem;font-weight:800;cursor:pointer;border-bottom:3px solid ${isContas?'var(--accent)':'transparent'};margin-bottom:-2px;transition:all .2s;display:flex;align-items:center;gap:8px;">
-            <span>🏦</span> Contas Bancárias &amp; Conciliação
-          </button>
-          <button data-fb-click="MasterAdmin.switchTab" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="sistema" style="padding:12px 20px;border:none;background:transparent;color:${isSistema?'var(--accent)':'#94a3b8'};font-family:inherit;font-size:.875rem;font-weight:800;cursor:pointer;border-bottom:3px solid ${isSistema?'var(--accent)':'transparent'};margin-bottom:-2px;transition:all .2s;display:flex;align-items:center;gap:8px;">
-            <span>⚙️</span> Manutenção do Sistema &amp; Banco de Dados (Dev / Master)
-          </button>
-        </div>
-
-        ${isContas ? this._renderContasBancariasSaaS() : (isSistema ? this._renderSistema() : `
+    let tabContent = '';
+    if (isAgenda) {
+      tabContent = this._renderAgendaDev();
+    } else if (isContas) {
+      tabContent = this._renderContasBancariasSaaS();
+    } else if (isSistema) {
+      tabContent = this._renderSistema();
+    } else {
+      tabContent = `
         <!-- Top Bar Master -->
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:26px;flex-wrap:wrap;gap:14px;">
           <div>
@@ -927,7 +920,29 @@ const MasterAdmin = {
             💬 Central de Atendimento DEV carregando...
           </div>
         `}
-        `)}
+      `;
+    }
+
+    el.innerHTML = `
+      <div style="max-width:1200px;margin:0 auto;padding:10px 0 50px;">
+        
+        <!-- Navigation Tabs Master -->
+        <div style="display:flex;gap:0;border-bottom:2px solid rgba(255,255,255,.1);margin-bottom:26px;overflow-x:auto;">
+          <button data-fb-click="MasterAdmin.switchTab" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="empresas" style="padding:12px 20px;border:none;background:transparent;color:${isEmpresas?'var(--accent)':'#94a3b8'};font-family:inherit;font-size:.875rem;font-weight:800;cursor:pointer;border-bottom:3px solid ${isEmpresas?'var(--accent)':'transparent'};margin-bottom:-2px;transition:all .2s;display:flex;align-items:center;gap:8px;">
+            <span>🏢</span> Gestão de Construtoras &amp; SaaS
+          </button>
+          <button data-fb-click="MasterAdmin.switchTab" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="contas" style="padding:12px 20px;border:none;background:transparent;color:${isContas?'var(--accent)':'#94a3b8'};font-family:inherit;font-size:.875rem;font-weight:800;cursor:pointer;border-bottom:3px solid ${isContas?'var(--accent)':'transparent'};margin-bottom:-2px;transition:all .2s;display:flex;align-items:center;gap:8px;">
+            <span>🏦</span> Contas Bancárias &amp; Conciliação
+          </button>
+          <button data-fb-click="MasterAdmin.switchTab" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="agenda" style="padding:12px 20px;border:none;background:transparent;color:${isAgenda?'var(--accent)':'#94a3b8'};font-family:inherit;font-size:.875rem;font-weight:800;cursor:pointer;border-bottom:3px solid ${isAgenda?'var(--accent)':'transparent'};margin-bottom:-2px;transition:all .2s;display:flex;align-items:center;gap:8px;">
+            <span>📅</span> Agenda &amp; Lives Dev
+          </button>
+          <button data-fb-click="MasterAdmin.switchTab" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="sistema" style="padding:12px 20px;border:none;background:transparent;color:${isSistema?'var(--accent)':'#94a3b8'};font-family:inherit;font-size:.875rem;font-weight:800;cursor:pointer;border-bottom:3px solid ${isSistema?'var(--accent)':'transparent'};margin-bottom:-2px;transition:all .2s;display:flex;align-items:center;gap:8px;">
+            <span>⚙️</span> Manutenção do Sistema &amp; Banco de Dados (Dev / Master)
+          </button>
+        </div>
+
+        ${tabContent}
 
       </div>
     `;
@@ -2152,6 +2167,112 @@ const MasterAdmin = {
     }).catch(() => {
       alert('Códigos:\n' + text);
     });
+  },
+
+  _renderAgendaDev() {
+    const eventos = (typeof AgendaEventos !== 'undefined') ? AgendaEventos.getEventos() : [];
+    const hoje = typeof Utils !== 'undefined' ? Utils.today() : new Date().toISOString().slice(0, 10);
+    const futuros = eventos.filter(e => !e.gravado && e.data >= hoje);
+    const gravados = eventos.filter(e => e.gravado || e.data < hoje);
+
+    return `
+      <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:14px;padding:26px;box-shadow:0 8px 30px rgba(0,0,0,.35);">
+        
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:24px;flex-wrap:wrap;gap:14px;border-bottom:1px solid rgba(255,255,255,.08);padding-bottom:18px;">
+          <div>
+            <div style="display:inline-flex;align-items:center;gap:6px;background:rgba(18,217,160,.15);border:1px solid #12D9A0;color:#3EE8B5;padding:4px 12px;border-radius:20px;font-size:.75rem;font-weight:800;margin-bottom:6px;">
+              <span>📅</span><span>AGENDA DEV &amp; CAPACITAÇÃO TÉCNICA</span>
+            </div>
+            <h2 style="font-size:1.5rem;font-weight:900;color:#fff;margin:0 0 4px;">Gerenciador de Lives, Workshops &amp; Calendário</h2>
+            <div style="font-size:.82rem;color:#94a3b8;">Cadastre novas programações ao vivo ou workshops operacionais para todos os clientes e construtoras do FinObra.</div>
+          </div>
+
+          <div style="display:flex;align-items:center;gap:10px;">
+            <button type="button" data-fb-click="AgendaEventos.abrirModal" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="novo" class="btn-primary" style="padding:10px 18px;border-radius:8px;font-weight:800;display:inline-flex;align-items:center;gap:8px;font-size:.85rem;background:linear-gradient(135deg,#12D9A0,#0ea578);color:#030603;border:none;cursor:pointer;">
+              <span>➕ Agendar Novo Evento / Live</span>
+            </button>
+            <button type="button" data-fb-click="MasterAdmin.switchTab" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="agenda" class="btn-action" style="padding:10px 14px;border-radius:8px;font-size:.85rem;">
+              <span>🔄 Atualizar</span>
+            </button>
+          </div>
+        </div>
+
+        <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(220px, 1fr));gap:16px;margin-bottom:24px;">
+          <div class="metric-card">
+            <div style="font-size:.75rem;color:#94a3b8;font-weight:700;text-transform:uppercase;">Próximas Lives Agendadas</div>
+            <div style="font-size:1.8rem;font-weight:900;color:#3EE8B5;margin-top:4px;">${futuros.length}</div>
+          </div>
+          <div class="metric-card">
+            <div style="font-size:.75rem;color:#94a3b8;font-weight:700;text-transform:uppercase;">Treinamentos / Gravados</div>
+            <div style="font-size:1.8rem;font-weight:900;color:#F3CF67;margin-top:4px;">${gravados.length}</div>
+          </div>
+          <div class="metric-card">
+            <div style="font-size:.75rem;color:#94a3b8;font-weight:700;text-transform:uppercase;">Total de Eventos no Calendário</div>
+            <div style="font-size:1.8rem;font-weight:900;color:#fff;margin-top:4px;">${eventos.length}</div>
+          </div>
+        </div>
+
+        <h3 style="font-size:1.1rem;font-weight:800;color:#fff;margin-bottom:14px;">Programações Cadastradas</h3>
+        
+        ${eventos.length === 0 ? `
+          <div style="padding:40px 20px;text-align:center;background:rgba(255,255,255,.02);border:1px dashed rgba(255,255,255,.15);border-radius:12px;">
+            <div style="font-size:2.4rem;margin-bottom:10px;">☕</div>
+            <h4 style="font-size:1rem;font-weight:800;color:#fff;margin-bottom:6px;">Nenhum evento agendado no momento</h4>
+            <p style="font-size:.82rem;color:#94a3b8;max-width:500px;margin:0 auto 16px;line-height:1.5;">
+              A agenda está vazia. Clique no botão abaixo para adicionar a primeira live, treinamento ou comunicado técnico para os clientes.
+            </p>
+            <button type="button" data-fb-click="AgendaEventos.abrirModal" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="novo" class="btn-primary" style="padding:8px 20px;font-weight:800;border-radius:8px;font-size:.84rem;cursor:pointer;">
+              ➕ Cadastrar Primeiro Evento
+            </button>
+          </div>
+        ` : `
+          <div class="table-container">
+            <table style="width:100%;border-collapse:collapse;font-size:.84rem;text-align:left;">
+              <thead>
+                <tr style="background:rgba(255,255,255,.05);border-bottom:1px solid var(--border);color:#cbd5e1;">
+                  <th style="padding:12px 16px;">Data &amp; Hora</th>
+                  <th style="padding:12px 16px;">Tipo</th>
+                  <th style="padding:12px 16px;">Título da Aula / Live</th>
+                  <th style="padding:12px 16px;">Instrutor</th>
+                  <th style="padding:12px 16px;">Link</th>
+                  <th style="padding:12px 16px;text-align:right;">Ações</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${eventos.map(e => `
+                  <tr style="border-bottom:1px solid rgba(255,255,255,.05);">
+                    <td style="padding:12px 16px;white-space:nowrap;font-weight:700;color:#3EE8B5;">
+                      📅 ${e.data} às ${this._esc(e.hora)} (${this._esc(e.duracao || '60 min')})
+                    </td>
+                    <td style="padding:12px 16px;">
+                      <span style="font-size:.72rem;font-weight:800;padding:2px 8px;border-radius:6px;background:${e.tipo==='live'?'rgba(239,68,68,.2)':(e.tipo==='workshop'?'rgba(56,189,248,.2)':'rgba(16,185,129,.2)')};color:${e.tipo==='live'?'#fca5a5':(e.tipo==='workshop'?'#7dd3fc':'#6ee7b7')};">
+                        ${e.tipo === 'live' ? '🔴 Live' : (e.tipo === 'workshop' ? '🛠️ Workshop' : '🚀 Release')}
+                      </span>
+                    </td>
+                    <td style="padding:12px 16px;font-weight:700;color:#fff;">
+                      ${this._esc(e.titulo)}
+                    </td>
+                    <td style="padding:12px 16px;color:#94a3b8;">
+                      ${this._esc(e.instrutor || 'Dev FinObra')}
+                    </td>
+                    <td style="padding:12px 16px;">
+                      <a href="${this._esc(e.link)}" target="_blank" rel="noopener noreferrer" style="color:#38bdf8;text-decoration:none;font-size:.78rem;">
+                        Abrir Link ↗
+                      </a>
+                    </td>
+                    <td style="padding:12px 16px;text-align:right;">
+                      <button type="button" data-fb-click="AgendaEventos.excluirEvento" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(e.id)}" style="background:rgba(239,68,68,.15);border:1px solid rgba(239,68,68,.3);color:#fca5a5;padding:4px 10px;border-radius:6px;font-size:.72rem;cursor:pointer;" title="Excluir evento">
+                        🗑️ Excluir
+                      </button>
+                    </td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+          </div>
+        `}
+      </div>
+    `;
   }
 };
 

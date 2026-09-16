@@ -601,6 +601,7 @@ const Dashboard = {
     const json = await res.json().catch(() => ({}));
     if (!res.ok || !json.success || !json.snapshot) return;
     const d = json.snapshot;
+    this._cloudSnapshot = d;
     const set = (id, value) => { const el = document.getElementById(id); if (el) el.textContent = value; };
     set('kpi-total-receitas', Utils.fmt.currency(d.totalReceitas));
     set('kpi-total-despesas', Utils.fmt.currency(d.totalDespesas));
@@ -637,20 +638,31 @@ const Dashboard = {
           </tr>`).join('');
       }
     }
+
+    if (d.monthlySeries?.length || d.categoryExpenses?.length) {
+      this._barChart(obraId);
+      this._donutChart(obraId);
+    }
   },
 
   _barChart(obraId) {
     const canvas = document.getElementById('ch-bar');
     if (!canvas) return;
-    const lans = DB.getLancamentos(obraId==='todas'?null:obraId);
     const months = {};
-    lans.forEach(l => {
-      const k = (l.data || '').slice(0,7);
-      if (!k) return;
-      if (!months[k]) months[k]={rec:0,desp:0};
-      if (l.tipo==='receita') months[k].rec+=l.valor;
-      if (l.tipo==='despesa') months[k].desp+=l.valor;
-    });
+    if (this._cloudSnapshot?.monthlySeries?.length) {
+      this._cloudSnapshot.monthlySeries.forEach(m => {
+        if (m.mes) months[m.mes] = { rec: m.receitas || 0, desp: m.despesas || 0 };
+      });
+    } else {
+      const lans = DB.getLancamentos(obraId==='todas'?null:obraId);
+      lans.forEach(l => {
+        const k = (l.data || '').slice(0,7);
+        if (!k) return;
+        if (!months[k]) months[k]={rec:0,desp:0};
+        if (l.tipo==='receita') months[k].rec+=l.valor;
+        if (l.tipo==='despesa') months[k].desp+=l.valor;
+      });
+    }
     const keys = Object.keys(months).sort();
     if (!keys.length) {
       const cur = new Date().toISOString().slice(0,7);
@@ -672,14 +684,23 @@ const Dashboard = {
   _donutChart(obraId) {
     const canvas = document.getElementById('ch-donut');
     if (!canvas) return;
-    const lans = DB.getLancamentos(obraId==='todas'?null:obraId);
-    const desp = lans.filter(l => l.tipo === 'despesa');
-    const cats = {};
-    desp.forEach(d => {
-      cats[d.categoria] = (cats[d.categoria] || 0) + (d.valor || 0);
-    });
-    const labels = Object.keys(cats).map(Utils.catLabel.bind(Utils));
-    const values = Object.values(cats);
+
+    let labels = [];
+    let values = [];
+
+    if (this._cloudSnapshot?.categoryExpenses?.length) {
+      labels = this._cloudSnapshot.categoryExpenses.map(c => Utils.catLabel(c.categoria));
+      values = this._cloudSnapshot.categoryExpenses.map(c => c.total);
+    } else {
+      const lans = DB.getLancamentos(obraId==='todas'?null:obraId);
+      const desp = lans.filter(l => l.tipo === 'despesa');
+      const cats = {};
+      desp.forEach(d => {
+        cats[d.categoria] = (cats[d.categoria] || 0) + (d.valor || 0);
+      });
+      labels = Object.keys(cats).map(Utils.catLabel.bind(Utils));
+      values = Object.values(cats);
+    }
 
     if (!values.length || values.every(v => v === 0)) {
       const container = canvas.parentElement;

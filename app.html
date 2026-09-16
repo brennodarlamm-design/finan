@@ -11,20 +11,39 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/css/style.css?v=20260909_1">
-  <!-- Chart.js -->
-  <script defer src="/js/vendor/chart.umd.min.js?v=4.4.0"></script>
+  <link rel="stylesheet" href="/css/startup.css">
+  <script defer src="/js/startup.js"></script>
   <!-- Excel, ZIP, PDF e módulos opcionais são carregados sob demanda. -->
   <script defer src="/js/version_guard.js"></script>
   <link rel="stylesheet" href="/css/premium.css?v=20260913" media="screen">
 </head>
 <body class="ui-workspace">
-  <div id="app-root"></div>
+  <div id="app-root">
+    <section id="app-startup" class="app-startup" aria-busy="true" aria-label="Carregamento do FinObra">
+      <aside class="startup-sidebar" aria-hidden="true">
+        <strong class="startup-brand">FinObra<span>Gestão de obras</span></strong>
+        <div class="startup-line"></div><div class="startup-line"></div><div class="startup-line"></div>
+      </aside>
+      <main class="startup-main">
+        <header class="startup-header"><strong>FinObra</strong><span>Seu espaço de trabalho</span></header>
+        <div class="startup-content">
+          <p class="startup-eyebrow">GESTÃO DE OBRAS E FINANCEIRO</p>
+          <h1 id="startup-title">Preparando seu espaço de trabalho</h1>
+          <p id="startup-message" role="status" aria-live="polite">Carregando o sistema com segurança…</p>
+          <div class="startup-cards" aria-hidden="true"><div></div><div></div><div></div></div>
+          <div id="startup-actions" hidden><a class="startup-retry" href="">Tentar novamente</a><a href="/login">Voltar ao login</a></div>
+          <noscript>Ative o JavaScript no navegador para acessar o FinObra.</noscript>
+        </div>
+      </main>
+    </section>
+  </div>
   <div id="toast-container" class="toast-container"></div>
 
   <!-- JS Modules (order matters) -->
   <script defer src="/js/assets.js"></script>
   <script defer src="/js/ui.js"></script>
   <script defer src="/js/auth.js"></script>
+  <script defer src="/js/idb_storage.js"></script>
   <script defer src="/js/data.js?v=20260903_1"></script>
   <script defer src="/js/data_demo.js?v=20260902_4"></script>
   <script defer src="/js/utils.js?v=20260902_4"></script>
@@ -40,11 +59,7 @@
   <script defer src="/js/lancamentos.js?v=20260903_1"></script>
   <script defer src="/js/recibos.js?v=20260904_1"></script>
   <script defer src="/js/contratos.js?v=20260904_1"></script>
-  <script defer src="/js/ofx.js"></script>
   <script defer src="/js/notas.js"></script>
-  <script defer src="/js/orcamento_bancos.js"></script>
-  <script defer src="/js/orcamento_templates.js"></script>
-  <script defer src="/js/orcamento_proposta.js"></script>
   <script defer src="/js/orcamentos.js"></script>
   <script defer src="/js/medicoes.js"></script>
   <script defer src="/js/precompras_workflow.js"></script>
@@ -64,9 +79,12 @@
   <script defer src="/js/fases_doc.js?v=20260909_4"></script>
   <script defer src="/js/obra_detalhe.js?v=20260909_3"></script>
   <script defer src="/js/patch22.js?v=20260912_1"></script>
-  <script defer src="/js/cronograma_sla.js?v=20260913_1"></script>
+  <script defer src="/js/cronograma_sla.js?v=20260915_52"></script>
   <script defer src="/js/portal_cliente.js?v=20260913_1"></script>
-  <script defer src="/js/app.js?v=20260909_2"></script>
+  <script defer src="/js/minhas_demandas.js?v=20260915_52"></script>
+  <script defer src="/js/central_gestor.js?v=20260915_52"></script>
+  <script defer src="/js/agenda_eventos.js?v=20260915_54"></script>
+  <script defer src="/js/app.js?v=20260915_52"></script>
   <script defer src="/js/patch51.js?v=20260916_1"></script>
   <script defer src="/js/patch51-hardening.js?v=20260916_2"></script>
   <script defer src="/js/patch51-followup.js?v=20260916_1"></script>

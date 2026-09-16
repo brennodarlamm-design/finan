@@ -1,144 +1,189 @@
-// js/cronograma_sla.js — Gestão de Prazos & SLAs de Processos com Recálculo em Cascata
-// Suporta processos de Projetos, Aprovações/Legal, Execução de Obras e Pós-Obra
+// js/cronograma_sla.js — Gestão de Prazos & SLAs · Patch 52: Templates, Cargos, Checklist, Motivo de Atraso
+// Suporta: Obra Particular · Casa Caixa · Reforma · Projeto Arquitetônico + tipos customizados
 
 const CronogramaSLA = {
-  _KEY_SLAS_PADRAO: 'finobra_slas_padrao',
+  _KEY_SLAS_PADRAO:   'finobra_slas_padrao',
+  _KEY_CARGOS:        'finobra_workflow_cargos',
+  _KEY_TEMPLATES:     'finobra_workflow_templates',
 
-  // ── CATÁLOGO PADRÃO DE PROCESSOS E ETAPAS COM DEPENDÊNCIAS ──
-  PADRAO_PROCESSOS: [
-    {
-      id: 'proc_estudo_preliminar',
-      codigo: 'PROJ-01',
-      nome: 'Estudo Preliminar & Levantamento',
-      tipo: 'projeto',
-      tipoLabel: 'Projetos',
+  // ── TEMPLATES DE WORKFLOW PADRÃO (Patch 52) ──────────────────────────────
+  // Cada template mapeia a uma modalidade de obra. cargo_responsavel é a chave
+  // do cargo (não o nome do usuário), resolvida em tempo de execução via getCargos().
+  TEMPLATES_PADRAO: {
+    obra_particular: {
+      nome: 'Obra Particular / Recursos Próprios',
+      icone: '💼',
+      builtin: true,
+      processos: [
+        { id:'proc_estudo_preliminar',  codigo:'PROJ-01', nome:'Estudo Preliminar & Levantamento', tipo:'projeto', tipoLabel:'Projetos', icone:'📐', dias_sla:30, predecessor_id:null, cargo_responsavel:'arquiteto', checklist:['Briefing assinado pelo cliente','Levantamento topográfico realizado'], descricao:'Levantamento topográfico, sondagem e estudo de necessidades do cliente' },
+        { id:'proc_anteprojeto',        codigo:'PROJ-02', nome:'Anteprojeto Arquitetônico',         tipo:'projeto', tipoLabel:'Projetos', icone:'✏️', dias_sla:20, predecessor_id:'proc_estudo_preliminar', cargo_responsavel:'arquiteto', checklist:['Plantas preliminares aprovadas pelo cliente'], descricao:'Plantas preliminares, cortes e modelagem 3D para aprovação do cliente' },
+        { id:'proc_projeto_executivo',  codigo:'PROJ-03', nome:'Projeto Arquitetônico Executivo',   tipo:'projeto', tipoLabel:'Projetos', icone:'🏛️', dias_sla:25, predecessor_id:'proc_anteprojeto',        cargo_responsavel:'arquiteto', checklist:['Memorial descritivo elaborado','Plantas cotadas finalizadas'], descricao:'Detalhamento completo de arquitetura, paginações e esquadrias' },
+        { id:'proc_projetos_comp',      codigo:'PROJ-04', nome:'Projetos Complementares',           tipo:'projeto', tipoLabel:'Projetos', icone:'⚡', dias_sla:30, predecessor_id:'proc_projeto_executivo', cargo_responsavel:'engenheiro_civil', checklist:['Estrutural calculado','Elétrico e hidro aprovados'], descricao:'Cálculo estrutural, instalações elétricas, hidrossanitárias e lógica' },
+        { id:'proc_aprovacao_pref',     codigo:'APROV-01', nome:'Aprovação na Prefeitura & Viabilidade', tipo:'aprovacao', tipoLabel:'Aprovações & Legal', icone:'📜', dias_sla:45, predecessor_id:'proc_projeto_executivo', cargo_responsavel:'arquiteto', checklist:[], descricao:'Protocolo e tramitação do processo de aprovação do projeto legal' },
+        { id:'proc_alvara_art',         codigo:'APROV-02', nome:'Alvará de Construção & ART/RRT',   tipo:'aprovacao', tipoLabel:'Aprovações & Legal', icone:'🎓', dias_sla:15, predecessor_id:'proc_aprovacao_pref',    cargo_responsavel:'engenheiro_civil', checklist:['ART/RRT emitida e paga'], descricao:'Emissão formal do alvará de obras e anotações de responsabilidade técnica' },
+        { id:'proc_fundacoes',          codigo:'OBRA-01', nome:'Canteiro, Terraplenagem & Fundações', tipo:'obra', tipoLabel:'Execução de Obra', icone:'🏗️', dias_sla:35, predecessor_id:'proc_alvara_art', cargo_responsavel:'engenheiro_civil', checklist:['Canteiro implantado','Sondagem confirmada'], descricao:'Instalação de canteiro, terraplenagem, estacas e blocos de fundação' },
+        { id:'proc_estrutura',          codigo:'OBRA-02', nome:'Estrutura & Alvenaria',              tipo:'obra', tipoLabel:'Execução de Obra', icone:'🧱', dias_sla:60, predecessor_id:'proc_fundacoes',         cargo_responsavel:'engenheiro_civil', checklist:[], descricao:'Pilares, vigas, lajes e elevação de paredes de alvenaria' },
+        { id:'proc_instalacoes',        codigo:'OBRA-03', nome:'Instalações, Cobertura & Vedações',  tipo:'obra', tipoLabel:'Execução de Obra', icone:'💧', dias_sla:45, predecessor_id:'proc_estrutura',          cargo_responsavel:'tecnico_obra', checklist:[], descricao:'Tubulações hidrossanitárias, fiação elétrica e telhado' },
+        { id:'proc_acabamento',         codigo:'OBRA-04', nome:'Revestimentos, Esquadrias & Pintura', tipo:'obra', tipoLabel:'Execução de Obra', icone:'🎨', dias_sla:45, predecessor_id:'proc_instalacoes',         cargo_responsavel:'tecnico_obra', checklist:[], descricao:'Pisos, azulejos, colocação de portas, janelas e pintura interna/externa' },
+        { id:'proc_habitese',           codigo:'POS-01', nome:'Vistoria Prefeitura, Habite-se & Limpeza', tipo:'pos_obra', tipoLabel:'Pós-Obra & Entrega', icone:'🧹', dias_sla:30, predecessor_id:'proc_acabamento', cargo_responsavel:'arquiteto', checklist:['Habite-se emitido','Limpeza final realizada'], descricao:'Vistoria final do fiscal, emissão do Habite-se e faxina de entrega' },
+        { id:'proc_entrega',            codigo:'POS-02', nome:'Entrega das Chaves & Manual do Proprietário', tipo:'pos_obra', tipoLabel:'Pós-Obra & Entrega', icone:'🔑', dias_sla:15, predecessor_id:'proc_habitese',    cargo_responsavel:'gestor_obras', checklist:['Manual do proprietário entregue','Termo de entrega assinado'], descricao:'Vistoria com o cliente, assinatura do termo de entrega e entrega das chaves' },
+      ]
+    },
+    casa_caixa: {
+      nome: 'Casa Caixa (MCMV / SBPE)',
+      icone: '🏦',
+      builtin: true,
+      processos: [
+        { id:'cc_documentacao',         codigo:'CEF-01', nome:'Documentação & Habilitação CEF',     tipo:'aprovacao', tipoLabel:'Aprovações & Legal', icone:'📋', dias_sla:20, predecessor_id:null, cargo_responsavel:'administrativo', checklist:['RG/CPF do mutuário','Comprovante de renda','Proposta aprovada pelo banco'], descricao:'Coleta e protocolo de documentação para aprovação do crédito imobiliário' },
+        { id:'cc_engenharia_cef',       codigo:'CEF-02', nome:'Engenharia & Laudo CEF',             tipo:'aprovacao', tipoLabel:'Aprovações & Legal', icone:'🏗️', dias_sla:30, predecessor_id:'cc_documentacao',   cargo_responsavel:'engenheiro_civil', checklist:['Memorial descritivo CEF aprovado','Cronograma físico-financeiro entregue'], descricao:'Laudo de avaliação, memorial e projeto protocolado na CEF' },
+        { id:'cc_alvara',               codigo:'CEF-03', nome:'Alvará & ART',                       tipo:'aprovacao', tipoLabel:'Aprovações & Legal', icone:'🎓', dias_sla:20, predecessor_id:'cc_engenharia_cef', cargo_responsavel:'engenheiro_civil', checklist:['Alvará de construção emitido','ART/RRT registrada'], descricao:'Alvará de construção e ART/RRT registradas para início da obra' },
+        { id:'cc_fundacoes',            codigo:'CEF-04', nome:'Fundações & Infraestrutura',          tipo:'obra', tipoLabel:'Execução de Obra', icone:'⛏️', dias_sla:25, predecessor_id:'cc_alvara',          cargo_responsavel:'engenheiro_civil', checklist:[], descricao:'Movimento de terra e fundações dentro das especificações da CEF' },
+        { id:'cc_estrutura',            codigo:'CEF-05', nome:'Estrutura & Alvenaria',               tipo:'obra', tipoLabel:'Execução de Obra', icone:'🧱', dias_sla:40, predecessor_id:'cc_fundacoes',        cargo_responsavel:'engenheiro_civil', checklist:[], descricao:'Concretagem, alvenaria e cobertura aprovadas em vistoria CEF' },
+        { id:'cc_instalacoes',          codigo:'CEF-06', nome:'Instalações & Acabamento',            tipo:'obra', tipoLabel:'Execução de Obra', icone:'💡', dias_sla:35, predecessor_id:'cc_estrutura',         cargo_responsavel:'tecnico_obra', checklist:[], descricao:'Instalações prediais, revestimentos e pintura final' },
+        { id:'cc_vistoria_cef',         codigo:'CEF-07', nome:'Vistoria Final CEF & Liberação',     tipo:'pos_obra', tipoLabel:'Pós-Obra & Entrega', icone:'🔍', dias_sla:15, predecessor_id:'cc_instalacoes',     cargo_responsavel:'engenheiro_civil', checklist:['Habite-se emitido','Vistoria CEF aprovada'], descricao:'Vistoria do engenheiro CEF e liberação do FGTS/financiamento' },
+        { id:'cc_entrega_chaves',       codigo:'CEF-08', nome:'Entrega de Chaves',                   tipo:'pos_obra', tipoLabel:'Pós-Obra & Entrega', icone:'🔑', dias_sla:10, predecessor_id:'cc_vistoria_cef',   cargo_responsavel:'gestor_obras', checklist:['Registro de imóvel atualizado','Termo de entrega assinado'], descricao:'Entrega formal das chaves ao mutuário, registro e quitação' },
+      ]
+    },
+    reforma: {
+      nome: 'Reforma / Retrofit',
+      icone: '🔨',
+      builtin: true,
+      processos: [
+        { id:'ref_levantamento',        codigo:'REF-01', nome:'Levantamento & Diagnóstico',          tipo:'projeto', tipoLabel:'Projetos', icone:'📐', dias_sla:7,  predecessor_id:null, cargo_responsavel:'arquiteto', checklist:['Visita técnica realizada','Registro fotográfico feito'], descricao:'Levantamento dimensional e diagnóstico das patologias existentes' },
+        { id:'ref_projeto',             codigo:'REF-02', nome:'Projeto de Reforma',                  tipo:'projeto', tipoLabel:'Projetos', icone:'✏️', dias_sla:10, predecessor_id:'ref_levantamento',   cargo_responsavel:'arquiteto', checklist:['Projeto aprovado pelo cliente'], descricao:'Plantas, perspectivas e especificações técnicas da reforma' },
+        { id:'ref_orcamento',           codigo:'REF-03', nome:'Orçamento & Contrato',                tipo:'projeto', tipoLabel:'Projetos', icone:'💰', dias_sla:5,  predecessor_id:'ref_projeto',         cargo_responsavel:'orcamentista', checklist:['Orçamento aprovado','Contrato assinado'], descricao:'Planilha de custos detalhada e assinatura do contrato' },
+        { id:'ref_execucao',            codigo:'REF-04', nome:'Execução da Reforma',                 tipo:'obra', tipoLabel:'Execução de Obra', icone:'🏗️', dias_sla:30, predecessor_id:'ref_orcamento',       cargo_responsavel:'tecnico_obra', checklist:[], descricao:'Execução de demolições, alvenaria, instalações e revestimentos' },
+        { id:'ref_entrega',             codigo:'REF-05', nome:'Limpeza & Entrega Final',             tipo:'pos_obra', tipoLabel:'Pós-Obra & Entrega', icone:'✅', dias_sla:5, predecessor_id:'ref_execucao',     cargo_responsavel:'gestor_obras', checklist:['Vistoria final feita','Termo de entrega assinado'], descricao:'Limpeza especializada e vistoria final com o cliente' },
+      ]
+    },
+    projeto_arq: {
+      nome: 'Projeto Arquitetônico',
       icone: '📐',
-      dias_sla: 30,
-      predecessor_id: null,
-      descricao: 'Levantamento topográfico, sondagem e estudo de necessidades do cliente'
+      builtin: true,
+      processos: [
+        { id:'pa_estudo',               codigo:'PA-01', nome:'Estudo Preliminar',                    tipo:'projeto', tipoLabel:'Projetos', icone:'📐', dias_sla:15, predecessor_id:null, cargo_responsavel:'arquiteto', checklist:['Briefing formalizado','Programa de necessidades definido'], descricao:'Conceito, partido arquitetônico e croquis iniciais' },
+        { id:'pa_anteprojeto',          codigo:'PA-02', nome:'Anteprojeto',                          tipo:'projeto', tipoLabel:'Projetos', icone:'✏️', dias_sla:20, predecessor_id:'pa_estudo',            cargo_responsavel:'arquiteto', checklist:['Aprovação do cliente no anteprojeto'], descricao:'Plantas, cortes, fachadas e modelo 3D' },
+        { id:'pa_executivo',            codigo:'PA-03', nome:'Projeto Executivo Completo',           tipo:'projeto', tipoLabel:'Projetos', icone:'🏛️', dias_sla:25, predecessor_id:'pa_anteprojeto',       cargo_responsavel:'projetista', checklist:['Detalhamento completo finalizado'], descricao:'Projeto legal e executivo com todos os detalhamentos' },
+        { id:'pa_complementares',       codigo:'PA-04', nome:'Projetos Complementares',              tipo:'projeto', tipoLabel:'Projetos', icone:'⚡', dias_sla:20, predecessor_id:'pa_executivo',         cargo_responsavel:'engenheiro_civil', checklist:['Estrutural entregue','Instalações entregues'], descricao:'Elétrico, hidrossanitário, estrutural e demais especialidades' },
+        { id:'pa_aprovacao',            codigo:'PA-05', nome:'Aprovação Legal',                      tipo:'aprovacao', tipoLabel:'Aprovações & Legal', icone:'📜', dias_sla:30, predecessor_id:'pa_complementares', cargo_responsavel:'arquiteto', checklist:['Processo protocolado na Prefeitura'], descricao:'Protocolo e aprovação do projeto junto à Prefeitura' },
+        { id:'pa_entrega',              codigo:'PA-06', nome:'Entrega Final do Projeto',             tipo:'pos_obra', tipoLabel:'Pós-Obra & Entrega', icone:'📦', dias_sla:5, predecessor_id:'pa_aprovacao',    cargo_responsavel:'arquiteto', checklist:['Arquivos DWG e PDF entregues','ART/RRT assinada'], descricao:'Entrega do projeto completo em formato digital e impresso' },
+      ]
     },
-    {
-      id: 'proc_anteprojeto',
-      codigo: 'PROJ-02',
-      nome: 'Anteprojeto Arquitetônico',
-      tipo: 'projeto',
-      tipoLabel: 'Projetos',
-      icone: '✏️',
-      dias_sla: 20,
-      predecessor_id: 'proc_estudo_preliminar',
-      descricao: 'Plantas preliminares, cortes e modelagem 3D para aprovação do cliente'
-    },
-    {
-      id: 'proc_projeto_executivo',
-      codigo: 'PROJ-03',
-      nome: 'Projeto Arquitetônico Executivo',
-      tipo: 'projeto',
-      tipoLabel: 'Projetos',
-      icone: '🏛️',
-      dias_sla: 25,
-      predecessor_id: 'proc_anteprojeto',
-      descricao: 'Detalhamento completo de arquitetura, paginações e esquadrias'
-    },
-    {
-      id: 'proc_projetos_comp',
-      codigo: 'PROJ-04',
-      nome: 'Projetos Complementares (Estrutural, Elétrico, Hidrossanitário)',
-      tipo: 'projeto',
-      tipoLabel: 'Projetos',
-      icone: '⚡',
-      dias_sla: 30,
-      predecessor_id: 'proc_projeto_executivo',
-      descricao: 'Cálculo estrutural, instalações elétricas, hidrossanitárias e lógica'
-    },
-    {
-      id: 'proc_aprovacao_pref',
-      codigo: 'APROV-01',
-      nome: 'Aprovação na Prefeitura & Viabilidade',
-      tipo: 'aprovacao',
-      tipoLabel: 'Aprovações & Legal',
-      icone: '📜',
-      dias_sla: 45,
-      predecessor_id: 'proc_projeto_executivo',
-      descricao: 'Protocolo e tramitação do processo de aprovação do projeto legal'
-    },
-    {
-      id: 'proc_alvara_art',
-      codigo: 'APROV-02',
-      nome: 'Alvará de Construção & ART/RRT',
-      tipo: 'aprovacao',
-      tipoLabel: 'Aprovações & Legal',
-      icone: '🎓',
-      dias_sla: 15,
-      predecessor_id: 'proc_aprovacao_pref',
-      descricao: 'Emissão formal do alvará de obras e anotações de responsabilidade técnica'
-    },
-    {
-      id: 'proc_fundacoes',
-      codigo: 'OBRA-01',
-      nome: 'Canteiro, Terraplenagem & Fundações',
-      tipo: 'obra',
-      tipoLabel: 'Execução de Obra',
-      icone: '🏗️',
-      dias_sla: 35,
-      predecessor_id: 'proc_alvara_art',
-      descricao: 'Instalação de canteiro, terraplenagem, estacas e blocos de fundação'
-    },
-    {
-      id: 'proc_estrutura',
-      codigo: 'OBRA-02',
-      nome: 'Estrutura & Alvenaria',
-      tipo: 'obra',
-      tipoLabel: 'Execução de Obra',
-      icone: '🧱',
-      dias_sla: 60,
-      predecessor_id: 'proc_fundacoes',
-      descricao: 'Pilares, vigas, lajes e elevação de paredes de alvenaria'
-    },
-    {
-      id: 'proc_instalacoes',
-      codigo: 'OBRA-03',
-      nome: 'Instalações, Cobertura & Vedações',
-      tipo: 'obra',
-      tipoLabel: 'Execução de Obra',
-      icone: '💧',
-      dias_sla: 45,
-      predecessor_id: 'proc_estrutura',
-      descricao: 'Tubulações hidrossanitárias, fiação elétrica e telhado'
-    },
-    {
-      id: 'proc_acabamento',
-      codigo: 'OBRA-04',
-      nome: 'Revestimentos, Esquadrias & Pintura',
-      tipo: 'obra',
-      tipoLabel: 'Execução de Obra',
-      icone: '🎨',
-      dias_sla: 45,
-      predecessor_id: 'proc_instalacoes',
-      descricao: 'Pisos, azulejos, colocação de portas, janelas e pintura interna/externa'
-    },
-    {
-      id: 'proc_habitese',
-      codigo: 'POS-01',
-      nome: 'Vistoria Prefeitura, Habite-se & Limpeza',
-      tipo: 'pos_obra',
-      tipoLabel: 'Pós-Obra & Entrega',
-      icone: '🧹',
-      dias_sla: 30,
-      predecessor_id: 'proc_acabamento',
-      descricao: 'Vistoria final do fiscal, emissão do Habite-se e faxina de entrega'
-    },
-    {
-      id: 'proc_entrega',
-      codigo: 'POS-02',
-      nome: 'Entrega das Chaves & Manual do Proprietário',
-      tipo: 'pos_obra',
-      tipoLabel: 'Pós-Obra & Entrega',
-      icone: '🔑',
-      dias_sla: 15,
-      predecessor_id: 'proc_habitese',
-      descricao: 'Vistoria com o cliente, assinatura do termo de entrega e entrega das chaves'
-    }
+  },
+
+  // ── CATÁLOGO PADRÃO (compatibilidade Patch 51) ───────────────────────────
+  // Aponta para os processos do template obra_particular por retrocompatibilidade.
+  get PADRAO_PROCESSOS() { return this.TEMPLATES_PADRAO.obra_particular.processos; },
+
+
+  // ── CARGOS / FUNÇÕES DA EMPRESA (Patch 52) ──────────────────────────────
+  // Cargos padrão — substituem referências a nomes de usuários hardcoded.
+  CARGOS_PADRAO: [
+    { id:'arquiteto',       nome:'Arquiteto',              icone:'🏙️', cor:'#6366f1', usuario_id:null, usuario_nome:'' },
+    { id:'engenheiro_civil',nome:'Engenheiro Civil',        icone:'🏗️', cor:'#f59e0b', usuario_id:null, usuario_nome:'' },
+    { id:'projetista',      nome:'Projetista',              icone:'✏️',     cor:'#8b5cf6', usuario_id:null, usuario_nome:'' },
+    { id:'orcamentista',    nome:'Orçamentista',           icone:'💰',     cor:'#10b981', usuario_id:null, usuario_nome:'' },
+    { id:'tecnico_obra',    nome:'Técnico de Obra',        icone:'⛏️',     cor:'#f97316', usuario_id:null, usuario_nome:'' },
+    { id:'financeiro',      nome:'Financeiro',              icone:'📊',     cor:'#22c55e', usuario_id:null, usuario_nome:'' },
+    { id:'administrativo',  nome:'Administrativo',          icone:'🗂️',     cor:'#64748b', usuario_id:null, usuario_nome:'' },
+    { id:'gestor_obras',    nome:'Gestor de Obras',         icone:'🏢',     cor:'#c9a227', usuario_id:null, usuario_nome:'' },
   ],
+
+  getCargos() {
+    try {
+      const k = (typeof DB !== 'undefined' && DB._ck) ? DB._ck(this._KEY_CARGOS) : this._KEY_CARGOS;
+      const raw = localStorage.getItem(k);
+      if (raw) { const p = JSON.parse(raw); if (Array.isArray(p) && p.length) return p; }
+    } catch (e) { console.warn('[CronogramaSLA] getCargos:', e); }
+    return JSON.parse(JSON.stringify(this.CARGOS_PADRAO));
+  },
+
+  saveCargos(cargos) {
+    if (!Array.isArray(cargos)) return false;
+    try {
+      const k = (typeof DB !== 'undefined' && DB._ck) ? DB._ck(this._KEY_CARGOS) : this._KEY_CARGOS;
+      localStorage.setItem(k, JSON.stringify(cargos));
+      if (typeof DB !== 'undefined' && DB.syncToCloud) DB.syncToCloud('save', 'preferencias', { preferences: { workflow_cargos: cargos } });
+      return true;
+    } catch (e) { console.error('[CronogramaSLA] saveCargos:', e); return false; }
+  },
+
+  // Resolve cargo_responsavel da etapa -> { id, nome, cargo, icone } ou null
+  getResponsavelEtapa(processo) {
+    if (!processo) return null;
+    // Override explícito de usuário (substituição temporária)
+    if (processo.responsavel_usuario_id) {
+      const users = (typeof Auth !== 'undefined' && Auth.getUsers) ? Auth.getUsers() : [];
+      const u = users.find(x => x.id === processo.responsavel_usuario_id);
+      if (u) return { id: u.id, nome: u.nome, cargo: processo.cargo_responsavel || '', icone: '👤' };
+    }
+    // Resolve pelo cargo
+    if (processo.cargo_responsavel) {
+      const cargos = this.getCargos();
+      const cargo = cargos.find(c => c.id === processo.cargo_responsavel);
+      if (cargo && cargo.usuario_id) {
+        const users = (typeof Auth !== 'undefined' && Auth.getUsers) ? Auth.getUsers() : [];
+        const u = users.find(x => x.id === cargo.usuario_id);
+        return { id: cargo.usuario_id, nome: u?.nome || cargo.usuario_nome || cargo.nome, cargo: cargo.nome, icone: cargo.icone || '👤' };
+      }
+      if (cargo) return { id: null, nome: cargo.nome, cargo: cargo.nome, icone: cargo.icone || '👤' };
+    }
+    return null;
+  },
+
+  // Retorna todas as demandas ativas de um usuário em todas as obras
+  getDemandas(usuarioId) {
+    if (!usuarioId || typeof DB === 'undefined') return [];
+    const obras = DB.getAll('clientes').filter(o => !['concluida', 'concluido', 'concluída', 'cancelada', 'cancelado', 'sistema'].includes(String(o.status || '').toLowerCase()));
+    const demandas = [];
+
+    for (const obra of obras) {
+      const processos = this.getObraProcessos(obra.id);
+      for (const proc of processos) {
+        if (proc.status === 'concluido') continue;
+        const resp = this.getResponsavelEtapa(proc);
+        if (resp && resp.id === usuarioId) {
+          demandas.push({
+            ...proc,
+            obra_id: obra.id,
+            obra_nome: obra.nome || 'Obra sem nome',
+            responsavel_resolvido: resp
+          });
+        }
+      }
+    }
+    return demandas;
+  },
+
+  // ── TEMPLATES CUSTOMIZADOS (persistência) ──────────────────────────
+  getTemplates() {
+    try {
+      const k = (typeof DB !== 'undefined' && DB._ck) ? DB._ck(this._KEY_TEMPLATES) : this._KEY_TEMPLATES;
+      const raw = localStorage.getItem(k);
+      if (raw) { const p = JSON.parse(raw); if (p && typeof p === 'object') return { ...this.TEMPLATES_PADRAO, ...p }; }
+    } catch (e) { console.warn('[CronogramaSLA] getTemplates:', e); }
+    return { ...this.TEMPLATES_PADRAO };
+  },
+
+  saveTemplates(templates) {
+    if (!templates || typeof templates !== 'object') return false;
+    try {
+      const k = (typeof DB !== 'undefined' && DB._ck) ? DB._ck(this._KEY_TEMPLATES) : this._KEY_TEMPLATES;
+      // Só persiste os templates customizados (não os builtin)
+      const custom = Object.fromEntries(Object.entries(templates).filter(([,v]) => !v.builtin));
+      localStorage.setItem(k, JSON.stringify(custom));
+      if (typeof DB !== 'undefined' && DB.syncToCloud) DB.syncToCloud('save', 'preferencias', { preferences: { workflow_templates: custom } });
+      return true;
+    } catch (e) { console.error('[CronogramaSLA] saveTemplates:', e); return false; }
+  },
+
+  // Retorna a chave de template adequada para uma obra
+  _templateKeyForObra(obra) {
+    if (!obra) return 'obra_particular';
+    if (obra.tipo_workflow) return obra.tipo_workflow;
+    const modalMap = { caixa:'casa_caixa', reforma:'reforma', outros_bancos:'obra_particular', particular:'obra_particular', administracao:'obra_particular', empreitada:'obra_particular' };
+    return modalMap[obra.modalidade_obra] || 'obra_particular';
+  },
 
   // ── PREFERÊNCIAS DE SLA DA EMPRESA ──
   getSlasEmpresa() {
@@ -186,8 +231,12 @@ const CronogramaSLA = {
       return this.calcularCascata(salvos, obra.data_inicio);
     }
 
-    // Caso contrário, herda do template padrão da empresa
-    const padrao = this.getSlasEmpresa();
+    // Patch 52: resolve template pelo tipo/modalidade da obra
+    const tmplKey = this._templateKeyForObra(obra);
+    const templates = this.getTemplates();
+    const tmpl = templates[tmplKey] || templates.obra_particular;
+    const padrao = tmpl ? tmpl.processos : this.getSlasEmpresa();
+
     const processos = padrao.map((p, idx) => ({
       id: p.id,
       codigo: p.codigo || `ETP-${idx + 1}`,
@@ -198,11 +247,18 @@ const CronogramaSLA = {
       dias_sla: parseInt(p.dias_sla, 10) || 30,
       predecessor_id: p.predecessor_id || null,
       descricao: p.descricao || '',
-      status: 'pendente', // 'pendente' | 'em_andamento' | 'concluido'
+      // Patch 52 — campos de workflow
+      cargo_responsavel: p.cargo_responsavel || null,
+      checklist: Array.isArray(p.checklist) ? [...p.checklist] : [],
+      checklist_status: {},
+      responsavel_usuario_id: null,
+      motivo_atraso: null,
+      motivo_atraso_detalhe: '',
+      status: 'pendente',
       data_inicio_real: '',
       data_fim_real: '',
       percentual: 0,
-      observacoes: ''
+      observacoes: '',
     }));
 
     return this.calcularCascata(processos, obra.data_inicio);
@@ -320,6 +376,23 @@ const CronogramaSLA = {
         atrasoAcumuladoTotal += diasAtraso;
       }
 
+      // ── SLA EVOLUTIVO (Patch 52) ──
+      // Dias já executados (desde data de início até hoje ou até conclusão)
+      if (p.status === 'concluido' && p.data_inicio_real && p.data_fim_real) {
+        p.dias_executados = Math.max(0, this._diffDias(p.data_fim_real, p.data_inicio_real));
+        p.dias_restantes = 0;
+      } else if (p.status === 'em_andamento') {
+        const inicioEfetivo = p.data_inicio_real || p.data_inicio_prevista;
+        p.dias_executados = Math.max(0, this._diffDias(hoje, inicioEfetivo));
+        p.dias_restantes = Math.max(0, this._diffDias(p.data_fim_prevista, hoje));
+      } else {
+        p.dias_executados = 0;
+        p.dias_restantes = diasSla;
+      }
+
+      // Resolve responsável para exibição
+      p.responsavel_resolvido = this.getResponsavelEtapa(p);
+
       procMap.set(p.id, p);
     }
 
@@ -412,11 +485,81 @@ const CronogramaSLA = {
     </div>`;
   },
 
-  // ── RENDERIZAÇÃO DA LINHA DO TEMPO COMPLETA COM CASCATA ──
+  _modoVisualizacao: {},
+
+  getModoVisualizacao(obraId) {
+    if (!obraId) return 'linha_tempo';
+    return (this._modoVisualizacao && this._modoVisualizacao[obraId]) || 'linha_tempo';
+  },
+
+  setModoVisualizacao(obraId, modo) {
+    if (!obraId) return;
+    this._modoVisualizacao = this._modoVisualizacao || {};
+    this._modoVisualizacao[obraId] = modo;
+
+    const container = document.getElementById('sla-visualizacao-container');
+    if (container) {
+      const processos = this.getObraProcessos(obraId);
+      if (modo === 'kanban') {
+        container.innerHTML = this._renderKanban(obraId, processos);
+      } else if (modo === 'gantt') {
+        container.innerHTML = this._renderGantt(obraId, processos);
+      } else {
+        container.innerHTML = this._renderTimelineList(obraId, processos);
+      }
+      document.querySelectorAll('.sla-modo-btn').forEach(btn => {
+        const isAct = btn.dataset.modo === modo;
+        btn.style.background = isAct ? 'var(--accent)' : 'var(--bg-secondary)';
+        btn.style.color = isAct ? '#000' : 'var(--text2)';
+        btn.style.fontWeight = isAct ? '800' : '600';
+      });
+    } else if (typeof ObraDetalhe !== 'undefined' && ObraDetalhe.activeTab === 'slas') {
+      ObraDetalhe.setTab('slas');
+    }
+  },
+
+  iniciarEtapaRapido(obraId, processoId) {
+    const processos = this.getObraProcessos(obraId);
+    const p = processos.find(item => item.id === processoId);
+    if (!p) return;
+    const hoje = Utils.today();
+    const prevStatus = p.status;
+    p.status = 'em_andamento';
+    if (!p.data_inicio_real) p.data_inicio_real = hoje;
+
+    if (!Array.isArray(p.historico)) p.historico = [];
+    const userName = (typeof Auth !== 'undefined' && Auth.getUser && Auth.getUser()?.nome) || 'Usuário';
+    p.historico.push({
+      data: new Date().toISOString(),
+      autor: userName,
+      de_status: prevStatus,
+      para_status: 'em_andamento',
+      texto: 'Etapa iniciada via ação rápida.'
+    });
+
+    // Atualiza status da obra se estava em planejamento/pendente
+    const obra = DB.getById('clientes', obraId);
+    if (obra && ['pendente', 'planejamento', 'orcamento'].includes(obra.status)) {
+      DB.update('clientes', obraId, { status: 'em_andamento' });
+    }
+
+    if (!this.salvarProcessosObra(obraId, processos)) {
+      return Utils.toast('Erro ao iniciar etapa.', 'error');
+    }
+    Utils.toast('Etapa iniciada com sucesso!', 'success');
+    if (typeof ObraDetalhe !== 'undefined' && ObraDetalhe.activeTab === 'slas') {
+      ObraDetalhe.setTab('slas');
+    } else if (typeof App !== 'undefined' && App.route === 'obras') {
+      App.navigate('obras');
+    }
+  },
+
+  // ── RENDERIZAÇÃO DA LINHA DO TEMPO COMPLETA COM CASCATA (Patch 53: Modos + WhatsApp) ──
   renderLinhaTempo(obraId, { somenteLeitura = false } = {}) {
     const obra = DB.getById('clientes', obraId) || {};
     const processos = this.getObraProcessos(obraId);
     const resumo = this.getResumoObra(obraId);
+    const modo = this.getModoVisualizacao(obraId);
     const e = Utils.escapeHtml.bind(Utils);
 
     const corStatus = resumo.statusGeral === 'atrasado'
@@ -424,6 +567,15 @@ const CronogramaSLA = {
       : resumo.statusGeral === 'atencao'
         ? '#f59e0b'
         : 'var(--success)';
+
+    let contentHtml = '';
+    if (modo === 'kanban') {
+      contentHtml = this._renderKanban(obraId, processos, { somenteLeitura });
+    } else if (modo === 'gantt') {
+      contentHtml = this._renderGantt(obraId, processos, { somenteLeitura });
+    } else {
+      contentHtml = this._renderTimelineList(obraId, processos, { somenteLeitura });
+    }
 
     return `
     <div class="sla-timeline-wrapper" style="margin-bottom:24px;">
@@ -443,32 +595,53 @@ const CronogramaSLA = {
               Atrasos em fases de projetos ou licenças recalculam automaticamente a data final de entrega da obra.
             </p>
           </div>
-          ${!somenteLeitura ? `
-            <div style="display:flex;gap:8px;align-items:center;">
-              <button class="btn btn-secondary btn-sm" data-fb-click="CronogramaSLA.abrirModalConfigObra" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(obraId))}">
-                ⚙️ Ajustar Prazos da Obra
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+            <!-- SELETOR DE MODO DE VISUALIZAÇÃO (Patch 53) -->
+            <div style="display:flex;background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--r-md);padding:3px;gap:3px;">
+              <button class="btn btn-sm sla-modo-btn" data-modo="linha_tempo" style="font-size:.75rem;padding:4px 10px;border:none;border-radius:4px;background:${modo === 'linha_tempo' ? 'var(--accent)' : 'transparent'};color:${modo === 'linha_tempo' ? '#000' : 'var(--text2)'};font-weight:${modo === 'linha_tempo' ? '800' : '600'};"
+                data-fb-click="CronogramaSLA.setModoVisualizacao" data-fb-click-n="2" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(obraId))}" data-fb-click-t1="string" data-fb-click-v1="linha_tempo">
+                📋 Linha do Tempo
+              </button>
+              <button class="btn btn-sm sla-modo-btn" data-modo="kanban" style="font-size:.75rem;padding:4px 10px;border:none;border-radius:4px;background:${modo === 'kanban' ? 'var(--accent)' : 'transparent'};color:${modo === 'kanban' ? '#000' : 'var(--text2)'};font-weight:${modo === 'kanban' ? '800' : '600'};"
+                data-fb-click="CronogramaSLA.setModoVisualizacao" data-fb-click-n="2" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(obraId))}" data-fb-click-t1="string" data-fb-click-v1="kanban">
+                📊 Kanban
+              </button>
+              <button class="btn btn-sm sla-modo-btn" data-modo="gantt" style="font-size:.75rem;padding:4px 10px;border:none;border-radius:4px;background:${modo === 'gantt' ? 'var(--accent)' : 'transparent'};color:${modo === 'gantt' ? '#000' : 'var(--text2)'};font-weight:${modo === 'gantt' ? '800' : '600'};"
+                data-fb-click="CronogramaSLA.setModoVisualizacao" data-fb-click-n="2" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(obraId))}" data-fb-click-t1="string" data-fb-click-v1="gantt">
+                📈 Gantt
               </button>
             </div>
-          ` : ''}
+
+            <!-- BOTÃO WHATSAPP RESUMO DA OBRA (Patch 53) -->
+            <button class="btn btn-secondary btn-sm" title="Enviar Resumo de Prazos via WhatsApp" data-fb-click="WhatsApp.enviarResumoWorkflowObra" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(obraId))}">
+              💬 Resumo WhatsApp
+            </button>
+
+            ${!somenteLeitura ? `
+              <button class="btn btn-secondary btn-sm" data-fb-click="CronogramaSLA.abrirModalConfigObra" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(obraId))}">
+                ⚙️ Ajustar Prazos
+              </button>
+            ` : ''}
+          </div>
         </div>
 
-        <!-- 4 CARDS DE INDICADORES -->
-        <div class="g4" style="gap:12px;">
-          <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--r-md);padding:12px;text-align:center;">
-            <div style="font-size:.68rem;font-weight:700;text-transform:uppercase;color:var(--text3)">Início da Obra</div>
-            <div style="font-size:1.05rem;font-weight:900;color:var(--text);margin-top:2px">${Utils.fmt.date(obra.data_inicio) || 'Não definido'}</div>
+        <!-- 4 CARDS DE INDICADORES (Tailwind Specialist & KPI Dashboard Design) -->
+        <div class="kpi-grid-dashboard" style="margin-bottom:14px;">
+          <div class="haptic-card" style="background:var(--bg-card);border:1px solid var(--border-s);border-radius:var(--r-lg);padding:16px 14px;text-align:center;box-shadow:var(--shadow-soft-sm);">
+            <div style="font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:0.04em;color:var(--text3)">Início da Obra</div>
+            <div class="tabular-nums" style="font-size:1.15rem;font-weight:900;color:var(--text);margin-top:4px">${Utils.fmt.date(obra.data_inicio) || 'Não definido'}</div>
           </div>
-          <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--r-md);padding:12px;text-align:center;">
-            <div style="font-size:.68rem;font-weight:700;text-transform:uppercase;color:var(--text3)">Previsão de Entrega</div>
-            <div style="font-size:1.05rem;font-weight:900;color:var(--accent);margin-top:2px">${Utils.fmt.date(resumo.dataEntregaEstimada) || '—'}</div>
+          <div class="haptic-card" style="background:var(--bg-card);border:1px solid var(--border-s);border-radius:var(--r-lg);padding:16px 14px;text-align:center;box-shadow:var(--shadow-soft-sm);">
+            <div style="font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:0.04em;color:var(--text3)">Previsão de Entrega</div>
+            <div class="tabular-nums" style="font-size:1.15rem;font-weight:900;color:var(--accent);margin-top:4px">${Utils.fmt.date(resumo.dataEntregaEstimada) || '—'}</div>
           </div>
-          <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--r-md);padding:12px;text-align:center;">
-            <div style="font-size:.68rem;font-weight:700;text-transform:uppercase;color:var(--text3)">Fases Concluídas</div>
-            <div style="font-size:1.05rem;font-weight:900;color:var(--success);margin-top:2px">${resumo.concluidos} de ${resumo.totalProcessos} (${resumo.pctGeral}%)</div>
+          <div class="haptic-card" style="background:var(--bg-card);border:1px solid var(--border-s);border-radius:var(--r-lg);padding:16px 14px;text-align:center;box-shadow:var(--shadow-soft-sm);">
+            <div style="font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:0.04em;color:var(--text3)">Fases Concluídas</div>
+            <div class="tabular-nums" style="font-size:1.15rem;font-weight:900;color:var(--success);margin-top:4px">${resumo.concluidos} de ${resumo.totalProcessos} (${resumo.pctGeral}%)</div>
           </div>
-          <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--r-md);padding:12px;text-align:center;">
-            <div style="font-size:.68rem;font-weight:700;text-transform:uppercase;color:var(--text3)">Variação de Prazo</div>
-            <div style="font-size:1.05rem;font-weight:900;color:${corStatus};margin-top:2px">
+          <div class="haptic-card" style="background:var(--bg-card);border:1px solid var(--border-s);border-radius:var(--r-lg);padding:16px 14px;text-align:center;box-shadow:var(--shadow-soft-sm);">
+            <div style="font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:0.04em;color:var(--text3)">Variação de Prazo</div>
+            <div class="tabular-nums" style="font-size:1.15rem;font-weight:900;color:${corStatus};margin-top:4px">
               ${resumo.diasAtrasoAcumulado > 0 ? `+${resumo.diasAtrasoAcumulado} dias` : '0 dias (no prazo)'}
             </div>
           </div>
@@ -479,12 +652,21 @@ const CronogramaSLA = {
         </div>
       </div>
 
-      <!-- LISTA DE ETAPAS / FLUXO EM CASCATA -->
+      <!-- CONTAINER DINÂMICO DE VISUALIZAÇÃO -->
+      <div id="sla-visualizacao-container">
+        ${contentHtml}
+      </div>
+    </div>`;
+  },
+
+  // ── MODO 1: LISTA CRONOLÓGICA (Linha do Tempo) ──
+  _renderTimelineList(obraId, processos, { somenteLeitura = false } = {}) {
+    const e = Utils.escapeHtml.bind(Utils);
+    return `
       <div style="display:flex;flex-direction:column;gap:10px;">
         ${processos.map((p, idx) => {
           const isDone = p.status === 'concluido';
           const isInProgress = p.status === 'em_andamento';
-          const isPending = p.status === 'pendente';
 
           const badgeSlaColor = p.status_sla === 'atrasado'
             ? 'var(--danger)'
@@ -498,10 +680,12 @@ const CronogramaSLA = {
               ? '🟡 Em Atenção'
               : '🟢 No Prazo';
 
+          const resp = p.responsavel_resolvido;
+
           return `
           <div style="background:var(--surface);border:1px solid ${isInProgress ? 'var(--accent)' : 'var(--border)'};border-radius:var(--r-md);padding:14px 18px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;transition:border-color .2s;">
             <div style="display:flex;align-items:center;gap:14px;flex:1;min-width:260px;">
-              <div style="font-size:1.6rem;width:40px;height:40px;border-radius:50%;background:var(--bg-secondary);display:flex;align-items:center;justify-content:center;border:1px solid var(--border);">
+              <div style="font-size:1.6rem;width:40px;height:40px;border-radius:50%;background:var(--bg-secondary);display:flex;align-items:center;justify-content:center;border:1px solid var(--border);flex-shrink:0;">
                 ${p.icone || '📋'}
               </div>
               <div style="flex:1;min-width:0;">
@@ -510,6 +694,7 @@ const CronogramaSLA = {
                   <strong style="font-size:.92rem;color:var(--text);">${e(p.nome)}</strong>
                   <span style="font-size:.68rem;background:rgba(201,162,39,.1);color:var(--accent);padding:1px 8px;border-radius:10px;font-weight:700;">⏱️ SLA ${p.dias_sla} dias</span>
                   <span style="font-size:.68rem;color:${badgeSlaColor};font-weight:800;background:${badgeSlaColor}15;padding:1px 8px;border-radius:10px;">${badgeSlaText}</span>
+                  ${resp ? `<span style="font-size:.68rem;color:var(--accent2);font-weight:700;background:rgba(201,162,39,.08);padding:1px 8px;border-radius:10px;">${e(resp.icone || '👤')} ${e(resp.nome)}</span>` : ''}
                 </div>
                 <div style="font-size:.75rem;color:var(--text3);margin-top:4px;display:flex;gap:16px;flex-wrap:wrap;">
                   <span>📅 Início: <strong>${Utils.fmt.date(p.data_inicio_real || p.data_inicio_prevista)}</strong></span>
@@ -520,10 +705,15 @@ const CronogramaSLA = {
               </div>
             </div>
 
-            <div style="display:flex;align-items:center;gap:10px;">
+            <div style="display:flex;align-items:center;gap:8px;">
               <span class="badge" style="background:${isDone ? 'rgba(16,185,129,.15)' : isInProgress ? 'rgba(59,130,246,.15)' : 'var(--bg-secondary)'};color:${isDone ? 'var(--success)' : isInProgress ? '#3b82f6' : 'var(--text3)'};font-size:.74rem;font-weight:700;padding:4px 10px;">
                 ${isDone ? '✓ Concluído' : isInProgress ? '🔄 Em Andamento' : '⏳ Pendente'}
               </span>
+
+              <!-- WhatsApp botão de notificação rápida (Patch 53) -->
+              <button class="btn btn-secondary btn-sm" style="font-size:.75rem;padding:4px 8px;" title="Notificar via WhatsApp" data-fb-click="WhatsApp.abrirModalNotificacaoEtapa" data-fb-click-n="2" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(obraId))}" data-fb-click-t1="string" data-fb-click-v1="${encodeURIComponent(String(p.id))}">
+                💬
+              </button>
 
               ${!somenteLeitura ? `
                 <button class="btn btn-secondary btn-sm" style="font-size:.75rem;padding:4px 10px;" data-fb-click="CronogramaSLA.abrirModalApontamento" data-fb-click-n="2" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(obraId))}" data-fb-click-t1="string" data-fb-click-v1="${encodeURIComponent(String(p.id))}">
@@ -533,36 +723,302 @@ const CronogramaSLA = {
             </div>
           </div>`;
         }).join('')}
-      </div>
-    </div>`;
+      </div>`;
   },
 
-  // ── MODAL DE APONTAMENTO DE STATUS DA ETAPA ──
+  // ── MODO 2: KANBAN DO WORKFLOW (Patch 53) ──
+  _renderKanban(obraId, processos, { somenteLeitura = false } = {}) {
+    const e = Utils.escapeHtml.bind(Utils);
+    const cols = {
+      pendente: { titulo: '⏳ Pendente', cor: 'var(--text3)', items: processos.filter(p => p.status === 'pendente') },
+      em_andamento: { titulo: '🔄 Em Andamento', cor: '#3b82f6', items: processos.filter(p => p.status === 'em_andamento') },
+      concluido: { titulo: '✅ Concluído', cor: 'var(--success)', items: processos.filter(p => p.status === 'concluido') },
+    };
+
+    const renderCard = (p) => {
+      const isAtrasado = p.status_sla === 'atrasado';
+      const isAtencao = p.status_sla === 'atencao';
+      const corBadge = isAtrasado ? 'var(--danger)' : isAtencao ? '#f59e0b' : 'var(--success)';
+      const resp = p.responsavel_resolvido;
+      const chkTotal = Array.isArray(p.checklist) ? p.checklist.length : 0;
+      const chkDone = chkTotal > 0 ? Object.values(p.checklist_status || {}).filter(Boolean).length : 0;
+
+      return `
+        <div style="background:var(--surface);border:1px solid ${isAtrasado ? 'rgba(239,68,68,.4)' : 'var(--border)'};border-radius:var(--r-md);padding:12px;margin-bottom:10px;box-shadow:0 1px 3px rgba(0,0,0,.08);transition:transform .15s, box-shadow .15s;">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:6px;margin-bottom:6px;">
+            <span style="font-size:.65rem;font-weight:800;background:var(--bg-secondary);border:1px solid var(--border);padding:1px 5px;border-radius:4px;color:var(--text3);">${e(p.codigo)}</span>
+            <span style="font-size:.65rem;font-weight:800;color:${corBadge};background:${corBadge}15;padding:1px 6px;border-radius:8px;">
+              ${isAtrasado ? `🔴 +${p.dias_atraso}d` : isAtencao ? '🟡 Atenção' : '🟢 No prazo'}
+            </span>
+          </div>
+
+          <div style="font-weight:800;font-size:.85rem;color:var(--text);line-height:1.3;margin-bottom:6px;">
+            ${e(p.icone || '📋')} ${e(p.nome)}
+          </div>
+
+          <div style="font-size:.72rem;color:var(--text3);margin-bottom:8px;display:flex;flex-direction:column;gap:2px;">
+            <div>📅 Prazo: <strong>${Utils.fmt.date(p.data_fim_prevista)}</strong> (SLA ${p.dias_sla}d)</div>
+            ${p.data_inicio_real ? `<div>🚀 Início: ${Utils.fmt.date(p.data_inicio_real)}</div>` : ''}
+            ${p.data_fim_real ? `<div>🏁 Término: ${Utils.fmt.date(p.data_fim_real)}</div>` : ''}
+          </div>
+
+          ${chkTotal > 0 ? `
+            <div style="font-size:.68rem;color:var(--text3);margin-bottom:8px;display:flex;align-items:center;gap:6px;">
+              <span>Checklist: ${chkDone}/${chkTotal}</span>
+              <div style="flex:1;background:var(--bg-secondary);height:4px;border-radius:2px;overflow:hidden;">
+                <div style="width:${(chkDone/chkTotal)*100}%;height:100%;background:var(--success);"></div>
+              </div>
+            </div>` : ''}
+
+          ${resp ? `
+            <div style="font-size:.7rem;color:var(--accent2);font-weight:700;margin-bottom:10px;display:flex;align-items:center;gap:4px;">
+              <span>${e(resp.icone || '👤')}</span>
+              <span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${e(resp.nome)}</span>
+            </div>` : ''}
+
+          <div style="display:flex;justify-content:flex-end;align-items:center;gap:6px;border-top:1px solid var(--border);padding-top:8px;">
+            <button class="btn btn-secondary btn-sm" style="font-size:.7rem;padding:3px 7px;" title="Notificar via WhatsApp"
+              data-fb-click="WhatsApp.abrirModalNotificacaoEtapa" data-fb-click-n="2" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(obraId))}" data-fb-click-t1="string" data-fb-click-v1="${encodeURIComponent(String(p.id))}">
+              💬
+            </button>
+
+            ${!somenteLeitura && p.status === 'pendente' ? `
+              <button class="btn btn-secondary btn-sm" style="font-size:.7rem;padding:3px 8px;color:#3b82f6;" title="Iniciar etapa agora"
+                data-fb-click="CronogramaSLA.iniciarEtapaRapido" data-fb-click-n="2" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(obraId))}" data-fb-click-t1="string" data-fb-click-v1="${encodeURIComponent(String(p.id))}">
+                ▶️ Iniciar
+              </button>
+            ` : ''}
+
+            ${!somenteLeitura ? `
+              <button class="btn btn-secondary btn-sm" style="font-size:.7rem;padding:3px 8px;"
+                data-fb-click="CronogramaSLA.abrirModalApontamento" data-fb-click-n="2" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(obraId))}" data-fb-click-t1="string" data-fb-click-v1="${encodeURIComponent(String(p.id))}">
+                ✏️ Apontar
+              </button>
+            ` : ''}
+          </div>
+        </div>`;
+    };
+
+    return `
+      <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(280px, 1fr));gap:16px;align-items:start;">
+        ${Object.entries(cols).map(([statusKey, col]) => `
+          <div class="haptic-card" style="background:var(--bg-card);border:1px solid var(--border-s);border-top:3px solid ${col.cor};border-radius:var(--r-lg);padding:16px;box-shadow:var(--shadow-soft-sm);">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+              <h3 style="font-size:.88rem;font-weight:800;color:var(--text);margin:0;">${col.titulo}</h3>
+              <span class="tabular-nums" style="font-size:.72rem;background:var(--bg-secondary);border:1px solid var(--border-s);border-radius:9999px;padding:2px 8px;font-weight:700;color:var(--text2);">${col.items.length}</span>
+            </div>
+            <div style="display:flex;flex-direction:column;">
+              ${col.items.length ? col.items.map(renderCard).join('') : '<div style="font-size:.75rem;color:var(--text3);text-align:center;padding:24px 0;">Nenhuma etapa nesta coluna</div>'}
+            </div>
+          </div>
+        `).join('')}
+      </div>`;
+  },
+
+  // ── MODO 3: VISÃO GANTT PROPORCIONAL (Patch 53) ──
+  _renderGantt(obraId, processos, { somenteLeitura = false } = {}) {
+    if (!processos.length) return '<div class="empty-state">Sem etapas para exibir no gráfico Gantt.</div>';
+    const e = Utils.escapeHtml.bind(Utils);
+    const hoje = Utils.today();
+
+    // Calcula balizas de data mínima e máxima
+    let minDate = processos[0].data_inicio_real || processos[0].data_inicio_prevista || hoje;
+    let maxDate = processos[processos.length - 1].data_fim_prevista || hoje;
+
+    for (const p of processos) {
+      const ini = p.data_inicio_real || p.data_inicio_prevista;
+      const fim = p.data_fim_real || p.data_fim_prevista;
+      if (ini && ini < minDate) minDate = ini;
+      if (fim && fim > maxDate) maxDate = fim;
+    }
+
+    const totalDias = Math.max(1, this._diffDias(maxDate, minDate));
+    const hojeOffset = this._diffDias(hoje, minDate);
+    const hojePct = Math.min(100, Math.max(0, Math.round((hojeOffset / totalDias) * 100)));
+
+    return `
+      <div style="background:var(--bg-card);border:1px solid var(--border-s);border-radius:var(--r-lg);padding:18px;overflow-x:auto;box-shadow:var(--shadow-soft-sm);">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+          <div>
+            <h3 style="font-size:.92rem;font-weight:800;color:var(--text);margin:0;">📈 Diagrama de Gantt &amp; Linha do Tempo Visual</h3>
+            <div style="font-size:.72rem;color:var(--text3);margin-top:2px;">
+              Período global: <strong>${Utils.fmt.date(minDate)}</strong> até <strong>${Utils.fmt.date(maxDate)}</strong> (${totalDias} dias)
+            </div>
+          </div>
+          <div style="display:flex;align-items:center;gap:12px;font-size:.72rem;">
+            <span style="display:flex;align-items:center;gap:4px;"><span style="width:10px;height:10px;border-radius:2px;background:var(--success);display:inline-block;"></span> Concluído</span>
+            <span style="display:flex;align-items:center;gap:4px;"><span style="width:10px;height:10px;border-radius:2px;background:#3b82f6;display:inline-block;"></span> Em Andamento</span>
+            <span style="display:flex;align-items:center;gap:4px;"><span style="width:10px;height:10px;border-radius:2px;background:var(--danger);display:inline-block;"></span> Atrasado</span>
+            <span style="display:flex;align-items:center;gap:4px;"><span style="width:10px;height:10px;border-radius:2px;background:var(--border);display:inline-block;"></span> Pendente</span>
+          </div>
+        </div>
+
+        <div style="min-width:680px;position:relative;">
+          <!-- Barra de datas de baliza -->
+          <div style="display:flex;justify-content:space-between;font-size:.68rem;color:var(--text3);border-bottom:1px solid var(--border);padding-bottom:6px;margin-bottom:8px;margin-left:220px;">
+            <span>${Utils.fmt.date(minDate)}</span>
+            <span>Hoje (${Utils.fmt.date(hoje)})</span>
+            <span>${Utils.fmt.date(maxDate)}</span>
+          </div>
+
+          <!-- Linha vertical "Hoje" -->
+          <div style="position:absolute;top:24px;bottom:0;left:calc(220px + (100% - 220px) * ${hojePct} / 100);width:2px;background:var(--danger);z-index:2;opacity:0.7;pointer-events:none;" title="Hoje: ${Utils.fmt.date(hoje)}"></div>
+
+          <!-- Linhas do Gantt -->
+          <div style="display:flex;flex-direction:column;gap:6px;">
+            ${processos.map((p) => {
+              const ini = p.data_inicio_real || p.data_inicio_prevista || minDate;
+              const fim = p.data_fim_real || p.data_fim_prevista || ini;
+              const offsetDias = Math.max(0, this._diffDias(ini, minDate));
+              const duracaoDias = Math.max(1, this._diffDias(fim, ini));
+              const leftPct = Math.min(99, Math.max(0, (offsetDias / totalDias) * 100));
+              const widthPct = Math.min(100 - leftPct, Math.max(1.5, (duracaoDias / totalDias) * 100));
+
+              let barColor = 'var(--border)';
+              if (p.status === 'concluido') barColor = 'var(--success)';
+              else if (p.status === 'em_andamento') {
+                barColor = p.status_sla === 'atrasado' ? 'var(--danger)' : p.status_sla === 'atencao' ? '#f59e0b' : '#3b82f6';
+              }
+
+              return `
+                <div style="display:flex;align-items:center;gap:10px;height:32px;">
+                  <div style="width:210px;flex-shrink:0;font-size:.75rem;font-weight:700;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer;"
+                    data-fb-click="CronogramaSLA.abrirModalApontamento" data-fb-click-n="2" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(obraId))}" data-fb-click-t1="string" data-fb-click-v1="${encodeURIComponent(String(p.id))}">
+                    ${e(p.icone || '📋')} ${e(p.nome)}
+                  </div>
+                  <div style="flex:1;position:relative;height:100%;background:var(--bg-secondary);border-radius:4px;overflow:hidden;">
+                    <div style="position:absolute;left:${leftPct.toFixed(1)}%;width:${widthPct.toFixed(1)}%;top:4px;bottom:4px;background:${barColor};border-radius:4px;cursor:pointer;display:flex;align-items:center;padding:0 6px;transition:filter .15s;"
+                      title="${e(p.nome)} (${duracaoDias} dias) - ${Utils.fmt.date(ini)} a ${Utils.fmt.date(fim)}"
+                      data-fb-click="CronogramaSLA.abrirModalApontamento" data-fb-click-n="2" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(obraId))}" data-fb-click-t1="string" data-fb-click-v1="${encodeURIComponent(String(p.id))}">
+                      <span style="font-size:.65rem;font-weight:800;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${p.dias_sla}d</span>
+                    </div>
+                  </div>
+                </div>`;
+            }).join('')}
+          </div>
+        </div>
+      </div>`;
+  },
+
+  // ── MODAL DE APONTAMENTO DE STATUS DA ETAPA (Patch 52 + Patch 53: Histórico & Notificação) ──
   abrirModalApontamento(obraId, processoId) {
     const processos = this.getObraProcessos(obraId);
     const p = processos.find(item => item.id === processoId);
     if (!p) return;
     const e = Utils.escapeHtml.bind(Utils);
+    const cargos = this.getCargos();
+    const respResolvido = this.getResponsavelEtapa(p);
+
+    // Checklist HTML
+    const checklistHtml = Array.isArray(p.checklist) && p.checklist.length > 0
+      ? `<div id="sla-checklist-wrap" style="background:rgba(201,162,39,.06);border:1px solid rgba(201,162,39,.25);border-radius:var(--r-md);padding:12px;margin-bottom:14px;">
+          <div style="font-weight:700;font-size:.8rem;color:var(--accent2);margin-bottom:8px;">✅ Checklist de Conclusão</div>
+          <div style="font-size:.78rem;color:var(--text3);margin-bottom:8px;">Todos os itens devem ser marcados para concluir esta etapa.</div>
+          ${p.checklist.map(item => {
+            const done = p.checklist_status?.[item] === true;
+            return `<label style="display:flex;align-items:center;gap:8px;cursor:pointer;padding:4px 0;">
+              <input type="checkbox" class="sla-checklist-item" data-item="${e(item)}" ${done ? 'checked' : ''} style="transform:scale(1.15);">
+              <span style="${done ? 'text-decoration:line-through;color:var(--text3);' : ''} font-size:.82rem;">${e(item)}</span>
+            </label>`;
+          }).join('')}
+        </div>`
+      : '';
+
+    // Motivo de atraso HTML (só aparece se já está atrasado)
+    const isAtrasado = p.status_sla === 'atrasado';
+    const motivoHtml = `<div id="sla-motivo-wrap" style="${isAtrasado ? '' : 'display:none;'}">
+      <div style="background:rgba(239,68,68,.06);border:1px solid rgba(239,68,68,.3);border-radius:var(--r-md);padding:12px;margin-bottom:14px;">
+        <div style="font-weight:700;font-size:.8rem;color:var(--danger);margin-bottom:8px;">🔴 Motivo do Atraso (Obrigatório)</div>
+        <select class="form-control" id="sla-motivo-sel" style="margin-bottom:8px;">
+          <option value="">Selecione o motivo...</option>
+          <option value="cliente" ${p.motivo_atraso==='cliente' ? 'selected' : ''}>👤 Aguardando cliente</option>
+          <option value="orgao_publico" ${p.motivo_atraso==='orgao_publico' ? 'selected' : ''}>🏛️ Órgão público / Prefeitura</option>
+          <option value="fornecedor" ${p.motivo_atraso==='fornecedor' ? 'selected' : ''}>🚛 Fornecedor / Material</option>
+          <option value="interno" ${p.motivo_atraso==='interno' ? 'selected' : ''}>👥 Capacidade interna da equipe</option>
+          <option value="documentacao" ${p.motivo_atraso==='documentacao' ? 'selected' : ''}>📄 Documentação pendente</option>
+          <option value="outro" ${p.motivo_atraso==='outro' ? 'selected' : ''}>💬 Outro</option>
+        </select>
+        <input type="text" class="form-control" id="sla-motivo-detalhe" placeholder="Detalhe o motivo..." value="${e(p.motivo_atraso_detalhe || '')}" style="font-size:.8rem;">
+      </div>
+    </div>`;
+
+    // Resp. por cargo
+    const cargoOptions = cargos.map(c => `<option value="${e(c.id)}" ${p.cargo_responsavel===c.id?'selected':''}>${e(c.icone)} ${e(c.nome)}${c.usuario_nome ? ' (→ ' + e(c.usuario_nome) + ')' : ''}</option>`).join('');
+
+    // SLA evolutivo info bar
+    const slaInfoBar = (p.status === 'em_andamento' || p.status === 'concluido') ? `
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:14px;">
+        <div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px;text-align:center;">
+          <div style="font-size:.65rem;color:var(--text3);text-transform:uppercase;font-weight:700;">Executado</div>
+          <div style="font-size:1rem;font-weight:900;color:var(--text);">${p.dias_executados ?? 0}d</div>
+        </div>
+        <div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px;text-align:center;">
+          <div style="font-size:.65rem;color:var(--text3);text-transform:uppercase;font-weight:700;">Restante</div>
+          <div style="font-size:1rem;font-weight:900;color:${isAtrasado ? 'var(--danger)' : 'var(--success)'}">${isAtrasado ? '+' + (p.dias_atraso || 0) + 'd atraso' : (p.dias_restantes ?? p.dias_sla) + 'd'}</div>
+        </div>
+        <div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px;text-align:center;">
+          <div style="font-size:.65rem;color:var(--text3);text-transform:uppercase;font-weight:700;">Situação</div>
+          <div style="font-size:.85rem;font-weight:800;">${isAtrasado ? '🔴 Atrasado' : p.status_sla === 'atencao' ? '🟡 Atenção' : '🟢 No prazo'}</div>
+        </div>
+      </div>` : '';
+
+    // Histórico de transições e comentários (Patch 53)
+    const historicoList = Array.isArray(p.historico) && p.historico.length > 0
+      ? `<div style="background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--r-md);padding:12px;margin-bottom:14px;">
+          <div style="font-weight:700;font-size:.8rem;color:var(--text);margin-bottom:8px;">📜 Histórico de Apontamentos &amp; Transições</div>
+          <div style="display:flex;flex-direction:column;gap:8px;max-height:160px;overflow-y:auto;">
+            ${p.historico.slice().reverse().map(h => `
+              <div style="font-size:.73rem;border-left:2px solid var(--accent);padding-left:8px;">
+                <div style="color:var(--text2);display:flex;justify-content:space-between;">
+                  <strong>${e(h.autor || 'Usuário')}</strong>
+                  <span style="color:var(--text3);font-size:.68rem;">${Utils.fmt.datetime ? Utils.fmt.datetime(h.data) : h.data}</span>
+                </div>
+                ${h.de_status && h.para_status ? `<div style="color:var(--text3);margin-top:1px;">Transição: <em>${e(h.de_status)}</em> &rarr; <em>${e(h.para_status)}</em></div>` : ''}
+                ${h.texto ? `<div style="color:var(--text);margin-top:2px;">💬 ${e(h.texto)}</div>` : ''}
+              </div>
+            `).join('')}
+          </div>
+        </div>`
+      : '';
 
     Utils.showModal(`
-      <div class="modal" style="max-width:540px;">
-        <div class="modal-header">
-          <span class="modal-title">✏️ Apontamento de Fase: ${e(p.nome)}</span>
-          <button class="modal-close" data-fb-click="Utils.closeModal" data-fb-click-n="0">✕</button>
+      <div class="modal" style="max-width:560px;">
+        <div class="modal-header" style="display:flex;justify-content:space-between;align-items:center;">
+          <span class="modal-title">${e(p.icone || '📋')} ${e(p.nome)}</span>
+          <div style="display:flex;align-items:center;gap:8px;">
+            <button class="btn btn-secondary btn-sm" title="Notificar via WhatsApp" data-fb-click="WhatsApp.abrirModalNotificacaoEtapa" data-fb-click-n="2" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(obraId))}" data-fb-click-t1="string" data-fb-click-v1="${encodeURIComponent(String(p.id))}">
+              💬 Notificar WhatsApp
+            </button>
+            <button class="modal-close" data-fb-click="Utils.closeModal" data-fb-click-n="0">&#x2715;</button>
+          </div>
         </div>
-        <div class="modal-body">
-          <div style="background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--r-md);padding:10px 14px;margin-bottom:16px;font-size:.82rem;">
-            <div><strong>Código:</strong> ${e(p.codigo)} &middot; <strong>SLA Configurado:</strong> ${p.dias_sla} dias</div>
-            <div style="color:var(--text3);margin-top:2px;">Previsão Calculada: ${Utils.fmt.date(p.data_inicio_prevista)} até ${Utils.fmt.date(p.data_fim_prevista)}</div>
+        <div class="modal-body" style="max-height:calc(80vh - 130px);overflow-y:auto;">
+          <div style="background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--r-md);padding:10px 14px;margin-bottom:14px;font-size:.82rem;">
+            <div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:4px;">
+              <span><strong>${e(p.codigo)}</strong> &middot; SLA: ${p.dias_sla} dias</span>
+              ${respResolvido ? `<span style="color:var(--accent2);font-weight:700;">${e(respResolvido.icone)} ${e(respResolvido.nome)} <span style="color:var(--text3);font-weight:400;">(${e(respResolvido.cargo)})</span></span>` : ''}
+            </div>
+            <div style="color:var(--text3);margin-top:2px;">Início: <strong>${Utils.fmt.date(p.data_inicio_prevista)}</strong> &rarr; Prazo: <strong>${Utils.fmt.date(p.data_fim_prevista)}</strong></div>
           </div>
 
-          <div class="form-group" style="margin-bottom:14px;">
-            <label class="form-label">Status da Fase *</label>
-            <select class="form-control" id="sla-status-sel">
-              <option value="pendente" ${p.status === 'pendente' ? 'selected' : ''}>⏳ Pendente / Não iniciada</option>
-              <option value="em_andamento" ${p.status === 'em_andamento' ? 'selected' : ''}>🔄 Em Andamento</option>
-              <option value="concluido" ${p.status === 'concluido' ? 'selected' : ''}>✅ Concluída</option>
-            </select>
+          ${slaInfoBar}
+
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px;">
+            <div class="form-group">
+              <label class="form-label">Status da Fase *</label>
+              <select class="form-control" id="sla-status-sel">
+                <option value="pendente" ${p.status==='pendente'?'selected':''}>&#x23F3; Pendente</option>
+                <option value="em_andamento" ${p.status==='em_andamento'?'selected':''}>&#x1F504; Em Andamento</option>
+                <option value="concluido" ${p.status==='concluido'?'selected':''}>&#x2705; Concluída</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Cargo Responsável</label>
+              <select class="form-control" id="sla-cargo-sel">
+                <option value="">-- Nenhum --</option>
+                ${cargoOptions}
+              </select>
+            </div>
           </div>
 
           <div class="form-row cols-2" style="margin-bottom:14px;">
@@ -577,46 +1033,153 @@ const CronogramaSLA = {
           </div>
 
           <div class="form-group" style="margin-bottom:14px;">
-            <label class="form-label">Ajuste de SLA desta Etapa (dias)</label>
+            <label class="form-label">SLA desta Etapa (dias)</label>
             <input type="number" min="1" max="365" class="form-control" id="sla-dias-val" value="${p.dias_sla}">
-            <span style="font-size:.72rem;color:var(--text3);margin-top:2px;display:block">
-              Ao alterar os dias ou registrar atraso, o sistema recalcula em cascata todo o cronograma.
-            </span>
+            <span style="font-size:.72rem;color:var(--text3);margin-top:2px;display:block">Alterar recalcula todo o cronograma em cascata.</span>
           </div>
 
-          <div class="form-group">
-            <label class="form-label">Observações de Campo / Justificativa</label>
-            <textarea class="form-control" id="sla-obs-val" rows="2" placeholder="Ex: Atraso na análise pela prefeitura">${e(p.observacoes || '')}</textarea>
+          ${checklistHtml}
+          ${motivoHtml}
+
+          <div class="form-group" style="margin-bottom:14px;">
+            <label class="form-label">Novo Comentário / Observação</label>
+            <textarea class="form-control" id="sla-comentario-input" rows="2" placeholder="Descreva o andamento, pendências ou justificativa..."></textarea>
           </div>
+
+          ${historicoList}
         </div>
         <div class="modal-footer">
           <button class="btn btn-secondary" data-fb-click="Utils.closeModal" data-fb-click-n="0">Cancelar</button>
-          <button class="btn btn-primary" data-fb-click="CronogramaSLA.salvarApontamento" data-fb-click-n="2" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(obraId))}" data-fb-click-t1="string" data-fb-click-v1="${encodeURIComponent(String(processoId))}">
-            ✔ Salvar &amp; Recalcular Cascata
+          <button class="btn btn-primary" id="sla-salvar-btn" data-fb-click="CronogramaSLA.salvarApontamento" data-fb-click-n="2" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(obraId))}" data-fb-click-t1="string" data-fb-click-v1="${encodeURIComponent(String(processoId))}">
+            &#x2714; Salvar &amp; Recalcular Cascata
           </button>
         </div>
-      </div>`);
+      </div>
+    `);
+
+    // Bind status change and checklist toggle
+    const statusEl = document.getElementById('sla-status-sel');
+    if (statusEl) {
+      statusEl.addEventListener('change', () => CronogramaSLA._onStatusChange(statusEl));
+      this._onStatusChange(statusEl);
+    }
+    document.querySelectorAll('.sla-checklist-item').forEach(cb => {
+      cb.addEventListener('change', () => CronogramaSLA._updateChecklistBtn());
+    });
+    this._updateChecklistBtn();
+  },
+
+  // Mostra/oculta motivo de atraso quando status muda
+  _onStatusChange(sel) {
+    if (!sel) return;
+    const motivoWrap = document.getElementById('sla-motivo-wrap');
+    if (motivoWrap) motivoWrap.style.display = sel.value !== 'pendente' ? 'block' : 'none';
+  },
+
+  // Desabilita botão se checklist não concluído
+  _updateChecklistBtn() {
+    const btn = document.getElementById('sla-salvar-btn');
+    const statusSel = document.getElementById('sla-status-sel');
+    if (!btn || !statusSel) return;
+    if (statusSel.value !== 'concluido') { btn.disabled = false; btn.title = ''; return; }
+    const items = document.querySelectorAll('.sla-checklist-item');
+    const allChecked = items.length === 0 || [...items].every(cb => cb.checked);
+    btn.disabled = !allChecked;
+    btn.title = allChecked ? '' : 'Marque todos os itens do checklist para concluir';
   },
 
   salvarApontamento(obraId, processoId) {
     const processos = this.getObraProcessos(obraId);
-    const p = processos.find(item => item.id === processoId);
-    if (!p) return;
+    const pIdx = processos.findIndex(item => item.id === processoId);
+    if (pIdx === -1) return;
+    const p = processos[pIdx];
 
     const statusSel = document.getElementById('sla-status-sel');
     const dataIniInput = document.getElementById('sla-data-ini');
     const dataFimInput = document.getElementById('sla-data-fim');
     const diasInput = document.getElementById('sla-dias-val');
-    const obsInput = document.getElementById('sla-obs-val');
+    const comentarioInput = document.getElementById('sla-comentario-input');
+    const cargoSel = document.getElementById('sla-cargo-sel');
+    const motivoSel = document.getElementById('sla-motivo-sel');
+    const motivoDetalhe = document.getElementById('sla-motivo-detalhe');
 
-    p.status = statusSel ? statusSel.value : p.status;
+    const prevStatus = p.status;
+    const newStatus = statusSel ? statusSel.value : p.status;
+    const novoComentario = comentarioInput ? comentarioInput.value.trim() : '';
+
+    // Valida motivo de atraso quando está atrasado
+    if (newStatus === 'em_andamento' && p.status_sla === 'atrasado') {
+      if (motivoSel && !motivoSel.value) {
+        Utils.toast('Informe o motivo do atraso para salvar.', 'warning');
+        motivoSel.focus(); return;
+      }
+    }
+
+    // Valida checklist
+    const checkItems = document.querySelectorAll('.sla-checklist-item');
+    if (newStatus === 'concluido' && checkItems.length > 0) {
+      const allChecked = [...checkItems].every(cb => cb.checked);
+      if (!allChecked) { Utils.toast('Marque todos os itens do checklist para concluir.', 'warning'); return; }
+    }
+
+    // Salva estado do checklist
+    const newChecklistStatus = {};
+    checkItems.forEach(cb => { newChecklistStatus[cb.dataset.item] = cb.checked; });
+
+    p.status = newStatus;
     p.data_inicio_real = dataIniInput ? dataIniInput.value : p.data_inicio_real;
     p.data_fim_real = dataFimInput ? dataFimInput.value : p.data_fim_real;
     p.dias_sla = diasInput ? (parseInt(diasInput.value, 10) || p.dias_sla) : p.dias_sla;
-    p.observacoes = obsInput ? obsInput.value.trim() : p.observacoes;
+    p.cargo_responsavel = cargoSel ? (cargoSel.value || p.cargo_responsavel) : p.cargo_responsavel;
+    p.motivo_atraso = motivoSel ? (motivoSel.value || p.motivo_atraso) : p.motivo_atraso;
+    p.motivo_atraso_detalhe = motivoDetalhe ? motivoDetalhe.value.trim() : p.motivo_atraso_detalhe;
+    if (Object.keys(newChecklistStatus).length) p.checklist_status = newChecklistStatus;
 
     if (p.status === 'concluido' && !p.data_fim_real) {
       p.data_fim_real = Utils.today();
+    }
+
+    // Histórico de auditoria / anotações (Patch 53)
+    if (!Array.isArray(p.historico)) p.historico = [];
+    if (newStatus !== prevStatus || novoComentario) {
+      const userName = (typeof Auth !== 'undefined' && Auth.getUser && Auth.getUser()?.nome) || 'Usuário';
+      p.historico.push({
+        data: new Date().toISOString(),
+        autor: userName,
+        de_status: prevStatus,
+        para_status: newStatus,
+        texto: novoComentario || (newStatus !== prevStatus ? `Status alterado de ${prevStatus} para ${newStatus}` : '')
+      });
+      if (novoComentario) p.observacoes = novoComentario;
+    }
+
+    // ── AUTOMAÇÃO DE TRANSIÇÃO EM CASCATA (Patch 53) ──
+    // Ao concluir esta etapa, inicia automaticamente a etapa sucessora se pendente
+    if (newStatus === 'concluido') {
+      const sucessor = processos.find(proc => proc.predecessor_id === p.id) || (pIdx + 1 < processos.length ? processos[pIdx + 1] : null);
+      if (sucessor && sucessor.status === 'pendente') {
+        sucessor.status = 'em_andamento';
+        sucessor.data_inicio_real = Utils.today();
+        if (!Array.isArray(sucessor.historico)) sucessor.historico = [];
+        sucessor.historico.push({
+          data: new Date().toISOString(),
+          autor: 'Sistema (Cascata Automática)',
+          de_status: 'pendente',
+          para_status: 'em_andamento',
+          texto: `Iniciada automaticamente após conclusão de: ${p.nome}`
+        });
+      }
+    }
+
+    // ── SMART TRIGGERS DE STATUS DA OBRA (Patch 53) ──
+    const obra = DB.getById('clientes', obraId);
+    if (obra) {
+      const todasConcluidas = processos.every(proc => proc.status === 'concluido');
+      if (todasConcluidas && obra.status !== 'concluida') {
+        DB.update('clientes', obraId, { status: 'concluida' });
+      } else if (['pendente', 'planejamento', 'orcamento'].includes(obra.status) && (newStatus === 'em_andamento' || newStatus === 'concluido')) {
+        DB.update('clientes', obraId, { status: 'em_andamento' });
+      }
     }
 
     if (!this.salvarProcessosObra(obraId, processos)) return Utils.toast('Não foi possível salvar os SLAs desta obra.', 'error');

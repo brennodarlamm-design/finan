@@ -9,6 +9,17 @@ const DB = {
     fornecedores: 'finobra_fornecedores', contratos: 'finobra_contratos'
   },
 
+  _memCache: new Map(),
+  _memHydrated: false,
+  _crossTabBound: false,
+  _crossTabChannel: null,
+
+  _circuitState: 'CLOSED', // 'CLOSED' | 'OPEN' | 'HALF_OPEN'
+  _circuitFailureCount: 0,
+  _circuitNextAttemptAt: 0,
+  _circuitCooldownMs: 30000,
+  _circuitFailureThreshold: 5,
+
   _t() {
     return (typeof Auth !== 'undefined' && Auth.getCurrentTenantId) ? Auth.getCurrentTenantId() : 'public';
   },
@@ -29,9 +40,174 @@ const DB = {
     return;
   },
 
+  _initMemoryCache() {
+    if (!this._memCache) this._memCache = new Map();
+    if (typeof localStorage === 'undefined') return;
+    try {
+      const len = localStorage.length || 0;
+      const tenantPrefix = `finobra_${this._t()}_`;
+      for (let i = 0; i < len; i++) {
+        const k = localStorage.key(i);
+        if (k && (k.startsWith(tenantPrefix) || k.startsWith('finobra_'))) {
+          try {
+            const raw = localStorage.getItem(k);
+            if (raw) this._memCache.set(k, JSON.parse(raw));
+          } catch {}
+        }
+      }
+    } catch (err) {
+      console.warn('[Storage] Falha ao pré-carregar cache em memória:', err);
+    }
+  },
+
+  async _hydrateFromIndexedDB() {
+    if (this._memHydrated) return;
+    if (typeof IDBStorage === 'undefined' || !IDBStorage.isAvailable()) return;
+    try {
+      const keys = await IDBStorage.getAllKeys();
+      const tenantPrefix = `finobra_${this._t()}_`;
+      let hydratedCount = 0;
+      for (const k of keys) {
+        if (typeof k === 'string' && (k.startsWith(tenantPrefix) || k.startsWith('finobra_'))) {
+          const idbVal = await IDBStorage.getItem(k);
+          if (idbVal !== null && idbVal !== undefined) {
+            const current = this._memCache.get(k);
+            if (!current || (Array.isArray(idbVal) && Array.isArray(current) && idbVal.length > current.length)) {
+              this._memCache.set(k, idbVal);
+              try { localStorage.setItem(k, JSON.stringify(idbVal)); } catch {}
+              hydratedCount++;
+            }
+          }
+        }
+      }
+      this._memHydrated = true;
+      if (hydratedCount > 0) {
+        console.info(`[Storage] 📦 ${hydratedCount} coleções sincronizadas do IndexedDB para a memória.`);
+      }
+    } catch (err) {
+      console.warn('[Storage] Falha ao hidratar do IndexedDB:', err);
+    }
+  },
+
+  _bindCrossTabChannel() {
+    if (this._crossTabBound || typeof window === 'undefined') return;
+    this._crossTabBound = true;
+
+    if (typeof BroadcastChannel !== 'undefined') {
+      try {
+        this._crossTabChannel = new BroadcastChannel('finobra_tab_sync');
+        this._crossTabChannel.onmessage = (event) => {
+          this._handleCrossTabMessage(event?.data);
+        };
+      } catch (err) {
+        console.warn('[CrossTab] BroadcastChannel indisponível:', err);
+      }
+    }
+
+    window.addEventListener('storage', (e) => {
+      if (!e.key) return;
+      const tenant = this._t();
+      if (e.key.startsWith(`finobra_${tenant}_`)) {
+        const table = e.key.replace(`finobra_${tenant}_`, '');
+        this._handleCrossTabMutation(table);
+      }
+    });
+  },
+
+  _broadcastMutation(table) {
+    if (this._crossTabChannel && typeof this._crossTabChannel.postMessage === 'function') {
+      try {
+        this._crossTabChannel.postMessage({
+          type: 'MUTATION',
+          tenantId: this._t(),
+          table: table,
+          timestamp: Date.now()
+        });
+      } catch (err) {
+        console.warn('[CrossTab] Erro ao enviar mensagem no canal:', err);
+      }
+    }
+  },
+
+  _handleCrossTabMessage(msg) {
+    if (!msg || typeof msg !== 'object') return;
+    if (msg.tenantId && msg.tenantId !== this._t()) return;
+    if (msg.type === 'MUTATION' && msg.table) {
+      this._handleCrossTabMutation(msg.table);
+    }
+  },
+
+  async _handleCrossTabMutation(table) {
+    const storageKey = this._k(table);
+    let updatedData = null;
+    if (typeof IDBStorage !== 'undefined' && IDBStorage.isAvailable()) {
+      try {
+        updatedData = await IDBStorage.getItem(storageKey);
+      } catch {}
+    }
+    if (!updatedData) {
+      try {
+        const raw = localStorage.getItem(storageKey);
+        if (raw) updatedData = JSON.parse(raw);
+      } catch {}
+    }
+    if (Array.isArray(updatedData) && this._memCache) {
+      this._memCache.set(storageKey, updatedData);
+    }
+    this._emitCrossTabEvent('mutation', { table });
+  },
+
+  _emitCrossTabEvent(type, detail = {}) {
+    if (typeof window !== 'undefined' && typeof window.dispatchEvent === 'function') {
+      window.dispatchEvent(new CustomEvent('finobra:cross-tab-mutation', { detail: { type, ...detail } }));
+    }
+  },
+
+  _calculateBackoff(attempt = 1) {
+    const base = 2000;
+    const max = 60000;
+    const exp = Math.min(max, base * Math.pow(1.5, Math.min(Math.max(1, attempt), 8)));
+    const jitter = 0.6 + Math.random() * 0.4;
+    return Math.floor(exp * jitter);
+  },
+
+  _isCircuitOpen() {
+    if (this._circuitState === 'OPEN') {
+      if (Date.now() >= this._circuitNextAttemptAt) {
+        this._circuitState = 'HALF_OPEN';
+        console.info('[CircuitBreaker] Disjuntor em estado de teste HALF_OPEN.');
+        return false;
+      }
+      return true;
+    }
+    return false;
+  },
+
+  _recordNetworkSuccess() {
+    if (this._circuitState !== 'CLOSED') {
+      console.info('[CircuitBreaker] Conexão restabelecida com sucesso. Disjuntor FECHADO (CLOSED).');
+    }
+    this._circuitState = 'CLOSED';
+    this._circuitFailureCount = 0;
+    this._circuitNextAttemptAt = 0;
+  },
+
+  _recordNetworkFailure(is5xxOrNetwork = true) {
+    if (!is5xxOrNetwork) return;
+    this._circuitFailureCount++;
+    if (this._circuitFailureCount >= this._circuitFailureThreshold) {
+      this._circuitState = 'OPEN';
+      this._circuitNextAttemptAt = Date.now() + this._circuitCooldownMs;
+      console.warn(`[CircuitBreaker] ⚠️ ${this._circuitFailureCount} falhas consecutivas de rede/servidor. Disjuntor ABERTO por ${this._circuitCooldownMs / 1000}s.`);
+    }
+  },
+
   init() {
+    this._initMemoryCache();
     this._bindNetworkListeners();
+    this._bindCrossTabChannel();
     this.expurgarDadosDemo();
+    this._hydrateFromIndexedDB();
     const pending = this.getSyncPendingCount ? this.getSyncPendingCount() : 0;
     const failed = this.getSyncFailedCount ? this.getSyncFailedCount() : 0;
     if (failed > 0) {
@@ -120,11 +296,19 @@ const DB = {
   // ── GESTÃO DA EMPRESA / CONSTRUTORA ──
   getEmpresa() {
     const t = this._t();
-    const raw = localStorage.getItem(`finobra_${t}_empresa`);
+    const storageKey = `finobra_${t}_empresa`;
+    if (this._memCache && this._memCache.has(storageKey)) {
+      const cached = this._memCache.get(storageKey);
+      if (cached && typeof cached === 'object') return cached;
+    }
+    const raw = localStorage.getItem(storageKey);
     if (raw) {
       try {
         const obj = JSON.parse(raw);
-        if (obj && typeof obj === 'object') return obj;
+        if (obj && typeof obj === 'object') {
+          if (this._memCache) this._memCache.set(storageKey, obj);
+          return obj;
+        }
       } catch {}
     }
 
@@ -141,6 +325,7 @@ const DB = {
 
   saveEmpresa(empresaData) {
     const t = this._t();
+    const storageKey = `finobra_${t}_empresa`;
     const current = this.getEmpresa();
     const updated = {
       ...current,
@@ -149,23 +334,37 @@ const DB = {
       configurada: true,
       updated_at: new Date().toISOString()
     };
+    if (this._memCache) this._memCache.set(storageKey, updated);
+    if (typeof IDBStorage !== 'undefined' && IDBStorage.setItem) {
+      IDBStorage.setItem(storageKey, updated).catch(() => {});
+    }
     try {
-      localStorage.setItem(`finobra_${t}_empresa`, JSON.stringify(updated));
+      localStorage.setItem(storageKey, JSON.stringify(updated));
     } catch (e) {
       console.warn(`[Storage] Erro ao salvar dados da empresa ${t}:`, e);
       if (this.purgeStorage) this.purgeStorage();
       try {
-        localStorage.setItem(`finobra_${t}_empresa`, JSON.stringify(updated));
+        localStorage.setItem(storageKey, JSON.stringify(updated));
       } catch (e2) {
         console.error(`[Storage] Falha crítica ao persistir dados da empresa:`, e2);
       }
     }
+    this._broadcastMutation('empresa');
     return updated;
   },
 
   getAll(key) {
+    const storageKey = this._k(key);
+    if (this._memCache && this._memCache.has(storageKey)) {
+      const cached = this._memCache.get(storageKey);
+      return Array.isArray(cached) ? cached : [];
+    }
     try {
-      return JSON.parse(localStorage.getItem(this._k(key)) || '[]');
+      const raw = localStorage.getItem(storageKey);
+      const parsed = raw ? JSON.parse(raw) : [];
+      const list = Array.isArray(parsed) ? parsed : [];
+      if (this._memCache) this._memCache.set(storageKey, list);
+      return list;
     } catch {
       return [];
     }
@@ -173,17 +372,31 @@ const DB = {
 
   save(key, data) {
     const storageKey = this._k(key);
+    const normalized = Array.isArray(data) ? data : [];
+    if (this._memCache) this._memCache.set(storageKey, normalized);
+
+    // Persistência assíncrona robusta no IndexedDB (sem limite de 5MB do LocalStorage)
+    if (typeof IDBStorage !== 'undefined' && IDBStorage.setItem) {
+      IDBStorage.setItem(storageKey, normalized).catch(err => {
+        console.warn(`[Storage] Falha ao persistir no IndexedDB (${key}):`, err);
+      });
+    }
+
+    // Persistência síncrona de melhor esforço no LocalStorage
     try {
-      localStorage.setItem(storageKey, JSON.stringify(data));
+      localStorage.setItem(storageKey, JSON.stringify(normalized));
     } catch (e) {
       console.warn(`[Storage] Quota excedida ao salvar ${key}. Liberando espaço no LocalStorage...`);
       this.purgeStorage();
       try {
-        localStorage.setItem(storageKey, JSON.stringify(data));
+        localStorage.setItem(storageKey, JSON.stringify(normalized));
       } catch (e2) {
-        console.error(`[Storage] Falha ao persistir ${key} no cache local:`, e2);
+        console.warn(`[Storage] LocalStorage cheio para ${key}; dados preservados com segurança no IndexedDB e na memória.`);
       }
     }
+
+    // Notifica outras abas ativas
+    this._broadcastMutation(key);
   },
 
   purgeStorage() {
@@ -832,6 +1045,402 @@ const DB = {
     return Array.from(resultMap.values());
   },
 
+  _syncCursorKey() {
+    return `finobra_${this._t()}_sync_cursor`;
+  },
+
+  getSyncCursor() {
+    try {
+      return localStorage.getItem(this._syncCursorKey()) || null;
+    } catch {
+      return null;
+    }
+  },
+
+  setSyncCursor(cursor) {
+    if (!cursor) return;
+    try {
+      localStorage.setItem(this._syncCursorKey(), String(cursor));
+    } catch (e) {
+      console.warn('[Sync] Falha ao salvar cursor de sincronização:', e);
+    }
+  },
+
+  _deleteLocalIds(table, ids) {
+    if (!Array.isArray(ids) || !ids.length) return;
+    const idSet = new Set(ids.map(String));
+    if (['clientes', 'obras'].includes(table)) {
+      this.save('clientes', (this.getAll('clientes') || []).filter(item => !idSet.has(String(item.id))));
+    } else if (['lancamentos'].includes(table)) {
+      this.save('lancamentos', (this.getAll('lancamentos') || []).filter(item => !idSet.has(String(item.id))));
+    } else if (['notas', 'notas_fiscais'].includes(table)) {
+      this.save('notas', (this.getAll('notas') || []).filter(item => !idSet.has(String(item.id))));
+    } else if (['fornecedores'].includes(table)) {
+      this.save('fornecedores', (this.getAll('fornecedores') || []).filter(item => !idSet.has(String(item.id))));
+    } else if (['produtos'].includes(table)) {
+      this.save('produtos', (this.getAll('produtos') || []).filter(item => !idSet.has(String(item.id))));
+    } else if (['orcamentos'].includes(table)) {
+      this.save('orcamentos', (this.getAll('orcamentos') || []).filter(item => !idSet.has(String(item.id))));
+    } else if (['medicoes'].includes(table)) {
+      this.save('medicoes', (this.getAll('medicoes') || []).filter(item => !idSet.has(String(item.id))));
+    } else if (['contas', 'contas_bancarias'].includes(table)) {
+      this.save('contas', (this.getAll('contas') || []).filter(item => !idSet.has(String(item.id))));
+    } else if (['precompras'].includes(table)) {
+      this.save('precompras', (this.getAll('precompras') || []).filter(item => !idSet.has(String(item.id))));
+    } else if (['contratos'].includes(table)) {
+      this.save('contratos', (this.getAll('contratos') || []).filter(item => !idSet.has(String(item.id))));
+    } else if (['recibos'].includes(table)) {
+      try {
+        const cur = JSON.parse(localStorage.getItem(this._ck('finobra_recibos')) || '[]');
+        const filtered = cur.filter(item => !idSet.has(String(item.id)));
+        localStorage.setItem(this._ck('finobra_recibos'), JSON.stringify(filtered));
+      } catch {}
+    } else if (['documentos'].includes(table)) {
+      if (typeof Documentos !== 'undefined' && typeof Documentos.getAll === 'function') {
+        const cur = Documentos.getAll() || [];
+        Documentos.salvarLista(cur.filter(item => !idSet.has(String(item.id))));
+      }
+    }
+  },
+
+  _applyDeltaToCollection(table, cloudMutated = [], localItems = []) {
+    const queue = [
+      ...((typeof this._getSyncFailed === 'function') ? this._getSyncFailed().filter(item => item.payload?.action === 'save') : []),
+      ...((typeof this._getSyncQueue === 'function') ? this._getSyncQueue() : [])
+    ];
+    const tableAliases = [table];
+    if (table === 'clientes') tableAliases.push('obras');
+    if (table === 'obras') tableAliases.push('clientes');
+    if (table === 'notas') tableAliases.push('notas_fiscais');
+    if (table === 'contas') tableAliases.push('contas_bancarias');
+
+    const relevantQueue = queue.filter(q => tableAliases.includes(q?.payload?.table));
+    const pendingDeletes = new Set();
+    for (const q of relevantQueue) {
+      if (q?.payload?.action === 'delete') {
+        const id = String(q.payload.id || q.payload.data?.id || q.payload.data?.cloud_id || '');
+        if (id) pendingDeletes.add(id);
+      }
+    }
+    const pendingSaves = new Map();
+    for (const q of relevantQueue) {
+      if (q?.payload?.action === 'save') {
+        const item = q.payload.data;
+        const id = String(q.payload.id || item?.id || item?.cloud_id || '');
+        if (id && !pendingDeletes.has(id)) {
+          pendingSaves.set(id, item);
+        }
+      }
+    }
+
+    const resultMap = new Map();
+    for (const lItem of (Array.isArray(localItems) ? localItems : [])) {
+      const id = String(lItem?.id || lItem?.cloud_id || '');
+      if (!id || pendingDeletes.has(id)) continue;
+      resultMap.set(id, lItem);
+    }
+
+    for (const cItem of (Array.isArray(cloudMutated) ? cloudMutated : [])) {
+      const id = String(cItem?.id || cItem?.cloud_id || '');
+      if (!id || pendingDeletes.has(id)) continue;
+      if (pendingSaves.has(id)) {
+        resultMap.set(id, { ...cItem, ...pendingSaves.get(id) });
+      } else {
+        resultMap.set(id, cItem);
+      }
+    }
+
+    for (const [id, item] of pendingSaves) {
+      if (!resultMap.has(id)) resultMap.set(id, item);
+    }
+    return Array.from(resultMap.values());
+  },
+
+  _applyTableData(table, cloudItems, isDelta = false) {
+    if (!cloudItems) return;
+    const completenessBootstrapped = this.isCloudCompletenessBootstrapped ? this.isCloudCompletenessBootstrapped() : true;
+
+    if (['clientes', 'obras'].includes(table) && Array.isArray(cloudItems)) {
+      const local = this.getAll('clientes') || [];
+      const normalized = cloudItems.map(o => ({
+        ...o,
+        data_inicio: (typeof Utils !== 'undefined' && Utils.cleanDate) ? Utils.cleanDate(o.data_inicio) : (o.data_inicio ? String(o.data_inicio).split('T')[0] : o.data_inicio),
+        processos_sla: o.cronograma_config?.processos_sla || o.processos_sla || [],
+        data_previsao_termino: o.data_previsao || o.data_previsao_termino || '',
+        data_previsao: (typeof Utils !== 'undefined' && Utils.cleanDate) ? Utils.cleanDate(o.data_previsao) : (o.data_previsao ? String(o.data_previsao).split('T')[0] : o.data_previsao)
+      }));
+      this.save('clientes', isDelta ? this._applyDeltaToCollection('clientes', normalized, local) : this._reconcileCollection('clientes', normalized, local));
+    } else if (table === 'fornecedores' && Array.isArray(cloudItems)) {
+      const local = this.getAll('fornecedores') || [];
+      this.save('fornecedores', isDelta ? this._applyDeltaToCollection('fornecedores', cloudItems, local) : this._reconcileCollection('fornecedores', cloudItems, local));
+    } else if (table === 'lancamentos' && Array.isArray(cloudItems)) {
+      const local = this.getAll('lancamentos') || [];
+      const normalized = cloudItems.map(l => ({
+        ...l,
+        data: (typeof Utils !== 'undefined' && Utils.cleanDate) ? Utils.cleanDate(l.data) || l.data : (l.data ? String(l.data).split('T')[0] : l.data),
+        data_vencimento: (typeof Utils !== 'undefined' && Utils.cleanDate) ? Utils.cleanDate(l.data_vencimento) || Utils.cleanDate(l.data) || l.data : (l.data_vencimento ? String(l.data_vencimento).split('T')[0] : l.data),
+        data_pagamento: (typeof Utils !== 'undefined' && Utils.cleanDate) ? Utils.cleanDate(l.data_pagamento) || null : (l.data_pagamento ? String(l.data_pagamento).split('T')[0] : null),
+        valor: Number(l.valor) || 0
+      }));
+      this.save('lancamentos', isDelta ? this._applyDeltaToCollection('lancamentos', normalized, local) : this._reconcileCollection('lancamentos', normalized, local));
+    } else if (['notas', 'notas_fiscais'].includes(table) && Array.isArray(cloudItems)) {
+      const local = this.getAll('notas') || [];
+      const normalized = cloudItems.map(n => {
+        const vBruto = Number(n.valor_bruto !== undefined ? n.valor_bruto : n.valor_total) || 0;
+        const vImp = Number(n.impostos) || 0;
+        const vLiq = Number(n.valor_liquido !== undefined ? n.valor_liquido : (vBruto - vImp)) || 0;
+        const vTot = Number(n.valor_total !== undefined ? n.valor_total : vBruto) || 0;
+        return {
+          ...n,
+          data_emissao: (typeof Utils !== 'undefined' && Utils.cleanDate) ? Utils.cleanDate(n.data_emissao) || n.data_emissao : (n.data_emissao ? String(n.data_emissao).split('T')[0] : n.data_emissao),
+          data_vencimento: (typeof Utils !== 'undefined' && Utils.cleanDate) ? Utils.cleanDate(n.data_vencimento) || null : (n.data_vencimento ? String(n.data_vencimento).split('T')[0] : null),
+          data_pagamento: (typeof Utils !== 'undefined' && Utils.cleanDate) ? Utils.cleanDate(n.data_pagamento) || null : (n.data_pagamento ? String(n.data_pagamento).split('T')[0] : null),
+          valor_bruto: vBruto,
+          impostos: vImp,
+          valor_liquido: vLiq,
+          valor_total: vTot,
+          categoria: n.categoria || 'material',
+          tipo: n.tipo || 'entrada',
+          chave_nfe: n.chave_nfe || n.chave_acesso || ''
+        };
+      });
+      this.save('notas', isDelta ? this._applyDeltaToCollection('notas', normalized, local) : this._reconcileCollection('notas', normalized, local));
+    } else if (table === 'orcamentos' && Array.isArray(cloudItems)) {
+      const local = this.getAll('orcamentos') || [];
+      const mapped = cloudItems.map(o => ({
+        ...o,
+        nome: o.nome || o.titulo || 'Orçamento',
+        titulo: o.titulo || o.nome || 'Orçamento',
+        status: o.status || 'ativo',
+        descricao: o.descricao || '',
+        data_criacao: (typeof Utils !== 'undefined' && Utils.cleanDate) ? Utils.cleanDate(o.data_criacao) || o.data_criacao : (o.data_criacao ? String(o.data_criacao).split('T')[0] : o.data_criacao),
+        valor_total: Number(o.valor_total !== undefined ? o.valor_total : o.valor_total_previsto) || 0,
+        valor_total_previsto: Number(o.valor_total_previsto !== undefined ? o.valor_total_previsto : o.valor_total) || 0,
+        etapas: Array.isArray(o.etapas) ? o.etapas : (Array.isArray(o.itens) ? o.itens : []),
+        itens: Array.isArray(o.itens) ? o.itens : (Array.isArray(o.etapas) ? o.etapas : []),
+        categorias: Array.isArray(o.categorias) ? o.categorias : []
+      }));
+      this.save('orcamentos', isDelta ? this._applyDeltaToCollection('orcamentos', mapped, local) : this._reconcileCollection('orcamentos', mapped, local));
+    } else if (table === 'medicoes' && Array.isArray(cloudItems)) {
+      const local = this.getAll('medicoes') || [];
+      const mapped = cloudItems.map(m => ({
+        ...m,
+        data: (typeof Utils !== 'undefined' && Utils.cleanDate) ? Utils.cleanDate(m.data) || m.data : (m.data ? String(m.data).split('T')[0] : m.data),
+        valor_medido: Number(m.valor_medido !== undefined ? m.valor_medido : m.valor_solicitado) || 0
+      }));
+      this.save('medicoes', isDelta ? this._applyDeltaToCollection('medicoes', mapped, local) : this._reconcileCollection('medicoes', mapped, local));
+    } else if (['contas', 'contas_bancarias'].includes(table) && Array.isArray(cloudItems)) {
+      const local = this.getAll('contas') || [];
+      this.save('contas', isDelta ? this._applyDeltaToCollection('contas', cloudItems, local) : this._reconcileCollection('contas', cloudItems, local));
+    } else if (table === 'produtos' && Array.isArray(cloudItems)) {
+      const local = this.getAll('produtos') || [];
+      this.save('produtos', isDelta ? this._applyDeltaToCollection('produtos', cloudItems, local) : this._reconcileCollection('produtos', cloudItems, local));
+    } else if (table === 'precompras' && Array.isArray(cloudItems)) {
+      const local = this.getAll('precompras') || [];
+      this.save('precompras', isDelta ? this._applyDeltaToCollection('precompras', cloudItems, local) : this._reconcileCollection('precompras', cloudItems, local));
+    } else if (table === 'contratos' && Array.isArray(cloudItems)) {
+      const local = this.getAll('contratos') || [];
+      this.save('contratos', isDelta ? this._applyDeltaToCollection('contratos', cloudItems, local) : this._reconcileCollection('contratos', cloudItems, local));
+    } else if (table === 'recibos' && Array.isArray(cloudItems)) {
+      let local = [];
+      try { local = JSON.parse(localStorage.getItem(this._ck('finobra_recibos')) || '[]'); } catch {}
+      const next = isDelta ? this._applyDeltaToCollection('recibos', cloudItems, local) : this._reconcileCollection('recibos', cloudItems, local);
+      try { localStorage.setItem(this._ck('finobra_recibos'), JSON.stringify(next)); } catch (e) { console.warn('[Sync] Falha ao salvar recibos em cache:', e); }
+    } else if (table === 'orcamentos_sinapi' && Array.isArray(cloudItems)) {
+      const local = this._localSinapiForCurrentTenant ? this._localSinapiForCurrentTenant() : [];
+      const next = isDelta ? this._applyDeltaToCollection('orcamentos_sinapi', cloudItems, local) : this._reconcileCollection('orcamentos_sinapi', cloudItems, local);
+      try { localStorage.setItem(this._ck('orcamentos_sinapi'), JSON.stringify(next)); } catch (e) { console.warn('[Sync] Falha ao salvar orçamentos SINAPI em cache:', e); }
+    } else if (table === 'doc_fases' && Array.isArray(cloudItems)) {
+      const cloudByObra = new Map();
+      for (const row of cloudItems) {
+        const obraId = String(row?.obra_id || '');
+        const faseKey = String(row?.fase_key || '');
+        const docId = String(row?.doc_id || row?.id || '');
+        if (!obraId || !faseKey || !docId) continue;
+        if (!cloudByObra.has(obraId)) cloudByObra.set(obraId, {});
+        const grouped = cloudByObra.get(obraId);
+        if (!Array.isArray(grouped[faseKey])) grouped[faseKey] = [];
+        grouped[faseKey].push({ ...row, id: docId });
+      }
+      for (const obra of (this.getAll('clientes') || [])) {
+        if (!obra?.id) continue;
+        const key = this._fasesDocKey(obra.id);
+        const cloud = cloudByObra.get(String(obra.id));
+        if (!cloud && isDelta) continue;
+        let next = cloud || {};
+        if (!completenessBootstrapped || isDelta) {
+          let local = {};
+          try { local = JSON.parse(localStorage.getItem(key) || '{}'); } catch {}
+          next = { ...local };
+          for (const [faseKey, docs] of Object.entries(cloud || {})) {
+            const map = new Map((Array.isArray(next[faseKey]) ? next[faseKey] : []).map(x => [String(x.id), x]));
+            (Array.isArray(docs) ? docs : []).forEach(x => x?.id && map.set(String(x.id), x));
+            next[faseKey] = Array.from(map.values());
+          }
+        }
+        try { localStorage.setItem(key, JSON.stringify(next)); } catch (e) { console.warn('[Sync] Falha ao salvar fases documentais:', e); }
+      }
+    } else if (table === 'preferencias' && cloudItems && typeof cloudItems === 'object' && !Array.isArray(cloudItems)) {
+      const localPrefs = this._preferencesLocalSnapshot ? this._preferencesLocalSnapshot() : {};
+      const nextPrefs = (completenessBootstrapped || isDelta) ? { ...localPrefs, ...cloudItems } : { ...cloudItems, ...localPrefs };
+      this._applyTenantPreferences(nextPrefs);
+    } else if (table === 'documentos' && Array.isArray(cloudItems) && typeof Documentos !== 'undefined') {
+      const locais = Documentos.getAll() || [];
+      const localMap = new Map(locais.map(x => [x.id, x]));
+      const merged = cloudItems.map(cloudDoc => {
+        const loc = localMap.get(cloudDoc.id);
+        return {
+          id: cloudDoc.id,
+          entidade_tipo: cloudDoc.tipo || cloudDoc.entidade_tipo,
+          entidade_id: cloudDoc.referencia_id || cloudDoc.entidade_id,
+          titulo: cloudDoc.titulo,
+          nome_arquivo: cloudDoc.nome_arquivo,
+          tipo_mime: cloudDoc.tipo_arquivo || cloudDoc.tipo_mime,
+          tamanho: cloudDoc.tamanho_bytes || cloudDoc.tamanho,
+          criado_em: cloudDoc.created_at || cloudDoc.criado_em,
+          url: cloudDoc.url || loc?.url || null,
+          data_base64: loc?.data_base64 || loc?.base64_data || cloudDoc.base64_data || null
+        };
+      });
+      if (!isDelta) {
+        locais.forEach(l => {
+          const syncKey = this._ck('finobra_cloud_uploaded_' + l.id);
+          const pendenteUpload = typeof localStorage !== 'undefined' && !localStorage.getItem(syncKey);
+          if (pendenteUpload && !merged.some(m => m.id === l.id)) {
+            merged.push(l);
+          }
+        });
+      }
+      const reconciledDocs = isDelta ? this._applyDeltaToCollection('documentos', merged, locais) : this._reconcileCollection('documentos', merged, locais);
+      Documentos.salvarLista(reconciledDocs);
+    }
+  },
+
+  async syncDelta() {
+    const cursor = this.getSyncCursor();
+    if (!cursor) {
+      console.info('[Sync] Nenhum cursor prévio; executando sincronização inicial.');
+      return this.syncFromCloud();
+    }
+    this._emitSyncStatus('syncing');
+    try {
+      const revision = this._localMutationRevision || 0;
+      const res = await fetch(`/api/db?table=delta&since=${encodeURIComponent(cursor)}`, {
+        headers: this._apiHeaders()
+      });
+      if (res.status === 401) {
+        if (typeof Auth !== 'undefined' && Auth.handleSessionExpired) Auth.handleSessionExpired();
+        throw new Error('SESSION_EXPIRED');
+      }
+      if (!res.ok) throw new Error(`Falha no delta sync: HTTP ${res.status}`);
+      const json = await res.json();
+      if (!json.success) throw new Error(json.error || 'Resposta inválida no delta sync');
+
+      if (json.requiresFullSync) {
+        console.info('[Sync] Sincronização completa exigida pelo servidor (>30 dias ou cursor inválido).');
+        return this.syncFromCloud();
+      }
+
+      if (revision !== (this._localMutationRevision || 0)) {
+        this._emitSyncStatus('pending');
+        return false;
+      }
+
+      const delta = json.delta || {};
+      const deleted = delta.deleted || {};
+      const mutated = delta.mutated || {};
+
+      for (const [table, ids] of Object.entries(deleted)) {
+        this._deleteLocalIds(table, ids);
+      }
+
+      for (const [table, items] of Object.entries(mutated)) {
+        this._applyTableData(table, items, true);
+      }
+
+      if (json.cursor) {
+        this.setSyncCursor(json.cursor);
+      }
+      console.log(`✅ Sincronização incremental delta concluída com sucesso.`);
+      this._emitSyncStatus('synced');
+      return true;
+    } catch (e) {
+      console.warn('[Sync] Falha na sincronização delta, mantendo cache:', e?.message || e);
+      this._emitSyncStatus('offline', { error: e?.message || 'offline' });
+      return false;
+    }
+  },
+
+  _routeTables(route) {
+    const r = String(route || '').toLowerCase().trim();
+    switch (r) {
+      case 'dashboard':
+        return ['clientes', 'contas'];
+      case 'lancamentos':
+      case 'escritorio':
+      case 'financeiro':
+        return ['lancamentos', 'clientes', 'fornecedores', 'contas'];
+      case 'contas-bancarias':
+        return ['contas'];
+      case 'conciliacao-ofx':
+        return ['lancamentos', 'contas'];
+      case 'recibos':
+        return ['recibos', 'clientes', 'fornecedores'];
+      case 'obras':
+      case 'obra-detalhe':
+      case 'portal-cliente':
+      case 'minhas-demandas':
+      case 'central-gestor':
+        return ['clientes'];
+      case 'medicoes':
+        return ['medicoes', 'clientes'];
+      case 'documentacao':
+      case 'documentos':
+        return ['documentos', 'clientes'];
+      case 'pre-compras':
+      case 'precompras':
+        return ['precompras', 'clientes', 'fornecedores'];
+      case 'contratos':
+        return ['contratos', 'clientes', 'fornecedores'];
+      case 'fornecedores':
+        return ['fornecedores'];
+      case 'produtos':
+        return ['produtos'];
+      case 'notas':
+      case 'notas-fiscais':
+      case 'consulta-nfe':
+        return ['notas', 'clientes', 'fornecedores'];
+      case 'orcamentos':
+        return ['orcamentos', 'clientes'];
+      case 'configuracoes':
+        return ['preferencias'];
+      default:
+        return ['clientes'];
+    }
+  },
+
+  async syncRoute(targetRoute) {
+    const tables = this._routeTables(targetRoute);
+    if (!this._routeLoadedTables) this._routeLoadedTables = new Set();
+    const needed = tables.filter(t => !this._routeLoadedTables.has(t));
+    if (!needed.length) return false;
+
+    let anyUpdated = false;
+    for (const table of needed) {
+      try {
+        const items = await this._fetchCloudTablePaged(table);
+        if (Array.isArray(items)) {
+          this._applyTableData(table, items, false);
+          this._routeLoadedTables.add(table);
+          anyUpdated = true;
+        }
+      } catch (err) {
+        console.warn(`[Sync] syncRoute falha ao buscar tabela '${table}':`, err?.message || err);
+      }
+    }
+    return anyUpdated;
+  },
+
   async syncFromCloud() {
     this._emitSyncStatus('syncing');
     try {
@@ -845,186 +1454,23 @@ const DB = {
       const coreBootstrapped = this.isCoreCloudBootstrapped ? this.isCoreCloudBootstrapped() : true;
       const mergeLegacy = (cloud, local) => (!coreBootstrapped && local.length ? this._reconcileCollection('legacy', cloud, local) : this._reconcileCollection('legacy', cloud, local));
 
-      if (Array.isArray(d.clientes)) {
-        const local = this.getAll('clientes') || [];
-        const normalizedCloud = d.clientes.map(o => ({
-          ...o,
-          data_inicio: (typeof Utils !== 'undefined' && Utils.cleanDate) ? Utils.cleanDate(o.data_inicio) : (o.data_inicio ? String(o.data_inicio).split('T')[0] : o.data_inicio),
-          processos_sla: o.cronograma_config?.processos_sla || o.processos_sla || [],
-          data_previsao_termino: o.data_previsao || o.data_previsao_termino || '',
-          data_previsao: (typeof Utils !== 'undefined' && Utils.cleanDate) ? Utils.cleanDate(o.data_previsao) : (o.data_previsao ? String(o.data_previsao).split('T')[0] : o.data_previsao)
-        }));
-        this.save('clientes', this._reconcileCollection('clientes', normalizedCloud, local));
-      }
-
-      if (Array.isArray(d.fornecedores)) {
-        const local = this.getAll('fornecedores') || [];
-        this.save('fornecedores', this._reconcileCollection('fornecedores', d.fornecedores, local));
-      }
-
-      if (Array.isArray(d.lancamentos)) {
-        const local = this.getAll('lancamentos') || [];
-        const normalizedCloud = d.lancamentos.map(l => ({
-          ...l,
-          data: (typeof Utils !== 'undefined' && Utils.cleanDate) ? Utils.cleanDate(l.data) || l.data : (l.data ? String(l.data).split('T')[0] : l.data),
-          data_vencimento: (typeof Utils !== 'undefined' && Utils.cleanDate) ? Utils.cleanDate(l.data_vencimento) || Utils.cleanDate(l.data) || l.data : (l.data_vencimento ? String(l.data_vencimento).split('T')[0] : l.data),
-          data_pagamento: (typeof Utils !== 'undefined' && Utils.cleanDate) ? Utils.cleanDate(l.data_pagamento) || null : (l.data_pagamento ? String(l.data_pagamento).split('T')[0] : null),
-          valor: Number(l.valor) || 0
-        }));
-        this.save('lancamentos', this._reconcileCollection('lancamentos', normalizedCloud, local));
-      }
-
-      if (Array.isArray(d.notas)) {
-        const local = this.getAll('notas') || [];
-        const normalizedCloud = d.notas.map(n => {
-          const vBruto = Number(n.valor_bruto !== undefined ? n.valor_bruto : n.valor_total) || 0;
-          const vImp = Number(n.impostos) || 0;
-          const vLiq = Number(n.valor_liquido !== undefined ? n.valor_liquido : (vBruto - vImp)) || 0;
-          const vTot = Number(n.valor_total !== undefined ? n.valor_total : vBruto) || 0;
-          return {
-            ...n,
-            data_emissao: (typeof Utils !== 'undefined' && Utils.cleanDate) ? Utils.cleanDate(n.data_emissao) || n.data_emissao : (n.data_emissao ? String(n.data_emissao).split('T')[0] : n.data_emissao),
-            data_vencimento: (typeof Utils !== 'undefined' && Utils.cleanDate) ? Utils.cleanDate(n.data_vencimento) || null : (n.data_vencimento ? String(n.data_vencimento).split('T')[0] : null),
-            data_pagamento: (typeof Utils !== 'undefined' && Utils.cleanDate) ? Utils.cleanDate(n.data_pagamento) || null : (n.data_pagamento ? String(n.data_pagamento).split('T')[0] : null),
-            valor_bruto: vBruto,
-            impostos: vImp,
-            valor_liquido: vLiq,
-            valor_total: vTot,
-            categoria: n.categoria || 'material',
-            tipo: n.tipo || 'entrada',
-            chave_nfe: n.chave_nfe || n.chave_acesso || ''
-          };
-        });
-        this.save('notas', this._reconcileCollection('notas', normalizedCloud, local));
-      }
-
-      if (Array.isArray(d.orcamentos)) {
-        const local = this.getAll('orcamentos') || [];
-        const mappedCloud = d.orcamentos.map(o => ({
-          ...o,
-          nome: o.nome || o.titulo || 'Orçamento',
-          titulo: o.titulo || o.nome || 'Orçamento',
-          status: o.status || 'ativo',
-          descricao: o.descricao || '',
-          data_criacao: (typeof Utils !== 'undefined' && Utils.cleanDate) ? Utils.cleanDate(o.data_criacao) || o.data_criacao : (o.data_criacao ? String(o.data_criacao).split('T')[0] : o.data_criacao),
-          valor_total: Number(o.valor_total !== undefined ? o.valor_total : o.valor_total_previsto) || 0,
-          valor_total_previsto: Number(o.valor_total_previsto !== undefined ? o.valor_total_previsto : o.valor_total) || 0,
-          etapas: Array.isArray(o.etapas) ? o.etapas : (Array.isArray(o.itens) ? o.itens : []),
-          itens: Array.isArray(o.itens) ? o.itens : (Array.isArray(o.etapas) ? o.etapas : []),
-          categorias: Array.isArray(o.categorias) ? o.categorias : []
-        }));
-        this.save('orcamentos', this._reconcileCollection('orcamentos', mappedCloud, local));
-      }
-
-      if (Array.isArray(d.medicoes)) {
-        const local = this.getAll('medicoes') || [];
-        const mappedCloud = d.medicoes.map(m => ({
-          ...m,
-          data: (typeof Utils !== 'undefined' && Utils.cleanDate) ? Utils.cleanDate(m.data) || m.data : (m.data ? String(m.data).split('T')[0] : m.data),
-          valor_medido: Number(m.valor_medido !== undefined ? m.valor_medido : m.valor_solicitado) || 0
-        }));
-        this.save('medicoes', this._reconcileCollection('medicoes', mappedCloud, local));
-      }
-
-      if (Array.isArray(d.contas)) {
-        const local = this.getAll('contas') || [];
-        this.save('contas', this._reconcileCollection('contas', d.contas, local));
-      }
-
-      if (Array.isArray(d.produtos)) {
-        const local = this.getAll('produtos') || [];
-        this.save('produtos', this._reconcileCollection('produtos', d.produtos, local));
-      }
-
-      if (Array.isArray(d.precompras)) {
-        const local = this.getAll('precompras') || [];
-        this.save('precompras', this._reconcileCollection('precompras', d.precompras, local));
-      }
-
-      if (Array.isArray(d.contratos)) {
-        const local = this.getAll('contratos') || [];
-        this.save('contratos', this._reconcileCollection('contratos', d.contratos, local));
-      }
-
-      if (Array.isArray(d.recibos)) {
-        let local = [];
-        try { local = JSON.parse(localStorage.getItem(this._ck('finobra_recibos')) || '[]'); } catch {}
-        const next = this._reconcileCollection('recibos', d.recibos, local);
-        try { localStorage.setItem(this._ck('finobra_recibos'), JSON.stringify(next)); } catch (e) { console.warn('[Sync] Falha ao salvar recibos em cache:', e); }
-      }
-
-      if (Array.isArray(d.orcamentos_sinapi)) {
-        const local = this._localSinapiForCurrentTenant ? this._localSinapiForCurrentTenant() : [];
-        const next = this._reconcileCollection('orcamentos_sinapi', d.orcamentos_sinapi, local);
-        try { localStorage.setItem(this._ck('orcamentos_sinapi'), JSON.stringify(next)); } catch (e) { console.warn('[Sync] Falha ao salvar orçamentos SINAPI em cache:', e); }
-      }
-
-      const completenessBootstrapped = this.isCloudCompletenessBootstrapped ? this.isCloudCompletenessBootstrapped() : true;
-      if (Array.isArray(d.doc_fases)) {
-        const cloudByObra = new Map();
-        for (const row of d.doc_fases) {
-          const obraId = String(row?.obra_id || '');
-          const faseKey = String(row?.fase_key || '');
-          const docId = String(row?.doc_id || row?.id || '');
-          if (!obraId || !faseKey || !docId) continue;
-          if (!cloudByObra.has(obraId)) cloudByObra.set(obraId, {});
-          const grouped = cloudByObra.get(obraId);
-          if (!Array.isArray(grouped[faseKey])) grouped[faseKey] = [];
-          grouped[faseKey].push({ ...row, id:docId });
-        }
-        for (const obra of (this.getAll('clientes') || [])) {
-          if (!obra?.id) continue;
-          const key = this._fasesDocKey(obra.id);
-          const cloud = cloudByObra.get(String(obra.id)) || {};
-          let next = cloud;
-          if (!completenessBootstrapped) {
-            let local = {};
-            try { local = JSON.parse(localStorage.getItem(key) || '{}'); } catch {}
-            next = { ...cloud };
-            for (const [faseKey, docs] of Object.entries(local || {})) {
-              const map = new Map((Array.isArray(cloud[faseKey]) ? cloud[faseKey] : []).map(x => [String(x.id), x]));
-              (Array.isArray(docs) ? docs : []).forEach(x => x?.id && map.set(String(x.id), x));
-              next[faseKey] = Array.from(map.values());
-            }
-          }
-          try { localStorage.setItem(key, JSON.stringify(next)); } catch (e) { console.warn('[Sync] Falha ao salvar fases documentais:', e); }
-        }
-      }
-
+      if (Array.isArray(d.clientes)) this._applyTableData('clientes', d.clientes, false);
+      if (Array.isArray(d.fornecedores)) this._applyTableData('fornecedores', d.fornecedores, false);
+      if (Array.isArray(d.lancamentos)) this._applyTableData('lancamentos', d.lancamentos, false);
+      if (Array.isArray(d.notas)) this._applyTableData('notas', d.notas, false);
+      if (Array.isArray(d.orcamentos)) this._applyTableData('orcamentos', d.orcamentos, false);
+      if (Array.isArray(d.medicoes)) this._applyTableData('medicoes', d.medicoes, false);
+      if (Array.isArray(d.contas)) this._applyTableData('contas', d.contas, false);
+      if (Array.isArray(d.produtos)) this._applyTableData('produtos', d.produtos, false);
+      if (Array.isArray(d.precompras)) this._applyTableData('precompras', d.precompras, false);
+      if (Array.isArray(d.contratos)) this._applyTableData('contratos', d.contratos, false);
+      if (Array.isArray(d.recibos)) this._applyTableData('recibos', d.recibos, false);
+      if (Array.isArray(d.orcamentos_sinapi)) this._applyTableData('orcamentos_sinapi', d.orcamentos_sinapi, false);
+      if (Array.isArray(d.doc_fases)) this._applyTableData('doc_fases', d.doc_fases, false);
       if (d.preferencias && typeof d.preferencias === 'object' && !Array.isArray(d.preferencias)) {
-        const localPrefs = this._preferencesLocalSnapshot ? this._preferencesLocalSnapshot() : {};
-        const nextPrefs = completenessBootstrapped ? d.preferencias : { ...d.preferencias, ...localPrefs };
-        this._applyTenantPreferences(nextPrefs);
+        this._applyTableData('preferencias', d.preferencias, false);
       }
-
-      if (Array.isArray(d.documentos) && typeof Documentos !== 'undefined') {
-        const locais = Documentos.getAll() || [];
-        const localMap = new Map(locais.map(x => [x.id, x]));
-        const merged = d.documentos.map(cloudDoc => {
-          const loc = localMap.get(cloudDoc.id);
-          return {
-            id: cloudDoc.id,
-            entidade_tipo: cloudDoc.tipo,
-            entidade_id: cloudDoc.referencia_id,
-            titulo: cloudDoc.titulo,
-            nome_arquivo: cloudDoc.nome_arquivo,
-            tipo_mime: cloudDoc.tipo_arquivo,
-            tamanho: cloudDoc.tamanho_bytes,
-            criado_em: cloudDoc.created_at,
-            url: cloudDoc.url || loc?.url || null,
-            data_base64: loc?.data_base64 || loc?.base64_data || cloudDoc.base64_data || null
-          };
-        });
-        locais.forEach(l => {
-          const syncKey = this._ck('finobra_cloud_uploaded_' + l.id);
-          const pendenteUpload = typeof localStorage !== 'undefined' && !localStorage.getItem(syncKey);
-          if (pendenteUpload && !merged.some(m => m.id === l.id)) {
-            merged.push(l);
-          }
-        });
-        const reconciledDocs = this._reconcileCollection('documentos', merged, locais);
-        Documentos.salvarLista(reconciledDocs);
-      }
+      if (Array.isArray(d.documentos)) this._applyTableData('documentos', d.documentos, false);
 
       // Mantém dados cadastrais da empresa sincronizados com o tenant real do servidor.
       try {
@@ -1041,6 +1487,7 @@ const DB = {
         console.warn('[Tenant] Não foi possível atualizar os dados cadastrais:', tenantErr);
       }
 
+      this.setSyncCursor(new Date().toISOString());
       console.log('✅ Dados sincronizados com Neon PostgreSQL!');
       this._emitSyncStatus('synced');
       return true;
@@ -1056,9 +1503,17 @@ const DB = {
   },
 
   _getSyncQueue() {
+    const key = this._syncQueueKey();
+    if (this._memCache && this._memCache.has(key)) {
+      const cached = this._memCache.get(key);
+      if (Array.isArray(cached)) return cached;
+    }
     try {
-      const list = JSON.parse(localStorage.getItem(this._syncQueueKey()) || '[]');
-      return Array.isArray(list) ? list : [];
+      const raw = localStorage.getItem(key);
+      const list = raw ? JSON.parse(raw) : [];
+      const res = Array.isArray(list) ? list : [];
+      if (this._memCache) this._memCache.set(key, res);
+      return res;
     } catch (err) {
       console.warn('[Sync] Fila local inválida; mantendo operação em modo seguro:', err);
       this._syncStorageFailure = true;
@@ -1068,8 +1523,13 @@ const DB = {
 
   _saveSyncQueue(queue) {
     const normalized = Array.isArray(queue) ? queue : [];
+    const key = this._syncQueueKey();
+    if (this._memCache) this._memCache.set(key, normalized);
+    if (typeof IDBStorage !== 'undefined' && IDBStorage.setItem) {
+      IDBStorage.setItem(key, normalized).catch(() => {});
+    }
     const payload = JSON.stringify(normalized);
-    const persist = () => localStorage.setItem(this._syncQueueKey(), payload);
+    const persist = () => localStorage.setItem(key, payload);
     try {
       persist();
       return true;
@@ -1096,9 +1556,17 @@ const DB = {
   },
 
   _getSyncFailed() {
+    const key = this._syncFailedKey();
+    if (this._memCache && this._memCache.has(key)) {
+      const cached = this._memCache.get(key);
+      if (Array.isArray(cached)) return cached;
+    }
     try {
-      const list = JSON.parse(localStorage.getItem(this._syncFailedKey()) || '[]');
-      return Array.isArray(list) ? list : [];
+      const raw = localStorage.getItem(key);
+      const list = raw ? JSON.parse(raw) : [];
+      const res = Array.isArray(list) ? list : [];
+      if (this._memCache) this._memCache.set(key, res);
+      return res;
     } catch (err) {
       console.warn('[Sync] Fila de atenção local inválida:', err);
       return [];
@@ -1107,8 +1575,13 @@ const DB = {
 
   _saveSyncFailed(items) {
     const normalized = Array.isArray(items) ? items.slice(-200) : [];
+    const key = this._syncFailedKey();
+    if (this._memCache) this._memCache.set(key, normalized);
+    if (typeof IDBStorage !== 'undefined' && IDBStorage.setItem) {
+      IDBStorage.setItem(key, normalized).catch(() => {});
+    }
     const payload = JSON.stringify(normalized);
-    const persist = () => localStorage.setItem(this._syncFailedKey(), payload);
+    const persist = () => localStorage.setItem(key, payload);
     try {
       persist();
       return true;
@@ -1204,9 +1677,10 @@ const DB = {
     return failed.length;
   },
 
-  _scheduleSyncRetry(delay = 10000) {
+  _scheduleSyncRetry(delay) {
+    const finalDelay = (typeof delay === 'number' && delay > 0) ? delay : this._calculateBackoff(1);
     clearTimeout(this._syncRetryTimer);
-    this._syncRetryTimer = setTimeout(() => this._flushCloudQueue(), delay);
+    this._syncRetryTimer = setTimeout(() => this._flushCloudQueue(), finalDelay);
     this._bindNetworkListeners();
   },
 
@@ -1260,6 +1734,12 @@ const DB = {
 
   async _flushCloudQueue() {
     if (this._syncFlushing) return;
+    if (this._isCircuitOpen()) {
+      const waitMs = Math.max(2000, this._circuitNextAttemptAt - Date.now());
+      console.warn(`[Sync] Disjuntor de rede aberto. Aguardando ${Math.ceil(waitMs / 1000)}s antes da próxima sondagem.`);
+      this._scheduleSyncRetry(waitMs);
+      return;
+    }
     this._syncFlushing = true;
     try {
       while (true) {
@@ -1269,13 +1749,17 @@ const DB = {
         const item = queue[0];
         let res;
         try {
+          const clientMutationId = item.payload?.client_mutation_id || item.queueId || (this.uuid ? this.uuid() : `${Date.now()}_${Math.random()}`);
+          if (item.payload) item.payload.client_mutation_id = clientMutationId;
           res = await fetch('/api/db', {
             method: 'POST',
             headers: this._apiHeaders(),
             body: JSON.stringify(item.payload)
           });
         } catch {
-          this._scheduleSyncRetry(10000);
+          this._recordNetworkFailure(true);
+          const retries = Number(item._retries || 0) + 1;
+          this._scheduleSyncRetry(this._calculateBackoff(retries));
           break;
         }
 
@@ -1290,6 +1774,9 @@ const DB = {
         // explicitamente marcado como partial/failed. Nunca confirmar silenciosamente.
         const partialFailure = !!errorJson.partial || (Array.isArray(errorJson.failed) && errorJson.failed.length > 0) || (res.ok && errorJson.success === false);
         if (!res.ok || partialFailure) {
+          const isServerError = res.status >= 500 || res.status === 429;
+          this._recordNetworkFailure(isServerError);
+
           const code = String(errorJson.code || (partialFailure ? 'SYNC_PARTIAL' : `HTTP_${res.status}`));
           const message = String(errorJson.error || errorJson.message || (partialFailure ? 'Sincronização parcial; alguns registros não foram confirmados.' : `${item.payload?.action}/${item.payload?.table}`));
 
@@ -1302,7 +1789,7 @@ const DB = {
             else console.warn(`[Sync] Operação movida para atenção (${code}): ${message}`);
             const moved = this._moveSyncItemToAttention(item, { error:message, code, status:res.status });
             if (typeof Utils !== 'undefined' && Utils.toast) Utils.toast(message, 'warning');
-            if (moved < 0) { this._scheduleSyncRetry(15000); break; }
+            if (moved < 0) { this._scheduleSyncRetry(this._calculateBackoff(item._retries || 1)); break; }
             continue;
           }
 
@@ -1312,14 +1799,15 @@ const DB = {
             console.error(`[Sync] Operação requer atenção após ${retries} falhas do servidor:`, message);
             const moved = this._moveSyncItemToAttention(item, { error:message, code:`${code}_MAX_RETRIES`, status:res.status });
             if (typeof Utils !== 'undefined' && Utils.toast) Utils.toast('Uma alteração não foi perdida, mas requer atenção para sincronizar.', 'warning');
-            if (moved < 0) { this._scheduleSyncRetry(15000); break; }
+            if (moved < 0) { this._scheduleSyncRetry(this._calculateBackoff(retries)); break; }
             continue;
           }
           console.warn(`[Sync] Servidor recusou ${item.payload.action}/${item.payload.table}. Tentativa ${retries}/5.`);
-          this._scheduleSyncRetry(res.status === 429 ? 30000 : 15000);
+          this._scheduleSyncRetry(res.status === 429 ? 30000 : this._calculateBackoff(retries));
           break;
         }
 
+        this._recordNetworkSuccess();
         this._acceptSyncVersion(item, responseJson.sync_version);
         const pending = this._ackSyncQueueItem(item);
         this._emitSyncStatus(pending ? 'pending' : 'synced');
@@ -1332,19 +1820,20 @@ const DB = {
   },
 
   _acceptSyncVersion(item, version) {
-    if (item.payload?.table !== 'lancamentos' || !version) return;
+    const table = item.payload?.table;
+    if (!table || !version) return;
     const id = item.payload.data?.id;
     const previous = item.payload.data?.sync_version;
-    const local = this.getAll('lancamentos');
+    const local = this.getAll(table);
     const record = local.find(row => row.id === id);
     if (record && record.sync_version === previous) {
       record.sync_version = version;
-      this.save('lancamentos', local);
+      this.save(table, local);
     }
     // Uma segunda edição feita durante o envio deve partir da versão confirmada.
     const queue = this._getSyncQueue();
     for (const entry of queue) {
-      if (entry.payload?.table === 'lancamentos' && entry.payload?.data?.id === id && entry.payload.data.sync_version === previous) {
+      if (entry.payload?.table === table && entry.payload?.data?.id === id && entry.payload.data.sync_version === previous) {
         entry.payload.data.sync_version = version;
       }
     }
@@ -1354,18 +1843,19 @@ const DB = {
   resolveSyncConflict(queueId, remote, keepLocal, reviewedData) {
     const failed = this._getSyncFailed();
     const item = failed.find(entry => entry.queueId === queueId && entry.errorCode === 'SYNC_CONFLICT');
-    if (!item || item.payload?.table !== 'lancamentos') throw new Error('Conflito não encontrado. Atualize a lista.');
+    if (!item) throw new Error('Conflito não encontrado. Atualize a lista.');
+    const table = item.payload?.table || 'lancamentos';
     if (reviewedData && JSON.stringify(reviewedData) !== JSON.stringify(item.payload.data)) throw new Error('A alteração local mudou. Abra a revisão novamente.');
-    const id = item.payload.data.id;
-    if (remote && remote.id !== id) throw new Error('Lançamento de revisão inválido.');
-    if (this._getSyncQueue().some(entry => entry.payload?.table === 'lancamentos' && entry.payload?.data?.id === id)) throw new Error('Aguarde a alteração pendente antes de revisar este lançamento.');
-    if (keepLocal && !remote?.sync_version) throw new Error('Este lançamento foi excluído na nuvem. Cadastre um novo lançamento se necessário.');
+    const id = item.payload.data?.id;
+    if (remote && remote.id !== id) throw new Error('Registro de revisão inválido.');
+    if (this._getSyncQueue().some(entry => (entry.payload?.table || 'lancamentos') === table && entry.payload?.data?.id === id)) throw new Error('Aguarde a alteração pendente antes de revisar este registro.');
+    if (keepLocal && !remote?.sync_version) throw new Error('Este registro foi excluído na nuvem. Cadastre um novo registro se necessário.');
     const record = keepLocal ? { ...item.payload.data, sync_version:remote.sync_version } : remote;
-    if (keepLocal && !this.syncToCloud('save', 'lancamentos', record)) throw new Error('Não foi possível salvar a alteração na fila.');
+    if (keepLocal && !this.syncToCloud('save', table, record)) throw new Error('Não foi possível salvar a alteração na fila.');
     if (!this._saveSyncFailed(failed.filter(entry => entry.queueId !== queueId))) throw new Error('Não foi possível concluir a revisão local.');
-    const local = this.getAll('lancamentos').filter(entry => entry.id !== id);
+    const local = this.getAll(table).filter(entry => entry.id !== id);
     if (record) local.push(record);
-    this.save('lancamentos', local);
+    this.save(table, local);
     this._localMutationRevision = (this._localMutationRevision || 0) + 1;
     this._emitSyncStatus(this.getSyncPendingCount() ? 'pending' : this.getSyncFailedCount() ? 'attention' : 'synced');
   },
@@ -1376,7 +1866,8 @@ const DB = {
     this._localMutationRevision = (this._localMutationRevision || 0) + 1;
     const module = this._moduleForKey(table);
     if (module && typeof Auth !== 'undefined' && typeof Auth.canModule === 'function' && !Auth.canModule(module, action === 'delete' ? 'delete' : 'write')) return;
-    const payload = { action, table, data, id };
+    const mutationId = (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : (this.uuid ? this.uuid() : `${Date.now()}_${Math.random().toString(36).slice(2, 9)}`);
+    const payload = { action, table, data, id, client_mutation_id: mutationId };
     let queue = this._getSyncQueue();
     const entityId = String(id || data?.cloud_id || data?.id || (table === 'preferencias' ? '__tenant_preferences__' : '') || '');
 
