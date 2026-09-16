@@ -53,9 +53,10 @@ test('sitemap.xml contém URLs canônicas essenciais com prioridades e changefre
 const landingPath = path.resolve('landing.html');
 test('landing.html existe', fs.existsSync(landingPath));
 const landing = fs.readFileSync(landingPath, 'utf8');
+const landingPage = fs.readFileSync(path.resolve('js/landing_page.js'), 'utf8');
 
 test('landing.html possui título otimizado para busca orgânica',
-  landing.includes('<title>FinObra — Sistema de Gestão Financeira e Obras para Construtoras</title>'));
+  landing.includes('<title>FinObra — Gestão de Obras com Mais Controle e Menos Retrabalho</title>'));
 
 test('landing.html possui meta tags essenciais (description, keywords, canonical, robots)',
   landing.includes('<meta name="description"') &&
@@ -73,10 +74,11 @@ test('landing.html possui Open Graph e Twitter Cards completos para compartilham
 test('landing.html possui código de verificação Google Search Console',
   landing.includes('name="google-site-verification" content="UsbTkevWB8EbCcBAij5Dmoa5_UA9DR0I6FZETGzhqBY"'));
 
-test('landing.html possui Schema.org JSON-LD com SoftwareApplication, Organization e FAQPage',
-  landing.includes('"@type": "SoftwareApplication"') &&
-  landing.includes('"@type": "Organization"') &&
-  landing.includes('"@type": "FAQPage"'));
+test('landing possui Schema.org JSON-LD com SoftwareApplication, Organization e FAQPage',
+  landing.includes('"@type":"SoftwareApplication"') &&
+  landing.includes('"@type":"Organization"') &&
+  landingPage.includes("'@type': 'FAQPage'") &&
+  landingPage.includes("faqSchemaScript.type = 'application/ld+json'"));
 
 // 3. Validação de index.html, master.html e auth-route-patch38.js
 const indexPath = path.resolve('index.html');
