@@ -33,3 +33,11 @@
   - [x] 5.1 Criar `scripts/test-master-improvement.js`
   - [x] 5.2 Adicionar `"test:improvement"` ao `package.json`
   - [x] 5.3 Executar testes completos e validar zero regressões
+
+- [x] **Fase 6: Segmentação da Sidebar, Agenda Dev & E-mails**
+  - [x] 6.1 Reorganizar barra lateral em 7 segmentos sanfonados da Construção Civil
+  - [x] 6.2 Criar módulo `js/agenda_eventos.js` e botão 📅 no cabeçalho
+  - [x] 6.3 Expandir `js/notificacoes.js` com abas para Alertas, E-mails e Novidades
+  - [x] 6.4 Atualizar `js/patch26-events.js` e registrar bridge CSP
+  - [x] 6.5 Criar suíte `scripts/test-segmentation-agenda.js` e validar 100% dos testes
+

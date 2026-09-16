@@ -1031,4 +1031,255 @@ select:focus-visible {
   border-color: rgba(99, 102, 241, 0.28);
 }
 
+/* ─────────────────────────────────────────────────────────────
+   SIDEBAR ACCORDION NAVIGATION (Segmentação Construção Civil)
+   ───────────────────────────────────────────────────────────── */
+.nav-accordion-group {
+  margin-bottom: 2px;
+}
+
+.nav-accordion-header {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 16px 8px 14px;
+  background: transparent;
+  border: none;
+  color: var(--text3);
+  font-size: 0.7rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  cursor: pointer;
+  border-radius: var(--r-sm);
+  transition: all var(--t);
+  user-select: none;
+}
+
+.nav-accordion-header:hover {
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text);
+}
+
+.nav-accordion-header.active-segment {
+  color: var(--accent);
+}
+
+.nav-accordion-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.nav-accordion-title span:first-child {
+  font-size: 0.95rem;
+}
+
+.nav-accordion-chevron {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  transition: transform 0.22s var(--ease-spring);
+  color: var(--text3);
+  flex-shrink: 0;
+}
+
+.nav-accordion-header[aria-expanded="true"] .nav-accordion-chevron {
+  transform: rotate(180deg);
+  color: var(--accent);
+}
+
+.nav-accordion-body {
+  overflow: hidden;
+  transition: max-height 0.25s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.2s ease;
+}
+
+.nav-accordion-body.collapsed {
+  max-height: 0 !important;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.nav-accordion-body.expanded {
+  max-height: 600px;
+  opacity: 1;
+}
+
+.nav-accordion-body .nav-item {
+  padding-left: 24px;
+  font-size: 0.835rem;
+}
+
+/* ─────────────────────────────────────────────────────────────
+   AGENDA DEV & CAPACITAÇÃO OPERACIONAL (📅 Header & Modal)
+   ───────────────────────────────────────────────────────────── */
+.header-agenda-btn {
+  position: relative;
+  margin-right: 2px;
+}
+
+.agenda-badge {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  background: var(--accent);
+  color: #060E09;
+  font-size: 0.62rem;
+  font-weight: 900;
+  border-radius: 9999px;
+  min-width: 16px;
+  height: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 3px;
+  box-shadow: 0 0 8px rgba(18, 217, 160, 0.5);
+}
+
+.agenda-tabs {
+  display: flex;
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid var(--border-s);
+  border-radius: var(--r-md);
+  padding: 3px;
+  gap: 4px;
+  margin-bottom: 18px;
+}
+
+.agenda-tab-btn {
+  flex: 1;
+  padding: 8px 12px;
+  border-radius: var(--r-sm);
+  background: transparent;
+  border: none;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--text3);
+  cursor: pointer;
+  transition: all var(--t);
+  text-align: center;
+}
+
+.agenda-tab-btn:hover {
+  color: var(--text);
+}
+
+.agenda-tab-btn.active {
+  background: var(--bg-card);
+  color: var(--accent);
+  box-shadow: var(--shadow-soft-sm);
+}
+
+.agenda-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  padding: 16px;
+  margin-bottom: 14px;
+  transition: transform var(--t), border-color var(--t), box-shadow var(--t);
+  position: relative;
+}
+
+.agenda-card:hover {
+  border-color: var(--border-str);
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-ambient);
+}
+
+.agenda-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 9999px;
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.agenda-tag.live {
+  background: rgba(239, 68, 68, 0.15);
+  color: #f87171;
+  border: 1px solid rgba(239, 68, 68, 0.35);
+  animation: pulseLive 2s infinite;
+}
+
+.agenda-tag.workshop {
+  background: rgba(59, 130, 246, 0.15);
+  color: #60a5fa;
+  border: 1px solid rgba(59, 130, 246, 0.35);
+}
+
+.agenda-tag.update {
+  background: rgba(18, 217, 160, 0.15);
+  color: #34d399;
+  border: 1px solid rgba(18, 217, 160, 0.35);
+}
+
+@keyframes pulseLive {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+
+/* ─────────────────────────────────────────────────────────────
+   CENTRAL DE NOTIFICAÇÕES APRIMORADA (Abas: Alertas / E-mails / Updates)
+   ───────────────────────────────────────────────────────────── */
+.notif-tab-nav {
+  display: flex;
+  border-bottom: 1px solid var(--border-s);
+  background: rgba(15, 23, 42, 0.6);
+  padding: 0 12px;
+  gap: 8px;
+}
+
+.notif-tab-btn {
+  padding: 10px 14px;
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--text3);
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all var(--t);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.notif-tab-btn:hover {
+  color: var(--text);
+}
+
+.notif-tab-btn.active {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+}
+
+.notif-email-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--border-s);
+  transition: background var(--t);
+}
+
+.notif-email-row:hover {
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.notif-update-card {
+  padding: 14px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  margin-bottom: 12px;
+}
+
 
