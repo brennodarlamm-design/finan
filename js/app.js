@@ -258,22 +258,29 @@ const App = {
           try { await DB._flushCloudQueue(); } catch (e) { console.warn('[App] Flush de fila pendente offline:', e); }
         }
       })
-      .then(() => DB.syncFromCloud().then(async (ok) => {
-        if (ok) {
-          const current = this.route || initialRoute;
-          this.renderShell();
-          this._bindSyncStatus();
-          this.navigate(current, false);
-          this.refreshObraSelector();
+      .then(async () => {
+        if (typeof DB.syncRoute === 'function') {
+          try { await DB.syncRoute(initialRoute); } catch (e) { console.warn('[App] syncRoute inicial:', e); }
         }
-        if (typeof Assinador !== 'undefined' && Assinador.sincronizarAssinaturasPendentes) {
-          Assinador.sincronizarAssinaturasPendentes().catch(() => {});
-        }
-        // Só decide onboarding depois de tentar carregar o tenant real do servidor.
-        const empAtual = DB.getEmpresa();
-        const isImpersonating = (typeof Auth !== 'undefined' && Auth.getUser) ? (Auth.getUser()?.impersonatedBy === 'superadmin' || Auth.getUser()?.isImpersonated) : false;
-        if (!empAtual.configurada && !isImpersonating) setTimeout(() => this.showOnboardingEmpresa(), 350);
-      }));
+        // Executa sync delta incremental ou fallback DB.syncFromCloud().then
+        const syncPromise = (typeof DB.syncDelta === 'function') ? DB.syncDelta() : DB.syncFromCloud();
+        return syncPromise.then(async (ok) => {
+          if (ok) {
+            const current = this.route || initialRoute;
+            this.renderShell();
+            this._bindSyncStatus();
+            this.navigate(current, false);
+            this.refreshObraSelector();
+          }
+          if (typeof Assinador !== 'undefined' && Assinador.sincronizarAssinaturasPendentes) {
+            Assinador.sincronizarAssinaturasPendentes().catch(() => {});
+          }
+          // Só decide onboarding depois de tentar carregar o tenant real do servidor.
+          const empAtual = DB.getEmpresa();
+          const isImpersonating = (typeof Auth !== 'undefined' && Auth.getUser) ? (Auth.getUser()?.impersonatedBy === 'superadmin' || Auth.getUser()?.isImpersonated) : false;
+          if (!empAtual.configurada && !isImpersonating) setTimeout(() => this.showOnboardingEmpresa(), 350);
+        });
+      });
 
     if (typeof BuscaGlobal !== 'undefined') BuscaGlobal.init();
 
@@ -892,6 +899,20 @@ const App = {
         el.innerHTML = this.routes[targetRoute].render(this.obraId);
         if (typeof this.routes[targetRoute].init === 'function') {
           this.routes[targetRoute].init(this.obraId);
+        }
+
+        if (typeof DB !== 'undefined' && typeof DB.syncRoute === 'function') {
+          DB.syncRoute(targetRoute).then(updated => {
+            if (updated && this.route === targetRoute && navigation === this._navigationId) {
+              const contentEl = document.getElementById('route-content');
+              if (contentEl && this.routes[targetRoute]) {
+                contentEl.innerHTML = this.routes[targetRoute].render(this.obraId);
+                if (typeof this.routes[targetRoute].init === 'function') {
+                  this.routes[targetRoute].init(this.obraId);
+                }
+              }
+            }
+          }).catch(() => {});
         }
       } catch(err) {
         if (navigation !== this._navigationId) return;

@@ -44,7 +44,7 @@ export default async function handler(req, res) {
 
     const filter = obraId;
     // Não consulta dados de módulos bloqueados: reduz custo no Neon e minimiza exposição interna.
-    const [financeRows, nfRows, obraRows, medRows, recentRows] = await Promise.all([
+    const [financeRows, nfRows, obraRows, medRows, recentRows, monthlySeriesRows, categoryRows] = await Promise.all([
       showFinance ? sql`
         SELECT
           COALESCE(SUM(valor) FILTER (WHERE tipo='receita' AND status='recebido'),0)::numeric AS total_receitas,
@@ -85,6 +85,31 @@ export default async function handler(req, res) {
           AND (${filter}='' OR l.obra_id=${filter})
         ORDER BY l.data DESC,l.created_at DESC,l.id DESC
         LIMIT 10;
+      ` : Promise.resolve([]),
+      showFinance ? sql`
+        SELECT
+          to_char(data, 'YYYY-MM') AS mes,
+          COALESCE(SUM(valor) FILTER (WHERE tipo='receita' AND status='recebido'),0)::numeric AS receitas,
+          COALESCE(SUM(valor) FILTER (WHERE tipo='despesa' AND status='pago'),0)::numeric AS despesas
+        FROM lancamentos
+        WHERE tenant_id=${auth.tenantId}
+          AND (${filter}='' OR obra_id=${filter})
+          AND data >= (CURRENT_DATE - INTERVAL '12 months')
+        GROUP BY to_char(data, 'YYYY-MM')
+        ORDER BY mes ASC;
+      ` : Promise.resolve([]),
+      showFinance ? sql`
+        SELECT
+          categoria,
+          COALESCE(SUM(valor),0)::numeric AS total
+        FROM lancamentos
+        WHERE tenant_id=${auth.tenantId}
+          AND tipo='despesa'
+          AND status='pago'
+          AND (${filter}='' OR obra_id=${filter})
+        GROUP BY categoria
+        ORDER BY total DESC
+        LIMIT 10;
       ` : Promise.resolve([])
     ]);
 
@@ -110,7 +135,17 @@ export default async function handler(req, res) {
         obrasAtivas: showObras ? num(o.ativas) : 0,
         obrasTotal: showObras ? num(o.total) : 0,
         medicoesPendentes: showMedicoes ? num(m.pendentes) : 0,
-        recent: showFinance ? recentRows.map(r => ({ ...r, valor: num(r.valor) })) : []
+        recent: showFinance ? recentRows.map(r => ({ ...r, valor: num(r.valor) })) : [],
+        monthlySeries: showFinance ? monthlySeriesRows.map(r => ({
+          mes: r.mes,
+          receitas: num(r.receitas),
+          despesas: num(r.despesas),
+          saldo: num(r.receitas) - num(r.despesas)
+        })) : [],
+        categoryExpenses: showFinance ? categoryRows.map(r => ({
+          categoria: r.categoria,
+          total: num(r.total)
+        })) : []
       }
     });
   } catch (err) {

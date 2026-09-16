@@ -194,14 +194,14 @@ function todayBoaVista() {
 }
 
 function parsePagination(query = {}) {
-  if (query.limit === undefined && query.offset === undefined) return null;
+  if (query.limit === undefined && query.offset === undefined && query.cursor === undefined) return null;
   const rawLimit = Number.parseInt(query.limit, 10);
   const rawOffset = Number.parseInt(query.offset, 10);
   const limit = Math.min(Math.max(Number.isFinite(rawLimit) ? rawLimit : 250, 1), 500);
   const offset = Math.max(Number.isFinite(rawOffset) ? rawOffset : 0, 0);
-  return { limit, offset };
+  const cursor = query.cursor ? String(query.cursor).trim() : null;
+  return { limit, offset, cursor };
 }
-
 
 function auditPreview(table, data) {
   if (!data || typeof data !== 'object') return null;
@@ -224,12 +224,16 @@ async function auditDb(sql, req, auth, acao, table, data, id = null) {
 
 function pageResponse(items, pagination) {
   if (!pagination) return { success: true, data: items };
+  const lastItem = items.length ? items[items.length - 1] : null;
+  const nextCursor = (items.length === pagination.limit && lastItem?.id) ? String(lastItem.id) : null;
   return {
     success: true,
     data: items,
     pagination: {
       limit: pagination.limit,
       offset: pagination.offset,
+      cursor: pagination.cursor,
+      nextCursor,
       count: items.length,
       hasMore: items.length === pagination.limit,
       nextOffset: pagination.offset + items.length
@@ -454,8 +458,122 @@ export default async function handler(req, res) {
       const requestedTable = String(table || '').trim();
       const requestedPlanError = requestedTable ? planFeatureErrorForTable(auth, requestedTable) : null;
       if (requestedPlanError) return res.status(403).json(requestedPlanError);
-      if (requestedTable && !['all','sync_manifest'].includes(requestedTable) && !tableAllowed(auth, requestedTable, 'read')) {
+      if (requestedTable && !['all','sync_manifest','delta'].includes(requestedTable) && !tableAllowed(auth, requestedTable, 'read')) {
         return res.status(403).json(permissionError('MODULE_READ_FORBIDDEN', requestedTable));
+      }
+
+      if (table === 'delta') {
+        const rawSince = String(req.query?.since || req.query?.cursor || '').trim();
+        const sinceDate = rawSince ? new Date(rawSince) : null;
+        const isValidSince = sinceDate instanceof Date && !isNaN(sinceDate.getTime()) && (Date.now() - sinceDate.getTime() < 30 * 24 * 60 * 60 * 1000);
+        const nextCursor = new Date().toISOString();
+
+        if (!isValidSince) {
+          return res.status(200).json({
+            success: true,
+            requiresFullSync: true,
+            cursor: nextCursor,
+            delta: { mutated: {}, deleted: {} }
+          });
+        }
+
+        const sinceIso = sinceDate.toISOString();
+
+        const deletedRows = await sql`
+          SELECT DISTINCT entidade, entidade_id
+          FROM audit_logs
+          WHERE tenant_id = ${tenantId}
+            AND acao = 'excluir'
+            AND created_at >= ${sinceIso};
+        `;
+        const deleted = {};
+        for (const row of deletedRows) {
+          let ent = row.entidade;
+          if (ent === 'notas_fiscais') ent = 'notas';
+          if (ent === 'obras') ent = 'clientes';
+          if (ent === 'contas_bancarias') ent = 'contas';
+          if (!deleted[ent]) deleted[ent] = [];
+          if (row.entidade_id) deleted[ent].push(row.entidade_id);
+        }
+
+        const [
+          precompras, contratos, recibos, orcamentosSinapi, docFases, prefs,
+          obrasMutated, fornecedoresMutated, lancamentosMutated, notasMutated, orcamentosMutated, medicoesMutated, docsMutated, produtosMutated, contasMutated
+        ] = await Promise.all([
+          tableAllowed(auth, 'precompras', 'read')
+            ? sql`SELECT * FROM precompras WHERE tenant_id = ${tenantId} AND (updated_at >= ${sinceIso} OR created_at >= ${sinceIso}) ORDER BY updated_at ASC;`
+            : Promise.resolve([]),
+          tableAllowed(auth, 'contratos', 'read')
+            ? sql`SELECT * FROM contratos WHERE tenant_id = ${tenantId} AND (updated_at >= ${sinceIso} OR created_at >= ${sinceIso}) ORDER BY updated_at ASC;`
+            : Promise.resolve([]),
+          tableAllowed(auth, 'recibos', 'read')
+            ? sql`SELECT * FROM recibos WHERE tenant_id = ${tenantId} AND (updated_at >= ${sinceIso} OR created_at >= ${sinceIso}) ORDER BY updated_at ASC;`
+            : Promise.resolve([]),
+          tableAllowed(auth, 'orcamentos_sinapi', 'read')
+            ? sql`SELECT * FROM orcamentos_sinapi WHERE tenant_id = ${tenantId} AND (updated_at >= ${sinceIso} OR created_at >= ${sinceIso}) ORDER BY updated_at ASC;`
+            : Promise.resolve([]),
+          tableAllowed(auth, 'doc_fases', 'read')
+            ? sql`SELECT * FROM obra_doc_fases WHERE tenant_id = ${tenantId} AND (updated_at >= ${sinceIso} OR created_at >= ${sinceIso}) ORDER BY updated_at ASC;`
+            : Promise.resolve([]),
+          sql`SELECT preferences, updated_at FROM tenant_preferences WHERE tenant_id = ${tenantId} AND updated_at >= ${sinceIso} LIMIT 1;`,
+
+          tableAllowed(auth, 'obras', 'read')
+            ? sql`SELECT * FROM obras WHERE tenant_id = ${tenantId} AND id NOT IN ('escritorio', 'geral') AND id IN (SELECT entidade_id FROM audit_logs WHERE tenant_id = ${tenantId} AND entidade = 'obras' AND created_at >= ${sinceIso});`
+            : Promise.resolve([]),
+          tableAllowed(auth, 'fornecedores', 'read')
+            ? sql`SELECT * FROM fornecedores WHERE tenant_id = ${tenantId} AND id IN (SELECT entidade_id FROM audit_logs WHERE tenant_id = ${tenantId} AND entidade = 'fornecedores' AND created_at >= ${sinceIso});`
+            : Promise.resolve([]),
+          tableAllowed(auth, 'lancamentos', 'read')
+            ? sql`SELECT *, xmin::text AS sync_version FROM lancamentos WHERE tenant_id = ${tenantId} AND (created_at >= ${sinceIso} OR id IN (SELECT entidade_id FROM audit_logs WHERE tenant_id = ${tenantId} AND entidade = 'lancamentos' AND created_at >= ${sinceIso})) ORDER BY data DESC;`
+            : Promise.resolve([]),
+          tableAllowed(auth, 'notas', 'read')
+            ? sql`SELECT * FROM notas_fiscais WHERE tenant_id = ${tenantId} AND (created_at >= ${sinceIso} OR id IN (SELECT entidade_id FROM audit_logs WHERE tenant_id = ${tenantId} AND entidade IN ('notas','notas_fiscais') AND created_at >= ${sinceIso})) ORDER BY data_emissao DESC;`
+            : Promise.resolve([]),
+          tableAllowed(auth, 'orcamentos', 'read')
+            ? sql`SELECT * FROM orcamentos WHERE tenant_id = ${tenantId} AND (created_at >= ${sinceIso} OR id IN (SELECT entidade_id FROM audit_logs WHERE tenant_id = ${tenantId} AND entidade = 'orcamentos' AND created_at >= ${sinceIso})) ORDER BY created_at DESC;`
+            : Promise.resolve([]),
+          tableAllowed(auth, 'medicoes', 'read')
+            ? sql`SELECT * FROM medicoes WHERE tenant_id = ${tenantId} AND (created_at >= ${sinceIso} OR id IN (SELECT entidade_id FROM audit_logs WHERE tenant_id = ${tenantId} AND entidade = 'medicoes' AND created_at >= ${sinceIso})) ORDER BY data DESC;`
+            : Promise.resolve([]),
+          tableAllowed(auth, 'documentos', 'read')
+            ? sql`SELECT id, tipo, referencia_id, titulo, categoria, nome_arquivo, tipo_arquivo, tamanho_bytes, url, created_at FROM documentos WHERE tenant_id = ${tenantId} AND (created_at >= ${sinceIso} OR id IN (SELECT entidade_id FROM audit_logs WHERE tenant_id = ${tenantId} AND entidade = 'documentos' AND created_at >= ${sinceIso})) ORDER BY created_at DESC;`
+            : Promise.resolve([]),
+          tableAllowed(auth, 'produtos', 'read')
+            ? sql`SELECT * FROM produtos WHERE tenant_id = ${tenantId} AND id IN (SELECT entidade_id FROM audit_logs WHERE tenant_id = ${tenantId} AND entidade = 'produtos' AND created_at >= ${sinceIso}) ORDER BY nome ASC;`
+            : Promise.resolve([]),
+          tableAllowed(auth, 'contas', 'read')
+            ? sql`SELECT * FROM contas_bancarias WHERE tenant_id = ${tenantId} AND (created_at >= ${sinceIso} OR updated_at >= ${sinceIso} OR id IN (SELECT entidade_id FROM audit_logs WHERE tenant_id = ${tenantId} AND entidade IN ('contas','contas_bancarias') AND created_at >= ${sinceIso})) ORDER BY created_at ASC;`
+            : Promise.resolve([])
+        ]);
+
+        const mutated = {
+          clientes: obrasMutated.map(o => ({ ...o, data_inicio: cleanDate(o.data_inicio), data_previsao: cleanDate(o.data_previsao) })),
+          fornecedores: fornecedoresMutated.map(f => ({ ...f, cnpj: f.cnpj_cpf || f.cnpj || '', razao_social: f.razao_social || f.nome, nome_fantasia: f.nome, endereco: f.endereco || '', municipio: f.municipio || '', uf: f.uf || '', ativo: f.ativo !== false })),
+          lancamentos: lancamentosMutated.map(l => ({ ...l, data: cleanDate(l.data) || todayBoaVista(), data_vencimento: cleanDate(l.data_vencimento) || cleanDate(l.data), data_pagamento: cleanDate(l.data_pagamento), valor: cleanNum(l.valor), itens: Array.isArray(l.itens) ? l.itens : safeJsonParse(l.itens, []) })),
+          notas: notasMutated.map(n => ({ ...n, data_emissao: cleanDate(n.data_emissao), data_vencimento: cleanDate(n.data_vencimento), data_pagamento: cleanDate(n.data_pagamento), valor_bruto: cleanNum(n.valor_bruto !== undefined ? n.valor_bruto : n.valor_total), impostos: cleanNum(n.impostos), valor_liquido: cleanNum(n.valor_liquido !== undefined ? n.valor_liquido : (n.valor_bruto || n.valor_total)), valor_total: cleanNum(n.valor_total !== undefined ? n.valor_total : n.valor_bruto), categoria: n.categoria || 'material', tipo: n.tipo || 'entrada', chave_nfe: n.chave_nfe || n.chave_acesso || '', itens: Array.isArray(n.itens) ? n.itens : safeJsonParse(n.itens, []) })),
+          produtos: produtosMutated.map(p => ({ ...p, valor_medio: cleanNum(p.valor_medio) })),
+          orcamentos: orcamentosMutated.map(normalizeOrcamento),
+          medicoes: medicoesMutated.map(normalizeMedicao),
+          documentos: docsMutated,
+          contas: contasMutated,
+          precompras: precompras.map(jsonPayload),
+          contratos: contratos.map(jsonPayload),
+          recibos: recibos.map(jsonPayload),
+          orcamentos_sinapi: orcamentosSinapi.map(jsonPayload),
+          doc_fases: docFases.map(docPhasePayload),
+          preferencias: prefs[0]?.preferences || null
+        };
+
+        for (const [k, v] of Object.entries(mutated)) {
+          if (Array.isArray(v) && !v.length) delete mutated[k];
+          if (v === null) delete mutated[k];
+        }
+
+        return res.status(200).json({
+          success: true,
+          cursor: nextCursor,
+          delta: { mutated, deleted }
+        });
       }
 
       if (table === 'sync_manifest') {
@@ -796,7 +914,7 @@ export default async function handler(req, res) {
 
     // ── POST: Gravação / Atualização / Exclusão / Sync com Tenant Scoping ───────
     if (req.method === 'POST') {
-      const { action, table, data, id, payload } = req.body || {};
+      const { action, table, data, id, payload, client_mutation_id } = req.body || {};
       const directPlanError = table ? planFeatureErrorForTable(auth, table) : null;
       if (directPlanError) return res.status(403).json(directPlanError);
 
