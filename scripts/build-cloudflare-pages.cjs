@@ -15,6 +15,8 @@ const rootFiles = [
   'version.json',
   'robots.txt',
   'sitemap.xml',
+  'llms.txt',
+  'llms-full.txt',
   'favicon.ico',
   'favicon.svg',
   'favicon-32x32.png',
