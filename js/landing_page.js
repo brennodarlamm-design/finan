@@ -2,6 +2,11 @@
 (() => {
   'use strict';
 
+  // Mantém o comportamento canônico do Patch 38 mesmo que a landing seja servida
+  // por um alias/preview: clicar no logo sempre volta para a raiz pública.
+  const brandHomeLink = document.querySelector('a.brand');
+  if (brandHomeLink) brandHomeLink.setAttribute('href', '/');
+
   const revealEls = document.querySelectorAll('.reveal');
   if ('IntersectionObserver' in window) {
     const io = new IntersectionObserver(entries => {
