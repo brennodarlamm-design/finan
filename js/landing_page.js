@@ -7,6 +7,29 @@
   const brandHomeLink = document.querySelector('a.brand');
   if (brandHomeLink) brandHomeLink.setAttribute('href', '/');
 
+  // Structured data do FAQ é gerado a partir das mesmas perguntas exibidas na página.
+  // O JSON-LD anterior de SoftwareApplication/Organization permanece no HTML.
+  const faqSchema = {
+    '@context': 'https://schema.org',
+    '@type': 'FAQPage',
+    mainEntity: [
+      ['Posso testar antes de contratar?', 'Sim. O período de teste do projeto é de 15 dias para conhecer o fluxo do sistema antes de escolher um plano.'],
+      ['Quantas pessoas podem acessar?', 'O Plano Básico permite 1 usuário, o Profissional 2 usuários e o Construtora Ilimitado 5 usuários ativos.'],
+      ['Quantas obras posso gerenciar?', 'O Plano Básico permite até 3 obras ativas, o Profissional até 10 e o Construtora Ilimitado não possui limite de obras ativas.'],
+      ['O FinObra funciona no celular?', 'Sim. A interface web é responsiva e pode ser acessada pelo navegador em computador, tablet e celular.'],
+      ['Como funciona o suporte?', 'O FinObra possui central de chat, FinBot para dúvidas rápidas e canal de Suporte / Comercial para atendimento da equipe.'],
+      ['Onde encontro Privacidade e Termos?', 'Os documentos oficiais continuam disponíveis nas páginas de Política de Privacidade e Termos de Serviço, acessíveis também no rodapé.']
+    ].map(([name, text]) => ({
+      '@type': 'Question',
+      name,
+      acceptedAnswer: { '@type': 'Answer', text }
+    }))
+  };
+  const faqSchemaScript = document.createElement('script');
+  faqSchemaScript.type = 'application/ld+json';
+  faqSchemaScript.textContent = JSON.stringify(faqSchema);
+  document.head.appendChild(faqSchemaScript);
+
   const revealEls = document.querySelectorAll('.reveal');
   if ('IntersectionObserver' in window) {
     const io = new IntersectionObserver(entries => {
