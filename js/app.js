@@ -567,27 +567,30 @@ const App = {
 
   isSectionExpanded(sectionId) {
     const states = this._getExpandedSections();
-    const sec = this._navSections.find(s => s.id === sectionId);
-    const activeRoute = this._normalizeRoute(this.route || this._getRouteFromUrl());
-    if (sec && activeRoute && sec.rotas.includes(activeRoute)) {
-      return true;
+    if (typeof states[sectionId] === 'boolean') {
+      return states[sectionId];
     }
-    return states[sectionId] !== false;
+    return true;
   },
 
   toggleNavSection(encodedSectionId) {
     const sectionId = decodeURIComponent(encodedSectionId || '');
+    const header = document.querySelector(`[data-section-header="${sectionId}"]`);
+    const body = document.getElementById(`nav-sec-body-${sectionId}`);
+    
+    // Determina o estado atual olhando a classe 'expanded' do elemento no DOM
+    const isCurrentlyExp = body 
+      ? body.classList.contains('expanded') 
+      : this.isSectionExpanded(sectionId);
+
+    const willBeOpen = !isCurrentlyExp;
     const states = this._getExpandedSections();
-    const isCurrentlyExp = this.isSectionExpanded(sectionId);
-    states[sectionId] = !isCurrentlyExp;
+    states[sectionId] = willBeOpen;
     try {
       localStorage.setItem('finobra_expanded_nav_sections', JSON.stringify(states));
     } catch {}
 
-    const header = document.querySelector(`[data-section-header="${sectionId}"]`);
-    const body = document.getElementById(`nav-sec-body-${sectionId}`);
     if (header && body) {
-      const willBeOpen = !isCurrentlyExp;
       header.setAttribute('aria-expanded', String(willBeOpen));
       body.classList.toggle('expanded', willBeOpen);
       body.classList.toggle('collapsed', !willBeOpen);
@@ -836,6 +839,11 @@ const App = {
           secHdr.setAttribute('aria-expanded', 'true');
           secHdr.classList.add('active-segment');
         }
+        try {
+          const states = this._getExpandedSections();
+          states[secKey] = true;
+          localStorage.setItem('finobra_expanded_nav_sections', JSON.stringify(states));
+        } catch {}
       }
     }
 

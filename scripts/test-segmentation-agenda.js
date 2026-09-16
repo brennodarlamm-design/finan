@@ -45,6 +45,7 @@ test('app.js implementa controle colapsável de seções (toggleNavSection, isSe
   assert.ok(appSrc.includes('toggleNavSection('), 'App deve implementar toggleNavSection');
   assert.ok(appSrc.includes('isSectionExpanded('), 'App deve implementar isSectionExpanded');
   assert.ok(appSrc.includes('_renderSidebarNav('), 'App deve implementar _renderSidebarNav');
+  assert.ok(appSrc.includes("body.classList.contains('expanded')"), 'toggleNavSection deve alternar com base no estado real do DOM');
   assert.ok(appSrc.includes('AgendaEventos.renderHeaderBtn()'), 'Header deve conter botão de Agenda');
 });
 
