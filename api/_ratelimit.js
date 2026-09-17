@@ -38,10 +38,10 @@ function bucketId(key, windowStart, windowMs) {
 
 function securityIpFromRateKey(key) {
   const value = String(key || '');
-  if (value.startsWith('login:ip:')) return value.slice('login:ip:'.length);
-  if (value.startsWith('mfa:')) return value.slice('mfa:'.length);
-  if (value.startsWith('reset:ip:')) return value.slice('reset:ip:'.length);
-  if (value.startsWith('password-reset:ip:')) return value.slice('password-reset:ip:'.length);
+  const pureIpPrefixes = ['login:ip:', 'mfa:', 'google:', 'reg:', 'reset:', 'reset:ip:', 'password-reset:ip:'];
+  for (const prefix of pureIpPrefixes) {
+    if (value.startsWith(prefix)) return value.slice(prefix.length);
+  }
   return '';
 }
 
@@ -53,7 +53,7 @@ function securityIpFromRateKey(key) {
  *
  * Patch 56:
  * - checa banimento por IP antes de consumir recursos de autenticação;
- * - cada violação de rate limit em login/MFA aumenta o score de abuso;
+ * - cada violação de rate limit em login/MFA/Google/reset/cadastro aumenta score;
  * - reincidência causa ban progressivo distribuído.
  */
 export async function checkRateLimit(key, limit = 10, windowMs = 60000) {
@@ -108,7 +108,7 @@ export async function checkRateLimit(key, limit = 10, windowMs = 60000) {
         weight: 4,
         source: 'rate_limit',
         metadata: {
-          bucket: String(key || '').slice(0, 160),
+          bucketClass: String(key || '').split(':', 1)[0].slice(0, 40),
           limit: safeLimit,
           windowMs: safeWindow,
           count
