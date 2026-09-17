@@ -121,21 +121,37 @@ await assertThrows(
 // ── Bloco 2: Leitura cruzada (Tenant A lendo dados do Tenant B) ─────────────
 console.log('\n📋  Bloco 2: Leitura cruzada — Tenant A lendo dados do Tenant B');
 
-const TABELAS_TENANT = ['obras', 'lancamentos', 'fornecedores', 'notas_fiscais', 'medicoes'];
+await assertZeroRows(
+  'SELECT em "obras" do Tenant B via contexto do Tenant A',
+  () => sqlA`SELECT id FROM obras WHERE tenant_id = ${TENANT_B_ID} LIMIT 5`
+);
 
-for (const tabela of TABELAS_TENANT) {
-  await assertZeroRows(
-    `SELECT em "${tabela}" do Tenant B via contexto do Tenant A`,
-    () => sqlA`SELECT id FROM ${baseSql.unsafe(tabela)} WHERE tenant_id = ${TENANT_B_ID} LIMIT 5`
-  );
-}
+await assertZeroRows(
+  'SELECT em "lancamentos" do Tenant B via contexto do Tenant A',
+  () => sqlA`SELECT id FROM lancamentos WHERE tenant_id = ${TENANT_B_ID} LIMIT 5`
+);
+
+await assertZeroRows(
+  'SELECT em "fornecedores" do Tenant B via contexto do Tenant A',
+  () => sqlA`SELECT id FROM fornecedores WHERE tenant_id = ${TENANT_B_ID} LIMIT 5`
+);
+
+await assertZeroRows(
+  'SELECT em "notas_fiscais" do Tenant B via contexto do Tenant A',
+  () => sqlA`SELECT id FROM notas_fiscais WHERE tenant_id = ${TENANT_B_ID} LIMIT 5`
+);
+
+await assertZeroRows(
+  'SELECT em "medicoes" do Tenant B via contexto do Tenant A',
+  () => sqlA`SELECT id FROM medicoes WHERE tenant_id = ${TENANT_B_ID} LIMIT 5`
+);
 
 // ── Bloco 3: Escrita cruzada (Tenant A escrevendo em tabelas do Tenant B) ───
 console.log('\n📋  Bloco 3: Escrita cruzada — Tenant A escrevendo no Tenant B');
 
 await assertZeroAffected(
   'UPDATE em "obras" do Tenant B via contexto do Tenant A',
-  () => sqlA`UPDATE obras SET updated_at = NOW() WHERE tenant_id = ${TENANT_B_ID} RETURNING id`
+  () => sqlA`UPDATE obras SET nome = 'hack_tentativa' WHERE tenant_id = ${TENANT_B_ID} RETURNING id`
 );
 
 await assertZeroAffected(
@@ -143,19 +159,19 @@ await assertZeroAffected(
   () => sqlA`DELETE FROM lancamentos WHERE tenant_id = ${TENANT_B_ID} RETURNING id`
 );
 
-// ── Bloco 4: INSERT com tenant_id errado ────────────────────────────────────
+// ── Bloco 4: INSERT com tenant_id cruzado ────────────────────────────────────
 console.log('\n📋  Bloco 4: INSERT com tenant_id cruzado');
 
 await assertZeroAffected(
   'INSERT em "obras" com tenant_id do Tenant B via contexto do Tenant A',
   () => sqlA`
-    INSERT INTO obras (id, tenant_id, nome, status, created_at, updated_at)
+    INSERT INTO obras (id, tenant_id, nome, status, created_at)
     VALUES (
       'rls_test_' || substr(md5(random()::text), 1, 8),
       ${TENANT_B_ID},
       '__RLS_TEST_DEVE_FALHAR__',
       'planejamento',
-      NOW(), NOW()
+      NOW()
     )
     ON CONFLICT DO NOTHING
     RETURNING id
