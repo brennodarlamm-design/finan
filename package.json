@@ -58,6 +58,7 @@
     "test:segmentation": "node scripts/test-segmentation-agenda.js",
     "test:trigger": "node scripts/test-trigger-integration.js",
     "test:architecture": "node scripts/test-backend-architecture.js",
+    "test:phase2": "node scripts/test-phase2-reliability.js",
     "test:e2e": "node scripts/test-e2e-synthetic.js"
   },
   "dependencies": {

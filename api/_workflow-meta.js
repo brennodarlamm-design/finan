@@ -4,6 +4,7 @@ import { neon } from '@neondatabase/serverless';
 import { resolveAuthAndTenant } from './_auth.js';
 import { canAccessModule, canWriteData, permissionError } from './_permissions.js';
 import { writeAudit } from './_audit.js';
+import { createTenantSql } from './_tenant-sql.js';
 
 function getSql() {
   if (!process.env.DATABASE_URL) throw new Error('DATABASE_URL não configurada.');
@@ -30,7 +31,8 @@ export default async function workflowMetaHandler(req, res) {
   const obraId = cleanId(body.obraId || body.obra_id, 64);
   if (!obraId) return res.status(400).json({ success:false, code:'OBRA_REQUIRED', error:'Obra é obrigatória.' });
 
-  const sql = getSql();
+  const baseSql = getSql();
+  const sql = createTenantSql(baseSql, { tenantId, isSystem: auth.isSystem === true });
   try {
     const obraRows = await sql`SELECT id FROM obras WHERE tenant_id=${tenantId} AND id=${obraId} LIMIT 1;`;
     if (!obraRows.length) return res.status(404).json({ success:false, code:'OBRA_NOT_FOUND', error:'Obra não encontrada.' });

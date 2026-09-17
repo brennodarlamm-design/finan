@@ -161,6 +161,33 @@ const Parcelamento = {
     }, 100);
   },
 
+  calcularDataVencimento(dataInicialStr, parcelaIndex, intervalo = 'mensal') {
+    if (!dataInicialStr || parcelaIndex === 0) return dataInicialStr;
+    const parts = dataInicialStr.split('-').map(Number);
+    if (parts.length !== 3 || parts.some(isNaN)) return dataInicialStr;
+    const [y, m, d] = parts;
+
+    if (intervalo === 'mensal') {
+      const targetMonthIndex = (m - 1) + parcelaIndex;
+      const targetYear = y + Math.floor(targetMonthIndex / 12);
+      const targetMonth = ((targetMonthIndex % 12) + 12) % 12;
+      const maxDiasNoMes = new Date(targetYear, targetMonth + 1, 0).getDate();
+      const targetDay = Math.min(d, maxDiasNoMes);
+
+      const mm = String(targetMonth + 1).padStart(2, '0');
+      const dd = String(targetDay).padStart(2, '0');
+      return `${targetYear}-${mm}-${dd}`;
+    }
+
+    const baseDate = new Date(`${dataInicialStr}T12:00:00`);
+    if (intervalo === 'quinzenal') {
+      baseDate.setDate(baseDate.getDate() + (parcelaIndex * 15));
+    } else if (intervalo === 'semanal') {
+      baseDate.setDate(baseDate.getDate() + (parcelaIndex * 7));
+    }
+    return baseDate.toISOString().split('T')[0];
+  },
+
   _gerarPreview() {
     const totalVal = parseFloat(document.getElementById('parc-total')?.value) || 0;
     const qtd = parseInt(document.getElementById('parc-qtd')?.value, 10) || 3;
@@ -179,20 +206,11 @@ const Parcelamento = {
     const valorBaseParcela = totalVal > 0 ? Math.floor((totalVal / qtd) * 100) / 100 : 0;
     const centavosRestantes = totalVal > 0 ? Math.round((totalVal - (valorBaseParcela * qtd)) * 100) / 100 : 0;
 
-    const baseDate = new Date(primVenc + 'T12:00:00');
     let rowsHtml = '';
 
     for (let i = 1; i <= qtd; i++) {
       const valorParcela = (i === 1 ? (valorBaseParcela + centavosRestantes) : valorBaseParcela);
-      const vencDate = new Date(baseDate);
-      if (intervalo === 'mensal') {
-        vencDate.setMonth(baseDate.getMonth() + (i - 1));
-      } else if (intervalo === 'quinzenal') {
-        vencDate.setDate(baseDate.getDate() + ((i - 1) * 15));
-      } else if (intervalo === 'semanal') {
-        vencDate.setDate(baseDate.getDate() + ((i - 1) * 7));
-      }
-      const vencStr = vencDate.toISOString().split('T')[0];
+      const vencStr = this.calcularDataVencimento(primVenc, i - 1, intervalo);
       const descItem = `${descBase} (${i}/${qtd})`;
 
       rowsHtml += `

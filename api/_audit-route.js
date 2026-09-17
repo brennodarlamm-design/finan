@@ -3,6 +3,7 @@ import { neon } from '@neondatabase/serverless';
 import { resolveAuthAndTenant } from './_auth.js';
 import { canViewAudit, permissionError } from './_permissions.js';
 import { checkRateLimit, getClientIp } from './_ratelimit.js';
+import { createTenantSql } from './_tenant-sql.js';
 
 function getSql() {
   if (!process.env.DATABASE_URL) throw new Error('DATABASE_URL não configurada.');
@@ -116,7 +117,8 @@ export default async function handler(req, res) {
   if (!auth.authenticated) return res.status(auth.status || 401).json({ success: false, error: auth.error || 'Não autorizado.' });
 
   try {
-    const sql = getSql();
+    const baseSql = getSql();
+    const sql = createTenantSql(baseSql, { tenantId: auth.tenantId, isSystem: auth.isSystem === true });
 
     if (req.method !== 'GET') return res.status(405).json({ success: false, error: 'Método não permitido.' });
     if (!canViewAudit(auth)) return res.status(403).json(permissionError('ROLE_AUDIT_FORBIDDEN'));

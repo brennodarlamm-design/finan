@@ -2,6 +2,7 @@
 
 import { resolveAuthAndTenant } from './_auth.js';
 import { canAccessModule, permissionError } from './_permissions.js';
+import { checkRateLimit, getClientIp } from './_ratelimit.js';
 import certificadoHandler from './_certificado.js';
 
 const ALLOWED_ORIGINS = [
@@ -52,6 +53,10 @@ export default async function handler(req, res) {
   // ── 0. CONSULTA PÚBLICA DE CNPJ (BrasilAPI) ──────────────────────────────
   const isCnpj = req.query?.action === 'cnpj' || req.query?.cnpj || (req.body && req.body.action === 'cnpj');
   if (isCnpj) {
+    const ip = getClientIp(req);
+    const rl = await checkRateLimit(`cnpj:ip:${ip}`, 20, 60000);
+    if (!rl.allowed) return res.status(429).json({ error: 'Muitas consultas de CNPJ. Aguarde um momento antes de tentar novamente.' });
+
     const cnpj = req.query?.cnpj || (req.body && req.body.cnpj);
     if (!cnpj) return res.status(400).json({ error: 'CNPJ não informado' });
     const cnpjLimpo = String(cnpj).replace(/\D/g, '');
@@ -73,6 +78,10 @@ export default async function handler(req, res) {
   // ── 0.1. CONSULTA DE CEP (BrasilAPI com Fallback ViaCEP) ─────────────────
   const isCep = req.query?.action === 'cep' || (req.query?.cep && !req.query?.action) || (req.body && (req.body.action === 'cep' || req.body.cep));
   if (isCep) {
+    const ip = getClientIp(req);
+    const rl = await checkRateLimit(`cep:ip:${ip}`, 30, 60000);
+    if (!rl.allowed) return res.status(429).json({ success: false, error: 'Muitas consultas de CEP. Aguarde um momento antes de tentar novamente.' });
+
     const rawCep = req.query?.cep || (req.body && req.body.cep);
     if (!rawCep) return res.status(400).json({ success: false, error: 'CEP não informado.' });
     const cepLimpo = String(rawCep).replace(/\D/g, '');

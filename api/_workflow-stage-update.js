@@ -3,6 +3,7 @@ import { neon } from '@neondatabase/serverless';
 import { resolveAuthAndTenant } from './_auth.js';
 import { canAccessModule, canWriteData, permissionError, normalizeRole } from './_permissions.js';
 import { writeAudit } from './_audit.js';
+import { createTenantSql } from './_tenant-sql.js';
 
 const sqlClient = () => {
   if (!process.env.DATABASE_URL) throw new Error('DATABASE_URL não configurada.');
@@ -47,7 +48,8 @@ export default async function workflowStageUpdateHandler(req, res) {
   const etapaId = cleanId(body.etapaId || body.etapa_id, 80);
   if (!obraId || !etapaId) return res.status(400).json({ success:false, code:'WORKFLOW_STAGE_REQUIRED', error:'Obra e etapa são obrigatórias.' });
 
-  const sql = sqlClient();
+  const baseSql = sqlClient();
+  const sql = createTenantSql(baseSql, { tenantId, isSystem: auth.isSystem === true });
   try {
     const rows = await sql`
       SELECT * FROM workflow_etapas

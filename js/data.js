@@ -1693,10 +1693,21 @@ const DB = {
     return failed.length;
   },
 
+  _syncScheduledAt: 0,
+
   _scheduleSyncRetry(delay) {
     const finalDelay = (typeof delay === 'number' && delay > 0) ? delay : this._calculateBackoff(1);
+    const targetTime = Date.now() + finalDelay;
+    if (this._syncRetryTimer && this._syncScheduledAt > targetTime) {
+      return;
+    }
     clearTimeout(this._syncRetryTimer);
-    this._syncRetryTimer = setTimeout(() => this._flushCloudQueue(), finalDelay);
+    this._syncScheduledAt = targetTime;
+    this._syncRetryTimer = setTimeout(() => {
+      this._syncRetryTimer = null;
+      this._syncScheduledAt = 0;
+      this._flushCloudQueue();
+    }, finalDelay);
     this._bindNetworkListeners();
   },
 
@@ -1750,6 +1761,40 @@ const DB = {
 
   async _flushCloudQueue() {
     if (this._syncFlushing) return;
+
+    // Mutex Cross-Tab: Web Locks API nativo ou lease no localStorage
+    if (typeof navigator !== 'undefined' && navigator.locks && navigator.locks.request) {
+      return navigator.locks.request(`finobra_sync_lock_${this._t()}`, { ifAvailable: true }, async (lock) => {
+        if (!lock) {
+          console.info('[Sync] Outra aba está sincronizando a fila offline. Aguardando...');
+          return;
+        }
+        await this._executeFlushQueue();
+      });
+    }
+
+    const lockKey = `finobra_${this._t()}_flush_lease`;
+    const now = Date.now();
+    const rawLease = (typeof localStorage !== 'undefined') ? localStorage.getItem(lockKey) : null;
+    if (rawLease) {
+      try {
+        const lease = JSON.parse(rawLease);
+        if (lease.expiresAt > now) return;
+      } catch {}
+    }
+    try {
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem(lockKey, JSON.stringify({ tabId: this._tabId || Math.random(), expiresAt: now + 25000 }));
+      }
+      await this._executeFlushQueue();
+    } finally {
+      try {
+        if (typeof localStorage !== 'undefined') localStorage.removeItem(lockKey);
+      } catch {}
+    }
+  },
+
+  async _executeFlushQueue() {
     if (this._isCircuitOpen()) {
       const waitMs = Math.max(2000, this._circuitNextAttemptAt - Date.now());
       console.warn(`[Sync] Disjuntor de rede aberto. Aguardando ${Math.ceil(waitMs / 1000)}s antes da próxima sondagem.`);
@@ -1775,7 +1820,14 @@ const DB = {
         } catch {
           this._recordNetworkFailure(true);
           const retries = Number(item._retries || 0) + 1;
-          this._scheduleSyncRetry(this._calculateBackoff(retries));
+          this._updateQueuedItem(item, {
+            _retries: retries,
+            lastError: 'Falha de conectividade de rede',
+            lastAttemptAt: new Date().toISOString()
+          });
+          const backoff = this._calculateBackoff(retries);
+          console.warn(`[Sync] Falha de conexão. Tentativa ${retries}. Reagendando em ${backoff}ms.`);
+          this._scheduleSyncRetry(backoff);
           break;
         }
 
@@ -1830,8 +1882,11 @@ const DB = {
       }
     } finally {
       this._syncFlushing = false;
-      if (this.getSyncPendingCount() > 0) this._scheduleSyncRetry(5000);
-      else if (this.getSyncFailedCount() > 0) this._emitSyncStatus('attention', { failed:this.getSyncFailedCount() });
+      if (this.getSyncPendingCount() > 0 && !this._syncRetryTimer) {
+        this._scheduleSyncRetry(5000);
+      } else if (this.getSyncPendingCount() === 0 && this.getSyncFailedCount() > 0) {
+        this._emitSyncStatus('attention', { failed:this.getSyncFailedCount() });
+      }
     }
   },
 
@@ -2109,7 +2164,7 @@ const DB = {
       }
     }
 
-    // 2. Obter Gastos Reais (Lançamentos e Notas)
+    // 2. Obter Gastos Reais (Lançamentos e Notas Desduplicadas)
     const lans = (this.getAll('lancamentos') || []).filter(l => {
       if (l.tipo !== 'despesa' || l.status === 'cancelado') return false;
       if (isTodas) return l.obra_id !== 'escritorio' && l.obra_id !== 'sede';
@@ -2118,8 +2173,18 @@ const DB = {
 
     const notas = (this.getAll('notas') || []).filter(n => {
       if (n.status === 'cancelada') return false;
+      if (n.tipo === 'saida') return false; // Bloqueia notas de faturamento/venda
       if (isTodas) return n.obra_id !== 'escritorio' && n.obra_id !== 'sede';
       return n.obra_id === obraId;
+    });
+
+    // Construção dos conjuntos de indexação para desduplicação O(1)
+    const linkedNotaIds = new Set();
+    const linkedChaves = new Set();
+    lans.forEach(l => {
+      if (l.nota_fiscal_id) linkedNotaIds.add(String(l.nota_fiscal_id));
+      if (l.chave_nfe) linkedChaves.add(String(l.chave_nfe).trim());
+      if (l.chave_acesso) linkedChaves.add(String(l.chave_acesso).trim());
     });
 
     let totalRealizado = 0;
@@ -2152,7 +2217,14 @@ const DB = {
     });
 
     notas.forEach(n => {
-      if (!n.lancamento_id) {
+      const notaId = String(n.id || '');
+      const chaveAcesso = String(n.chave_acesso || n.chave_nfe || '').trim();
+      const jaVinculada = Boolean(
+        n.lancamento_id ||
+        (notaId && linkedNotaIds.has(notaId)) ||
+        (chaveAcesso && linkedChaves.has(chaveAcesso))
+      );
+      if (!jaVinculada) {
         const val = Number(n.valor_total || n.valor_bruto || 0);
         const etapaId = classificarEtapa(n.categoria, n.descricao || n.emitente);
         const target = etapaMap.get(etapaId) || etapaMap.get('outros');
@@ -2290,16 +2362,25 @@ const DB = {
     });
     pvData[pvData.length - 1] = bac;
 
-    // 2. Actual Cost (AC) acumulado mês a mês
+    // 2. Actual Cost (AC) acumulado mês a mês (desduplicado)
     const lans = (this.getAll('lancamentos') || []).filter(l => {
       if (l.tipo !== 'despesa' || l.status === 'cancelado') return false;
       if (isTodas) return l.obra_id !== 'escritorio' && l.obra_id !== 'sede';
       return targetIds.has(l.obra_id);
     });
     const notas = (this.getAll('notas') || []).filter(n => {
-      if (n.status === 'cancelada' || n.lancamento_id) return false;
+      if (n.status === 'cancelada') return false;
+      if (n.tipo === 'saida') return false; // Bloqueia notas de faturamento/venda
       if (isTodas) return n.obra_id !== 'escritorio' && n.obra_id !== 'sede';
       return targetIds.has(n.obra_id);
+    });
+
+    const linkedNotaIds = new Set();
+    const linkedChaves = new Set();
+    lans.forEach(l => {
+      if (l.nota_fiscal_id) linkedNotaIds.add(String(l.nota_fiscal_id));
+      if (l.chave_nfe) linkedChaves.add(String(l.chave_nfe).trim());
+      if (l.chave_acesso) linkedChaves.add(String(l.chave_acesso).trim());
     });
 
     const gastosPorMes = {};
@@ -2313,10 +2394,19 @@ const DB = {
     });
 
     notas.forEach(n => {
-      const d = String(n.data_emissao || n.data || '').slice(0, 7);
-      const val = Number(n.valor_total || n.valor_bruto || 0);
-      if (gastosPorMes[d] !== undefined) gastosPorMes[d] += val;
-      else if (d < meses[0]) gastosPorMes[meses[0]] += val;
+      const notaId = String(n.id || '');
+      const chaveAcesso = String(n.chave_acesso || n.chave_nfe || '').trim();
+      const jaVinculada = Boolean(
+        n.lancamento_id ||
+        (notaId && linkedNotaIds.has(notaId)) ||
+        (chaveAcesso && linkedChaves.has(chaveAcesso))
+      );
+      if (!jaVinculada) {
+        const d = String(n.data_emissao || n.data || '').slice(0, 7);
+        const val = Number(n.valor_total || n.valor_bruto || 0);
+        if (gastosPorMes[d] !== undefined) gastosPorMes[d] += val;
+        else if (d < meses[0]) gastosPorMes[meses[0]] += val;
+      }
     });
 
     const mesAtualKey = `${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, '0')}`;

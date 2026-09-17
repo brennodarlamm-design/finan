@@ -874,6 +874,9 @@ const App = {
     const navigation = this._navigationId = (this._navigationId || 0) + 1;
     this._charts.forEach(c => { try { c.destroy(); } catch{} });
     this._charts = [];
+    if (typeof Cobranca !== 'undefined' && typeof Cobranca.fecharModalPix === 'function') {
+      try { Cobranca.fecharModalPix(); } catch {}
+    }
 
     // Atualiza itens ativos no menu lateral
     document.querySelectorAll('.nav-item,.mobile-nav-item').forEach(el => {

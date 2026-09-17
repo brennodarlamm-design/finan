@@ -260,8 +260,27 @@ const Cobranca = {
     this.abrirModalPagamentoPix(planoId, this._selectedCycle || 'monthly');
   },
 
+  fecharModalPix() {
+    if (this._pixPollTimer) {
+      clearInterval(this._pixPollTimer);
+      this._pixPollTimer = null;
+    }
+    if (this._pixAbortController) {
+      try { this._pixAbortController.abort(); } catch {}
+      this._pixAbortController = null;
+    }
+    if (this._pixKeyHandler) {
+      window.removeEventListener('keydown', this._pixKeyHandler);
+      this._pixKeyHandler = null;
+    }
+    const m = document.getElementById('cobranca-pix-modal');
+    if (m) m.remove();
+  },
+
   // ── MODAL: PAGAMENTO VIA PIX DINÂMICO ──────────────────────────────────────
   async abrirModalPagamentoPix(planoId, cycle = this._selectedCycle || 'monthly') {
+    this.fecharModalPix();
+
     const plano = this.PLANOS[planoId] || this.PLANOS['pro'];
     const emp = (typeof DB !== 'undefined' && DB.getEmpresa()) || {};
     const u = (typeof Auth !== 'undefined' && Auth.getUser()) || {};
@@ -276,6 +295,15 @@ const Cobranca = {
       modal.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.8);display:flex;align-items:center;justify-content:center;z-index:99999;backdrop-filter:blur(6px);padding:16px;';
       document.body.appendChild(modal);
     }
+
+    this._pixKeyHandler = (e) => {
+      if (e.key === 'Escape') this.fecharModalPix();
+    };
+    window.addEventListener('keydown', this._pixKeyHandler);
+
+    modal.onclick = (e) => {
+      if (e.target === modal) this.fecharModalPix();
+    };
 
     modal.innerHTML = `<div style="background:#0f1710;border:1px solid rgba(201,162,39,.4);border-radius:14px;width:100%;max-width:540px;padding:34px;text-align:center;color:#f0ead6;"><div style="font-size:2rem;margin-bottom:10px;">⏳</div><div style="font-weight:800;">Gerando cobrança segura no servidor...</div></div>`;
 
@@ -298,15 +326,6 @@ const Cobranca = {
       const waMessage = encodeURIComponent(`Olá! Realizei o pagamento PIX da assinatura FinObra (${plano.nome} [Ciclo ${cycleLabel}] - R$ ${amountFmt}) para ${companyName}. TXID: ${inv.txid || ''}. Segue o comprovante para conferência:`);
       const waHref = whatsapp ? `https://api.whatsapp.com/send?phone=${whatsapp}&text=${waMessage}` : '#';
       const qrSrc = pixPayload ? `https://api.qrserver.com/v1/create-qr-code/?size=200x200&margin=4&data=${encodeURIComponent(pixPayload)}` : '';
-
-      // Cancela qualquer polling anterior
-      if (this._pixPollTimer) { clearInterval(this._pixPollTimer); this._pixPollTimer = null; }
-
-      const fecharModalPix = () => {
-        if (this._pixPollTimer) { clearInterval(this._pixPollTimer); this._pixPollTimer = null; }
-        const m = document.getElementById('cobranca-pix-modal');
-        if (m) m.remove();
-      };
 
       modal.innerHTML = `
         <div style="background:#090d0a;border:1px solid rgba(201,162,39,.35);border-radius:18px;width:100%;max-width:580px;max-height:92vh;display:flex;flex-direction:column;box-shadow:0 28px 70px rgba(0,0,0,.92);overflow:hidden;color:#f0ead6;font-family:inherit;">
@@ -421,8 +440,8 @@ const Cobranca = {
         </div>`;
 
       // Eventos dos botões de fechar
-      document.getElementById('pix-modal-close-btn')?.addEventListener('click', fecharModalPix);
-      document.getElementById('pix-cancel-btn')?.addEventListener('click', fecharModalPix);
+      document.getElementById('pix-modal-close-btn')?.addEventListener('click', () => this.fecharModalPix());
+      document.getElementById('pix-cancel-btn')?.addEventListener('click', () => this.fecharModalPix());
 
       // Copiar código PIX
       const input = document.getElementById('pix-copia-cola-input');
@@ -442,15 +461,30 @@ const Cobranca = {
       };
 
       // ── MONITORAMENTO DE LIQUIDAÇÃO EM TEMPO REAL (POLLING) ──────────────────
+      let pollCycles = 0;
+      const MAX_POLL_CYCLES = 225; // Limite de 15 minutos (225 ciclos x 4s)
+      this._pixAbortController = new AbortController();
+
       this._pixPollTimer = setInterval(async () => {
+        pollCycles++;
+        if (pollCycles > MAX_POLL_CYCLES) {
+          this.fecharModalPix();
+          if (typeof Utils !== 'undefined' && Utils.toast) {
+            Utils.toast('Tempo limite de verificação do PIX atingido. Se realizou o pagamento, confirme via WhatsApp.', 'warning');
+          }
+          return;
+        }
+
         try {
           const authH = (typeof Auth !== 'undefined' && Auth.getAuthHeaders) ? Auth.getAuthHeaders() : { 'Content-Type': 'application/json' };
-          const chkRes = await fetch(`/api/plano?action=check_invoice&invoiceId=${encodeURIComponent(inv.id)}`, { headers: authH });
+          const chkRes = await fetch(`/api/plano?action=check_invoice&invoiceId=${encodeURIComponent(inv.id)}`, {
+            headers: authH,
+            signal: this._pixAbortController?.signal
+          });
           const chkData = await chkRes.json().catch(() => ({}));
           
           if (chkData?.success && chkData?.paid) {
-            clearInterval(this._pixPollTimer);
-            this._pixPollTimer = null;
+            this.fecharModalPix();
 
             const stBox = document.getElementById('pix-status-box');
             if (stBox) {
@@ -473,7 +507,6 @@ const Cobranca = {
             }
 
             setTimeout(() => {
-              fecharModalPix();
               if (typeof Cobranca !== 'undefined' && Cobranca.init) {
                 Cobranca.init();
               }
@@ -488,8 +521,9 @@ const Cobranca = {
       }, 4000);
 
     } catch (err) {
-      modal.innerHTML = `<div style="background:#0f1710;border:1px solid rgba(239,68,68,.45);border-radius:14px;width:100%;max-width:520px;padding:28px;color:#f0ead6;text-align:center;"><div style="font-size:2rem;margin-bottom:10px;">⚠️</div><div style="font-weight:900;color:#fff;margin-bottom:8px;">Não foi possível gerar a cobrança</div><div id="billing-error-text" style="color:#fca5a5;font-size:.86rem;"></div><button data-fb-click="Patch26Actions.removeById" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="cobranca-pix-modal" style="margin-top:18px;padding:9px 18px;border-radius:8px;border:1px solid rgba(255,255,255,.2);background:rgba(255,255,255,.05);color:#fff;cursor:pointer;">Fechar</button></div>`;
+      modal.innerHTML = `<div style="background:#0f1710;border:1px solid rgba(239,68,68,.45);border-radius:14px;width:100%;max-width:520px;padding:28px;color:#f0ead6;text-align:center;"><div style="font-size:2rem;margin-bottom:10px;">⚠️</div><div style="font-weight:900;color:#fff;margin-bottom:8px;">Não foi possível gerar a cobrança</div><div id="billing-error-text" style="color:#fca5a5;font-size:.86rem;"></div><button id="pix-error-close-btn" data-fb-click="Patch26Actions.removeById" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="cobranca-pix-modal" style="margin-top:18px;padding:9px 18px;border-radius:8px;border:1px solid rgba(255,255,255,.2);background:rgba(255,255,255,.05);color:#fff;cursor:pointer;">Fechar</button></div>`;
       const msg = document.getElementById('billing-error-text');
       if (msg) msg.textContent = err?.message || 'Erro de comunicação com o servidor.';
+      document.getElementById('pix-error-close-btn')?.addEventListener('click', () => this.fecharModalPix());
     }
   }};

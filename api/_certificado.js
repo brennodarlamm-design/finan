@@ -6,6 +6,7 @@ import { neon } from '@neondatabase/serverless';
 import { resolveAuthAndTenant } from './_auth.js';
 import { canAccessModule, permissionError } from './_permissions.js';
 import { writeAudit } from './_audit.js';
+import { createTenantSql } from './_tenant-sql.js';
 
 const ALLOWED_ORIGINS = [
   'https://finobra.app.br',
@@ -165,7 +166,8 @@ export default async function handler(req, res) {
   if (!conn) {
     return res.status(500).json({ success: false, error: 'Banco de dados não configurado no servidor.' });
   }
-  const sql = neon(conn);
+  const baseSql = neon(conn);
+  const sql = createTenantSql(baseSql, { tenantId: auth.tenantId, isSystem: auth.isSystem === true });
 
   const action = req.query.action || (req.body && req.body.action) || (req.method === 'GET' ? 'status' : '');
 

@@ -4,6 +4,7 @@ import { neon } from '@neondatabase/serverless';
 import { resolveAuthAndTenant } from './_auth.js';
 import { canAccessModule, canWriteData, normalizeRole, permissionError } from './_permissions.js';
 import { writeAudit } from './_audit.js';
+import { createTenantSql } from './_tenant-sql.js';
 
 const clean = (v, max=80) => String(v ?? '').trim().replace(/[^A-Za-z0-9_.:@-]/g, '').slice(0,max);
 const isManager = auth => ['superadmin','admin','gestor'].includes(normalizeRole(auth?.user?.perfil));
@@ -48,7 +49,8 @@ export default async function workflowCompleteHandler(req, res) {
   const uid = actorId(auth);
   if (!obraId || !etapaId || !uid) return res.status(400).json({ success:false, code:'WORKFLOW_INVALID_INPUT', error:'Obra, etapa e usuário são obrigatórios.' });
 
-  const sql = sqlClient();
+  const baseSql = sqlClient();
+  const sql = createTenantSql(baseSql, { tenantId, isSystem: auth.isSystem === true });
   try {
     const beforeRows = await sql`
       SELECT * FROM workflow_etapas
