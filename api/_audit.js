@@ -1,9 +1,23 @@
 import crypto from 'crypto';
+import { getTrustedClientIp, recordIpFailure } from './_security-ip.js';
 
 export function requestIp(req) {
-  const fwd = req.headers['x-forwarded-for'];
-  if (typeof fwd === 'string' && fwd.trim()) return fwd.split(',')[0].trim().slice(0, 80);
-  return String(req.headers['x-real-ip'] || req.socket?.remoteAddress || '').slice(0, 80);
+  return String(getTrustedClientIp(req) || '').slice(0, 80);
+}
+
+function securityFailureFromAudit(acao, depois) {
+  const action = String(acao || '').trim();
+  const reason = String(depois?.motivo || '').trim();
+
+  if (action === 'mfa_invalido') {
+    return { reason: 'mfa_invalid', weight: 2, source: 'audit:mfa' };
+  }
+
+  if (action === 'login_bloqueado' && reason === 'invalid_password') {
+    return { reason: 'invalid_password', weight: 1, source: 'audit:login' };
+  }
+
+  return null;
 }
 
 export async function writeAudit(sql, req, auth, { acao, entidade, entidadeId = null, antes = null, depois = null }) {
@@ -22,6 +36,22 @@ export async function writeAudit(sql, req, auth, { acao, entidade, entidadeId = 
         ${ip}, ${userAgent}
       );
     `;
+
+    // Patch 56: somente falhas autenticamente hostis aumentam score.
+    // Conta inativa, tenant bloqueado ou trial expirado não punem o IP.
+    const securityFailure = securityFailureFromAudit(acao, depois);
+    if (securityFailure && ip) {
+      await recordIpFailure(sql, ip, {
+        ...securityFailure,
+        metadata: {
+          acao,
+          entidade,
+          entidadeId,
+          tenantId: tenantId || null,
+          userId: userId || null
+        }
+      });
+    }
   } catch (err) {
     // Auditoria não deve derrubar a operação principal, mas deve aparecer nos logs.
     console.error('[Audit] Falha ao registrar evento:', err.message);
