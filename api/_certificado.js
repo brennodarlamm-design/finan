@@ -49,6 +49,10 @@ function getEncryptionSecrets() {
 }
 
 function encryptCertData(pfxBuffer, passphrase) {
+  const dedicated = String(process.env.CERT_ENCRYPTION_KEY || '').trim();
+  if (!dedicated) {
+    console.warn('⚠️ [Segurança] CERT_ENCRYPTION_KEY não configurada no servidor. Recomenda-se chave dedicada para isolamento criptográfico.');
+  }
   const { primary } = getEncryptionSecrets();
   const key = deriveEncryptionKey(primary);
   const iv = crypto.randomBytes(12);

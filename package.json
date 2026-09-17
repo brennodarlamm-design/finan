@@ -69,5 +69,8 @@
   },
   "devDependencies": {
     "@electric-sql/pglite": "^0.5.8"
+  },
+  "overrides": {
+    "ws": "^8.21.3"
   }
 }

@@ -1,7 +1,7 @@
 // api/users.js — Gestão de usuários por tenant (Neon)
 import { neon } from '@neondatabase/serverless';
 import crypto from 'crypto';
-import { hashPassword, verifyPassword, resolveAuthAndTenant } from './_auth.js';
+import { hashPassword, verifyPassword, resolveAuthAndTenant, getInternalApiSecret } from './_auth.js';
 import { writeAudit } from './_audit.js';
 import { canManageUsers, canManageTenant, permissionError, sanitizePermissions } from './_permissions.js';
 import { getPlanRule, minimumPlanForUsers, upgradeDescriptor } from './_plans.js';
@@ -300,7 +300,7 @@ function renderSupportEmailHtml(vars) {
 async function notifySupportHuman({ tenantName, userName, userEmail, conversationId, message }) {
   const tasks = [];
   const notifyPhone = String(process.env.FINOBRA_SUPPORT_WHATSAPP || '5595991363678').replace(/\D/g, '');
-  const internalSecret = String(process.env.API_SECRET || process.env.VERCEL_API_SECRET || '').trim();
+  const internalSecret = getInternalApiSecret();
   if (notifyPhone && internalSecret) {
     const text = `🔔 *FinObra — Atendimento solicitado*\n\nEmpresa: ${tenantName || 'Cliente'}\nUsuário: ${userName || 'Usuário'}\nChamado: ${conversationId}\nMensagem: ${cleanSupportText(message, 500) || 'Cliente solicitou atendimento humano.'}\n\nAbra o painel Master > Central de Atendimento.`;
     tasks.push(fetch(`${getSupportRenderBaseUrl()}/send-message`, {

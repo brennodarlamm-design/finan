@@ -95,6 +95,57 @@ const Utils = {
     }
   },
 
+  sanitizeHtml(dirty) {
+    if (!dirty) return '';
+    if (typeof window === 'undefined' || !window.DOMParser) return this.escapeHtml(dirty);
+    try {
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(String(dirty), 'text/html');
+      const ALLOWED_TAGS = new Set([
+        'b', 'i', 'u', 'em', 'strong', 'a', 'p', 'br', 'span', 'ul', 'ol', 'li',
+        'code', 'pre', 'blockquote', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'hr'
+      ]);
+      const ALLOWED_ATTRS = new Set(['href', 'target', 'rel', 'class', 'title']);
+
+      function cleanNode(node) {
+        const toRemove = [];
+        for (let i = 0; i < node.childNodes.length; i++) {
+          const child = node.childNodes[i];
+          if (child.nodeType === 1) {
+            const tag = child.tagName.toLowerCase();
+            if (!ALLOWED_TAGS.has(tag)) {
+              toRemove.push(child);
+              continue;
+            }
+            const attrs = Array.from(child.attributes);
+            for (const attr of attrs) {
+              const name = attr.name.toLowerCase();
+              if (name.startsWith('on') || !ALLOWED_ATTRS.has(name)) {
+                child.removeAttribute(attr.name);
+              } else if (name === 'href') {
+                const val = String(attr.value || '').trim().toLowerCase();
+                if (val.startsWith('javascript:') || val.startsWith('data:') || val.startsWith('vbscript:')) {
+                  child.removeAttribute('href');
+                }
+              }
+            }
+            cleanNode(child);
+          } else if (child.nodeType !== 3) {
+            toRemove.push(child);
+          }
+        }
+        for (const bad of toRemove) {
+          bad.remove();
+        }
+      }
+
+      cleanNode(doc.body);
+      return doc.body.innerHTML;
+    } catch {
+      return this.escapeHtml(dirty);
+    }
+  },
+
   today() {
     // Retorna YYYY-MM-DD no fuso horário oficial (America/Boa_Vista, UTC-4), evitando virada indevida de data às 20h UTC
     try {

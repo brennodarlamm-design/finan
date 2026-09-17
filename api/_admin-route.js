@@ -3,7 +3,7 @@
 
 import { neon } from '@neondatabase/serverless';
 import crypto from 'crypto';
-import { hashPassword, verifyPassword, resolveAuthAndTenant, signToken, verifyToken } from './_auth.js';
+import { hashPassword, verifyPassword, resolveAuthAndTenant, signToken, verifyToken, getSessionSigningSecret, getInternalApiSecret } from './_auth.js';
 import { generateBackupCodes } from './_totp.js';
 import { writeAudit } from './_audit.js';
 import { parseWebhookPayload, settlePixPayment, sendPaymentReceipt } from './_webhook_pix_core.js';
@@ -898,7 +898,7 @@ export default async function handler(req, res) {
         } else {
           try {
             const renderBaseUrl = (process.env.RENDER_WHATSAPP_URL || 'https://finan-backend-9rxw.onrender.com').replace(/\/send-message\/?$/, '').replace(/\/+$/, '');
-            const secret = (process.env.API_SECRET || process.env.VERCEL_API_SECRET || '').trim();
+            const secret = getInternalApiSecret();
 
             const wpRes = await fetch(`${renderBaseUrl}/send-message`, {
               method: 'POST',
@@ -1011,7 +1011,7 @@ export default async function handler(req, res) {
     // ── POST ?action=trigger_billing_sweep (Disparar Varredura de Cobrança 24/7) ──
     if (req.method === 'POST' && action === 'trigger_billing_sweep') {
       const renderBaseUrl = (process.env.RENDER_WHATSAPP_URL || 'https://finan-backend-9rxw.onrender.com').replace(/\/send-message\/?$/, '').replace(/\/+$/, '');
-      const secret = (process.env.API_SECRET || process.env.VERCEL_API_SECRET || '').trim();
+      const secret = getInternalApiSecret();
       const forcedTenantId = req.body?.tenantId || null;
 
       let sweepResult = null;
@@ -1433,7 +1433,7 @@ export default async function handler(req, res) {
       }
 
       const target = tenantRows[0];
-      const secret = (process.env.API_SECRET || process.env.VERCEL_API_SECRET || '').trim();
+      const secret = getSessionSigningSecret();
       const originalCredential = requestCredential(req);
       const originalPayload = originalCredential ? verifyToken(originalCredential, secret) : null;
       const liveSessionId = String(auth.user?.sessionId || '');
@@ -1500,7 +1500,7 @@ export default async function handler(req, res) {
     }
 
     if (req.method === 'POST' && action === 'restore_master_session') {
-      const secret = (process.env.API_SECRET || process.env.VERCEL_API_SECRET || '').trim();
+      const secret = getSessionSigningSecret();
       let restoreToken = readCookie(req, MASTER_RESTORE_COOKIE);
       let payload = restoreToken ? verifyToken(restoreToken, secret) : null;
       let recoveredFromImpersonatedSession = false;
