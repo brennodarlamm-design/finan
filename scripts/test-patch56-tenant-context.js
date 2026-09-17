@@ -17,7 +17,7 @@ function makeFakeNeon() {
   const calls = [];
 
   function txn(strings, ...values) {
-    if (Array.isArray(strings) && Object.prototype.hasOwnProperty.call(strings, 'raw')) {
+    if (Array.isArray(strings) && Array.isArray(strings.raw)) {
       return { kind: 'template', text: strings.join('?'), values };
     }
     return { kind: 'raw', text: String(strings || ''), values };
@@ -78,8 +78,8 @@ await systemSql`SELECT 1;`;
 assert.strictEqual(systemFake.calls[0][0].values[0], '', 'Contexto system pode operar sem tenant específico.');
 assert.strictEqual(systemFake.calls[0][0].values[1], 'true', 'Contexto system precisa ser explícito.');
 
-assert.throws(
-  () => sql('SELECT 1'),
+await assert.rejects(
+  async () => sql('SELECT 1'),
   /tagged template/,
   'Wrapper não deve aceitar SQL bruto fora do tagged template.'
 );
