@@ -167,15 +167,15 @@ const Lancamentos = {
         <td style="text-align:center;">${clipBadge}</td>
         <td style="text-align:center;font-size:14px">${l.conciliado?'&#x2705;':'&#x23F3;'}</td>
         <td style="text-align:center;">
-          <div style="display:flex;gap:4px;justify-content:center;align-items:center;">
+          <div style="display:flex;gap:8px;justify-content:center;align-items:center;">
             ${!isBaixado ? `
-            <button class="btn btn-sm btn-success" data-fb-click="Lancamentos.marcarBaixa" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(l.id))}" title="Dar Baixa (Confirmar Pagamento/Recebimento)" style="font-size:.72rem;padding:3px 7px;">
+            <button class="btn btn-sm btn-success" data-fb-click="Lancamentos.marcarBaixa" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(l.id))}" title="Dar Baixa (Confirmar Pagamento/Recebimento)" style="font-size:.78rem;padding:6px 12px;min-height:36px;font-weight:700;">
               ✓ Baixar
             </button>` : ''}
-            <button class="icon-btn" data-fb-click="Patch26Actions.lancamentoAlertById" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(l.id))}" title="Enviar Alerta no WhatsApp" style="font-size:13px;color:#25D366;">📲</button>
-            <button class="icon-btn" data-fb-click="Lancamentos.emitirRecibo" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(l.id))}" title="Emitir Recibo Oficial" style="font-size:13px">&#x1F9FE;</button>
-            <button class="icon-btn" data-fb-click="Lancamentos.showForm" data-fb-click-n="2" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(l.tipo))}" data-fb-click-t1="string" data-fb-click-v1="${encodeURIComponent(String(l.id))}" title="Editar" style="font-size:13px">&#x270F;&#xFE0F;</button>
-            <button class="icon-btn" data-fb-click="Lancamentos.del" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(l.id))}" title="Excluir" style="font-size:13px;color:var(--danger)">&#x1F5D1;&#xFE0F;</button>
+            <button class="icon-btn" data-fb-click="Patch26Actions.lancamentoAlertById" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(l.id))}" title="Enviar Alerta no WhatsApp" style="font-size:13px;color:#25D366;min-width:32px;min-height:32px;">📲</button>
+            <button class="icon-btn" data-fb-click="Lancamentos.emitirRecibo" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(l.id))}" title="Emitir Recibo Oficial" style="font-size:13px;min-width:32px;min-height:32px;">&#x1F9FE;</button>
+            <button class="icon-btn" data-fb-click="Lancamentos.showForm" data-fb-click-n="2" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(l.tipo))}" data-fb-click-t1="string" data-fb-click-v1="${encodeURIComponent(String(l.id))}" title="Editar" style="font-size:13px;min-width:32px;min-height:32px;">&#x270F;&#xFE0F;</button>
+            <button class="icon-btn" data-fb-click="Lancamentos.del" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(l.id))}" title="Excluir" style="font-size:13px;color:var(--danger);min-width:32px;min-height:32px;">&#x1F5D1;&#xFE0F;</button>
           </div>
         </td>
       </tr>`;
@@ -306,28 +306,28 @@ const Lancamentos = {
             </div>
             
             <div class="form-row cols-2" style="margin-bottom:14px;">
-              <div class="form-group"><label class="form-label">Obra / Centro de Custo *</label><select class="form-control" name="obra_id" required>${Utils.clienteOptions(l.obra_id||(App.obraId!=='todas'?App.obraId:''), 'Selecione centro...', true)}</select></div>
-              <div class="form-group"><label class="form-label">Valor (R$) *</label><div class="input-prefix"><span class="input-pfx-txt">R$</span><input name="valor" type="number" value="${l.valor||''}" step="0.01" min="0" required placeholder="0,00"></div></div>
+              <div class="form-group"><label class="form-label" for="lan-obra-id">Obra / Centro de Custo *</label><select class="form-control" id="lan-obra-id" name="obra_id" required>${Utils.clienteOptions(l.obra_id||(App.obraId!=='todas'?App.obraId:''), 'Selecione centro...', true)}</select></div>
+              <div class="form-group"><label class="form-label" for="lan-valor">Valor (R$) *</label><div class="input-prefix"><span class="input-pfx-txt">R$</span><input id="lan-valor" name="valor" type="number" value="${l.valor||''}" step="0.01" min="0" required placeholder="0,00"></div></div>
             </div>
 
             <div class="form-row cols-2" style="margin-bottom:14px;">
               <div class="form-group">
-                <label class="form-label">Data de Compet&ecirc;ncia / Emiss&atilde;o *</label>
-                <input class="form-control" type="date" name="data" value="${l.data||hoje}" required>
+                <label class="form-label" for="lan-data">Data de Compet&ecirc;ncia / Emiss&atilde;o *</label>
+                <input class="form-control" id="lan-data" type="date" name="data" value="${l.data||hoje}" required>
               </div>
               <div class="form-group">
-                <label class="form-label">Data de Vencimento / Previs&atilde;o *</label>
-                <input class="form-control" type="date" name="data_vencimento" value="${l.data_vencimento||l.data||hoje}" required>
+                <label class="form-label" for="lan-data-venc">Data de Vencimento / Previs&atilde;o *</label>
+                <input class="form-control" id="lan-data-venc" type="date" name="data_vencimento" value="${l.data_vencimento||l.data||hoje}" required>
               </div>
             </div>
 
             <div class="form-group" style="margin-bottom:14px;">
-              <label class="form-label">Descri&ccedil;&atilde;o *</label>
-              <input class="form-control" name="descricao" value="${l.descricao||''}" required placeholder="Ex: Compra de cimento para fundação">
+              <label class="form-label" for="lan-descricao">Descri&ccedil;&atilde;o *</label>
+              <input class="form-control" id="lan-descricao" name="descricao" value="${l.descricao||''}" required placeholder="Ex: Compra de cimento para fundação">
             </div>
 
             <div class="form-group" style="margin-bottom:14px;">
-              <label class="form-label">Fornecedor / Beneficiário / Favorecido</label>
+              <label class="form-label" for="lan-forn-sel">Fornecedor / Beneficiário / Favorecido</label>
               <div style="display:flex;gap:8px;align-items:center;">
                 <select class="form-control" id="lan-forn-sel" data-fb-change="Lancamentos._onFornecedorChange" data-fb-change-n="1" data-fb-change-t0="self" style="flex:1;">
                   ${typeof Fornecedores !== 'undefined' ? Fornecedores.fornecedorOptions(l.fornecedor_beneficiario||'') : '<option value="">Sem fornecedores cadastrados</option>'}
@@ -341,13 +341,13 @@ const Lancamentos = {
             </div>
 
             <div class="form-row cols-2" style="margin-bottom:14px;">
-              <div class="form-group"><label class="form-label">Categoria *</label><select class="form-control" name="categoria" required>${cats.map(([v,t])=>`<option value="${v}" ${l.categoria===v?'selected':''}>${t}</option>`).join('')}</select></div>
-              <div class="form-group"><label class="form-label">Status *</label><select class="form-control" name="status" id="lan-status-sel" data-fb-change="Lancamentos._onStatusChange" data-fb-change-n="1" data-fb-change-t0="value" required>${statOpts.map(([v,t])=>`<option value="${v}" ${(l.status||statOpts[0][0])===v?'selected':''}>${t}</option>`).join('')}</select></div>
+              <div class="form-group"><label class="form-label" for="lan-categoria">Categoria *</label><select class="form-control" id="lan-categoria" name="categoria" required>${cats.map(([v,t])=>`<option value="${v}" ${l.categoria===v?'selected':''}>${t}</option>`).join('')}</select></div>
+              <div class="form-group"><label class="form-label" for="lan-status-sel">Status *</label><select class="form-control" name="status" id="lan-status-sel" data-fb-change="Lancamentos._onStatusChange" data-fb-change-n="1" data-fb-change-t0="value" required>${statOpts.map(([v,t])=>`<option value="${v}" ${(l.status||statOpts[0][0])===v?'selected':''}>${t}</option>`).join('')}</select></div>
             </div>
 
             <!-- CAMPO: DATA DE PAGAMENTO / RECEBIMENTO -->
             <div class="form-group" id="lan-data-pagamento-group" style="margin-bottom:14px;display:${isPagoOuRec?'block':'none'};background:rgba(16,185,129,.05);border:1px solid rgba(16,185,129,.2);border-radius:8px;padding:10px 12px;">
-              <label class="form-label" id="lan-data-pagamento-label" style="color:var(--success);font-weight:700;margin-bottom:4px;">
+              <label class="form-label" id="lan-data-pagamento-label" for="lan-data-pagamento" style="color:var(--success);font-weight:700;margin-bottom:4px;">
                 ${initialTipo === 'receita' ? '✓ Data Efetiva do Recebimento' : '✓ Data Efetiva do Pagamento'}
               </label>
               <input class="form-control" type="date" name="data_pagamento" id="lan-data-pagamento" value="${l.data_pagamento || (isPagoOuRec ? l.data : hoje)}" style="border-color:var(--success);background:var(--bg-card);">
@@ -356,7 +356,7 @@ const Lancamentos = {
 
             <!-- Seleção de Conta Bancária Vinculada -->
             <div class="form-group" style="margin-bottom:14px;">
-              <label class="form-label">Conta Banc&aacute;ria</label>
+              <label class="form-label" for="lan-conta-sel">Conta Banc&aacute;ria</label>
               <div style="display:flex;gap:8px;align-items:center;">
                 <select class="form-control" id="lan-conta-sel" data-fb-change="Lancamentos._onContaChange" data-fb-change-n="1" data-fb-change-t0="self" style="flex:1;">
                   ${typeof Contas !== 'undefined' ? Contas.contaOptions(contaAtual) : `<option value="">Nenhuma conta</option>`}
@@ -367,24 +367,24 @@ const Lancamentos = {
             </div>
 
             <div class="form-group" style="margin-bottom:14px;">
-              <label class="form-label">Linha Digit&aacute;vel / C&oacute;digo de Barras do Boleto / Chave Pix</label>
-              <input class="form-control" name="codigo_barras" value="${Utils.escapeHtml(l.codigo_barras||'')}" placeholder="Ex: 34191.79001 01043.510047 91020.150008 5 98760000012000" style="font-family:monospace;font-size:.82rem;">
+              <label class="form-label" for="lan-cod-barras">Linha Digit&aacute;vel / C&oacute;digo de Barras do Boleto / Chave Pix</label>
+              <input class="form-control" id="lan-cod-barras" name="codigo_barras" value="${Utils.escapeHtml(l.codigo_barras||'')}" placeholder="Ex: 34191.79001 01043.510047 91020.150008 5 98760000012000" style="font-family:monospace;font-size:.82rem;">
             </div>
 
             <div class="form-group" id="lan-nf-group" style="margin-bottom:14px;display:${initialTipo==='despesa'?'block':'none'};">
-              <label class="form-label">Vincular Nota Fiscal</label>
-              <select class="form-control" name="nota_fiscal_id">
+              <label class="form-label" for="lan-nf-sel">Vincular Nota Fiscal</label>
+              <select class="form-control" id="lan-nf-sel" name="nota_fiscal_id">
                 <option value="">Nenhuma NF vinculada</option>
                 ${notas.filter(n=>n.tipo==='entrada').map(n=>`<option value="${n.id}" ${l.nota_fiscal_id===n.id?'selected':''}>NF ${n.numero_nf||'S/N'} &mdash; ${(n.emitente||'Sem emitente').slice(0,30)} (${Utils.fmt.currency(n.valor_bruto !== undefined ? n.valor_bruto : (n.valor_total || 0))})</option>`).join('')}
               </select>
             </div>
 
             <div class="form-row cols-2" style="margin-bottom:14px;">
-              <div class="form-group"><label class="form-label">Conciliado?</label><select class="form-control" name="conciliado"><option value="true" ${l.conciliado?'selected':''}>&#x2705; Sim</option><option value="false" ${!l.conciliado?'selected':''}>&#x23F3; N&atilde;o</option></select></div>
-              <div class="form-group"><label class="form-label">Origem</label><select class="form-control" name="origem"><option value="manual" ${(l.origem||'manual')==='manual'?'selected':''}>&#x270D; Manual</option><option value="ocr" ${l.origem==='ocr'?'selected':''}>🤖 Reconhecimento OCR</option><option value="ofx" ${l.origem==='ofx'?'selected':''}>&#x1F504; Importado OFX</option><option value="importacao_excel" ${l.origem==='importacao_excel'?'selected':''}>📊 Planilha Excel</option><option value="medicao" ${l.origem==='medicao'?'selected':''}>&#x1F4CB; Medi&ccedil;&atilde;o Caixa</option></select></div>
+              <div class="form-group"><label class="form-label" for="lan-conciliado">Conciliado?</label><select class="form-control" id="lan-conciliado" name="conciliado"><option value="true" ${l.conciliado?'selected':''}>&#x2705; Sim</option><option value="false" ${!l.conciliado?'selected':''}>&#x23F3; N&atilde;o</option></select></div>
+              <div class="form-group"><label class="form-label" for="lan-origem">Origem</label><select class="form-control" id="lan-origem" name="origem"><option value="manual" ${(l.origem||'manual')==='manual'?'selected':''}>&#x270D; Manual</option><option value="ocr" ${l.origem==='ocr'?'selected':''}>🤖 Reconhecimento OCR</option><option value="ofx" ${l.origem==='ofx'?'selected':''}>&#x1F504; Importado OFX</option><option value="importacao_excel" ${l.origem==='importacao_excel'?'selected':''}>📊 Planilha Excel</option><option value="medicao" ${l.origem==='medicao'?'selected':''}>&#x1F4CB; Medi&ccedil;&atilde;o Caixa</option></select></div>
             </div>
 
-            <div class="form-group"><label class="form-label">Observa&ccedil;&otilde;es</label><textarea class="form-control" name="observacoes" rows="2" placeholder="Observações adicionais ou notas">${Utils.escapeHtml(l.observacoes||'')}</textarea></div>
+            <div class="form-group"><label class="form-label" for="lan-obs">Observa&ccedil;&otilde;es</label><textarea class="form-control" id="lan-obs" name="observacoes" rows="2" placeholder="Observações adicionais ou notas">${Utils.escapeHtml(l.observacoes||'')}</textarea></div>
 
             <!-- SEÇÃO DE ITENS / PRODUTOS -->
             <div id="lan-itens-container" style="display:${initialTipo==='despesa'?'block':'none'};">

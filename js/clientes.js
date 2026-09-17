@@ -132,9 +132,9 @@ const Clientes = {
           </button>
           <button class="btn btn-secondary btn-sm" style="background:rgba(18,217,160,.12);color:var(--accent);border-color:rgba(18,217,160,.3);font-weight:700;" data-fb-click="PortalCliente.abrirModalCompartilhar" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(c.id))}" title="Compartilhar Portal do Cliente via Link / WhatsApp">🌐 Portal</button>
           <button class="btn btn-secondary btn-sm" style="flex:1" data-fb-click="Patch26Actions.openObra" data-fb-click-n="2" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(c.id))}" data-fb-click-t1="string" data-fb-click-v1="lancamentos" title="Ver lançamentos financeiros">💰 Extrato</button>
-          <button class="btn btn-secondary btn-sm" data-fb-click="Patch26Actions.openObra" data-fb-click-n="2" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(c.id))}" data-fb-click-t1="string" data-fb-click-v1="documentos" title="Percurso Documental (43 docs)" style="padding:4px 10px">📋</button>
-          <button class="icon-btn btn-sm" data-fb-click="Clientes.showForm" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(c.id))}" title="Editar">✏️</button>
-          <button class="icon-btn btn-sm" style="color:var(--danger)" data-fb-click="Clientes.del" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(c.id))}" title="Excluir">🗑️</button>
+          <button class="btn btn-secondary btn-sm" data-fb-click="Patch26Actions.openObra" data-fb-click-n="2" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(c.id))}" data-fb-click-t1="string" data-fb-click-v1="documentos" title="Percurso Documental (43 docs)" style="padding:6px 12px;min-height:38px;">📋</button>
+          <button class="icon-btn btn-sm" data-fb-click="Clientes.showForm" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(c.id))}" title="Editar" style="min-width:38px;min-height:38px;">✏️</button>
+          <button class="icon-btn btn-sm" style="color:var(--danger);min-width:38px;min-height:38px;margin-left:4px;" data-fb-click="Clientes.del" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(c.id))}" title="Excluir">🗑️</button>
         </div>
       </div>`;
     }).join('');
@@ -183,7 +183,7 @@ const Clientes = {
           <form id="f-cli">
             <div class="form-row cols-2" style="margin-bottom:14px;">
               <div class="form-group">
-                <label class="form-label" style="font-weight:700;color:var(--accent);">Modalidade da Obra *</label>
+                <label class="form-label" for="cli-modalidade" style="font-weight:700;color:var(--accent);">Modalidade da Obra *</label>
                 <select class="form-control" name="modalidade_obra" id="cli-modalidade" data-fb-change="Clientes.onModalidadeChange" data-fb-change-n="1" data-fb-change-t0="value">
                   <option value="caixa" ${isCaixa?'selected':''}>🏦 Financiamento Caixa Econômica (PCI / SBPE / MCMV)</option>
                   <option value="particular" ${c.modalidade_obra==='particular'?'selected':''}>💼 Obra Particular / Recursos Próprios</option>
@@ -194,7 +194,7 @@ const Clientes = {
                 </select>
               </div>
               <div class="form-group">
-                <label class="form-label" style="font-weight:700;color:var(--accent2);">Template de Workflow (SLA)</label>
+                <label class="form-label" for="cli-workflow" style="font-weight:700;color:var(--accent2);">Template de Workflow (SLA)</label>
                 <select class="form-control" name="tipo_workflow" id="cli-workflow">
                   <option value="">⚙️ Automático pela modalidade</option>
                   <option value="casa_caixa" ${c.tipo_workflow==='casa_caixa'?'selected':''}>🏦 Casa Caixa (MCMV / SBPE)</option>
@@ -205,46 +205,46 @@ const Clientes = {
               </div>
             </div>
             <div class="form-row cols-2" style="margin-bottom:14px;">
-              <div class="form-group"><label class="form-label">Nome Completo / Proprietário *</label><input class="form-control" name="nome" value="${e(c.nome||'')}" required placeholder="Nome do proprietário ou cliente"></div>
-              <div class="form-group"><label class="form-label">CPF/CNPJ *</label><input class="form-control" name="cpf_cnpj" value="${e(c.cpf_cnpj||'')}" required placeholder="000.000.000-00"></div>
+              <div class="form-group"><label class="form-label" for="cli-nome">Nome Completo / Proprietário *</label><input class="form-control" id="cli-nome" name="nome" value="${e(c.nome||'')}" required placeholder="Nome do proprietário ou cliente"></div>
+              <div class="form-group"><label class="form-label" for="cli-cpf-cnpj">CPF/CNPJ *</label><input class="form-control" id="cli-cpf-cnpj" name="cpf_cnpj" value="${e(c.cpf_cnpj||'')}" required placeholder="000.000.000-00"></div>
             </div>
             <div class="form-row cols-2" style="margin-bottom:14px;">
-              <div class="form-group"><label class="form-label">Telefone</label><input class="form-control" name="telefone" value="${e(c.telefone||'')}" placeholder="(00) 00000-0000"></div>
-              <div class="form-group"><label class="form-label">E-mail</label><input class="form-control" type="email" name="email" value="${e(c.email||'')}" placeholder="email@exemplo.com"></div>
+              <div class="form-group"><label class="form-label" for="cli-telefone">Telefone</label><input class="form-control" id="cli-telefone" name="telefone" value="${e(c.telefone||'')}" placeholder="(00) 00000-0000"></div>
+              <div class="form-group"><label class="form-label" for="cli-email">E-mail</label><input class="form-control" type="email" id="cli-email" name="email" value="${e(c.email||'')}" placeholder="email@exemplo.com"></div>
             </div>
-            <div class="form-group" style="margin-bottom:14px;"><label class="form-label">Endereço da Obra</label><input class="form-control" name="endereco" value="${e(c.endereco||'')}" placeholder="Rua, número, bairro"></div>
+            <div class="form-group" style="margin-bottom:14px;"><label class="form-label" for="cli-endereco">Endereço da Obra</label><input class="form-control" id="cli-endereco" name="endereco" value="${e(c.endereco||'')}" placeholder="Rua, número, bairro"></div>
             <div class="form-row cols-3" style="margin-bottom:14px;">
-              <div class="form-group"><label class="form-label">Cidade *</label><input class="form-control" name="cidade" value="${e(c.cidade||'')}" required placeholder="Cidade"></div>
-              <div class="form-group"><label class="form-label">Estado</label><select class="form-control" name="estado">${Utils.stateOptions(c.estado || tenantUF)}</select></div>
-              <div class="form-group"><label class="form-label">CEP</label><input class="form-control" name="cep" id="cli-cep" value="${e(c.cep||'')}" placeholder="00000-000" data-fb-blur="Clientes.onCepChange" data-fb-blur-n="1" data-fb-blur-t0="self"></div>
+              <div class="form-group"><label class="form-label" for="cli-cidade">Cidade *</label><input class="form-control" id="cli-cidade" name="cidade" value="${e(c.cidade||'')}" required placeholder="Cidade"></div>
+              <div class="form-group"><label class="form-label" for="cli-estado">Estado</label><select class="form-control" id="cli-estado" name="estado">${Utils.stateOptions(c.estado || tenantUF)}</select></div>
+              <div class="form-group"><label class="form-label" for="cli-cep">CEP</label><input class="form-control" name="cep" id="cli-cep" value="${e(c.cep||'')}" placeholder="00000-000" data-fb-blur="Clientes.onCepChange" data-fb-blur-n="1" data-fb-blur-t0="self"></div>
             </div>
             <div class="divider"></div>
             <div class="form-row cols-2" style="margin-bottom:14px;">
               <div class="form-group">
-                <label class="form-label" id="lbl-contrato">${isCaixa ? 'Nº Contrato Caixa *' : 'Nº do Contrato / Referência'}</label>
+                <label class="form-label" id="lbl-contrato" for="inp-contrato">${isCaixa ? 'Nº Contrato Caixa *' : 'Nº do Contrato / Referência'}</label>
                 <input class="form-control" name="num_contrato_caixa" id="inp-contrato" value="${e(c.num_contrato_caixa||'')}" ${isCaixa ? 'required' : ''} placeholder="${isCaixa ? '0000000-0/0000' : 'Ex: CTR-2026/01 ou Direto'}">
               </div>
               <div class="form-group">
-                <label class="form-label" id="lbl-agencia">${isCaixa ? 'Agência Caixa' : 'Banco / Agência ou Local'}</label>
-                <input class="form-control" name="agencia_caixa" value="${e(c.agencia_caixa||'')}" placeholder="${isCaixa ? '0000 — Nome Agência' : 'Ex: 0000 — Itaú / Direto'}">
+                <label class="form-label" id="lbl-agencia" for="cli-agencia">${isCaixa ? 'Agência Caixa' : 'Banco / Agência ou Local'}</label>
+                <input class="form-control" id="cli-agencia" name="agencia_caixa" value="${e(c.agencia_caixa||'')}" placeholder="${isCaixa ? '0000 — Nome Agência' : 'Ex: 0000 — Itaú / Direto'}">
               </div>
             </div>
             <div class="form-row cols-3" style="margin-bottom:14px;">
               <div class="form-group">
-                <label class="form-label" id="lbl-val-fin">${isCaixa ? 'Valor Financiado *' : 'Valor Contratado / Total *'}</label>
-                <div class="input-prefix"><span class="input-pfx-txt">R$</span><input name="valor_financiado" type="number" value="${e(c.valor_financiado||'')}" step="0.01" min="0" required placeholder="0,00"></div>
+                <label class="form-label" id="lbl-val-fin" for="cli-val-fin">${isCaixa ? 'Valor Financiado *' : 'Valor Contratado / Total *'}</label>
+                <div class="input-prefix"><span class="input-pfx-txt">R$</span><input id="cli-val-fin" name="valor_financiado" type="number" value="${e(c.valor_financiado||'')}" step="0.01" min="0" required placeholder="0,00"></div>
               </div>
               <div class="form-group">
-                <label class="form-label" id="lbl-val-prop">${isCaixa ? 'Valor Próprio (Entrada)' : 'Aporte Inicial / Entrada'}</label>
-                <div class="input-prefix"><span class="input-pfx-txt">R$</span><input name="valor_proprio" type="number" value="${e(c.valor_proprio||'')}" step="0.01" min="0" placeholder="0,00"></div>
+                <label class="form-label" id="lbl-val-prop" for="cli-val-prop">${isCaixa ? 'Valor Próprio (Entrada)' : 'Aporte Inicial / Entrada'}</label>
+                <div class="input-prefix"><span class="input-pfx-txt">R$</span><input id="cli-val-prop" name="valor_proprio" type="number" value="${e(c.valor_proprio||'')}" step="0.01" min="0" placeholder="0,00"></div>
               </div>
-              <div class="form-group"><label class="form-label">Área Construída</label><div class="input-prefix"><span class="input-pfx-txt">m²</span><input name="area_construida" type="number" value="${e(c.area_construida||'')}" min="0" placeholder="0"></div></div>
+              <div class="form-group"><label class="form-label" for="cli-area">Área Construída</label><div class="input-prefix"><span class="input-pfx-txt">m²</span><input id="cli-area" name="area_construida" type="number" value="${e(c.area_construida||'')}" min="0" placeholder="0"></div></div>
             </div>
             <div class="form-row cols-3" style="margin-bottom:14px;">
-              <div class="form-group"><label class="form-label">Data Início</label><input class="form-control" type="date" name="data_inicio" value="${e(c.data_inicio||'')}"></div>
-              <div class="form-group"><label class="form-label">Previsão Término</label><input class="form-control" type="date" name="data_previsao_termino" value="${e(c.data_previsao_termino||'')}"></div>
-              <div class="form-group"><label class="form-label">Status</label>
-                <select class="form-control" name="status">
+              <div class="form-group"><label class="form-label" for="cli-dt-inicio">Data Início</label><input class="form-control" type="date" id="cli-dt-inicio" name="data_inicio" value="${e(c.data_inicio||'')}"></div>
+              <div class="form-group"><label class="form-label" for="cli-dt-termino">Previsão Término</label><input class="form-control" type="date" id="cli-dt-termino" name="data_previsao_termino" value="${e(c.data_previsao_termino||'')}"></div>
+              <div class="form-group"><label class="form-label" for="cli-status">Status</label>
+                <select class="form-control" id="cli-status" name="status">
                   <option value="em_andamento" ${(c.status||'em_andamento')==='em_andamento'?'selected':''}>Em Andamento</option>
                   <option value="documentacao" ${c.status==='documentacao'?'selected':''}>Documentação</option>
                   <option value="aprovada" ${c.status==='aprovada'?'selected':''}>Aprovada</option>
@@ -254,8 +254,8 @@ const Clientes = {
                 </select>
               </div>
             </div>
-            <div class="form-group" style="margin-bottom:14px;"><label class="form-label">Engenheiro / Responsável Técnico</label><input class="form-control" name="engenheiro_responsavel" value="${e(c.engenheiro_responsavel||'')}" placeholder="Nome e CREA/CAU"></div>
-            <div class="form-group"><label class="form-label">Observações</label><textarea class="form-control" name="observacoes" rows="2">${e(c.observacoes||'')}</textarea></div>
+            <div class="form-group" style="margin-bottom:14px;"><label class="form-label" for="cli-rt">Engenheiro / Responsável Técnico</label><input class="form-control" id="cli-rt" name="engenheiro_responsavel" value="${e(c.engenheiro_responsavel||'')}" placeholder="Nome e CREA/CAU"></div>
+            <div class="form-group" style="margin-bottom:14px;"><label class="form-label" for="cli-obs">Observações</label><textarea class="form-control" id="cli-obs" name="observacoes" rows="2">${e(c.observacoes||'')}</textarea></div>
           </form>
         </div>
         <div class="modal-footer">

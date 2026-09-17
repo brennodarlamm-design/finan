@@ -574,5 +574,103 @@ const Utils = {
       console.warn('[Utils] Erro ao consultar CEP:', e);
       return null;
     }
+  },
+
+  renderKpiSkeletons(count = 6) {
+    return `
+      <div class="kpi-grid">
+        ${Array(count).fill(0).map(() => `
+          <div class="kpi-card" style="position:relative;overflow:hidden;">
+            <div class="skeleton" style="width:36px;height:36px;border-radius:10px;margin-bottom:12px;"></div>
+            <div class="skeleton skeleton-kpi-label"></div>
+            <div class="skeleton skeleton-kpi-value"></div>
+            <div class="skeleton skeleton-kpi-change"></div>
+          </div>
+        `).join('')}
+      </div>
+    `;
+  },
+
+  renderTableSkeleton({ cols = 6, rows = 6 } = {}) {
+    return `
+      <div class="card" style="padding:0;overflow:hidden;margin-bottom:16px;">
+        <div class="tbl-wrap" style="border:none;">
+          <table style="width:100%;">
+            <thead>
+              <tr>
+                ${Array(cols).fill(0).map(() => `
+                  <th style="padding:12px 14px;">
+                    <div class="skeleton" style="height:12px;width:75%;border-radius:3px;"></div>
+                  </th>
+                `).join('')}
+              </tr>
+            </thead>
+            <tbody>
+              ${Array(rows).fill(0).map(() => `
+                <tr>
+                  ${Array(cols).fill(0).map(() => `
+                    <td style="padding:12px 14px;">
+                      <div class="skeleton skeleton-row" style="height:20px;margin:2px 0;"></div>
+                    </td>
+                  `).join('')}
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    `;
+  },
+
+  renderPageSkeleton(type = 'dashboard') {
+    const a11ySr = '<span style="position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0;">Carregando módulo…</span>';
+    if (type === 'table') {
+      return `
+        <div role="status" aria-label="Carregando módulo" class="page-skeleton">
+          ${a11ySr}
+          <div class="page-header">
+            <div>
+              <div class="skeleton" style="height:26px;width:240px;margin-bottom:8px;border-radius:6px;"></div>
+              <div class="skeleton" style="height:14px;width:380px;border-radius:4px;"></div>
+            </div>
+            <div class="page-actions">
+              <div class="skeleton" style="height:44px;width:140px;border-radius:8px;"></div>
+            </div>
+          </div>
+          <div style="display:flex;gap:12px;margin-bottom:16px;">
+            <div class="skeleton" style="height:44px;flex:1;border-radius:8px;"></div>
+            <div class="skeleton" style="height:44px;width:160px;border-radius:8px;"></div>
+          </div>
+          ${this.renderTableSkeleton({ cols: 7, rows: 8 })}
+        </div>
+      `;
+    }
+
+    // Padrão Dashboard
+    return `
+      <div role="status" aria-label="Carregando módulo" class="page-skeleton">
+        ${a11ySr}
+        <div class="page-header">
+          <div>
+            <div class="skeleton" style="height:26px;width:220px;margin-bottom:8px;border-radius:6px;"></div>
+            <div class="skeleton" style="height:14px;width:340px;border-radius:4px;"></div>
+          </div>
+          <div class="page-actions">
+            <div class="skeleton" style="height:44px;width:150px;border-radius:8px;"></div>
+          </div>
+        </div>
+        ${this.renderKpiSkeletons(6)}
+        <div class="g2" style="margin-bottom:16px;">
+          <div class="card" style="height:280px;padding:18px;">
+            <div class="skeleton" style="height:18px;width:180px;margin-bottom:16px;"></div>
+            <div class="skeleton" style="height:210px;width:100%;border-radius:8px;"></div>
+          </div>
+          <div class="card" style="height:280px;padding:18px;">
+            <div class="skeleton" style="height:18px;width:180px;margin-bottom:16px;"></div>
+            <div class="skeleton" style="height:210px;width:100%;border-radius:8px;"></div>
+          </div>
+        </div>
+      </div>
+    `;
   }
 };

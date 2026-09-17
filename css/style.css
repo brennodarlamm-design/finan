@@ -41,8 +41,8 @@
   --font-weight-heavy: 800;
 
   --text: #EEF0EA;          /* warm white with olive tint */
-  --text2: #8C8983;         /* warm gray */
-  --text3: #575B50;         /* muted olive-gray */
+  --text2: #CBD5E1;         /* warm gray / slate-300 */
+  --text3: #94A3B8;         /* Slate-400 — Legibilidade WCAG AA (>6.4:1) */
 
   /* Layout */
   --sidebar-w: 260px;
@@ -682,8 +682,8 @@ html { scrollbar-width:thin;scrollbar-color:var(--border-d) var(--bg-primary); }
   .page-actions { width:100%;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px; }
   .page-actions>.btn,.page-actions>button { width:100%;justify-content:center; }
   .btn { min-height:44px;justify-content:center; }
-  .btn-sm { min-height:40px;padding:8px 12px; }
-  .icon-btn,.modal-close { min-width:40px;min-height:40px; }
+  .btn-sm { min-height:44px;min-width:44px;padding:10px 14px; }
+  .icon-btn,.modal-close { min-width:44px;min-height:44px;display:inline-flex;align-items:center;justify-content:center; }
   .form-control,.input-prefix input { min-height:44px;font-size:16px; }
   textarea.form-control { min-height:96px; }
   .filters-bar { align-items:stretch; }

@@ -224,7 +224,7 @@ const Cobranca = {
     const cycleNames = { monthly:'Mensal', quarterly:'Trimestral', semiannual:'Semestral', annual:'Anual' };
     if(!invoices.length){el.innerHTML='<div style="padding:16px;text-align:center;color:var(--text3)">Nenhuma cobrança registrada ainda.</div>';return;}
     const rows=invoices.map(i=>{const val='R$ '+(Number(i.amount_cents||0)/100).toFixed(2).replace('.',','); const venc=i.expires_at?new Date(i.expires_at).toLocaleDateString('pt-BR'):'—'; const pago=i.paid_at?new Date(i.paid_at).toLocaleDateString('pt-BR'):'—'; const cName = cycleNames[i.cycle] || (i.cycle && i.cycle !== 'monthly' ? i.cycle : ''); return {i,val,venc,pago,cName,s:status[i.status]||i.status||'—'};});
-    el.innerHTML=`<div style="font-weight:900;font-size:1rem;margin-bottom:12px">Histórico de cobranças</div><div style="overflow:auto"><table class="acc-billing-table"><thead><tr><th>Competência</th><th>Vencimento</th><th>Valor</th><th>Status</th><th>Pagamento</th></tr></thead><tbody>${rows.map(r=>`<tr><td>${Utils.escapeHtml(r.i.competencia||'—')}${r.cName?` <span style="font-size:.7rem;color:var(--accent2)">(${Utils.escapeHtml(r.cName)})</span>`:''}</td><td>${r.venc}</td><td><strong>${r.val}</strong></td><td>${Utils.escapeHtml(r.s)}</td><td>${r.pago}</td></tr>`).join('')}</tbody></table></div><div class="acc-billing-cards">${rows.map(r=>`<div class="acc-kpi"><div style="display:flex;justify-content:space-between;gap:10px"><strong>${Utils.escapeHtml(r.i.competencia||'Cobrança')}${r.cName?` (${Utils.escapeHtml(r.cName)})`:''}</strong><span>${Utils.escapeHtml(r.s)}</span></div><div style="font-size:1.05rem;font-weight:900;margin:8px 0">${r.val}</div><div style="font-size:.74rem;color:var(--text3)">Vencimento: ${r.venc} • Pagamento: ${r.pago}</div></div>`).join('')}</div>`;
+    el.innerHTML=`<div style="font-weight:900;font-size:1rem;margin-bottom:12px">Histórico de cobranças</div><div style="overflow:auto"><table class="acc-billing-table"><thead><tr><th>Competência</th><th>Vencimento</th><th>Valor</th><th>Status</th><th>Pagamento</th><th style="text-align:right">Ação</th></tr></thead><tbody>${rows.map(r=>`<tr><td>${Utils.escapeHtml(r.i.competencia||'—')}${r.cName?` <span style="font-size:.7rem;color:var(--accent2)">(${Utils.escapeHtml(r.cName)})</span>`:''}</td><td>${r.venc}</td><td><strong>${r.val}</strong></td><td>${Utils.escapeHtml(r.s)}</td><td>${r.pago}</td><td style="text-align:right">${r.i.status==='pending'?`<button class="btn btn-sm btn-primary" data-fb-click="Cobranca.reabrirModalPix" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(r.i.id))}" style="min-height:36px;font-weight:800;white-space:nowrap;">⚡ Pagar com PIX</button>`:'—'}</td></tr>`).join('')}</tbody></table></div><div class="acc-billing-cards">${rows.map(r=>`<div class="acc-kpi"><div style="display:flex;justify-content:space-between;gap:10px"><strong>${Utils.escapeHtml(r.i.competencia||'Cobrança')}${r.cName?` (${Utils.escapeHtml(r.cName)})`:''}</strong><span>${Utils.escapeHtml(r.s)}</span></div><div style="font-size:1.05rem;font-weight:900;margin:8px 0">${r.val}</div><div style="font-size:.74rem;color:var(--text3)">Vencimento: ${r.venc} • Pagamento: ${r.pago}</div>${r.i.status==='pending'?`<div style="margin-top:10px;padding-top:10px;border-top:1px solid rgba(255,255,255,.08)"><button class="btn btn-primary btn-block" data-fb-click="Cobranca.reabrirModalPix" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(r.i.id))}" style="min-height:44px;font-weight:800;width:100%;justify-content:center;">⚡ Pagar com PIX (${r.val})</button></div>`:''}</div>`).join('')}</div>`;
   },
 
   _renderModules(p) {
@@ -282,8 +282,6 @@ const Cobranca = {
     this.fecharModalPix();
 
     const plano = this.PLANOS[planoId] || this.PLANOS['pro'];
-    const emp = (typeof DB !== 'undefined' && DB.getEmpresa()) || {};
-    const u = (typeof Auth !== 'undefined' && Auth.getUser()) || {};
     const cycleData = this.CYCLE_PRICING?.[plano.id]?.[cycle] || { priceCents: Math.round(plano.valorMensal * 100), totalCents: Math.round(plano.valorMensal * 100), months: 1, label: 'Mensal' };
     const cycleLabel = cycleData.label || 'Mensal';
 
@@ -318,212 +316,284 @@ const Cobranca = {
       const inv = data.invoice;
       const amount = Number(inv.amount_cents || cycleData.totalCents || Math.round(plano.valorMensal * 100)) / 100;
       const amountFmt = amount.toFixed(2).replace('.', ',');
-      const pixPayload = String(inv.pix_payload || '');
-      const txid = Utils.escapeHtml(String(inv.txid || ''));
-      const whatsapp = String(data.billingWhatsapp || '').replace(/\D/g, '');
-      const whatsappDisplay = whatsapp ? `+${whatsapp}` : 'Suporte FinObra';
-      const companyName = emp.nome_fantasia || emp.razao_social || u.empresaNome || 'Minha Construtora';
-      const waMessage = encodeURIComponent(`Olá! Realizei o pagamento PIX da assinatura FinObra (${plano.nome} [Ciclo ${cycleLabel}] - R$ ${amountFmt}) para ${companyName}. TXID: ${inv.txid || ''}. Segue o comprovante para conferência:`);
-      const waHref = whatsapp ? `https://api.whatsapp.com/send?phone=${whatsapp}&text=${waMessage}` : '#';
-      const qrSrc = pixPayload ? `https://api.qrserver.com/v1/create-qr-code/?size=200x200&margin=4&data=${encodeURIComponent(pixPayload)}` : '';
 
-      modal.innerHTML = `
-        <div style="background:#090d0a;border:1px solid rgba(201,162,39,.35);border-radius:18px;width:100%;max-width:580px;max-height:92vh;display:flex;flex-direction:column;box-shadow:0 28px 70px rgba(0,0,0,.92);overflow:hidden;color:#f0ead6;font-family:inherit;">
-          
-          <!-- Header com Trust Badges -->
-          <div style="background:linear-gradient(135deg,#12210c,#1b2f13);padding:16px 20px;border-bottom:1px solid rgba(201,162,39,.25);display:flex;align-items:center;justify-content:space-between;gap:12px;">
-            <div style="display:flex;align-items:center;gap:12px;">
-              <div style="width:38px;height:38px;border-radius:10px;background:rgba(201,162,39,.15);border:1px solid rgba(201,162,39,.3);display:flex;align-items:center;justify-content:center;font-size:1.25rem;">⚡</div>
-              <div>
-                <div style="font-weight:900;font-size:1.02rem;color:var(--accent2);display:flex;align-items:center;gap:8px;">
-                  Pagamento Seguro via PIX
-                  <span style="background:rgba(34,197,94,.18);border:1px solid rgba(34,197,94,.4);color:#4ade80;font-size:.65rem;font-weight:800;padding:2px 7px;border-radius:100px;text-transform:uppercase;letter-spacing:.04em;">Transação 100% Protegida por Criptografia SSL 256-bit</span>
-                </div>
-                <div style="font-size:.74rem;color:#94a3b8;margin-top:2px;">
-                  ${Utils.escapeHtml(plano.nome)} &bull; Ciclo ${Utils.escapeHtml(cycleLabel)} &bull; <strong style="color:#22c55e;">R$ ${amountFmt}</strong>
-                </div>
-              </div>
-            </div>
-            <button id="pix-modal-close-btn" style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);color:#94a3b8;width:32px;height:32px;border-radius:8px;font-size:1.1rem;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .2s;">✕</button>
-          </div>
-
-          <!-- Corpo Rolável com Design Limpo e Espaçoso -->
-          <div style="padding:20px;overflow-y:auto;display:flex;flex-direction:column;gap:16px;text-align:center;">
-            
-            <!-- Resumo e Identificador da Transação -->
-            <div style="background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:10px 14px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;font-size:.76rem;text-align:left;">
-              <div>
-                <span style="color:#94a3b8;">Beneficiário Oficial:</span> <strong style="color:#fff;">FinObra Soluções Tecnológicas</strong>
-              </div>
-              <div>
-                <span style="color:#94a3b8;">Identificador (TXID):</span> <code style="color:var(--accent2);font-family:monospace;background:rgba(0,0,0,.3);padding:2px 6px;border-radius:4px;">${txid}</code>
-              </div>
-            </div>
-
-            <!-- QR Code em Destaque -->
-            <div style="display:flex;flex-direction:column;align-items:center;gap:10px;">
-              ${qrSrc ? `
-                <div style="background:#ffffff;padding:12px;border-radius:16px;box-shadow:0 10px 30px rgba(0,0,0,.6);border:2px solid rgba(201,162,39,.5);display:inline-block;">
-                  <img src="${qrSrc}" alt="QR Code PIX" style="display:block;width:180px;height:180px;border-radius:4px;">
-                </div>
-                <div style="font-size:.75rem;color:#94a3b8;display:flex;align-items:center;gap:6px;">
-                  <span style="width:7px;height:7px;border-radius:50%;background:#22c55e;display:inline-block;box-shadow:0 0 8px #22c55e;"></span>
-                  Aponte a câmera do aplicativo do seu banco para escanear
-                </div>
-              ` : `
-                <div style="padding:16px;border:1px solid #ef4444;border-radius:10px;color:#fecaca;background:rgba(239,68,68,.08);">
-                  Chave PIX em configuração no servidor. Utilize o botão do WhatsApp abaixo para atendimento prioritário.
-                </div>
-              `}
-            </div>
-
-            <!-- Campo PIX Copia e Cola -->
-            ${pixPayload ? `
-              <div style="background:rgba(0,0,0,.35);border:1px solid rgba(201,162,39,.25);border-radius:12px;padding:12px 14px;text-align:left;">
-                <div style="font-size:.72rem;font-weight:700;color:#94a3b8;margin-bottom:6px;display:flex;justify-content:space-between;">
-                  <span>Código PIX Copia e Cola</span>
-                  <span style="color:var(--accent2);font-size:.68rem;">Expira em 24h</span>
-                </div>
-                <div style="display:flex;gap:8px;">
-                  <input type="text" id="pix-copia-cola-input" readonly style="flex:1;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.15);border-radius:8px;padding:8px 12px;color:#cbd5e1;font-size:.74rem;font-family:monospace;outline:none;">
-                  <button id="pix-copy-btn" style="background:var(--accent);border:none;color:#0f1710;padding:8px 16px;border-radius:8px;font-size:.78rem;font-weight:900;cursor:pointer;white-space:nowrap;transition:all .2s;">
-                    Copiar Código 📋
-                  </button>
-                </div>
-              </div>
-            ` : ''}
-
-            <!-- Radar de Status em Tempo Real -->
-            <div id="pix-status-box" style="background:rgba(34,197,94,.06);border:1px solid rgba(34,197,94,.22);border-radius:10px;padding:10px 14px;font-size:.78rem;color:#86efac;display:flex;align-items:center;justify-content:center;gap:8px;">
-              <span class="spinner" style="width:14px;height:14px;border:2px solid rgba(134,239,172,.3);border-top-color:#22c55e;border-radius:50%;animation:spin 1s linear infinite;display:inline-block;"></span>
-              <span>Aguardando compensação bancária em tempo real...</span>
-            </div>
-
-            <!-- Guia de Instruções Passo a Passo -->
-            <div style="background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.07);border-radius:12px;padding:14px;text-align:left;">
-              <div style="font-weight:800;font-size:.82rem;color:#f0ead6;margin-bottom:8px;display:flex;align-items:center;gap:6px;">
-                <span>📖</span> Como pagar com seu banco:
-              </div>
-              <ol style="margin:0;padding-left:18px;font-size:.74rem;color:#94a3b8;line-height:1.6;display:flex;flex-direction:column;gap:4px;">
-                <li>Abra o aplicativo do seu banco no smartphone e entre na área <strong>PIX</strong>.</li>
-                <li>Escolha <strong>Pagar com QR Code</strong> ou <strong>PIX Copia e Cola</strong>.</li>
-                <li>Confira se o valor é <strong>R$ ${amountFmt}</strong> e o recebedor é <strong>FinObra Soluções Tecnológicas</strong>.</li>
-                <li>Conclua o pagamento. A liberação ocorre <strong>automaticamente em poucos segundos</strong>.</li>
-              </ol>
-            </div>
-
-            <!-- Tratativas de Prazos, Suporte & Confirmação -->
-            <div style="background:rgba(234,179,8,.05);border:1px solid rgba(234,179,8,.2);border-radius:10px;padding:10px 14px;font-size:.73rem;color:#fde047;text-align:left;line-height:1.5;">
-              <strong>ℹ️ Tratativa de Compensação:</strong> A confirmação PIX é processada pelo Banco Central geralmente entre 5 e 30 segundos. Se o valor já foi debitado de sua conta bancária mas a tela não atualizou em até 2 minutos, <strong>não pague novamente</strong>. Envie seu comprovante pelo botão abaixo para validação prioritária.
-            </div>
-
-            <!-- Ações e Botão WhatsApp -->
-            <div style="display:flex;flex-direction:column;gap:8px;width:100%;">
-              ${whatsapp ? `
-                <a href="${waHref}" target="_blank" rel="noopener noreferrer" style="background:#22c55e;color:#0b1d0f;padding:11px 16px;border-radius:10px;font-weight:900;font-size:.82rem;text-decoration:none;display:flex;align-items:center;justify-content:center;gap:8px;box-shadow:0 4px 14px rgba(34,197,94,.25);">
-                  💬 Informar Pagamento ou Enviar Comprovante no WhatsApp (${Utils.escapeHtml(whatsappDisplay)})
-                </a>
-              ` : ''}
-              <button id="pix-cancel-btn" style="background:transparent;border:none;color:#64748b;font-size:.74rem;cursor:pointer;padding:6px;text-decoration:underline;">
-                Voltar aos planos sem concluir agora
-              </button>
-            </div>
-
-            <!-- Selos de Segurança no Rodapé do Modal -->
-            <div style="display:flex;align-items:center;justify-content:center;gap:16px;font-size:.68rem;color:#64748b;padding-top:4px;border-top:1px solid rgba(255,255,255,.05);">
-              <span>🔒 Criptografia SSL 256-bit</span>
-              <span>🏛️ Homologado Banco Central do Brasil (SPI)</span>
-              <span>⚡ Confirmação Direta</span>
-            </div>
-
-          </div>
-        </div>`;
-
-      // Eventos dos botões de fechar
-      document.getElementById('pix-modal-close-btn')?.addEventListener('click', () => this.fecharModalPix());
-      document.getElementById('pix-cancel-btn')?.addEventListener('click', () => this.fecharModalPix());
-
-      // Copiar código PIX
-      const input = document.getElementById('pix-copia-cola-input');
-      if (input) input.value = pixPayload;
-      const copyBtn = document.getElementById('pix-copy-btn');
-      if (copyBtn) copyBtn.onclick = async () => {
-        try { await navigator.clipboard.writeText(pixPayload); }
-        catch { input?.select(); document.execCommand?.('copy'); }
-        copyBtn.textContent = '✓ Código Copiado!';
-        copyBtn.style.background = '#22c55e';
-        copyBtn.style.color = '#0f1710';
-        setTimeout(() => {
-          copyBtn.textContent = 'Copiar Código 📋';
-          copyBtn.style.background = 'var(--accent)';
-          copyBtn.style.color = '#0f1710';
-        }, 3000);
-      };
-
-      // ── MONITORAMENTO DE LIQUIDAÇÃO EM TEMPO REAL (POLLING) ──────────────────
-      let pollCycles = 0;
-      const MAX_POLL_CYCLES = 225; // Limite de 15 minutos (225 ciclos x 4s)
-      this._pixAbortController = new AbortController();
-
-      this._pixPollTimer = setInterval(async () => {
-        pollCycles++;
-        if (pollCycles > MAX_POLL_CYCLES) {
-          this.fecharModalPix();
-          if (typeof Utils !== 'undefined' && Utils.toast) {
-            Utils.toast('Tempo limite de verificação do PIX atingido. Se realizou o pagamento, confirme via WhatsApp.', 'warning');
-          }
-          return;
-        }
-
-        try {
-          const authH = (typeof Auth !== 'undefined' && Auth.getAuthHeaders) ? Auth.getAuthHeaders() : { 'Content-Type': 'application/json' };
-          const chkRes = await fetch(`/api/plano?action=check_invoice&invoiceId=${encodeURIComponent(inv.id)}`, {
-            headers: authH,
-            signal: this._pixAbortController?.signal
-          });
-          const chkData = await chkRes.json().catch(() => ({}));
-          
-          if (chkData?.success && chkData?.paid) {
-            this.fecharModalPix();
-
-            const stBox = document.getElementById('pix-status-box');
-            if (stBox) {
-              stBox.style.background = 'rgba(34,197,94,.2)';
-              stBox.style.borderColor = '#22c55e';
-              stBox.style.color = '#4ade80';
-              stBox.style.fontSize = '.9rem';
-              stBox.style.fontWeight = '900';
-              stBox.innerHTML = `🎉 Pagamento Confirmado com Sucesso! Atualizando seu plano...`;
-            }
-
-            // Notificação visual toast
-            if (typeof Utils !== 'undefined' && Utils.toast) {
-              Utils.toast('🎉 Pagamento confirmado! Sua assinatura foi atualizada com sucesso.', 'success');
-            }
-
-            // Atualiza sessão e plano do usuário em background
-            if (typeof Auth !== 'undefined' && Auth.refreshSessionFromServer) {
-              await Auth.refreshSessionFromServer();
-            }
-
-            setTimeout(() => {
-              if (typeof Cobranca !== 'undefined' && Cobranca.init) {
-                Cobranca.init();
-              }
-              if (typeof App !== 'undefined' && App.renderShell) {
-                App.renderShell();
-              }
-            }, 2500);
-          }
-        } catch {
-          // Falha transitória de rede durante polling — ignora e tenta no próximo ciclo
-        }
-      }, 4000);
-
+      this._montarModalPix(inv, plano, cycleLabel, amountFmt, data.billingWhatsapp);
     } catch (err) {
       modal.innerHTML = `<div style="background:#0f1710;border:1px solid rgba(239,68,68,.45);border-radius:14px;width:100%;max-width:520px;padding:28px;color:#f0ead6;text-align:center;"><div style="font-size:2rem;margin-bottom:10px;">⚠️</div><div style="font-weight:900;color:#fff;margin-bottom:8px;">Não foi possível gerar a cobrança</div><div id="billing-error-text" style="color:#fca5a5;font-size:.86rem;"></div><button id="pix-error-close-btn" data-fb-click="Patch26Actions.removeById" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="cobranca-pix-modal" style="margin-top:18px;padding:9px 18px;border-radius:8px;border:1px solid rgba(255,255,255,.2);background:rgba(255,255,255,.05);color:#fff;cursor:pointer;">Fechar</button></div>`;
       const msg = document.getElementById('billing-error-text');
       if (msg) msg.textContent = err?.message || 'Erro de comunicação com o servidor.';
       document.getElementById('pix-error-close-btn')?.addEventListener('click', () => this.fecharModalPix());
     }
-  }};
+  },
+
+  async reabrirModalPix(invoiceId) {
+    let inv = (this._accountData?.invoices || []).find(i => String(i.id) === String(invoiceId));
+    if (!inv) {
+      try {
+        const headers = (typeof DB !== 'undefined' && DB._apiHeaders) ? DB._apiHeaders() : (typeof Auth !== 'undefined' ? Auth.getAuthHeaders() : {});
+        const res = await fetch('/api/plano?billing=1', { headers });
+        const json = await res.json().catch(() => ({}));
+        if (json.invoices) {
+          this._accountData = json;
+          inv = json.invoices.find(i => String(i.id) === String(invoiceId));
+        }
+      } catch (e) {
+        console.warn('[Cobranca] Erro ao buscar fatura:', e);
+      }
+    }
+
+    if (!inv) {
+      if (typeof Utils !== 'undefined' && Utils.toast) {
+        Utils.toast('Fatura não encontrada ou expirada.', 'warning');
+      }
+      return;
+    }
+
+    const plano = this.PLANOS[inv.plan_id] || this.PLANOS['pro'];
+    const cycleNames = { monthly:'Mensal', quarterly:'Trimestral', semiannual:'Semestral', annual:'Anual' };
+    const cycleLabel = cycleNames[inv.cycle] || 'Mensal';
+    const amount = Number(inv.amount_cents || 0) / 100;
+    const amountFmt = amount.toFixed(2).replace('.', ',');
+
+    this._montarModalPix(inv, plano, cycleLabel, amountFmt);
+  },
+
+  _montarModalPix(inv, plano, cycleLabel, amountFmt, billingWhatsapp = '') {
+    this.fecharModalPix();
+
+    const emp = (typeof DB !== 'undefined' && DB.getEmpresa()) || {};
+    const u = (typeof Auth !== 'undefined' && Auth.getUser()) || {};
+    const pixPayload = String(inv.pix_payload || '');
+    const txid = Utils.escapeHtml(String(inv.txid || ''));
+    const whatsapp = String(billingWhatsapp || this._accountData?.billingWhatsapp || '').replace(/\D/g, '');
+    const whatsappDisplay = whatsapp ? `+${whatsapp}` : 'Suporte FinObra';
+    const companyName = emp.nome_fantasia || emp.razao_social || u.empresaNome || 'Minha Construtora';
+    const waMessage = encodeURIComponent(`Olá! Realizei o pagamento PIX da assinatura FinObra (${plano.nome} [Ciclo ${cycleLabel}] - R$ ${amountFmt}) para ${companyName}. TXID: ${inv.txid || ''}. Segue o comprovante para conferência:`);
+    const waHref = whatsapp ? `https://api.whatsapp.com/send?phone=${whatsapp}&text=${waMessage}` : '#';
+    const qrSrc = pixPayload ? `https://api.qrserver.com/v1/create-qr-code/?size=200x200&margin=4&data=${encodeURIComponent(pixPayload)}` : '';
+
+    let modal = document.getElementById('cobranca-pix-modal');
+    if (!modal) {
+      modal = document.createElement('div');
+      modal.id = 'cobranca-pix-modal';
+      modal.className = 'modal-backdrop';
+      modal.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.8);display:flex;align-items:center;justify-content:center;z-index:99999;backdrop-filter:blur(6px);padding:16px;';
+      document.body.appendChild(modal);
+    }
+
+    this._pixKeyHandler = (e) => {
+      if (e.key === 'Escape') this.fecharModalPix();
+    };
+    window.addEventListener('keydown', this._pixKeyHandler);
+
+    modal.onclick = (e) => {
+      if (e.target === modal) this.fecharModalPix();
+    };
+
+    modal.innerHTML = `
+      <div style="background:#090d0a;border:1px solid rgba(201,162,39,.35);border-radius:18px;width:100%;max-width:540px;max-height:92vh;display:flex;flex-direction:column;box-shadow:0 28px 70px rgba(0,0,0,.92);overflow:hidden;color:#f0ead6;font-family:inherit;">
+        
+        <!-- Header com Valor em Destaque e Fechar -->
+        <div style="background:linear-gradient(135deg,#12210c,#1b2f13);padding:16px 20px;border-bottom:1px solid rgba(201,162,39,.25);display:flex;align-items:center;justify-content:space-between;gap:12px;">
+          <div style="display:flex;align-items:center;gap:12px;">
+            <div style="width:40px;height:40px;border-radius:10px;background:rgba(201,162,39,.15);border:1px solid rgba(201,162,39,.3);display:flex;align-items:center;justify-content:center;font-size:1.3rem;">⚡</div>
+            <div>
+              <div style="font-weight:900;font-size:1.05rem;color:var(--accent2);display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+                Pagamento Seguro via PIX
+                <span style="background:rgba(34,197,94,.18);border:1px solid rgba(34,197,94,.4);color:#4ade80;font-size:.65rem;font-weight:800;padding:2px 7px;border-radius:100px;text-transform:uppercase;">100% Protegido</span>
+              </div>
+              <div style="font-size:.78rem;color:#94a3b8;margin-top:2px;">
+                ${Utils.escapeHtml(plano.nome)} &bull; Ciclo ${Utils.escapeHtml(cycleLabel)} &bull; <strong style="color:#22c55e;font-size:.95rem;">R$ ${amountFmt}</strong>
+              </div>
+            </div>
+          </div>
+          <button id="pix-modal-close-btn" style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);color:#94a3b8;min-width:44px;min-height:44px;border-radius:10px;font-size:1.2rem;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .2s;" title="Fechar modal">✕</button>
+        </div>
+
+        <!-- Corpo Rolável Mobile-First -->
+        <div style="padding:18px 20px;overflow-y:auto;display:flex;flex-direction:column;gap:14px;text-align:center;">
+
+          <!-- BLOCO PRIMÁRIO (ZERO SCROLL): Botão Copiar Código PIX de 52px -->
+          ${pixPayload ? `
+            <div style="background:linear-gradient(135deg,rgba(18,217,160,.12),rgba(16,185,129,.05));border:1.5px solid var(--accent);border-radius:14px;padding:14px;display:flex;flex-direction:column;gap:10px;">
+              <button id="pix-copy-btn" style="background:linear-gradient(135deg,var(--accent),var(--accent2));border:none;color:#060e09;min-height:52px;border-radius:10px;font-size:1rem;font-weight:900;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:10px;box-shadow:0 4px 18px rgba(18,217,160,.35);transition:all .2s;width:100%;">
+                📋 COPIAR CÓDIGO PIX (1 Clique)
+              </button>
+              <div style="display:flex;gap:6px;align-items:center;">
+                <input type="text" id="pix-copia-cola-input" readonly value="${Utils.escapeHtml(pixPayload)}" style="flex:1;background:rgba(0,0,0,.4);border:1px solid rgba(255,255,255,.12);border-radius:6px;padding:6px 10px;color:#cbd5e1;font-size:.72rem;font-family:monospace;outline:none;" title="Código PIX Copia e Cola">
+                <span style="font-size:.68rem;color:#94a3b8;white-space:nowrap;">Expira em 24h</span>
+              </div>
+            </div>
+          ` : ''}
+
+          <!-- Radar de Status em Tempo Real -->
+          <div id="pix-status-box" style="background:rgba(34,197,94,.06);border:1px solid rgba(34,197,94,.22);border-radius:10px;padding:10px 14px;font-size:.78rem;color:#86efac;display:flex;align-items:center;justify-content:center;gap:8px;">
+            <span class="spinner" style="width:14px;height:14px;border:2px solid rgba(134,239,172,.3);border-top-color:#22c55e;border-radius:50%;animation:spin 1s linear infinite;display:inline-block;"></span>
+            <span>Aguardando compensação bancária em tempo real...</span>
+          </div>
+
+          <!-- Accordion Retrátil para QR Code (Mobile amigável) -->
+          ${qrSrc ? `
+            <div style="border:1px solid rgba(255,255,255,.1);border-radius:12px;overflow:hidden;background:rgba(255,255,255,.02);">
+              <button type="button" id="pix-toggle-qr-btn" style="width:100%;min-height:44px;background:none;border:none;color:#94a3b8;font-size:.78rem;font-weight:700;padding:10px 14px;display:flex;align-items:center;justify-content:space-between;cursor:pointer;">
+                <span>📱 Prefere escanear com outro aparelho? [Ver QR Code]</span>
+                <span id="pix-qr-chevron">▼</span>
+              </button>
+              <div id="pix-qr-container" style="display:none;padding:14px;flex-direction:column;align-items:center;gap:10px;border-top:1px solid rgba(255,255,255,.08);background:rgba(0,0,0,.2);">
+                <div style="background:#ffffff;padding:10px;border-radius:12px;box-shadow:0 8px 24px rgba(0,0,0,.5);display:inline-block;">
+                  <img src="${qrSrc}" alt="QR Code PIX" style="display:block;width:170px;height:170px;border-radius:4px;">
+                </div>
+                <div style="font-size:.72rem;color:#94a3b8;">Aponte a câmera do aplicativo do seu banco para escanear</div>
+              </div>
+            </div>
+          ` : ''}
+
+          <!-- Resumo e Identificador TXID -->
+          <div style="background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:8px 12px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px;font-size:.72rem;text-align:left;">
+            <div><span style="color:#94a3b8;">Beneficiário Oficial:</span> <strong style="color:#fff;">FinObra Soluções Tecnológicas</strong></div>
+            <div><span style="color:#94a3b8;">Identificador (TXID):</span> <code style="color:var(--accent2);font-family:monospace;background:rgba(0,0,0,.3);padding:2px 6px;border-radius:4px;">${txid}</code></div>
+          </div>
+
+          <!-- Guia de Instruções Passo a Passo -->
+          <div style="background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.07);border-radius:12px;padding:12px;text-align:left;">
+            <div style="font-weight:800;font-size:.8rem;color:#f0ead6;margin-bottom:6px;display:flex;align-items:center;gap:6px;">
+              <span>📖</span> Como pagar com seu banco:
+            </div>
+            <ol style="margin:0;padding-left:18px;font-size:.74rem;color:#94a3b8;line-height:1.5;display:flex;flex-direction:column;gap:3px;">
+              <li>Abra o app do seu banco e acesse a área <strong>PIX</strong>.</li>
+              <li>Escolha <strong>PIX Copia e Cola</strong> ou <strong>Pagar com QR Code</strong>.</li>
+              <li>Confira o valor de <strong>R$ ${amountFmt}</strong> e confirme.</li>
+              <li>Pronto! A liquidação é reconhecida automaticamente aqui em segundos.</li>
+            </ol>
+          </div>
+
+          <!-- Ações e WhatsApp -->
+          <div style="display:flex;flex-direction:column;gap:8px;width:100%;">
+            ${whatsapp ? `
+              <a href="${waHref}" target="_blank" rel="noopener noreferrer" style="background:#22c55e;color:#0b1d0f;min-height:44px;padding:10px 16px;border-radius:10px;font-weight:900;font-size:.82rem;text-decoration:none;display:flex;align-items:center;justify-content:center;gap:8px;box-shadow:0 4px 14px rgba(34,197,94,.25);">
+                💬 Enviar Comprovante no WhatsApp (${Utils.escapeHtml(whatsappDisplay)})
+              </a>
+            ` : ''}
+            <button id="pix-cancel-btn" style="background:transparent;border:none;color:#64748b;font-size:.74rem;cursor:pointer;padding:8px;min-height:44px;text-decoration:underline;">
+              Voltar sem concluir agora
+            </button>
+          </div>
+
+          <!-- Selos de Segurança -->
+          <div style="display:flex;align-items:center;justify-content:center;gap:14px;font-size:.68rem;color:#94a3b8;padding-top:4px;border-top:1px solid rgba(255,255,255,.05);flex-wrap:wrap;">
+            <span>🔒 Transação 100% Protegida por Criptografia SSL 256-bit</span>
+            <span>🏛️ Homologado Banco Central do Brasil</span>
+            <span>⚡ Liberação Automática 24/7</span>
+          </div>
+
+        </div>
+      </div>`;
+
+    // Eventos dos botões de fechar
+    document.getElementById('pix-modal-close-btn')?.addEventListener('click', () => this.fecharModalPix());
+    document.getElementById('pix-cancel-btn')?.addEventListener('click', () => this.fecharModalPix());
+
+    // Toggle QR Code
+    const qrToggleBtn = document.getElementById('pix-toggle-qr-btn');
+    const qrContainer = document.getElementById('pix-qr-container');
+    const qrChevron = document.getElementById('pix-qr-chevron');
+    if (qrToggleBtn && qrContainer) {
+      qrToggleBtn.onclick = () => {
+        const isHidden = qrContainer.style.display === 'none';
+        qrContainer.style.display = isHidden ? 'flex' : 'none';
+        if (qrChevron) qrChevron.textContent = isHidden ? '▲' : '▼';
+      };
+    }
+
+    // Copiar código PIX com feedback háptico e visual
+    const input = document.getElementById('pix-copia-cola-input');
+    const copyBtn = document.getElementById('pix-copy-btn');
+    if (copyBtn) copyBtn.onclick = async () => {
+      try {
+        if (navigator.clipboard?.writeText) {
+          await navigator.clipboard.writeText(pixPayload);
+        } else {
+          input?.select();
+          document.execCommand?.('copy');
+        }
+        if (navigator.vibrate) {
+          try { navigator.vibrate([40, 60, 40]); } catch {}
+        }
+        copyBtn.textContent = '✓ Código Copiado!';
+        copyBtn.style.background = '#22c55e';
+        copyBtn.style.color = '#060e09';
+        if (typeof Utils !== 'undefined' && Utils.toast) {
+          Utils.toast('Código PIX copiado! Abra o app do banco para pagar.', 'success');
+        }
+      } catch {
+        input?.select();
+        document.execCommand?.('copy');
+      }
+      setTimeout(() => {
+        if (copyBtn) {
+          copyBtn.textContent = '📋 COPIAR CÓDIGO PIX (1 Clique)';
+          copyBtn.style.background = 'linear-gradient(135deg,var(--accent),var(--accent2))';
+          copyBtn.style.color = '#060e09';
+        }
+      }, 3500);
+    };
+
+    // ── MONITORAMENTO DE LIQUIDAÇÃO EM TEMPO REAL (POLLING) ──────────────────
+    let pollCycles = 0;
+    const MAX_POLL_CYCLES = 225; // Limite de 15 minutos (225 ciclos x 4s)
+    this._pixAbortController = new AbortController();
+
+    this._pixPollTimer = setInterval(async () => {
+      pollCycles++;
+      if (pollCycles > MAX_POLL_CYCLES) {
+        this.fecharModalPix();
+        if (typeof Utils !== 'undefined' && Utils.toast) {
+          Utils.toast('Tempo limite de verificação do PIX atingido. Se realizou o pagamento, confirme via WhatsApp.', 'warning');
+        }
+        return;
+      }
+
+      try {
+        const authH = (typeof Auth !== 'undefined' && Auth.getAuthHeaders) ? Auth.getAuthHeaders() : { 'Content-Type': 'application/json' };
+        const chkRes = await fetch(`/api/plano?action=check_invoice&invoiceId=${encodeURIComponent(inv.id)}`, {
+          headers: authH,
+          signal: this._pixAbortController?.signal
+        });
+        const chkData = await chkRes.json().catch(() => ({}));
+        
+        if (chkData?.success && chkData?.paid) {
+          this.fecharModalPix();
+
+          const stBox = document.getElementById('pix-status-box');
+          if (stBox) {
+            stBox.style.background = 'rgba(34,197,94,.2)';
+            stBox.style.borderColor = '#22c55e';
+            stBox.style.color = '#4ade80';
+            stBox.style.fontSize = '.9rem';
+            stBox.style.fontWeight = '900';
+            stBox.innerHTML = `🎉 Pagamento Confirmado com Sucesso! Atualizando seu plano...`;
+          }
+
+          if (typeof Utils !== 'undefined' && Utils.toast) {
+            Utils.toast('🎉 Pagamento confirmado! Sua assinatura foi atualizada com sucesso.', 'success');
+          }
+
+          if (typeof Auth !== 'undefined' && Auth.refreshSessionFromServer) {
+            await Auth.refreshSessionFromServer();
+          }
+
+          setTimeout(() => {
+            if (typeof Cobranca !== 'undefined' && Cobranca.init) {
+              Cobranca.init();
+            }
+            if (typeof App !== 'undefined' && App.renderShell) {
+              App.renderShell();
+            }
+          }, 2500);
+        }
+      } catch {
+        // Falha transitória de rede durante polling — ignora e tenta no próximo ciclo
+      }
+    }, 4000);
+  }
+};

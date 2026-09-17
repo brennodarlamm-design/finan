@@ -25,6 +25,8 @@ const Dashboard = {
       </div>
     </div>
 
+    ${this._renderOnboardingChecklist ? this._renderOnboardingChecklist() : ''}
+
     ${resumoPre.pendentesQtd > 0 ? `
     <div class="card" style="background:linear-gradient(135deg,rgba(245,158,11,.14),rgba(201,162,39,.1));border:1px solid rgba(245,158,11,.4);margin-bottom:16px;padding:14px 20px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;">
       <div style="display:flex;align-items:center;gap:12px;">
@@ -1139,5 +1141,141 @@ const Dashboard = {
       printFrame.contentWindow.focus();
       printFrame.contentWindow.print();
     }, 400);
+  },
+
+  _renderOnboardingChecklist() {
+    const isDismissed = (typeof localStorage !== 'undefined' && localStorage.getItem('finobra_onboarding_dismissed') === 'true');
+    const emp = (typeof DB !== 'undefined' && DB.getEmpresa) ? DB.getEmpresa() : {};
+    const obras = (typeof DB !== 'undefined' && DB.getAll) ? DB.getAll('clientes') : [];
+    const lans = (typeof DB !== 'undefined' && DB.getAll) ? DB.getAll('lancamentos') : [];
+    const orcs = (typeof DB !== 'undefined' && DB.getAll) ? DB.getAll('orcamentos') : [];
+
+    const step1Done = Boolean(emp && emp.nome && emp.nome.trim() !== '' && (emp.cnpj || emp.cidade || emp.logo_url));
+    const step2Done = obras.length >= 1;
+    const step3Done = lans.length >= 1 || orcs.length >= 1;
+
+    const totalDone = (step1Done ? 1 : 0) + (step2Done ? 1 : 0) + (step3Done ? 1 : 0);
+    const pct = Math.round((totalDone / 3) * 100);
+
+    // Se o usuário completou os 3 passos ou dispensou, não ocupa espaço no topo
+    if (isDismissed && totalDone < 3) return '';
+    if (totalDone === 3 && isDismissed) return '';
+
+    if (totalDone === 3) {
+      return `
+        <div class="card" style="background:linear-gradient(135deg,rgba(18,217,160,.12),rgba(16,185,129,.05));border:1px solid rgba(18,217,160,.35);margin-bottom:20px;padding:16px 20px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;">
+          <div style="display:flex;align-items:center;gap:12px;">
+            <span style="font-size:1.8rem;">🎉</span>
+            <div>
+              <div style="font-weight:800;color:var(--accent);font-size:.96rem;">Parabéns! Sua construtora está 100% pronta para operar.</div>
+              <div style="font-size:.78rem;color:var(--text2);margin-top:2px;">Empresa configurada, obras ativas e fluxo financeiro integrado. Todos os relatórios estão habilitados.</div>
+            </div>
+          </div>
+          <button class="btn btn-secondary btn-sm" data-fb-click="Dashboard.dismissOnboarding" data-fb-click-n="0" style="font-size:.75rem;padding:6px 12px;">
+            Entendido ✕
+          </button>
+        </div>
+      `;
+    }
+
+    return `
+      <div class="card" id="onboarding-checklist-card" style="background:linear-gradient(135deg,#121b10,#172314);border:1px solid rgba(18,217,160,.35);margin-bottom:22px;padding:22px;border-radius:16px;box-shadow:0 8px 32px rgba(0,0,0,.4);">
+        
+        <!-- Cabeçalho do Guia -->
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:12px;margin-bottom:16px;">
+          <div>
+            <div style="display:inline-flex;align-items:center;gap:6px;background:rgba(18,217,160,.14);border:1px solid rgba(18,217,160,.3);padding:3px 10px;border-radius:20px;font-size:.72rem;font-weight:800;color:var(--accent);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px;">
+              <span>🚀</span> Guia de Início Rápido
+            </div>
+            <h2 style="font-size:1.15rem;font-weight:900;color:var(--text);margin:0 0 4px;">Bem-vindo ao FinObra! Complete os 3 passos para ativar seu sistema:</h2>
+            <div style="font-size:.8rem;color:var(--text3);">Siga as etapas abaixo para cadastrar sua base e alimentar seus indicadores em tempo real.</div>
+          </div>
+          <div style="display:flex;align-items:center;gap:12px;">
+            <div style="text-align:right;">
+              <div style="font-size:.75rem;font-weight:800;color:var(--accent);">${totalDone} de 3 concluídos (${pct}%)</div>
+              <div style="width:120px;height:6px;background:rgba(255,255,255,.08);border-radius:3px;overflow:hidden;margin-top:4px;">
+                <div style="width:${pct}%;height:100%;background:linear-gradient(90deg,var(--accent),var(--accent2));border-radius:3px;transition:width .4s ease;"></div>
+              </div>
+            </div>
+            <button data-fb-click="Dashboard.dismissOnboarding" data-fb-click-n="0" style="background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);color:var(--text3);width:28px;height:28px;border-radius:6px;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:.85rem;" title="Dispensar guia">✕</button>
+          </div>
+        </div>
+
+        <!-- Grade dos 3 Passos -->
+        <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(260px, 1fr));gap:14px;">
+          
+          <!-- Passo 1: Configurar Empresa -->
+          <div style="background:rgba(0,0,0,.25);border:1px solid ${step1Done ? 'rgba(18,217,160,.4)' : 'rgba(255,255,255,.08)'};border-radius:12px;padding:16px;display:flex;flex-direction:column;justify-content:space-between;position:relative;">
+            <div>
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+                <div style="width:32px;height:32px;border-radius:8px;background:${step1Done ? 'rgba(18,217,160,.2)' : 'rgba(255,255,255,.06)'};color:${step1Done ? 'var(--accent)' : 'var(--text3)'};display:flex;align-items:center;justify-content:center;font-weight:900;font-size:.9rem;">
+                  ${step1Done ? '✓' : '1'}
+                </div>
+                <span class="badge ${step1Done ? 'badge-success' : 'badge-secondary'}">${step1Done ? 'Concluído' : 'Pendente'}</span>
+              </div>
+              <h3 style="font-size:.92rem;font-weight:800;color:var(--text);margin:0 0 6px;">1. Configurar Construtora</h3>
+              <p style="font-size:.78rem;color:var(--text3);line-height:1.45;margin:0 0 14px;">
+                Informe a razão social, CNPJ, telefone institucional e insira o logotipo da construtora para timbrar contratos e recibos.
+              </p>
+            </div>
+            <button class="btn ${step1Done ? 'btn-secondary' : 'btn-primary'} btn-sm" data-fb-click="App.navigate" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="configuracoes" style="min-height:44px;font-weight:700;width:100%;justify-content:center;">
+              ${step1Done ? 'Editar Dados da Empresa' : 'Configurar Empresa →'}
+            </button>
+          </div>
+
+          <!-- Passo 2: Cadastrar 1ª Obra -->
+          <div style="background:rgba(0,0,0,.25);border:1px solid ${step2Done ? 'rgba(18,217,160,.4)' : 'rgba(255,255,255,.08)'};border-radius:12px;padding:16px;display:flex;flex-direction:column;justify-content:space-between;position:relative;">
+            <div>
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+                <div style="width:32px;height:32px;border-radius:8px;background:${step2Done ? 'rgba(18,217,160,.2)' : 'rgba(255,255,255,.06)'};color:${step2Done ? 'var(--accent)' : 'var(--text3)'};display:flex;align-items:center;justify-content:center;font-weight:900;font-size:.9rem;">
+                  ${step2Done ? '✓' : '2'}
+                </div>
+                <span class="badge ${step2Done ? 'badge-success' : 'badge-secondary'}">${step2Done ? 'Concluído' : 'Pendente'}</span>
+              </div>
+              <h3 style="font-size:.92rem;font-weight:800;color:var(--text);margin:0 0 6px;">2. Cadastrar 1ª Obra</h3>
+              <p style="font-size:.78rem;color:var(--text3);line-height:1.45;margin:0 0 14px;">
+                Crie o centro de custo da sua primeira obra (Financiamento Caixa, Obra Particular, Empreitada ou Reforma).
+              </p>
+            </div>
+            <button class="btn ${step2Done ? 'btn-secondary' : 'btn-primary'} btn-sm" data-fb-click="Clientes.showForm" data-fb-click-n="0" style="min-height:44px;font-weight:700;width:100%;justify-content:center;">
+              ${step2Done ? 'Cadastrar Nova Obra' : '+ Cadastrar 1ª Obra'}
+            </button>
+          </div>
+
+          <!-- Passo 3: Adicionar 1º Lançamento ou Orçamento -->
+          <div style="background:rgba(0,0,0,.25);border:1px solid ${step3Done ? 'rgba(18,217,160,.4)' : 'rgba(255,255,255,.08)'};border-radius:12px;padding:16px;display:flex;flex-direction:column;justify-content:space-between;position:relative;">
+            <div>
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+                <div style="width:32px;height:32px;border-radius:8px;background:${step3Done ? 'rgba(18,217,160,.2)' : 'rgba(255,255,255,.06)'};color:${step3Done ? 'var(--accent)' : 'var(--text3)'};display:flex;align-items:center;justify-content:center;font-weight:900;font-size:.9rem;">
+                  ${step3Done ? '✓' : '3'}
+                </div>
+                <span class="badge ${step3Done ? 'badge-success' : 'badge-secondary'}">${step3Done ? 'Concluído' : 'Pendente'}</span>
+              </div>
+              <h3 style="font-size:.92rem;font-weight:800;color:var(--text);margin:0 0 6px;">3. 1º Lançamento ou Orçamento</h3>
+              <p style="font-size:.78rem;color:var(--text3);line-height:1.45;margin:0 0 14px;">
+                Lance uma despesa/receita no contas a pagar ou monte a planilha SINAPI/orçamentária para ver os gráficos ganharem vida.
+              </p>
+            </div>
+            <button class="btn ${step3Done ? 'btn-secondary' : 'btn-primary'} btn-sm" data-fb-click="Lancamentos.showForm" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="despesa" style="min-height:44px;font-weight:700;width:100%;justify-content:center;">
+              ${step3Done ? '+ Novo Lançamento' : '+ Criar 1º Lançamento'}
+            </button>
+          </div>
+
+        </div>
+      </div>
+    `;
+  },
+
+  dismissOnboarding() {
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem('finobra_onboarding_dismissed', 'true');
+    }
+    const card = document.getElementById('onboarding-checklist-card');
+    if (card) {
+      card.style.transition = 'all .3s ease';
+      card.style.opacity = '0';
+      card.style.transform = 'translateY(-10px)';
+      setTimeout(() => card.remove(), 300);
+    }
   }
 };

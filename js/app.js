@@ -928,7 +928,10 @@ const App = {
       try {
         const resource = { dashboard:'charts', 'obra-detalhe':'charts', 'conciliacao-ofx':'ofx', orcamentos:'sinapi', relatorios:'reports' }[targetRoute];
         if (resource && !FinObraAssets.ready(resource)) {
-          el.innerHTML = '<div role="status" style="padding:40px;text-align:center;color:var(--text3)">Carregando módulo…</div>';
+          const skeletonType = ['lancamentos', 'notas', 'medicoes', 'clientes', 'fornecedores', 'orcamentos', 'contas'].includes(targetRoute) ? 'table' : 'dashboard';
+          el.innerHTML = (typeof Utils !== 'undefined' && Utils.renderPageSkeleton)
+            ? Utils.renderPageSkeleton(skeletonType)
+            : '<div role="status" aria-label="Carregando" class="skeleton" style="height:240px;border-radius:12px;margin:20px 0;"><span style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0);">Carregando módulo…</span></div>';
           await FinObraAssets.load(resource);
           if (navigation !== this._navigationId || el !== document.getElementById('route-content')) return;
         }

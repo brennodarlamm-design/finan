@@ -193,18 +193,18 @@ const Medicoes = {
       <div class="modal" style="max-width:420px">
         <div class="modal-header"><span class="modal-title">💰 Liberar Parcela / Faturamento</span><button class="modal-close" data-fb-click="Utils.closeModal" data-fb-click-n="0">✕</button></div>
         <div class="modal-body">
-          <div class="form-group"><label class="form-label">Valor Bruto Aprovado (R$)</label>
+          <div class="form-group"><label class="form-label" for="lib-val">Valor Bruto Aprovado (R$)</label>
             <div class="input-prefix"><span class="input-pfx-txt">R$</span><input id="lib-val" type="number" value="${sugerido}" step="0.01" min="0"></div>
           </div>
           <div class="form-row cols-2" style="margin-bottom:12px;">
-            <div class="form-group"><label class="form-label">Retenção Técnica</label>
+            <div class="form-group"><label class="form-label" for="lib-retencao">Retenção Técnica</label>
               <div class="input-prefix"><span class="input-pfx-txt">R$</span><input id="lib-retencao" type="number" value="${m.retencao_tecnica||0}" step="0.01" min="0"></div>
             </div>
-            <div class="form-group"><label class="form-label">Descontos / Glosas</label>
+            <div class="form-group"><label class="form-label" for="lib-descontos">Descontos / Glosas</label>
               <div class="input-prefix"><span class="input-pfx-txt">R$</span><input id="lib-descontos" type="number" value="${m.descontos||0}" step="0.01" min="0"></div>
             </div>
           </div>
-          <div class="form-group"><label class="form-label">Data de Liberação</label><input class="form-control" type="date" id="lib-dt" value="${Utils.today()}"></div>
+          <div class="form-group"><label class="form-label" for="lib-dt">Data de Liberação</label><input class="form-control" type="date" id="lib-dt" value="${Utils.today()}"></div>
         </div>
         <div class="modal-footer">
           <button class="btn btn-secondary" data-fb-click="Utils.closeModal" data-fb-click-n="0">Cancelar</button>
@@ -286,9 +286,9 @@ const Medicoes = {
         <div class="modal-body">
           <form id="f-med">
             <div class="form-row cols-3" style="margin-bottom:14px;">
-              <div class="form-group"><label class="form-label">Obra *</label><select class="form-control" name="obra_id" required>${Utils.clienteOptions(m.obra_id||App.obraId!=='todas'?App.obraId:'')}</select></div>
-              <div class="form-group"><label class="form-label">Nº da Medição *</label><input class="form-control" type="number" name="numero_medicao" value="${m.numero_medicao||1}" min="1" required></div>
-              <div class="form-group"><label class="form-label">Status</label><select class="form-control" name="status">
+              <div class="form-group"><label class="form-label" for="med-obra-id">Obra *</label><select class="form-control" id="med-obra-id" name="obra_id" required>${Utils.clienteOptions(m.obra_id||App.obraId!=='todas'?App.obraId:'')}</select></div>
+              <div class="form-group"><label class="form-label" for="med-numero">Nº da Medição *</label><input class="form-control" id="med-numero" type="number" name="numero_medicao" value="${m.numero_medicao||1}" min="1" required></div>
+              <div class="form-group"><label class="form-label" for="med-status">Status</label><select class="form-control" id="med-status" name="status">
                 <option value="preparando" ${(m.status||'preparando')==='preparando'?'selected':''}>📋 Preparando</option>
                 <option value="submetida" ${m.status==='submetida'?'selected':''}>📤 Submetida</option>
                 <option value="em_analise" ${m.status==='em_analise'?'selected':''}>🔍 Em Análise</option>
@@ -297,34 +297,34 @@ const Medicoes = {
                 <option value="rejeitada" ${m.status==='rejeitada'?'selected':''}>❌ Rejeitada</option>
               </select></div>
             </div>
-            <div class="form-group" style="margin-bottom:14px;"><label class="form-label">Descrição da Etapa Executada *</label><textarea class="form-control" name="etapa_descricao" rows="2" required placeholder="Descreva as etapas executadas nesta medição...">${m.etapa_descricao||''}</textarea></div>
+            <div class="form-group" style="margin-bottom:14px;"><label class="form-label" for="med-descricao">Descrição da Etapa Executada *</label><textarea class="form-control" id="med-descricao" name="etapa_descricao" rows="2" required placeholder="Descreva as etapas executadas nesta medição...">${m.etapa_descricao||''}</textarea></div>
             <div class="form-row cols-2" style="margin-bottom:14px;">
-              <div class="form-group"><label class="form-label">% Físico Executado</label><div class="input-prefix"><span class="input-pfx-txt">%</span><input name="percentual_fisico" type="number" value="${m.percentual_fisico||0}" min="0" max="100"></div></div>
-              <div class="form-group"><label class="form-label">% Financeiro</label><div class="input-prefix"><span class="input-pfx-txt">%</span><input name="percentual_financeiro" type="number" value="${m.percentual_financeiro||0}" min="0" max="100"></div></div>
+              <div class="form-group"><label class="form-label" for="med-pct-fisico">% Físico Executado</label><div class="input-prefix"><span class="input-pfx-txt">%</span><input id="med-pct-fisico" name="percentual_fisico" type="number" value="${m.percentual_fisico||0}" min="0" max="100"></div></div>
+              <div class="form-group"><label class="form-label" for="med-pct-financeiro">% Financeiro</label><div class="input-prefix"><span class="input-pfx-txt">%</span><input id="med-pct-financeiro" name="percentual_financeiro" type="number" value="${m.percentual_financeiro||0}" min="0" max="100"></div></div>
             </div>
             <div class="form-row cols-3" style="margin-bottom:14px;">
-              <div class="form-group"><label class="form-label">Valor Solicitado *</label><div class="input-prefix"><span class="input-pfx-txt">R$</span><input name="valor_solicitado" type="number" value="${m.valor_solicitado||m.valor_medido||''}" step="0.01" min="0" required></div></div>
-              <div class="form-group"><label class="form-label">Valor Aprovado</label><div class="input-prefix"><span class="input-pfx-txt">R$</span><input name="valor_aprovado" type="number" value="${m.valor_aprovado||''}" step="0.01" min="0"></div></div>
-              <div class="form-group"><label class="form-label">Valor Liberado</label><div class="input-prefix"><span class="input-pfx-txt">R$</span><input name="valor_liberado" type="number" value="${m.valor_liberado||''}" step="0.01" min="0"></div></div>
+              <div class="form-group"><label class="form-label" for="med-val-solicitado">Valor Solicitado *</label><div class="input-prefix"><span class="input-pfx-txt">R$</span><input id="med-val-solicitado" name="valor_solicitado" type="number" value="${m.valor_solicitado||m.valor_medido||''}" step="0.01" min="0" required></div></div>
+              <div class="form-group"><label class="form-label" for="med-val-aprovado">Valor Aprovado</label><div class="input-prefix"><span class="input-pfx-txt">R$</span><input id="med-val-aprovado" name="valor_aprovado" type="number" value="${m.valor_aprovado||''}" step="0.01" min="0"></div></div>
+              <div class="form-group"><label class="form-label" for="med-val-liberado">Valor Liberado</label><div class="input-prefix"><span class="input-pfx-txt">R$</span><input id="med-val-liberado" name="valor_liberado" type="number" value="${m.valor_liberado||''}" step="0.01" min="0"></div></div>
             </div>
             <div class="form-row cols-2" style="margin-bottom:14px;">
-              <div class="form-group"><label class="form-label">Retenção Técnica (R$)</label><div class="input-prefix"><span class="input-pfx-txt">R$</span><input name="retencao_tecnica" type="number" value="${m.retencao_tecnica||''}" step="0.01" min="0" placeholder="0.00"></div></div>
-              <div class="form-group"><label class="form-label">Descontos / Glosas (R$)</label><div class="input-prefix"><span class="input-pfx-txt">R$</span><input name="descontos" type="number" value="${m.descontos||''}" step="0.01" min="0" placeholder="0.00"></div></div>
+              <div class="form-group"><label class="form-label" for="med-retencao">Retenção Técnica (R$)</label><div class="input-prefix"><span class="input-pfx-txt">R$</span><input id="med-retencao" name="retencao_tecnica" type="number" value="${m.retencao_tecnica||''}" step="0.01" min="0" placeholder="0.00"></div></div>
+              <div class="form-group"><label class="form-label" for="med-descontos">Descontos / Glosas (R$)</label><div class="input-prefix"><span class="input-pfx-txt">R$</span><input id="med-descontos" name="descontos" type="number" value="${m.descontos||''}" step="0.01" min="0" placeholder="0.00"></div></div>
             </div>
             <div class="form-row cols-4" style="margin-bottom:14px;">
-              <div class="form-group"><label class="form-label">Data Previsão</label><input class="form-control" type="date" name="data_previsao" value="${m.data_previsao||''}"></div>
-              <div class="form-group"><label class="form-label">Data Medição</label><input class="form-control" type="date" name="data_medicao" value="${m.data_medicao||''}"></div>
-              <div class="form-group"><label class="form-label">Data Aprovação</label><input class="form-control" type="date" name="data_aprovacao" value="${m.data_aprovacao||''}"></div>
-              <div class="form-group"><label class="form-label">Data Liberação</label><input class="form-control" type="date" name="data_liberacao" value="${m.data_liberacao||''}"></div>
+              <div class="form-group"><label class="form-label" for="med-dt-prev">Data Previsão</label><input class="form-control" id="med-dt-prev" type="date" name="data_previsao" value="${m.data_previsao||''}"></div>
+              <div class="form-group"><label class="form-label" for="med-dt-med">Data Medição</label><input class="form-control" id="med-dt-med" type="date" name="data_medicao" value="${m.data_medicao||''}"></div>
+              <div class="form-group"><label class="form-label" for="med-dt-aprov">Data Aprovação</label><input class="form-control" id="med-dt-aprov" type="date" name="data_aprovacao" value="${m.data_aprovacao||''}"></div>
+              <div class="form-group"><label class="form-label" for="med-dt-lib">Data Liberação</label><input class="form-control" id="med-dt-lib" type="date" name="data_liberacao" value="${m.data_liberacao||''}"></div>
             </div>
             <div class="form-row cols-2" style="margin-bottom:14px;">
-              <div class="form-group"><label class="form-label">Engenheiro / Responsável Técnico</label><input class="form-control" name="engenheiro_responsavel" value="${m.engenheiro_responsavel||''}" placeholder="Nome e CREA/CAU"></div>
-              <div class="form-group"><label class="form-label">Documentação</label><select class="form-control" name="documentos_ok">
+              <div class="form-group"><label class="form-label" for="med-rt">Engenheiro / Responsável Técnico</label><input class="form-control" id="med-rt" name="engenheiro_responsavel" value="${m.engenheiro_responsavel||''}" placeholder="Nome e CREA/CAU"></div>
+              <div class="form-group"><label class="form-label" for="med-docs-ok">Documentação</label><select class="form-control" id="med-docs-ok" name="documentos_ok">
                 <option value="true" ${m.documentos_ok?'selected':''}>✅ Completa</option>
                 <option value="false" ${!m.documentos_ok?'selected':''}>⏳ Pendente</option>
               </select></div>
             </div>
-            <div class="form-group"><label class="form-label">Observações</label><textarea class="form-control" name="observacoes" rows="2">${m.observacoes||''}</textarea></div>
+            <div class="form-group"><label class="form-label" for="med-obs">Observações</label><textarea class="form-control" id="med-obs" name="observacoes" rows="2">${m.observacoes||''}</textarea></div>
           </form>
         </div>
         <div class="modal-footer">

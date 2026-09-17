@@ -80,7 +80,8 @@ const tests = [
   'scripts/test-patch55-security.js',
   'scripts/test-patch56-security.js',
   'scripts/test-patch56-tenant-context.js',
-  'scripts/test-phase2-reliability.js'
+  'scripts/test-phase2-reliability.js',
+  'scripts/test-phase3-ergonomics.js'
 ].filter(fs.existsSync);
 
 const p50NativeSourceTests = new Set([
@@ -94,7 +95,8 @@ const p50NativeSourceTests = new Set([
   'scripts/test-patch55-security.js',
   'scripts/test-patch56-security.js',
   'scripts/test-patch56-tenant-context.js',
-  'scripts/test-phase2-reliability.js'
+  'scripts/test-phase2-reliability.js',
+  'scripts/test-phase3-ergonomics.js'
 ]);
 const preload = path.resolve('scripts/test-api-wrapper-preload.cjs');
 
