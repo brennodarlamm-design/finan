@@ -6,6 +6,7 @@ import { checkRateLimit, getClientIp } from './_ratelimit.js';
 import { canUseFeature, planError } from './_plans.js';
 import { canWriteData, canAccessModule, permissionError } from './_permissions.js';
 import { writeAudit } from './_audit.js';
+import { createTenantSql } from './_tenant-sql.js';
 
 function getSql() {
   if (!process.env.DATABASE_URL) throw new Error('DATABASE_URL não configurada.');
@@ -42,7 +43,8 @@ export default async function handler(req, res) {
   res.setHeader('Cache-Control', 'no-store');
   if (req.method === 'OPTIONS') return res.status(200).end();
 
-  const sql = getSql();
+  // publicSql: acesso global sem contexto de tenant (GET de validação pública por código único).
+  const publicSql = getSql();
 
   try {
     // Consulta pública: valida somente registros realmente existentes no Neon.
@@ -56,7 +58,7 @@ export default async function handler(req, res) {
         return res.status(400).json({ success: false, valid: false, error: 'Código de validação inválido.' });
       }
 
-      const rows = await sql`
+      const rows = await publicSql`
         SELECT
           s.codigo_validacao, s.hash_sha256, s.nome, s.doc, s.papel,
           s.doc_tipo, s.doc_id, s.doc_numero, s.data_hora, s.data_hora_fmt,
@@ -112,6 +114,9 @@ export default async function handler(req, res) {
         return res.status(403).json(planError('signatures', auth.user?.tenantPlan));
       }
 
+      // tenantSql: contexto RLS ativo via set_config(app.current_tenant_id) por transação.
+      const tenantSql = createTenantSql(getSql(), { tenantId: auth.tenantId });
+
       const rl = await checkRateLimit(`assinatura:write:${auth.tenantId}:${auth.user?.id || 'user'}`, 60, 60_000);
       if (!rl.allowed) return res.status(429).json({ success: false, error: 'Limite de registros atingido. Tente novamente em instantes.' });
 
@@ -125,7 +130,7 @@ export default async function handler(req, res) {
       const parsedDate = b.data_hora ? new Date(b.data_hora) : new Date();
       const dataHoraIso = Number.isNaN(parsedDate.getTime()) ? new Date().toISOString() : parsedDate.toISOString();
       try {
-        await sql`
+        await tenantSql`
           INSERT INTO document_signatures (
             id, tenant_id, user_id, codigo_validacao, hash_sha256, nome, doc, papel,
             doc_tipo, doc_id, doc_numero, data_hora, data_hora_fmt, ip_dispositivo
@@ -138,7 +143,7 @@ export default async function handler(req, res) {
         `;
       } catch (err) {
         if (String(err?.message || '').toLowerCase().includes('unique')) {
-          const existing = await sql`SELECT tenant_id, hash_sha256 FROM document_signatures WHERE codigo_validacao=${codigo} LIMIT 1;`;
+          const existing = await tenantSql`SELECT tenant_id, hash_sha256 FROM document_signatures WHERE codigo_validacao=${codigo} LIMIT 1;`;
           if (existing.length && existing[0].tenant_id === auth.tenantId && String(existing[0].hash_sha256).toLowerCase() === hash) {
             return res.status(200).json({ success: true, codigo_validacao: codigo, already_registered: true });
           }
@@ -147,7 +152,7 @@ export default async function handler(req, res) {
         throw err;
       }
 
-      await writeAudit(sql, req, auth, {
+      await writeAudit(tenantSql, req, auth, {
         acao: 'assinar', entidade: clean(b.doc_tipo,50) || 'documento', entidadeId: clean(b.doc_id,64) || codigo,
         depois: { codigo_validacao: codigo, hash_sha256: hash, papel: clean(b.papel,120) || null, doc_numero: clean(b.doc_numero,100) || null }
       });

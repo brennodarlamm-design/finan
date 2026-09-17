@@ -7,6 +7,7 @@ import { canManageTenant, canAccessModule, permissionError } from './_permission
 import { writeAudit } from './_audit.js';
 import { setEdgeCacheHeaders } from './_http.js';
 import webhookPixHandler from './_webhook_pix.js';
+import { createTenantSql } from './_tenant-sql.js';
 
 function getSql() {
   if (!process.env.DATABASE_URL) throw new Error('DATABASE_URL não configurada.');
@@ -109,7 +110,8 @@ export default async function handler(req, res) {
   if (!canAccessModule(auth,'planos',req.method === 'POST' ? 'write' : 'read')) return res.status(403).json(permissionError(req.method === 'POST' ? 'MODULE_WRITE_FORBIDDEN' : 'MODULE_READ_FORBIDDEN','planos'));
 
   try {
-    const sql = getSql();
+    // sql com contexto RLS: set_config(app.current_tenant_id) em cada transação.
+    const sql = createTenantSql(getSql(), { tenantId: auth.tenantId });
 
     // ── CONSULTA DE STATUS EM TEMPO REAL PARA MODAL PIX ──────────────────────
     if (req.method === 'GET' && req.query?.action === 'check_invoice') {

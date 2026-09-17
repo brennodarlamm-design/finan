@@ -141,6 +141,28 @@ export function getInternalApiSecret() {
   return String(process.env.INTERNAL_API_SECRET || '').trim();
 }
 
+/**
+ * Retorna um cliente Neon com o role neondb_owner para uso EXCLUSIVO durante o
+ * bootstrap de autenticação — antes de qualquer tenant ser resolvido.
+ *
+ * ⚠️  FRONTEIRA DE SEGURANÇA:
+ *   - Usar SOMENTE em _auth.js e no handshake inicial de login/refresh.
+ *   - Após resolveAuthAndTenant() retornar { tenantId }, todas as queries de
+ *     dados de tenant devem usar createTenantSql() de ./_tenant-sql.js.
+ *   - NUNCA usar este cliente para queries que dependem do isolamento RLS por tenant.
+ *
+ * Motivo: o driver HTTP do Neon não preserva contexto entre chamadas. O contexto
+ * RLS (app.current_tenant_id) precisa estar na mesma transação da query protegida.
+ * No bootstrap de auth, não existe tenantId ainda, portanto createTenantSql não pode
+ * ser usado — o owner bypassa RLS por design nessa etapa.
+ */
+export function createBootstrapSql() {
+  const conn = process.env.DATABASE_URL;
+  if (!conn) throw new Error('DATABASE_URL não configurada para bootstrap de autenticação.');
+  // neon() já é importado no topo deste módulo — não precisa de await.
+  return neon(conn);
+}
+
 export async function resolveAuthAndTenant(req) {
   const sessionSecret = getSessionSigningSecret();
   const internalSecret = getInternalApiSecret();

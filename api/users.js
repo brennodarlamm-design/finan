@@ -6,11 +6,8 @@ import { writeAudit } from './_audit.js';
 import { canManageUsers, canManageTenant, permissionError, sanitizePermissions } from './_permissions.js';
 import { getPlanRule, minimumPlanForUsers, upgradeDescriptor } from './_plans.js';
 import { checkRateLimit, getClientIp } from './_ratelimit.js';
+import { createTenantSql } from './_tenant-sql.js';
 
-function getSql() {
-  if (!process.env.DATABASE_URL) throw new Error('DATABASE_URL não configurada.');
-  return neon(process.env.DATABASE_URL);
-}
 
 function cors(req, res) {
   const allowed = ['https://finobra.app.br','https://www.finobra.app.br','http://localhost:3000','http://localhost:3333','http://localhost:5000','http://127.0.0.1:3000','http://127.0.0.1:3333','http://127.0.0.1:5000'];
@@ -384,7 +381,9 @@ export default async function handler(req, res) {
   if (!auth.authenticated) return res.status(auth.status || 401).json({ success:false, error:auth.error });
   if (auth.isSystem) return res.status(403).json({ success:false, error:'Use uma sessão de usuário para gerenciar usuários.' });
 
-  const sql = getSql();
+  const baseSql = neon(process.env.DATABASE_URL);
+  const sql = createTenantSql(baseSql, { tenantId: auth.tenantId, isSystem: false });
+
   const target = req.query.target || req.body?.target || '';
 
   // ── Central de Suporte do CLIENTE (compartilhada via Neon) ───────────────
