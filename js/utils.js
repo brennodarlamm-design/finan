@@ -294,14 +294,40 @@ const Utils = {
     }, 3200);
   },
 
+  _modalDirty: false,
+
+  setModalDirty(val = true) {
+    this._modalDirty = !!val;
+  },
+
   showModal(html) {
     this.closeModal();
+    this._modalDirty = false;
     this._modalReturnFocus = document.activeElement;
     const el = document.createElement('div');
     el.id = 'modal-overlay';
     el.className = 'modal-overlay';
     el.innerHTML = html;
-    el.addEventListener('click', e => { if(e.target===el) this.closeModal(); });
+
+    const markDirty = (e) => {
+      const tag = e.target?.tagName?.toLowerCase();
+      if (['input', 'textarea', 'select'].includes(tag)) {
+        this._modalDirty = true;
+      }
+    };
+    el.addEventListener('input', markDirty);
+    el.addEventListener('change', markDirty);
+
+    const checkAndClose = () => {
+      if (this._modalDirty) {
+        if (!window.confirm('Você possui alterações não salvas neste formulário. Deseja realmente fechar e perder os dados preenchidos?')) {
+          return;
+        }
+      }
+      this.closeModal();
+    };
+
+    el.addEventListener('click', e => { if(e.target===el) checkAndClose(); });
     document.body.appendChild(el);
     document.body.classList.add('modal-open');
     const dialog = el.querySelector('.modal') || el;
@@ -312,7 +338,7 @@ const Utils = {
     if (title) dialog.setAttribute('aria-label',title.textContent.trim());
     dialog.focus({preventScroll:true});
     el.addEventListener('keydown', event => {
-      if (event.key === 'Escape') { event.preventDefault(); this.closeModal(); }
+      if (event.key === 'Escape') { event.preventDefault(); checkAndClose(); }
       if (event.key !== 'Tab') return;
       const focusable = Array.from(dialog.querySelectorAll('button,a[href],input,select,textarea,[tabindex="0"]')).filter(node => !node.disabled && node.getClientRects().length);
       const first = focusable[0], last = focusable[focusable.length-1];
@@ -323,6 +349,7 @@ const Utils = {
   },
 
   closeModal() {
+    this._modalDirty = false;
     const el = document.getElementById('modal-overlay');
     if (el) el.remove();
     document.body.classList.remove('modal-open');

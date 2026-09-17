@@ -497,10 +497,22 @@ const SINAPI = {
 
   _parsePreco(raw) {
     if (raw === null || raw === undefined || raw === '') return 0;
-    if (typeof raw === 'number') return Math.round(raw * 100) / 100;
-    // String com formato brasileiro: "1.234,56"
-    const s = String(raw).replace(/[^\d,.-]/g, '').replace('.', '').replace(',', '.');
-    return Math.round(parseFloat(s) * 100) / 100 || 0;
+    if (typeof raw === 'number') return isNaN(raw) ? 0 : Math.round(raw * 100) / 100;
+    let s = String(raw).trim();
+    if (!s) return 0;
+    s = s.replace(/[R$\s]/gi, '');
+    if (s.includes(',')) {
+      s = s.replace(/\./g, '').replace(',', '.');
+    } else {
+      const parts = s.split('.');
+      if (parts.length > 2) {
+        const last = parts.pop();
+        s = parts.join('') + '.' + last;
+      }
+    }
+    s = s.replace(/[^\d.-]/g, '');
+    const num = parseFloat(s);
+    return isNaN(num) ? 0 : Math.round(num * 100) / 100;
   },
 
   // ─────────────────────────────────────────────────

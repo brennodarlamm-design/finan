@@ -31,7 +31,23 @@ const DB = {
 
   _ck(name) {
     const t = this._t();
-    return `${name}_${t}`;
+    const cleanName = String(name || '').replace(/^finobra_/, '');
+    const canonicalKey = `finobra_${t}_${cleanName}`;
+    if (typeof localStorage !== 'undefined') {
+      const legacyKey1 = `${name}_${t}`;
+      const legacyKey2 = `${cleanName}_${t}`;
+      try {
+        if (localStorage.getItem(canonicalKey) === null) {
+          const legacyVal = localStorage.getItem(legacyKey1) ?? (legacyKey2 !== legacyKey1 ? localStorage.getItem(legacyKey2) : null);
+          if (legacyVal !== null) {
+            localStorage.setItem(canonicalKey, legacyVal);
+            localStorage.removeItem(legacyKey1);
+            if (legacyKey2 !== legacyKey1) localStorage.removeItem(legacyKey2);
+          }
+        }
+      } catch {}
+    }
+    return canonicalKey;
   },
 
   _migrateLegacyTenantCache() {

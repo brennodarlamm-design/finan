@@ -274,7 +274,7 @@ export default async function handler(req, res) {
 
       if (table === 'delta') {
         // Delta sync via audit_logs (acao = 'excluir', sinceIso, cursor, nextCursor, requiresFullSync: true)
-        return await handleDeltaSync(sql, tenantId, auth, req, res);
+        return await handleDeltaSync(sql, tenantId, auth, req.query || {}, res);
       }
 
       if (table === 'sync_manifest') {

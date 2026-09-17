@@ -4,7 +4,7 @@ const Medicoes = {
   render(obraId) {
     let meds = DB.getAll('medicoes');
     if (obraId && obraId !== 'todas') meds = meds.filter(m => m.obra_id === obraId);
-    meds.sort((a,b) => a.obra_id.localeCompare(b.obra_id) || a.numero_medicao - b.numero_medicao);
+    meds.sort((a,b) => String(a?.obra_id || '').localeCompare(String(b?.obra_id || '')) || (Number(a?.numero_medicao) || 0) - (Number(b?.numero_medicao) || 0));
 
     const liberadas = meds.filter(m=>m.status==='liberada');
     const emAnalise = meds.filter(m=>['em_analise','submetida'].includes(m.status));
@@ -371,7 +371,7 @@ const Medicoes = {
     let meds=DB.getAll('medicoes');
     if(oid&&oid!=='todas') meds=meds.filter(m=>m.obra_id===oid);
     if(st) meds=meds.filter(m=>m.status===st);
-    meds.sort((a,b)=>a.obra_id.localeCompare(b.obra_id)||a.numero_medicao-b.numero_medicao);
+    meds.sort((a,b) => String(a?.obra_id || '').localeCompare(String(b?.obra_id || '')) || (Number(a?.numero_medicao) || 0) - (Number(b?.numero_medicao) || 0));
     list.innerHTML=this._medCards(meds,oid);
   },
 

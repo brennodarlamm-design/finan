@@ -25,7 +25,8 @@ function tableAllowed(auth, table, action = 'read') {
  */
 export async function handleDeltaSync(sql, tenantId, auth, query, res) {
   setPrivateNoCache(res);
-  const rawCursor = query.cursor || query.since || null;
+  const queryObj = (query && typeof query === 'object' && query.query) ? query.query : (query || {});
+  const rawCursor = queryObj.cursor || queryObj.since || null;
   const nextCursor = new Date().toISOString();
 
   let sinceDate = null;
