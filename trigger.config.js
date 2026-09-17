@@ -2,7 +2,7 @@
 import { defineConfig } from "@trigger.dev/sdk";
 
 export default defineConfig({
-  project: "finan-as",
+  project: process.env.TRIGGER_PROJECT_REF || "proj_aszulswxjzimbcfaajha",
   dirs: ["./trigger"],
   retries: {
     enabledInDev: true,

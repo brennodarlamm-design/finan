@@ -18,8 +18,9 @@ monitor-nfe/xmls/
 *.pfx
 *.p12
 
-# Vercel
+# Vercel & Cloudflare
 .vercel/
+.wrangler/
 
 # Backups temporários e binários locais
 *.tmp

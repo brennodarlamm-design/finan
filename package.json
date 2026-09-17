@@ -7,6 +7,7 @@
     "dev": "npx serve .",
     "deploy": "node scripts/deploy.js",
     "deploy:cloudflare": "npx wrangler deploy",
+    "clean:deployments": "node scripts/clean-old-deployments.js",
     "build:cloudflare": "node scripts/build-cloudflare-pages.cjs && node scripts/patch38-postbuild.cjs",
     "postinstall": "node scripts/build-cloudflare-pages.cjs && node scripts/patch38-postbuild.cjs",
     "render:status": "node scripts/render-status.js",
