@@ -81,10 +81,6 @@ const tests = [
   'scripts/test-patch56-security.js'
 ].filter(fs.existsSync);
 
-// Até o P49, as suítes foram escritas quando api/admin.js e api/audit.js eram arquivos
-// monolíticos. No P50 eles viraram wrappers finos para manter 12 funções na Vercel.
-// O preload faz os testes legados enxergarem wrapper + helper interno real. As suítes
-// P50+ e arquitetura backend leem os arquivos físicos sem composição para validar a nova fronteira de segurança.
 const p50NativeSourceTests = new Set([
   'scripts/test-patch50-security.js',
   'scripts/test-p50-dev-key-vault.js',
@@ -101,6 +97,14 @@ const preload = path.resolve('scripts/test-api-wrapper-preload.cjs');
 for (const file of tests) {
   console.log(`\n=== ${file} ===`);
   const env = { ...process.env };
+
+  // Patch 56: a suíte nunca depende de segredos hardcoded da aplicação.
+  // Estes valores são exclusivos do processo de teste e não são usados em produção.
+  env.SESSION_SIGNING_SECRET ||= 'test-only-session-signing-secret-0123456789abcdef';
+  env.MFA_ENCRYPTION_KEY ||= 'test-only-mfa-encryption-key-0123456789abcdef';
+  env.TENANT_KEY_PEPPER ||= 'test-only-tenant-key-pepper-0123456789abcdef';
+  env.IP_BAN_PEPPER ||= 'test-only-ip-ban-pepper-0123456789abcdef';
+
   if (!p50NativeSourceTests.has(file)) {
     const prior = String(env.NODE_OPTIONS || '').trim();
     env.NODE_OPTIONS = `${prior}${prior ? ' ' : ''}--require=${preload}`;
