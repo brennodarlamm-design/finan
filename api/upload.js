@@ -4,6 +4,7 @@ import { handleUpload } from '@vercel/blob/client';
 import { neon } from '@neondatabase/serverless';
 import { resolveAuthAndTenant } from './_auth.js';
 import { canWriteData, canDeleteData, canAccessModule, permissionError } from './_permissions.js';
+import { createTenantSql } from './_tenant-sql.js';
 
 function getSql() {
   const conn = process.env.DATABASE_URL;
@@ -74,6 +75,7 @@ export default async function handler(req, res) {
   }
 
   const tenantId = auth.tenantId;
+  const sql = createTenantSql(getSql(), { tenantId, isSystem: auth.isSystem === true });
   if (req.method === 'GET' && !canAccessModule(auth,'documentos','read')) return res.status(403).json(permissionError('MODULE_READ_FORBIDDEN','documentos'));
   if (req.method === 'POST' && !canAccessModule(auth,'documentos','write')) return res.status(403).json(permissionError('MODULE_WRITE_FORBIDDEN','documentos'));
   if (req.method === 'DELETE' && !canAccessModule(auth,'documentos','delete')) return res.status(403).json(permissionError('MODULE_DELETE_FORBIDDEN','documentos'));
@@ -96,7 +98,6 @@ export default async function handler(req, res) {
       const documentId = String(req.query?.document_id || req.query?.id || '').trim();
       if (!documentId) return res.status(400).json({ success: false, error: 'ID do documento é obrigatório.' });
 
-      const sql = getSql();
       const rows = await sql`SELECT id, url, nome_arquivo, tipo_arquivo FROM documentos WHERE id = ${documentId} AND tenant_id = ${tenantId} LIMIT 1;`;
       if (!rows.length || !rows[0].url) {
         return res.status(404).json({ success: false, error: 'Arquivo não encontrado para este tenant.' });
@@ -152,7 +153,6 @@ export default async function handler(req, res) {
       }
 
       // 1. Validação de segurança e posse no banco Neon
-      const sql = getSql();
       let docRows = [];
       if (documentId) {
         docRows = await sql`SELECT id, url, tenant_id FROM documentos WHERE id = ${documentId} AND tenant_id = ${tenantId} LIMIT 1;`;
