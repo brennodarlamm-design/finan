@@ -9,6 +9,7 @@ import { getPlanRule, isActiveObraStatus, canUseFeature, planError } from './_pl
 import { canWriteData, canDeleteData, canAccessTable, permissionError } from './_permissions.js';
 import { writeAudit } from './_audit.js';
 import { ALLOWED_ORIGINS, sendError, setPrivateNoCache } from './_http.js';
+import { createTenantSql } from './_tenant-sql.js';
 
 function setCORS(req, res) {
   const origin = req.headers.origin;
@@ -255,7 +256,8 @@ export default async function handler(req, res) {
   }
 
   const tenantId = auth.tenantId;
-  const sql = getSql();
+  const baseSql = getSql();
+  const sql = createTenantSql(baseSql, { tenantId, isSystem: Boolean(auth.isSystem) });
 
   try {
     // ── GET: Consultar dados isolados pelo Tenant ─────────────────────────────
