@@ -14,7 +14,25 @@ import {
 } from './_tenant-access-key.js';
 import { triggerBillingSweep, isTriggerConfigured } from './_trigger-client.js';
 
-function getSql() {
+/**
+ * Retorna o cliente SQL com o role neondb_owner (conexão privilegiada).
+ *
+ * ⚠️  CAMINHO PRIVILEGIADO — NÃO substituir por createTenantSql().
+ *
+ * Todas as operações deste módulo são intencionalmente CROSS-TENANT:
+ *   - Listagem global de tenants, cobranças e suporte
+ *   - Impersonação e auditoria de suporte Master
+ *   - Operações administrativas, faturamento e billing
+ *   - Confirmação de pagamentos e webhooks PIX
+ *
+ * O isolamento RLS por tenant é responsabilidade de cada rota de tenant
+ * (db.js, dashboard.js, users.js, etc.) via createTenantSql().
+ * O admin route usa neondb_owner por design para acessar dados globais
+ * sem restrição de tenant_id.
+ *
+ * Fronteira: neondb_owner (admin/cross-tenant) vs finobra_app (tenant-scoped via RLS)
+ */
+function getOwnerSql() {
   const conn = process.env.DATABASE_URL;
   if (!conn) {
     throw new Error('DATABASE_URL não configurada no servidor.');
@@ -229,7 +247,9 @@ export default async function handler(req, res) {
     }
   }
 
-  const sql = getSql();
+  // Conexão privilegiada cross-tenant — intencional para operações Master/admin.
+  // Para rotas de tenant, use createTenantSql() via api/_tenant-sql.js.
+  const sql = getOwnerSql();
   const action = req.query.action || (req.body && req.body.action) || 'tenants';
 
   try {
