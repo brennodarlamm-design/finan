@@ -107,4 +107,10 @@ const tenantKey = read('api/_tenant-access-key.js');
 assert(!tenantKey.includes('finobra_pepper_access_key_seed_2026'), 'Chave da empresa não pode conter pepper hardcoded.');
 assert(tenantKey.includes('TENANT_KEY_PEPPER não configurado em produção'), 'Tenant key deve falhar fechado sem pepper dedicado em produção.');
 
-console.log('✅ Patch 56: IP ban, Fail2Ban e secrets fail-closed validados.');
+const mfaMigration = read('scripts/migrate-legacy-mfa-secrets.js');
+assert(mfaMigration.includes("process.argv.includes('--apply')"), 'Migração MFA deve ser dry-run por padrão e exigir --apply.');
+assert(mfaMigration.includes('MFA_ENCRYPTION_KEY dedicada deve possuir pelo menos 32 caracteres'), 'Migração MFA deve exigir chave dedicada forte.');
+assert(mfaMigration.includes("mfa_secret NOT LIKE 'v1$%'"), 'Migração MFA deve verificar que nenhum segredo legado permaneceu.');
+assert(mfaMigration.includes('AND mfa_secret = ${original}'), 'Migração MFA deve usar proteção contra atualização concorrente.');
+
+console.log('✅ Patch 56: IP ban, Fail2Ban, secrets fail-closed e migração MFA validados.');
