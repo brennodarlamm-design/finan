@@ -9,6 +9,31 @@ import svgRenderer from 'qrcode/lib/renderer/svg.js';
 // Alfabeto padrão Base32 (RFC 4648)
 const BASE32_ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
 
+function isProduction() {
+  return process.env.VERCEL_ENV === 'production' || process.env.NODE_ENV === 'production';
+}
+
+export function getMfaEncryptionKey(customKey) {
+  const dedicated = String(customKey || process.env.MFA_ENCRYPTION_KEY || '').trim();
+  if (dedicated) {
+    if (dedicated.length < 32) {
+      throw new Error('MFA_ENCRYPTION_KEY deve possuir pelo menos 32 caracteres.');
+    }
+    return dedicated;
+  }
+
+  // Patch 56: produção exige chave dedicada; nenhuma chave pública/hardcoded é aceita.
+  if (isProduction()) {
+    throw new Error('MFA_ENCRYPTION_KEY não configurado em produção.');
+  }
+
+  // Compatibilidade apenas para desenvolvimento/testes locais.
+  const devFallback = String(process.env.SESSION_SIGNING_SECRET || '').trim();
+  if (devFallback.length >= 32) return devFallback;
+
+  throw new Error('MFA_ENCRYPTION_KEY não configurado.');
+}
+
 /**
  * Codifica um Buffer em string Base32 (sem padding =)
  */
@@ -195,15 +220,6 @@ export function verifyBackupCode(enteredCode, hashedCodesList = []) {
   return { valid: false, remainingHashedCodes: hashedCodesList };
 }
 
-function escapeXml(value) {
-  return String(value || '')
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&apos;');
-}
-
 /**
  * Gerador Oficial e Seguro de QR Code SVG Vetorial (Padrão ISO/IEC 18004).
  * Renderiza uma matriz QR de alto contraste (módulos pretos em fundo branco),
@@ -228,7 +244,7 @@ export function generateQrSvg(text, size = 220) {
  */
 export function encryptMfaSecret(secretText, customKey) {
   if (!secretText) return null;
-  const rawKey = customKey || process.env.MFA_ENCRYPTION_KEY || process.env.SESSION_SIGNING_SECRET || 'finobra_mfa_enc_fallback_key_2026';
+  const rawKey = getMfaEncryptionKey(customKey);
   const key = crypto.createHash('sha256').update(String(rawKey), 'utf8').digest();
   const iv = crypto.randomBytes(12);
   const cipher = crypto.createCipheriv('aes-256-gcm', key, iv);
@@ -254,7 +270,7 @@ export function decryptMfaSecret(storedValue, customKey) {
     throw new Error('Formato inválido para segredo MFA criptografado');
   }
   const [, ivB64, tagB64, encB64] = parts;
-  const rawKey = customKey || process.env.MFA_ENCRYPTION_KEY || process.env.SESSION_SIGNING_SECRET || 'finobra_mfa_enc_fallback_key_2026';
+  const rawKey = getMfaEncryptionKey(customKey);
   const key = crypto.createHash('sha256').update(String(rawKey), 'utf8').digest();
   const decipher = crypto.createDecipheriv('aes-256-gcm', key, Buffer.from(ivB64, 'base64'));
   decipher.setAuthTag(Buffer.from(tagB64, 'base64'));
@@ -262,4 +278,3 @@ export function decryptMfaSecret(storedValue, customKey) {
   decrypted += decipher.final('utf8');
   return { secret: decrypted, isLegacy: false };
 }
-
