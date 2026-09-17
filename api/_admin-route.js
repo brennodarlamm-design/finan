@@ -33,9 +33,9 @@ import { triggerBillingSweep, isTriggerConfigured } from './_trigger-client.js';
  * Fronteira: neondb_owner (admin/cross-tenant) vs finobra_app (tenant-scoped via RLS)
  */
 function getOwnerSql() {
-  const conn = process.env.DATABASE_URL;
+  const conn = process.env.DATABASE_OWNER_URL || process.env.DATABASE_URL;
   if (!conn) {
-    throw new Error('DATABASE_URL não configurada no servidor.');
+    throw new Error('DATABASE_OWNER_URL ou DATABASE_URL não configurada no servidor.');
   }
   return neon(conn);
 }

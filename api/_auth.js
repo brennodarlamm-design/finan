@@ -157,8 +157,8 @@ export function getInternalApiSecret() {
  * ser usado — o owner bypassa RLS por design nessa etapa.
  */
 export function createBootstrapSql() {
-  const conn = process.env.DATABASE_URL;
-  if (!conn) throw new Error('DATABASE_URL não configurada para bootstrap de autenticação.');
+  const conn = process.env.DATABASE_OWNER_URL || process.env.DATABASE_URL;
+  if (!conn) throw new Error('DATABASE_OWNER_URL ou DATABASE_URL não configurada para bootstrap de autenticação.');
   // neon() já é importado no topo deste módulo — não precisa de await.
   return neon(conn);
 }
@@ -217,9 +217,9 @@ export async function resolveAuthAndTenant(req) {
     return { authenticated: false, status: 401, error: 'Token de autenticação inválido ou expirado.' };
   }
 
-  const conn = process.env.DATABASE_URL;
+  const conn = process.env.DATABASE_OWNER_URL || process.env.DATABASE_URL;
   if (!conn) {
-    console.error('🚨 [Segurança] DATABASE_URL não configurada para validação da sessão.');
+    console.error('🚨 [Segurança] DATABASE_OWNER_URL ou DATABASE_URL não configurada para validação da sessão.');
     return { authenticated: false, status: 500, error: 'Banco de autenticação indisponível.' };
   }
 

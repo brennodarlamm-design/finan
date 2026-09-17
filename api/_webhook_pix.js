@@ -61,9 +61,9 @@ export default async function webhookPixHandler(req, res) {
     });
   }
 
-  const conn = process.env.DATABASE_URL;
+  const conn = process.env.DATABASE_OWNER_URL || process.env.DATABASE_URL;
   if (!conn) {
-    console.error('❌ [Webhook PIX] DATABASE_URL não configurada.');
+    console.error('❌ [Webhook PIX] DATABASE_OWNER_URL ou DATABASE_URL não configurada.');
     return res.status(500).json({ success: false, error: 'Banco de dados indisponível no momento.' });
   }
 

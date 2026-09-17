@@ -53,9 +53,12 @@ export function tenantAccessKeyLast4(value) {
 }
 
 export function isTenantAccessKeyShapeValid(value) {
+  const raw = String(value || '').trim().toUpperCase();
   const normalized = normalizeTenantAccessKey(value);
-  // Aceita 6 dígitos numéricos (padrão FinObra) e suporta legado FO-XXXXXX-...
-  return /^\d{6}$/.test(normalized) || /^FO-[A-Z0-9]{6}(?:-[A-Z0-9]{1,6}){3,5}$/.test(normalized);
+  // Aceita 6 dígitos numéricos (padrão FinObra) e suporta legado FO-XXXXXX-... (com ou sem hífens)
+  return /^\d{6}$/.test(normalized) ||
+         /^FO-[A-Z0-9]{6}(?:-[A-Z0-9]{1,6}){3,5}$/.test(raw) ||
+         /^FO[A-Z0-9]{9,36}$/.test(normalized);
 }
 
 export function timingSafeHashEqual(leftHash, rightHash) {

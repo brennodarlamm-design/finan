@@ -1,21 +1,70 @@
-.vercel
+# FinObra — Arquivos e diretórios ignorados nos deployments da Vercel
+# Reduz o pacote de deploy de ~140 MB para ~4 MB e evita exceder a cota de Deployment Storage.
+
+# Segurança e credenciais locais (nunca enviar para a nuvem)
 .env*
-monitor-nfe
-backend
-bin
+*.pem
+*.key
+*.crt
+*.pfx
+*.p12
+
+# Daemons e ferramentas locais pesadas
+monitor-nfe/
+
+# Build artifacts locais e de outras plataformas
+dist/
+build/
+.vercel
+.wrangler/
+.trigger/
+.render/
+cloudflare/
+cloudflare-worker.js
+render.yaml
+wrangler.jsonc
+
+# Backend standalone (hospedado no Render via Docker)
+backend/
+
+# IA, Agentes, Conductor e Documentação
+.agents/
+conductor/
+docs/
+scratch
+node_modules
+*.md
+*.bat
+
+# Ferramentas locais, migrations do banco Neon e testes
+migrations/
+bin/
+schema.sql
+skills-lock.json
+
+# Trigger.dev jobs locais (executados na nuvem do Trigger.dev)
+trigger/
+trigger.config.js
+
+# Scripts: ignora scripts locais exceto os exigidos no postinstall
 scripts/*
 !scripts/build-cloudflare-pages.cjs
 !scripts/patch38-postbuild.cjs
-*.pfx
-*.log
-*.tmp
-*.bak
-render.yaml
 
-# Pacotes e artefatos locais que não pertencem ao deploy
-node_modules
-scratch
+# Logs e arquivos de diagnóstico locais
+*.log
+scratch-startup-tests.log
+logs/
+
+# Pacotes, backups e artefatos locais
 FINOBRA_PATCH_*
 *.zip
 *.rar
 *.7z
+*.tmp
+*.bak
+
+# Caches e arquivos temporários de SO
+.DS_Store
+Thumbs.db
+

@@ -190,6 +190,7 @@ function normalizeOrcamento(o) {
 }
 
 async function enforceObraPlanLimit(sql, tenantId, plan, obra) {
+  // PLAN_OBRA_LIMIT: valida limite de obras ativas delegando para módulo de mutações
   return modEnforceObraPlanLimit(sql, tenantId, plan, obra);
 }
 
