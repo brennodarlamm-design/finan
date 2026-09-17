@@ -30,11 +30,21 @@ function patchLanding() {
   let html = read('index.html');
   html = html.replace('href="/landing" aria-label="FinObra"', 'href="/" aria-label="FinObra"');
   html = ensureCanonical(html, 'https://finobra.app.br/');
-  html = injectBeforeHeadClose(html, '<meta property="og:type" content="website">');
-  html = injectBeforeHeadClose(html, '<meta property="og:title" content="FinObra — Gestão de Obras, Financeiro e Engenharia">');
-  html = injectBeforeHeadClose(html, '<meta property="og:description" content="Gestão de obras, financeiro, compras, documentos e engenharia em um só sistema.">');
-  html = injectBeforeHeadClose(html, '<meta property="og:url" content="https://finobra.app.br/">');
-  html = injectBeforeHeadClose(html, '<meta name="twitter:card" content="summary">');
+  if (!html.includes('property="og:type"')) {
+    html = injectBeforeHeadClose(html, '<meta property="og:type" content="website">');
+  }
+  if (!html.includes('property="og:title"')) {
+    html = injectBeforeHeadClose(html, '<meta property="og:title" content="FinObra — Sistema de Gestão Financeira e Obras para Construtoras">');
+  }
+  if (!html.includes('property="og:description"')) {
+    html = injectBeforeHeadClose(html, '<meta property="og:description" content="Software de gestão de obras e financeiro para construtoras. Medições com retenções, orçamentos SINAPI oficiais e cronograma. Teste grátis por 15 dias!">');
+  }
+  if (!html.includes('property="og:url"')) {
+    html = injectBeforeHeadClose(html, '<meta property="og:url" content="https://finobra.app.br/">');
+  }
+  if (!html.includes('name="twitter:card"')) {
+    html = injectBeforeHeadClose(html, '<meta name="twitter:card" content="summary_large_image">');
+  }
   write('index.html', html);
 }
 

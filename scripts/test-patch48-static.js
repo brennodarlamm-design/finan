@@ -42,7 +42,6 @@ test('robots.txt permite indexação pública e bloqueia áreas restritas (/app/
 const rootSitemap = fs.readFileSync(rootSitemapPath, 'utf8');
 test('sitemap.xml contém URLs canônicas essenciais com prioridades e changefreq',
   rootSitemap.includes('<loc>https://finobra.app.br/</loc>') &&
-  rootSitemap.includes('<loc>https://finobra.app.br/landing</loc>') &&
   rootSitemap.includes('<loc>https://finobra.app.br/validar</loc>') &&
   rootSitemap.includes('<loc>https://finobra.app.br/termos</loc>') &&
   rootSitemap.includes('<loc>https://finobra.app.br/privacidade</loc>') &&

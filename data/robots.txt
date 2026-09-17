@@ -1,9 +1,10 @@
 User-agent: *
 Allow: /
-Allow: /landing
 Allow: /privacidade
 Allow: /termos
 Allow: /validar
+Allow: /llms.txt
+Allow: /llms-full.txt
 Disallow: /app
 Disallow: /app/
 Disallow: /login

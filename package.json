@@ -60,6 +60,7 @@
     "test:architecture": "node scripts/test-backend-architecture.js",
     "test:phase2": "node scripts/test-phase2-reliability.js",
     "test:phase3": "node scripts/test-phase3-ergonomics.js",
+    "test:seo": "node scripts/test-seo-indexing.js",
     "test:e2e": "node scripts/test-e2e-synthetic.js"
   },
   "dependencies": {

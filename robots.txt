@@ -1,6 +1,5 @@
 User-agent: *
 Allow: /
-Allow: /landing
 Allow: /privacidade
 Allow: /termos
 Allow: /validar
