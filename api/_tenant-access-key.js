@@ -1,5 +1,9 @@
 import crypto from 'crypto';
 
+function isProduction() {
+  return process.env.VERCEL_ENV === 'production' || process.env.NODE_ENV === 'production';
+}
+
 export function normalizeTenantAccessKey(value = '') {
   return String(value || '').trim().replace(/[\s-]+/g, '').toUpperCase();
 }
@@ -9,14 +13,31 @@ export function generateTenantAccessKey() {
   return String(crypto.randomInt(100000, 1000000));
 }
 
-export function getTenantKeyPepper() {
-  return process.env.TENANT_KEY_PEPPER || process.env.SESSION_SIGNING_SECRET || 'finobra_pepper_access_key_seed_2026';
+export function getTenantKeyPepper(customPepper) {
+  const dedicated = String(customPepper || process.env.TENANT_KEY_PEPPER || '').trim();
+  if (dedicated) {
+    if (dedicated.length < 32) {
+      throw new Error('TENANT_KEY_PEPPER deve possuir pelo menos 32 caracteres.');
+    }
+    return dedicated;
+  }
+
+  // Patch 56: produção exige segredo dedicado e nunca usa segredo público/hardcoded.
+  if (isProduction()) {
+    throw new Error('TENANT_KEY_PEPPER não configurado em produção.');
+  }
+
+  // Compatibilidade apenas para desenvolvimento/testes locais.
+  const devFallback = String(process.env.SESSION_SIGNING_SECRET || '').trim();
+  if (devFallback.length >= 32) return devFallback;
+
+  throw new Error('TENANT_KEY_PEPPER não configurado.');
 }
 
 export function hashTenantAccessKey(value, customPepper) {
   const normalized = normalizeTenantAccessKey(value);
   if (!normalized) return '';
-  const pepper = customPepper || getTenantKeyPepper();
+  const pepper = getTenantKeyPepper(customPepper);
   return crypto.createHmac('sha256', pepper).update(normalized, 'utf8').digest('hex');
 }
 
