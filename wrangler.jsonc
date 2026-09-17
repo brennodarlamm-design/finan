@@ -35,8 +35,12 @@
       "/portal/*"
     ]
   },
+  "triggers": {
+    "crons": ["*/10 * * * *"]
+  },
   "vars": {
     "FINOBRA_API_ORIGIN": "https://api.finobra.app.br",
-    "FINOBRA_CANONICAL_ORIGIN": "https://finobra.app.br"
+    "FINOBRA_CANONICAL_ORIGIN": "https://finobra.app.br",
+    "RENDER_HEALTH_URL": "https://finan-backend-9rxw.onrender.com/healthz"
   }
 }

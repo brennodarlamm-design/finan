@@ -363,5 +363,22 @@ export default {
     }
 
     return fetchFrontendResponse(request, env);
+  },
+
+  /**
+   * Robô Cron 24/7 Edge: executa periodicamente para manter o serviço Render
+   * acordado e ativo, prevenindo o sleep de 15 minutos do tier gratuito.
+   */
+  async scheduled(event, env, ctx) {
+    const targetUrl = env.RENDER_HEALTH_URL || 'https://finan-backend-9rxw.onrender.com/healthz';
+    ctx.waitUntil(
+      fetch(targetUrl, {
+        headers: { 'User-Agent': 'FinObra-KeepAlive/1.0 (Cloudflare Edge Worker)' }
+      }).then(res => {
+        console.log(`[Cloudflare Keep-Alive] Ping no Render status: ${res.status}`);
+      }).catch(err => {
+        console.warn(`[Cloudflare Keep-Alive] Aviso no ping do Render: ${err.message}`);
+      })
+    );
   }
 };

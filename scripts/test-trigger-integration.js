@@ -16,7 +16,7 @@ import {
   scheduledBillingSweep,
   dailyMorningSummary
 } from '../trigger/index.js';
-import { dailySlaAudit, weeklyNeonMaintenance } from '../trigger/maintenance.js';
+import { dailySlaAudit, weeklyNeonMaintenance, renderKeepAlive } from '../trigger/maintenance.js';
 import { asyncFiscalOcr } from '../trigger/ocr.js';
 
 console.log('🧪 Iniciando suíte de testes de integração Trigger.dev & Resend...');
@@ -49,12 +49,14 @@ assert(dailySlaAudit && dailySlaAudit.id === 'daily-sla-audit',
   'Tarefa dailySlaAudit deve ter id "daily-sla-audit"');
 assert(weeklyNeonMaintenance && weeklyNeonMaintenance.id === 'weekly-neon-maintenance',
   'Tarefa weeklyNeonMaintenance deve ter id "weekly-neon-maintenance"');
+assert(renderKeepAlive && renderKeepAlive.id === 'render-keep-alive',
+  'Tarefa renderKeepAlive deve ter id "render-keep-alive"');
 
 // Tarefas de OCR Assíncrono
 assert(asyncFiscalOcr && asyncFiscalOcr.id === 'async-fiscal-ocr',
   'Tarefa asyncFiscalOcr deve ter id "async-fiscal-ocr"');
 
-console.log('   ✅ Todas as 6 tarefas exportadas possuem IDs e schemas válidos.');
+console.log('   ✅ Todas as 7 tarefas exportadas possuem IDs e schemas válidos.');
 
 // ── 3. TESTE DE DESPACHO E RESILIÊNCIA A FALHAS (FALLBACK) ───────────────────
 console.log('3. Testando dispatcher e resiliência a falhas...');
@@ -103,8 +105,8 @@ console.log('   ✅ Payloads estruturados validados com sucesso.');
 // ── 5. TESTE DE CRON EXPRESSIONS DAS TAREFAS AGENDADAS ───────────────────────
 console.log('5. Validando expressões cron das automações...');
 
-// Formato padrão de 5 campos cron: minuto hora dia_mes mes dia_semana
-const cronRegex = /^(\*|[0-9,\-/]+)\s+(\*|[0-9,\-/]+)\s+(\*|[0-9,\-/]+)\s+(\*|[0-9,\-/]+)\s+(\*|[0-9,\-/]+)$/;
+// Formato padrão de 5 campos cron: minuto hora dia_mes mes dia_semana (inclui steps com asterisco */10)
+const cronRegex = /^([0-9,\-*/]+)\s+([0-9,\-*/]+)\s+([0-9,\-*/]+)\s+([0-9,\-*/]+)\s+([0-9,\-*/]+)$/;
 
 // Validando cron de billing sweep: "30 12 * * 1-5"
 assert(cronRegex.test("30 12 * * 1-5"), 'Cron de billing sweep deve ser válido');
@@ -118,6 +120,9 @@ assert(cronRegex.test("30 11 * * *"), 'Cron de auditoria de SLA deve ser válido
 // Validando cron de manutenção semanal: "0 4 * * 0"
 assert(cronRegex.test("0 4 * * 0"), 'Cron de manutenção semanal deve ser válido');
 
-console.log('   ✅ Expressões cron das 4 tarefas agendadas são perfeitamente válidas.');
+// Validando cron de keep-alive do Render: "*/10 * * * *"
+assert(cronRegex.test("*/10 * * * *"), 'Cron de render keep-alive deve ser válido');
+
+console.log('   ✅ Expressões cron das 5 tarefas agendadas são perfeitamente válidas.');
 
 console.log('\n🎉 TODOS OS TESTES DE INTEGRAÇÃO DO TRIGGER.DEV PASSARAM COM SUCESSO!\n');

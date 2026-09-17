@@ -1558,7 +1558,7 @@ app.get('/cron/billing-status', requireAuth, async (req, res) => {
 
 
 // ── KEEP-ALIVE SELF-PING (EVITA SLEEP NO RENDER FREE TIER) ─────────────────
-const RENDER_EXTERNAL_URL = process.env.RENDER_EXTERNAL_URL || 'https://finan-wf12.onrender.com';
+const RENDER_EXTERNAL_URL = process.env.RENDER_EXTERNAL_URL || 'https://finan-backend-9rxw.onrender.com';
 cron.schedule('*/10 * * * *', async () => {
   try {
     const pingRes = await fetch(`${RENDER_EXTERNAL_URL}/health`);

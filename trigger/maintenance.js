@@ -230,3 +230,27 @@ export const weeklyNeonMaintenance = schedules.task({
     return result;
   }
 });
+
+/**
+ * ── 4. ROBÔ KEEP-ALIVE RENDER (A cada 10 minutos 24/7) ─────────────────────
+ * Dispara requisições periódicas para o backend Render mantendo o processo ativo
+ * e prevenindo o desligamento automático (sleep de 15 minutos) do plano gratuito.
+ */
+export const renderKeepAlive = schedules.task({
+  id: "render-keep-alive",
+  cron: "*/10 * * * *", // A cada 10 minutos
+  run: async () => {
+    const targetUrl = process.env.RENDER_HEALTH_URL || "https://finan-backend-9rxw.onrender.com/healthz";
+    try {
+      const res = await fetch(targetUrl, {
+        headers: { "User-Agent": "FinObra-KeepAlive/1.0 (Trigger.dev Robot)" }
+      });
+      logger.info(`[Render Keep-Alive] Ping executado com status: ${res.status}`);
+      return { ok: true, status: res.status, url: targetUrl };
+    } catch (err) {
+      logger.warn("[Render Keep-Alive] Aviso ao pingar Render:", { error: err.message });
+      return { ok: false, error: err.message, url: targetUrl };
+    }
+  }
+});
+
