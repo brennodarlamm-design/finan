@@ -43,7 +43,6 @@ assert.strictEqual(reasonWeight('mfa_invalid'), 2);
 assert.strictEqual(reasonWeight('rate_limit_exceeded'), 4);
 assert.strictEqual(reasonWeight('sql_injection_probe'), 15);
 
-// Fail-closed: produção não pode cair para strings hardcoded nem reutilizar SESSION_SIGNING_SECRET.
 const saved = {
   VERCEL_ENV: process.env.VERCEL_ENV,
   NODE_ENV: process.env.NODE_ENV,
@@ -113,4 +112,12 @@ assert(mfaMigration.includes('MFA_ENCRYPTION_KEY dedicada deve possuir pelo meno
 assert(mfaMigration.includes("mfa_secret NOT LIKE 'v1$%'"), 'Migração MFA deve verificar que nenhum segredo legado permaneceu.');
 assert(mfaMigration.includes('AND mfa_secret = ${original}'), 'Migração MFA deve usar proteção contra atualização concorrente.');
 
-console.log('✅ Patch 56: IP ban, Fail2Ban, secrets fail-closed e migração MFA validados.');
+const preflight = read('scripts/security-preflight.js');
+assert(preflight.includes('// Não altera dados, roles, policies ou schema.'), 'Preflight deve declarar caráter read-only.');
+assert(!/\b(INSERT|UPDATE|DELETE|ALTER|DROP|CREATE)\s+(INTO|TABLE|ROLE|POLICY|FROM)/i.test(preflight.replace(/console\.[^;]+;/g, '')), 'Preflight não deve executar SQL mutável.');
+assert(preflight.includes("process.argv.includes('--strict')"), 'Preflight deve suportar modo strict.');
+assert(preflight.includes("identity?.current_user === 'neondb_owner'"), 'Preflight deve detectar runtime com owner.');
+assert(preflight.includes('MFA legado em texto puro ainda existe'), 'Preflight deve detectar MFA legado.');
+assert(preflight.includes('FORCE RLS ainda não está completo'), 'Preflight deve detectar FORCE RLS incompleto.');
+
+console.log('✅ Patch 56: IP ban, Fail2Ban, secrets fail-closed, migração MFA e preflight validados.');
