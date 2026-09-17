@@ -76,7 +76,8 @@ const tests = [
   'scripts/test-storage-reliability.js',
   'scripts/test-trigger-integration.js',
   'scripts/test-backend-architecture.js',
-  'scripts/test-security-governance.js'
+  'scripts/test-security-governance.js',
+  'scripts/test-patch55-security.js'
 ].filter(fs.existsSync);
 
 // Até o P49, as suítes foram escritas quando api/admin.js e api/audit.js eram arquivos
@@ -90,7 +91,8 @@ const p50NativeSourceTests = new Set([
   'scripts/test-patch51-static.js',
   'scripts/test-patch51-workflow-integration.js',
   'scripts/test-backend-architecture.js',
-  'scripts/test-security-governance.js'
+  'scripts/test-security-governance.js',
+  'scripts/test-patch55-security.js'
 ]);
 const preload = path.resolve('scripts/test-api-wrapper-preload.cjs');
 

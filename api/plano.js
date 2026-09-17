@@ -111,6 +111,30 @@ export default async function handler(req, res) {
   try {
     const sql = getSql();
 
+    // ── CONSULTA DE STATUS EM TEMPO REAL PARA MODAL PIX ──────────────────────
+    if (req.method === 'GET' && req.query?.action === 'check_invoice') {
+      const invoiceId = String(req.query?.invoiceId || req.query?.invoice_id || '').trim();
+      if (!invoiceId) return res.status(400).json({ success: false, error: 'invoiceId é obrigatório.' });
+
+      const rows = await sql`
+        SELECT id, tenant_id, plan_id, cycle, amount_cents, txid, status, paid_at
+        FROM billing_invoices
+        WHERE id = ${invoiceId} AND tenant_id = ${auth.tenantId}
+        LIMIT 1;
+      `;
+      if (!rows.length) return res.status(404).json({ success: false, error: 'Fatura não encontrada.' });
+      const inv = rows[0];
+      return res.status(200).json({
+        success: true,
+        status: inv.status,
+        paid: inv.status === 'paid',
+        paidAt: inv.paid_at || null,
+        invoiceId: inv.id,
+        txid: inv.txid || null,
+        planId: inv.plan_id
+      });
+    }
+
     if (req.method === 'POST') {
       const action = String(req.query?.action || req.body?.action || '').trim();
       if (action !== 'create_invoice') return res.status(400).json({ success:false, error:'Ação de cobrança inválida.' });

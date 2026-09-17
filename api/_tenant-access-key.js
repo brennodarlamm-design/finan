@@ -9,7 +9,18 @@ export function generateTenantAccessKey() {
   return String(crypto.randomInt(100000, 1000000));
 }
 
-export function hashTenantAccessKey(value) {
+export function getTenantKeyPepper() {
+  return process.env.TENANT_KEY_PEPPER || process.env.SESSION_SIGNING_SECRET || 'finobra_pepper_access_key_seed_2026';
+}
+
+export function hashTenantAccessKey(value, customPepper) {
+  const normalized = normalizeTenantAccessKey(value);
+  if (!normalized) return '';
+  const pepper = customPepper || getTenantKeyPepper();
+  return crypto.createHmac('sha256', pepper).update(normalized, 'utf8').digest('hex');
+}
+
+export function hashTenantAccessKeyLegacy(value) {
   const normalized = normalizeTenantAccessKey(value);
   if (!normalized) return '';
   return crypto.createHash('sha256').update(normalized, 'utf8').digest('hex');
@@ -35,19 +46,41 @@ export function timingSafeHashEqual(leftHash, rightHash) {
 
 export async function resolveTenantByAccessKey(sql, accessKey) {
   if (!isTenantAccessKeyShapeValid(accessKey)) return null;
-  const keyHash = hashTenantAccessKey(accessKey);
+  const pepperedHash = hashTenantAccessKey(accessKey);
   const rows = await sql`
     SELECT id, razao_social, nome_fantasia, cnpj, telefone, plano, status,
            created_at, vencimento, access_key_hash, access_key_last4, access_key_created_at
     FROM tenants
-    WHERE access_key_hash = ${keyHash}
+    WHERE access_key_hash = ${pepperedHash}
       AND status NOT IN ('cancelado', 'bloqueado')
     LIMIT 1;
   `;
-  if (!rows.length) return null;
-  const tenant = rows[0];
-  if (!timingSafeHashEqual(keyHash, tenant.access_key_hash)) return null;
-  return tenant;
+  if (rows.length && timingSafeHashEqual(pepperedHash, rows[0].access_key_hash)) {
+    return rows[0];
+  }
+
+  // Fallback transparente: hash legado sem pepper (auto-migração on-the-fly)
+  const legacyHash = hashTenantAccessKeyLegacy(accessKey);
+  const legacyRows = await sql`
+    SELECT id, razao_social, nome_fantasia, cnpj, telefone, plano, status,
+           created_at, vencimento, access_key_hash, access_key_last4, access_key_created_at
+    FROM tenants
+    WHERE access_key_hash = ${legacyHash}
+      AND status NOT IN ('cancelado', 'bloqueado')
+    LIMIT 1;
+  `;
+  if (legacyRows.length && timingSafeHashEqual(legacyHash, legacyRows[0].access_key_hash)) {
+    const tenant = legacyRows[0];
+    try {
+      await sql`UPDATE tenants SET access_key_hash = ${pepperedHash} WHERE id = ${tenant.id};`;
+      tenant.access_key_hash = pepperedHash;
+    } catch (err) {
+      console.warn('[Tenant Key] Falha na auto-migração de hash com pepper:', err.message);
+    }
+    return tenant;
+  }
+
+  return null;
 }
 
 export async function resolveTenantUserByLogin(sql, tenantId, usernameOrEmail) {

@@ -3,6 +3,7 @@
 
 import crypto from 'crypto';
 import { triggerEmail, isTriggerConfigured } from './_trigger-client.js';
+import { getPlanCyclePrice } from './_plans.js';
 
 /**
  * Validação de Assinatura e Token de Autenticação do Webhook
@@ -201,9 +202,17 @@ export function parseWebhookPayload(rawBody = {}) {
  * Liquidação Atômica no Banco Neon com Garantia de Idempotência
  */
 export async function settlePixPayment(sql, payload, meta = {}) {
+  // Proteção 1: Rejeita simulação de pagamento vinda de webhook público não autorizado
+  if (payload.simulated && meta.source !== 'superadmin_simulation') {
+    return {
+      success: false,
+      error: 'Simulação de pagamento não é permitida em chamadas de webhook público.'
+    };
+  }
+
   let invoice = null;
 
-  // 1. Busca por invoiceId
+  // 1. Busca estrita por invoiceId
   if (payload.invoiceId) {
     const rows = await sql`
       SELECT id, tenant_id, plan_id, COALESCE(cycle, 'monthly') AS cycle, amount_cents, status, txid, paid_at
@@ -214,7 +223,7 @@ export async function settlePixPayment(sql, payload, meta = {}) {
     if (rows.length) invoice = rows[0];
   }
 
-  // 2. Busca por txid caso ainda não encontrado
+  // 2. Busca estrita por txid caso ainda não encontrado
   if (!invoice && payload.txid) {
     const rows = await sql`
       SELECT id, tenant_id, plan_id, COALESCE(cycle, 'monthly') AS cycle, amount_cents, status, txid, paid_at
@@ -225,20 +234,25 @@ export async function settlePixPayment(sql, payload, meta = {}) {
     if (rows.length) invoice = rows[0];
   }
 
-  // 3. Busca por tenantId (fatura pendente ou expirada mais recente)
-  if (!invoice && payload.tenantId) {
-    const rows = await sql`
-      SELECT id, tenant_id, plan_id, COALESCE(cycle, 'monthly') AS cycle, amount_cents, status, txid, paid_at
-      FROM billing_invoices
-      WHERE tenant_id = ${payload.tenantId} AND status IN ('pending', 'expired')
-      ORDER BY created_at DESC
-      LIMIT 1;
-    `;
-    if (rows.length) invoice = rows[0];
+  // Se nenhuma fatura registrada foi encontrada, falha fechado imediatamente
+  // (Elimina a criação arbitrária de cobrança ou liquidação cega por tenantId)
+  if (!invoice) {
+    return {
+      success: false,
+      error: 'Fatura de cobrança não encontrada para os identificadores fornecidos (invoiceId ou txid inválido).'
+    };
   }
 
-  // 4. Checagem de Idempotência: Se fatura já estiver paga, encerra com 200 sem estender datas em duplicidade
-  if (invoice && invoice.status === 'paid') {
+  // Proteção 2: Validação de isolamento do tenant da fatura
+  if (payload.tenantId && String(payload.tenantId).trim() !== String(invoice.tenant_id).trim()) {
+    return {
+      success: false,
+      error: 'Inconsistência de segurança: o tenantId do payload não coincide com a fatura registrada.'
+    };
+  }
+
+  // Proteção 3: Idempotência — se a fatura já estiver paga, encerra com sucesso sem duplicar dias
+  if (invoice.status === 'paid') {
     return {
       success: true,
       already_processed: true,
@@ -250,108 +264,79 @@ export async function settlePixPayment(sql, payload, meta = {}) {
     };
   }
 
+  // Proteção 4: Conferência Rigorosa do Valor Pago contra o Valor da Fatura (Anti-Tampering)
+  const expectedCents = Number(invoice.amount_cents || 0);
+  const receivedCents = Number(payload.amountCents || 0);
+
+  if (!receivedCents || receivedCents <= 0) {
+    return {
+      success: false,
+      error: 'Valor pago não informado ou inválido no evento de pagamento.'
+    };
+  }
+
+  if (receivedCents < expectedCents) {
+    return {
+      success: false,
+      error: `Valor pago (R$ ${(receivedCents / 100).toFixed(2)}) é inferior ao valor da fatura (R$ ${(expectedCents / 100).toFixed(2)}). Liquidação rejeitada por subpagamento.`,
+      expectedCents,
+      receivedCents
+    };
+  }
+
+  // Proteção 5: Validação de Consistência com o Catálogo Oficial de Preços do SaaS
+  const canonicalPricing = getPlanCyclePrice(invoice.plan_id, invoice.cycle);
+  if (canonicalPricing && canonicalPricing.totalCents > 0) {
+    if (expectedCents < canonicalPricing.totalCents) {
+      return {
+        success: false,
+        error: `Inconsistência cadastral: o valor da fatura (R$ ${(expectedCents / 100).toFixed(2)}) é inferior ao preço oficial do plano ${invoice.plan_id} no ciclo ${invoice.cycle} (R$ ${(canonicalPricing.totalCents / 100).toFixed(2)}).`
+      };
+    }
+  }
+
   let resultRecord = null;
   const effectiveTxid = payload.txid || (invoice ? invoice.txid : `pix_${Date.now()}`);
   const payloadJson = payload.rawBody ? JSON.stringify(payload.rawBody) : '{}';
 
-  if (invoice) {
-    // Fatura existente: atualização atômica da fatura e renovação de vencimento da empresa
-    const updated = await sql`
-      WITH paid AS (
-        UPDATE billing_invoices
-        SET status = 'paid',
-            paid_at = NOW(),
-            paid_by = ${meta.source || 'webhook_pix'},
-            txid = COALESCE(billing_invoices.txid, ${effectiveTxid}),
-            gateway = ${payload.gateway || 'pix_webhook'},
-            webhook_payload = ${payloadJson}::jsonb,
-            updated_at = NOW()
-        WHERE id = ${invoice.id} AND status IN ('pending', 'expired')
-        RETURNING id, tenant_id, plan_id, COALESCE(cycle, 'monthly') AS cycle, amount_cents, txid, paid_at
-      ), tenant_upd AS (
-        UPDATE tenants t
-        SET plano = paid.plan_id,
-            status = 'ativo',
-            vencimento = (CASE WHEN t.vencimento IS NOT NULL AND t.vencimento >= CURRENT_DATE THEN t.vencimento ELSE CURRENT_DATE END + (
-              CASE
-                WHEN paid.cycle = 'annual' THEN 365
-                WHEN paid.cycle = 'semiannual' THEN 180
-                WHEN paid.cycle = 'quarterly' THEN 90
-                ELSE 30
-              END
-            ))::date,
-            updated_at = NOW()
-        FROM paid
-        WHERE t.id = paid.tenant_id
-        RETURNING t.id, t.nome_fantasia, t.razao_social, t.telefone, t.email, t.responsavel, t.plano, t.status, t.vencimento
-      )
-      SELECT paid.id AS invoice_id, paid.tenant_id, paid.plan_id, paid.cycle, paid.amount_cents, paid.txid, paid.paid_at,
-             tenant_upd.nome_fantasia, tenant_upd.razao_social, tenant_upd.telefone, tenant_upd.email,
-             tenant_upd.responsavel, tenant_upd.status, tenant_upd.vencimento
-      FROM paid JOIN tenant_upd ON tenant_upd.id = paid.tenant_id;
-    `;
-
-    if (updated.length) {
-      resultRecord = updated[0];
-    }
-  } else if (payload.tenantId) {
-    // Empresa conhecida sem fatura pendente cadastrada: gera cobrança liquidada e renova
-    const tenantRows = await sql`
-      SELECT id, nome_fantasia, razao_social, telefone, email, responsavel, plano, status, vencimento
-      FROM tenants WHERE id = ${payload.tenantId} LIMIT 1;
-    `;
-
-    if (!tenantRows.length) {
-      return { success: false, error: `Empresa não encontrada para o tenantId: ${payload.tenantId}` };
-    }
-
-    const t = tenantRows[0];
-    const newInvoiceId = 'inv_' + crypto.randomBytes(8).toString('hex');
-    const planId = t.plano || 'pro';
-    const amountCents = payload.amountCents || 27990;
-
-    await sql`
-      INSERT INTO billing_invoices (id, tenant_id, plan_id, cycle, amount_cents, status, txid, gateway, webhook_payload, paid_by, paid_at, expires_at)
-      VALUES (
-        ${newInvoiceId}, ${t.id}, ${planId}, 'monthly', ${amountCents},
-        'paid', ${effectiveTxid}, ${payload.gateway || 'pix_webhook'},
-        ${payloadJson}::jsonb, ${meta.source || 'webhook_pix'}, NOW(), NOW() + INTERVAL '30 days'
-      );
-    `;
-
-    const tenantUpd = await sql`
-      UPDATE tenants
-      SET status = 'ativo',
-          vencimento = (CASE WHEN vencimento IS NOT NULL AND vencimento >= CURRENT_DATE THEN vencimento ELSE CURRENT_DATE END + 30)::date,
+  // Fatura existente validada: atualização atômica da fatura e renovação de vencimento da empresa
+  const updated = await sql`
+    WITH paid AS (
+      UPDATE billing_invoices
+      SET status = 'paid',
+          paid_at = NOW(),
+          paid_by = ${meta.source || 'webhook_pix'},
+          txid = COALESCE(billing_invoices.txid, ${effectiveTxid}),
+          gateway = ${payload.gateway || 'pix_webhook'},
+          webhook_payload = ${payloadJson}::jsonb,
           updated_at = NOW()
-      WHERE id = ${t.id}
-      RETURNING id, nome_fantasia, razao_social, telefone, email, responsavel, plano, status, vencimento;
-    `;
+      WHERE id = ${invoice.id} AND status IN ('pending', 'expired')
+      RETURNING id, tenant_id, plan_id, COALESCE(cycle, 'monthly') AS cycle, amount_cents, txid, paid_at
+    ), tenant_upd AS (
+      UPDATE tenants t
+      SET plano = paid.plan_id,
+          status = 'ativo',
+          vencimento = (CASE WHEN t.vencimento IS NOT NULL AND t.vencimento >= CURRENT_DATE THEN t.vencimento ELSE CURRENT_DATE END + (
+            CASE
+              WHEN paid.cycle = 'annual' THEN 365
+              WHEN paid.cycle = 'semiannual' THEN 180
+              WHEN paid.cycle = 'quarterly' THEN 90
+              ELSE 30
+            END
+          ))::date,
+          updated_at = NOW()
+      FROM paid
+      WHERE t.id = paid.tenant_id
+      RETURNING t.id, t.nome_fantasia, t.razao_social, t.telefone, t.email, t.responsavel, t.plano, t.status, t.vencimento
+    )
+    SELECT paid.id AS invoice_id, paid.tenant_id, paid.plan_id, paid.cycle, paid.amount_cents, paid.txid, paid.paid_at,
+           tenant_upd.nome_fantasia, tenant_upd.razao_social, tenant_upd.telefone, tenant_upd.email,
+           tenant_upd.responsavel, tenant_upd.status, tenant_upd.vencimento
+    FROM paid JOIN tenant_upd ON tenant_upd.id = paid.tenant_id;
+  `;
 
-    if (tenantUpd.length) {
-      const tu = tenantUpd[0];
-      resultRecord = {
-        invoice_id: newInvoiceId,
-        tenant_id: tu.id,
-        plan_id: planId,
-        cycle: 'monthly',
-        amount_cents: amountCents,
-        txid: effectiveTxid,
-        paid_at: new Date(),
-        nome_fantasia: tu.nome_fantasia,
-        razao_social: tu.razao_social,
-        telefone: tu.telefone,
-        email: tu.email,
-        responsavel: tu.responsavel,
-        status: tu.status,
-        vencimento: tu.vencimento
-      };
-    }
-  } else {
-    return {
-      success: false,
-      error: 'Identificador de fatura (invoiceId), TXID ou empresa (tenantId) não encontrado no banco.'
-    };
+  if (updated.length) {
+    resultRecord = updated[0];
   }
 
   if (!resultRecord) {

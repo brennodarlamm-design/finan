@@ -4,7 +4,7 @@
 import crypto from 'crypto';
 import { neon } from '@neondatabase/serverless';
 import { resolveAuthAndTenant, getInternalApiSecret } from './_auth.js';
-import { generateTenantAccessKey, hashTenantAccessKey, tenantAccessKeyLast4 } from './_tenant-access-key.js';
+import { generateTenantAccessKey, hashTenantAccessKey, hashTenantAccessKeyLegacy, tenantAccessKeyLast4 } from './_tenant-access-key.js';
 import { writeAudit } from './_audit.js';
 
 function getSql() {
@@ -104,8 +104,21 @@ export default async function handler(req, res) {
           return res.status(409).json({ success: false, error: 'A chave armazenada não pôde ser descriptografada. Rotacione-a.' });
         }
 
-        if (!accessKey || hashTenantAccessKey(accessKey) !== rows[0].access_key_hash) {
+        const pepperedMatch = accessKey && hashTenantAccessKey(accessKey) === rows[0].access_key_hash;
+        const legacyMatch = !pepperedMatch && accessKey && hashTenantAccessKeyLegacy(accessKey) === rows[0].access_key_hash;
+
+        if (!pepperedMatch && !legacyMatch) {
           return res.status(409).json({ success: false, error: 'A chave do cofre não corresponde ao hash ativo. Rotacione-a.' });
+        }
+
+        if (legacyMatch) {
+          try {
+            const upgradedHash = hashTenantAccessKey(accessKey);
+            await sql`UPDATE tenants SET access_key_hash = ${upgradedHash} WHERE id = ${tenantId};`;
+            rows[0].access_key_hash = upgradedHash;
+          } catch (mErr) {
+            console.warn('[DEV Tenant Keys] Falha ao auto-migrar hash com pepper:', mErr.message);
+          }
         }
 
         await writeAudit(sql, req, guard.auth, {

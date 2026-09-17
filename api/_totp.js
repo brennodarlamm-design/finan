@@ -221,3 +221,45 @@ export function generateQrSvg(text, size = 220) {
     throw err;
   }
 }
+
+/**
+ * Criptografa o segredo MFA Base32 utilizando AES-256-GCM.
+ * Retorna string compacta prefixada com v1$: v1$<iv_base64>$<authTag_base64>$<ciphertext_base64>
+ */
+export function encryptMfaSecret(secretText, customKey) {
+  if (!secretText) return null;
+  const rawKey = customKey || process.env.MFA_ENCRYPTION_KEY || process.env.SESSION_SIGNING_SECRET || 'finobra_mfa_enc_fallback_key_2026';
+  const key = crypto.createHash('sha256').update(String(rawKey), 'utf8').digest();
+  const iv = crypto.randomBytes(12);
+  const cipher = crypto.createCipheriv('aes-256-gcm', key, iv);
+  let encrypted = cipher.update(String(secretText).trim(), 'utf8', 'base64');
+  encrypted += cipher.final('base64');
+  const tag = cipher.getAuthTag().toString('base64');
+  return `v1$${iv.toString('base64')}$${tag}$${encrypted}`;
+}
+
+/**
+ * Descriptografa o segredo MFA. Suporta transparência com segredos legados em texto plano.
+ * Retorna { secret: string, isLegacy: boolean }
+ */
+export function decryptMfaSecret(storedValue, customKey) {
+  if (!storedValue) return { secret: '', isLegacy: false };
+  const str = String(storedValue).trim();
+  if (!str.startsWith('v1$')) {
+    // Segredo em texto puro (legado)
+    return { secret: str, isLegacy: true };
+  }
+  const parts = str.split('$');
+  if (parts.length !== 4) {
+    throw new Error('Formato inválido para segredo MFA criptografado');
+  }
+  const [, ivB64, tagB64, encB64] = parts;
+  const rawKey = customKey || process.env.MFA_ENCRYPTION_KEY || process.env.SESSION_SIGNING_SECRET || 'finobra_mfa_enc_fallback_key_2026';
+  const key = crypto.createHash('sha256').update(String(rawKey), 'utf8').digest();
+  const decipher = crypto.createDecipheriv('aes-256-gcm', key, Buffer.from(ivB64, 'base64'));
+  decipher.setAuthTag(Buffer.from(tagB64, 'base64'));
+  let decrypted = decipher.update(encB64, 'base64', 'utf8');
+  decrypted += decipher.final('utf8');
+  return { secret: decrypted, isLegacy: false };
+}
+

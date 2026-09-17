@@ -19,7 +19,9 @@ import {
   generateTotpUri,
   generateBackupCodes,
   verifyBackupCode,
-  generateQrSvg
+  generateQrSvg,
+  encryptMfaSecret,
+  decryptMfaSecret
 } from './_totp.js';
 import { triggerEmail, isTriggerConfigured } from './_trigger-client.js';
 
@@ -517,12 +519,17 @@ export default async function handler(req, res) {
             newBackupCodes = backupRes.remainingHashedCodes;
           }
         } else if (totpCode) {
-          const totpRes = verifyTotpCode(user.mfa_secret, totpCode, {
+          const { secret: decryptedSecret, isLegacy } = decryptMfaSecret(user.mfa_secret);
+          const totpRes = verifyTotpCode(decryptedSecret, totpCode, {
             lastUsedStep: user.mfa_last_used_step || 0
           });
           if (totpRes.valid) {
             mfaValid = true;
             newStep = totpRes.step;
+            if (isLegacy && decryptedSecret) {
+              const reEncrypted = encryptMfaSecret(decryptedSecret);
+              await sql`UPDATE usuarios SET mfa_secret = ${reEncrypted} WHERE id = ${user.id};`;
+            }
           }
         }
 
@@ -635,12 +642,17 @@ export default async function handler(req, res) {
           newBackupCodes = bRes.remainingHashedCodes;
         }
       } else if (code) {
-        const totpRes = verifyTotpCode(user.mfa_secret, code, {
+        const { secret: decryptedSecret, isLegacy } = decryptMfaSecret(user.mfa_secret);
+        const totpRes = verifyTotpCode(decryptedSecret, code, {
           lastUsedStep: user.mfa_last_used_step || 0
         });
         if (totpRes.valid) {
           mfaValid = true;
           newStep = totpRes.step;
+          if (isLegacy && decryptedSecret) {
+            const reEncrypted = encryptMfaSecret(decryptedSecret);
+            await sql`UPDATE usuarios SET mfa_secret = ${reEncrypted} WHERE id = ${user.id};`;
+          }
         }
       } else {
         return res.status(400).json({ success: false, message: 'Código de autenticação ou de recuperação obrigatório.' });
@@ -776,10 +788,11 @@ export default async function handler(req, res) {
         return res.status(400).json({ success: false, message: 'Código incorreto. Digite o código atual de 6 dígitos gerado pelo Google Authenticator.' });
       }
 
-      // Persiste MFA ativado
+      // Persiste MFA ativado com segredo criptografado em repouso (AES-256-GCM)
+      const encryptedSecret = encryptMfaSecret(decoded.temp_secret);
       await sql`
         UPDATE usuarios
-        SET mfa_secret = ${decoded.temp_secret},
+        SET mfa_secret = ${encryptedSecret},
             mfa_enabled = TRUE,
             mfa_backup_codes = ${JSON.stringify(decoded.backup_hashes || [])}::jsonb,
             mfa_last_used_step = ${verifyRes.step}
