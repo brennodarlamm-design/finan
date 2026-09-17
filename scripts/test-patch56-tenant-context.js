@@ -91,16 +91,28 @@ assert(helperSource.includes("set_config('app.is_system'"));
 assert(helperSource.includes('true) AS tenant_context'), 'set_config precisa ser transaction-local (SET LOCAL sem vazamento).');
 assert(!helperSource.includes('SET app.current_tenant_id ='), 'Não deve depender de SET persistente de sessão no Neon HTTP.');
 
-// Integração piloto: a API central de dados passa a executar todas as consultas
-// através do contexto tenant. Os WHERE tenant_id existentes continuam como defesa
-// em profundidade e serão mantidos mesmo quando FORCE RLS entrar em produção.
+// Integração: rotas multi-tenant passam a executar consultas pelo contexto RLS.
+// Os WHERE tenant_id existentes continuam como defesa em profundidade.
 const dbSource = read('api/db.js');
 assert(dbSource.includes("import { createTenantSql } from './_tenant-sql.js';"), 'api/db.js deve importar createTenantSql.');
 assert(dbSource.includes('const baseSql = getSql();'), 'api/db.js deve separar cliente base do cliente tenant-scoped.');
 assert(dbSource.includes('createTenantSql(baseSql, { tenantId, isSystem: Boolean(auth.isSystem) })'), 'api/db.js deve criar contexto a partir do tenant autenticado.');
 assert(!dbSource.includes('const sql = getSql();'), 'api/db.js não pode mais expor cliente SQL sem contexto após autenticação.');
 
+const dashboardSource = read('api/dashboard.js');
+assert(dashboardSource.includes("import { createTenantSql } from './_tenant-sql.js';"), 'dashboard deve importar createTenantSql.');
+assert(dashboardSource.includes('createTenantSql(getSql(), { tenantId: auth.tenantId, isSystem: auth.isSystem === true })'), 'dashboard deve usar contexto do tenant autenticado.');
+
+const uploadSource = read('api/upload.js');
+assert(uploadSource.includes("import { createTenantSql } from './_tenant-sql.js';"), 'upload deve importar createTenantSql.');
+assert(uploadSource.includes('createTenantSql(getSql(), { tenantId, isSystem: auth.isSystem === true })'), 'upload deve escopar metadados de documentos ao tenant.');
+assert(!uploadSource.includes('const sql = getSql();'), 'upload não deve abrir cliente SQL sem contexto dentro de GET/DELETE.');
+
+const workflowSource = read('api/_workflow.js');
+assert(workflowSource.includes("import { createTenantSql } from './_tenant-sql.js';"), 'workflow deve importar createTenantSql.');
+assert(workflowSource.includes('sql=createTenantSql(sqlClient(),{tenantId:t,isSystem:auth.isSystem===true})'), 'workflow deve operar dentro do contexto RLS do tenant.');
+
 const querySource = read('api/_db-queries.js');
 assert(querySource.includes('WHERE tenant_id = ${tenantId}'), 'Filtros tenant explícitos devem permanecer como defesa em profundidade.');
 
-console.log('✅ Patch 56: camada de contexto tenant transacional e integração piloto validadas.');
+console.log('✅ Patch 56: contexto tenant transacional aplicado em DB, dashboard, documentos e workflow.');
