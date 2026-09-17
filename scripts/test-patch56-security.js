@@ -68,7 +68,6 @@ for (const [key, value] of Object.entries(saved)) {
   if (value === undefined) delete process.env[key]; else process.env[key] = value;
 }
 
-// Custom keys fortes continuam aceitas e permitem testes determinísticos.
 assert.strictEqual(getIpBanPepper('I'.repeat(40)), 'I'.repeat(40));
 assert.strictEqual(getMfaEncryptionKey('M'.repeat(40)), 'M'.repeat(40));
 assert.strictEqual(getTenantKeyPepper('T'.repeat(40)), 'T'.repeat(40));
@@ -83,8 +82,9 @@ const rateLimit = read('api/_ratelimit.js');
 assert(rateLimit.includes('checkIpBan'));
 assert(rateLimit.includes('recordIpFailure'));
 assert(rateLimit.includes("reason: 'rate_limit_exceeded'"));
-assert(rateLimit.includes("value.startsWith('login:ip:')"));
-assert(rateLimit.includes("value.startsWith('mfa:')"));
+for (const prefix of ['login:ip:', 'mfa:', 'google:', 'reg:', 'reset:']) {
+  assert(rateLimit.includes(`'${prefix}'`), `Rate limit deve aplicar Fail2Ban ao prefixo ${prefix}.`);
+}
 
 const audit = read('api/_audit.js');
 assert(audit.includes("reason === 'invalid_password'"));
