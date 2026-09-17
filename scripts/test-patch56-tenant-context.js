@@ -10,6 +10,7 @@ import { createTenantSql, isTenantScopedSql } from '../api/_tenant-sql.js';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const root = path.resolve(__dirname, '..');
+const read = (p) => fs.readFileSync(path.join(root, p), 'utf8');
 
 console.log('=== Patch 56 Tenant SQL Context ===');
 
@@ -84,10 +85,22 @@ await assert.rejects(
   'Wrapper não deve aceitar SQL bruto fora do tagged template.'
 );
 
-const helperSource = fs.readFileSync(path.join(root, 'api/_tenant-sql.js'), 'utf8');
+const helperSource = read('api/_tenant-sql.js');
 assert(helperSource.includes("set_config('app.current_tenant_id'"));
 assert(helperSource.includes("set_config('app.is_system'"));
 assert(helperSource.includes('true) AS tenant_context'), 'set_config precisa ser transaction-local (SET LOCAL sem vazamento).');
 assert(!helperSource.includes('SET app.current_tenant_id ='), 'Não deve depender de SET persistente de sessão no Neon HTTP.');
 
-console.log('✅ Patch 56: camada de contexto tenant transacional validada.');
+// Integração piloto: a API central de dados passa a executar todas as consultas
+// através do contexto tenant. Os WHERE tenant_id existentes continuam como defesa
+// em profundidade e serão mantidos mesmo quando FORCE RLS entrar em produção.
+const dbSource = read('api/db.js');
+assert(dbSource.includes("import { createTenantSql } from './_tenant-sql.js';"), 'api/db.js deve importar createTenantSql.');
+assert(dbSource.includes('const baseSql = getSql();'), 'api/db.js deve separar cliente base do cliente tenant-scoped.');
+assert(dbSource.includes('createTenantSql(baseSql, { tenantId, isSystem: Boolean(auth.isSystem) })'), 'api/db.js deve criar contexto a partir do tenant autenticado.');
+assert(!dbSource.includes('const sql = getSql();'), 'api/db.js não pode mais expor cliente SQL sem contexto após autenticação.');
+
+const querySource = read('api/_db-queries.js');
+assert(querySource.includes('WHERE tenant_id = ${tenantId}'), 'Filtros tenant explícitos devem permanecer como defesa em profundidade.');
+
+console.log('✅ Patch 56: camada de contexto tenant transacional e integração piloto validadas.');
