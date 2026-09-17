@@ -32,7 +32,7 @@ function normalizeContext({ tenantId, isSystem = false } = {}) {
 }
 
 function isTemplateStrings(value) {
-  return Array.isArray(value) && Object.prototype.hasOwnProperty.call(value, 'raw');
+  return Array.isArray(value) && Array.isArray(value.raw);
 }
 
 /**
