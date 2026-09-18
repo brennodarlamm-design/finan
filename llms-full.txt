@@ -1,4 +1,4 @@
-# FinObra (FinGo — Obras em Fluxo) — SaaS de Gestão Financeira e Operacional para Construtoras (Documentação Completa para LLMs)
+# FinGo — Obras em Fluxo — SaaS de Gestão Financeira e Operacional para Construtoras (Documentação Completa para LLMs)
 
 > Documento completo de especificação de sistema, arquitetura, contratos de API, dicionário de dados e fluxos operacionais, formatado conforme o padrão llmstxt.org para agentes e modelos de inteligência artificial.
 > Versão: 2.38.0
@@ -9,7 +9,7 @@
 
 ## 1. Visão Geral da Plataforma
 
-O FinGo (FinObra) é uma solução B2B desenvolvida para empresas da construção civil no Brasil (construtoras, incorporadoras, empreiteiras, engenheiros civis e arquitetos). O sistema combina gestão financeira especializada, custos de engenharia e controle operacional de prazos em uma única plataforma multitenant.
+O FinGo é uma solução B2B desenvolvida para empresas da construção civil no Brasil (construtoras, incorporadoras, empreiteiras, engenheiros civis e arquitetos). O sistema combina gestão financeira especializada, custos de engenharia e controle operacional de prazos em uma única plataforma multitenant.
 
 ### Diferenciais Centrais:
 - **SINAPI Integrado**: Integração analítica e sintética com tabelas oficiais da Caixa Econômica Federal e IBGE (regimes Desonerado e Não Desonerado, encargos sociais e fórmulas de BDI diferenciado).

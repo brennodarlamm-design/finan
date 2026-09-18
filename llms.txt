@@ -1,6 +1,6 @@
-# FinObra — SaaS de Gestão Financeira e Operacional para Construtoras
+# FinGo — Obras em Fluxo — SaaS de Gestão Financeira e Operacional para Construtoras
 
-> FinObra é uma plataforma SaaS B2B completa desenvolvida para construtoras, incorporadoras, arquitetos e engenheiros civis. O sistema unifica controle financeiro multitenant, fluxo de caixa, gestão de contas bancárias, importação automática de NF-e via SEFAZ/A1, conciliação bancária OFX inteligente, orçamentação integrada à base oficial da Caixa Econômica Federal (SINAPI), boletins de medição com retenções técnicas (ISS, INSS, IRRF), assinatura digital ICP-Brasil e gestão operacional de workflow com prazos e SLAs em cascata.
+> FinGo é uma plataforma SaaS B2B completa desenvolvida para construtoras, incorporadoras, arquitetos e engenheiros civis. O sistema unifica controle financeiro multitenant, fluxo de caixa, gestão de contas bancárias, importação automática de NF-e via SEFAZ/A1, conciliação bancária OFX inteligente, orçamentação integrada à base oficial da Caixa Econômica Federal (SINAPI), boletins de medição com retenções técnicas (ISS, INSS, IRRF), assinatura digital ICP-Brasil e gestão operacional de workflow com prazos e SLAs em cascata.
 
 ## Documentação & Páginas Principais
 

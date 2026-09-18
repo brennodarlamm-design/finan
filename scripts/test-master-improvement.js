@@ -128,8 +128,8 @@ test('llms.txt e llms-full.txt existem e seguem padrão llmstxt.org', () => {
   assert.ok(fs.existsSync(fullPath), 'llms-full.txt deve existir');
 
   const txtContent = fs.readFileSync(txtPath, 'utf8');
-  assert.ok(txtContent.startsWith('# FinObra'), 'llms.txt deve iniciar com H1');
-  assert.ok(txtContent.includes('> FinObra é uma plataforma'), 'llms.txt deve conter resumo em blockquote');
+  assert.ok(txtContent.startsWith('# FinGo') || txtContent.startsWith('# FinObra'), 'llms.txt deve iniciar com H1');
+  assert.ok(txtContent.includes('> FinGo é uma plataforma') || txtContent.includes('> FinObra é uma plataforma'), 'llms.txt deve conter resumo em blockquote');
 
   const fullContent = fs.readFileSync(fullPath, 'utf8');
   assert.ok(fullContent.includes('Documentação Completa para LLMs'), 'llms-full.txt deve ter escopo completo');
