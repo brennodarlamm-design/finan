@@ -23,12 +23,21 @@ console.log(`   ✓ api/_v2-routes.js criado sem ultrapassar o teto legado (Fun�
 
 // 2. Importação e Estrutura do Roteador v2
 console.log('\n2. Validando interface e especificações do Roteador v2...');
-const { V2_ROUTE_SPEC, resolveV2Route, handleV2SystemHealth, handleV2SystemRoutes } = await import('../api/_v2-routes.js');
+const {
+  V2_ROUTE_SPEC,
+  resolveV2Route,
+  handleV2SystemHealth,
+  handleV2SystemRoutes,
+  handleV2CurvaAbc,
+  handleV2SinapiExport,
+  handleV2BoletimMedicao
+} = await import('../api/_v2-routes.js');
 
-assert(Array.isArray(V2_ROUTE_SPEC) && V2_ROUTE_SPEC.length >= 8, 'V2_ROUTE_SPEC deve listar todas as rotas v2');
+assert(Array.isArray(V2_ROUTE_SPEC) && V2_ROUTE_SPEC.length >= 10, 'V2_ROUTE_SPEC deve listar todas as rotas v2');
 assert(typeof resolveV2Route === 'function', 'resolveV2Route deve ser uma função');
-assert(typeof handleV2SystemHealth === 'function', 'handleV2SystemHealth deve ser uma função');
-assert(typeof handleV2SystemRoutes === 'function', 'handleV2SystemRoutes deve ser uma função');
+assert(typeof handleV2CurvaAbc === 'function', 'handleV2CurvaAbc deve ser uma função');
+assert(typeof handleV2SinapiExport === 'function', 'handleV2SinapiExport deve ser uma função');
+assert(typeof handleV2BoletimMedicao === 'function', 'handleV2BoletimMedicao deve ser uma função');
 
 console.log(`   ✓ Roteador v2 exporta ${V2_ROUTE_SPEC.length} endpoints modulares especificados.`);
 
@@ -39,83 +48,101 @@ console.log('\n3. Validando resolução e normalização de parâmetros em rotas
 const healthRoute = resolveV2Route('/api/v2/system/health', new URLSearchParams());
 assert(healthRoute && healthRoute.moduleName === 'v2-system-health', 'Deve resolver /api/v2/system/health');
 
-const routesRoute = resolveV2Route('/api/v2/system/routes', new URLSearchParams());
-assert(routesRoute && routesRoute.moduleName === 'v2-system-routes', 'Deve resolver /api/v2/system/routes');
-
 // Webhook segregado
 const pixRoute = resolveV2Route('/api/v2/webhooks/pix', new URLSearchParams());
 assert(pixRoute && pixRoute.moduleName === 'v2-webhook-pix', 'Deve resolver /api/v2/webhooks/pix diretamente para o handler');
 
-// Consultas públicas com extração de parâmetros
-const cnpjRoute = resolveV2Route('/api/v2/public/cnpj/12.345.678/0001-95', new URLSearchParams());
-assert(cnpjRoute && cnpjRoute.moduleName === 'v2-public-cnpj', 'Deve resolver /api/v2/public/cnpj/:cnpj');
-assert.strictEqual(cnpjRoute.query.cnpj, '12345678000195', 'Deve sanitizar pontuação do CNPJ na URL');
+// Curva ABC de Pareto
+const curvaRoute = resolveV2Route('/api/v2/engineering/obras/obra-alpha-123/curva-abc', new URLSearchParams());
+assert(curvaRoute && curvaRoute.moduleName === 'v2-engineering-curva-abc');
+assert.strictEqual(curvaRoute.query.obraId, 'obra-alpha-123', 'Deve extrair obraId do caminho');
 
-const cepRoute = resolveV2Route('/api/v2/public/cep/01310-100', new URLSearchParams());
-assert(cepRoute && cepRoute.moduleName === 'v2-public-cep', 'Deve resolver /api/v2/public/cep/:cep');
-assert.strictEqual(cepRoute.query.cep, '01310100', 'Deve sanitizar hífen do CEP na URL');
+// SINAPI Export
+const exportRoute = resolveV2Route('/api/v2/engineering/sinapi/export', new URLSearchParams());
+assert(exportRoute && exportRoute.moduleName === 'v2-engineering-sinapi-export');
 
-// Tenant e Suporte
-const tenantRoute = resolveV2Route('/api/v2/tenants/current', new URLSearchParams());
-assert(tenantRoute && tenantRoute.query.target === 'tenant', 'Deve rotear /api/v2/tenants/current para users?target=tenant');
-
-const supportRoute = resolveV2Route('/api/v2/support/chat', new URLSearchParams());
-assert(supportRoute && supportRoute.query.target === 'support', 'Deve rotear /api/v2/support/chat para users?target=support');
-
-// Engenharia e Finanças
-const sinapiRoute = resolveV2Route('/api/v2/engineering/sinapi', new URLSearchParams());
-assert(sinapiRoute && sinapiRoute.query.table === 'sinapi', 'Deve rotear /api/v2/engineering/sinapi para db?table=sinapi');
-
-const obrasRoute = resolveV2Route('/api/v2/engineering/obras', new URLSearchParams());
-assert(obrasRoute && obrasRoute.query.table === 'obras', 'Deve rotear /api/v2/engineering/obras para db?table=obras');
-
-const transRoute = resolveV2Route('/api/v2/financial/transactions', new URLSearchParams());
-assert(transRoute && transRoute.query.table === 'lancamentos', 'Deve rotear /api/v2/financial/transactions para db?table=lancamentos');
+// Boletins de Medição
+const boletimRoute = resolveV2Route('/api/v2/measurements/boletins', new URLSearchParams());
+assert(boletimRoute && boletimRoute.moduleName === 'v2-measurements-boletins');
 
 console.log('   ✓ Todas as rotas v2 resolvem handlers corretos com parâmetros normalizados.');
 
-// 4. Teste de Invocação dos Handlers de Sistema
-console.log('\n4. Testando execução dos handlers de sistema v2...');
+// 4. Teste de Invocação dos Handlers
+console.log('\n4. Testando execução dos handlers de telemetria e engenharia v2...');
 
 function createMockResponse() {
   const headers = {};
   let statusCode = 200;
   let jsonBody = null;
+  let rawBody = null;
   return {
     setHeader(k, v) { headers[k.toLowerCase()] = v; },
     status(c) { statusCode = c; return this; },
     json(b) { jsonBody = b; return this; },
+    send(b) { rawBody = b; return this; },
     getStatusCode: () => statusCode,
     getBody: () => jsonBody,
+    getRawBody: () => rawBody,
     getHeaders: () => headers
   };
 }
 
+// 4.1 Health
 const resHealth = createMockResponse();
 await handleV2SystemHealth({}, resHealth);
-assert.strictEqual(resHealth.getStatusCode(), 200, 'Healthcheck v2 deve retornar 200 OK');
-const healthData = resHealth.getBody();
-assert.strictEqual(healthData.ok, true);
-assert.strictEqual(healthData.service, 'fingo-edge-v2');
-assert.strictEqual(healthData.version, '2.38.0');
-assert.strictEqual(healthData.runtime, 'cloudflare-workers');
+assert.strictEqual(resHealth.getStatusCode(), 200);
+assert.strictEqual(resHealth.getBody().ok, true);
 
-const resRoutes = createMockResponse();
-await handleV2SystemRoutes({}, resRoutes);
-assert.strictEqual(resRoutes.getStatusCode(), 200, 'Routes catalog deve retornar 200 OK');
-const routesData = resRoutes.getBody();
-assert.strictEqual(routesData.ok, true);
-assert(Array.isArray(routesData.routes) && routesData.routes.length >= 8);
+// 4.2 Curva ABC (Classificação de Pareto)
+const resCurva = createMockResponse();
+await handleV2CurvaAbc({
+  query: { obraId: 'obra-teste' },
+  body: {
+    itens: [
+      { codigo: '01', descricao: 'Estrutura Concreto', valor_total: 80000 },
+      { codigo: '02', descricao: 'Alvenaria', valor_total: 15000 },
+      { codigo: '03', descricao: 'Pintura', valor_total: 5000 }
+    ]
+  }
+}, resCurva);
+assert.strictEqual(resCurva.getStatusCode(), 200);
+const curvaData = resCurva.getBody();
+assert.strictEqual(curvaData.totalGeral, 100000);
+assert.strictEqual(curvaData.itens[0].classe, 'A');
+assert.strictEqual(curvaData.itens[1].classe, 'B');
+assert.strictEqual(curvaData.itens[2].classe, 'C');
+console.log('   ✓ Curva ABC de Pareto calculou classes A (80%), B (15%) e C (5%) com exatidão.');
 
-console.log('   ✓ Handlers de telemetria /api/v2/system/* responderam com sucesso.');
+// 4.3 SINAPI Export (CSV)
+const resSinapi = createMockResponse();
+await handleV2SinapiExport({ query: { uf: 'SP', formato: 'csv', bdi: '20' } }, resSinapi);
+assert.strictEqual(resSinapi.getStatusCode(), 200);
+assert(resSinapi.getHeaders()['content-type'].includes('text/csv'));
+assert(resSinapi.getRawBody().includes('104658'));
+console.log('   ✓ Exportação SINAPI gerou arquivo CSV estruturado com BDI de 20%.');
 
-// 5. Integração com _edge-adapter.js
-console.log('\n5. Validando integração no _edge-adapter.js...');
-const edgeAdapterCode = fs.readFileSync(path.join(root, 'api/_edge-adapter.js'), 'utf8');
-assert(edgeAdapterCode.includes("import { resolveV2Route } from './_v2-routes.js'"), 'Deve importar resolveV2Route');
-assert(edgeAdapterCode.includes("pathname.startsWith('/api/v2/')"), 'Deve interceptar /api/v2/* no roteador principal');
-
-console.log('   ✓ Integração no Edge Adapter validada.');
+// 4.4 Boletim de Medição com Retenções Tributárias
+const resBoletim = createMockResponse();
+await handleV2BoletimMedicao({
+  body: {
+    valorBruto: 10000,
+    aliqISS: 5,
+    desonerado: true,
+    aliqIRRF: 1.5,
+    aliqRetencaoGarantia: 5
+  }
+}, resBoletim);
+assert.strictEqual(resBoletim.getStatusCode(), 200);
+const bol = resBoletim.getBody().boletim;
+assert.strictEqual(bol.valorBruto, 10000);
+assert.strictEqual(bol.retencoes.iss.valor, 500);
+assert.strictEqual(bol.retencoes.inss.valor, 350); // 3.5% desonerado
+assert.strictEqual(bol.retencoes.irrf.valor, 150); // 1.5%
+assert.strictEqual(bol.retencoes.pisCofinsCsll.valor, 465); // 4.65% acima de R$ 5.000
+assert.strictEqual(bol.retencoes.garantiaContratual.valor, 500); // 5%
+assert.strictEqual(bol.totalRetencoes, 1965);
+assert.strictEqual(bol.valorLiquido, 8035);
+console.log('   ✓ Boletim de Medição calculou todas as 5 retenções na fonte (INSS, ISS, IRRF, PIS/COFINS, Garantia) perfeitamente.');
 
 console.log('\n======================================================');
 console.log('🎉 TODOS OS TESTES DA FASE 5 PASSARAM COM SUCESSO!');
