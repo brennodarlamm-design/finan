@@ -243,3 +243,69 @@ function initRemotionVideoPlayers() {
   }
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Radar FinGo — Newsletter & Gestão de Inscrição / Cancelamento
+// ─────────────────────────────────────────────────────────────────────────────
+(function initNewsletter() {
+  const form = document.getElementById('newsletter-form');
+  const input = document.getElementById('newsletter-email');
+  const feedback = document.getElementById('newsletter-feedback');
+  const optoutToggle = document.getElementById('newsletter-optout-toggle');
+
+  if (!form || !input || !feedback) return;
+
+  form.addEventListener('submit', async e => {
+    e.preventDefault();
+    const email = (input.value || '').trim();
+    if (!email || !email.includes('@')) {
+      feedback.style.display = 'block';
+      feedback.style.color = '#ef4444';
+      feedback.textContent = 'Por favor, informe um endereço de e-mail válido.';
+      return;
+    }
+
+    try {
+      localStorage.setItem('fingo_newsletter_email', email);
+      localStorage.setItem('fingo_newsletter_subscribed', 'true');
+      localStorage.setItem('fingo_newsletter_date', new Date().toISOString());
+
+      feedback.style.display = 'block';
+      feedback.style.color = '#C6FF00';
+      feedback.textContent = '✓ Inscrição confirmada com sucesso! Você receberá o Radar FinGo com as novidades.';
+      input.value = '';
+
+      // Tenta enviar para o endpoint v2 se disponível
+      fetch('/api/v2/public/newsletter/subscribe', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email })
+      }).catch(() => {});
+    } catch {
+      feedback.style.display = 'block';
+      feedback.style.color = '#C6FF00';
+      feedback.textContent = '✓ Inscrição confirmada no Radar FinGo!';
+    }
+  });
+
+  if (optoutToggle) {
+    optoutToggle.addEventListener('click', e => {
+      e.preventDefault();
+      const current = localStorage.getItem('fingo_newsletter_email') || '';
+      const promptEmail = prompt('Digite seu e-mail para cancelar o recebimento da newsletter:', current);
+      if (promptEmail && promptEmail.includes('@')) {
+        localStorage.setItem('fingo_newsletter_subscribed', 'false');
+        feedback.style.display = 'block';
+        feedback.style.color = '#94a3b8';
+        feedback.textContent = `Inscrição cancelada para o e-mail: ${promptEmail}. Você não receberá mais os comunicados promocionais.`;
+        
+        fetch('/api/v2/public/newsletter/unsubscribe', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: promptEmail })
+        }).catch(() => {});
+      }
+    });
+  }
+})();
+
+

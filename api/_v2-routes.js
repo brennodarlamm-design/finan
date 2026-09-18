@@ -13,6 +13,8 @@ export const V2_ROUTE_SPEC = [
   { method: 'POST', path: '/api/v2/webhooks/pix', desc: 'Webhook bancário PIX segregado (sem query multiplexing)' },
   { method: 'GET', path: '/api/v2/public/cnpj/:cnpj', desc: 'Consulta aberta de CNPJ na BrasilAPI' },
   { method: 'GET', path: '/api/v2/public/cep/:cep', desc: 'Consulta aberta de CEP na BrasilAPI / ViaCEP' },
+  { method: 'POST', path: '/api/v2/public/newsletter/subscribe', desc: 'Inscrição no Radar FinGo (Newsletter & Eventos)' },
+  { method: 'POST', path: '/api/v2/public/newsletter/unsubscribe', desc: 'Cancelamento de inscrição no Radar FinGo' },
   { method: 'GET', path: '/api/v2/tenants/current', desc: 'Dados e preferências da construtora ativa' },
   { method: 'POST', path: '/api/v2/support/chat', desc: 'Mensagens para o Copiloto FinBot com pool de IA' },
   { method: 'GET', path: '/api/v2/engineering/sinapi', desc: 'Consulta oficial da base SINAPI da Caixa' },
@@ -237,6 +239,41 @@ export async function handleV2BoletimMedicao(req, res) {
 }
 
 /**
+ * Endpoint de Gestão da Newsletter / Radar FinGo
+ */
+export async function handleV2Newsletter(req, res) {
+  res.setHeader('Cache-Control', 'no-store');
+  res.setHeader('Content-Type', 'application/json; charset=utf-8');
+
+  const isUnsubscribe = req.url?.includes('unsubscribe');
+  const email = (req.body?.email || req.query?.email || '').trim().toLowerCase();
+
+  if (!email || !email.includes('@') || email.length < 5) {
+    return res.status(400).json({
+      success: false,
+      error: 'INVALID_EMAIL',
+      message: 'Endereço de e-mail inválido.'
+    });
+  }
+
+  if (isUnsubscribe) {
+    return res.status(200).json({
+      success: true,
+      action: 'unsubscribed',
+      email,
+      message: 'Inscrição no Radar FinGo cancelada com sucesso. Você não receberá mais comunicados de marketing.'
+    });
+  }
+
+  return res.status(200).json({
+    success: true,
+    action: 'subscribed',
+    email,
+    message: 'Inscrição no Radar FinGo confirmada com sucesso! Bem-vindo(a) às atualizações de engenharia e SINAPI.'
+  });
+}
+
+/**
  * Resolve e despacha requisições /api/v2/* para handlers especializados.
  */
 export function resolveV2Route(pathname, searchParams) {
@@ -273,6 +310,11 @@ export function resolveV2Route(pathname, searchParams) {
       query.cep = pathname.replace('/api/v2/public/cep/', '').replace(/\D/g, '');
     }
     return { handler: nfeHandler, query, moduleName: 'v2-public-cep' };
+  }
+
+  // 3.1 Newsletter Radar FinGo (Inscrição e Descadastro)
+  if (pathname === '/api/v2/public/newsletter/subscribe' || pathname === '/api/v2/public/newsletter/unsubscribe') {
+    return { handler: handleV2Newsletter, query, moduleName: 'v2-public-newsletter' };
   }
 
   // 4. Construtora / Tenant

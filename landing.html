@@ -2281,6 +2281,42 @@
         </div>
       </div>
     </section>
+
+    <!-- =====================================================================
+         NEWSLETTER & RADAR DE ATUALIZAÇÕES
+         ===================================================================== -->
+    <section class="section-wrap" id="newsletter" style="padding-top:0;">
+      <div class="wrap">
+        <div style="background:linear-gradient(135deg, #0d170d 0%, #060a06 100%);border:1px solid #1a2a1a;border-radius:12px;padding:36px 32px;box-shadow:0 12px 36px rgba(0,0,0,0.4);position:relative;overflow:hidden;">
+          <div style="position:absolute;top:-40px;right:-40px;width:140px;height:140px;background:radial-gradient(circle, rgba(198,255,0,0.12) 0%, transparent 70%);border-radius:50%;pointer-events:none;"></div>
+          <div style="max-width:680px;margin:0 auto;text-align:center;">
+            <div style="display:inline-flex;align-items:center;gap:6px;padding:4px 10px;background:rgba(198,255,0,0.1);border:1px solid rgba(198,255,0,0.3);border-radius:4px;font-size:11px;font-weight:800;color:#C6FF00;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:14px;">
+              📡 Radar FinGo &bull; Engenharia & Atualizações
+            </div>
+            <h2 style="font-size:26px;font-weight:900;color:#ffffff;letter-spacing:-0.5px;margin:0 0 10px;">
+              Receba Atualizações SINAPI, Eventos e Novidades do Sistema
+            </h2>
+            <p style="font-size:14px;line-height:1.6;color:#94a3b8;margin:0 0 24px;">
+              Fique por dentro dos lançamentos de recursos, webinars técnicos de BDI e novas tabelas oficiais da Caixa Econômica Federal. Cancele sua inscrição quando quiser em um clique.
+            </p>
+            
+            <form id="newsletter-form" style="display:flex;flex-wrap:wrap;gap:10px;justify-content:center;max-width:520px;margin:0 auto 12px;">
+              <input type="email" id="newsletter-email" name="email" placeholder="Seu e-mail corporativo ou pessoal" required style="flex:1 1 260px;padding:12px 16px;border-radius:4px;border:1px solid #283828;background:#050805;color:#ffffff;font-size:14px;outline:none;" />
+              <button type="submit" class="btn btn-mint haptic-press" style="padding:12px 24px;font-size:13px;font-weight:800;text-transform:uppercase;letter-spacing:0.04em;">
+                <span>Inscrever-se</span>
+                <span class="btn-icon-pill">✓</span>
+              </button>
+            </form>
+            
+            <div id="newsletter-feedback" style="display:none;font-size:13px;font-weight:700;margin-top:10px;"></div>
+            
+            <div style="font-size:11px;color:#64748b;margin-top:14px;">
+              🔒 Respeitamos sua privacidade. Zero spam. Você pode <a href="#newsletter" id="newsletter-optout-toggle" style="color:#94a3b8;text-decoration:underline;">cancelar sua inscrição</a> ou gerenciar preferências a qualquer momento.
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
   </main>
 
   <!-- =====================================================================
@@ -2304,6 +2340,7 @@
 
       <div class="footer-links">
         <a href="/login">Área do Cliente</a>
+        <a href="#newsletter">Newsletter & Novidades</a>
         <a href="/validar" target="_blank">Validar Documento ICP</a>
         <a href="/privacidade">Privacidade & LGPD</a>
         <a href="/termos">Termos de Uso</a>

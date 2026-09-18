@@ -144,6 +144,19 @@ assert.strictEqual(bol.totalRetencoes, 1965);
 assert.strictEqual(bol.valorLiquido, 8035);
 console.log('   ✓ Boletim de Medição calculou todas as 5 retenções na fonte (INSS, ISS, IRRF, PIS/COFINS, Garantia) perfeitamente.');
 
+// 4.5 Newsletter Radar FinGo (Subscribe & Unsubscribe)
+const { handleV2Newsletter } = await import('../api/_v2-routes.js');
+const resSub = createMockResponse();
+await handleV2Newsletter({ body: { email: 'contato@construtora.com.br' } }, resSub);
+assert.strictEqual(resSub.getStatusCode(), 200);
+assert.strictEqual(resSub.getBody().action, 'subscribed');
+
+const resUnsub = createMockResponse();
+await handleV2Newsletter({ url: '/api/v2/public/newsletter/unsubscribe', body: { email: 'contato@construtora.com.br' } }, resUnsub);
+assert.strictEqual(resUnsub.getStatusCode(), 200);
+assert.strictEqual(resUnsub.getBody().action, 'unsubscribed');
+console.log('   ✓ Endpoints de Newsletter (Inscrição e Cancelamento) validados com sucesso.');
+
 console.log('\n======================================================');
 console.log('🎉 TODOS OS TESTES DA FASE 5 PASSARAM COM SUCESSO!');
 console.log('======================================================\n');

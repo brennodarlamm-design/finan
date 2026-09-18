@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sua Chave de Acesso FinGo — {{{EMPRESA}}}</title>
+</head>
+<body style="margin:0;padding:0;background:#060a06;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#1e293b;">
+  <!-- Preview Text -->
+  <span style="display:none !important;visibility:hidden;font-size:1px;line-height:1px;max-height:0;max-width:0;opacity:0;overflow:hidden;">
+    Sua Chave da Empresa FinGo: {{{CHAVE_EMPRESA}}} — Acesso seguro para {{{EMPRESA}}}.
+  </span>
+
+  <div style="background:#060a06;padding:40px 16px;min-height:100vh;">
+    <div style="max-width:580px;margin:0 auto;background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 16px 40px rgba(0,0,0,0.5);">
+      
+      <!-- Cabeçalho Institucional FinGo (Brutalist Tech) -->
+      <div style="background:#0b120b;padding:28px 32px;border-bottom:3px solid #C6FF00;">
+        <table style="width:100%;border-collapse:collapse;">
+          <tr>
+            <td>
+              <div style="font-size:26px;font-weight:900;color:#ffffff;letter-spacing:-0.5px;">
+                Fin<span style="color:#C6FF00;">Go</span>
+              </div>
+              <div style="font-size:11px;color:#94a3b8;margin-top:4px;text-transform:uppercase;letter-spacing:0.1em;font-weight:700;">
+                Obras em Fluxo &bull; Credenciais Corporativas
+              </div>
+            </td>
+            <td style="text-align:right;">
+              <span style="display:inline-block;padding:6px 12px;background:rgba(198,255,0,0.15);border:1px solid rgba(198,255,0,0.4);border-radius:4px;font-size:11px;font-weight:800;color:#C6FF00;text-transform:uppercase;letter-spacing:0.05em;">
+                Acesso Seguro
+              </span>
+            </td>
+          </tr>
+        </table>
+      </div>
+
+      <!-- Corpo do E-mail -->
+      <div style="padding:36px 32px 30px;">
+        <h1 style="margin:0 0 12px;font-size:22px;font-weight:800;color:#0b120b;line-height:1.3;">
+          Credenciais de Acesso da sua Construtora
+        </h1>
+        
+        <p style="margin:0 0 24px;font-size:14px;line-height:1.6;color:#475569;">
+          Olá, <strong>{{{RESPONSAVEL}}}</strong>! A conta da empresa <strong>{{{EMPRESA}}}</strong> está ativa no <strong>FinGo ERP</strong>. Abaixo está a Chave da Empresa necessária para que seus colaboradores acessem a plataforma com isolamento multi-tenant seguro:
+        </p>
+
+        <!-- Card de Destaque da Chave da Empresa -->
+        <div style="background:#0b120b;border:1px solid #1a261a;border-radius:8px;padding:24px;margin-bottom:28px;text-align:center;box-shadow:inset 0 2px 8px rgba(0,0,0,0.4);">
+          <div style="font-size:11px;font-weight:800;color:#94a3b8;text-transform:uppercase;letter-spacing:0.12em;margin-bottom:8px;">
+            🔑 Chave da Empresa (6 Dígitos)
+          </div>
+          <div style="font-family:'SF Mono',Menlo,Consolas,monospace;font-size:36px;font-weight:900;color:#C6FF00;letter-spacing:6px;margin:8px 0;user-select:all;">
+            {{{CHAVE_EMPRESA}}}
+          </div>
+          <div style="font-size:11px;color:#64748b;margin-top:8px;">
+            Identificador do Tenant: <strong style="color:#cbd5e1;">{{{TENANT_ID}}}</strong>
+          </div>
+        </div>
+
+        <!-- Instruções de Primeiro Acesso -->
+        <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:20px;margin-bottom:28px;">
+          <div style="font-size:13px;font-weight:800;color:#0b120b;margin-bottom:12px;text-transform:uppercase;letter-spacing:0.04em;">
+            📋 Como Acessar a Plataforma:
+          </div>
+          <table style="width:100%;border-collapse:collapse;font-size:13px;color:#334155;line-height:1.6;">
+            <tr>
+              <td style="width:24px;vertical-align:top;font-weight:800;color:#16a34a;">1.</td>
+              <td style="padding-bottom:10px;">Acesse a página de entrada em <a href="https://fingo.api.br/login" target="_blank" style="color:#16a34a;font-weight:700;text-decoration:none;">fingo.api.br/login</a>.</td>
+            </tr>
+            <tr>
+              <td style="width:24px;vertical-align:top;font-weight:800;color:#16a34a;">2.</td>
+              <td style="padding-bottom:10px;">No campo <strong>Chave da Empresa</strong>, digite o código de 6 dígitos acima (<strong>{{{CHAVE_EMPRESA}}}</strong>).</td>
+            </tr>
+            <tr>
+              <td style="width:24px;vertical-align:top;font-weight:800;color:#16a34a;">3.</td>
+              <td>Insira seu e-mail corporativo (ou entre direto com <strong>Google</strong>) e sua senha cadastrada.</td>
+            </tr>
+          </table>
+        </div>
+
+        <!-- Alerta de Segurança -->
+        <div style="background:#fefce8;border:1px solid #fef08a;border-radius:8px;padding:14px 16px;margin-bottom:28px;font-size:12px;color:#713f12;line-height:1.55;">
+          🛡️ <strong>Importante:</strong> Esta chave identifica exclusivamente sua construtora no banco de dados. Compartilhe-a apenas com os colaboradores autorizados da sua equipe.
+        </div>
+
+        <!-- Botão de Ação CTA -->
+        <div style="text-align:center;margin:32px 0 10px;">
+          <a href="{{{LINK_ACESSO}}}" target="_blank" rel="noopener noreferrer" style="display:inline-block;background:#0b120b;color:#C6FF00;border:1px solid #C6FF00;font-size:14px;font-weight:800;padding:14px 32px;border-radius:4px;text-decoration:none;letter-spacing:0.02em;text-transform:uppercase;">
+            Acessar Painel FinGo &rarr;
+          </a>
+        </div>
+
+      </div>
+
+      <!-- Rodapé -->
+      <div style="background:#f8fafc;padding:20px 32px;border-top:1px solid #e2e8f0;text-align:center;font-size:11px;color:#94a3b8;line-height:1.6;">
+        <strong>FinGo Tecnologia e Gestão de Obras</strong> &bull; CNPJ 53.864.218/0001-20<br>
+        Suporte Técnico & Comercial: <a href="mailto:suporte@fingo.api.br" style="color:#64748b;text-decoration:none;">suporte@fingo.api.br</a>
+      </div>
+
+    </div>
+  </div>
+</body>
+</html>
