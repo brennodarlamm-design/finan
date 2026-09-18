@@ -1,3 +1,5 @@
+import { executeEdgeApi } from './api/_edge-adapter.js';
+
 const DEFAULT_API_ORIGIN = 'https://api.fingo.api.br';
 const DEFAULT_CANONICAL_ORIGIN = 'https://fingo.api.br';
 const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
@@ -368,6 +370,30 @@ async function proxyApi(request, env) {
   }
 }
 
+async function handleApi(request, env) {
+  try {
+    const edgeResponse = await executeEdgeApi(request, env);
+    if (edgeResponse && edgeResponse.status < 500) {
+      return edgeResponse;
+    }
+    if (edgeResponse && edgeResponse.status >= 500 && env.FINOBRA_API_ORIGIN) {
+      console.warn('[FinGo Edge] Resposta 5xx no Edge, acionando fallback upstream...');
+      return await proxyApi(request, env);
+    }
+    return edgeResponse;
+  } catch (err) {
+    console.error('[FinGo Edge] Falha ao processar API no Edge:', err?.message || err);
+    if (env.FINOBRA_API_ORIGIN) {
+      return await proxyApi(request, env);
+    }
+    return Response.json({
+      success: false,
+      error: 'Erro interno no gateway Edge.',
+      code: 'EDGE_ERROR'
+    }, { status: 500 });
+  }
+}
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
@@ -379,7 +405,7 @@ export default {
       return healthResponse(request, env);
     }
     if (isApiPath(url.pathname)) {
-      return proxyApi(request, env);
+      return handleApi(request, env);
     }
 
     return fetchFrontendResponse(request, env);

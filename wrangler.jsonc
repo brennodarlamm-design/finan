@@ -3,6 +3,7 @@
   "name": "finan",
   "main": "cloudflare-worker.js",
   "compatibility_date": "2026-09-12",
+  "compatibility_flags": ["nodejs_compat"],
   "workers_dev": true,
   "assets": {
     "directory": "./dist",

@@ -60,8 +60,8 @@ async function main() {
   console.log(`- Produção: ${prod.length}`);
   console.log(`- Preview: ${preview.length}`);
 
-  // Preserva os 3 deploys mais recentes de produção (rollback safety)
-  const KEEP_PROD_COUNT = 3;
+  // Preserva os 2 deploys mais recentes de produção (rollback safety)
+  const KEEP_PROD_COUNT = 2;
   const prodToKeep = prod.slice(0, KEEP_PROD_COUNT);
   const prodToDelete = prod.slice(KEEP_PROD_COUNT);
 
