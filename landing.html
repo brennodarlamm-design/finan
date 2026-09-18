@@ -152,53 +152,54 @@
   <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png?v=3">
   <link rel="preconnect" href="https://fonts.googleapis.com" crossorigin>
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&family=Outfit:wght@600;700;800;900&display=optional">
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&family=Outfit:wght@600;700;800;900&display=optional" rel="stylesheet">
+  <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;600;700;800;900&family=Outfit:wght@600;700;800;900&display=swap">
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;600;700;800;900&family=Outfit:wght@600;700;800;900&display=swap" rel="stylesheet">
 
   <style>
     /* =========================================================================
-       FINOBRA — INDUSTRIAL ARCHITECTURAL PRECISION & EXECUTIVE BRUTALISM (v2.38)
-       Skill: frontend-design | Tokens, Double-Bezel, Haptic & Tabular Typography
+       FINGO — BRUTALIST TECH INDUSTRIAL DESIGN SYSTEM (v4.0)
+       Skill: fingo-brand-system | Acid Green, Deep Obsidian & Remotion Engine
        ========================================================================= */
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     html { scroll-behavior: smooth; font-size: 15px; }
 
     :root {
-      /* Deep Obsidian & Carbon Palettes */
-      --bg-void: #030603;
-      --bg-base: #060B05;
-      --bg-surface: #0B1309;
-      --bg-surface-elevated: #111C0E;
-      --bg-glass: rgba(9, 16, 8, 0.78);
+      /* FinGo Deep Obsidian & Carbon Palettes */
+      --bg-void: #0A0A0A;
+      --bg-base: #0D0D0D;
+      --bg-surface: #1A1A1A;
+      --bg-surface-elevated: #282828;
+      --bg-glass: rgba(13, 13, 13, 0.88);
 
-      /* Precision Metals & Semantic Colors */
-      --accent-mint: #12D9A0;
-      --accent-mint-bright: #3EE8B5;
-      --accent-mint-dim: rgba(18, 217, 160, 0.14);
-      --accent-mint-glow: rgba(18, 217, 160, 0.35);
+      /* FinGo Brand Color — Acid Green Neon */
+      --accent-mint: #C6FF00;
+      --accent-mint-bright: #D4FF33;
+      --accent-mint-dim: rgba(198, 255, 0, 0.12);
+      --accent-mint-glow: rgba(198, 255, 0, 0.35);
 
-      --gold-champagne: #F3CF67;
-      --gold-deep: #D9AD38;
-      --gold-glow: rgba(243, 207, 103, 0.25);
+      /* FinGo Secondary Tech Accent — Purple */
+      --gold-champagne: #9B6FD4;
+      --gold-deep: #7F49B8;
+      --gold-glow: rgba(127, 73, 184, 0.35);
 
-      --alert-coral: #FB7185;
-      --warning-amber: #FBBF24;
-      --info-cyan: #38BDF8;
+      --alert-coral: #FF3B3B;
+      --warning-amber: #FFB800;
+      --info-cyan: #7F49B8;
 
-      /* Drafting Borders & Hairlines */
-      --border-hairline: rgba(255, 255, 255, 0.07);
-      --border-subtle: rgba(255, 255, 255, 0.12);
-      --border-accent: rgba(18, 217, 160, 0.28);
-      --border-gold: rgba(243, 207, 103, 0.32);
+      /* Precision Machined Borders */
+      --border-hairline: #282828;
+      --border-subtle: #3D3D3D;
+      --border-accent: rgba(198, 255, 0, 0.4);
+      --border-gold: rgba(127, 73, 184, 0.4);
 
       /* Typography Tokens */
-      --font-display: 'Outfit', -apple-system, sans-serif;
+      --font-display: 'Bebas Neue', 'Outfit', -apple-system, sans-serif;
       --font-mono-numbers: 'Inter', -apple-system, sans-serif;
 
-      --text-white: #FFFFFF;
-      --text-main: #EEF2EB;
-      --text-muted: #95A391;
-      --text-dim: #606E5D;
+      --text-white: #F0F0E8;
+      --text-main: #E8E8DC;
+      --text-muted: #8E8E8E;
+      --text-dim: #555555;
 
       /* Layout & Spacing Rhythm (Base 4px/8px) */
       --max-width: 1200px;
@@ -209,17 +210,17 @@
       --space-xl: 56px;
       --space-2xl: 88px;
 
-      /* Radii */
-      --r-sm: 8px;
-      --r-md: 14px;
-      --r-lg: 20px;
-      --r-pill: 9999px;
+      /* Radii — Brutalist Tech (Max 4-6px) */
+      --r-sm: 4px;
+      --r-md: 4px;
+      --r-lg: 6px;
+      --r-pill: 4px;
 
       /* Shadows & Kinetic Easing */
-      --shadow-ambient: 0 20px 60px -15px rgba(0, 0, 0, 0.85);
-      --shadow-mint-glow: 0 0 40px -8px var(--accent-mint-glow);
-      --ease-spring: cubic-bezier(0.32, 0.72, 0, 1);
-      --t-spring: 180ms var(--ease-spring);
+      --shadow-ambient: 0 20px 60px -15px rgba(0, 0, 0, 0.95);
+      --shadow-mint-glow: 0 0 35px rgba(198, 255, 0, 0.45);
+      --ease-spring: cubic-bezier(0.4, 0, 0.6, 1);
+      --t-spring: 150ms var(--ease-spring);
     }
 
     body {
@@ -245,11 +246,11 @@
       z-index: -1;
       background-color: var(--bg-void);
       background-image: 
-        radial-gradient(circle at 18% 12%, rgba(18, 217, 160, 0.10), transparent 42%),
-        radial-gradient(circle at 85% 25%, rgba(243, 207, 103, 0.08), transparent 38%),
-        radial-gradient(circle at 50% 75%, rgba(18, 217, 160, 0.05), transparent 48%),
-        linear-gradient(rgba(255, 255, 255, 0.024) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(255, 255, 255, 0.024) 1px, transparent 1px);
+        radial-gradient(circle at 18% 12%, rgba(198, 255, 0, 0.08), transparent 42%),
+        radial-gradient(circle at 85% 25%, rgba(127, 73, 184, 0.07), transparent 38%),
+        radial-gradient(circle at 50% 75%, rgba(198, 255, 0, 0.04), transparent 48%),
+        linear-gradient(rgba(255, 255, 255, 0.02) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
       background-size: auto, auto, auto, 48px 48px, 48px 48px;
     }
 
@@ -262,7 +263,7 @@
        DOUBLE-BEZEL ARCHITECTURE (Machined Physical Chassis)
        ========================================================================= */
     .bezel-shell {
-      background: rgba(15, 23, 14, 0.65);
+      background: rgba(20, 20, 20, 0.75);
       border: 1px solid var(--border-subtle);
       border-radius: var(--r-lg);
       padding: 6px;
@@ -274,8 +275,8 @@
     .bezel-core {
       background: var(--bg-surface);
       border: 1px solid var(--border-hairline);
-      border-radius: calc(var(--r-lg) - 5px);
-      box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.06);
+      border-radius: calc(var(--r-lg) - 2px);
+      box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.04);
     }
 
     /* =========================================================================
@@ -296,37 +297,40 @@
       align-items: center;
       justify-content: center;
       gap: 9px;
-      padding: 13px 24px;
+      padding: 12px 24px;
       border-radius: var(--r-md);
       font-family: var(--font-display);
       font-weight: 800;
-      font-size: 0.88rem;
-      letter-spacing: 0.01em;
+      font-size: 0.95rem;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
       text-decoration: none;
       border: 1px solid transparent;
       white-space: nowrap;
     }
 
     .btn-mint {
-      background: linear-gradient(135deg, var(--accent-mint-bright), var(--accent-mint));
-      color: #03140D;
+      background: var(--accent-mint);
+      color: #0A0A0A;
       box-shadow: 0 4px 20px var(--accent-mint-glow);
     }
 
     .btn-mint:hover {
-      box-shadow: 0 6px 28px rgba(18, 217, 160, 0.5);
-      transform: translateY(-1px);
+      background: var(--accent-mint-bright);
+      box-shadow: 0 6px 28px rgba(198, 255, 0, 0.5);
+      transform: translateY(-2px);
     }
 
     .btn-gold {
-      background: linear-gradient(135deg, var(--gold-champagne), var(--gold-deep));
-      color: #121508;
+      background: var(--gold-deep);
+      color: #F0F0E8;
       box-shadow: 0 4px 20px var(--gold-glow);
     }
 
     .btn-gold:hover {
-      box-shadow: 0 6px 28px rgba(243, 207, 103, 0.45);
-      transform: translateY(-1px);
+      background: var(--gold-champagne);
+      box-shadow: 0 6px 28px rgba(127, 73, 184, 0.45);
+      transform: translateY(-2px);
     }
 
     .btn-ghost {
@@ -336,18 +340,18 @@
     }
 
     .btn-ghost:hover {
-      background: rgba(255, 255, 255, 0.08);
-      border-color: rgba(255, 255, 255, 0.22);
-      color: var(--text-white);
-      transform: translateY(-1px);
+      background: rgba(198, 255, 0, 0.08);
+      border-color: var(--accent-mint);
+      color: var(--accent-mint);
+      transform: translateY(-2px);
     }
 
     /* Nested Island Trailing Arrow */
     .btn-icon-pill {
       width: 20px;
       height: 20px;
-      border-radius: 50%;
-      background: rgba(0, 0, 0, 0.18);
+      border-radius: 2px;
+      background: rgba(0, 0, 0, 0.22);
       display: inline-flex;
       align-items: center;
       justify-content: center;
@@ -361,21 +365,112 @@
     }
 
     /* =========================================================================
+       REMOTION VIDEO ENGINE SHOWCASE STYLES
+       ========================================================================= */
+    .hero-video-box {
+      position: relative;
+      width: 100%;
+      border-radius: 4px;
+      overflow: hidden;
+      background: #000;
+      margin-bottom: 20px;
+      border: 1px solid var(--border-hairline);
+    }
+
+    .hero-video-box video {
+      width: 100%;
+      height: auto;
+      display: block;
+      border-radius: 4px;
+      aspect-ratio: 16/9;
+      object-fit: cover;
+    }
+
+    .hero-video-badge {
+      position: absolute;
+      bottom: 12px;
+      left: 12px;
+      background: rgba(10, 10, 10, 0.88);
+      border: 1px solid var(--border-subtle);
+      padding: 5px 12px;
+      border-radius: 4px;
+      font-size: 0.7rem;
+      font-weight: 800;
+      color: var(--accent-mint);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      letter-spacing: 0.04em;
+    }
+
+    .hero-video-ctrl {
+      position: absolute;
+      bottom: 12px;
+      right: 12px;
+      background: rgba(10, 10, 10, 0.88);
+      border: 1px solid var(--border-subtle);
+      color: var(--text-white);
+      border-radius: 4px;
+      padding: 5px 12px;
+      font-size: 0.72rem;
+      font-weight: 700;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      transition: all var(--t-spring);
+    }
+
+    .hero-video-ctrl:hover {
+      border-color: var(--accent-mint);
+      color: var(--accent-mint);
+    }
+
+    .video-ch-btn {
+      cursor: pointer;
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid var(--border-hairline);
+      color: var(--text-muted);
+      border-radius: var(--r-sm);
+      padding: 6px 12px;
+      font-size: 0.75rem;
+      font-weight: 700;
+      transition: all var(--t-spring);
+    }
+
+    .video-ch-btn:hover {
+      border-color: var(--accent-mint);
+      color: var(--text-white);
+    }
+
+    .video-ch-btn.active {
+      background: var(--accent-mint);
+      color: #0A0A0A;
+      border-color: var(--accent-mint);
+      font-weight: 800;
+      box-shadow: 0 0 12px rgba(198, 255, 0, 0.35);
+    }
+
+    /* =========================================================================
        FLUID ISLAND DETACHED HEADER
        ========================================================================= */
     .header-island {
       position: sticky;
-      top: 16px;
+      top: 14px;
       z-index: 100;
       width: min(var(--max-width), calc(100% - 32px));
       margin: 0 auto;
-      background: rgba(8, 14, 7, 0.82);
+      background: rgba(13, 13, 13, 0.90);
       backdrop-filter: blur(20px);
       -webkit-backdrop-filter: blur(20px);
       border: 1px solid var(--border-subtle);
-      border-radius: var(--r-pill);
-      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.65);
-      padding: 8px 18px;
+      border-radius: var(--r-md);
+      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.75);
+      padding: 10px 20px;
       display: flex;
       align-items: center;
       justify-content: space-between;
@@ -385,36 +480,25 @@
     .brand-group {
       display: flex;
       align-items: center;
-      gap: 11px;
+      gap: 12px;
       text-decoration: none;
       color: var(--text-white);
     }
 
-    .brand-emblem {
-      width: 36px;
-      height: 36px;
-      border-radius: 10px;
-      background: linear-gradient(135deg, #0A2617, #133D26);
-      border: 1px solid var(--border-accent);
-      display: grid;
-      place-items: center;
-      box-shadow: 0 0 16px rgba(18, 217, 160, 0.3);
-    }
-
-    .brand-emblem svg {
-      width: 22px;
-      height: 22px;
+    .brand-logo-img {
+      height: 38px;
+      width: auto;
+      object-fit: contain;
+      display: block;
     }
 
     .brand-title {
       font-family: var(--font-display);
       font-weight: 900;
-      font-size: 1.15rem;
-      letter-spacing: -0.02em;
-      background: linear-gradient(135deg, #FFFFFF, var(--accent-mint-bright));
-      -webkit-background-clip: text;
-      background-clip: text;
-      color: transparent;
+      font-size: 1.3rem;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      color: var(--text-white);
     }
 
     .nav-links {
@@ -1443,17 +1527,12 @@
   <!-- Fluid Island Header -->
   <header class="header-island">
     <a class="brand-group" href="/" aria-label="FinObra">
-      <div class="brand-emblem" aria-hidden="true">
-        <svg viewBox="0 0 32 32" fill="none">
-          <path d="M5 23V13L16 5l11 8v10" stroke="#12D9A0" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
-          <path d="M11 25v-9h10v9M8 25h16" stroke="#3EE8B5" stroke-width="2.2" stroke-linecap="round"/>
-        </svg>
-      </div>
-      <span class="brand-title">FinObra</span>
+      <img src="/img/fingo/fingo-logo-full.png" alt="FinGo — Obras em Fluxo" class="brand-logo-img">
     </a>
 
     <nav class="nav-links" aria-label="Navegação Principal">
       <a class="nav-link" href="#modulos">Módulos</a>
+      <a class="nav-link" href="#demonstracao">Demonstração</a>
       <a class="nav-link" href="#roi">Simulador de ROI</a>
       <a class="nav-link" href="#planos">Planos</a>
       <a class="nav-link" href="#comparar">Comparativo</a>
@@ -1471,6 +1550,7 @@
         <summary class="mobile-menu-summary" aria-label="Abrir Menu">☰</summary>
         <div class="mobile-drawer-pop">
           <a href="#modulos">Módulos do Sistema</a>
+          <a href="#demonstracao">Demonstração em Vídeo</a>
           <a href="#roi">Simulador de ROI</a>
           <a href="#planos">Planos & Preços</a>
           <a href="#comparar">Comparativo de Recursos</a>
@@ -1490,16 +1570,16 @@
       <div class="wrap">
         <div class="telemetry-badge">
           <span class="pulse-dot"></span>
-          <span>SISTEMA OPERACIONAL DA CONSTRUÇÃO CIVIL</span>
+          <span>ERA FINGO • OBRAS EM FLUXO</span>
         </div>
 
         <h1 class="hero-title">
-          ENGENHARIA & GESTÃO CONECTADAS.<br>
-          <span class="hero-title-highlight">CONTROLE MILIMÉTRICO PARA TODO TIPO DE OBRA.</span>
+          GESTÃO DE OBRAS EM FLUXO CONTÍNUO.<br>
+          <span class="hero-title-highlight">PRECISÃO MILIMÉTRICA DO CANTEIRO AO FINANCEIRO.</span>
         </h1>
 
         <p class="hero-subtitle">
-          Gestão financeira multitenant, base <strong>SINAPI</strong>, medições com retenções técnicas e motor de <strong>prazos em cascata</strong>. Do canteiro ao escritório, controle total para obras residenciais, comerciais, industriais, reformas e empreitadas.
+          Gestão financeira multitenant, base <strong>SINAPI</strong>, medições com retenções técnicas e motor de <strong>prazos em cascata</strong>. Do canteiro ao escritório, controle total com a tecnologia e dinamismo <strong>FinGo</strong>.
         </p>
 
         <div class="hero-cta-bar">
@@ -1519,7 +1599,7 @@
           <span class="hero-trust-item">Retenções ISS, INSS e IRRF na fonte</span>
         </div>
 
-        <!-- Terminal de Engenharia & Workflow em Cascata -->
+        <!-- Terminal de Engenharia & Showcase de Vídeo Remotion -->
         <div class="terminal-container bezel-shell">
           <div class="terminal-header">
             <div class="terminal-dots">
@@ -1527,11 +1607,31 @@
               <span class="terminal-dot amber"></span>
               <span class="terminal-dot active"></span>
             </div>
-            <div class="terminal-url-pill">fingo.api.br/central-gestor/telemetria</div>
-            <span class="terminal-badge-live">● TELEMETRIA ATIVA</span>
+            <div class="terminal-url-pill">fingo.api.br/telemetria-ao-vivo</div>
+            <span class="terminal-badge-live">● REMOTION LIVE ENGINE</span>
           </div>
 
           <div class="terminal-body bezel-core">
+            <!-- Remotion Pro-Motion Live Engine Showcase -->
+            <div class="hero-video-box">
+              <video
+                id="fingo-hero-video"
+                src="/img/fingo/hero-video.mp4"
+                poster="/img/fingo/hero-video-preview.png"
+                autoplay
+                loop
+                muted
+                playsinline
+              ></video>
+              <div class="hero-video-badge">
+                <span class="pulse-dot" style="width:6px; height:6px;"></span>
+                <span>REMOTION ENGINE v2.0 • 60 FPS • FLUXO CONTÍNUO</span>
+              </div>
+              <button id="hero-video-toggle" class="hero-video-ctrl haptic-press" aria-label="Pausar ou reproduzir vídeo">
+                <span id="hero-video-icon">⏸</span>
+                <span id="hero-video-text">PAUSAR</span>
+              </button>
+            </div>
             <!-- Telemetry KPI Strip -->
             <div class="telemetry-strip">
               <div class="telemetry-cell">
@@ -1677,6 +1777,53 @@
     </section>
 
     <!-- =====================================================================
+         REMOTION FEATURE DEMO SHOWCASE (Interactive Video Tour)
+         ===================================================================== -->
+    <section class="section-wrap" id="demonstracao" style="padding-top: 0;">
+      <div class="wrap">
+        <div class="section-header">
+          <div class="section-kicker">Tecnologia Remotion em Ação</div>
+          <h2 class="section-title">FinGo em Movimento: A Plataforma ao Vivo</h2>
+          <p class="section-desc">Assista à demonstração interativa dos 5 pilares do FinGo. Clique nos módulos para saltar diretamente aos capítulos de cada recurso.</p>
+        </div>
+
+        <div class="bezel-shell" style="padding:8px; background:rgba(20,20,20,0.85); border:1px solid var(--border-subtle);">
+          <div style="padding:14px 18px; border-bottom:1px solid var(--border-hairline); display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px;">
+            <div style="display:flex; align-items:center; gap:10px;">
+              <span style="font-family:var(--font-display); font-size:1.1rem; font-weight:900; color:var(--text-white); letter-spacing:0.04em; text-transform:uppercase;">
+                TOUR INTERATIVO <span style="color:var(--accent-mint);">FINGO</span>
+              </span>
+              <span class="step-badge green" style="margin:0;">1080P PRO-MOTION</span>
+            </div>
+            <div class="video-chapter-buttons" style="display:flex; gap:8px; flex-wrap:wrap;">
+              <button class="video-ch-btn haptic-press active" data-time="0">1. Gestão de Obras</button>
+              <button class="video-ch-btn haptic-press" data-time="4">2. SINAPI Caixa</button>
+              <button class="video-ch-btn haptic-press" data-time="8">3. Medições & Retenções</button>
+              <button class="video-ch-btn haptic-press" data-time="12">4. Conciliação & DRE</button>
+              <button class="video-ch-btn haptic-press" data-time="16">5. Cascata de SLA</button>
+            </div>
+          </div>
+          <div style="position:relative; width:100%; border-radius:4px; overflow:hidden; background:#000;">
+            <video
+              id="fingo-feature-video"
+              src="/img/fingo/feature-demo.mp4"
+              poster="/img/fingo/feature-demo-financeiro.png"
+              loop
+              muted
+              playsinline
+              style="width:100%; height:auto; display:block; aspect-ratio:16/9; object-fit:cover;"
+            ></video>
+            <div id="feature-video-play-overlay" style="position:absolute; inset:0; display:flex; align-items:center; justify-content:center; background:rgba(0,0,0,0.4); cursor:pointer; transition:opacity 0.2s;">
+              <div style="width:72px; height:72px; border-radius:4px; background:var(--accent-mint); color:#0A0A0A; display:flex; align-items:center; justify-content:center; font-size:28px; box-shadow:0 0 35px rgba(198,255,0,0.65); padding-left:4px; transition:transform 0.15s ease;">
+                ▶
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- =====================================================================
          CALCULADORA DE ROI (Differentiation Anchor)
          ===================================================================== -->
     <section class="section-wrap" id="roi">
@@ -1687,7 +1834,7 @@
               <div>
                 <div class="section-kicker">Simulador de Produtividade</div>
                 <h2 style="font-family:var(--font-display);font-size:1.85rem;font-weight:900;color:var(--text-white);letter-spacing:-0.02em;margin-bottom:8px;">
-                  Simule o Impacto do FinObra na Sua Construtora
+                  Simule o Impacto do FinGo na Sua Construtora
                 </h2>
                 <p style="font-size:0.86rem;color:var(--text-muted);">
                   Ajuste o número de canteiros e o volume de compras para estimar horas de retrabalho poupadas e vazamentos de custos estancados.
@@ -2057,7 +2204,7 @@
       <div class="wrap">
         <div class="cta-banner">
           <h2>Assuma o Controle Cirúrgico das Suas Obras</h2>
-          <p>Experimente o FinObra por 15 dias sem compromisso e veja a diferença de ter custos, compras, medições e prazos em um ecossistema unificado.</p>
+          <p>Experimente o FinGo por 15 dias sem compromisso e veja a diferença de ter custos, compras, medições e prazos em um ecossistema unificado.</p>
           <div class="hero-cta-bar" style="margin-bottom:0;">
             <a class="btn btn-mint haptic-press" href="/cadastro">
               <span>Criar Conta Gratuita em 1 Minuto</span>
@@ -2078,10 +2225,12 @@
   <footer class="footer">
     <div class="wrap footer-content">
       <div>
-        <div class="brand-title" style="margin-bottom:6px;">FinObra</div>
-        <div style="line-height:1.6;">
+        <a class="brand-group" href="/" aria-label="FinGo — Obras em Fluxo" style="margin-bottom:10px; display:inline-block;">
+          <img src="/img/fingo/fingo-logo-full.png" alt="FinGo — Obras em Fluxo" class="brand-logo-img" style="height:34px;">
+        </a>
+        <div style="line-height:1.6; color:var(--text-muted);">
           Sistema SaaS de Gestão Financeira e Operacional para Construtoras.<br>
-          Boa Vista / Roraima — Brasil
+          Era FinGo • Obras em Fluxo — Brasil
         </div>
       </div>
 
@@ -2094,7 +2243,7 @@
       </div>
 
       <div>
-        © 2026 FinObra Tecnologia. Todos os direitos reservados.
+        © 2026 FinGo — Obras em Fluxo. Todos os direitos reservados.
       </div>
     </div>
   </footer>

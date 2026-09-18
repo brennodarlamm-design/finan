@@ -4,36 +4,36 @@
 
 /* ===== VARIABLES ===== */
 :root {
-  /* === DEEP OLIVE-BLACK BACKGROUNDS === */
-  --bg-base: #090C07;
-  --bg-primary: #0E1209;
-  --bg-secondary: #151A10;
-  --bg-card: #1A2014;
-  --bg-card-hover: #212919;
-  --bg-input: #111509;
+  /* === FINGO BRAND SYSTEM — BRUTALIST TECH INDUSTRIAL PALETTE === */
+  --bg-base: #0D0D0D;
+  --bg-primary: #0A0A0A;
+  --bg-secondary: #1A1A1A;
+  --bg-card: #1A1A1A;
+  --bg-card-hover: #2B2B2B;
+  --bg-input: #1A1A1A;
 
-  /* === BORDERS (olive family) === */
-  --border-s: #252C1E;
-  --border-d: #313B27;
-  --border-str: #3F4D33;
+  /* === BORDERS (FinGo shadow & smoke) === */
+  --border-s: #282828;
+  --border-d: #3D3D3D;
+  --border-str: #4A4A4A;
 
-  /* === PRIMARY ACCENT — Electric Teal === */
-  --accent: #12D9A0;
-  --accent-h: #0FB88A;
-  --accent2: #3EE8B5;
-  --accent3: #7AF5D4;
-  --accent-glow: rgba(18,217,160,.28);
-  --accent-glow-lg: rgba(18,217,160,.14);
+  /* === PRIMARY ACCENT — FinGo Acid Green === */
+  --accent: #C6FF00;
+  --accent-h: #D4FF33;
+  --accent2: #C6FF00;
+  --accent3: #D4FF33;
+  --accent-glow: rgba(198, 255, 0, 0.3);
+  --accent-glow-lg: rgba(198, 255, 0, 0.15);
 
   /* === SEMANTIC COLORS === */
-  --success: #12D9A0;
-  --success-bg: rgba(18,217,160,.1);
-  --warning: #F5A623;
-  --warning-bg: rgba(245,166,35,.1);
-  --danger: #FF5C5C;
-  --danger-bg: rgba(255,92,92,.1);
-  --info: #60A5FA;
-  --info-bg: rgba(96,165,250,.1);
+  --success: #C6FF00;
+  --success-bg: rgba(198, 255, 0, 0.1);
+  --warning: #FFB800;
+  --warning-bg: rgba(255, 184, 0, 0.1);
+  --danger: #FF3B3B;
+  --danger-bg: rgba(255, 59, 59, 0.1);
+  --info: #7F49B8;
+  --info-bg: rgba(127, 73, 184, 0.1);
 
   /* === TYPOGRAPHY TOKENS === */
   --font-weight-regular: 400;
@@ -42,33 +42,33 @@
   --font-weight-bold: 700;
   --font-weight-heavy: 800;
 
-  --text: #EEF0EA;          /* warm white with olive tint */
-  --text2: #CBD5E1;         /* warm gray / slate-300 */
+  --text: #F0F0E8;          /* FinGo offwhite */
+  --text2: #E8E8DC;         /* FinGo silver */
   --text3: #94A3B8;         /* Slate-400 — Legibilidade WCAG AA (>6.4:1) */
 
   /* Layout */
   --sidebar-w: 260px;
   --header-h: 64px;
-  --bg-header: rgba(9, 12, 7, 0.9);
+  --bg-header: rgba(10, 10, 10, 0.92);
   --modal-max-w: 600px;
   --modal-max-h: 92vh;
 
-  /* Radii */
-  --r-sm: 6px;
-  --r-md: 10px;
-  --r-lg: 14px;
-  --r-xl: 20px;
+  /* Radii — Brutalist Tech (Max 4-6px) */
+  --r-sm: 4px;
+  --r-md: 4px;
+  --r-lg: 6px;
+  --r-xl: 6px;
 
   /* Shadows */
   --shadow-sm: 0 1px 6px rgba(0,0,0,.7);
   --shadow-md: 0 4px 24px rgba(0,0,0,.6);
   --shadow-lg: 0 8px 48px rgba(0,0,0,.8);
-  --shadow-accent: 0 4px 24px rgba(18,217,160,.35);
-  --shadow-accent-lg: 0 8px 40px rgba(18,217,160,.2);
-  --shadow-green: 0 4px 24px rgba(18,217,160,.2);
+  --shadow-accent: 0 4px 24px rgba(198, 255, 0, 0.35);
+  --shadow-accent-lg: 0 8px 40px rgba(198, 255, 0, 0.2);
+  --shadow-green: 0 4px 24px rgba(198, 255, 0, 0.2);
   --shadow-soft-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
   --shadow-soft-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
-  --shadow-ambient: 0 10px 25px -5px rgba(0, 0, 0, 0.35), 0 8px 10px -6px rgba(0, 0, 0, 0.3);
+  --shadow-ambient: 0 10px 25px -5px rgba(0, 0, 0, 0.5), 0 8px 10px -6px rgba(0, 0, 0, 0.4);
 
   /* Spacing Scale (Tailwind 4px/8px standard) */
   --space-1: 4px;
@@ -144,14 +144,14 @@ button { font-family:inherit; }
   display:flex;align-items:center;gap:12px;flex-shrink:0;
 }
 .logo-icon {
-  width:40px;height:40px;border-radius:10px;flex-shrink:0;
-  background:linear-gradient(135deg,#0D1E14,#152B1E);
-  border:1px solid rgba(18,217,160,.4);
+  width:38px;height:38px;border-radius:var(--r-sm);flex-shrink:0;
+  background:#1A1A1A;
+  border:1px solid var(--border-str);
   display:flex;align-items:center;justify-content:center;
-  box-shadow:0 0 0 1px rgba(18,217,160,.1), var(--shadow-accent);
+  box-shadow:0 0 0 1px rgba(198,255,0,.1), var(--shadow-accent);
   overflow:hidden;
 }
-.logo-txt h2 { font-size:1.05rem;font-weight:900;background:linear-gradient(135deg,var(--accent3),var(--accent2),var(--accent));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;letter-spacing:.02em; }
+.logo-txt h2 { font-size:1.05rem;font-weight:900;background:linear-gradient(135deg,var(--accent3),var(--accent2),var(--accent));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;letter-spacing:.04em;text-transform:uppercase; }
 .logo-txt p { color:var(--text3);font-size:.68rem;margin-top:1px;letter-spacing:.04em; }
 
 .sidebar-nav { flex:1;padding:12px 0;overflow-y:auto; }
@@ -164,15 +164,15 @@ button { font-family:inherit; }
 }
 .nav-item:hover { background:var(--bg-secondary);color:var(--text); }
 .nav-item.active {
-  background:rgba(18,217,160,.09);color:var(--accent2);
+  background:rgba(198,255,0,.08);color:var(--accent);
   /* AUDIT FIX 2.2: inset shadow sutil dá profundidade ao active state */
-  box-shadow:inset 0 1px 0 rgba(18,217,160,.12);
+  box-shadow:inset 0 1px 0 rgba(198,255,0,.15);
 }
 .nav-item.active::before {
   content:'';position:absolute;left:0;top:0;bottom:0;
-  width:3px;background:linear-gradient(180deg,var(--accent2),var(--accent));border-radius:0 2px 2px 0;
+  width:3px;background:var(--accent);border-radius:0 2px 2px 0;
   /* AUDIT FIX 2.2: glow mais pronunciado no active indicator */
-  box-shadow:0 0 12px rgba(18,217,160,.7);
+  box-shadow:0 0 12px rgba(198,255,0,.7);
 }
 .nav-item span:first-child { font-size:16px;flex-shrink:0;width:20px;text-align:center; }
 .nav-badge {
@@ -342,8 +342,8 @@ tfoot td { padding:10px 14px;background:var(--bg-secondary); }
   font-weight:600;font-family:inherit;cursor:pointer;border:none;
   transition:all var(--t);text-decoration:none;white-space:nowrap;
 }
-.btn-primary { background:linear-gradient(135deg,var(--accent),var(--accent2));color:#060E09;font-weight:700;box-shadow:0 4px 16px var(--accent-glow); }
-.btn-primary:hover { background:linear-gradient(135deg,var(--accent2),var(--accent3));box-shadow:0 6px 28px var(--accent-glow);transform:translateY(-1px); }
+.btn-primary { background:var(--accent);color:#0A0A0A;font-weight:700;letter-spacing:.03em;box-shadow:0 4px 16px var(--accent-glow); }
+.btn-primary:hover { background:var(--accent-h);box-shadow:0 6px 28px var(--accent-glow);transform:translateY(-1px); }
 .btn-secondary { background:var(--bg-card);color:var(--text);border:1px solid var(--border-d); }
 .btn-secondary:hover { background:var(--bg-card-hover);border-color:rgba(212,168,50,.35);color:var(--accent2); }
 .btn-success { background:linear-gradient(135deg,var(--success),#16a34a);color:#fff;box-shadow:0 4px 14px rgba(34,197,94,.25); }
@@ -423,8 +423,8 @@ textarea.form-control { resize:vertical; }
 }
 .modal {
   background:var(--bg-card);border:1px solid var(--border-d);
-  border-radius:var(--r-xl);width:100%;max-width:var(--modal-max-w, 600px);max-height:var(--modal-max-h, 92vh);
-  overflow-y:auto;box-shadow:var(--shadow-lg);animation:modalIn var(--t-enter) forwards;
+  border-radius:var(--r-lg);width:100%;max-width:var(--modal-max-w, 600px);max-height:var(--modal-max-h, 92vh);
+  overflow-y:auto;box-shadow:0 16px 64px rgba(0,0,0,.85);animation:modalIn var(--t-enter) forwards;
 }
 .modal-lg { max-width:780px; }
 .modal-xl { max-width:960px; }

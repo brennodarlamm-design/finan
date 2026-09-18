@@ -1,0 +1,32 @@
+{
+  "name": "fingo-remotion",
+  "version": "1.0.0",
+  "description": "FinGo — Obras em Fluxo — Brand Animations",
+  "scripts": {
+    "studio": "remotion studio src/index.ts",
+    "preview": "remotion studio src/index.ts",
+    "render:logo": "remotion render src/index.ts LogoReveal dist/logo-reveal.mp4",
+    "render:hero": "remotion render src/index.ts HeroVideo dist/hero-video.mp4",
+    "render:og": "remotion render src/index.ts OGVideo dist/og-video.mp4",
+    "render:feature": "remotion render src/index.ts FeatureDemo dist/feature-demo.mp4",
+    "render:all": "node scripts/render-all.mjs"
+  },
+  "dependencies": {
+    "@remotion/cli": "^4.0.0",
+    "@remotion/player": "^4.0.0",
+    "@remotion/renderer": "^4.0.0",
+    "jpeg-js": "^0.4.4",
+    "pngjs": "^7.0.0",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "remotion": "^4.0.0"
+  },
+  "devDependencies": {
+    "@types/react": "^18.2.0",
+    "@types/react-dom": "^18.2.0",
+    "typescript": "^5.0.0"
+  },
+  "allowScripts": {
+    "esbuild@0.28.1": true
+  }
+}

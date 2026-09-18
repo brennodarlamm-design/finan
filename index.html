@@ -22,11 +22,11 @@
   <style>
     *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
     :root{
-      --bg-base:#090C07;--bg-card:#1A2014;--border:#252C1E;
-      --accent:#12D9A0;--accent2:#3EE8B5;--accent-glow:rgba(18,217,160,.25);
-      --success:#12D9A0;--warning:#F5A623;--danger:#FF5C5C;
-      --text:#EEF0EA;--text2:#CBD5E1;--text3:#94A3B8;
-      --radius:10px;--shadow:0 8px 40px rgba(0,0,0,.75);
+      --bg-base:#0A0A0A;--bg-card:#1A1A1A;--border:#282828;
+      --accent:#C6FF00;--accent2:#D4FF33;--accent-glow:rgba(198,255,0,.35);
+      --success:#C6FF00;--warning:#FFB800;--danger:#FF3B3B;
+      --text:#F0F0E8;--text2:#E8E8DC;--text3:#94A3B8;
+      --radius:4px;--shadow:0 8px 40px rgba(0,0,0,.75);
     }
     html,body{height:100%;font-family:'Inter',sans-serif;background:var(--bg-base);color:var(--text);}
     .page{display:flex;min-height:100vh;}
@@ -34,18 +34,18 @@
     /* ── LEFT PANEL ── */
     .panel-left{
       flex:1;position:relative;overflow:hidden;
-      background:linear-gradient(145deg,#070A06 0%,#0D1409 35%,#111C0E 65%,#162215 100%);
+      background:linear-gradient(145deg,#070707 0%,#0A0A0A 35%,#121212 65%,#1A1A1A 100%);
       display:flex;align-items:center;justify-content:center;
     }
     .grid-bg{
       position:absolute;inset:0;
-      background-image:linear-gradient(rgba(18,217,160,.04) 1px,transparent 1px),linear-gradient(90deg,rgba(18,217,160,.04) 1px,transparent 1px);
+      background-image:linear-gradient(rgba(198,255,0,.04) 1px,transparent 1px),linear-gradient(90deg,rgba(198,255,0,.04) 1px,transparent 1px);
       background-size:44px 44px;
     }
     .orb{position:absolute;border-radius:50%;filter:blur(80px);animation:float 10s ease-in-out infinite;}
-    .o1{width:500px;height:500px;background:rgba(18,217,160,.07);top:-150px;left:-150px;}
-    .o2{width:350px;height:350px;background:rgba(75,80,66,.12);bottom:-80px;right:-80px;animation-delay:-5s;}
-    .o3{width:220px;height:220px;background:rgba(62,232,181,.06);top:42%;left:35%;animation-delay:-2.5s;}
+    .o1{width:500px;height:500px;background:rgba(198,255,0,.05);top:-150px;left:-150px;}
+    .o2{width:350px;height:350px;background:rgba(127,73,184,.08);bottom:-80px;right:-80px;animation-delay:-5s;}
+    .o3{width:220px;height:220px;background:rgba(198,255,0,.04);top:42%;left:35%;animation-delay:-2.5s;}
     @keyframes float{0%,100%{transform:translate(0,0) scale(1)}33%{transform:translate(25px,-25px) scale(1.06)}66%{transform:translate(-12px,12px) scale(.94)}}
 
     .panel-left-content{position:relative;z-index:1;max-width:520px;padding:48px;}
@@ -56,40 +56,39 @@
     }
     .hero-logo-icon{
       width:80px;height:80px;flex-shrink:0;
-      filter:drop-shadow(0 0 24px rgba(18,217,160,.45));
+      filter:drop-shadow(0 0 24px rgba(198,255,0,.45));
       animation:pulse 3s ease-in-out infinite;
     }
-    @keyframes pulse{0%,100%{filter:drop-shadow(0 0 20px rgba(18,217,160,.45))}50%{filter:drop-shadow(0 0 40px rgba(18,217,160,.85))}}
+    @keyframes pulse{0%,100%{filter:drop-shadow(0 0 20px rgba(198,255,0,.45))}50%{filter:drop-shadow(0 0 40px rgba(198,255,0,.85))}}
     .hero-logo-text .brand-name{
       font-size:2.2rem;font-weight:900;letter-spacing:.04em;
-      background:linear-gradient(135deg,#E8C84A,#C9A227);
-      -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
+      color:var(--text);
       line-height:1;
     }
     .hero-logo-text .brand-sub{
-      font-size:.8rem;font-weight:600;letter-spacing:.22em;text-transform:uppercase;
-      color:rgba(201,162,39,.65);margin-top:5px;
+      font-size:.8rem;font-weight:700;letter-spacing:.22em;text-transform:uppercase;
+      color:var(--accent);margin-top:5px;
     }
 
     .hero-title{font-size:1.85rem;font-weight:800;line-height:1.2;margin-bottom:14px;color:var(--text);}
-    .hero-title span{background:linear-gradient(135deg,#3EE8B5,#12D9A0);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;}
-    .hero-desc{color:rgba(238,240,234,.5);font-size:.93rem;line-height:1.7;margin-bottom:40px;}
+    .hero-title span{color:var(--accent);}
+    .hero-desc{color:rgba(238,240,234,.6);font-size:.93rem;line-height:1.7;margin-bottom:40px;}
     .features{display:flex;flex-direction:column;gap:10px;}
     .feat{
       display:flex;align-items:center;gap:14px;
-      background:rgba(18,217,160,.04);border:1px solid rgba(18,217,160,.1);
-      border-radius:12px;padding:14px 18px;
+      background:rgba(255,255,255,.02);border:1px solid var(--border);
+      border-radius:4px;padding:14px 18px;
       transition:border-color .2s,background .2s;
     }
-    .feat:hover{background:rgba(18,217,160,.08);border-color:rgba(18,217,160,.28);}
+    .feat:hover{background:rgba(198,255,0,.04);border-color:rgba(198,255,0,.3);}
     .feat-icon{font-size:22px;width:38px;text-align:center;flex-shrink:0;}
     .feat-text strong{display:block;font-size:.875rem;color:var(--text);margin-bottom:2px;}
-    .feat-text span{font-size:.78rem;color:rgba(240,234,214,.4);}
+    .feat-text span{font-size:.78rem;color:var(--text3);}
 
-    /* Divider dourado */
+    /* Divider */
     .hero-divider{
       width:60px;height:2px;margin-bottom:28px;
-      background:linear-gradient(90deg,transparent,#12D9A0,transparent);
+      background:linear-gradient(90deg,transparent,var(--accent),transparent);
       border-radius:1px;
     }
 
@@ -103,22 +102,21 @@
     }
     .panel-right::before{
       content:'';position:absolute;top:0;left:0;right:0;height:2px;
-      background:linear-gradient(90deg,transparent,rgba(18,217,160,.6),transparent);
+      background:linear-gradient(90deg,transparent,var(--accent),transparent);
     }
     .form-wrap{width:100%;max-width:360px;}
 
     .logo-row{display:flex;align-items:center;gap:14px;margin-bottom:44px;}
     .logo-box{
-      width:52px;height:52px;border-radius:13px;
-      background:linear-gradient(135deg,#0D1E14,#152B1E);
-      border:1px solid rgba(18,217,160,.35);
+      width:52px;height:52px;border-radius:4px;
+      background:var(--bg-card);
+      border:1px solid var(--border);
       display:flex;align-items:center;justify-content:center;
-      box-shadow:0 6px 24px rgba(18,217,160,.25);
+      box-shadow:0 6px 24px rgba(0,0,0,.5);
     }
     .logo-box-text h2{
       font-size:1.35rem;font-weight:900;letter-spacing:.05em;
-      background:linear-gradient(135deg,#3EE8B5,#12D9A0);
-      -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
+      color:var(--text);
     }
     .logo-box-text p{color:var(--text3);font-size:.72rem;margin-top:2px;letter-spacing:.08em;text-transform:uppercase;}
 
@@ -146,25 +144,26 @@
 
     .btn-primary{
       width:100%;padding:14px;border:none;border-radius:var(--radius);
-      background:linear-gradient(135deg,#12D9A0,#3EE8B5);color:#060E09;
+      background:var(--accent);color:#0A0A0A;
       font-size:.95rem;font-weight:800;font-family:inherit;cursor:pointer;
+      text-transform:uppercase;letter-spacing:.04em;
       display:flex;align-items:center;justify-content:center;gap:10px;
-      box-shadow:0 6px 24px rgba(18,217,160,.38);
+      box-shadow:0 6px 24px var(--accent-glow);
       transition:all .2s;margin-top:4px;
     }
-    .btn-primary:hover:not(:disabled){background:linear-gradient(135deg,#0FB88A,#12D9A0);box-shadow:0 8px 32px rgba(18,217,160,.55);transform:translateY(-1px);}
+    .btn-primary:hover:not(:disabled){background:var(--accent2);box-shadow:0 8px 32px rgba(198,255,0,.55);transform:translateY(-1px);}
     .btn-primary:disabled{opacity:.7;cursor:not-allowed;transform:none;}
 
     .demo-box{
       margin-top:24px;padding:16px;
-      background:rgba(201,162,39,.06);border:1px solid rgba(201,162,39,.18);
-      border-radius:10px;font-size:.8rem;
+      background:rgba(198,255,0,.03);border:1px solid rgba(198,255,0,.15);
+      border-radius:var(--radius);font-size:.8rem;
     }
     .demo-box strong{color:var(--accent);}
     .demo-cred{display:flex;justify-content:space-between;margin-top:10px;gap:8px;}
     .demo-cred code{
-      background:rgba(0,0,0,.4);padding:4px 10px;border-radius:6px;
-      color:var(--accent2);font-size:.83rem;
+      background:rgba(0,0,0,.6);padding:4px 10px;border-radius:4px;
+      color:var(--accent);font-size:.83rem;
     }
 
     .err-box{
@@ -172,7 +171,7 @@
       background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.3);
       border-radius:var(--radius);color:var(--danger);font-size:.85rem;display:none;
     }
-    .spinner{width:20px;height:20px;border:2px solid rgba(28,45,18,.4);border-top-color:#1C2D12;border-radius:50%;animation:spin .7s linear infinite;}
+    .spinner{width:20px;height:20px;border:2px solid rgba(10,10,10,.4);border-top-color:#0A0A0A;border-radius:50%;animation:spin .7s linear infinite;}
     @keyframes spin{to{transform:rotate(360deg)}}
 
     /* Divider estilizado */
@@ -183,14 +182,14 @@
     /* Botão Google */
     .btn-google{
       width:100%;padding:12px 16px;border-radius:var(--radius);
-      background:#111509;border:1px solid var(--border);
+      background:#141414;border:1px solid var(--border);
       color:var(--text);font-size:.89rem;font-weight:600;font-family:inherit;cursor:pointer;
       display:flex;align-items:center;justify-content:center;gap:12px;
       transition:all .2s;box-shadow:0 3px 12px rgba(0,0,0,.4);
     }
     .btn-google:hover{
-      background:#1A2014;border-color:rgba(18,217,160,.4);
-      transform:translateY(-1px);box-shadow:0 6px 18px rgba(18,217,160,.15);
+      background:#1C1C1C;border-color:rgba(198,255,0,.4);
+      transform:translateY(-1px);box-shadow:0 6px 18px rgba(198,255,0,.15);
     }
     .btn-google:active{transform:translateY(0);}
 
@@ -198,13 +197,13 @@
     .otp-row{display:flex;gap:8px;justify-content:center;margin:20px 0 16px;}
     .otp-box{
       width:46px;height:52px;text-align:center;
-      font-size:1.4rem;font-weight:800;color:var(--accent2);
-      background:#111509;border:1.5px solid var(--border);
-      border-radius:10px;outline:none;transition:all .2s;font-family:inherit;
+      font-size:1.4rem;font-weight:800;color:var(--accent);
+      background:#141414;border:1.5px solid var(--border);
+      border-radius:4px;outline:none;transition:all .2s;font-family:inherit;
     }
     .otp-box:focus{
       border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-glow);
-      transform:scale(1.05);background:#182015;
+      transform:scale(1.05);background:#1A1A1A;
     }
     .recovery-step{display:none;}
     .recovery-step.active{display:block;animation:modalIn .2s ease;}
@@ -226,10 +225,10 @@
     <div class="panel-left-content">
 
       <div class="hero-logo" style="margin-bottom:24px;display:flex;align-items:center;gap:18px;">
-        <img src="img/finobra_logo.jpg" alt="FinObra Logo" style="width:84px;height:84px;border-radius:18px;box-shadow:0 8px 30px rgba(18,217,160,0.3);border:1.5px solid rgba(18,217,160,0.45);object-fit:cover;">
+        <img src="/img/fingo/fingo-symbol.png" alt="FinGo Logo" style="width:72px;height:72px;border-radius:4px;box-shadow:0 8px 30px rgba(198,255,0,0.3);border:1px solid #3D3D3D;background:#1A1A1A;object-fit:contain;padding:6px;">
         <div class="hero-logo-text">
-          <div class="brand-name" style="font-size:2.35rem;font-weight:900;letter-spacing:.05em;background:linear-gradient(135deg,#7AF5D4,#12D9A0,#0FB88A);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;">FINOBRA</div>
-          <div class="brand-sub" style="font-size:.76rem;font-weight:700;letter-spacing:.2em;color:rgba(18,217,160,.7);text-transform:uppercase;">SISTEMA DE GESTÃO DE OBRAS</div>
+          <div class="brand-name" style="font-size:2.35rem;font-weight:900;letter-spacing:.05em;color:var(--text);">FIN<span style="color:var(--accent);">GO</span></div>
+          <div class="brand-sub" style="font-size:.76rem;font-weight:700;letter-spacing:.2em;color:var(--accent);text-transform:uppercase;">OBRAS EM FLUXO</div>
         </div>
       </div>
 
@@ -293,14 +292,14 @@
   <div class="panel-right">
     <div class="form-wrap">
       <div class="logo-row" style="display:flex;align-items:center;gap:14px;margin-bottom:24px;">
-        <img src="img/finobra_logo.jpg" alt="FinObra" style="width:54px;height:54px;border-radius:12px;border:1.5px solid rgba(201,162,39,0.4);box-shadow:0 4px 16px rgba(201,162,39,0.25);object-fit:cover;">
+        <img src="/img/fingo/fingo-symbol.png" alt="FinGo" style="width:50px;height:50px;border-radius:4px;border:1px solid #3D3D3D;background:#1A1A1A;box-shadow:0 4px 16px rgba(198,255,0,0.25);object-fit:contain;padding:4px;">
         <div class="logo-box-text">
-          <h2 style="font-size:1.45rem;font-weight:900;letter-spacing:.05em;background:linear-gradient(135deg,#F7E07C,#C9A227);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;">FINOBRA</h2>
-          <p style="color:var(--text3);font-size:.72rem;margin-top:2px;letter-spacing:.08em;text-transform:uppercase;">Sistema de Gestão de Obras</p>
+          <h2 style="font-size:1.45rem;font-weight:900;letter-spacing:.05em;color:var(--text);">FIN<span style="color:var(--accent);">GO</span></h2>
+          <p style="color:var(--text3);font-size:.72rem;margin-top:2px;letter-spacing:.08em;text-transform:uppercase;">Obras em Fluxo</p>
         </div>
       </div>
 
-      <h2 class="welcome-h" id="welcome-title">Bem-vindo ao FinObra!</h2>
+      <h2 class="welcome-h" id="welcome-title">Bem-vindo ao FinGo!</h2>
       <p class="welcome-p" id="welcome-subtitle">Acesse o portal da sua construtora para gerenciar suas obras</p>
 
       <form id="login-form" autocomplete="on">
@@ -382,12 +381,12 @@
 
 <!-- MODAL DE SOLICITAÇÃO DE ACESSO COMERCIAL -->
 <div id="register-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:999;align-items:center;justify-content:center;padding:20px;backdrop-filter:blur(8px);">
-  <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:16px;width:100%;max-width:480px;padding:32px;box-shadow:var(--shadow);position:relative;animation:modalIn .25s ease;">
+  <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:4px;width:100%;max-width:480px;padding:32px;box-shadow:var(--shadow);position:relative;animation:modalIn .25s ease;">
     <button data-fb-click="closeRegisterModal" data-fb-click-n="0" style="position:absolute;top:18px;right:18px;background:none;border:none;color:var(--text3);font-size:1.4rem;cursor:pointer;line-height:1;">&times;</button>
     <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;">
-      <img src="img/finobra_logo.jpg" alt="FinObra" style="width:44px;height:44px;border-radius:10px;border:1px solid rgba(201,162,39,.4);object-fit:cover;">
+      <img src="/img/fingo/fingo-symbol.png" alt="FinGo" style="width:44px;height:44px;border-radius:4px;border:1px solid var(--border);background:#1A1A1A;object-fit:contain;padding:4px;">
       <div>
-        <h3 style="font-size:1.15rem;font-weight:800;color:var(--text);">Solicitar Acesso ao FinObra</h3>
+        <h3 style="font-size:1.15rem;font-weight:800;color:var(--text);">Solicitar Acesso ao FinGo</h3>
         <p style="font-size:.78rem;color:var(--text2);margin-top:2px;">Preencha os dados ou fale diretamente com nosso comercial</p>
       </div>
     </div>
@@ -437,11 +436,11 @@
 
 <!-- MODAL DE RECUPERAÇÃO DE SENHA COM CÓDIGO OTP -->
 <div id="recovery-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:1000;align-items:center;justify-content:center;padding:20px;backdrop-filter:blur(8px);">
-  <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:16px;width:100%;max-width:440px;padding:32px;box-shadow:var(--shadow);position:relative;animation:modalIn .25s ease;">
+  <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:4px;width:100%;max-width:440px;padding:32px;box-shadow:var(--shadow);position:relative;animation:modalIn .25s ease;">
     <button data-fb-click="closeRecoveryModal" data-fb-click-n="0" style="position:absolute;top:18px;right:18px;background:none;border:none;color:var(--text3);font-size:1.4rem;cursor:pointer;line-height:1;">&times;</button>
     
     <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;">
-      <div style="width:42px;height:42px;border-radius:10px;background:rgba(201,162,39,.1);border:1px solid rgba(201,162,39,.3);display:flex;align-items:center;justify-content:center;font-size:20px;">
+      <div style="width:42px;height:42px;border-radius:4px;background:rgba(198,255,0,.1);border:1px solid rgba(198,255,0,.3);display:flex;align-items:center;justify-content:center;font-size:20px;">
         🔑
       </div>
       <div>

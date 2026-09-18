@@ -162,8 +162,84 @@ function initRoiCalculator() {
 }
 
 if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', initRoiCalculator);
+  document.addEventListener('DOMContentLoaded', () => {
+    initRoiCalculator();
+    initRemotionVideoPlayers();
+  });
 } else {
   initRoiCalculator();
+  initRemotionVideoPlayers();
+}
+
+// ── REMOTION VIDEO ENGINE PLAYERS (Hero & Feature Demo) ──
+function initRemotionVideoPlayers() {
+  // 1. Hero Video Controller
+  const heroVideo = document.getElementById('fingo-hero-video');
+  const heroToggle = document.getElementById('hero-video-toggle');
+  const heroIcon = document.getElementById('hero-video-icon');
+  const heroText = document.getElementById('hero-video-text');
+
+  if (heroVideo && heroToggle) {
+    heroToggle.addEventListener('click', () => {
+      if (heroVideo.paused) {
+        heroVideo.play();
+        if (heroIcon) heroIcon.textContent = '⏸';
+        if (heroText) heroText.textContent = 'PAUSAR';
+      } else {
+        heroVideo.pause();
+        if (heroIcon) heroIcon.textContent = '▶';
+        if (heroText) heroText.textContent = 'REPRODUZIR';
+      }
+    });
+  }
+
+  // 2. Feature Demo Video Interactive Tour
+  const featureVideo = document.getElementById('fingo-feature-video');
+  const featureOverlay = document.getElementById('feature-video-play-overlay');
+  const chapterBtns = document.querySelectorAll('.video-ch-btn');
+
+  if (featureVideo) {
+    if (featureOverlay) {
+      featureOverlay.addEventListener('click', () => {
+        if (featureVideo.paused) {
+          featureVideo.play();
+          featureOverlay.style.opacity = '0';
+          featureOverlay.style.pointerEvents = 'none';
+        } else {
+          featureVideo.pause();
+          featureOverlay.style.opacity = '1';
+          featureOverlay.style.pointerEvents = 'auto';
+        }
+      });
+
+      featureVideo.addEventListener('pause', () => {
+        featureOverlay.style.opacity = '1';
+        featureOverlay.style.pointerEvents = 'auto';
+      });
+
+      featureVideo.addEventListener('play', () => {
+        featureOverlay.style.opacity = '0';
+        featureOverlay.style.pointerEvents = 'none';
+      });
+    }
+
+    chapterBtns.forEach(btn => {
+      btn.addEventListener('click', () => {
+        const time = parseFloat(btn.dataset.time || '0');
+        featureVideo.currentTime = time;
+        featureVideo.play();
+        chapterBtns.forEach(b => b.classList.toggle('active', b === btn));
+      });
+    });
+
+    featureVideo.addEventListener('timeupdate', () => {
+      const t = featureVideo.currentTime;
+      chapterBtns.forEach(btn => {
+        const time = parseFloat(btn.dataset.time || '0');
+        const isActive = t >= time && t < time + 4;
+        btn.classList.toggle('active', isActive);
+      });
+    });
+  }
 }
 

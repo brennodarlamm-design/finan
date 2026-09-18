@@ -466,7 +466,7 @@ const App = {
             <img src="${safeLogoUrl}" alt="${brandName}" style="max-height:48px;max-width:185px;width:auto;height:auto;object-fit:contain;border-radius:6px;display:block;">
           </div>
         </div>`
-      : `<div class="workspace-brand"><span class="workspace-brand-mark">${FinObraUI.icon('obras')}</span><div style="min-width:0"><div class="workspace-brand-name">FinObra</div><div class="workspace-brand-company" title="${brandName}">${brandName}</div></div></div>`;
+      : `<div class="workspace-brand"><span class="workspace-brand-mark"><img src="/img/fingo/fingo-symbol.png" alt="FinGo" style="width:24px;height:24px;object-fit:contain;display:block;"></span><div style="min-width:0"><div class="workspace-brand-name">Fin<span style="color:var(--accent);">Go</span></div><div class="workspace-brand-company" title="${brandName}">${brandName}</div></div></div>`;
 
     const isCollapsed = window.innerWidth > 768 && localStorage.getItem('finobra_sidebar_collapsed') === 'true';
     const isImpersonating = Boolean((u?.impersonatedBy === 'superadmin' || u?.isImpersonated) || (typeof Auth !== 'undefined' && Auth.isImpersonating && Auth.isImpersonating()));
