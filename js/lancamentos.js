@@ -113,7 +113,7 @@ const Lancamentos = {
             ${showObra?'<th>Obra</th>':''}
             <th>Descri&ccedil;&atilde;o</th><th>Categoria</th><th>Fornecedor / Benefici&aacute;rio</th>
             <th>Conta Banc&aacute;ria</th>
-            <th>NF</th><th>Tipo</th><th>Valor</th><th>Status</th>
+            <th>NF</th><th>Tipo</th><th class="numeric" style="text-align:right;">Valor</th><th>Status</th>
             <th title="Anexos">📎</th>
             <th title="Conciliado">&#x2696;</th>
             <th style="text-align:center;">A&ccedil;&otilde;es</th>
@@ -162,7 +162,7 @@ const Lancamentos = {
         <td style="font-size:.76rem;color:var(--text3);max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${l.conta_bancaria ? `&#x1F3E6; ${Utils.escapeHtml(l.conta_bancaria)}` : '&mdash;'}</td>
         <td>${nf?`<span style="color:var(--accent2);cursor:pointer;font-size:.78rem;font-weight:700" data-fb-click="App.navigate" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="notas" title="Ver NF">#${Utils.escapeHtml(nf.numero_nf)}</span>`:'&mdash;'}</td>
         <td>${l.tipo==='receita'?'<span class="badge badge-success">&uarr; Receita</span>':'<span class="badge badge-danger">&darr; Despesa</span>'}</td>
-        <td style="font-weight:800;white-space:nowrap;color:${l.tipo==='receita'?'var(--success)':'var(--danger)'};">${l.tipo==='receita'?'+':'&minus;'} ${Utils.fmt.currency(l.valor)}</td>
+        <td class="numeric font-weight-bold" style="font-weight:800;white-space:nowrap;text-align:right;color:${l.tipo==='receita'?'var(--success)':'var(--danger)'};">${l.tipo==='receita'?'+':'&minus;'} ${Utils.fmt.currency(l.valor)}</td>
         <td>${statusBadge}</td>
         <td style="text-align:center;">${clipBadge}</td>
         <td style="text-align:center;font-size:14px">${l.conciliado?'&#x2705;':'&#x23F3;'}</td>
@@ -193,8 +193,8 @@ const Lancamentos = {
       : `TOTAL FILTRADO (${total} itens)`;
 
     return `<td colspan="${cols-7}" style="font-weight:700;color:var(--text3);font-size:.75rem">${labelTxt}</td>
-      <td colspan="2" style="font-weight:800;color:var(--success);white-space:nowrap">+${Utils.fmt.currency(rec)}</td>
-      <td colspan="5" style="font-weight:800;color:var(--danger);white-space:nowrap">&minus;${Utils.fmt.currency(desp)}</td>`;
+      <td colspan="2" class="numeric font-weight-extrabold" style="font-weight:800;color:var(--success);white-space:nowrap;text-align:right;">+${Utils.fmt.currency(rec)}</td>
+      <td colspan="5" class="numeric font-weight-extrabold" style="font-weight:800;color:var(--danger);white-space:nowrap;text-align:right;">&minus;${Utils.fmt.currency(desp)}</td>`;
   },
 
   emitirRecibo(lancamentoId) {

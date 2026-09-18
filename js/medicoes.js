@@ -70,7 +70,7 @@ const Medicoes = {
           </div>
           <div style="text-align:right">
             <div style="font-size:.72rem;color:var(--text3)">${isCaixa ? 'Liberado / Solicitado' : 'Faturado / Previsto'}</div>
-            <div style="font-weight:900;font-size:1rem;color:var(--success)">${Utils.fmt.currency(totalLib)} <span style="color:var(--text3);font-weight:400">/ ${Utils.fmt.currency(totalSol)}</span></div>
+            <div class="numeric tabular-nums" style="font-weight:900;font-size:1rem;color:var(--success)">${Utils.fmt.currency(totalLib)} <span style="color:var(--text3);font-weight:400">/ ${Utils.fmt.currency(totalSol)}</span></div>
             ${saldoAFaturar > 0 ? `<div style="font-size:.7rem;color:var(--accent);margin-top:2px;">Saldo a faturar: <strong>${Utils.fmt.currency(saldoAFaturar)}</strong></div>` : ''}
           </div>
         </div>
@@ -132,27 +132,27 @@ const Medicoes = {
           <div style="display:grid;gap:6px;font-size:.8rem">
             <div style="display:flex;justify-content:space-between;padding:6px 10px;background:var(--bg-secondary);border-radius:6px">
               <span style="color:var(--text3)">📤 Solicitado / Previsto:</span>
-              <strong style="color:var(--accent)">${Utils.fmt.currency(m.valor_solicitado || m.valor_medido)}</strong>
+              <strong class="numeric tabular-nums" style="color:var(--accent)">${Utils.fmt.currency(m.valor_solicitado || m.valor_medido)}</strong>
             </div>
             ${retencao > 0 ? `
               <div style="display:flex;justify-content:space-between;padding:4px 10px;background:rgba(245,158,11,.08);border-radius:6px;font-size:.74rem;">
                 <span style="color:var(--warning)">🔒 Retenção Técnica:</span>
-                <strong style="color:var(--warning)">- ${Utils.fmt.currency(retencao)}</strong>
+                <strong class="numeric tabular-nums" style="color:var(--warning)">- ${Utils.fmt.currency(retencao)}</strong>
               </div>
             ` : ''}
             ${descontos > 0 ? `
               <div style="display:flex;justify-content:space-between;padding:4px 10px;background:rgba(239,68,68,.08);border-radius:6px;font-size:.74rem;">
                 <span style="color:var(--danger)">🔻 Descontos / Glosas:</span>
-                <strong style="color:var(--danger)">- ${Utils.fmt.currency(descontos)}</strong>
+                <strong class="numeric tabular-nums" style="color:var(--danger)">- ${Utils.fmt.currency(descontos)}</strong>
               </div>
             ` : ''}
             <div style="display:flex;justify-content:space-between;padding:6px 10px;background:var(--bg-secondary);border-radius:6px">
               <span style="color:var(--text3)">✅ Aprovado:</span>
-              <strong style="color:${m.valor_aprovado?'var(--success)':'var(--text3)'}">${m.valor_aprovado?Utils.fmt.currency(m.valor_aprovado):'Aguardando'}</strong>
+              <strong class="numeric tabular-nums" style="color:${m.valor_aprovado?'var(--success)':'var(--text3)'}">${m.valor_aprovado?Utils.fmt.currency(m.valor_aprovado):'Aguardando'}</strong>
             </div>
             <div style="display:flex;justify-content:space-between;padding:6px 10px;background:var(--bg-secondary);border-radius:6px">
               <span style="color:var(--text3)">💰 Liberado / Faturado:</span>
-              <strong style="color:${m.valor_liberado?'var(--success)':'var(--text3)'}">${m.valor_liberado?Utils.fmt.currency(m.valor_liberado):'Aguardando'}</strong>
+              <strong class="numeric tabular-nums" style="color:${m.valor_liberado?'var(--success)':'var(--text3)'}">${m.valor_liberado?Utils.fmt.currency(m.valor_liberado):'Aguardando'}</strong>
             </div>
           </div>
         </div>

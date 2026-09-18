@@ -45,31 +45,31 @@ const Dashboard = {
       <div class="kpi-card">
         <div class="kpi-icon green"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg></div>
         <div class="kpi-label">Total Recebido</div>
-        <div class="kpi-value green" id="kpi-total-receitas">${Utils.fmt.currency(r.totalReceitas)}</div>
+        <div class="kpi-value tabular-nums green" id="kpi-total-receitas">${Utils.fmt.currency(r.totalReceitas)}</div>
         <div class="kpi-change">💰 Receitas confirmadas</div>
       </div>
       <div class="kpi-card">
         <div class="kpi-icon red"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg></div>
         <div class="kpi-label">Total Gasto</div>
-        <div class="kpi-value red" id="kpi-total-despesas">${Utils.fmt.currency(r.totalDespesas)}</div>
+        <div class="kpi-value tabular-nums red" id="kpi-total-despesas">${Utils.fmt.currency(r.totalDespesas)}</div>
         <div class="kpi-change">💸 Despesas pagas</div>
       </div>
       <div class="kpi-card">
         <div class="kpi-icon ${r.saldo>=0?'blue':'red'}"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg></div>
         <div class="kpi-label">Saldo Disponível</div>
-        <div class="kpi-value ${r.saldo>=0?'blue':'red'}" id="kpi-saldo">${Utils.fmt.currency(r.saldo)}</div>
+        <div class="kpi-value tabular-nums ${r.saldo>=0?'blue':'red'}" id="kpi-saldo">${Utils.fmt.currency(r.saldo)}</div>
         <div class="kpi-change">${r.saldo>=0?'✅ Positivo':'⚠ Atenção ao saldo'}</div>
       </div>
       <div class="kpi-card">
         <div class="kpi-icon yellow"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg></div>
         <div class="kpi-label">NFs Pendentes</div>
-        <div class="kpi-value yellow" id="kpi-nf-pendentes">${r.nfPendentes}</div>
+        <div class="kpi-value tabular-nums yellow" id="kpi-nf-pendentes">${r.nfPendentes}</div>
         <div class="kpi-change" id="kpi-nf-pendentes-valor">${Utils.fmt.currency(r.nfPendentesValor)}</div>
       </div>
       <div class="kpi-card">
         <div class="kpi-icon cyan"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></div>
         <div class="kpi-label">A Pagar</div>
-        <div class="kpi-value cyan" id="kpi-a-pagar">${r.aPagar}</div>
+        <div class="kpi-value tabular-nums cyan" id="kpi-a-pagar">${r.aPagar}</div>
         <div class="kpi-change" id="kpi-a-pagar-valor">${Utils.fmt.currency(r.aPagarValor)}</div>
       </div>
       <div class="kpi-card">

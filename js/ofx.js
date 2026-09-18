@@ -609,11 +609,11 @@ const OFX = {
                 <thead>
                   <tr>
                     <th>Transação Extrato OFX</th>
-                    <th>Valor Extrato</th>
+                    <th class="numeric" style="width:140px;text-align:right;">Valor Extrato</th>
                     <th style="text-align:center">Confiança</th>
                     <th>Lançamento do Sistema</th>
                     <th>Obra / Centro</th>
-                    <th>Diferença</th>
+                    <th class="numeric" style="width:130px;text-align:right;">Diferença</th>
                     <th style="text-align:right">Ação</th>
                   </tr>
                 </thead>
@@ -631,7 +631,7 @@ const OFX = {
                         ${isCredit?'📈':'📉'} ${e(trn.memo.slice(0,28))}<br>
                         <span style="font-size:.7rem;color:var(--text3);">📅 ${Utils.fmt.date(trn.data)}</span>
                       </td>
-                      <td style="font-size:.82rem;font-weight:800;color:${isCredit?'var(--success)':'var(--danger)'};white-space:nowrap;">
+                      <td class="numeric font-weight-bold" style="font-size:.82rem;font-weight:800;text-align:right;color:${isCredit?'var(--color-success)':'var(--color-danger)'};white-space:nowrap;">
                         ${Utils.fmt.currency(trn.valor)}
                       </td>
                       <td style="text-align:center;">
@@ -644,7 +644,7 @@ const OFX = {
                       <td style="font-size:.76rem;color:var(--accent);">
                         ${e(obNome)}
                       </td>
-                      <td style="font-size:.75rem;white-space:nowrap;">
+                      <td class="numeric font-weight-bold" style="font-size:.75rem;white-space:nowrap;text-align:right;">
                         ${diffFmt}
                       </td>
                       <td style="text-align:right;white-space:nowrap;">

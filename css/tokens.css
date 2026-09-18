@@ -1,0 +1,360 @@
+/**
+ * FinObra Design System — Canonical Design Tokens v4.0
+ * Arquivo: css/tokens.css
+ * Padrão Arquitetural: Single Source of Truth (SSOT)
+ * Especificação: Fase 4 — Governança Visual & Design System
+ */
+
+/* ─────────────────────────────────────────────────────────────
+   DECLARAÇÃO DE PRECEDÊNCIA SOBERANA DA CASCATA
+   ───────────────────────────────────────────────────────────── */
+@layer reset, tokens, base, components, utilities;
+
+@layer tokens {
+  :root {
+    /* ─────────────────────────────────────────────────────────────
+       1. SUPERFÍCIES & FUNDOS (DARK MODE DEEP EMERALD OLIVE)
+       ───────────────────────────────────────────────────────────── */
+    --surface-ground:         #070B06; /* Fundo absoluto mais profundo da tela */
+    --surface-base:           #0B1109; /* Fundo base da aplicação (body e sidebar) */
+    --surface-primary:        #0E160C; /* Fundo de seções primárias e headers */
+    --surface-card:           #141D12; /* Superfície padrão para cards e containers */
+    --surface-card-hover:     #1A2617; /* Feedback de hover em cards e linhas de tabela */
+    --surface-card-active:    #212F1E; /* Estado pressionado/selecionado */
+    --surface-overlay:        #1B2718; /* Modais, popovers, dropdowns e tooltips */
+    --surface-input:          #0F180D; /* Fundo de formulários, inputs e selects */
+    --surface-input-hover:    #162213; /* Hover em campos de formulário */
+    --surface-table-header:   #10190D; /* Cabeçalho de tabelas contábeis */
+    --surface-table-zebra:    #0E160C; /* Linhas alternadas de tabelas */
+
+    /* ─────────────────────────────────────────────────────────────
+       2. BORDAS & SEPARADORES (SUTILEZA ÓPTICA TRANSLÚCIDA)
+       ───────────────────────────────────────────────────────────── */
+    --border-subtle:          rgba(255, 255, 255, 0.06); /* Divisores discretos */
+    --border-default:         rgba(255, 255, 255, 0.12); /* Bordas normais de cards */
+    --border-strong:          rgba(255, 255, 255, 0.22); /* Bordas destacadas e inputs */
+    --border-focus:           rgba(18, 217, 160, 0.65);  /* Anel de foco acessível */
+    --border-accent:          rgba(18, 217, 160, 0.35);  /* Realce com a cor de marca */
+    --border-table:           rgba(255, 255, 255, 0.08); /* Linhas horizontais de tabela */
+
+    /* ─────────────────────────────────────────────────────────────
+       3. TIPOGRAFIA & CONTRASTE (WCAG 2.1 AA COMPLIANT)
+       ───────────────────────────────────────────────────────────── */
+    --text-primary:           #F2F5F0; /* Contraste > 15:1 em surface-ground (Títulos e Dados) */
+    --text-secondary:         #CBD5E1; /* Contraste > 7:1 em surface-card (Labels e Metadata) */
+    --text-muted:             #94A3B8; /* Contraste > 6.5:1 em surface-ground (WCAG AA & AAA) */
+    --text-disabled:          #4B5448; /* Elementos desabilitados */
+    --text-inverse:           #050A05; /* Texto sobre botões teal de alto brilho */
+    --text-accent:            #12D9A0; /* Texto realçado na cor primária */
+
+    /* ─────────────────────────────────────────────────────────────
+       4. IDENTIDADE PRIMÁRIA: ELECTRIC TEAL / MINT (WORKSPACE & APP)
+       ───────────────────────────────────────────────────────────── */
+    --color-primary:          #12D9A0; /* Cor primária de ação e botões principais */
+    --color-primary-hover:    #3EE8B5; /* Estado de hover (luminosidade +15%) */
+    --color-primary-active:   #0FB88A; /* Estado pressionado */
+    --color-primary-dim:      rgba(18, 217, 160, 0.12); /* Fundos de badges e tags */
+    --color-primary-dim-hover:rgba(18, 217, 160, 0.20); /* Hover em tags primárias */
+    --color-primary-border:   rgba(18, 217, 160, 0.30); /* Bordas de badges */
+    --color-primary-glow:     rgba(18, 217, 160, 0.28); /* Halo luminoso dark mode */
+
+    /* ─────────────────────────────────────────────────────────────
+       5. IDENTIDADE MASTER / DEV: CHAMPAGNE GOLD (PORTAL & BACKOFFICE)
+       ───────────────────────────────────────────────────────────── */
+    --color-gold:             #D9B338; /* Dourado mestre para gestão SaaS e superadmin */
+    --color-gold-hover:       #EDCA55; /* Dourado claro de hover */
+    --color-gold-active:      #B59223; /* Dourado escuro de clique */
+    --color-gold-dim:         rgba(217, 179, 56, 0.12); /* Fundo de badges Master */
+    --color-gold-border:      rgba(217, 179, 56, 0.35); /* Borda dourada institucional */
+    --color-gold-glow:        rgba(217, 179, 56, 0.25); /* Glow para cards do Master */
+    --color-gold-text:        #F5DE87; /* Texto dourado de alta legibilidade */
+
+    /* ─────────────────────────────────────────────────────────────
+       6. CORES SEMÂNTICAS & STATUS DE OBRA
+       ───────────────────────────────────────────────────────────── */
+    /* Sucesso / Receitas / Concluído */
+    --color-success:          #10B981;
+    --color-success-hover:    #059669;
+    --color-success-dim:      rgba(16, 185, 129, 0.12);
+    --color-success-border:   rgba(16, 185, 129, 0.32);
+    --color-success-text:     #6EE7B7;
+
+    /* Aviso / Pendências / Atenção */
+    --color-warning:          #F59E0B;
+    --color-warning-hover:    #D97706;
+    --color-warning-dim:      rgba(245, 158, 11, 0.12);
+    --color-warning-border:   rgba(245, 158, 11, 0.32);
+    --color-warning-text:     #FCD34D;
+
+    /* Perigo / Despesas / Atrasos Críticos */
+    --color-danger:           #F43F5E;
+    --color-danger-hover:     #E11D48;
+    --color-danger-dim:       rgba(244, 63, 94, 0.12);
+    --color-danger-border:    rgba(244, 63, 94, 0.32);
+    --color-danger-text:      #FDA4AF;
+
+    /* Informação / NF-e / Documentos */
+    --color-info:             #38BDF8;
+    --color-info-hover:       #0284C7;
+    --color-info-dim:         rgba(56, 189, 248, 0.12);
+    --color-info-border:      rgba(56, 189, 248, 0.32);
+    --color-info-text:        #BAE6FD;
+
+    /* Neutro / Rascunho */
+    --color-neutral:          #94A3B8;
+    --color-neutral-dim:      rgba(148, 163, 184, 0.10);
+    --color-neutral-border:   rgba(148, 163, 184, 0.25);
+
+    /* ─────────────────────────────────────────────────────────────
+       7. ELEVAÇÃO & CAMADAS DARK MODE (Z-INDEX MODEL)
+       ───────────────────────────────────────────────────────────── */
+    --z-ground:               0;
+    --z-base:                 1;
+    --z-card:                 2;
+    --z-sticky-nav:           50;
+    --z-header:               90;
+    --z-sidebar:              100;
+    --z-sidebar-overlay:      105;
+    --z-dropdown:             500;
+    --z-modal-backdrop:       1000;
+    --z-modal-window:         1010;
+    --z-toast:                1200;
+    --z-tooltip:              1300;
+
+    /* ─────────────────────────────────────────────────────────────
+       8. MODELO DE PROFUNDIDADE, RIM LIGHT & SOMBRAS DARK
+       ───────────────────────────────────────────────────────────── */
+    --shadow-rim-light:       inset 0 1px 0 rgba(255, 255, 255, 0.07);
+    --shadow-card:            0 4px 16px -2px rgba(0, 0, 0, 0.55),
+                              inset 0 1px 0 rgba(255, 255, 255, 0.05);
+    --shadow-card-hover:      0 8px 28px -4px rgba(0, 0, 0, 0.65),
+                              inset 0 1px 0 rgba(255, 255, 255, 0.08);
+    --shadow-modal:           0 24px 64px -12px rgba(0, 0, 0, 0.88),
+                              0 0 0 1px rgba(255, 255, 255, 0.10);
+    --shadow-dropdown:        0 12px 32px -4px rgba(0, 0, 0, 0.75),
+                              0 0 0 1px rgba(255, 255, 255, 0.08);
+    --shadow-glow-teal:       0 0 24px -4px var(--color-primary-glow);
+    --shadow-glow-gold:       0 0 24px -4px var(--color-gold-glow);
+    --shadow-sm:              0 2px 8px rgba(0, 0, 0, 0.40);
+    --shadow-md:              0 4px 16px -2px rgba(0, 0, 0, 0.55);
+    --shadow-lg:              0 10px 30px -4px rgba(0, 0, 0, 0.70);
+    --shadow-xl:              0 24px 64px -12px rgba(0, 0, 0, 0.88);
+
+    /* ─────────────────────────────────────────────────────────────
+       9. ESCALA ESPACIAL MODULAR (GRID PADRONIZADO DE 4px / 8px)
+       ───────────────────────────────────────────────────────────── */
+    --space-05:               2px;
+    --space-1:                4px;
+    --space-2:                8px;
+    --space-3:                12px;
+    --space-4:                16px;
+    --space-5:                20px;
+    --space-6:                24px;
+    --space-8:                32px;
+    --space-10:               40px;
+    --space-12:               48px;
+    --space-16:               64px;
+
+    /* ─────────────────────────────────────────────────────────────
+       10. GEOMETRIA & RAIOS DE CANTO PADRONIZADOS
+       ───────────────────────────────────────────────────────────── */
+    --radius-xs:              4px;   /* Micro-tags, switches e checkboxes */
+    --radius-sm:              8px;   /* Botões compactos, chips e inputs */
+    --radius-md:              12px;  /* Botões primários, selects e dropdowns */
+    --radius-lg:              16px;  /* Cards padrão, containers e tabelas */
+    --radius-xl:              20px;  /* Modais compactos e popovers */
+    --radius-2xl:             24px;  /* Modais primários e sheets flutuantes */
+    --radius-full:            9999px;/* Badges de status, pílulas e avatares */
+
+    /* ─────────────────────────────────────────────────────────────
+       11. TIPOGRAFIA & PESOS NATIVOS (INTER VARIABLE & MONO)
+       ───────────────────────────────────────────────────────────── */
+    --font-family-base:       'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    --font-family-sans:       var(--font-family-base);
+    --font-family-mono:       'JetBrains Mono', 'Fira Code', ui-monospace, SFMono-Regular, monospace;
+
+    /* Escala Modular Harmônica */
+    --font-size-2xs:          0.6875rem; /* 11px */
+    --font-size-xs:           0.75rem;   /* 12px */
+    --font-size-sm:           0.8125rem; /* 13px */
+    --font-size-base:         0.875rem;  /* 14px */
+    --font-size-md:           1.00rem;   /* 16px */
+    --font-size-lg:           1.125rem;  /* 18px */
+    --font-size-xl:           1.375rem;  /* 22px */
+    --font-size-2xl:          1.75rem;   /* 28px */
+    --font-size-3xl:          2.25rem;   /* 36px */
+
+    /* Pesos Tipográficos Reais */
+    --font-weight-regular:    400;
+    --font-weight-medium:     500;
+    --font-weight-semibold:   600;
+    --font-weight-bold:       700;
+    --font-weight-extrabold:  800;
+    --font-weight-black:      900;
+
+    --line-height-tight:      1.2;
+    --line-height-snug:       1.35;
+    --line-height-normal:     1.5;
+    --line-height-relaxed:    1.65;
+
+    --letter-spacing-tight:   -0.03em;
+    --letter-spacing-normal:  0em;
+    --letter-spacing-wide:    0.05em;
+
+    /* ─────────────────────────────────────────────────────────────
+       12. TRANSIÇÕES & MICROINTERAÇÕES HÁPTICAS (SPRING EASING)
+       ───────────────────────────────────────────────────────────── */
+    --ease-spring:            cubic-bezier(0.32, 0.72, 0, 1);
+    --ease-out-quad:          cubic-bezier(0.25, 0.46, 0.45, 0.94);
+    --duration-instant:       80ms;
+    --duration-fast:          120ms;
+    --duration-base:          160ms;
+    --duration-slow:          300ms;
+    --duration-enter:         260ms;
+
+    --transition-fast:        var(--duration-fast) var(--ease-spring);
+    --transition-base:        var(--duration-base) var(--ease-spring);
+    --transition-slow:        var(--duration-slow) var(--ease-spring);
+
+    /* Dimensões Fixas de Layout Core */
+    --sidebar-width:          240px;
+    --header-height:          64px;
+
+    /* ─────────────────────────────────────────────────────────────
+       ALIASES DE RETROCOMPATIBILIDADE (ZERO BREAKING CHANGES)
+       ───────────────────────────────────────────────────────────── */
+    --bg-base:                var(--surface-ground);
+    --bg-primary:             var(--surface-base);
+    --bg-secondary:           var(--surface-primary);
+    --bg-card:                var(--surface-card);
+    --bg-card-hover:          var(--surface-card-hover);
+    --bg-input:               var(--surface-input);
+    --border-s:               var(--border-subtle);
+    --border-d:               var(--border-default);
+    --border-str:             var(--border-strong);
+    --border:                 var(--border-default);
+    --text:                   var(--text-primary);
+    --text2:                  var(--text-secondary);
+    --text3:                  var(--text-muted);
+    --accent:                 var(--color-primary);
+    --accent-h:               var(--color-primary-hover);
+    --accent2:                var(--color-primary-hover);
+    --accent3:                #7AF5D4;
+    --accent-glow:            var(--color-primary-glow);
+    --sidebar-w:              var(--sidebar-width);
+    --header-h:               var(--header-height);
+    --r-sm:                   var(--radius-sm);
+    --r-md:                   var(--radius-md);
+    --r-lg:                   var(--radius-lg);
+    --r-xl:                   var(--radius-xl);
+    --success:                var(--color-success);
+    --warning:                var(--color-warning);
+    --danger:                 var(--color-danger);
+    --info:                   var(--color-info);
+    --t:                      var(--transition-base);
+    --t-fast:                 var(--transition-fast);
+    --t-base:                 var(--transition-base);
+    --t-spring:               var(--transition-base);
+  }
+
+  /* ─────────────────────────────────────────────────────────────
+     ESCOPOS TEMÁTICOS CONTEXTUAIS
+     ───────────────────────────────────────────────────────────── */
+
+  /* Contexto Master Backoffice: Ativa o Tema Ouro Corporativo */
+  .ui-portal, [data-theme="master"] {
+    --color-primary:          var(--color-gold);
+    --color-primary-hover:    var(--color-gold-hover);
+    --color-primary-active:   var(--color-gold-active);
+    --color-primary-dim:      var(--color-gold-dim);
+    --color-primary-border:   var(--color-gold-border);
+    --color-primary-glow:     var(--color-gold-glow);
+    --border-accent:          var(--color-gold-border);
+    --accent:                 var(--color-gold);
+    --accent2:                var(--color-gold-hover);
+    --accent-glow:            var(--color-gold-glow);
+  }
+
+  /* Contexto Workspace Fintech: Electric Teal */
+  .ui-workspace {
+    --color-primary:          #12D9A0;
+    --accent:                 #12D9A0;
+  }
+
+  /* Contexto Login & Telas Públicas */
+  .ui-auth, .ui-public {
+    --surface-ground:         #0A0F09;
+    --surface-card:           #131C11;
+  }
+}
+
+@layer utilities {
+  /* ─────────────────────────────────────────────────────────────
+     PADRÃO NUMÉRICO CONTÁBIL (DES-04) & ALINHAMENTO
+     ───────────────────────────────────────────────────────────── */
+  .numeric,
+  .tabular-nums,
+  table th.numeric,
+  table td.numeric,
+  .financial-value,
+  .kpi-value-numeric {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum" 1;
+    text-align: right;
+    white-space: nowrap;
+  }
+
+  /* Alinhamento de Texto Utilitário */
+  .text-right      { text-align: right !important; }
+  .text-center     { text-align: center !important; }
+  .text-left       { text-align: left !important; }
+  .nowrap          { white-space: nowrap !important; }
+  .truncate        { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  /* Tipografia Monoespaçada Financeira */
+  .font-mono-financial {
+    font-family: var(--font-family-mono);
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum" 1;
+    letter-spacing: -0.02em;
+  }
+
+  /* Cores Semânticas de Texto */
+  .text-primary    { color: var(--text-primary) !important; }
+  .text-secondary  { color: var(--text-secondary) !important; }
+  .text-muted      { color: var(--text-muted) !important; }
+  .text-accent     { color: var(--color-primary) !important; }
+  .text-gold       { color: var(--color-gold) !important; }
+  .text-success    { color: var(--color-success) !important; }
+  .text-danger     { color: var(--color-danger) !important; }
+  .text-warning    { color: var(--color-warning) !important; }
+  .text-info       { color: var(--color-info) !important; }
+
+  /* Pesos Tipográficos */
+  .font-regular    { font-weight: var(--font-weight-regular) !important; }
+  .font-medium     { font-weight: var(--font-weight-medium) !important; }
+  .font-semibold   { font-weight: var(--font-weight-semibold) !important; }
+  .font-bold       { font-weight: var(--font-weight-bold) !important; }
+  .font-heavy      { font-weight: var(--font-weight-extrabold) !important; }
+  .font-mono       { font-family: var(--font-family-mono) !important; }
+
+  /* Flexbox & Layout Helpers */
+  .d-flex          { display: flex !important; }
+  .flex-row-center { display: flex !important; align-items: center !important; }
+  .flex-between    { display: flex !important; align-items: center !important; justify-content: space-between !important; }
+  .gap-1           { gap: var(--space-1) !important; }
+  .gap-2           { gap: var(--space-2) !important; }
+  .gap-3           { gap: var(--space-3) !important; }
+  .gap-4           { gap: var(--space-4) !important; }
+
+  /* Bordas Padronizadas */
+  .border-b-subtle { border-bottom: 1px solid var(--border-subtle) !important; }
+  .border-subtle   { border: 1px solid var(--border-subtle) !important; }
+  .border-default  { border: 1px solid var(--border-default) !important; }
+
+  /* Micro-interação Háptica */
+  .haptic-btn:active, .haptic-card:active {
+    transform: scale(0.98);
+    transition: transform var(--duration-instant) var(--ease-spring);
+  }
+}
