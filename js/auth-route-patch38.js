@@ -1,11 +1,11 @@
-// FinObra Patch 38 — comportamento específico das rotas públicas de autenticação.
+// FinGo Patch 38 — comportamento específico das rotas públicas de autenticação.
 (() => {
   const route = window.location.pathname;
   const isSignup = route === '/cadastro';
   const isLogin = route === '/login' || route === '/login.html';
 
-  if (isSignup) document.title = 'Criar conta | FinObra';
-  if (isLogin) document.title = 'Entrar | FinObra';
+  if (isSignup) document.title = 'Criar conta | FinGo';
+  if (isLogin) document.title = 'Entrar | FinGo';
 
   window.addEventListener('DOMContentLoaded', () => {
     const registerModal = document.getElementById('register-modal');
@@ -17,13 +17,13 @@
       modal.setAttribute('aria-modal', 'true');
     }
 
-    if (registerModal) registerModal.setAttribute('aria-label', 'Cadastrar nova empresa no FinObra');
-    if (recoveryModal) recoveryModal.setAttribute('aria-label', 'Recuperar acesso ao FinObra');
+    if (registerModal) registerModal.setAttribute('aria-label', 'Cadastrar nova empresa no FinGo');
+    if (recoveryModal) recoveryModal.setAttribute('aria-label', 'Recuperar acesso ao FinGo');
 
     if (isSignup) {
       const title = document.getElementById('welcome-title');
       const subtitle = document.getElementById('welcome-subtitle');
-      if (title) title.textContent = 'Crie sua conta no FinObra';
+      if (title) title.textContent = 'Crie sua conta no FinGo';
       if (subtitle) subtitle.textContent = 'Comece seu período de teste e configure sua construtora.';
       window.setTimeout(() => document.getElementById('reg-empresa')?.focus(), 180);
 

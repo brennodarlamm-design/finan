@@ -216,7 +216,7 @@ const Cobranca = {
   _renderAccountSupport(p) {
     const el=document.getElementById('finobra-account-support'); if(!el)return;
     const level=Utils.escapeHtml(p?.supportLevel||'Padrão');
-    el.innerHTML=`<div style="font-weight:900;font-size:1rem;margin-bottom:8px">Suporte / Comercial</div><p style="font-size:.82rem;color:var(--text3);line-height:1.55">Seu plano possui atendimento <strong style="color:var(--text2)">${level}</strong>. Para dúvidas de uso, problemas técnicos ou informações comerciais, use a central do FinObra. Diagnósticos internos ficam restritos à equipe DEV.</p><button class="btn btn-primary" data-fb-click="Cobranca.openSupport" data-fb-click-n="0">Abrir atendimento</button>`;
+    el.innerHTML=`<div style="font-weight:900;font-size:1rem;margin-bottom:8px">Suporte / Comercial</div><p style="font-size:.82rem;color:var(--text3);line-height:1.55">Seu plano possui atendimento <strong style="color:var(--text2)">${level}</strong>. Para dúvidas de uso, problemas técnicos ou informações comerciais, use a central do FinGo. Diagnósticos internos ficam restritos à equipe DEV.</p><button class="btn btn-primary" data-fb-click="Cobranca.openSupport" data-fb-click-n="0">Abrir atendimento</button>`;
   },
 
   _renderBillingHistory(invoices=[]) {
@@ -366,9 +366,9 @@ const Cobranca = {
     const pixPayload = String(inv.pix_payload || '');
     const txid = Utils.escapeHtml(String(inv.txid || ''));
     const whatsapp = String(billingWhatsapp || this._accountData?.billingWhatsapp || '').replace(/\D/g, '');
-    const whatsappDisplay = whatsapp ? `+${whatsapp}` : 'Suporte FinObra';
+    const whatsappDisplay = whatsapp ? `+${whatsapp}` : 'Suporte FinGo';
     const companyName = emp.nome_fantasia || emp.razao_social || u.empresaNome || 'Minha Construtora';
-    const waMessage = encodeURIComponent(`Olá! Realizei o pagamento PIX da assinatura FinObra (${plano.nome} [Ciclo ${cycleLabel}] - R$ ${amountFmt}) para ${companyName}. TXID: ${inv.txid || ''}. Segue o comprovante para conferência:`);
+    const waMessage = encodeURIComponent(`Olá! Realizei o pagamento PIX da assinatura FinGo (${plano.nome} [Ciclo ${cycleLabel}] - R$ ${amountFmt}) para ${companyName}. TXID: ${inv.txid || ''}. Segue o comprovante para conferência:`);
     const waHref = whatsapp ? `https://api.whatsapp.com/send?phone=${whatsapp}&text=${waMessage}` : '#';
     const qrSrc = pixPayload ? `https://api.qrserver.com/v1/create-qr-code/?size=200x200&margin=4&data=${encodeURIComponent(pixPayload)}` : '';
 
@@ -450,7 +450,7 @@ const Cobranca = {
 
           <!-- Resumo e Identificador TXID -->
           <div style="background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:8px 12px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px;font-size:.72rem;text-align:left;">
-            <div><span style="color:#94a3b8;">Beneficiário Oficial:</span> <strong style="color:#fff;">FinObra Soluções Tecnológicas</strong></div>
+            <div><span style="color:#94a3b8;">Beneficiário Oficial:</span> <strong style="color:#fff;">FinGo Soluções Tecnológicas</strong></div>
             <div><span style="color:#94a3b8;">Identificador (TXID):</span> <code style="color:var(--accent2);font-family:monospace;background:rgba(0,0,0,.3);padding:2px 6px;border-radius:4px;">${txid}</code></div>
           </div>
 

@@ -624,7 +624,7 @@ const Recibos = {
       <!DOCTYPE html>
       <html>
         <head>
-          <title>Recibo Nº ${Utils.escapeHtml(r.numero)} — ${Utils.escapeHtml(DB.getEmpresa().nome_fantasia || DB.getEmpresa().razao_social || 'FinObra')}</title>
+          <title>Recibo Nº ${Utils.escapeHtml(r.numero)} — ${Utils.escapeHtml(DB.getEmpresa().nome_fantasia || DB.getEmpresa().razao_social || 'FinGo')}</title>
           <meta charset="utf-8">
           <style>
             @page { size: A4 portrait; margin: 15mm 15mm; }

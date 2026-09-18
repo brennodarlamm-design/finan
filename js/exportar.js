@@ -195,7 +195,7 @@ const Exportar = {
       <!DOCTYPE html>
       <html>
         <head>
-          <title>Relatório ${Utils.escapeHtml(DB.getEmpresa().nome_fantasia || DB.getEmpresa().razao_social || "FinObra")}</title>
+          <title>Relatório ${Utils.escapeHtml(DB.getEmpresa().nome_fantasia || DB.getEmpresa().razao_social || "FinGo")}</title>
           <meta charset="utf-8">
           <style>
             body { font-family: 'Segoe UI', sans-serif; background: #f1f5f9; padding: 30px; margin: 0; display: flex; justify-content: center; }
@@ -411,8 +411,8 @@ const Exportar = {
     const dataIso = (typeof Utils !== 'undefined' && Utils.today) ? Utils.today() : new Date().toISOString().slice(0, 10);
     const tipoLabel = tipo === 'completo' ? 'Completo' : tipo.charAt(0).toUpperCase() + tipo.slice(1);
     const emp = DB.getEmpresa ? DB.getEmpresa() : {};
-    const empresaArq = String(emp.nome_fantasia || emp.razao_social || 'FinObra')
-      .normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-zA-Z0-9_-]/g, '_').replace(/_+/g,'_').slice(0, 35) || 'FinObra';
+    const empresaArq = String(emp.nome_fantasia || emp.razao_social || 'FinGo')
+      .normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-zA-Z0-9_-]/g, '_').replace(/_+/g,'_').slice(0, 35) || 'FinGo';
     const nomeArq = `${empresaArq}_${safeNome}_${tipoLabel}_${dataIso}.xlsx`;
 
     // Download direto via Blob com nome garantido

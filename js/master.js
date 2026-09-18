@@ -1060,8 +1060,8 @@ const MasterAdmin = {
         <div style="background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.08);border-radius:14px;padding:20px;">
           <div style="font-size:.95rem;font-weight:800;color:#fff;margin-bottom:14px;">ℹ️ Diagnóstico &amp; Metadados do Sistema</div>
           <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:16px;font-size:.84rem;">
-            <div><div style="color:#64748b;margin-bottom:4px;">Sistema / Plataforma</div><div style="font-weight:700;color:#fff;">FinObra SaaS Backoffice</div></div>
-            <div><div style="color:#64748b;margin-bottom:4px;">Versão em Produção</div><div style="font-weight:700;color:#fff;">2.4.0 (FinObra Cloud)</div></div>
+            <div><div style="color:#64748b;margin-bottom:4px;">Sistema / Plataforma</div><div style="font-weight:700;color:#fff;">FinGo SaaS Backoffice</div></div>
+            <div><div style="color:#64748b;margin-bottom:4px;">Versão em Produção</div><div style="font-weight:700;color:#fff;">2.4.0 (FinGo Cloud)</div></div>
             <div><div style="color:#64748b;margin-bottom:4px;">Armazenamento Central</div><div style="font-weight:700;color:#22c55e;">🐘 Neon PostgreSQL + Vercel Blob</div></div>
             <div><div style="color:#64748b;margin-bottom:4px;">Isolamento Multi-Tenant</div><div style="font-weight:700;color:#22c55e;">Ativo (Cryptographic Tenant Tokens)</div></div>
           </div>
@@ -1138,7 +1138,7 @@ const MasterAdmin = {
     const id=String(e.id||''); // IDs de tenant são gerados pelo servidor e não são texto livre.
     const telDigits=String(e.telefone||'').replace(/\D/g,'');
     const wa=(telDigits ? (telDigits.startsWith('55')?telDigits:'55'+telDigits) : '5595991363678');
-    const waText=encodeURIComponent(`Olá, ${e.responsavel||''}! Aqui é do FinObra referente à assinatura da ${e.nome_fantasia||''}.`);
+    const waText=encodeURIComponent(`Olá, ${e.responsavel||''}! Aqui é do FinGo referente à assinatura da ${e.nome_fantasia||''}.`);
 
     let vencHtml = '<span style="color:#64748b;">—</span>';
     if (e.vencimento) {
@@ -1897,20 +1897,20 @@ const MasterAdmin = {
     let subject = '';
 
     if (type === 'reminder') {
-      subject = `🔔 FinObra — Lembrete de Renovação de Assinatura (${venc})`;
-      msg = `Olá, ${resp}! 👋\n\nPassando para lembrar que a assinatura do *FinObra* da empresa *${nome}* (Plano ${pInfo.n}) vence em *${venc}* (${situacaoTxt}).\n\n💰 *Valor:* R$ ${pInfo.v}\n🔑 *Chave PIX:* ${pix}\n👤 *Beneficiário:* FinObra Soluções Tecnológicas\n\nQualquer dúvida ou caso precise de emissão de NF, estamos à disposição!`;
+      subject = `🔔 FinGo — Lembrete de Renovação de Assinatura (${venc})`;
+      msg = `Olá, ${resp}! 👋\n\nPassando para lembrar que a assinatura do *FinGo* da empresa *${nome}* (Plano ${pInfo.n}) vence em *${venc}* (${situacaoTxt}).\n\n💰 *Valor:* R$ ${pInfo.v}\n🔑 *Chave PIX:* ${pix}\n👤 *Beneficiário:* FinGo Soluções Tecnológicas\n\nQualquer dúvida ou caso precise de emissão de NF, estamos à disposição!`;
     } else if (type === 'due_today') {
-      subject = `⚠️ FinObra — Sua assinatura vence hoje (${venc})`;
-      msg = `Olá, ${resp}! 🔔\n\nA assinatura do *FinObra* da empresa *${nome}* vence *hoje (${venc})*.\n\nPara garantir a continuidade dos acessos da sua equipe e sincronização das obras sem interrupção:\n\n💰 *Valor:* R$ ${pInfo.v}\n🔑 *Chave PIX:* ${pix}\n👤 *Beneficiário:* FinObra Soluções Tecnológicas\n\nApós o pagamento via PIX, a renovação é confirmada e os acessos continuam ativos normalmente.`;
+      subject = `⚠️ FinGo — Sua assinatura vence hoje (${venc})`;
+      msg = `Olá, ${resp}! 🔔\n\nA assinatura do *FinGo* da empresa *${nome}* vence *hoje (${venc})*.\n\nPara garantir a continuidade dos acessos da sua equipe e sincronização das obras sem interrupção:\n\n💰 *Valor:* R$ ${pInfo.v}\n🔑 *Chave PIX:* ${pix}\n👤 *Beneficiário:* FinGo Soluções Tecnológicas\n\nApós o pagamento via PIX, a renovação é confirmada e os acessos continuam ativos normalmente.`;
     } else if (type === 'overdue') {
-      subject = `🚨 FinObra — Aviso de Vencimento e Regularização de Acesso`;
-      msg = `Olá, ${resp}! ⚠️\n\nIdentificamos que a assinatura do *FinObra* da empresa *${nome}* venceu em *${venc}* (${situacaoTxt}) e consta pendente.\n\nPara evitar o bloqueio preventivo dos acessos, emissão de relatórios e sincronização no canteiro de obras, solicitamos a regularização:\n\n💰 *Valor:* R$ ${pInfo.v}\n🔑 *Chave PIX:* ${pix}\n👤 *Beneficiário:* FinObra Soluções Tecnológicas\n\nSe já realizou o pagamento, desconsidere este aviso ou nos envie o comprovante por aqui!`;
+      subject = `🚨 FinGo — Aviso de Vencimento e Regularização de Acesso`;
+      msg = `Olá, ${resp}! ⚠️\n\nIdentificamos que a assinatura do *FinGo* da empresa *${nome}* venceu em *${venc}* (${situacaoTxt}) e consta pendente.\n\nPara evitar o bloqueio preventivo dos acessos, emissão de relatórios e sincronização no canteiro de obras, solicitamos a regularização:\n\n💰 *Valor:* R$ ${pInfo.v}\n🔑 *Chave PIX:* ${pix}\n👤 *Beneficiário:* FinGo Soluções Tecnológicas\n\nSe já realizou o pagamento, desconsidere este aviso ou nos envie o comprovante por aqui!`;
     } else if (type === 'trial_ending') {
-      subject = `🚀 FinObra — Seu período de testes termina em ${venc}`;
-      msg = `Olá, ${resp}! 🚀\n\nSeu período de teste gratuito do *FinObra* na empresa *${nome}* termina em *${venc}*.\n\nEsperamos que a plataforma esteja transformando a gestão das suas obras! Para continuar utilizando todos os recursos com a sua equipe:\n\n👉 Conheça os planos e assine: https://fingo.api.br/app.html#planos\n💰 *Valor de referência:* R$ ${pInfo.v}/mês (${pInfo.n})\n🔑 *Chave PIX:* ${pix}\n👤 *Beneficiário:* FinObra Soluções Tecnológicas\n\nEstamos à disposição para ajudar na escolha do melhor plano!`;
+      subject = `🚀 FinGo — Seu período de testes termina em ${venc}`;
+      msg = `Olá, ${resp}! 🚀\n\nSeu período de teste gratuito do *FinGo* na empresa *${nome}* termina em *${venc}*.\n\nEsperamos que a plataforma esteja transformando a gestão das suas obras! Para continuar utilizando todos os recursos com a sua equipe:\n\n👉 Conheça os planos e assine: https://fingo.api.br/app.html#planos\n💰 *Valor de referência:* R$ ${pInfo.v}/mês (${pInfo.n})\n🔑 *Chave PIX:* ${pix}\n👤 *Beneficiário:* FinGo Soluções Tecnológicas\n\nEstamos à disposição para ajudar na escolha do melhor plano!`;
     } else {
-      subject = `FinObra — Notificação de Assinatura (${nome})`;
-      msg = `Olá, ${resp}! Aqui é do FinObra referente à assinatura da empresa ${nome}.`;
+      subject = `FinGo — Notificação de Assinatura (${nome})`;
+      msg = `Olá, ${resp}! Aqui é do FinGo referente à assinatura da empresa ${nome}.`;
     }
 
     const msgEl = document.getElementById('mc-message');
@@ -2034,7 +2034,7 @@ const MasterAdmin = {
   },
 
   async executarVarreduraCobranca() {
-    if (!confirm('Deseja iniciar agora a varredura de cobrança 24/7 de todos os contratos e assinaturas do FinObra?')) {
+    if (!confirm('Deseja iniciar agora a varredura de cobrança 24/7 de todos os contratos e assinaturas do FinGo?')) {
       return;
     }
 
@@ -2184,7 +2184,7 @@ const MasterAdmin = {
               <span>📅</span><span>AGENDA DEV &amp; CAPACITAÇÃO TÉCNICA</span>
             </div>
             <h2 style="font-size:1.5rem;font-weight:900;color:#fff;margin:0 0 4px;">Gerenciador de Lives, Workshops &amp; Calendário</h2>
-            <div style="font-size:.82rem;color:#94a3b8;">Cadastre novas programações ao vivo ou workshops operacionais para todos os clientes e construtoras do FinObra.</div>
+            <div style="font-size:.82rem;color:#94a3b8;">Cadastre novas programações ao vivo ou workshops operacionais para todos os clientes e construtoras do FinGo.</div>
           </div>
 
           <div style="display:flex;align-items:center;gap:10px;">
@@ -2253,7 +2253,7 @@ const MasterAdmin = {
                       ${this._esc(e.titulo)}
                     </td>
                     <td style="padding:12px 16px;color:#94a3b8;">
-                      ${this._esc(e.instrutor || 'Dev FinObra')}
+                      ${this._esc(e.instrutor || 'Dev FinGo')}
                     </td>
                     <td style="padding:12px 16px;">
                       <a href="${this._esc(e.link)}" target="_blank" rel="noopener noreferrer" style="color:#38bdf8;text-decoration:none;font-size:.78rem;">

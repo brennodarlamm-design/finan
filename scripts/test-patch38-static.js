@@ -67,7 +67,7 @@ assert(loginPage.includes("window.location.replace('/app')"), 'login/cadastro co
 assert(loginPage.includes('Auth.loginWithGoogle'), 'login com Google deve permanecer disponível.');
 assert(loginPage.includes('Auth.solicitarCodigoRecuperacao'), 'recuperação de senha deve permanecer disponível.');
 assert(loginPage.includes("window.location.search.includes('expired=1')"), 'sessão expirada deve continuar tratada na tela de login.');
-assert(authRoute.includes("document.title = 'Criar conta | FinObra'"), 'cadastro deve possuir título próprio.');
+assert(authRoute.includes("document.title = 'Criar conta | FinGo'"), 'cadastro deve possuir título próprio.');
 assert(authRoute.includes("window.location.assign('/login')"), 'fechamento do cadastro dedicado deve retornar ao login.');
 assert(authRoute.includes("modal.setAttribute('aria-modal', 'true')"), 'modais de autenticação devem ser acessíveis.');
 assert(authRoute.includes("event.key !== 'Escape'"), 'modais devem tratar tecla Escape.');
@@ -78,9 +78,9 @@ assert(authCss.includes('#register-modal > div'), 'modal de cadastro deve virar 
 assert(authCss.includes('#recovery-modal > div'), 'recuperação de senha deve virar sheet responsiva no mobile.');
 assert(authCss.includes('.otp-box'), 'OTP deve possuir dimensionamento responsivo.');
 
-assert(privacy.includes('<title>Política de Privacidade — FinObra</title>'), 'Privacidade deve possuir conteúdo e título próprios.');
-assert(terms.includes('<title>Termos de Serviço — FinObra</title>'), 'Termos deve possuir conteúdo e título próprios.');
-assert(validation.includes('<title>Portal de Validação de Registros de Assinatura — FinObra</title>'), 'Validação deve possuir conteúdo e título próprios.');
+assert(privacy.includes('<title>Política de Privacidade — FinGo</title>'), 'Privacidade deve possuir conteúdo e título próprios.');
+assert(terms.includes('<title>Termos de Serviço — FinGo</title>'), 'Termos deve possuir conteúdo e título próprios.');
+assert(validation.includes('<title>Portal de Validação de Registros de Assinatura — FinGo</title>'), 'Validação deve possuir conteúdo e título próprios.');
 assert(!privacy.includes('Portal de Validação de Registros de Assinatura'), 'Privacidade não pode conter o conteúdo do portal de validação.');
 
 assert(robots.includes('Disallow: /app'), 'robots deve bloquear o app autenticado.');

@@ -65,27 +65,27 @@ document.querySelectorAll('.faq details').forEach(details => {
 const PLAN_DATA = {
   monthly: {
     label: 'Mensal',
-    starter: { price: 'R$ 119,90', sub: '/ mês', total: 'Cobrança mensal sem fidelidade', wa: 'Olá! Quero conhecer o Plano Básico Mensal do FinObra.' },
-    pro: { price: 'R$ 279,90', sub: '/ mês', total: 'Cobrança mensal sem fidelidade', wa: 'Olá! Quero conhecer o Plano Profissional Mensal do FinObra.' },
-    unlimited: { price: 'R$ 499,90', sub: '/ mês', total: 'Cobrança mensal sem fidelidade', wa: 'Olá! Quero conhecer o Plano Construtora Ilimitado Mensal do FinObra.' }
+    starter: { price: 'R$ 119,90', sub: '/ mês', total: 'Cobrança mensal sem fidelidade', wa: 'Olá! Quero conhecer o Plano Básico Mensal do FinGo.' },
+    pro: { price: 'R$ 279,90', sub: '/ mês', total: 'Cobrança mensal sem fidelidade', wa: 'Olá! Quero conhecer o Plano Profissional Mensal do FinGo.' },
+    unlimited: { price: 'R$ 499,90', sub: '/ mês', total: 'Cobrança mensal sem fidelidade', wa: 'Olá! Quero conhecer o Plano Construtora Ilimitado Mensal do FinGo.' }
   },
   quarterly: {
     label: 'Trimestral',
-    starter: { price: 'R$ 113,30', sub: '/ mês', total: 'R$ 339,90 a cada 3 meses • <strong>Economia de R$ 19,80</strong>', wa: 'Olá! Quero conhecer o Plano Básico Trimestral do FinObra.' },
-    pro: { price: 'R$ 263,30', sub: '/ mês', total: 'R$ 789,90 a cada 3 meses • <strong>Economia de R$ 49,80</strong>', wa: 'Olá! Quero conhecer o Plano Profissional Trimestral do FinObra.' },
-    unlimited: { price: 'R$ 466,63', sub: '/ mês', total: 'R$ 1.399,90 a cada 3 meses • <strong>Economia de R$ 99,80</strong>', wa: 'Olá! Quero conhecer o Plano Construtora Ilimitado Trimestral do FinObra.' }
+    starter: { price: 'R$ 113,30', sub: '/ mês', total: 'R$ 339,90 a cada 3 meses • <strong>Economia de R$ 19,80</strong>', wa: 'Olá! Quero conhecer o Plano Básico Trimestral do FinGo.' },
+    pro: { price: 'R$ 263,30', sub: '/ mês', total: 'R$ 789,90 a cada 3 meses • <strong>Economia de R$ 49,80</strong>', wa: 'Olá! Quero conhecer o Plano Profissional Trimestral do FinGo.' },
+    unlimited: { price: 'R$ 466,63', sub: '/ mês', total: 'R$ 1.399,90 a cada 3 meses • <strong>Economia de R$ 99,80</strong>', wa: 'Olá! Quero conhecer o Plano Construtora Ilimitado Trimestral do FinGo.' }
   },
   semiannual: {
     label: 'Semestral',
-    starter: { price: 'R$ 106,65', sub: '/ mês', total: 'R$ 639,90 a cada 6 meses • <strong>Economia de R$ 79,50</strong>', wa: 'Olá! Quero conhecer o Plano Básico Semestral do FinObra.' },
-    pro: { price: 'R$ 246,65', sub: '/ mês', total: 'R$ 1.479,90 a cada 6 meses • <strong>Economia de R$ 199,50</strong>', wa: 'Olá! Quero conhecer o Plano Profissional Semestral do FinObra.' },
-    unlimited: { price: 'R$ 441,65', sub: '/ mês', total: 'R$ 2.649,90 a cada 6 meses • <strong>Economia de R$ 349,50</strong>', wa: 'Olá! Quero conhecer o Plano Construtora Ilimitado Semestral do FinObra.' }
+    starter: { price: 'R$ 106,65', sub: '/ mês', total: 'R$ 639,90 a cada 6 meses • <strong>Economia de R$ 79,50</strong>', wa: 'Olá! Quero conhecer o Plano Básico Semestral do FinGo.' },
+    pro: { price: 'R$ 246,65', sub: '/ mês', total: 'R$ 1.479,90 a cada 6 meses • <strong>Economia de R$ 199,50</strong>', wa: 'Olá! Quero conhecer o Plano Profissional Semestral do FinGo.' },
+    unlimited: { price: 'R$ 441,65', sub: '/ mês', total: 'R$ 2.649,90 a cada 6 meses • <strong>Economia de R$ 349,50</strong>', wa: 'Olá! Quero conhecer o Plano Construtora Ilimitado Semestral do FinGo.' }
   },
   annual: {
     label: 'Anual',
-    starter: { price: 'R$ 99,91', sub: '/ mês', total: 'R$ 1.199,00/ano • <strong>2 meses grátis (Economia de R$ 239,80)</strong>', wa: 'Olá! Quero conhecer o Plano Básico Anual do FinObra.' },
-    pro: { price: 'R$ 233,25', sub: '/ mês', total: 'R$ 2.799,00/ano • <strong>2 meses grátis (Economia de R$ 559,80)</strong>', wa: 'Olá! Quero conhecer o Plano Profissional Anual do FinObra.' },
-    unlimited: { price: 'R$ 416,58', sub: '/ mês', total: 'R$ 4.999,00/ano • <strong>2 meses grátis (Economia de R$ 999,80)</strong>', wa: 'Olá! Quero conhecer o Plano Construtora Ilimitado Anual do FinObra.' }
+    starter: { price: 'R$ 99,91', sub: '/ mês', total: 'R$ 1.199,00/ano • <strong>2 meses grátis (Economia de R$ 239,80)</strong>', wa: 'Olá! Quero conhecer o Plano Básico Anual do FinGo.' },
+    pro: { price: 'R$ 233,25', sub: '/ mês', total: 'R$ 2.799,00/ano • <strong>2 meses grátis (Economia de R$ 559,80)</strong>', wa: 'Olá! Quero conhecer o Plano Profissional Anual do FinGo.' },
+    unlimited: { price: 'R$ 416,58', sub: '/ mês', total: 'R$ 4.999,00/ano • <strong>2 meses grátis (Economia de R$ 999,80)</strong>', wa: 'Olá! Quero conhecer o Plano Construtora Ilimitado Anual do FinGo.' }
   }
 };
 

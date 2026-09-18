@@ -100,39 +100,39 @@ const App = {
   },
 
   routeMeta: {
-    'dashboard':         { icon:'📊', label:'Dashboard', title:'Dashboard Financeiro de Obras | FinObra' },
-    'obras':             { icon:'🏗️', label:'Obras & Clientes', title:'Gestão de Obras & Clientes | FinObra' },
-    'clientes':          { icon:'🏗️', label:'Obras & Clientes', title:'Gestão de Obras & Clientes | FinObra' },
-    'obra-detalhe':      { icon:'🏢', label:'Central da Obra', title:'Dossiê Central da Obra | FinObra' },
-    'lancamentos':       { icon:'💰', label:'Lançamentos Financeiros', title:'Controle Financeiro de Obras | FinObra' },
-    'financeiro':        { icon:'💰', label:'Lançamentos Financeiros', title:'Controle Financeiro de Obras | FinObra' },
-    'escritorio':        { icon:'🏢', label:'Despesas Escritório', title:'Custos Indiretos & Escritório | FinObra' },
-    'pre-compras':       { icon:'🛒', label:'Ordens de Pré-Compra', title:'Ordens de Compra & Cotações | FinObra' },
-    'precompras':        { icon:'🛒', label:'Ordens de Pré-Compra', title:'Ordens de Compra & Cotações | FinObra' },
-    'recibos':           { icon:'🧾', label:'Recibos Oficiais', title:'Emissão de Recibos de Construção | FinObra' },
-    'contratos':         { icon:'📜', label:'Contratos de Obra', title:'Gerador de Contratos de Empreitada | FinObra' },
-    'notas-fiscais':     { icon:'📄', label:'Notas Fiscais', title:'Notas Fiscais & XML Danfe | FinObra' },
-    'notas':             { icon:'📄', label:'Notas Fiscais', title:'Notas Fiscais & XML Danfe | FinObra' },
-    'consulta-nfe':      { icon:'🔎', label:'Busca NF-e', title:'Consulta Automática NF-e SEFAZ | FinObra' },
-    'nfe':               { icon:'🔎', label:'Busca NF-e', title:'Consulta Automática NF-e SEFAZ | FinObra' },
-    'conciliacao-ofx':   { icon:'🔄', label:'Conciliação OFX', title:'Conciliação Bancária OFX | FinObra' },
-    'ofx':               { icon:'🔄', label:'Conciliação OFX', title:'Conciliação Bancária OFX | FinObra' },
-    'orcamentos':        { icon:'📋', label:'Orçamentos & SINAPI', title:'Orçamento de Obras & Base SINAPI | FinObra' },
-    'medicoes':          { icon:'🔨', label:'Medições & Faturamento', title:'Boletim de Medição de Obras | FinObra' },
-    'documentacao':      { icon:'📋', label:'Documentação de Obras', title:'Documentos & Alvarás de Obra | FinObra' },
-    'relatorios':        { icon:'📥', label:'Relatórios & Exportação', title:'Relatórios Financeiros & Exportação | FinObra' },
-    'exportar':          { icon:'📥', label:'Relatórios & Exportação', title:'Relatórios Financeiros & Exportação | FinObra' },
-    'contas-bancarias':  { icon:'🏦', label:'Contas Bancárias', title:'Contas Correntes & Caixa | FinObra' },
-    'contas':            { icon:'🏦', label:'Contas Bancárias', title:'Contas Correntes & Caixa | FinObra' },
-    'fornecedores':      { icon:'🚛', label:'Fornecedores', title:'Cadastro de Fornecedores & Empreiteiros | FinObra' },
-    'produtos':          { icon:'📦', label:'Produtos / Insumos', title:'Catálogo de Insumos & Materiais | FinObra' },
-    'configuracoes':     { icon:'⚙️', label:'Configurações', title:'Configurações da Empresa | FinObra' },
-    'portal-cliente':    { icon:'🌐', label:'Portal do Cliente', title:'Portal da Transparência do Cliente | FinObra' },
-    'master':            { icon:'🛡️', label:'Painel Dev Master', title:'Painel Master Administrativo | FinObra' },
-    'planos':            { icon:'💎', label:'Planos & Mensalidades', title:'Planos & Assinatura | FinObra' },
+    'dashboard':         { icon:'📊', label:'Dashboard', title:'Dashboard Financeiro de Obras | FinGo' },
+    'obras':             { icon:'🏗️', label:'Obras & Clientes', title:'Gestão de Obras & Clientes | FinGo' },
+    'clientes':          { icon:'🏗️', label:'Obras & Clientes', title:'Gestão de Obras & Clientes | FinGo' },
+    'obra-detalhe':      { icon:'🏢', label:'Central da Obra', title:'Dossiê Central da Obra | FinGo' },
+    'lancamentos':       { icon:'💰', label:'Lançamentos Financeiros', title:'Controle Financeiro de Obras | FinGo' },
+    'financeiro':        { icon:'💰', label:'Lançamentos Financeiros', title:'Controle Financeiro de Obras | FinGo' },
+    'escritorio':        { icon:'🏢', label:'Despesas Escritório', title:'Custos Indiretos & Escritório | FinGo' },
+    'pre-compras':       { icon:'🛒', label:'Ordens de Pré-Compra', title:'Ordens de Compra & Cotações | FinGo' },
+    'precompras':        { icon:'🛒', label:'Ordens de Pré-Compra', title:'Ordens de Compra & Cotações | FinGo' },
+    'recibos':           { icon:'🧾', label:'Recibos Oficiais', title:'Emissão de Recibos de Construção | FinGo' },
+    'contratos':         { icon:'📜', label:'Contratos de Obra', title:'Gerador de Contratos de Empreitada | FinGo' },
+    'notas-fiscais':     { icon:'📄', label:'Notas Fiscais', title:'Notas Fiscais & XML Danfe | FinGo' },
+    'notas':             { icon:'📄', label:'Notas Fiscais', title:'Notas Fiscais & XML Danfe | FinGo' },
+    'consulta-nfe':      { icon:'🔎', label:'Busca NF-e', title:'Consulta Automática NF-e SEFAZ | FinGo' },
+    'nfe':               { icon:'🔎', label:'Busca NF-e', title:'Consulta Automática NF-e SEFAZ | FinGo' },
+    'conciliacao-ofx':   { icon:'🔄', label:'Conciliação OFX', title:'Conciliação Bancária OFX | FinGo' },
+    'ofx':               { icon:'🔄', label:'Conciliação OFX', title:'Conciliação Bancária OFX | FinGo' },
+    'orcamentos':        { icon:'📋', label:'Orçamentos & SINAPI', title:'Orçamento de Obras & Base SINAPI | FinGo' },
+    'medicoes':          { icon:'🔨', label:'Medições & Faturamento', title:'Boletim de Medição de Obras | FinGo' },
+    'documentacao':      { icon:'📋', label:'Documentação de Obras', title:'Documentos & Alvarás de Obra | FinGo' },
+    'relatorios':        { icon:'📥', label:'Relatórios & Exportação', title:'Relatórios Financeiros & Exportação | FinGo' },
+    'exportar':          { icon:'📥', label:'Relatórios & Exportação', title:'Relatórios Financeiros & Exportação | FinGo' },
+    'contas-bancarias':  { icon:'🏦', label:'Contas Bancárias', title:'Contas Correntes & Caixa | FinGo' },
+    'contas':            { icon:'🏦', label:'Contas Bancárias', title:'Contas Correntes & Caixa | FinGo' },
+    'fornecedores':      { icon:'🚛', label:'Fornecedores', title:'Cadastro de Fornecedores & Empreiteiros | FinGo' },
+    'produtos':          { icon:'📦', label:'Produtos / Insumos', title:'Catálogo de Insumos & Materiais | FinGo' },
+    'configuracoes':     { icon:'⚙️', label:'Configurações', title:'Configurações da Empresa | FinGo' },
+    'portal-cliente':    { icon:'🌐', label:'Portal do Cliente', title:'Portal da Transparência do Cliente | FinGo' },
+    'master':            { icon:'🛡️', label:'Painel Dev Master', title:'Painel Master Administrativo | FinGo' },
+    'planos':            { icon:'💎', label:'Planos & Mensalidades', title:'Planos & Assinatura | FinGo' },
     // Patch 52
-    'minhas-demandas':   { icon:'👤', label:'Minhas Demandas', title:'Minhas Demandas & Etapas | FinObra' },
-    'central-gestor':    { icon:'🏢', label:'Central do Gestor', title:'Central do Gestor de Obras | FinObra' },
+    'minhas-demandas':   { icon:'👤', label:'Minhas Demandas', title:'Minhas Demandas & Etapas | FinGo' },
+    'central-gestor':    { icon:'🏢', label:'Central do Gestor', title:'Central do Gestor de Obras | FinGo' },
   },
 
   _getRouteFromUrl() {
@@ -909,10 +909,10 @@ const App = {
     }
 
     // Atualiza cabeçalho e título da página na aba do navegador
-    const meta = this.routeMeta[targetRoute] || { icon: '📊', label: 'FinObra' };
+    const meta = this.routeMeta[targetRoute] || { icon: '📊', label: 'FinGo' };
     const hTitle = document.getElementById('h-title');
     if (hTitle) hTitle.textContent = meta.label;
-    document.title = meta.title || `FinObra — ${meta.label}`;
+    document.title = meta.title || `FinGo — ${meta.label}`;
 
     // A URL acompanha a intenção de navegação mesmo enquanto o módulo é baixado.
     if (updateHistory) {

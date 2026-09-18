@@ -103,7 +103,7 @@ assert(types.includes('FAQPage'), 'Schema deve conter a entidade FAQPage');
 assert(types.includes('BreadcrumbList'), 'Schema deve conter a entidade BreadcrumbList para navegação hierárquica');
 
 const webSiteNode = schema['@graph'].find(n => n['@type'] === 'WebSite');
-assert.strictEqual(webSiteNode.name, 'FinObra');
+assert.strictEqual(webSiteNode.name, 'FinGo');
 assert(webSiteNode.alternateName && webSiteNode.alternateName.length > 0);
 
 const orgNode = schema['@graph'].find(n => n['@type'] === 'Organization');

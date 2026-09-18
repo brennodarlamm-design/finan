@@ -369,7 +369,7 @@ export async function sendPaymentReceipt(record) {
   const cicloDesc = cycleNames[record.cycle] || '30 dias';
   const valorFmt = (Number(record.amount_cents || 0) / 100).toFixed(2).replace('.', ',');
 
-  const message = `🎉 *Pagamento PIX Confirmado!*\n\nOlá, ${responsavel}! 👋\nConfirmamos com sucesso o recebimento do pagamento da assinatura do *FinObra* para a empresa *${nomeEmpresa}*.\n\n✅ *Status:* Assinatura Ativa & Liberada\n📦 *Plano:* ${String(record.plan_id || 'Profissional').toUpperCase()} (${cicloDesc})\n💰 *Valor:* R$ ${valorFmt}\n🗓️ *Novo Vencimento:* ${fmtVenc}\n🔑 *Identificador PIX (TXID):* ${record.txid || '—'}\n\nMuito obrigado pela confiança e parceria! Os acessos da sua equipe e a sincronização com os canteiros de obras continuam ativos normalmente.`;
+  const message = `🎉 *Pagamento PIX Confirmado!*\n\nOlá, ${responsavel}! 👋\nConfirmamos com sucesso o recebimento do pagamento da assinatura do *FinGo* para a empresa *${nomeEmpresa}*.\n\n✅ *Status:* Assinatura Ativa & Liberada\n📦 *Plano:* ${String(record.plan_id || 'Profissional').toUpperCase()} (${cicloDesc})\n💰 *Valor:* R$ ${valorFmt}\n🗓️ *Novo Vencimento:* ${fmtVenc}\n🔑 *Identificador PIX (TXID):* ${record.txid || '—'}\n\nMuito obrigado pela confiança e parceria! Os acessos da sua equipe e a sincronização com os canteiros de obras continuam ativos normalmente.`;
 
   const results = {
     whatsapp: { attempted: false, success: false },

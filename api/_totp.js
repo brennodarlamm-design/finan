@@ -163,7 +163,7 @@ export function verifyTotpCode(secret, code, options = {}) {
  * Formata URI oficial compatível com Google Authenticator e apps padrão
  */
 export function generateTotpUri(optionsOrSecret, maybeAccount, maybeIssuer) {
-  let secret, account = 'admin', issuer = 'FinObra Master';
+  let secret, account = 'admin', issuer = 'FinGo Master';
   if (typeof optionsOrSecret === 'object' && optionsOrSecret !== null) {
     secret = optionsOrSecret.secret;
     account = optionsOrSecret.account || account;

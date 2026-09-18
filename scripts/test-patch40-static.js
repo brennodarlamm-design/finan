@@ -40,7 +40,7 @@ assert(adminJs.includes('renderBillingEmailHtml'), 'api/admin.js implementa rend
 // 4. Template de E-mail Responsivo
 assert(emailTpl.includes('{{{EMPRESA}}}') && emailTpl.includes('{{{PLANO}}}'), 'Template de e-mail possui tags para empresa e plano.');
 assert(emailTpl.includes('{{{VALOR}}}') && emailTpl.includes('{{{PIX_CHAVE}}}'), 'Template de e-mail inclui valor e chave PIX para pagamento.');
-assert(emailTpl.includes('Fin') && emailTpl.includes('Obra'), 'Template de e-mail possui identidade institucional FinObra.');
+assert(emailTpl.includes('FinGo'), 'Template de e-mail possui identidade institucional FinGo.');
 
 // 5. Interface Interativa do Painel Master
 assert(masterJs.includes('MasterAdmin.abrirModalCobranca'), 'MasterAdmin possui método abrirModalCobranca.');

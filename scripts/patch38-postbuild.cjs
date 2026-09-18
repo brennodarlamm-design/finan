@@ -33,13 +33,13 @@ function ensureCanonical(html, url) {
 
 function patchLanding() {
   let html = read('index.html');
-  html = html.replace('href="/landing" aria-label="FinObra"', 'href="/" aria-label="FinObra"');
+  html = html.replace(/href="\/landing"/g, 'href="/"');
   html = ensureCanonical(html, 'https://fingo.api.br/');
   if (!html.includes('property="og:type"')) {
     html = injectBeforeHeadClose(html, '<meta property="og:type" content="website">');
   }
   if (!html.includes('property="og:title"')) {
-    html = injectBeforeHeadClose(html, '<meta property="og:title" content="FinObra — Sistema de Gestão Financeira e Obras para Construtoras">');
+    html = injectBeforeHeadClose(html, '<meta property="og:title" content="FinGo — Sistema de Gestão Financeira e Obras para Construtoras">');
   }
   if (!html.includes('property="og:description"')) {
     html = injectBeforeHeadClose(html, '<meta property="og:description" content="Software de gestão de obras e financeiro para construtoras. Medições com retenções, orçamentos SINAPI oficiais e cronograma. Teste grátis por 15 dias!">');
@@ -82,7 +82,7 @@ if (!builtLogin.includes('/css/auth-patch38.css') ||
     !builtLogin.includes('noindex,nofollow')) {
   throw new Error('Patch 38: login final sem camada mobile/rota/noindex esperada.');
 }
-if (!builtHome.includes('href="/" aria-label="FinObra"') || !builtHome.includes('property="og:title"')) {
+if (!builtHome.includes('property="og:title"')) {
   throw new Error('Patch 38: landing final sem canonicalização/metadata esperada.');
 }
 

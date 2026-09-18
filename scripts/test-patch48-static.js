@@ -54,7 +54,7 @@ test('landing.html existe', fs.existsSync(landingPath));
 const landing = fs.readFileSync(landingPath, 'utf8');
 
 test('landing.html possui título otimizado para busca orgânica',
-  landing.includes('<title>FinObra — Sistema de Gestão Financeira e Obras para Construtoras</title>'));
+  landing.includes('<title>FinGo — Sistema de Gestão Financeira e Obras para Construtoras</title>'));
 
 test('landing.html possui meta tags essenciais (description, keywords, canonical, robots)',
   landing.includes('<meta name="description"') &&
@@ -84,30 +84,30 @@ const authRoutePath = path.resolve('js/auth-route-patch38.js');
 
 const indexHtml = fs.readFileSync(indexPath, 'utf8');
 test('index.html possui título semântico e meta description',
-  indexHtml.includes('Entrar | FinObra — Gestão de Obras e Finanças') &&
+  indexHtml.includes('Entrar | FinGo — Gestão de Obras e Finanças') &&
   indexHtml.includes('<meta name="description"'));
 
 const masterHtml = fs.readFileSync(masterPath, 'utf8');
 test('master.html possui diretiva de noindex e título de backoffice',
-  masterHtml.includes('Painel Master Administrativo | FinObra Backoffice') &&
+  masterHtml.includes('Painel Master Administrativo | FinGo Backoffice') &&
   masterHtml.includes('noindex, nofollow'));
 
 const authRoute = fs.readFileSync(authRoutePath, 'utf8');
 test('js/auth-route-patch38.js define títulos específicos para /login e /cadastro',
-  authRoute.includes('Criar conta | FinObra') &&
-  authRoute.includes('Entrar | FinObra'));
+  authRoute.includes('Criar conta | FinGo') &&
+  authRoute.includes('Entrar | FinGo'));
 
 // 4. Validação da Camada SPA Router em js/app.js
 const appJsPath = path.resolve('js/app.js');
 const appJs = fs.readFileSync(appJsPath, 'utf8');
 test('js/app.js possui App.routeMeta com títulos semânticos por módulo',
   appJs.includes('routeMeta:') &&
-  appJs.includes('Dashboard Financeiro de Obras | FinObra') &&
-  appJs.includes('Orçamento de Obras & Base SINAPI | FinObra') &&
-  appJs.includes('Controle Financeiro de Obras | FinObra'));
+  appJs.includes('Dashboard Financeiro de Obras | FinGo') &&
+  appJs.includes('Orçamento de Obras & Base SINAPI | FinGo') &&
+  appJs.includes('Controle Financeiro de Obras | FinGo'));
 
 test('js/app.js atualiza document.title dinamicamente na navegação',
-  appJs.includes('document.title = meta.title || `FinObra — ${meta.label}`;'));
+  appJs.includes('document.title = meta.title || `FinGo — ${meta.label}`;'));
 
 // 5. Validação dos Scripts de Build e Headers de Produção
 const cfBuildPath = path.resolve('scripts/build-cloudflare-pages.cjs');

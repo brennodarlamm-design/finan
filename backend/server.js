@@ -451,7 +451,7 @@ async function startWhatsApp(tenantId, forceClean = false) {
       logger: pino({ level: 'silent' }),
       printQRInTerminal: false,
       auth: state,
-      browser: ['FinObra ERP', 'Chrome', '1.0.0'],
+      browser: ['FinGo ERP', 'Chrome', '1.0.0'],
       connectTimeoutMs: 60000,
       defaultQueryTimeoutMs: 60000,
       keepAliveIntervalMs: 25000,
@@ -644,7 +644,7 @@ app.get('/', requireAuth, (req, res) => {
   }));
 
   res.json({
-    name: 'FinObra — Backend 24/7 Multi-Tenant (Render)',
+    name: 'FinGo — Backend 24/7 Multi-Tenant (Render)',
     status: 'online',
     total_sessoes: sessions.size,
     sessoes: summary,
@@ -757,7 +757,7 @@ app.all('/qr', (req, res) => {
       <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>WhatsApp Conectado — FinObra</title>
+        <title>WhatsApp Conectado — FinGo</title>
         <style>
           body { font-family: system-ui, sans-serif; background: #0f172a; color: #f8fafc; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; }
           .card { background: #1e293b; padding: 32px; border-radius: 16px; border: 1px solid #334155; text-align: center; max-width: 420px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
@@ -792,7 +792,7 @@ app.all('/qr', (req, res) => {
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <meta http-equiv="refresh" content="15">
-        <title>Escanear QR Code — FinObra WhatsApp</title>
+        <title>Escanear QR Code — FinGo WhatsApp</title>
         <style>
           body { font-family: system-ui, sans-serif; background: #0f172a; color: #f8fafc; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; }
           .card { background: #1e293b; padding: 32px; border-radius: 16px; border: 1px solid #334155; text-align: center; max-width: 420px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
@@ -1083,7 +1083,7 @@ async function executarResumoMatinal(explicitTenantId = null) {
 
       const totalFmt = totalValor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
       const dataLocal = new Date().toLocaleDateString('pt-BR', { timeZone: 'America/Boa_Vista' });
-      const msg = `🏢 *${t.nome.toUpperCase()} — RESUMO MATINAL*\n📅 *Data:* ${dataLocal}\n\n⚠️ *Atenção:* Você possui *${boletos.length} conta(s)* com vencimento hoje ou pendentes:\n${listaTexto}\n💰 *Total a pagar:* ${totalFmt}\n\n_Mensagem automática gerada pelo FinObra._`;
+      const msg = `🏢 *${t.nome.toUpperCase()} — RESUMO MATINAL*\n📅 *Data:* ${dataLocal}\n\n⚠️ *Atenção:* Você possui *${boletos.length} conta(s)* com vencimento hoje ou pendentes:\n${listaTexto}\n💰 *Total a pagar:* ${totalFmt}\n\n_Mensagem automática gerada pelo FinGo._`;
 
       if (session.connectionStatus === 'connected' && session.sock) {
         const jid = await resolveWhatsAppJid(session, destPhone);

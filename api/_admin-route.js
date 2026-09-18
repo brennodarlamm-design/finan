@@ -358,7 +358,7 @@ export default async function handler(req, res) {
       if (!rows.length) return res.status(404).json({ success:false, error:'Conversa não encontrada ou já encerrada.' });
       await sql`
         INSERT INTO support_messages (id,conversation_id,tenant_id,sender_type,sender_user_id,sender_name,body)
-        VALUES (${`smsg_${crypto.randomBytes(10).toString('hex')}`},${conversationId},${rows[0].tenant_id},'system',${auth.user.userId || auth.user.id},'FinObra',${'Suporte entrou no atendimento.'});
+        VALUES (${`smsg_${crypto.randomBytes(10).toString('hex')}`},${conversationId},${rows[0].tenant_id},'system',${auth.user.userId || auth.user.id},'FinGo',${'Suporte entrou no atendimento.'});
       `;
       await writeAudit(sql, req, { ...auth, tenantId:rows[0].tenant_id }, { acao:'suporte_assumido', entidade:'support_conversation', entidadeId:conversationId, depois:{ atendente:auth.user.nome || auth.user.username } });
       return res.status(200).json({ success:true, conversation:rows[0] });
@@ -389,7 +389,7 @@ export default async function handler(req, res) {
       if (!rows.length) return res.status(404).json({ success:false, error:'Conversa não encontrada.' });
       await sql`
         INSERT INTO support_messages (id,conversation_id,tenant_id,sender_type,sender_user_id,sender_name,body)
-        VALUES (${`smsg_${crypto.randomBytes(10).toString('hex')}`},${conversationId},${rows[0].tenant_id},'system',${auth.user.userId || auth.user.id},'FinObra',${'Atendimento marcado como resolvido.'});
+        VALUES (${`smsg_${crypto.randomBytes(10).toString('hex')}`},${conversationId},${rows[0].tenant_id},'system',${auth.user.userId || auth.user.id},'FinGo',${'Atendimento marcado como resolvido.'});
       `;
       await writeAudit(sql, req, { ...auth, tenantId:rows[0].tenant_id }, { acao:'suporte_resolvido', entidade:'support_conversation', entidadeId:conversationId });
       return res.status(200).json({ success:true });
@@ -827,7 +827,7 @@ export default async function handler(req, res) {
       const planoInfo = PLANOS_INFO[t.plano] || { nome: String(t.plano || 'Profissional').toUpperCase(), valor: '279,90' };
 
       const pixKey = String(userPixKey || process.env.FINOBRA_PIX_KEY || process.env.FINOBRA_SUPPORT_WHATSAPP || '5595991363678').trim();
-      const pixBeneficiary = String(userPixBeneficiary || process.env.FINOBRA_PIX_BENEFICIARY || 'FinObra Soluções Tecnológicas').trim();
+      const pixBeneficiary = String(userPixBeneficiary || process.env.FINOBRA_PIX_BENEFICIARY || 'FinGo Soluções Tecnológicas').trim();
 
       // Cálculo de vencimento e dias restantes
       let fmtVenc = 'A definir';

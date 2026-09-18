@@ -609,7 +609,7 @@ const ImportarExcel = {
     ];
 
     XLSX.utils.book_append_sheet(wb, ws, "Lancamentos");
-    XLSX.writeFile(wb, "Modelo_Importacao_Lancamentos_FinObra.xlsx");
+    XLSX.writeFile(wb, "Modelo_Importacao_Lancamentos_FinGo.xlsx");
     Utils.toast('Planilha modelo baixada com sucesso!', 'success');
   },
 

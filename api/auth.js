@@ -766,7 +766,7 @@ export default async function handler(req, res) {
       }
 
       const generatedSecret = generateTotpSecret(20);
-      const uri = generateTotpUri({ issuer: 'FinObra Master', account: targetUsername, secret: generatedSecret });
+      const uri = generateTotpUri({ issuer: 'FinGo Master', account: targetUsername, secret: generatedSecret });
       const qrSvg = generateQrSvg(uri, 220);
       const backup = generateBackupCodes(6);
 
@@ -933,7 +933,7 @@ export default async function handler(req, res) {
       return res.status(200).json({
         success: true,
         commercial_request: true,
-        message: 'Sua solicitação de acesso foi recebida com sucesso! Nossa equipe comercial entrará em contato para ativar sua construtora no FinObra.'
+        message: 'Sua solicitação de acesso foi recebida com sucesso! Nossa equipe comercial entrará em contato para ativar sua construtora no FinGo.'
       });
     }
 

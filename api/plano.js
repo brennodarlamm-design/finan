@@ -50,7 +50,7 @@ function crc16Ccitt(text) {
 function buildPixPayload({ key, amountCents, txid }) {
   const cleanKey = String(key || '').trim();
   if (!cleanKey) return '';
-  const merchantName = onlyAscii(process.env.FINOBRA_PIX_MERCHANT_NAME || 'FINOBRA SISTEMA', 25) || 'FINOBRA';
+  const merchantName = onlyAscii(process.env.FINOBRA_PIX_MERCHANT_NAME || process.env.FINGO_PIX_MERCHANT_NAME || 'FINGO SISTEMA', 25) || 'FINGO';
   const merchantCity = onlyAscii(process.env.FINOBRA_PIX_CITY || 'BOA VISTA', 15) || 'BOA VISTA';
   const merchantAccount = tlv('00', 'BR.GOV.BCB.PIX') + tlv('01', cleanKey);
   const amount = (Number(amountCents || 0) / 100).toFixed(2);

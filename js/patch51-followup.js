@@ -206,7 +206,7 @@
     if (added.length && typeof Notificacoes !== 'undefined' && typeof Notificacoes.enviarPushDesktop === 'function') {
       const first = added[0];
       const suffix = added.length > 1 ? ` (+${added.length - 1} nova(s))` : '';
-      Notificacoes.enviarPushDesktop('FinObra — Nova etapa atribuída', `${first.nome} · ${first.obra_nome}${suffix}`);
+      Notificacoes.enviarPushDesktop('FinGo — Nova etapa atribuída', `${first.nome} · ${first.obra_nome}${suffix}`);
     }
     return tasks;
   };
