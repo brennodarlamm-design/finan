@@ -270,11 +270,30 @@ export function decryptMfaSecret(storedValue, customKey) {
     throw new Error('Formato inválido para segredo MFA criptografado');
   }
   const [, ivB64, tagB64, encB64] = parts;
-  const rawKey = getMfaEncryptionKey(customKey);
-  const key = crypto.createHash('sha256').update(String(rawKey), 'utf8').digest();
-  const decipher = crypto.createDecipheriv('aes-256-gcm', key, Buffer.from(ivB64, 'base64'));
-  decipher.setAuthTag(Buffer.from(tagB64, 'base64'));
-  let decrypted = decipher.update(encB64, 'base64', 'utf8');
-  decrypted += decipher.final('utf8');
-  return { secret: decrypted, isLegacy: false };
+  try {
+    const rawKey = getMfaEncryptionKey(customKey);
+    const key = crypto.createHash('sha256').update(String(rawKey), 'utf8').digest();
+    const decipher = crypto.createDecipheriv('aes-256-gcm', key, Buffer.from(ivB64, 'base64'));
+    decipher.setAuthTag(Buffer.from(tagB64, 'base64'));
+    let decrypted = decipher.update(encB64, 'base64', 'utf8');
+    decrypted += decipher.final('utf8');
+    return { secret: decrypted, isLegacy: false };
+  } catch (err) {
+    // Auto-migração: se falhar com a chave dedicada (ex: segredo criptografado antes do Patch 56),
+    // tenta decodificar com SESSION_SIGNING_SECRET para não travar contas existentes.
+    const legacyKey = String(process.env.SESSION_SIGNING_SECRET || '').trim();
+    if (legacyKey && legacyKey.length >= 32) {
+      try {
+        const lKey = crypto.createHash('sha256').update(legacyKey, 'utf8').digest();
+        const lDecipher = crypto.createDecipheriv('aes-256-gcm', lKey, Buffer.from(ivB64, 'base64'));
+        lDecipher.setAuthTag(Buffer.from(tagB64, 'base64'));
+        let dec = lDecipher.update(encB64, 'base64', 'utf8');
+        dec += lDecipher.final('utf8');
+        return { secret: dec, isLegacy: true };
+      } catch {
+        // Falhou com ambas as chaves
+      }
+    }
+    throw err;
+  }
 }

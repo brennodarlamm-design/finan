@@ -1,6 +1,11 @@
 const fs = require('fs');
 const path = require('path');
 
+// Vercel build bypass
+if (process.env.VERCEL === '1' || process.env.VERCEL || process.env.VERCEL_ENV) {
+  process.exit(0);
+}
+
 const root = path.resolve(__dirname, '..');
 const dist = path.join(root, 'dist');
 

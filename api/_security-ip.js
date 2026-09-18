@@ -104,7 +104,13 @@ function isUndefinedTable(err) {
 }
 
 export async function checkIpBan(sql, ip, { customPepper } = {}) {
-  const ipHash = hashIp(ip, customPepper);
+  let ipHash = '';
+  try {
+    ipHash = hashIp(ip, customPepper);
+  } catch (err) {
+    console.warn('[SecurityIP] Pepper indisponível para checagem de IP:', err?.message || err);
+    return { blocked: false, reason: 'security_ip_unavailable' };
+  }
   if (!sql || !ipHash) return { blocked: false, reason: 'security_ip_unavailable' };
 
   try {
@@ -145,7 +151,13 @@ export async function checkIpBan(sql, ip, { customPepper } = {}) {
 
 export async function recordIpFailure(sql, ip, options = {}) {
   const normalizedIp = normalizeIp(ip);
-  const ipHash = hashIp(normalizedIp, options.customPepper);
+  let ipHash = '';
+  try {
+    ipHash = hashIp(normalizedIp, options.customPepper);
+  } catch (err) {
+    console.warn('[SecurityIP] Pepper indisponível para registro de falha de IP:', err?.message || err);
+    return { recorded: false, reason: 'security_ip_unavailable' };
+  }
   if (!sql || !ipHash) return { recorded: false, reason: 'security_ip_unavailable' };
 
   const reason = String(options.reason || 'security_failure').slice(0, 80);

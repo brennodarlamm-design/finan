@@ -642,7 +642,27 @@ export default async function handler(req, res) {
           newBackupCodes = bRes.remainingHashedCodes;
         }
       } else if (code) {
-        const { secret: decryptedSecret, isLegacy } = decryptMfaSecret(user.mfa_secret);
+        let decryptedSecret = '';
+        let isLegacy = false;
+        try {
+          const dec = decryptMfaSecret(user.mfa_secret);
+          decryptedSecret = dec.secret;
+          isLegacy = dec.isLegacy;
+        } catch (mfaErr) {
+          console.error('[Auth MFA] Falha ao descriptografar segredo MFA:', mfaErr.message || mfaErr);
+          return res.status(500).json({
+            success: false,
+            message: 'Erro interno na validação de MFA. Verifique as configurações de criptografia do servidor ou use o código de emergência.'
+          });
+        }
+
+        if (!decryptedSecret) {
+          return res.status(400).json({
+            success: false,
+            message: 'Segredo MFA não configurado para esta conta. Utilize o código de recuperação.'
+          });
+        }
+
         const totpRes = verifyTotpCode(decryptedSecret, code, {
           lastUsedStep: user.mfa_last_used_step || 0
         });
@@ -650,8 +670,12 @@ export default async function handler(req, res) {
           mfaValid = true;
           newStep = totpRes.step;
           if (isLegacy && decryptedSecret) {
-            const reEncrypted = encryptMfaSecret(decryptedSecret);
-            await sql`UPDATE usuarios SET mfa_secret = ${reEncrypted} WHERE id = ${user.id};`;
+            try {
+              const reEncrypted = encryptMfaSecret(decryptedSecret);
+              await sql`UPDATE usuarios SET mfa_secret = ${reEncrypted} WHERE id = ${user.id};`;
+            } catch (encErr) {
+              console.warn('[Auth MFA] Migração para segredo criptografado adiada:', encErr.message || encErr);
+            }
           }
         }
       } else {

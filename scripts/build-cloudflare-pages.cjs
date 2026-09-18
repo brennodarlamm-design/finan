@@ -2,6 +2,12 @@ const fs = require('fs');
 const path = require('path');
 const { execFileSync } = require('child_process');
 
+// Vercel build bypass: Vercel possui pipeline serverless próprio e não consome a pasta dist do Cloudflare Pages.
+if (process.env.VERCEL === '1' || process.env.VERCEL || process.env.VERCEL_ENV) {
+  console.log('✅ Ambiente Vercel detectado: pulando build de distribuição do Cloudflare Pages.');
+  process.exit(0);
+}
+
 const root = path.resolve(__dirname, '..');
 const out = path.join(root, 'dist');
 
@@ -139,9 +145,15 @@ for (const dir of directories) copyRequired(path.join(root, dir), path.join(out,
 copyRequired(path.join(root, 'landing.html'), path.join(out, 'index.html'));
 copyRequired(path.join(root, 'index.html'), path.join(out, 'login.html'));
 
-copyRequired(path.join(root, 'cloudflare', '_headers'), path.join(out, '_headers'));
-copyRequired(path.join(root, 'cloudflare', '_redirects'), path.join(out, '_redirects'));
-copyRequired(path.join(root, 'cloudflare', '_routes.json'), path.join(out, '_routes.json'));
+const cfDir = path.join(root, 'cloudflare');
+if (fs.existsSync(cfDir)) {
+  for (const cfFile of ['_headers', '_redirects', '_routes.json']) {
+    const cfSrc = path.join(cfDir, cfFile);
+    if (fs.existsSync(cfSrc)) {
+      copyRequired(cfSrc, path.join(out, cfFile));
+    }
+  }
+}
 
 const deploymentMetadata = writeDeploymentMetadata();
 
