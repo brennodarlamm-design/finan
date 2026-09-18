@@ -51,12 +51,16 @@
       "destination": "/api/$1"
     },
     {
+      "source": "/",
+      "destination": "/landing.html"
+    },
+    {
       "source": "/login",
-      "destination": "/"
+      "destination": "/index.html"
     },
     {
       "source": "/cadastro",
-      "destination": "/"
+      "destination": "/index.html"
     },
     {
       "source": "/master",

@@ -44,7 +44,7 @@
         return;
       }
 
-      container.innerHTML = `<div class="idle-card"><div class="idle-icon">🔄</div><div class="idle-text">Consultando registro na base central do FinObra…</div></div>`;
+      container.innerHTML = `<div class="idle-card"><div class="idle-icon">🔄</div><div class="idle-text">Consultando registro na base central do FinGo…</div></div>`;
 
       let registro;
       try {
@@ -107,7 +107,7 @@
           </div>
           <div class="data-row">
             <span class="data-label">Empresa responsável pelo registro:</span>
-            <span class="data-val">${escapeHtml(registro.empresa || 'Empresa usuária do FinObra')} ${registro.empresa_cnpj ? `&bull; CNPJ ${escapeHtml(registro.empresa_cnpj)}` : ''}</span>
+            <span class="data-val">${escapeHtml(registro.empresa || 'Empresa usuária do FinGo')} ${registro.empresa_cnpj ? `&bull; CNPJ ${escapeHtml(registro.empresa_cnpj)}` : ''}</span>
           </div>
           <div class="data-row">
             <span class="data-label">Signatário:</span>
@@ -151,7 +151,7 @@
           <img src="${qrCodeUrl}" alt="QR Code" class="legal-qr">
           <div class="legal-text">
             <strong>🔎 O que esta consulta confirma:</strong><br>
-            Esta consulta confirma que o código exibido foi registrado na base central do FinObra e que os metadados acima correspondem ao registro eletrônico armazenado. O hash SHA-256 exibido protege a integridade do <strong>registro de assinatura</strong>. A validade jurídica do documento deve ser analisada conforme o contexto, a identificação das partes e os requisitos legais aplicáveis.
+            Esta consulta confirma que o código exibido foi registrado na base central do FinGo e que os metadados acima correspondem ao registro eletrônico armazenado. O hash SHA-256 exibido protege a integridade do <strong>registro de assinatura</strong>. A validade jurídica do documento deve ser analisada conforme o contexto, a identificação das partes e os requisitos legais aplicáveis.
           </div>
         </div>
 

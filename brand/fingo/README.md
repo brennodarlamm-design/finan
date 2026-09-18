@@ -1,6 +1,6 @@
-﻿# FinGo Brand Assets
+# FinGo Brand Assets
 
-Nova identidade visual — Era FinGo: Obras em Fluxo.
+Nova identidade visual — FinGo: Obras em Fluxo.
 
 ## Arquivos
 

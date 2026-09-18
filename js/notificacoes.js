@@ -435,8 +435,8 @@ const Notificacoes = {
       try {
         new Notification(titulo, {
           body: corpo,
-          icon: 'img/logo.png',
-          badge: 'img/logo.png'
+          icon: '/img/fingo/fingo-symbol.png',
+          badge: '/img/fingo/fingo-symbol.png'
         });
       } catch (err) {
         console.warn('Erro ao disparar push desktop:', err);

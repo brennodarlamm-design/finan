@@ -1,4 +1,4 @@
-﻿---
+---
 name: fingo-brand-system
 description: >
   Sistema de design da nova identidade visual FinGo — Obras em Fluxo.
@@ -10,7 +10,7 @@ description: >
 
 # FinGo Brand System — Skill de Design Oficial
 
-> **Era FinGo. Obras em Fluxo.**
+> **FinGo — Obras em Fluxo.**
 
 ## PALETA PRINCIPAL (do brandbook oficial)
 
