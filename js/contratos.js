@@ -19,7 +19,14 @@ const Contratos = {
   },
 
   salvarLista(contratos) {
-    localStorage.setItem(this._getKey(), JSON.stringify(contratos));
+    const key = this._getKey();
+    localStorage.setItem(key, JSON.stringify(contratos));
+    if (typeof IDBStorage !== 'undefined' && IDBStorage.set) {
+      IDBStorage.set(key, contratos).catch(() => null);
+    }
+    if (typeof DB !== 'undefined' && typeof DB._broadcastLocalChange === 'function') {
+      DB._broadcastLocalChange('contratos', 'save');
+    }
   },
 
   getById(id) {

@@ -39,7 +39,7 @@ export async function validateNotaFiscalTenant(sql, notaId, tenantId) {
 }
 
 export async function enforceObraPlanLimit(sql, tenantId, plan, obra) {
-  if (!obra?.id || !isActiveObraStatus(obra.status)) return { allowed: true };
+  if (!obra?.id || !isActiveObraStatus(obra.status) || ['escritorio', 'geral'].includes(String(obra.id).toLowerCase())) return { allowed: true };
   const rule = getPlanRule(plan);
   if (rule.maxActiveObras == null) return { allowed: true };
 
@@ -50,7 +50,8 @@ export async function enforceObraPlanLimit(sql, tenantId, plan, obra) {
     SELECT COUNT(*)::int AS total
     FROM obras
     WHERE tenant_id = ${tenantId}
-      AND LOWER(COALESCE(status, 'em_andamento')) NOT IN ('concluida','concluído','concluido','cancelada','cancelado');
+      AND LOWER(COALESCE(status, 'em_andamento')) NOT IN ('concluida','concluído','concluido','concluído','cancelada','cancelado','sistema')
+      AND id NOT IN ('escritorio', 'geral');
   `;
   const current = Number(countRows[0]?.total || 0);
   if (current >= rule.maxActiveObras) {
@@ -75,15 +76,20 @@ export async function validateBulkObraPlanLimit(sql, tenantId, plan, obras) {
   const rule = getPlanRule(plan);
   if (rule.maxActiveObras == null) return { allowed: true };
 
-  const rows = await sql`SELECT id, status FROM obras WHERE tenant_id = ${tenantId};`;
+  const isCountable = (id, status) => isActiveObraStatus(status) && !['escritorio', 'geral'].includes(String(id).toLowerCase());
+
+  const rows = await sql`
+    SELECT id, status FROM obras
+    WHERE tenant_id = ${tenantId} AND id NOT IN ('escritorio', 'geral');
+  `;
   const projected = new Map(rows.map((r) => [String(r.id), r.status]));
-  let activeCount = rows.reduce((count, r) => count + (isActiveObraStatus(r.status) ? 1 : 0), 0);
+  let activeCount = rows.reduce((count, r) => count + (isCountable(r.id, r.status) ? 1 : 0), 0);
 
   for (const obra of obras) {
-    if (!obra?.id || !obra?.nome) continue;
+    if (!obra?.id || !obra?.nome || ['escritorio', 'geral'].includes(String(obra.id).toLowerCase())) continue;
     const key = String(obra.id);
-    const previousActive = projected.has(key) && isActiveObraStatus(projected.get(key));
-    const nextActive = isActiveObraStatus(obra.status);
+    const previousActive = projected.has(key) && isCountable(key, projected.get(key));
+    const nextActive = isCountable(key, obra.status);
 
     if (!previousActive && nextActive) activeCount += 1;
     if (previousActive && !nextActive) activeCount -= 1;

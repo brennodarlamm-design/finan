@@ -1241,10 +1241,14 @@ const Configuracoes = {
     });
     backup.documentos = typeof Documentos !== 'undefined' ? Documentos.getAll() : [];
     backup.recibos = typeof Recibos !== 'undefined' ? Recibos.getAll() : [];
-    backup.contratos = typeof Contratos !== 'undefined' ? Contratos.getAll() : [];
-    backup.orcamentos_sinapi = JSON.parse(localStorage.getItem(DB._ck ? DB._ck('orcamentos_sinapi') : 'orcamentos_sinapi') || '[]');
-      backup.preferencias = (DB._preferencesLocalSnapshot ? DB._preferencesLocalSnapshot() : {});
-      backup.doc_fases = (DB._collectLocalDocPhases ? DB._collectLocalDocPhases() : []);
+    try {
+      const sinapiRaw = localStorage.getItem(DB._ck ? DB._ck('finobra_orcamentos_sinapi') : 'finobra_orcamentos_sinapi') || localStorage.getItem(DB._ck ? DB._ck('orcamentos_sinapi') : 'orcamentos_sinapi') || '[]';
+      backup.orcamentos_sinapi = JSON.parse(sinapiRaw);
+    } catch {
+      backup.orcamentos_sinapi = [];
+    }
+    backup.preferencias = (DB._preferencesLocalSnapshot ? DB._preferencesLocalSnapshot() : {});
+    backup.doc_fases = (DB._collectLocalDocPhases ? DB._collectLocalDocPhases() : []);
     backup.exported_at = new Date().toISOString();
     const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
     const a = document.createElement('a');

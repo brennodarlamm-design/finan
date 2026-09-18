@@ -69,10 +69,23 @@ export async function handleV2CurvaAbc(req, res) {
     });
   }
 
+function parseNumeric(val, fallback = 0) {
+  if (val === undefined || val === null || val === '') return fallback;
+  if (typeof val === 'number') return Number.isFinite(val) ? val : fallback;
+  let str = String(val).trim();
+  if (str.includes(',') && str.includes('.')) {
+    str = str.replace(/\./g, '').replace(',', '.');
+  } else if (str.includes(',')) {
+    str = str.replace(',', '.');
+  }
+  const n = Number(str);
+  return Number.isFinite(n) ? n : fallback;
+}
+
   const sorted = itens.map(item => {
-    const qtd = Number(item.quantidade || item.qtd || 1);
-    const preco = Number(item.preco_unitario || item.preco || item.total || 0);
-    const total = Number(item.valor_total || (qtd * preco));
+    const qtd = parseNumeric(item.quantidade ?? item.qtd, 1);
+    const preco = parseNumeric(item.preco_unitario ?? item.preco ?? item.total, 0);
+    const total = parseNumeric(item.valor_total, qtd * preco);
     return {
       codigo: String(item.codigo || item.id || ''),
       descricao: String(item.descricao || item.nome || 'Item'),
@@ -184,6 +197,7 @@ export async function handleV2BoletimMedicao(req, res) {
 
   const aliqISS = Number(body.aliqISS !== undefined ? body.aliqISS : 5.0);
   const desonerado = Boolean(body.desonerado);
+  const optanteSimples = Boolean(body.optanteSimples || body.simplesNacional);
   const aliqINSS = desonerado ? 3.5 : 11.0;
   const aliqIRRF = Number(body.aliqIRRF !== undefined ? body.aliqIRRF : 1.5);
   const aliqRetencaoGarantia = Number(body.aliqRetencaoGarantia !== undefined ? body.aliqRetencaoGarantia : 5.0);
@@ -191,7 +205,11 @@ export async function handleV2BoletimMedicao(req, res) {
   const valorISS = Number((valorBruto * (aliqISS / 100)).toFixed(2));
   const valorINSS = Number((valorBruto * (aliqINSS / 100)).toFixed(2));
   const valorIRRF = Number((valorBruto * (aliqIRRF / 100)).toFixed(2));
-  const valorPisCofinsCsll = valorBruto >= 5000 ? Number((valorBruto * 0.0465).toFixed(2)) : 0;
+
+  // Lei 13.137/2015: dispensa retenção de PIS/COFINS/CSLL quando o valor da retenção for igual ou inferior a R$ 10,00.
+  // Empresas optantes pelo Simples Nacional não sofrem retenção na fonte (IN RFB 459/2004).
+  const rawPisCofins = valorBruto * 0.0465;
+  const valorPisCofinsCsll = (optanteSimples || rawPisCofins <= 10.0) ? 0 : Number(rawPisCofins.toFixed(2));
   const valorGarantia = Number((valorBruto * (aliqRetencaoGarantia / 100)).toFixed(2));
 
   const totalRetencoes = Number((valorISS + valorINSS + valorIRRF + valorPisCofinsCsll + valorGarantia).toFixed(2));
@@ -205,7 +223,11 @@ export async function handleV2BoletimMedicao(req, res) {
         iss: { aliquota: `${aliqISS}%`, valor: valorISS },
         inss: { aliquota: `${aliqINSS}%`, regime: desonerado ? 'Desonerado (Lei 12.546)' : 'Geral', valor: valorINSS },
         irrf: { aliquota: `${aliqIRRF}%`, valor: valorIRRF },
-        pisCofinsCsll: { aliquota: valorBruto >= 5000 ? '4.65%' : 'Isento (< R$ 5.000)', valor: valorPisCofinsCsll },
+        pisCofinsCsll: {
+          aliquota: optanteSimples ? 'Isento (Simples Nacional)' : (rawPisCofins <= 10.0 ? 'Dispensado (DARF <= R$ 10,00)' : '4.65% (CSRF)'),
+          regime: optanteSimples ? 'Simples Nacional' : 'Lei 13.137/2015',
+          valor: valorPisCofinsCsll
+        },
         garantiaContratual: { aliquota: `${aliqRetencaoGarantia}%`, valor: valorGarantia }
       },
       totalRetencoes,

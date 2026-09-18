@@ -67,8 +67,8 @@ export default async function handler(req, res) {
       ` : Promise.resolve([{}]),
       showObras ? sql`
         SELECT
-          COUNT(*)::int AS total,
-          COUNT(*) FILTER (WHERE LOWER(COALESCE(status,'em_andamento')) NOT IN ('concluida','concluída','concluido','concluído','cancelada','cancelado'))::int AS ativas
+          COUNT(*) FILTER (WHERE id NOT IN ('escritorio','geral') AND LOWER(COALESCE(status,'em_andamento')) <> 'sistema')::int AS total,
+          COUNT(*) FILTER (WHERE LOWER(COALESCE(status,'em_andamento')) NOT IN ('concluida','concluída','concluido','concluído','cancelada','cancelado','sistema') AND id NOT IN ('escritorio','geral'))::int AS ativas
         FROM obras WHERE tenant_id=${auth.tenantId};
       ` : Promise.resolve([{}]),
       showMedicoes ? sql`

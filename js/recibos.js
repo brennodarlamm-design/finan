@@ -13,7 +13,14 @@ const Recibos = {
   },
 
   salvarLista(recibos) {
-    localStorage.setItem(this._getKey(), JSON.stringify(recibos));
+    const key = this._getKey();
+    localStorage.setItem(key, JSON.stringify(recibos));
+    if (typeof IDBStorage !== 'undefined' && IDBStorage.set) {
+      IDBStorage.set(key, recibos).catch(() => null);
+    }
+    if (typeof DB !== 'undefined' && typeof DB._broadcastLocalChange === 'function') {
+      DB._broadcastLocalChange('recibos', 'save');
+    }
   },
 
   getById(id) {

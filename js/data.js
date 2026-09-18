@@ -1001,7 +1001,7 @@ const DB = {
    */
   _reconcileCollection(table, cloudItems = [], localItems = []) {
     const queue = [
-      ...((typeof this._getSyncFailed === 'function') ? this._getSyncFailed().filter(item => item.payload?.action === 'save') : []),
+      ...((typeof this._getSyncFailed === 'function') ? this._getSyncFailed() : []),
       ...((typeof this._getSyncQueue === 'function') ? this._getSyncQueue() : [])
     ];
     // Só remova cache ausente da nuvem após concluir a migração dos dados locais.
@@ -1011,6 +1011,10 @@ const DB = {
     if (table === 'obras') tableAliases.push('clientes');
     if (table === 'notas') tableAliases.push('notas_fiscais');
     if (table === 'contas') tableAliases.push('contas_bancarias');
+    if (table === 'orcamentos') tableAliases.push('orcamentos_sinapi');
+    if (table === 'orcamentos_sinapi') tableAliases.push('orcamentos');
+    if (table === 'documentos') tableAliases.push('doc_fases');
+    if (table === 'doc_fases') tableAliases.push('documentos');
 
     const relevantQueue = queue.filter(q => tableAliases.includes(q?.payload?.table));
 
@@ -1105,8 +1109,15 @@ const DB = {
       this.save('fornecedores', (this.getAll('fornecedores') || []).filter(item => !idSet.has(String(item.id))));
     } else if (['produtos'].includes(table)) {
       this.save('produtos', (this.getAll('produtos') || []).filter(item => !idSet.has(String(item.id))));
-    } else if (['orcamentos'].includes(table)) {
+    } else if (['orcamentos', 'orcamentos_sinapi'].includes(table)) {
       this.save('orcamentos', (this.getAll('orcamentos') || []).filter(item => !idSet.has(String(item.id))));
+      try {
+        const curSinapi = JSON.parse(localStorage.getItem(this._ck('finobra_orcamentos_sinapi')) || localStorage.getItem(this._ck('orcamentos_sinapi')) || '[]');
+        if (Array.isArray(curSinapi)) {
+          const filtered = curSinapi.filter(item => !idSet.has(String(item.id)) && !idSet.has(String(item.obraId)) && !idSet.has(String(item.obra_id)));
+          localStorage.setItem(this._ck('finobra_orcamentos_sinapi'), JSON.stringify(filtered));
+        }
+      } catch {}
     } else if (['medicoes'].includes(table)) {
       this.save('medicoes', (this.getAll('medicoes') || []).filter(item => !idSet.has(String(item.id))));
     } else if (['contas', 'contas_bancarias'].includes(table)) {
@@ -1121,7 +1132,7 @@ const DB = {
         const filtered = cur.filter(item => !idSet.has(String(item.id)));
         localStorage.setItem(this._ck('finobra_recibos'), JSON.stringify(filtered));
       } catch {}
-    } else if (['documentos'].includes(table)) {
+    } else if (['documentos', 'doc_fases'].includes(table)) {
       if (typeof Documentos !== 'undefined' && typeof Documentos.getAll === 'function') {
         const cur = Documentos.getAll() || [];
         Documentos.salvarLista(cur.filter(item => !idSet.has(String(item.id))));
@@ -1131,7 +1142,7 @@ const DB = {
 
   _applyDeltaToCollection(table, cloudMutated = [], localItems = []) {
     const queue = [
-      ...((typeof this._getSyncFailed === 'function') ? this._getSyncFailed().filter(item => item.payload?.action === 'save') : []),
+      ...((typeof this._getSyncFailed === 'function') ? this._getSyncFailed() : []),
       ...((typeof this._getSyncQueue === 'function') ? this._getSyncQueue() : [])
     ];
     const tableAliases = [table];
@@ -1139,6 +1150,10 @@ const DB = {
     if (table === 'obras') tableAliases.push('clientes');
     if (table === 'notas') tableAliases.push('notas_fiscais');
     if (table === 'contas') tableAliases.push('contas_bancarias');
+    if (table === 'orcamentos') tableAliases.push('orcamentos_sinapi');
+    if (table === 'orcamentos_sinapi') tableAliases.push('orcamentos');
+    if (table === 'documentos') tableAliases.push('doc_fases');
+    if (table === 'doc_fases') tableAliases.push('documentos');
 
     const relevantQueue = queue.filter(q => tableAliases.includes(q?.payload?.table));
     const pendingDeletes = new Set();
@@ -2492,7 +2507,8 @@ const DB = {
     let mesesAdicionais = 0;
     if (spi < 0.95 && spi > 0) {
       const mesesFaltantes = Math.max(1, totalMeses - 1 - mesAtualIdx);
-      mesesAdicionais = Math.round((mesesFaltantes / spi) - mesesFaltantes);
+      const rawMesesAdicionais = Math.round((mesesFaltantes / Math.max(0.15, spi)) - mesesFaltantes);
+      mesesAdicionais = Math.min(rawMesesAdicionais, mesesFaltantes * 4, 120);
     }
     const dataTerminoEstimada = new Date(maiorFim);
     if (mesesAdicionais > 0) {
