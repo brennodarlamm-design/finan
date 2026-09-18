@@ -213,7 +213,7 @@
     const key = state.revealed.get(tenantId);
     const row = state.rows.find(r => r.tenantId === tenantId);
     if (!key || !row) return;
-    const msg = `Olá! Segue sua Chave da Empresa FinObra para ${row.nomeFantasia || 'sua construtora'}:\n\n🔑 Chave da Empresa: *${key}*\n\nUse essa chave junto com seu usuário/e-mail e senha em https://finobra.app.br/login`;
+    const msg = `Olá! Segue sua Chave da Empresa FinObra para ${row.nomeFantasia || 'sua construtora'}:\n\n🔑 Chave da Empresa: *${key}*\n\nUse essa chave junto com seu usuário/e-mail e senha em https://fingo.api.br/login`;
     try {
       await navigator.clipboard.writeText(msg);
       if (typeof Utils !== 'undefined' && Utils.toast) Utils.toast('Mensagem pronta para WhatsApp copiada.', 'success');

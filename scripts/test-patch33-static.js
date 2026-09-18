@@ -30,7 +30,7 @@ assert(worker.includes('const healthy = configOk && !loopRisk && deploymentMetad
 
 assert(workflow.includes('"deploymentMetadataOk":true'), 'Smoke test deve exigir metadados válidos.');
 assert(workflow.includes('$GITHUB_SHA'), 'Smoke test deve comparar o SHA publicado com GITHUB_SHA.');
-assert(workflow.includes('https://finobra.app.br/version.json'), 'Smoke test deve validar version.json publicado.');
+assert(workflow.includes('https://fingo.api.br/version.json') || workflow.includes('https://finobra.app.br/version.json'), 'Smoke test deve validar version.json publicado.');
 assert(workflow.includes('"source":"github-actions"'), 'Deploy de produção controlado deve exigir GitHub Actions como origem.');
 assert(!workflow.includes('"source":"cloudflare-workers-builds"'), 'Workflow de produção não deve aceitar Workers Builds concorrente após a desconexão.');
 assert(workflow.includes('Production smoke test passed for commit $GITHUB_SHA'), 'Log final deve identificar o commit validado, podendo acrescentar o contrato de smoke atual.');

@@ -69,7 +69,7 @@ const PortalCliente = {
   },
 
   getUrlPortal(obraId) {
-    const origin = (typeof window !== 'undefined' && window.location.origin) ? window.location.origin : 'https://finobra.app.br';
+    const origin = (typeof window !== 'undefined' && window.location.origin) ? window.location.origin : 'https://fingo.api.br';
     const obra = (typeof DB !== 'undefined' && DB.getAll)
       ? ((DB.getAll('clientes') || []).find(o => String(o.id) === String(obraId)) || {})
       : {};
@@ -528,7 +528,7 @@ const PortalCliente = {
 
         <footer style="border-top:1px solid var(--border);padding:24px 16px;text-align:center;font-size:.75rem;color:var(--text3);background:rgba(14,25,13,.5);">
           <div>🔒 Portal de Transparência protegido por criptografia &middot; ${e(emp.n)}</div>
-          <div style="margin-top:4px;">Tecnologia <a href="https://finobra.app.br" target="_blank" rel="noopener" style="color:var(--accent);text-decoration:none;font-weight:700;">FinObra</a> &middot; Gestão de Obras e Engenharia</div>
+          <div style="margin-top:4px;">Tecnologia <a href="https://fingo.api.br" target="_blank" rel="noopener" style="color:var(--accent);text-decoration:none;font-weight:700;">FinObra</a> &middot; Gestão de Obras e Engenharia</div>
         </footer>
       </div>`;
   },

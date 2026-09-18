@@ -8,6 +8,6 @@ ok(admin.includes("auth.user?.impersonated === true && auth.user?.impersonatedBy
 ok(admin.includes('SELECT perfil, ativo, tenant_id FROM usuarios'),'retorno valida tenant real do Master');
 ok(ci.includes('wait-vercel-api:'),'CI possui gate Vercel antes do Cloudflare');
 ok(ci.includes('needs: [validate, wait-vercel-api]'),'Cloudflare depende do gate Vercel');
-ok(ci.includes("https://api.finobra.app.br/api/auth?action=health"),'gate consulta health público da API');
+ok(ci.includes("https://api.fingo.api.br/api/auth?action=health") || ci.includes("https://api.finobra.app.br/api/auth?action=health"),'gate consulta health público da API');
 ok(ci.includes('Cloudflare deploy is blocked'),'falha do backend bloqueia rollout do frontend');
 console.log('\n✅ Patch 37 release hardening validado.');

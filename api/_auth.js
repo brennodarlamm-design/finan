@@ -66,8 +66,8 @@ function getCookie(req, name) {
 function allowedBrowserOrigins(req) {
   // H-21: Lista canônica estrita de origens permitidas sem derivação cega do header Host não confiável
   const origins = new Set([
-    'https://finobra.app.br',
-    'https://www.finobra.app.br',
+    'https://fingo.api.br',
+    'https://www.fingo.api.br',
     'http://localhost:3000',
     'http://localhost:3333',
     'http://localhost:5000',

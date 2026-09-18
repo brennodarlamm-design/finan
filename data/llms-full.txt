@@ -3,7 +3,7 @@
 > Documento completo de especificação de sistema, arquitetura, contratos de API, dicionário de dados e fluxos operacionais, formatado conforme o padrão llmstxt.org para agentes e modelos de inteligência artificial.
 > Versão: 2.38.0
 > Data: 2026-09-15
-> URL Canônica: https://finobra.app.br/llms-full.txt
+> URL Canônica: https://fingo.api.br/llms-full.txt
 
 ---
 

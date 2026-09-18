@@ -42,8 +42,8 @@ console.error = (...args) => {
 const app = express();
 
 const ALLOWED_ORIGINS = [
-  'https://finobra.app.br',
-  'https://www.finobra.app.br',
+  'https://fingo.api.br',
+  'https://www.fingo.api.br',
   'http://localhost:3000',
   'http://localhost:3333',
   'http://localhost:5000',
@@ -1147,7 +1147,7 @@ function renderBillingEmailHtmlServer(vars) {
   const pixChave = escapeHtmlServer(vars.PIX_CHAVE);
   const pixBeneficiario = escapeHtmlServer(vars.PIX_BENEFICIARIO);
   const mensagemExtra = escapeHtmlServer(vars.MENSAGEM_EXTRA).replace(/\r?\n/g, '<br>');
-  const linkAcesso = encodeURI(vars.LINK_ACESSO || 'https://finobra.app.br/login');
+  const linkAcesso = encodeURI(vars.LINK_ACESSO || 'https://fingo.api.br/login');
 
   return `<!DOCTYPE html>
 <html lang="pt-BR">
@@ -1296,7 +1296,7 @@ async function executarVarreduraCobranca({ manualTrigger = false, forcedTenantId
   const pixKey = String(process.env.FINOBRA_PIX_KEY || process.env.FINOBRA_SUPPORT_WHATSAPP || '5595991363678').trim();
   const pixBeneficiary = String(process.env.FINOBRA_PIX_BENEFICIARY || 'FinObra Soluções Tecnológicas').trim();
   const resendKey = String(process.env.RESEND_API_KEY || '').trim();
-  const emailFrom = String(process.env.FINOBRA_SUPPORT_EMAIL_FROM || 'FinObra <suporte@finobra.app.br>').trim();
+  const emailFrom = String(process.env.FINOBRA_SUPPORT_EMAIL_FROM || 'FinObra <suporte@fingo.api.br>').trim();
 
   // Sessão WhatsApp de disparo (Master/Angelim)
   const masterSession = getTenantSession('angelim') || (TARGET_TENANT_ID ? getTenantSession(TARGET_TENANT_ID) : null);
@@ -1392,7 +1392,7 @@ async function executarVarreduraCobranca({ manualTrigger = false, forcedTenantId
     } else if (templateType === 'trial_ending') {
       defaultSubject = `🚀 FinObra — Seu período de testes termina em ${fmtVenc}`;
       defaultTituloAviso = `Seu período de testes está terminando em ${fmtVenc}`;
-      finalMessage = `Olá, ${responsavel}! 🚀\n\nSeu período de teste gratuito do *FinObra* na empresa *${nomeEmpresa}* termina em *${fmtVenc}*.\n\nEsperamos que a plataforma esteja transformando a gestão das suas obras! Para continuar utilizando todos os recursos com a sua equipe:\n\n👉 Conheça os planos e assine: https://finobra.app.br/app.html#planos\n💰 *Valor de referência:* R$ ${planoInfo.valor}/mês (${planoInfo.nome})\n🔑 *Chave PIX:* ${pixKey}\n👤 *Beneficiário:* ${pixBeneficiary}\n\nEstamos à disposição para ajudar na escolha do melhor plano!`;
+      finalMessage = `Olá, ${responsavel}! 🚀\n\nSeu período de teste gratuito do *FinObra* na empresa *${nomeEmpresa}* termina em *${fmtVenc}*.\n\nEsperamos que a plataforma esteja transformando a gestão das suas obras! Para continuar utilizando todos os recursos com a sua equipe:\n\n👉 Conheça os planos e assine: https://fingo.api.br/app.html#planos\n💰 *Valor de referência:* R$ ${planoInfo.valor}/mês (${planoInfo.nome})\n🔑 *Chave PIX:* ${pixKey}\n👤 *Beneficiário:* ${pixBeneficiary}\n\nEstamos à disposição para ajudar na escolha do melhor plano!`;
     }
 
     let channelUsed = 'none';
@@ -1427,7 +1427,7 @@ async function executarVarreduraCobranca({ manualTrigger = false, forcedTenantId
           PIX_CHAVE: pixKey,
           PIX_BENEFICIARIO: pixBeneficiary,
           MENSAGEM_EXTRA: finalMessage,
-          LINK_ACESSO: 'https://finobra.app.br/login'
+          LINK_ACESSO: 'https://fingo.api.br/login'
         });
 
         const res = await fetch('https://api.resend.com/emails', {
@@ -1474,7 +1474,7 @@ async function executarVarreduraCobranca({ manualTrigger = false, forcedTenantId
         await sql`
           INSERT INTO audit_logs (tenant_id, user_email, action, details, ip_address)
           VALUES (
-            ${t.id}, 'billing-cron@finobra.app.br', 'cobranca_automatica_enviada',
+            ${t.id}, 'billing-cron@fingo.api.br', 'cobranca_automatica_enviada',
             ${JSON.stringify({ stage, channel: channelUsed, diasRestantes, empresa: nomeEmpresa, destPhone, destEmail })}::jsonb,
             '127.0.0.1'
           );

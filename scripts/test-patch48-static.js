@@ -37,14 +37,14 @@ test('robots.txt permite indexação pública e bloqueia áreas restritas (/app/
   rootRobots.includes('Disallow: /app/') &&
   rootRobots.includes('Disallow: /api/') &&
   rootRobots.includes('Disallow: /master') &&
-  rootRobots.includes('Sitemap: https://finobra.app.br/sitemap.xml'));
+  rootRobots.includes('Sitemap: https://fingo.api.br/sitemap.xml'));
 
 const rootSitemap = fs.readFileSync(rootSitemapPath, 'utf8');
 test('sitemap.xml contém URLs canônicas essenciais com prioridades e changefreq',
-  rootSitemap.includes('<loc>https://finobra.app.br/</loc>') &&
-  rootSitemap.includes('<loc>https://finobra.app.br/validar</loc>') &&
-  rootSitemap.includes('<loc>https://finobra.app.br/termos</loc>') &&
-  rootSitemap.includes('<loc>https://finobra.app.br/privacidade</loc>') &&
+  rootSitemap.includes('<loc>https://fingo.api.br/</loc>') &&
+  rootSitemap.includes('<loc>https://fingo.api.br/validar</loc>') &&
+  rootSitemap.includes('<loc>https://fingo.api.br/termos</loc>') &&
+  rootSitemap.includes('<loc>https://fingo.api.br/privacidade</loc>') &&
   rootSitemap.includes('<changefreq>weekly</changefreq>') &&
   rootSitemap.includes('<priority>1.0</priority>'));
 
@@ -59,7 +59,7 @@ test('landing.html possui título otimizado para busca orgânica',
 test('landing.html possui meta tags essenciais (description, keywords, canonical, robots)',
   landing.includes('<meta name="description"') &&
   landing.includes('<meta name="keywords"') &&
-  landing.includes('<link rel="canonical" href="https://finobra.app.br/">') &&
+  landing.includes('<link rel="canonical" href="https://fingo.api.br/">') &&
   landing.includes('content="index,follow'));
 
 test('landing.html possui Open Graph e Twitter Cards completos para compartilhamento social',

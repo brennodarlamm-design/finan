@@ -8,7 +8,7 @@ Este diretório centraliza a documentação técnica, manuais de arquitetura e h
 
 * **[Histórico de Patches & Migrações](history/):**
   * [`CLOUDFLARE_MIGRATION.md`](history/CLOUDFLARE_MIGRATION.md): Arquitetura de migração de edge computing para Cloudflare Workers e Pages com redundância Vercel.
-  * [`DOMAIN_CUTOVER.md`](history/DOMAIN_CUTOVER.md): Procedimentos e gates de segurança para o cutover do domínio `finobra.app.br`.
+  * [`DOMAIN_CUTOVER.md`](history/DOMAIN_CUTOVER.md): Procedimentos e gates de segurança para o cutover do domínio `fingo.api.br`.
   * [`LOADING_PERFORMANCE.md`](history/LOADING_PERFORMANCE.md): Otimizações de latência inicial, lazy-loading de módulos de engenharia e renderização SPA.
   * [`SYNC_RELIABILITY.md`](history/SYNC_RELIABILITY.md): Protocolo de sincronização bidirecional offline-first entre IndexedDB e Neon PostgreSQL.
   * [`VISUAL_REDESIGN.md`](history/VISUAL_REDESIGN.md): Especificações de design system, paleta de cores corporativa e diretrizes de usabilidade mobile-first.

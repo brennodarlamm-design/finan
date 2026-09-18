@@ -145,8 +145,8 @@ test('robots.txt permite acesso público a /llms.txt e /llms-full.txt', () => {
 test('sitemap.xml e data/sitemap.xml indexam as rotas de LLMs', () => {
   const s1 = fs.readFileSync(path.join(root, 'sitemap.xml'), 'utf8');
   const s2 = fs.readFileSync(path.join(root, 'data', 'sitemap.xml'), 'utf8');
-  assert.ok(s1.includes('https://finobra.app.br/llms.txt') && s1.includes('https://finobra.app.br/llms-full.txt'), 'sitemap.xml deve conter URLs de LLM');
-  assert.ok(s2.includes('https://finobra.app.br/llms.txt') && s2.includes('https://finobra.app.br/llms-full.txt'), 'data/sitemap.xml deve conter URLs de LLM');
+  assert.ok(s1.includes('https://fingo.api.br/llms.txt') && s1.includes('https://fingo.api.br/llms-full.txt'), 'sitemap.xml deve conter URLs de LLM');
+  assert.ok(s2.includes('https://fingo.api.br/llms.txt') && s2.includes('https://fingo.api.br/llms-full.txt'), 'data/sitemap.xml deve conter URLs de LLM');
 });
 
 // ── [5] AUDITORIA DE SEGURANÇA & CONFORMIDADE CSP ───────────────

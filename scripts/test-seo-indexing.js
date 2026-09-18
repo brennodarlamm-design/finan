@@ -26,13 +26,13 @@ assert(!sitemap.includes('/landing.html'), 'sitemap.xml NÃO deve conter /landin
 assert(!sitemap.includes('/index.html'), 'sitemap.xml NÃO deve conter /index.html');
 
 // URLs canônicas obrigatórias
-assert(sitemap.includes('<loc>https://finobra.app.br/</loc>'), 'sitemap.xml deve conter https://finobra.app.br/ como home');
+assert(sitemap.includes('<loc>https://fingo.api.br/</loc>'), 'sitemap.xml deve conter https://fingo.api.br/ como home');
 assert(sitemap.includes('<priority>1.0</priority>'), 'Home do sitemap.xml deve ter prioridade 1.0');
-assert(sitemap.includes('<loc>https://finobra.app.br/validar</loc>'), 'sitemap.xml deve conter rota /validar');
-assert(sitemap.includes('<loc>https://finobra.app.br/privacidade</loc>'), 'sitemap.xml deve conter rota /privacidade');
-assert(sitemap.includes('<loc>https://finobra.app.br/termos</loc>'), 'sitemap.xml deve conter rota /termos');
-assert(sitemap.includes('<loc>https://finobra.app.br/llms.txt</loc>'), 'sitemap.xml deve conter /llms.txt para motores de IA');
-assert(sitemap.includes('<loc>https://finobra.app.br/llms-full.txt</loc>'), 'sitemap.xml deve conter /llms-full.txt para motores de IA');
+assert(sitemap.includes('<loc>https://fingo.api.br/validar</loc>'), 'sitemap.xml deve conter rota /validar');
+assert(sitemap.includes('<loc>https://fingo.api.br/privacidade</loc>'), 'sitemap.xml deve conter rota /privacidade');
+assert(sitemap.includes('<loc>https://fingo.api.br/termos</loc>'), 'sitemap.xml deve conter rota /termos');
+assert(sitemap.includes('<loc>https://fingo.api.br/llms.txt</loc>'), 'sitemap.xml deve conter /llms.txt para motores de IA');
+assert(sitemap.includes('<loc>https://fingo.api.br/llms-full.txt</loc>'), 'sitemap.xml deve conter /llms-full.txt para motores de IA');
 
 // Contagem exata de URLs no sitemap
 const urlMatches = sitemap.match(/<loc>/g) || [];
@@ -60,7 +60,7 @@ assert(robots.includes('Disallow: /login'), 'robots.txt deve bloquear /login');
 assert(robots.includes('Disallow: /cadastro'), 'robots.txt deve bloquear /cadastro');
 assert(robots.includes('Disallow: /master'), 'robots.txt deve bloquear /master');
 assert(robots.includes('Disallow: /api/'), 'robots.txt deve bloquear /api/');
-assert(robots.includes('Sitemap: https://finobra.app.br/sitemap.xml'), 'robots.txt deve apontar para o sitemap.xml canônico');
+assert(robots.includes('Sitemap: https://fingo.api.br/sitemap.xml'), 'robots.txt deve apontar para o sitemap.xml canônico');
 
 console.log('   ✓ robots.txt validado: crawl budget protegido, áreas privadas bloqueadas.');
 
@@ -79,14 +79,14 @@ assert(descLen >= 120 && descLen <= 165, `Meta description deve ter entre 120 e 
 console.log(`   ✓ Meta Description otimizada (${descLen} caracteres): "${descMatch[1]}"`);
 
 // Canonical link
-assert(landing.includes('<link rel="canonical" href="https://finobra.app.br/">'), 'landing.html deve ter canonical link para https://finobra.app.br/');
+assert(landing.includes('<link rel="canonical" href="https://fingo.api.br/">'), 'landing.html deve ter canonical link para https://fingo.api.br/');
 
 // OpenGraph e Twitter Cards 1200x630
-assert(landing.includes('property="og:image" content="https://finobra.app.br/img/og-finobra-cover.jpg"'), 'og:image deve apontar para banner 1200x630');
+assert(landing.includes('property="og:image" content="https://fingo.api.br/img/og-finobra-cover.jpg"'), 'og:image deve apontar para banner 1200x630');
 assert(landing.includes('property="og:image:width" content="1200"'), 'og:image:width deve ser 1200');
 assert(landing.includes('property="og:image:height" content="630"'), 'og:image:height deve ser 630');
 assert(landing.includes('name="twitter:card" content="summary_large_image"'), 'twitter:card deve ser summary_large_image');
-assert(landing.includes('name="twitter:image" content="https://finobra.app.br/img/og-finobra-cover.jpg"'), 'twitter:image deve apontar para banner 1200x630');
+assert(landing.includes('name="twitter:image" content="https://fingo.api.br/img/og-finobra-cover.jpg"'), 'twitter:image deve apontar para banner 1200x630');
 
 // Schema.org JSON-LD Graph
 const jsonLdMatch = landing.match(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/i);
@@ -117,9 +117,9 @@ console.log('   ✓ Schema.org @graph (WebSite, Organization, SoftwareApplicatio
 console.log('\n4. Validando páginas públicas secundárias (privacidade, termos, validar)...');
 
 const pages = [
-  { file: 'privacidade.html', canonical: 'https://finobra.app.br/privacidade' },
-  { file: 'termos.html', canonical: 'https://finobra.app.br/termos' },
-  { file: 'validar.html', canonical: 'https://finobra.app.br/validar' }
+  { file: 'privacidade.html', canonical: 'https://fingo.api.br/privacidade' },
+  { file: 'termos.html', canonical: 'https://fingo.api.br/termos' },
+  { file: 'validar.html', canonical: 'https://fingo.api.br/validar' }
 ];
 
 for (const p of pages) {

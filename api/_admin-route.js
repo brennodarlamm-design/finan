@@ -41,8 +41,8 @@ function getOwnerSql() {
 }
 
 const ALLOWED_ORIGINS = [
-  'https://finobra.app.br',
-  'https://www.finobra.app.br',
+  'https://fingo.api.br',
+  'https://www.fingo.api.br',
   'http://localhost:3000',
   'http://localhost:3333',
   'http://localhost:5000',
@@ -120,7 +120,7 @@ function renderBillingEmailHtml(vars) {
   const pixChave = escapeHtmlAdmin(vars.PIX_CHAVE);
   const pixBeneficiario = escapeHtmlAdmin(vars.PIX_BENEFICIARIO);
   const mensagemExtra = escapeHtmlAdmin(vars.MENSAGEM_EXTRA).replace(/\r?\n/g, '<br>');
-  const linkAcesso = encodeURI(vars.LINK_ACESSO || 'https://finobra.app.br/login');
+  const linkAcesso = encodeURI(vars.LINK_ACESSO || 'https://fingo.api.br/login');
 
   return `<!DOCTYPE html>
 <html lang="pt-BR">
@@ -879,7 +879,7 @@ export default async function handler(req, res) {
       } else if (templateType === 'trial_ending') {
         defaultSubject = `🚀 FinObra — Seu período de testes termina em ${fmtVenc}`;
         defaultTituloAviso = `Seu período de testes está terminando em ${fmtVenc}`;
-        defaultMessage = `Olá, ${responsavel}! 🚀\n\nSeu período de teste gratuito do *FinObra* na empresa *${nomeEmpresa}* termina em *${fmtVenc}*.\n\nEsperamos que a plataforma esteja transformando a gestão das suas obras! Para continuar utilizando todos os recursos com a sua equipe:\n\n👉 Conheça os planos e assine: https://finobra.app.br/app.html#planos\n💰 *Valor de referência:* R$ ${planoInfo.valor}/mês (${planoInfo.nome})\n🔑 *Chave PIX:* ${pixKey}\n👤 *Beneficiário:* ${pixBeneficiary}\n\nEstamos à disposição para ajudar na escolha do melhor plano!`;
+        defaultMessage = `Olá, ${responsavel}! 🚀\n\nSeu período de teste gratuito do *FinObra* na empresa *${nomeEmpresa}* termina em *${fmtVenc}*.\n\nEsperamos que a plataforma esteja transformando a gestão das suas obras! Para continuar utilizando todos os recursos com a sua equipe:\n\n👉 Conheça os planos e assine: https://fingo.api.br/app.html#planos\n💰 *Valor de referência:* R$ ${planoInfo.valor}/mês (${planoInfo.nome})\n🔑 *Chave PIX:* ${pixKey}\n👤 *Beneficiário:* ${pixBeneficiary}\n\nEstamos à disposição para ajudar na escolha do melhor plano!`;
       } else {
         defaultSubject = `FinObra — Notificação de Assinatura (${nomeEmpresa})`;
         defaultTituloAviso = `Notificação de Assinatura — ${nomeEmpresa}`;
@@ -952,7 +952,7 @@ export default async function handler(req, res) {
       if (channel === 'email' || channel === 'both') {
         results.email.attempted = true;
         const resendKey = String(process.env.RESEND_API_KEY || '').trim();
-        const emailFrom = String(process.env.FINOBRA_SUPPORT_EMAIL_FROM || 'FinObra <suporte@finobra.app.br>').trim();
+        const emailFrom = String(process.env.FINOBRA_SUPPORT_EMAIL_FROM || 'FinObra <suporte@fingo.api.br>').trim();
 
         if (!destEmail || !destEmail.includes('@')) {
           results.email.error = 'E-mail da empresa inválido ou não cadastrado.';
@@ -972,7 +972,7 @@ export default async function handler(req, res) {
               PIX_CHAVE: pixKey,
               PIX_BENEFICIARIO: pixBeneficiary,
               MENSAGEM_EXTRA: finalMessage,
-              LINK_ACESSO: 'https://finobra.app.br/login'
+              LINK_ACESSO: 'https://fingo.api.br/login'
             });
 
             const emailRes = await fetch('https://api.resend.com/emails', {

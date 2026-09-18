@@ -28,7 +28,7 @@ assert(!headers.includes('Content-Security-Policy:'), 'CSP estático deve sair d
 assert(!headers.includes('sha256-lv5QAlKyRRFekfMCIK5/skjWMK/6hC6EOpqfQ5fJBrA='), 'Hash CSP transitório antigo não deve permanecer.');
 assert(!headers.includes('sha256-RiQEu6B9cjyiSYCR3jRLuThqlZdv+wrEm71eFLqZjzI='), 'Segundo hash CSP transitório antigo não deve permanecer.');
 assert(headers.includes('Cross-Origin-Opener-Policy: same-origin-allow-popups'), 'Headers estáticos devem manter COOP compatível com login Google.');
-assert(worker.includes("const DEFAULT_API_ORIGIN = 'https://api.finobra.app.br'"), 'Patch 31 não pode alterar o upstream dedicado da API.');
+assert(worker.includes("const DEFAULT_API_ORIGIN = 'https://api.fingo.api.br'"), 'Patch 31 não pode alterar o upstream dedicado da API.');
 assert(worker.includes('API upstream loop detected'), 'Proteção contra loop deve permanecer ativa.');
 
 console.log('✅ Patch 31: redirect canônico, CSP com nonce e hardening do edge validados.');

@@ -9,8 +9,8 @@ import { writeAudit } from './_audit.js';
 import { createTenantSql } from './_tenant-sql.js';
 
 const ALLOWED_ORIGINS = [
-  'https://finobra.app.br',
-  'https://www.finobra.app.br',
+  'https://fingo.api.br',
+  'https://www.fingo.api.br',
   'http://localhost:3000',
   'http://localhost:3333',
   'http://localhost:5000',

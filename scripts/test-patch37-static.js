@@ -16,8 +16,8 @@ assert(build.includes("landing.html'), path.join(out, 'index.html") && build.inc
 assert(worker.includes("'landing-shell'") && worker.includes("'login-shell'") && worker.includes("'signup-shell'"),'Worker distingue landing, login e cadastro.');
 assert(worker.includes("['/landing', '/landing.html', '/index.html']") && worker.includes("target.pathname = '/cadastro'"),'Worker canonicaliza URLs públicas antigas.');
 assert(wrangler.includes('"/cadastro"') && wrangler.includes('"/login.html"'),'Wrangler executa worker nas novas rotas públicas.');
-assert(landing.includes('rel="canonical" href="https://finobra.app.br/"') && landing.includes('href="/cadastro"') && !landing.includes('/login?cadastro=1'),'Landing usa raiz canônica e rota limpa de cadastro.');
-assert(login.includes('noindex,follow') && login.includes('https://finobra.app.br/login'),'Login tem canonical próprio e não concorre com SEO da landing.');
+assert(landing.includes('rel="canonical" href="https://fingo.api.br/"') && landing.includes('href="/cadastro"') && !landing.includes('/login?cadastro=1'),'Landing usa raiz canônica e rota limpa de cadastro.');
+assert(login.includes('noindex,follow') && login.includes('https://fingo.api.br/login'),'Login tem canonical próprio e não concorre com SEO da landing.');
 assert(loginJs.includes('FINOBRA_PATCH37_SIGNUP_ROUTE') && loginJs.includes("window.location.pathname === '/cadastro'"),'Cadastro abre automaticamente o formulário de criação de conta.');
 assert(auth.includes("p === '/cadastro'") && auth.includes("window.location.replace('/login?expired=1')"),'Sessão expirada usa /login e cadastro é reconhecido como shell de autenticação.');
 assert(guard.includes('/api/health') && guard.includes('FINOBRA_RELEASE_ALIGNED') && !guard.includes("CURRENT = '2026"),'Version guard compara releases reais de Edge/API.');

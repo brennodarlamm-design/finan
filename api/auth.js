@@ -36,8 +36,8 @@ function getSql() {
 }
 
 const ALLOWED_ORIGINS = [
-  'https://finobra.app.br',
-  'https://www.finobra.app.br',
+  'https://fingo.api.br',
+  'https://www.fingo.api.br',
   'http://localhost:3000',
   'http://localhost:3333',
   'http://localhost:5000',
@@ -1263,7 +1263,7 @@ export default async function handler(req, res) {
       const resendKey = (process.env.RESEND_API_KEY || '').trim();
       if ((resendKey || isTriggerConfigured()) && user.email) {
         try {
-          const fromEmail = (process.env.RESEND_FROM_EMAIL || 'FinObra <nao-responder@finobra.app.br>').trim();
+          const fromEmail = (process.env.RESEND_FROM_EMAIL || 'FinObra <nao-responder@fingo.api.br>').trim();
           const emailSubject = 'FinObra — Código de Recuperação de Senha';
           const emailHtml = `
             <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 500px; margin: 0 auto; padding: 24px; border: 1px solid #e2e8f0; border-radius: 8px; background: #ffffff;">

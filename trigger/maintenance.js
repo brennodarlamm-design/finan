@@ -120,7 +120,7 @@ export const dailySlaAudit = schedules.task({
         if (!info.email || !info.email.includes('@')) continue;
 
         try {
-          const emailFrom = String(process.env.FINOBRA_SUPPORT_EMAIL_FROM || 'FinObra <suporte@finobra.app.br>').trim();
+          const emailFrom = String(process.env.FINOBRA_SUPPORT_EMAIL_FROM || 'FinObra <suporte@fingo.api.br>').trim();
           const subject = `⚠️ FinObra — Alerta de Processos com SLA Expirado (${info.obrasAtrasadas.length} obra(s))`;
 
           let itensHtml = '';
@@ -149,7 +149,7 @@ export const dailySlaAudit = schedules.task({
                 <p style="margin: 0 0 16px 0; font-size: 14px;">Identificamos etapas de cronograma com prazo de execução expirado que requerem alinhamento operacional:</p>
                 ${itensHtml}
                 <div style="text-align: center; margin-top: 24px;">
-                  <a href="https://finobra.app.br/app.html" style="background: #0284c7; color: #fff; text-decoration: none; padding: 10px 20px; border-radius: 6px; font-size: 14px; font-weight: 600; display: inline-block;">Abrir Hub da Obra</a>
+                  <a href="https://fingo.api.br/app.html" style="background: #0284c7; color: #fff; text-decoration: none; padding: 10px 20px; border-radius: 6px; font-size: 14px; font-weight: 600; display: inline-block;">Abrir Hub da Obra</a>
                 </div>
               </div>
             </div>

@@ -34,7 +34,7 @@ function ensureCanonical(html, url) {
 function patchLanding() {
   let html = read('index.html');
   html = html.replace('href="/landing" aria-label="FinObra"', 'href="/" aria-label="FinObra"');
-  html = ensureCanonical(html, 'https://finobra.app.br/');
+  html = ensureCanonical(html, 'https://fingo.api.br/');
   if (!html.includes('property="og:type"')) {
     html = injectBeforeHeadClose(html, '<meta property="og:type" content="website">');
   }
@@ -45,7 +45,7 @@ function patchLanding() {
     html = injectBeforeHeadClose(html, '<meta property="og:description" content="Software de gestão de obras e financeiro para construtoras. Medições com retenções, orçamentos SINAPI oficiais e cronograma. Teste grátis por 15 dias!">');
   }
   if (!html.includes('property="og:url"')) {
-    html = injectBeforeHeadClose(html, '<meta property="og:url" content="https://finobra.app.br/">');
+    html = injectBeforeHeadClose(html, '<meta property="og:url" content="https://fingo.api.br/">');
   }
   if (!html.includes('name="twitter:card"')) {
     html = injectBeforeHeadClose(html, '<meta name="twitter:card" content="summary_large_image">');
@@ -56,7 +56,7 @@ function patchLanding() {
 function patchLogin() {
   let html = read('login.html');
   html = html.replace('<meta name="robots" content="noindex,follow">', '<meta name="robots" content="noindex,nofollow">');
-  html = ensureCanonical(html, 'https://finobra.app.br/login');
+  html = ensureCanonical(html, 'https://fingo.api.br/login');
   html = injectBeforeHeadClose(html, '<link rel="stylesheet" href="/css/auth-patch38.css?v=20260913">');
   html = injectBeforeHeadClose(html, '<script src="/js/auth-route-patch38.js?v=20260913" defer></script>');
   write('login.html', html);
@@ -70,10 +70,10 @@ function patchDocument(file, canonicalUrl) {
 
 patchLanding();
 patchLogin();
-patchDocument('privacidade.html', 'https://finobra.app.br/privacidade');
-patchDocument('termos.html', 'https://finobra.app.br/termos');
-patchDocument('validar.html', 'https://finobra.app.br/validar');
-patchDocument('master.html', 'https://finobra.app.br/master');
+patchDocument('privacidade.html', 'https://fingo.api.br/privacidade');
+patchDocument('termos.html', 'https://fingo.api.br/termos');
+patchDocument('validar.html', 'https://fingo.api.br/validar');
+patchDocument('master.html', 'https://fingo.api.br/master');
 
 const builtLogin = read('login.html');
 const builtHome = read('index.html');

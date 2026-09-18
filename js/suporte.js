@@ -397,7 +397,7 @@ const Suporte = {
           <div style="background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:16px;">
             <h4 style="color:var(--accent2);margin-bottom:6px;display:flex;align-items:center;gap:6px;">🛡️ 5. Assinatura Eletrônica & Validação Pública</h4>
             <p style="font-size:.85rem;color:#cbd5e1;line-height:1.5;">
-              Recibos e contratos gerados pelo FinObra recebem hash criptográfico SHA-256 e QR Code. Qualquer cliente ou fiscal pode validar a autenticidade online pelo portal público <strong style="color:var(--accent2);">finobra.app.br/validar</strong>.
+              Recibos e contratos gerados pelo FinObra recebem hash criptográfico SHA-256 e QR Code. Qualquer cliente ou fiscal pode validar a autenticidade online pelo portal público <strong style="color:var(--accent2);">fingo.api.br/validar</strong>.
             </p>
           </div>
 
@@ -576,7 +576,7 @@ const Suporte = {
             <span style="font-size:1.5rem;color:#38bdf8;">✉️</span>
             <div style="flex:1;">
               <div style="font-size:.75rem;color:#94a3b8;">E-mail do Suporte</div>
-              <div style="font-weight:800;font-size:.95rem;color:#fff;">suporte@finobra.app.br</div>
+              <div style="font-weight:800;font-size:.95rem;color:#fff;">suporte@fingo.api.br</div>
             </div>
           </div>
 

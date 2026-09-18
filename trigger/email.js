@@ -29,7 +29,7 @@ export const sendTransactionalEmail = task({
       throw new Error("RESEND_API_KEY ausente");
     }
 
-    const fromEmail = String(process.env.FINOBRA_SUPPORT_EMAIL_FROM || 'FinObra <suporte@finobra.app.br>').trim();
+    const fromEmail = String(process.env.FINOBRA_SUPPORT_EMAIL_FROM || 'FinObra <suporte@fingo.api.br>').trim();
 
     logger.info("Enviando e-mail transacional via Resend", {
       to,
@@ -43,7 +43,7 @@ export const sendTransactionalEmail = task({
       to: Array.isArray(to) ? to : [to],
       subject,
       html,
-      reply_to: replyTo || process.env.FINOBRA_SUPPORT_EMAIL || 'suporte@finobra.app.br'
+      reply_to: replyTo || process.env.FINOBRA_SUPPORT_EMAIL || 'suporte@fingo.api.br'
     };
 
     if (Array.isArray(attachments) && attachments.length > 0) {

@@ -4,24 +4,24 @@
 
 ## Documentação & Páginas Principais
 
-- [Apresentação & Landing Page](https://finobra.app.br/landing): Visão geral dos planos, recursos, diferenciais e calculadora de ROI para construtoras.
-- [Acesso ao Sistema (App)](https://finobra.app.br/app): Interface principal do software com acesso a dashboard, lançamentos, medições e cronogramas.
-- [Validador Público de Assinaturas](https://finobra.app.br/validar): Validador criptográfico de contratos, medições e recibos emitidos pelo FinObra com verificação de integridade SHA-256 e padrão ICP-Brasil.
-- [Termos de Uso](https://finobra.app.br/termos): Termos de serviço, condições de assinatura e conformidade comercial.
-- [Política de Privacidade & LGPD](https://finobra.app.br/privacidade): Práticas de governança, segurança de dados, encriptação e tratamento de informações conforme a Lei Geral de Proteção de Dados.
+- [Apresentação & Landing Page](https://fingo.api.br/landing): Visão geral dos planos, recursos, diferenciais e calculadora de ROI para construtoras.
+- [Acesso ao Sistema (App)](https://fingo.api.br/app): Interface principal do software com acesso a dashboard, lançamentos, medições e cronogramas.
+- [Validador Público de Assinaturas](https://fingo.api.br/validar): Validador criptográfico de contratos, medições e recibos emitidos pelo FinObra com verificação de integridade SHA-256 e padrão ICP-Brasil.
+- [Termos de Uso](https://fingo.api.br/termos): Termos de serviço, condições de assinatura e conformidade comercial.
+- [Política de Privacidade & LGPD](https://fingo.api.br/privacidade): Práticas de governança, segurança de dados, encriptação e tratamento de informações conforme a Lei Geral de Proteção de Dados.
 
 ## Módulos Principais do Sistema
 
-- [Gestão Financeira & Caixa](https://finobra.app.br/app#lancamentos): Contas a pagar, contas a receber, extrato bancário unificado, conciliação OFX automática com detecção de padrões, DRE Gerencial em tempo real e fluxo de caixa projetado para 90 dias.
-- [Orçamentos & Base Oficial SINAPI](https://finobra.app.br/app#orcamentos): Orçamentação analítica e sintética conectada aos snapshots oficiais da Caixa/IBGE com suporte a regimes Desonerado e Não Desonerado, leis sociais e BDI diferenciado para materiais e serviços.
-- [Medições & Faturamento](https://finobra.app.br/app#medicoes): Boletins de medição com acumulado físico e financeiro, liberação de parcelas e cálculo automático de retenções tributárias na fonte.
-- [Gestão Operacional de Workflow & SLAs](https://finobra.app.br/app#central-gestor): Controle de prazos e etapas da obra com motor em cascata, templates especializados (Casa Caixa/PCI, Obra Particular, Reforma), visões em Linha do Tempo, Kanban e Gantt proporcional.
-- [Painel Minhas Demandas](https://finobra.app.br/app#minhas-demandas): Visão personalizada por operador e cargo com etapas divididas em Vencidas, Próximas, Em Andamento e Aguardando Início.
-- [Comunicação Ativa WhatsApp](https://finobra.app.br/app#whatsapp): Alertas automáticos de cobrança, início e conclusão de fases com integração à API Baileys e fallback para WhatsApp Web.
-- [Notas Fiscais Eletrônicas (NF-e)](https://finobra.app.br/app#nfe): Monitoramento e busca em tempo real na SEFAZ via Certificado Digital A1 com importação de XML e conversão direta em contas a pagar.
+- [Gestão Financeira & Caixa](https://fingo.api.br/app#lancamentos): Contas a pagar, contas a receber, extrato bancário unificado, conciliação OFX automática com detecção de padrões, DRE Gerencial em tempo real e fluxo de caixa projetado para 90 dias.
+- [Orçamentos & Base Oficial SINAPI](https://fingo.api.br/app#orcamentos): Orçamentação analítica e sintética conectada aos snapshots oficiais da Caixa/IBGE com suporte a regimes Desonerado e Não Desonerado, leis sociais e BDI diferenciado para materiais e serviços.
+- [Medições & Faturamento](https://fingo.api.br/app#medicoes): Boletins de medição com acumulado físico e financeiro, liberação de parcelas e cálculo automático de retenções tributárias na fonte.
+- [Gestão Operacional de Workflow & SLAs](https://fingo.api.br/app#central-gestor): Controle de prazos e etapas da obra com motor em cascata, templates especializados (Casa Caixa/PCI, Obra Particular, Reforma), visões em Linha do Tempo, Kanban e Gantt proporcional.
+- [Painel Minhas Demandas](https://fingo.api.br/app#minhas-demandas): Visão personalizada por operador e cargo com etapas divididas em Vencidas, Próximas, Em Andamento e Aguardando Início.
+- [Comunicação Ativa WhatsApp](https://fingo.api.br/app#whatsapp): Alertas automáticos de cobrança, início e conclusão de fases com integração à API Baileys e fallback para WhatsApp Web.
+- [Notas Fiscais Eletrônicas (NF-e)](https://fingo.api.br/app#nfe): Monitoramento e busca em tempo real na SEFAZ via Certificado Digital A1 com importação de XML e conversão direta em contas a pagar.
 
 ## Arquitetura & Segurança
 
-- [Arquitetura Serverless & Neon PostgreSQL](https://finobra.app.br/api): Backend em Serverless Functions Node.js/Vercel conectadas ao banco de dados serverless Neon PostgreSQL com isolamento estrito de multitenancy por `empresa_id` e RLS (Row-Level Security).
-- [Política de Segurança Estrita (CSP)](https://finobra.app.br/): Content Security Policy rigorosa (`script-src-attr 'none'`) com Event Bridge declarativo, impedindo execução de código arbitrário e garantindo integridade de dados bancários e cadastrais.
-- [Autenticação & 2FA / TOTP](https://finobra.app.br/login): Sessões criptografadas com suporte a autenticação em dois fatores via Google Authenticator / TOTP RFC 6238 e códigos de backup.
+- [Arquitetura Serverless & Neon PostgreSQL](https://fingo.api.br/api): Backend em Serverless Functions Node.js/Vercel conectadas ao banco de dados serverless Neon PostgreSQL com isolamento estrito de multitenancy por `empresa_id` e RLS (Row-Level Security).
+- [Política de Segurança Estrita (CSP)](https://fingo.api.br/): Content Security Policy rigorosa (`script-src-attr 'none'`) com Event Bridge declarativo, impedindo execução de código arbitrário e garantindo integridade de dados bancários e cadastrais.
+- [Autenticação & 2FA / TOTP](https://fingo.api.br/login): Sessões criptografadas com suporte a autenticação em dois fatores via Google Authenticator / TOTP RFC 6238 e códigos de backup.

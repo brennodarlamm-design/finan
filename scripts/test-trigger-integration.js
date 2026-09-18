@@ -69,7 +69,7 @@ try {
   delete process.env.TRIGGER_API_KEY;
 
   const resUnconfigured = await triggerEmail({
-    to: 'teste@finobra.app.br',
+    to: 'teste@fingo.api.br',
     subject: 'Teste Mock',
     html: '<p>Teste</p>'
   });
@@ -90,7 +90,7 @@ console.log('   ✅ Dispatcher resiliente: não quebra requisições quando offl
 console.log('4. Testando validação de payloads para tarefas...');
 
 const sampleEmailPayload = {
-  to: 'contato@finobra.app.br',
+  to: 'contato@fingo.api.br',
   subject: 'Alerta de Canteiro',
   html: '<h1>Atenção</h1>',
   tenantId: 'tenant_teste_123'

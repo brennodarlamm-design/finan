@@ -434,7 +434,7 @@ const Assinador = {
     if (!sig?.codigo_validacao) return '';
     const origin = (typeof window !== 'undefined' && window.location?.origin && window.location.origin !== 'null' && window.location.protocol.startsWith('http'))
       ? window.location.origin
-      : 'https://finobra.app.br';
+      : 'https://fingo.api.br';
     const params = new URLSearchParams();
     params.set('val', sig.codigo_validacao);
     if (sig.hash_sha256) params.set('hash', sig.hash_sha256.substring(0, 16));
@@ -460,7 +460,7 @@ const Assinador = {
     const docId = opts.docId || '';
     const urlValidacao = this.gerarUrlValidacao(sig, docTipo, docId);
     const qrUrl = this.gerarQRCodeUrl(urlValidacao, 160);
-    const originHost = (typeof window !== 'undefined' && window.location && window.location.host) ? window.location.host : 'finobra.app.br';
+    const originHost = (typeof window !== 'undefined' && window.location && window.location.host) ? window.location.host : 'fingo.api.br';
 
     return `
     <div style="margin-top:12px;background:#f8fafc;border:1.5px solid #10b981;border-radius:6px;padding:10px 14px;display:flex;align-items:center;justify-content:space-between;gap:14px;text-align:left;color:#0f172a;box-shadow:0 2px 6px rgba(16,185,129,0.12);">

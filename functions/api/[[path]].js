@@ -1,5 +1,5 @@
 const DEFAULT_API_ORIGIN = 'https://finan-as.vercel.app';
-const DEFAULT_CANONICAL_ORIGIN = 'https://finobra.app.br';
+const DEFAULT_CANONICAL_ORIGIN = 'https://fingo.api.br';
 const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
 
 function sameOriginBrowserRequest(request) {

@@ -30,12 +30,12 @@ assert(workflow.includes('CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_
 assert(workflow.includes('manual production deploy enabled'), 'Checagem de credenciais deve deixar claro que o deploy é manual.');
 assert(workflow.includes("'\"securityMode\":\"nonce-csp\"'"), 'Smoke test deve validar CSP nonce em produção.');
 assert(workflow.includes("'\"loopRisk\":false'"), 'Smoke test deve validar proteção contra loop.');
-assert(workflow.includes('https://www.finobra.app.br/'), 'Smoke test deve verificar canonicalização do www.');
+assert(workflow.includes('https://www.fingo.api.br/') || workflow.includes('https://www.finobra.app.br/'), 'Smoke test deve verificar canonicalização do www.');
 assert(workflow.includes('auth_status'), 'Smoke test deve verificar rota de autenticação sem credenciais.');
 assert(workflow.includes("[[ \"$auth_status\" == '401' ]]"), 'Auth smoke test deve esperar 401 para usuário não autenticado.');
 const hasLegacyAppStatus = workflow.includes('app_status=');
 const hasStructuredAppCheck = workflow.includes('check_route') &&
-  workflow.includes("'https://finobra.app.br/app/dashboard' 'app-shell'") &&
+  (workflow.includes("'https://fingo.api.br/app/dashboard' 'app-shell'") || workflow.includes("'https://finobra.app.br/app/dashboard' 'app-shell'")) &&
   workflow.includes("'<div id=\"app-root\"></div>'");
 assert(hasLegacyAppStatus || hasStructuredAppCheck, 'Smoke test deve validar deep link do app por GET, incluindo shell e conteúdo.');
 assert(!workflow.includes("if: steps.cloudflare.outputs.ready == 'true'"), 'Deploy não deve depender de fluxo automático por push.');

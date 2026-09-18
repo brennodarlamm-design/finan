@@ -64,7 +64,7 @@ assert(workerJs.includes("routeName = 'master-shell'"), 'Edge identifica a rota 
 assert(workerJs.includes("target.pathname === '/master.html'"), 'Edge canonicaliza /master.html para /master.');
 assert(redirects.includes('/master /master.html 200'), 'Assets Cloudflare possuem fallback explícito de /master para master.html.');
 assert(vercelJson.includes('"source": "/master"') && vercelJson.includes('"destination": "/master.html"'), 'Vercel possui rewrite explícito de /master para master.html.');
-assert(masterHtml.includes('rel="canonical" href="https://finobra.app.br/master"'), 'master.html possui canonical apontando para /master.');
+assert(masterHtml.includes('rel="canonical" href="https://fingo.api.br/master"'), 'master.html possui canonical apontando para /master.');
 assert(masterHtml.includes('name="robots" content="noindex, nofollow"'), 'master.html bloqueia indexação de motores de busca.');
 
 // 8. Versionamento e Pacote

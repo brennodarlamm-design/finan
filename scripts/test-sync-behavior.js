@@ -111,12 +111,12 @@ const env = { ASSETS:{ fetch: async request => {
   return new Response('<html>shell</html>', { headers:{ 'content-type':'text/html' } });
 } } };
 for (const [path, target] of [['/index.html','/'], ['/app.html','/app'], ['/login.html','/login']]) {
-  const response = await worker.fetch(new Request('https://finobra.app.br' + path), env);
+  const response = await worker.fetch(new Request('https://fingo.api.br' + path), env);
   assert.equal(response.status, 308);
   assert.equal(new URL(response.headers.get('location')).pathname, target);
 }
 for (const [path, file, route] of [['/','/index.html','landing-shell'], ['/app/dashboard','/app.html','app-shell'], ['/login','/login.html','login-shell'], ['/cadastro','/login.html','signup-shell']]) {
-  const response = await worker.fetch(new Request('https://finobra.app.br' + path), env);
+  const response = await worker.fetch(new Request('https://fingo.api.br' + path), env);
   assert.equal(response.status, 200);
   assert.equal(assetPaths.at(-1), file);
   assert.equal(response.headers.get('X-FinObra-Route'), route);

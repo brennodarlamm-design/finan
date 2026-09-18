@@ -75,7 +75,7 @@ function EnviarWhatsApp {
         } | ConvertTo-Json -Compress
 
         $body = [System.Text.Encoding]::UTF8.GetBytes($payload)
-        $targetUrl = if ($url) { $url } else { "https://finobra.app.br/api/send-whatsapp" }
+        $targetUrl = if ($url) { $url } else { "https://fingo.api.br/api/send-whatsapp" }
 
         $resp = Invoke-WebRequest -Uri $targetUrl -Method Post -Headers $headers -Body $body -UseBasicParsing -TimeoutSec 15
         Log "Mensagem enviada com sucesso pela API FinObra. HTTP $($resp.StatusCode)"
@@ -122,7 +122,7 @@ Log "Consultando contas a pagar do tenant configurado..."
 # Consulta os lancamentos da nuvem com escopo explicito de tenant.
 $lancamentos = @()
 try {
-    $apiUrl = "https://finobra.app.br/api/db?table=all"
+    $apiUrl = "https://fingo.api.br/api/db?table=all"
     $response = Invoke-RestMethod -Uri $apiUrl -Method Get -Headers $authHeaders -TimeoutSec 15
     if ($response.success -and $response.data.lancamentos) {
         $lancamentos = $response.data.lancamentos

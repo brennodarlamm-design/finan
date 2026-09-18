@@ -421,7 +421,7 @@ export async function sendPaymentReceipt(record) {
   if (email && email.includes('@') && resendKey) {
     results.email.attempted = true;
     try {
-      const emailFrom = String(process.env.FINOBRA_SUPPORT_EMAIL_FROM || 'FinObra <suporte@finobra.app.br>').trim();
+      const emailFrom = String(process.env.FINOBRA_SUPPORT_EMAIL_FROM || 'FinObra <suporte@fingo.api.br>').trim();
       const subject = `🎉 FinObra — Pagamento Confirmado e Assinatura Renovada (${fmtVenc})`;
 
       const emailHtml = `
@@ -444,7 +444,7 @@ export async function sendPaymentReceipt(record) {
             </div>
             <p style="margin:0;font-size:14px;line-height:1.5;color:#475569;">Agradecemos pela parceria contínua! Os acessos de todos os colaboradores e canteiros de obras estão ativos normalmente.</p>
             <div style="margin-top:28px;text-align:center;">
-              <a href="https://finobra.app.br/login" style="display:inline-block;background:#0284c7;color:#ffffff;text-decoration:none;padding:12px 24px;border-radius:6px;font-weight:700;font-size:14px;">Acessar o FinObra</a>
+              <a href="https://fingo.api.br/login" style="display:inline-block;background:#0284c7;color:#ffffff;text-decoration:none;padding:12px 24px;border-radius:6px;font-weight:700;font-size:14px;">Acessar o FinObra</a>
             </div>
           </div>
           <div style="background:#f1f5f9;padding:14px 30px;border-top:1px solid #e2e8f0;font-size:12px;color:#94a3b8;text-align:center;">

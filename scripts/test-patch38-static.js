@@ -54,7 +54,7 @@ assert(redirects.includes('/validar /validar.html 200'), 'Validação deve resol
 assert(redirects.includes('/robots.txt /data/robots.txt 200'), 'robots.txt deve ser publicado na raiz.');
 assert(redirects.includes('/sitemap.xml /data/sitemap.xml 200'), 'sitemap.xml deve ser publicado na raiz.');
 
-assert(landing.includes('<link rel="canonical" href="https://finobra.app.br/">'), 'a landing deve manter canonical apontando para a raiz.');
+assert(landing.includes('<link rel="canonical" href="https://fingo.api.br/">'), 'a landing deve manter canonical apontando para a raiz.');
 assert(landing.includes('href="/login"'), 'a landing deve apontar Entrar/Área do Cliente para /login.');
 assert(landing.includes('href="/cadastro"'), 'a landing deve apontar teste grátis para /cadastro.');
 assert(landingPage.includes("brandHomeLink.setAttribute('href', '/')"), 'o logo deve navegar diretamente para a home canônica.');
@@ -86,10 +86,10 @@ assert(!privacy.includes('Portal de Validação de Registros de Assinatura'), 'P
 assert(robots.includes('Disallow: /app'), 'robots deve bloquear o app autenticado.');
 assert(robots.includes('Disallow: /login'), 'robots deve bloquear login.');
 assert(robots.includes('Disallow: /cadastro'), 'robots deve bloquear cadastro.');
-assert(robots.includes('Sitemap: https://finobra.app.br/sitemap.xml'), 'robots deve anunciar o sitemap canônico.');
-assert(sitemap.includes('<loc>https://finobra.app.br/</loc>'), 'sitemap deve incluir a landing canônica.');
-assert(sitemap.includes('<loc>https://finobra.app.br/privacidade</loc>'), 'sitemap deve incluir Privacidade.');
-assert(sitemap.includes('<loc>https://finobra.app.br/termos</loc>'), 'sitemap deve incluir Termos.');
+assert(robots.includes('Sitemap: https://fingo.api.br/sitemap.xml'), 'robots deve anunciar o sitemap canônico.');
+assert(sitemap.includes('<loc>https://fingo.api.br/</loc>'), 'sitemap deve incluir a landing canônica.');
+assert(sitemap.includes('<loc>https://fingo.api.br/privacidade</loc>'), 'sitemap deve incluir Privacidade.');
+assert(sitemap.includes('<loc>https://fingo.api.br/termos</loc>'), 'sitemap deve incluir Termos.');
 assert(!sitemap.includes('/login'), 'sitemap não deve indexar login.');
 assert(!sitemap.includes('/cadastro'), 'sitemap não deve indexar cadastro.');
 assert(!sitemap.includes('/app'), 'sitemap não deve indexar área autenticada.');
