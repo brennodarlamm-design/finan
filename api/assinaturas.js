@@ -96,7 +96,7 @@ export default async function handler(req, res) {
           data_hora: r.data_hora,
           data_hora_fmt: r.data_hora_fmt,
           ip_dispositivo: r.ip_dispositivo,
-          empresa: r.nome_fantasia || r.razao_social || 'Empresa usuária do FinObra',
+          empresa: r.nome_fantasia || r.razao_social || 'Empresa usuária do FinGo',
           empresa_cnpj: maskDocument(r.cnpj),
           empresa_cidade: r.cidade || '',
           empresa_uf: r.uf || ''

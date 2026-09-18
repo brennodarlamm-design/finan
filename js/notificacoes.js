@@ -421,7 +421,7 @@ const Notificacoes = {
       if (permission === 'granted') {
         Utils.toast('🔔 Notificações ativadas com sucesso!', 'success');
         this.enviarPushDesktop(
-          `${(DB.getEmpresa()?.nome_fantasia || DB.getEmpresa()?.razao_social || 'FinObra')} — Sistema Financeiro`,
+          `${(DB.getEmpresa()?.nome_fantasia || DB.getEmpresa()?.razao_social || 'FinGo')} — Sistema Financeiro`,
           'Notificações ativadas! Você será alertado quando houver boletos a vencer.'
         );
       } else {

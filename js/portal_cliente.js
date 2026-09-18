@@ -391,7 +391,7 @@ const PortalCliente = {
             <p style="font-size:.86rem;color:#A8C090;line-height:1.5;margin-bottom:20px;">
               Este link de acompanhamento não foi localizado ou expirou. Por favor, solicite à sua construtora o link atualizado da sua obra.
             </p>
-            <div style="font-size:.75rem;color:#5A7048;">FinObra &middot; Sistema de Gestão para Construtoras</div>
+            <div style="font-size:.75rem;color:#5A7048;">FinGo &middot; Sistema de Gestão para Construtoras</div>
           </div>
         </div>`;
       return;

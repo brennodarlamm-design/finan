@@ -97,7 +97,7 @@ async function executarLoginMaster(e) {
     verificarSessaoMaster();
   } else {
     showMasterError(loginRes.success
-      ? 'Acesso negado. Apenas o Super Administrador da plataforma FinObra pode acessar este portal.'
+      ? 'Acesso negado. Apenas o Super Administrador da plataforma FinGo pode acessar este portal.'
       : (loginRes.message || 'Usuário ou senha incorretos.'));
   }
 }

@@ -33,7 +33,7 @@ export const PLAN_RULES = Object.freeze({
   trial: Object.freeze({
     id: 'trial',
     label: 'Teste gratuito',
-    idealFor: 'Conhecer o FinObra com os principais recursos liberados',
+    idealFor: 'Conhecer o FinGo com os principais recursos liberados',
     maxActiveObras: 10,
     maxUsers: 2,
     monthlyPriceCents: 0,

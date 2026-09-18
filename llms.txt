@@ -4,9 +4,9 @@
 
 ## Documentação & Páginas Principais
 
-- [Apresentação & Landing Page](https://fingo.api.br/landing): Visão geral dos planos, recursos, diferenciais e calculadora de ROI para construtoras.
+- [Apresentação & Landing Page](https://fingo.api.br/): Visão geral dos planos, recursos, diferenciais e calculadora de ROI para construtoras.
 - [Acesso ao Sistema (App)](https://fingo.api.br/app): Interface principal do software com acesso a dashboard, lançamentos, medições e cronogramas.
-- [Validador Público de Assinaturas](https://fingo.api.br/validar): Validador criptográfico de contratos, medições e recibos emitidos pelo FinObra com verificação de integridade SHA-256 e padrão ICP-Brasil.
+- [Validador Público de Assinaturas](https://fingo.api.br/validar): Validador criptográfico de contratos, medições e recibos emitidos pelo FinGo com verificação de integridade SHA-256 e padrão ICP-Brasil.
 - [Termos de Uso](https://fingo.api.br/termos): Termos de serviço, condições de assinatura e conformidade comercial.
 - [Política de Privacidade & LGPD](https://fingo.api.br/privacidade): Práticas de governança, segurança de dados, encriptação e tratamento de informações conforme a Lei Geral de Proteção de Dados.
 

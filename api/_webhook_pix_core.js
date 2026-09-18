@@ -421,18 +421,18 @@ export async function sendPaymentReceipt(record) {
   if (email && email.includes('@') && resendKey) {
     results.email.attempted = true;
     try {
-      const emailFrom = String(process.env.FINOBRA_SUPPORT_EMAIL_FROM || 'FinObra <suporte@fingo.api.br>').trim();
-      const subject = `🎉 FinObra — Pagamento Confirmado e Assinatura Renovada (${fmtVenc})`;
+      const emailFrom = String(process.env.FINOBRA_SUPPORT_EMAIL_FROM || 'FinGo <suporte@fingo.api.br>').trim();
+      const subject = `🎉 FinGo — Pagamento Confirmado e Assinatura Renovada (${fmtVenc})`;
 
       const emailHtml = `
         <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;max-width:600px;margin:0 auto;background:#ffffff;border:1px solid #e2e8f0;border-radius:12px;overflow:hidden;color:#1e293b;">
           <div style="background:linear-gradient(135deg,#0284c7,#0369a1);padding:24px 30px;color:#ffffff;">
-            <h1 style="margin:0;font-size:22px;font-weight:800;letter-spacing:-0.5px;">FinObra · Gestão de Obras</h1>
+            <h1 style="margin:0;font-size:22px;font-weight:800;letter-spacing:-0.5px;">FinGo · Gestão de Obras</h1>
             <p style="margin:6px 0 0 0;font-size:14px;color:#e0f2fe;">Comprovante Oficial de Liquidação de Assinatura</p>
           </div>
           <div style="padding:28px 30px;">
             <p style="margin:0 0 16px 0;font-size:15px;line-height:1.6;">Olá, <strong>${responsavel}</strong>!</p>
-            <p style="margin:0 0 20px 0;font-size:15px;line-height:1.6;">Confirmamos o recebimento do pagamento da assinatura do <strong>FinObra</strong> para a empresa <strong>${nomeEmpresa}</strong>.</p>
+            <p style="margin:0 0 20px 0;font-size:15px;line-height:1.6;">Confirmamos o recebimento do pagamento da assinatura do <strong>FinGo</strong> para a empresa <strong>${nomeEmpresa}</strong>.</p>
             <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:18px;margin-bottom:24px;">
               <table style="width:100%;border-collapse:collapse;font-size:14px;">
                 <tr><td style="padding:6px 0;color:#64748b;">Status:</td><td style="padding:6px 0;font-weight:700;color:#16a34a;">🟢 Assinatura Ativa & Liberada</td></tr>
@@ -444,11 +444,11 @@ export async function sendPaymentReceipt(record) {
             </div>
             <p style="margin:0;font-size:14px;line-height:1.5;color:#475569;">Agradecemos pela parceria contínua! Os acessos de todos os colaboradores e canteiros de obras estão ativos normalmente.</p>
             <div style="margin-top:28px;text-align:center;">
-              <a href="https://fingo.api.br/login" style="display:inline-block;background:#0284c7;color:#ffffff;text-decoration:none;padding:12px 24px;border-radius:6px;font-weight:700;font-size:14px;">Acessar o FinObra</a>
+              <a href="https://fingo.api.br/login" style="display:inline-block;background:#0284c7;color:#ffffff;text-decoration:none;padding:12px 24px;border-radius:6px;font-weight:700;font-size:14px;">Acessar o FinGo</a>
             </div>
           </div>
           <div style="background:#f1f5f9;padding:14px 30px;border-top:1px solid #e2e8f0;font-size:12px;color:#94a3b8;text-align:center;">
-            FinObra Soluções Tecnológicas · Mensagem Automática gerada pelo Webhook PIX
+            FinGo · Obras em Fluxo · Mensagem Automática gerada pelo Webhook PIX
           </div>
         </div>
       `;

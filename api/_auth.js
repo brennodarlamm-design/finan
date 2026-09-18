@@ -263,7 +263,7 @@ export async function resolveAuthAndTenant(req) {
 
     if (!isSuperAdmin) {
       if (live.tenant_status === 'bloqueado' || live.tenant_status === 'cancelado') {
-        return { authenticated: false, status: 403, error: 'Acesso bloqueado para esta empresa. Contate o suporte FinObra.' };
+        return { authenticated: false, status: 403, error: 'Acesso bloqueado para esta empresa. Contate o suporte FinGo.' };
       }
       if (live.tenant_status === 'trial' && trialExpired(live.tenant_created_at, 15, live.tenant_vencimento)) {
         return { authenticated: false, status: 403, error: 'O período de teste gratuito de 15 dias expirou. Regularize o plano para continuar.' };

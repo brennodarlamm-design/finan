@@ -184,7 +184,7 @@ const AgendaEventos = {
             </div>
             <div>
               <label style="font-size:.75rem;font-weight:700;color:var(--text2);display:block;margin-bottom:4px;">Instrutor / Responsável</label>
-              <input type="text" id="agenda-instrutor" class="input" value="Dev FinObra" style="width:100%;font-size:.82rem;">
+              <input type="text" id="agenda-instrutor" class="input" value="Dev FinGo" style="width:100%;font-size:.82rem;">
             </div>
           </div>
           <div>
@@ -268,7 +268,7 @@ const AgendaEventos = {
     const hora = document.getElementById('agenda-hora')?.value;
     const duracao = document.getElementById('agenda-duracao')?.value?.trim() || '60 min';
     const tipo = document.getElementById('agenda-tipo')?.value || 'live';
-    const instrutor = document.getElementById('agenda-instrutor')?.value?.trim() || 'Dev FinObra';
+    const instrutor = document.getElementById('agenda-instrutor')?.value?.trim() || 'Dev FinGo';
     const link = document.getElementById('agenda-link')?.value?.trim();
     const descricao = document.getElementById('agenda-desc')?.value?.trim() || '';
 

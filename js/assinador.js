@@ -106,7 +106,7 @@ const Assinador = {
               <!-- Linha guia para assinar -->
               <div style="position:absolute;bottom:35px;left:40px;right:40px;border-bottom:1px solid #cbd5e1;pointer-events:none;display:flex;justify-content:space-between;align-items:center;">
                 <span style="font-size:.65rem;color:#94a3b8;text-transform:uppercase;letter-spacing:.05em;background:#fff;padding-right:4px;">✕ Assine sobre a linha</span>
-                <span style="font-size:.65rem;color:#cbd5e1;text-transform:uppercase;">FinObra Digital</span>
+                <span style="font-size:.65rem;color:#cbd5e1;text-transform:uppercase;">FinGo Digital</span>
               </div>
             </div>
           </div>
@@ -298,7 +298,7 @@ const Assinador = {
       ip_dispositivo: this._obterInfoDispositivo(),
       hash_sha256: hashSHA256,
       codigo_validacao: codigoValidacao,
-      lei_amparo: 'Registro eletrônico no FinObra',
+      lei_amparo: 'Registro eletrônico no FinGo',
       doc_tipo: this._metadataDoc?.tipo || 'documento',
       doc_id: this._metadataDoc?.id || '',
       doc_numero: this._metadataDoc?.numero || ''
@@ -491,7 +491,7 @@ const Assinador = {
 
       <!-- QR Code de Autenticação -->
       <div style="flex-shrink:0;text-align:center;padding-left:10px;border-left:1px dashed #cbd5e1;">
-        <a href="${urlValidacao}" target="_blank" title="Aponte a câmera do celular para consultar o registro no FinObra" style="text-decoration:none;display:block;">
+        <a href="${urlValidacao}" target="_blank" title="Aponte a câmera do celular para consultar o registro no FinGo" style="text-decoration:none;display:block;">
           <img src="${qrUrl}" alt="QR Code de consulta do registro" style="width:68px;height:68px;border-radius:4px;border:1px solid #94a3b8;background:#fff;padding:2px;display:block;margin:0 auto 2px auto;">
           <span style="font-size:.56rem;font-weight:800;color:#047857;display:block;letter-spacing:0.2px;line-height:1.1;">CONSULTAR QR<br>REGISTRO</span>
         </a>
@@ -522,7 +522,7 @@ const Assinador = {
     Utils.toast('PDF preparado para Gov.br!','info');
   },
 
-  modalGovBr({ nomeDocumento = 'Documento FinObra', onBaixarPDF = null } = {}) {
+  modalGovBr({ nomeDocumento = 'Documento FinGo', onBaixarPDF = null } = {}) {
     this._govBrDownload = typeof onBaixarPDF === 'function' ? onBaixarPDF : null;
     Utils.showModal(`
       <div class="modal" style="max-width:580px;width:95vw;">
@@ -549,7 +549,7 @@ const Assinador = {
           </div>
 
           <div style="background:rgba(201,162,39,.1);border:1px solid rgba(201,162,39,.3);border-radius:6px;padding:10px 14px;font-size:.75rem;color:var(--text);margin-bottom:14px;">
-            💡 <em>Dica:</em> Após assinar no Gov.br, faça o download do PDF assinado e anexe-o diretamente no menu <strong>Documentos / GED</strong> da Obra no FinObra para manter o histórico arquivado na nuvem.
+            💡 <em>Dica:</em> Após assinar no Gov.br, faça o download do PDF assinado e anexe-o diretamente no menu <strong>Documentos / GED</strong> da Obra no FinGo para manter o histórico arquivado na nuvem.
           </div>
         </div>
         <div class="modal-footer" style="display:flex;justify-content:space-between;align-items:center;">

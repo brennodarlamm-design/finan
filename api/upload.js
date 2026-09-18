@@ -217,7 +217,7 @@ export default async function handler(req, res) {
         return res.status(409).json({
           success: false,
           code: 'PRIVATE_BLOB_DIRECT_UPLOAD_ONLY',
-          error: 'Upload privado deve usar o fluxo autenticado do FinObra.'
+          error: 'Upload privado deve usar o fluxo autenticado do FinGo.'
         });
       }
       const jsonResponse = await handleUpload({
@@ -298,7 +298,7 @@ export default async function handler(req, res) {
     if (disallowedExts.includes(lowerExt) || disallowedMimes.includes(cleanMime) || !ALLOWED_EXTENSIONS.includes(lowerExt)) {
       return res.status(400).json({
         success: false,
-        error: 'Tipo de arquivo não permitido por políticas de segurança do FinObra.'
+        error: 'Tipo de arquivo não permitido por políticas de segurança do FinGo.'
       });
     }
 
@@ -366,7 +366,7 @@ export default async function handler(req, res) {
     if (!mimeEntry) {
       return res.status(400).json({
         success: false,
-        error: 'Tipo de arquivo não permitido por políticas de segurança do FinObra.'
+        error: 'Tipo de arquivo não permitido por políticas de segurança do FinGo.'
       });
     }
 

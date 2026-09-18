@@ -1187,7 +1187,7 @@ const Dashboard = {
             <div style="display:inline-flex;align-items:center;gap:6px;background:rgba(18,217,160,.14);border:1px solid rgba(18,217,160,.3);padding:3px 10px;border-radius:20px;font-size:.72rem;font-weight:800;color:var(--accent);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px;">
               <span>🚀</span> Guia de Início Rápido
             </div>
-            <h2 style="font-size:1.15rem;font-weight:900;color:var(--text);margin:0 0 4px;">Bem-vindo ao FinObra! Complete os 3 passos para ativar seu sistema:</h2>
+            <h2 style="font-size:1.15rem;font-weight:900;color:var(--text);margin:0 0 4px;">Bem-vindo ao FinGo! Complete os 3 passos para ativar seu sistema:</h2>
             <div style="font-size:.8rem;color:var(--text3);">Siga as etapas abaixo para cadastrar sua base e alimentar seus indicadores em tempo real.</div>
           </div>
           <div style="display:flex;align-items:center;gap:12px;">

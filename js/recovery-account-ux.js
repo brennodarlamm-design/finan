@@ -40,7 +40,7 @@
     prompt.style.marginTop = '10px';
 
     const question = document.createElement('div');
-    question.textContent = 'Quer criar sua conta no FinObra agora?';
+    question.textContent = 'Quer criar sua conta no FinGo agora?';
     question.style.marginBottom = '10px';
     question.style.color = 'var(--text)';
     question.style.fontWeight = '600';

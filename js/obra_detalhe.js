@@ -1640,7 +1640,7 @@ const ObraDetalhe = {
     const bdi = DB.getBDIConfig ? DB.getBDIConfig(id, { desonerado: isDeson }) : null;
     const obra = DB.getById('clientes', id) || { nome: 'Todas as Obras / Geral' };
     const emp = DB.getEmpresa() || {};
-    const empNome = emp.razao_social || emp.nome_fantasia || 'FINOBRA CONSTRUTORA';
+    const empNome = emp.razao_social || emp.nome_fantasia || 'FINGO CONSTRUTORA';
 
     const wb = XLSX.utils.book_new();
 
@@ -1887,7 +1887,7 @@ const ObraDetalhe = {
     const obra = this._safeHtmlRecord(obraRaw);
     const empRaw = DB.getEmpresa() || {};
     const emp = this._safeHtmlRecord(empRaw);
-    const empNome = emp.razao_social || emp.nome_fantasia || 'FINOBRA CONSTRUTORA';
+    const empNome = emp.razao_social || emp.nome_fantasia || 'FINGO CONSTRUTORA';
     const safeLogoUrl = Utils.safeUrl ? Utils.safeUrl(empRaw.logo_url) : '';
 
     const tituloRelatorio = modo === 'cronograma' ? 'CRONOGRAMA FÍSICO-FINANCEIRO MENSAL OFICIAL'
@@ -2158,7 +2158,7 @@ const ObraDetalhe = {
         </div>
 
         <div class="footer">
-          <span>FinObra &bull; Relatório Executivo de Engenharia de Custos &bull; Em conformidade com TCU Acórdão 2622/2013 e Lei 14.133/2021</span>
+          <span>FinGo &bull; Relatório Executivo de Engenharia de Custos &bull; Em conformidade com TCU Acórdão 2622/2013 e Lei 14.133/2021</span>
           <span>Emitido em ${new Date().toLocaleDateString('pt-BR')} às ${new Date().toLocaleTimeString('pt-BR')}</span>
         </div>
       </body>
@@ -2542,7 +2542,7 @@ const ObraDetalhe = {
       <!DOCTYPE html>
       <html lang="pt-BR">
         <head>
-          <title>Dossiê Executivo — ${obra.nome} — FinObra</title>
+          <title>Dossiê Executivo — ${obra.nome} — FinGo</title>
           <meta charset="utf-8">
           <style>
             @page {
@@ -3015,7 +3015,7 @@ const ObraDetalhe = {
 
         <!-- Rodapé Final -->
         <div style="display:flex;justify-content:space-between;align-items:center;border-top:1px solid #e2e8f0;padding-top:6px;font-size:7.5px;color:#94a3b8;">
-          <span>FinObra &bull; Sistema de Gestão Financeira & Percurso Documental</span>
+          <span>FinGo &bull; Sistema de Gestão Financeira & Percurso Documental</span>
           <span>Impresso em ${new Date().toLocaleDateString('pt-BR')} ${new Date().toLocaleTimeString('pt-BR')} &bull; Documento Oficial</span>
         </div>
       </div>

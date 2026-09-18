@@ -1522,7 +1522,7 @@ const OrcamentoSINAPI = {
     const { subtotal, bdi, valorBDI, totalGeral:total } = this.calcularTotais(orc);
 
     const wsData = [
-      [(DB.getEmpresa()?.nome_fantasia || DB.getEmpresa()?.razao_social || 'FINOBRA ENGENHARIA').toUpperCase(), '', '', '', '', '', ''],
+      [(DB.getEmpresa()?.nome_fantasia || DB.getEmpresa()?.razao_social || 'FINGO ENGENHARIA').toUpperCase(), '', '', '', '', '', ''],
       ['PLANILHA ORÇAMENTÁRIA DETALHADA', '', '', '', '', '', ''],
       [`Orçamento: ${orc.nome}`, '', '', '', `Ref.: ${orc.uf} ${orc.referencia_sinapi}`, '', ''],
       [`Obra: ${cliente?.nome || '—'}`, '', '', '', `BDI: ${bdi}%`, '', ''],
@@ -1552,7 +1552,7 @@ const OrcamentoSINAPI = {
     const ws = XLSX.utils.aoa_to_sheet(wsData);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Orçamento');
-    XLSX.writeFile(wb, `Orcamento_${(orc.nome||'FinObra').replace(/[^a-zA-Z0-9]/g, '_')}.xlsx`);
+    XLSX.writeFile(wb, `Orcamento_${(orc.nome||'FinGo').replace(/[^a-zA-Z0-9]/g, '_')}.xlsx`);
     Utils.toast('Planilha Excel exportada!', 'success');
   },
 

@@ -161,7 +161,7 @@ export default async function handler(req, res) {
     // ── AÇÃO: DISPARO DE TESTE ─────────────────────────────────────────────
     if (action === 'test') {
       const destPhone = (req.body?.phone || req.query?.phone || '').replace(/\D/g, '');
-      const testMsg = req.body?.message || `*FinObra — Teste de Notificação*\n\n✅ Olá! Seu WhatsApp está conectado e pronto para enviar relatórios, alertas de vencimento de boletos e comprovantes da sua construtora.`;
+      const testMsg = req.body?.message || `*FinGo — Teste de Notificação*\n\n✅ Olá! Seu WhatsApp está conectado e pronto para enviar relatórios, alertas de vencimento de boletos e comprovantes da sua construtora.`;
 
       const response = await fetch(`${renderBase}/send-message`, {
         method: 'POST',

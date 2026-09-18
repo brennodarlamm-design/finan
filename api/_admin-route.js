@@ -127,27 +127,27 @@ function renderBillingEmailHtml(vars) {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Assinatura FinObra — ${empresa}</title>
+  <title>Assinatura FinGo — ${empresa}</title>
 </head>
 <body style="margin:0;padding:0;background:#0f172a;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#1e293b;">
   <span style="display:none !important;visibility:hidden;font-size:1px;line-height:1px;max-height:0;max-width:0;opacity:0;overflow:hidden;">
-    Aviso de assinatura FinObra: ${situacao} — ${empresa}.
+    Aviso de assinatura FinGo: ${situacao} — ${empresa}.
   </span>
   <div style="background:#0f172a;padding:36px 16px;min-height:100vh;">
     <div style="max-width:580px;margin:0 auto;background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 12px 36px rgba(0,0,0,0.35);">
-      <div style="background:linear-gradient(135deg, #09121d 0%, #152438 100%);padding:28px 32px;border-bottom:3px solid #c9a227;">
+      <div style="background:linear-gradient(135deg, #09121d 0%, #152438 100%);padding:28px 32px;border-bottom:3px solid #C6FF00;">
         <table style="width:100%;border-collapse:collapse;">
           <tr>
             <td>
               <div style="font-size:24px;font-weight:900;color:#ffffff;letter-spacing:-0.5px;">
-                Fin<span style="color:#c9a227;">Obra</span>
+                FIN<span style="color:#C6FF00;">GO</span>
               </div>
               <div style="font-size:12px;color:#94a3b8;margin-top:4px;text-transform:uppercase;letter-spacing:0.08em;font-weight:600;">
                 Faturamento &amp; Assinaturas SaaS
               </div>
             </td>
             <td style="text-align:right;">
-              <span style="display:inline-block;padding:6px 12px;background:rgba(201,162,39,0.18);border:1px solid rgba(201,162,39,0.45);border-radius:20px;font-size:11px;font-weight:800;color:#facc15;text-transform:uppercase;">
+              <span style="display:inline-block;padding:6px 12px;background:rgba(198,255,0,0.18);border:1px solid rgba(198,255,0,0.45);border-radius:20px;font-size:11px;font-weight:800;color:#C6FF00;text-transform:uppercase;">
                 ${badgeStatus}
               </span>
             </td>
@@ -159,7 +159,7 @@ function renderBillingEmailHtml(vars) {
           ${tituloAviso}
         </h1>
         <p style="margin:0 0 20px;font-size:14px;line-height:1.6;color:#475569;">
-          Olá, <strong>${responsavel}</strong>! Seguem as informações referentes à renovação da assinatura da empresa <strong>${empresa}</strong> no FinObra:
+          Olá, <strong>${responsavel}</strong>! Seguem as informações referentes à renovação da assinatura da empresa <strong>${empresa}</strong> no FinGo:
         </p>
         <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:18px 20px;margin-bottom:24px;">
           <table style="width:100%;border-collapse:collapse;font-size:13px;">
@@ -200,12 +200,12 @@ function renderBillingEmailHtml(vars) {
         </div>
         <div style="text-align:center;margin:28px 0 10px;">
           <a href="${linkAcesso}" target="_blank" rel="noopener noreferrer" style="display:inline-block;background:#0f172a;color:#ffffff;font-size:14px;font-weight:700;padding:12px 28px;border-radius:8px;text-decoration:none;">
-            Acessar Painel FinObra &rarr;
+            Acessar Painel FinGo &rarr;
           </a>
         </div>
       </div>
       <div style="background:#f8fafc;padding:20px 32px;border-top:1px solid #e2e8f0;text-align:center;font-size:11px;color:#94a3b8;line-height:1.5;">
-        Este e-mail foi enviado automaticamente pelo FinObra ERP para o responsável cadastrado na plataforma.<br>
+        Este e-mail foi enviado automaticamente pelo FinGo ERP para o responsável cadastrado na plataforma.<br>
         Em caso de dúvidas ou envio de comprovante, responda a este e-mail ou contate nosso suporte.
       </div>
     </div>
@@ -860,30 +860,30 @@ export default async function handler(req, res) {
       }
 
       // Monta textos padrão por template
-      let defaultSubject = `FinObra — Assinatura ${nomeEmpresa}`;
+      let defaultSubject = `FinGo — Assinatura ${nomeEmpresa}`;
       let defaultMessage = '';
-      let defaultTituloAviso = `Assinatura FinObra — ${nomeEmpresa}`;
+      let defaultTituloAviso = `Assinatura FinGo — ${nomeEmpresa}`;
 
       if (templateType === 'reminder') {
-        defaultSubject = `🔔 FinObra — Lembrete de Renovação de Assinatura (${fmtVenc})`;
+        defaultSubject = `🔔 FinGo — Lembrete de Renovação de Assinatura (${fmtVenc})`;
         defaultTituloAviso = `Lembrete de Renovação — ${situacaoTxt || 'próximo vencimento'}`;
-        defaultMessage = `Olá, ${responsavel}! 👋\n\nPassando para lembrar que a assinatura do *FinObra* da empresa *${nomeEmpresa}* (Plano ${planoInfo.nome}) vence em *${fmtVenc}* (${situacaoTxt}).\n\n💰 *Valor:* R$ ${planoInfo.valor}\n🔑 *Chave PIX:* ${pixKey}\n👤 *Beneficiário:* ${pixBeneficiary}\n\nQualquer dúvida ou caso precise de emissão de NF, estamos à disposição!`;
+        defaultMessage = `Olá, ${responsavel}! 👋\n\nPassando para lembrar que a assinatura do *FinGo* da empresa *${nomeEmpresa}* (Plano ${planoInfo.nome}) vence em *${fmtVenc}* (${situacaoTxt}).\n\n💰 *Valor:* R$ ${planoInfo.valor}\n🔑 *Chave PIX:* ${pixKey}\n👤 *Beneficiário:* ${pixBeneficiary}\n\nQualquer dúvida ou caso precise de emissão de NF, estamos à disposição!`;
       } else if (templateType === 'due_today') {
-        defaultSubject = `⚠️ FinObra — Sua assinatura vence hoje (${fmtVenc})`;
+        defaultSubject = `⚠️ FinGo — Sua assinatura vence hoje (${fmtVenc})`;
         defaultTituloAviso = `Sua assinatura vence hoje (${fmtVenc})`;
-        defaultMessage = `Olá, ${responsavel}! 🔔\n\nA assinatura do *FinObra* da empresa *${nomeEmpresa}* vence *hoje (${fmtVenc})*.\n\nPara garantir a continuidade dos acessos da sua equipe e sincronização das obras sem interrupção:\n\n💰 *Valor:* R$ ${planoInfo.valor}\n🔑 *Chave PIX:* ${pixKey}\n👤 *Beneficiário:* ${pixBeneficiary}\n\nApós o pagamento via PIX, a renovação é confirmada e os acessos continuam ativos normalmente.`;
+        defaultMessage = `Olá, ${responsavel}! 🔔\n\nA assinatura do *FinGo* da empresa *${nomeEmpresa}* vence *hoje (${fmtVenc})*.\n\nPara garantir a continuidade dos acessos da sua equipe e sincronização das obras sem interrupção:\n\n💰 *Valor:* R$ ${planoInfo.valor}\n🔑 *Chave PIX:* ${pixKey}\n👤 *Beneficiário:* ${pixBeneficiary}\n\nApós o pagamento via PIX, a renovação é confirmada e os acessos continuam ativos normalmente.`;
       } else if (templateType === 'overdue') {
-        defaultSubject = `🚨 FinObra — Aviso de Vencimento e Regularização de Acesso`;
+        defaultSubject = `🚨 FinGo — Aviso de Vencimento e Regularização de Acesso`;
         defaultTituloAviso = `Aviso de Regularização — ${situacaoTxt || 'Assinatura Pendente'}`;
-        defaultMessage = `Olá, ${responsavel}! ⚠️\n\nIdentificamos que a assinatura do *FinObra* da empresa *${nomeEmpresa}* venceu em *${fmtVenc}* (${situacaoTxt}) e consta pendente.\n\nPara evitar o bloqueio preventivo dos acessos, emissão de relatórios e sincronização no canteiro de obras, solicitamos a regularização:\n\n💰 *Valor:* R$ ${planoInfo.valor}\n🔑 *Chave PIX:* ${pixKey}\n👤 *Beneficiário:* ${pixBeneficiary}\n\nSe já realizou o pagamento, por favor desconsidere este aviso ou nos envie o comprovante!`;
+        defaultMessage = `Olá, ${responsavel}! ⚠️\n\nIdentificamos que a assinatura do *FinGo* da empresa *${nomeEmpresa}* venceu em *${fmtVenc}* (${situacaoTxt}) e consta pendente.\n\nPara evitar o bloqueio preventivo dos acessos, emissão de relatórios e sincronização no canteiro de obras, solicitamos a regularização:\n\n💰 *Valor:* R$ ${planoInfo.valor}\n🔑 *Chave PIX:* ${pixKey}\n👤 *Beneficiário:* ${pixBeneficiary}\n\nSe já realizou o pagamento, por favor desconsidere este aviso ou nos envie o comprovante!`;
       } else if (templateType === 'trial_ending') {
-        defaultSubject = `🚀 FinObra — Seu período de testes termina em ${fmtVenc}`;
+        defaultSubject = `🚀 FinGo — Seu período de testes termina em ${fmtVenc}`;
         defaultTituloAviso = `Seu período de testes está terminando em ${fmtVenc}`;
-        defaultMessage = `Olá, ${responsavel}! 🚀\n\nSeu período de teste gratuito do *FinObra* na empresa *${nomeEmpresa}* termina em *${fmtVenc}*.\n\nEsperamos que a plataforma esteja transformando a gestão das suas obras! Para continuar utilizando todos os recursos com a sua equipe:\n\n👉 Conheça os planos e assine: https://fingo.api.br/app.html#planos\n💰 *Valor de referência:* R$ ${planoInfo.valor}/mês (${planoInfo.nome})\n🔑 *Chave PIX:* ${pixKey}\n👤 *Beneficiário:* ${pixBeneficiary}\n\nEstamos à disposição para ajudar na escolha do melhor plano!`;
+        defaultMessage = `Olá, ${responsavel}! 🚀\n\nSeu período de teste gratuito do *FinGo* na empresa *${nomeEmpresa}* termina em *${fmtVenc}*.\n\nEsperamos que a plataforma esteja transformando a gestão das suas obras! Para continuar utilizando todos os recursos com a sua equipe:\n\n👉 Conheça os planos e assine: https://fingo.api.br/app.html#planos\n💰 *Valor de referência:* R$ ${planoInfo.valor}/mês (${planoInfo.nome})\n🔑 *Chave PIX:* ${pixKey}\n👤 *Beneficiário:* ${pixBeneficiary}\n\nEstamos à disposição para ajudar na escolha do melhor plano!`;
       } else {
-        defaultSubject = `FinObra — Notificação de Assinatura (${nomeEmpresa})`;
+        defaultSubject = `FinGo — Notificação de Assinatura (${nomeEmpresa})`;
         defaultTituloAviso = `Notificação de Assinatura — ${nomeEmpresa}`;
-        defaultMessage = `Olá, ${responsavel}! Aqui é do FinObra referente à assinatura da empresa ${nomeEmpresa}.`;
+        defaultMessage = `Olá, ${responsavel}! Aqui é do FinGo referente à assinatura da empresa ${nomeEmpresa}.`;
       }
 
       const finalMessage = String(customMessage || defaultMessage).trim();
@@ -952,7 +952,7 @@ export default async function handler(req, res) {
       if (channel === 'email' || channel === 'both') {
         results.email.attempted = true;
         const resendKey = String(process.env.RESEND_API_KEY || '').trim();
-        const emailFrom = String(process.env.FINOBRA_SUPPORT_EMAIL_FROM || 'FinObra <suporte@fingo.api.br>').trim();
+        const emailFrom = String(process.env.FINOBRA_SUPPORT_EMAIL_FROM || 'FinGo <suporte@fingo.api.br>').trim();
 
         if (!destEmail || !destEmail.includes('@')) {
           results.email.error = 'E-mail da empresa inválido ou não cadastrado.';

@@ -195,12 +195,12 @@ function renderSupportEmailHtml(vars) {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Novo atendimento no FinObra — ${empresa}</title>
+  <title>Novo atendimento no FinGo — ${empresa}</title>
 </head>
 <body style="margin:0;padding:0;background:#f4f6f8;font-family:Arial,Helvetica,sans-serif;color:#1f2937;">
   <!-- Preview text / Preheader -->
   <span style="display:none !important;visibility:hidden;font-size:1px;line-height:1px;max-height:0;max-width:0;opacity:0;overflow:hidden;">
-    ${cliente} solicitou atendimento humano no FinObra.
+    ${cliente} solicitou atendimento humano no FinGo.
   </span>
 
   <div style="margin:0;padding:0;background:#f4f6f8;font-family:Arial,Helvetica,sans-serif;color:#1f2937;">
@@ -210,7 +210,7 @@ function renderSupportEmailHtml(vars) {
         
         <div style="background:#111827;padding:24px 28px;">
           <div style="font-size:22px;font-weight:700;color:#ffffff;">
-            FinObra
+            FinGo
           </div>
           <div style="font-size:13px;color:#d1d5db;margin-top:4px;">
             Central de Atendimento
@@ -278,13 +278,13 @@ function renderSupportEmailHtml(vars) {
           </div>
 
           <p style="font-size:13px;color:#6b7280;line-height:1.5;margin:0;">
-            Este aviso foi gerado automaticamente pelo FinObra após o cliente solicitar atendimento humano.
+            Este aviso foi gerado automaticamente pelo FinGo após o cliente solicitar atendimento humano.
           </p>
 
         </div>
 
         <div style="background:#f9fafb;border-top:1px solid #e5e7eb;padding:18px 28px;text-align:center;font-size:12px;color:#9ca3af;">
-          FinObra • Gestão para Construção
+          FinGo • Gestão para Construção
         </div>
 
       </div>
@@ -299,7 +299,7 @@ async function notifySupportHuman({ tenantName, userName, userEmail, conversatio
   const notifyPhone = String(process.env.FINOBRA_SUPPORT_WHATSAPP || '5595991363678').replace(/\D/g, '');
   const internalSecret = getInternalApiSecret();
   if (notifyPhone && internalSecret) {
-    const text = `🔔 *FinObra — Atendimento solicitado*\n\nEmpresa: ${tenantName || 'Cliente'}\nUsuário: ${userName || 'Usuário'}\nChamado: ${conversationId}\nMensagem: ${cleanSupportText(message, 500) || 'Cliente solicitou atendimento humano.'}\n\nAbra o painel Master > Central de Atendimento.`;
+    const text = `🔔 *FinGo — Atendimento solicitado*\n\nEmpresa: ${tenantName || 'Cliente'}\nUsuário: ${userName || 'Usuário'}\nChamado: ${conversationId}\nMensagem: ${cleanSupportText(message, 500) || 'Cliente solicitou atendimento humano.'}\n\nAbra o painel Master > Central de Atendimento.`;
     tasks.push(fetch(`${getSupportRenderBaseUrl()}/send-message`, {
       method: 'POST',
       headers: { 'Content-Type':'application/json', 'Authorization':`Bearer ${internalSecret}`, 'x-api-key':internalSecret, 'User-Agent':'FinObra-Support/1.0' },
@@ -309,13 +309,13 @@ async function notifySupportHuman({ tenantName, userName, userEmail, conversatio
   }
 
   const resendKey = String(process.env.RESEND_API_KEY || '').trim();
-  const emailFrom = String(process.env.FINOBRA_SUPPORT_EMAIL_FROM || 'FinObra <onboarding@resend.dev>').trim();
+  const emailFrom = String(process.env.FINOBRA_SUPPORT_EMAIL_FROM || 'FinGo <onboarding@resend.dev>').trim();
   const emailTo = String(process.env.FINOBRA_SUPPORT_EMAIL || 'brennodarlam@gmail.com').trim();
   const templateId = String(process.env.RESEND_SUPPORT_TEMPLATE_ID || '').trim();
 
   if (resendKey && emailFrom && emailTo) {
     const vars = {
-      EMPRESA: String(tenantName || 'Cliente FinObra').trim(),
+      EMPRESA: String(tenantName || 'Cliente FinGo').trim(),
       CLIENTE: String(userName || 'Cliente').trim(),
       EMAIL_CLIENTE: String(userEmail || 'Não informado').trim(),
       CHAMADO_ID: String(conversationId || 'Não informado').trim(),
@@ -327,7 +327,7 @@ async function notifySupportHuman({ tenantName, userName, userEmail, conversatio
     const payload = {
       from: emailFrom,
       to: [emailTo],
-      subject: `🔔 Novo atendimento no FinObra — ${vars.EMPRESA}`
+      subject: `🔔 Novo atendimento no FinGo — ${vars.EMPRESA}`
     };
 
     if (templateId) {
@@ -417,7 +417,7 @@ export default async function handler(req, res) {
           conversation = rows[0];
           await sql`
             INSERT INTO support_messages (id,conversation_id,tenant_id,sender_type,sender_user_id,sender_name,body)
-            VALUES (${`smsg_${crypto.randomBytes(10).toString('hex')}`},${id},${auth.tenantId},'bot',NULL,'FinBot',${`Olá, ${auth.user.nome || 'tudo bem'}! Sou o FinBot, assistente do FinObra. Posso responder dúvidas sobre o sistema. Se preferir falar com uma pessoa, clique em “Chamar atendente”.`});
+            VALUES (${`smsg_${crypto.randomBytes(10).toString('hex')}`},${id},${auth.tenantId},'bot',NULL,'FinBot',${`Olá, ${auth.user.nome || 'tudo bem'}! Sou o FinBot, assistente do FinGo. Posso responder dúvidas sobre o sistema. Se preferir falar com uma pessoa, clique em “Chamar atendente”.`});
           `;
         }
         const messages = await loadSupportMessages(sql, auth, conversation.id);
@@ -442,7 +442,7 @@ export default async function handler(req, res) {
           await sql`UPDATE support_conversations SET status='waiting', human_requested_at=COALESCE(human_requested_at,NOW()), last_message_at=NOW(), updated_at=NOW() WHERE id=${conversation.id};`;
           await sql`
             INSERT INTO support_messages (id,conversation_id,tenant_id,sender_type,sender_name,body)
-            VALUES (${`smsg_${crypto.randomBytes(10).toString('hex')}`},${conversation.id},${auth.tenantId},'system','FinObra',${'Atendimento humano solicitado. Sua conversa entrou na fila do suporte.'});
+            VALUES (${`smsg_${crypto.randomBytes(10).toString('hex')}`},${conversation.id},${auth.tenantId},'system','FinGo',${'Atendimento humano solicitado. Sua conversa entrou na fila do suporte.'});
           `;
         } else if (conversation.status === 'bot') {
           let reply = null;
@@ -484,7 +484,7 @@ export default async function handler(req, res) {
           await sql`UPDATE support_conversations SET status='waiting', human_requested_at=COALESCE(human_requested_at,NOW()), last_message_at=NOW(), updated_at=NOW() WHERE id=${conversation.id};`;
           await sql`
             INSERT INTO support_messages (id,conversation_id,tenant_id,sender_type,sender_name,body)
-            VALUES (${`smsg_${crypto.randomBytes(10).toString('hex')}`},${conversation.id},${auth.tenantId},'system','FinObra',${'Atendimento humano solicitado. Sua conversa entrou na fila do suporte.'});
+            VALUES (${`smsg_${crypto.randomBytes(10).toString('hex')}`},${conversation.id},${auth.tenantId},'system','FinGo',${'Atendimento humano solicitado. Sua conversa entrou na fila do suporte.'});
           `;
         }
         conversation = await loadSupportConversation(sql, auth, conversation.id);
@@ -508,7 +508,7 @@ export default async function handler(req, res) {
         await sql`UPDATE support_conversations SET status='closed', resolved_at=COALESCE(resolved_at,NOW()), updated_at=NOW() WHERE id=${conversation.id};`;
         await sql`
           INSERT INTO support_messages (id,conversation_id,tenant_id,sender_type,sender_name,body)
-          VALUES (${`smsg_${crypto.randomBytes(10).toString('hex')}`},${conversation.id},${auth.tenantId},'system','FinObra',${'Conversa encerrada pelo cliente.'});
+          VALUES (${`smsg_${crypto.randomBytes(10).toString('hex')}`},${conversation.id},${auth.tenantId},'system','FinGo',${'Conversa encerrada pelo cliente.'});
         `;
         return res.status(200).json({ success:true });
       }

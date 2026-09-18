@@ -138,7 +138,7 @@ const WhatsApp = {
       msg += `\n🧾 *Chave NF-e:*\n\`${dados.chave_nfe}\`\n`;
     }
 
-    msg += `\n👉 _Notificação gerada pelo FinObra — ${nomeEmp}_`;
+    msg += `\n👉 _Notificação gerada pelo FinGo — ${nomeEmp}_`;
 
     this.abrirEnvio(msg);
   },
@@ -204,7 +204,7 @@ const WhatsApp = {
 
     msg += `💵 *TOTAL GERAL A PAGAR:* ${Utils.fmt.currency(totalGeral)}\n`;
     msg += `-------------------------------------------\n`;
-    msg += `👉 _Resumo automático gerado pelo FinObra — ${nomeEmp}_`;
+    msg += `👉 _Resumo automático gerado pelo FinGo — ${nomeEmp}_`;
 
     this.abrirEnvio(msg);
   },
@@ -224,7 +224,7 @@ const WhatsApp = {
     const statusIcon = isAtrasado ? '🔴 ATRASADA' : isAtencao ? '🟡 EM ATENÇÃO' : (p.status === 'concluido' ? '✅ CONCLUÍDA' : '🟢 NO PRAZO');
 
     const emp = typeof DB !== 'undefined' ? DB.getEmpresa() : null;
-    const nomeEmp = emp?.nome_fantasia || emp?.razao_social || 'FinObra';
+    const nomeEmp = emp?.nome_fantasia || emp?.razao_social || 'FinGo';
 
     let msg = `🏗️ *${nomeEmp.toUpperCase()} — WORKFLOW DE OBRA*\n`;
     msg += `-------------------------------------------\n`;
@@ -323,7 +323,7 @@ const WhatsApp = {
     if (!resumo) return;
 
     const emp = typeof DB !== 'undefined' ? DB.getEmpresa() : null;
-    const nomeEmp = emp?.nome_fantasia || emp?.razao_social || 'FinObra';
+    const nomeEmp = emp?.nome_fantasia || emp?.razao_social || 'FinGo';
 
     let msg = `☀️ *${nomeEmp.toUpperCase()} — STATUS DE WORKFLOW DA OBRA* ☀️\n`;
     msg += `-------------------------------------------\n`;
@@ -335,7 +335,7 @@ const WhatsApp = {
     }
     msg += `🚦 *Situação dos Prazos:* ${resumo.totalAtrasados > 0 ? `🔴 ${resumo.totalAtrasados} etapa(s) em atraso` : '🟢 Cronograma 100% no prazo'}\n`;
     msg += `-------------------------------------------\n`;
-    msg += `👉 _Acompanhe os detalhes completos no FinObra._`;
+    msg += `👉 _Acompanhe os detalhes completos no FinGo._`;
 
     const telFinal = (telefone || obra.telefone || this.getTelefonePadrao() || '').replace(/\D/g, '');
     this.abrirEnvio(msg, telFinal);
@@ -408,7 +408,7 @@ const WhatsApp = {
       return;
     }
     this.setTelefonePadrao(limpo);
-    const msg = `*FinObra — Teste de Notificação*\n\n✅ Olá! Este número foi conectado com sucesso ao FinObra para o recebimento de alertas de boletos e resumos financeiros da construtora.`;
+    const msg = `*FinGo — Teste de Notificação*\n\n✅ Olá! Este número foi conectado com sucesso ao FinGo para o recebimento de alertas de boletos e resumos financeiros da construtora.`;
     this.abrirEnvio(msg, limpo);
   },
 
@@ -764,7 +764,7 @@ const WhatsApp = {
         headers: headers,
         body: JSON.stringify({
           phone: limpo,
-          message: `*FinObra — Teste de Notificação*\n\n✅ Olá! Seu WhatsApp está conectado e pronto para enviar relatórios diários e alertas de boletos da construtora.`
+          message: `*FinGo — Teste de Notificação*\n\n✅ Olá! Seu WhatsApp está conectado e pronto para enviar relatórios diários e alertas de boletos da construtora.`
         })
       });
 
@@ -807,7 +807,7 @@ const WhatsApp = {
         headers: headers,
         body: JSON.stringify({
           phone: tel,
-          message: `*FinObra — Teste de Notificação*\n\n✅ Olá! Seu WhatsApp está conectado e pronto para enviar relatórios diários e alertas de boletos da construtora.`
+          message: `*FinGo — Teste de Notificação*\n\n✅ Olá! Seu WhatsApp está conectado e pronto para enviar relatórios diários e alertas de boletos da construtora.`
         })
       });
 
@@ -842,16 +842,16 @@ const WhatsApp = {
 
     switch (tipoNotificacao) {
       case 'inicio':
-        return `*FinObra — Início de Etapa*\n\n` +
+        return `*FinGo — Início de Etapa*\n\n` +
           `Olá, *${nomeResp}*!\n\n` +
           `A seguinte fase da obra *${nomeObra}* foi iniciada:\n` +
           `📌 *Etapa:* ${codigoEtapa} — ${nomeEtapa}\n` +
           `📅 *Início:* ${inicioFmt}\n` +
           `🏁 *Prazo Final (SLA):* ${prazoFmt} (${etapa.dias_sla || 15} dias)\n\n` +
-          `Favor acompanhar os apontamentos no sistema FinObra. Bom trabalho!`;
+          `Favor acompanhar os apontamentos no sistema FinGo. Bom trabalho!`;
 
       case 'conclusao':
-        return `*FinObra — Etapa Concluída com Sucesso!*\n\n` +
+        return `*FinGo — Etapa Concluída com Sucesso!*\n\n` +
           `Informamos que uma nova etapa foi concluída na obra *${nomeObra}*:\n` +
           `✅ *Etapa:* ${codigoEtapa} — ${nomeEtapa}\n` +
           `👤 *Responsável:* ${nomeResp}\n` +
@@ -859,17 +859,17 @@ const WhatsApp = {
           `O cronograma da obra foi atualizado e as próximas etapas já estão em andamento.`;
 
       case 'atraso':
-        return `*FinObra — Alerta de Prazo / Atraso de SLA*\n\n` +
+        return `*FinGo — Alerta de Prazo / Atraso de SLA*\n\n` +
           `Atenção *${nomeResp}*!\n\n` +
           `A etapa *${codigoEtapa} — ${nomeEtapa}* da obra *${nomeObra}* excedeu o prazo previsto de SLA.\n` +
           `🔴 *Atraso:* +${diasAtraso || etapa.dias_atraso || 1} dias\n` +
           `🏁 *Prazo Previsto:* ${prazoFmt}\n` +
           (motivo ? `📝 *Motivo Registrado:* ${motivo}\n` : '') +
-          `\nPor favor, atualize o status ou revise as pendências de campo no FinObra para recalcular o cronograma.`;
+          `\nPor favor, atualize o status ou revise as pendências de campo no FinGo para recalcular o cronograma.`;
 
       case 'cobranca':
       default:
-        return `*FinObra — Cobrança de Status / Prazos*\n\n` +
+        return `*FinGo — Cobrança de Status / Prazos*\n\n` +
           `Olá, *${nomeResp}*!\n\n` +
           `Gostaríamos de um alinhamento sobre o andamento da fase na obra *${nomeObra}*:\n` +
           `📋 *Etapa:* ${codigoEtapa} — ${nomeEtapa}\n` +
@@ -1027,13 +1027,13 @@ const WhatsApp = {
         ? `🟡 Em Atenção`
         : `🟢 No Prazo`;
 
-    const texto = `*FinObra — Status e Prazos do Projeto*\n\n` +
+    const texto = `*FinGo — Status e Prazos do Projeto*\n\n` +
       `Obra: *${obra.nome || 'Obra'}*\n` +
       `Situação do Cronograma: *${statusMsg}*\n` +
       `Fases Concluídas: *${resumo.concluidos || 0} de ${resumo.totalProcessos || 0}* (${resumo.pctGeral || 0}%)\n` +
       `Previsão Atual de Entrega: *${dataEntrega}*\n` +
       (resumo.etapaAtual ? `Fase Atual em Execução: *${resumo.etapaAtual.nome}*\n` : '') +
-      `\nRelatório gerado via FinObra Gestão de Obras.`;
+      `\nRelatório gerado via FinGo — Obras em Fluxo.`;
 
     const telSugerido = obra.telefone || '';
 

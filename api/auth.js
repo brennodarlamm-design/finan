@@ -438,7 +438,7 @@ export default async function handler(req, res) {
         await writeAudit(sql, req, { tenantId: user.tenant_id, user: { id: user.id } }, { acao: 'login_bloqueado', entidade: 'auth', entidadeId: user.id, depois: { motivo: 'tenant_blocked', ip: clientIp } });
         return res.status(403).json({
           success: false,
-          message: 'Acesso bloqueado para esta empresa. Entre em contato com o suporte comercial FinObra.'
+          message: 'Acesso bloqueado para esta empresa. Entre em contato com o suporte comercial FinGo.'
         });
       }
       if (user.tenant_status === 'cancelado') {
@@ -1029,7 +1029,7 @@ export default async function handler(req, res) {
         if (userRecord.tenant_status === 'bloqueado' || userRecord.tenant_status === 'cancelado') {
           return res.status(403).json({
             success: false,
-            message: 'Acesso da empresa bloqueado. Contate o suporte comercial FinObra.'
+            message: 'Acesso da empresa bloqueado. Contate o suporte comercial FinGo.'
           });
         }
         if (userRecord.tenant_status === 'trial') {
@@ -1048,7 +1048,7 @@ export default async function handler(req, res) {
         return res.status(403).json({
           success: false,
           not_registered: true,
-          message: 'Esta conta Google não está vinculada a nenhuma construtora cadastrada no FinObra. Solicite acesso ao administrador da sua empresa ou à nossa equipe comercial.'
+          message: 'Esta conta Google não está vinculada a nenhuma construtora cadastrada no FinGo. Solicite acesso ao administrador da sua empresa ou à nossa equipe comercial.'
         });
       }
 
@@ -1243,7 +1243,7 @@ export default async function handler(req, res) {
       const destPhone = (user.tenant_telefone || '').replace(/\D/g, '');
       if (destPhone) {
         const numFmt = destPhone.startsWith('55') ? destPhone : `55${destPhone}`;
-        const mensagemOtp = `*FinObra — Código de Verificação*\n\nOlá, ${user.nome}!\n\nSeu código seguro para redefinir sua senha é:\n\n👉 *${otpCode}*\n\nEste código é válido por *10 minutos*. Se você não solicitou esta redefinição, ignore esta mensagem.`;
+        const mensagemOtp = `*FinGo — Código de Verificação*\n\nOlá, ${user.nome}!\n\nSeu código seguro para redefinir sua senha no FinGo é:\n\n👉 *${otpCode}*\n\nEste código é válido por *10 minutos*. Se você não solicitou esta redefinição, ignore esta mensagem.`;
         try {
           await fetch('https://finan-wf12.onrender.com/send-message', {
             method: 'POST',
@@ -1263,12 +1263,12 @@ export default async function handler(req, res) {
       const resendKey = (process.env.RESEND_API_KEY || '').trim();
       if ((resendKey || isTriggerConfigured()) && user.email) {
         try {
-          const fromEmail = (process.env.RESEND_FROM_EMAIL || 'FinObra <nao-responder@fingo.api.br>').trim();
-          const emailSubject = 'FinObra — Código de Recuperação de Senha';
+          const fromEmail = (process.env.RESEND_FROM_EMAIL || 'FinGo <nao-responder@fingo.api.br>').trim();
+          const emailSubject = 'FinGo — Código de Recuperação de Senha';
           const emailHtml = `
             <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 500px; margin: 0 auto; padding: 24px; border: 1px solid #e2e8f0; border-radius: 8px; background: #ffffff;">
               <h2 style="color: #0f172a; margin-top: 0;">Código de Verificação</h2>
-              <p style="color: #334155; font-size: 15px;">Recebemos uma solicitação de redefinição de senha para sua conta no <strong>FinObra</strong>.</p>
+              <p style="color: #334155; font-size: 15px;">Recebemos uma solicitação de redefinição de senha para sua conta no <strong>FinGo</strong>.</p>
               <div style="background: #f8fafc; border: 1px solid #cbd5e1; padding: 18px; border-radius: 8px; text-align: center; margin: 24px 0;">
                 <span style="font-size: 32px; font-weight: 700; letter-spacing: 6px; color: #0284c7; font-family: monospace;">${otpCode}</span>
               </div>

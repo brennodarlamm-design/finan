@@ -352,7 +352,7 @@ const OrcamentoProposta = {
       `👤 *Cliente:* ${cliente.nome || 'Cliente'}\n` +
       `💰 *Valor Global:* ${Utils.fmt.currency(totalGeral)}\n` +
       `📅 *Validade:* ${prop.validade_dias} dias\n\n` +
-      `_Acesse o detalhamento completo no sistema FinObra._`;
+      `_Acesse o detalhamento completo no sistema FinGo._`;
 
     const telefone = String(cliente.telefone || cliente.celular || '').replace(/\D/g, '');
     const url = telefone ? `https://wa.me/55${telefone}?text=${encodeURIComponent(texto)}` : `https://wa.me/?text=${encodeURIComponent(texto)}`;

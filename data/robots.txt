@@ -13,6 +13,7 @@ Disallow: /master
 Disallow: /master.html
 Disallow: /api/
 Disallow: /__finobra/
+Disallow: /__fingo/
 Disallow: /portal/
 
 Sitemap: https://fingo.api.br/sitemap.xml

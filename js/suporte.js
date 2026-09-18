@@ -153,7 +153,7 @@ const Suporte = {
       return;
     }
     const modal = this._ensureChatModal();
-    modal.innerHTML = `<div style="background:#0f1710;border:1px solid rgba(201,162,39,.35);border-radius:14px;width:min(620px,100%);padding:34px;text-align:center;color:#f0ead6;"><div style="font-size:2rem;margin-bottom:10px;">🤖</div><div style="font-weight:800;color:var(--accent2);">Abrindo atendimento FinObra...</div><div style="font-size:.8rem;color:#94a3b8;margin-top:6px;">Carregando sua conversa com segurança.</div></div>`;
+    modal.innerHTML = `<div style="background:#0f1710;border:1px solid rgba(201,162,39,.35);border-radius:14px;width:min(620px,100%);padding:34px;text-align:center;color:#f0ead6;"><div style="font-size:2rem;margin-bottom:10px;">🤖</div><div style="font-weight:800;color:var(--accent2);">Abrindo atendimento FinGo...</div><div style="font-size:.8rem;color:#94a3b8;margin-top:6px;">Carregando sua conversa com segurança.</div></div>`;
     try {
       this.sessao.loading = true;
       const data = await this._apiSupport('start', 'POST', { action:'start' });
@@ -335,7 +335,7 @@ const Suporte = {
   },
 
   getLinkWhatsApp(msg) {
-    const texto = encodeURIComponent(msg || 'Olá! Preciso de suporte no FinObra.');
+    const texto = encodeURIComponent(msg || 'Olá! Preciso de suporte no FinGo.');
     return `https://wa.me/${this.WHATSAPP_NUMERO}?text=${texto}`;
   },
 
@@ -357,7 +357,7 @@ const Suporte = {
           <div style="display:flex;align-items:center;gap:10px;">
             <span style="font-size:1.3rem;">📖</span>
             <div>
-              <div style="font-weight:800;font-size:1rem;color:var(--accent2);">Manual do Usuário — FinObra</div>
+              <div style="font-weight:800;font-size:1rem;color:var(--accent2);">Manual do Usuário — FinGo</div>
               <div style="font-size:.75rem;color:#94a3b8;">Guia rápido de operações e funcionalidades</div>
             </div>
           </div>
@@ -397,7 +397,7 @@ const Suporte = {
           <div style="background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:16px;">
             <h4 style="color:var(--accent2);margin-bottom:6px;display:flex;align-items:center;gap:6px;">🛡️ 5. Assinatura Eletrônica & Validação Pública</h4>
             <p style="font-size:.85rem;color:#cbd5e1;line-height:1.5;">
-              Recibos e contratos gerados pelo FinObra recebem hash criptográfico SHA-256 e QR Code. Qualquer cliente ou fiscal pode validar a autenticidade online pelo portal público <strong style="color:var(--accent2);">fingo.api.br/validar</strong>.
+              Recibos e contratos gerados pelo FinGo recebem hash criptográfico SHA-256 e QR Code. Qualquer cliente ou fiscal pode validar a autenticidade online pelo portal público <strong style="color:var(--accent2);">fingo.api.br/validar</strong>.
             </p>
           </div>
 
@@ -484,7 +484,7 @@ const Suporte = {
         </div>
 
         <div style="padding:14px 20px;background:rgba(0,0,0,.3);border-top:1px solid rgba(255,255,255,.08);display:flex;justify-content:space-between;align-items:center;">
-          <span style="font-size:.8rem;color:#94a3b8;">Canal Oficial FinObra no YouTube</span>
+          <span style="font-size:.8rem;color:#94a3b8;">Canal Oficial FinGo no YouTube</span>
           <button data-fb-click="Patch26Actions.removeById" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="suporte-tutoriais-modal" style="background:var(--accent);border:none;color:#0f1710;padding:8px 20px;border-radius:8px;font-weight:800;cursor:pointer;">Fechar</button>
         </div>
       </div>
@@ -520,7 +520,7 @@ const Suporte = {
 
         <div style="padding:22px;display:flex;flex-direction:column;gap:16px;">
           <p style="font-size:.85rem;color:#cbd5e1;line-height:1.5;">
-            Treine sua equipe de engenharia, compras e financeiro para extrair o máximo do FinObra. O treinamento inclui configuração inicial de obras, medições Caixa e fluxo de caixa.
+            Treine sua equipe de engenharia, compras e financeiro para extrair o máximo do FinGo. O treinamento inclui configuração inicial de obras, medições Caixa e fluxo de caixa.
           </p>
 
           <div style="background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:16px;">
@@ -528,7 +528,7 @@ const Suporte = {
             <div style="font-weight:800;font-size:1rem;color:#fff;">45 a 60 minutos (Google Meet / Ao Vivo)</div>
           </div>
 
-          <a href="${this.getLinkWhatsApp(`Olá! Gostaria de agendar um treinamento do FinObra para a equipe da minha empresa (${u.empresaNome || u.nome || 'minha construtora'}).`)}" target="_blank" style="background:#22c55e;border:none;color:#fff;padding:14px;border-radius:10px;font-weight:800;font-size:.9rem;text-decoration:none;display:flex;align-items:center;justify-content:center;gap:8px;box-shadow:0 4px 16px rgba(34,197,94,.3);">
+          <a href="${this.getLinkWhatsApp(`Olá! Gostaria de agendar um treinamento do FinGo para a equipe da minha empresa (${u.empresaNome || u.nome || 'minha construtora'}).`)}" target="_blank" style="background:#22c55e;border:none;color:#fff;padding:14px;border-radius:10px;font-weight:800;font-size:.9rem;text-decoration:none;display:flex;align-items:center;justify-content:center;gap:8px;box-shadow:0 4px 16px rgba(34,197,94,.3);">
             <span>📅 Agendar pelo WhatsApp: (95) 99136-3678</span>
           </a>
         </div>
