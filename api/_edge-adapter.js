@@ -13,6 +13,7 @@ import uploadHandler from './upload.js';
 import whatsappHandler from './whatsapp.js';
 import auditHandler from './audit.js';
 import reconhecerHandler from './reconhecer-documento.js';
+import { resolveV2Route } from './_v2-routes.js';
 
 const HANDLERS = {
   auth: authHandler,
@@ -78,7 +79,13 @@ function resolveRouteAndQuery(pathname, searchParams) {
     query[k] = v;
   }
 
-  // Rewrites específicos do sistema
+  // 1. Roteador RESTful Modular Edge v2 (Cloudflare Workers nativo)
+  if (pathname.startsWith('/api/v2/')) {
+    const v2Target = resolveV2Route(pathname, searchParams);
+    if (v2Target) return v2Target;
+  }
+
+  // Rewrites específicos do sistema v1
   if (pathname === '/api/health') {
     query.action = query.action || 'health';
     return { handler: HANDLERS.auth, query, moduleName: 'auth' };

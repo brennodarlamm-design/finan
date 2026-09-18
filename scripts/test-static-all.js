@@ -87,7 +87,8 @@ const tests = [
   'scripts/test-snapshot-payload.js',
   'scripts/test-finbot-key-pool.js',
   'scripts/test-bug-hunter-fixes.js',
-  'scripts/test-edge-security-design.js'
+  'scripts/test-edge-security-design.js',
+  'scripts/test-edge-v2-routes.js'
 ].filter(fs.existsSync);
 
 const p50NativeSourceTests = new Set([
@@ -108,7 +109,8 @@ const p50NativeSourceTests = new Set([
   'scripts/test-snapshot-payload.js',
   'scripts/test-finbot-key-pool.js',
   'scripts/test-bug-hunter-fixes.js',
-  'scripts/test-edge-security-design.js'
+  'scripts/test-edge-security-design.js',
+  'scripts/test-edge-v2-routes.js'
 ]);
 const preload = path.resolve('scripts/test-api-wrapper-preload.cjs');
 
