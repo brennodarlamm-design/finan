@@ -88,10 +88,17 @@ const DB = {
           const idbVal = await IDBStorage.getItem(k);
           if (idbVal !== null && idbVal !== undefined) {
             const current = this._memCache.get(k);
-            if (!current || (Array.isArray(idbVal) && Array.isArray(current) && idbVal.length > current.length)) {
+            // BUG-CRIT-03: Não ressuscitar registros excluídos comparando apenas comprimento de array.
+            // Se o cache em memória já contém dados válidos, preserva a versão atual e alinha o IndexedDB.
+            // Só hidrata do IDB se a memória não possuir a chave, ou se a memória estiver vazia e o IDB tiver dados.
+            const needsHydration = !current || (Array.isArray(current) && current.length === 0 && Array.isArray(idbVal) && idbVal.length > 0);
+            if (needsHydration) {
               this._memCache.set(k, idbVal);
               try { localStorage.setItem(k, JSON.stringify(idbVal)); } catch {}
               hydratedCount++;
+            } else if (current && Array.isArray(current) && Array.isArray(idbVal) && current.length < idbVal.length) {
+              // Registros foram deletados na sessão ativa; alinha o IDB com o estado atual em vez de restaurar fantasmas.
+              try { await IDBStorage.setItem(k, current); } catch {}
             }
           }
         }
@@ -2122,23 +2129,24 @@ const DB = {
 
     let totalOrcado = 0;
 
-    // Consolidar Orçamentos Convencionais
+    // Consolidar Orçamentos Convencionais (BUG-CRIT-04 fix)
     orcsConv.forEach(orc => {
-      if (Array.isArray(orc.categorias) && orc.categorias.length > 0) {
+      if (Array.isArray(orc.etapas) && orc.etapas.length > 0) {
+        orc.etapas.forEach(et => {
+          const catId = String(et.categoria_id || et.categoria || 'outros').toLowerCase();
+          const target = etapaMap.get(catId) || etapaMap.get('outros');
+          const val = Number(et.valor_previsto || et.total || (Number(et.quantidade || 1) * Number(et.valor_unitario || 0)) || 0);
+          target.previsto += val;
+          target.itensOrcados += 1;
+          totalOrcado += val;
+        });
+      } else if (Array.isArray(orc.categorias) && orc.categorias.length > 0) {
         orc.categorias.forEach(cat => {
           const catId = String(cat.id || 'outros').toLowerCase();
           const target = etapaMap.get(catId) || etapaMap.get('outros');
-          const val = Number(cat.total || cat.subtotal || 0);
+          const val = Number(cat.total || cat.subtotal || (Array.isArray(cat.itens) ? cat.itens.reduce((sum, item) => sum + Number(item.total || item.valor || 0), 0) : 0));
           target.previsto += val;
-          target.itensOrcados += (Array.isArray(cat.itens) ? cat.itens.length : 0);
-          totalOrcado += val;
-        });
-      } else if (Array.isArray(orc.etapas) && orc.etapas.length > 0) {
-        orc.etapas.forEach(et => {
-          const etId = String(et.id || et.categoria || 'outros').toLowerCase();
-          const target = etapaMap.get(etId) || etapaMap.get('outros');
-          const val = Number(et.valor_previsto || et.total || 0);
-          target.previsto += val;
+          target.itensOrcados += (Array.isArray(cat.itens) ? cat.itens.length : (val > 0 ? 1 : 0));
           totalOrcado += val;
         });
       } else if (orc.valor_total || orc.valor_total_previsto) {
@@ -2148,11 +2156,11 @@ const DB = {
       }
     });
 
-    // Consolidar Orçamentos SINAPI
+    // Consolidar Orçamentos SINAPI (BUG-CRIT-01 fix: single BDI application)
     orcsSinapi.forEach(orc => {
-      const subtotal = (orc.itens || []).reduce((s, i) => s + Number(i.total || 0), 0);
       const bdi = Number(orc.bdi || 25);
-      const val = subtotal * (1 + bdi / 100);
+      const subtotal = (orc.itens || []).reduce((s, i) => s + Number(i.total || 0), 0);
+      const val = Number(orc.valor_total) || (subtotal * (1 + bdi / 100));
       etapaMap.get('outros').previsto += val;
       etapaMap.get('outros').itensOrcados += (orc.itens || []).length;
       totalOrcado += val;
@@ -2785,31 +2793,45 @@ const DB = {
 
     const itensMapeados = new Map();
 
-    // 1. Itens orçados convencionais
+    // 1. Itens orçados convencionais (BUG-CRIT-04 fix)
     orcsConv.forEach(orc => {
-      (orc.categorias || []).forEach(cat => {
-        (cat.itens || []).forEach(i => {
-          const desc = String(i.descricao || 'Item orçado').trim();
+      const etapasList = Array.isArray(orc.etapas) && orc.etapas.length > 0 ? orc.etapas : [];
+      if (etapasList.length > 0) {
+        etapasList.forEach(et => {
+          const desc = String(et.nome || et.descricao || 'Item orçado').trim();
           const key = desc.toLowerCase();
-          const val = Number(i.total || (Number(i.quantidade||1) * Number(i.preco_unitario||0)) || 0);
+          const val = Number(et.valor_previsto || et.total || (Number(et.quantidade || 1) * Number(et.valor_unitario || 0)) || 0);
           if (val > 0) {
-            const cur = itensMapeados.get(key) || { descricao: desc, categoria: cat.nome || 'Geral', valor: 0, quantidade: 0, unidade: i.unidade || 'un' };
+            const cur = itensMapeados.get(key) || { descricao: desc, categoria: et.categoria_nome || et.categoria || 'Geral', valor: 0, quantidade: 0, unidade: et.unidade || 'un' };
             cur.valor += val;
-            cur.quantidade += Number(i.quantidade || 1);
+            cur.quantidade += Number(et.quantidade || 1);
             itensMapeados.set(key, cur);
           }
         });
-      });
+      } else {
+        (orc.categorias || []).forEach(cat => {
+          (cat.itens || []).forEach(i => {
+            const desc = String(i.descricao || i.nome || 'Item orçado').trim();
+            const key = desc.toLowerCase();
+            const val = Number(i.total || (Number(i.quantidade || 1) * Number(i.preco_unitario || i.valor_unitario || 0)) || 0);
+            if (val > 0) {
+              const cur = itensMapeados.get(key) || { descricao: desc, categoria: cat.nome || 'Geral', valor: 0, quantidade: 0, unidade: i.unidade || 'un' };
+              cur.valor += val;
+              cur.quantidade += Number(i.quantidade || 1);
+              itensMapeados.set(key, cur);
+            }
+          });
+        });
+      }
     });
 
-    // 2. Itens orçados SINAPI
+    // 2. Itens orçados SINAPI (BUG-CRIT-01 fix: single BDI application)
     orcsSinapi.forEach(orc => {
       const bdi = Number(orc.bdi || 24.23);
       (orc.itens || []).forEach(i => {
         const desc = String(i.descricao || i.codigo || 'Composição SINAPI').trim();
         const key = desc.toLowerCase();
-        const sub = Number(i.total || 0);
-        const val = sub * (1 + bdi / 100);
+        const val = Number(i.total_com_bdi) || (Number(i.total || 0) * (1 + bdi / 100));
         if (val > 0) {
           const cur = itensMapeados.get(key) || { descricao: desc, categoria: 'SINAPI', valor: 0, quantidade: 0, unidade: i.unidade || 'un' };
           cur.valor += val;

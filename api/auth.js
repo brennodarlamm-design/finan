@@ -64,7 +64,7 @@ const SESSION_COOKIE = 'finobra_session_token';
 
 function cookieSecure(req) {
   const proto = String(req.headers['x-forwarded-proto'] || '').toLowerCase();
-  return proto === 'https' || Boolean(process.env.VERCEL);
+  return proto === 'https' || Boolean(process.env.VERCEL) || Boolean(process.env.FINOBRA_CANONICAL_ORIGIN?.startsWith('https'));
 }
 
 function setSessionCookie(req, res, token, expMs) {

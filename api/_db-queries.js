@@ -93,10 +93,10 @@ export async function handleDeltaSync(sql, tenantId, auth, query, res) {
     sql`SELECT preferences, updated_at FROM tenant_preferences WHERE tenant_id = ${tenantId} AND updated_at >= ${sinceIso} LIMIT 1;`,
 
     tableAllowed(auth, 'obras', 'read')
-      ? sql`SELECT * FROM obras WHERE tenant_id = ${tenantId} AND id NOT IN ('escritorio', 'geral') AND id IN (SELECT entidade_id FROM audit_logs WHERE tenant_id = ${tenantId} AND entidade = 'obras' AND created_at >= ${sinceIso});`
+      ? sql`SELECT * FROM obras WHERE tenant_id = ${tenantId} AND id NOT IN ('escritorio', 'geral') AND (created_at >= ${sinceIso} OR (updated_at IS NOT NULL AND updated_at >= ${sinceIso}) OR id IN (SELECT entidade_id FROM audit_logs WHERE tenant_id = ${tenantId} AND entidade = 'obras' AND created_at >= ${sinceIso}));`
       : Promise.resolve([]),
     tableAllowed(auth, 'fornecedores', 'read')
-      ? sql`SELECT * FROM fornecedores WHERE tenant_id = ${tenantId} AND id IN (SELECT entidade_id FROM audit_logs WHERE tenant_id = ${tenantId} AND entidade = 'fornecedores' AND created_at >= ${sinceIso});`
+      ? sql`SELECT * FROM fornecedores WHERE tenant_id = ${tenantId} AND (created_at >= ${sinceIso} OR (updated_at IS NOT NULL AND updated_at >= ${sinceIso}) OR id IN (SELECT entidade_id FROM audit_logs WHERE tenant_id = ${tenantId} AND entidade = 'fornecedores' AND created_at >= ${sinceIso}));`
       : Promise.resolve([]),
     tableAllowed(auth, 'lancamentos', 'read')
       ? sql`SELECT *, xmin::text AS sync_version FROM lancamentos WHERE tenant_id = ${tenantId} AND (created_at >= ${sinceIso} OR id IN (SELECT entidade_id FROM audit_logs WHERE tenant_id = ${tenantId} AND entidade = 'lancamentos' AND created_at >= ${sinceIso})) ORDER BY data DESC;`
@@ -114,7 +114,7 @@ export async function handleDeltaSync(sql, tenantId, auth, query, res) {
       ? sql`SELECT id, tipo, referencia_id, titulo, categoria, nome_arquivo, tipo_arquivo, tamanho_bytes, url, created_at FROM documentos WHERE tenant_id = ${tenantId} AND (created_at >= ${sinceIso} OR id IN (SELECT entidade_id FROM audit_logs WHERE tenant_id = ${tenantId} AND entidade = 'documentos' AND created_at >= ${sinceIso})) ORDER BY created_at DESC;`
       : Promise.resolve([]),
     tableAllowed(auth, 'produtos', 'read')
-      ? sql`SELECT * FROM produtos WHERE tenant_id = ${tenantId} AND id IN (SELECT entidade_id FROM audit_logs WHERE tenant_id = ${tenantId} AND entidade = 'produtos' AND created_at >= ${sinceIso}) ORDER BY nome ASC;`
+      ? sql`SELECT * FROM produtos WHERE tenant_id = ${tenantId} AND (created_at >= ${sinceIso} OR (updated_at IS NOT NULL AND updated_at >= ${sinceIso}) OR id IN (SELECT entidade_id FROM audit_logs WHERE tenant_id = ${tenantId} AND entidade = 'produtos' AND created_at >= ${sinceIso})) ORDER BY nome ASC;`
       : Promise.resolve([]),
     tableAllowed(auth, 'contas', 'read')
       ? sql`SELECT * FROM contas_bancarias WHERE tenant_id = ${tenantId} AND (created_at >= ${sinceIso} OR updated_at >= ${sinceIso} OR id IN (SELECT entidade_id FROM audit_logs WHERE tenant_id = ${tenantId} AND entidade IN ('contas','contas_bancarias') AND created_at >= ${sinceIso})) ORDER BY created_at ASC;`

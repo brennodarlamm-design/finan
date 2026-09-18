@@ -139,15 +139,15 @@ const OrcamentoSINAPI = {
             <div>
               <div style="display:flex;align-items:center;gap:8px;">
                 <h2 style="font-weight:800;font-size:1.25rem;color:#f8fafc;margin:0;letter-spacing:-.02em;">Orçamentos</h2>
-                <span style="background:rgba(18,217,160,0.15);color:#12D9A0;border:1px solid rgba(18,217,160,0.3);font-size:.72rem;font-weight:800;padding:2px 8px;border-radius:12px;">${orcs.length} cadastrado${orcs.length===1?'':'s'}</span>
+                <span style="background:rgba(198,255,0,0.12);color:#C6FF00;border:1px solid rgba(198,255,0,0.3);font-size:.72rem;font-weight:800;padding:2px 8px;border-radius:4px;">${orcs.length} cadastrado${orcs.length===1?'':'s'}</span>
               </div>
               <p style="font-size:.78rem;color:#94a3b8;margin:2px 0 0 0;">Gestão de orçamentos, composições unitárias e propostas comerciais</p>
             </div>
           </div>
 
           <!-- Barra de Busca com alto contraste -->
-          <div style="display:flex;align-items:center;background:#0d120a;border:1.5px solid #313e27;border-radius:8px;overflow:hidden;min-width:280px;height:38px;box-shadow:inset 0 1px 2px rgba(0,0,0,0.4);">
-            <span style="color:#12D9A0;font-size:.85rem;padding:0 12px;display:flex;align-items:center;gap:6px;font-weight:700;">
+          <div style="display:flex;align-items:center;background:#0d120a;border:1.5px solid #313e27;border-radius:6px;overflow:hidden;min-width:280px;height:38px;box-shadow:inset 0 1px 2px rgba(0,0,0,0.4);">
+            <span style="color:#C6FF00;font-size:.85rem;padding:0 12px;display:flex;align-items:center;gap:6px;font-weight:700;">
               🔍
             </span>
             <input
@@ -213,7 +213,7 @@ const OrcamentoSINAPI = {
           <button
             type="button"
             class="btn btn-sm"
-            style="background:${this._filterComProposta?'#12D9A0':'#0d120a'};color:${this._filterComProposta?'#090C07':'#e2e8f0'};border:1.5px solid ${this._filterComProposta?'#12D9A0':'#313e27'};font-size:.8rem;font-weight:700;height:34px;padding:0 12px;display:inline-flex;align-items:center;gap:6px;border-radius:6px;cursor:pointer;"
+            style="background:${this._filterComProposta?'#C6FF00':'#0d120a'};color:${this._filterComProposta?'#0A0A0A':'#e2e8f0'};border:1.5px solid ${this._filterComProposta?'#C6FF00':'#313e27'};font-size:.8rem;font-weight:700;height:34px;padding:0 12px;display:inline-flex;align-items:center;gap:6px;border-radius:4px;cursor:pointer;"
             data-fb-click="OrcamentoSINAPI._toggleComProposta"
             data-fb-click-n="0"
           >
@@ -1135,7 +1135,8 @@ const OrcamentoSINAPI = {
       quantidade: 1.00,
       preco_unitario: precoUnit,
       preco_com_bdi: Math.round(precoBdi * 100) / 100,
-      total: Math.round(precoBdi * 100) / 100
+      total: Math.round(precoUnit * 100) / 100,
+      total_com_bdi: Math.round(precoBdi * 100) / 100
     };
 
     orc.itens = [...(orc.itens || []), novoItem];
@@ -1209,7 +1210,8 @@ const OrcamentoSINAPI = {
     const pBdi = it.preco_com_bdi || (it.preco_unitario * (1 + bdi / 100));
 
     it.quantidade = qtd;
-    it.total = Math.round((qtd * pBdi) * 100) / 100;
+    it.total = Math.round((qtd * (it.preco_unitario || 0)) * 100) / 100;
+    it.total_com_bdi = Math.round((qtd * pBdi) * 100) / 100;
 
     this._save(orc);
     this.openEditor(orcId);
@@ -1306,7 +1308,8 @@ const OrcamentoSINAPI = {
     (orc.itens || []).forEach(it => {
       const pUnit = Number(it.preco_unitario) || 0;
       it.preco_com_bdi = Math.round((pUnit * (1 + bdi / 100)) * 100) / 100;
-      it.total = Math.round(((Number(it.quantidade) || 0) * it.preco_com_bdi) * 100) / 100;
+      it.total = Math.round(((Number(it.quantidade) || 0) * pUnit) * 100) / 100;
+      it.total_com_bdi = Math.round(((Number(it.quantidade) || 0) * it.preco_com_bdi) * 100) / 100;
     });
 
     orc.data_alteracao = new Date().toLocaleString('pt-BR');
@@ -1473,8 +1476,15 @@ const OrcamentoSINAPI = {
       const existing = this._getById(id);
       saved = { ...existing, ...payload };
       saved.itens = (saved.itens || []).map(item => {
-        const preco = Math.round(Number(item.preco_unitario || 0) * (1 + saved.bdi / 100) * 100) / 100;
-        return { ...item, preco_com_bdi:preco, total:Math.round(Number(item.quantidade || 0) * preco * 100) / 100 };
+        const pUnit = Number(item.preco_unitario || 0);
+        const preco = Math.round(pUnit * (1 + saved.bdi / 100) * 100) / 100;
+        const qtd = Number(item.quantidade || 0);
+        return {
+          ...item,
+          preco_com_bdi: preco,
+          total: Math.round(qtd * pUnit * 100) / 100,
+          total_com_bdi: Math.round(qtd * preco * 100) / 100
+        };
       });
       this._save(saved);
       Utils.toast('Orçamento atualizado!', 'success');
@@ -1669,6 +1679,12 @@ const OrcamentoSINAPI = {
   _add(orc) {
     if (typeof DB !== 'undefined' && DB.canWriteLocal && !DB.canWriteLocal('write')) return DB._denyLocal('write');
     try {
+      if (typeof this.calcularTotais === 'function') {
+        const t = this.calcularTotais(orc);
+        orc.valor_total = t.totalGeral;
+        orc.subtotal = t.subtotal;
+        orc.valor_bdi = t.valorBDI;
+      }
       const all = JSON.parse(localStorage.getItem(this._storageKey()) || '[]');
       all.unshift(orc);
       localStorage.setItem(this._storageKey(), JSON.stringify(all));
@@ -1679,6 +1695,12 @@ const OrcamentoSINAPI = {
   _save(orc) {
     if (typeof DB !== 'undefined' && DB.canWriteLocal && !DB.canWriteLocal('write')) return DB._denyLocal('write');
     try {
+      if (typeof this.calcularTotais === 'function') {
+        const t = this.calcularTotais(orc);
+        orc.valor_total = t.totalGeral;
+        orc.subtotal = t.subtotal;
+        orc.valor_bdi = t.valorBDI;
+      }
       const all = JSON.parse(localStorage.getItem(this._storageKey()) || '[]');
       const idx = all.findIndex(o => o.id === orc.id);
       if (idx !== -1) all[idx] = orc;

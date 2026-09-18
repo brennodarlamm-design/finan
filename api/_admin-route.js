@@ -72,7 +72,7 @@ const MASTER_RESTORE_COOKIE = 'finobra_master_restore_token';
 
 function cookieSecure(req) {
   const proto = String(req.headers['x-forwarded-proto'] || '').toLowerCase();
-  return proto === 'https' || Boolean(process.env.VERCEL);
+  return proto === 'https' || Boolean(process.env.VERCEL) || Boolean(process.env.FINOBRA_CANONICAL_ORIGIN?.startsWith('https'));
 }
 function readCookie(req, name) {
   const raw = String(req.headers?.cookie || '');

@@ -31,15 +31,18 @@ export default async function webhookPixHandler(req, res) {
   let isSuperAdminSession = false;
 
   if (!authResult.authorized) {
-    // Permite que o Super Admin logado simule o webhook via sessão de navegador
-    try {
-      const sessionAuth = await resolveAuthAndTenant(req);
-      if (sessionAuth.authenticated && sessionAuth.user?.perfil === 'superadmin') {
-        authResult = { authorized: true, source: 'superadmin-session' };
-        isSuperAdminSession = true;
+    // SEC-EDGE-02: Permite simulação apenas se houver credencial explícita na requisição, evitando DoS no Neon
+    const hasAuthCredential = Boolean(req.headers?.authorization || req.headers?.cookie?.includes('finobra_session_token'));
+    if (hasAuthCredential) {
+      try {
+        const sessionAuth = await resolveAuthAndTenant(req);
+        if (sessionAuth.authenticated && sessionAuth.user?.perfil === 'superadmin') {
+          authResult = { authorized: true, source: 'superadmin-session' };
+          isSuperAdminSession = true;
+        }
+      } catch {
+        // Ignora erro de sessão e mantém o erro de autorização padrão
       }
-    } catch {
-      // Ignora erro de sessão e mantém o erro de autorização padrão
     }
   }
 

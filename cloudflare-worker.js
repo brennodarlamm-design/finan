@@ -372,15 +372,29 @@ async function proxyApi(request, env) {
 
 async function handleApi(request, env) {
   try {
-    const edgeResponse = await executeEdgeApi(request, env);
-    if (edgeResponse && edgeResponse.status < 500) {
-      return edgeResponse;
-    }
-    if (edgeResponse && edgeResponse.status >= 500 && env.FINOBRA_API_ORIGIN) {
+    let response = await executeEdgeApi(request, env);
+    if (response && response.status >= 500 && env.FINOBRA_API_ORIGIN) {
       console.warn('[FinGo Edge] Resposta 5xx no Edge, acionando fallback upstream...');
-      return await proxyApi(request, env);
+      response = await proxyApi(request, env);
     }
-    return edgeResponse;
+    if (response) {
+      const secureHeaders = new Headers(response.headers);
+      if (!secureHeaders.has('Strict-Transport-Security')) {
+        secureHeaders.set('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+      }
+      if (!secureHeaders.has('X-Content-Type-Options')) {
+        secureHeaders.set('X-Content-Type-Options', 'nosniff');
+      }
+      if (!secureHeaders.has('Referrer-Policy')) {
+        secureHeaders.set('Referrer-Policy', 'strict-origin-when-cross-origin');
+      }
+      return new Response(response.body, {
+        status: response.status,
+        statusText: response.statusText,
+        headers: secureHeaders
+      });
+    }
+    return response;
   } catch (err) {
     console.error('[FinGo Edge] Falha ao processar API no Edge:', err?.message || err);
     if (env.FINOBRA_API_ORIGIN) {
@@ -390,7 +404,13 @@ async function handleApi(request, env) {
       success: false,
       error: 'Erro interno no gateway Edge.',
       code: 'EDGE_ERROR'
-    }, { status: 500 });
+    }, {
+      status: 500,
+      headers: {
+        'Strict-Transport-Security': 'max-age=31536000; includeSubDomains',
+        'X-Content-Type-Options': 'nosniff'
+      }
+    });
   }
 }
 

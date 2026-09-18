@@ -2180,7 +2180,7 @@ const MasterAdmin = {
         
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:24px;flex-wrap:wrap;gap:14px;border-bottom:1px solid rgba(255,255,255,.08);padding-bottom:18px;">
           <div>
-            <div style="display:inline-flex;align-items:center;gap:6px;background:rgba(18,217,160,.15);border:1px solid #12D9A0;color:#3EE8B5;padding:4px 12px;border-radius:20px;font-size:.75rem;font-weight:800;margin-bottom:6px;">
+            <div style="display:inline-flex;align-items:center;gap:6px;background:rgba(198,255,0,.12);border:1px solid #C6FF00;color:#C6FF00;padding:4px 12px;border-radius:4px;font-size:.75rem;font-weight:800;margin-bottom:6px;">
               <span>📅</span><span>AGENDA DEV &amp; CAPACITAÇÃO TÉCNICA</span>
             </div>
             <h2 style="font-size:1.5rem;font-weight:900;color:#fff;margin:0 0 4px;">Gerenciador de Lives, Workshops &amp; Calendário</h2>
@@ -2188,10 +2188,10 @@ const MasterAdmin = {
           </div>
 
           <div style="display:flex;align-items:center;gap:10px;">
-            <button type="button" data-fb-click="AgendaEventos.abrirModal" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="novo" class="btn-primary" style="padding:10px 18px;border-radius:8px;font-weight:800;display:inline-flex;align-items:center;gap:8px;font-size:.85rem;background:linear-gradient(135deg,#12D9A0,#0ea578);color:#030603;border:none;cursor:pointer;">
+            <button type="button" data-fb-click="AgendaEventos.abrirModal" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="novo" class="btn-primary" style="padding:10px 18px;border-radius:4px;font-weight:800;display:inline-flex;align-items:center;gap:8px;font-size:.85rem;background:#C6FF00;color:#0A0A0A;border:none;cursor:pointer;">
               <span>➕ Agendar Novo Evento / Live</span>
             </button>
-            <button type="button" data-fb-click="MasterAdmin.switchTab" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="agenda" class="btn-action" style="padding:10px 14px;border-radius:8px;font-size:.85rem;">
+            <button type="button" data-fb-click="MasterAdmin.switchTab" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="agenda" class="btn-action" style="padding:10px 14px;border-radius:4px;font-size:.85rem;">
               <span>🔄 Atualizar</span>
             </button>
           </div>

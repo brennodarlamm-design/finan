@@ -181,30 +181,75 @@ button:disabled { cursor:not-allowed;opacity:.55; }
 
 
 
-/* Entrada e páginas complementares: mesma paleta e controles. */
-.ui-auth { background:#101c21;--text3:#9fb4b8;--text2:#bdcbd0; }
-.ui-auth .panel-left { background:linear-gradient(145deg,#122c26,#1a3730); }
-.ui-auth .grid-bg { opacity:.5; }
-.ui-auth .orb { display:none; }
-.ui-auth .panel-left-content { max-width:660px;width:100%;padding:clamp(32px,5vw,76px); }
-.ui-auth .hero-logo-icon { animation:none;filter:none;width:64px;height:64px; }
-.ui-auth .hero-logo-text .brand-name { font-size:2rem;letter-spacing:-.04em;background:none;color:#e7ecd7;-webkit-text-fill-color:#e7ecd7; }
-.ui-auth .hero-title { font-size:clamp(1.8rem,3vw,3rem);font-weight:600;line-height:1.17;letter-spacing:-.05em; }
-.ui-auth .panel-right { background:#101c21;border-left:1px solid #34473d;width:48%;min-width:440px; }
-.ui-auth .panel-right::before { display:none; }
-.ui-auth .form-wrap { max-width:400px;width:100%; }
-.ui-auth .logo-row { margin-bottom:32px!important; }
-.ui-auth .welcome-h { font-size:1.55rem;font-weight:650;letter-spacing:-.04em; }
-.ui-auth .welcome-p { color:var(--text2);line-height:1.65;font-size:.9rem; }
-.ui-auth .inp { border-color:#40555d;background:#17272e;color:#eff6f3;min-height:48px; }
-.ui-auth .inp::placeholder { color:#a0b4bb; }
-.ui-auth .btn-primary { min-height:48px;background:#8adfba;color:#123525;box-shadow:none;border-radius:10px;font-weight:650; }
-.ui-auth .btn-google { min-height:48px;border-color:#486068;background:#1c2d34;color:#eaf4ef; }
-.ui-auth .feat { border-color:#3a5447;background:#ffffff04;padding:14px;border-radius:10px; }
-.ui-auth .feat-icon { background:#365846;box-shadow:none; }
-.ui-auth .feat-text span { color:#b7cbbd;line-height:1.5; }
-.ui-auth #register-modal>div,.ui-auth #recovery-modal>div { background:#15262d!important;border-color:#46616b!important;max-height:92dvh;overflow-y:auto; }
-.ui-auth #register-modal input,.ui-auth #recovery-modal input { min-height:46px;font-size:16px; }
+/* Entrada e páginas complementares: estética Brutalist Tech Industrial FinGo */
+.ui-auth {
+  background: var(--fingo-void, #0A0A0A);
+  --text3: var(--fingo-mist, #8E8E8E);
+  --text2: var(--fingo-silver, #E8E8DC);
+}
+.ui-auth .panel-left {
+  background: linear-gradient(145deg, #0A0A0A, #141414);
+}
+.ui-auth .grid-bg { opacity: .3; }
+.ui-auth .orb { display: none; }
+.ui-auth .panel-left-content { max-width: 660px; width: 100%; padding: clamp(32px, 5vw, 76px); }
+.ui-auth .hero-logo-icon { animation: none; filter: none; width: 64px; height: 64px; }
+.ui-auth .hero-logo-text .brand-name { font-size: 2rem; letter-spacing: -.04em; background: none; color: var(--fingo-offwhite, #F0F0E8); -webkit-text-fill-color: var(--fingo-offwhite, #F0F0E8); }
+.ui-auth .hero-title { font-size: clamp(1.8rem, 3vw, 3rem); font-weight: 700; line-height: 1.17; letter-spacing: -.05em; color: var(--fingo-offwhite, #F0F0E8); }
+.ui-auth .panel-right {
+  background: var(--fingo-deep, #1A1A1A);
+  border-left: 1px solid var(--fingo-shadow, #282828);
+  width: 48%;
+  min-width: 440px;
+}
+.ui-auth .panel-right::before { display: none; }
+.ui-auth .form-wrap { max-width: 400px; width: 100%; }
+.ui-auth .logo-row { margin-bottom: 32px !important; }
+.ui-auth .welcome-h { font-size: 1.55rem; font-weight: 700; letter-spacing: -.04em; color: var(--fingo-offwhite, #F0F0E8); }
+.ui-auth .welcome-p { color: var(--text3); line-height: 1.65; font-size: .9rem; }
+.ui-auth .inp {
+  border-color: var(--fingo-smoke, #3D3D3D);
+  background: var(--fingo-ink, #0D0D0D);
+  color: var(--fingo-offwhite, #F0F0E8);
+  min-height: 48px;
+  border-radius: var(--radius-default, 4px);
+}
+.ui-auth .inp::placeholder { color: var(--fingo-mist, #8E8E8E); }
+.ui-auth .btn-primary {
+  min-height: 48px;
+  background: var(--fingo-acid, #C6FF00) !important;
+  color: #0A0A0A !important;
+  box-shadow: 0 4px 16px rgba(198, 255, 0, 0.35);
+  border-radius: var(--radius-default, 4px) !important;
+  font-weight: 800;
+}
+.ui-auth .btn-google {
+  min-height: 48px;
+  border-color: var(--fingo-smoke, #3D3D3D);
+  background: var(--fingo-ink, #0D0D0D);
+  color: var(--fingo-offwhite, #F0F0E8);
+  border-radius: var(--radius-default, 4px);
+}
+.ui-auth .feat {
+  border-color: var(--fingo-shadow, #282828);
+  background: rgba(255, 255, 255, 0.02);
+  padding: 14px;
+  border-radius: var(--radius-default, 4px);
+}
+.ui-auth .feat-icon { background: var(--fingo-stone, #2B2B2B); box-shadow: none; border-radius: var(--radius-sm, 2px); }
+.ui-auth .feat-text span { color: var(--fingo-silver, #E8E8DC); line-height: 1.5; }
+.ui-auth #register-modal > div, .ui-auth #recovery-modal > div {
+  background: var(--fingo-deep, #1A1A1A) !important;
+  border-color: var(--fingo-smoke, #3D3D3D) !important;
+  border-radius: var(--radius-md, 6px) !important;
+  max-height: 92dvh;
+  overflow-y: auto;
+}
+.ui-auth #register-modal input, .ui-auth #recovery-modal input {
+  min-height: 46px;
+  font-size: 16px;
+  border-radius: var(--radius-default, 4px);
+}
 .ui-public { background:#0e1a20;color:#e7f0ed;--text3:#9fb4bc;--text2:#bdcdd0; }
 .ui-public main { width:min(860px,calc(100% - 40px));margin-inline:auto; }
 .ui-public header { background:#14272bf5!important;border-color:#3b514c!important; }

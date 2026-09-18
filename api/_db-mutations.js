@@ -400,7 +400,7 @@ export async function handleSave(sql, tenantId, auth, req, res, table, data) {
     const dbObraId = (!safeObraId || safeObraId === 'escritorio' || safeObraId === 'geral') ? null : safeObraId;
     const rawJson = JSON.stringify(o);
     const subtotal = (Array.isArray(o.itens) ? o.itens : []).reduce((sum, item) => sum + cleanNum(item?.total), 0);
-    const total = subtotal * (1 + cleanNum(o.bdi) / 100);
+    const total = cleanNum(o.valor_total) > 0 ? cleanNum(o.valor_total) : (subtotal * (1 + cleanNum(o.bdi) / 100));
     try {
       await sql`
         INSERT INTO orcamentos_sinapi (tenant_id,id,obra_id,nome,status,valor_total,payload)

@@ -178,6 +178,13 @@ export async function executeEdgeApi(request, env) {
     }
   }
 
+  // SEC-EDGE-01: Garante headers canônicos de Edge (HTTPS, IP real e Cloudflare Ray)
+  const cfIp = request.headers.get('cf-connecting-ip') || '';
+  headers['x-forwarded-proto'] = headers['x-forwarded-proto'] || (url.protocol ? url.protocol.replace(':', '') : 'https');
+  headers['x-forwarded-for'] = headers['x-forwarded-for'] || cfIp;
+  headers['cf-connecting-ip'] = headers['cf-connecting-ip'] || cfIp;
+  headers['cf-ray'] = headers['cf-ray'] || request.headers.get('cf-ray') || '';
+
   // Objeto req compatível com Vercel/Express
   const req = {
     method,
@@ -193,6 +200,16 @@ export async function executeEdgeApi(request, env) {
     let statusCode = 200;
     const responseHeaders = new Headers();
     let finished = false;
+
+    // SEC-EDGE-06: Aplica cabeçalhos defensivos globais de API
+    function ensureSecurityHeaders() {
+      if (!responseHeaders.has('strict-transport-security')) {
+        responseHeaders.set('strict-transport-security', 'max-age=31536000; includeSubDomains');
+      }
+      if (!responseHeaders.has('x-content-type-options')) {
+        responseHeaders.set('x-content-type-options', 'nosniff');
+      }
+    }
 
     const res = {
       status(code) {
@@ -226,6 +243,7 @@ export async function executeEdgeApi(request, env) {
         if (!responseHeaders.has('content-type')) {
           responseHeaders.set('content-type', 'application/json; charset=utf-8');
         }
+        ensureSecurityHeaders();
         const text = JSON.stringify(data);
         resolve(new Response(text, { status: statusCode, headers: responseHeaders }));
         return res;
@@ -233,6 +251,7 @@ export async function executeEdgeApi(request, env) {
       send(data) {
         if (finished) return res;
         finished = true;
+        ensureSecurityHeaders();
         if (typeof data === 'object' && data !== null && !Buffer.isBuffer(data)) {
           return res.json(data);
         }
@@ -242,12 +261,14 @@ export async function executeEdgeApi(request, env) {
       end(data) {
         if (finished) return res;
         finished = true;
+        ensureSecurityHeaders();
         resolve(new Response(data || null, { status: statusCode, headers: responseHeaders }));
         return res;
       },
       redirect(statusOrUrl, url) {
         if (finished) return res;
         finished = true;
+        ensureSecurityHeaders();
         let redirectStatus = 302;
         let targetUrl = statusOrUrl;
         if (typeof statusOrUrl === 'number') {
@@ -263,14 +284,18 @@ export async function executeEdgeApi(request, env) {
     try {
       await handler(req, res);
     } catch (handlerErr) {
-      console.error(`[Edge API Error] Erro ao executar ${moduleName}:`, handlerErr);
+      // SEC-EDGE-04: Sanitiza qualquer credencial ou string de conexão dos logs do Edge
+      const safeErr = String(handlerErr?.stack || handlerErr?.message || handlerErr)
+        .replace(/postgres(?:ql)?:\/\/[^:]+:[^@]+@[^\s"']+/gi, 'postgresql://[REDACTED_CREDENTIALS]');
+      console.error(`[Edge API Error] Erro ao executar ${moduleName}:`, safeErr);
       if (!finished) {
         finished = true;
+        ensureSecurityHeaders();
         resolve(Response.json({
           success: false,
           error: 'Erro interno ao processar requisição no Edge.',
           code: 'INTERNAL_SERVER_ERROR'
-        }, { status: 500 }));
+        }, { status: 500, headers: responseHeaders }));
       }
     }
   });

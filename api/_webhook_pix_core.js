@@ -29,17 +29,12 @@ export function isWebhookAuthorized(req) {
 
   const asaasToken = String(process.env.ASAAS_WEBHOOK_TOKEN || webhookSecret).trim();
 
-  /** Comparação em tempo constante: evita timing side-channel */
+  /** Comparação em tempo constante: evita timing side-channel e discrepâncias de comprimento */
   function safeCompare(a, b) {
     if (!a || !b) return false;
-    const bufA = Buffer.from(String(a));
-    const bufB = Buffer.from(String(b));
-    if (bufA.length !== bufB.length) {
-      // Ainda executamos timingSafeEqual para não revelar o comprimento esperado via tempo
-      crypto.timingSafeEqual(bufA, Buffer.alloc(bufA.length));
-      return false;
-    }
-    return crypto.timingSafeEqual(bufA, bufB);
+    const hashA = crypto.createHash('sha256').update(String(a)).digest();
+    const hashB = crypto.createHash('sha256').update(String(b)).digest();
+    return crypto.timingSafeEqual(hashA, hashB);
   }
 
   // 1. Header x-webhook-secret
@@ -460,7 +455,7 @@ export async function sendPaymentReceipt(record) {
           to: email,
           subject,
           html: emailHtml,
-          tenantId: tenant?.id || null
+          tenantId: record.tenant_id || null
         }, {
           idempotencyKey: `pix-receipt-${record.txid || record.id || Date.now()}`
         });
