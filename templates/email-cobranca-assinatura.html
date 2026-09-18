@@ -5,29 +5,29 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Assinatura FinGo — {{{EMPRESA}}}</title>
 </head>
-<body style="margin:0;padding:0;background:#0f172a;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#1e293b;">
+<body style="margin:0;padding:0;background:#0A0A0A;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#F0F0E8;">
   <!-- Preview Text -->
   <span style="display:none !important;visibility:hidden;font-size:1px;line-height:1px;max-height:0;max-width:0;opacity:0;overflow:hidden;">
     Aviso de assinatura FinGo: {{{SITUACAO}}} — {{{EMPRESA}}}.
   </span>
 
-  <div style="background:#0f172a;padding:36px 16px;min-height:100vh;">
-    <div style="max-width:580px;margin:0 auto;background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 12px 36px rgba(0,0,0,0.35);">
+  <div style="background:#0A0A0A;padding:40px 16px;min-height:100vh;">
+    <div style="max-width:580px;margin:0 auto;background:#141D12;border:1px solid #282828;border-radius:6px;overflow:hidden;box-shadow:0 16px 40px rgba(0,0,0,0.8);">
       
-      <!-- Cabeçalho Institucional -->
-      <div style="background:linear-gradient(135deg, #09121d 0%, #152438 100%);padding:28px 32px;border-bottom:3px solid #C6FF00;">
+      <!-- Cabeçalho Institucional com Logotipo Oficial -->
+      <div style="background:#0A0A0A;padding:28px 32px;border-bottom:3px solid #C6FF00;">
         <table style="width:100%;border-collapse:collapse;">
           <tr>
             <td>
-              <div style="font-size:24px;font-weight:900;color:#ffffff;letter-spacing:-0.5px;">
-                Fin<span style="color:#C6FF00;">Go</span>
-              </div>
-              <div style="font-size:12px;color:#94a3b8;margin-top:4px;text-transform:uppercase;letter-spacing:0.08em;font-weight:600;">
+              <a href="https://fingo.api.br" target="_blank" style="text-decoration:none;display:inline-block;">
+                <img src="https://fingo.api.br/img/fingo/fingo-logo-full.png" alt="FinGo — Obras em Fluxo" style="height:36px;width:auto;max-width:180px;object-fit:contain;display:block;border:0;" />
+              </a>
+              <div style="font-size:10px;color:#8E8E8E;margin-top:4px;text-transform:uppercase;letter-spacing:0.1em;font-weight:700;">
                 Faturamento &amp; Assinaturas SaaS
               </div>
             </td>
             <td style="text-align:right;">
-              <span style="display:inline-block;padding:6px 12px;background:rgba(198,255,0,0.18);border:1px solid rgba(198,255,0,0.45);border-radius:20px;font-size:11px;font-weight:800;color:#C6FF00;text-transform:uppercase;">
+              <span style="display:inline-block;padding:6px 12px;background:rgba(198,255,0,0.12);border:1px solid rgba(198,255,0,0.35);border-radius:4px;font-size:11px;font-weight:800;color:#C6FF00;text-transform:uppercase;">
                 {{{BADGE_STATUS}}}
               </span>
             </td>
@@ -36,61 +36,61 @@
       </div>
 
       <!-- Corpo da Mensagem -->
-      <div style="padding:32px 32px 28px;">
-        <h1 style="margin:0 0 10px;font-size:20px;font-weight:800;color:#0f172a;line-height:1.35;">
+      <div style="padding:36px 32px 28px;">
+        <h1 style="margin:0 0 12px;font-size:22px;font-weight:900;color:#F0F0E8;line-height:1.3;letter-spacing:-0.4px;">
           {{{TITULO_AVISO}}}
         </h1>
         
-        <p style="margin:0 0 20px;font-size:14px;line-height:1.6;color:#475569;">
-          Olá, <strong>{{{RESPONSAVEL}}}</strong>! Seguem as informações referentes à renovação da assinatura da empresa <strong>{{{EMPRESA}}}</strong> no FinGo:
+        <p style="margin:0 0 24px;font-size:14px;line-height:1.65;color:#CBD5E1;">
+          Olá, <strong>{{{RESPONSAVEL}}}</strong>! Seguem as informações referentes à assinatura da empresa <strong>{{{EMPRESA}}}</strong> no FinGo ERP:
         </p>
 
         <!-- Card Resumo da Cobrança -->
-        <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:18px 20px;margin-bottom:24px;">
+        <div style="background:#0A0A0A;border:1px solid #282828;border-radius:6px;padding:20px;margin-bottom:24px;">
           <table style="width:100%;border-collapse:collapse;font-size:13px;">
             <tr>
-              <td style="padding:6px 0;color:#64748b;">Empresa:</td>
-              <td style="padding:6px 0;font-weight:700;color:#0f172a;text-align:right;">{{{EMPRESA}}}</td>
+              <td style="padding:6px 0;color:#8E8E8E;">Empresa:</td>
+              <td style="padding:6px 0;font-weight:700;color:#F0F0E8;text-align:right;">{{{EMPRESA}}}</td>
             </tr>
             <tr>
-              <td style="padding:6px 0;color:#64748b;">Plano Contratado:</td>
-              <td style="padding:6px 0;font-weight:700;color:#0f172a;text-align:right;">{{{PLANO}}}</td>
+              <td style="padding:6px 0;color:#8E8E8E;">Plano Contratado:</td>
+              <td style="padding:6px 0;font-weight:700;color:#F0F0E8;text-align:right;">{{{PLANO}}}</td>
             </tr>
             <tr>
-              <td style="padding:6px 0;color:#64748b;">Vencimento:</td>
-              <td style="padding:6px 0;font-weight:700;color:#2563eb;text-align:right;">{{{VENCIMENTO}}} ({{{SITUACAO}}})</td>
+              <td style="padding:6px 0;color:#8E8E8E;">Vencimento:</td>
+              <td style="padding:6px 0;font-weight:700;color:#C6FF00;text-align:right;">{{{VENCIMENTO}}} ({{{SITUACAO}}})</td>
             </tr>
-            <tr style="border-top:1px dashed #cbd5e1;">
-              <td style="padding:10px 0 4px;font-size:14px;font-weight:700;color:#0f172a;">Valor da Assinatura:</td>
-              <td style="padding:10px 0 4px;font-size:18px;font-weight:900;color:#16a34a;text-align:right;">R$ {{{VALOR}}}</td>
+            <tr style="border-top:1px dashed #282828;">
+              <td style="padding:12px 0 4px;font-size:14px;font-weight:700;color:#F0F0E8;">Valor da Assinatura:</td>
+              <td style="padding:12px 0 4px;font-size:20px;font-weight:900;color:#C6FF00;text-align:right;">R$ {{{VALOR}}}</td>
             </tr>
           </table>
         </div>
 
         <!-- Instruções de Pagamento via PIX -->
-        <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:12px;padding:18px 20px;margin-bottom:24px;">
-          <div style="font-size:13px;font-weight:800;color:#166534;margin-bottom:8px;display:flex;align-items:center;">
+        <div style="background:#0A0A0A;border:1px solid rgba(198,255,0,0.3);border-radius:6px;padding:20px;margin-bottom:24px;">
+          <div style="font-size:12px;font-weight:800;color:#C6FF00;margin-bottom:8px;text-transform:uppercase;letter-spacing:0.06em;">
             ⚡ Pagamento Prático via PIX
           </div>
-          <div style="font-size:12px;color:#334155;margin-bottom:10px;line-height:1.5;">
-            Transfira o valor exato utilizando a chave PIX abaixo. A renovação é computada e os acessos mantidos ativos sem interrupção:
+          <div style="font-size:12px;color:#CBD5E1;margin-bottom:10px;line-height:1.5;">
+            Transfira o valor utilizando a chave PIX abaixo para liquidação imediata da fatura:
           </div>
-          <div style="background:#ffffff;border:1px solid #86efac;border-radius:8px;padding:10px 14px;font-family:monospace;font-size:13px;font-weight:700;color:#0f172a;word-break:break-all;user-select:all;">
+          <div style="background:#141D12;border:1px solid #282828;border-radius:4px;padding:12px 14px;font-family:'SF Mono',Menlo,Consolas,monospace;font-size:13px;font-weight:800;color:#C6FF00;word-break:break-all;user-select:all;">
             {{{PIX_CHAVE}}}
           </div>
-          <div style="font-size:11px;color:#64748b;margin-top:6px;">
-            Beneficiário / Destino: <strong>{{{PIX_BENEFICIARIO}}}</strong>
+          <div style="font-size:11px;color:#8E8E8E;margin-top:8px;">
+            Beneficiário: <strong style="color:#CBD5E1;">{{{PIX_BENEFICIARIO}}}</strong>
           </div>
         </div>
 
-        <!-- Mensagem de Apoio / Chamado -->
-        <div style="font-size:13px;color:#64748b;line-height:1.55;margin-bottom:24px;">
+        <!-- Mensagem de Apoio -->
+        <div style="font-size:13px;color:#CBD5E1;line-height:1.6;margin-bottom:24px;">
           {{{MENSAGEM_EXTRA}}}
         </div>
 
-        <!-- Botão de Ação -->
-        <div style="text-align:center;margin:28px 0 10px;">
-          <a href="{{{LINK_ACESSO}}}" target="_blank" rel="noopener noreferrer" style="display:inline-block;background:#0f172a;color:#ffffff;font-size:14px;font-weight:700;padding:12px 28px;border-radius:8px;text-decoration:none;box-shadow:0 4px 12px rgba(15,23,42,0.25);">
+        <!-- Botão de Ação CTA -->
+        <div style="text-align:center;margin:30px 0 10px;">
+          <a href="{{{LINK_ACESSO}}}" target="_blank" rel="noopener noreferrer" style="display:inline-block;background:#C6FF00;color:#0A0A0A;font-size:14px;font-weight:900;padding:14px 34px;border-radius:4px;text-decoration:none;letter-spacing:0.04em;text-transform:uppercase;box-shadow:0 4px 20px rgba(198,255,0,0.3);">
             Acessar Painel FinGo &rarr;
           </a>
         </div>
@@ -98,9 +98,9 @@
       </div>
 
       <!-- Rodapé -->
-      <div style="background:#f8fafc;padding:20px 32px;border-top:1px solid #e2e8f0;text-align:center;font-size:11px;color:#94a3b8;line-height:1.5;">
-        Este e-mail foi enviado automaticamente pelo FinGo ERP para o responsável cadastrado na plataforma.<br>
-        Em caso de dúvidas ou envio de comprovante, responda a este e-mail ou contate nosso suporte.
+      <div style="background:#0A0A0A;padding:20px 32px;border-top:1px solid #282828;text-align:center;font-size:11px;color:#8E8E8E;line-height:1.6;">
+        <strong style="color:#CBD5E1;">FinGo ERP — Obras em Fluxo</strong> &bull; CNPJ 53.864.218/0001-20<br>
+        Em caso de dúvidas ou comprovante, contate: <a href="mailto:suporte@fingo.api.br" style="color:#C6FF00;text-decoration:none;">suporte@fingo.api.br</a>
       </div>
 
     </div>
