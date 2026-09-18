@@ -60,6 +60,7 @@ assert(robots.includes('Disallow: /login'), 'robots.txt deve bloquear /login');
 assert(robots.includes('Disallow: /cadastro'), 'robots.txt deve bloquear /cadastro');
 assert(robots.includes('Disallow: /master'), 'robots.txt deve bloquear /master');
 assert(robots.includes('Disallow: /api/'), 'robots.txt deve bloquear /api/');
+assert(robots.includes('Disallow: /version.json'), 'robots.txt deve bloquear /version.json para crawl budget');
 assert(robots.includes('Sitemap: https://fingo.api.br/sitemap.xml'), 'robots.txt deve apontar para o sitemap.xml canônico');
 
 console.log('   ✓ robots.txt validado: crawl budget protegido, áreas privadas bloqueadas.');
@@ -99,20 +100,27 @@ assert(types.includes('WebSite'), 'Schema deve conter a entidade WebSite (exigê
 assert(types.includes('Organization'), 'Schema deve conter a entidade Organization');
 assert(types.includes('SoftwareApplication'), 'Schema deve conter a entidade SoftwareApplication');
 assert(types.includes('FAQPage'), 'Schema deve conter a entidade FAQPage');
+assert(types.includes('BreadcrumbList'), 'Schema deve conter a entidade BreadcrumbList para navegação hierárquica');
 
 const webSiteNode = schema['@graph'].find(n => n['@type'] === 'WebSite');
 assert.strictEqual(webSiteNode.name, 'FinObra');
 assert(webSiteNode.alternateName && webSiteNode.alternateName.length > 0);
+
+const orgNode = schema['@graph'].find(n => n['@type'] === 'Organization');
+assert(orgNode.address, 'Organization deve conter endereço para GEO-Targeting e Schema enriquecido');
+
+const faqNode = schema['@graph'].find(n => n['@type'] === 'FAQPage');
+assert.strictEqual(faqNode.mainEntity.length, 5, 'FAQPage deve conter exatamente as 5 perguntas exibidas na interface');
 
 const softNode = schema['@graph'].find(n => n['@type'] === 'SoftwareApplication');
 assert(softNode.image, 'SoftwareApplication deve conter imagem de capa para Rich Snippets');
 assert(softNode.aggregateRating, 'SoftwareApplication deve conter aggregateRating para estrelas na busca');
 assert.strictEqual(softNode.aggregateRating.ratingValue, '4.9');
 
-console.log('   ✓ Schema.org @graph (WebSite, Organization, SoftwareApplication, FAQPage) validado com sucesso.');
+console.log('   ✓ Schema.org @graph (WebSite, Organization, SoftwareApplication, BreadcrumbList, FAQPage [5/5]) validado com sucesso.');
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 4. Metatags e Canonicais nas Páginas Satélite
+// 4. Metatags, Canonicais e GEO-Targeting nas Páginas Satélite
 // ─────────────────────────────────────────────────────────────────────────────
 console.log('\n4. Validando páginas públicas secundárias (privacidade, termos, validar)...');
 
@@ -128,7 +136,12 @@ for (const p of pages) {
   assert(content.includes('<meta name="robots" content="index,follow">'), `${p.file} deve permitir indexação com robots index,follow`);
   assert(/<meta\s+name=["']description["']/i.test(content), `${p.file} deve possuir meta description`);
   assert(content.includes('property="og:image"'), `${p.file} deve possuir og:image configurado`);
-  console.log(`   ✓ ${p.file}: Canonical, description, robots index e OpenGraph verificados.`);
+  assert(content.includes('content="BR"'), `${p.file} deve possuir geo.region BR`);
+  assert(content.includes('content="Brasil"'), `${p.file} deve possuir geo.placename Brasil`);
+  assert(content.includes('"@type": "BreadcrumbList"') || content.includes('"BreadcrumbList"'), `${p.file} deve possuir BreadcrumbList Schema`);
+  assert(content.includes('href="/favicon.svg"'), `${p.file} deve linkar favicon.svg`);
+  assert(content.includes('href="/site.webmanifest"'), `${p.file} deve linkar site.webmanifest`);
+  console.log(`   ✓ ${p.file}: Canonical, description, GEO, Breadcrumbs e Webmanifest verificados.`);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -156,6 +169,25 @@ assert(bannerStat.size > 50000, `Banner og-finobra-cover.jpg deve ter alta resol
 assert(fs.existsSync(path.join(root, 'dist/img/og-finobra-cover.jpg')), 'dist/img/og-finobra-cover.jpg deve existir na pasta de distribuição');
 
 console.log(`   ✓ Banner OpenGraph verificado (${Math.round(bannerStat.size / 1024)} KB) em img/ e dist/img/.`);
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 7. Padrão de Descoberta por IA (llms.txt) e PWA Manifest (site.webmanifest)
+// ─────────────────────────────────────────────────────────────────────────────
+console.log('\n7. Validando padrão llmstxt.org e PWA manifest...');
+
+const llmsTxt = read('llms.txt');
+assert(llmsTxt.includes('## Optional'), 'llms.txt deve conter seção ## Optional conforme padrão llmstxt.org');
+assert(llmsTxt.includes('https://fingo.api.br/llms-full.txt'), 'llms.txt deve linkar para /llms-full.txt na seção opcional');
+
+const dataLlmsTxt = read('data/llms.txt');
+assert(dataLlmsTxt.includes('## Optional'), 'data/llms.txt deve conter seção ## Optional');
+
+assert(fs.existsSync(path.join(root, 'site.webmanifest')), 'site.webmanifest deve existir na raiz');
+const manifestContent = JSON.parse(read('site.webmanifest'));
+assert.strictEqual(manifestContent.short_name, 'FinGo');
+assert(Array.isArray(manifestContent.icons) && manifestContent.icons.length >= 2, 'site.webmanifest deve conter ícones');
+
+console.log('   ✓ llms.txt, data/llms.txt e site.webmanifest validados com sucesso.');
 
 console.log('\n======================================================');
 console.log('🎉 TODOS OS TESTES DE SEO E INDEXABILIDADE PASSARAM COM SUCESSO!');

@@ -1,0 +1,27 @@
+{
+  "name": "FinGo — Obras em Fluxo",
+  "short_name": "FinGo",
+  "description": "Software de Gestão de Obras, Custos SINAPI e Finanças para Construtoras",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#040804",
+  "theme_color": "#040804",
+  "lang": "pt-BR",
+  "icons": [
+    {
+      "src": "/favicon-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    },
+    {
+      "src": "/apple-touch-icon.png",
+      "sizes": "180x180",
+      "type": "image/png"
+    }
+  ]
+}

@@ -25,3 +25,7 @@
 - [Arquitetura Serverless & Neon PostgreSQL](https://fingo.api.br/api): Backend em Serverless Functions Node.js/Vercel conectadas ao banco de dados serverless Neon PostgreSQL com isolamento estrito de multitenancy por `empresa_id` e RLS (Row-Level Security).
 - [Política de Segurança Estrita (CSP)](https://fingo.api.br/): Content Security Policy rigorosa (`script-src-attr 'none'`) com Event Bridge declarativo, impedindo execução de código arbitrário e garantindo integridade de dados bancários e cadastrais.
 - [Autenticação & 2FA / TOTP](https://fingo.api.br/login): Sessões criptografadas com suporte a autenticação em dois fatores via Google Authenticator / TOTP RFC 6238 e códigos de backup.
+
+## Optional
+
+- [Documentação Técnica Completa para LLMs](https://fingo.api.br/llms-full.txt): Especificação técnica detalhada, dicionário de dados, fórmulas oficiais de BDI, cálculo SINAPI e retenções tributárias para inteligência artificial.

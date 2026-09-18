@@ -13,6 +13,8 @@
   <meta name="theme-color" content="#040804">
   <meta name="geo.region" content="BR">
   <meta name="geo.placename" content="Brasil">
+  <meta name="geo.position" content="-14.235004;-51.92528">
+  <meta name="ICBM" content="-14.235004, -51.92528">
   
   <!-- Open Graph / Facebook / WhatsApp -->
   <meta property="og:type" content="website">
@@ -46,7 +48,7 @@
         "@id": "https://fingo.api.br/#website",
         "url": "https://fingo.api.br/",
         "name": "FinObra",
-        "alternateName": ["FinObra Gestão de Obras", "FinObra SaaS", "FinObra Construção Civil"],
+        "alternateName": ["FinGo", "FinGo Obras", "FinObra Gestão de Obras", "FinObra SaaS", "FinObra Construção Civil"],
         "description": "Plataforma integrada de gestão de obras, finanças e engenharia para construtoras e incorporadoras.",
         "publisher": { "@id": "https://fingo.api.br/#organization" },
         "inLanguage": "pt-BR"
@@ -55,9 +57,16 @@
         "@type": "Organization",
         "@id": "https://fingo.api.br/#organization",
         "name": "FinObra",
+        "alternateName": ["FinGo", "FinGo Tecnologia", "FinGo Obras", "FinObra Gestão de Obras"],
         "url": "https://fingo.api.br/",
         "logo": "https://fingo.api.br/img/finobra_logo.jpg",
         "image": "https://fingo.api.br/img/og-finobra-cover.jpg",
+        "address": {
+          "@type": "PostalAddress",
+          "addressCountry": "BR",
+          "addressRegion": "SP",
+          "addressLocality": "São Paulo"
+        },
         "contactPoint": {
           "@type": "ContactPoint",
           "telephone": "+55-95-99136-3678",
@@ -105,40 +114,60 @@
         ]
       },
       {
+        "@type": "BreadcrumbList",
+        "@id": "https://fingo.api.br/#breadcrumb",
+        "itemListElement": [
+          {
+            "@type": "ListItem",
+            "position": 1,
+            "name": "Home",
+            "item": "https://fingo.api.br/"
+          }
+        ]
+      },
+      {
         "@type": "FAQPage",
         "@id": "https://fingo.api.br/#faq",
         "isPartOf": { "@id": "https://fingo.api.br/#website" },
         "mainEntity": [
           {
             "@type": "Question",
-            "name": "Como funciona o teste grátis de 15 dias do FinObra?",
+            "name": "Como funciona o teste grátis de 15 dias?",
             "acceptedAnswer": {
               "@type": "Answer",
-              "text": "Você pode criar sua conta e utilizar todas as funcionalidades do FinObra gratuitamente por 15 dias, sem necessidade de cadastrar cartão de crédito e sem taxa de implantação."
+              "text": "Você cria sua conta em menos de 1 minuto e tem acesso irrestrito às funcionalidades do plano para testar com suas obras reais. Não pedimos número de cartão de crédito e não cobramos taxa de implantação."
             }
           },
           {
             "@type": "Question",
-            "name": "O FinObra possui integração com a tabela SINAPI?",
+            "name": "Como funciona o limite de usuários ativos?",
             "acceptedAnswer": {
               "@type": "Answer",
-              "text": "Sim, o FinObra conta com base oficial SINAPI da Caixa Econômica Federal atualizada para composição de preços, insumos e cálculo de BDI."
+              "text": "O limite é contado por pessoas da sua equipe com login próprio (1 no Básico, 2 no Profissional e 5 no Ilimitado). Se a mesma pessoa acessar do notebook do escritório e do celular no canteiro, conta como apenas 1 usuário."
             }
           },
           {
             "@type": "Question",
-            "name": "Consigo gerenciar mais de uma obra ao mesmo tempo?",
+            "name": "O sistema funciona no canteiro de obras pelo celular?",
             "acceptedAnswer": {
               "@type": "Answer",
-              "text": "Sim! O FinObra foi desenhado como multi-obra e multi-centro de custo, permitindo separar as finanças, despesas e medições de cada canteiro de obra de forma independente ou consolidada."
+              "text": "Sim! Toda a interface foi desenhada com responsividade total para celulares e tablets. Mestres de obra e engenheiros de campo podem registrar apontamentos de fases, fotos e medições diretamente pelo smartphone."
             }
           },
           {
             "@type": "Question",
-            "name": "O sistema funciona no celular?",
+            "name": "A base do SINAPI é oficial e atualizada?",
             "acceptedAnswer": {
               "@type": "Answer",
-              "text": "Sim, a interface é 100% responsiva e otimizada para smartphones e tablets, permitindo registrar lançamentos e acompanhar fotos e medições diretamente do canteiro de obras."
+              "text": "Sim. Conectamos snapshots oficiais mensais publicados pela Caixa Econômica Federal e pelo IBGE para cada UF do Brasil, garantindo orçamentos desonerados e não desonerados em total conformidade pública e bancária."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "Como é feito o suporte e atendimento?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "Disponibilizamos chat interno em tempo real dentro do sistema, canal direto com nossa equipe via WhatsApp e o assistente de engenharia FinBot para esclarecimento imediato de procedimentos operacionais."
             }
           }
         ]
@@ -147,9 +176,11 @@
   }
   </script>
 
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
   <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png?v=3">
   <link rel="icon" type="image/x-icon" href="/favicon.ico?v=3">
   <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png?v=3">
+  <link rel="manifest" href="/site.webmanifest">
   <link rel="preconnect" href="https://fonts.googleapis.com" crossorigin>
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;600;700;800;900&family=Outfit:wght@600;700;800;900&display=swap">

@@ -15,5 +15,6 @@ Disallow: /api/
 Disallow: /__finobra/
 Disallow: /__fingo/
 Disallow: /portal/
+Disallow: /version.json
 
 Sitemap: https://fingo.api.br/sitemap.xml
