@@ -1,0 +1,52 @@
+# FinObra / FinGo — Cloudflare Pages Ignore File (.cfignore)
+# Impede o envio de segredos, dependências pesadas e subprojetos durante o build do Pages
+
+# Credenciais e segredos locais (nunca enviar para a nuvem)
+.env*
+*.pem
+*.key
+*.crt
+*.pfx
+*.p12
+
+# Daemons e ferramentas locais pesadas
+monitor-nfe/
+remotion/
+
+# Backend standalone hospedado no Render via Docker
+backend/
+
+# IA, Agentes, Conductor e Documentação interna
+.agents/
+conductor/
+docs/
+scratch/
+*.md
+*.bat
+
+# Ferramentas locais, migrations e schemas SQL (gerenciados externamente no Neon)
+migrations/
+bin/
+schema.sql
+skills-lock.json
+
+# Trigger.dev jobs e configurações locais
+trigger/
+trigger.config.js
+
+# Scripts: ignora scripts locais exceto os exigidos no build
+scripts/*
+!scripts/build-cloudflare-pages.cjs
+!scripts/patch38-postbuild.cjs
+
+# Logs e arquivos de diagnóstico locais
+*.log
+scratch-startup-tests.log
+logs/
+
+# Backups temporários e pacotes locais
+FINOBRA_PATCH_*
+*.tmp
+*.bak
+*.zip
+*.tar.gz

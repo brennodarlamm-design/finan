@@ -1,0 +1,51 @@
+# FinObra / FinGo — Cloudflare Wrangler Ignore File (.wranglerignore)
+# Protege o deploy do Cloudflare Workers garantindo que apenas arquivos de produção sejam empacotados
+
+# Credenciais e segredos locais (nunca enviar para a nuvem)
+.env*
+*.pem
+*.key
+*.crt
+*.pfx
+*.p12
+
+# Daemons e ferramentas locais pesadas
+monitor-nfe/
+remotion/
+
+# Backend standalone hospedado no Render via Docker
+backend/
+
+# Dependências locais não bundled
+node_modules/
+*/node_modules/
+
+# IA, Agentes, Conductor e Documentação interna
+.agents/
+conductor/
+docs/
+scratch/
+*.md
+*.bat
+
+# Ferramentas locais, migrations e schemas SQL
+migrations/
+bin/
+schema.sql
+skills-lock.json
+
+# Trigger.dev jobs e configurações locais
+trigger/
+trigger.config.js
+
+# Logs e arquivos de diagnóstico locais
+*.log
+scratch-startup-tests.log
+logs/
+
+# Backups temporários e pacotes locais
+FINOBRA_PATCH_*
+*.tmp
+*.bak
+*.zip
+*.tar.gz
