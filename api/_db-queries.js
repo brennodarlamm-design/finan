@@ -241,7 +241,7 @@ export async function handleFullSnapshot(sql, tenantId, auth, res) {
     sql`SELECT preferences FROM tenant_preferences WHERE tenant_id = ${tenantId} LIMIT 1;`
   ]);
 
-  return res.status(200).json({
+  const data = {
     clientes: obras.map(o => ({ ...o, data_inicio: cleanDate(o.data_inicio), data_previsao: cleanDate(o.data_previsao) })),
     fornecedores: fornecedores.map(f => ({ ...f, cnpj: f.cnpj_cpf || f.cnpj || '', razao_social: f.razao_social || f.nome, nome_fantasia: f.nome, endereco: f.endereco || '', municipio: f.municipio || '', uf: f.uf || '', ativo: f.ativo !== false })),
     lancamentos: lancamentos.map(l => ({ ...l, data: cleanDate(l.data) || todayBoaVista(), data_vencimento: cleanDate(l.data_vencimento) || cleanDate(l.data), data_pagamento: cleanDate(l.data_pagamento), valor: cleanNum(l.valor), itens: Array.isArray(l.itens) ? l.itens : safeJsonParse(l.itens, []) })),
@@ -257,6 +257,13 @@ export async function handleFullSnapshot(sql, tenantId, auth, res) {
     orcamentos_sinapi: orcamentosSinapi.map(jsonPayload),
     doc_fases: docFases.map(docPhasePayload),
     preferencias: prefs[0]?.preferences || null
+  };
+
+  return res.status(200).json({
+    success: true,
+    tenantId,
+    data,
+    ...data
   });
 }
 

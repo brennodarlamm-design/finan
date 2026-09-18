@@ -782,8 +782,11 @@ const DB = {
       }
       if (!res.ok) throw new Error(`Falha no snapshot: HTTP ${res.status}`);
       const json = await res.json();
-      if (!json.success || !json.data) throw new Error('Snapshot da nuvem inválido');
-      return json.data;
+      const payload = (json && json.data && typeof json.data === 'object')
+        ? json.data
+        : (json && typeof json === 'object' && Array.isArray(json.clientes) ? json : null);
+      if (!payload) throw new Error('Snapshot da nuvem inválido');
+      return payload;
     }
 
     console.info('[Sync] Base grande detectada. Usando sincronização paginada.');
