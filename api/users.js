@@ -68,32 +68,93 @@ function planUserLimitError(usage) {
 const SUPPORT_STATUSES = new Set(['bot','waiting','assigned','resolved','closed']);
 const cleanSupportText = (v, max=4000) => String(v ?? '').replace(/\0/g, '').trim().slice(0, max);
 const wantsHumanSupport = text => /\b(atendente|humano|pessoa|especialista|falar com algu[eé]m|suporte humano|chamar suporte|chamar atendente)\b/i.test(String(text || ''));
-const FINBOT_SYSTEM_PROMPT = `Você é o FinBot, o Copiloto de Inteligência Financeira e Engenharia do FinGo (software especializado de gestão para construtoras e obras).
-Sua missão é auxiliar engenheiros, mestres de obras, gestores e construtoras com suporte ao sistema, cálculos de custos, planejamento e regras do setor da construção civil brasileira.
+export const FINBOT_SYSTEM_PROMPT = `Você é o FinBot, o Copiloto de Inteligência Financeira, Engenharia e Gestão do FinGo (software especializado de gestão para construtoras e obras).
+Sua missão é auxiliar engenheiros, mestres de obras, gestores, administradores e construtoras com suporte operacional, cálculos de custos, planejamento, parametrizações cadastrais, regras de acesso e normas da construção civil brasileira.
 
-Diretrizes de Atuação:
-1. Especialidade: Construção civil brasileira, orçamentos SINAPI Caixa, BDI, Curva S, EVM, medições físicas/financeiras com retenções na fonte (INSS 11% ou 3.5% na desoneração, ISS 2% a 5%, IRRF 1.2% a 1.5%, PIS/COFINS/CSLL 4.65%), retenção técnica contratual de garantia (5% a 10%), requisições de canteiro, conciliação bancária OFX e notas fiscais com OCR.
-2. Navegação no FinGo:
-   - Obras & Clientes: Cadastro e contratos Caixa.
-   - Hub da Obra: Cronograma Físico-Financeiro, Curva S, EVM e BDI.
-   - Orçamentos & SINAPI: Planilhas com base oficial Caixa por estado.
-   - Medições: Boletins acumulados e conferência técnica.
-   - Financeiro: Lançamentos de receitas e despesas, fluxo de caixa e conciliação OFX.
-   - Notas Fiscais: Importação de XML/DANFE e leitura por IA Vision.
-   - Pré-Compras: Requisições do canteiro com aprovação antes da compra.
-   - Contratos & Recibos: Assinatura eletrônica SHA-256 com QR Code.
-3. Tom e Formatação:
-   - Respostas claras, profissionais, acolhedoras e diretas ao ponto.
-   - Use formatação Markdown limpa (negrito e marcadores quando enriquecer a leitura).
-   - Seja conciso (idealmente 2 a 4 parágrafos objetivos), perfeitas para leitura rápida no canteiro ou escritório.
-4. Atendimento Humano:
+Diretrizes de Atuação e Base de Conhecimento:
+
+1. Especialidade em Engenharia & Construção Civil:
+   - Orçamentos SINAPI Caixa oficiais mensais por UF (com desoneração e não-desoneração), composições analíticas e insumos.
+   - BDI (Benefícios e Despesas Indiretas), Curva S físico-financeira, Gerenciamento de Valor Agregado (EVM: BAC, PV, EV, AC, CPI, SPI, EAC, VAC) e Curva ABC de insumos/etapas (Pareto 80/15/5) com comparativo Orçado vs Realizado.
+   - Medições com retenções fiscais na fonte: INSS (11% ou 3.5% na desoneração), ISS (2% a 5%), IRRF (1.2% a 1.5%), PIS/COFINS/CSLL (4.65%), e retenção contratual de garantia técnica (5% a 10%).
+   - Suprimentos e Financeiro: Pré-compras e requisições de canteiro com fluxo de aprovação, importação de NF-e XML/DANFE com leitura por IA Vision (OCR), conciliação bancária OFX e fluxo de caixa por obra.
+
+2. Guias Passo a Passo de Cadastro e Onboarding:
+   - Cadastro da Empresa (Construtora):
+     * Onde: Em "Configurações > Empresa".
+     * Campos: Razão Social, Nome Fantasia, CNPJ, Telefone/WhatsApp, E-mail oficial, Endereço completo, Município/UF, Responsável Técnico, Registro profissional CREA/CAU e Logotipo da empresa.
+     * Aplicação: Os dados e a logomarca da construtora são inseridos automaticamente em cabeçalhos de orçamentos, relatórios de engenharia em PDF, contratos, recibos e ordens de compra.
+   - Cadastro de Obras:
+     * Onde: Em "Obras & Clientes > Nova Obra".
+     * Passo a passo: Selecionar o Cliente contratante, dar um Nome à obra, informar Endereço/Localização, Data de Início e Previsão de Término, Valor Contratual, Contrato Caixa / Matrícula CNO (se houver), BDI estimado (%) e Tipo de Obra.
+     * Limites de obras ativas simultâneas: Básico (até 3 obras), Profissional (até 10 obras), Construtora Ilimitado (obras ILIMITADAS). Finalizar ou arquivar obras concluídas libera vagas no limite.
+   - Cadastro de Clientes:
+     * Onde: Em "Obras & Clientes".
+     * Campos: Razão Social / Nome Completo, CPF/CNPJ, Telefone, E-mail e Endereço. Ficam vinculados diretamente às obras contratadas.
+   - Cadastro de Fornecedores & Empreiteiros:
+     * Onde: No módulo "Fornecedores".
+     * Campos: CNPJ/CPF, Razão Social, Nome Fantasia, Categoria (Materiais, Serviços, Equipamentos, Empreiteiro), Telefone, E-mail, Município/UF, Dados Bancários e Chave PIX (para agilizar pagamentos e conciliação).
+   - Centros de Custo & Contas Bancárias:
+     * Onde: No módulo "Contas Bancárias" e no "Financeiro".
+     * Funcionamento: Cadastro de bancos, contas correntes e caixas de canteiro (dinheiro miúdo). A própria Obra atua como centro de custo principal para apuração de DRE e orçado vs realizado.
+
+3. Administrativo do Site, Planos e Faturamento:
+   - Painel "Conta & Assinatura":
+     * Onde acessar: Clicar no menu de usuário ou em "Configurações > Conta & Assinatura" (ou /app/planos).
+     * O que exibe: Plano contratado, status da assinatura (Ativo, Em teste, Vencido), limite de usuários ativos (em uso vs contratados), limite de obras ativas em andamento, data de vencimento e histórico de faturas.
+   - Planos Disponíveis:
+     * Plano Básico (Starter): R$ 119,90/mês (ou até R$ 99,91/mês no anual). Inclui 1 usuário ativo e até 3 obras ativas simultâneas. Módulos essenciais de canteiro, caixa e medições.
+     * Plano Profissional (Pro): R$ 279,90/mês (ou R$ 233,25/mês no anual). Inclui 2 usuários ativos e até 10 obras ativas. Recursos extras: Leitura OCR de notas fiscais com IA Vision, Pré-Compras com aprovação, Contratos em nuvem e Assinatura Eletrônica SHA-256 com QR Code de validação pública. Suporte prioritário.
+     * Construtora Ilimitado (Unlimited): R$ 499,90/mês (ou R$ 416,58/mês no anual). Inclui 5 usuários ativos padrão (expansível via faturamento) e Obras Ativas ILIMITADAS. Recursos exclusivos: Engenharia avançada completa (Curva S, EVM, Curva ABC Pareto, BDI), Tabela oficial SINAPI Caixa mensal por estado (UF) com composições analíticas, Permissões Granulares RBAC por módulo e Suporte VIP.
+     * Ciclos de Faturamento: Mensal (sem fidelidade), Trimestral (~5,5% de desconto), Semestral (~11% de desconto) e Anual (2 meses grátis — pague 10, leve 12).
+   - Pagamentos, Liquidação & Upgrades:
+     * Faturamento via PIX com liquidação instantânea por QR Code dinâmico e chave Copia e Cola.
+     * A liberação de limites e novos módulos é 100% automática no banco de dados via webhook assim que o PIX é pago, sem tempo de espera bancária.
+     * Para fazer upgrade: Acesse "Conta & Assinatura", selecione o novo plano/ciclo e pague o PIX correspondente.
+
+4. Definição e Governança de Acessos (Usuários, Perfis, RBAC e Sessões):
+   - Como Cadastrar e Convidar Colaboradores:
+     * Onde configurar: Em "Configurações > Usuários" (/api/users).
+     * Quem tem permissão: Somente administradores da construtora ("admin") ou "superadmin".
+     * Passo a passo: Clicar em "+ Novo Usuário", preencher Nome Completo, Usuário de login (username único sem espaços, mín. 3 caracteres), E-mail corporativo, Senha inicial (mín. 8 caracteres) e selecionar o Perfil.
+   - Hierarquia de Perfis Nativos:
+     * Administrador ("admin"): Dono, sócio ou diretor geral da construtora. Possui acesso total e irrestrito a todos os módulos, gerencia os usuários da equipe, edita os dados cadastrais da construtora, gerencia faturamento e consulta a trilha de auditoria. Regra de segurança: A empresa deve possuir sempre pelo menos 1 administrador ativo (proteção LAST_ADMIN contra bloqueio acidental).
+     * Gestor ("gestor"): Ideal para Engenheiros Residentes, Gerentes de Obra e Gestores Financeiros. Tem acesso operacional total (leitura, escrita e exclusão) nas rotinas de obras, cronogramas, orçamentos, medições e lançamentos, mas NÃO tem acesso à gestão de usuários, dados contratuais da empresa nem logs de auditoria.
+     * Operador ("operador"): Ideal para Encarregados de Campo, Mestres de Obras, Almoxarifes e Assistentes. Pode consultar dados e criar novos registros (ex.: diário de obra, fotos, requisições de compras, lançamentos de despesa do canteiro), mas NÃO possui permissão para excluir registros (delete desabilitado).
+     * Visualizador ("visualizador"): Ideal para Investidores, Clientes finais, Sócios passivos ou Auditores externos. Acesso estritamente de consulta (somente leitura; não pode criar, alterar nem excluir dados).
+   - Permissões Granulares por Módulo (RBAC Avançado — Plano Ilimitado):
+     * No plano Construtora Ilimitado, o administrador pode customizar permissões individuais para cada colaborador por módulo (Dashboard, Obras, Financeiro, Fornecedores, Pré-Compras, Contratos, Notas Fiscais, Orçamentos/SINAPI, Medições, etc.).
+     * Para cada módulo, o admin define se o colaborador pode: Visualizar (Leitura), Criar/Editar (Escrita) e Excluir.
+     * Exemplo: Um Engenheiro de Campo pode ter acesso total a Obras e Medições, mas ficar com acesso bloqueado ao módulo Financeiro e Contas Bancárias.
+     * Regra de Menor Privilégio: Permissões granulares funcionam como filtro restritivo de segurança — nunca elevam privilégios além da capacidade máxima do perfil nativo da pessoa.
+   - Dispositivos Conectados e Sessões Ativas (Multi-device sem custo extra):
+     * Cada licença de usuário ativo permite acesso simultâneo em múltiplos dispositivos da mesma pessoa (smartphone no canteiro, notebook no escritório e tablet) sem consumir novas licenças do plano!
+     * Em "Configurações > Sessões", o usuário ou o administrador pode auditar todos os aparelhos conectados (com navegador, IP e data/hora) e desconectar sessões remotamente com um clique.
+   - Segurança de Senha & Redefinição:
+     * A senha deve conter no mínimo 8 caracteres. Para alterar a própria senha, o sistema exige confirmação da senha atual.
+     * Ao alterar a senha, todas as outras sessões ativas nos demais computadores ou celulares são revogadas imediatamente no banco Neon para proteção da conta.
+
+5. Tom, Formatação e Atendimento Humano:
+   - Respostas claras, acolhedoras, profissionais e diretas ao ponto.
+   - Use formatação Markdown limpa (negrito e listas numeradas ou com marcadores para guiar o usuário passo a passo).
+   - Seja conciso e didático (idealmente 2 a 4 parágrafos ou passos objetivos), perfeito para leitura rápida no canteiro de obras ou no escritório.
    - Se o usuário expressar desejo de falar com atendente ou pessoa, oriente cordialmente que ele pode clicar em "Chamar atendente" na tela para que nossa equipe assuma o chamado.`;
 
-const SUPPORT_KB = Object.freeze([
+export const SUPPORT_KB = Object.freeze([
+  { topic:'cadastro_empresa', patterns:[/cadastr.*empresa/i,/dados.*empresa/i,/configur.*empresa/i,/logo.*empresa/i,/crea/i,/cau/i,/razão social/i,/razao social/i], answer:'Para cadastrar ou atualizar os dados da construtora, acesse Configurações > Empresa. Lá você informa Razão Social, Nome Fantasia, CNPJ, telefone, e-mail, endereço, responsável técnico, CREA/CAU e envia o logotipo da empresa. Essas informações saem impressas nos cabeçalhos de orçamentos, relatórios de engenharia e contratos.' },
+  { topic:'cadastro_obras', patterns:[/como.*cadastrar.*obra/i,/nova obra/i,/criar.*obra/i,/adicionar.*obra/i], answer:'Para cadastrar uma obra, acesse Obras & Clientes e clique em "+ Nova Obra". Preencha o cliente contratante, nome da obra, endereço, datas de início e previsão de término, valor contratual, BDI (%) e número do contrato Caixa/CNO se houver. O plano Básico inclui até 3 obras ativas, o Profissional até 10, e o Ilimitado possui obras ativas ilimitadas.' },
+  { topic:'cadastro_fornecedores', patterns:[/cadastr.*fornecedor/i,/novo.*fornecedor/i,/adicionar.*fornecedor/i,/chave pix.*fornecedor/i], answer:'No módulo Fornecedores, clique em "+ Novo Fornecedor". Cadastre CNPJ/CPF, razão social, nome fantasia, categoria (materiais, serviços, empreiteiro), telefone, e-mail, município/UF, dados bancários e chave PIX. Assim que salvo, o fornecedor fica disponível nos lançamentos do financeiro, notas fiscais e compras.' },
+  { topic:'cadastro_clientes', patterns:[/cadastr.*cliente/i,/novo.*cliente/i,/adicionar.*cliente/i], answer:'Em Obras & Clientes, você pode cadastrar e gerenciar seus clientes com nome/razão social, CPF/CNPJ, telefone, e-mail e endereço. Os clientes cadastrados podem ser vinculados diretamente às obras contratadas.' },
+  { topic:'definir_acesso', patterns:[/como.*definir.*acesso/i,/definir.*acesso/i,/configurar.*acesso/i,/restringir.*acesso/i,/bloquear.*módulo/i,/permiss.*módulo/i,/rbac/i], answer:'Para definir acessos, o administrador deve acessar Configurações > Usuários. Cada colaborador recebe um perfil nativo (admin, gestor, operador ou visualizador). No plano Construtora Ilimitado, você também pode ativar Permissões Granulares por Módulo, escolhendo individualmente quem pode ler, gravar ou excluir em Obras, Financeiro, Medições, etc.' },
+  { topic:'perfis_acesso', patterns:[/perfil.*acesso/i,/perfis/i,/diferença.*perfil/i,/diferenca.*perfil/i,/gestor.*operador/i,/niveis.*acesso/i,/níveis.*acesso/i,/qual a diferença dos perfis/i], answer:'O FinGo possui 4 perfis de acesso: 1) Admin: acesso irrestrito a tudo, gestão de usuários, dados da empresa e auditoria; 2) Gestor (Engenheiro/Financeiro): gerencia obras, medições e lançamentos, sem gerenciar usuários; 3) Operador (Mestre/Encarregado): visualiza e cria apontamentos e requisições de compra, sem permissão para excluir; 4) Visualizador: acesso estritamente de consulta (somente leitura).' },
+  { topic:'usuarios_equipe', patterns:[/cadastr.*usuário/i,/cadastrar.*usuario/i,/novo.*usuário/i,/novo.*usuario/i,/convidar.*equipe/i,/adicionar.*usuário/i,/adicionar.*usuario/i], answer:'Em Configurações > Usuários, o administrador clica em "+ Novo Usuário" e preenche Nome, Usuário de login (mín. 3 caracteres), E-mail corporativo, Senha inicial (mín. 8 caracteres) e o perfil desejado. O plano Básico inclui 1 usuário ativo, o Profissional 2 e o Ilimitado 5 (com suporte a expansão de licenças).' },
+  { topic:'sessoes_dispositivos', patterns:[/limite.*dispositivo/i,/celular.*notebook/i,/computador.*celular/i,/mais.*de.*um.*aparelho/i,/sessões.*ativas/i,/sessoes.*ativas/i,/dispositivos.*conectados/i], answer:'Não há custo extra por dispositivo! Cada usuário ativo da sua construtora pode usar o FinGo simultaneamente no smartphone, notebook e tablet. Em Configurações > Sessões, você pode ver todos os aparelhos conectados à sua conta e desconectar sessões remotamente a qualquer momento.' },
+  { topic:'planos_upgrade', patterns:[/fazer.*upgrade/i,/mudar.*plano/i,/trocar.*plano/i,/preço.*plano/i,/preco.*plano/i,/quanto custa/i,/tabela.*preço/i,/tabela.*preco/i,/mensalidade/i,/cobrança/i,/cobranca/i,/\bpix\b/i], answer:'Em Conta & Assinatura você confere e altera seu plano: Básico (R$ 119,90/mês, 1 usuário, 3 obras); Profissional (R$ 279,90/mês, 2 usuários, 10 obras, OCR de notas por IA e assinaturas com QR Code); Construtora Ilimitado (R$ 499,90/mês, 5 usuários, obras ilimitadas, SINAPI oficial mensal, engenharia Curva S/EVM e RBAC por módulo). Pagamento via PIX instantâneo com liberação automática.' },
+  { topic:'troca_senha', patterns:[/trocar.*senha/i,/alterar.*senha/i,/esqueci.*senha/i,/recuperar.*senha/i,/mudar.*senha/i], answer:'Para trocar sua senha, acesse o seu perfil de usuário ou Configurações > Usuários. A nova senha deve ter no mínimo 8 caracteres e exige a confirmação da senha atual. Por segurança, ao alterar a senha todas as outras sessões abertas em outros computadores ou celulares são encerradas automaticamente.' },
   { topic:'notas', patterns:[/nota fiscal/i,/\bnf-?e\b/i,/\bnfce\b/i,/\bnfse\b/i,/\bxml\b/i,/\bocr\b/i,/danfe/i], answer:'Em Notas Fiscais você pode consultar e organizar NF-e/NFC-e/NFS-e, XML e DANFE. O reconhecimento de documentos usa Gemini Vision para ler PDF ou imagem e sugerir fornecedor, valores e itens quando o documento for uma nota fiscal.' },
   { topic:'medicoes', patterns:[/mediç/i,/medicao/i,/medição/i,/boletim/i,/caixa econômica/i,/caixa economica/i], answer:'No módulo Medições você registra avanço físico, percentuais e valores medidos da obra. O FinObra mantém acumulados e permite preparar boletins para acompanhamento e financiamento.' },
   { topic:'ofx', patterns:[/\bofx\b/i,/concilia/i,/extrato banc/i], answer:'Na Conciliação OFX, importe o arquivo .OFX do banco. O FinObra cruza as transações com os lançamentos e sugere correspondências para conferência antes da baixa.' },
-  { topic:'obras', patterns:[/\bobra\b/i,/cliente/i,/nova obra/i,/contrato caixa/i], answer:'Para cadastrar uma obra, entre em Obras & Clientes e escolha Nova Obra. Informe cliente, datas, valor/contrato e os demais dados. Os limites de obras ativas dependem do plano contratado.' },
+  { topic:'obras', patterns:[/\bobra\b/i,/cliente/i,/contrato caixa/i], answer:'Para cadastrar uma obra, entre em Obras & Clientes e escolha Nova Obra. Informe cliente, datas, valor/contrato e os demais dados. Os limites de obras ativas dependem do plano contratado.' },
   { topic:'fornecedores', patterns:[/fornecedor/i,/cnpj/i], answer:'Fornecedores são cadastrados no módulo Fornecedores com CNPJ/CPF, razão social, contato, endereço, município e UF. Depois ficam disponíveis nos lançamentos, notas e compras.' },
   { topic:'financeiro', patterns:[/lançamento/i,/lancamento/i,/receita/i,/despesa/i,/contas? a pagar/i,/contas? a receber/i,/fluxo de caixa/i], answer:'No Financeiro, use Novo Lançamento para registrar receita ou despesa, vencimento, fornecedor, obra/centro de custo, conta e status. O sistema também consolida fluxo de caixa e realizado por obra.' },
   { topic:'orcamentos', patterns:[/orçamento/i,/orcamento/i,/planilha orçament/i,/insumo/i,/composição/i,/composicao/i], answer:'Em Orçamentos você monta a planilha da obra com categorias, itens, quantidades e preços. O FinObra calcula totais e compara orçamento com realizado. SINAPI e controles avançados de engenharia fazem parte do plano Construtora Ilimitado.' },
@@ -104,13 +165,13 @@ const SUPPORT_KB = Object.freeze([
   { topic:'contratos', patterns:[/contrato/i,/recibo/i], answer:'Contratos e Recibos ficam salvos na nuvem da empresa. Você pode criar, editar, imprimir e, nos planos compatíveis, usar assinatura eletrônica e QR de validação.' },
   { topic:'assinatura', patterns:[/assinatura/i,/qr code/i,/validar/i,/validação/i,/validacao/i], answer:'A assinatura eletrônica gera um código de validação registrado no servidor. O QR Code leva à página pública de validação, que consulta o registro real no FinObra.' },
   { topic:'usuarios', patterns:[/usuário/i,/usuario/i,/perfil/i,/permiss/i,/acesso/i], answer:'Em Configurações > Usuários, o administrador gerencia as pessoas da equipe. O Básico inclui 1 usuário ativo, o Profissional 2 e o Ilimitado 5. Celular, notebook e outros dispositivos da mesma pessoa não contam como usuários extras. Permissões granulares por módulo ficam disponíveis no Ilimitado.' },
-  { topic:'planos', patterns:[/plano/i,/cobrança/i,/cobranca/i,/\bpix\b/i,/mensalidade/i,/pagamento/i], answer:'Abra Conta & Assinatura para consultar plano, usuários e obras em uso, módulos incluídos, cobranças por competência e opções de plano.' },
+  { topic:'planos', patterns:[/plano/i,/mensalidade/i,/pagamento/i], answer:'Abra Conta & Assinatura para consultar plano, usuários e obras em uso, módulos incluídos, cobranças por competência e opções de plano.' },
   { topic:'whatsapp', patterns:[/whatsapp/i,/mensagem/i,/qr.*whatsapp/i], answer:'O WhatsApp usa uma sessão própria da empresa no servidor. Quando necessário, conecte pelo QR Code e confira o status da sessão antes de enviar mensagens.' },
   { topic:'sessoes', patterns:[/sessão/i,/sessao/i,/dispositivo/i,/celular conectado/i,/computador conectado/i], answer:'Em Configurações > Sessões você vê os dispositivos conectados à sua conta e pode encerrar acessos. Sessões de celular, notebook ou navegador não consomem usuários extras do plano.' },
   { topic:'erro', patterns:[/erro/i,/bug/i,/não funciona/i,/nao funciona/i,/travou/i,/problema/i], answer:'Informe em qual tela aconteceu, o que você estava fazendo e qual mensagem apareceu. O diagnóstico técnico fica com a equipe DEV/Suporte e não é exibido na tela do cliente. Se precisar, clique em “Chamar atendente”.' }
 ]);
 
-function supportBotReply(text) {
+export function supportBotReply(text) {
   const t = String(text || '').trim();
   if (/(atendente|humano|pessoa|especialista|falar com algu[eé]m)/i.test(t)) return null;
   for (const item of SUPPORT_KB) {

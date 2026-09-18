@@ -36,13 +36,71 @@ test('api/users.js define FINBOT_SYSTEM_PROMPT especializado em engenharia/const
 test('api/users.js passa histórico de mensagens para a IA', /loadSupportMessages/.test(usersContent) && /history/.test(usersContent));
 test('api/users.js mantém fallback de segurança para suporte humano e KB', /findLearnedSupportAnswer/.test(usersContent) && /supportBotReply/.test(usersContent));
 
+// Novos testes de inteligência: Cadastros, Administrativo e Governança de Acessos
+test('FINBOT_SYSTEM_PROMPT possui guia de cadastros e onboarding (empresa, obras, clientes, fornecedores)',
+  /Cadastro da Empresa/i.test(usersContent) &&
+  /CREA\/CAU/i.test(usersContent) &&
+  /Cadastro de Obras/i.test(usersContent) &&
+  /Cadastro de Fornecedores/i.test(usersContent) &&
+  /Centros de Custo/i.test(usersContent)
+);
+
+test('FINBOT_SYSTEM_PROMPT possui administrativo, planos e faturamento PIX',
+  /Conta & Assinatura/i.test(usersContent) &&
+  /Plano Básico/i.test(usersContent) &&
+  /Plano Profissional/i.test(usersContent) &&
+  /Construtora Ilimitado/i.test(usersContent) &&
+  /PIX/i.test(usersContent) &&
+  /upgrade/i.test(usersContent)
+);
+
+test('FINBOT_SYSTEM_PROMPT possui governança de acessos (perfis RBAC, módulos granulares e sessões multi-device)',
+  /Configurações > Usuários/i.test(usersContent) &&
+  /Administrador/i.test(usersContent) &&
+  /Gestor/i.test(usersContent) &&
+  /Operador/i.test(usersContent) &&
+  /Visualizador/i.test(usersContent) &&
+  /Permissões Granulares por Módulo/i.test(usersContent) &&
+  /Dispositivos Conectados e Sessões Ativas/i.test(usersContent) &&
+  /LAST_ADMIN/i.test(usersContent)
+);
+
 const { getKeyPoolStatus } = await import('../api/_ai-key-pool.js');
 const status = getKeyPoolStatus();
 test('Pool lê as chaves do ambiente com sucesso', typeof status.totalKeys === 'number' && status.totalKeys >= 1);
 test('Pool mascara as chaves para proteger segredos nos logs', status.details.every(d => d.masked.includes('...')));
 
-console.log(`\nResultado: ${12 - fails}/12 testes aprovados.`);
+// Validação funcional da Base de Conhecimento Estruturada do FinBot (Fallback KB)
+const { supportBotReply } = await import('../api/users.js');
+
+const replyEmpresa = supportBotReply('como cadastrar minha empresa e anexar o logo?');
+test('KB responde corretamente sobre cadastro de empresa e logotipo',
+  replyEmpresa && replyEmpresa.includes('Configurações > Empresa') && replyEmpresa.includes('logotipo')
+);
+
+const replyAcesso = supportBotReply('como definir acesso e permissoes para minha equipe?');
+test('KB responde corretamente sobre definição de acessos e permissões',
+  replyAcesso && replyAcesso.includes('Configurações > Usuários') && replyAcesso.includes('perfil nativo')
+);
+
+const replyPerfis = supportBotReply('qual a diferença dos perfis de acesso gestor e operador?');
+test('KB responde corretamente sobre os 4 perfis nativos do FinGo',
+  replyPerfis && replyPerfis.includes('Admin') && replyPerfis.includes('Gestor') && replyPerfis.includes('Operador')
+);
+
+const replySessoes = supportBotReply('posso usar no celular e no notebook ao mesmo tempo sem pagar extra?');
+test('KB responde corretamente sobre sessões multi-dispositivo sem custo extra',
+  replySessoes && replySessoes.includes('Não há custo extra por dispositivo') && replySessoes.includes('Configurações > Sessões')
+);
+
+const replyPlanos = supportBotReply('como funciona o pagamento via pix e fazer upgrade de plano?');
+test('KB responde corretamente sobre planos, faturamento e upgrade',
+  replyPlanos && replyPlanos.includes('Conta & Assinatura') && replyPlanos.includes('PIX')
+);
+
+const totalTests = 12 + 3 + 5;
+console.log(`\nResultado: ${totalTests - fails}/${totalTests} testes aprovados.`);
 if (fails > 0) {
   process.exit(1);
 }
-console.log('🚀 Pool de Chaves e FinBot validados com sucesso!\n');
+console.log('🚀 Pool de Chaves, FinBot (Onboarding, Admin, RBAC) e KB validados com 100% de sucesso!\n');
