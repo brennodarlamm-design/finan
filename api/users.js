@@ -7,6 +7,7 @@ import { canManageUsers, canManageTenant, permissionError, sanitizePermissions }
 import { getPlanRule, minimumPlanForUsers, upgradeDescriptor } from './_plans.js';
 import { checkRateLimit, getClientIp } from './_ratelimit.js';
 import { createTenantSql } from './_tenant-sql.js';
+import { callGeminiKeyPool } from './_ai-key-pool.js';
 
 
 function cors(req, res) {
@@ -67,6 +68,26 @@ function planUserLimitError(usage) {
 const SUPPORT_STATUSES = new Set(['bot','waiting','assigned','resolved','closed']);
 const cleanSupportText = (v, max=4000) => String(v ?? '').replace(/\0/g, '').trim().slice(0, max);
 const wantsHumanSupport = text => /\b(atendente|humano|pessoa|especialista|falar com algu[eé]m|suporte humano|chamar suporte|chamar atendente)\b/i.test(String(text || ''));
+const FINBOT_SYSTEM_PROMPT = `Você é o FinBot, o Copiloto de Inteligência Financeira e Engenharia do FinGo (software especializado de gestão para construtoras e obras).
+Sua missão é auxiliar engenheiros, mestres de obras, gestores e construtoras com suporte ao sistema, cálculos de custos, planejamento e regras do setor da construção civil brasileira.
+
+Diretrizes de Atuação:
+1. Especialidade: Construção civil brasileira, orçamentos SINAPI Caixa, BDI, Curva S, EVM, medições físicas/financeiras com retenções na fonte (INSS 11% ou 3.5% na desoneração, ISS 2% a 5%, IRRF 1.2% a 1.5%, PIS/COFINS/CSLL 4.65%), retenção técnica contratual de garantia (5% a 10%), requisições de canteiro, conciliação bancária OFX e notas fiscais com OCR.
+2. Navegação no FinGo:
+   - Obras & Clientes: Cadastro e contratos Caixa.
+   - Hub da Obra: Cronograma Físico-Financeiro, Curva S, EVM e BDI.
+   - Orçamentos & SINAPI: Planilhas com base oficial Caixa por estado.
+   - Medições: Boletins acumulados e conferência técnica.
+   - Financeiro: Lançamentos de receitas e despesas, fluxo de caixa e conciliação OFX.
+   - Notas Fiscais: Importação de XML/DANFE e leitura por IA Vision.
+   - Pré-Compras: Requisições do canteiro com aprovação antes da compra.
+   - Contratos & Recibos: Assinatura eletrônica SHA-256 com QR Code.
+3. Tom e Formatação:
+   - Respostas claras, profissionais, acolhedoras e diretas ao ponto.
+   - Use formatação Markdown limpa (negrito e marcadores quando enriquecer a leitura).
+   - Seja conciso (idealmente 2 a 4 parágrafos objetivos), perfeitas para leitura rápida no canteiro ou escritório.
+4. Atendimento Humano:
+   - Se o usuário expressar desejo de falar com atendente ou pessoa, oriente cordialmente que ele pode clicar em "Chamar atendente" na tela para que nossa equipe assuma o chamado.`;
 
 const SUPPORT_KB = Object.freeze([
   { topic:'notas', patterns:[/nota fiscal/i,/\bnf-?e\b/i,/\bnfce\b/i,/\bnfse\b/i,/\bxml\b/i,/\bocr\b/i,/danfe/i], answer:'Em Notas Fiscais você pode consultar e organizar NF-e/NFC-e/NFS-e, XML e DANFE. O reconhecimento de documentos usa Gemini Vision para ler PDF ou imagem e sugerir fornecedor, valores e itens quando o documento for uma nota fiscal.' },
@@ -446,14 +467,39 @@ export default async function handler(req, res) {
           `;
         } else if (conversation.status === 'bot') {
           let reply = null;
+
+          // 1. Inteligência Generativa Especialista: Chamada ao Pool de Chaves Gemini (com rotação e fallback)
           try {
-            reply = await findLearnedSupportAnswer(sql, auth.tenantId, text);
-          } catch (eLearn) {
-            console.warn('[FinBot] Falha ao consultar memória aprendida:', eLearn?.message || eLearn);
+            const historyRows = await loadSupportMessages(sql, auth, conversation.id);
+            const history = historyRows.slice(-6).map(m => ({
+              role: m.sender_type === 'client' ? 'user' : 'model',
+              text: m.body
+            }));
+
+            reply = await callGeminiKeyPool(text, {
+              systemInstruction: FINBOT_SYSTEM_PROMPT,
+              history,
+              temperature: 0.3,
+              maxTokens: 800
+            });
+          } catch (eAi) {
+            console.warn('[FinBot AI] Falha ao consultar pool de IA:', eAi?.message || eAi);
           }
+
+          // 2. Fallback de contingência: Memória aprendida de atendentes humanos anteriores do mesmo tenant
+          if (!reply) {
+            try {
+              reply = await findLearnedSupportAnswer(sql, auth.tenantId, text);
+            } catch (eLearn) {
+              console.warn('[FinBot] Falha ao consultar memória aprendida:', eLearn?.message || eLearn);
+            }
+          }
+
+          // 3. Fallback de contingência: Base de conhecimento estática estruturada do FinObra
           if (!reply) {
             reply = supportBotReply(text);
           }
+
           if (reply) {
             await sql`
               INSERT INTO support_messages (id,conversation_id,tenant_id,sender_type,sender_name,body)
