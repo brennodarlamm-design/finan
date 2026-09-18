@@ -20,6 +20,8 @@
       "/privacidade.html",
       "/termos.html",
       "/validar.html",
+      "/llms.txt",
+      "/llms-full.txt",
       "/app",
       "/app/*",
       "/landing",

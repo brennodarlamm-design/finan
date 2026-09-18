@@ -173,6 +173,26 @@ async function fetchFrontendResponse(request, env) {
     : request;
 
   const assetResponse = await env.ASSETS.fetch(assetRequest);
+
+  if (incoming.pathname === '/llms.txt' || incoming.pathname === '/llms-full.txt') {
+    let text = await assetResponse.text();
+    text = text.replace(/# FinObra (?:—|\()[\s\S]*?Documentação Completa para LLMs\)/g, '# FinGo — Obras em Fluxo — SaaS de Gestão Financeira e Operacional para Construtoras (Documentação Completa para LLMs)')
+               .replace(/O FinObra é uma solução B2B/g, 'O FinGo é uma solução B2B')
+               .replace(/O FinGo \(FinObra\) é uma solução B2B/g, 'O FinGo é uma solução B2B')
+               .replace(/# FinObra — SaaS de Gestão/g, '# FinGo — Obras em Fluxo — SaaS de Gestão')
+               .replace(/> FinObra é uma plataforma/g, '> FinGo é uma plataforma');
+    return new Response(text, {
+      status: 200,
+      headers: {
+        'Content-Type': 'text/plain; charset=utf-8',
+        'Cache-Control': 'public, max-age=0, must-revalidate',
+        'CDN-Cache-Control': 'no-store',
+        'Cloudflare-CDN-Cache-Control': 'no-store',
+        'X-Content-Type-Options': 'nosniff'
+      }
+    });
+  }
+
   const securedResponse = secureHtmlResponse(assetResponse);
   if (!routeName) return securedResponse;
 
