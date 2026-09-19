@@ -372,6 +372,53 @@ const BIMIFCExtendedImporter = (function() {
       // Difference therefore keeps the positive side. FALSE keeps the negative side.
       return clipTrianglesByPlane(triangles,planeBasis,agreement);
     };
+    const pointList2D=id=>{
+      const e=entities.get(id); if(!e||e.type!=='IFCCARTESIANPOINTLIST2D') return [];
+      return [...String(e.args[0]||'').matchAll(/\(([-+0-9Ee.,\s]+)\)/g)].map(m=>{
+        const v=m[1].split(',').map(x=>Number(x.trim()));
+        return {x:v[0]||0,y:v[1]||0};
+      }).filter(p=>Number.isFinite(p.x)&&Number.isFinite(p.y));
+    };
+    const boundedCurve2D=id=>{
+      const e=entities.get(id); if(!e) return [];
+      if(e.type==='IFCPOLYLINE'){
+        const pts=refsIn(e.args[0]).map(point).map(p=>({x:p.x,y:p.y}));
+        if(pts.length>2&&Math.hypot(pts[0].x-pts[pts.length-1].x,pts[0].y-pts[pts.length-1].y)<1e-9) pts.pop();
+        return pts;
+      }
+      if(e.type==='IFCINDEXEDPOLYCURVE'){
+        const pts=pointList2D(refOf(e.args[0]));
+        if(pts.length>2&&Math.hypot(pts[0].x-pts[pts.length-1].x,pts[0].y-pts[pts.length-1].y)<1e-9) pts.pop();
+        return pts;
+      }
+      return [];
+    };
+    const prismFromBoundary=(poly,positionBasis,subjectTriangles)=>{
+      if(poly.length<3) return [];
+      let maxZ=0;
+      for(const tri of subjectTriangles) for(const p of tri) maxZ=Math.max(maxZ,basisToLocal(positionBasis,p).z);
+      const depth=Math.max(1,maxZ+Math.max(1,Math.abs(maxZ)*0.25));
+      const bottom=poly.map(p=>applyBasis(positionBasis,{x:p.x,y:p.y,z:0}));
+      const top=poly.map(p=>applyBasis(positionBasis,{x:p.x,y:p.y,z:depth}));
+      const out=[];
+      triangulate2D(poly).forEach(([a,b,c])=>{out.push([bottom[a],bottom[c],bottom[b]],[top[a],top[b],top[c]]);});
+      for(let i=0;i<poly.length;i++){const j=(i+1)%poly.length;out.push([bottom[i],bottom[j],top[j]],[bottom[i],top[j],top[i]]);}
+      return out;
+    };
+    const polygonalHalfSpaceDifference=(triangles,halfSpaceId,basis)=>{
+      const hs=entities.get(halfSpaceId);
+      if(!hs||hs.type!=='IFCPOLYGONALBOUNDEDHALFSPACE'||typeof BIMCSG==='undefined') return null;
+      const surface=entities.get(refOf(hs.args[0])); if(!surface||surface.type!=='IFCPLANE') return null;
+      const positionBasis=composeBasis(basis,axis3(refOf(hs.args[2])));
+      const poly=boundedCurve2D(refOf(hs.args[3])); if(poly.length<3) return null;
+      let cutter=prismFromBoundary(poly,positionBasis,triangles); if(!cutter.length) return null;
+      const planeBasis=composeBasis(basis,axis3(refOf(surface.args[0])));
+      const agreement=/\.T\./i.test(String(hs.args[1]||''));
+      // Material half-space: TRUE => lado negativo; FALSE => lado positivo.
+      cutter=clipTrianglesByPlane(cutter,planeBasis,!agreement);
+      if(!cutter.length) return triangles;
+      return BIMCSG.subtract(triangles,cutter);
+    };
     const exactBooleanIds=new Set();
     const partialBooleanIds=new Set();
     const representation=(id,basis,depth=0)=>{
@@ -391,11 +438,17 @@ const BIMIFCExtendedImporter = (function() {
         const firstId=refOf(e.args[1]),secondId=refOf(e.args[2]);
         const first=representation(firstId,basis,depth+1);
         const secondEntity=entities.get(secondId);
-        if(first.length&&operator.includes('DIFFERENCE')&&['IFCHALFSPACESOLID','IFCBOXEDHALFSPACE'].includes(secondEntity?.type)){
-          const clipped=halfSpaceDifference(first,secondId,basis);
-          if(clipped&&clipped.length){
-            exactBooleanIds.add(e.id);
-            return clipped;
+        if(first.length&&operator.includes('DIFFERENCE')&&['IFCHALFSPACESOLID','IFCBOXEDHALFSPACE','IFCPOLYGONALBOUNDEDHALFSPACE'].includes(secondEntity?.type)){
+          try{
+            const clipped=secondEntity.type==='IFCPOLYGONALBOUNDEDHALFSPACE'
+              ? polygonalHalfSpaceDifference(first,secondId,basis)
+              : halfSpaceDifference(first,secondId,basis);
+            if(clipped&&clipped.length){
+              exactBooleanIds.add(e.id);
+              return clipped;
+            }
+          }catch(err){
+            console.warn('[FinGo BIM] half-space IFC caiu para geometria parcial:',err?.message||err);
           }
           partialBooleanIds.add(e.id);
           return first;
@@ -486,9 +539,9 @@ const BIMIFCExtendedImporter = (function() {
       const swept=descendants(reprId,new Set(['IFCEXTRUDEDAREASOLID'])).length>0;
       const sweptDisk=descendants(reprId,new Set(['IFCSWEPTDISKSOLID'])).length>0;
       const booleanIds=descendants(reprId,new Set(['IFCBOOLEANCLIPPINGRESULT','IFCBOOLEANRESULT','IFCCSGSOLID']));
-      const unsupportedBoundedHalfSpace=descendants(reprId,new Set(['IFCPOLYGONALBOUNDEDHALFSPACE'])).length>0;
+      const boundedHalfSpaces=descendants(reprId,new Set(['IFCPOLYGONALBOUNDEDHALFSPACE']));
       const faceVoids=descendants(reprId,new Set(['IFCINDEXEDPOLYGONALFACEWITHVOIDS'])).length>0;
-      const booleanPartial=unsupportedBoundedHalfSpace||booleanIds.some(id=>partialBooleanIds.has(id));
+      const booleanPartial=booleanIds.some(id=>partialBooleanIds.has(id));
       const booleanExact=booleanIds.length>0&&!booleanPartial&&booleanIds.every(id=>exactBooleanIds.has(id));
 
       let openingExact=true,openingSubtractions=0;
@@ -518,7 +571,7 @@ const BIMIFCExtendedImporter = (function() {
           format:'IFC',ifcClass:e.type,globalId,stepId:e.id,storeyId:storey?.id||null,storeyName:storey?.name||null,storeyElevation:storey?.elevation??null,
           psets:psets.get(e.id)||{},geometryKinds:kinds,geometryQuality:partial?'partial':(kinds.join('+')||'supported'),
           openingCount:openings.length,openingSubtractions,booleanExact,
-          partialReason:booleanPartial?(unsupportedBoundedHalfSpace?'polygonal-bounded-halfspace-not-supported':'boolean-or-csg-operand-not-supported'):faceVoids?'polygon-face-voids-not-supported':(openings.length&&!openingExact)?'opening-subtraction-failed':null,
+          partialReason:booleanPartial?(boundedHalfSpaces.length?'polygonal-bounded-halfspace-curve-not-supported':'boolean-or-csg-operand-not-supported'):faceVoids?'polygon-face-voids-not-supported':(openings.length&&!openingExact)?'opening-subtraction-failed':null,
           clashEligible:!partial
         }
       });
