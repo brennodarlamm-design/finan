@@ -66,6 +66,10 @@ Antes de codificar, classifique a fonte:
 - Separar explicitamente `advancedBrepTopology` de `advancedBrepGeometry`: shell combinatoriamente válido pode continuar renderizável, mas qualquer inconsistência geométrica deve forçar `clashEligible=false`.
 - Para auto-interseção, usar broad phase por AABB e teste narrow phase triângulo/segmento apenas entre faces que não compartilham vértices topológicos; contato legítimo em arestas/vértices adjacentes não deve ser confundido com interseção própria.
 - A validação geométrica de AdvancedBrep tem orçamento computacional finito; se o orçamento de pares de triângulos for excedido, rebaixar para parcial em vez de travar o navegador ou assumir validade.
+- Em AdvancedBrep fechado, contatos legítimos só pela borda são permitidos; interseção de interiores entre faces adjacentes ou não adjacentes invalida a geometria.
+- Faces coplanares distintas não podem ter sobreposição de área positiva; compartilhar somente uma aresta ou vértice continua permitido.
+- Calcular volume do shell com origem local deslocada e tolerâncias baseadas na extensão local, nunca na distância absoluta ao zero global; isso evita falsos positivos em modelos georreferenciados/UTM.
+- Volume geométrico praticamente nulo invalida o shell para clash. O sinal do volume pode ser registrado como winding global, mas não deve ser apresentado como substituto de validação normativa IFC.
 
 ## Workflow
 
