@@ -94,6 +94,9 @@ Antes de codificar, classifique a fonte:
 - histórico de versão preservado;
 - testes do BIM verdes;
 - em pull requests que alterem BIM, o workflow `.github/workflows/bim-pr-validation.yml` deve validar regressões BIM, suíte estática, sintaxe e build Cloudflare sem executar deploy;
-- preview Vercel READY;
+- QA obrigatório com fixtures IFC reais da buildingSMART verde (`npm run test:bim-real`);
+- artifact `bim-real-qa-report` gerado no GitHub Actions;
+- para releases BIM relevantes, executar também o workflow manual `BIM large real-model QA` e revisar tempo, triângulos e memória;
+- preview Vercel READY quando a cota permitir; `build-rate-limit` deve ser registrado separadamente de falha de código;
 - Security Regression e Cloudflare build verdes;
 - nenhuma alteração de produção sem aprovação.
