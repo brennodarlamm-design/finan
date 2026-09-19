@@ -146,16 +146,35 @@ jobs:
             return 1
           }
 
-          retry_body_contains             'edge health metadata'             'https://fingo.api.br/__finobra/health'             '"ok":true'             '"securityMode":"nonce-csp"'             '"loopRisk":false'             '"deploymentMetadataOk":true'             "\"commit\":\"$GITHUB_SHA\""
+          retry_body_contains \
+            'edge health metadata' \
+            'https://fingo.api.br/__finobra/health' \
+            '"ok":true' \
+            '"securityMode":"nonce-csp"' \
+            '"loopRisk":false' \
+            '"deploymentMetadataOk":true' \
+            "\"commit\":\"$GITHUB_SHA\""
           health="$RETRY_BODY"
 
-          retry_body_contains             'version metadata'             'https://fingo.api.br/version.json'             "\"commit\":\"$GITHUB_SHA\""             '"source":"github-actions"'
+          retry_body_contains \
+            'version metadata' \
+            'https://fingo.api.br/version.json' \
+            "\"commit\":\"$GITHUB_SHA\"" \
+            '"source":"github-actions"'
           version="$RETRY_BODY"
 
-          retry_body_contains             'Edge API health'             'https://fingo.api.br/api/v2/system/health'             '"ok":true'             '"service":"fingo-edge-v2"'             '"runtime":"cloudflare-workers"'
+          retry_body_contains \
+            'Edge API health' \
+            'https://fingo.api.br/api/v2/system/health' \
+            '"ok":true' \
+            '"service":"fingo-edge-v2"' \
+            '"runtime":"cloudflare-workers"'
           edge_api_health="$RETRY_BODY"
 
-          retry_status_equals             'unauthenticated auth contract'             'https://fingo.api.br/api/auth?action=me'             '401'
+          retry_status_equals \
+            'unauthenticated auth contract' \
+            'https://fingo.api.br/api/auth?action=me' \
+            '401'
           auth_status="$RETRY_STATUS"
 
           check_route() {
