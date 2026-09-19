@@ -293,7 +293,103 @@ const BIMIFCExtendedImporter = (function() {
     };
     const axis1=id=>{
       const e=entities.get(id); if(!e||e.type!=='IFCAXIS1PLACEMENT') return {origin:{x:0,y:0,z:0},axis:{x:0,y:0,z:1}};
-      return {origin:point(refOf(e.args[0])),axis:e.args[1]&&e.args[1]!=='    const pointListAny=id=>{
+      return {origin:point(refOf(e.args[0])),axis:e.args[1]&&e.args[1]!=='$'?direction(refOf(e.args[1])):{x:0,y:0,z:1}};
+    };
+    const revolvedAreaSolid=(id,basis)=>{
+      const e=entities.get(id); if(!e||e.type!=='IFCREVOLVEDAREASOLID') return [];
+      const poly=profilePolygon(refOf(e.args[0])),position=axis3(refOf(e.args[1])),axis=axis1(refOf(e.args[2])),angle=Math.abs(num(e.args[3]));
+      if(!poly||poly.length<3||angle<=1e-9) return [];
+      const sweep=Math.min(Math.PI*2,angle),segments=Math.max(8,Math.min(96,Math.ceil(sweep/(Math.PI/24))));
+      const rings=[];
+      for(let s=0;s<=segments;s++){
+        const a=sweep*(s/segments);
+        rings.push(poly.map(p=>{
+          const local=rotateAroundAxis({x:p.x,y:p.y,z:0},axis.origin,axis.axis,a);
+          return applyBasis(basis,applyBasis(position,local));
+        }));
+      }
+      const out=[];
+      for(let s=0;s<segments;s++){
+        const r0=rings[s],r1=rings[s+1];
+        for(let i=0;i<poly.length;i++){
+          const j=(i+1)%poly.length;
+          out.push([r0[i],r0[j],r1[j]],[r0[i],r1[j],r1[i]]);
+        }
+      }
+      if(sweep<Math.PI*2-1e-6){
+        const caps=triangulate2D(poly);
+        caps.forEach(([a,b,c])=>{
+          out.push([rings[0][a],rings[0][c],rings[0][b]]);
+          out.push([rings[segments][a],rings[segments][b],rings[segments][c]]);
+        });
+      }
+      return out;
+    };
+    const localBoxTriangles=(w,d,h)=>{
+      const v=[
+        {x:0,y:0,z:0},{x:w,y:0,z:0},{x:w,y:d,z:0},{x:0,y:d,z:0},
+        {x:0,y:0,z:h},{x:w,y:0,z:h},{x:w,y:d,z:h},{x:0,y:d,z:h}
+      ];
+      const f=[[0,2,1],[0,3,2],[4,5,6],[4,6,7],[0,1,5],[0,5,4],[1,2,6],[1,6,5],[2,3,7],[2,7,6],[3,0,4],[3,4,7]];
+      return f.map(t=>t.map(i=>v[i]));
+    };
+    const csgPrimitive=(id,basis)=>{
+      const e=entities.get(id); if(!e) return [];
+      const position=composeBasis(basis,axis3(refOf(e.args[0])));
+      if(e.type==='IFCBLOCK'){
+        const x=num(e.args[1]),y=num(e.args[2]),z=num(e.args[3]);
+        if(x<=0||y<=0||z<=0) return [];
+        return localBoxTriangles(x,y,z).map(tri=>tri.map(p=>applyBasis(position,p)));
+      }
+      if(e.type==='IFCRIGHTCIRCULARCYLINDER'||e.type==='IFCRIGHTCIRCULARCONE'){
+        const height=num(e.args[1]),radius=num(e.args[2]);
+        if(height<=0||radius<=0) return [];
+        const topRadius=e.type==='IFCRIGHTCIRCULARCONE'?0:radius,sides=24,out=[],bottom=[],top=[];
+        for(let i=0;i<sides;i++){
+          const a=Math.PI*2*i/sides;
+          bottom.push(applyBasis(position,{x:Math.cos(a)*radius,y:Math.sin(a)*radius,z:0}));
+          top.push(applyBasis(position,{x:Math.cos(a)*topRadius,y:Math.sin(a)*topRadius,z:height}));
+        }
+        const cb=applyBasis(position,{x:0,y:0,z:0}),ct=applyBasis(position,{x:0,y:0,z:height});
+        for(let i=0;i<sides;i++){
+          const j=(i+1)%sides;
+          out.push([cb,bottom[j],bottom[i]]);
+          if(topRadius>1e-9){
+            out.push([ct,top[i],top[j]],[bottom[i],bottom[j],top[j]],[bottom[i],top[j],top[i]]);
+          }else{
+            out.push([bottom[i],bottom[j],ct]);
+          }
+        }
+        return out;
+      }
+      if(e.type==='IFCRECTANGULARPYRAMID'){
+        const x=num(e.args[1]),y=num(e.args[2]),h=num(e.args[3]);
+        if(x<=0||y<=0||h<=0) return [];
+        const p=[
+          applyBasis(position,{x:0,y:0,z:0}),applyBasis(position,{x:x,y:0,z:0}),
+          applyBasis(position,{x:x,y:y,z:0}),applyBasis(position,{x:0,y:y,z:0}),
+          applyBasis(position,{x:x/2,y:y/2,z:h})
+        ];
+        return [[p[0],p[2],p[1]],[p[0],p[3],p[2]],[p[0],p[1],p[4]],[p[1],p[2],p[4]],[p[2],p[3],p[4]],[p[3],p[0],p[4]]];
+      }
+      if(e.type==='IFCSPHERE'){
+        const radius=num(e.args[1]); if(radius<=0) return [];
+        const lat=12,lon=24,out=[];
+        for(let i=0;i<lat;i++){
+          const a0=-Math.PI/2+Math.PI*i/lat,a1=-Math.PI/2+Math.PI*(i+1)/lat;
+          for(let j=0;j<lon;j++){
+            const b0=Math.PI*2*j/lon,b1=Math.PI*2*(j+1)/lon;
+            const p=(a,b)=>applyBasis(position,{x:Math.cos(a)*Math.cos(b)*radius,y:Math.cos(a)*Math.sin(b)*radius,z:Math.sin(a)*radius});
+            const p00=p(a0,b0),p01=p(a0,b1),p10=p(a1,b0),p11=p(a1,b1);
+            if(i>0) out.push([p00,p10,p11]);
+            if(i<lat-1) out.push([p00,p11,p01]);
+          }
+        }
+        return out;
+      }
+      return [];
+    };
+    const pointListAny=id=>{
       const e=entities.get(id); if(!e||!['IFCCARTESIANPOINTLIST3D','IFCCARTESIANPOINTLIST2D'].includes(e.type)) return [];
       return [...String(e.args[0]||'').matchAll(/\(([-+0-9Ee.,\s]+)\)/g)].map(m=>{
         const v=m[1].split(',').map(x=>Number(x.trim()));
@@ -864,678 +960,6 @@ const BIMIFCExtendedImporter = (function() {
       });
     }
     if(!elements.length) throw new Error('IFC válido, mas sem geometria compatível com SweptSolid, RevolvedAreaSolid, SweptDiskSolid, CSG primitives, MappedItem, FacetedBrep ou TessellatedFaceSet.');
-    const schema=src.match(/FILE_SCHEMA\s*\(\s*\(\s*'([^']+)'/i)?.[1]||'IFC';
-    const si=[...entities.values()].find(e=>e.type==='IFCSIUNIT'&&/LENGTHUNIT/.test(e.raw));
-    const sourceLengthUnit=si?(String(si.raw).match(/\.(MILLI|CENTI|DECI|KILO)?\.,\.METRE\./i)?.[1]||'METRE').toLowerCase():'unknown';
-    return {elements,metadata:{schema,geometryKinds:Array.from(geometryKinds),curveKinds:Array.from(exactCurveKinds),storeys:Array.from(storeys.values()),partialElements,clashEligible:partialElements===0,sourceElementCount:elements.length,sourceLengthUnit,geometryQuality:partialElements?'partial':'supported',csgEngine:typeof BIMCSG!=='undefined'?'bsp':'unavailable'}};
-  }
-  return {parse};
-})();
-
-if (typeof window !== 'undefined') window.BIMIFCExtendedImporter = BIMIFCExtendedImporter;
-?direction(refOf(e.args[1])):{x:0,y:0,z:1}};
-    };
-    const revolvedAreaSolid=(id,basis)=>{
-      const e=entities.get(id); if(!e||e.type!=='IFCREVOLVEDAREASOLID') return [];
-      const poly=profilePolygon(refOf(e.args[0])),position=axis3(refOf(e.args[1])),axis=axis1(refOf(e.args[2])),angle=Math.abs(num(e.args[3]));
-      if(!poly||poly.length<3||angle<=1e-9) return [];
-      const sweep=Math.min(Math.PI*2,angle),segments=Math.max(8,Math.min(96,Math.ceil(sweep/(Math.PI/24))));
-      const rings=[];
-      for(let s=0;s<=segments;s++){
-        const a=sweep*(s/segments);
-        rings.push(poly.map(p=>{
-          const local=rotateAroundAxis({x:p.x,y:p.y,z:0},axis.origin,axis.axis,a);
-          return applyBasis(basis,applyBasis(position,local));
-        }));
-      }
-      const out=[];
-      for(let s=0;s<segments;s++){
-        const r0=rings[s],r1=rings[s+1];
-        for(let i=0;i<poly.length;i++){
-          const j=(i+1)%poly.length;
-          out.push([r0[i],r0[j],r1[j]],[r0[i],r1[j],r1[i]]);
-        }
-      }
-      if(sweep<Math.PI*2-1e-6){
-        const caps=triangulate2D(poly);
-        caps.forEach(([a,b,c])=>{
-          out.push([rings[0][a],rings[0][c],rings[0][b]]);
-          out.push([rings[segments][a],rings[segments][b],rings[segments][c]]);
-        });
-      }
-      return out;
-    };
-    const localBoxTriangles=(w,d,h)=>{
-      const v=[
-        {x:0,y:0,z:0},{x:w,y:0,z:0},{x:w,y:d,z:0},{x:0,y:d,z:0},
-        {x:0,y:0,z:h},{x:w,y:0,z:h},{x:w,y:d,z:h},{x:0,y:d,z:h}
-      ];
-      const f=[[0,2,1],[0,3,2],[4,5,6],[4,6,7],[0,1,5],[0,5,4],[1,2,6],[1,6,5],[2,3,7],[2,7,6],[3,0,4],[3,4,7]];
-      return f.map(t=>t.map(i=>v[i]));
-    };
-    const csgPrimitive=(id,basis)=>{
-      const e=entities.get(id); if(!e) return [];
-      const position=composeBasis(basis,axis3(refOf(e.args[0])));
-      if(e.type==='IFCBLOCK'){
-        const x=num(e.args[1]),y=num(e.args[2]),z=num(e.args[3]);
-        if(x<=0||y<=0||z<=0) return [];
-        return localBoxTriangles(x,y,z).map(tri=>tri.map(p=>applyBasis(position,p)));
-      }
-      if(e.type==='IFCRIGHTCIRCULARCYLINDER'||e.type==='IFCRIGHTCIRCULARCONE'){
-        const height=num(e.args[1]),radius=num(e.args[2]);
-        if(height<=0||radius<=0) return [];
-        const topRadius=e.type==='IFCRIGHTCIRCULARCONE'?0:radius,sides=24,out=[],bottom=[],top=[];
-        for(let i=0;i<sides;i++){
-          const a=Math.PI*2*i/sides;
-          bottom.push(applyBasis(position,{x:Math.cos(a)*radius,y:Math.sin(a)*radius,z:0}));
-          top.push(applyBasis(position,{x:Math.cos(a)*topRadius,y:Math.sin(a)*topRadius,z:height}));
-        }
-        const cb=applyBasis(position,{x:0,y:0,z:0}),ct=applyBasis(position,{x:0,y:0,z:height});
-        for(let i=0;i<sides;i++){
-          const j=(i+1)%sides;
-          out.push([cb,bottom[j],bottom[i]]);
-          if(topRadius>1e-9){
-            out.push([ct,top[i],top[j]],[bottom[i],bottom[j],top[j]],[bottom[i],top[j],top[i]]);
-          }else{
-            out.push([bottom[i],bottom[j],ct]);
-          }
-        }
-        return out;
-      }
-      if(e.type==='IFCRECTANGULARPYRAMID'){
-        const x=num(e.args[1]),y=num(e.args[2]),h=num(e.args[3]);
-        if(x<=0||y<=0||h<=0) return [];
-        const p=[
-          applyBasis(position,{x:0,y:0,z:0}),applyBasis(position,{x:x,y:0,z:0}),
-          applyBasis(position,{x:x,y:y,z:0}),applyBasis(position,{x:0,y:y,z:0}),
-          applyBasis(position,{x:x/2,y:y/2,z:h})
-        ];
-        return [[p[0],p[2],p[1]],[p[0],p[3],p[2]],[p[0],p[1],p[4]],[p[1],p[2],p[4]],[p[2],p[3],p[4]],[p[3],p[0],p[4]]];
-      }
-      if(e.type==='IFCSPHERE'){
-        const radius=num(e.args[1]); if(radius<=0) return [];
-        const lat=12,lon=24,out=[];
-        for(let i=0;i<lat;i++){
-          const a0=-Math.PI/2+Math.PI*i/lat,a1=-Math.PI/2+Math.PI*(i+1)/lat;
-          for(let j=0;j<lon;j++){
-            const b0=Math.PI*2*j/lon,b1=Math.PI*2*(j+1)/lon;
-            const p=(a,b)=>applyBasis(position,{x:Math.cos(a)*Math.cos(b)*radius,y:Math.cos(a)*Math.sin(b)*radius,z:Math.sin(a)*radius});
-            const p00=p(a0,b0),p01=p(a0,b1),p10=p(a1,b0),p11=p(a1,b1);
-            if(i>0) out.push([p00,p10,p11]);
-            if(i<lat-1) out.push([p00,p11,p01]);
-          }
-        }
-        return out;
-      }
-      return [];
-    };
-    const pointListAny=id=>{
-      const e=entities.get(id); if(!e||!['IFCCARTESIANPOINTLIST3D','IFCCARTESIANPOINTLIST2D'].includes(e.type)) return [];
-      return [...String(e.args[0]||'').matchAll(/\(([-+0-9Ee.,\s]+)\)/g)].map(m=>{
-        const v=m[1].split(',').map(x=>Number(x.trim()));
-        return {x:v[0]||0,y:v[1]||0,z:v[2]||0};
-      }).filter(p=>[p.x,p.y,p.z].every(Number.isFinite));
-    };
-    const pointList3D=id=>entities.get(id)?.type==='IFCCARTESIANPOINTLIST3D'?pointListAny(id):[];
-    const partialCurveIds=new Set();
-    const exactCurveKinds=new Set();
-    const appendPoints=(target,pts)=>{
-      for(const p of pts||[]){
-        const last=target[target.length-1];
-        if(!last||Math.hypot(last.x-p.x,last.y-p.y,last.z-p.z)>1e-8) target.push(p);
-      }
-      return target;
-    };
-    const sampleArc3D=(p1,p2,p3)=>{
-      const a=sub(p2,p1),b=sub(p3,p1),axb=cross(a,b),den=2*(axb.x*axb.x+axb.y*axb.y+axb.z*axb.z);
-      if(Math.abs(den)<1e-12) return [p1,p3];
-      const aa=a.x*a.x+a.y*a.y+a.z*a.z,bb=b.x*b.x+b.y*b.y+b.z*b.z;
-      const center=add(p1,mul(add(mul(cross(b,axb),aa),mul(cross(axb,a),bb)),1/den));
-      const normal=norm(axb,{x:0,y:0,z:1}),u=norm(sub(p1,center),{x:1,y:0,z:0}),v=norm(cross(normal,u),{x:0,y:1,z:0});
-      const angle=p=>Math.atan2((p.x-center.x)*v.x+(p.y-center.y)*v.y+(p.z-center.z)*v.z,(p.x-center.x)*u.x+(p.y-center.y)*u.y+(p.z-center.z)*u.z);
-      const normPos=x=>{let y=x%(Math.PI*2);if(y<0)y+=Math.PI*2;return y;};
-      const midPos=normPos(angle(p2)),endPos=normPos(angle(p3));
-      let sweep=(midPos>1e-8&&midPos<endPos-1e-8)?endPos:(endPos-Math.PI*2);
-      if(Math.abs(sweep)<1e-8) sweep=Math.PI*2;
-      const radius=Math.hypot(p1.x-center.x,p1.y-center.y,p1.z-center.z);
-      const segments=Math.max(4,Math.min(48,Math.ceil(Math.abs(sweep)/(Math.PI/18))));
-      const out=[];
-      for(let i=0;i<=segments;i++){
-        const ang=sweep*(i/segments);
-        out.push(add(center,add(mul(u,Math.cos(ang)*radius),mul(v,Math.sin(ang)*radius))));
-      }
-      return out;
-    };
-    const curveBasis=id=>{
-      const e=entities.get(id); if(!e) return identityBasis();
-      if(e.type==='IFCAXIS2PLACEMENT3D') return axis3(id);
-      if(e.type==='IFCAXIS2PLACEMENT2D'){
-        const a=axis2(id);
-        return {origin:{x:a.origin.x,y:a.origin.y,z:0},x:{x:a.x.x,y:a.x.y,z:0},y:{x:a.y.x,y:a.y.y,z:0},z:{x:0,y:0,z:1}};
-      }
-      return identityBasis();
-    };
-    const localInBasis=(b,p)=>{
-      const q=sub(p,b.origin);
-      return {x:q.x*b.x.x+q.y*b.x.y+q.z*b.x.z,y:q.x*b.y.x+q.y*b.y.y+q.z*b.y.z,z:q.x*b.z.x+q.y*b.z.y+q.z*b.z.z};
-    };
-    const sampleConic=(entity,start=0,sweep=Math.PI*2,close=false)=>{
-      const pos=curveBasis(refOf(entity.args[0])),rx=num(entity.args[1]),ry=entity.type==='IFCELLIPSE'?num(entity.args[2]):rx;
-      if(rx<=0||ry<=0) return [];
-      const segments=Math.max(8,Math.min(96,Math.ceil(Math.abs(sweep)/(Math.PI/24))));
-      const out=[];
-      for(let i=0;i<=segments;i++){
-        const t=start+sweep*(i/segments);
-        out.push(applyBasis(pos,{x:Math.cos(t)*rx,y:Math.sin(t)*ry,z:0}));
-      }
-      if(close&&out.length&&Math.hypot(out[0].x-out[out.length-1].x,out[0].y-out[out.length-1].y,out[0].z-out[out.length-1].z)>1e-8) out.push({...out[0]});
-      return out;
-    };
-    const trimAngle=(token,entity)=>{
-      const pos=curveBasis(refOf(entity.args[0])),rx=num(entity.args[1]),ry=entity.type==='IFCELLIPSE'?num(entity.args[2]):rx;
-      const pid=refsIn(token)[0];
-      if(pid&&entities.get(pid)?.type==='IFCCARTESIANPOINT'){
-        const p=localInBasis(pos,point(pid));
-        return Math.atan2(p.y/(ry||1),p.x/(rx||1));
-      }
-      const m=String(token||'').match(/[-+]?\d*\.?\d+(?:[Ee][-+]?\d+)?/);
-      return m?Number(m[0]):null;
-    };
-    const indexedPolyCurvePoints=e=>{
-      const pts=pointListAny(refOf(e.args[0])); if(!pts.length) return [];
-      const segText=String(e.args[1]||'');
-      if(!segText||segText==='$') return pts;
-      const out=[]; let matched=0;
-      const re=/IFC(LINE|ARC)INDEX\s*\(\s*\(([^)]*)\)\s*\)/gi; let m;
-      while((m=re.exec(segText))){
-        matched++;
-        const idx=m[2].split(',').map(x=>Number(x.trim())-1).filter(Number.isInteger);
-        if(m[1].toUpperCase()==='LINE') appendPoints(out,idx.map(i=>pts[i]).filter(Boolean));
-        else if(idx.length===3&&idx.every(i=>pts[i])){appendPoints(out,sampleArc3D(pts[idx[0]],pts[idx[1]],pts[idx[2]]));exactCurveKinds.add('indexed-arc');}
-        else partialCurveIds.add(e.id);
-      }
-      if(!matched){partialCurveIds.add(e.id);return pts;}
-      exactCurveKinds.add('indexed-polycurve');
-      return out;
-    };
-    const numberList=token=>[...String(token||'').matchAll(/[-+]?\d*\.?\d+(?:[Ee][-+]?\d+)?/g)].map(m=>Number(m[0])).filter(Number.isFinite);
-    const bsplineCurvePoints=e=>{
-      const degree=Math.trunc(num(e.args[0]));
-      const controlIds=refsIn(e.args[1]||'');
-      const controls=controlIds.map(point);
-      if(degree<1||controls.length<degree+1){partialCurveIds.add(e.id);return [];}
-
-      const withKnots=/BSPLINECURVEWITHKNOTS/.test(e.type);
-      const rational=/RATIONALBSPLINECURVEWITHKNOTS/.test(e.type);
-      let knotVector=[];
-      if(withKnots){
-        const multiplicities=numberList(e.args[5]);
-        const knots=numberList(e.args[6]);
-        if(!multiplicities.length||multiplicities.length!==knots.length){partialCurveIds.add(e.id);return [];}
-        for(let i=0;i<knots.length;i++){
-          const count=Math.max(0,Math.trunc(multiplicities[i]));
-          for(let k=0;k<count;k++) knotVector.push(knots[i]);
-        }
-      }
-      if(!knotVector.length){
-        partialCurveIds.add(e.id);
-        return [];
-      }
-      if(knotVector.length!==controls.length+degree+1){
-        partialCurveIds.add(e.id);
-        return [];
-      }
-
-      const weights=rational?numberList(e.args[8]):controls.map(()=>1);
-      if(weights.length!==controls.length||weights.some(w=>!Number.isFinite(w)||w<=0)){partialCurveIds.add(e.id);return [];}
-
-      const n=controls.length-1;
-      const uMin=knotVector[degree],uMax=knotVector[n+1];
-      if(!Number.isFinite(uMin)||!Number.isFinite(uMax)||uMax-uMin<=1e-12){partialCurveIds.add(e.id);return [];}
-
-      const findSpan=u=>{
-        if(u>=knotVector[n+1]-1e-12) return n;
-        if(u<=knotVector[degree]+1e-12) return degree;
-        let low=degree,high=n+1,mid=Math.floor((low+high)/2);
-        while(u<knotVector[mid]||u>=knotVector[mid+1]){
-          if(u<knotVector[mid]) high=mid; else low=mid;
-          mid=Math.floor((low+high)/2);
-        }
-        return mid;
-      };
-      const basisFunctions=(span,u)=>{
-        const N=new Array(degree+1).fill(0),left=new Array(degree+1),right=new Array(degree+1);
-        N[0]=1;
-        for(let j=1;j<=degree;j++){
-          left[j]=u-knotVector[span+1-j];
-          right[j]=knotVector[span+j]-u;
-          let saved=0;
-          for(let r=0;r<j;r++){
-            const denom=right[r+1]+left[j-r];
-            const temp=Math.abs(denom)<1e-14?0:N[r]/denom;
-            N[r]=saved+right[r+1]*temp;
-            saved=left[j-r]*temp;
-          }
-          N[j]=saved;
-        }
-        return N;
-      };
-      const evaluate=u=>{
-        const span=findSpan(u),N=basisFunctions(span,u);
-        let x=0,y=0,z=0,w=0;
-        for(let j=0;j<=degree;j++){
-          const idx=span-degree+j,weight=weights[idx],b=N[j]*weight,p=controls[idx];
-          x+=p.x*b;y+=p.y*b;z+=p.z*b;w+=b;
-        }
-        return Math.abs(w)<1e-14?null:{x:x/w,y:y/w,z:z/w};
-      };
-
-      let nonZeroSpans=0;
-      for(let i=degree;i<=n;i++) if(knotVector[i+1]-knotVector[i]>1e-12) nonZeroSpans++;
-      const samples=Math.max(24,Math.min(128,nonZeroSpans*16));
-      const out=[];
-      for(let i=0;i<=samples;i++){
-        const u=i===samples?uMax:uMin+(uMax-uMin)*(i/samples);
-        const p=evaluate(u);
-        if(p) appendPoints(out,[p]);
-      }
-      if(out.length<2){partialCurveIds.add(e.id);return [];}
-      exactCurveKinds.add(rational?'nurbs-curve':'bspline-curve');
-      return out;
-    };
-
-    const curvePoints=(id,depth=0)=>{
-      if(!id||depth>20) return [];
-      const e=entities.get(id); if(!e) return [];
-      if(e.type==='IFCPOLYLINE') return refsIn(e.args[0]).map(point);
-      if(e.type==='IFCINDEXEDPOLYCURVE') return indexedPolyCurvePoints(e);
-      if(e.type==='IFCBSPLINECURVEWITHKNOTS'||e.type==='IFCRATIONALBSPLINECURVEWITHKNOTS') return bsplineCurvePoints(e);
-      if(e.type==='IFCCIRCLE'||e.type==='IFCELLIPSE'){exactCurveKinds.add(e.type==='IFCCIRCLE'?'circle':'ellipse');return sampleConic(e,0,Math.PI*2,true);}
-      if(e.type==='IFCTRIMMEDCURVE'){
-        const baseEntity=entities.get(refOf(e.args[0]));
-        if(!baseEntity||!['IFCCIRCLE','IFCELLIPSE'].includes(baseEntity.type)){partialCurveIds.add(e.id);return [];}
-        const a0=trimAngle(e.args[1],baseEntity),a1=trimAngle(e.args[2],baseEntity);
-        if(a0===null||a1===null){partialCurveIds.add(e.id);return [];}
-        const sense=/\.T\./i.test(String(e.args[3]||'')); let sweep=a1-a0;
-        if(sense&&sweep<=0)sweep+=Math.PI*2;if(!sense&&sweep>=0)sweep-=Math.PI*2;
-        exactCurveKinds.add('trimmed-conic');return sampleConic(baseEntity,a0,sweep,false);
-      }
-      if(e.type==='IFCCOMPOSITECURVESEGMENT'){
-        const parent=refOf(e.args[2]),sameSense=/\.T\./i.test(String(e.args[1]||'')); let pts=curvePoints(parent,depth+1);
-        if(partialCurveIds.has(parent))partialCurveIds.add(e.id);if(!sameSense)pts=[...pts].reverse();return pts;
-      }
-      if(e.type==='IFCCOMPOSITECURVE'){
-        const out=[],segments=refsIn(e.args[0]);
-        for(const segId of segments){const pts=curvePoints(segId,depth+1);if(!pts.length||partialCurveIds.has(segId))partialCurveIds.add(e.id);appendPoints(out,pts);}
-        if(out.length)exactCurveKinds.add('composite-curve');return out;
-      }
-      partialCurveIds.add(e.id);return [];
-    };
-    const sweptDiskSolid=(id,basis)=>{
-      const e=entities.get(id); if(!e||e.type!=='IFCSWEPTDISKSOLID') return [];
-      const path=curvePoints(refOf(e.args[0])),radius=num(e.args[1]);
-      if(path.length<2||radius<=0) return [];
-      const sides=12,out=[];
-      for(let s=0;s<path.length-1;s++){
-        const a=path[s],b=path[s+1],dir=norm(sub(b,a),{x:0,y:0,z:1});
-        const helper=Math.abs(dir.z)<.9?{x:0,y:0,z:1}:{x:0,y:1,z:0};
-        const u=norm(cross(dir,helper),{x:1,y:0,z:0});
-        const v=norm(cross(dir,u),{x:0,y:1,z:0});
-        const ringA=[],ringB=[];
-        for(let i=0;i<sides;i++){
-          const ang=(Math.PI*2*i)/sides,offset=add(mul(u,Math.cos(ang)*radius),mul(v,Math.sin(ang)*radius));
-          ringA.push(applyBasis(basis,add(a,offset)));
-          ringB.push(applyBasis(basis,add(b,offset)));
-        }
-        for(let i=0;i<sides;i++){
-          const j=(i+1)%sides;
-          out.push([ringA[i],ringA[j],ringB[j]],[ringA[i],ringB[j],ringB[i]]);
-        }
-        if(s===0){
-          const center=applyBasis(basis,a);
-          for(let i=0;i<sides;i++){const j=(i+1)%sides;out.push([center,ringA[j],ringA[i]]);}
-        }
-        if(s===path.length-2){
-          const center=applyBasis(basis,b);
-          for(let i=0;i<sides;i++){const j=(i+1)%sides;out.push([center,ringB[i],ringB[j]]);}
-        }
-      }
-      return out;
-    };
-    const facetedBrep=(id,basis)=>{
-      const brep=entities.get(id),shell=entities.get(refOf(brep?.args[0])); if(!brep||brep.type!=='IFCFACETEDBREP'||shell?.type!=='IFCCLOSEDSHELL') return [];
-      const out=[];
-      refsIn(shell.args[0]).forEach(faceId=>{
-        const face=entities.get(faceId); if(face?.type!=='IFCFACE') return;
-        const bounds=refsIn(face.args[0]),outer=bounds.map(x=>entities.get(x)).find(x=>x?.type==='IFCFACEOUTERBOUND')||entities.get(bounds[0]);
-        const loop=entities.get(refOf(outer?.args[0])); if(loop?.type!=='IFCPOLYLOOP') return;
-        polygon3D(refsIn(loop.args[0]).map(point)).forEach(tri=>out.push(tri.map(p=>applyBasis(basis,p))));
-      });
-      return out;
-    };
-    const partialFaceVoidIds=new Set();
-    const exactFaceVoidIds=new Set();
-    const indexedFaces=(id,basis)=>{
-      const e=entities.get(id); if(!e) return [];
-      if(e.type==='IFCTRIANGULATEDFACESET'){
-        const pts=pointList3D(refOf(e.args[0])); if(!pts.length) return [];
-        return [...String(e.args[3]||'').matchAll(/\((\s*\d+\s*,\s*\d+\s*,\s*\d+\s*)\)/g)]
-          .map(m=>m[1].split(',').map(v=>pts[Number(v.trim())-1])).filter(t=>t.every(Boolean)).map(t=>t.map(p=>applyBasis(basis,p)));
-      }
-      if(e.type==='IFCPOLYGONALFACESET'){
-        const pts=pointList3D(refOf(e.args[0])); if(!pts.length) return [];
-        const out=[];
-        refsIn(e.args[2]||'').forEach(faceId=>{
-          const face=entities.get(faceId); if(!face||!['IFCINDEXEDPOLYGONALFACE','IFCINDEXEDPOLYGONALFACEWITHVOIDS'].includes(face.type)) return;
-          const outerIdx=[...String(face.args[0]||'').matchAll(/\d+/g)].map(m=>Number(m[0])-1);
-          const outer=outerIdx.map(i=>pts[i]).filter(Boolean);
-          if(face.type==='IFCINDEXEDPOLYGONALFACE'){
-            polygon3D(outer).forEach(tri=>out.push(tri.map(p=>applyBasis(basis,p))));
-            return;
-          }
-          const holes=[...String(face.args[1]||'').matchAll(/\((\s*\d+(?:\s*,\s*\d+)+\s*)\)/g)]
-            .map(m=>m[1].split(',').map(v=>pts[Number(v.trim())-1]).filter(Boolean))
-            .filter(loop=>loop.length>=3);
-          const tris=polygon3DWithVoids(outer,holes);
-          if(!tris.length){partialFaceVoidIds.add(faceId);return;}
-          exactFaceVoidIds.add(faceId);
-          tris.forEach(tri=>out.push(tri.map(p=>applyBasis(basis,p))));
-        });
-        return out;
-      }
-      return [];
-    };
-    const basisToLocal=(b,p)=>{const q=sub(p,b.origin);return{x:q.x*b.x.x+q.y*b.x.y+q.z*b.x.z,y:q.x*b.y.x+q.y*b.y.y+q.z*b.y.z,z:q.x*b.z.x+q.y*b.z.y+q.z*b.z.z};};
-    const cartTransform=id=>{
-      const e=entities.get(id); if(!e||!/IFCCARTESIANTRANSFORMATIONOPERATOR(3D)?/.test(e.type)) return identityBasis();
-      const x=e.args[0]&&e.args[0]!=='$'?direction(refOf(e.args[0])):{x:1,y:0,z:0};
-      const y=e.args[1]&&e.args[1]!=='$'?direction(refOf(e.args[1])):{x:0,y:1,z:0};
-      const origin=point(refOf(e.args[2])),st=String(e.args[3]||'').trim(),scale=/[-+]?\d/.test(st)?num(st):1;
-      const z=e.args[4]&&e.args[4]!=='$'?direction(refOf(e.args[4])):norm(cross(x,y),{x:0,y:0,z:1});
-      return {origin,x:mul(norm(x,{x:1,y:0,z:0}),scale||1),y:mul(norm(y,{x:0,y:1,z:0}),scale||1),z:mul(norm(z,{x:0,y:0,z:1}),scale||1)};
-    };
-    const geometryTypes=new Set(['IFCPRODUCTDEFINITIONSHAPE','IFCSHAPEREPRESENTATION','IFCREPRESENTATIONMAP','IFCEXTRUDEDAREASOLID','IFCSWEPTDISKSOLID','IFCFACETEDBREP','IFCTRIANGULATEDFACESET','IFCPOLYGONALFACESET','IFCMAPPEDITEM','IFCBOOLEANCLIPPINGRESULT','IFCBOOLEANRESULT','IFCCSGSOLID']);
-    const clipTrianglesByPlane=(triangles,planeBasis,keepPositive)=>{
-      const eps=1e-7,normal=planeBasis.z,origin=planeBasis.origin,segments=[],out=[];
-      const signed=p=>(p.x-origin.x)*normal.x+(p.y-origin.y)*normal.y+(p.z-origin.z)*normal.z;
-      const inside=d=>keepPositive?d>=-eps:d<=eps;
-      const intersect=(a,b,da,db)=>{
-        const denom=da-db;
-        const t=Math.abs(denom)<eps?.5:da/denom;
-        return {x:a.x+(b.x-a.x)*t,y:a.y+(b.y-a.y)*t,z:a.z+(b.z-a.z)*t};
-      };
-      for(const tri of triangles){
-        let poly=tri.map(p=>({p,d:signed(p)})),clipped=[],cuts=[];
-        for(let i=0;i<poly.length;i++){
-          const cur=poly[i],next=poly[(i+1)%poly.length],ci=inside(cur.d),ni=inside(next.d);
-          if(ci&&ni) clipped.push(next);
-          else if(ci&&!ni){const p=intersect(cur.p,next.p,cur.d,next.d);clipped.push({p,d:0});cuts.push(p);}
-          else if(!ci&&ni){const p=intersect(cur.p,next.p,cur.d,next.d);clipped.push({p,d:0},next);cuts.push(p);}
-        }
-        if(clipped.length>=3){
-          const pts=clipped.map(x=>x.p);
-          for(let i=1;i<pts.length-1;i++) out.push([pts[0],pts[i],pts[i+1]]);
-        }
-        const unique=[];
-        for(const p of cuts){
-          if(!unique.some(q=>Math.hypot(p.x-q.x,p.y-q.y,p.z-q.z)<1e-6)) unique.push(p);
-        }
-        if(unique.length===2) segments.push(unique);
-      }
-
-      const key=p=>[p.x,p.y,p.z].map(v=>Math.round(v*1e6)).join(':');
-      const points=new Map(),adj=new Map();
-      const connect=(a,b)=>{
-        const ka=key(a),kb=key(b);points.set(ka,a);points.set(kb,b);
-        if(!adj.has(ka))adj.set(ka,new Set());if(!adj.has(kb))adj.set(kb,new Set());
-        adj.get(ka).add(kb);adj.get(kb).add(ka);
-      };
-      segments.forEach(([a,b])=>connect(a,b));
-      const visitedEdges=new Set(),loops=[];
-      for(const start of adj.keys()){
-        for(const first of adj.get(start)){
-          const edgeKey=[start,first].sort().join('|'); if(visitedEdges.has(edgeKey)) continue;
-          const loop=[start]; let prev=start,cur=first,guard=0;
-          visitedEdges.add(edgeKey);
-          while(guard++<10000){
-            loop.push(cur);
-            if(cur===start) break;
-            const nexts=[...(adj.get(cur)||[])].filter(n=>n!==prev);
-            if(!nexts.length) break;
-            const next=nexts.find(n=>!visitedEdges.has([cur,n].sort().join('|')))||nexts[0];
-            visitedEdges.add([cur,next].sort().join('|'));
-            prev=cur;cur=next;
-          }
-          if(loop.length>=4&&loop[loop.length-1]===start) loops.push(loop.slice(0,-1).map(k=>points.get(k)));
-        }
-      }
-
-      const desiredNormal=keepPositive?mul(normal,-1):normal;
-      for(const loop of loops){
-        const projected=loop.map(p=>({x:dot3(sub(p,origin),planeBasis.x),y:dot3(sub(p,origin),planeBasis.y)}));
-        const faces=triangulate2D(projected);
-        for(const [ia,ib,ic] of faces){
-          let tri=[loop[ia],loop[ib],loop[ic]];
-          const n=cross(sub(tri[1],tri[0]),sub(tri[2],tri[0]));
-          if(dot3(n,desiredNormal)<0) tri=[tri[0],tri[2],tri[1]];
-          out.push(tri);
-        }
-      }
-      return out;
-    };
-    const dot3=(a,b)=>a.x*b.x+a.y*b.y+a.z*b.z;
-    const halfSpaceDifference=(triangles,halfSpaceId,basis)=>{
-      const hs=entities.get(halfSpaceId);
-      if(!hs||!['IFCHALFSPACESOLID','IFCBOXEDHALFSPACE'].includes(hs.type)) return null;
-      const surface=entities.get(refOf(hs.args[0]));
-      if(!surface||surface.type!=='IFCPLANE') return null;
-      const planeBasis=composeBasis(basis,axis3(refOf(surface.args[0])));
-      const agreement=/\.T\./i.test(String(hs.args[1]||''));
-      // If agreement is TRUE, the half-space material is opposite the plane normal.
-      // Difference therefore keeps the positive side. FALSE keeps the negative side.
-      return clipTrianglesByPlane(triangles,planeBasis,agreement);
-    };
-    const pointList2D=id=>{
-      const e=entities.get(id); if(!e||e.type!=='IFCCARTESIANPOINTLIST2D') return [];
-      return [...String(e.args[0]||'').matchAll(/\(([-+0-9Ee.,\s]+)\)/g)].map(m=>{
-        const v=m[1].split(',').map(x=>Number(x.trim()));
-        return {x:v[0]||0,y:v[1]||0};
-      }).filter(p=>Number.isFinite(p.x)&&Number.isFinite(p.y));
-    };
-    const boundedCurve2D=id=>{
-      const pts=curvePoints(id).map(p=>({x:p.x,y:p.y}));
-      if(pts.length>2&&Math.hypot(pts[0].x-pts[pts.length-1].x,pts[0].y-pts[pts.length-1].y)<1e-9) pts.pop();
-      return pts;
-    };
-    const prismFromBoundary=(poly,positionBasis,subjectTriangles)=>{
-      if(poly.length<3) return [];
-      let maxZ=0;
-      for(const tri of subjectTriangles) for(const p of tri) maxZ=Math.max(maxZ,basisToLocal(positionBasis,p).z);
-      const depth=Math.max(1,maxZ+Math.max(1,Math.abs(maxZ)*0.25));
-      const bottom=poly.map(p=>applyBasis(positionBasis,{x:p.x,y:p.y,z:0}));
-      const top=poly.map(p=>applyBasis(positionBasis,{x:p.x,y:p.y,z:depth}));
-      const out=[];
-      triangulate2D(poly).forEach(([a,b,c])=>{out.push([bottom[a],bottom[c],bottom[b]],[top[a],top[b],top[c]]);});
-      for(let i=0;i<poly.length;i++){const j=(i+1)%poly.length;out.push([bottom[i],bottom[j],top[j]],[bottom[i],top[j],top[i]]);}
-      return out;
-    };
-    const polygonalHalfSpaceDifference=(triangles,halfSpaceId,basis)=>{
-      const hs=entities.get(halfSpaceId);
-      if(!hs||hs.type!=='IFCPOLYGONALBOUNDEDHALFSPACE'||typeof BIMCSG==='undefined') return null;
-      const surface=entities.get(refOf(hs.args[0])); if(!surface||surface.type!=='IFCPLANE') return null;
-      const positionBasis=composeBasis(basis,axis3(refOf(hs.args[2])));
-      const poly=boundedCurve2D(refOf(hs.args[3])); if(poly.length<3) return null;
-      let cutter=prismFromBoundary(poly,positionBasis,triangles); if(!cutter.length) return null;
-      const planeBasis=composeBasis(basis,axis3(refOf(surface.args[0])));
-      const agreement=/\.T\./i.test(String(hs.args[1]||''));
-      // Material half-space: TRUE => lado negativo; FALSE => lado positivo.
-      cutter=clipTrianglesByPlane(cutter,planeBasis,!agreement);
-      if(!cutter.length) return triangles;
-      return BIMCSG.subtract(triangles,cutter);
-    };
-    const exactBooleanIds=new Set();
-    const partialBooleanIds=new Set();
-    const representation=(id,basis,depth=0)=>{
-      if(!id||depth>20) return [];
-      const e=entities.get(id); if(!e) return [];
-      if(e.type==='IFCEXTRUDEDAREASOLID') return extrusion(id,basis);
-      if(e.type==='IFCSWEPTDISKSOLID') return sweptDiskSolid(id,basis);
-      if(e.type==='IFCFACETEDBREP') return facetedBrep(id,basis);
-      if(e.type==='IFCTRIANGULATEDFACESET'||e.type==='IFCPOLYGONALFACESET') return indexedFaces(id,basis);
-      if(e.type==='IFCMAPPEDITEM'){
-        const map=entities.get(refOf(e.args[0])); if(map?.type!=='IFCREPRESENTATIONMAP') return [];
-        const origin=axis3(refOf(map.args[0])),target=cartTransform(refOf(e.args[1]));
-        return representation(refOf(map.args[1]),identityBasis(),depth+1).map(tri=>tri.map(p=>applyBasis(basis,applyBasis(target,basisToLocal(origin,p)))));
-      }
-      if(e.type==='IFCBOOLEANCLIPPINGRESULT'||e.type==='IFCBOOLEANRESULT'){
-        const operator=String(e.args[0]||'.DIFFERENCE.').toUpperCase();
-        const firstId=refOf(e.args[1]),secondId=refOf(e.args[2]);
-        const first=representation(firstId,basis,depth+1);
-        const secondEntity=entities.get(secondId);
-        if(first.length&&operator.includes('DIFFERENCE')&&['IFCHALFSPACESOLID','IFCBOXEDHALFSPACE','IFCPOLYGONALBOUNDEDHALFSPACE'].includes(secondEntity?.type)){
-          try{
-            const clipped=secondEntity.type==='IFCPOLYGONALBOUNDEDHALFSPACE'
-              ? polygonalHalfSpaceDifference(first,secondId,basis)
-              : halfSpaceDifference(first,secondId,basis);
-            if(clipped&&clipped.length){
-              exactBooleanIds.add(e.id);
-              return clipped;
-            }
-          }catch(err){
-            console.warn('[FinGo BIM] half-space IFC caiu para geometria parcial:',err?.message||err);
-          }
-          partialBooleanIds.add(e.id);
-          return first;
-        }
-        const second=representation(secondId,basis,depth+1);
-        if(first.length&&second.length&&typeof BIMCSG!=='undefined'){
-          try{
-            const result=BIMCSG.booleanOperation(operator,first,second);
-            if(result.length){
-              exactBooleanIds.add(e.id);
-              return result;
-            }
-          }catch(err){
-            console.warn('[FinGo BIM] CSG IFC caiu para geometria parcial:',err?.message||err);
-          }
-        }
-        partialBooleanIds.add(e.id);
-        return first;
-      }
-      if(e.type==='IFCCSGSOLID'){
-        const root=refsIn(e.raw)[0];
-        const result=representation(root,basis,depth+1);
-        if(result.length&&!partialBooleanIds.has(root)) exactBooleanIds.add(e.id);
-        else partialBooleanIds.add(e.id);
-        return result;
-      }
-      if(e.type==='IFCPRODUCTDEFINITIONSHAPE'||e.type==='IFCSHAPEREPRESENTATION'||e.type==='IFCREPRESENTATIONMAP'){
-        const out=[]; for(const child of refsIn(e.raw)){const ce=entities.get(child);if(ce&&geometryTypes.has(ce.type)) out.push(...representation(child,basis,depth+1));} return out;
-      }
-      return [];
-    };
-    const childrenOf=id=>refsIn(entities.get(id)?.raw||'');
-    const descendants=(id,target,maxDepth=10)=>{
-      const found=[],seen=new Set();
-      const walk=(x,d)=>{if(!x||d>maxDepth||seen.has(x))return;seen.add(x);const e=entities.get(x);if(!e)return;if(target.has(e.type))found.push(x);childrenOf(x).forEach(c=>walk(c,d+1));};
-      walk(id,0);return found;
-    };
-    const productType=type=>/^IFC(WALL|WALLSTANDARDCASE|SLAB|BEAM|COLUMN|FOOTING|ROOF|COVERING|DOOR|WINDOW|STAIR|MEMBER|PLATE|CURTAINWALL|BUILDINGELEMENTPROXY|FLOWSEGMENT|PIPESEGMENT|DUCTSEGMENT|CABLESEGMENT)/.test(String(type||''));
-
-    const storeys=new Map();
-    for(const e of entities.values()){
-      if(e.type!=='IFCBUILDINGSTOREY') continue;
-      const name=unquote(e.args[2]||'')||('Pavimento #'+e.id),token=String(e.args[e.args.length-1]||'').trim();
-      const elevation=/^[-+]?\d*\.?\d+(?:[Ee][-+]?\d+)?$/.test(token)?Number(token):0;
-      storeys.set(e.id,{id:e.id,key:'storey_'+e.id,name,elevation});
-    }
-    const storeyByProduct=new Map();
-    for(const e of entities.values()){
-      if(e.type!=='IFCRELCONTAINEDINSPATIALSTRUCTURE') continue;
-      const refs=refsIn(e.raw),sid=refs.find(x=>entities.get(x)?.type==='IFCBUILDINGSTOREY'); if(!sid) continue;
-      refs.filter(x=>x!==sid&&productType(entities.get(x)?.type)).forEach(x=>storeyByProduct.set(x,storeys.get(sid)));
-    }
-    const openingsByHost=new Map();
-    for(const e of entities.values()){
-      if(e.type!=='IFCRELVOIDSELEMENT') continue;
-      const refs=refsIn(e.raw);
-      const host=refs.find(x=>productType(entities.get(x)?.type));
-      const opening=refs.find(x=>entities.get(x)?.type==='IFCOPENINGELEMENT');
-      if(!host||!opening) continue;
-      if(!openingsByHost.has(host)) openingsByHost.set(host,[]);
-      openingsByHost.get(host).push(opening);
-    }
-    const openingTriangles=openingId=>{
-      const opening=entities.get(openingId); if(!opening||opening.type!=='IFCOPENINGELEMENT') return [];
-      const placementId=refsIn(opening.raw).find(x=>entities.get(x)?.type==='IFCLOCALPLACEMENT');
-      const reprId=refsIn(opening.raw).find(x=>entities.get(x)?.type==='IFCPRODUCTDEFINITIONSHAPE');
-      if(!reprId) return [];
-      return representation(reprId,localPlacement(placementId));
-    };
-    const psets=new Map();
-    for(const e of entities.values()){
-      if(e.type!=='IFCRELDEFINESBYPROPERTIES') continue;
-      const refs=refsIn(e.raw),pid=refs.find(x=>entities.get(x)?.type==='IFCPROPERTYSET'); if(!pid) continue;
-      const ps=entities.get(pid),name=unquote(ps.args[2]||'PropertySet'),values={};
-      refsIn(ps.args[ps.args.length-1]||'').forEach(propId=>{const p=entities.get(propId);if(p?.type==='IFCPROPERTYSINGLEVALUE') values[unquote(p.args[0]||('#'+propId))]=parseIfcValue(p.args[2]);});
-      refs.filter(x=>x!==pid&&productType(entities.get(x)?.type)).forEach(x=>{if(!psets.has(x))psets.set(x,{});psets.get(x)[name]=values;});
-    }
-
-    const elements=[],geometryKinds=new Set(); let partialElements=0;
-    for(const e of entities.values()){
-      if(!productType(e.type)) continue;
-      const placementId=refsIn(e.raw).find(x=>entities.get(x)?.type==='IFCLOCALPLACEMENT');
-      const reprId=refsIn(e.raw).find(x=>entities.get(x)?.type==='IFCPRODUCTDEFINITIONSHAPE'); if(!reprId) continue;
-      let tris=representation(reprId,localPlacement(placementId)); if(!tris.length) continue;
-      const mapped=descendants(reprId,new Set(['IFCMAPPEDITEM'])).length>0;
-      const brep=descendants(reprId,new Set(['IFCFACETEDBREP'])).length>0;
-      const tess=descendants(reprId,new Set(['IFCTRIANGULATEDFACESET','IFCPOLYGONALFACESET'])).length>0;
-      const swept=descendants(reprId,new Set(['IFCEXTRUDEDAREASOLID'])).length>0;
-      const sweptDisk=descendants(reprId,new Set(['IFCSWEPTDISKSOLID'])).length>0;
-      const booleanIds=descendants(reprId,new Set(['IFCBOOLEANCLIPPINGRESULT','IFCBOOLEANRESULT','IFCCSGSOLID']));
-      const boundedHalfSpaces=descendants(reprId,new Set(['IFCPOLYGONALBOUNDEDHALFSPACE']));
-      const faceVoidIds=descendants(reprId,new Set(['IFCINDEXEDPOLYGONALFACEWITHVOIDS']));
-      const faceVoidsPartial=faceVoidIds.some(id=>partialFaceVoidIds.has(id));
-      const faceVoidsExact=faceVoidIds.length>0&&!faceVoidsPartial&&faceVoidIds.every(id=>exactFaceVoidIds.has(id));
-      const curveIds=descendants(reprId,new Set(['IFCINDEXEDPOLYCURVE','IFCCOMPOSITECURVE','IFCCOMPOSITECURVESEGMENT','IFCTRIMMEDCURVE','IFCCIRCLE','IFCELLIPSE','IFCBSPLINECURVEWITHKNOTS','IFCRATIONALBSPLINECURVEWITHKNOTS']));
-      const curvePartial=curveIds.some(id=>partialCurveIds.has(id));
-      const curveExact=curveIds.length>0&&!curvePartial;
-      const booleanPartial=booleanIds.some(id=>partialBooleanIds.has(id));
-      const booleanExact=booleanIds.length>0&&!booleanPartial&&booleanIds.every(id=>exactBooleanIds.has(id));
-
-      let openingExact=true,openingSubtractions=0;
-      const openings=openingsByHost.get(e.id)||[];
-      for(const openingId of openings){
-        const cutter=openingTriangles(openingId);
-        if(!cutter.length||typeof BIMCSG==='undefined'){openingExact=false;continue;}
-        try{
-          const cut=BIMCSG.subtract(tris,cutter);
-          if(!cut.length){openingExact=false;continue;}
-          tris=cut;
-          openingSubtractions++;
-        }catch(err){
-          console.warn('[FinGo BIM] abertura IFC caiu para geometria parcial:',err?.message||err);
-          openingExact=false;
-        }
-      }
-
-      const partial=booleanPartial||faceVoidsPartial||curvePartial||(openings.length>0&&!openingExact);
-      if(partial) partialElements++;
-      if(mapped)geometryKinds.add('mapped-item');if(brep)geometryKinds.add('faceted-brep');if(tess)geometryKinds.add('tessellated-face-set');if(swept)geometryKinds.add('swept-solid');if(sweptDisk)geometryKinds.add('swept-disk-solid');if(booleanExact)geometryKinds.add('csg-exact');if(openingSubtractions)geometryKinds.add('opening-subtraction');if(faceVoidsExact)geometryKinds.add('polygon-face-voids');if(curveExact)geometryKinds.add('advanced-curves');
-      const globalId=unquote(e.args[0]||('#'+e.id)),name=unquote(e.args[2]||'')||(e.type+' #'+e.id),storey=storeyByProduct.get(e.id)||null;
-      const kinds=[mapped?'MappedItem':null,brep?'FacetedBrep':null,tess?'TessellatedFaceSet':null,swept?'SweptSolid':null,sweptDisk?'SweptDiskSolid':null,booleanExact?'CSG':null,openingSubtractions?'Openings':null,faceVoidsExact?'FaceVoids':null,curveExact?'Curves':null].filter(Boolean);
-      elements.push({
-        id:'ifc_'+(globalId||e.id),name,floor:storey?.key||'all',discipline:disciplineForClass(e.type),category:e.type,color:colorForClass(e.type),rawTriangles:tris,
-        importedProperties:{
-          format:'IFC',ifcClass:e.type,globalId,stepId:e.id,storeyId:storey?.id||null,storeyName:storey?.name||null,storeyElevation:storey?.elevation??null,
-          psets:psets.get(e.id)||{},geometryKinds:kinds,geometryQuality:partial?'partial':(kinds.join('+')||'supported'),
-          openingCount:openings.length,openingSubtractions,booleanExact,
-          partialReason:booleanPartial?(boundedHalfSpaces.length?'polygonal-bounded-halfspace-curve-not-supported':'boolean-or-csg-operand-not-supported'):faceVoidsPartial?'polygon-face-voids-triangulation-failed':curvePartial?'curve-segment-not-supported':(openings.length&&!openingExact)?'opening-subtraction-failed':null,
-          clashEligible:!partial
-        }
-      });
-    }
-    if(!elements.length) throw new Error('IFC válido, mas sem geometria compatível com SweptSolid, SweptDiskSolid, MappedItem, FacetedBrep ou TessellatedFaceSet.');
     const schema=src.match(/FILE_SCHEMA\s*\(\s*\(\s*'([^']+)'/i)?.[1]||'IFC';
     const si=[...entities.values()].find(e=>e.type==='IFCSIUNIT'&&/LENGTHUNIT/.test(e.raw));
     const sourceLengthUnit=si?(String(si.raw).match(/\.(MILLI|CENTI|DECI|KILO)?\.,\.METRE\./i)?.[1]||'METRE').toLowerCase():'unknown';
