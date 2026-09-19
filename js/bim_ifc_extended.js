@@ -854,8 +854,9 @@ const BIMIFCExtendedImporter = (function() {
       if(!(la>1e-12&&lb>1e-12))return false;
       const dot=(na.x*nb.x+na.y*nb.y+na.z*nb.z)/(la*lb);
       if(Math.abs(dot)<1-1e-7)return false;
-      const scale=Math.max(1,...a.concat(b).map(p=>Math.hypot(p.x,p.y,p.z)));
-      const planeTol=Math.max(1e-8,scale*1e-7);
+      const all=[...a,...b],xs=all.map(p=>p.x),ys=all.map(p=>p.y),zs=all.map(p=>p.z);
+      const localDiag=Math.max(1e-9,Math.hypot(Math.max(...xs)-Math.min(...xs),Math.max(...ys)-Math.min(...ys),Math.max(...zs)-Math.min(...zs)));
+      const planeTol=Math.max(1e-8,localDiag*1e-7);
       const n={x:na.x/la,y:na.y/la,z:na.z/la};
       if(b.some(p=>Math.abs((p.x-a[0].x)*n.x+(p.y-a[0].y)*n.y+(p.z-a[0].z)*n.z)>planeTol))return false;
       const project=dominantProjection(na),aa=a.map(project),bb=b.map(project);
@@ -867,8 +868,8 @@ const BIMIFCExtendedImporter = (function() {
       for(let i=0;i<3;i++)for(let j=0;j<3;j++)if(segmentIntersect2DProper(aa[i],aa[(i+1)%3],bb[j],bb[(j+1)%3]))return true;
       return false;
     };
-    const signedTriangleVolume=tri=>{
-      const [a,b,c]=tri,bc=cross(b,c);
+    const signedTriangleVolume=(tri,origin={x:0,y:0,z:0})=>{
+      const a=sub(tri[0],origin),b=sub(tri[1],origin),c=sub(tri[2],origin),bc=cross(b,c);
       return (a.x*bc.x+a.y*bc.y+a.z*bc.z)/6;
     };
     const advancedBrepGeometryConsistency=id=>{
@@ -903,7 +904,8 @@ const BIMIFCExtendedImporter = (function() {
       const points=allTriangles.flat();
       const xs=points.map(p=>p.x),ys=points.map(p=>p.y),zs=points.map(p=>p.z);
       const diag=Math.max(1e-9,Math.hypot(Math.max(...xs)-Math.min(...xs),Math.max(...ys)-Math.min(...ys),Math.max(...zs)-Math.min(...zs)));
-      const signedVolume=allTriangles.reduce((sum,tri)=>sum+signedTriangleVolume(tri),0);
+      const volumeOrigin=points[0]||{x:0,y:0,z:0};
+      const signedVolume=allTriangles.reduce((sum,tri)=>sum+signedTriangleVolume(tri,volumeOrigin),0);
       const volume=Math.abs(signedVolume),volumeTol=Math.max(1e-12,diag*diag*diag*1e-9);
       if(!(volume>volumeTol))return {ok:false,reason:'advanced-brep-shell-zero-volume',intersectionChecks:checks,signedVolume,volume};
       return {ok:true,reason:null,intersectionChecks:checks,signedVolume,volume,winding:signedVolume>0?'positive':'negative'};
