@@ -108,6 +108,83 @@ const BIMIFCExtendedImporter = (function() {
     const projected=clean.map(p=>ax>=ay&&ax>=az?{x:p.y,y:p.z}:ay>=az?{x:p.x,y:p.z}:{x:p.x,y:p.y});
     return triangulate2D(projected).map(([a,b,c])=>[clean[a],clean[b],clean[c]]);
   }
+  function polygon3DWithVoids(outer, holes=[]){
+    const cleanLoop=loop=>{
+      const pts=[...(loop||[])];
+      if(pts.length>2){
+        const a=pts[0],b=pts[pts.length-1];
+        if(Math.hypot(a.x-b.x,a.y-b.y,a.z-b.z)<1e-9) pts.pop();
+      }
+      return pts;
+    };
+    const o=cleanLoop(outer), hs=(holes||[]).map(cleanLoop).filter(h=>h.length>=3);
+    if(o.length<3) return [];
+
+    let n={x:0,y:0,z:0};
+    for(let i=1;i<o.length-1;i++){
+      n=cross(sub(o[i],o[0]),sub(o[i+1],o[0]));
+      if(Math.hypot(n.x,n.y,n.z)>1e-9) break;
+    }
+    const nl=Math.hypot(n.x,n.y,n.z);
+    if(nl<1e-9) return [];
+    n={x:n.x/nl,y:n.y/nl,z:n.z/nl};
+    const origin=o[0],ax=Math.abs(n.x),ay=Math.abs(n.y),az=Math.abs(n.z);
+    let project,unproject;
+    if(ax>=ay&&ax>=az){
+      project=p=>({x:p.y,y:p.z});
+      unproject=q=>({x:origin.x-(n.y*(q.x-origin.y)+n.z*(q.y-origin.z))/n.x,y:q.x,z:q.y});
+    }else if(ay>=az){
+      project=p=>({x:p.x,y:p.z});
+      unproject=q=>({x:q.x,y:origin.y-(n.x*(q.x-origin.x)+n.z*(q.y-origin.z))/n.y,z:q.y});
+    }else{
+      project=p=>({x:p.x,y:p.y});
+      unproject=q=>({x:q.x,y:q.y,z:origin.z-(n.x*(q.x-origin.x)+n.y*(q.y-origin.y))/n.z});
+    }
+
+    const loops=[o,...hs].map(loop=>loop.map(project));
+    const xs=[...new Set(loops.flat().map(p=>Math.round(p.x*1e9)/1e9))].sort((a,b)=>a-b);
+    const edges=[];
+    loops.forEach(loop=>{
+      for(let i=0;i<loop.length;i++){
+        const a=loop[i],b=loop[(i+1)%loop.length];
+        if(Math.abs(a.x-b.x)<1e-12) continue;
+        edges.push({a,b,minX:Math.min(a.x,b.x),maxX:Math.max(a.x,b.x)});
+      }
+    });
+    const evalY=(edge,x)=>edge.a.y+(edge.b.y-edge.a.y)*((x-edge.a.x)/(edge.b.x-edge.a.x));
+    const dot=(a,b)=>a.x*b.x+a.y*b.y+a.z*b.z;
+    const out=[];
+
+    for(let s=0;s<xs.length-1;s++){
+      const x0=xs[s],x1=xs[s+1];
+      if(x1-x0<1e-10) continue;
+      const xm=(x0+x1)/2;
+      const hits=edges
+        .filter(e=>xm>e.minX&&xm<e.maxX)
+        .map(e=>({edge:e,y:evalY(e,xm)}))
+        .sort((a,b)=>a.y-b.y);
+      if(hits.length%2!==0) return [];
+      for(let i=0;i<hits.length;i+=2){
+        const low=hits[i],high=hits[i+1];
+        if(!high||high.y-low.y<1e-10) continue;
+        const quad=[
+          unproject({x:x0,y:evalY(low.edge,x0)}),
+          unproject({x:x1,y:evalY(low.edge,x1)}),
+          unproject({x:x1,y:evalY(high.edge,x1)}),
+          unproject({x:x0,y:evalY(high.edge,x0)})
+        ];
+        const candidates=[[quad[0],quad[1],quad[2]],[quad[0],quad[2],quad[3]]];
+        for(let tri of candidates){
+          const tn=cross(sub(tri[1],tri[0]),sub(tri[2],tri[0]));
+          if(Math.hypot(tn.x,tn.y,tn.z)<1e-10) continue;
+          if(dot(tn,n)<0) tri=[tri[0],tri[2],tri[1]];
+          out.push(tri);
+        }
+      }
+    }
+    return out;
+  }
+
   function parseIfcValue(token){
     const s=String(token||'').trim();
     if(s==='$'||s==='*') return null;
