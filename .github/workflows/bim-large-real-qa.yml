@@ -1,6 +1,12 @@
 name: BIM large real-model QA
 
 on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'scripts/run-bim-large-qa.js'
+      - '.github/workflows/bim-large-real-qa.yml'
   workflow_dispatch:
     inputs:
       model_set:
@@ -54,3 +60,4 @@ jobs:
           name: bim-large-real-qa-report-${{ inputs.model_set }}
           path: .qa/
           if-no-files-found: warn
+          include-hidden-files: true
