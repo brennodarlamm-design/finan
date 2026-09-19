@@ -200,6 +200,8 @@ const BIMIFCExtendedImporter = (function() {
     if(!/ISO-10303-21/i.test(src)||!/IFCPROJECT/i.test(src)) throw new Error('IFC inválido ou incompleto.');
     const entities=parseEntities(src);
     if(!entities.size) throw new Error('IFC sem entidades STEP legíveis.');
+    const schema=src.match(/FILE_SCHEMA\s*\(\s*\(\s*'([^']+)'/i)?.[1]||'IFC';
+    const schemaSupportsAdvancedBrep=!/^IFC2X3/i.test(schema);
 
     const angularSegments=(sweep,min=4,max=96)=>{
       const ratio=Math.abs(sweep)/(Math.PI/24);
@@ -895,6 +897,33 @@ const BIMIFCExtendedImporter = (function() {
       const siCandidates=[...entities.values()].filter(unit=>unit.type==='IFCSIUNIT'&&/\.PLANEANGLEUNIT\./i.test(unit.raw)&&/\.RADIAN\./i.test(unit.raw));
       return siCandidates.length===1?1:null;
     };
+    const sweptCurveProfileEvaluator=profileId=>{
+      const p=entities.get(profileId);
+      if(!p||!/\.CURVE\./i.test(String(p.args[0]||''))) return null;
+      if(p.type==='IFCCIRCLEPROFILEDEF'){
+        const radius=num(p.args[p.args.length-1]);
+        if(!(radius>1e-9)) return null;
+        const posRef=p.args.map(refOf).find(x=>entities.get(x)?.type==='IFCAXIS2PLACEMENT2D');
+        const a=axis2(posRef);
+        const center={x:a.origin.x,y:a.origin.y,z:0};
+        return {
+          kind:'circle-profile',
+          radius,
+          center,
+          evaluate:t=>({
+            x:a.origin.x+a.x.x*Math.cos(t)*radius+a.y.x*Math.sin(t)*radius,
+            y:a.origin.y+a.x.y*Math.cos(t)*radius+a.y.y*Math.sin(t)*radius,
+            z:0
+          })
+        };
+      }
+      return null;
+    };
+    const pointLineDistance=(p,origin,axis)=>{
+      const k=norm(axis,{x:0,y:0,z:1}),q=sub(p,origin),proj=mul(k,q.x*k.x+q.y*k.y+q.z*k.z);
+      const d=sub(q,proj);
+      return Math.hypot(d.x,d.y,d.z);
+    };
     const rectangularPatchGrid=(evaluate,u1,u2,v1,v2,uSegments,vSegments)=>{
       const grid=[];
       for(let i=0;i<=uSegments;i++){
@@ -920,43 +949,58 @@ const BIMIFCExtendedImporter = (function() {
       const e=entities.get(surfaceId);
       if(!e||e.type!=='IFCRECTANGULARTRIMMEDSURFACE'||holes.length) return null;
       const basisSurfaceId=refOf(e.args[0]),base=entities.get(basisSurfaceId);
-      if(!base||!['IFCCYLINDRICALSURFACE','IFCSPHERICALSURFACE','IFCTOROIDALSURFACE'].includes(base.type)){
-        partialSurfaceIds.add(surfaceId);return null;
-      }
+      const supported=new Set([
+        'IFCCYLINDRICALSURFACE','IFCSPHERICALSURFACE','IFCTOROIDALSURFACE',
+        'IFCSURFACEOFLINEAREXTRUSION','IFCSURFACEOFREVOLUTION'
+      ]);
+      if(!base||!supported.has(base.type)){partialSurfaceIds.add(surfaceId);return null;}
+
       const angleScale=planeAngleScaleToRadians();
       if(!(angleScale>0)){partialSurfaceIds.add(surfaceId);return null;}
-      const u1=num(e.args[1])*angleScale,u2=num(e.args[3])*angleScale;
-      const angularV=base.type!=='IFCCYLINDRICALSURFACE';
-      const v1=num(e.args[2])*(angularV?angleScale:1),v2=num(e.args[4])*(angularV?angleScale:1);
+
+      let uAngular=true,vAngular=false,profile=null;
+      if(base.type==='IFCSPHERICALSURFACE'||base.type==='IFCTOROIDALSURFACE') vAngular=true;
+      if(base.type==='IFCSURFACEOFLINEAREXTRUSION'){
+        profile=sweptCurveProfileEvaluator(refOf(base.args[0]));
+        if(!profile){partialSurfaceIds.add(surfaceId);return null;}
+      }
+      if(base.type==='IFCSURFACEOFREVOLUTION'){
+        profile=sweptCurveProfileEvaluator(refOf(base.args[0]));
+        if(!profile){partialSurfaceIds.add(surfaceId);return null;}
+        vAngular=true;
+      }
+
+      const u1=num(e.args[1])*(uAngular?angleScale:1),u2Raw=num(e.args[3])*(uAngular?angleScale:1);
+      const v1=num(e.args[2])*(vAngular?angleScale:1),v2=num(e.args[4])*(vAngular?angleScale:1);
       const uSense=/\.T\./i.test(String(e.args[5]||'')),vSense=/\.T\./i.test(String(e.args[6]||''));
-      const rawDu=u2-u1,dv=v2-v1;
+      const rawDu=u2Raw-u1,dv=v2-v1;
       if(Math.abs(rawDu)<=1e-9||Math.abs(dv)<=1e-9){partialSurfaceIds.add(surfaceId);return null;}
+
       let du=rawDu;
-      if(uSense&&du<0)du+=Math.PI*2;
-      if(!uSense&&du>0)du-=Math.PI*2;
-      if(Math.abs(du)<=1e-9||Math.abs(du)>Math.PI*2+1e-6||vSense!==(dv>0)){partialSurfaceIds.add(surfaceId);return null;}
-      const resolvedU2=u1+du,position=axis3(refOf(base.args[0]));
-      const uSegments=angularSegments(du,4,96);
-      let vSegments=1,evaluate=null,kind=null,baseKind=null,meta={};
+      if(uAngular){
+        if(uSense&&du<0)du+=Math.PI*2;
+        if(!uSense&&du>0)du-=Math.PI*2;
+        if(Math.abs(du)>Math.PI*2+1e-6){partialSurfaceIds.add(surfaceId);return null;}
+      }else if(uSense!==(du>0)){partialSurfaceIds.add(surfaceId);return null;}
+      if(Math.abs(du)<=1e-9||vSense!==(dv>0)){partialSurfaceIds.add(surfaceId);return null;}
+
+      const resolvedU2=u1+du;
+      let uSegments=uAngular?angularSegments(du,4,96):8,vSegments=1,evaluate=null,kind=null,baseKind=null,meta={};
 
       if(base.type==='IFCCYLINDRICALSURFACE'){
-        const radius=num(base.args[1]);
+        const radius=num(base.args[1]),position=axis3(refOf(base.args[0]));
         if(!(radius>1e-9)){partialSurfaceIds.add(surfaceId);return null;}
         evaluate=(u,v)=>applyBasis(position,{x:Math.cos(u)*radius,y:Math.sin(u)*radius,z:v});
         kind='rectangular-trimmed-cylinder';baseKind='cylindrical-surface';meta={radius,height:Math.abs(dv),sweepU:du};
       }else if(base.type==='IFCSPHERICALSURFACE'){
-        const radius=num(base.args[1]);
+        const radius=num(base.args[1]),position=axis3(refOf(base.args[0]));
         const vMin=Math.min(v1,v2),vMax=Math.max(v1,v2);
         if(!(radius>1e-9)||vMin<-Math.PI/2-1e-7||vMax>Math.PI/2+1e-7){partialSurfaceIds.add(surfaceId);return null;}
         vSegments=angularSegments(dv,2,48);
-        evaluate=(u,v)=>applyBasis(position,{
-          x:Math.cos(v)*Math.cos(u)*radius,
-          y:Math.cos(v)*Math.sin(u)*radius,
-          z:Math.sin(v)*radius
-        });
+        evaluate=(u,v)=>applyBasis(position,{x:Math.cos(v)*Math.cos(u)*radius,y:Math.cos(v)*Math.sin(u)*radius,z:Math.sin(v)*radius});
         kind='rectangular-trimmed-sphere';baseKind='spherical-surface';meta={radius,sweepU:du,sweepV:dv};
-      }else{
-        const majorRadius=num(base.args[1]),minorRadius=num(base.args[2]);
+      }else if(base.type==='IFCTOROIDALSURFACE'){
+        const majorRadius=num(base.args[1]),minorRadius=num(base.args[2]),position=axis3(refOf(base.args[0]));
         if(!(majorRadius>minorRadius&&minorRadius>1e-9)||Math.abs(dv)>Math.PI*2+1e-6){partialSurfaceIds.add(surfaceId);return null;}
         vSegments=angularSegments(dv,4,96);
         evaluate=(u,v)=>{
@@ -964,6 +1008,22 @@ const BIMIFCExtendedImporter = (function() {
           return applyBasis(position,{x:radial*Math.cos(u),y:radial*Math.sin(u),z:minorRadius*Math.sin(v)});
         };
         kind='rectangular-trimmed-torus';baseKind='toroidal-surface';meta={majorRadius,minorRadius,sweepU:du,sweepV:dv};
+      }else if(base.type==='IFCSURFACEOFLINEAREXTRUSION'){
+        const position=base.args[1]&&base.args[1]!=='$'?axis3(refOf(base.args[1])):identityBasis();
+        const dir=direction(refOf(base.args[2])),depth=num(base.args[3]);
+        if(!(depth>1e-9)||Math.abs(dir.z)<1e-7){partialSurfaceIds.add(surfaceId);return null;}
+        evaluate=(u,v)=>applyBasis(position,add(profile.evaluate(u),mul(dir,depth*v)));
+        kind='rectangular-trimmed-linear-extrusion';baseKind='surface-of-linear-extrusion';
+        meta={profileKind:profile.kind,depth,sweepU:du,sweepV:dv};
+      }else{
+        const position=base.args[1]&&base.args[1]!=='$'?axis3(refOf(base.args[1])):identityBasis();
+        const axis=axis1(refOf(base.args[2]));
+        const clearance=pointLineDistance(profile.center,axis.origin,axis.axis);
+        if(!(clearance>profile.radius+Math.max(1e-7,profile.radius*1e-6))){partialSurfaceIds.add(surfaceId);return null;}
+        vSegments=angularSegments(dv,4,96);
+        evaluate=(u,v)=>applyBasis(position,rotateAroundAxis(profile.evaluate(v),axis.origin,axis.axis,u));
+        kind='rectangular-trimmed-surface-of-revolution';baseKind='surface-of-revolution';
+        meta={profileKind:profile.kind,profileRadius:profile.radius,axisClearance:clearance,sweepU:du,sweepV:dv};
       }
 
       const patch=rectangularPatchGrid(evaluate,u1,resolvedU2,v1,v2,uSegments,vSegments);
@@ -1258,7 +1318,13 @@ const BIMIFCExtendedImporter = (function() {
         else partialBooleanIds.add(e.id);
         return result;
       }
-      if(e.type==='IFCPRODUCTDEFINITIONSHAPE'||e.type==='IFCSHAPEREPRESENTATION'||e.type==='IFCREPRESENTATIONMAP'){
+      if(e.type==='IFCPRODUCTDEFINITIONSHAPE'){
+        const reps=refsIn(e.args[2]||e.raw).map(x=>entities.get(x)).filter(x=>x?.type==='IFCSHAPEREPRESENTATION');
+        const body=reps.filter(r=>/^body$/i.test(unquote(r.args[1]||'')));
+        const selected=body.length?body:reps;
+        const out=[]; for(const rep of selected) out.push(...representation(rep.id,basis,depth+1)); return out;
+      }
+      if(e.type==='IFCSHAPEREPRESENTATION'||e.type==='IFCREPRESENTATIONMAP'){
         const out=[]; for(const child of refsIn(e.raw)){const ce=entities.get(child);if(ce&&geometryTypes.has(ce.type)) out.push(...representation(child,basis,depth+1));} return out;
       }
       return [];
@@ -1320,19 +1386,22 @@ const BIMIFCExtendedImporter = (function() {
       const brep=descendants(reprId,new Set(['IFCFACETEDBREP'])).length>0;
       const advancedBrepIds=descendants(reprId,new Set(['IFCADVANCEDBREP','IFCMANIFOLDSOLIDBREP']));
       const advancedFaceIds=descendants(reprId,new Set(['IFCADVANCEDFACE']));
-      const advancedBrepPartial=advancedFaceIds.some(id=>partialAdvancedFaceIds.has(id));
+      const advancedBrepVersionMismatch=advancedBrepIds.some(id=>entities.get(id)?.type==='IFCADVANCEDBREP')&&!schemaSupportsAdvancedBrep;
+      const advancedBrepPartial=advancedBrepVersionMismatch||advancedFaceIds.some(id=>partialAdvancedFaceIds.has(id));
       const advancedBrepExact=advancedBrepIds.length>0&&!advancedBrepPartial&&advancedFaceIds.every(id=>exactAdvancedFaceIds.has(id));
       const nurbsSurfaceIds=descendants(reprId,new Set(['IFCBSPLINESURFACEWITHKNOTS','IFCRATIONALBSPLINESURFACEWITHKNOTS']));
       const cylindricalSurfaceIds=descendants(reprId,new Set(['IFCCYLINDRICALSURFACE']));
       const sphericalSurfaceIds=descendants(reprId,new Set(['IFCSPHERICALSURFACE']));
       const toroidalSurfaceIds=descendants(reprId,new Set(['IFCTOROIDALSURFACE']));
+      const sweptSurfaceIds=descendants(reprId,new Set(['IFCSURFACEOFLINEAREXTRUSION','IFCSURFACEOFREVOLUTION']));
       const rectangularTrimmedSurfaceIds=descendants(reprId,new Set(['IFCRECTANGULARTRIMMEDSURFACE']));
-      const advancedSurfaceIds=[...nurbsSurfaceIds,...cylindricalSurfaceIds,...sphericalSurfaceIds,...toroidalSurfaceIds,...rectangularTrimmedSurfaceIds];
+      const advancedSurfaceIds=[...nurbsSurfaceIds,...cylindricalSurfaceIds,...sphericalSurfaceIds,...toroidalSurfaceIds,...sweptSurfaceIds,...rectangularTrimmedSurfaceIds];
       const advancedCurved=advancedBrepExact&&advancedSurfaceIds.length>0&&!advancedSurfaceIds.some(id=>partialSurfaceIds.has(id));
       const advancedNurbs=advancedCurved&&nurbsSurfaceIds.length>0;
       const advancedCylinder=advancedCurved&&cylindricalSurfaceIds.length>0;
       const advancedSphere=advancedCurved&&sphericalSurfaceIds.length>0;
       const advancedTorus=advancedCurved&&toroidalSurfaceIds.length>0;
+      const advancedSweptSurface=advancedCurved&&sweptSurfaceIds.length>0;
       const tess=descendants(reprId,new Set(['IFCTRIANGULATEDFACESET','IFCPOLYGONALFACESET'])).length>0;
       const swept=descendants(reprId,new Set(['IFCEXTRUDEDAREASOLID'])).length>0;
       const revolved=descendants(reprId,new Set(['IFCREVOLVEDAREASOLID'])).length>0;
@@ -1367,11 +1436,11 @@ const BIMIFCExtendedImporter = (function() {
 
       const partial=advancedBrepPartial||booleanPartial||faceVoidsPartial||curvePartial||(openings.length>0&&!openingExact);
       if(partial) partialElements++;
-      if(mapped)geometryKinds.add('mapped-item');if(brep)geometryKinds.add('faceted-brep');if(advancedBrepExact&&!advancedCurved)geometryKinds.add('advanced-brep-planar');if(advancedNurbs)geometryKinds.add('advanced-brep-nurbs');if(advancedCylinder)geometryKinds.add('advanced-brep-cylinder');if(advancedSphere)geometryKinds.add('advanced-brep-sphere');if(advancedTorus)geometryKinds.add('advanced-brep-torus');if(tess)geometryKinds.add('tessellated-face-set');if(swept)geometryKinds.add('swept-solid');if(revolved)geometryKinds.add('revolved-area-solid');if(sweptDisk)geometryKinds.add('swept-disk-solid');if(primitive)geometryKinds.add('csg-primitive');if(booleanExact)geometryKinds.add('csg-exact');if(openingSubtractions)geometryKinds.add('opening-subtraction');if(faceVoidsExact)geometryKinds.add('polygon-face-voids');if(curveExact)geometryKinds.add('advanced-curves');
+      if(mapped)geometryKinds.add('mapped-item');if(brep)geometryKinds.add('faceted-brep');if(advancedBrepExact&&!advancedCurved)geometryKinds.add('advanced-brep-planar');if(advancedNurbs)geometryKinds.add('advanced-brep-nurbs');if(advancedCylinder)geometryKinds.add('advanced-brep-cylinder');if(advancedSphere)geometryKinds.add('advanced-brep-sphere');if(advancedTorus)geometryKinds.add('advanced-brep-torus');if(advancedSweptSurface)geometryKinds.add('advanced-brep-swept-surface');if(tess)geometryKinds.add('tessellated-face-set');if(swept)geometryKinds.add('swept-solid');if(revolved)geometryKinds.add('revolved-area-solid');if(sweptDisk)geometryKinds.add('swept-disk-solid');if(primitive)geometryKinds.add('csg-primitive');if(booleanExact)geometryKinds.add('csg-exact');if(openingSubtractions)geometryKinds.add('opening-subtraction');if(faceVoidsExact)geometryKinds.add('polygon-face-voids');if(curveExact)geometryKinds.add('advanced-curves');
       const globalId=unquote(e.args[0]||('#'+e.id)),name=unquote(e.args[2]||'')||(e.type+' #'+e.id),storey=storeyByProduct.get(e.id)||null;
       const advancedKinds=advancedBrepExact
         ? (advancedCurved
-          ? [advancedNurbs?'AdvancedBrepNURBS':null,advancedCylinder?'AdvancedBrepCylinder':null,advancedSphere?'AdvancedBrepSphere':null,advancedTorus?'AdvancedBrepTorus':null].filter(Boolean)
+          ? [advancedNurbs?'AdvancedBrepNURBS':null,advancedCylinder?'AdvancedBrepCylinder':null,advancedSphere?'AdvancedBrepSphere':null,advancedTorus?'AdvancedBrepTorus':null,advancedSweptSurface?'AdvancedBrepSweptSurface':null].filter(Boolean)
           : ['AdvancedBrep'])
         : [];
       const kinds=[mapped?'MappedItem':null,brep?'FacetedBrep':null,...advancedKinds,tess?'TessellatedFaceSet':null,swept?'SweptSolid':null,revolved?'RevolvedAreaSolid':null,sweptDisk?'SweptDiskSolid':null,primitive?'CSGPrimitive':null,booleanExact?'CSG':null,openingSubtractions?'Openings':null,faceVoidsExact?'FaceVoids':null,curveExact?'Curves':null].filter(Boolean);
@@ -1381,13 +1450,12 @@ const BIMIFCExtendedImporter = (function() {
           format:'IFC',ifcClass:e.type,globalId,stepId:e.id,storeyId:storey?.id||null,storeyName:storey?.name||null,storeyElevation:storey?.elevation??null,
           psets:psets.get(e.id)||{},geometryKinds:kinds,geometryQuality:partial?'partial':(kinds.join('+')||'supported'),
           openingCount:openings.length,openingSubtractions,booleanExact,
-          partialReason:advancedBrepPartial?'advanced-brep-curved-surface-not-supported':booleanPartial?(boundedHalfSpaces.length?'polygonal-bounded-halfspace-curve-not-supported':'boolean-or-csg-operand-not-supported'):faceVoidsPartial?'polygon-face-voids-triangulation-failed':curvePartial?'curve-segment-not-supported':(openings.length&&!openingExact)?'opening-subtraction-failed':null,
+          partialReason:advancedBrepVersionMismatch?'advanced-brep-not-supported-in-schema':advancedBrepPartial?'advanced-brep-curved-surface-not-supported':booleanPartial?(boundedHalfSpaces.length?'polygonal-bounded-halfspace-curve-not-supported':'boolean-or-csg-operand-not-supported'):faceVoidsPartial?'polygon-face-voids-triangulation-failed':curvePartial?'curve-segment-not-supported':(openings.length&&!openingExact)?'opening-subtraction-failed':null,
           clashEligible:!partial
         }
       });
     }
     if(!elements.length) throw new Error('IFC válido, mas sem geometria compatível com SweptSolid, RevolvedAreaSolid, SweptDiskSolid, CSG primitives, MappedItem, Faceted/AdvancedBrep ou TessellatedFaceSet.');
-    const schema=src.match(/FILE_SCHEMA\s*\(\s*\(\s*'([^']+)'/i)?.[1]||'IFC';
     const si=[...entities.values()].find(e=>e.type==='IFCSIUNIT'&&/LENGTHUNIT/.test(e.raw));
     const sourceLengthUnit=si?(String(si.raw).match(/\.(MILLI|CENTI|DECI|KILO)?\.,\.METRE\./i)?.[1]||'METRE').toLowerCase():'unknown';
     return {elements,metadata:{schema,geometryKinds:Array.from(geometryKinds),curveKinds:Array.from(exactCurveKinds),surfaceKinds:Array.from(exactSurfaceKinds),storeys:Array.from(storeys.values()),partialElements,clashEligible:partialElements===0,sourceElementCount:elements.length,sourceLengthUnit,geometryQuality:partialElements?'partial':'supported',csgEngine:typeof BIMCSG!=='undefined'?'bsp':'unavailable'}};
