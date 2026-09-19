@@ -26,6 +26,9 @@ const BIMViewer = {
   // Elementos do Modelo 3D da Obra
   elements: [],
   renderedFaces: [],
+  financialSnapshot: null,
+  isExpanded: false,
+  _escapeHandler: null,
 
   /**
    * Inicializa e renderiza o visualizador dentro do container da Obra
@@ -42,6 +45,8 @@ const BIMViewer = {
       pavimentos: 2,
       padrao: 'Normal'
     };
+    const snapshot = this._getOperationalSnapshot(obraId);
+    this.financialSnapshot = snapshot;
 
     container.innerHTML = `
       <div class="bim-viewer-layout" style="display:flex;flex-direction:column;gap:16px;">
@@ -66,6 +71,7 @@ const BIMViewer = {
             <div class="btn-group" style="display:inline-flex;background:#142210;border-radius:6px;border:1px solid #243518;padding:2px;">
               <button type="button" class="bim-view-btn" data-action="resetView" title="Vista Isométrica 3D" style="padding:5px 10px;font-size:.75rem;border:none;background:transparent;color:#F0EAD6;cursor:pointer;font-weight:700;">📐 Isométrica</button>
               <button type="button" class="bim-view-btn" data-action="topView" title="Planta Baixa (Superior)" style="padding:5px 10px;font-size:.75rem;border:none;background:transparent;color:#F0EAD6;cursor:pointer;font-weight:700;">🗺️ Planta</button>
+              <button type="button" class="bim-view-btn" data-action="toggleExpanded" title="Expandir visualizador" style="padding:5px 10px;font-size:.75rem;border:none;background:transparent;color:#F0EAD6;cursor:pointer;font-weight:700;">⛶ Expandir</button>
             </div>
 
             <label class="btn-action" style="cursor:pointer;margin:0;font-size:.75rem;padding:6px 12px;background:rgba(198,255,0,.1);border:1px solid rgba(198,255,0,.3);color:#C6FF00;border-radius:6px;font-weight:700;">
@@ -75,6 +81,8 @@ const BIMViewer = {
           </div>
         </div>
 
+        ${this._renderOperationalSummaryHtml(snapshot)}
+
         <!-- Área Principal 3D e Painel Lateral de Custos -->
         <div class="bim-main-grid" style="display:grid;grid-template-columns:1fr 340px;gap:16px;">
           <!-- Canvas 3D -->
@@ -82,14 +90,7 @@ const BIMViewer = {
             <canvas id="bim-canvas" style="width:100%;height:100%;display:block;cursor:grab;touch-action:none;"></canvas>
 
             <!-- Seletor Flutuante de Pavimentos (Canto Superior Esquerdo) -->
-            <div style="position:absolute;top:16px;left:16px;display:flex;flex-direction:column;gap:6px;background:rgba(10,17,8,0.88);backdrop-filter:blur(10px);border:1px solid #243518;border-radius:8px;padding:10px 12px;z-index:2;box-shadow:0 8px 24px rgba(0,0,0,0.6);">
-              <span style="font-size:.68rem;font-weight:800;color:#94A3B8;text-transform:uppercase;letter-spacing:.05em;">Pavimentos</span>
-              <button type="button" class="bim-floor-btn ${this.currentFloor === 'all' ? 'active' : ''}" data-floor="all" style="text-align:left;padding:6px 10px;font-size:.76rem;border:none;border-radius:4px;cursor:pointer;background:${this.currentFloor === 'all' ? '#C6FF00' : 'transparent'};color:${this.currentFloor === 'all' ? '#000' : '#F0F0E8'};font-weight:800;">Todos os Pavimentos</button>
-              <button type="button" class="bim-floor-btn ${this.currentFloor === 'cobertura' ? 'active' : ''}" data-floor="cobertura" style="text-align:left;padding:6px 10px;font-size:.76rem;border:none;border-radius:4px;cursor:pointer;background:${this.currentFloor === 'cobertura' ? '#C6FF00' : 'transparent'};color:${this.currentFloor === 'cobertura' ? '#000' : '#F0F0E8'};font-weight:800;">Cobertura &amp; Telhado</button>
-              <button type="button" class="bim-floor-btn ${this.currentFloor === 'pav1' ? 'active' : ''}" data-floor="pav1" style="text-align:left;padding:6px 10px;font-size:.76rem;border:none;border-radius:4px;cursor:pointer;background:${this.currentFloor === 'pav1' ? '#C6FF00' : 'transparent'};color:${this.currentFloor === 'pav1' ? '#000' : '#F0F0E8'};font-weight:800;">1º Pavimento &amp; Sacada</button>
-              <button type="button" class="bim-floor-btn ${this.currentFloor === 'terreo' ? 'active' : ''}" data-floor="terreo" style="text-align:left;padding:6px 10px;font-size:.76rem;border:none;border-radius:4px;cursor:pointer;background:${this.currentFloor === 'terreo' ? '#C6FF00' : 'transparent'};color:${this.currentFloor === 'terreo' ? '#000' : '#F0F0E8'};font-weight:800;">Pavimento Térreo</button>
-              <button type="button" class="bim-floor-btn ${this.currentFloor === 'fundacao' ? 'active' : ''}" data-floor="fundacao" style="text-align:left;padding:6px 10px;font-size:.76rem;border:none;border-radius:4px;cursor:pointer;background:${this.currentFloor === 'fundacao' ? '#C6FF00' : 'transparent'};color:${this.currentFloor === 'fundacao' ? '#000' : '#F0F0E8'};font-weight:800;">Fundações &amp; Baldrame</button>
-            </div>
+            ${this._renderFloorButtonsHtml(obra)}
 
             <!-- Dica de Interação de Câmera -->
             <div style="position:absolute;bottom:14px;left:16px;font-size:.72rem;color:#94A3B8;background:rgba(0,0,0,0.75);backdrop-filter:blur(6px);padding:6px 12px;border-radius:6px;border:1px solid #243518;pointer-events:none;">
@@ -107,6 +108,7 @@ const BIMViewer = {
 
     this._setup3DCanvas();
     this._generateParametricBuilding(obra);
+    this._applyOperationalData(snapshot);
     this.selectedElement = this.elements[1] || this.elements[0];
     const detailsContainer = document.getElementById('bim-element-details');
     if (detailsContainer) {
@@ -678,10 +680,13 @@ const BIMViewer = {
       `;
     }
 
-    const orc = elem.orcado || 0;
-    const real = elem.realizado || 0;
+    const orc = Number(elem.orcado || 0);
+    const real = Number(elem.realizado || 0);
     const saldo = orc - real;
-    const pct = elem.executadoPct || 0;
+    const pct = Number(elem.executadoPct || 0);
+    const progressLabel = elem.progressLabel || 'Avanço medido da obra';
+    const sourceLabel = elem.dataSource || 'Dados vinculados à obra';
+    const recent = this._recentLancamentosForElement(elem).slice(0, 3);
 
     return `
       <div style="display:flex;align-items:center;gap:10px;border-bottom:1px solid #243518;padding-bottom:14px;">
@@ -712,7 +717,7 @@ const BIMViewer = {
 
         <div style="background:#0A1108;border:1px solid #243518;border-radius:8px;padding:12px 14px;">
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
-            <span style="font-size:.72rem;font-weight:700;color:#94A3B8;">Avanço Físico</span>
+            <span style="font-size:.72rem;font-weight:700;color:#94A3B8;">${Utils.escapeHtml(progressLabel)}</span>
             <span style="font-size:.82rem;font-weight:900;color:#C6FF00;">${pct}%</span>
           </div>
           <div style="height:6px;background:rgba(255,255,255,0.08);border-radius:3px;overflow:hidden;">
@@ -720,11 +725,174 @@ const BIMViewer = {
           </div>
         </div>
 
+        <div style="font-size:.68rem;color:#64748B;">Fonte: ${Utils.escapeHtml(sourceLabel)}</div>
+
+        <div style="background:#0A1108;border:1px solid #243518;border-radius:8px;padding:10px 12px;">
+          <div style="font-size:.70rem;font-weight:800;color:#94A3B8;text-transform:uppercase;margin-bottom:7px;">Lançamentos recentes</div>
+          ${recent.length ? recent.map(l => `
+            <div style="display:grid;grid-template-columns:1fr auto;gap:8px;padding:6px 0;border-top:1px solid rgba(148,163,184,.12);">
+              <div style="min-width:0;">
+                <div style="font-size:.72rem;color:#E2E8F0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${Utils.escapeHtml(l.descricao || l.fornecedor_beneficiario || 'Lançamento')}</div>
+                <div style="font-size:.64rem;color:#64748B;">${Utils.escapeHtml(l.data_vencimento || l.data || '')}</div>
+              </div>
+              <strong style="font-size:.72rem;color:${l.tipo === 'receita' ? '#C6FF00' : '#F59E0B'};">${Utils.fmt.currency(Number(l.valor || 0))}</strong>
+            </div>`).join('') : '<div style="font-size:.72rem;color:#64748B;">Nenhum lançamento classificado para esta etapa.</div>'}
+        </div>
+
         <button type="button" class="btn-action" data-action="filterLancamentos" style="width:100%;text-align:center;justify-content:center;padding:9px 12px;font-size:.78rem;background:rgba(198,255,0,0.1);color:#C6FF00;border-color:rgba(198,255,0,0.3);margin-top:4px;font-weight:700;">
-          📊 Ver Lançamentos Desta Etapa
+          📊 Abrir Lançamentos da Obra
         </button>
       </div>
     `;
+  },
+
+
+  _getOperationalSnapshot(obraId) {
+    const emptyResumo = { totalReceitas:0, totalDespesas:0, saldo:0, aPagar:0, aPagarValor:0, aReceber:0, aReceberValor:0 };
+    const emptyComp = { totalOrcado:0, totalRealizado:0, saldoRestante:0, percentualFinanceiro:0, percentualFisico:0, etapas:[], statusSaude:'sem_dados', alertaDesc:'Cadastre orçamento, medições e lançamentos para acompanhar a obra em tempo real.' };
+    if (typeof DB === 'undefined') return { resumo: emptyResumo, comp: emptyComp, lancamentos: [] };
+    try {
+      const resumo = typeof DB.getResumo === 'function' ? DB.getResumo(obraId) : emptyResumo;
+      const comp = typeof DB.getOrcamentoVsRealizado === 'function' ? DB.getOrcamentoVsRealizado(obraId) : emptyComp;
+      const lancamentos = typeof DB.getLancamentos === 'function'
+        ? DB.getLancamentos(obraId)
+        : (DB.getAll?.('lancamentos') || []).filter(l => l.obra_id === obraId);
+      return { resumo: { ...emptyResumo, ...(resumo || {}) }, comp: { ...emptyComp, ...(comp || {}) }, lancamentos: Array.isArray(lancamentos) ? lancamentos : [] };
+    } catch (err) {
+      console.warn('[FinGo BIM] Não foi possível montar o snapshot operacional:', err?.message || err);
+      return { resumo: emptyResumo, comp: emptyComp, lancamentos: [] };
+    }
+  },
+
+  _renderOperationalSummaryHtml(snapshot) {
+    const resumo = snapshot?.resumo || {};
+    const comp = snapshot?.comp || {};
+    const fisico = Math.max(0, Math.min(100, Number(comp.percentualFisico || 0)));
+    const cards = [
+      ['Orçado', Utils.fmt.currency(Number(comp.totalOrcado || 0)), '#F0F0E8'],
+      ['Custo realizado', Utils.fmt.currency(Number(comp.totalRealizado || 0)), '#F59E0B'],
+      ['Receita recebida', Utils.fmt.currency(Number(resumo.totalReceitas || 0)), '#C6FF00'],
+      ['A receber', Utils.fmt.currency(Number(resumo.aReceberValor || 0)), '#38BDF8'],
+      ['Avanço físico', `${fisico}%`, '#C6FF00']
+    ];
+    return `
+      <div class="bim-operational-summary" style="display:grid;grid-template-columns:repeat(5,minmax(120px,1fr));gap:10px;">
+        ${cards.map(([label,value,color]) => `
+          <div style="background:#0F1A0E;border:1px solid #243518;border-radius:10px;padding:11px 13px;min-width:0;">
+            <div style="font-size:.66rem;color:#94A3B8;text-transform:uppercase;font-weight:800;letter-spacing:.04em;">${label}</div>
+            <div style="font-size:.92rem;color:${color};font-weight:900;margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${value}</div>
+          </div>`).join('')}
+      </div>
+      <div style="font-size:.72rem;color:#94A3B8;padding:0 2px;">${Utils.escapeHtml(comp.alertaDesc || '')}</div>
+    `;
+  },
+
+  _renderFloorButtonsHtml(obra) {
+    const pavimentos = Math.max(1, Number(obra?.pavimentos || 1));
+    const floors = [
+      ['all', 'Todos os Pavimentos'],
+      ['cobertura', 'Cobertura & Telhado'],
+      ...(pavimentos > 1 ? [['pav1', '1º Pavimento & Sacada']] : []),
+      ['terreo', 'Pavimento Térreo'],
+      ['fundacao', 'Fundações & Baldrame']
+    ];
+    return `
+      <div style="position:absolute;top:16px;left:16px;display:flex;flex-direction:column;gap:6px;background:rgba(10,17,8,0.88);backdrop-filter:blur(10px);border:1px solid #243518;border-radius:8px;padding:10px 12px;z-index:2;box-shadow:0 8px 24px rgba(0,0,0,0.6);">
+        <span style="font-size:.68rem;font-weight:800;color:#94A3B8;text-transform:uppercase;letter-spacing:.05em;">Pavimentos · ${pavimentos}</span>
+        ${floors.map(([floor,label]) => `<button type="button" class="bim-floor-btn ${this.currentFloor === floor ? 'active' : ''}" data-floor="${floor}" style="text-align:left;padding:6px 10px;font-size:.76rem;border:none;border-radius:4px;cursor:pointer;background:${this.currentFloor === floor ? '#C6FF00' : 'transparent'};color:${this.currentFloor === floor ? '#000' : '#F0F0E8'};font-weight:800;">${label}</button>`).join('')}
+      </div>
+    `;
+  },
+
+  _applyOperationalData(snapshot) {
+    const comp = snapshot?.comp || {};
+    const stageMap = new Map((comp.etapas || []).map(e => [String(e.id || '').toLowerCase(), e]));
+    const allocations = {
+      fundacao: ['elem_fundacao'],
+      alvenaria: ['elem_terreo_alvenaria', 'elem_pav1'],
+      cobertura: ['elem_cobertura']
+    };
+
+    Object.entries(allocations).forEach(([stageId, ids]) => {
+      const stage = stageMap.get(stageId);
+      const targets = ids.map(id => this.elements.find(e => e.id === id)).filter(Boolean);
+      if (!targets.length) return;
+      const divisor = targets.length;
+      targets.forEach(elem => {
+        elem.orcado = stage ? Number(stage.previsto || 0) / divisor : 0;
+        elem.realizado = stage ? Number(stage.realizado || 0) / divisor : 0;
+        if (Number(comp.percentualFisico || 0) > 0) {
+          elem.executadoPct = Math.max(0, Math.min(100, Number(comp.percentualFisico || 0)));
+          elem.progressLabel = 'Avanço físico medido';
+        } else {
+          elem.executadoPct = stage ? Math.max(0, Math.min(100, Number(stage.percentual || 0))) : 0;
+          elem.progressLabel = 'Avanço financeiro da etapa';
+        }
+        elem.dataSource = stage
+          ? 'Orçamento, despesas e medições reais vinculados à obra'
+          : 'Sem dados classificados nesta macroetapa';
+      });
+    });
+  },
+
+  _stageKeyForElement(elem) {
+    if (!elem) return 'outros';
+    if (elem.floor === 'fundacao') return 'fundacao';
+    if (elem.floor === 'cobertura') return 'cobertura';
+    if (elem.floor === 'terreo' || elem.floor === 'pav1') return 'alvenaria';
+    return 'outros';
+  },
+
+  _recentLancamentosForElement(elem) {
+    const all = this.financialSnapshot?.lancamentos || [];
+    const stage = this._stageKeyForElement(elem);
+    const keywords = {
+      fundacao: ['fundacao','fundação','concreto','ferro','aço','aco','sapata','viga','pilar','laje'],
+      alvenaria: ['alvenaria','tijolo','bloco','argamassa','reboco','chapisco','laje','parede'],
+      cobertura: ['cobertura','telha','telhado','madeiramento','calha','rufo','impermeabil']
+    }[stage] || [];
+    const matched = all.filter(l => {
+      const hay = `${l.categoria || ''} ${l.descricao || ''} ${l.fornecedor_beneficiario || ''}`.toLowerCase();
+      return keywords.some(k => hay.includes(k));
+    });
+    return matched.length ? matched : all.slice(0, 3);
+  },
+
+  _navigateToLancamentos() {
+    if (typeof App === 'undefined') return;
+    if (this.activeObraId) App.obraId = this.activeObraId;
+    if (typeof App.navigate === 'function') App.navigate('lancamentos');
+  },
+
+  _resizeCanvas() {
+    if (!this.canvas?.parentElement) return;
+    const rect = this.canvas.parentElement.getBoundingClientRect();
+    const ratio = window.devicePixelRatio || 1;
+    this.canvas.width = Math.max(1, rect.width * ratio);
+    this.canvas.height = Math.max(1, rect.height * ratio);
+    this.ctx = this.canvas.getContext('2d');
+    this.ctx.scale(ratio, ratio);
+  },
+
+  _toggleExpanded() {
+    const root = document.getElementById(this.containerId)?.querySelector('.bim-viewer-layout');
+    if (!root) return;
+    this.isExpanded = !this.isExpanded;
+    if (this.isExpanded) {
+      root.dataset.bimExpanded = '1';
+      Object.assign(root.style, {
+        position: 'fixed', inset: '12px', zIndex: '10050', background: '#070B06',
+        padding: '14px', overflow: 'auto', borderRadius: '12px', boxShadow: '0 24px 80px rgba(0,0,0,.8)'
+      });
+      document.body.style.overflow = 'hidden';
+    } else {
+      delete root.dataset.bimExpanded;
+      ['position','inset','zIndex','background','padding','overflow','borderRadius','boxShadow'].forEach(p => root.style[p] = '');
+      document.body.style.overflow = '';
+    }
+    const btn = root.querySelector('[data-action="toggleExpanded"]');
+    if (btn) btn.textContent = this.isExpanded ? '✕ Fechar expansão' : '⛶ Expandir';
+    window.setTimeout(() => this._resizeCanvas(), 50);
   },
 
   /**
@@ -871,6 +1039,18 @@ const BIMViewer = {
         this.zoom = 1.2;
       });
     }
+
+    const expandBtn = document.querySelector('[data-action="toggleExpanded"]');
+    if (expandBtn) expandBtn.addEventListener('click', () => this._toggleExpanded());
+
+    const lancBtn = document.querySelector('[data-action="filterLancamentos"]');
+    if (lancBtn) lancBtn.addEventListener('click', () => this._navigateToLancamentos());
+
+    if (this._escapeHandler) document.removeEventListener('keydown', this._escapeHandler);
+    this._escapeHandler = (event) => {
+      if (event.key === 'Escape' && this.isExpanded) this._toggleExpanded();
+    };
+    document.addEventListener('keydown', this._escapeHandler);
 
     // Input de Upload de Arquivo 3D
     const fileInput = document.getElementById('bim-file-input');
