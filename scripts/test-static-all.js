@@ -97,6 +97,7 @@ const tests = [
   'scripts/test-bim-viewer-work-pr.js',
   'scripts/test-bim-geometry-importer.js',
   'scripts/test-bim-ifc-extended.js',
+  'scripts/test-bim-render-performance.js',
   'scripts/test-bim-clash-engine.js',
   'scripts/test-3d-skills.js'
 ].filter(fs.existsSync);
