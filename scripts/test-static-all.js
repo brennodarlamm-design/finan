@@ -95,6 +95,7 @@ const tests = [
   'scripts/test-legal-cookie-banner.js',
   'scripts/test-evolutionary-pillars.js',
   'scripts/test-bim-viewer-work-pr.js',
+  'scripts/test-bim-geometry-importer.js',
   'scripts/test-3d-skills.js'
 ].filter(fs.existsSync);
 
