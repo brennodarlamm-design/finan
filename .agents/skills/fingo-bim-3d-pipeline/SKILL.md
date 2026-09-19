@@ -62,6 +62,10 @@ Antes de codificar, classifique a fonte:
 - `clashEligible=true` significa apenas que a geometria usada pelo FinGo foi resolvida deterministicamente sem fallback conhecido; não significa que o arquivo passou STEP syntax, EXPRESS schema, normative rules, MVD/IDS ou buildingSMART Validation Service.
 - Um arquivo abrir/renderizar no viewer nunca é prova suficiente de conformidade IFC. Validação normativa e validação geométrica do viewer são gates distintos.
 - Ao evoluir Brep, não assumir que `IfcClosedShell` é manifold apenas pelo nome: antes de declarar conformidade topológica plena, verificar fechamento, arestas compartilhadas e ausência de degenerescência conforme as regras do schema/validador.
+- Em `IfcAdvancedBrep`, topologia edge-manifold não basta para autoridade geométrica: cada `IfcEdgeCurve` deve ser coerente com seus vértices, cada loop planar deve pertencer ao `IfcPlane` declarado e faces topologicamente não adjacentes não podem se auto-intersectar.
+- Separar explicitamente `advancedBrepTopology` de `advancedBrepGeometry`: shell combinatoriamente válido pode continuar renderizável, mas qualquer inconsistência geométrica deve forçar `clashEligible=false`.
+- Para auto-interseção, usar broad phase por AABB e teste narrow phase triângulo/segmento apenas entre faces que não compartilham vértices topológicos; contato legítimo em arestas/vértices adjacentes não deve ser confundido com interseção própria.
+- A validação geométrica de AdvancedBrep tem orçamento computacional finito; se o orçamento de pares de triângulos for excedido, rebaixar para parcial em vez de travar o navegador ou assumir validade.
 
 ## Workflow
 
