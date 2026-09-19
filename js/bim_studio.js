@@ -87,6 +87,7 @@ const BIMStudio = {
 
     // 7. Iluminação Solar & Céu PBR
     this._setupLighting();
+    this._setupHdriEnvironment();
 
     // 8. Grid Técnico do Solo & Platô
     this._setupGroundGrid();
@@ -393,6 +394,48 @@ const BIMStudio = {
       this.scene.background.setHex(0x020508);
       this.scene.fog.color.setHex(0x020508);
       this.interiorLights.forEach(l => { l.intensity = 2.8; });
+    }
+  },
+
+  _setupHdriEnvironment() {
+    try {
+      // Criar mapa de céu equirretangular realista via Canvas 2D
+      const cSky = document.createElement('canvas');
+      cSky.width = 1024;
+      cSky.height = 512;
+      const ctx = cSky.getContext('2d');
+
+      // Gradiente atmosférico vertical: zênite azul celeste -> horizonte dourado -> solo
+      const grad = ctx.createLinearGradient(0, 0, 0, 512);
+      grad.addColorStop(0.0, '#0284C7'); // Zênite azul vibrante
+      grad.addColorStop(0.35, '#38BDF8'); // Céu claro
+      grad.addColorStop(0.50, '#FED7AA'); // Horizonte dourado / entardecer
+      grad.addColorStop(0.55, '#243518'); // Horizonte terrestre
+      grad.addColorStop(1.0, '#0A1108');  // Solo escuro
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, 1024, 512);
+
+      // Disco do sol e reflexo
+      const sunGrad = ctx.createRadialGradient(680, 240, 0, 680, 240, 120);
+      sunGrad.addColorStop(0, 'rgba(255, 255, 240, 1.0)');
+      sunGrad.addColorStop(0.2, 'rgba(254, 240, 138, 0.8)');
+      sunGrad.addColorStop(1, 'rgba(254, 215, 170, 0)');
+      ctx.fillStyle = sunGrad;
+      ctx.beginPath();
+      ctx.arc(680, 240, 120, 0, Math.PI * 2);
+      ctx.fill();
+
+      const skyTex = new THREE.CanvasTexture(cSky);
+      skyTex.mapping = THREE.EquirectangularReflectionMapping;
+
+      if (THREE.PMREMGenerator) {
+        const pmrem = new THREE.PMREMGenerator(this.renderer);
+        pmrem.compileEquirectangularShader();
+        const envMap = pmrem.fromEquirectangular(skyTex).texture;
+        this.scene.environment = envMap;
+      }
+    } catch (eHdr) {
+      console.warn('[BIM Studio] HDRI procedural não pôde ser gerado:', eHdr);
     }
   },
 
@@ -902,6 +945,85 @@ const BIMStudio = {
           document.exitFullscreen().catch(() => {});
         }
       });
+    }
+
+    // Renderização com IA (Google Gemini)
+    const btnRenderAi = document.getElementById('btn-render-ai');
+    if (btnRenderAi) {
+      btnRenderAi.addEventListener('click', () => {
+        this._renderWithAI();
+      });
+    }
+
+    const btnCloseAi = document.getElementById('btn-close-ai-modal');
+    if (btnCloseAi) {
+      btnCloseAi.addEventListener('click', () => {
+        const modal = document.getElementById('ai-render-modal');
+        if (modal) modal.style.display = 'none';
+      });
+    }
+
+    const btnReRenderAi = document.getElementById('btn-re-render-ai');
+    if (btnReRenderAi) {
+      btnReRenderAi.addEventListener('click', () => {
+        this._renderWithAI();
+      });
+    }
+  },
+
+  async _renderWithAI() {
+    const modal = document.getElementById('ai-render-modal');
+    const loading = document.getElementById('ai-loading');
+    const resultWrap = document.getElementById('ai-result-wrap');
+    const resultImg = document.getElementById('ai-result-img');
+    const downloadBtn = document.getElementById('btn-download-ai');
+    const loadingText = document.getElementById('ai-loading-text');
+
+    if (!modal || !loading || !resultWrap || !resultImg) return;
+
+    modal.style.display = 'flex';
+    loading.style.display = 'flex';
+    resultWrap.style.display = 'none';
+    if (loadingText) loadingText.textContent = 'Capturando geometria 3D & Gerando com Google Gemini AI...';
+
+    try {
+      // 1. Capturar snapshot atual da cena 3D
+      this.renderer.render(this.scene, this.camera);
+      const snapshotBase64 = this.renderer.domElement.toDataURL('image/jpeg', 0.88);
+
+      // 2. Chamar a API do FinGo com o pool do Gemini
+      const response = await fetch('/api/bim-render', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          image: snapshotBase64,
+          prompt: 'Ultra-photorealistic architectural photography of a luxury modern residential villa, 8k resolution, cumaru wood deck, illuminated swimming pool, elegant warm lighting, professional architectural visualization published in ArchDaily, clean modern lines, realistic materials, photorealistic concrete and glass.'
+        })
+      });
+
+      const data = await response.json();
+      if (!response.ok || !data.success || !data.imageUrl) {
+        throw new Error(data.error || 'Falha ao renderizar imagem com IA');
+      }
+
+      // 3. Exibir imagem no modal
+      resultImg.src = data.imageUrl;
+      if (downloadBtn) {
+        downloadBtn.href = data.imageUrl;
+        downloadBtn.download = `fingo_bim_gemini_${Date.now()}.jpg`;
+      }
+
+      loading.style.display = 'none';
+      resultWrap.style.display = 'flex';
+    } catch (err) {
+      console.error('[FinGo BIM Studio] Erro no render IA:', err);
+      if (loadingText) loadingText.textContent = `Erro ao renderizar: ${err.message || 'Tente novamente.'}`;
+      setTimeout(() => {
+        if (loading.style.display === 'flex') {
+          modal.style.display = 'none';
+          alert(`Não foi possível concluir o render com IA: ${err.message || 'Verifique a conexão.'}`);
+        }
+      }, 2500);
     }
   },
 

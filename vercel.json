@@ -47,6 +47,10 @@
       "destination": "/api/plano?sub=webhook_pix&$1"
     },
     {
+      "source": "/api/bim-render",
+      "destination": "/api/upload?action=bim-render"
+    },
+    {
       "source": "/api/(.*)",
       "destination": "/api/$1"
     },
