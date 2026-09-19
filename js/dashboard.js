@@ -672,6 +672,10 @@ const Dashboard = {
       keys.push(cur);
     }
     const labels = keys.map(k=>{ const [y,m]=k.split('-'); return `${m}/${y}`; });
+    if (typeof Chart !== 'undefined') {
+      const existing = Chart.getChart(canvas);
+      if (existing) existing.destroy();
+    }
     const ch = new Chart(canvas,{
       type:'bar',
       data:{ labels, datasets:[
@@ -718,6 +722,11 @@ const Dashboard = {
 
     const total = values.reduce((a,b)=>a+b,0);
     const palette = ['#38bdf8', '#34d399', '#fbbf24', '#f87171', '#a78bfa', '#fb923c', '#e879f9', '#2dd4bf', '#818cf8', '#f43f5e', '#a3e635', '#22d3ee', '#c084fc', '#facc15', '#60a5fa'];
+
+    if (typeof Chart !== 'undefined') {
+      const existing = Chart.getChart(canvas);
+      if (existing) existing.destroy();
+    }
 
     const ch = new Chart(canvas,{
       type:'doughnut',
@@ -826,6 +835,11 @@ const Dashboard = {
         <span style="background:${saldoFinal>=0?'rgba(201,162,39,.18)':'rgba(239,68,68,.25)'};color:${saldoFinal>=0?'var(--accent2)':'#f87171'};padding:3px 10px;border-radius:12px;font-size:.74rem;font-weight:800;border:1px solid ${saldoFinal>=0?'rgba(201,162,39,.4)':'rgba(239,68,68,.5)'};">
           Saldo em 90d: ${Utils.fmt.currency(saldoFinal)}
         </span>`;
+    }
+
+    if (typeof Chart !== 'undefined') {
+      const existing = Chart.getChart(canvas);
+      if (existing) existing.destroy();
     }
 
     const ch = new Chart(canvas, {

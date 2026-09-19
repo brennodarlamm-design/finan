@@ -206,6 +206,19 @@ const Suporte = {
 
         <div id="suporte-chat-msgs" style="flex:1;overflow-y:auto;padding:18px;display:flex;flex-direction:column;gap:11px;background:radial-gradient(ellipse at top,rgba(28,45,18,.3),transparent 70%);">
           ${this.sessao.messages.map(m => this.renderBolhaMensagem(m)).join('')}
+          ${this.sessao.isBotTyping ? `
+            <div id="suporte-typing-bubble" style="display:flex;gap:9px;align-items:center;align-self:flex-start;max-width:86%;">
+              <div style="width:30px;height:30px;border-radius:50%;background:rgba(198,255,0,.15);border:1px solid rgba(198,255,0,.3);display:flex;align-items:center;justify-content:center;font-size:1rem;">🤖</div>
+              <div style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);padding:8px 14px;border-radius:0 12px 12px 12px;font-size:.78rem;color:#bae6fd;display:flex;align-items:center;gap:6px;">
+                <span>FinBot analisando</span>
+                <span style="display:inline-flex;gap:3px;margin-left:2px;">
+                  <span style="width:5px;height:5px;background:#38bdf8;border-radius:50%;display:inline-block;animation:syncPulse 1s infinite alternate;"></span>
+                  <span style="width:5px;height:5px;background:#38bdf8;border-radius:50%;display:inline-block;animation:syncPulse 1s infinite alternate .2s;"></span>
+                  <span style="width:5px;height:5px;background:#38bdf8;border-radius:50%;display:inline-block;animation:syncPulse 1s infinite alternate .4s;"></span>
+                </span>
+              </div>
+            </div>
+          ` : ''}
         </div>
 
         ${!closed ? `<div style="padding:10px 14px;border-top:1px solid rgba(255,255,255,.08);background:rgba(0,0,0,.3);">
@@ -235,8 +248,8 @@ const Suporte = {
     const name = isMe ? '' : (isBot ? 'FinBot' : 'Suporte');
     const text = this._esc(m.body || '').replace(/\n/g, '<br>');
     return `<div style="display:flex;gap:9px;align-items:flex-start;max-width:86%;${isMe?'align-self:flex-end;flex-direction:row-reverse;':''}">
-      <div style="width:30px;height:30px;border-radius:50%;background:${isMe?'#243818':(isBot?'rgba(56,189,248,.16)':'rgba(34,197,94,.16)')};border:1px solid rgba(201,162,39,.25);display:flex;align-items:center;justify-content:center;font-size:${isBot?'1rem':'.65rem'};font-weight:900;flex-shrink:0;">${initials}</div>
-      <div><div style="background:${isMe?'linear-gradient(135deg,#1C2D12,#243818)':'rgba(255,255,255,.06)'};border:1px solid ${isMe?'rgba(201,162,39,.3)':'rgba(255,255,255,.1)'};padding:9px 12px;border-radius:${isMe?'12px 0 12px 12px':'0 12px 12px 12px'};font-size:.83rem;line-height:1.45;color:#f8fafc;">${name?`<div style="font-size:.65rem;font-weight:800;color:${isBot?'#7dd3fc':'#4ade80'};margin-bottom:3px;">${name}</div>`:''}${text}<div style="font-size:.62rem;color:#64748b;margin-top:5px;text-align:right;">${this._esc(this._fmtTime(m.created_at))}</div></div></div>
+      <div style="width:30px;height:30px;border-radius:50%;background:${isMe?'#1A2F13':(isBot?'rgba(56,189,248,.16)':'rgba(34,197,94,.16)')};border:1px solid ${isMe?'rgba(198,255,0,.35)':'rgba(255,255,255,.1)'};display:flex;align-items:center;justify-content:center;font-size:${isBot?'1rem':'.65rem'};font-weight:900;flex-shrink:0;">${initials}</div>
+      <div><div style="background:${isMe?'linear-gradient(135deg,#121F0D,#1A2F13)':'rgba(255,255,255,.06)'};border:1px solid ${isMe?'rgba(198,255,0,.3)':'rgba(255,255,255,.1)'};padding:9px 12px;border-radius:${isMe?'12px 0 12px 12px':'0 12px 12px 12px'};font-size:.83rem;line-height:1.45;color:#f8fafc;">${name?`<div style="font-size:.65rem;font-weight:800;color:${isBot?'#7dd3fc':'#4ade80'};margin-bottom:3px;">${name}</div>`:''}${text}<div style="font-size:.62rem;color:#64748b;margin-top:5px;text-align:right;">${this._esc(this._fmtTime(m.created_at))}</div></div></div>
     </div>`;
   },
 
@@ -251,17 +264,42 @@ const Suporte = {
     const btn = document.getElementById('suporte-chat-send');
     const text = String(inp?.value || '').trim();
     if (!text || !this.sessao.conversationId || this.sessao.loading) return;
+
     if (inp) inp.value = '';
     if (btn) btn.disabled = true;
+
+    // 1. Atualização Otimista Imediata (0ms de latência percebida)
+    const optId = 'opt_' + Date.now();
+    const optMsg = {
+      id: optId,
+      conversation_id: this.sessao.conversationId,
+      sender_type: 'client',
+      body: text,
+      created_at: new Date().toISOString()
+    };
+    if (!Array.isArray(this.sessao.messages)) this.sessao.messages = [];
+    this.sessao.messages.push(optMsg);
+    this.sessao.isBotTyping = true;
     this.sessao.loading = true;
+    this.renderTelaChat();
+
+    // 2. Processamento e IA em segundo plano
     try {
       const data = await this._apiSupport('message', 'POST', { action:'message', conversationId:this.sessao.conversationId, text });
+      this.sessao.isBotTyping = false;
       this._applySupportData(data);
       this.renderTelaChat();
     } catch (err) {
+      this.sessao.isBotTyping = false;
+      this.sessao.messages = this.sessao.messages.filter(m => m.id !== optId);
+      this.renderTelaChat();
       if (inp) inp.value = text;
       if (typeof Utils !== 'undefined' && Utils.toast) Utils.toast(err?.message || 'Falha ao enviar mensagem.', 'error');
-    } finally { this.sessao.loading = false; if(btn) btn.disabled=false; }
+    } finally {
+      this.sessao.loading = false;
+      this.sessao.isBotTyping = false;
+      if (btn) btn.disabled = false;
+    }
   },
 
   async chamarAtendente() {

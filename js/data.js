@@ -1468,6 +1468,23 @@ const DB = {
 
     let anyUpdated = false;
     for (const table of needed) {
+      if (table === 'preferencias') {
+        try {
+          const res = await fetch('/api/db?table=preferencias', { headers: this._apiHeaders() });
+          if (res.ok) {
+            const json = await res.json();
+            const prefs = json.preferencias || (json.data && typeof json.data === 'object' && !Array.isArray(json.data) ? json.data : null);
+            if (prefs) {
+              this._applyTableData('preferencias', prefs, false);
+              this._routeLoadedTables.add('preferencias');
+              anyUpdated = true;
+            }
+          }
+        } catch (err) {
+          console.warn(`[Sync] syncRoute falha ao buscar preferencias:`, err?.message || err);
+        }
+        continue;
+      }
       try {
         const items = await this._fetchCloudTablePaged(table);
         if (Array.isArray(items)) {

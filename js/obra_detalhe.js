@@ -478,6 +478,9 @@ const ObraDetalhe = {
     const pctsAcumulados = topItens.map(i => i.pctAcumulado);
     const coresBarras = topItens.map(i => i.classe === 'A' ? '#ef4444' : i.classe === 'B' ? '#f59e0b' : '#3b82f6');
 
+    const prev = Chart.getChart(canvas);
+    if (prev) { try { prev.destroy(); } catch{} }
+
     const ch = new Chart(canvas, {
       data: {
         labels,

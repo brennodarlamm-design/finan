@@ -3,12 +3,11 @@
  * Versão: 2.38.0
  */
 
-const CACHE_NAME = 'fingo-static-v2.38.0';
+const CACHE_NAME = 'fingo-static-v2.38.1';
 
 const PRECACHE_ASSETS = [
   '/',
   '/index.html',
-  '/login',
   '/app.html',
   '/css/tokens.css',
   '/css/style.css',
@@ -68,38 +67,49 @@ self.addEventListener('fetch', (event) => {
     event.respondWith(
       caches.open(CACHE_NAME).then(async (cache) => {
         const cachedResponse = await cache.match(event.request);
-        const fetchPromise = fetch(event.request)
-          .then((networkResponse) => {
-            if (networkResponse && networkResponse.status === 200) {
-              cache.put(event.request, networkResponse.clone());
-            }
-            return networkResponse;
-          })
-          .catch(() => cachedResponse);
-
-        return cachedResponse || fetchPromise;
+        try {
+          const networkResponse = await fetch(event.request);
+          if (networkResponse && (networkResponse.status === 200 || networkResponse.type === 'opaque')) {
+            cache.put(event.request, networkResponse.clone()).catch(() => {});
+          }
+          return networkResponse;
+        } catch (e) {
+          if (cachedResponse) return cachedResponse;
+          return new Response('', { status: 408, statusText: 'Offline' });
+        }
       })
     );
     return;
   }
 
-  // Estratégia: Network-first com fallback para Cache para navegação HTML
+  // Estratégia: Network-first com fallback garantido para navegação HTML
   event.respondWith(
-    fetch(event.request)
-      .then((networkResponse) => {
-        if (networkResponse && networkResponse.status === 200) {
+    (async () => {
+      try {
+        const networkResponse = await fetch(event.request);
+        if (networkResponse && (networkResponse.status === 200 || networkResponse.type === 'opaque')) {
           const resClone = networkResponse.clone();
-          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, resClone));
+          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, resClone).catch(() => {}));
         }
         return networkResponse;
-      })
-      .catch(async () => {
+      } catch (err) {
         const cached = await caches.match(event.request);
         if (cached) return cached;
-        if (event.request.headers.get('accept')?.includes('text/html')) {
-          return caches.match('/app.html') || caches.match('/');
+        const accept = event.request.headers.get('accept') || '';
+        const isHtml = event.request.mode === 'navigate' || accept.includes('text/html') || url.pathname.startsWith('/app');
+        if (isHtml) {
+          const appCached = await caches.match('/app.html');
+          if (appCached) return appCached;
+          const indexCached = (await caches.match('/index.html')) || (await caches.match('/'));
+          if (indexCached) return indexCached;
         }
-      })
+        return new Response('<html><body><h1>Modo Offline</h1><p>Conexão indisponível no momento.</p></body></html>', {
+          status: 503,
+          statusText: 'Service Unavailable',
+          headers: { 'Content-Type': 'text/html;charset=utf-8' }
+        });
+      }
+    })()
   );
 });
 
