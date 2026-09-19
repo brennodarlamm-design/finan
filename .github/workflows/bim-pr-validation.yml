@@ -12,6 +12,7 @@ on:
       - 'css/style.css'
       - '.agents/skills/fingo-bim-3d-pipeline/**'
       - '.github/workflows/bim-pr-validation.yml'
+      - '.github/workflows/bim-large-real-qa.yml'
 
 permissions:
   contents: read
@@ -44,6 +45,7 @@ jobs:
           name: bim-real-qa-report
           path: .qa/
           if-no-files-found: warn
+          include-hidden-files: true
       - name: BIM clash engine regression
         run: node scripts/test-bim-clash-engine.js
       - name: BIM renderer performance regression
