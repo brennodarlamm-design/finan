@@ -630,16 +630,12 @@ assert(offSurface.elements[0].importedProperties.advancedBrepGeometry==='invalid
 assert(offSurface.elements[0].importedProperties.partialReason==='advanced-brep-face-off-surface','diagnóstico identifica face fora do IfcPlane');
 
 
-const selfIntersectingAdvancedBrepIfc = (()=>{
+const makeOctaAdvancedBrepIfc=(pts,globalId,name)=>{
   let nextId=1;
   const rows=[];
   const add=body=>{const id=nextId++;rows.push(`#${id}=${body};`);return id;};
   const fmt=n=>Number.isInteger(n)?`${n}.`:`${n}`;
   const vec=v=>`(${v.map(fmt).join(',')})`;
-  const pts=[
-    [1,0,0],[0,1,0],[-1,0,0],[0,-1,0],
-    [-2,-2,-2],[0,0,-1]
-  ];
   const faces=[
     [4,0,1],[4,1,2],[4,2,3],[4,3,0],
     [5,1,0],[5,2,1],[5,3,2],[5,0,3]
@@ -679,7 +675,7 @@ const selfIntersectingAdvancedBrepIfc = (()=>{
   const localPlacement=add(`IFCLOCALPLACEMENT($,#${rootPlacement})`);
   const shape=add(`IFCSHAPEREPRESENTATION($,'Body','AdvancedBrep',(#${brep}))`);
   const pds=add(`IFCPRODUCTDEFINITIONSHAPE($,$,(#${shape}))`);
-  add(`IFCBUILDINGELEMENTPROXY('ADV-SELF-X',$,'Advanced BRep Auto-Intersectante',$,$,#${localPlacement},#${pds},$,$)`);
+  add(`IFCBUILDINGELEMENTPROXY('${globalId}',$,'${name}',$,$,#${localPlacement},#${pds},$,$)`);
   add(`IFCPROJECT('P',$,'Projeto',$,$,$,$,$,$)`);
   return `ISO-10303-21;
 HEADER;
@@ -689,7 +685,12 @@ DATA;
 ${rows.join('\n')}
 ENDSEC;
 END-ISO-10303-21;`;
-})();
+};
+
+const selfIntersectingAdvancedBrepIfc = makeOctaAdvancedBrepIfc([
+  [1,0,0],[0,1,0],[-1,0,0],[0,-1,0],
+  [-2,-2,-2],[0,0,-1]
+],'ADV-SELF-X','Advanced BRep Auto-Intersectante');
 const selfIntersectingAdvancedBrep=ext.parse(selfIntersectingAdvancedBrepIfc);
 assert(selfIntersectingAdvancedBrep.metadata.clashEligible===false,'shell edge-manifold auto-intersectante fica fora do clash autoritativo');
 assert(selfIntersectingAdvancedBrep.elements[0].importedProperties.advancedBrepTopology==='edge-manifold','auto-interseção geométrica não é confundida com falha combinatória');
@@ -697,8 +698,10 @@ assert(selfIntersectingAdvancedBrep.elements[0].importedProperties.advancedBrepG
 assert(selfIntersectingAdvancedBrep.elements[0].importedProperties.partialReason==='advanced-brep-shell-self-intersection','detector identifica interseção própria entre faces não adjacentes');
 
 
-const coplanarOverlapAdvancedBrepIfc = selfIntersectingAdvancedBrepIfc
-  .replace('#6=IFCCARTESIANPOINT((0.,0.,-1.));','#6=IFCCARTESIANPOINT((-2.,-2.,-2.));');
+const coplanarOverlapAdvancedBrepIfc = makeOctaAdvancedBrepIfc([
+  [1,0,0],[0,1,0],[-1,0,0],[0,-1,0],
+  [0,0,1],[0,0,1]
+],'ADV-COPLANAR-X','Advanced BRep Coplanar Sobreposto');
 const coplanarOverlapAdvancedBrep=ext.parse(coplanarOverlapAdvancedBrepIfc);
 assert(coplanarOverlapAdvancedBrep.metadata.clashEligible===false,'shell edge-manifold com faces coplanares sobrepostas fica fora do clash');
 assert(coplanarOverlapAdvancedBrep.elements[0].importedProperties.advancedBrepTopology==='edge-manifold','sobreposição coplanar preserva diagnóstico topológico separado');
