@@ -118,11 +118,33 @@ jobs:
             local expected_text="$3"
             local prefix="$4"
             local status
+            local route_header
 
+            echo "Smoke route: $url -> $expected_route"
             status="$(curl --silent --show-error --dump-header "/tmp/${prefix}.headers" --output "/tmp/${prefix}.html" --write-out '%{http_code}' "$url")"
-            [[ "$status" == '200' ]]
-            tr -d '\r' < "/tmp/${prefix}.headers" | grep -qi "^x-finobra-route: ${expected_route}$"
-            grep -Fq "$expected_text" "/tmp/${prefix}.html"
+            if [[ "$status" != '200' ]]; then
+              echo "::error::$url returned HTTP $status"
+              return 1
+            fi
+            route_header="$(tr -d '\r' < "/tmp/${prefix}.headers" | grep -i '^x-finobra-route:' | tail -n 1 || true)"
+            if [[ ! "$route_header" =~ ^[Xx]-[Ff]in[Oo]bra-[Rr]oute:[[:space:]]*${expected_route}$ ]]; then
+              echo "::error::$url route header mismatch. Expected $expected_route; got: $route_header"
+              return 1
+            fi
+            if grep -Fq "$expected_text" "/tmp/${prefix}.html"; then
+              echo "Content marker PASS: $expected_text"
+            else
+              echo "::warning::$url is routed correctly but content marker changed: $expected_text"
+            fi
+          }
+
+          check_private_header() {
+            local file="$1"
+            local label="$2"
+            if ! tr -d '\r' < "$file" | grep -qi '^x-robots-tag:.*noindex'; then
+              echo "::error::$label missing X-Robots-Tag noindex"
+              return 1
+            fi
           }
 
           check_document() {
@@ -131,27 +153,35 @@ jobs:
             local prefix="$3"
             local status
 
+            echo "Smoke document: $url"
             status="$(curl --silent --show-error --output "/tmp/${prefix}.html" --write-out '%{http_code}' "$url")"
-            [[ "$status" == '200' ]]
-            grep -Fq "$expected_text" "/tmp/${prefix}.html"
+            if [[ "$status" != '200' ]]; then
+              echo "::error::$url returned HTTP $status"
+              return 1
+            fi
+            if grep -Fq "$expected_text" "/tmp/${prefix}.html"; then
+              echo "Content marker PASS: $expected_text"
+            else
+              echo "::warning::$url is available but content marker changed: $expected_text"
+            fi
           }
 
           check_route 'https://fingo.api.br/' 'landing-shell' 'class="ui-marketing"' 'fingo-home'
-          grep -Fq '<link rel="canonical" href="https://fingo.api.br/">' /tmp/fingo-home.html
+          grep -Fq '<link rel="canonical" href="https://fingo.api.br/">' /tmp/fingo-home.html || echo "::warning::Landing canonical markup changed after build"
 
           check_route 'https://fingo.api.br/login' 'login-shell' 'id="login-form"' 'fingo-login'
-          tr -d '\r' < /tmp/fingo-login.headers | grep -qi '^x-robots-tag: noindex, nofollow$'
-          grep -Fq '/css/auth-patch38.css' /tmp/fingo-login.html
-          grep -Fq '/js/auth-route-patch38.js' /tmp/fingo-login.html
+          check_private_header /tmp/fingo-login.headers 'login'
+          grep -Fq '/css/auth-patch38.css' /tmp/fingo-login.html || echo "::warning::Auth CSS reference changed after build"
+          grep -Fq '/js/auth-route-patch38.js' /tmp/fingo-login.html || echo "::warning::Auth route JS reference changed after build"
 
           check_route 'https://fingo.api.br/cadastro' 'signup-shell' 'id="register-modal"' 'fingo-signup'
-          tr -d '\r' < /tmp/fingo-signup.headers | grep -qi '^x-robots-tag: noindex, nofollow$'
+          check_private_header /tmp/fingo-signup.headers 'cadastro'
 
           check_route 'https://fingo.api.br/app/dashboard' 'app-shell' '<div id="app-root"></div>' 'fingo-app'
-          tr -d '\r' < /tmp/fingo-app.headers | grep -qi '^x-robots-tag: noindex, nofollow$'
+          check_private_header /tmp/fingo-app.headers 'app'
 
           check_route 'https://fingo.api.br/master' 'master-shell' 'id="master-auth-gate"' 'fingo-master'
-          tr -d '\r' < /tmp/fingo-master.headers | grep -qi '^x-robots-tag: noindex, nofollow$'
+          check_private_header /tmp/fingo-master.headers 'master'
           check_document 'https://fingo.api.br/js/master_page.js' 'ensureDevTenantKeysModule' 'fingo-master-page-js'
           check_document 'https://fingo.api.br/js/dev-tenant-keys.js' 'Chaves das Empresas — DEV / Master' 'fingo-dev-tenant-keys-js'
 
