@@ -39,7 +39,7 @@ jobs:
           set -euo pipefail
           mkdir -p .qa/large
           BASE="https://raw.githubusercontent.com/buildingSMART/Certification-datasets/main"
-          if [ "${{ inputs.model_set }}" = "infra" ]; then
+          if [ "${{ inputs.model_set || 'building' }}" = "infra" ]; then
             curl --fail --location --retry 3 --output .qa/large/ifc4-infra-bridge.ifc "$BASE/IFC%204.0.2.1%20%28IFC%204%20ADD2%20TC1%29/Simple-Scene/Infra-Bridge.ifc"
             curl --fail --location --retry 3 --output .qa/large/ifc4-infra-landscaping.ifc "$BASE/IFC%204.0.2.1%20%28IFC%204%20ADD2%20TC1%29/Simple-Scene/Infra-Landscaping.ifc"
           else
@@ -57,7 +57,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: bim-large-real-qa-report-${{ inputs.model_set }}
+          name: bim-large-real-qa-report-${{ inputs.model_set || 'building' }}
           path: .qa/
           if-no-files-found: warn
           include-hidden-files: true
