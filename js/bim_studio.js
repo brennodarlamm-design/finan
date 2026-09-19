@@ -952,7 +952,9 @@ const BIMStudio = {
     if (btnRenderAi) {
       btnRenderAi.addEventListener('click', () => {
         const modal = document.getElementById('ai-render-modal');
+        const loading = document.getElementById('ai-loading');
         if (modal) modal.style.display = 'flex';
+        if (loading) loading.style.display = 'none';
         this._initGeminiKeyConfig();
       });
     }
@@ -1009,7 +1011,7 @@ const BIMStudio = {
           statusEl.innerHTML = `<span style="color:#C6FF00;font-weight:700;">● Chave Pessoal Ativa:</span> <code>${masked}</code> (Usada prioritariamente no pool do Imagen 3)`;
           if (clearBtn) clearBtn.style.display = 'inline-flex';
         } else {
-          statusEl.innerHTML = `<span style="color:#94A3B8;">○ Usando Pool de Chaves Compartilhado.</span> <span style="color:#EAB308;">(Dica: adicione sua chave gratuita do Google AI Studio para cota garantida e sem fila)</span>`;
+          statusEl.innerHTML = `<span style="color:#94A3B8;">○ Nenhuma chave pessoal configurada.</span> <span style="color:#EAB308;">(Cole sua chave gratuita do Google AI Studio acima ou use o Render 4K Local ao lado)</span>`;
           if (clearBtn) clearBtn.style.display = 'none';
         }
       }
@@ -1028,7 +1030,7 @@ const BIMStudio = {
         } else if (!val) {
           localStorage.removeItem('fingo_gemini_key');
           updateStatus();
-          alert('Chave removida. O estúdio usará o pool público padrão.');
+          alert('Chave removida.');
         } else {
           alert('A chave informada parece inválida ou curta demais. Verifique se copiou a chave completa do Google AI Studio.');
         }
@@ -1058,13 +1060,37 @@ const BIMStudio = {
 
     if (!modal || !loading || !resultWrap || !resultImg) return;
 
+    const userKey = localStorage.getItem('fingo_gemini_key') || document.getElementById('gemini-key-input')?.value.trim() || '';
+
+    // Se o usuário não tiver configurado chave, orientar amigavelmente sem disparar requisição que vai falhar
+    if (!userKey) {
+      const keyInput = document.getElementById('gemini-key-input');
+      const statusEl = document.getElementById('gemini-key-status');
+      if (keyInput) {
+        keyInput.focus();
+        keyInput.style.borderColor = '#C6FF00';
+        keyInput.style.boxShadow = '0 0 14px rgba(198,255,0,0.4)';
+        setTimeout(() => {
+          keyInput.style.borderColor = '#243518';
+          keyInput.style.boxShadow = 'none';
+        }, 3000);
+      }
+      if (statusEl) {
+        statusEl.innerHTML = `
+          <div style="background:rgba(239,68,68,0.15);border:1px solid #EF4444;border-radius:6px;padding:8px 10px;margin-top:4px;">
+            <b style="color:#EF4444;">⚠️ Nenhuma chave do Gemini informada.</b><br>
+            <span style="color:#F0EAD6;">Cole sua chave gratuita do <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener" style="color:#C6FF00;text-decoration:underline;">Google AI Studio</a> no campo acima e clique em "Salvar Chave", ou clique no botão ao lado <b>"🎨 Renderizar 4K Local (0s)"</b> para gerar imediatamente sem precisar de chave!</span>
+          </div>
+        `;
+      }
+      return;
+    }
+
     modal.style.display = 'flex';
     loading.style.display = 'flex';
     resultWrap.style.display = 'none';
     if (loadingText) loadingText.textContent = 'Capturando geometria 3D & Gerando com Google Gemini Imagen 3...';
     if (loadingSubtext) loadingSubtext.textContent = 'Aplicando iluminação solar fotométrica, física de reflexão no vidro e texturas fotorrealistas de madeira cumaru e piscina...';
-
-    const userKey = localStorage.getItem('fingo_gemini_key') || document.getElementById('gemini-key-input')?.value.trim() || '';
 
     try {
       // 1. Capturar snapshot atual da cena 3D
