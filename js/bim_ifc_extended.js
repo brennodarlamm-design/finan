@@ -864,19 +864,31 @@ const BIMIFCExtendedImporter = (function() {
       return {triangles,radius,height};
     };
     const planeAngleScaleToRadians=()=>{
-      for(const unit of entities.values()){
+      const scaleForUnit=unitId=>{
+        const unit=entities.get(unitId); if(!unit) return null;
         if(unit.type==='IFCSIUNIT'&&/\.PLANEANGLEUNIT\./i.test(unit.raw)&&/\.RADIAN\./i.test(unit.raw)) return 1;
-      }
-      for(const unit of entities.values()){
-        if(unit.type!=='IFCCONVERSIONBASEDUNIT'||!/\.PLANEANGLEUNIT\./i.test(unit.raw)) continue;
+        if(unit.type!=='IFCCONVERSIONBASEDUNIT'||!/\.PLANEANGLEUNIT\./i.test(unit.raw)) return null;
         const factorId=refsIn(unit.raw).find(id=>entities.get(id)?.type==='IFCMEASUREWITHUNIT');
-        const factor=entities.get(factorId);
-        const scale=factor?num(factor.args[0]):0;
-        const baseUnitId=factor?refsIn(factor.raw).find(id=>entities.get(id)?.type==='IFCSIUNIT'):null;
+        const factor=entities.get(factorId); if(!factor) return null;
+        const scale=num(factor.args[0]);
+        const baseUnitId=refsIn(factor.raw).find(id=>entities.get(id)?.type==='IFCSIUNIT');
         const baseUnit=entities.get(baseUnitId);
-        if(scale>0&&baseUnit&&/\.PLANEANGLEUNIT\./i.test(baseUnit.raw)&&/\.RADIAN\./i.test(baseUnit.raw)) return scale;
+        return scale>0&&baseUnit&&/\.PLANEANGLEUNIT\./i.test(baseUnit.raw)&&/\.RADIAN\./i.test(baseUnit.raw)?scale:null;
+      };
+      for(const assignment of entities.values()){
+        if(assignment.type!=='IFCUNITASSIGNMENT') continue;
+        for(const unitId of refsIn(assignment.args[0]||assignment.raw)){
+          const scale=scaleForUnit(unitId);
+          if(scale) return scale;
+        }
       }
-      return null;
+      const conversionCandidates=[...entities.values()].filter(unit=>unit.type==='IFCCONVERSIONBASEDUNIT'&&/\.PLANEANGLEUNIT\./i.test(unit.raw));
+      for(const unit of conversionCandidates){
+        const scale=scaleForUnit(unit.id);
+        if(scale) return scale;
+      }
+      const siCandidates=[...entities.values()].filter(unit=>unit.type==='IFCSIUNIT'&&/\.PLANEANGLEUNIT\./i.test(unit.raw)&&/\.RADIAN\./i.test(unit.raw));
+      return siCandidates.length===1?1:null;
     };
     const rectangularTrimmedCylinderPatch=(surfaceId,outer,holes=[])=>{
       const e=entities.get(surfaceId);
