@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" version="1.2" baseProfile="tiny-ps" viewBox="0 0 512 512" width="512" height="512">
+  <title>FinGo — Obras em Fluxo</title>
+  <!-- Background Solid Surface -->
+  <rect width="512" height="512" fill="#0A0A0A"/>
+  <circle cx="256" cy="256" r="246" fill="#141D12" stroke="#282828" stroke-width="8"/>
+  <!-- FinGo Acid Green Neon Symbol (BIMI Safe Centered) -->
+  <g transform="translate(114, 121) scale(0.72)">
+    <polygon points="385,10 139,10 10,139 10,358 93,275 93,174 172,95 385,95" fill="#C6FF00"/>
+    <polygon points="385,155 218,155 137,236 267,236 138,365 265,365 385,245" fill="#C6FF00"/>
+  </g>
+</svg>
