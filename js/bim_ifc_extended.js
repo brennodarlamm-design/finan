@@ -375,11 +375,98 @@ const BIMIFCExtendedImporter = (function() {
       exactCurveKinds.add('indexed-polycurve');
       return out;
     };
+    const numberList=token=>[...String(token||'').matchAll(/[-+]?\d*\.?\d+(?:[Ee][-+]?\d+)?/g)].map(m=>Number(m[0])).filter(Number.isFinite);
+    const bsplineCurvePoints=e=>{
+      const degree=Math.trunc(num(e.args[0]));
+      const controlIds=refsIn(e.args[1]||'');
+      const controls=controlIds.map(point);
+      if(degree<1||controls.length<degree+1){partialCurveIds.add(e.id);return [];}
+
+      const withKnots=/BSPLINECURVEWITHKNOTS/.test(e.type);
+      const rational=/RATIONALBSPLINECURVEWITHKNOTS/.test(e.type);
+      let knotVector=[];
+      if(withKnots){
+        const multiplicities=numberList(e.args[5]);
+        const knots=numberList(e.args[6]);
+        if(!multiplicities.length||multiplicities.length!==knots.length){partialCurveIds.add(e.id);return [];}
+        for(let i=0;i<knots.length;i++){
+          const count=Math.max(0,Math.trunc(multiplicities[i]));
+          for(let k=0;k<count;k++) knotVector.push(knots[i]);
+        }
+      }
+      if(!knotVector.length){
+        partialCurveIds.add(e.id);
+        return [];
+      }
+      if(knotVector.length!==controls.length+degree+1){
+        partialCurveIds.add(e.id);
+        return [];
+      }
+
+      const weights=rational?numberList(e.args[8]):controls.map(()=>1);
+      if(weights.length!==controls.length||weights.some(w=>!Number.isFinite(w)||w<=0)){partialCurveIds.add(e.id);return [];}
+
+      const n=controls.length-1;
+      const uMin=knotVector[degree],uMax=knotVector[n+1];
+      if(!Number.isFinite(uMin)||!Number.isFinite(uMax)||uMax-uMin<=1e-12){partialCurveIds.add(e.id);return [];}
+
+      const findSpan=u=>{
+        if(u>=knotVector[n+1]-1e-12) return n;
+        if(u<=knotVector[degree]+1e-12) return degree;
+        let low=degree,high=n+1,mid=Math.floor((low+high)/2);
+        while(u<knotVector[mid]||u>=knotVector[mid+1]){
+          if(u<knotVector[mid]) high=mid; else low=mid;
+          mid=Math.floor((low+high)/2);
+        }
+        return mid;
+      };
+      const basisFunctions=(span,u)=>{
+        const N=new Array(degree+1).fill(0),left=new Array(degree+1),right=new Array(degree+1);
+        N[0]=1;
+        for(let j=1;j<=degree;j++){
+          left[j]=u-knotVector[span+1-j];
+          right[j]=knotVector[span+j]-u;
+          let saved=0;
+          for(let r=0;r<j;r++){
+            const denom=right[r+1]+left[j-r];
+            const temp=Math.abs(denom)<1e-14?0:N[r]/denom;
+            N[r]=saved+right[r+1]*temp;
+            saved=left[j-r]*temp;
+          }
+          N[j]=saved;
+        }
+        return N;
+      };
+      const evaluate=u=>{
+        const span=findSpan(u),N=basisFunctions(span,u);
+        let x=0,y=0,z=0,w=0;
+        for(let j=0;j<=degree;j++){
+          const idx=span-degree+j,weight=weights[idx],b=N[j]*weight,p=controls[idx];
+          x+=p.x*b;y+=p.y*b;z+=p.z*b;w+=b;
+        }
+        return Math.abs(w)<1e-14?null:{x:x/w,y:y/w,z:z/w};
+      };
+
+      let nonZeroSpans=0;
+      for(let i=degree;i<=n;i++) if(knotVector[i+1]-knotVector[i]>1e-12) nonZeroSpans++;
+      const samples=Math.max(24,Math.min(128,nonZeroSpans*16));
+      const out=[];
+      for(let i=0;i<=samples;i++){
+        const u=i===samples?uMax:uMin+(uMax-uMin)*(i/samples);
+        const p=evaluate(u);
+        if(p) appendPoints(out,[p]);
+      }
+      if(out.length<2){partialCurveIds.add(e.id);return [];}
+      exactCurveKinds.add(rational?'nurbs-curve':'bspline-curve');
+      return out;
+    };
+
     const curvePoints=(id,depth=0)=>{
       if(!id||depth>20) return [];
       const e=entities.get(id); if(!e) return [];
       if(e.type==='IFCPOLYLINE') return refsIn(e.args[0]).map(point);
       if(e.type==='IFCINDEXEDPOLYCURVE') return indexedPolyCurvePoints(e);
+      if(e.type==='IFCBSPLINECURVEWITHKNOTS'||e.type==='IFCRATIONALBSPLINECURVEWITHKNOTS') return bsplineCurvePoints(e);
       if(e.type==='IFCCIRCLE'||e.type==='IFCELLIPSE'){exactCurveKinds.add(e.type==='IFCCIRCLE'?'circle':'ellipse');return sampleConic(e,0,Math.PI*2,true);}
       if(e.type==='IFCTRIMMEDCURVE'){
         const baseEntity=entities.get(refOf(e.args[0]));
@@ -727,7 +814,7 @@ const BIMIFCExtendedImporter = (function() {
       const faceVoidIds=descendants(reprId,new Set(['IFCINDEXEDPOLYGONALFACEWITHVOIDS']));
       const faceVoidsPartial=faceVoidIds.some(id=>partialFaceVoidIds.has(id));
       const faceVoidsExact=faceVoidIds.length>0&&!faceVoidsPartial&&faceVoidIds.every(id=>exactFaceVoidIds.has(id));
-      const curveIds=descendants(reprId,new Set(['IFCINDEXEDPOLYCURVE','IFCCOMPOSITECURVE','IFCCOMPOSITECURVESEGMENT','IFCTRIMMEDCURVE','IFCCIRCLE','IFCELLIPSE']));
+      const curveIds=descendants(reprId,new Set(['IFCINDEXEDPOLYCURVE','IFCCOMPOSITECURVE','IFCCOMPOSITECURVESEGMENT','IFCTRIMMEDCURVE','IFCCIRCLE','IFCELLIPSE','IFCBSPLINECURVEWITHKNOTS','IFCRATIONALBSPLINECURVEWITHKNOTS']));
       const curvePartial=curveIds.some(id=>partialCurveIds.has(id));
       const curveExact=curveIds.length>0&&!curvePartial;
       const booleanPartial=booleanIds.some(id=>partialBooleanIds.has(id));
