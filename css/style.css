@@ -1421,9 +1421,16 @@ select:focus-visible {
   min-height: 540px;
 }
 @media (max-width: 900px) {
-  .bim-main-grid {
-    grid-template-columns: 1fr;
+  .bim-main-grid,
+  .bim-bottom-grid {
+    grid-template-columns: 1fr !important;
     min-height: auto;
+  }
+  .bim-toolbar {
+    align-items: stretch !important;
+  }
+  #bim-section-range {
+    width: 72px !important;
   }
 }
 
