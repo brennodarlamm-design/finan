@@ -49,6 +49,14 @@ const BIMViewer = {
   render(containerId, obraId) {
     this.containerId = containerId;
     this.activeObraId = obraId;
+    this.modelSource = 'procedural';
+    this.importedModel = null;
+    this.activeModelDocId = null;
+    this.clashAnalysis = null;
+    this.clashResults = [];
+    this.clashHighlightIds = [];
+    this.currentFloor = 'all';
+    this.disciplineFilter = 'all';
     const container = document.getElementById(containerId);
     if (!container) return;
 
@@ -105,6 +113,9 @@ const BIMViewer = {
                 <option value="all">Todas disciplinas</option>
                 <option value="estrutural">Estrutural</option>
                 <option value="arquitetura">Arquitetura</option>
+                <option value="hidraulica">Hidráulica</option>
+                <option value="eletrica">Elétrica</option>
+                <option value="mecanica">Mecânica / HVAC</option>
               </select>
               <button type="button" class="bim-color-btn" data-color-mode="material" style="padding:5px 8px;font-size:.70rem;border:none;background:#C6FF00;color:#000;border-radius:4px;cursor:pointer;font-weight:800;">Materiais</button>
               <button type="button" class="bim-color-btn" data-color-mode="status" style="padding:5px 8px;font-size:.70rem;border:none;background:transparent;color:#F0EAD6;border-radius:4px;cursor:pointer;font-weight:700;">Status</button>
@@ -838,6 +849,7 @@ const BIMViewer = {
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px 10px;margin-top:10px;font-size:.70rem;">
             <div><span style="color:#64748B;">Classe IFC</span><br><strong style="color:#E2E8F0;">${Utils.escapeHtml(props.ifcClass)}</strong></div>
             <div><span style="color:#64748B;">Disciplina</span><br><strong style="color:#E2E8F0;">${Utils.escapeHtml(props.discipline)}</strong></div>
+            ${elem.importedProperties?.storeyName ? `<div><span style="color:#64748B;">Pavimento IFC</span><br><strong style="color:#E2E8F0;">${Utils.escapeHtml(elem.importedProperties.storeyName)}</strong></div>` : ''}
             <div><span style="color:#64748B;">Material</span><br><strong style="color:#E2E8F0;">${Utils.escapeHtml(props.material)}</strong></div>
             <div><span style="color:#64748B;">Status</span><br><strong style="color:${this._statusColorForElement(elem)};">${Utils.escapeHtml(props.status)}</strong></div>
             <div><span style="color:#64748B;">Dimensão X</span><br><strong style="color:#E2E8F0;">${props.width}</strong></div>
@@ -849,6 +861,8 @@ const BIMViewer = {
             ${elem.importedProperties?.globalId ? `<div style="grid-column:1/-1;"><span style="color:#64748B;">IFC GlobalId</span><br><strong style="color:#E2E8F0;word-break:break-all;">${Utils.escapeHtml(elem.importedProperties.globalId)}</strong></div>` : ''}
             ${elem.importedProperties?.stepId ? `<div><span style="color:#64748B;">STEP ID</span><br><strong style="color:#E2E8F0;">#${Utils.escapeHtml(String(elem.importedProperties.stepId))}</strong></div>` : ''}
             ${elem.importedProperties?.geometryQuality ? `<div><span style="color:#64748B;">Geometria</span><br><strong style="color:${elem.importedProperties.geometryQuality === 'partial' ? '#F59E0B' : '#C6FF00'};">${Utils.escapeHtml(elem.importedProperties.geometryQuality)}</strong></div>` : ''}
+            ${Array.isArray(elem.importedProperties?.geometryKinds) && elem.importedProperties.geometryKinds.length ? `<div style="grid-column:1/-1;"><span style="color:#64748B;">Representações IFC</span><br><strong style="color:#C4B5FD;">${Utils.escapeHtml(elem.importedProperties.geometryKinds.join(' + '))}</strong></div>` : ''}
+            ${elem.importedProperties?.partialReason ? `<div style="grid-column:1/-1;background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.2);padding:6px 8px;border-radius:6px;"><span style="color:#F59E0B;">Limitação geométrica</span><br><strong style="color:#FCD34D;">${Utils.escapeHtml(elem.importedProperties.partialReason)}</strong></div>` : ''}
           </div>
           ${this._renderIfcPropertySets(elem)}
           <div style="font-size:.62rem;color:#64748B;margin-top:8px;">${isImported ? 'Dimensões exibidas na escala normalizada do viewer. IDs e Property Sets IFC são preservados do arquivo original quando disponíveis.' : 'Dimensões e volume seguem a escala paramétrica do modelo atual.'}</div>
@@ -1001,6 +1015,7 @@ const BIMViewer = {
     this.panX = 0;
     this.panY = 25;
     this._setModelSourceUi();
+    this._refreshFloorButtons();
     this._refreshSelectedElementUi();
   },
 
@@ -1018,6 +1033,7 @@ const BIMViewer = {
     this.currentFloor = 'all';
     this.disciplineFilter = 'all';
     this._setModelSourceUi();
+    this._refreshFloorButtons();
     this._refreshSelectedElementUi();
   },
 
@@ -1591,20 +1607,65 @@ const BIMViewer = {
   },
 
   _renderFloorButtonsHtml(obra) {
-    const pavimentos = Math.max(1, Number(obra?.pavimentos || 1));
-    const floors = [
-      ['all', 'Todos os Pavimentos'],
-      ['cobertura', 'Cobertura & Telhado'],
-      ...(pavimentos > 1 ? [['pav1', '1º Pavimento & Sacada']] : []),
-      ['terreo', 'Pavimento Térreo'],
-      ['fundacao', 'Fundações & Baldrame']
-    ];
+    let floors;
+    let pavimentos;
+
+    if (this.modelSource === 'imported') {
+      const storeys = new Map();
+      (this.elements || []).forEach(elem => {
+        if (!elem.floor || elem.floor === 'all') return;
+        const meta = elem.importedProperties || {};
+        if (!storeys.has(elem.floor)) {
+          storeys.set(elem.floor, {
+            key: elem.floor,
+            label: meta.storeyName || elem.floor,
+            elevation: Number(meta.storeyElevation || 0)
+          });
+        }
+      });
+      const ordered = Array.from(storeys.values()).sort((a,b) => b.elevation - a.elevation);
+      floors = [['all', 'Todos os Pavimentos'], ...ordered.map(s => [s.key, s.label])];
+      pavimentos = ordered.length || 1;
+    } else {
+      pavimentos = Math.max(1, Number(obra?.pavimentos || 1));
+      floors = [
+        ['all', 'Todos os Pavimentos'],
+        ['cobertura', 'Cobertura & Telhado'],
+        ...(pavimentos > 1 ? [['pav1', '1º Pavimento & Sacada']] : []),
+        ['terreo', 'Pavimento Térreo'],
+        ['fundacao', 'Fundações & Baldrame']
+      ];
+    }
+
     return `
-      <div style="position:absolute;top:16px;left:16px;display:flex;flex-direction:column;gap:6px;background:rgba(10,17,8,0.88);backdrop-filter:blur(10px);border:1px solid #243518;border-radius:8px;padding:10px 12px;z-index:2;box-shadow:0 8px 24px rgba(0,0,0,0.6);">
+      <div id="bim-floor-panel" style="position:absolute;top:16px;left:16px;display:flex;flex-direction:column;gap:6px;background:rgba(10,17,8,0.88);backdrop-filter:blur(10px);border:1px solid #243518;border-radius:8px;padding:10px 12px;z-index:2;box-shadow:0 8px 24px rgba(0,0,0,0.6);max-height:calc(100% - 32px);overflow:auto;">
         <span style="font-size:.68rem;font-weight:800;color:#94A3B8;text-transform:uppercase;letter-spacing:.05em;">Pavimentos · ${pavimentos}</span>
-        ${floors.map(([floor,label]) => `<button type="button" class="bim-floor-btn ${this.currentFloor === floor ? 'active' : ''}" data-floor="${floor}" style="text-align:left;padding:6px 10px;font-size:.76rem;border:none;border-radius:4px;cursor:pointer;background:${this.currentFloor === floor ? '#C6FF00' : 'transparent'};color:${this.currentFloor === floor ? '#000' : '#F0F0E8'};font-weight:800;">${label}</button>`).join('')}
+        ${floors.map(([floor,label]) => `<button type="button" class="bim-floor-btn ${this.currentFloor === floor ? 'active' : ''}" data-floor="${Utils.escapeHtml(floor)}" style="text-align:left;padding:6px 10px;font-size:.76rem;border:none;border-radius:4px;cursor:pointer;background:${this.currentFloor === floor ? '#C6FF00' : 'transparent'};color:${this.currentFloor === floor ? '#000' : '#F0F0E8'};font-weight:800;white-space:nowrap;">${Utils.escapeHtml(label)}</button>`).join('')}
       </div>
     `;
+  },
+
+  _bindFloorButtonEvents() {
+    document.querySelectorAll('.bim-floor-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        const floor = e.currentTarget.getAttribute('data-floor');
+        this.currentFloor = floor;
+        document.querySelectorAll('.bim-floor-btn').forEach(b => {
+          b.style.background = 'transparent';
+          b.style.color = '#F0EAD6';
+        });
+        e.currentTarget.style.background = '#C6FF00';
+        e.currentTarget.style.color = '#000';
+      });
+    });
+  },
+
+  _refreshFloorButtons() {
+    const host = document.getElementById('bim-floor-panel');
+    if (!host) return;
+    const obra = (typeof DB !== 'undefined' && DB.getById('clientes', this.activeObraId)) || {};
+    host.outerHTML = this._renderFloorButtonsHtml(obra);
+    this._bindFloorButtonEvents();
   },
 
   _applyOperationalData(snapshot) {
@@ -1801,18 +1862,7 @@ const BIMViewer = {
     });
 
     // Botões de Pavimento
-    document.querySelectorAll('.bim-floor-btn').forEach(btn => {
-      btn.addEventListener('click', (e) => {
-        const floor = e.currentTarget.getAttribute('data-floor');
-        this.currentFloor = floor;
-        document.querySelectorAll('.bim-floor-btn').forEach(b => {
-          b.style.background = 'transparent';
-          b.style.color = '#F0EAD6';
-        });
-        e.currentTarget.style.background = '#C6FF00';
-        e.currentTarget.style.color = '#000';
-      });
-    });
+    this._bindFloorButtonEvents();
 
     // Botões de Modo
     document.querySelectorAll('.bim-btn').forEach(btn => {
