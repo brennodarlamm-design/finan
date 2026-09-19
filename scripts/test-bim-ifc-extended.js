@@ -213,6 +213,36 @@ assert(booleanModel.metadata.clashEligible===true,'IfcBooleanResult exato perman
 assert(booleanModel.elements[0].importedProperties.booleanExact===true,'IfcBooleanResult registra CSG exato');
 assert(booleanModel.elements[0].rawTriangles.length>12,'diferença booleana altera a malha');
 
+const halfSpaceIfc = `ISO-10303-21;
+HEADER;
+FILE_SCHEMA(('IFC4'));
+ENDSEC;
+DATA;
+#1=IFCCARTESIANPOINT((0.,0.,0.));
+#2=IFCAXIS2PLACEMENT3D(#1,$,$);
+#3=IFCLOCALPLACEMENT($,#2);
+#4=IFCAXIS2PLACEMENT2D(#1,$);
+#5=IFCRECTANGLEPROFILEDEF(.AREA.,$,#4,4.,4.);
+#6=IFCDIRECTION((0.,0.,1.));
+#7=IFCEXTRUDEDAREASOLID(#5,#2,#6,4.);
+#8=IFCCARTESIANPOINT((0.,0.,2.));
+#9=IFCAXIS2PLACEMENT3D(#8,$,$);
+#10=IFCPLANE(#9);
+#11=IFCHALFSPACESOLID(#10,.T.);
+#12=IFCBOOLEANCLIPPINGRESULT(.DIFFERENCE.,#7,#11);
+#13=IFCSHAPEREPRESENTATION($,'Body','Clipping',(#12));
+#14=IFCPRODUCTDEFINITIONSHAPE($,$,(#13));
+#15=IFCBUILDINGELEMENTPROXY('CLIP-GID',$,'Sólido Recortado',$,$,#3,#14,$,$);
+#16=IFCPROJECT('P',$,'Projeto',$,$,$,$,$,$);
+ENDSEC;
+END-ISO-10303-21;`;
+const half=ext.parse(halfSpaceIfc);
+const halfPoints=half.elements[0].rawTriangles.flat();
+assert(half.metadata.clashEligible===true,'IfcHalfSpaceSolid planar suportado mantém clash autoritativo');
+assert(half.elements[0].importedProperties.booleanExact===true,'IfcBooleanClippingResult planar é marcado como exato');
+assert(Math.min(...halfPoints.map(p=>p.z))>=2-1e-5,'clipping remove o lado correto do half-space');
+assert(half.elements[0].rawTriangles.length>=12,'clipping planar fecha a superfície de corte');
+
 const viewer=fs.readFileSync('js/bim_viewer.js','utf8');
 assert(viewer.includes('id="bim-floor-panel"'),'viewer possui painel de pavimentos atualizável');
 assert(viewer.includes("elem.importedProperties?.storeyName"),'inspetor mostra pavimento IFC');
