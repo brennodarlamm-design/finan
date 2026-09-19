@@ -1,6 +1,7 @@
 /**
  * FinGo — Módulo Visualizador 3D BIM Interativo para Obras & Orçamentos (BIMViewer)
- * Renderizador 3D procedural arquitetônico de alta fidelidade com vínculo direto ao SINAPI e custos.
+ * Renderizador 3D CAD/BIM procedural arquitetônico de alta fidelidade com vínculo direto ao SINAPI e custos.
+ * Interface Brutalist Tech inspirada em estações de trabalho de engenharia de ponta.
  */
 
 const BIMViewer = {
@@ -11,6 +12,9 @@ const BIMViewer = {
   currentFloor: 'all', // 'all', 'fundacao', 'terreo', 'pav1', 'cobertura'
   viewMode: 'solid', // 'solid', 'wireframe', 'xray'
   selectedElement: null,
+  hiddenElementIds: new Set(),
+  activeLeftTab: 'tree', // 'tree' | 'properties'
+  activeRightTab: 'mep', // 'mep' | 'costs'
 
   // Estados de Câmera 3D
   rotX: 24 * (Math.PI / 180),
@@ -57,16 +61,19 @@ const BIMViewer = {
     this.clashAnalysis = null;
     this.clashResults = [];
     this.clashHighlightIds = [];
+    this.hiddenElementIds = new Set();
     this.currentFloor = 'all';
     this.disciplineFilter = 'all';
+    this.activeLeftTab = 'tree';
+    this.activeRightTab = 'mep';
     const container = document.getElementById(containerId);
     if (!container) return;
 
     const obra = (typeof DB !== 'undefined' && DB.getById('clientes', obraId)) || {
-      nome: 'Obra Modelo',
-      area_construida: 240,
+      nome: 'Mansão Villa Aurora',
+      area_construida: 480,
       pavimentos: 2,
-      padrao: 'Normal'
+      padrao: 'Alto Padrão'
     };
     const snapshot = this._getOperationalSnapshot(obraId);
     this.financialSnapshot = snapshot;
@@ -74,52 +81,39 @@ const BIMViewer = {
     this.coordinationIssues = this._loadCoordinationIssues();
 
     container.innerHTML = `
-      <div class="bim-viewer-layout" style="display:flex;flex-direction:column;gap:16px;">
-        <!-- Barra de Ferramentas Superior do BIM -->
-        <div class="bim-toolbar" style="display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px;background:#0A1108;border:1px solid #243518;border-radius:10px;padding:12px 16px;">
-          <div style="display:flex;align-items:center;gap:10px;">
-            <span style="font-size:1.25rem;">🏢</span>
+      <div class="bim-viewer-layout" style="display:flex;flex-direction:column;gap:12px;font-family:inherit;">
+        <!-- Barra de Ferramentas Superior do BIM (Header Brutalist Tech) -->
+        <div class="bim-toolbar" style="display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px;background:#0A1108;border:1px solid #243518;border-radius:10px;padding:10px 16px;">
+          <div style="display:flex;align-items:center;gap:12px;">
+            <div style="width:34px;height:34px;background:#142210;border:1px solid #C6FF00;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:1.1rem;box-shadow:0 0 12px rgba(198,255,0,0.2);">
+              🏛️
+            </div>
             <div>
-              <div style="font-size:.9rem;font-weight:800;color:#F0EAD6;">Modelo 3D BIM Arquitetônico &amp; Orçamento</div>
-              <div style="font-size:.75rem;color:#94A3B8;">${Utils.escapeHtml(obra.nome || 'Obra')} &middot; ${obra.area_construida || 240} m² &middot; ${obra.pavimentos || 2} pavimentos</div>
-              <div style="display:flex;align-items:center;gap:8px;margin-top:6px;flex-wrap:wrap;">
-                <select id="bim-model-preset-select" title="Seletor de Modelos BIM e Projetos de Exemplo" style="background:#142210;color:#C6FF00;border:1px solid #243518;border-radius:6px;padding:3px 8px;font-size:.68rem;font-weight:800;outline:none;cursor:pointer;">
-                  <option value="sobrado_procedural">🏡 Mansão Alto Padrão 480 m² (R$ 1.000.000 — Completa com Todas as Infraestruturas)</option>
-                  <option value="ifc4_structural">🏗️ Estrutura de Concreto Armado (IFC4)</option>
-                  <option value="ifc4_hvac">🧊 Instalações MEP &amp; HVAC Climatização (IFC4)</option>
-                  <option value="ifc4_architecture">🏛️ Arquitetura buildingSMART (IFC4)</option>
-                  <option value="bim_multi_clash">⚡ Coordenação Multi-disciplinar (Clash Real)</option>
-                  <option value="ifc4_opening_window">🪟 Parede com Abertura &amp; Esquadria (IFC4)</option>
-                </select>
-                <span id="bim-model-source-label" style="font-size:.62rem;color:#C6FF00;font-weight:800;">MAQUETE PARAMÉTRICA</span>
-                <button type="button" data-action="restoreProcedural" id="bim-restore-procedural" style="display:none;background:transparent;border:none;color:#94A3B8;font-size:.62rem;cursor:pointer;text-decoration:underline;">voltar à mansão (R$ 1M)</button>
+              <div style="display:flex;align-items:center;gap:8px;">
+                <span style="font-size:.92rem;font-weight:900;color:#F0EAD6;letter-spacing:-.02em;">ESTAÇÃO 3D BIM &amp; ENGENHARIA</span>
+                <span style="background:rgba(198,255,0,0.15);color:#C6FF00;border:1px solid rgba(198,255,0,0.4);font-size:.60rem;font-weight:900;padding:2px 6px;border-radius:4px;text-transform:uppercase;letter-spacing:.05em;">Pro Workstation</span>
               </div>
+              <div style="font-size:.74rem;color:#94A3B8;margin-top:2px;">${Utils.escapeHtml(obra.nome || 'Obra')} &middot; ${obra.area_construida || 480} m² &middot; ${obra.pavimentos || 2} pavimentos</div>
             </div>
           </div>
 
-          <!-- Controles de Câmera e Modo -->
+          <!-- Controles Rápidos de Modelo & Importação -->
           <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
-            <div class="btn-group" style="display:inline-flex;background:#142210;border-radius:6px;border:1px solid #243518;padding:2px;">
-              <button type="button" class="bim-btn ${this.viewMode === 'solid' ? 'active' : ''}" data-action="setMode" data-mode="solid" style="padding:5px 12px;font-size:.75rem;font-weight:700;border:none;background:${this.viewMode === 'solid' ? '#C6FF00' : 'transparent'};color:${this.viewMode === 'solid' ? '#000' : '#F0EAD6'};border-radius:4px;cursor:pointer;">Sólido</button>
-              <button type="button" class="bim-btn ${this.viewMode === 'wireframe' ? 'active' : ''}" data-action="setMode" data-mode="wireframe" style="padding:5px 12px;font-size:.75rem;font-weight:700;border:none;background:${this.viewMode === 'wireframe' ? '#C6FF00' : 'transparent'};color:${this.viewMode === 'wireframe' ? '#000' : '#F0EAD6'};border-radius:4px;cursor:pointer;">Wireframe</button>
-              <button type="button" class="bim-btn ${this.viewMode === 'xray' ? 'active' : ''}" data-action="setMode" data-mode="xray" style="padding:5px 12px;font-size:.75rem;font-weight:700;border:none;background:${this.viewMode === 'xray' ? '#C6FF00' : 'transparent'};color:${this.viewMode === 'xray' ? '#000' : '#F0EAD6'};border-radius:4px;cursor:pointer;">Raio-X</button>
+            <div style="display:flex;align-items:center;background:#142210;border:1px solid #243518;border-radius:6px;padding:2px 6px;">
+              <span style="font-size:.65rem;color:#94A3B8;margin-right:6px;font-weight:700;">PROJETO:</span>
+              <select id="bim-model-preset-select" title="Seletor de Modelos BIM e Projetos de Exemplo" style="background:transparent;color:#C6FF00;border:none;font-size:.70rem;font-weight:800;outline:none;cursor:pointer;">
+                <option value="sobrado_procedural">🏡 Mansão Alto Padrão 480 m² (R$ 1.000.000 — Completa com Todas as Infraestruturas)</option>
+                <option value="ifc4_structural">🏗️ Estrutura de Concreto Armado (IFC4)</option>
+                <option value="ifc4_hvac">🧊 Instalações MEP &amp; HVAC Climatização (IFC4)</option>
+                <option value="ifc4_architecture">🏛️ Arquitetura buildingSMART (IFC4)</option>
+                <option value="bim_multi_clash">⚡ Coordenação Multi-disciplinar (Clash Real)</option>
+                <option value="ifc4_opening_window">🪟 Parede com Abertura &amp; Esquadria (IFC4)</option>
+              </select>
             </div>
 
-            <div class="btn-group" style="display:inline-flex;background:#142210;border-radius:6px;border:1px solid #243518;padding:2px;">
-              <button type="button" class="bim-view-btn" data-action="resetView" title="Vista Isométrica 3D" style="padding:5px 10px;font-size:.75rem;border:none;background:transparent;color:#F0EAD6;cursor:pointer;font-weight:700;">📐 Isométrica</button>
-              <button type="button" class="bim-view-btn" data-action="topView" title="Planta Baixa (Superior)" style="padding:5px 10px;font-size:.75rem;border:none;background:transparent;color:#F0EAD6;cursor:pointer;font-weight:700;">🗺️ Planta</button>
-              <button type="button" class="bim-view-btn" data-action="toggleExpanded" title="Expandir visualizador" style="padding:5px 10px;font-size:.75rem;border:none;background:transparent;color:#F0EAD6;cursor:pointer;font-weight:700;">⛶ Expandir</button>
-            </div>
-
-            <div class="btn-group" style="display:inline-flex;background:#142210;border-radius:6px;border:1px solid #243518;padding:2px;align-items:center;">
-              <button type="button" class="bim-section-btn" data-section="none" style="padding:5px 9px;font-size:.72rem;border:none;background:#C6FF00;color:#000;border-radius:4px;cursor:pointer;font-weight:800;">Inteiro</button>
-              <button type="button" class="bim-section-btn" data-section="x" style="padding:5px 9px;font-size:.72rem;border:none;background:transparent;color:#F0EAD6;border-radius:4px;cursor:pointer;font-weight:700;">Corte X</button>
-              <button type="button" class="bim-section-btn" data-section="z" style="padding:5px 9px;font-size:.72rem;border:none;background:transparent;color:#F0EAD6;border-radius:4px;cursor:pointer;font-weight:700;">Corte Z</button>
-              <input id="bim-section-range" type="range" min="-120" max="120" step="5" value="0" title="Posição do plano de corte" disabled style="width:90px;margin:0 5px;accent-color:#C6FF00;opacity:.45;">
-            </div>
-
-            <div class="btn-group" style="display:inline-flex;background:#142210;border-radius:6px;border:1px solid #243518;padding:2px;align-items:center;">
-              <select id="bim-discipline-filter" title="Filtrar disciplina BIM" style="background:#142210;color:#F0EAD6;border:none;padding:5px 7px;font-size:.72rem;font-weight:700;outline:none;">
+            <div style="display:flex;align-items:center;background:#142210;border:1px solid #243518;border-radius:6px;padding:2px 6px;">
+              <span style="font-size:.65rem;color:#94A3B8;margin-right:6px;font-weight:700;">DISCIPLINA:</span>
+              <select id="bim-discipline-filter" title="Filtrar disciplina BIM" style="background:transparent;color:#F0EAD6;border:none;font-size:.70rem;font-weight:700;outline:none;cursor:pointer;">
                 <option value="all">Todas disciplinas</option>
                 <option value="estrutural">Estrutural</option>
                 <option value="arquitetura">Arquitetura</option>
@@ -127,16 +121,14 @@ const BIMViewer = {
                 <option value="eletrica">Elétrica</option>
                 <option value="mecanica">Mecânica / HVAC</option>
               </select>
-              <button type="button" class="bim-color-btn" data-color-mode="material" style="padding:5px 8px;font-size:.70rem;border:none;background:#C6FF00;color:#000;border-radius:4px;cursor:pointer;font-weight:800;">Materiais</button>
-              <button type="button" class="bim-color-btn" data-color-mode="status" style="padding:5px 8px;font-size:.70rem;border:none;background:transparent;color:#F0EAD6;border-radius:4px;cursor:pointer;font-weight:700;">Status</button>
             </div>
 
-            <button type="button" class="btn-action" data-action="runClashDetection" style="font-size:.72rem;padding:6px 10px;background:rgba(127,73,184,.12);border-color:rgba(167,139,250,.35);color:#C4B5FD;font-weight:800;">
+            <button type="button" class="btn-action" data-action="runClashDetection" style="font-size:.72rem;padding:6px 10px;background:rgba(127,73,184,.15);border-color:rgba(167,139,250,.4);color:#C4B5FD;font-weight:800;border-radius:6px;cursor:pointer;">
               ⚡ Interferências
             </button>
 
-            <label class="btn-action" style="cursor:pointer;margin:0;font-size:.75rem;padding:6px 12px;background:rgba(198,255,0,.1);border:1px solid rgba(198,255,0,.3);color:#C6FF00;border-radius:6px;font-weight:700;">
-              <span>📁 Importar 3D (.obj / .ifc)</span>
+            <label class="btn-action" style="cursor:pointer;margin:0;font-size:.72rem;padding:6px 10px;background:rgba(198,255,0,.1);border:1px solid rgba(198,255,0,.3);color:#C6FF00;border-radius:6px;font-weight:700;">
+              <span>📁 Importar (.ifc / .obj)</span>
               <input type="file" id="bim-file-input" accept=".obj,.ifc,.gltf,.glb" style="display:none;" />
             </label>
           </div>
@@ -144,33 +136,114 @@ const BIMViewer = {
 
         ${this._renderOperationalSummaryHtml(snapshot)}
 
-        <!-- Área Principal 3D e Painel Lateral de Custos -->
-        <div class="bim-main-grid" style="display:grid;grid-template-columns:1fr 340px;gap:16px;">
-          <!-- Canvas 3D -->
-          <div class="bim-canvas-wrap" style="position:relative;background:#070B06;border:1px solid #243518;border-radius:12px;overflow:hidden;min-height:560px;display:flex;align-items:center;justify-content:center;">
-            <canvas id="bim-canvas" style="width:100%;height:100%;display:block;cursor:grab;touch-action:none;"></canvas>
-
-            <!-- Seletor Flutuante de Pavimentos (Canto Superior Esquerdo) -->
-            ${this._renderFloorButtonsHtml(obra)}
-
-            <!-- Dica de Interação de Câmera -->
-            <div style="position:absolute;bottom:14px;left:16px;font-size:.72rem;color:#94A3B8;background:rgba(0,0,0,0.75);backdrop-filter:blur(6px);padding:6px 12px;border-radius:6px;border:1px solid #243518;pointer-events:none;">
-              🖱️ Clique e arraste para girar 360° &middot; Scroll para Zoom &middot; Clique em qualquer parte da casa para inspecionar custos
+        <!-- WORKSTATION CAD/BIM PRINCIPAL — 3 COLUNAS -->
+        <div class="bim-workstation-grid" style="display:grid;grid-template-columns:270px 1fr 310px;gap:12px;align-items:stretch;">
+          
+          <!-- COLUNA ESQUERDA: Árvore de Projeto (Project Tree) & Propriedades -->
+          <div style="background:#0F1A0E;border:1px solid #243518;border-radius:12px;display:flex;flex-direction:column;overflow:hidden;">
+            <!-- Tabs Esquerda -->
+            <div style="display:flex;border-bottom:1px solid #243518;background:#0A1108;">
+              <button type="button" id="bim-left-tab-tree" data-tab="tree" class="bim-subtab-btn" style="flex:1;padding:8px 6px;font-size:.70rem;font-weight:800;border:none;background:#142210;color:#C6FF00;border-bottom:2px solid #C6FF00;cursor:pointer;">
+                🌳 Disciplinas &amp; Layers
+              </button>
+              <button type="button" id="bim-left-tab-props" data-tab="props" class="bim-subtab-btn" style="flex:1;padding:8px 6px;font-size:.70rem;font-weight:800;border:none;background:transparent;color:#94A3B8;cursor:pointer;">
+                ⚙️ Propriedades CAD
+              </button>
             </div>
-            <div id="bim-status-legend" style="position:absolute;right:14px;bottom:14px;display:none;gap:8px;flex-wrap:wrap;background:rgba(0,0,0,.78);border:1px solid #243518;border-radius:7px;padding:6px 9px;font-size:.62rem;color:#CBD5E1;pointer-events:none;">
-              <span>● <b style="color:#64748B;">Não iniciado</b></span>
-              <span>● <b style="color:#F59E0B;">Em execução</b></span>
-              <span>● <b style="color:#22C55E;">Concluído</b></span>
-              <span>● <b style="color:#EF4444;">Pendência</b></span>
+
+            <!-- Conteúdo da Árvore de Disciplinas -->
+            <div id="bim-tree-container" style="flex:1;padding:12px;overflow-y:auto;max-height:580px;display:flex;flex-direction:column;gap:8px;">
+              <!-- Preenchido dinamicamente por _renderProjectTreeHtml() -->
+            </div>
+
+            <!-- Conteúdo de Propriedades (Oculto inicialmente) -->
+            <div id="bim-props-container" style="display:none;flex:1;padding:14px;overflow-y:auto;max-height:580px;flex-direction:column;gap:10px;">
+              <!-- Preenchido dinamicamente -->
             </div>
           </div>
 
-          <!-- Painel Lateral de Inspeção de Custos & SINAPI -->
-          <div id="bim-element-details" style="background:#0F1A0E;border:1px solid #243518;border-radius:12px;padding:20px;display:flex;flex-direction:column;gap:14px;">
-            ${this._renderElementDetailsHtml(this.elements[1] || this.elements[0], obra)}
+          <!-- COLUNA CENTRAL: Canvas Viewport 3D com Gizmo & Controles Flutuantes -->
+          <div class="bim-canvas-wrap" style="position:relative;background:#060A05;border:1px solid #243518;border-radius:12px;overflow:hidden;min-height:580px;display:flex;flex-direction:column;">
+            
+            <!-- Breadcrumb Header no Topo do Viewport -->
+            <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 14px;background:rgba(10,17,8,0.85);backdrop-filter:blur(8px);border-bottom:1px solid rgba(36,53,24,0.6);z-index:2;">
+              <div style="font-family:monospace;font-size:.66rem;font-weight:700;color:#94A3B8;letter-spacing:.04em;display:flex;align-items:center;gap:6px;">
+                <span style="color:#C6FF00;">PROJECT:</span> ${Utils.escapeHtml((obra.nome || 'MANSÃO').toUpperCase())} &middot; <span style="color:#38BDF8;">480 SQM</span> &middot; <span id="bim-viewport-cam-label" style="color:#F0EAD6;">VIEWPORT: ISOMETRIC - NW</span>
+              </div>
+              <div style="display:flex;align-items:center;gap:6px;">
+                <button type="button" class="bim-view-btn" data-action="toggleExpanded" title="Expandir Tela Cheia" style="padding:3px 8px;font-size:.68rem;border:1px solid #243518;background:#142210;color:#C6FF00;border-radius:4px;cursor:pointer;font-weight:800;">⛶ Expandir</button>
+              </div>
+            </div>
+
+            <!-- Canvas 3D Principal -->
+            <div style="flex:1;position:relative;width:100%;height:100%;">
+              <canvas id="bim-canvas" style="width:100%;height:100%;display:block;cursor:grab;touch-action:none;"></canvas>
+
+              <!-- Pavimentos Flutuantes (Esquerda Superior) -->
+              ${this._renderFloorButtonsHtml(obra)}
+
+              <!-- Dica de Interação de Câmera -->
+              <div style="position:absolute;bottom:54px;left:14px;font-size:.68rem;color:#94A3B8;background:rgba(0,0,0,0.75);backdrop-filter:blur(6px);padding:5px 10px;border-radius:6px;border:1px solid #243518;pointer-events:none;">
+                🖱️ Arraste para orbitar 360° &middot; Scroll para zoom &middot; Clique para inspecionar
+              </div>
+            </div>
+
+            <!-- Barra Inferior de Ferramentas CAD do Viewport -->
+            <div style="display:flex;align-items:center;justify-content:space-between;padding:6px 12px;background:#0A1108;border-top:1px solid #243518;flex-wrap:wrap;gap:8px;z-index:2;">
+              <!-- Modos de Shading -->
+              <div class="btn-group" style="display:inline-flex;background:#142210;border-radius:6px;border:1px solid #243518;padding:2px;">
+                <button type="button" class="bim-btn ${this.viewMode === 'solid' ? 'active' : ''}" data-action="setMode" data-mode="solid" style="padding:4px 10px;font-size:.70rem;font-weight:800;border:none;background:${this.viewMode === 'solid' ? '#C6FF00' : 'transparent'};color:${this.viewMode === 'solid' ? '#000' : '#F0EAD6'};border-radius:4px;cursor:pointer;">Sólido</button>
+                <button type="button" class="bim-btn ${this.viewMode === 'wireframe' ? 'active' : ''}" data-action="setMode" data-mode="wireframe" style="padding:4px 10px;font-size:.70rem;font-weight:800;border:none;background:${this.viewMode === 'wireframe' ? '#C6FF00' : 'transparent'};color:${this.viewMode === 'wireframe' ? '#000' : '#F0EAD6'};border-radius:4px;cursor:pointer;">Wireframe</button>
+                <button type="button" class="bim-btn ${this.viewMode === 'xray' ? 'active' : ''}" data-action="setMode" data-mode="xray" style="padding:4px 10px;font-size:.70rem;font-weight:800;border:none;background:${this.viewMode === 'xray' ? '#C6FF00' : 'transparent'};color:${this.viewMode === 'xray' ? '#000' : '#F0EAD6'};border-radius:4px;cursor:pointer;">Raio-X</button>
+              </div>
+
+              <!-- Vistas Rápidas -->
+              <div class="btn-group" style="display:inline-flex;background:#142210;border-radius:6px;border:1px solid #243518;padding:2px;">
+                <button type="button" class="bim-view-btn" data-action="resetView" style="padding:4px 9px;font-size:.70rem;border:none;background:transparent;color:#F0EAD6;cursor:pointer;font-weight:700;">📐 Isométrica</button>
+                <button type="button" class="bim-view-btn" data-action="topView" style="padding:4px 9px;font-size:.70rem;border:none;background:transparent;color:#F0EAD6;cursor:pointer;font-weight:700;">🗺️ Planta</button>
+              </div>
+
+              <!-- Planos de Corte X / Z -->
+              <div class="btn-group" style="display:inline-flex;background:#142210;border-radius:6px;border:1px solid #243518;padding:2px;align-items:center;">
+                <button type="button" class="bim-section-btn" data-section="none" style="padding:4px 8px;font-size:.68rem;border:none;background:#C6FF00;color:#000;border-radius:4px;cursor:pointer;font-weight:800;">Inteiro</button>
+                <button type="button" class="bim-section-btn" data-section="x" style="padding:4px 8px;font-size:.68rem;border:none;background:transparent;color:#F0EAD6;border-radius:4px;cursor:pointer;font-weight:700;">Corte X</button>
+                <button type="button" class="bim-section-btn" data-section="z" style="padding:4px 8px;font-size:.68rem;border:none;background:transparent;color:#F0EAD6;border-radius:4px;cursor:pointer;font-weight:700;">Corte Z</button>
+                <input id="bim-section-range" type="range" min="-120" max="120" step="5" value="0" title="Posição do plano de corte" disabled style="width:75px;margin:0 4px;accent-color:#C6FF00;opacity:.45;">
+              </div>
+
+              <!-- Modo de Cores -->
+              <div class="btn-group" style="display:inline-flex;background:#142210;border-radius:6px;border:1px solid #243518;padding:2px;align-items:center;">
+                <button type="button" class="bim-color-btn" data-color-mode="material" style="padding:4px 7px;font-size:.68rem;border:none;background:#C6FF00;color:#000;border-radius:4px;cursor:pointer;font-weight:800;">Materiais</button>
+                <button type="button" class="bim-color-btn" data-color-mode="status" style="padding:4px 7px;font-size:.68rem;border:none;background:transparent;color:#F0EAD6;border-radius:4px;cursor:pointer;font-weight:700;">Status</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- COLUNA DIREITA: Overview Técnico MEP & SINAPI / Custos -->
+          <div style="background:#0F1A0E;border:1px solid #243518;border-radius:12px;display:flex;flex-direction:column;overflow:hidden;">
+            <!-- Tabs Direita -->
+            <div style="display:flex;border-bottom:1px solid #243518;background:#0A1108;">
+              <button type="button" id="bim-right-tab-mep" data-tab="mep" class="bim-subtab-btn" style="flex:1;padding:8px 6px;font-size:.70rem;font-weight:800;border:none;background:#142210;color:#C6FF00;border-bottom:2px solid #C6FF00;cursor:pointer;">
+                📊 Infraestrutura MEP
+              </button>
+              <button type="button" id="bim-right-tab-costs" data-tab="costs" class="bim-subtab-btn" style="flex:1;padding:8px 6px;font-size:.70rem;font-weight:800;border:none;background:transparent;color:#94A3B8;cursor:pointer;">
+                💰 SINAPI &amp; Custos
+              </button>
+            </div>
+
+            <!-- Conteúdo MEP Overview -->
+            <div id="bim-mep-overview-panel" style="flex:1;padding:12px;overflow-y:auto;max-height:580px;display:flex;flex-direction:column;gap:10px;">
+              <!-- Preenchido dinamicamente por _renderMepOverviewHtml() -->
+            </div>
+
+            <!-- Conteúdo de Inspeção SINAPI / Custos (Oculto inicialmente) -->
+            <div id="bim-element-details" style="display:none;flex:1;padding:14px;overflow-y:auto;max-height:580px;flex-direction:column;gap:12px;">
+              <!-- Preenchido dinamicamente por _renderElementDetailsHtml() -->
+            </div>
           </div>
         </div>
 
+        <!-- Painéis Inferiores de Coordenação & Versões -->
         <div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(320px,.8fr);gap:12px;" class="bim-bottom-grid">
           <div id="bim-model-versions">${this._renderModelVersionsHtml()}</div>
           <div id="bim-coordination-panel">${this._renderCoordinationHtml()}</div>
@@ -183,12 +256,322 @@ const BIMViewer = {
     this._generateParametricBuilding(obra);
     this._applyOperationalData(snapshot);
     this.selectedElement = this.elements[1] || this.elements[0];
+    this._refreshWorkstationUi(obra);
+    this._bindEvents();
+    this._hydrateLatestModelVersion();
+  },
+
+  /**
+   * Atualiza as abas e componentes da Workstation CAD/BIM
+   */
+  _refreshWorkstationUi(obra) {
+    const treeContainer = document.getElementById('bim-tree-container');
+    if (treeContainer) {
+      treeContainer.innerHTML = this._renderProjectTreeHtml();
+      this._bindTreeEvents();
+    }
+
+    const mepContainer = document.getElementById('bim-mep-overview-panel');
+    if (mepContainer) {
+      mepContainer.innerHTML = this._renderMepOverviewHtml();
+    }
+
     const detailsContainer = document.getElementById('bim-element-details');
     if (detailsContainer) {
       detailsContainer.innerHTML = this._renderElementDetailsHtml(this.selectedElement, obra);
     }
-    this._bindEvents();
-    this._hydrateLatestModelVersion();
+
+    const propsContainer = document.getElementById('bim-props-container');
+    if (propsContainer && this.selectedElement) {
+      const p = this._getElementProperties(this.selectedElement);
+      propsContainer.innerHTML = `
+        <div style="font-size:.72rem;font-weight:900;color:#C6FF00;text-transform:uppercase;letter-spacing:.05em;">Propriedades Paramétricas</div>
+        <div style="background:#0A1108;border:1px solid #243518;border-radius:8px;padding:10px;font-size:.75rem;display:flex;flex-direction:column;gap:6px;">
+          <div style="display:flex;justify-content:space-between;"><span style="color:#94A3B8;">Elemento:</span><b style="color:#FFFFFF;">${Utils.escapeHtml(this.selectedElement.name)}</b></div>
+          <div style="display:flex;justify-content:space-between;"><span style="color:#94A3B8;">Classe IFC:</span><span style="color:#38BDF8;font-family:monospace;font-size:.70rem;">${Utils.escapeHtml(p.ifcClass)}</span></div>
+          <div style="display:flex;justify-content:space-between;"><span style="color:#94A3B8;">Material:</span><span style="color:#F0EAD6;">${Utils.escapeHtml(p.material)}</span></div>
+          <div style="display:flex;justify-content:space-between;"><span style="color:#94A3B8;">Largura (X):</span><span style="color:#C6FF00;">${p.width}</span></div>
+          <div style="display:flex;justify-content:space-between;"><span style="color:#94A3B8;">Altura (Y):</span><span style="color:#C6FF00;">${p.height}</span></div>
+          <div style="display:flex;justify-content:space-between;"><span style="color:#94A3B8;">Profundidade (Z):</span><span style="color:#C6FF00;">${p.depth}</span></div>
+          <div style="display:flex;justify-content:space-between;"><span style="color:#94A3B8;">Volume Sólido:</span><span style="color:#F59E0B;">${p.volume}</span></div>
+          <div style="display:flex;justify-content:space-between;"><span style="color:#94A3B8;">Total de Malhas:</span><span style="color:#FFFFFF;">${p.meshCount} peças</span></div>
+        </div>
+      `;
+    }
+  },
+
+  /**
+   * Renderiza a Árvore de Projeto (Project Tree) com toggles de visibilidade (👁️)
+   */
+  _renderProjectTreeHtml() {
+    if (!this.elements || !this.elements.length) {
+      return '<div style="color:#94A3B8;font-size:.75rem;text-align:center;padding:12px;">Sem elementos carregados.</div>';
+    }
+
+    const disciplineIcons = {
+      estrutural: '🏗️',
+      arquitetura: '🏛️',
+      hidraulica: '💧',
+      eletrica: '⚡',
+      mecanica: '🧊',
+      fundacao: '🧱',
+      site: '🌿'
+    };
+
+    return `
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+        <span style="font-size:.65rem;color:#94A3B8;font-weight:800;text-transform:uppercase;">Disciplinas Modeladas (${this.elements.length})</span>
+        <button type="button" id="bim-toggle-all-vis" style="background:transparent;border:none;color:#C6FF00;font-size:.62rem;font-weight:800;cursor:pointer;text-decoration:underline;">
+          ${this.hiddenElementIds.size === 0 ? 'Ocultar Todas' : 'Mostrar Todas'}
+        </button>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:6px;">
+        ${this.elements.map(elem => {
+          const isHidden = this.hiddenElementIds.has(elem.id);
+          const isSelected = this.selectedElement?.id === elem.id;
+          const icon = disciplineIcons[elem.discipline] || '📦';
+          const meshesCount = (elem.meshes || []).length;
+          return `
+            <div class="bim-tree-item ${isSelected ? 'selected' : ''}" data-elem-id="${Utils.escapeHtml(elem.id)}" style="display:flex;align-items:center;justify-content:space-between;padding:6px 8px;background:${isSelected ? 'rgba(198,255,0,0.12)' : '#0A1108'};border:1px solid ${isSelected ? '#C6FF00' : '#243518'};border-radius:6px;cursor:pointer;transition:background .15s;">
+              <div style="display:flex;align-items:center;gap:7px;min-width:0;flex:1;">
+                <span style="font-size:.85rem;">${icon}</span>
+                <div style="min-width:0;flex:1;">
+                  <div style="font-size:.72rem;font-weight:800;color:${isSelected ? '#C6FF00' : '#F0EAD6'};white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
+                    ${Utils.escapeHtml(elem.name)}
+                  </div>
+                  <div style="font-size:.60rem;color:#94A3B8;">${meshesCount} peças 3D &middot; ${elem.discipline.toUpperCase()}</div>
+                </div>
+              </div>
+              <button type="button" class="bim-vis-btn" data-elem-id="${Utils.escapeHtml(elem.id)}" title="${isHidden ? 'Exibir disciplina' : 'Ocultar disciplina'}" style="background:transparent;border:none;font-size:.80rem;cursor:pointer;padding:2px 4px;color:${isHidden ? '#64748B' : '#C6FF00'};opacity:${isHidden ? 0.45 : 1};">
+                ${isHidden ? '👁️‍🗨️' : '👁️'}
+              </button>
+            </div>
+          `;
+        }).join('')}
+      </div>
+    `;
+  },
+
+  /**
+   * Renderiza o painel MEP Overview com métricas consolidadas de engenharia
+   */
+  _renderMepOverviewHtml() {
+    const items = [
+      { icon: '💧', label: 'Água Fria & Quente', desc: 'Reserva 3.000 L, Barrilete 50mm, Colunas 32mm e Ramais PPR', value: '255 m tubos', color: '#0EA5E9' },
+      { icon: '🚽', label: 'Esgoto & Ventilação', desc: 'Tubos de queda 100mm, caixas sifonadas e coletor 150mm', value: '140 m rede', color: '#F8FAFC' },
+      { icon: '⚡', label: 'Elétrica & Automação', desc: 'QDG 48 disj., eletrocalhas perfuradas, circuitos e spots LED', value: '18.5 kVA / 8 pts', color: '#EAB308' },
+      { icon: '🧊', label: 'Climatização Central', desc: '2 Condensadoras VRF 8 HP, rede de dutos e 3 cassetes 4 vias', value: '16 HP / 48k BTU', color: '#38BDF8' },
+      { icon: '🏊', label: 'Lazer, Piscina & Deck', desc: 'Piscina de concreto armado, espelho d\'água e deck de cumaru', value: '72 m² lazer', color: '#06B6D4' },
+      { icon: '🏗️', label: 'Superestrutura', desc: '24 Pilares 30x30 cm, vigas de cinta e laje protendida', value: '145 m³ concreto', color: '#94A3B8' }
+    ];
+
+    return `
+      <div style="font-size:.68rem;font-weight:900;color:#C6FF00;text-transform:uppercase;letter-spacing:.05em;margin-bottom:2px;">
+        Quantitativos &amp; Engenharia MEP
+      </div>
+      <div style="display:flex;flex-direction:column;gap:8px;">
+        ${items.map(it => `
+          <div style="background:#0A1108;border:1px solid #243518;border-radius:8px;padding:8px 10px;display:flex;align-items:flex-start;gap:8px;">
+            <span style="font-size:1.1rem;margin-top:1px;">${it.icon}</span>
+            <div style="flex:1;min-width:0;">
+              <div style="display:flex;justify-content:space-between;align-items:center;">
+                <span style="font-size:.72rem;font-weight:800;color:#F0EAD6;">${it.label}</span>
+                <span style="font-size:.70rem;font-weight:900;color:${it.color};font-variant-numeric:tabular-nums;">${it.value}</span>
+              </div>
+              <p style="font-size:.62rem;color:#94A3B8;margin:2px 0 0;line-height:1.3;">${it.desc}</p>
+            </div>
+          </div>
+        `).join('')}
+      </div>
+    `;
+  },
+
+  /**
+   * Vincula eventos da árvore e abas laterais
+   */
+  _bindTreeEvents() {
+    // Toggles de visibilidade individual
+    document.querySelectorAll('.bim-vis-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const elemId = e.currentTarget.getAttribute('data-elem-id');
+        if (!elemId) return;
+        if (this.hiddenElementIds.has(elemId)) {
+          this.hiddenElementIds.delete(elemId);
+        } else {
+          this.hiddenElementIds.add(elemId);
+        }
+        this._lastRenderKey = '';
+        this._refreshWorkstationUi();
+      });
+    });
+
+    // Clique no item da árvore para selecionar
+    document.querySelectorAll('.bim-tree-item').forEach(item => {
+      item.addEventListener('click', (e) => {
+        const elemId = e.currentTarget.getAttribute('data-elem-id');
+        const elem = this.elements.find(el => el.id === elemId);
+        if (elem) {
+          this.selectedElement = elem;
+          this._lastRenderKey = '';
+          const obra = (typeof DB !== 'undefined' && DB.getById('clientes', this.activeObraId)) || {};
+          this._refreshWorkstationUi(obra);
+        }
+      });
+    });
+
+    // Toggle Mostrar/Ocultar Todas
+    const toggleAllBtn = document.getElementById('bim-toggle-all-vis');
+    if (toggleAllBtn) {
+      toggleAllBtn.addEventListener('click', () => {
+        if (this.hiddenElementIds.size === 0) {
+          this.elements.forEach(e => this.hiddenElementIds.add(e.id));
+        } else {
+          this.hiddenElementIds.clear();
+        }
+        this._lastRenderKey = '';
+        this._refreshWorkstationUi();
+      });
+    }
+
+    // Abas Esquerda (Tree vs Props)
+    const tabTree = document.getElementById('bim-left-tab-tree');
+    const tabProps = document.getElementById('bim-left-tab-props');
+    const treeCont = document.getElementById('bim-tree-container');
+    const propsCont = document.getElementById('bim-props-container');
+
+    if (tabTree && tabProps && treeCont && propsCont) {
+      tabTree.addEventListener('click', () => {
+        tabTree.style.background = '#142210';
+        tabTree.style.color = '#C6FF00';
+        tabTree.style.borderBottom = '2px solid #C6FF00';
+        tabProps.style.background = 'transparent';
+        tabProps.style.color = '#94A3B8';
+        tabProps.style.borderBottom = 'none';
+        treeCont.style.display = 'flex';
+        propsCont.style.display = 'none';
+      });
+
+      tabProps.addEventListener('click', () => {
+        tabProps.style.background = '#142210';
+        tabProps.style.color = '#C6FF00';
+        tabProps.style.borderBottom = '2px solid #C6FF00';
+        tabTree.style.background = 'transparent';
+        tabTree.style.color = '#94A3B8';
+        tabTree.style.borderBottom = 'none';
+        propsCont.style.display = 'flex';
+        treeCont.style.display = 'none';
+        const obra = (typeof DB !== 'undefined' && DB.getById('clientes', this.activeObraId)) || {};
+        this._refreshWorkstationUi(obra);
+      });
+    }
+
+    // Abas Direita (MEP vs Costs)
+    const tabMep = document.getElementById('bim-right-tab-mep');
+    const tabCosts = document.getElementById('bim-right-tab-costs');
+    const mepCont = document.getElementById('bim-mep-overview-panel');
+    const costsCont = document.getElementById('bim-element-details');
+
+    if (tabMep && tabCosts && mepCont && costsCont) {
+      tabMep.addEventListener('click', () => {
+        tabMep.style.background = '#142210';
+        tabMep.style.color = '#C6FF00';
+        tabMep.style.borderBottom = '2px solid #C6FF00';
+        tabCosts.style.background = 'transparent';
+        tabCosts.style.color = '#94A3B8';
+        tabCosts.style.borderBottom = 'none';
+        mepCont.style.display = 'flex';
+        costsCont.style.display = 'none';
+      });
+
+      tabCosts.addEventListener('click', () => {
+        tabCosts.style.background = '#142210';
+        tabCosts.style.color = '#C6FF00';
+        tabCosts.style.borderBottom = '2px solid #C6FF00';
+        tabMep.style.background = 'transparent';
+        tabMep.style.color = '#94A3B8';
+        tabMep.style.borderBottom = 'none';
+        costsCont.style.display = 'flex';
+        mepCont.style.display = 'none';
+      });
+    }
+  },
+
+  /**
+   * Desenha o Gizmo de Orientação 3D / Bússola no canto superior direito do viewport
+   */
+  _drawOrientationGizmo(w, h) {
+    const gizmoX = w - 60;
+    const gizmoY = 60;
+    const size = 30;
+
+    this.ctx.save();
+    // Fundo circular de vidro escuro
+    this.ctx.beginPath();
+    this.ctx.arc(gizmoX, gizmoY, 36, 0, Math.PI * 2);
+    this.ctx.fillStyle = 'rgba(10, 17, 8, 0.88)';
+    this.ctx.fill();
+    this.ctx.strokeStyle = '#243518';
+    this.ctx.lineWidth = 1.5;
+    this.ctx.stroke();
+
+    // Bússola e eixos 3D
+    const axes = [
+      { name: 'X', color: '#EF4444', vec: [size, 0, 0] },
+      { name: 'Y', color: '#22C55E', vec: [0, size, 0] },
+      { name: 'Z', color: '#38BDF8', vec: [0, 0, size] }
+    ];
+
+    const cosY = Math.cos(this.rotY), sinY = Math.sin(this.rotY);
+    const cosX = Math.cos(this.rotX), sinX = Math.sin(this.rotX);
+
+    const projectedAxes = axes.map(ax => {
+      const [vx, vy, vz] = ax.vec;
+      const x1 = vx * cosY + vz * sinY;
+      const z1 = -vx * sinY + vz * cosY;
+      const y2 = vy * cosX - z1 * sinX;
+      const z2 = vy * sinX + z1 * cosX;
+      return {
+        ...ax,
+        px: x1,
+        py: -y2,
+        pz: z2
+      };
+    });
+
+    // Ordenar eixos por profundidade Z
+    projectedAxes.sort((a, b) => a.pz - b.pz);
+
+    projectedAxes.forEach(ax => {
+      this.ctx.beginPath();
+      this.ctx.moveTo(gizmoX, gizmoY);
+      this.ctx.lineTo(gizmoX + ax.px, gizmoY + ax.py);
+      this.ctx.strokeStyle = ax.color;
+      this.ctx.lineWidth = 2.5;
+      this.ctx.stroke();
+
+      // Ponta do eixo / Letra
+      this.ctx.fillStyle = ax.color;
+      this.ctx.font = 'bold 9px monospace';
+      this.ctx.textAlign = 'center';
+      this.ctx.textBaseline = 'middle';
+      this.ctx.fillText(ax.name, gizmoX + ax.px * 1.28, gizmoY + ax.py * 1.28);
+    });
+
+    // Rótulo da câmera
+    const rotDegY = Math.round((this.rotY * 180) / Math.PI) % 360;
+    const viewLabel = this.rotX > 1.2 ? 'TOP'
+      : Math.abs(rotDegY) < 20 ? 'FACHADA'
+      : Math.abs(rotDegY - 90) < 25 ? 'LESTE'
+      : Math.abs(rotDegY + 90) < 25 ? 'OESTE'
+      : 'ISO · NW';
+
+    this.ctx.fillStyle = '#C6FF00';
+    this.ctx.font = 'bold 8px monospace';
+    this.ctx.textAlign = 'center';
+    this.ctx.fillText(viewLabel, gizmoX, gizmoY + 46);
+
+    this.ctx.restore();
   },
 
   /**
@@ -207,13 +590,9 @@ const BIMViewer = {
     this._startRenderLoop();
   },
 
-/**
+  /**
    * Gera a maquete volumétrica procedural detalhada com elementos arquitetônicos e todas as infraestruturas
-   * Mansão Alto Padrão 480 m² (Orçamento R$ 1.000.000,00) com Estrutura, Alvenaria, Hidráulica, Elétrica, HVAC e Cobertura.
-   */
-/**
-   * Gera a maquete volumétrica procedural detalhada com elementos arquitetônicos e todas as infraestruturas
-   * Mansão Alto Padrão 480 m² (Orçamento R$ 1.000.000,00) com Estrutura, Alvenaria, Hidráulica, Elétrica, HVAC e Cobertura.
+   * Mansão Alto Padrão 480 m² (Orçamento R$ 1.000.000,00) com Estrutura, Alvenaria, Hidráulica, Elétrica, HVAC, Cobertura e Terreno.
    */
   _generateParametricBuilding(obra) {
     this.elements = [];
@@ -232,6 +611,35 @@ const BIMViewer = {
       rows.forEach(z => {
         sapataCoords.push({ x, z });
       });
+    });
+
+    // =========================================================================
+    // 0. DISCIPLINA: TERRENO, PLATÔ & IMPLANTAÇÃO (site) — R$ 35.000
+    // =========================================================================
+    const siteMeshes = [
+      // Platô principal do terreno gramado
+      { type: 'box', x: -W/2 - 50, y: -48, z: -L/2 - 110, w: W + 100, h: 4, d: L + 160, color: '#143015', name: 'Platô Gramado de Implantação' },
+      // Calçada de acesso em concreto estampado
+      { type: 'box', x: -30, y: -46, z: L/2 + 10, w: 60, h: 3, d: 40, color: '#475569', name: 'Acesso Social em Concreto Usinado' },
+      // Muro de divisa / contenção fundos
+      { type: 'box', x: -W/2 - 45, y: -44, z: -L/2 - 105, w: W + 90, h: 28, d: 6, color: '#334155', name: 'Muro de Contenção e Divisa Fundos' },
+      { type: 'box', x: -W/2 - 45, y: -44, z: -L/2 - 105, w: 6, h: 28, d: L + 150, color: '#334155', name: 'Muro Lateral Esquerdo' },
+      { type: 'box', x: W/2 + 39,  y: -44, z: -L/2 - 105, w: 6, h: 28, d: L + 150, color: '#334155', name: 'Muro Lateral Direito' }
+    ];
+
+    this.elements.push({
+      id: 'elem_terreno_site',
+      name: 'Terreno, Platô, Calçadas & Muros',
+      floor: 'fundacao',
+      discipline: 'arquitetura',
+      category: 'Implantação e Movimento de Terra',
+      sinapiCode: '98462',
+      sinapiDesc: 'Movimento de terra, escavação mecânica, regularização de terreno e calçadas perimetrais em concreto',
+      orcado: 35000.00,
+      realizado: 34200.00,
+      executadoPct: 100,
+      color: '#15803D',
+      meshes: siteMeshes
     });
 
     // =========================================================================
@@ -279,7 +687,7 @@ const BIMViewer = {
       { type: 'box', x: -W/2 + 20, y: -36, z: -L/2 - 70, w: 80, h: 36, d: 60, color: '#334155', name: 'Estrutura de Concreto da Piscina' },
       // Água Translúcida da Piscina
       { type: 'box', x: -W/2 + 24, y: -4, z: -L/2 - 66, w: 72, h: 4, d: 52, color: 'rgba(6, 182, 212, 0.75)', isWater: true, name: 'Espelho d\'Água Piscina' },
-      // Deck de Madeira Tratada
+      // Deck de Madeira Cumaru
       { type: 'box', x: -W/2 + 12, y: -1, z: -L/2 - 80, w: 100, h: 3, d: 80, color: '#9A3412', name: 'Deck de Madeira Cumaru' },
       // Casa de Máquinas e Bombas
       { type: 'box', x: W/2 - 60, y: -28, z: -L/2 - 50, w: 36, h: 26, d: 36, color: '#475569', name: 'Casa de Máquinas e Filtragem' }
@@ -379,7 +787,7 @@ const BIMViewer = {
       { type: 'box', x: -6, y: 2, z: L/2 - 13, w: 34, h: 50, d: 5, color: '#78350F', name: 'Porta Pivotante em Madeira Cumaru' },
       { type: 'box', x: 22, y: 16, z: L/2 - 8, w: 3, h: 22, d: 3, color: '#F8FAFC', name: 'Puxador Inox Escovado 1,50m' },
 
-      // Parede Garagem / Acesso Térreo Direito
+      // Parede Garagem / Acesso Térreo Direito (Cutaway suave)
       { type: 'box', x: 34, y: 2, z: L/2 - 14, w: 60, h: H, d: 8, color: '#C2410C', isBrick: true, name: 'Alvenaria Garagem Coberta' },
 
       // Paredes Laterais e Fundos Térreo
@@ -404,11 +812,11 @@ const BIMViewer = {
       { type: 'box', x: W/2 - 8, y: yPav1 + 6, z: L/2 + 4, w: 2, h: 22, d: 26, color: 'rgba(56, 189, 248, 0.45)', isGlass: true, name: 'Guarda-corpo Lateral Dir.' },
 
       // Paredes Frontais 1º Pavimento (Suíte Master + Dormitórios)
-      { type: 'box', x: -W/2 + 10, y: yPav1 + 2, z: L/2 - 14, w: W - 20, h: H, d: 8, color: '#F1F5F9', name: 'Alvenaria Suíte Master & Closet' },
+      { type: 'box', x: -W/2 + 10, y: yPav1 + 2, z: L/2 - 14, w: 90, h: H, d: 8, color: '#F1F5F9', name: 'Alvenaria Suíte Master & Closet' },
       // Porta-balcão de correr para a sacada
       { type: 'box', x: -36, y: yPav1 + 2, z: L/2 - 12, w: 56, h: 46, d: 3, color: 'rgba(56, 189, 248, 0.75)', isGlass: true, name: 'Porta-Balcão 4 Folhas Sacada' },
       // Janela do Quarto 2
-      { type: 'box', x: 32, y: yPav1 + 14, z: L/2 - 12, w: 42, h: 32, d: 3, color: 'rgba(56, 189, 248, 0.75)', isGlass: true, name: 'Janela Quarto Superior' },
+      { type: 'box', x: 42, y: yPav1 + 14, z: L/2 - 12, w: 42, h: 32, d: 3, color: 'rgba(56, 189, 248, 0.75)', isGlass: true, name: 'Janela Quarto Superior' },
 
       // Paredes Laterais e Fundos 1º Pavimento
       { type: 'box', x: -W/2 + 10, y: yPav1 + 2, z: -L/2 + 10, w: 8, h: H, d: L - 24, color: '#E2E8F0', name: 'Parede Superior Lateral Esq.' },
@@ -444,7 +852,7 @@ const BIMViewer = {
       { type: 'box', x: -46, y: yRoofBase + 2, z: -24, w: 92, h: 5, d: 6, color: '#0EA5E9', isPipe: true, name: 'Barrilete Geral de Distribuição (50mm)' }
     );
 
-    // Colunas de Água Fria e Água Quente Descendo os Pavimentos (Tubos Azuis)
+    // Colunas de Água Fria e Água Quente Descendo os Pavimentos
     const colunasPipes = [
       { x: -W/2 + 28, z: 20 },
       { x: W/2 - 36,  z: 20 },
@@ -646,7 +1054,6 @@ const BIMViewer = {
       meshes: coberturaMeshes
     });
   },
-
   _startRenderLoop() {
     if (this.animationId) cancelAnimationFrame(this.animationId);
 
@@ -719,9 +1126,10 @@ const BIMViewer = {
     // Desenhar Grid de Terreno / Canteiro
     this._drawGroundGrid(cx, cy);
 
-    // Filtrar elementos do pavimento ativo
+    // Filtrar elementos do pavimento ativo e visibilidade da árvore
     const visibleElements = this.elements.filter(elem => {
-      const floorOk = this.currentFloor === 'all' || elem.floor === this.currentFloor;
+      if (this.hiddenElementIds && this.hiddenElementIds.has(elem.id)) return false;
+      const floorOk = this.currentFloor === 'all' || elem.floor === 'all' || elem.floor === this.currentFloor;
       const disciplineOk = this.disciplineFilter === 'all' || String(elem.discipline || '').includes(this.disciplineFilter);
       return floorOk && disciplineOk;
     });
@@ -759,6 +1167,9 @@ const BIMViewer = {
     faces.forEach(face => {
       this._drawFace(face, cx, cy);
     });
+
+    // Desenhar o Gizmo de Orientação 3D no canto superior direito
+    this._drawOrientationGizmo(w, h);
   },
 
   /**
