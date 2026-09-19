@@ -424,6 +424,13 @@ assert(revolved.metadata.geometryKinds.includes('revolved-area-solid'),'metadata
 assert(revolved.elements[0].importedProperties.geometryKinds.includes('RevolvedAreaSolid'),'elemento registra representação RevolvedAreaSolid');
 assert(revolved.elements[0].rawTriangles.length>300,'revolução completa gera superfície triangulada');
 
+const revolvedDegreesIfc = revolvedIfc
+  .replace('IFCREVOLVEDAREASOLID(#6,#2,#8,6.283185307179586);','IFCREVOLVEDAREASOLID(#6,#2,#8,360.);')
+  .replace("#13=IFCPROJECT('P',$,'Projeto',$,$,$,$,$,$);", "#14=IFCSIUNIT(*,.PLANEANGLEUNIT.,$,.RADIAN.);\n#15=IFCMEASUREWITHUNIT(IFCPLANEANGLEMEASURE(0.0174532925199433),#14);\n#16=IFCCONVERSIONBASEDUNIT($,.PLANEANGLEUNIT.,'DEGREE',#15);\n#17=IFCUNITASSIGNMENT((#16));\n#13=IFCPROJECT('P',$,'Projeto',$,$,$,$,$,#17);");
+const revolvedDegrees=ext.parse(revolvedDegreesIfc);
+assert(revolvedDegrees.metadata.clashEligible===true,'IfcRevolvedAreaSolid respeita unidade angular em graus');
+assert(revolvedDegrees.elements[0].rawTriangles.length===revolved.elements[0].rawTriangles.length,'revolução de 360 graus equivale à revolução de 2π radianos');
+
 const primitiveCsgIfc = `ISO-10303-21;
 HEADER;
 FILE_SCHEMA(('IFC4'));
@@ -660,7 +667,8 @@ DATA;
 #38=IFCPRODUCTDEFINITIONSHAPE($,$,(#37));
 #39=IFCBUILDINGELEMENTPROXY('TRIM-CYL',$,'Cilindro Aparado',$,$,#36,#38,$,$);
 #40=IFCSIUNIT(*,.PLANEANGLEUNIT.,$,.RADIAN.);
-#41=IFCPROJECT('P',$,'Projeto',$,$,$,$,$,$);
+#41=IFCPROJECT('P',$,'Projeto',$,$,$,$,$,#42);
+#42=IFCUNITASSIGNMENT((#40));
 ENDSEC;
 END-ISO-10303-21;`;
 const rectangularTrimmedCylinder=ext.parse(rectangularTrimmedCylinderIfc);
@@ -669,6 +677,13 @@ assert(rectangularTrimmedCylinder.metadata.surfaceKinds.includes('rectangular-tr
 assert(rectangularTrimmedCylinder.metadata.surfaceKinds.includes('cylindrical-surface'),'metadata preserva a superfície base cilíndrica');
 assert(rectangularTrimmedCylinder.metadata.geometryKinds.includes('advanced-brep-cylinder'),'recorte cilíndrico integra AdvancedBrep curvo');
 assert(rectangularTrimmedCylinder.elements[0].rawTriangles.length===24,'recorte de 90 graus gera 12 segmentos e 24 triângulos');
+
+const rectangularTrimmedCylinderDegreesIfc = rectangularTrimmedCylinderIfc
+  .replaceAll('1.5707963267948966','90.')
+  .replace("#40=IFCSIUNIT(*,.PLANEANGLEUNIT.,$,.RADIAN.);\n#41=IFCPROJECT('P',$,'Projeto',$,$,$,$,$,#42);\n#42=IFCUNITASSIGNMENT((#40));", "#43=IFCSIUNIT(*,.PLANEANGLEUNIT.,$,.RADIAN.);\n#44=IFCMEASUREWITHUNIT(IFCPLANEANGLEMEASURE(0.0174532925199433),#43);\n#40=IFCCONVERSIONBASEDUNIT($,.PLANEANGLEUNIT.,'DEGREE',#44);\n#42=IFCUNITASSIGNMENT((#40));\n#41=IFCPROJECT('P',$,'Projeto',$,$,$,$,$,#42);");
+const rectangularTrimmedCylinderDegrees=ext.parse(rectangularTrimmedCylinderDegreesIfc);
+assert(rectangularTrimmedCylinderDegrees.metadata.clashEligible===true,'recorte cilíndrico em graus permanece autoritativo quando IfcUnitAssignment declara conversão');
+assert(rectangularTrimmedCylinderDegrees.elements[0].rawTriangles.length===rectangularTrimmedCylinder.elements[0].rawTriangles.length,'90 graus e π/2 radianos produzem a mesma tesselação cilíndrica');
 
 const viewer=fs.readFileSync('js/bim_viewer.js','utf8');
 assert(viewer.includes('id="bim-floor-panel"'),'viewer possui painel de pavimentos atualizável');
