@@ -925,10 +925,13 @@ const BIMIFCExtendedImporter = (function() {
       const angularV=base.type!=='IFCCYLINDRICALSURFACE';
       const v1=num(e.args[2])*(angularV?angleScale:1),v2=num(e.args[4])*(angularV?angleScale:1);
       const uSense=/\.T\./i.test(String(e.args[5]||'')),vSense=/\.T\./i.test(String(e.args[6]||''));
-      const du=u2-u1,dv=v2-v1;
-      if(Math.abs(du)<=1e-9||Math.abs(dv)<=1e-9||Math.abs(du)>Math.PI*2+1e-6){partialSurfaceIds.add(surfaceId);return null;}
-      if(uSense!==(du>0)||vSense!==(dv>0)){partialSurfaceIds.add(surfaceId);return null;}
-      const position=axis3(refOf(base.args[0]));
+      const rawDu=u2-u1,dv=v2-v1;
+      if(Math.abs(rawDu)<=1e-9||Math.abs(dv)<=1e-9){partialSurfaceIds.add(surfaceId);return null;}
+      let du=rawDu;
+      if(uSense&&du<0)du+=Math.PI*2;
+      if(!uSense&&du>0)du-=Math.PI*2;
+      if(Math.abs(du)<=1e-9||Math.abs(du)>Math.PI*2+1e-6||vSense!==(dv>0)){partialSurfaceIds.add(surfaceId);return null;}
+      const resolvedU2=u1+du,position=axis3(refOf(base.args[0]));
       const uSegments=Math.max(4,Math.min(96,Math.ceil(Math.abs(du)/(Math.PI/24))));
       let vSegments=1,evaluate=null,kind=null,baseKind=null,meta={};
 
@@ -959,7 +962,7 @@ const BIMIFCExtendedImporter = (function() {
         kind='rectangular-trimmed-torus';baseKind='toroidal-surface';meta={majorRadius,minorRadius,sweepU:du,sweepV:dv};
       }
 
-      const patch=rectangularPatchGrid(evaluate,u1,u2,v1,v2,uSegments,vSegments);
+      const patch=rectangularPatchGrid(evaluate,u1,resolvedU2,v1,v2,uSegments,vSegments);
       if(!patch||!fullSurfaceBoundaryMatches(outer,patch,0.002)){partialSurfaceIds.add(surfaceId);return null;}
       exactSurfaceKinds.add(kind);
       exactSurfaceKinds.add(baseKind);
