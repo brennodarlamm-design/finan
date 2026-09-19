@@ -1,0 +1,62 @@
+name: BIM PR validation
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'js/bim_*.js'
+      - 'scripts/test-bim-*.js'
+      - 'tests/fixtures/bim-real/**'
+      - 'app.html'
+      - 'css/style.css'
+      - '.agents/skills/fingo-bim-3d-pipeline/**'
+      - '.github/workflows/bim-pr-validation.yml'
+      - '.github/workflows/bim-large-real-qa.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: bim-pr-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  validate-bim:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: BIM extended IFC regression
+        run: node scripts/test-bim-ifc-extended.js
+      - name: BIM geometry importer regression
+        run: node scripts/test-bim-geometry-importer.js
+      - name: BIM real-model QA
+        run: npm run test:bim-real
+      - name: Upload BIM QA report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bim-real-qa-report
+          path: .qa/
+          if-no-files-found: warn
+          include-hidden-files: true
+      - name: BIM clash engine regression
+        run: node scripts/test-bim-clash-engine.js
+      - name: BIM renderer performance regression
+        run: node scripts/test-bim-render-performance.js
+      - name: BIM viewer integration regression
+        run: node scripts/test-bim-viewer-work-pr.js
+      - name: Full static regression suite
+        run: npm test
+      - name: Syntax verification
+        run: node scripts/check-all-syntax.js
+      - name: Cloudflare build verification
+        run: npm run build:cloudflare
+      - name: Wrangler bundle dry run
+        run: npx --yes wrangler deploy --dry-run

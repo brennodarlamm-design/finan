@@ -93,7 +93,13 @@ const tests = [
   'scripts/test-cloudflare-workers-full.js',
   'scripts/test-edge-security-monitoring.js',
   'scripts/test-legal-cookie-banner.js',
-  'scripts/test-evolutionary-pillars.js'
+  'scripts/test-evolutionary-pillars.js',
+  'scripts/test-bim-viewer-work-pr.js',
+  'scripts/test-bim-geometry-importer.js',
+  'scripts/test-bim-ifc-extended.js',
+  'scripts/test-bim-render-performance.js',
+  'scripts/test-bim-clash-engine.js',
+  'scripts/test-3d-skills.js'
 ].filter(fs.existsSync);
 
 const p50NativeSourceTests = new Set([

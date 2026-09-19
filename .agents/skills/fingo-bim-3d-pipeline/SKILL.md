@@ -1,0 +1,102 @@
+---
+name: fingo-bim-3d-pipeline
+description: >
+  Orquestra tarefas 3D/BIM do FinGo escolhendo entre arquivo BIM real, build123d
+  paramétrico, geração visual por imagem e otimização Blender/Python. Acione para
+  importação, exportação web, criação de fixtures, versionamento, propriedades,
+  coordenação, cortes, performance ou preparação para clash detection.
+risk: safe
+source: project
+---
+
+# FinGo BIM 3D Pipeline
+
+## When to use
+
+Use esta skill como porta de entrada para qualquer alteração relevante do BIM Viewer.
+
+Antes de codificar, classifique a fonte:
+
+| Fonte | Pipeline |
+| --- | --- |
+| IFC/OBJ/GLTF/GLB real | preservar arquivo e importar diretamente |
+| Geometria paramétrica conhecida | ler `build123d-cad-modeling` |
+| Imagem 2D sem CAD original | ler `generate-3d-model` após autorização |
+| Asset pesado | otimização Blender/Python/glTF Transform |
+| Clash detection | somente após geometria real tessellada e coordenadas confiáveis |
+
+## Constraints
+
+- Não simular clash detection sobre bounding boxes procedurais como se fosse resultado BIM real.
+- Não converter asset gerado por IA em modelo autoritativo.
+- Não ultrapassar 15 MB por upload atual.
+- Meta de até 150k triângulos por modelo; preferir 75k ou menos para mobile.
+- Texturas <= 2048x2048.
+- Preservar escala, eixo e unidade em metadata.
+- Todo modelo novo é uma nova versão; não sobrescrever silenciosamente a versão anterior.
+- IFC original deve ser mantido mesmo que exista uma versão GLB derivada.
+- Toda transformação deve registrar origem, ferramenta, parâmetros e hash quando disponível.
+- Booleanas IFC só podem ser marcadas como exatas quando o motor determinístico realmente produzir a malha resultante.
+- `IfcRelVoidsElement`, `IfcBooleanResult`, `IfcBooleanClippingResult` e half-spaces suportados devem preservar o guardrail de `clashEligible`; fallback parcial nunca é autoritativo.
+- O motor BSP/CSG do viewer limita cada operação a 12.000 triângulos de entrada e 50.000 de saída; acima disso, preservar o modelo e marcar a operação como parcial em vez de travar o navegador.
+- A cadeia IFC atualmente prioriza SweptSolid, SweptDiskSolid, MappedItem, FacetedBrep, TessellatedFaceSet, openings e half-spaces planares/poligonais suportados.
+- Curvas IFC suportadas deterministicamente incluem Polyline, IndexedPolyCurve com LineIndex/ArcIndex, CompositeCurve, TrimmedCurve sobre Circle/Ellipse, IfcBSplineCurveWithKnots e IfcRationalBSplineCurveWithKnots; segmentos desconhecidos devem marcar o elemento como parcial.
+- B-Spline/NURBS devem preservar grau, vetor de nós, multiplicidades e pesos; vetor de nós inválido ou pesos inconsistentes tornam a curva parcial.
+- O renderer pode usar culling e LOD apenas para exibição/interação; a malha autoritativa armazenada e usada no clash nunca deve ser destrutivamente reduzida.
+- IfcIndexedPolygonalFaceWithVoids só pode permanecer autoritativo quando a decomposição planar preservar exatamente o contorno externo e os vazios.
+- `IfcRevolvedAreaSolid` pode ser tessellado deterministicamente por revolução do perfil em torno de `IfcAxis1Placement`; revoluções parciais devem receber tampas de fechamento.
+- Primitivas CSG IFC suportadas incluem `IfcBlock`, `IfcRightCircularCylinder`, `IfcRightCircularCone`, `IfcRectangularPyramid` e `IfcSphere`; elas podem participar de booleanas BSP sem serem rebaixadas para proxies fictícios.
+- Primitivas e sólidos por revolução só permanecem autoritativos quando dimensões, placement e malha resultante são válidos; nunca inventar parâmetros ausentes.
+- `IfcAdvancedBrep` / `IfcManifoldSolidBrep` podem ser autoritativos quando todas as `IfcAdvancedFace` usam superfície planar suportada e seus `IfcEdgeLoop` fecham corretamente; superfícies curvas ainda não tesselladas devem marcar o elemento como parcial.
+- Em AdvancedBrep, preserve a ordem/orientação de `IfcOrientedEdge` e use os vértices topológicos como fallback seguro quando a curva do `IfcEdgeCurve` não estiver suportada.
+- `IfcBSplineSurfaceWithKnots` e `IfcRationalBSplineSurfaceWithKnots` só podem permanecer autoritativas em `IfcAdvancedFace` quando grau, malha de controle, nós, multiplicidades e pesos são consistentes e o contorno da face corresponde ao perímetro completo do patch tessellado.
+- Patches NURBS/B-Spline com recortes internos ou trimming arbitrário ainda não suportado devem cair para parcial; nunca renderizar o patch inteiro como se o recorte tivesse sido aplicado.
+- `IfcCylindricalSurface` em `IfcAdvancedFace` só pode ser autoritativa quando o `IfcEdgeLoop` provar uma faixa lateral cilíndrica completa: dois círculos fechados coaxiais com o mesmo raio da superfície e duas geratrizes coincidentes na costura. Cilindros parciais, arcos aparados, holes ou topologia ambígua permanecem parciais e fora do clash autoritativo.
+- `IfcRectangularTrimmedSurface` sobre `IfcCylindricalSurface` pode ser autoritativa para arcos cilíndricos parciais quando U/V, `Usense`/`Vsense`, contorno topológico e unidade angular declarada são consistentes; o contorno da face deve coincidir com o patch paramétrico.
+- `IfcRectangularTrimmedSurface` sobre `IfcSphericalSurface` e `IfcToroidalSurface` pode ser autoritativa quando os parâmetros permanecem no domínio da superfície, o toro satisfaz `MajorRadius > MinorRadius`, a unidade angular é conhecida e o `IfcEdgeLoop` coincide com o perímetro paramétrico tessellado.
+- Em superfícies elementares fechadas no parâmetro U, respeitar a ciclicidade e `Usense`: intervalos como 270°→0° podem representar um patch positivo de 90°. `Vsense` continua compatível com a ordem V1/V2 conforme a regra IFC.
+- Valores angulares IFC devem respeitar a `IfcUnitAssignment`: radianos SI ou unidade de conversão explícita (por exemplo grau → radiano). A mesma regra vale para trims cônicos/circulares e sólidos por revolução; não confundir a unidade SI base de uma conversão com a unidade realmente atribuída ao projeto.
+- Para extração 3D autoritativa de um produto, preferir sempre a `IfcShapeRepresentation` com `RepresentationIdentifier='Body'`; `Box`, `Axis`, `FootPrint`, `Surface` ou outras representações auxiliares não devem ser mescladas à malha de clash quando existe `Body`.
+- Respeitar a versão declarada em `FILE_SCHEMA`: `IfcAdvancedBrep` / `IfcAdvancedFace` são IFC4+ e não podem ser tratados como geometria normativa de um arquivo IFC2x3.
+- Índices de tessellation IFC são 1-based; qualquer acesso a arrays JavaScript deve converter explicitamente para 0-based.
+- `clashEligible=true` significa apenas que a geometria usada pelo FinGo foi resolvida deterministicamente sem fallback conhecido; não significa que o arquivo passou STEP syntax, EXPRESS schema, normative rules, MVD/IDS ou buildingSMART Validation Service.
+- Um arquivo abrir/renderizar no viewer nunca é prova suficiente de conformidade IFC. Validação normativa e validação geométrica do viewer são gates distintos.
+- Ao evoluir Brep, não assumir que `IfcClosedShell` é manifold apenas pelo nome: antes de declarar conformidade topológica plena, verificar fechamento, arestas compartilhadas e ausência de degenerescência conforme as regras do schema/validador.
+- Em `IfcAdvancedBrep`, topologia edge-manifold não basta para autoridade geométrica: cada `IfcEdgeCurve` deve ser coerente com seus vértices, cada loop planar deve pertencer ao `IfcPlane` declarado e faces topologicamente não adjacentes não podem se auto-intersectar.
+- Separar explicitamente `advancedBrepTopology` de `advancedBrepGeometry`: shell combinatoriamente válido pode continuar renderizável, mas qualquer inconsistência geométrica deve forçar `clashEligible=false`.
+- Para auto-interseção, usar broad phase por AABB e teste narrow phase triângulo/segmento apenas entre faces que não compartilham vértices topológicos; contato legítimo em arestas/vértices adjacentes não deve ser confundido com interseção própria.
+- A validação geométrica de AdvancedBrep tem orçamento computacional finito; se o orçamento de pares de triângulos for excedido, rebaixar para parcial em vez de travar o navegador ou assumir validade.
+- Em AdvancedBrep fechado, contatos legítimos só pela borda são permitidos; interseção de interiores entre faces adjacentes ou não adjacentes invalida a geometria.
+- Faces coplanares distintas não podem ter sobreposição de área positiva; compartilhar somente uma aresta ou vértice continua permitido.
+- Calcular volume do shell com origem local deslocada e tolerâncias baseadas na extensão local, nunca na distância absoluta ao zero global; isso evita falsos positivos em modelos georreferenciados/UTM.
+- Volume geométrico praticamente nulo invalida o shell para clash. O sinal do volume pode ser registrado como winding global, mas não deve ser apresentado como substituto de validação normativa IFC.
+
+## Workflow
+
+1. Identificar fonte e autoridade do modelo.
+2. Validar localmente formato e tamanho.
+3. Para CAD paramétrico, seguir `build123d-cad-modeling`.
+4. Para imagem 2D, seguir `generate-3d-model`.
+5. Produzir GLB para a web e preservar fonte original.
+6. Validar GLB.
+7. Conferir orçamento de polígonos/texturas.
+8. Abrir em preview e validar escala/orientação.
+9. Versionar em Documentos da obra.
+10. Só então habilitar propriedades, filtros, cortes e coordenação.
+11. Clash detection só entra depois que elementos reais tiverem geometria e sistema de coordenadas comparável.
+12. Antes do clash, confirmar que booleanas/openings do elemento estão `clashEligible !== false`; elementos parciais ficam fora da análise autoritativa.
+
+## Definition of done
+
+- asset válido;
+- <= 15 MB;
+- metadata de unidade/origem presente;
+- histórico de versão preservado;
+- testes do BIM verdes;
+- em pull requests que alterem BIM, o workflow `.github/workflows/bim-pr-validation.yml` deve validar regressões BIM, suíte estática, sintaxe e build Cloudflare sem executar deploy;
+- QA obrigatório com fixtures IFC reais da buildingSMART verde (`npm run test:bim-real`);
+- artifact `bim-real-qa-report` gerado no GitHub Actions;
+- para releases BIM relevantes, executar também o workflow manual `BIM large real-model QA` e revisar tempo, triângulos e memória;
+- preview Vercel READY quando a cota permitir; `build-rate-limit` deve ser registrado separadamente de falha de código;
+- Security Regression e Cloudflare build verdes;
+- nenhuma alteração de produção sem aprovação.

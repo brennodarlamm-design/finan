@@ -236,6 +236,7 @@ export default async function handler(req, res) {
               'image/jpeg', 'image/png', 'image/webp', 'image/gif',
               'application/zip', 'application/x-zip-compressed', 'application/x-rar-compressed', 'application/x-7z-compressed',
               'application/acad', 'application/x-acad', 'image/vnd.dwg', 'image/vnd.dxf',
+              'application/x-step', 'model/ifc', 'model/obj', 'model/gltf+json', 'model/gltf-binary',
               'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
               'application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
               'text/plain', 'text/csv', 'application/xml', 'text/xml'
@@ -268,7 +269,7 @@ export default async function handler(req, res) {
 
     const ALLOWED_EXTENSIONS = [
       'pdf', 'png', 'jpg', 'jpeg', 'webp', 'ofx', 'qfx', 'xml', 'xlsx', 'xls',
-      'csv', 'doc', 'docx', 'txt', 'dwg', 'dxf', 'zip', 'rar', '7z'
+      'csv', 'doc', 'docx', 'txt', 'dwg', 'dxf', 'ifc', 'obj', 'gltf', 'glb', 'zip', 'rar', '7z'
     ];
     const ALLOWED_MIMES = [
       'application/pdf', 'image/jpeg', 'image/png', 'image/webp',
@@ -277,7 +278,8 @@ export default async function handler(req, res) {
       'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
       'application/x-ofx', 'application/ofx',
       'application/zip', 'application/x-zip-compressed', 'application/x-rar-compressed', 'application/x-7z-compressed',
-      'application/acad', 'application/x-acad', 'image/vnd.dwg', 'image/vnd.dxf'
+      'application/acad', 'application/x-acad', 'image/vnd.dwg', 'image/vnd.dxf',
+      'application/x-step', 'model/ifc', 'model/obj', 'model/gltf+json', 'model/gltf-binary', 'application/json'
     ];
 
     const lowerExt = (filename.includes('.') ? filename.split('.').pop() : '').toLowerCase();
@@ -354,11 +356,18 @@ export default async function handler(req, res) {
       { exts: ['xls'],         mime: ['application/vnd.ms-excel'],                                         magic: ['D0CF11E0'] },          // OLE2
       { exts: ['doc'],         mime: ['application/msword'],                                                magic: ['D0CF11E0'] },
       { exts: ['dwg'],         mime: ['application/acad','application/x-acad','image/vnd.dwg'],             magic: ['41433130','41433131','41433132','41433133','41433134','41433135'] }, // AC10-AC15+
+      { exts: ['glb'],         mime: ['model/gltf-binary'],                                                 magic: ['676C5446'] },          // glTF
       { exts: ['rar'],         mime: ['application/x-rar-compressed'],                                     magic: ['526172211A07'] },      // Rar!..
       { exts: ['7z'],          mime: ['application/x-7z-compressed'],                                      magic: ['377ABCAF271C'] },      // 7z
       // Texto puro: sem magic bytes fixos — verificação mínima de não-executável
       { exts: ['txt','csv','xml','ofx','qfx','dxf'], textOnly: true,
         mime: ['text/plain','text/csv','application/xml','text/xml','application/x-ofx','application/ofx','image/vnd.dxf'] },
+      { exts: ['ifc'], textOnly: true,
+        mime: ['text/plain','application/x-step','model/ifc'] },
+      { exts: ['obj'], textOnly: true,
+        mime: ['text/plain','model/obj'] },
+      { exts: ['gltf'], textOnly: true,
+        mime: ['application/json','text/plain','model/gltf+json'] },
     ];
 
     // Encontrar a entrada da tabela pelo lowerExt
@@ -379,6 +388,25 @@ export default async function handler(req, res) {
         success: false,
         error: `MIME "${cleanMime}" não é compatível com a extensão ".${lowerExt}".`
       });
+    }
+
+    if (lowerExt === 'ifc') {
+      const headText = buffer.slice(0, Math.min(buffer.length, 1024 * 1024)).toString('utf8');
+      if (!/ISO-10303-21/i.test(headText) || !/IFCPROJECT/i.test(headText)) {
+        return res.status(400).json({ success: false, error: 'Arquivo IFC inválido ou incompleto.' });
+      }
+    } else if (lowerExt === 'obj') {
+      const headText = buffer.slice(0, Math.min(buffer.length, 1024 * 1024)).toString('utf8');
+      if (!/^v\s+/m.test(headText) || !/^f\s+/m.test(headText)) {
+        return res.status(400).json({ success: false, error: 'Arquivo OBJ inválido: vértices/faces não encontrados.' });
+      }
+    } else if (lowerExt === 'gltf') {
+      try {
+        const parsed = JSON.parse(buffer.toString('utf8'));
+        if (!parsed?.asset?.version) throw new Error('asset.version ausente');
+      } catch {
+        return res.status(400).json({ success: false, error: 'Arquivo GLTF inválido.' });
+      }
     }
 
     // Verificar magic bytes: suporta prefixo hex (magic[]) ou validador completo (magicValidator).

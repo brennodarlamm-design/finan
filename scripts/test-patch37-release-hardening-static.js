@@ -6,8 +6,8 @@ ok(admin.includes('Encerre o modo suporte atual antes de acessar outra empresa.'
 ok(admin.includes('Math.min(originalExp || maxSupportExp, maxSupportExp)'),'sessão suporte limitada pela validade da sessão Master');
 ok(admin.includes("auth.user?.impersonated === true && auth.user?.impersonatedBy === 'superadmin'"),'fallback de retorno exige sessão impersonada explícita');
 ok(admin.includes('SELECT perfil, ativo, tenant_id FROM usuarios'),'retorno valida tenant real do Master');
-ok(ci.includes('wait-vercel-api:'),'CI possui gate Vercel antes do Cloudflare');
-ok(ci.includes('needs: [validate, wait-vercel-api]'),'Cloudflare depende do gate Vercel');
-ok(ci.includes("https://api.fingo.api.br/api/auth?action=health") || ci.includes("https://api.finobra.app.br/api/auth?action=health"),'gate consulta health público da API');
-ok(ci.includes('Cloudflare deploy is blocked'),'falha do backend bloqueia rollout do frontend');
-console.log('\n✅ Patch 37 release hardening validado.');
+ok(!ci.includes('wait-vercel-api:'),'CI de produção não depende mais de gate Vercel');
+ok(ci.includes('needs: validate'),'deploy Cloudflare depende apenas da validação do próprio release');
+ok(ci.includes("https://fingo.api.br/api/v2/system/health"),'smoke de produção valida Edge API no domínio canônico');
+ok(ci.includes("'\"runtime\":\"cloudflare-workers\"'"),'smoke exige runtime Cloudflare Workers');
+console.log('\n✅ Patch 37 release hardening validado para Cloudflare-only.');

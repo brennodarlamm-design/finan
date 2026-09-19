@@ -63,7 +63,8 @@
     "test:seo": "node scripts/test-seo-indexing.js",
     "test:phase4": "node scripts/test-phase4-design-system.js",
     "audit:styles": "node scripts/audit-inline-styles.js",
-    "test:e2e": "node scripts/test-e2e-synthetic.js"
+    "test:e2e": "node scripts/test-e2e-synthetic.js",
+    "test:bim-real": "node scripts/test-bim-real-qa.js --json=.qa/bim-real-qa.json --markdown=.qa/bim-real-qa.md"
   },
   "dependencies": {
     "@neondatabase/serverless": "^0.9.5",

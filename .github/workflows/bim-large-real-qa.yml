@@ -1,0 +1,63 @@
+name: BIM large real-model QA
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'scripts/run-bim-large-qa.js'
+      - '.github/workflows/bim-large-real-qa.yml'
+  workflow_dispatch:
+    inputs:
+      model_set:
+        description: Official buildingSMART large-model set
+        required: true
+        default: infra
+        type: choice
+        options:
+          - infra
+          - building
+
+permissions:
+  contents: read
+
+jobs:
+  large-real-model-qa:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Download official buildingSMART stress models
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p .qa/large
+          BASE="https://raw.githubusercontent.com/buildingSMART/Certification-datasets/main"
+          if [ "${{ inputs.model_set || 'building' }}" = "infra" ]; then
+            curl --fail --location --retry 3 --output .qa/large/ifc4-infra-bridge.ifc "$BASE/IFC%204.0.2.1%20%28IFC%204%20ADD2%20TC1%29/Simple-Scene/Infra-Bridge.ifc"
+            curl --fail --location --retry 3 --output .qa/large/ifc4-infra-landscaping.ifc "$BASE/IFC%204.0.2.1%20%28IFC%204%20ADD2%20TC1%29/Simple-Scene/Infra-Landscaping.ifc"
+          else
+            curl --fail --location --retry 3 --output .qa/large/ifc4-building-architecture.ifc "$BASE/IFC%204.0.2.1%20%28IFC%204%20ADD2%20TC1%29/Simple-Scene/Building-Architecture.ifc"
+            curl --fail --location --retry 3 --output .qa/large/ifc4-building-structural.ifc "$BASE/IFC%204.0.2.1%20%28IFC%204%20ADD2%20TC1%29/Simple-Scene/Building-Structural.ifc"
+            curl --fail --location --retry 3 --output .qa/large/ifc4-infra-plumbing.ifc "$BASE/IFC%204.0.2.1%20%28IFC%204%20ADD2%20TC1%29/Simple-Scene/Infra-Plumbing.ifc"
+          fi
+      - name: Run large real-model stress QA
+        shell: bash
+        run: |
+          node scripts/run-bim-large-qa.js .qa/large/*.ifc \
+            --json=.qa/bim-large-qa.json \
+            --markdown=.qa/bim-large-qa.md
+      - name: Upload large BIM QA report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bim-large-real-qa-report-${{ inputs.model_set || 'building' }}
+          path: .qa/
+          if-no-files-found: warn
+          include-hidden-files: true

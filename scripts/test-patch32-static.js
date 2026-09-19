@@ -13,7 +13,7 @@ assert(fs.existsSync(workflowPath), 'Workflow de produção deve existir.');
 const workflow = fs.readFileSync(workflowPath, 'utf8');
 const pkg = fs.readFileSync('package.json', 'utf8');
 
-assert(workflow.includes('name: FinObra CI / manual production deploy'), 'Workflow deve identificar CI e deploy manual.');
+assert(workflow.includes('name: FinGo CI / manual Cloudflare production deploy'), 'Workflow deve identificar CI e deploy manual Cloudflare.');
 assert(workflow.includes('      - main'), 'Workflow deve validar pushes no branch main.');
 assert(workflow.includes('workflow_dispatch:'), 'Workflow deve permitir execução manual controlada.');
 assert(workflow.includes('deploy_production:'), 'Deploy manual deve exigir confirmação explícita.');
