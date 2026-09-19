@@ -749,6 +749,7 @@ const BIMIFCExtendedImporter = (function() {
     const advancedFaceLocalTriangles=new Map();
     const exactAdvancedBrepGeometryIds=new Set();
     const partialAdvancedBrepGeometryReasons=new Map();
+    const advancedBrepGeometryInfo=new Map();
     const pointLineDistance3D=(p,o,d)=>{
       const k=norm(d,{x:1,y:0,z:0}),q=sub(p,o),proj=mul(k,q.x*k.x+q.y*k.y+q.z*k.z);
       const r=sub(q,proj);return Math.hypot(r.x,r.y,r.z);
@@ -830,6 +831,46 @@ const BIMIFCExtendedImporter = (function() {
       for(let i=0;i<3;i++)if(segmentTriangleProper(b[i],b[(i+1)%3],a))return true;
       return false;
     };
+    const triangleNormal=tri=>cross(sub(tri[1],tri[0]),sub(tri[2],tri[0]));
+    const dominantProjection=normal=>{
+      const a=[Math.abs(normal.x),Math.abs(normal.y),Math.abs(normal.z)];
+      const drop=a[0]>=a[1]&&a[0]>=a[2]?'x':a[1]>=a[2]?'y':'z';
+      return p=>drop==='x'?{x:p.y,y:p.z}:drop==='y'?{x:p.x,y:p.z}:{x:p.x,y:p.y};
+    };
+    const orient2=(a,b,c)=>(b.x-a.x)*(c.y-a.y)-(b.y-a.y)*(c.x-a.x);
+    const pointInTriangle2DStrict=(p,t,eps=1e-9)=>{
+      const o1=orient2(t[0],t[1],p),o2=orient2(t[1],t[2],p),o3=orient2(t[2],t[0],p);
+      const hasPos=o1>eps||o2>eps||o3>eps,hasNeg=o1<-eps||o2<-eps||o3<-eps;
+      return !(hasPos&&hasNeg)&&Math.abs(o1)>eps&&Math.abs(o2)>eps&&Math.abs(o3)>eps;
+    };
+    const segmentIntersect2DProper=(a,b,c,d,eps=1e-9)=>{
+      const o1=orient2(a,b,c),o2=orient2(a,b,d),o3=orient2(c,d,a),o4=orient2(c,d,b);
+      return ((o1>eps&&o2<-eps)||(o1<-eps&&o2>eps))&&((o3>eps&&o4<-eps)||(o3<-eps&&o4>eps));
+    };
+    const coplanarTrianglesOverlapArea=(a,b)=>{
+      if(!boxesOverlap(triBox(a),triBox(b)))return false;
+      const na=triangleNormal(a),nb=triangleNormal(b);
+      const la=Math.hypot(na.x,na.y,na.z),lb=Math.hypot(nb.x,nb.y,nb.z);
+      if(!(la>1e-12&&lb>1e-12))return false;
+      const dot=(na.x*nb.x+na.y*nb.y+na.z*nb.z)/(la*lb);
+      if(Math.abs(dot)<1-1e-7)return false;
+      const scale=Math.max(1,...a.concat(b).map(p=>Math.hypot(p.x,p.y,p.z)));
+      const planeTol=Math.max(1e-8,scale*1e-7);
+      const n={x:na.x/la,y:na.y/la,z:na.z/la};
+      if(b.some(p=>Math.abs((p.x-a[0].x)*n.x+(p.y-a[0].y)*n.y+(p.z-a[0].z)*n.z)>planeTol))return false;
+      const project=dominantProjection(na),aa=a.map(project),bb=b.map(project);
+      const ca={x:(aa[0].x+aa[1].x+aa[2].x)/3,y:(aa[0].y+aa[1].y+aa[2].y)/3};
+      const cb={x:(bb[0].x+bb[1].x+bb[2].x)/3,y:(bb[0].y+bb[1].y+bb[2].y)/3};
+      if(pointInTriangle2DStrict(ca,bb)||pointInTriangle2DStrict(cb,aa))return true;
+      for(const p of aa)if(pointInTriangle2DStrict(p,bb))return true;
+      for(const p of bb)if(pointInTriangle2DStrict(p,aa))return true;
+      for(let i=0;i<3;i++)for(let j=0;j<3;j++)if(segmentIntersect2DProper(aa[i],aa[(i+1)%3],bb[j],bb[(j+1)%3]))return true;
+      return false;
+    };
+    const signedTriangleVolume=tri=>{
+      const [a,b,c]=tri,bc=cross(b,c);
+      return (a.x*bc.x+a.y*bc.y+a.z*bc.z)/6;
+    };
     const advancedBrepGeometryConsistency=id=>{
       const brep=entities.get(id),shell=entities.get(refOf(brep?.args?.[0]));
       const faceIds=refsIn(shell?.args?.[0]||'');
@@ -850,15 +891,22 @@ const BIMIFCExtendedImporter = (function() {
       let checks=0;
       const budget=200000;
       for(let i=0;i<faceIds.length;i++)for(let j=i+1;j<faceIds.length;j++){
-        const aId=faceIds[i],bId=faceIds[j],av=verticesByFace.get(aId),bv=verticesByFace.get(bId);
-        if([...av].some(v=>bv.has(v))) continue;
+        const aId=faceIds[i],bId=faceIds[j];
         if(!boxesOverlap(boxesByFace.get(aId),boxesByFace.get(bId))) continue;
         for(const ta of advancedFaceLocalTriangles.get(aId)||[])for(const tb of advancedFaceLocalTriangles.get(bId)||[]){
           if(++checks>budget)return {ok:false,reason:'advanced-brep-geometry-validation-budget'};
+          if(coplanarTrianglesOverlapArea(ta,tb))return {ok:false,reason:'advanced-brep-shell-coplanar-overlap'};
           if(trianglesProperlyIntersect(ta,tb))return {ok:false,reason:'advanced-brep-shell-self-intersection'};
         }
       }
-      return {ok:true,reason:null,intersectionChecks:checks};
+      const allTriangles=faceIds.flatMap(faceId=>advancedFaceLocalTriangles.get(faceId)||[]);
+      const points=allTriangles.flat();
+      const xs=points.map(p=>p.x),ys=points.map(p=>p.y),zs=points.map(p=>p.z);
+      const diag=Math.max(1e-9,Math.hypot(Math.max(...xs)-Math.min(...xs),Math.max(...ys)-Math.min(...ys),Math.max(...zs)-Math.min(...zs)));
+      const signedVolume=allTriangles.reduce((sum,tri)=>sum+signedTriangleVolume(tri),0);
+      const volume=Math.abs(signedVolume),volumeTol=Math.max(1e-12,diag*diag*diag*1e-9);
+      if(!(volume>volumeTol))return {ok:false,reason:'advanced-brep-shell-zero-volume',intersectionChecks:checks,signedVolume,volume};
+      return {ok:true,reason:null,intersectionChecks:checks,signedVolume,volume,winding:signedVolume>0?'positive':'negative'};
     };
     const exactSurfaceKinds=new Set();
     const partialSurfaceIds=new Set();
@@ -1294,6 +1342,7 @@ const BIMIFCExtendedImporter = (function() {
       });
       if(topology.ok){
         const geometry=advancedBrepGeometryConsistency(id);
+        advancedBrepGeometryInfo.set(id,geometry);
         if(geometry.ok) exactAdvancedBrepGeometryIds.add(id);
         else partialAdvancedBrepGeometryReasons.set(id,geometry.reason||'advanced-brep-geometry-invalid');
       }
@@ -1609,6 +1658,7 @@ const BIMIFCExtendedImporter = (function() {
       const advancedBrepTopologyReason=advancedBrepIds.map(id=>partialAdvancedBrepTopologyReasons.get(id)).find(Boolean)||null;
       const advancedBrepGeometryPartial=advancedBrepIds.some(id=>exactAdvancedBrepTopologyIds.has(id)&&!exactAdvancedBrepGeometryIds.has(id));
       const advancedBrepGeometryReason=advancedBrepIds.map(id=>partialAdvancedBrepGeometryReasons.get(id)).find(Boolean)||null;
+      const advancedBrepInfo=advancedBrepIds.map(id=>advancedBrepGeometryInfo.get(id)).find(Boolean)||null;
       const advancedBrepPartial=advancedBrepVersionMismatch||advancedBrepFacePartial||advancedBrepTopologyPartial||advancedBrepGeometryPartial;
       const advancedBrepExact=advancedBrepGeometryExact&&!advancedBrepTopologyPartial&&!advancedBrepGeometryPartial;
       const nurbsSurfaceIds=desc(new Set(['IFCBSPLINESURFACEWITHKNOTS','IFCRATIONALBSPLINESURFACEWITHKNOTS']));
@@ -1676,6 +1726,9 @@ const BIMIFCExtendedImporter = (function() {
           advancedBrepTopologyReason,
           advancedBrepGeometry:advancedBrepIds.length?(advancedBrepGeometryPartial?'invalid':(!advancedBrepTopologyPartial?'consistent':null)):null,
           advancedBrepGeometryReason,
+          advancedBrepVolume:advancedBrepInfo?.volume??null,
+          advancedBrepSignedVolume:advancedBrepInfo?.signedVolume??null,
+          advancedBrepWinding:advancedBrepInfo?.winding??null,
           partialReason:advancedBrepVersionMismatch?'advanced-brep-not-supported-in-schema':advancedBrepFacePartial?'advanced-brep-curved-surface-not-supported':advancedBrepTopologyPartial?(advancedBrepTopologyReason||'advanced-brep-shell-topology-invalid'):advancedBrepGeometryPartial?(advancedBrepGeometryReason||'advanced-brep-geometry-invalid'):booleanPartial?(boundedHalfSpaces.length?'polygonal-bounded-halfspace-curve-not-supported':'boolean-or-csg-operand-not-supported'):faceVoidsPartial?'polygon-face-voids-triangulation-failed':curvePartial?'curve-segment-not-supported':(openings.length&&!openingExact)?'opening-subtraction-failed':null,
           clashEligible:!partial
         }
