@@ -675,6 +675,77 @@ const BIMIFCExtendedImporter = (function() {
       }
       return out;
     };
+    const exactAdvancedBrepTopologyIds=new Set();
+    const partialAdvancedBrepTopologyReasons=new Map();
+    const orientedEdgeTopology=orientedId=>{
+      const oriented=entities.get(orientedId);
+      if(!oriented||oriented.type!=='IFCORIENTEDEDGE') return null;
+      const edgeId=refOf(oriented.args[2]),edge=entities.get(edgeId);
+      if(!edge||edge.type!=='IFCEDGECURVE') return null;
+      const a=refOf(edge.args[0]),b=refOf(edge.args[1]);
+      if(!a||!b||entities.get(a)?.type!=='IFCVERTEXPOINT'||entities.get(b)?.type!=='IFCVERTEXPOINT') return null;
+      const forward=/\.T\./i.test(String(oriented.args[3]||''));
+      const start=forward?a:b,end=forward?b:a;
+      const pts=edgeCurvePoints(edgeId);
+      let extent=0;
+      for(let i=1;i<pts.length;i++) extent+=Math.hypot(pts[i].x-pts[i-1].x,pts[i].y-pts[i-1].y,pts[i].z-pts[i-1].z);
+      if(!(extent>1e-9)) return null;
+      return {orientedId,edgeId,start,end,forward};
+    };
+    const edgeLoopTopology=loopId=>{
+      const loop=entities.get(loopId);
+      if(!loop||loop.type!=='IFCEDGELOOP') return {ok:false,reason:'advanced-brep-loop-not-edge-loop',edges:[]};
+      const orientedIds=refsIn(loop.args[0]);
+      if(!orientedIds.length||new Set(orientedIds).size!==orientedIds.length) return {ok:false,reason:'advanced-brep-loop-duplicate-oriented-edge',edges:[]};
+      const edges=orientedIds.map(orientedEdgeTopology);
+      if(edges.some(x=>!x)) return {ok:false,reason:'advanced-brep-loop-invalid-edge',edges:[]};
+      for(let i=0;i<edges.length;i++){
+        const cur=edges[i],next=edges[(i+1)%edges.length];
+        if(cur.end!==next.start) return {ok:false,reason:'advanced-brep-loop-not-continuous',edges};
+      }
+      return {ok:true,reason:null,edges};
+    };
+    const advancedBrepTopology=id=>{
+      const brep=entities.get(id);
+      const shell=entities.get(refOf(brep?.args?.[0]));
+      if(!brep||!['IFCADVANCEDBREP','IFCMANIFOLDSOLIDBREP'].includes(brep.type)||shell?.type!=='IFCCLOSEDSHELL'){
+        return {ok:false,reason:'advanced-brep-shell-missing',faces:0,edges:0,vertices:0};
+      }
+      const faceIds=refsIn(shell.args[0]);
+      if(!faceIds.length||new Set(faceIds).size!==faceIds.length) return {ok:false,reason:'advanced-brep-shell-duplicate-face',faces:faceIds.length,edges:0,vertices:0};
+      const edgeUsage=new Map(),orientedSeen=new Set(),vertices=new Set(),adj=new Map(faceIds.map(x=>[x,new Set()]));
+      for(const faceId of faceIds){
+        const face=entities.get(faceId);
+        if(!face||face.type!=='IFCADVANCEDFACE') return {ok:false,reason:'advanced-brep-shell-non-advanced-face',faces:faceIds.length,edges:edgeUsage.size,vertices:vertices.size};
+        const bounds=refsIn(face.args[0]).map(x=>entities.get(x)).filter(Boolean);
+        if(!bounds.length||bounds.filter(x=>x.type==='IFCFACEOUTERBOUND').length!==1) return {ok:false,reason:'advanced-brep-face-invalid-bounds',faces:faceIds.length,edges:edgeUsage.size,vertices:vertices.size};
+        for(const bound of bounds){
+          const loopId=refOf(bound.args[0]),loopCheck=edgeLoopTopology(loopId);
+          if(!loopCheck.ok) return {ok:false,reason:loopCheck.reason,faces:faceIds.length,edges:edgeUsage.size,vertices:vertices.size};
+          const boundOrientation=/\.T\./i.test(String(bound.args[1]||''));
+          for(const info of loopCheck.edges){
+            if(orientedSeen.has(info.orientedId)) return {ok:false,reason:'advanced-brep-shell-reused-oriented-edge',faces:faceIds.length,edges:edgeUsage.size,vertices:vertices.size};
+            orientedSeen.add(info.orientedId);vertices.add(info.start);vertices.add(info.end);
+            if(!edgeUsage.has(info.edgeId)) edgeUsage.set(info.edgeId,[]);
+            edgeUsage.get(info.edgeId).push({faceId,forward:boundOrientation?info.forward:!info.forward});
+          }
+        }
+      }
+      for(const uses of edgeUsage.values()){
+        if(uses.length!==2) return {ok:false,reason:'advanced-brep-shell-edge-use-count',faces:faceIds.length,edges:edgeUsage.size,vertices:vertices.size};
+        if(uses[0].forward===uses[1].forward) return {ok:false,reason:'advanced-brep-shell-edge-orientation',faces:faceIds.length,edges:edgeUsage.size,vertices:vertices.size};
+        if(uses[0].faceId!==uses[1].faceId){
+          adj.get(uses[0].faceId)?.add(uses[1].faceId);
+          adj.get(uses[1].faceId)?.add(uses[0].faceId);
+        }
+      }
+      const visited=new Set(),stack=faceIds.length?[faceIds[0]]:[];
+      while(stack.length){const x=stack.pop();if(visited.has(x))continue;visited.add(x);for(const y of adj.get(x)||[])if(!visited.has(y))stack.push(y);}
+      if(faceIds.length>1&&visited.size!==faceIds.length) return {ok:false,reason:'advanced-brep-shell-disconnected',faces:faceIds.length,edges:edgeUsage.size,vertices:vertices.size};
+      const chi=vertices.size-edgeUsage.size+faceIds.length,genus=(2-chi)/2;
+      if(!Number.isFinite(genus)||genus<-1e-9||Math.abs(genus-Math.round(genus))>1e-9) return {ok:false,reason:'advanced-brep-shell-euler-invalid',faces:faceIds.length,edges:edgeUsage.size,vertices:vertices.size,euler:chi};
+      return {ok:true,reason:null,faces:faceIds.length,edges:edgeUsage.size,vertices:vertices.size,euler:chi,genus:Math.round(genus)};
+    };
     const exactSurfaceKinds=new Set();
     const partialSurfaceIds=new Set();
     const refRows=token=>{
@@ -1076,6 +1147,12 @@ const BIMIFCExtendedImporter = (function() {
         return [];
       }
       if(!tris.length){partialAdvancedFaceIds.add(faceId);return [];}
+      const nonDegenerate=tris.filter(t=>{
+        const n=cross(sub(t[1],t[0]),sub(t[2],t[0]));
+        return Math.hypot(n.x,n.y,n.z)>1e-10;
+      });
+      if(nonDegenerate.length!==tris.length||!nonDegenerate.length){partialAdvancedFaceIds.add(faceId);return [];}
+      tris=nonDegenerate;
       const sameSense=/\.T\./i.test(String(face.args[2]||''));
       const boundOrientation=/\.T\./i.test(String(outerBound.args[1]||''));
       if(!sameSense||!boundOrientation) tris=tris.map(t=>[t[0],t[2],t[1]]);
@@ -1086,6 +1163,9 @@ const BIMIFCExtendedImporter = (function() {
       const brep=entities.get(id);
       if(!brep||!['IFCADVANCEDBREP','IFCMANIFOLDSOLIDBREP'].includes(brep.type)) return [];
       const shell=entities.get(refOf(brep.args[0])); if(shell?.type!=='IFCCLOSEDSHELL') return [];
+      const topology=advancedBrepTopology(id);
+      if(topology.ok) exactAdvancedBrepTopologyIds.add(id);
+      else partialAdvancedBrepTopologyReasons.set(id,topology.reason||'advanced-brep-shell-topology-invalid');
       const out=[];
       refsIn(shell.args[0]).forEach(faceId=>{
         const face=entities.get(faceId);
@@ -1403,8 +1483,12 @@ const BIMIFCExtendedImporter = (function() {
       const advancedBrepIds=desc(new Set(['IFCADVANCEDBREP','IFCMANIFOLDSOLIDBREP']));
       const advancedFaceIds=desc(new Set(['IFCADVANCEDFACE']));
       const advancedBrepVersionMismatch=advancedBrepIds.some(id=>entities.get(id)?.type==='IFCADVANCEDBREP')&&!schemaSupportsAdvancedBrep;
-      const advancedBrepPartial=advancedBrepVersionMismatch||advancedFaceIds.some(id=>partialAdvancedFaceIds.has(id));
-      const advancedBrepExact=advancedBrepIds.length>0&&!advancedBrepPartial&&advancedFaceIds.every(id=>exactAdvancedFaceIds.has(id));
+      const advancedBrepFacePartial=advancedFaceIds.some(id=>partialAdvancedFaceIds.has(id));
+      const advancedBrepGeometryExact=advancedBrepIds.length>0&&!advancedBrepVersionMismatch&&!advancedBrepFacePartial&&advancedFaceIds.every(id=>exactAdvancedFaceIds.has(id));
+      const advancedBrepTopologyPartial=advancedBrepIds.some(id=>!exactAdvancedBrepTopologyIds.has(id));
+      const advancedBrepTopologyReason=advancedBrepIds.map(id=>partialAdvancedBrepTopologyReasons.get(id)).find(Boolean)||null;
+      const advancedBrepPartial=advancedBrepVersionMismatch||advancedBrepFacePartial||advancedBrepTopologyPartial;
+      const advancedBrepExact=advancedBrepGeometryExact&&!advancedBrepTopologyPartial;
       const nurbsSurfaceIds=desc(new Set(['IFCBSPLINESURFACEWITHKNOTS','IFCRATIONALBSPLINESURFACEWITHKNOTS']));
       const cylindricalSurfaceIds=desc(new Set(['IFCCYLINDRICALSURFACE']));
       const sphericalSurfaceIds=desc(new Set(['IFCSPHERICALSURFACE']));
@@ -1412,7 +1496,7 @@ const BIMIFCExtendedImporter = (function() {
       const sweptSurfaceIds=desc(new Set(['IFCSURFACEOFLINEAREXTRUSION','IFCSURFACEOFREVOLUTION']));
       const rectangularTrimmedSurfaceIds=desc(new Set(['IFCRECTANGULARTRIMMEDSURFACE']));
       const advancedSurfaceIds=[...nurbsSurfaceIds,...cylindricalSurfaceIds,...sphericalSurfaceIds,...toroidalSurfaceIds,...sweptSurfaceIds,...rectangularTrimmedSurfaceIds];
-      const advancedCurved=advancedBrepExact&&advancedSurfaceIds.length>0&&!advancedSurfaceIds.some(id=>partialSurfaceIds.has(id));
+      const advancedCurved=advancedBrepGeometryExact&&advancedSurfaceIds.length>0&&!advancedSurfaceIds.some(id=>partialSurfaceIds.has(id));
       const advancedNurbs=advancedCurved&&nurbsSurfaceIds.length>0;
       const advancedCylinder=advancedCurved&&cylindricalSurfaceIds.length>0;
       const advancedSphere=advancedCurved&&sphericalSurfaceIds.length>0;
@@ -1452,9 +1536,9 @@ const BIMIFCExtendedImporter = (function() {
 
       const partial=advancedBrepPartial||booleanPartial||faceVoidsPartial||curvePartial||(openings.length>0&&!openingExact);
       if(partial) partialElements++;
-      if(mapped)geometryKinds.add('mapped-item');if(brep)geometryKinds.add('faceted-brep');if(advancedBrepExact&&!advancedCurved)geometryKinds.add('advanced-brep-planar');if(advancedNurbs)geometryKinds.add('advanced-brep-nurbs');if(advancedCylinder)geometryKinds.add('advanced-brep-cylinder');if(advancedSphere)geometryKinds.add('advanced-brep-sphere');if(advancedTorus)geometryKinds.add('advanced-brep-torus');if(advancedSweptSurface)geometryKinds.add('advanced-brep-swept-surface');if(tess)geometryKinds.add('tessellated-face-set');if(swept)geometryKinds.add('swept-solid');if(revolved)geometryKinds.add('revolved-area-solid');if(sweptDisk)geometryKinds.add('swept-disk-solid');if(primitive)geometryKinds.add('csg-primitive');if(booleanExact)geometryKinds.add('csg-exact');if(openingSubtractions)geometryKinds.add('opening-subtraction');if(faceVoidsExact)geometryKinds.add('polygon-face-voids');if(curveExact)geometryKinds.add('advanced-curves');
+      if(mapped)geometryKinds.add('mapped-item');if(brep)geometryKinds.add('faceted-brep');if(advancedBrepGeometryExact&&!advancedCurved)geometryKinds.add('advanced-brep-planar');if(advancedNurbs)geometryKinds.add('advanced-brep-nurbs');if(advancedCylinder)geometryKinds.add('advanced-brep-cylinder');if(advancedSphere)geometryKinds.add('advanced-brep-sphere');if(advancedTorus)geometryKinds.add('advanced-brep-torus');if(advancedSweptSurface)geometryKinds.add('advanced-brep-swept-surface');if(tess)geometryKinds.add('tessellated-face-set');if(swept)geometryKinds.add('swept-solid');if(revolved)geometryKinds.add('revolved-area-solid');if(sweptDisk)geometryKinds.add('swept-disk-solid');if(primitive)geometryKinds.add('csg-primitive');if(booleanExact)geometryKinds.add('csg-exact');if(openingSubtractions)geometryKinds.add('opening-subtraction');if(faceVoidsExact)geometryKinds.add('polygon-face-voids');if(curveExact)geometryKinds.add('advanced-curves');
       const globalId=unquote(e.args[0]||('#'+e.id)),name=unquote(e.args[2]||'')||(e.type+' #'+e.id),storey=storeyByProduct.get(e.id)||null;
-      const advancedKinds=advancedBrepExact
+      const advancedKinds=advancedBrepGeometryExact
         ? (advancedCurved
           ? [advancedNurbs?'AdvancedBrepNURBS':null,advancedCylinder?'AdvancedBrepCylinder':null,advancedSphere?'AdvancedBrepSphere':null,advancedTorus?'AdvancedBrepTorus':null,advancedSweptSurface?'AdvancedBrepSweptSurface':null].filter(Boolean)
           : ['AdvancedBrep'])
@@ -1466,7 +1550,9 @@ const BIMIFCExtendedImporter = (function() {
           format:'IFC',ifcClass:e.type,globalId,stepId:e.id,storeyId:storey?.id||null,storeyName:storey?.name||null,storeyElevation:storey?.elevation??null,
           psets:psets.get(e.id)||{},geometryKinds:kinds,geometryQuality:partial?'partial':(kinds.join('+')||'supported'),
           openingCount:openings.length,openingSubtractions,booleanExact,
-          partialReason:advancedBrepVersionMismatch?'advanced-brep-not-supported-in-schema':advancedBrepPartial?'advanced-brep-curved-surface-not-supported':booleanPartial?(boundedHalfSpaces.length?'polygonal-bounded-halfspace-curve-not-supported':'boolean-or-csg-operand-not-supported'):faceVoidsPartial?'polygon-face-voids-triangulation-failed':curvePartial?'curve-segment-not-supported':(openings.length&&!openingExact)?'opening-subtraction-failed':null,
+          advancedBrepTopology:advancedBrepIds.length?(advancedBrepTopologyPartial?'invalid':'edge-manifold'):null,
+          advancedBrepTopologyReason,
+          partialReason:advancedBrepVersionMismatch?'advanced-brep-not-supported-in-schema':advancedBrepFacePartial?'advanced-brep-curved-surface-not-supported':advancedBrepTopologyPartial?(advancedBrepTopologyReason||'advanced-brep-shell-topology-invalid'):booleanPartial?(boundedHalfSpaces.length?'polygonal-bounded-halfspace-curve-not-supported':'boolean-or-csg-operand-not-supported'):faceVoidsPartial?'polygon-face-voids-triangulation-failed':curvePartial?'curve-segment-not-supported':(openings.length&&!openingExact)?'opening-subtraction-failed':null,
           clashEligible:!partial
         }
       });
