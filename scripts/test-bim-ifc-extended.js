@@ -616,6 +616,73 @@ assert(offSurface.metadata.clashEligible===false,'face cujos loops não pertence
 assert(offSurface.elements[0].importedProperties.advancedBrepGeometry==='invalid','face fora da superfície declarada é registrada como geometria inválida');
 assert(offSurface.elements[0].importedProperties.partialReason==='advanced-brep-face-off-surface','diagnóstico identifica face fora do IfcPlane');
 
+
+const selfIntersectingAdvancedBrepIfc = (()=>{
+  let nextId=1;
+  const rows=[];
+  const add=body=>{const id=nextId++;rows.push(`#${id}=${body};`);return id;};
+  const fmt=n=>Number.isInteger(n)?`${n}.`:`${n}`;
+  const vec=v=>`(${v.map(fmt).join(',')})`;
+  const pts=[
+    [1,0,0],[0,1,0],[-1,0,0],[0,-1,0],
+    [-2,-2,-2],[0,0,-1]
+  ];
+  const faces=[
+    [4,0,1],[4,1,2],[4,2,3],[4,3,0],
+    [5,1,0],[5,2,1],[5,3,2],[5,0,3]
+  ];
+  const pointIds=pts.map(p=>add(`IFCCARTESIANPOINT(${vec(p)})`));
+  const vertexIds=pointIds.map(id=>add(`IFCVERTEXPOINT(#${id})`));
+  const edgePairs=[[0,1],[1,2],[2,3],[3,0],[4,0],[4,1],[4,2],[4,3],[5,0],[5,1],[5,2],[5,3]];
+  const edgeMap=new Map();
+  for(const [a,b] of edgePairs){
+    const curve=add(`IFCPOLYLINE((#${pointIds[a]},#${pointIds[b]}))`);
+    const edge=add(`IFCEDGECURVE(#${vertexIds[a]},#${vertexIds[b]},#${curve},.T.)`);
+    edgeMap.set(`${a}:${b}`,{edge,forward:true});
+    edgeMap.set(`${b}:${a}`,{edge,forward:false});
+  }
+  const faceIds=[];
+  const cross3=(a,b)=>[a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]];
+  const minus=(a,b)=>a.map((v,i)=>v-b[i]);
+  for(const [a,b,c] of faces){
+    const oriented=[];
+    for(const [u,v] of [[a,b],[b,c],[c,a]]){
+      const info=edgeMap.get(`${u}:${v}`);
+      oriented.push(add(`IFCORIENTEDEDGE(*,*,#${info.edge},${info.forward?'.T.':'.F.'})`));
+    }
+    const loop=add(`IFCEDGELOOP((${oriented.map(id=>`#${id}`).join(',')}))`);
+    const bound=add(`IFCFACEOUTERBOUND(#${loop},.T.)`);
+    const normal=cross3(minus(pts[b],pts[a]),minus(pts[c],pts[a]));
+    const ref=minus(pts[b],pts[a]);
+    const normalDir=add(`IFCDIRECTION(${vec(normal)})`);
+    const refDir=add(`IFCDIRECTION(${vec(ref)})`);
+    const placement=add(`IFCAXIS2PLACEMENT3D(#${pointIds[a]},#${normalDir},#${refDir})`);
+    const plane=add(`IFCPLANE(#${placement})`);
+    faceIds.push(add(`IFCADVANCEDFACE((#${bound}),#${plane},.T.)`));
+  }
+  const shell=add(`IFCCLOSEDSHELL((${faceIds.map(id=>`#${id}`).join(',')}))`);
+  const brep=add(`IFCADVANCEDBREP(#${shell})`);
+  const rootPlacement=add(`IFCAXIS2PLACEMENT3D(#${pointIds[0]},$,$)`);
+  const localPlacement=add(`IFCLOCALPLACEMENT($,#${rootPlacement})`);
+  const shape=add(`IFCSHAPEREPRESENTATION($,'Body','AdvancedBrep',(#${brep}))`);
+  const pds=add(`IFCPRODUCTDEFINITIONSHAPE($,$,(#${shape}))`);
+  add(`IFCBUILDINGELEMENTPROXY('ADV-SELF-X',$,'Advanced BRep Auto-Intersectante',$,$,#${localPlacement},#${pds},$,$)`);
+  add(`IFCPROJECT('P',$,'Projeto',$,$,$,$,$,$)`);
+  return `ISO-10303-21;
+HEADER;
+FILE_SCHEMA(('IFC4'));
+ENDSEC;
+DATA;
+${rows.join('\n')}
+ENDSEC;
+END-ISO-10303-21;`;
+})();
+const selfIntersectingAdvancedBrep=ext.parse(selfIntersectingAdvancedBrepIfc);
+assert(selfIntersectingAdvancedBrep.metadata.clashEligible===false,'shell edge-manifold auto-intersectante fica fora do clash autoritativo');
+assert(selfIntersectingAdvancedBrep.elements[0].importedProperties.advancedBrepTopology==='edge-manifold','auto-interseção geométrica não é confundida com falha combinatória');
+assert(selfIntersectingAdvancedBrep.elements[0].importedProperties.advancedBrepGeometry==='invalid','shell auto-intersectante recebe geometria inválida');
+assert(selfIntersectingAdvancedBrep.elements[0].importedProperties.partialReason==='advanced-brep-shell-self-intersection','detector identifica interseção própria entre faces não adjacentes');
+
 const openAdvancedBrepIfc = closedAdvancedBrepIfc.replace('#47=IFCCLOSEDSHELL((#43,#44,#45,#46));','#47=IFCCLOSEDSHELL((#43,#44,#45));');
 const openAdvancedBrep=ext.parse(openAdvancedBrepIfc);
 assert(openAdvancedBrep.metadata.clashEligible===false,'ClosedShell com uma face ausente fica fora do clash');
