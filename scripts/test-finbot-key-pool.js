@@ -5,6 +5,9 @@ import dotenv from 'dotenv';
 
 dotenv.config({ path: '.env.local' });
 
+// CI hermético: o teste valida leitura/mascaramento sem depender de segredo real.
+process.env.GEMINI_API_KEY ||= 'test-only-gemini-key-0123456789abcdef';
+
 let fails = 0;
 function test(name, cond) {
   if (cond) {
