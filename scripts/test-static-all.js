@@ -93,7 +93,8 @@ const tests = [
   'scripts/test-cloudflare-workers-full.js',
   'scripts/test-edge-security-monitoring.js',
   'scripts/test-legal-cookie-banner.js',
-  'scripts/test-evolutionary-pillars.js'
+  'scripts/test-evolutionary-pillars.js',
+  'scripts/test-bim-viewer-work-pr.js'
 ].filter(fs.existsSync);
 
 const p50NativeSourceTests = new Set([
