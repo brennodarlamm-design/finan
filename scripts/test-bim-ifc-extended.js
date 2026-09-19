@@ -601,7 +601,9 @@ assert(closedAdvancedBrep.elements[0].importedProperties.advancedBrepGeometry===
 assert(closedAdvancedBrep.elements[0].importedProperties.advancedBrepGeometryReason===null,'shell geometricamente consistente não recebe motivo de falha');
 assert(closedAdvancedBrep.elements[0].rawTriangles.length===4,'tetraedro AdvancedBrep preserva quatro faces triangulares');
 
-const badEdgeGeometryIfc = closedAdvancedBrepIfc.replace('#9=IFCPOLYLINE((#1,#2));','#9=IFCPOLYLINE((#3,#4));');
+const badEdgeGeometryIfc = closedAdvancedBrepIfc
+  .replace('#15=IFCEDGECURVE(#5,#6,#9,.T.);','#15=IFCEDGECURVE(#5,#6,#66,.T.);')
+  .replace("#53=IFCPROJECT('P',$,'Projeto',$,$,$,$,$,$);", "#64=IFCDIRECTION((0.,1.,0.));\n#65=IFCVECTOR(#64,1.);\n#66=IFCLINE(#3,#65);\n#53=IFCPROJECT('P',$,'Projeto',$,$,$,$,$,$);");
 const badEdgeGeometry=ext.parse(badEdgeGeometryIfc);
 assert(badEdgeGeometry.metadata.clashEligible===false,'edge geometry que não passa pelos vértices topológicos fica fora do clash');
 assert(badEdgeGeometry.elements[0].importedProperties.advancedBrepTopology==='edge-manifold','erro geométrico não mascara topologia combinatória válida');
