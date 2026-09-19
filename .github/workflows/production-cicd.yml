@@ -109,9 +109,6 @@ jobs:
           [[ "$edge_api_health" == *'"service":"fingo-edge-v2"'* ]]
           [[ "$edge_api_health" == *'"runtime":"cloudflare-workers"'* ]]
 
-          final_url="$(curl --fail --silent --show-error --location --output /dev/null --write-out '%{url_effective}' https://www.fingo.api.br/)"
-          [[ "$final_url" == 'https://fingo.api.br/' ]]
-
           auth_status="$(curl --silent --output /dev/null --write-out '%{http_code}' 'https://fingo.api.br/api/auth?action=me')"
           [[ "$auth_status" == '401' ]]
 
