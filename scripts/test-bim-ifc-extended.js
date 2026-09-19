@@ -599,6 +599,8 @@ assert(closedAdvancedBrep.elements[0].importedProperties.advancedBrepTopology===
 assert(closedAdvancedBrep.elements[0].importedProperties.advancedBrepTopologyReason===null,'shell fechado não recebe motivo de falha topológica');
 assert(closedAdvancedBrep.elements[0].importedProperties.advancedBrepGeometry==='consistent','faces e superfícies do shell fechado são geometricamente consistentes');
 assert(closedAdvancedBrep.elements[0].importedProperties.advancedBrepGeometryReason===null,'shell geometricamente consistente não recebe motivo de falha');
+assert(Math.abs(closedAdvancedBrep.elements[0].importedProperties.advancedBrepVolume-(1/6))<1e-9,'tetraedro reporta volume geométrico absoluto de 1/6');
+assert(['positive','negative'].includes(closedAdvancedBrep.elements[0].importedProperties.advancedBrepWinding),'shell fechado registra winding global pelo volume assinado');
 assert(closedAdvancedBrep.elements[0].rawTriangles.length===4,'tetraedro AdvancedBrep preserva quatro faces triangulares');
 
 const badEdgeGeometryIfc = closedAdvancedBrepIfc
@@ -682,6 +684,15 @@ assert(selfIntersectingAdvancedBrep.metadata.clashEligible===false,'shell edge-m
 assert(selfIntersectingAdvancedBrep.elements[0].importedProperties.advancedBrepTopology==='edge-manifold','auto-interseção geométrica não é confundida com falha combinatória');
 assert(selfIntersectingAdvancedBrep.elements[0].importedProperties.advancedBrepGeometry==='invalid','shell auto-intersectante recebe geometria inválida');
 assert(selfIntersectingAdvancedBrep.elements[0].importedProperties.partialReason==='advanced-brep-shell-self-intersection','detector identifica interseção própria entre faces não adjacentes');
+
+
+const coplanarOverlapAdvancedBrepIfc = selfIntersectingAdvancedBrepIfc
+  .replace('#6=IFCCARTESIANPOINT((0.,0.,-1.));','#6=IFCCARTESIANPOINT((-2.,-2.,-2.));');
+const coplanarOverlapAdvancedBrep=ext.parse(coplanarOverlapAdvancedBrepIfc);
+assert(coplanarOverlapAdvancedBrep.metadata.clashEligible===false,'shell edge-manifold com faces coplanares sobrepostas fica fora do clash');
+assert(coplanarOverlapAdvancedBrep.elements[0].importedProperties.advancedBrepTopology==='edge-manifold','sobreposição coplanar preserva diagnóstico topológico separado');
+assert(coplanarOverlapAdvancedBrep.elements[0].importedProperties.advancedBrepGeometry==='invalid','sobreposição coplanar invalida apenas a camada geométrica');
+assert(coplanarOverlapAdvancedBrep.elements[0].importedProperties.partialReason==='advanced-brep-shell-coplanar-overlap','detector identifica área coplanar sobreposta');
 
 const openAdvancedBrepIfc = closedAdvancedBrepIfc.replace('#47=IFCCLOSEDSHELL((#43,#44,#45,#46));','#47=IFCCLOSEDSHELL((#43,#44,#45));');
 const openAdvancedBrep=ext.parse(openAdvancedBrepIfc);
