@@ -1,6 +1,7 @@
 import fs from 'fs';
 import vm from 'vm';
 
+const csgSrc = fs.readFileSync('js/bim_csg.js','utf8');
 const extendedSrc = fs.readFileSync('js/bim_ifc_extended.js','utf8');
 const importerSrc = fs.readFileSync('js/bim_geometry_importer.js','utf8');
 const sandbox = {
@@ -14,8 +15,10 @@ const sandbox = {
   btoa: globalThis.btoa
 };
 vm.createContext(sandbox);
+vm.runInContext(csgSrc + '\n;globalThis.__CSG = BIMCSG;', sandbox);
 vm.runInContext(extendedSrc + '\n;globalThis.__EXT = BIMIFCExtendedImporter;', sandbox);
 vm.runInContext(importerSrc + '\n;globalThis.__IMP = BIMGeometryImporter;', sandbox);
+const csg = sandbox.__CSG;
 const ext = sandbox.__EXT;
 const importer = sandbox.__IMP;
 
@@ -150,13 +153,65 @@ END-ISO-10303-21;`;
 const circle=ext.parse(circleIfc);
 assert(circle.elements[0].rawTriangles.length>=76,'IfcCircleProfileDef é discretizado deterministicamente');
 
-const openingIfc = mappedIfc.replace(
-  "#18=IFCPROJECT",
-  "#19=IFCOPENINGELEMENT('OPEN',$,'Abertura',$,$,#3,#14,$);\n#20=IFCRELVOIDSELEMENT('VOID',$,$,$,#15,#19);\n#18=IFCPROJECT"
-);
+const openingIfc = `ISO-10303-21;
+HEADER;
+FILE_SCHEMA(('IFC4'));
+ENDSEC;
+DATA;
+#1=IFCCARTESIANPOINT((0.,0.,0.));
+#2=IFCAXIS2PLACEMENT3D(#1,$,$);
+#3=IFCLOCALPLACEMENT($,#2);
+#4=IFCAXIS2PLACEMENT2D(#1,$);
+#5=IFCRECTANGLEPROFILEDEF(.AREA.,$,#4,4.,0.4);
+#6=IFCDIRECTION((0.,0.,1.));
+#7=IFCEXTRUDEDAREASOLID(#5,#2,#6,3.);
+#8=IFCSHAPEREPRESENTATION($,'Body','SweptSolid',(#7));
+#9=IFCPRODUCTDEFINITIONSHAPE($,$,(#8));
+#10=IFCWALL('WALL-GID',$,'Parede com Vão',$,$,#3,#9,$);
+#11=IFCCARTESIANPOINT((0.,0.,0.5));
+#12=IFCAXIS2PLACEMENT3D(#11,$,$);
+#13=IFCRECTANGLEPROFILEDEF(.AREA.,$,#4,1.,0.8);
+#14=IFCEXTRUDEDAREASOLID(#13,#12,#6,2.);
+#15=IFCSHAPEREPRESENTATION($,'Body','SweptSolid',(#14));
+#16=IFCPRODUCTDEFINITIONSHAPE($,$,(#15));
+#17=IFCOPENINGELEMENT('OPEN-GID',$,'Abertura',$,$,#3,#16,$);
+#18=IFCRELVOIDSELEMENT('VOID-GID',$,$,$,#10,#17);
+#19=IFCPROJECT('P',$,'Projeto',$,$,$,$,$,$);
+ENDSEC;
+END-ISO-10303-21;`;
 const opening=ext.parse(openingIfc);
-assert(opening.metadata.clashEligible===false,'host com IfcRelVoidsElement bloqueia clash autoritativo');
-assert(opening.elements[0].importedProperties.partialReason==='opening-not-subtracted','abertura não subtraída é explicada no metadata');
+assert(opening.metadata.clashEligible===true,'IfcRelVoidsElement suportado mantém clash autoritativo');
+assert(opening.elements[0].importedProperties.openingSubtractions===1,'abertura é subtraída por CSG');
+assert(opening.elements[0].importedProperties.partialReason===null,'abertura exata não gera limitação parcial');
+assert(opening.elements[0].rawTriangles.length>12,'subtração cria faces internas do vão');
+
+const booleanIfc = `ISO-10303-21;
+HEADER;
+FILE_SCHEMA(('IFC4'));
+ENDSEC;
+DATA;
+#1=IFCCARTESIANPOINT((0.,0.,0.));
+#2=IFCAXIS2PLACEMENT3D(#1,$,$);
+#3=IFCLOCALPLACEMENT($,#2);
+#4=IFCAXIS2PLACEMENT2D(#1,$);
+#5=IFCRECTANGLEPROFILEDEF(.AREA.,$,#4,4.,4.);
+#6=IFCDIRECTION((0.,0.,1.));
+#7=IFCEXTRUDEDAREASOLID(#5,#2,#6,3.);
+#8=IFCCARTESIANPOINT((0.,0.,1.));
+#9=IFCAXIS2PLACEMENT3D(#8,$,$);
+#10=IFCRECTANGLEPROFILEDEF(.AREA.,$,#4,1.,1.);
+#11=IFCEXTRUDEDAREASOLID(#10,#9,#6,3.);
+#12=IFCBOOLEANRESULT(.DIFFERENCE.,#7,#11);
+#13=IFCSHAPEREPRESENTATION($,'Body','CSG',(#12));
+#14=IFCPRODUCTDEFINITIONSHAPE($,$,(#13));
+#15=IFCBUILDINGELEMENTPROXY('CSG-GID',$,'Sólido Booleano',$,$,#3,#14,$,$);
+#16=IFCPROJECT('P',$,'Projeto',$,$,$,$,$,$);
+ENDSEC;
+END-ISO-10303-21;`;
+const booleanModel=ext.parse(booleanIfc);
+assert(booleanModel.metadata.clashEligible===true,'IfcBooleanResult exato permanece elegível para clash');
+assert(booleanModel.elements[0].importedProperties.booleanExact===true,'IfcBooleanResult registra CSG exato');
+assert(booleanModel.elements[0].rawTriangles.length>12,'diferença booleana altera a malha');
 
 const viewer=fs.readFileSync('js/bim_viewer.js','utf8');
 assert(viewer.includes('id="bim-floor-panel"'),'viewer possui painel de pavimentos atualizável');
@@ -164,7 +219,9 @@ assert(viewer.includes("elem.importedProperties?.storeyName"),'inspetor mostra p
 assert(viewer.includes("option value=\"hidraulica\"")&&viewer.includes("option value=\"eletrica\""),'filtro inclui disciplinas MEP');
 
 const app=fs.readFileSync('app.html','utf8');
+assert(app.indexOf('/js/bim_csg.js') < app.indexOf('/js/bim_ifc_extended.js'),'motor CSG carrega antes do tessellador IFC');
 assert(app.indexOf('/js/bim_ifc_extended.js') < app.indexOf('/js/bim_geometry_importer.js'),'tessellador IFC estendido carrega antes do importador');
+assert(typeof csg.subtract === 'function' && typeof csg.booleanOperation === 'function','motor CSG expõe operações determinísticas');
 
 if(process.exitCode) process.exit(process.exitCode);
 console.log('✅ IFC estendido, pavimentos e guardrails validados.');
