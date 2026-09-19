@@ -813,6 +813,23 @@ assert(toroidalTrimmed.metadata.geometryKinds.includes('advanced-brep-torus'),'m
 assert(toroidalTrimmed.elements[0].importedProperties.geometryKinds.includes('AdvancedBrepTorus'),'elemento identifica AdvancedBrep toroidal');
 assert(toroidalTrimmed.elements[0].rawTriangles.length===192,'patch toroidal 90° × 60° gera tesselação determinística');
 
+const toroidalSeamIfc = toroidalTrimmedIfc
+  .replace('#3=IFCCARTESIANPOINT((3.,0.,0.));','#3=IFCCARTESIANPOINT((0.,-3.,0.));')
+  .replace('#4=IFCCARTESIANPOINT((0.,3.,0.));','#4=IFCCARTESIANPOINT((3.,0.,0.));')
+  .replace('#5=IFCCARTESIANPOINT((4.,0.,0.));','#5=IFCCARTESIANPOINT((0.,-4.,0.));')
+  .replace('#6=IFCCARTESIANPOINT((0.,4.,0.));','#6=IFCCARTESIANPOINT((4.,0.,0.));')
+  .replace('#7=IFCCARTESIANPOINT((0.,3.5,0.8660254037844386));','#7=IFCCARTESIANPOINT((3.5,0.,0.8660254037844386));')
+  .replace('#8=IFCCARTESIANPOINT((3.5,0.,0.8660254037844386));','#8=IFCCARTESIANPOINT((0.,-3.5,0.8660254037844386));')
+  .replace('#15=IFCAXIS2PLACEMENT3D(#4,#10,#11);','#15=IFCAXIS2PLACEMENT3D(#4,#12,#10);')
+  .replace('#16=IFCAXIS2PLACEMENT3D(#3,#12,#10);','#16=IFCAXIS2PLACEMENT3D(#3,#51,#12);')
+  .replace('#21=IFCTRIMMEDCURVE(#17,(0.),(1.5707963267948966),.T.,.PARAMETER.);','#21=IFCTRIMMEDCURVE(#17,(4.71238898038469),(0.),.T.,.PARAMETER.);')
+  .replace('#23=IFCTRIMMEDCURVE(#19,(0.),(1.5707963267948966),.T.,.PARAMETER.);','#23=IFCTRIMMEDCURVE(#19,(4.71238898038469),(0.),.T.,.PARAMETER.);')
+  .replace('#40=IFCRECTANGULARTRIMMEDSURFACE(#39,0.,0.,1.5707963267948966,1.0471975511965976,.T.,.T.);','#40=IFCRECTANGULARTRIMMEDSURFACE(#39,4.71238898038469,0.,0.,1.0471975511965976,.T.,.T.);')
+  .replace("#50=IFCPROJECT('P',$,'Projeto',$,$,$,$,$,#49);", "#51=IFCDIRECTION((-1.,0.,0.));\n#50=IFCPROJECT('P',$,'Projeto',$,$,$,$,$,#49);");
+const toroidalSeam=ext.parse(toroidalSeamIfc);
+assert(toroidalSeam.metadata.clashEligible===true,'patch toroidal cruzando a costura U 270°→360° permanece autoritativo');
+assert(toroidalSeam.elements[0].rawTriangles.length===toroidalTrimmed.elements[0].rawTriangles.length,'costura cíclica U preserva a mesma densidade de tesselação');
+
 const viewer=fs.readFileSync('js/bim_viewer.js','utf8');
 assert(viewer.includes('id="bim-floor-panel"'),'viewer possui painel de pavimentos atualizável');
 assert(viewer.includes("elem.importedProperties?.storeyName"),'inspetor mostra pavimento IFC');
