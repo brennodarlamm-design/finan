@@ -44,6 +44,9 @@ Antes de codificar, classifique a fonte:
 - B-Spline/NURBS devem preservar grau, vetor de nós, multiplicidades e pesos; vetor de nós inválido ou pesos inconsistentes tornam a curva parcial.
 - O renderer pode usar culling e LOD apenas para exibição/interação; a malha autoritativa armazenada e usada no clash nunca deve ser destrutivamente reduzida.
 - IfcIndexedPolygonalFaceWithVoids só pode permanecer autoritativo quando a decomposição planar preservar exatamente o contorno externo e os vazios.
+- `IfcRevolvedAreaSolid` pode ser tessellado deterministicamente por revolução do perfil em torno de `IfcAxis1Placement`; revoluções parciais devem receber tampas de fechamento.
+- Primitivas CSG IFC suportadas incluem `IfcBlock`, `IfcRightCircularCylinder`, `IfcRightCircularCone`, `IfcRectangularPyramid` e `IfcSphere`; elas podem participar de booleanas BSP sem serem rebaixadas para proxies fictícios.
+- Primitivas e sólidos por revolução só permanecem autoritativos quando dimensões, placement e malha resultante são válidos; nunca inventar parâmetros ausentes.
 
 ## Workflow
 
