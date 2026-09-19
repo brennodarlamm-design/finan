@@ -143,11 +143,11 @@ const BIMGeometryImporter = (() => {
         return {x:(q.x-centerX)*scale,y:(q.y-baseY)*scale-40,z:(q.z-centerZ)*scale};
       }));
       triangleCount += triangles.length;
-      if(triangleCount>MAX_TRIANGLES) throw new Error(\`Modelo excede o limite de \${MAX_TRIANGLES.toLocaleString('pt-BR')} triângulos.\`);
+      if(triangleCount>MAX_TRIANGLES) throw new Error(`Modelo excede o limite de ${MAX_TRIANGLES.toLocaleString('pt-BR')} triângulos.`);
       const bb=boundsFromTriangles(triangles);
       return {
-        id: elem.id || \`imported_\${elemIndex+1}\`,
-        name: elem.name || \`Elemento importado \${elemIndex+1}\`,
+        id: elem.id || `imported_${elemIndex+1}`,
+        name: elem.name || `Elemento importado ${elemIndex+1}`,
         floor: 'all',
         discipline: elem.discipline || 'arquitetura',
         category: elem.category || 'Modelo importado',
@@ -187,7 +187,7 @@ const BIMGeometryImporter = (() => {
       } else if(line.startsWith('o ') || line.startsWith('g ')){
         const name=line.slice(2).trim();
         if(current.faces.length===0 && groups.length===1) current.name=name||current.name;
-        else { current={name:name||\`Grupo \${groups.length+1}\`,faces:[]}; groups.push(current); }
+        else { current={name:name||`Grupo ${groups.length+1}`,faces:[]}; groups.push(current); }
       } else if(line.startsWith('f ')){
         const refs=line.split(/\s+/).slice(1).map(tok=>parseInt(tok.split('/')[0],10)).filter(Number.isFinite);
         if(refs.length<3) continue;
@@ -197,7 +197,7 @@ const BIMGeometryImporter = (() => {
     }
     if(!vertices.length) throw new Error('OBJ inválido: nenhum vértice encontrado.');
     const elements=groups.filter(g=>g.faces.length).map((g,i)=>({
-      id:\`obj_\${i+1}\`,
+      id:`obj_${i+1}`,
       name:g.name,
       discipline:'arquitetura',
       category:'OBJ',
@@ -373,7 +373,7 @@ const BIMGeometryImporter = (() => {
       const props={};
       refsIn(pset.args.at(-1)||'').forEach(propId=>{
         const prop=entities.get(propId);
-        if(prop?.type==='IFCPROPERTYSINGLEVALUE') props[unquote(prop.args[0]||\`#\${propId}\`)]=parseIfcValue(prop.args[2]);
+        if(prop?.type==='IFCPROPERTYSINGLEVALUE') props[unquote(prop.args[0]||`#${propId}`)]=parseIfcValue(prop.args[2]);
       });
       related.forEach(id=>{
         if(!psetsByProduct.has(id)) psetsByProduct.set(id,{});
@@ -396,10 +396,10 @@ const BIMGeometryImporter = (() => {
       const basis=localPlacement(placementId);
       const tris=extrudes.flatMap(id=>extrusionTriangles(id,basis));
       if(!tris.length) continue;
-      const globalId=unquote(e.args[0]||\`#\${e.id}\`);
-      const name=unquote(e.args[2]||'')||\`\${e.type} #\${e.id}\`;
+      const globalId=unquote(e.args[0]||`#${e.id}`);
+      const name=unquote(e.args[2]||'')||`${e.type} #${e.id}`;
       elements.push({
-        id:\`ifc_\${globalId || e.id}\`,
+        id:`ifc_${globalId || e.id}`,
         name,
         discipline:disciplineForClass(e.type),
         category:e.type,
@@ -512,10 +512,10 @@ const BIMGeometryImporter = (() => {
           if(!tris.length) return;
           const material=json.materials?.[prim.material];
           const rgba=material?.pbrMetallicRoughness?.baseColorFactor;
-          const color=rgba?\`rgba(\${Math.round(rgba[0]*255)},\${Math.round(rgba[1]*255)},\${Math.round(rgba[2]*255)},\${rgba[3]??1})\`:'#94A3B8';
+          const color=rgba?`rgba(${Math.round(rgba[0]*255)},${Math.round(rgba[1]*255)},${Math.round(rgba[2]*255)},${rgba[3]??1})`:'#94A3B8';
           elements.push({
-            id:\`gltf_\${nodeIndex}_\${pidx}\`,
-            name:node.name||mesh?.name||\`GLTF Mesh \${node.mesh}\`,
+            id:`gltf_${nodeIndex}_${pidx}`,
+            name:node.name||mesh?.name||`GLTF Mesh ${node.mesh}`,
             discipline:'arquitetura',
             category:'GLTF',
             color,
