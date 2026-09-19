@@ -43,5 +43,10 @@ assert(src.includes('_bindCoordinationEvents()'), 'eventos de coordenação são
 
 const css = fs.readFileSync('css/style.css', 'utf8');
 assert(css.includes('.bim-bottom-grid') && css.includes('grid-template-columns: 1fr !important'), 'coordenação e histórico BIM colapsam corretamente no mobile');
+assert(src.includes("disciplineFilter: 'all'") && src.includes('bim-discipline-filter'), 'viewer filtra disciplinas BIM');
+assert(src.includes("colorMode: 'material'") && src.includes('_statusColorForElement(elem)'), 'viewer possui modo de cores por status de execução');
+assert(src.includes('Não iniciado') && src.includes('Em execução') && src.includes('Concluído') && src.includes('Pendência'), 'legenda de status usa as quatro cores previstas');
+assert(src.includes('DB.getCronogramaFisicoFinanceiro') && src.includes('_getScheduleStatus(snapshot)'), 'viewer integra cronograma físico-financeiro');
+assert(src.includes('_compareLatestModelVersions()'), 'histórico BIM compara as duas versões mais recentes');
 
-console.log('✅ BIM Viewer operacional, importação e coordenação BIM validados.');
+console.log('✅ BIM Viewer operacional, importação, coordenação e planejamento visual validados.');
