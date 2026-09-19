@@ -166,6 +166,29 @@ const BIMIFCExtendedImporter = (function() {
         const a=axis2(posRef),base=[[-xdim/2,-ydim/2],[xdim/2,-ydim/2],[xdim/2,ydim/2],[-xdim/2,ydim/2]];
         return base.map(([x,y])=>({x:a.origin.x+a.x.x*x+a.y.x*y,y:a.origin.y+a.x.y*x+a.y.y*y}));
       }
+      if(p.type==='IFCCIRCLEPROFILEDEF'){
+        const radius=num(p.args[p.args.length-1]);
+        if(radius<=0) return null;
+        const posRef=p.args.map(refOf).find(x=>entities.get(x)?.type==='IFCAXIS2PLACEMENT2D');
+        const a=axis2(posRef),segments=20,poly=[];
+        for(let i=0;i<segments;i++){
+          const ang=(Math.PI*2*i)/segments,x=Math.cos(ang)*radius,y=Math.sin(ang)*radius;
+          poly.push({x:a.origin.x+a.x.x*x+a.y.x*y,y:a.origin.y+a.x.y*x+a.y.y*y});
+        }
+        return poly;
+      }
+      if(p.type==='IFCISHAPEPROFILEDEF'){
+        const width=num(p.args[3]),depth=num(p.args[4]),web=num(p.args[5]),flange=num(p.args[6]);
+        if(width<=0||depth<=0||web<=0||flange<=0||web>=width||flange*2>=depth) return null;
+        const posRef=p.args.map(refOf).find(x=>entities.get(x)?.type==='IFCAXIS2PLACEMENT2D');
+        const a=axis2(posRef),hw=width/2,hd=depth/2,ww=web/2;
+        const base=[
+          [-hw,-hd],[hw,-hd],[hw,-hd+flange],[ww,-hd+flange],
+          [ww,hd-flange],[hw,hd-flange],[hw,hd],[-hw,hd],
+          [-hw,hd-flange],[-ww,hd-flange],[-ww,-hd+flange],[-hw,-hd+flange]
+        ];
+        return base.map(([x,y])=>({x:a.origin.x+a.x.x*x+a.y.x*y,y:a.origin.y+a.x.y*x+a.y.y*y}));
+      }
       if(p.type==='IFCARBITRARYCLOSEDPROFILEDEF'){
         const curveId=refsIn(p.raw).find(x=>entities.get(x)?.type==='IFCPOLYLINE');
         const curve=entities.get(curveId); if(!curve) return null;
@@ -191,6 +214,43 @@ const BIMIFCExtendedImporter = (function() {
       return [...String(e.args[0]||'').matchAll(/\(([-+0-9Ee.,\s]+)\)/g)].map(m=>{
         const v=m[1].split(',').map(x=>Number(x.trim()));return {x:v[0]||0,y:v[1]||0,z:v[2]||0};
       }).filter(p=>[p.x,p.y,p.z].every(Number.isFinite));
+    };
+    const curvePoints=id=>{
+      const e=entities.get(id); if(!e) return [];
+      if(e.type==='IFCPOLYLINE') return refsIn(e.args[0]).map(point);
+      if(e.type==='IFCINDEXEDPOLYCURVE') return pointList3D(refOf(e.args[0]));
+      return [];
+    };
+    const sweptDiskSolid=(id,basis)=>{
+      const e=entities.get(id); if(!e||e.type!=='IFCSWEPTDISKSOLID') return [];
+      const path=curvePoints(refOf(e.args[0])),radius=num(e.args[1]);
+      if(path.length<2||radius<=0) return [];
+      const sides=12,out=[];
+      for(let s=0;s<path.length-1;s++){
+        const a=path[s],b=path[s+1],dir=norm(sub(b,a),{x:0,y:0,z:1});
+        const helper=Math.abs(dir.z)<.9?{x:0,y:0,z:1}:{x:0,y:1,z:0};
+        const u=norm(cross(dir,helper),{x:1,y:0,z:0});
+        const v=norm(cross(dir,u),{x:0,y:1,z:0});
+        const ringA=[],ringB=[];
+        for(let i=0;i<sides;i++){
+          const ang=(Math.PI*2*i)/sides,offset=add(mul(u,Math.cos(ang)*radius),mul(v,Math.sin(ang)*radius));
+          ringA.push(applyBasis(basis,add(a,offset)));
+          ringB.push(applyBasis(basis,add(b,offset)));
+        }
+        for(let i=0;i<sides;i++){
+          const j=(i+1)%sides;
+          out.push([ringA[i],ringA[j],ringB[j]],[ringA[i],ringB[j],ringB[i]]);
+        }
+        if(s===0){
+          const center=applyBasis(basis,a);
+          for(let i=0;i<sides;i++){const j=(i+1)%sides;out.push([center,ringA[j],ringA[i]]);}
+        }
+        if(s===path.length-2){
+          const center=applyBasis(basis,b);
+          for(let i=0;i<sides;i++){const j=(i+1)%sides;out.push([center,ringB[i],ringB[j]]);}
+        }
+      }
+      return out;
     };
     const facetedBrep=(id,basis)=>{
       const brep=entities.get(id),shell=entities.get(refOf(brep?.args[0])); if(!brep||brep.type!=='IFCFACETEDBREP'||shell?.type!=='IFCCLOSEDSHELL') return [];
@@ -231,11 +291,12 @@ const BIMIFCExtendedImporter = (function() {
       const z=e.args[4]&&e.args[4]!=='$'?direction(refOf(e.args[4])):norm(cross(x,y),{x:0,y:0,z:1});
       return {origin,x:mul(norm(x,{x:1,y:0,z:0}),scale||1),y:mul(norm(y,{x:0,y:1,z:0}),scale||1),z:mul(norm(z,{x:0,y:0,z:1}),scale||1)};
     };
-    const geometryTypes=new Set(['IFCPRODUCTDEFINITIONSHAPE','IFCSHAPEREPRESENTATION','IFCREPRESENTATIONMAP','IFCEXTRUDEDAREASOLID','IFCFACETEDBREP','IFCTRIANGULATEDFACESET','IFCPOLYGONALFACESET','IFCMAPPEDITEM','IFCBOOLEANCLIPPINGRESULT','IFCBOOLEANRESULT','IFCCSGSOLID']);
+    const geometryTypes=new Set(['IFCPRODUCTDEFINITIONSHAPE','IFCSHAPEREPRESENTATION','IFCREPRESENTATIONMAP','IFCEXTRUDEDAREASOLID','IFCSWEPTDISKSOLID','IFCFACETEDBREP','IFCTRIANGULATEDFACESET','IFCPOLYGONALFACESET','IFCMAPPEDITEM','IFCBOOLEANCLIPPINGRESULT','IFCBOOLEANRESULT','IFCCSGSOLID']);
     const representation=(id,basis,depth=0)=>{
       if(!id||depth>20) return [];
       const e=entities.get(id); if(!e) return [];
       if(e.type==='IFCEXTRUDEDAREASOLID') return extrusion(id,basis);
+      if(e.type==='IFCSWEPTDISKSOLID') return sweptDiskSolid(id,basis);
       if(e.type==='IFCFACETEDBREP') return facetedBrep(id,basis);
       if(e.type==='IFCTRIANGULATEDFACESET'||e.type==='IFCPOLYGONALFACESET') return indexedFaces(id,basis);
       if(e.type==='IFCMAPPEDITEM'){
@@ -295,13 +356,14 @@ const BIMIFCExtendedImporter = (function() {
       const brep=descendants(reprId,new Set(['IFCFACETEDBREP'])).length>0;
       const tess=descendants(reprId,new Set(['IFCTRIANGULATEDFACESET','IFCPOLYGONALFACESET'])).length>0;
       const swept=descendants(reprId,new Set(['IFCEXTRUDEDAREASOLID'])).length>0;
+      const sweptDisk=descendants(reprId,new Set(['IFCSWEPTDISKSOLID'])).length>0;
       const bool=descendants(reprId,new Set(['IFCBOOLEANCLIPPINGRESULT','IFCBOOLEANRESULT','IFCCSGSOLID','IFCHALFSPACESOLID'])).length>0;
       const faceVoids=descendants(reprId,new Set(['IFCINDEXEDPOLYGONALFACEWITHVOIDS'])).length>0;
       const opening=voided.has(e.id),partial=bool||faceVoids||opening;
       if(partial) partialElements++;
-      if(mapped)geometryKinds.add('mapped-item');if(brep)geometryKinds.add('faceted-brep');if(tess)geometryKinds.add('tessellated-face-set');if(swept)geometryKinds.add('swept-solid');
+      if(mapped)geometryKinds.add('mapped-item');if(brep)geometryKinds.add('faceted-brep');if(tess)geometryKinds.add('tessellated-face-set');if(swept)geometryKinds.add('swept-solid');if(sweptDisk)geometryKinds.add('swept-disk-solid');
       const globalId=unquote(e.args[0]||('#'+e.id)),name=unquote(e.args[2]||'')||(e.type+' #'+e.id),storey=storeyByProduct.get(e.id)||null;
-      const kinds=[mapped?'MappedItem':null,brep?'FacetedBrep':null,tess?'TessellatedFaceSet':null,swept?'SweptSolid':null].filter(Boolean);
+      const kinds=[mapped?'MappedItem':null,brep?'FacetedBrep':null,tess?'TessellatedFaceSet':null,swept?'SweptSolid':null,sweptDisk?'SweptDiskSolid':null].filter(Boolean);
       elements.push({
         id:'ifc_'+(globalId||e.id),name,floor:storey?.key||'all',discipline:disciplineForClass(e.type),category:e.type,color:colorForClass(e.type),rawTriangles:tris,
         importedProperties:{
@@ -311,7 +373,7 @@ const BIMIFCExtendedImporter = (function() {
         }
       });
     }
-    if(!elements.length) throw new Error('IFC válido, mas sem geometria compatível com SweptSolid, MappedItem, FacetedBrep ou TessellatedFaceSet.');
+    if(!elements.length) throw new Error('IFC válido, mas sem geometria compatível com SweptSolid, SweptDiskSolid, MappedItem, FacetedBrep ou TessellatedFaceSet.');
     const schema=src.match(/FILE_SCHEMA\s*\(\s*\(\s*'([^']+)'/i)?.[1]||'IFC';
     const si=[...entities.values()].find(e=>e.type==='IFCSIUNIT'&&/LENGTHUNIT/.test(e.raw));
     const sourceLengthUnit=si?(String(si.raw).match(/\.(MILLI|CENTI|DECI|KILO)?\.,\.METRE\./i)?.[1]||'METRE').toLowerCase():'unknown';
