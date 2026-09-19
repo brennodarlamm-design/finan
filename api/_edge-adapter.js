@@ -199,7 +199,8 @@ export async function executeEdgeApi(request, env) {
     headers,
     query,
     cookies,
-    body
+    body,
+    env
   };
 
   // Criação do objeto res simulado com Promise

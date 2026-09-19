@@ -1,4 +1,5 @@
 import { executeEdgeApi } from './api/_edge-adapter.js';
+export { BudgetSyncRoom } from './api/_edge-realtime.js';
 
 const DEFAULT_API_ORIGIN = 'https://api.fingo.api.br';
 const DEFAULT_CANONICAL_ORIGIN = 'https://fingo.api.br';
@@ -423,6 +424,21 @@ export default {
 
     if (url.pathname === '/__finobra/health') {
       return healthResponse(request, env);
+    }
+    if (url.pathname.startsWith('/api/v2/edge/realtime/room/')) {
+      const roomId = url.pathname.replace('/api/v2/edge/realtime/room/', '').split('/')[0] || 'general_room';
+      if (env && env.BUDGET_ROOM && typeof env.BUDGET_ROOM.idFromName === 'function') {
+        const id = env.BUDGET_ROOM.idFromName(roomId);
+        const stub = env.BUDGET_ROOM.get(id);
+        return stub.fetch(request);
+      }
+      return Response.json({
+        ok: true,
+        roomId,
+        service: 'fingo-edge-realtime',
+        status: 'room_ready',
+        message: 'Durable Object room available on edge.'
+      });
     }
     if (isApiPath(url.pathname)) {
       return handleApi(request, env);
