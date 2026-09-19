@@ -29,6 +29,10 @@ assert(src.includes('IFCFOOTING / IFCBEAM') && src.includes('IFCROOF'), 'classes
 assert(src.includes('_meshPassesSection(mesh)') && src.includes("sectionMode: 'none'"), 'cortes X/Z filtram a geometria do viewer');
 assert(src.includes('_inspectModelFile(file)') && src.includes("['ifc','obj','gltf','glb']"), 'importador valida IFC, OBJ, GLTF e GLB');
 assert(src.includes("subtipo: 'bim_model'") && src.includes('_renderModelVersionsHtml'), 'modelos importados geram histórico de versões por obra');
+assert(src.includes('versions.slice(0, 10).map'), 'histórico BIM exibe até dez modelos/versionamentos para QA e demonstração');
+const dataSync = fs.readFileSync('js/data.js', 'utf8');
+assert(dataSync.includes("categoria: cloudDoc.categoria || loc?.categoria || ''"), 'sync cloud preserva categoria bim_model dos documentos');
+assert(dataSync.includes("cloudDoc.categoria === 'bim_model' ? 'bim_model'"), 'sync cloud restaura subtipo BIM derivado da categoria persistida');
 
 const upload = fs.readFileSync('api/upload.js', 'utf8');
 assert(upload.includes("'ifc', 'obj', 'gltf', 'glb'"), 'upload seguro permite formatos BIM/3D');
