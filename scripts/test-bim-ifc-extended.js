@@ -106,6 +106,50 @@ const brep=ext.parse(brepIfc);
 assert(brep.elements[0].rawTriangles.length===1,'IfcFacetedBrep triangula face poligonal');
 assert(brep.metadata.geometryKinds.includes('faceted-brep'),'metadata registra faceted BRep');
 
+const pipeIfc = `ISO-10303-21;
+HEADER;
+FILE_SCHEMA(('IFC4'));
+ENDSEC;
+DATA;
+#1=IFCCARTESIANPOINT((0.,0.,0.));
+#2=IFCCARTESIANPOINT((0.,0.,5.));
+#3=IFCPOLYLINE((#1,#2));
+#4=IFCSWEPTDISKSOLID(#3,0.25,$,$,$);
+#5=IFCAXIS2PLACEMENT3D(#1,$,$);
+#6=IFCLOCALPLACEMENT($,#5);
+#7=IFCSHAPEREPRESENTATION($,'Body','SweptSolid',(#4));
+#8=IFCPRODUCTDEFINITIONSHAPE($,$,(#7));
+#9=IFCPIPESEGMENT('PIPE-GID',$,'Tubo Hidráulico',$,$,#6,#8,$);
+#10=IFCPROJECT('P',$,'Projeto',$,$,$,$,$,$);
+ENDSEC;
+END-ISO-10303-21;`;
+const pipe=ext.parse(pipeIfc);
+assert(pipe.elements.length===1,'IfcSweptDiskSolid gera geometria MEP');
+assert(pipe.elements[0].rawTriangles.length>40,'tubo possui envelope triangular completo');
+assert(pipe.elements[0].discipline==='hidraulica','IfcPipeSegment é classificado como hidráulica');
+assert(pipe.elements[0].importedProperties.geometryKinds.includes('SweptDiskSolid'),'metadata registra SweptDiskSolid');
+
+const circleIfc = `ISO-10303-21;
+HEADER;
+FILE_SCHEMA(('IFC4'));
+ENDSEC;
+DATA;
+#1=IFCCARTESIANPOINT((0.,0.,0.));
+#2=IFCAXIS2PLACEMENT3D(#1,$,$);
+#3=IFCLOCALPLACEMENT($,#2);
+#4=IFCAXIS2PLACEMENT2D(#1,$);
+#5=IFCCIRCLEPROFILEDEF(.AREA.,$,#4,0.5);
+#6=IFCDIRECTION((0.,0.,1.));
+#7=IFCEXTRUDEDAREASOLID(#5,#2,#6,3.);
+#8=IFCSHAPEREPRESENTATION($,'Body','SweptSolid',(#7));
+#9=IFCPRODUCTDEFINITIONSHAPE($,$,(#8));
+#10=IFCCOLUMN('COL-GID',$,'Pilar Circular',$,$,#3,#9,$);
+#11=IFCPROJECT('P',$,'Projeto',$,$,$,$,$,$);
+ENDSEC;
+END-ISO-10303-21;`;
+const circle=ext.parse(circleIfc);
+assert(circle.elements[0].rawTriangles.length>=76,'IfcCircleProfileDef é discretizado deterministicamente');
+
 const openingIfc = mappedIfc.replace(
   "#18=IFCPROJECT",
   "#19=IFCOPENINGELEMENT('OPEN',$,'Abertura',$,$,#3,#14,$);\n#20=IFCRELVOIDSELEMENT('VOID',$,$,$,#15,#19);\n#18=IFCPROJECT"
