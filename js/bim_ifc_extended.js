@@ -292,6 +292,86 @@ const BIMIFCExtendedImporter = (function() {
       return {origin,x:mul(norm(x,{x:1,y:0,z:0}),scale||1),y:mul(norm(y,{x:0,y:1,z:0}),scale||1),z:mul(norm(z,{x:0,y:0,z:1}),scale||1)};
     };
     const geometryTypes=new Set(['IFCPRODUCTDEFINITIONSHAPE','IFCSHAPEREPRESENTATION','IFCREPRESENTATIONMAP','IFCEXTRUDEDAREASOLID','IFCSWEPTDISKSOLID','IFCFACETEDBREP','IFCTRIANGULATEDFACESET','IFCPOLYGONALFACESET','IFCMAPPEDITEM','IFCBOOLEANCLIPPINGRESULT','IFCBOOLEANRESULT','IFCCSGSOLID']);
+    const clipTrianglesByPlane=(triangles,planeBasis,keepPositive)=>{
+      const eps=1e-7,normal=planeBasis.z,origin=planeBasis.origin,segments=[],out=[];
+      const signed=p=>(p.x-origin.x)*normal.x+(p.y-origin.y)*normal.y+(p.z-origin.z)*normal.z;
+      const inside=d=>keepPositive?d>=-eps:d<=eps;
+      const intersect=(a,b,da,db)=>{
+        const denom=da-db;
+        const t=Math.abs(denom)<eps?.5:da/denom;
+        return {x:a.x+(b.x-a.x)*t,y:a.y+(b.y-a.y)*t,z:a.z+(b.z-a.z)*t};
+      };
+      for(const tri of triangles){
+        let poly=tri.map(p=>({p,d:signed(p)})),clipped=[],cuts=[];
+        for(let i=0;i<poly.length;i++){
+          const cur=poly[i],next=poly[(i+1)%poly.length],ci=inside(cur.d),ni=inside(next.d);
+          if(ci&&ni) clipped.push(next);
+          else if(ci&&!ni){const p=intersect(cur.p,next.p,cur.d,next.d);clipped.push({p,d:0});cuts.push(p);}
+          else if(!ci&&ni){const p=intersect(cur.p,next.p,cur.d,next.d);clipped.push({p,d:0},next);cuts.push(p);}
+        }
+        if(clipped.length>=3){
+          const pts=clipped.map(x=>x.p);
+          for(let i=1;i<pts.length-1;i++) out.push([pts[0],pts[i],pts[i+1]]);
+        }
+        const unique=[];
+        for(const p of cuts){
+          if(!unique.some(q=>Math.hypot(p.x-q.x,p.y-q.y,p.z-q.z)<1e-6)) unique.push(p);
+        }
+        if(unique.length===2) segments.push(unique);
+      }
+
+      const key=p=>[p.x,p.y,p.z].map(v=>Math.round(v*1e6)).join(':');
+      const points=new Map(),adj=new Map();
+      const connect=(a,b)=>{
+        const ka=key(a),kb=key(b);points.set(ka,a);points.set(kb,b);
+        if(!adj.has(ka))adj.set(ka,new Set());if(!adj.has(kb))adj.set(kb,new Set());
+        adj.get(ka).add(kb);adj.get(kb).add(ka);
+      };
+      segments.forEach(([a,b])=>connect(a,b));
+      const visitedEdges=new Set(),loops=[];
+      for(const start of adj.keys()){
+        for(const first of adj.get(start)){
+          const edgeKey=[start,first].sort().join('|'); if(visitedEdges.has(edgeKey)) continue;
+          const loop=[start]; let prev=start,cur=first,guard=0;
+          visitedEdges.add(edgeKey);
+          while(guard++<10000){
+            loop.push(cur);
+            if(cur===start) break;
+            const nexts=[...(adj.get(cur)||[])].filter(n=>n!==prev);
+            if(!nexts.length) break;
+            const next=nexts.find(n=>!visitedEdges.has([cur,n].sort().join('|')))||nexts[0];
+            visitedEdges.add([cur,next].sort().join('|'));
+            prev=cur;cur=next;
+          }
+          if(loop.length>=4&&loop[loop.length-1]===start) loops.push(loop.slice(0,-1).map(k=>points.get(k)));
+        }
+      }
+
+      const desiredNormal=keepPositive?mul(normal,-1):normal;
+      for(const loop of loops){
+        const projected=loop.map(p=>({x:dot3(sub(p,origin),planeBasis.x),y:dot3(sub(p,origin),planeBasis.y)}));
+        const faces=triangulate2D(projected);
+        for(const [ia,ib,ic] of faces){
+          let tri=[loop[ia],loop[ib],loop[ic]];
+          const n=cross(sub(tri[1],tri[0]),sub(tri[2],tri[0]));
+          if(dot3(n,desiredNormal)<0) tri=[tri[0],tri[2],tri[1]];
+          out.push(tri);
+        }
+      }
+      return out;
+    };
+    const dot3=(a,b)=>a.x*b.x+a.y*b.y+a.z*b.z;
+    const halfSpaceDifference=(triangles,halfSpaceId,basis)=>{
+      const hs=entities.get(halfSpaceId);
+      if(!hs||!['IFCHALFSPACESOLID','IFCBOXEDHALFSPACE'].includes(hs.type)) return null;
+      const surface=entities.get(refOf(hs.args[0]));
+      if(!surface||surface.type!=='IFCPLANE') return null;
+      const planeBasis=composeBasis(basis,axis3(refOf(surface.args[0])));
+      const agreement=/\.T\./i.test(String(hs.args[1]||''));
+      // If agreement is TRUE, the half-space material is opposite the plane normal.
+      // Difference therefore keeps the positive side. FALSE keeps the negative side.
+      return clipTrianglesByPlane(triangles,planeBasis,agreement);
+    };
     const exactBooleanIds=new Set();
     const partialBooleanIds=new Set();
     const representation=(id,basis,depth=0)=>{
@@ -310,6 +390,16 @@ const BIMIFCExtendedImporter = (function() {
         const operator=String(e.args[0]||'.DIFFERENCE.').toUpperCase();
         const firstId=refOf(e.args[1]),secondId=refOf(e.args[2]);
         const first=representation(firstId,basis,depth+1);
+        const secondEntity=entities.get(secondId);
+        if(first.length&&operator.includes('DIFFERENCE')&&['IFCHALFSPACESOLID','IFCBOXEDHALFSPACE'].includes(secondEntity?.type)){
+          const clipped=halfSpaceDifference(first,secondId,basis);
+          if(clipped&&clipped.length){
+            exactBooleanIds.add(e.id);
+            return clipped;
+          }
+          partialBooleanIds.add(e.id);
+          return first;
+        }
         const second=representation(secondId,basis,depth+1);
         if(first.length&&second.length&&typeof BIMCSG!=='undefined'){
           try{
@@ -396,9 +486,9 @@ const BIMIFCExtendedImporter = (function() {
       const swept=descendants(reprId,new Set(['IFCEXTRUDEDAREASOLID'])).length>0;
       const sweptDisk=descendants(reprId,new Set(['IFCSWEPTDISKSOLID'])).length>0;
       const booleanIds=descendants(reprId,new Set(['IFCBOOLEANCLIPPINGRESULT','IFCBOOLEANRESULT','IFCCSGSOLID']));
-      const halfSpace=descendants(reprId,new Set(['IFCHALFSPACESOLID'])).length>0;
+      const unsupportedBoundedHalfSpace=descendants(reprId,new Set(['IFCPOLYGONALBOUNDEDHALFSPACE'])).length>0;
       const faceVoids=descendants(reprId,new Set(['IFCINDEXEDPOLYGONALFACEWITHVOIDS'])).length>0;
-      const booleanPartial=halfSpace||booleanIds.some(id=>partialBooleanIds.has(id));
+      const booleanPartial=unsupportedBoundedHalfSpace||booleanIds.some(id=>partialBooleanIds.has(id));
       const booleanExact=booleanIds.length>0&&!booleanPartial&&booleanIds.every(id=>exactBooleanIds.has(id));
 
       let openingExact=true,openingSubtractions=0;
@@ -428,7 +518,7 @@ const BIMIFCExtendedImporter = (function() {
           format:'IFC',ifcClass:e.type,globalId,stepId:e.id,storeyId:storey?.id||null,storeyName:storey?.name||null,storeyElevation:storey?.elevation??null,
           psets:psets.get(e.id)||{},geometryKinds:kinds,geometryQuality:partial?'partial':(kinds.join('+')||'supported'),
           openingCount:openings.length,openingSubtractions,booleanExact,
-          partialReason:booleanPartial?'boolean-or-csg-operand-not-supported':faceVoids?'polygon-face-voids-not-supported':(openings.length&&!openingExact)?'opening-subtraction-failed':null,
+          partialReason:booleanPartial?(unsupportedBoundedHalfSpace?'polygonal-bounded-halfspace-not-supported':'boolean-or-csg-operand-not-supported'):faceVoids?'polygon-face-voids-not-supported':(openings.length&&!openingExact)?'opening-subtraction-failed':null,
           clashEligible:!partial
         }
       });
