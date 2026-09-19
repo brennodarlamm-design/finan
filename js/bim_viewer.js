@@ -31,6 +31,7 @@ const BIMViewer = {
   sectionMode: 'none', // none | x | z
   sectionPosition: 0,
   modelVersions: [],
+  coordinationIssues: [],
   _escapeHandler: null,
 
   /**
@@ -51,6 +52,7 @@ const BIMViewer = {
     const snapshot = this._getOperationalSnapshot(obraId);
     this.financialSnapshot = snapshot;
     this.modelVersions = this._loadModelVersions();
+    this.coordinationIssues = this._loadCoordinationIssues();
 
     container.innerHTML = `
       <div class="bim-viewer-layout" style="display:flex;flex-direction:column;gap:16px;">
@@ -115,8 +117,9 @@ const BIMViewer = {
           </div>
         </div>
 
-        <div id="bim-model-versions">
-          ${this._renderModelVersionsHtml()}
+        <div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(320px,.8fr);gap:12px;" class="bim-bottom-grid">
+          <div id="bim-model-versions">${this._renderModelVersionsHtml()}</div>
+          <div id="bim-coordination-panel">${this._renderCoordinationHtml()}</div>
         </div>
       </div>
     `;
@@ -956,6 +959,167 @@ const BIMViewer = {
     }
   },
 
+  _loadCoordinationIssues() {
+    try {
+      if (typeof Documentos === 'undefined' || typeof Documentos.listar !== 'function' || !this.activeObraId) return [];
+      return Documentos.listar('obra', this.activeObraId)
+        .filter(doc => doc.subtipo === 'bim_issue')
+        .sort((a, b) => String(b.criado_em || '').localeCompare(String(a.criado_em || '')));
+    } catch {
+      return [];
+    }
+  },
+
+  _issuePhotoCount(issueId) {
+    try {
+      if (typeof Documentos === 'undefined' || typeof Documentos.listar !== 'function') return 0;
+      return Documentos.listar('obra', this.activeObraId)
+        .filter(doc => doc.subtipo === 'bim_issue_photo' && doc.parent_issue_id === issueId).length;
+    } catch {
+      return 0;
+    }
+  },
+
+  _renderCoordinationHtml() {
+    const issues = Array.isArray(this.coordinationIssues) ? this.coordinationIssues : [];
+    const abertas = issues.filter(i => i.status !== 'resolvida').length;
+    const selected = this.selectedElement?.name || 'Elemento selecionado no modelo';
+    return `
+      <div style="background:#0F1A0E;border:1px solid #243518;border-radius:10px;padding:12px 14px;">
+        <div style="display:flex;justify-content:space-between;gap:12px;align-items:center;">
+          <div>
+            <div style="font-size:.76rem;font-weight:900;color:#F0F0E8;">Coordenação BIM</div>
+            <div style="font-size:.66rem;color:#64748B;">Pendências, fotos e acompanhamento por elemento.</div>
+          </div>
+          <span style="font-size:.68rem;color:${abertas ? '#F59E0B' : '#C6FF00'};font-weight:800;">${abertas} aberta(s)</span>
+        </div>
+
+        <div style="display:grid;grid-template-columns:minmax(0,1fr) 110px auto;gap:7px;margin-top:10px;">
+          <input id="bim-issue-title" class="form-control" maxlength="180" placeholder="Ex: conferir esquadria da fachada" style="min-width:0;font-size:.72rem;">
+          <select id="bim-issue-priority" class="form-control" style="font-size:.72rem;">
+            <option value="normal">Normal</option>
+            <option value="alta">Alta</option>
+            <option value="critica">Crítica</option>
+          </select>
+          <button type="button" class="btn-action" data-action="createBimIssue" style="font-size:.72rem;padding:7px 10px;color:#C6FF00;border-color:rgba(198,255,0,.35);">+ Pendência</button>
+        </div>
+        <div style="font-size:.62rem;color:#64748B;margin-top:5px;">Vínculo atual: ${Utils.escapeHtml(selected)}</div>
+
+        <div style="margin-top:8px;max-height:250px;overflow:auto;">
+          ${issues.length ? issues.slice(0, 10).map(issue => {
+            const resolved = issue.status === 'resolvida';
+            const priorityColor = issue.prioridade === 'critica' ? '#EF4444' : issue.prioridade === 'alta' ? '#F59E0B' : '#94A3B8';
+            const photoCount = this._issuePhotoCount(issue.id);
+            return `<div style="border-top:1px solid rgba(148,163,184,.12);padding:8px 0;">
+              <div style="display:flex;justify-content:space-between;gap:8px;align-items:flex-start;">
+                <div style="min-width:0;">
+                  <div style="font-size:.72rem;font-weight:800;color:${resolved ? '#64748B' : '#E2E8F0'};${resolved ? 'text-decoration:line-through;' : ''}">${Utils.escapeHtml(issue.titulo || 'Pendência BIM')}</div>
+                  <div style="font-size:.61rem;color:#64748B;margin-top:2px;">${Utils.escapeHtml(issue.bim_element_nome || issue.bim_element_id || 'Modelo geral')} · <span style="color:${priorityColor};">${Utils.escapeHtml(issue.prioridade || 'normal')}</span> · 📷 ${photoCount}</div>
+                </div>
+                <div style="display:flex;gap:5px;flex-shrink:0;">
+                  <label class="btn-action" title="Anexar foto à pendência" style="padding:4px 7px;font-size:.66rem;cursor:pointer;">📷
+                    <input type="file" accept="image/png,image/jpeg,image/webp" data-bim-issue-photo="${Utils.escapeHtml(issue.id)}" style="display:none;">
+                  </label>
+                  <button type="button" class="btn-action" data-action="toggleBimIssue" data-issue-id="${Utils.escapeHtml(issue.id)}" style="padding:4px 7px;font-size:.66rem;">${resolved ? 'Reabrir' : 'Resolver'}</button>
+                </div>
+              </div>
+            </div>`;
+          }).join('') : '<div style="font-size:.70rem;color:#64748B;padding:10px 0;">Nenhuma pendência BIM registrada para esta obra.</div>'}
+        </div>
+      </div>
+    `;
+  },
+
+  _refreshCoordination() {
+    this.coordinationIssues = this._loadCoordinationIssues();
+    const host = document.getElementById('bim-coordination-panel');
+    if (host) {
+      host.innerHTML = this._renderCoordinationHtml();
+      this._bindCoordinationEvents();
+    }
+  },
+
+  _createCoordinationIssue() {
+    const input = document.getElementById('bim-issue-title');
+    const priority = document.getElementById('bim-issue-priority');
+    const titulo = String(input?.value || '').trim();
+    if (!titulo) return Utils.toast('Informe a pendência BIM.', 'warning');
+    if (typeof Documentos === 'undefined' || typeof Documentos.adicionar !== 'function') {
+      return Utils.toast('Módulo de documentos indisponível.', 'error');
+    }
+    Documentos.adicionar({
+      entidade_tipo: 'obra',
+      entidade_id: this.activeObraId,
+      titulo,
+      subtipo: 'bim_issue',
+      categoria: 'bim_coordination',
+      status: 'aberta',
+      prioridade: priority?.value || 'normal',
+      bim_element_id: this.selectedElement?.id || null,
+      bim_element_nome: this.selectedElement?.name || 'Modelo geral'
+    });
+    if (input) input.value = '';
+    this._refreshCoordination();
+    Utils.toast('Pendência BIM registrada.', 'success');
+  },
+
+  _toggleCoordinationIssue(issueId) {
+    if (!issueId || typeof Documentos === 'undefined') return;
+    const docs = Documentos.getAll();
+    const idx = docs.findIndex(d => d.id === issueId && d.subtipo === 'bim_issue');
+    if (idx < 0) return;
+    docs[idx] = {
+      ...docs[idx],
+      status: docs[idx].status === 'resolvida' ? 'aberta' : 'resolvida',
+      atualizado_em: new Date().toISOString()
+    };
+    Documentos.salvarLista(docs);
+    if (typeof DB !== 'undefined' && DB.syncToCloud) DB.syncToCloud('save', 'documentos', docs[idx]);
+    this._refreshCoordination();
+  },
+
+  async _addCoordinationPhoto(issueId, file) {
+    if (!issueId || !file || typeof Documentos === 'undefined') return;
+    if (!/^image\/(png|jpeg|webp)$/i.test(file.type || '')) return Utils.toast('Use PNG, JPG ou WEBP.', 'warning');
+    if (file.size > 8 * 1024 * 1024) return Utils.toast('A foto deve ter no máximo 8 MB.', 'warning');
+    try {
+      const base64 = await Documentos.lerArquivoBase64(file);
+      Documentos.adicionar({
+        entidade_tipo: 'obra',
+        entidade_id: this.activeObraId,
+        titulo: `Foto BIM — ${file.name}`,
+        nome_arquivo: file.name,
+        tipo_mime: file.type,
+        tamanho: file.size,
+        subtipo: 'bim_issue_photo',
+        categoria: 'bim_coordination',
+        parent_issue_id: issueId,
+        data_base64: base64
+      });
+      this._refreshCoordination();
+      Utils.toast('Foto anexada à pendência.', 'success');
+    } catch (err) {
+      Utils.toast(err?.message || 'Não foi possível anexar a foto.', 'error');
+    }
+  },
+
+  _bindCoordinationEvents() {
+    const createBtn = document.querySelector('[data-action="createBimIssue"]');
+    if (createBtn) createBtn.addEventListener('click', () => this._createCoordinationIssue());
+
+    document.querySelectorAll('[data-action="toggleBimIssue"]').forEach(btn => {
+      btn.addEventListener('click', e => this._toggleCoordinationIssue(e.currentTarget.getAttribute('data-issue-id')));
+    });
+
+    document.querySelectorAll('[data-bim-issue-photo]').forEach(input => {
+      input.addEventListener('change', async e => {
+        const file = e.currentTarget.files?.[0];
+        if (file) await this._addCoordinationPhoto(e.currentTarget.getAttribute('data-bim-issue-photo'), file);
+        e.currentTarget.value = '';
+      });
+    });
+  },
+
   _getOperationalSnapshot(obraId) {
     const emptyResumo = { totalReceitas:0, totalDespesas:0, saldo:0, aPagar:0, aPagarValor:0, aReceber:0, aReceberValor:0 };
     const emptyComp = { totalOrcado:0, totalRealizado:0, saldoRestante:0, percentualFinanceiro:0, percentualFisico:0, etapas:[], statusSaude:'sem_dados', alertaDesc:'Cadastre orçamento, medições e lançamentos para acompanhar a obra em tempo real.' };
@@ -1197,6 +1361,11 @@ const BIMViewer = {
       if (detailsContainer && this.selectedElement) {
         const obra = (typeof DB !== 'undefined' && DB.getById('clientes', this.activeObraId)) || {};
         detailsContainer.innerHTML = this._renderElementDetailsHtml(this.selectedElement, obra);
+        const coord = document.getElementById('bim-coordination-panel');
+        if (coord) {
+          coord.innerHTML = this._renderCoordinationHtml();
+          this._bindCoordinationEvents();
+        }
       }
     });
 
@@ -1277,6 +1446,8 @@ const BIMViewer = {
 
     const lancBtn = document.querySelector('[data-action="filterLancamentos"]');
     if (lancBtn) lancBtn.addEventListener('click', () => this._navigateToLancamentos());
+
+    this._bindCoordinationEvents();
 
     if (this._escapeHandler) document.removeEventListener('keydown', this._escapeHandler);
     this._escapeHandler = (event) => {
