@@ -51,6 +51,7 @@ Antes de codificar, classifique a fonte:
 - Em AdvancedBrep, preserve a ordem/orientação de `IfcOrientedEdge` e use os vértices topológicos como fallback seguro quando a curva do `IfcEdgeCurve` não estiver suportada.
 - `IfcBSplineSurfaceWithKnots` e `IfcRationalBSplineSurfaceWithKnots` só podem permanecer autoritativas em `IfcAdvancedFace` quando grau, malha de controle, nós, multiplicidades e pesos são consistentes e o contorno da face corresponde ao perímetro completo do patch tessellado.
 - Patches NURBS/B-Spline com recortes internos ou trimming arbitrário ainda não suportado devem cair para parcial; nunca renderizar o patch inteiro como se o recorte tivesse sido aplicado.
+- `IfcCylindricalSurface` em `IfcAdvancedFace` só pode ser autoritativa quando o `IfcEdgeLoop` provar uma faixa lateral cilíndrica completa: dois círculos fechados coaxiais com o mesmo raio da superfície e duas geratrizes coincidentes na costura. Cilindros parciais, arcos aparados, holes ou topologia ambígua permanecem parciais e fora do clash autoritativo.
 
 ## Workflow
 
