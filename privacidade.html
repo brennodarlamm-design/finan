@@ -273,7 +273,28 @@
     </div>
 
     <section>
-      <h2>4. Finalidade do Tratamento de Dados</h2>
+      <h2>4. Tratamento de Dados em Arquivos e Documentos Enviados pelo Cliente (Uploads)</h2>
+      <p>
+        A plataforma FinGo permite o upload e a custódia de diversos tipos de arquivos operacionais, projetos de engenharia, fotos de diário de obras, notas fiscais e comprovantes bancários. No que tange a esses dados:
+      </p>
+      <ul>
+        <li>
+          <strong>Papéis Segundo a LGPD (Lei 13.709/2018):</strong> Em relação aos dados pessoais eventualmente inseridos ou contidos nos arquivos enviados pelo Usuário (tais como nomes de empreiteiros, CPFs em recibos, assinaturas e dados de contato), a <strong>sua Construtora/Empresa atua como Controladora de Dados</strong> (Art. 5º, VI), sendo o <strong>FinGo o Operador de Dados</strong> (Art. 5º, VII), que realiza o tratamento em nome da Controladora para a exclusiva execução do software.
+        </li>
+        <li>
+          <strong>Bases Legais Aplicáveis:</strong> O tratamento dessas informações fundamenta-se na Execução de Contrato e Procedimentos Preliminares (Art. 7º, V da LGPD) e no Cumprimento de Obrigações Legais ou Regulatórias (Art. 7º, II da LGPD), mormente as normas de escrituração contábil, fiscal e trabalhista da construção civil.
+        </li>
+        <li>
+          <strong>Confidencialidade e Não Utilização para Outros Fins:</strong> O FinGo compromete-se a não comercializar, não transferir e não utilizar o conteúdo de projetos de engenharia, orçamentos, fotos de canteiro ou documentos fiscais para qualquer propósito comercial de terceiros ou treinamento público de inteligência artificial.
+        </li>
+        <li>
+          <strong>Segregação e Criptografia no Armazenamento:</strong> Todos os arquivos são armazenados de forma segregada por identificador de inquilino (<code>tenant_id</code>), utilizando criptografia em trânsito (TLS 1.3 / HTTPS) e criptografia em repouso (AES-256) em infraestrutura de nuvem segura (Cloudflare R2 Object Storage / S3).
+        </li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>5. Finalidade do Tratamento de Dados</h2>
       <p>As informações são processadas com as seguintes finalidades legítimas:</p>
       <ul>
         <li>Autenticar o acesso de administradores e gestores aos módulos do sistema FinGo.</li>
@@ -285,7 +306,7 @@
     </section>
 
     <section>
-      <h2>5. Segurança e Armazenamento</h2>
+      <h2>6. Segurança e Armazenamento</h2>
       <p>
         Adotamos rigorosos padrões de segurança cibernética e infraestrutura de ponta:
       </p>
@@ -297,7 +318,19 @@
     </section>
 
     <section>
-      <h2>6. Direitos do Titular (LGPD)</h2>
+      <h2>7. Política de Cookies e Tecnologias de Sessão</h2>
+      <p>
+        O FinGo utiliza cookies e tecnologias de armazenamento local estritamente necessários para a correta navegação e segurança da plataforma:
+      </p>
+      <ul>
+        <li><strong>Cookies Estritamente Necessários (Sessão &amp; Autenticação):</strong> Utilizamos cookies seguros (<code>finobra_session_token</code>) configurados com os atributos <code>HttpOnly</code>, <code>SameSite=Lax</code> e <code>Secure</code>. Esses cookies são indispensáveis para autenticar seu acesso, manter você conectado com segurança e proteger suas operações contra ataques de falsificação de requisições entre sites (CSRF).</li>
+        <li><strong>Armazenamento Local de Preferências (LocalStorage):</strong> Armazenamos em seu navegador preferências de interface (modo escuro, aba ativa), cache temporário para operação offline de canteiro de obras e o registro da sua concordância com estes termos (<code>fingo_cookie_consent_v2</code>).</li>
+        <li><strong>Não Rastreamos para Fins Publicitários:</strong> Não utilizamos cookies de terceiros para rastrear seus hábitos de navegação em outros sites ou para exibir publicidade comportamental direcionada.</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>8. Direitos do Titular (LGPD)</h2>
       <p>Em consonância com o Artigo 18 da LGPD, você possui o direito de:</p>
       <ul>
         <li>Confirmar a existência de tratamento de seus dados pessoais.</li>
@@ -308,7 +341,7 @@
     </section>
 
     <section>
-      <h2>7. Contato do Encarregado de Proteção de Dados (DPO)</h2>
+      <h2>9. Contato do Encarregado de Proteção de Dados (DPO)</h2>
       <p>
         Para exercer qualquer um dos seus direitos, esclarecer dúvidas sobre esta Política ou solicitar a exclusão de dados vinculados à sua conta Google ou FinGo, entre em contato através dos canais oficiais:
       </p>
@@ -329,5 +362,6 @@
     <p>FinGo — Obras em Fluxo &middot; Todos os direitos reservados &copy; 2026</p>
   </footer>
 
+  <script src="/js/cookie_banner.js"></script>
 </body>
 </html>

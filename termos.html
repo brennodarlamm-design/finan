@@ -281,7 +281,42 @@
     </div>
 
     <section>
-      <h2>5. Uso Aceitável da Plataforma</h2>
+      <h2>5. Da Custódia, Armazenamento e Upload de Arquivos, Documentos e Projetos pelo Cliente</h2>
+      <p>
+        A plataforma FinGo disponibiliza aos seus usuários módulos para upload, processamento e custódia segura de documentos operacionais, financeiros e de engenharia. Em relação a esses arquivos, aplicam-se as seguintes diretrizes:
+      </p>
+      <ul>
+        <li>
+          <strong>5.1. Titularidade Exclusiva do Cliente:</strong> Todos os arquivos enviados pelo Cliente — incluindo plantas e projetos de engenharia (PDF, DWG, DXF, IFC, BIM), fotografias e relatórios de diário de obra (JPG, PNG, WebP), planilhas orçamentárias e composições de custos (XLSX, CSV), notas fiscais e arquivos XML de faturamento (NF-e, NFC-e, CT-e, DANFE) e contratos com prestadores — são e permanecerão de <strong>propriedade exclusiva e inalienável da sua construtora/empresa</strong>. O FinGo não adquire qualquer direito de propriedade intelectual, licença de comercialização ou titularidade sobre tais conteúdos.
+        </li>
+        <li>
+          <strong>5.2. Papel de Operador Tecnológico e Custodiante:</strong> O FinGo atua estritamente como provedor e custodiante de infraestrutura em nuvem segura, processando e mantendo os arquivos única e exclusivamente para a prestação dos serviços contratados (como visualização, extração inteligente de dados via OCR, conciliação e conferência de medições).
+        </li>
+        <li>
+          <strong>5.3. Segurança, Segregação e Criptografia:</strong>
+          <ul style="margin-top:6px;">
+            <li><em>Isolamento Lógico Multi-Tenant:</em> Os arquivos são armazenados em diretórios segregados pelo identificador único de inquilino (<code>tenant_id</code>), impedindo estritamente o acesso cruzado entre diferentes construtoras.</li>
+            <li><em>Criptografia em Trânsito e em Repouso:</em> Todo o tráfego de upload e download é protegido por TLS 1.3 / HTTPS com HSTS, e os objetos são armazenados com criptografia em repouso padrão AES-256 em infraestrutura de nuvem segura (Cloudflare R2 Object Storage / S3-compatible).</li>
+            <li><em>Links Temporários Pré-Assinados:</em> A visualização de documentos privados ocorre mediante geração de URLs pré-assinadas temporárias com tempo de vida limitado (TTL de até 10 minutos), mitigando riscos de acesso não autorizado por compartilhamento indevido de links.</li>
+          </ul>
+        </li>
+        <li>
+          <strong>5.4. Uso Aceitável de Uploads e Tipos de Arquivos Permitidos:</strong>
+          São estritamente proibidos uploads de arquivos executáveis, scripts ou códigos maliciosos (<code>.exe</code>, <code>.bat</code>, <code>.cmd</code>, <code>.sh</code>, <code>.php</code>, <code>.js</code>, <code>.py</code>, etc.), arquivos com extensões forjadas ou conteúdos que violem direitos de terceiros ou a legislação brasileira. A plataforma emprega validação automatizada de integridade por <em>Magic Bytes</em> binários no momento do upload.
+        </li>
+        <li>
+          <strong>5.5. Retenção, Disponibilidade e Descarte de Documentos:</strong>
+          Durante a vigência do plano ativo, o Cliente terá acesso contínuo para visualização e download de seu acervo documental. Em caso de encerramento da conta, a plataforma assegura o prazo de 30 (trinta) dias para exportação completa de todo o acervo de arquivos e dados, findo o qual os arquivos de mídia poderão ser expurgados de forma segura e irreversível dos servidores de armazenamento ativo, ressalvadas as obrigações legais de guarda fiscal.
+        </li>
+        <li>
+          <strong>5.6. Responsabilidade Técnica de Engenharia:</strong>
+          A responsabilidade pelo conteúdo técnico de projetos, memoriais, ARTs/RRTs, cálculos estruturais e precisão das medições de campo permanece com os engenheiros, arquitetos e responsáveis técnicos designados pelo Cliente. O FinGo provê ferramentas tecnológicas de apoio à gestão, não realizando juízo de conformidade executiva das obras.
+        </li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>6. Uso Aceitável da Plataforma</h2>
       <p>O usuário concorda em não utilizar a plataforma para:</p>
       <ul>
         <li>Praticar qualquer ato ilícito, fraudulento ou violador da legislação brasileira vigente.</li>
@@ -292,28 +327,28 @@
     </section>
 
     <section>
-      <h2>6. Disponibilidade, Nível de Serviço (SLA) e Backup</h2>
+      <h2>7. Disponibilidade, Nível de Serviço (SLA) e Backup</h2>
       <p>
         Empregamos os melhores esforços técnicos e infraestrutura de alta disponibilidade em nuvem serverless para garantir a operação ininterrupta da plataforma. No entanto, o serviço pode sofrer interrupções programadas para manutenção preventiva ou atualizações de segurança, as quais serão comunicadas previamente aos administradores.
       </p>
     </section>
 
     <section>
-      <h2>7. Rescisão e Encerramento de Contas</h2>
+      <h2>8. Rescisão e Encerramento de Contas</h2>
       <p>
         O usuário pode solicitar o encerramento da sua conta a qualquer momento mediante contato com o suporte. Em caso de encerramento, o usuário terá a faculdade de solicitar a exportação de seus dados operacionais no prazo legal.
       </p>
     </section>
 
     <section>
-      <h2>8. Legislação Aplicável e Foro</h2>
+      <h2>9. Legislação Aplicável e Foro</h2>
       <p>
         Estes Termos são regidos e interpretados de acordo com as leis da República Federativa do Brasil. Fica eleito o foro da comarca da sede da empresa contratada para dirimir quaisquer litígios decorrentes destes termos.
       </p>
     </section>
 
     <section>
-      <h2>9. Contato e Suporte</h2>
+      <h2>10. Contato e Suporte</h2>
       <p>
         Para esclarecimentos ou dúvidas sobre estes Termos de Serviço:
       </p>
@@ -333,5 +368,6 @@
     <p>FinGo — Obras em Fluxo &middot; Todos os direitos reservados &copy; 2026</p>
   </footer>
 
+  <script src="/js/cookie_banner.js"></script>
 </body>
 </html>
