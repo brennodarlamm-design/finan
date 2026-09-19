@@ -28,7 +28,9 @@ const rootFiles = [
   'favicon-32x32.png',
   'favicon-192x192.png',
   'apple-touch-icon.png',
-  'site.webmanifest'
+  'site.webmanifest',
+  'sw.js',
+  'twa-manifest.json'
 ];
 
 const directories = ['css', 'js', 'img', 'data'];

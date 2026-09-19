@@ -23,8 +23,11 @@
       measure('navigation-to-shell', null, 'shell-visible');
     }
   });
-  mark('startup-script');
-  window.addEventListener('error', event => {
-    if (event.target?.tagName === 'SCRIPT' || event.error) fail();
-  }, true);
+  window.addEventListener('load', () => {
+    if ('serviceWorker' in navigator && (window.location.protocol === 'https:' || window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')) {
+      navigator.serviceWorker.register('/sw.js', { scope: '/' }).catch(err => {
+        console.warn('[FinGo PWA] Registro de Service Worker omitido:', err?.message || err);
+      });
+    }
+  });
 })();

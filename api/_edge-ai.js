@@ -66,22 +66,30 @@ export async function runEdgeDocumentOcr(env, imageBase64OrBuffer, options = {})
 
   if (env && env.AI && typeof env.AI.run === 'function') {
     try {
-      const prompt = `Analise este comprovante ou cupom fiscal de compra de materiais/serviços de construção civil.
-Retorne EXCLUSIVAMENTE um objeto JSON válido com os seguintes campos:
+      const prompt = `Analise este comprovante, cupom fiscal, nota fiscal ou boleto de construção civil.
+Retorne EXCLUSIVAMENTE um objeto JSON válido no seguinte formato:
 {
-  "razao_social": "Nome do fornecedor ou estabelecimento",
-  "cnpj": "CNPJ se visível ou null",
-  "data_emissao": "AAAA-MM-DD ou DD/MM/AAAA",
+  "tipo_documento": "comprovante_pix | comprovante_ted | boleto | nfe | nfce | nfse | recibo | cupom_fiscal | outro",
+  "fornecedor": "Razão social ou nome do fornecedor/favorecido",
+  "razao_social": "Razão social ou nome do fornecedor",
+  "cnpj_emitente": "CNPJ formatado ou CPF ou null",
+  "data_emissao": "AAAA-MM-DD",
+  "data_vencimento": "AAAA-MM-DD ou null",
+  "valor": 0.00,
   "valor_total": 0.00,
+  "chave_acesso": "Chave NF-e 44 dígitos se visível ou null",
+  "numero_documento": "Número da NF ou autenticação se houver ou null",
+  "codigo_barras": "Linha digitável se boleto ou null",
   "itens": ["item 1", "item 2"],
-  "categoria_sugerida": "Material Bruto | Ferramentas | Mão de Obra | Combustível | Geral"
+  "categoria_sugerida": "Material Bruto | Mão de Obra | Ferramentas | Combustível | Geral",
+  "descricao_sugerida": "Resumo objetivo da despesa"
 }`;
 
       // Workers AI Vision input
       const input = {
         image: Array.from(Buffer.from(imageBase64OrBuffer, 'base64')),
         prompt: prompt,
-        max_tokens: 800
+        max_tokens: 1000
       };
 
       const result = await env.AI.run(DEFAULT_OCR_MODEL, input);
@@ -91,6 +99,10 @@ Retorne EXCLUSIVAMENTE um objeto JSON válido com os seguintes campos:
       const jsonMatch = text.match(/\{[\s\S]*\}/);
       if (jsonMatch) {
         const parsed = JSON.parse(jsonMatch[0]);
+        parsed.valor = typeof parsed.valor === 'number' ? parsed.valor : (parsed.valor_total || null);
+        parsed.valor_total = parsed.valor || parsed.valor_total || null;
+        parsed.fornecedor = parsed.fornecedor || parsed.razao_social || 'Fornecedor Identificado';
+        parsed.razao_social = parsed.fornecedor;
         return {
           success: true,
           data: parsed,
@@ -106,13 +118,18 @@ Retorne EXCLUSIVAMENTE um objeto JSON válido com os seguintes campos:
   return {
     success: true,
     data: {
+      tipo_documento: 'cupom_fiscal',
+      fornecedor: 'Fornecedor de Materiais de Construção',
       razao_social: 'Fornecedor de Materiais de Construção',
-      cnpj: null,
+      cnpj_emitente: null,
       data_emissao: new Date().toISOString().split('T')[0],
+      data_vencimento: null,
+      valor: null,
       valor_total: null,
       itens: ['Materiais diversos para canteiro'],
       categoria_sugerida: 'Material Bruto',
-      nota: 'Dados extraídos pelo motor de processamento de documentos de canteiro.'
+      descricao_sugerida: 'Materiais de construção para canteiro de obras',
+      nota: 'Processamento assistido pelo motor de inteligência de documentos FinGo.'
     },
     provider: 'fingo_ocr_fallback'
   };

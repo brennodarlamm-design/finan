@@ -1,17 +1,23 @@
 {
+  "id": "https://fingo.api.br/",
   "name": "FinGo — Obras em Fluxo",
   "short_name": "FinGo",
-  "description": "Software de Gestão de Obras, Custos SINAPI e Finanças para Construtoras",
+  "description": "Sistema SaaS de Gestão de Obras, Custos SINAPI, Medições e Finanças para Construtoras",
   "start_url": "/",
+  "scope": "/",
   "display": "standalone",
+  "orientation": "any",
   "background_color": "#040804",
   "theme_color": "#040804",
   "lang": "pt-BR",
+  "dir": "ltr",
+  "categories": ["business", "finance", "productivity", "utilities"],
   "icons": [
     {
       "src": "/favicon-192x192.png",
       "sizes": "192x192",
-      "type": "image/png"
+      "type": "image/png",
+      "purpose": "any maskable"
     },
     {
       "src": "/favicon.svg",
@@ -22,6 +28,45 @@
       "src": "/apple-touch-icon.png",
       "sizes": "180x180",
       "type": "image/png"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Novo Lançamento",
+      "short_name": "Lançamento",
+      "description": "Registrar nova despesa ou receita de obra",
+      "url": "/app?action=novo-lancamento",
+      "icons": [{ "src": "/favicon-192x192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Orçamento SINAPI",
+      "short_name": "SINAPI",
+      "description": "Consultar composições e tabela de preços da Caixa",
+      "url": "/app?action=sinapi",
+      "icons": [{ "src": "/favicon-192x192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Medições de Empreiteiros",
+      "short_name": "Medições",
+      "description": "Acompanhar boletins e retenções de mão de obra",
+      "url": "/app?action=medicoes",
+      "icons": [{ "src": "/favicon-192x192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "FinBot Copiloto IA",
+      "short_name": "FinBot",
+      "description": "Assistente inteligente de custos e canteiro",
+      "url": "/app?action=finbot",
+      "icons": [{ "src": "/favicon-192x192.png", "sizes": "192x192" }]
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "/img/og-finobra-cover.jpg",
+      "sizes": "1200x630",
+      "type": "image/jpeg",
+      "form_factor": "wide",
+      "label": "Visão Geral do Painel Executivo FinGo"
     }
   ]
 }

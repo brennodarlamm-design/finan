@@ -6,6 +6,7 @@ import { checkRateLimit, getClientIp } from './_ratelimit.js';
 import { canUseFeature, planError } from './_plans.js';
 import { canWriteData, canAccessModule, permissionError } from './_permissions.js';
 import { triggerOcr, isTriggerConfigured } from './_trigger-client.js';
+import { runEdgeDocumentOcr } from './_edge-ai.js';
 
 export const config = {
   maxDuration: 60,
@@ -77,12 +78,6 @@ export default async function handler(req, res) {
     });
   }
 
-  const geminiApiKey = String(process.env.GEMINI_API_KEY || '').trim();
-
-  if (!geminiApiKey) {
-    return res.status(500).json({ error: 'GEMINI_API_KEY não configurada no servidor.' });
-  }
-
   const { base64, mimeType } = req.body || {};
   if (!base64 || !mimeType) {
     return res.status(400).json({ error: 'Campos "base64" e "mimeType" são obrigatórios.' });
@@ -113,6 +108,29 @@ export default async function handler(req, res) {
     return res.status(400).json({
       error: 'Assinatura binária do documento inválida. O OCR aceita estritamente arquivos PDF e imagens JPEG, PNG ou WEBP.'
     });
+  }
+
+  // 1. Prioridade Edge: Execução nativa via Cloudflare Workers AI quando disponível no ambiente
+  const edgeEnv = req.env || globalThis.__CLOUDFLARE_ENV__;
+  if (edgeEnv && edgeEnv.AI) {
+    try {
+      const edgeOcrResult = await runEdgeDocumentOcr(edgeEnv, cleanBase64);
+      if (edgeOcrResult && edgeOcrResult.success && edgeOcrResult.data && edgeOcrResult.provider === 'cloudflare_vision_ai') {
+        return res.status(200).json({
+          ok: true,
+          sucesso: true,
+          dados: edgeOcrResult.data,
+          provider: 'cloudflare_vision_ai'
+        });
+      }
+    } catch (edgeOcrErr) {
+      console.warn('[OCR] Erro ao processar via Workers AI, prosseguindo para o pipeline principal:', edgeOcrErr.message);
+    }
+  }
+
+  const geminiApiKey = String(process.env.GEMINI_API_KEY || '').trim();
+  if (!geminiApiKey) {
+    return res.status(500).json({ error: 'GEMINI_API_KEY não configurada no servidor.' });
   }
 
   // Desvio para processamento assíncrono em background via Trigger.dev (elimina timeout de 10s da Vercel Hobby)

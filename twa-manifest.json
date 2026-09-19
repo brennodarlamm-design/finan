@@ -1,0 +1,53 @@
+{
+  "packageId": "br.api.fingo.app",
+  "host": "fingo.api.br",
+  "name": "FinGo — Obras em Fluxo",
+  "launcherName": "FinGo",
+  "display": "standalone",
+  "themeColor": "#040804",
+  "navigationColor": "#040804",
+  "backgroundColor": "#040804",
+  "enableNotifications": true,
+  "startUrl": "/",
+  "iconUrl": "https://fingo.api.br/favicon-192x192.png",
+  "maskableIconUrl": "https://fingo.api.br/favicon-192x192.png",
+  "appVersionName": "2.38.0",
+  "appVersionCode": 2380,
+  "signingKey": {
+    "alias": "fingo-release-key"
+  },
+  "generatorApp": "bubblewrap-cli",
+  "webManifestUrl": "https://fingo.api.br/site.webmanifest",
+  "fallbackType": "customtabs",
+  "features": {
+    "locationDelegation": {
+      "enabled": false
+    },
+    "playBilling": {
+      "enabled": false
+    }
+  },
+  "alphaDependencies": {
+    "enabled": false
+  },
+  "shortcuts": [
+    {
+      "name": "Novo Lançamento",
+      "short_name": "Lançamento",
+      "url": "https://fingo.api.br/app?action=novo-lancamento",
+      "chosenIconUrl": "https://fingo.api.br/favicon-192x192.png"
+    },
+    {
+      "name": "Orçamento SINAPI",
+      "short_name": "SINAPI",
+      "url": "https://fingo.api.br/app?action=sinapi",
+      "chosenIconUrl": "https://fingo.api.br/favicon-192x192.png"
+    },
+    {
+      "name": "Medições de Empreiteiros",
+      "short_name": "Medições",
+      "url": "https://fingo.api.br/app?action=medicoes",
+      "chosenIconUrl": "https://fingo.api.br/favicon-192x192.png"
+    }
+  ]
+}

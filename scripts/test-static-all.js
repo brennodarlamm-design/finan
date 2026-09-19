@@ -92,7 +92,8 @@ const tests = [
   'scripts/test-bug-hunter-reaudit-fixes.js',
   'scripts/test-cloudflare-workers-full.js',
   'scripts/test-edge-security-monitoring.js',
-  'scripts/test-legal-cookie-banner.js'
+  'scripts/test-legal-cookie-banner.js',
+  'scripts/test-evolutionary-pillars.js'
 ].filter(fs.existsSync);
 
 const p50NativeSourceTests = new Set([
@@ -116,7 +117,8 @@ const p50NativeSourceTests = new Set([
   'scripts/test-edge-security-design.js',
   'scripts/test-edge-v2-routes.js',
   'scripts/test-bug-hunter-reaudit-fixes.js',
-  'scripts/test-legal-cookie-banner.js'
+  'scripts/test-legal-cookie-banner.js',
+  'scripts/test-evolutionary-pillars.js'
 ]);
 const preload = path.resolve('scripts/test-api-wrapper-preload.cjs');
 

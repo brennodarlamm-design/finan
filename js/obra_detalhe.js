@@ -307,6 +307,10 @@ const ObraDetalhe = {
                 style="padding:10px 18px;font-size:.88rem;font-weight:800;border:none;border-bottom:3px solid ${this.activeTab==='slas'?'var(--accent)':'transparent'};color:${this.activeTab==='slas'?'var(--accent)':'var(--text2)'};border-radius:0;background:${this.activeTab==='slas'?'rgba(18,217,160,0.08)':'transparent'};">
           ⏱️ Prazos &amp; SLAs (Cascata)
         </button>
+        <button class="btn od-tab-btn ${this.activeTab==='bim-3d'?'active':''}" data-tab="bim-3d" data-od-click="ObraDetalhe.setTab('bim-3d')"
+                style="padding:10px 18px;font-size:.88rem;font-weight:800;border:none;border-bottom:3px solid ${this.activeTab==='bim-3d'?'var(--accent)':'transparent'};color:${this.activeTab==='bim-3d'?'var(--accent)':'var(--text2)'};border-radius:0;background:${this.activeTab==='bim-3d'?'rgba(198,255,0,0.08)':'transparent'};">
+          🏢 Modelo 3D BIM
+        </button>
       </div>
 
       <!-- Container do Conteúdo da Aba -->
@@ -322,10 +326,17 @@ const ObraDetalhe = {
     if (tab === 'medicoes') return this._renderTabMedicoes(obraId);
     if (tab === 'recibos') return this._renderTabRecibos(obraId);
     if (tab === 'slas') return typeof CronogramaSLA !== 'undefined' ? CronogramaSLA.renderLinhaTempo(obraId) : '<div class="empty-state">Módulo de SLAs indisponível.</div>';
+    if (tab === 'bim-3d') return '<div id="od-bim-container" style="min-height:540px;"></div>';
     return this._renderTabLancamentos(obraId);
   },
 
   _bindTabEvents(tab, obraId) {
+    if (tab === 'bim-3d') {
+      if (typeof BIMViewer !== 'undefined') {
+        BIMViewer.render('od-bim-container', obraId);
+      }
+      return;
+    }
     if (tab === 'orcado-realizado') {
       this._bindSubTabOrcadoEvents(this.subTabOrcado || 'curva-s', obraId);
     } else if (tab === 'lancamentos') {
