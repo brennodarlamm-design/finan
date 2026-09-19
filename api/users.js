@@ -391,7 +391,7 @@ async function notifySupportHuman({ tenantName, userName, userEmail, conversatio
   }
 
   const resendKey = String(process.env.RESEND_API_KEY || '').trim();
-  const emailFrom = String(process.env.FINOBRA_SUPPORT_EMAIL_FROM || 'FinGo <onboarding@resend.dev>').trim();
+  const emailFrom = String(process.env.FINOBRA_SUPPORT_EMAIL_FROM || 'FinGo <suporte@fingo.api.br>').trim();
   const emailTo = String(process.env.FINOBRA_SUPPORT_EMAIL || 'brennodarlam@gmail.com').trim();
   const templateId = String(process.env.RESEND_SUPPORT_TEMPLATE_ID || '').trim();
 

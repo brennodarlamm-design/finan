@@ -1296,7 +1296,7 @@ async function executarVarreduraCobranca({ manualTrigger = false, forcedTenantId
   const pixKey = String(process.env.FINOBRA_PIX_KEY || process.env.FINOBRA_SUPPORT_WHATSAPP || '5595991363678').trim();
   const pixBeneficiary = String(process.env.FINOBRA_PIX_BENEFICIARY || 'FinObra Soluções Tecnológicas').trim();
   const resendKey = String(process.env.RESEND_API_KEY || '').trim();
-  const emailFrom = String(process.env.FINOBRA_SUPPORT_EMAIL_FROM || 'FinObra <suporte@fingo.api.br>').trim();
+  const emailFrom = String(process.env.FINOBRA_SUPPORT_EMAIL_FROM || 'FinGo <suporte@fingo.api.br>').trim();
 
   // Sessão WhatsApp de disparo (Master/Angelim)
   const masterSession = getTenantSession('angelim') || (TARGET_TENANT_ID ? getTenantSession(TARGET_TENANT_ID) : null);
