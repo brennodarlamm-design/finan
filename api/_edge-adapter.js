@@ -13,7 +13,6 @@ import uploadHandler from './upload.js';
 import whatsappHandler from './whatsapp.js';
 import auditHandler from './audit.js';
 import reconhecerHandler from './reconhecer-documento.js';
-import bimRenderHandler from './_bim-render.js';
 import { resolveV2Route } from './_v2-routes.js';
 
 const HANDLERS = {
@@ -133,10 +132,6 @@ function resolveRouteAndQuery(pathname, searchParams) {
     query.sub = query.sub || 'webhook_pix';
     query.path = pathname.replace('/api/webhook-pix/', '');
     return { handler: HANDLERS.plano, query, moduleName: 'plano' };
-  }
-
-  if (pathname === '/api/bim-render' || pathname === '/api/bim/render') {
-    return { handler: bimRenderHandler, query, moduleName: 'bim-render' };
   }
 
   // Roteamento padrão: /api/:module

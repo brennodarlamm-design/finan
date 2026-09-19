@@ -5,7 +5,6 @@ import { neon } from '@neondatabase/serverless';
 import { resolveAuthAndTenant } from './_auth.js';
 import { canWriteData, canDeleteData, canAccessModule, permissionError } from './_permissions.js';
 import { createTenantSql } from './_tenant-sql.js';
-import bimRenderHandler from './_bim-render.js';
 
 function getSql() {
   const conn = process.env.DATABASE_URL;
@@ -64,10 +63,6 @@ export default async function handler(req, res) {
 
   if (req.method === 'OPTIONS') {
     return res.status(200).end();
-  }
-
-  if (req.query?.action === 'bim-render' || req.body?.action === 'bim-render') {
-    return bimRenderHandler(req, res);
   }
 
   // 1. Validação de Autenticação Segura
