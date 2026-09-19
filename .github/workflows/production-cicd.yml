@@ -136,7 +136,7 @@ jobs:
             grep -Fq "$expected_text" "/tmp/${prefix}.html"
           }
 
-          check_route 'https://fingo.api.br/' 'landing-shell' 'Sua obra sob controle.' 'fingo-home'
+          check_route 'https://fingo.api.br/' 'landing-shell' 'class="ui-marketing"' 'fingo-home'
           grep -Fq '<link rel="canonical" href="https://fingo.api.br/">' /tmp/fingo-home.html
 
           check_route 'https://fingo.api.br/login' 'login-shell' 'id="login-form"' 'fingo-login'
@@ -150,14 +150,14 @@ jobs:
           check_route 'https://fingo.api.br/app/dashboard' 'app-shell' '<div id="app-root"></div>' 'fingo-app'
           tr -d '\r' < /tmp/fingo-app.headers | grep -qi '^x-robots-tag: noindex, nofollow$'
 
-          check_route 'https://fingo.api.br/master' 'master-shell' 'FinObra Master Backoffice' 'fingo-master'
+          check_route 'https://fingo.api.br/master' 'master-shell' 'id="master-auth-gate"' 'fingo-master'
           tr -d '\r' < /tmp/fingo-master.headers | grep -qi '^x-robots-tag: noindex, nofollow$'
           check_document 'https://fingo.api.br/js/master_page.js' 'ensureDevTenantKeysModule' 'fingo-master-page-js'
           check_document 'https://fingo.api.br/js/dev-tenant-keys.js' 'Chaves das Empresas — DEV / Master' 'fingo-dev-tenant-keys-js'
 
           check_document 'https://fingo.api.br/privacidade' 'Política de Privacidade' 'fingo-privacy'
           check_document 'https://fingo.api.br/termos' 'Termos de Serviço' 'fingo-terms'
-          check_document 'https://fingo.api.br/validar' 'Portal de Validação de Registros de Assinatura' 'fingo-validate'
+          check_document 'https://fingo.api.br/validar' 'Validação de Autenticidade Digital' 'fingo-validate'
 
           robots="$(curl --fail --silent --show-error https://fingo.api.br/robots.txt)"
           [[ "$robots" == *'Disallow: /login'* ]]
