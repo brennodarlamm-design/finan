@@ -115,11 +115,25 @@ python .agents/skills/generate-3d-model/scripts/validate_glb.py /caminho/model.g
 
 ### 5. Otimizar para web quando necessário
 
-Se exceder orçamento de tamanho/polígonos:
+Se exceder orçamento de tamanho/polígonos, prefira o script versionado:
 
-- usar Blender/Python ou glTF Transform;
+```bash
+blender -b \
+  -P .agents/skills/generate-3d-model/scripts/optimize_glb_blender.py \
+  -- /caminho/model.glb /caminho/model.optimized.glb 75000
+```
+
+Depois:
+
+```bash
+python .agents/skills/generate-3d-model/scripts/validate_glb.py /caminho/model.optimized.glb
+```
+
+Regras:
+
 - preservar escala;
 - não aplicar decimação agressiva a pontos de inspeção;
+- não alterar eixos sem registrar;
 - revalidar o GLB após cada transformação.
 
 ### 6. Registrar no FinGo
