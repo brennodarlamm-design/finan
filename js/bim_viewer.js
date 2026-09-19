@@ -30,6 +30,8 @@ const BIMViewer = {
   isExpanded: false,
   sectionMode: 'none', // none | x | z
   sectionPosition: 0,
+  disciplineFilter: 'all',
+  colorMode: 'material', // material | status
   modelVersions: [],
   coordinationIssues: [],
   _escapeHandler: null,
@@ -87,6 +89,16 @@ const BIMViewer = {
               <input id="bim-section-range" type="range" min="-120" max="120" step="5" value="0" title="Posição do plano de corte" disabled style="width:90px;margin:0 5px;accent-color:#C6FF00;opacity:.45;">
             </div>
 
+            <div class="btn-group" style="display:inline-flex;background:#142210;border-radius:6px;border:1px solid #243518;padding:2px;align-items:center;">
+              <select id="bim-discipline-filter" title="Filtrar disciplina BIM" style="background:#142210;color:#F0EAD6;border:none;padding:5px 7px;font-size:.72rem;font-weight:700;outline:none;">
+                <option value="all">Todas disciplinas</option>
+                <option value="estrutural">Estrutural</option>
+                <option value="arquitetura">Arquitetura</option>
+              </select>
+              <button type="button" class="bim-color-btn" data-color-mode="material" style="padding:5px 8px;font-size:.70rem;border:none;background:#C6FF00;color:#000;border-radius:4px;cursor:pointer;font-weight:800;">Materiais</button>
+              <button type="button" class="bim-color-btn" data-color-mode="status" style="padding:5px 8px;font-size:.70rem;border:none;background:transparent;color:#F0EAD6;border-radius:4px;cursor:pointer;font-weight:700;">Status</button>
+            </div>
+
             <label class="btn-action" style="cursor:pointer;margin:0;font-size:.75rem;padding:6px 12px;background:rgba(198,255,0,.1);border:1px solid rgba(198,255,0,.3);color:#C6FF00;border-radius:6px;font-weight:700;">
               <span>📁 Importar 3D (.obj / .ifc)</span>
               <input type="file" id="bim-file-input" accept=".obj,.ifc,.gltf,.glb" style="display:none;" />
@@ -108,6 +120,12 @@ const BIMViewer = {
             <!-- Dica de Interação de Câmera -->
             <div style="position:absolute;bottom:14px;left:16px;font-size:.72rem;color:#94A3B8;background:rgba(0,0,0,0.75);backdrop-filter:blur(6px);padding:6px 12px;border-radius:6px;border:1px solid #243518;pointer-events:none;">
               🖱️ Clique e arraste para girar 360° &middot; Scroll para Zoom &middot; Clique em qualquer parte da casa para inspecionar custos
+            </div>
+            <div id="bim-status-legend" style="position:absolute;right:14px;bottom:14px;display:none;gap:8px;flex-wrap:wrap;background:rgba(0,0,0,.78);border:1px solid #243518;border-radius:7px;padding:6px 9px;font-size:.62rem;color:#CBD5E1;pointer-events:none;">
+              <span>● <b style="color:#64748B;">Não iniciado</b></span>
+              <span>● <b style="color:#F59E0B;">Em execução</b></span>
+              <span>● <b style="color:#22C55E;">Concluído</b></span>
+              <span>● <b style="color:#EF4444;">Pendência</b></span>
             </div>
           </div>
 
@@ -201,6 +219,7 @@ const BIMViewer = {
       id: 'elem_fundacao',
       name: 'Fundações, Sapatas & Baldrame',
       floor: 'fundacao',
+      discipline: 'estrutural',
       category: 'Fundações e Estrutura Enterrada',
       sinapiCode: '96538',
       sinapiDesc: 'Armação de bloco, viga baldrame e sapata de concreto armado com aço CA-50',
@@ -259,6 +278,7 @@ const BIMViewer = {
       id: 'elem_terreo_alvenaria',
       name: 'Pavimento Térreo & Alvenaria',
       floor: 'terreo',
+      discipline: 'arquitetura estrutural',
       category: 'Estruturas e Alvenaria',
       sinapiCode: '104658',
       sinapiDesc: 'Alvenaria de vedação de blocos cerâmicos furados 9x19x19cm com argamassa mista',
@@ -313,6 +333,7 @@ const BIMViewer = {
       id: 'elem_pav1',
       name: '1º Pavimento & Sacada',
       floor: 'pav1',
+      discipline: 'arquitetura estrutural',
       category: 'Estruturas e Alvenaria',
       sinapiCode: '101964',
       sinapiDesc: 'Laje pré-moldada unidirecional para piso com vigotas treliçadas',
@@ -353,6 +374,7 @@ const BIMViewer = {
       id: 'elem_cobertura',
       name: 'Cobertura, Tesouras & Telhado',
       floor: 'cobertura',
+      discipline: 'arquitetura',
       category: 'Cobertura e Telhado',
       sinapiCode: '94213',
       sinapiDesc: 'Telhamento com telha cerâmica tipo portuguesa com estrutura de madeira',
@@ -394,8 +416,9 @@ const BIMViewer = {
 
     // Filtrar elementos do pavimento ativo
     const visibleElements = this.elements.filter(elem => {
-      if (this.currentFloor === 'all') return true;
-      return elem.floor === this.currentFloor;
+      const floorOk = this.currentFloor === 'all' || elem.floor === this.currentFloor;
+      const disciplineOk = this.disciplineFilter === 'all' || String(elem.discipline || '').includes(this.disciplineFilter);
+      return floorOk && disciplineOk;
     });
 
     // Gera as faces poligonais 3D de todas as peças
@@ -404,10 +427,14 @@ const BIMViewer = {
       const isSelected = this.selectedElement?.id === elem.id;
       const meshes = (elem.meshes || []).filter(mesh => this._meshPassesSection(mesh));
       meshes.forEach(mesh => {
+        const displayColor = this.colorMode === 'status' ? this._statusColorForElement(elem) : mesh.color;
         if (mesh.type === 'box') {
-          faces.push(...this._createBoxFaces(mesh, mesh.color, elem.id, isSelected, mesh));
+          faces.push(...this._createBoxFaces(mesh, displayColor, elem.id, isSelected, mesh));
         } else if (mesh.type === 'roof_gable') {
-          faces.push(...this._createRoofGableFaces(mesh, elem.id, isSelected));
+          const roofMesh = this.colorMode === 'status'
+            ? { ...mesh, colorLeft: displayColor, colorRight: displayColor, colorGable: displayColor, colorRidge: displayColor }
+            : mesh;
+          faces.push(...this._createRoofGableFaces(roofMesh, elem.id, isSelected));
         }
       });
     });
@@ -750,7 +777,9 @@ const BIMViewer = {
           <summary style="cursor:pointer;font-size:.70rem;font-weight:800;color:#C6FF00;text-transform:uppercase;">Propriedades BIM & Quantitativos</summary>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px 10px;margin-top:10px;font-size:.70rem;">
             <div><span style="color:#64748B;">Classe IFC</span><br><strong style="color:#E2E8F0;">${Utils.escapeHtml(props.ifcClass)}</strong></div>
+            <div><span style="color:#64748B;">Disciplina</span><br><strong style="color:#E2E8F0;">${Utils.escapeHtml(props.discipline)}</strong></div>
             <div><span style="color:#64748B;">Material</span><br><strong style="color:#E2E8F0;">${Utils.escapeHtml(props.material)}</strong></div>
+            <div><span style="color:#64748B;">Status</span><br><strong style="color:${this._statusColorForElement(elem)};">${Utils.escapeHtml(props.status)}</strong></div>
             <div><span style="color:#64748B;">Dimensão X</span><br><strong style="color:#E2E8F0;">${props.width}</strong></div>
             <div><span style="color:#64748B;">Dimensão Y</span><br><strong style="color:#E2E8F0;">${props.height}</strong></div>
             <div><span style="color:#64748B;">Dimensão Z</span><br><strong style="color:#E2E8F0;">${props.depth}</strong></div>
@@ -780,6 +809,17 @@ const BIMViewer = {
     `;
   },
 
+
+  _statusColorForElement(elem) {
+    const hasOpenIssue = (this.coordinationIssues || []).some(issue =>
+      issue.status !== 'resolvida' && issue.bim_element_id && issue.bim_element_id === elem?.id
+    );
+    if (hasOpenIssue) return '#EF4444';
+    const pct = Number(elem?.executadoPct || 0);
+    if (pct >= 100) return '#22C55E';
+    if (pct > 0) return '#F59E0B';
+    return '#64748B';
+  },
 
   _meshPassesSection(mesh) {
     if (!mesh || this.sectionMode === 'none') return true;
@@ -822,7 +862,11 @@ const BIMViewer = {
     const fmt = n => Number.isFinite(n) ? `${Math.round(n * 10) / 10} u` : '0 u';
     return {
       ifcClass,
+      discipline: String(elem.discipline || 'geral').replace(/\b\w/g, c => c.toUpperCase()),
       material: materials.size ? Array.from(materials).slice(0, 3).join(', ') : (elem.category || 'Material não classificado'),
+      status: this._statusColorForElement(elem) === '#EF4444' ? 'Com pendência'
+        : Number(elem.executadoPct || 0) >= 100 ? 'Concluído'
+        : Number(elem.executadoPct || 0) > 0 ? 'Em execução' : 'Não iniciado',
       width: fmt(bounds.maxX - bounds.minX),
       height: fmt(bounds.maxY - bounds.minY),
       depth: fmt(bounds.maxZ - bounds.minZ),
@@ -842,8 +886,29 @@ const BIMViewer = {
     }
   },
 
+  _compareLatestModelVersions() {
+    const versions = Array.isArray(this.modelVersions) ? this.modelVersions : [];
+    if (versions.length < 2) return null;
+    const parse = doc => {
+      try { return typeof doc.bim_metadata === 'string' ? JSON.parse(doc.bim_metadata) : (doc.bim_metadata || {}); } catch { return {}; }
+    };
+    const current = parse(versions[0]);
+    const previous = parse(versions[1]);
+    const delta = (a, b) => Number(a || 0) - Number(b || 0);
+    return {
+      format: String(current.format || '').toUpperCase(),
+      sizeDelta: Number(versions[0].tamanho || 0) - Number(versions[1].tamanho || 0),
+      elementDelta: delta(current.elements || current.faces || current.meshes, previous.elements || previous.faces || previous.meshes),
+      storeyDelta: delta(current.storeys, previous.storeys),
+      schemaChanged: Boolean(current.schema && previous.schema && current.schema !== previous.schema),
+      currentSchema: current.schema || '',
+      previousSchema: previous.schema || ''
+    };
+  },
+
   _renderModelVersionsHtml() {
     const versions = Array.isArray(this.modelVersions) ? this.modelVersions : [];
+    const comparison = this._compareLatestModelVersions();
     return `
       <div style="background:#0F1A0E;border:1px solid #243518;border-radius:10px;padding:12px 14px;">
         <div style="display:flex;justify-content:space-between;gap:12px;align-items:center;margin-bottom:8px;">
@@ -853,6 +918,13 @@ const BIMViewer = {
           </div>
           <span style="font-size:.68rem;color:#C6FF00;font-weight:800;">${versions.length} versão(ões)</span>
         </div>
+        ${comparison ? `<div style="display:flex;gap:10px;flex-wrap:wrap;padding:8px 0;border-top:1px solid rgba(148,163,184,.12);font-size:.64rem;color:#94A3B8;">
+          <span>Comparação v${versions.length} × v${versions.length - 1}</span>
+          <span style="color:${comparison.elementDelta ? '#F59E0B' : '#C6FF00'};">Elementos/malhas: ${comparison.elementDelta >= 0 ? '+' : ''}${comparison.elementDelta}</span>
+          <span>Tamanho: ${comparison.sizeDelta >= 0 ? '+' : ''}${Math.round(comparison.sizeDelta / 1024)} KB</span>
+          ${comparison.storeyDelta ? `<span>Pavimentos: ${comparison.storeyDelta >= 0 ? '+' : ''}${comparison.storeyDelta}</span>` : ''}
+          ${comparison.schemaChanged ? `<span style="color:#F59E0B;">Schema: ${Utils.escapeHtml(comparison.previousSchema)} → ${Utils.escapeHtml(comparison.currentSchema)}</span>` : ''}
+        </div>` : ''}
         ${versions.length ? versions.slice(0, 5).map((doc, idx) => {
           let meta = {};
           try { meta = typeof doc.bim_metadata === 'string' ? JSON.parse(doc.bim_metadata) : (doc.bim_metadata || {}); } catch {}
@@ -1123,40 +1195,69 @@ const BIMViewer = {
   _getOperationalSnapshot(obraId) {
     const emptyResumo = { totalReceitas:0, totalDespesas:0, saldo:0, aPagar:0, aPagarValor:0, aReceber:0, aReceberValor:0 };
     const emptyComp = { totalOrcado:0, totalRealizado:0, saldoRestante:0, percentualFinanceiro:0, percentualFisico:0, etapas:[], statusSaude:'sem_dados', alertaDesc:'Cadastre orçamento, medições e lançamentos para acompanhar a obra em tempo real.' };
-    if (typeof DB === 'undefined') return { resumo: emptyResumo, comp: emptyComp, lancamentos: [] };
+    if (typeof DB === 'undefined') return { resumo: emptyResumo, comp: emptyComp, lancamentos: [], cronograma: null };
     try {
       const resumo = typeof DB.getResumo === 'function' ? DB.getResumo(obraId) : emptyResumo;
       const comp = typeof DB.getOrcamentoVsRealizado === 'function' ? DB.getOrcamentoVsRealizado(obraId) : emptyComp;
       const lancamentos = typeof DB.getLancamentos === 'function'
         ? DB.getLancamentos(obraId)
         : (DB.getAll?.('lancamentos') || []).filter(l => l.obra_id === obraId);
-      return { resumo: { ...emptyResumo, ...(resumo || {}) }, comp: { ...emptyComp, ...(comp || {}) }, lancamentos: Array.isArray(lancamentos) ? lancamentos : [] };
+      const cronograma = typeof DB.getCronogramaFisicoFinanceiro === 'function' ? DB.getCronogramaFisicoFinanceiro(obraId) : null;
+      return { resumo: { ...emptyResumo, ...(resumo || {}) }, comp: { ...emptyComp, ...(comp || {}) }, lancamentos: Array.isArray(lancamentos) ? lancamentos : [], cronograma };
     } catch (err) {
       console.warn('[FinGo BIM] Não foi possível montar o snapshot operacional:', err?.message || err);
-      return { resumo: emptyResumo, comp: emptyComp, lancamentos: [] };
+      return { resumo: emptyResumo, comp: emptyComp, lancamentos: [], cronograma: null };
     }
+  },
+
+  _getScheduleStatus(snapshot) {
+    const cron = snapshot?.cronograma;
+    if (!cron || !Array.isArray(cron.mesesKeys) || !cron.mesesKeys.length) {
+      return { planned: 0, label: 'Cronograma não configurado', deviation: 0 };
+    }
+    const now = new Date();
+    const key = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    let idx = cron.mesesKeys.findIndex(k => k === key);
+    if (idx < 0) {
+      idx = cron.mesesKeys.findIndex(k => k > key);
+      idx = idx <= 0 ? 0 : idx - 1;
+      if (idx < 0) idx = cron.mesesKeys.length - 1;
+    }
+    const planned = Number(cron.totaisAcumulados?.[idx]?.percentualAcumulado || 0);
+    const actual = Number(snapshot?.comp?.percentualFisico || 0);
+    return {
+      planned: Math.max(0, Math.min(100, Math.round(planned * 10) / 10)),
+      actual,
+      deviation: Math.round((actual - planned) * 10) / 10,
+      label: cron.mesesLabels?.[idx] || key
+    };
   },
 
   _renderOperationalSummaryHtml(snapshot) {
     const resumo = snapshot?.resumo || {};
     const comp = snapshot?.comp || {};
     const fisico = Math.max(0, Math.min(100, Number(comp.percentualFisico || 0)));
+    const schedule = this._getScheduleStatus(snapshot);
     const cards = [
       ['Orçado', Utils.fmt.currency(Number(comp.totalOrcado || 0)), '#F0F0E8'],
       ['Custo realizado', Utils.fmt.currency(Number(comp.totalRealizado || 0)), '#F59E0B'],
       ['Receita recebida', Utils.fmt.currency(Number(resumo.totalReceitas || 0)), '#C6FF00'],
       ['A receber', Utils.fmt.currency(Number(resumo.aReceberValor || 0)), '#38BDF8'],
-      ['Avanço físico', `${fisico}%`, '#C6FF00']
+      ['Avanço físico', `${fisico}%`, '#C6FF00'],
+      [`Planejado · ${schedule.label}`, `${schedule.planned}%`, schedule.deviation < -5 ? '#EF4444' : '#A78BFA']
     ];
     return `
-      <div class="bim-operational-summary" style="display:grid;grid-template-columns:repeat(5,minmax(120px,1fr));gap:10px;">
+      <div class="bim-operational-summary" style="display:grid;grid-template-columns:repeat(6,minmax(110px,1fr));gap:10px;">
         ${cards.map(([label,value,color]) => `
           <div style="background:#0F1A0E;border:1px solid #243518;border-radius:10px;padding:11px 13px;min-width:0;">
             <div style="font-size:.66rem;color:#94A3B8;text-transform:uppercase;font-weight:800;letter-spacing:.04em;">${label}</div>
             <div style="font-size:.92rem;color:${color};font-weight:900;margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${value}</div>
           </div>`).join('')}
       </div>
-      <div style="font-size:.72rem;color:#94A3B8;padding:0 2px;">${Utils.escapeHtml(comp.alertaDesc || '')}</div>
+      <div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;font-size:.72rem;color:#94A3B8;padding:0 2px;">
+        <span>${Utils.escapeHtml(comp.alertaDesc || '')}</span>
+        <span style="color:${schedule.deviation < -5 ? '#EF4444' : schedule.deviation > 5 ? '#C6FF00' : '#94A3B8'};">Cronograma: ${schedule.deviation >= 0 ? '+' : ''}${schedule.deviation}% vs planejado</span>
+      </div>
     `;
   },
 
@@ -1440,6 +1541,27 @@ const BIMViewer = {
         this.sectionPosition = Number(e.currentTarget.value || 0);
       });
     }
+
+    const disciplineFilter = document.getElementById('bim-discipline-filter');
+    if (disciplineFilter) {
+      disciplineFilter.value = this.disciplineFilter;
+      disciplineFilter.addEventListener('change', e => {
+        this.disciplineFilter = e.currentTarget.value || 'all';
+      });
+    }
+
+    document.querySelectorAll('.bim-color-btn').forEach(btn => {
+      btn.addEventListener('click', e => {
+        this.colorMode = e.currentTarget.getAttribute('data-color-mode') || 'material';
+        document.querySelectorAll('.bim-color-btn').forEach(b => {
+          const active = b.getAttribute('data-color-mode') === this.colorMode;
+          b.style.background = active ? '#C6FF00' : 'transparent';
+          b.style.color = active ? '#000' : '#F0EAD6';
+        });
+        const legend = document.getElementById('bim-status-legend');
+        if (legend) legend.style.display = this.colorMode === 'status' ? 'flex' : 'none';
+      });
+    });
 
     const expandBtn = document.querySelector('[data-action="toggleExpanded"]');
     if (expandBtn) expandBtn.addEventListener('click', () => this._toggleExpanded());
