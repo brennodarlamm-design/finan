@@ -34,5 +34,9 @@ assert(g.includes('authoritative_bim: false'), 'modelo por IA não pode virar BI
 const o = fs.readFileSync(files[2], 'utf8');
 assert(o.includes('Clash detection') && o.includes('geometria real'), 'orquestrador impede clash fictício');
 
+const blender = fs.readFileSync('.agents/skills/generate-3d-model/scripts/optimize_glb_blender.py', 'utf8');
+assert(blender.includes('bpy.ops.import_scene.gltf') && blender.includes('bpy.ops.export_scene.gltf'), 'workflow Blender importa e exporta GLB');
+assert(blender.includes('DECIMATE') && blender.includes('target_triangles'), 'workflow Blender aplica orçamento determinístico de triângulos');
+
 if (failed) process.exit(1);
 console.log('✅ Skills 3D/BIM do FinGo validadas.');
