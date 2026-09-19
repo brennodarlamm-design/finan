@@ -13,7 +13,7 @@ const assert = (ok, msg) => {
 };
 
 for (const file of files) {
-  const src = fs.readFileSync(file, 'utf8');
+  const src = fs.readFileSync(file, 'utf8').replace(/\r\n/g, '\n');
   const fm = src.match(/^---\n([\s\S]*?)\n---/);
   assert(Boolean(fm), `${file}: frontmatter YAML presente`);
   assert(/\nname:\s+[a-z0-9-]+\n/.test('\n' + (fm?.[1] || '') + '\n'), `${file}: name em minúsculas e hífens`);
