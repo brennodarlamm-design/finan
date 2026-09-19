@@ -13,6 +13,7 @@ const out = path.join(root, 'dist');
 
 const rootFiles = [
   'app.html',
+  'bim.html',
   'landing.html',
   'master.html',
   'privacidade.html',

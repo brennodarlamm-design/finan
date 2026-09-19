@@ -131,6 +131,10 @@ const BIMViewer = {
               <span>📁 Importar (.ifc / .obj)</span>
               <input type="file" id="bim-file-input" accept=".obj,.ifc,.gltf,.glb" style="display:none;" />
             </label>
+
+            <a href="/bim.html?obraId=${this.activeObraId || ''}" target="_blank" class="btn-action" title="Abrir FinGo BIM Studio em tela cheia com renderização WebGL e materiais fotorrealistas PBR" style="text-decoration:none;font-size:.72rem;padding:6px 12px;background:rgba(198,255,0,.15);border:1px solid #C6FF00;color:#C6FF00;border-radius:6px;font-weight:900;display:inline-flex;align-items:center;gap:6px;box-shadow:0 0 10px rgba(198,255,0,0.15);">
+              🚀 FinGo BIM Studio 3D (WebGL / PBR)
+            </a>
           </div>
         </div>
 

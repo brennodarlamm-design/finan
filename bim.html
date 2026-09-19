@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>FinGo BIM Studio — Estação 3D WebGL de Alta Fidelidade</title>
+  <meta name="robots" content="noindex, nofollow">
+  <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png?v=3">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/tokens.css?v=20260918_1">
+  <link rel="stylesheet" href="/css/style.css?v=20260909_1">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background-color: #060A05;
+      color: #F0EAD6;
+      font-family: 'Inter', system-ui, -apple-system, sans-serif;
+      overflow: hidden;
+      height: 100vh;
+      width: 100vw;
+      user-select: none;
+    }
+    .bim-studio-layout {
+      display: grid;
+      grid-template-rows: 52px 1fr 44px;
+      height: 100vh;
+      width: 100vw;
+    }
+    .bim-top-header {
+      background: #0A1108;
+      border-bottom: 1px solid #243518;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 16px;
+      z-index: 10;
+    }
+    .bim-main-workspace {
+      display: grid;
+      grid-template-columns: 290px 1fr 330px;
+      height: calc(100vh - 96px);
+      position: relative;
+      overflow: hidden;
+    }
+    .bim-panel {
+      background: #0A1108;
+      border-right: 1px solid #243518;
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+      overflow: hidden;
+      z-index: 5;
+    }
+    .bim-panel-right {
+      border-right: none;
+      border-left: 1px solid #243518;
+    }
+    .bim-viewport-container {
+      position: relative;
+      height: 100%;
+      width: 100%;
+      background: #050805;
+      overflow: hidden;
+    }
+    #webgl-canvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+      outline: none;
+    }
+    .bim-bottom-bar {
+      background: #0A1108;
+      border-top: 1px solid #243518;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 16px;
+      z-index: 10;
+    }
+    .bim-btn {
+      background: #142210;
+      color: #F0EAD6;
+      border: 1px solid #243518;
+      border-radius: 6px;
+      padding: 6px 12px;
+      font-size: .75rem;
+      font-weight: 700;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: all .15s ease;
+    }
+    .bim-btn:hover {
+      background: #1E3318;
+      color: #C6FF00;
+      border-color: #C6FF00;
+    }
+    .bim-btn.active {
+      background: #C6FF00;
+      color: #000000;
+      border-color: #C6FF00;
+      font-weight: 800;
+    }
+    .bim-tree-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 7px 10px;
+      background: #0D160B;
+      border: 1px solid #1E2D15;
+      border-radius: 6px;
+      cursor: pointer;
+      margin-bottom: 5px;
+      transition: all .15s;
+    }
+    .bim-tree-item:hover, .bim-tree-item.selected {
+      background: rgba(198, 255, 0, 0.12);
+      border-color: #C6FF00;
+    }
+    .bim-tree-item.selected .elem-title {
+      color: #C6FF00;
+      font-weight: 800;
+    }
+    .mep-card {
+      background: #0D160B;
+      border: 1px solid #1E2D15;
+      border-radius: 8px;
+      padding: 9px 12px;
+      margin-bottom: 8px;
+    }
+    .glass-pill {
+      background: rgba(10, 17, 8, 0.85);
+      backdrop-filter: blur(8px);
+      border: 1px solid #243518;
+      border-radius: 6px;
+      padding: 4px 10px;
+      font-size: .70rem;
+      font-family: 'JetBrains Mono', monospace;
+    }
+  </style>
+</head>
+<body>
+  <div class="bim-studio-layout">
+    
+    <!-- HEADER SUPERIOR -->
+    <header class="bim-top-header">
+      <div style="display:flex;align-items:center;gap:14px;">
+        <a href="/app.html#obras" style="display:flex;align-items:center;gap:6px;text-decoration:none;color:#94A3B8;font-size:.76rem;font-weight:800;padding:4px 10px;background:#142210;border:1px solid #243518;border-radius:6px;">
+          <span>← Voltar ao App</span>
+        </a>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <strong style="font-size:.95rem;font-weight:900;color:#F0EAD6;letter-spacing:-.02em;">Fin<span style="color:#C6FF00;">Go</span> BIM Studio</strong>
+          <span style="background:rgba(198,255,0,0.15);color:#C6FF00;border:1px solid rgba(198,255,0,0.4);font-size:.60rem;font-weight:900;padding:2px 6px;border-radius:4px;text-transform:uppercase;">WebGL 2.0 PBR</span>
+        </div>
+      </div>
+
+      <!-- Informações da Obra Ativa -->
+      <div style="display:flex;align-items:center;gap:12px;">
+        <div class="glass-pill" style="color:#C6FF00;">
+          <span id="studio-obra-name">Mansão Villa Aurora</span> &middot; 480 m²
+        </div>
+        <div class="glass-pill" style="color:#F0EAD6;">
+          Orçado: <b style="color:#C6FF00;">R$ 1.035.000,00</b>
+        </div>
+        <div class="glass-pill" style="color:#94A3B8;">
+          Avanço: <b style="color:#38BDF8;">85%</b>
+        </div>
+      </div>
+
+      <!-- Ações do Header -->
+      <div style="display:flex;align-items:center;gap:8px;">
+        <button type="button" id="btn-snapshot" class="bim-btn" title="Capturar imagem em alta resolução">
+          📸 Captura 4K
+        </button>
+        <button type="button" id="btn-fullscreen" class="bim-btn" title="Alternar Tela Cheia">
+          ⛶ Tela Cheia
+        </button>
+      </div>
+    </header>
+
+    <!-- ÁREA DE TRABALHO PRINCIPAL (3 COLUNAS) -->
+    <main class="bim-main-workspace">
+      
+      <!-- PAINEL ESQUERDO: Árvore de Projeto e Camadas -->
+      <aside class="bim-panel">
+        <div style="padding:10px 14px;border-bottom:1px solid #243518;display:flex;justify-content:space-between;align-items:center;">
+          <span style="font-size:.70rem;font-weight:900;color:#C6FF00;text-transform:uppercase;letter-spacing:.05em;">Árvore de Projeto (8)</span>
+          <button type="button" id="btn-toggle-all-vis" style="background:transparent;border:none;color:#94A3B8;font-size:.65rem;cursor:pointer;text-decoration:underline;">
+            Alternar Todas
+          </button>
+        </div>
+        <div id="studio-tree-list" style="flex:1;padding:10px;overflow-y:auto;">
+          <!-- Preenchido via JS -->
+        </div>
+        <div style="padding:10px 14px;border-top:1px solid #243518;background:#070B06;">
+          <div style="font-size:.65rem;color:#94A3B8;margin-bottom:6px;font-weight:800;text-transform:uppercase;">Shader / Materiais</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;">
+            <button type="button" class="bim-btn active" data-shading="pbr" style="justify-content:center;">Fotorrealista</button>
+            <button type="button" class="bim-btn" data-shading="wireframe" style="justify-content:center;">Wireframe</button>
+          </div>
+        </div>
+      </aside>
+
+      <!-- VIEWPORT CENTRAL: Canvas Three.js WebGL -->
+      <section class="bim-viewport-container" id="viewport-container">
+        <canvas id="webgl-canvas"></canvas>
+
+        <!-- Indicador de Câmera e Orientação Flutuante -->
+        <div style="position:absolute;top:12px;left:14px;display:flex;flex-direction:column;gap:6px;pointer-events:none;">
+          <div class="glass-pill" style="color:#C6FF00;">
+            CÂMERA: <span id="cam-view-label" style="color:#F0EAD6;">ISOMÉTRICA NW</span>
+          </div>
+        </div>
+
+        <!-- Instruções de Controle Flutuantes -->
+        <div style="position:absolute;bottom:12px;left:14px;font-size:.68rem;color:#94A3B8;background:rgba(10,17,8,0.85);backdrop-filter:blur(6px);padding:5px 12px;border-radius:6px;border:1px solid #243518;pointer-events:none;">
+          🖱️ Botão Esquerdo: Girar 360° &middot; Botão Direito: Pan &middot; Scroll: Zoom &middot; Clique no objeto para inspecionar
+        </div>
+      </section>
+
+      <!-- PAINEL DIREITO: Ficha Técnica MEP & SINAPI -->
+      <aside class="bim-panel bim-panel-right">
+        <div style="padding:10px 14px;border-bottom:1px solid #243518;display:flex;align-items:center;justify-content:space-between;">
+          <span style="font-size:.70rem;font-weight:900;color:#C6FF00;text-transform:uppercase;letter-spacing:.05em;">Engenharia MEP &amp; Custos</span>
+        </div>
+        
+        <div style="flex:1;padding:12px;overflow-y:auto;display:flex;flex-direction:column;gap:8px;">
+          <!-- Card de Inspeção do Elemento Selecionado -->
+          <div id="inspector-card" style="background:#142210;border:1px solid #C6FF00;border-radius:8px;padding:12px;">
+            <div style="font-size:.65rem;color:#C6FF00;font-weight:800;text-transform:uppercase;">Elemento Selecionado</div>
+            <div id="inspected-name" style="font-size:.85rem;font-weight:900;color:#FFFFFF;margin-top:2px;">Fundações, Sapatas &amp; Baldrames</div>
+            <div id="inspected-desc" style="font-size:.70rem;color:#94A3B8;margin-top:4px;">Armação de sapatas isoladas CA-50 e vigas baldrame com concreto Fck 30 MPa.</div>
+            
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px;">
+              <div style="background:#0A1108;padding:6px 8px;border-radius:6px;border:1px solid #243518;">
+                <div style="font-size:.60rem;color:#94A3B8;">SINAPI Caixa</div>
+                <div id="inspected-sinapi" style="font-size:.78rem;font-weight:800;color:#C6FF00;">96538</div>
+              </div>
+              <div style="background:#0A1108;padding:6px 8px;border-radius:6px;border:1px solid #243518;">
+                <div style="font-size:.60rem;color:#94A3B8;">Orçado</div>
+                <div id="inspected-orcado" style="font-size:.78rem;font-weight:800;color:#F0EAD6;">R$ 145.000</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Métricas MEP Gerais -->
+          <div style="font-size:.68rem;font-weight:800;color:#94A3B8;text-transform:uppercase;margin-top:6px;">Macro-Infraestrutura</div>
+          
+          <div class="mep-card">
+            <div style="display:flex;justify-content:space-between;font-size:.74rem;font-weight:800;">
+              <span>💧 Água Fria &amp; Quente</span>
+              <span style="color:#0EA5E9;">255 m tubos</span>
+            </div>
+            <p style="font-size:.64rem;color:#94A3B8;margin-top:2px;">Reservatório 3.000 L, Barrilete 50mm e Ramais PPR</p>
+          </div>
+
+          <div class="mep-card">
+            <div style="display:flex;justify-content:space-between;font-size:.74rem;font-weight:800;">
+              <span>🚽 Esgoto &amp; Queda</span>
+              <span style="color:#F8FAFC;">140 m rede</span>
+            </div>
+            <p style="font-size:.64rem;color:#94A3B8;margin-top:2px;">Tubos primários 100mm, caixas sifonadas e coletor 150mm</p>
+          </div>
+
+          <div class="mep-card">
+            <div style="display:flex;justify-content:space-between;font-size:.74rem;font-weight:800;">
+              <span>⚡ Elétrica &amp; Automação</span>
+              <span style="color:#FACC15;">18.5 kVA</span>
+            </div>
+            <p style="font-size:.64rem;color:#94A3B8;margin-top:2px;">QDG 48 disj., eletrocalhas perfuradas e spots LED</p>
+          </div>
+
+          <div class="mep-card">
+            <div style="display:flex;justify-content:space-between;font-size:.74rem;font-weight:800;">
+              <span>🧊 Climatização VRF</span>
+              <span style="color:#38BDF8;">16 HP / 48k BTU</span>
+            </div>
+            <p style="font-size:.64rem;color:#94A3B8;margin-top:2px;">2 Condensadoras Inverter e dutos de ar galvanizados</p>
+          </div>
+
+          <div class="mep-card">
+            <div style="display:flex;justify-content:space-between;font-size:.74rem;font-weight:800;">
+              <span>🏊 Lazer &amp; Piscina</span>
+              <span style="color:#06B6D4;">72 m² deck</span>
+            </div>
+            <p style="font-size:.64rem;color:#94A3B8;margin-top:2px;">Piscina concreto armado e deck de cumaru tratado</p>
+          </div>
+        </div>
+      </aside>
+
+    </main>
+
+    <!-- BARRA INFERIOR DE CONTROLES -->
+    <footer class="bim-bottom-bar">
+      <!-- Presets de Câmera -->
+      <div style="display:flex;align-items:center;gap:6px;">
+        <span style="font-size:.65rem;color:#94A3B8;font-weight:800;text-transform:uppercase;margin-right:4px;">Vistas:</span>
+        <button type="button" class="bim-btn active" data-view="iso">📐 Isométrica NW</button>
+        <button type="button" class="bim-btn" data-view="top">🗺️ Planta Superior</button>
+        <button type="button" class="bim-btn" data-view="front">🏛️ Fachada Frontal</button>
+        <button type="button" class="bim-btn" data-view="side">🏢 Fachada Lateral</button>
+      </div>
+
+      <!-- Posição Solar / Hora do Dia -->
+      <div style="display:flex;align-items:center;gap:8px;">
+        <span style="font-size:.65rem;color:#94A3B8;font-weight:800;text-transform:uppercase;">☀️ Sol:</span>
+        <input type="range" id="sun-slider" min="0" max="360" value="45" style="width:110px;accent-color:#C6FF00;">
+      </div>
+
+      <!-- Status do Motor Gráfico -->
+      <div style="font-family:'JetBrains Mono',monospace;font-size:.65rem;color:#94A3B8;">
+        THREE.JS R128 &middot; <span style="color:#C6FF00;" id="fps-counter">60 FPS</span> &middot; 143 OBJETOS
+      </div>
+    </footer>
+
+  </div>
+
+  <!-- Three.js e OrbitControls via CDN (já permitidos no CSP de cloudflare-worker.js) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/controls/OrbitControls.min.js"></script>
+  
+  <!-- Controlador do Estúdio BIM -->
+  <script src="/js/bim_studio.js"></script>
+</body>
+</html>

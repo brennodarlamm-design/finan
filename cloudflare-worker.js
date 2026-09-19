@@ -40,6 +40,10 @@ function isAppShellPath(pathname) {
   return pathname === '/app' || pathname === '/app.html' || pathname.startsWith('/app/') || pathname === '/portal' || pathname.startsWith('/portal/');
 }
 
+function isBimShellPath(pathname) {
+  return pathname === '/bim' || pathname === '/bim.html';
+}
+
 function isLoginShellPath(pathname) {
   return pathname === '/login' || pathname === '/login.html' || pathname === '/cadastro';
 }
@@ -69,6 +73,9 @@ function canonicalRedirect(request, env) {
 
     if (target.pathname === '/app.html') {
       target.pathname = '/app';
+      changed = true;
+    } else if (target.pathname === '/bim.html') {
+      target.pathname = '/bim';
       changed = true;
     } else if (target.pathname === '/login.html') {
       target.pathname = '/login';
@@ -151,6 +158,7 @@ async function fetchFrontendResponse(request, env) {
   const incoming = new URL(request.url);
   const shellMethod = ['GET', 'HEAD'].includes(method);
   const appShell = shellMethod && isAppShellPath(incoming.pathname);
+  const bimShell = shellMethod && isBimShellPath(incoming.pathname);
   const loginShell = shellMethod && isLoginShellPath(incoming.pathname);
   const masterShell = shellMethod && isMasterShellPath(incoming.pathname);
   const landingShell = shellMethod && incoming.pathname === '/';
@@ -163,6 +171,9 @@ async function fetchFrontendResponse(request, env) {
   if (appShell) {
     assetPath = '/app.html';
     routeName = 'app-shell';
+  } else if (bimShell) {
+    assetPath = '/bim.html';
+    routeName = 'bim-shell';
   } else if (loginShell) {
     assetPath = '/login.html';
     routeName = incoming.pathname === '/cadastro' ? 'signup-shell' : 'login-shell';
@@ -205,7 +216,7 @@ async function fetchFrontendResponse(request, env) {
   const headers = new Headers(securedResponse.headers);
   headers.set('X-FinObra-Route', routeName);
   headers.set('Cache-Control', 'public, max-age=0, must-revalidate');
-  if (routeName === 'login-shell' || routeName === 'signup-shell' || routeName === 'app-shell' || routeName === 'master-shell') {
+  if (routeName === 'login-shell' || routeName === 'signup-shell' || routeName === 'app-shell' || routeName === 'master-shell' || routeName === 'bim-shell') {
     headers.set('X-Robots-Tag', 'noindex, nofollow');
   }
 
