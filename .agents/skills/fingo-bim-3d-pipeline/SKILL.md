@@ -75,6 +75,7 @@ Antes de codificar, classifique a fonte:
 - metadata de unidade/origem presente;
 - histórico de versão preservado;
 - testes do BIM verdes;
+- em pull requests que alterem BIM, o workflow `.github/workflows/bim-pr-validation.yml` deve validar regressões BIM, suíte estática, sintaxe e build Cloudflare sem executar deploy;
 - preview Vercel READY;
 - Security Regression e Cloudflare build verdes;
 - nenhuma alteração de produção sem aprovação.
