@@ -891,35 +891,79 @@ const BIMIFCExtendedImporter = (function() {
       const siCandidates=[...entities.values()].filter(unit=>unit.type==='IFCSIUNIT'&&/\.PLANEANGLEUNIT\./i.test(unit.raw)&&/\.RADIAN\./i.test(unit.raw));
       return siCandidates.length===1?1:null;
     };
-    const rectangularTrimmedCylinderPatch=(surfaceId,outer,holes=[])=>{
+    const rectangularPatchGrid=(evaluate,u1,u2,v1,v2,uSegments,vSegments)=>{
+      const grid=[];
+      for(let i=0;i<=uSegments;i++){
+        const u=u1+(u2-u1)*(i/uSegments),row=[];
+        for(let j=0;j<=vSegments;j++) row.push(evaluate(u,v1+(v2-v1)*(j/vSegments)));
+        grid.push(row);
+      }
+      if(grid.some(row=>row.some(p=>!p||![p.x,p.y,p.z].every(Number.isFinite)))) return null;
+      const triangles=[];
+      for(let i=0;i<uSegments;i++)for(let j=0;j<vSegments;j++){
+        const a=grid[i][j],b=grid[i+1][j],d=grid[i][j+1],c=grid[i+1][j+1];
+        triangles.push([a,b,c],[a,c,d]);
+      }
+      const perimeter=[
+        ...grid[0],
+        ...grid.slice(1,-1).map(row=>row[row.length-1]),
+        ...[...grid[grid.length-1]].reverse(),
+        ...grid.slice(1,-1).reverse().map(row=>row[0])
+      ];
+      return {triangles,perimeter,grid};
+    };
+    const rectangularTrimmedAnalyticPatch=(surfaceId,outer,holes=[])=>{
       const e=entities.get(surfaceId);
       if(!e||e.type!=='IFCRECTANGULARTRIMMEDSURFACE'||holes.length) return null;
-      const basisSurfaceId=refOf(e.args[0]),cylinder=entities.get(basisSurfaceId);
-      if(!cylinder||cylinder.type!=='IFCCYLINDRICALSURFACE'){partialSurfaceIds.add(surfaceId);return null;}
+      const basisSurfaceId=refOf(e.args[0]),base=entities.get(basisSurfaceId);
+      if(!base||!['IFCCYLINDRICALSURFACE','IFCSPHERICALSURFACE','IFCTOROIDALSURFACE'].includes(base.type)){
+        partialSurfaceIds.add(surfaceId);return null;
+      }
       const angleScale=planeAngleScaleToRadians();
       if(!(angleScale>0)){partialSurfaceIds.add(surfaceId);return null;}
-      const u1=num(e.args[1])*angleScale,v1=num(e.args[2]),u2=num(e.args[3])*angleScale,v2=num(e.args[4]);
+      const u1=num(e.args[1])*angleScale,u2=num(e.args[3])*angleScale;
+      const angularV=base.type!=='IFCCYLINDRICALSURFACE';
+      const v1=num(e.args[2])*(angularV?angleScale:1),v2=num(e.args[4])*(angularV?angleScale:1);
       const uSense=/\.T\./i.test(String(e.args[5]||'')),vSense=/\.T\./i.test(String(e.args[6]||''));
       const du=u2-u1,dv=v2-v1;
       if(Math.abs(du)<=1e-9||Math.abs(dv)<=1e-9||Math.abs(du)>Math.PI*2+1e-6){partialSurfaceIds.add(surfaceId);return null;}
       if(uSense!==(du>0)||vSense!==(dv>0)){partialSurfaceIds.add(surfaceId);return null;}
-      const radius=num(cylinder.args[1]),position=axis3(refOf(cylinder.args[0]));
-      if(!(radius>1e-9)){partialSurfaceIds.add(surfaceId);return null;}
-      const segments=Math.max(4,Math.min(96,Math.ceil(Math.abs(du)/(Math.PI/24))));
-      const bottom=[],top=[],triangles=[];
-      for(let i=0;i<=segments;i++){
-        const u=u1+du*(i/segments);
-        bottom.push(applyBasis(position,{x:Math.cos(u)*radius,y:Math.sin(u)*radius,z:v1}));
-        top.push(applyBasis(position,{x:Math.cos(u)*radius,y:Math.sin(u)*radius,z:v2}));
+      const position=axis3(refOf(base.args[0]));
+      const uSegments=Math.max(4,Math.min(96,Math.ceil(Math.abs(du)/(Math.PI/24))));
+      let vSegments=1,evaluate=null,kind=null,baseKind=null,meta={};
+
+      if(base.type==='IFCCYLINDRICALSURFACE'){
+        const radius=num(base.args[1]);
+        if(!(radius>1e-9)){partialSurfaceIds.add(surfaceId);return null;}
+        evaluate=(u,v)=>applyBasis(position,{x:Math.cos(u)*radius,y:Math.sin(u)*radius,z:v});
+        kind='rectangular-trimmed-cylinder';baseKind='cylindrical-surface';meta={radius,height:Math.abs(dv),sweepU:du};
+      }else if(base.type==='IFCSPHERICALSURFACE'){
+        const radius=num(base.args[1]);
+        const vMin=Math.min(v1,v2),vMax=Math.max(v1,v2);
+        if(!(radius>1e-9)||vMin<-Math.PI/2-1e-7||vMax>Math.PI/2+1e-7){partialSurfaceIds.add(surfaceId);return null;}
+        vSegments=Math.max(2,Math.min(48,Math.ceil(Math.abs(dv)/(Math.PI/24))));
+        evaluate=(u,v)=>applyBasis(position,{
+          x:Math.cos(v)*Math.cos(u)*radius,
+          y:Math.cos(v)*Math.sin(u)*radius,
+          z:Math.sin(v)*radius
+        });
+        kind='rectangular-trimmed-sphere';baseKind='spherical-surface';meta={radius,sweepU:du,sweepV:dv};
+      }else{
+        const majorRadius=num(base.args[1]),minorRadius=num(base.args[2]);
+        if(!(majorRadius>minorRadius&&minorRadius>1e-9)||Math.abs(dv)>Math.PI*2+1e-6){partialSurfaceIds.add(surfaceId);return null;}
+        vSegments=Math.max(4,Math.min(96,Math.ceil(Math.abs(dv)/(Math.PI/24))));
+        evaluate=(u,v)=>{
+          const radial=majorRadius+minorRadius*Math.cos(v);
+          return applyBasis(position,{x:radial*Math.cos(u),y:radial*Math.sin(u),z:minorRadius*Math.sin(v)});
+        };
+        kind='rectangular-trimmed-torus';baseKind='toroidal-surface';meta={majorRadius,minorRadius,sweepU:du,sweepV:dv};
       }
-      for(let i=0;i<segments;i++){
-        triangles.push([bottom[i],bottom[i+1],top[i+1]],[bottom[i],top[i+1],top[i]]);
-      }
-      const patch={triangles,perimeter:[...bottom,...[...top].reverse()],radius,height:Math.abs(dv),sweep:du};
-      if(!fullSurfaceBoundaryMatches(outer,patch,0.002)){partialSurfaceIds.add(surfaceId);return null;}
-      exactSurfaceKinds.add('rectangular-trimmed-cylinder');
-      exactSurfaceKinds.add('cylindrical-surface');
-      return patch;
+
+      const patch=rectangularPatchGrid(evaluate,u1,u2,v1,v2,uSegments,vSegments);
+      if(!patch||!fullSurfaceBoundaryMatches(outer,patch,0.002)){partialSurfaceIds.add(surfaceId);return null;}
+      exactSurfaceKinds.add(kind);
+      exactSurfaceKinds.add(baseKind);
+      return {...patch,...meta};
     };
     const partialAdvancedFaceIds=new Set();
     const exactAdvancedFaceIds=new Set();
@@ -953,7 +997,7 @@ const BIMIFCExtendedImporter = (function() {
         }
         tris=patch.triangles;
       }else if(surface.type==='IFCRECTANGULARTRIMMEDSURFACE'){
-        const patch=rectangularTrimmedCylinderPatch(surfaceId,outer,holes);
+        const patch=rectangularTrimmedAnalyticPatch(surfaceId,outer,holes);
         if(!patch){
           partialSurfaceIds.add(surfaceId);
           partialAdvancedFaceIds.add(faceId);
@@ -1273,11 +1317,15 @@ const BIMIFCExtendedImporter = (function() {
       const advancedBrepExact=advancedBrepIds.length>0&&!advancedBrepPartial&&advancedFaceIds.every(id=>exactAdvancedFaceIds.has(id));
       const nurbsSurfaceIds=descendants(reprId,new Set(['IFCBSPLINESURFACEWITHKNOTS','IFCRATIONALBSPLINESURFACEWITHKNOTS']));
       const cylindricalSurfaceIds=descendants(reprId,new Set(['IFCCYLINDRICALSURFACE']));
+      const sphericalSurfaceIds=descendants(reprId,new Set(['IFCSPHERICALSURFACE']));
+      const toroidalSurfaceIds=descendants(reprId,new Set(['IFCTOROIDALSURFACE']));
       const rectangularTrimmedSurfaceIds=descendants(reprId,new Set(['IFCRECTANGULARTRIMMEDSURFACE']));
-      const advancedSurfaceIds=[...nurbsSurfaceIds,...cylindricalSurfaceIds,...rectangularTrimmedSurfaceIds];
+      const advancedSurfaceIds=[...nurbsSurfaceIds,...cylindricalSurfaceIds,...sphericalSurfaceIds,...toroidalSurfaceIds,...rectangularTrimmedSurfaceIds];
       const advancedCurved=advancedBrepExact&&advancedSurfaceIds.length>0&&!advancedSurfaceIds.some(id=>partialSurfaceIds.has(id));
       const advancedNurbs=advancedCurved&&nurbsSurfaceIds.length>0;
       const advancedCylinder=advancedCurved&&cylindricalSurfaceIds.length>0;
+      const advancedSphere=advancedCurved&&sphericalSurfaceIds.length>0;
+      const advancedTorus=advancedCurved&&toroidalSurfaceIds.length>0;
       const tess=descendants(reprId,new Set(['IFCTRIANGULATEDFACESET','IFCPOLYGONALFACESET'])).length>0;
       const swept=descendants(reprId,new Set(['IFCEXTRUDEDAREASOLID'])).length>0;
       const revolved=descendants(reprId,new Set(['IFCREVOLVEDAREASOLID'])).length>0;
@@ -1312,10 +1360,14 @@ const BIMIFCExtendedImporter = (function() {
 
       const partial=advancedBrepPartial||booleanPartial||faceVoidsPartial||curvePartial||(openings.length>0&&!openingExact);
       if(partial) partialElements++;
-      if(mapped)geometryKinds.add('mapped-item');if(brep)geometryKinds.add('faceted-brep');if(advancedBrepExact&&!advancedCurved)geometryKinds.add('advanced-brep-planar');if(advancedNurbs)geometryKinds.add('advanced-brep-nurbs');if(advancedCylinder)geometryKinds.add('advanced-brep-cylinder');if(tess)geometryKinds.add('tessellated-face-set');if(swept)geometryKinds.add('swept-solid');if(revolved)geometryKinds.add('revolved-area-solid');if(sweptDisk)geometryKinds.add('swept-disk-solid');if(primitive)geometryKinds.add('csg-primitive');if(booleanExact)geometryKinds.add('csg-exact');if(openingSubtractions)geometryKinds.add('opening-subtraction');if(faceVoidsExact)geometryKinds.add('polygon-face-voids');if(curveExact)geometryKinds.add('advanced-curves');
+      if(mapped)geometryKinds.add('mapped-item');if(brep)geometryKinds.add('faceted-brep');if(advancedBrepExact&&!advancedCurved)geometryKinds.add('advanced-brep-planar');if(advancedNurbs)geometryKinds.add('advanced-brep-nurbs');if(advancedCylinder)geometryKinds.add('advanced-brep-cylinder');if(advancedSphere)geometryKinds.add('advanced-brep-sphere');if(advancedTorus)geometryKinds.add('advanced-brep-torus');if(tess)geometryKinds.add('tessellated-face-set');if(swept)geometryKinds.add('swept-solid');if(revolved)geometryKinds.add('revolved-area-solid');if(sweptDisk)geometryKinds.add('swept-disk-solid');if(primitive)geometryKinds.add('csg-primitive');if(booleanExact)geometryKinds.add('csg-exact');if(openingSubtractions)geometryKinds.add('opening-subtraction');if(faceVoidsExact)geometryKinds.add('polygon-face-voids');if(curveExact)geometryKinds.add('advanced-curves');
       const globalId=unquote(e.args[0]||('#'+e.id)),name=unquote(e.args[2]||'')||(e.type+' #'+e.id),storey=storeyByProduct.get(e.id)||null;
-      const advancedKind=advancedBrepExact?(advancedNurbs?'AdvancedBrepNURBS':advancedCylinder?'AdvancedBrepCylinder':'AdvancedBrep'):null;
-      const kinds=[mapped?'MappedItem':null,brep?'FacetedBrep':null,advancedKind,tess?'TessellatedFaceSet':null,swept?'SweptSolid':null,revolved?'RevolvedAreaSolid':null,sweptDisk?'SweptDiskSolid':null,primitive?'CSGPrimitive':null,booleanExact?'CSG':null,openingSubtractions?'Openings':null,faceVoidsExact?'FaceVoids':null,curveExact?'Curves':null].filter(Boolean);
+      const advancedKinds=advancedBrepExact
+        ? (advancedCurved
+          ? [advancedNurbs?'AdvancedBrepNURBS':null,advancedCylinder?'AdvancedBrepCylinder':null,advancedSphere?'AdvancedBrepSphere':null,advancedTorus?'AdvancedBrepTorus':null].filter(Boolean)
+          : ['AdvancedBrep'])
+        : [];
+      const kinds=[mapped?'MappedItem':null,brep?'FacetedBrep':null,...advancedKinds,tess?'TessellatedFaceSet':null,swept?'SweptSolid':null,revolved?'RevolvedAreaSolid':null,sweptDisk?'SweptDiskSolid':null,primitive?'CSGPrimitive':null,booleanExact?'CSG':null,openingSubtractions?'Openings':null,faceVoidsExact?'FaceVoids':null,curveExact?'Curves':null].filter(Boolean);
       elements.push({
         id:'ifc_'+(globalId||e.id),name,floor:storey?.key||'all',discipline:disciplineForClass(e.type),category:e.type,color:colorForClass(e.type),rawTriangles:tris,
         importedProperties:{
