@@ -297,7 +297,7 @@ const BIMIFCExtendedImporter = (function() {
     };
     const revolvedAreaSolid=(id,basis)=>{
       const e=entities.get(id); if(!e||e.type!=='IFCREVOLVEDAREASOLID') return [];
-      const poly=profilePolygon(refOf(e.args[0])),position=axis3(refOf(e.args[1])),axis=axis1(refOf(e.args[2])),angle=Math.abs(num(e.args[3]));
+      const poly=profilePolygon(refOf(e.args[0])),position=axis3(refOf(e.args[1])),axis=axis1(refOf(e.args[2])),angle=Math.abs(num(e.args[3])*(planeAngleScaleToRadians()||1));
       if(!poly||poly.length<3||angle<=1e-9) return [];
       const sweep=Math.min(Math.PI*2,angle),segments=Math.max(8,Math.min(96,Math.ceil(sweep/(Math.PI/24))));
       const rings=[];
@@ -459,7 +459,8 @@ const BIMIFCExtendedImporter = (function() {
         return Math.atan2(p.y/(ry||1),p.x/(rx||1));
       }
       const m=String(token||'').match(/[-+]?\d*\.?\d+(?:[Ee][-+]?\d+)?/);
-      return m?Number(m[0]):null;
+      if(!m) return null;
+      return Number(m[0])*(planeAngleScaleToRadians()||1);
     };
     const indexedPolyCurvePoints=e=>{
       const pts=pointListAny(refOf(e.args[0])); if(!pts.length) return [];
