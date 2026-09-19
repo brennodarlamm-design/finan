@@ -22,6 +22,8 @@ const BIMViewer = {
   lastMouseX: 0,
   lastMouseY: 0,
   animationId: null,
+  _lastRenderKey: '',
+  renderStats: { faces: 0, culledMeshes: 0, triangleStride: 1 },
 
   // Elementos do Modelo 3D da Obra
   elements: [],
@@ -424,7 +426,49 @@ const BIMViewer = {
       this._drawScene();
       this.animationId = requestAnimationFrame(render);
     };
+    this._lastRenderKey = '';
     render();
+  },
+
+  _sceneRenderKey(w, h) {
+    const first = this.elements?.[0]?.id || '';
+    const last = this.elements?.[this.elements.length - 1]?.id || '';
+    const progress = (this.elements || []).reduce((sum, elem) => sum + Number(elem.executadoPct || 0), 0);
+    return [
+      w, h,
+      this.rotX.toFixed(5), this.rotY.toFixed(5), this.zoom.toFixed(4),
+      Math.round(this.panX * 10) / 10, Math.round(this.panY * 10) / 10,
+      this.currentFloor, this.disciplineFilter, this.sectionMode, Math.round(Number(this.sectionPosition || 0) * 10) / 10,
+      this.colorMode, this.viewMode, this.selectedElement?.id || '',
+      (this.clashHighlightIds || []).join(','),
+      this.isDragging ? 1 : 0,
+      this.modelSource, this.activeModelDocId || '',
+      this.elements?.length || 0, first, last,
+      Number(this.importedModel?.triangleCount || 0),
+      Math.round(progress * 100) / 100
+    ].join('|');
+  },
+
+  _triangleRenderStride() {
+    if (!this.isDragging) return 1;
+    const total = Number(this.importedModel?.triangleCount || 0);
+    if (total > 120000) return 4;
+    if (total > 60000) return 2;
+    return 1;
+  },
+
+  _meshVisibleInViewport(mesh, cx, cy, w, h) {
+    const x=Number(mesh?.x),y=Number(mesh?.y),z=Number(mesh?.z);
+    const mw=Number(mesh?.w),mh=Number(mesh?.h),md=Number(mesh?.d);
+    if (![x,y,z,mw,mh,md].every(Number.isFinite)) return true;
+    const corners=[
+      [x,y,z],[x+mw,y,z],[x,y+mh,z],[x+mw,y+mh,z],
+      [x,y,z+md],[x+mw,y,z+md],[x,y+mh,z+md],[x+mw,y+mh,z+md]
+    ].map(([px,py,pz])=>this._project3D(px,py,pz));
+    const minX=Math.min(...corners.map(p=>p.x))+cx,maxX=Math.max(...corners.map(p=>p.x))+cx;
+    const minY=Math.min(...corners.map(p=>p.y))+cy,maxY=Math.max(...corners.map(p=>p.y))+cy;
+    const margin=80;
+    return !(maxX < -margin || minX > w + margin || maxY < -margin || minY > h + margin);
   },
 
   /**
@@ -434,10 +478,15 @@ const BIMViewer = {
     if (!this.ctx || !this.canvas) return;
     const w = this.canvas.parentElement.clientWidth;
     const h = this.canvas.parentElement.clientHeight;
+    const renderKey = this._sceneRenderKey(w, h);
+    if (renderKey === this._lastRenderKey) return;
+    this._lastRenderKey = renderKey;
     this.ctx.clearRect(0, 0, w, h);
 
     const cx = w / 2 + this.panX;
     const cy = h / 2 + this.panY;
+    const triangleStride = this._triangleRenderStride();
+    let culledMeshes = 0;
 
     // Desenhar Grid de Terreno / Canteiro
     this._drawGroundGrid(cx, cy);
@@ -455,11 +504,15 @@ const BIMViewer = {
       const isSelected = this.selectedElement?.id === elem.id || this.clashHighlightIds.includes(elem.id);
       const meshes = (elem.meshes || []).filter(mesh => this._meshPassesSection(mesh));
       meshes.forEach(mesh => {
+        if (!this._meshVisibleInViewport(mesh, cx, cy, w, h)) {
+          culledMeshes++;
+          return;
+        }
         const displayColor = this.colorMode === 'status' ? this._statusColorForElement(elem) : mesh.color;
         if (mesh.type === 'box') {
           faces.push(...this._createBoxFaces(mesh, displayColor, elem.id, isSelected, mesh));
         } else if (mesh.type === 'triangles') {
-          faces.push(...this._createTriangleFaces(mesh, displayColor, elem.id, isSelected));
+          faces.push(...this._createTriangleFaces(mesh, displayColor, elem.id, isSelected, { cx, cy, w, h, stride: triangleStride }));
         } else if (mesh.type === 'roof_gable') {
           const roofMesh = this.colorMode === 'status'
             ? { ...mesh, colorLeft: displayColor, colorRight: displayColor, colorGable: displayColor, colorRidge: displayColor }
@@ -472,6 +525,7 @@ const BIMViewer = {
     // Ordenar faces por profundidade Z projetada (Z-sort)
     faces.sort((a, b) => b.avgZ - a.avgZ);
     this.renderedFaces = faces;
+    this.renderStats = { faces: faces.length, culledMeshes, triangleStride };
 
     // Desenhar faces na tela
     faces.forEach(face => {
@@ -576,10 +630,12 @@ const BIMViewer = {
    * Converte triângulos importados (OBJ/IFC/GLTF/GLB) em faces do renderer 2D.
    * O corte X/Z é aplicado por triângulo para não ocultar o elemento inteiro.
    */
-  _createTriangleFaces(mesh, color, elemId, isSelected) {
+  _createTriangleFaces(mesh, color, elemId, isSelected, viewport = null) {
     const triangles = Array.isArray(mesh?.triangles) ? mesh.triangles : [];
     const faces = [];
-    for (const tri of triangles) {
+    const stride = Math.max(1, Number(viewport?.stride || 1));
+    for (let triIndex = 0; triIndex < triangles.length; triIndex += stride) {
+      const tri = triangles[triIndex];
       if (!Array.isArray(tri) || tri.length !== 3) continue;
       const centerX = tri.reduce((s,p)=>s+Number(p.x||0),0)/3;
       const centerZ = tri.reduce((s,p)=>s+Number(p.z||0),0)/3;
@@ -593,6 +649,12 @@ const BIMViewer = {
       const nlen=Math.hypot(nx,ny,nz)||1;
       const light=Math.max(.42,Math.min(1,.72 + (ny/nlen)*.22 + (nz/nlen)*.08));
       const pts=tri.map(p=>this._project3D(p.x,p.y,p.z));
+      if (viewport) {
+        const minX=Math.min(...pts.map(p=>p.x))+viewport.cx,maxX=Math.max(...pts.map(p=>p.x))+viewport.cx;
+        const minY=Math.min(...pts.map(p=>p.y))+viewport.cy,maxY=Math.max(...pts.map(p=>p.y))+viewport.cy;
+        const margin=24;
+        if (maxX < -margin || minX > viewport.w + margin || maxY < -margin || minY > viewport.h + margin) continue;
+      }
       faces.push({
         pts,
         avgZ:pts.reduce((s,p)=>s+p.z,0)/3,
