@@ -668,22 +668,156 @@ const BIMIFCExtendedImporter = (function() {
       }
       return out;
     };
+    const exactSurfaceKinds=new Set();
+    const partialSurfaceIds=new Set();
+    const refRows=token=>{
+      let s=String(token||'').trim();
+      if(s.startsWith('(')&&s.endsWith(')')) s=s.slice(1,-1);
+      return splitTopLevel(s).map(row=>refsIn(row)).filter(row=>row.length);
+    };
+    const numberRows=token=>{
+      let s=String(token||'').trim();
+      if(s.startsWith('(')&&s.endsWith(')')) s=s.slice(1,-1);
+      return splitTopLevel(s).map(row=>numberList(row)).filter(row=>row.length);
+    };
+    const repeatedKnots=(multiplicities,knots)=>{
+      if(!multiplicities.length||multiplicities.length!==knots.length) return [];
+      const out=[];
+      for(let i=0;i<knots.length;i++){
+        const count=Math.max(0,Math.trunc(multiplicities[i]));
+        for(let k=0;k<count;k++) out.push(knots[i]);
+      }
+      return out;
+    };
+    const basisVector=(degree,knots,count,u)=>{
+      const n=count-1;
+      if(degree<1||count<degree+1||knots.length!==count+degree+1) return null;
+      let span;
+      if(u>=knots[n+1]-1e-12) span=n;
+      else if(u<=knots[degree]+1e-12) span=degree;
+      else{
+        let low=degree,high=n+1,mid=Math.floor((low+high)/2),guard=0;
+        while((u<knots[mid]||u>=knots[mid+1])&&guard++<100){
+          if(u<knots[mid])high=mid;else low=mid;
+          mid=Math.floor((low+high)/2);
+        }
+        span=mid;
+      }
+      const local=new Array(degree+1).fill(0),left=new Array(degree+1),right=new Array(degree+1);
+      local[0]=1;
+      for(let j=1;j<=degree;j++){
+        left[j]=u-knots[span+1-j]; right[j]=knots[span+j]-u;
+        let saved=0;
+        for(let r=0;r<j;r++){
+          const denom=right[r+1]+left[j-r],temp=Math.abs(denom)<1e-14?0:local[r]/denom;
+          local[r]=saved+right[r+1]*temp; saved=left[j-r]*temp;
+        }
+        local[j]=saved;
+      }
+      const full=new Array(count).fill(0);
+      for(let j=0;j<=degree;j++) full[span-degree+j]=local[j];
+      return full;
+    };
+    const bsplineSurfacePatch=surfaceId=>{
+      const e=entities.get(surfaceId); if(!e||!['IFCBSPLINESURFACEWITHKNOTS','IFCRATIONALBSPLINESURFACEWITHKNOTS'].includes(e.type)) return null;
+      const uDegree=Math.trunc(num(e.args[0])),vDegree=Math.trunc(num(e.args[1]));
+      const rows=refRows(e.args[2]);
+      if(rows.length<uDegree+1||!rows.length){partialSurfaceIds.add(surfaceId);return null;}
+      const vCount=rows[0].length;
+      if(vCount<vDegree+1||rows.some(row=>row.length!==vCount)){partialSurfaceIds.add(surfaceId);return null;}
+      const controls=rows.map(row=>row.map(point));
+      const uKnots=repeatedKnots(numberList(e.args[7]),numberList(e.args[9]));
+      const vKnots=repeatedKnots(numberList(e.args[8]),numberList(e.args[10]));
+      if(uKnots.length!==rows.length+uDegree+1||vKnots.length!==vCount+vDegree+1){partialSurfaceIds.add(surfaceId);return null;}
+      const rational=e.type==='IFCRATIONALBSPLINESURFACEWITHKNOTS';
+      const weights=rational?numberRows(e.args[12]):rows.map(row=>row.map(()=>1));
+      if(weights.length!==rows.length||weights.some((row,i)=>row.length!==rows[i].length||row.some(w=>!Number.isFinite(w)||w<=0))){partialSurfaceIds.add(surfaceId);return null;}
+      const uMin=uKnots[uDegree],uMax=uKnots[rows.length],vMin=vKnots[vDegree],vMax=vKnots[vCount];
+      if(!(uMax-uMin>1e-12)||!(vMax-vMin>1e-12)){partialSurfaceIds.add(surfaceId);return null;}
+      const spans=(knots,degree,count)=>{
+        let n=0;for(let i=degree;i<count;i++)if(knots[i+1]-knots[i]>1e-12)n++;return n;
+      };
+      const uSamples=Math.max(6,Math.min(32,spans(uKnots,uDegree,rows.length)*8));
+      const vSamples=Math.max(6,Math.min(32,spans(vKnots,vDegree,vCount)*8));
+      const evaluate=(u,v)=>{
+        const Nu=basisVector(uDegree,uKnots,rows.length,u),Nv=basisVector(vDegree,vKnots,vCount,v);
+        if(!Nu||!Nv)return null;
+        let x=0,y=0,z=0,w=0;
+        for(let i=0;i<rows.length;i++)for(let j=0;j<vCount;j++){
+          const b=Nu[i]*Nv[j]*weights[i][j],p=controls[i][j];x+=p.x*b;y+=p.y*b;z+=p.z*b;w+=b;
+        }
+        return Math.abs(w)<1e-14?null:{x:x/w,y:y/w,z:z/w};
+      };
+      const grid=[];
+      for(let i=0;i<=uSamples;i++){
+        const u=i===uSamples?uMax:uMin+(uMax-uMin)*(i/uSamples),row=[];
+        for(let j=0;j<=vSamples;j++){
+          const v=j===vSamples?vMax:vMin+(vMax-vMin)*(j/vSamples),p=evaluate(u,v);
+          if(!p){partialSurfaceIds.add(surfaceId);return null;}
+          row.push(p);
+        }
+        grid.push(row);
+      }
+      const triangles=[];
+      for(let i=0;i<uSamples;i++)for(let j=0;j<vSamples;j++){
+        const a=grid[i][j],b=grid[i+1][j],d=grid[i][j+1],cc=grid[i+1][j+1];
+        triangles.push([a,b,cc],[a,cc,d]);
+      }
+      const perimeter=[
+        ...grid[0],
+        ...grid.slice(1,-1).map(row=>row[row.length-1]),
+        ...[...grid[grid.length-1]].reverse(),
+        ...grid.slice(1,-1).reverse().map(row=>row[0])
+      ];
+      exactSurfaceKinds.add(rational?'nurbs-surface':'bspline-surface');
+      return {triangles,perimeter,grid,rational};
+    };
+    const pointSegmentDistance=(p,a,b)=>{
+      const ab=sub(b,a),ap=sub(p,a),den=ab.x*ab.x+ab.y*ab.y+ab.z*ab.z;
+      const t=den<1e-16?0:Math.max(0,Math.min(1,(ap.x*ab.x+ap.y*ab.y+ap.z*ab.z)/den));
+      const q={x:a.x+ab.x*t,y:a.y+ab.y*t,z:a.z+ab.z*t};
+      return Math.hypot(p.x-q.x,p.y-q.y,p.z-q.z);
+    };
+    const distanceToLoop=(p,loop)=>{
+      if(!loop?.length)return Infinity;
+      let best=Infinity;
+      for(let i=0;i<loop.length;i++)best=Math.min(best,pointSegmentDistance(p,loop[i],loop[(i+1)%loop.length]));
+      return best;
+    };
+    const fullSurfaceBoundaryMatches=(outer,patch)=>{
+      const pts=patch?.perimeter||[]; if(outer.length<3||pts.length<4)return false;
+      const all=[...outer,...pts],xs=all.map(p=>p.x),ys=all.map(p=>p.y),zs=all.map(p=>p.z);
+      const diag=Math.hypot(Math.max(...xs)-Math.min(...xs),Math.max(...ys)-Math.min(...ys),Math.max(...zs)-Math.min(...zs));
+      const tol=Math.max(1e-5,diag*0.02);
+      return outer.every(p=>distanceToLoop(p,pts)<=tol)&&pts.every(p=>distanceToLoop(p,outer)<=tol);
+    };
     const partialAdvancedFaceIds=new Set();
     const exactAdvancedFaceIds=new Set();
     const advancedFaceTriangles=(faceId,basis)=>{
       const face=entities.get(faceId); if(!face||face.type!=='IFCADVANCEDFACE') return [];
       const surfaceId=refOf(face.args[1]),surface=entities.get(surfaceId);
-      if(!surface||surface.type!=='IFCPLANE'){
-        partialAdvancedFaceIds.add(faceId);
-        return [];
-      }
+      if(!surface){partialAdvancedFaceIds.add(faceId);return [];}
       const bounds=refsIn(face.args[0]).map(id=>entities.get(id)).filter(Boolean);
       const outerBound=bounds.find(b=>b.type==='IFCFACEOUTERBOUND')||bounds[0];
       if(!outerBound){partialAdvancedFaceIds.add(faceId);return [];}
       const outer=loopPoints(refOf(outerBound.args[0]));
       const holes=bounds.filter(b=>b!==outerBound).map(b=>loopPoints(refOf(b.args[0]))).filter(h=>h.length>=3);
       if(outer.length<3){partialAdvancedFaceIds.add(faceId);return [];}
-      let tris=polygon3DWithVoids(outer,holes);
+      let tris=[];
+      if(surface.type==='IFCPLANE'){
+        tris=polygon3DWithVoids(outer,holes);
+      }else if(['IFCBSPLINESURFACEWITHKNOTS','IFCRATIONALBSPLINESURFACEWITHKNOTS'].includes(surface.type)){
+        const patch=bsplineSurfacePatch(surfaceId);
+        if(!patch||holes.length||!fullSurfaceBoundaryMatches(outer,patch)){
+          partialSurfaceIds.add(surfaceId);
+          partialAdvancedFaceIds.add(faceId);
+          return [];
+        }
+        tris=patch.triangles;
+      }else{
+        partialAdvancedFaceIds.add(faceId);
+        return [];
+      }
       if(!tris.length){partialAdvancedFaceIds.add(faceId);return [];}
       const sameSense=/\.T\./i.test(String(face.args[2]||''));
       const boundOrientation=/\.T\./i.test(String(outerBound.args[1]||''));
@@ -991,6 +1125,8 @@ const BIMIFCExtendedImporter = (function() {
       const advancedFaceIds=descendants(reprId,new Set(['IFCADVANCEDFACE']));
       const advancedBrepPartial=advancedFaceIds.some(id=>partialAdvancedFaceIds.has(id));
       const advancedBrepExact=advancedBrepIds.length>0&&!advancedBrepPartial&&advancedFaceIds.every(id=>exactAdvancedFaceIds.has(id));
+      const advancedSurfaceIds=descendants(reprId,new Set(['IFCBSPLINESURFACEWITHKNOTS','IFCRATIONALBSPLINESURFACEWITHKNOTS']));
+      const advancedCurved=advancedBrepExact&&advancedSurfaceIds.length>0&&!advancedSurfaceIds.some(id=>partialSurfaceIds.has(id));
       const tess=descendants(reprId,new Set(['IFCTRIANGULATEDFACESET','IFCPOLYGONALFACESET'])).length>0;
       const swept=descendants(reprId,new Set(['IFCEXTRUDEDAREASOLID'])).length>0;
       const revolved=descendants(reprId,new Set(['IFCREVOLVEDAREASOLID'])).length>0;
@@ -1025,9 +1161,9 @@ const BIMIFCExtendedImporter = (function() {
 
       const partial=advancedBrepPartial||booleanPartial||faceVoidsPartial||curvePartial||(openings.length>0&&!openingExact);
       if(partial) partialElements++;
-      if(mapped)geometryKinds.add('mapped-item');if(brep)geometryKinds.add('faceted-brep');if(advancedBrepExact)geometryKinds.add('advanced-brep-planar');if(tess)geometryKinds.add('tessellated-face-set');if(swept)geometryKinds.add('swept-solid');if(revolved)geometryKinds.add('revolved-area-solid');if(sweptDisk)geometryKinds.add('swept-disk-solid');if(primitive)geometryKinds.add('csg-primitive');if(booleanExact)geometryKinds.add('csg-exact');if(openingSubtractions)geometryKinds.add('opening-subtraction');if(faceVoidsExact)geometryKinds.add('polygon-face-voids');if(curveExact)geometryKinds.add('advanced-curves');
+      if(mapped)geometryKinds.add('mapped-item');if(brep)geometryKinds.add('faceted-brep');if(advancedBrepExact&&!advancedCurved)geometryKinds.add('advanced-brep-planar');if(advancedCurved)geometryKinds.add('advanced-brep-nurbs');if(tess)geometryKinds.add('tessellated-face-set');if(swept)geometryKinds.add('swept-solid');if(revolved)geometryKinds.add('revolved-area-solid');if(sweptDisk)geometryKinds.add('swept-disk-solid');if(primitive)geometryKinds.add('csg-primitive');if(booleanExact)geometryKinds.add('csg-exact');if(openingSubtractions)geometryKinds.add('opening-subtraction');if(faceVoidsExact)geometryKinds.add('polygon-face-voids');if(curveExact)geometryKinds.add('advanced-curves');
       const globalId=unquote(e.args[0]||('#'+e.id)),name=unquote(e.args[2]||'')||(e.type+' #'+e.id),storey=storeyByProduct.get(e.id)||null;
-      const kinds=[mapped?'MappedItem':null,brep?'FacetedBrep':null,advancedBrepExact?'AdvancedBrep':null,tess?'TessellatedFaceSet':null,swept?'SweptSolid':null,revolved?'RevolvedAreaSolid':null,sweptDisk?'SweptDiskSolid':null,primitive?'CSGPrimitive':null,booleanExact?'CSG':null,openingSubtractions?'Openings':null,faceVoidsExact?'FaceVoids':null,curveExact?'Curves':null].filter(Boolean);
+      const kinds=[mapped?'MappedItem':null,brep?'FacetedBrep':null,advancedBrepExact?(advancedCurved?'AdvancedBrepNURBS':'AdvancedBrep'):null,tess?'TessellatedFaceSet':null,swept?'SweptSolid':null,revolved?'RevolvedAreaSolid':null,sweptDisk?'SweptDiskSolid':null,primitive?'CSGPrimitive':null,booleanExact?'CSG':null,openingSubtractions?'Openings':null,faceVoidsExact?'FaceVoids':null,curveExact?'Curves':null].filter(Boolean);
       elements.push({
         id:'ifc_'+(globalId||e.id),name,floor:storey?.key||'all',discipline:disciplineForClass(e.type),category:e.type,color:colorForClass(e.type),rawTriangles:tris,
         importedProperties:{
@@ -1043,7 +1179,7 @@ const BIMIFCExtendedImporter = (function() {
     const schema=src.match(/FILE_SCHEMA\s*\(\s*\(\s*'([^']+)'/i)?.[1]||'IFC';
     const si=[...entities.values()].find(e=>e.type==='IFCSIUNIT'&&/LENGTHUNIT/.test(e.raw));
     const sourceLengthUnit=si?(String(si.raw).match(/\.(MILLI|CENTI|DECI|KILO)?\.,\.METRE\./i)?.[1]||'METRE').toLowerCase():'unknown';
-    return {elements,metadata:{schema,geometryKinds:Array.from(geometryKinds),curveKinds:Array.from(exactCurveKinds),storeys:Array.from(storeys.values()),partialElements,clashEligible:partialElements===0,sourceElementCount:elements.length,sourceLengthUnit,geometryQuality:partialElements?'partial':'supported',csgEngine:typeof BIMCSG!=='undefined'?'bsp':'unavailable'}};
+    return {elements,metadata:{schema,geometryKinds:Array.from(geometryKinds),curveKinds:Array.from(exactCurveKinds),surfaceKinds:Array.from(exactSurfaceKinds),storeys:Array.from(storeys.values()),partialElements,clashEligible:partialElements===0,sourceElementCount:elements.length,sourceLengthUnit,geometryQuality:partialElements?'partial':'supported',csgEngine:typeof BIMCSG!=='undefined'?'bsp':'unavailable'}};
   }
   return {parse};
 })();
