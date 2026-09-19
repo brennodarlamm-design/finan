@@ -201,6 +201,10 @@ const BIMIFCExtendedImporter = (function() {
     const entities=parseEntities(src);
     if(!entities.size) throw new Error('IFC sem entidades STEP legíveis.');
 
+    const angularSegments=(sweep,min=4,max=96)=>{
+      const ratio=Math.abs(sweep)/(Math.PI/24);
+      return Math.max(min,Math.min(max,Math.ceil(ratio-1e-9)));
+    };
     const point=id=>{
       const e=entities.get(id); if(!e||e.type!=='IFCCARTESIANPOINT') return {x:0,y:0,z:0};
       const vals=splitTopLevel(String(e.args[0]||'').replace(/^\(/,'').replace(/\)$/,'')).map(num);
@@ -299,7 +303,7 @@ const BIMIFCExtendedImporter = (function() {
       const e=entities.get(id); if(!e||e.type!=='IFCREVOLVEDAREASOLID') return [];
       const poly=profilePolygon(refOf(e.args[0])),position=axis3(refOf(e.args[1])),axis=axis1(refOf(e.args[2])),angle=Math.abs(num(e.args[3])*(planeAngleScaleToRadians()||1));
       if(!poly||poly.length<3||angle<=1e-9) return [];
-      const sweep=Math.min(Math.PI*2,angle),segments=Math.max(8,Math.min(96,Math.ceil(sweep/(Math.PI/24))));
+      const sweep=Math.min(Math.PI*2,angle),segments=angularSegments(sweep,8,96);
       const rings=[];
       for(let s=0;s<=segments;s++){
         const a=sweep*(s/segments);
@@ -442,7 +446,7 @@ const BIMIFCExtendedImporter = (function() {
     const sampleConic=(entity,start=0,sweep=Math.PI*2,close=false)=>{
       const pos=curveBasis(refOf(entity.args[0])),rx=num(entity.args[1]),ry=entity.type==='IFCELLIPSE'?num(entity.args[2]):rx;
       if(rx<=0||ry<=0) return [];
-      const segments=Math.max(8,Math.min(96,Math.ceil(Math.abs(sweep)/(Math.PI/24))));
+      const segments=angularSegments(sweep,8,96);
       const out=[];
       for(let i=0;i<=segments;i++){
         const t=start+sweep*(i/segments);
@@ -932,7 +936,7 @@ const BIMIFCExtendedImporter = (function() {
       if(!uSense&&du>0)du-=Math.PI*2;
       if(Math.abs(du)<=1e-9||Math.abs(du)>Math.PI*2+1e-6||vSense!==(dv>0)){partialSurfaceIds.add(surfaceId);return null;}
       const resolvedU2=u1+du,position=axis3(refOf(base.args[0]));
-      const uSegments=Math.max(4,Math.min(96,Math.ceil(Math.abs(du)/(Math.PI/24))));
+      const uSegments=angularSegments(du,4,96);
       let vSegments=1,evaluate=null,kind=null,baseKind=null,meta={};
 
       if(base.type==='IFCCYLINDRICALSURFACE'){
@@ -944,7 +948,7 @@ const BIMIFCExtendedImporter = (function() {
         const radius=num(base.args[1]);
         const vMin=Math.min(v1,v2),vMax=Math.max(v1,v2);
         if(!(radius>1e-9)||vMin<-Math.PI/2-1e-7||vMax>Math.PI/2+1e-7){partialSurfaceIds.add(surfaceId);return null;}
-        vSegments=Math.max(2,Math.min(48,Math.ceil(Math.abs(dv)/(Math.PI/24))));
+        vSegments=angularSegments(dv,2,48);
         evaluate=(u,v)=>applyBasis(position,{
           x:Math.cos(v)*Math.cos(u)*radius,
           y:Math.cos(v)*Math.sin(u)*radius,
@@ -954,7 +958,7 @@ const BIMIFCExtendedImporter = (function() {
       }else{
         const majorRadius=num(base.args[1]),minorRadius=num(base.args[2]);
         if(!(majorRadius>minorRadius&&minorRadius>1e-9)||Math.abs(dv)>Math.PI*2+1e-6){partialSurfaceIds.add(surfaceId);return null;}
-        vSegments=Math.max(4,Math.min(96,Math.ceil(Math.abs(dv)/(Math.PI/24))));
+        vSegments=angularSegments(dv,4,96);
         evaluate=(u,v)=>{
           const radial=majorRadius+minorRadius*Math.cos(v);
           return applyBasis(position,{x:radial*Math.cos(u),y:radial*Math.sin(u),z:minorRadius*Math.sin(v)});
