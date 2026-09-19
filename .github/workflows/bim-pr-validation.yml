@@ -46,26 +46,6 @@ jobs:
           path: .qa/
           if-no-files-found: warn
           include-hidden-files: true
-      - name: BIM large official stress QA — PR 16
-        if: github.event.pull_request.number == 16
-        shell: bash
-        run: |
-          set -euo pipefail
-          mkdir -p .qa/large
-          BASE="https://raw.githubusercontent.com/buildingSMART/Certification-datasets/main"
-          curl --fail --location --retry 3 --output .qa/large/ifc4-infra-bridge.ifc "$BASE/IFC%204.0.2.1%20%28IFC%204%20ADD2%20TC1%29/Simple-Scene/Infra-Bridge.ifc"
-          curl --fail --location --retry 3 --output .qa/large/ifc4-infra-landscaping.ifc "$BASE/IFC%204.0.2.1%20%28IFC%204%20ADD2%20TC1%29/Simple-Scene/Infra-Landscaping.ifc"
-          node scripts/run-bim-large-qa.js .qa/large/*.ifc \
-            --json=.qa/bim-large-qa.json \
-            --markdown=.qa/bim-large-qa.md
-      - name: Upload BIM large stress report — PR 16
-        if: always() && github.event.pull_request.number == 16
-        uses: actions/upload-artifact@v4
-        with:
-          name: bim-large-real-qa-report
-          path: .qa/
-          if-no-files-found: warn
-          include-hidden-files: true
       - name: BIM clash engine regression
         run: node scripts/test-bim-clash-engine.js
       - name: BIM renderer performance regression
