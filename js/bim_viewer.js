@@ -36,7 +36,7 @@ const BIMViewer = {
     const container = document.getElementById(containerId);
     if (!container) return;
 
-    const obra = (typeof DB !== 'undefined' && DB.get('clientes', obraId)) || {
+    const obra = (typeof DB !== 'undefined' && DB.getById('clientes', obraId)) || {
       nome: 'Obra Modelo',
       area_construida: 240,
       pavimentos: 2,
@@ -522,7 +522,7 @@ const BIMViewer = {
 
       const detailsContainer = document.getElementById('bim-element-details');
       if (detailsContainer) {
-        const obra = (typeof DB !== 'undefined' && DB.get('clientes', this.activeObraId)) || {};
+        const obra = (typeof DB !== 'undefined' && DB.getById('clientes', this.activeObraId)) || {};
         detailsContainer.innerHTML = this._renderElementDetailsHtml(nextElem, obra);
       }
     });

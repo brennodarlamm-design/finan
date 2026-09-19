@@ -484,6 +484,7 @@ const DB = {
     }
   },
   getById(key, id) { return this.getAll(key).find(i => i.id === id) || null; },
+  get(key, id) { return this.getById(key, id); },
 
   _moduleForKey(key) {
     const map = {
