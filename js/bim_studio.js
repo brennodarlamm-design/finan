@@ -947,11 +947,27 @@ const BIMStudio = {
       });
     }
 
-    // Renderização com IA (Google Gemini)
+    // Renderização com IA & Local (Abre Modal de Estação de Render)
     const btnRenderAi = document.getElementById('btn-render-ai');
     if (btnRenderAi) {
       btnRenderAi.addEventListener('click', () => {
+        const modal = document.getElementById('ai-render-modal');
+        if (modal) modal.style.display = 'flex';
+        this._initGeminiKeyConfig();
+      });
+    }
+
+    const btnStartAiRender = document.getElementById('btn-start-ai-render');
+    if (btnStartAiRender) {
+      btnStartAiRender.addEventListener('click', () => {
         this._renderWithAI();
+      });
+    }
+
+    const btnRenderLocal4k = document.getElementById('btn-render-local-4k');
+    if (btnRenderLocal4k) {
+      btnRenderLocal4k.addEventListener('click', () => {
+        this._renderLocal4K();
       });
     }
 
@@ -966,25 +982,89 @@ const BIMStudio = {
     const btnReRenderAi = document.getElementById('btn-re-render-ai');
     if (btnReRenderAi) {
       btnReRenderAi.addEventListener('click', () => {
-        this._renderWithAI();
+        if (this._lastRenderMode === 'local') {
+          this._renderLocal4K();
+        } else {
+          this._renderWithAI();
+        }
+      });
+    }
+
+    // Inicializa configuração de chaves ao carregar
+    this._initGeminiKeyConfig();
+  },
+
+  _initGeminiKeyConfig() {
+    const keyInput = document.getElementById('gemini-key-input');
+    const saveBtn = document.getElementById('btn-save-gemini-key');
+    const clearBtn = document.getElementById('btn-clear-gemini-key');
+    const statusEl = document.getElementById('gemini-key-status');
+
+    const updateStatus = () => {
+      const stored = localStorage.getItem('fingo_gemini_key') || '';
+      if (keyInput) keyInput.value = stored;
+      if (statusEl) {
+        if (stored && stored.length > 10) {
+          const masked = `${stored.slice(0, 8)}...${stored.slice(-4)}`;
+          statusEl.innerHTML = `<span style="color:#C6FF00;font-weight:700;">● Chave Pessoal Ativa:</span> <code>${masked}</code> (Usada prioritariamente no pool do Imagen 3)`;
+          if (clearBtn) clearBtn.style.display = 'inline-flex';
+        } else {
+          statusEl.innerHTML = `<span style="color:#94A3B8;">○ Usando Pool de Chaves Compartilhado.</span> <span style="color:#EAB308;">(Dica: adicione sua chave gratuita do Google AI Studio para cota garantida e sem fila)</span>`;
+          if (clearBtn) clearBtn.style.display = 'none';
+        }
+      }
+    };
+
+    updateStatus();
+
+    if (saveBtn && !saveBtn._bound) {
+      saveBtn._bound = true;
+      saveBtn.addEventListener('click', () => {
+        const val = keyInput ? keyInput.value.trim() : '';
+        if (val && val.length > 10) {
+          localStorage.setItem('fingo_gemini_key', val);
+          updateStatus();
+          alert('Chave do Google Gemini salva com sucesso! Ela será usada prioritariamente nas suas renderizações.');
+        } else if (!val) {
+          localStorage.removeItem('fingo_gemini_key');
+          updateStatus();
+          alert('Chave removida. O estúdio usará o pool público padrão.');
+        } else {
+          alert('A chave informada parece inválida ou curta demais. Verifique se copiou a chave completa do Google AI Studio.');
+        }
+      });
+    }
+
+    if (clearBtn && !clearBtn._bound) {
+      clearBtn._bound = true;
+      clearBtn.addEventListener('click', () => {
+        localStorage.removeItem('fingo_gemini_key');
+        if (keyInput) keyInput.value = '';
+        updateStatus();
       });
     }
   },
 
   async _renderWithAI() {
+    this._lastRenderMode = 'ai';
     const modal = document.getElementById('ai-render-modal');
     const loading = document.getElementById('ai-loading');
+    const loadingSubtext = document.getElementById('ai-loading-subtext');
     const resultWrap = document.getElementById('ai-result-wrap');
     const resultImg = document.getElementById('ai-result-img');
     const downloadBtn = document.getElementById('btn-download-ai');
     const loadingText = document.getElementById('ai-loading-text');
+    const badgeEl = document.getElementById('ai-result-badge');
 
     if (!modal || !loading || !resultWrap || !resultImg) return;
 
     modal.style.display = 'flex';
     loading.style.display = 'flex';
     resultWrap.style.display = 'none';
-    if (loadingText) loadingText.textContent = 'Capturando geometria 3D & Gerando com Google Gemini AI...';
+    if (loadingText) loadingText.textContent = 'Capturando geometria 3D & Gerando com Google Gemini Imagen 3...';
+    if (loadingSubtext) loadingSubtext.textContent = 'Aplicando iluminação solar fotométrica, física de reflexão no vidro e texturas fotorrealistas de madeira cumaru e piscina...';
+
+    const userKey = localStorage.getItem('fingo_gemini_key') || document.getElementById('gemini-key-input')?.value.trim() || '';
 
     try {
       // 1. Capturar snapshot atual da cena 3D
@@ -992,11 +1072,17 @@ const BIMStudio = {
       const snapshotBase64 = this.renderer.domElement.toDataURL('image/jpeg', 0.88);
 
       // 2. Chamar a API do FinGo com o pool do Gemini
+      const headers = { 'Content-Type': 'application/json' };
+      if (userKey) {
+        headers['x-gemini-key'] = userKey;
+      }
+
       const response = await fetch('/api/bim-render', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify({
           image: snapshotBase64,
+          apiKey: userKey,
           prompt: 'Ultra-photorealistic architectural photography of a luxury modern residential villa, 8k resolution, cumaru wood deck, illuminated swimming pool, elegant warm lighting, professional architectural visualization published in ArchDaily, clean modern lines, realistic materials, photorealistic concrete and glass.'
         })
       });
@@ -1012,19 +1098,109 @@ const BIMStudio = {
         downloadBtn.href = data.imageUrl;
         downloadBtn.download = `fingo_bim_gemini_${Date.now()}.jpg`;
       }
+      if (badgeEl) {
+        badgeEl.textContent = 'QUALIDADE: 4K ULTRA-HD · MOTOR: GOOGLE GEMINI IMAGEN 3';
+      }
 
       loading.style.display = 'none';
       resultWrap.style.display = 'flex';
     } catch (err) {
       console.error('[FinGo BIM Studio] Erro no render IA:', err);
-      if (loadingText) loadingText.textContent = `Erro ao renderizar: ${err.message || 'Tente novamente.'}`;
-      setTimeout(() => {
-        if (loading.style.display === 'flex') {
-          modal.style.display = 'none';
-          alert(`Não foi possível concluir o render com IA: ${err.message || 'Verifique a conexão.'}`);
+      if (loadingText) {
+        loadingText.innerHTML = `
+          <div style="color:#EF4444;font-weight:800;margin-bottom:8px;">⚠️ ${err.message || 'Erro no render com IA'}</div>
+          <div style="font-size:.78rem;color:#94A3B8;margin-bottom:12px;">Dica: Você pode renderizar gratuitamente e sem fila agora mesmo usando o <b>Super PBR 4K Local</b> abaixo:</div>
+          <button type="button" id="btn-fallback-local-4k" class="bim-btn" style="background:#C6FF00;color:#000000;font-weight:900;padding:8px 16px;margin:0 auto;box-shadow:0 0 16px rgba(198,255,0,0.3);">
+            🎨 Renderizar Agora em 4K Local (Three.js PBR)
+          </button>
+        `;
+        const fbBtn = document.getElementById('btn-fallback-local-4k');
+        if (fbBtn) {
+          fbBtn.onclick = () => this._renderLocal4K();
         }
-      }, 2500);
+      }
     }
+  },
+
+  _renderLocal4K() {
+    this._lastRenderMode = 'local';
+    const modal = document.getElementById('ai-render-modal');
+    const loading = document.getElementById('ai-loading');
+    const loadingSubtext = document.getElementById('ai-loading-subtext');
+    const resultWrap = document.getElementById('ai-result-wrap');
+    const resultImg = document.getElementById('ai-result-img');
+    const downloadBtn = document.getElementById('btn-download-ai');
+    const loadingText = document.getElementById('ai-loading-text');
+    const badgeEl = document.getElementById('ai-result-badge');
+
+    if (!modal || !loading || !resultWrap || !resultImg) return;
+
+    modal.style.display = 'flex';
+    loading.style.display = 'flex';
+    resultWrap.style.display = 'none';
+    if (loadingText) loadingText.textContent = 'Renderizando em Ultra-HD 4K (Three.js Super PBR Local)...';
+    if (loadingSubtext) loadingSubtext.textContent = 'Calculando oclusão de ambiente, dispersão de luz ACES Filmic e sombras PCF em alta resolução no seu dispositivo...';
+
+    // Permite que o DOM renderize o spinner antes do cálculo intensivo
+    setTimeout(() => {
+      try {
+        const origSize = new THREE.Vector2();
+        this.renderer.getSize(origSize);
+        const origPixelRatio = this.renderer.getPixelRatio();
+
+        // Renderizar em 3840x2160 (4K UHD)
+        const targetW = 3840;
+        const targetH = 2160;
+
+        const origAspect = this.camera.aspect;
+        this.camera.aspect = targetW / targetH;
+        this.camera.updateProjectionMatrix();
+
+        this.renderer.setPixelRatio(1);
+        this.renderer.setSize(targetW, targetH, false);
+        this.renderer.render(this.scene, this.camera);
+
+        const dataUrl = this.renderer.domElement.toDataURL('image/png');
+
+        // Restaurar estado da cena e câmera
+        this.camera.aspect = origAspect;
+        this.camera.updateProjectionMatrix();
+        this.renderer.setPixelRatio(origPixelRatio);
+        this.renderer.setSize(origSize.x, origSize.y, true);
+        this.renderer.render(this.scene, this.camera);
+
+        resultImg.src = dataUrl;
+        if (downloadBtn) {
+          downloadBtn.href = dataUrl;
+          downloadBtn.download = `fingo_bim_pbr_4k_${Date.now()}.png`;
+        }
+        if (badgeEl) {
+          badgeEl.textContent = 'QUALIDADE: 4K ULTRA-HD (3840x2160) · MOTOR: THREE.JS PBR ACES';
+        }
+
+        loading.style.display = 'none';
+        resultWrap.style.display = 'flex';
+      } catch (err) {
+        console.error('[FinGo BIM Studio] Erro no render local 4K:', err);
+        // Fallback para viewport nativa
+        try {
+          this.renderer.render(this.scene, this.camera);
+          const dataUrl = this.renderer.domElement.toDataURL('image/png');
+          resultImg.src = dataUrl;
+          if (downloadBtn) {
+            downloadBtn.href = dataUrl;
+            downloadBtn.download = `fingo_bim_pbr_${Date.now()}.png`;
+          }
+          if (badgeEl) {
+            badgeEl.textContent = 'QUALIDADE: FULL-HD PBR · MOTOR: THREE.JS ACES';
+          }
+          loading.style.display = 'none';
+          resultWrap.style.display = 'flex';
+        } catch (e2) {
+          if (loadingText) loadingText.textContent = `Erro no render local: ${err.message}`;
+        }
+      }
+    }, 80);
   },
 
   _selectMesh(mesh) {

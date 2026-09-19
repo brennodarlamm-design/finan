@@ -58,7 +58,8 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { prompt, image } = req.body || {};
+    const { prompt, image, apiKey } = req.body || {};
+    const userKey = String(apiKey || req.headers?.['x-gemini-key'] || '').trim();
     let base64 = '';
     let mimeType = 'image/jpeg';
 
@@ -75,11 +76,12 @@ export default async function handler(req, res) {
     const result = await callGeminiImageGeneration({
       prompt,
       imageBase64: base64,
-      mimeType
+      mimeType,
+      userKey
     });
 
     if (!result.success) {
-      return res.status(500).json({ success: false, error: result.error || 'Falha na renderização de IA' });
+      return res.status(400).json({ success: false, error: result.error || 'Falha na renderização de IA' });
     }
 
     return res.status(200).json({

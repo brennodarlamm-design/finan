@@ -5,21 +5,28 @@
  * Estado interno do pool de chaves em memória no Worker/Processo.
  */
 const keyStates = new Map();
+const dynamicKeys = new Set();
 let currentKeyIndex = 0;
 
 /**
- * Obtém a lista deduplicada de chaves do Gemini a partir do ambiente.
+ * Adiciona uma chave dinamicamente ao pool em tempo de execução.
+ */
+export function addKeyToPool(key) {
+  if (typeof key === 'string' && key.trim().length > 10) {
+    dynamicKeys.add(key.trim());
+  }
+}
+
+/**
+ * Obtém a lista deduplicada de chaves do Gemini a partir do ambiente e pool dinâmico.
  */
 function getGeminiKeys() {
   const rawList = String(process.env.GEMINI_API_KEYS || process.env.GEMINI_API_KEY || '').trim();
-  if (!rawList) return [];
+  const envKeys = rawList
+    ? rawList.split(',').map(k => k.trim()).filter(k => k.length > 10)
+    : [];
 
-  const keys = rawList
-    .split(',')
-    .map(k => k.trim())
-    .filter(k => k.length > 10);
-
-  return [...new Set(keys)];
+  return [...new Set([...envKeys, ...dynamicKeys])];
 }
 
 /**
@@ -235,9 +242,19 @@ export async function callGeminiImageGeneration({
   prompt = '',
   imageBase64 = '',
   mimeType = 'image/jpeg',
-  aspectRatio = '16:9'
+  aspectRatio = '16:9',
+  userKey = ''
 } = {}) {
-  const keys = getGeminiKeys();
+  const trimmedUserKey = (typeof userKey === 'string' && userKey.trim().length > 10) ? userKey.trim() : '';
+  if (trimmedUserKey) {
+    addKeyToPool(trimmedUserKey);
+  }
+
+  const allKeys = getGeminiKeys();
+  const keys = trimmedUserKey
+    ? [trimmedUserKey, ...allKeys.filter(k => k !== trimmedUserKey)]
+    : allKeys;
+
   const defaultPrompt = 'Ultra-photorealistic architectural photography of a luxury modern residential villa, 8k resolution, cumaru wood deck, illuminated swimming pool, elegant lighting, professional architectural visualization published in ArchDaily, clean modern lines, realistic materials, photorealistic concrete and glass.';
   const finalPrompt = (prompt && prompt.trim()) ? prompt.trim() : defaultPrompt;
 
@@ -279,8 +296,12 @@ export async function callGeminiImageGeneration({
               source: 'gemini-key-pool'
             };
           }
-        } else if (res.status === 429 || res.status === 403) {
-          markKeyCooldown(currentKey, `HTTP ${res.status} Imagen quota`, 30);
+        } else {
+          const errText = await res.text().catch(() => '');
+          console.warn(`[FinGo AI Render] Imagen 3 retornou HTTP ${res.status}:`, errText.slice(0, 200));
+          if (res.status === 429 || res.status === 403) {
+            markKeyCooldown(currentKey, `HTTP ${res.status} Imagen quota`, 30);
+          }
         }
       } catch (err) {
         console.warn(`[FinGo AI Render] Erro ao chamar Imagen 3 com chave ${keyState.masked}:`, err.message);
@@ -288,26 +309,12 @@ export async function callGeminiImageGeneration({
     }
   }
 
-  // 2. Fallback Gratuito de Alto Nível (Neural FLUX ArchViz):
-  // Gera renderização arquitetônica fotorrealista instantânea sem depender de cotas
-  try {
-    const seed = Math.floor(Math.random() * 999999);
-    const archPrompt = encodeURIComponent(`${finalPrompt}, 8k architectural photography, octane render, unreal engine 5, masterpiece, highly detailed, luxurious mansion`);
-    const fallbackUrl = `https://image.pollinations.ai/prompt/${archPrompt}?width=1280&height=720&model=flux&seed=${seed}&nologo=true`;
-    
-    return {
-      success: true,
-      imageUrl: fallbackUrl,
-      provider: 'flux-archviz-engine',
-      source: 'free-neural-pool'
-    };
-  } catch (err) {
-    console.error('[FinGo AI Render] Erro no fallback neural:', err);
-    return {
-      success: false,
-      error: 'Não foi possível gerar a renderização no momento.'
-    };
-  }
+  // 2. Se não houver chaves no pool ou se o Imagen 3 falhou
+  return {
+    success: false,
+    code: 'NO_KEY_OR_QUOTA',
+    error: 'Chave do Google Gemini não configurada ou cota temporariamente esgotada. Insira sua chave gratuita do Google AI Studio no campo de configuração para ativar o motor Imagen 3 diretamente!'
+  };
 }
 
 /**

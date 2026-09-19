@@ -336,36 +336,100 @@
 
   </div>
 
-  <!-- MODAL DE RENDERIZAÇÃO FOTORREALISTA COM IA (GEMINI) -->
-  <div id="ai-render-modal" style="display:none;position:fixed;inset:0;background:rgba(6,10,5,0.88);backdrop-filter:blur(10px);z-index:999;align-items:center;justify-content:center;padding:20px;">
-    <div style="background:#0D160B;border:1px solid #7F49B8;border-radius:14px;max-width:860px;width:100%;overflow:hidden;box-shadow:0 0 40px rgba(127,73,184,0.35);display:flex;flex-direction:column;">
+  <!-- MODAL DE RENDERIZAÇÃO FOTORREALISTA COM IA & 4K LOCAL -->
+  <div id="ai-render-modal" style="display:none;position:fixed;inset:0;background:rgba(6,10,5,0.92);backdrop-filter:blur(12px);z-index:999;align-items:center;justify-content:center;padding:20px;">
+    <div style="background:#0D160B;border:1px solid #7F49B8;border-radius:14px;max-width:880px;width:100%;max-height:92vh;overflow-y:auto;box-shadow:0 0 50px rgba(127,73,184,0.4);display:flex;flex-direction:column;">
       <!-- Header do Modal -->
-      <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 20px;background:#142210;border-bottom:1px solid #243518;">
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 20px;background:#142210;border-bottom:1px solid #243518;position:sticky;top:0;z-index:10;">
         <div style="display:flex;align-items:center;gap:10px;">
           <span style="font-size:1.3rem;">✨</span>
           <div>
-            <strong style="font-size:.95rem;color:#F0EAD6;letter-spacing:-.02em;">Renderização Fotorrealista por IA</strong>
-            <span style="background:rgba(168,85,247,0.2);color:#C084FC;border:1px solid rgba(168,85,247,0.4);font-size:.60rem;font-weight:900;padding:2px 6px;border-radius:4px;text-transform:uppercase;margin-left:6px;">Google Gemini Pool</span>
+            <strong style="font-size:.95rem;color:#F0EAD6;letter-spacing:-.02em;">Estação de Renderização Fotorrealista</strong>
+            <span style="background:rgba(168,85,247,0.2);color:#C084FC;border:1px solid rgba(168,85,247,0.4);font-size:.60rem;font-weight:900;padding:2px 6px;border-radius:4px;text-transform:uppercase;margin-left:6px;">Gemini Imagen 3 + Super PBR 4K</span>
           </div>
         </div>
-        <button type="button" id="btn-close-ai-modal" style="background:transparent;border:none;color:#94A3B8;font-size:1.3rem;cursor:pointer;">✕</button>
+        <button type="button" id="btn-close-ai-modal" style="background:transparent;border:none;color:#94A3B8;font-size:1.3rem;cursor:pointer;padding:4px 8px;">✕</button>
       </div>
 
       <!-- Corpo do Modal -->
-      <div style="padding:20px;display:flex;flex-direction:column;gap:14px;align-items:center;">
-        <!-- Loading State -->
-        <div id="ai-loading" style="display:none;flex-direction:column;align-items:center;gap:14px;padding:40px 20px;text-align:center;">
-          <div style="width:48px;height:48px;border:4px solid #243518;border-top-color:#C6FF00;border-radius:50%;animation:spin 1s linear infinite;"></div>
-          <div style="font-size:.92rem;font-weight:800;color:#F0EAD6;" id="ai-loading-text">Processando com Google Gemini AI...</div>
-          <div style="font-size:.74rem;color:#94A3B8;max-width:440px;">Aplicando iluminação solar fotométrica, física de reflexão no vidro e texturas fotorrealistas de madeira cumaru e piscina...</div>
+      <div style="padding:20px;display:flex;flex-direction:column;gap:16px;">
+        
+        <!-- Card de Configuração de Chave Gemini / Pool Inteligente -->
+        <div style="background:#070C06;border:1px solid #1E2D15;border-radius:10px;padding:14px;display:flex;flex-direction:column;gap:10px;">
+          <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
+            <div style="display:flex;align-items:center;gap:8px;">
+              <span style="font-size:1rem;">🔑</span>
+              <strong style="font-size:.78rem;color:#F0EAD6;">Chave Gemini API (Google AI Studio)</strong>
+              <span style="font-size:.65rem;color:#94A3B8;">— Gratuito (15 req/min)</span>
+            </div>
+            <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer" style="font-size:.70rem;color:#C6FF00;text-decoration:none;font-weight:700;display:inline-flex;align-items:center;gap:4px;">
+              Obter chave gratuita no Google AI Studio ↗
+            </a>
+          </div>
+
+          <div style="display:flex;gap:8px;align-items:center;">
+            <input type="password" id="gemini-key-input" placeholder="Cole sua chave AIzaSy... aqui" style="flex:1;background:#0D160B;border:1px solid #243518;border-radius:6px;padding:8px 12px;color:#F0EAD6;font-size:.78rem;font-family:'JetBrains Mono',monospace;outline:none;" />
+            <button type="button" id="btn-save-gemini-key" class="bim-btn" style="background:#C6FF00;color:#000000;font-weight:800;white-space:nowrap;">
+              Salvar Chave
+            </button>
+            <button type="button" id="btn-clear-gemini-key" class="bim-btn" style="display:none;background:#1A2518;color:#94A3B8;white-space:nowrap;">
+              Remover
+            </button>
+          </div>
+
+          <div id="gemini-key-status" style="font-size:.70rem;color:#94A3B8;font-family:'JetBrains Mono',monospace;">
+            <!-- Preenchido dinamicamente via JS -->
+          </div>
         </div>
 
-        <!-- Preview Image -->
+        <!-- Seletor de Modos de Renderização -->
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+          <!-- Opção 1: Gemini Imagen 3 -->
+          <div style="background:#111A0F;border:1px solid #7F49B8;border-radius:10px;padding:14px;display:flex;flex-direction:column;justify-content:space-between;gap:12px;">
+            <div>
+              <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;">
+                <span style="font-size:1.1rem;">✨</span>
+                <strong style="font-size:.82rem;color:#C084FC;">Google Gemini Imagen 3</strong>
+              </div>
+              <p style="font-size:.72rem;color:#94A3B8;line-height:1.4;">
+                Fotorrealismo arquitetônico via IA generativa. Adiciona céu dramático, iluminação global, água fotorrealista e vegetação de paisagismo a partir do ângulo 3D atual.
+              </p>
+            </div>
+            <button type="button" id="btn-start-ai-render" class="bim-btn" style="background:linear-gradient(135deg,#7F49B8,#9333EA);color:#FFFFFF;border:1px solid #C084FC;font-weight:900;justify-content:center;padding:10px 14px;box-shadow:0 0 14px rgba(147,51,234,0.35);">
+              ✨ Renderizar com Gemini IA
+            </button>
+          </div>
+
+          <!-- Opção 2: Three.js Super PBR 4K -->
+          <div style="background:#111A0F;border:1px solid #243518;border-radius:10px;padding:14px;display:flex;flex-direction:column;justify-content:space-between;gap:12px;">
+            <div>
+              <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;">
+                <span style="font-size:1.1rem;">🎨</span>
+                <strong style="font-size:.82rem;color:#C6FF00;">Three.js Super PBR 4K Local</strong>
+              </div>
+              <p style="font-size:.72rem;color:#94A3B8;line-height:1.4;">
+                Renderização local direta no navegador com texturas PBR, ACES Filmic Tone Mapping, sombras suaves PCF e antialiasing em resolução 3840x2160. Instantâneo e 100% gratuito.
+              </p>
+            </div>
+            <button type="button" id="btn-render-local-4k" class="bim-btn" style="background:#C6FF00;color:#000000;border:1px solid #C6FF00;font-weight:900;justify-content:center;padding:10px 14px;box-shadow:0 0 14px rgba(198,255,0,0.25);">
+              🎨 Renderizar 4K Local (0s)
+            </button>
+          </div>
+        </div>
+
+        <!-- Loading State -->
+        <div id="ai-loading" style="display:none;flex-direction:column;align-items:center;gap:14px;padding:36px 20px;text-align:center;background:#070C06;border:1px solid #243518;border-radius:10px;">
+          <div style="width:48px;height:48px;border:4px solid #243518;border-top-color:#C6FF00;border-radius:50%;animation:spin 1s linear infinite;"></div>
+          <div style="font-size:.92rem;font-weight:800;color:#F0EAD6;" id="ai-loading-text">Processando renderização...</div>
+          <div style="font-size:.74rem;color:#94A3B8;max-width:480px;" id="ai-loading-subtext">Aplicando iluminação solar fotométrica, física de reflexão no vidro e texturas fotorrealistas de madeira cumaru e piscina...</div>
+        </div>
+
+        <!-- Preview Image e Resultados -->
         <div id="ai-result-wrap" style="display:none;width:100%;flex-direction:column;align-items:center;gap:14px;">
           <div style="position:relative;width:100%;border-radius:10px;overflow:hidden;border:1px solid #243518;background:#060A05;box-shadow:0 8px 30px rgba(0,0,0,0.5);">
-            <img id="ai-result-img" src="" alt="Renderização Fotorrealista IA" style="width:100%;max-height:480px;object-fit:contain;display:block;" />
-            <div style="position:absolute;bottom:10px;left:10px;background:rgba(10,17,8,0.85);backdrop-filter:blur(6px);padding:4px 10px;border-radius:6px;font-size:.68rem;color:#C6FF00;font-family:monospace;border:1px solid #243518;">
-              QUALIDADE: 4K ULTRA-HD &middot; MOTOR: GEMINI ARCHVIZ
+            <img id="ai-result-img" src="" alt="Renderização Fotorrealista" style="width:100%;max-height:500px;object-fit:contain;display:block;" />
+            <div id="ai-result-badge" style="position:absolute;bottom:10px;left:10px;background:rgba(10,17,8,0.85);backdrop-filter:blur(6px);padding:4px 10px;border-radius:6px;font-size:.68rem;color:#C6FF00;font-family:'JetBrains Mono',monospace;border:1px solid #243518;">
+              QUALIDADE: 4K ULTRA-HD &middot; MOTOR: GOOGLE GEMINI IMAGEN 3
             </div>
           </div>
 
@@ -373,11 +437,12 @@
             <button type="button" id="btn-re-render-ai" class="bim-btn" style="background:#142210;color:#F0EAD6;">
               🔄 Gerar Novamente
             </button>
-            <a id="btn-download-ai" href="#" download="fingo_render_gemini_4k.jpg" class="bim-btn" style="background:#C6FF00;color:#000000;font-weight:900;text-decoration:none;">
+            <a id="btn-download-ai" href="#" download="fingo_render_4k.jpg" class="bim-btn" style="background:#C6FF00;color:#000000;font-weight:900;text-decoration:none;">
               📸 Baixar Imagem 4K
             </a>
           </div>
         </div>
+
       </div>
     </div>
   </div>
