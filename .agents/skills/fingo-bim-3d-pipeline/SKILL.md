@@ -40,7 +40,9 @@ Antes de codificar, classifique a fonte:
 - `IfcRelVoidsElement`, `IfcBooleanResult`, `IfcBooleanClippingResult` e half-spaces suportados devem preservar o guardrail de `clashEligible`; fallback parcial nunca é autoritativo.
 - O motor BSP/CSG do viewer limita cada operação a 12.000 triângulos de entrada e 50.000 de saída; acima disso, preservar o modelo e marcar a operação como parcial em vez de travar o navegador.
 - A cadeia IFC atualmente prioriza SweptSolid, SweptDiskSolid, MappedItem, FacetedBrep, TessellatedFaceSet, openings e half-spaces planares/poligonais suportados.
-- Curvas IFC suportadas deterministicamente incluem Polyline, IndexedPolyCurve com LineIndex/ArcIndex, CompositeCurve e TrimmedCurve sobre Circle/Ellipse; segmentos desconhecidos devem marcar o elemento como parcial.
+- Curvas IFC suportadas deterministicamente incluem Polyline, IndexedPolyCurve com LineIndex/ArcIndex, CompositeCurve, TrimmedCurve sobre Circle/Ellipse, IfcBSplineCurveWithKnots e IfcRationalBSplineCurveWithKnots; segmentos desconhecidos devem marcar o elemento como parcial.
+- B-Spline/NURBS devem preservar grau, vetor de nós, multiplicidades e pesos; vetor de nós inválido ou pesos inconsistentes tornam a curva parcial.
+- O renderer pode usar culling e LOD apenas para exibição/interação; a malha autoritativa armazenada e usada no clash nunca deve ser destrutivamente reduzida.
 - IfcIndexedPolygonalFaceWithVoids só pode permanecer autoritativo quando a decomposição planar preservar exatamente o contorno externo e os vazios.
 
 ## Workflow
