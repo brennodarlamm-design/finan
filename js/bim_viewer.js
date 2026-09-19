@@ -28,6 +28,9 @@ const BIMViewer = {
   renderedFaces: [],
   financialSnapshot: null,
   isExpanded: false,
+  sectionMode: 'none', // none | x | z
+  sectionPosition: 0,
+  modelVersions: [],
   _escapeHandler: null,
 
   /**
@@ -47,6 +50,7 @@ const BIMViewer = {
     };
     const snapshot = this._getOperationalSnapshot(obraId);
     this.financialSnapshot = snapshot;
+    this.modelVersions = this._loadModelVersions();
 
     container.innerHTML = `
       <div class="bim-viewer-layout" style="display:flex;flex-direction:column;gap:16px;">
@@ -74,9 +78,16 @@ const BIMViewer = {
               <button type="button" class="bim-view-btn" data-action="toggleExpanded" title="Expandir visualizador" style="padding:5px 10px;font-size:.75rem;border:none;background:transparent;color:#F0EAD6;cursor:pointer;font-weight:700;">⛶ Expandir</button>
             </div>
 
+            <div class="btn-group" style="display:inline-flex;background:#142210;border-radius:6px;border:1px solid #243518;padding:2px;align-items:center;">
+              <button type="button" class="bim-section-btn" data-section="none" style="padding:5px 9px;font-size:.72rem;border:none;background:#C6FF00;color:#000;border-radius:4px;cursor:pointer;font-weight:800;">Inteiro</button>
+              <button type="button" class="bim-section-btn" data-section="x" style="padding:5px 9px;font-size:.72rem;border:none;background:transparent;color:#F0EAD6;border-radius:4px;cursor:pointer;font-weight:700;">Corte X</button>
+              <button type="button" class="bim-section-btn" data-section="z" style="padding:5px 9px;font-size:.72rem;border:none;background:transparent;color:#F0EAD6;border-radius:4px;cursor:pointer;font-weight:700;">Corte Z</button>
+              <input id="bim-section-range" type="range" min="-120" max="120" step="5" value="0" title="Posição do plano de corte" disabled style="width:90px;margin:0 5px;accent-color:#C6FF00;opacity:.45;">
+            </div>
+
             <label class="btn-action" style="cursor:pointer;margin:0;font-size:.75rem;padding:6px 12px;background:rgba(198,255,0,.1);border:1px solid rgba(198,255,0,.3);color:#C6FF00;border-radius:6px;font-weight:700;">
               <span>📁 Importar 3D (.obj / .ifc)</span>
-              <input type="file" id="bim-file-input" accept=".obj,.ifc,.gltf,.glb,.json" style="display:none;" />
+              <input type="file" id="bim-file-input" accept=".obj,.ifc,.gltf,.glb" style="display:none;" />
             </label>
           </div>
         </div>
@@ -102,6 +113,10 @@ const BIMViewer = {
           <div id="bim-element-details" style="background:#0F1A0E;border:1px solid #243518;border-radius:12px;padding:20px;display:flex;flex-direction:column;gap:14px;">
             ${this._renderElementDetailsHtml(this.elements[1] || this.elements[0], obra)}
           </div>
+        </div>
+
+        <div id="bim-model-versions">
+          ${this._renderModelVersionsHtml()}
         </div>
       </div>
     `;
@@ -384,7 +399,7 @@ const BIMViewer = {
     const faces = [];
     visibleElements.forEach(elem => {
       const isSelected = this.selectedElement?.id === elem.id;
-      const meshes = elem.meshes || [];
+      const meshes = (elem.meshes || []).filter(mesh => this._meshPassesSection(mesh));
       meshes.forEach(mesh => {
         if (mesh.type === 'box') {
           faces.push(...this._createBoxFaces(mesh, mesh.color, elem.id, isSelected, mesh));
@@ -687,6 +702,7 @@ const BIMViewer = {
     const progressLabel = elem.progressLabel || 'Avanço medido da obra';
     const sourceLabel = elem.dataSource || 'Dados vinculados à obra';
     const recent = this._recentLancamentosForElement(elem).slice(0, 3);
+    const props = this._getElementProperties(elem);
 
     return `
       <div style="display:flex;align-items:center;gap:10px;border-bottom:1px solid #243518;padding-bottom:14px;">
@@ -727,6 +743,21 @@ const BIMViewer = {
 
         <div style="font-size:.68rem;color:#64748B;">Fonte: ${Utils.escapeHtml(sourceLabel)}</div>
 
+        <details open style="background:#0A1108;border:1px solid #243518;border-radius:8px;padding:10px 12px;">
+          <summary style="cursor:pointer;font-size:.70rem;font-weight:800;color:#C6FF00;text-transform:uppercase;">Propriedades BIM & Quantitativos</summary>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px 10px;margin-top:10px;font-size:.70rem;">
+            <div><span style="color:#64748B;">Classe IFC</span><br><strong style="color:#E2E8F0;">${Utils.escapeHtml(props.ifcClass)}</strong></div>
+            <div><span style="color:#64748B;">Material</span><br><strong style="color:#E2E8F0;">${Utils.escapeHtml(props.material)}</strong></div>
+            <div><span style="color:#64748B;">Dimensão X</span><br><strong style="color:#E2E8F0;">${props.width}</strong></div>
+            <div><span style="color:#64748B;">Dimensão Y</span><br><strong style="color:#E2E8F0;">${props.height}</strong></div>
+            <div><span style="color:#64748B;">Dimensão Z</span><br><strong style="color:#E2E8F0;">${props.depth}</strong></div>
+            <div><span style="color:#64748B;">Subelementos</span><br><strong style="color:#E2E8F0;">${props.meshCount}</strong></div>
+            <div><span style="color:#64748B;">Volume paramétrico</span><br><strong style="color:#E2E8F0;">${props.volume}</strong></div>
+            <div><span style="color:#64748B;">ID BIM</span><br><strong style="color:#E2E8F0;">${Utils.escapeHtml(elem.id)}</strong></div>
+          </div>
+          <div style="font-size:.62rem;color:#64748B;margin-top:8px;">Dimensões e volume seguem a escala paramétrica do modelo atual; arquivos IFC importados preservam metadados próprios na versão do modelo.</div>
+        </details>
+
         <div style="background:#0A1108;border:1px solid #243518;border-radius:8px;padding:10px 12px;">
           <div style="font-size:.70rem;font-weight:800;color:#94A3B8;text-transform:uppercase;margin-bottom:7px;">Lançamentos recentes</div>
           ${recent.length ? recent.map(l => `
@@ -746,6 +777,184 @@ const BIMViewer = {
     `;
   },
 
+
+  _meshPassesSection(mesh) {
+    if (!mesh || this.sectionMode === 'none') return true;
+    const centerX = Number(mesh.x || 0) + Number(mesh.w || 0) / 2;
+    const centerZ = Number(mesh.z || 0) + Number(mesh.d || 0) / 2;
+    if (this.sectionMode === 'x') return centerX <= this.sectionPosition;
+    if (this.sectionMode === 'z') return centerZ <= this.sectionPosition;
+    return true;
+  },
+
+  _getElementProperties(elem) {
+    const meshes = Array.isArray(elem?.meshes) ? elem.meshes : [];
+    if (!meshes.length) return { ifcClass:'IFCBUILDINGELEMENT', material:'—', width:'0 u', height:'0 u', depth:'0 u', meshCount:0, volume:'0 u³' };
+
+    const bounds = { minX:Infinity, minY:Infinity, minZ:Infinity, maxX:-Infinity, maxY:-Infinity, maxZ:-Infinity };
+    let volume = 0;
+    const materials = new Set();
+
+    meshes.forEach(mesh => {
+      const x = Number(mesh.x || 0), y = Number(mesh.y || 0), z = Number(mesh.z || 0);
+      const w = Number(mesh.w || 0), h = Number(mesh.h || 0), d = Number(mesh.d || 0);
+      bounds.minX = Math.min(bounds.minX, x); bounds.maxX = Math.max(bounds.maxX, x + w);
+      bounds.minY = Math.min(bounds.minY, y); bounds.maxY = Math.max(bounds.maxY, y + h);
+      bounds.minZ = Math.min(bounds.minZ, z); bounds.maxZ = Math.max(bounds.maxZ, z + d);
+      if (mesh.type === 'roof_gable') volume += Math.abs(w * d * h * 0.5);
+      else volume += Math.abs(w * h * d);
+      if (mesh.isGlass) materials.add('Vidro');
+      else if (mesh.isBrick) materials.add('Alvenaria');
+      else if (mesh.isFrame) materials.add('Alumínio / Esquadria');
+      else if (/madeira/i.test(mesh.name || '')) materials.add('Madeira');
+      else if (/telha/i.test(mesh.name || '')) materials.add('Cobertura');
+      else if (/concreto|sapata|viga|pilar|laje|baldrame/i.test(mesh.name || '')) materials.add('Concreto armado');
+    });
+
+    const ifcClass = elem.floor === 'fundacao' ? 'IFCFOOTING / IFCBEAM'
+      : elem.floor === 'cobertura' ? 'IFCROOF'
+      : elem.floor === 'pav1' ? 'IFCSLAB / IFCWALL'
+      : 'IFCWALL / IFCCOLUMN';
+
+    const fmt = n => Number.isFinite(n) ? `${Math.round(n * 10) / 10} u` : '0 u';
+    return {
+      ifcClass,
+      material: materials.size ? Array.from(materials).slice(0, 3).join(', ') : (elem.category || 'Material não classificado'),
+      width: fmt(bounds.maxX - bounds.minX),
+      height: fmt(bounds.maxY - bounds.minY),
+      depth: fmt(bounds.maxZ - bounds.minZ),
+      meshCount: meshes.length,
+      volume: `${Math.round(volume)} u³`
+    };
+  },
+
+  _loadModelVersions() {
+    try {
+      if (typeof Documentos === 'undefined' || typeof Documentos.listar !== 'function' || !this.activeObraId) return [];
+      return Documentos.listar('obra', this.activeObraId)
+        .filter(doc => doc.subtipo === 'bim_model' || doc.categoria === 'bim_model')
+        .sort((a, b) => String(b.criado_em || '').localeCompare(String(a.criado_em || '')));
+    } catch {
+      return [];
+    }
+  },
+
+  _renderModelVersionsHtml() {
+    const versions = Array.isArray(this.modelVersions) ? this.modelVersions : [];
+    return `
+      <div style="background:#0F1A0E;border:1px solid #243518;border-radius:10px;padding:12px 14px;">
+        <div style="display:flex;justify-content:space-between;gap:12px;align-items:center;margin-bottom:8px;">
+          <div>
+            <div style="font-size:.76rem;font-weight:900;color:#F0F0E8;">Versões do modelo BIM</div>
+            <div style="font-size:.66rem;color:#64748B;">Arquivos validados e vinculados à obra.</div>
+          </div>
+          <span style="font-size:.68rem;color:#C6FF00;font-weight:800;">${versions.length} versão(ões)</span>
+        </div>
+        ${versions.length ? versions.slice(0, 5).map((doc, idx) => {
+          let meta = {};
+          try { meta = typeof doc.bim_metadata === 'string' ? JSON.parse(doc.bim_metadata) : (doc.bim_metadata || {}); } catch {}
+          return `<div style="display:grid;grid-template-columns:auto 1fr auto;gap:9px;align-items:center;padding:8px 0;border-top:1px solid rgba(148,163,184,.12);">
+            <div style="width:26px;height:26px;border-radius:7px;background:rgba(198,255,0,.10);display:grid;place-items:center;color:#C6FF00;font-size:.68rem;font-weight:900;">v${versions.length - idx}</div>
+            <div style="min-width:0;">
+              <div style="font-size:.72rem;color:#E2E8F0;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${Utils.escapeHtml(doc.nome_arquivo || doc.titulo || 'Modelo BIM')}</div>
+              <div style="font-size:.62rem;color:#64748B;">${Utils.escapeHtml(String(meta.format || doc.bim_format || '').toUpperCase())} · ${Utils.escapeHtml(meta.schema || meta.summary || 'validado')} · ${Utils.escapeHtml(String(doc.criado_em || '').slice(0, 16).replace('T',' '))}</div>
+            </div>
+            <span style="font-size:.62rem;color:#C6FF00;font-weight:800;">Validado</span>
+          </div>`;
+        }).join('') : '<div style="font-size:.70rem;color:#64748B;padding:7px 0;">Nenhum IFC/OBJ/GLTF foi versionado nesta obra.</div>'}
+      </div>
+    `;
+  },
+
+  _refreshModelVersions() {
+    this.modelVersions = this._loadModelVersions();
+    const host = document.getElementById('bim-model-versions');
+    if (host) host.innerHTML = this._renderModelVersionsHtml();
+  },
+
+  _bimMime(ext) {
+    return {
+      ifc: 'application/x-step',
+      obj: 'model/obj',
+      gltf: 'model/gltf+json',
+      glb: 'model/gltf-binary'
+    }[ext] || 'application/octet-stream';
+  },
+
+  async _inspectModelFile(file) {
+    const ext = String(file?.name || '').split('.').pop().toLowerCase();
+    const allowed = ['ifc','obj','gltf','glb'];
+    if (!allowed.includes(ext)) throw new Error('Formato BIM/3D não suportado. Use IFC, OBJ, GLTF ou GLB.');
+    if (Number(file.size || 0) > 15 * 1024 * 1024) throw new Error('O modelo excede o limite atual de 15 MB.');
+
+    const meta = { format: ext, size: Number(file.size || 0), summary: 'arquivo validado' };
+
+    if (ext === 'glb') {
+      const buf = await file.slice(0, 12).arrayBuffer();
+      const view = new Uint8Array(buf);
+      const magic = String.fromCharCode(...view.slice(0, 4));
+      if (magic !== 'glTF') throw new Error('Arquivo GLB inválido: assinatura glTF não encontrada.');
+      meta.summary = 'container binário glTF';
+      return meta;
+    }
+
+    const text = await file.text();
+    if (ext === 'ifc') {
+      if (!/ISO-10303-21/i.test(text) || !/IFCPROJECT/i.test(text)) throw new Error('Arquivo IFC inválido ou incompleto.');
+      const schema = text.match(/FILE_SCHEMA\s*\(\s*\(\s*'([^']+)'/i)?.[1] || 'IFC';
+      const storeys = (text.match(/IFCBUILDINGSTOREY/gi) || []).length;
+      const elements = (text.match(/=IFC(?:WALL|SLAB|BEAM|COLUMN|FOOTING|ROOF|DOOR|WINDOW|STAIR|MEMBER|PLATE)[A-Z0-9_]*/gi) || []).length;
+      meta.schema = schema;
+      meta.storeys = storeys;
+      meta.elements = elements;
+      meta.summary = `${schema} · ${storeys} pavimento(s) · ${elements} elemento(s)`;
+    } else if (ext === 'obj') {
+      const vertices = (text.match(/^v\s+/gm) || []).length;
+      const faces = (text.match(/^f\s+/gm) || []).length;
+      if (!vertices || !faces) throw new Error('Arquivo OBJ inválido: vértices/faces não encontrados.');
+      meta.vertices = vertices;
+      meta.faces = faces;
+      meta.summary = `${vertices} vértices · ${faces} faces`;
+    } else if (ext === 'gltf') {
+      let parsed;
+      try { parsed = JSON.parse(text); } catch { throw new Error('Arquivo GLTF inválido: JSON malformado.'); }
+      if (!parsed?.asset?.version) throw new Error('Arquivo GLTF inválido: asset.version ausente.');
+      meta.schema = `glTF ${parsed.asset.version}`;
+      meta.meshes = Array.isArray(parsed.meshes) ? parsed.meshes.length : 0;
+      meta.nodes = Array.isArray(parsed.nodes) ? parsed.nodes.length : 0;
+      meta.summary = `glTF ${parsed.asset.version} · ${meta.meshes} malha(s) · ${meta.nodes} nó(s)`;
+    }
+    return meta;
+  },
+
+  async _handleModelImport(file) {
+    if (!file) return;
+    try {
+      Utils.toast('Validando modelo BIM/3D...', 'info');
+      const meta = await this._inspectModelFile(file);
+      if (typeof Documentos === 'undefined' || typeof Documentos.lerArquivoBase64 !== 'function') {
+        throw new Error('Módulo de documentos indisponível para versionar o modelo.');
+      }
+      const base64 = await Documentos.lerArquivoBase64(file);
+      Documentos.adicionar({
+        entidade_tipo: 'obra',
+        entidade_id: this.activeObraId,
+        titulo: `Modelo BIM — ${file.name}`,
+        nome_arquivo: file.name,
+        tipo_mime: this._bimMime(meta.format),
+        tamanho: file.size,
+        categoria: 'bim_model',
+        subtipo: 'bim_model',
+        bim_format: meta.format,
+        bim_metadata: JSON.stringify(meta),
+        data_base64: base64
+      });
+      this._refreshModelVersions();
+      Utils.toast(`Modelo ${file.name} validado e versionado. ${meta.summary}`, 'success');
+    } catch (err) {
+      Utils.toast(err?.message || 'Não foi possível validar o modelo BIM.', 'error');
+    }
+  },
 
   _getOperationalSnapshot(obraId) {
     const emptyResumo = { totalReceitas:0, totalDespesas:0, saldo:0, aPagar:0, aPagarValor:0, aReceber:0, aReceberValor:0 };
@@ -1040,6 +1249,29 @@ const BIMViewer = {
       });
     }
 
+    document.querySelectorAll('.bim-section-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        this.sectionMode = e.currentTarget.getAttribute('data-section') || 'none';
+        document.querySelectorAll('.bim-section-btn').forEach(b => {
+          const active = b.getAttribute('data-section') === this.sectionMode;
+          b.style.background = active ? '#C6FF00' : 'transparent';
+          b.style.color = active ? '#000' : '#F0EAD6';
+        });
+        const range = document.getElementById('bim-section-range');
+        if (range) {
+          range.disabled = this.sectionMode === 'none';
+          range.style.opacity = this.sectionMode === 'none' ? '.45' : '1';
+        }
+      });
+    });
+
+    const sectionRange = document.getElementById('bim-section-range');
+    if (sectionRange) {
+      sectionRange.addEventListener('input', (e) => {
+        this.sectionPosition = Number(e.currentTarget.value || 0);
+      });
+    }
+
     const expandBtn = document.querySelector('[data-action="toggleExpanded"]');
     if (expandBtn) expandBtn.addEventListener('click', () => this._toggleExpanded());
 
@@ -1055,11 +1287,10 @@ const BIMViewer = {
     // Input de Upload de Arquivo 3D
     const fileInput = document.getElementById('bim-file-input');
     if (fileInput) {
-      fileInput.addEventListener('change', (e) => {
+      fileInput.addEventListener('change', async (e) => {
         const file = e.target.files[0];
-        if (file) {
-          Utils.toast(`📂 Modelo "${file.name}" carregado com sucesso no visualizador!`, 'success');
-        }
+        if (file) await this._handleModelImport(file);
+        e.target.value = '';
       });
     }
   }
