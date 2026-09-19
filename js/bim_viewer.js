@@ -82,9 +82,17 @@ const BIMViewer = {
             <div>
               <div style="font-size:.9rem;font-weight:800;color:#F0EAD6;">Modelo 3D BIM Arquitetônico &amp; Orçamento</div>
               <div style="font-size:.75rem;color:#94A3B8;">${Utils.escapeHtml(obra.nome || 'Obra')} &middot; ${obra.area_construida || 240} m² &middot; ${obra.pavimentos || 2} pavimentos</div>
-              <div style="display:flex;align-items:center;gap:7px;margin-top:4px;">
+              <div style="display:flex;align-items:center;gap:8px;margin-top:6px;flex-wrap:wrap;">
+                <select id="bim-model-preset-select" title="Seletor de Modelos BIM e Projetos de Exemplo" style="background:#142210;color:#C6FF00;border:1px solid #243518;border-radius:6px;padding:3px 8px;font-size:.68rem;font-weight:800;outline:none;cursor:pointer;">
+                  <option value="sobrado_procedural">🏡 Sobrado Residencial Villa Aurora (240 m²)</option>
+                  <option value="ifc4_structural">🏗️ Estrutura de Concreto Armado (IFC4)</option>
+                  <option value="ifc4_hvac">🧊 Instalações MEP &amp; HVAC Climatização (IFC4)</option>
+                  <option value="ifc4_architecture">🏛️ Arquitetura buildingSMART (IFC4)</option>
+                  <option value="bim_multi_clash">⚡ Coordenação Multi-disciplinar (Clash Real)</option>
+                  <option value="ifc4_opening_window">🪟 Parede com Abertura &amp; Esquadria (IFC4)</option>
+                </select>
                 <span id="bim-model-source-label" style="font-size:.62rem;color:#C6FF00;font-weight:800;">MAQUETE PARAMÉTRICA</span>
-                <button type="button" data-action="restoreProcedural" id="bim-restore-procedural" style="display:none;background:transparent;border:none;color:#94A3B8;font-size:.62rem;cursor:pointer;text-decoration:underline;">voltar à maquete</button>
+                <button type="button" data-action="restoreProcedural" id="bim-restore-procedural" style="display:none;background:transparent;border:none;color:#94A3B8;font-size:.62rem;cursor:pointer;text-decoration:underline;">voltar ao sobrado</button>
               </div>
             </div>
           </div>
@@ -1081,6 +1089,50 @@ const BIMViewer = {
     this._refreshSelectedElementUi();
   },
 
+  async _loadPresetModel(presetKey) {
+    if (presetKey === 'sobrado_procedural') {
+      this._restoreProceduralModel();
+      return;
+    }
+    if (typeof BIMPresets === 'undefined' || typeof BIMGeometryImporter === 'undefined') {
+      Utils.toast('Catálogo de modelos BIM indisponível.', 'warning');
+      return;
+    }
+    if (presetKey === 'bim_multi_clash') {
+      Utils.toast('Carregando coordenação multi-disciplinar (Estrutura + MEP + Arquitetura)...', 'info');
+      try {
+        const structScene = await BIMGeometryImporter.importContent(BIMPresets.ifc4_structural.content, 'estrutura.ifc', 'application/x-step');
+        const hvacScene = await BIMGeometryImporter.importContent(BIMPresets.ifc4_hvac.content, 'hvac.ifc', 'application/x-step');
+        const archScene = await BIMGeometryImporter.importContent(BIMPresets.ifc4_architecture.content, 'arquitetura.ifc', 'application/x-step');
+        const combinedElements = [...structScene.elements, ...hvacScene.elements, ...archScene.elements];
+        const combinedScene = {
+          format: 'ifc',
+          elements: combinedElements,
+          triangleCount: structScene.triangleCount + hvacScene.triangleCount + archScene.triangleCount,
+          clashEligible: true,
+          geometryQuality: 'full',
+          viewerScale: structScene.viewerScale
+        };
+        this._applyImportedScene(combinedScene, 'preset_multi_clash');
+        this._runClashDetection();
+        Utils.toast(`Coordenação carregada: ${combinedElements.length} elementos com análise de interferências.`, 'success');
+      } catch (err) {
+        Utils.toast('Erro ao carregar coordenação: ' + (err?.message || err), 'error');
+      }
+      return;
+    }
+    const preset = BIMPresets[presetKey];
+    if (!preset) return;
+    try {
+      Utils.toast(`Carregando ${preset.name}...`, 'info');
+      const scene = await BIMGeometryImporter.importContent(preset.content, preset.name + '.ifc', 'application/x-step');
+      this._applyImportedScene(scene, 'preset_' + presetKey);
+      Utils.toast(`${preset.name} carregado com sucesso (${scene.triangleCount.toLocaleString('pt-BR')} triângulos).`, 'success');
+    } catch (err) {
+      Utils.toast('Erro ao carregar modelo: ' + (err?.message || err), 'error');
+    }
+  },
+
   _restoreProceduralModel() {
     const obra = (typeof DB !== 'undefined' && DB.getById('clientes', this.activeObraId)) || {};
     this.modelSource = 'procedural';
@@ -1094,6 +1146,8 @@ const BIMViewer = {
     this.selectedElement = this.elements[1] || this.elements[0] || null;
     this.currentFloor = 'all';
     this.disciplineFilter = 'all';
+    const presetSelect = document.getElementById('bim-model-preset-select');
+    if (presetSelect) presetSelect.value = 'sobrado_procedural';
     this._setModelSourceUi();
     this._refreshFloorButtons();
     this._refreshSelectedElementUi();
@@ -2010,6 +2064,13 @@ const BIMViewer = {
 
     const restoreBtn = document.querySelector('[data-action="restoreProcedural"]');
     if (restoreBtn) restoreBtn.addEventListener('click', () => this._restoreProceduralModel());
+
+    const presetSelect = document.getElementById('bim-model-preset-select');
+    if (presetSelect) {
+      presetSelect.addEventListener('change', async (e) => {
+        await this._loadPresetModel(e.target.value);
+      });
+    }
 
     this._bindClashEvents();
 
