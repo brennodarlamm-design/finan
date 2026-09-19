@@ -65,7 +65,10 @@ const ObraDetalhe = {
       b.classList.toggle('active', isAct);
       b.style.borderColor = isAct ? 'var(--accent)' : 'var(--border)';
       b.style.color = isAct ? 'var(--accent)' : 'var(--text2)';
-      b.style.background = isAct ? 'rgba(18,217,160,0.12)' : 'var(--bg-secondary)';
+      b.style.background = isAct ? 'rgba(198,255,0,0.12)' : 'var(--bg-secondary)';
+      if (isAct) {
+        try { b.scrollIntoView({ behavior: 'smooth', inline: 'nearest', block: 'nearest' }); } catch {}
+      }
     });
     const container = document.getElementById('od-subtab-orcado-content');
     if (container && this.currentObraId) {
@@ -89,7 +92,10 @@ const ObraDetalhe = {
       b.classList.toggle('active', isAct);
       b.style.borderColor = isAct ? 'var(--accent)' : 'transparent';
       b.style.color = isAct ? 'var(--accent)' : 'var(--text2)';
-      b.style.background = isAct ? 'rgba(18,217,160,0.08)' : 'transparent';
+      b.style.background = isAct ? 'rgba(198,255,0,0.08)' : 'transparent';
+      if (isAct) {
+        try { b.scrollIntoView({ behavior: 'smooth', inline: 'nearest', block: 'nearest' }); } catch {}
+      }
     });
     const container = document.getElementById('od-tab-content');
     if (container && this.currentObraId) {
@@ -282,33 +288,33 @@ const ObraDetalhe = {
       </div>
 
       <!-- Barra de Abas (Navegação Interna da Obra) -->
-      <div style="display:flex;gap:8px;border-bottom:2px solid var(--border);margin-bottom:20px;overflow-x:auto;padding-bottom:2px;">
+      <div style="display:flex;gap:6px;border-bottom:2px solid var(--border);margin-bottom:20px;overflow-x:auto;padding-bottom:4px;scrollbar-width:thin;scrollbar-color:rgba(198,255,0,.25) transparent;-webkit-overflow-scrolling:touch;width:100%;box-sizing:border-box;">
         <button class="btn od-tab-btn ${this.activeTab==='orcado-realizado'?'active':''}" data-tab="orcado-realizado" data-od-click="ObraDetalhe.setTab('orcado-realizado')"
-                style="padding:10px 18px;font-size:.88rem;font-weight:800;border:none;border-bottom:3px solid ${this.activeTab==='orcado-realizado'?'var(--accent)':'transparent'};color:${this.activeTab==='orcado-realizado'?'var(--accent)':'var(--text2)'};border-radius:0;background:${this.activeTab==='orcado-realizado'?'rgba(18,217,160,0.08)':'transparent'};">
+                style="padding:10px 16px;font-size:.84rem;font-weight:800;border:none;border-bottom:3px solid ${this.activeTab==='orcado-realizado'?'var(--accent)':'transparent'};color:${this.activeTab==='orcado-realizado'?'var(--accent)':'var(--text2)'};border-radius:6px 6px 0 0;background:${this.activeTab==='orcado-realizado'?'rgba(198,255,0,0.08)':'transparent'};white-space:nowrap;flex-shrink:0;">
           🏗️ Orçado × Realizado
         </button>
         <button class="btn od-tab-btn ${this.activeTab==='lancamentos'?'active':''}" data-tab="lancamentos" data-od-click="ObraDetalhe.setTab('lancamentos')"
-                style="padding:10px 18px;font-size:.88rem;font-weight:800;border:none;border-bottom:3px solid ${this.activeTab==='lancamentos'?'var(--accent)':'transparent'};color:${this.activeTab==='lancamentos'?'var(--accent)':'var(--text2)'};border-radius:0;background:${this.activeTab==='lancamentos'?'rgba(18,217,160,0.08)':'transparent'};">
+                style="padding:10px 16px;font-size:.84rem;font-weight:800;border:none;border-bottom:3px solid ${this.activeTab==='lancamentos'?'var(--accent)':'transparent'};color:${this.activeTab==='lancamentos'?'var(--accent)':'var(--text2)'};border-radius:6px 6px 0 0;background:${this.activeTab==='lancamentos'?'rgba(198,255,0,0.08)':'transparent'};white-space:nowrap;flex-shrink:0;">
           💰 Extrato &amp; Lançamentos
         </button>
         <button class="btn od-tab-btn ${this.activeTab==='documentos'?'active':''}" data-tab="documentos" data-od-click="ObraDetalhe.setTab('documentos')"
-                style="padding:10px 18px;font-size:.88rem;font-weight:800;border:none;border-bottom:3px solid ${this.activeTab==='documentos'?'var(--accent)':'transparent'};color:${this.activeTab==='documentos'?'var(--accent)':'var(--text2)'};border-radius:0;background:${this.activeTab==='documentos'?'rgba(18,217,160,0.08)':'transparent'};">
+                style="padding:10px 16px;font-size:.84rem;font-weight:800;border:none;border-bottom:3px solid ${this.activeTab==='documentos'?'var(--accent)':'transparent'};color:${this.activeTab==='documentos'?'var(--accent)':'var(--text2)'};border-radius:6px 6px 0 0;background:${this.activeTab==='documentos'?'rgba(198,255,0,0.08)':'transparent'};white-space:nowrap;flex-shrink:0;">
           📋 Documentação (43 Docs)
         </button>
         <button class="btn od-tab-btn ${this.activeTab==='medicoes'?'active':''}" data-tab="medicoes" data-od-click="ObraDetalhe.setTab('medicoes')"
-                style="padding:10px 18px;font-size:.88rem;font-weight:800;border:none;border-bottom:3px solid ${this.activeTab==='medicoes'?'var(--accent)':'transparent'};color:${this.activeTab==='medicoes'?'var(--accent)':'var(--text2)'};border-radius:0;background:${this.activeTab==='medicoes'?'rgba(18,217,160,0.08)':'transparent'};">
+                style="padding:10px 16px;font-size:.84rem;font-weight:800;border:none;border-bottom:3px solid ${this.activeTab==='medicoes'?'var(--accent)':'transparent'};color:${this.activeTab==='medicoes'?'var(--accent)':'var(--text2)'};border-radius:6px 6px 0 0;background:${this.activeTab==='medicoes'?'rgba(198,255,0,0.08)':'transparent'};white-space:nowrap;flex-shrink:0;">
           🔨 Medições &amp; Faturamento
         </button>
         <button class="btn od-tab-btn ${this.activeTab==='recibos'?'active':''}" data-tab="recibos" data-od-click="ObraDetalhe.setTab('recibos')"
-                style="padding:10px 18px;font-size:.88rem;font-weight:800;border:none;border-bottom:3px solid ${this.activeTab==='recibos'?'var(--accent)':'transparent'};color:${this.activeTab==='recibos'?'var(--accent)':'var(--text2)'};border-radius:0;background:${this.activeTab==='recibos'?'rgba(18,217,160,0.08)':'transparent'};">
+                style="padding:10px 16px;font-size:.84rem;font-weight:800;border:none;border-bottom:3px solid ${this.activeTab==='recibos'?'var(--accent)':'transparent'};color:${this.activeTab==='recibos'?'var(--accent)':'var(--text2)'};border-radius:6px 6px 0 0;background:${this.activeTab==='recibos'?'rgba(198,255,0,0.08)':'transparent'};white-space:nowrap;flex-shrink:0;">
           🧾 Recibos &amp; Contratos
         </button>
         <button class="btn od-tab-btn ${this.activeTab==='slas'?'active':''}" data-tab="slas" data-od-click="ObraDetalhe.setTab('slas')"
-                style="padding:10px 18px;font-size:.88rem;font-weight:800;border:none;border-bottom:3px solid ${this.activeTab==='slas'?'var(--accent)':'transparent'};color:${this.activeTab==='slas'?'var(--accent)':'var(--text2)'};border-radius:0;background:${this.activeTab==='slas'?'rgba(18,217,160,0.08)':'transparent'};">
+                style="padding:10px 16px;font-size:.84rem;font-weight:800;border:none;border-bottom:3px solid ${this.activeTab==='slas'?'var(--accent)':'transparent'};color:${this.activeTab==='slas'?'var(--accent)':'var(--text2)'};border-radius:6px 6px 0 0;background:${this.activeTab==='slas'?'rgba(198,255,0,0.08)':'transparent'};white-space:nowrap;flex-shrink:0;">
           ⏱️ Prazos &amp; SLAs (Cascata)
         </button>
         <button class="btn od-tab-btn ${this.activeTab==='bim-3d'?'active':''}" data-tab="bim-3d" data-od-click="ObraDetalhe.setTab('bim-3d')"
-                style="padding:10px 18px;font-size:.88rem;font-weight:800;border:none;border-bottom:3px solid ${this.activeTab==='bim-3d'?'var(--accent)':'transparent'};color:${this.activeTab==='bim-3d'?'var(--accent)':'var(--text2)'};border-radius:0;background:${this.activeTab==='bim-3d'?'rgba(198,255,0,0.08)':'transparent'};">
+                style="padding:10px 16px;font-size:.84rem;font-weight:800;border:none;border-bottom:3px solid ${this.activeTab==='bim-3d'?'var(--accent)':'transparent'};color:${this.activeTab==='bim-3d'?'var(--accent)':'var(--text2)'};border-radius:6px 6px 0 0;background:${this.activeTab==='bim-3d'?'rgba(198,255,0,0.08)':'transparent'};white-space:nowrap;flex-shrink:0;">
           🏢 Modelo 3D BIM
         </button>
       </div>

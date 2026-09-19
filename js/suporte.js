@@ -189,11 +189,11 @@ const Suporte = {
     const safeCompany = this._esc(u.empresaNome || 'sua empresa');
 
     modal.innerHTML = `
-      <div style="background:#0f1710;border:1px solid rgba(201,162,39,.4);border-radius:14px;width:100%;max-width:680px;height:650px;max-height:92vh;box-shadow:0 24px 60px rgba(0,0,0,.85);display:flex;flex-direction:column;overflow:hidden;font-family:inherit;color:#f0ead6;">
-        <div style="background:linear-gradient(135deg,#1C2D12,#243818);padding:14px 18px;border-bottom:1px solid rgba(201,162,39,.3);display:flex;align-items:center;justify-content:space-between;gap:12px;flex-shrink:0;">
+      <div style="background:var(--bg-base, #0D0D0D);border:1px solid var(--border-s, #282828);border-radius:14px;width:100%;max-width:680px;height:min(650px, 90dvh);max-height:90dvh;box-shadow:0 24px 60px rgba(0,0,0,.85);display:flex;flex-direction:column;overflow:hidden;font-family:inherit;color:var(--text, #F0F0E8);">
+        <div style="background:linear-gradient(135deg,#121F0D,#1A2F13);padding:14px 18px;border-bottom:1px solid var(--border-s, #282828);display:flex;align-items:center;justify-content:space-between;gap:12px;flex-shrink:0;">
           <div style="display:flex;align-items:center;gap:11px;min-width:0;">
-            <div style="width:40px;height:40px;border-radius:12px;background:${isHuman ? 'rgba(34,197,94,.18)' : 'rgba(56,189,248,.16)'};display:flex;align-items:center;justify-content:center;font-size:1.25rem;">${isHuman ? '👨‍💻' : '🤖'}</div>
-            <div style="min-width:0;"><div style="font-weight:900;color:var(--accent2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${this._esc(title)}</div><div style="font-size:.72rem;color:${st.color};font-weight:700;">${st.icon} ${st.label} · ${safeCompany}</div></div>
+            <div style="width:40px;height:40px;border-radius:12px;background:${isHuman ? 'rgba(198,255,0,.15)' : 'rgba(127,73,184,.2)'};display:flex;align-items:center;justify-content:center;font-size:1.25rem;">${isHuman ? '👨‍💻' : '🤖'}</div>
+            <div style="min-width:0;"><div style="font-weight:900;color:var(--accent, #C6FF00);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${this._esc(title)}</div><div style="font-size:.72rem;color:${st.color};font-weight:700;">${st.icon} ${st.label} · ${safeCompany}</div></div>
           </div>
           <div style="display:flex;gap:7px;align-items:center;">
             ${!closed ? `<button data-fb-click="Suporte.encerrarChat" data-fb-click-n="0" style="background:none;border:1px solid rgba(255,255,255,.15);color:#94a3b8;padding:5px 9px;border-radius:6px;font-size:.7rem;cursor:pointer;">Encerrar</button>` : ''}

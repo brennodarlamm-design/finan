@@ -1411,5 +1411,45 @@ select:focus-visible {
   .skeleton { animation: none; background: var(--bg-secondary); }
 }
 
+/* ===================================================================
+   RESPONSIVE ENHANCEMENTS (BIM 3D & ORÇAMENTOS MODAL)
+   =================================================================== */
+.bim-main-grid {
+  display: grid;
+  grid-template-columns: 1fr 340px;
+  gap: 16px;
+  min-height: 540px;
+}
+@media (max-width: 900px) {
+  .bim-main-grid {
+    grid-template-columns: 1fr;
+    min-height: auto;
+  }
+}
 
-
+.orc-item-main-row {
+  display: grid;
+  grid-template-columns: 3fr 1fr 1fr 1.3fr 1.3fr 1fr 40px;
+  gap: 8px;
+  align-items: flex-end;
+}
+.orc-item-sub-row {
+  display: grid;
+  grid-template-columns: 2fr 1.5fr 1.5fr 1.2fr;
+  margin-top: 8px;
+  padding-top: 6px;
+  border-top: 1px dashed rgba(255,255,255,.06);
+  gap: 8px;
+  align-items: center;
+}
+@media (max-width: 768px) {
+  .orc-item-main-row {
+    grid-template-columns: repeat(2, 1fr) 40px;
+  }
+  .orc-item-main-row > *:first-child {
+    grid-column: 1 / -1;
+  }
+  .orc-item-sub-row {
+    grid-template-columns: 1fr;
+  }
+}

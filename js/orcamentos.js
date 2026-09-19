@@ -847,7 +847,7 @@ const Orcamentos = {
 
     return `
     <div class="orc-item-row" id="row-${itemId}" data-item-id="${itemId}" data-cat-id="${catId}">
-      <div class="form-row" style="grid-template-columns: 3fr 1fr 1fr 1.3fr 1.3fr 1fr 40px; gap:8px; align-items:flex-end;">
+      <div class="form-row orc-item-main-row">
         <div class="form-group" style="margin:0">
           <label class="form-label" style="font-size:.7rem">Descrição do Item / Etapa *</label>
           <input class="form-control item-nome" value="${Utils.escapeHtml(item.nome || '')}" placeholder="Ex: Porcelanato 80x80cm retificado" required data-fb-input="Orcamentos._recalcModalTotals" data-fb-input-n="0">
@@ -889,7 +889,7 @@ const Orcamentos = {
       </div>
 
       <!-- Detalhes complementares expansíveis (opcional) -->
-      <div class="form-row" style="grid-template-columns: 2fr 1.5fr 1.5fr 1.2fr; margin-top:8px;padding-top:6px;border-top:1px dashed rgba(255,255,255,.06);gap:8px;align-items:center;">
+      <div class="form-row orc-item-sub-row">
         <div class="form-group" style="margin:0">
           <input class="form-control item-obs" value="${Utils.escapeHtml(item.observacoes || '')}" placeholder="Observações e especificações técnicas..." style="font-size:.76rem;height:30px">
         </div>

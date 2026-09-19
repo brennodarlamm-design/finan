@@ -76,29 +76,29 @@ const BIMViewer = {
         </div>
 
         <!-- Área Principal 3D e Painel Lateral de Custos -->
-        <div style="display:grid;grid-template-columns:1fr 320px;gap:16px;min-height:540px;">
+        <div class="bim-main-grid">
           <!-- Canvas 3D -->
-          <div style="position:relative;background:#060C05;border:1px solid #243518;border-radius:12px;overflow:hidden;min-height:540px;display:flex;align-items:center;justify-content:center;">
+          <div class="bim-canvas-wrap" style="position:relative;background:var(--fingo-void, #0A0A0A);border:1px solid var(--border-s, #282828);border-radius:var(--r-lg, 12px);overflow:hidden;min-height:540px;display:flex;align-items:center;justify-content:center;">
             <canvas id="bim-canvas" style="width:100%;height:100%;display:block;cursor:grab;touch-action:none;"></canvas>
 
             <!-- Seletor Flutuante de Pavimentos (Canto Superior Esquerdo) -->
-            <div style="position:absolute;top:16px;left:16px;display:flex;flex-direction:column;gap:6px;background:rgba(10,17,8,0.85);backdrop-filter:blur(8px);border:1px solid #243518;border-radius:8px;padding:8px 10px;z-index:2;">
-              <span style="font-size:.68rem;font-weight:800;color:#94A3B8;text-transform:uppercase;letter-spacing:.05em;">Pavimentos</span>
-              <button type="button" class="bim-floor-btn ${this.currentFloor === 'all' ? 'active' : ''}" data-floor="all" style="text-align:left;padding:4px 8px;font-size:.75rem;border:none;border-radius:4px;cursor:pointer;background:${this.currentFloor === 'all' ? '#C6FF00' : 'transparent'};color:${this.currentFloor === 'all' ? '#000' : '#F0EAD6'};font-weight:700;">Todos</button>
-              <button type="button" class="bim-floor-btn ${this.currentFloor === 'cobertura' ? 'active' : ''}" data-floor="cobertura" style="text-align:left;padding:4px 8px;font-size:.75rem;border:none;border-radius:4px;cursor:pointer;background:${this.currentFloor === 'cobertura' ? '#C6FF00' : 'transparent'};color:${this.currentFloor === 'cobertura' ? '#000' : '#F0EAD6'};font-weight:700;">Cobertura</button>
-              <button type="button" class="bim-floor-btn ${this.currentFloor === 'pav1' ? 'active' : ''}" data-floor="pav1" style="text-align:left;padding:4px 8px;font-size:.75rem;border:none;border-radius:4px;cursor:pointer;background:${this.currentFloor === 'pav1' ? '#C6FF00' : 'transparent'};color:${this.currentFloor === 'pav1' ? '#000' : '#F0EAD6'};font-weight:700;">1º Pavimento</button>
-              <button type="button" class="bim-floor-btn ${this.currentFloor === 'terreo' ? 'active' : ''}" data-floor="terreo" style="text-align:left;padding:4px 8px;font-size:.75rem;border:none;border-radius:4px;cursor:pointer;background:${this.currentFloor === 'terreo' ? '#C6FF00' : 'transparent'};color:${this.currentFloor === 'terreo' ? '#000' : '#F0EAD6'};font-weight:700;">Térreo</button>
-              <button type="button" class="bim-floor-btn ${this.currentFloor === 'fundacao' ? 'active' : ''}" data-floor="fundacao" style="text-align:left;padding:4px 8px;font-size:.75rem;border:none;border-radius:4px;cursor:pointer;background:${this.currentFloor === 'fundacao' ? '#C6FF00' : 'transparent'};color:${this.currentFloor === 'fundacao' ? '#000' : '#F0EAD6'};font-weight:700;">Fundações</button>
+            <div style="position:absolute;top:16px;left:16px;display:flex;flex-direction:column;gap:6px;background:rgba(13,13,13,0.85);backdrop-filter:blur(8px);border:1px solid var(--border-s, #282828);border-radius:8px;padding:8px 10px;z-index:2;">
+              <span style="font-size:.68rem;font-weight:800;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;">Pavimentos</span>
+              <button type="button" class="bim-floor-btn ${this.currentFloor === 'all' ? 'active' : ''}" data-floor="all" style="text-align:left;padding:4px 8px;font-size:.75rem;border:none;border-radius:4px;cursor:pointer;background:${this.currentFloor === 'all' ? '#C6FF00' : 'transparent'};color:${this.currentFloor === 'all' ? '#000' : '#F0F0E8'};font-weight:700;">Todos</button>
+              <button type="button" class="bim-floor-btn ${this.currentFloor === 'cobertura' ? 'active' : ''}" data-floor="cobertura" style="text-align:left;padding:4px 8px;font-size:.75rem;border:none;border-radius:4px;cursor:pointer;background:${this.currentFloor === 'cobertura' ? '#C6FF00' : 'transparent'};color:${this.currentFloor === 'cobertura' ? '#000' : '#F0F0E8'};font-weight:700;">Cobertura</button>
+              <button type="button" class="bim-floor-btn ${this.currentFloor === 'pav1' ? 'active' : ''}" data-floor="pav1" style="text-align:left;padding:4px 8px;font-size:.75rem;border:none;border-radius:4px;cursor:pointer;background:${this.currentFloor === 'pav1' ? '#C6FF00' : 'transparent'};color:${this.currentFloor === 'pav1' ? '#000' : '#F0F0E8'};font-weight:700;">1º Pavimento</button>
+              <button type="button" class="bim-floor-btn ${this.currentFloor === 'terreo' ? 'active' : ''}" data-floor="terreo" style="text-align:left;padding:4px 8px;font-size:.75rem;border:none;border-radius:4px;cursor:pointer;background:${this.currentFloor === 'terreo' ? '#C6FF00' : 'transparent'};color:${this.currentFloor === 'terreo' ? '#000' : '#F0F0E8'};font-weight:700;">Térreo</button>
+              <button type="button" class="bim-floor-btn ${this.currentFloor === 'fundacao' ? 'active' : ''}" data-floor="fundacao" style="text-align:left;padding:4px 8px;font-size:.75rem;border:none;border-radius:4px;cursor:pointer;background:${this.currentFloor === 'fundacao' ? '#C6FF00' : 'transparent'};color:${this.currentFloor === 'fundacao' ? '#000' : '#F0F0E8'};font-weight:700;">Fundações</button>
             </div>
 
             <!-- Dica de Interação de Câmera -->
-            <div style="position:absolute;bottom:14px;left:16px;font-size:.72rem;color:#94A3B8;background:rgba(0,0,0,0.6);padding:4px 10px;border-radius:6px;pointer-events:none;">
+            <div style="position:absolute;bottom:14px;left:16px;font-size:.72rem;color:var(--text3);background:rgba(0,0,0,0.65);padding:4px 10px;border-radius:6px;pointer-events:none;">
               🖱️ Clique e arraste para girar 360° &middot; Scroll para Zoom &middot; Clique em uma parte para inspecionar custos
             </div>
           </div>
 
           <!-- Painel Lateral de Inspeção de Custos & SINAPI -->
-          <div id="bim-element-details" style="background:#0F1A0B;border:1px solid #243518;border-radius:12px;padding:20px;display:flex;flex-direction:column;gap:14px;">
+          <div id="bim-element-details" style="background:var(--bg-card, #1A1A1A);border:1px solid var(--border-s, #282828);border-radius:var(--r-lg, 12px);padding:20px;display:flex;flex-direction:column;gap:14px;">
             ${this._renderElementDetailsHtml(null, obra)}
           </div>
         </div>

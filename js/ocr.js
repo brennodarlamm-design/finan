@@ -31,6 +31,12 @@ const OCR = {
         </div>
         <div class="modal-body" id="ocr-modal-body" style="padding:20px 24px;overflow-y:auto;flex:1;">
 
+          <!-- Guia de Enquadramento de Canteiro -->
+          <div style="background:rgba(198,255,0,0.06);border:1px solid rgba(198,255,0,0.22);border-radius:10px;padding:10px 14px;margin-bottom:14px;display:flex;align-items:center;gap:10px;font-size:.76rem;color:var(--text2);">
+            <span style="font-size:1.15rem;color:var(--accent);">🎯</span>
+            <div><strong style="color:var(--accent);">Dica de Canteiro:</strong> Enquadre o boleto ou nota fiscal bem iluminado e evite reflexos para leitura instantânea com 100% de precisão.</div>
+          </div>
+
           <!-- Botões de ação principais -->
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px;">
 
