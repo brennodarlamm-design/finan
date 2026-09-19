@@ -56,6 +56,12 @@ Antes de codificar, classifique a fonte:
 - `IfcRectangularTrimmedSurface` sobre `IfcSphericalSurface` e `IfcToroidalSurface` pode ser autoritativa quando os parâmetros permanecem no domínio da superfície, o toro satisfaz `MajorRadius > MinorRadius`, a unidade angular é conhecida e o `IfcEdgeLoop` coincide com o perímetro paramétrico tessellado.
 - Em superfícies elementares fechadas no parâmetro U, respeitar a ciclicidade e `Usense`: intervalos como 270°→0° podem representar um patch positivo de 90°. `Vsense` continua compatível com a ordem V1/V2 conforme a regra IFC.
 - Valores angulares IFC devem respeitar a `IfcUnitAssignment`: radianos SI ou unidade de conversão explícita (por exemplo grau → radiano). A mesma regra vale para trims cônicos/circulares e sólidos por revolução; não confundir a unidade SI base de uma conversão com a unidade realmente atribuída ao projeto.
+- Para extração 3D autoritativa de um produto, preferir sempre a `IfcShapeRepresentation` com `RepresentationIdentifier='Body'`; `Box`, `Axis`, `FootPrint`, `Surface` ou outras representações auxiliares não devem ser mescladas à malha de clash quando existe `Body`.
+- Respeitar a versão declarada em `FILE_SCHEMA`: `IfcAdvancedBrep` / `IfcAdvancedFace` são IFC4+ e não podem ser tratados como geometria normativa de um arquivo IFC2x3.
+- Índices de tessellation IFC são 1-based; qualquer acesso a arrays JavaScript deve converter explicitamente para 0-based.
+- `clashEligible=true` significa apenas que a geometria usada pelo FinGo foi resolvida deterministicamente sem fallback conhecido; não significa que o arquivo passou STEP syntax, EXPRESS schema, normative rules, MVD/IDS ou buildingSMART Validation Service.
+- Um arquivo abrir/renderizar no viewer nunca é prova suficiente de conformidade IFC. Validação normativa e validação geométrica do viewer são gates distintos.
+- Ao evoluir Brep, não assumir que `IfcClosedShell` é manifold apenas pelo nome: antes de declarar conformidade topológica plena, verificar fechamento, arestas compartilhadas e ausência de degenerescência conforme as regras do schema/validador.
 
 ## Workflow
 
