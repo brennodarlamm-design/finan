@@ -52,6 +52,8 @@ Antes de codificar, classifique a fonte:
 - `IfcBSplineSurfaceWithKnots` e `IfcRationalBSplineSurfaceWithKnots` só podem permanecer autoritativas em `IfcAdvancedFace` quando grau, malha de controle, nós, multiplicidades e pesos são consistentes e o contorno da face corresponde ao perímetro completo do patch tessellado.
 - Patches NURBS/B-Spline com recortes internos ou trimming arbitrário ainda não suportado devem cair para parcial; nunca renderizar o patch inteiro como se o recorte tivesse sido aplicado.
 - `IfcCylindricalSurface` em `IfcAdvancedFace` só pode ser autoritativa quando o `IfcEdgeLoop` provar uma faixa lateral cilíndrica completa: dois círculos fechados coaxiais com o mesmo raio da superfície e duas geratrizes coincidentes na costura. Cilindros parciais, arcos aparados, holes ou topologia ambígua permanecem parciais e fora do clash autoritativo.
+- `IfcRectangularTrimmedSurface` sobre `IfcCylindricalSurface` pode ser autoritativa para arcos cilíndricos parciais quando U/V, `Usense`/`Vsense`, contorno topológico e unidade angular declarada são consistentes; o contorno da face deve coincidir com o patch paramétrico.
+- Valores angulares IFC devem respeitar a `IfcUnitAssignment`: radianos SI ou unidade de conversão explícita (por exemplo grau → radiano). A mesma regra vale para trims cônicos/circulares e sólidos por revolução; não confundir a unidade SI base de uma conversão com a unidade realmente atribuída ao projeto.
 
 ## Workflow
 
