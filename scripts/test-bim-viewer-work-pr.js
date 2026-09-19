@@ -36,5 +36,12 @@ assert(upload.includes("exts: ['glb']") && upload.includes("magic: ['676C5446']"
 assert(upload.includes("lowerExt === 'ifc'") && upload.includes('ISO-10303-21'), 'IFC recebe validação estrutural antes do armazenamento');
 assert(upload.includes("lowerExt === 'obj'") && upload.includes("Arquivo OBJ inválido"), 'OBJ exige vértices e faces');
 assert(upload.includes("lowerExt === 'gltf'") && upload.includes('asset?.version'), 'GLTF exige JSON e asset.version');
+assert(src.includes('_loadCoordinationIssues()') && src.includes("subtipo: 'bim_issue'"), 'coordenação BIM persiste pendências por obra');
+assert(src.includes('_addCoordinationPhoto(issueId, file)') && src.includes("subtipo: 'bim_issue_photo'"), 'pendências aceitam evidência fotográfica');
+assert(src.includes('_toggleCoordinationIssue(issueId)'), 'pendências podem ser resolvidas e reabertas');
+assert(src.includes('_bindCoordinationEvents()'), 'eventos de coordenação são religados após atualização do painel');
 
-console.log('✅ BIM Viewer operacional e importação BIM validados.');
+const css = fs.readFileSync('css/style.css', 'utf8');
+assert(css.includes('.bim-bottom-grid') && css.includes('grid-template-columns: 1fr !important'), 'coordenação e histórico BIM colapsam corretamente no mobile');
+
+console.log('✅ BIM Viewer operacional, importação e coordenação BIM validados.');
