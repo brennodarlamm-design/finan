@@ -148,7 +148,7 @@ const BIMGeometryImporter = (() => {
       return {
         id: elem.id || `imported_${elemIndex+1}`,
         name: elem.name || `Elemento importado ${elemIndex+1}`,
-        floor: 'all',
+        floor: elem.floor || 'all',
         discipline: elem.discipline || 'arquitetura',
         category: elem.category || 'Modelo importado',
         color: elem.color || '#94A3B8',
@@ -242,6 +242,16 @@ const BIMGeometryImporter = (() => {
   function parseIFC(text) {
     const src=String(text||'');
     if(!/ISO-10303-21/i.test(src)||!/IFCPROJECT/i.test(src)) throw new Error('IFC inválido ou incompleto.');
+    if (typeof BIMIFCExtendedImporter !== 'undefined' && typeof BIMIFCExtendedImporter.parse === 'function') {
+      const extended = BIMIFCExtendedImporter.parse(src);
+      const normalized = normalizeElements(extended.elements || [], 'z-up');
+      return {
+        ...normalized,
+        format:'ifc',
+        authoritativeBim:true,
+        ...(extended.metadata || {})
+      };
+    }
     const entities=parseStepEntities(src);
     if(!entities.size) throw new Error('IFC sem entidades STEP legíveis.');
 
