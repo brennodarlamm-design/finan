@@ -1336,6 +1336,8 @@ const DB = {
           entidade_tipo: cloudDoc.tipo || cloudDoc.entidade_tipo,
           entidade_id: cloudDoc.referencia_id || cloudDoc.entidade_id,
           titulo: cloudDoc.titulo,
+          categoria: cloudDoc.categoria || loc?.categoria || '',
+          subtipo: loc?.subtipo || (cloudDoc.categoria === 'bim_model' ? 'bim_model' : undefined),
           nome_arquivo: cloudDoc.nome_arquivo,
           tipo_mime: cloudDoc.tipo_arquivo || cloudDoc.tipo_mime,
           tamanho: cloudDoc.tamanho_bytes || cloudDoc.tamanho,

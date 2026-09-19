@@ -1310,7 +1310,7 @@ const BIMViewer = {
           ${comparison.storeyDelta ? `<span>Pavimentos: ${comparison.storeyDelta >= 0 ? '+' : ''}${comparison.storeyDelta}</span>` : ''}
           ${comparison.schemaChanged ? `<span style="color:#F59E0B;">Schema: ${Utils.escapeHtml(comparison.previousSchema)} → ${Utils.escapeHtml(comparison.currentSchema)}</span>` : ''}
         </div>` : ''}
-        ${versions.length ? versions.slice(0, 5).map((doc, idx) => {
+        ${versions.length ? versions.slice(0, 10).map((doc, idx) => {
           let meta = {};
           try { meta = typeof doc.bim_metadata === 'string' ? JSON.parse(doc.bim_metadata) : (doc.bim_metadata || {}); } catch {}
           return `<div style="display:grid;grid-template-columns:auto 1fr auto;gap:9px;align-items:center;padding:8px 0;border-top:1px solid rgba(148,163,184,.12);">
