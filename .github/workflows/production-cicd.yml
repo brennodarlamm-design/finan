@@ -80,37 +80,83 @@ jobs:
         run: |
           set -euo pipefail
 
-          health=''
-          for attempt in {1..12}; do
-            health="$(curl --fail --silent --show-error https://fingo.api.br/__finobra/health || true)"
-            if [[ "$health" == *'"ok":true'* && \
-                  "$health" == *'"securityMode":"nonce-csp"'* && \
-                  "$health" == *'"loopRisk":false'* && \
-                  "$health" == *'"deploymentMetadataOk":true'* && \
-                  "$health" == *"\"commit\":\"$GITHUB_SHA\""* ]]; then
-              break
-            fi
-            echo "Waiting for Cloudflare propagation (${attempt}/12)..."
-            sleep 5
-          done
+          MAX_ATTEMPTS=12
+          RETRY_DELAY=5
+          RETRY_BODY=''
+          RETRY_STATUS=''
 
-          [[ "$health" == *'"ok":true'* ]]
-          [[ "$health" == *'"securityMode":"nonce-csp"'* ]]
-          [[ "$health" == *'"loopRisk":false'* ]]
-          [[ "$health" == *'"deploymentMetadataOk":true'* ]]
-          [[ "$health" == *"\"commit\":\"$GITHUB_SHA\""* ]]
+          retry_body_contains() {
+            local label="$1"
+            local url="$2"
+            shift 2
+            local attempt
+            local marker
+            local body
+            local matched
 
-          version="$(curl --fail --silent --show-error https://fingo.api.br/version.json)"
-          [[ "$version" == *"\"commit\":\"$GITHUB_SHA\""* ]]
-          [[ "$version" == *'"source":"github-actions"'* ]]
+            for ((attempt=1; attempt<=MAX_ATTEMPTS; attempt++)); do
+              body="$(curl --fail --silent --show-error "$url" || true)"
+              matched=true
+              for marker in "$@"; do
+                if [[ "$body" != *"$marker"* ]]; then
+                  matched=false
+                  break
+                fi
+              done
 
-          edge_api_health="$(curl --fail --silent --show-error 'https://fingo.api.br/api/v2/system/health')"
-          [[ "$edge_api_health" == *'"ok":true'* ]]
-          [[ "$edge_api_health" == *'"service":"fingo-edge-v2"'* ]]
-          [[ "$edge_api_health" == *'"runtime":"cloudflare-workers"'* ]]
+              if [[ "$matched" == true ]]; then
+                RETRY_BODY="$body"
+                echo "$label ready on attempt $attempt/$MAX_ATTEMPTS"
+                return 0
+              fi
 
-          auth_status="$(curl --silent --output /dev/null --write-out '%{http_code}' 'https://fingo.api.br/api/auth?action=me')"
-          [[ "$auth_status" == '401' ]]
+              echo "Waiting for Cloudflare propagation: $label ($attempt/$MAX_ATTEMPTS)..."
+              if (( attempt < MAX_ATTEMPTS )); then
+                sleep "$RETRY_DELAY"
+              fi
+            done
+
+            echo "::error::$label did not reach the expected deployment state after $MAX_ATTEMPTS attempts."
+            echo "::error::$label last response: $body"
+            return 1
+          }
+
+          retry_status_equals() {
+            local label="$1"
+            local url="$2"
+            local expected="$3"
+            local attempt
+            local status
+
+            for ((attempt=1; attempt<=MAX_ATTEMPTS; attempt++)); do
+              status="$(curl --silent --show-error --output /dev/null --write-out '%{http_code}' "$url" || true)"
+              if [[ "$status" == "$expected" ]]; then
+                RETRY_STATUS="$status"
+                echo "$label ready on attempt $attempt/$MAX_ATTEMPTS (HTTP $status)"
+                return 0
+              fi
+
+              echo "Waiting for Cloudflare propagation: $label ($attempt/$MAX_ATTEMPTS), got HTTP $status..."
+              if (( attempt < MAX_ATTEMPTS )); then
+                sleep "$RETRY_DELAY"
+              fi
+            done
+
+            echo "::error::$label expected HTTP $expected but last response was HTTP $status."
+            return 1
+          }
+
+          retry_body_contains             'edge health metadata'             'https://fingo.api.br/__finobra/health'             '"ok":true'             '"securityMode":"nonce-csp"'             '"loopRisk":false'             '"deploymentMetadataOk":true'             "\"commit\":\"$GITHUB_SHA\""
+          health="$RETRY_BODY"
+
+          retry_body_contains             'version metadata'             'https://fingo.api.br/version.json'             "\"commit\":\"$GITHUB_SHA\""             '"source":"github-actions"'
+          version="$RETRY_BODY"
+
+          retry_body_contains             'Edge API health'             'https://fingo.api.br/api/v2/system/health'             '"ok":true'             '"service":"fingo-edge-v2"'             '"runtime":"cloudflare-workers"'
+          edge_api_health="$RETRY_BODY"
+
+          retry_status_equals             'unauthenticated auth contract'             'https://fingo.api.br/api/auth?action=me'             '401'
+          auth_status="$RETRY_STATUS"
 
           check_route() {
             local url="$1"
