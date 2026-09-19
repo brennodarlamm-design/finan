@@ -1,0 +1,127 @@
+name: Cloudflare Pages preview
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'app.html'
+      - 'index.html'
+      - 'landing.html'
+      - 'login.html'
+      - 'master.html'
+      - 'css/**'
+      - 'js/**'
+      - 'functions/**'
+      - 'cloudflare/**'
+      - 'scripts/build-cloudflare-pages.cjs'
+      - 'scripts/patch38-postbuild.cjs'
+      - 'package.json'
+      - 'package-lock.json'
+      - '.github/workflows/cloudflare-pages-preview.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cloudflare-pages-preview-${{ github.event.pull_request.number || github.ref_name }}
+  cancel-in-progress: true
+
+jobs:
+  preview:
+    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Verify Cloudflare credentials
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ -n "$CLOUDFLARE_API_TOKEN" ]]
+          [[ -n "$CLOUDFLARE_ACCOUNT_ID" ]]
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build Cloudflare Pages assets
+        run: npm run build:cloudflare
+
+      - name: Discover Cloudflare Pages project
+        id: project
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx --yes wrangler pages project list --json > /tmp/pages-projects.json
+          cat /tmp/pages-projects.json
+          PROJECT_NAME="$(node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          const raw=JSON.parse(fs.readFileSync('/tmp/pages-projects.json','utf8'));
+          const projects=Array.isArray(raw)?raw:(Array.isArray(raw?.result)?raw.result:[]);
+          if(!projects.length){console.error('No Cloudflare Pages projects returned.');process.exit(2);}
+          const names=projects.map(p=>String(p.name||p.project_name||'')).filter(Boolean);
+          const exact=names.filter(n=>/^(finan|finobra|fingo)$/i.test(n));
+          const fuzzy=names.filter(n=>/(finan|finobra|fingo)/i.test(n));
+          const candidates=exact.length===1?exact:(exact.length===0&&fuzzy.length===1?fuzzy:[]);
+          if(candidates.length!==1){console.error('Could not identify one FinGo/FinObra Pages project safely. Available: '+names.join(', '));process.exit(3);}
+          process.stdout.write(candidates[0]);
+          NODE
+          )"
+          echo "name=$PROJECT_NAME" >> "$GITHUB_OUTPUT"
+
+      - name: Deploy preview to Cloudflare Pages
+        id: deploy
+        shell: bash
+        env:
+          PROJECT_NAME: ${{ steps.project.outputs.name }}
+          PREVIEW_BRANCH: ${{ github.event.pull_request.head.ref || github.ref_name }}
+          PREVIEW_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          set -euo pipefail
+          OUTPUT="$(npx --yes wrangler pages deploy dist \
+            --project-name "$PROJECT_NAME" \
+            --branch "$PREVIEW_BRANCH" \
+            --commit-hash "$PREVIEW_SHA" \
+            --commit-message "PR ${{ github.event.pull_request.number || 'manual' }} preview: $PREVIEW_SHA" 2>&1 | tee /dev/stderr)"
+          URL="$(printf '%s\n' "$OUTPUT" | grep -Eo 'https://[a-zA-Z0-9._-]+\.pages\.dev' | tail -n 1 || true)"
+          [[ -n "$URL" ]] || { echo '::error::No pages.dev URL returned by Wrangler.'; exit 1; }
+          echo "url=$URL" >> "$GITHUB_OUTPUT"
+
+      - name: Smoke test preview
+        shell: bash
+        env:
+          PREVIEW_URL: ${{ steps.deploy.outputs.url }}
+        run: |
+          set -euo pipefail
+          status=''
+          for attempt in {1..12}; do
+            status="$(curl --silent --show-error --location --output /tmp/preview.html --write-out '%{http_code}' "$PREVIEW_URL/" || true)"
+            [[ "$status" == '200' ]] && break
+            sleep 5
+          done
+          [[ "$status" == '200' ]]
+          grep -Eq 'FinGo|FinObra|Sua obra sob controle' /tmp/preview.html
+          curl --silent --show-error --head "$PREVIEW_URL/" | tr -d '\r' | grep -qi '^x-robots-tag: noindex'
+
+      - name: Preview summary
+        shell: bash
+        env:
+          PROJECT_NAME: ${{ steps.project.outputs.name }}
+          PREVIEW_URL: ${{ steps.deploy.outputs.url }}
+          PREVIEW_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          echo '## Cloudflare Pages Preview' >> "$GITHUB_STEP_SUMMARY"
+          echo '' >> "$GITHUB_STEP_SUMMARY"
+          echo "- Project: $PROJECT_NAME" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Commit: $PREVIEW_SHA" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Preview: $PREVIEW_URL" >> "$GITHUB_STEP_SUMMARY"
+          echo '- Smoke test: PASS' >> "$GITHUB_STEP_SUMMARY"
