@@ -32,7 +32,12 @@ assert(workflow.includes("'\"securityMode\":\"nonce-csp\"'"), 'Smoke test deve v
 assert(workflow.includes("'\"loopRisk\":false'"), 'Smoke test deve validar proteção contra loop.');
 assert(workflow.includes("check_route 'https://fingo.api.br/' 'landing-shell'"), 'Smoke test deve validar diretamente o domínio canônico FinGo.');
 assert(workflow.includes('auth_status'), 'Smoke test deve verificar rota de autenticação sem credenciais.');
-assert(workflow.includes("[[ \"$auth_status\" == '401' ]]"), 'Auth smoke test deve esperar 401 para usuário não autenticado.');
+const hasLegacyAuth401Check = workflow.includes("[[ \"$auth_status\" == '401' ]]");
+const hasRetryAuth401Check = workflow.includes('retry_status_equals') &&
+  workflow.includes("'unauthenticated auth contract'") &&
+  workflow.includes("'https://fingo.api.br/api/auth?action=me'") &&
+  workflow.includes("'401'");
+assert(hasLegacyAuth401Check || hasRetryAuth401Check, 'Auth smoke test deve esperar 401 para usuário não autenticado, com retry quando aplicável.');
 const hasLegacyAppStatus = workflow.includes('app_status=');
 const hasStructuredAppCheck = workflow.includes('check_route') &&
   (workflow.includes("'https://fingo.api.br/app/dashboard' 'app-shell'") || workflow.includes("'https://finobra.app.br/app/dashboard' 'app-shell'")) &&
