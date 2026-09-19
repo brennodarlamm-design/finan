@@ -37,6 +37,9 @@ const BIMViewer = {
   modelSource: 'procedural',
   importedModel: null,
   activeModelDocId: null,
+  clashAnalysis: null,
+  clashResults: [],
+  clashHighlightIds: [],
   _modelLoadToken: 0,
   _escapeHandler: null,
 
@@ -107,6 +110,10 @@ const BIMViewer = {
               <button type="button" class="bim-color-btn" data-color-mode="status" style="padding:5px 8px;font-size:.70rem;border:none;background:transparent;color:#F0EAD6;border-radius:4px;cursor:pointer;font-weight:700;">Status</button>
             </div>
 
+            <button type="button" class="btn-action" data-action="runClashDetection" style="font-size:.72rem;padding:6px 10px;background:rgba(127,73,184,.12);border-color:rgba(167,139,250,.35);color:#C4B5FD;font-weight:800;">
+              ⚡ Interferências
+            </button>
+
             <label class="btn-action" style="cursor:pointer;margin:0;font-size:.75rem;padding:6px 12px;background:rgba(198,255,0,.1);border:1px solid rgba(198,255,0,.3);color:#C6FF00;border-radius:6px;font-weight:700;">
               <span>📁 Importar 3D (.obj / .ifc)</span>
               <input type="file" id="bim-file-input" accept=".obj,.ifc,.gltf,.glb" style="display:none;" />
@@ -147,6 +154,7 @@ const BIMViewer = {
           <div id="bim-model-versions">${this._renderModelVersionsHtml()}</div>
           <div id="bim-coordination-panel">${this._renderCoordinationHtml()}</div>
         </div>
+        <div id="bim-clash-panel">${this._renderClashPanelHtml()}</div>
       </div>
     `;
 
@@ -433,7 +441,7 @@ const BIMViewer = {
     // Gera as faces poligonais 3D de todas as peças
     const faces = [];
     visibleElements.forEach(elem => {
-      const isSelected = this.selectedElement?.id === elem.id;
+      const isSelected = this.selectedElement?.id === elem.id || this.clashHighlightIds.includes(elem.id);
       const meshes = (elem.meshes || []).filter(mesh => this._meshPassesSection(mesh));
       meshes.forEach(mesh => {
         const displayColor = this.colorMode === 'status' ? this._statusColorForElement(elem) : mesh.color;
@@ -980,6 +988,9 @@ const BIMViewer = {
     this.modelSource = 'imported';
     this.importedModel = scene;
     this.activeModelDocId = docId || null;
+    this.clashAnalysis = null;
+    this.clashResults = [];
+    this.clashHighlightIds = [];
     this.elements = scene.elements;
     this.currentFloor = 'all';
     this.disciplineFilter = 'all';
@@ -998,6 +1009,9 @@ const BIMViewer = {
     this.modelSource = 'procedural';
     this.importedModel = null;
     this.activeModelDocId = null;
+    this.clashAnalysis = null;
+    this.clashResults = [];
+    this.clashHighlightIds = [];
     this._generateParametricBuilding(obra);
     this._applyOperationalData(this.financialSnapshot || this._getOperationalSnapshot(this.activeObraId));
     this.selectedElement = this.elements[1] || this.elements[0] || null;
@@ -1018,6 +1032,138 @@ const BIMViewer = {
       coord.innerHTML = this._renderCoordinationHtml();
       this._bindCoordinationEvents();
     }
+    const clash = document.getElementById('bim-clash-panel');
+    if (clash) {
+      clash.innerHTML = this._renderClashPanelHtml();
+      this._bindClashEvents();
+    }
+  },
+
+  _renderClashPanelHtml() {
+    const imported = this.modelSource === 'imported';
+    const eligible = imported && this.importedModel?.clashEligible !== false;
+    const results = Array.isArray(this.clashResults) ? this.clashResults : [];
+    const analysis = this.clashAnalysis;
+
+    return `
+      <div style="background:#0F1A0E;border:1px solid #243518;border-radius:10px;padding:12px 14px;">
+        <div style="display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap;">
+          <div>
+            <div style="font-size:.76rem;font-weight:900;color:#F0F0E8;">Análise de Interferências</div>
+            <div style="font-size:.66rem;color:#64748B;">BVH + interseção triângulo-triângulo em geometria importada.</div>
+          </div>
+          <button type="button" class="btn-action" data-action="runClashDetection" ${eligible ? '' : 'disabled'} style="font-size:.70rem;padding:6px 9px;color:${eligible ? '#C4B5FD' : '#64748B'};border-color:rgba(167,139,250,.30);">
+            ⚡ ${analysis ? 'Reanalisar' : 'Analisar geometria'}
+          </button>
+        </div>
+
+        ${!imported ? '<div style="font-size:.70rem;color:#64748B;padding:10px 0;">Importe ou abra uma versão IFC/OBJ/GLTF/GLB para executar a análise geométrica.</div>' : ''}
+        ${imported && !eligible ? '<div style="font-size:.70rem;color:#F59E0B;padding:10px 0;">Este modelo contém geometria IFC parcial/booleana não tessellada integralmente. Clash autoritativo permanece bloqueado para evitar falso positivo.</div>' : ''}
+
+        ${analysis ? `
+          <div style="display:flex;gap:14px;flex-wrap:wrap;margin-top:9px;font-size:.65rem;color:#94A3B8;">
+            <span><b style="color:#F0F0E8;">${results.length}</b> interferência(s) confirmada(s)</span>
+            <span><b style="color:#F0F0E8;">${analysis.eligibleElements || 0}</b> elementos analisados</span>
+            <span><b style="color:#F0F0E8;">${Number(analysis.comparisons || 0).toLocaleString('pt-BR')}</b> comparações de triângulos</span>
+            ${analysis.truncated ? '<span style="color:#F59E0B;">limite de processamento atingido</span>' : ''}
+          </div>
+        ` : ''}
+
+        <div style="margin-top:8px;max-height:280px;overflow:auto;">
+          ${results.length ? results.slice(0, 50).map((clash, idx) => `
+            <div style="display:grid;grid-template-columns:auto 1fr auto;gap:9px;align-items:center;padding:8px 0;border-top:1px solid rgba(148,163,184,.12);">
+              <div style="width:25px;height:25px;border-radius:6px;display:grid;place-items:center;background:rgba(239,68,68,.12);color:#EF4444;font-size:.66rem;font-weight:900;">${idx+1}</div>
+              <div style="min-width:0;">
+                <div style="font-size:.70rem;color:#E2E8F0;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${Utils.escapeHtml(clash.elementAName)} × ${Utils.escapeHtml(clash.elementBName)}</div>
+                <div style="font-size:.61rem;color:#64748B;">${Utils.escapeHtml(clash.disciplineA)} × ${Utils.escapeHtml(clash.disciplineB)} · ponto ${Math.round(clash.point.x*10)/10}, ${Math.round(clash.point.y*10)/10}, ${Math.round(clash.point.z*10)/10}</div>
+              </div>
+              <div style="display:flex;gap:5px;">
+                <button type="button" class="btn-action" data-action="focusClash" data-clash-index="${idx}" style="font-size:.62rem;padding:4px 7px;">Ver</button>
+                <button type="button" class="btn-action" data-action="issueFromClash" data-clash-index="${idx}" style="font-size:.62rem;padding:4px 7px;color:#F59E0B;">Pendência</button>
+              </div>
+            </div>`).join('') : (analysis && eligible ? '<div style="font-size:.70rem;color:#C6FF00;padding:10px 0;">Nenhuma interferência inter-disciplinar confirmada pelos triângulos suportados.</div>' : '')}
+        </div>
+
+        <div style="font-size:.61rem;color:#64748B;margin-top:8px;">Contatos coplanares e simples encostos por borda são ignorados. O resultado depende da completude geométrica da versão importada.</div>
+      </div>
+    `;
+  },
+
+  _bindClashEvents() {
+    document.querySelectorAll('[data-action="runClashDetection"]').forEach(btn => {
+      btn.addEventListener('click', () => this._runClashDetection());
+    });
+    document.querySelectorAll('[data-action="focusClash"]').forEach(btn => {
+      btn.addEventListener('click', e => this._focusClash(Number(e.currentTarget.getAttribute('data-clash-index'))));
+    });
+    document.querySelectorAll('[data-action="issueFromClash"]').forEach(btn => {
+      btn.addEventListener('click', e => this._createIssueFromClash(Number(e.currentTarget.getAttribute('data-clash-index'))));
+    });
+  },
+
+  async _runClashDetection() {
+    if (this.modelSource !== 'imported') return Utils.toast('Abra um modelo importado antes de analisar interferências.', 'warning');
+    if (this.importedModel?.clashEligible === false) return Utils.toast('Clash bloqueado: a geometria IFC desta versão é parcial.', 'warning');
+    if (typeof BIMClashEngine === 'undefined') return Utils.toast('Motor de interferências indisponível.', 'error');
+
+    Utils.toast('Analisando interferências geométricas...', 'info');
+    await new Promise(resolve => requestAnimationFrame(resolve));
+    const analysis = BIMClashEngine.detect(this.elements, {
+      maxClashes: 50,
+      maxComparisons: 300000,
+      interDisciplineOnly: true
+    });
+    this.clashAnalysis = analysis;
+    this.clashResults = analysis.clashes || [];
+    this.clashHighlightIds = [];
+    const host = document.getElementById('bim-clash-panel');
+    if (host) {
+      host.innerHTML = this._renderClashPanelHtml();
+      this._bindClashEvents();
+    }
+    Utils.toast(this.clashResults.length
+      ? `${this.clashResults.length} interferência(s) confirmada(s).`
+      : 'Nenhuma interferência inter-disciplinar confirmada.', this.clashResults.length ? 'warning' : 'success');
+  },
+
+  _focusClash(index) {
+    const clash = this.clashResults?.[index];
+    if (!clash) return;
+    this.clashHighlightIds = [clash.elementAId, clash.elementBId];
+    this.selectedElement = this.elements.find(e => e.id === clash.elementAId) || this.selectedElement;
+    this._refreshSelectedElementUi();
+  },
+
+  _createIssueFromClash(index) {
+    const clash = this.clashResults?.[index];
+    if (!clash || typeof Documentos === 'undefined' || typeof Documentos.adicionar !== 'function') return;
+    const existing = (this.coordinationIssues || []).find(issue =>
+      issue.subtipo === 'bim_issue' &&
+      issue.origem === 'clash_detection' &&
+      ((issue.bim_element_id === clash.elementAId && issue.bim_element_b_id === clash.elementBId) ||
+       (issue.bim_element_id === clash.elementBId && issue.bim_element_b_id === clash.elementAId)) &&
+      issue.status !== 'resolvida'
+    );
+    if (existing) return Utils.toast('Já existe uma pendência aberta para esta interferência.', 'warning');
+
+    Documentos.adicionar({
+      entidade_tipo:'obra',
+      entidade_id:this.activeObraId,
+      titulo:`Interferência BIM — ${clash.elementAName} × ${clash.elementBName}`,
+      subtipo:'bim_issue',
+      categoria:'bim_coordination',
+      origem:'clash_detection',
+      status:'aberta',
+      prioridade:'alta',
+      bim_element_id:clash.elementAId,
+      bim_element_nome:clash.elementAName,
+      bim_element_b_id:clash.elementBId,
+      bim_element_b_nome:clash.elementBName,
+      clash_point:JSON.stringify(clash.point),
+      clash_method:clash.method || 'triangle-bvh'
+    });
+    this._refreshCoordination();
+    Utils.toast('Pendência criada a partir da interferência.', 'success');
   },
 
   async _loadModelDocument(docId, {silent=false} = {}) {
@@ -1632,6 +1778,7 @@ const BIMViewer = {
       }
 
       const hitElem = hitElemId ? this.elements.find(el => el.id === hitElemId) : null;
+      this.clashHighlightIds = [];
       if (hitElem) {
         this.selectedElement = hitElem;
       } else {
@@ -1751,6 +1898,8 @@ const BIMViewer = {
 
     const restoreBtn = document.querySelector('[data-action="restoreProcedural"]');
     if (restoreBtn) restoreBtn.addEventListener('click', () => this._restoreProceduralModel());
+
+    this._bindClashEvents();
 
     document.querySelectorAll('[data-action="loadBimVersion"]').forEach(btn => {
       btn.addEventListener('click', async (e) => {
