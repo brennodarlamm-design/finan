@@ -203,9 +203,9 @@ const BIMGeometryImporter = (() => {
       category:'OBJ',
       color:'#94A3B8',
       rawTriangles:g.faces.map(f=>f.map(idx=>vertices[idx])).filter(t=>t.every(Boolean)),
-      importedProperties:{format:'OBJ',vertices:vertices.length,faces:g.faces.length,geometryQuality:'full'}
+      importedProperties:{format:'OBJ',vertices:vertices.length,faces:g.faces.length,geometryQuality:'full',clashEligible:true}
     }));
-    return {...normalizeElements(elements,'y-up'), format:'obj', authoritativeBim:false, geometryQuality:'full'};
+    return {...normalizeElements(elements,'y-up'), format:'obj', authoritativeBim:false, geometryQuality:'full', clashEligible:true};
   }
 
   function parseStepEntities(text) {
