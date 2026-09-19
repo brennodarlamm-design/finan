@@ -1,4 +1,7 @@
 import { executeEdgeApi } from './api/_edge-adapter.js';
+import { applyEdgeSecurityMiddleware } from './api/_edge-security.js';
+import { recordEdgeMetric, getEdgeMetricsSummary, renderEdgeMetricsHtml } from './api/_edge-metrics.js';
+import { dispatchEdgeAlert } from './api/_edge-alerts.js';
 export { BudgetSyncRoom } from './api/_edge-realtime.js';
 
 const DEFAULT_API_ORIGIN = 'https://api.fingo.api.br';
@@ -417,7 +420,30 @@ async function handleApi(request, env) {
 
 export default {
   async fetch(request, env) {
+    const startTime = Date.now();
     const url = new URL(request.url);
+
+    // 1. Dashboard de Métricas & Observabilidade em Tempo Real
+    if (url.pathname === '/__edge/metrics' || url.pathname === '/__finobra/metrics') {
+      const summary = getEdgeMetricsSummary();
+      return new Response(renderEdgeMetricsHtml(summary), {
+        headers: {
+          'Content-Type': 'text/html; charset=utf-8',
+          'Cache-Control': 'no-store, no-cache'
+        }
+      });
+    }
+
+    // 2. Middleware de Segurança Ativa (Fail2Ban & Idempotência)
+    const securityBlock = await applyEdgeSecurityMiddleware(request, env);
+    if (securityBlock) {
+      recordEdgeMetric({
+        status: securityBlock.status,
+        latencyMs: Date.now() - startTime,
+        isSecurityBlock: true
+      });
+      return securityBlock;
+    }
 
     const redirect = canonicalRedirect(request, env);
     if (redirect) return redirect;
@@ -440,8 +466,17 @@ export default {
         message: 'Durable Object room available on edge.'
       });
     }
+
     if (isApiPath(url.pathname)) {
-      return handleApi(request, env);
+      const response = await handleApi(request, env);
+      if (response) {
+        recordEdgeMetric({
+          status: response.status,
+          latencyMs: Date.now() - startTime,
+          isCacheHit: response.headers.get('X-FinGo-Transformed') === 'true' || response.headers.get('CF-Cache-Status') === 'HIT'
+        });
+      }
+      return response;
     }
 
     return fetchFrontendResponse(request, env);

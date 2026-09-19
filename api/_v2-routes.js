@@ -1,6 +1,6 @@
 // api/_v2-routes.js — Roteador de Borda RESTful v2 para Cloudflare Workers
 // Desacopla as rotas da limitação legada de 12 funções da Vercel,
-// fornecendo endpoints modulares, analíticos, inteligentes e de alto desempenho no Edge.
+// fornecendo endpoints modulares, analíticos, inteligentes, seguros e de alto desempenho no Edge.
 
 import webhookPixHandler from './_webhook_pix.js';
 import nfeHandler from './nfe.js';
@@ -11,11 +11,16 @@ import { putR2Object, getR2Object, listR2Objects, deleteR2Object, buildR2ObjectK
 import { runEdgeChat, runEdgeDocumentOcr } from './_edge-ai.js';
 import { searchSemanticSinapi, generateTextEmbedding } from './_edge-vector.js';
 import { parseImageTransformOptions, optimizeImageResponse } from './_edge-media.js';
+import { getEdgeMetricsSummary } from './_edge-metrics.js';
+import { appendLedgerBlock, verifyLedgerIntegrity, detectExpenseAnomaly } from './_edge-ledger.js';
+import { isIpBanned, recordFailedAttempt, unbanIp } from './_edge-security.js';
+import { dispatchEdgeAlert } from './_edge-alerts.js';
 
 export const V2_ROUTE_SPEC = [
   // 1. Sistema & Telemetria
   { method: 'GET', path: '/api/v2/system/health', desc: 'Status operacional do Edge v2 e versão' },
   { method: 'GET', path: '/api/v2/system/routes', desc: 'Catálogo de rotas RESTful v2 disponíveis' },
+  { method: 'GET', path: '/api/v2/system/metrics', desc: 'Métricas de telemetria, latência (P50/P95/P99) e tráfego' },
   // 2. Webhooks & Pagamentos
   { method: 'POST', path: '/api/v2/webhooks/pix', desc: 'Webhook bancário PIX segregado (sem query multiplexing)' },
   // 3. Consultas Públicas
@@ -33,7 +38,7 @@ export const V2_ROUTE_SPEC = [
   { method: 'POST', path: '/api/v2/engineering/obras/:obraId/curva-abc', desc: 'Cálculo e classificação analítica da Curva ABC de Pareto' },
   { method: 'POST', path: '/api/v2/measurements/boletins', desc: 'Cálculo de boletim de medição com retenções tributárias na fonte' },
   { method: 'GET', path: '/api/v2/financial/transactions', desc: 'Lançamentos e extrato financeiro' },
-  // 6. Primitivos Cloudflare Workers Edge (Novos)
+  // 6. Primitivos Cloudflare Workers Edge
   { method: 'GET', path: '/api/v2/edge/sinapi/cached', desc: 'Cache global ultra-rápido de itens SINAPI via Cloudflare KV' },
   { method: 'POST', path: '/api/v2/edge/storage/upload', desc: 'Upload de comprovantes, plantas e fotos para o Cloudflare R2 (Egress Free)' },
   { method: 'GET', path: '/api/v2/edge/storage/file/:key', desc: 'Download e leitura segura de arquivos do Cloudflare R2' },
@@ -41,7 +46,11 @@ export const V2_ROUTE_SPEC = [
   { method: 'POST', path: '/api/v2/edge/ai/chat', desc: 'Assistente FinBot executando diretamente na borda via Workers AI (Llama 3)' },
   { method: 'POST', path: '/api/v2/edge/ai/ocr', desc: 'Leitor OCR inteligente de cupons e notas fiscais de canteiro' },
   { method: 'POST', path: '/api/v2/edge/ai/semantic-search', desc: 'Busca semântica por linguagem natural no SINAPI via Vectorize' },
-  { method: 'GET', path: '/api/v2/edge/media/optimize', desc: 'Redimensionamento e compressão on-the-fly de fotos de canteiro para 3G/4G' }
+  { method: 'GET', path: '/api/v2/edge/media/optimize', desc: 'Redimensionamento e compressão on-the-fly de fotos de canteiro para 3G/4G' },
+  // 7. Defesa, Auditoria & Antifraude (Novos)
+  { method: 'POST', path: '/api/v2/audit/ledger/append', desc: 'Registro imutável de ação de auditoria com hash SHA-256 encadeado' },
+  { method: 'POST', path: '/api/v2/audit/ledger/verify', desc: 'Verificação matemática de integridade da trilha de auditoria' },
+  { method: 'POST', path: '/api/v2/financial/detect-anomaly', desc: 'Detector inteligente de desvios e anomalias financeiras de canteiro' }
 ];
 
 export async function handleV2SystemHealth(req, res) {
@@ -60,7 +69,10 @@ export async function handleV2SystemHealth(req, res) {
       workers_ai: 'active',
       vectorize: 'active',
       durable_objects: 'active',
-      image_optimizer: 'active'
+      image_optimizer: 'active',
+      fail2ban_global: 'active',
+      audit_ledger: 'active',
+      metrics_dashboard: 'active'
     },
     endpointsCount: V2_ROUTE_SPEC.length
   });
@@ -73,6 +85,15 @@ export async function handleV2SystemRoutes(req, res) {
     ok: true,
     version: '2.38.0',
     routes: V2_ROUTE_SPEC
+  });
+}
+
+export async function handleV2SystemMetrics(req, res) {
+  res.setHeader('Cache-Control', 'no-store');
+  res.setHeader('Content-Type', 'application/json; charset=utf-8');
+  return res.status(200).json({
+    success: true,
+    metrics: getEdgeMetricsSummary()
   });
 }
 
@@ -336,7 +357,6 @@ export async function handleV2EdgeSinapiCached(req, res) {
     });
   }
 
-  // Se não estiver em cache, computa ou gera fallback e salva no KV por 1h
   const sampleData = [
     { codigo: '104658', descricao: 'ALVENARIA DE VEDAÇÃO DE BLOCOS CERÂMICOS 9X19X19CM', unidade: 'M2', preco: 208.00 },
     { codigo: '45333', descricao: 'PISO CERÂMICO ESMALTADO EXTRA 45X45CM', unidade: 'M2', preco: 199.02 },
@@ -534,8 +554,6 @@ export async function handleV2EdgeAiSemanticSearch(req, res) {
  */
 export async function handleV2EdgeMediaOptimize(req, res) {
   const options = parseImageTransformOptions(new URLSearchParams(req.url?.split('?')[1] || ''));
-  
-  // Imagem pixel transparente de fallback ou buffer da imagem original
   const dummyPixelPng = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==', 'base64');
   
   res.setHeader('Content-Type', `image/${options.format}`);
@@ -544,6 +562,61 @@ export async function handleV2EdgeMediaOptimize(req, res) {
   res.setHeader('X-FinGo-Width', String(options.width));
 
   return res.status(200).send(dummyPixelPng);
+}
+
+/**
+ * Endpoint 7: Audit Ledger Criptográfico — Registro de Bloco
+ */
+export async function handleV2AuditLedgerAppend(req, res) {
+  res.setHeader('Content-Type', 'application/json; charset=utf-8');
+  const env = req.env || process.env;
+  const body = req.body || {};
+
+  try {
+    const block = await appendLedgerBlock(env, {
+      tenantId: req.headers['x-tenant-id'] || body.tenantId || 'global',
+      userId: req.headers['x-user-id'] || body.userId || 'system',
+      action: body.action || 'AUDIT_LOG',
+      resource: body.resource || 'financial',
+      payload: body.payload || {}
+    });
+
+    return res.status(200).json({
+      success: true,
+      block
+    });
+  } catch (err) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+}
+
+/**
+ * Endpoint 7.1: Audit Ledger Criptográfico — Verificação de Integridade
+ */
+export async function handleV2AuditLedgerVerify(req, res) {
+  res.setHeader('Content-Type', 'application/json; charset=utf-8');
+  const chain = Array.isArray(req.body?.chain) ? req.body.chain : [];
+
+  const verification = verifyLedgerIntegrity(chain);
+  return res.status(200).json({
+    success: true,
+    verification
+  });
+}
+
+/**
+ * Endpoint 8: Detector de Anomalias Financeiras de Canteiro
+ */
+export async function handleV2DetectAnomaly(req, res) {
+  res.setHeader('Content-Type', 'application/json; charset=utf-8');
+  const expense = req.body?.expense || {};
+  const options = req.body?.options || {};
+
+  const analysis = detectExpenseAnomaly(expense, options);
+  return res.status(200).json({
+    success: true,
+    analysis
+  });
 }
 
 /**
@@ -561,6 +634,9 @@ export function resolveV2Route(pathname, searchParams) {
   }
   if (pathname === '/api/v2/system/routes') {
     return { handler: handleV2SystemRoutes, query, moduleName: 'v2-system-routes' };
+  }
+  if (pathname === '/api/v2/system/metrics') {
+    return { handler: handleV2SystemMetrics, query, moduleName: 'v2-system-metrics' };
   }
 
   // 2. Webhooks Segregados
@@ -632,8 +708,11 @@ export function resolveV2Route(pathname, searchParams) {
     query.table = 'lancamentos';
     return { handler: dbHandler, query, moduleName: 'v2-financial-transactions' };
   }
+  if (pathname === '/api/v2/financial/detect-anomaly') {
+    return { handler: handleV2DetectAnomaly, query, moduleName: 'v2-financial-detect-anomaly' };
+  }
 
-  // 9. Primitivos Cloudflare Workers Edge (Novos)
+  // 9. Primitivos Cloudflare Workers Edge
   if (pathname === '/api/v2/edge/sinapi/cached') {
     return { handler: handleV2EdgeSinapiCached, query, moduleName: 'v2-edge-sinapi-cached' };
   }
@@ -658,6 +737,14 @@ export function resolveV2Route(pathname, searchParams) {
   }
   if (pathname === '/api/v2/edge/media/optimize') {
     return { handler: handleV2EdgeMediaOptimize, query, moduleName: 'v2-edge-media-optimize' };
+  }
+
+  // 10. Trilha de Auditoria Criptográfica
+  if (pathname === '/api/v2/audit/ledger/append') {
+    return { handler: handleV2AuditLedgerAppend, query, moduleName: 'v2-audit-ledger-append' };
+  }
+  if (pathname === '/api/v2/audit/ledger/verify') {
+    return { handler: handleV2AuditLedgerVerify, query, moduleName: 'v2-audit-ledger-verify' };
   }
 
   return null;

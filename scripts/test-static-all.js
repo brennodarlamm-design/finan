@@ -90,7 +90,8 @@ const tests = [
   'scripts/test-edge-security-design.js',
   'scripts/test-edge-v2-routes.js',
   'scripts/test-bug-hunter-reaudit-fixes.js',
-  'scripts/test-cloudflare-workers-full.js'
+  'scripts/test-cloudflare-workers-full.js',
+  'scripts/test-edge-security-monitoring.js'
 ].filter(fs.existsSync);
 
 const p50NativeSourceTests = new Set([
