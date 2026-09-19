@@ -45,54 +45,28 @@ jobs:
           test ! -e dist/.git
           echo 'Cloudflare Pages build validated.'
 
-      - name: Discover Cloudflare Pages project
+      - name: Deploy isolated Cloudflare Worker preview
         if: github.event_name == 'pull_request'
-        id: pages_project
+        id: worker_preview
         shell: bash
+        env:
+          PREVIEW_NAME: finan-pr-${{ github.event.pull_request.number }}-preview
+          PREVIEW_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
           set -euo pipefail
           [[ -n "$CLOUDFLARE_API_TOKEN" ]]
           [[ -n "$CLOUDFLARE_ACCOUNT_ID" ]]
-          npx --yes wrangler pages project list --json > /tmp/pages-projects.json
-          cat /tmp/pages-projects.json
-          PROJECT_NAME="$(node --input-type=module <<'NODE'
-          import fs from 'node:fs';
-          const raw=JSON.parse(fs.readFileSync('/tmp/pages-projects.json','utf8'));
-          const projects=Array.isArray(raw)?raw:(Array.isArray(raw?.result)?raw.result:[]);
-          const names=projects.map(p=>String(p.name||p.project_name||'')).filter(Boolean);
-          const exact=names.filter(n=>/^(finan|finobra|fingo)$/i.test(n));
-          const fuzzy=names.filter(n=>/(finan|finobra|fingo)/i.test(n));
-          const candidates=exact.length===1?exact:(exact.length===0&&fuzzy.length===1?fuzzy:[]);
-          if(candidates.length!==1){
-            console.error('Could not identify one FinGo/FinObra Pages project safely. Available: '+names.join(', '));
-            process.exit(3);
-          }
-          process.stdout.write(candidates[0]);
-          NODE
-          )"
-          echo "name=$PROJECT_NAME" >> "$GITHUB_OUTPUT"
-          echo "Cloudflare Pages project: $PROJECT_NAME"
-
-      - name: Deploy Cloudflare Pages preview
-        if: github.event_name == 'pull_request'
-        id: pages_preview
-        shell: bash
-        env:
-          PROJECT_NAME: ${{ steps.pages_project.outputs.name }}
-          PREVIEW_BRANCH: ${{ github.event.pull_request.head.ref }}
-          PREVIEW_SHA: ${{ github.event.pull_request.head.sha }}
-        run: |
-          set -euo pipefail
-          OUTPUT="$(npx --yes wrangler pages deploy dist             --project-name "$PROJECT_NAME"             --branch "$PREVIEW_BRANCH"             --commit-hash "$PREVIEW_SHA"             --commit-message "PR ${{ github.event.pull_request.number }} preview: $PREVIEW_SHA" 2>&1 | tee /dev/stderr)"
-          URL="$(printf '%s\n' "$OUTPUT" | grep -Eo 'https://[a-zA-Z0-9._-]+\.pages\.dev' | tail -n 1 || true)"
-          [[ -n "$URL" ]] || { echo "::error::Wrangler did not return a pages.dev preview URL."; exit 1; }
+          OUTPUT="$(npx --yes wrangler deploy             --config wrangler.preview.jsonc             --name "$PREVIEW_NAME"             --var FINOBRA_PREVIEW_COMMIT:"$PREVIEW_SHA" 2>&1 | tee /dev/stderr)"
+          URL="$(printf '%s\n' "$OUTPUT" | grep -Eo 'https://[a-zA-Z0-9._-]+\.workers\.dev' | tail -n 1 || true)"
+          [[ -n "$URL" ]] || { echo "::error::Wrangler did not return a workers.dev preview URL."; exit 1; }
           echo "url=$URL" >> "$GITHUB_OUTPUT"
+          echo "name=$PREVIEW_NAME" >> "$GITHUB_OUTPUT"
 
-      - name: Smoke test Cloudflare Pages preview
+      - name: Smoke test Cloudflare Worker preview
         if: github.event_name == 'pull_request'
         shell: bash
         env:
-          PREVIEW_URL: ${{ steps.pages_preview.outputs.url }}
+          PREVIEW_URL: ${{ steps.worker_preview.outputs.url }}
         run: |
           set -euo pipefail
           status=''
@@ -104,5 +78,23 @@ jobs:
           done
           [[ "$status" == '200' ]]
           grep -Eq 'FinGo|FinObra|Sua obra sob controle' /tmp/cloudflare-preview.html
-          curl --silent --show-error --head "$PREVIEW_URL/" | tr -d '\r' | grep -qi '^x-robots-tag: noindex'
-          echo "Cloudflare Pages preview ready: $PREVIEW_URL"
+          health="$(curl --fail --silent --show-error "$PREVIEW_URL/__finobra/health")"
+          [[ "$health" == *'"ok":true'* ]]
+          echo "Cloudflare Worker preview ready: $PREVIEW_URL"
+
+      - name: Cloudflare preview summary
+        if: github.event_name == 'pull_request'
+        shell: bash
+        env:
+          PREVIEW_URL: ${{ steps.worker_preview.outputs.url }}
+          PREVIEW_NAME: ${{ steps.worker_preview.outputs.name }}
+          PREVIEW_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          {
+            echo '## Cloudflare Preview'
+            echo ''
+            echo "- Worker: $PREVIEW_NAME"
+            echo "- Commit: $PREVIEW_SHA"
+            echo "- URL: $PREVIEW_URL"
+            echo '- Smoke test: PASS'
+          } >> "$GITHUB_STEP_SUMMARY"
