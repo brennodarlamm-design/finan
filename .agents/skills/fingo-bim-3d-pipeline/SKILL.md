@@ -49,6 +49,8 @@ Antes de codificar, classifique a fonte:
 - Primitivas e sólidos por revolução só permanecem autoritativos quando dimensões, placement e malha resultante são válidos; nunca inventar parâmetros ausentes.
 - `IfcAdvancedBrep` / `IfcManifoldSolidBrep` podem ser autoritativos quando todas as `IfcAdvancedFace` usam superfície planar suportada e seus `IfcEdgeLoop` fecham corretamente; superfícies curvas ainda não tesselladas devem marcar o elemento como parcial.
 - Em AdvancedBrep, preserve a ordem/orientação de `IfcOrientedEdge` e use os vértices topológicos como fallback seguro quando a curva do `IfcEdgeCurve` não estiver suportada.
+- `IfcBSplineSurfaceWithKnots` e `IfcRationalBSplineSurfaceWithKnots` só podem permanecer autoritativas em `IfcAdvancedFace` quando grau, malha de controle, nós, multiplicidades e pesos são consistentes e o contorno da face corresponde ao perímetro completo do patch tessellado.
+- Patches NURBS/B-Spline com recortes internos ou trimming arbitrário ainda não suportado devem cair para parcial; nunca renderizar o patch inteiro como se o recorte tivesse sido aplicado.
 
 ## Workflow
 
