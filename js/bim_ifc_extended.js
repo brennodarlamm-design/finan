@@ -292,6 +292,8 @@ const BIMIFCExtendedImporter = (function() {
       return {origin,x:mul(norm(x,{x:1,y:0,z:0}),scale||1),y:mul(norm(y,{x:0,y:1,z:0}),scale||1),z:mul(norm(z,{x:0,y:0,z:1}),scale||1)};
     };
     const geometryTypes=new Set(['IFCPRODUCTDEFINITIONSHAPE','IFCSHAPEREPRESENTATION','IFCREPRESENTATIONMAP','IFCEXTRUDEDAREASOLID','IFCSWEPTDISKSOLID','IFCFACETEDBREP','IFCTRIANGULATEDFACESET','IFCPOLYGONALFACESET','IFCMAPPEDITEM','IFCBOOLEANCLIPPINGRESULT','IFCBOOLEANRESULT','IFCCSGSOLID']);
+    const exactBooleanIds=new Set();
+    const partialBooleanIds=new Set();
     const representation=(id,basis,depth=0)=>{
       if(!id||depth>20) return [];
       const e=entities.get(id); if(!e) return [];
@@ -304,8 +306,32 @@ const BIMIFCExtendedImporter = (function() {
         const origin=axis3(refOf(map.args[0])),target=cartTransform(refOf(e.args[1]));
         return representation(refOf(map.args[1]),identityBasis(),depth+1).map(tri=>tri.map(p=>applyBasis(basis,applyBasis(target,basisToLocal(origin,p)))));
       }
-      if(e.type==='IFCBOOLEANCLIPPINGRESULT'||e.type==='IFCBOOLEANRESULT') return representation(refOf(e.args[1]||e.args[0]),basis,depth+1);
-      if(e.type==='IFCCSGSOLID') return representation(refsIn(e.raw)[0],basis,depth+1);
+      if(e.type==='IFCBOOLEANCLIPPINGRESULT'||e.type==='IFCBOOLEANRESULT'){
+        const operator=String(e.args[0]||'.DIFFERENCE.').toUpperCase();
+        const firstId=refOf(e.args[1]),secondId=refOf(e.args[2]);
+        const first=representation(firstId,basis,depth+1);
+        const second=representation(secondId,basis,depth+1);
+        if(first.length&&second.length&&typeof BIMCSG!=='undefined'){
+          try{
+            const result=BIMCSG.booleanOperation(operator,first,second);
+            if(result.length){
+              exactBooleanIds.add(e.id);
+              return result;
+            }
+          }catch(err){
+            console.warn('[FinGo BIM] CSG IFC caiu para geometria parcial:',err?.message||err);
+          }
+        }
+        partialBooleanIds.add(e.id);
+        return first;
+      }
+      if(e.type==='IFCCSGSOLID'){
+        const root=refsIn(e.raw)[0];
+        const result=representation(root,basis,depth+1);
+        if(result.length&&!partialBooleanIds.has(root)) exactBooleanIds.add(e.id);
+        else partialBooleanIds.add(e.id);
+        return result;
+      }
       if(e.type==='IFCPRODUCTDEFINITIONSHAPE'||e.type==='IFCSHAPEREPRESENTATION'||e.type==='IFCREPRESENTATIONMAP'){
         const out=[]; for(const child of refsIn(e.raw)){const ce=entities.get(child);if(ce&&geometryTypes.has(ce.type)) out.push(...representation(child,basis,depth+1));} return out;
       }
@@ -332,11 +358,23 @@ const BIMIFCExtendedImporter = (function() {
       const refs=refsIn(e.raw),sid=refs.find(x=>entities.get(x)?.type==='IFCBUILDINGSTOREY'); if(!sid) continue;
       refs.filter(x=>x!==sid&&productType(entities.get(x)?.type)).forEach(x=>storeyByProduct.set(x,storeys.get(sid)));
     }
-    const voided=new Set();
+    const openingsByHost=new Map();
     for(const e of entities.values()){
       if(e.type!=='IFCRELVOIDSELEMENT') continue;
-      const host=refsIn(e.raw).find(x=>productType(entities.get(x)?.type)); if(host) voided.add(host);
+      const refs=refsIn(e.raw);
+      const host=refs.find(x=>productType(entities.get(x)?.type));
+      const opening=refs.find(x=>entities.get(x)?.type==='IFCOPENINGELEMENT');
+      if(!host||!opening) continue;
+      if(!openingsByHost.has(host)) openingsByHost.set(host,[]);
+      openingsByHost.get(host).push(opening);
     }
+    const openingTriangles=openingId=>{
+      const opening=entities.get(openingId); if(!opening||opening.type!=='IFCOPENINGELEMENT') return [];
+      const placementId=refsIn(opening.raw).find(x=>entities.get(x)?.type==='IFCLOCALPLACEMENT');
+      const reprId=refsIn(opening.raw).find(x=>entities.get(x)?.type==='IFCPRODUCTDEFINITIONSHAPE');
+      if(!reprId) return [];
+      return representation(reprId,localPlacement(placementId));
+    };
     const psets=new Map();
     for(const e of entities.values()){
       if(e.type!=='IFCRELDEFINESBYPROPERTIES') continue;
@@ -351,25 +389,47 @@ const BIMIFCExtendedImporter = (function() {
       if(!productType(e.type)) continue;
       const placementId=refsIn(e.raw).find(x=>entities.get(x)?.type==='IFCLOCALPLACEMENT');
       const reprId=refsIn(e.raw).find(x=>entities.get(x)?.type==='IFCPRODUCTDEFINITIONSHAPE'); if(!reprId) continue;
-      const tris=representation(reprId,localPlacement(placementId)); if(!tris.length) continue;
+      let tris=representation(reprId,localPlacement(placementId)); if(!tris.length) continue;
       const mapped=descendants(reprId,new Set(['IFCMAPPEDITEM'])).length>0;
       const brep=descendants(reprId,new Set(['IFCFACETEDBREP'])).length>0;
       const tess=descendants(reprId,new Set(['IFCTRIANGULATEDFACESET','IFCPOLYGONALFACESET'])).length>0;
       const swept=descendants(reprId,new Set(['IFCEXTRUDEDAREASOLID'])).length>0;
       const sweptDisk=descendants(reprId,new Set(['IFCSWEPTDISKSOLID'])).length>0;
-      const bool=descendants(reprId,new Set(['IFCBOOLEANCLIPPINGRESULT','IFCBOOLEANRESULT','IFCCSGSOLID','IFCHALFSPACESOLID'])).length>0;
+      const booleanIds=descendants(reprId,new Set(['IFCBOOLEANCLIPPINGRESULT','IFCBOOLEANRESULT','IFCCSGSOLID']));
+      const halfSpace=descendants(reprId,new Set(['IFCHALFSPACESOLID'])).length>0;
       const faceVoids=descendants(reprId,new Set(['IFCINDEXEDPOLYGONALFACEWITHVOIDS'])).length>0;
-      const opening=voided.has(e.id),partial=bool||faceVoids||opening;
+      const booleanPartial=halfSpace||booleanIds.some(id=>partialBooleanIds.has(id));
+      const booleanExact=booleanIds.length>0&&!booleanPartial&&booleanIds.every(id=>exactBooleanIds.has(id));
+
+      let openingExact=true,openingSubtractions=0;
+      const openings=openingsByHost.get(e.id)||[];
+      for(const openingId of openings){
+        const cutter=openingTriangles(openingId);
+        if(!cutter.length||typeof BIMCSG==='undefined'){openingExact=false;continue;}
+        try{
+          const cut=BIMCSG.subtract(tris,cutter);
+          if(!cut.length){openingExact=false;continue;}
+          tris=cut;
+          openingSubtractions++;
+        }catch(err){
+          console.warn('[FinGo BIM] abertura IFC caiu para geometria parcial:',err?.message||err);
+          openingExact=false;
+        }
+      }
+
+      const partial=booleanPartial||faceVoids||(openings.length>0&&!openingExact);
       if(partial) partialElements++;
-      if(mapped)geometryKinds.add('mapped-item');if(brep)geometryKinds.add('faceted-brep');if(tess)geometryKinds.add('tessellated-face-set');if(swept)geometryKinds.add('swept-solid');if(sweptDisk)geometryKinds.add('swept-disk-solid');
+      if(mapped)geometryKinds.add('mapped-item');if(brep)geometryKinds.add('faceted-brep');if(tess)geometryKinds.add('tessellated-face-set');if(swept)geometryKinds.add('swept-solid');if(sweptDisk)geometryKinds.add('swept-disk-solid');if(booleanExact)geometryKinds.add('csg-exact');if(openingSubtractions)geometryKinds.add('opening-subtraction');
       const globalId=unquote(e.args[0]||('#'+e.id)),name=unquote(e.args[2]||'')||(e.type+' #'+e.id),storey=storeyByProduct.get(e.id)||null;
-      const kinds=[mapped?'MappedItem':null,brep?'FacetedBrep':null,tess?'TessellatedFaceSet':null,swept?'SweptSolid':null,sweptDisk?'SweptDiskSolid':null].filter(Boolean);
+      const kinds=[mapped?'MappedItem':null,brep?'FacetedBrep':null,tess?'TessellatedFaceSet':null,swept?'SweptSolid':null,sweptDisk?'SweptDiskSolid':null,booleanExact?'CSG':null,openingSubtractions?'Openings':null].filter(Boolean);
       elements.push({
         id:'ifc_'+(globalId||e.id),name,floor:storey?.key||'all',discipline:disciplineForClass(e.type),category:e.type,color:colorForClass(e.type),rawTriangles:tris,
         importedProperties:{
           format:'IFC',ifcClass:e.type,globalId,stepId:e.id,storeyId:storey?.id||null,storeyName:storey?.name||null,storeyElevation:storey?.elevation??null,
           psets:psets.get(e.id)||{},geometryKinds:kinds,geometryQuality:partial?'partial':(kinds.join('+')||'supported'),
-          partialReason:bool?'boolean-or-csg-not-fully-subtracted':faceVoids?'polygon-face-voids-not-supported':opening?'opening-not-subtracted':null,clashEligible:!partial
+          openingCount:openings.length,openingSubtractions,booleanExact,
+          partialReason:booleanPartial?'boolean-or-csg-operand-not-supported':faceVoids?'polygon-face-voids-not-supported':(openings.length&&!openingExact)?'opening-subtraction-failed':null,
+          clashEligible:!partial
         }
       });
     }
@@ -377,7 +437,7 @@ const BIMIFCExtendedImporter = (function() {
     const schema=src.match(/FILE_SCHEMA\s*\(\s*\(\s*'([^']+)'/i)?.[1]||'IFC';
     const si=[...entities.values()].find(e=>e.type==='IFCSIUNIT'&&/LENGTHUNIT/.test(e.raw));
     const sourceLengthUnit=si?(String(si.raw).match(/\.(MILLI|CENTI|DECI|KILO)?\.,\.METRE\./i)?.[1]||'METRE').toLowerCase():'unknown';
-    return {elements,metadata:{schema,geometryKinds:Array.from(geometryKinds),storeys:Array.from(storeys.values()),partialElements,clashEligible:partialElements===0,sourceElementCount:elements.length,sourceLengthUnit,geometryQuality:partialElements?'partial':'supported'}};
+    return {elements,metadata:{schema,geometryKinds:Array.from(geometryKinds),storeys:Array.from(storeys.values()),partialElements,clashEligible:partialElements===0,sourceElementCount:elements.length,sourceLengthUnit,geometryQuality:partialElements?'partial':'supported',csgEngine:typeof BIMCSG!=='undefined'?'bsp':'unavailable'}};
   }
   return {parse};
 })();
