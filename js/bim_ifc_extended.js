@@ -796,20 +796,47 @@ const BIMIFCExtendedImporter = (function() {
       let d=Math.abs(a-b)%tau;
       return Math.min(d,tau-d);
     };
-    const angularCoverage=angles=>{
-      const tau=Math.PI*2;
-      const values=[...new Set((angles||[]).map(a=>{
-        let v=a%tau;if(v<0)v+=tau;return Math.round(v*1e9)/1e9;
-      }))].sort((a,b)=>a-b);
-      if(values.length<4) return 0;
-      let maxGap=0;
-      for(let i=0;i<values.length;i++){
-        const next=i===values.length-1?values[0]+tau:values[i+1];
-        maxGap=Math.max(maxGap,next-values[i]);
+    const cylindricalBoundaryBand=(loopId,surfaceBasis,radius)=>{
+      const loop=entities.get(loopId);
+      if(!loop||loop.type!=='IFCEDGELOOP') return null;
+      const orientedEdges=refsIn(loop.args[0]).map(id=>entities.get(id)).filter(e=>e?.type==='IFCORIENTEDEDGE');
+      if(orientedEdges.length!==4) return null;
+      const circles=[],lines=[];
+      const tol=Math.max(1e-5,radius*1e-4);
+      const dist=(a,b)=>Math.hypot(a.x-b.x,a.y-b.y,a.z-b.z);
+      for(const oriented of orientedEdges){
+        const edge=entities.get(refOf(oriented.args[2]));
+        if(!edge||edge.type!=='IFCEDGECURVE') return null;
+        const geom=entities.get(refOf(edge.args[2]));
+        const start=vertexPoint(refOf(edge.args[0])),end=vertexPoint(refOf(edge.args[1]));
+        if(!geom||!start||!end) return null;
+        if(geom.type==='IFCCIRCLE'){
+          if(dist(start,end)>tol) return null;
+          const r=num(geom.args[1]),circleBasis=curveBasis(refOf(geom.args[0]));
+          const centerLocal=localInBasis(surfaceBasis,circleBasis.origin);
+          const axisDot=Math.abs(circleBasis.z.x*surfaceBasis.z.x+circleBasis.z.y*surfaceBasis.z.y+circleBasis.z.z*surfaceBasis.z.z);
+          if(Math.abs(r-radius)>tol||Math.hypot(centerLocal.x,centerLocal.y)>tol||axisDot<0.9999) return null;
+          circles.push({z:centerLocal.z});
+        }else if(geom.type==='IFCLINE'){
+          const a=localInBasis(surfaceBasis,start),b=localInBasis(surfaceBasis,end);
+          if(Math.abs(Math.hypot(a.x,a.y)-radius)>tol||Math.abs(Math.hypot(b.x,b.y)-radius)>tol) return null;
+          const angleA=Math.atan2(a.y,a.x),angleB=Math.atan2(b.y,b.x);
+          if(circularAngleDistance(angleA,angleB)>0.01||Math.abs(a.z-b.z)<=tol) return null;
+          lines.push({a,b,angle:(angleA+angleB)/2});
+        }else return null;
       }
-      return tau-maxGap;
+      if(circles.length!==2||lines.length!==2) return null;
+      circles.sort((a,b)=>a.z-b.z);
+      if(circles[1].z-circles[0].z<=tol) return null;
+      const zMin=circles[0].z,zMax=circles[1].z,zTol=Math.max(tol,(zMax-zMin)*1e-4);
+      for(const line of lines){
+        const zs=[line.a.z,line.b.z].sort((a,b)=>a-b);
+        if(Math.abs(zs[0]-zMin)>zTol||Math.abs(zs[1]-zMax)>zTol) return null;
+      }
+      if(circularAngleDistance(lines[0].angle,lines[1].angle)>0.01) return null;
+      return {zMin,zMax};
     };
-    const cylindricalSurfacePatch=(surfaceId,outer,holes=[])=>{
+    const cylindricalSurfacePatch=(surfaceId,loopId,outer,holes=[])=>{
       const e=entities.get(surfaceId);
       if(!e||e.type!=='IFCCYLINDRICALSURFACE') return null;
       if(holes.length){partialSurfaceIds.add(surfaceId);return null;}
@@ -821,23 +848,9 @@ const BIMIFCExtendedImporter = (function() {
       if(local.some(p=>Math.abs(Math.hypot(p.x,p.y)-radius)>radialTol)){
         partialSurfaceIds.add(surfaceId);return null;
       }
-      const zs=local.map(p=>p.z),zMin=Math.min(...zs),zMax=Math.max(...zs),height=zMax-zMin;
-      if(!(height>radialTol)){partialSurfaceIds.add(surfaceId);return null;}
-      const zTol=Math.max(radialTol,height*1e-4);
-      const atMin=p=>Math.abs(p.z-zMin)<=zTol,atMax=p=>Math.abs(p.z-zMax)<=zTol;
-      const angle=p=>Math.atan2(p.y,p.x);
-      const bottom=local.filter(atMin),top=local.filter(atMax);
-      const minCoverage=angularCoverage(bottom.map(angle)),maxCoverage=angularCoverage(top.map(angle));
-      if(bottom.length<8||top.length<8||minCoverage<Math.PI*2-0.2||maxCoverage<Math.PI*2-0.2){
-        partialSurfaceIds.add(surfaceId);return null;
-      }
-      const middle=local.filter(p=>!atMin(p)&&!atMax(p));
-      if(middle.length){
-        const seam=angle(middle[0]);
-        if(middle.some(p=>circularAngleDistance(angle(p),seam)>0.03)){
-          partialSurfaceIds.add(surfaceId);return null;
-        }
-      }
+      const band=cylindricalBoundaryBand(loopId,position,radius);
+      if(!band){partialSurfaceIds.add(surfaceId);return null;}
+      const {zMin,zMax}=band,height=zMax-zMin;
       const segments=48,triangles=[];
       for(let i=0;i<segments;i++){
         const a0=Math.PI*2*i/segments,a1=Math.PI*2*(i+1)/segments;
@@ -874,7 +887,7 @@ const BIMIFCExtendedImporter = (function() {
         }
         tris=patch.triangles;
       }else if(surface.type==='IFCCYLINDRICALSURFACE'){
-        const patch=cylindricalSurfacePatch(surfaceId,outer,holes);
+        const patch=cylindricalSurfacePatch(surfaceId,refOf(outerBound.args[0]),outer,holes);
         if(!patch){
           partialSurfaceIds.add(surfaceId);
           partialAdvancedFaceIds.add(faceId);
