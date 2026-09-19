@@ -1335,6 +1335,20 @@ const BIMIFCExtendedImporter = (function() {
       const walk=(x,d)=>{if(!x||d>maxDepth||seen.has(x))return;seen.add(x);const e=entities.get(x);if(!e)return;if(target.has(e.type))found.push(x);childrenOf(x).forEach(c=>walk(c,d+1));};
       walk(id,0);return found;
     };
+    const authoritativeRepresentationRoots=shapeId=>{
+      const shape=entities.get(shapeId);
+      if(shape?.type!=='IFCPRODUCTDEFINITIONSHAPE') return shapeId?[shapeId]:[];
+      const reps=refsIn(shape.args[2]||shape.raw).filter(id=>entities.get(id)?.type==='IFCSHAPEREPRESENTATION');
+      const body=reps.filter(id=>/^body$/i.test(unquote(entities.get(id)?.args?.[1]||'')));
+      return body.length?body:reps;
+    };
+    const descendantsFromRoots=(roots,target,maxDepth=10)=>{
+      const out=[],seen=new Set();
+      for(const root of roots||[]) for(const id of descendants(root,target,maxDepth)){
+        if(!seen.has(id)){seen.add(id);out.push(id);}
+      }
+      return out;
+    };
     const productType=type=>/^IFC(WALL|WALLSTANDARDCASE|SLAB|BEAM|COLUMN|FOOTING|ROOF|COVERING|DOOR|WINDOW|STAIR|MEMBER|PLATE|CURTAINWALL|BUILDINGELEMENTPROXY|FLOWSEGMENT|PIPESEGMENT|DUCTSEGMENT|CABLESEGMENT)/.test(String(type||''));
 
     const storeys=new Map();
@@ -1381,20 +1395,22 @@ const BIMIFCExtendedImporter = (function() {
       if(!productType(e.type)) continue;
       const placementId=refsIn(e.raw).find(x=>entities.get(x)?.type==='IFCLOCALPLACEMENT');
       const reprId=refsIn(e.raw).find(x=>entities.get(x)?.type==='IFCPRODUCTDEFINITIONSHAPE'); if(!reprId) continue;
+      const reprRoots=authoritativeRepresentationRoots(reprId);
+      const desc=target=>descendantsFromRoots(reprRoots,target);
       let tris=representation(reprId,localPlacement(placementId)); if(!tris.length) continue;
-      const mapped=descendants(reprId,new Set(['IFCMAPPEDITEM'])).length>0;
-      const brep=descendants(reprId,new Set(['IFCFACETEDBREP'])).length>0;
-      const advancedBrepIds=descendants(reprId,new Set(['IFCADVANCEDBREP','IFCMANIFOLDSOLIDBREP']));
-      const advancedFaceIds=descendants(reprId,new Set(['IFCADVANCEDFACE']));
+      const mapped=desc(new Set(['IFCMAPPEDITEM'])).length>0;
+      const brep=desc(new Set(['IFCFACETEDBREP'])).length>0;
+      const advancedBrepIds=desc(new Set(['IFCADVANCEDBREP','IFCMANIFOLDSOLIDBREP']));
+      const advancedFaceIds=desc(new Set(['IFCADVANCEDFACE']));
       const advancedBrepVersionMismatch=advancedBrepIds.some(id=>entities.get(id)?.type==='IFCADVANCEDBREP')&&!schemaSupportsAdvancedBrep;
       const advancedBrepPartial=advancedBrepVersionMismatch||advancedFaceIds.some(id=>partialAdvancedFaceIds.has(id));
       const advancedBrepExact=advancedBrepIds.length>0&&!advancedBrepPartial&&advancedFaceIds.every(id=>exactAdvancedFaceIds.has(id));
-      const nurbsSurfaceIds=descendants(reprId,new Set(['IFCBSPLINESURFACEWITHKNOTS','IFCRATIONALBSPLINESURFACEWITHKNOTS']));
-      const cylindricalSurfaceIds=descendants(reprId,new Set(['IFCCYLINDRICALSURFACE']));
-      const sphericalSurfaceIds=descendants(reprId,new Set(['IFCSPHERICALSURFACE']));
-      const toroidalSurfaceIds=descendants(reprId,new Set(['IFCTOROIDALSURFACE']));
-      const sweptSurfaceIds=descendants(reprId,new Set(['IFCSURFACEOFLINEAREXTRUSION','IFCSURFACEOFREVOLUTION']));
-      const rectangularTrimmedSurfaceIds=descendants(reprId,new Set(['IFCRECTANGULARTRIMMEDSURFACE']));
+      const nurbsSurfaceIds=desc(new Set(['IFCBSPLINESURFACEWITHKNOTS','IFCRATIONALBSPLINESURFACEWITHKNOTS']));
+      const cylindricalSurfaceIds=desc(new Set(['IFCCYLINDRICALSURFACE']));
+      const sphericalSurfaceIds=desc(new Set(['IFCSPHERICALSURFACE']));
+      const toroidalSurfaceIds=desc(new Set(['IFCTOROIDALSURFACE']));
+      const sweptSurfaceIds=desc(new Set(['IFCSURFACEOFLINEAREXTRUSION','IFCSURFACEOFREVOLUTION']));
+      const rectangularTrimmedSurfaceIds=desc(new Set(['IFCRECTANGULARTRIMMEDSURFACE']));
       const advancedSurfaceIds=[...nurbsSurfaceIds,...cylindricalSurfaceIds,...sphericalSurfaceIds,...toroidalSurfaceIds,...sweptSurfaceIds,...rectangularTrimmedSurfaceIds];
       const advancedCurved=advancedBrepExact&&advancedSurfaceIds.length>0&&!advancedSurfaceIds.some(id=>partialSurfaceIds.has(id));
       const advancedNurbs=advancedCurved&&nurbsSurfaceIds.length>0;
@@ -1402,17 +1418,17 @@ const BIMIFCExtendedImporter = (function() {
       const advancedSphere=advancedCurved&&sphericalSurfaceIds.length>0;
       const advancedTorus=advancedCurved&&toroidalSurfaceIds.length>0;
       const advancedSweptSurface=advancedCurved&&sweptSurfaceIds.length>0;
-      const tess=descendants(reprId,new Set(['IFCTRIANGULATEDFACESET','IFCPOLYGONALFACESET'])).length>0;
-      const swept=descendants(reprId,new Set(['IFCEXTRUDEDAREASOLID'])).length>0;
-      const revolved=descendants(reprId,new Set(['IFCREVOLVEDAREASOLID'])).length>0;
-      const sweptDisk=descendants(reprId,new Set(['IFCSWEPTDISKSOLID'])).length>0;
-      const primitive=descendants(reprId,new Set(['IFCBLOCK','IFCRIGHTCIRCULARCYLINDER','IFCRIGHTCIRCULARCONE','IFCRECTANGULARPYRAMID','IFCSPHERE'])).length>0;
-      const booleanIds=descendants(reprId,new Set(['IFCBOOLEANCLIPPINGRESULT','IFCBOOLEANRESULT','IFCCSGSOLID']));
-      const boundedHalfSpaces=descendants(reprId,new Set(['IFCPOLYGONALBOUNDEDHALFSPACE']));
-      const faceVoidIds=descendants(reprId,new Set(['IFCINDEXEDPOLYGONALFACEWITHVOIDS']));
+      const tess=desc(new Set(['IFCTRIANGULATEDFACESET','IFCPOLYGONALFACESET'])).length>0;
+      const swept=desc(new Set(['IFCEXTRUDEDAREASOLID'])).length>0;
+      const revolved=desc(new Set(['IFCREVOLVEDAREASOLID'])).length>0;
+      const sweptDisk=desc(new Set(['IFCSWEPTDISKSOLID'])).length>0;
+      const primitive=desc(new Set(['IFCBLOCK','IFCRIGHTCIRCULARCYLINDER','IFCRIGHTCIRCULARCONE','IFCRECTANGULARPYRAMID','IFCSPHERE'])).length>0;
+      const booleanIds=desc(new Set(['IFCBOOLEANCLIPPINGRESULT','IFCBOOLEANRESULT','IFCCSGSOLID']));
+      const boundedHalfSpaces=desc(new Set(['IFCPOLYGONALBOUNDEDHALFSPACE']));
+      const faceVoidIds=desc(new Set(['IFCINDEXEDPOLYGONALFACEWITHVOIDS']));
       const faceVoidsPartial=faceVoidIds.some(id=>partialFaceVoidIds.has(id));
       const faceVoidsExact=faceVoidIds.length>0&&!faceVoidsPartial&&faceVoidIds.every(id=>exactFaceVoidIds.has(id));
-      const curveIds=descendants(reprId,new Set(['IFCINDEXEDPOLYCURVE','IFCCOMPOSITECURVE','IFCCOMPOSITECURVESEGMENT','IFCTRIMMEDCURVE','IFCCIRCLE','IFCELLIPSE','IFCBSPLINECURVEWITHKNOTS','IFCRATIONALBSPLINECURVEWITHKNOTS']));
+      const curveIds=desc(new Set(['IFCINDEXEDPOLYCURVE','IFCCOMPOSITECURVE','IFCCOMPOSITECURVESEGMENT','IFCTRIMMEDCURVE','IFCCIRCLE','IFCELLIPSE','IFCBSPLINECURVEWITHKNOTS','IFCRATIONALBSPLINECURVEWITHKNOTS']));
       const curvePartial=curveIds.some(id=>partialCurveIds.has(id));
       const curveExact=curveIds.length>0&&!curvePartial;
       const booleanPartial=booleanIds.some(id=>partialBooleanIds.has(id));
