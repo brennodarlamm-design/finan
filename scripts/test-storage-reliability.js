@@ -35,7 +35,7 @@ test('js/idb_storage.js usa banco finobra_db e store kv_store versão 1',
 );
 
 test('app.html carrega js/idb_storage.js antes de js/data.js',
-  appHtml.includes('<script defer src="/js/idb_storage.js"></script>') &&
+  (appHtml.includes('<script defer src="/js/idb_storage.js"></script>') || /\/js\/idb_storage\.js(?:\?v=[^"]*)?"/.test(appHtml)) &&
   appHtml.indexOf('/js/idb_storage.js') < appHtml.indexOf('/js/data.js')
 );
 

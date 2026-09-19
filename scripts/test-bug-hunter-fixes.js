@@ -39,9 +39,9 @@ test('data.js consolida SINAPI sem multiplicar BDI duplamente', /Number\(orc\.va
 
 // BUG-CRIT-02: Quebra Silenciosa do Delta Sync
 console.log('\n[BUG-CRIT-02] Quebra Silenciosa do Delta Sync para Obras, Fornecedores e Produtos:');
-test('_db-queries.js inclui created_at e updated_at no delta sync de obras', /SELECT \* FROM obras WHERE.*\(created_at >= \$\{sinceIso\} OR \(updated_at IS NOT NULL AND updated_at >= \$\{sinceIso\}\) OR id IN/.test(queriesCode));
-test('_db-queries.js inclui created_at e updated_at no delta sync de fornecedores', /SELECT \* FROM fornecedores WHERE.*\(created_at >= \$\{sinceIso\} OR \(updated_at IS NOT NULL AND updated_at >= \$\{sinceIso\}\) OR id IN/.test(queriesCode));
-test('_db-queries.js inclui created_at e updated_at no delta sync de produtos', /SELECT \* FROM produtos WHERE.*\(created_at >= \$\{sinceIso\} OR \(updated_at IS NOT NULL AND updated_at >= \$\{sinceIso\}\) OR id IN/.test(queriesCode));
+test('_db-queries.js inclui created_at e audit_logs no delta sync de obras', /SELECT \* FROM obras WHERE.*\(created_at >= \$\{sinceIso\} OR id IN \(SELECT entidade_id FROM audit_logs WHERE tenant_id = \$\{tenantId\} AND entidade = 'obras'/.test(queriesCode));
+test('_db-queries.js inclui created_at e audit_logs no delta sync de fornecedores', /SELECT \* FROM fornecedores WHERE.*\(created_at >= \$\{sinceIso\} OR id IN \(SELECT entidade_id FROM audit_logs WHERE tenant_id = \$\{tenantId\} AND entidade = 'fornecedores'/.test(queriesCode));
+test('_db-queries.js inclui created_at e audit_logs no delta sync de produtos', /SELECT \* FROM produtos WHERE.*\(created_at >= \$\{sinceIso\} OR id IN \(SELECT entidade_id FROM audit_logs WHERE tenant_id = \$\{tenantId\} AND entidade = 'produtos'/.test(queriesCode));
 
 // BUG-CRIT-03: Ressuscitação Fantasma de Registros no IndexedDB
 console.log('\n[BUG-CRIT-03] Ressuscitação Fantasma de Registros pelo IndexedDB:');
