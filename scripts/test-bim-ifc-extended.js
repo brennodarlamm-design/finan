@@ -603,6 +603,17 @@ assert(Math.abs(closedAdvancedBrep.elements[0].importedProperties.advancedBrepVo
 assert(['positive','negative'].includes(closedAdvancedBrep.elements[0].importedProperties.advancedBrepWinding),'shell fechado registra winding global pelo volume assinado');
 assert(closedAdvancedBrep.elements[0].rawTriangles.length===4,'tetraedro AdvancedBrep preserva quatro faces triangulares');
 
+
+const georeferencedAdvancedBrepIfc = closedAdvancedBrepIfc
+  .replace('#1=IFCCARTESIANPOINT((0.,0.,0.));','#1=IFCCARTESIANPOINT((1000000.,5000000.,100.));')
+  .replace('#2=IFCCARTESIANPOINT((1.,0.,0.));','#2=IFCCARTESIANPOINT((1000001.,5000000.,100.));')
+  .replace('#3=IFCCARTESIANPOINT((0.,1.,0.));','#3=IFCCARTESIANPOINT((1000000.,5000001.,100.));')
+  .replace('#4=IFCCARTESIANPOINT((0.,0.,1.));','#4=IFCCARTESIANPOINT((1000000.,5000000.,101.));');
+const georeferencedAdvancedBrep=ext.parse(georeferencedAdvancedBrepIfc);
+assert(georeferencedAdvancedBrep.metadata.clashEligible===true,'AdvancedBrep georreferenciado preserva autoridade geométrica');
+assert(Math.abs(georeferencedAdvancedBrep.elements[0].importedProperties.advancedBrepVolume-(1/6))<1e-9,'volume do shell é estável após grande translação de coordenadas');
+assert(georeferencedAdvancedBrep.elements[0].importedProperties.advancedBrepGeometry==='consistent','tolerâncias locais evitam falsos positivos em coordenadas grandes');
+
 const badEdgeGeometryIfc = closedAdvancedBrepIfc
   .replace('#15=IFCEDGECURVE(#5,#6,#9,.T.);','#15=IFCEDGECURVE(#5,#6,#66,.T.);')
   .replace("#53=IFCPROJECT('P',$,'Projeto',$,$,$,$,$,$);", "#64=IFCDIRECTION((0.,1.,0.));\n#65=IFCVECTOR(#64,1.);\n#66=IFCLINE(#3,#65);\n#53=IFCPROJECT('P',$,'Projeto',$,$,$,$,$,$);");
