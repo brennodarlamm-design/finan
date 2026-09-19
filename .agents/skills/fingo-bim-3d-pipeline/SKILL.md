@@ -36,6 +36,10 @@ Antes de codificar, classifique a fonte:
 - Todo modelo novo é uma nova versão; não sobrescrever silenciosamente a versão anterior.
 - IFC original deve ser mantido mesmo que exista uma versão GLB derivada.
 - Toda transformação deve registrar origem, ferramenta, parâmetros e hash quando disponível.
+- Booleanas IFC só podem ser marcadas como exatas quando o motor determinístico realmente produzir a malha resultante.
+- `IfcRelVoidsElement`, `IfcBooleanResult`, `IfcBooleanClippingResult` e half-spaces suportados devem preservar o guardrail de `clashEligible`; fallback parcial nunca é autoritativo.
+- O motor BSP/CSG do viewer limita cada operação a 12.000 triângulos de entrada e 50.000 de saída; acima disso, preservar o modelo e marcar a operação como parcial em vez de travar o navegador.
+- A cadeia IFC atualmente prioriza SweptSolid, SweptDiskSolid, MappedItem, FacetedBrep, TessellatedFaceSet, openings e half-spaces planares/poligonais suportados.
 
 ## Workflow
 
@@ -50,6 +54,7 @@ Antes de codificar, classifique a fonte:
 9. Versionar em Documentos da obra.
 10. Só então habilitar propriedades, filtros, cortes e coordenação.
 11. Clash detection só entra depois que elementos reais tiverem geometria e sistema de coordenadas comparável.
+12. Antes do clash, confirmar que booleanas/openings do elemento estão `clashEligible !== false`; elementos parciais ficam fora da análise autoritativa.
 
 ## Definition of done
 
