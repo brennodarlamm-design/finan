@@ -230,8 +230,22 @@ export default async function handler(req, res) {
 
       const id = 'inv_' + crypto.randomBytes(10).toString('hex');
       const txid = ('FIN' + crypto.randomBytes(10).toString('hex')).toUpperCase().slice(0, 25);
-      const pixKey = String(process.env.FINOBRA_PIX_KEY || '+5595991363678').trim();
+      const pixKey = String(process.env.FINOBRA_PIX_KEY || '').trim();
+      if (!pixKey) {
+        return res.status(503).json({
+          success:false,
+          code:'BILLING_PIX_NOT_CONFIGURED',
+          error:'A cobrança PIX está temporariamente indisponível. A configuração de pagamento precisa ser validada pelo suporte.'
+        });
+      }
       const pixPayload = buildPixPayload({ key: pixKey, amountCents, txid });
+      if (!pixPayload) {
+        return res.status(503).json({
+          success:false,
+          code:'BILLING_PIX_PAYLOAD_FAILED',
+          error:'Não foi possível gerar a cobrança PIX com segurança.'
+        });
+      }
       const rows = await sql`
         INSERT INTO billing_invoices (id, tenant_id, plan_id, cycle, amount_cents, status, txid, pix_payload, created_by, expires_at)
         VALUES (${id}, ${auth.tenantId}, ${planId}, ${cycle}, ${amountCents}, 'pending', ${txid}, ${pixPayload || null}, ${auth.user?.userId || auth.user?.id || null}, NOW() + INTERVAL '1 day')
