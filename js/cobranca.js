@@ -579,6 +579,8 @@ const Cobranca = {
 
     // ── MONITORAMENTO DE LIQUIDAÇÃO EM TEMPO REAL (POLLING) ──────────────────
     let pollCycles = 0;
+    let pollFailures = 0;
+    let pollWarningShown = false;
     const MAX_POLL_CYCLES = 225; // Limite de 15 minutos (225 ciclos x 4s)
     this._pixAbortController = new AbortController();
 
@@ -599,8 +601,22 @@ const Cobranca = {
           signal: this._pixAbortController?.signal
         });
         const chkData = await chkRes.json().catch(() => ({}));
+        if (!chkRes.ok) throw new Error(`Verificação PIX respondeu HTTP ${chkRes.status}`);
+        if (chkData?.success !== true) throw new Error(chkData?.error || 'Resposta inválida na verificação do PIX.');
+
+        pollFailures = 0;
+        if (pollWarningShown) {
+          pollWarningShown = false;
+          const recoveredBox = document.getElementById('pix-status-box');
+          if (recoveredBox) {
+            recoveredBox.style.background = 'rgba(34,197,94,.06)';
+            recoveredBox.style.borderColor = 'rgba(34,197,94,.22)';
+            recoveredBox.style.color = '#86efac';
+            recoveredBox.innerHTML = '<span class="spinner" style="width:14px;height:14px;border:2px solid rgba(134,239,172,.3);border-top-color:#22c55e;border-radius:50%;animation:spin 1s linear infinite;display:inline-block;"></span><span>Conexão restabelecida. Aguardando compensação bancária...</span>';
+          }
+        }
         
-        if (chkData?.success && chkData?.paid) {
+        if (chkData?.paid) {
           this.fecharModalPix();
 
           const stBox = document.getElementById('pix-status-box');
@@ -645,8 +661,23 @@ const Cobranca = {
             }
           }, 1200);
         }
-      } catch {
-        // Falha transitória de rede durante polling — ignora e tenta no próximo ciclo
+      } catch (pollErr) {
+        if (this._pixAbortController?.signal?.aborted) return;
+        pollFailures++;
+        console.warn('[Cobrança] Falha transitória ao verificar PIX:', pollErr?.message || pollErr);
+        if (pollFailures >= 3 && !pollWarningShown) {
+          pollWarningShown = true;
+          const stBox = document.getElementById('pix-status-box');
+          if (stBox) {
+            stBox.style.background = 'rgba(245,158,11,.10)';
+            stBox.style.borderColor = 'rgba(245,158,11,.35)';
+            stBox.style.color = '#fbbf24';
+            stBox.innerHTML = '<span>⚠️ Não conseguimos confirmar o pagamento agora. Sua cobrança continua válida e a verificação automática seguirá tentando.</span>';
+          }
+          if (typeof Utils !== 'undefined' && Utils.toast) {
+            Utils.toast('A confirmação do PIX está temporariamente indisponível. Continuaremos verificando automaticamente.', 'warning');
+          }
+        }
       }
     }, 4000);
   }
