@@ -204,6 +204,17 @@ const productionWorkflow=read('.github/workflows/production-cicd.yml');
 ok('Vercel legado não cria novos deploys Git após migração para Cloudflare',
   vercelConfig?.git?.deploymentEnabled === false);
 
+const apiCorsSources = [
+  'api/_http.js','api/nfe.js','api/db.js','api/dashboard.js','api/plano.js','api/_auth.js',
+  'api/whatsapp.js','api/_audit-route.js','api/assinaturas.js','api/upload.js','api/auth.js',
+  'api/users.js','api/_certificado.js','api/_admin-route.js','api/reconhecer-documento.js',
+  'backend/server.js'
+].map(read).join('\n');
+ok('Origem Vercel legada não é mais confiada por CORS/autorização',
+  !apiCorsSources.includes('finan-as(?:-[a-z0-9-]+)?') &&
+  !apiCorsSources.includes('isFinobraVercel'));
+
+
 ok('Newsletter só confirma consentimento após persistência durável e protegida',
   newsletterMigration.includes('CREATE TABLE IF NOT EXISTS newsletter_subscribers') &&
   newsletterMigration.includes('UNIQUE (email)') &&
