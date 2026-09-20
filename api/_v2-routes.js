@@ -17,6 +17,8 @@ import { isIpBanned, recordFailedAttempt, unbanIp } from './_edge-security.js';
 import { dispatchEdgeAlert } from './_edge-alerts.js';
 import { resolveAuthAndTenant } from './_auth.js';
 import { canAccessModule, canWriteData, canDeleteData, permissionError } from './_permissions.js';
+import { createOwnerSql } from './_database.js';
+import { checkRateLimit, getClientIp } from './_ratelimit.js';
 
 export const V2_ROUTE_SPEC = [
   // 1. Sistema & Telemetria
@@ -301,10 +303,25 @@ export async function handleV2Newsletter(req, res) {
   res.setHeader('Cache-Control', 'no-store');
   res.setHeader('Content-Type', 'application/json; charset=utf-8');
 
-  const isUnsubscribe = req.url?.includes('unsubscribe');
-  const email = (req.body?.email || req.query?.email || '').trim().toLowerCase();
+  if (String(req.method || 'POST').toUpperCase() !== 'POST') {
+    return res.status(405).json({ success:false, error:'METHOD_NOT_ALLOWED', message:'Método não permitido.' });
+  }
 
-  if (!email || !email.includes('@') || email.length < 5) {
+  const clientIp = getClientIp(req);
+  const rl = await checkRateLimit(`newsletter:${clientIp}`, 20, 60 * 60 * 1000);
+  if (!rl.allowed) {
+    return res.status(429).json({
+      success:false,
+      error:'RATE_LIMITED',
+      message:'Muitas alterações de newsletter em pouco tempo. Aguarde antes de tentar novamente.'
+    });
+  }
+
+  const isUnsubscribe = req.url?.includes('unsubscribe');
+  const email = String(req.body?.email || req.query?.email || '').trim().toLowerCase();
+  const validEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) && email.length <= 254;
+
+  if (!validEmail) {
     return res.status(400).json({
       success: false,
       error: 'INVALID_EMAIL',
@@ -312,21 +329,56 @@ export async function handleV2Newsletter(req, res) {
     });
   }
 
-  if (isUnsubscribe) {
+  try {
+    const sql = createOwnerSql();
+
+    if (isUnsubscribe) {
+      await sql`
+        INSERT INTO newsletter_subscriptions
+          (email, status, source, subscribed_at, unsubscribed_at, updated_at)
+        VALUES
+          (${email}, 'unsubscribed', 'landing', NULL, NOW(), NOW())
+        ON CONFLICT (email) DO UPDATE SET
+          status = 'unsubscribed',
+          unsubscribed_at = NOW(),
+          updated_at = NOW();
+      `;
+
+      return res.status(200).json({
+        success: true,
+        action: 'unsubscribed',
+        email,
+        message: 'Inscrição no Radar FinGo cancelada com sucesso. Você não receberá mais comunicados de marketing.'
+      });
+    }
+
+    await sql`
+      INSERT INTO newsletter_subscriptions
+        (email, status, source, subscribed_at, unsubscribed_at, updated_at)
+      VALUES
+        (${email}, 'subscribed', 'landing', NOW(), NULL, NOW())
+      ON CONFLICT (email) DO UPDATE SET
+        status = 'subscribed',
+        source = 'landing',
+        subscribed_at = NOW(),
+        unsubscribed_at = NULL,
+        updated_at = NOW();
+    `;
+
     return res.status(200).json({
       success: true,
-      action: 'unsubscribed',
+      action: 'subscribed',
       email,
-      message: 'Inscrição no Radar FinGo cancelada com sucesso. Você não receberá mais comunicados de marketing.'
+      message: 'Inscrição no Radar FinGo confirmada com sucesso! Bem-vindo(a) às atualizações de engenharia e SINAPI.'
+    });
+  } catch (err) {
+    console.error('[Newsletter] Falha ao persistir consentimento:', err?.message || err);
+    return res.status(503).json({
+      success:false,
+      error:'NEWSLETTER_PERSISTENCE_UNAVAILABLE',
+      message:'Não foi possível confirmar sua preferência de newsletter agora. Tente novamente em instantes.'
     });
   }
-
-  return res.status(200).json({
-    success: true,
-    action: 'subscribed',
-    email,
-    message: 'Inscrição no Radar FinGo confirmada com sucesso! Bem-vindo(a) às atualizações de engenharia e SINAPI.'
-  });
 }
 
 // =========================================================================
