@@ -33,7 +33,7 @@ function canonicalOrigin(env) {
   return url.origin;
 }
 
-async function authenticateRealtimeRequest(request, env) {
+async function authenticateEdgeRequest(request, env) {
   const authUrl = new URL('/api/auth?action=me', upstreamOrigin(env));
   const headers = new Headers();
   for (const name of ['cookie','authorization','x-api-key','apikey','x-tenant-id','user-agent']) {
@@ -475,13 +475,25 @@ export default {
     const startTime = Date.now();
     const url = new URL(request.url);
 
-    // 1. Dashboard de Métricas & Observabilidade em Tempo Real
+    // 1. Dashboard de Métricas & Observabilidade em Tempo Real.
+    // Telemetria operacional fica restrita a superadmin autenticado.
     if (url.pathname === '/__edge/metrics' || url.pathname === '/__finobra/metrics') {
+      if (!sameOriginBrowserRequest(request)) {
+        return Response.json({ ok:false, error:'Origem não autorizada.' }, { status:403 });
+      }
+      const identity = await authenticateEdgeRequest(request, env);
+      if (!identity.ok || identity.role !== 'superadmin') {
+        return Response.json({ ok:false, error:'Acesso restrito à administração da plataforma.' }, {
+          status: identity.status === 503 ? 503 : 403,
+          headers: { 'Cache-Control':'no-store' }
+        });
+      }
       const summary = getEdgeMetricsSummary();
       return new Response(renderEdgeMetricsHtml(summary), {
         headers: {
           'Content-Type': 'text/html; charset=utf-8',
-          'Cache-Control': 'no-store, no-cache'
+          'Cache-Control': 'no-store, no-cache',
+          'X-Content-Type-Options': 'nosniff'
         }
       });
     }
@@ -507,7 +519,7 @@ export default {
       if (!sameOriginBrowserRequest(request)) {
         return Response.json({ ok:false, error:'Origem não autorizada.' }, { status:403 });
       }
-      const identity = await authenticateRealtimeRequest(request, env);
+      const identity = await authenticateEdgeRequest(request, env);
       if (!identity.ok) {
         return Response.json(
           { ok:false, error: identity.status === 503 ? 'Serviço de autenticação indisponível.' : 'Sessão obrigatória para colaboração em tempo real.' },
