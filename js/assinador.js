@@ -356,6 +356,7 @@ const Assinador = {
       const res = await fetch('/api/assinaturas', {
         method: 'POST',
         headers,
+        signal: AbortSignal.timeout(20000),
         body: JSON.stringify({
           codigo_validacao: sig.codigo_validacao,
           hash_sha256: sig.hash_sha256,
