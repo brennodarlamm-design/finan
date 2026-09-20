@@ -949,6 +949,7 @@ const App = {
           method: 'POST',
           headers,
           keepalive: true,
+          signal: AbortSignal.timeout(5000),
           body: bodyStr
         }).catch(() => {});
       } catch {}
