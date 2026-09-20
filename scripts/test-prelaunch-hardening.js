@@ -49,7 +49,8 @@ ok('R2 exige tenant explícito na geração da chave', r2.includes('tenantId vá
 ok('R2 não mascara falhas remotas de upload, leitura, exclusão ou listagem', r2.includes('Falha ao gravar o arquivo no armazenamento Cloudflare R2.') && r2.includes('Falha ao consultar o armazenamento Cloudflare R2.') && r2.includes('Falha ao excluir o arquivo no armazenamento Cloudflare R2.') && r2.includes('Falha ao listar arquivos no armazenamento Cloudflare R2.'));
 ok('Rotas R2 exigem autenticação e isolamento de tenant', routes.includes('resolveAuthAndTenant(req)') && routes.includes("canAccessModule(auth, 'documentos'") && routes.includes('expectedPrefix'));
 ok('Upload principal grava em R2 quando binding existe', upload.includes('r2Ready') && upload.includes("storage: 'cloudflare_r2'") && upload.includes('r2://'));
-ok('Vercel Blob ficou apenas como compatibilidade legada', upload.includes("storage: 'vercel_blob_legacy'"));
+ok('Novos uploads não caem silenciosamente no Vercel Blob', upload.includes('FINOBRA_ALLOW_LEGACY_BLOB_UPLOAD') && upload.includes("code: 'R2_STORAGE_REQUIRED'") && upload.includes('!r2Ready && !allowLegacyBlobUpload'));
+ok('Vercel Blob ficou apenas como compatibilidade legada controlada', upload.includes("storage: 'vercel_blob_legacy'") && upload.includes('allowLegacyBlobUpload'));
 ok('Cancelamento self-service existe no backend', plano.includes("action === 'cancel_subscription'") && plano.includes("status='cancelamento_agendado'"));
 ok('Cancelamento de assinatura é atômico entre faturas e tenant', plano.includes('WITH canceled_invoices AS') && plano.includes('tenant_upd AS') && plano.includes('canceledInvoices:Number('));
 ok('Cancelamento encerra acesso ao fim do período', auth.includes("tenant_status === 'cancelamento_agendado'") && authApi.includes("tenant_status === 'cancelamento_agendado'"));
