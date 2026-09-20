@@ -111,7 +111,7 @@ const assinadorClient=read('js/assinador.js');
 ok('Registro de assinatura tem deadline no navegador', assinadorClient.includes('AbortSignal.timeout(30000)'));
 
 const dashboardClient=read('js/dashboard.js');
-ok('Dashboard tem deadline no navegador', dashboardClient.includes("fetch('/api/dashboard' + q") && dashboardClient.includes('AbortSignal.timeout(20000)'));
+ok('Dashboard tem deadline e fallback visível no navegador', dashboardClient.includes("fetch('/api/dashboard' + q") && dashboardClient.includes('AbortSignal.timeout(20000)') && dashboardClient.includes('Dashboard respondeu HTTP') && dashboardClient.includes('Resumo em tempo real indisponível. Exibindo os dados locais'));
 
 const utilsClient=read('js/utils.js');
 const fornecedoresClient=read('js/fornecedores.js');
