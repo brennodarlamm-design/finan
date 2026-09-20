@@ -301,11 +301,12 @@ export async function settlePixPayment(sql, payload, meta = {}) {
   // - prior_status=pending/expired: pagamento novo reativa normalmente a assinatura.
   const updated = await sql`
     WITH candidate AS (
-      SELECT id, status AS prior_status
-      FROM billing_invoices
-      WHERE id = ${invoice.id}
-        AND status IN ('pending', 'expired', 'canceled')
-      FOR UPDATE
+      SELECT bi.id, bi.status AS prior_status
+      FROM billing_invoices bi
+      JOIN tenants t ON t.id = bi.tenant_id
+      WHERE bi.id = ${invoice.id}
+        AND bi.status IN ('pending', 'expired', 'canceled')
+      FOR UPDATE OF bi, t
     ), paid AS (
       UPDATE billing_invoices bi
       SET status = 'paid',
@@ -481,7 +482,7 @@ export async function sendPaymentReceipt(record) {
           results.email.success = true;
           results.email.id = trigRes.runId;
           results.email.via = 'trigger_dev';
-          return;
+          return results;
         }
       }
 
