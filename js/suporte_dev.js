@@ -28,7 +28,7 @@ const SuporteDev = {
     const q = new URLSearchParams({ action, ...params });
     const opts = { method, headers:this._headers() };
     if (body) opts.body = JSON.stringify(body);
-    const resp = await fetch(`/api/admin?${q.toString()}`, opts);
+    const resp = await fetch(`/api/admin?${q.toString()}`, { ...opts, signal: AbortSignal.timeout(15000) });
     const data = await resp.json().catch(() => ({}));
     if (!resp.ok || !data.success) {
       const err = new Error(data.error || 'Falha na Central de Atendimento.');
