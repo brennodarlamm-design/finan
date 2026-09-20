@@ -823,7 +823,14 @@ export default async function handler(req, res) {
       };
       const planoInfo = PLANOS_INFO[t.plano] || { nome: String(t.plano || 'Profissional').toUpperCase(), valor: '279,90' };
 
-      const pixKey = String(userPixKey || process.env.FINOBRA_PIX_KEY || process.env.FINOBRA_SUPPORT_WHATSAPP || '5595991363678').trim();
+      const pixKey = String(userPixKey || process.env.FINOBRA_PIX_KEY || '').trim();
+      if (!pixKey) {
+        return res.status(503).json({
+          success:false,
+          code:'BILLING_PIX_NOT_CONFIGURED',
+          error:'Nenhuma chave PIX foi informada e FINOBRA_PIX_KEY não está configurada. O aviso de cobrança não foi enviado.'
+        });
+      }
       const pixBeneficiary = String(userPixBeneficiary || process.env.FINOBRA_PIX_BENEFICIARY || 'FinGo Soluções Tecnológicas').trim();
 
       // Cálculo de vencimento e dias restantes
