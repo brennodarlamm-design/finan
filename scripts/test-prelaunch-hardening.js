@@ -30,6 +30,11 @@ ok('Conta expõe ação de cancelamento', cobranca.includes('cancelarAssinatura(
 ok('Recuperação de senha usa timeout em canais externos', (authApi.match(/AbortSignal\.timeout\(10000\)/g)||[]).length >= 2);
 ok('Telemetria não envia query string/hash', app.includes('window.location.origin') && app.includes('window.location.pathname') && !app.includes('url: window.location.href'));
 ok('Landing não promete mais provisionamento instantâneo', landing.includes('A solicitação leva menos de 1 minuto') && !landing.includes('Você cria sua conta em menos de 1 minuto'));
+ok('Landing possui foco visível por teclado', landing.includes(':focus-visible') && landing.includes('outline: 3px solid var(--accent-mint-bright)'));
+ok('Landing evita overflow do cabeçalho e calculadora em telas estreitas', landing.includes('.header-cta-group > .btn { display: none; }') && landing.includes('.calc-controls,') && landing.includes('min-width: 0;') && landing.includes('width: calc(100% - 20px)'));
+ok('Menu mobile preserva login e solicitação de teste', landing.includes('<a href="/login">Entrar no Sistema</a>') && landing.includes('<a href="/cadastro">Solicitar Teste de 15 Dias</a>'));
+ok('Imagens principais da landing têm dimensões explícitas', (landing.match(/<img\b[^>]*\bwidth="\d+"[^>]*\bheight="\d+"/g)||[]).length >= 4);
+ok('Controles mobile principais têm alvo mínimo de 44px', landing.includes('min-height: 44px') && landing.includes('.mobile-menu-summary'));
 ok('Backup lógico diário está versionado e cifrado antes do artifact', backup.includes("cron: '20 7 * * *'") && backup.includes('pg_dump') && backup.includes('BACKUP_ENCRYPTION_PASSPHRASE') && backup.includes('openssl enc -aes-256-cbc') && backup.includes("backup/*.enc") && backup.includes('retention-days: 30'));
 ok('Rollback Cloudflare está versionado', rollback.includes('wrangler rollback') && rollback.includes('/__finobra/health'));
 const edgeBackup=read('api/_edge-backup.js');
