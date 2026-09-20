@@ -159,26 +159,36 @@ export default async function handler(req, res) {
           });
         }
 
-        await sql`
-          UPDATE billing_invoices
-          SET status='canceled', canceled_at=NOW(), updated_at=NOW()
-          WHERE tenant_id=${auth.tenantId} AND status='pending';
+        const cancellationRows = await sql`
+          WITH canceled_invoices AS (
+            UPDATE billing_invoices
+            SET status='canceled', canceled_at=NOW(), updated_at=NOW()
+            WHERE tenant_id=${auth.tenantId} AND status='pending'
+            RETURNING id
+          ),
+          tenant_upd AS (
+            UPDATE tenants
+            SET status='cancelamento_agendado',
+                vencimento=COALESCE(
+                  vencimento,
+                  CASE
+                    WHEN status='trial' OR plano='trial' THEN (COALESCE(created_at, NOW())::date + 15)
+                    ELSE CURRENT_DATE
+                  END
+                ),
+                updated_at=NOW()
+            WHERE id=${auth.tenantId}
+            RETURNING status, vencimento
+          )
+          SELECT tenant_upd.status,
+                 tenant_upd.vencimento,
+                 (SELECT COUNT(*)::int FROM canceled_invoices) AS canceled_invoices
+          FROM tenant_upd;
         `;
-        const canceledTenantRows = await sql`
-          UPDATE tenants
-          SET status='cancelamento_agendado',
-              vencimento=COALESCE(
-                vencimento,
-                CASE
-                  WHEN status='trial' OR plano='trial' THEN (COALESCE(created_at, NOW())::date + 15)
-                  ELSE CURRENT_DATE
-                END
-              ),
-              updated_at=NOW()
-          WHERE id=${auth.tenantId}
-          RETURNING status, vencimento;
-        `;
-        const accessUntil = dateOnly(canceledTenantRows[0]?.vencimento || tenant.vencimento) || null;
+        if (!cancellationRows.length) {
+          return res.status(409).json({ success:false, error:'Não foi possível agendar o cancelamento da assinatura.' });
+        }
+        const accessUntil = dateOnly(cancellationRows[0]?.vencimento || tenant.vencimento) || null;
         await writeAudit(sql, req, auth, {
           acao:'cancelar_assinatura',
           entidade:'plano',
@@ -190,6 +200,7 @@ export default async function handler(req, res) {
           success:true,
           status:'cancelamento_agendado',
           accessUntil,
+          canceledInvoices:Number(cancellationRows[0]?.canceled_invoices || 0),
           message:'Cancelamento agendado. O acesso continua disponível até o fim do período atual; cobranças pendentes foram canceladas.'
         });
       }
