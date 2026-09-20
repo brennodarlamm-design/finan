@@ -45,7 +45,8 @@ export async function putR2Object(env, key, data, options = {}) {
         storage: 'cloudflare_r2'
       };
     } catch (err) {
-      console.warn('[FinGo Edge R2] Erro no upload R2 remoto, usando fallback:', err?.message || err);
+      console.error('[FinGo Edge R2] Falha no upload persistente:', err?.message || err);
+      throw new Error('Falha ao gravar o arquivo no armazenamento Cloudflare R2.');
     }
   }
 
@@ -149,7 +150,8 @@ export async function listR2Objects(env, prefix = '', limit = 50) {
         truncated: result.truncated
       };
     } catch (err) {
-      console.warn('[FinGo Edge R2] Erro ao listar R2 remoto:', err?.message || err);
+      console.error('[FinGo Edge R2] Falha ao listar armazenamento persistente:', err?.message || err);
+      throw new Error('Falha ao listar arquivos no armazenamento Cloudflare R2.');
     }
   }
 
