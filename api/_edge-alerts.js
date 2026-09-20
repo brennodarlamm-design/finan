@@ -58,8 +58,33 @@ export async function dispatchEdgeAlert(env, alert) {
 
   if (targetPhone && severity === 'CRITICAL') {
     try {
-      const alertMsg = `🚨 *[FinGo Edge Alert - ${severity}]*\n*Tipo:* ${type}\n*Título:* ${title}\n*Detalhe:* ${message}\n*Horário:* ${new Date().toLocaleTimeString('pt-BR')}`;
-      // Log do disparo estruturado
+      const alertMsg = `🚨 *[FinGo Edge Alert - ${severity}]*\n*Tipo:* ${type}\n*Título:* ${title}\n*Detalhe:* ${message}\n*Horário:* ${new Date().toISOString()}`;
+      const renderBase = String(env?.RENDER_WHATSAPP_URL || env?.RENDER_HEALTH_URL || process.env?.RENDER_WHATSAPP_URL || 'https://finan-backend-9rxw.onrender.com')
+        .replace(/\/healthz\/?$/, '')
+        .replace(/\/+$/, '');
+      const internalSecret = String(env?.INTERNAL_API_SECRET || process.env?.INTERNAL_API_SECRET || '').trim();
+      if (!internalSecret) throw new Error('INTERNAL_API_SECRET não configurado para alertas operacionais.');
+
+      const response = await fetch(`${renderBase}/send-message`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${internalSecret}`,
+          'x-api-key': internalSecret,
+          'x-tenant-id': String(env?.FINOBRA_MASTER_TENANT || 'angelim')
+        },
+        body: JSON.stringify({
+          phone: String(targetPhone).replace(/\D/g, ''),
+          number: String(targetPhone).replace(/\D/g, ''),
+          message: alertMsg,
+          text: alertMsg
+        }),
+        signal: AbortSignal.timeout(8000)
+      });
+      const responseData = await response.json().catch(() => ({}));
+      if (!response.ok || !(responseData.success || responseData.messageId)) {
+        throw new Error(responseData.error || `HTTP ${response.status}`);
+      }
       whatsappDispatched = true;
     } catch (err) {
       console.warn('[FinGo Edge Alert] Falha ao enviar alerta WhatsApp:', err?.message || err);
