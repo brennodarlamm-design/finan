@@ -59,5 +59,8 @@ ok('Falhas 5xx geram alerta operacional', worker.includes("type: 'EDGE_HTTP_5XX'
 ok('Pagamento confirmado recupera UI quando refresh de sessão falha', cobranca.includes('sessionRefreshed') && cobranca.includes('window.location.reload()'));
 ok('Falha de sincronização de rota é mostrada ao usuário', app.includes('Dados locais exibidos. A sincronização com a nuvem falhou'));
 
+const authClient=read('js/auth.js');
+ok('Auth crítico usa timeout no navegador', authClient.includes('async _fetchWithTimeout(') && authClient.includes("this._fetchWithTimeout('/api/auth?action=login'") && authClient.includes("this._fetchWithTimeout('/api/auth?action=mfa_verify'") && authClient.includes("this._fetchWithTimeout('/api/auth?action=request_reset'") && authClient.includes("this._fetchWithTimeout('/api/auth?action=verify_reset'") && authClient.includes("this._fetchWithTimeout('/api/auth?action=register'"));
+
 if(process.exitCode) process.exit(process.exitCode);
 console.log('\n✅ Hardening pré-lançamento protegido por regressão estática.');
