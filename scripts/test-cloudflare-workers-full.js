@@ -75,10 +75,18 @@ assert.equal(afterR2Delete, null, 'deleteR2Object deve remover o arquivo.');
 
 const failingR2Env = {
   ATTACHMENTS_R2: {
+    put: async () => { throw new Error('simulated r2 upload failure'); },
     get: async () => { throw new Error('simulated r2 read failure'); },
-    delete: async () => { throw new Error('simulated r2 delete failure'); }
-  }
+    delete: async () => { throw new Error('simulated r2 delete failure'); },
+    list: async () => { throw new Error('simulated r2 list failure'); }
+  },
+  FINOBRA_ALLOW_MEMORY_STORAGE: 'true'
 };
+await assert.rejects(
+  () => putR2Object(failingR2Env, r2Key, fileContent, { contentType: 'application/pdf' }),
+  /Falha ao gravar o arquivo no armazenamento Cloudflare R2/,
+  'putR2Object não deve cair para memória quando o binding remoto existe mas falha.'
+);
 await assert.rejects(
   () => getR2Object(failingR2Env, r2Key),
   /Falha ao consultar o armazenamento Cloudflare R2/,
@@ -88,6 +96,11 @@ await assert.rejects(
   () => deleteR2Object(failingR2Env, r2Key),
   /Falha ao excluir o arquivo no armazenamento Cloudflare R2/,
   'deleteR2Object não deve reportar sucesso quando a exclusão remota falha.'
+);
+await assert.rejects(
+  () => listR2Objects(failingR2Env, 'tenants/darlam_const/'),
+  /Falha ao listar arquivos no armazenamento Cloudflare R2/,
+  'listR2Objects não deve retornar fallback vazio quando a listagem remota falha.'
 );
 console.log('   ✓ Cloudflare R2: isolamento multi-tenant, upload, download, listagem e falha fechada aprovados.');
 
