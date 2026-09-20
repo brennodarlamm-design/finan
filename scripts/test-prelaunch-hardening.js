@@ -59,6 +59,7 @@ ok('Cancelamento vencido é materializado como cancelado', auth.includes("SET st
 const pixCore=read('api/_webhook_pix_core.js');
 ok('PIX concorrente preserva crédito e distingue reativação posterior', pixCore.includes('WITH candidate AS') && pixCore.includes('FOR UPDATE') && pixCore.includes("status IN ('pending', 'expired', 'canceled')") && pixCore.includes('candidate.prior_status') && pixCore.includes("t.status = 'cancelamento_agendado' AND paid.prior_status = 'canceled'"));
 ok('Conta expõe ação de cancelamento', cobranca.includes('cancelarAssinatura()') && cobranca.includes('Cancelar renovação'));
+ok('Conta oferece caminho de reativação após cancelamento', cobranca.includes("needsReactivation=['cancelamento_agendado','cancelado']") && cobranca.includes('Reativar / contratar plano') && cobranca.includes('Reativar este plano') && cobranca.includes("this._renderCardPlano(plan,p.id===plan.id,canManage,p.status)"));
 ok('Recuperação de senha usa timeout em canais externos', (authApi.match(/AbortSignal\.timeout\(10000\)/g)||[]).length >= 2);
 ok('Telemetria não envia query string/hash', app.includes('window.location.origin') && app.includes('window.location.pathname') && !app.includes('url: window.location.href'));
 ok('Landing não promete mais provisionamento instantâneo', landing.includes('A solicitação leva menos de 1 minuto') && !landing.includes('Você cria sua conta em menos de 1 minuto'));
