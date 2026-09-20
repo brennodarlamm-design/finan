@@ -103,7 +103,8 @@ export const scheduledBillingSweep = schedules.task({
                 to: [t.email],
                 subject: `⚠️ Lembrete de Vencimento: ${pendentes.length} conta(s) pendente(s) — FinGo`,
                 html: emailHtml
-              })
+              }),
+              signal: AbortSignal.timeout(12000)
             });
             summary.notifiedEmails++;
           } catch (emErr) {
