@@ -103,5 +103,32 @@ ok('Configurações usam timeout no navegador', configuracoesClient.includes('ti
 const masterClient=read('js/master.js');
 ok('Painel Master usa timeout no navegador', masterClient.includes('timeoutMs = 20000') && (masterClient.match(/this\._fetchWithTimeout\(/g)||[]).length >= 17 && !/await fetch\(['"`]\/api/.test(masterClient));
 
+
+const documentosClient=read('js/documentos.js');
+ok('Documentos têm deadlines no navegador', (documentosClient.match(/AbortSignal\.timeout\(90000\)/g)||[]).length >= 2 && (documentosClient.match(/AbortSignal\.timeout\(20000\)/g)||[]).length >= 3);
+
+const assinadorClient=read('js/assinador.js');
+ok('Registro de assinatura tem deadline no navegador', assinadorClient.includes('AbortSignal.timeout(30000)'));
+
+const dashboardClient=read('js/dashboard.js');
+ok('Dashboard tem deadline no navegador', dashboardClient.includes("fetch('/api/dashboard' + q") && dashboardClient.includes('AbortSignal.timeout(20000)'));
+
+const utilsClient=read('js/utils.js');
+const fornecedoresClient=read('js/fornecedores.js');
+ok('Consultas CEP/CNPJ têm deadline no navegador', utilsClient.includes('AbortSignal.timeout(10000)') && fornecedoresClient.includes('AbortSignal.timeout(10000)'));
+
+const appClient=read('js/app.js');
+ok('Onboarding e telemetria têm deadlines no navegador', appClient.includes('AbortSignal.timeout(5000)') && appClient.includes('AbortSignal.timeout(10000)'));
+
+const validarClient=read('js/validar_page.js');
+const workflowClient=read('js/patch51.js');
+const suporteClient=read('js/suporte_dev.js');
+ok('Validação pública, workflow e suporte têm deadlines', validarClient.includes('AbortSignal.timeout(15000)') && (workflowClient.match(/AbortSignal\.timeout\(20000\)/g)||[]).length >= 2 && suporteClient.includes('AbortSignal.timeout(20000)'));
+
+const loginPageClient=read('js/login_page.js');
+const masterPageClient=read('js/master_page.js');
+const contasClient=read('js/contas.js');
+ok('Solicitação comercial, gate Master e contas têm deadlines', loginPageClient.includes("Auth._fetchWithTimeout('/api/auth?action=register'") && masterPageClient.includes("Auth._fetchWithTimeout('/api/auth?action=me'") && contasClient.includes('AbortSignal.timeout(20000)'));
+
 if(process.exitCode) process.exit(process.exitCode);
 console.log('\n✅ Hardening pré-lançamento protegido por regressão estática.');
