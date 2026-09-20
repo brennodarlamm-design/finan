@@ -5,10 +5,10 @@ import { canViewAudit, permissionError } from './_permissions.js';
 import { checkRateLimit, getClientIp } from './_ratelimit.js';
 import { createTenantSql } from './_tenant-sql.js';
 import { dispatchEdgeAlert } from './_edge-alerts.js';
+import { createRuntimeSql } from './_database.js';
 
 function getSql() {
-  if (!process.env.DATABASE_URL) throw new Error('DATABASE_URL não configurada.');
-  return neon(process.env.DATABASE_URL);
+  return createRuntimeSql();
 }
 
 function setCors(req, res) {
@@ -141,7 +141,7 @@ export default async function handler(req, res) {
 
   try {
     const baseSql = getSql();
-    const sql = createTenantSql(baseSql, { tenantId: auth.tenantId, isSystem: auth.isSystem === true });
+    const sql = createTenantSql(baseSql, { tenantId: auth.tenantId });
 
     if (req.method !== 'GET') return res.status(405).json({ success: false, error: 'Método não permitido.' });
     if (!canViewAudit(auth)) return res.status(403).json(permissionError('ROLE_AUDIT_FORBIDDEN'));
