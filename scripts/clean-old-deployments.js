@@ -22,7 +22,8 @@ async function fetchAllDeployments() {
     if (until) url += `&until=${until}`;
 
     const res = await fetch(url, {
-      headers: { Authorization: `Bearer ${token}` }
+      headers: { Authorization: `Bearer ${token}` },
+      signal: AbortSignal.timeout(15000)
     });
     const data = await res.json();
     if (!res.ok) {
@@ -91,7 +92,8 @@ async function main() {
     try {
       const res = await fetch(`https://api.vercel.com/v13/deployments/${d.uid}?teamId=${teamId}`, {
         method: 'DELETE',
-        headers: { Authorization: `Bearer ${token}` }
+        headers: { Authorization: `Bearer ${token}` },
+        signal: AbortSignal.timeout(15000)
       });
 
       if (res.ok) {
