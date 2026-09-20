@@ -6,6 +6,9 @@ assert(triggerClient.includes('withDeadline(tasks.trigger'), 'Trigger.dev SDK de
 const workerSource = fs.readFileSync(new URL('../cloudflare-worker.js', import.meta.url), 'utf8');
 assert(workerSource.includes("Telemetria operacional fica restrita a superadmin autenticado"), 'Painel de métricas Edge deve exigir superadmin.');
 assert(workerSource.includes("identity.role !== 'superadmin'"), 'Métricas Edge devem validar role superadmin.');
+assert(workerSource.includes('FINOBRA_UPSTREAM_TIMEOUT_MS || 20000'), 'Proxy Edge deve limitar espera da API upstream.');
+assert(workerSource.includes('AbortSignal.timeout(5000)'), 'Keep-alive Render deve ter timeout explícito.');
+
 
 assert(triggerClient.includes('AbortSignal.timeout(Number(options.timeoutMs || 8000))'), 'Fallback REST do Trigger.dev deve ter timeout explícito.');
 
