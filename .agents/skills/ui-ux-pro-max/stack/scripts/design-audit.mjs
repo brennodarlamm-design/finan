@@ -74,11 +74,19 @@ function inPageChecks() {
 
   // 3. Tap targets (mobile only)
   if (vw <= 480) {
+    const effectiveTargetRect = (el) => {
+      const own = el.getBoundingClientRect();
+      if (el.matches('input[type="checkbox"], input[type="radio"]') && el.labels?.length) {
+        const label = el.labels[0].getBoundingClientRect();
+        if (label.width > 0 && label.height > 0) return label;
+      }
+      return own;
+    };
     const small = [...document.querySelectorAll('a,button,[role=button],input,select')]
-      .filter((el) => { const r = el.getBoundingClientRect(); return r.width > 0 && r.height > 0 && (r.width < 44 || r.height < 44); });
+      .filter((el) => { const r = effectiveTargetRect(el); return r.width > 0 && r.height > 0 && (r.width < 44 || r.height < 44); });
     if (small.length) {
       const examples = small.slice(0, 10).map((el) => {
-        const r = el.getBoundingClientRect();
+        const r = effectiveTargetRect(el);
         const label = (el.getAttribute('aria-label') || el.textContent || el.getAttribute('name') || el.id || '').trim().replace(/\s+/g, ' ').slice(0, 32);
         return `${el.tagName.toLowerCase()}${el.id ? '#' + el.id : ''}${el.className && typeof el.className === 'string' ? '.' + el.className.trim().split(/\s+/)[0] : ''} ${Math.round(r.width)}×${Math.round(r.height)}${label ? ' "' + label + '"' : ''}`;
       });
