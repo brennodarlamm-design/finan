@@ -92,7 +92,7 @@ export const scheduledBillingSweep = schedules.task({
           `;
 
           try {
-            await fetch('https://api.resend.com/emails', {
+            const emailRes = await fetch('https://api.resend.com/emails', {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',
@@ -106,7 +106,11 @@ export const scheduledBillingSweep = schedules.task({
               }),
               signal: AbortSignal.timeout(12000)
             });
-            summary.notifiedEmails++;
+            if (!emailRes.ok) {
+              logger.warn(`Resend rejeitou e-mail de cobrança para ${t.id}:`, { status: emailRes.status });
+            } else {
+              summary.notifiedEmails++;
+            }
           } catch (emErr) {
             logger.warn(`Falha ao disparar e-mail de cobrança para ${t.id}:`, { error: emErr.message });
           }
