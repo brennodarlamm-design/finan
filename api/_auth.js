@@ -268,6 +268,12 @@ export async function resolveAuthAndTenant(req) {
       if (live.tenant_status === 'trial' && trialExpired(live.tenant_created_at, 15, live.tenant_vencimento)) {
         return { authenticated: false, status: 403, error: 'O período de teste gratuito de 15 dias expirou. Regularize o plano para continuar.' };
       }
+      if (live.tenant_status === 'cancelamento_agendado' && live.tenant_vencimento) {
+        const cancelDue = new Date(String(live.tenant_vencimento).slice(0, 10) + 'T23:59:59-04:00').getTime();
+        if (Number.isFinite(cancelDue) && Date.now() > cancelDue) {
+          return { authenticated:false, status:403, error:'Assinatura encerrada ao fim do período contratado. Reative um plano para continuar.' };
+        }
+      }
     }
 
     const requestedTenant = String(req.headers['x-tenant-id'] || '').trim();
