@@ -135,5 +135,19 @@ ok('Consultas auxiliares e guards usam deadlines explícitos',
   (versionGuardClient.match(/AbortSignal\.timeout\(5000\)/g)||[]).length >= 2 &&
   validarPageClient.includes('AbortSignal.timeout(10000)'));
 
+const utilsClient=read('js/utils.js');
+const appClient=read('js/app.js');
+const patch51Client=read('js/patch51.js');
+const loginPageClient=read('js/login_page.js');
+const dashboardClient=read('js/dashboard.js');
+const bimImporterClient=read('js/bim_geometry_importer.js');
+ok('App principal e BIM usam deadlines explícitos',
+  utilsClient.includes('AbortSignal.timeout(10000)') &&
+  appClient.includes('AbortSignal.timeout(10000)') &&
+  (patch51Client.match(/AbortSignal\.timeout\(15000\)/g)||[]).length >= 2 &&
+  loginPageClient.includes('AbortSignal.timeout(15000)') &&
+  dashboardClient.includes('AbortSignal.timeout(15000)') &&
+  bimImporterClient.includes('AbortSignal.timeout(45000)'));
+
 if(process.exitCode) process.exit(process.exitCode);
 console.log('\n✅ Hardening pré-lançamento protegido por regressão estática.');
