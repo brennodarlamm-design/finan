@@ -71,6 +71,18 @@ jobs:
             echo "::error::Configure CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID before production deploy."
             exit 1
           fi
+      - name: Apply required database migration
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL_UNPOOLED }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -z "${DATABASE_URL:-}" ]]; then
+            echo "::error::Configure DATABASE_URL_UNPOOLED before production deploy."
+            exit 1
+          fi
+          node scripts/run-migration.js migrations/033_newsletter_subscriptions.sql
+
       - name: Ensure R2 attachments bucket exists
         shell: bash
         run: |
