@@ -13,6 +13,18 @@ assert(workerSource.includes('AbortSignal.timeout(5000)'), 'Keep-alive Render de
 
 assert(triggerClient.includes('AbortSignal.timeout(Number(options.timeoutMs || 8000))'), 'Fallback REST do Trigger.dev deve ter timeout explícito.');
 
+const databaseBoundary = read('api/_database.js');
+const tenantSqlBoundary = read('api/_tenant-sql.js');
+const authDbBoundary = read('api/_auth.js');
+const adminDbBoundary = read('api/_admin-route.js');
+const webhookDbBoundary = read('api/_webhook_pix.js');
+assert(databaseBoundary.includes("DATABASE_URL não pode usar role owner/BYPASSRLS"), 'Runtime deve rejeitar DATABASE_URL com role owner.');
+assert(databaseBoundary.includes("DATABASE_OWNER_URL não configurada"), 'Acesso privilegiado deve exigir DATABASE_OWNER_URL dedicado.');
+assert(!tenantSqlBoundary.includes("set_config('app.is_system'"), 'Wrapper RLS tenant não pode manter bypass app.is_system.');
+assert(!authDbBoundary.includes('DATABASE_OWNER_URL || process.env.DATABASE_URL'), 'Auth privilegiado não pode cair para DATABASE_URL.');
+assert(!adminDbBoundary.includes('DATABASE_OWNER_URL || process.env.DATABASE_URL'), 'Admin privilegiado não pode cair para DATABASE_URL.');
+assert(!webhookDbBoundary.includes('DATABASE_OWNER_URL || process.env.DATABASE_URL'), 'Webhook de pagamento não pode cair para DATABASE_URL.');
+
 function ok(name, condition){
   if(!condition){ console.error('❌ '+name); process.exitCode=1; }
   else console.log('✅ '+name);
