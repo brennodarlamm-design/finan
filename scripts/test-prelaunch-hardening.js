@@ -80,5 +80,15 @@ ok('Cobrança crítica usa timeout no navegador', billingClient.includes('async 
 const dataClient=read('js/data.js');
 ok('Sincronização DB usa timeout no navegador', dataClient.includes('async _fetchWithTimeout(') && dataClient.includes('timeoutMs = 25000') && (dataClient.match(/this\._fetchWithTimeout\(/g)||[]).length >= 16);
 
+
+const whatsappClient=read('js/whatsapp.js');
+ok('WhatsApp crítico usa timeout no navegador', whatsappClient.includes('async _fetchWithTimeout(') && whatsappClient.includes('timeoutMs = 18000') && (whatsappClient.match(/this\._fetchWithTimeout\(/g)||[]).length >= 8);
+
+const nfeClient=read('js/nfe.js');
+ok('NF-e e certificado usam timeout no navegador', nfeClient.includes('async _fetchWithTimeout(') && nfeClient.includes('timeoutMs = 25000') && nfeClient.includes("this._fetchWithTimeout('/api/certificado?action=status'") && nfeClient.includes("this._fetchWithTimeout('/api/certificado?action=upload'") && nfeClient.includes("this._fetchWithTimeout('/api/certificado?action=remover'") && (nfeClient.match(/this\._fetchWithTimeout\(/g)||[]).length >= 10);
+
+const ocrClient=read('js/ocr.js');
+ok('OCR usa timeout no navegador', ocrClient.includes('async _fetchWithTimeout(') && ocrClient.includes('timeoutMs = 65000') && ocrClient.includes("this._fetchWithTimeout('/api/reconhecer-documento'") && ocrClient.includes("this._fetchWithTimeout('/api/db?table=ocr_historico'"));
+
 if(process.exitCode) process.exit(process.exitCode);
 console.log('\n✅ Hardening pré-lançamento protegido por regressão estática.');
