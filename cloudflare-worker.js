@@ -366,7 +366,12 @@ async function proxyApi(request, env) {
   if (!SAFE_METHODS.has(method)) headers.set('Origin', canonicalOrigin(env));
   headers.set('X-FinObra-Edge', 'cloudflare-worker');
 
-  const init = { method, headers, redirect: 'manual' };
+  const init = {
+    method,
+    headers,
+    redirect: 'manual',
+    signal: AbortSignal.timeout(Number(env.FINOBRA_UPSTREAM_TIMEOUT_MS || 20000))
+  };
 
   if (!['GET', 'HEAD'].includes(method)) {
     const rawBody = await request.arrayBuffer();
@@ -567,7 +572,8 @@ export default {
     const targetUrl = env.RENDER_HEALTH_URL || 'https://finan-backend-9rxw.onrender.com/healthz';
     ctx.waitUntil(
       fetch(targetUrl, {
-        headers: { 'User-Agent': 'FinGo-KeepAlive/1.0 (Cloudflare Edge Worker)' }
+        headers: { 'User-Agent': 'FinGo-KeepAlive/1.0 (Cloudflare Edge Worker)' },
+        signal: AbortSignal.timeout(5000)
       }).then(res => {
         console.log(`[Cloudflare Keep-Alive] Ping no Render status: ${res.status}`);
       }).catch(err => {
