@@ -59,7 +59,8 @@ export async function onRequest(context) {
   const init = {
     method,
     headers,
-    redirect: 'manual'
+    redirect: 'manual',
+    signal: AbortSignal.timeout(Number(env.FINOBRA_UPSTREAM_TIMEOUT_MS || 20000))
   };
   if (!['GET', 'HEAD'].includes(method)) init.body = request.body;
 
@@ -74,7 +75,11 @@ export async function onRequest(context) {
       headers: responseHeaders
     });
   } catch (err) {
+    const timedOut = err?.name === 'TimeoutError' || err?.name === 'AbortError';
     console.error('[Cloudflare API proxy] upstream indisponível:', err?.message || err);
-    return Response.json({ ok: false, error: 'Não foi possível acessar a API no momento.' }, { status: 502 });
+    return Response.json(
+      { ok: false, error: timedOut ? 'A API demorou mais que o limite permitido.' : 'Não foi possível acessar a API no momento.' },
+      { status: timedOut ? 504 : 502 }
+    );
   }
 }
