@@ -473,7 +473,7 @@ const Configuracoes = {
 
                 <div style="background:rgba(0,0,0,0.25);padding:10px 12px;border-radius:8px;border:1px solid var(--border-s);">
                   <div style="font-weight:700;color:var(--text);margin-bottom:3px;display:flex;align-items:center;gap:5px;">
-                    <span>🚀</span> Aplicações no FinObra
+                    <span>🚀</span> Aplicações no FinGo
                   </div>
                   <div style="color:var(--text2);">
                     Seu logotipo timbrado é inserido automaticamente no <strong>Menu Lateral</strong>, no <strong>Dossiê Executivo da Obra</strong>, em <strong>Recibos Oficiais</strong>, <strong>Ordens de Compra</strong> e <strong>Contratos</strong>.
