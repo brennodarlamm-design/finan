@@ -28,7 +28,7 @@ const pkg = JSON.parse(read('package.json'));
 // Rate limiting distribuído
 test('Migração cria api_rate_limits', /CREATE TABLE IF NOT EXISTS api_rate_limits/i.test(migration));
 test('Schema incorpora api_rate_limits', /CREATE TABLE IF NOT EXISTS api_rate_limits/i.test(schema));
-test('Rate limit usa Neon compartilhado', /neon\(conn\)/i.test(rl) && /ON CONFLICT \(bucket_key\) DO UPDATE/i.test(rl));
+test('Rate limit usa runtime Neon compartilhado com role limitado', /createRuntimeSql\(\)/i.test(rl) && /ON CONFLICT \(bucket_key\) DO UPDATE/i.test(rl));
 test('Rate limit mantém fallback local restrito', /fallbackCheck/i.test(rl) && /safeLimit \* 0\.8/i.test(rl));
 test('Rate limit limpa buckets expirados', /DELETE FROM api_rate_limits WHERE expires_at/i.test(rl));
 test('Login usa rate limit assíncrono', /await checkRateLimit\(`login:/i.test(authApi));
