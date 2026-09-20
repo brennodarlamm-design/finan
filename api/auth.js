@@ -457,6 +457,17 @@ export default async function handler(req, res) {
       if (user.tenant_status === 'cancelamento_agendado' && user.tenant_vencimento) {
         const cancelDue = new Date(String(user.tenant_vencimento).slice(0,10) + 'T23:59:59-04:00').getTime();
         if (Number.isFinite(cancelDue) && Date.now() > cancelDue) {
+          try {
+            await sql`
+              UPDATE tenants
+              SET status='cancelado', updated_at=NOW()
+              WHERE id=${user.tenant_id}
+                AND status='cancelamento_agendado'
+                AND vencimento < CURRENT_DATE;
+            `;
+          } catch (finalizeErr) {
+            console.warn('[Auth Login] Falha ao materializar cancelamento vencido:', finalizeErr?.message || finalizeErr);
+          }
           await writeAudit(sql, req, { tenantId:user.tenant_id, user:{ id:user.id } }, { acao:'login_bloqueado', entidade:'auth', entidadeId:user.id, depois:{ motivo:'subscription_canceled_period_end', ip:clientIp } });
           return res.status(403).json({ success:false, message:'Sua assinatura foi encerrada ao final do período contratado. Reative um plano para continuar.' });
         }
