@@ -71,7 +71,16 @@ export class BudgetSyncRoom {
 
     webSocket.addEventListener('message', async (event) => {
       try {
-        const message = JSON.parse(event.data);
+        const raw = typeof event.data === 'string' ? event.data : '';
+        if (!raw || raw.length > 64 * 1024) {
+          webSocket.send(JSON.stringify({ type:'error', code:'MESSAGE_TOO_LARGE', message:'Mensagem inválida ou acima do limite permitido.' }));
+          return;
+        }
+        const message = JSON.parse(raw);
+        if (!message || typeof message !== 'object' || Array.isArray(message)) {
+          webSocket.send(JSON.stringify({ type:'error', code:'INVALID_MESSAGE', message:'Mensagem de colaboração inválida.' }));
+          return;
+        }
         
         switch (message.type) {
           case 'item_updated':
@@ -100,7 +109,7 @@ export class BudgetSyncRoom {
             break;
 
           default:
-            this.broadcast(message, webSocket);
+            webSocket.send(JSON.stringify({ type:'error', code:'UNSUPPORTED_MESSAGE', message:'Tipo de mensagem não suportado.' }));
         }
       } catch (err) {
         console.warn('[FinGo Realtime] Mensagem inválida recebida:', err?.message || err);
