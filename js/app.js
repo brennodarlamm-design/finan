@@ -1073,7 +1073,12 @@ const App = {
                 }
               }
             }
-          }).catch(() => {});
+          }).catch((syncErr) => {
+            console.warn('[App] Falha ao sincronizar rota; mantendo dados locais:', syncErr?.message || syncErr);
+            if (this.route === targetRoute && navigation === this._navigationId && typeof Utils !== 'undefined' && Utils.toast) {
+              Utils.toast('Dados locais exibidos. A sincronização com a nuvem falhou e será tentada novamente.', 'warning');
+            }
+          });
         }
       } catch(err) {
         if (navigation !== this._navigationId) return;
