@@ -3,6 +3,35 @@
 // Suporta: Boletos, NF-e, NFC-e, NFS-e, Contas de Consumo, DAS, DARF, GPS e outros
 
 const OCR = {
+  async _fetchWithTimeout(url, options = {}, timeoutMs = 45000) {
+    if (typeof Auth !== 'undefined' && typeof Auth._fetchWithTimeout === 'function') {
+      return Auth._fetchWithTimeout(url, options, timeoutMs);
+    }
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    let externalAbortHandler = null;
+    try {
+      if (options.signal) {
+        if (options.signal.aborted) controller.abort();
+        else {
+          externalAbortHandler = () => controller.abort();
+          options.signal.addEventListener('abort', externalAbortHandler, { once: true });
+        }
+      }
+      return await this._fetchWithTimeout(url, { ...options, signal: controller.signal });
+    } catch (err) {
+      if (controller.signal.aborted && err?.name === 'AbortError') {
+        const timeoutError = new Error('A solicitação demorou mais que o esperado. Tente novamente.');
+        timeoutError.name = 'TimeoutError';
+        throw timeoutError;
+      }
+      throw err;
+    } finally {
+      clearTimeout(timer);
+      if (externalAbortHandler && options.signal) options.signal.removeEventListener('abort', externalAbortHandler);
+    }
+  },
+
 
   // ── Ponto de entrada: abre o modal de upload ─────────────────────────────
   abrirModal() {
@@ -164,7 +193,7 @@ const OCR = {
 
       // Chamar API de Reconhecimento com autenticação
       const apiHeaders = (typeof DB !== 'undefined' && DB._apiHeaders) ? DB._apiHeaders() : { 'Content-Type': 'application/json' };
-      const resp = await fetch('/api/reconhecer-documento', {
+      const resp = await this._fetchWithTimeout('/api/reconhecer-documento', {
         method: 'POST',
         headers: apiHeaders,
         body: JSON.stringify({ base64, mimeType })
@@ -979,7 +1008,7 @@ const OCR = {
   async sincronizarHistoricoNuvem() {
     try {
       const headers = (typeof DB !== 'undefined' && DB._apiHeaders) ? DB._apiHeaders() : {};
-      const res = await fetch('/api/db?table=ocr_historico', { headers });
+      const res = await this._fetchWithTimeout('/api/db?table=ocr_historico', { headers }, 15000);
       if (res.ok) {
         const json = await res.json();
         if (Array.isArray(json.data)) {
