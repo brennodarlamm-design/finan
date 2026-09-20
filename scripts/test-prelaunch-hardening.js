@@ -129,7 +129,16 @@ ok('Onboarding e telemetria têm deadlines no navegador', appClient.includes('Ab
 const validarClient=read('js/validar_page.js');
 const workflowClient=read('js/patch51.js');
 const suporteClient=read('js/suporte_dev.js');
+const suporteCustomerClient=read('js/suporte.js');
+const landingPageClient=read('js/landing_page.js');
+const triggerEmail=read('trigger/email.js');
+const v2Routes=read('api/_v2-routes.js');
+const newsletterMigration=read('migrations/033_newsletter_subscriptions.sql');
 ok('Validação pública, workflow e suporte têm deadlines', validarClient.includes('AbortSignal.timeout(15000)') && (workflowClient.match(/AbortSignal\.timeout\(20000\)/g)||[]).length >= 2 && suporteClient.includes('AbortSignal.timeout(20000)'));
+ok('Atendimento do cliente tem deadline e erro amigável', suporteCustomerClient.includes('AbortSignal.timeout(20000)') && suporteCustomerClient.includes('O atendimento demorou além do esperado. Tente novamente.'));
+ok('E-mail transacional central tem deadline', triggerEmail.includes('AbortSignal.timeout(12000)') && triggerEmail.includes('maxAttempts: 4'));
+ok('Newsletter só confirma após persistência real', landingPageClient.includes("await newsletterRequest('subscribe', email)") && landingPageClient.includes("await newsletterRequest('unsubscribe', promptEmail)") && landingPageClient.includes('AbortSignal.timeout(10000)') && !landingPageClient.includes("fetch('/api/v2/public/newsletter/subscribe'"));
+ok('Newsletter persiste consentimento no banco', v2Routes.includes('newsletter_subscriptions') && v2Routes.includes('createOwnerSql()') && v2Routes.includes('NEWSLETTER_PERSISTENCE_UNAVAILABLE') && newsletterMigration.includes('CREATE TABLE IF NOT EXISTS newsletter_subscriptions'));
 
 const loginPageClient=read('js/login_page.js');
 const masterPageClient=read('js/master_page.js');
