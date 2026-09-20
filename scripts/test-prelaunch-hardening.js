@@ -134,5 +134,10 @@ ok('Solicitação comercial, gate Master e contas têm deadlines', loginPageClie
 ok('UI de documentos identifica R2 sem anunciar Vercel como storage principal', documentosClient.includes('☁️ Cloudflare R2') && documentosClient.includes('☁️ Armazenamento legado') && !documentosClient.includes('Documento salvo no Vercel Blob!'));
 ok('Master exibe R2 como armazenamento central', masterClient.includes('Neon PostgreSQL + Cloudflare R2') && !masterClient.includes('Neon PostgreSQL + Vercel Blob'));
 
+
+const billingTrigger=read('trigger/billing.js');
+const maintenanceTrigger=read('trigger/maintenance.js');
+ok('Branding visível usa FinGo', !billingTrigger.includes('FinObra') && billingTrigger.includes('FinGo') && !configuracoesClient.includes('Aplicações no FinObra') && configuracoesClient.includes('Aplicações no FinGo') && maintenanceTrigger.includes('⚠️ FinGo — Alerta de Processos com SLA Expirado'));
+
 if(process.exitCode) process.exit(process.exitCode);
 console.log('\n✅ Hardening pré-lançamento protegido por regressão estática.');
