@@ -80,8 +80,17 @@ export default async function handler(req, res) {
   if (req.method === 'POST' && !canWriteData(auth)) return res.status(403).json(permissionError('ROLE_READ_ONLY'));
   if (req.method === 'DELETE' && !canDeleteData(auth)) return res.status(403).json(permissionError('ROLE_DELETE_FORBIDDEN'));
   const r2Ready = Boolean(req.env?.ATTACHMENTS_R2 && typeof req.env.ATTACHMENTS_R2.put === 'function');
+  const allowLegacyBlobUpload = String(process.env.FINOBRA_ALLOW_LEGACY_BLOB_UPLOAD || '').trim().toLowerCase() === 'true';
   const privateBlobReady = Boolean(String(process.env.FINOBRA_BLOB_READ_WRITE_TOKEN || process.env.BLOB_READ_WRITE_TOKEN || '').trim() || String(process.env.FINOBRA_BLOB_STORE_ID || '').trim());
   const configuredAccess = String(process.env.FINOBRA_BLOB_ACCESS || process.env.BLOB_ACCESS || (privateBlobReady ? 'private' : 'public')).trim().toLowerCase();
+
+  if (!r2Ready && !allowLegacyBlobUpload && req.method === 'POST') {
+    return res.status(503).json({
+      success: false,
+      code: 'R2_STORAGE_REQUIRED',
+      error: 'Cloudflare R2 indisponível. Novos uploads estão bloqueados para impedir fallback acidental para armazenamento legado.'
+    });
+  }
 
   if (!r2Ready && configuredAccess === 'private' && !privateBlobReady && req.method === 'POST') {
     return res.status(500).json({
@@ -488,7 +497,7 @@ export default async function handler(req, res) {
       });
     }
 
-    // Fallback temporário somente para objetos legados enquanto o upstream Node ainda existir.
+    // Upload legado somente quando explicitamente habilitado para migração/compatibilidade controlada.
     const now = new Date();
     const ano = now.getFullYear();
     const mes = String(now.getMonth() + 1).padStart(2, '0');
