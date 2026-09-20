@@ -43,6 +43,32 @@ const Auth = {
     return headers;
   },
 
+  async _fetchWithTimeout(url, options = {}, timeoutMs = 15000) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    let externalAbortHandler = null;
+    try {
+      if (options.signal) {
+        if (options.signal.aborted) controller.abort();
+        else {
+          externalAbortHandler = () => controller.abort();
+          options.signal.addEventListener('abort', externalAbortHandler, { once: true });
+        }
+      }
+      return await fetch(url, { ...options, signal: controller.signal });
+    } catch (err) {
+      if (controller.signal.aborted && err?.name === 'AbortError') {
+        const timeoutError = new Error('A solicitação demorou mais que o esperado. Tente novamente.');
+        timeoutError.name = 'TimeoutError';
+        throw timeoutError;
+      }
+      throw err;
+    } finally {
+      clearTimeout(timer);
+      if (externalAbortHandler && options.signal) options.signal.removeEventListener('abort', externalAbortHandler);
+    }
+  },
+
   getUsers() {
     try {
       const raw = localStorage.getItem(this.USERS_KEY);
@@ -101,7 +127,7 @@ const Auth = {
     };
 
     try {
-      const resp = await fetch('/api/auth?action=login', {
+      const resp = await this._fetchWithTimeout('/api/auth?action=login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
@@ -129,7 +155,7 @@ const Auth = {
 
   async verifyMfa(mfaToken, totpCode, backupCode = '') {
     try {
-      const resp = await fetch('/api/auth?action=mfa_verify', {
+      const resp = await this._fetchWithTimeout('/api/auth?action=mfa_verify', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ mfa_token: mfaToken, totp_code: totpCode, backup_code: backupCode })
@@ -151,7 +177,7 @@ const Auth = {
 
   async setupMfa(setupToken) {
     try {
-      const resp = await fetch('/api/auth?action=mfa_setup', {
+      const resp = await this._fetchWithTimeout('/api/auth?action=mfa_setup', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ setup_token: setupToken })
@@ -166,7 +192,7 @@ const Auth = {
 
   async activateMfa(setupToken, totpCode) {
     try {
-      const resp = await fetch('/api/auth?action=mfa_activate', {
+      const resp = await this._fetchWithTimeout('/api/auth?action=mfa_activate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ setup_token: setupToken, totp_code: totpCode })
@@ -196,7 +222,7 @@ const Auth = {
       : (extraBody.access_key || extraBody.company_key || extraBody.accessKey || '').trim();
 
     try {
-      const resp = await fetch('/api/auth?action=google', {
+      const resp = await this._fetchWithTimeout('/api/auth?action=google', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -234,7 +260,7 @@ const Auth = {
       : (extraBody?.access_key || extraBody?.company_key || extraBody?.accessKey || '').trim();
 
     try {
-      const resp = await fetch('/api/auth?action=request_reset', {
+      const resp = await this._fetchWithTimeout('/api/auth?action=request_reset', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -287,7 +313,7 @@ const Auth = {
     }
 
     try {
-      const resp = await fetch('/api/auth?action=verify_reset', {
+      const resp = await this._fetchWithTimeout('/api/auth?action=verify_reset', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ requestId, code, newPassword: novaSenha })
@@ -316,7 +342,7 @@ const Auth = {
     }
 
     try {
-      const res = await fetch('/api/auth?action=register', {
+      const res = await this._fetchWithTimeout('/api/auth?action=register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
