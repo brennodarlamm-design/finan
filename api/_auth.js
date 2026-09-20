@@ -103,10 +103,6 @@ function cookieMutationOriginAllowed(req) {
   if (!origin) return false;
   const allowed = allowedBrowserOrigins(req);
   if (allowed.has(origin)) return true;
-  // H-20: Permite apenas deployments Vercel pertencentes ao projeto FinObra (finan|finobra)
-  if (/^https:\/\/finan-as(?:-[a-z0-9-]+)?\.vercel\.app$/i.test(origin)) {
-    return true;
-  }
   return false;
 }
 
