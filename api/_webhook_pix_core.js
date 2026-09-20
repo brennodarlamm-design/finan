@@ -294,7 +294,10 @@ export async function settlePixPayment(sql, payload, meta = {}) {
   const effectiveTxid = payload.txid || (invoice ? invoice.txid : `pix_${Date.now()}`);
   const payloadJson = payload.rawBody ? JSON.stringify(payload.rawBody) : '{}';
 
-  // Fatura existente validada: atualização atômica da fatura e renovação de vencimento da empresa
+  // Fatura existente validada: atualização atômica da fatura e renovação do tenant.
+  // Um PIX confirmado pela fonte autorizada continua liquidável mesmo se o usuário cancelar
+  // enquanto o pagamento está em trânsito; nesse caso o período pago é creditado, mas a
+  // intenção de não renovar permanece em cancelamento_agendado.
   const updated = await sql`
     WITH paid AS (
       UPDATE billing_invoices
@@ -305,12 +308,15 @@ export async function settlePixPayment(sql, payload, meta = {}) {
           gateway = ${payload.gateway || 'pix_webhook'},
           webhook_payload = ${payloadJson}::jsonb,
           updated_at = NOW()
-      WHERE id = ${invoice.id} AND status IN ('pending', 'expired')
+      WHERE id = ${invoice.id} AND status IN ('pending', 'expired', 'canceled')
       RETURNING id, tenant_id, plan_id, COALESCE(cycle, 'monthly') AS cycle, amount_cents, txid, paid_at
     ), tenant_upd AS (
       UPDATE tenants t
       SET plano = paid.plan_id,
-          status = 'ativo',
+          status = CASE
+            WHEN t.status = 'cancelamento_agendado' THEN 'cancelamento_agendado'
+            ELSE 'ativo'
+          END,
           vencimento = (CASE WHEN t.vencimento IS NOT NULL AND t.vencimento >= CURRENT_DATE THEN t.vencimento ELSE CURRENT_DATE END + (
             CASE
               WHEN paid.cycle = 'annual' THEN 365
@@ -335,7 +341,7 @@ export async function settlePixPayment(sql, payload, meta = {}) {
   }
 
   if (!resultRecord) {
-    return { success: false, error: 'Cobrança não pôde ser liquidada (possivelmente cancelada ou bloqueada).' };
+    return { success: false, error: 'Cobrança não pôde ser liquidada porque não está em um estado liquidável ou foi processada por outra requisição.' };
   }
 
   return {
