@@ -121,7 +121,7 @@ export const dailySlaAudit = schedules.task({
 
         try {
           const emailFrom = String(process.env.FINOBRA_SUPPORT_EMAIL_FROM || 'FinGo <suporte@fingo.api.br>').trim();
-          const subject = `⚠️ FinObra — Alerta de Processos com SLA Expirado (${info.obrasAtrasadas.length} obra(s))`;
+          const subject = `⚠️ FinGo — Alerta de Processos com SLA Expirado (${info.obrasAtrasadas.length} obra(s))`;
 
           let itensHtml = '';
           for (const item of info.obrasAtrasadas) {
