@@ -1055,9 +1055,9 @@
 
     .calc-slider {
       width: 100%;
-      height: 8px;
+      height: 44px;
       border-radius: 4px;
-      background: rgba(255, 255, 255, 0.1);
+      background: linear-gradient(rgba(255, 255, 255, 0.10), rgba(255, 255, 255, 0.10)) center / 100% 8px no-repeat;
       outline: none;
       -webkit-appearance: none;
       appearance: none;
@@ -1520,6 +1520,7 @@
     }
 
     /* Accessibility and narrow-screen hardening */
+    :where(a, button, input, select, textarea, summary, [tabindex]):focus,
     :where(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
       outline: 3px solid var(--accent-mint-bright);
       outline-offset: 3px;
@@ -1575,9 +1576,29 @@
     }
 
     @media (max-width: 768px) {
-      .plans{display:flex;overflow-x:auto;scroll-snap-type:x mandatory;gap:16px;padding:12px 4px 20px;}
-      .plans-grid{display:flex;overflow-x:auto;scroll-snap-type:x mandatory;gap:16px;padding:12px 4px 20px;}
-      .plan-card, .plan{min-width:85vw;scroll-snap-align:center;}
+      .plans,
+      .plans-grid {
+        display: flex;
+        width: 100%;
+        max-width: 100%;
+        overflow-x: auto;
+        overflow-y: visible;
+        scroll-snap-type: x mandatory;
+        gap: 16px;
+        padding: 16px 4px 20px;
+      }
+      .plan-card,
+      .plan {
+        flex: 0 0 calc(100% - 20px);
+        min-width: calc(100% - 20px);
+        max-width: calc(100% - 20px);
+        scroll-snap-align: center;
+      }
+      .featured-badge {
+        max-width: calc(100% - 24px);
+        white-space: normal;
+        text-align: center;
+      }
       .compare-shell, .compare-container{display:none;}
       .mobile-compare{display:block;margin-top:20px;}
     }
@@ -1601,6 +1622,47 @@
       .brand-sub { font-size: 0.56rem; letter-spacing: 0.10em; white-space: nowrap; }
       .mobile-menu-details { flex-shrink: 0; }
       .mobile-drawer-pop { right: 0; }
+      .terminal-header {
+        flex-wrap: wrap;
+        padding-inline: 12px;
+      }
+      .terminal-url-pill {
+        order: 3;
+        flex: 1 1 100%;
+        max-width: 100%;
+        min-width: 0;
+        overflow-wrap: anywhere;
+      }
+      .terminal-badge-live {
+        max-width: 100%;
+        white-space: normal;
+        text-align: center;
+        overflow-wrap: anywhere;
+      }
+      .billing-switcher-wrap {
+        width: 100%;
+        min-width: 0;
+        overflow: hidden;
+      }
+      .billing-switcher {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        width: 100%;
+        max-width: 100%;
+        overflow: visible;
+      }
+      .cycle-btn {
+        width: 100%;
+        min-width: 0;
+        min-height: 44px;
+        justify-content: center;
+        padding: 9px 7px;
+        white-space: normal;
+        text-align: center;
+      }
+      .discount-pill {
+        white-space: nowrap;
+      }
       .hero-title { font-size: 2.2rem; }
       .telemetry-strip { grid-template-columns: 1fr; }
       .cascade-steps { grid-template-columns: 1fr; }
@@ -1624,6 +1686,23 @@
       .faq-question,
       .video-ch-btn {
         min-height: 44px;
+      }
+      .brand-group {
+        min-height: 44px;
+      }
+      #newsletter-email {
+        min-height: 44px;
+      }
+      #newsletter-optout-toggle {
+        display: inline-flex;
+        align-items: center;
+        min-height: 44px;
+        vertical-align: middle;
+      }
+      .footer a {
+        min-height: 44px;
+        display: inline-flex;
+        align-items: center;
       }
     }
 
