@@ -42,6 +42,7 @@ const app=read('js/app.js');
 const landing=read('landing.html');
 const backup=read('.github/workflows/database-backup.yml');
 const rollback=read('.github/workflows/cloudflare-rollback.yml');
+const vercelConfig=read('vercel.json');
 const cloudflareBuild=read('scripts/build-cloudflare-pages.cjs');
 const billingIdempotencyMigration=read('migrations/034_billing_pending_invoice_idempotency.sql');
 
@@ -76,6 +77,7 @@ ok('Controles mobile principais têm alvo mínimo de 44px', landing.includes('mi
 ok('Backup lógico diário está versionado e cifrado antes do artifact', backup.includes("cron: '20 7 * * *'") && backup.includes('pg_dump') && backup.includes('BACKUP_ENCRYPTION_PASSPHRASE') && backup.includes('openssl enc -aes-256-cbc') && backup.includes("backup/*.enc") && backup.includes('retention-days: 30'));
 ok('Backup recusa role sem bypass de RLS e valida tabelas críticas', backup.includes('Verify backup role can bypass RLS') && backup.includes('rolbypassrls::text') && backup.includes("Refusing to create a potentially incomplete production backup") && backup.includes('for critical_table in tenants usuarios obras lancamentos billing_invoices') && backup.includes('TABLE DATA .* ${critical_table}( |$)'));
 ok('Rollback Cloudflare está versionado', rollback.includes('wrangler rollback') && rollback.includes('/__finobra/health'));
+ok('Vercel Git auto-deploy permanece desativado após migração Cloudflare', vercelConfig.includes('"deploymentEnabled": false'));
 ok('Build público bloqueia segredos de servidor', cloudflareBuild.includes('assertNoServerSecretsInPublicBundle') && cloudflareBuild.includes('DATABASE_OWNER_URL') && cloudflareBuild.includes('SESSION_SIGNING_SECRET') && cloudflareBuild.includes('PIX_WEBHOOK_SECRET') && cloudflareBuild.includes('RESEND_API_KEY') && cloudflareBuild.includes('Segredo de servidor detectado no bundle público'));
 const edgeBackup=read('api/_edge-backup.js');
 const edgeAlerts=read('api/_edge-alerts.js');
