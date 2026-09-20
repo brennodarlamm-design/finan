@@ -1,6 +1,19 @@
 // js/documentos.js — Gerenciamento e Anexo de Documentos, Boletos e Comprovantes
 // Armazenamento em LocalStorage com suporte a PDF, Imagens e Recibos
 
+async function documentosFetchWithTimeout(url, options = {}, timeoutMs = 30000) {
+  if (typeof Auth !== 'undefined' && typeof Auth._fetchWithTimeout === 'function') {
+    return Auth._fetchWithTimeout(url, options, timeoutMs);
+  }
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(url, { ...options, signal: controller.signal });
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 const Documentos = {
   _KEY: 'finobra_documentos',
   _memoryBlobs: new Map(),
@@ -111,7 +124,7 @@ const Documentos = {
   async _resolverUrlProtegida(id) {
     try {
       const headers = (typeof DB !== 'undefined' && DB._apiHeaders) ? DB._apiHeaders() : {};
-      const res = await fetch(`/api/upload?document_id=${encodeURIComponent(id)}`, { headers });
+      const res = await documentosFetchWithTimeout(`/api/upload?document_id=${encodeURIComponent(id)}`, { headers });
       if (res.status === 401 || res.status === 403) {
         if (typeof Auth !== 'undefined' && Auth.handleSessionExpired) Auth.handleSessionExpired();
         return null;
@@ -146,7 +159,7 @@ const Documentos = {
     // Tenta buscar da nuvem (Neon) se o arquivo foi anexado por outro dispositivo (ex: celular)
     try {
       const headers = (typeof DB !== 'undefined' && DB._apiHeaders) ? DB._apiHeaders() : {};
-      const res = await fetch(`/api/db?table=documento_conteudo&id=${encodeURIComponent(id)}`, { headers });
+      const res = await documentosFetchWithTimeout(`/api/db?table=documento_conteudo&id=${encodeURIComponent(id)}`, { headers });
       if (res.status === 401) {
         if (typeof Auth !== 'undefined' && Auth.handleSessionExpired) {
           Auth.handleSessionExpired();
@@ -274,7 +287,7 @@ const Documentos = {
   async _uploadBlobBackground(id, filename, base64, contentType) {
     try {
       const headers = (typeof DB !== 'undefined' && DB._apiHeaders) ? DB._apiHeaders() : { 'Content-Type': 'application/json' };
-      const res = await fetch('/api/upload', {
+      const res = await documentosFetchWithTimeout('/api/upload', {
         method: 'POST',
         headers,
         body: JSON.stringify({
@@ -658,7 +671,7 @@ const Documentos = {
       let blobUrl = null;
       try {
         const headers = (typeof DB !== 'undefined' && DB._apiHeaders) ? DB._apiHeaders() : { 'Content-Type': 'application/json' };
-        const res = await fetch('/api/upload', {
+        const res = await documentosFetchWithTimeout('/api/upload', {
           method: 'POST',
           headers,
           body: JSON.stringify({
