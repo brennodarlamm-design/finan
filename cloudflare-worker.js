@@ -2,7 +2,7 @@ import { executeEdgeApi } from './api/_edge-adapter.js';
 import { applyEdgeSecurityMiddleware } from './api/_edge-security.js';
 import { recordEdgeMetric, getEdgeMetricsSummary, renderEdgeMetricsHtml } from './api/_edge-metrics.js';
 import { dispatchEdgeAlert } from './api/_edge-alerts.js';
-import { createCriticalR2Backup } from './api/_edge-backup.js';
+import { createCriticalR2Backup, migrateLegacyDocumentsToR2 } from './api/_edge-backup.js';
 export { BudgetSyncRoom } from './api/_edge-realtime.js';
 
 const DEFAULT_API_ORIGIN = 'https://api.fingo.api.br';
@@ -526,6 +526,15 @@ export default {
         if (!result?.skipped) console.log('[FinGo Backup] Snapshot crítico salvo:', result?.key || result);
       }).catch(err => {
         console.error('[FinGo Backup] Falha no snapshot crítico:', err?.message || err);
+      })
+    );
+
+    // Migração idempotente de documentos antigos: só altera a URL após upload + verificação no R2.
+    ctx.waitUntil(
+      migrateLegacyDocumentsToR2(env).then(result => {
+        if (result?.migrated) console.log('[FinGo Storage] Documentos legados migrados para R2:', result.migrated);
+      }).catch(err => {
+        console.error('[FinGo Storage] Falha na migração legada para R2:', err?.message || err);
       })
     );
   }
