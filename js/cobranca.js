@@ -35,6 +35,28 @@ const Cobranca = {
   },
   _selectedCycle: 'monthly',
 
+  async _fetchWithTimeout(url, options = {}, timeoutMs = 15000) {
+    if (typeof Auth !== 'undefined' && typeof Auth._fetchWithTimeout === 'function') {
+      return Auth._fetchWithTimeout(url, options, timeoutMs);
+    }
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    let externalAbortHandler = null;
+    try {
+      if (options.signal) {
+        if (options.signal.aborted) controller.abort();
+        else {
+          externalAbortHandler = () => controller.abort();
+          options.signal.addEventListener('abort', externalAbortHandler, { once:true });
+        }
+      }
+      return await fetch(url, { ...options, signal:controller.signal });
+    } finally {
+      clearTimeout(timer);
+      if (externalAbortHandler && options.signal) options.signal.removeEventListener('abort', externalAbortHandler);
+    }
+  },
+
   setBillingCycle(cycle) {
     const valid = ['monthly', 'quarterly', 'semiannual', 'annual'];
     this._selectedCycle = valid.includes(cycle) ? cycle : 'monthly';
@@ -197,7 +219,7 @@ const Cobranca = {
     const usageBox=document.getElementById('finobra-plan-usage');
     try {
       const headers=DB?._apiHeaders?.()||Auth.getAuthHeaders(); const u=Auth?.getUser?.()||{}; const canManage=['admin','superadmin'].includes(String(u.perfil||'').toLowerCase());
-      const res=await fetch(canManage?'/api/plano?billing=1':'/api/plano',{headers}); const json=await res.json().catch(()=>({})); if(!res.ok||!json.success||!json.plan) throw new Error(json.error||'Falha ao consultar plano');
+      const res=await this._fetchWithTimeout(canManage?'/api/plano?billing=1':'/api/plano',{headers}); const json=await res.json().catch(()=>({})); if(!res.ok||!json.success||!json.plan) throw new Error(json.error||'Falha ao consultar plano');
       const p=json.plan; this._accountData=json; if(Auth) Auth._planAccess=p;
       const obrasMax=p.maxActiveObras==null?'Ilimitadas':p.maxActiveObras; const usersMax=p.maxUsers==null?'Ilimitados':p.maxUsers;
       const statusEl=document.getElementById('acc-plan-status'); if(statusEl) statusEl.textContent=`${p.label||'Plano'} • ${p.status||'ativo'}${p.vencimento?' • próxima referência '+(Utils.formatDate?Utils.formatDate(p.vencimento):p.vencimento):''}`;
@@ -212,7 +234,7 @@ const Cobranca = {
     if (!confirm(`Cancelar a renovação da assinatura?\n\nO acesso continuará disponível até ${until}. Cobranças PIX pendentes serão canceladas. Esta ação pode ser revertida fazendo um novo pagamento de plano.`)) return;
     try {
       const headers=DB?._apiHeaders?.()||Auth.getAuthHeaders();
-      const res=await fetch('/api/plano?action=cancel_subscription',{method:'POST',headers,body:JSON.stringify({action:'cancel_subscription'})});
+      const res=await this._fetchWithTimeout('/api/plano?action=cancel_subscription',{method:'POST',headers,body:JSON.stringify({action:'cancel_subscription'})});
       const json=await res.json().catch(()=>({}));
       if(!res.ok||!json.success) throw new Error(json.error||'Não foi possível cancelar a renovação.');
       if(typeof Utils!=='undefined'&&Utils.toast) Utils.toast(json.message||'Renovação cancelada com sucesso.','success');
@@ -324,7 +346,7 @@ const Cobranca = {
 
     try {
       const headers = (typeof DB !== 'undefined' && DB._apiHeaders) ? DB._apiHeaders() : (typeof Auth !== 'undefined' ? Auth.getAuthHeaders() : { 'Content-Type':'application/json' });
-      const resp = await fetch('/api/plano?action=create_invoice', {
+      const resp = await this._fetchWithTimeout('/api/plano?action=create_invoice', {
         method:'POST', headers, body:JSON.stringify({ plan_id:plano.id, cycle })
       });
       const data = await resp.json().catch(() => ({}));
@@ -348,7 +370,7 @@ const Cobranca = {
     if (!inv) {
       try {
         const headers = (typeof DB !== 'undefined' && DB._apiHeaders) ? DB._apiHeaders() : (typeof Auth !== 'undefined' ? Auth.getAuthHeaders() : {});
-        const res = await fetch('/api/plano?billing=1', { headers });
+        const res = await this._fetchWithTimeout('/api/plano?billing=1', { headers });
         const json = await res.json().catch(() => ({}));
         if (json.invoices) {
           this._accountData = json;
@@ -572,7 +594,7 @@ const Cobranca = {
 
       try {
         const authH = (typeof Auth !== 'undefined' && Auth.getAuthHeaders) ? Auth.getAuthHeaders() : { 'Content-Type': 'application/json' };
-        const chkRes = await fetch(`/api/plano?action=check_invoice&invoiceId=${encodeURIComponent(inv.id)}`, {
+        const chkRes = await this._fetchWithTimeout(`/api/plano?action=check_invoice&invoiceId=${encodeURIComponent(inv.id)}`, {
           headers: authH,
           signal: this._pixAbortController?.signal
         });
