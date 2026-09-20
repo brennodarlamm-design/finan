@@ -22,8 +22,8 @@ ok('Superadmin não depende de username=admin', !/username\s*===\s*['"]admin['"]
 ok('API_SECRET não é aceito em query string na autenticação', !/req\.query\s*&&\s*req\.query\.secret|req\.query\.secret/.test(auth));
 ok('WhatsApp frontend não contém chave Evolution hardcoded', !/ANGELIM-FINANCAS-EVOLUTION|finobra_evolution_key/.test(wa));
 ok('Painel Master usa data.success', !/data\.ok/.test(master) && /data\.success/.test(master));
-ok('Configuração de usuários grava via /api/users', /fetch\('\/api\/users'/.test(cfg));
-ok('Configuração de empresa grava via /api/tenant', /fetch\('\/api\/tenant'/.test(cfg));
+ok('Configuração de usuários grava via /api/users', /configuracoesFetchWithTimeout\('\/api\/users'/.test(cfg));
+ok('Configuração de empresa grava via /api/tenant', /configuracoesFetchWithTimeout\('\/api\/tenant'/.test(cfg));
 ok('Fila de sincronização está habilitada', /_syncQueueKey\(\)/.test(data) && /_flushCloudQueue\(\)/.test(data));
 ok('Auth live consulta usuários/tenants no Neon', /FROM usuarios u[\s\S]*JOIN tenants t/.test(auth));
 
