@@ -46,9 +46,10 @@ export async function createCriticalR2Backup(env, { force = false } = {}) {
   const now = new Date();
   const dateKey = utcDateKey(now);
   const hour = now.getUTCHours();
+  const minute = now.getUTCMinutes();
 
   // O cron roda a cada 10 min. A janela 07:00 UTC corresponde a 03:00 em Boa Vista.
-  if (!force && hour !== 7) {
+  if (!force && (hour !== 7 || minute >= 10)) {
     return { skipped: true, reason: 'outside_backup_window', date: dateKey };
   }
 
