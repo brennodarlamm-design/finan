@@ -139,8 +139,52 @@ export default async function handler(req, res) {
 
     if (req.method === 'POST') {
       const action = String(req.query?.action || req.body?.action || '').trim();
-      if (action !== 'create_invoice') return res.status(400).json({ success:false, error:'Ação de cobrança inválida.' });
       if (!canManageTenant(auth)) return res.status(403).json(permissionError('ROLE_MANAGE_TENANT_FORBIDDEN'));
+
+      if (action === 'cancel_subscription') {
+        const tenantRows = await sql`
+          SELECT id, plano, status, vencimento
+          FROM tenants
+          WHERE id = ${auth.tenantId}
+          LIMIT 1;
+        `;
+        if (!tenantRows.length) return res.status(404).json({ success:false, error:'Empresa não encontrada.' });
+        const tenant = tenantRows[0];
+        if (tenant.status === 'cancelado' || tenant.status === 'cancelamento_agendado') {
+          return res.status(200).json({
+            success:true,
+            alreadyCanceled:true,
+            status:tenant.status,
+            accessUntil:dateOnly(tenant.vencimento) || null
+          });
+        }
+
+        await sql`
+          UPDATE billing_invoices
+          SET status='canceled', canceled_at=NOW(), updated_at=NOW()
+          WHERE tenant_id=${auth.tenantId} AND status='pending';
+        `;
+        await sql`
+          UPDATE tenants
+          SET status='cancelamento_agendado', updated_at=NOW()
+          WHERE id=${auth.tenantId};
+        `;
+        await writeAudit(sql, req, auth, {
+          acao:'cancelar_assinatura',
+          entidade:'plano',
+          entidadeId:auth.tenantId,
+          antes:{ status:tenant.status, plano:tenant.plano, vencimento:tenant.vencimento || null },
+          depois:{ status:'cancelamento_agendado', acesso_ate:tenant.vencimento || null }
+        });
+        return res.status(200).json({
+          success:true,
+          status:'cancelamento_agendado',
+          accessUntil:dateOnly(tenant.vencimento) || null,
+          message:'Cancelamento agendado. O acesso continua disponível até o vencimento atual e não haverá nova cobrança automática.'
+        });
+      }
+
+      if (action !== 'create_invoice') return res.status(400).json({ success:false, error:'Ação de cobrança inválida.' });
 
       const planId = normalizePlan(req.body?.plan_id);
       if (planId === 'trial') return res.status(400).json({ success:false, error:'O plano Trial não gera cobrança.' });
