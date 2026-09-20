@@ -1349,8 +1349,12 @@ export default async function handler(req, res) {
       if (!requestId || !code || !newPassword) {
         return res.status(400).json({ success: false, message: 'Dados incompletos para redefinição de senha.' });
       }
-      if (String(newPassword).length < 8) {
+      const normalizedNewPassword = String(newPassword);
+      if (normalizedNewPassword.length < 8) {
         return res.status(400).json({ success: false, message: 'A nova senha deve ter no mínimo 8 caracteres.' });
+      }
+      if (normalizedNewPassword.length > 128) {
+        return res.status(400).json({ success: false, message: 'A nova senha excede o limite máximo permitido de 128 caracteres.' });
       }
 
       const activeResets = await sql`
@@ -1377,17 +1381,48 @@ export default async function handler(req, res) {
         return res.status(401).json({ success: false, message: `Código incorreto. Você tem mais ${restantes} tentativa(s).` });
       }
 
-      const newHash = hashPassword(String(newPassword));
-      const queries = [
-        sql`UPDATE recuperacao_senhas SET usado = TRUE WHERE id = ${rec.id} AND usado = FALSE`,
-        sql`UPDATE usuarios SET senha_hash = ${newHash}, updated_at = NOW() WHERE id = ${rec.usuario_id}`,
-        sql`UPDATE auth_sessions SET revoked_at = COALESCE(revoked_at, NOW()) WHERE user_id = ${rec.usuario_id} AND revoked_at IS NULL`
-      ];
-      await sql.transaction(queries);
+      const newHash = hashPassword(normalizedNewPassword);
+      const resetApplied = await sql`
+        WITH consumed AS (
+          UPDATE recuperacao_senhas
+          SET usado = TRUE
+          WHERE id = ${rec.id}
+            AND usuario_id = ${rec.usuario_id}
+            AND usado = FALSE
+            AND expira_em > NOW()
+            AND tentativas < max_tentativas
+          RETURNING usuario_id
+        ),
+        password_upd AS (
+          UPDATE usuarios u
+          SET senha_hash = ${newHash}, updated_at = NOW()
+          FROM consumed c
+          WHERE u.id = c.usuario_id
+          RETURNING u.id
+        ),
+        sessions_revoked AS (
+          UPDATE auth_sessions s
+          SET revoked_at = COALESCE(s.revoked_at, NOW())
+          FROM consumed c
+          WHERE s.user_id = c.usuario_id AND s.revoked_at IS NULL
+          RETURNING s.id
+        )
+        SELECT password_upd.id AS user_id,
+               (SELECT COUNT(*)::int FROM sessions_revoked) AS revoked_sessions
+        FROM password_upd;
+      `;
+
+      if (!resetApplied.length) {
+        return res.status(409).json({
+          success: false,
+          message: 'Este código já foi utilizado, expirou ou deixou de ser válido. Solicite um novo código.'
+        });
+      }
 
       return res.status(200).json({
         success: true,
-        message: 'Senha redefinida com sucesso! Você já pode realizar login.'
+        revokedSessions: Number(resetApplied[0]?.revoked_sessions || 0),
+        message: 'Senha redefinida com sucesso! Por segurança, as sessões anteriores foram encerradas. Faça login novamente.'
       });
     }
 
