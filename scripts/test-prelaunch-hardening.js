@@ -90,5 +90,18 @@ ok('NF-e e certificado usam timeout no navegador', nfeClient.includes('async _fe
 const ocrClient=read('js/ocr.js');
 ok('OCR usa timeout no navegador', ocrClient.includes('async _fetchWithTimeout(') && ocrClient.includes('timeoutMs = 65000') && ocrClient.includes("this._fetchWithTimeout('/api/reconhecer-documento'") && ocrClient.includes("this._fetchWithTimeout('/api/db?table=ocr_historico'"));
 
+
+const versionGuardClient=read('js/version_guard.js');
+ok('Release guard usa timeout no navegador', versionGuardClient.includes('timeoutMs = 8000') && (versionGuardClient.match(/await fetchWithTimeout\(/g)||[]).length >= 2 && !/await fetch\(['"`]\/api/.test(versionGuardClient));
+
+const devKeysClient=read('js/dev-tenant-keys.js');
+ok('Cofre DEV usa timeout no navegador', devKeysClient.includes('timeoutMs = 15000') && (devKeysClient.match(/await fetchWithTimeout\(/g)||[]).length >= 3 && !/await fetch\(['"`]\/api/.test(devKeysClient));
+
+const configuracoesClient=read('js/configuracoes.js');
+ok('Configurações usam timeout no navegador', configuracoesClient.includes('timeoutMs = 20000') && (configuracoesClient.match(/this\._fetchWithTimeout\(/g)||[]).length >= 8 && !/await fetch\(['"`]\/api/.test(configuracoesClient));
+
+const masterClient=read('js/master.js');
+ok('Painel Master usa timeout no navegador', masterClient.includes('timeoutMs = 20000') && (masterClient.match(/this\._fetchWithTimeout\(/g)||[]).length >= 17 && !/await fetch\(['"`]\/api/.test(masterClient));
+
 if(process.exitCode) process.exit(process.exitCode);
 console.log('\n✅ Hardening pré-lançamento protegido por regressão estática.');
