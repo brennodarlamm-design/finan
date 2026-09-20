@@ -147,9 +147,12 @@ test('settlePixPayment executa renovação atômica em billing_invoices e tenant
   coreCode.includes("vencimento =")
 ));
 
-test('settlePixPayment reconcilia PIX confirmado com cancelamento concorrente', (
+test('settlePixPayment reconcilia PIX em trânsito sem bloquear reativação posterior', (
+  coreCode.includes('WITH candidate AS') &&
+  coreCode.includes('FOR UPDATE') &&
   coreCode.includes("status IN ('pending', 'expired', 'canceled')") &&
-  coreCode.includes("WHEN t.status = 'cancelamento_agendado' THEN 'cancelamento_agendado'")
+  coreCode.includes('candidate.prior_status') &&
+  coreCode.includes("t.status = 'cancelamento_agendado' AND paid.prior_status = 'canceled'")
 ));
 
 test('sendPaymentReceipt dispara comprovante via WhatsApp e E-mail', (
