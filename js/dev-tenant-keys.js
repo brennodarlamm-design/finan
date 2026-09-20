@@ -22,6 +22,19 @@
       : { 'Content-Type': 'application/json' };
   }
 
+  async function fetchWithTimeout(url, options = {}, timeoutMs = 15000) {
+    if (typeof Auth !== 'undefined' && typeof Auth._fetchWithTimeout === 'function') {
+      return Auth._fetchWithTimeout(url, options, timeoutMs);
+    }
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      return await fetch(url, { ...options, signal: controller.signal });
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
   function masked(last4) {
     return last4 ? `••${esc(last4)}` : '—';
   }
@@ -139,7 +152,7 @@
     state.lastError = '';
     render();
     try {
-      const resp = await fetch('/api/audit?action=dev_tenant_keys_list', { headers: authHeaders(), cache: 'no-store' });
+      const resp = await fetchWithTimeout('/api/audit?action=dev_tenant_keys_list', { headers: authHeaders(), cache: 'no-store' });
       const data = await resp.json().catch(() => ({}));
       if (!resp.ok || !data.success) throw new Error(data.error || 'Falha ao carregar cofre DEV.');
       state.rows = Array.isArray(data.keys) ? data.keys : [];
@@ -159,7 +172,7 @@
       return;
     }
     try {
-      const resp = await fetch(`/api/audit?action=dev_tenant_keys_reveal&tenantId=${encodeURIComponent(tenantId)}`, {
+      const resp = await fetchWithTimeout(`/api/audit?action=dev_tenant_keys_reveal&tenantId=${encodeURIComponent(tenantId)}`, {
         headers: authHeaders(),
         cache: 'no-store'
       });
@@ -178,7 +191,7 @@
     if (!confirm(`Rotacionar a Chave da Empresa de "${nome}"?\n\nA chave anterior deixará de funcionar imediatamente. A nova chave ficará armazenada no cofre DEV e poderá ser consultada somente pelo Master com MFA.`)) return null;
 
     try {
-      const resp = await fetch('/api/audit?action=dev_tenant_keys_rotate', {
+      const resp = await fetchWithTimeout('/api/audit?action=dev_tenant_keys_rotate', {
         method: 'POST',
         headers: authHeaders(),
         body: JSON.stringify({ tenantId })
