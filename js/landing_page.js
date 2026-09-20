@@ -274,35 +274,53 @@ function initRemotionVideoPlayers() {
       feedback.textContent = '✓ Inscrição confirmada com sucesso! Você receberá o Radar FinGo com as novidades.';
       input.value = '';
 
-      // Tenta enviar para o endpoint v2 se disponível
-      fetch('/api/v2/public/newsletter/subscribe', {
+      // Confirma a inscrição no servidor antes de anunciar sucesso ao usuário.
+      const subscribeRes = await fetch('/api/v2/public/newsletter/subscribe', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email })
-      }).catch(() => {});
-    } catch {
+        body: JSON.stringify({ email }),
+        signal: AbortSignal.timeout(8000)
+      });
+      const subscribeData = await subscribeRes.json().catch(() => ({}));
+      if (!subscribeRes.ok || subscribeData.success === false) {
+        throw new Error(subscribeData.message || 'Não foi possível confirmar a inscrição.');
+      }
+    } catch (err) {
+      console.warn('[Newsletter] Falha ao confirmar inscrição:', err?.message || err);
+      localStorage.removeItem('fingo_newsletter_subscribed');
       feedback.style.display = 'block';
-      feedback.style.color = '#C6FF00';
-      feedback.textContent = '✓ Inscrição confirmada no Radar FinGo!';
+      feedback.style.color = '#ef4444';
+      feedback.textContent = 'Não foi possível confirmar sua inscrição agora. Tente novamente.';
     }
   });
 
   if (optoutToggle) {
-    optoutToggle.addEventListener('click', e => {
+    optoutToggle.addEventListener('click', async e => {
       e.preventDefault();
       const current = localStorage.getItem('fingo_newsletter_email') || '';
       const promptEmail = prompt('Digite seu e-mail para cancelar o recebimento da newsletter:', current);
       if (promptEmail && promptEmail.includes('@')) {
-        localStorage.setItem('fingo_newsletter_subscribed', 'false');
-        feedback.style.display = 'block';
-        feedback.style.color = '#94a3b8';
-        feedback.textContent = `Inscrição cancelada para o e-mail: ${promptEmail}. Você não receberá mais os comunicados promocionais.`;
-        
-        fetch('/api/v2/public/newsletter/unsubscribe', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email: promptEmail })
-        }).catch(() => {});
+        try {
+          const unsubscribeRes = await fetch('/api/v2/public/newsletter/unsubscribe', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email: promptEmail }),
+            signal: AbortSignal.timeout(8000)
+          });
+          const unsubscribeData = await unsubscribeRes.json().catch(() => ({}));
+          if (!unsubscribeRes.ok || unsubscribeData.success === false) {
+            throw new Error(unsubscribeData.message || 'Não foi possível cancelar a inscrição.');
+          }
+          localStorage.setItem('fingo_newsletter_subscribed', 'false');
+          feedback.style.display = 'block';
+          feedback.style.color = '#94a3b8';
+          feedback.textContent = `Inscrição cancelada para o e-mail: ${promptEmail}. Você não receberá mais os comunicados promocionais.`;
+        } catch (err) {
+          console.warn('[Newsletter] Falha ao cancelar inscrição:', err?.message || err);
+          feedback.style.display = 'block';
+          feedback.style.color = '#ef4444';
+          feedback.textContent = 'Não foi possível cancelar sua inscrição agora. Tente novamente.';
+        }
       }
     });
   }
