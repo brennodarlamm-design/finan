@@ -393,6 +393,15 @@ async function handleApi(request, env) {
       response = await proxyApi(request, env);
     }
     if (response) {
+      if (response.status >= 500) {
+        await dispatchEdgeAlert(env, {
+          type: 'EDGE_HTTP_5XX',
+          severity: 'CRITICAL',
+          title: `Falha HTTP ${response.status} no Edge`,
+          message: `${request.method} ${new URL(request.url).pathname} respondeu ${response.status}.`,
+          details: { status: response.status, method: request.method, path: new URL(request.url).pathname }
+        }).catch((alertErr) => console.warn('[FinGo Edge] Alerta operacional falhou:', alertErr?.message || alertErr));
+      }
       const secureHeaders = new Headers(response.headers);
       if (!secureHeaders.has('Strict-Transport-Security')) {
         secureHeaders.set('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
