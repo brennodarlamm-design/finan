@@ -138,6 +138,7 @@ ok('Master exibe R2 como armazenamento central', masterClient.includes('Neon Pos
 const billingTrigger=read('trigger/billing.js');
 const maintenanceTrigger=read('trigger/maintenance.js');
 ok('Tarefas agendadas limitam chamadas externas', billingTrigger.includes('AbortSignal.timeout(12000)') && maintenanceTrigger.includes('AbortSignal.timeout(12000)') && maintenanceTrigger.includes('AbortSignal.timeout(5000)'));
+ok('Tarefas agendadas não tratam 429/5xx como sucesso', billingTrigger.includes('if (!emailRes.ok)') && billingTrigger.includes('summary.notifiedEmails++') && maintenanceTrigger.includes('if (!res.ok)') && maintenanceTrigger.includes('return { ok: false, status: res.status'));
 ok('Branding visível usa FinGo', !billingTrigger.includes('FinObra') && billingTrigger.includes('FinGo') && !configuracoesClient.includes('Aplicações no FinObra') && configuracoesClient.includes('Aplicações no FinGo') && maintenanceTrigger.includes('⚠️ FinGo — Alerta de Processos com SLA Expirado') && maintenanceTrigger.includes('FinGo-KeepAlive/1.0'));
 
 if(process.exitCode) process.exit(process.exitCode);
