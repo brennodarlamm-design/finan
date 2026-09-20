@@ -299,7 +299,7 @@ export async function handleV2BoletimMedicao(req, res) {
 /**
  * Endpoint de Gestão da Newsletter / Radar FinGo
  */
-export async function handleV2Newsletter(req, res) {
+export async function handleV2Newsletter(req, res, deps = {}) {
   res.setHeader('Cache-Control', 'no-store');
   res.setHeader('Content-Type', 'application/json; charset=utf-8');
 
@@ -330,7 +330,7 @@ export async function handleV2Newsletter(req, res) {
   }
 
   try {
-    const sql = createOwnerSql();
+    const sql = deps.sql || createOwnerSql();
 
     if (isUnsubscribe) {
       await sql`
