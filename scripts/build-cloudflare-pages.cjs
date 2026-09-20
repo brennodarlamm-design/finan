@@ -161,6 +161,39 @@ if (fs.existsSync(cfDir)) {
 
 const deploymentMetadata = writeDeploymentMetadata();
 
+function assertNoServerSecretsInPublicBundle() {
+  const publicExtensions = new Set(['.html', '.js', '.json', '.txt', '.xml', '.webmanifest']);
+  const forbiddenPatterns = [
+    ['private-key', /-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----/],
+    ['postgres-connection', /postgres(?:ql)?:\/\/[^\s"'<>]+/i],
+    ['openai-secret', /\bsk-[A-Za-z0-9_-]{20,}\b/],
+    ['github-token', /\bgh[pousr]_[A-Za-z0-9]{20,}\b/],
+    ['resend-secret', /\bre_[A-Za-z0-9_-]{20,}\b/],
+    ['server-secret-assignment', /(?:DATABASE_URL|DATABASE_OWNER_URL|SESSION_SIGNING_SECRET|INTERNAL_API_SECRET|PIX_WEBHOOK_SECRET|ASAAS_WEBHOOK_TOKEN|RESEND_API_KEY|MFA_ENCRYPTION_KEY|TENANT_KEY_PEPPER)\s*[:=]\s*["'][^"']{8,}["']/i]
+  ];
+
+  const walkPublic = dir => {
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+      const full = path.join(dir, entry.name);
+      if (entry.isDirectory()) {
+        walkPublic(full);
+        continue;
+      }
+      if (!publicExtensions.has(path.extname(entry.name).toLowerCase()) && entry.name !== 'site.webmanifest') continue;
+      const source = fs.readFileSync(full, 'utf8');
+      for (const [label, regex] of forbiddenPatterns) {
+        if (regex.test(source)) {
+          throw new Error(`Segredo de servidor detectado no bundle público (${label}): ${path.relative(out, full)}`);
+        }
+      }
+    }
+  };
+
+  walkPublic(out);
+}
+
+assertNoServerSecretsInPublicBundle();
+
 const loginPagePath = path.join(out, 'js', 'login_page.js');
 let loginPage = fs.readFileSync(loginPagePath, 'utf8').replace(/\r\n/g, '\n');
 
@@ -212,4 +245,4 @@ if ((!deploymentMetadata.commit || deploymentMetadata.commit === 'unknown') && !
   throw new Error('Build Cloudflare sem identificação do commit de origem.');
 }
 
-console.log(`✅ Cloudflare dist preparado com commit ${deploymentMetadata.commit.slice(0, 12)} via ${deploymentMetadata.source}, frontend-only, CSP e recuperação multi-tenant validada.`);
+console.log(`✅ Cloudflare dist preparado com commit ${deploymentMetadata.commit.slice(0, 12)} via ${deploymentMetadata.source}, frontend-only, sem segredos de servidor, CSP e recuperação multi-tenant validada.`);
