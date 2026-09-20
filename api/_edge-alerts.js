@@ -2,7 +2,8 @@
 // Dispara notificações instantâneas para canais operacionais (WhatsApp/Telegram/Logs) com controle de taxa (throttle).
 
 const recentAlerts = new Map(); // signature -> timestamp
-const ALERT_COOLDOWN_MS = 5 * 60 * 1000; // 5 minutos de cooldown por assinatura de erro
+const ALERT_COOLDOWN_MS = 5 * 60 * 1000; // 5 minutos após entrega/log bem-sucedido
+const ALERT_RETRY_COOLDOWN_MS = 30 * 1000; // retry curto quando o canal operacional falha
 
 /**
  * Gera uma assinatura única para o incidente para evitar repetições.
@@ -26,19 +27,25 @@ export async function dispatchEdgeAlert(env, alert) {
 
   const signature = getAlertSignature(type, title);
   const now = Date.now();
-  const lastSent = recentAlerts.get(signature);
+  const lastWindow = recentAlerts.get(signature);
+  const lastSentAt = typeof lastWindow === 'number' ? lastWindow : Number(lastWindow?.timestamp || 0);
+  const cooldownMs = typeof lastWindow === 'number'
+    ? ALERT_COOLDOWN_MS
+    : Number(lastWindow?.cooldownMs || ALERT_COOLDOWN_MS);
 
-  // Aplica throttle: não reenvia o mesmo erro se ocorreu nos últimos 5 minutos
-  if (lastSent && now - lastSent < ALERT_COOLDOWN_MS) {
+  // Em falha de canal externo usamos uma janela curta, permitindo nova tentativa sem
+  // transformar cada erro 5xx em uma tempestade de notificações.
+  if (lastSentAt && now - lastSentAt < cooldownMs) {
     return {
       dispatched: false,
       throttled: true,
-      reason: 'Cooldown ativo para este tipo de alerta.',
+      reason: cooldownMs === ALERT_RETRY_COOLDOWN_MS
+        ? 'Retry operacional aguardando a janela curta de 30 segundos.'
+        : 'Cooldown ativo para este tipo de alerta.',
+      retryAfterMs: Math.max(0, cooldownMs - (now - lastSentAt)),
       signature
     };
   }
-
-  recentAlerts.set(signature, now);
 
   const payload = {
     timestamp: new Date().toISOString(),
@@ -91,10 +98,17 @@ export async function dispatchEdgeAlert(env, alert) {
     }
   }
 
+  const externalChannelRequired = Boolean(targetPhone && severity === 'CRITICAL');
+  const appliedCooldownMs = externalChannelRequired && !whatsappDispatched
+    ? ALERT_RETRY_COOLDOWN_MS
+    : ALERT_COOLDOWN_MS;
+  recentAlerts.set(signature, { timestamp: now, cooldownMs: appliedCooldownMs });
+
   // Limpeza periódica do mapa de alertas (mantém até 500 itens)
   if (recentAlerts.size > 500) {
-    for (const [k, ts] of recentAlerts.entries()) {
-      if (now - ts > ALERT_COOLDOWN_MS) recentAlerts.delete(k);
+    for (const [k, window] of recentAlerts.entries()) {
+      const ts = typeof window === 'number' ? window : Number(window?.timestamp || 0);
+      if (!ts || now - ts > ALERT_COOLDOWN_MS) recentAlerts.delete(k);
     }
   }
 
@@ -103,6 +117,7 @@ export async function dispatchEdgeAlert(env, alert) {
     throttled: false,
     signature,
     payload,
+    retryAfterMs: externalChannelRequired && !whatsappDispatched ? ALERT_RETRY_COOLDOWN_MS : 0,
     channels: {
       console: true,
       whatsapp: whatsappDispatched
