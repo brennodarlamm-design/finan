@@ -156,5 +156,20 @@ ok('Trigger maintenance e billing usam deadlines explícitos',
   maintenanceTask.includes('AbortSignal.timeout(8000)') &&
   billingTask.includes('AbortSignal.timeout(15000)'));
 
+const backendServer=read('backend/server.js');
+const serviceWorker=read('sw.js');
+const pagesProxy=read('functions/api/[[path]].js');
+const renderDeploy=read('scripts/render-deploy.js');
+const legacyCleanup=read('scripts/clean-old-deployments.js');
+ok('Proxy, service worker e Render usam deadlines explícitos',
+  backendServer.includes('AbortSignal.timeout(15000)') &&
+  backendServer.includes('AbortSignal.timeout(8000)') &&
+  serviceWorker.includes('AbortSignal.timeout(12000)') &&
+  serviceWorker.includes('AbortSignal.timeout(15000)') &&
+  pagesProxy.includes('FINOBRA_UPSTREAM_TIMEOUT_MS || 20000') &&
+  pagesProxy.includes('timedOut ? 504 : 502') &&
+  renderDeploy.includes('AbortSignal.timeout(15000)') &&
+  (legacyCleanup.match(/AbortSignal\.timeout\(15000\)/g)||[]).length >= 2);
+
 if(process.exitCode) process.exit(process.exitCode);
 console.log('\n✅ Hardening pré-lançamento protegido por regressão estática.');
