@@ -45,11 +45,15 @@ const rollback=read('.github/workflows/cloudflare-rollback.yml');
 
 ok('Wrangler declara binding ATTACHMENTS_R2 persistente', wrangler.includes('"binding": "ATTACHMENTS_R2"') && wrangler.includes('"bucket_name": "fingo-attachments"'));
 ok('R2 falha fechado fora de testes quando binding está ausente', r2.includes('Binding ATTACHMENTS_R2 indisponível') && r2.includes('FINOBRA_ALLOW_MEMORY_STORAGE'));
+ok('R2 exige tenant explícito na geração da chave', r2.includes('tenantId válido é obrigatório para gerar chave no R2.'));
+ok('R2 não mascara falha remota de leitura ou exclusão', r2.includes('Falha ao consultar o armazenamento Cloudflare R2.') && r2.includes('Falha ao excluir o arquivo no armazenamento Cloudflare R2.'));
 ok('Rotas R2 exigem autenticação e isolamento de tenant', routes.includes('resolveAuthAndTenant(req)') && routes.includes("canAccessModule(auth, 'documentos'") && routes.includes('expectedPrefix'));
 ok('Upload principal grava em R2 quando binding existe', upload.includes('r2Ready') && upload.includes("storage: 'cloudflare_r2'") && upload.includes('r2://'));
 ok('Vercel Blob ficou apenas como compatibilidade legada', upload.includes("storage: 'vercel_blob_legacy'"));
 ok('Cancelamento self-service existe no backend', plano.includes("action === 'cancel_subscription'") && plano.includes("status='cancelamento_agendado'"));
+ok('Cancelamento de assinatura é atômico entre faturas e tenant', plano.includes('WITH canceled_invoices AS') && plano.includes('tenant_upd AS') && plano.includes('canceledInvoices:Number('));
 ok('Cancelamento encerra acesso ao fim do período', auth.includes("tenant_status === 'cancelamento_agendado'") && authApi.includes("tenant_status === 'cancelamento_agendado'"));
+ok('Cancelamento vencido é materializado como cancelado', auth.includes("SET status='cancelado'") && auth.includes('vencimento < CURRENT_DATE') && authApi.includes("SET status='cancelado'") && authApi.includes('vencimento < CURRENT_DATE'));
 ok('Conta expõe ação de cancelamento', cobranca.includes('cancelarAssinatura()') && cobranca.includes('Cancelar renovação'));
 ok('Recuperação de senha usa timeout em canais externos', (authApi.match(/AbortSignal\.timeout\(10000\)/g)||[]).length >= 2);
 ok('Telemetria não envia query string/hash', app.includes('window.location.origin') && app.includes('window.location.pathname') && !app.includes('url: window.location.href'));
@@ -154,6 +158,7 @@ ok('Master exibe R2 como armazenamento central', masterClient.includes('Neon Pos
 
 const billingTrigger=read('trigger/billing.js');
 const maintenanceTrigger=read('trigger/maintenance.js');
+ok('Jobs cross-tenant exigem DATABASE_OWNER_URL dedicado', billingTrigger.includes('process.env.DATABASE_OWNER_URL') && maintenanceTrigger.includes('process.env.DATABASE_OWNER_URL') && !billingTrigger.includes('process.env.DATABASE_URL ||') && !maintenanceTrigger.includes('process.env.DATABASE_URL ||'));
 ok('Tarefas agendadas limitam chamadas externas', billingTrigger.includes('AbortSignal.timeout(12000)') && maintenanceTrigger.includes('AbortSignal.timeout(12000)') && maintenanceTrigger.includes('AbortSignal.timeout(5000)'));
 ok('Tarefas agendadas não tratam 429/5xx como sucesso', billingTrigger.includes('if (!emailRes.ok)') && billingTrigger.includes('summary.notifiedEmails++') && maintenanceTrigger.includes('if (!res.ok)') && maintenanceTrigger.includes('return { ok: false, status: res.status'));
 ok('Branding visível usa FinGo', !billingTrigger.includes('FinObra') && billingTrigger.includes('FinGo') && !configuracoesClient.includes('Aplicações no FinObra') && configuracoesClient.includes('Aplicações no FinGo') && maintenanceTrigger.includes('⚠️ FinGo — Alerta de Processos com SLA Expirado') && maintenanceTrigger.includes('FinGo-KeepAlive/1.0'));
