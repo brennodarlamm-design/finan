@@ -182,6 +182,22 @@ ok('Fluxos auxiliares do navegador não podem ficar pendurados ou confirmar suce
   appClient.includes('signal: AbortSignal.timeout(5000)') &&
   authClient.includes("keepalive:true, signal:AbortSignal.timeout(5000)"));
 
+const vercelConfig=JSON.parse(read('vercel.json'));
+const newsletterMigration=read('migrations/033_newsletter_subscriptions.sql');
+const edgeV2Source=read('api/_v2-routes.js');
+const productionWorkflow=read('.github/workflows/production-cicd.yml');
+
+ok('Vercel legado não cria novos deploys Git após migração para Cloudflare',
+  vercelConfig?.git?.deploymentEnabled === false);
+
+ok('Newsletter só confirma consentimento após persistência durável e protegida',
+  newsletterMigration.includes('CREATE TABLE IF NOT EXISTS newsletter_subscribers') &&
+  newsletterMigration.includes('UNIQUE (email)') &&
+  edgeV2Source.includes('INSERT INTO newsletter_subscribers') &&
+  edgeV2Source.includes('NEWSLETTER_STORAGE_UNAVAILABLE') &&
+  edgeV2Source.includes('newsletter:ip:') &&
+  productionWorkflow.includes('migrations/033_newsletter_subscriptions.sql'));
+
 ok('OTP de recuperação não é persistido no navegador',
   !authClient.includes('finobra_otp_') &&
   authClient.includes('O OTP permanece somente em memória') &&
