@@ -35,7 +35,12 @@ ok('Wrangler declara binding ATTACHMENTS_R2 persistente', wrangler.includes('"bi
 ok('R2 falha fechado fora de testes quando binding está ausente', r2.includes('Binding ATTACHMENTS_R2 indisponível') && r2.includes('FINOBRA_ALLOW_MEMORY_STORAGE'));
 ok('Rotas R2 exigem autenticação e isolamento de tenant', routes.includes('resolveAuthAndTenant(req)') && routes.includes("canAccessModule(auth, 'documentos'") && routes.includes('expectedPrefix'));
 ok('Upload principal grava em R2 quando binding existe', upload.includes('r2Ready') && upload.includes("storage: 'cloudflare_r2'") && upload.includes('r2://'));
-ok('Vercel Blob ficou apenas como compatibilidade legada', upload.includes("storage: 'vercel_blob_legacy'"));
+ok('Vercel Blob ficou somente para leitura/exclusão legada, nunca para novos uploads',
+  upload.includes("blob.vercel-storage.com") &&
+  upload.includes('await del(finalUrl') &&
+  !upload.includes("storage: 'vercel_blob_legacy'") &&
+  !upload.includes('await put(') &&
+  !upload.includes('handleUpload({'));
 ok('Cancelamento self-service existe no backend', plano.includes("action === 'cancel_subscription'") && plano.includes("status='cancelamento_agendado'"));
 ok('Cancelamento encerra acesso ao fim do período', auth.includes("tenant_status === 'cancelamento_agendado'") && authApi.includes("tenant_status === 'cancelamento_agendado'"));
 ok('Conta expõe ação de cancelamento', cobranca.includes('cancelarAssinatura()') && cobranca.includes('Cancelar renovação'));
@@ -54,6 +59,15 @@ const edgeAlerts=read('api/_edge-alerts.js');
 const worker=read('cloudflare-worker.js');
 ok('Worker mantém snapshot diário dos dados críticos no R2', edgeBackup.includes('neon-critical') && edgeBackup.includes('CRITICAL_TABLES') && worker.includes('createCriticalR2Backup'));
 ok('Migração de documentos legados só troca URL após validar R2', edgeBackup.includes('migrateLegacyDocumentsToR2') && edgeBackup.includes('getR2Object') && edgeBackup.includes("migratedFrom: 'vercel_blob'") && worker.includes('migrateLegacyDocumentsToR2'));
+const dbMutations=read('api/_db-mutations.js');
+ok('Mutações de storage falham fechado sem fallback para upstream/Vercel',
+  worker.includes('isStorageMutation(request)') &&
+  worker.includes('!isStorageMutation(request)') &&
+  upload.includes("code: 'R2_STORAGE_UNAVAILABLE'") &&
+  dbMutations.includes('await deleteR2Object(req.env, key)') &&
+  dbMutations.includes("code: 'DOCUMENT_STORAGE_DELETE_FAILED'") &&
+  dbMutations.includes('O registro foi preservado para nova tentativa.'));
+
 ok('Alertas Edge críticos fazem envio real com timeout', edgeAlerts.includes('/send-message') && edgeAlerts.includes('AbortSignal.timeout(8000)'));
 ok('Falhas 5xx geram alerta operacional', worker.includes("type: 'EDGE_HTTP_5XX'"));
 ok('Pagamento confirmado recupera UI quando refresh de sessão falha', cobranca.includes('sessionRefreshed') && cobranca.includes('window.location.reload()'));
