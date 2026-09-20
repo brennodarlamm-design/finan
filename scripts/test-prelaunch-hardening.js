@@ -65,5 +65,8 @@ ok('Auth crítico usa timeout no navegador', authClient.includes('async _fetchWi
 const billingClient=read('js/cobranca.js');
 ok('Cobrança crítica usa timeout no navegador', billingClient.includes('async _fetchWithTimeout(') && billingClient.includes("this._fetchWithTimeout('/api/plano?action=cancel_subscription'") && billingClient.includes("this._fetchWithTimeout('/api/plano?action=create_invoice'") && billingClient.includes('check_invoice&invoiceId'));
 
+const dataClient=read('js/data.js');
+ok('Sincronização DB usa timeout no navegador', dataClient.includes('async _fetchWithTimeout(') && dataClient.includes('timeoutMs = 25000') && (dataClient.match(/this\._fetchWithTimeout\(/g)||[]).length >= 16);
+
 if(process.exitCode) process.exit(process.exitCode);
 console.log('\n✅ Hardening pré-lançamento protegido por regressão estática.');
