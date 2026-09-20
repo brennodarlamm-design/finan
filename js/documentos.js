@@ -352,7 +352,15 @@ const Documentos = {
     if (doc && doc.url && doc.url.includes('blob.vercel-storage.com')) {
       try {
         const headers = (typeof DB !== 'undefined' && DB._apiHeaders) ? DB._apiHeaders() : {};
-        fetch(`/api/upload?url=${encodeURIComponent(doc.url)}`, { method: 'DELETE', headers }).catch(() => {});
+        fetch(`/api/upload?url=${encodeURIComponent(doc.url)}`, {
+          method: 'DELETE',
+          headers,
+          signal: AbortSignal.timeout(8000)
+        }).then((response) => {
+          if (!response.ok) console.warn('[Documentos] Exclusão do blob legado falhou com HTTP', response.status);
+        }).catch((err) => {
+          console.warn('[Documentos] Exclusão do blob legado falhou:', err?.message || err);
+        });
       } catch (e) {}
     }
 
