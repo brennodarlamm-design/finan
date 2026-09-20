@@ -17,6 +17,8 @@ import { isIpBanned, recordFailedAttempt, unbanIp } from './_edge-security.js';
 import { dispatchEdgeAlert } from './_edge-alerts.js';
 import { resolveAuthAndTenant } from './_auth.js';
 import { canAccessModule, canWriteData, canDeleteData, permissionError } from './_permissions.js';
+import { neon } from '@neondatabase/serverless';
+import { checkRateLimit, getClientIp } from './_ratelimit.js';
 
 export const V2_ROUTE_SPEC = [
   // 1. Sistema & Telemetria
@@ -302,9 +304,10 @@ export async function handleV2Newsletter(req, res) {
   res.setHeader('Content-Type', 'application/json; charset=utf-8');
 
   const isUnsubscribe = req.url?.includes('unsubscribe');
-  const email = (req.body?.email || req.query?.email || '').trim().toLowerCase();
+  const email = String(req.body?.email || req.query?.email || '').trim().toLowerCase();
+  const emailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) && email.length <= 320;
 
-  if (!email || !email.includes('@') || email.length < 5) {
+  if (!emailValid) {
     return res.status(400).json({
       success: false,
       error: 'INVALID_EMAIL',
@@ -312,21 +315,80 @@ export async function handleV2Newsletter(req, res) {
     });
   }
 
-  if (isUnsubscribe) {
-    return res.status(200).json({
-      success: true,
-      action: 'unsubscribed',
-      email,
-      message: 'Inscrição no Radar FinGo cancelada com sucesso. Você não receberá mais comunicados de marketing.'
+  const clientIp = getClientIp(req);
+  const rate = await checkRateLimit(`newsletter:ip:${clientIp}`, 20, 60 * 60 * 1000);
+  if (!rate.allowed) {
+    res.setHeader('Retry-After', String(Math.max(1, Math.ceil((rate.resetMs || 60000) / 1000))));
+    return res.status(429).json({
+      success: false,
+      error: 'RATE_LIMITED',
+      message: 'Muitas tentativas. Aguarde alguns minutos e tente novamente.'
     });
   }
 
-  return res.status(200).json({
-    success: true,
-    action: 'subscribed',
-    email,
-    message: 'Inscrição no Radar FinGo confirmada com sucesso! Bem-vindo(a) às atualizações de engenharia e SINAPI.'
-  });
+  const conn = String(req.env?.DATABASE_URL || process.env.DATABASE_URL || '').trim();
+  const sql = typeof req.newsletterSql === 'function'
+    ? req.newsletterSql
+    : (conn ? neon(conn) : null);
+
+  if (!sql) {
+    console.error('[Newsletter] DATABASE_URL indisponível; consentimento não foi persistido.');
+    return res.status(503).json({
+      success: false,
+      error: 'NEWSLETTER_STORAGE_UNAVAILABLE',
+      message: 'Não foi possível registrar sua preferência agora. Tente novamente.'
+    });
+  }
+
+  try {
+    if (isUnsubscribe) {
+      // Registra também descadastro de e-mail ainda não conhecido para manter uma suppression list.
+      await sql`
+        INSERT INTO newsletter_subscribers (
+          email, subscribed, source, subscribed_at, unsubscribed_at, updated_at
+        )
+        VALUES (${email}, FALSE, 'landing', NULL, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        ON CONFLICT (email) DO UPDATE SET
+          subscribed = FALSE,
+          unsubscribed_at = CURRENT_TIMESTAMP,
+          updated_at = CURRENT_TIMESTAMP
+      `;
+
+      return res.status(200).json({
+        success: true,
+        action: 'unsubscribed',
+        email,
+        message: 'Inscrição no Radar FinGo cancelada com sucesso. Você não receberá mais comunicados de marketing.'
+      });
+    }
+
+    await sql`
+      INSERT INTO newsletter_subscribers (
+        email, subscribed, source, subscribed_at, unsubscribed_at, updated_at
+      )
+      VALUES (${email}, TRUE, 'landing', CURRENT_TIMESTAMP, NULL, CURRENT_TIMESTAMP)
+      ON CONFLICT (email) DO UPDATE SET
+        subscribed = TRUE,
+        source = EXCLUDED.source,
+        subscribed_at = CURRENT_TIMESTAMP,
+        unsubscribed_at = NULL,
+        updated_at = CURRENT_TIMESTAMP
+    `;
+
+    return res.status(200).json({
+      success: true,
+      action: 'subscribed',
+      email,
+      message: 'Inscrição no Radar FinGo confirmada com sucesso! Bem-vindo(a) às atualizações de engenharia e SINAPI.'
+    });
+  } catch (err) {
+    console.error('[Newsletter] Falha ao persistir preferência:', err?.message || err);
+    return res.status(503).json({
+      success: false,
+      error: 'NEWSLETTER_STORAGE_UNAVAILABLE',
+      message: 'Não foi possível registrar sua preferência agora. Tente novamente.'
+    });
+  }
 }
 
 // =========================================================================
