@@ -2,6 +2,7 @@
 
 import crypto from 'crypto';
 import { neon } from '@neondatabase/serverless';
+import { createOwnerSql } from './_database.js';
 
 export function hashPassword(password) {
   if (!password || typeof password !== 'string') throw new Error('Senha inválida para hashing');
@@ -157,10 +158,7 @@ export function getInternalApiSecret() {
  * ser usado — o owner bypassa RLS por design nessa etapa.
  */
 export function createBootstrapSql() {
-  const conn = process.env.DATABASE_OWNER_URL || process.env.DATABASE_URL;
-  if (!conn) throw new Error('DATABASE_OWNER_URL ou DATABASE_URL não configurada para bootstrap de autenticação.');
-  // neon() já é importado no topo deste módulo — não precisa de await.
-  return neon(conn);
+  return createOwnerSql();
 }
 
 export async function resolveAuthAndTenant(req) {
@@ -217,14 +215,13 @@ export async function resolveAuthAndTenant(req) {
     return { authenticated: false, status: 401, error: 'Token de autenticação inválido ou expirado.' };
   }
 
-  const conn = process.env.DATABASE_OWNER_URL || process.env.DATABASE_URL;
-  if (!conn) {
-    console.error('🚨 [Segurança] DATABASE_OWNER_URL ou DATABASE_URL não configurada para validação da sessão.');
+  if (!String(process.env.DATABASE_OWNER_URL || '').trim()) {
+    console.error('🚨 [Segurança] DATABASE_OWNER_URL não configurada para validação da sessão.');
     return { authenticated: false, status: 500, error: 'Banco de autenticação indisponível.' };
   }
 
   try {
-    const sql = neon(conn);
+    const sql = createOwnerSql();
     const rows = await sql`
       SELECT
         u.id, u.username, u.email, u.nome, u.perfil, u.avatar, u.ativo, u.tenant_id, u.permissoes, u.mfa_enabled,
