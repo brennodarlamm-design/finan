@@ -595,8 +595,23 @@ const Cobranca = {
             Utils.toast('🎉 Pagamento confirmado! Sua assinatura foi atualizada com sucesso.', 'success');
           }
 
+          let sessionRefreshed = true;
           if (typeof Auth !== 'undefined' && Auth.refreshSessionFromServer) {
-            await Auth.refreshSessionFromServer();
+            try {
+              const refreshed = await Auth.refreshSessionFromServer();
+              sessionRefreshed = refreshed?.success !== false;
+            } catch (refreshErr) {
+              sessionRefreshed = false;
+              console.warn('[Cobrança] Pagamento confirmado, mas a sessão ainda não refletiu o novo plano:', refreshErr?.message || refreshErr);
+            }
+          }
+
+          if (!sessionRefreshed) {
+            if (typeof Utils !== 'undefined' && Utils.toast) {
+              Utils.toast('Pagamento confirmado. Atualizando o acesso para refletir o novo plano…', 'info');
+            }
+            setTimeout(() => window.location.reload(), 1200);
+            return;
           }
 
           setTimeout(() => {
@@ -606,7 +621,7 @@ const Cobranca = {
             if (typeof App !== 'undefined' && App.renderShell) {
               App.renderShell();
             }
-          }, 2500);
+          }, 1200);
         }
       } catch {
         // Falha transitória de rede durante polling — ignora e tenta no próximo ciclo
