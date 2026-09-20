@@ -1,0 +1,62 @@
+name: FinGo production database backup
+
+on:
+  schedule:
+    - cron: '20 7 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: fingo-production-database-backup
+  cancel-in-progress: false
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      DATABASE_URL_UNPOOLED: ${{ secrets.DATABASE_URL_UNPOOLED }}
+    steps:
+      - name: Validate backup secret
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -z "${DATABASE_URL_UNPOOLED:-}" ]]; then
+            echo "::error::Configure the repository secret DATABASE_URL_UNPOOLED with the Neon direct connection string."
+            exit 1
+          fi
+
+      - name: Install PostgreSQL client
+        shell: bash
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y postgresql-client
+
+      - name: Create encrypted-ready logical backup
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p backup
+          ts="$(date -u +'%Y%m%dT%H%M%SZ')"
+          file="backup/fingo-production-${ts}.dump"
+          pg_dump             --dbname="$DATABASE_URL_UNPOOLED"             --format=custom             --no-owner             --no-privileges             --file="$file"
+          pg_restore --list "$file" > "backup/fingo-production-${ts}.manifest.txt"
+          sha256sum "$file" > "backup/fingo-production-${ts}.sha256"
+          echo "BACKUP_FILE=$file" >> "$GITHUB_ENV"
+
+      - name: Verify backup can be read
+        shell: bash
+        run: |
+          set -euo pipefail
+          pg_restore --list "$BACKUP_FILE" >/dev/null
+          test -s "$BACKUP_FILE"
+
+      - name: Upload backup artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: fingo-production-db-${{ github.run_id }}
+          path: backup/
+          retention-days: 30
+          if-no-files-found: error
