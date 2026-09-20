@@ -6,6 +6,32 @@ const NFe = {
   _KEY_CACHE: 'finobra_nfe_cache',
   _API_BASE: '/api/nfe',
 
+  async _fetchWithTimeout(url, options = {}, timeoutMs = 25000) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    let externalAbortHandler = null;
+    try {
+      if (options.signal) {
+        if (options.signal.aborted) controller.abort();
+        else {
+          externalAbortHandler = () => controller.abort();
+          options.signal.addEventListener('abort', externalAbortHandler, { once: true });
+        }
+      }
+      return await this._fetchWithTimeout(url, { ...options, signal: controller.signal });
+    } catch (err) {
+      if (controller.signal.aborted && err?.name === 'AbortError') {
+        const timeoutError = new Error('A operação fiscal demorou mais que o esperado. Tente novamente.');
+        timeoutError.name = 'TimeoutError';
+        throw timeoutError;
+      }
+      throw err;
+    } finally {
+      clearTimeout(timer);
+      if (externalAbortHandler && options.signal) options.signal.removeEventListener('abort', externalAbortHandler);
+    }
+  },
+
   _getTenantCacheKey() {
     const t = (typeof Auth !== 'undefined' && Auth.getCurrentTenantId) ? Auth.getCurrentTenantId() : 'public';
     return `finobra_${t}_nfe_cache`;
@@ -71,7 +97,7 @@ const NFe = {
   async buscarPorChave(chaveRaw) {
     const chave = this._limparChave(chaveRaw);
     if (!this._validarChave(chave)) throw new Error('Chave de acesso inválida (deve ter 44 dígitos).');
-    const res = await fetch(`${this._API_BASE}?action=buscar&chave=${chave}`, {
+    const res = await this._fetchWithTimeout(`${this._API_BASE}?action=buscar&chave=${chave}`, {
       method: 'POST',
       headers: this._headers()
     });
@@ -87,7 +113,7 @@ const NFe = {
   async consultarStatus(chave) {
     chave = this._limparChave(chave);
     try {
-      const res = await fetch(`${this._API_BASE}?action=status&chave=${chave}`, {
+      const res = await this._fetchWithTimeout(`${this._API_BASE}?action=status&chave=${chave}`, {
         method: 'POST',
         headers: this._headers()
       });
@@ -98,7 +124,7 @@ const NFe = {
 
   async baixarDanfePDF(chave) {
     chave = this._limparChave(chave);
-    const res = await fetch(`${this._API_BASE}?action=danfe&chave=${chave}`, {
+    const res = await this._fetchWithTimeout(`${this._API_BASE}?action=danfe&chave=${chave}`, {
       method: 'GET',
       headers: this._headers()
     });
@@ -111,7 +137,7 @@ const NFe = {
 
   async baixarXML(chave) {
     chave = this._limparChave(chave);
-    const res = await fetch(`${this._API_BASE}?action=xml&chave=${chave}`, {
+    const res = await this._fetchWithTimeout(`${this._API_BASE}?action=xml&chave=${chave}`, {
       method: 'GET',
       headers: this._headers()
     });
@@ -126,7 +152,7 @@ const NFe = {
     const params = new URLSearchParams();
     params.set('action', 'minhas_nfes');
     if (after) params.set('after', after);
-    const res = await fetch(`${this._API_BASE}?${params.toString()}`, {
+    const res = await this._fetchWithTimeout(`${this._API_BASE}?${params.toString()}`, {
       method: 'GET',
       headers: this._headers()
     });
@@ -145,7 +171,7 @@ const NFe = {
 
   // Envia arquivo retDistDFeInt ou enviNFe gerado pelo certificado digital
   async enviarSefazXml(xmlString) {
-    const res = await fetch(`${this._API_BASE}?action=sefaz_xml`, {
+    const res = await this._fetchWithTimeout(`${this._API_BASE}?action=sefaz_xml`, {
       method: 'POST',
       headers: this._headers(),
       body: JSON.stringify({ xml: xmlString })
@@ -162,7 +188,7 @@ const NFe = {
 
   // Envia XML individual de NF-e/CT-e para a Área do Cliente (GRÁTIS)
   async enviarXmlIndividual(xmlString) {
-    const res = await fetch(`${this._API_BASE}/fd/add/xml`, {
+    const res = await this._fetchWithTimeout(`${this._API_BASE}/fd/add/xml`, {
       method: 'PUT',
       headers: { ...this._headers(), 'Content-Type': 'text/plain' },
       body: xmlString
@@ -304,7 +330,7 @@ const NFe = {
 
   async _carregarTabCert() {
     try {
-      const res = await fetch('/api/certificado?action=status', { headers: this._headers() });
+      const res = await this._fetchWithTimeout('/api/certificado?action=status', { headers: this._headers() });
       const json = await res.json().catch(() => ({}));
       if (res.ok && json.success && json.configurado && json.certificado) {
         this._certOnline = json.certificado;
@@ -471,7 +497,7 @@ const NFe = {
         const base64 = String(reader.result || '').split(',')[1];
         if (!base64) throw new Error('Não foi possível codificar o arquivo.');
 
-        const res = await fetch('/api/certificado?action=upload', {
+        const res = await this._fetchWithTimeout('/api/certificado?action=upload', {
           method: 'POST',
           headers: this._headers(),
           body: JSON.stringify({
@@ -542,7 +568,7 @@ const NFe = {
     const doRemove = async () => {
       try {
         if (typeof Utils !== 'undefined' && Utils.toast) Utils.toast('Removendo certificado...', 'info');
-        const res = await fetch('/api/certificado?action=remover', {
+        const res = await this._fetchWithTimeout('/api/certificado?action=remover', {
           method: 'DELETE',
           headers: this._headers()
         });
