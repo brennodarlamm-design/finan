@@ -579,7 +579,7 @@ const BIMGeometryImporter = (() => {
     if(content instanceof ArrayBuffer) return new File([content],filename,{type:mime});
     const str=String(content||'');
     if(/^https?:\/\//i.test(str)){
-      const res=await fetch(str,{credentials:'omit'});
+      const res=await fetch(str,{credentials:'omit',signal:AbortSignal.timeout(45000)});
       if(!res.ok) throw new Error('Não foi possível carregar o arquivo BIM versionado.');
       return new File([await res.blob()],filename,{type:res.headers.get('content-type')||mime});
     }
