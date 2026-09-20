@@ -3,10 +3,10 @@ import { neon } from '@neondatabase/serverless';
 import { resolveAuthAndTenant } from './_auth.js';
 import { canAccessModule, permissionError } from './_permissions.js';
 import { createTenantSql } from './_tenant-sql.js';
+import { createRuntimeSql } from './_database.js';
 
 function getSql() {
-  if (!process.env.DATABASE_URL) throw new Error('DATABASE_URL não configurada.');
-  return neon(process.env.DATABASE_URL);
+  return createRuntimeSql();
 }
 
 function setCors(req, res) {
@@ -31,7 +31,7 @@ export default async function handler(req, res) {
   if (!canAccessModule(auth, 'dashboard', 'read')) return res.status(403).json(permissionError('MODULE_READ_FORBIDDEN','dashboard'));
 
   try {
-    const sql = createTenantSql(getSql(), { tenantId: auth.tenantId, isSystem: auth.isSystem === true });
+    const sql = createTenantSql(getSql(), { tenantId: auth.tenantId });
     const showFinance = canAccessModule(auth,'financeiro','read');
     const showNotas = canAccessModule(auth,'notas','read');
     const showObras = canAccessModule(auth,'obras','read');
