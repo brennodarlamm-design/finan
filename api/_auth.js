@@ -268,6 +268,17 @@ export async function resolveAuthAndTenant(req) {
       if (live.tenant_status === 'cancelamento_agendado' && live.tenant_vencimento) {
         const cancelDue = new Date(String(live.tenant_vencimento).slice(0, 10) + 'T23:59:59-04:00').getTime();
         if (Number.isFinite(cancelDue) && Date.now() > cancelDue) {
+          try {
+            await sql`
+              UPDATE tenants
+              SET status='cancelado', updated_at=NOW()
+              WHERE id=${live.tenant_id}
+                AND status='cancelamento_agendado'
+                AND vencimento < CURRENT_DATE;
+            `;
+          } catch (finalizeErr) {
+            console.warn('[Auth] Falha ao materializar cancelamento vencido:', finalizeErr?.message || finalizeErr);
+          }
           return { authenticated:false, status:403, error:'Assinatura encerrada ao fim do período contratado. Reative um plano para continuar.' };
         }
       }
