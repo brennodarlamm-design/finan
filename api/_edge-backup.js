@@ -2,7 +2,7 @@
 // Complementa o PITR limitado do Neon e o pg_dump do GitHub Actions.
 
 import { neon } from '@neondatabase/serverless';
-import { putR2Object } from './_edge-r2.js';
+import { putR2Object, getR2Object, buildR2ObjectKey } from './_edge-r2.js';
 import { dispatchEdgeAlert } from './_edge-alerts.js';
 
 const CRITICAL_TABLES = Object.freeze([
@@ -125,6 +125,95 @@ export async function createCriticalR2Backup(env, { force = false } = {}) {
   );
 
   return manifest;
+}
+
+
+function decodeStoredDataUrl(value, fallbackMime = 'application/octet-stream') {
+  const raw = String(value || '');
+  const match = raw.match(/^data:([^;,]+)?;base64,([\s\S]+)$/i);
+  if (match) {
+    return {
+      mime: String(match[1] || fallbackMime),
+      bytes: Buffer.from(match[2], 'base64')
+    };
+  }
+  return { mime: fallbackMime, bytes: Buffer.from(raw, 'base64') };
+}
+
+export async function migrateLegacyDocumentsToR2(env, { limit = 25 } = {}) {
+  const conn = String(env?.DATABASE_OWNER_URL || env?.DATABASE_URL || '').trim();
+  if (!conn || !env?.ATTACHMENTS_R2 || typeof env.ATTACHMENTS_R2.put !== 'function') {
+    return { skipped:true, reason:'storage_or_database_not_ready' };
+  }
+
+  const sql = neon(conn);
+  const rowsResult = await sql.query(
+    `SELECT id, tenant_id, nome_arquivo, tipo_arquivo, tamanho_bytes, base64_data, url
+       FROM documentos
+       WHERE url ILIKE '%blob.vercel-storage.com%'
+         AND base64_data IS NOT NULL
+         AND length(base64_data) > 0
+       ORDER BY created_at ASC NULLS LAST, id ASC
+       LIMIT ${Math.max(1, Math.min(Number(limit) || 25, 100))}`
+  );
+  const rows = Array.isArray(rowsResult) ? rowsResult : (rowsResult?.rows || []);
+  if (!rows.length) return { migrated:0, remaining:false };
+
+  let migrated = 0;
+  const failures = [];
+
+  for (const row of rows) {
+    try {
+      const decoded = decodeStoredDataUrl(row.base64_data, row.tipo_arquivo || 'application/octet-stream');
+      if (!decoded.bytes.length) throw new Error('Documento legado sem conteúdo decodificável.');
+
+      const key = buildR2ObjectKey(
+        row.tenant_id,
+        'documentos',
+        row.nome_arquivo || `${row.id}.bin`
+      );
+      const stored = await putR2Object(env, key, decoded.bytes, {
+        contentType: decoded.mime,
+        customMetadata: {
+          tenantId: String(row.tenant_id || ''),
+          documentId: String(row.id || ''),
+          migratedFrom: 'vercel_blob',
+          originalName: String(row.nome_arquivo || '')
+        }
+      });
+
+      const verify = await getR2Object(env, key);
+      if (!verify || Number(verify.size || 0) !== Number(stored.size || decoded.bytes.length)) {
+        throw new Error('Validação do objeto R2 falhou após upload.');
+      }
+
+      const newUrl = `r2://${key}`;
+      await sql`
+        UPDATE documentos
+        SET url = ${newUrl},
+            tipo_arquivo = ${decoded.mime},
+            tamanho_bytes = ${decoded.bytes.length}
+        WHERE id = ${row.id}
+          AND tenant_id = ${row.tenant_id}
+          AND url = ${row.url}
+      `;
+      migrated++;
+    } catch (err) {
+      failures.push({ id:row.id, error:String(err?.message || err).slice(0, 300) });
+    }
+  }
+
+  if (failures.length) {
+    await dispatchEdgeAlert(env, {
+      type:'LEGACY_STORAGE_MIGRATION_ERROR',
+      severity:'CRITICAL',
+      title:'Migração Vercel Blob → R2 incompleta',
+      message:`${failures.length} documento(s) não foram migrados.`,
+      details:{ failures }
+    }).catch(() => {});
+  }
+
+  return { migrated, failures, remaining: rows.length >= limit };
 }
 
 export { CRITICAL_TABLES };
