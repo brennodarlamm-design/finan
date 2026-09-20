@@ -171,6 +171,17 @@ ok('Proxy, service worker e Render usam deadlines explícitos',
   renderDeploy.includes('AbortSignal.timeout(15000)') &&
   (legacyCleanup.match(/AbortSignal\.timeout\(15000\)/g)||[]).length >= 2);
 
+const landingClient=read('js/landing_page.js');
+const documentosClient2=read('js/documentos.js');
+ok('Fluxos auxiliares do navegador não podem ficar pendurados ou confirmar sucesso prematuro',
+  (landingClient.match(/AbortSignal\.timeout\(8000\)/g)||[]).length >= 2 &&
+  landingClient.includes('if (!subscribeRes.ok || subscribeData.success === false)') &&
+  landingClient.includes('if (!unsubscribeRes.ok || unsubscribeData.success === false)') &&
+  documentosClient2.includes('signal: AbortSignal.timeout(8000)') &&
+  documentosClient2.includes("console.warn('[Documentos] Exclusão do blob legado falhou:") &&
+  appClient.includes('signal: AbortSignal.timeout(5000)') &&
+  authClient.includes("keepalive:true, signal:AbortSignal.timeout(5000)"));
+
 ok('OTP de recuperação não é persistido no navegador',
   !authClient.includes('finobra_otp_') &&
   authClient.includes('O OTP permanece somente em memória') &&
