@@ -91,13 +91,16 @@ function inPageChecks() {
     .filter((el) => {
       const r = el.getBoundingClientRect();
       const s = getComputedStyle(el);
-      return r.width > 0 && r.height > 0 && s.visibility !== 'hidden' && s.display !== 'none' && !el.disabled;
+      const closedDetails = el.closest('details:not([open])');
+      const hiddenByClosedDetails = closedDetails && el.tagName !== 'SUMMARY';
+      return r.width > 0 && r.height > 0 && s.visibility !== 'hidden' && s.display !== 'none' && !el.disabled && !hiddenByClosedDetails;
     })
     .slice(0, 25);
   let noFocus = 0;
   const noFocusExamples = [];
   for (const el of focusables) {
     el.focus();
+    if (document.activeElement !== el) continue;
     const s = getComputedStyle(el);
     const hasOutline = s.outlineStyle !== 'none' && parseFloat(s.outlineWidth) > 0;
     const hasShadow = s.boxShadow && s.boxShadow !== 'none';
