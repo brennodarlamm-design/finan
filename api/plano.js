@@ -235,8 +235,39 @@ export default async function handler(req, res) {
       const rows = await sql`
         INSERT INTO billing_invoices (id, tenant_id, plan_id, cycle, amount_cents, status, txid, pix_payload, created_by, expires_at)
         VALUES (${id}, ${auth.tenantId}, ${planId}, ${cycle}, ${amountCents}, 'pending', ${txid}, ${pixPayload || null}, ${auth.user?.userId || auth.user?.id || null}, NOW() + INTERVAL '1 day')
+        ON CONFLICT (tenant_id, plan_id, cycle) WHERE status = 'pending'
+        DO NOTHING
         RETURNING id, tenant_id, plan_id, cycle, amount_cents, status, txid, pix_payload, expires_at, created_at;
       `;
+
+      if (!rows.length) {
+        const concurrent = await sql`
+          SELECT id, tenant_id, plan_id, cycle, amount_cents, status, txid, pix_payload, expires_at, created_at
+          FROM billing_invoices
+          WHERE tenant_id=${auth.tenantId}
+            AND plan_id=${planId}
+            AND cycle=${cycle}
+            AND status='pending'
+            AND (expires_at IS NULL OR expires_at > NOW())
+          ORDER BY created_at DESC
+          LIMIT 1;
+        `;
+        if (concurrent.length) {
+          return res.status(200).json({
+            success:true,
+            invoice:concurrent[0],
+            cycleInfo,
+            billingWhatsapp:billingWhatsapp(),
+            reused:true
+          });
+        }
+        return res.status(409).json({
+          success:false,
+          code:'BILLING_CREATE_CONFLICT',
+          error:'Outra solicitação de cobrança foi processada ao mesmo tempo. Atualize a conta e tente novamente.'
+        });
+      }
+
       await writeAudit(sql, req, auth, { acao:'criar', entidade:'cobranca', entidadeId:id, depois:{ plan_id:planId, cycle, amount_cents:amountCents, txid } });
       return res.status(201).json({ success:true, invoice:rows[0], cycleInfo, billingWhatsapp:billingWhatsapp(), reused:false });
     }
