@@ -566,21 +566,34 @@ const Academia = {
           </div>
 
           <!-- Player de Vídeo Real da Aula -->
-          <div style="position:relative;background:#000;border:1px solid rgba(198,255,0,0.35);border-radius:12px;overflow:hidden;box-shadow:0 16px 48px rgba(0,0,0,0.85);display:flex;flex-direction:column;">
-            <video id="academia-video-player"
-              controls
-              playsinline
-              preload="metadata"
-              poster="${aula.videoPoster || '/img/fingo/logo-reveal-poster.png'}"
-              style="width:100%;aspect-ratio:16/9;display:block;background:#000;outline:none;"
-              data-fb-ended="Academia.onVideoEnded" data-fb-ended-n="1" data-fb-ended-t0="string" data-fb-ended-v0="${encodeURIComponent(aula.id)}"
-            >
-              <source src="${aula.videoUrl || '/img/fingo/feature-demo.mp4'}" type="video/mp4">
-              Seu navegador não suporta reprodução de vídeo HTML5.
-            </video>
+          <div style="position:relative;background:#050a06;border:1px solid rgba(198,255,0,0.35);border-radius:12px;overflow:hidden;box-shadow:0 16px 48px rgba(0,0,0,0.85);display:flex;flex-direction:column;min-height:340px;">
+            <!-- Topbar do Player -->
+            <div style="padding:10px 18px;background:linear-gradient(90deg,#101c12,#18281a);border-bottom:1px solid rgba(198,255,0,0.2);display:flex;align-items:center;justify-content:space-between;flex-shrink:0;">
+              <div style="display:flex;align-items:center;gap:8px;font-size:.82rem;font-weight:800;color:var(--accent);">
+                <span>▶ Vídeo Aula Oficial FinGo</span>
+                <span style="color:var(--text3);font-weight:400;">•</span>
+                <span style="color:var(--text2);font-weight:600;">${aula.duracao}</span>
+              </div>
+              <span style="font-size:.7rem;background:rgba(198,255,0,0.12);color:var(--accent);border:1px solid rgba(198,255,0,0.3);padding:2px 8px;border-radius:4px;font-weight:800;">HD 1080p</span>
+            </div>
+
+            <!-- Área de Vídeo com Altura e Proporção Garantidas -->
+            <div style="position:relative;width:100%;aspect-ratio:16/9;min-height:280px;background:#000;display:flex;align-items:center;justify-content:center;">
+              <video id="academia-video-player"
+                controls
+                playsinline
+                preload="auto"
+                poster="${aula.videoPoster || '/img/fingo/logo-reveal-poster.png'}"
+                style="width:100%;height:100%;min-height:280px;aspect-ratio:16/9;display:block;background:#000;outline:none;"
+                data-fb-ended="Academia.onVideoEnded" data-fb-ended-n="1" data-fb-ended-t0="string" data-fb-ended-v0="${encodeURIComponent(aula.id)}"
+              >
+                <source src="${aula.videoUrl || '/img/fingo/feature-demo.mp4'}" type="video/mp4">
+                Seu navegador não suporta reprodução de vídeo HTML5.
+              </video>
+            </div>
 
             <!-- Barra de Ferramentas e Controles Rápidos do Vídeo -->
-            <div style="padding:10px 18px;background:#0f1710;border-top:1px solid rgba(198,255,0,0.2);display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">
+            <div style="padding:10px 18px;background:#0f1710;border-top:1px solid rgba(198,255,0,0.2);display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;flex-shrink:0;">
               <div style="display:flex;align-items:center;gap:8px;">
                 <span style="font-size:.72rem;color:var(--text3);font-weight:800;text-transform:uppercase;letter-spacing:.05em;">Velocidade:</span>
                 <button type="button" class="btn btn-ghost btn-sm" data-fb-click="Academia.setVideoRate" data-fb-click-n="1" data-fb-click-t0="number" data-fb-click-v0="1" style="padding:3px 8px;font-size:.75rem;font-weight:700;">1x</button>

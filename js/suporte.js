@@ -48,8 +48,8 @@ const Suporte = {
             </a>
 
             <a href="#" data-fb-click="Patch26Actions.suporteMenu" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="tutoriais" class="suporte-menu-item" style="display:flex;align-items:center;gap:12px;padding:10px 16px;color:#f0ead6;text-decoration:none;font-size:.85rem;transition:background .2s;">
-              <span style="font-size:1.05rem;color:#f43f5e;">🖥️</span>
-              <span>Tutoriais do Sistema</span>
+              <span style="font-size:1.05rem;color:#c6ff00;">🎓</span>
+              <span>Tutoriais & Academia FinGo</span>
             </a>
 
             <a href="#" data-fb-click="Patch26Actions.suporteMenu" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="agendamento" class="suporte-menu-item" style="display:flex;align-items:center;gap:12px;padding:10px 16px;color:#f0ead6;text-decoration:none;font-size:.85rem;transition:background .2s;">
@@ -60,11 +60,6 @@ const Suporte = {
             <a href="#" data-fb-click="Patch26Actions.suporteMenu" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="contatos" class="suporte-menu-item" style="display:flex;align-items:center;gap:12px;padding:10px 16px;color:#f0ead6;text-decoration:none;font-size:.85rem;transition:background .2s;">
               <span style="font-size:1.05rem;color:#34d399;">📞</span>
               <span>Contatos Suporte</span>
-            </a>
-
-            <a href="#" data-fb-click="Patch26Actions.suporteMenu" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="treinamentos" class="suporte-menu-item" style="display:flex;align-items:center;gap:12px;padding:10px 16px;color:#f0ead6;text-decoration:none;font-size:.85rem;transition:background .2s;">
-              <span style="font-size:1.05rem;color:#c084fc;">▶️</span>
-              <span>Treinamentos</span>
             </a>
           </div>
         </div>
