@@ -1,6 +1,10 @@
 import fs from 'fs';
 
 function read(p){ return fs.readFileSync(p,'utf8'); }
+const triggerClient = fs.readFileSync(new URL('../api/_trigger-client.js', import.meta.url), 'utf8');
+assert(triggerClient.includes('withDeadline(tasks.trigger'), 'Trigger.dev SDK deve ter deadline explícito.');
+assert(triggerClient.includes('AbortSignal.timeout(Number(options.timeoutMs || 8000))'), 'Fallback REST do Trigger.dev deve ter timeout explícito.');
+
 function ok(name, condition){
   if(!condition){ console.error('❌ '+name); process.exitCode=1; }
   else console.log('✅ '+name);
