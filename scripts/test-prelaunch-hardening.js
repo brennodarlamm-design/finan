@@ -93,5 +93,23 @@ ok('OCR usa timeout no navegador',
   ocrClient.includes('return await fetch(url, { ...options, signal: controller.signal });') &&
   !ocrClient.includes('return await this._fetchWithTimeout(url, { ...options, signal: controller.signal });'));
 
+const documentosClient=read('js/documentos.js');
+ok('Documentos críticos usam timeout no navegador',
+  documentosClient.includes('async function documentosFetchWithTimeout(') &&
+  (documentosClient.match(/documentosFetchWithTimeout\(/g)||[]).length >= 5 &&
+  documentosClient.includes('return await fetch(url, { ...options, signal: controller.signal });'));
+
+const masterClient=read('js/master.js');
+ok('Painel master usa timeout no navegador',
+  masterClient.includes('async function masterFetchWithTimeout(') &&
+  (masterClient.match(/masterFetchWithTimeout\(/g)||[]).length >= 18 &&
+  masterClient.includes('return await fetch(url, { ...options, signal: controller.signal });'));
+
+const configuracoesClient=read('js/configuracoes.js');
+ok('Configurações usam timeout no navegador',
+  configuracoesClient.includes('async function configuracoesFetchWithTimeout(') &&
+  (configuracoesClient.match(/configuracoesFetchWithTimeout\(/g)||[]).length >= 9 &&
+  configuracoesClient.includes('return await fetch(url, { ...options, signal: controller.signal });'));
+
 if(process.exitCode) process.exit(process.exitCode);
 console.log('\n✅ Hardening pré-lançamento protegido por regressão estática.');
