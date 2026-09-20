@@ -82,6 +82,32 @@ jobs:
           [[ "$health" == *'"ok":true'* ]]
           echo "Cloudflare Worker preview ready: $PREVIEW_URL"
 
+      - name: Install mobile UX audit browser
+        if: github.event_name == 'pull_request'
+        working-directory: .agents/skills/ui-ux-pro-max/stack
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
+
+      - name: Audit landing and login across mobile/tablet/desktop
+        if: github.event_name == 'pull_request'
+        shell: bash
+        env:
+          PREVIEW_URL: ${{ steps.worker_preview.outputs.url }}
+        run: |
+          set -euo pipefail
+          node .agents/skills/ui-ux-pro-max/stack/scripts/design-audit.mjs --url "$PREVIEW_URL/" --out ux-audit/landing
+          node .agents/skills/ui-ux-pro-max/stack/scripts/design-audit.mjs --url "$PREVIEW_URL/login" --out ux-audit/login
+
+      - name: Upload UX audit screenshots
+        if: always() && github.event_name == 'pull_request'
+        uses: actions/upload-artifact@v4
+        with:
+          name: mobile-ux-audit-${{ github.event.pull_request.number }}
+          path: ux-audit/
+          retention-days: 14
+          if-no-files-found: warn
+
       - name: Cloudflare preview summary
         if: github.event_name == 'pull_request'
         shell: bash
