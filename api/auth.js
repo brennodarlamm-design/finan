@@ -457,6 +457,13 @@ export default async function handler(req, res) {
           return res.status(403).json({ success:false, message:'Seu período de teste gratuito expirou. Faça o upgrade de plano para continuar.' });
         }
       }
+      if (user.tenant_status === 'cancelamento_agendado' && user.tenant_vencimento) {
+        const cancelDue = new Date(String(user.tenant_vencimento).slice(0,10) + 'T23:59:59-04:00').getTime();
+        if (Number.isFinite(cancelDue) && Date.now() > cancelDue) {
+          await writeAudit(sql, req, { tenantId:user.tenant_id, user:{ id:user.id } }, { acao:'login_bloqueado', entidade:'auth', entidadeId:user.id, depois:{ motivo:'subscription_canceled_period_end', ip:clientIp } });
+          return res.status(403).json({ success:false, message:'Sua assinatura foi encerrada ao final do período contratado. Reative um plano para continuar.' });
+        }
+      }
 
       const passwordMatches = verifyPassword(password, user.senha_hash);
       if (!passwordMatches) {
