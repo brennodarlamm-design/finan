@@ -62,5 +62,8 @@ ok('Falha de sincronização de rota é mostrada ao usuário', app.includes('Dad
 const authClient=read('js/auth.js');
 ok('Auth crítico usa timeout no navegador', authClient.includes('async _fetchWithTimeout(') && authClient.includes("this._fetchWithTimeout('/api/auth?action=login'") && authClient.includes("this._fetchWithTimeout('/api/auth?action=mfa_verify'") && authClient.includes("this._fetchWithTimeout('/api/auth?action=request_reset'") && authClient.includes("this._fetchWithTimeout('/api/auth?action=verify_reset'") && authClient.includes("this._fetchWithTimeout('/api/auth?action=register'") && authClient.includes("this._fetchWithTimeout('/api/auth?action=sessions'") && authClient.includes("this._fetchWithTimeout('/api/auth?action=revoke_session'") && authClient.includes("this._fetchWithTimeout('/api/admin?action=restore_master_session'"));
 
+const billingClient=read('js/cobranca.js');
+ok('Cobrança crítica usa timeout no navegador', billingClient.includes('async _fetchWithTimeout(') && billingClient.includes("this._fetchWithTimeout('/api/plano?action=cancel_subscription'") && billingClient.includes("this._fetchWithTimeout('/api/plano?action=create_invoice'") && billingClient.includes('check_invoice&invoiceId'));
+
 if(process.exitCode) process.exit(process.exitCode);
 console.log('\n✅ Hardening pré-lançamento protegido por regressão estática.');
