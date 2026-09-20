@@ -47,6 +47,11 @@ console.log('2. Validando Módulo 2: Cloudflare R2 (Object Storage)...');
 const r2Key = buildR2ObjectKey('darlam_const', 'plantas', 'projeto_estrutural.pdf');
 assert(r2Key.startsWith('tenants/darlam_const/plantas/'), 'buildR2ObjectKey deve isolar por tenant e categoria.');
 assert(r2Key.endsWith('_projeto_estrutural.pdf'), 'buildR2ObjectKey deve preservar nome limpo do arquivo.');
+assert.throws(
+  () => buildR2ObjectKey('', 'plantas', 'sem-tenant.pdf'),
+  /tenantId válido é obrigatório/,
+  'buildR2ObjectKey deve falhar fechado sem tenant explícito.'
+);
 
 const memoryTestEnv = { FINOBRA_ALLOW_MEMORY_STORAGE: 'true' };
 const fileContent = Buffer.from('PDF_DUMMY_CANTEIRO_PROJETO_CONTENT');
@@ -67,7 +72,24 @@ assert(listRes.objects.length >= 1, 'listR2Objects deve listar arquivos do tenan
 await deleteR2Object(memoryTestEnv, r2Key);
 const afterR2Delete = await getR2Object(memoryTestEnv, r2Key);
 assert.equal(afterR2Delete, null, 'deleteR2Object deve remover o arquivo.');
-console.log('   ✓ Cloudflare R2: isolamento multi-tenant, upload, download e listagem aprovados.');
+
+const failingR2Env = {
+  ATTACHMENTS_R2: {
+    get: async () => { throw new Error('simulated r2 read failure'); },
+    delete: async () => { throw new Error('simulated r2 delete failure'); }
+  }
+};
+await assert.rejects(
+  () => getR2Object(failingR2Env, r2Key),
+  /Falha ao consultar o armazenamento Cloudflare R2/,
+  'getR2Object não deve transformar falha remota em arquivo ausente.'
+);
+await assert.rejects(
+  () => deleteR2Object(failingR2Env, r2Key),
+  /Falha ao excluir o arquivo no armazenamento Cloudflare R2/,
+  'deleteR2Object não deve reportar sucesso quando a exclusão remota falha.'
+);
+console.log('   ✓ Cloudflare R2: isolamento multi-tenant, upload, download, listagem e falha fechada aprovados.');
 
 // -------------------------------------------------------------
 // 3. Workers AI — FinBot Edge & Vision OCR
