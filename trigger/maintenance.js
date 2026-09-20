@@ -3,8 +3,8 @@ import { task, schedules, logger } from "@trigger.dev/sdk";
 import { neon } from "@neondatabase/serverless";
 
 function getDbClient() {
-  const dbUrl = process.env.DATABASE_URL || process.env.DATABASE_URL_UNPOOLED;
-  if (!dbUrl) throw new Error("DATABASE_URL não configurada para a tarefa de manutenção.");
+  const dbUrl = String(process.env.DATABASE_OWNER_URL || '').trim();
+  if (!dbUrl) throw new Error("DATABASE_OWNER_URL não configurada para a tarefa administrativa de manutenção.");
   return neon(dbUrl);
 }
 
