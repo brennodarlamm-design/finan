@@ -254,9 +254,23 @@ function initRemotionVideoPlayers() {
 
   if (!form || !input || !feedback) return;
 
+  async function newsletterRequest(action, email) {
+    const res = await fetch(`/api/v2/public/newsletter/${action}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email }),
+      signal: AbortSignal.timeout(10000)
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || data.success !== true) {
+      throw new Error(data.message || 'Não foi possível atualizar sua inscrição agora.');
+    }
+    return data;
+  }
+
   form.addEventListener('submit', async e => {
     e.preventDefault();
-    const email = (input.value || '').trim();
+    const email = (input.value || '').trim().toLowerCase();
     if (!email || !email.includes('@')) {
       feedback.style.display = 'block';
       feedback.style.color = '#ef4444';
@@ -264,45 +278,62 @@ function initRemotionVideoPlayers() {
       return;
     }
 
+    const submitBtn = form.querySelector('button[type="submit"]');
+    const originalText = submitBtn?.textContent || '';
+    if (submitBtn) {
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Confirmando...';
+    }
+
+    feedback.style.display = 'block';
+    feedback.style.color = '#94a3b8';
+    feedback.textContent = 'Confirmando sua inscrição no Radar FinGo...';
+
     try {
+      await newsletterRequest('subscribe', email);
+
       localStorage.setItem('fingo_newsletter_email', email);
       localStorage.setItem('fingo_newsletter_subscribed', 'true');
       localStorage.setItem('fingo_newsletter_date', new Date().toISOString());
 
-      feedback.style.display = 'block';
       feedback.style.color = '#C6FF00';
       feedback.textContent = '✓ Inscrição confirmada com sucesso! Você receberá o Radar FinGo com as novidades.';
       input.value = '';
-
-      // Tenta enviar para o endpoint v2 se disponível
-      fetch('/api/v2/public/newsletter/subscribe', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email })
-      }).catch(() => {});
-    } catch {
-      feedback.style.display = 'block';
-      feedback.style.color = '#C6FF00';
-      feedback.textContent = '✓ Inscrição confirmada no Radar FinGo!';
+    } catch (err) {
+      feedback.style.color = '#ef4444';
+      feedback.textContent = err?.name === 'TimeoutError' || err?.name === 'AbortError'
+        ? 'Não foi possível confirmar a inscrição agora. Tente novamente em instantes.'
+        : (err?.message || 'Não foi possível confirmar a inscrição agora.');
+    } finally {
+      if (submitBtn) {
+        submitBtn.disabled = false;
+        submitBtn.textContent = originalText;
+      }
     }
   });
 
   if (optoutToggle) {
-    optoutToggle.addEventListener('click', e => {
+    optoutToggle.addEventListener('click', async e => {
       e.preventDefault();
       const current = localStorage.getItem('fingo_newsletter_email') || '';
-      const promptEmail = prompt('Digite seu e-mail para cancelar o recebimento da newsletter:', current);
-      if (promptEmail && promptEmail.includes('@')) {
+      const promptEmail = (prompt('Digite seu e-mail para cancelar o recebimento da newsletter:', current) || '').trim().toLowerCase();
+      if (!promptEmail || !promptEmail.includes('@')) return;
+
+      feedback.style.display = 'block';
+      feedback.style.color = '#94a3b8';
+      feedback.textContent = 'Confirmando o cancelamento da inscrição...';
+
+      try {
+        await newsletterRequest('unsubscribe', promptEmail);
+        localStorage.setItem('fingo_newsletter_email', promptEmail);
         localStorage.setItem('fingo_newsletter_subscribed', 'false');
-        feedback.style.display = 'block';
         feedback.style.color = '#94a3b8';
         feedback.textContent = `Inscrição cancelada para o e-mail: ${promptEmail}. Você não receberá mais os comunicados promocionais.`;
-        
-        fetch('/api/v2/public/newsletter/unsubscribe', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email: promptEmail })
-        }).catch(() => {});
+      } catch (err) {
+        feedback.style.color = '#ef4444';
+        feedback.textContent = err?.name === 'TimeoutError' || err?.name === 'AbortError'
+          ? 'Não foi possível confirmar o cancelamento agora. Tente novamente em instantes.'
+          : (err?.message || 'Não foi possível confirmar o cancelamento agora.');
       }
     });
   }
