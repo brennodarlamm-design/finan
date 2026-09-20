@@ -949,6 +949,7 @@ const App = {
           method: 'POST',
           headers,
           keepalive: true,
+          signal: AbortSignal.timeout(5000),
           body: bodyStr
         }).catch(() => {});
       } catch {}
@@ -1389,7 +1390,7 @@ const App = {
     }
     Utils.toast('Consultando CNPJ na Receita Federal...', 'info');
     try {
-      const res = await fetch(`/api/cnpj?cnpj=${raw}`);
+      const res = await fetch(`/api/cnpj?cnpj=${raw}`, { signal: AbortSignal.timeout(10000) });
       if (!res.ok) throw new Error('Falha na consulta');
       const data = await res.json();
       if (data.razao_social || data.nome_fantasia) {
