@@ -150,12 +150,16 @@ const triggerEmail=read('trigger/email.js');
 const v2Routes=read('api/_v2-routes.js');
 const newsletterMigration=read('migrations/033_newsletter_subscriptions.sql');
 const migrationRunner=read('scripts/run-migration.js');
+const securityPreflight=read('scripts/security-preflight.js');
+const mfaMigration=read('scripts/migrate-legacy-mfa-secrets.js');
 ok('Validação pública, workflow e suporte têm deadlines', validarClient.includes('AbortSignal.timeout(15000)') && (workflowClient.match(/AbortSignal\.timeout\(20000\)/g)||[]).length >= 2 && suporteClient.includes('AbortSignal.timeout(20000)'));
 ok('Atendimento do cliente tem deadline e erro amigável', suporteCustomerClient.includes('AbortSignal.timeout(20000)') && suporteCustomerClient.includes('O atendimento demorou além do esperado. Tente novamente.'));
 ok('E-mail transacional central tem deadline', triggerEmail.includes('AbortSignal.timeout(12000)') && triggerEmail.includes('maxAttempts: 4'));
 ok('Newsletter só confirma após persistência real', landingPageClient.includes("await newsletterRequest('subscribe', email)") && landingPageClient.includes("await newsletterRequest('unsubscribe', promptEmail)") && landingPageClient.includes('AbortSignal.timeout(10000)') && !landingPageClient.includes("fetch('/api/v2/public/newsletter/subscribe'"));
 ok('Newsletter persiste consentimento no banco', v2Routes.includes('newsletter_subscriptions') && v2Routes.includes('createOwnerSql()') && v2Routes.includes('NEWSLETTER_PERSISTENCE_UNAVAILABLE') && newsletterMigration.includes('CREATE TABLE IF NOT EXISTS newsletter_subscriptions'));
 ok('Runner de migração exige role owner dedicada', migrationRunner.includes('process.env.DATABASE_OWNER_URL') && !migrationRunner.includes("process.env.DATABASE_URL ||") && migrationRunner.includes('Migrações exigem conexão privilegiada dedicada.'));
+ok('Preflight de segurança separa runtime e owner', securityPreflight.includes('runtimeConn') && securityPreflight.includes('ownerConn') && securityPreflight.includes('runtimeSql') && securityPreflight.includes('ownerSql') && securityPreflight.includes('DATABASE_OWNER_URL privilegiada não configurada.'));
+ok('Migração MFA exige conexão owner dedicada', mfaMigration.includes('process.env.DATABASE_OWNER_URL') && !mfaMigration.includes('process.env.DATABASE_URL ||') && mfaMigration.includes('DATABASE_OWNER_URL privilegiada não configurada.'));
 
 const loginPageClient=read('js/login_page.js');
 const masterPageClient=read('js/master_page.js');
