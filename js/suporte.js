@@ -122,7 +122,7 @@ const Suporte = {
     const url = `/api/support?${qs.toString()}`;
     const opts = { method, headers:(typeof Auth !== 'undefined' && Auth.getAuthHeaders) ? Auth.getAuthHeaders() : {} };
     if (body) opts.body = JSON.stringify(body);
-    const resp = await fetch(url, opts);
+    const resp = await fetch(url, { ...opts, signal: AbortSignal.timeout(15000) });
     const data = await resp.json().catch(() => ({}));
     if (!resp.ok || !data.success) throw new Error(data.error || 'Não foi possível acessar o suporte agora.');
     return data;

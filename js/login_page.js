@@ -52,16 +52,19 @@ if (window.location.hash.startsWith('#validar') || window.location.search.includ
       const resp = await fetch('/api/auth?action=register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        signal: AbortSignal.timeout(15000),
         body: JSON.stringify({ nome, email, telefone: whats, empresaNome: empNome, cnpj, mensagem: msg })
       });
       const data = await resp.json().catch(() => ({}));
       if (data.success && data.commercial_request) {
         if (okBox) {
-          okBox.textContent = data.message || 'Solicitação enviada! Nossa equipe entrará em contato em breve.';
+          okBox.innerHTML = '<strong>✓ Solicitação recebida.</strong><br>Próximo passo: a equipe FinGo valida os dados da construtora e envia as credenciais/chave da empresa pelos canais informados. Para atendimento imediato, use o botão de WhatsApp abaixo.';
           okBox.style.display = 'block';
+          okBox.setAttribute('role', 'status');
+          okBox.setAttribute('aria-live', 'polite');
         }
-        btn.textContent = '✓ Solicitação enviada!';
-        setTimeout(() => closeRegisterModal(), 3500);
+        btn.textContent = '✓ Solicitação recebida';
+        btn.disabled = true;
       } else {
         throw new Error(data.message || 'Erro ao enviar solicitação. Tente via WhatsApp.');
       }
@@ -112,7 +115,7 @@ if (window.location.hash.startsWith('#validar') || window.location.search.includ
     pwd.type = isHidden ? 'text' : 'password';
     document.getElementById('eye-icon').innerHTML = isHidden
       ? '<path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/>'
-      : '<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>';
+      : '<path d="M2 12c2.5-4 5.8-6 10-6s7.5 2 10 6c-2.5 4-5.8 6-10 6S4.5 16 2 12z"/><circle cx="12" cy="12" r="3"/>';
   }
 
   // ── GOOGLE SIGN-IN INTEGRATION ──────────────────────────────
@@ -265,6 +268,9 @@ if (window.location.hash.startsWith('#validar') || window.location.search.includ
 
   function closeRecoveryModal() {
     clearInterval(recoveryTimerInterval);
+    recoveryRequestId = null;
+    recoveryResetToken = null;
+    recoveryExpiresAt = null;
     document.getElementById('recovery-modal').style.display = 'none';
   }
 
@@ -486,6 +492,10 @@ if (window.location.hash.startsWith('#validar') || window.location.search.includ
         btn.innerHTML = '<span>Salvar Nova Senha</span>';
         return;
       }
+
+      recoveryResetToken = null;
+      recoveryRequestId = null;
+      recoveryExpiresAt = null;
 
       // Avança para Etapa 4 (Sucesso)
       document.getElementById('rec-step-3').className = 'recovery-step';

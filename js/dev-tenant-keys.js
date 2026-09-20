@@ -139,7 +139,7 @@
     state.lastError = '';
     render();
     try {
-      const resp = await fetch('/api/audit?action=dev_tenant_keys_list', { headers: authHeaders(), cache: 'no-store' });
+      const resp = await fetch('/api/audit?action=dev_tenant_keys_list', { headers: authHeaders(), cache: 'no-store', signal: AbortSignal.timeout(12000) });
       const data = await resp.json().catch(() => ({}));
       if (!resp.ok || !data.success) throw new Error(data.error || 'Falha ao carregar cofre DEV.');
       state.rows = Array.isArray(data.keys) ? data.keys : [];
@@ -161,7 +161,8 @@
     try {
       const resp = await fetch(`/api/audit?action=dev_tenant_keys_reveal&tenantId=${encodeURIComponent(tenantId)}`, {
         headers: authHeaders(),
-        cache: 'no-store'
+        cache: 'no-store',
+        signal: AbortSignal.timeout(12000)
       });
       const data = await resp.json().catch(() => ({}));
       if (!resp.ok || !data.success || !data.accessKey) throw new Error(data.error || 'Não foi possível revelar a chave.');
@@ -181,6 +182,7 @@
       const resp = await fetch('/api/audit?action=dev_tenant_keys_rotate', {
         method: 'POST',
         headers: authHeaders(),
+        signal: AbortSignal.timeout(15000),
         body: JSON.stringify({ tenantId })
       });
       const data = await resp.json().catch(() => ({}));

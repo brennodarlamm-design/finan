@@ -24,7 +24,7 @@ const Patch51 = {
     const query = new URLSearchParams({ action:`workflow_${action}`, ...params });
     const options = { method, headers:this.authHeaders() };
     if (body !== null) options.body = JSON.stringify({ action:`workflow_${action}`, ...body });
-    const res = await fetch(`/api/audit?${query.toString()}`, options);
+    const res = await fetch(`/api/audit?${query.toString()}`, { ...options, signal: AbortSignal.timeout(15000) });
     const json = await res.json().catch(() => ({}));
     if (!res.ok || !json.success) {
       const err = new Error(json.error || `Falha no Patch 51 (HTTP ${res.status})`);
@@ -52,7 +52,7 @@ const Patch51 = {
 
   async loadUsers() {
     try {
-      const res = await fetch('/api/users', { headers:this.authHeaders() });
+      const res = await fetch('/api/users', { headers:this.authHeaders(), signal: AbortSignal.timeout(15000) });
       const json = await res.json().catch(() => ({}));
       if (res.ok && json.success && Array.isArray(json.users)) {
         this._users = json.users.filter(u => u.ativo !== false);

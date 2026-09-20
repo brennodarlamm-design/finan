@@ -15,6 +15,10 @@ import { getEdgeMetricsSummary } from './_edge-metrics.js';
 import { appendLedgerBlock, verifyLedgerIntegrity, detectExpenseAnomaly } from './_edge-ledger.js';
 import { isIpBanned, recordFailedAttempt, unbanIp } from './_edge-security.js';
 import { dispatchEdgeAlert } from './_edge-alerts.js';
+import { resolveAuthAndTenant } from './_auth.js';
+import { canAccessModule, canWriteData, canDeleteData, permissionError } from './_permissions.js';
+import { neon } from '@neondatabase/serverless';
+import { checkRateLimit, getClientIp } from './_ratelimit.js';
 
 export const V2_ROUTE_SPEC = [
   // 1. Sistema & Telemetria
@@ -300,9 +304,10 @@ export async function handleV2Newsletter(req, res) {
   res.setHeader('Content-Type', 'application/json; charset=utf-8');
 
   const isUnsubscribe = req.url?.includes('unsubscribe');
-  const email = (req.body?.email || req.query?.email || '').trim().toLowerCase();
+  const email = String(req.body?.email || req.query?.email || '').trim().toLowerCase();
+  const emailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) && email.length <= 320;
 
-  if (!email || !email.includes('@') || email.length < 5) {
+  if (!emailValid) {
     return res.status(400).json({
       success: false,
       error: 'INVALID_EMAIL',
@@ -310,21 +315,80 @@ export async function handleV2Newsletter(req, res) {
     });
   }
 
-  if (isUnsubscribe) {
-    return res.status(200).json({
-      success: true,
-      action: 'unsubscribed',
-      email,
-      message: 'Inscrição no Radar FinGo cancelada com sucesso. Você não receberá mais comunicados de marketing.'
+  const clientIp = getClientIp(req);
+  const rate = await checkRateLimit(`newsletter:ip:${clientIp}`, 20, 60 * 60 * 1000);
+  if (!rate.allowed) {
+    res.setHeader('Retry-After', String(Math.max(1, Math.ceil((rate.resetMs || 60000) / 1000))));
+    return res.status(429).json({
+      success: false,
+      error: 'RATE_LIMITED',
+      message: 'Muitas tentativas. Aguarde alguns minutos e tente novamente.'
     });
   }
 
-  return res.status(200).json({
-    success: true,
-    action: 'subscribed',
-    email,
-    message: 'Inscrição no Radar FinGo confirmada com sucesso! Bem-vindo(a) às atualizações de engenharia e SINAPI.'
-  });
+  const conn = String(req.env?.DATABASE_URL || process.env.DATABASE_URL || '').trim();
+  const sql = typeof req.newsletterSql === 'function'
+    ? req.newsletterSql
+    : (conn ? neon(conn) : null);
+
+  if (!sql) {
+    console.error('[Newsletter] DATABASE_URL indisponível; consentimento não foi persistido.');
+    return res.status(503).json({
+      success: false,
+      error: 'NEWSLETTER_STORAGE_UNAVAILABLE',
+      message: 'Não foi possível registrar sua preferência agora. Tente novamente.'
+    });
+  }
+
+  try {
+    if (isUnsubscribe) {
+      // Registra também descadastro de e-mail ainda não conhecido para manter uma suppression list.
+      await sql`
+        INSERT INTO newsletter_subscribers (
+          email, subscribed, source, subscribed_at, unsubscribed_at, updated_at
+        )
+        VALUES (${email}, FALSE, 'landing', NULL, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        ON CONFLICT (email) DO UPDATE SET
+          subscribed = FALSE,
+          unsubscribed_at = CURRENT_TIMESTAMP,
+          updated_at = CURRENT_TIMESTAMP
+      `;
+
+      return res.status(200).json({
+        success: true,
+        action: 'unsubscribed',
+        email,
+        message: 'Inscrição no Radar FinGo cancelada com sucesso. Você não receberá mais comunicados de marketing.'
+      });
+    }
+
+    await sql`
+      INSERT INTO newsletter_subscribers (
+        email, subscribed, source, subscribed_at, unsubscribed_at, updated_at
+      )
+      VALUES (${email}, TRUE, 'landing', CURRENT_TIMESTAMP, NULL, CURRENT_TIMESTAMP)
+      ON CONFLICT (email) DO UPDATE SET
+        subscribed = TRUE,
+        source = EXCLUDED.source,
+        subscribed_at = CURRENT_TIMESTAMP,
+        unsubscribed_at = NULL,
+        updated_at = CURRENT_TIMESTAMP
+    `;
+
+    return res.status(200).json({
+      success: true,
+      action: 'subscribed',
+      email,
+      message: 'Inscrição no Radar FinGo confirmada com sucesso! Bem-vindo(a) às atualizações de engenharia e SINAPI.'
+    });
+  } catch (err) {
+    console.error('[Newsletter] Falha ao persistir preferência:', err?.message || err);
+    return res.status(503).json({
+      success: false,
+      error: 'NEWSLETTER_STORAGE_UNAVAILABLE',
+      message: 'Não foi possível registrar sua preferência agora. Tente novamente.'
+    });
+  }
 }
 
 // =========================================================================
@@ -380,10 +444,16 @@ export async function handleV2EdgeSinapiCached(req, res) {
  */
 export async function handleV2EdgeStorageUpload(req, res) {
   res.setHeader('Content-Type', 'application/json; charset=utf-8');
+  res.setHeader('Cache-Control', 'no-store');
   const env = req.env || process.env;
   const body = req.body || {};
 
-  const tenantId = req.headers['x-tenant-id'] || body.tenantId || 'global';
+  const auth = await resolveAuthAndTenant(req);
+  if (!auth.authenticated) return res.status(auth.status || 401).json({ success:false, error:auth.error || 'Não autorizado.' });
+  if (!canAccessModule(auth, 'documentos', 'write')) return res.status(403).json(permissionError('MODULE_WRITE_FORBIDDEN', 'documentos'));
+  if (!canWriteData(auth)) return res.status(403).json(permissionError('ROLE_READ_ONLY'));
+
+  const tenantId = auth.tenantId;
   const category = body.category || 'obras_anexos';
   const filename = body.filename || 'anexo_canteiro.pdf';
   const contentType = body.contentType || 'application/octet-stream';
@@ -396,6 +466,9 @@ export async function handleV2EdgeStorageUpload(req, res) {
   try {
     const objectKey = buildR2ObjectKey(tenantId, category, filename);
     const buffer = Buffer.from(base64Data, 'base64');
+    if (buffer.byteLength > 15 * 1024 * 1024) {
+      return res.status(413).json({ success:false, error:'Arquivo excede o limite máximo permitido de 15 MB.' });
+    }
     const result = await putR2Object(env, objectKey, buffer, {
       contentType,
       customMetadata: {
@@ -416,7 +489,8 @@ export async function handleV2EdgeStorageUpload(req, res) {
       }
     });
   } catch (err) {
-    return res.status(500).json({ success: false, error: err.message });
+    console.error('[FinGo Edge R2] Falha no upload autenticado:', err?.message || err);
+    return res.status(500).json({ success: false, error: 'Falha ao persistir arquivo no armazenamento seguro.' });
   }
 }
 
@@ -427,8 +501,16 @@ export async function handleV2EdgeStorageGet(req, res) {
   const env = req.env || process.env;
   const key = decodeURIComponent(req.query?.key || req.params?.key || '');
 
+  const auth = await resolveAuthAndTenant(req);
+  if (!auth.authenticated) return res.status(auth.status || 401).json({ success:false, error:auth.error || 'Não autorizado.' });
+  if (!canAccessModule(auth, 'documentos', 'read')) return res.status(403).json(permissionError('MODULE_READ_FORBIDDEN', 'documentos'));
+
   if (!key) {
     return res.status(400).json({ success: false, error: 'Chave do arquivo obrigatória.' });
+  }
+  const expectedPrefix = `tenants/${auth.tenantId}/`;
+  if (!key.startsWith(expectedPrefix) && !auth.isSystem) {
+    return res.status(403).json({ success:false, error:'Arquivo não pertence ao tenant autenticado.' });
   }
 
   try {
@@ -438,12 +520,14 @@ export async function handleV2EdgeStorageGet(req, res) {
     }
 
     res.setHeader('Content-Type', obj.contentType || 'application/octet-stream');
-    res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+    res.setHeader('Cache-Control', 'private, no-store');
+    res.setHeader('Content-Disposition', 'inline');
     res.setHeader('X-Storage-Engine', obj.storage);
 
     return res.status(200).send(obj.body);
   } catch (err) {
-    return res.status(500).json({ success: false, error: err.message });
+    console.error('[FinGo Edge R2] Falha na leitura autenticada:', err?.message || err);
+    return res.status(500).json({ success: false, error: 'Falha ao ler arquivo do armazenamento seguro.' });
   }
 }
 
@@ -452,8 +536,14 @@ export async function handleV2EdgeStorageGet(req, res) {
  */
 export async function handleV2EdgeStorageList(req, res) {
   res.setHeader('Content-Type', 'application/json; charset=utf-8');
+  res.setHeader('Cache-Control', 'no-store');
   const env = req.env || process.env;
-  const tenantId = req.headers['x-tenant-id'] || req.query?.tenantId || 'global';
+
+  const auth = await resolveAuthAndTenant(req);
+  if (!auth.authenticated) return res.status(auth.status || 401).json({ success:false, error:auth.error || 'Não autorizado.' });
+  if (!canAccessModule(auth, 'documentos', 'read')) return res.status(403).json(permissionError('MODULE_READ_FORBIDDEN', 'documentos'));
+
+  const tenantId = auth.tenantId;
   const prefix = `tenants/${tenantId}/`;
 
   try {
@@ -465,7 +555,8 @@ export async function handleV2EdgeStorageList(req, res) {
       files: list.objects
     });
   } catch (err) {
-    return res.status(500).json({ success: false, error: err.message });
+    console.error('[FinGo Edge R2] Falha na listagem autenticada:', err?.message || err);
+    return res.status(500).json({ success: false, error: 'Falha ao listar arquivos do armazenamento seguro.' });
   }
 }
 

@@ -199,5 +199,9 @@
     "api/reconhecer-documento.js": {
       "maxDuration": 60
     }
+  },
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "git": {
+    "deploymentEnabled": false
   }
 }

@@ -54,8 +54,7 @@ const ALLOWED_ORIGINS = [
 
 app.use(cors({
   origin: (origin, callback) => {
-    const isFinobraVercel = /^https:\/\/finan-as(?:-[a-z0-9-]+)?\.vercel\.app$/i.test(origin || '');
-    if (!origin || ALLOWED_ORIGINS.includes(origin) || isFinobraVercel) {
+    if (!origin || ALLOWED_ORIGINS.includes(origin)) {
       callback(null, true);
     } else {
       callback(null, false);
@@ -1436,6 +1435,7 @@ async function executarVarreduraCobranca({ manualTrigger = false, forcedTenantId
             'Authorization': `Bearer ${resendKey}`,
             'Content-Type': 'application/json'
           },
+          signal: AbortSignal.timeout(15000),
           body: JSON.stringify({
             from: emailFrom,
             to: [destEmail],
@@ -1561,7 +1561,7 @@ app.get('/cron/billing-status', requireAuth, async (req, res) => {
 const RENDER_EXTERNAL_URL = process.env.RENDER_EXTERNAL_URL || 'https://finan-backend-9rxw.onrender.com';
 cron.schedule('*/10 * * * *', async () => {
   try {
-    const pingRes = await fetch(`${RENDER_EXTERNAL_URL}/health`);
+    const pingRes = await fetch(`${RENDER_EXTERNAL_URL}/health`, { signal: AbortSignal.timeout(8000) });
     console.log(`💓 [Keep-Alive] Ping no servidor (${pingRes.status})`);
   } catch (pingErr) {
     console.warn('⚠️ [Keep-Alive] Aviso no auto-ping:', pingErr.message);

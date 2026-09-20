@@ -98,6 +98,7 @@ export const scheduledBillingSweep = schedules.task({
                 'Content-Type': 'application/json',
                 'Authorization': `Bearer ${resendKey}`
               },
+              signal: AbortSignal.timeout(15000),
               body: JSON.stringify({
                 from: process.env.FINOBRA_SUPPORT_EMAIL_FROM || 'FinGo <suporte@fingo.api.br>',
                 to: [t.email],

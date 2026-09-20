@@ -2,6 +2,7 @@ import { executeEdgeApi } from './api/_edge-adapter.js';
 import { applyEdgeSecurityMiddleware } from './api/_edge-security.js';
 import { recordEdgeMetric, getEdgeMetricsSummary, renderEdgeMetricsHtml } from './api/_edge-metrics.js';
 import { dispatchEdgeAlert } from './api/_edge-alerts.js';
+import { createCriticalR2Backup, migrateLegacyDocumentsToR2 } from './api/_edge-backup.js';
 export { BudgetSyncRoom } from './api/_edge-realtime.js';
 
 const DEFAULT_API_ORIGIN = 'https://api.fingo.api.br';
@@ -30,6 +31,37 @@ function canonicalOrigin(env) {
   const url = new URL(raw);
   if (url.protocol !== 'https:') throw new Error('FINOBRA_CANONICAL_ORIGIN deve usar HTTPS.');
   return url.origin;
+}
+
+async function authenticateEdgeRequest(request, env) {
+  const authUrl = new URL('/api/auth?action=me', upstreamOrigin(env));
+  const headers = new Headers();
+  for (const name of ['cookie','authorization','x-api-key','apikey','x-tenant-id','user-agent']) {
+    const value = request.headers.get(name);
+    if (value) headers.set(name, value);
+  }
+  headers.set('Accept', 'application/json');
+  try {
+    const response = await fetch(authUrl.toString(), {
+      method: 'GET',
+      headers,
+      signal: AbortSignal.timeout(8000)
+    });
+    const body = await response.json().catch(() => ({}));
+    if (!response.ok || !body?.success || !body?.user?.id || !body?.user?.tenantId) {
+      return { ok:false, status:response.status === 403 ? 403 : 401 };
+    }
+    return {
+      ok:true,
+      userId:String(body.user.id),
+      userName:String(body.user.nome || body.user.username || 'Usuário'),
+      role:String(body.user.perfil || 'visualizador').toLowerCase(),
+      tenantId:String(body.user.tenantId)
+    };
+  } catch (error) {
+    console.warn('[FinGo Realtime] Falha ao validar sessão:', error?.message || error);
+    return { ok:false, status:503 };
+  }
 }
 
 function isApiPath(pathname) {
@@ -334,7 +366,12 @@ async function proxyApi(request, env) {
   if (!SAFE_METHODS.has(method)) headers.set('Origin', canonicalOrigin(env));
   headers.set('X-FinObra-Edge', 'cloudflare-worker');
 
-  const init = { method, headers, redirect: 'manual' };
+  const init = {
+    method,
+    headers,
+    redirect: 'manual',
+    signal: AbortSignal.timeout(Number(env.FINOBRA_UPSTREAM_TIMEOUT_MS || 20000))
+  };
 
   if (!['GET', 'HEAD'].includes(method)) {
     const rawBody = await request.arrayBuffer();
@@ -385,14 +422,30 @@ async function proxyApi(request, env) {
   }
 }
 
+function isStorageMutation(request) {
+  const method = String(request?.method || 'GET').toUpperCase();
+  if (SAFE_METHODS.has(method)) return false;
+  const pathname = new URL(request.url).pathname;
+  return pathname === '/api/upload' || pathname.startsWith('/api/v2/edge/storage/');
+}
+
 async function handleApi(request, env) {
   try {
     let response = await executeEdgeApi(request, env);
-    if (response && response.status >= 500 && env.FINOBRA_API_ORIGIN) {
+    if (response && response.status >= 500 && env.FINOBRA_API_ORIGIN && !isStorageMutation(request)) {
       console.warn('[FinGo Edge] Resposta 5xx no Edge, acionando fallback upstream...');
       response = await proxyApi(request, env);
     }
     if (response) {
+      if (response.status >= 500) {
+        await dispatchEdgeAlert(env, {
+          type: 'EDGE_HTTP_5XX',
+          severity: 'CRITICAL',
+          title: `Falha HTTP ${response.status} no Edge`,
+          message: `${request.method} ${new URL(request.url).pathname} respondeu ${response.status}.`,
+          details: { status: response.status, method: request.method, path: new URL(request.url).pathname }
+        }).catch((alertErr) => console.warn('[FinGo Edge] Alerta operacional falhou:', alertErr?.message || alertErr));
+      }
       const secureHeaders = new Headers(response.headers);
       if (!secureHeaders.has('Strict-Transport-Security')) {
         secureHeaders.set('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
@@ -412,7 +465,7 @@ async function handleApi(request, env) {
     return response;
   } catch (err) {
     console.error('[FinGo Edge] Falha ao processar API no Edge:', err?.message || err);
-    if (env.FINOBRA_API_ORIGIN) {
+    if (env.FINOBRA_API_ORIGIN && !isStorageMutation(request)) {
       return await proxyApi(request, env);
     }
     return Response.json({
@@ -434,13 +487,25 @@ export default {
     const startTime = Date.now();
     const url = new URL(request.url);
 
-    // 1. Dashboard de Métricas & Observabilidade em Tempo Real
+    // 1. Dashboard de Métricas & Observabilidade em Tempo Real.
+    // Telemetria operacional fica restrita a superadmin autenticado.
     if (url.pathname === '/__edge/metrics' || url.pathname === '/__finobra/metrics') {
+      if (!sameOriginBrowserRequest(request)) {
+        return Response.json({ ok:false, error:'Origem não autorizada.' }, { status:403 });
+      }
+      const identity = await authenticateEdgeRequest(request, env);
+      if (!identity.ok || identity.role !== 'superadmin') {
+        return Response.json({ ok:false, error:'Acesso restrito à administração da plataforma.' }, {
+          status: identity.status === 503 ? 503 : 403,
+          headers: { 'Cache-Control':'no-store' }
+        });
+      }
       const summary = getEdgeMetricsSummary();
       return new Response(renderEdgeMetricsHtml(summary), {
         headers: {
           'Content-Type': 'text/html; charset=utf-8',
-          'Cache-Control': 'no-store, no-cache'
+          'Cache-Control': 'no-store, no-cache',
+          'X-Content-Type-Options': 'nosniff'
         }
       });
     }
@@ -463,19 +528,32 @@ export default {
       return healthResponse(request, env);
     }
     if (url.pathname.startsWith('/api/v2/edge/realtime/room/')) {
-      const roomId = url.pathname.replace('/api/v2/edge/realtime/room/', '').split('/')[0] || 'general_room';
-      if (env && env.BUDGET_ROOM && typeof env.BUDGET_ROOM.idFromName === 'function') {
-        const id = env.BUDGET_ROOM.idFromName(roomId);
-        const stub = env.BUDGET_ROOM.get(id);
-        return stub.fetch(request);
+      if (!sameOriginBrowserRequest(request)) {
+        return Response.json({ ok:false, error:'Origem não autorizada.' }, { status:403 });
       }
-      return Response.json({
-        ok: true,
-        roomId,
-        service: 'fingo-edge-realtime',
-        status: 'room_ready',
-        message: 'Durable Object room available on edge.'
-      });
+      const identity = await authenticateEdgeRequest(request, env);
+      if (!identity.ok) {
+        return Response.json(
+          { ok:false, error: identity.status === 503 ? 'Serviço de autenticação indisponível.' : 'Sessão obrigatória para colaboração em tempo real.' },
+          { status: identity.status }
+        );
+      }
+
+      const rawRoomId = url.pathname.replace('/api/v2/edge/realtime/room/', '').split('/')[0] || 'general_room';
+      const roomId = rawRoomId.replace(/[^a-zA-Z0-9_.:-]/g, '').slice(0, 120) || 'general_room';
+      const tenantRoomId = `${identity.tenantId}:${roomId}`;
+
+      if (env && env.BUDGET_ROOM && typeof env.BUDGET_ROOM.idFromName === 'function') {
+        const id = env.BUDGET_ROOM.idFromName(tenantRoomId);
+        const stub = env.BUDGET_ROOM.get(id);
+        const trustedHeaders = new Headers(request.headers);
+        trustedHeaders.set('x-fingo-user-id', identity.userId);
+        trustedHeaders.set('x-fingo-user-name', identity.userName);
+        trustedHeaders.set('x-fingo-user-role', identity.role);
+        trustedHeaders.set('x-fingo-tenant-id', identity.tenantId);
+        return stub.fetch(new Request(request, { headers: trustedHeaders }));
+      }
+      return Response.json({ ok:false, error:'Serviço de colaboração em tempo real indisponível.' }, { status:503 });
     }
 
     if (isApiPath(url.pathname)) {
@@ -501,11 +579,31 @@ export default {
     const targetUrl = env.RENDER_HEALTH_URL || 'https://finan-backend-9rxw.onrender.com/healthz';
     ctx.waitUntil(
       fetch(targetUrl, {
-        headers: { 'User-Agent': 'FinObra-KeepAlive/1.0 (Cloudflare Edge Worker)' }
+        headers: { 'User-Agent': 'FinGo-KeepAlive/1.0 (Cloudflare Edge Worker)' },
+        signal: AbortSignal.timeout(5000)
       }).then(res => {
         console.log(`[Cloudflare Keep-Alive] Ping no Render status: ${res.status}`);
       }).catch(err => {
         console.warn(`[Cloudflare Keep-Alive] Aviso no ping do Render: ${err.message}`);
+      })
+    );
+
+    // Segunda camada de recuperação: snapshot diário dos dados críticos Neon em R2.
+    // A função é idempotente por data e só executa na janela das 07:00 UTC.
+    ctx.waitUntil(
+      createCriticalR2Backup(env).then(result => {
+        if (!result?.skipped) console.log('[FinGo Backup] Snapshot crítico salvo:', result?.key || result);
+      }).catch(err => {
+        console.error('[FinGo Backup] Falha no snapshot crítico:', err?.message || err);
+      })
+    );
+
+    // Migração idempotente de documentos antigos: só altera a URL após upload + verificação no R2.
+    ctx.waitUntil(
+      migrateLegacyDocumentsToR2(env).then(result => {
+        if (result?.migrated) console.log('[FinGo Storage] Documentos legados migrados para R2:', result.migrated);
+      }).catch(err => {
+        console.error('[FinGo Storage] Falha na migração legada para R2:', err?.message || err);
       })
     );
   }

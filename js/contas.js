@@ -316,7 +316,7 @@ const Contas = {
     Utils.toast('Sincronizando contas com o Neon PostgreSQL...', 'info');
     try {
       const headers = (typeof DB !== 'undefined' && DB._apiHeaders) ? DB._apiHeaders() : {};
-      const res = await fetch('/api/db?table=contas', { headers });
+      const res = await fetch('/api/db?table=contas', { headers, signal: AbortSignal.timeout(15000) });
       if (res.ok) {
         const json = await res.json();
         if (json.success && Array.isArray(json.data) && json.data.length > 0) {

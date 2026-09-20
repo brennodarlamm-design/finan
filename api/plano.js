@@ -17,7 +17,7 @@ function getSql() {
 function setCors(req, res) {
   const allowed = ['https://fingo.api.br','https://www.fingo.api.br','http://localhost:3000','http://localhost:3333','http://localhost:5000','http://127.0.0.1:3000','http://127.0.0.1:3333','http://127.0.0.1:5000'];
   const origin = req.headers.origin;
-  if (origin && (allowed.includes(origin) || /^https:\/\/finan-as(?:-[a-z0-9-]+)?\.vercel\.app$/i.test(origin))) res.setHeader('Access-Control-Allow-Origin', origin);
+  if (origin && allowed.includes(origin)) res.setHeader('Access-Control-Allow-Origin', origin);
   res.setHeader('Access-Control-Allow-Credentials', 'true');
   res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, x-tenant-id');
@@ -139,8 +139,62 @@ export default async function handler(req, res) {
 
     if (req.method === 'POST') {
       const action = String(req.query?.action || req.body?.action || '').trim();
-      if (action !== 'create_invoice') return res.status(400).json({ success:false, error:'Ação de cobrança inválida.' });
       if (!canManageTenant(auth)) return res.status(403).json(permissionError('ROLE_MANAGE_TENANT_FORBIDDEN'));
+
+      if (action === 'cancel_subscription') {
+        const tenantRows = await sql`
+          SELECT id, plano, status, vencimento, created_at
+          FROM tenants
+          WHERE id = ${auth.tenantId}
+          LIMIT 1;
+        `;
+        if (!tenantRows.length) return res.status(404).json({ success:false, error:'Empresa não encontrada.' });
+        const tenant = tenantRows[0];
+        if (tenant.status === 'cancelado' || tenant.status === 'cancelamento_agendado') {
+          return res.status(200).json({
+            success:true,
+            alreadyCanceled:true,
+            status:tenant.status,
+            accessUntil:dateOnly(tenant.vencimento) || null
+          });
+        }
+
+        await sql`
+          UPDATE billing_invoices
+          SET status='canceled', canceled_at=NOW(), updated_at=NOW()
+          WHERE tenant_id=${auth.tenantId} AND status='pending';
+        `;
+        const canceledTenantRows = await sql`
+          UPDATE tenants
+          SET status='cancelamento_agendado',
+              vencimento=COALESCE(
+                vencimento,
+                CASE
+                  WHEN status='trial' OR plano='trial' THEN (COALESCE(created_at, NOW())::date + 15)
+                  ELSE CURRENT_DATE
+                END
+              ),
+              updated_at=NOW()
+          WHERE id=${auth.tenantId}
+          RETURNING status, vencimento;
+        `;
+        const accessUntil = dateOnly(canceledTenantRows[0]?.vencimento || tenant.vencimento) || null;
+        await writeAudit(sql, req, auth, {
+          acao:'cancelar_assinatura',
+          entidade:'plano',
+          entidadeId:auth.tenantId,
+          antes:{ status:tenant.status, plano:tenant.plano, vencimento:tenant.vencimento || null },
+          depois:{ status:'cancelamento_agendado', acesso_ate:accessUntil }
+        });
+        return res.status(200).json({
+          success:true,
+          status:'cancelamento_agendado',
+          accessUntil,
+          message:'Cancelamento agendado. O acesso continua disponível até o fim do período atual; cobranças pendentes foram canceladas.'
+        });
+      }
+
+      if (action !== 'create_invoice') return res.status(400).json({ success:false, error:'Ação de cobrança inválida.' });
 
       const planId = normalizePlan(req.body?.plan_id);
       if (planId === 'trial') return res.status(400).json({ success:false, error:'O plano Trial não gera cobrança.' });

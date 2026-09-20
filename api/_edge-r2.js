@@ -45,7 +45,10 @@ export async function putR2Object(env, key, data, options = {}) {
     }
   }
 
-  // Fallback em memória
+  if (String(env?.FINOBRA_ALLOW_MEMORY_STORAGE || '') !== 'true') {
+    throw new Error('Binding ATTACHMENTS_R2 indisponível. Upload bloqueado para evitar persistência volátil.');
+  }
+
   const buffer = data instanceof ArrayBuffer ? new Uint8Array(data) : Buffer.from(data);
   memoryStorage.set(key, {
     data: buffer,
@@ -58,7 +61,7 @@ export async function putR2Object(env, key, data, options = {}) {
   return {
     key,
     size: buffer.byteLength,
-    storage: 'memory_fallback',
+    storage: 'memory_test_fallback',
     contentType
   };
 }
@@ -85,6 +88,8 @@ export async function getR2Object(env, key) {
       console.warn('[FinGo Edge R2] Erro ao recuperar do R2 remoto:', err?.message || err);
     }
   }
+
+  if (String(env?.FINOBRA_ALLOW_MEMORY_STORAGE || '') !== 'true') return null;
 
   const item = memoryStorage.get(key);
   if (item) {
@@ -114,8 +119,12 @@ export async function deleteR2Object(env, key) {
     }
   }
 
-  memoryStorage.delete(key);
-  return true;
+  if (env && env.ATTACHMENTS_R2 && typeof env.ATTACHMENTS_R2.delete === 'function') return true;
+  if (String(env?.FINOBRA_ALLOW_MEMORY_STORAGE || '') === 'true') {
+    memoryStorage.delete(key);
+    return true;
+  }
+  throw new Error('Binding ATTACHMENTS_R2 indisponível. Exclusão não executada.');
 }
 
 /**
@@ -139,7 +148,11 @@ export async function listR2Objects(env, prefix = '', limit = 50) {
     }
   }
 
-  // Fallback
+  if (String(env?.FINOBRA_ALLOW_MEMORY_STORAGE || '') !== 'true') {
+    throw new Error('Binding ATTACHMENTS_R2 indisponível. Listagem bloqueada.');
+  }
+
+  // Fallback exclusivo de testes
   const list = [];
   for (const [k, v] of memoryStorage.entries()) {
     if (k.startsWith(prefix)) {

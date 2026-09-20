@@ -1,6 +1,8 @@
 // trigger/email.js — Tarefa de Envio de E-mails Transacionais com Resend
 import { task, logger } from "@trigger.dev/sdk";
 
+const RESEND_REQUEST_TIMEOUT_MS = 15000;
+
 export const sendTransactionalEmail = task({
   id: "send-transactional-email",
   retry: {
@@ -54,14 +56,26 @@ export const sendTransactionalEmail = task({
       body.tags = [{ name: 'category', value: String(tag) }];
     }
 
-    const res = await fetch('https://api.resend.com/emails', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${resendKey}`
-      },
-      body: JSON.stringify(body)
-    });
+    let res;
+    try {
+      res = await fetch('https://api.resend.com/emails', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${resendKey}`
+        },
+        body: JSON.stringify(body),
+        signal: AbortSignal.timeout(RESEND_REQUEST_TIMEOUT_MS)
+      });
+    } catch (err) {
+      const timedOut = err?.name === 'TimeoutError' || err?.name === 'AbortError';
+      logger.error("Falha de transporte ao entregar e-mail pelo Resend", {
+        timedOut,
+        timeoutMs: RESEND_REQUEST_TIMEOUT_MS,
+        error: String(err?.message || err)
+      });
+      throw new Error(timedOut ? "Timeout ao enviar e-mail pelo Resend" : "Falha de rede ao enviar e-mail pelo Resend");
+    }
 
     const data = await res.json().catch(() => ({}));
 

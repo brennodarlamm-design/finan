@@ -27,7 +27,7 @@
       const hash = (urlParams.get('hash') || '').trim();
       const qs = new URLSearchParams({ code });
       if (hash) qs.set('hash', hash);
-      const res = await fetch('/api/assinaturas?' + qs.toString(), { headers: { 'Accept': 'application/json' } });
+      const res = await fetch('/api/assinaturas?' + qs.toString(), { headers: { 'Accept': 'application/json' }, signal: AbortSignal.timeout(10000) });
       const data = await res.json().catch(() => ({}));
       if (res.ok && data.success && data.valid && data.record) return data.record;
       if (res.status === 404 || data.valid === false) return null;

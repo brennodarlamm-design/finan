@@ -29,8 +29,8 @@ ok('API possui manifesto para bases grandes', db.includes("table === 'sync_manif
 ok('Sync troca automaticamente para paginação em base grande', data.includes('_fetchCloudTablePaged') && data.includes('Base grande detectada'));
 ok('Fila diferencia rejeição de plano de sessão expirada', data.includes("startsWith('PLAN_')"));
 ok('UUID usa Web Crypto quando disponível', data.includes('crypto.randomUUID'));
-ok('Upload suporta Blob privado', upload.includes("access: 'private'") && upload.includes('FINOBRA_BLOB_ACCESS'));
-ok('Documento privado usa URL assinada temporária', upload.includes('issueSignedToken') && upload.includes('presignUrl'));
+ok('Upload novo usa somente R2 privado e bloqueia fallback Vercel', upload.includes("storage: 'cloudflare_r2'") && upload.includes("access: 'private'") && upload.includes("code: 'R2_STORAGE_UNAVAILABLE'") && !upload.includes('await put('));
+ok('Documento Vercel legado mantém URL assinada temporária apenas para leitura', upload.includes('issueSignedToken') && upload.includes('presignUrl') && upload.includes('.private.blob.vercel-storage.com'));
 ok('URL assinada só é liberada por document_id + tenant', upload.includes('WHERE id = ${documentId} AND tenant_id = ${tenantId}'));
 ok('Frontend resolve URL privada via API autenticada', docs.includes('_resolverUrlProtegida') && docs.includes('/api/upload?document_id='));
 ok('Cadastro de obra avisa limite antes de persistir', clientes.includes('limites = { trial: 10, starter: 3, pro: 10, unlimited: Infinity }'));

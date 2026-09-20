@@ -20,7 +20,8 @@ try {
       'Accept': 'application/json',
       'Content-Type': 'application/json'
     },
-    body: JSON.stringify({ clearCache: 'do_not_clear' })
+    body: JSON.stringify({ clearCache: 'do_not_clear' }),
+    signal: AbortSignal.timeout(15000)
   });
 
   if (!res.ok) {

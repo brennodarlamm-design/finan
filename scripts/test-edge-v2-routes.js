@@ -146,16 +146,36 @@ console.log('   ✓ Boletim de Medição calculou todas as 5 retenções na font
 
 // 4.5 Newsletter Radar FinGo (Subscribe & Unsubscribe)
 const { handleV2Newsletter } = await import('../api/_v2-routes.js');
+const newsletterWrites = [];
+const newsletterSql = async (strings, ...values) => {
+  newsletterWrites.push({ query: strings.join('?'), values });
+  return [];
+};
+
 const resSub = createMockResponse();
-await handleV2Newsletter({ body: { email: 'contato@construtora.com.br' } }, resSub);
+await handleV2Newsletter({
+  body: { email: 'Contato@Construtora.com.br' },
+  newsletterSql
+}, resSub);
 assert.strictEqual(resSub.getStatusCode(), 200);
 assert.strictEqual(resSub.getBody().action, 'subscribed');
+assert.strictEqual(resSub.getBody().email, 'contato@construtora.com.br');
 
 const resUnsub = createMockResponse();
-await handleV2Newsletter({ url: '/api/v2/public/newsletter/unsubscribe', body: { email: 'contato@construtora.com.br' } }, resUnsub);
+await handleV2Newsletter({
+  url: '/api/v2/public/newsletter/unsubscribe',
+  body: { email: 'contato@construtora.com.br' },
+  newsletterSql
+}, resUnsub);
 assert.strictEqual(resUnsub.getStatusCode(), 200);
 assert.strictEqual(resUnsub.getBody().action, 'unsubscribed');
-console.log('   ✓ Endpoints de Newsletter (Inscrição e Cancelamento) validados com sucesso.');
+assert.strictEqual(newsletterWrites.length, 2, 'Subscribe e unsubscribe devem persistir no storage');
+
+const resInvalidNewsletter = createMockResponse();
+await handleV2Newsletter({ body: { email: 'email-invalido' }, newsletterSql }, resInvalidNewsletter);
+assert.strictEqual(resInvalidNewsletter.getStatusCode(), 400);
+assert.strictEqual(newsletterWrites.length, 2, 'E-mail inválido não deve tocar o banco');
+console.log('   ✓ Newsletter persiste opt-in/opt-out, normaliza e-mail e rejeita entrada inválida.');
 
 console.log('\n======================================================');
 console.log('🎉 TODOS OS TESTES DA FASE 5 PASSARAM COM SUCESSO!');

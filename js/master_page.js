@@ -38,7 +38,7 @@ async function verificarSessaoMaster() {
   let autorizado = false;
   if (flag && Auth.getSession()) {
     try {
-      const r = await fetch('/api/auth?action=me', { headers: Auth.getAuthHeaders() });
+      const r = await fetch('/api/auth?action=me', { headers: Auth.getAuthHeaders(), signal: AbortSignal.timeout(10000) });
       const data = await r.json().catch(() => ({}));
       autorizado = !!(r.ok && data.success && data.user?.perfil === 'superadmin');
     } catch {}

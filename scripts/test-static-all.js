@@ -99,7 +99,8 @@ const tests = [
   'scripts/test-bim-ifc-extended.js',
   'scripts/test-bim-render-performance.js',
   'scripts/test-bim-clash-engine.js',
-  'scripts/test-3d-skills.js'
+  'scripts/test-3d-skills.js',
+  'scripts/test-prelaunch-hardening.js'
 ].filter(fs.existsSync);
 
 const p50NativeSourceTests = new Set([

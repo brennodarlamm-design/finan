@@ -170,7 +170,7 @@ const SINAPI = {
     }
     onProgress?.(`Carregando snapshot Caixa ${snapshot.uf} ${snapshot.referencia}...`);
     try {
-      const res=await fetch(snapshot.file, { cache:'no-cache' });
+      const res=await fetch(snapshot.file, { cache:'no-cache', signal: AbortSignal.timeout(20000) });
       if (!res.ok) throw new Error(`arquivo local indisponível (HTTP ${res.status})`);
       onProgress?.('Validando composições e metadados...');
       const base=await res.json();
