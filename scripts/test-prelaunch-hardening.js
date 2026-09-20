@@ -149,5 +149,12 @@ ok('App principal e BIM usam deadlines explícitos',
   dashboardClient.includes('AbortSignal.timeout(15000)') &&
   bimImporterClient.includes('AbortSignal.timeout(45000)'));
 
+const maintenanceTask=read('trigger/maintenance.js');
+const billingTask=read('trigger/billing.js');
+ok('Trigger maintenance e billing usam deadlines explícitos',
+  maintenanceTask.includes('AbortSignal.timeout(15000)') &&
+  maintenanceTask.includes('AbortSignal.timeout(8000)') &&
+  billingTask.includes('AbortSignal.timeout(15000)'));
+
 if(process.exitCode) process.exit(process.exitCode);
 console.log('\n✅ Hardening pré-lançamento protegido por regressão estática.');
