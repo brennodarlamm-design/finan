@@ -172,6 +172,8 @@ export const dailySlaAudit = schedules.task({
 
           if (emailRes.ok) {
             summary.notificacoesDespachadas++;
+          } else {
+            logger.warn(`Resend rejeitou alerta SLA do tenant ${tenantId}:`, { status: emailRes.status });
           }
         } catch (errSend) {
           logger.warn(`Falha ao despachar e-mail de alerta SLA para tenant ${tenantId}:`, { error: errSend.message });
@@ -247,6 +249,10 @@ export const renderKeepAlive = schedules.task({
         headers: { "User-Agent": "FinGo-KeepAlive/1.0 (Trigger.dev Robot)" },
         signal: AbortSignal.timeout(5000)
       });
+      if (!res.ok) {
+        logger.warn("[Render Keep-Alive] Backend respondeu com erro HTTP.", { status: res.status });
+        return { ok: false, status: res.status, url: targetUrl };
+      }
       logger.info(`[Render Keep-Alive] Ping executado com status: ${res.status}`);
       return { ok: true, status: res.status, url: targetUrl };
     } catch (err) {
