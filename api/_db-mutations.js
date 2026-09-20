@@ -8,6 +8,7 @@ import {
 import { setPrivateNoCache } from './_http.js';
 import { getPlanRule, isActiveObraStatus } from './_plans.js';
 import { writeAudit } from './_audit.js';
+import { deleteR2Object } from './_edge-r2.js';
 
 export async function validateObraTenant(sql, obraId, tenantId) {
   if (!obraId) return null;
@@ -633,12 +634,46 @@ export async function handleDelete(sql, tenantId, auth, req, res, table, id) {
   }
 
   if (table === 'documentos') {
-    try {
-      const rows = await sql`SELECT url FROM documentos WHERE id = ${id} AND tenant_id = ${tenantId} LIMIT 1;`;
-      if (rows.length && rows[0].url && rows[0].url.includes('blob.vercel-storage.com')) {
-        import('@vercel/blob').then(({ del }) => del(rows[0].url)).catch(() => {});
+    const rows = await sql`SELECT url FROM documentos WHERE id = ${id} AND tenant_id = ${tenantId} LIMIT 1;`;
+    const storageUrl = String(rows[0]?.url || '').trim();
+
+    if (storageUrl) {
+      try {
+        if (storageUrl.startsWith('r2://')) {
+          const key = storageUrl.slice('r2://'.length);
+          const expectedPrefix = `tenants/${tenantId}/`;
+          if (!key.startsWith(expectedPrefix) && !auth.isSystem) {
+            return res.status(409).json({
+              success: false,
+              code: 'DOCUMENT_STORAGE_TENANT_MISMATCH',
+              error: 'A referência do arquivo não pertence ao tenant autenticado.'
+            });
+          }
+          if (!req.env?.ATTACHMENTS_R2 || typeof req.env.ATTACHMENTS_R2.delete !== 'function') {
+            return res.status(503).json({
+              success: false,
+              code: 'R2_STORAGE_UNAVAILABLE',
+              error: 'Armazenamento R2 indisponível. O registro foi preservado para permitir nova tentativa.'
+            });
+          }
+          await deleteR2Object(req.env, key);
+        } else if (storageUrl.includes('blob.vercel-storage.com')) {
+          const { del } = await import('@vercel/blob');
+          await Promise.race([
+            del(storageUrl),
+            new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout ao excluir blob legado.')), 8000))
+          ]);
+        }
+      } catch (err) {
+        console.warn('[Documentos] Falha ao excluir objeto antes do registro:', err?.message || err);
+        return res.status(503).json({
+          success: false,
+          code: 'DOCUMENT_STORAGE_DELETE_FAILED',
+          error: 'Não foi possível excluir o arquivo do armazenamento. O registro foi preservado para nova tentativa.'
+        });
       }
-    } catch (e) {}
+    }
+
     await sql`DELETE FROM documentos WHERE id = ${id} AND tenant_id = ${tenantId};`;
     await writeAudit(sql, req, auth, { acao: 'excluir', entidade: 'documentos', entidadeId: id, antes: { id } });
     return res.status(200).json({ success: true, id });
