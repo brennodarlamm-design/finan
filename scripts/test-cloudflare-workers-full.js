@@ -115,13 +115,25 @@ const room = new BudgetSyncRoom(roomState, {});
 assert(typeof room.fetch === 'function', 'BudgetSyncRoom deve implementar método fetch de Durable Object.');
 assert(typeof room.broadcast === 'function', 'BudgetSyncRoom deve possuir canal de broadcast de mensagens.');
 
-// Teste do endpoint HTTP de status da sala
-const statusReq = new Request('https://fingo.api.br/api/v2/edge/realtime/room/obra_99/status');
+// A sala rejeita acesso direto sem identidade validada pelo Worker.
+const unauthStatusReq = new Request('https://fingo.api.br/api/v2/edge/realtime/room/obra_99/status');
+const unauthStatusRes = await room.fetch(unauthStatusReq);
+assert.equal(unauthStatusRes.status, 401, 'Status da sala deve rejeitar acesso sem identidade autenticada.');
+
+// O Worker injeta estes headers somente depois de validar /api/auth?action=me.
+const statusReq = new Request('https://fingo.api.br/api/v2/edge/realtime/room/obra_99/status', {
+  headers: {
+    'x-fingo-user-id': 'user_123',
+    'x-fingo-user-name': 'Engenheiro Teste',
+    'x-fingo-user-role': 'gestor',
+    'x-fingo-tenant-id': 'tenant_123'
+  }
+});
 const statusRes = await room.fetch(statusReq);
-assert.equal(statusRes.status, 200, 'Status da sala de sincronização deve responder 200 OK.');
+assert.equal(statusRes.status, 200, 'Status da sala autenticada deve responder 200 OK.');
 const statusJson = await statusRes.json();
 assert('activeSessions' in statusJson, 'Status da sala deve informar contagem de sessões ativas.');
-console.log('   ✓ Durable Objects: classe BudgetSyncRoom e canal de sincronização aprovados.');
+console.log('   ✓ Durable Objects: identidade confiável e acesso autenticado aprovados.');
 
 // -------------------------------------------------------------
 // 6. Image Optimizer — Fotos de Canteiro e 3G/4G
