@@ -86,7 +86,7 @@ jobs:
         if: github.event_name == 'pull_request'
         working-directory: .agents/skills/ui-ux-pro-max/stack
         run: |
-          npm ci
+          npm install --no-audit --no-fund
           npx playwright install --with-deps chromium
 
       - name: Audit landing and login across mobile/tablet/desktop
