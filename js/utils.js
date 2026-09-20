@@ -560,7 +560,8 @@ const Utils = {
 
     try {
       const res = await fetch(`/api/cep?cep=${cep}`, {
-        headers: { 'Accept': 'application/json' }
+        headers: { 'Accept': 'application/json' },
+        signal: AbortSignal.timeout(10000)
       });
       if (!res.ok) return null;
       const data = await res.json().catch(() => null);
