@@ -61,6 +61,9 @@ const Cobranca = {
     const valid = ['monthly', 'quarterly', 'semiannual', 'annual'];
     this._selectedCycle = valid.includes(cycle) ? cycle : 'monthly';
     const ass = this.getAssinaturaAtual();
+    const serverPlan = this._accountData?.plan || null;
+    const currentPlanId = serverPlan?.id || ass.planoId;
+    const subscriptionStatus = serverPlan?.status || ass.status;
     const u = (typeof Auth !== 'undefined' && Auth.getUser()) || {};
     const canManage = ['admin','superadmin'].includes(String(u.perfil||'').toLowerCase());
 
@@ -74,7 +77,7 @@ const Cobranca = {
 
     const container = document.getElementById('acc-plans-container');
     if (container) {
-      container.innerHTML = Object.values(this.PLANOS).map(p => this._renderCardPlano(p, ass.planoId === p.id, canManage)).join('');
+      container.innerHTML = Object.values(this.PLANOS).map(p => this._renderCardPlano(p, currentPlanId === p.id, canManage, subscriptionStatus)).join('');
     }
   },
 
@@ -193,7 +196,7 @@ const Cobranca = {
     const ass=this.getAssinaturaAtual(); const u=Auth?.getUser?.()||{}; const emp=DB?.getEmpresa?.()||{}; const canManage=['admin','superadmin'].includes(String(u.perfil||'').toLowerCase());
     const nome=Utils.escapeHtml(emp.nome_fantasia||emp.razao_social||u.empresaNome||'sua empresa'); const plano=this.PLANOS[ass.planoId]||this.PLANOS.pro;
     el.innerHTML=`<div class="acc-shell"><div class="acc-head"><div><div class="acc-title">Conta & Assinatura</div><div class="acc-sub">Plano, cobranças, módulos e limites da ${nome} em um único lugar.</div></div></div>
-      <div class="acc-hero"><div><div style="font-size:.7rem;color:#94a3b8;text-transform:uppercase;letter-spacing:.07em">Conta ativa</div><div class="acc-plan-name">${Utils.escapeHtml(plano.nome)}</div><div style="font-size:.8rem;color:#94a3b8;margin-top:4px" id="acc-plan-status">Consultando assinatura no servidor…</div></div><div class="acc-hero-actions" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">${canManage?'<button class="btn btn-primary" data-fb-click="Cobranca.switchAccountTab" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="planos">Alterar plano</button>':''}<button class="btn btn-secondary" data-fb-click="Cobranca.switchAccountTab" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="cobrancas">Ver cobranças</button>${canManage?'<button class="btn btn-secondary" data-fb-click="Cobranca.cancelarAssinatura" data-fb-click-n="0" style="border-color:rgba(239,68,68,.45);color:#fca5a5">Cancelar renovação</button>':''}</div></div>
+      <div class="acc-hero"><div><div style="font-size:.7rem;color:#94a3b8;text-transform:uppercase;letter-spacing:.07em">Conta ativa</div><div class="acc-plan-name">${Utils.escapeHtml(plano.nome)}</div><div style="font-size:.8rem;color:#94a3b8;margin-top:4px" id="acc-plan-status">Consultando assinatura no servidor…</div></div><div class="acc-hero-actions" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">${canManage?'<button class="btn btn-primary" data-fb-click="Cobranca.switchAccountTab" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="planos">Alterar plano</button>':''}<button class="btn btn-secondary" data-fb-click="Cobranca.switchAccountTab" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="cobrancas">Ver cobranças</button>${canManage?'<button id="acc-subscription-action-btn" class="btn btn-secondary" data-fb-click="Cobranca.cancelarAssinatura" data-fb-click-n="0" style="border-color:rgba(239,68,68,.45);color:#fca5a5">Cancelar renovação</button>':''}</div></div>
       <div class="acc-tabs"><button class="acc-tab active" data-tab="visao" data-fb-click="Cobranca.switchAccountTab" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="visao">Visão geral</button><button class="acc-tab" data-tab="cobrancas" data-fb-click="Cobranca.switchAccountTab" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="cobrancas">Cobranças</button><button class="acc-tab" data-tab="modulos" data-fb-click="Cobranca.switchAccountTab" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="modulos">Meu Plano</button><button class="acc-tab" data-tab="equipe" data-fb-click="Cobranca.switchAccountTab" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="equipe">Equipe & Sessões</button><button class="acc-tab" data-tab="suporte" data-fb-click="Cobranca.switchAccountTab" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="suporte">Suporte</button><button class="acc-tab" data-tab="planos" data-fb-click="Cobranca.switchAccountTab" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="planos">Comparar Planos</button></div>
       <section class="acc-panel active" data-panel="visao"><div id="finobra-plan-usage" class="card">Consultando uso atual…</div></section>
       <section class="acc-panel" data-panel="cobrancas"><div id="finobra-billing-history" class="card">Consultando cobranças…</div></section>
@@ -222,7 +225,31 @@ const Cobranca = {
       const res=await this._fetchWithTimeout(canManage?'/api/plano?billing=1':'/api/plano',{headers}); const json=await res.json().catch(()=>({})); if(!res.ok||!json.success||!json.plan) throw new Error(json.error||'Falha ao consultar plano');
       const p=json.plan; this._accountData=json; if(Auth) Auth._planAccess=p;
       const obrasMax=p.maxActiveObras==null?'Ilimitadas':p.maxActiveObras; const usersMax=p.maxUsers==null?'Ilimitados':p.maxUsers;
-      const statusEl=document.getElementById('acc-plan-status'); if(statusEl) statusEl.textContent=`${p.label||'Plano'} • ${p.status||'ativo'}${p.vencimento?' • próxima referência '+(Utils.formatDate?Utils.formatDate(p.vencimento):p.vencimento):''}`;
+      const statusLabels={ativo:'Ativo',trial:'Período de teste',cancelamento_agendado:'Renovação cancelada',cancelado:'Encerrado',suspenso:'Suspenso'};
+      const statusEl=document.getElementById('acc-plan-status');
+      if(statusEl) statusEl.textContent=`${p.label||'Plano'} • ${statusLabels[p.status]||p.status||'Ativo'}${p.vencimento?' • acesso até '+(Utils.formatDate?Utils.formatDate(p.vencimento):p.vencimento):''}`;
+
+      const subscriptionActionBtn=document.getElementById('acc-subscription-action-btn');
+      if(subscriptionActionBtn){
+        const needsReactivation=['cancelamento_agendado','cancelado'].includes(String(p.status||''));
+        subscriptionActionBtn.textContent=needsReactivation?'Reativar / contratar plano':'Cancelar renovação';
+        subscriptionActionBtn.setAttribute('data-fb-click', needsReactivation?'Cobranca.switchAccountTab':'Cobranca.cancelarAssinatura');
+        subscriptionActionBtn.setAttribute('data-fb-click-n', needsReactivation?'1':'0');
+        if(needsReactivation){
+          subscriptionActionBtn.setAttribute('data-fb-click-t0','string');
+          subscriptionActionBtn.setAttribute('data-fb-click-v0','planos');
+          subscriptionActionBtn.style.borderColor='rgba(34,197,94,.45)';
+          subscriptionActionBtn.style.color='#86efac';
+        } else {
+          subscriptionActionBtn.removeAttribute('data-fb-click-t0');
+          subscriptionActionBtn.removeAttribute('data-fb-click-v0');
+          subscriptionActionBtn.style.borderColor='rgba(239,68,68,.45)';
+          subscriptionActionBtn.style.color='#fca5a5';
+        }
+      }
+
+      const plansContainer=document.getElementById('acc-plans-container');
+      if(plansContainer) plansContainer.innerHTML=Object.values(this.PLANOS).map(plan=>this._renderCardPlano(plan,p.id===plan.id,canManage,p.status)).join('');
       if(usageBox) usageBox.innerHTML=`<div class="acc-usage-grid"><div class="acc-kpi"><div class="acc-kpi-l">Usuários</div><div class="acc-kpi-v">${Number(p.usage?.activeUsers||0)} / ${usersMax}</div><div style="font-size:.72rem;color:var(--text3);margin-top:4px">Pessoas ativas no plano</div></div><div class="acc-kpi"><div class="acc-kpi-l">Obras ativas</div><div class="acc-kpi-v">${Number(p.usage?.activeObras||0)} / ${obrasMax}</div><div style="font-size:.72rem;color:var(--text3);margin-top:4px">Obras em andamento</div></div><div class="acc-kpi"><div class="acc-kpi-l">Suporte</div><div class="acc-kpi-v">${Utils.escapeHtml(p.supportLevel||'Padrão')}</div><div style="font-size:.72rem;color:var(--text3);margin-top:4px">Suporte / Comercial</div></div><div class="acc-kpi"><div class="acc-kpi-l">Mensalidade</div><div class="acc-kpi-v">R$ ${(Number(p.monthlyPriceCents||0)/100).toFixed(2).replace('.',',')}</div><div style="font-size:.72rem;color:var(--text3);margin-top:4px">Sem fidelidade</div></div></div>`;
       this._renderBillingHistory(json.invoices||[]); this._renderModules(p); this._renderAccountTeam(p); this._renderAccountSupport(p);
     } catch(e) { if(usageBox) usageBox.textContent='Não foi possível consultar os dados da assinatura agora.'; }
@@ -274,7 +301,7 @@ const Cobranca = {
     el.innerHTML=`<div style="font-weight:900;font-size:1rem;margin-bottom:6px">Módulos do seu plano</div><div style="font-size:.78rem;color:var(--text3);margin-bottom:14px">Módulo contratado e recurso avançado são coisas diferentes. Por exemplo, Orçamentos pode estar incluído sem liberar SINAPI.</div><div class="acc-mod-grid">${Object.entries(catalog).map(([k,v])=>`<div class="acc-mod"><span style="color:${allowed.has(k)?'#22c55e':'#94a3b8'}">${allowed.has(k)?'✓':'🔒'}</span><span style="flex:1">${v}</span><span style="font-size:.68rem;color:var(--text3)">${allowed.has(k)?'Incluído':'Outro plano'}</span></div>`).join('')}</div><div style="font-weight:900;font-size:1rem;margin:22px 0 10px">Recursos avançados</div><div class="acc-mod-grid">${advanced.map(([k,v])=>`<div class="acc-mod"><span style="color:${f[k]?'#22c55e':'#94a3b8'}">${f[k]?'✓':'🔒'}</span><span style="flex:1">${v}</span><span style="font-size:.68rem;color:var(--text3)">${f[k]?'Incluído':'Outro plano'}</span></div>`).join('')}</div>`;
   },
 
-  _renderCardPlano(plano, isAtual, canManage = false) {
+  _renderCardPlano(plano, isAtual, canManage = false, subscriptionStatus = '') {
     const feat = plano.destaque;
     const obras = plano.limiteObras == null ? 'Ilimitadas' : plano.limiteObras;
     const cycle = this._selectedCycle || 'monthly';
@@ -290,7 +317,13 @@ const Cobranca = {
       ? `<div style="font-size:.75rem;color:var(--accent2);margin:-8px 0 14px;font-weight:700">R$ ${totalCobrado} a cada ${cycleData.months} meses${cycleData.tag ? ` • <span style="background:#22c55e;color:#0f1710;padding:1px 6px;border-radius:6px;font-weight:900">${cycleData.tag}</span>` : ''}</div>`
       : `<div style="font-size:.75rem;color:var(--text3);margin:-8px 0 14px">Cobrança mensal sem fidelidade</div>`;
 
-    return `<article class="acc-plan-card ${feat ? 'featured' : ''}"><div><div style="font-size:.68rem;color:var(--accent2);font-weight:900;text-transform:uppercase;letter-spacing:.05em">${Utils.escapeHtml(plano.badge)}</div><h3 style="font-size:1.2rem;margin:8px 0 3px">${Utils.escapeHtml(plano.nome)}</h3><div style="font-size:.76rem;color:var(--text3);min-height:34px">${Utils.escapeHtml(plano.ideal)}</div><div style="font-size:2rem;font-weight:900;margin:16px 0 4px">R$ ${precoEquiv}<span style="font-size:.75rem;color:var(--text3);font-weight:500">/mês</span></div>${cycleNote}<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px"><span class="badge badge-secondary">👥 ${plano.limiteUsuarios} usuário(s)</span><span class="badge badge-secondary">🏗️ ${obras} obras</span></div><ul style="list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:9px">${plano.recursos.map(r => `<li style="font-size:.8rem;color:var(--text2)">✓ ${Utils.escapeHtml(r)}</li>`).join('')}</ul></div><div style="margin-top:20px">${isAtual ? '<button class="btn btn-secondary" disabled style="width:100%">✓ Plano atual</button>' : canManage ? `<button class="btn btn-primary" style="width:100%" data-fb-click="Cobranca.selecionarPlano" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(plano.id)}">Escolher este plano</button>` : '<button class="btn btn-secondary" disabled style="width:100%">Administrador necessário</button>'}</div></article>`;
+    const canReactivateCurrent = isAtual && ['cancelamento_agendado','cancelado'].includes(String(subscriptionStatus||''));
+    const planAction = isAtual && !canReactivateCurrent
+      ? '<button class="btn btn-secondary" disabled style="width:100%">✓ Plano atual</button>'
+      : canManage
+        ? `<button class="btn btn-primary" style="width:100%" data-fb-click="Cobranca.selecionarPlano" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(plano.id)}">${canReactivateCurrent?'Reativar este plano':'Escolher este plano'}</button>`
+        : '<button class="btn btn-secondary" disabled style="width:100%">Administrador necessário</button>';
+    return `<article class="acc-plan-card ${feat ? 'featured' : ''}"><div><div style="font-size:.68rem;color:var(--accent2);font-weight:900;text-transform:uppercase;letter-spacing:.05em">${Utils.escapeHtml(plano.badge)}</div><h3 style="font-size:1.2rem;margin:8px 0 3px">${Utils.escapeHtml(plano.nome)}</h3><div style="font-size:.76rem;color:var(--text3);min-height:34px">${Utils.escapeHtml(plano.ideal)}</div><div style="font-size:2rem;font-weight:900;margin:16px 0 4px">R$ ${precoEquiv}<span style="font-size:.75rem;color:var(--text3);font-weight:500">/mês</span></div>${cycleNote}<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px"><span class="badge badge-secondary">👥 ${plano.limiteUsuarios} usuário(s)</span><span class="badge badge-secondary">🏗️ ${obras} obras</span></div><ul style="list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:9px">${plano.recursos.map(r => `<li style="font-size:.8rem;color:var(--text2)">✓ ${Utils.escapeHtml(r)}</li>`).join('')}</ul></div><div style="margin-top:20px">${planAction}</div></article>`;
   },
 
   selecionarPlano(planoId) {
