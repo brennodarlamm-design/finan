@@ -293,8 +293,7 @@ const Auth = {
       return { success: false, message: 'O código deve conter 6 dígitos numéricos.' };
     }
 
-    // Salva o código temporariamente para ser submetido com a nova senha de forma atômica
-    sessionStorage.setItem(`finobra_otp_${requestId}`, cleanCode);
+    // O OTP permanece somente em memória na tela de recuperação; não é persistido no navegador.
     return { success: true, resetToken: cleanCode };
   },
 
@@ -307,7 +306,7 @@ const Auth = {
       return { success: false, message: 'A nova senha deve possuir pelo menos 8 caracteres.' };
     }
 
-    const code = resetToken || sessionStorage.getItem(`finobra_otp_${requestId}`);
+    const code = String(resetToken || '').trim();
     if (!code) {
       return { success: false, message: 'Sessão expirada. Solicite um novo código.' };
     }
@@ -320,7 +319,6 @@ const Auth = {
       });
       const data = await resp.json().catch(() => ({}));
       if (resp.ok && data.success) {
-        sessionStorage.removeItem(`finobra_otp_${requestId}`);
         return { success: true, message: data.message || 'Senha redefinida com sucesso!' };
       }
       return { success: false, message: data.message || 'Código incorreto ou expirado.' };
