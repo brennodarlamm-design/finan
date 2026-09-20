@@ -111,7 +111,7 @@ const Documentos = {
   async _resolverUrlProtegida(id) {
     try {
       const headers = (typeof DB !== 'undefined' && DB._apiHeaders) ? DB._apiHeaders() : {};
-      const res = await fetch(`/api/upload?document_id=${encodeURIComponent(id)}`, { headers });
+      const res = await fetch(`/api/upload?document_id=${encodeURIComponent(id)}`, { headers, signal: AbortSignal.timeout(20000) });
       if (res.status === 401 || res.status === 403) {
         if (typeof Auth !== 'undefined' && Auth.handleSessionExpired) Auth.handleSessionExpired();
         return null;
@@ -146,7 +146,7 @@ const Documentos = {
     // Tenta buscar da nuvem (Neon) se o arquivo foi anexado por outro dispositivo (ex: celular)
     try {
       const headers = (typeof DB !== 'undefined' && DB._apiHeaders) ? DB._apiHeaders() : {};
-      const res = await fetch(`/api/db?table=documento_conteudo&id=${encodeURIComponent(id)}`, { headers });
+      const res = await fetch(`/api/db?table=documento_conteudo&id=${encodeURIComponent(id)}`, { headers, signal: AbortSignal.timeout(20000) });
       if (res.status === 401) {
         if (typeof Auth !== 'undefined' && Auth.handleSessionExpired) {
           Auth.handleSessionExpired();
@@ -281,7 +281,8 @@ const Documentos = {
           filename: filename || 'documento',
           contentType: contentType || 'application/octet-stream',
           base64
-        })
+        }),
+        signal: AbortSignal.timeout(90000)
       });
       if (res.ok) {
         const data = await res.json();
@@ -339,7 +340,7 @@ const Documentos = {
     if (doc && doc.url && doc.url.includes('blob.vercel-storage.com')) {
       try {
         const headers = (typeof DB !== 'undefined' && DB._apiHeaders) ? DB._apiHeaders() : {};
-        fetch(`/api/upload?url=${encodeURIComponent(doc.url)}`, { method: 'DELETE', headers }).catch(() => {});
+        fetch(`/api/upload?url=${encodeURIComponent(doc.url)}`, { method: 'DELETE', headers, signal: AbortSignal.timeout(20000) }).catch(() => {});
       } catch (e) {}
     }
 
@@ -665,7 +666,8 @@ const Documentos = {
             filename: file.name,
             contentType: file.type || 'application/octet-stream',
             base64
-          })
+          }),
+          signal: AbortSignal.timeout(90000)
         });
         if (res.ok) {
           const resData = await res.json();
