@@ -43,6 +43,7 @@ const landing=read('landing.html');
 const backup=read('.github/workflows/database-backup.yml');
 const rollback=read('.github/workflows/cloudflare-rollback.yml');
 const cloudflareBuild=read('scripts/build-cloudflare-pages.cjs');
+const billingIdempotencyMigration=read('migrations/034_billing_pending_invoice_idempotency.sql');
 
 ok('Wrangler declara binding ATTACHMENTS_R2 persistente', wrangler.includes('"binding": "ATTACHMENTS_R2"') && wrangler.includes('"bucket_name": "fingo-attachments"'));
 ok('R2 falha fechado fora de testes quando binding está ausente', r2.includes('Binding ATTACHMENTS_R2 indisponível') && r2.includes('FINOBRA_ALLOW_MEMORY_STORAGE'));
@@ -52,6 +53,7 @@ ok('Rotas R2 exigem autenticação e isolamento de tenant', routes.includes('res
 ok('Upload principal grava em R2 quando binding existe', upload.includes('r2Ready') && upload.includes("storage: 'cloudflare_r2'") && upload.includes('r2://'));
 ok('Novos uploads não caem silenciosamente no Vercel Blob', upload.includes('FINOBRA_ALLOW_LEGACY_BLOB_UPLOAD') && upload.includes("code: 'R2_STORAGE_REQUIRED'") && upload.includes('!r2Ready && !allowLegacyBlobUpload'));
 ok('Vercel Blob ficou apenas como compatibilidade legada controlada', upload.includes("storage: 'vercel_blob_legacy'") && upload.includes('allowLegacyBlobUpload'));
+ok('Checkout concorrente não duplica cobrança pendente', billingIdempotencyMigration.includes('uq_billing_pending_tenant_plan_cycle') && billingIdempotencyMigration.includes('PARTITION BY tenant_id, plan_id, cycle') && plano.includes("ON CONFLICT (tenant_id, plan_id, cycle) WHERE status = 'pending'") && plano.includes('DO NOTHING') && plano.includes('invoice:concurrent[0]') && plano.includes('reused:true'));
 ok('Cancelamento self-service existe no backend', plano.includes("action === 'cancel_subscription'") && plano.includes("status='cancelamento_agendado'"));
 ok('Cancelamento de assinatura é atômico entre faturas e tenant', plano.includes('WITH canceled_invoices AS') && plano.includes('tenant_upd AS') && plano.includes('canceledInvoices:Number('));
 ok('Cancelamento encerra acesso ao fim do período', auth.includes("tenant_status === 'cancelamento_agendado'") && authApi.includes("tenant_status === 'cancelamento_agendado'"));
