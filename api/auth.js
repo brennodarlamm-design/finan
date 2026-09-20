@@ -24,15 +24,12 @@ import {
   decryptMfaSecret
 } from './_totp.js';
 import { triggerEmail, isTriggerConfigured } from './_trigger-client.js';
+import { createOwnerSql } from './_database.js';
 
 const googleClient = new OAuth2Client();
 
 function getSql() {
-  const conn = process.env.DATABASE_URL;
-  if (!conn) {
-    throw new Error('Variável de ambiente DATABASE_URL não configurada.');
-  }
-  return neon(conn);
+  return createOwnerSql();
 }
 
 const ALLOWED_ORIGINS = [
