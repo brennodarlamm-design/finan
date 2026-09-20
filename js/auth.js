@@ -520,7 +520,7 @@ const Auth = {
 
   logout() {
     const headers = this.getAuthHeaders();
-    fetch('/api/auth?action=logout', { method:'POST', headers, body:'{}', keepalive:true }).catch(() => {});
+    fetch('/api/auth?action=logout', { method:'POST', headers, body:'{}', keepalive:true, signal:AbortSignal.timeout(5000) }).catch(() => {});
     this.logoutSilently();
     window.location.replace('/login');
   },
