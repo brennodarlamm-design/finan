@@ -13,6 +13,7 @@ import {
   tenantAccessKeyLast4
 } from './_tenant-access-key.js';
 import { triggerBillingSweep, isTriggerConfigured } from './_trigger-client.js';
+import { createOwnerSql } from './_database.js';
 
 /**
  * Retorna o cliente SQL com o role neondb_owner (conexão privilegiada).
@@ -33,11 +34,7 @@ import { triggerBillingSweep, isTriggerConfigured } from './_trigger-client.js';
  * Fronteira: neondb_owner (admin/cross-tenant) vs finobra_app (tenant-scoped via RLS)
  */
 function getOwnerSql() {
-  const conn = process.env.DATABASE_OWNER_URL || process.env.DATABASE_URL;
-  if (!conn) {
-    throw new Error('DATABASE_OWNER_URL ou DATABASE_URL não configurada no servidor.');
-  }
-  return neon(conn);
+  return createOwnerSql();
 }
 
 const ALLOWED_ORIGINS = [
