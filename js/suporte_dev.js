@@ -26,7 +26,7 @@ const SuporteDev = {
 
   async _api(action, method='GET', body=null, params={}) {
     const q = new URLSearchParams({ action, ...params });
-    const opts = { method, headers:this._headers() };
+    const opts = { method, headers:this._headers(), signal: AbortSignal.timeout(20000) };
     if (body) opts.body = JSON.stringify(body);
     const resp = await fetch(`/api/admin?${q.toString()}`, opts);
     const data = await resp.json().catch(() => ({}));
