@@ -111,5 +111,29 @@ ok('Configurações usam timeout no navegador',
   (configuracoesClient.match(/configuracoesFetchWithTimeout\(/g)||[]).length >= 9 &&
   configuracoesClient.includes('return await fetch(url, { ...options, signal: controller.signal });'));
 
+const assinadorClient=read('js/assinador.js');
+const suporteClient=read('js/suporte.js');
+const suporteDevClient=read('js/suporte_dev.js');
+const masterPageClient=read('js/master_page.js');
+const contasClient=read('js/contas.js');
+ok('Assinatura e suporte usam deadlines explícitos',
+  assinadorClient.includes('AbortSignal.timeout(20000)') &&
+  suporteClient.includes('AbortSignal.timeout(15000)') &&
+  suporteDevClient.includes('AbortSignal.timeout(15000)') &&
+  masterPageClient.includes('AbortSignal.timeout(10000)') &&
+  contasClient.includes('AbortSignal.timeout(15000)'));
+
+const fornecedoresClient=read('js/fornecedores.js');
+const sinapiClient=read('js/sinapi.js');
+const devTenantKeysClient=read('js/dev-tenant-keys.js');
+const versionGuardClient=read('js/version_guard.js');
+const validarPageClient=read('js/validar_page.js');
+ok('Consultas auxiliares e guards usam deadlines explícitos',
+  fornecedoresClient.includes('AbortSignal.timeout(10000)') &&
+  sinapiClient.includes('AbortSignal.timeout(20000)') &&
+  (devTenantKeysClient.match(/AbortSignal\.timeout\(/g)||[]).length >= 3 &&
+  (versionGuardClient.match(/AbortSignal\.timeout\(5000\)/g)||[]).length >= 2 &&
+  validarPageClient.includes('AbortSignal.timeout(10000)'));
+
 if(process.exitCode) process.exit(process.exitCode);
 console.log('\n✅ Hardening pré-lançamento protegido por regressão estática.');
