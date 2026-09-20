@@ -118,6 +118,7 @@ ok('Release guard usa timeout no navegador', versionGuardClient.includes('timeou
 
 const devKeysClient=read('js/dev-tenant-keys.js');
 ok('Cofre DEV usa timeout no navegador', devKeysClient.includes('timeoutMs = 15000') && (devKeysClient.match(/await fetchWithTimeout\(/g)||[]).length >= 3 && !/await fetch\(['"`]\/api/.test(devKeysClient));
+ok('Cofre DEV auto-oculta segredos revelados', devKeysClient.includes('scheduleAutoHide(tenantId)') && devKeysClient.includes('60_000') && devKeysClient.includes("document.addEventListener('visibilitychange'") && devKeysClient.includes("window.addEventListener('pagehide'"));
 
 const configuracoesClient=read('js/configuracoes.js');
 ok('Configurações usam timeout no navegador', configuracoesClient.includes('timeoutMs = 20000') && (configuracoesClient.match(/this\._fetchWithTimeout\(/g)||[]).length >= 8 && !/await fetch\(['"`]\/api/.test(configuracoesClient));
