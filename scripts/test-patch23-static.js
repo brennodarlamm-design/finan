@@ -17,7 +17,7 @@ const backend = read('backend/server.js');
 const apiFiles = fs.readdirSync('api').filter(n => n.endsWith('.js')).map(n => read(`api/${n}`)).join('\n');
 
 ok('CORS não aceita qualquer *.vercel.app', !apiFiles.includes("endsWith('.vercel.app')") && !apiFiles.includes('endsWith(".vercel.app")'));
-ok('CORS reconhece somente previews do projeto finan-as', /finan-as\(\?:-\[a-z0-9-\]\+\)\?/.test(apiFiles) || apiFiles.includes('finan-as(?:-[a-z0-9-]+)?'));
+ok('CORS não confia mais em previews Vercel após migração Cloudflare', !apiFiles.includes('finan-as(?:-[a-z0-9-]+)?') && !/finan-as\(\?:-\[a-z0-9-\]\+\)\?/.test(apiFiles));
 ok('Certificado suporta chave dedicada CERT_ENCRYPTION_KEY', cert.includes('CERT_ENCRYPTION_KEY'));
 ok('Certificado mantém fallback de decriptação legado para rotação segura', cert.includes('legacy') && cert.includes('decryptWithSecret'));
 ok('Upload público não permite SVG', !/allowedContentTypes:[\s\S]{0,500}image\/svg\+xml/.test(upload));
