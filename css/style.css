@@ -219,6 +219,26 @@ button { font-family:inherit; }
 .nav-pinned-section {
   animation:fadeIn .2s ease-in-out;
 }
+.academia-card {
+  transition:border-color var(--t), transform var(--t);
+}
+.academia-card:hover {
+  border-color:rgba(198,255,0,0.5) !important;
+  transform:translateY(-2px);
+}
+.academia-close-btn {
+  background:none;
+  border:none;
+  color:var(--text3);
+  font-size:1.3rem;
+  cursor:pointer;
+  padding:6px 10px;
+  border-radius:6px;
+  transition:color var(--t);
+}
+.academia-close-btn:hover {
+  color:#fff;
+}
 .sidebar-foot { padding:14px 16px;border-top:1px solid var(--border-s);flex-shrink:0; }
 .user-card {
   display:flex;align-items:center;gap:10px;

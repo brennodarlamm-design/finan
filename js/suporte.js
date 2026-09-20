@@ -451,6 +451,10 @@ const Suporte = {
   // ── 5. MODAL: TUTORIAIS DO SISTEMA ────────────────────────────────────────
   abrirTutoriais() {
     this.fecharDropdown();
+    if (typeof Academia !== 'undefined' && typeof Academia.abrir === 'function') {
+      Academia.abrir();
+      return;
+    }
     let modal = document.getElementById('suporte-tutoriais-modal');
     if (!modal) {
       modal = document.createElement('div');
