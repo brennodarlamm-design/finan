@@ -1,0 +1,65 @@
+name: FinGo Cloudflare rollback
+
+on:
+  workflow_dispatch:
+    inputs:
+      version_id:
+        description: 'Cloudflare Worker version ID to restore. Leave empty to roll back one version.'
+        required: false
+        type: string
+      reason:
+        description: 'Rollback reason'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  rollback:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+
+      - name: Validate Cloudflare credentials
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "${CLOUDFLARE_API_TOKEN:-}"
+          test -n "${CLOUDFLARE_ACCOUNT_ID:-}"
+
+      - name: Roll back Worker
+        shell: bash
+        run: |
+          set -euo pipefail
+          VERSION="${{ inputs.version_id }}"
+          REASON="${{ inputs.reason }}"
+          if [[ -n "$VERSION" ]]; then
+            npx wrangler rollback "$VERSION" --name finan --message "$REASON"
+          else
+            npx wrangler rollback --name finan --message "$REASON"
+          fi
+
+      - name: Verify production health
+        shell: bash
+        run: |
+          set -euo pipefail
+          for i in {1..12}; do
+            body="$(curl --fail --silent --show-error https://fingo.api.br/__finobra/health || true)"
+            if [[ "$body" == *'"ok":true'* && "$body" == *'"loopRisk":false'* ]]; then
+              echo "Rollback health check passed."
+              exit 0
+            fi
+            sleep 5
+          done
+          echo "::error::Production did not become healthy after rollback."
+          exit 1
