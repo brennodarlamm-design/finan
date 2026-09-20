@@ -3,6 +3,10 @@ import fs from 'fs';
 function read(p){ return fs.readFileSync(p,'utf8'); }
 const triggerClient = fs.readFileSync(new URL('../api/_trigger-client.js', import.meta.url), 'utf8');
 assert(triggerClient.includes('withDeadline(tasks.trigger'), 'Trigger.dev SDK deve ter deadline explícito.');
+const workerSource = fs.readFileSync(new URL('../cloudflare-worker.js', import.meta.url), 'utf8');
+assert(workerSource.includes("Telemetria operacional fica restrita a superadmin autenticado"), 'Painel de métricas Edge deve exigir superadmin.');
+assert(workerSource.includes("identity.role !== 'superadmin'"), 'Métricas Edge devem validar role superadmin.');
+
 assert(triggerClient.includes('AbortSignal.timeout(Number(options.timeoutMs || 8000))'), 'Fallback REST do Trigger.dev deve ter timeout explícito.');
 
 function ok(name, condition){
