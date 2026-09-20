@@ -23,13 +23,13 @@ function loadEnv() {
 
 loadEnv();
 
-const dbUrl = (process.env.DATABASE_URL || '').trim();
+const dbUrl = (process.env.DATABASE_OWNER_URL || '').trim();
 if (!dbUrl) {
-  console.error('❌ DATABASE_URL não encontrada no arquivo .env.local.');
+  console.error('❌ DATABASE_OWNER_URL não configurada. Migrações exigem conexão privilegiada dedicada.');
   process.exit(1);
 }
 
-console.log('🚀 Conectando ao Lakebase Postgres (Neon)...');
+console.log('🚀 Conectando ao Neon Postgres com a role owner dedicada para migrações...');
 const sql = neon(dbUrl);
 
 function calculateChecksum(content) {
