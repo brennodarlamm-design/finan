@@ -6,13 +6,10 @@ import { resolveAuthAndTenant } from './_auth.js';
 import { canWriteData, canDeleteData, canAccessModule, permissionError } from './_permissions.js';
 import { createTenantSql } from './_tenant-sql.js';
 import { putR2Object, deleteR2Object, buildR2ObjectKey } from './_edge-r2.js';
+import { createRuntimeSql } from './_database.js';
 
 function getSql() {
-  const conn = process.env.DATABASE_URL;
-  if (!conn) {
-    throw new Error('DATABASE_URL não configurada no servidor.');
-  }
-  return neon(conn);
+  return createRuntimeSql();
 }
 
 
@@ -76,7 +73,7 @@ export default async function handler(req, res) {
   }
 
   const tenantId = auth.tenantId;
-  const sql = createTenantSql(getSql(), { tenantId, isSystem: auth.isSystem === true });
+  const sql = createTenantSql(getSql(), { tenantId });
   if (req.method === 'GET' && !canAccessModule(auth,'documentos','read')) return res.status(403).json(permissionError('MODULE_READ_FORBIDDEN','documentos'));
   if (req.method === 'POST' && !canAccessModule(auth,'documentos','write')) return res.status(403).json(permissionError('MODULE_WRITE_FORBIDDEN','documentos'));
   if (req.method === 'DELETE' && !canAccessModule(auth,'documentos','delete')) return res.status(403).json(permissionError('MODULE_DELETE_FORBIDDEN','documentos'));
