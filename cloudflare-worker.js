@@ -33,6 +33,37 @@ function canonicalOrigin(env) {
   return url.origin;
 }
 
+async function authenticateRealtimeRequest(request, env) {
+  const authUrl = new URL('/api/auth?action=me', upstreamOrigin(env));
+  const headers = new Headers();
+  for (const name of ['cookie','authorization','x-api-key','apikey','x-tenant-id','user-agent']) {
+    const value = request.headers.get(name);
+    if (value) headers.set(name, value);
+  }
+  headers.set('Accept', 'application/json');
+  try {
+    const response = await fetch(authUrl.toString(), {
+      method: 'GET',
+      headers,
+      signal: AbortSignal.timeout(8000)
+    });
+    const body = await response.json().catch(() => ({}));
+    if (!response.ok || !body?.success || !body?.user?.id || !body?.user?.tenantId) {
+      return { ok:false, status:response.status === 403 ? 403 : 401 };
+    }
+    return {
+      ok:true,
+      userId:String(body.user.id),
+      userName:String(body.user.nome || body.user.username || 'Usuário'),
+      role:String(body.user.perfil || 'visualizador').toLowerCase(),
+      tenantId:String(body.user.tenantId)
+    };
+  } catch (error) {
+    console.warn('[FinGo Realtime] Falha ao validar sessão:', error?.message || error);
+    return { ok:false, status:503 };
+  }
+}
+
 function isApiPath(pathname) {
   return pathname === '/api' || pathname.startsWith('/api/');
 }
@@ -473,19 +504,32 @@ export default {
       return healthResponse(request, env);
     }
     if (url.pathname.startsWith('/api/v2/edge/realtime/room/')) {
-      const roomId = url.pathname.replace('/api/v2/edge/realtime/room/', '').split('/')[0] || 'general_room';
-      if (env && env.BUDGET_ROOM && typeof env.BUDGET_ROOM.idFromName === 'function') {
-        const id = env.BUDGET_ROOM.idFromName(roomId);
-        const stub = env.BUDGET_ROOM.get(id);
-        return stub.fetch(request);
+      if (!sameOriginBrowserRequest(request)) {
+        return Response.json({ ok:false, error:'Origem não autorizada.' }, { status:403 });
       }
-      return Response.json({
-        ok: true,
-        roomId,
-        service: 'fingo-edge-realtime',
-        status: 'room_ready',
-        message: 'Durable Object room available on edge.'
-      });
+      const identity = await authenticateRealtimeRequest(request, env);
+      if (!identity.ok) {
+        return Response.json(
+          { ok:false, error: identity.status === 503 ? 'Serviço de autenticação indisponível.' : 'Sessão obrigatória para colaboração em tempo real.' },
+          { status: identity.status }
+        );
+      }
+
+      const rawRoomId = url.pathname.replace('/api/v2/edge/realtime/room/', '').split('/')[0] || 'general_room';
+      const roomId = rawRoomId.replace(/[^a-zA-Z0-9_.:-]/g, '').slice(0, 120) || 'general_room';
+      const tenantRoomId = `${identity.tenantId}:${roomId}`;
+
+      if (env && env.BUDGET_ROOM && typeof env.BUDGET_ROOM.idFromName === 'function') {
+        const id = env.BUDGET_ROOM.idFromName(tenantRoomId);
+        const stub = env.BUDGET_ROOM.get(id);
+        const trustedHeaders = new Headers(request.headers);
+        trustedHeaders.set('x-fingo-user-id', identity.userId);
+        trustedHeaders.set('x-fingo-user-name', identity.userName);
+        trustedHeaders.set('x-fingo-user-role', identity.role);
+        trustedHeaders.set('x-fingo-tenant-id', identity.tenantId);
+        return stub.fetch(new Request(request, { headers: trustedHeaders }));
+      }
+      return Response.json({ ok:false, error:'Serviço de colaboração em tempo real indisponível.' }, { status:503 });
     }
 
     if (isApiPath(url.pathname)) {
