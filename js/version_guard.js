@@ -4,7 +4,7 @@
   const reloadKey = 'finobra_release_reload_once';
 
   const loadEdge = async () => {
-    const res = await fetch(`/version.json?t=${Date.now()}`, { cache:'no-store', credentials:'same-origin' });
+    const res = await fetch(`/version.json?t=${Date.now()}`, { cache:'no-store', credentials:'same-origin', signal: AbortSignal.timeout(5000) });
     if (!res.ok) return null;
     const data = await res.json().catch(() => null);
     if (!data || !data.commit || data.commit === 'unknown') return null;
@@ -12,7 +12,7 @@
   };
 
   const loadApi = async () => {
-    const res = await fetch(`/api/health?t=${Date.now()}`, { cache:'no-store', credentials:'same-origin' });
+    const res = await fetch(`/api/health?t=${Date.now()}`, { cache:'no-store', credentials:'same-origin', signal: AbortSignal.timeout(5000) });
     if (!res.ok) return null;
     return res.json().catch(() => null);
   };
