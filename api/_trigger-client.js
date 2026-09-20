@@ -12,6 +12,18 @@ export function isTriggerConfigured() {
   return Boolean(key && key.startsWith('tr_'));
 }
 
+function withDeadline(promise, timeoutMs, label) {
+  let timer;
+  const timeout = new Promise((_, reject) => {
+    timer = setTimeout(() => {
+      const err = new Error(`${label} excedeu ${timeoutMs}ms`);
+      err.name = 'TimeoutError';
+      reject(err);
+    }, timeoutMs);
+  });
+  return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
+}
+
 /**
  * Despacha uma tarefa para o Trigger.dev de forma assíncrona e desacoplada.
  * Retorna imediatamente com o ID da execução (runId) ou fallback seguro se não configurado.
@@ -27,11 +39,11 @@ export async function triggerJob(taskId, payload = {}, options = {}) {
 
   try {
     // Utiliza o SDK oficial @trigger.dev/sdk para enfileirar a execução
-    const handle = await tasks.trigger(taskId, payload, {
+    const handle = await withDeadline(tasks.trigger(taskId, payload, {
       idempotencyKey: idempotencyKey ? String(idempotencyKey) : undefined,
       delay: options.delay,
       tags: options.tags || ['finobra', String(options.tenantId || 'public')]
-    });
+    }), Number(options.timeoutMs || 8000), 'Trigger.dev SDK');
 
     return {
       success: true,
@@ -56,7 +68,8 @@ export async function triggerJob(taskId, payload = {}, options = {}) {
             idempotencyKey: idempotencyKey ? String(idempotencyKey) : undefined,
             tags: options.tags || ['finobra', String(options.tenantId || 'public')]
           }
-        })
+        }),
+        signal: AbortSignal.timeout(Number(options.timeoutMs || 8000))
       });
 
       const data = await res.json().catch(() => ({}));
