@@ -1,3 +1,4 @@
+import assert from 'node:assert/strict';
 import fs from 'fs';
 
 function read(p){ return fs.readFileSync(p,'utf8'); }
