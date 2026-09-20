@@ -181,8 +181,9 @@ export const HeroVideo: React.FC = () => {
               width: '100%',
               height: '100%',
               objectFit: 'cover',
-              display: 'block',
+              display: 'block'
             }}
+            from={-14}
           />
         </div>
 

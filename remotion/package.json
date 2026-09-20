@@ -9,6 +9,10 @@
     "render:hero": "remotion render src/index.ts HeroVideo dist/hero-video.mp4",
     "render:og": "remotion render src/index.ts OGVideo dist/og-video.mp4",
     "render:feature": "remotion render src/index.ts FeatureDemo dist/feature-demo.mp4",
+    "render:canal-intro": "remotion render src/index.ts CanalIntro dist/canal-intro.mp4",
+    "render:canal-outro": "remotion render src/index.ts CanalOutro dist/canal-outro.mp4",
+    "render:canal-lowerthird": "remotion render src/index.ts CanalLowerThird dist/canal-lowerthird.mp4",
+    "render:canal-thumb": "remotion still src/index.ts CanalThumbnail dist/canal-thumbnail-sinapi.png",
     "render:all": "node scripts/render-all.mjs"
   },
   "dependencies": {
