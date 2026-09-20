@@ -268,6 +268,9 @@ if (window.location.hash.startsWith('#validar') || window.location.search.includ
 
   function closeRecoveryModal() {
     clearInterval(recoveryTimerInterval);
+    recoveryRequestId = null;
+    recoveryResetToken = null;
+    recoveryExpiresAt = null;
     document.getElementById('recovery-modal').style.display = 'none';
   }
 
@@ -489,6 +492,10 @@ if (window.location.hash.startsWith('#validar') || window.location.search.includ
         btn.innerHTML = '<span>Salvar Nova Senha</span>';
         return;
       }
+
+      recoveryResetToken = null;
+      recoveryRequestId = null;
+      recoveryExpiresAt = null;
 
       // Avança para Etapa 4 (Sucesso)
       document.getElementById('rec-step-3').className = 'recovery-step';
