@@ -143,7 +143,7 @@ export default async function handler(req, res) {
 
       if (action === 'cancel_subscription') {
         const tenantRows = await sql`
-          SELECT id, plano, status, vencimento
+          SELECT id, plano, status, vencimento, created_at
           FROM tenants
           WHERE id = ${auth.tenantId}
           LIMIT 1;
@@ -164,23 +164,33 @@ export default async function handler(req, res) {
           SET status='canceled', canceled_at=NOW(), updated_at=NOW()
           WHERE tenant_id=${auth.tenantId} AND status='pending';
         `;
-        await sql`
+        const canceledTenantRows = await sql`
           UPDATE tenants
-          SET status='cancelamento_agendado', updated_at=NOW()
-          WHERE id=${auth.tenantId};
+          SET status='cancelamento_agendado',
+              vencimento=COALESCE(
+                vencimento,
+                CASE
+                  WHEN status='trial' OR plano='trial' THEN (COALESCE(created_at, NOW())::date + 15)
+                  ELSE CURRENT_DATE
+                END
+              ),
+              updated_at=NOW()
+          WHERE id=${auth.tenantId}
+          RETURNING status, vencimento;
         `;
+        const accessUntil = dateOnly(canceledTenantRows[0]?.vencimento || tenant.vencimento) || null;
         await writeAudit(sql, req, auth, {
           acao:'cancelar_assinatura',
           entidade:'plano',
           entidadeId:auth.tenantId,
           antes:{ status:tenant.status, plano:tenant.plano, vencimento:tenant.vencimento || null },
-          depois:{ status:'cancelamento_agendado', acesso_ate:tenant.vencimento || null }
+          depois:{ status:'cancelamento_agendado', acesso_ate:accessUntil }
         });
         return res.status(200).json({
           success:true,
           status:'cancelamento_agendado',
-          accessUntil:dateOnly(tenant.vencimento) || null,
-          message:'Cancelamento agendado. O acesso continua disponível até o vencimento atual e não haverá nova cobrança automática.'
+          accessUntil,
+          message:'Cancelamento agendado. O acesso continua disponível até o fim do período atual; cobranças pendentes foram canceladas.'
         });
       }
 
