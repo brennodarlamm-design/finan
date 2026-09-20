@@ -36,6 +36,7 @@ const edgeBackup=read('api/_edge-backup.js');
 const edgeAlerts=read('api/_edge-alerts.js');
 const worker=read('cloudflare-worker.js');
 ok('Worker mantém snapshot diário dos dados críticos no R2', edgeBackup.includes('neon-critical') && edgeBackup.includes('CRITICAL_TABLES') && worker.includes('createCriticalR2Backup'));
+ok('Migração de documentos legados só troca URL após validar R2', edgeBackup.includes('migrateLegacyDocumentsToR2') && edgeBackup.includes('getR2Object') && edgeBackup.includes("migratedFrom: 'vercel_blob'") && worker.includes('migrateLegacyDocumentsToR2'));
 ok('Alertas Edge críticos fazem envio real com timeout', edgeAlerts.includes('/send-message') && edgeAlerts.includes('AbortSignal.timeout(8000)'));
 ok('Falhas 5xx geram alerta operacional', worker.includes("type: 'EDGE_HTTP_5XX'"));
 ok('Pagamento confirmado recupera UI quando refresh de sessão falha', cobranca.includes('sessionRefreshed') && cobranca.includes('window.location.reload()'));
