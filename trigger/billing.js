@@ -72,7 +72,7 @@ export const scheduledBillingSweep = schedules.task({
 
           const emailHtml = `
             <div style="font-family:sans-serif;max-width:600px;margin:0 auto;color:#1e293b;">
-              <h2 style="color:#0f172a;">Aviso de Cobrança & Vencimentos — FinObra</h2>
+              <h2 style="color:#0f172a;">Aviso de Cobrança & Vencimentos — FinGo</h2>
               <p>Olá, <strong>${t.nome}</strong>,</p>
               <p>Identificamos <strong>${pendentes.length} conta(s)</strong> com vencimento hoje ou pendentes no total de <strong>${totalFmt}</strong>:</p>
               <table style="width:100%;border-collapse:collapse;margin:16px 0;font-size:14px;">
@@ -85,9 +85,9 @@ export const scheduledBillingSweep = schedules.task({
                 </thead>
                 <tbody>${rowsHtml}</tbody>
               </table>
-              <p>Acesse o FinObra para liquidar ou programar as transferências bancárias.</p>
+              <p>Acesse o FinGo para liquidar ou programar as transferências bancárias.</p>
               <hr style="border:none;border-top:1px solid #e2e8f0;margin:24px 0;" />
-              <p style="font-size:12px;color:#94a3b8;">Mensagem automática gerada pelo sistema FinObra.</p>
+              <p style="font-size:12px;color:#94a3b8;">Mensagem automática gerada pelo sistema FinGo.</p>
             </div>
           `;
 
@@ -101,7 +101,7 @@ export const scheduledBillingSweep = schedules.task({
               body: JSON.stringify({
                 from: process.env.FINOBRA_SUPPORT_EMAIL_FROM || 'FinGo <suporte@fingo.api.br>',
                 to: [t.email],
-                subject: `⚠️ Lembrete de Vencimento: ${pendentes.length} conta(s) pendente(s) — FinObra`,
+                subject: `⚠️ Lembrete de Vencimento: ${pendentes.length} conta(s) pendente(s) — FinGo`,
                 html: emailHtml
               })
             });
