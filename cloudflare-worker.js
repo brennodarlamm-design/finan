@@ -422,10 +422,17 @@ async function proxyApi(request, env) {
   }
 }
 
+function isStorageMutation(request) {
+  const method = String(request?.method || 'GET').toUpperCase();
+  if (SAFE_METHODS.has(method)) return false;
+  const pathname = new URL(request.url).pathname;
+  return pathname === '/api/upload' || pathname.startsWith('/api/v2/edge/storage/');
+}
+
 async function handleApi(request, env) {
   try {
     let response = await executeEdgeApi(request, env);
-    if (response && response.status >= 500 && env.FINOBRA_API_ORIGIN) {
+    if (response && response.status >= 500 && env.FINOBRA_API_ORIGIN && !isStorageMutation(request)) {
       console.warn('[FinGo Edge] Resposta 5xx no Edge, acionando fallback upstream...');
       response = await proxyApi(request, env);
     }
@@ -458,7 +465,7 @@ async function handleApi(request, env) {
     return response;
   } catch (err) {
     console.error('[FinGo Edge] Falha ao processar API no Edge:', err?.message || err);
-    if (env.FINOBRA_API_ORIGIN) {
+    if (env.FINOBRA_API_ORIGIN && !isStorageMutation(request)) {
       return await proxyApi(request, env);
     }
     return Response.json({
