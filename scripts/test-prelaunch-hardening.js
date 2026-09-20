@@ -42,6 +42,7 @@ const app=read('js/app.js');
 const landing=read('landing.html');
 const backup=read('.github/workflows/database-backup.yml');
 const rollback=read('.github/workflows/cloudflare-rollback.yml');
+const cloudflareBuild=read('scripts/build-cloudflare-pages.cjs');
 
 ok('Wrangler declara binding ATTACHMENTS_R2 persistente', wrangler.includes('"binding": "ATTACHMENTS_R2"') && wrangler.includes('"bucket_name": "fingo-attachments"'));
 ok('R2 falha fechado fora de testes quando binding está ausente', r2.includes('Binding ATTACHMENTS_R2 indisponível') && r2.includes('FINOBRA_ALLOW_MEMORY_STORAGE'));
@@ -68,6 +69,7 @@ ok('Imagens principais da landing têm dimensões explícitas', (landing.match(/
 ok('Controles mobile principais têm alvo mínimo de 44px', landing.includes('min-height: 44px') && landing.includes('.mobile-menu-summary'));
 ok('Backup lógico diário está versionado e cifrado antes do artifact', backup.includes("cron: '20 7 * * *'") && backup.includes('pg_dump') && backup.includes('BACKUP_ENCRYPTION_PASSPHRASE') && backup.includes('openssl enc -aes-256-cbc') && backup.includes("backup/*.enc") && backup.includes('retention-days: 30'));
 ok('Rollback Cloudflare está versionado', rollback.includes('wrangler rollback') && rollback.includes('/__finobra/health'));
+ok('Build público bloqueia segredos de servidor', cloudflareBuild.includes('assertNoServerSecretsInPublicBundle') && cloudflareBuild.includes('DATABASE_OWNER_URL') && cloudflareBuild.includes('SESSION_SIGNING_SECRET') && cloudflareBuild.includes('PIX_WEBHOOK_SECRET') && cloudflareBuild.includes('RESEND_API_KEY') && cloudflareBuild.includes('Segredo de servidor detectado no bundle público'));
 const edgeBackup=read('api/_edge-backup.js');
 const edgeAlerts=read('api/_edge-alerts.js');
 const worker=read('cloudflare-worker.js');
