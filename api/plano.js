@@ -8,10 +8,10 @@ import { writeAudit } from './_audit.js';
 import { setEdgeCacheHeaders } from './_http.js';
 import webhookPixHandler from './_webhook_pix.js';
 import { createTenantSql } from './_tenant-sql.js';
+import { createRuntimeSql } from './_database.js';
 
 function getSql() {
-  if (!process.env.DATABASE_URL) throw new Error('DATABASE_URL não configurada.');
-  return neon(process.env.DATABASE_URL);
+  return createRuntimeSql();
 }
 
 function setCors(req, res) {
