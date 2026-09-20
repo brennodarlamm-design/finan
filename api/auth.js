@@ -1245,7 +1245,7 @@ export default async function handler(req, res) {
         const numFmt = destPhone.startsWith('55') ? destPhone : `55${destPhone}`;
         const mensagemOtp = `*FinGo — Código de Verificação*\n\nOlá, ${user.nome}!\n\nSeu código seguro para redefinir sua senha no FinGo é:\n\n👉 *${otpCode}*\n\nEste código é válido por *10 minutos*. Se você não solicitou esta redefinição, ignore esta mensagem.`;
         try {
-          await fetch('https://finan-wf12.onrender.com/send-message', {
+          const waResp = await fetch('https://finan-wf12.onrender.com/send-message', {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
@@ -1253,8 +1253,12 @@ export default async function handler(req, res) {
               'x-api-key': getInternalApiSecret(),
               'x-tenant-id': user.tenant_id
             },
-            body: JSON.stringify({ tenantId: user.tenant_id, phone: numFmt, message: mensagemOtp })
+            body: JSON.stringify({ tenantId: user.tenant_id, phone: numFmt, message: mensagemOtp }),
+            signal: AbortSignal.timeout(10000)
           });
+          if (!waResp.ok) {
+            console.warn('[Auth] OTP WhatsApp respondeu HTTP', waResp.status);
+          }
         } catch (errWa) {
           console.warn('[Auth] Falha ao enviar OTP por WhatsApp:', errWa?.message || errWa);
         }
@@ -1292,7 +1296,7 @@ export default async function handler(req, res) {
           }
 
           if (!dispatchedViaTrigger && resendKey) {
-            await fetch('https://api.resend.com/emails', {
+            const mailResp = await fetch('https://api.resend.com/emails', {
               method: 'POST',
               headers: {
                 'Authorization': `Bearer ${resendKey}`,
@@ -1303,8 +1307,12 @@ export default async function handler(req, res) {
                 to: [user.email],
                 subject: emailSubject,
                 html: emailHtml
-              })
+              }),
+              signal: AbortSignal.timeout(10000)
             });
+            if (!mailResp.ok) {
+              console.warn('[Auth] OTP e-mail respondeu HTTP', mailResp.status);
+            }
           }
         } catch (errMail) {
           console.warn('[Auth] Falha ao enviar OTP por e-mail:', errMail?.message || errMail);
