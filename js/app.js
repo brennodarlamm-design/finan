@@ -938,7 +938,8 @@ const App = {
           route: this.route || (this._getRouteFromUrl ? this._getRouteFromUrl() : 'unknown'),
           breadcrumbs: (this._breadcrumbs || []).slice(-10),
           viewport: `${window.innerWidth || 0}x${window.innerHeight || 0}`,
-          url: window.location.href,
+          // Nunca envia query string/hash para telemetria: podem conter códigos, tokens ou dados operacionais.
+          url: `${window.location.origin}${window.location.pathname}`,
           connection: navigator.connection?.effectiveType || '',
           online: navigator.onLine !== false
         };
