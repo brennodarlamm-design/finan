@@ -144,6 +144,8 @@ test('settlePixPayment possui checagem de idempotência para fatura já paga', (
 test('settlePixPayment executa renovação atômica em billing_invoices e tenants', (
   coreCode.includes("UPDATE billing_invoices") &&
   coreCode.includes("UPDATE tenants t") &&
+  coreCode.includes("JOIN tenants t ON t.id = bi.tenant_id") &&
+  coreCode.includes("FOR UPDATE OF bi, t") &&
   coreCode.includes("vencimento =")
 ));
 
@@ -158,7 +160,8 @@ test('settlePixPayment reconcilia PIX em trânsito sem bloquear reativação pos
 test('sendPaymentReceipt dispara comprovante via WhatsApp e E-mail', (
   coreCode.includes('/send-message') &&
   coreCode.includes('https://api.resend.com/emails') &&
-  coreCode.includes('Pagamento PIX Confirmado')
+  coreCode.includes('Pagamento PIX Confirmado') &&
+  coreCode.includes("results.email.via = 'trigger_dev';\n          return results;")
 ));
 
 // 6. Arquitetura Serverless e Rewrites Vercel (Hobby <= 12 functions)
