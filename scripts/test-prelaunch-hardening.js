@@ -46,7 +46,7 @@ const rollback=read('.github/workflows/cloudflare-rollback.yml');
 ok('Wrangler declara binding ATTACHMENTS_R2 persistente', wrangler.includes('"binding": "ATTACHMENTS_R2"') && wrangler.includes('"bucket_name": "fingo-attachments"'));
 ok('R2 falha fechado fora de testes quando binding está ausente', r2.includes('Binding ATTACHMENTS_R2 indisponível') && r2.includes('FINOBRA_ALLOW_MEMORY_STORAGE'));
 ok('R2 exige tenant explícito na geração da chave', r2.includes('tenantId válido é obrigatório para gerar chave no R2.'));
-ok('R2 não mascara falha remota de leitura ou exclusão', r2.includes('Falha ao consultar o armazenamento Cloudflare R2.') && r2.includes('Falha ao excluir o arquivo no armazenamento Cloudflare R2.'));
+ok('R2 não mascara falhas remotas de upload, leitura, exclusão ou listagem', r2.includes('Falha ao gravar o arquivo no armazenamento Cloudflare R2.') && r2.includes('Falha ao consultar o armazenamento Cloudflare R2.') && r2.includes('Falha ao excluir o arquivo no armazenamento Cloudflare R2.') && r2.includes('Falha ao listar arquivos no armazenamento Cloudflare R2.'));
 ok('Rotas R2 exigem autenticação e isolamento de tenant', routes.includes('resolveAuthAndTenant(req)') && routes.includes("canAccessModule(auth, 'documentos'") && routes.includes('expectedPrefix'));
 ok('Upload principal grava em R2 quando binding existe', upload.includes('r2Ready') && upload.includes("storage: 'cloudflare_r2'") && upload.includes('r2://'));
 ok('Vercel Blob ficou apenas como compatibilidade legada', upload.includes("storage: 'vercel_blob_legacy'"));
