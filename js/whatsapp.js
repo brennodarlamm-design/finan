@@ -1,6 +1,32 @@
 // js/whatsapp.js — Integração e Alertas de Boletos / Vencimentos no WhatsApp
 
 const WhatsApp = {
+  async _fetchWithTimeout(url, options = {}, timeoutMs = 18000) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    let externalAbortHandler = null;
+    try {
+      if (options.signal) {
+        if (options.signal.aborted) controller.abort();
+        else {
+          externalAbortHandler = () => controller.abort();
+          options.signal.addEventListener('abort', externalAbortHandler, { once: true });
+        }
+      }
+      return await this._fetchWithTimeout(url, { ...options, signal: controller.signal });
+    } catch (err) {
+      if (controller.signal.aborted && err?.name === 'AbortError') {
+        const timeoutError = new Error('A comunicação com o WhatsApp demorou mais que o esperado. Tente novamente.');
+        timeoutError.name = 'TimeoutError';
+        throw timeoutError;
+      }
+      throw err;
+    } finally {
+      clearTimeout(timer);
+      if (externalAbortHandler && options.signal) options.signal.removeEventListener('abort', externalAbortHandler);
+    }
+  },
+
   _prefKey(name) {
     return (typeof DB !== 'undefined' && DB._ck) ? DB._ck(name) : name;
   },
@@ -78,7 +104,7 @@ const WhatsApp = {
         ? Auth.getAuthHeaders()
         : { 'Content-Type': 'application/json' };
 
-      const resProxy = await fetch('/api/send-whatsapp', {
+      const resProxy = await this._fetchWithTimeout('/api/send-whatsapp', {
         method: 'POST',
         headers: authHeaders,
         body: JSON.stringify({
@@ -447,7 +473,7 @@ const WhatsApp = {
         ? Auth.getAuthHeaders()
         : { 'Content-Type': 'application/json' };
 
-      const res = await fetch('/api/whatsapp?action=session', {
+      const res = await this._fetchWithTimeout('/api/whatsapp?action=session', {
         method: 'GET',
         headers: headers
       });
@@ -698,7 +724,7 @@ const WhatsApp = {
         ? Auth.getAuthHeaders()
         : { 'Content-Type': 'application/json' };
 
-      await fetch('/api/whatsapp?action=disconnect', {
+      await this._fetchWithTimeout('/api/whatsapp?action=disconnect', {
         method: 'POST',
         headers: headers
       });
@@ -726,7 +752,7 @@ const WhatsApp = {
         ? Auth.getAuthHeaders()
         : { 'Content-Type': 'application/json' };
 
-      await fetch('/api/whatsapp?action=disconnect', {
+      await this._fetchWithTimeout('/api/whatsapp?action=disconnect', {
         method: 'POST',
         headers: headers
       });
@@ -759,7 +785,7 @@ const WhatsApp = {
         ? Auth.getAuthHeaders()
         : { 'Content-Type': 'application/json' };
 
-      const res = await fetch('/api/whatsapp?action=test', {
+      const res = await this._fetchWithTimeout('/api/whatsapp?action=test', {
         method: 'POST',
         headers: headers,
         body: JSON.stringify({
@@ -802,7 +828,7 @@ const WhatsApp = {
         ? Auth.getAuthHeaders()
         : { 'Content-Type': 'application/json' };
 
-      const res = await fetch('/api/whatsapp?action=test', {
+      const res = await this._fetchWithTimeout('/api/whatsapp?action=test', {
         method: 'POST',
         headers: headers,
         body: JSON.stringify({
@@ -993,7 +1019,7 @@ const WhatsApp = {
           ? Auth.getAuthHeaders()
           : { 'Content-Type': 'application/json' };
 
-        const res = await fetch('/api/whatsapp?action=test', {
+        const res = await this._fetchWithTimeout('/api/whatsapp?action=test', {
           method: 'POST',
           headers: headers,
           body: JSON.stringify({ phone: limpo, message })
@@ -1078,7 +1104,7 @@ const WhatsApp = {
               ? Auth.getAuthHeaders()
               : { 'Content-Type': 'application/json' };
 
-            const res = await fetch('/api/whatsapp?action=test', {
+            const res = await this._fetchWithTimeout('/api/whatsapp?action=test', {
               method: 'POST',
               headers: headers,
               body: JSON.stringify({ phone: limpo, message: msg })
