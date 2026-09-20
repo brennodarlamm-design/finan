@@ -179,6 +179,46 @@ button { font-family:inherit; }
   margin-left:auto;background:var(--danger);color:#fff;
   font-size:.63rem;font-weight:700;padding:2px 6px;border-radius:10px;min-width:18px;text-align:center;
 }
+.nav-fav-btn {
+  margin-left:auto;
+  padding:3px 5px;
+  font-size:.8rem;
+  line-height:1;
+  border-radius:4px;
+  opacity:0.28;
+  transition:opacity var(--t), transform .15s ease, filter .15s ease;
+  cursor:pointer;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  user-select:none;
+  flex-shrink:0;
+  min-width:22px;
+  min-height:22px;
+}
+.nav-badge + .nav-fav-btn {
+  margin-left:6px;
+}
+.nav-item:hover .nav-fav-btn {
+  opacity:0.7;
+}
+.nav-fav-btn:hover {
+  opacity:1 !important;
+  transform:scale(1.22);
+}
+.nav-fav-btn.is-fav {
+  opacity:1;
+  filter:drop-shadow(0 0 4px rgba(244,63,94,0.45));
+}
+.nav-item-pinned {
+  background:rgba(255,255,255,0.02);
+}
+.nav-item-pinned:hover {
+  background:var(--bg-secondary);
+}
+.nav-pinned-section {
+  animation:fadeIn .2s ease-in-out;
+}
 .sidebar-foot { padding:14px 16px;border-top:1px solid var(--border-s);flex-shrink:0; }
 .user-card {
   display:flex;align-items:center;gap:10px;

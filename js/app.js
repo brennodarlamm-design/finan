@@ -655,6 +655,88 @@ const App = {
     }
   },
 
+  _navItemsCatalog: {
+    'dashboard': { icon: '📊', label: 'Dashboard' },
+    'minhas-demandas': { icon: '👤', label: 'Minhas Demandas' },
+    'central-gestor': { icon: '🏢', label: 'Central do Gestor' },
+    'obras': { icon: '🏗️', label: 'Obras & Clientes' },
+    'medicoes': { icon: '🔨', label: 'Medições & Faturamento' },
+    'documentacao': { icon: '📁', label: 'Documentação de Obras' },
+    'portal-cliente': { icon: '🌐', label: 'Portal do Cliente' },
+    'lancamentos': { icon: '💰', label: 'Lançamentos' },
+    'escritorio': { icon: '🏢', label: 'Despesas Escritório' },
+    'contas-bancarias': { icon: '🏦', label: 'Contas Bancárias' },
+    'conciliacao-ofx': { icon: '🔄', label: 'Conciliação OFX' },
+    'recibos': { icon: '🧾', label: 'Recibos Oficiais' },
+    'pre-compras': { icon: '🛒', label: 'Pré-Compras' },
+    'contratos': { icon: '📜', label: 'Contratos de Obra' },
+    'fornecedores': { icon: '🚛', label: 'Fornecedores' },
+    'produtos': { icon: '📦', label: 'Produtos / Insumos' },
+    'notas-fiscais': { icon: '📄', label: 'Notas Fiscais' },
+    'consulta-nfe': { icon: '🔎', label: 'Busca NF-e' },
+    'orcamentos': { icon: '📋', label: 'Orçamentos' },
+    'relatorios': { icon: '📥', label: 'Exportar Relatórios' },
+    'planos': { icon: '💎', label: 'Planos & Mensalidades' },
+    'configuracoes': { icon: '⚙️', label: 'Configurações' }
+  },
+
+  getFavoriteRoutes() {
+    try {
+      const tenant = (typeof Auth !== 'undefined' && Auth.getTenantId) ? Auth.getTenantId() : (Auth?.getUser?.()?.tenant_id || 'default');
+      const raw = localStorage.getItem(`finobra_fav_routes_${tenant}`);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) return parsed.map(r => this._normalizeRoute(r));
+      }
+    } catch {}
+    return [];
+  },
+
+  isRouteFavorite(route) {
+    const norm = this._normalizeRoute(route);
+    return this.getFavoriteRoutes().includes(norm);
+  },
+
+  toggleFavorite(encodedRoute, ev) {
+    if (ev) {
+      if (typeof ev.stopPropagation === 'function') ev.stopPropagation();
+      if (typeof ev.preventDefault === 'function') ev.preventDefault();
+    }
+    const route = decodeURIComponent(encodedRoute || '');
+    const norm = this._normalizeRoute(route);
+    const tenant = (typeof Auth !== 'undefined' && Auth.getTenantId) ? Auth.getTenantId() : (Auth?.getUser?.()?.tenant_id || 'default');
+    let favs = this.getFavoriteRoutes();
+    const isAlreadyFav = favs.includes(norm);
+
+    if (isAlreadyFav) {
+      favs = favs.filter(r => r !== norm);
+      if (typeof Utils !== 'undefined' && Utils.toast) {
+        const itemInfo = this._navItemsCatalog[norm];
+        Utils.toast(`${itemInfo?.label || 'Módulo'} desafixado dos favoritos.`, 'info');
+      }
+    } else {
+      favs.push(norm);
+      if (typeof Utils !== 'undefined' && Utils.toast) {
+        const itemInfo = this._navItemsCatalog[norm];
+        Utils.toast(`⭐ ${itemInfo?.label || 'Módulo'} fixado no topo dos favoritos!`, 'success');
+      }
+    }
+
+    try {
+      localStorage.setItem(`finobra_fav_routes_${tenant}`, JSON.stringify(favs));
+    } catch {}
+
+    this.refreshSidebarNav();
+  },
+
+  refreshSidebarNav() {
+    const navEl = document.querySelector('.sidebar-nav');
+    if (!navEl) return;
+    const resumoPre = typeof DB !== 'undefined' && DB.getPreComprasResumo ? DB.getPreComprasResumo('todas') : { pendentesQtd: 0 };
+    const badgePre = resumoPre.pendentesQtd > 0 ? `<span class="nav-badge" style="background:#f59e0b;color:#182713;font-weight:900;" title="${resumoPre.pendentesQtd} pedido(s) pendente(s)">${resumoPre.pendentesQtd}</span>` : '';
+    navEl.innerHTML = this._renderSidebarNav(badgePre);
+  },
+
   _renderSidebarNav(badgePre) {
     const badgeDemandas = (() => {
       const cnt = typeof MinhasDemandas !== 'undefined' ? MinhasDemandas.getBadgeCount() : 0;
@@ -662,8 +744,39 @@ const App = {
     })();
 
     const activeRoute = this._normalizeRoute(this.route || this._getRouteFromUrl());
+    const favRoutes = this.getFavoriteRoutes();
 
-    return this._navSections.map(sec => {
+    // Seção de Fixados / Favoritos no topo da navegação
+    let pinnedSectionHtml = '';
+    if (favRoutes && favRoutes.length > 0) {
+      const validFavs = favRoutes.filter(r => {
+        if (!this._navItemsCatalog[r]) return false;
+        if (typeof Auth !== 'undefined' && Auth.canRoute && !Auth.canRoute(r, 'read')) return false;
+        return true;
+      });
+
+      if (validFavs.length > 0) {
+        const pinnedItemsHtml = validFavs.map(r => {
+          const info = this._navItemsCatalog[r];
+          const badge = r === 'minhas-demandas' ? badgeDemandas : (r === 'pre-compras' ? badgePre : '');
+          return this._navItem(r, info.icon, info.label, badge, true);
+        }).join('');
+
+        pinnedSectionHtml = `
+          <div class="nav-pinned-section" style="margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid rgba(255,255,255,0.08);">
+            <div class="nav-pinned-header" style="display:flex;align-items:center;justify-content:space-between;padding:4px 14px 6px;font-size:0.68rem;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:0.06em;">
+              <span style="display:flex;align-items:center;gap:5px;"><span>⭐</span> <span>Fixados</span></span>
+              <span style="font-size:0.65rem;background:rgba(255,255,255,0.06);padding:1px 6px;border-radius:999px;font-weight:600;">${validFavs.length}</span>
+            </div>
+            <div class="nav-pinned-items">
+              ${pinnedItemsHtml}
+            </div>
+          </div>
+        `;
+      }
+    }
+
+    const sectionsHtml = this._navSections.map(sec => {
       const isExpanded = this.isSectionExpanded(sec.id);
       const isCurrentInSec = sec.rotas.includes(activeRoute);
 
@@ -711,7 +824,7 @@ const App = {
           ${this._navItem('planos','💎','Planos & Mensalidades')}
           ${this._navItem('configuracoes','⚙️','Configurações')}
           <a href="/validar" target="_blank" class="nav-item" style="text-decoration:none;color:var(--accent2);margin-top:2px;border:1px dashed rgba(201,162,39,0.3);border-radius:6px;" title="Portal público para consultar autenticidade de documentos por código">
-            <span>🛡️</span><span>Validar Autenticidade ↗</span>
+            <span>🛡️</span><span style="flex:1;text-align:left;">Validar Autenticidade ↗</span>
           </a>
         `;
       }
@@ -737,6 +850,8 @@ const App = {
         </div>
       `;
     }).join('');
+
+    return pinnedSectionHtml + sectionsHtml;
   },
 
   _mobileNavigation() {
@@ -744,20 +859,26 @@ const App = {
     return `<nav class="mobile-workspace-nav" aria-label="Navegação principal">${items.filter(([route]) => !Auth.canRoute || Auth.canRoute(route,'read')).map(([route,label]) => `<button type="button" class="mobile-nav-item${this.route===route?' active':''}" data-route="${route}" data-fb-click="Patch26Actions.navigateCloseSidebar" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${route}">${FinObraUI.icon(route)}<span>${label}</span></button>`).join('')}<button type="button" class="mobile-nav-item" aria-label="Abrir menu completo" data-fb-click="App.toggleSidebar" data-fb-click-n="0">${FinObraUI.icon('menu')}<span>Menu</span></button></nav>`;
   },
 
-  _navItem(route, icon, label, badgeHtml = '') {
+  _navItem(route, icon, label, badgeHtml = '', isPinnedItem = false) {
     icon = FinObraUI.icon(route);
     const targetRoute = this._normalizeRoute(route);
     if (typeof Auth !== 'undefined' && Auth.canRoute && !Auth.canRoute(targetRoute, 'read')) {
       if (Auth.isPlanRouteLocked?.(targetRoute)) {
         return `<button type="button" class="nav-item" style="opacity:.72;border:1px dashed var(--border);" data-fb-click="Cobranca.showLockedModule" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(targetRoute))}" title="Disponível em outro plano">
-          <span>${icon}</span><span style="flex:1">${label}</span><span style="font-size:.68rem;color:var(--accent2)">🔒</span>
+          <span>${icon}</span><span style="flex:1;text-align:left;">${label}</span><span style="font-size:.68rem;color:var(--accent2)">🔒</span>
         </button>`;
       }
       return '';
     }
     const isAct = (this.route === targetRoute) || (this._normalizeRoute(this.route) === targetRoute);
-    return `<button type="button" class="nav-item${isAct?' active':''}" data-route="${targetRoute}" data-fb-click="Patch26Actions.navigateCloseSidebar" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(targetRoute))}">
-      <span>${icon}</span><span>${label}</span>${badgeHtml}
+    const isFav = this.isRouteFavorite(targetRoute);
+    const favTitle = isFav ? 'Desafixar dos favoritos' : 'Fixar no topo dos favoritos';
+
+    return `<button type="button" class="nav-item${isAct?' active':''}${isPinnedItem ? ' nav-item-pinned' : ''}" data-route="${targetRoute}" data-fb-click="Patch26Actions.navigateCloseSidebar" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(targetRoute))}">
+      <span>${icon}</span><span class="nav-label" style="flex:1;text-align:left;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${label}</span>${badgeHtml}
+      <span class="nav-fav-btn ${isFav ? 'is-fav' : ''}" data-fb-click="App.toggleFavorite" data-fb-click-n="2" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(targetRoute))}" data-fb-click-t1="event" title="${favTitle}" aria-label="${favTitle}" role="button" tabindex="0">
+        ${isFav ? '❤️' : '🤍'}
+      </span>
     </button>`;
   },
 
