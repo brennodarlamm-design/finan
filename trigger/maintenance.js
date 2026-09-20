@@ -161,6 +161,7 @@ export const dailySlaAudit = schedules.task({
               'Authorization': `Bearer ${resendKey}`,
               'Content-Type': 'application/json'
             },
+            signal: AbortSignal.timeout(15000),
             body: JSON.stringify({
               from: emailFrom,
               to: [info.email],
@@ -243,7 +244,8 @@ export const renderKeepAlive = schedules.task({
     const targetUrl = process.env.RENDER_HEALTH_URL || "https://finan-backend-9rxw.onrender.com/healthz";
     try {
       const res = await fetch(targetUrl, {
-        headers: { "User-Agent": "FinObra-KeepAlive/1.0 (Trigger.dev Robot)" }
+        headers: { "User-Agent": "FinObra-KeepAlive/1.0 (Trigger.dev Robot)" },
+        signal: AbortSignal.timeout(8000)
       });
       logger.info(`[Render Keep-Alive] Ping executado com status: ${res.status}`);
       return { ok: true, status: res.status, url: targetUrl };
