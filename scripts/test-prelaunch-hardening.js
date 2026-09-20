@@ -68,5 +68,30 @@ ok('Cobrança crítica usa timeout no navegador', billingClient.includes('async 
 const dataClient=read('js/data.js');
 ok('Sincronização DB usa timeout no navegador', dataClient.includes('async _fetchWithTimeout(') && dataClient.includes('timeoutMs = 25000') && (dataClient.match(/this\._fetchWithTimeout\(/g)||[]).length >= 16);
 
+const emailTask=read('trigger/email.js');
+ok('Resend transacional usa deadline explícito', emailTask.includes('RESEND_REQUEST_TIMEOUT_MS = 15000') && emailTask.includes('AbortSignal.timeout(RESEND_REQUEST_TIMEOUT_MS)'));
+
+const whatsappClient=read('js/whatsapp.js');
+ok('WhatsApp crítico usa timeout no navegador',
+  whatsappClient.includes('async _fetchWithTimeout(') &&
+  (whatsappClient.match(/this\._fetchWithTimeout\(/g)||[]).length >= 8 &&
+  whatsappClient.includes('return await fetch(url, { ...options, signal: controller.signal });') &&
+  !whatsappClient.includes('return await this._fetchWithTimeout(url, { ...options, signal: controller.signal });'));
+
+const nfeClient=read('js/nfe.js');
+ok('NF-e e certificado usam timeout no navegador',
+  nfeClient.includes('async _fetchWithTimeout(') &&
+  (nfeClient.match(/this\._fetchWithTimeout\(/g)||[]).length >= 10 &&
+  nfeClient.includes('return await fetch(url, { ...options, signal: controller.signal });') &&
+  !nfeClient.includes('return await this._fetchWithTimeout(url, { ...options, signal: controller.signal });'));
+
+const ocrClient=read('js/ocr.js');
+ok('OCR usa timeout no navegador',
+  ocrClient.includes('async _fetchWithTimeout(') &&
+  (ocrClient.match(/this\._fetchWithTimeout\(/g)||[]).length >= 2 &&
+  ocrClient.includes("this._fetchWithTimeout('/api/db?table=ocr_historico', { headers }, 15000)") &&
+  ocrClient.includes('return await fetch(url, { ...options, signal: controller.signal });') &&
+  !ocrClient.includes('return await this._fetchWithTimeout(url, { ...options, signal: controller.signal });'));
+
 if(process.exitCode) process.exit(process.exitCode);
 console.log('\n✅ Hardening pré-lançamento protegido por regressão estática.');
