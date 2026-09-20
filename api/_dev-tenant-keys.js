@@ -6,11 +6,10 @@ import { neon } from '@neondatabase/serverless';
 import { resolveAuthAndTenant, getInternalApiSecret } from './_auth.js';
 import { generateTenantAccessKey, hashTenantAccessKey, hashTenantAccessKeyLegacy, tenantAccessKeyLast4 } from './_tenant-access-key.js';
 import { writeAudit } from './_audit.js';
+import { createOwnerSql } from './_database.js';
 
 function getSql() {
-  const conn = String(process.env.DATABASE_URL || '').trim();
-  if (!conn) throw new Error('DATABASE_URL não configurada.');
-  return neon(conn);
+  return createOwnerSql();
 }
 
 function deriveVaultKey() {
