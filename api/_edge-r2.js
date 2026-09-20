@@ -7,8 +7,12 @@ const memoryStorage = new Map();
  * Gera caminho canônico e seguro no bucket R2 com isolamento multi-tenant.
  */
 export function buildR2ObjectKey(tenantId, category, filename) {
-  const normTenant = String(tenantId || 'general').trim().replace(/[^a-zA-Z0-9_-]/g, '');
-  const normCat = String(category || 'docs').trim().replace(/[^a-zA-Z0-9_-]/g, '');
+  const rawTenant = String(tenantId || '').trim();
+  const normTenant = rawTenant.replace(/[^a-zA-Z0-9_-]/g, '');
+  if (!rawTenant || !normTenant) {
+    throw new Error('tenantId válido é obrigatório para gerar chave no R2.');
+  }
+  const normCat = String(category || 'docs').trim().replace(/[^a-zA-Z0-9_-]/g, '') || 'docs';
   const cleanName = String(filename || 'arquivo.bin').trim().replace(/[^a-zA-Z0-9_.-]/g, '_');
   const timestamp = Date.now();
   const rand = Math.random().toString(36).substring(2, 8);
@@ -85,7 +89,8 @@ export async function getR2Object(env, key) {
         };
       }
     } catch (err) {
-      console.warn('[FinGo Edge R2] Erro ao recuperar do R2 remoto:', err?.message || err);
+      console.error('[FinGo Edge R2] Falha ao recuperar objeto persistente:', err?.message || err);
+      throw new Error('Falha ao consultar o armazenamento Cloudflare R2.');
     }
   }
 
@@ -114,12 +119,12 @@ export async function deleteR2Object(env, key) {
   if (env && env.ATTACHMENTS_R2 && typeof env.ATTACHMENTS_R2.delete === 'function') {
     try {
       await env.ATTACHMENTS_R2.delete(key);
+      return true;
     } catch (err) {
-      console.warn('[FinGo Edge R2] Erro ao deletar no R2 remoto:', err?.message || err);
+      console.error('[FinGo Edge R2] Falha ao excluir objeto persistente:', err?.message || err);
+      throw new Error('Falha ao excluir o arquivo no armazenamento Cloudflare R2.');
     }
   }
-
-  if (env && env.ATTACHMENTS_R2 && typeof env.ATTACHMENTS_R2.delete === 'function') return true;
   if (String(env?.FINOBRA_ALLOW_MEMORY_STORAGE || '') === 'true') {
     memoryStorage.delete(key);
     return true;
