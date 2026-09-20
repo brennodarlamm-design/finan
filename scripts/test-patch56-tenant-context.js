@@ -32,7 +32,7 @@ function makeFakeNeon() {
     const queries = typeof builder === 'function' ? builder(txn) : builder;
     calls.push(queries);
     return queries.map((query, index) => index === 0
-      ? [{ tenant_context: query.values?.[0] || '', system_context: query.values?.[1] || 'false' }]
+      ? [{ tenant_context: query.values?.[0] || '' }]
       : [{ ok: true, query }]);
   };
 
@@ -45,7 +45,6 @@ const sql = createTenantSql(fake.baseSql, { tenantId });
 
 assert.strictEqual(isTenantScopedSql(sql), true, 'Wrapper deve ser marcado como tenant-scoped.');
 assert.strictEqual(sql.tenantId, tenantId, 'Tenant normalizado deve ficar disponível para diagnóstico.');
-assert.strictEqual(sql.isSystem, false, 'Tenant comum nunca pode nascer como system.');
 
 const result = await sql`SELECT id FROM obras WHERE tenant_id = ${tenantId} LIMIT 1;`;
 assert.strictEqual(result.length, 1);
@@ -55,9 +54,7 @@ assert.strictEqual(fake.calls[0].length, 2, 'Transação deve conter contexto + 
 const contextQuery = fake.calls[0][0];
 const userQuery = fake.calls[0][1];
 assert(contextQuery.text.includes("set_config('app.current_tenant_id'"), 'Contexto deve definir app.current_tenant_id.');
-assert(contextQuery.text.includes("set_config('app.is_system'"), 'Contexto deve definir app.is_system.');
 assert.strictEqual(contextQuery.values[0], tenantId, 'Tenant deve ser bind parameter, nunca interpolado em SQL bruto.');
-assert.strictEqual(contextQuery.values[1], 'false', 'Tenant comum deve usar app.is_system=false.');
 assert.strictEqual(userQuery.values[0], tenantId, 'Parâmetros da query original devem ser preservados.');
 
 const txResult = await sql.transaction(tx => [
@@ -73,11 +70,11 @@ assert.throws(
   'Acesso comum sem tenant deve falhar fechado.'
 );
 
-const systemFake = makeFakeNeon();
-const systemSql = createTenantSql(systemFake.baseSql, { isSystem: true });
-await systemSql`SELECT 1;`;
-assert.strictEqual(systemFake.calls[0][0].values[0], '', 'Contexto system pode operar sem tenant específico.');
-assert.strictEqual(systemFake.calls[0][0].values[1], 'true', 'Contexto system precisa ser explícito.');
+assert.throws(
+  () => createTenantSql(fake.baseSql, { isSystem: true }),
+  /Contexto tenant obrigatório/,
+  'isSystem nunca pode criar bypass sem tenant.'
+);
 
 await assert.rejects(
   async () => sql('SELECT 1'),
@@ -87,7 +84,7 @@ await assert.rejects(
 
 const helperSource = read('api/_tenant-sql.js');
 assert(helperSource.includes("set_config('app.current_tenant_id'"));
-assert(helperSource.includes("set_config('app.is_system'"));
+assert(!helperSource.includes("set_config('app.is_system'"), 'Wrapper tenant não pode manter bypass app.is_system.');
 assert(helperSource.includes('true) AS tenant_context'), 'set_config precisa ser transaction-local (SET LOCAL sem vazamento).');
 assert(!helperSource.includes('SET app.current_tenant_id ='), 'Não deve depender de SET persistente de sessão no Neon HTTP.');
 
@@ -96,21 +93,21 @@ assert(!helperSource.includes('SET app.current_tenant_id ='), 'Não deve depende
 const dbSource = read('api/db.js');
 assert(dbSource.includes("import { createTenantSql } from './_tenant-sql.js';"), 'api/db.js deve importar createTenantSql.');
 assert(dbSource.includes('const baseSql = getSql();'), 'api/db.js deve separar cliente base do cliente tenant-scoped.');
-assert(dbSource.includes('createTenantSql(baseSql, { tenantId, isSystem: Boolean(auth.isSystem) })'), 'api/db.js deve criar contexto a partir do tenant autenticado.');
+assert(dbSource.includes('createTenantSql(baseSql, { tenantId })'), 'api/db.js deve criar contexto a partir do tenant autenticado.');
 assert(!dbSource.includes('const sql = getSql();'), 'api/db.js não pode mais expor cliente SQL sem contexto após autenticação.');
 
 const dashboardSource = read('api/dashboard.js');
 assert(dashboardSource.includes("import { createTenantSql } from './_tenant-sql.js';"), 'dashboard deve importar createTenantSql.');
-assert(dashboardSource.includes('createTenantSql(getSql(), { tenantId: auth.tenantId, isSystem: auth.isSystem === true })'), 'dashboard deve usar contexto do tenant autenticado.');
+assert(dashboardSource.includes('createTenantSql(getSql(), { tenantId: auth.tenantId })'), 'dashboard deve usar contexto do tenant autenticado.');
 
 const uploadSource = read('api/upload.js');
 assert(uploadSource.includes("import { createTenantSql } from './_tenant-sql.js';"), 'upload deve importar createTenantSql.');
-assert(uploadSource.includes('createTenantSql(getSql(), { tenantId, isSystem: auth.isSystem === true })'), 'upload deve escopar metadados de documentos ao tenant.');
+assert(uploadSource.includes('createTenantSql(getSql(), { tenantId })'), 'upload deve escopar metadados de documentos ao tenant.');
 assert(!uploadSource.includes('const sql = getSql();'), 'upload não deve abrir cliente SQL sem contexto dentro de GET/DELETE.');
 
 const workflowSource = read('api/_workflow.js');
 assert(workflowSource.includes("import { createTenantSql } from './_tenant-sql.js';"), 'workflow deve importar createTenantSql.');
-assert(workflowSource.includes('sql=createTenantSql(sqlClient(),{tenantId:t,isSystem:auth.isSystem===true})'), 'workflow deve operar dentro do contexto RLS do tenant.');
+assert(workflowSource.includes('sql=createTenantSql(sqlClient(),{tenantId:t})'), 'workflow deve operar dentro do contexto RLS do tenant.');
 
 const querySource = read('api/_db-queries.js');
 assert(querySource.includes('WHERE tenant_id = ${tenantId}'), 'Filtros tenant explícitos devem permanecer como defesa em profundidade.');
