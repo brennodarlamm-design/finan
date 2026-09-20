@@ -87,7 +87,13 @@ function inPageChecks() {
   }
 
   // 4. Focus visibility (sample of focusables)
-  const focusables = [...document.querySelectorAll('a[href],button,input,select,textarea,[tabindex]:not([tabindex="-1"])')].slice(0, 25);
+  const focusables = [...document.querySelectorAll('a[href],button,input,select,textarea,summary,[tabindex]:not([tabindex="-1"])')]
+    .filter((el) => {
+      const r = el.getBoundingClientRect();
+      const s = getComputedStyle(el);
+      return r.width > 0 && r.height > 0 && s.visibility !== 'hidden' && s.display !== 'none' && !el.disabled;
+    })
+    .slice(0, 25);
   let noFocus = 0;
   for (const el of focusables) {
     el.focus();
