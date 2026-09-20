@@ -68,7 +68,7 @@ self.addEventListener('fetch', (event) => {
       caches.open(CACHE_NAME).then(async (cache) => {
         const cachedResponse = await cache.match(event.request);
         try {
-          const networkResponse = await fetch(event.request);
+          const networkResponse = await fetch(event.request, { signal: AbortSignal.timeout(12000) });
           if (networkResponse && (networkResponse.status === 200 || networkResponse.type === 'opaque')) {
             cache.put(event.request, networkResponse.clone()).catch(() => {});
           }
@@ -86,7 +86,7 @@ self.addEventListener('fetch', (event) => {
   event.respondWith(
     (async () => {
       try {
-        const networkResponse = await fetch(event.request);
+        const networkResponse = await fetch(event.request, { signal: AbortSignal.timeout(15000) });
         if (networkResponse && (networkResponse.status === 200 || networkResponse.type === 'opaque')) {
           const resClone = networkResponse.clone();
           caches.open(CACHE_NAME).then((cache) => cache.put(event.request, resClone).catch(() => {}));
