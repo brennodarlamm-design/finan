@@ -456,14 +456,14 @@ const Auth = {
   },
 
   async listSessions() {
-    const res = await fetch('/api/auth?action=sessions', { headers:this.getAuthHeaders() });
+    const res = await this._fetchWithTimeout('/api/auth?action=sessions', { headers:this.getAuthHeaders() });
     const data = await res.json().catch(() => ({}));
     if (!res.ok || !data.success) throw new Error(data.error || 'Não foi possível carregar as sessões.');
     return data;
   },
 
   async revokeSession(sessionId) {
-    const res = await fetch('/api/auth?action=revoke_session', { method:'POST', headers:this.getAuthHeaders(), body:JSON.stringify({ sessionId }) });
+    const res = await this._fetchWithTimeout('/api/auth?action=revoke_session', { method:'POST', headers:this.getAuthHeaders(), body:JSON.stringify({ sessionId }) });
     const data = await res.json().catch(() => ({}));
     if (!res.ok || !data.success) throw new Error(data.error || 'Não foi possível encerrar a sessão.');
     if (data.currentRevoked) this.handleSessionExpired();
@@ -471,7 +471,7 @@ const Auth = {
   },
 
   async revokeOtherSessions() {
-    const res = await fetch('/api/auth?action=revoke_other_sessions', { method:'POST', headers:this.getAuthHeaders(), body:'{}' });
+    const res = await this._fetchWithTimeout('/api/auth?action=revoke_other_sessions', { method:'POST', headers:this.getAuthHeaders(), body:'{}' });
     const data = await res.json().catch(() => ({}));
     if (!res.ok || !data.success) throw new Error(data.error || 'Não foi possível encerrar as outras sessões.');
     return data;
@@ -618,7 +618,7 @@ const Auth = {
     try { backup = JSON.parse(sessionStorage.getItem(this.IMPERSONATION_BACKUP_KEY) || 'null'); } catch {}
 
     try {
-      const res = await fetch('/api/admin?action=restore_master_session', {
+      const res = await this._fetchWithTimeout('/api/admin?action=restore_master_session', {
         method:'POST',
         headers:this.getAuthHeaders(),
         body:JSON.stringify({ tenantId:current.tenantId })
