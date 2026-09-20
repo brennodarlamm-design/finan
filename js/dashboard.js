@@ -599,7 +599,7 @@ const Dashboard = {
   async _loadCloudSnapshot(obraId) {
     if (typeof Auth === 'undefined' || !Auth.getAuthHeaders) return;
     const q = obraId && obraId !== 'todas' ? `?obra_id=${encodeURIComponent(obraId)}` : '';
-    const res = await fetch('/api/dashboard' + q, { headers: Auth.getAuthHeaders() });
+    const res = await fetch('/api/dashboard' + q, { headers: Auth.getAuthHeaders(), signal: AbortSignal.timeout(15000) });
     const json = await res.json().catch(() => ({}));
     if (!res.ok || !json.success || !json.snapshot) return;
     const d = json.snapshot;
