@@ -1,6 +1,5 @@
 // api/upload.js — Upload e gerenciamento de documentos com Cloudflare R2 e compatibilidade legada Vercel Blob
-import { put, del, issueSignedToken, presignUrl } from '@vercel/blob';
-import { handleUpload } from '@vercel/blob/client';
+import { del, issueSignedToken, presignUrl } from '@vercel/blob';
 import { neon } from '@neondatabase/serverless';
 import { resolveAuthAndTenant } from './_auth.js';
 import { canWriteData, canDeleteData, canAccessModule, permissionError } from './_permissions.js';
@@ -49,7 +48,7 @@ function setCors(req, res) {
   const origin = req.headers.origin;
   res.setHeader('Vary', 'Origin');
   if (origin) {
-    const isAllowed = ALLOWED_ORIGINS.includes(origin) || /^https:\/\/finan-as(?:-[a-z0-9-]+)?\.vercel\.app$/i.test(origin);
+    const isAllowed = ALLOWED_ORIGINS.includes(origin);
     if (isAllowed) {
       res.setHeader('Access-Control-Allow-Origin', origin);
       res.setHeader('Access-Control-Allow-Credentials', 'true');
@@ -83,16 +82,16 @@ export default async function handler(req, res) {
   if (req.method === 'POST' && !canWriteData(auth)) return res.status(403).json(permissionError('ROLE_READ_ONLY'));
   if (req.method === 'DELETE' && !canDeleteData(auth)) return res.status(403).json(permissionError('ROLE_DELETE_FORBIDDEN'));
   const r2Ready = Boolean(req.env?.ATTACHMENTS_R2 && typeof req.env.ATTACHMENTS_R2.put === 'function');
-  const privateBlobReady = Boolean(String(process.env.FINOBRA_BLOB_READ_WRITE_TOKEN || process.env.BLOB_READ_WRITE_TOKEN || '').trim() || String(process.env.FINOBRA_BLOB_STORE_ID || '').trim());
-  const configuredAccess = String(process.env.FINOBRA_BLOB_ACCESS || process.env.BLOB_ACCESS || (privateBlobReady ? 'private' : 'public')).trim().toLowerCase();
 
-  if (!r2Ready && configuredAccess === 'private' && !privateBlobReady && req.method === 'POST') {
-    return res.status(500).json({
+  // Após a migração para Cloudflare, novos uploads nunca podem cair no Vercel Blob.
+  // Leitura/exclusão de blobs antigos continua suportada apenas durante a migração.
+  if (req.method === 'POST' && !r2Ready) {
+    return res.status(503).json({
       success: false,
-      error: 'Armazenamento privado seguro não está pronto no servidor. Upload bloqueado por segurança (fail-closed).'
+      code: 'R2_STORAGE_UNAVAILABLE',
+      error: 'Armazenamento Cloudflare R2 indisponível. O upload foi bloqueado sem fallback para storage legado.'
     });
   }
-  const blobAccess = configuredAccess === 'private' && privateBlobReady ? 'private' : 'public';
 
   // ── GET: URL temporária para leitura de documento privado ───────────────────
   if (req.method === 'GET') {
@@ -239,54 +238,13 @@ export default async function handler(req, res) {
   }
 
   try {
-    // A. Suporte a Client-side Upload token (@vercel/blob/client handleUpload).
-    // O fluxo legado é mantido apenas para store público. Em modo privado, o app atual
-    // usa upload server-side para não gerar acidentalmente um token de store público.
+    // Tokens de upload direto do Vercel Blob foram desativados.
     if (req.body && req.body.type === 'blob.generate-client-token') {
-      if (r2Ready) {
-        return res.status(409).json({
-          success: false,
-          code: 'R2_DIRECT_UPLOAD_ONLY',
-          error: 'O FinGo usa Cloudflare R2. Envie o arquivo pelo fluxo autenticado do aplicativo.'
-        });
-      }
-      if (blobAccess === 'private') {
-        return res.status(409).json({
-          success: false,
-          code: 'PRIVATE_BLOB_DIRECT_UPLOAD_ONLY',
-          error: 'Upload privado deve usar o fluxo autenticado do FinGo.'
-        });
-      }
-      const jsonResponse = await handleUpload({
-        body: req.body,
-        request: req,
-        onBeforeGenerateToken: async (pathname) => {
-          const now = new Date();
-          const ano = now.getFullYear();
-          const mes = String(now.getMonth() + 1).padStart(2, '0');
-          const cleanName = (pathname || 'documento').replace(/[^a-zA-Z0-9._-]/g, '_');
-          const targetPath = `${tenantId}/documentos/${ano}/${mes}/${Date.now()}_${cleanName}`;
-
-          return {
-            allowedContentTypes: [
-              'application/pdf',
-              'image/jpeg', 'image/png', 'image/webp', 'image/gif',
-              'application/zip', 'application/x-zip-compressed', 'application/x-rar-compressed', 'application/x-7z-compressed',
-              'application/acad', 'application/x-acad', 'image/vnd.dwg', 'image/vnd.dxf',
-              'application/x-step', 'model/ifc', 'model/obj', 'model/gltf+json', 'model/gltf-binary',
-              'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-              'application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-              'text/plain', 'text/csv', 'application/xml', 'text/xml'
-            ],
-            maximumSizeInBytes: 15 * 1024 * 1024, // 15 MB
-            tokenPayload: JSON.stringify({ tenantId, targetPath })
-          };
-        },
-        onUploadCompleted: async ({ blob, tokenPayload }) => {
-          console.log(`[Blob] Upload concluído para ${blob.url} (tenant: ${tokenPayload})`);
-        }
+      return res.status(409).json({
+        success: false,
+        code: 'R2_DIRECT_UPLOAD_ONLY',
+        error: 'O FinGo usa Cloudflare R2. Envie o arquivo pelo fluxo autenticado do aplicativo.'
       });
-      return res.status(200).json(jsonResponse);
     }
 
     // B. Upload Direto via Payload JSON (base64)
@@ -470,46 +428,23 @@ export default async function handler(req, res) {
 
     const safeFilename = filename.replace(/[^a-zA-Z0-9._-]/g, '_');
 
-    if (r2Ready) {
-      const objectKey = buildR2ObjectKey(tenantId, 'documentos', safeFilename);
-      const stored = await putR2Object(req.env, objectKey, buffer, {
-        contentType: cleanMime,
-        customMetadata: {
-          tenantId,
-          category: 'documentos',
-          originalName: filename
-        }
-      });
-      return res.status(200).json({
-        success: true,
-        url: `r2://${stored.key}`,
-        pathname: stored.key,
-        size: stored.size,
-        contentType: cleanMime,
-        access: 'private',
-        storage: 'cloudflare_r2'
-      });
-    }
-
-    // Fallback temporário somente para objetos legados enquanto o upstream Node ainda existir.
-    const now = new Date();
-    const ano = now.getFullYear();
-    const mes = String(now.getMonth() + 1).padStart(2, '0');
-    const pathname = `${tenantId}/documentos/${ano}/${mes}/${Date.now()}_${safeFilename}`;
-    const blob = await put(pathname, buffer, {
-      ...(blobAccess === 'private' ? getPrivateBlobOptions() : {}),
-      access: blobAccess,
-      contentType: cleanMime
+    const objectKey = buildR2ObjectKey(tenantId, 'documentos', safeFilename);
+    const stored = await putR2Object(req.env, objectKey, buffer, {
+      contentType: cleanMime,
+      customMetadata: {
+        tenantId,
+        category: 'documentos',
+        originalName: filename
+      }
     });
-
     return res.status(200).json({
       success: true,
-      url: blob.url,
-      pathname: blob.pathname,
-      size: buffer.length,
-      contentType: blob.contentType,
-      access: blobAccess,
-      storage: 'vercel_blob_legacy'
+      url: `r2://${stored.key}`,
+      pathname: stored.key,
+      size: stored.size,
+      contentType: cleanMime,
+      access: 'private',
+      storage: 'cloudflare_r2'
     });
 
   } catch (err) {
