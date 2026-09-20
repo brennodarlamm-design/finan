@@ -52,6 +52,7 @@ if (window.location.hash.startsWith('#validar') || window.location.search.includ
       const resp = await fetch('/api/auth?action=register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        signal: AbortSignal.timeout(15000),
         body: JSON.stringify({ nome, email, telefone: whats, empresaNome: empNome, cnpj, mensagem: msg })
       });
       const data = await resp.json().catch(() => ({}));
