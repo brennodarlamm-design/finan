@@ -57,7 +57,7 @@ ok('Cancelamento de assinatura é atômico entre faturas e tenant', plano.includ
 ok('Cancelamento encerra acesso ao fim do período', auth.includes("tenant_status === 'cancelamento_agendado'") && authApi.includes("tenant_status === 'cancelamento_agendado'"));
 ok('Cancelamento vencido é materializado como cancelado', auth.includes("SET status='cancelado'") && auth.includes('vencimento < CURRENT_DATE') && authApi.includes("SET status='cancelado'") && authApi.includes('vencimento < CURRENT_DATE'));
 const pixCore=read('api/_webhook_pix_core.js');
-ok('PIX confirmado em trânsito não perde crédito por cancelamento concorrente', pixCore.includes("status IN ('pending', 'expired', 'canceled')") && pixCore.includes("WHEN t.status = 'cancelamento_agendado' THEN 'cancelamento_agendado'"));
+ok('PIX concorrente preserva crédito e distingue reativação posterior', pixCore.includes('WITH candidate AS') && pixCore.includes('FOR UPDATE') && pixCore.includes("status IN ('pending', 'expired', 'canceled')") && pixCore.includes('candidate.prior_status') && pixCore.includes("t.status = 'cancelamento_agendado' AND paid.prior_status = 'canceled'"));
 ok('Conta expõe ação de cancelamento', cobranca.includes('cancelarAssinatura()') && cobranca.includes('Cancelar renovação'));
 ok('Recuperação de senha usa timeout em canais externos', (authApi.match(/AbortSignal\.timeout\(10000\)/g)||[]).length >= 2);
 ok('Telemetria não envia query string/hash', app.includes('window.location.origin') && app.includes('window.location.pathname') && !app.includes('url: window.location.href'));
