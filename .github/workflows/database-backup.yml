@@ -17,15 +17,15 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     env:
-      DATABASE_URL_UNPOOLED: ${{ secrets.DATABASE_URL_UNPOOLED }}
+      DATABASE_BACKUP_URL: ${{ secrets.DATABASE_OWNER_URL_UNPOOLED || secrets.DATABASE_URL_UNPOOLED }}
       BACKUP_ENCRYPTION_PASSPHRASE: ${{ secrets.BACKUP_ENCRYPTION_PASSPHRASE }}
     steps:
       - name: Validate backup secrets
         shell: bash
         run: |
           set -euo pipefail
-          if [[ -z "${DATABASE_URL_UNPOOLED:-}" ]]; then
-            echo "::error::Configure the repository secret DATABASE_URL_UNPOOLED with the Neon direct connection string."
+          if [[ -z "${DATABASE_BACKUP_URL:-}" ]]; then
+            echo "::error::Configure DATABASE_OWNER_URL_UNPOOLED (preferred) or DATABASE_URL_UNPOOLED with the Neon direct owner connection string."
             exit 1
           fi
           if [[ -z "${BACKUP_ENCRYPTION_PASSPHRASE:-}" ]]; then
@@ -43,6 +43,17 @@ jobs:
           sudo apt-get update -y
           sudo apt-get install -y postgresql-client
 
+      - name: Verify backup role can bypass RLS
+        shell: bash
+        run: |
+          set -euo pipefail
+          role_info="$(psql "$DATABASE_BACKUP_URL" -Atc "SELECT current_user || '|' || rolsuper::text || '|' || rolbypassrls::text FROM pg_roles WHERE rolname = current_user;")"
+          IFS='|' read -r role_name role_super role_bypass <<< "$role_info"
+          echo "Backup connection role: $role_name"
+          if [[ "$role_super" != "true" && "$role_bypass" != "true" ]]; then
+            echo "::error::Backup connection role '$role_name' cannot bypass RLS. Refusing to create a potentially incomplete production backup."
+            exit 1
+          fi
       - name: Create and encrypt logical backup
         shell: bash
         run: |
@@ -53,7 +64,7 @@ jobs:
           dump="backup/plain/${base}.dump"
 
           pg_dump \
-            --dbname="$DATABASE_URL_UNPOOLED" \
+            --dbname="$DATABASE_BACKUP_URL" \
             --format=custom \
             --no-owner \
             --no-privileges \
@@ -88,7 +99,15 @@ jobs:
           dump_file="$(find "$verify_dir/extracted" -maxdepth 1 -name '*.dump' -type f -print -quit)"
           test -n "$dump_file"
           test -s "$dump_file"
-          pg_restore --list "$dump_file" >/dev/null
+          pg_restore --list "$dump_file" > "$verify_dir/manifest.txt"
+
+          for critical_table in tenants usuarios obras lancamentos billing_invoices; do
+            if ! grep -Eq "TABLE DATA .* ${critical_table}( |$)" "$verify_dir/manifest.txt"; then
+              echo "::error::Critical table '$critical_table' is missing from the logical backup manifest."
+              exit 1
+            fi
+          done
+
           rm -rf "$verify_dir"
 
       - name: Assert no plaintext database dump will be uploaded
