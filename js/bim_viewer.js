@@ -70,10 +70,10 @@ const BIMViewer = {
     if (!container) return;
 
     const obra = (typeof DB !== 'undefined' && DB.getById('clientes', obraId)) || {
-      nome: 'Mansão Villa Aurora',
-      area_construida: 480,
-      pavimentos: 2,
-      padrao: 'Alto Padrão'
+      nome: 'Obra Cadastrada',
+      area_construida: 120,
+      pavimentos: 1,
+      padrao: 'Médio Padrão'
     };
     const snapshot = this._getOperationalSnapshot(obraId);
     this.financialSnapshot = snapshot;
@@ -93,7 +93,7 @@ const BIMViewer = {
                 <span style="font-size:.92rem;font-weight:900;color:#F0EAD6;letter-spacing:-.02em;">ESTAÇÃO 3D BIM &amp; ENGENHARIA</span>
                 <span style="background:rgba(198,255,0,0.15);color:#C6FF00;border:1px solid rgba(198,255,0,0.4);font-size:.60rem;font-weight:900;padding:2px 6px;border-radius:4px;text-transform:uppercase;letter-spacing:.05em;">Pro Workstation</span>
               </div>
-              <div style="font-size:.74rem;color:#94A3B8;margin-top:2px;">${Utils.escapeHtml(obra.nome || 'Obra')} &middot; ${obra.area_construida || 480} m² &middot; ${obra.pavimentos || 2} pavimentos</div>
+              <div style="font-size:.74rem;color:#94A3B8;margin-top:2px;">${Utils.escapeHtml(obra.nome || 'Obra')} &middot; ${obra.area_construida || 120} m² &middot; ${obra.pavimentos || 1} pavimentos</div>
             </div>
           </div>
 
@@ -102,7 +102,8 @@ const BIMViewer = {
             <div style="display:flex;align-items:center;background:#142210;border:1px solid #243518;border-radius:6px;padding:2px 6px;">
               <span style="font-size:.65rem;color:#94A3B8;margin-right:6px;font-weight:700;">PROJETO:</span>
               <select id="bim-model-preset-select" title="Seletor de Modelos BIM e Projetos de Exemplo" style="background:transparent;color:#C6FF00;border:none;font-size:.70rem;font-weight:800;outline:none;cursor:pointer;">
-                <option value="sobrado_procedural">🏡 Mansão Alto Padrão 480 m² (R$ 1.000.000 — Completa com Todas as Infraestruturas)</option>
+                <option value="obra_atual" selected>🏗️ Modelo da Obra (${Utils.escapeHtml(obra.nome || 'Obra')} · ${obra.area_construida || 120} m²)</option>
+                <option value="sobrado_procedural">🏡 Exemplo: Mansão Alto Padrão 480 m² (Demonstração)</option>
                 <option value="ifc4_structural">🏗️ Estrutura de Concreto Armado (IFC4)</option>
                 <option value="ifc4_hvac">🧊 Instalações MEP &amp; HVAC Climatização (IFC4)</option>
                 <option value="ifc4_architecture">🏛️ Arquitetura buildingSMART (IFC4)</option>
@@ -172,7 +173,7 @@ const BIMViewer = {
             <!-- Breadcrumb Header no Topo do Viewport -->
             <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 14px;background:rgba(10,17,8,0.85);backdrop-filter:blur(8px);border-bottom:1px solid rgba(36,53,24,0.6);z-index:2;">
               <div style="font-family:monospace;font-size:.66rem;font-weight:700;color:#94A3B8;letter-spacing:.04em;display:flex;align-items:center;gap:6px;">
-                <span style="color:#C6FF00;">PROJECT:</span> ${Utils.escapeHtml((obra.nome || 'MANSÃO').toUpperCase())} &middot; <span style="color:#38BDF8;">480 SQM</span> &middot; <span id="bim-viewport-cam-label" style="color:#F0EAD6;">VIEWPORT: ISOMETRIC - NW</span>
+                <span style="color:#C6FF00;">PROJECT:</span> ${Utils.escapeHtml((obra.nome || 'OBRA').toUpperCase())} &middot; <span style="color:#38BDF8;">${Math.round(obra.area_construida || 120)} SQM</span> &middot; <span id="bim-viewport-cam-label" style="color:#F0EAD6;">VIEWPORT: ISOMETRIC - NW</span>
               </div>
               <div style="display:flex;align-items:center;gap:6px;">
                 <button type="button" class="bim-view-btn" data-action="toggleExpanded" title="Expandir Tela Cheia" style="padding:3px 8px;font-size:.68rem;border:1px solid #243518;background:#142210;color:#C6FF00;border-radius:4px;cursor:pointer;font-weight:800;">⛶ Expandir</button>
@@ -596,20 +597,36 @@ const BIMViewer = {
 
   /**
    * Gera a maquete volumétrica procedural detalhada com elementos arquitetônicos e todas as infraestruturas
-   * Mansão Alto Padrão 480 m² (Orçamento R$ 1.000.000,00) com Estrutura, Alvenaria, Hidráulica, Elétrica, HVAC, Cobertura e Terreno.
+   * Dinamicamente dimensionada a partir dos parâmetros da Obra (área, pavimentos, padrão e orçamento).
    */
   _generateParametricBuilding(obra) {
     this.elements = [];
-    const W = 200;  // Largura total da mansão
-    const L = 260;  // Comprimento total
-    const H = 56;   // Altura do pé-direito por pavimento
+    const areaTotal = Math.max(30, Number(obra?.area_construida) || (obra?.nome ? 120 : 480));
+    const pavimentos = Math.max(1, Math.min(6, Number(obra?.pavimentos) || (areaTotal > 180 ? 2 : 1)));
+    const padrao = obra?.padrao || 'Médio Padrão';
+    const hasPool = /piscina|deck|lazer/i.test((obra?.nome || '') + ' ' + (obra?.observacoes || '')) || padrao === 'Alto Padrão';
+
+    // Proporção e dimensões da edificação baseadas na área e pavimentos
+    const areaPorPav = areaTotal / pavimentos;
+    const ratio = 1.3;
+    const largM = Math.sqrt(areaPorPav / ratio);
+    const compM = largM * ratio;
+    const scale = 13; // 1m ~= 13 unidades na cena 2.5D
+    const W = Math.round(largM * scale);
+    const L = Math.round(compM * scale);
+    const H = 46;   // Altura do pé-direito por pavimento
     const yTerreo = 0;
     const yPav1 = H + 6;
-    const yRoofBase = yPav1 + H + 4;
+    const yRoofBase = pavimentos >= 2 ? (yPav1 + H + 4) : (H + 4);
 
-    // Grid de 12 Pilares / Sapatas (3 colunas x 4 linhas)
-    const cols = [-W/2 + 16, 0, W/2 - 16];
-    const rows = [-L/2 + 16, -L/6, L/6, L/2 - 16];
+    // Orçamento base proporcional à metragem e padrão da obra
+    const cubMedio = padrao === 'Alto Padrão' ? 2800 : (padrao === 'Econômico' ? 1600 : 2200);
+    const orcadoTotal = Number(obra?.valor_total) > 0 ? Number(obra.valor_total) : (areaTotal * cubMedio);
+    const realizadoTotal = Math.round(orcadoTotal * 0.78);
+
+    // Grid de Pilares / Sapatas (adaptável conforme dimensões)
+    const cols = W > 150 ? [-W/2 + 16, 0, W/2 - 16] : [-W/2 + 14, W/2 - 14];
+    const rows = L > 180 ? [-L/2 + 16, -L/6, L/6, L/2 - 16] : [-L/2 + 14, 0, L/2 - 14];
     const sapataCoords = [];
     cols.forEach(x => {
       rows.forEach(z => {
@@ -618,17 +635,17 @@ const BIMViewer = {
     });
 
     // =========================================================================
-    // 0. DISCIPLINA: TERRENO, PLATÔ & IMPLANTAÇÃO (site) — R$ 35.000
+    // 0. DISCIPLINA: TERRENO, PLATÔ & IMPLANTAÇÃO (site)
     // =========================================================================
     const siteMeshes = [
       // Platô principal do terreno gramado
-      { type: 'box', x: -W/2 - 50, y: -48, z: -L/2 - 110, w: W + 100, h: 4, d: L + 160, color: '#143015', name: 'Platô Gramado de Implantação' },
+      { type: 'box', x: -W/2 - 40, y: -48, z: -L/2 - 60, w: W + 80, h: 4, d: L + 110, color: '#143015', name: 'Platô Gramado de Implantação' },
       // Calçada de acesso em concreto estampado
-      { type: 'box', x: -30, y: -46, z: L/2 + 10, w: 60, h: 3, d: 40, color: '#475569', name: 'Acesso Social em Concreto Usinado' },
+      { type: 'box', x: -Math.min(30, Math.round(W/4)), y: -46, z: L/2 + 10, w: Math.min(60, Math.round(W/2)), h: 3, d: 35, color: '#475569', name: 'Acesso Social em Concreto Usinado' },
       // Muro de divisa / contenção fundos
-      { type: 'box', x: -W/2 - 45, y: -44, z: -L/2 - 105, w: W + 90, h: 28, d: 6, color: '#334155', name: 'Muro de Contenção e Divisa Fundos' },
-      { type: 'box', x: -W/2 - 45, y: -44, z: -L/2 - 105, w: 6, h: 28, d: L + 150, color: '#334155', name: 'Muro Lateral Esquerdo' },
-      { type: 'box', x: W/2 + 39,  y: -44, z: -L/2 - 105, w: 6, h: 28, d: L + 150, color: '#334155', name: 'Muro Lateral Direito' }
+      { type: 'box', x: -W/2 - 35, y: -44, z: -L/2 - 55, w: W + 70, h: 26, d: 6, color: '#334155', name: 'Muro de Contenção e Divisa Fundos' },
+      { type: 'box', x: -W/2 - 35, y: -44, z: -L/2 - 55, w: 6, h: 26, d: L + 95, color: '#334155', name: 'Muro Lateral Esquerdo' },
+      { type: 'box', x: W/2 + 29,  y: -44, z: -L/2 - 55, w: 6, h: 26, d: L + 95, color: '#334155', name: 'Muro Lateral Direito' }
     ];
 
     this.elements.push({
@@ -639,31 +656,28 @@ const BIMViewer = {
       category: 'Implantação e Movimento de Terra',
       sinapiCode: '98462',
       sinapiDesc: 'Movimento de terra, escavação mecânica, regularização de terreno e calçadas perimetrais em concreto',
-      orcado: 35000.00,
-      realizado: 34200.00,
+      orcado: Math.round(orcadoTotal * 0.04),
+      realizado: Math.round(realizadoTotal * 0.04),
       executadoPct: 100,
       color: '#15803D',
       meshes: siteMeshes
     });
 
     // =========================================================================
-    // 1. DISCIPLINA: FUNDAÇÕES & CONTENÇÃO (fundacao / estrutural) — R$ 145.000
+    // 1. DISCIPLINA: FUNDAÇÕES & BALDRAME (fundacao / estrutural)
     // =========================================================================
     const fundacaoMeshes = [];
     sapataCoords.forEach(pos => {
-      // Sapata isolada de concreto armado
       fundacaoMeshes.push({
-        type: 'box', x: pos.x - 18, y: -44, z: pos.z - 18, w: 36, h: 16, d: 36,
+        type: 'box', x: pos.x - 16, y: -44, z: pos.z - 16, w: 32, h: 16, d: 32,
         color: '#475569', name: 'Sapata de Concreto Armado (CA-50)'
       });
-      // Arranque de pilar
       fundacaoMeshes.push({
-        type: 'box', x: pos.x - 9, y: -28, z: pos.z - 9, w: 18, h: 14, d: 18,
+        type: 'box', x: pos.x - 8, y: -28, z: pos.z - 8, w: 16, h: 14, d: 16,
         color: '#64748B', name: 'Arranque de Pilar Estrutural'
       });
     });
 
-    // Vigas Baldrame longitudinais (3 linhas)
     cols.forEach(x => {
       fundacaoMeshes.push({
         type: 'box', x: x - 8, y: -14, z: -L/2 + 12, w: 16, h: 14, d: L - 24,
@@ -671,7 +685,6 @@ const BIMViewer = {
       });
     });
 
-    // Vigas Baldrame transversais (4 linhas)
     rows.forEach(z => {
       fundacaoMeshes.push({
         type: 'box', x: -W/2 + 12, y: -14, z: z - 8, w: W - 24, h: 14, d: 16,
@@ -679,45 +692,46 @@ const BIMViewer = {
       });
     });
 
-    // Contrapiso impermeabilizado (Radier de piso)
     fundacaoMeshes.push({
       type: 'box', x: -W/2 + 6, y: -2, z: -L/2 + 6, w: W - 12, h: 4, d: L - 12,
       color: '#94A3B8', name: 'Laje de Contrapiso Impermeabilizada'
     });
 
-    // Piscina com Deck e Prainha nos fundos
-    fundacaoMeshes.push(
-      // Estrutura de Concreto da Piscina
-      { type: 'box', x: -W/2 + 20, y: -36, z: -L/2 - 70, w: 80, h: 36, d: 60, color: '#334155', name: 'Estrutura de Concreto da Piscina' },
-      // Água Translúcida da Piscina
-      { type: 'box', x: -W/2 + 24, y: -4, z: -L/2 - 66, w: 72, h: 4, d: 52, color: 'rgba(6, 182, 212, 0.75)', isWater: true, name: 'Espelho d\'Água Piscina' },
-      // Deck de Madeira Cumaru
-      { type: 'box', x: -W/2 + 12, y: -1, z: -L/2 - 80, w: 100, h: 3, d: 80, color: '#9A3412', name: 'Deck de Madeira Cumaru' },
-      // Casa de Máquinas e Bombas
-      { type: 'box', x: W/2 - 60, y: -28, z: -L/2 - 50, w: 36, h: 26, d: 36, color: '#475569', name: 'Casa de Máquinas e Filtragem' }
-    );
+    if (hasPool) {
+      fundacaoMeshes.push(
+        { type: 'box', x: -W/2 + 20, y: -36, z: -L/2 - 70, w: Math.min(80, W - 40), h: 36, d: 50, color: '#334155', name: 'Estrutura de Concreto da Piscina' },
+        { type: 'box', x: -W/2 + 24, y: -4, z: -L/2 - 66, w: Math.min(72, W - 48), h: 4, d: 42, color: 'rgba(6, 182, 212, 0.75)', isWater: true, name: 'Espelho d\'Água Piscina' },
+        { type: 'box', x: -W/2 + 12, y: -1, z: -L/2 - 75, w: Math.min(96, W - 24), h: 3, d: 65, color: '#9A3412', name: 'Deck de Madeira Cumaru' },
+        { type: 'box', x: W/2 - 50, y: -28, z: -L/2 - 45, w: 30, h: 26, d: 30, color: '#475569', name: 'Casa de Máquinas e Filtragem' }
+      );
+    } else {
+      fundacaoMeshes.push({
+        type: 'box', x: -W/2 + 10, y: -46, z: -L/2 - 40, w: W - 20, h: 2, d: 35,
+        color: '#166534', name: 'Área Gramada e Pátio dos Fundos'
+      });
+    }
 
     this.elements.push({
       id: 'elem_fundacao',
-      name: 'Fundações, Sapatas, Baldrames & Piscina',
+      name: hasPool ? 'Fundações, Sapatas, Baldrames & Piscina' : 'Fundações, Sapatas & Vigas Baldrames',
       floor: 'fundacao',
       discipline: 'estrutural',
       category: 'Fundações e Geotecnia',
       sinapiCode: '96538',
       sinapiDesc: 'Armação e concretagem de bloco, viga baldrame e sapata com aço CA-50 e concreto Fck 30 MPa',
-      orcado: 145000.00,
-      realizado: 142300.00,
+      orcado: Math.round(orcadoTotal * 0.15),
+      realizado: Math.round(realizadoTotal * 0.15),
       executadoPct: 100,
       color: '#64748B',
       meshes: fundacaoMeshes
     });
 
     // =========================================================================
-    // 2. DISCIPLINA: SUPERESTRUTURA DE CONCRETO (estrutural) — R$ 230.000
+    // 2. DISCIPLINA: SUPERESTRUTURA DE CONCRETO (estrutural)
     // =========================================================================
     const estruturaMeshes = [];
 
-    // 12 Pilares no Térreo
+    // Pilares no Térreo
     sapataCoords.forEach(pos => {
       estruturaMeshes.push({
         type: 'box', x: pos.x - 8, y: 2, z: pos.z - 8, w: 16, h: H, d: 16,
@@ -725,7 +739,7 @@ const BIMViewer = {
       });
     });
 
-    // Vigas de Cinta do Térreo (Perímetro + Intermediárias)
+    // Vigas de Cinta do Térreo
     cols.forEach(x => {
       estruturaMeshes.push({
         type: 'box', x: x - 7, y: H - 10, z: -L/2 + 10, w: 14, h: 12, d: L - 20,
@@ -739,19 +753,21 @@ const BIMViewer = {
       });
     });
 
-    // Laje Maciça Intermediária com Balanço Frontal (Sacada Gourmet)
-    estruturaMeshes.push({
-      type: 'box', x: -W/2 + 2, y: yPav1 - 6, z: -L/2 + 2, w: W - 4, h: 8, d: L + 30,
-      color: '#CBD5E1', name: 'Laje Maciça de Concreto Protendido (e=15cm)'
-    });
-
-    // 12 Pilares no 1º Pavimento
-    sapataCoords.forEach(pos => {
+    if (pavimentos >= 2) {
+      // Laje Maciça Intermediária com Balanço Frontal (Sacada Gourmet)
       estruturaMeshes.push({
-        type: 'box', x: pos.x - 8, y: yPav1 + 2, z: pos.z - 8, w: 16, h: H, d: 16,
-        color: '#94A3B8', name: 'Pilar Concreto 1º Pavimento'
+        type: 'box', x: -W/2 + 2, y: yPav1 - 6, z: -L/2 + 2, w: W - 4, h: 8, d: L + 24,
+        color: '#CBD5E1', name: 'Laje Maciça de Concreto Protendido (e=15cm)'
       });
-    });
+
+      // Pilares no 1º Pavimento
+      sapataCoords.forEach(pos => {
+        estruturaMeshes.push({
+          type: 'box', x: pos.x - 8, y: yPav1 + 2, z: pos.z - 8, w: 16, h: H, d: 16,
+          color: '#94A3B8', name: 'Pilar Concreto 1º Pavimento'
+        });
+      });
+    }
 
     // Laje de Forro Superior / Cobertura
     estruturaMeshes.push({
@@ -761,109 +777,105 @@ const BIMViewer = {
 
     this.elements.push({
       id: 'elem_estrutura_concreto',
-      name: 'Superestrutura: 24 Pilares, Vigas & Lajes Maciças',
+      name: pavimentos >= 2 ? `Superestrutura: ${sapataCoords.length * 2} Pilares, Vigas & Lajes Maciças` : `Superestrutura: ${sapataCoords.length} Pilares, Vigas & Laje de Forro`,
       floor: 'all',
       discipline: 'estrutural',
       category: 'Superestrutura Concreto Armado',
       sinapiCode: '103670',
       sinapiDesc: 'Estrutura de concreto armado para edifícios (pilares, vigas e lajes maciças Fck 35 MPa com escoramento metálico)',
-      orcado: 230000.00,
-      realizado: 218500.00,
+      orcado: Math.round(orcadoTotal * 0.24),
+      realizado: Math.round(realizadoTotal * 0.24),
       executadoPct: 92,
       color: '#94A3B8',
       meshes: estruturaMeshes
     });
 
     // =========================================================================
-    // 3. DISCIPLINA: ARQUITETURA & ALVENARIA (arquitetura) — R$ 180.000
+    // 3. DISCIPLINA: ARQUITETURA & ALVENARIA (arquitetura)
     // =========================================================================
     const arqMeshes = [];
 
     // Paredes e Fachada Térreo
+    const wallFrontW = Math.max(40, Math.round(W * 0.35));
     arqMeshes.push(
       // Parede frontal esquerda
-      { type: 'box', x: -W/2 + 10, y: 2, z: L/2 - 14, w: 70, h: H, d: 8, color: '#C2410C', isBrick: true, name: 'Alvenaria Fachada Sala de Estar' },
+      { type: 'box', x: -W/2 + 10, y: 2, z: L/2 - 14, w: wallFrontW, h: H, d: 8, color: '#C2410C', isBrick: true, name: 'Alvenaria Fachada Sala de Estar' },
       // Pele de Vidro Fachada Sala (Structural Glazing)
-      { type: 'box', x: -W/2 + 16, y: 12, z: L/2 - 13, w: 58, h: 38, d: 3, color: 'rgba(56, 189, 248, 0.70)', isGlass: true, name: 'Pele de Vidro Sala Duplo Laminado' },
-      { type: 'box', x: -W/2 + 14, y: 10, z: L/2 - 14, w: 62, h: 42, d: 1, color: '#0F172A', isFrame: true, name: 'Caixilharia Alumínio Preto Linha Gold' },
+      { type: 'box', x: -W/2 + 14, y: 10, z: L/2 - 13, w: wallFrontW - 10, h: H - 18, d: 3, color: 'rgba(56, 189, 248, 0.70)', isGlass: true, name: 'Pele de Vidro Sala Duplo Laminado' },
+      { type: 'box', x: -W/2 + 12, y: 8, z: L/2 - 14, w: wallFrontW - 6, h: H - 14, d: 1, color: '#0F172A', isFrame: true, name: 'Caixilharia Alumínio Preto Linha Gold' },
 
-      // Porta Pivotante Monumental em Madeira Nobre (3,20m)
-      { type: 'box', x: -6, y: 2, z: L/2 - 13, w: 34, h: 50, d: 5, color: '#78350F', name: 'Porta Pivotante em Madeira Cumaru' },
-      { type: 'box', x: 22, y: 16, z: L/2 - 8, w: 3, h: 22, d: 3, color: '#F8FAFC', name: 'Puxador Inox Escovado 1,50m' },
+      // Porta Pivotante Monumental
+      { type: 'box', x: -6, y: 2, z: L/2 - 13, w: Math.min(32, Math.round(W * 0.2)), h: Math.min(48, H - 6), d: 5, color: '#78350F', name: 'Porta Pivotante em Madeira' },
+      { type: 'box', x: Math.min(22, Math.round(W * 0.15)), y: 14, z: L/2 - 8, w: 3, h: 20, d: 3, color: '#F8FAFC', name: 'Puxador Inox Escovado' },
 
-      // Parede Garagem / Acesso Térreo Direito (Cutaway suave)
-      { type: 'box', x: 34, y: 2, z: L/2 - 14, w: 60, h: H, d: 8, color: '#C2410C', isBrick: true, name: 'Alvenaria Garagem Coberta' },
+      // Parede Garagem / Acesso Térreo Direito
+      { type: 'box', x: 26, y: 2, z: L/2 - 14, w: Math.max(40, Math.round(W/2 - 36)), h: H, d: 8, color: '#C2410C', isBrick: true, name: 'Alvenaria Garagem / Acesso' },
 
       // Paredes Laterais e Fundos Térreo
       { type: 'box', x: -W/2 + 10, y: 2, z: -L/2 + 10, w: 8, h: H, d: L - 24, color: '#EA580C', isBrick: true, name: 'Alvenaria Lateral Esquerda' },
       { type: 'box', x: W/2 - 18, y: 2, z: -L/2 + 10, w: 8, h: H, d: L - 24, color: '#EA580C', isBrick: true, name: 'Alvenaria Lateral Direita' },
-      { type: 'box', x: -W/2 + 10, y: 2, z: -L/2 + 10, w: W - 20, h: H, d: 8, color: '#C2410C', isBrick: true, name: 'Alvenaria Fundos Espaço Gourmet' },
-
-      // Bancada Gourmet e Churrasqueira
-      { type: 'box', x: 20, y: 2, z: -L/2 + 20, w: 60, h: 20, d: 18, color: '#1E293B', name: 'Bancada Granito Preto São Gabriel' },
-      { type: 'box', x: 62, y: 2, z: -L/2 + 18, w: 18, h: 52, d: 18, color: '#7C2D12', isBrick: true, name: 'Churrasqueira Alvenaria Refratária' },
+      { type: 'box', x: -W/2 + 10, y: 2, z: -L/2 + 10, w: W - 20, h: H, d: 8, color: '#C2410C', isBrick: true, name: 'Alvenaria Fundos' },
 
       // Piso Varanda Frontal
-      { type: 'box', x: -W/2 + 4, y: 0, z: L/2 - 6, w: W - 8, h: 3, d: 32, color: '#CBD5E1', name: 'Piso Porcelanato Acetinado 120x120cm' }
+      { type: 'box', x: -W/2 + 4, y: 0, z: L/2 - 6, w: W - 8, h: 3, d: 26, color: '#CBD5E1', name: 'Piso Porcelanato Acetinado' }
     );
 
-    // Paredes e Sacada do 1º Pavimento
-    arqMeshes.push(
-      // Guarda-corpo panorâmico da sacada frontal
-      { type: 'box', x: -W/2 + 8, y: yPav1 + 6, z: L/2 + 30, w: W - 16, h: 22, d: 2, color: 'rgba(56, 189, 248, 0.45)', isGlass: true, name: 'Guarda-corpo Vidro Temperado Sacada' },
-      { type: 'box', x: -W/2 + 6, y: yPav1 + 28, z: L/2 + 29, w: W - 12, h: 3, d: 4, color: '#0F172A', isFrame: true, name: 'Perfil Corrimão Alumínio Preto' },
-      { type: 'box', x: -W/2 + 6, y: yPav1 + 6, z: L/2 + 4, w: 2, h: 22, d: 26, color: 'rgba(56, 189, 248, 0.45)', isGlass: true, name: 'Guarda-corpo Lateral Esq.' },
-      { type: 'box', x: W/2 - 8, y: yPav1 + 6, z: L/2 + 4, w: 2, h: 22, d: 26, color: 'rgba(56, 189, 248, 0.45)', isGlass: true, name: 'Guarda-corpo Lateral Dir.' },
+    if (pavimentos >= 2) {
+      // Paredes e Sacada do 1º Pavimento
+      arqMeshes.push(
+        // Guarda-corpo panorâmico da sacada frontal
+        { type: 'box', x: -W/2 + 8, y: yPav1 + 6, z: L/2 + 24, w: W - 16, h: 22, d: 2, color: 'rgba(56, 189, 248, 0.45)', isGlass: true, name: 'Guarda-corpo Vidro Temperado Sacada' },
+        { type: 'box', x: -W/2 + 6, y: yPav1 + 28, z: L/2 + 23, w: W - 12, h: 3, d: 4, color: '#0F172A', isFrame: true, name: 'Perfil Corrimão Alumínio Preto' },
+        { type: 'box', x: -W/2 + 6, y: yPav1 + 6, z: L/2 + 4, w: 2, h: 22, d: 20, color: 'rgba(56, 189, 248, 0.45)', isGlass: true, name: 'Guarda-corpo Lateral Esq.' },
+        { type: 'box', x: W/2 - 8, y: yPav1 + 6, z: L/2 + 4, w: 2, h: 22, d: 20, color: 'rgba(56, 189, 248, 0.45)', isGlass: true, name: 'Guarda-corpo Lateral Dir.' },
 
-      // Paredes Frontais 1º Pavimento (Suíte Master + Dormitórios)
-      { type: 'box', x: -W/2 + 10, y: yPav1 + 2, z: L/2 - 14, w: 90, h: H, d: 8, color: '#F1F5F9', name: 'Alvenaria Suíte Master & Closet' },
-      // Porta-balcão de correr para a sacada
-      { type: 'box', x: -36, y: yPav1 + 2, z: L/2 - 12, w: 56, h: 46, d: 3, color: 'rgba(56, 189, 248, 0.75)', isGlass: true, name: 'Porta-Balcão 4 Folhas Sacada' },
-      // Janela do Quarto 2
-      { type: 'box', x: 42, y: yPav1 + 14, z: L/2 - 12, w: 42, h: 32, d: 3, color: 'rgba(56, 189, 248, 0.75)', isGlass: true, name: 'Janela Quarto Superior' },
+        // Paredes Frontais 1º Pavimento
+        { type: 'box', x: -W/2 + 10, y: yPav1 + 2, z: L/2 - 14, w: Math.max(50, Math.round(W * 0.45)), h: H, d: 8, color: '#F1F5F9', name: 'Alvenaria Suíte Superior' },
+        // Porta-balcão de correr para a sacada
+        { type: 'box', x: -28, y: yPav1 + 2, z: L/2 - 12, w: Math.min(48, Math.round(W * 0.3)), h: H - 10, d: 3, color: 'rgba(56, 189, 248, 0.75)', isGlass: true, name: 'Porta-Balcão Sacada' },
 
-      // Paredes Laterais e Fundos 1º Pavimento
-      { type: 'box', x: -W/2 + 10, y: yPav1 + 2, z: -L/2 + 10, w: 8, h: H, d: L - 24, color: '#E2E8F0', name: 'Parede Superior Lateral Esq.' },
-      { type: 'box', x: W/2 - 18, y: yPav1 + 2, z: -L/2 + 10, w: 8, h: H, d: L - 24, color: '#E2E8F0', name: 'Parede Superior Lateral Dir.' },
-      { type: 'box', x: -W/2 + 10, y: yPav1 + 2, z: -L/2 + 10, w: W - 20, h: H, d: 8, color: '#E2E8F0', name: 'Parede Superior Fundos' }
-    );
+        // Paredes Laterais e Fundos 1º Pavimento
+        { type: 'box', x: -W/2 + 10, y: yPav1 + 2, z: -L/2 + 10, w: 8, h: H, d: L - 24, color: '#E2E8F0', name: 'Parede Superior Lateral Esq.' },
+        { type: 'box', x: W/2 - 18, y: yPav1 + 2, z: -L/2 + 10, w: 8, h: H, d: L - 24, color: '#E2E8F0', name: 'Parede Superior Lateral Dir.' },
+        { type: 'box', x: -W/2 + 10, y: yPav1 + 2, z: -L/2 + 10, w: W - 20, h: H, d: 8, color: '#E2E8F0', name: 'Parede Superior Fundos' }
+      );
+    }
 
     this.elements.push({
       id: 'elem_arquitetura_alvenaria',
-      name: 'Arquitetura, Alvenaria, Fachadas & Gourmet',
+      name: 'Arquitetura, Alvenaria, Fachadas & Esquadrias',
       floor: 'all',
       discipline: 'arquitetura',
       category: 'Arquitetura e Esquadrias',
       sinapiCode: '104658',
-      sinapiDesc: 'Alvenaria de vedação de blocos cerâmicos, esquadrias de alumínio preto linha Gold e vidros laminados de controle solar',
-      orcado: 180000.00,
-      realizado: 165000.00,
+      sinapiDesc: 'Alvenaria de vedação de blocos cerâmicos, esquadrias de alumínio e vidros laminados de controle solar',
+      orcado: Math.round(orcadoTotal * 0.18),
+      realizado: Math.round(realizadoTotal * 0.18),
       executadoPct: 80,
       color: '#EA580C',
       meshes: arqMeshes
     });
 
     // =========================================================================
-    // 4. DISCIPLINA: INSTALAÇÕES HIDROSSANITÁRIAS (hidraulica) — R$ 115.000
+    // 4. DISCIPLINA: INSTALAÇÕES HIDROSSANITÁRIAS (hidraulica)
     // =========================================================================
     const hidMeshes = [];
 
-    // 2 Caixas d'água de 1.500L no Ático / Cobertura
+    // Reservatório d'água no Ático / Cobertura
     hidMeshes.push(
-      { type: 'box', x: -44, y: yRoofBase + 8, z: -20, w: 32, h: 28, d: 32, color: '#0284C7', name: 'Caixa d\'Água Polietileno 1.500 L (Reserva 1)' },
-      { type: 'box', x: 12,  y: yRoofBase + 8, z: -20, w: 32, h: 28, d: 32, color: '#0284C7', name: 'Caixa d\'Água Polietileno 1.500 L (Reserva 2)' },
-      // Barrilete de Distribuição em PVC PBA
-      { type: 'box', x: -46, y: yRoofBase + 2, z: -24, w: 92, h: 5, d: 6, color: '#0EA5E9', isPipe: true, name: 'Barrilete Geral de Distribuição (50mm)' }
+      { type: 'box', x: -Math.min(30, Math.round(W/4)), y: yRoofBase + 6, z: -15, w: Math.min(30, Math.round(W/4)), h: 24, d: Math.min(30, Math.round(L/5)), color: '#0284C7', name: 'Caixa d\'Água Polietileno 1.000 L' },
+      { type: 'box', x: -Math.min(32, Math.round(W/4)), y: yRoofBase + 2, z: -18, w: Math.min(60, Math.round(W/2)), h: 5, d: 6, color: '#0EA5E9', isPipe: true, name: 'Barrilete de Distribuição (50mm)' }
     );
 
     // Colunas de Água Fria e Água Quente Descendo os Pavimentos
     const colunasPipes = [
-      { x: -W/2 + 28, z: 20 },
-      { x: W/2 - 36,  z: 20 },
-      { x: 0,         z: -L/2 + 30 }
+      { x: -W/2 + 24, z: 15 },
+      { x: W/2 - 28,  z: 15 }
     ];
+    if (L > 160) colunasPipes.push({ x: 0, z: -L/2 + 25 });
+
     colunasPipes.forEach(col => {
-      // Coluna vertical de água fria (Ático até Térreo)
+      // Coluna vertical de água fria
       hidMeshes.push({
         type: 'box', x: col.x, y: 2, z: col.z, w: 4, h: yRoofBase + 4, d: 4,
         color: '#0284C7', isPipe: true, name: 'Coluna de Água Fria Soldável (32mm)'
@@ -873,153 +885,148 @@ const BIMViewer = {
         type: 'box', x: col.x + 6, y: 2, z: col.z, w: 4, h: yRoofBase + 4, d: 4,
         color: '#10B981', isPipe: true, name: 'Coluna de Água Quente PPR Termofusão'
       });
-      // Ramal horizontal na laje do 1º Pavimento
+      // Tubo de queda de esgoto primário 100mm
       hidMeshes.push({
-        type: 'box', x: col.x - 20, y: yPav1 - 2, z: col.z, w: 40, h: 4, d: 4,
-        color: '#0EA5E9', isPipe: true, name: 'Ramal de Distribuição Sanitária 1º Pav.'
-      });
-    });
-
-    // Tubulação de Esgoto Primário 100mm e Ventilação (Tubos Brancos)
-    colunasPipes.forEach(col => {
-      hidMeshes.push({
-        type: 'box', x: col.x + 14, y: -16, z: col.z, w: 7, h: yRoofBase + 2, d: 7,
+        type: 'box', x: col.x + 12, y: -16, z: col.z, w: 6, h: yRoofBase + 2, d: 6,
         color: '#F8FAFC', isPipe: true, name: 'Tubo de Queda de Esgoto Primário 100mm'
       });
-      // Caixa Sifonada / Ralo Linear
-      hidMeshes.push({
-        type: 'box', x: col.x + 10, y: yPav1 - 4, z: col.z - 8, w: 14, h: 6, d: 14,
-        color: '#E2E8F0', name: 'Caixa Sifonada com Grelha Inox'
-      });
     });
 
-    // Tubulação Subterrânea de Esgoto Geral e Ligação de Piscina
+    // Tubulação Subterrânea de Esgoto Geral
     hidMeshes.push(
-      { type: 'box', x: -W/2 + 20, y: -18, z: -L/2 + 10, w: W - 40, h: 8, d: 8, color: '#F1F5F9', isPipe: true, name: 'Coletor Predial de Esgoto 150mm' },
-      { type: 'box', x: -W/2 + 30, y: -24, z: -L/2 - 40, w: 6, h: 6, d: 40, color: '#0284C7', isPipe: true, name: 'Tubulação de Sucção e Recirculação Piscina' }
+      { type: 'box', x: -W/2 + 16, y: -18, z: -L/2 + 10, w: W - 32, h: 7, d: 7, color: '#F1F5F9', isPipe: true, name: 'Coletor Predial de Esgoto 150mm' }
     );
+    if (hasPool) {
+      hidMeshes.push(
+        { type: 'box', x: -W/2 + 30, y: -24, z: -L/2 - 40, w: 6, h: 6, d: 35, color: '#0284C7', isPipe: true, name: 'Tubulação de Sucção e Recirculação Piscina' }
+      );
+    }
 
     this.elements.push({
       id: 'elem_hidraulica_sanitario',
-      name: 'Instalações Hidrossanitárias, Caixas d\'Água & Esgoto',
+      name: 'Instalações Hidrossanitárias & Esgoto',
       floor: 'all',
       discipline: 'hidraulica',
       category: 'Instalações Hidráulicas e Sanitárias',
       sinapiCode: '89985',
-      sinapiDesc: 'Tubulação de PVC soldável, PPR para água quente, reservatórios de 1.500L, barrilete e rede coletora de esgoto predial',
-      orcado: 115000.00,
-      realizado: 98000.00,
+      sinapiDesc: 'Tubulação de PVC soldável, PPR para água quente, reservatório, barrilete e rede coletora de esgoto predial',
+      orcado: Math.round(orcadoTotal * 0.12),
+      realizado: Math.round(realizadoTotal * 0.12),
       executadoPct: 85,
       color: '#0EA5E9',
       meshes: hidMeshes
     });
 
     // =========================================================================
-    // 5. DISCIPLINA: INSTALAÇÕES ELÉTRICAS & AUTOMAÇÃO (eletrica) — R$ 125.000
+    // 5. DISCIPLINA: INSTALAÇÕES ELÉTRICAS & AUTOMAÇÃO (eletrica)
     // =========================================================================
     const eletricaMeshes = [];
 
-    // Quadros de Distribuição Geral (QDG no Térreo) e Parcial (QDC no 1º Pav.)
+    // Quadros de Distribuição
     eletricaMeshes.push(
-      { type: 'box', x: -W/2 + 14, y: 18, z: 40, w: 6, h: 28, d: 24, color: '#EAB308', name: 'Quadro de Distribuição Geral (QDG 48 Disjuntores)' },
-      { type: 'box', x: -W/2 + 14, y: yPav1 + 18, z: 40, w: 6, h: 24, d: 20, color: '#EAB308', name: 'Quadro de Distribuição Parcial (QDC 1º Pavimento)' }
+      { type: 'box', x: -W/2 + 14, y: 18, z: Math.round(L/4), w: 6, h: 24, d: 20, color: '#EAB308', name: 'Quadro de Distribuição Geral (QDG)' }
     );
+    if (pavimentos >= 2) {
+      eletricaMeshes.push(
+        { type: 'box', x: -W/2 + 14, y: yPav1 + 18, z: Math.round(L/4), w: 6, h: 22, d: 18, color: '#EAB308', name: 'Quadro de Distribuição Parcial (QDC)' }
+      );
+    }
 
-    // Eletrocalhas Metálicas Principais no Entreforro (Térreo e 1º Pav.)
+    // Eletrocalhas
     eletricaMeshes.push(
-      { type: 'box', x: -W/2 + 18, y: H - 4, z: -L/2 + 30, w: 8, h: 5, d: L - 60, color: '#CA8A04', isElectric: true, name: 'Eletrocalha Perfurada Térreo (100x50mm)' },
-      { type: 'box', x: -W/2 + 18, y: yPav1 + H - 4, z: -L/2 + 30, w: 8, h: 5, d: L - 60, color: '#CA8A04', isElectric: true, name: 'Eletrocalha Perfurada 1º Pav. (100x50mm)' }
+      { type: 'box', x: -W/2 + 18, y: H - 4, z: -L/2 + 25, w: 7, h: 5, d: L - 50, color: '#CA8A04', isElectric: true, name: 'Eletrocalha Perfurada Térreo' }
     );
+    if (pavimentos >= 2) {
+      eletricaMeshes.push(
+        { type: 'box', x: -W/2 + 18, y: yPav1 + H - 4, z: -L/2 + 25, w: 7, h: 5, d: L - 50, color: '#CA8A04', isElectric: true, name: 'Eletrocalha Perfurada 1º Pav.' }
+      );
+    }
 
-    // Eletrodutos Corrugados Reforçados e Pontos de Iluminação / Tomadas
+    // Pontos de Iluminação / Tomadas
     const circuitos = [
-      { x: -40, z: 60 },
-      { x: 40,  z: 60 },
-      { x: -40, z: -40 },
-      { x: 40,  z: -40 }
+      { x: -Math.round(W/4), z: Math.round(L/4) },
+      { x: Math.round(W/4),  z: Math.round(L/4) },
+      { x: -Math.round(W/4), z: -Math.round(L/4) },
+      { x: Math.round(W/4),  z: -Math.round(L/4) }
     ];
     circuitos.forEach(pt => {
-      // Eletroduto vertical descendo para interruptores
       eletricaMeshes.push({
         type: 'box', x: pt.x, y: 4, z: pt.z, w: 3, h: H - 8, d: 3,
         color: '#FACC15', isElectric: true, name: 'Eletroduto Corrugado PEAD Antichamas'
       });
-      // Spots LED de Embutir no Teto
       eletricaMeshes.push({
-        type: 'box', x: pt.x - 6, y: H - 1, z: pt.z - 6, w: 12, h: 2, d: 12,
-        color: '#FEF08A', name: 'Painel LED Embutir 24W IRC>90'
+        type: 'box', x: pt.x - 5, y: H - 1, z: pt.z - 5, w: 10, h: 2, d: 10,
+        color: '#FEF08A', name: 'Painel LED Embutir'
       });
-      // Spots LED no 1º Pavimento
-      eletricaMeshes.push({
-        type: 'box', x: pt.x - 6, y: yPav1 + H - 1, z: pt.z - 6, w: 12, h: 2, d: 12,
-        color: '#FEF08A', name: 'Painel LED Embutir 1º Pavimento'
-      });
+      if (pavimentos >= 2) {
+        eletricaMeshes.push({
+          type: 'box', x: pt.x - 5, y: yPav1 + H - 1, z: pt.z - 5, w: 10, h: 2, d: 10,
+          color: '#FEF08A', name: 'Painel LED Embutir 1º Pavimento'
+        });
+      }
     });
 
     this.elements.push({
       id: 'elem_eletrica_automacao',
-      name: 'Instalações Elétricas, Quadros QDG & Automação',
+      name: 'Instalações Elétricas & Iluminação LED',
       floor: 'all',
       discipline: 'eletrica',
       category: 'Instalações Elétricas e Automação',
       sinapiCode: '91834',
-      sinapiDesc: 'Quadro de distribuição com barramentos trifásicos, eletrocalhas perfuradas, fiação de cobre antichamas e luminárias LED',
-      orcado: 125000.00,
-      realizado: 112000.00,
+      sinapiDesc: 'Quadro de distribuição com barramentos, eletrocalhas perfuradas, fiação de cobre antichamas e luminárias LED',
+      orcado: Math.round(orcadoTotal * 0.12),
+      realizado: Math.round(realizadoTotal * 0.12),
       executadoPct: 90,
       color: '#EAB308',
       meshes: eletricaMeshes
     });
 
     // =========================================================================
-    // 6. DISCIPLINA: CLIMATIZAÇÃO CENTRAL & HVAC (mecanica) — R$ 85.000
+    // 6. DISCIPLINA: CLIMATIZAÇÃO CENTRAL & HVAC (mecanica)
     // =========================================================================
     const hvacMeshes = [];
 
-    // Unidades Condensadoras Externas VRF / Multi-Split no Piso Técnico
+    // Condensadora no Piso Técnico
     hvacMeshes.push(
-      { type: 'box', x: W/2 - 40, y: yRoofBase + 2, z: -L/2 + 20, w: 26, h: 32, d: 20, color: '#475569', name: 'Condensadora VRF Inverter 8 HP (Unidade 1)' },
-      { type: 'box', x: W/2 - 40, y: yRoofBase + 2, z: -L/2 + 50, w: 26, h: 32, d: 20, color: '#475569', name: 'Condensadora VRF Inverter 8 HP (Unidade 2)' }
+      { type: 'box', x: W/2 - 34, y: yRoofBase + 2, z: -L/2 + 20, w: 24, h: 28, d: 18, color: '#475569', name: 'Condensadora Inverter Externa' }
     );
 
-    // Rede Principal de Dutos de Insuflamento e Retorno de Ar no Forro
+    // Rede de Dutos / Evaporadoras
     hvacMeshes.push(
-      // Duto mestre horizontal no forro do térreo
-      { type: 'box', x: -20, y: H - 8, z: -L/2 + 30, w: 40, h: 8, d: L - 60, color: '#94A3B8', isDuct: true, name: 'Duto Principal de Climatização Chapa Galvanizada' },
-      // Duto mestre horizontal no forro do 1º pav
-      { type: 'box', x: -20, y: yPav1 + H - 8, z: -L/2 + 30, w: 40, h: 8, d: L - 60, color: '#94A3B8', isDuct: true, name: 'Duto Climatização 1º Pavimento' },
-      // Evaporadoras Cassete 4 Vias de Teto
-      { type: 'box', x: -16, y: H - 6, z: 20, w: 32, h: 6, d: 32, color: '#F1F5F9', name: 'Evaporadora Cassete 4 Vias Sala Principal' },
-      { type: 'box', x: -16, y: H - 6, z: -60, w: 32, h: 6, d: 32, color: '#F1F5F9', name: 'Evaporadora Cassete Espaço Gourmet' },
-      { type: 'box', x: -16, y: yPav1 + H - 6, z: 20, w: 32, h: 6, d: 32, color: '#F1F5F9', name: 'Evaporadora Suíte Master' }
+      { type: 'box', x: -16, y: H - 8, z: -L/2 + 25, w: 32, h: 7, d: L - 50, color: '#94A3B8', isDuct: true, name: 'Duto Principal de Climatização' },
+      { type: 'box', x: -14, y: H - 6, z: 15, w: 28, h: 6, d: 28, color: '#F1F5F9', name: 'Evaporadora Cassete Sala' }
     );
-
-    // Linha Frigorígena de Cobre Isolada (Ático até Térreo)
+    if (pavimentos >= 2) {
+      hvacMeshes.push(
+        { type: 'box', x: -16, y: yPav1 + H - 8, z: -L/2 + 25, w: 32, h: 7, d: L - 50, color: '#94A3B8', isDuct: true, name: 'Duto Climatização 1º Pavimento' },
+        { type: 'box', x: -14, y: yPav1 + H - 6, z: 15, w: 28, h: 6, d: 28, color: '#F1F5F9', name: 'Evaporadora Cassete 1º Pav.' }
+      );
+    }
     hvacMeshes.push({
-      type: 'box', x: W/2 - 34, y: 4, z: -L/2 + 34, w: 4, h: yRoofBase, d: 4,
+      type: 'box', x: W/2 - 30, y: 4, z: -L/2 + 25, w: 4, h: yRoofBase, d: 4,
       color: '#B45309', isPipe: true, name: 'Linha Frigorígena Cobre com Isolamento Térmico'
     });
 
     this.elements.push({
       id: 'elem_climatizacao_hvac',
-      name: 'Climatização Central VRF, Dutos & Evaporadoras',
+      name: 'Climatização & Rede de Dutos',
       floor: 'all',
       discipline: 'mecanica',
       category: 'Climatização e HVAC',
       sinapiCode: '98512',
-      sinapiDesc: 'Sistema VRF de fluxo de refrigerante variável, rede de dutos galvanizados com isolamento térmico e evaporadoras cassete',
-      orcado: 85000.00,
-      realizado: 68000.00,
+      sinapiDesc: 'Sistema split/VRF, rede de distribuição de ar e evaporadoras',
+      orcado: Math.round(orcadoTotal * 0.08),
+      realizado: Math.round(realizadoTotal * 0.08),
       executadoPct: 80,
       color: '#38BDF8',
       meshes: hvacMeshes
     });
 
     // =========================================================================
-    // 7. DISCIPLINA: COBERTURA & TELHADO COLONIAL (cobertura) — R$ 120.000
+    // 7. DISCIPLINA: COBERTURA & TELHADO COLONIAL (cobertura)
     // =========================================================================
     const coberturaMeshes = [];
-    const roofRidgeHeight = 44;
+    const roofRidgeHeight = Math.min(42, Math.round(W * 0.22));
 
     // Telhado de 2 Águas com Cumeeira e Oitões Triangulares
     coberturaMeshes.push({
@@ -1030,29 +1037,29 @@ const BIMViewer = {
       w: W + 24,
       h: roofRidgeHeight,
       d: L + 24,
-      colorLeft: '#9A3412',  // Telhas cerâmicas terracota
-      colorRight: '#7C2D12', // Sombreado
-      colorGable: '#E2E8F0', // Oitão rebocado
-      colorRidge: '#C2410C', // Cumeeira cerâmica
-      name: 'Telhado Colonial Cerâmico de 2 Águas com Estrutura de Madeira Nobre'
+      colorLeft: '#9A3412',
+      colorRight: '#7C2D12',
+      colorGable: '#E2E8F0',
+      colorRidge: '#C2410C',
+      name: 'Telhado Colonial de 2 Águas com Estrutura de Madeira'
     });
 
-    // Calhas Pluviais e Condutores Verticais
+    // Calhas Pluviais
     coberturaMeshes.push(
-      { type: 'box', x: -W/2 - 14, y: yRoofBase - 2, z: -L/2 - 14, w: 6, h: 6, d: L + 28, color: '#64748B', isPipe: true, name: 'Calha Pluvial em Chapa Galvanizada Esq.' },
-      { type: 'box', x: W/2 + 8,   y: yRoofBase - 2, z: -L/2 - 14, w: 6, h: 6, d: L + 28, color: '#64748B', isPipe: true, name: 'Calha Pluvial em Chapa Galvanizada Dir.' }
+      { type: 'box', x: -W/2 - 14, y: yRoofBase - 2, z: -L/2 - 14, w: 6, h: 6, d: L + 28, color: '#64748B', isPipe: true, name: 'Calha Pluvial Galvanizada Esq.' },
+      { type: 'box', x: W/2 + 8,   y: yRoofBase - 2, z: -L/2 - 14, w: 6, h: 6, d: L + 28, color: '#64748B', isPipe: true, name: 'Calha Pluvial Galvanizada Dir.' }
     );
 
     this.elements.push({
       id: 'elem_cobertura_telhado',
-      name: 'Cobertura, Tesouras de Madeira, Telhas & Calhas',
+      name: 'Cobertura, Telhado Colonial & Calhas',
       floor: 'cobertura',
       discipline: 'arquitetura',
       category: 'Cobertura e Telhado',
       sinapiCode: '94213',
-      sinapiDesc: 'Estrutura de madeira de lei para telhados de 2 águas, telhas cerâmicas esmaltadas, calhas e rufos galvanizados',
-      orcado: 120000.00,
-      realizado: 42000.00,
+      sinapiDesc: 'Estrutura de madeira para telhado de 2 águas, telhas cerâmicas e calhas pluviais',
+      orcado: Math.round(orcadoTotal * 0.12),
+      realizado: Math.round(realizadoTotal * 0.12),
       executadoPct: 35,
       color: '#EA580C',
       meshes: coberturaMeshes
@@ -1739,8 +1746,32 @@ const BIMViewer = {
   },
 
   async _loadPresetModel(presetKey) {
-    if (presetKey === 'sobrado_procedural') {
+    if (presetKey === 'obra_atual') {
       this._restoreProceduralModel();
+      return;
+    }
+    if (presetKey === 'sobrado_procedural') {
+      // Exemplo demonstrativo da Mansão Alto Padrão 480 m²
+      this.modelSource = 'procedural';
+      this.importedModel = null;
+      this.activeModelDocId = null;
+      this.clashAnalysis = null;
+      this.clashResults = [];
+      this.clashHighlightIds = [];
+      this._generateParametricBuilding({
+        nome: 'Mansão Alto Padrão 480 m²',
+        area_construida: 480,
+        pavimentos: 2,
+        padrao: 'Alto Padrão',
+        observacoes: 'Piscina com deck cumaru'
+      });
+      this.selectedElement = this.elements[1] || this.elements[0] || null;
+      this.currentFloor = 'all';
+      this.disciplineFilter = 'all';
+      this._setModelSourceUi();
+      this._refreshFloorButtons();
+      this._refreshSelectedElementUi();
+      Utils.toast('Maquete de exemplo da Mansão Alto Padrão (480 m²) carregada.', 'info');
       return;
     }
     if (typeof BIMPresets === 'undefined' || typeof BIMGeometryImporter === 'undefined') {
@@ -1796,7 +1827,7 @@ const BIMViewer = {
     this.currentFloor = 'all';
     this.disciplineFilter = 'all';
     const presetSelect = document.getElementById('bim-model-preset-select');
-    if (presetSelect) presetSelect.value = 'sobrado_procedural';
+    if (presetSelect) presetSelect.value = 'obra_atual';
     this._setModelSourceUi();
     this._refreshFloorButtons();
     this._refreshSelectedElementUi();

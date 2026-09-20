@@ -161,13 +161,13 @@
       <!-- Informações da Obra Ativa -->
       <div style="display:flex;align-items:center;gap:12px;">
         <div class="glass-pill" style="color:#C6FF00;">
-          <span id="studio-obra-name">Mansão Villa Aurora</span> &middot; 480 m²
+          <span id="studio-obra-name">Carregando Obra...</span> &middot; <span id="studio-obra-area">---</span> m²
         </div>
         <div class="glass-pill" style="color:#F0EAD6;">
-          Orçado: <b style="color:#C6FF00;">R$ 1.035.000,00</b>
+          Orçado: <b id="studio-obra-orcado" style="color:#C6FF00;">R$ ---</b>
         </div>
         <div class="glass-pill" style="color:#94A3B8;">
-          Avanço: <b style="color:#38BDF8;">85%</b>
+          Avanço: <b id="studio-obra-avanco" style="color:#38BDF8;">---%</b>
         </div>
       </div>
 
@@ -388,7 +388,12 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
   <script src="/js/vendor/OrbitControls.js"></script>
   
-  <!-- Controlador do Estúdio BIM (com cache buster v5) -->
-  <script src="/js/bim_studio.js?v=20260919_v5"></script>
+  <!-- Camada de Dados e Autenticação do FinGo -->
+  <script src="/js/utils.js"></script>
+  <script src="/js/auth.js"></script>
+  <script src="/js/data.js"></script>
+
+  <!-- Controlador do Estúdio BIM (com cache buster v6) -->
+  <script src="/js/bim_studio.js?v=20260919_v6"></script>
 </body>
 </html>

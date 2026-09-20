@@ -44,6 +44,12 @@ const BIMStudio = {
       return;
     }
 
+    // 0. Identificar Obra Ativa a partir da URL
+    const urlParams = new URLSearchParams(window.location.search);
+    const obraId = urlParams.get('obraId');
+    this.activeObra = (typeof DB !== 'undefined' && obraId && DB.getById('clientes', obraId)) || null;
+    this._hydrateHeader(this.activeObra);
+
     // 1. Configurar Cena com Atmosfera Suave
     this.scene = new THREE.Scene();
     this.scene.background = new THREE.Color(0x060E08);
@@ -96,8 +102,8 @@ const BIMStudio = {
     this.raycaster = new THREE.Raycaster();
     this.mouse = new THREE.Vector2();
 
-    // 10. Construir a Mansão de Alto Padrão (480 m²) com as 8 Disciplinas
-    this._buildMansionModel();
+    // 10. Construir o Modelo 3D da Obra com as 8 Disciplinas
+    this._buildBuildingModel(this.activeObra);
 
     // 11. Construir a Interface Lateral
     this._buildProjectTree();
@@ -107,6 +113,46 @@ const BIMStudio = {
 
     // 13. Loop de Renderização 60 FPS
     this._startLoop();
+  },
+
+  _hydrateHeader(obra) {
+    const nameEl = document.getElementById('studio-obra-name');
+    const areaEl = document.getElementById('studio-obra-area');
+    const orcadoEl = document.getElementById('studio-obra-orcado');
+    const avancoEl = document.getElementById('studio-obra-avanco');
+
+    if (!obra) {
+      if (nameEl) nameEl.textContent = 'Mansão Alto Padrão (Demonstração)';
+      if (areaEl) areaEl.textContent = '480';
+      if (orcadoEl) orcadoEl.textContent = 'R$ 1.035.000,00';
+      if (avancoEl) avancoEl.textContent = '85%';
+      return;
+    }
+
+    const areaTotal = Math.max(30, Number(obra.area_construida) || 120);
+    if (nameEl) nameEl.textContent = obra.nome || 'Obra Cadastrada';
+    if (areaEl) areaEl.textContent = String(areaTotal);
+
+    let orcadoFmt = 'R$ ---';
+    let avancoFmt = '0%';
+    try {
+      if (typeof DB !== 'undefined' && typeof DB.getOrcamentoVsRealizado === 'function') {
+        const comp = DB.getOrcamentoVsRealizado(obra.id);
+        if (comp && comp.totalOrcado > 0) {
+          orcadoFmt = typeof Utils !== 'undefined' ? Utils.fmt.currency(comp.totalOrcado) : `R$ ${comp.totalOrcado.toLocaleString('pt-BR', {minimumFractionDigits: 2})}`;
+          avancoFmt = `${Math.round(comp.percentualFisico || comp.percentualFinanceiro || 0)}%`;
+        }
+      }
+    } catch {}
+
+    if (orcadoFmt === 'R$ ---') {
+      const cubMedio = obra.padrao === 'Alto Padrão' ? 2800 : (obra.padrao === 'Econômico' ? 1600 : 2200);
+      const orc = Number(obra.valor_total) > 0 ? Number(obra.valor_total) : (areaTotal * cubMedio);
+      orcadoFmt = typeof Utils !== 'undefined' ? Utils.fmt.currency(orc) : `R$ ${orc.toLocaleString('pt-BR', {minimumFractionDigits: 2})}`;
+    }
+
+    if (orcadoEl) orcadoEl.textContent = orcadoFmt;
+    if (avancoEl) avancoEl.textContent = avancoFmt;
   },
 
   // =========================================================================
@@ -446,18 +492,31 @@ const BIMStudio = {
   },
 
   // =========================================================================
-  // MODELO 3D DA MANSÃO (480 m²) COM AS 8 DISCIPLINAS & MATERIAIS PBR
+  // MODELO 3D PARAMÉTRICO DINÂMICO BASEADO NA OBRA ATIVA COM AS 8 DISCIPLINAS
   // =========================================================================
-  _buildMansionModel() {
-    const W = 200;
-    const L = 260;
-    const H = 56;
+  _buildBuildingModel(obra) {
+    const areaTotal = Math.max(30, Number(obra?.area_construida) || (obra?.nome ? 120 : 480));
+    const pavimentos = Math.max(1, Math.min(6, Number(obra?.pavimentos) || (areaTotal > 180 ? 2 : 1)));
+    const padrao = obra?.padrao || 'Médio Padrão';
+    const hasPool = /piscina|deck|lazer/i.test((obra?.nome || '') + ' ' + (obra?.observacoes || '')) || padrao === 'Alto Padrão';
+
+    const areaPorPav = areaTotal / pavimentos;
+    const ratio = 1.3;
+    const largM = Math.sqrt(areaPorPav / ratio);
+    const compM = largM * ratio;
+    const scale = 13; // 1m ~= 13 unidades no canvas WebGL
+    const W = Math.round(largM * scale);
+    const L = Math.round(compM * scale);
+    const H = 46;
     const yPav1 = H + 6;
-    const yRoofBase = yPav1 + H + 4;
+    const yRoofBase = pavimentos >= 2 ? (yPav1 + H + 4) : (H + 4);
+
+    const cubMedio = padrao === 'Alto Padrão' ? 2800 : (padrao === 'Econômico' ? 1600 : 2200);
+    const orcadoTotal = Number(obra?.valor_total) > 0 ? Number(obra.valor_total) : (areaTotal * cubMedio);
 
     // Grid de Pilares / Sapatas
-    const cols = [-W/2 + 16, 0, W/2 - 16];
-    const rows = [-L/2 + 16, -L/6, L/6, L/2 - 16];
+    const cols = W > 150 ? [-W/2 + 16, 0, W/2 - 16] : [-W/2 + 14, W/2 - 14];
+    const rows = L > 180 ? [-L/2 + 16, -L/6, L/6, L/2 - 16] : [-L/2 + 14, 0, L/2 - 14];
     const sapataCoords = [];
     cols.forEach(x => rows.forEach(z => sapataCoords.push({ x, z })));
 
@@ -596,103 +655,125 @@ const BIMStudio = {
     // =========================================================================
     const groupSite = new THREE.Group();
     groupSite.name = 'Terreno & Implantação';
-    groupSite.userData = { id: 'site', sinapi: '98462', orcado: 35000, desc: 'Platô nivelado, calçadas perimetrais e grama natural esmeralda.' };
-    groupSite.add(createBox(W + 120, 6, L + 160, -W/2 - 60, -48, -L/2 - 90, matGrass, 'Grama Natural Esmeralda', 'Terreno', '98462', 15000));
-    groupSite.add(createBox(W + 40, 4, L + 50, -W/2 - 20, -42, -L/2 - 25, matConcrete, 'Calçada de Acesso Concreto Usinado', 'Terreno', '98462', 20000));
+    const orcSite = Math.round(orcadoTotal * 0.04);
+    groupSite.userData = { id: 'site', sinapi: '98462', orcado: orcSite, desc: 'Platô nivelado, calçadas perimetrais e grama natural esmeralda.' };
+    groupSite.add(createBox(W + 100, 6, L + 120, -W/2 - 50, -48, -L/2 - 60, matGrass, 'Grama Natural Esmeralda', 'Terreno', '98462', Math.round(orcSite * 0.4)));
+    groupSite.add(createBox(Math.min(60, Math.round(W/2)), 4, 35, -Math.min(30, Math.round(W/4)), -42, L/2 + 5, matConcrete, 'Calçada de Acesso Concreto Usinado', 'Terreno', '98462', Math.round(orcSite * 0.6)));
 
     // =========================================================================
-    // 1. FUNDAÇÕES, RADIER, PISCINA & DECK
+    // 1. FUNDAÇÕES, RADIER & ESTRUTURAS DE BASE
     // =========================================================================
     const groupFundacao = new THREE.Group();
-    groupFundacao.name = 'Fundações & Piscina';
-    groupFundacao.userData = { id: 'fundacao', sinapi: '96538', orcado: 145000, desc: '12 sapatas isoladas CA-50, baldrames, radier e piscina de concreto armado.' };
+    groupFundacao.name = hasPool ? 'Fundações & Piscina' : 'Fundações & Baldrame';
+    const orcFund = Math.round(orcadoTotal * 0.15);
+    groupFundacao.userData = { id: 'fundacao', sinapi: '96538', orcado: orcFund, desc: `${sapataCoords.length} sapatas isoladas CA-50, baldrames e radier de concreto armado.` };
     sapataCoords.forEach(pos => {
-      groupFundacao.add(createBox(36, 16, 36, pos.x - 18, -44, pos.z - 18, matConcrete, 'Sapata Isolada CA-50', 'Fundações', '96538', 4000));
-      groupFundacao.add(createBox(18, 14, 18, pos.x - 9, -28, pos.z - 9, matConcreteLight, 'Arranque de Pilar', 'Fundações', '96538', 1500));
+      groupFundacao.add(createBox(32, 16, 32, pos.x - 16, -44, pos.z - 16, matConcrete, 'Sapata Isolada CA-50', 'Fundações', '96538', Math.round(orcFund * 0.02)));
+      groupFundacao.add(createBox(16, 14, 16, pos.x - 8, -28, pos.z - 8, matConcreteLight, 'Arranque de Pilar', 'Fundações', '96538', Math.round(orcFund * 0.01)));
     });
-    cols.forEach(x => groupFundacao.add(createBox(16, 14, L - 24, x - 8, -14, -L/2 + 12, matConcreteLight, 'Viga Baldrame Long.', 'Fundações', '96538', 8000)));
-    rows.forEach(z => groupFundacao.add(createBox(W - 24, 14, 16, -W/2 + 12, -14, z - 8, matConcreteLight, 'Viga Baldrame Trans.', 'Fundações', '96538', 6000)));
-    groupFundacao.add(createBox(W - 12, 4, L - 12, -W/2 + 6, -2, -L/2 + 6, matSlab, 'Contrapiso Radier', 'Fundações', '96538', 15000));
+    cols.forEach(x => groupFundacao.add(createBox(16, 14, L - 24, x - 8, -14, -L/2 + 12, matConcreteLight, 'Viga Baldrame Long.', 'Fundações', '96538', Math.round(orcFund * 0.05))));
+    rows.forEach(z => groupFundacao.add(createBox(W - 24, 14, 16, -W/2 + 12, -14, z - 8, matConcreteLight, 'Viga Baldrame Trans.', 'Fundações', '96538', Math.round(orcFund * 0.04))));
+    groupFundacao.add(createBox(W - 12, 4, L - 12, -W/2 + 6, -2, -L/2 + 6, matSlab, 'Contrapiso Radier', 'Fundações', '96538', Math.round(orcFund * 0.15)));
     
-    // Piscina com Revestimento Pastilhado, Espelho d'Água e Deck de Cumaru
-    groupFundacao.add(createBox(80, 36, 60, -W/2 + 20, -36, -L/2 - 70, matPoolBottom, 'Estrutura e Pastilhas da Piscina', 'Lazer', '96538', 25000));
-    groupFundacao.add(createBox(72, 4, 52, -W/2 + 24, -4, -L/2 - 66, matWater, "Espelho d'Água Translúcido", 'Lazer', '96538', 12000));
-    groupFundacao.add(createBox(100, 3, 80, -W/2 + 12, -1, -L/2 - 80, matDeck, 'Deck Madeira Nobre Cumaru', 'Lazer', '96538', 18000));
+    if (hasPool) {
+      groupFundacao.add(createBox(Math.min(80, W - 40), 36, 50, -W/2 + 20, -36, -L/2 - 70, matPoolBottom, 'Estrutura e Pastilhas da Piscina', 'Lazer', '96538', Math.round(orcFund * 0.18)));
+      groupFundacao.add(createBox(Math.min(72, W - 48), 4, 42, -W/2 + 24, -4, -L/2 - 66, matWater, "Espelho d'Água Translúcido", 'Lazer', '96538', Math.round(orcFund * 0.08)));
+      groupFundacao.add(createBox(Math.min(96, W - 24), 3, 65, -W/2 + 12, -1, -L/2 - 75, matDeck, 'Deck Madeira Nobre Cumaru', 'Lazer', '96538', Math.round(orcFund * 0.12)));
+    } else {
+      groupFundacao.add(createBox(W - 20, 2, 35, -W/2 + 10, -46, -L/2 - 40, matGrass, 'Área Gramada e Pátio dos Fundos', 'Terreno', '96538', Math.round(orcFund * 0.05)));
+    }
 
     // =========================================================================
     // 2. SUPERESTRUTURA DE CONCRETO
     // =========================================================================
     const groupEstrutura = new THREE.Group();
     groupEstrutura.name = 'Superestrutura de Concreto';
-    groupEstrutura.userData = { id: 'estrutura', sinapi: '103670', orcado: 230000, desc: '24 pilares 30x30 cm, vigas de cinta e lajes maciças protendidas.' };
+    const orcEst = Math.round(orcadoTotal * 0.24);
+    groupEstrutura.userData = { id: 'estrutura', sinapi: '103670', orcado: orcEst, desc: `${sapataCoords.length * pavimentos} pilares 30x30 cm, vigas de cinta e lajes maciças protendidas.` };
     sapataCoords.forEach(pos => {
-      groupEstrutura.add(createBox(16, H, 16, pos.x - 8, 2, pos.z - 8, matConcreteLight, 'Pilar Térreo (30x30)', 'Estrutural', '103670', 3500));
-      groupEstrutura.add(createBox(16, H, 16, pos.x - 8, yPav1 + 2, pos.z - 8, matConcreteLight, 'Pilar 1º Pavimento', 'Estrutural', '103670', 3500));
+      groupEstrutura.add(createBox(16, H, 16, pos.x - 8, 2, pos.z - 8, matConcreteLight, 'Pilar Térreo (30x30)', 'Estrutural', '103670', Math.round(orcEst * 0.015)));
+      if (pavimentos >= 2) {
+        groupEstrutura.add(createBox(16, H, 16, pos.x - 8, yPav1 + 2, pos.z - 8, matConcreteLight, 'Pilar 1º Pavimento', 'Estrutural', '103670', Math.round(orcEst * 0.015)));
+      }
     });
-    groupEstrutura.add(createBox(W - 4, 8, L + 30, -W/2 + 2, yPav1 - 6, -L/2 + 2, matSlab, 'Laje Maciça Protendida Intermediária', 'Estrutural', '103670', 45000));
-    groupEstrutura.add(createBox(W - 4, 8, L - 4, -W/2 + 2, yRoofBase - 6, -L/2 + 2, matSlab, 'Laje Forro Superior', 'Estrutural', '103670', 38000));
+    if (pavimentos >= 2) {
+      groupEstrutura.add(createBox(W - 4, 8, L + 24, -W/2 + 2, yPav1 - 6, -L/2 + 2, matSlab, 'Laje Maciça Protendida Intermediária', 'Estrutural', '103670', Math.round(orcEst * 0.2)));
+    }
+    groupEstrutura.add(createBox(W - 4, 8, L - 4, -W/2 + 2, yRoofBase - 6, -L/2 + 2, matSlab, 'Laje Forro Superior', 'Estrutural', '103670', Math.round(orcEst * 0.2)));
 
     // =========================================================================
-    // 3. ARQUITETURA & ALVENARIA (PAREDES DECORATIVAS & VIDRO)
+    // 3. ARQUITETURA & ALVENARIA
     // =========================================================================
     const groupArq = new THREE.Group();
     groupArq.name = 'Arquitetura & Alvenaria';
-    groupArq.userData = { id: 'arquitetura', sinapi: '104658', orcado: 180000, desc: 'Alvenaria com pedra decorativa, pele de vidro duplo, esquadrias pretas e porta pivotante monumental.' };
+    const orcArq = Math.round(orcadoTotal * 0.18);
+    groupArq.userData = { id: 'arquitetura', sinapi: '104658', orcado: orcArq, desc: 'Alvenaria com pedra decorativa, pele de vidro duplo, esquadrias e porta pivotante.' };
     
-    // Parede de Destaque em Pedra Moledo na Fachada
-    groupArq.add(createBox(70, H, 8, -W/2 + 10, 2, L/2 - 14, matStoneWall, 'Parede Revestida em Pedra Moledo', 'Arquitetura', '104658', 16000));
-    groupArq.add(createBox(58, 38, 3, -W/2 + 16, 12, L/2 - 13, matGlass, 'Pele de Vidro Duplo Laminado', 'Arquitetura', '104658', 25000));
-    groupArq.add(createBox(62, 42, 1, -W/2 + 14, 10, L/2 - 14, matFrameBlack, 'Caixilharia Linha Gold Anodizada', 'Arquitetura', '104658', 10000));
+    const wallFrontW = Math.max(40, Math.round(W * 0.35));
+    groupArq.add(createBox(wallFrontW, H, 8, -W/2 + 10, 2, L/2 - 14, matStoneWall, 'Parede Revestida em Pedra Moledo', 'Arquitetura', '104658', Math.round(orcArq * 0.12)));
+    groupArq.add(createBox(wallFrontW - 10, H - 18, 3, -W/2 + 14, 10, L/2 - 13, matGlass, 'Pele de Vidro Duplo Laminado', 'Arquitetura', '104658', Math.round(orcArq * 0.15)));
+    groupArq.add(createBox(wallFrontW - 6, H - 14, 1, -W/2 + 12, 8, L/2 - 14, matFrameBlack, 'Caixilharia Linha Gold Anodizada', 'Arquitetura', '104658', Math.round(orcArq * 0.06)));
     
-    // Porta Pivotante Monumental Cumaru com Puxador Inox
-    groupArq.add(createBox(34, 50, 5, -6, 2, L/2 - 13, matWoodCumaru, 'Porta Pivotante Cumaru 3,20m', 'Arquitetura', '104658', 15000));
-    groupArq.add(createBox(3, 22, 3, 22, 16, L/2 - 8, matInox, 'Puxador Inox Escovado 1,50m', 'Arquitetura', '104658', 1800));
+    // Porta Pivotante
+    groupArq.add(createBox(Math.min(32, Math.round(W * 0.2)), Math.min(48, H - 6), 5, -6, 2, L/2 - 13, matWoodCumaru, 'Porta Pivotante Cumaru', 'Arquitetura', '104658', Math.round(orcArq * 0.08)));
+    groupArq.add(createBox(3, 20, 3, Math.min(22, Math.round(W * 0.15)), 14, L/2 - 8, matInox, 'Puxador Inox Escovado', 'Arquitetura', '104658', Math.round(orcArq * 0.01)));
     
-    // Paredes Laterais e Espaço Gourmet
-    groupArq.add(createBox(8, H, L - 24, -W/2 + 10, 2, -L/2 + 10, matWallLight, 'Parede Lateral Esquerda', 'Arquitetura', '104658', 18000));
-    groupArq.add(createBox(8, H, L - 24, W/2 - 18, 2, -L/2 + 10, matWallLight, 'Parede Lateral Direita', 'Arquitetura', '104658', 18000));
-    groupArq.add(createBox(60, 20, 18, 20, 2, -L/2 + 20, matGranite, 'Bancada Granito São Gabriel', 'Arquitetura', '104658', 8500));
-    groupArq.add(createBox(18, 52, 18, 62, 2, -L/2 + 18, matBrick, 'Churrasqueira Alvenaria Refratária', 'Arquitetura', '104658', 6000));
+    // Paredes Laterais e Fundos
+    groupArq.add(createBox(8, H, L - 24, -W/2 + 10, 2, -L/2 + 10, matWallLight, 'Parede Lateral Esquerda', 'Arquitetura', '104658', Math.round(orcArq * 0.1)));
+    groupArq.add(createBox(8, H, L - 24, W/2 - 18, 2, -L/2 + 10, matWallLight, 'Parede Lateral Direita', 'Arquitetura', '104658', Math.round(orcArq * 0.1)));
+    groupArq.add(createBox(W - 20, H, 8, -W/2 + 10, 2, -L/2 + 10, matWallLight, 'Parede Fundos', 'Arquitetura', '104658', Math.round(orcArq * 0.1)));
     
-    // 1º Pavimento
-    groupArq.add(createBox(W - 16, 22, 2, -W/2 + 8, yPav1 + 6, L/2 + 30, matGlass, 'Guarda-corpo Sacada Vidro Laminado', 'Arquitetura', '104658', 14000));
-    groupArq.add(createBox(W - 12, 3, 4, -W/2 + 6, yPav1 + 28, L/2 + 29, matFrameBlack, 'Corrimão Alumínio Preto Fosco', 'Arquitetura', '104658', 4500));
-    groupArq.add(createBox(90, H, 8, -W/2 + 10, yPav1 + 2, L/2 - 14, matWallLight, 'Parede Suíte Master', 'Arquitetura', '104658', 16000));
-    groupArq.add(createBox(56, 46, 3, -36, yPav1 + 2, L/2 - 12, matGlass, 'Porta-Balcão 4 Folhas Vidro', 'Arquitetura', '104658', 12000));
+    if (pavimentos >= 2) {
+      groupArq.add(createBox(W - 16, 22, 2, -W/2 + 8, yPav1 + 6, L/2 + 24, matGlass, 'Guarda-corpo Sacada Vidro Laminado', 'Arquitetura', '104658', Math.round(orcArq * 0.08)));
+      groupArq.add(createBox(W - 12, 3, 4, -W/2 + 6, yPav1 + 28, L/2 + 23, matFrameBlack, 'Corrimão Alumínio Preto Fosco', 'Arquitetura', '104658', Math.round(orcArq * 0.02)));
+      groupArq.add(createBox(Math.max(50, Math.round(W * 0.45)), H, 8, -W/2 + 10, yPav1 + 2, L/2 - 14, matWallLight, 'Parede Suíte Superior', 'Arquitetura', '104658', Math.round(orcArq * 0.09)));
+      groupArq.add(createBox(Math.min(48, Math.round(W * 0.3)), H - 10, 3, -28, yPav1 + 2, L/2 - 12, matGlass, 'Porta-Balcão Vidro', 'Arquitetura', '104658', Math.round(orcArq * 0.07)));
+    }
 
     // =========================================================================
     // 4. INSTALAÇÕES HIDROSSANITÁRIAS & ESGOTO
     // =========================================================================
     const groupHid = new THREE.Group();
     groupHid.name = 'Instalações Hidrossanitárias';
-    groupHid.userData = { id: 'hidraulica', sinapi: '89985', orcado: 115000, desc: '2 Caixas de 1.500L, barrilete 50mm, colunas de água fria/quente PPR e tubos de queda 100mm.' };
-    groupHid.add(createBox(32, 28, 32, -44, yRoofBase + 8, -20, matPipeCold, "Caixa d'Água 1.500 L (1)", 'Hidráulica', '89985', 3800));
-    groupHid.add(createBox(32, 28, 32, 12, yRoofBase + 8, -20, matPipeCold, "Caixa d'Água 1.500 L (2)", 'Hidráulica', '89985', 3800));
-    groupHid.add(createBox(92, 5, 6, -46, yRoofBase + 2, -24, matPipeCold, 'Barrilete Geral 50mm Soldável', 'Hidráulica', '89985', 4500));
-    const pipesCol = [{ x: -W/2 + 28, z: 20 }, { x: W/2 - 36, z: 20 }, { x: 0, z: -L/2 + 30 }];
+    const orcHid = Math.round(orcadoTotal * 0.12);
+    groupHid.userData = { id: 'hidraulica', sinapi: '89985', orcado: orcHid, desc: 'Caixa d\'água, barrilete, colunas de água fria/quente PPR e tubos de queda 100mm.' };
+    groupHid.add(createBox(Math.min(30, Math.round(W/4)), 24, Math.min(30, Math.round(L/5)), -Math.min(30, Math.round(W/4)), yRoofBase + 6, -15, matPipeCold, "Caixa d'Água 1.000 L", 'Hidráulica', '89985', Math.round(orcHid * 0.15)));
+    groupHid.add(createBox(Math.min(60, Math.round(W/2)), 5, 6, -Math.min(32, Math.round(W/4)), yRoofBase + 2, -18, matPipeCold, 'Barrilete Geral 50mm Soldável', 'Hidráulica', '89985', Math.round(orcHid * 0.08)));
+    
+    const pipesCol = [{ x: -W/2 + 24, z: 15 }, { x: W/2 - 28, z: 15 }];
+    if (L > 160) pipesCol.push({ x: 0, z: -L/2 + 25 });
     pipesCol.forEach(col => {
-      groupHid.add(createBox(4, yRoofBase + 4, 4, col.x, 2, col.z, matPipeCold, 'Coluna Água Fria Soldável (Azul)', 'Hidráulica', '89985', 2800));
-      groupHid.add(createBox(4, yRoofBase + 4, 4, col.x + 6, 2, col.z, matPipeHot, 'Coluna Água Quente PPR (Verde)', 'Hidráulica', '89985', 3500));
-      groupHid.add(createBox(7, yRoofBase + 2, 7, col.x + 14, -16, col.z, matPipeSewage, 'Tubo de Queda Esgoto 100mm (Branco)', 'Hidráulica', '89985', 4200));
-      groupHid.add(createBox(40, 4, 4, col.x - 20, yPav1 - 2, col.z, matPipeCold, 'Ramal Distribuição', 'Hidráulica', '89985', 1800));
+      groupHid.add(createBox(4, yRoofBase + 4, 4, col.x, 2, col.z, matPipeCold, 'Coluna Água Fria Soldável (Azul)', 'Hidráulica', '89985', Math.round(orcHid * 0.05)));
+      groupHid.add(createBox(4, yRoofBase + 4, 4, col.x + 6, 2, col.z, matPipeHot, 'Coluna Água Quente PPR (Verde)', 'Hidráulica', '89985', Math.round(orcHid * 0.05)));
+      groupHid.add(createBox(6, yRoofBase + 2, 6, col.x + 12, -16, col.z, matPipeSewage, 'Tubo de Queda Esgoto 100mm (Branco)', 'Hidráulica', '89985', Math.round(orcHid * 0.06)));
     });
-    groupHid.add(createBox(W - 40, 8, 8, -W/2 + 20, -18, -L/2 + 10, matPipeSewage, 'Coletor Predial Esgoto 150mm', 'Hidráulica', '89985', 12000));
+    groupHid.add(createBox(W - 32, 7, 7, -W/2 + 16, -18, -L/2 + 10, matPipeSewage, 'Coletor Predial Esgoto 150mm', 'Hidráulica', '89985', Math.round(orcHid * 0.2)));
 
     // =========================================================================
     // 5. INSTALAÇÕES ELÉTRICAS & AUTOMAÇÃO
     // =========================================================================
     const groupEle = new THREE.Group();
     groupEle.name = 'Instalações Elétricas';
-    groupEle.userData = { id: 'eletrica', sinapi: '91834', orcado: 125000, desc: 'QDG 48 disjuntores, eletrocalhas perfuradas, eletrodutos PEAD e spots LED de embutir.' };
-    groupEle.add(createBox(6, 28, 24, -W/2 + 14, 18, 40, matElectric, 'Quadro QDG 48 Disjuntores', 'Elétrica', '91834', 12000));
-    groupEle.add(createBox(6, 24, 20, -W/2 + 14, yPav1 + 18, 40, matElectric, 'Quadro QDC 1º Pavimento', 'Elétrica', '91834', 8500));
-    groupEle.add(createBox(8, 5, L - 60, -W/2 + 18, H - 4, -L/2 + 30, matTray, 'Eletrocalha Perfurada Térreo', 'Elétrica', '91834', 9500));
-    groupEle.add(createBox(8, 5, L - 60, -W/2 + 18, yPav1 + H - 4, -L/2 + 30, matTray, 'Eletrocalha Perfurada 1º Pav.', 'Elétrica', '91834', 9500));
-    const circuits = [{ x: -40, z: 60 }, { x: 40, z: 60 }, { x: -40, z: -40 }, { x: 40, z: -40 }];
+    const orcEle = Math.round(orcadoTotal * 0.12);
+    groupEle.userData = { id: 'eletrica', sinapi: '91834', orcado: orcEle, desc: 'QDG, eletrocalhas perfuradas, eletrodutos PEAD e spots LED de embutir.' };
+    groupEle.add(createBox(6, 24, 20, -W/2 + 14, 18, Math.round(L/4), matElectric, 'Quadro QDG', 'Elétrica', '91834', Math.round(orcEle * 0.2)));
+    if (pavimentos >= 2) {
+      groupEle.add(createBox(6, 22, 18, -W/2 + 14, yPav1 + 18, Math.round(L/4), matElectric, 'Quadro QDC 1º Pavimento', 'Elétrica', '91834', Math.round(orcEle * 0.12)));
+    }
+    groupEle.add(createBox(7, 5, L - 50, -W/2 + 18, H - 4, -L/2 + 25, matTray, 'Eletrocalha Perfurada Térreo', 'Elétrica', '91834', Math.round(orcEle * 0.15)));
+    
+    const circuits = [
+      { x: -Math.round(W/4), z: Math.round(L/4) },
+      { x: Math.round(W/4),  z: Math.round(L/4) },
+      { x: -Math.round(W/4), z: -Math.round(L/4) },
+      { x: Math.round(W/4),  z: -Math.round(L/4) }
+    ];
     circuits.forEach(pt => {
-      groupEle.add(createBox(3, H - 8, 3, pt.x, 4, pt.z, matElectric, 'Eletroduto PEAD Antichamas', 'Elétrica', '91834', 1200));
-      groupEle.add(createBox(12, 2, 12, pt.x - 6, H - 1, pt.z - 6, matInox, 'Painel LED Embutir 24W', 'Elétrica', '91834', 650));
-      groupEle.add(createBox(12, 2, 12, pt.x - 6, yPav1 + H - 1, pt.z - 6, matInox, 'Painel LED 1º Pav.', 'Elétrica', '91834', 650));
+      groupEle.add(createBox(3, H - 8, 3, pt.x, 4, pt.z, matElectric, 'Eletroduto PEAD Antichamas', 'Elétrica', '91834', Math.round(orcEle * 0.02)));
+      groupEle.add(createBox(10, 2, 10, pt.x - 5, H - 1, pt.z - 5, matInox, 'Painel LED Embutir', 'Elétrica', '91834', Math.round(orcEle * 0.015)));
+      if (pavimentos >= 2) {
+        groupEle.add(createBox(10, 2, 10, pt.x - 5, yPav1 + H - 1, pt.z - 5, matInox, 'Painel LED 1º Pav.', 'Elétrica', '91834', Math.round(orcEle * 0.015)));
+      }
     });
 
     // =========================================================================
@@ -700,35 +781,36 @@ const BIMStudio = {
     // =========================================================================
     const groupHvac = new THREE.Group();
     groupHvac.name = 'Climatização & HVAC';
-    groupHvac.userData = { id: 'mecanica', sinapi: '98512', orcado: 85000, desc: 'Sistema VRF 16 HP, rede de dutos galvanizados e evaporadoras cassete 4 vias.' };
-    groupHvac.add(createBox(26, 32, 20, W/2 - 40, yRoofBase + 2, -L/2 + 20, matConcrete, 'Condensadora VRF 8 HP (1)', 'HVAC', '98512', 22000));
-    groupHvac.add(createBox(26, 32, 20, W/2 - 40, yRoofBase + 2, -L/2 + 50, matConcrete, 'Condensadora VRF 8 HP (2)', 'HVAC', '98512', 22000));
-    groupHvac.add(createBox(40, 8, L - 60, -20, H - 8, -L/2 + 30, matDuct, 'Duto Principal Galvanizado Térreo', 'HVAC', '98512', 12000));
-    groupHvac.add(createBox(40, 8, L - 60, -20, yPav1 + H - 8, -L/2 + 30, matDuct, 'Duto Climatização 1º Pav.', 'HVAC', '98512', 12000));
-    groupHvac.add(createBox(32, 6, 32, -16, H - 6, 20, matWallLight, 'Evaporadora Cassete 4 Vias Sala', 'HVAC', '98512', 4500));
-    groupHvac.add(createBox(32, 6, 32, -16, H - 6, -60, matWallLight, 'Evaporadora Cassete Gourmet', 'HVAC', '98512', 4500));
-    groupHvac.add(createBox(32, 6, 32, -16, yPav1 + H - 6, 20, matWallLight, 'Evaporadora Cassete Suíte', 'HVAC', '98512', 4500));
+    const orcHvac = Math.round(orcadoTotal * 0.08);
+    groupHvac.userData = { id: 'mecanica', sinapi: '98512', orcado: orcHvac, desc: 'Sistema de climatização, rede de dutos e evaporadoras.' };
+    groupHvac.add(createBox(24, 28, 18, W/2 - 34, yRoofBase + 2, -L/2 + 20, matConcrete, 'Condensadora Inverter Externa', 'HVAC', '98512', Math.round(orcHvac * 0.35)));
+    groupHvac.add(createBox(32, 7, L - 50, -16, H - 8, -L/2 + 25, matDuct, 'Duto Principal de Climatização', 'HVAC', '98512', Math.round(orcHvac * 0.2)));
+    groupHvac.add(createBox(28, 6, 28, -14, H - 6, 15, matWallLight, 'Evaporadora Cassete Sala', 'HVAC', '98512', Math.round(orcHvac * 0.15)));
+    if (pavimentos >= 2) {
+      groupHvac.add(createBox(28, 6, 28, -14, yPav1 + H - 6, 15, matWallLight, 'Evaporadora Cassete 1º Pav.', 'HVAC', '98512', Math.round(orcHvac * 0.15)));
+    }
 
     // =========================================================================
     // 7. COBERTURA & TELHADO COLONIAL
     // =========================================================================
     const groupCob = new THREE.Group();
     groupCob.name = 'Cobertura & Telhado';
-    groupCob.userData = { id: 'cobertura', sinapi: '94213', orcado: 120000, desc: 'Telhado colonial cerâmico de 2 águas com cumeeira e calhas galvanizadas.' };
+    const orcCob = Math.round(orcadoTotal * 0.12);
+    groupCob.userData = { id: 'cobertura', sinapi: '94213', orcado: orcCob, desc: 'Telhado colonial cerâmico de 2 águas com cumeeira e calhas galvanizadas.' };
     
-    // Geometria de Telhado Inclinado 2 Águas
-    const roofGeom = new THREE.ConeGeometry(W/2 + 20, 44, 4);
+    const roofRidgeHeight = Math.min(42, Math.round(W * 0.22));
+    const roofGeom = new THREE.ConeGeometry(W/2 + 20, roofRidgeHeight, 4);
     const roofMesh = new THREE.Mesh(roofGeom, matRoofTile);
-    roofMesh.position.set(0, yRoofBase + 24, 0);
+    roofMesh.position.set(0, yRoofBase + Math.round(roofRidgeHeight / 2), 0);
     roofMesh.rotation.y = Math.PI / 4;
     roofMesh.scale.set(1.15, 1, 1.4);
     roofMesh.castShadow = true;
     roofMesh.receiveShadow = true;
-    roofMesh.userData = { name: 'Telhado Colonial 2 Águas', category: 'Cobertura', sinapi: '94213', orcado: 110000, originalMaterial: matRoofTile };
+    roofMesh.userData = { name: 'Telhado Colonial 2 Águas', category: 'Cobertura', sinapi: '94213', orcado: Math.round(orcCob * 0.8), originalMaterial: matRoofTile };
     groupCob.add(roofMesh);
 
-    groupCob.add(createBox(6, 6, L + 28, -W/2 - 14, yRoofBase - 2, -L/2 - 14, matConcrete, 'Calha Pluvial Galvanizada Esq.', 'Cobertura', '94213', 5000));
-    groupCob.add(createBox(6, 6, L + 28, W/2 + 8, yRoofBase - 2, -L/2 - 14, matConcrete, 'Calha Pluvial Galvanizada Dir.', 'Cobertura', '94213', 5000));
+    groupCob.add(createBox(6, 6, L + 28, -W/2 - 14, yRoofBase - 2, -L/2 - 14, matConcrete, 'Calha Pluvial Galvanizada Esq.', 'Cobertura', '94213', Math.round(orcCob * 0.1)));
+    groupCob.add(createBox(6, 6, L + 28, W/2 + 8, yRoofBase - 2, -L/2 - 14, matConcrete, 'Calha Pluvial Galvanizada Dir.', 'Cobertura', '94213', Math.round(orcCob * 0.1)));
 
     // Adicionar Grupos à Cena
     const groups = [groupSite, groupFundacao, groupEstrutura, groupArq, groupHid, groupEle, groupHvac, groupCob];
@@ -738,6 +820,16 @@ const BIMStudio = {
     });
 
     this.elements = groups;
+  },
+
+  _buildMansionModel() {
+    return this._buildBuildingModel({
+      nome: 'Mansão Villa Aurora',
+      area_construida: 480,
+      pavimentos: 2,
+      padrao: 'Alto Padrão',
+      observacoes: 'Piscina com deck cumaru'
+    });
   },
 
   // =========================================================================
