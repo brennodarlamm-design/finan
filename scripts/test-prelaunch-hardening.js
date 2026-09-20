@@ -130,5 +130,9 @@ const masterPageClient=read('js/master_page.js');
 const contasClient=read('js/contas.js');
 ok('Solicitação comercial, gate Master e contas têm deadlines', loginPageClient.includes("Auth._fetchWithTimeout('/api/auth?action=register'") && masterPageClient.includes("Auth._fetchWithTimeout('/api/auth?action=me'") && contasClient.includes('AbortSignal.timeout(20000)'));
 
+
+ok('UI de documentos identifica R2 sem anunciar Vercel como storage principal', documentosClient.includes('☁️ Cloudflare R2') && documentosClient.includes('☁️ Armazenamento legado') && !documentosClient.includes('Documento salvo no Vercel Blob!'));
+ok('Master exibe R2 como armazenamento central', masterClient.includes('Neon PostgreSQL + Cloudflare R2') && !masterClient.includes('Neon PostgreSQL + Vercel Blob'));
+
 if(process.exitCode) process.exit(process.exitCode);
 console.log('\n✅ Hardening pré-lançamento protegido por regressão estática.');
