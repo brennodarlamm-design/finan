@@ -8,6 +8,7 @@
   const state = {
     rows: [],
     revealed: new Map(),
+    revealTimers: new Map(),
     loading: false,
     lastError: ''
   };
@@ -37,6 +38,32 @@
 
   function masked(last4) {
     return last4 ? `••${esc(last4)}` : '—';
+  }
+
+  function clearRevealTimer(tenantId) {
+    const timer = state.revealTimers.get(tenantId);
+    if (timer) clearTimeout(timer);
+    state.revealTimers.delete(tenantId);
+  }
+
+  function hideKey(tenantId, rerender = true) {
+    clearRevealTimer(tenantId);
+    const removed = state.revealed.delete(tenantId);
+    if (removed && rerender) render();
+  }
+
+  function scheduleAutoHide(tenantId) {
+    clearRevealTimer(tenantId);
+    state.revealTimers.set(tenantId, setTimeout(() => {
+      hideKey(tenantId);
+    }, 60_000));
+  }
+
+  function clearAllRevealed() {
+    for (const tenantId of state.revealTimers.keys()) clearRevealTimer(tenantId);
+    if (!state.revealed.size) return;
+    state.revealed.clear();
+    render();
   }
 
   function findSystemAnchor() {
@@ -156,7 +183,7 @@
       const data = await resp.json().catch(() => ({}));
       if (!resp.ok || !data.success) throw new Error(data.error || 'Falha ao carregar cofre DEV.');
       state.rows = Array.isArray(data.keys) ? data.keys : [];
-      state.revealed.clear();
+      clearAllRevealed();
     } catch (err) {
       state.lastError = err?.message || 'Falha ao carregar cofre DEV.';
     } finally {
@@ -167,8 +194,7 @@
 
   async function toggleReveal(tenantId) {
     if (state.revealed.has(tenantId)) {
-      state.revealed.delete(tenantId);
-      render();
+      hideKey(tenantId);
       return;
     }
     try {
@@ -179,6 +205,7 @@
       const data = await resp.json().catch(() => ({}));
       if (!resp.ok || !data.success || !data.accessKey) throw new Error(data.error || 'Não foi possível revelar a chave.');
       state.revealed.set(tenantId, String(data.accessKey));
+      scheduleAutoHide(tenantId);
       render();
     } catch (err) {
       alert(err?.message || 'Não foi possível revelar a chave.');
@@ -200,6 +227,7 @@
       if (!resp.ok || !data.success || !data.accessKey) throw new Error(data.error || 'Falha ao rotacionar a chave.');
 
       state.revealed.set(tenantId, String(data.accessKey));
+      scheduleAutoHide(tenantId);
       const idx = state.rows.findIndex(r => r.tenantId === tenantId);
       if (idx >= 0) state.rows[idx] = { ...state.rows[idx], last4: data.last4, vaultReady: true };
       render();
@@ -258,6 +286,11 @@
     installMasterOverride();
     ensurePanel();
   });
+
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) clearAllRevealed();
+  });
+  window.addEventListener('pagehide', clearAllRevealed);
 
   globalThis.DevTenantKeys = { load, rotateTenant, toggleReveal };
 })();
