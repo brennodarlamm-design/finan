@@ -2,6 +2,7 @@ import { executeEdgeApi } from './api/_edge-adapter.js';
 import { applyEdgeSecurityMiddleware } from './api/_edge-security.js';
 import { recordEdgeMetric, getEdgeMetricsSummary, renderEdgeMetricsHtml } from './api/_edge-metrics.js';
 import { dispatchEdgeAlert } from './api/_edge-alerts.js';
+import { createCriticalR2Backup } from './api/_edge-backup.js';
 export { BudgetSyncRoom } from './api/_edge-realtime.js';
 
 const DEFAULT_API_ORIGIN = 'https://api.fingo.api.br';
@@ -510,11 +511,21 @@ export default {
     const targetUrl = env.RENDER_HEALTH_URL || 'https://finan-backend-9rxw.onrender.com/healthz';
     ctx.waitUntil(
       fetch(targetUrl, {
-        headers: { 'User-Agent': 'FinObra-KeepAlive/1.0 (Cloudflare Edge Worker)' }
+        headers: { 'User-Agent': 'FinGo-KeepAlive/1.0 (Cloudflare Edge Worker)' }
       }).then(res => {
         console.log(`[Cloudflare Keep-Alive] Ping no Render status: ${res.status}`);
       }).catch(err => {
         console.warn(`[Cloudflare Keep-Alive] Aviso no ping do Render: ${err.message}`);
+      })
+    );
+
+    // Segunda camada de recuperação: snapshot diário dos dados críticos Neon em R2.
+    // A função é idempotente por data e só executa na janela das 07:00 UTC.
+    ctx.waitUntil(
+      createCriticalR2Backup(env).then(result => {
+        if (!result?.skipped) console.log('[FinGo Backup] Snapshot crítico salvo:', result?.key || result);
+      }).catch(err => {
+        console.error('[FinGo Backup] Falha no snapshot crítico:', err?.message || err);
       })
     );
   }
