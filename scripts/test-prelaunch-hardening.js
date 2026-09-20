@@ -60,7 +60,7 @@ ok('Pagamento confirmado recupera UI quando refresh de sessão falha', cobranca.
 ok('Falha de sincronização de rota é mostrada ao usuário', app.includes('Dados locais exibidos. A sincronização com a nuvem falhou'));
 
 const authClient=read('js/auth.js');
-ok('Auth crítico usa timeout no navegador', authClient.includes('async _fetchWithTimeout(') && authClient.includes("this._fetchWithTimeout('/api/auth?action=login'") && authClient.includes("this._fetchWithTimeout('/api/auth?action=mfa_verify'") && authClient.includes("this._fetchWithTimeout('/api/auth?action=request_reset'") && authClient.includes("this._fetchWithTimeout('/api/auth?action=verify_reset'") && authClient.includes("this._fetchWithTimeout('/api/auth?action=register'"));
+ok('Auth crítico usa timeout no navegador', authClient.includes('async _fetchWithTimeout(') && authClient.includes("this._fetchWithTimeout('/api/auth?action=login'") && authClient.includes("this._fetchWithTimeout('/api/auth?action=mfa_verify'") && authClient.includes("this._fetchWithTimeout('/api/auth?action=request_reset'") && authClient.includes("this._fetchWithTimeout('/api/auth?action=verify_reset'") && authClient.includes("this._fetchWithTimeout('/api/auth?action=register'") && authClient.includes("this._fetchWithTimeout('/api/auth?action=sessions'") && authClient.includes("this._fetchWithTimeout('/api/auth?action=revoke_session'") && authClient.includes("this._fetchWithTimeout('/api/admin?action=restore_master_session'"));
 
 if(process.exitCode) process.exit(process.exitCode);
 console.log('\n✅ Hardening pré-lançamento protegido por regressão estática.');
