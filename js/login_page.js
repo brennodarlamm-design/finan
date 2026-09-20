@@ -57,11 +57,13 @@ if (window.location.hash.startsWith('#validar') || window.location.search.includ
       const data = await resp.json().catch(() => ({}));
       if (data.success && data.commercial_request) {
         if (okBox) {
-          okBox.textContent = data.message || 'Solicitação enviada! Nossa equipe entrará em contato em breve.';
+          okBox.innerHTML = '<strong>✓ Solicitação recebida.</strong><br>Próximo passo: a equipe FinGo valida os dados da construtora e envia as credenciais/chave da empresa pelos canais informados. Para atendimento imediato, use o botão de WhatsApp abaixo.';
           okBox.style.display = 'block';
+          okBox.setAttribute('role', 'status');
+          okBox.setAttribute('aria-live', 'polite');
         }
-        btn.textContent = '✓ Solicitação enviada!';
-        setTimeout(() => closeRegisterModal(), 3500);
+        btn.textContent = '✓ Solicitação recebida';
+        btn.disabled = true;
       } else {
         throw new Error(data.message || 'Erro ao enviar solicitação. Tente via WhatsApp.');
       }
