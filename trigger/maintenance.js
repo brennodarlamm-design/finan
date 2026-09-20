@@ -166,7 +166,8 @@ export const dailySlaAudit = schedules.task({
               to: [info.email],
               subject,
               html
-            })
+            }),
+            signal: AbortSignal.timeout(12000)
           });
 
           if (emailRes.ok) {
@@ -243,7 +244,8 @@ export const renderKeepAlive = schedules.task({
     const targetUrl = process.env.RENDER_HEALTH_URL || "https://finan-backend-9rxw.onrender.com/healthz";
     try {
       const res = await fetch(targetUrl, {
-        headers: { "User-Agent": "FinObra-KeepAlive/1.0 (Trigger.dev Robot)" }
+        headers: { "User-Agent": "FinGo-KeepAlive/1.0 (Trigger.dev Robot)" },
+        signal: AbortSignal.timeout(5000)
       });
       logger.info(`[Render Keep-Alive] Ping executado com status: ${res.status}`);
       return { ok: true, status: res.status, url: targetUrl };
