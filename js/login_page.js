@@ -49,11 +49,11 @@ if (window.location.hash.startsWith('#validar') || window.location.search.includ
     const msg = (document.getElementById('reg-msg') || {}).value?.trim() || '';
 
     try {
-      const resp = await fetch('/api/auth?action=register', {
+      const resp = await Auth._fetchWithTimeout('/api/auth?action=register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ nome, email, telefone: whats, empresaNome: empNome, cnpj, mensagem: msg })
-      });
+      }, 20000);
       const data = await resp.json().catch(() => ({}));
       if (data.success && data.commercial_request) {
         if (okBox) {
