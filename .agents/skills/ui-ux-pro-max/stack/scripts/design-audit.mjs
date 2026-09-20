@@ -121,20 +121,42 @@ function inPageChecks() {
   const toRgb = (c) => { const m = c.match(/rgba?\(([^)]+)\)/); if (!m) return null; const p = m[1].split(',').map((x) => parseFloat(x)); return { r: p[0], g: p[1], b: p[2], a: p[3] ?? 1 }; };
   const lum = ({ r, g, b }) => { const f = (v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; }; return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b); };
   const ratio = (a, b) => { const L1 = lum(a), L2 = lum(b); return (Math.max(L1, L2) + 0.05) / (Math.min(L1, L2) + 0.05); };
-  const bgOf = (el) => { let n = el; while (n) { const c = toRgb(getComputedStyle(n).backgroundColor); if (c && c.a !== 0) return c; n = n.parentElement; } return { r: 255, g: 255, b: 255, a: 1 }; };
+  const composite = (top, bottom) => {
+    const a = top.a + bottom.a * (1 - top.a);
+    if (a <= 0) return { r: 255, g: 255, b: 255, a: 1 };
+    return {
+      r: (top.r * top.a + bottom.r * bottom.a * (1 - top.a)) / a,
+      g: (top.g * top.a + bottom.g * bottom.a * (1 - top.a)) / a,
+      b: (top.b * top.a + bottom.b * bottom.a * (1 - top.a)) / a,
+      a
+    };
+  };
+  const bgOf = (el) => {
+    const layers = [];
+    let n = el;
+    while (n) {
+      const c = toRgb(getComputedStyle(n).backgroundColor);
+      if (c && c.a > 0) layers.push(c);
+      n = n.parentElement;
+    }
+    let out = { r: 255, g: 255, b: 255, a: 1 };
+    for (let i = layers.length - 1; i >= 0; i--) out = composite(layers[i], out);
+    return out;
+  };
   const textEls = [...document.querySelectorAll('p,span,a,li,h1,h2,h3,h4,button,label,td')]
     .filter((el) => (el.textContent || '').trim().length > 1 && el.offsetParent !== null).slice(0, 120);
   let lowContrast = 0;
   const lowContrastExamples = [];
   for (const el of textEls) {
     const s = getComputedStyle(el);
-    const fg = toRgb(s.color); if (!fg) continue;
+    const fg = toRgb(s.color); if (!fg || fg.a === 0) continue;
     const bg = bgOf(el);
+    const effectiveFg = fg.a < 1 ? composite(fg, bg) : fg;
     const size = parseFloat(s.fontSize);
     const bold = parseInt(s.fontWeight, 10) >= 700;
     const large = size >= 24 || (size >= 18.66 && bold);
     const need = large ? 3 : 4.5;
-    const measured = ratio(fg, bg);
+    const measured = ratio(effectiveFg, bg);
     if (measured < need - 0.05) {
       lowContrast++;
       if (lowContrastExamples.length < 10) {
