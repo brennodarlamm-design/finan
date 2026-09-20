@@ -95,15 +95,22 @@ function inPageChecks() {
     })
     .slice(0, 25);
   let noFocus = 0;
+  const noFocusExamples = [];
   for (const el of focusables) {
     el.focus();
     const s = getComputedStyle(el);
     const hasOutline = s.outlineStyle !== 'none' && parseFloat(s.outlineWidth) > 0;
     const hasShadow = s.boxShadow && s.boxShadow !== 'none';
-    if (!hasOutline && !hasShadow) noFocus++;
+    if (!hasOutline && !hasShadow) {
+      noFocus++;
+      if (noFocusExamples.length < 12) {
+        const label = (el.getAttribute('aria-label') || el.textContent || el.getAttribute('name') || el.id || '').trim().replace(/\s+/g, ' ').slice(0, 42);
+        noFocusExamples.push(`${el.tagName.toLowerCase()}${el.id ? '#' + el.id : ''}${el.className && typeof el.className === 'string' ? '.' + el.className.trim().split(/\s+/)[0] : ''} "${label}" active=${document.activeElement === el}`);
+      }
+    }
     el.blur();
   }
-  if (noFocus > 0) push('high', 'focus-visible', `${noFocus}/${focusables.length} sampled interactive elements show no visible focus indicator.`);
+  if (noFocus > 0) push('high', 'focus-visible', `${noFocus}/${focusables.length} sampled interactive elements show no visible focus indicator.`, noFocusExamples.join(' | '));
 
   // 5. Accessible names on controls
   const namelessBtns = [...document.querySelectorAll('button,a[href]')].filter((el) => {
