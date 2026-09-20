@@ -18,7 +18,7 @@ const NFe = {
           options.signal.addEventListener('abort', externalAbortHandler, { once: true });
         }
       }
-      return await this._fetchWithTimeout(url, { ...options, signal: controller.signal });
+      return await fetch(url, { ...options, signal: controller.signal });
     } catch (err) {
       if (controller.signal.aborted && err?.name === 'AbortError') {
         const timeoutError = new Error('A operação fiscal demorou mais que o esperado. Tente novamente.');
