@@ -171,5 +171,11 @@ ok('Proxy, service worker e Render usam deadlines explícitos',
   renderDeploy.includes('AbortSignal.timeout(15000)') &&
   (legacyCleanup.match(/AbortSignal\.timeout\(15000\)/g)||[]).length >= 2);
 
+ok('OTP de recuperação não é persistido no navegador',
+  !authClient.includes('finobra_otp_') &&
+  authClient.includes('O OTP permanece somente em memória') &&
+  loginPageClient.includes('recoveryResetToken = null') &&
+  loginPageClient.includes('recoveryRequestId = null'));
+
 if(process.exitCode) process.exit(process.exitCode);
 console.log('\n✅ Hardening pré-lançamento protegido por regressão estática.');
