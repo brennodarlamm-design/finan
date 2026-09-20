@@ -1075,7 +1075,7 @@ const MasterAdmin = {
           <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:16px;font-size:.84rem;">
             <div><div style="color:#64748b;margin-bottom:4px;">Sistema / Plataforma</div><div style="font-weight:700;color:#fff;">FinGo SaaS Backoffice</div></div>
             <div><div style="color:#64748b;margin-bottom:4px;">Versão em Produção</div><div style="font-weight:700;color:#fff;">2.4.0 (FinGo Cloud)</div></div>
-            <div><div style="color:#64748b;margin-bottom:4px;">Armazenamento Central</div><div style="font-weight:700;color:#22c55e;">🐘 Neon PostgreSQL + Vercel Blob</div></div>
+            <div><div style="color:#64748b;margin-bottom:4px;">Armazenamento Central</div><div style="font-weight:700;color:#22c55e;">🐘 Neon PostgreSQL + Cloudflare R2</div></div>
             <div><div style="color:#64748b;margin-bottom:4px;">Isolamento Multi-Tenant</div><div style="font-weight:700;color:#22c55e;">Ativo (Cryptographic Tenant Tokens)</div></div>
           </div>
         </div>
