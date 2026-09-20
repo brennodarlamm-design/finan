@@ -14,16 +14,26 @@ export class BudgetSyncRoom {
   async fetch(request) {
     const url = new URL(request.url);
 
-    // Endpoint de handshake WebSocket
+    const userId = String(request.headers.get('x-fingo-user-id') || '').trim();
+    const userName = String(request.headers.get('x-fingo-user-name') || '').trim();
+    const role = String(request.headers.get('x-fingo-user-role') || '').trim().toLowerCase();
+    const tenantId = String(request.headers.get('x-fingo-tenant-id') || '').trim();
+    if (!userId || !tenantId) {
+      return Response.json({ ok:false, error:'Identidade autenticada obrigatória.' }, { status:401 });
+    }
+
+    // Endpoint de handshake WebSocket. Identidade é injetada exclusivamente pelo Worker
+    // após validação da sessão; query string nunca concede userId/role.
     if (request.headers.get('Upgrade') === 'websocket') {
       const pair = new WebSocketPair();
       const [client, server] = Object.values(pair);
 
-      const userId = url.searchParams.get('userId') || `user_${Math.random().toString(36).substr(2, 6)}`;
-      const userName = url.searchParams.get('userName') || 'Engenheiro Convidado';
-      const role = url.searchParams.get('role') || 'editor';
-
-      await this.handleSession(server, { userId, userName, role });
+      await this.handleSession(server, {
+        userId,
+        userName: userName || 'Usuário FinGo',
+        role: role || 'visualizador',
+        tenantId
+      });
 
       return new Response(null, {
         status: 101,
@@ -67,8 +77,17 @@ export class BudgetSyncRoom {
           case 'item_updated':
           case 'etapa_reordered':
           case 'bdi_changed':
+            if (userInfo.role === 'visualizador') {
+              webSocket.send(JSON.stringify({ type:'error', code:'READ_ONLY', message:'Seu perfil não pode editar esta sala.' }));
+              break;
+            }
+            this.broadcast({
+              ...message,
+              sender: userInfo,
+              timestamp: Date.now()
+            }, webSocket);
+            break;
           case 'cell_focus':
-            // Propaga a alteração para os outros colaboradores da sala
             this.broadcast({
               ...message,
               sender: userInfo,
