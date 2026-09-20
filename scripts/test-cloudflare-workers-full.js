@@ -48,23 +48,24 @@ const r2Key = buildR2ObjectKey('darlam_const', 'plantas', 'projeto_estrutural.pd
 assert(r2Key.startsWith('tenants/darlam_const/plantas/'), 'buildR2ObjectKey deve isolar por tenant e categoria.');
 assert(r2Key.endsWith('_projeto_estrutural.pdf'), 'buildR2ObjectKey deve preservar nome limpo do arquivo.');
 
+const memoryTestEnv = { FINOBRA_ALLOW_MEMORY_STORAGE: 'true' };
 const fileContent = Buffer.from('PDF_DUMMY_CANTEIRO_PROJETO_CONTENT');
-const uploadRes = await putR2Object({}, r2Key, fileContent, {
+const uploadRes = await putR2Object(memoryTestEnv, r2Key, fileContent, {
   contentType: 'application/pdf',
   customMetadata: { obraId: 'obra_101' }
 });
 assert.equal(uploadRes.key, r2Key, 'putR2Object deve retornar a chave criada.');
 assert.equal(uploadRes.size, fileContent.byteLength, 'putR2Object deve registrar o tamanho exato.');
 
-const downloaded = await getR2Object({}, r2Key);
+const downloaded = await getR2Object(memoryTestEnv, r2Key);
 assert(downloaded && downloaded.size === fileContent.byteLength, 'getR2Object deve recuperar o arquivo íntegro.');
 assert.equal(downloaded.contentType, 'application/pdf', 'getR2Object deve preservar o Content-Type.');
 
-const listRes = await listR2Objects({}, 'tenants/darlam_const/');
+const listRes = await listR2Objects(memoryTestEnv, 'tenants/darlam_const/');
 assert(listRes.objects.length >= 1, 'listR2Objects deve listar arquivos do tenant.');
 
-await deleteR2Object({}, r2Key);
-const afterR2Delete = await getR2Object({}, r2Key);
+await deleteR2Object(memoryTestEnv, r2Key);
+const afterR2Delete = await getR2Object(memoryTestEnv, r2Key);
 assert.equal(afterR2Delete, null, 'deleteR2Object deve remover o arquivo.');
 console.log('   ✓ Cloudflare R2: isolamento multi-tenant, upload, download e listagem aprovados.');
 
