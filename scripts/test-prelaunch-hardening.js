@@ -71,6 +71,10 @@ ok('Falhas 5xx geram alerta operacional', worker.includes("type: 'EDGE_HTTP_5XX'
 ok('Pagamento confirmado recupera UI quando refresh de sessão falha', cobranca.includes('sessionRefreshed') && cobranca.includes('window.location.reload()'));
 ok('Falha de sincronização de rota é mostrada ao usuário', app.includes('Dados locais exibidos. A sincronização com a nuvem falhou'));
 
+const loginRecoveryClient=read('js/login_page.js');
+ok('Recuperação OTP não cria falsa confirmação nem dead-end', loginRecoveryClient.includes('O código só é confirmado pelo servidor junto com a troca atômica da senha.') && loginRecoveryClient.includes('Continuar com este código') && loginRecoveryClient.includes('otpRejected') && loginRecoveryClient.includes("document.getElementById('rec-step-2').className = 'recovery-step active'") && loginRecoveryClient.includes('sessionStorage.removeItem'));
+ok('Recuperação de senha comunica validação atômica e mínimo correto', landing.includes('Agora defina sua nova senha. O código será confirmado com segurança ao salvar a alteração.') && landing.includes('placeholder="Mínimo 8 caracteres"') && !landing.includes('Código verificado com sucesso!'));
+
 const authClient=read('js/auth.js');
 ok('Auth crítico usa timeout no navegador', authClient.includes('async _fetchWithTimeout(') && authClient.includes("this._fetchWithTimeout('/api/auth?action=login'") && authClient.includes("this._fetchWithTimeout('/api/auth?action=mfa_verify'") && authClient.includes("this._fetchWithTimeout('/api/auth?action=request_reset'") && authClient.includes("this._fetchWithTimeout('/api/auth?action=verify_reset'") && authClient.includes("this._fetchWithTimeout('/api/auth?action=register'") && authClient.includes("this._fetchWithTimeout('/api/auth?action=sessions'") && authClient.includes("this._fetchWithTimeout('/api/auth?action=revoke_session'") && authClient.includes("this._fetchWithTimeout('/api/admin?action=restore_master_session'"));
 
