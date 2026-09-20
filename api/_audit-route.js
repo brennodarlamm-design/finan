@@ -4,6 +4,7 @@ import { resolveAuthAndTenant } from './_auth.js';
 import { canViewAudit, permissionError } from './_permissions.js';
 import { checkRateLimit, getClientIp } from './_ratelimit.js';
 import { createTenantSql } from './_tenant-sql.js';
+import { dispatchEdgeAlert } from './_edge-alerts.js';
 
 function getSql() {
   if (!process.env.DATABASE_URL) throw new Error('DATABASE_URL não configurada.');
@@ -88,14 +89,16 @@ export default async function handler(req, res) {
     try {
       const sql = getSql();
       const id = `err_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`;
+      const routeName = redactSensitive(b.route, 120) || null;
+      const tenantId = auth.authenticated ? auth.tenantId : null;
       await sql`
         INSERT INTO client_error_logs (
           id, tenant_id, user_id, route, message, source, line_no, col_no, stack, user_agent, metadata, status
         ) VALUES (
           ${id},
-          ${auth.authenticated ? auth.tenantId : null},
+          ${tenantId},
           ${auth.authenticated ? (auth.user?.userId || null) : null},
-          ${redactSensitive(b.route, 120) || null},
+          ${routeName},
           ${message},
           ${redactSensitive(b.source, 500) || null},
           ${Number.isFinite(Number(b.line)) ? Number(b.line) : null},
@@ -106,6 +109,26 @@ export default async function handler(req, res) {
           'open'
         );
       `;
+
+      const burstRows = await sql`
+        SELECT COUNT(*)::int AS total
+        FROM client_error_logs
+        WHERE created_at >= NOW() - INTERVAL '5 minutes'
+          AND tenant_id IS NOT DISTINCT FROM ${tenantId}
+          AND route IS NOT DISTINCT FROM ${routeName};
+      `;
+      const burstCount = Number(burstRows[0]?.total || 0);
+      if (burstCount >= 5 && (burstCount === 5 || burstCount % 10 === 0)) {
+        dispatchEdgeAlert(req.env || process.env, {
+          type:'CLIENT_ERROR_BURST',
+          severity:'CRITICAL',
+          title:'Pico de erros no frontend FinGo',
+          message:`${burstCount} erros em 5 minutos na rota ${routeName || 'desconhecida'}.`,
+          details:{ route:routeName || 'unknown', tenantScoped:Boolean(tenantId), count:burstCount },
+          source:'client_error_telemetry'
+        }).catch(alertErr => console.warn('[Telemetry] Falha ao enviar alerta de pico:', alertErr?.message || alertErr));
+      }
+
       return res.status(201).json({ success: true, id });
     } catch (dbErr) {
       console.error('[Telemetry] Falha ao persistir erro de cliente:', dbErr);
