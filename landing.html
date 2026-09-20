@@ -868,7 +868,7 @@
 
     .cascade-step.completed { border-color: rgba(18, 217, 160, 0.35); }
     .cascade-step.running { border-color: var(--accent-mint); box-shadow: 0 0 16px rgba(18, 217, 160, 0.18); }
-    .cascade-step.pending { opacity: 0.65; }
+    .cascade-step.pending { opacity: 1; border-color: var(--border-subtle); }
 
     .step-badge {
       font-size: 0.62rem;
@@ -880,8 +880,8 @@
     }
 
     .step-badge.green { background: rgba(18, 217, 160, 0.15); color: var(--accent-mint); }
-    .step-badge.blue { background: rgba(56, 189, 248, 0.15); color: var(--info-cyan); }
-    .step-badge.muted { background: rgba(255, 255, 255, 0.06); color: var(--text-dim); }
+    .step-badge.blue { background: rgba(198, 255, 0, 0.10); color: var(--accent-mint-bright); }
+    .step-badge.muted { background: rgba(255, 255, 255, 0.08); color: var(--text-main); }
 
     .step-name {
       font-size: 0.82rem;
@@ -1181,10 +1181,10 @@
     }
 
     .cycle-btn.active {
-      background: linear-gradient(135deg, var(--gold-champagne), var(--gold-deep));
-      color: #0E1208;
+      background: var(--accent-mint);
+      color: #0A0A0A;
       font-weight: 900;
-      box-shadow: 0 4px 14px var(--gold-glow);
+      box-shadow: 0 4px 14px var(--accent-mint-glow);
     }
 
     .discount-pill {
@@ -1198,9 +1198,9 @@
     }
 
     .cycle-btn.active .discount-pill {
-      background: #0E1208;
-      color: var(--gold-champagne);
-      border-color: rgba(0, 0, 0, 0.3);
+      background: #0A0A0A;
+      color: var(--accent-mint-bright);
+      border-color: rgba(0, 0, 0, 0.35);
     }
 
     .plans-grid {
