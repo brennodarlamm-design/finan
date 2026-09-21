@@ -1,5 +1,7 @@
-# FinObra / FinGo — Cloudflare Wrangler Ignore File (.wranglerignore)
+# ==============================================================================
+# FinGo — Cloudflare Wrangler Ignore File (.wranglerignore)
 # Protege o deploy do Cloudflare Workers garantindo que apenas arquivos de produção sejam empacotados
+# ==============================================================================
 
 # Credenciais e segredos locais (nunca enviar para a nuvem)
 .env*
@@ -8,6 +10,12 @@
 *.crt
 *.pfx
 *.p12
+
+# Controle de versão e IDEs
+.git/
+.github/
+.vscode/
+.idea/
 
 # Daemons e ferramentas locais pesadas
 monitor-nfe/
@@ -43,9 +51,22 @@ trigger.config.js
 scratch-startup-tests.log
 logs/
 
+# Relatórios de testes e caches
+test-results/
+playwright-report/
+coverage/
+.marketing-dist/
+.wrangler/
+.trigger/
+.render/
+
 # Backups temporários e pacotes locais
 FINOBRA_PATCH_*
 *.tmp
 *.bak
 *.zip
 *.tar.gz
+*.tar
+*.tgz
+*.rar
+*.7z

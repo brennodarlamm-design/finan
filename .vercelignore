@@ -1,5 +1,7 @@
-# FinObra — Arquivos e diretórios ignorados nos deployments da Vercel
-# Reduz o pacote de deploy de ~140 MB para ~4 MB e evita exceder a cota de Deployment Storage.
+# ==============================================================================
+# FinGo — Vercel Deployment Ignore File (.vercelignore)
+# Reduz o pacote de deploy e evita envio de arquivos locais para a nuvem
+# ==============================================================================
 
 # Segurança e credenciais locais (nunca enviar para a nuvem)
 .env*
@@ -9,8 +11,15 @@
 *.pfx
 *.p12
 
+# Controle de versão e IDEs
+.git/
+.github/
+.vscode/
+.idea/
+
 # Daemons e ferramentas locais pesadas
 monitor-nfe/
+remotion/
 
 # Build artifacts locais e de outras plataformas
 dist/
@@ -19,10 +28,16 @@ build/
 .wrangler/
 .trigger/
 .render/
+.marketing-dist/
+test-results/
+playwright-report/
+coverage/
+.nyc_output/
 cloudflare/
 cloudflare-worker.js
 render.yaml
 wrangler.jsonc
+wrangler.preview.jsonc
 
 # Backend standalone (hospedado no Render via Docker)
 backend/
@@ -31,8 +46,8 @@ backend/
 .agents/
 conductor/
 docs/
-scratch
-node_modules
+scratch/
+node_modules/
 *.md
 *.bat
 
@@ -61,10 +76,13 @@ FINOBRA_PATCH_*
 *.zip
 *.rar
 *.7z
+*.tar
+*.tgz
 *.tmp
 *.bak
 
 # Caches e arquivos temporários de SO
 .DS_Store
 Thumbs.db
-
+ehthumbs.db
+Desktop.ini

@@ -1,5 +1,7 @@
-# FinObra / FinGo — Cloudflare Pages Ignore File (.cfignore)
+# ==============================================================================
+# FinGo — Cloudflare Pages Ignore File (.cfignore)
 # Impede o envio de segredos, dependências pesadas e subprojetos durante o build do Pages
+# ==============================================================================
 
 # Credenciais e segredos locais (nunca enviar para a nuvem)
 .env*
@@ -8,6 +10,12 @@
 *.crt
 *.pfx
 *.p12
+
+# Controle de versão e metadados de IDE
+.git/
+.github/
+.vscode/
+.idea/
 
 # Daemons e ferramentas locais pesadas
 monitor-nfe/
@@ -44,9 +52,22 @@ scripts/*
 scratch-startup-tests.log
 logs/
 
+# Relatórios de testes e caches
+test-results/
+playwright-report/
+coverage/
+.marketing-dist/
+.wrangler/
+.trigger/
+.render/
+
 # Backups temporários e pacotes locais
 FINOBRA_PATCH_*
 *.tmp
 *.bak
 *.zip
 *.tar.gz
+*.tar
+*.tgz
+*.rar
+*.7z
