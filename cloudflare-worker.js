@@ -504,6 +504,11 @@ const AGENT_CARD_PAYLOAD = {
   "version": "1.0.0",
   "supportedInterfaces": [
     {
+      "url": "https://fingo.api.br/api/mcp",
+      "protocolBinding": "MCP+HTTP",
+      "protocolVersion": "2024-11-05"
+    },
+    {
       "url": "https://fingo.api.br/api",
       "protocolBinding": "HTTP+JSON",
       "protocolVersion": "1.1"
@@ -959,6 +964,28 @@ function x402PaymentResponse(request) {
 
 async function mcpEndpointResponse(request) {
   if (request.method === 'OPTIONS') return handleDiscoveryOptions();
+
+  const acceptHeader = String(request.headers.get('Accept') || '').toLowerCase();
+  if (request.method === 'GET' && acceptHeader.includes('text/event-stream')) {
+    const sessionId = crypto.randomUUID().replaceAll('-', '');
+    const encoder = new TextEncoder();
+    const stream = new ReadableStream({
+      start(controller) {
+        controller.enqueue(encoder.encode(`event: endpoint\ndata: https://fingo.api.br/api/mcp?sessionId=${sessionId}\n\n`));
+      }
+    });
+    return new Response(stream, {
+      headers: {
+        'Content-Type': 'text/event-stream; charset=utf-8',
+        'Cache-Control': 'no-cache, no-transform',
+        'Connection': 'keep-alive',
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+        'Access-Control-Allow-Headers': '*',
+        'X-Content-Type-Options': 'nosniff'
+      }
+    });
+  }
 
   let body = null;
   if (request.method === 'POST') {
@@ -1638,8 +1665,23 @@ export default {
       if (request.method === 'OPTIONS') return handleDiscoveryOptions();
       return jsonDiscoveryResponse(UCP_DISCOVERY_PAYLOAD);
     }
-    if (url.pathname === '/api/mcp') {
+    if (url.pathname === '/api/mcp' || url.pathname === '/mcp' || url.pathname === '/sse') {
       return mcpEndpointResponse(request);
+    }
+    if (url.pathname === '/api') {
+      const accept = String(request.headers.get('Accept') || '').toLowerCase();
+      if (accept.includes('text/event-stream')) {
+        return mcpEndpointResponse(request);
+      }
+      if (request.method === 'POST') {
+        try {
+          const clonedReq = request.clone();
+          const jsonBody = await clonedReq.json();
+          if (jsonBody && jsonBody.jsonrpc === '2.0') {
+            return mcpEndpointResponse(request);
+          }
+        } catch {}
+      }
     }
     if (url.pathname === '/api' || url.pathname === '/api/v1' || url.pathname === '/api/x402' || url.pathname === '/api/x402/quote' || url.pathname === '/api/x402/settle') {
       return x402PaymentResponse(request);
