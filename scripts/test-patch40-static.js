@@ -8,7 +8,7 @@ function assert(condition, message) {
   console.log(`✅ ${message}`);
 }
 
-const adminJs = fs.readFileSync('api/admin.js', 'utf8');
+const adminJs = fs.readFileSync('api/admin.js', 'utf8') + (fs.existsSync('api/_admin-route.js') ? '\n' + fs.readFileSync('api/_admin-route.js', 'utf8') : '');
 const masterJs = fs.readFileSync('js/master.js', 'utf8');
 const patch26Js = fs.readFileSync('js/patch26-events.js', 'utf8');
 const emailTpl = fs.readFileSync('templates/email-cobranca-assinatura.html', 'utf8');

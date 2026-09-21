@@ -1834,11 +1834,13 @@ const MasterAdmin = {
           <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;">
             <div>
               <label style="display:block;font-size:.74rem;color:#94a3b8;margin-bottom:4px;">Telefone WhatsApp</label>
-              <input type="text" id="mc-phone" value="${tel}" placeholder="5595991234567" style="width:100%;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.15);border-radius:8px;padding:8px 10px;color:#fff;font-size:.82rem;">
+              <input type="text" id="mc-phone" value="${tel}" placeholder="5595991234567" style="width:100%;background:rgba(255,255,255,.05);border:1px solid ${tel ? 'rgba(255,255,255,.15)' : '#f59e0b'};border-radius:8px;padding:8px 10px;color:#fff;font-size:.82rem;">
+              ${!tel ? '<div style="font-size:.68rem;color:#f59e0b;margin-top:4px;">💡 Sem telefone no banco. Digite aqui para salvar e disparar.</div>' : ''}
             </div>
             <div>
               <label style="display:block;font-size:.74rem;color:#94a3b8;margin-bottom:4px;">E-mail do Cliente</label>
-              <input type="email" id="mc-email" value="${email}" placeholder="cliente@empresa.com" style="width:100%;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.15);border-radius:8px;padding:8px 10px;color:#fff;font-size:.82rem;">
+              <input type="email" id="mc-email" value="${email}" placeholder="cliente@empresa.com" style="width:100%;background:rgba(255,255,255,.05);border:1px solid ${email ? 'rgba(255,255,255,.15)' : '#f59e0b'};border-radius:8px;padding:8px 10px;color:#fff;font-size:.82rem;">
+              ${!email ? '<div style="font-size:.68rem;color:#f59e0b;margin-top:4px;">💡 Sem e-mail no banco. Digite aqui para salvar e disparar.</div>' : ''}
             </div>
             <div>
               <label style="display:block;font-size:.74rem;color:#94a3b8;margin-bottom:4px;">Chave PIX de Recebimento</label>
@@ -1935,12 +1937,13 @@ const MasterAdmin = {
   abrirWaWebDireto() {
     const phone = (document.getElementById('mc-phone')?.value || '').replace(/\D/g, '');
     const msg = document.getElementById('mc-message')?.value || '';
-    if (!phone) {
-      alert('Informe um telefone válido com DDD para abrir o WhatsApp Web.');
-      return;
+    let url;
+    if (phone && phone.length >= 10) {
+      const fullPhone = phone.startsWith('55') ? phone : '55' + phone;
+      url = `https://wa.me/${fullPhone}?text=${encodeURIComponent(msg)}`;
+    } else {
+      url = `https://web.whatsapp.com/send?text=${encodeURIComponent(msg)}`;
     }
-    const fullPhone = phone.startsWith('55') ? phone : '55' + phone;
-    const url = `https://wa.me/${fullPhone}?text=${encodeURIComponent(msg)}`;
     window.open(url, '_blank', 'noopener,noreferrer');
   },
 
@@ -1952,9 +1955,11 @@ const MasterAdmin = {
     }
 
     const templateType = document.getElementById('mc-template-type')?.value || 'reminder';
-    const channel = document.querySelector('input[name="mc-channel"]:checked')?.value || 'both';
-    const phone = (document.getElementById('mc-phone')?.value || '').replace(/\D/g, '');
-    const email = (document.getElementById('mc-email')?.value || '').trim();
+    let channel = document.querySelector('input[name="mc-channel"]:checked')?.value || 'both';
+    const phoneInput = document.getElementById('mc-phone');
+    const phone = (phoneInput?.value || '').replace(/\D/g, '');
+    const emailInput = document.getElementById('mc-email');
+    const email = (emailInput?.value || '').trim();
     const pix = (document.getElementById('mc-pix')?.value || '').trim();
     const subject = (document.getElementById('mc-subject')?.value || '').trim();
     const message = (document.getElementById('mc-message')?.value || '').trim();
@@ -1962,6 +1967,34 @@ const MasterAdmin = {
     if (channel === 'wa_web') {
       this.abrirWaWebDireto();
       return;
+    }
+
+    // Validação preventiva de telefone
+    if (channel === 'whatsapp' && (!phone || phone.length < 10)) {
+      alert('Por favor, informe o telefone de WhatsApp do cliente com DDD (ou escolha o canal E-mail).');
+      if (phoneInput) {
+        phoneInput.focus();
+        phoneInput.style.borderColor = '#ef4444';
+      }
+      return;
+    }
+
+    // Se ambos estiver selecionado mas não há telefone, pergunta amigavelmente se deseja enviar apenas por e-mail
+    if (channel === 'both' && (!phone || phone.length < 10)) {
+      if (!email || !email.includes('@')) {
+        alert('Informe o telefone com DDD ou o e-mail do cliente para enviar a notificação.');
+        if (phoneInput) phoneInput.focus();
+        return;
+      }
+      const continuar = confirm('Esta empresa não possui telefone de WhatsApp cadastrado.\n\nDeseja disparar a notificação apenas por E-mail institucional?');
+      if (!continuar) {
+        if (phoneInput) {
+          phoneInput.focus();
+          phoneInput.style.borderColor = '#ef4444';
+        }
+        return;
+      }
+      channel = 'email';
     }
 
     const fb = document.getElementById('mc-feedback');
@@ -2007,13 +2040,15 @@ const MasterAdmin = {
         if (results.whatsapp.success) {
           relatorioHtml += `<li><strong>WhatsApp:</strong> Entregue com sucesso pelo robô (ID: ${results.whatsapp.messageId})</li>`;
         } else {
-          relatorioHtml += `<li style="color:#fca5a5;"><strong>WhatsApp:</strong> ${results.whatsapp.error} <a href="${results.waLink}" target="_blank" rel="noopener noreferrer" style="color:#38bdf8;text-decoration:underline;">[Abrir manualmente no WhatsApp Web]</a></li>`;
+          const waHref = results.waLink || (phone && phone.length >= 10 ? `https://wa.me/${phone.startsWith('55') ? phone : '55' + phone}?text=${encodeURIComponent(message)}` : `https://web.whatsapp.com/send?text=${encodeURIComponent(message)}`);
+          relatorioHtml += `<li style="color:#fca5a5;"><strong>WhatsApp:</strong> ${results.whatsapp.error} <a href="${waHref}" target="_blank" rel="noopener noreferrer" style="color:#38bdf8;text-decoration:underline;font-weight:700;">[Abrir no WhatsApp Web]</a></li>`;
         }
       }
 
       if (results.email?.attempted) {
         if (results.email.success) {
-          relatorioHtml += `<li><strong>E-mail:</strong> Enviado com sucesso via Resend (ID: ${results.email.id})</li>`;
+          const extraInfo = results.email.fallbackUsed ? ` (via ${results.email.fallbackUsed})` : '';
+          relatorioHtml += `<li><strong>E-mail:</strong> Enviado com sucesso via Resend (ID: ${results.email.id})${extraInfo}</li>`;
         } else {
           relatorioHtml += `<li style="color:#fca5a5;"><strong>E-mail:</strong> ${results.email.error}</li>`;
         }

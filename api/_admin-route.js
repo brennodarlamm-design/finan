@@ -812,8 +812,32 @@ export default async function handler(req, res) {
       const t = tenantRows[0];
       const nomeEmpresa = t.nome_fantasia || t.razao_social || 'Sua Empresa';
       const responsavel = t.responsavel || 'Gestor(a)';
-      const destPhone = String(userPhone || t.telefone || '').replace(/\D/g, '');
-      const destEmail = String(userEmail || t.email || '').trim();
+      let destPhone = String(userPhone || t.telefone || '').replace(/\D/g, '');
+      if (destPhone.length >= 10 && destPhone.length <= 11 && !destPhone.startsWith('55')) {
+        destPhone = '55' + destPhone;
+      }
+      let destEmail = String(userEmail || t.email || '').trim();
+      if (!destEmail) {
+        try {
+          const adminRows = await sql`
+            SELECT email FROM usuarios 
+            WHERE tenant_id = ${tenantId} AND email IS NOT NULL AND email != ''
+            ORDER BY CASE perfil WHEN 'admin' THEN 1 WHEN 'superadmin' THEN 2 ELSE 3 END, created_at ASC 
+            LIMIT 1;
+          `;
+          if (adminRows.length && adminRows[0].email) {
+            destEmail = String(adminRows[0].email).trim();
+          }
+        } catch (_) {}
+      }
+
+      // Se o usuário informou telefone ou e-mail novo e o tenant não tinha, atualiza no banco para usos futuros
+      if (userPhone && !t.telefone && destPhone) {
+        await sql`UPDATE tenants SET telefone = ${destPhone}, updated_at = NOW() WHERE id = ${tenantId};`.catch(() => {});
+      }
+      if (userEmail && !t.email && destEmail) {
+        await sql`UPDATE tenants SET email = ${destEmail}, updated_at = NOW() WHERE id = ${tenantId};`.catch(() => {});
+      }
 
       const PLANOS_INFO = {
         starter: { nome: 'Básico', valor: '119,90' },
@@ -911,7 +935,7 @@ export default async function handler(req, res) {
       const results = {
         whatsapp: { attempted: false, success: false },
         email: { attempted: false, success: false },
-        waLink: destPhone ? `https://wa.me/${destPhone}?text=${encodeURIComponent(finalMessage)}` : null
+        waLink: destPhone ? `https://wa.me/${destPhone}?text=${encodeURIComponent(finalMessage)}` : `https://web.whatsapp.com/send?text=${encodeURIComponent(finalMessage)}`
       };
 
       // 1. Disparo por WhatsApp
@@ -955,8 +979,14 @@ export default async function handler(req, res) {
       // 2. Disparo por E-mail
       if (channel === 'email' || channel === 'both') {
         results.email.attempted = true;
-        const resendKey = String(process.env.RESEND_API_KEY || '').trim();
-        const emailFrom = String(process.env.FINOBRA_SUPPORT_EMAIL_FROM || 'FinGo <suporte@fingo.api.br>').trim();
+        let resendKey = String(process.env.RESEND_API_KEY || '').trim();
+        if ((resendKey.startsWith('"') && resendKey.endsWith('"')) || (resendKey.startsWith("'") && resendKey.endsWith("'"))) {
+          resendKey = resendKey.slice(1, -1);
+        }
+        let emailFrom = String(process.env.RESEND_FROM_EMAIL || process.env.FINOBRA_SUPPORT_EMAIL_FROM || 'FinGo <suporte@fingo.api.br>').trim();
+        if ((emailFrom.startsWith('"') && emailFrom.endsWith('"')) || (emailFrom.startsWith("'") && emailFrom.endsWith("'"))) {
+          emailFrom = emailFrom.slice(1, -1);
+        }
 
         if (!destEmail || !destEmail.includes('@')) {
           results.email.error = 'E-mail da empresa inválido ou não cadastrado.';
@@ -999,7 +1029,39 @@ export default async function handler(req, res) {
               results.email.success = true;
               results.email.id = emailData.id;
             } else {
-              results.email.error = emailData.message || `Resend retornou status ${emailRes.status}`;
+              const errMsg = emailData.message || `Resend retornou status ${emailRes.status}`;
+              // Se a chave estiver restrita ou não autorizada para fingo.api.br, tenta fallback com domínio secundário verificado
+              if (errMsg.includes('is not authorized to send emails from') && emailFrom.includes('fingo.api.br')) {
+                const fallbackFrom = 'FinGo <suporte@finobra.app.br>';
+                try {
+                  const retryRes = await fetch('https://api.resend.com/emails', {
+                    method: 'POST',
+                    headers: {
+                      'Authorization': `Bearer ${resendKey}`,
+                      'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                      from: fallbackFrom,
+                      to: [destEmail],
+                      subject: finalSubject,
+                      html: emailHtml
+                    }),
+                    signal: AbortSignal.timeout(12000)
+                  });
+                  const retryData = await retryRes.json().catch(() => ({}));
+                  if (retryRes.ok && retryData.id) {
+                    results.email.success = true;
+                    results.email.id = retryData.id;
+                    results.email.fallbackUsed = fallbackFrom;
+                  } else {
+                    results.email.error = errMsg;
+                  }
+                } catch (_) {
+                  results.email.error = errMsg;
+                }
+              } else {
+                results.email.error = errMsg;
+              }
             }
           } catch (emErr) {
             results.email.error = `Falha ao disparar e-mail via Resend: ${emErr.message}`;

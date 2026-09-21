@@ -96,7 +96,8 @@ async function requireMaster(req, { humanOnly = true } = {}) {
     if (humanOnly) return { ok: false, auth, status: 403, error: 'Operação restrita ao Super Admin humano.' };
     return { ok: true, auth };
   }
-  if (auth.user?.perfil !== 'superadmin') {
+  const isSuperAdmin = auth.user?.perfil === 'superadmin';
+  if (!isSuperAdmin) {
     return { ok: false, auth, status: 403, error: 'Acesso restrito ao Super Admin.' };
   }
   if (!auth.user?.mfa_enabled || !auth.user?.mfa_verified) {
@@ -285,13 +286,16 @@ async function handleBillingNotice(req, res) {
   }
 
   const tenantId = String(preview.tenant?.id || req.body?.tenantId || '').trim();
-  const destPhone = String(preview.destPhone || '').replace(/\D/g, '');
+  let destPhone = String(preview.destPhone || '').replace(/\D/g, '');
+  if (destPhone.length >= 10 && destPhone.length <= 11 && !destPhone.startsWith('55')) {
+    destPhone = '55' + destPhone;
+  }
   if (!tenantId) return res.status(400).json({ success: false, error: 'Empresa não informada.' });
 
   const results = {
     whatsapp: { attempted: true, success: false },
     email: { attempted: false, success: false },
-    waLink: destPhone ? `https://wa.me/${destPhone}?text=${encodeURIComponent(preview.message || '')}` : null
+    waLink: destPhone ? `https://wa.me/${destPhone}?text=${encodeURIComponent(preview.message || '')}` : `https://web.whatsapp.com/send?text=${encodeURIComponent(preview.message || '')}`
   };
 
   if (!destPhone || destPhone.length < 10) {
