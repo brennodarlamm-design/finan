@@ -200,28 +200,28 @@ const AI_CATALOG_PAYLOAD = {
   },
   "entries": [
     {
-      "identifier": "urn:ai:fingo.api.br:mcp:server",
+      "identifier": "urn:air:fingo.api.br:mcp:server",
       "displayName": "FinGo MCP Server",
       "type": "application/mcp-server-card+json",
       "url": "https://fingo.api.br/.well-known/mcp/server-card.json",
       "description": "FinGo Model Context Protocol (MCP) server providing construction budget, SINAPI lookup, and financial management tools."
     },
     {
-      "identifier": "urn:ai:fingo.api.br:a2a:agent",
+      "identifier": "urn:air:fingo.api.br:a2a:agent",
       "displayName": "FinGo A2A Agent",
       "type": "application/agent-card+json",
       "url": "https://fingo.api.br/.well-known/agent-card.json",
       "description": "FinGo Autonomous Agent with A2A protocol and AP2 merchant payment capabilities."
     },
     {
-      "identifier": "urn:ai:fingo.api.br:skills:index",
+      "identifier": "urn:air:fingo.api.br:skills:index",
       "displayName": "FinGo Agent Skills",
       "type": "application/agent-skills+json",
       "url": "https://fingo.api.br/.well-known/agent-skills/index.json",
       "description": "FinGo Agent Skills discovery index for financial management, SINAPI budgeting, and NFe processing."
     },
     {
-      "identifier": "urn:ai:fingo.api.br:api:catalog",
+      "identifier": "urn:air:fingo.api.br:api:catalog",
       "displayName": "FinGo RFC 9727 API Catalog",
       "type": "application/linkset+json",
       "url": "https://fingo.api.br/.well-known/api-catalog",
@@ -1398,7 +1398,7 @@ export default {
     }
     if (url.pathname === '/.well-known/ai-catalog.json') {
       if (request.method === 'OPTIONS') return handleDiscoveryOptions();
-      return jsonDiscoveryResponse(AI_CATALOG_PAYLOAD);
+      return jsonDiscoveryResponse(AI_CATALOG_PAYLOAD, 'application/ai-catalog+json');
     }
     if (url.pathname === '/openapi.json' || url.pathname === '/api/openapi.json') {
       return openApiResponse(request, env);
