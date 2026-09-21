@@ -42,19 +42,14 @@ const Suporte = {
               <span>Chat com FinBot / Atendente</span>
             </a>
 
-            <a href="#" data-fb-click="Patch26Actions.suporteMenu" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="manual" class="suporte-menu-item" style="display:flex;align-items:center;gap:12px;padding:10px 16px;color:#f0ead6;text-decoration:none;font-size:.85rem;transition:background .2s;">
+            <a href="/manuais" target="_blank" class="suporte-menu-item" style="display:flex;align-items:center;gap:12px;padding:10px 16px;color:#f0ead6;text-decoration:none;font-size:.85rem;transition:background .2s;">
               <span style="font-size:1.05rem;color:#a3e635;">📖</span>
-              <span>Manual do Sistema</span>
+              <span>Manuais do Sistema (12 Guias)</span>
             </a>
 
             <a href="#" data-fb-click="Patch26Actions.suporteMenu" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="tutoriais" class="suporte-menu-item" style="display:flex;align-items:center;gap:12px;padding:10px 16px;color:#f0ead6;text-decoration:none;font-size:.85rem;transition:background .2s;">
               <span style="font-size:1.05rem;color:#c6ff00;">🎓</span>
               <span>Tutoriais & Academia FinGo</span>
-            </a>
-
-            <a href="#" data-fb-click="Patch26Actions.suporteMenu" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="agendamento" class="suporte-menu-item" style="display:flex;align-items:center;gap:12px;padding:10px 16px;color:#f0ead6;text-decoration:none;font-size:.85rem;transition:background .2s;">
-              <span style="font-size:1.05rem;color:#fbbf24;">📅</span>
-              <span>Agenda Treinamentos</span>
             </a>
 
             <a href="#" data-fb-click="Patch26Actions.suporteMenu" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="contatos" class="suporte-menu-item" style="display:flex;align-items:center;gap:12px;padding:10px 16px;color:#f0ead6;text-decoration:none;font-size:.85rem;transition:background .2s;">
@@ -641,8 +636,12 @@ const Suporte = {
     `;
   },
 
-  // ── 8. MODAL: TRILHA DE TREINAMENTOS ──────────────────────────────────────
+  // ── 8. MANUAIS DO SISTEMA ────────────────────────────────────────────────
+  abrirManual() {
+    window.open('/manuais', '_blank');
+  },
+
   abrirTreinamentos() {
-    this.abrirTutoriais();
+    window.open('/manuais', '_blank');
   }
 };

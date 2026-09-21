@@ -232,6 +232,8 @@ export function Footer() {
             </a>
             <a href="/planos">Planos</a>
             <a href="/sobre-nos">Sobre nós</a>
+            <a href="/manuais">Manuais do Sistema</a>
+            <a href="/blog">Blog</a>
             <a href="/calculadora-bdi">Calculadora BDI</a>
             <a
               href="https://smithery.ai/servers/brennodarlamm-d5fx/fingo-mcp"

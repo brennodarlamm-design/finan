@@ -14,6 +14,8 @@ export default defineConfig({
             "/": "/landing.html",
             "/planos": "/planos.html",
             "/sobre-nos": "/sobre-nos.html",
+            "/manuais": "/manuais.html",
+            "/blog": "/blog.html",
             "/login": "/index.html",
             "/cadastro": "/index.html",
             "/app": "/app.html",
@@ -32,6 +34,14 @@ export default defineConfig({
   publicDir: false,
   build: {
     outDir: ".marketing-dist",
-    rollupOptions: { input: ["landing.html", "planos.html", "sobre-nos.html"] },
+    rollupOptions: {
+      input: [
+        "landing.html",
+        "planos.html",
+        "sobre-nos.html",
+        "manuais.html",
+        "blog.html",
+      ],
+    },
   },
 });

@@ -1252,6 +1252,10 @@ async function fetchFrontendResponse(request, env) {
       md = `# Sobre o FinGo — Obras em Fluxo\n\nConstruir exige visão. Gerir também.\n\n## Nosso Propósito\nTornar a gestão da construção mais clara, conectada e próxima de quem faz a obra acontecer. O FinGo é uma plataforma de gestão financeira e operacional para a construção civil. Reunimos rotinas de obras, custos, compras e medições em um só lugar.\n\n## Nossos Objetivos\n1. Aproximar canteiro e escritório\n2. Dar clareza à gestão de custos\n3. Simplificar rotinas para evoluir a operação\n\nContato: contato@fingo.api.br\n`;
     } else if (incoming.pathname === '/calculadora-bdi') {
       md = `# FinGo — Calculadora de BDI Online Oficial\n\nCálculo de Benefícios e Despesas Indiretas conforme o Acórdão nº 2622/2013 do TCU e Decreto Federal nº 7.983/2013.\n\n## Fórmula Oficial do TCU\nBDI = [((1 + AC + S + R + G) * (1 + DF) * (1 + L)) / (1 - I) - 1] * 100\n\n### Parâmetros e Faixas de Referência (Edificações)\n- AC (Administração Central): 3,00% a 5,50% (Médio: 4,00%)\n- S (Seguro): 0,80% a 1,00% (Médio: 0,80%)\n- R (Risco): 0,97% a 1,27% (Médio: 0,97%)\n- G (Garantia): 0,80% a 1,00% (Médio: 0,80%)\n- DF (Despesas Financeiras): 0,59% a 1,39% (Médio: 1,23%)\n- L (Lucro Bruto): 6,16% a 8,96% (Médio: 7,40%)\n- I (Tributos): PIS (0,65%) + COFINS (3,00%) + ISS (2,00% a 5,00%) + CPRB (4,50% quando desonerado)\n\nCalculadora Interativa Online: https://fingo.api.br/calculadora-bdi\nOrçamentos com SINAPI Oficial: https://fingo.api.br/planos\n`;
+    } else if (incoming.pathname === '/manuais') {
+      md = `# FinGo — Manuais de Instrução do Sistema\n\n12 Manuais Práticos passo a passo para dominar a gestão financeira, orçamentária e canteiro de obras no FinGo.\n\n## Trilhas de Conhecimento\n1. Obras & Canteiro (Início de Obra, Cadastros, Etapas Construtivas)\n2. Medições & Retenções (Boletins Caixa, Retenção 11% INSS e 5% ISS)\n3. Engenharia & SINAPI (Orçamentos 27 Estados, BDI TCU Acórdão 2622, Curva ABC)\n4. Financeiro & Caixa (Contas a Pagar/Receber, Conciliação Bancária OFX, DRE)\n5. Suprimentos & OCR (Cotações com Fornecedores, Leitura de NF-e por Inteligência Artificial)\n6. BIM 3D & Inovação (Visualização IFC/GLB no Canteiro)\n\nManuais Online com Exportação para PDF: https://fingo.api.br/manuais\n`;
+    } else if (incoming.pathname === '/blog') {
+      md = `# FinGo — Blog de Engenharia & Gestão de Obras\n\nArtigos técnicos e práticos para engenheiros, orçamentistas e gestores da construção civil.\n\n## Artigos em Destaque\n- Como Calcular o BDI de Obras Públicas e Privadas pelo Acórdão 2622/2013 do TCU\n- Retenções Técnicas na Construção Civil: Guia Prático dos 11% de INSS e 5% de ISS em Medições\n- SINAPI Desonerado vs Não Desonerado: Como Escolher o Regime Certo para sua Construtora\n- Conciliação Bancária Automática com Arquivos OFX em Construtoras\n- OCR e Importação Inteligente de NF-e no Canteiro de Obras\n- BIM 3D no Canteiro: Como o Visualizador IFC Reduz Retrabalhos e Desperdícios\n\nBlog Oficial: https://fingo.api.br/blog\n`;
     } else {
       const llmsReq = new Request(new URL('/llms.txt', incoming).toString(), { method: 'GET', headers: request.headers });
       const llmsRes = await env.ASSETS.fetch(llmsReq);
@@ -1290,7 +1294,7 @@ async function fetchFrontendResponse(request, env) {
   } else if (masterShell) {
     assetPath = '/master.html';
     routeName = 'master-shell';
-  } else if (['/planos', '/sobre-nos', '/calculadora-bdi'].includes(incoming.pathname)) {
+  } else if (['/planos', '/sobre-nos', '/calculadora-bdi', '/manuais', '/blog'].includes(incoming.pathname)) {
     assetPath = incoming.pathname + '.html';
     routeName = 'marketing-shell';
   } else if (landingShell) {

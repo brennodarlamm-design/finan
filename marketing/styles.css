@@ -1,5 +1,6 @@
 @import "tailwindcss" source(none);
 @source './**/*.jsx';
+@source './**/*.js';
 @theme {
   --color-void: #0a0a0a;
   --color-ink: #0d0d0d;
@@ -67,5 +68,49 @@
   }
   .card-industrial {
     @apply rounded-sm border border-shadow bg-panel p-6 transition-all duration-150 hover:border-acid/40;
+  }
+  /* Mega Menu Dropdown */
+  .mega-menu-panel {
+    @apply absolute left-1/2 -translate-x-1/2 top-full mt-2 w-[92vw] max-w-4xl rounded-sm border border-shadow bg-[#111111]/95 p-6 shadow-2xl backdrop-blur-xl transition-all duration-200;
+  }
+}
+
+/* Regras de Impressão e Exportação para PDF */
+@media print {
+  body {
+    background: #ffffff !important;
+    color: #111111 !important;
+  }
+  header,
+  footer,
+  .no-print,
+  #finbot-root {
+    display: none !important;
+  }
+  .printable-card {
+    border: 1px solid #cccccc !important;
+    background: #ffffff !important;
+    color: #111111 !important;
+    box-shadow: none !important;
+    page-break-inside: avoid;
+  }
+  .text-acid {
+    color: #15803d !important;
+  }
+  .text-paper,
+  .text-silver {
+    color: #111111 !important;
+  }
+  .text-muted {
+    color: #555555 !important;
+  }
+  .border-shadow,
+  .border-line {
+    border-color: #dddddd !important;
+  }
+  .bg-panel,
+  .bg-void,
+  .bg-ink {
+    background-color: #ffffff !important;
   }
 }

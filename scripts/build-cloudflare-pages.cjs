@@ -20,6 +20,8 @@ const rootFiles = [
   'termos.html',
   'validar.html',
   'calculadora-bdi.html',
+  'manuais.html',
+  'blog.html',
   'version.json',
   'robots.txt',
   'sitemap.xml',

@@ -9,6 +9,8 @@ for (const file of [
   "landing.html",
   "planos.html",
   "sobre-nos.html",
+  "manuais.html",
+  "blog.html",
   "assets",
 ]) {
   fs.cpSync(path.join(".marketing-dist", file), path.join(destination, file), {

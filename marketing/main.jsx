@@ -10,20 +10,55 @@ import "./styles.css";
 import { FinBot } from "./finbot.jsx";
 import { FeatureTour } from "./feature-tour.jsx";
 import { Brand, Faq, Newsletter, Footer } from "./brand-sections.jsx";
+import { TRILHAS, MANUAIS } from "./manuais-data.js";
+import { ARTIGOS_BLOG } from "./blog-data.js";
+
 const route = location.pathname.replace(/\/$|\.html$/g, "") || "/";
 const current =
-  route === "/planos" ? "plans" : route === "/sobre-nos" ? "about" : "home";
+  route === "/planos"
+    ? "plans"
+    : route === "/sobre-nos"
+      ? "about"
+      : route === "/manuais"
+        ? "manuais"
+        : route === "/blog"
+          ? "blog"
+          : "home";
 const contact = "https://wa.me/5595991363678";
 const money = (cents) =>
   (cents / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 const paid = ["starter", "pro", "unlimited"];
+
 function Header() {
   const [open, setOpen] = useState(false);
+  const [institucionalOpen, setInstitucionalOpen] = useState(false);
+  const [mobileInstitucionalOpen, setMobileInstitucionalOpen] = useState(false);
+  const dropdownRef = useRef(null);
+
+  useEffect(() => {
+    function handleClickOutside(event) {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setInstitucionalOpen(false);
+      }
+    }
+    function handleKeyDown(event) {
+      if (event.key === "Escape") {
+        setInstitucionalOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, []);
+
   const links = [
     ["/", "Início", "home"],
     ["/planos", "Planos", "plans"],
-    ["/sobre-nos", "Sobre nós", "about"],
   ];
+
   return (
     <header className="relative z-20 border-b border-line bg-void">
       <div className="wrap flex min-h-24 items-center justify-between gap-6">
@@ -38,12 +73,167 @@ function Header() {
               href={url}
               aria-current={id === current ? "page" : undefined}
               className={
-                id === current ? "text-acid" : "text-muted hover:text-paper"
+                id === current ? "text-acid font-bold" : "text-muted hover:text-paper"
               }
             >
               {label}
             </a>
           ))}
+
+          {/* Mega Menu Dropdown Trigger */}
+          <div className="relative" ref={dropdownRef}>
+            <button
+              type="button"
+              onClick={() => setInstitucionalOpen((v) => !v)}
+              aria-expanded={institucionalOpen}
+              className={`inline-flex items-center gap-1.5 transition-colors duration-150 ${
+                ["about", "manuais", "blog"].includes(current) || institucionalOpen
+                  ? "text-acid font-bold"
+                  : "text-muted hover:text-paper"
+              }`}
+            >
+              <span>Institucional</span>
+              <svg
+                className={`h-4 w-4 transition-transform duration-200 ${
+                  institucionalOpen ? "rotate-180 text-acid" : "text-muted"
+                }`}
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                aria-hidden="true"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
+
+            {/* Mega Menu Panel */}
+            {institucionalOpen && (
+              <div
+                className="mega-menu-panel z-50 animate-in fade-in slide-in-from-top-2 duration-150"
+                role="region"
+                aria-label="Menu Institucional"
+              >
+                <div className="grid gap-8 lg:grid-cols-12">
+                  {/* Apresentação Esquerda */}
+                  <div className="flex flex-col justify-between border-b border-shadow pb-6 lg:col-span-5 lg:border-b-0 lg:border-r lg:pb-0 lg:pr-8">
+                    <div>
+                      <span className="font-mono text-xs uppercase tracking-widest text-acid">
+                        Institucional // FinGo
+                      </span>
+                      <h3 className="font-display mt-3 text-2xl uppercase leading-tight text-paper">
+                        Construir exige visão. <br />
+                        <span className="text-acid">Gerir também.</span>
+                      </h3>
+                      <p className="mt-3 text-xs leading-relaxed text-muted">
+                        Plataforma integrada de engenharia, finanças e canteiro de obras. 
+                        Projetada para dar clareza aos custos e velocidade à operação de construtoras no Brasil.
+                      </p>
+                    </div>
+                    <div className="mt-6">
+                      <a
+                        href="/sobre-nos"
+                        onClick={() => setInstitucionalOpen(false)}
+                        className="action text-xs py-3 px-5 inline-flex items-center gap-2"
+                      >
+                        <span>Conheça nossa trajetória</span>
+                        <span aria-hidden="true">↗</span>
+                      </a>
+                    </div>
+                  </div>
+
+                  {/* Grade Direita de Links Oficiais */}
+                  <div className="grid gap-3 sm:grid-cols-2 lg:col-span-7">
+                    <a
+                      href="/sobre-nos"
+                      onClick={() => setInstitucionalOpen(false)}
+                      className="group rounded-sm border border-shadow bg-void p-4 transition-all duration-150 hover:border-acid/50 hover:bg-panel"
+                    >
+                      <div className="flex items-center gap-2.5">
+                        <span className="text-lg">🏛️</span>
+                        <h4 className="font-bold text-sm text-paper group-hover:text-acid">
+                          Quem Somos
+                        </h4>
+                      </div>
+                      <p className="mt-1.5 text-xs leading-relaxed text-muted">
+                        Propósito, história e princípios de engenharia no canteiro.
+                      </p>
+                    </a>
+
+                    <a
+                      href="/manuais"
+                      onClick={() => setInstitucionalOpen(false)}
+                      className="group rounded-sm border border-shadow bg-void p-4 transition-all duration-150 hover:border-acid/50 hover:bg-panel"
+                    >
+                      <div className="flex items-center gap-2.5">
+                        <span className="text-lg">📚</span>
+                        <h4 className="font-bold text-sm text-paper group-hover:text-acid">
+                          Manuais do Sistema
+                        </h4>
+                      </div>
+                      <p className="mt-1.5 text-xs leading-relaxed text-muted">
+                        12 guias práticos ilustrados com telas e exportação para PDF.
+                      </p>
+                    </a>
+
+                    <a
+                      href="/blog"
+                      onClick={() => setInstitucionalOpen(false)}
+                      className="group rounded-sm border border-shadow bg-void p-4 transition-all duration-150 hover:border-acid/50 hover:bg-panel"
+                    >
+                      <div className="flex items-center gap-2.5">
+                        <span className="text-lg">📐</span>
+                        <h4 className="font-bold text-sm text-paper group-hover:text-acid">
+                          Blog de Engenharia
+                        </h4>
+                      </div>
+                      <p className="mt-1.5 text-xs leading-relaxed text-muted">
+                        Artigos técnicos: BDI TCU, retenções INSS/ISS, SINAPI e custos.
+                      </p>
+                    </a>
+
+                    <a
+                      href={contact}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={() => setInstitucionalOpen(false)}
+                      className="group rounded-sm border border-shadow bg-void p-4 transition-all duration-150 hover:border-acid/50 hover:bg-panel"
+                    >
+                      <div className="flex items-center gap-2.5">
+                        <span className="text-lg">💬</span>
+                        <h4 className="font-bold text-sm text-paper group-hover:text-acid">
+                          Atendimento & Suporte
+                        </h4>
+                      </div>
+                      <p className="mt-1.5 text-xs leading-relaxed text-muted">
+                        Fale diretamente com nossa equipe técnica via WhatsApp.
+                      </p>
+                    </a>
+                  </div>
+                </div>
+
+                {/* Faixa de Destaque Inferior */}
+                <div className="mt-6 border-t border-shadow pt-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 bg-panel/60 -mx-6 -mb-6 px-6 py-3.5 rounded-b-sm">
+                  <div className="flex items-center gap-2 text-xs">
+                    <span className="badge-acid">DESTAQUE</span>
+                    <span className="text-paper font-semibold">
+                      Calculadora BDI Online Oficial:
+                    </span>
+                    <span className="text-muted hidden md:inline">
+                      Acórdão 2622/2013 do TCU. Calcule gratuitamente em segundos.
+                    </span>
+                  </div>
+                  <a
+                    href="/calculadora-bdi"
+                    onClick={() => setInstitucionalOpen(false)}
+                    className="text-xs font-bold text-acid hover:underline inline-flex items-center gap-1 shrink-0"
+                  >
+                    <span>Acessar calculadora</span>
+                    <span aria-hidden="true">↗</span>
+                  </a>
+                </div>
+              </div>
+            )}
+          </div>
         </nav>
         <a href="/login" className="outline-action hidden md:inline-flex">
           Acessar o sistema ↗
@@ -61,18 +251,62 @@ function Header() {
         <nav
           id="mobile-nav"
           aria-label="Navegação móvel"
-          className="wrap flex flex-col gap-5 pb-7 md:hidden"
+          className="wrap flex flex-col gap-4 pb-7 md:hidden border-t border-line/40 pt-4"
         >
-          {links.map(([url, label, id]) => (
-            <a
-              key={id}
-              href={url}
-              aria-current={id === current ? "page" : undefined}
+          <a
+            href="/"
+            aria-current={current === "home" ? "page" : undefined}
+            className={current === "home" ? "text-acid font-bold" : "text-paper"}
+          >
+            Início
+          </a>
+          <a
+            href="/planos"
+            aria-current={current === "plans" ? "page" : undefined}
+            className={current === "plans" ? "text-acid font-bold" : "text-paper"}
+          >
+            Planos
+          </a>
+
+          {/* Acordeão Institucional no Mobile */}
+          <div className="rounded-sm border border-shadow bg-panel p-3.5">
+            <button
+              type="button"
+              onClick={() => setMobileInstitucionalOpen(!mobileInstitucionalOpen)}
+              className="flex w-full items-center justify-between font-mono text-xs uppercase tracking-wider text-acid"
             >
-              {label}
-            </a>
-          ))}
-          <a href="/login">Acessar o sistema ↗</a>
+              <span>Institucional</span>
+              <span className="text-sm font-bold">{mobileInstitucionalOpen ? "−" : "+"}</span>
+            </button>
+            {mobileInstitucionalOpen && (
+              <div className="mt-3 flex flex-col gap-3 text-sm pl-2 border-l border-line">
+                <a href="/sobre-nos" className="text-muted hover:text-paper">
+                  🏛️ Quem Somos
+                </a>
+                <a href="/manuais" className="text-muted hover:text-paper">
+                  📚 Manuais do Sistema (12 Guias)
+                </a>
+                <a href="/blog" className="text-muted hover:text-paper">
+                  📐 Blog de Engenharia & Custos
+                </a>
+                <a href="/calculadora-bdi" className="text-muted hover:text-paper">
+                  ⚡ Calculadora BDI Online Oficial
+                </a>
+                <a
+                  href={contact}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-muted hover:text-paper"
+                >
+                  💬 Atendimento WhatsApp
+                </a>
+              </div>
+            )}
+          </div>
+
+          <a href="/login" className="action text-center mt-2">
+            Acessar o sistema ↗
+          </a>
         </nav>
       )}
     </header>
@@ -678,6 +912,560 @@ function About() {
     </>
   );
 }
+function ManualsSection() {
+  return (
+    <section className="border-t border-shadow bg-ink py-20">
+      <div className="wrap">
+        <div className="mb-12 flex flex-col justify-between gap-6 md:flex-row md:items-end">
+          <div className="max-w-2xl">
+            <p className="eyebrow">Aprenda a Operar // Documentação Oficial</p>
+            <h2 className="font-display text-3xl uppercase md:text-5xl">
+              Manuais Práticos: <span className="text-acid">Domine cada rotina</span>
+            </h2>
+            <p className="mt-4 text-base leading-relaxed text-muted">
+              12 guias ilustrados passo a passo com telas do sistema, localização exata de cada botão no canteiro e instruções para gerar PDFs de treinamento para sua equipe.
+            </p>
+          </div>
+          <a href="/manuais" className="action shrink-0">
+            Ver todos os 12 manuais ↗
+          </a>
+        </div>
+
+        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+          {[
+            {
+              num: "01",
+              title: "Início de Obra & Clientes",
+              trilha: "Obras & Canteiro",
+              desc: "Cadastre clientes, vincule contratos, prazos de entrega e estruture os centros de custo da obra.",
+              id: "manual-1-inicio-obra",
+            },
+            {
+              num: "04",
+              title: "Medições & Retenções Técnicas",
+              trilha: "Financeiro & Caixa",
+              desc: "Boletins de medição com cálculo automático de 11% de INSS e 5% de ISS na fonte para empreiteiros.",
+              id: "manual-4-medicoes-retencoes",
+            },
+            {
+              num: "07",
+              title: "Orçamentos SINAPI da Caixa",
+              trilha: "Engenharia & SINAPI",
+              desc: "Consultas das composições oficiais dos 27 estados, aplicação de BDI TCU e curvas ABC de insumos.",
+              id: "manual-7-orcamento-sinapi",
+            },
+            {
+              num: "12",
+              title: "BIM 3D & Coordenação",
+              trilha: "BIM 3D & Inovação",
+              desc: "Visualizador IFC e modelos 3D no canteiro em tempo real para verificar compatibilização e projeto.",
+              id: "manual-12-bim-viewer",
+            },
+          ].map((item) => (
+            <div
+              key={item.num}
+              className="group flex flex-col justify-between rounded-sm border border-shadow bg-panel p-6 transition-all duration-150 hover:-translate-y-1 hover:border-acid/50"
+            >
+              <div>
+                <div className="flex items-center justify-between">
+                  <span className="font-mono text-xs text-acid">GUIA {item.num} //</span>
+                  <span className="badge-purple text-[10px]">{item.trilha}</span>
+                </div>
+                <h3 className="mt-4 font-bold text-lg text-paper group-hover:text-acid">
+                  {item.title}
+                </h3>
+                <p className="mt-2 text-xs leading-relaxed text-muted">
+                  {item.desc}
+                </p>
+              </div>
+              <div className="mt-6 border-t border-shadow pt-4">
+                <a
+                  href={`/manuais#${item.id}`}
+                  className="inline-flex items-center gap-1 text-xs font-bold text-acid group-hover:underline"
+                >
+                  <span>Abrir manual ilustrado</span>
+                  <span aria-hidden="true">↗</span>
+                </a>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function ManualsView() {
+  const [selectedTrilha, setSelectedTrilha] = useState("todas");
+  const [search, setSearch] = useState("");
+  const [activeManual, setActiveManual] = useState(null);
+
+  useEffect(() => {
+    const hash = window.location.hash.replace("#", "");
+    if (hash) {
+      const found = MANUAIS.find((m) => m.id === hash);
+      if (found) setActiveManual(found);
+    }
+  }, []);
+
+  const filtered = MANUAIS.filter((m) => {
+    const matchTrilha = selectedTrilha === "todas" || m.trilha === selectedTrilha;
+    const query = search.trim().toLowerCase();
+    const matchSearch =
+      !query ||
+      m.titulo.toLowerCase().includes(query) ||
+      m.resumo.toLowerCase().includes(query) ||
+      m.modulo.toLowerCase().includes(query) ||
+      m.trilhaLabel.toLowerCase().includes(query);
+    return matchTrilha && matchSearch;
+  });
+
+  return (
+    <div className="py-16 md:py-24">
+      {/* Header */}
+      <section className="wrap mb-12">
+        <p className="eyebrow">Documentação Oficial & Capacitação // FinGo</p>
+        <h1 className="page-title">
+          Manuais de <br />
+          <span className="text-acid">Instrução do Sistema</span>
+        </h1>
+        <p className="mt-6 max-w-2xl text-lg leading-relaxed text-muted">
+          12 guias práticos com passo a passo ilustrado, diagramas de telas com localização de botões e função de exportação para PDF para treinamento da sua equipe de engenharia e canteiro.
+        </p>
+
+        {/* Filtros e Busca */}
+        <div className="mt-10 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+          <div className="flex flex-wrap gap-2">
+            {TRILHAS.map((t) => (
+              <button
+                key={t.id}
+                onClick={() => setSelectedTrilha(t.id)}
+                className={`rounded-sm px-3.5 py-2 text-xs font-bold transition-all ${
+                  selectedTrilha === t.id
+                    ? "bg-acid text-void"
+                    : "border border-shadow bg-panel text-muted hover:border-line hover:text-paper"
+                }`}
+              >
+                <span className="mr-1.5">{t.icone}</span>
+                <span>{t.label}</span>
+              </button>
+            ))}
+          </div>
+          <div className="w-full md:w-72">
+            <input
+              type="search"
+              placeholder="Buscar por módulo, rotina..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="w-full rounded-sm border border-line bg-panel px-4 py-2.5 text-xs text-paper placeholder:text-muted focus:border-acid focus:outline-none"
+            />
+          </div>
+        </div>
+      </section>
+
+      {/* Grade de Manuais */}
+      <section className="wrap">
+        {filtered.length === 0 ? (
+          <div className="rounded-sm border border-shadow bg-panel p-12 text-center text-muted">
+            Nenhum manual encontrado para a busca atual.
+          </div>
+        ) : (
+          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+            {filtered.map((manual) => (
+              <article
+                key={manual.id}
+                id={manual.id}
+                className="group flex flex-col justify-between rounded-sm border border-shadow bg-panel p-6 transition-all duration-150 hover:-translate-y-1 hover:border-acid/50"
+              >
+                <div>
+                  <div className="flex items-center justify-between border-b border-shadow pb-3">
+                    <span className="font-mono text-xs font-bold text-acid">
+                      MANUAL #{manual.numero}
+                    </span>
+                    <span className="badge-purple text-[10px]">
+                      {manual.trilhaLabel}
+                    </span>
+                  </div>
+
+                  <h2 className="mt-4 font-bold text-lg leading-snug text-paper group-hover:text-acid">
+                    {manual.titulo}
+                  </h2>
+
+                  <div className="mt-3 flex items-center gap-3 text-xs text-muted font-mono">
+                    <span>Módulo: <strong className="text-silver">{manual.modulo}</strong></span>
+                    <span>•</span>
+                    <span>⏱️ {manual.tempoLeitura}</span>
+                  </div>
+
+                  <p className="mt-3 text-xs leading-relaxed text-muted line-clamp-3">
+                    {manual.resumo}
+                  </p>
+                </div>
+
+                <div className="mt-6 flex items-center gap-3 border-t border-shadow pt-4">
+                  <button
+                    onClick={() => setActiveManual(manual)}
+                    className="action w-full text-xs py-2.5"
+                  >
+                    Abrir Manual Completo ↗
+                  </button>
+                  <button
+                    onClick={() => {
+                      setActiveManual(manual);
+                      setTimeout(() => window.print(), 300);
+                    }}
+                    title="Imprimir ou Salvar em PDF"
+                    className="outline-action px-3 py-2.5 text-xs text-silver shrink-0 hover:text-acid"
+                  >
+                    🖨️ PDF
+                  </button>
+                </div>
+              </article>
+            ))}
+          </div>
+        )}
+      </section>
+
+      {/* Modal / Drawer do Manual Ativo */}
+      {activeManual && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 p-4 backdrop-blur-md overflow-y-auto"
+          role="dialog"
+          aria-modal="true"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setActiveManual(null);
+          }}
+        >
+          <div className="printable-card my-8 w-full max-w-4xl rounded-sm border border-shadow bg-[#111111] p-6 md:p-10 shadow-2xl">
+            {/* Topo do Modal */}
+            <div className="flex flex-col-reverse md:flex-row md:items-center md:justify-between gap-4 border-b border-shadow pb-6">
+              <div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="badge-acid font-mono text-xs">
+                    MANUAL #{activeManual.numero}
+                  </span>
+                  <span className="badge-purple text-xs">
+                    {activeManual.trilhaLabel}
+                  </span>
+                  <span className="font-mono text-xs text-muted">
+                    ⏱️ Leitura: {activeManual.tempoLeitura} • Nível: {activeManual.nivel}
+                  </span>
+                </div>
+                <h2 className="mt-3 font-display text-2xl uppercase md:text-3xl text-paper">
+                  {activeManual.titulo}
+                </h2>
+                <p className="mt-2 text-xs font-mono text-acid">
+                  MÓDULO DE EXECUÇÃO: {activeManual.modulo.toUpperCase()}
+                </p>
+              </div>
+
+              {/* Controles de Ação (escondidos na impressão) */}
+              <div className="flex items-center gap-2 self-end md:self-start no-print">
+                <button
+                  onClick={() => window.print()}
+                  className="outline-action px-3 py-1.5 text-xs text-acid"
+                >
+                  🖨️ Imprimir / PDF
+                </button>
+                <button
+                  onClick={() => setActiveManual(null)}
+                  className="outline-action px-3 py-1.5 text-xs"
+                >
+                  ✕ Fechar
+                </button>
+              </div>
+            </div>
+
+            {/* Resumo */}
+            <div className="mt-6 rounded-sm border border-line/40 bg-panel/50 p-4 text-xs leading-relaxed text-silver">
+              <strong className="text-paper">Objetivo Operacional: </strong>
+              {activeManual.resumo}
+            </div>
+
+            {/* Passo a Passo */}
+            <div className="mt-8 space-y-6">
+              <h3 className="font-mono text-xs font-bold uppercase tracking-widest text-acid">
+                Passo a Passo de Execução //
+              </h3>
+              <div className="space-y-4">
+                {activeManual.passos.map((p) => (
+                  <div
+                    key={p.num}
+                    className="flex items-start gap-4 rounded-sm border border-shadow bg-void p-4 transition-colors hover:border-line"
+                  >
+                    <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-sm bg-acid font-mono text-xs font-bold text-void">
+                      0{p.num}
+                    </span>
+                    <div className="flex-1">
+                      <h4 className="font-bold text-sm text-paper">
+                        {p.titulo}
+                      </h4>
+                      <p className="mt-1 text-xs leading-relaxed text-muted">
+                        {p.desc}
+                      </p>
+                      <div className="mt-2.5 inline-flex items-center gap-1.5 rounded-sm bg-panel px-2.5 py-1 text-[11px] font-mono text-acid border border-shadow">
+                        <span>📍 Onde executar:</span>
+                        <strong className="text-silver">{p.ondeExecutar}</strong>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Print de Tela / Diagrama Esquemático */}
+            {activeManual.telaMockup && (
+              <div className="mt-10 rounded-sm border border-shadow bg-ink p-5 md:p-6">
+                <div className="flex items-center justify-between border-b border-shadow pb-3">
+                  <div className="flex items-center gap-2">
+                    <span className="h-2 w-2 rounded-full bg-acid" />
+                    <span className="font-mono text-xs font-bold uppercase text-paper">
+                      Diagrama de Tela: {activeManual.telaMockup.tituloTela}
+                    </span>
+                  </div>
+                  <span className="font-mono text-[10px] text-muted">
+                    INTERFACE FINGO v2.38
+                  </span>
+                </div>
+
+                {/* Caixa Esquemática */}
+                <div className="mt-4 rounded-sm border border-line bg-void p-4 font-mono text-xs space-y-3">
+                  <div className="rounded-sm border border-dashed border-acid bg-acid/10 p-3 text-acid">
+                    <span className="font-bold">🎯 LOCAL EXATO DA AÇÃO: </span>
+                    <span className="text-paper">{activeManual.telaMockup.localAcao}</span>
+                  </div>
+
+                  <div className="text-xs text-muted">
+                    <strong className="text-paper uppercase tracking-wider block mb-2">
+                      Elementos Chave Visíveis na Tela:
+                    </strong>
+                    <ul className="space-y-1 pl-4 list-disc text-silver">
+                      {activeManual.telaMockup.elementosChave?.map((el, idx) => (
+                        <li key={idx}>{el}</li>
+                      ))}
+                    </ul>
+                  </div>
+                </div>
+
+                {/* Dica Técnica */}
+                {activeManual.telaMockup.dicaTecnica && (
+                  <div className="mt-4 flex items-start gap-2.5 rounded-sm border border-purple/30 bg-purple/10 p-3.5 text-xs text-purple-light">
+                    <span className="text-sm">💡</span>
+                    <div>
+                      <strong className="text-paper">Dica de Engenharia: </strong>
+                      <span>{activeManual.telaMockup.dicaTecnica}</span>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Rodapé do Modal com Navegação */}
+            <div className="mt-8 flex flex-col sm:flex-row items-center justify-between gap-4 border-t border-shadow pt-6 no-print">
+              <div className="flex gap-2">
+                {(() => {
+                  const currentIndex = MANUAIS.findIndex((m) => m.id === activeManual.id);
+                  const prevManual = currentIndex > 0 ? MANUAIS[currentIndex - 1] : null;
+                  const nextManual = currentIndex < MANUAIS.length - 1 ? MANUAIS[currentIndex + 1] : null;
+                  return (
+                    <>
+                      {prevManual && (
+                        <button
+                          onClick={() => setActiveManual(prevManual)}
+                          className="outline-action px-3 py-2 text-xs"
+                        >
+                          ← Manual #{prevManual.numero}
+                        </button>
+                      )}
+                      {nextManual && (
+                        <button
+                          onClick={() => setActiveManual(nextManual)}
+                          className="outline-action px-3 py-2 text-xs"
+                        >
+                          Manual #{nextManual.numero} →
+                        </button>
+                      )}
+                    </>
+                  );
+                })()}
+              </div>
+
+              <div className="flex gap-3">
+                <button
+                  onClick={() => window.print()}
+                  className="action text-xs py-2 px-4 inline-flex items-center gap-2"
+                >
+                  <span>Imprimir / Salvar em PDF</span>
+                  <span>🖨️</span>
+                </button>
+                <button
+                  onClick={() => setActiveManual(null)}
+                  className="outline-action text-xs py-2 px-4"
+                >
+                  Fechar
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function BlogView() {
+  const [selectedArticle, setSelectedArticle] = useState(null);
+
+  useEffect(() => {
+    const hash = window.location.hash.replace("#", "");
+    if (hash) {
+      const found = ARTIGOS_BLOG.find((a) => a.slug === hash || a.id === hash);
+      if (found) setSelectedArticle(found);
+    }
+  }, []);
+
+  if (selectedArticle) {
+    return (
+      <article className="wrap py-16 md:py-24 max-w-4xl">
+        <div className="mb-8">
+          <button
+            onClick={() => setSelectedArticle(null)}
+            className="outline-action text-xs py-2 px-3 inline-flex items-center gap-1.5"
+          >
+            <span>← Voltar para todos os artigos</span>
+          </button>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-3">
+          <span className="badge-acid">{selectedArticle.categoria}</span>
+          <span className="font-mono text-xs text-muted">
+            {selectedArticle.data} • ⏱️ {selectedArticle.tempoLeitura} de leitura
+          </span>
+        </div>
+
+        <h1 className="font-display mt-6 text-3xl uppercase md:text-5xl leading-tight">
+          {selectedArticle.titulo}
+        </h1>
+
+        <p className="mt-6 border-l-2 border-acid pl-4 text-lg italic text-silver leading-relaxed bg-panel/30 py-2">
+          {selectedArticle.resumo}
+        </p>
+
+        <div className="mt-10 space-y-5 text-base leading-relaxed text-silver">
+          {selectedArticle.conteudo.map((paragrafo, idx) => {
+            const isFormula = paragrafo.startsWith("BDI =");
+            const isBullet = paragrafo.startsWith("•") || paragrafo.startsWith("1.") || paragrafo.startsWith("2.");
+            if (isFormula) {
+              return (
+                <div
+                  key={idx}
+                  className="rounded-sm border border-acid bg-void p-5 font-mono text-sm text-acid my-6 overflow-x-auto shadow-[0_0_15px_rgba(198,255,0,0.15)]"
+                >
+                  {paragrafo}
+                </div>
+              );
+            }
+            if (isBullet) {
+              return (
+                <div key={idx} className="font-mono text-xs bg-panel p-3 rounded-sm border border-shadow text-paper pl-4">
+                  {paragrafo}
+                </div>
+              );
+            }
+            return (
+              <p key={idx} className="text-muted leading-relaxed">
+                {paragrafo}
+              </p>
+            );
+          })}
+        </div>
+
+        {/* Banner de Conversão ao Fim do Artigo */}
+        <div className="mt-14 rounded-sm border border-shadow bg-panel p-8">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6">
+            <div>
+              <span className="badge-purple">FinGo Engenharia & Gestão</span>
+              <h3 className="font-display text-2xl uppercase mt-2 text-paper">
+                Pronto para automatizar esses cálculos na sua construtora?
+              </h3>
+              <p className="text-xs text-muted mt-1 max-w-lg">
+                O FinGo possui calculadora oficial de BDI TCU Acórdão 2622, tabelas SINAPI Caixa atualizadas e retenções automáticas de 11% INSS e 5% ISS em boletins de medição.
+              </p>
+            </div>
+            <div className="flex flex-col sm:flex-row gap-3 shrink-0">
+              <a href="/calculadora-bdi" className="outline-action text-xs">
+                Calcular BDI Grátis ↗
+              </a>
+              <a href="/planos" className="action text-xs">
+                Conhecer Planos ↗
+              </a>
+            </div>
+          </div>
+        </div>
+      </article>
+    );
+  }
+
+  return (
+    <div className="py-16 md:py-24">
+      <section className="wrap mb-14">
+        <p className="eyebrow">Engenharia, Custos & Gestão de Obras // FinGo</p>
+        <h1 className="page-title">
+          Blog de <br />
+          <span className="text-acid">Engenharia & Finanças</span>
+        </h1>
+        <p className="mt-6 max-w-2xl text-lg leading-relaxed text-muted">
+          Artigos técnicos aprofundados sobre orçamentos SINAPI da Caixa, cálculo de BDI pelo TCU, retenções em cessão de mão de obra e conciliação bancária na construção civil.
+        </p>
+      </section>
+
+      <section className="wrap">
+        <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-3">
+          {ARTIGOS_BLOG.map((artigo) => (
+            <article
+              key={artigo.id}
+              className="group flex flex-col justify-between rounded-sm border border-shadow bg-panel p-6 transition-all duration-150 hover:-translate-y-1 hover:border-acid/50"
+            >
+              <div>
+                <div className="flex items-center justify-between border-b border-shadow pb-3">
+                  <span className="badge-purple text-[10px]">
+                    {artigo.categoria}
+                  </span>
+                  <span className="font-mono text-xs text-muted">
+                    ⏱️ {artigo.tempoLeitura}
+                  </span>
+                </div>
+
+                <p className="mt-4 font-mono text-xs text-acid">
+                  {artigo.data}
+                </p>
+
+                <h2 className="mt-2 font-bold text-lg leading-snug text-paper group-hover:text-acid">
+                  {artigo.titulo}
+                </h2>
+
+                <p className="mt-3 text-xs leading-relaxed text-muted line-clamp-3">
+                  {artigo.resumo}
+                </p>
+              </div>
+
+              <div className="mt-6 border-t border-shadow pt-4">
+                <button
+                  onClick={() => setSelectedArticle(artigo)}
+                  className="inline-flex items-center gap-1.5 text-xs font-bold text-acid group-hover:underline"
+                >
+                  <span>Ler artigo completo</span>
+                  <span aria-hidden="true">↗</span>
+                </button>
+              </div>
+            </article>
+          ))}
+        </div>
+      </section>
+    </div>
+  );
+}
+
 function CookieNotice() {
   const [visible, setVisible] = useState(() => {
     try {
@@ -730,6 +1518,7 @@ function CookieNotice() {
     </aside>
   );
 }
+
 function App() {
   return (
     <>
@@ -745,10 +1534,15 @@ function App() {
           <Plans />
         ) : current === "about" ? (
           <About />
+        ) : current === "manuais" ? (
+          <ManualsView />
+        ) : current === "blog" ? (
+          <BlogView />
         ) : (
           <>
             <Home />
             <FeatureTour />
+            <ManualsSection />
             <Faq />
             <Newsletter />
           </>
