@@ -73,6 +73,7 @@ patchLogin();
 patchDocument('privacidade.html', 'https://fingo.api.br/privacidade');
 patchDocument('termos.html', 'https://fingo.api.br/termos');
 patchDocument('validar.html', 'https://fingo.api.br/validar');
+patchDocument('calculadora-bdi.html', 'https://fingo.api.br/calculadora-bdi');
 patchDocument('master.html', 'https://fingo.api.br/master');
 
 const builtLogin = read('login.html');

@@ -16,6 +16,8 @@
       "/js/webmcp.js",
       "/planos",
       "/sobre-nos",
+      "/calculadora-bdi",
+      "/calculadora-bdi.html",
       "/api/*",
       "/__finobra/health",
       "/",

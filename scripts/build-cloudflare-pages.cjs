@@ -19,6 +19,7 @@ const rootFiles = [
   'privacidade.html',
   'termos.html',
   'validar.html',
+  'calculadora-bdi.html',
   'version.json',
   'robots.txt',
   'sitemap.xml',

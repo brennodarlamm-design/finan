@@ -33,10 +33,11 @@ assert(sitemap.includes('<loc>https://fingo.api.br/privacidade</loc>'), 'sitemap
 assert(sitemap.includes('<loc>https://fingo.api.br/termos</loc>'), 'sitemap.xml deve conter rota /termos');
 assert(sitemap.includes('<loc>https://fingo.api.br/llms.txt</loc>'), 'sitemap.xml deve conter /llms.txt para motores de IA');
 assert(sitemap.includes('<loc>https://fingo.api.br/llms-full.txt</loc>'), 'sitemap.xml deve conter /llms-full.txt para motores de IA');
+assert(sitemap.includes('<loc>https://fingo.api.br/calculadora-bdi</loc>'), 'sitemap.xml deve conter rota /calculadora-bdi');
 
 // Contagem exata de URLs no sitemap
 const urlMatches = sitemap.match(/<loc>/g) || [];
-assert.strictEqual(urlMatches.length, 8, `sitemap.xml deve conter exatamente 8 URLs públicas canônicas. Encontradas: ${urlMatches.length}`);
+assert.strictEqual(urlMatches.length, 9, `sitemap.xml deve conter exatamente 9 URLs públicas canônicas. Encontradas: ${urlMatches.length}`);
 
 // Verificação de URLs duplicadas
 const locs = [...sitemap.matchAll(/<loc>(.*?)<\/loc>/g)].map(m => m[1]);

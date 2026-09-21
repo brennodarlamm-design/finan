@@ -232,6 +232,7 @@ export function Footer() {
             </a>
             <a href="/planos">Planos</a>
             <a href="/sobre-nos">Sobre nós</a>
+            <a href="/calculadora-bdi">Calculadora BDI</a>
           </nav>
         </div>
         <p className="mt-10 text-xs text-muted">
