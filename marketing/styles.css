@@ -75,7 +75,25 @@
   }
 }
 
+@keyframes pulse-acid {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(198, 255, 0, 0.7);
+  }
+  50% {
+    box-shadow: 0 0 0 10px rgba(198, 255, 0, 0);
+  }
+}
+.pulse-beacon {
+  animation: pulse-acid 2s infinite;
+}
+
 /* Regras de Impressão e Exportação para PDF */
+@media screen {
+  .print-only {
+    display: none !important;
+  }
+}
+
 @media print {
   body {
     background: #ffffff !important;
@@ -84,8 +102,12 @@
   header,
   footer,
   .no-print,
+  .screen-only,
   #finbot-root {
     display: none !important;
+  }
+  .print-only {
+    display: block !important;
   }
   .printable-card {
     border: 1px solid #cccccc !important;

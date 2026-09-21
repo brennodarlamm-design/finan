@@ -995,18 +995,513 @@ function ManualsSection() {
   );
 }
 
+function ScreenSimulator({ manual, activeStep }) {
+  const step = manual.passos[activeStep - 1] || manual.passos[0];
+  const stepNum = activeStep;
+
+  // Render contextual mock content based on manual.id and activeStep
+  const getContextualView = () => {
+    switch (manual.id) {
+      case "manual-1-inicio-obra":
+        if (stepNum === 1) {
+          return (
+            <div className="p-4 space-y-3">
+              <div className="rounded border-2 border-dashed border-acid/80 bg-acid/10 p-4 text-center shadow-[0_0_15px_rgba(198,255,0,0.15)]">
+                <span className="text-2xl">👈</span>
+                <p className="font-bold text-acid text-xs mt-1 uppercase tracking-wide">
+                  PASSO 1: Selecione "Obras & Clientes" no Menu Lateral
+                </p>
+                <p className="text-[11px] text-paper mt-1">
+                  Clique no ícone de capacete na barra lateral esquerda para abrir o módulo.
+                </p>
+              </div>
+              <div className="grid grid-cols-2 gap-2 opacity-50 pointer-events-none">
+                <div className="rounded bg-panel p-3 border border-shadow">
+                  <span className="text-[10px] text-muted font-mono uppercase">Obras Ativas</span>
+                  <p className="text-sm font-bold text-paper font-mono">12 canteiros</p>
+                </div>
+                <div className="rounded bg-panel p-3 border border-shadow">
+                  <span className="text-[10px] text-muted font-mono uppercase">Contratos Caixa</span>
+                  <p className="text-sm font-bold text-acid font-mono">R$ 18.450.000,00</p>
+                </div>
+              </div>
+            </div>
+          );
+        }
+        if (stepNum === 2) {
+          return (
+            <div className="p-4 space-y-3">
+              <div className="flex items-center justify-between border-b border-shadow pb-3">
+                <div>
+                  <span className="text-xs font-bold text-paper">Canteiros de Obras Cadastrados</span>
+                  <p className="text-[10px] text-muted">Gestão física e financeira da construtora</p>
+                </div>
+                <div className="relative">
+                  <button className="pulse-beacon rounded bg-acid px-3.5 py-1.5 text-xs font-bold text-void flex items-center gap-1.5 shadow-[0_0_15px_rgba(198,255,0,0.4)]">
+                    <span>+ Nova Obra</span>
+                  </button>
+                  <div className="absolute -top-7 right-0 rounded bg-acid text-void font-mono font-bold text-[9px] px-2 py-0.5 whitespace-nowrap shadow-lg animate-bounce">
+                    👇 PASSO 2: CLIQUE AQUI
+                  </div>
+                </div>
+              </div>
+              <div className="space-y-2 opacity-40 pointer-events-none">
+                <div className="flex items-center justify-between p-2.5 rounded bg-panel border border-shadow text-xs">
+                  <span className="text-paper font-semibold">Edifício Horizon — Torre A</span>
+                  <span className="badge-acid text-[9px]">42% CONCLUÍDO</span>
+                </div>
+                <div className="flex items-center justify-between p-2.5 rounded bg-panel border border-shadow text-xs">
+                  <span className="text-paper font-semibold">Residencial Jardins — Bloco B</span>
+                  <span className="badge-purple text-[9px]">FUNDAÇÃO</span>
+                </div>
+              </div>
+            </div>
+          );
+        }
+        if (stepNum === 3) {
+          return (
+            <div className="p-3">
+              <div className="rounded border-2 border-acid bg-[#141414] p-3.5 shadow-2xl space-y-3">
+                <div className="flex items-center justify-between border-b border-shadow pb-2">
+                  <span className="text-xs font-bold text-acid uppercase tracking-wider">
+                    Formulário: Cadastrar Nova Obra
+                  </span>
+                  <span className="badge-acid text-[9px]">PASSO 3: DADOS GERAIS</span>
+                </div>
+                <div className="space-y-2 text-xs">
+                  <div>
+                    <label className="text-[10px] font-mono text-muted block mb-0.5">Nome da Obra *</label>
+                    <div className="rounded border-2 border-acid bg-void px-2.5 py-1.5 text-paper font-mono text-xs shadow-[0_0_8px_rgba(198,255,0,0.2)]">
+                      Residencial Jardins do Lago — Torre Sul
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="text-[10px] font-mono text-muted block mb-0.5">Cliente / Contratante *</label>
+                      <div className="rounded border border-line bg-void px-2.5 py-1 text-silver font-mono text-[11px]">
+                        Incorporadora Alpha Ltda
+                      </div>
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-mono text-muted block mb-0.5">CPF / CNPJ *</label>
+                      <div className="rounded border border-line bg-void px-2.5 py-1 text-silver font-mono text-[11px]">
+                        12.345.678/0001-90
+                      </div>
+                    </div>
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-mono text-muted block mb-0.5">Responsável Técnico (CREA/CAU) *</label>
+                    <div className="rounded border border-line bg-void px-2.5 py-1 text-silver font-mono text-[11px]">
+                      Eng. Carlos Mendes — CREA 45912/D-RR
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          );
+        }
+        if (stepNum === 4) {
+          return (
+            <div className="p-3">
+              <div className="rounded border-2 border-acid bg-[#141414] p-3.5 shadow-2xl space-y-3">
+                <div className="flex items-center justify-between border-b border-shadow pb-2">
+                  <div className="flex gap-2">
+                    <span className="text-xs text-muted">Dados Gerais</span>
+                    <span className="text-xs font-bold text-acid border-b-2 border-acid pb-0.5">Prazos & Orçamento</span>
+                  </div>
+                  <span className="badge-acid text-[9px]">PASSO 4: METAS</span>
+                </div>
+                <div className="grid grid-cols-2 gap-2 text-xs">
+                  <div>
+                    <label className="text-[10px] font-mono text-muted block mb-0.5">Início da Obra *</label>
+                    <div className="rounded border border-line bg-void px-2.5 py-1.5 text-paper font-mono text-xs">
+                      01/10/2026
+                    </div>
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-mono text-muted block mb-0.5">Entrega Prevista *</label>
+                    <div className="rounded border border-line bg-void px-2.5 py-1.5 text-paper font-mono text-xs">
+                      30/11/2027
+                    </div>
+                  </div>
+                </div>
+                <div>
+                  <label className="text-[10px] font-mono text-muted block mb-0.5">Valor Contratado / Orçado (R$) *</label>
+                  <div className="rounded border-2 border-acid bg-void px-2.5 py-1.5 text-acid font-mono font-bold text-sm shadow-[0_0_10px_rgba(198,255,0,0.25)]">
+                    R$ 4.850.000,00
+                  </div>
+                  <span className="text-[10px] text-muted mt-1 block">Vinculado ao repasse Caixa Econômica / Financiamento</span>
+                </div>
+              </div>
+            </div>
+          );
+        }
+        if (stepNum === 5) {
+          return (
+            <div className="p-3 space-y-3">
+              <div className="rounded border border-shadow bg-panel p-4 space-y-3">
+                <div className="flex items-center justify-between border-b border-shadow pb-2">
+                  <span className="text-xs font-bold text-paper">Resumo Final da Obra</span>
+                  <span className="badge-purple text-[9px]">PRONTO PARA ATIVAR</span>
+                </div>
+                <div className="rounded border border-acid/60 bg-acid/10 p-3 text-xs text-acid flex items-center gap-2.5">
+                  <span className="text-lg">✅</span>
+                  <div>
+                    <strong className="block text-paper">Centro de Custo #OBR-042 Criado!</strong>
+                    <span className="text-[11px]">Painel de evolução física e fluxo de caixa ativados.</span>
+                  </div>
+                </div>
+                <div className="flex justify-end pt-2">
+                  <button className="pulse-beacon rounded bg-acid px-5 py-2.5 text-xs font-bold text-void flex items-center gap-2 shadow-[0_0_15px_rgba(198,255,0,0.4)]">
+                    <span>💾 Salvar Obra</span>
+                  </button>
+                </div>
+              </div>
+              <div className="text-center">
+                <span className="font-mono text-[10px] text-acid font-bold">🚀 PASSO 5: Clique em Salvar Obra para finalizar o cadastro</span>
+              </div>
+            </div>
+          );
+        }
+        break;
+
+      case "manual-4-medicoes-retencoes":
+        if (stepNum === 1) {
+          return (
+            <div className="p-4 space-y-3">
+              <div className="rounded border-2 border-dashed border-acid/80 bg-acid/10 p-4 text-center shadow-[0_0_15px_rgba(198,255,0,0.15)]">
+                <span className="text-2xl">👈</span>
+                <p className="font-bold text-acid text-xs mt-1 uppercase tracking-wide">
+                  PASSO 1: Acesse "Medições & Faturamento" no Menu
+                </p>
+                <p className="text-[11px] text-paper mt-1">
+                  Gerencie boletins de empreiteiros com cálculo automático de retenções tributárias.
+                </p>
+              </div>
+            </div>
+          );
+        }
+        if (stepNum === 2) {
+          return (
+            <div className="p-4 space-y-3">
+              <div className="flex items-center justify-between border-b border-shadow pb-3">
+                <div>
+                  <span className="text-xs font-bold text-paper">Boletins de Medição</span>
+                  <p className="text-[10px] text-muted">Controle de empreiteiros e repasses</p>
+                </div>
+                <div className="relative">
+                  <button className="pulse-beacon rounded bg-acid px-3.5 py-1.5 text-xs font-bold text-void flex items-center gap-1.5 shadow-[0_0_15px_rgba(198,255,0,0.4)]">
+                    <span>+ Nova Medição</span>
+                  </button>
+                  <div className="absolute -top-7 right-0 rounded bg-acid text-void font-mono font-bold text-[9px] px-2 py-0.5 whitespace-nowrap shadow-lg animate-bounce">
+                    👇 PASSO 2: CLIQUE AQUI
+                  </div>
+                </div>
+              </div>
+            </div>
+          );
+        }
+        if (stepNum === 3) {
+          return (
+            <div className="p-3 space-y-2">
+              <div className="rounded border-2 border-acid bg-[#141414] p-3 text-xs space-y-2">
+                <div className="flex justify-between border-b border-shadow pb-1.5">
+                  <span className="font-bold text-paper">Lançamento de Quantitativos Medidos</span>
+                  <span className="badge-acid text-[9px]">PASSO 3: SERVIÇOS</span>
+                </div>
+                <div className="flex items-center justify-between p-2 rounded bg-void text-[11px] font-mono border border-line">
+                  <span className="text-paper">Alvenaria de vedação 14x19x29</span>
+                  <span className="text-acid font-bold">1.240 m² = R$ 104.408,00</span>
+                </div>
+                <div className="flex items-center justify-between p-2 rounded bg-void text-[11px] font-mono border border-line">
+                  <span className="text-paper">Concreto bombeável FCK 30 MPa</span>
+                  <span className="text-acid font-bold">180 m³ = R$ 89.100,00</span>
+                </div>
+              </div>
+            </div>
+          );
+        }
+        if (stepNum === 4) {
+          return (
+            <div className="p-3 space-y-2">
+              <div className="rounded border-2 border-acid bg-[#141414] p-3.5 text-xs space-y-2.5">
+                <div className="flex justify-between border-b border-shadow pb-1.5">
+                  <span className="font-bold text-acid">Aba: Retenções Tributárias na Fonte</span>
+                  <span className="badge-purple text-[9px]">PASSO 4: TRIBUTOS</span>
+                </div>
+                <div className="grid grid-cols-2 gap-2 font-mono text-[11px]">
+                  <div className="rounded bg-void p-2 border border-line">
+                    <span className="text-muted block text-[9px]">INSS Cessão Mão de Obra (11%)</span>
+                    <span className="text-paper font-bold">- R$ 11.484,88</span>
+                  </div>
+                  <div className="rounded bg-void p-2 border border-line">
+                    <span className="text-muted block text-[9px]">ISSQN Municipal (5%)</span>
+                    <span className="text-paper font-bold">- R$ 5.220,40</span>
+                  </div>
+                </div>
+                <div className="rounded bg-void p-2.5 border border-acid flex justify-between font-mono text-xs shadow-[0_0_10px_rgba(198,255,0,0.2)]">
+                  <span className="text-silver">Líquido a Pagar ao Empreiteiro:</span>
+                  <span className="text-acid font-bold">R$ 87.702,72</span>
+                </div>
+              </div>
+            </div>
+          );
+        }
+        if (stepNum === 5) {
+          return (
+            <div className="p-3 space-y-3">
+              <div className="rounded border border-shadow bg-panel p-4 space-y-3 text-center">
+                <p className="text-xs text-paper font-bold">Espelho de Medição Formatado no Padrão Caixa Econômica</p>
+                <div className="flex justify-center">
+                  <button className="pulse-beacon rounded bg-acid px-5 py-2.5 text-xs font-bold text-void flex items-center gap-2 shadow-[0_0_15px_rgba(198,255,0,0.4)]">
+                    <span>📄 Emitir Boletim de Medição (PDF)</span>
+                  </button>
+                </div>
+                <p className="font-mono text-[10px] text-acid">🚀 PASSO 5: Gera o boletim oficial e provisiona guias no Contas a Pagar</p>
+              </div>
+            </div>
+          );
+        }
+        break;
+
+      default:
+        // Generic high-craft simulator matching any of the 12 manuals
+        if (stepNum === 1) {
+          return (
+            <div className="p-4 space-y-3">
+              <div className="rounded border-2 border-dashed border-acid/80 bg-acid/10 p-4 text-center shadow-[0_0_15px_rgba(198,255,0,0.15)]">
+                <span className="text-2xl">👈</span>
+                <p className="font-bold text-acid text-xs mt-1 uppercase tracking-wide">
+                  PASSO 1: Acesse {manual.modulo} no Menu Lateral
+                </p>
+                <p className="text-[11px] text-paper mt-1">
+                  Clique no ícone destacado na barra esquerda para abrir a tela operacional.
+                </p>
+              </div>
+              <div className="rounded bg-panel p-3 border border-shadow text-xs text-muted leading-relaxed">
+                {manual.resumo}
+              </div>
+            </div>
+          );
+        }
+        if (stepNum === 2) {
+          return (
+            <div className="p-4 space-y-3">
+              <div className="flex items-center justify-between border-b border-shadow pb-3">
+                <span className="text-xs font-bold text-paper">Módulo: {manual.modulo}</span>
+                <div className="relative">
+                  <button className="pulse-beacon rounded bg-acid px-3.5 py-1.5 text-xs font-bold text-void flex items-center gap-1.5 shadow-[0_0_15px_rgba(198,255,0,0.4)]">
+                    <span>{step.titulo}</span>
+                  </button>
+                  <div className="absolute -top-7 right-0 rounded bg-acid text-void font-mono font-bold text-[9px] px-2 py-0.5 whitespace-nowrap shadow-lg animate-bounce">
+                    👇 PASSO 2: CLIQUE AQUI
+                  </div>
+                </div>
+              </div>
+              <p className="text-xs text-muted leading-relaxed">{step.desc}</p>
+            </div>
+          );
+        }
+        if (stepNum === 3) {
+          return (
+            <div className="p-3">
+              <div className="rounded border-2 border-acid bg-[#141414] p-3.5 shadow-2xl space-y-2.5 text-xs">
+                <div className="flex items-center justify-between border-b border-shadow pb-1.5">
+                  <span className="font-bold text-acid uppercase">{step.titulo}</span>
+                  <span className="badge-acid text-[9px]">PASSO 3: ENTRADA</span>
+                </div>
+                <p className="text-silver leading-relaxed">{step.desc}</p>
+                <div className="rounded border border-dashed border-acid/50 bg-void p-2.5 font-mono text-[11px] text-acid">
+                  🎯 Local exato da ação: {step.ondeExecutar}
+                </div>
+              </div>
+            </div>
+          );
+        }
+        if (stepNum === 4) {
+          return (
+            <div className="p-3">
+              <div className="rounded border-2 border-acid bg-[#141414] p-3.5 shadow-2xl space-y-2.5 text-xs">
+                <div className="flex items-center justify-between border-b border-shadow pb-1.5">
+                  <span className="font-bold text-acid uppercase">{step.titulo}</span>
+                  <span className="badge-purple text-[9px]">PASSO 4: REGRAS</span>
+                </div>
+                <p className="text-silver leading-relaxed">{step.desc}</p>
+                <div className="rounded border border-line bg-void p-2.5 font-mono text-[11px] text-silver">
+                  ⚙️ Parâmetros calculados automaticamente pelo FinGo OS v2.38
+                </div>
+              </div>
+            </div>
+          );
+        }
+        if (stepNum === 5) {
+          return (
+            <div className="p-3 space-y-3">
+              <div className="rounded border border-shadow bg-panel p-4 space-y-3 text-center text-xs">
+                <span className="text-xl">🎉</span>
+                <p className="font-bold text-paper text-sm">{step.titulo}</p>
+                <p className="text-muted leading-relaxed">{step.desc}</p>
+                <div className="flex justify-center">
+                  <button className="pulse-beacon rounded bg-acid px-5 py-2.5 text-xs font-bold text-void flex items-center gap-2 shadow-[0_0_15px_rgba(198,255,0,0.4)]">
+                    <span>💾 Concluir Operação</span>
+                  </button>
+                </div>
+                <p className="font-mono text-[10px] text-acid">🚀 PASSO 5: Rotina finalizada e vinculada ao canteiro!</p>
+              </div>
+            </div>
+          );
+        }
+        break;
+    }
+  };
+
+  const getActiveSidebarIcon = () => {
+    const mod = manual.modulo.toLowerCase();
+    if (mod.includes("obra") || mod.includes("cliente")) return "obras";
+    if (mod.includes("medição") || mod.includes("medicao")) return "medicoes";
+    if (mod.includes("financeiro") || mod.includes("caixa") || mod.includes("dre") || mod.includes("ofx")) return "financeiro";
+    if (mod.includes("orçamento") || mod.includes("sinapi") || mod.includes("bdi")) return "sinapi";
+    if (mod.includes("suprimento") || mod.includes("compra")) return "compras";
+    if (mod.includes("nota") || mod.includes("nfe") || mod.includes("documento") || mod.includes("assinatura")) return "docs";
+    if (mod.includes("bim")) return "bim";
+    return "obras";
+  };
+
+  const activeModuleKey = getActiveSidebarIcon();
+
+  return (
+    <div className="rounded-sm border border-shadow bg-[#080808] overflow-hidden shadow-2xl">
+      {/* Top Window Bar */}
+      <div className="flex items-center justify-between border-b border-shadow bg-[#121212] px-3.5 py-2 select-none">
+        <div className="flex items-center gap-2">
+          <span className="h-2.5 w-2.5 rounded-full bg-[#ff5f56]" />
+          <span className="h-2.5 w-2.5 rounded-full bg-[#ffbd2e]" />
+          <span className="h-2.5 w-2.5 rounded-full bg-[#27c93f]" />
+          <span className="ml-2 font-mono text-[11px] text-muted hidden sm:inline">
+            FinGo OS v2.38 // Simulador de Interface
+          </span>
+        </div>
+        <div className="rounded bg-void px-2.5 py-0.5 font-mono text-[10px] text-muted border border-shadow">
+          https://fingo.api.br/app#{manual.id}
+        </div>
+        <div className="flex items-center gap-1.5">
+          <span className="h-2 w-2 rounded-full bg-acid animate-pulse" />
+          <span className="font-mono text-[10px] text-acid font-bold">AO VIVO</span>
+        </div>
+      </div>
+
+      {/* Simulated App Screen */}
+      <div className="flex min-h-[350px]">
+        {/* Sidebar */}
+        <div className="w-14 shrink-0 border-r border-shadow bg-[#0d0d0d] p-2 flex flex-col items-center gap-3 select-none">
+          <div className="h-6 w-6 rounded bg-acid text-void font-bold text-xs flex items-center justify-center font-display mb-1">
+            F
+          </div>
+          <div className="w-full space-y-2">
+            {[
+              { id: "obras", icon: "🏗️", label: "Obras" },
+              { id: "medicoes", icon: "📋", label: "Medições" },
+              { id: "financeiro", icon: "💰", label: "Financeiro" },
+              { id: "sinapi", icon: "📐", label: "SINAPI" },
+              { id: "compras", icon: "🛒", label: "Compras" },
+              { id: "docs", icon: "📄", label: "Docs" },
+              { id: "bim", icon: "🧊", label: "BIM" },
+            ].map((item) => {
+              const isTargetModule = item.id === activeModuleKey;
+              const isStep1 = stepNum === 1 && isTargetModule;
+              return (
+                <div
+                  key={item.id}
+                  title={item.label}
+                  className={`relative h-8 w-8 rounded flex items-center justify-center text-sm transition-all ${
+                    isStep1
+                      ? "bg-acid text-void font-bold pulse-beacon shadow-[0_0_12px_rgba(198,255,0,0.6)]"
+                      : isTargetModule
+                      ? "bg-panel border border-acid/40 text-paper"
+                      : "text-muted hover:text-paper"
+                  }`}
+                >
+                  <span>{item.icon}</span>
+                  {isStep1 && (
+                    <div className="absolute left-10 z-30 rounded bg-acid text-void font-mono font-bold text-[9px] px-2 py-0.5 whitespace-nowrap shadow-lg">
+                      👈 CLIQUE AQUI
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Content */}
+        <div className="flex-1 flex flex-col bg-void">
+          {/* Breadcrumb toolbar */}
+          <div className="flex items-center justify-between border-b border-shadow bg-[#111111] px-4 py-2 text-xs select-none">
+            <div className="flex items-center gap-2 font-mono text-[11px] text-muted">
+              <span>FinGo</span>
+              <span>›</span>
+              <span className="text-paper">{manual.modulo}</span>
+              <span>›</span>
+              <span className="text-acid">Passo 0{stepNum}</span>
+            </div>
+            <div className="flex items-center gap-2 text-[10px] font-mono text-muted">
+              <span>Canteiro: Edifício Horizon</span>
+              <span className="badge-purple text-[9px]">CONSTRUTORA ALPHA</span>
+            </div>
+          </div>
+
+          {/* Contextual Screen View */}
+          <div className="flex-1 flex flex-col justify-center">
+            {getContextualView()}
+          </div>
+
+          {/* Status footer */}
+          <div className="border-t border-shadow bg-[#0d0d0d] px-3.5 py-1.5 flex items-center justify-between font-mono text-[10px] text-muted select-none">
+            <span>📍 Local: {step.ondeExecutar}</span>
+            <span className="text-acid font-bold">Etapa 0{stepNum} / 05</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function ManualsView() {
   const [selectedTrilha, setSelectedTrilha] = useState("todas");
   const [search, setSearch] = useState("");
   const [activeManual, setActiveManual] = useState(null);
+  const [activeStep, setActiveStep] = useState(1);
+  const [viewMode, setViewMode] = useState("interactive"); // "interactive" | "all"
 
   useEffect(() => {
     const hash = window.location.hash.replace("#", "");
     if (hash) {
       const found = MANUAIS.find((m) => m.id === hash);
-      if (found) setActiveManual(found);
+      if (found) {
+        setActiveManual(found);
+        setActiveStep(1);
+        setViewMode("interactive");
+      }
     }
   }, []);
+
+  // Keyboard navigation for steps
+  useEffect(() => {
+    function handleKeyDown(e) {
+      if (!activeManual) return;
+      if (e.key === "Escape") {
+        setActiveManual(null);
+      } else if (viewMode === "interactive") {
+        if (e.key === "ArrowRight") {
+          setActiveStep((s) => Math.min(5, s + 1));
+        } else if (e.key === "ArrowLeft") {
+          setActiveStep((s) => Math.max(1, s - 1));
+        }
+      }
+    }
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [activeManual, viewMode]);
 
   const filtered = MANUAIS.filter((m) => {
     const matchTrilha = selectedTrilha === "todas" || m.trilha === selectedTrilha;
@@ -1020,6 +1515,8 @@ function ManualsView() {
     return matchTrilha && matchSearch;
   });
 
+  const currentStep = activeManual ? activeManual.passos[activeStep - 1] || activeManual.passos[0] : null;
+
   return (
     <div className="py-16 md:py-24">
       {/* Header */}
@@ -1030,7 +1527,7 @@ function ManualsView() {
           <span className="text-acid">Instrução do Sistema</span>
         </h1>
         <p className="mt-6 max-w-2xl text-lg leading-relaxed text-muted">
-          12 guias práticos com passo a passo ilustrado, diagramas de telas com localização de botões e função de exportação para PDF para treinamento da sua equipe de engenharia e canteiro.
+          12 guias práticos interativos com simulador visual de telas, localização exata de cada botão no canteiro e exportação para PDF técnico.
         </p>
 
         {/* Filtros e Busca */}
@@ -1104,14 +1601,20 @@ function ManualsView() {
 
                 <div className="mt-6 flex items-center gap-3 border-t border-shadow pt-4">
                   <button
-                    onClick={() => setActiveManual(manual)}
+                    onClick={() => {
+                      setActiveManual(manual);
+                      setActiveStep(1);
+                      setViewMode("interactive");
+                    }}
                     className="action w-full text-xs py-2.5"
                   >
-                    Abrir Manual Completo ↗
+                    Abrir Manual Interativo ↗
                   </button>
                   <button
                     onClick={() => {
                       setActiveManual(manual);
+                      setActiveStep(1);
+                      setViewMode("all");
                       setTimeout(() => window.print(), 300);
                     }}
                     title="Imprimir ou Salvar em PDF"
@@ -1126,19 +1629,19 @@ function ManualsView() {
         )}
       </section>
 
-      {/* Modal / Drawer do Manual Ativo */}
+      {/* Modal Interativo do Manual */}
       {activeManual && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 p-4 backdrop-blur-md overflow-y-auto"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 p-3 sm:p-6 backdrop-blur-md overflow-y-auto"
           role="dialog"
           aria-modal="true"
           onClick={(e) => {
             if (e.target === e.currentTarget) setActiveManual(null);
           }}
         >
-          <div className="printable-card my-8 w-full max-w-4xl rounded-sm border border-shadow bg-[#111111] p-6 md:p-10 shadow-2xl">
-            {/* Topo do Modal */}
-            <div className="flex flex-col-reverse md:flex-row md:items-center md:justify-between gap-4 border-b border-shadow pb-6">
+          <div className="printable-card my-auto w-full max-w-5xl rounded-sm border border-shadow bg-[#101010] p-5 md:p-8 shadow-2xl">
+            {/* Header do Modal */}
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 border-b border-shadow pb-5 no-print">
               <div>
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="badge-acid font-mono text-xs">
@@ -1148,120 +1651,270 @@ function ManualsView() {
                     {activeManual.trilhaLabel}
                   </span>
                   <span className="font-mono text-xs text-muted">
-                    ⏱️ Leitura: {activeManual.tempoLeitura} • Nível: {activeManual.nivel}
+                    ⏱️ {activeManual.tempoLeitura} • Nível {activeManual.nivel}
                   </span>
                 </div>
-                <h2 className="mt-3 font-display text-2xl uppercase md:text-3xl text-paper">
+                <h2 className="mt-2.5 font-display text-xl uppercase md:text-3xl text-paper">
                   {activeManual.titulo}
                 </h2>
-                <p className="mt-2 text-xs font-mono text-acid">
+                <p className="mt-1 text-xs font-mono text-acid">
                   MÓDULO DE EXECUÇÃO: {activeManual.modulo.toUpperCase()}
                 </p>
               </div>
 
-              {/* Controles de Ação (escondidos na impressão) */}
-              <div className="flex items-center gap-2 self-end md:self-start no-print">
+              {/* Seletor de Modo e Botões de Ação */}
+              <div className="flex flex-wrap items-center gap-2 self-start md:self-center">
+                <div className="flex rounded-sm border border-shadow bg-void p-0.5">
+                  <button
+                    onClick={() => setViewMode("interactive")}
+                    className={`px-3 py-1.5 text-xs font-bold rounded-xs transition-all ${
+                      viewMode === "interactive"
+                        ? "bg-acid text-void"
+                        : "text-muted hover:text-paper"
+                    }`}
+                  >
+                    🎯 Modo Interativo
+                  </button>
+                  <button
+                    onClick={() => setViewMode("all")}
+                    className={`px-3 py-1.5 text-xs font-bold rounded-xs transition-all ${
+                      viewMode === "all"
+                        ? "bg-acid text-void"
+                        : "text-muted hover:text-paper"
+                    }`}
+                  >
+                    📋 Lista Completa
+                  </button>
+                </div>
+
                 <button
                   onClick={() => window.print()}
-                  className="outline-action px-3 py-1.5 text-xs text-acid"
+                  className="outline-action px-3 py-1.5 text-xs text-acid inline-flex items-center gap-1.5"
+                  title="Exportar ou Imprimir Manual em PDF"
                 >
-                  🖨️ Imprimir / PDF
+                  <span>🖨️ PDF</span>
                 </button>
                 <button
                   onClick={() => setActiveManual(null)}
                   className="outline-action px-3 py-1.5 text-xs"
+                  title="Fechar (Esc)"
                 >
-                  ✕ Fechar
+                  ✕
                 </button>
               </div>
             </div>
 
-            {/* Resumo */}
-            <div className="mt-6 rounded-sm border border-line/40 bg-panel/50 p-4 text-xs leading-relaxed text-silver">
-              <strong className="text-paper">Objetivo Operacional: </strong>
-              {activeManual.resumo}
-            </div>
-
-            {/* Passo a Passo */}
-            <div className="mt-8 space-y-6">
-              <h3 className="font-mono text-xs font-bold uppercase tracking-widest text-acid">
-                Passo a Passo de Execução //
-              </h3>
-              <div className="space-y-4">
-                {activeManual.passos.map((p) => (
-                  <div
-                    key={p.num}
-                    className="flex items-start gap-4 rounded-sm border border-shadow bg-void p-4 transition-colors hover:border-line"
-                  >
-                    <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-sm bg-acid font-mono text-xs font-bold text-void">
-                      0{p.num}
+            {/* MODO 1: INTERATIVO GUIADO COM TELA SIMULADA */}
+            {viewMode === "interactive" && (
+              <div className="screen-only mt-6 space-y-6">
+                {/* Stepper Progress Bar */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between text-xs font-mono">
+                    <span className="text-acid font-bold">
+                      PROGRESSO: PASSO 0{activeStep} DE 05
                     </span>
-                    <div className="flex-1">
-                      <h4 className="font-bold text-sm text-paper">
-                        {p.titulo}
-                      </h4>
-                      <p className="mt-1 text-xs leading-relaxed text-muted">
-                        {p.desc}
+                    <span className="text-muted hidden sm:inline">
+                      Dica: Use as setas [ ← ] e [ → ] do teclado para navegar
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-5 gap-1.5 sm:gap-2">
+                    {activeManual.passos.map((p) => {
+                      const isCurrent = activeStep === p.num;
+                      const isPassed = activeStep > p.num;
+                      return (
+                        <button
+                          key={p.num}
+                          onClick={() => setActiveStep(p.num)}
+                          className={`flex flex-col text-left p-2 rounded transition-all cursor-pointer ${
+                            isCurrent
+                              ? "bg-acid text-void font-bold shadow-[0_0_12px_rgba(198,255,0,0.4)]"
+                              : isPassed
+                              ? "bg-panel border border-acid/40 text-paper"
+                              : "bg-void border border-shadow text-muted hover:border-line"
+                          }`}
+                        >
+                          <span className="font-mono text-[10px] uppercase">
+                            0{p.num} {isPassed ? "✓" : ""}
+                          </span>
+                          <span className="truncate text-xs font-bold leading-snug">
+                            {p.titulo}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Grid Split View: Instruções à Esquerda + Tela à Direita */}
+                <div className="grid gap-6 lg:grid-cols-12 items-start">
+                  {/* Coluna Esquerda: Instruções do Passo Ativo */}
+                  <div className="lg:col-span-5 space-y-4">
+                    <div className="rounded-sm border border-shadow bg-void p-5 space-y-3.5">
+                      <div className="flex items-center justify-between">
+                        <span className="badge-acid text-[10px]">
+                          PASSO 0{activeStep} DE 05
+                        </span>
+                        <span className="font-mono text-[11px] text-muted">
+                          {activeManual.modulo}
+                        </span>
+                      </div>
+
+                      <h3 className="font-display text-xl uppercase text-paper leading-tight">
+                        {currentStep.titulo}
+                      </h3>
+
+                      <p className="text-sm leading-relaxed text-silver">
+                        {currentStep.desc}
                       </p>
-                      <div className="mt-2.5 inline-flex items-center gap-1.5 rounded-sm bg-panel px-2.5 py-1 text-[11px] font-mono text-acid border border-shadow">
-                        <span>📍 Onde executar:</span>
-                        <strong className="text-silver">{p.ondeExecutar}</strong>
+
+                      {/* Pinpoint Action Box */}
+                      <div className="rounded-sm border-2 border-acid/80 bg-acid/10 p-3 text-xs text-acid space-y-1 shadow-[0_0_15px_rgba(198,255,0,0.1)]">
+                        <div className="flex items-center gap-1.5 font-bold uppercase tracking-wider text-[10px]">
+                          <span>🎯</span>
+                          <span>Onde Executar no Sistema:</span>
+                        </div>
+                        <div className="font-mono text-paper font-bold text-xs">
+                          {currentStep.ondeExecutar}
+                        </div>
+                      </div>
+
+                      {/* Dica de Engenharia */}
+                      {activeManual.dicaEngenharia && (
+                        <div className="rounded-sm border border-purple/30 bg-purple/10 p-3 text-xs text-purple-light space-y-1">
+                          <div className="flex items-center gap-1.5 font-bold text-paper text-[11px]">
+                            <span>💡</span>
+                            <span>Dica Prática de Engenharia:</span>
+                          </div>
+                          <p className="leading-relaxed text-[11px]">
+                            {activeManual.dicaEngenharia}
+                          </p>
+                        </div>
+                      )}
+
+                      {/* Controles de Avanço do Passo */}
+                      <div className="flex items-center gap-3 pt-3 border-t border-shadow">
+                        <button
+                          disabled={activeStep === 1}
+                          onClick={() => setActiveStep((s) => Math.max(1, s - 1))}
+                          className="outline-action w-full py-2.5 text-xs disabled:opacity-30 disabled:pointer-events-none"
+                        >
+                          ← Anterior
+                        </button>
+                        <button
+                          disabled={activeStep === 5}
+                          onClick={() => setActiveStep((s) => Math.min(5, s + 1))}
+                          className="action w-full py-2.5 text-xs disabled:opacity-30 disabled:pointer-events-none"
+                        >
+                          Próximo Passo →
+                        </button>
                       </div>
                     </div>
                   </div>
-                ))}
-              </div>
-            </div>
 
-            {/* Print de Tela / Diagrama Esquemático */}
-            {activeManual.telaMockup && (
-              <div className="mt-10 rounded-sm border border-shadow bg-ink p-5 md:p-6">
-                <div className="flex items-center justify-between border-b border-shadow pb-3">
-                  <div className="flex items-center gap-2">
-                    <span className="h-2 w-2 rounded-full bg-acid" />
-                    <span className="font-mono text-xs font-bold uppercase text-paper">
-                      Diagrama de Tela: {activeManual.telaMockup.tituloTela}
-                    </span>
-                  </div>
-                  <span className="font-mono text-[10px] text-muted">
-                    INTERFACE FINGO v2.38
-                  </span>
-                </div>
-
-                {/* Caixa Esquemática */}
-                <div className="mt-4 rounded-sm border border-line bg-void p-4 font-mono text-xs space-y-3">
-                  <div className="rounded-sm border border-dashed border-acid bg-acid/10 p-3 text-acid">
-                    <span className="font-bold">🎯 LOCAL EXATO DA AÇÃO: </span>
-                    <span className="text-paper">{activeManual.telaMockup.localAcao}</span>
-                  </div>
-
-                  <div className="text-xs text-muted">
-                    <strong className="text-paper uppercase tracking-wider block mb-2">
-                      Elementos Chave Visíveis na Tela:
-                    </strong>
-                    <ul className="space-y-1 pl-4 list-disc text-silver">
-                      {activeManual.telaMockup.elementosChave?.map((el, idx) => (
-                        <li key={idx}>{el}</li>
-                      ))}
-                    </ul>
+                  {/* Coluna Direita: Simulador de Tela do Sistema */}
+                  <div className="lg:col-span-7">
+                    <ScreenSimulator manual={activeManual} activeStep={activeStep} />
                   </div>
                 </div>
-
-                {/* Dica Técnica */}
-                {activeManual.telaMockup.dicaTecnica && (
-                  <div className="mt-4 flex items-start gap-2.5 rounded-sm border border-purple/30 bg-purple/10 p-3.5 text-xs text-purple-light">
-                    <span className="text-sm">💡</span>
-                    <div>
-                      <strong className="text-paper">Dica de Engenharia: </strong>
-                      <span>{activeManual.telaMockup.dicaTecnica}</span>
-                    </div>
-                  </div>
-                )}
               </div>
             )}
 
-            {/* Rodapé do Modal com Navegação */}
-            <div className="mt-8 flex flex-col sm:flex-row items-center justify-between gap-4 border-t border-shadow pt-6 no-print">
+            {/* MODO 2: LISTA COMPLETA DOS 5 PASSOS */}
+            {viewMode === "all" && (
+              <div className="screen-only mt-6 space-y-6">
+                <div className="rounded-sm border border-shadow bg-void p-4 text-xs text-muted flex items-center justify-between">
+                  <span>Visualização de todos os 5 passos do manual para consulta rápida.</span>
+                  <span className="text-acid font-mono text-xs">Total: 5 passos</span>
+                </div>
+                <div className="space-y-4">
+                  {activeManual.passos.map((p) => (
+                    <div
+                      key={p.num}
+                      className="rounded-sm border border-shadow bg-void p-5 space-y-2.5 hover:border-acid/40 transition-colors"
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="badge-acid text-xs">
+                          PASSO 0{p.num}
+                        </span>
+                        <span className="font-mono text-xs text-acid">
+                          📍 {p.ondeExecutar}
+                        </span>
+                      </div>
+                      <h3 className="font-bold text-base text-paper">
+                        {p.titulo}
+                      </h3>
+                      <p className="text-xs leading-relaxed text-silver">
+                        {p.desc}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Simulador Geral */}
+                <div className="mt-8">
+                  <ScreenSimulator manual={activeManual} activeStep={3} />
+                </div>
+              </div>
+            )}
+
+            {/* MODO 3: FORMATAÇÃO EXECUTIVA PARA IMPRESSÃO / PDF */}
+            <div className="print-only mt-4 space-y-6">
+              <div className="border-b border-line pb-4">
+                <div className="text-xs font-mono uppercase text-muted">
+                  FinGo Tecnologia // Manual de Operação e Engenharia
+                </div>
+                <h1 className="text-2xl font-bold uppercase mt-1">
+                  Manual #{activeManual.numero}: {activeManual.titulo}
+                </h1>
+                <p className="text-xs mt-1">
+                  Módulo: <strong>{activeManual.modulo}</strong> • Trilha: {activeManual.trilhaLabel} • Nível: {activeManual.nivel}
+                </p>
+              </div>
+
+              <div>
+                <h2 className="text-sm font-bold uppercase mb-2">1. Objetivo Operacional</h2>
+                <p className="text-xs leading-relaxed">{activeManual.resumo}</p>
+              </div>
+
+              <div>
+                <h2 className="text-sm font-bold uppercase mb-2">2. Passo a Passo de Execução</h2>
+                <table className="w-full text-xs text-left border border-line">
+                  <thead>
+                    <tr className="bg-panel">
+                      <th className="p-2 border border-line">Passo</th>
+                      <th className="p-2 border border-line">Ação</th>
+                      <th className="p-2 border border-line">Descrição Detalhada</th>
+                      <th className="p-2 border border-line">Onde Executar</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {activeManual.passos.map((p) => (
+                      <tr key={p.num} className="border-b border-line">
+                        <td className="p-2 border border-line font-bold font-mono">0{p.num}</td>
+                        <td className="p-2 border border-line font-bold">{p.titulo}</td>
+                        <td className="p-2 border border-line">{p.desc}</td>
+                        <td className="p-2 border border-line font-mono">{p.ondeExecutar}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {activeManual.dicaEngenharia && (
+                <div className="border border-line p-3 text-xs">
+                  <strong>💡 Recomendação Técnica de Engenharia: </strong>
+                  <span>{activeManual.dicaEngenharia}</span>
+                </div>
+              )}
+
+              <div className="text-[10px] text-muted pt-4 border-t border-line flex justify-between">
+                <span>Documento Oficial FinGo — https://fingo.api.br/manuais</span>
+                <span>Impresso em: {new Date().toLocaleDateString("pt-BR")}</span>
+              </div>
+            </div>
+
+            {/* Rodapé do Modal com Navegação entre Manuais */}
+            <div className="mt-8 flex flex-col sm:flex-row items-center justify-between gap-4 border-t border-shadow pt-5 no-print">
               <div className="flex gap-2">
                 {(() => {
                   const currentIndex = MANUAIS.findIndex((m) => m.id === activeManual.id);
@@ -1271,7 +1924,10 @@ function ManualsView() {
                     <>
                       {prevManual && (
                         <button
-                          onClick={() => setActiveManual(prevManual)}
+                          onClick={() => {
+                            setActiveManual(prevManual);
+                            setActiveStep(1);
+                          }}
                           className="outline-action px-3 py-2 text-xs"
                         >
                           ← Manual #{prevManual.numero}
@@ -1279,7 +1935,10 @@ function ManualsView() {
                       )}
                       {nextManual && (
                         <button
-                          onClick={() => setActiveManual(nextManual)}
+                          onClick={() => {
+                            setActiveManual(nextManual);
+                            setActiveStep(1);
+                          }}
                           className="outline-action px-3 py-2 text-xs"
                         >
                           Manual #{nextManual.numero} →
