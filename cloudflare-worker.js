@@ -211,6 +211,7 @@ async function fetchFrontendResponse(request, env) {
       md = await llmsRes.text();
     }
 
+    md = md.replaceAll('FinObra', 'FinGo');
     const tokens = Math.ceil(md.length / 4);
     return new Response(md, {
       status: 200,
