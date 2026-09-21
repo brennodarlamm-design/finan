@@ -11,9 +11,24 @@ Sistema SaaS de Gestão Financeira e Operacional para a Construção Civil.
 O FinGo disponibiliza um servidor MCP público para integração com agentes de IA, IDEs e assistentes autônomos (Cursor, Claude Desktop, Windsurf, Smithery, Glama):
 
 * **Smithery Server:** https://smithery.ai/servers/brennodarlamm-d5fx/fingo-mcp
-* **Endpoint MCP:** `https://fingo.api.br/api/mcp`
+* **Glama MCP Endpoint:** `https://glama.ai/endpoints/jmtfw2cwfi/mcp`
+* **Endpoint MCP Direto:** `https://fingo.api.br/api/mcp`
 * **MCP Server Card:** `https://fingo.api.br/.well-known/mcp/server-card.json`
 * **AI Catalog (ARD):** `https://fingo.api.br/.well-known/ai-catalog.json`
+
+### Como conectar no Claude Desktop / Cursor:
+```json
+{
+  "mcpServers": {
+    "fin-go": {
+      "url": "https://glama.ai/endpoints/jmtfw2cwfi/mcp",
+      "headers": {
+        "Authorization": "Bearer <SEU_TOKEN_GLAMA>"
+      }
+    }
+  }
+}
+```
 
 ### Ferramentas Expostas pelo Servidor MCP:
 1. `search_plans`: Consulta planos, recursos, limites de obras e faixas de preço do FinGo.

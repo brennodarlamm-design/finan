@@ -63,11 +63,24 @@ O FinGo possui conformidade com o **padrão SEP-1649 (MCP Server Card)** e proto
 
 ---
 
-### 2.2. Glama.ai (MCP Registry)
-* **URL de Submissão:** https://glama.ai/mcp/servers
-* **Endpoint:** `https://fingo.api.br/api/mcp`
-* **Metadata Card:** `https://fingo.api.br/.well-known/mcp/server-card.json`
-* **Capabilities:** Tools (`get_sinapi_info`, `get_financial_summary`)
+### 2.2. Glama.ai (MCP Registry) — **PUBLICADO ✅**
+* **Status:** Publicado com sucesso no registro oficial do Glama.
+* **Glama Proxy Endpoint:** `https://glama.ai/endpoints/jmtfw2cwfi/mcp`
+* **Endpoint Direto:** `https://fingo.api.br/api/mcp`
+* **Configuração para Clientes (Claude Desktop / Cursor):**
+```json
+{
+  "mcpServers": {
+    "fin-go": {
+      "url": "https://glama.ai/endpoints/jmtfw2cwfi/mcp",
+      "headers": {
+        "Authorization": "Bearer <ACCESS_TOKEN>"
+      }
+    }
+  }
+}
+```
+* **Capabilities:** Tools (`search_plans`, `get_sinapi_info`, `get_financial_summary`) com JSON-RPC 2.0 e output tipado.
 
 ---
 
