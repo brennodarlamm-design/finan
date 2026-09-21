@@ -46,10 +46,11 @@ assert(bannerCode.includes('href="/termos"') && bannerCode.includes('href="/priv
 assert(bannerCode.includes('#C6FF00') || bannerCode.includes('var(--accent'), 'cookie_banner.js aplica paleta de design Brutalist Tech');
 assert(bannerCode.includes('fingo-cb-accept-btn'), 'cookie_banner.js possui botão de aceite e persistência');
 
+const react = fs.readFileSync('marketing/main.jsx','utf8');
+assert(react.includes('fingo_cookie_consent_v2') && react.includes('<CookieNotice />'), 'Landing React mantém aviso de privacidade e preferência persistida');
 // 4. Validar injeção do banner nas páginas HTML
 console.log('\n4. Validando carregamento do banner nas páginas da aplicação...');
 const htmlPages = [
-  'landing.html',
   'index.html',
   'app.html',
   'master.html',

@@ -10,6 +10,8 @@
     "binding": "ASSETS",
     "html_handling": "none",
     "run_worker_first": [
+      "/planos",
+      "/sobre-nos",
       "/api/*",
       "/__finobra/health",
       "/",

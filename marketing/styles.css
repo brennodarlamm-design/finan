@@ -1,0 +1,56 @@
+@import "tailwindcss" source(none);
+@source './**/*.jsx';
+@theme {
+  --color-void: #0a0a0a;
+  --color-panel: #1a1a1a;
+  --color-line: #3d3d3d;
+  --color-acid: #c6ff00;
+  --color-paper: #f0f0e8;
+  --color-muted: #b7b7ad;
+  --font-sans: "Monument Grotesk", "Helvetica Neue", sans-serif;
+  --font-display: "Monument Grotesk", Impact, sans-serif;
+}
+@layer base {
+  body {
+    @apply m-0 bg-void text-paper antialiased;
+  }
+  button,
+  a,
+  summary {
+    @apply touch-manipulation;
+  }
+  button,
+  summary {
+    @apply cursor-pointer;
+  }
+  a,
+  button,
+  summary {
+    @apply focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-acid;
+  }
+  h1,
+  h2,
+  h3 {
+    @apply tracking-tight;
+  }
+  ::selection {
+    @apply bg-acid text-void;
+  }
+}
+@layer components {
+  .wrap {
+    @apply mx-auto w-full max-w-7xl px-6 md:px-12;
+  }
+  .eyebrow {
+    @apply mb-6 font-mono text-xs uppercase tracking-widest text-acid;
+  }
+  .action {
+    @apply inline-flex items-center justify-center gap-8 rounded-sm bg-acid px-6 py-4 text-sm font-bold text-void transition-colors hover:bg-paper;
+  }
+  .outline-action {
+    @apply inline-flex items-center justify-center rounded-sm border border-line px-5 py-3 text-sm font-bold hover:border-acid hover:text-acid;
+  }
+  .page-title {
+    @apply max-w-4xl font-display text-5xl uppercase leading-none md:text-7xl;
+  }
+}

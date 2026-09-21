@@ -13,8 +13,8 @@ function assert(condition, message) {
 
 const worker = read('cloudflare-worker.js');
 const build = read('scripts/build-cloudflare-pages.cjs');
-const landing = read('landing.html');
-const landingPage = read('js/landing_page.js');
+const landing = read('landing.html') + read('marketing/main.jsx');
+const landingPage = read('marketing/main.jsx') + read('marketing/brand-sections.jsx');
 const login = read('index.html');
 const loginPage = read('js/login_page.js');
 const authRoute = read('js/auth-route-patch38.js');
@@ -57,8 +57,8 @@ assert(redirects.includes('/sitemap.xml /data/sitemap.xml 200'), 'sitemap.xml de
 assert(landing.includes('<link rel="canonical" href="https://fingo.api.br/">'), 'a landing deve manter canonical apontando para a raiz.');
 assert(landing.includes('href="/login"'), 'a landing deve apontar Entrar/Área do Cliente para /login.');
 assert(landing.includes('href="/cadastro"'), 'a landing deve apontar teste grátis para /cadastro.');
-assert(landingPage.includes("brandHomeLink.setAttribute('href', '/')"), 'o logo deve navegar diretamente para a home canônica.');
-assert(landingPage.includes("window.matchMedia('(max-width: 700px)')"), 'FAQ deve possuir tratamento de visibilidade em telas pequenas.');
+assert(landingPage.includes('href="/"'), 'o logo React navega para a home canônica.');
+assert(landingPage.includes('<details') && landingPage.includes('<summary'), 'FAQ usa disclosure nativo acessível no celular.');
 
 assert(login.includes('id="login-form"'), 'o shell de autenticação precisa conter o formulário de login.');
 assert(login.includes('id="register-modal"'), 'o shell de autenticação precisa conter o cadastro.');

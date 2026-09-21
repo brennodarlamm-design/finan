@@ -212,6 +212,9 @@ async function fetchFrontendResponse(request, env) {
   } else if (masterShell) {
     assetPath = '/master.html';
     routeName = 'master-shell';
+  } else if (['/planos', '/sobre-nos'].includes(incoming.pathname)) {
+    assetPath = incoming.pathname + '.html';
+    routeName = 'marketing-shell';
   } else if (landingShell) {
     assetPath = '/index.html';
     routeName = 'landing-shell';

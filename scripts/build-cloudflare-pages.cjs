@@ -214,7 +214,7 @@ fs.writeFileSync(loginPagePath, loginPage, 'utf8');
 
 const builtHome = fs.readFileSync(path.join(out, 'index.html'), 'utf8');
 const builtLogin = fs.readFileSync(path.join(out, 'login.html'), 'utf8');
-if (!builtHome.includes('class="ui-marketing"') || !builtHome.includes('href="/cadastro"') || !builtLogin.includes('id="login-form"')) {
+if (!builtHome.includes('id="root"') || !builtHome.includes('/marketing/main.jsx') || !builtLogin.includes('id="login-form"')) {
   throw new Error('Patch 37: landing/login não foram materializados corretamente no dist.');
 }
 
@@ -246,3 +246,7 @@ if ((!deploymentMetadata.commit || deploymentMetadata.commit === 'unknown') && !
 }
 
 console.log(`✅ Cloudflare dist preparado com commit ${deploymentMetadata.commit.slice(0, 12)} via ${deploymentMetadata.source}, frontend-only, sem segredos de servidor, CSP e recuperação multi-tenant validada.`);
+
+execFileSync(process.execPath, [path.join(root, 'scripts/build-marketing.js'), out], { cwd: root, stdio: 'inherit' });
+
+assertNoServerSecretsInPublicBundle();

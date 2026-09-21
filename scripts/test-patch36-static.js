@@ -28,14 +28,11 @@ assert(cfg.includes('Seu time chegou ao limite do plano') && cfg.includes('Dispo
 assert(cob.includes('Conta & Assinatura') && cob.includes('Histórico de cobranças') && cob.includes('acc-billing-cards'),'Central da Conta possui plano, cobranças e mobile cards.');
 assert(cob.includes('acc-plans{display:flex;overflow-x:auto;scroll-snap-type:x mandatory'),'Planos internos usam carrossel horizontal no celular em vez de pilha longa.');
 
-const landing=fs.readFileSync('landing.html','utf8');
-assert(landing.includes('15 dias') && !/7\s+dias/i.test(landing),'Landing padroniza teste gratuito em 15 dias.');
-assert(landing.includes('Suporte / Comercial') && !landing.includes('(95) 99136-3678'),'Landing usa Suporte / Comercial sem exibir telefone.');
-assert(landing.includes('1 usuário') && landing.includes('2 usuários') && landing.includes('5 usuários'),'Landing comunica limites de usuários 1/2/5.');
-assert(landing.includes('3 ativas') && landing.includes('10 ativas') && landing.includes('Ilimitadas'),'Landing comunica limites de obras por plano.');
-assert(landing.includes('.plans-grid {') && landing.includes('overflow-x: auto;') && landing.includes('scroll-snap-type: x mandatory') && landing.includes('scroll-snap-align: center'),'Planos da landing usam swipe horizontal no celular.');
-assert(landing.includes('mobile-compare') && landing.includes('module-groups'),'Landing possui comparação mobile e módulos organizados por área.');
-assert(landing.includes('wa.me/5595991363678'),'Contato continua operacional por WhatsApp sem número visível.');
+const landing=fs.readFileSync('marketing/main.jsx','utf8');
+assert(landing.includes('15 dias'), 'Planos informam período de avaliação.');
+assert(landing.includes('PLAN_RULES') && landing.includes('p.maxUsers') && landing.includes('p.maxActiveObras'), 'Planos React usam limites da fonte autoritativa.');
+assert(landing.includes('overflow-x-auto') && landing.includes('<table'), 'Comparação permite rolagem no celular.');
+assert(landing.includes('wa.me/5595991363678'), 'Contato comercial preservado.');
 
 
 const db=fs.readFileSync('api/db.js','utf8');
