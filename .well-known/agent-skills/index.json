@@ -1,0 +1,26 @@
+{
+  "$schema": "https://schemas.agentskills.io/discovery/0.2.0/schema.json",
+  "skills": [
+    {
+      "name": "financial-management",
+      "type": "skill-md",
+      "description": "Gestão financeira, contas a pagar e receber, fluxo de caixa e centros de custo para obras de construção civil.",
+      "url": "https://fingo.api.br/.well-known/agent-skills/financial-management/SKILL.md",
+      "digest": "sha256:79664b41df1e70736d2fd258e3db5761c7c106e8c04d5482eaf5bc10ce78c9c9"
+    },
+    {
+      "name": "sinapi-budgeting",
+      "type": "skill-md",
+      "description": "Consulta a composições de custo oficiais SINAPI Caixa/IBGE e orçamentação de engenharia para licitações e obras privadas.",
+      "url": "https://fingo.api.br/.well-known/agent-skills/sinapi-budgeting/SKILL.md",
+      "digest": "sha256:854b3f1cb0bfe853194975d7768cb8e07b3cf46d3030a41e382885a1adfe1f51"
+    },
+    {
+      "name": "nfe-processing",
+      "type": "skill-md",
+      "description": "Processamento inteligente de NF-e, consulta de CNPJ na Receita Federal e cálculo automatizado de retenções tributárias da construção civil.",
+      "url": "https://fingo.api.br/.well-known/agent-skills/nfe-processing/SKILL.md",
+      "digest": "sha256:e5a67ec0a28a955792b575bf2acfa68fe41b2dfcd24e41b9697cb9e8c50853da"
+    }
+  ]
+}

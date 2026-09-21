@@ -5,6 +5,7 @@
   Permissions-Policy: camera=(), microphone=(), geolocation=()
   Strict-Transport-Security: max-age=31536000; includeSubDomains
   Cross-Origin-Opener-Policy: same-origin-allow-popups
+  Link: </.well-known/api-catalog>; rel="api-catalog", </openapi.json>; rel="service-desc", </llms-full.txt>; rel="service-doc", </auth.md>; rel="service-doc", </llms.txt>; rel="describedby", </api/x402>; rel="payment"
 
 /js/*
   Cache-Control: public, max-age=0, must-revalidate

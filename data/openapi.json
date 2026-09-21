@@ -1,0 +1,219 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "FinGo API — Obras em Fluxo",
+    "version": "2.0.0",
+    "description": "API corporativa para gestão financeira, orçamentária, obras de engenharia, NFe/impostos e inteligência operacional.",
+    "contact": {
+      "name": "Suporte FinGo",
+      "url": "https://fingo.api.br",
+      "email": "suporte@fingo.api.br"
+    },
+    "license": {
+      "name": "Proprietary"
+    }
+  },
+  "x-service-info": {
+    "categories": [
+      "finance",
+      "construction",
+      "saas",
+      "budgeting"
+    ]
+  },
+  "servers": [
+    {
+      "url": "https://fingo.api.br/api",
+      "description": "FinGo Edge API Gateway"
+    }
+  ],
+  "paths": {
+    "/auth": {
+      "get": {
+        "summary": "Validação de sessão do usuário",
+        "description": "Retorna a identidade do usuário autenticado, tenant e perfil de acesso.",
+        "parameters": [
+          {
+            "name": "action",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "me",
+                "health"
+              ]
+            },
+            "description": "Ação solicitada: 'me' para sessão, 'health' para status da auth."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Sessão ativa e válida."
+          },
+          "401": {
+            "description": "Não autenticado."
+          }
+        }
+      },
+      "post": {
+        "summary": "Autenticação, MFA e recuperação de conta",
+        "parameters": [
+          {
+            "name": "action",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "login",
+                "logout",
+                "totp-setup",
+                "totp-verify",
+                "request_reset",
+                "verify_reset",
+                "agent-register",
+                "token"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Operação concluída com sucesso."
+          },
+          "400": {
+            "description": "Parâmetros inválidos."
+          },
+          "401": {
+            "description": "Credenciais inválidas."
+          }
+        }
+      }
+    },
+    "/db": {
+      "get": {
+        "summary": "Consulta de entidades do tenant",
+        "description": "Recupera dados de obras, transações, fornecedores, clientes e categorias.",
+        "parameters": [
+          {
+            "name": "entity",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Nome da entidade (ex: transacoes, obras, fornecedores)."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Lista de registros retornada."
+          },
+          "401": {
+            "description": "Sessão não informada ou inválida."
+          }
+        }
+      },
+      "post": {
+        "summary": "Mutações e sincronização de dados",
+        "description": "Criação, edição e exclusão de registros financeiros e de engenharia.",
+        "responses": {
+          "200": {
+            "description": "Registro salvo com sucesso."
+          },
+          "400": {
+            "description": "Dados inválidos."
+          }
+        }
+      }
+    },
+    "/dashboard": {
+      "get": {
+        "summary": "Métricas e consolidação de KPIs",
+        "description": "Retorna saldos, fluxo de caixa, custos por obra e orçado vs realizado.",
+        "responses": {
+          "200": {
+            "description": "Métricas consolidadas com sucesso."
+          }
+        }
+      }
+    },
+    "/plano": {
+      "get": {
+        "summary": "Consultar status e limites do plano",
+        "responses": {
+          "200": {
+            "description": "Informações do plano retornadas."
+          }
+        }
+      },
+      "post": {
+        "summary": "Checkout e alteração de plano",
+        "x-payment-info": {
+          "intent": "charge",
+          "method": "card",
+          "amount": "119.90",
+          "currency": "BRL",
+          "description": "Assinatura mensal do Plano Básico FinGo"
+        },
+        "responses": {
+          "200": {
+            "description": "Transação de assinatura processada."
+          },
+          "402": {
+            "description": "Payment Required via protocolo x402 ou checkout tradicional."
+          }
+        }
+      }
+    },
+    "/users": {
+      "get": {
+        "summary": "Listagem de usuários do tenant",
+        "responses": {
+          "200": {
+            "description": "Lista de usuários."
+          }
+        }
+      },
+      "post": {
+        "summary": "Gestão de usuários e permissões",
+        "responses": {
+          "200": {
+            "description": "Usuário criado ou atualizado."
+          }
+        }
+      }
+    },
+    "/nfe": {
+      "get": {
+        "summary": "Consulta cadastral e validação de CNPJ",
+        "parameters": [
+          {
+            "name": "cnpj",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Dados cadastrais retornados."
+          }
+        }
+      }
+    },
+    "/whatsapp": {
+      "post": {
+        "summary": "Disparo de alertas e relatórios via WhatsApp",
+        "responses": {
+          "200": {
+            "description": "Mensagem enviada com sucesso."
+          }
+        }
+      }
+    }
+  }
+}

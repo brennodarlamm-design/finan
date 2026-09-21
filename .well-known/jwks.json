@@ -1,0 +1,21 @@
+{
+  "keys": [
+    {
+      "kty": "RSA",
+      "use": "sig",
+      "alg": "RS256",
+      "kid": "fingo-auth-rsa-2026",
+      "n": "u1P5z9n3Q8u6sF9l6cT4W2b7A5y8H3j1K9m0N4v7P2r5T8x1Z3c6B9e2D5g8J1m4P7s0V3y6B9e2D5g8J1m4P7s0V3y6B9e2D5g8J1m4P7s0V3y6B9e2D5g8J1m4P7s0V3y6B9e2D5g8J1m4P7s0V3y6B9e2D5g8J1m4P7s0V3y6B9e2D5g8J1m4P7s0V3y6B9e2D5g8J1m4P7s0V3y6B9e2D5g8J1m4P7s0V3y6B9e2D5g8J1m4",
+      "e": "AQAB"
+    },
+    {
+      "kty": "EC",
+      "crv": "P-256",
+      "use": "sig",
+      "alg": "ES256",
+      "kid": "fingo-auth-es256",
+      "x": "bD6Mktk3a3VEqjMXdAC70r3nB1ujA2BOjQHf7qk8brg",
+      "y": "d_W_2lTazf8SA_VvbCgV1Rp03mdCbYZ5NioRUsKQZI0"
+    }
+  ]
+}

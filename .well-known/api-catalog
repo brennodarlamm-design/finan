@@ -1,0 +1,66 @@
+{
+  "linkset": [
+    {
+      "anchor": "https://fingo.api.br/api",
+      "service-desc": [
+        {
+          "href": "https://fingo.api.br/api/openapi.json",
+          "type": "application/vnd.oai.openapi+json;version=3.0"
+        },
+        {
+          "href": "https://fingo.api.br/openapi.json",
+          "type": "application/vnd.oai.openapi+json;version=3.0"
+        }
+      ],
+      "service-doc": [
+        {
+          "href": "https://fingo.api.br/llms-full.txt",
+          "type": "text/plain"
+        },
+        {
+          "href": "https://fingo.api.br/auth.md",
+          "type": "text/markdown"
+        },
+        {
+          "href": "https://fingo.api.br/",
+          "type": "text/html"
+        }
+      ],
+      "status": [
+        {
+          "href": "https://fingo.api.br/__finobra/health",
+          "type": "application/json"
+        }
+      ]
+    },
+    {
+      "anchor": "https://fingo.api.br",
+      "service-desc": [
+        {
+          "href": "https://fingo.api.br/openapi.json",
+          "type": "application/vnd.oai.openapi+json;version=3.0"
+        }
+      ],
+      "service-doc": [
+        {
+          "href": "https://fingo.api.br/llms-full.txt",
+          "type": "text/plain"
+        },
+        {
+          "href": "https://fingo.api.br/auth.md",
+          "type": "text/markdown"
+        },
+        {
+          "href": "https://fingo.api.br/",
+          "type": "text/html"
+        }
+      ],
+      "status": [
+        {
+          "href": "https://fingo.api.br/__finobra/health",
+          "type": "application/json"
+        }
+      ]
+    }
+  ]
+}

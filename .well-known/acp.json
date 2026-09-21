@@ -1,0 +1,21 @@
+{
+  "protocol": {
+    "name": "acp",
+    "version": "1.0.0"
+  },
+  "api_base_url": "https://fingo.api.br/api",
+  "transports": [
+    "http",
+    "https",
+    "rest"
+  ],
+  "capabilities": {
+    "services": [
+      "checkout",
+      "subscriptions",
+      "invoicing",
+      "catalog",
+      "plans"
+    ]
+  }
+}

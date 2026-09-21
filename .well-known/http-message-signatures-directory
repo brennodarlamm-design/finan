@@ -1,0 +1,21 @@
+{
+  "keys": [
+    {
+      "crv": "Ed25519",
+      "x": "WtZRzaUk3DGnKywKQAyJhv0vrL6b2N2nnxPncLdjG50",
+      "kty": "OKP",
+      "kid": "fingo-bot-ed25519",
+      "use": "sig",
+      "alg": "EdDSA"
+    },
+    {
+      "kty": "EC",
+      "x": "bD6Mktk3a3VEqjMXdAC70r3nB1ujA2BOjQHf7qk8brg",
+      "y": "d_W_2lTazf8SA_VvbCgV1Rp03mdCbYZ5NioRUsKQZI0",
+      "crv": "P-256",
+      "kid": "fingo-bot-es256",
+      "use": "sig",
+      "alg": "ES256"
+    }
+  ]
+}

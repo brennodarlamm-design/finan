@@ -1,0 +1,19 @@
+{
+  "resource": "https://fingo.api.br",
+  "authorization_servers": [
+    "https://fingo.api.br"
+  ],
+  "scopes_supported": [
+    "read",
+    "write",
+    "finance",
+    "construction",
+    "openid",
+    "profile",
+    "email"
+  ],
+  "bearer_methods_supported": [
+    "header"
+  ],
+  "resource_documentation": "https://fingo.api.br/llms-full.txt"
+}

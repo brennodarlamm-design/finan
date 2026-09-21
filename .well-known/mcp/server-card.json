@@ -1,0 +1,20 @@
+{
+  "serverInfo": {
+    "name": "fingo-mcp-server",
+    "version": "1.0.0",
+    "description": "Servidor Model Context Protocol (MCP) do FinGo para integração de agentes de IA com gestão de obras, finanças e SINAPI."
+  },
+  "endpoint": "https://fingo.api.br/api/mcp",
+  "capabilities": {
+    "tools": {
+      "listChanged": false
+    },
+    "resources": {
+      "subscribe": false,
+      "listChanged": false
+    },
+    "prompts": {
+      "listChanged": false
+    }
+  }
+}

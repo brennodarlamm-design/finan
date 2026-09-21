@@ -1,0 +1,20 @@
+{
+  "protocol_version": "1.0.0",
+  "services": [
+    "subscriptions",
+    "checkout",
+    "invoicing",
+    "api-access"
+  ],
+  "capabilities": [
+    "one-time-payment",
+    "recurring-subscription",
+    "metered-billing"
+  ],
+  "endpoints": {
+    "checkout": "https://fingo.api.br/api/plano",
+    "subscriptions": "https://fingo.api.br/api/plano",
+    "catalog": "https://fingo.api.br/planos",
+    "status": "https://fingo.api.br/__finobra/health"
+  }
+}

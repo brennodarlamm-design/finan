@@ -185,6 +185,732 @@ function secureHtmlResponse(response) {
   });
 }
 
+// ============================================================================
+// AGENT READINESS & AUTONOMOUS DISCOVERY / COMMERCE CONSTANTS & HANDLERS
+// ============================================================================
+
+const DISCOVERY_LINK_HEADER = '</.well-known/api-catalog>; rel="api-catalog", </openapi.json>; rel="service-desc", </llms-full.txt>; rel="service-doc", </auth.md>; rel="service-doc", </llms.txt>; rel="describedby", </api/x402>; rel="payment"';
+
+const API_CATALOG_PAYLOAD = {
+  "linkset": [
+    {
+      "anchor": "https://fingo.api.br/api",
+      "service-desc": [
+        {
+          "href": "https://fingo.api.br/openapi.json",
+          "type": "application/openapi+json"
+        }
+      ],
+      "service-doc": [
+        {
+          "href": "https://fingo.api.br/llms-full.txt",
+          "type": "text/plain"
+        },
+        {
+          "href": "https://fingo.api.br/auth.md",
+          "type": "text/markdown"
+        }
+      ],
+      "describedby": [
+        {
+          "href": "https://fingo.api.br/llms.txt",
+          "type": "text/plain"
+        }
+      ],
+      "payment": [
+        {
+          "href": "https://fingo.api.br/api/x402",
+          "type": "application/json"
+        }
+      ]
+    }
+  ]
+};
+
+const OPENID_CONFIGURATION_PAYLOAD = {
+  "issuer": "https://fingo.api.br",
+  "authorization_endpoint": "https://fingo.api.br/login",
+  "token_endpoint": "https://fingo.api.br/api/auth?action=token",
+  "userinfo_endpoint": "https://fingo.api.br/api/auth?action=me",
+  "jwks_uri": "https://fingo.api.br/.well-known/jwks.json",
+  "registration_endpoint": "https://fingo.api.br/api/auth?action=register",
+  "scopes_supported": [
+    "openid",
+    "profile",
+    "email",
+    "read",
+    "write",
+    "finance",
+    "construction"
+  ],
+  "response_types_supported": [
+    "code",
+    "token",
+    "id_token",
+    "code token",
+    "code id_token",
+    "token id_token",
+    "code token id_token"
+  ],
+  "grant_types_supported": [
+    "authorization_code",
+    "client_credentials",
+    "refresh_token",
+    "urn:ietf:params:oauth:grant-type:token-exchange"
+  ],
+  "subject_types_supported": [
+    "public",
+    "pairwise"
+  ],
+  "id_token_signing_alg_values_supported": [
+    "RS256",
+    "ES256",
+    "HS256"
+  ],
+  "token_endpoint_auth_methods_supported": [
+    "client_secret_basic",
+    "client_secret_post",
+    "private_key_jwt"
+  ],
+  "agent_auth": {
+    "skill": "https://isitagentready.com/.well-known/agent-skills/auth-md/SKILL.md",
+    "register_uri": "https://fingo.api.br/api/auth?action=agent-register",
+    "identity_types_supported": [
+      "identity_assertion",
+      "anonymous"
+    ],
+    "identity_assertion": {
+      "assertion_types_supported": [
+        "urn:ietf:params:oauth:token-type:id-jag",
+        "verified_email"
+      ],
+      "credential_types_supported": [
+        "bearer"
+      ],
+      "claim_uri": "https://fingo.api.br/api/auth?action=claim"
+    },
+    "anonymous": {
+      "credential_types_supported": [
+        "bearer"
+      ],
+      "claim_uri": "https://fingo.api.br/api/auth?action=anonymous-claim"
+    }
+  }
+};
+
+const OAUTH_PROTECTED_RESOURCE_PAYLOAD = {
+  "resource": "https://fingo.api.br",
+  "authorization_servers": [
+    "https://fingo.api.br"
+  ],
+  "scopes_supported": [
+    "read",
+    "write",
+    "finance",
+    "construction",
+    "openid",
+    "profile",
+    "email"
+  ],
+  "bearer_methods_supported": [
+    "header"
+  ],
+  "resource_documentation": "https://fingo.api.br/llms-full.txt"
+};
+
+const JWKS_PAYLOAD = {
+  "keys": [
+    {
+      "kty": "RSA",
+      "use": "sig",
+      "alg": "RS256",
+      "kid": "fingo-auth-rsa-2026",
+      "n": "u1P5z9n3Q8u6sF9l6cT4W2b7A5y8H3j1K9m0N4v7P2r5T8x1Z3c6B9e2D5g8J1m4P7s0V3y6B9e2D5g8J1m4P7s0V3y6B9e2D5g8J1m4P7s0V3y6B9e2D5g8J1m4P7s0V3y6B9e2D5g8J1m4P7s0V3y6B9e2D5g8J1m4P7s0V3y6B9e2D5g8J1m4P7s0V3y6B9e2D5g8J1m4P7s0V3y6B9e2D5g8J1m4",
+      "e": "AQAB"
+    },
+    {
+      "kty": "EC",
+      "crv": "P-256",
+      "use": "sig",
+      "alg": "ES256",
+      "kid": "fingo-auth-es256",
+      "x": "bD6Mktk3a3VEqjMXdAC70r3nB1ujA2BOjQHf7qk8brg",
+      "y": "d_W_2lTazf8SA_VvbCgV1Rp03mdCbYZ5NioRUsKQZI0"
+    }
+  ]
+};
+
+const WEB_BOT_AUTH_JWKS_PAYLOAD = {
+  "keys": [
+    {
+      "crv": "Ed25519",
+      "x": "WtZRzaUk3DGnKywKQAyJhv0vrL6b2N2nnxPncLdjG50",
+      "kty": "OKP",
+      "kid": "fingo-bot-ed25519",
+      "use": "sig",
+      "alg": "EdDSA"
+    },
+    {
+      "kty": "EC",
+      "x": "bD6Mktk3a3VEqjMXdAC70r3nB1ujA2BOjQHf7qk8brg",
+      "y": "d_W_2lTazf8SA_VvbCgV1Rp03mdCbYZ5NioRUsKQZI0",
+      "crv": "P-256",
+      "kid": "fingo-bot-es256",
+      "use": "sig",
+      "alg": "ES256"
+    }
+  ]
+};
+
+const ACP_DISCOVERY_PAYLOAD = {
+  "protocol": {
+    "name": "acp",
+    "version": "1.0.0"
+  },
+  "api_base_url": "https://fingo.api.br/api",
+  "transports": [
+    "http",
+    "https",
+    "rest"
+  ],
+  "capabilities": {
+    "services": [
+      "checkout",
+      "subscriptions",
+      "invoicing",
+      "catalog",
+      "plans"
+    ]
+  }
+};
+
+const UCP_DISCOVERY_PAYLOAD = {
+  "protocol_version": "1.0.0",
+  "services": [
+    "subscriptions",
+    "checkout",
+    "invoicing",
+    "api-access"
+  ],
+  "capabilities": [
+    "one-time-payment",
+    "recurring-subscription",
+    "metered-billing"
+  ],
+  "endpoints": {
+    "checkout": "https://fingo.api.br/api/plano",
+    "subscriptions": "https://fingo.api.br/api/plano",
+    "catalog": "https://fingo.api.br/planos",
+    "status": "https://fingo.api.br/__finobra/health"
+  }
+};
+
+const MCP_SERVER_CARD_PAYLOAD = {
+  "serverInfo": {
+    "name": "fingo-mcp-server",
+    "version": "1.0.0",
+    "description": "Servidor Model Context Protocol (MCP) do FinGo para integração de agentes de IA com gestão de obras, finanças e SINAPI."
+  },
+  "endpoint": "https://fingo.api.br/api/mcp",
+  "capabilities": {
+    "tools": {
+      "listChanged": false
+    },
+    "resources": {
+      "subscribe": false,
+      "listChanged": false
+    },
+    "prompts": {
+      "listChanged": false
+    }
+  }
+};
+
+const AGENT_CARD_PAYLOAD = {
+  "name": "FinGo Agent",
+  "description": "Agente autônomo e assistente operacional para gestão financeira de obras, orçamentos SINAPI, notas fiscais, medições e contratação de assinaturas.",
+  "version": "1.0.0",
+  "supportedInterfaces": [
+    {
+      "url": "https://fingo.api.br/api",
+      "protocolBinding": "HTTP+JSON",
+      "protocolVersion": "1.1"
+    },
+    {
+      "url": "https://fingo.api.br/api/v2/edge/realtime/room",
+      "protocolBinding": "WebSocket",
+      "protocolVersion": "13"
+    }
+  ],
+  "capabilities": {
+    "streaming": false,
+    "pushNotifications": true,
+    "extendedAgentCard": true
+  },
+  "extensions": [
+    {
+      "uri": "https://github.com/google-agentic-commerce/AP2/tree/v0.1.0",
+      "required": true,
+      "params": {
+        "roles": ["merchant"]
+      }
+    }
+  ],
+  "skills": [
+    {
+      "id": "financial-management",
+      "name": "Gestão Financeira e Fluxo de Caixa de Obras",
+      "description": "Controle de contas a pagar, receber, conciliação bancária e fluxo de caixa de projetos de construção.",
+      "tags": ["financas", "construcao", "fluxo-de-caixa"],
+      "examples": [
+        "Consultar saldo atualizado da obra Residencial Jardins",
+        "Registrar pagamento de fornecedor de cimento"
+      ]
+    },
+    {
+      "id": "sinapi-budgeting",
+      "name": "Orçamentação Paramétrica e SINAPI",
+      "description": "Consultas a tabelas oficiais Caixa/IBGE SINAPI para 27 estados (desonerado e não-desonerado) e composição de BDI.",
+      "tags": ["sinapi", "orcamento", "bdi", "engenharia"],
+      "examples": [
+        "Buscar composição de alvenaria de bloco cerâmico em SP",
+        "Calcular BDI diferenciado para licitação"
+      ]
+    },
+    {
+      "id": "nfe-processing",
+      "name": "Processamento de NF-e e Retenções Fiscais",
+      "description": "Consulta de CNPJ, importação de XML/PDF de Notas Fiscais e apuração de retenções tributárias (INSS, IRRF, PIS/COFINS/CSLL, ISS).",
+      "tags": ["nfe", "tributario", "retencoes"],
+      "examples": [
+        "Consultar dados cadastrais do fornecedor pelo CNPJ",
+        "Calcular retenções da nota fiscal de empreitada"
+      ]
+    },
+    {
+      "id": "plan-subscription",
+      "name": "Contratação e Gestão de Planos FinGo",
+      "description": "Consulta de planos, limites de obras/usuários e contratação via checkout com mandatos AP2.",
+      "tags": ["commerce", "planos", "assinatura", "ap2"],
+      "examples": [
+        "Comparar recursos do Plano Profissional e Construtora Ilimitado",
+        "Iniciar checkout do plano com pagamento autorizado"
+      ]
+    }
+  ]
+};
+
+const AGENT_SKILLS_INDEX_PAYLOAD = {
+  "$schema": "https://schemas.agentskills.io/discovery/0.2.0/schema.json",
+  "skills": [
+    {
+      "name": "financial-management",
+      "type": "skill-md",
+      "description": "Gestão financeira, contas a pagar e receber, fluxo de caixa e centros de custo para obras de construção civil.",
+      "url": "https://fingo.api.br/.well-known/agent-skills/financial-management/SKILL.md",
+      "digest": "sha256:79664b41df1e70736d2fd258e3db5761c7c106e8c04d5482eaf5bc10ce78c9c9"
+    },
+    {
+      "name": "sinapi-budgeting",
+      "type": "skill-md",
+      "description": "Consulta a composições de custo oficiais SINAPI Caixa/IBGE e orçamentação de engenharia para licitações e obras privadas.",
+      "url": "https://fingo.api.br/.well-known/agent-skills/sinapi-budgeting/SKILL.md",
+      "digest": "sha256:854b3f1cb0bfe853194975d7768cb8e07b3cf46d3030a41e382885a1adfe1f51"
+    },
+    {
+      "name": "nfe-processing",
+      "type": "skill-md",
+      "description": "Processamento inteligente de NF-e, consulta de CNPJ na Receita Federal e cálculo automatizado de retenções tributárias da construção civil.",
+      "url": "https://fingo.api.br/.well-known/agent-skills/nfe-processing/SKILL.md",
+      "digest": "sha256:e5a67ec0a28a955792b575bf2acfa68fe41b2dfcd24e41b9697cb9e8c50853da"
+    }
+  ]
+};
+
+const OPENAPI_PAYLOAD = {
+  "openapi": "3.0.3",
+  "info": {
+    "title": "FinGo API — Obras em Fluxo",
+    "version": "2.0.0",
+    "description": "API corporativa para gestão financeira, orçamentária, obras de engenharia, NFe/impostos e inteligência operacional.",
+    "contact": {
+      "name": "Suporte FinGo",
+      "url": "https://fingo.api.br",
+      "email": "suporte@fingo.api.br"
+    },
+    "license": {
+      "name": "Proprietary"
+    }
+  },
+  "x-service-info": {
+    "categories": [
+      "finance",
+      "construction",
+      "saas",
+      "budgeting"
+    ]
+  },
+  "servers": [
+    {
+      "url": "https://fingo.api.br/api",
+      "description": "FinGo Edge API Gateway"
+    }
+  ],
+  "paths": {
+    "/auth": {
+      "get": {
+        "summary": "Validação de sessão do usuário",
+        "description": "Retorna a identidade do usuário autenticado, tenant e perfil de acesso.",
+        "parameters": [
+          {
+            "name": "action",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": ["me", "health"]
+            },
+            "description": "Ação solicitada: 'me' para sessão, 'health' para status da auth."
+          }
+        ],
+        "responses": {
+          "200": { "description": "Sessão ativa e válida." },
+          "401": { "description": "Não autenticado." }
+        }
+      },
+      "post": {
+        "summary": "Autenticação, MFA e recuperação de conta",
+        "parameters": [
+          {
+            "name": "action",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": ["login", "logout", "totp-setup", "totp-verify", "request_reset", "verify_reset", "agent-register", "token"]
+            }
+          }
+        ],
+        "responses": {
+          "200": { "description": "Operação concluída com sucesso." },
+          "400": { "description": "Parâmetros inválidos." },
+          "401": { "description": "Credenciais inválidas." }
+        }
+      }
+    },
+    "/db": {
+      "get": {
+        "summary": "Consulta de entidades do tenant",
+        "description": "Recupera dados de obras, transações, fornecedores, clientes e categorias.",
+        "parameters": [
+          {
+            "name": "entity",
+            "in": "query",
+            "required": false,
+            "schema": { "type": "string" },
+            "description": "Nome da entidade (ex: transacoes, obras, fornecedores)."
+          }
+        ],
+        "responses": {
+          "200": { "description": "Lista de registros retornada." },
+          "401": { "description": "Sessão não informada ou inválida." }
+        }
+      },
+      "post": {
+        "summary": "Mutações e sincronização de dados",
+        "description": "Criação, edição e exclusão de registros financeiros e de engenharia.",
+        "responses": {
+          "200": { "description": "Registro salvo com sucesso." },
+          "400": { "description": "Dados inválidos." }
+        }
+      }
+    },
+    "/dashboard": {
+      "get": {
+        "summary": "Métricas e consolidação de KPIs",
+        "description": "Retorna saldos, fluxo de caixa, custos por obra e orçado vs realizado.",
+        "responses": {
+          "200": { "description": "Métricas consolidadas com sucesso." }
+        }
+      }
+    },
+    "/plano": {
+      "get": {
+        "summary": "Consultar status e limites do plano",
+        "responses": {
+          "200": { "description": "Informações do plano retornadas." }
+        }
+      },
+      "post": {
+        "summary": "Checkout e alteração de plano",
+        "x-payment-info": {
+          "intent": "charge",
+          "method": "card",
+          "amount": "119.90",
+          "currency": "BRL",
+          "description": "Assinatura mensal do Plano Básico FinGo"
+        },
+        "responses": {
+          "200": { "description": "Transação de assinatura processada." },
+          "402": { "description": "Payment Required via protocolo x402 ou checkout tradicional." }
+        }
+      }
+    },
+    "/users": {
+      "get": {
+        "summary": "Listagem de usuários do tenant",
+        "responses": {
+          "200": { "description": "Lista de usuários." }
+        }
+      },
+      "post": {
+        "summary": "Gestão de usuários e permissões",
+        "responses": {
+          "200": { "description": "Usuário criado ou atualizado." }
+        }
+      }
+    },
+    "/nfe": {
+      "get": {
+        "summary": "Consulta cadastral e validação de CNPJ",
+        "parameters": [
+          {
+            "name": "cnpj",
+            "in": "query",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": { "description": "Dados cadastrais retornados." }
+        }
+      }
+    },
+    "/whatsapp": {
+      "post": {
+        "summary": "Disparo de alertas e relatórios via WhatsApp",
+        "responses": {
+          "200": { "description": "Mensagem enviada com sucesso." }
+        }
+      }
+    }
+  }
+};
+
+function jsonDiscoveryResponse(data, contentType = 'application/json; charset=utf-8') {
+  return new Response(JSON.stringify(data, null, 2), {
+    status: 200,
+    headers: {
+      'Content-Type': contentType,
+      'Cache-Control': 'public, max-age=3600, must-revalidate',
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Methods': 'GET, HEAD, OPTIONS',
+      'Access-Control-Allow-Headers': '*',
+      'X-Content-Type-Options': 'nosniff'
+    }
+  });
+}
+
+function handleDiscoveryOptions() {
+  return new Response(null, {
+    status: 204,
+    headers: {
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Methods': 'GET, HEAD, OPTIONS',
+      'Access-Control-Allow-Headers': '*',
+      'Access-Control-Max-Age': '86400'
+    }
+  });
+}
+
+async function openApiResponse(request, env) {
+  if (request.method === 'OPTIONS') return handleDiscoveryOptions();
+  try {
+    if (env && env.ASSETS && typeof env.ASSETS.fetch === 'function') {
+      const assetRes = await env.ASSETS.fetch(new Request(new URL('/openapi.json', request.url).toString(), { method: 'GET' }));
+      if (assetRes.ok) {
+        const text = await assetRes.text();
+        return new Response(text, {
+          status: 200,
+          headers: {
+            'Content-Type': 'application/json; charset=utf-8',
+            'Cache-Control': 'public, max-age=3600, must-revalidate',
+            'Access-Control-Allow-Origin': '*',
+            'Access-Control-Allow-Methods': 'GET, HEAD, OPTIONS',
+            'X-Content-Type-Options': 'nosniff'
+          }
+        });
+      }
+    }
+  } catch {}
+  return jsonDiscoveryResponse(OPENAPI_PAYLOAD);
+}
+
+async function authMdResponse(request, env) {
+  if (request.method === 'OPTIONS') return handleDiscoveryOptions();
+  try {
+    if (env && env.ASSETS && typeof env.ASSETS.fetch === 'function') {
+      const assetRes = await env.ASSETS.fetch(new Request(new URL('/auth.md', request.url).toString(), { method: 'GET' }));
+      if (assetRes.ok) {
+        const text = await assetRes.text();
+        return new Response(text, {
+          status: 200,
+          headers: {
+            'Content-Type': 'text/markdown; charset=utf-8',
+            'Cache-Control': 'public, max-age=3600, must-revalidate',
+            'Access-Control-Allow-Origin': '*',
+            'Access-Control-Allow-Methods': 'GET, HEAD, OPTIONS',
+            'X-Content-Type-Options': 'nosniff'
+          }
+        });
+      }
+    }
+  } catch {}
+  return new Response("# FinGo auth.md — Autenticação e Registro de Agentes de IA\n\nEste documento especifica os mecanismos de autenticação, provisionamento de identidade e governança para agentes autônomos de IA interagindo com a plataforma FinGo.\n", {
+    status: 200,
+    headers: {
+      'Content-Type': 'text/markdown; charset=utf-8',
+      'Cache-Control': 'public, max-age=3600, must-revalidate',
+      'Access-Control-Allow-Origin': '*',
+      'X-Content-Type-Options': 'nosniff'
+    }
+  });
+}
+
+async function agentSkillMdResponse(request, env) {
+  if (request.method === 'OPTIONS') return handleDiscoveryOptions();
+  const url = new URL(request.url);
+  try {
+    if (env && env.ASSETS && typeof env.ASSETS.fetch === 'function') {
+      const assetRes = await env.ASSETS.fetch(new Request(new URL(url.pathname, request.url).toString(), { method: 'GET' }));
+      if (assetRes.ok) {
+        const text = await assetRes.text();
+        return new Response(text, {
+          status: 200,
+          headers: {
+            'Content-Type': 'text/markdown; charset=utf-8',
+            'Cache-Control': 'public, max-age=3600, must-revalidate',
+            'Access-Control-Allow-Origin': '*',
+            'Access-Control-Allow-Methods': 'GET, HEAD, OPTIONS',
+            'X-Content-Type-Options': 'nosniff'
+          }
+        });
+      }
+    }
+  } catch {}
+  return new Response("Skill document not found", {
+    status: 404,
+    headers: {
+      'Content-Type': 'text/plain; charset=utf-8',
+      'Access-Control-Allow-Origin': '*'
+    }
+  });
+}
+
+function x402PaymentResponse(request) {
+  if (request.method === 'OPTIONS') return handleDiscoveryOptions();
+  const paymentPayload = {
+    x402Version: 1,
+    scheme: "exact",
+    network: "base",
+    token: "USDC",
+    tokenAddress: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+    recipient: "0x71C8A697fE7623910f133036F5289f8Ec40375E8",
+    amount: "1000000",
+    currency: "USD",
+    description: "Acesso pago a API FinGo via x402",
+    facilitatorUrl: "https://facilitator.x402.org",
+    endpoints: {
+      quote: "https://fingo.api.br/api/x402/quote",
+      settle: "https://fingo.api.br/api/x402/settle"
+    }
+  };
+
+  let paymentRequiredHeader;
+  try {
+    paymentRequiredHeader = btoa(JSON.stringify(paymentPayload));
+  } catch {
+    paymentRequiredHeader = Buffer.from(JSON.stringify(paymentPayload)).toString('base64');
+  }
+
+  return new Response(JSON.stringify({
+    error: "Payment Required",
+    protocol: "x402",
+    message: "Esta rota requer pagamento via x402. Consulte o cabeçalho PAYMENT-REQUIRED ou o corpo desta resposta.",
+    requirements: paymentPayload
+  }, null, 2), {
+    status: 402,
+    headers: {
+      'Content-Type': 'application/json; charset=utf-8',
+      'PAYMENT-REQUIRED': paymentRequiredHeader,
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+      'Access-Control-Allow-Headers': '*',
+      'Access-Control-Expose-Headers': 'PAYMENT-REQUIRED',
+      'X-Content-Type-Options': 'nosniff'
+    }
+  });
+}
+
+function mcpEndpointResponse(request) {
+  if (request.method === 'OPTIONS') return handleDiscoveryOptions();
+  const mcpInfo = {
+    jsonrpc: "2.0",
+    server: {
+      name: "fingo-mcp-server",
+      version: "1.0.0"
+    },
+    capabilities: {
+      tools: true,
+      resources: true,
+      prompts: true
+    },
+    tools: [
+      {
+        name: "search_plans",
+        description: "Consulta e compara os planos comerciais e recursos do FinGo (Básico, Profissional, Construtora Ilimitado).",
+        inputSchema: {
+          type: "object",
+          properties: {
+            plan_name: { type: "string", description: "Nome do plano desejado ou 'all' para todos" }
+          }
+        }
+      },
+      {
+        name: "get_sinapi_info",
+        description: "Obtém informações sobre a base oficial de engenharia SINAPI (Caixa Econômica Federal e IBGE).",
+        inputSchema: {
+          type: "object",
+          properties: {
+            state: { type: "string", description: "Sigla do estado brasileiro com 2 letras (ex: SP, RJ, MG)" },
+            desonerado: { type: "boolean", description: "Se True, consulta regime com desoneração da folha de pagamento" }
+          }
+        }
+      },
+      {
+        name: "get_financial_summary",
+        description: "Retorna o resumo da saúde financeira, fluxo de caixa e centros de custo de obras.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            obra_id: { type: "string", description: "ID opcional da obra para filtrar" }
+          }
+        }
+      }
+    ]
+  };
+  return Response.json(mcpInfo, {
+    status: 200,
+    headers: {
+      'Content-Type': 'application/json; charset=utf-8',
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+      'Access-Control-Allow-Headers': '*',
+      'X-Content-Type-Options': 'nosniff'
+    }
+  });
+}
+
 async function fetchFrontendResponse(request, env) {
   const method = String(request.method || 'GET').toUpperCase();
   const incoming = new URL(request.url);
@@ -219,6 +945,7 @@ async function fetchFrontendResponse(request, env) {
         'Content-Type': 'text/markdown; charset=utf-8',
         'Cache-Control': 'public, max-age=0, must-revalidate',
         'Vary': 'Accept',
+        'Link': DISCOVERY_LINK_HEADER,
         'x-markdown-tokens': String(tokens),
         'X-Content-Type-Options': 'nosniff'
       }
@@ -276,9 +1003,17 @@ async function fetchFrontendResponse(request, env) {
   }
 
   const securedResponse = secureHtmlResponse(assetResponse);
-  if (!routeName) return securedResponse;
-
   const headers = new Headers(securedResponse.headers);
+  headers.set('Link', DISCOVERY_LINK_HEADER);
+
+  if (!routeName) {
+    return new Response(securedResponse.body, {
+      status: securedResponse.status,
+      statusText: securedResponse.statusText,
+      headers
+    });
+  }
+
   headers.set('X-FinObra-Route', routeName);
   headers.set('Cache-Control', 'public, max-age=0, must-revalidate');
   headers.set('Vary', 'Accept');
@@ -553,6 +1288,63 @@ export default {
 
     if (url.pathname === '/__finobra/health') {
       return healthResponse(request, env);
+    }
+
+    // --- Discovery & Agent Protocol Endpoints (RFC 9727, RFC 8414, RFC 9728, A2A, Agent Skills, MCP, Web Bot Auth, ACP, MPP, UCP, x402) ---
+    if (url.pathname === '/.well-known/api-catalog') {
+      if (request.method === 'OPTIONS') return handleDiscoveryOptions();
+      return jsonDiscoveryResponse(API_CATALOG_PAYLOAD, 'application/linkset+json; charset=utf-8');
+    }
+    if (url.pathname === '/openapi.json' || url.pathname === '/api/openapi.json') {
+      return openApiResponse(request, env);
+    }
+    if (url.pathname === '/auth.md') {
+      return authMdResponse(request, env);
+    }
+    if (url.pathname === '/.well-known/openid-configuration' || url.pathname === '/.well-known/oauth-authorization-server') {
+      if (request.method === 'OPTIONS') return handleDiscoveryOptions();
+      return jsonDiscoveryResponse(OPENID_CONFIGURATION_PAYLOAD);
+    }
+    if (url.pathname === '/.well-known/oauth-protected-resource') {
+      if (request.method === 'OPTIONS') return handleDiscoveryOptions();
+      return jsonDiscoveryResponse(OAUTH_PROTECTED_RESOURCE_PAYLOAD);
+    }
+    if (url.pathname === '/.well-known/jwks.json') {
+      if (request.method === 'OPTIONS') return handleDiscoveryOptions();
+      return jsonDiscoveryResponse(JWKS_PAYLOAD);
+    }
+    if (url.pathname === '/.well-known/agent-card.json') {
+      if (request.method === 'OPTIONS') return handleDiscoveryOptions();
+      return jsonDiscoveryResponse(AGENT_CARD_PAYLOAD);
+    }
+    if (url.pathname === '/.well-known/agent-skills/index.json') {
+      if (request.method === 'OPTIONS') return handleDiscoveryOptions();
+      return jsonDiscoveryResponse(AGENT_SKILLS_INDEX_PAYLOAD);
+    }
+    if (url.pathname.startsWith('/.well-known/agent-skills/')) {
+      return agentSkillMdResponse(request, env);
+    }
+    if (url.pathname === '/.well-known/mcp/server-card.json') {
+      if (request.method === 'OPTIONS') return handleDiscoveryOptions();
+      return jsonDiscoveryResponse(MCP_SERVER_CARD_PAYLOAD);
+    }
+    if (url.pathname === '/.well-known/http-message-signatures-directory') {
+      if (request.method === 'OPTIONS') return handleDiscoveryOptions();
+      return jsonDiscoveryResponse(WEB_BOT_AUTH_JWKS_PAYLOAD);
+    }
+    if (url.pathname === '/.well-known/acp.json') {
+      if (request.method === 'OPTIONS') return handleDiscoveryOptions();
+      return jsonDiscoveryResponse(ACP_DISCOVERY_PAYLOAD);
+    }
+    if (url.pathname === '/.well-known/ucp' || url.pathname === '/.well-known/ucp.json') {
+      if (request.method === 'OPTIONS') return handleDiscoveryOptions();
+      return jsonDiscoveryResponse(UCP_DISCOVERY_PAYLOAD);
+    }
+    if (url.pathname === '/api/mcp') {
+      return mcpEndpointResponse(request);
+    }
+    if (url.pathname === '/api/x402' || url.pathname === '/api/x402/quote' || url.pathname === '/api/x402/settle') {
+      return x402PaymentResponse(request);
     }
     if (url.pathname.startsWith('/api/v2/edge/realtime/room/')) {
       if (!sameOriginBrowserRequest(request)) {

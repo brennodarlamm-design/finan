@@ -24,6 +24,8 @@ const rootFiles = [
   'sitemap.xml',
   'llms.txt',
   'llms-full.txt',
+  'auth.md',
+  'openapi.json',
   'favicon.ico',
   'favicon.svg',
   'favicon-32x32.png',
@@ -34,7 +36,7 @@ const rootFiles = [
   'twa-manifest.json'
 ];
 
-const directories = ['css', 'js', 'img', 'data'];
+const directories = ['css', 'js', 'img', 'data', '.well-known'];
 
 function copyRequired(src, dst) {
   if (!fs.existsSync(src)) throw new Error(`Arquivo obrigatório ausente: ${path.relative(root, src)}`);
@@ -162,7 +164,7 @@ if (fs.existsSync(cfDir)) {
 const deploymentMetadata = writeDeploymentMetadata();
 
 function assertNoServerSecretsInPublicBundle() {
-  const publicExtensions = new Set(['.html', '.js', '.json', '.txt', '.xml', '.webmanifest']);
+  const publicExtensions = new Set(['.html', '.js', '.json', '.txt', '.xml', '.webmanifest', '.md']);
   const forbiddenPatterns = [
     ['private-key', /-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----/],
     ['postgres-connection', /postgres(?:ql)?:\/\/[^\s"'<>]+/i],
