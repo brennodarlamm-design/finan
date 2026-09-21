@@ -21,6 +21,15 @@
     "extensions": [
       {
         "uri": "https://github.com/google-agentic-commerce/AP2/tree/v0.1.0",
+        "description": "Agent Payments Protocol (AP2) v0.1.0 for secure agent transactions",
+        "required": true,
+        "params": {
+          "roles": ["merchant"]
+        }
+      },
+      {
+        "uri": "https://github.com/google-agentic-commerce/ap2/tree/v0.1.0",
+        "description": "Agent Payments Protocol (ap2) v0.1.0 for secure agent transactions",
         "required": true,
         "params": {
           "roles": ["merchant"]
@@ -31,6 +40,15 @@
   "extensions": [
     {
       "uri": "https://github.com/google-agentic-commerce/AP2/tree/v0.1.0",
+      "description": "Agent Payments Protocol (AP2) v0.1.0 for secure agent transactions",
+      "required": true,
+      "params": {
+        "roles": ["merchant"]
+      }
+    },
+    {
+      "uri": "https://github.com/google-agentic-commerce/ap2/tree/v0.1.0",
+      "description": "Agent Payments Protocol (ap2) v0.1.0 for secure agent transactions",
       "required": true,
       "params": {
         "roles": ["merchant"]

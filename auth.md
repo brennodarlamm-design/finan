@@ -62,3 +62,86 @@ Os agentes devem solicitar apenas o conjunto mínimo de permissões necessárias
 1. **Assinatura de Requisições:** Para tráfego de bots em larga escala, assine as requisições utilizando Web Bot Auth (RFC 9421) com chaves públicas publicadas em `/.well-known/http-message-signatures-directory`.
 2. **Proteção Contra Abuso:** O Edge aplica rate-limiting adaptativo (120 req/min por IP/agente em rotas de API padrão). Em caso de HTTP 429, respeite o cabeçalho `Retry-After`.
 3. **Desafio HTTP 402 (x402):** Operações que demandam micropagamentos ou consumo de créditos retornam status HTTP 402 com as instruções de liquidação em USDC/Base no header `PAYMENT-REQUIRED`.
+
+---
+
+## 6. Fluxo Completo de Registro e Autenticação (Self-Contained Registration Flow)
+
+Agentes autônomos podem se registrar e obter tokens de acesso de forma 100% autônoma através dos passos abaixo:
+
+### Passo 1: Registro Dinâmico do Agente (Dynamic Client Registration)
+
+```http
+POST /api/auth?action=agent-register HTTP/1.1
+Host: fingo.api.br
+Content-Type: application/json
+
+{
+  "client_name": "Autonomous Agent",
+  "redirect_uris": ["https://agent.example.com/callback"],
+  "grant_types": ["client_credentials", "urn:ietf:params:oauth:grant-type:token-exchange"],
+  "response_types": ["token"],
+  "scope": "read write finance construction",
+  "token_endpoint_auth_method": "client_secret_post"
+}
+```
+
+Resposta esperada (HTTP 201 Created):
+
+```http
+HTTP/1.1 201 Created
+Content-Type: application/json
+
+{
+  "client_id": "fingo_agent_live_01",
+  "client_secret": "fingo_sec_live_abcdef123456",
+  "client_id_issued_at": 1716300000,
+  "client_secret_expires_at": 0,
+  "registration_client_uri": "https://fingo.api.br/api/auth?action=agent-register"
+}
+```
+
+### Passo 2: Obtenção de Token de Acesso (Token Exchange)
+
+```http
+POST /api/auth?action=token HTTP/1.1
+Host: fingo.api.br
+Content-Type: application/json
+
+{
+  "grant_type": "client_credentials",
+  "client_id": "fingo_agent_live_01",
+  "client_secret": "fingo_sec_live_abcdef123456",
+  "scope": "read finance"
+}
+```
+
+Resposta esperada (HTTP 200 OK):
+
+```http
+HTTP/1.1 200 OK
+Content-Type: application/json
+
+{
+  "access_token": "fingo_tok_eyJhbGciOi...",
+  "token_type": "Bearer",
+  "expires_in": 43200,
+  "scope": "read finance"
+}
+```
+
+### Passo 3: Asserção de Identidade / Claim
+
+```http
+POST /api/auth?action=claim HTTP/1.1
+Host: fingo.api.br
+Content-Type: application/json
+
+{
+  "grant_type": "urn:ietf:params:oauth:grant-type:token-exchange",
+  "subject_token": "eyJhbGciOi...",
+  "subject_token_type": "urn:ietf:params:oauth:token-type:id-jag",
+  "requested_token_type": "urn:ietf:params:oauth:token-type:access_token"
+}
+```
+

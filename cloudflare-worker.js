@@ -275,9 +275,11 @@ const OPENID_CONFIGURATION_PAYLOAD = {
   "agent_auth": {
     "skill": "https://fingo.api.br/auth.md",
     "register_uri": "https://fingo.api.br/api/auth?action=agent-register",
+    "claim_uri": "https://fingo.api.br/api/auth?action=claim",
     "identity_types_supported": [
       "identity_assertion",
-      "anonymous"
+      "anonymous",
+      "verified_email"
     ],
     "identity_assertion": {
       "assertion_types_supported": [
@@ -289,11 +291,17 @@ const OPENID_CONFIGURATION_PAYLOAD = {
       ],
       "claim_uri": "https://fingo.api.br/api/auth?action=claim"
     },
+    "verified_email": {
+      "claim_uri": "https://fingo.api.br/api/auth?action=claim",
+      "credential_types_supported": [
+        "bearer"
+      ]
+    },
     "anonymous": {
       "credential_types_supported": [
         "bearer"
       ],
-      "claim_uri": "https://fingo.api.br/api/auth?action=anonymous-claim"
+      "claim_uri": "https://fingo.api.br/api/auth?action=claim"
     }
   }
 };
@@ -470,6 +478,15 @@ const AGENT_CARD_PAYLOAD = {
     "extensions": [
       {
         "uri": "https://github.com/google-agentic-commerce/AP2/tree/v0.1.0",
+        "description": "Agent Payments Protocol (AP2) v0.1.0 for secure agent transactions",
+        "required": true,
+        "params": {
+          "roles": ["merchant"]
+        }
+      },
+      {
+        "uri": "https://github.com/google-agentic-commerce/ap2/tree/v0.1.0",
+        "description": "Agent Payments Protocol (ap2) v0.1.0 for secure agent transactions",
         "required": true,
         "params": {
           "roles": ["merchant"]
@@ -480,6 +497,15 @@ const AGENT_CARD_PAYLOAD = {
   "extensions": [
     {
       "uri": "https://github.com/google-agentic-commerce/AP2/tree/v0.1.0",
+      "description": "Agent Payments Protocol (AP2) v0.1.0 for secure agent transactions",
+      "required": true,
+      "params": {
+        "roles": ["merchant"]
+      }
+    },
+    {
+      "uri": "https://github.com/google-agentic-commerce/ap2/tree/v0.1.0",
+      "description": "Agent Payments Protocol (ap2) v0.1.0 for secure agent transactions",
       "required": true,
       "params": {
         "roles": ["merchant"]
@@ -732,7 +758,9 @@ function jsonDiscoveryResponse(data, contentType = 'application/json; charset=ut
     status: 200,
     headers: {
       'Content-Type': contentType,
-      'Cache-Control': 'public, max-age=3600, must-revalidate',
+      'Cache-Control': 'public, max-age=0, must-revalidate',
+      'CDN-Cache-Control': 'no-store',
+      'Cloudflare-CDN-Cache-Control': 'no-store',
       'Access-Control-Allow-Origin': '*',
       'Access-Control-Allow-Methods': 'GET, HEAD, OPTIONS',
       'Access-Control-Allow-Headers': '*',
@@ -843,11 +871,15 @@ function x402PaymentResponse(request) {
     x402Version: 1,
     scheme: "exact",
     network: "base",
+    payTo: "0x71C8A697fE7623910f133036F5289f8Ec40375E8",
+    recipient: "0x71C8A697fE7623910f133036F5289f8Ec40375E8",
+    maxAmountRequired: "1000000",
+    amount: "1000000",
+    asset: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
     token: "USDC",
     tokenAddress: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
-    recipient: "0x71C8A697fE7623910f133036F5289f8Ec40375E8",
-    amount: "1000000",
     currency: "USD",
+    resource: "https://fingo.api.br/api",
     description: "Acesso pago a API FinGo via x402",
     facilitatorUrl: "https://facilitator.x402.org",
     endpoints: {
@@ -873,10 +905,14 @@ function x402PaymentResponse(request) {
     headers: {
       'Content-Type': 'application/json; charset=utf-8',
       'PAYMENT-REQUIRED': paymentRequiredHeader,
+      'Payment-Required': paymentRequiredHeader,
+      'payment-required': paymentRequiredHeader,
+      'x-payment-required': paymentRequiredHeader,
+      'WWW-Authenticate': 'x402 realm="fingo", token="USDC", amount="1.00"',
       'Access-Control-Allow-Origin': '*',
       'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
       'Access-Control-Allow-Headers': '*',
-      'Access-Control-Expose-Headers': 'PAYMENT-REQUIRED',
+      'Access-Control-Expose-Headers': 'PAYMENT-REQUIRED, Payment-Required, payment-required, x-payment-required, WWW-Authenticate',
       'X-Content-Type-Options': 'nosniff'
     }
   });
