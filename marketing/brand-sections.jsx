@@ -201,53 +201,153 @@ export function Newsletter() {
 }
 export function Footer() {
   return (
-    <footer className="bg-void border-t border-line">
-      <div className="wrap py-12">
-        <div className="flex flex-col justify-between gap-9 lg:flex-row">
-          <div className="shrink-0">
-            <Brand compact />
-            <p className="mt-4 text-xs leading-relaxed text-muted">
-              Sistema SaaS de Gestão Financeira e Operacional para Construtoras.
-              <br />
-              FinGo — Obras em Fluxo — Brasil
-            </p>
+    <footer className="bg-void border-t border-line text-paper">
+      <div className="wrap py-14 md:py-16">
+        <div className="grid gap-10 md:gap-8 grid-cols-2 sm:grid-cols-2 md:grid-cols-12">
+          {/* Coluna 1: Marca & Apresentação */}
+          <div className="col-span-2 sm:col-span-2 md:col-span-4 flex flex-col justify-between">
+            <div>
+              <Brand compact />
+              <p className="mt-4 text-xs leading-relaxed text-muted max-w-sm">
+                Sistema SaaS de Gestão Financeira, Orçamentária e Operacional para Construtoras e Canteiros de Obras.
+              </p>
+              <p className="mt-2 text-xs font-mono text-silver">
+                FinGo — Obras em Fluxo — Brasil
+              </p>
+            </div>
+            <div className="mt-6 flex items-center gap-2">
+              <span className="h-2 w-2 rounded-full bg-acid animate-pulse" />
+              <span className="font-mono text-[11px] text-muted">
+                FinGo OS v2.38 • Cloudflare Edge
+              </span>
+            </div>
           </div>
-          <nav
-            aria-label="Rodapé"
-            className="flex max-w-2xl flex-wrap content-start gap-x-5 gap-y-4 text-xs text-muted [&_a:hover]:text-acid"
-          >
-            <a href="/login">Área do Cliente</a>
-            <a href="/#newsletter">Newsletter & Novidades</a>
-            <a href="/validar" target="_blank" rel="noopener noreferrer">
-              Validar Documento ICP
-            </a>
-            <a href="/privacidade">Privacidade & LGPD</a>
-            <a href="/termos">Termos de Uso</a>
-            <a
-              href="https://wa.me/5595991363678?text=Olá! Gostaria de falar com o Suporte / Comercial do FinGo."
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Suporte WhatsApp
-            </a>
-            <a href="/planos">Planos</a>
-            <a href="/sobre-nos">Sobre nós</a>
-            <a href="/manuais">Manuais do Sistema</a>
-            <a href="/blog">Blog</a>
-            <a href="/calculadora-bdi">Calculadora BDI</a>
-            <a
-              href="https://smithery.ai/servers/brennodarlamm-d5fx/fingo-mcp"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              MCP no Smithery
-            </a>
-          </nav>
+
+          {/* Coluna 2: Produto & Soluções */}
+          <div className="col-span-1 md:col-span-2">
+            <h4 className="font-mono text-xs font-bold uppercase tracking-widest text-acid mb-4">
+              Produto
+            </h4>
+            <nav aria-label="Links do Produto" className="flex flex-col gap-2.5 text-xs text-muted">
+              <a href="/planos" className="hover:text-acid transition-colors">
+                Planos & Preços
+              </a>
+              <a href="/manuais" className="hover:text-acid transition-colors">
+                Manuais do Sistema
+              </a>
+              <a href="/calculadora-bdi" className="hover:text-acid transition-colors">
+                Calculadora BDI TCU
+              </a>
+              <a href="/login" className="hover:text-acid transition-colors">
+                Área do Cliente
+              </a>
+              <a href="/validar" target="_blank" rel="noopener noreferrer" className="hover:text-acid transition-colors">
+                Validar Documento ICP
+              </a>
+            </nav>
+          </div>
+
+          {/* Coluna 3: Institucional */}
+          <div className="col-span-1 md:col-span-2">
+            <h4 className="font-mono text-xs font-bold uppercase tracking-widest text-acid mb-4">
+              Institucional
+            </h4>
+            <nav aria-label="Links Institucionais" className="flex flex-col gap-2.5 text-xs text-muted">
+              <a href="/sobre-nos" className="hover:text-acid transition-colors">
+                Quem Somos
+              </a>
+              <a href="/blog" className="hover:text-acid transition-colors">
+                Blog de Engenharia
+              </a>
+              <a href="/#newsletter" className="hover:text-acid transition-colors">
+                Radar FinGo
+              </a>
+              <a
+                href="https://smithery.ai/servers/brennodarlamm-d5fx/fingo-mcp"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="hover:text-acid transition-colors"
+              >
+                MCP no Smithery ↗
+              </a>
+              <a
+                href="https://glama.ai/endpoints/jmtfw2cwfi/mcp"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="hover:text-acid transition-colors"
+              >
+                Glama MCP ↗
+              </a>
+            </nav>
+          </div>
+
+          {/* Coluna 4: Suporte & Contato */}
+          <div className="col-span-1 md:col-span-2">
+            <h4 className="font-mono text-xs font-bold uppercase tracking-widest text-acid mb-4">
+              Suporte
+            </h4>
+            <nav aria-label="Links de Suporte" className="flex flex-col gap-2.5 text-xs text-muted">
+              <a
+                href="https://wa.me/5595991363678?text=Olá! Gostaria de falar com o Suporte / Comercial do FinGo."
+                target="_blank"
+                rel="noopener noreferrer"
+                className="hover:text-acid transition-colors"
+              >
+                WhatsApp Suporte ↗
+              </a>
+              <button
+                type="button"
+                onClick={() => {
+                  const btn = document.querySelector("#finbot-trigger, .finbot-toggle-btn");
+                  if (btn) btn.click();
+                  else window.location.href = "https://wa.me/5595991363678";
+                }}
+                className="text-left hover:text-acid transition-colors"
+              >
+                Chat com FinBot
+              </button>
+              <a href="/manuais" className="hover:text-acid transition-colors">
+                Central de Manuais
+              </a>
+              <a href="mailto:contato@fingo.api.br" className="hover:text-acid transition-colors">
+                contato@fingo.api.br
+              </a>
+            </nav>
+          </div>
+
+          {/* Coluna 5: LGPD & Legal */}
+          <div className="col-span-1 md:col-span-2">
+            <h4 className="font-mono text-xs font-bold uppercase tracking-widest text-acid mb-4">
+              LGPD & Legal
+            </h4>
+            <nav aria-label="Links de LGPD e Termos" className="flex flex-col gap-2.5 text-xs text-muted">
+              <a href="/privacidade" className="hover:text-acid transition-colors">
+                Privacidade & LGPD
+              </a>
+              <a href="/termos" className="hover:text-acid transition-colors">
+                Termos de Uso
+              </a>
+              <a href="/validar" target="_blank" rel="noopener noreferrer" className="hover:text-acid transition-colors">
+                Assinatura ICP-Brasil
+              </a>
+              <a href="/privacidade#direitos-titular" className="hover:text-acid transition-colors">
+                Direitos do Titular LGPD
+              </a>
+            </nav>
+          </div>
         </div>
-        <p className="mt-10 text-xs text-muted">
-          © {new Date().getFullYear()} FinGo — Obras em Fluxo. Todos os direitos
-          reservados.
-        </p>
+
+        {/* Rodapé Inferior: Copyright e Informações */}
+        <div className="mt-12 border-t border-line/60 pt-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-muted">
+          <p>
+            © {new Date().getFullYear()} FinGo — Obras em Fluxo. Todos os direitos reservados.
+          </p>
+          <div className="flex items-center gap-4 text-[11px] font-mono text-muted">
+            <span>Segurança TLS 1.3</span>
+            <span>•</span>
+            <span>Conformidade LGPD (Lei 13.709/2018)</span>
+          </div>
+        </div>
       </div>
     </footer>
   );
