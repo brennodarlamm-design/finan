@@ -84,40 +84,32 @@ O FinGo possui conformidade com o **padrão SEP-1649 (MCP Server Card)** e proto
 
 ---
 
-### 2.3. GitHub Agentfinder Catalog (`github/agentfinder-catalog`)
+### 2.3. GitHub Agentfinder Catalog (`github/agentfinder-catalog`) — **PR ABERTO #52 ✅**
 * **Repositório:** https://github.com/github/agentfinder-catalog
-* **Arquivo para PR:** `catalogs/fingo.api.br.json`
-* **Conteúdo do PR:**
+* **Pull Request Oficial:** https://github.com/github/agentfinder-catalog/pull/52
+* **Fork:** `https://github.com/brennodarlamm-design/agentfinder-catalog`
+* **Branch:** `add-fingo-mcp-server`
+* **Arquivo Submetido:** `catalog/brennodarlamm-design/fingo-mcp-server.json`
+* **Conteúdo do Augment:**
 ```json
 {
-  "specVersion": "1.0",
-  "host": {
-    "displayName": "FinGo",
-    "identifier": "fingo.api.br"
-  },
-  "entries": [
-    {
-      "identifier": "urn:air:fingo.api.br:mcp:server",
-      "displayName": "FinGo MCP Server",
-      "type": "application/mcp-server-card+json",
-      "url": "https://fingo.api.br/.well-known/mcp/server-card.json",
-      "description": "FinGo MCP server providing construction budget, SINAPI lookup, and financial management tools."
-    },
-    {
-      "identifier": "urn:air:fingo.api.br:a2a:agent",
-      "displayName": "FinGo A2A Agent",
-      "type": "application/agent-card+json",
-      "url": "https://fingo.api.br/.well-known/agent-card.json",
-      "description": "FinGo Autonomous Agent with A2A protocol and AP2 merchant payment capabilities."
-    },
-    {
-      "identifier": "urn:air:fingo.api.br:skills:index",
-      "displayName": "FinGo Agent Skills",
-      "type": "application/agent-skills+json",
-      "url": "https://fingo.api.br/.well-known/agent-skills/index.json",
-      "description": "FinGo Agent Skills discovery index for financial management, SINAPI budgeting, and NFe processing."
-    }
-  ]
+  "identifier": "urn:ai:github.com:brennodarlamm-design:finan:fingo-mcp-server",
+  "displayName": "FinGo MCP Server",
+  "mediaType": "application/mcp-server-card+json",
+  "url": "https://fingo.api.br/.well-known/mcp/server-card.json",
+  "description": "FinGo Model Context Protocol (MCP) server providing construction budget, SINAPI lookup, and financial management tools.",
+  "tags": [
+    "mcp-server",
+    "construction",
+    "budgeting",
+    "finance",
+    "sinapi",
+    "civil-engineering"
+  ],
+  "metadata": {
+    "sourceSet": "finan",
+    "repoPath": ".well-known/mcp/server-card.json"
+  }
 }
 ```
 
