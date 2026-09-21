@@ -273,7 +273,7 @@ const OPENID_CONFIGURATION_PAYLOAD = {
     "private_key_jwt"
   ],
   "agent_auth": {
-    "skill": "https://isitagentready.com/.well-known/agent-skills/auth-md/SKILL.md",
+    "skill": "https://fingo.api.br/auth.md",
     "register_uri": "https://fingo.api.br/api/auth?action=agent-register",
     "identity_types_supported": [
       "identity_assertion",
@@ -385,7 +385,28 @@ const ACP_DISCOVERY_PAYLOAD = {
 };
 
 const UCP_DISCOVERY_PAYLOAD = {
+  "ucp": {
+    "version": "1.0.0",
+    "services": [
+      "subscriptions",
+      "checkout",
+      "invoicing",
+      "api-access"
+    ],
+    "capabilities": [
+      "one-time-payment",
+      "recurring-subscription",
+      "metered-billing"
+    ],
+    "endpoints": {
+      "checkout": "https://fingo.api.br/api/plano",
+      "subscriptions": "https://fingo.api.br/api/plano",
+      "catalog": "https://fingo.api.br/planos",
+      "status": "https://fingo.api.br/__finobra/health"
+    }
+  },
   "protocol_version": "1.0.0",
+  "version": "1.0.0",
   "services": [
     "subscriptions",
     "checkout",
@@ -445,7 +466,16 @@ const AGENT_CARD_PAYLOAD = {
   "capabilities": {
     "streaming": false,
     "pushNotifications": true,
-    "extendedAgentCard": true
+    "extendedAgentCard": true,
+    "extensions": [
+      {
+        "uri": "https://github.com/google-agentic-commerce/AP2/tree/v0.1.0",
+        "required": true,
+        "params": {
+          "roles": ["merchant"]
+        }
+      }
+    ]
   },
   "extensions": [
     {
@@ -1343,7 +1373,7 @@ export default {
     if (url.pathname === '/api/mcp') {
       return mcpEndpointResponse(request);
     }
-    if (url.pathname === '/api/x402' || url.pathname === '/api/x402/quote' || url.pathname === '/api/x402/settle') {
+    if (url.pathname === '/api' || url.pathname === '/api/v1' || url.pathname === '/api/x402' || url.pathname === '/api/x402/quote' || url.pathname === '/api/x402/settle') {
       return x402PaymentResponse(request);
     }
     if (url.pathname.startsWith('/api/v2/edge/realtime/room/')) {

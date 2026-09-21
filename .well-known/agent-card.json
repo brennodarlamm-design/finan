@@ -17,7 +17,16 @@
   "capabilities": {
     "streaming": false,
     "pushNotifications": true,
-    "extendedAgentCard": true
+    "extendedAgentCard": true,
+    "extensions": [
+      {
+        "uri": "https://github.com/google-agentic-commerce/AP2/tree/v0.1.0",
+        "required": true,
+        "params": {
+          "roles": ["merchant"]
+        }
+      }
+    ]
   },
   "extensions": [
     {

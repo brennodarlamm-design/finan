@@ -44,7 +44,7 @@
     "private_key_jwt"
   ],
   "agent_auth": {
-    "skill": "https://isitagentready.com/.well-known/agent-skills/auth-md/SKILL.md",
+    "skill": "https://fingo.api.br/auth.md",
     "register_uri": "https://fingo.api.br/api/auth?action=agent-register",
     "identity_types_supported": [
       "identity_assertion",
