@@ -75,7 +75,7 @@ test('landing.html possui código de verificação Google Search Console',
 test('landing.html possui Schema.org JSON-LD com SoftwareApplication, Organization e FAQPage',
   landing.includes('"@type": "SoftwareApplication"') &&
   landing.includes('"@type": "Organization"') &&
-  landing.includes('"@type": "FAQPage"'));
+  fs.readFileSync('planos.html','utf8').includes('"@type": "FAQPage"'));
 
 // 3. Validação de index.html, master.html e auth-route-patch38.js
 const indexPath = path.resolve('index.html');

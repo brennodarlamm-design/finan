@@ -67,11 +67,15 @@ ok('CSP ativa não contém unsafe-inline em script-src-attr', !activeCsp.include
 const lifecycle = `${packageJson.scripts?.postinstall || ''} ${packageJson.scripts?.pretest || ''}`;
 ok('CSP materializada não depende de transformadores no lifecycle npm', !/prepare-patch26|apply-patch26|apply-patch25|apply-patch24|apply-patch23|apply-patch22/.test(lifecycle));
 
-for (const name of ['app.html', 'index.html', 'master.html', 'landing.html', 'validar.html']) {
+for (const name of ['app.html', 'index.html', 'master.html', 'validar.html']) {
   const src = fs.readFileSync(path.join(root, name), 'utf8');
   ok(`${name} carrega ações nomeadas antes do bridge`, src.includes('/js/patch26-actions.js') && src.includes('/js/patch26-events.js') && src.indexOf('/js/patch26-actions.js') < src.indexOf('/js/patch26-events.js'));
 }
 
+for (const page of ['landing.html','planos.html','sobre-nos.html']) {
+ const html=fs.readFileSync(path.join(root,page),'utf8');
+ ok(page+' usa módulo React externo sem bridge legado', html.includes('type="module" src="/marketing/main.jsx"') && !html.includes('patch26-events.js'));
+}
 if (offenders.length) {
   console.error('\nSuperfícies CSP restantes:');
   offenders.forEach(v => console.error(`  - ${v}`));

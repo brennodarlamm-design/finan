@@ -4,7 +4,7 @@
   "description": "FinObra — SaaS de gestão financeira e operacional para construtoras",
   "type": "module",
   "scripts": {
-    "dev": "npx serve .",
+    "dev": "vite --host 127.0.0.1",
     "deploy": "node scripts/deploy.js",
     "deploy:cloudflare": "npx wrangler deploy",
     "clean:deployments": "node scripts/clean-old-deployments.js",
@@ -69,7 +69,11 @@
     "test:phase4": "node scripts/test-phase4-design-system.js",
     "audit:styles": "node scripts/audit-inline-styles.js",
     "test:e2e": "node scripts/test-e2e-synthetic.js",
-    "test:bim-real": "node scripts/test-bim-real-qa.js --json=.qa/bim-real-qa.json --markdown=.qa/bim-real-qa.md"
+    "test:bim-real": "node scripts/test-bim-real-qa.js --json=.qa/bim-real-qa.json --markdown=.qa/bim-real-qa.md",
+    "dev:landing": "vite --host 127.0.0.1",
+    "build:landing": "node scripts/build-marketing.js",
+    "test:landing": "playwright test --config marketing/playwright.config.js",
+    "dev:legacy": "npx serve ."
   },
   "dependencies": {
     "@neondatabase/serverless": "^0.9.5",
@@ -77,10 +81,17 @@
     "@vercel/blob": "^2.8.0",
     "dotenv": "^16.4.5",
     "google-auth-library": "^11.0.2",
-    "qrcode": "^1.5.4"
+    "qrcode": "^1.5.4",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0"
   },
   "devDependencies": {
-    "@electric-sql/pglite": "^0.5.8"
+    "@electric-sql/pglite": "^0.5.8",
+    "@playwright/test": "^1.63.0",
+    "@tailwindcss/vite": "^4.3.3",
+    "@vitejs/plugin-react": "^6.1.1",
+    "tailwindcss": "^4.3.3",
+    "vite": "^8.3.0"
   },
   "overrides": {
     "ws": "^8.21.3"

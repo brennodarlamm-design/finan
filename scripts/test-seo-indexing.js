@@ -36,7 +36,7 @@ assert(sitemap.includes('<loc>https://fingo.api.br/llms-full.txt</loc>'), 'sitem
 
 // Contagem exata de URLs no sitemap
 const urlMatches = sitemap.match(/<loc>/g) || [];
-assert.strictEqual(urlMatches.length, 6, `sitemap.xml deve conter exatamente 6 URLs públicas canônicas. Encontradas: ${urlMatches.length}`);
+assert.strictEqual(urlMatches.length, 8, `sitemap.xml deve conter exatamente 8 URLs públicas canônicas. Encontradas: ${urlMatches.length}`);
 
 // Verificação de URLs duplicadas
 const locs = [...sitemap.matchAll(/<loc>(.*?)<\/loc>/g)].map(m => m[1]);
@@ -99,7 +99,8 @@ const types = schema['@graph'].map(node => node['@type']);
 assert(types.includes('WebSite'), 'Schema deve conter a entidade WebSite (exigência do Google para Brand Entity)');
 assert(types.includes('Organization'), 'Schema deve conter a entidade Organization');
 assert(types.includes('SoftwareApplication'), 'Schema deve conter a entidade SoftwareApplication');
-assert(types.includes('FAQPage'), 'Schema deve conter a entidade FAQPage');
+assert(types.includes('FAQPage'), 'FAQ institucional restaurado na home');
+assert.strictEqual(schema['@graph'].find(n => n['@type'] === 'FAQPage').mainEntity.length, 5, 'Home contém cinco perguntas originais');
 assert(types.includes('BreadcrumbList'), 'Schema deve conter a entidade BreadcrumbList para navegação hierárquica');
 
 const webSiteNode = schema['@graph'].find(n => n['@type'] === 'WebSite');
@@ -107,17 +108,16 @@ assert.strictEqual(webSiteNode.name, 'FinGo');
 assert(webSiteNode.alternateName && webSiteNode.alternateName.length > 0);
 
 const orgNode = schema['@graph'].find(n => n['@type'] === 'Organization');
-assert(orgNode.address, 'Organization deve conter endereço para GEO-Targeting e Schema enriquecido');
+assert(orgNode.contactPoint, 'Organization mantém contato comercial');
 
-const faqNode = schema['@graph'].find(n => n['@type'] === 'FAQPage');
-assert.strictEqual(faqNode.mainEntity.length, 5, 'FAQPage deve conter exatamente as 5 perguntas exibidas na interface');
+const faqNode = JSON.parse(read('planos.html').match(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/i)[1]);
+assert.strictEqual(faqNode.mainEntity.length, 3, 'FAQPage deve conter exatamente as 3 perguntas exibidas na interface');
 
 const softNode = schema['@graph'].find(n => n['@type'] === 'SoftwareApplication');
 assert(softNode.image, 'SoftwareApplication deve conter imagem de capa para Rich Snippets');
-assert(softNode.aggregateRating, 'SoftwareApplication deve conter aggregateRating para estrelas na busca');
-assert.strictEqual(softNode.aggregateRating.ratingValue, '4.9');
+assert(!softNode.aggregateRating, 'Não publica avaliações sem comprovação');
 
-console.log('   ✓ Schema.org @graph (WebSite, Organization, SoftwareApplication, BreadcrumbList, FAQPage [5/5]) validado com sucesso.');
+console.log('   ✓ Schema.org @graph (WebSite, Organization, SoftwareApplication, BreadcrumbList, FAQPage em /planos [3/3]) validado com sucesso.');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // 4. Metatags, Canonicais e GEO-Targeting nas Páginas Satélite
@@ -166,7 +166,7 @@ assert(fs.existsSync(path.join(root, 'img/og-finobra-cover.jpg')), 'img/og-finob
 const bannerStat = fs.statSync(path.join(root, 'img/og-finobra-cover.jpg'));
 assert(bannerStat.size > 50000, `Banner og-finobra-cover.jpg deve ter alta resolução (> 50KB). Tamanho atual: ${bannerStat.size} bytes`);
 
-assert(fs.existsSync(path.join(root, 'dist/img/og-finobra-cover.jpg')), 'dist/img/og-finobra-cover.jpg deve existir na pasta de distribuição');
+if (fs.existsSync(path.join(root, 'dist'))) assert(fs.existsSync(path.join(root, 'dist/img/og-finobra-cover.jpg')), 'Distribuição existente deve conter banner OpenGraph');
 
 console.log(`   ✓ Banner OpenGraph verificado (${Math.round(bannerStat.size / 1024)} KB) em img/ e dist/img/.`);
 

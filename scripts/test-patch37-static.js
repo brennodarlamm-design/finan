@@ -2,7 +2,7 @@ import fs from 'fs';
 function assert(cond,msg){ if(!cond){ console.error('❌ '+msg); process.exit(1); } console.log('✅ '+msg); }
 const worker=fs.readFileSync('cloudflare-worker.js','utf8');
 const build=fs.readFileSync('scripts/build-cloudflare-pages.cjs','utf8');
-const landing=fs.readFileSync('landing.html','utf8');
+const landing=fs.readFileSync('landing.html','utf8') + fs.readFileSync('marketing/main.jsx','utf8');
 const login=fs.readFileSync('index.html','utf8');
 const loginJs=fs.readFileSync('js/login_page.js','utf8');
 const auth=fs.readFileSync('js/auth.js','utf8');

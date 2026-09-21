@@ -39,4 +39,6 @@
     <changefreq>monthly</changefreq>
     <priority>0.8</priority>
   </url>
+  <url><loc>https://fingo.api.br/planos</loc></url>
+  <url><loc>https://fingo.api.br/sobre-nos</loc></url>
 </urlset>
