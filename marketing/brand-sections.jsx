@@ -262,22 +262,6 @@ export function Footer() {
               <a href="/#newsletter" className="hover:text-acid transition-colors">
                 Radar FinGo
               </a>
-              <a
-                href="https://smithery.ai/servers/brennodarlamm-d5fx/fingo-mcp"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="hover:text-acid transition-colors"
-              >
-                MCP no Smithery ↗
-              </a>
-              <a
-                href="https://glama.ai/endpoints/jmtfw2cwfi/mcp"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="hover:text-acid transition-colors"
-              >
-                Glama MCP ↗
-              </a>
             </nav>
           </div>
 
