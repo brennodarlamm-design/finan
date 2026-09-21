@@ -30,7 +30,7 @@ export function Faq() {
   return (
     <section
       id="faq"
-      className="bg-void py-20 md:py-24"
+      className="border-t border-shadow bg-ink py-20 md:py-24"
       aria-labelledby="faq-title"
     >
       <div className="wrap max-w-5xl">
@@ -44,7 +44,7 @@ export function Faq() {
           {FAQ_ITEMS.map(({ question, answer }) => (
             <details
               key={question}
-              className="group rounded-sm border border-line bg-panel"
+              className="group rounded-sm border border-shadow bg-panel transition-colors duration-150 hover:border-line"
             >
               <summary className="flex list-none items-center justify-between gap-5 p-6 font-display text-lg uppercase [&::-webkit-details-marker]:hidden">
                 {question}
@@ -109,14 +109,14 @@ export function Newsletter() {
     <section
       id="newsletter"
       aria-labelledby="newsletter-title"
-      className="bg-void pb-20 pt-8"
+      className="border-t border-shadow bg-void pb-20 pt-16"
     >
       <div className="wrap">
-        <div className="rounded-sm border border-acid/15 bg-void px-6 py-10 md:px-10">
+        <div className="rounded-sm border border-shadow bg-panel px-6 py-10 md:px-10">
           <div className="mx-auto max-w-2xl text-center">
-            <p className="mb-5 inline-block rounded-sm border border-acid/30 bg-acid/10 px-3 py-1 text-xs font-bold uppercase tracking-wide text-acid">
+            <span className="badge-purple mb-5">
               Radar FinGo • Engenharia & Atualizações
-            </p>
+            </span>
             <h2
               id="newsletter-title"
               className="text-2xl font-bold leading-snug md:text-3xl"
@@ -151,7 +151,7 @@ export function Newsletter() {
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="Seu e-mail corporativo ou pessoal"
                 disabled={pending}
-                className="min-w-0 flex-1 rounded-sm border border-line bg-void px-4 py-3 text-sm outline-none focus:border-acid disabled:opacity-60"
+                className="min-w-0 flex-1 rounded-sm border border-line bg-void px-4 py-3 text-sm outline-none transition-colors focus:border-acid disabled:opacity-60"
               />
               <button
                 type="submit"

@@ -2,11 +2,17 @@
 @source './**/*.jsx';
 @theme {
   --color-void: #0a0a0a;
+  --color-ink: #0d0d0d;
   --color-panel: #1a1a1a;
+  --color-shadow: #282828;
+  --color-stone: #2b2b2b;
   --color-line: #3d3d3d;
+  --color-silver: #e8e8dc;
   --color-acid: #c6ff00;
   --color-paper: #f0f0e8;
   --color-muted: #b7b7ad;
+  --color-purple: #7f49b8;
+  --color-purple-light: #9b6fd4;
   --font-sans: "Monument Grotesk", "Helvetica Neue", sans-serif;
   --font-display: "Monument Grotesk", Impact, sans-serif;
 }
@@ -45,12 +51,21 @@
     @apply mb-6 font-mono text-xs uppercase tracking-widest text-acid;
   }
   .action {
-    @apply inline-flex items-center justify-center gap-8 rounded-sm bg-acid px-6 py-4 text-sm font-bold text-void transition-colors hover:bg-paper;
+    @apply inline-flex items-center justify-center gap-8 rounded-sm bg-acid px-6 py-4 text-sm font-bold text-void transition-all duration-150 hover:-translate-y-0.5 hover:bg-[#d4ff33] hover:shadow-[0_4px_20px_rgba(198,255,0,0.35)] active:translate-y-0;
   }
   .outline-action {
-    @apply inline-flex items-center justify-center rounded-sm border border-line px-5 py-3 text-sm font-bold hover:border-acid hover:text-acid;
+    @apply inline-flex items-center justify-center rounded-sm border border-line px-5 py-3 text-sm font-bold transition-all duration-150 hover:-translate-y-0.5 hover:border-acid hover:text-acid hover:shadow-[0_2px_12px_rgba(198,255,0,0.15)] active:translate-y-0;
   }
   .page-title {
     @apply max-w-4xl font-display text-5xl uppercase leading-none md:text-7xl;
+  }
+  .badge-purple {
+    @apply inline-flex items-center gap-1.5 rounded-sm border border-purple/30 bg-purple/10 px-2.5 py-1 text-xs font-bold uppercase tracking-wider text-purple-light;
+  }
+  .badge-acid {
+    @apply inline-flex items-center gap-1.5 rounded-sm border border-acid/30 bg-acid/10 px-2.5 py-1 text-xs font-bold uppercase tracking-wider text-acid;
+  }
+  .card-industrial {
+    @apply rounded-sm border border-shadow bg-panel p-6 transition-all duration-150 hover:border-acid/40;
   }
 }

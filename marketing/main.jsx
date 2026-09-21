@@ -147,17 +147,35 @@ function Home() {
           </p>
         </div>
       </section>
-      <section className="border-y border-line">
-        <div className="wrap grid gap-4 py-7 text-sm md:grid-cols-3">
-          <p className="rounded-sm bg-acid px-5 py-4 font-bold text-void">
-            01 / Clareza sobre os custos
-          </p>
-          <p className="rounded-sm bg-acid px-5 py-4 font-bold text-void">
-            02 / Operação conectada
-          </p>
-          <p className="rounded-sm bg-acid px-5 py-4 font-bold text-void">
-            03 / Decisões com contexto
-          </p>
+      <section className="border-y border-shadow bg-ink">
+        <div className="wrap grid gap-4 py-8 text-sm md:grid-cols-3">
+          <div className="group rounded-sm border border-shadow bg-panel p-5 transition-all duration-150 hover:-translate-y-0.5 hover:border-acid/40">
+            <span className="font-mono text-xs font-bold text-acid">01 //</span>
+            <p className="mt-2 font-display text-base uppercase text-paper">
+              Clareza sobre os custos
+            </p>
+            <p className="mt-1 text-xs leading-relaxed text-muted">
+              Previsibilidade orçamentária, Curva ABC e controle real de insumos no canteiro.
+            </p>
+          </div>
+          <div className="group rounded-sm border border-shadow bg-panel p-5 transition-all duration-150 hover:-translate-y-0.5 hover:border-acid/40">
+            <span className="font-mono text-xs font-bold text-acid">02 //</span>
+            <p className="mt-2 font-display text-base uppercase text-paper">
+              Operação conectada
+            </p>
+            <p className="mt-1 text-xs leading-relaxed text-muted">
+              Canteiro e escritório sincronizados: compras, notas e medições no mesmo fluxo.
+            </p>
+          </div>
+          <div className="group rounded-sm border border-shadow bg-panel p-5 transition-all duration-150 hover:-translate-y-0.5 hover:border-acid/40">
+            <span className="font-mono text-xs font-bold text-acid">03 //</span>
+            <p className="mt-2 font-display text-base uppercase text-paper">
+              Decisões com contexto
+            </p>
+            <p className="mt-1 text-xs leading-relaxed text-muted">
+              Métricas consolidadas e relatórios técnicos para agir antes de desvios de margem.
+            </p>
+          </div>
         </div>
       </section>
       <section className="wrap py-24">
@@ -192,7 +210,7 @@ function Home() {
               "Acompanhe medições e escolha um plano com os recursos de engenharia que sua operação precisa.",
             ],
           ].map(([n, title, text]) => (
-            <article key={n} className="bg-void p-8">
+            <article key={n} className="bg-void p-8 transition-colors duration-150 hover:bg-panel">
               <span className="font-mono text-acid">{n} ↗</span>
               <h3 className="mb-4 mt-10 text-xl font-bold">{title}</h3>
               <p className="leading-relaxed text-muted">{text}</p>
@@ -200,7 +218,180 @@ function Home() {
           ))}
         </div>
       </section>
+      <ProductShowcase />
     </>
+  );
+}
+
+function ProductShowcase() {
+  const [activeTab, setActiveTab] = useState("kpis");
+  return (
+    <section className="border-y border-shadow bg-ink py-20">
+      <div className="wrap">
+        <div className="mb-10 flex flex-col justify-between gap-4 md:flex-row md:items-end">
+          <div>
+            <p className="eyebrow">Interface & Controle Operacional</p>
+            <h2 className="font-display text-3xl uppercase md:text-4xl">
+              Engenharia e finanças <span className="text-acid">no mesmo ambiente</span>
+            </h2>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="badge-purple">● SINAPI 27 Estados</span>
+            <span className="badge-acid">● FinGo OS v2.38</span>
+          </div>
+        </div>
+
+        <div className="overflow-hidden rounded-sm border border-shadow bg-void shadow-2xl">
+          <div className="flex flex-wrap items-center justify-between gap-4 border-b border-shadow bg-panel px-5 py-3">
+            <div className="flex items-center gap-3">
+              <span className="inline-flex gap-1.5" aria-hidden="true">
+                <span className="h-2.5 w-2.5 rounded-full bg-line" />
+                <span className="h-2.5 w-2.5 rounded-full bg-line" />
+                <span className="h-2.5 w-2.5 rounded-full bg-acid" />
+              </span>
+              <span className="font-mono text-xs uppercase tracking-wider text-muted">
+                OBRA: EDIFÍCIO HORIZON // TORRE A • STATUS: NO PRAZO
+              </span>
+            </div>
+            <div className="flex gap-1">
+              {[
+                ["kpis", "Painel Executivo"],
+                ["medicoes", "Boletim de Medição"],
+                ["sinapi", "Tabela SINAPI"],
+              ].map(([id, label]) => (
+                <button
+                  key={id}
+                  onClick={() => setActiveTab(id)}
+                  className={`rounded-sm px-3 py-1.5 text-xs font-bold transition-all ${
+                    activeTab === id
+                      ? "bg-acid text-void"
+                      : "bg-void text-muted hover:text-paper"
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="p-6 md:p-8">
+            {activeTab === "kpis" && (
+              <div className="space-y-6">
+                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                  <div className="rounded-sm border border-shadow bg-panel p-4">
+                    <p className="font-mono text-xs uppercase text-muted">Contrato Total</p>
+                    <p className="mt-1 font-mono text-xl font-bold text-paper">R$ 4.850.000,00</p>
+                    <div className="mt-3 flex items-center justify-between text-xs text-acid">
+                      <span>Execução: 42.8%</span>
+                      <span>No prazo</span>
+                    </div>
+                    <div className="mt-2 h-1.5 w-full rounded-full bg-void">
+                      <div className="h-full rounded-full bg-acid" style={{ width: "42.8%" }} />
+                    </div>
+                  </div>
+                  <div className="rounded-sm border border-shadow bg-panel p-4">
+                    <p className="font-mono text-xs uppercase text-muted">Medido no Mês</p>
+                    <p className="mt-1 font-mono text-xl font-bold text-paper">R$ 384.200,00</p>
+                    <p className="mt-3 text-xs text-muted">Aprovado pelo cliente • 100%</p>
+                    <div className="mt-2 h-1.5 w-full rounded-full bg-void">
+                      <div className="h-full rounded-full bg-acid" style={{ width: "100%" }} />
+                    </div>
+                  </div>
+                  <div className="rounded-sm border border-shadow bg-panel p-4">
+                    <p className="font-mono text-xs uppercase text-muted">Economia BDI / Insumos</p>
+                    <p className="mt-1 font-mono text-xl font-bold text-acid">+ R$ 68.450,00</p>
+                    <p className="mt-3 text-xs text-muted">Otimização de compras</p>
+                    <div className="mt-2 h-1.5 w-full rounded-full bg-void">
+                      <div className="h-full rounded-full bg-purple-light" style={{ width: "85%" }} />
+                    </div>
+                  </div>
+                  <div className="rounded-sm border border-shadow bg-panel p-4">
+                    <p className="font-mono text-xs uppercase text-muted">Retenções Técnicas</p>
+                    <p className="mt-1 font-mono text-xl font-bold text-paper">R$ 19.210,00</p>
+                    <p className="mt-3 text-xs text-muted">5% garantia contratual</p>
+                    <div className="mt-2 h-1.5 w-full rounded-full bg-void">
+                      <div className="h-full rounded-full bg-line" style={{ width: "50%" }} />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="rounded-sm border border-shadow bg-panel p-5">
+                  <div className="flex items-center justify-between border-b border-shadow pb-3">
+                    <span className="font-mono text-xs font-bold uppercase text-paper">
+                      Últimos Lançamentos Vinculados ao Canteiro
+                    </span>
+                    <span className="font-mono text-xs text-acid">Sincronizado há 2 min ↗</span>
+                  </div>
+                  <div className="mt-3 divide-y divide-shadow font-mono text-xs">
+                    <div className="flex flex-col justify-between gap-2 py-2.5 sm:flex-row sm:items-center">
+                      <div className="flex items-center gap-3">
+                        <span className="text-acid">01</span>
+                        <span className="text-paper">Alvenaria de vedação blocos cerâmicos 14x19x29</span>
+                      </div>
+                      <div className="flex items-center gap-4">
+                        <span className="text-muted">1.240 m²</span>
+                        <span className="font-bold text-paper">R$ 104.408,00</span>
+                        <span className="badge-acid">MEDIDO</span>
+                      </div>
+                    </div>
+                    <div className="flex flex-col justify-between gap-2 py-2.5 sm:flex-row sm:items-center">
+                      <div className="flex items-center gap-3">
+                        <span className="text-acid">02</span>
+                        <span className="text-paper">Concreto usinado bombeável fck=30 MPa</span>
+                      </div>
+                      <div className="flex items-center gap-4">
+                        <span className="text-muted">180 m³</span>
+                        <span className="font-bold text-paper">R$ 89.100,00</span>
+                        <span className="badge-purple">LIBERADO</span>
+                      </div>
+                    </div>
+                    <div className="flex flex-col justify-between gap-2 py-2.5 sm:flex-row sm:items-center">
+                      <div className="flex items-center gap-3">
+                        <span className="text-acid">03</span>
+                        <span className="text-paper">Aço CA-50 d=10.0mm cortado e dobrado</span>
+                      </div>
+                      <div className="flex items-center gap-4">
+                        <span className="text-muted">4.500 kg</span>
+                        <span className="font-bold text-paper">R$ 57.600,00</span>
+                        <span className="badge-acid">FATURADO</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {activeTab === "medicoes" && (
+              <div className="space-y-4 font-mono text-xs">
+                <div className="rounded-sm border border-shadow bg-panel p-5">
+                  <div className="flex flex-col justify-between gap-2 sm:flex-row sm:items-center">
+                    <span className="font-bold text-paper">Boletim de Medição #04 — Etapa Estrutural</span>
+                    <span className="text-acid">Período: 01 a 15 do corrente</span>
+                  </div>
+                  <p className="mt-3 leading-relaxed text-muted">
+                    Validação em 2 etapas com retenção técnica de 5% calculada automaticamente pelo sistema. Histórico completo auditável com exportação em PDF e planilha.
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {activeTab === "sinapi" && (
+              <div className="space-y-4 font-mono text-xs">
+                <div className="rounded-sm border border-shadow bg-panel p-5">
+                  <div className="flex flex-col justify-between gap-2 sm:flex-row sm:items-center">
+                    <span className="font-bold text-paper">Base Oficial SINAPI — Caixa Econômica Federal</span>
+                    <span className="text-purple-light">27 Unidades Federativas</span>
+                  </div>
+                  <p className="mt-3 leading-relaxed text-muted">
+                    Composições analíticas e sintéticas com desoneração e sem desoneração atualizadas mensalmente. Precificação precisa para licitações e orçamentos executivos.
+                  </p>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </section>
   );
 }
 function Plans() {
@@ -219,16 +410,31 @@ function Plans() {
       </p>
       <div
         aria-label="Periodicidade de cobrança"
-        className="my-12 flex flex-wrap gap-2"
+        className="my-12 flex flex-wrap items-center gap-2"
       >
         {Object.values(PLAN_BILLING_CYCLES).map((c) => (
           <button
             key={c.id}
             aria-pressed={cycle === c.id}
             onClick={() => setCycle(c.id)}
-            className={`rounded-sm border px-5 py-3 text-sm ${cycle === c.id ? "border-acid bg-acid text-void" : "border-line hover:border-acid"}`}
+            className={`flex items-center gap-2 rounded-sm border px-5 py-3 text-sm transition-all duration-150 ${
+              cycle === c.id
+                ? "border-acid bg-acid font-bold text-void shadow-[0_2px_12px_rgba(198,255,0,0.25)]"
+                : "border-line bg-void hover:border-acid hover:text-paper"
+            }`}
           >
-            {c.label}
+            <span>{c.label}</span>
+            {c.discountPercent > 0 && (
+              <span
+                className={`rounded-xs px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider ${
+                  cycle === c.id
+                    ? "bg-void text-acid"
+                    : "bg-purple/20 text-purple-light"
+                }`}
+              >
+                -{c.discountPercent}%
+              </span>
+            )}
           </button>
         ))}
       </div>
@@ -239,13 +445,27 @@ function Plans() {
           return (
             <article
               key={id}
-              className={`flex flex-col rounded-sm border p-7 ${id === "pro" ? "border-acid bg-panel" : "border-line"}`}
+              className={`flex flex-col rounded-sm border p-7 transition-all duration-150 hover:-translate-y-1 ${
+                id === "pro"
+                  ? "border-acid bg-panel shadow-[0_4px_24px_rgba(198,255,0,0.12)]"
+                  : "border-line bg-void hover:border-acid/40"
+              }`}
             >
-              <p className="eyebrow">
-                {id === "pro"
-                  ? "Para crescer com controle"
-                  : "Gestão de ponta a ponta"}
-              </p>
+              <div className="mb-2 flex items-center justify-between">
+                <p className="eyebrow mb-0">
+                  {id === "pro"
+                    ? "Para crescer com controle"
+                    : id === "unlimited"
+                      ? "Operações em escala"
+                      : "Gestão de ponta a ponta"}
+                </p>
+                {id === "pro" && (
+                  <span className="badge-acid">Mais Escolhido</span>
+                )}
+                {id === "unlimited" && (
+                  <span className="badge-purple">SINAPI & BIM</span>
+                )}
+              </div>
               <h2 className="text-2xl font-bold">{p.label}</h2>
               <p className="mt-4 min-h-20 text-sm leading-relaxed text-muted">
                 {p.idealFor}
@@ -259,7 +479,7 @@ function Plans() {
                   ? "Cobrança mensal, sem fidelidade"
                   : `${money(price.totalCents)} a cada ${price.months} meses`}
               </p>
-              <p className="mt-3 min-h-6 text-sm text-acid">
+              <p className="mt-3 min-h-6 text-sm text-acid font-medium">
                 {price.savingsCents > 0
                   ? `Economize ${money(price.savingsCents)} no período`
                   : "Flexibilidade para começar"}
