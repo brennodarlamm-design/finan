@@ -64,8 +64,8 @@ assert(
   'api/_auth.js não deriva origens confiáveis a partir do header Host não confiável (H-21)'
 );
 assert(
-  authBackendCode.includes('finan|finobra') && authBackendCode.includes('vercel'),
-  'api/_auth.js restringe origens vercel.app para subdomínios do projeto FinObra (H-20)'
+  authBackendCode.includes('https://fingo.api.br') && !authBackendCode.includes('*.vercel.app'),
+  'api/_auth.js define lista canônica estrita para domínio próprio FinGo (H-20)'
 );
 
 // 4. Validando api/auth.js (H-10)
