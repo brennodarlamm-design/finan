@@ -195,6 +195,35 @@ async function fetchFrontendResponse(request, env) {
   const masterShell = shellMethod && isMasterShellPath(incoming.pathname);
   const landingShell = shellMethod && incoming.pathname === '/';
 
+  // Content Negotiation: Markdown for Agents (Accept: text/markdown)
+  const acceptHeader = String(request.headers.get('Accept') || '').toLowerCase();
+  const wantsMarkdown = acceptHeader.includes('text/markdown');
+
+  if (wantsMarkdown && shellMethod && (landingShell || incoming.pathname === '/planos' || incoming.pathname === '/sobre-nos' || incoming.pathname === '/index.html' || incoming.pathname === '/landing')) {
+    let md = '';
+    if (incoming.pathname === '/planos') {
+      md = `# FinGo — Planos & Preços\n\nO plano certo para a sua obra. Compare recursos, equipe e capacidade de obras.\n\n## Planos Disponíveis\n\n### 1. Plano Básico — R$ 119,90 / mês\n- Ideal para: Profissionais autônomos e pequenas construtoras com operação enxuta\n- Obras ativas: Até 3\n- Usuários: 1\n- Recursos: Dashboard, Obras & Clientes, Financeiro, Fornecedores, Produtos, Recibos, Medições, Relatórios, Contas Bancárias, WhatsApp, Suporte padrão.\n\n### 2. Plano Profissional — R$ 279,90 / mês (Mais Escolhido)\n- Ideal para: Construtoras em crescimento que precisam automatizar documentos e compras\n- Obras ativas: Até 10\n- Usuários: 2\n- Recursos: Todos do Básico + Pré-compras, Contratos, NF-e, Orçamentos, Documentos, Assinatura Eletrônica ICP-Brasil, OCR de Notas Fiscais, Suporte prioritário.\n\n### 3. Construtora Ilimitado — R$ 499,90 / mês (Engenharia & SINAPI)\n- Ideal para: Operações completas com engenharia, equipe e obras em escala\n- Obras ativas: Ilimitadas\n- Usuários: 5\n- Recursos: Todos do Profissional + Base Oficial SINAPI (Caixa/IBGE) 27 estados desonerado/não desonerado, Engenharia Avançada, BDI diferenciado, Permissões avançadas, Suporte Prioritário/VIP.\n\n## Ciclos de Cobrança\n- Mensal: Sem fidelidade\n- Trimestral: ~5,5% OFF\n- Semestral: ~11% OFF\n- Anual: 2 meses grátis (Pague 10, Leve 12) — ~20% OFF\n\nContratação: https://fingo.api.br/planos\n`;
+    } else if (incoming.pathname === '/sobre-nos') {
+      md = `# Sobre o FinGo — Obras em Fluxo\n\nConstruir exige visão. Gerir também.\n\n## Nosso Propósito\nTornar a gestão da construção mais clara, conectada e próxima de quem faz a obra acontecer. O FinGo é uma plataforma de gestão financeira e operacional para a construção civil. Reunimos rotinas de obras, custos, compras e medições em um só lugar.\n\n## Nossos Objetivos\n1. Aproximar canteiro e escritório\n2. Dar clareza à gestão de custos\n3. Simplificar rotinas para evoluir a operação\n\nContato: contato@fingo.api.br\n`;
+    } else {
+      const llmsReq = new Request(new URL('/llms.txt', incoming).toString(), { method: 'GET', headers: request.headers });
+      const llmsRes = await env.ASSETS.fetch(llmsReq);
+      md = await llmsRes.text();
+    }
+
+    const tokens = Math.ceil(md.length / 4);
+    return new Response(md, {
+      status: 200,
+      headers: {
+        'Content-Type': 'text/markdown; charset=utf-8',
+        'Cache-Control': 'public, max-age=0, must-revalidate',
+        'Vary': 'Accept',
+        'x-markdown-tokens': String(tokens),
+        'X-Content-Type-Options': 'nosniff'
+      }
+    });
+  }
+
   // With html_handling:"none", ASSETS.fetch('/login.html') returns 200 directly.
   // We rewrite clean URLs to explicit .html so the binding locates the file.
   let routeName = null;
@@ -251,6 +280,7 @@ async function fetchFrontendResponse(request, env) {
   const headers = new Headers(securedResponse.headers);
   headers.set('X-FinObra-Route', routeName);
   headers.set('Cache-Control', 'public, max-age=0, must-revalidate');
+  headers.set('Vary', 'Accept');
   if (routeName === 'login-shell' || routeName === 'signup-shell' || routeName === 'app-shell' || routeName === 'master-shell' || routeName === 'bim-shell') {
     headers.set('X-Robots-Tag', 'noindex, nofollow');
   }
