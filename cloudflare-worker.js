@@ -905,14 +905,10 @@ function x402PaymentResponse(request) {
     headers: {
       'Content-Type': 'application/json; charset=utf-8',
       'PAYMENT-REQUIRED': paymentRequiredHeader,
-      'Payment-Required': paymentRequiredHeader,
-      'payment-required': paymentRequiredHeader,
-      'x-payment-required': paymentRequiredHeader,
-      'WWW-Authenticate': 'x402 realm="fingo", token="USDC", amount="1.00"',
       'Access-Control-Allow-Origin': '*',
       'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
       'Access-Control-Allow-Headers': '*',
-      'Access-Control-Expose-Headers': 'PAYMENT-REQUIRED, Payment-Required, payment-required, x-payment-required, WWW-Authenticate',
+      'Access-Control-Expose-Headers': 'PAYMENT-REQUIRED',
       'X-Content-Type-Options': 'nosniff'
     }
   });
