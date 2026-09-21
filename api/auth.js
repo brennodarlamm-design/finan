@@ -24,15 +24,12 @@ import {
   decryptMfaSecret
 } from './_totp.js';
 import { triggerEmail, isTriggerConfigured } from './_trigger-client.js';
+import { createOwnerSql } from './_database.js';
 
 const googleClient = new OAuth2Client();
 
 function getSql() {
-  const conn = process.env.DATABASE_URL;
-  if (!conn) {
-    throw new Error('Variável de ambiente DATABASE_URL não configurada.');
-  }
-  return neon(conn);
+  return createOwnerSql();
 }
 
 const ALLOWED_ORIGINS = [
@@ -50,7 +47,7 @@ function setCors(req, res) {
   const origin = req.headers.origin;
   res.setHeader('Vary', 'Origin');
   if (origin) {
-    const isAllowed = ALLOWED_ORIGINS.includes(origin) || /^https:\/\/finan-as(?:-[a-z0-9-]+)?\.vercel\.app$/i.test(origin);
+    const isAllowed = ALLOWED_ORIGINS.includes(origin);
     if (isAllowed) {
       res.setHeader('Access-Control-Allow-Origin', origin);
       res.setHeader('Access-Control-Allow-Credentials', 'true');
@@ -455,6 +452,24 @@ export default async function handler(req, res) {
         if ((due && Date.now() > due) || (!due && fallbackDue && Date.now() > fallbackDue)) {
           await writeAudit(sql, req, { tenantId: user.tenant_id, user: { id: user.id } }, { acao: 'login_bloqueado', entidade: 'auth', entidadeId: user.id, depois: { motivo: 'trial_expired', ip: clientIp } });
           return res.status(403).json({ success:false, message:'Seu período de teste gratuito expirou. Faça o upgrade de plano para continuar.' });
+        }
+      }
+      if (user.tenant_status === 'cancelamento_agendado' && user.tenant_vencimento) {
+        const cancelDue = new Date(String(user.tenant_vencimento).slice(0,10) + 'T23:59:59-04:00').getTime();
+        if (Number.isFinite(cancelDue) && Date.now() > cancelDue) {
+          try {
+            await sql`
+              UPDATE tenants
+              SET status='cancelado', updated_at=NOW()
+              WHERE id=${user.tenant_id}
+                AND status='cancelamento_agendado'
+                AND vencimento < CURRENT_DATE;
+            `;
+          } catch (finalizeErr) {
+            console.warn('[Auth Login] Falha ao materializar cancelamento vencido:', finalizeErr?.message || finalizeErr);
+          }
+          await writeAudit(sql, req, { tenantId:user.tenant_id, user:{ id:user.id } }, { acao:'login_bloqueado', entidade:'auth', entidadeId:user.id, depois:{ motivo:'subscription_canceled_period_end', ip:clientIp } });
+          return res.status(403).json({ success:false, message:'Sua assinatura foi encerrada ao final do período contratado. Reative um plano para continuar.' });
         }
       }
 
@@ -1245,7 +1260,7 @@ export default async function handler(req, res) {
         const numFmt = destPhone.startsWith('55') ? destPhone : `55${destPhone}`;
         const mensagemOtp = `*FinGo — Código de Verificação*\n\nOlá, ${user.nome}!\n\nSeu código seguro para redefinir sua senha no FinGo é:\n\n👉 *${otpCode}*\n\nEste código é válido por *10 minutos*. Se você não solicitou esta redefinição, ignore esta mensagem.`;
         try {
-          await fetch('https://finan-wf12.onrender.com/send-message', {
+          const waResp = await fetch('https://finan-wf12.onrender.com/send-message', {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
@@ -1253,8 +1268,12 @@ export default async function handler(req, res) {
               'x-api-key': getInternalApiSecret(),
               'x-tenant-id': user.tenant_id
             },
-            body: JSON.stringify({ tenantId: user.tenant_id, phone: numFmt, message: mensagemOtp })
+            body: JSON.stringify({ tenantId: user.tenant_id, phone: numFmt, message: mensagemOtp }),
+            signal: AbortSignal.timeout(10000)
           });
+          if (!waResp.ok) {
+            console.warn('[Auth] OTP WhatsApp respondeu HTTP', waResp.status);
+          }
         } catch (errWa) {
           console.warn('[Auth] Falha ao enviar OTP por WhatsApp:', errWa?.message || errWa);
         }
@@ -1292,7 +1311,7 @@ export default async function handler(req, res) {
           }
 
           if (!dispatchedViaTrigger && resendKey) {
-            await fetch('https://api.resend.com/emails', {
+            const mailResp = await fetch('https://api.resend.com/emails', {
               method: 'POST',
               headers: {
                 'Authorization': `Bearer ${resendKey}`,
@@ -1303,8 +1322,12 @@ export default async function handler(req, res) {
                 to: [user.email],
                 subject: emailSubject,
                 html: emailHtml
-              })
+              }),
+              signal: AbortSignal.timeout(10000)
             });
+            if (!mailResp.ok) {
+              console.warn('[Auth] OTP e-mail respondeu HTTP', mailResp.status);
+            }
           }
         } catch (errMail) {
           console.warn('[Auth] Falha ao enviar OTP por e-mail:', errMail?.message || errMail);
@@ -1326,8 +1349,12 @@ export default async function handler(req, res) {
       if (!requestId || !code || !newPassword) {
         return res.status(400).json({ success: false, message: 'Dados incompletos para redefinição de senha.' });
       }
-      if (String(newPassword).length < 8) {
+      const normalizedNewPassword = String(newPassword);
+      if (normalizedNewPassword.length < 8) {
         return res.status(400).json({ success: false, message: 'A nova senha deve ter no mínimo 8 caracteres.' });
+      }
+      if (normalizedNewPassword.length > 128) {
+        return res.status(400).json({ success: false, message: 'A nova senha excede o limite máximo permitido de 128 caracteres.' });
       }
 
       const activeResets = await sql`
@@ -1354,17 +1381,48 @@ export default async function handler(req, res) {
         return res.status(401).json({ success: false, message: `Código incorreto. Você tem mais ${restantes} tentativa(s).` });
       }
 
-      const newHash = hashPassword(String(newPassword));
-      const queries = [
-        sql`UPDATE recuperacao_senhas SET usado = TRUE WHERE id = ${rec.id} AND usado = FALSE`,
-        sql`UPDATE usuarios SET senha_hash = ${newHash}, updated_at = NOW() WHERE id = ${rec.usuario_id}`,
-        sql`UPDATE auth_sessions SET revoked_at = COALESCE(revoked_at, NOW()) WHERE user_id = ${rec.usuario_id} AND revoked_at IS NULL`
-      ];
-      await sql.transaction(queries);
+      const newHash = hashPassword(normalizedNewPassword);
+      const resetApplied = await sql`
+        WITH consumed AS (
+          UPDATE recuperacao_senhas
+          SET usado = TRUE
+          WHERE id = ${rec.id}
+            AND usuario_id = ${rec.usuario_id}
+            AND usado = FALSE
+            AND expira_em > NOW()
+            AND tentativas < max_tentativas
+          RETURNING usuario_id
+        ),
+        password_upd AS (
+          UPDATE usuarios u
+          SET senha_hash = ${newHash}, updated_at = NOW()
+          FROM consumed c
+          WHERE u.id = c.usuario_id
+          RETURNING u.id
+        ),
+        sessions_revoked AS (
+          UPDATE auth_sessions s
+          SET revoked_at = COALESCE(s.revoked_at, NOW())
+          FROM consumed c
+          WHERE s.user_id = c.usuario_id AND s.revoked_at IS NULL
+          RETURNING s.id
+        )
+        SELECT password_upd.id AS user_id,
+               (SELECT COUNT(*)::int FROM sessions_revoked) AS revoked_sessions
+        FROM password_upd;
+      `;
+
+      if (!resetApplied.length) {
+        return res.status(409).json({
+          success: false,
+          message: 'Este código já foi utilizado, expirou ou deixou de ser válido. Solicite um novo código.'
+        });
+      }
 
       return res.status(200).json({
         success: true,
-        message: 'Senha redefinida com sucesso! Você já pode realizar login.'
+        revokedSessions: Number(resetApplied[0]?.revoked_sessions || 0),
+        message: 'Senha redefinida com sucesso! Por segurança, as sessões anteriores foram encerradas. Faça login novamente.'
       });
     }
 

@@ -294,23 +294,40 @@ export async function settlePixPayment(sql, payload, meta = {}) {
   const effectiveTxid = payload.txid || (invoice ? invoice.txid : `pix_${Date.now()}`);
   const payloadJson = payload.rawBody ? JSON.stringify(payload.rawBody) : '{}';
 
-  // Fatura existente validada: atualização atômica da fatura e renovação de vencimento da empresa
+  // Fatura existente validada: atualização atômica da fatura e renovação do tenant.
+  // Um PIX confirmado pela fonte autorizada continua liquidável mesmo se o usuário cancelar
+  // enquanto o pagamento está em trânsito. O status anterior da fatura é travado em candidate:
+  // - prior_status=canceled: crédito o período pago, preservando cancelamento_agendado;
+  // - prior_status=pending/expired: pagamento novo reativa normalmente a assinatura.
   const updated = await sql`
-    WITH paid AS (
-      UPDATE billing_invoices
+    WITH candidate AS (
+      SELECT bi.id, bi.status AS prior_status
+      FROM billing_invoices bi
+      JOIN tenants t ON t.id = bi.tenant_id
+      WHERE bi.id = ${invoice.id}
+        AND bi.status IN ('pending', 'expired', 'canceled')
+      FOR UPDATE OF bi, t
+    ), paid AS (
+      UPDATE billing_invoices bi
       SET status = 'paid',
           paid_at = NOW(),
           paid_by = ${meta.source || 'webhook_pix'},
-          txid = COALESCE(billing_invoices.txid, ${effectiveTxid}),
+          txid = COALESCE(bi.txid, ${effectiveTxid}),
           gateway = ${payload.gateway || 'pix_webhook'},
           webhook_payload = ${payloadJson}::jsonb,
           updated_at = NOW()
-      WHERE id = ${invoice.id} AND status IN ('pending', 'expired')
-      RETURNING id, tenant_id, plan_id, COALESCE(cycle, 'monthly') AS cycle, amount_cents, txid, paid_at
+      FROM candidate
+      WHERE bi.id = candidate.id
+      RETURNING bi.id, bi.tenant_id, bi.plan_id, COALESCE(bi.cycle, 'monthly') AS cycle,
+                bi.amount_cents, bi.txid, bi.paid_at, candidate.prior_status
     ), tenant_upd AS (
       UPDATE tenants t
       SET plano = paid.plan_id,
-          status = 'ativo',
+          status = CASE
+            WHEN t.status = 'cancelamento_agendado' AND paid.prior_status = 'canceled'
+              THEN 'cancelamento_agendado'
+            ELSE 'ativo'
+          END,
           vencimento = (CASE WHEN t.vencimento IS NOT NULL AND t.vencimento >= CURRENT_DATE THEN t.vencimento ELSE CURRENT_DATE END + (
             CASE
               WHEN paid.cycle = 'annual' THEN 365
@@ -325,6 +342,7 @@ export async function settlePixPayment(sql, payload, meta = {}) {
       RETURNING t.id, t.nome_fantasia, t.razao_social, t.telefone, t.email, t.responsavel, t.plano, t.status, t.vencimento
     )
     SELECT paid.id AS invoice_id, paid.tenant_id, paid.plan_id, paid.cycle, paid.amount_cents, paid.txid, paid.paid_at,
+           paid.prior_status,
            tenant_upd.nome_fantasia, tenant_upd.razao_social, tenant_upd.telefone, tenant_upd.email,
            tenant_upd.responsavel, tenant_upd.status, tenant_upd.vencimento
     FROM paid JOIN tenant_upd ON tenant_upd.id = paid.tenant_id;
@@ -335,7 +353,7 @@ export async function settlePixPayment(sql, payload, meta = {}) {
   }
 
   if (!resultRecord) {
-    return { success: false, error: 'Cobrança não pôde ser liquidada (possivelmente cancelada ou bloqueada).' };
+    return { success: false, error: 'Cobrança não pôde ser liquidada porque não está em um estado liquidável ou foi processada por outra requisição.' };
   }
 
   return {
@@ -464,7 +482,7 @@ export async function sendPaymentReceipt(record) {
           results.email.success = true;
           results.email.id = trigRes.runId;
           results.email.via = 'trigger_dev';
-          return;
+          return results;
         }
       }
 

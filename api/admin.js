@@ -13,14 +13,13 @@ import {
   getInternalApiSecret
 } from './_auth.js';
 import { writeAudit } from './_audit.js';
+import { createOwnerSql } from './_database.js';
 
 const SESSION_COOKIE = 'finobra_session_token';
 const MASTER_RESTORE_COOKIE = 'finobra_master_restore_token';
 
 function getSql() {
-  const conn = String(process.env.DATABASE_OWNER_URL || process.env.DATABASE_URL || '').trim();
-  if (!conn) throw new Error('DATABASE_OWNER_URL ou DATABASE_URL não configurada no servidor.');
-  return neon(conn);
+  return createOwnerSql();
 }
 
 function cookieSecure(req) {

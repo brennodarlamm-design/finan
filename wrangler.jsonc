@@ -38,6 +38,12 @@
       "/portal/*"
     ]
   },
+  "r2_buckets": [
+    {
+      "binding": "ATTACHMENTS_R2",
+      "bucket_name": "fingo-attachments"
+    }
+  ],
   "triggers": {
     "crons": ["*/10 * * * *"]
   },

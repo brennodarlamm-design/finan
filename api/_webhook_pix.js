@@ -5,6 +5,7 @@
 import { neon } from '@neondatabase/serverless';
 import { resolveAuthAndTenant } from './_auth.js';
 import { writeAudit } from './_audit.js';
+import { createOwnerSql } from './_database.js';
 import {
   isWebhookAuthorized,
   parseWebhookPayload,
@@ -64,14 +65,8 @@ export default async function webhookPixHandler(req, res) {
     });
   }
 
-  const conn = process.env.DATABASE_OWNER_URL || process.env.DATABASE_URL;
-  if (!conn) {
-    console.error('❌ [Webhook PIX] DATABASE_OWNER_URL ou DATABASE_URL não configurada.');
-    return res.status(500).json({ success: false, error: 'Banco de dados indisponível no momento.' });
-  }
-
   try {
-    const sql = neon(conn);
+    const sql = createOwnerSql();
 
     // 3. Liquidação Atômica no Banco de Dados
     const settleResult = await settlePixPayment(sql, payload, {

@@ -938,7 +938,8 @@ const App = {
           route: this.route || (this._getRouteFromUrl ? this._getRouteFromUrl() : 'unknown'),
           breadcrumbs: (this._breadcrumbs || []).slice(-10),
           viewport: `${window.innerWidth || 0}x${window.innerHeight || 0}`,
-          url: window.location.href,
+          // Nunca envia query string/hash para telemetria: podem conter códigos, tokens ou dados operacionais.
+          url: `${window.location.origin}${window.location.pathname}`,
           connection: navigator.connection?.effectiveType || '',
           online: navigator.onLine !== false
         };
@@ -948,6 +949,7 @@ const App = {
           method: 'POST',
           headers,
           keepalive: true,
+          signal: AbortSignal.timeout(5000),
           body: bodyStr
         }).catch(() => {});
       } catch {}
@@ -1072,7 +1074,12 @@ const App = {
                 }
               }
             }
-          }).catch(() => {});
+          }).catch((syncErr) => {
+            console.warn('[App] Falha ao sincronizar rota; mantendo dados locais:', syncErr?.message || syncErr);
+            if (this.route === targetRoute && navigation === this._navigationId && typeof Utils !== 'undefined' && Utils.toast) {
+              Utils.toast('Dados locais exibidos. A sincronização com a nuvem falhou e será tentada novamente.', 'warning');
+            }
+          });
         }
       } catch(err) {
         if (navigation !== this._navigationId) return;
@@ -1383,7 +1390,7 @@ const App = {
     }
     Utils.toast('Consultando CNPJ na Receita Federal...', 'info');
     try {
-      const res = await fetch(`/api/cnpj?cnpj=${raw}`);
+      const res = await fetch(`/api/cnpj?cnpj=${raw}`, { signal: AbortSignal.timeout(10000) });
       if (!res.ok) throw new Error('Falha na consulta');
       const data = await res.json();
       if (data.razao_social || data.nome_fantasia) {

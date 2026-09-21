@@ -3,16 +3,16 @@ import { neon } from '@neondatabase/serverless';
 import { resolveAuthAndTenant } from './_auth.js';
 import { canAccessModule, permissionError } from './_permissions.js';
 import { createTenantSql } from './_tenant-sql.js';
+import { createRuntimeSql } from './_database.js';
 
 function getSql() {
-  if (!process.env.DATABASE_URL) throw new Error('DATABASE_URL não configurada.');
-  return neon(process.env.DATABASE_URL);
+  return createRuntimeSql();
 }
 
 function setCors(req, res) {
   const allowed = ['https://fingo.api.br','https://www.fingo.api.br','http://localhost:3000','http://localhost:3333','http://localhost:5000','http://127.0.0.1:3000','http://127.0.0.1:3333','http://127.0.0.1:5000'];
   const origin = req.headers.origin;
-  if (origin && (allowed.includes(origin) || /^https:\/\/finan-as(?:-[a-z0-9-]+)?\.vercel\.app$/i.test(origin))) res.setHeader('Access-Control-Allow-Origin', origin);
+  if (origin && allowed.includes(origin)) res.setHeader('Access-Control-Allow-Origin', origin);
   res.setHeader('Access-Control-Allow-Credentials', 'true');
   res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, x-tenant-id');
@@ -31,7 +31,7 @@ export default async function handler(req, res) {
   if (!canAccessModule(auth, 'dashboard', 'read')) return res.status(403).json(permissionError('MODULE_READ_FORBIDDEN','dashboard'));
 
   try {
-    const sql = createTenantSql(getSql(), { tenantId: auth.tenantId, isSystem: auth.isSystem === true });
+    const sql = createTenantSql(getSql(), { tenantId: auth.tenantId });
     const showFinance = canAccessModule(auth,'financeiro','read');
     const showNotas = canAccessModule(auth,'notas','read');
     const showObras = canAccessModule(auth,'obras','read');

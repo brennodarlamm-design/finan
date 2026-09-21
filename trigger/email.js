@@ -60,7 +60,8 @@ export const sendTransactionalEmail = task({
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${resendKey}`
       },
-      body: JSON.stringify(body)
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(12000)
     });
 
     const data = await res.json().catch(() => ({}));

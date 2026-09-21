@@ -14,6 +14,19 @@ const MasterAdmin = {
   _bankAccounts: null,
   _bankAccountsLoading: false,
 
+  async _fetchWithTimeout(url, options = {}, timeoutMs = 20000) {
+    if (typeof Auth !== 'undefined' && typeof Auth._fetchWithTimeout === 'function') {
+      return Auth._fetchWithTimeout(url, options, timeoutMs);
+    }
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      return await fetch(url, { ...options, signal: controller.signal });
+    } finally {
+      clearTimeout(timer);
+    }
+  },
+
   _esc(value) {
     if (typeof Utils !== 'undefined' && Utils.escapeHtml) return Utils.escapeHtml(String(value ?? ''));
     return String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -23,7 +36,7 @@ const MasterAdmin = {
     if (this._empresas && !force) return this._empresas;
     this._isLoading = true;
     try {
-      const resp = await fetch('/api/admin?action=tenants', {
+      const resp = await this._fetchWithTimeout('/api/admin?action=tenants', {
         headers: (typeof Auth !== 'undefined' && Auth.getAuthHeaders) ? Auth.getAuthHeaders() : {}
       });
       if (resp.ok) {
@@ -62,7 +75,7 @@ const MasterAdmin = {
     if (this._billingLoading) return this._billing || { invoices:[], summary:{} };
     this._billingLoading = true;
     try {
-      const resp = await fetch('/api/admin?action=billing', {
+      const resp = await this._fetchWithTimeout('/api/admin?action=billing', {
         headers:(typeof Auth !== 'undefined' && Auth.getAuthHeaders) ? Auth.getAuthHeaders() : {}
       });
       const data = await resp.json().catch(() => ({}));
@@ -82,7 +95,7 @@ const MasterAdmin = {
     if (this._errorsGlobalLoading) return this._errorsGlobal || { errors:[], summary:{}, top_routes:[], clusters:[] };
     this._errorsGlobalLoading = true;
     try {
-      const resp = await fetch('/api/admin?action=client_errors&limit=100', {
+      const resp = await this._fetchWithTimeout('/api/admin?action=client_errors&limit=100', {
         headers:(typeof Auth !== 'undefined' && Auth.getAuthHeaders) ? Auth.getAuthHeaders() : {}
       });
       const data = await resp.json().catch(() => ({}));
@@ -105,7 +118,7 @@ const MasterAdmin = {
     if (this._integrityLoading) return this._integrity || null;
     this._integrityLoading = true;
     try {
-      const resp = await fetch('/api/admin?action=integrity_status', { headers:(typeof Auth !== 'undefined' && Auth.getAuthHeaders) ? Auth.getAuthHeaders() : {} });
+      const resp = await this._fetchWithTimeout('/api/admin?action=integrity_status', { headers:(typeof Auth !== 'undefined' && Auth.getAuthHeaders) ? Auth.getAuthHeaders() : {} });
       const data = await resp.json().catch(() => ({}));
       if (resp.ok && data.success) this._integrity = data;
     } catch (err) { console.warn('Falha ao carregar integridade:', err); }
@@ -118,7 +131,7 @@ const MasterAdmin = {
     if (this._bankAccountsLoading) return this._bankAccounts || { accounts: [], tenant_stats: [], summary: {} };
     this._bankAccountsLoading = true;
     try {
-      const resp = await fetch('/api/admin?action=bank_accounts_overview', {
+      const resp = await this._fetchWithTimeout('/api/admin?action=bank_accounts_overview', {
         headers: (typeof Auth !== 'undefined' && Auth.getAuthHeaders) ? Auth.getAuthHeaders() : {}
       });
       const data = await resp.json().catch(() => ({}));
@@ -619,7 +632,7 @@ const MasterAdmin = {
   async limparErrosAntigos() {
     if (!confirm('Deseja realmente expurgar os registros de telemetria com mais de 30 dias?\n\nEssa ação é irreversível e ajuda a manter a base de dados enxuta.')) return;
     try {
-      const resp = await fetch('/api/admin?action=clear_old_client_errors', {
+      const resp = await this._fetchWithTimeout('/api/admin?action=clear_old_client_errors', {
         method: 'POST',
         headers: (typeof Auth !== 'undefined' ? Auth.getAuthHeaders() : { 'Content-Type': 'application/json' }),
         body: JSON.stringify({ days: 30 })
@@ -643,7 +656,7 @@ const MasterAdmin = {
     const cycleDesc = cycleNames[inv.cycle] || '30 dias';
     if (!confirm(`Confirmar recebimento de R$ ${valor} da ${nome}? O plano será ativado/renovado por ${cycleDesc}.`)) return;
     try {
-      const resp = await fetch('/api/admin?action=confirm_payment', {
+      const resp = await this._fetchWithTimeout('/api/admin?action=confirm_payment', {
         method:'POST',
         headers:(typeof Auth !== 'undefined' ? Auth.getAuthHeaders() : { 'Content-Type':'application/json' }),
         body:JSON.stringify({ invoiceId })
@@ -666,7 +679,7 @@ const MasterAdmin = {
     if (!confirm(`Simular recebimento de Webhook PIX de R$ ${valor} para a empresa "${nome}"?\n\nO sistema executará a liquidação automática, renovará o acesso e disparará o comprovante no WhatsApp.`)) return;
 
     try {
-      const resp = await fetch('/api/admin?action=simulate_webhook_pix', {
+      const resp = await this._fetchWithTimeout('/api/admin?action=simulate_webhook_pix', {
         method: 'POST',
         headers: (typeof Auth !== 'undefined' ? Auth.getAuthHeaders() : { 'Content-Type': 'application/json' }),
         body: JSON.stringify({
@@ -695,7 +708,7 @@ const MasterAdmin = {
     if (!tenantId || !tenantId.trim()) return;
 
     try {
-      const resp = await fetch('/api/admin?action=simulate_webhook_pix', {
+      const resp = await this._fetchWithTimeout('/api/admin?action=simulate_webhook_pix', {
         method: 'POST',
         headers: (typeof Auth !== 'undefined' ? Auth.getAuthHeaders() : { 'Content-Type': 'application/json' }),
         body: JSON.stringify({
@@ -1062,7 +1075,7 @@ const MasterAdmin = {
           <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:16px;font-size:.84rem;">
             <div><div style="color:#64748b;margin-bottom:4px;">Sistema / Plataforma</div><div style="font-weight:700;color:#fff;">FinGo SaaS Backoffice</div></div>
             <div><div style="color:#64748b;margin-bottom:4px;">Versão em Produção</div><div style="font-weight:700;color:#fff;">2.4.0 (FinGo Cloud)</div></div>
-            <div><div style="color:#64748b;margin-bottom:4px;">Armazenamento Central</div><div style="font-weight:700;color:#22c55e;">🐘 Neon PostgreSQL + Vercel Blob</div></div>
+            <div><div style="color:#64748b;margin-bottom:4px;">Armazenamento Central</div><div style="font-weight:700;color:#22c55e;">🐘 Neon PostgreSQL + Cloudflare R2</div></div>
             <div><div style="color:#64748b;margin-bottom:4px;">Isolamento Multi-Tenant</div><div style="font-weight:700;color:#22c55e;">Ativo (Cryptographic Tenant Tokens)</div></div>
           </div>
         </div>
@@ -1215,7 +1228,7 @@ const MasterAdmin = {
 
       // Registra a entrada no suporte antes de trocar o token.
       try {
-        await fetch('/api/admin?action=support_start', {
+        await this._fetchWithTimeout('/api/admin?action=support_start', {
           method: 'POST',
           headers: (typeof Auth !== 'undefined' && Auth.getAuthHeaders) ? Auth.getAuthHeaders() : { 'Content-Type': 'application/json' },
           body: JSON.stringify({ tenantId })
@@ -1223,7 +1236,7 @@ const MasterAdmin = {
       } catch {}
 
       // O backend emite um token de curta duração já vinculado ao tenant selecionado.
-      const res = await fetch('/api/admin?action=impersonate', {
+      const res = await this._fetchWithTimeout('/api/admin?action=impersonate', {
         method: 'POST',
         headers: (typeof Auth !== 'undefined' && Auth.getAuthHeaders) ? Auth.getAuthHeaders() : { 'Content-Type': 'application/json' },
         body: JSON.stringify({ tenantId })
@@ -1462,7 +1475,7 @@ const MasterAdmin = {
     const vencimento = document.getElementById('me-edit-vencimento').value;
 
     try {
-      const res = await fetch('/api/admin?action=update_tenant', {
+      const res = await this._fetchWithTimeout('/api/admin?action=update_tenant', {
         method: 'PATCH',
         headers: (typeof Auth !== 'undefined' && Auth.getAuthHeaders) ? Auth.getAuthHeaders() : { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -1505,7 +1518,7 @@ const MasterAdmin = {
     if (!confirmed) return;
 
     try {
-      const res = await fetch('/api/admin?action=generate_tenant_access_key', {
+      const res = await this._fetchWithTimeout('/api/admin?action=generate_tenant_access_key', {
         method: 'POST',
         headers: (typeof Auth !== 'undefined' && Auth.getAuthHeaders) ? Auth.getAuthHeaders() : { 'Content-Type': 'application/json' },
         body: JSON.stringify({ tenantId: tid })
@@ -1681,7 +1694,7 @@ const MasterAdmin = {
     const senha = document.getElementById('ne-senha').value.trim();
 
     try {
-      const res = await fetch('/api/admin?action=create_tenant', {
+      const res = await this._fetchWithTimeout('/api/admin?action=create_tenant', {
         method: 'POST',
         headers: (typeof Auth !== 'undefined' && Auth.getAuthHeaders) ? Auth.getAuthHeaders() : { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -1967,7 +1980,7 @@ const MasterAdmin = {
 
     try {
       const headers = (typeof Auth !== 'undefined' && Auth.getAuthHeaders) ? Auth.getAuthHeaders() : { 'Content-Type': 'application/json' };
-      const res = await fetch('/api/admin?action=send_billing_notice', {
+      const res = await this._fetchWithTimeout('/api/admin?action=send_billing_notice', {
         method: 'POST',
         headers,
         body: JSON.stringify({
@@ -2044,7 +2057,7 @@ const MasterAdmin = {
 
     try {
       const headers = (typeof Auth !== 'undefined' && Auth.getAuthHeaders) ? Auth.getAuthHeaders() : { 'Content-Type': 'application/json' };
-      const res = await fetch('/api/admin?action=trigger_billing_sweep', {
+      const res = await this._fetchWithTimeout('/api/admin?action=trigger_billing_sweep', {
         method: 'POST',
         headers
       });
@@ -2119,7 +2132,7 @@ const MasterAdmin = {
         ? { ...Auth.getAuthHeaders(), 'Content-Type': 'application/json' }
         : { 'Content-Type': 'application/json' };
 
-      const res = await fetch('/api/admin?action=mfa_regenerate_backup_codes', {
+      const res = await this._fetchWithTimeout('/api/admin?action=mfa_regenerate_backup_codes', {
         method: 'POST',
         headers,
         body: JSON.stringify({ password })

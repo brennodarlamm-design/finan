@@ -205,24 +205,15 @@ await assertZeroRows(
   () => sqlB`SELECT id FROM lancamentos WHERE tenant_id = ${TENANT_A_ID} LIMIT 5`
 );
 
-// ── Bloco 7: Modo system (isSystem: true) ────────────────────────────────────
-console.log('\n📋  Bloco 7: Modo system — isSystem deve permitir leitura cross-tenant');
+// ── Bloco 7: Flag isSystem não pode bypassar RLS ─────────────────────────────
+console.log('\n📋  Bloco 7: isSystem não altera o isolamento RLS');
 
-const sqlSystem = createTenantSql(baseSql, { tenantId: TENANT_A_ID, isSystem: true });
+const sqlSystemFlag = createTenantSql(baseSql, { tenantId: TENANT_A_ID, isSystem: true });
 
-try {
-  // Com isSystem=true, a política RLS deve permitir acesso.
-  // Não testamos que retorna dados (pode não haver dados no Tenant B),
-  // mas a query não deve ser rejeitada por RLS.
-  await sqlSystem`SELECT COUNT(*)::int AS total FROM obras WHERE tenant_id = ${TENANT_B_ID}`;
-  pass('Acesso system cross-tenant não rejeitado por RLS (comportamento esperado)');
-} catch (err) {
-  if (/permission denied|rls|policy/i.test(err.message)) {
-    fail('Modo system bloqueado por RLS — política app.is_system não está configurada', err.message);
-  } else {
-    fail('Erro inesperado no modo system', err.message);
-  }
-}
+await assertZeroRows(
+  'Flag isSystem não permite Tenant A ler obras do Tenant B',
+  () => sqlSystemFlag`SELECT id FROM obras WHERE tenant_id = ${TENANT_B_ID} LIMIT 5`
+);
 
 // ── Resultado final ──────────────────────────────────────────────────────────
 

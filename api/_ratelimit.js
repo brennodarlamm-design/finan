@@ -6,6 +6,7 @@
 import crypto from 'crypto';
 import { neon } from '@neondatabase/serverless';
 import { getTrustedClientIp, checkIpBan, recordIpFailure } from './_security-ip.js';
+import { createRuntimeSql } from './_database.js';
 
 const localFallback = new Map();
 
@@ -69,7 +70,7 @@ export async function checkRateLimit(key, limit = 10, windowMs = 60000) {
   if (!conn) return fallbackCheck(String(key), safeLimit, safeWindow);
 
   try {
-    const sql = neon(conn);
+    const sql = createRuntimeSql();
 
     if (securityIp) {
       const ban = await checkIpBan(sql, securityIp);

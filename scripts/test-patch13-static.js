@@ -63,16 +63,19 @@ ok('Auth request_reset previne enumeração de contas com requestId opaco e resp
   !requestResetBlock.includes('canalInfo')
 );
 
-ok('Auth verify_reset exige senha mínima de 8 caracteres',
-  authApi.includes('String(newPassword).length < 8') &&
+ok('Auth verify_reset limita senha entre 8 e 128 caracteres',
+  authApi.includes('normalizedNewPassword.length < 8') &&
+  authApi.includes('normalizedNewPassword.length > 128') &&
   authApi.includes('A nova senha deve ter no mínimo 8 caracteres.')
 );
 
-ok('Auth verify_reset invalida OTP, atualiza senha e revoga sessões atomicamente',
-  authApi.includes('UPDATE recuperacao_senhas SET usado = TRUE') &&
-  authApi.includes('UPDATE usuarios SET senha_hash = ${newHash}') &&
-  authApi.includes('UPDATE auth_sessions SET revoked_at') &&
-  authApi.includes('sql.transaction(queries)')
+ok('Auth verify_reset consome OTP, atualiza senha e revoga sessões em uma única operação atômica',
+  authApi.includes('WITH consumed AS') &&
+  authApi.includes('password_upd AS') &&
+  authApi.includes('sessions_revoked AS') &&
+  authApi.includes('AND usado = FALSE') &&
+  authApi.includes('AND expira_em > NOW()') &&
+  authApi.includes('revokedSessions:')
 );
 
 // 3. Consistência de Campos entre Save e Sync (H-02)
@@ -103,4 +106,4 @@ if (fails) {
   console.error(`\n❌ Patch 13: ${fails} verificação(ões) falharam.`);
   process.exit(1);
 }
-console.log('\n✅ Patch 13: todas as 14 verificações passaram com 100% de sucesso!');
+console.log('\n✅ Patch 13: todas as verificações passaram com 100% de sucesso!');

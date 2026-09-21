@@ -588,7 +588,13 @@ const Dashboard = {
   },
 
   init(obraId) {
-    this._loadCloudSnapshot(obraId).catch(() => {});
+    this._loadCloudSnapshot(obraId).catch((err) => {
+      console.warn('[Dashboard] Snapshot em nuvem indisponível; mantendo dados locais:', err?.message || err);
+      if (!this._snapshotWarned && typeof Utils !== 'undefined' && Utils.toast) {
+        this._snapshotWarned = true;
+        Utils.toast('Resumo em tempo real indisponível. Exibindo os dados locais enquanto tentamos novamente.', 'warning');
+      }
+    });
     setTimeout(() => {
       this._barChart(obraId);
       this._donutChart(obraId);
@@ -599,9 +605,11 @@ const Dashboard = {
   async _loadCloudSnapshot(obraId) {
     if (typeof Auth === 'undefined' || !Auth.getAuthHeaders) return;
     const q = obraId && obraId !== 'todas' ? `?obra_id=${encodeURIComponent(obraId)}` : '';
-    const res = await fetch('/api/dashboard' + q, { headers: Auth.getAuthHeaders() });
+    const res = await fetch('/api/dashboard' + q, { headers: Auth.getAuthHeaders(), signal: AbortSignal.timeout(20000) });
     const json = await res.json().catch(() => ({}));
-    if (!res.ok || !json.success || !json.snapshot) return;
+    if (!res.ok) throw new Error(`Dashboard respondeu HTTP ${res.status}`);
+    if (!json.success || !json.snapshot) throw new Error(json.error || 'Resposta inválida do dashboard.');
+    this._snapshotWarned = false;
     const d = json.snapshot;
     this._cloudSnapshot = d;
     const set = (id, value) => { const el = document.getElementById(id); if (el) el.textContent = value; };

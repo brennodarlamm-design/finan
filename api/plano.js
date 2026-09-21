@@ -8,16 +8,16 @@ import { writeAudit } from './_audit.js';
 import { setEdgeCacheHeaders } from './_http.js';
 import webhookPixHandler from './_webhook_pix.js';
 import { createTenantSql } from './_tenant-sql.js';
+import { createRuntimeSql } from './_database.js';
 
 function getSql() {
-  if (!process.env.DATABASE_URL) throw new Error('DATABASE_URL não configurada.');
-  return neon(process.env.DATABASE_URL);
+  return createRuntimeSql();
 }
 
 function setCors(req, res) {
   const allowed = ['https://fingo.api.br','https://www.fingo.api.br','http://localhost:3000','http://localhost:3333','http://localhost:5000','http://127.0.0.1:3000','http://127.0.0.1:3333','http://127.0.0.1:5000'];
   const origin = req.headers.origin;
-  if (origin && (allowed.includes(origin) || /^https:\/\/finan-as(?:-[a-z0-9-]+)?\.vercel\.app$/i.test(origin))) res.setHeader('Access-Control-Allow-Origin', origin);
+  if (origin && allowed.includes(origin)) res.setHeader('Access-Control-Allow-Origin', origin);
   res.setHeader('Access-Control-Allow-Credentials', 'true');
   res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, x-tenant-id');
@@ -139,8 +139,73 @@ export default async function handler(req, res) {
 
     if (req.method === 'POST') {
       const action = String(req.query?.action || req.body?.action || '').trim();
-      if (action !== 'create_invoice') return res.status(400).json({ success:false, error:'Ação de cobrança inválida.' });
       if (!canManageTenant(auth)) return res.status(403).json(permissionError('ROLE_MANAGE_TENANT_FORBIDDEN'));
+
+      if (action === 'cancel_subscription') {
+        const tenantRows = await sql`
+          SELECT id, plano, status, vencimento, created_at
+          FROM tenants
+          WHERE id = ${auth.tenantId}
+          LIMIT 1;
+        `;
+        if (!tenantRows.length) return res.status(404).json({ success:false, error:'Empresa não encontrada.' });
+        const tenant = tenantRows[0];
+        if (tenant.status === 'cancelado' || tenant.status === 'cancelamento_agendado') {
+          return res.status(200).json({
+            success:true,
+            alreadyCanceled:true,
+            status:tenant.status,
+            accessUntil:dateOnly(tenant.vencimento) || null
+          });
+        }
+
+        const cancellationRows = await sql`
+          WITH canceled_invoices AS (
+            UPDATE billing_invoices
+            SET status='canceled', canceled_at=NOW(), updated_at=NOW()
+            WHERE tenant_id=${auth.tenantId} AND status='pending'
+            RETURNING id
+          ),
+          tenant_upd AS (
+            UPDATE tenants
+            SET status='cancelamento_agendado',
+                vencimento=COALESCE(
+                  vencimento,
+                  CASE
+                    WHEN status='trial' OR plano='trial' THEN (COALESCE(created_at, NOW())::date + 15)
+                    ELSE CURRENT_DATE
+                  END
+                ),
+                updated_at=NOW()
+            WHERE id=${auth.tenantId}
+            RETURNING status, vencimento
+          )
+          SELECT tenant_upd.status,
+                 tenant_upd.vencimento,
+                 (SELECT COUNT(*)::int FROM canceled_invoices) AS canceled_invoices
+          FROM tenant_upd;
+        `;
+        if (!cancellationRows.length) {
+          return res.status(409).json({ success:false, error:'Não foi possível agendar o cancelamento da assinatura.' });
+        }
+        const accessUntil = dateOnly(cancellationRows[0]?.vencimento || tenant.vencimento) || null;
+        await writeAudit(sql, req, auth, {
+          acao:'cancelar_assinatura',
+          entidade:'plano',
+          entidadeId:auth.tenantId,
+          antes:{ status:tenant.status, plano:tenant.plano, vencimento:tenant.vencimento || null },
+          depois:{ status:'cancelamento_agendado', acesso_ate:accessUntil }
+        });
+        return res.status(200).json({
+          success:true,
+          status:'cancelamento_agendado',
+          accessUntil,
+          canceledInvoices:Number(cancellationRows[0]?.canceled_invoices || 0),
+          message:'Cancelamento agendado. O acesso continua disponível até o fim do período atual; cobranças pendentes foram canceladas.'
+        });
+      }
+
+      if (action !== 'create_invoice') return res.status(400).json({ success:false, error:'Ação de cobrança inválida.' });
 
       const planId = normalizePlan(req.body?.plan_id);
       if (planId === 'trial') return res.status(400).json({ success:false, error:'O plano Trial não gera cobrança.' });
@@ -165,13 +230,58 @@ export default async function handler(req, res) {
 
       const id = 'inv_' + crypto.randomBytes(10).toString('hex');
       const txid = ('FIN' + crypto.randomBytes(10).toString('hex')).toUpperCase().slice(0, 25);
-      const pixKey = String(process.env.FINOBRA_PIX_KEY || '+5595991363678').trim();
+      const pixKey = String(process.env.FINOBRA_PIX_KEY || '').trim();
+      if (!pixKey) {
+        return res.status(503).json({
+          success:false,
+          code:'BILLING_PIX_NOT_CONFIGURED',
+          error:'A cobrança PIX está temporariamente indisponível. A configuração de pagamento precisa ser validada pelo suporte.'
+        });
+      }
       const pixPayload = buildPixPayload({ key: pixKey, amountCents, txid });
+      if (!pixPayload) {
+        return res.status(503).json({
+          success:false,
+          code:'BILLING_PIX_PAYLOAD_FAILED',
+          error:'Não foi possível gerar a cobrança PIX com segurança.'
+        });
+      }
       const rows = await sql`
         INSERT INTO billing_invoices (id, tenant_id, plan_id, cycle, amount_cents, status, txid, pix_payload, created_by, expires_at)
         VALUES (${id}, ${auth.tenantId}, ${planId}, ${cycle}, ${amountCents}, 'pending', ${txid}, ${pixPayload || null}, ${auth.user?.userId || auth.user?.id || null}, NOW() + INTERVAL '1 day')
+        ON CONFLICT (tenant_id, plan_id, cycle) WHERE status = 'pending'
+        DO NOTHING
         RETURNING id, tenant_id, plan_id, cycle, amount_cents, status, txid, pix_payload, expires_at, created_at;
       `;
+
+      if (!rows.length) {
+        const concurrent = await sql`
+          SELECT id, tenant_id, plan_id, cycle, amount_cents, status, txid, pix_payload, expires_at, created_at
+          FROM billing_invoices
+          WHERE tenant_id=${auth.tenantId}
+            AND plan_id=${planId}
+            AND cycle=${cycle}
+            AND status='pending'
+            AND (expires_at IS NULL OR expires_at > NOW())
+          ORDER BY created_at DESC
+          LIMIT 1;
+        `;
+        if (concurrent.length) {
+          return res.status(200).json({
+            success:true,
+            invoice:concurrent[0],
+            cycleInfo,
+            billingWhatsapp:billingWhatsapp(),
+            reused:true
+          });
+        }
+        return res.status(409).json({
+          success:false,
+          code:'BILLING_CREATE_CONFLICT',
+          error:'Outra solicitação de cobrança foi processada ao mesmo tempo. Atualize a conta e tente novamente.'
+        });
+      }
+
       await writeAudit(sql, req, auth, { acao:'criar', entidade:'cobranca', entidadeId:id, depois:{ plan_id:planId, cycle, amount_cents:amountCents, txid } });
       return res.status(201).json({ success:true, invoice:rows[0], cycleInfo, billingWhatsapp:billingWhatsapp(), reused:false });
     }

@@ -135,7 +135,7 @@
             "name": "Como funciona o teste grátis de 15 dias?",
             "acceptedAnswer": {
               "@type": "Answer",
-              "text": "Você cria sua conta em menos de 1 minuto e tem acesso irrestrito às funcionalidades do plano para testar com suas obras reais. Não pedimos número de cartão de crédito e não cobramos taxa de implantação."
+              "text": "A solicitação leva menos de 1 minuto. A equipe FinGo valida os dados da construtora e libera o ambiente de teste de 15 dias, sem cartão de crédito e sem taxa de implantação."
             }
           },
           {
@@ -868,7 +868,7 @@
 
     .cascade-step.completed { border-color: rgba(18, 217, 160, 0.35); }
     .cascade-step.running { border-color: var(--accent-mint); box-shadow: 0 0 16px rgba(18, 217, 160, 0.18); }
-    .cascade-step.pending { opacity: 0.65; }
+    .cascade-step.pending { opacity: 1; border-color: var(--border-subtle); }
 
     .step-badge {
       font-size: 0.62rem;
@@ -880,8 +880,8 @@
     }
 
     .step-badge.green { background: rgba(18, 217, 160, 0.15); color: var(--accent-mint); }
-    .step-badge.blue { background: rgba(56, 189, 248, 0.15); color: var(--info-cyan); }
-    .step-badge.muted { background: rgba(255, 255, 255, 0.06); color: var(--text-dim); }
+    .step-badge.blue { background: rgba(198, 255, 0, 0.10); color: var(--accent-mint-bright); }
+    .step-badge.muted { background: rgba(255, 255, 255, 0.08); color: var(--text-main); }
 
     .step-name {
       font-size: 0.82rem;
@@ -1055,9 +1055,9 @@
 
     .calc-slider {
       width: 100%;
-      height: 8px;
+      height: 44px;
       border-radius: 4px;
-      background: rgba(255, 255, 255, 0.1);
+      background: linear-gradient(rgba(255, 255, 255, 0.10), rgba(255, 255, 255, 0.10)) center / 100% 8px no-repeat;
       outline: none;
       -webkit-appearance: none;
       appearance: none;
@@ -1181,10 +1181,10 @@
     }
 
     .cycle-btn.active {
-      background: linear-gradient(135deg, var(--gold-champagne), var(--gold-deep));
-      color: #0E1208;
+      background: var(--accent-mint);
+      color: #0A0A0A;
       font-weight: 900;
-      box-shadow: 0 4px 14px var(--gold-glow);
+      box-shadow: 0 4px 14px var(--accent-mint-glow);
     }
 
     .discount-pill {
@@ -1198,9 +1198,9 @@
     }
 
     .cycle-btn.active .discount-pill {
-      background: #0E1208;
-      color: var(--gold-champagne);
-      border-color: rgba(0, 0, 0, 0.3);
+      background: #0A0A0A;
+      color: var(--accent-mint-bright);
+      border-color: rgba(0, 0, 0, 0.35);
     }
 
     .plans-grid {
@@ -1519,6 +1519,46 @@
       font-size: 1.35rem;
     }
 
+    /* Accessibility and narrow-screen hardening */
+    :where(a, button, input, select, textarea, summary, [tabindex]):focus,
+    :where(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
+      outline: 3px solid var(--accent-mint-bright);
+      outline-offset: 3px;
+      box-shadow: 0 0 0 2px var(--bg-void);
+    }
+
+    .brand-group,
+    .brand-text-lockup,
+    .header-cta-group,
+    .calc-layout,
+    .calc-controls,
+    .calc-control-group,
+    .calc-results {
+      min-width: 0;
+    }
+
+    .mobile-menu-summary {
+      width: 44px;
+      height: 44px;
+      min-width: 44px;
+      min-height: 44px;
+    }
+
+    .mobile-drawer-pop {
+      width: min(280px, calc(100vw - 32px));
+      max-width: calc(100vw - 32px);
+    }
+
+    .mobile-drawer-pop a {
+      min-height: 44px;
+      display: flex;
+      align-items: center;
+    }
+
+    .calculator-box {
+      overflow: hidden;
+    }
+
     /* =========================================================================
        RESPONSIVE BREAKPOINTS (Mobile-First Collapse)
        ========================================================================= */
@@ -1536,23 +1576,140 @@
     }
 
     @media (max-width: 768px) {
-      .plans{display:flex;overflow-x:auto;scroll-snap-type:x mandatory;gap:16px;padding:12px 4px 20px;}
-      .plans-grid{display:flex;overflow-x:auto;scroll-snap-type:x mandatory;gap:16px;padding:12px 4px 20px;}
-      .plan-card, .plan{min-width:85vw;scroll-snap-align:center;}
+      .plans,
+      .plans-grid {
+        display: flex;
+        width: 100%;
+        max-width: 100%;
+        overflow-x: auto;
+        overflow-y: visible;
+        scroll-snap-type: x mandatory;
+        gap: 16px;
+        padding: 16px 4px 20px;
+      }
+      .plan-card,
+      .plan {
+        flex: 0 0 calc(100% - 20px);
+        min-width: calc(100% - 20px);
+        max-width: calc(100% - 20px);
+        scroll-snap-align: center;
+      }
+      .featured-badge {
+        max-width: calc(100% - 24px);
+        white-space: normal;
+        text-align: center;
+      }
       .compare-shell, .compare-container{display:none;}
       .mobile-compare{display:block;margin-top:20px;}
     }
 
     @media (max-width: 640px) {
-      .header-island { top: 10px; padding: 6px 14px; }
-      .header-cta-group .btn-ghost { display: none; }
+      .header-island {
+        top: 10px;
+        width: calc(100% - 20px);
+        padding: 6px 10px;
+        gap: 8px;
+        box-sizing: border-box;
+      }
+      .header-cta-group {
+        margin-left: auto;
+        flex-shrink: 0;
+      }
+      .header-cta-group > .btn { display: none; }
+      .brand-group { gap: 8px; min-width: 0; }
+      .brand-symbol-icon { width: 38px; height: 38px; }
+      .brand-text-lockup img { max-width: 88px; }
+      .brand-sub { font-size: 0.56rem; letter-spacing: 0.10em; white-space: nowrap; }
+      .mobile-menu-details { flex-shrink: 0; }
+      .mobile-drawer-pop { right: 0; }
+      .terminal-header {
+        flex-wrap: wrap;
+        padding-inline: 12px;
+      }
+      .terminal-url-pill {
+        order: 3;
+        flex: 1 1 100%;
+        max-width: 100%;
+        min-width: 0;
+        overflow-wrap: anywhere;
+      }
+      .terminal-badge-live {
+        max-width: 100%;
+        white-space: normal;
+        text-align: center;
+        overflow-wrap: anywhere;
+      }
+      .billing-switcher-wrap {
+        width: 100%;
+        min-width: 0;
+        overflow: hidden;
+      }
+      .billing-switcher {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        width: 100%;
+        max-width: 100%;
+        overflow: visible;
+      }
+      .cycle-btn {
+        width: 100%;
+        min-width: 0;
+        min-height: 44px;
+        justify-content: center;
+        padding: 9px 7px;
+        white-space: normal;
+        text-align: center;
+      }
+      .discount-pill {
+        white-space: nowrap;
+      }
       .hero-title { font-size: 2.2rem; }
       .telemetry-strip { grid-template-columns: 1fr; }
       .cascade-steps { grid-template-columns: 1fr; }
+      .calculator-box { padding: 28px 18px; }
+      .calc-layout,
+      .calc-controls,
+      .calc-control-group,
+      .calc-results { width: 100%; max-width: 100%; }
+      .calc-label-row { gap: 12px; }
+      .calc-label-row > * { min-width: 0; }
+      .calc-display-val { white-space: nowrap; flex-shrink: 0; }
       .calc-metric-grid { grid-template-columns: 1fr; }
       .calc-metric-card.hero-metric { grid-column: span 1; }
       .compare-container { overflow-x: auto; }
       .compare-table { min-width: 540px; }
+
+      .btn,
+      button,
+      summary,
+      .mobile-drawer-pop a,
+      .faq-question,
+      .video-ch-btn {
+        min-height: 44px;
+      }
+      .brand-group {
+        min-height: 44px;
+      }
+      #newsletter-email {
+        min-height: 44px;
+      }
+      #newsletter-optout-toggle {
+        display: inline-flex;
+        align-items: center;
+        min-height: 44px;
+        vertical-align: middle;
+      }
+      .footer a {
+        min-height: 44px;
+        display: inline-flex;
+        align-items: center;
+      }
+    }
+
+    @media (max-width: 380px) {
+      .brand-sub { display: none; }
+      .brand-text-lockup img { max-width: 82px; }
+      .calculator-box { padding-inline: 14px; }
     }
 
     /* Scroll Reveal (Audit 2.5) — Smooth entrance for marketing elements */
@@ -1587,9 +1744,9 @@
   <!-- Fluid Island Header -->
   <header class="header-island">
     <a class="brand-group" href="/" aria-label="FinGo — Obras em Fluxo">
-      <img src="/img/fingo/fingo-symbol.png" alt="FinGo" class="brand-symbol-icon">
+      <img src="/img/fingo/fingo-symbol.png" alt="FinGo" class="brand-symbol-icon" width="42" height="42">
       <div class="brand-text-lockup">
-        <img src="/img/fingo/fingo-wordmark.png" alt="FinGo" style="height:22px; width:auto; object-fit:contain; display:block;">
+        <img src="/img/fingo/fingo-wordmark.png" alt="FinGo" width="92" height="22" style="height:22px; width:auto; object-fit:contain; display:block;">
         <span class="brand-sub">OBRAS EM FLUXO</span>
       </div>
     </a>
@@ -1621,6 +1778,7 @@
           <a href="#faq">Dúvidas Frequentes</a>
           <a href="https://wa.me/5595991363678?text=Olá! Gostaria de falar com o Suporte / Comercial do FinGo." target="_blank" rel="noopener noreferrer">Suporte WhatsApp</a>
           <a href="/login">Entrar no Sistema</a>
+          <a href="/cadastro">Solicitar Teste de 15 Dias</a>
         </div>
       </details>
     </div>
@@ -1950,7 +2108,7 @@
               </div>
 
               <a class="btn btn-mint haptic-press" style="width:100%;margin-top:6px;" href="/cadastro">
-                <span>Estancar Custos — Testar 15 Dias Grátis</span>
+                <span>Estancar Custos — Solicitar Teste de 15 Dias</span>
                 <span class="btn-icon-pill">↗</span>
               </a>
             </div>
@@ -2048,7 +2206,7 @@
             </ul>
 
             <a class="btn btn-gold haptic-press" id="landing-btn-pro" href="/cadastro">
-              <span>Testar 15 Dias Grátis</span>
+              <span>Solicitar Teste de 15 Dias</span>
               <span class="btn-icon-pill">↗</span>
             </a>
           </article>
@@ -2226,7 +2384,7 @@
           <details class="faq-item" open>
             <summary>Como funciona o teste grátis de 15 dias?</summary>
             <div class="faq-content">
-              Você cria sua conta em menos de 1 minuto e tem acesso irrestrito às funcionalidades do plano para testar com suas obras reais. Não pedimos número de cartão de crédito e não cobramos taxa de implantação.
+              A solicitação leva menos de 1 minuto. A equipe FinGo valida os dados da construtora e libera o ambiente de teste de 15 dias, sem cartão de crédito e sem taxa de implantação.
             </div>
           </details>
 
@@ -2326,9 +2484,9 @@
     <div class="wrap footer-content">
       <div>
         <a class="brand-group" href="/" aria-label="FinGo — Obras em Fluxo" style="margin-bottom:12px; text-decoration:none;">
-          <img src="/img/fingo/fingo-symbol.png" alt="FinGo" class="brand-symbol-icon">
+          <img src="/img/fingo/fingo-symbol.png" alt="FinGo" class="brand-symbol-icon" width="42" height="42">
           <div class="brand-text-lockup">
-            <img src="/img/fingo/fingo-wordmark.png" alt="FinGo" style="height:22px; width:auto; object-fit:contain; display:block;">
+            <img src="/img/fingo/fingo-wordmark.png" alt="FinGo" width="92" height="22" style="height:22px; width:auto; object-fit:contain; display:block;">
             <span class="brand-sub">OBRAS EM FLUXO</span>
           </div>
         </a>

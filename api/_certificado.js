@@ -7,6 +7,7 @@ import { resolveAuthAndTenant } from './_auth.js';
 import { canAccessModule, permissionError } from './_permissions.js';
 import { writeAudit } from './_audit.js';
 import { createTenantSql } from './_tenant-sql.js';
+import { createRuntimeSql } from './_database.js';
 
 const ALLOWED_ORIGINS = [
   'https://fingo.api.br',
@@ -23,7 +24,7 @@ function setCors(req, res) {
   const origin = req.headers.origin;
   res.setHeader('Vary', 'Origin');
   if (origin) {
-    const isAllowed = ALLOWED_ORIGINS.includes(origin) || /^https:\/\/finan-as(?:-[a-z0-9-]+)?\.vercel\.app$/i.test(origin);
+    const isAllowed = ALLOWED_ORIGINS.includes(origin);
     if (isAllowed) {
       res.setHeader('Access-Control-Allow-Origin', origin);
       res.setHeader('Access-Control-Allow-Credentials', 'true');
@@ -162,12 +163,14 @@ export default async function handler(req, res) {
     });
   }
 
-  const conn = process.env.DATABASE_URL;
-  if (!conn) {
+  let baseSql;
+  try {
+    baseSql = createRuntimeSql();
+  } catch (err) {
+    console.error('[Certificado] Runtime database indisponível:', err.message);
     return res.status(500).json({ success: false, error: 'Banco de dados não configurado no servidor.' });
   }
-  const baseSql = neon(conn);
-  const sql = createTenantSql(baseSql, { tenantId: auth.tenantId, isSystem: auth.isSystem === true });
+  const sql = createTenantSql(baseSql, { tenantId: auth.tenantId });
 
   const action = req.query.action || (req.body && req.body.action) || (req.method === 'GET' ? 'status' : '');
 

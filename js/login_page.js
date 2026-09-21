@@ -49,19 +49,21 @@ if (window.location.hash.startsWith('#validar') || window.location.search.includ
     const msg = (document.getElementById('reg-msg') || {}).value?.trim() || '';
 
     try {
-      const resp = await fetch('/api/auth?action=register', {
+      const resp = await Auth._fetchWithTimeout('/api/auth?action=register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ nome, email, telefone: whats, empresaNome: empNome, cnpj, mensagem: msg })
-      });
+      }, 20000);
       const data = await resp.json().catch(() => ({}));
       if (data.success && data.commercial_request) {
         if (okBox) {
-          okBox.textContent = data.message || 'Solicitação enviada! Nossa equipe entrará em contato em breve.';
+          okBox.innerHTML = '<strong>✓ Solicitação recebida.</strong><br>Próximo passo: a equipe FinGo valida os dados da construtora e envia as credenciais/chave da empresa pelos canais informados. Para atendimento imediato, use o botão de WhatsApp abaixo.';
           okBox.style.display = 'block';
+          okBox.setAttribute('role', 'status');
+          okBox.setAttribute('aria-live', 'polite');
         }
-        btn.textContent = '✓ Solicitação enviada!';
-        setTimeout(() => closeRegisterModal(), 3500);
+        btn.textContent = '✓ Solicitação recebida';
+        btn.disabled = true;
       } else {
         throw new Error(data.message || 'Erro ao enviar solicitação. Tente via WhatsApp.');
       }
@@ -112,7 +114,7 @@ if (window.location.hash.startsWith('#validar') || window.location.search.includ
     pwd.type = isHidden ? 'text' : 'password';
     document.getElementById('eye-icon').innerHTML = isHidden
       ? '<path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/>'
-      : '<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>';
+      : '<path d="M2 12c2.5-4 5.8-6 10-6s7.5 2 10 6c-2.5 4-5.8 6-10 6S4.5 16 2 12z"/><circle cx="12" cy="12" r="3"/>';
   }
 
   // ── GOOGLE SIGN-IN INTEGRATION ──────────────────────────────
@@ -425,7 +427,7 @@ if (window.location.hash.startsWith('#validar') || window.location.search.includ
 
     const btn = document.getElementById('rec-btn-step-2');
     btn.disabled = true;
-    btn.innerHTML = '<div class="spinner"></div> Validando...';
+    btn.innerHTML = '<div class="spinner"></div> Preparando...';
 
     try {
       const result = await Auth.validarCodigoRecuperacao(recoveryRequestId, code);
@@ -433,25 +435,26 @@ if (window.location.hash.startsWith('#validar') || window.location.search.includ
         errBox.textContent = result.message;
         errBox.style.display = 'block';
         btn.disabled = false;
-        btn.innerHTML = '<span>Validar Código</span>';
+        btn.innerHTML = '<span>Continuar com este código</span>';
         return;
       }
 
       recoveryResetToken = result.resetToken;
-      clearInterval(recoveryTimerInterval);
 
+      // O código só é confirmado pelo servidor junto com a troca atômica da senha.
+      // Mantém o contador correndo para não criar uma falsa confirmação de OTP.
       // Avança para Etapa 3 (Nova Senha)
       document.getElementById('rec-step-2').className = 'recovery-step';
       document.getElementById('rec-step-3').className = 'recovery-step active';
       btn.disabled = false;
-      btn.innerHTML = '<span>Validar Código</span>';
+      btn.innerHTML = '<span>Continuar com este código</span>';
 
       setTimeout(() => document.getElementById('rec-new-pwd').focus(), 150);
     } catch (err) {
       errBox.textContent = 'Erro ao validar código: ' + err.message;
       errBox.style.display = 'block';
       btn.disabled = false;
-      btn.innerHTML = '<span>Validar Código</span>';
+      btn.innerHTML = '<span>Continuar com este código</span>';
     }
   }
 
@@ -480,12 +483,52 @@ if (window.location.hash.startsWith('#validar') || window.location.search.includ
     try {
       const result = await Auth.redefinirSenha(recoveryRequestId, recoveryResetToken, p1);
       if (!result.success) {
-        errBox.textContent = result.message;
+        const message = result.message || 'Não foi possível redefinir a senha.';
+        const otpRejected = /c[oó]digo|otp|tentativas de validação|tentativas excedid|novo c[oó]digo/i.test(message);
+
+        if (otpRejected) {
+          recoveryResetToken = null;
+          try { sessionStorage.removeItem(`finobra_otp_${recoveryRequestId}`); } catch {}
+
+          document.getElementById('rec-step-3').className = 'recovery-step';
+          document.getElementById('rec-step-2').className = 'recovery-step active';
+
+          const otpErr = document.getElementById('rec-err-2');
+          if (otpErr) {
+            otpErr.textContent = message;
+            otpErr.style.display = 'block';
+          }
+
+          for (let i = 1; i <= 6; i++) {
+            const otpInput = document.getElementById('otp-' + i);
+            if (otpInput) otpInput.value = '';
+          }
+
+          if (/expirad|limite de tentativas|novo c[oó]digo/i.test(message)) {
+            clearInterval(recoveryTimerInterval);
+            const countdown = document.getElementById('rec-countdown');
+            const resendBtn = document.getElementById('rec-resend-btn');
+            if (countdown) countdown.textContent = 'Expirado';
+            if (resendBtn) {
+              resendBtn.disabled = false;
+              resendBtn.style.opacity = '1';
+            }
+          }
+
+          btn.disabled = false;
+          btn.innerHTML = '<span>Salvar Nova Senha</span>';
+          setTimeout(() => document.getElementById('otp-1')?.focus(), 100);
+          return;
+        }
+
+        errBox.textContent = message;
         errBox.style.display = 'block';
         btn.disabled = false;
         btn.innerHTML = '<span>Salvar Nova Senha</span>';
         return;
       }
+
+      clearInterval(recoveryTimerInterval);
 
       // Avança para Etapa 4 (Sucesso)
       document.getElementById('rec-step-3').className = 'recovery-step';

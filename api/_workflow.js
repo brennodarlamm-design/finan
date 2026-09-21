@@ -4,8 +4,9 @@ import { resolveAuthAndTenant } from './_auth.js';
 import { canAccessModule, canWriteData, permissionError, normalizeRole } from './_permissions.js';
 import { writeAudit } from './_audit.js';
 import { createTenantSql } from './_tenant-sql.js';
+import { createRuntimeSql } from './_database.js';
 
-const sqlClient=()=>{if(!process.env.DATABASE_URL)throw new Error('DATABASE_URL não configurada.');return neon(process.env.DATABASE_URL)};
+const sqlClient=()=>createRuntimeSql();
 const text=(v,m=255)=>String(v??'').replace(/\0/g,'').trim().slice(0,m);
 const id=(v,m=80)=>text(v,m).replace(/[^A-Za-z0-9_.:@-]/g,'');
 const date=v=>/^\d{4}-\d{2}-\d{2}$/.test(String(v||''))?String(v):null;
@@ -23,7 +24,7 @@ function schemaErr(e){return/relation .* does not exist|function finobra_complet
 export default async function workflowHandler(req,res){
  const auth=await resolveAuthAndTenant(req);if(!auth.authenticated)return res.status(auth.status||401).json({success:false,error:auth.error||'Acesso não autorizado.'});
  if(!canAccessModule(auth,'obras','read'))return res.status(403).json(permissionError('MODULE_READ_FORBIDDEN','obras'));
- const t=auth.tenantId,sql=createTenantSql(sqlClient(),{tenantId:t,isSystem:auth.isSystem===true}),action=text(req.query?.action||req.body?.action,80).toLowerCase(),b=req.body||{},uid=actor(auth);
+ const t=auth.tenantId,sql=createTenantSql(sqlClient(),{tenantId:t}),action=text(req.query?.action||req.body?.action,80).toLowerCase(),b=req.body||{},uid=actor(auth);
  try{
   if(req.method==='GET'&&action==='meta_list'){const r=await sql`SELECT * FROM obra_cadastro_geral WHERE tenant_id=${t} ORDER BY updated_at DESC`;return res.json({success:true,data:r})}
   if(req.method==='GET'&&action==='list'){const o=id(req.query?.obraId,64);if(!o||!await obra(sql,t,o))return res.status(404).json({success:false,code:'OBRA_NOT_FOUND',error:'Obra não encontrada.'});const[s,h]=await Promise.all([sql`SELECT * FROM workflow_etapas WHERE tenant_id=${t} AND obra_id=${o} ORDER BY ordem`,sql`SELECT * FROM workflow_historico WHERE tenant_id=${t} AND obra_id=${o} ORDER BY created_at DESC LIMIT 200`]);return res.json({success:true,stages:s,history:h})}

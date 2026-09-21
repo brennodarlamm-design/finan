@@ -8,12 +8,13 @@ import { getPlanRule, minimumPlanForUsers, upgradeDescriptor } from './_plans.js
 import { checkRateLimit, getClientIp } from './_ratelimit.js';
 import { createTenantSql } from './_tenant-sql.js';
 import { callGeminiKeyPool } from './_ai-key-pool.js';
+import { createRuntimeSql } from './_database.js';
 
 
 function cors(req, res) {
   const allowed = ['https://fingo.api.br','https://www.fingo.api.br','http://localhost:3000','http://localhost:3333','http://localhost:5000','http://127.0.0.1:3000','http://127.0.0.1:3333','http://127.0.0.1:5000'];
   const origin = req.headers.origin;
-  if (origin && (allowed.includes(origin) || /^https:\/\/finan-as(?:-[a-z0-9-]+)?\.vercel\.app$/i.test(origin))) res.setHeader('Access-Control-Allow-Origin', origin);
+  if (origin && allowed.includes(origin)) res.setHeader('Access-Control-Allow-Origin', origin);
   res.setHeader('Access-Control-Allow-Credentials', 'true');
   res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PATCH,OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, x-tenant-id');
@@ -463,8 +464,8 @@ export default async function handler(req, res) {
   if (!auth.authenticated) return res.status(auth.status || 401).json({ success:false, error:auth.error });
   if (auth.isSystem) return res.status(403).json({ success:false, error:'Use uma sessão de usuário para gerenciar usuários.' });
 
-  const baseSql = neon(process.env.DATABASE_URL);
-  const sql = createTenantSql(baseSql, { tenantId: auth.tenantId, isSystem: false });
+  const baseSql = createRuntimeSql();
+  const sql = createTenantSql(baseSql, { tenantId: auth.tenantId });
 
   const target = req.query.target || req.body?.target || '';
 

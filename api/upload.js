@@ -1,17 +1,15 @@
-// api/upload.js — Endpoint Serverless para Upload e Gerenciamento no Vercel Blob
+// api/upload.js — Upload e gerenciamento de documentos com Cloudflare R2 e compatibilidade legada Vercel Blob
 import { put, del, issueSignedToken, presignUrl } from '@vercel/blob';
 import { handleUpload } from '@vercel/blob/client';
 import { neon } from '@neondatabase/serverless';
 import { resolveAuthAndTenant } from './_auth.js';
 import { canWriteData, canDeleteData, canAccessModule, permissionError } from './_permissions.js';
 import { createTenantSql } from './_tenant-sql.js';
+import { putR2Object, deleteR2Object, buildR2ObjectKey } from './_edge-r2.js';
+import { createRuntimeSql } from './_database.js';
 
 function getSql() {
-  const conn = process.env.DATABASE_URL;
-  if (!conn) {
-    throw new Error('DATABASE_URL não configurada no servidor.');
-  }
-  return neon(conn);
+  return createRuntimeSql();
 }
 
 
@@ -48,7 +46,7 @@ function setCors(req, res) {
   const origin = req.headers.origin;
   res.setHeader('Vary', 'Origin');
   if (origin) {
-    const isAllowed = ALLOWED_ORIGINS.includes(origin) || /^https:\/\/finan-as(?:-[a-z0-9-]+)?\.vercel\.app$/i.test(origin);
+    const isAllowed = ALLOWED_ORIGINS.includes(origin);
     if (isAllowed) {
       res.setHeader('Access-Control-Allow-Origin', origin);
       res.setHeader('Access-Control-Allow-Credentials', 'true');
@@ -75,19 +73,29 @@ export default async function handler(req, res) {
   }
 
   const tenantId = auth.tenantId;
-  const sql = createTenantSql(getSql(), { tenantId, isSystem: auth.isSystem === true });
+  const sql = createTenantSql(getSql(), { tenantId });
   if (req.method === 'GET' && !canAccessModule(auth,'documentos','read')) return res.status(403).json(permissionError('MODULE_READ_FORBIDDEN','documentos'));
   if (req.method === 'POST' && !canAccessModule(auth,'documentos','write')) return res.status(403).json(permissionError('MODULE_WRITE_FORBIDDEN','documentos'));
   if (req.method === 'DELETE' && !canAccessModule(auth,'documentos','delete')) return res.status(403).json(permissionError('MODULE_DELETE_FORBIDDEN','documentos'));
   if (req.method === 'POST' && !canWriteData(auth)) return res.status(403).json(permissionError('ROLE_READ_ONLY'));
   if (req.method === 'DELETE' && !canDeleteData(auth)) return res.status(403).json(permissionError('ROLE_DELETE_FORBIDDEN'));
+  const r2Ready = Boolean(req.env?.ATTACHMENTS_R2 && typeof req.env.ATTACHMENTS_R2.put === 'function');
+  const allowLegacyBlobUpload = String(process.env.FINOBRA_ALLOW_LEGACY_BLOB_UPLOAD || '').trim().toLowerCase() === 'true';
   const privateBlobReady = Boolean(String(process.env.FINOBRA_BLOB_READ_WRITE_TOKEN || process.env.BLOB_READ_WRITE_TOKEN || '').trim() || String(process.env.FINOBRA_BLOB_STORE_ID || '').trim());
   const configuredAccess = String(process.env.FINOBRA_BLOB_ACCESS || process.env.BLOB_ACCESS || (privateBlobReady ? 'private' : 'public')).trim().toLowerCase();
-  
-  if (configuredAccess === 'private' && !privateBlobReady && req.method === 'POST') {
+
+  if (!r2Ready && !allowLegacyBlobUpload && req.method === 'POST') {
+    return res.status(503).json({
+      success: false,
+      code: 'R2_STORAGE_REQUIRED',
+      error: 'Cloudflare R2 indisponível. Novos uploads estão bloqueados para impedir fallback acidental para armazenamento legado.'
+    });
+  }
+
+  if (!r2Ready && configuredAccess === 'private' && !privateBlobReady && req.method === 'POST') {
     return res.status(500).json({
       success: false,
-      error: 'Armazenamento privado seguro não está pronto no servidor (BLOB_READ_WRITE_TOKEN pendente). Upload bloqueado por segurança (fail-closed).'
+      error: 'Armazenamento privado seguro não está pronto no servidor. Upload bloqueado por segurança (fail-closed).'
     });
   }
   const blobAccess = configuredAccess === 'private' && privateBlobReady ? 'private' : 'public';
@@ -104,6 +112,22 @@ export default async function handler(req, res) {
       }
 
       const blobUrl = String(rows[0].url);
+      if (blobUrl.startsWith('r2://')) {
+        const key = blobUrl.slice('r2://'.length);
+        const expectedPrefix = `tenants/${tenantId}/`;
+        if (!key.startsWith(expectedPrefix) && !auth.isSystem) {
+          return res.status(403).json({ success:false, error:'Arquivo não pertence ao tenant autenticado.' });
+        }
+        return res.status(200).json({
+          success: true,
+          url: `/api/v2/edge/storage/file/${encodeURIComponent(key)}`,
+          private: true,
+          storage: 'cloudflare_r2',
+          filename: rows[0].nome_arquivo || '',
+          contentType: rows[0].tipo_arquivo || 'application/octet-stream'
+        });
+      }
+
       const isPrivate = blobUrl.includes('.private.blob.vercel-storage.com');
       if (!isPrivate) {
         return res.status(200).json({ success: true, url: blobUrl, private: false });
@@ -168,10 +192,14 @@ export default async function handler(req, res) {
         let isCanonicalTenantBlob = false;
         try {
           if (url) {
-            const parsedUrl = new URL(url);
-            const cleanPath = parsedUrl.pathname.replace(/^\/+/, '');
-            // O caminho deve iniciar estritamente com "<tenantId>/"
-            isCanonicalTenantBlob = cleanPath.startsWith(`${tenantId}/`) || cleanPath.startsWith(`tenants/${tenantId}/`);
+            if (String(url).startsWith('r2://')) {
+              const cleanPath = String(url).slice('r2://'.length);
+              isCanonicalTenantBlob = cleanPath.startsWith(`tenants/${tenantId}/`);
+            } else {
+              const parsedUrl = new URL(url);
+              const cleanPath = parsedUrl.pathname.replace(/^\/+/, '');
+              isCanonicalTenantBlob = cleanPath.startsWith(`${tenantId}/`) || cleanPath.startsWith(`tenants/${tenantId}/`);
+            }
           }
         } catch {
           isCanonicalTenantBlob = false;
@@ -185,8 +213,16 @@ export default async function handler(req, res) {
         }
       }
 
-      // 2. Exclusão no Vercel Blob
-      if (finalUrl && finalUrl.includes('blob.vercel-storage.com')) {
+      // 2. Exclusão no armazenamento persistente
+      if (finalUrl && String(finalUrl).startsWith('r2://')) {
+        const key = String(finalUrl).slice('r2://'.length);
+        const expectedPrefix = `tenants/${tenantId}/`;
+        if (!key.startsWith(expectedPrefix) && !auth.isSystem) {
+          return res.status(403).json({ success:false, error:'Arquivo não pertence ao tenant autenticado.' });
+        }
+        await deleteR2Object(req.env || {}, key);
+      } else if (finalUrl && finalUrl.includes('blob.vercel-storage.com')) {
+        // Compatibilidade de leitura/exclusão para objetos legados durante a migração.
         const deleteOptions = finalUrl.includes('.private.blob.vercel-storage.com') ? getPrivateBlobOptions() : undefined;
         await del(finalUrl, deleteOptions);
       }
@@ -213,6 +249,13 @@ export default async function handler(req, res) {
     // O fluxo legado é mantido apenas para store público. Em modo privado, o app atual
     // usa upload server-side para não gerar acidentalmente um token de store público.
     if (req.body && req.body.type === 'blob.generate-client-token') {
+      if (r2Ready) {
+        return res.status(409).json({
+          success: false,
+          code: 'R2_DIRECT_UPLOAD_ONLY',
+          error: 'O FinGo usa Cloudflare R2. Envie o arquivo pelo fluxo autenticado do aplicativo.'
+        });
+      }
       if (blobAccess === 'private') {
         return res.status(409).json({
           success: false,
@@ -431,13 +474,34 @@ export default async function handler(req, res) {
     // Para arquivos de texto puro: apenas garantir que não são PE/ELF/HTML
     // (isExeOrScript já foi verificado acima, antes deste bloco)
 
-    // Estrutura de pastas no Blob: <tenantId>/documentos/<ano>/<mes>/<timestamp>_<filename>
+    const safeFilename = filename.replace(/[^a-zA-Z0-9._-]/g, '_');
+
+    if (r2Ready) {
+      const objectKey = buildR2ObjectKey(tenantId, 'documentos', safeFilename);
+      const stored = await putR2Object(req.env, objectKey, buffer, {
+        contentType: cleanMime,
+        customMetadata: {
+          tenantId,
+          category: 'documentos',
+          originalName: filename
+        }
+      });
+      return res.status(200).json({
+        success: true,
+        url: `r2://${stored.key}`,
+        pathname: stored.key,
+        size: stored.size,
+        contentType: cleanMime,
+        access: 'private',
+        storage: 'cloudflare_r2'
+      });
+    }
+
+    // Upload legado somente quando explicitamente habilitado para migração/compatibilidade controlada.
     const now = new Date();
     const ano = now.getFullYear();
     const mes = String(now.getMonth() + 1).padStart(2, '0');
-    const safeFilename = filename.replace(/[^a-zA-Z0-9._-]/g, '_');
     const pathname = `${tenantId}/documentos/${ano}/${mes}/${Date.now()}_${safeFilename}`;
-
     const blob = await put(pathname, buffer, {
       ...(blobAccess === 'private' ? getPrivateBlobOptions() : {}),
       access: blobAccess,
@@ -450,7 +514,8 @@ export default async function handler(req, res) {
       pathname: blob.pathname,
       size: buffer.length,
       contentType: blob.contentType,
-      access: blobAccess
+      access: blobAccess,
+      storage: 'vercel_blob_legacy'
     });
 
   } catch (err) {

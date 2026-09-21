@@ -4,10 +4,10 @@ import { neon } from '@neondatabase/serverless';
 import { resolveAuthAndTenant } from './_auth.js';
 import { canAccessModule, permissionError } from './_permissions.js';
 import { createTenantSql } from './_tenant-sql.js';
+import { createRuntimeSql } from './_database.js';
 
 function getSql() {
-  if (!process.env.DATABASE_URL) throw new Error('DATABASE_URL não configurada.');
-  return neon(process.env.DATABASE_URL);
+  return createRuntimeSql();
 }
 
 export default async function workflowUsersHandler(req, res) {
@@ -22,7 +22,7 @@ export default async function workflowUsersHandler(req, res) {
 
   try {
     const baseSql = getSql();
-    const sql = createTenantSql(baseSql, { tenantId: auth.tenantId, isSystem: auth.isSystem === true });
+    const sql = createTenantSql(baseSql, { tenantId: auth.tenantId });
     const rows = await sql`
       SELECT id, nome, perfil
       FROM usuarios

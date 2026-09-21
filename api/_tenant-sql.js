@@ -2,8 +2,8 @@
 // Patch 56 / Fase B: prepara a aplicação para finobra_app + FORCE ROW LEVEL SECURITY.
 //
 // O driver HTTP do Neon não preserva estado de sessão entre queries. Por isso,
-// app.current_tenant_id e app.is_system precisam ser definidos na MESMA transação
-// da consulta que depende das políticas RLS.
+// app.current_tenant_id precisa ser definido na MESMA transação da consulta
+// que depende das políticas RLS. Não existe bypass de sistema neste wrapper.
 
 function normalizeTenantId(value) {
   return String(value || '').trim().slice(0, 160);
@@ -15,20 +15,16 @@ function assertBaseSql(baseSql) {
   }
 }
 
-function normalizeContext({ tenantId, isSystem = false } = {}) {
+function normalizeContext({ tenantId } = {}) {
   const normalizedTenantId = normalizeTenantId(tenantId);
-  const system = isSystem === true;
 
-  // Fail-closed: uma chamada normal nunca pode executar sem tenant resolvido.
-  if (!system && !normalizedTenantId) {
+  // Fail-closed: toda consulta tenant-scoped exige tenant resolvido.
+  // Acesso global deve usar DATABASE_OWNER_URL em rota explicitamente privilegiada.
+  if (!normalizedTenantId) {
     throw new Error('Contexto tenant obrigatório para acesso ao banco.');
   }
 
-  return {
-    tenantId: normalizedTenantId,
-    isSystem: system,
-    systemFlag: system ? 'true' : 'false'
-  };
+  return { tenantId: normalizedTenantId };
 }
 
 function isTemplateStrings(value) {
@@ -39,8 +35,7 @@ function isTemplateStrings(value) {
  * Retorna um tagged-template compatível com sql`...`.
  * Cada consulta é executada em uma transação contendo:
  *   1. set_config(app.current_tenant_id, ..., true)
- *   2. set_config(app.is_system, ..., true)
- *   3. a consulta do chamador
+ *   2. a consulta do chamador
  *
  * O terceiro parâmetro true de set_config equivale a SET LOCAL: o valor morre
  * ao fim da transação e não vaza para outra requisição/tenant.
@@ -57,8 +52,7 @@ export function createTenantSql(baseSql, context = {}) {
     const results = await baseSql.transaction(txn => [
       txn`
         SELECT
-          set_config('app.current_tenant_id', ${ctx.tenantId}, true) AS tenant_context,
-          set_config('app.is_system', ${ctx.systemFlag}, true) AS system_context;
+          set_config('app.current_tenant_id', ${ctx.tenantId}, true) AS tenant_context;
       `,
       txn(strings, ...values)
     ]);
@@ -85,8 +79,7 @@ export function createTenantSql(baseSql, context = {}) {
       return [
         txn`
           SELECT
-            set_config('app.current_tenant_id', ${ctx.tenantId}, true) AS tenant_context,
-            set_config('app.is_system', ${ctx.systemFlag}, true) AS system_context;
+            set_config('app.current_tenant_id', ${ctx.tenantId}, true) AS tenant_context;
         `,
         ...userQueries
       ];
@@ -97,7 +90,6 @@ export function createTenantSql(baseSql, context = {}) {
 
   Object.defineProperties(scopedSql, {
     tenantId: { value: ctx.tenantId, enumerable: true },
-    isSystem: { value: ctx.isSystem, enumerable: true },
     __tenantScoped: { value: true, enumerable: false }
   });
 

@@ -4,11 +4,9 @@ import { resolveAuthAndTenant } from './_auth.js';
 import { canAccessModule, canWriteData, permissionError, normalizeRole } from './_permissions.js';
 import { writeAudit } from './_audit.js';
 import { createTenantSql } from './_tenant-sql.js';
+import { createRuntimeSql } from './_database.js';
 
-const sqlClient = () => {
-  if (!process.env.DATABASE_URL) throw new Error('DATABASE_URL não configurada.');
-  return neon(process.env.DATABASE_URL);
-};
+const sqlClient = () => createRuntimeSql();
 const text = (v, max=255) => String(v ?? '').replace(/\0/g, '').trim().slice(0, max);
 const cleanId = (v, max=80) => text(v, max).replace(/[^A-Za-z0-9_.:@-]/g, '');
 const manager = auth => ['superadmin','admin','gestor'].includes(normalizeRole(auth?.user?.perfil));
@@ -49,7 +47,7 @@ export default async function workflowStageUpdateHandler(req, res) {
   if (!obraId || !etapaId) return res.status(400).json({ success:false, code:'WORKFLOW_STAGE_REQUIRED', error:'Obra e etapa são obrigatórias.' });
 
   const baseSql = sqlClient();
-  const sql = createTenantSql(baseSql, { tenantId, isSystem: auth.isSystem === true });
+  const sql = createTenantSql(baseSql, { tenantId });
   try {
     const rows = await sql`
       SELECT * FROM workflow_etapas

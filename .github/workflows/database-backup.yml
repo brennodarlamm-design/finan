@@ -1,0 +1,130 @@
+name: FinGo production database backup
+
+on:
+  schedule:
+    - cron: '20 7 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: fingo-production-database-backup
+  cancel-in-progress: false
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      DATABASE_BACKUP_URL: ${{ secrets.DATABASE_OWNER_URL_UNPOOLED || secrets.DATABASE_URL_UNPOOLED }}
+      BACKUP_ENCRYPTION_PASSPHRASE: ${{ secrets.BACKUP_ENCRYPTION_PASSPHRASE }}
+    steps:
+      - name: Validate backup secrets
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -z "${DATABASE_BACKUP_URL:-}" ]]; then
+            echo "::error::Configure DATABASE_OWNER_URL_UNPOOLED (preferred) or DATABASE_URL_UNPOOLED with the Neon direct owner connection string."
+            exit 1
+          fi
+          if [[ -z "${BACKUP_ENCRYPTION_PASSPHRASE:-}" ]]; then
+            echo "::error::Configure BACKUP_ENCRYPTION_PASSPHRASE before enabling production backups."
+            exit 1
+          fi
+          if [[ "${#BACKUP_ENCRYPTION_PASSPHRASE}" -lt 24 ]]; then
+            echo "::error::BACKUP_ENCRYPTION_PASSPHRASE must contain at least 24 characters."
+            exit 1
+          fi
+
+      - name: Install PostgreSQL client
+        shell: bash
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y postgresql-client
+
+      - name: Verify backup role can bypass RLS
+        shell: bash
+        run: |
+          set -euo pipefail
+          role_info="$(psql "$DATABASE_BACKUP_URL" -Atc "SELECT current_user || '|' || rolsuper::text || '|' || rolbypassrls::text FROM pg_roles WHERE rolname = current_user;")"
+          IFS='|' read -r role_name role_super role_bypass <<< "$role_info"
+          echo "Backup connection role: $role_name"
+          if [[ "$role_super" != "true" && "$role_bypass" != "true" ]]; then
+            echo "::error::Backup connection role '$role_name' cannot bypass RLS. Refusing to create a potentially incomplete production backup."
+            exit 1
+          fi
+      - name: Create and encrypt logical backup
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p backup/plain
+          ts="$(date -u +'%Y%m%dT%H%M%SZ')"
+          base="fingo-production-${ts}"
+          dump="backup/plain/${base}.dump"
+
+          pg_dump \
+            --dbname="$DATABASE_BACKUP_URL" \
+            --format=custom \
+            --no-owner \
+            --no-privileges \
+            --file="$dump"
+
+          pg_restore --list "$dump" > "backup/plain/${base}.manifest.txt"
+          sha256sum "$dump" > "backup/plain/${base}.dump.sha256"
+
+          tar -C backup/plain -czf "/tmp/${base}.tar.gz" .
+          openssl enc -aes-256-cbc -salt -pbkdf2 -iter 200000 \
+            -in "/tmp/${base}.tar.gz" \
+            -out "backup/${base}.tar.gz.enc" \
+            -pass env:BACKUP_ENCRYPTION_PASSPHRASE
+
+          sha256sum "backup/${base}.tar.gz.enc" > "backup/${base}.tar.gz.enc.sha256"
+          rm -rf backup/plain "/tmp/${base}.tar.gz"
+
+          echo "BACKUP_ARCHIVE=backup/${base}.tar.gz.enc" >> "$GITHUB_ENV"
+
+      - name: Verify encrypted backup round-trip
+        shell: bash
+        run: |
+          set -euo pipefail
+          verify_dir="$(mktemp -d)"
+          openssl enc -d -aes-256-cbc -pbkdf2 -iter 200000 \
+            -in "$BACKUP_ARCHIVE" \
+            -out "$verify_dir/backup.tar.gz" \
+            -pass env:BACKUP_ENCRYPTION_PASSPHRASE
+
+          mkdir -p "$verify_dir/extracted"
+          tar -xzf "$verify_dir/backup.tar.gz" -C "$verify_dir/extracted"
+          dump_file="$(find "$verify_dir/extracted" -maxdepth 1 -name '*.dump' -type f -print -quit)"
+          test -n "$dump_file"
+          test -s "$dump_file"
+          pg_restore --list "$dump_file" > "$verify_dir/manifest.txt"
+
+          for critical_table in tenants usuarios obras lancamentos billing_invoices; do
+            if ! grep -Eq "TABLE DATA .* ${critical_table}( |$)" "$verify_dir/manifest.txt"; then
+              echo "::error::Critical table '$critical_table' is missing from the logical backup manifest."
+              exit 1
+            fi
+          done
+
+          rm -rf "$verify_dir"
+
+      - name: Assert no plaintext database dump will be uploaded
+        shell: bash
+        run: |
+          set -euo pipefail
+          if find backup -type f \( -name '*.dump' -o -name '*.tar.gz' \) | grep -q .; then
+            echo "::error::Plaintext backup material remains in the artifact directory."
+            exit 1
+          fi
+
+      - name: Upload encrypted backup artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: fingo-production-db-${{ github.run_id }}
+          path: |
+            backup/*.enc
+            backup/*.enc.sha256
+          retention-days: 30
+          if-no-files-found: error

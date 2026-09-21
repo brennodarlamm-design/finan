@@ -13,6 +13,7 @@ import {
   tenantAccessKeyLast4
 } from './_tenant-access-key.js';
 import { triggerBillingSweep, isTriggerConfigured } from './_trigger-client.js';
+import { createOwnerSql } from './_database.js';
 
 /**
  * Retorna o cliente SQL com o role neondb_owner (conexão privilegiada).
@@ -33,11 +34,7 @@ import { triggerBillingSweep, isTriggerConfigured } from './_trigger-client.js';
  * Fronteira: neondb_owner (admin/cross-tenant) vs finobra_app (tenant-scoped via RLS)
  */
 function getOwnerSql() {
-  const conn = process.env.DATABASE_OWNER_URL || process.env.DATABASE_URL;
-  if (!conn) {
-    throw new Error('DATABASE_OWNER_URL ou DATABASE_URL não configurada no servidor.');
-  }
-  return neon(conn);
+  return createOwnerSql();
 }
 
 const ALLOWED_ORIGINS = [
@@ -55,7 +52,7 @@ function setCors(req, res) {
   const origin = req.headers.origin;
   res.setHeader('Vary', 'Origin');
   if (origin) {
-    const isAllowed = ALLOWED_ORIGINS.includes(origin) || /^https:\/\/finan-as(?:-[a-z0-9-]+)?\.vercel\.app$/i.test(origin);
+    const isAllowed = ALLOWED_ORIGINS.includes(origin);
     if (isAllowed) {
       res.setHeader('Access-Control-Allow-Origin', origin);
       res.setHeader('Access-Control-Allow-Credentials', 'true');
@@ -826,7 +823,14 @@ export default async function handler(req, res) {
       };
       const planoInfo = PLANOS_INFO[t.plano] || { nome: String(t.plano || 'Profissional').toUpperCase(), valor: '279,90' };
 
-      const pixKey = String(userPixKey || process.env.FINOBRA_PIX_KEY || process.env.FINOBRA_SUPPORT_WHATSAPP || '5595991363678').trim();
+      const pixKey = String(userPixKey || process.env.FINOBRA_PIX_KEY || '').trim();
+      if (!pixKey) {
+        return res.status(503).json({
+          success:false,
+          code:'BILLING_PIX_NOT_CONFIGURED',
+          error:'Nenhuma chave PIX foi informada e FINOBRA_PIX_KEY não está configurada. O aviso de cobrança não foi enviado.'
+        });
+      }
       const pixBeneficiary = String(userPixBeneficiary || process.env.FINOBRA_PIX_BENEFICIARY || 'FinGo Soluções Tecnológicas').trim();
 
       // Cálculo de vencimento e dias restantes

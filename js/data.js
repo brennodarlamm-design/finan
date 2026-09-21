@@ -20,6 +20,19 @@ const DB = {
   _circuitCooldownMs: 30000,
   _circuitFailureThreshold: 5,
 
+  async _fetchWithTimeout(url, options = {}, timeoutMs = 25000) {
+    if (typeof Auth !== 'undefined' && typeof Auth._fetchWithTimeout === 'function') {
+      return Auth._fetchWithTimeout(url, options, timeoutMs);
+    }
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      return await fetch(url, { ...options, signal: controller.signal });
+    } finally {
+      clearTimeout(timer);
+    }
+  },
+
   _t() {
     return (typeof Auth !== 'undefined' && Auth.getCurrentTenantId) ? Auth.getCurrentTenantId() : 'public';
   },
@@ -722,7 +735,7 @@ const DB = {
 
   async _fetchCloudPage(table, limit = 400, offset = 0) {
     const params = new URLSearchParams({ table, limit: String(limit), offset: String(offset) });
-    const res = await fetch(`/api/db?${params.toString()}`, { headers: this._apiHeaders() });
+    const res = await this._fetchWithTimeout(`/api/db?${params.toString()}`, { headers: this._apiHeaders() });
     if (res.status === 401) {
       if (typeof Auth !== 'undefined' && Auth.handleSessionExpired) Auth.handleSessionExpired();
       throw new Error('SESSION_EXPIRED');
@@ -757,7 +770,7 @@ const DB = {
   async _fetchCloudSnapshot() {
     let usePaged = false;
     try {
-      const manifestRes = await fetch('/api/db?table=sync_manifest', { headers: this._apiHeaders() });
+      const manifestRes = await this._fetchWithTimeout('/api/db?table=sync_manifest', { headers: this._apiHeaders() });
       if (manifestRes.ok) {
         const manifest = await manifestRes.json();
         const c = manifest.counts || {};
@@ -778,7 +791,7 @@ const DB = {
     }
 
     if (!usePaged) {
-      const res = await fetch('/api/db?table=all', { headers: this._apiHeaders() });
+      const res = await this._fetchWithTimeout('/api/db?table=all', { headers: this._apiHeaders() });
       if (res.status === 401) {
         if (typeof Auth !== 'undefined' && Auth.handleSessionExpired) Auth.handleSessionExpired();
         throw new Error('SESSION_EXPIRED');
@@ -813,7 +826,7 @@ const DB = {
       this._fetchCloudTablePaged('recibos'),
       this._fetchCloudTablePaged('orcamentos_sinapi'),
       this._fetchCloudTablePaged('doc_fases'),
-      fetch('/api/db?table=preferencias', { headers:this._apiHeaders() }).then(async r => {
+      this._fetchWithTimeout('/api/db?table=preferencias', { headers:this._apiHeaders() }).then(async r => {
         if (!r.ok) throw new Error(`Falha ao sincronizar preferencias: HTTP ${r.status}`);
         return r.json();
       })
@@ -904,7 +917,7 @@ const DB = {
     try {
       const body = JSON.stringify({ action:'sync_all', payload });
       if (body.length <= 1_500_000) {
-        const res = await fetch('/api/db', { method:'POST', headers:this._apiHeaders(), body });
+        const res = await this._fetchWithTimeout('/api/db', { method:'POST', headers:this._apiHeaders(), body });
         const json = await res.json().catch(() => ({}));
         if (!res.ok || !json.success) throw new Error(json.error || `HTTP ${res.status}`);
       } else {
@@ -914,13 +927,13 @@ const DB = {
         ];
         for (let i = 0; i < entries.length; i += 4) {
           await Promise.all(entries.slice(i, i + 4).map(async ({ table, item }) => {
-            const res = await fetch('/api/db', { method:'POST', headers:this._apiHeaders(), body:JSON.stringify({ action:'save', table, data:item }) });
+            const res = await this._fetchWithTimeout('/api/db', { method:'POST', headers:this._apiHeaders(), body:JSON.stringify({ action:'save', table, data:item }) });
             const json = await res.json().catch(() => ({}));
             if (!res.ok || !json.success) throw new Error(json.error || `${table}: HTTP ${res.status}`);
           }));
         }
         if (meaningfulPrefs) {
-          const res = await fetch('/api/db', { method:'POST', headers:this._apiHeaders(), body:JSON.stringify({ action:'save', table:'preferencias', data:{ preferences:payload.preferencias } }) });
+          const res = await this._fetchWithTimeout('/api/db', { method:'POST', headers:this._apiHeaders(), body:JSON.stringify({ action:'save', table:'preferencias', data:{ preferences:payload.preferencias } }) });
           const json = await res.json().catch(() => ({}));
           if (!res.ok || !json.success) throw new Error(json.error || `preferencias: HTTP ${res.status}`);
         }
@@ -964,7 +977,7 @@ const DB = {
       // Vercel limita o corpo das funções. Assinaturas desenhadas podem deixar contratos grandes;
       // acima de ~1,5 MB migra registro a registro para evitar falha por tamanho do payload.
       if (bulkBody.length <= 1_500_000) {
-        const res = await fetch('/api/db', { method: 'POST', headers: this._apiHeaders(), body: bulkBody });
+        const res = await this._fetchWithTimeout('/api/db', { method: 'POST', headers: this._apiHeaders(), body: bulkBody });
         const json = await res.json().catch(() => ({}));
         if (!res.ok || !json.success) throw new Error(json.error || `HTTP ${res.status}`);
       } else {
@@ -976,7 +989,7 @@ const DB = {
         for (let i = 0; i < entries.length; i += concurrency) {
           const batch = entries.slice(i, i + concurrency);
           await Promise.all(batch.map(async ({ table, item }) => {
-            const res = await fetch('/api/db', {
+            const res = await this._fetchWithTimeout('/api/db', {
               method: 'POST', headers: this._apiHeaders(),
               body: JSON.stringify({ action: 'save', table, data: item })
             });
@@ -1369,7 +1382,7 @@ const DB = {
     this._emitSyncStatus('syncing');
     try {
       const revision = this._localMutationRevision || 0;
-      const res = await fetch(`/api/db?table=delta&since=${encodeURIComponent(cursor)}`, {
+      const res = await this._fetchWithTimeout(`/api/db?table=delta&since=${encodeURIComponent(cursor)}`, {
         headers: this._apiHeaders()
       });
       if (res.status === 401) {
@@ -1473,7 +1486,7 @@ const DB = {
     for (const table of needed) {
       if (table === 'preferencias') {
         try {
-          const res = await fetch('/api/db?table=preferencias', { headers: this._apiHeaders() });
+          const res = await this._fetchWithTimeout('/api/db?table=preferencias', { headers: this._apiHeaders() });
           if (res.ok) {
             const json = await res.json();
             const prefs = json.preferencias || (json.data && typeof json.data === 'object' && !Array.isArray(json.data) ? json.data : null);
@@ -1535,7 +1548,7 @@ const DB = {
 
       // Mantém dados cadastrais da empresa sincronizados com o tenant real do servidor.
       try {
-        const tenantRes = await fetch('/api/tenant', { headers: this._apiHeaders() });
+        const tenantRes = await this._fetchWithTimeout('/api/tenant', { headers: this._apiHeaders() });
         const tenantJson = await tenantRes.json().catch(() => ({}));
         if (tenantRes.ok && tenantJson.success && tenantJson.tenant) {
           this.saveEmpresa({
@@ -1857,7 +1870,7 @@ const DB = {
         try {
           const clientMutationId = item.payload?.client_mutation_id || item.queueId || (this.uuid ? this.uuid() : `${Date.now()}_${Math.random()}`);
           if (item.payload) item.payload.client_mutation_id = clientMutationId;
-          res = await fetch('/api/db', {
+          res = await this._fetchWithTimeout('/api/db', {
             method: 'POST',
             headers: this._apiHeaders(),
             body: JSON.stringify(item.payload)
@@ -2049,7 +2062,7 @@ const DB = {
       }
       const body = JSON.stringify({ action: 'sync_all', payload });
       if (body.length <= 1_500_000) {
-        const res = await fetch('/api/db', { method:'POST', headers:this._apiHeaders(), body });
+        const res = await this._fetchWithTimeout('/api/db', { method:'POST', headers:this._apiHeaders(), body });
         const json = await res.json().catch(() => ({}));
         if (!res.ok || json.success === false || json.partial || (Array.isArray(json.failed) && json.failed.length)) {
           return { success:false, partial:!!json.partial, synced:Number(json.synced||0), failed:json.failed || [], error:json.error || 'Sincronização parcial.' };
@@ -2065,7 +2078,7 @@ const DB = {
       }
       for (let i = 0; i < entries.length; i += 4) {
         const results = await Promise.all(entries.slice(i, i + 4).map(async ({ table, item }) => {
-          const res = await fetch('/api/db', {
+          const res = await this._fetchWithTimeout('/api/db', {
             method:'POST', headers:this._apiHeaders(),
             body:JSON.stringify({ action:'save', table, data:item })
           });
@@ -2076,7 +2089,7 @@ const DB = {
         synced += results.reduce((a,b) => a+b, 0);
       }
       if (payload.preferencias && typeof payload.preferencias === 'object') {
-        const res = await fetch('/api/db', {
+        const res = await this._fetchWithTimeout('/api/db', {
           method:'POST', headers:this._apiHeaders(),
           body:JSON.stringify({ action:'save', table:'preferencias', data:{ preferences:payload.preferencias } })
         });

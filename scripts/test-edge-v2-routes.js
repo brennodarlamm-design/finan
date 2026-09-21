@@ -146,15 +146,21 @@ console.log('   ✓ Boletim de Medição calculou todas as 5 retenções na font
 
 // 4.5 Newsletter Radar FinGo (Subscribe & Unsubscribe)
 const { handleV2Newsletter } = await import('../api/_v2-routes.js');
+const newsletterSqlCalls = [];
+const mockNewsletterSql = async (strings, ...values) => {
+  newsletterSqlCalls.push({ text: Array.isArray(strings) ? strings.join('?') : String(strings), values });
+  return [];
+};
 const resSub = createMockResponse();
-await handleV2Newsletter({ body: { email: 'contato@construtora.com.br' } }, resSub);
+await handleV2Newsletter({ body: { email: 'contato@construtora.com.br' } }, resSub, { sql: mockNewsletterSql });
 assert.strictEqual(resSub.getStatusCode(), 200);
 assert.strictEqual(resSub.getBody().action, 'subscribed');
 
 const resUnsub = createMockResponse();
-await handleV2Newsletter({ url: '/api/v2/public/newsletter/unsubscribe', body: { email: 'contato@construtora.com.br' } }, resUnsub);
+await handleV2Newsletter({ url: '/api/v2/public/newsletter/unsubscribe', body: { email: 'contato@construtora.com.br' } }, resUnsub, { sql: mockNewsletterSql });
 assert.strictEqual(resUnsub.getStatusCode(), 200);
 assert.strictEqual(resUnsub.getBody().action, 'unsubscribed');
+assert.strictEqual(newsletterSqlCalls.length, 2, 'Newsletter deve persistir subscribe e unsubscribe via SQL injetado no teste.');
 console.log('   ✓ Endpoints de Newsletter (Inscrição e Cancelamento) validados com sucesso.');
 
 console.log('\n======================================================');

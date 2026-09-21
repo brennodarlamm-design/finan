@@ -71,6 +71,15 @@ jobs:
             echo "::error::Configure CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID before production deploy."
             exit 1
           fi
+      - name: Ensure R2 attachments bucket exists
+        shell: bash
+        run: |
+          set -euo pipefail
+          if npx wrangler r2 bucket list | grep -Fq 'fingo-attachments'; then
+            echo "R2 bucket fingo-attachments already exists."
+          else
+            npx wrangler r2 bucket create fingo-attachments
+          fi
       - name: Build production assets
         run: npm run build:cloudflare
       - name: Deploy Worker and static assets

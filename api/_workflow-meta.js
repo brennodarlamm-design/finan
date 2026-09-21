@@ -5,10 +5,10 @@ import { resolveAuthAndTenant } from './_auth.js';
 import { canAccessModule, canWriteData, permissionError } from './_permissions.js';
 import { writeAudit } from './_audit.js';
 import { createTenantSql } from './_tenant-sql.js';
+import { createRuntimeSql } from './_database.js';
 
 function getSql() {
-  if (!process.env.DATABASE_URL) throw new Error('DATABASE_URL não configurada.');
-  return neon(process.env.DATABASE_URL);
+  return createRuntimeSql();
 }
 
 const cleanText = (value, max = 255) => String(value ?? '').replace(/\0/g, '').trim().slice(0, max);
@@ -32,7 +32,7 @@ export default async function workflowMetaHandler(req, res) {
   if (!obraId) return res.status(400).json({ success:false, code:'OBRA_REQUIRED', error:'Obra é obrigatória.' });
 
   const baseSql = getSql();
-  const sql = createTenantSql(baseSql, { tenantId, isSystem: auth.isSystem === true });
+  const sql = createTenantSql(baseSql, { tenantId });
   try {
     const obraRows = await sql`SELECT id FROM obras WHERE tenant_id=${tenantId} AND id=${obraId} LIMIT 1;`;
     if (!obraRows.length) return res.status(404).json({ success:false, code:'OBRA_NOT_FOUND', error:'Obra não encontrada.' });

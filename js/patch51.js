@@ -22,7 +22,7 @@ const Patch51 = {
 
   async api(action, { method='GET', body=null, params={} } = {}) {
     const query = new URLSearchParams({ action:`workflow_${action}`, ...params });
-    const options = { method, headers:this.authHeaders() };
+    const options = { method, headers:this.authHeaders(), signal: AbortSignal.timeout(20000) };
     if (body !== null) options.body = JSON.stringify({ action:`workflow_${action}`, ...body });
     const res = await fetch(`/api/audit?${query.toString()}`, options);
     const json = await res.json().catch(() => ({}));
@@ -52,7 +52,7 @@ const Patch51 = {
 
   async loadUsers() {
     try {
-      const res = await fetch('/api/users', { headers:this.authHeaders() });
+      const res = await fetch('/api/users', { headers:this.authHeaders(), signal: AbortSignal.timeout(20000) });
       const json = await res.json().catch(() => ({}));
       if (res.ok && json.success && Array.isArray(json.users)) {
         this._users = json.users.filter(u => u.ativo !== false);

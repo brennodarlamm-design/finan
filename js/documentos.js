@@ -111,7 +111,7 @@ const Documentos = {
   async _resolverUrlProtegida(id) {
     try {
       const headers = (typeof DB !== 'undefined' && DB._apiHeaders) ? DB._apiHeaders() : {};
-      const res = await fetch(`/api/upload?document_id=${encodeURIComponent(id)}`, { headers });
+      const res = await fetch(`/api/upload?document_id=${encodeURIComponent(id)}`, { headers, signal: AbortSignal.timeout(20000) });
       if (res.status === 401 || res.status === 403) {
         if (typeof Auth !== 'undefined' && Auth.handleSessionExpired) Auth.handleSessionExpired();
         return null;
@@ -146,7 +146,7 @@ const Documentos = {
     // Tenta buscar da nuvem (Neon) se o arquivo foi anexado por outro dispositivo (ex: celular)
     try {
       const headers = (typeof DB !== 'undefined' && DB._apiHeaders) ? DB._apiHeaders() : {};
-      const res = await fetch(`/api/db?table=documento_conteudo&id=${encodeURIComponent(id)}`, { headers });
+      const res = await fetch(`/api/db?table=documento_conteudo&id=${encodeURIComponent(id)}`, { headers, signal: AbortSignal.timeout(20000) });
       if (res.status === 401) {
         if (typeof Auth !== 'undefined' && Auth.handleSessionExpired) {
           Auth.handleSessionExpired();
@@ -263,7 +263,7 @@ const Documentos = {
       });
     }
 
-    // Se o documento ainda não tiver URL no Vercel Blob e houver base64, faz upload em segundo plano
+    // Se o documento ainda não tiver URL persistente e houver base64, faz upload em segundo plano
     if (!item.url && base64 && typeof fetch !== 'undefined') {
       this._uploadBlobBackground(id, item.nome_arquivo || item.titulo || 'documento', base64, item.tipo_mime);
     }
@@ -281,7 +281,8 @@ const Documentos = {
           filename: filename || 'documento',
           contentType: contentType || 'application/octet-stream',
           base64
-        })
+        }),
+        signal: AbortSignal.timeout(90000)
       });
       if (res.ok) {
         const data = await res.json();
@@ -335,11 +336,11 @@ const Documentos = {
     const docs = this.getAll().filter(d => d.id !== id);
     this.salvarLista(docs);
 
-    // Se o documento estiver no Vercel Blob, chamar endpoint para exclusão
+    // Compatibilidade: documentos legados no Vercel Blob também são excluídos pelo endpoint
     if (doc && doc.url && doc.url.includes('blob.vercel-storage.com')) {
       try {
         const headers = (typeof DB !== 'undefined' && DB._apiHeaders) ? DB._apiHeaders() : {};
-        fetch(`/api/upload?url=${encodeURIComponent(doc.url)}`, { method: 'DELETE', headers }).catch(() => {});
+        fetch(`/api/upload?url=${encodeURIComponent(doc.url)}`, { method: 'DELETE', headers, signal: AbortSignal.timeout(20000) }).catch(() => {});
       } catch (e) {}
     }
 
@@ -606,7 +607,8 @@ const Documentos = {
     const isImg = (d.tipo_mime && d.tipo_mime.startsWith('image/')) || nome.match(/\.(png|jpg|jpeg|webp|svg)$/i);
     const icon = isPDF ? '📕' : isZip ? '📦' : isCAD ? '📐' : isImg ? '🖼️' : '📎';
     const tamKB = d.tamanho ? `${(d.tamanho / (1024 * (d.tamanho > 1024 * 1024 ? 1024 : 1))).toFixed(1)} ${d.tamanho > 1024 * 1024 ? 'MB' : 'KB'}` : '';
-    const isBlob = !!(d.url && d.url.includes('blob.vercel-storage.com'));
+    const isR2 = !!(d.url && String(d.url).startsWith('r2://'));
+    const isLegacyBlob = !!(d.url && d.url.includes('blob.vercel-storage.com'));
 
     return `
     <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--r-md);gap:12px;">
@@ -617,7 +619,7 @@ const Documentos = {
             <span style="font-weight:700;font-size:.84rem;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
               ${esc(d.titulo || d.nome_arquivo)}
             </span>
-            ${isBlob ? `<span style="font-size:.62rem;font-weight:700;color:#38bdf8;background:rgba(56,189,248,0.12);padding:1px 6px;border-radius:4px;border:1px solid rgba(56,189,248,0.25);white-space:nowrap;">☁️ Vercel Blob</span>` : ''}
+            ${isR2 ? `<span style="font-size:.62rem;font-weight:700;color:#38bdf8;background:rgba(56,189,248,0.12);padding:1px 6px;border-radius:4px;border:1px solid rgba(56,189,248,0.25);white-space:nowrap;">☁️ Cloudflare R2</span>` : (isLegacyBlob ? `<span style="font-size:.62rem;font-weight:700;color:var(--text3);background:rgba(148,163,184,.10);padding:1px 6px;border-radius:4px;border:1px solid rgba(148,163,184,.20);white-space:nowrap;">☁️ Armazenamento legado</span>` : '')}
           </div>
           <div style="font-size:.72rem;color:var(--text3);">
             ${esc(d.nome_arquivo)} ${tamKB ? `&middot; ${tamKB}` : ''} &middot; Anexado em ${Utils.fmt.datetime(d.criado_em)}
@@ -652,7 +654,7 @@ const Documentos = {
     const titulo = tituloInput?.value.trim() || file.name;
 
     try {
-      Utils.toast('Enviando para nuvem (Vercel Blob)...', 'info');
+      Utils.toast('Enviando documento para o armazenamento seguro...', 'info');
       const base64 = await this.lerArquivoBase64(file);
       
       let blobUrl = null;
@@ -665,7 +667,8 @@ const Documentos = {
             filename: file.name,
             contentType: file.type || 'application/octet-stream',
             base64
-          })
+          }),
+          signal: AbortSignal.timeout(90000)
         });
         if (res.ok) {
           const resData = await res.json();
@@ -676,7 +679,7 @@ const Documentos = {
           console.warn('[Blob] Upload na API falhou com status', res.status);
         }
       } catch (errUpload) {
-        console.warn('[Blob] Falha de conexão ao enviar para Vercel Blob:', errUpload);
+        console.warn('[Documentos] Falha de conexão ao enviar para o armazenamento:', errUpload);
       }
 
       this.adicionar({
@@ -690,7 +693,7 @@ const Documentos = {
         data_base64: blobUrl ? null : base64
       });
 
-      Utils.toast(blobUrl ? 'Documento salvo no Vercel Blob!' : 'Documento salvo localmente!', 'success');
+      Utils.toast(blobUrl ? 'Documento salvo no armazenamento seguro!' : 'Documento salvo localmente!', 'success');
       this.abrirModal(entidadeTipo, entidadeId);
       
       // Atualizar a visualização na tabela se aplicável

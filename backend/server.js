@@ -54,8 +54,7 @@ const ALLOWED_ORIGINS = [
 
 app.use(cors({
   origin: (origin, callback) => {
-    const isFinobraVercel = /^https:\/\/finan-as(?:-[a-z0-9-]+)?\.vercel\.app$/i.test(origin || '');
-    if (!origin || ALLOWED_ORIGINS.includes(origin) || isFinobraVercel) {
+    if (!origin || ALLOWED_ORIGINS.includes(origin)) {
       callback(null, true);
     } else {
       callback(null, false);
@@ -1293,8 +1292,12 @@ async function executarVarreduraCobranca({ manualTrigger = false, forcedTenantId
     trial: { nome: 'Trial (Período de Testes)', valor: '279,90' }
   };
 
-  const pixKey = String(process.env.FINOBRA_PIX_KEY || process.env.FINOBRA_SUPPORT_WHATSAPP || '5595991363678').trim();
-  const pixBeneficiary = String(process.env.FINOBRA_PIX_BENEFICIARY || 'FinObra Soluções Tecnológicas').trim();
+  const pixKey = String(process.env.FINOBRA_PIX_KEY || '').trim();
+  if (!pixKey) {
+    console.error('❌ [BillingCron] FINOBRA_PIX_KEY ausente. Notificações de cobrança bloqueadas para evitar envio de chave incorreta.');
+    return { success:false, executed:false, reason:'pix_key_not_configured', error:'FINOBRA_PIX_KEY não configurada.' };
+  }
+  const pixBeneficiary = String(process.env.FINOBRA_PIX_BENEFICIARY || 'FinGo Soluções Tecnológicas').trim();
   const resendKey = String(process.env.RESEND_API_KEY || '').trim();
   const emailFrom = String(process.env.FINOBRA_SUPPORT_EMAIL_FROM || 'FinGo <suporte@fingo.api.br>').trim();
 

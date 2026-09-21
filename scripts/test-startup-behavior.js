@@ -17,8 +17,8 @@ const sql = async (strings) => {
   throw new Error(`Consulta inesperada: ${query}`);
 };
 const apiContext = vm.createContext({
-  console, process:{ env:{ DATABASE_URL:'test-only' } }, Buffer,
-  OAuth2Client:class {}, neon:() => sql, getPlanRule,
+  console, process:{ env:{ DATABASE_URL:'postgres://finobra_app:test@localhost/db', DATABASE_OWNER_URL:'postgres://neondb_owner:test@localhost/db' } }, Buffer,
+  OAuth2Client:class {}, neon:() => sql, createOwnerSql:() => sql, getPlanRule,
   getSessionSigningSecret:() => 'test-only',
   resolveAuthAndTenant:async () => authorized
     ? { authenticated:true, tenantId:'effective', user:{ userId:'u1', sessionId:'session1' } }

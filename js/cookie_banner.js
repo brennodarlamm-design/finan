@@ -128,6 +128,12 @@
         .fingo-cb-text a:hover {
           color: #E8C84A;
         }
+        .fingo-cb-text a:focus,
+        .fingo-cb-btn-accept:focus,
+        .fingo-cb-btn-link:focus {
+          outline: 3px solid #D4FF33;
+          outline-offset: 3px;
+        }
         .fingo-cb-actions {
           display: flex;
           align-items: center;
@@ -187,8 +193,14 @@
           }
           .fingo-cb-btn-accept, .fingo-cb-btn-link {
             width: 100%;
+            min-height: 44px;
             text-align: center;
             justify-content: center;
+          }
+          .fingo-cb-text a {
+            display: inline-flex;
+            align-items: center;
+            min-height: 44px;
           }
         }
       </style>

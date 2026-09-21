@@ -10,9 +10,14 @@ dotenv.config({ path: '.env.local' });
 dotenv.config();
 
 const strict = process.argv.includes('--strict');
-const conn = String(process.env.DATABASE_URL || '').trim();
-if (!conn) {
-  console.error('DATABASE_URL não configurada.');
+const runtimeConn = String(process.env.DATABASE_URL || '').trim();
+const ownerConn = String(process.env.DATABASE_OWNER_URL || '').trim();
+if (!runtimeConn) {
+  console.error('DATABASE_URL runtime não configurada.');
+  process.exit(1);
+}
+if (!ownerConn) {
+  console.error('DATABASE_OWNER_URL privilegiada não configurada.');
   process.exit(1);
 }
 
@@ -25,15 +30,16 @@ const secretChecks = {
   PIX_WEBHOOK_SECRET: String(process.env.PIX_WEBHOOK_SECRET || '').length >= 24
 };
 
-const sql = neon(conn);
+const runtimeSql = neon(runtimeConn);
+const ownerSql = neon(ownerConn);
 
-const [identity] = await sql`
+const [identity] = await runtimeSql`;
   SELECT current_user AS current_user,
          current_setting('app.current_tenant_id', true) AS tenant_context,
          current_setting('app.is_system', true) AS system_context;
 `;
 
-const [rls] = await sql`
+const [rls] = await ownerSql`
   SELECT
     COUNT(*)::int AS tenant_tables,
     COUNT(*) FILTER (WHERE c.relrowsecurity)::int AS rls_enabled,
@@ -48,14 +54,14 @@ const [rls] = await sql`
     AND NOT a.attisdropped;
 `;
 
-const roles = await sql`
+const roles = await ownerSql`
   SELECT rolname, rolcanlogin, rolbypassrls, rolsuper, rolcreaterole, rolcreatedb
   FROM pg_roles
   WHERE rolname IN ('finobra_app', 'neondb_owner')
   ORDER BY rolname;
 `;
 
-const [mfa] = await sql`
+const [mfa] = await ownerSql`
   SELECT
     COUNT(*) FILTER (WHERE perfil = 'superadmin' AND mfa_enabled = TRUE AND mfa_secret IS NOT NULL)::int AS superadmins_mfa,
     COUNT(*) FILTER (WHERE perfil = 'superadmin' AND mfa_enabled = TRUE AND mfa_secret LIKE 'v1$%')::int AS encrypted_mfa,
@@ -63,14 +69,14 @@ const [mfa] = await sql`
   FROM usuarios;
 `;
 
-const [securityTables] = await sql`
+const [securityTables] = await ownerSql`
   SELECT
     to_regclass('public.security_ip_state') IS NOT NULL AS security_ip_state,
     to_regclass('public.security_ip_events') IS NOT NULL AS security_ip_events,
     to_regclass('public.security_ip_allowlist') IS NOT NULL AS security_ip_allowlist;
 `;
 
-const [dataApiGrants] = await sql`
+const [dataApiGrants] = await ownerSql`
   SELECT COUNT(*)::int AS public_table_grants
   FROM information_schema.table_privileges
   WHERE table_schema = 'public'

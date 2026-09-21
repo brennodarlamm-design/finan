@@ -14,13 +14,26 @@ const Configuracoes = {
     return String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   },
 
+  async _fetchWithTimeout(url, options = {}, timeoutMs = 20000) {
+    if (typeof Auth !== 'undefined' && typeof Auth._fetchWithTimeout === 'function') {
+      return Auth._fetchWithTimeout(url, options, timeoutMs);
+    }
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      return await fetch(url, { ...options, signal: controller.signal });
+    } finally {
+      clearTimeout(timer);
+    }
+  },
+
   _perfilLabel(perfil) {
     return ({ superadmin:'Superadministrador', admin:'Administrador', gestor:'Gestor', operador:'Operador', visualizador:'Visualizador' })[String(perfil || '').toLowerCase()] || 'Usuário';
   },
 
   async loadUsers() {
     try {
-      const res = await fetch('/api/users', { headers: Auth.getAuthHeaders() });
+      const res = await this._fetchWithTimeout('/api/users', { headers: Auth.getAuthHeaders() });
       const data = await res.json().catch(() => ({}));
       if (!res.ok || !data.success || !Array.isArray(data.users)) throw new Error(data.error || 'Falha ao carregar usuários.');
       this._usersCache = data.users;
@@ -36,7 +49,7 @@ const Configuracoes = {
 
   async loadEmpresaCloud() {
     try {
-      const res = await fetch('/api/tenant', { headers: Auth.getAuthHeaders() });
+      const res = await this._fetchWithTimeout('/api/tenant', { headers: Auth.getAuthHeaders() });
       const data = await res.json().catch(() => ({}));
       if (res.ok && data.success && data.tenant) {
         DB.saveEmpresa({ ...data.tenant, whatsapp: (data.tenant.telefone || '').replace(/\D/g, ''), configurada: true });
@@ -460,7 +473,7 @@ const Configuracoes = {
 
                 <div style="background:rgba(0,0,0,0.25);padding:10px 12px;border-radius:8px;border:1px solid var(--border-s);">
                   <div style="font-weight:700;color:var(--text);margin-bottom:3px;display:flex;align-items:center;gap:5px;">
-                    <span>🚀</span> Aplicações no FinObra
+                    <span>🚀</span> Aplicações no FinGo
                   </div>
                   <div style="color:var(--text2);">
                     Seu logotipo timbrado é inserido automaticamente no <strong>Menu Lateral</strong>, no <strong>Dossiê Executivo da Obra</strong>, em <strong>Recibos Oficiais</strong>, <strong>Ordens de Compra</strong> e <strong>Contratos</strong>.
@@ -609,7 +622,7 @@ const Configuracoes = {
     }
     Utils.toast('Consultando CNPJ na Receita Federal...', 'info');
     try {
-      const res = await fetch(`/api/cnpj?cnpj=${raw}`);
+      const res = await this._fetchWithTimeout(`/api/cnpj?cnpj=${raw}`);
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
         Utils.toast(data.message || data.error || 'CNPJ não encontrado na Receita Federal.', 'warning');
@@ -664,7 +677,7 @@ const Configuracoes = {
       logo_url: fd.get('logo_url') || ''
     };
     try {
-      const res = await fetch('/api/tenant', { method:'PATCH', headers:Auth.getAuthHeaders(), body:JSON.stringify(empresaData) });
+      const res = await this._fetchWithTimeout('/api/tenant', { method:'PATCH', headers:Auth.getAuthHeaders(), body:JSON.stringify(empresaData) });
       const data = await res.json().catch(() => ({}));
       if (!res.ok || !data.success) throw new Error(data.error || 'Não foi possível salvar os dados da empresa.');
       const saved = { ...data.tenant, whatsapp:(data.tenant.telefone || '').replace(/\D/g,''), configurada:true };
@@ -875,7 +888,7 @@ const Configuracoes = {
     if (!id && (!body.senha || body.senha.length < 8)) { Utils.toast('Senha deve ter pelo menos 8 caracteres!', 'warning'); return; }
     if (id) body.id = id;
     try {
-      const res = await fetch('/api/users', { method:id?'PATCH':'POST', headers:Auth.getAuthHeaders(), body:JSON.stringify(body) });
+      const res = await this._fetchWithTimeout('/api/users', { method:id?'PATCH':'POST', headers:Auth.getAuthHeaders(), body:JSON.stringify(body) });
       const data = await res.json().catch(() => ({}));
       if (!res.ok || !data.success) {
         if (data.code === 'PLAN_USER_LIMIT') { Utils.closeModal(); this.showUserLimitModal(data); return; }
@@ -888,7 +901,7 @@ const Configuracoes = {
 
   async toggleAtivo(id, ativo) {
     try {
-      const res = await fetch('/api/users', { method:'PATCH', headers:Auth.getAuthHeaders(), body:JSON.stringify({ id, ativo:!ativo }) });
+      const res = await this._fetchWithTimeout('/api/users', { method:'PATCH', headers:Auth.getAuthHeaders(), body:JSON.stringify({ id, ativo:!ativo }) });
       const data = await res.json().catch(() => ({}));
       if (!res.ok || !data.success) {
         if (data.code === 'PLAN_USER_LIMIT') { this.showUserLimitModal(data); return; }
@@ -957,7 +970,7 @@ const Configuracoes = {
     const body = { id, nome:fd.get('nome').trim(), email:fd.get('email').trim(), avatar:fd.get('avatar').trim(), senha_atual:fd.get('senha_atual') || undefined, senha:fd.get('nova_senha') || undefined };
     if (body.senha && body.senha.length < 8) { Utils.toast('Nova senha deve ter pelo menos 8 caracteres!', 'warning'); return; }
     try {
-      const res = await fetch('/api/users', { method:'PATCH', headers:Auth.getAuthHeaders(), body:JSON.stringify(body) });
+      const res = await this._fetchWithTimeout('/api/users', { method:'PATCH', headers:Auth.getAuthHeaders(), body:JSON.stringify(body) });
       const data = await res.json().catch(() => ({}));
       if (!res.ok || !data.success) throw new Error(data.error || 'Falha ao atualizar perfil.');
       const updated = data.user;
@@ -1032,7 +1045,7 @@ const Configuracoes = {
     const list = document.getElementById('audit-list');
     if (list && reset) list.textContent = 'Carregando auditoria…';
     try {
-      const res = await fetch(`/api/audit?limit=50&offset=${this._auditOffset}`, { headers: Auth.getAuthHeaders() });
+      const res = await this._fetchWithTimeout(`/api/audit?limit=50&offset=${this._auditOffset}`, { headers: Auth.getAuthHeaders() });
       const data = await res.json().catch(() => ({}));
       if (!res.ok || !data.success || !Array.isArray(data.data)) throw new Error(data.error || 'Falha ao carregar auditoria.');
       this._auditCache.push(...data.data);

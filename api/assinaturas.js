@@ -7,10 +7,10 @@ import { canUseFeature, planError } from './_plans.js';
 import { canWriteData, canAccessModule, permissionError } from './_permissions.js';
 import { writeAudit } from './_audit.js';
 import { createTenantSql } from './_tenant-sql.js';
+import { createRuntimeSql } from './_database.js';
 
 function getSql() {
-  if (!process.env.DATABASE_URL) throw new Error('DATABASE_URL não configurada.');
-  return neon(process.env.DATABASE_URL);
+  return createRuntimeSql();
 }
 
 function cors(req, res) {
@@ -20,7 +20,7 @@ function cors(req, res) {
     'http://127.0.0.1:3000', 'http://127.0.0.1:3333', 'http://127.0.0.1:5000'
   ];
   const origin = req.headers.origin;
-  if (origin && (allowed.includes(origin) || /^https:\/\/finan-as(?:-[a-z0-9-]+)?\.vercel\.app$/i.test(origin))) {
+  if (origin && allowed.includes(origin)) {
     res.setHeader('Access-Control-Allow-Origin', origin);
   }
   res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');

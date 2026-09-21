@@ -10,11 +10,11 @@ dotenv.config({ path: '.env.local' });
 dotenv.config();
 
 const apply = process.argv.includes('--apply');
-const conn = String(process.env.DATABASE_URL || '').trim();
+const conn = String(process.env.DATABASE_OWNER_URL || '').trim();
 const mfaKey = String(process.env.MFA_ENCRYPTION_KEY || '').trim();
 
 if (!conn) {
-  console.error('DATABASE_URL não configurada.');
+  console.error('DATABASE_OWNER_URL privilegiada não configurada.');
   process.exit(1);
 }
 

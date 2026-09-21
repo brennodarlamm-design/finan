@@ -29,6 +29,7 @@ const subHandlerPath = path.resolve('api/_webhook_pix.js');
 const planoPath = path.resolve('api/plano.js');
 const vercelJsonPath = path.resolve('vercel.json');
 const adminPath = path.resolve('api/admin.js');
+const adminRoutePath = path.resolve('api/_admin-route.js');
 const masterHtmlPath = path.resolve('master.html');
 const masterJsPath = path.resolve('js/master.js');
 const patch26EventsPath = path.resolve('js/patch26-events.js');
@@ -38,15 +39,17 @@ test('api/_webhook_pix_core.js existe', fs.existsSync(corePath));
 test('api/_webhook_pix.js existe', fs.existsSync(subHandlerPath));
 test('migrations/020_webhook_pix_integration.sql existe', fs.existsSync(migration020Path));
 
-const coreCode = fs.readFileSync(corePath, 'utf8');
-const subHandlerCode = fs.readFileSync(subHandlerPath, 'utf8');
-const planoCode = fs.readFileSync(planoPath, 'utf8');
-const vercelJson = fs.readFileSync(vercelJsonPath, 'utf8');
-const adminCode = fs.readFileSync(adminPath, 'utf8');
-const masterHtml = fs.readFileSync(masterHtmlPath, 'utf8');
-const masterJs = fs.readFileSync(masterJsPath, 'utf8');
-const patch26Events = fs.readFileSync(patch26EventsPath, 'utf8');
-const migration020 = fs.readFileSync(migration020Path, 'utf8');
+const readNormalized = p => fs.readFileSync(p, 'utf8').replace(/\r\n/g, '\n');
+const coreCode = readNormalized(corePath);
+const subHandlerCode = readNormalized(subHandlerPath);
+const planoCode = readNormalized(planoPath);
+const vercelJson = readNormalized(vercelJsonPath);
+const adminCode = readNormalized(adminPath);
+const adminRouteCode = readNormalized(adminRoutePath);
+const masterHtml = readNormalized(masterHtmlPath);
+const masterJs = readNormalized(masterJsPath);
+const patch26Events = readNormalized(patch26EventsPath);
+const migration020 = readNormalized(migration020Path);
 
 // 2. Validação da Migração 020
 test('Migração 020 amplia txid para VARCHAR(128)', migration020.includes('ALTER TABLE billing_invoices ALTER COLUMN txid TYPE VARCHAR(128)'));
@@ -144,13 +147,24 @@ test('settlePixPayment possui checagem de idempotência para fatura já paga', (
 test('settlePixPayment executa renovação atômica em billing_invoices e tenants', (
   coreCode.includes("UPDATE billing_invoices") &&
   coreCode.includes("UPDATE tenants t") &&
+  coreCode.includes("JOIN tenants t ON t.id = bi.tenant_id") &&
+  coreCode.includes("FOR UPDATE OF bi, t") &&
   coreCode.includes("vencimento =")
+));
+
+test('settlePixPayment reconcilia PIX em trânsito sem bloquear reativação posterior', (
+  coreCode.includes('WITH candidate AS') &&
+  coreCode.includes('FOR UPDATE') &&
+  coreCode.includes("status IN ('pending', 'expired', 'canceled')") &&
+  coreCode.includes('candidate.prior_status') &&
+  coreCode.includes("t.status = 'cancelamento_agendado' AND paid.prior_status = 'canceled'")
 ));
 
 test('sendPaymentReceipt dispara comprovante via WhatsApp e E-mail', (
   coreCode.includes('/send-message') &&
   coreCode.includes('https://api.resend.com/emails') &&
-  coreCode.includes('Pagamento PIX Confirmado')
+  coreCode.includes('Pagamento PIX Confirmado') &&
+  coreCode.includes("results.email.via = 'trigger_dev';\n          return results;")
 ));
 
 // 6. Arquitetura Serverless e Rewrites Vercel (Hobby <= 12 functions)
@@ -179,8 +193,10 @@ test('api/_webhook_pix.js valida autenticação via isWebhookAuthorized ou sess�
 test('api/_webhook_pix.js chama settlePixPayment e sendPaymentReceipt', subHandlerCode.includes('settlePixPayment(sql, payload') && subHandlerCode.includes('sendPaymentReceipt(data)'));
 test('api/_webhook_pix.js registra evento em audit_logs', subHandlerCode.includes('writeAudit(sql, req'));
 
-// 8. Integração no Backoffice Master
-test('api/admin.js suporta action simulate_webhook_pix', adminCode.includes("action === 'simulate_webhook_pix'"));
+test('api/admin.js suporta action simulate_webhook_pix', (
+  adminCode.includes("action === 'simulate_webhook_pix'") ||
+  (adminCode.includes('originalAdminHandler') && adminRouteCode.includes("action === 'simulate_webhook_pix'"))
+));
 test('master.html possui botão Simular Webhook PIX no cabeçalho', masterHtml.includes('MasterAdmin.abrirSimuladorWebhookPix'));
 test('js/master.js implementa simularWebhookPix e abrirSimuladorWebhookPix', (
   masterJs.includes('async simularWebhookPix(') &&

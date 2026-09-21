@@ -82,6 +82,139 @@ jobs:
           [[ "$health" == *'"ok":true'* ]]
           echo "Cloudflare Worker preview ready: $PREVIEW_URL"
 
+      - name: Install mobile UX audit browser
+        if: github.event_name == 'pull_request'
+        working-directory: .agents/skills/ui-ux-pro-max/stack
+        run: |
+          npm install --no-audit --no-fund
+          npx playwright install --with-deps chromium
+
+      - name: Audit landing and login across mobile/tablet/desktop
+        if: github.event_name == 'pull_request'
+        shell: bash
+        env:
+          PREVIEW_URL: ${{ steps.worker_preview.outputs.url }}
+        run: |
+          set -euo pipefail
+          node .agents/skills/ui-ux-pro-max/stack/scripts/design-audit.mjs --url "$PREVIEW_URL/" --out ux-audit/landing
+          node .agents/skills/ui-ux-pro-max/stack/scripts/design-audit.mjs --url "$PREVIEW_URL/login" --out ux-audit/login
+
+      - name: Authenticated mobile app smoke
+        if: github.event_name == 'pull_request'
+        working-directory: .agents/skills/ui-ux-pro-max/stack
+        shell: bash
+        env:
+          PREVIEW_URL: ${{ steps.worker_preview.outputs.url }}
+        run: |
+          set -euo pipefail
+          mkdir -p ../../../../../ux-audit/app
+          node --input-type=module <<'NODE'
+          import { chromium } from 'playwright';
+          import fs from 'node:fs/promises';
+
+          const base = process.env.PREVIEW_URL;
+          const browser = await chromium.launch();
+          const context = await browser.newContext({
+            viewport: { width: 390, height: 844 },
+            deviceScaleFactor: 1,
+            isMobile: true,
+            hasTouch: true
+          });
+          const page = await context.newPage();
+          const pageErrors = [];
+          page.on('pageerror', e => pageErrors.push(e.message));
+
+          const user = {
+            id:'ci-user', userId:'ci-user', username:'ci.mobile', nome:'CI Mobile',
+            email:'ci@example.invalid', perfil:'admin', tenantId:'ci-tenant',
+            realTenantId:'ci-tenant', empresaNome:'Construtora CI', permissions:{},
+            remember:false, sessionId:'ci-session'
+          };
+          const plan = {
+            id:'unlimited', label:'Construtora Ilimitado', status:'ativo',
+            maxActiveObras:null, maxUsers:5,
+            modules:['dashboard','obras','financeiro','fornecedores','produtos','precompras','recibos','contratos','notas','orcamentos','medicoes','documentos','relatorios','contas','whatsapp','assinatura','planos','configuracoes'],
+            features:{ocr:true,signatures:true,sinapi:true,engineering:true,advancedPermissions:true},
+            usage:{activeObras:0,totalObras:0,activeUsers:1,totalUsers:1}
+          };
+
+          await page.addInitScript(({user}) => {
+            sessionStorage.setItem('finobra_session', JSON.stringify(user));
+            localStorage.setItem('finobra_ci-tenant_empresa', JSON.stringify({
+              id:'ci-tenant', nome:'Construtora CI', nome_fantasia:'Construtora CI',
+              razao_social:'Construtora CI', plano:'unlimited', status:'ativo',
+              configurada:true, created_at:new Date().toISOString()
+            }));
+          }, {user});
+
+          await page.route('**/api/**', async route => {
+            const u = new URL(route.request().url());
+            let body = { success:true, data:[] };
+            if (u.pathname === '/api/auth' && u.searchParams.get('action') === 'me') {
+              body = { success:true, user, tenant:{id:'ci-tenant',nome_fantasia:'Construtora CI',plano:'unlimited',status:'ativo'}, plan };
+            } else if (u.pathname === '/api/plano') {
+              body = { success:true, plan, invoices:[], billingCycles:[], allPlansPricing:{} };
+            } else if (u.pathname === '/api/dashboard') {
+              body = { success:true, data:{}, summary:{} };
+            } else if (u.pathname === '/api/db') {
+              body = { success:true, data:[], rows:[], total:0 };
+            } else if (u.pathname === '/api/users') {
+              body = { success:true, data:[], users:[] };
+            }
+            await route.fulfill({ status:200, contentType:'application/json', body:JSON.stringify(body) });
+          });
+
+          await page.goto(base + '/app/dashboard', {waitUntil:'networkidle', timeout:30000});
+          await page.waitForTimeout(1000);
+
+          const checks = await page.evaluate(() => {
+            const content = document.getElementById('route-content');
+            const mobileNav = [...document.querySelectorAll('.mobile-nav-item')].filter(el => {
+              const r=el.getBoundingClientRect();
+              return r.width>0 && r.height>0;
+            });
+            const smallNav = mobileNav.filter(el => {
+              const r=el.getBoundingClientRect();
+              return r.width < 44 || r.height < 44;
+            }).length;
+            return {
+              width: window.innerWidth,
+              scrollWidth: document.documentElement.scrollWidth,
+              contentVisible: Boolean(content && content.getBoundingClientRect().height > 0),
+              loginVisible: Boolean(document.querySelector('#login-form')),
+              mobileNavCount: mobileNav.length,
+              smallNav
+            };
+          });
+
+          if (checks.width !== 390) throw new Error('Viewport mobile incorreto.');
+          if (checks.scrollWidth > checks.width + 1) throw new Error(`App possui overflow horizontal: ${checks.scrollWidth}px em ${checks.width}px.`);
+          if (!checks.contentVisible || checks.loginVisible) throw new Error('Shell autenticado não carregou corretamente.');
+          if (checks.mobileNavCount < 1) throw new Error('Navegação mobile não está disponível.');
+          if (checks.smallNav > 0) throw new Error(`${checks.smallNav} itens da navegação mobile têm alvo menor que 44px.`);
+          if (pageErrors.length) throw new Error('Erros JS no shell mobile: ' + pageErrors.join(' | '));
+
+          for (const target of ['clientes','lancamentos','planos']) {
+            await page.evaluate((route) => App.navigate(route), target);
+            await page.waitForTimeout(250);
+            const overflow = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1);
+            if (overflow) throw new Error(`Overflow horizontal após navegar para ${target}.`);
+          }
+
+          await page.screenshot({path:'../../../../../ux-audit/app/mobile-390-authenticated.png', fullPage:true});
+          await fs.writeFile('../../../../../ux-audit/app/result.json', JSON.stringify({ok:true, checks, routes:['dashboard','clientes','lancamentos','planos']}, null, 2));
+          await browser.close();
+          NODE
+
+      - name: Upload UX audit screenshots
+        if: always() && github.event_name == 'pull_request'
+        uses: actions/upload-artifact@v4
+        with:
+          name: mobile-ux-audit-${{ github.event.pull_request.number }}
+          path: ux-audit/
+          retention-days: 14
+          if-no-files-found: warn
+
       - name: Cloudflare preview summary
         if: github.event_name == 'pull_request'
         shell: bash

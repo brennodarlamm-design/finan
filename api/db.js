@@ -15,7 +15,7 @@ function setCORS(req, res) {
   const origin = req.headers.origin;
   res.setHeader('Vary', 'Origin');
   if (origin) {
-    const isAllowed = ALLOWED_ORIGINS.includes(origin) || /^https:\/\/finan-as(?:-[a-z0-9-]+)?\.vercel\.app$/i.test(origin);
+    const isAllowed = ALLOWED_ORIGINS.includes(origin);
     if (isAllowed) {
       res.setHeader('Access-Control-Allow-Origin', origin);
       res.setHeader('Access-Control-Allow-Credentials', 'true');
@@ -60,6 +60,7 @@ import {
   handleDelete
 } from './_db-mutations.js';
 import { handleSyncAll } from './_db-sync.js';
+import { createRuntimeSql } from './_database.js';
 
 // ── COMPATIBILIDADE ESTÁTICA E HELPERS NORMALIZADORES ────────────────────────
 function cleanDate(d) {
@@ -230,11 +231,7 @@ function deniedSyncCollection(auth, payload) {
 }
 
 function getSql() {
-  const conn = process.env.DATABASE_URL;
-  if (!conn) {
-    throw new Error('Variável de ambiente DATABASE_URL não configurada.');
-  }
-  return neon(conn);
+  return createRuntimeSql();
 }
 
 /**
@@ -258,7 +255,7 @@ export default async function handler(req, res) {
 
   const tenantId = auth.tenantId;
   const baseSql = getSql();
-  const sql = createTenantSql(baseSql, { tenantId, isSystem: Boolean(auth.isSystem) });
+  const sql = createTenantSql(baseSql, { tenantId });
 
   try {
     // ── GET: Consultar dados isolados pelo Tenant ─────────────────────────────

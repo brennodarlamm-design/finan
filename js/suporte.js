@@ -120,12 +120,23 @@ const Suporte = {
   async _apiSupport(action, method='GET', body=null, params={}) {
     const qs = new URLSearchParams({ action: action || 'current', ...params });
     const url = `/api/support?${qs.toString()}`;
-    const opts = { method, headers:(typeof Auth !== 'undefined' && Auth.getAuthHeaders) ? Auth.getAuthHeaders() : {} };
+    const opts = {
+      method,
+      headers:(typeof Auth !== 'undefined' && Auth.getAuthHeaders) ? Auth.getAuthHeaders() : {},
+      signal: AbortSignal.timeout(20000)
+    };
     if (body) opts.body = JSON.stringify(body);
-    const resp = await fetch(url, opts);
-    const data = await resp.json().catch(() => ({}));
-    if (!resp.ok || !data.success) throw new Error(data.error || 'Não foi possível acessar o suporte agora.');
-    return data;
+    try {
+      const resp = await fetch(url, opts);
+      const data = await resp.json().catch(() => ({}));
+      if (!resp.ok || !data.success) throw new Error(data.error || 'Não foi possível acessar o suporte agora.');
+      return data;
+    } catch (err) {
+      if (err?.name === 'TimeoutError' || err?.name === 'AbortError') {
+        throw new Error('O atendimento demorou além do esperado. Tente novamente.');
+      }
+      throw err;
+    }
   },
 
   _ensureChatModal() {

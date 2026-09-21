@@ -47,26 +47,62 @@ console.log('2. Validando Módulo 2: Cloudflare R2 (Object Storage)...');
 const r2Key = buildR2ObjectKey('darlam_const', 'plantas', 'projeto_estrutural.pdf');
 assert(r2Key.startsWith('tenants/darlam_const/plantas/'), 'buildR2ObjectKey deve isolar por tenant e categoria.');
 assert(r2Key.endsWith('_projeto_estrutural.pdf'), 'buildR2ObjectKey deve preservar nome limpo do arquivo.');
+assert.throws(
+  () => buildR2ObjectKey('', 'plantas', 'sem-tenant.pdf'),
+  /tenantId válido é obrigatório/,
+  'buildR2ObjectKey deve falhar fechado sem tenant explícito.'
+);
 
+const memoryTestEnv = { FINOBRA_ALLOW_MEMORY_STORAGE: 'true' };
 const fileContent = Buffer.from('PDF_DUMMY_CANTEIRO_PROJETO_CONTENT');
-const uploadRes = await putR2Object({}, r2Key, fileContent, {
+const uploadRes = await putR2Object(memoryTestEnv, r2Key, fileContent, {
   contentType: 'application/pdf',
   customMetadata: { obraId: 'obra_101' }
 });
 assert.equal(uploadRes.key, r2Key, 'putR2Object deve retornar a chave criada.');
 assert.equal(uploadRes.size, fileContent.byteLength, 'putR2Object deve registrar o tamanho exato.');
 
-const downloaded = await getR2Object({}, r2Key);
+const downloaded = await getR2Object(memoryTestEnv, r2Key);
 assert(downloaded && downloaded.size === fileContent.byteLength, 'getR2Object deve recuperar o arquivo íntegro.');
 assert.equal(downloaded.contentType, 'application/pdf', 'getR2Object deve preservar o Content-Type.');
 
-const listRes = await listR2Objects({}, 'tenants/darlam_const/');
+const listRes = await listR2Objects(memoryTestEnv, 'tenants/darlam_const/');
 assert(listRes.objects.length >= 1, 'listR2Objects deve listar arquivos do tenant.');
 
-await deleteR2Object({}, r2Key);
-const afterR2Delete = await getR2Object({}, r2Key);
+await deleteR2Object(memoryTestEnv, r2Key);
+const afterR2Delete = await getR2Object(memoryTestEnv, r2Key);
 assert.equal(afterR2Delete, null, 'deleteR2Object deve remover o arquivo.');
-console.log('   ✓ Cloudflare R2: isolamento multi-tenant, upload, download e listagem aprovados.');
+
+const failingR2Env = {
+  ATTACHMENTS_R2: {
+    put: async () => { throw new Error('simulated r2 upload failure'); },
+    get: async () => { throw new Error('simulated r2 read failure'); },
+    delete: async () => { throw new Error('simulated r2 delete failure'); },
+    list: async () => { throw new Error('simulated r2 list failure'); }
+  },
+  FINOBRA_ALLOW_MEMORY_STORAGE: 'true'
+};
+await assert.rejects(
+  () => putR2Object(failingR2Env, r2Key, fileContent, { contentType: 'application/pdf' }),
+  /Falha ao gravar o arquivo no armazenamento Cloudflare R2/,
+  'putR2Object não deve cair para memória quando o binding remoto existe mas falha.'
+);
+await assert.rejects(
+  () => getR2Object(failingR2Env, r2Key),
+  /Falha ao consultar o armazenamento Cloudflare R2/,
+  'getR2Object não deve transformar falha remota em arquivo ausente.'
+);
+await assert.rejects(
+  () => deleteR2Object(failingR2Env, r2Key),
+  /Falha ao excluir o arquivo no armazenamento Cloudflare R2/,
+  'deleteR2Object não deve reportar sucesso quando a exclusão remota falha.'
+);
+await assert.rejects(
+  () => listR2Objects(failingR2Env, 'tenants/darlam_const/'),
+  /Falha ao listar arquivos no armazenamento Cloudflare R2/,
+  'listR2Objects não deve retornar fallback vazio quando a listagem remota falha.'
+);
+console.log('   ✓ Cloudflare R2: isolamento multi-tenant, upload, download, listagem e falha fechada aprovados.');
 
 // -------------------------------------------------------------
 // 3. Workers AI — FinBot Edge & Vision OCR
@@ -114,13 +150,25 @@ const room = new BudgetSyncRoom(roomState, {});
 assert(typeof room.fetch === 'function', 'BudgetSyncRoom deve implementar método fetch de Durable Object.');
 assert(typeof room.broadcast === 'function', 'BudgetSyncRoom deve possuir canal de broadcast de mensagens.');
 
-// Teste do endpoint HTTP de status da sala
-const statusReq = new Request('https://fingo.api.br/api/v2/edge/realtime/room/obra_99/status');
+// A sala rejeita acesso direto sem identidade validada pelo Worker.
+const unauthStatusReq = new Request('https://fingo.api.br/api/v2/edge/realtime/room/obra_99/status');
+const unauthStatusRes = await room.fetch(unauthStatusReq);
+assert.equal(unauthStatusRes.status, 401, 'Status da sala deve rejeitar acesso sem identidade autenticada.');
+
+// O Worker injeta estes headers somente depois de validar /api/auth?action=me.
+const statusReq = new Request('https://fingo.api.br/api/v2/edge/realtime/room/obra_99/status', {
+  headers: {
+    'x-fingo-user-id': 'user_123',
+    'x-fingo-user-name': 'Engenheiro Teste',
+    'x-fingo-user-role': 'gestor',
+    'x-fingo-tenant-id': 'tenant_123'
+  }
+});
 const statusRes = await room.fetch(statusReq);
-assert.equal(statusRes.status, 200, 'Status da sala de sincronização deve responder 200 OK.');
+assert.equal(statusRes.status, 200, 'Status da sala autenticada deve responder 200 OK.');
 const statusJson = await statusRes.json();
 assert('activeSessions' in statusJson, 'Status da sala deve informar contagem de sessões ativas.');
-console.log('   ✓ Durable Objects: classe BudgetSyncRoom e canal de sincronização aprovados.');
+console.log('   ✓ Durable Objects: identidade confiável e acesso autenticado aprovados.');
 
 // -------------------------------------------------------------
 // 6. Image Optimizer — Fotos de Canteiro e 3G/4G

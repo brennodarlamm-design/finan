@@ -3,8 +3,8 @@ import { task, schedules, logger } from "@trigger.dev/sdk";
 import { neon } from "@neondatabase/serverless";
 
 function getDbClient() {
-  const dbUrl = process.env.DATABASE_URL || process.env.DATABASE_URL_UNPOOLED;
-  if (!dbUrl) throw new Error("DATABASE_URL não configurada para a tarefa de cobrança.");
+  const dbUrl = String(process.env.DATABASE_OWNER_URL || '').trim();
+  if (!dbUrl) throw new Error("DATABASE_OWNER_URL não configurada para a tarefa administrativa de cobrança.");
   return neon(dbUrl);
 }
 
@@ -72,7 +72,7 @@ export const scheduledBillingSweep = schedules.task({
 
           const emailHtml = `
             <div style="font-family:sans-serif;max-width:600px;margin:0 auto;color:#1e293b;">
-              <h2 style="color:#0f172a;">Aviso de Cobrança & Vencimentos — FinObra</h2>
+              <h2 style="color:#0f172a;">Aviso de Cobrança & Vencimentos — FinGo</h2>
               <p>Olá, <strong>${t.nome}</strong>,</p>
               <p>Identificamos <strong>${pendentes.length} conta(s)</strong> com vencimento hoje ou pendentes no total de <strong>${totalFmt}</strong>:</p>
               <table style="width:100%;border-collapse:collapse;margin:16px 0;font-size:14px;">
@@ -85,14 +85,14 @@ export const scheduledBillingSweep = schedules.task({
                 </thead>
                 <tbody>${rowsHtml}</tbody>
               </table>
-              <p>Acesse o FinObra para liquidar ou programar as transferências bancárias.</p>
+              <p>Acesse o FinGo para liquidar ou programar as transferências bancárias.</p>
               <hr style="border:none;border-top:1px solid #e2e8f0;margin:24px 0;" />
-              <p style="font-size:12px;color:#94a3b8;">Mensagem automática gerada pelo sistema FinObra.</p>
+              <p style="font-size:12px;color:#94a3b8;">Mensagem automática gerada pelo sistema FinGo.</p>
             </div>
           `;
 
           try {
-            await fetch('https://api.resend.com/emails', {
+            const emailRes = await fetch('https://api.resend.com/emails', {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',
@@ -101,11 +101,16 @@ export const scheduledBillingSweep = schedules.task({
               body: JSON.stringify({
                 from: process.env.FINOBRA_SUPPORT_EMAIL_FROM || 'FinGo <suporte@fingo.api.br>',
                 to: [t.email],
-                subject: `⚠️ Lembrete de Vencimento: ${pendentes.length} conta(s) pendente(s) — FinObra`,
+                subject: `⚠️ Lembrete de Vencimento: ${pendentes.length} conta(s) pendente(s) — FinGo`,
                 html: emailHtml
-              })
+              }),
+              signal: AbortSignal.timeout(12000)
             });
-            summary.notifiedEmails++;
+            if (!emailRes.ok) {
+              logger.warn(`Resend rejeitou e-mail de cobrança para ${t.id}:`, { status: emailRes.status });
+            } else {
+              summary.notifiedEmails++;
+            }
           } catch (emErr) {
             logger.warn(`Falha ao disparar e-mail de cobrança para ${t.id}:`, { error: emErr.message });
           }

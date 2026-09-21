@@ -5,14 +5,14 @@ import { resolveAuthAndTenant } from './_auth.js';
 import { canAccessModule, canWriteData, normalizeRole, permissionError } from './_permissions.js';
 import { writeAudit } from './_audit.js';
 import { createTenantSql } from './_tenant-sql.js';
+import { createRuntimeSql } from './_database.js';
 
 const clean = (v, max=80) => String(v ?? '').trim().replace(/[^A-Za-z0-9_.:@-]/g, '').slice(0,max);
 const isManager = auth => ['superadmin','admin','gestor'].includes(normalizeRole(auth?.user?.perfil));
 const actorId = auth => clean(auth?.user?.userId || auth?.user?.id, 64);
 
 function sqlClient() {
-  if (!process.env.DATABASE_URL) throw new Error('DATABASE_URL não configurada.');
-  return neon(process.env.DATABASE_URL);
+  return createRuntimeSql();
 }
 
 async function updateForecast(sql, tenantId, obraId) {
@@ -50,7 +50,7 @@ export default async function workflowCompleteHandler(req, res) {
   if (!obraId || !etapaId || !uid) return res.status(400).json({ success:false, code:'WORKFLOW_INVALID_INPUT', error:'Obra, etapa e usuário são obrigatórios.' });
 
   const baseSql = sqlClient();
-  const sql = createTenantSql(baseSql, { tenantId, isSystem: auth.isSystem === true });
+  const sql = createTenantSql(baseSql, { tenantId });
   try {
     const beforeRows = await sql`
       SELECT * FROM workflow_etapas
