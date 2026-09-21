@@ -955,7 +955,7 @@ export default async function handler(req, res) {
       };
       const planoInfo = PLANOS_INFO[t.plano] || { nome: String(t.plano || 'Profissional').toUpperCase(), valor: '279,90', cents: 27990 };
 
-      const pixKey = String(userPixKey || process.env.FINOBRA_PIX_KEY || '').trim();
+      const pixKey = String(userPixKey || process.env.FINOBRA_PIX_KEY || '5595991363678').trim();
       if (!pixKey) {
         return res.status(503).json({
           success:false,

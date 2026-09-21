@@ -1755,6 +1755,8 @@ const MasterAdmin = {
     const resp = this._esc(emp.responsavel || 'Gestor(a)');
     const tel = this._esc(emp.telefone || '');
     const email = this._esc(emp.email || '');
+    const planosMap = { starter: 'Básico (R$ 119,90)', pro: 'Profissional (R$ 279,90)', unlimited: 'Ilimitado (R$ 499,90)', trial: 'Trial' };
+    const plano = planosMap[emp.plano] || emp.plano || 'Profissional';
     const parseVencLocal = (v) => {
       if (!v) return 'A definir';
       if (typeof v === 'string') {
