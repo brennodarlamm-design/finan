@@ -67,19 +67,30 @@
           </table>
         </div>
 
-        <!-- Instruções de Pagamento via PIX -->
-        <div style="background:#0A0A0A;border:1px solid rgba(198,255,0,0.3);border-radius:6px;padding:20px;margin-bottom:24px;">
-          <div style="font-size:12px;font-weight:800;color:#C6FF00;margin-bottom:8px;text-transform:uppercase;letter-spacing:0.06em;">
+        <!-- Instruções de Pagamento via PIX com QR Code -->
+        <div style="background:#0A0A0A;border:1px solid rgba(198,255,0,0.3);border-radius:8px;padding:24px 20px;margin-bottom:24px;text-align:center;">
+          <div style="font-size:12px;font-weight:800;color:#C6FF00;margin-bottom:6px;text-transform:uppercase;letter-spacing:0.06em;">
             ⚡ Pagamento Prático via PIX
           </div>
-          <div style="font-size:12px;color:#CBD5E1;margin-bottom:10px;line-height:1.5;">
-            Transfira o valor utilizando a chave PIX abaixo para liquidação imediata da fatura:
+          <div style="font-size:13px;color:#CBD5E1;margin-bottom:14px;line-height:1.5;">
+            Escaneie o QR Code abaixo no aplicativo do seu banco para liquidação imediata:
           </div>
-          <div style="background:#141D12;border:1px solid #282828;border-radius:4px;padding:12px 14px;font-family:'SF Mono',Menlo,Consolas,monospace;font-size:13px;font-weight:800;color:#C6FF00;word-break:break-all;user-select:all;">
-            {{{PIX_CHAVE}}}
+          <div style="display:inline-block;background:#FFFFFF;padding:12px;border-radius:8px;margin:0 auto 12px;box-shadow:0 6px 22px rgba(0,0,0,0.7);">
+            <img src="{{{PIX_QR_CODE_URL}}}" alt="QR Code PIX" width="180" height="180" style="display:block;width:180px;height:180px;border:0;border-radius:4px;" />
           </div>
-          <div style="font-size:11px;color:#8E8E8E;margin-top:8px;">
-            Beneficiário: <strong style="color:#CBD5E1;">{{{PIX_BENEFICIARIO}}}</strong>
+          <div style="font-size:12px;color:#8E8E8E;margin-bottom:14px;">
+            Beneficiário: <strong style="color:#CBD5E1;">{{{PIX_BENEFICIARIO}}}</strong> &bull; Valor: <strong style="color:#C6FF00;">R$ {{{VALOR}}}</strong>
+          </div>
+          <div style="background:#141D12;border:1px solid #282828;border-radius:6px;padding:12px 14px;text-align:left;">
+            <div style="font-size:10px;color:#8E8E8E;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:4px;font-weight:700;">
+              📱 No celular? Use a Chave PIX ou Código Copia e Cola:
+            </div>
+            <div style="font-family:'SF Mono',Menlo,Consolas,monospace;font-size:12px;font-weight:800;color:#C6FF00;word-break:break-all;user-select:all;margin-bottom:6px;">
+              {{{PIX_PAYLOAD}}}
+            </div>
+            <div style="font-size:11px;color:#8E8E8E;">
+              Chave direta: <strong style="color:#CBD5E1;font-family:monospace;">{{{PIX_CHAVE}}}</strong>
+            </div>
           </div>
         </div>
 

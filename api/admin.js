@@ -400,8 +400,15 @@ async function handleBillingSweep(req, res) {
     let skipped = 0;
     for (const t of tenants) {
       evaluated++;
-      const parts = String(t.vencimento || '').slice(0, 10).split('-');
-      if (parts.length !== 3) continue;
+      let iso = '';
+      if (t.vencimento instanceof Date && !isNaN(t.vencimento.getTime())) {
+        iso = t.vencimento.toISOString().split('T')[0];
+      } else {
+        const m = String(t.vencimento || '').match(/(\d{4})-(\d{2})-(\d{2})/);
+        if (m) iso = `${m[1]}-${m[2]}-${m[3]}`;
+      }
+      if (!iso) continue;
+      const parts = iso.split('-');
       const vencDate = new Date(`${parts[0]}-${parts[1]}-${parts[2]}T00:00:00`);
       const todayDate = new Date(`${hoje}T00:00:00`);
       const diff = Math.round((vencDate.getTime() - todayDate.getTime()) / 86400000);

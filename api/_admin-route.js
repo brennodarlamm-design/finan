@@ -105,6 +105,101 @@ function escapeHtmlAdmin(str) {
     .replace(/'/g, '&#039;');
 }
 
+function onlyAscii(value, max) {
+  return String(value || '')
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .toUpperCase().replace(/[^A-Z0-9 .\-]/g, '')
+    .replace(/\s+/g, ' ').trim().slice(0, max);
+}
+
+function tlv(id, value) {
+  const v = String(value ?? '');
+  return `${id}${String(v.length).padStart(2, '0')}${v}`;
+}
+
+function crc16Ccitt(text) {
+  let crc = 0xFFFF;
+  for (let i = 0; i < text.length; i++) {
+    crc ^= text.charCodeAt(i) << 8;
+    for (let bit = 0; bit < 8; bit++) {
+      crc = (crc & 0x8000) ? ((crc << 1) ^ 0x1021) : (crc << 1);
+      crc &= 0xFFFF;
+    }
+  }
+  return crc.toString(16).toUpperCase().padStart(4, '0');
+}
+
+function buildPixPayload({ key, amountCents, txid, merchantName, merchantCity }) {
+  const cleanKey = String(key || '').trim();
+  if (!cleanKey) return '';
+  const mName = onlyAscii(merchantName || 'FINGO SISTEMA', 25) || 'FINGO';
+  const mCity = onlyAscii(merchantCity || 'BOA VISTA', 15) || 'BOA VISTA';
+  const merchantAccount = tlv('00', 'BR.GOV.BCB.PIX') + tlv('01', cleanKey);
+  const amount = (Number(amountCents || 0) / 100).toFixed(2);
+  const additional = tlv('05', onlyAscii(txid, 25) || '***');
+  const base =
+    tlv('00', '01') +
+    tlv('26', merchantAccount) +
+    tlv('52', '0000') +
+    tlv('53', '986') +
+    (Number(amountCents) > 0 ? tlv('54', amount) : '') +
+    tlv('58', 'BR') +
+    tlv('59', mName) +
+    tlv('60', mCity) +
+    tlv('62', additional) +
+    '6304';
+  return base + crc16Ccitt(base);
+}
+
+function parseVencimento(venc) {
+  if (!venc) return { iso: '', fmt: 'A definir', dias: 0, situacao: 'A definir', badge: 'Aviso' };
+  let iso = '';
+  if (venc instanceof Date && !isNaN(venc.getTime())) {
+    iso = venc.toISOString().split('T')[0];
+  } else {
+    const s = String(venc).trim();
+    const m = s.match(/(\d{4})-(\d{2})-(\d{2})/);
+    if (m) {
+      iso = `${m[1]}-${m[2]}-${m[3]}`;
+    } else {
+      const d = new Date(s);
+      if (!isNaN(d.getTime())) iso = d.toISOString().split('T')[0];
+    }
+  }
+  if (!iso) return { iso: String(venc), fmt: String(venc), dias: 0, situacao: '', badge: 'Aviso' };
+  const [y, m, d] = iso.split('-');
+  const fmt = `${d}/${m}/${y}`;
+
+  let todayStr = '';
+  try {
+    todayStr = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
+  } catch (_) {
+    todayStr = new Date().toISOString().split('T')[0];
+  }
+  const [ty, tm, td] = todayStr.split('-').map(Number);
+  const targetUtc = Date.UTC(Number(y), Number(m) - 1, Number(d));
+  const todayUtc = Date.UTC(ty, tm - 1, td);
+  const dias = Math.round((targetUtc - todayUtc) / (1000 * 60 * 60 * 24));
+
+  let situacao = '';
+  let badge = 'Aviso';
+  if (dias > 1) {
+    situacao = `vence em ${dias} dias`;
+    badge = `Vence em ${dias}d`;
+  } else if (dias === 1) {
+    situacao = 'vence amanhã';
+    badge = 'Vence Amanhã';
+  } else if (dias === 0) {
+    situacao = 'vence hoje';
+    badge = 'Vence Hoje';
+  } else {
+    const pass = Math.abs(dias);
+    situacao = `vencido há ${pass} dia${pass > 1 ? 's' : ''}`;
+    badge = `Vencido há ${pass}d`;
+  }
+  return { iso, fmt, dias, situacao, badge };
+}
+
 function renderBillingEmailHtml(vars) {
   const empresa = escapeHtmlAdmin(vars.EMPRESA);
   const responsavel = escapeHtmlAdmin(vars.RESPONSAVEL);
@@ -115,6 +210,8 @@ function renderBillingEmailHtml(vars) {
   const badgeStatus = escapeHtmlAdmin(vars.BADGE_STATUS);
   const tituloAviso = escapeHtmlAdmin(vars.TITULO_AVISO);
   const pixChave = escapeHtmlAdmin(vars.PIX_CHAVE);
+  const pixPayload = escapeHtmlAdmin(vars.PIX_PAYLOAD || vars.PIX_CHAVE);
+  const pixQrCodeUrl = encodeURI(vars.PIX_QR_CODE_URL || `https://api.qrserver.com/v1/create-qr-code/?size=220x220&margin=2&data=${encodeURIComponent(vars.PIX_PAYLOAD || vars.PIX_CHAVE || '')}`);
   const pixBeneficiario = escapeHtmlAdmin(vars.PIX_BENEFICIARIO);
   const mensagemExtra = escapeHtmlAdmin(vars.MENSAGEM_EXTRA).replace(/\r?\n/g, '<br>');
   const linkAcesso = encodeURI(vars.LINK_ACESSO || 'https://fingo.api.br/login');
@@ -178,18 +275,29 @@ function renderBillingEmailHtml(vars) {
             </tr>
           </table>
         </div>
-        <div style="background:#0A0A0A;border:1px solid rgba(198,255,0,0.3);border-radius:6px;padding:20px;margin-bottom:24px;">
-          <div style="font-size:12px;font-weight:800;color:#C6FF00;margin-bottom:8px;text-transform:uppercase;letter-spacing:0.06em;">
+        <div style="background:#0A0A0A;border:1px solid rgba(198,255,0,0.3);border-radius:8px;padding:24px 20px;margin-bottom:24px;text-align:center;">
+          <div style="font-size:12px;font-weight:800;color:#C6FF00;margin-bottom:6px;text-transform:uppercase;letter-spacing:0.06em;">
             ⚡ Pagamento Prático via PIX
           </div>
-          <div style="font-size:12px;color:#CBD5E1;margin-bottom:10px;line-height:1.5;">
-            Transfira o valor utilizando a chave PIX abaixo para liquidação imediata da fatura:
+          <div style="font-size:13px;color:#CBD5E1;margin-bottom:14px;line-height:1.5;">
+            Escaneie o QR Code abaixo no aplicativo do seu banco para liquidação imediata:
           </div>
-          <div style="background:#141D12;border:1px solid #282828;border-radius:4px;padding:12px 14px;font-family:'SF Mono',Menlo,Consolas,monospace;font-size:13px;font-weight:800;color:#C6FF00;word-break:break-all;user-select:all;">
-            ${pixChave}
+          <div style="display:inline-block;background:#FFFFFF;padding:12px;border-radius:8px;margin:0 auto 12px;box-shadow:0 6px 22px rgba(0,0,0,0.7);">
+            <img src="${pixQrCodeUrl}" alt="QR Code PIX" width="180" height="180" style="display:block;width:180px;height:180px;border:0;border-radius:4px;" />
           </div>
-          <div style="font-size:11px;color:#8E8E8E;margin-top:8px;">
-            Beneficiário: <strong style="color:#CBD5E1;">${pixBeneficiario}</strong>
+          <div style="font-size:12px;color:#8E8E8E;margin-bottom:14px;">
+            Beneficiário: <strong style="color:#CBD5E1;">${pixBeneficiario}</strong> &bull; Valor: <strong style="color:#C6FF00;">R$ ${valor}</strong>
+          </div>
+          <div style="background:#141D12;border:1px solid #282828;border-radius:6px;padding:12px 14px;text-align:left;">
+            <div style="font-size:10px;color:#8E8E8E;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:4px;font-weight:700;">
+              📱 No celular? Use a Chave PIX ou Código Copia e Cola:
+            </div>
+            <div style="font-family:'SF Mono',Menlo,Consolas,monospace;font-size:12px;font-weight:800;color:#C6FF00;word-break:break-all;user-select:all;margin-bottom:6px;">
+              ${pixPayload}
+            </div>
+            <div style="font-size:11px;color:#8E8E8E;">
+              Chave direta: <strong style="color:#CBD5E1;font-family:monospace;">${pixChave}</strong>
+            </div>
           </div>
         </div>
         <div style="font-size:13px;color:#CBD5E1;line-height:1.6;margin-bottom:24px;">
@@ -840,12 +948,12 @@ export default async function handler(req, res) {
       }
 
       const PLANOS_INFO = {
-        starter: { nome: 'Básico', valor: '119,90' },
-        pro: { nome: 'Profissional', valor: '279,90' },
-        unlimited: { nome: 'Ilimitado', valor: '499,90' },
-        trial: { nome: 'Trial (Período de Testes)', valor: '279,90' }
+        starter: { nome: 'Básico', valor: '119,90', cents: 11990 },
+        pro: { nome: 'Profissional', valor: '279,90', cents: 27990 },
+        unlimited: { nome: 'Ilimitado', valor: '499,90', cents: 49990 },
+        trial: { nome: 'Trial (Período de Testes)', valor: '279,90', cents: 27990 }
       };
-      const planoInfo = PLANOS_INFO[t.plano] || { nome: String(t.plano || 'Profissional').toUpperCase(), valor: '279,90' };
+      const planoInfo = PLANOS_INFO[t.plano] || { nome: String(t.plano || 'Profissional').toUpperCase(), valor: '279,90', cents: 27990 };
 
       const pixKey = String(userPixKey || process.env.FINOBRA_PIX_KEY || '').trim();
       if (!pixKey) {
@@ -857,35 +965,28 @@ export default async function handler(req, res) {
       }
       const pixBeneficiary = String(userPixBeneficiary || process.env.FINOBRA_PIX_BENEFICIARY || 'FinGo Soluções Tecnológicas').trim();
 
-      // Cálculo de vencimento e dias restantes
-      let fmtVenc = 'A definir';
-      let diasRestantes = 0;
-      let situacaoTxt = '';
-      let badgeStatus = 'Aviso';
+      // Cálculo de vencimento e dias restantes com parsing robusto (suporta Date, ISO, GMT)
+      const vInfo = parseVencimento(t.vencimento);
+      const fmtVenc = vInfo.fmt;
+      const diasRestantes = vInfo.dias;
+      const situacaoTxt = vInfo.situacao;
+      const isTrial = t.status === 'trial' || t.plano === 'trial';
+      const badgeStatus = isTrial && diasRestantes >= 0
+        ? (diasRestantes === 0 ? 'Trial Termina Hoje' : `Trial: ${diasRestantes}d`)
+        : vInfo.badge;
 
-      if (t.vencimento) {
-        const parts = String(t.vencimento).split('-');
-        fmtVenc = parts.length === 3 ? `${parts[2]}/${parts[1]}/${parts[0]}` : String(t.vencimento);
-        const vencDate = new Date(`${parts[0]}-${parts[1]}-${parts[2]}T00:00:00`);
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-        diasRestantes = Math.round((vencDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+      // Gera o payload PIX EMV BRCode oficial e a URL do QR Code
+      const amountCents = planoInfo.cents || Math.round(parseFloat(String(planoInfo.valor || '279.90').replace(',', '.')) * 100);
+      const cleanTenantId = String(tenantId).replace(/[^a-zA-Z0-9]/g, '').slice(0, 15);
+      const pixPayload = buildPixPayload({
+        key: pixKey,
+        amountCents,
+        txid: `FINGO${cleanTenantId}`,
+        merchantName: pixBeneficiary || 'FINGO SISTEMA',
+        merchantCity: 'BOA VISTA'
+      }) || pixKey;
 
-        if (diasRestantes > 1) {
-          situacaoTxt = `vence em ${diasRestantes} dias`;
-          badgeStatus = `Vence em ${diasRestantes}d`;
-        } else if (diasRestantes === 1) {
-          situacaoTxt = 'vence amanhã';
-          badgeStatus = 'Vence Amanhã';
-        } else if (diasRestantes === 0) {
-          situacaoTxt = 'vence hoje';
-          badgeStatus = 'Vence Hoje';
-        } else {
-          const pass = Math.abs(diasRestantes);
-          situacaoTxt = `vencido há ${pass} dia${pass > 1 ? 's' : ''}`;
-          badgeStatus = `Vencido há ${pass}d`;
-        }
-      }
+      const pixQrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=220x220&margin=2&data=${encodeURIComponent(pixPayload || pixKey)}`;
 
       // Monta textos padrão por template
       let defaultSubject = `FinGo — Assinatura ${nomeEmpresa}`;
@@ -928,6 +1029,8 @@ export default async function handler(req, res) {
           subject: finalSubject,
           message: finalMessage,
           pixKey,
+          pixPayload,
+          pixQrCodeUrl,
           pixBeneficiary
         });
       }
@@ -1004,6 +1107,8 @@ export default async function handler(req, res) {
               BADGE_STATUS: badgeStatus,
               TITULO_AVISO: defaultTituloAviso,
               PIX_CHAVE: pixKey,
+              PIX_PAYLOAD: pixPayload,
+              PIX_QR_CODE_URL: pixQrCodeUrl,
               PIX_BENEFICIARIO: pixBeneficiary,
               MENSAGEM_EXTRA: finalMessage,
               LINK_ACESSO: 'https://fingo.api.br/login'
@@ -1164,11 +1269,9 @@ export default async function handler(req, res) {
 
         for (const t of tenants) {
           evaluated++;
-          const parts = String(t.vencimento).split('-');
-          if (parts.length !== 3) continue;
-          const vencDate = new Date(`${parts[0]}-${parts[1]}-${parts[2]}T00:00:00`);
-          const todayDate = new Date(`${hoje}T00:00:00`);
-          const diff = Math.round((vencDate.getTime() - todayDate.getTime()) / (1000 * 60 * 60 * 24));
+          const vInfo = parseVencimento(t.vencimento);
+          if (!vInfo.iso) continue;
+          const diff = vInfo.dias;
 
           let stage = null;
           if (t.plano === 'trial' && diff <= 2 && diff >= 0) stage = 'trial_ending';

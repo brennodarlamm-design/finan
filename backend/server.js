@@ -1144,6 +1144,8 @@ function renderBillingEmailHtmlServer(vars) {
   const badgeStatus = escapeHtmlServer(vars.BADGE_STATUS);
   const tituloAviso = escapeHtmlServer(vars.TITULO_AVISO);
   const pixChave = escapeHtmlServer(vars.PIX_CHAVE);
+  const pixPayload = escapeHtmlServer(vars.PIX_PAYLOAD || vars.PIX_CHAVE);
+  const pixQrCodeUrl = encodeURI(vars.PIX_QR_CODE_URL || `https://api.qrserver.com/v1/create-qr-code/?size=220x220&margin=2&data=${encodeURIComponent(vars.PIX_PAYLOAD || vars.PIX_CHAVE || '')}`);
   const pixBeneficiario = escapeHtmlServer(vars.PIX_BENEFICIARIO);
   const mensagemExtra = escapeHtmlServer(vars.MENSAGEM_EXTRA).replace(/\r?\n/g, '<br>');
   const linkAcesso = encodeURI(vars.LINK_ACESSO || 'https://fingo.api.br/login');
@@ -1204,15 +1206,21 @@ function renderBillingEmailHtmlServer(vars) {
             </tr>
           </table>
         </div>
-        <div style="background:#fefce8;border:2px dashed #ca8a04;border-radius:12px;padding:20px;margin-bottom:24px;text-align:center;">
+        <div style="background:#fefce8;border:2px dashed #ca8a04;border-radius:12px;padding:24px 20px;margin-bottom:24px;text-align:center;">
           <div style="font-size:11px;font-weight:800;color:#854d0e;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:6px;">
             Pagamento Instantâneo via PIX
           </div>
-          <div style="font-family:monospace;font-size:15px;font-weight:800;color:#0f172a;background:#ffffff;padding:10px 14px;border-radius:8px;border:1px solid #e2e8f0;display:inline-block;margin:6px 0;word-break:break-all;">
-            ${pixChave}
+          <div style="font-size:13px;color:#475569;margin-bottom:12px;">
+            Escaneie o QR Code abaixo no app do seu banco para liquidação imediata:
           </div>
-          <div style="font-size:12px;color:#713f12;margin-top:6px;">
-            Beneficiário: <strong>${pixBeneficiario}</strong>
+          <div style="display:inline-block;background:#ffffff;padding:10px;border-radius:8px;box-shadow:0 4px 14px rgba(0,0,0,0.15);margin-bottom:12px;">
+            <img src="${pixQrCodeUrl}" alt="QR Code PIX" width="160" height="160" style="display:block;border:0;width:160px;height:160px;" />
+          </div>
+          <div style="font-size:12px;color:#713f12;margin-bottom:10px;">
+            Beneficiário: <strong>${pixBeneficiario}</strong> &bull; Valor: <strong style="color:#059669;">R$ ${valor}</strong>
+          </div>
+          <div style="font-family:monospace;font-size:13px;font-weight:800;color:#0f172a;background:#ffffff;padding:10px 14px;border-radius:8px;border:1px solid #e2e8f0;display:inline-block;word-break:break-all;">
+            ${pixPayload}
           </div>
         </div>
         <div style="text-align:center;margin:28px 0 10px;">

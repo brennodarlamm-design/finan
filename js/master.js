@@ -1755,9 +1755,20 @@ const MasterAdmin = {
     const resp = this._esc(emp.responsavel || 'Gestor(a)');
     const tel = this._esc(emp.telefone || '');
     const email = this._esc(emp.email || '');
-    const planosMap = { starter: 'Básico (R$ 119,90)', pro: 'Profissional (R$ 279,90)', unlimited: 'Ilimitado (R$ 499,90)', trial: 'Trial' };
-    const plano = planosMap[emp.plano] || emp.plano || 'Profissional';
-    const venc = emp.vencimento ? emp.vencimento.split('-').reverse().join('/') : 'A definir';
+    const parseVencLocal = (v) => {
+      if (!v) return 'A definir';
+      if (typeof v === 'string') {
+        const m = v.match(/(\d{4})-(\d{2})-(\d{2})/);
+        if (m) return `${m[3]}/${m[2]}/${m[1]}`;
+      }
+      const d = new Date(v);
+      if (!isNaN(d.getTime())) {
+        const iso = d.toISOString().split('T')[0].split('-');
+        return `${iso[2]}/${iso[1]}/${iso[0]}`;
+      }
+      return String(v);
+    };
+    const venc = parseVencLocal(emp.vencimento);
     const dr = emp.diasRestantes;
 
     let situacao = 'Vencimento em dia';
@@ -1848,6 +1859,17 @@ const MasterAdmin = {
             </div>
           </div>
 
+          <!-- Prévia do QR Code PIX -->
+          <div style="background:rgba(255,255,255,.03);border:1px solid rgba(198,255,0,.25);border-radius:10px;padding:12px 14px;display:flex;align-items:center;justify-content:space-between;gap:14px;">
+            <div>
+              <div style="font-size:.76rem;font-weight:800;color:var(--accent2);margin-bottom:2px;text-transform:uppercase;">⚡ QR Code PIX Escaneável no E-mail</div>
+              <div style="font-size:.72rem;color:#94a3b8;line-height:1.4;">O e-mail enviado ao cliente exibirá o QR Code gerado em alta definição com o valor exato do plano para pagamento instantâneo via app do banco.</div>
+            </div>
+            <div style="background:#fff;padding:4px;border-radius:6px;flex-shrink:0;">
+              <img id="mc-pix-qr-preview" src="https://api.qrserver.com/v1/create-qr-code/?size=64x64&margin=1&data=5595991363678" alt="QR Code PIX" style="display:block;width:64px;height:64px;border:0;">
+            </div>
+          </div>
+
           <!-- Assunto do E-mail -->
           <div id="mc-subject-wrap">
             <label style="display:block;font-size:.74rem;color:#94a3b8;margin-bottom:4px;">Assunto do E-mail</label>
@@ -1895,8 +1917,25 @@ const MasterAdmin = {
     const nome = emp.nome_fantasia || emp.razao_social || 'Empresa';
     const resp = emp.responsavel || 'Gestor(a)';
     const dr = emp.diasRestantes;
-    const venc = emp.vencimento ? emp.vencimento.split('-').reverse().join('/') : 'A definir';
+    const parseVencLocal = (v) => {
+      if (!v) return 'A definir';
+      if (typeof v === 'string') {
+        const m = v.match(/(\d{4})-(\d{2})-(\d{2})/);
+        if (m) return `${m[3]}/${m[2]}/${m[1]}`;
+      }
+      const d = new Date(v);
+      if (!isNaN(d.getTime())) {
+        const iso = d.toISOString().split('T')[0].split('-');
+        return `${iso[2]}/${iso[1]}/${iso[0]}`;
+      }
+      return String(v);
+    };
+    const venc = parseVencLocal(emp.vencimento);
     const pix = document.getElementById('mc-pix')?.value || '5595991363678';
+    const qrImg = document.getElementById('mc-pix-qr-preview');
+    if (qrImg && pix) {
+      qrImg.src = `https://api.qrserver.com/v1/create-qr-code/?size=64x64&margin=1&data=${encodeURIComponent(pix)}`;
+    }
     
     const planosMap = { starter: { n: 'Básico', v: '119,90' }, pro: { n: 'Profissional', v: '279,90' }, unlimited: { n: 'Ilimitado', v: '499,90' }, trial: { n: 'Trial', v: '279,90' } };
     const pInfo = planosMap[emp.plano] || { n: 'Profissional', v: '279,90' };
