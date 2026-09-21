@@ -476,8 +476,12 @@ const UCP_DISCOVERY_PAYLOAD = {
 const MCP_SERVER_CARD_PAYLOAD = {
   "serverInfo": {
     "name": "fingo-mcp-server",
+    "title": "FinGo MCP Server",
     "version": "1.0.0",
-    "description": "Servidor Model Context Protocol (MCP) do FinGo para integração de agentes de IA com gestão de obras, finanças e SINAPI."
+    "description": "Servidor Model Context Protocol (MCP) oficial do FinGo para gestão de obras, finanças e base de custos oficial SINAPI (Caixa/IBGE).",
+    "homepage": "https://fingo.api.br",
+    "icon": "https://fingo.api.br/favicon.svg",
+    "iconUrl": "https://fingo.api.br/favicon.svg"
   },
   "endpoint": "https://fingo.api.br/api/mcp",
   "capabilities": {
@@ -953,62 +957,249 @@ function x402PaymentResponse(request) {
   });
 }
 
-function mcpEndpointResponse(request) {
+async function mcpEndpointResponse(request) {
   if (request.method === 'OPTIONS') return handleDiscoveryOptions();
+
+  let body = null;
+  if (request.method === 'POST') {
+    try {
+      body = await request.clone().json();
+    } catch {
+      body = null;
+    }
+  }
+
+  const serverInfo = {
+    name: "fingo-mcp-server",
+    title: "FinGo MCP Server",
+    version: "1.0.0",
+    description: "Servidor Model Context Protocol (MCP) oficial do FinGo para gestão de obras, finanças e base oficial SINAPI (Caixa/IBGE).",
+    homepage: "https://fingo.api.br",
+    icon: "https://fingo.api.br/favicon.svg",
+    iconUrl: "https://fingo.api.br/favicon.svg"
+  };
+
+  const tools = [
+    {
+      name: "search_plans",
+      description: "Pesquisa e compara os planos comerciais, capacidades e recursos do FinGo (Básico, Profissional, Construtora Ilimitado).",
+      inputSchema: {
+        type: "object",
+        properties: {
+          plan_name: {
+            type: "string",
+            description: "Nome do plano desejado (ex: 'basico', 'profissional', 'ilimitado') ou 'all' para todos os planos."
+          }
+        },
+        required: []
+      },
+      outputSchema: {
+        type: "object",
+        properties: {
+          plans: {
+            type: "array",
+            description: "Lista de planos encontrados com detalhes de recursos, capacidade de obras e preços."
+          }
+        }
+      },
+      annotations: {
+        audience: ["all"],
+        priority: 0.9,
+        readOnlyHint: true
+      }
+    },
+    {
+      name: "get_sinapi_info",
+      description: "Consulta a cobertura e base de dados oficial SINAPI (Caixa Econômica Federal e IBGE) para os 27 estados do Brasil.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          state: {
+            type: "string",
+            description: "Sigla da Unidade Federativa com 2 letras (ex: SP, RJ, MG, SC, PR, DF)."
+          },
+          desonerado: {
+            type: "boolean",
+            description: "Se true, consulta o regime com desoneração da folha (CPRB 4,5%). Se false, não desonerado."
+          }
+        },
+        required: ["state"]
+      },
+      outputSchema: {
+        type: "object",
+        properties: {
+          coverage: {
+            type: "string",
+            description: "Detalhamento e referencial legal da base SINAPI disponível."
+          },
+          state: {
+            type: "string",
+            description: "Estado brasileiro consultado."
+          }
+        }
+      },
+      annotations: {
+        audience: ["engineering"],
+        priority: 1.0,
+        readOnlyHint: true
+      }
+    },
+    {
+      name: "get_financial_summary",
+      description: "Retorna o resumo executivo de saúde financeira, fluxo de caixa e centros de custo de obras no FinGo.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          obra_id: {
+            type: "string",
+            description: "Identificador opcional da obra para filtragem analítica de centro de custo."
+          }
+        },
+        required: []
+      },
+      outputSchema: {
+        type: "object",
+        properties: {
+          summary: {
+            type: "string",
+            description: "Resumo executivo de contas a pagar, receber, saldo e DRE."
+          }
+        }
+      },
+      annotations: {
+        audience: ["finance"],
+        priority: 0.8,
+        readOnlyHint: true
+      }
+    }
+  ];
+
+  const jsonHeaders = {
+    'Content-Type': 'application/json; charset=utf-8',
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+    'Access-Control-Allow-Headers': '*',
+    'X-Content-Type-Options': 'nosniff'
+  };
+
+  // Suporte formal ao protocolo JSON-RPC 2.0 (usado por Smithery, Cursor e Claude)
+  if (body && typeof body === 'object' && body.jsonrpc === "2.0") {
+    const id = body.id ?? null;
+    const method = body.method;
+
+    if (method === "initialize") {
+      return Response.json({
+        jsonrpc: "2.0",
+        id,
+        result: {
+          protocolVersion: "2024-11-05",
+          serverInfo,
+          capabilities: {
+            tools: { listChanged: false },
+            resources: { subscribe: false, listChanged: false },
+            prompts: { listChanged: false }
+          }
+        }
+      }, { headers: jsonHeaders });
+    }
+
+    if (method === "tools/list") {
+      return Response.json({
+        jsonrpc: "2.0",
+        id,
+        result: { tools }
+      }, { headers: jsonHeaders });
+    }
+
+    if (method === "resources/list") {
+      return Response.json({
+        jsonrpc: "2.0",
+        id,
+        result: {
+          resources: [
+            {
+              uri: "fingo://sinapi/overview",
+              name: "SINAPI Caixa/IBGE Overview",
+              mimeType: "application/json",
+              description: "Visão geral da cobertura da base de custos e insumos SINAPI no FinGo."
+            }
+          ]
+        }
+      }, { headers: jsonHeaders });
+    }
+
+    if (method === "prompts/list") {
+      return Response.json({
+        jsonrpc: "2.0",
+        id,
+        result: {
+          prompts: [
+            {
+              name: "orcamento_sinapi",
+              description: "Prompt estruturado para elaboração de orçamento analítico usando SINAPI e BDI.",
+              arguments: [
+                {
+                  name: "tipo_obra",
+                  description: "Tipo de empreendimento (ex: Edificação, Reforma, Infraestrutura)",
+                  required: true
+                }
+              ]
+            }
+          ]
+        }
+      }, { headers: jsonHeaders });
+    }
+
+    if (method === "ping") {
+      return Response.json({ jsonrpc: "2.0", id, result: {} }, { headers: jsonHeaders });
+    }
+
+    if (method === "tools/call") {
+      const toolName = body.params?.name;
+      const args = body.params?.arguments || {};
+      let text = "";
+
+      if (toolName === "search_plans") {
+        text = "Planos FinGo: Básico (R$ 119,90/mês, até 3 obras), Profissional (R$ 279,90/mês, até 10 obras, NF-e, OCR), Construtora Ilimitado (R$ 499,90/mês, obras ilimitadas, SINAPI oficial 27 estados, BDI analítico). Contratação: https://fingo.api.br/planos";
+      } else if (toolName === "get_sinapi_info") {
+        const uf = String(args.state || 'BR').toUpperCase();
+        text = `Base oficial SINAPI (Caixa Econômica Federal e IBGE) para ${uf}: composições analíticas, sintéticas e insumos desonerados/não desonerados conforme Decreto Federal nº 7.983/2013 disponíveis no FinGo.`;
+      } else if (toolName === "get_financial_summary") {
+        text = "FinGo Financeiro: Centros de custo consolidados, conciliação bancária, fluxo de caixa e DRE operacional ativos.";
+      } else {
+        return Response.json({
+          jsonrpc: "2.0",
+          id,
+          error: { code: -32601, message: `Ferramenta desconhecida: ${toolName}` }
+        }, { headers: jsonHeaders });
+      }
+
+      return Response.json({
+        jsonrpc: "2.0",
+        id,
+        result: { content: [{ type: "text", text }] }
+      }, { headers: jsonHeaders });
+    }
+
+    return Response.json({ jsonrpc: "2.0", id, result: {} }, { headers: jsonHeaders });
+  }
+
+  // GET ou Discovery direto
   const mcpInfo = {
     jsonrpc: "2.0",
-    server: {
-      name: "fingo-mcp-server",
-      version: "1.0.0"
-    },
+    server: serverInfo,
+    serverInfo,
     capabilities: {
-      tools: true,
-      resources: true,
-      prompts: true
+      tools: { listChanged: false },
+      resources: { subscribe: false, listChanged: false },
+      prompts: { listChanged: false }
     },
-    tools: [
-      {
-        name: "search_plans",
-        description: "Consulta e compara os planos comerciais e recursos do FinGo (Básico, Profissional, Construtora Ilimitado).",
-        inputSchema: {
-          type: "object",
-          properties: {
-            plan_name: { type: "string", description: "Nome do plano desejado ou 'all' para todos" }
-          }
-        }
-      },
-      {
-        name: "get_sinapi_info",
-        description: "Obtém informações sobre a base oficial de engenharia SINAPI (Caixa Econômica Federal e IBGE).",
-        inputSchema: {
-          type: "object",
-          properties: {
-            state: { type: "string", description: "Sigla do estado brasileiro com 2 letras (ex: SP, RJ, MG)" },
-            desonerado: { type: "boolean", description: "Se True, consulta regime com desoneração da folha de pagamento" }
-          }
-        }
-      },
-      {
-        name: "get_financial_summary",
-        description: "Retorna o resumo da saúde financeira, fluxo de caixa e centros de custo de obras.",
-        inputSchema: {
-          type: "object",
-          properties: {
-            obra_id: { type: "string", description: "ID opcional da obra para filtrar" }
-          }
-        }
-      }
-    ]
+    tools
   };
+
   return Response.json(mcpInfo, {
     status: 200,
-    headers: {
-      'Content-Type': 'application/json; charset=utf-8',
-      'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-      'Access-Control-Allow-Headers': '*',
-      'X-Content-Type-Options': 'nosniff'
-    }
+    headers: jsonHeaders
   });
 }
 

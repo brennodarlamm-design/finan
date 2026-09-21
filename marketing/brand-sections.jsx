@@ -233,6 +233,13 @@ export function Footer() {
             <a href="/planos">Planos</a>
             <a href="/sobre-nos">Sobre nós</a>
             <a href="/calculadora-bdi">Calculadora BDI</a>
+            <a
+              href="https://smithery.ai/servers/brennodarlamm-d5fx/fingo-mcp"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              MCP no Smithery
+            </a>
           </nav>
         </div>
         <p className="mt-10 text-xs text-muted">

@@ -1,11 +1,17 @@
+User-agent: SmitheryBot
+Allow: /
+Allow: /api/mcp
+
 User-agent: *
 Content-Signal: ai-train=no, search=yes, ai-input=yes
 Allow: /
 Allow: /privacidade
 Allow: /termos
 Allow: /validar
+Allow: /calculadora-bdi
 Allow: /llms.txt
 Allow: /llms-full.txt
+Allow: /api/mcp
 Disallow: /app
 Disallow: /app/
 Disallow: /login
