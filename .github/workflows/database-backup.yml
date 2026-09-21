@@ -40,8 +40,17 @@ jobs:
       - name: Install PostgreSQL client
         shell: bash
         run: |
+          set -euo pipefail
+          sudo install -d /etc/apt/keyrings
+          curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo gpg --dearmor -o /etc/apt/keyrings/postgresql.gpg
+          echo "deb [signed-by=/etc/apt/keyrings/postgresql.gpg] http://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" | sudo tee /etc/apt/sources.list.d/pgdg.list
           sudo apt-get update -y
-          sudo apt-get install -y postgresql-client
+          sudo apt-get install -y postgresql-client-18 || sudo apt-get install -y postgresql-client-17 || sudo apt-get install -y postgresql-client
+          if [ -d "/usr/lib/postgresql/18/bin" ]; then
+            echo "/usr/lib/postgresql/18/bin" >> "$GITHUB_PATH"
+          elif [ -d "/usr/lib/postgresql/17/bin" ]; then
+            echo "/usr/lib/postgresql/17/bin" >> "$GITHUB_PATH"
+          fi
 
       - name: Verify backup role can bypass RLS
         shell: bash
@@ -54,6 +63,7 @@ jobs:
             echo "::error::Backup connection role '$role_name' cannot bypass RLS. Refusing to create a potentially incomplete production backup."
             exit 1
           fi
+
       - name: Create and encrypt logical backup
         shell: bash
         run: |
@@ -63,14 +73,34 @@ jobs:
           base="fingo-production-${ts}"
           dump="backup/plain/${base}.dump"
 
-          pg_dump \
-            --dbname="$DATABASE_BACKUP_URL" \
-            --format=custom \
-            --no-owner \
-            --no-privileges \
-            --file="$dump"
+          pg_major="$(pg_dump --version 2>/dev/null | grep -oE '[0-9]+' | head -1 || echo 0)"
+          if [ "$pg_major" -ge 18 ]; then
+            pg_dump \
+              --dbname="$DATABASE_BACKUP_URL" \
+              --format=custom \
+              --no-owner \
+              --no-privileges \
+              --file="$dump"
 
-          pg_restore --list "$dump" > "backup/plain/${base}.manifest.txt"
+            pg_restore --list "$dump" > "backup/plain/${base}.manifest.txt"
+          else
+            echo "pg_dump version ($pg_major) is older than server 18; executing via postgres:18 docker container..."
+            docker run --rm \
+              -v "$PWD/backup/plain:/backup" \
+              postgres:18 \
+              pg_dump \
+                --dbname="$DATABASE_BACKUP_URL" \
+                --format=custom \
+                --no-owner \
+                --no-privileges \
+                --file="/backup/${base}.dump"
+
+            docker run --rm \
+              -v "$PWD/backup/plain:/backup" \
+              postgres:18 \
+              pg_restore --list "/backup/${base}.dump" > "backup/plain/${base}.manifest.txt"
+          fi
+
           sha256sum "$dump" > "backup/plain/${base}.dump.sha256"
 
           tar -C backup/plain -czf "/tmp/${base}.tar.gz" .
@@ -99,7 +129,17 @@ jobs:
           dump_file="$(find "$verify_dir/extracted" -maxdepth 1 -name '*.dump' -type f -print -quit)"
           test -n "$dump_file"
           test -s "$dump_file"
-          pg_restore --list "$dump_file" > "$verify_dir/manifest.txt"
+
+          pg_major="$(pg_restore --version 2>/dev/null | grep -oE '[0-9]+' | head -1 || echo 0)"
+          if [ "$pg_major" -ge 18 ]; then
+            pg_restore --list "$dump_file" > "$verify_dir/manifest.txt"
+          else
+            echo "Using docker postgres:18 for pg_restore manifest verification..."
+            docker run --rm \
+              -v "$verify_dir:/verify" \
+              postgres:18 \
+              pg_restore --list "/verify/extracted/$(basename "$dump_file")" > "$verify_dir/manifest.txt"
+          fi
 
           for critical_table in tenants usuarios obras lancamentos billing_invoices; do
             if ! grep -Eq "TABLE DATA .* ${critical_table}( |$)" "$verify_dir/manifest.txt"; then
