@@ -189,7 +189,46 @@ function secureHtmlResponse(response) {
 // AGENT READINESS & AUTONOMOUS DISCOVERY / COMMERCE CONSTANTS & HANDLERS
 // ============================================================================
 
-const DISCOVERY_LINK_HEADER = '</.well-known/api-catalog>; rel="api-catalog", </openapi.json>; rel="service-desc", </llms-full.txt>; rel="service-doc", </auth.md>; rel="service-doc", </llms.txt>; rel="describedby", </api/x402>; rel="payment"';
+const DISCOVERY_LINK_HEADER = '</.well-known/api-catalog>; rel="api-catalog", </.well-known/ai-catalog.json>; rel="ai-catalog", </openapi.json>; rel="service-desc", </llms-full.txt>; rel="service-doc", </auth.md>; rel="service-doc", </llms.txt>; rel="describedby", </api/x402>; rel="payment"';
+
+const AI_CATALOG_PAYLOAD = {
+  "$schema": "https://agenticresourcediscovery.org/schemas/v1/ai-catalog.json",
+  "specVersion": "1.0",
+  "host": {
+    "displayName": "FinGo",
+    "identifier": "fingo.api.br"
+  },
+  "entries": [
+    {
+      "identifier": "urn:air:fingo.api.br:mcp-server",
+      "display_name": "FinGo MCP Server",
+      "media_type": "application/mcp-server-card+json",
+      "url": "https://fingo.api.br/.well-known/mcp/server-card.json",
+      "description": "FinGo Model Context Protocol (MCP) server providing construction budget, SINAPI lookup, and financial management tools."
+    },
+    {
+      "identifier": "urn:air:fingo.api.br:a2a-agent",
+      "display_name": "FinGo A2A Agent",
+      "media_type": "application/agent-card+json",
+      "url": "https://fingo.api.br/.well-known/agent-card.json",
+      "description": "FinGo Autonomous Agent with A2A protocol and AP2 merchant payment capabilities."
+    },
+    {
+      "identifier": "urn:air:fingo.api.br:agent-skills",
+      "display_name": "FinGo Agent Skills",
+      "media_type": "application/agent-skills+json",
+      "url": "https://fingo.api.br/.well-known/agent-skills/index.json",
+      "description": "FinGo Agent Skills discovery index for financial management, SINAPI budgeting, and NFe processing."
+    },
+    {
+      "identifier": "urn:air:fingo.api.br:api-catalog",
+      "display_name": "FinGo RFC 9727 API Catalog",
+      "media_type": "application/linkset+json",
+      "url": "https://fingo.api.br/.well-known/api-catalog",
+      "description": "RFC 9727 API Catalog indexing FinGo OpenAPI descriptions, documentation, and services."
+    }
+  ]
+};
 
 const API_CATALOG_PAYLOAD = {
   "linkset": [
@@ -1356,6 +1395,10 @@ export default {
     if (url.pathname === '/.well-known/api-catalog') {
       if (request.method === 'OPTIONS') return handleDiscoveryOptions();
       return jsonDiscoveryResponse(API_CATALOG_PAYLOAD, 'application/linkset+json; charset=utf-8');
+    }
+    if (url.pathname === '/.well-known/ai-catalog.json') {
+      if (request.method === 'OPTIONS') return handleDiscoveryOptions();
+      return jsonDiscoveryResponse(AI_CATALOG_PAYLOAD);
     }
     if (url.pathname === '/openapi.json' || url.pathname === '/api/openapi.json') {
       return openApiResponse(request, env);

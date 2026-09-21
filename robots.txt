@@ -19,3 +19,5 @@ Disallow: /portal/
 Disallow: /version.json
 
 Sitemap: https://fingo.api.br/sitemap.xml
+Agentmap: https://fingo.api.br/.well-known/ai-catalog.json
+
