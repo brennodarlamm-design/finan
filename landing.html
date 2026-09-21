@@ -99,11 +99,49 @@
         "@id": "https://fingo.api.br/#website"
       },
       "offers": {
-        "@type": "Offer",
-        "price": "119.90",
+        "@type": "AggregateOffer",
+        "lowPrice": "119.90",
+        "highPrice": "499.90",
         "priceCurrency": "BRL",
+        "offerCount": "3",
         "priceValidUntil": "2027-12-31",
         "availability": "https://schema.org/InStock"
+      },
+      "hasOfferCatalog": {
+        "@type": "OfferCatalog",
+        "name": "Planos de Assinatura FinGo",
+        "itemListElement": [
+          {
+            "@type": "Offer",
+            "name": "Plano Básico",
+            "description": "Para profissionais autônomos e pequenas reformas. Até 2 obras ativas e 1 usuário.",
+            "price": "119.90",
+            "priceCurrency": "BRL",
+            "priceValidUntil": "2027-12-31",
+            "availability": "https://schema.org/InStock",
+            "url": "https://fingo.api.br/planos"
+          },
+          {
+            "@type": "Offer",
+            "name": "Plano Profissional",
+            "description": "Para construtoras em crescimento. Até 5 obras ativas, 2 usuários, financeiro e medições completas.",
+            "price": "249.90",
+            "priceCurrency": "BRL",
+            "priceValidUntil": "2027-12-31",
+            "availability": "https://schema.org/InStock",
+            "url": "https://fingo.api.br/planos"
+          },
+          {
+            "@type": "Offer",
+            "name": "Plano Construtora Ilimitado",
+            "description": "Obras ilimitadas, 5 usuários, integração oficial SINAPI Caixa 27 estados, engenharia avançada e BDI.",
+            "price": "499.90",
+            "priceCurrency": "BRL",
+            "priceValidUntil": "2027-12-31",
+            "availability": "https://schema.org/InStock",
+            "url": "https://fingo.api.br/planos"
+          }
+        ]
       },
       "featureList": [
         "Gestão e Diário de Obras em Tempo Real",

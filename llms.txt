@@ -26,6 +26,13 @@
 - [Política de Segurança Estrita (CSP)](https://fingo.api.br/): Content Security Policy rigorosa (`script-src-attr 'none'`) com Event Bridge declarativo, impedindo execução de código arbitrário e garantindo integridade de dados bancários e cadastrais.
 - [Autenticação & 2FA / TOTP](https://fingo.api.br/login): Sessões criptografadas com suporte a autenticação em dois fatores via Google Authenticator / TOTP RFC 6238 e códigos de backup.
 
+## Conformidade Legal & Normas Regulatórias
+
+- **Decreto Federal nº 7.983/2013**: Estabelece critérios e métodos para orçamentos de referência na construção civil, faixas de BDI para materiais e serviços e tabelas oficiais do SINAPI (Caixa Econômica Federal / IBGE).
+- **Lei nº 14.133/2021 (Nova Lei de Licitações e Contratos)**: Critérios de orçamentação paramétrica e analítica, composições unitárias de custo e exigências de cronograma físico-financeiro.
+- **Retenções Fiscais na Fonte**: Regras oficiais para retenção de INSS (IN RFB nº 971/2009 — cessão de mão de obra com dedução de material), IRRF (IN RFB nº 1.234/2012) e ISS (Lei Complementar nº 116/2003).
+- **Assinaturas Eletrônicas Válidas**: Padrão ICP-Brasil e Gov.br em conformidade com a MP nº 2.200-2/2001 e Lei nº 14.063/2020 para contratos e boletins de medição.
+
 ## Optional
 
 - [Documentação Técnica Completa para LLMs](https://fingo.api.br/llms-full.txt): Especificação técnica detalhada, dicionário de dados, fórmulas oficiais de BDI, cálculo SINAPI e retenções tributárias para inteligência artificial.
