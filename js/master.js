@@ -13,6 +13,11 @@ const MasterAdmin = {
   _integrityLoading: false,
   _bankAccounts: null,
   _bankAccountsLoading: false,
+  _accessRequests: null,
+  _accessRequestsLoading: false,
+  _accessRequestsFilter: 'all',
+  _accessRequestsSearch: '',
+  _activeLeadToConvert: null,
 
   async _fetchWithTimeout(url, options = {}, timeoutMs = 20000) {
     if (typeof Auth !== 'undefined' && typeof Auth._fetchWithTimeout === 'function') {
@@ -154,6 +159,314 @@ const MasterAdmin = {
     await this.carregarContasBancarias(true);
     const target = document.getElementById('master-content-area') ? 'master-content-area' : 'route-content';
     this.render(target);
+  },
+
+  async carregarSolicitacoesAcesso(force = false) {
+    if (this._accessRequests && !force) return this._accessRequests;
+    if (this._accessRequestsLoading) return this._accessRequests || { requests: [], summary: {} };
+    this._accessRequestsLoading = true;
+    try {
+      const resp = await this._fetchWithTimeout('/api/admin?action=access_requests', {
+        headers: (typeof Auth !== 'undefined' && Auth.getAuthHeaders) ? Auth.getAuthHeaders() : {}
+      });
+      const data = await resp.json().catch(() => ({}));
+      if (resp.ok && data.success) {
+        this._accessRequests = {
+          requests: Array.isArray(data.requests) ? data.requests : [],
+          summary: data.summary || {}
+        };
+        const pendentes = Number(this._accessRequests.summary?.pendentes || 0);
+        const headerBadge = document.getElementById('master-leads-badge-header');
+        if (headerBadge) {
+          if (pendentes > 0) {
+            headerBadge.innerText = pendentes;
+            headerBadge.style.display = 'inline-block';
+          } else {
+            headerBadge.style.display = 'none';
+          }
+        }
+      }
+    } catch (err) {
+      console.warn('Falha ao carregar solicitações de acesso / leads:', err);
+    }
+    this._accessRequestsLoading = false;
+    if (!this._accessRequests) this._accessRequests = { requests: [], summary: {} };
+    return this._accessRequests;
+  },
+
+  async recarregarSolicitacoesAcesso() {
+    await this.carregarSolicitacoesAcesso(true);
+    const target = document.getElementById('master-content-area') ? 'master-content-area' : 'route-content';
+    this.render(target);
+  },
+
+  filtrarSolicitacoesAcesso(status) {
+    this._accessRequestsFilter = status || 'all';
+    const target = document.getElementById('master-content-area') ? 'master-content-area' : 'route-content';
+    this.render(target);
+  },
+
+  buscarSolicitacoesAcesso(el) {
+    this._accessRequestsSearch = (el && el.value) ? el.value.trim().toLowerCase() : '';
+    const target = document.getElementById('master-content-area') ? 'master-content-area' : 'route-content';
+    this.render(target);
+  },
+
+  async atualizarStatusLeadClick(leadId, novoStatus) {
+    if (!leadId || !novoStatus) return;
+    try {
+      const resp = await this._fetchWithTimeout('/api/admin?action=update_access_request_status', {
+        method: 'POST',
+        headers: (typeof Auth !== 'undefined' && Auth.getAuthHeaders) ? Auth.getAuthHeaders() : { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: leadId, status: novoStatus })
+      });
+      const data = await resp.json().catch(() => ({}));
+      if (!resp.ok || !data.success) throw new Error(data.error || 'Falha ao atualizar status');
+      await this.carregarSolicitacoesAcesso(true);
+      const target = document.getElementById('master-content-area') ? 'master-content-area' : 'route-content';
+      this.render(target);
+    } catch (err) {
+      alert('Erro ao atualizar status: ' + (err?.message || err));
+    }
+  },
+
+  async excluirSolicitacaoAcessoClick(leadId) {
+    if (!leadId) return;
+    if (!confirm('Deseja realmente excluir esta solicitação de acesso comercial?')) return;
+    try {
+      const resp = await this._fetchWithTimeout('/api/admin?action=delete_access_request', {
+        method: 'POST',
+        headers: (typeof Auth !== 'undefined' && Auth.getAuthHeaders) ? Auth.getAuthHeaders() : { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: leadId })
+      });
+      const data = await resp.json().catch(() => ({}));
+      if (!resp.ok || !data.success) throw new Error(data.error || 'Falha ao remover solicitação');
+      await this.carregarSolicitacoesAcesso(true);
+      const target = document.getElementById('master-content-area') ? 'master-content-area' : 'route-content';
+      this.render(target);
+    } catch (err) {
+      alert('Erro ao excluir: ' + (err?.message || err));
+    }
+  },
+
+  converterLeadClick(leadId) {
+    const bundle = this._accessRequests || { requests: [] };
+    const lead = (bundle.requests || []).find(r => r.id === leadId);
+    if (!lead) {
+      alert('Lead não encontrado.');
+      return;
+    }
+    this.abrirModalNovaEmpresa({
+      nome_fantasia: lead.empresa_nome || lead.nome,
+      razao_social: lead.empresa_nome || lead.nome,
+      cnpj: lead.cnpj || '',
+      responsavel: lead.nome || '',
+      telefone: lead.telefone || '',
+      email: lead.email || '',
+      lead_id: lead.id
+    });
+  },
+
+  _renderSolicitacoesAcesso() {
+    const bundle = this._accessRequests || { requests: [], summary: {} };
+    const summary = bundle.summary || {};
+    const allRequests = bundle.requests || [];
+    const filter = this._accessRequestsFilter || 'all';
+    const search = (this._accessRequestsSearch || '').toLowerCase();
+
+    const total = Number(summary.total || allRequests.length || 0);
+    const pendentes = Number(summary.pendentes || 0);
+    const emContato = Number(summary.em_contato || 0);
+    const aprovados = Number(summary.aprovados || 0);
+    const rejeitados = Number(summary.rejeitados || 0);
+
+    const filtered = allRequests.filter(r => {
+      if (filter !== 'all' && (r.status || 'pendente') !== filter) return false;
+      if (search) {
+        const text = [r.nome, r.email, r.telefone, r.empresa_nome, r.cnpj, r.mensagem].join(' ').toLowerCase();
+        if (!text.includes(search)) return false;
+      }
+      return true;
+    });
+
+    const statusBadges = {
+      pendente: { label: '🟡 Pendente', color: '#f59e0b', bg: 'rgba(245,158,11,.12)', border: '#f59e0b' },
+      em_contato: { label: '🔵 Em Contato', color: '#38bdf8', bg: 'rgba(56,189,248,.12)', border: '#38bdf8' },
+      aprovado: { label: '🟢 Aprovado', color: '#22c55e', bg: 'rgba(34,197,94,.12)', border: '#22c55e' },
+      rejeitado: { label: '⚪ Rejeitado', color: '#94a3b8', bg: 'rgba(148,163,184,.12)', border: '#94a3b8' }
+    };
+
+    const rows = filtered.length ? filtered.map(r => {
+      const st = statusBadges[r.status] || statusBadges.pendente;
+      const dataHora = r.created_at ? new Date(r.created_at).toLocaleString('pt-BR') : '—';
+      const cleanPhone = String(r.telefone || '').replace(/\D/g, '');
+      const waLink = cleanPhone ? (cleanPhone.startsWith('55') ? `https://wa.me/${cleanPhone}` : `https://wa.me/55${cleanPhone}`) : '';
+      const waText = encodeURIComponent(`Olá ${r.nome}, sou da equipe comercial FinGo! Recebi sua solicitação de acesso para a construtora ${r.empresa_nome || ''}.`);
+      const fullWaUrl = waLink ? `${waLink}?text=${waText}` : '';
+
+      return `
+        <tr style="border-bottom:1px solid rgba(255,255,255,.06);transition:background .15s;">
+          <td style="padding:14px 16px;">
+            <div style="font-weight:800;color:#fff;font-size:.9rem;">${this._esc(r.empresa_nome || 'Não informada')}</div>
+            <div style="font-size:.74rem;color:#94a3b8;margin-top:2px;">
+              ${r.cnpj ? `<span>CNPJ/Loc: <strong style="color:#cbd5e1;">${this._esc(r.cnpj)}</strong></span>` : '<span style="color:#64748b;">Sem CNPJ/cidade</span>'}
+              <span style="margin-left:8px;font-family:monospace;color:#64748b;">IP: ${this._esc(r.ip || '—')}</span>
+            </div>
+          </td>
+          <td style="padding:14px 16px;">
+            <div style="font-weight:700;color:#e2e8f0;">${this._esc(r.nome)}</div>
+            <div style="font-size:.76rem;margin-top:3px;display:flex;flex-direction:column;gap:2px;">
+              <a href="mailto:${this._esc(r.email)}" style="color:#38bdf8;text-decoration:none;">✉️ ${this._esc(r.email)}</a>
+              ${r.telefone ? `
+                <a href="${fullWaUrl || '#'}" target="_blank" style="color:#4ade80;text-decoration:none;font-weight:700;">
+                  💬 ${this._esc(r.telefone)}
+                </a>
+              ` : '<span style="color:#64748b;">Sem telefone</span>'}
+            </div>
+          </td>
+          <td style="padding:14px 16px;max-width:280px;">
+            <div style="font-size:.8rem;color:#cbd5e1;line-height:1.4;word-break:break-word;">
+              ${r.mensagem ? `"${this._esc(r.mensagem)}"` : '<span style="color:#64748b;font-style:italic;">Sem observações.</span>'}
+            </div>
+          </td>
+          <td style="padding:14px 16px;font-size:.76rem;color:#94a3b8;white-space:nowrap;">
+            ${this._esc(dataHora)}
+          </td>
+          <td style="padding:14px 16px;text-align:center;">
+            <span style="display:inline-block;padding:4px 10px;border-radius:12px;font-size:.74rem;font-weight:800;color:${st.color};background:${st.bg};border:1px solid ${st.border};">
+              ${st.label}
+            </span>
+            <div style="margin-top:6px;display:flex;gap:4px;justify-content:center;flex-wrap:wrap;">
+              ${r.status !== 'em_contato' ? `<button data-lead-id="${r.id}" data-lead-status="em_contato" data-fb-click="MasterAdmin.atualizarStatusLeadClick" data-fb-click-n="2" data-fb-click-t0="dataset" data-fb-click-v0="leadId" data-fb-click-t1="dataset" data-fb-click-v1="leadStatus" style="background:rgba(56,189,248,.12);border:1px solid #38bdf8;color:#38bdf8;border-radius:4px;padding:2px 6px;font-size:.68rem;font-weight:700;cursor:pointer;" title="Marcar como Em Contato">📞 Em Contato</button>` : ''}
+              ${r.status !== 'aprovado' ? `<button data-lead-id="${r.id}" data-lead-status="aprovado" data-fb-click="MasterAdmin.atualizarStatusLeadClick" data-fb-click-n="2" data-fb-click-t0="dataset" data-fb-click-v0="leadId" data-fb-click-t1="dataset" data-fb-click-v1="leadStatus" style="background:rgba(34,197,94,.12);border:1px solid #22c55e;color:#86efac;border-radius:4px;padding:2px 6px;font-size:.68rem;font-weight:700;cursor:pointer;" title="Marcar como Aprovado">✓ Aprovar</button>` : ''}
+              ${r.status !== 'pendente' ? `<button data-lead-id="${r.id}" data-lead-status="pendente" data-fb-click="MasterAdmin.atualizarStatusLeadClick" data-fb-click-n="2" data-fb-click-t0="dataset" data-fb-click-v0="leadId" data-fb-click-t1="dataset" data-fb-click-v1="leadStatus" style="background:rgba(245,158,11,.12);border:1px solid #f59e0b;color:#fde047;border-radius:4px;padding:2px 6px;font-size:.68rem;font-weight:700;cursor:pointer;" title="Voltar para Pendente">↺ Pendente</button>` : ''}
+            </div>
+          </td>
+          <td style="padding:14px 16px;text-align:right;white-space:nowrap;">
+            <div style="display:inline-flex;gap:6px;align-items:center;">
+              ${fullWaUrl ? `
+                <a href="${fullWaUrl}" target="_blank" style="background:#22c55e;color:#052e16;text-decoration:none;padding:6px 10px;border-radius:6px;font-size:.75rem;font-weight:800;display:inline-flex;align-items:center;gap:4px;" title="Conversar no WhatsApp">
+                  <span>💬 WhatsApp</span>
+                </a>
+              ` : ''}
+              <button data-lead-id="${r.id}" data-fb-click="MasterAdmin.converterLeadClick" data-fb-click-n="1" data-fb-click-t0="dataset" data-fb-click-v0="leadId" style="background:var(--accent);color:#0A0A0A;border:none;padding:6px 12px;border-radius:6px;font-size:.75rem;font-weight:800;cursor:pointer;" title="Criar Construtora e Tenant Oficial a partir deste Lead">
+                🏢 Criar Construtora
+              </button>
+              <button data-lead-id="${r.id}" data-fb-click="MasterAdmin.excluirSolicitacaoAcessoClick" data-fb-click-n="1" data-fb-click-t0="dataset" data-fb-click-v0="leadId" style="background:none;border:1px solid rgba(239,68,68,.3);color:#f87171;padding:6px 8px;border-radius:6px;font-size:.72rem;cursor:pointer;" title="Excluir solicitação">
+                🗑️
+              </button>
+            </div>
+          </td>
+        </tr>
+      `;
+    }).join('') : `
+      <tr>
+        <td colspan="6" style="padding:48px 20px;text-align:center;color:#94a3b8;">
+          <div style="font-size:2rem;margin-bottom:8px;">📭</div>
+          <div style="font-size:.95rem;font-weight:700;color:#fff;">Nenhuma solicitação encontrada</div>
+          <div style="font-size:.78rem;color:#64748b;margin-top:4px;">Não há leads correspondentes aos filtros selecionados.</div>
+        </td>
+      </tr>
+    `;
+
+    return `
+      <div>
+        <!-- Top Bar Leads -->
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:24px;flex-wrap:wrap;gap:14px;">
+          <div>
+            <div style="display:inline-flex;align-items:center;gap:6px;background:rgba(198,255,0,.15);border:1px solid var(--accent);color:var(--accent2);padding:4px 12px;border-radius:20px;font-size:.75rem;font-weight:800;margin-bottom:6px;">
+              <span>📥</span><span>CRM &amp; PROSPECÇÃO COMERCIAL</span>
+            </div>
+            <h2 style="font-size:1.6rem;font-weight:900;color:#fff;margin:0 0 4px;">Solicitações de Acesso &amp; Leads Comerciais</h2>
+            <div style="font-size:.82rem;color:#94a3b8;">Construtoras e profissionais que preencheram o formulário comercial para testar a plataforma FinGo</div>
+          </div>
+
+          <div style="display:flex;align-items:center;gap:10px;">
+            <button data-fb-click="MasterAdmin.recarregarSolicitacoesAcesso" data-fb-click-n="0" class="btn-action" style="background:rgba(255,255,255,.05);border-color:var(--border);color:#cbd5e1;">
+              <span>🔄 Atualizar Lista</span>
+            </button>
+            <a href="https://fingo.api.br/#register-form" target="_blank" class="btn-action" style="color:var(--accent2);border-color:rgba(198,255,0,.3);">
+              <span>🌐 Ver Formulário Público ↗</span>
+            </a>
+          </div>
+        </div>
+
+        <!-- 4 Cards de Métricas de Prospecção -->
+        <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(220px, 1fr));gap:16px;margin-bottom:28px;">
+          
+          <div style="background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:18px 20px;">
+            <div style="font-size:.75rem;color:#94a3b8;text-transform:uppercase;letter-spacing:.05em;">Total de Solicitações</div>
+            <div style="font-size:1.8rem;font-weight:900;color:#fff;margin:8px 0 4px;">${total}</div>
+            <div style="font-size:.78rem;color:#94a3b8;">Recebidas na página inicial</div>
+          </div>
+
+          <div style="background:rgba(255,255,255,.02);border:1px solid ${pendentes > 0 ? '#f59e0b' : 'rgba(255,255,255,.08)'};border-radius:12px;padding:18px 20px;">
+            <div style="font-size:.75rem;color:${pendentes > 0 ? '#fde047' : '#94a3b8'};text-transform:uppercase;letter-spacing:.05em;font-weight:800;">Aguardando Contato</div>
+            <div style="font-size:1.8rem;font-weight:900;color:${pendentes > 0 ? '#f59e0b' : '#94a3b8'};margin:8px 0 4px;">${pendentes}</div>
+            <div style="font-size:.78rem;color:${pendentes > 0 ? '#fde047' : '#64748b'};">${pendentes > 0 ? '⚠️ Exigem retorno comercial rápido' : 'Nenhum lead pendente'}</div>
+          </div>
+
+          <div style="background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:18px 20px;">
+            <div style="font-size:.75rem;color:#94a3b8;text-transform:uppercase;letter-spacing:.05em;">Em Negociação</div>
+            <div style="font-size:1.8rem;font-weight:900;color:#38bdf8;margin:8px 0 4px;">${emContato}</div>
+            <div style="font-size:.78rem;color:#94a3b8;">Em contato ou demonstração</div>
+          </div>
+
+          <div style="background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:18px 20px;">
+            <div style="font-size:.75rem;color:#94a3b8;text-transform:uppercase;letter-spacing:.05em;">Convertidos / Aprovados</div>
+            <div style="font-size:1.8rem;font-weight:900;color:#22c55e;margin:8px 0 4px;">${aprovados}</div>
+            <div style="font-size:.78rem;color:#22c55e;">Ativados como clientes</div>
+          </div>
+
+        </div>
+
+        <!-- Filtros e Barra de Busca -->
+        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:18px;background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:12px 16px;">
+          <div style="display:flex;gap:6px;flex-wrap:wrap;">
+            <button data-filter="all" data-fb-click="MasterAdmin.filtrarSolicitacoesAcesso" data-fb-click-n="1" data-fb-click-t0="dataset" data-fb-click-v0="filter" style="padding:6px 12px;border-radius:6px;font-size:.75rem;font-weight:800;cursor:pointer;border:1px solid ${filter==='all'?'var(--accent)':'rgba(255,255,255,.1)'};background:${filter==='all'?'rgba(198,255,0,.15)':'transparent'};color:${filter==='all'?'var(--accent2)':'#94a3b8'};">
+              Todos (${total})
+            </button>
+            <button data-filter="pendente" data-fb-click="MasterAdmin.filtrarSolicitacoesAcesso" data-fb-click-n="1" data-fb-click-t0="dataset" data-fb-click-v0="filter" style="padding:6px 12px;border-radius:6px;font-size:.75rem;font-weight:800;cursor:pointer;border:1px solid ${filter==='pendente'?'#f59e0b':'rgba(255,255,255,.1)'};background:${filter==='pendente'?'rgba(245,158,11,.15)':'transparent'};color:${filter==='pendente'?'#fde047':'#94a3b8'};">
+              🟡 Pendentes (${pendentes})
+            </button>
+            <button data-filter="em_contato" data-fb-click="MasterAdmin.filtrarSolicitacoesAcesso" data-fb-click-n="1" data-fb-click-t0="dataset" data-fb-click-v0="filter" style="padding:6px 12px;border-radius:6px;font-size:.75rem;font-weight:800;cursor:pointer;border:1px solid ${filter==='em_contato'?'#38bdf8':'rgba(255,255,255,.1)'};background:${filter==='em_contato'?'rgba(56,189,248,.15)':'transparent'};color:${filter==='em_contato'?'#7dd3fc':'#94a3b8'};">
+              🔵 Em Contato (${emContato})
+            </button>
+            <button data-filter="aprovado" data-fb-click="MasterAdmin.filtrarSolicitacoesAcesso" data-fb-click-n="1" data-fb-click-t0="dataset" data-fb-click-v0="filter" style="padding:6px 12px;border-radius:6px;font-size:.75rem;font-weight:800;cursor:pointer;border:1px solid ${filter==='aprovado'?'#22c55e':'rgba(255,255,255,.1)'};background:${filter==='aprovado'?'rgba(34,197,94,.15)':'transparent'};color:${filter==='aprovado'?'#86efac':'#94a3b8'};">
+              🟢 Aprovados (${aprovados})
+            </button>
+            <button data-filter="rejeitado" data-fb-click="MasterAdmin.filtrarSolicitacoesAcesso" data-fb-click-n="1" data-fb-click-t0="dataset" data-fb-click-v0="filter" style="padding:6px 12px;border-radius:6px;font-size:.75rem;font-weight:800;cursor:pointer;border:1px solid ${filter==='rejeitado'?'#94a3b8':'rgba(255,255,255,.1)'};background:${filter==='rejeitado'?'rgba(148,163,184,.15)':'transparent'};color:${filter==='rejeitado'?'#cbd5e1':'#64748b'};">
+              ⚪ Rejeitados (${rejeitados})
+            </button>
+          </div>
+
+          <div style="position:relative;min-width:240px;">
+            <input type="text" placeholder="🔍 Filtrar lead por nome, empresa, e-mail..." value="${this._esc(this._accessRequestsSearch || '')}" data-fb-input="MasterAdmin.buscarSolicitacoesAcesso" data-fb-input-n="1" data-fb-input-t0="self" style="width:100%;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.15);border-radius:6px;padding:7px 12px;color:#fff;font-size:.8rem;outline:none;">
+          </div>
+        </div>
+
+        <!-- Tabela de Leads -->
+        <div style="background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.08);border-radius:14px;overflow:hidden;margin-bottom:34px;">
+          <div style="overflow-x:auto;">
+            <table style="width:100%;border-collapse:collapse;text-align:left;font-size:.82rem;">
+              <thead>
+                <tr style="background:rgba(255,255,255,.03);border-bottom:1px solid rgba(255,255,255,.06);color:#94a3b8;font-size:.72rem;text-transform:uppercase;letter-spacing:.05em;">
+                  <th style="padding:12px 16px;">Empresa / Construtora</th>
+                  <th style="padding:12px 16px;">Contato &amp; WhatsApp</th>
+                  <th style="padding:12px 16px;">Mensagem / Interesse</th>
+                  <th style="padding:12px 16px;">Data do Cadastro</th>
+                  <th style="padding:12px 16px;text-align:center;">Status</th>
+                  <th style="padding:12px 16px;text-align:right;">Ações Comerciais</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${rows}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    `;
   },
 
   _renderIntegridade() {
@@ -810,6 +1123,7 @@ const MasterAdmin = {
     if (!this._errorsGlobal && !this._errorsGlobalLoading) this.carregarErrosSaaS().then(() => this.render(containerId));
     if (!this._integrity && !this._integrityLoading) this.carregarIntegridade().then(() => this.render(containerId));
     if (!this._bankAccounts && !this._bankAccountsLoading) this.carregarContasBancarias().then(() => this.render(containerId));
+    if (!this._accessRequests && !this._accessRequestsLoading) this.carregarSolicitacoesAcesso().then(() => this.render(containerId));
 
     // Cálculo das métricas globais
     const totalEmpresas = empresas.length;
@@ -819,6 +1133,8 @@ const MasterAdmin = {
     const billingSummary = this._billing?.summary || {};
     const cobrancasPendentes = Number(billingSummary.pending_count || 0);
     const valorPendente = Number(billingSummary.pending_cents || 0) / 100;
+    const leadsSummary = this._accessRequests?.summary || {};
+    const leadsPendentesCount = Number(leadsSummary.pendentes || 0);
     
     // MRR estimado
     const precos = { starter: 119.90, pro: 279.90, unlimited: 499.90 };
@@ -829,13 +1145,16 @@ const MasterAdmin = {
       return acc;
     }, 0);
 
+    const isLeads = this._activeTab === 'leads';
     const isSistema = this._activeTab === 'sistema';
     const isContas = this._activeTab === 'contas';
     const isAgenda = this._activeTab === 'agenda';
-    const isEmpresas = !isSistema && !isContas && !isAgenda;
+    const isEmpresas = !isSistema && !isContas && !isAgenda && !isLeads;
 
     let tabContent = '';
-    if (isAgenda) {
+    if (isLeads) {
+      tabContent = this._renderSolicitacoesAcesso();
+    } else if (isAgenda) {
       tabContent = this._renderAgendaDev();
     } else if (isContas) {
       tabContent = this._renderContasBancariasSaaS();
@@ -892,6 +1211,22 @@ const MasterAdmin = {
 
         </div>
 
+        ${leadsPendentesCount > 0 ? `
+          <div style="background:rgba(245,158,11,.12);border:1px solid #f59e0b;border-radius:12px;padding:14px 18px;margin-bottom:24px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;">
+            <div style="display:flex;align-items:center;gap:12px;">
+              <span style="font-size:1.5rem;">📥</span>
+              <div>
+                <div style="font-weight:800;font-size:.9rem;color:#fde047;">${leadsPendentesCount} nova(s) solicitação(ões) de acesso comercial pendente(s)!</div>
+                <div style="font-size:.76rem;color:#cbd5e1;">Novos contatos que preencheram o formulário de cadastro e aguardam ativação.</div>
+              </div>
+            </div>
+            <button data-fb-click="MasterAdmin.switchTab" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="leads" style="background:var(--accent);color:#0A0A0A;border:none;padding:8px 14px;border-radius:6px;font-weight:800;font-size:.8rem;cursor:pointer;display:inline-flex;align-items:center;gap:6px;">
+              <span>Ver Leads &amp; Responder</span>
+              <span>↗</span>
+            </button>
+          </div>
+        ` : ''}
+
         <!-- Tabela de Construtoras / Clientes -->
         <div style="background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.08);border-radius:14px;overflow:hidden;margin-bottom:34px;">
           <div style="padding:16px 20px;border-bottom:1px solid rgba(255,255,255,.08);display:flex;align-items:center;justify-content:space-between;">
@@ -943,6 +1278,10 @@ const MasterAdmin = {
         <div style="display:flex;gap:0;border-bottom:2px solid rgba(255,255,255,.1);margin-bottom:26px;overflow-x:auto;">
           <button data-fb-click="MasterAdmin.switchTab" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="empresas" style="padding:12px 20px;border:none;background:transparent;color:${isEmpresas?'var(--accent)':'#94a3b8'};font-family:inherit;font-size:.875rem;font-weight:800;cursor:pointer;border-bottom:3px solid ${isEmpresas?'var(--accent)':'transparent'};margin-bottom:-2px;transition:all .2s;display:flex;align-items:center;gap:8px;">
             <span>🏢</span> Gestão de Construtoras &amp; SaaS
+          </button>
+          <button data-fb-click="MasterAdmin.switchTab" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="leads" style="padding:12px 20px;border:none;background:transparent;color:${isLeads?'var(--accent)':'#94a3b8'};font-family:inherit;font-size:.875rem;font-weight:800;cursor:pointer;border-bottom:3px solid ${isLeads?'var(--accent)':'transparent'};margin-bottom:-2px;transition:all .2s;display:flex;align-items:center;gap:8px;">
+            <span>📥</span> Solicitações &amp; Leads
+            ${leadsPendentesCount > 0 ? `<span style="background:#ef4444;color:#fff;font-size:.7rem;padding:2px 7px;border-radius:12px;font-weight:900;">${leadsPendentesCount}</span>` : ''}
           </button>
           <button data-fb-click="MasterAdmin.switchTab" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="contas" style="padding:12px 20px;border:none;background:transparent;color:${isContas?'var(--accent)':'#94a3b8'};font-family:inherit;font-size:.875rem;font-weight:800;cursor:pointer;border-bottom:3px solid ${isContas?'var(--accent)':'transparent'};margin-bottom:-2px;transition:all .2s;display:flex;align-items:center;gap:8px;">
             <span>🏦</span> Contas Bancárias &amp; Conciliação
@@ -1598,7 +1937,7 @@ const MasterAdmin = {
   },
 
   // ── MODAL: CADASTRAR NOVA CONSTRUTORA ──────────────────────────────────────
-  abrirModalNovaEmpresa() {
+  abrirModalNovaEmpresa(prefill = {}) {
     let modal = document.getElementById('master-nova-empresa-modal');
     if (!modal) {
       modal = document.createElement('div');
@@ -1608,13 +1947,21 @@ const MasterAdmin = {
       document.body.appendChild(modal);
     }
 
+    const pf = (prefill && typeof prefill === 'object') ? prefill : {};
+    this._activeLeadToConvert = pf.lead_id || null;
+    const initialNome = this._esc(pf.nome_fantasia || pf.razao_social || '');
+    const initialCnpj = this._esc(pf.cnpj || '');
+    const initialResp = this._esc(pf.responsavel || '');
+    const initialWhats = this._esc(pf.telefone || '');
+    const initialEmail = this._esc(pf.email || '');
+
     modal.innerHTML = `
       <div style="background:#0f1710;border:1px solid rgba(201,162,39,.4);border-radius:14px;width:100%;max-width:580px;box-shadow:0 24px 60px rgba(0,0,0,.85);overflow:hidden;color:#f0ead6;font-family:inherit;">
         <div style="background:linear-gradient(135deg,#1C2D12,#243818);padding:16px 20px;border-bottom:1px solid rgba(201,162,39,.3);display:flex;align-items:center;justify-content:space-between;">
           <div style="display:flex;align-items:center;gap:10px;">
             <span style="font-size:1.3rem;">➕</span>
             <div>
-              <div style="font-weight:800;font-size:1rem;color:var(--accent2);">Cadastrar Nova Construtora / Cliente</div>
+              <div style="font-weight:800;font-size:1rem;color:var(--accent2);">${this._activeLeadToConvert ? 'Ativar Construtora a partir de Lead Comercial' : 'Cadastrar Nova Construtora / Cliente'}</div>
               <div style="font-size:.75rem;color:#94a3b8;">Criar tenant e liberar acesso à plataforma</div>
             </div>
           </div>
@@ -1624,13 +1971,13 @@ const MasterAdmin = {
         <form data-fb-submit="MasterAdmin.salvarNovaEmpresa" data-fb-submit-n="1" data-fb-submit-t0="event" style="padding:22px;display:flex;flex-direction:column;gap:14px;">
           <div>
             <label style="display:block;font-size:.78rem;color:#94a3b8;margin-bottom:4px;">Nome Fantasia da Construtora *</label>
-            <input type="text" id="ne-nome" required placeholder="Ex: Vanguard Engenharia" style="width:100%;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.15);border-radius:8px;padding:9px 12px;color:#fff;font-size:.85rem;">
+            <input type="text" id="ne-nome" required value="${initialNome}" placeholder="Ex: Vanguard Engenharia" style="width:100%;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.15);border-radius:8px;padding:9px 12px;color:#fff;font-size:.85rem;">
           </div>
 
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
             <div>
               <label style="display:block;font-size:.78rem;color:#94a3b8;margin-bottom:4px;">CNPJ</label>
-              <input type="text" id="ne-cnpj" placeholder="00.000.000/0001-00" style="width:100%;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.15);border-radius:8px;padding:9px 12px;color:#fff;font-size:.85rem;">
+              <input type="text" id="ne-cnpj" value="${initialCnpj}" placeholder="00.000.000/0001-00" style="width:100%;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.15);border-radius:8px;padding:9px 12px;color:#fff;font-size:.85rem;">
             </div>
             <div>
               <label style="display:block;font-size:.78rem;color:#94a3b8;margin-bottom:4px;">Plano SaaS *</label>
@@ -1645,18 +1992,18 @@ const MasterAdmin = {
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
             <div>
               <label style="display:block;font-size:.78rem;color:#94a3b8;margin-bottom:4px;">Nome do Responsável *</label>
-              <input type="text" id="ne-resp" required placeholder="Ex: Eng. Carlos Silva" style="width:100%;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.15);border-radius:8px;padding:9px 12px;color:#fff;font-size:.85rem;">
+              <input type="text" id="ne-resp" required value="${initialResp}" placeholder="Ex: Eng. Carlos Silva" style="width:100%;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.15);border-radius:8px;padding:9px 12px;color:#fff;font-size:.85rem;">
             </div>
             <div>
               <label style="display:block;font-size:.78rem;color:#94a3b8;margin-bottom:4px;">WhatsApp com DDD *</label>
-              <input type="text" id="ne-whats" required placeholder="95991234567" style="width:100%;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.15);border-radius:8px;padding:9px 12px;color:#fff;font-size:.85rem;">
+              <input type="text" id="ne-whats" required value="${initialWhats}" placeholder="95991234567" style="width:100%;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.15);border-radius:8px;padding:9px 12px;color:#fff;font-size:.85rem;">
             </div>
           </div>
 
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
             <div>
               <label style="display:block;font-size:.78rem;color:#94a3b8;margin-bottom:4px;">E-mail de Login *</label>
-              <input type="email" id="ne-email" required placeholder="carlos@vanguard.com.br" style="width:100%;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.15);border-radius:8px;padding:9px 12px;color:#fff;font-size:.85rem;">
+              <input type="email" id="ne-email" required value="${initialEmail}" placeholder="carlos@vanguard.com.br" style="width:100%;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.15);border-radius:8px;padding:9px 12px;color:#fff;font-size:.85rem;">
             </div>
             <div>
               <label style="display:block;font-size:.78rem;color:#94a3b8;margin-bottom:4px;">Senha de Acesso *</label>
@@ -1717,6 +2064,21 @@ const MasterAdmin = {
 
       const modal = document.getElementById('master-nova-empresa-modal');
       if (modal) modal.remove();
+
+      // Se foi convertida de um lead comercial, atualiza o status do lead para 'aprovado'
+      if (this._activeLeadToConvert) {
+        try {
+          await this._fetchWithTimeout('/api/admin?action=update_access_request_status', {
+            method: 'POST',
+            headers: (typeof Auth !== 'undefined' && Auth.getAuthHeaders) ? Auth.getAuthHeaders() : { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id: this._activeLeadToConvert, status: 'aprovado' })
+          });
+          this._activeLeadToConvert = null;
+          await this.carregarSolicitacoesAcesso(true);
+        } catch (errLead) {
+          console.warn('Não foi possível marcar lead como aprovado:', errLead);
+        }
+      }
 
       await this.carregarEmpresas(true);
       const target = document.getElementById('master-content-area') ? 'master-content-area' : 'route-content';

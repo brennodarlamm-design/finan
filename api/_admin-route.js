@@ -621,6 +621,98 @@ export default async function handler(req, res) {
       });
     }
 
+    // ── Gestão de Solicitações de Acesso / Leads Comerciais ───────────
+    if (req.method === 'GET' && (action === 'access_requests' || action === 'leads')) {
+      const statusFilter = String(req.query?.status || 'all').trim().toLowerCase();
+      const search = String(req.query?.search || '').trim().toLowerCase();
+
+      const requests = await sql`
+        SELECT id, nome, email, telefone, empresa_nome, cnpj, mensagem, status, ip, created_at
+        FROM access_requests
+        WHERE (${statusFilter} = 'all' OR status = ${statusFilter})
+          AND (
+            ${search} = '' OR
+            LOWER(nome) LIKE ${'%' + search + '%'} OR
+            LOWER(email) LIKE ${'%' + search + '%'} OR
+            LOWER(COALESCE(empresa_nome, '')) LIKE ${'%' + search + '%'} OR
+            LOWER(COALESCE(telefone, '')) LIKE ${'%' + search + '%'} OR
+            LOWER(COALESCE(cnpj, '')) LIKE ${'%' + search + '%'}
+          )
+        ORDER BY created_at DESC
+        LIMIT 200;
+      `;
+
+      const summaryRows = await sql`
+        SELECT
+          COUNT(*)::int AS total,
+          COUNT(*) FILTER (WHERE status = 'pendente')::int AS pendentes,
+          COUNT(*) FILTER (WHERE status = 'em_contato')::int AS em_contato,
+          COUNT(*) FILTER (WHERE status = 'aprovado')::int AS aprovados,
+          COUNT(*) FILTER (WHERE status = 'rejeitado')::int AS rejeitados
+        FROM access_requests;
+      `;
+
+      return res.status(200).json({
+        success: true,
+        requests,
+        summary: summaryRows[0] || { total: 0, pendentes: 0, em_contato: 0, aprovados: 0, rejeitados: 0 }
+      });
+    }
+
+    if (req.method === 'POST' && (action === 'update_access_request_status' || action === 'update_lead_status')) {
+      const requestId = String(req.body?.id || '').trim();
+      const newStatus = String(req.body?.status || '').trim().toLowerCase();
+      const validStatuses = ['pendente', 'em_contato', 'aprovado', 'rejeitado'];
+
+      if (!requestId || !validStatuses.includes(newStatus)) {
+        return res.status(400).json({ success: false, error: 'ID e status válido (pendente, em_contato, aprovado, rejeitado) são obrigatórios.' });
+      }
+
+      const updated = await sql`
+        UPDATE access_requests
+        SET status = ${newStatus}
+        WHERE id = ${requestId}
+        RETURNING id, nome, email, empresa_nome, status;
+      `;
+
+      if (!updated.length) {
+        return res.status(404).json({ success: false, error: 'Solicitação de acesso não encontrada.' });
+      }
+
+      await writeAudit(sql, req, auth, {
+        acao: 'lead_status_alterado',
+        entidade: 'access_requests',
+        entidadeId: requestId,
+        depois: { status: newStatus, lead: updated[0] }
+      });
+
+      return res.status(200).json({
+        success: true,
+        request: updated[0],
+        message: `Status da solicitação atualizado para "${newStatus}".`
+      });
+    }
+
+    if (req.method === 'POST' && (action === 'delete_access_request' || action === 'delete_lead')) {
+      const requestId = String(req.body?.id || '').trim();
+      if (!requestId) return res.status(400).json({ success: false, error: 'ID da solicitação é obrigatório.' });
+
+      const deleted = await sql`
+        DELETE FROM access_requests WHERE id = ${requestId} RETURNING id, nome, email;
+      `;
+
+      if (!deleted.length) return res.status(404).json({ success: false, error: 'Solicitação não encontrada.' });
+
+      await writeAudit(sql, req, auth, {
+        acao: 'lead_excluido',
+        entidade: 'access_requests',
+        entidadeId: requestId,
+        depois: { deleted: deleted[0] }
+      });
+
+      return res.status(200).json({ success: true, message: 'Solicitação removida com sucesso.' });
+    }
+
     if (req.method === 'GET' && action === 'tenants') {
       const rows = await sql`
         SELECT 

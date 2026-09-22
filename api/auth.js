@@ -945,6 +945,220 @@ export default async function handler(req, res) {
         });
       }
 
+      // Disparo de notificações transacionais via Resend
+      let resendKey = String(process.env.RESEND_API_KEY || '').trim();
+      if ((resendKey.startsWith('"') && resendKey.endsWith('"')) || (resendKey.startsWith("'") && resendKey.endsWith("'"))) {
+        resendKey = resendKey.slice(1, -1);
+      }
+      const fromEmail = String(process.env.RESEND_FROM_EMAIL || 'FinGo <suporte@fingo.api.br>').trim();
+      const adminEmails = [
+        'brennodarlam@gmail.com',
+        'suporte@fingo.api.br'
+      ];
+      if (process.env.ADMIN_NOTIFY_EMAIL && !adminEmails.includes(process.env.ADMIN_NOTIFY_EMAIL.trim())) {
+        adminEmails.push(process.env.ADMIN_NOTIFY_EMAIL.trim());
+      }
+
+      if (resendKey) {
+        try {
+          const escapeHtmlLocal = (str) => String(str || '')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#039;');
+
+          const cleanPhone = rawTelefone.replace(/\D/g, '');
+          const waLeadUrl = cleanPhone
+            ? (cleanPhone.startsWith('55') ? `https://wa.me/${cleanPhone}` : `https://wa.me/55${cleanPhone}`)
+            : '';
+          const waAdminMsg = encodeURIComponent(`Olá ${rawNome}, sou da equipe comercial do FinGo! Recebi sua solicitação de acesso para a ${rawEmpresa || 'sua construtora'}.`);
+          const waActionLink = waLeadUrl ? `${waLeadUrl}?text=${waAdminMsg}` : '';
+
+          let dataHora = '';
+          try {
+            dataHora = new Date().toLocaleString('pt-BR', { timeZone: 'America/Manaus' });
+          } catch {
+            dataHora = new Date().toISOString();
+          }
+
+          // 1. E-mail de Alerta para o Administrador / Comercial
+          const adminHtml = `
+            <!DOCTYPE html>
+            <html lang="pt-BR">
+            <head><meta charset="UTF-8"></head>
+            <body style="margin:0;padding:0;background:#0A0A0A;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;color:#F0F0E8;">
+              <div style="max-width:600px;margin:24px auto;background:#141D12;border:1px solid #282828;border-radius:10px;overflow:hidden;box-shadow:0 12px 36px rgba(0,0,0,0.8);">
+                <div style="background:#0A0A0A;padding:22px 28px;border-bottom:3px solid #C6FF00;">
+                  <table style="width:100%;border-collapse:collapse;">
+                    <tr>
+                      <td>
+                        <a href="https://fingo.api.br" target="_blank" style="text-decoration:none;display:inline-block;">
+                          <img src="https://fingo.api.br/img/fingo/fingo-logo-full.png" alt="FinGo" style="height:32px;display:block;border:0;" />
+                        </a>
+                      </td>
+                      <td style="text-align:right;">
+                        <span style="display:inline-block;padding:4px 10px;background:rgba(198,255,0,0.12);border:1px solid rgba(198,255,0,0.4);border-radius:4px;font-size:11px;font-weight:800;color:#C6FF00;text-transform:uppercase;">
+                          NOVO LEAD COMERCIAL
+                        </span>
+                      </td>
+                    </tr>
+                  </table>
+                </div>
+                <div style="padding:28px;">
+                  <h2 style="margin:0 0 14px;color:#FFFFFF;font-size:18px;font-weight:800;">
+                    📥 Nova Solicitação de Acesso ao FinGo
+                  </h2>
+                  <p style="color:#94a3b8;font-size:14px;line-height:1.5;margin-bottom:20px;">
+                    Um novo interessado preencheu o formulário comercial na página inicial solicitando acesso à plataforma.
+                  </p>
+                  
+                  <div style="background:rgba(255,255,255,0.03);border:1px solid #282828;border-radius:8px;padding:16px 20px;margin-bottom:24px;font-size:14px;">
+                    <div style="padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.06);">
+                      <span style="color:#8E8E8E;display:inline-block;width:140px;">Empresa / Construtora:</span>
+                      <strong style="color:#C6FF00;font-size:15px;">${escapeHtmlLocal(rawEmpresa || 'Não informada')}</strong>
+                    </div>
+                    <div style="padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.06);">
+                      <span style="color:#8E8E8E;display:inline-block;width:140px;">Contato:</span>
+                      <strong style="color:#FFFFFF;">${escapeHtmlLocal(rawNome)}</strong>
+                    </div>
+                    <div style="padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.06);">
+                      <span style="color:#8E8E8E;display:inline-block;width:140px;">E-mail:</span>
+                      <a href="mailto:${escapeHtmlLocal(rawEmail)}" style="color:#38bdf8;text-decoration:none;font-weight:600;">${escapeHtmlLocal(rawEmail)}</a>
+                    </div>
+                    <div style="padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.06);">
+                      <span style="color:#8E8E8E;display:inline-block;width:140px;">WhatsApp / Fone:</span>
+                      <strong style="color:#FFFFFF;">${escapeHtmlLocal(rawTelefone || 'Não informado')}</strong>
+                    </div>
+                    ${rawCnpj ? `
+                    <div style="padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.06);">
+                      <span style="color:#8E8E8E;display:inline-block;width:140px;">CNPJ / Local:</span>
+                      <span style="color:#CBD5E1;">${escapeHtmlLocal(rawCnpj)}</span>
+                    </div>` : ''}
+                    ${rawMsg ? `
+                    <div style="padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.06);">
+                      <span style="color:#8E8E8E;display:inline-block;width:140px;">Mensagem:</span>
+                      <span style="color:#CBD5E1;">${escapeHtmlLocal(rawMsg)}</span>
+                    </div>` : ''}
+                    <div style="padding:8px 0;">
+                      <span style="color:#8E8E8E;display:inline-block;width:140px;">Data &amp; Hora:</span>
+                      <span style="color:#94a3b8;font-family:monospace;font-size:12px;">${dataHora} (Manaus)</span>
+                    </div>
+                  </div>
+
+                  <div style="margin-bottom:20px;">
+                    ${waActionLink ? `
+                    <a href="${waActionLink}" target="_blank" style="display:inline-block;padding:12px 20px;background:#22c55e;color:#052e16;font-weight:800;font-size:13px;border-radius:6px;text-decoration:none;margin-right:10px;margin-bottom:10px;">
+                      💬 Iniciar Conversa no WhatsApp
+                    </a>` : ''}
+                    <a href="https://fingo.api.br/master" target="_blank" style="display:inline-block;padding:12px 20px;background:#C6FF00;color:#0A0A0A;font-weight:800;font-size:13px;border-radius:6px;text-decoration:none;margin-bottom:10px;">
+                      🛡️ Abrir Master Backoffice
+                    </a>
+                  </div>
+                </div>
+                <div style="background:#0A0A0A;padding:16px 28px;border-top:1px solid #282828;font-size:11px;color:#8E8E8E;text-align:center;">
+                  FinGo ERP — Obras em Fluxo &bull; ID da Solicitação: <code style="color:#C6FF00;">${reqId}</code>
+                </div>
+              </div>
+            </body>
+            </html>
+          `;
+
+          // 2. E-mail de confirmação para o Cliente/Lead
+          const clientHtml = `
+            <!DOCTYPE html>
+            <html lang="pt-BR">
+            <head><meta charset="UTF-8"></head>
+            <body style="margin:0;padding:0;background:#0A0A0A;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;color:#F0F0E8;">
+              <div style="max-width:580px;margin:24px auto;background:#141D12;border:1px solid #282828;border-radius:10px;overflow:hidden;box-shadow:0 12px 36px rgba(0,0,0,0.8);">
+                <div style="background:#0A0A0A;padding:24px 30px;border-bottom:3px solid #C6FF00;">
+                  <a href="https://fingo.api.br" target="_blank" style="text-decoration:none;display:inline-block;">
+                    <img src="https://fingo.api.br/img/fingo/fingo-logo-full.png" alt="FinGo" style="height:34px;display:block;border:0;" />
+                  </a>
+                  <div style="font-size:11px;color:#8E8E8E;margin-top:6px;text-transform:uppercase;letter-spacing:0.08em;font-weight:700;">
+                    SaaS de Gestão para Construtoras &bull; Obras em Fluxo
+                  </div>
+                </div>
+                <div style="padding:32px 30px;">
+                  <h2 style="margin:0 0 12px;color:#FFFFFF;font-size:19px;font-weight:800;">
+                    Olá, ${escapeHtmlLocal(rawNome)}!
+                  </h2>
+                  <p style="color:#CBD5E1;font-size:14px;line-height:1.6;margin-bottom:16px;">
+                    Recebemos com sucesso sua solicitação de acesso ao <strong>FinGo ERP</strong> para a <strong>${escapeHtmlLocal(rawEmpresa || 'sua empresa')}</strong>.
+                  </p>
+                  <p style="color:#94a3b8;font-size:13px;line-height:1.6;margin-bottom:24px;">
+                    Nossa equipe técnica e comercial entrará em contato em instantes pelo WhatsApp <strong>${escapeHtmlLocal(rawTelefone || '')}</strong> ou por este e-mail para agendar uma demonstração rápida e liberar seu ambiente exclusivo de testes com fluxo de caixa, SINAPI, orçamentos e BIM 3D.
+                  </p>
+
+                  <div style="background:rgba(198,255,0,0.06);border:1px solid rgba(198,255,0,0.25);border-radius:8px;padding:18px;margin-bottom:24px;text-align:center;">
+                    <div style="font-size:13px;color:#CBD5E1;margin-bottom:12px;font-weight:600;">
+                      Prefere iniciar o atendimento agora mesmo?
+                    </div>
+                    <a href="https://wa.me/5595991232345?text=${encodeURIComponent(`Olá, acabei de solicitar acesso ao FinGo para a empresa ${rawEmpresa || rawNome}!`)}" target="_blank" style="display:inline-block;padding:12px 24px;background:#22c55e;color:#052e16;font-weight:800;font-size:13px;border-radius:6px;text-decoration:none;">
+                      💬 Falar com Especialista no WhatsApp
+                    </a>
+                  </div>
+
+                  <p style="color:#64748b;font-size:12px;margin:0;">
+                    Caso não tenha solicitado este contato, basta desconsiderar este e-mail.
+                  </p>
+                </div>
+                <div style="background:#0A0A0A;padding:18px 30px;border-top:1px solid #282828;font-size:11px;color:#8E8E8E;text-align:center;line-height:1.5;">
+                  FinGo — Plataforma de Gestão e Engenharia de Obras<br>
+                  Dúvidas? Escreva para <a href="mailto:suporte@fingo.api.br" style="color:#C6FF00;text-decoration:none;">suporte@fingo.api.br</a>
+                </div>
+              </div>
+            </body>
+            </html>
+          `;
+
+          // Disparo concorrente para Admin e Cliente
+          const emailDispatches = [];
+
+          // Envia para os admins
+          emailDispatches.push(
+            fetch('https://api.resend.com/emails', {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${resendKey}`,
+                'Content-Type': 'application/json'
+              },
+              body: JSON.stringify({
+                from: fromEmail,
+                to: adminEmails,
+                subject: `🔔 Novo Lead FinGo: ${rawEmpresa || rawNome}`,
+                html: adminHtml
+              }),
+              signal: AbortSignal.timeout(10000)
+            }).then(r => r.json().catch(() => ({})))
+          );
+
+          // Envia confirmação para o lead
+          if (rawEmail && rawEmail.includes('@')) {
+            emailDispatches.push(
+              fetch('https://api.resend.com/emails', {
+                method: 'POST',
+                headers: {
+                  'Authorization': `Bearer ${resendKey}`,
+                  'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                  from: fromEmail,
+                  to: [rawEmail],
+                  subject: `FinGo — Solicitação de Acesso Recebida (${rawEmpresa || 'Construtora'})`,
+                  html: clientHtml
+                }),
+                signal: AbortSignal.timeout(10000)
+              }).then(r => r.json().catch(() => ({})))
+            );
+          }
+
+          await Promise.allSettled(emailDispatches);
+        } catch (mailErr) {
+          console.warn('[Register Access Request] Falha ao enviar notificações por e-mail:', mailErr?.message || mailErr);
+        }
+      }
+
       return res.status(200).json({
         success: true,
         commercial_request: true,
