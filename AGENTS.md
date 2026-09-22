@@ -10,9 +10,23 @@ Este documento define regras inegociáveis para o desenvolvimento e operação d
 > 1. **Implementação & Testes:** Validar todas as alterações com os testes automatizados da suíte.
 > 2. **Commit / Comentário Primeiro:** Realizar SEMPRE o `git commit` com mensagem semântica detalhada e clara.
 > 3. **Push para o Repositório:** Sincronizar os commits locais com o repositório remoto via `git push`.
-> 4. **Deploy SOMENTE Depois:** Qualquer comando de build de distribuição ou deploy em produção (`npm run deploy`, `node scripts/deploy.js`, etc.) **SÓ PODE SER EXECUTADO APÓS O COMMIT E O PUSH ESTAREM CONCLUÍDOS**.
+> 4. **Deploy SOMENTE Depois:** Qualquer comando de build de distribuição ou deploy em produção (`npm run build:cloudflare && npm run deploy:cloudflare`) **SÓ PODE SER EXECUTADO APÓS O COMMIT E O PUSH ESTAREM CONCLUÍDOS**.
 >
 > ❌ **NUNCA**, sob nenhuma circunstância, disparar rotinas de deploy, build de produção ou publicação em ambiente remoto com alterações pendentes ou sem o commit previamente realizado e confirmado.
+
+---
+
+## 🚨 Regra Inegociável: Deploy Exclusivo no Cloudflare Pages (Vercel Banido)
+
+> **PROIBIÇÃO ABSOLUTA DO VERCEL:**
+> ❌ **NUNCA**, sob nenhuma hipótese, realizar deploy na Vercel (`vercel deploy`, `npx vercel`, Vercel CLI, Vercel Dashboard ou tokens da Vercel). O Vercel está terminantemente banido deste repositório como plataforma de produção.
+>
+> ✅ **DESTINO ÚNICO DE PRODUÇÃO — CLOUDFLARE PAGES:**
+> Todo e qualquer deploy de produção DEVE ser feito exclusivamente para o Cloudflare Pages:
+> 1. Build de distribuição: `npm run build:cloudflare` (gera os artefatos sanitizados na pasta `dist/`).
+> 2. Publicação: `npm run deploy:cloudflare` (`npx wrangler deploy`).
+>
+> ❌ **NUNCA** executar comandos de deploy sem antes validar testes, realizar o `git commit` e fazer o `git push`.
 
 
 ---

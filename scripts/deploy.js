@@ -1,26 +1,7 @@
-// scripts/deploy.js — Executa o deploy no Vercel CLI usando o token do .env.local
-import dotenv from 'dotenv';
-dotenv.config({ path: '.env.local' });
-import { spawn } from 'child_process';
+// scripts/deploy.js — Bloqueio do Vercel conforme AGENTS.md
+console.error('❌ ERRO: O deploy no Vercel foi BANIDO conforme regra inegociável em AGENTS.md.');
+console.error('👉 O destino único de produção é o Cloudflare Pages:');
+console.error('   1. npm run build:cloudflare');
+console.error('   2. npm run deploy:cloudflare');
+process.exit(1);
 
-const token = process.env.VERCEL_TOKEN;
-if (!token) {
-  console.error('❌ VERCEL_TOKEN não encontrado em .env.local');
-  process.exit(1);
-}
-
-console.log('🚀 Iniciando deploy em produção no Vercel CLI...');
-
-const cmd = process.platform === 'win32' ? 'npx.cmd' : 'npx';
-const args = ['vercel', 'deploy', '--prod', '--yes', '--token', token];
-
-const child = spawn(cmd, args, { stdio: 'inherit', shell: true });
-
-child.on('close', (code) => {
-  if (code === 0) {
-    console.log('✅ Deploy finalizado com sucesso!');
-  } else {
-    console.error(`❌ Processo de deploy encerrou com código ${code}`);
-  }
-  process.exit(code);
-});
