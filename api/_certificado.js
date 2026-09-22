@@ -96,6 +96,7 @@ export function decryptCertData(encBase64, ivHex, authTagHex) {
 
 function extractX509FromPfx(buffer) {
   let bestCert = null;
+  let bestScore = -1;
   for (let i = 0; i < buffer.length - 100; i++) {
     if (buffer[i] === 0x30 && buffer[i + 1] === 0x82) {
       const len = (buffer[i + 2] << 8) | buffer[i + 3];
@@ -106,10 +107,23 @@ function extractX509FromPfx(buffer) {
           const cert = new crypto.X509Certificate(slice);
           if (cert.subject && cert.validTo) {
             const subj = cert.subject || '';
-            if (/(\d{14}|\d{2}\.\d{3}\.\d{3}\/\d{4}-\d{2})/.test(subj)) {
-              return cert;
+            const altName = cert.subjectAltName || '';
+            const fullText = subj + ' ' + altName;
+
+            // Score: prefer ICP-Brasil leaf certs with CNPJ or CPF
+            let score = 0;
+            if (/OID\.2\.16\.76\.1\.3\.3=/.test(subj)) score = 3;       // CNPJ ICP-Brasil OID
+            else if (/OID\.2\.16\.76\.1\.3\.1=/.test(subj)) score = 2;  // CPF ICP-Brasil OID
+            else if (/(\d{2}\.\d{3}\.\d{3}\/\d{4}-\d{2})/.test(fullText)) score = 3; // CNPJ formatado
+            else if (/(?<!\d)(\d{14})(?!\d)/.test(fullText)) score = 2;              // CNPJ puro 14d
+            else score = 1; // qualquer cert válido é aceito como fallback
+
+            if (score > bestScore) {
+              bestScore = score;
+              bestCert = cert;
             }
-            if (!bestCert) bestCert = cert;
+
+            // Avança o cursor apenas se o cert foi consumido (evita reanálise)
             i += totalLen - 1;
           }
         } catch {}
@@ -127,10 +141,32 @@ function parseCertDetails(cert) {
   const commonName = cnMatch ? cnMatch[1].trim() : '';
 
   let cnpj = null;
-  const fullText = subject + ' ' + (cert.subjectAltName || '');
-  const cnpjMatch = fullText.match(/(\d{2}\.\d{3}\.\d{3}\/\d{4}-\d{2})|(?<!\d)(\d{14})(?!\d)/);
-  if (cnpjMatch) {
-    cnpj = (cnpjMatch[1] || cnpjMatch[2]).replace(/\D/g, '');
+  const altName = cert.subjectAltName || '';
+  const fullText = subject + ' ' + altName;
+
+  // 1. OID ICP-Brasil para CNPJ: OID.2.16.76.1.3.3=<14 dígitos>
+  const icpCnpjMatch = subject.match(/OID\.2\.16\.76\.1\.3\.3=(\d{14})/i);
+  if (icpCnpjMatch) {
+    cnpj = icpCnpjMatch[1];
+  }
+
+  // 2. CNPJ formatado (XX.XXX.XXX/XXXX-XX) em qualquer campo legível
+  if (!cnpj) {
+    const fmtMatch = fullText.match(/(\d{2}\.\d{3}\.\d{3}\/\d{4}-\d{2})/);
+    if (fmtMatch) cnpj = fmtMatch[1].replace(/\D/g, '');
+  }
+
+  // 3. CNPJ puro de 14 dígitos isolado — ex.: CN=EMPRESA LTDA:12345678000195
+  if (!cnpj) {
+    const pureMatch = fullText.match(/(?<!\d)(\d{14})(?!\d)/);
+    if (pureMatch) cnpj = pureMatch[1];
+  }
+
+  // 4. CNPJ embutido no CN no padrão ICP-Brasil A1: "RAZÃO SOCIAL:CNPJ"
+  if (!cnpj && commonName.includes(':')) {
+    const cnParts = commonName.split(':');
+    const candidate = (cnParts[cnParts.length - 1] || '').replace(/\D/g, '');
+    if (candidate.length === 14) cnpj = candidate;
   }
 
   let razaoSocial = commonName;
@@ -147,6 +183,7 @@ function parseCertDetails(cert) {
     serialNumber: cert.serialNumber || null
   };
 }
+
 
 export default async function handler(req, res) {
   setCors(req, res);

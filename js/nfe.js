@@ -156,9 +156,11 @@ const NFe = {
       method: 'GET',
       headers: this._headers()
     });
+    if (res.status === 403) return { _permissaoNegada: true };
     if (!res.ok) return null;
     return await res.json();
   },
+
 
   _extrairChaveDoXml(xmlString) {
     if (!xmlString) return null;
@@ -684,6 +686,18 @@ const NFe = {
     container.innerHTML = '<div style="text-align:center;padding:20px;color:var(--text3);"><div style="display:inline-block;width:20px;height:20px;border:2px solid rgba(255,255,255,.15);border-top-color:var(--accent);border-radius:50%;animation:spin .7s linear infinite;"></div> Carregando da nuvem...</div>';
     try {
       const data = await this.listarMinhasNFes(after);
+      if (data && data._permissaoNegada) {
+        container.innerHTML = `
+          <div style="text-align:center;padding:32px 24px;">
+            <div style="font-size:2rem;margin-bottom:12px;">🔒</div>
+            <div style="font-weight:700;color:var(--text);font-size:.95rem;margin-bottom:6px;">Acesso Restrito</div>
+            <div style="font-size:.82rem;color:var(--text3);max-width:340px;margin:0 auto;">
+              A listagem global de NF-es na nuvem é restrita a administradores do sistema.<br>
+              Utilize a aba <strong>📋 Consultadas Recentemente</strong> para ver as NF-es que você já buscou.
+            </div>
+          </div>`;
+        return;
+      }
       if (!data || data.status !== 'OK') {
         const msg = (data && data.statusMessage) ? data.statusMessage : 'Nenhuma NF-e encontrada na Área do Cliente MeuDanfe.';
         container.innerHTML = `<div style="text-align:center;padding:24px;color:var(--text3);">${Utils.escapeHtml(msg)}</div>`;
@@ -752,6 +766,10 @@ const NFe = {
         }
 
         const data = await this.listarMinhasNFes(after);
+        if (data && data._permissaoNegada) {
+          Utils.toast('🔒 Acesso restrito: listagem global de NF-es é exclusiva de administradores.', 'warning');
+          break;
+        }
         if (!data || data.status !== 'OK') {
           if (data?.status === 'TOO_MANY_REQUESTS') {
             Utils.toast(data.statusMessage || 'Aguarde 1 hora para recomeçar a listagem do início.', 'warning');
