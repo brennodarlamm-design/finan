@@ -1507,7 +1507,9 @@ async function proxyApi(request, env) {
 
 async function handleApi(request, env) {
   try {
-    let response = await executeEdgeApi(request, env);
+    const isMutating = !SAFE_METHODS.has(String(request.method || 'GET').toUpperCase());
+    const edgeRequest = isMutating ? request.clone() : request;
+    let response = await executeEdgeApi(edgeRequest, env);
     if (response && response.status >= 500 && env.FINOBRA_API_ORIGIN) {
       console.warn('[FinGo Edge] Resposta 5xx no Edge, acionando fallback upstream...');
       response = await proxyApi(request, env);
@@ -1542,7 +1544,11 @@ async function handleApi(request, env) {
   } catch (err) {
     console.error('[FinGo Edge] Falha ao processar API no Edge:', err?.message || err);
     if (env.FINOBRA_API_ORIGIN) {
-      return await proxyApi(request, env);
+      try {
+        return await proxyApi(request, env);
+      } catch (proxyErr) {
+        console.error('[FinGo Edge] Falha no fallback proxyApi:', proxyErr?.message || proxyErr);
+      }
     }
     return Response.json({
       success: false,

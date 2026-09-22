@@ -338,11 +338,23 @@ export async function handleSave(sql, tenantId, auth, req, res, table, data) {
 
   if (table === 'produtos') {
     const p = data;
+    if (!p || typeof p !== 'object' || Array.isArray(p)) {
+      return res.status(400).json({ success: false, error: 'Dados do produto inválidos.' });
+    }
+    const nomeFinal = String(p.nome || p.descricao || p.titulo || '').trim();
+    if (!nomeFinal) {
+      return res.status(400).json({ success: false, error: 'Nome do produto é obrigatório.' });
+    }
+    const prodId = String(p.id || '').trim();
+    if (!prodId) {
+      return res.status(400).json({ success: false, error: 'ID do produto é obrigatório.' });
+    }
     await sql`
       INSERT INTO produtos (id, tenant_id, nome, unidade, categoria, codigo, valor_medio, observacoes)
       VALUES (
-        ${p.id}, ${tenantId}, ${p.nome}, ${p.unidade || 'un'}, ${p.categoria || 'material'},
-        ${p.codigo || null}, ${cleanNum(p.valor_medio)}, ${p.observacoes || ''}
+        ${prodId}, ${tenantId}, ${nomeFinal.slice(0, 255)}, ${String(p.unidade || 'un').trim().slice(0, 32)},
+        ${String(p.categoria || 'material').trim().slice(0, 100)},
+        ${p.codigo ? String(p.codigo).trim().slice(0, 64) : null}, ${cleanNum(p.valor_medio)}, ${String(p.observacoes || '')}
       )
       ON CONFLICT (id) DO UPDATE SET
         nome = EXCLUDED.nome,
@@ -354,8 +366,8 @@ export async function handleSave(sql, tenantId, auth, req, res, table, data) {
         updated_at = NOW()
       WHERE produtos.tenant_id = ${tenantId};
     `;
-    await auditDb(sql, req, auth, 'salvar', 'produtos', p);
-    return res.status(200).json({ success: true, id: p.id });
+    await auditDb(sql, req, auth, 'salvar', 'produtos', { ...p, id: prodId, nome: nomeFinal });
+    return res.status(200).json({ success: true, id: prodId });
   }
 
   if (table === 'precompras') {
@@ -645,9 +657,13 @@ export async function handleDelete(sql, tenantId, auth, req, res, table, id) {
   }
 
   if (table === 'produtos') {
-    await sql`DELETE FROM produtos WHERE id = ${id} AND tenant_id = ${tenantId};`;
-    await writeAudit(sql, req, auth, { acao: 'excluir', entidade: 'produtos', entidadeId: id, antes: { id } });
-    return res.status(200).json({ success: true, id });
+    const prodId = String(id || data?.id || '').trim();
+    if (!prodId) {
+      return res.status(400).json({ success: false, error: 'ID do produto é obrigatório para exclusão.' });
+    }
+    await sql`DELETE FROM produtos WHERE id = ${prodId} AND tenant_id = ${tenantId};`;
+    await writeAudit(sql, req, auth, { acao: 'excluir', entidade: 'produtos', entidadeId: prodId, antes: { id: prodId } });
+    return res.status(200).json({ success: true, id: prodId });
   }
 
   if (table === 'precompras' || table === 'contratos' || table === 'recibos') {
