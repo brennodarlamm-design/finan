@@ -75,10 +75,10 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          if npx wrangler r2 bucket list | grep -Fq 'fingo-attachments'; then
+          if npx wrangler@3.114.0 r2 bucket list | grep -Fq 'fingo-attachments'; then
             echo "R2 bucket fingo-attachments already exists."
           else
-            npx wrangler r2 bucket create fingo-attachments
+            npx wrangler@3.114.0 r2 bucket create fingo-attachments
           fi
       - name: Build production assets
         run: npm run build:cloudflare

@@ -44,9 +44,9 @@ jobs:
           VERSION="${{ inputs.version_id }}"
           REASON="${{ inputs.reason }}"
           if [[ -n "$VERSION" ]]; then
-            npx wrangler rollback "$VERSION" --name finan --message "$REASON"
+            npx --package=wrangler@3.114.0 wrangler rollback "$VERSION" --name finan --message "$REASON"
           else
-            npx wrangler rollback --name finan --message "$REASON"
+            npx --package=wrangler@3.114.0 wrangler rollback --name finan --message "$REASON"
           fi
 
       - name: Verify production health

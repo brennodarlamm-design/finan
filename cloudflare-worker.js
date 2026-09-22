@@ -269,10 +269,10 @@ const API_CATALOG_PAYLOAD = {
 const OPENID_CONFIGURATION_PAYLOAD = {
   "issuer": "https://fingo.api.br",
   "authorization_endpoint": "https://fingo.api.br/login",
-  "token_endpoint": "https://fingo.api.br/api/auth?action=token",
+  "token_endpoint": "https://fingo.api.br/api/auth?action=login",
   "userinfo_endpoint": "https://fingo.api.br/api/auth?action=me",
   "jwks_uri": "https://fingo.api.br/.well-known/jwks.json",
-  "registration_endpoint": "https://fingo.api.br/api/auth?action=register",
+  "registration_endpoint": "https://fingo.api.br/planos",
   "scopes_supported": [
     "openid",
     "profile",
@@ -283,36 +283,25 @@ const OPENID_CONFIGURATION_PAYLOAD = {
     "construction"
   ],
   "response_types_supported": [
-    "code",
-    "token",
-    "id_token",
-    "code token",
-    "code id_token",
-    "token id_token",
-    "code token id_token"
+    "token"
   ],
   "grant_types_supported": [
-    "authorization_code",
-    "client_credentials",
-    "refresh_token",
-    "urn:ietf:params:oauth:grant-type:token-exchange"
+    "password",
+    "client_credentials"
   ],
   "subject_types_supported": [
-    "public",
-    "pairwise"
+    "public"
   ],
   "id_token_signing_alg_values_supported": [
-    "RS256",
-    "ES256",
     "HS256"
   ],
   "token_endpoint_auth_methods_supported": [
-    "client_secret_basic",
-    "client_secret_post",
-    "private_key_jwt"
+    "bearer",
+    "client_secret_post"
   ],
   "agent_auth": {
     "skill": "https://fingo.api.br/auth.md",
+    "type": "bearer_and_session_cookie",
     "register_uri": "https://fingo.api.br/api/auth?action=agent-register",
     "claim_uri": "https://fingo.api.br/api/auth?action=claim",
     "identity_types_supported": [
