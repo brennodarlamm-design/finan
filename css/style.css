@@ -45,6 +45,7 @@
   --text: #F0F0E8;          /* FinGo offwhite */
   --text2: #E8E8DC;         /* FinGo silver */
   --text3: #94A3B8;         /* Slate-400 — Legibilidade WCAG AA (>6.4:1) */
+  --text3: #e9ecf0;         /* FinGo branco empresarial / platina nítido (>12:1) */
 
   /* Layout */
   --sidebar-w: 260px;
@@ -1520,3 +1521,75 @@ select:focus-visible {
     grid-template-columns: 1fr;
   }
 }
+
+/* ============================================================
+   ACESSIBILIDADE: TEMA CLARO / BRANCO EMPRESARIAL
+   ============================================================ */
+[data-theme="light"] {
+  --bg-primary: #F8F9FA;
+  --bg-secondary: #FFFFFF;
+  --bg-card: #FFFFFF;
+  --bg-card-hover: #F1F5F9;
+  --bg-input: #FFFFFF;
+  --border-s: #E2E8F0;
+  --border-d: #CBD5E1;
+  --border-str: #94A3B8;
+  --border: #E2E8F0;
+  --text: #0A0A0A;
+  --text2: #1E293B;
+  --text3: #475569;
+  --fingo-offwhite: #0A0A0A;
+  --fingo-silver: #1E293B;
+  --fingo-mist: #475569;
+  --fingo-deep: #FFFFFF;
+  --fingo-ink: #F8F9FA;
+  --fingo-shadow: #E2E8F0;
+  background-color: #F8F9FA !important;
+  color: #0A0A0A !important;
+}
+
+[data-theme="light"] .sidebar {
+  background: #FFFFFF !important;
+  border-right: 1px solid #E2E8F0 !important;
+}
+
+[data-theme="light"] .top-header,
+[data-theme="light"] .header {
+  background: #FFFFFF !important;
+  border-bottom: 1px solid #E2E8F0 !important;
+}
+
+[data-theme="light"] .card {
+  background: #FFFFFF !important;
+  border-color: #E2E8F0 !important;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.05) !important;
+}
+
+/* ============================================================
+   ACESSIBILIDADE: MODOS PARA DALTONISMO
+   ============================================================ */
+[data-colorblind="deuteranopia"],
+[data-colorblind="protanopia"] {
+  --success: #38BDF8 !important; /* Azul céu seguro */
+  --danger: #F59E0B !important;  /* Âmbar seguro */
+  --color-success: #38BDF8 !important;
+  --color-error: #F59E0B !important;
+}
+
+[data-colorblind="tritanopia"] {
+  --success: #10B981 !important;
+  --danger: #EC4899 !important; /* Rosa magenta seguro */
+  --color-success: #10B981 !important;
+  --color-error: #EC4899 !important;
+}
+
+[data-colorblind="high-contrast"] {
+  --border: #FFFFFF !important;
+  --border-s: #FFFFFF !important;
+  --border-d: #FFFFFF !important;
+  --text: #FFFFFF !important;
+  --text2: #FFFFFF !important;
+  --text3: #FFFFFF !important;
+  filter: contrast(125%);
+}
+

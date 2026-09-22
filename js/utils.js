@@ -179,43 +179,43 @@ const Utils = {
 
   badge(status) {
     const m = {
-      pago:'<span class="badge badge-success">✓ Pago</span>',
-      recebido:'<span class="badge badge-success">✓ Recebido</span>',
-      a_pagar:'<span class="badge badge-warning">⏳ A Pagar</span>',
-      a_receber:'<span class="badge badge-warning">⏳ A Receber</span>',
-      em_atraso:'<span class="badge badge-danger">⚠ Em Atraso</span>',
-      pendente:'<span class="badge badge-warning">⏳ Pendente</span>',
-      pendente_aprovacao:'<span class="badge badge-warning" style="background:rgba(245,158,11,.15);color:#f59e0b;border:1px solid rgba(245,158,11,.35);font-weight:700;">⏳ Aguardando Aprovação</span>',
-      vencida:'<span class="badge badge-danger">⚠ Vencida</span>',
-      cancelada:'<span class="badge badge-secondary">✕ Cancelada</span>',
-      em_andamento:'<span class="badge badge-info">🔨 Em Andamento</span>',
-      documentacao:'<span class="badge" style="background:rgba(198,255,0,.14);color:#C6FF00;border:1px solid rgba(198,255,0,.35);font-weight:700;">📑 Documentação</span>',
-      aprovada:'<span class="badge badge-success" style="background:rgba(16,185,129,.18);color:#34d399;border:1px solid rgba(16,185,129,.4);font-weight:700;">✓ Aprovada</span>',
-      concluida:'<span class="badge badge-success">✓ Concluída</span>',
-      pausada:'<span class="badge badge-warning">⏸ Pausada</span>',
-      preparando:'<span class="badge badge-secondary">📋 Preparando</span>',
-      submetida:'<span class="badge badge-info">📤 Submetida</span>',
-      em_analise:'<span class="badge badge-warning">🔍 Em Análise</span>',
-      liberada:'<span class="badge badge-success" style="background:rgba(16,185,129,.2)">💰 Liberada</span>',
-      convertida:'<span class="badge badge-success" style="background:rgba(201,162,39,.18);color:var(--accent2);border:1px solid rgba(201,162,39,.4)">💰 Despesa Gerada</span>',
-      rejeitada:'<span class="badge badge-danger">✕ Rejeitada</span>',
-      paga:'<span class="badge badge-success">✓ Paga</span>',
-      ativo:'<span class="badge badge-success">✓ Ativo</span>',
-      a_revisar:'<span class="badge" style="background:rgba(245,158,11,.18);color:#f59e0b;border:1px solid rgba(245,158,11,.4);font-weight:700;">🟡 A Revisar</span>',
-      revisao:'<span class="badge" style="background:rgba(245,158,11,.18);color:#f59e0b;border:1px solid rgba(245,158,11,.4);font-weight:700;">🟡 A Revisar</span>',
-      aprovado:'<span class="badge badge-success" style="background:rgba(16,185,129,.18);color:#34d399;border:1px solid rgba(16,185,129,.4);font-weight:700;">🟢 Aprovado</span>',
-      cancelado:'<span class="badge badge-danger" style="background:rgba(239,68,68,.18);color:#f87171;border:1px solid rgba(239,68,68,.4);font-weight:700;">🔴 Cancelado</span>',
-      despesa_gerada:'<span class="badge" style="background:rgba(201,162,39,.18);color:var(--accent2);border:1px solid rgba(201,162,39,.4);font-weight:700;">💰 Despesas Geradas</span>',
+      pago:'<span class="badge badge-success"><span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:currentColor;margin-right:5px;vertical-align:middle;"></span>Pago</span>',
+      recebido:'<span class="badge badge-success"><span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:currentColor;margin-right:5px;vertical-align:middle;"></span>Recebido</span>',
+      a_pagar:'<span class="badge badge-warning"><span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:currentColor;margin-right:5px;vertical-align:middle;"></span>A Pagar</span>',
+      a_receber:'<span class="badge badge-warning"><span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:currentColor;margin-right:5px;vertical-align:middle;"></span>A Receber</span>',
+      em_atraso:'<span class="badge badge-danger"><span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:currentColor;margin-right:5px;vertical-align:middle;"></span>Em Atraso</span>',
+      pendente:'<span class="badge badge-warning"><span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:currentColor;margin-right:5px;vertical-align:middle;"></span>Pendente</span>',
+      pendente_aprovacao:'<span class="badge badge-warning" style="background:rgba(245,158,11,.15);color:#f59e0b;border:1px solid rgba(245,158,11,.35);font-weight:700;"><span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:currentColor;margin-right:5px;vertical-align:middle;"></span>Aguardando Aprovação</span>',
+      vencida:'<span class="badge badge-danger"><span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:currentColor;margin-right:5px;vertical-align:middle;"></span>Vencida</span>',
+      cancelada:'<span class="badge badge-secondary"><span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:currentColor;margin-right:5px;vertical-align:middle;"></span>Cancelada</span>',
+      em_andamento:'<span class="badge badge-info"><span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:currentColor;margin-right:5px;vertical-align:middle;"></span>Em Andamento</span>',
+      documentacao:'<span class="badge" style="background:rgba(198,255,0,.14);color:#C6FF00;border:1px solid rgba(198,255,0,.35);font-weight:700;"><span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:currentColor;margin-right:5px;vertical-align:middle;"></span>Documentação</span>',
+      aprovada:'<span class="badge badge-success" style="background:rgba(16,185,129,.18);color:#34d399;border:1px solid rgba(16,185,129,.4);font-weight:700;"><span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:currentColor;margin-right:5px;vertical-align:middle;"></span>Aprovada</span>',
+      concluida:'<span class="badge badge-success"><span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:currentColor;margin-right:5px;vertical-align:middle;"></span>Concluída</span>',
+      pausada:'<span class="badge badge-warning"><span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:currentColor;margin-right:5px;vertical-align:middle;"></span>Pausada</span>',
+      preparando:'<span class="badge badge-secondary"><span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:currentColor;margin-right:5px;vertical-align:middle;"></span>Preparando</span>',
+      submetida:'<span class="badge badge-info"><span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:currentColor;margin-right:5px;vertical-align:middle;"></span>Submetida</span>',
+      em_analise:'<span class="badge badge-warning"><span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:currentColor;margin-right:5px;vertical-align:middle;"></span>Em Análise</span>',
+      liberada:'<span class="badge badge-success" style="background:rgba(16,185,129,.2)"><span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:currentColor;margin-right:5px;vertical-align:middle;"></span>Liberada</span>',
+      convertida:'<span class="badge badge-success" style="background:rgba(201,162,39,.18);color:var(--accent2);border:1px solid rgba(201,162,39,.4)"><span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:currentColor;margin-right:5px;vertical-align:middle;"></span>Despesa Gerada</span>',
+      rejeitada:'<span class="badge badge-danger"><span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:currentColor;margin-right:5px;vertical-align:middle;"></span>Rejeitada</span>',
+      paga:'<span class="badge badge-success"><span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:currentColor;margin-right:5px;vertical-align:middle;"></span>Paga</span>',
+      ativo:'<span class="badge badge-success"><span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:currentColor;margin-right:5px;vertical-align:middle;"></span>Ativo</span>',
+      a_revisar:'<span class="badge" style="background:rgba(245,158,11,.18);color:#f59e0b;border:1px solid rgba(245,158,11,.4);font-weight:700;"><span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:currentColor;margin-right:5px;vertical-align:middle;"></span>A Revisar</span>',
+      revisao:'<span class="badge" style="background:rgba(245,158,11,.18);color:#f59e0b;border:1px solid rgba(245,158,11,.4);font-weight:700;"><span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:currentColor;margin-right:5px;vertical-align:middle;"></span>A Revisar</span>',
+      aprovado:'<span class="badge badge-success" style="background:rgba(16,185,129,.18);color:#34d399;border:1px solid rgba(16,185,129,.4);font-weight:700;"><span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:currentColor;margin-right:5px;vertical-align:middle;"></span>Aprovado</span>',
+      cancelado:'<span class="badge badge-danger" style="background:rgba(239,68,68,.18);color:#f87171;border:1px solid rgba(239,68,68,.4);font-weight:700;"><span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:currentColor;margin-right:5px;vertical-align:middle;"></span>Cancelado</span>',
+      despesa_gerada:'<span class="badge" style="background:rgba(201,162,39,.18);color:var(--accent2);border:1px solid rgba(201,162,39,.4);font-weight:700;"><span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:currentColor;margin-right:5px;vertical-align:middle;"></span>Despesas Geradas</span>',
     };
     return m[status] || `<span class="badge badge-secondary">${this.escapeHtml(status || '')}</span>`;
   },
 
   prioridadeBadge(p) {
     const m = {
-      baixa: '<span class="badge" style="background:rgba(148,163,184,.12);color:#94a3b8;border:1px solid rgba(148,163,184,.3)">🟢 Baixa</span>',
-      normal: '<span class="badge badge-info">🔵 Normal</span>',
-      alta: '<span class="badge badge-warning">🟠 Alta</span>',
-      urgente: '<span class="badge badge-danger" style="font-weight:800;border:1px solid rgba(239,68,68,.5)">🔴 Urgente</span>'
+      baixa: '<span class="badge" style="background:rgba(148,163,184,.12);color:#e9ecf0;border:1px solid rgba(148,163,184,.3)"><span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:#10b981;margin-right:5px;vertical-align:middle;"></span>Baixa</span>',
+      normal: '<span class="badge badge-info"><span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:#38bdf8;margin-right:5px;vertical-align:middle;"></span>Normal</span>',
+      alta: '<span class="badge badge-warning"><span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:#f59e0b;margin-right:5px;vertical-align:middle;"></span>Alta</span>',
+      urgente: '<span class="badge badge-danger" style="font-weight:800;border:1px solid rgba(239,68,68,.5)"><span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:#ef4444;margin-right:5px;vertical-align:middle;"></span>Urgente</span>'
     };
     return m[p] || `<span class="badge badge-secondary">${this.escapeHtml(p || 'Normal')}</span>`;
   },
@@ -223,39 +223,39 @@ const Utils = {
   catLabel(c) {
     const m = {
       // Receitas e Obras
-      parcela_caixa:'🏦 Parcela Caixa (Financiamento)',
-      aporte_cliente:'💰 Aporte do Cliente / Parcela Particular',
-      medicao_obra:'📋 Medição / Faturamento de Obra',
-      taxa_adm:'💼 Taxa de Administração de Obra',
-      entrada_propria:'💵 Entrada Própria',
-      aporte_financeiro:'💼 Aporte Financeiro',
-      emprestimo:'🤝 Empréstimo',
-      financiamento:'🏗️ Financiamento',
-      material:'🧱 Material',
-      mao_de_obra:'👷 Mão de Obra',
-      servico:'🔧 Serviço',
-      equipamento:'🏗️ Equipamento',
-      taxa:'📋 Taxa/Imposto',
-      outro:'📦 Outros',
+      parcela_caixa:'Parcela Caixa (Financiamento)',
+      aporte_cliente:'Aporte do Cliente / Parcela Particular',
+      medicao_obra:'Medição / Faturamento de Obra',
+      taxa_adm:'Taxa de Administração de Obra',
+      entrada_propria:'Entrada Própria',
+      aporte_financeiro:'Aporte Financeiro',
+      emprestimo:'Empréstimo',
+      financiamento:'Financiamento',
+      material:'Material',
+      mao_de_obra:'Mão de Obra',
+      servico:'Serviço',
+      equipamento:'Equipamento',
+      taxa:'Taxa / Imposto',
+      outro:'Outros',
       // Despesas Administrativas & Sede
-      energia:'💡 Energia Elétrica',
-      agua:'💧 Água e Esgoto',
-      internet_tel:'🌐 Internet & Telefonia',
-      imposto_simples:'🏛️ DAS Simples Nacional',
-      tributos_trabalhistas:'📄 INSS / FGTS / Tributos',
-      salario:'👥 Salários / Folha',
-      pro_labore:'💼 Pró-Labore Sócios',
-      beneficios:'🎫 Benefícios (VT / VR)',
-      aluguel_sede:'🏢 Aluguel / Condomínio Sede',
-      contabilidade:'⚖️ Contábil / Jurídico',
-      software_ti:'💻 Softwares, TI & Domínio',
-      material_escritorio:'📦 Material Escritório & Copa',
-      manutencao_sede:'🔧 Manutenção da Sede',
-      veiculos_sede:'🚗 Veículos & Combustível',
+      energia:'Energia Elétrica',
+      agua:'Água e Esgoto',
+      internet_tel:'Internet & Telefonia',
+      imposto_simples:'DAS Simples Nacional',
+      tributos_trabalhistas:'INSS / FGTS / Tributos',
+      salario:'Salários / Folha',
+      pro_labore:'Pró-Labore Sócios',
+      beneficios:'Benefícios (VT / VR)',
+      aluguel_sede:'Aluguel / Condomínio Sede',
+      contabilidade:'Contábil / Jurídico',
+      software_ti:'Softwares, TI & Domínio',
+      material_escritorio:'Material Escritório & Copa',
+      manutencao_sede:'Manutenção da Sede',
+      veiculos_sede:'Veículos & Combustível',
       // Marketing
-      marketing:'📣 Marketing',
-      trafego_pago:'🎯 Tráfego Pago',
-      comercial:'🤝 Comercial',
+      marketing:'Marketing',
+      trafego_pago:'Tráfego Pago',
+      comercial:'Comercial',
     };
     if (m[c]) return m[c];
     // Busca em categorias customizadas (despesas e fornecedores)
@@ -264,8 +264,12 @@ const Utils = {
       const customDesp = JSON.parse(localStorage.getItem(scoped('finobra_cats_despesa_custom')) || '[]');
       const customForn = JSON.parse(localStorage.getItem(scoped('finobra_categorias_custom')) || '[]');
       const found = [...customDesp, ...customForn].find(x => x.value === c);
-      if (found) return this.escapeHtml(found.label);
+      if (found) {
+        found.label = String(found.label || '').replace(/^[\p{Extended_Pictographic}\uFE0F\u200D\s]+/u, '').trim();
+        return this.escapeHtml(found.label);
+      }
     } catch(e) {}
+    c = String(c || '').replace(/^[\p{Extended_Pictographic}\uFE0F\u200D\s]+/u, '').trim();
     return this.escapeHtml(c || '');
   },
 

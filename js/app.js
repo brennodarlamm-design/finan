@@ -169,6 +169,7 @@ const App = {
   },
 
   async init() {
+    this.applyAccessibilitySettings();
     window.FinObraStartup?.mark('app-init');
     const rawPath = window.location.pathname || '';
     const rawHash = window.location.hash || '';
@@ -528,6 +529,11 @@ const App = {
               <span style="font-size:.78rem;color:var(--text2);font-weight:600;">Buscar...</span>
               <kbd style="font-size:.65rem;color:var(--text3);background:rgba(255,255,255,.06);border:1px solid var(--border);border-radius:3px;padding:1px 4px;">Ctrl+K</kbd>
             </button>
+            <!-- Botão Acessibilidade -->
+            <button type="button" class="header-access-btn" aria-label="Acessibilidade e temas" data-fb-click="App.showAccessibilityModal" data-fb-click-n="0" title="Acessibilidade: Tela Clara/Escura &amp; Daltonismo" style="cursor:pointer;display:flex;align-items:center;gap:6px;background:rgba(255,255,255,.05);border:1px solid var(--border);border-radius:8px;padding:5px 9px;transition:all .2s;color:var(--text2);">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="4" r="2"/><path d="m4.93 10.93 4.24-4.24a2 2 0 0 1 2.83 0l4.24 4.24M12 8v13M8 17l4 4 4-4"/></svg>
+              <span style="font-size:.75rem;font-weight:600;">Acessibilidade</span>
+            </button>
             <!-- Central de Alertas Notificações -->
             <div id="header-notif-container">
               ${typeof Notificacoes !== 'undefined' ? Notificacoes.renderBellBtn() : ''}
@@ -574,43 +580,43 @@ const App = {
     {
       id: 'gestao',
       label: 'Visão Geral & Gestão',
-      icone: '🏠',
+      get icone() { return FinObraUI.icon('sec-gestao'); },
       rotas: ['dashboard', 'minhas-demandas', 'central-gestor']
     },
     {
       id: 'obras',
       label: 'Obras & Canteiro',
-      icone: '🏗️',
+      get icone() { return FinObraUI.icon('sec-obras'); },
       rotas: ['obras', 'medicoes', 'documentacao', 'portal-cliente']
     },
     {
       id: 'financeiro',
       label: 'Financeiro & Caixa',
-      icone: '💰',
+      get icone() { return FinObraUI.icon('sec-financeiro'); },
       rotas: ['lancamentos', 'escritorio', 'contas-bancarias', 'conciliacao-ofx', 'recibos']
     },
     {
       id: 'suprimentos',
       label: 'Suprimentos & Compras',
-      icone: '🛒',
+      get icone() { return FinObraUI.icon('sec-suprimentos'); },
       rotas: ['pre-compras', 'contratos', 'fornecedores', 'produtos']
     },
     {
       id: 'fiscal',
       label: 'Fiscal & SEFAZ',
-      icone: '📄',
+      get icone() { return FinObraUI.icon('sec-fiscal'); },
       rotas: ['notas-fiscais', 'consulta-nfe']
     },
     {
       id: 'planejamento',
       label: 'Engenharia & SINAPI',
-      icone: '📐',
+      get icone() { return FinObraUI.icon('sec-planejamento'); },
       rotas: ['orcamentos', 'relatorios']
     },
     {
       id: 'sistema',
       label: 'Sistema & Configurações',
-      icone: '⚙️',
+      get icone() { return FinObraUI.icon('sec-sistema'); },
       rotas: ['planos', 'configuracoes', 'validar']
     }
   ],
@@ -718,7 +724,7 @@ const App = {
       favs.push(norm);
       if (typeof Utils !== 'undefined' && Utils.toast) {
         const itemInfo = this._navItemsCatalog[norm];
-        Utils.toast(`⭐ ${itemInfo?.label || 'Módulo'} fixado no topo dos favoritos!`, 'success');
+        Utils.toast(`📌 ${itemInfo?.label || 'Módulo'} fixado no topo dos fixados!`, 'success');
       }
     }
 
@@ -765,7 +771,7 @@ const App = {
         pinnedSectionHtml = `
           <div class="nav-pinned-section" style="margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid rgba(255,255,255,0.08);">
             <div class="nav-pinned-header" style="display:flex;align-items:center;justify-content:space-between;padding:4px 14px 6px;font-size:0.68rem;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:0.06em;">
-              <span style="display:flex;align-items:center;gap:5px;"><span>⭐</span> <span>Fixados</span></span>
+              <span style="display:flex;align-items:center;gap:6px;"><span>${FinObraUI.icon('pin')}</span> <span>Fixados</span></span>
               <span style="font-size:0.65rem;background:rgba(255,255,255,0.06);padding:1px 6px;border-radius:999px;font-weight:600;">${validFavs.length}</span>
             </div>
             <div class="nav-pinned-items">
@@ -824,7 +830,7 @@ const App = {
           ${this._navItem('planos','💎','Planos & Mensalidades')}
           ${this._navItem('configuracoes','⚙️','Configurações')}
           <a href="/validar" target="_blank" class="nav-item" style="text-decoration:none;color:var(--accent2);margin-top:2px;border:1px dashed rgba(201,162,39,0.3);border-radius:6px;" title="Portal público para consultar autenticidade de documentos por código">
-            <span>🛡️</span><span style="flex:1;text-align:left;">Validar Autenticidade ↗</span>
+            <svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg><span style="flex:1;text-align:left;">Validar Autenticidade ↗</span>
           </a>
         `;
       }
@@ -872,12 +878,12 @@ const App = {
     }
     const isAct = (this.route === targetRoute) || (this._normalizeRoute(this.route) === targetRoute);
     const isFav = this.isRouteFavorite(targetRoute);
-    const favTitle = isFav ? 'Desafixar dos favoritos' : 'Fixar no topo dos favoritos';
+    const favTitle = isFav ? 'Desafixar dos fixados' : 'Fixar no topo dos fixados';
 
     return `<button type="button" class="nav-item${isAct?' active':''}${isPinnedItem ? ' nav-item-pinned' : ''}" data-route="${targetRoute}" data-fb-click="Patch26Actions.navigateCloseSidebar" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(targetRoute))}">
       <span>${icon}</span><span class="nav-label" style="flex:1;text-align:left;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${label}</span>${badgeHtml}
-      <span class="nav-fav-btn ${isFav ? 'is-fav' : ''}" data-fb-click="App.toggleFavorite" data-fb-click-n="2" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(targetRoute))}" data-fb-click-t1="event" title="${favTitle}" aria-label="${favTitle}" role="button" tabindex="0">
-        ${isFav ? '❤️' : '🤍'}
+      <span class="nav-fav-btn ${isFav ? 'is-fav' : ''}" data-fb-click="App.toggleFavorite" data-fb-click-n="2" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(targetRoute))}" data-fb-click-t1="event" title="${favTitle}" aria-label="${favTitle}" role="button" tabindex="0" style="display:inline-flex;align-items:center;justify-content:center;padding:4px;cursor:pointer;">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="${isFav ? 'var(--accent)' : 'none'}" stroke="${isFav ? 'var(--accent)' : 'currentColor'}" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="transition:transform .15s,color .15s;${isFav ? 'transform:rotate(-30deg);' : 'opacity:.45;'}"><line x1="12" y1="17" x2="12" y2="22"></line><path d="M5 17h14v-2l-2-2V6h1V4H6v2h1v7l-2 2z"></path></svg>
       </span>
     </button>`;
   },
@@ -1495,6 +1501,109 @@ const App = {
       return Auth.stopImpersonation();
     }
     window.location.href = '/master.html';
+  },
+
+  // ── Acessibilidade & Temas ────────────────────────────────────────────────
+  applyAccessibilitySettings() {
+    try {
+      const theme = localStorage.getItem('finobra_theme') || 'dark';
+      const colorblind = localStorage.getItem('finobra_colorblind') || 'none';
+      if (theme === 'light') {
+        document.documentElement.setAttribute('data-theme', 'light');
+      } else {
+        document.documentElement.removeAttribute('data-theme');
+      }
+      if (colorblind && colorblind !== 'none') {
+        document.documentElement.setAttribute('data-colorblind', colorblind);
+      } else {
+        document.documentElement.removeAttribute('data-colorblind');
+      }
+    } catch(e) {}
+  },
+
+  showAccessibilityModal() {
+    const currentTheme = localStorage.getItem('finobra_theme') || 'dark';
+    const currentColorblind = localStorage.getItem('finobra_colorblind') || 'none';
+    
+    Utils.showModal(`
+      <div class="modal" style="max-width:520px;width:94vw;">
+        <div class="modal-header" style="display:flex;align-items:center;justify-content:space-between;">
+          <span class="modal-title" style="display:flex;align-items:center;gap:8px;">
+            ${typeof FinObraUI !== 'undefined' ? FinObraUI.icon('acessibilidade') : '♿'}
+            <span>Acessibilidade &amp; Tema Visual</span>
+          </span>
+          <button class="modal-close" data-fb-click="Utils.closeModal" data-fb-click-n="0">✕</button>
+        </div>
+        <div class="modal-body" style="padding:20px;">
+          <div style="margin-bottom:20px;">
+            <label style="display:block;font-size:.78rem;font-weight:700;text-transform:uppercase;color:var(--text3);margin-bottom:10px;">Aparência da Tela</label>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+              <button type="button" class="btn ${currentTheme !== 'light' ? 'btn-primary' : 'btn-secondary'}" data-fb-click="App.setTheme" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="dark" style="justify-content:center;gap:8px;font-size:.84rem;">
+                Modo Escuro (Padrão)
+              </button>
+              <button type="button" class="btn ${currentTheme === 'light' ? 'btn-primary' : 'btn-secondary'}" data-fb-click="App.setTheme" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="light" style="justify-content:center;gap:8px;font-size:.84rem;">
+                Tela Branca / Clara
+              </button>
+            </div>
+          </div>
+
+          <div style="margin-bottom:12px;">
+            <label style="display:block;font-size:.78rem;font-weight:700;text-transform:uppercase;color:var(--text3);margin-bottom:10px;">Modo para Daltonismo &amp; Contraste</label>
+            <div style="display:flex;flex-direction:column;gap:8px;">
+              <label style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--bg-secondary);border:1px solid var(--border);border-radius:6px;cursor:pointer;">
+                <input type="radio" name="cb-mode" value="none" ${currentColorblind === 'none' ? 'checked' : ''} data-fb-change="App.setColorblind" data-fb-change-n="1" data-fb-change-t0="string" data-fb-change-v0="none">
+                <div>
+                  <strong style="display:block;font-size:.84rem;">Padrão (Visão Tricromática Completa)</strong>
+                  <span style="font-size:.72rem;color:var(--text3);">Cores originais da identidade FinGo.</span>
+                </div>
+              </label>
+              <label style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--bg-secondary);border:1px solid var(--border);border-radius:6px;cursor:pointer;">
+                <input type="radio" name="cb-mode" value="deuteranopia" ${currentColorblind === 'deuteranopia' ? 'checked' : ''} data-fb-change="App.setColorblind" data-fb-change-n="1" data-fb-change-t0="string" data-fb-change-v0="deuteranopia">
+                <div>
+                  <strong style="display:block;font-size:.84rem;">Deuteranopia / Protanopia (Verde / Vermelho)</strong>
+                  <span style="font-size:.72rem;color:var(--text3);">Substitui verde e vermelho por Azul Céu e Âmbar seguros.</span>
+                </div>
+              </label>
+              <label style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--bg-secondary);border:1px solid var(--border);border-radius:6px;cursor:pointer;">
+                <input type="radio" name="cb-mode" value="tritanopia" ${currentColorblind === 'tritanopia' ? 'checked' : ''} data-fb-change="App.setColorblind" data-fb-change-n="1" data-fb-change-t0="string" data-fb-change-v0="tritanopia">
+                <div>
+                  <strong style="display:block;font-size:.84rem;">Tritanopia (Azul / Amarelo)</strong>
+                  <span style="font-size:.72rem;color:var(--text3);">Ajuste seguro com Verde Esmeralda e Rosa Magenta.</span>
+                </div>
+              </label>
+              <label style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--bg-secondary);border:1px solid var(--border);border-radius:6px;cursor:pointer;">
+                <input type="radio" name="cb-mode" value="high-contrast" ${currentColorblind === 'high-contrast' ? 'checked' : ''} data-fb-change="App.setColorblind" data-fb-change-n="1" data-fb-change-t0="string" data-fb-change-v0="high-contrast">
+                <div>
+                  <strong style="display:block;font-size:.84rem;">Alto Contraste</strong>
+                  <span style="font-size:.72rem;color:var(--text3);">Bordas brancas nítidas e contraste de 125%.</span>
+                </div>
+              </label>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer" style="display:flex;justify-content:flex-end;">
+          <button class="btn btn-secondary" data-fb-click="Utils.closeModal" data-fb-click-n="0">Fechar</button>
+        </div>
+      </div>
+    `);
+  },
+
+  setTheme(theme) {
+    try {
+      localStorage.setItem('finobra_theme', theme);
+    } catch(e) {}
+    this.applyAccessibilitySettings();
+    Utils.closeModal?.();
+    this.showAccessibilityModal();
+  },
+
+  setColorblind(mode) {
+    try {
+      localStorage.setItem('finobra_colorblind', mode);
+    } catch(e) {}
+    this.applyAccessibilitySettings();
+    Utils.closeModal?.();
+    this.showAccessibilityModal();
   },
 
   // ── Loader de Sincronização ────────────────────────────────────────────────

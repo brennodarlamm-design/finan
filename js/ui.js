@@ -2,6 +2,8 @@
 const FinObraUI = (() => {
   const paths = {
     dashboard:'M3 3h7v7H3zM14 3h7v7h-7zM3 14h7v7H3zM14 14h7v7h-7z',
+    'minhas-demandas':'M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zm10-2v6m3-3h-6',
+    'central-gestor':'M2 3h20v14H2zM8 21h8M12 17v4M7 8h2M11 8h2M15 8h2M7 12h10',
     obras:'M3 21V8l9-5 9 5v13M8 21v-7h8v7M8 9h.01M16 9h.01',
     lancamentos:'M4 7h16M16 3l4 4-4 4M20 17H4M8 13l-4 4 4 4',
     fornecedores:'M3 6h11v12H3zM14 10h4l3 4v4h-7M6 18v3M18 18v3',
@@ -16,11 +18,22 @@ const FinObraUI = (() => {
     orcamentos:'M5 3h14v18H5zM8 7h8M8 12h2M14 12h2M8 16h2M14 16h2',
     medicoes:'M4 20V11M10 20V4M16 20v-7M22 20H2',
     documentacao:'M3 6h7l2 3h9v11H3V6zM3 6V4h7l2 2h8v3',
+    'portal-cliente':'M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2zm0 0v20m-10-10h20',
     relatorios:'M5 3h14v18H5zM9 16v-4M13 16V8M17 16v-6',
     planos:'M12 3l9 5-3 11H6L3 8l9-5zM3 8h18M8 8l4 11 4-11',
     'contas-bancarias':'M3 10h18M12 3l9 5H3l9-5zM5 12v7M10 12v7M15 12v7M20 12v7M2 21h20',
     configuracoes:'M4 7h16M4 17h16M8 4v6M16 14v6',
-    menu:'M4 6h16M4 12h16M4 18h16'
+    menu:'M4 6h16M4 12h16M4 18h16',
+    pin:'M12 17v5M5 17h14v-2l-2-2V6h1V4H6v2h1v7l-2 2z',
+    acessibilidade:'M12 2a2 2 0 1 0 0 4 2 2 0 0 0 0-4zm-2 6h4v5h3l-2 7h-2l1-5h-4l1 5H7l-2-7h3z',
+    'sec-gestao':'M3 3h7v7H3zM14 3h7v7h-7zM3 14h7v7H3zM14 14h7v7h-7z',
+    'sec-obras':'M2 22h20M4 22V7l5-4 5 4v15M14 10h6l2 4v8M14 22v-6h4v6',
+    'sec-financeiro':'M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6',
+    'sec-suprimentos':'M3 3h2l3 12h11l2-8H6M9 20h.01M18 20h.01',
+    'sec-fiscal':'M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8zM14 2v6h6M16 13H8M16 17H8M10 9H8',
+    'sec-planejamento':'M2 21l21-21M3 8l5-5M9 14l5-5M15 20l5-5',
+    'sec-sistema':'M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6zm7.4-2.8l1.6-1.2-1.6-2.8-2 .6a7 7 0 0 0-1.7-1l-.3-2.1h-3.2l-.3 2.1a7 7 0 0 0-1.7 1l-2-.6-1.6 2.8 1.6 1.2a7 7 0 0 0 0 2l-1.6 1.2 1.6 2.8 2-.6a7 7 0 0 0 1.7 1l.3 2.1h3.2l.3-2.1a7 7 0 0 0 1.7-1l2 .6 1.6-2.8-1.6-1.2a7 7 0 0 0 0-2z',
+    'sec-fixados':'M12 17v5M5 17h14v-2l-2-2V6h1V4H6v2h1v7l-2 2z'
   };
   const icon = name => `<svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${paths[name] || paths.documentacao}"/></svg>`;
   function enhance(root) {

@@ -2,6 +2,7 @@
 /* Phase 4: Canonical Design Tokens defer to css/tokens.css (SSOT) */
 .ui-workspace, .ui-portal, .ui-auth, .ui-public {
   --text3: #94A3B8; /* Preserved for WCAG AA compliance & Phase 3 ergonomics */
+  --text3: #e9ecf0; /* Aligned with FinGo white/platinum standard */
   --sidebar-w: 260px;
   --header-h: 64px;
 }

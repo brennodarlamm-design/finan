@@ -33,7 +33,7 @@ const Escritorio = {
     return `
     <div class="page-header">
       <div>
-        <h1 class="page-title">🏢 Despesas do Escritório</h1>
+        <h1 class="page-title">Despesas do Escritório</h1>
         <p class="page-sub">Gestão de custos fixos, contas de consumo (água, energia, internet), tributos (DAS Simples Nacional), folha e sede administrativa</p>
       </div>
       <div class="page-actions" style="display:flex;gap:8px;flex-wrap:wrap;">
@@ -58,21 +58,21 @@ const Escritorio = {
       </div>
       <div class="kpi-card" style="padding:14px;border:1px solid rgba(245,158,11,.3);">
         <div class="kpi-label">A Pagar (Vencimentos)</div>
-        <div class="kpi-value yellow" style="font-size:1.2rem">${Utils.fmt.currency(resumo.totalAPagar)}</div>
-        <div class="kpi-change" style="font-size:.7rem;">${resumo.aPagarQtd} conta(s) pendente(s)</div>
+        <div class="kpi-value yellow" style="font-size:1.2rem">${Utils.fmt.currency(resumo.aPagarValor)}</div>
+        <div class="kpi-change" style="font-size:.7rem;">${resumo.aPagarQtd} contas pendentes</div>
       </div>
       <div class="kpi-card" style="padding:14px;">
-        <div class="kpi-label">💡 Contas de Consumo</div>
+        <div class="kpi-label">Contas de Consumo</div>
         <div class="kpi-value cyan" style="font-size:1.2rem">${Utils.fmt.currency(resumo.consumoValor)}</div>
-        <div class="kpi-change" style="font-size:.7rem;">Energia, Água e Internet</div>
+        <div class="kpi-change" style="font-size:.7rem;">Água, Luz e Telefonia</div>
       </div>
       <div class="kpi-card" style="padding:14px;">
-        <div class="kpi-label">🏛️ Impostos & Simples</div>
+        <div class="kpi-label">Impostos &amp; Simples</div>
         <div class="kpi-value yellow" style="font-size:1.2rem">${Utils.fmt.currency(resumo.impostosValor)}</div>
         <div class="kpi-change" style="font-size:.7rem;">DAS Simples, INSS e Taxas</div>
       </div>
       <div class="kpi-card" style="padding:14px;">
-        <div class="kpi-label">👥 Folha & Sócios</div>
+        <div class="kpi-label">Folha &amp; Sócios</div>
         <div class="kpi-value green" style="font-size:1.2rem">${Utils.fmt.currency(resumo.folhaValor)}</div>
         <div class="kpi-change" style="font-size:.7rem;">Salários, Pró-Labore e VT/VR</div>
       </div>
@@ -81,22 +81,22 @@ const Escritorio = {
     <!-- ABAS RÁPIDAS POR GRUPO DE DESPESAS -->
     <div style="display:flex;gap:6px;border-bottom:1px solid var(--border);margin-bottom:16px;overflow-x:auto;padding-bottom:2px;">
       <button class="btn btn-sm ${this._activeGroup==='todas'?'btn-primary':'btn-secondary'}" data-fb-click="Escritorio.switchGroup" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="todas">
-        📋 Todas as Despesas (${DB.getDespesasEscritorio().length})
+        Todas as Despesas (${DB.getDespesasEscritorio().length})
       </button>
       <button class="btn btn-sm ${this._activeGroup==='consumo'?'btn-primary':'btn-secondary'}" data-fb-click="Escritorio.switchGroup" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="consumo">
-        💡 Contas de Consumo (Luz / Água / Net)
+        Contas de Consumo (Luz / Água / Net)
       </button>
       <button class="btn btn-sm ${this._activeGroup==='impostos'?'btn-primary':'btn-secondary'}" data-fb-click="Escritorio.switchGroup" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="impostos">
-        🏛️ Impostos & Simples Nacional
+        Impostos &amp; Simples Nacional
       </button>
       <button class="btn btn-sm ${this._activeGroup==='folha'?'btn-primary':'btn-secondary'}" data-fb-click="Escritorio.switchGroup" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="folha">
-        👥 Folha de Pagamento & Sócios
+        Folha de Pagamento &amp; Sócios
       </button>
       <button class="btn btn-sm ${this._activeGroup==='estrutura'?'btn-primary':'btn-secondary'}" data-fb-click="Escritorio.switchGroup" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="estrutura">
-        🏢 Aluguel & Instalações
+        Aluguel &amp; Instalações
       </button>
       <button class="btn btn-sm ${this._activeGroup==='servicos'?'btn-primary':'btn-secondary'}" data-fb-click="Escritorio.switchGroup" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="servicos">
-        ⚖️ Contabilidade, TI & Softwares
+        Contabilidade, TI &amp; Softwares
       </button>
     </div>
 
@@ -113,33 +113,33 @@ const Escritorio = {
         <label class="filter-label">Categoria</label>
         <select class="form-control" id="adm-cat" style="min-width:140px" data-fb-change="Escritorio.aplicarFiltros" data-fb-change-n="0">
           <option value="">Todas</option>
-          <option value="energia">💡 Energia Elétrica</option>
-          <option value="agua">💧 Água e Esgoto</option>
-          <option value="internet_tel">🌐 Internet & Telefonia</option>
-          <option value="imposto_simples">🏛️ DAS Simples Nacional</option>
-          <option value="tributos_trabalhistas">📄 INSS / FGTS / Tributos</option>
-          <option value="salario">👥 Salários / Folha</option>
-          <option value="pro_labore">💼 Pró-Labore Sócios</option>
-          <option value="beneficios">🎫 Benefícios (VT / VR)</option>
-          <option value="aluguel_sede">🏢 Aluguel / Sede</option>
-          <option value="contabilidade">⚖️ Contábil / Jurídico</option>
-          <option value="software_ti">💻 Softwares & TI</option>
-          <option value="material_escritorio">📦 Material & Copa</option>
-          <option value="manutencao_sede">🔧 Manutenção</option>
-          <option value="veiculos_sede">🚗 Veículos & Combustível</option>
-          <option value="marketing">📣 Marketing</option>
-          <option value="trafego_pago">🎯 Tráfego Pago</option>
-          <option value="comercial">🤝 Comercial</option>
-          ${this._getAllDespesaCats().map(c => `<option value="${Utils.escapeHtml(String(c.value || ''))}">${Utils.escapeHtml(String(c.label || ''))}</option>`).join('')}
+          <option value="energia">Energia Elétrica</option>
+          <option value="agua">Água e Esgoto</option>
+          <option value="internet_tel">Internet &amp; Telefonia</option>
+          <option value="imposto_simples">DAS Simples Nacional</option>
+          <option value="tributos_trabalhistas">INSS / FGTS / Tributos</option>
+          <option value="salario">Salários / Folha</option>
+          <option value="pro_labore">Pró-Labore Sócios</option>
+          <option value="beneficios">Benefícios (VT / VR)</option>
+          <option value="aluguel_sede">Aluguel / Sede</option>
+          <option value="contabilidade">Contábil / Jurídico</option>
+          <option value="software_ti">Softwares &amp; TI</option>
+          <option value="material_escritorio">Material &amp; Copa</option>
+          <option value="manutencao_sede">Manutenção</option>
+          <option value="veiculos_sede">Veículos &amp; Combustível</option>
+          <option value="marketing">Marketing</option>
+          <option value="trafego_pago">Tráfego Pago</option>
+          <option value="comercial">Comercial</option>
+          ${this._getAllDespesaCats().map(c => `<option value="${Utils.escapeHtml(String(c.value || ''))}">${Utils.escapeHtml(String(c.label || '').replace(/^[\p{Extended_Pictographic}\uFE0F\u200D\s]+/u, '').trim())}</option>`).join('')}
         </select>
       </div>
       <div class="filter-group">
         <label class="filter-label">Status</label>
         <select class="form-control" id="adm-status" style="min-width:110px" data-fb-change="Escritorio.aplicarFiltros" data-fb-change-n="0">
           <option value="">Todos</option>
-          <option value="a_pagar">⏳ A Pagar</option>
-          <option value="pago">✓ Pago</option>
-          <option value="em_atraso">⚠ Em Atraso</option>
+          <option value="a_pagar">A Pagar</option>
+          <option value="pago">Pago</option>
+          <option value="em_atraso">Em Atraso</option>
         </select>
       </div>
       <div class="filter-group">

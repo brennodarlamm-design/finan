@@ -9,20 +9,20 @@ const Orcamentos = {
 
   // ── CATÁLOGO OFICIAL DE CATEGORIAS DA CONSTRUÇÃO CIVIL ──
   CATEGORIAS_PADRAO: [
-    { id: 'cat-preliminares', nome: '1. Serviços Preliminares', icone: '📐', cor: '#3b82f6' },
-    { id: 'cat-fundacoes', nome: '2. Fundações e Terraplenagem', icone: '🏗️', cor: '#f59e0b' },
-    { id: 'cat-estrutura', nome: '3. Estrutura e Concreto', icone: '🏢', cor: '#10b981' },
-    { id: 'cat-alvenaria', nome: '4. Alvenaria e Fechamentos', icone: '🧱', cor: '#8b5cf6' },
-    { id: 'cat-cobertura', nome: '5. Cobertura e Telhado', icone: '🏠', cor: '#ec4899' },
-    { id: 'cat-hidraulica', nome: '6. Instalações Hidrossanitárias', icone: '💧', cor: '#06b6d4' },
-    { id: 'cat-eletrica', nome: '7. Instalações Elétricas e Dados', icone: '⚡', cor: '#eab308' },
-    { id: 'cat-revestimentos', nome: '8. Revestimentos e Pisos', icone: '✨', cor: '#14b8a6' },
-    { id: 'cat-esquadrias', nome: '9. Esquadrias e Vidraçaria', icone: '🚪', cor: '#6366f1' },
-    { id: 'cat-pintura', nome: '10. Pintura e Texturas', icone: '🎨', cor: '#f97316' },
-    { id: 'cat-loucas', nome: '11. Louças, Metais e Acessórios', icone: '🚰', cor: '#84cc16' },
-    { id: 'cat-limpeza', nome: '12. Limpeza Final e Entrega', icone: '🧹', cor: '#64748b' },
-    { id: 'cat-imprevistos', nome: '13. Administração e Imprevistos', icone: '🛡️', cor: '#ef4444' },
-    { id: 'cat-governanca', nome: '14. Governança, Fiscalização & Gestão Técnica', icone: '⚖️', cor: '#c9a227' }
+    { id: 'cat-preliminares', nome: '1. Serviços Preliminares', icone: '', cor: '#3b82f6' },
+    { id: 'cat-fundacoes', nome: '2. Fundações e Terraplenagem', icone: '', cor: '#f59e0b' },
+    { id: 'cat-estrutura', nome: '3. Estrutura e Concreto', icone: '', cor: '#10b981' },
+    { id: 'cat-alvenaria', nome: '4. Alvenaria e Fechamentos', icone: '', cor: '#8b5cf6' },
+    { id: 'cat-cobertura', nome: '5. Cobertura e Telhado', icone: '', cor: '#ec4899' },
+    { id: 'cat-hidraulica', nome: '6. Instalações Hidrossanitárias', icone: '', cor: '#06b6d4' },
+    { id: 'cat-eletrica', nome: '7. Instalações Elétricas e Dados', icone: '', cor: '#eab308' },
+    { id: 'cat-revestimentos', nome: '8. Revestimentos e Pisos', icone: '', cor: '#14b8a6' },
+    { id: 'cat-esquadrias', nome: '9. Esquadrias e Vidraçaria', icone: '', cor: '#6366f1' },
+    { id: 'cat-pintura', nome: '10. Pintura e Texturas', icone: '', cor: '#f97316' },
+    { id: 'cat-loucas', nome: '11. Louças, Metais e Acessórios', icone: '', cor: '#84cc16' },
+    { id: 'cat-limpeza', nome: '12. Limpeza Final e Entrega', icone: '', cor: '#64748b' },
+    { id: 'cat-imprevistos', nome: '13. Administração e Imprevistos', icone: '', cor: '#ef4444' },
+    { id: 'cat-governanca', nome: '14. Governança, Fiscalização & Gestão Técnica', icone: '', cor: '#c9a227' }
   ],
 
   UNIDADES_PADRAO: ['m²', 'm³', 'm', 'un', 'kg', 'vb', 'h', 'cj', 'sc', 'pt', 'gl', 'ton'],

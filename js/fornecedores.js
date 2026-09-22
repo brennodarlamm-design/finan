@@ -4,17 +4,17 @@ const Fornecedores = {
 
   // Categorias fixas do sistema (não podem ser excluídas)
   CATEGORIAS: [
-    { value: 'material',      label: '🧱 Material de Construção' },
-    { value: 'mao_de_obra',   label: '👷 Mão de Obra / Serviços' },
-    { value: 'servico',       label: '🔧 Serviço / Prestador' },
-    { value: 'equipamento',   label: '🏗️ Equipamento / Locação' },
-    { value: 'contabilidade', label: '⚖️ Contábil / Jurídico' },
-    { value: 'software_ti',   label: '💻 Software & TI' },
-    { value: 'transporte',    label: '🚚 Transporte / Logística' },
-    { value: 'marketing',     label: '📣 Marketing' },
-    { value: 'trafego_pago',  label: '🎯 Tráfego Pago' },
-    { value: 'comercial',     label: '🤝 Comercial' },
-    { value: 'outros',        label: '📦 Outros' },
+    { value: 'material',      label: 'Material de Construção' },
+    { value: 'mao_de_obra',   label: 'Mão de Obra / Serviços' },
+    { value: 'servico',       label: 'Serviço / Prestador' },
+    { value: 'equipamento',   label: 'Equipamento / Locação' },
+    { value: 'contabilidade', label: 'Contábil / Jurídico' },
+    { value: 'software_ti',   label: 'Software & TI' },
+    { value: 'transporte',    label: 'Transporte / Logística' },
+    { value: 'marketing',     label: 'Marketing' },
+    { value: 'trafego_pago',  label: 'Tráfego Pago' },
+    { value: 'comercial',     label: 'Comercial' },
+    { value: 'outros',        label: 'Outros' },
   ],
 
   // Categorias personalizadas ficam isoladas por tenant e sincronizadas no Neon.

@@ -10,11 +10,11 @@ const Produtos = {
   },
 
   CATEGORIAS: [
-    { value: 'material',    label: '🧱 Material de Construção' },
-    { value: 'mao_de_obra', label: '👷 Mão de Obra' },
-    { value: 'servico',     label: '🔧 Serviço' },
-    { value: 'equipamento', label: '🏗️ Equipamento' },
-    { value: 'outro',       label: '📦 Outro' },
+    { value: 'material',    label: 'Material de Construção' },
+    { value: 'mao_de_obra', label: 'Mão de Obra' },
+    { value: 'servico',     label: 'Serviço' },
+    { value: 'equipamento', label: 'Equipamento' },
+    { value: 'outro',       label: 'Outros' },
   ],
 
   // ────────────────────────────────────────────────────────────

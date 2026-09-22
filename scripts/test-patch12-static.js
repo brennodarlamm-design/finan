@@ -13,7 +13,13 @@ const vercelJson = read('vercel.json');
 const nfeJs = read('js/nfe.js');
 const backend = read('backend/server.js');
 const whatsappApi = read('api/whatsapp.js');
-const dbApi = read('api/db.js');
+const dbApi = [
+  read('api/db.js'),
+  fs.existsSync('api/_db-queries.js') ? read('api/_db-queries.js') : '',
+  fs.existsSync('api/_db-mutations.js') ? read('api/_db-mutations.js') : '',
+  fs.existsSync('api/_db-sync.js') ? read('api/_db-sync.js') : '',
+  fs.existsSync('api/_db-normalizers.js') ? read('api/_db-normalizers.js') : ''
+].join('\n');
 const uploadApi = read('api/upload.js');
 const dataJs = read('js/data.js');
 const appJs = read('js/app.js');

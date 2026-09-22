@@ -150,7 +150,7 @@ const Dashboard = {
 
     <div class="card" style="padding:0;">
       <div class="card-header" style="padding:18px 20px 0;">
-        <div class="card-title">📝 &Uacute;ltimos Lan&ccedil;amentos</div>
+        <div class="card-title">&Uacute;ltimos Lan&ccedil;amentos</div>
         <button class="btn btn-secondary btn-sm" data-fb-click="App.navigate" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(isEscritorio ? 'escritorio' : 'lancamentos'))}">Ver todos</button>
       </div>
       <div class="tbl-wrap" style="border:none;border-radius:0 0 14px 14px;">
@@ -232,10 +232,10 @@ const Dashboard = {
             <tr>
               <th>Centro de Custo / Obra</th>
               <th style="text-align:right;">Receita</th>
-              <th style="text-align:right;">🧱 Materiais</th>
-              <th style="text-align:right;">👷 Mão de Obra</th>
-              <th style="text-align:right;">🔧 Serviços/Eqp</th>
-              <th style="text-align:right;">📋 Indiretos</th>
+              <th style="text-align:right;">Materiais</th>
+              <th style="text-align:right;">Mão de Obra</th>
+              <th style="text-align:right;">Serviços &amp; Eqp</th>
+              <th style="text-align:right;">Indiretos</th>
               <th style="text-align:right;">Lucro Líquido</th>
               <th style="text-align:right;">Margem %</th>
             </tr>
@@ -245,7 +245,7 @@ const Dashboard = {
               const d = calcularDREPara(c.id);
               return `
               <tr>
-                <td style="font-weight:700;color:var(--text);">🏗️ ${c.nome}</td>
+                <td style="font-weight:700;color:var(--text);">${Utils.escapeHtml(c.nome)}</td>
                 <td style="text-align:right;color:var(--success);font-weight:700;">${Utils.fmt.currency(d.recs)}</td>
                 <td style="text-align:right;color:var(--text2);">${Utils.fmt.currency(d.mat)}</td>
                 <td style="text-align:right;color:var(--text2);">${Utils.fmt.currency(d.mo)}</td>
@@ -257,7 +257,7 @@ const Dashboard = {
             }).join('')}
             ${isTodas ? `
             <tr style="background:rgba(255,255,255,.02);font-style:italic;">
-              <td style="font-weight:700;color:var(--text);">🏢 Sede / Escritório Central</td>
+              <td style="font-weight:700;color:var(--text);">Sede / Escritório Central</td>
               <td style="text-align:right;color:var(--text3);">${Utils.fmt.currency(calcularDREPara('escritorio').recs)}</td>
               <td style="text-align:right;color:var(--text3);">${Utils.fmt.currency(calcularDREPara('escritorio').mat)}</td>
               <td style="text-align:right;color:var(--text3);">${Utils.fmt.currency(calcularDREPara('escritorio').mo)}</td>
@@ -276,11 +276,11 @@ const Dashboard = {
       const res = DB.getResumoEscritorio();
       const total = res.totalGeral || 1;
       const grupos = [
-        { label: '💡 Contas de Consumo (Luz / Água / Net)', val: res.consumoValor, color: 'cyan' },
-        { label: '🏛️ Impostos & Simples Nacional', val: res.impostosValor, color: 'yellow' },
-        { label: '👥 Folha de Pagamento & Sócios', val: res.folhaValor, color: 'green' },
-        { label: '🏢 Estrutura & Aluguel', val: res.estruturaValor, color: 'blue' },
-        { label: '⚖️ Contabilidade, TI & Softwares', val: res.servicosValor, color: 'purple' }
+        { label: 'Contas de Consumo (Luz / Água / Net)', val: res.consumoValor, color: 'cyan' },
+        { label: 'Impostos & Simples Nacional', val: res.impostosValor, color: 'yellow' },
+        { label: 'Folha de Pagamento & Sócios', val: res.folhaValor, color: 'green' },
+        { label: 'Estrutura & Aluguel', val: res.estruturaValor, color: 'blue' },
+        { label: 'Contabilidade, TI & Softwares', val: res.servicosValor, color: 'purple' }
       ];
 
       return grupos.map(g => {
@@ -639,10 +639,10 @@ const Dashboard = {
         recentBody.innerHTML = d.recent.map(l => `
           <tr>
             <td style="white-space:nowrap">${Utils.fmt.date(l.data)}</td>
-            ${showObra ? `<td style="font-size:.78rem;color:var(--text2)">${Utils.escapeHtml(l.obra_nome || (l.obra_id === 'escritorio' ? '🏢 Sede / Escritório' : '—'))}</td>` : ''}
+            ${showObra ? `<td style="font-size:.78rem;color:var(--text2)">${Utils.escapeHtml(l.obra_nome || (l.obra_id === 'escritorio' ? 'Sede / Escritório' : '—'))}</td>` : ''}
             <td>${Utils.escapeHtml(l.descricao || '')}</td>
             <td>${Utils.escapeHtml(Utils.catLabel(l.categoria))}</td>
-            <td>${l.tipo === 'receita' ? '<span class="badge badge-success">↑ Receita</span>' : '<span class="badge badge-danger">↓ Despesa</span>'}</td>
+            <td>${l.tipo === 'receita' ? '<span class="badge badge-success"><span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:currentColor;margin-right:5px;vertical-align:middle;"></span>Receita</span>' : '<span class="badge badge-danger"><span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:currentColor;margin-right:5px;vertical-align:middle;"></span>Despesa</span>'}</td>
             <td style="font-weight:800;white-space:nowrap;color:${l.tipo === 'receita' ? 'var(--success)' : 'var(--danger)'};">${l.tipo === 'receita' ? '+' : '−'} ${Utils.fmt.currency(l.valor)}</td>
             <td>${Utils.badge(l.status)}</td>
           </tr>`).join('');
@@ -690,7 +690,7 @@ const Dashboard = {
         { label:'Receitas', data:keys.map(k=>months[k].rec), backgroundColor:'rgba(16,185,129,.75)', borderColor:'#10b981', borderWidth:1, borderRadius:4 },
         { label:'Despesas', data:keys.map(k=>months[k].desp), backgroundColor:'rgba(239,68,68,.75)', borderColor:'#ef4444', borderWidth:1, borderRadius:4 }
       ]},
-      options:{ responsive:true, maintainAspectRatio:false, plugins:{ legend:{labels:{color:'#94a3b8',font:{size:11}}}, tooltip:{callbacks:{label:c=>` ${c.dataset.label}: ${Utils.fmt.currency(c.raw)}`}} }, scales:{ x:{ticks:{color:'#a0b5bd'},grid:{color:'rgba(255,255,255,.03)'}}, y:{ticks:{color:'#a0b5bd',callback:v=>'R$'+(v/1000).toFixed(0)+'k'},grid:{color:'rgba(255,255,255,.05)'}} } }
+      options:{ responsive:true, maintainAspectRatio:false, plugins:{ legend:{labels:{color:'#e9ecf0',font:{size:11,weight:600}}}, tooltip:{callbacks:{label:c=>` ${c.dataset.label}: ${Utils.fmt.currency(c.raw)}`}} }, scales:{ x:{ticks:{color:'#e9ecf0'},grid:{color:'rgba(255,255,255,.03)'}}, y:{ticks:{color:'#e9ecf0',callback:v=>'R$'+(v/1000).toFixed(0)+'k'},grid:{color:'rgba(255,255,255,.05)'}} } }
     });
     App.registerChart(ch);
   },
@@ -716,12 +716,14 @@ const Dashboard = {
       values = Object.values(cats);
     }
 
+    labels = labels.map(lbl => String(lbl || '').replace(/^[\p{Extended_Pictographic}\uFE0F\u200D\s]+/u, '').trim());
+
     if (!values.length || values.every(v => v === 0)) {
       const container = canvas.parentElement;
       if (container) {
         container.innerHTML = `
         <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;color:var(--text3);font-size:.85rem;text-align:center;">
-          <span style="font-size:2.2rem;margin-bottom:8px;opacity:.5;">🥧</span>
+          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="margin-bottom:8px;opacity:.5;"><circle cx="12" cy="12" r="10"/><path d="M12 2a10 10 0 0 1 10 10H12z"/></svg>
           <span>Nenhuma despesa registrada para exibir o gráfico neste centro.</span>
         </div>`;
       }
@@ -754,11 +756,15 @@ const Dashboard = {
         plugins:{
           legend:{
             position:'right',
-            labels:{ color:'#94a3b8', font:{size:10}, boxWidth:10, padding:8 }
+            labels:{ color:'#e9ecf0', font:{size:11, weight:600}, boxWidth:10, padding:8 }
           },
           tooltip:{
             callbacks:{
-              label: c => ` ${c.label}: ${Utils.fmt.currency(c.raw)} (${((c.raw/total)*100).toFixed(1)}%)`
+              label: c => {
+                const val = c.raw || 0;
+                const pct = total > 0 ? ((val / total) * 100).toFixed(1) : 0;
+                return ` ${c.label}: ${Utils.fmt.currency(val)} (${pct}%)`;
+              }
             }
           }
         }
@@ -891,7 +897,7 @@ const Dashboard = {
         interaction: { mode: 'index', intersect: false },
         plugins: {
           legend: {
-            labels: { color: '#94a3b8', font: { size: 11, family: 'Inter' }, boxWidth: 12 }
+            labels: { color: '#e9ecf0', font: { size: 11, family: 'Inter', weight: 600 }, boxWidth: 12 }
           },
           tooltip: {
             callbacks: {
@@ -902,12 +908,12 @@ const Dashboard = {
         scales: {
           x: {
             grid: { color: 'rgba(255,255,255,0.04)' },
-            ticks: { color: '#94a3b8', font: { size: 10, family: 'Inter' } }
+            ticks: { color: '#e9ecf0', font: { size: 10, family: 'Inter' } }
           },
           y: {
             grid: { color: 'rgba(255,255,255,0.06)' },
             ticks: {
-              color: '#94a3b8',
+              color: '#e9ecf0',
               font: { size: 10, family: 'Inter' },
               callback: v => Utils.fmt.currency(v)
             }
