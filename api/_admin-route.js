@@ -1462,9 +1462,12 @@ export default async function handler(req, res) {
         email,
         telefone,
         plano,
+        ciclo,
+        cycle,
         status,
         username,
-        senha
+        senha,
+        vencimento
       } = req.body || {};
 
       const finalNome = (nome_fantasia || razao_social || '').trim();
@@ -1487,9 +1490,17 @@ export default async function handler(req, res) {
 
       const rawUser = (username || finalEmail.split('@')[0]).trim().toLowerCase().replace(/[^a-z0-9._-]/g, '');
       const allowedPlans = ['trial', 'starter', 'pro', 'unlimited'];
+      const allowedCycles = ['trial', 'monthly', 'quarterly', 'semiannual', 'annual'];
       const finalPlano = String(plano || 'pro').toLowerCase();
-      const finalStatus = String(status || 'ativo').toLowerCase();
       if (!allowedPlans.includes(finalPlano)) return res.status(400).json({ success:false, error:'Plano inválido.' });
+
+      let effCiclo = String(ciclo || cycle || (finalPlano === 'trial' ? 'trial' : 'monthly')).toLowerCase();
+      if (!allowedCycles.includes(effCiclo)) {
+        effCiclo = finalPlano === 'trial' ? 'trial' : 'monthly';
+      }
+
+      const defaultStatus = finalPlano === 'trial' ? 'trial' : 'ativo';
+      const finalStatus = String(status || defaultStatus).toLowerCase();
       if (!['ativo','trial','inadimplente','bloqueado','cancelado'].includes(finalStatus)) return res.status(400).json({ success:false, error:'Status inválido.' });
 
       // Verifica se o usuário ou email já existe
@@ -1507,10 +1518,22 @@ export default async function handler(req, res) {
       const userId = 'usr_' + crypto.randomBytes(6).toString('hex');
       const passHash = hashPassword(finalSenha);
 
-      let finalVencimento = String(req.body?.vencimento || '').trim();
+      let finalVencimento = String(vencimento || req.body?.vencimento || '').trim();
       if (!finalVencimento || !/^\d{4}-\d{2}-\d{2}$/.test(finalVencimento)) {
         const dt = new Date();
-        dt.setDate(dt.getDate() + (finalStatus === 'trial' ? 15 : 30));
+        let addDays = 30;
+        if (finalPlano === 'trial' || effCiclo === 'trial' || finalStatus === 'trial') {
+          addDays = 15;
+        } else if (effCiclo === 'annual') {
+          addDays = 365;
+        } else if (effCiclo === 'semiannual') {
+          addDays = 180;
+        } else if (effCiclo === 'quarterly') {
+          addDays = 90;
+        } else {
+          addDays = 30;
+        }
+        dt.setDate(dt.getDate() + addDays);
         finalVencimento = dt.toISOString().split('T')[0];
       }
 
@@ -1563,6 +1586,7 @@ export default async function handler(req, res) {
           nome_fantasia: finalNome,
           email: finalEmail,
           plano: finalPlano,
+          ciclo: effCiclo,
           status: finalStatus,
           vencimento: finalVencimento,
           access_key_last4: last4
@@ -1577,6 +1601,7 @@ export default async function handler(req, res) {
           nome_fantasia: finalNome,
           email: finalEmail,
           plano: finalPlano,
+          ciclo: effCiclo,
           status: finalStatus,
           vencimento: finalVencimento,
           accessKey: rawAccessKey, // EXIBIDA UMA ÚNICA VEZ NO CADASTRO

@@ -1750,9 +1750,11 @@ const MasterAdmin = {
           <div>
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
               <label style="font-size:.78rem;color:#94a3b8;">Data de Vencimento do Plano / Trial *</label>
-              <div style="display:flex;gap:6px;">
+              <div style="display:flex;gap:6px;flex-wrap:wrap;">
                 <button type="button" data-fb-click="MasterAdmin._adicionarDiasVencimento" data-fb-click-n="1" data-fb-click-t0="number" data-fb-click-v0="15" style="background:rgba(245,158,11,.15);border:1px solid rgba(245,158,11,.3);color:#fbbf24;padding:2px 8px;border-radius:4px;font-size:.7rem;cursor:pointer;">+15 dias</button>
                 <button type="button" data-fb-click="MasterAdmin._adicionarDiasVencimento" data-fb-click-n="1" data-fb-click-t0="number" data-fb-click-v0="30" style="background:rgba(34,197,94,.15);border:1px solid rgba(34,197,94,.3);color:#4ade80;padding:2px 8px;border-radius:4px;font-size:.7rem;cursor:pointer;">+30 dias</button>
+                <button type="button" data-fb-click="MasterAdmin._adicionarDiasVencimento" data-fb-click-n="1" data-fb-click-t0="number" data-fb-click-v0="90" style="background:rgba(56,189,248,.15);border:1px solid rgba(56,189,248,.3);color:#7dd3fc;padding:2px 8px;border-radius:4px;font-size:.7rem;cursor:pointer;" title="Adicionar 90 dias (Trimestral)">+90d (Trim.)</button>
+                <button type="button" data-fb-click="MasterAdmin._adicionarDiasVencimento" data-fb-click-n="1" data-fb-click-t0="number" data-fb-click-v0="365" style="background:rgba(198,255,0,.15);border:1px solid rgba(198,255,0,.3);color:#C6FF00;padding:2px 8px;border-radius:4px;font-size:.7rem;cursor:pointer;" title="Adicionar 365 dias (Anual)">+365d (Anual)</button>
               </div>
             </div>
             <input type="date" id="me-edit-vencimento" required value="${vencAtual}" style="width:100%;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.15);border-radius:8px;padding:9px 12px;color:#fff;font-size:.85rem;">
@@ -1937,6 +1939,175 @@ const MasterAdmin = {
   },
 
   // ── MODAL: CADASTRAR NOVA CONSTRUTORA ──────────────────────────────────────
+  _getPlanPricingDetails(planId, cycleId) {
+    const p = String(planId || 'pro').toLowerCase();
+    const c = String(cycleId || 'monthly').toLowerCase();
+
+    const planSpecs = {
+      trial: {
+        name: 'Trial / Teste Gratuito',
+        obras: '10 obras simultâneas',
+        users: '2 usuários inclusos',
+        features: 'Todos os módulos liberados (OCR IA, Assinaturas, SINAPI, Cronograma SLA, Engenharia)',
+        days: 15
+      },
+      starter: {
+        name: 'Plano Básico',
+        obras: 'Até 3 obras ativas simultâneas',
+        users: '1 usuário incluso',
+        features: 'Financeiro, Medições, Contas Bancárias OFX, Recibos, Relatórios e WhatsApp',
+        cycles: {
+          monthly: { totalCents: 11990, monthlyEqCents: 11990, savingsCents: 0, days: 30, discount: 'Sem fidelidade' },
+          quarterly: { totalCents: 33990, monthlyEqCents: 11330, savingsCents: 1980, days: 90, discount: '~5,5% OFF' },
+          semiannual: { totalCents: 63990, monthlyEqCents: 10665, savingsCents: 7950, days: 180, discount: '~11% OFF' },
+          annual: { totalCents: 119900, monthlyEqCents: 9991, savingsCents: 23980, days: 365, discount: '2 meses grátis (Pague 10, Leve 12)' }
+        }
+      },
+      pro: {
+        name: 'Plano Profissional',
+        obras: 'Até 10 obras ativas simultâneas',
+        users: '2 usuários inclusos',
+        features: 'Tudo do Básico + OCR com IA, Assinatura Eletrônica QR Code, Pré-Compras e Portal Público',
+        cycles: {
+          monthly: { totalCents: 27990, monthlyEqCents: 27990, savingsCents: 0, days: 30, discount: 'Sem fidelidade' },
+          quarterly: { totalCents: 78990, monthlyEqCents: 26330, savingsCents: 4980, days: 90, discount: '~5,5% OFF' },
+          semiannual: { totalCents: 147990, monthlyEqCents: 24665, savingsCents: 19950, days: 180, discount: '~11% OFF' },
+          annual: { totalCents: 279900, monthlyEqCents: 23325, savingsCents: 55980, days: 365, discount: '2 meses grátis (Pague 10, Leve 12)' }
+        }
+      },
+      unlimited: {
+        name: 'Construtora Ilimitado',
+        obras: 'Obras & Clientes ILIMITADOS',
+        users: '5 usuários inclusos (controle RBAC)',
+        features: 'Tudo do Profissional + Obras sem limite, Engenharia avançada, SINAPI / Caixa e Suporte VIP',
+        cycles: {
+          monthly: { totalCents: 49990, monthlyEqCents: 49990, savingsCents: 0, days: 30, discount: 'Sem fidelidade' },
+          quarterly: { totalCents: 139990, monthlyEqCents: 46663, savingsCents: 9980, days: 90, discount: '~5,5% OFF' },
+          semiannual: { totalCents: 264990, monthlyEqCents: 44165, savingsCents: 34950, days: 180, discount: '~11% OFF' },
+          annual: { totalCents: 499900, monthlyEqCents: 41658, savingsCents: 99980, days: 365, discount: '2 meses grátis (Pague 10, Leve 12)' }
+        }
+      }
+    };
+
+    const spec = planSpecs[p] || planSpecs.pro;
+    if (p === 'trial') {
+      return {
+        planId: 'trial',
+        cycleId: 'trial',
+        name: spec.name,
+        totalText: 'R$ 0,00',
+        monthlyEqText: 'Grátis',
+        savingsText: '',
+        discount: 'Degustação completa por 15 dias',
+        days: 15,
+        obras: spec.obras,
+        users: spec.users,
+        features: spec.features,
+        isTrial: true
+      };
+    }
+
+    const cycleInfo = (spec.cycles && spec.cycles[c]) ? spec.cycles[c] : spec.cycles.monthly;
+    const formatBrl = cents => (cents / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+
+    return {
+      planId: p,
+      cycleId: c,
+      name: spec.name,
+      totalText: formatBrl(cycleInfo.totalCents),
+      monthlyEqText: formatBrl(cycleInfo.monthlyEqCents) + '/mês',
+      savingsText: cycleInfo.savingsCents > 0 ? `Economia de ${formatBrl(cycleInfo.savingsCents)}` : '',
+      discount: cycleInfo.discount,
+      days: cycleInfo.days,
+      obras: spec.obras,
+      users: spec.users,
+      features: spec.features,
+      isTrial: false
+    };
+  },
+
+  atualizarPreviaPlano() {
+    const selPlano = document.getElementById('ne-plano');
+    const selCiclo = document.getElementById('ne-ciclo');
+    const inpVenc = document.getElementById('ne-vencimento');
+    const divResumo = document.getElementById('ne-plano-resumo');
+    if (!selPlano || !divResumo) return;
+
+    const plano = selPlano.value;
+    const ciclo = selCiclo ? selCiclo.value : 'monthly';
+    const info = this._getPlanPricingDetails(plano, ciclo);
+
+    if (info.isTrial) {
+      if (selCiclo) {
+        selCiclo.disabled = true;
+      }
+    } else {
+      if (selCiclo) {
+        selCiclo.disabled = false;
+      }
+    }
+
+    // Calcula data de vencimento correspondente
+    const dt = new Date();
+    dt.setDate(dt.getDate() + info.days);
+    const calculatedIso = dt.toISOString().split('T')[0];
+    if (inpVenc) {
+      inpVenc.value = calculatedIso;
+    }
+
+    const calcParts = calculatedIso.split('-');
+    const dataFormatada = `${calcParts[2]}/${calcParts[1]}/${calcParts[0]}`;
+
+    divResumo.innerHTML = `
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap;">
+        <div>
+          <div style="display:inline-flex;align-items:center;gap:6px;background:${info.isTrial ? 'rgba(245,158,11,.15)' : 'rgba(198,255,0,.15)'};border:1px solid ${info.isTrial ? '#f59e0b' : 'var(--accent)'};padding:2px 8px;border-radius:4px;font-size:.7rem;font-weight:800;color:${info.isTrial ? '#fbbf24' : 'var(--accent2)'};text-transform:uppercase;">
+            <span>${info.isTrial ? '🟡 Avaliação Gratuita' : '💎 ' + info.name}</span>
+            <span>·</span>
+            <span>${info.isTrial ? '15 Dias de Degustação' : (selCiclo?.options[selCiclo.selectedIndex]?.text?.split('—')[0] || info.cycleId)}</span>
+          </div>
+          <div style="font-size:1.15rem;font-weight:900;color:#fff;margin-top:6px;">
+            ${info.totalText} ${!info.isTrial ? `<span style="font-size:.78rem;font-weight:600;color:#94a3b8;">(${info.monthlyEqText})</span>` : ''}
+          </div>
+        </div>
+        <div style="text-align:right;">
+          ${info.savingsText ? `<div style="display:inline-block;background:rgba(34,197,94,.15);border:1px solid #22c55e;color:#86efac;padding:2px 8px;border-radius:4px;font-size:.68rem;font-weight:800;margin-bottom:4px;">${info.savingsText}</div>` : ''}
+          <div style="font-size:.73rem;color:#94a3b8;">1º Vencimento: <strong style="color:#fff;">${dataFormatada}</strong> (+${info.days} dias)</div>
+        </div>
+      </div>
+      <div style="font-size:.74rem;color:#cbd5e1;margin-top:8px;padding-top:8px;border-top:1px dashed rgba(255,255,255,.1);line-height:1.4;">
+        🏗️ <strong>${info.obras}</strong> · 👥 <strong>${info.users}</strong><br>
+        ⚡ <span style="color:#94a3b8;">${info.features}</span>
+      </div>
+    `;
+  },
+
+  gerarSenhaForte() {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789!@#$%&*';
+    let rand = '';
+    const bytes = new Uint8Array(6);
+    if (typeof crypto !== 'undefined' && crypto.getRandomValues) {
+      crypto.getRandomValues(bytes);
+      for (let i = 0; i < bytes.length; i++) {
+        rand += chars[bytes[i] % chars.length];
+      }
+    } else {
+      for (let i = 0; i < 6; i++) {
+        rand += chars[Math.floor(Math.random() * chars.length)];
+      }
+    }
+    const senha = `FinGo#${rand}`;
+    const inp = document.getElementById('ne-senha');
+    if (inp) {
+      inp.type = 'text';
+      inp.value = senha;
+      inp.select();
+      if (typeof Utils !== 'undefined' && Utils.toast) {
+        Utils.toast('Senha gerada: ' + senha, 'success');
+      }
+    }
+  },
+
   abrirModalNovaEmpresa(prefill = {}) {
     let modal = document.getElementById('master-nova-empresa-modal');
     if (!modal) {
@@ -1954,6 +2125,7 @@ const MasterAdmin = {
     const initialResp = this._esc(pf.responsavel || '');
     const initialWhats = this._esc(pf.telefone || '');
     const initialEmail = this._esc(pf.email || '');
+    const initialPlano = pf.plano || (this._activeLeadToConvert ? 'trial' : 'pro');
 
     modal.innerHTML = `
       <div style="background:#0f1710;border:1px solid rgba(201,162,39,.4);border-radius:14px;width:100%;max-width:580px;box-shadow:0 24px 60px rgba(0,0,0,.85);overflow:hidden;color:#f0ead6;font-family:inherit;">
@@ -1962,7 +2134,7 @@ const MasterAdmin = {
             <span style="font-size:1.3rem;">➕</span>
             <div>
               <div style="font-weight:800;font-size:1rem;color:var(--accent2);">${this._activeLeadToConvert ? 'Ativar Construtora a partir de Lead Comercial' : 'Cadastrar Nova Construtora / Cliente'}</div>
-              <div style="font-size:.75rem;color:#94a3b8;">Criar tenant e liberar acesso à plataforma</div>
+              <div style="font-size:.75rem;color:#94a3b8;">Criar tenant oficial, definir plano e faturamento no Neon</div>
             </div>
           </div>
           <button data-fb-click="Patch26Actions.removeById" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="master-nova-empresa-modal" style="background:none;border:none;color:#94a3b8;font-size:1.2rem;cursor:pointer;padding:4px 8px;">✕</button>
@@ -1981,13 +2153,33 @@ const MasterAdmin = {
             </div>
             <div>
               <label style="display:block;font-size:.78rem;color:#94a3b8;margin-bottom:4px;">Plano SaaS *</label>
-              <select id="ne-plano" style="width:100%;background:#182713;border:1px solid rgba(255,255,255,.15);border-radius:8px;padding:9px 12px;color:#fff;font-size:.85rem;">
-                <option value="starter">Básico (até 3 obras - R$ 119,90)</option>
-                <option value="pro" selected>Profissional (até 10 obras - R$ 279,90)</option>
-                <option value="unlimited">Ilimitado (obras ilimitadas - R$ 499,90)</option>
+              <select id="ne-plano" data-fb-change="MasterAdmin.atualizarPreviaPlano" data-fb-change-n="0" style="width:100%;background:#182713;border:1px solid rgba(255,255,255,.15);border-radius:8px;padding:9px 12px;color:#fff;font-size:.85rem;">
+                <option value="trial" ${initialPlano==='trial'?'selected':''}>Trial / Teste Gratuito (15 dias — R$ 0,00)</option>
+                <option value="starter" ${initialPlano==='starter'?'selected':''}>Básico (até 3 obras - R$ 119,90/mês)</option>
+                <option value="pro" ${initialPlano==='pro'?'selected':''}>Profissional (até 10 obras - R$ 279,90/mês)</option>
+                <option value="unlimited" ${initialPlano==='unlimited'?'selected':''}>Ilimitado (obras ilimitadas - R$ 499,90/mês)</option>
               </select>
             </div>
           </div>
+
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+            <div>
+              <label style="display:block;font-size:.78rem;color:#94a3b8;margin-bottom:4px;">Ciclo de Faturamento *</label>
+              <select id="ne-ciclo" data-fb-change="MasterAdmin.atualizarPreviaPlano" data-fb-change-n="0" style="width:100%;background:#182713;border:1px solid rgba(255,255,255,.15);border-radius:8px;padding:9px 12px;color:#fff;font-size:.85rem;">
+                <option value="monthly" selected>Mensal (30 dias — Sem fidelidade)</option>
+                <option value="quarterly">Trimestral (90 dias — ~5,5% OFF)</option>
+                <option value="semiannual">Semestral (180 dias — ~11% OFF)</option>
+                <option value="annual">Anual (365 dias — 2 meses grátis)</option>
+              </select>
+            </div>
+            <div>
+              <label style="display:block;font-size:.78rem;color:#94a3b8;margin-bottom:4px;">Data de Vencimento Inicial *</label>
+              <input type="date" id="ne-vencimento" required style="width:100%;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.15);border-radius:8px;padding:9px 12px;color:#fff;font-size:.85rem;">
+            </div>
+          </div>
+
+          <!-- Card Dinâmico de Resumo do Plano & Faturamento -->
+          <div id="ne-plano-resumo" style="background:rgba(201,162,39,0.06);border:1px solid rgba(201,162,39,0.3);border-radius:10px;padding:12px 14px;"></div>
 
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
             <div>
@@ -2006,7 +2198,10 @@ const MasterAdmin = {
               <input type="email" id="ne-email" required value="${initialEmail}" placeholder="carlos@vanguard.com.br" style="width:100%;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.15);border-radius:8px;padding:9px 12px;color:#fff;font-size:.85rem;">
             </div>
             <div>
-              <label style="display:block;font-size:.78rem;color:#94a3b8;margin-bottom:4px;">Senha de Acesso *</label>
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+                <label style="font-size:.78rem;color:#94a3b8;">Senha de Acesso *</label>
+                <button type="button" data-fb-click="MasterAdmin.gerarSenhaForte" data-fb-click-n="0" style="background:none;border:none;color:var(--accent2);font-size:.72rem;font-weight:700;cursor:pointer;padding:0;text-decoration:underline;">🔑 Gerar Senha</button>
+              </div>
               <input type="password" id="ne-senha" required minlength="8" placeholder="Mínimo 8 caracteres" style="width:100%;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.15);border-radius:8px;padding:9px 12px;color:#fff;font-size:.85rem;">
             </div>
           </div>
@@ -2022,6 +2217,15 @@ const MasterAdmin = {
         </form>
       </div>
     `;
+
+    // Atualiza a prévia de valores e vencimento inicial
+    this.atualizarPreviaPlano();
+
+    // Registra listeners nativos para garantir atualização imediata
+    const pSel = document.getElementById('ne-plano');
+    const cSel = document.getElementById('ne-ciclo');
+    if (pSel) pSel.addEventListener('change', () => this.atualizarPreviaPlano());
+    if (cSel) cSel.addEventListener('change', () => this.atualizarPreviaPlano());
   },
 
   async salvarNovaEmpresa(e) {
@@ -2035,6 +2239,8 @@ const MasterAdmin = {
     const nome = document.getElementById('ne-nome').value.trim();
     const cnpj = document.getElementById('ne-cnpj').value.trim();
     const plano = document.getElementById('ne-plano').value;
+    const ciclo = document.getElementById('ne-ciclo') ? document.getElementById('ne-ciclo').value : 'monthly';
+    const vencimento = document.getElementById('ne-vencimento') ? document.getElementById('ne-vencimento').value : '';
     const resp = document.getElementById('ne-resp').value.trim();
     const whats = document.getElementById('ne-whats').value.trim();
     const email = document.getElementById('ne-email').value.trim();
@@ -2049,11 +2255,13 @@ const MasterAdmin = {
           razao_social: nome,
           cnpj,
           plano,
+          ciclo,
+          vencimento,
           responsavel: resp,
           telefone: whats,
           email,
           senha,
-          status: 'ativo'
+          status: plano === 'trial' ? 'trial' : 'ativo'
         })
       });
 
