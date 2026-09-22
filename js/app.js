@@ -1266,6 +1266,9 @@ const App = {
           <div style="color:var(--text3);font-size:.75rem;margin-top:4px;margin-bottom:16px;">${e(roleLabel)} &middot; Logado: ${Utils.fmt.datetime(u?.loginAt)}</div>
           
           <div style="display:flex;flex-direction:column;gap:8px;text-align:left;">
+            <button type="button" class="btn btn-secondary btn-block" data-fb-click="App.showAccessibilityModal" data-fb-click-n="0" style="display:flex;align-items:center;gap:8px;text-align:left;">
+              ♿ Acessibilidade &amp; Temas (Claro / Escuro / Daltonismo)
+            </button>
             ${canAdmin ? `<button class="btn btn-secondary btn-block" data-fb-click="Patch26Actions.closeModalOnboarding" data-fb-click-n="0">
               🏢 Dados &amp; Logotipo da Empresa
             </button>` : ''}

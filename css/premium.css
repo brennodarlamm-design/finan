@@ -101,6 +101,7 @@ button:disabled { cursor:not-allowed;opacity:.55; }
   :root { --sidebar-w:214px; }
   .ui-workspace .main-header { padding:0 20px;gap:8px; }
   .ui-workspace .header-global-search span,.ui-workspace .header-global-search kbd { display:none; }
+  .ui-workspace .header-access-btn span { display:none; }
   .ui-workspace .header-suporte-btn span:not(:first-child) { display:none; }
   .ui-workspace .main-content { padding:20px; }
 }
@@ -113,6 +114,7 @@ button:disabled { cursor:not-allowed;opacity:.55; }
   .ui-workspace .main-header>.hspacer { min-width:0; }
   .ui-workspace .header-global-search { display:inline-flex!important;justify-content:center;flex-shrink:0; }
   .ui-workspace .header-global-search span,.ui-workspace .header-global-search kbd { display:none; }
+  .ui-workspace .header-access-btn span { display:none; }
   .ui-workspace .header-suporte-btn { padding:8px!important;justify-content:center; }
   .ui-workspace .header-suporte-btn span:not(:first-child) { display:none; }
   .ui-workspace .suporte-dropdown-menu { position:fixed!important;top:64px!important;right:12px!important;max-width:calc(100vw - 24px); }
