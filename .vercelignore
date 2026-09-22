@@ -65,6 +65,7 @@ trigger.config.js
 scripts/*
 !scripts/build-cloudflare-pages.cjs
 !scripts/patch38-postbuild.cjs
+!scripts/build-marketing.js
 
 # Logs e arquivos de diagnóstico locais
 *.log
