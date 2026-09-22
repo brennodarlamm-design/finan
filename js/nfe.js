@@ -483,72 +483,91 @@ const NFe = {
       return;
     }
 
-    const reader = new FileReader();
-    reader.onerror = () => {
-      if (typeof Utils !== 'undefined' && Utils.toast) Utils.toast('Erro ao ler arquivo do certificado localmente.', 'error');
-    };
+    // Lê o arquivo como ArrayBuffer (mais confiável para binários .pfx/.p12)
+    let base64;
+    try {
+      const arrayBuffer = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = () => {
+          const errMsg = reader.error?.message || reader.error?.name || 'Erro desconhecido';
+          console.error('[NFe] FileReader falhou localmente:', reader.error);
+          reject(new Error(`Falha ao ler o arquivo localmente: ${errMsg}. Tente copiar o arquivo .pfx para a Área de Trabalho e selecione-o a partir daí.`));
+        };
+        reader.readAsArrayBuffer(file);
+      });
 
-    reader.onload = async () => {
-      try {
-        if (submitBtn) {
-          submitBtn.disabled = true;
-          submitBtn.textContent = '⏳ Validando e criptografando...';
-        }
-        if (typeof Utils !== 'undefined' && Utils.toast) Utils.toast('Validando chaves criptográficas do Certificado A1...', 'info');
+      // Converte ArrayBuffer → Base64 sem depender de split(',')
+      const bytes = new Uint8Array(arrayBuffer);
+      let binary = '';
+      for (let i = 0; i < bytes.byteLength; i++) binary += String.fromCharCode(bytes[i]);
+      base64 = btoa(binary);
+    } catch (readErr) {
+      console.error('[NFe] Erro ao ler certificado localmente:', readErr);
+      if (typeof Utils !== 'undefined' && Utils.toast) Utils.toast(readErr.message, 'error');
+      return;
+    }
 
-        const base64 = String(reader.result || '').split(',')[1];
-        if (!base64) throw new Error('Não foi possível codificar o arquivo.');
+    if (!base64) {
+      if (typeof Utils !== 'undefined' && Utils.toast) Utils.toast('Não foi possível codificar o arquivo. Tente novamente.', 'error');
+      return;
+    }
 
-        const res = await this._fetchWithTimeout('/api/certificado?action=upload', {
-          method: 'POST',
-          headers: this._headers(),
-          body: JSON.stringify({
-            pfx_base64: base64,
-            senha,
-            nome_arquivo: file.name
-          })
-        });
+    if (submitBtn) {
+      submitBtn.disabled = true;
+      submitBtn.textContent = '⏳ Validando e criptografando...';
+    }
+    if (typeof Utils !== 'undefined' && Utils.toast) Utils.toast('Validando chaves criptográficas do Certificado A1...', 'info');
 
-        const json = await res.json().catch(() => ({}));
-        if (!res.ok || !json.success) {
-          throw new Error(json.error || `Falha na validação do certificado (HTTP ${res.status}).`);
-        }
+    try {
+      const res = await this._fetchWithTimeout('/api/certificado?action=upload', {
+        method: 'POST',
+        headers: this._headers(),
+        body: JSON.stringify({
+          pfx_base64: base64,
+          senha,
+          nome_arquivo: file.name
+        })
+      });
 
-        this._certOnline = json.certificado;
-        this._certModoSubstituir = false;
-
-        // Mantém cache da empresa sincronizado
-        const emp = typeof DB !== 'undefined' && DB.getEmpresa ? DB.getEmpresa() : {};
-        if (typeof DB !== 'undefined' && DB.saveEmpresa) {
-          DB.saveEmpresa({
-            ...emp,
-            certificado_a1: json.certificado
-          });
-        }
-
-        if (typeof Utils !== 'undefined' && Utils.toast) {
-          Utils.toast(json.message || '✅ Certificado Digital A1 validado e vinculado com sucesso!', 'success');
-        }
-
-        const body = document.getElementById('nfe-tab-body');
-        if (body && this._currentTab === 'cert') {
-          body.innerHTML = this._renderTabCert();
-        }
-      } catch (err) {
-        console.error('[NFe] Erro ao salvar certificado A1:', err);
-        if (typeof Utils !== 'undefined' && Utils.toast) {
-          Utils.toast(err.message || 'Falha ao processar arquivo de certificado.', 'error');
-        }
-      } finally {
-        if (submitBtn) {
-          submitBtn.disabled = false;
-          submitBtn.textContent = '💾 Validar & Salvar';
-        }
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok || !json.success) {
+        throw new Error(json.error || `Falha na validação do certificado (HTTP ${res.status}).`);
       }
-    };
 
-    reader.readAsDataURL(file);
+      this._certOnline = json.certificado;
+      this._certModoSubstituir = false;
+
+      // Mantém cache da empresa sincronizado
+      const emp = typeof DB !== 'undefined' && DB.getEmpresa ? DB.getEmpresa() : {};
+      if (typeof DB !== 'undefined' && DB.saveEmpresa) {
+        DB.saveEmpresa({
+          ...emp,
+          certificado_a1: json.certificado
+        });
+      }
+
+      if (typeof Utils !== 'undefined' && Utils.toast) {
+        Utils.toast(json.message || '✅ Certificado Digital A1 validado e vinculado com sucesso!', 'success');
+      }
+
+      const body = document.getElementById('nfe-tab-body');
+      if (body && this._currentTab === 'cert') {
+        body.innerHTML = this._renderTabCert();
+      }
+    } catch (err) {
+      console.error('[NFe] Erro ao salvar certificado A1:', err);
+      if (typeof Utils !== 'undefined' && Utils.toast) {
+        Utils.toast(err.message || 'Falha ao processar arquivo de certificado.', 'error');
+      }
+    } finally {
+      if (submitBtn) {
+        submitBtn.disabled = false;
+        submitBtn.textContent = '💾 Validar & Salvar';
+      }
+    }
   },
+
 
   _substituirCertificadoA1() {
     this._certModoSubstituir = true;
