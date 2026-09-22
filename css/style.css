@@ -1526,43 +1526,135 @@ select:focus-visible {
    ACESSIBILIDADE: TEMA CLARO / BRANCO EMPRESARIAL
    ============================================================ */
 [data-theme="light"] {
-  --bg-primary: #F8F9FA;
-  --bg-secondary: #FFFFFF;
+  --bg-base: #F8F9FA;
+  --bg-primary: #FFFFFF;
+  --bg-secondary: #F1F5F9;
   --bg-card: #FFFFFF;
-  --bg-card-hover: #F1F5F9;
+  --bg-card-hover: #F8FAFC;
+  --bg-elevated: #FFFFFF;
+  --bg-hero: #F8F9FA;
   --bg-input: #FFFFFF;
+  --border-default: #CBD5E1;
+  --border-subtle: #E2E8F0;
   --border-s: #E2E8F0;
   --border-d: #CBD5E1;
   --border-str: #94A3B8;
   --border: #E2E8F0;
   --text: #0A0A0A;
+  --text-primary: #0A0A0A;
   --text2: #1E293B;
+  --text-secondary: #1E293B;
   --text3: #475569;
+  --text-tertiary: #475569;
   --fingo-offwhite: #0A0A0A;
   --fingo-silver: #1E293B;
   --fingo-mist: #475569;
   --fingo-deep: #FFFFFF;
   --fingo-ink: #F8F9FA;
   --fingo-shadow: #E2E8F0;
+  --bg-header: rgba(255, 255, 255, 0.96);
   background-color: #F8F9FA !important;
   color: #0A0A0A !important;
 }
 
-[data-theme="light"] .sidebar {
+[data-theme="light"] body,
+[data-theme="light"] .app,
+[data-theme="light"] .app-layout,
+[data-theme="light"] .main-wrapper,
+[data-theme="light"] .main-content,
+[data-theme="light"] .ui-workspace .main-content {
+  background-color: #F8F9FA !important;
+  color: #0A0A0A !important;
+}
+
+[data-theme="light"] .sidebar,
+[data-theme="light"] .ui-workspace .sidebar {
   background: #FFFFFF !important;
   border-right: 1px solid #E2E8F0 !important;
 }
 
-[data-theme="light"] .top-header,
-[data-theme="light"] .header {
-  background: #FFFFFF !important;
+[data-theme="light"] .sidebar-logo {
   border-bottom: 1px solid #E2E8F0 !important;
 }
 
-[data-theme="light"] .card {
+[data-theme="light"] .sidebar-foot {
+  border-top: 1px solid #E2E8F0 !important;
+}
+
+[data-theme="light"] .main-header,
+[data-theme="light"] .ui-workspace .main-header,
+[data-theme="light"] .top-header,
+[data-theme="light"] .header {
+  background: rgba(255, 255, 255, 0.96) !important;
+  border-bottom: 1px solid #E2E8F0 !important;
+  color: #0A0A0A !important;
+}
+
+[data-theme="light"] .header-title,
+[data-theme="light"] #h-title,
+[data-theme="light"] .page-title,
+[data-theme="light"] .ui-workspace .page-title {
+  color: #0A0A0A !important;
+}
+
+[data-theme="light"] .header-sub,
+[data-theme="light"] .page-sub,
+[data-theme="light"] .ui-workspace .page-sub {
+  color: #475569 !important;
+}
+
+[data-theme="light"] .header-search-btn,
+[data-theme="light"] .header-access-btn,
+[data-theme="light"] .header-global-search {
+  background: #FFFFFF !important;
+  border: 1px solid #CBD5E1 !important;
+  color: #1E293B !important;
+}
+
+[data-theme="light"] .header-access-btn svg,
+[data-theme="light"] .header-search-btn svg {
+  stroke: #1E293B !important;
+}
+
+[data-theme="light"] .card,
+[data-theme="light"] .ui-workspace .card,
+[data-theme="light"] #onboarding-checklist-card {
   background: #FFFFFF !important;
   border-color: #E2E8F0 !important;
+  color: #0A0A0A !important;
   box-shadow: 0 1px 3px rgba(0,0,0,0.05) !important;
+}
+
+[data-theme="light"] .nav-section {
+  color: #475569 !important;
+}
+
+[data-theme="light"] .nav-item {
+  color: #1E293B !important;
+}
+
+[data-theme="light"] .nav-item:hover {
+  background: #F1F5F9 !important;
+  color: #0A0A0A !important;
+}
+
+[data-theme="light"] .nav-item.active {
+  background: rgba(198, 255, 0, 0.18) !important;
+  color: #0A0A0A !important;
+  font-weight: 700 !important;
+}
+
+[data-theme="light"] .nav-accordion-header {
+  color: #475569 !important;
+}
+
+[data-theme="light"] .nav-accordion-header.active-segment {
+  color: #0A0A0A !important;
+}
+
+[data-theme="light"] .nav-accordion-header:hover {
+  background: #F1F5F9 !important;
+  color: #0A0A0A !important;
 }
 
 /* ============================================================

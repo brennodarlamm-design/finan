@@ -232,50 +232,6 @@ const MinhasDemandas = {
           ${renderGrupo('Aguardando Início', '#8E8C9A', grupos.aguardando)}
         </div>
       `)}
-
-      <!-- Rodapé Oficial FinGo: PALETA DE STATUS FINGO -->
-      <div style="background:#141414;border:1px solid #282828;border-radius:6px;padding:16px 20px;">
-        <div style="font-size:.72rem;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:#e9ecf0;margin-bottom:12px;">
-          PALETA DE STATUS FINGO
-        </div>
-        <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(200px, 1fr));gap:12px;">
-          <div style="display:flex;align-items:flex-start;gap:8px;">
-            <span style="width:10px;height:10px;border-radius:50%;background:#8F3D4A;flex-shrink:0;margin-top:4px;"></span>
-            <div>
-              <div style="font-size:.75rem;font-weight:800;color:#F0F0E8;">VENCIDAS #8F3D4A</div>
-              <div style="font-size:.7rem;color:#e9ecf0;opacity:.8;">Atrasos, prazos excedidos.</div>
-            </div>
-          </div>
-          <div style="display:flex;align-items:flex-start;gap:8px;">
-            <span style="width:10px;height:10px;border-radius:50%;background:#C7A96B;flex-shrink:0;margin-top:4px;"></span>
-            <div>
-              <div style="font-size:.75rem;font-weight:800;color:#F0F0E8;">PRÓXIMAS (5D) #C7A96B</div>
-              <div style="font-size:.7rem;color:#e9ecf0;opacity:.8;">Prazo se aproximando. Atenção.</div>
-            </div>
-          </div>
-          <div style="display:flex;align-items:flex-start;gap:8px;">
-            <span style="width:10px;height:10px;border-radius:50%;background:#7F49B8;flex-shrink:0;margin-top:4px;"></span>
-            <div>
-              <div style="font-size:.75rem;font-weight:800;color:#F0F0E8;">EM ANDAMENTO #7F49B8</div>
-              <div style="font-size:.7rem;color:#e9ecf0;opacity:.8;">Em execução. Fluxo ativo.</div>
-            </div>
-          </div>
-          <div style="display:flex;align-items:flex-start;gap:8px;">
-            <span style="width:10px;height:10px;border-radius:50%;background:#8E8C9A;flex-shrink:0;margin-top:4px;"></span>
-            <div>
-              <div style="font-size:.75rem;font-weight:800;color:#F0F0E8;">AGUARDANDO #8E8C9A</div>
-              <div style="font-size:.7rem;color:#e9ecf0;opacity:.8;">Aguardando ação de terceiros.</div>
-            </div>
-          </div>
-          <div style="display:flex;align-items:flex-start;gap:8px;">
-            <span style="width:10px;height:10px;border-radius:50%;background:#C6FF00;flex-shrink:0;margin-top:4px;"></span>
-            <div>
-              <div style="font-size:.75rem;font-weight:800;color:#C6FF00;">AÇÃO / DESTAQUE #C6FF00</div>
-              <div style="font-size:.7rem;color:#e9ecf0;opacity:.8;">Botões, elementos ativos e confirmações.</div>
-            </div>
-          </div>
-        </div>
-      </div>
     `;
   },
 

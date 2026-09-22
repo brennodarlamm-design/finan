@@ -515,7 +515,7 @@ const App = {
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
             </button>
             <div style="min-width:0;flex-shrink:1;">
-              <div class="header-title" id="h-title">📊 Dashboard</div>
+              <div class="header-title" id="h-title">Dashboard</div>
               <div class="header-sub">${brandName} — Gestão Financeira</div>
             </div>
             <div class="hspacer"></div>
@@ -530,7 +530,7 @@ const App = {
               <kbd style="font-size:.65rem;color:var(--text3);background:rgba(255,255,255,.06);border:1px solid var(--border);border-radius:3px;padding:1px 4px;">Ctrl+K</kbd>
             </button>
             <!-- Botão Acessibilidade -->
-            <button type="button" class="header-access-btn" aria-label="Acessibilidade e temas" data-fb-click="App.showAccessibilityModal" data-fb-click-n="0" title="Acessibilidade: Tela Clara/Escura &amp; Daltonismo" style="cursor:pointer;display:flex;align-items:center;gap:6px;background:rgba(255,255,255,.05);border:1px solid var(--border);border-radius:8px;padding:5px 9px;transition:all .2s;color:var(--text2);">
+            <button type="button" class="header-access-btn" aria-label="Acessibilidade e temas" data-fb-click="App.showAccessibilityModal" data-fb-click-n="0" title="Acessibilidade: Tela Clara/Escura &amp; Daltonismo" style="cursor:pointer;display:flex;align-items:center;gap:6px;background:rgba(255,255,255,.05);border:1px solid var(--border);border-radius:8px;padding:5px 9px;transition:all .2s;color:var(--text, #F0F0E8);">
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="4" r="2"/><path d="m4.93 10.93 4.24-4.24a2 2 0 0 1 2.83 0l4.24 4.24M12 8v13M8 17l4 4 4-4"/></svg>
               <span style="font-size:.75rem;font-weight:600;">Acessibilidade</span>
             </button>

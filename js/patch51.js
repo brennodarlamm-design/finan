@@ -363,13 +363,24 @@ const Patch51 = {
   },
 
   injectMyTasksNav() {
-    if (document.getElementById('p51-my-tasks-nav')) { this.updateTaskBadge(); return; }
+    const existing = document.getElementById('p51-my-tasks-nav');
+    if (existing) {
+      document.querySelectorAll('#p51-my-tasks-nav').forEach((el, idx) => { if (idx > 0) el.remove(); });
+      this.updateTaskBadge();
+      return;
+    }
+    document.querySelectorAll('.sidebar-nav .nav-item').forEach(el => {
+      if (el.textContent.includes('Minhas Etapas')) el.remove();
+    });
     const obrasBtn = document.querySelector('.sidebar-nav [data-route="obras"]');
     if (!obrasBtn) return;
     const btn = document.createElement('button');
     btn.type = 'button';
     btn.className = 'nav-item';
+    btn.id = 'p51-my-tasks-nav';
+    btn.dataset.route = 'minhas-etapas';
     btn.innerHTML = `${typeof FinObraUI !== 'undefined' ? FinObraUI.icon('pin') : '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="17" x2="12" y2="22"></line><path d="M5 17h14v-2l-2-2V6h1V4H6v2h1v7l-2 2z"></path></svg>'}<span>Minhas Etapas</span>`;
+    btn.addEventListener('click', () => this.openMyTasks());
     obrasBtn.insertAdjacentElement('afterend', btn);
     this.updateTaskBadge();
   },

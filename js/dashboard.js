@@ -17,10 +17,11 @@ const Dashboard = {
 
     return `
     <div class="page-header">
-      <div><h1 class="page-title">📊 Dashboard</h1><p class="page-sub">${lblSafe}</p></div>
+      <div><h1 class="page-title">Dashboard</h1><p class="page-sub">${lblSafe}</p></div>
       <div class="page-actions" style="display:flex;gap:8px;">
         <button class="btn btn-primary btn-sm" data-fb-click="Dashboard.abrirModalImpressao" data-fb-click-n="0" style="display:flex;align-items:center;gap:6px;">
-          🖨️ Imprimir / Exportar
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+          <span>Imprimir / Exportar</span>
         </button>
       </div>
     </div>
@@ -30,14 +31,14 @@ const Dashboard = {
     ${resumoPre.pendentesQtd > 0 ? `
     <div class="card" style="background:linear-gradient(135deg,rgba(245,158,11,.14),rgba(201,162,39,.1));border:1px solid rgba(245,158,11,.4);margin-bottom:16px;padding:14px 20px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;">
       <div style="display:flex;align-items:center;gap:12px;">
-        <span style="font-size:1.6rem;">🛒</span>
+        <span style="display:inline-flex;color:var(--accent2);"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg></span>
         <div>
           <strong style="color:var(--accent2);font-size:.92rem;">Autorização de Compras:</strong>
           <span style="color:var(--text);font-size:.85rem;margin-left:4px;">Existem <strong>${resumoPre.pendentesQtd} ordens de pré-compra</strong> aguardando autorização do Administrador (${Utils.fmt.currency(resumoPre.pendentesValor)}).</span>
         </div>
       </div>
       <button class="btn btn-warning btn-sm" data-fb-click="App.navigate" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="precompras" style="font-weight:700;">
-        ⚡ Analisar Pedidos (${resumoPre.pendentesQtd}) →
+        Analisar Pedidos (${resumoPre.pendentesQtd}) →
       </button>
     </div>` : ''}
 
@@ -46,13 +47,13 @@ const Dashboard = {
         <div class="kpi-icon green"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg></div>
         <div class="kpi-label">Total Recebido</div>
         <div class="kpi-value tabular-nums green" id="kpi-total-receitas">${Utils.fmt.currency(r.totalReceitas)}</div>
-        <div class="kpi-change">💰 Receitas confirmadas</div>
+        <div class="kpi-change">Receitas confirmadas</div>
       </div>
       <div class="kpi-card">
         <div class="kpi-icon red"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg></div>
         <div class="kpi-label">Total Gasto</div>
         <div class="kpi-value tabular-nums red" id="kpi-total-despesas">${Utils.fmt.currency(r.totalDespesas)}</div>
-        <div class="kpi-change">💸 Despesas pagas</div>
+        <div class="kpi-change">Despesas pagas</div>
       </div>
       <div class="kpi-card">
         <div class="kpi-icon ${r.saldo>=0?'blue':'red'}"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg></div>
@@ -1207,13 +1208,14 @@ const Dashboard = {
     }
 
     return `
-      <div class="card" id="onboarding-checklist-card" style="background:#1A1A1A;border:1px solid #282828;margin-bottom:22px;padding:22px;border-radius:6px;box-shadow:0 8px 32px rgba(0,0,0,.4);">
+      <div class="card" id="onboarding-checklist-card" style="background:var(--bg-card);border:1px solid var(--border-s);margin-bottom:22px;padding:22px;border-radius:6px;box-shadow:0 8px 32px rgba(0,0,0,.4);">
         
         <!-- Cabeçalho do Guia -->
         <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:12px;margin-bottom:16px;">
           <div>
             <div style="display:inline-flex;align-items:center;gap:6px;background:rgba(198,255,0,.12);border:1px solid rgba(198,255,0,.3);padding:3px 10px;border-radius:4px;font-size:.72rem;font-weight:800;color:var(--accent);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px;">
-              <span>🚀</span> Guia de Início Rápido
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+              <span>Guia de Início Rápido</span>
             </div>
             <h2 style="font-size:1.15rem;font-weight:900;color:var(--text);margin:0 0 4px;">Bem-vindo ao FinGo! Complete os 3 passos para ativar seu sistema:</h2>
             <div style="font-size:.8rem;color:var(--text3);">Siga as etapas abaixo para cadastrar sua base e alimentar seus indicadores em tempo real.</div>
@@ -1233,7 +1235,7 @@ const Dashboard = {
         <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(260px, 1fr));gap:14px;">
           
           <!-- Passo 1: Configurar Empresa -->
-          <div style="background:#0A0A0A;border:1px solid ${step1Done ? 'rgba(198,255,0,.4)' : 'rgba(255,255,255,.08)'};border-radius:6px;padding:16px;display:flex;flex-direction:column;justify-content:space-between;position:relative;">
+          <div style="background:var(--bg-input, var(--bg-primary));border:1px solid ${step1Done ? 'rgba(198,255,0,.4)' : 'var(--border-s)'};border-radius:6px;padding:16px;display:flex;flex-direction:column;justify-content:space-between;position:relative;">
             <div>
               <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
                 <div style="width:32px;height:32px;border-radius:4px;background:${step1Done ? 'rgba(198,255,0,.18)' : 'rgba(255,255,255,.06)'};color:${step1Done ? 'var(--accent)' : 'var(--text3)'};display:flex;align-items:center;justify-content:center;font-weight:900;font-size:.9rem;">
@@ -1252,7 +1254,7 @@ const Dashboard = {
           </div>
 
           <!-- Passo 2: Cadastrar 1ª Obra -->
-          <div style="background:#0A0A0A;border:1px solid ${step2Done ? 'rgba(198,255,0,.4)' : 'rgba(255,255,255,.08)'};border-radius:6px;padding:16px;display:flex;flex-direction:column;justify-content:space-between;position:relative;">
+          <div style="background:var(--bg-input, var(--bg-primary));border:1px solid ${step2Done ? 'rgba(198,255,0,.4)' : 'var(--border-s)'};border-radius:6px;padding:16px;display:flex;flex-direction:column;justify-content:space-between;position:relative;">
             <div>
               <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
                 <div style="width:32px;height:32px;border-radius:4px;background:${step2Done ? 'rgba(198,255,0,.18)' : 'rgba(255,255,255,.06)'};color:${step2Done ? 'var(--accent)' : 'var(--text3)'};display:flex;align-items:center;justify-content:center;font-weight:900;font-size:.9rem;">
@@ -1271,7 +1273,7 @@ const Dashboard = {
           </div>
 
           <!-- Passo 3: Adicionar 1º Lançamento ou Orçamento -->
-          <div style="background:#0A0A0A;border:1px solid ${step3Done ? 'rgba(198,255,0,.4)' : 'rgba(255,255,255,.08)'};border-radius:6px;padding:16px;display:flex;flex-direction:column;justify-content:space-between;position:relative;">
+          <div style="background:var(--bg-input, var(--bg-primary));border:1px solid ${step3Done ? 'rgba(198,255,0,.4)' : 'var(--border-s)'};border-radius:6px;padding:16px;display:flex;flex-direction:column;justify-content:space-between;position:relative;">
             <div>
               <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
                 <div style="width:32px;height:32px;border-radius:4px;background:${step3Done ? 'rgba(198,255,0,.18)' : 'rgba(255,255,255,.06)'};color:${step3Done ? 'var(--accent)' : 'var(--text3)'};display:flex;align-items:center;justify-content:center;font-weight:900;font-size:.9rem;">
