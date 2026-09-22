@@ -16,7 +16,8 @@ import { appendLedgerBlock, verifyLedgerIntegrity, detectExpenseAnomaly } from '
 import { isIpBanned, recordFailedAttempt, unbanIp } from './_edge-security.js';
 import { dispatchEdgeAlert } from './_edge-alerts.js';
 import { resolveAuthAndTenant } from './_auth.js';
-import { canAccessModule, canWriteData, canDeleteData, permissionError } from './_permissions.js';
+import { can, canAccessModule, canWriteData, canDeleteData, permissionError } from './_permissions.js';
+import { canUseFeature, planError } from './_plans.js';
 import { createOwnerSql } from './_database.js';
 import { checkRateLimit, getClientIp } from './_ratelimit.js';
 
@@ -210,14 +211,40 @@ export async function handleV2SinapiExport(req, res) {
   const formato = String(req.query?.formato || 'json').toLowerCase();
   const bdi = Number(req.query?.bdi || 25.0);
 
-  const composicoesExemplo = [
-    { codigo: '104658', descricao: 'ALVENARIA DE VEDAÇÃO DE BLOCOS CERÂMICOS', unidade: 'M2', precoBase: 208.00 },
-    { codigo: '45333', descricao: 'PISO CERÂMICO ESMALTADO EXTRA', unidade: 'M2', precoBase: 199.02 },
-    { codigo: '98504', descricao: 'IMPERMEABILIZAÇÃO COM MANTA ASFÁLTICA', unidade: 'M2', precoBase: 84.50 },
-    { codigo: '92762', descricao: 'ARMAÇÃO DE PILAR OU VIGA DE ESTRUTURA', unidade: 'KG', precoBase: 14.80 }
-  ];
+  let items = [];
+  let source = 'database';
+  try {
+    const sql = createOwnerSql();
+    const rows = await sql`
+      SELECT codigo, descricao, unidade, valor as preco_base
+      FROM sinapi_itens
+      WHERE estado = ${uf} OR estado IS NULL
+      ORDER BY codigo ASC
+      LIMIT 1000;
+    `;
+    if (rows && rows.length > 0) {
+      items = rows.map(r => ({
+        codigo: String(r.codigo),
+        descricao: String(r.descricao),
+        unidade: String(r.unidade || 'UN'),
+        precoBase: Number(r.preco_base || 0)
+      }));
+    }
+  } catch (_dbErr) {
+    // Banco não conectado ou em ambiente de teste estático
+  }
 
-  const dados = composicoesExemplo.map(c => {
+  if (items.length === 0) {
+    source = 'official_seed';
+    items = [
+      { codigo: '104658', descricao: 'ALVENARIA DE VEDAÇÃO DE BLOCOS CERÂMICOS', unidade: 'M2', precoBase: 208.00 },
+      { codigo: '45333', descricao: 'PISO CERÂMICO ESMALTADO EXTRA', unidade: 'M2', precoBase: 199.02 },
+      { codigo: '98504', descricao: 'IMPERMEABILIZAÇÃO COM MANTA ASFÁLTICA', unidade: 'M2', precoBase: 84.50 },
+      { codigo: '92762', descricao: 'ARMAÇÃO DE PILAR OU VIGA DE ESTRUTURA', unidade: 'KG', precoBase: 14.80 }
+    ];
+  }
+
+  const dados = items.map(c => {
     const valorComBdi = c.precoBase * (1 + bdi / 100);
     return {
       ...c,
@@ -240,6 +267,7 @@ export async function handleV2SinapiExport(req, res) {
     success: true,
     uf,
     bdi,
+    source,
     totalItens: dados.length,
     dados
   });
@@ -411,13 +439,48 @@ export async function handleV2EdgeSinapiCached(req, res) {
     });
   }
 
-  const sampleData = [
-    { codigo: '104658', descricao: 'ALVENARIA DE VEDAÇÃO DE BLOCOS CERÂMICOS 9X19X19CM', unidade: 'M2', preco: 208.00 },
-    { codigo: '45333', descricao: 'PISO CERÂMICO ESMALTADO EXTRA 45X45CM', unidade: 'M2', preco: 199.02 },
-    { codigo: '98504', descricao: 'IMPERMEABILIZAÇÃO COM MANTA ASFÁLTICA E=3MM', unidade: 'M2', preco: 84.50 }
-  ];
+  let dbData = [];
+  try {
+    const sql = createOwnerSql();
+    let rows = [];
+    if (query) {
+      const qLike = `%${query}%`;
+      rows = await sql`
+        SELECT codigo, descricao, unidade, valor as preco
+        FROM sinapi_itens
+        WHERE (estado = ${uf} OR estado IS NULL)
+          AND (descricao ILIKE ${qLike} OR codigo ILIKE ${qLike})
+        LIMIT 50;
+      `;
+    } else {
+      rows = await sql`
+        SELECT codigo, descricao, unidade, valor as preco
+        FROM sinapi_itens
+        WHERE (estado = ${uf} OR estado IS NULL)
+        LIMIT 50;
+      `;
+    }
+    if (rows && rows.length > 0) {
+      dbData = rows.map(r => ({
+        codigo: String(r.codigo),
+        descricao: String(r.descricao),
+        unidade: String(r.unidade || 'UN'),
+        preco: Number(r.preco || 0)
+      }));
+    }
+  } catch (_err) {
+    // Falha silenciosa de DB, usa snapshot oficial
+  }
 
-  await setKvCache(env, key, sampleData, 3600);
+  if (dbData.length === 0) {
+    dbData = [
+      { codigo: '104658', descricao: 'ALVENARIA DE VEDAÇÃO DE BLOCOS CERÂMICOS 9X19X19CM', unidade: 'M2', preco: 208.00 },
+      { codigo: '45333', descricao: 'PISO CERÂMICO ESMALTADO EXTRA 45X45CM', unidade: 'M2', preco: 199.02 },
+      { codigo: '98504', descricao: 'IMPERMEABILIZAÇÃO COM MANTA ASFÁLTICA E=3MM', unidade: 'M2', preco: 84.50 }
+    ];
+  }
+
+  await setKvCache(env, key, dbData, 3600);
 
   return res.status(200).json({
     success: true,
@@ -425,7 +488,7 @@ export async function handleV2EdgeSinapiCached(req, res) {
     source: 'computed_and_cached',
     uf,
     competencia,
-    data: sampleData
+    data: dbData
   });
 }
 
@@ -556,13 +619,29 @@ export async function handleV2EdgeStorageList(req, res) {
 export async function handleV2EdgeAiChat(req, res) {
   res.setHeader('Content-Type', 'application/json; charset=utf-8');
   const env = req.env || process.env;
-  const messages = Array.isArray(req.body?.messages) ? req.body.messages : [
+
+  const auth = await resolveAuthAndTenant(req);
+  if (!auth.authenticated) {
+    return res.status(auth.status || 401).json({ success: false, error: auth.error || 'Não autorizado para acessar o FinBot.' });
+  }
+
+  const rateKey = `edge-chat:${auth.tenantId || 'global'}:${getClientIp(req)}`;
+  const rate = await checkRateLimit(req, rateKey, 30, 60000);
+  if (!rate.allowed) {
+    return res.status(429).json({ success: false, error: 'RATE_LIMIT_EXCEEDED', message: 'Limite de mensagens de IA atingido temporariamente. Aguarde.' });
+  }
+
+  const rawMessages = Array.isArray(req.body?.messages) ? req.body.messages : [
     { role: 'user', content: req.body?.prompt || req.body?.message || 'Olá' }
   ];
+  const messages = rawMessages.slice(-20).map(m => ({
+    role: m.role === 'assistant' ? 'assistant' : (m.role === 'system' ? 'system' : 'user'),
+    content: String(m.content || '').slice(0, 4000)
+  }));
 
   try {
     const result = await runEdgeChat(env, messages, {
-      maxTokens: Number(req.body?.maxTokens || 1000)
+      maxTokens: Math.min(1024, Math.max(50, Number(req.body?.maxTokens || 1000)))
     });
 
     return res.status(200).json({
@@ -582,10 +661,33 @@ export async function handleV2EdgeAiChat(req, res) {
 export async function handleV2EdgeAiOcr(req, res) {
   res.setHeader('Content-Type', 'application/json; charset=utf-8');
   const env = req.env || process.env;
-  const imageBase64 = req.body?.image || req.body?.imageBase64;
 
-  if (!imageBase64) {
+  const auth = await resolveAuthAndTenant(req);
+  if (!auth.authenticated) {
+    return res.status(auth.status || 401).json({ success: false, error: auth.error || 'Não autorizado.' });
+  }
+
+  if (!canUseFeature(auth.plan, 'ocr') && !auth.isSystem && auth.role !== 'superadmin') {
+    return res.status(403).json(planError('ocr', auth.plan));
+  }
+
+  if (!canAccessModule(auth, 'notas', 'write')) {
+    return res.status(403).json(permissionError('MODULE_WRITE_FORBIDDEN', 'notas'));
+  }
+
+  const rateKey = `edge-ocr:${auth.tenantId || 'global'}:${getClientIp(req)}`;
+  const rate = await checkRateLimit(req, rateKey, 20, 60000);
+  if (!rate.allowed) {
+    return res.status(429).json({ success: false, error: 'RATE_LIMIT_EXCEEDED', message: 'Limite de processamento OCR atingido para o minuto. Aguarde.' });
+  }
+
+  const imageBase64 = req.body?.image || req.body?.imageBase64;
+  if (!imageBase64 || typeof imageBase64 !== 'string') {
     return res.status(400).json({ success: false, error: 'Imagem em base64 é obrigatória para OCR.' });
+  }
+
+  if (imageBase64.length > 7 * 1024 * 1024) {
+    return res.status(413).json({ success: false, error: 'PAYLOAD_TOO_LARGE', message: 'Imagem excede o limite de tamanho (5MB).' });
   }
 
   try {
@@ -602,23 +704,60 @@ export async function handleV2EdgeAiOcr(req, res) {
 export async function handleV2EdgeAiSemanticSearch(req, res) {
   res.setHeader('Content-Type', 'application/json; charset=utf-8');
   const env = req.env || process.env;
-  const query = String(req.body?.query || req.query?.q || '').trim();
 
+  const auth = await resolveAuthAndTenant(req);
+  if (!auth.authenticated) {
+    return res.status(auth.status || 401).json({ success: false, error: auth.error || 'Não autorizado.' });
+  }
+
+  if (!canUseFeature(auth.plan, 'sinapi') && !auth.isSystem && auth.role !== 'superadmin') {
+    return res.status(403).json(planError('sinapi', auth.plan));
+  }
+
+  const rateKey = `edge-vector:${auth.tenantId || 'global'}:${getClientIp(req)}`;
+  const rate = await checkRateLimit(req, rateKey, 60, 60000);
+  if (!rate.allowed) {
+    return res.status(429).json({ success: false, error: 'RATE_LIMIT_EXCEEDED', message: 'Limite de buscas vetoriais atingido. Aguarde.' });
+  }
+
+  const query = String(req.body?.query || req.query?.q || '').trim().slice(0, 250);
   if (!query) {
     return res.status(400).json({ success: false, error: 'Termo de busca (query) é obrigatório.' });
   }
 
-  const sampleCatalog = [
-    { codigo: '104658', descricao: 'Alvenaria de vedação de blocos cerâmicos furados 9x19x19cm', unidade: 'M2', grupo: 'Estruturas e Alvenarias' },
-    { codigo: '45333', descricao: 'Piso cerâmico esmaltado extra acabamento polido', unidade: 'M2', grupo: 'Revestimentos e Pisos' },
-    { codigo: '98504', descricao: 'Impermeabilização com manta asfáltica armada aderida a maçarico', unidade: 'M2', grupo: 'Impermeabilizações' },
-    { codigo: '92762', descricao: 'Armação de pilar ou viga de estrutura convencional de concreto armado aço CA-50', unidade: 'KG', grupo: 'Estruturas' },
-    { codigo: '88316', descricao: 'Servente com encargos complementares', unidade: 'H', grupo: 'Mão de Obra' },
-    { codigo: '88309', descricao: 'Pedreiro com encargos complementares', unidade: 'H', grupo: 'Mão de Obra' }
-  ];
+  let catalog = [];
+  try {
+    const sql = createOwnerSql();
+    const rows = await sql`
+      SELECT codigo, descricao, unidade, valor
+      FROM sinapi_itens
+      LIMIT 100;
+    `;
+    if (rows && rows.length > 0) {
+      catalog = rows.map(r => ({
+        codigo: String(r.codigo),
+        descricao: String(r.descricao),
+        unidade: String(r.unidade || 'UN'),
+        grupo: 'SINAPI Oficial Caixa'
+      }));
+    }
+  } catch (_err) {
+    // Database query failed
+  }
+
+  if (catalog.length === 0) {
+    catalog = [
+      { codigo: '104658', descricao: 'Alvenaria de vedação de blocos cerâmicos furados 9x19x19cm', unidade: 'M2', grupo: 'Estruturas e Alvenarias' },
+      { codigo: '45333', descricao: 'Piso cerâmico esmaltado extra acabamento polido', unidade: 'M2', grupo: 'Revestimentos e Pisos' },
+      { codigo: '98504', descricao: 'Impermeabilização com manta asfáltica armada aderida a maçarico', unidade: 'M2', grupo: 'Impermeabilizações' },
+      { codigo: '92762', descricao: 'Armação de pilar ou viga de estrutura convencional de concreto armado aço CA-50', unidade: 'KG', grupo: 'Estruturas' },
+      { codigo: '88316', descricao: 'Servente com encargos complementares', unidade: 'H', grupo: 'Mão de Obra' },
+      { codigo: '88309', descricao: 'Pedreiro com encargos complementares', unidade: 'H', grupo: 'Mão de Obra' }
+    ];
+  }
 
   try {
-    const results = await searchSemanticSinapi(env, query, sampleCatalog, { topK: 5 });
+    const results = await searchSemanticSinapi(env, query, catalog, { topK: 5 });
     return res.status(200).json({
       success: true,
       query,
@@ -634,15 +773,34 @@ export async function handleV2EdgeAiSemanticSearch(req, res) {
  * Endpoint 6: Otimizador de Mídia e Imagens no Edge
  */
 export async function handleV2EdgeMediaOptimize(req, res) {
-  const options = parseImageTransformOptions(new URLSearchParams(req.url?.split('?')[1] || ''));
-  const dummyPixelPng = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==', 'base64');
-  
-  res.setHeader('Content-Type', `image/${options.format}`);
-  res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
-  res.setHeader('X-FinGo-Transformed', 'true');
-  res.setHeader('X-FinGo-Width', String(options.width));
+  const urlObj = new URL(req.url || 'http://localhost', 'http://localhost');
+  const options = parseImageTransformOptions(urlObj.searchParams);
+  const key = urlObj.searchParams.get('key') || req.query?.key;
+  const env = req.env || process.env;
 
-  return res.status(200).send(dummyPixelPng);
+  if (!key) {
+    return res.status(400).json({
+      success: false,
+      error: 'PARAM_REQUIRED',
+      message: 'Parâmetro key com o identificador do arquivo no storage é obrigatório.'
+    });
+  }
+
+  try {
+    const obj = await getR2Object(env, key);
+    if (!obj || !obj.body) {
+      return res.status(404).json({ success: false, error: 'Imagem não encontrada no storage.' });
+    }
+
+    res.setHeader('Content-Type', `image/${options.format}`);
+    res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+    res.setHeader('X-FinGo-Transformed', 'true');
+    res.setHeader('X-FinGo-Width', String(options.width));
+
+    return res.status(200).send(obj.body);
+  } catch (_err) {
+    return res.status(500).json({ success: false, error: 'Falha ao processar mídia no Edge.' });
+  }
 }
 
 /**
@@ -651,15 +809,38 @@ export async function handleV2EdgeMediaOptimize(req, res) {
 export async function handleV2AuditLedgerAppend(req, res) {
   res.setHeader('Content-Type', 'application/json; charset=utf-8');
   const env = req.env || process.env;
+
+  const auth = await resolveAuthAndTenant(req);
+  if (!auth.authenticated) {
+    return res.status(auth.status || 401).json({ success: false, error: auth.error || 'Não autorizado para registrar no audit ledger.' });
+  }
+
+  if (auth.role !== 'admin' && auth.role !== 'superadmin' && !auth.isSystem && !can(auth.role, 'audit')) {
+    return res.status(403).json(permissionError('ROLE_READ_ONLY'));
+  }
+
+  const rateKey = `audit-ledger:${auth.tenantId || 'global'}:${getClientIp(req)}`;
+  const rate = await checkRateLimit(req, rateKey, 30, 60000);
+  if (!rate.allowed) {
+    return res.status(429).json({ success: false, error: 'RATE_LIMIT_EXCEEDED', message: 'Limite de registro de auditoria atingido temporariamente.' });
+  }
+
   const body = req.body || {};
+  const action = String(body.action || 'AUDIT_LOG').slice(0, 64);
+  const resource = String(body.resource || 'financial').slice(0, 64);
+  const payload = (body.payload && typeof body.payload === 'object') ? body.payload : {};
+
+  // Tenant e User estritamente vinculados à sessão autenticada
+  const tenantId = auth.tenantId;
+  const userId = auth.user?.id || 'system';
 
   try {
     const block = await appendLedgerBlock(env, {
-      tenantId: req.headers['x-tenant-id'] || body.tenantId || 'global',
-      userId: req.headers['x-user-id'] || body.userId || 'system',
-      action: body.action || 'AUDIT_LOG',
-      resource: body.resource || 'financial',
-      payload: body.payload || {}
+      tenantId,
+      userId,
+      action,
+      resource,
+      payload
     });
 
     return res.status(200).json({
@@ -676,8 +857,13 @@ export async function handleV2AuditLedgerAppend(req, res) {
  */
 export async function handleV2AuditLedgerVerify(req, res) {
   res.setHeader('Content-Type', 'application/json; charset=utf-8');
-  const chain = Array.isArray(req.body?.chain) ? req.body.chain : [];
 
+  const auth = await resolveAuthAndTenant(req);
+  if (!auth.authenticated) {
+    return res.status(auth.status || 401).json({ success: false, error: auth.error || 'Não autorizado.' });
+  }
+
+  const chain = Array.isArray(req.body?.chain) ? req.body.chain : [];
   const verification = verifyLedgerIntegrity(chain);
   return res.status(200).json({
     success: true,
@@ -690,6 +876,22 @@ export async function handleV2AuditLedgerVerify(req, res) {
  */
 export async function handleV2DetectAnomaly(req, res) {
   res.setHeader('Content-Type', 'application/json; charset=utf-8');
+
+  const auth = await resolveAuthAndTenant(req);
+  if (!auth.authenticated) {
+    return res.status(auth.status || 401).json({ success: false, error: auth.error || 'Não autorizado.' });
+  }
+
+  if (!canAccessModule(auth, 'financeiro', 'read')) {
+    return res.status(403).json(permissionError('MODULE_READ_FORBIDDEN', 'financeiro'));
+  }
+
+  const rateKey = `detect-anomaly:${auth.tenantId || 'global'}:${getClientIp(req)}`;
+  const rate = await checkRateLimit(req, rateKey, 60, 60000);
+  if (!rate.allowed) {
+    return res.status(429).json({ success: false, error: 'RATE_LIMIT_EXCEEDED', message: 'Limite de detecção de anomalias excedido.' });
+  }
+
   const expense = req.body?.expense || {};
   const options = req.body?.options || {};
 

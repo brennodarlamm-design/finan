@@ -243,6 +243,7 @@ const Fornecedores = {
     const f = id ? DB.getById('fornecedores', id) : null;
     const isEdit = !!f;
     const isPF   = f?.tipo_pessoa === 'pf';
+    const esc = (v) => (typeof Utils !== 'undefined' && Utils.escapeHtml) ? Utils.escapeHtml(String(v ?? '')) : String(v ?? '');
 
     Utils.showModal(`
       <div class="modal" style="max-width:780px;width:95vw;max-height:92vh;display:flex;flex-direction:column;">
@@ -286,7 +287,7 @@ const Fornecedores = {
                 <div class="form-group" style="flex:1;margin-bottom:0;">
                   <label class="form-label">CNPJ</label>
                   <input class="form-control" id="forn-cnpj-input" name="cnpj"
-                    value="${f?.cnpj ? this._fmtCnpj(f.cnpj) : ''}"
+                    value="${esc(f?.cnpj ? this._fmtCnpj(f.cnpj) : '')}"
                     placeholder="00.000.000/0000-00"
                     style="font-family:monospace;font-size:1rem;letter-spacing:.05em;" data-fb-input="Fornecedores._onCnpjInput" data-fb-input-n="1" data-fb-input-t0="self"
                     maxlength="18">
@@ -305,7 +306,7 @@ const Fornecedores = {
               <div class="form-group" style="margin-bottom:0;max-width:260px;">
                 <label class="form-label">CPF</label>
                 <input class="form-control" id="forn-cpf-input" name="cpf"
-                  value="${f?.cpf ? this._fmtCpf(f.cpf) : ''}"
+                  value="${esc(f?.cpf ? this._fmtCpf(f.cpf) : '')}"
                   placeholder="000.000.000-00"
                   style="font-family:monospace;font-size:1rem;letter-spacing:.05em;" data-fb-input="Fornecedores._onCpfInput" data-fb-input-n="1" data-fb-input-t0="self"
                   maxlength="14">
@@ -317,12 +318,12 @@ const Fornecedores = {
               <div class="form-group">
                 <label class="form-label" id="label-razao">${isPF ? 'Nome Completo *' : 'Razão Social *'}</label>
                 <input class="form-control" id="forn-razao" name="razao_social"
-                  value="${f?.razao_social||''}" required placeholder="${isPF ? 'Nome completo da pessoa' : 'Nome jurídico completo'}">
+                  value="${esc(f?.razao_social||'')}" required placeholder="${isPF ? 'Nome completo da pessoa' : 'Nome jurídico completo'}">
               </div>
               <div class="form-group" id="grupo-fantasia" style="${isPF ? 'display:none;' : ''}">
                 <label class="form-label">Nome Fantasia</label>
                 <input class="form-control" id="forn-fantasia" name="nome_fantasia"
-                  value="${f?.nome_fantasia||''}" placeholder="Nome comercial / como é conhecido">
+                  value="${esc(f?.nome_fantasia||'')}" placeholder="Nome comercial / como é conhecido">
               </div>
             </div>
 
@@ -338,12 +339,12 @@ const Fornecedores = {
               <div class="form-group">
                 <label class="form-label">Telefone</label>
                 <input class="form-control" id="forn-tel" name="telefone"
-                  value="${f?.telefone||''}" placeholder="(xx) 9 xxxx-xxxx">
+                  value="${esc(f?.telefone||'')}" placeholder="(xx) 9 xxxx-xxxx">
               </div>
               <div class="form-group">
                 <label class="form-label">E-mail</label>
                 <input class="form-control" id="forn-email" name="email" type="email"
-                  value="${f?.email||''}" placeholder="contato@empresa.com.br">
+                  value="${esc(f?.email||'')}" placeholder="contato@empresa.com.br">
               </div>
             </div>
 
@@ -354,34 +355,34 @@ const Fornecedores = {
                 <div class="form-group" style="grid-column:span 2;">
                   <label class="form-label">Logradouro</label>
                   <input class="form-control" id="forn-end" name="endereco"
-                    value="${f?.endereco||''}" placeholder="Rua, Av., Rodovia...">
+                    value="${esc(f?.endereco||'')}" placeholder="Rua, Av., Rodovia...">
                 </div>
                 <div class="form-group">
                   <label class="form-label">Nº / Complemento</label>
                   <input class="form-control" id="forn-numero" name="numero"
-                    value="${f?.numero||''}" placeholder="Nº, Sala, Galpão...">
+                    value="${esc(f?.numero||'')}" placeholder="Nº, Sala, Galpão...">
                 </div>
               </div>
               <div class="g4">
                 <div class="form-group">
                   <label class="form-label">Bairro</label>
                   <input class="form-control" id="forn-bairro" name="bairro"
-                    value="${f?.bairro||''}" placeholder="Bairro">
+                    value="${esc(f?.bairro||'')}" placeholder="Bairro">
                 </div>
                 <div class="form-group">
                   <label class="form-label">Município</label>
                   <input class="form-control" id="forn-municipio" name="municipio"
-                    value="${f?.municipio||''}" placeholder="Cidade">
+                    value="${esc(f?.municipio||'')}" placeholder="Cidade">
                 </div>
                 <div class="form-group">
                   <label class="form-label">UF</label>
                   <input class="form-control" id="forn-uf-inp" name="uf"
-                    value="${f?.uf||''}" placeholder="Ex: PA" maxlength="2" style="text-transform:uppercase;">
+                    value="${esc(f?.uf||'')}" placeholder="Ex: PA" maxlength="2" style="text-transform:uppercase;">
                 </div>
                 <div class="form-group">
                   <label class="form-label">CEP</label>
                   <input class="form-control" id="forn-cep" name="cep"
-                    value="${f?.cep||''}" placeholder="00000-000" data-fb-blur="Fornecedores.onCepChange" data-fb-blur-n="1" data-fb-blur-t0="self">
+                    value="${esc(f?.cep||'')}" placeholder="00000-000" data-fb-blur="Fornecedores.onCepChange" data-fb-blur-n="1" data-fb-blur-t0="self">
                 </div>
               </div>
             </div>
@@ -391,17 +392,17 @@ const Fornecedores = {
               <div class="form-group">
                 <label class="form-label">Nome do Contato</label>
                 <input class="form-control" name="contato_nome"
-                  value="${f?.contato_nome||''}" placeholder="Responsável comercial">
+                  value="${esc(f?.contato_nome||'')}" placeholder="Responsável comercial">
               </div>
               <div class="form-group">
                 <label class="form-label">Cargo / Função</label>
                 <input class="form-control" name="contato_cargo"
-                  value="${f?.contato_cargo||''}" placeholder="Vendedor, Gerente...">
+                  value="${esc(f?.contato_cargo||'')}" placeholder="Vendedor, Gerente...">
               </div>
               <div class="form-group">
                 <label class="form-label">Prazo de Pagamento (dias)</label>
                 <input class="form-control" name="prazo_pagamento" type="number" min="0" max="999"
-                  value="${f?.prazo_pagamento||''}" placeholder="Ex: 28">
+                  value="${esc(f?.prazo_pagamento||'')}" placeholder="Ex: 28">
               </div>
             </div>
 
@@ -417,7 +418,7 @@ const Fornecedores = {
               <div class="form-group">
                 <label class="form-label">Observações</label>
                 <input class="form-control" name="observacoes"
-                  value="${f?.observacoes||''}" placeholder="Notas internas sobre o fornecedor">
+                  value="${esc(f?.observacoes||'')}" placeholder="Notas internas sobre o fornecedor">
               </div>
             </div>
 

@@ -91,7 +91,9 @@ export async function handleDeltaSync(sql, tenantId, auth, query, res) {
       tableAllowed(auth, 'doc_fases', 'read')
         ? sql`SELECT * FROM obra_doc_fases WHERE tenant_id = ${tenantId} AND (updated_at >= ${sinceIso} OR created_at >= ${sinceIso}) ORDER BY updated_at ASC;`
         : Promise.resolve([]),
-      sql`SELECT preferences, updated_at FROM tenant_preferences WHERE tenant_id = ${tenantId} AND updated_at >= ${sinceIso} LIMIT 1;`,
+      tableAllowed(auth, 'preferencias', 'read')
+        ? sql`SELECT preferences, updated_at FROM tenant_preferences WHERE tenant_id = ${tenantId} AND updated_at >= ${sinceIso} LIMIT 1;`
+        : Promise.resolve([]),
 
       tableAllowed(auth, 'obras', 'read')
         ? sql`SELECT * FROM obras WHERE tenant_id = ${tenantId} AND id NOT IN ('escritorio', 'geral') AND (created_at >= ${sinceIso} OR id IN (SELECT entidade_id FROM audit_logs WHERE tenant_id = ${tenantId} AND entidade = 'obras' AND created_at >= ${sinceIso}));`
@@ -248,7 +250,9 @@ export async function handleFullSnapshot(sql, tenantId, auth, res) {
     tableAllowed(auth, 'doc_fases', 'read')
       ? sql`SELECT * FROM obra_doc_fases WHERE tenant_id = ${tenantId} ORDER BY updated_at ASC;`
       : Promise.resolve([]),
-    sql`SELECT preferences FROM tenant_preferences WHERE tenant_id = ${tenantId} LIMIT 1;`
+    tableAllowed(auth, 'preferencias', 'read')
+      ? sql`SELECT preferences FROM tenant_preferences WHERE tenant_id = ${tenantId} LIMIT 1;`
+      : Promise.resolve([])
   ]);
 
   const data = {

@@ -189,7 +189,7 @@ const Utils = {
       vencida:'<span class="badge badge-danger">⚠ Vencida</span>',
       cancelada:'<span class="badge badge-secondary">✕ Cancelada</span>',
       em_andamento:'<span class="badge badge-info">🔨 Em Andamento</span>',
-      documentacao:'<span class="badge badge-info" style="background:rgba(59,130,246,.18);color:#60a5fa;border:1px solid rgba(59,130,246,.4);font-weight:700;">📑 Documentação</span>',
+      documentacao:'<span class="badge" style="background:rgba(198,255,0,.14);color:#C6FF00;border:1px solid rgba(198,255,0,.35);font-weight:700;">📑 Documentação</span>',
       aprovada:'<span class="badge badge-success" style="background:rgba(16,185,129,.18);color:#34d399;border:1px solid rgba(16,185,129,.4);font-weight:700;">✓ Aprovada</span>',
       concluida:'<span class="badge badge-success">✓ Concluída</span>',
       pausada:'<span class="badge badge-warning">⏸ Pausada</span>',

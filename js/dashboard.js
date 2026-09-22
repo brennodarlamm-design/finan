@@ -124,7 +124,7 @@ const Dashboard = {
             <span style="font-size:.72rem;color:var(--text3);font-weight:700;">Boletos &amp; Contas a Pagar</span>
           </div>
           <div style="display:flex;gap:6px;align-items:center;">
-            <button class="btn btn-sm" data-fb-click="WhatsApp.enviarResumoDiario" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(obraId))}" style="background:#25D366;color:#fff;font-weight:700;display:flex;align-items:center;gap:5px;height:28px;padding:0 12px;border-radius:20px;border:none;cursor:pointer;" title="Enviar resumo de boletos para o WhatsApp">
+            <button class="btn btn-sm" data-fb-click="WhatsApp.enviarResumoDiario" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(obraId))}" style="background:#C6FF00;color:#0A0A0A;font-weight:800;display:flex;align-items:center;gap:5px;height:28px;padding:0 12px;border-radius:20px;border:none;cursor:pointer;" title="Enviar resumo de boletos para o WhatsApp">
               📲 Resumo WhatsApp
             </button>
             <button class="btn btn-ghost btn-sm" data-fb-click="WhatsApp.abrirModalTelefone" data-fb-click-n="0" title="Definir número de WhatsApp que recebe os alertas" style="padding:2px 8px;font-size:.76rem;color:var(--text2);display:flex;align-items:center;gap:3px;cursor:pointer;">
@@ -195,34 +195,34 @@ const Dashboard = {
 
     return `
       <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin-bottom:18px;">
-        <div style="background:rgba(16,185,129,.07);border:1px solid rgba(16,185,129,.25);border-radius:var(--r-md);padding:12px 14px;">
-          <div style="font-size:.72rem;color:var(--text3);font-weight:700;text-transform:uppercase;">(+) Receita Operacional</div>
-          <div style="font-size:1.25rem;font-weight:800;color:var(--success);margin-top:2px;">${Utils.fmt.currency(dGeral.recs)}</div>
-          <div style="font-size:.72rem;color:var(--text3);margin-top:2px;">Medições & Entradas</div>
+        <div style="background:#E8E8DC;border:1px solid #D1D1C7;border-radius:var(--r-md);padding:12px 14px;">
+          <div style="font-size:.72rem;color:#0A0A0A;font-weight:800;text-transform:uppercase;">(+) Receita Operacional</div>
+          <div style="font-size:1.25rem;font-weight:900;color:#0A0A0A;margin-top:2px;">${Utils.fmt.currency(dGeral.recs)}</div>
+          <div style="font-size:.72rem;color:#0A0A0A;font-weight:600;margin-top:2px;opacity:.85;">Medições &amp; Entradas</div>
         </div>
 
-        <div style="background:rgba(239,68,68,.07);border:1px solid rgba(239,68,68,.25);border-radius:var(--r-md);padding:12px 14px;">
-          <div style="font-size:.72rem;color:var(--text3);font-weight:700;text-transform:uppercase;">(-) Custos Diretos</div>
-          <div style="font-size:1.25rem;font-weight:800;color:var(--danger);margin-top:2px;">${Utils.fmt.currency(dGeral.custosDiretos)}</div>
-          <div style="font-size:.72rem;color:var(--text3);margin-top:2px;">Mat + Mão de Obra + Serv + Eqp</div>
+        <div style="background:#E8E8DC;border:1px solid #D1D1C7;border-radius:var(--r-md);padding:12px 14px;">
+          <div style="font-size:.72rem;color:#0A0A0A;font-weight:800;text-transform:uppercase;">(-) Custos Diretos</div>
+          <div style="font-size:1.25rem;font-weight:900;color:#0A0A0A;margin-top:2px;">- ${Utils.fmt.currency(Math.abs(dGeral.custosDiretos))}</div>
+          <div style="font-size:.72rem;color:#0A0A0A;font-weight:600;margin-top:2px;opacity:.85;">Mat + Mão de Obra + Serv + Eqp</div>
         </div>
 
-        <div style="background:rgba(59,130,246,.07);border:1px solid rgba(59,130,246,.25);border-radius:var(--r-md);padding:12px 14px;">
-          <div style="font-size:.72rem;color:var(--text3);font-weight:700;text-transform:uppercase;">(=) Margem Bruta</div>
-          <div style="font-size:1.25rem;font-weight:800;color:${dGeral.margemBruta>=0?'#3b82f6':'var(--danger)'};margin-top:2px;">
+        <div style="background:#E8E8DC;border:1px solid #D1D1C7;border-radius:var(--r-md);padding:12px 14px;">
+          <div style="font-size:.72rem;color:#0A0A0A;font-weight:800;text-transform:uppercase;">(=) Margem Bruta</div>
+          <div style="font-size:1.25rem;font-weight:900;color:#0A0A0A;margin-top:2px;">
             ${Utils.fmt.currency(dGeral.margemBruta)}
-            <span style="font-size:.75rem;font-weight:700;color:var(--text2);margin-left:4px;">(${dGeral.margemBrutaPct.toFixed(1)}%)</span>
+            <span style="font-size:.75rem;font-weight:800;color:#0A0A0A;margin-left:4px;">(${dGeral.margemBrutaPct.toFixed(1)}%)</span>
           </div>
-          <div style="font-size:.72rem;color:var(--text3);margin-top:2px;">Margem da Construção</div>
+          <div style="font-size:.72rem;color:#0A0A0A;font-weight:600;margin-top:2px;opacity:.85;">Margem da Construção</div>
         </div>
 
-        <div style="background:${dGeral.lucroLiquido>=0?'rgba(201,162,39,.08)':'rgba(239,68,68,.07)'};border:1px solid ${dGeral.lucroLiquido>=0?'rgba(201,162,39,.3)':'rgba(239,68,68,.3)'};border-radius:var(--r-md);padding:12px 14px;">
-          <div style="font-size:.72rem;color:var(--text3);font-weight:700;text-transform:uppercase;">(=) Resultado Líquido</div>
-          <div style="font-size:1.25rem;font-weight:800;color:${dGeral.lucroLiquido>=0?'var(--accent2)':'var(--danger)'};margin-top:2px;">
+        <div style="background:#E8E8DC;border:1px solid #D1D1C7;border-radius:var(--r-md);padding:12px 14px;">
+          <div style="font-size:.72rem;color:#0A0A0A;font-weight:800;text-transform:uppercase;">(=) Resultado Líquido</div>
+          <div style="font-size:1.25rem;font-weight:900;color:#0A0A0A;margin-top:2px;">
             ${Utils.fmt.currency(dGeral.lucroLiquido)}
-            <span style="font-size:.75rem;font-weight:700;color:var(--text2);margin-left:4px;">(${dGeral.margemLiqPct.toFixed(1)}%)</span>
+            <span style="font-size:.75rem;font-weight:800;color:#0A0A0A;margin-left:4px;">(${dGeral.margemLiqPct.toFixed(1)}%)</span>
           </div>
-          <div style="font-size:.72rem;color:var(--text3);margin-top:2px;">Lucro Real Pós-Indiretos</div>
+          <div style="font-size:.72rem;color:#0A0A0A;font-weight:600;margin-top:2px;opacity:.85;">Lucro Real Pós-Indiretos</div>
         </div>
       </div>
 
@@ -834,13 +834,13 @@ const Dashboard = {
     if (badgesContainer) {
       const saldoFinal = saldosAcumulados[saldosAcumulados.length - 1] || 0;
       badgesContainer.innerHTML = `
-        <span style="background:rgba(16,185,129,.15);color:var(--success);padding:3px 10px;border-radius:12px;font-size:.74rem;font-weight:700;">
+        <span style="background:#C6FF00;color:#0A0A0A;padding:3px 10px;border-radius:12px;font-size:.74rem;font-weight:800;">
           + Entradas Previstas: ${Utils.fmt.currency(totalPrevRec)}
         </span>
         <span style="background:rgba(239,68,68,.15);color:var(--danger);padding:3px 10px;border-radius:12px;font-size:.74rem;font-weight:700;">
           − Saídas Previstas: ${Utils.fmt.currency(totalPrevDesp)}
         </span>
-        <span style="background:${saldoFinal>=0?'rgba(201,162,39,.18)':'rgba(239,68,68,.25)'};color:${saldoFinal>=0?'var(--accent2)':'#f87171'};padding:3px 10px;border-radius:12px;font-size:.74rem;font-weight:800;border:1px solid ${saldoFinal>=0?'rgba(201,162,39,.4)':'rgba(239,68,68,.5)'};">
+        <span style="background:${saldoFinal>=0?'#7F49B8':'rgba(239,68,68,.25)'};color:${saldoFinal>=0?'#F0F0E8':'#f87171'};padding:3px 10px;border-radius:12px;font-size:.74rem;font-weight:800;border:1px solid ${saldoFinal>=0?'#9B6FD4':'rgba(239,68,68,.5)'};">
           Saldo em 90d: ${Utils.fmt.currency(saldoFinal)}
         </span>`;
     }
@@ -859,10 +859,10 @@ const Dashboard = {
             label: 'Saldo Acumulado Projetado (R$)',
             type: 'line',
             data: saldosAcumulados,
-            borderColor: '#eab308',
-            backgroundColor: 'rgba(234,179,8,0.1)',
+            borderColor: '#C6FF00',
+            backgroundColor: 'rgba(198,255,0,0.1)',
             borderWidth: 2.5,
-            pointBackgroundColor: '#eab308',
+            pointBackgroundColor: '#C6FF00',
             pointRadius: 4,
             pointHoverRadius: 6,
             tension: 0.3,
@@ -1201,12 +1201,12 @@ const Dashboard = {
     }
 
     return `
-      <div class="card" id="onboarding-checklist-card" style="background:linear-gradient(135deg,#121b10,#172314);border:1px solid rgba(18,217,160,.35);margin-bottom:22px;padding:22px;border-radius:16px;box-shadow:0 8px 32px rgba(0,0,0,.4);">
+      <div class="card" id="onboarding-checklist-card" style="background:#1A1A1A;border:1px solid #282828;margin-bottom:22px;padding:22px;border-radius:6px;box-shadow:0 8px 32px rgba(0,0,0,.4);">
         
         <!-- Cabeçalho do Guia -->
         <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:12px;margin-bottom:16px;">
           <div>
-            <div style="display:inline-flex;align-items:center;gap:6px;background:rgba(18,217,160,.14);border:1px solid rgba(18,217,160,.3);padding:3px 10px;border-radius:20px;font-size:.72rem;font-weight:800;color:var(--accent);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px;">
+            <div style="display:inline-flex;align-items:center;gap:6px;background:rgba(198,255,0,.12);border:1px solid rgba(198,255,0,.3);padding:3px 10px;border-radius:4px;font-size:.72rem;font-weight:800;color:var(--accent);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px;">
               <span>🚀</span> Guia de Início Rápido
             </div>
             <h2 style="font-size:1.15rem;font-weight:900;color:var(--text);margin:0 0 4px;">Bem-vindo ao FinGo! Complete os 3 passos para ativar seu sistema:</h2>
@@ -1219,7 +1219,7 @@ const Dashboard = {
                 <div style="width:${pct}%;height:100%;background:linear-gradient(90deg,var(--accent),var(--accent2));border-radius:3px;transition:width .4s ease;"></div>
               </div>
             </div>
-            <button data-fb-click="Dashboard.dismissOnboarding" data-fb-click-n="0" style="background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);color:var(--text3);width:28px;height:28px;border-radius:6px;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:.85rem;" title="Dispensar guia">✕</button>
+            <button data-fb-click="Dashboard.dismissOnboarding" data-fb-click-n="0" style="background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);color:var(--text3);width:28px;height:28px;border-radius:4px;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:.85rem;" title="Dispensar guia">✕</button>
           </div>
         </div>
 
@@ -1227,10 +1227,10 @@ const Dashboard = {
         <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(260px, 1fr));gap:14px;">
           
           <!-- Passo 1: Configurar Empresa -->
-          <div style="background:rgba(0,0,0,.25);border:1px solid ${step1Done ? 'rgba(18,217,160,.4)' : 'rgba(255,255,255,.08)'};border-radius:12px;padding:16px;display:flex;flex-direction:column;justify-content:space-between;position:relative;">
+          <div style="background:#0A0A0A;border:1px solid ${step1Done ? 'rgba(198,255,0,.4)' : 'rgba(255,255,255,.08)'};border-radius:6px;padding:16px;display:flex;flex-direction:column;justify-content:space-between;position:relative;">
             <div>
               <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
-                <div style="width:32px;height:32px;border-radius:8px;background:${step1Done ? 'rgba(18,217,160,.2)' : 'rgba(255,255,255,.06)'};color:${step1Done ? 'var(--accent)' : 'var(--text3)'};display:flex;align-items:center;justify-content:center;font-weight:900;font-size:.9rem;">
+                <div style="width:32px;height:32px;border-radius:4px;background:${step1Done ? 'rgba(198,255,0,.18)' : 'rgba(255,255,255,.06)'};color:${step1Done ? 'var(--accent)' : 'var(--text3)'};display:flex;align-items:center;justify-content:center;font-weight:900;font-size:.9rem;">
                   ${step1Done ? '✓' : '1'}
                 </div>
                 <span class="badge ${step1Done ? 'badge-success' : 'badge-secondary'}">${step1Done ? 'Concluído' : 'Pendente'}</span>
@@ -1246,10 +1246,10 @@ const Dashboard = {
           </div>
 
           <!-- Passo 2: Cadastrar 1ª Obra -->
-          <div style="background:rgba(0,0,0,.25);border:1px solid ${step2Done ? 'rgba(18,217,160,.4)' : 'rgba(255,255,255,.08)'};border-radius:12px;padding:16px;display:flex;flex-direction:column;justify-content:space-between;position:relative;">
+          <div style="background:#0A0A0A;border:1px solid ${step2Done ? 'rgba(198,255,0,.4)' : 'rgba(255,255,255,.08)'};border-radius:6px;padding:16px;display:flex;flex-direction:column;justify-content:space-between;position:relative;">
             <div>
               <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
-                <div style="width:32px;height:32px;border-radius:8px;background:${step2Done ? 'rgba(18,217,160,.2)' : 'rgba(255,255,255,.06)'};color:${step2Done ? 'var(--accent)' : 'var(--text3)'};display:flex;align-items:center;justify-content:center;font-weight:900;font-size:.9rem;">
+                <div style="width:32px;height:32px;border-radius:4px;background:${step2Done ? 'rgba(198,255,0,.18)' : 'rgba(255,255,255,.06)'};color:${step2Done ? 'var(--accent)' : 'var(--text3)'};display:flex;align-items:center;justify-content:center;font-weight:900;font-size:.9rem;">
                   ${step2Done ? '✓' : '2'}
                 </div>
                 <span class="badge ${step2Done ? 'badge-success' : 'badge-secondary'}">${step2Done ? 'Concluído' : 'Pendente'}</span>
@@ -1265,10 +1265,10 @@ const Dashboard = {
           </div>
 
           <!-- Passo 3: Adicionar 1º Lançamento ou Orçamento -->
-          <div style="background:rgba(0,0,0,.25);border:1px solid ${step3Done ? 'rgba(18,217,160,.4)' : 'rgba(255,255,255,.08)'};border-radius:12px;padding:16px;display:flex;flex-direction:column;justify-content:space-between;position:relative;">
+          <div style="background:#0A0A0A;border:1px solid ${step3Done ? 'rgba(198,255,0,.4)' : 'rgba(255,255,255,.08)'};border-radius:6px;padding:16px;display:flex;flex-direction:column;justify-content:space-between;position:relative;">
             <div>
               <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
-                <div style="width:32px;height:32px;border-radius:8px;background:${step3Done ? 'rgba(18,217,160,.2)' : 'rgba(255,255,255,.06)'};color:${step3Done ? 'var(--accent)' : 'var(--text3)'};display:flex;align-items:center;justify-content:center;font-weight:900;font-size:.9rem;">
+                <div style="width:32px;height:32px;border-radius:4px;background:${step3Done ? 'rgba(198,255,0,.18)' : 'rgba(255,255,255,.06)'};color:${step3Done ? 'var(--accent)' : 'var(--text3)'};display:flex;align-items:center;justify-content:center;font-weight:900;font-size:.9rem;">
                   ${step3Done ? '✓' : '3'}
                 </div>
                 <span class="badge ${step3Done ? 'badge-success' : 'badge-secondary'}">${step3Done ? 'Concluído' : 'Pendente'}</span>

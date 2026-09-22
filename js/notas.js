@@ -207,17 +207,17 @@ const Notas = {
           <form id="f-nf">
             <div class="form-row cols-3" style="margin-bottom:14px;">
               <div class="form-group"><label class="form-label">Obra / Centro de Custo *</label><select class="form-control" name="obra_id" required>${Utils.clienteOptions(n.obra_id||(App.obraId!=='todas'?App.obraId:''), 'Selecione centro...', true)}</select></div>
-              <div class="form-group"><label class="form-label">Número NF *</label><input class="form-control" name="numero_nf" value="${n.numero_nf||''}" required placeholder="001234"></div>
-              <div class="form-group"><label class="form-label">Série</label><input class="form-control" name="serie" value="${n.serie||'001'}" placeholder="001"></div>
+              <div class="form-group"><label class="form-label">Número NF *</label><input class="form-control" name="numero_nf" value="${esc(n.numero_nf||'')}" required placeholder="001234"></div>
+              <div class="form-group"><label class="form-label">Série</label><input class="form-control" name="serie" value="${esc(n.serie||'001')}" placeholder="001"></div>
             </div>
             <div class="form-row cols-2" style="margin-bottom:14px;">
-              <div class="form-group"><label class="form-label">Emitente *</label><input class="form-control" name="emitente" value="${n.emitente||''}" required placeholder="Razão social do emitente"></div>
-              <div class="form-group"><label class="form-label">CNPJ Emitente</label><input class="form-control" name="cnpj_emitente" value="${n.cnpj_emitente||''}" placeholder="00.000.000/0000-00"></div>
+              <div class="form-group"><label class="form-label">Emitente *</label><input class="form-control" name="emitente" value="${esc(n.emitente||'')}" required placeholder="Razão social do emitente"></div>
+              <div class="form-group"><label class="form-label">CNPJ Emitente</label><input class="form-control" name="cnpj_emitente" value="${esc(n.cnpj_emitente||'')}" placeholder="00.000.000/0000-00"></div>
             </div>
-            <div class="form-group" style="margin-bottom:14px;"><label class="form-label">Destinatário</label><input class="form-control" name="destinatario" value="${n.destinatario||''}" placeholder="Nome do destinatário"></div>
+            <div class="form-group" style="margin-bottom:14px;"><label class="form-label">Destinatário</label><input class="form-control" name="destinatario" value="${esc(n.destinatario||'')}" placeholder="Nome do destinatário"></div>
             <div class="form-row cols-2" style="margin-bottom:14px;">
-              <div class="form-group"><label class="form-label">Data Emissão *</label><input class="form-control" type="date" name="data_emissao" value="${n.data_emissao||Utils.today()}" required></div>
-              <div class="form-group"><label class="form-label">Data Vencimento</label><input class="form-control" type="date" name="data_vencimento" value="${n.data_vencimento||''}"></div>
+              <div class="form-group"><label class="form-label">Data Emissão *</label><input class="form-control" type="date" name="data_emissao" value="${esc(n.data_emissao||Utils.today())}" required></div>
+              <div class="form-group"><label class="form-label">Data Vencimento</label><input class="form-control" type="date" name="data_vencimento" value="${esc(n.data_vencimento||'')}"></div>
             </div>
             <div class="form-row cols-3" style="margin-bottom:14px;">
               <div class="form-group"><label class="form-label">Valor Bruto *</label><div class="input-prefix"><span class="input-pfx-txt">R$</span><input name="valor_bruto" type="number" value="${n.valor_bruto||''}" step="0.01" min="0" required id="nf-vb" data-fb-input="Notas.calcLiq" data-fb-input-n="0"></div></div>
@@ -246,17 +246,17 @@ const Notas = {
             <!-- CAMPO DATA PAGAMENTO DA NOTA -->
             <div class="form-group" id="nf-data-pagamento-group" style="margin-bottom:14px;display:${isPaga?'block':'none'};background:rgba(16,185,129,.05);border:1px solid rgba(16,185,129,.2);border-radius:8px;padding:10px 12px;">
               <label class="form-label" style="color:var(--success);font-weight:700;margin-bottom:4px;">✓ Data Efetiva do Pagamento da NF</label>
-              <input class="form-control" type="date" name="data_pagamento" id="nf-data-pagamento" value="${n.data_pagamento || (isPaga ? n.data_emissao : hoje)}" style="border-color:var(--success);background:var(--bg-card);">
+              <input class="form-control" type="date" name="data_pagamento" id="nf-data-pagamento" value="${esc(n.data_pagamento || (isPaga ? n.data_emissao : hoje))}" style="border-color:var(--success);background:var(--bg-card);">
             </div>
 
             <div class="form-row cols-2" style="margin-bottom:14px;">
               <div class="form-group"><label class="form-label">Vincular Lançamento</label><select class="form-control" name="lancamento_id">
                 <option value="">Nenhum</option>
-                ${lans.map(l=>`<option value="${l.id}" ${n.lancamento_id===l.id?'selected':''}>${l.descricao.slice(0,35)} (${Utils.fmt.currency(l.valor)})</option>`).join('')}
+                ${lans.map(l=>`<option value="${esc(l.id)}" ${n.lancamento_id===l.id?'selected':''}>${esc(l.descricao.slice(0,35))} (${Utils.fmt.currency(l.valor)})</option>`).join('')}
               </select></div>
-              <div class="form-group"><label class="form-label">Chave NF-e</label><input class="form-control" name="chave_nfe" value="${n.chave_nfe||''}" placeholder="44 dígitos" maxlength="44"></div>
+              <div class="form-group"><label class="form-label">Chave NF-e</label><input class="form-control" name="chave_nfe" value="${esc(n.chave_nfe||'')}" placeholder="44 dígitos" maxlength="44"></div>
             </div>
-            <div class="form-group"><label class="form-label">Observações</label><textarea class="form-control" name="observacoes" rows="2">${n.observacoes||''}</textarea></div>
+            <div class="form-group"><label class="form-label">Observações</label><textarea class="form-control" name="observacoes" rows="2">${esc(n.observacoes||'')}</textarea></div>
           </form>
         </div>
         <div class="modal-footer">
