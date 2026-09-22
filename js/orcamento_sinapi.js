@@ -130,7 +130,7 @@ const OrcamentoSINAPI = {
     <div class="page-container" style="padding:0;">
       
       <!-- Topo: Título e Filtros Globais Modernos -->
-      <div style="background:#181f14;color:#eef0ea;padding:16px 20px;border-radius:var(--r-md) var(--r-md) 0 0;border:1px solid #2d3824;border-bottom:none;">
+      <div style="background:var(--bg-card);color:var(--text);padding:16px 20px;border-radius:var(--r-md) var(--r-md) 0 0;border:1px solid var(--border);border-bottom:none;">
         
         <!-- Linha 1: Título e Busca -->
         <div style="display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:12px;">
@@ -138,21 +138,21 @@ const OrcamentoSINAPI = {
             <span style="font-size:1.4rem;">📊</span>
             <div>
               <div style="display:flex;align-items:center;gap:8px;">
-                <h2 style="font-weight:800;font-size:1.25rem;color:#f8fafc;margin:0;letter-spacing:-.02em;">Orçamentos</h2>
-                <span style="background:rgba(198,255,0,0.12);color:#C6FF00;border:1px solid rgba(198,255,0,0.3);font-size:.72rem;font-weight:800;padding:2px 8px;border-radius:4px;">${orcs.length} cadastrado${orcs.length===1?'':'s'}</span>
+                <h2 style="font-weight:800;font-size:1.25rem;color:var(--text);margin:0;letter-spacing:-.02em;">Orçamentos</h2>
+                <span style="background:var(--accent-dim, rgba(198,255,0,0.12));color:var(--action-fg);border:1px solid var(--border);font-size:.72rem;font-weight:800;padding:2px 8px;border-radius:4px;">${orcs.length} cadastrado${orcs.length===1?'':'s'}</span>
               </div>
-              <p style="font-size:.78rem;color:#94a3b8;margin:2px 0 0 0;">Gestão de orçamentos, composições unitárias e propostas comerciais</p>
+              <p style="font-size:.78rem;color:var(--text3);margin:2px 0 0 0;">Gestão de orçamentos, composições unitárias e propostas comerciais</p>
             </div>
           </div>
 
           <!-- Barra de Busca com alto contraste -->
-          <div style="display:flex;align-items:center;background:#0d120a;border:1.5px solid #313e27;border-radius:6px;overflow:hidden;min-width:280px;height:38px;box-shadow:inset 0 1px 2px rgba(0,0,0,0.4);">
-            <span style="color:#C6FF00;font-size:.85rem;padding:0 12px;display:flex;align-items:center;gap:6px;font-weight:700;">
+          <div style="display:flex;align-items:center;background:var(--bg-input);border:1.5px solid var(--border);border-radius:6px;overflow:hidden;min-width:280px;height:38px;">
+            <span style="color:var(--action-fg);font-size:.85rem;padding:0 12px;display:flex;align-items:center;gap:6px;font-weight:700;">
               🔍
             </span>
             <input
               type="text"
-              style="background:transparent;border:none;color:#ffffff;padding:6px 12px 6px 0;font-size:.85rem;outline:none;width:100%;font-weight:500;"
+              style="background:transparent;border:none;color:var(--text);padding:6px 12px 6px 0;font-size:.85rem;outline:none;width:100%;font-weight:500;"
               placeholder="Buscar por orçamento, cliente ou obra..."
               value="${e(this._filterSearch)}"
               data-fb-input="OrcamentoSINAPI._onSearchLista"
@@ -163,13 +163,13 @@ const OrcamentoSINAPI = {
         </div>
 
         <!-- Linha 2: Barra de Filtros In-Line Bem Identificados -->
-        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding-top:10px;border-top:1px solid #252e1e;">
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding-top:10px;border-top:1px solid var(--border);">
           
           <!-- Filtro de Obra -->
           <div style="display:inline-flex;align-items:center;gap:6px;">
-            <label style="font-size:.76rem;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.5px;">Obra:</label>
+            <label style="font-size:.76rem;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;">Obra:</label>
             <select
-              style="display:inline-block;width:auto;min-width:170px;max-width:240px;height:34px;padding:0 10px;font-size:.82rem;font-weight:600;background:#0d120a;color:#f1f5f9;border:1.5px solid #313e27;border-radius:6px;outline:none;cursor:pointer;"
+              style="display:inline-block;width:auto;min-width:170px;max-width:240px;height:34px;padding:0 10px;font-size:.82rem;font-weight:600;background:var(--bg-input);color:var(--text);border:1.5px solid var(--border);border-radius:6px;outline:none;cursor:pointer;"
               data-fb-change="OrcamentoSINAPI._onFilterObra"
               data-fb-change-n="1"
               data-fb-change-t0="value"
@@ -181,9 +181,9 @@ const OrcamentoSINAPI = {
 
           <!-- Filtro de Status -->
           <div style="display:inline-flex;align-items:center;gap:6px;">
-            <label style="font-size:.76rem;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.5px;">Status:</label>
+            <label style="font-size:.76rem;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;">Status:</label>
             <select
-              style="display:inline-block;width:auto;min-width:160px;height:34px;padding:0 10px;font-size:.82rem;font-weight:600;background:#0d120a;color:#f1f5f9;border:1.5px solid #313e27;border-radius:6px;outline:none;cursor:pointer;"
+              style="display:inline-block;width:auto;min-width:160px;height:34px;padding:0 10px;font-size:.82rem;font-weight:600;background:var(--bg-input);color:var(--text);border:1.5px solid var(--border);border-radius:6px;outline:none;cursor:pointer;"
               data-fb-change="OrcamentoSINAPI._onFilterStatus"
               data-fb-change-n="1"
               data-fb-change-t0="value"
@@ -197,9 +197,9 @@ const OrcamentoSINAPI = {
 
           <!-- Filtro de Etiqueta -->
           <div style="display:inline-flex;align-items:center;gap:6px;">
-            <label style="font-size:.76rem;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.5px;">Tipo:</label>
+            <label style="font-size:.76rem;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;">Tipo:</label>
             <select
-              style="display:inline-block;width:auto;min-width:160px;height:34px;padding:0 10px;font-size:.82rem;font-weight:600;background:#0d120a;color:#f1f5f9;border:1.5px solid #313e27;border-radius:6px;outline:none;cursor:pointer;"
+              style="display:inline-block;width:auto;min-width:160px;height:34px;padding:0 10px;font-size:.82rem;font-weight:600;background:var(--bg-input);color:var(--text);border:1.5px solid var(--border);border-radius:6px;outline:none;cursor:pointer;"
             >
               <option value="">🏷️ Todos os Tipos</option>
               <option value="residencial">🏠 Residencial</option>
@@ -213,7 +213,7 @@ const OrcamentoSINAPI = {
           <button
             type="button"
             class="btn btn-sm"
-            style="background:${this._filterComProposta?'#C6FF00':'#0d120a'};color:${this._filterComProposta?'#0A0A0A':'#e2e8f0'};border:1.5px solid ${this._filterComProposta?'#C6FF00':'#313e27'};font-size:.8rem;font-weight:700;height:34px;padding:0 12px;display:inline-flex;align-items:center;gap:6px;border-radius:4px;cursor:pointer;"
+            style="background:${this._filterComProposta?'var(--accent)':'var(--bg-input)'};color:${this._filterComProposta?'var(--accent-contrast, #101814)':'var(--text)'};border:1.5px solid ${this._filterComProposta?'var(--accent)':'var(--border)'};font-size:.8rem;font-weight:700;height:34px;padding:0 12px;display:inline-flex;align-items:center;gap:6px;border-radius:4px;cursor:pointer;"
             data-fb-click="OrcamentoSINAPI._toggleComProposta"
             data-fb-click-n="0"
           >
@@ -224,7 +224,7 @@ const OrcamentoSINAPI = {
           <button
             type="button"
             class="btn btn-sm"
-            style="background:${this._filterArquivados?'#f59e0b':'#0d120a'};color:${this._filterArquivados?'#090C07':'#e2e8f0'};border:1.5px solid ${this._filterArquivados?'#f59e0b':'#313e27'};font-size:.8rem;font-weight:700;height:34px;padding:0 12px;display:inline-flex;align-items:center;gap:6px;border-radius:6px;cursor:pointer;"
+            style="background:${this._filterArquivados?'var(--warning)':'var(--bg-input)'};color:${this._filterArquivados?'#101814':'var(--text)'};border:1.5px solid ${this._filterArquivados?'var(--warning)':'var(--border)'};font-size:.8rem;font-weight:700;height:34px;padding:0 12px;display:inline-flex;align-items:center;gap:6px;border-radius:6px;cursor:pointer;"
             data-fb-click="OrcamentoSINAPI._toggleArquivados"
             data-fb-click-n="0"
           >
@@ -234,13 +234,13 @@ const OrcamentoSINAPI = {
       </div>
 
       <!-- Barra de Ações: + NOVO, COPIAR, MODELOS PRONTOS, etc. -->
-      <div style="background:#ffffff;border:1.5px solid #cbd5e1;border-top:none;padding:12px 20px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;box-shadow:0 1px 3px rgba(0,0,0,0.05);">
+      <div style="background:var(--bg-card);border:1.5px solid var(--border);border-top:none;padding:12px 20px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;box-shadow:var(--shadow-sm, 0 1px 3px rgba(0,0,0,0.05));">
         <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
           
           <button
             type="button"
             class="btn btn-sm"
-            style="font-weight:800;font-size:.82rem;background:#0284c7;color:#ffffff;border:1.5px solid #0284c7;padding:6px 14px;border-radius:6px;display:inline-flex;align-items:center;gap:6px;cursor:pointer;"
+            style="font-weight:800;font-size:.82rem;background:var(--accent);color:var(--accent-contrast, #101814);border:1.5px solid var(--accent);padding:6px 14px;border-radius:6px;display:inline-flex;align-items:center;gap:6px;cursor:pointer;"
             data-fb-click="OrcamentoSINAPI.showForm"
             data-fb-click-n="0"
           >
@@ -250,7 +250,7 @@ const OrcamentoSINAPI = {
           <button
             type="button"
             class="btn btn-sm"
-            style="font-weight:700;font-size:.82rem;background:#f8fafc;color:#0f172a;border:1.5px solid #94a3b8;padding:6px 12px;border-radius:6px;cursor:pointer;"
+            style="font-weight:700;font-size:.82rem;background:var(--bg-elevated);color:var(--text);border:1.5px solid var(--border);padding:6px 12px;border-radius:6px;cursor:pointer;"
             data-fb-click="OrcamentoSINAPI.copiarSelecionado"
             data-fb-click-n="0"
           >
@@ -260,7 +260,7 @@ const OrcamentoSINAPI = {
           <button
             type="button"
             class="btn btn-sm"
-            style="font-weight:700;font-size:.82rem;background:#f8fafc;color:#0f172a;border:1.5px solid #94a3b8;padding:6px 12px;border-radius:6px;cursor:pointer;"
+            style="font-weight:700;font-size:.82rem;background:var(--bg-elevated);color:var(--text);border:1.5px solid var(--border);padding:6px 12px;border-radius:6px;cursor:pointer;"
             data-fb-click="OrcamentoSINAPI.copiarParaModeloSelecionado"
             data-fb-click-n="0"
           >
@@ -271,7 +271,7 @@ const OrcamentoSINAPI = {
           <button
             type="button"
             class="btn btn-sm"
-            style="font-weight:800;font-size:.82rem;background:#fffbeb;color:#92400e;border:1.5px solid #f59e0b;padding:6px 14px;border-radius:6px;box-shadow:0 1px 3px rgba(245,158,11,0.25);display:inline-flex;align-items:center;gap:6px;cursor:pointer;"
+            style="font-weight:800;font-size:.82rem;background:var(--bg-elevated);color:var(--warning);border:1.5px solid var(--warning);padding:6px 14px;border-radius:6px;display:inline-flex;align-items:center;gap:6px;cursor:pointer;"
             data-fb-click="OrcamentoTemplates.abrirModalCatalogo"
             data-fb-click-n="0"
             title="Abrir biblioteca de modelos prontos (Casa 100m², MCMV, FNDE, etc.)"
@@ -282,7 +282,7 @@ const OrcamentoSINAPI = {
           <button
             type="button"
             class="btn btn-sm"
-            style="font-weight:700;font-size:.82rem;background:#f8fafc;color:#334155;border:1.5px solid #94a3b8;padding:6px 12px;border-radius:6px;cursor:pointer;"
+            style="font-weight:700;font-size:.82rem;background:var(--bg-elevated);color:var(--text2);border:1.5px solid var(--border);padding:6px 12px;border-radius:6px;cursor:pointer;"
             data-fb-click="OrcamentoSINAPI.arquivarSelecionados"
             data-fb-click-n="0"
           >
@@ -292,7 +292,7 @@ const OrcamentoSINAPI = {
           <button
             type="button"
             class="btn btn-sm"
-            style="font-weight:700;font-size:.82rem;background:#fef2f2;color:#b91c1c;border:1.5px solid #f87171;padding:6px 12px;border-radius:6px;cursor:pointer;"
+            style="font-weight:700;font-size:.82rem;background:rgba(220,38,38,0.12);color:var(--danger);border:1.5px solid var(--danger);padding:6px 12px;border-radius:6px;cursor:pointer;"
             data-fb-click="OrcamentoSINAPI.removerSelecionados"
             data-fb-click-n="0"
           >
@@ -303,7 +303,7 @@ const OrcamentoSINAPI = {
         <button
           type="button"
           class="btn btn-sm"
-          style="border-radius:50%;width:32px;height:32px;padding:0;display:flex;align-items:center;justify-content:center;font-weight:800;background:#f1f5f9;color:#0f172a;border:1.5px solid #94a3b8;cursor:pointer;"
+          style="border-radius:50%;width:32px;height:32px;padding:0;display:flex;align-items:center;justify-content:center;font-weight:800;background:var(--bg-elevated);color:var(--text);border:1.5px solid var(--border);cursor:pointer;"
           title="Ajuda sobre o módulo de orçamentos"
           data-fb-click="OrcamentoSINAPI.infoAjuda"
           data-fb-click-n="0"
@@ -313,10 +313,10 @@ const OrcamentoSINAPI = {
       </div>
 
       <!-- Tabela Principal de Orçamentos com Alto Contraste -->
-      <div style="background:#ffffff;border:1.5px solid #cbd5e1;border-top:none;overflow-x:auto;">
+      <div style="background:var(--bg-card);border:1.5px solid var(--border);border-top:none;overflow-x:auto;">
         <table style="width:100%;border-collapse:collapse;font-size:.84rem;">
           <thead>
-            <tr style="background:#0f172a;color:#ffffff;font-size:.76rem;text-transform:uppercase;letter-spacing:.6px;font-weight:800;border-bottom:2px solid #334155;">
+            <tr style="background:var(--bg-elevated);color:var(--text);font-size:.76rem;text-transform:uppercase;letter-spacing:.6px;font-weight:800;border-bottom:2px solid var(--border);">
               <th style="padding:12px 14px;width:34px;text-align:center;">
                 <input type="checkbox" style="cursor:pointer;" data-fb-change="OrcamentoSINAPI._toggleSelectAll" data-fb-change-n="1" data-fb-change-t0="checked">
               </th>
@@ -338,48 +338,48 @@ const OrcamentoSINAPI = {
               const numOrc = o.numero || String(idx + 1).padStart(4, '0');
               const isChecked = this._selectedOrcs.has(o.id);
               return `
-              <tr style="border-bottom:1px solid #e2e8f0;background:${isChecked?'#f0fdf4':(idx%2===0?'#ffffff':'#f8fafc')};transition:background .15s;">
+              <tr style="border-bottom:1px solid var(--border);background:${isChecked?'var(--bg-elevated)':(idx%2===0?'var(--bg-card)':'var(--bg-secondary)')};transition:background .15s;">
                 <td style="padding:12px 14px;text-align:center;">
                   <input type="checkbox" style="cursor:pointer;" ${isChecked?'checked':''} data-fb-change="OrcamentoSINAPI._toggleSelectRow" data-fb-change-n="2" data-fb-change-t0="string" data-fb-change-v0="${encodeURIComponent(o.id)}" data-fb-change-t1="checked">
                 </td>
                 <td style="padding:12px 14px;cursor:pointer;" data-fb-click="OrcamentoSINAPI.openEditor" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(o.id)}">
-                  <span style="font-weight:800;color:#1d4ed8;font-size:.85rem;background:#eff6ff;padding:3px 8px;border-radius:5px;border:1px solid #bfdbfe;display:inline-block;">ORÇAMENTO ${numOrc}</span>
+                  <span style="font-weight:800;color:var(--action-fg);font-size:.85rem;background:var(--bg-elevated);padding:3px 8px;border-radius:5px;border:1px solid var(--border);display:inline-block;">ORÇAMENTO ${numOrc}</span>
                 </td>
                 <td style="padding:12px 14px;text-align:center;">
-                  <span style="background:${o.usa_ia?'#f0fdf4':'#f1f5f9'};color:${o.usa_ia?'#15803d':'#334155'};border:1px solid ${o.usa_ia?'#bbf7d0':'#cbd5e1'};font-weight:700;font-size:.75rem;padding:2px 8px;border-radius:4px;">${o.usa_ia ? 'Sim' : 'Não'}</span>
+                  <span style="background:${o.usa_ia?'var(--bg-elevated)':'var(--bg-secondary)'};color:${o.usa_ia?'var(--action-fg)':'var(--text3)'};border:1px solid var(--border);font-weight:700;font-size:.75rem;padding:2px 8px;border-radius:4px;">${o.usa_ia ? 'Sim' : 'Não'}</span>
                 </td>
                 <td style="padding:12px 14px;">
                   ${o.proposta ? `
-                    <button type="button" class="btn btn-link btn-sm" style="display:inline-flex;flex-direction:column;gap:1px;text-decoration:none;padding:2px 6px;text-align:left;cursor:pointer;background:#ecfdf5;border:1px solid #a7f3d0;border-radius:5px;" data-fb-click="OrcamentoProposta.abrirModal" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(o.id)}">
-                      <span style="font-weight:800;color:#065f46;font-size:.76rem;">📄 ${e(o.proposta.numero)}</span>
-                      <span style="font-size:.72rem;color:#047857;font-weight:700;">${Utils.fmt.currency(o.proposta.valor || 0)}</span>
-                      <span style="font-size:.68rem;color:#065f46;font-weight:600;">${e(o.proposta.data || '')}</span>
+                    <button type="button" class="btn btn-link btn-sm" style="display:inline-flex;flex-direction:column;gap:1px;text-decoration:none;padding:2px 6px;text-align:left;cursor:pointer;background:var(--bg-elevated);border:1px solid var(--border);border-radius:5px;" data-fb-click="OrcamentoProposta.abrirModal" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(o.id)}">
+                      <span style="font-weight:800;color:var(--text);font-size:.76rem;">📄 ${e(o.proposta.numero)}</span>
+                      <span style="font-size:.72rem;color:var(--action-fg);font-weight:700;">${Utils.fmt.currency(o.proposta.valor || 0)}</span>
+                      <span style="font-size:.68rem;color:var(--text3);font-weight:600;">${e(o.proposta.data || '')}</span>
                     </button>
-                  ` : `<span style="color:#64748b;font-weight:700;font-size:.8rem;background:#f1f5f9;padding:2px 8px;border-radius:4px;border:1px solid #e2e8f0;">—</span>`}
+                  ` : `<span style="color:var(--text3);font-weight:700;font-size:.8rem;background:var(--bg-secondary);padding:2px 8px;border-radius:4px;border:1px solid var(--border);">—</span>`}
                 </td>
-                <td style="padding:12px 14px;color:#0f172a;font-weight:700;font-size:.82rem;">
+                <td style="padding:12px 14px;color:var(--text);font-weight:700;font-size:.82rem;">
                   ${e(o.etiqueta || '—')}
                 </td>
-                <td style="padding:12px 14px;color:#0f172a;font-weight:700;font-size:.85rem;">
+                <td style="padding:12px 14px;color:var(--text);font-weight:700;font-size:.85rem;">
                   ${e(cliente?.nome || cliente?.cliente || 'Cliente Padrão')}
                 </td>
-                <td style="padding:12px 14px;color:#0f172a;font-weight:800;font-size:.85rem;cursor:pointer;" data-fb-click="OrcamentoSINAPI.openEditor" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(o.id)}">
+                <td style="padding:12px 14px;color:var(--text);font-weight:800;font-size:.85rem;cursor:pointer;" data-fb-click="OrcamentoSINAPI.openEditor" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(o.id)}">
                   ${e(o.nome)}
                 </td>
-                <td style="padding:12px 14px;color:#1e293b;font-weight:600;font-size:.82rem;">
+                <td style="padding:12px 14px;color:var(--text2);font-weight:600;font-size:.82rem;">
                   ${e(o.descricao || o.nome)}
                 </td>
-                <td style="padding:12px 14px;text-align:center;color:#1e293b;font-weight:700;font-size:.8rem;">
+                <td style="padding:12px 14px;text-align:center;color:var(--text2);font-weight:700;font-size:.8rem;">
                   ${e(o.data_alteracao || Utils.fmt.date(o.data_criacao))}
                 </td>
                 <td style="padding:12px 14px;text-align:center;">
-                  <span style="color:#0f172a;font-weight:800;font-size:.86rem;background:#f1f5f9;padding:2px 8px;border-radius:6px;border:1px solid #cbd5e1;">${(o.itens || []).length}</span>
+                  <span style="color:var(--text);font-weight:800;font-size:.86rem;background:var(--bg-secondary);padding:2px 8px;border-radius:6px;border:1px solid var(--border);">${(o.itens || []).length}</span>
                 </td>
                 <td style="padding:12px 14px;text-align:center;">
                   <div style="display:flex;gap:4px;justify-content:center;">
-                    <button class="btn btn-sm" style="background:#eff6ff;color:#1d4ed8;border:1.5px solid #93c5fd;padding:3px 9px;font-size:.76rem;font-weight:800;border-radius:5px;cursor:pointer;" data-fb-click="OrcamentoSINAPI.openEditor" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(o.id)}">Abrir</button>
-                    <button class="btn btn-sm" style="background:#f8fafc;color:#0f172a;border:1.5px solid #cbd5e1;font-size:12px;padding:3px 6px;border-radius:5px;cursor:pointer;" data-fb-click="OrcamentoSINAPI.showForm" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(o.id)}" title="Editar dados">✏️</button>
-                    <button class="btn btn-sm" style="background:#fef2f2;color:#b91c1c;border:1.5px solid #fca5a5;font-size:12px;padding:3px 6px;border-radius:5px;cursor:pointer;" data-fb-click="OrcamentoSINAPI.del" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(o.id)}" title="Excluir">🗑️</button>
+                    <button class="btn btn-sm" style="background:var(--accent);color:var(--accent-contrast, #101814);border:none;padding:3px 9px;font-size:.76rem;font-weight:800;border-radius:5px;cursor:pointer;" data-fb-click="OrcamentoSINAPI.openEditor" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(o.id)}">Abrir</button>
+                    <button class="btn btn-sm" style="background:var(--bg-secondary);color:var(--text);border:1px solid var(--border);font-size:12px;padding:3px 6px;border-radius:5px;cursor:pointer;" data-fb-click="OrcamentoSINAPI.showForm" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(o.id)}" title="Editar dados">✏️</button>
+                    <button class="btn btn-sm" style="background:rgba(220,38,38,0.12);color:var(--danger);border:1px solid var(--danger);font-size:12px;padding:3px 6px;border-radius:5px;cursor:pointer;" data-fb-click="OrcamentoSINAPI.del" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(o.id)}" title="Excluir">🗑️</button>
                   </div>
                 </td>
               </tr>`;
@@ -387,10 +387,10 @@ const OrcamentoSINAPI = {
 
             ${!orcs.length ? `
               <tr>
-                <td colspan="11" style="text-align:center;padding:48px 20px;color:#1e293b;">
+                <td colspan="11" style="text-align:center;padding:48px 20px;color:var(--text2);">
                   <div style="font-size:2.5rem;margin-bottom:8px;">📋</div>
-                  <h3 style="color:#0f172a;font-weight:800;margin-bottom:6px;">Nenhum orçamento encontrado</h3>
-                  <p style="font-size:.85rem;color:#334155;max-width:400px;margin:0 auto 16px;font-weight:500;">
+                  <h3 style="color:var(--text);font-weight:800;margin-bottom:6px;">Nenhum orçamento encontrado</h3>
+                  <p style="font-size:.85rem;color:var(--text3);max-width:400px;margin:0 auto 16px;font-weight:500;">
                     Crie um novo orçamento ou utilize nossos templates pré-prontos do SINAPI.
                   </p>
                   <button class="btn btn-primary" data-fb-click="OrcamentoSINAPI.showForm" data-fb-click-n="0">+ Novo Orçamento</button>
@@ -402,22 +402,22 @@ const OrcamentoSINAPI = {
         </table>
 
         <!-- Paginação Inferior com Alto Contraste -->
-        <div style="padding:12px 20px;display:flex;align-items:center;justify-content:space-between;background:#f1f5f9;border-top:1.5px solid #cbd5e1;font-size:.82rem;color:#0f172a;font-weight:700;">
+        <div style="padding:12px 20px;display:flex;align-items:center;justify-content:space-between;background:var(--bg-secondary);border-top:1.5px solid var(--border);font-size:.82rem;color:var(--text);font-weight:700;">
           <div style="display:flex;align-items:center;gap:8px;">
-            <span style="color:#334155;font-weight:700;">Mostrar</span>
-            <select style="display:inline-block;width:65px;height:32px;padding:2px 8px;font-size:.82rem;font-weight:800;color:#0f172a;background:#ffffff;border:1.5px solid #94a3b8;border-radius:6px;">
+            <span style="color:var(--text2);font-weight:700;">Mostrar</span>
+            <select style="display:inline-block;width:65px;height:32px;padding:2px 8px;font-size:.82rem;font-weight:800;color:var(--text);background:var(--bg-input);border:1.5px solid var(--border);border-radius:6px;">
               <option value="25" selected>25</option>
               <option value="50">50</option>
               <option value="100">100</option>
             </select>
-            <span style="color:#334155;font-weight:700;">registros</span>
+            <span style="color:var(--text2);font-weight:700;">registros</span>
           </div>
 
           <div style="display:flex;align-items:center;gap:14px;">
-            <span style="color:#0f172a;font-weight:800;">1 até ${orcs.length} de ${orcs.length} itens</span>
+            <span style="color:var(--text);font-weight:800;">1 até ${orcs.length} de ${orcs.length} itens</span>
             <div style="display:flex;gap:6px;">
-              <button class="btn btn-sm" style="background:#ffffff;color:#475569;border:1.5px solid #cbd5e1;font-size:.76rem;font-weight:700;padding:3px 12px;border-radius:5px;" disabled>Anterior</button>
-              <button class="btn btn-sm" style="background:#ffffff;color:#475569;border:1.5px solid #cbd5e1;font-size:.76rem;font-weight:700;padding:3px 12px;border-radius:5px;" disabled>Próximo</button>
+              <button class="btn btn-sm" style="background:var(--bg-elevated);color:var(--text3);border:1.5px solid var(--border);font-size:.76rem;font-weight:700;padding:3px 12px;border-radius:5px;" disabled>Anterior</button>
+              <button class="btn btn-sm" style="background:var(--bg-elevated);color:var(--text3);border:1.5px solid var(--border);font-size:.76rem;font-weight:700;padding:3px 12px;border-radius:5px;" disabled>Próximo</button>
             </div>
           </div>
         </div>

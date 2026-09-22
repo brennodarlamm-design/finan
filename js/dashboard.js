@@ -59,7 +59,7 @@ const Dashboard = {
         <div class="kpi-icon ${r.saldo>=0?'blue':'red'}"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg></div>
         <div class="kpi-label">Saldo Disponível</div>
         <div class="kpi-value tabular-nums ${r.saldo>=0?'blue':'red'}" id="kpi-saldo">${Utils.fmt.currency(r.saldo)}</div>
-        <div class="kpi-change">${r.saldo>=0?'✅ Positivo':'⚠ Atenção ao saldo'}</div>
+        <div class="kpi-change">${r.saldo>=0?'Positivo':'Atenção ao saldo'}</div>
       </div>
       <div class="kpi-card">
         <div class="kpi-icon yellow"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg></div>
@@ -76,18 +76,18 @@ const Dashboard = {
       <div class="kpi-card">
         <div class="kpi-icon green"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg></div>
         <div class="kpi-label">${isEscritorio ? 'Centro de Custo' : 'Obras Ativas'}</div>
-        <div class="kpi-value green" id="kpi-obras-ativas" style="${isEscritorio?'font-size:1.15rem;':''}">${isEscritorio ? '🏢 Sede Central' : ativos}</div>
+        <div class="kpi-value green" id="kpi-obras-ativas" style="${isEscritorio?'font-size:1.15rem;':''}">${isEscritorio ? 'Sede Central' : ativos}</div>
         <div class="kpi-change" id="kpi-obras-sub">${isEscritorio ? `${DB.getDespesasEscritorio().length} despesas registradas` : `de ${cs.length} obras | ${medPend} medições em análise`}</div>
       </div>
     </div>
 
     <div class="g2" style="margin-bottom:14px;">
       <div class="card">
-        <div class="card-header"><div class="card-title">💹 Receitas × Despesas por Mês</div></div>
+        <div class="card-header"><div class="card-title">Receitas × Despesas por Mês</div></div>
         <div class="chart-container" style="position:relative;height:240px;"><canvas id="ch-bar"></canvas></div>
       </div>
       <div class="card">
-        <div class="card-header"><div class="card-title">🥧 Distribuição de Despesas</div></div>
+        <div class="card-header"><div class="card-title">Distribuição de Despesas</div></div>
         <div class="chart-container" style="position:relative;height:240px;"><canvas id="ch-donut"></canvas></div>
       </div>
     </div>
@@ -96,8 +96,8 @@ const Dashboard = {
     <div class="card" style="margin-bottom:14px;">
       <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
         <div>
-          <div class="card-title">📈 Projeção de Fluxo de Caixa Futuro (Próximos 90 Dias)</div>
-          <div style="font-size:.74rem;color:var(--text3);margin-top:2px;">Previsão de entradas, saídas e evolução do saldo acumulado projetado</div>
+          <div class="card-title">Projeção de Fluxo de Caixa Futuro (Próximos 90 Dias)</div>
+          <div style="font-size:.78rem;color:var(--text3);margin-top:2px;">Previsão de entradas, saídas e evolução do saldo acumulado projetado</div>
         </div>
         <div id="fluxo-resumo-badges" style="display:flex;gap:8px;flex-wrap:wrap;"></div>
       </div>
@@ -196,34 +196,34 @@ const Dashboard = {
 
     return `
       <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin-bottom:18px;">
-        <div style="background:#E8E8DC;border:1px solid #D1D1C7;border-radius:var(--r-md);padding:12px 14px;">
-          <div style="font-size:.72rem;color:#0A0A0A;font-weight:800;text-transform:uppercase;">(+) Receita Operacional</div>
-          <div style="font-size:1.25rem;font-weight:900;color:#0A0A0A;margin-top:2px;">${Utils.fmt.currency(dGeral.recs)}</div>
-          <div style="font-size:.72rem;color:#0A0A0A;font-weight:600;margin-top:2px;opacity:.85;">Medições &amp; Entradas</div>
+        <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:var(--r-md);padding:12px 14px;">
+          <div style="font-size:.72rem;color:var(--text3);font-weight:800;text-transform:uppercase;">(+) Receita Operacional</div>
+          <div style="font-size:1.25rem;font-weight:900;color:var(--text);margin-top:2px;">${Utils.fmt.currency(dGeral.recs)}</div>
+          <div style="font-size:.72rem;color:var(--text3);font-weight:600;margin-top:2px;opacity:.85;">Medições &amp; Entradas</div>
         </div>
 
-        <div style="background:#E8E8DC;border:1px solid #D1D1C7;border-radius:var(--r-md);padding:12px 14px;">
-          <div style="font-size:.72rem;color:#0A0A0A;font-weight:800;text-transform:uppercase;">(-) Custos Diretos</div>
-          <div style="font-size:1.25rem;font-weight:900;color:#0A0A0A;margin-top:2px;">- ${Utils.fmt.currency(Math.abs(dGeral.custosDiretos))}</div>
-          <div style="font-size:.72rem;color:#0A0A0A;font-weight:600;margin-top:2px;opacity:.85;">Mat + Mão de Obra + Serv + Eqp</div>
+        <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:var(--r-md);padding:12px 14px;">
+          <div style="font-size:.72rem;color:var(--text3);font-weight:800;text-transform:uppercase;">(-) Custos Diretos</div>
+          <div style="font-size:1.25rem;font-weight:900;color:var(--text);margin-top:2px;">- ${Utils.fmt.currency(Math.abs(dGeral.custosDiretos))}</div>
+          <div style="font-size:.72rem;color:var(--text3);font-weight:600;margin-top:2px;opacity:.85;">Mat + Mão de Obra + Serv + Eqp</div>
         </div>
 
-        <div style="background:#E8E8DC;border:1px solid #D1D1C7;border-radius:var(--r-md);padding:12px 14px;">
-          <div style="font-size:.72rem;color:#0A0A0A;font-weight:800;text-transform:uppercase;">(=) Margem Bruta</div>
-          <div style="font-size:1.25rem;font-weight:900;color:#0A0A0A;margin-top:2px;">
+        <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:var(--r-md);padding:12px 14px;">
+          <div style="font-size:.72rem;color:var(--text3);font-weight:800;text-transform:uppercase;">(=) Margem Bruta</div>
+          <div style="font-size:1.25rem;font-weight:900;color:var(--text);margin-top:2px;">
             ${Utils.fmt.currency(dGeral.margemBruta)}
-            <span style="font-size:.75rem;font-weight:800;color:#0A0A0A;margin-left:4px;">(${dGeral.margemBrutaPct.toFixed(1)}%)</span>
+            <span style="font-size:.75rem;font-weight:800;color:var(--action-fg);margin-left:4px;">(${dGeral.margemBrutaPct.toFixed(1)}%)</span>
           </div>
-          <div style="font-size:.72rem;color:#0A0A0A;font-weight:600;margin-top:2px;opacity:.85;">Margem da Construção</div>
+          <div style="font-size:.72rem;color:var(--text3);font-weight:600;margin-top:2px;opacity:.85;">Margem da Construção</div>
         </div>
 
-        <div style="background:#E8E8DC;border:1px solid #D1D1C7;border-radius:var(--r-md);padding:12px 14px;">
-          <div style="font-size:.72rem;color:#0A0A0A;font-weight:800;text-transform:uppercase;">(=) Resultado Líquido</div>
-          <div style="font-size:1.25rem;font-weight:900;color:#0A0A0A;margin-top:2px;">
+        <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:var(--r-md);padding:12px 14px;">
+          <div style="font-size:.72rem;color:var(--text3);font-weight:800;text-transform:uppercase;">(=) Resultado Líquido</div>
+          <div style="font-size:1.25rem;font-weight:900;color:var(--text);margin-top:2px;">
             ${Utils.fmt.currency(dGeral.lucroLiquido)}
-            <span style="font-size:.75rem;font-weight:800;color:#0A0A0A;margin-left:4px;">(${dGeral.margemLiqPct.toFixed(1)}%)</span>
+            <span style="font-size:.75rem;font-weight:800;color:var(--action-fg);margin-left:4px;">(${dGeral.margemLiqPct.toFixed(1)}%)</span>
           </div>
-          <div style="font-size:.72rem;color:#0A0A0A;font-weight:600;margin-top:2px;opacity:.85;">Lucro Real Pós-Indiretos</div>
+          <div style="font-size:.72rem;color:var(--text3);font-weight:600;margin-top:2px;opacity:.85;">Lucro Real Pós-Indiretos</div>
         </div>
       </div>
 
@@ -841,13 +841,13 @@ const Dashboard = {
     if (badgesContainer) {
       const saldoFinal = saldosAcumulados[saldosAcumulados.length - 1] || 0;
       badgesContainer.innerHTML = `
-        <span style="background:#C6FF00;color:#0A0A0A;padding:3px 10px;border-radius:12px;font-size:.74rem;font-weight:800;">
+        <span style="background:var(--accent);color:var(--accent-contrast, #101814);padding:3px 10px;border-radius:12px;font-size:.74rem;font-weight:800;">
           + Entradas Previstas: ${Utils.fmt.currency(totalPrevRec)}
         </span>
         <span style="background:rgba(239,68,68,.15);color:var(--danger);padding:3px 10px;border-radius:12px;font-size:.74rem;font-weight:700;">
           − Saídas Previstas: ${Utils.fmt.currency(totalPrevDesp)}
         </span>
-        <span style="background:${saldoFinal>=0?'#7F49B8':'rgba(239,68,68,.25)'};color:${saldoFinal>=0?'#F0F0E8':'#f87171'};padding:3px 10px;border-radius:12px;font-size:.74rem;font-weight:800;border:1px solid ${saldoFinal>=0?'#9B6FD4':'rgba(239,68,68,.5)'};">
+        <span style="background:var(--bg-elevated);color:var(--text);padding:3px 10px;border-radius:12px;font-size:.74rem;font-weight:800;border:1px solid var(--border);">
           Saldo em 90d: ${Utils.fmt.currency(saldoFinal)}
         </span>`;
     }
@@ -1213,21 +1213,21 @@ const Dashboard = {
         <!-- Cabeçalho do Guia -->
         <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:12px;margin-bottom:16px;">
           <div>
-            <div style="display:inline-flex;align-items:center;gap:6px;background:rgba(198,255,0,.12);border:1px solid rgba(198,255,0,.3);padding:3px 10px;border-radius:4px;font-size:.72rem;font-weight:800;color:var(--accent);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px;">
+            <div style="display:inline-flex;align-items:center;gap:6px;background:var(--color-primary-dim, rgba(198,255,0,.12));border:1px solid var(--color-primary-border, rgba(198,255,0,.3));padding:4px 12px;border-radius:4px;font-size:.75rem;font-weight:800;color:var(--action-fg, var(--accent));text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px;">
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
               <span>Guia de Início Rápido</span>
             </div>
             <h2 style="font-size:1.15rem;font-weight:900;color:var(--text);margin:0 0 4px;">Bem-vindo ao FinGo! Complete os 3 passos para ativar seu sistema:</h2>
-            <div style="font-size:.8rem;color:var(--text3);">Siga as etapas abaixo para cadastrar sua base e alimentar seus indicadores em tempo real.</div>
+            <div style="font-size:.82rem;color:var(--text2);">Siga as etapas abaixo para cadastrar sua base e alimentar seus indicadores em tempo real.</div>
           </div>
           <div style="display:flex;align-items:center;gap:12px;">
             <div style="text-align:right;">
-              <div style="font-size:.75rem;font-weight:800;color:var(--accent);">${totalDone} de 3 concluídos (${pct}%)</div>
+              <div style="font-size:.75rem;font-weight:800;color:var(--action-fg, var(--accent));">${totalDone} de 3 concluídos (${pct}%)</div>
               <div style="width:120px;height:6px;background:rgba(255,255,255,.08);border-radius:3px;overflow:hidden;margin-top:4px;">
                 <div style="width:${pct}%;height:100%;background:linear-gradient(90deg,var(--accent),var(--accent2));border-radius:3px;transition:width .4s ease;"></div>
               </div>
             </div>
-            <button data-fb-click="Dashboard.dismissOnboarding" data-fb-click-n="0" style="background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);color:var(--text3);width:28px;height:28px;border-radius:4px;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:.85rem;" title="Dispensar guia">✕</button>
+            <button data-fb-click="Dashboard.dismissOnboarding" data-fb-click-n="0" style="background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);color:var(--text2);width:28px;height:28px;border-radius:4px;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:.85rem;" title="Dispensar guia">✕</button>
           </div>
         </div>
 
@@ -1238,13 +1238,13 @@ const Dashboard = {
           <div style="background:var(--bg-input, var(--bg-primary));border:1px solid ${step1Done ? 'rgba(198,255,0,.4)' : 'var(--border-s)'};border-radius:6px;padding:16px;display:flex;flex-direction:column;justify-content:space-between;position:relative;">
             <div>
               <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
-                <div style="width:32px;height:32px;border-radius:4px;background:${step1Done ? 'rgba(198,255,0,.18)' : 'rgba(255,255,255,.06)'};color:${step1Done ? 'var(--accent)' : 'var(--text3)'};display:flex;align-items:center;justify-content:center;font-weight:900;font-size:.9rem;">
+                <div style="width:32px;height:32px;border-radius:4px;background:${step1Done ? 'var(--color-primary-dim, rgba(198,255,0,.18))' : 'rgba(255,255,255,.06)'};color:${step1Done ? 'var(--action-fg, var(--accent))' : 'var(--text2)'};display:flex;align-items:center;justify-content:center;font-weight:900;font-size:.9rem;">
                   ${step1Done ? '✓' : '1'}
                 </div>
                 <span class="badge ${step1Done ? 'badge-success' : 'badge-secondary'}">${step1Done ? 'Concluído' : 'Pendente'}</span>
               </div>
               <h3 style="font-size:.92rem;font-weight:800;color:var(--text);margin:0 0 6px;">1. Configurar Construtora</h3>
-              <p style="font-size:.78rem;color:var(--text3);line-height:1.45;margin:0 0 14px;">
+              <p style="font-size:.82rem;color:var(--text2);line-height:1.45;margin:0 0 14px;">
                 Informe a razão social, CNPJ, telefone institucional e insira o logotipo da construtora para timbrar contratos e recibos.
               </p>
             </div>
@@ -1257,13 +1257,13 @@ const Dashboard = {
           <div style="background:var(--bg-input, var(--bg-primary));border:1px solid ${step2Done ? 'rgba(198,255,0,.4)' : 'var(--border-s)'};border-radius:6px;padding:16px;display:flex;flex-direction:column;justify-content:space-between;position:relative;">
             <div>
               <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
-                <div style="width:32px;height:32px;border-radius:4px;background:${step2Done ? 'rgba(198,255,0,.18)' : 'rgba(255,255,255,.06)'};color:${step2Done ? 'var(--accent)' : 'var(--text3)'};display:flex;align-items:center;justify-content:center;font-weight:900;font-size:.9rem;">
+                <div style="width:32px;height:32px;border-radius:4px;background:${step2Done ? 'var(--color-primary-dim, rgba(198,255,0,.18))' : 'rgba(255,255,255,.06)'};color:${step2Done ? 'var(--action-fg, var(--accent))' : 'var(--text2)'};display:flex;align-items:center;justify-content:center;font-weight:900;font-size:.9rem;">
                   ${step2Done ? '✓' : '2'}
                 </div>
                 <span class="badge ${step2Done ? 'badge-success' : 'badge-secondary'}">${step2Done ? 'Concluído' : 'Pendente'}</span>
               </div>
               <h3 style="font-size:.92rem;font-weight:800;color:var(--text);margin:0 0 6px;">2. Cadastrar 1ª Obra</h3>
-              <p style="font-size:.78rem;color:var(--text3);line-height:1.45;margin:0 0 14px;">
+              <p style="font-size:.82rem;color:var(--text2);line-height:1.45;margin:0 0 14px;">
                 Crie o centro de custo da sua primeira obra (Financiamento Caixa, Obra Particular, Empreitada ou Reforma).
               </p>
             </div>
@@ -1276,13 +1276,13 @@ const Dashboard = {
           <div style="background:var(--bg-input, var(--bg-primary));border:1px solid ${step3Done ? 'rgba(198,255,0,.4)' : 'var(--border-s)'};border-radius:6px;padding:16px;display:flex;flex-direction:column;justify-content:space-between;position:relative;">
             <div>
               <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
-                <div style="width:32px;height:32px;border-radius:4px;background:${step3Done ? 'rgba(198,255,0,.18)' : 'rgba(255,255,255,.06)'};color:${step3Done ? 'var(--accent)' : 'var(--text3)'};display:flex;align-items:center;justify-content:center;font-weight:900;font-size:.9rem;">
+                <div style="width:32px;height:32px;border-radius:4px;background:${step3Done ? 'var(--color-primary-dim, rgba(198,255,0,.18))' : 'rgba(255,255,255,.06)'};color:${step3Done ? 'var(--action-fg, var(--accent))' : 'var(--text2)'};display:flex;align-items:center;justify-content:center;font-weight:900;font-size:.9rem;">
                   ${step3Done ? '✓' : '3'}
                 </div>
                 <span class="badge ${step3Done ? 'badge-success' : 'badge-secondary'}">${step3Done ? 'Concluído' : 'Pendente'}</span>
               </div>
               <h3 style="font-size:.92rem;font-weight:800;color:var(--text);margin:0 0 6px;">3. 1º Lançamento ou Orçamento</h3>
-              <p style="font-size:.78rem;color:var(--text3);line-height:1.45;margin:0 0 14px;">
+              <p style="font-size:.82rem;color:var(--text2);line-height:1.45;margin:0 0 14px;">
                 Lance uma despesa/receita no contas a pagar ou monte a planilha SINAPI/orçamentária para ver os gráficos ganharem vida.
               </p>
             </div>

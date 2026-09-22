@@ -84,6 +84,7 @@ const tests = [
   'scripts/test-phase3-ergonomics.js',
   'scripts/test-seo-indexing.js',
   'scripts/test-phase4-design-system.js',
+  'scripts/test-light-theme-accessibility.js',
   'scripts/test-snapshot-payload.js',
   'scripts/test-finbot-key-pool.js',
   'scripts/test-bug-hunter-fixes.js',

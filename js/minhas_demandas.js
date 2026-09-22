@@ -56,14 +56,14 @@ const MinhasDemandas = {
     const iconAmpulheta     = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 22h14M5 2h14M17 22v-4.172a2 2 0 0 0-.586-1.414L12 12l-4.414 4.414A2 2 0 0 0 7 17.828V22M7 2v4.172a2 2 0 0 0 .586 1.414L12 12l4.414-4.414A2 2 0 0 0 17 6.172V2"/></svg>`;
 
     const kpiStatusCard = (badgeIcon, bgBadge, label, count) => `
-      <div class="haptic-card" style="background:#141414;border:1px solid #282828;border-radius:6px;padding:16px 18px;display:flex;align-items:center;justify-content:space-between;box-shadow:0 4px 18px rgba(0,0,0,0.4);">
+      <div class="haptic-card" style="background:var(--bg-card);border:1px solid var(--border);border-radius:6px;padding:16px 18px;display:flex;align-items:center;justify-content:space-between;box-shadow:var(--shadow-sm, 0 4px 18px rgba(0,0,0,0.4));">
         <div style="display:flex;flex-direction:column;gap:10px;">
           <div style="width:40px;height:40px;border-radius:50%;background:${bgBadge};display:flex;align-items:center;justify-content:center;box-shadow:0 2px 8px rgba(0,0,0,0.3);">
             ${badgeIcon}
           </div>
-          <div style="font-size:.75rem;color:#e9ecf0;font-weight:800;letter-spacing:0.06em;text-transform:uppercase;">${label}</div>
+          <div style="font-size:.75rem;color:var(--text3);font-weight:800;letter-spacing:0.06em;text-transform:uppercase;">${label}</div>
         </div>
-        <div class="tabular-nums" style="font-size:2.4rem;font-weight:900;color:#F0F0E8;line-height:1;font-family:inherit;">${count}</div>
+        <div class="tabular-nums" style="font-size:2.4rem;font-weight:900;color:var(--text);line-height:1;font-family:inherit;">${count}</div>
       </div>`;
 
     const renderDemanda = (d) => {
@@ -76,15 +76,15 @@ const MinhasDemandas = {
         : d.status === 'pendente' ? 'Aguardando' : 'No Prazo';
 
       return `
-        <div style="background:#141414;border:1px solid ${isAtrasado ? '#8F3D4A' : '#282828'};border-radius:6px;padding:14px 18px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;">
+        <div style="background:var(--bg-card);border:1px solid ${isAtrasado ? 'var(--danger)' : 'var(--border)'};border-radius:6px;padding:14px 18px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;">
           <div style="display:flex;align-items:center;gap:14px;flex:1;min-width:220px;">
-            <div style="width:36px;height:36px;border-radius:6px;background:#1A1A1A;display:flex;align-items:center;justify-content:center;border:1px solid #333;color:#e9ecf0;flex-shrink:0;">
+            <div style="width:36px;height:36px;border-radius:6px;background:var(--bg-elevated);display:flex;align-items:center;justify-content:center;border:1px solid var(--border);color:var(--text2);flex-shrink:0;">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
             </div>
             <div style="min-width:0;flex:1;">
-              <div style="font-size:.7rem;color:#C6FF00;font-weight:800;letter-spacing:.04em;text-transform:uppercase;">${e(d.obra_nome)}</div>
-              <div style="font-weight:800;color:#F0F0E8;font-size:.92rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${e(d.nome)}</div>
-              <div style="font-size:.74rem;color:#e9ecf0;margin-top:2px;">
+              <div style="font-size:.7rem;color:var(--action-fg);font-weight:800;letter-spacing:.04em;text-transform:uppercase;">${e(d.obra_nome)}</div>
+              <div style="font-weight:800;color:var(--text);font-size:.92rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${e(d.nome)}</div>
+              <div style="font-size:.74rem;color:var(--text3);margin-top:2px;">
                 Prazo: <strong>${typeof Utils !== 'undefined' ? Utils.fmt.date(d.data_fim_prevista) : d.data_fim_prevista}</strong>
                 · SLA: ${d.dias_sla}d
                 ${d.dias_executados ? `· Exec: ${d.dias_executados}d` : ''}
@@ -92,16 +92,16 @@ const MinhasDemandas = {
             </div>
           </div>
           <div style="display:flex;align-items:center;gap:10px;">
-            <span style="display:inline-flex;align-items:center;gap:6px;padding:3px 10px;border-radius:12px;background:rgba(255,255,255,0.06);border:1px solid #333;font-size:.74rem;font-weight:700;color:#F0F0E8;">
+            <span style="display:inline-flex;align-items:center;gap:6px;padding:3px 10px;border-radius:12px;background:var(--bg-elevated);border:1px solid var(--border);font-size:.74rem;font-weight:700;color:var(--text);">
               <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${badgeDotColor};"></span>
               ${badgeLabel}
             </span>
-            <button class="btn btn-secondary btn-sm" style="font-size:.75rem;padding:6px 12px;border:1px solid #333;background:#1A1A1A;color:#e9ecf0;display:flex;align-items:center;gap:6px;" title="Notificar via WhatsApp"
+            <button class="btn btn-secondary btn-sm" style="font-size:.75rem;padding:6px 12px;border:1px solid var(--border);background:var(--bg-input);color:var(--text);display:flex;align-items:center;gap:6px;" title="Notificar via WhatsApp"
               data-fb-click="WhatsApp.abrirModalNotificacaoEtapa" data-fb-click-n="2" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(d.obra_id)}" data-fb-click-t1="string" data-fb-click-v1="${encodeURIComponent(d.id)}">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>
               WhatsApp
             </button>
-            <button class="btn btn-primary btn-sm" style="font-size:.75rem;padding:6px 14px;font-weight:800;background:#C6FF00;color:#0A0A0A;border:none;"
+            <button class="btn btn-primary btn-sm" style="font-size:.75rem;padding:6px 14px;font-weight:800;background:var(--accent);color:var(--accent-contrast, #101814);border:none;"
               data-fb-click="CronogramaSLA.abrirModalApontamento" data-fb-click-n="2" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(d.obra_id)}" data-fb-click-t1="string" data-fb-click-v1="${encodeURIComponent(d.id)}">
               Apontar
             </button>
@@ -115,8 +115,8 @@ const MinhasDemandas = {
         <div style="margin-bottom:24px;">
           <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;">
             <span style="width:10px;height:10px;border-radius:50%;background:${corDot};display:inline-block;"></span>
-            <h3 style="font-size:.9rem;font-weight:800;color:#F0F0E8;margin:0;letter-spacing:.04em;text-transform:uppercase;">${titulo}</h3>
-            <span style="font-size:.72rem;background:#1A1A1A;border:1px solid #333;border-radius:10px;padding:2px 8px;color:#e9ecf0;font-weight:700;">${items.length}</span>
+            <h3 style="font-size:.9rem;font-weight:800;color:var(--text);margin:0;letter-spacing:.04em;text-transform:uppercase;">${titulo}</h3>
+            <span style="font-size:.72rem;background:var(--bg-elevated);border:1px solid var(--border);border-radius:10px;padding:2px 8px;color:var(--text2);font-weight:700;">${items.length}</span>
           </div>
           <div style="display:flex;flex-direction:column;gap:8px;">
             ${items.map(renderDemanda).join('')}
@@ -131,26 +131,26 @@ const MinhasDemandas = {
       const badgeText = isAtrasado ? `+${d.dias_atraso}d atraso` : isAtencao ? 'Atenção' : d.status === 'pendente' ? 'Aguardando' : 'No prazo';
 
       return `
-        <div style="background:#141414;border:1px solid ${isAtrasado ? '#8F3D4A' : '#282828'};border-radius:6px;padding:12px;margin-bottom:10px;box-shadow:0 4px 12px rgba(0,0,0,0.3);">
+        <div style="background:var(--bg-card);border:1px solid ${isAtrasado ? 'var(--danger)' : 'var(--border)'};border-radius:6px;padding:12px;margin-bottom:10px;box-shadow:var(--shadow-sm, 0 4px 12px rgba(0,0,0,0.3));">
           <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:6px;margin-bottom:6px;">
-            <span style="font-size:.68rem;color:#C6FF00;font-weight:800;letter-spacing:.03em;text-transform:uppercase;">${e(d.obra_nome)}</span>
-            <span style="display:inline-flex;align-items:center;gap:4px;font-size:.68rem;font-weight:700;color:#e9ecf0;">
+            <span style="font-size:.68rem;color:var(--action-fg);font-weight:800;letter-spacing:.03em;text-transform:uppercase;">${e(d.obra_nome)}</span>
+            <span style="display:inline-flex;align-items:center;gap:4px;font-size:.68rem;font-weight:700;color:var(--text3);">
               <span style="width:6px;height:6px;border-radius:50%;background:${dotColor};"></span>
               ${badgeText}
             </span>
           </div>
-          <div style="font-weight:800;color:#F0F0E8;font-size:.86rem;line-height:1.3;margin-bottom:8px;">
+          <div style="font-weight:800;color:var(--text);font-size:.86rem;line-height:1.3;margin-bottom:8px;">
             ${e(d.nome)}
           </div>
-          <div style="font-size:.72rem;color:#e9ecf0;margin-bottom:10px;">
+          <div style="font-size:.72rem;color:var(--text3);margin-bottom:10px;">
             Prazo: <strong>${typeof Utils !== 'undefined' ? Utils.fmt.date(d.data_fim_prevista) : d.data_fim_prevista}</strong> (SLA ${d.dias_sla}d)
           </div>
-          <div style="display:flex;justify-content:flex-end;align-items:center;gap:6px;border-top:1px solid #282828;padding-top:8px;">
-            <button class="btn btn-secondary btn-sm" style="font-size:.7rem;padding:4px 8px;border:1px solid #333;background:#1A1A1A;color:#e9ecf0;" title="Notificar via WhatsApp"
+          <div style="display:flex;justify-content:flex-end;align-items:center;gap:6px;border-top:1px solid var(--border);padding-top:8px;">
+            <button class="btn btn-secondary btn-sm" style="font-size:.7rem;padding:4px 8px;border:1px solid var(--border);background:var(--bg-input);color:var(--text);" title="Notificar via WhatsApp"
               data-fb-click="WhatsApp.abrirModalNotificacaoEtapa" data-fb-click-n="2" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(d.obra_id)}" data-fb-click-t1="string" data-fb-click-v1="${encodeURIComponent(d.id)}">
               WhatsApp
             </button>
-            <button class="btn btn-primary btn-sm" style="font-size:.7rem;padding:4px 10px;font-weight:800;background:#C6FF00;color:#0A0A0A;border:none;"
+            <button class="btn btn-primary btn-sm" style="font-size:.7rem;padding:4px 10px;font-weight:800;background:var(--accent);color:var(--accent-contrast, #101814);border:none;"
               data-fb-click="CronogramaSLA.abrirModalApontamento" data-fb-click-n="2" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(d.obra_id)}" data-fb-click-t1="string" data-fb-click-v1="${encodeURIComponent(d.id)}">
               Apontar
             </button>
@@ -169,13 +169,13 @@ const MinhasDemandas = {
       return `
         <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(250px, 1fr));gap:14px;align-items:start;margin-bottom:28px;">
           ${colunas.map(col => `
-            <div style="background:#141414;border:1px solid #282828;border-top:3px solid ${col.cor};border-radius:6px;padding:12px;">
+            <div style="background:var(--bg-card);border:1px solid var(--border);border-top:3px solid ${col.cor};border-radius:6px;padding:12px;">
               <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
-                <h4 style="font-size:.78rem;font-weight:800;color:#F0F0E8;margin:0;letter-spacing:.05em;">${col.titulo}</h4>
-                <span style="font-size:.72rem;background:#1A1A1A;border:1px solid #333;border-radius:10px;padding:2px 8px;font-weight:700;color:#e9ecf0;">${col.items.length}</span>
+                <h4 style="font-size:.78rem;font-weight:800;color:var(--text);margin:0;letter-spacing:.05em;">${col.titulo}</h4>
+                <span style="font-size:.72rem;background:var(--bg-elevated);border:1px solid var(--border);border-radius:10px;padding:2px 8px;font-weight:700;color:var(--text2);">${col.items.length}</span>
               </div>
               <div style="min-height:80px;">
-                ${col.items.length ? col.items.map(renderKanbanCard).join('') : '<div style="font-size:.75rem;color:#e9ecf0;opacity:.6;text-align:center;padding:22px 8px;border:1px dashed #282828;border-radius:4px;margin-top:4px;">Nenhuma etapa nesta coluna</div>'}
+                ${col.items.length ? col.items.map(renderKanbanCard).join('') : '<div style="font-size:.75rem;color:var(--text3);opacity:.8;text-align:center;padding:22px 8px;border:1px dashed var(--border);border-radius:4px;margin-top:4px;">Nenhuma etapa nesta coluna</div>'}
               </div>
             </div>
           `).join('')}
@@ -187,17 +187,17 @@ const MinhasDemandas = {
     return `
       <div class="page-header" style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:12px;margin-bottom:22px;">
         <div>
-          <h1 class="page-title" style="font-size:1.6rem;font-weight:900;letter-spacing:-.02em;margin:0 0 4px;color:#F0F0E8;">Minhas Demandas</h1>
-          <p class="page-sub" style="font-size:.8rem;color:#e9ecf0;margin:0;">${nomeUsuario} · ${dataHoje} · ${demandas.length} etapa(s) atribuída(s)</p>
+          <h1 class="page-title" style="font-size:1.6rem;font-weight:900;letter-spacing:-.02em;margin:0 0 4px;color:var(--text);">Minhas Demandas</h1>
+          <p class="page-sub" style="font-size:.8rem;color:var(--text3);margin:0;">${nomeUsuario} · ${dataHoje} · ${demandas.length} etapa(s) atribuída(s)</p>
         </div>
         <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
           <!-- Alternador de visualização -->
-          <div style="display:flex;background:#141414;border:1px solid #282828;border-radius:6px;padding:3px;gap:3px;">
-            <button class="btn btn-sm" style="font-size:.75rem;padding:5px 14px;border:none;border-radius:4px;background:${modo === 'lista' ? '#C6FF00' : 'transparent'};color:${modo === 'lista' ? '#0A0A0A' : '#e9ecf0'};font-weight:${modo === 'lista' ? '800' : '600'};cursor:pointer;"
+          <div style="display:flex;background:var(--bg-card);border:1px solid var(--border);border-radius:6px;padding:3px;gap:3px;">
+            <button class="btn btn-sm" style="font-size:.75rem;padding:5px 14px;border:none;border-radius:4px;background:${modo === 'lista' ? 'var(--accent)' : 'transparent'};color:${modo === 'lista' ? 'var(--accent-contrast, #101814)' : 'var(--text3)'};font-weight:${modo === 'lista' ? '800' : '600'};cursor:pointer;"
               data-fb-click="MinhasDemandas.setModoVisualizacao" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="lista">
               Lista
             </button>
-            <button class="btn btn-sm" style="font-size:.75rem;padding:5px 14px;border:none;border-radius:4px;background:${modo === 'kanban' ? '#C6FF00' : 'transparent'};color:${modo === 'kanban' ? '#0A0A0A' : '#e9ecf0'};font-weight:${modo === 'kanban' ? '800' : '600'};cursor:pointer;"
+            <button class="btn btn-sm" style="font-size:.75rem;padding:5px 14px;border:none;border-radius:4px;background:${modo === 'kanban' ? 'var(--accent)' : 'transparent'};color:${modo === 'kanban' ? 'var(--accent-contrast, #101814)' : 'var(--text3)'};font-weight:${modo === 'kanban' ? '800' : '600'};cursor:pointer;"
               data-fb-click="MinhasDemandas.setModoVisualizacao" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="kanban">
               Kanban
             </button>
@@ -206,7 +206,7 @@ const MinhasDemandas = {
           ${totalUrgente > 0 ? `
             <div style="display:flex;align-items:center;gap:6px;padding:6px 14px;background:rgba(143,61,74,0.18);border:1px solid #8F3D4A;border-radius:6px;">
               <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#8F3D4A;"></span>
-              <span style="font-weight:800;color:#f87171;font-size:.8rem;">${totalUrgente} urgente(s)</span>
+              <span style="font-weight:800;color:var(--danger);font-size:.8rem;">${totalUrgente} urgente(s)</span>
             </div>` : ''}
         </div>
       </div>
@@ -220,10 +220,10 @@ const MinhasDemandas = {
       </div>
 
       ${modo === 'kanban' ? renderKanban() : (!demandas.length ? `
-        <div class="empty-state" style="padding:48px 24px;text-align:center;background:#141414;border:1px solid #282828;border-radius:6px;margin-bottom:28px;">
-          <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#C6FF00" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="margin-bottom:12px;"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
-          <h3 style="font-size:1.1rem;font-weight:800;color:#F0F0E8;margin-bottom:6px;">Nenhuma etapa atribuída a você</h3>
-          <p style="font-size:.82rem;color:#e9ecf0;margin:0;">Configure os cargos em <strong>Configurações → Workflow → Cargos</strong> e atribua você a um cargo para acompanhar suas demandas operacionais.</p>
+        <div class="empty-state" style="padding:48px 24px;text-align:center;background:var(--bg-card);border:1px solid var(--border);border-radius:6px;margin-bottom:28px;">
+          <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="color:var(--action-fg);margin-bottom:12px;"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+          <h3 style="font-size:1.1rem;font-weight:800;color:var(--text);margin-bottom:6px;">Nenhuma etapa atribuída a você</h3>
+          <p style="font-size:.82rem;color:var(--text3);margin:0;">Configure os cargos em <strong>Configurações → Workflow → Cargos</strong> e atribua você a um cargo para acompanhar suas demandas operacionais.</p>
         </div>` : `
         <div style="margin-bottom:28px;">
           ${renderGrupo('Vencidas', '#8F3D4A', grupos.atrasadas)}
