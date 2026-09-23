@@ -51,9 +51,9 @@ export const RobotState = {
   errors: []
 };
 
-// Obter conexão com Neon PostgreSQL se DATABASE_URL estiver configurada
+// Obter conexão com Neon PostgreSQL (privilegiando DATABASE_OWNER_URL para criação de tabelas)
 function getSql() {
-  const dbUrl = process.env.DATABASE_URL || process.env.NEON_DATABASE_URL;
+  const dbUrl = process.env.DATABASE_OWNER_URL || process.env.DATABASE_URL || process.env.NEON_DATABASE_URL;
   if (!dbUrl) return null;
   return neon(dbUrl);
 }

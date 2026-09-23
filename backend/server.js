@@ -35,15 +35,19 @@ dotenv.config();
 // Suprime logs ruidosos de decifração externa/Bad MAC/Reconexão do libsignal para não poluir os logs do Render
 const _rawConsoleError = console.error;
 console.error = (...args) => {
-  const msg = typeof args[0] === 'string' ? args[0] : (args[0]?.message || String(args[0] || ''));
+  const fullText = args
+    .map(a => typeof a === 'string' ? a : (a?.message || a?.stack || String(a || '')))
+    .join(' ');
+  const msg = fullText;
   if (
     msg.includes('Bad MAC') ||
     msg.includes('Failed to decrypt message with any known session') ||
     msg.includes('Session error:Error: Bad MAC') ||
     msg.includes('Session error: Error: Bad MAC') ||
-    msg.includes('Session error:') ||
+    msg.includes('Session error') ||
     msg.includes('SessionError') ||
     msg.includes('Over 2000 messages into the future') ||
+    msg.includes('No matching sessions found for message') ||
     msg.includes('libsignal') ||
     msg.includes('Closing session:') ||
     msg.includes('Connection Closed') ||
