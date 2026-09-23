@@ -94,7 +94,170 @@ export function decryptCertData(encBase64, ivHex, authTagHex) {
   }
 }
 
+// ─── Parser DER/ASN.1 mínimo — zero dependências externas ────────────────────
+
+/**
+ * Lê um elemento TLV (tag-length-value) DER na posição `pos` do buffer.
+ * Suporta comprimentos definidos de até 4 bytes (cobrindo qualquer cert real).
+ * Retorna null se o buffer estiver mal-formado ou fora dos limites.
+ */
+function derTLV(buf, pos) {
+  if (pos >= buf.length) return null;
+  const tag = buf[pos];
+  let i = pos + 1;
+  if (i >= buf.length) return null;
+  const fb = buf[i++];
+  let len;
+  if (fb < 0x80) {
+    len = fb;
+  } else {
+    const nb = fb & 0x7f;
+    if (nb === 0 || nb > 4 || i + nb > buf.length) return null;
+    len = 0;
+    for (let k = 0; k < nb; k++) len = (len << 8) | buf[i++];
+  }
+  if (i + len > buf.length) return null;
+  return { tag, val: buf.subarray(i, i + len), next: i + len };
+}
+
+/** Itera todos os elementos filho de uma SEQUENCE ou SET DER. */
+function* derChildren(buf) {
+  let pos = 0;
+  while (pos < buf.length) {
+    const item = derTLV(buf, pos);
+    if (!item) break;
+    yield item;
+    pos = item.next;
+  }
+}
+
+// OIDs relevantes para PKCS#12 (value bytes DER, sem tag 0x06 nem length)
+const _OID_PKCS7_DATA     = Buffer.from('2a864886f70d010701',    'hex'); // 1.2.840.113549.1.7.1
+const _OID_CERT_BAG       = Buffer.from('2a864886f70d010c0a0103','hex'); // 1.2.840.113549.1.12.10.1.3
+const _OID_X509_CERT_TYPE = Buffer.from('2a864886f70d01091601',  'hex'); // 1.2.840.113549.1.9.22.1
+
+/**
+ * Extrai buffers DER brutos dos certificados X.509 contidos em cert bags
+ * não-encriptadas de um arquivo PKCS#12 (.pfx/.p12).
+ *
+ * Estrutura percorrida (RFC 7292):
+ *   PFX → authSafe ContentInfo → AuthenticatedSafe (SEQUENCE OF ContentInfo)
+ *     → SafeContents (para cada ContentInfo data não-encriptada)
+ *       → SafeBag (bagId = certBag)
+ *         → CertBag → [0] OCTET STRING → DER X.509
+ */
+function _extractCertDERsFromPkcs12(pfxBuf) {
+  const results = [];
+  try {
+    // 1. PFX ::= SEQUENCE { version INTEGER, authSafe ContentInfo, ... }
+    const pfxSeq = derTLV(pfxBuf, 0);
+    if (!pfxSeq || pfxSeq.tag !== 0x30) return results;
+
+    // authSafe é o 2º filho (índice 1), após o version INTEGER
+    const pfxKids = [...derChildren(pfxSeq.val)];
+    const authSafeCI = pfxKids[1];
+    if (!authSafeCI || authSafeCI.tag !== 0x30) return results;
+
+    // 2. ContentInfo = SEQUENCE { contentType OID, [0] EXPLICIT content }
+    const authSafeKids = [...derChildren(authSafeCI.val)];
+    const authOid     = authSafeKids[0];
+    const authContent = authSafeKids[1];
+    if (!authOid || authOid.tag !== 0x06) return results;
+    if (!authOid.val.equals(_OID_PKCS7_DATA)) return results;
+    if (!authContent || (authContent.tag & 0xe0) !== 0xa0) return results;
+
+    // 3. [0] EXPLICIT → OCTET STRING → AuthenticatedSafe DER
+    const authOctet = derTLV(authContent.val, 0);
+    if (!authOctet || authOctet.tag !== 0x04) return results;
+
+    // 4. AuthenticatedSafe ::= SEQUENCE OF ContentInfo
+    const authSafeSeq = derTLV(authOctet.val, 0);
+    if (!authSafeSeq || authSafeSeq.tag !== 0x30) return results;
+
+    // 5. Itera cada ContentInfo dentro da AuthenticatedSafe
+    for (const ci of derChildren(authSafeSeq.val)) {
+      if (ci.tag !== 0x30) continue;
+      const ciKids   = [...derChildren(ci.val)];
+      const ciOid    = ciKids[0];
+      const ciCont   = ciKids[1];
+      if (!ciOid || ciOid.tag !== 0x06) continue;
+      // Processa apenas ContentInfos do tipo data (não-encriptadas)
+      if (!ciOid.val.equals(_OID_PKCS7_DATA)) continue;
+      if (!ciCont || (ciCont.tag & 0xe0) !== 0xa0) continue;
+
+      // [0] EXPLICIT → OCTET STRING → SafeContents DER
+      const scOctet = derTLV(ciCont.val, 0);
+      if (!scOctet || scOctet.tag !== 0x04) continue;
+      const scSeq = derTLV(scOctet.val, 0);
+      if (!scSeq || scSeq.tag !== 0x30) continue;
+
+      // 6. SafeContents ::= SEQUENCE OF SafeBag
+      for (const safeBag of derChildren(scSeq.val)) {
+        if (safeBag.tag !== 0x30) continue;
+        const sbKids  = [...derChildren(safeBag.val)];
+        const bagId   = sbKids[0];
+        const bagVal  = sbKids[1];
+        if (!bagId || bagId.tag !== 0x06) continue;
+        if (!bagId.val.equals(_OID_CERT_BAG)) continue;       // filtra certBag
+        if (!bagVal || (bagVal.tag & 0xe0) !== 0xa0) continue;
+
+        // bagValue [0] → CertBag ::= SEQUENCE { certId OID, [0] certValue }
+        const cbSeq = derTLV(bagVal.val, 0);
+        if (!cbSeq || cbSeq.tag !== 0x30) continue;
+        const cbKids      = [...derChildren(cbSeq.val)];
+        const certId      = cbKids[0];
+        const certValWrap = cbKids[1];
+        if (!certId || certId.tag !== 0x06) continue;
+        if (!certId.val.equals(_OID_X509_CERT_TYPE)) continue; // x509Certificate
+        if (!certValWrap || (certValWrap.tag & 0xe0) !== 0xa0) continue;
+
+        // [0] EXPLICIT → OCTET STRING → DER X.509
+        const x509Oct = derTLV(certValWrap.val, 0);
+        if (!x509Oct || x509Oct.tag !== 0x04) continue;
+        results.push(x509Oct.val);
+      }
+    }
+  } catch { /* buffer malformado — retorna o que foi coletado até aqui */ }
+  return results;
+}
+
+/** Aplica scoring ICP-Brasil para selecionar o certificado folha mais relevante. */
+function _scoreCert(cert) {
+  const subj     = cert.subject || '';
+  const fullText = subj + ' ' + (cert.subjectAltName || '');
+  if (/OID\.2\.16\.76\.1\.3\.3=/.test(subj))              return 3; // CNPJ ICP OID
+  if (/OID\.2\.16\.76\.1\.3\.1=/.test(subj))              return 2; // CPF ICP OID
+  if (/(\d{2}\.\d{3}\.\d{3}\/\d{4}-\d{2})/.test(fullText)) return 3; // CNPJ formatado
+  if (/(?<!\d)(\d{14})(?!\d)/.test(fullText))              return 2; // CNPJ puro 14d
+  return 1; // qualquer cert válido aceito como último recurso
+}
+
+/**
+ * Extrai o certificado X.509 folha mais relevante de um buffer PFX/P12.
+ *
+ * Estratégia em duas etapas:
+ *   1. Parser PKCS#12 estruturado via DER — lida com cert bags aninhadas
+ *      (certificados ICP-Brasil modernos emitidos com PKCS#12 encapsulado).
+ *   2. Fallback: varredura byte-a-byte buscando sequências SEQUENCE 0x30 0x82
+ *      (compatibilidade com PFX legados/simples).
+ */
 function extractX509FromPfx(buffer) {
+  // ── Tentativa 1: parse PKCS#12 estruturado ───────────────────────────────
+  const derList = _extractCertDERsFromPkcs12(buffer);
+  if (derList.length > 0) {
+    let best = null, bestScore = -1;
+    for (const der of derList) {
+      try {
+        const cert = new crypto.X509Certificate(der);
+        if (!cert.subject || !cert.validTo) continue;
+        const score = _scoreCert(cert);
+        if (score > bestScore) { bestScore = score; best = cert; }
+      } catch {}
+    }
+    if (best) return best;
+  }
+
+  // ── Tentativa 2: fallback varredura byte-a-byte (PFX legados/simples) ────
   let bestCert = null;
   let bestScore = -1;
   for (let i = 0; i < buffer.length - 100; i++) {
@@ -106,23 +269,8 @@ function extractX509FromPfx(buffer) {
           const slice = buffer.subarray(i, i + totalLen);
           const cert = new crypto.X509Certificate(slice);
           if (cert.subject && cert.validTo) {
-            const subj = cert.subject || '';
-            const altName = cert.subjectAltName || '';
-            const fullText = subj + ' ' + altName;
-
-            // Score: prefer ICP-Brasil leaf certs with CNPJ or CPF
-            let score = 0;
-            if (/OID\.2\.16\.76\.1\.3\.3=/.test(subj)) score = 3;       // CNPJ ICP-Brasil OID
-            else if (/OID\.2\.16\.76\.1\.3\.1=/.test(subj)) score = 2;  // CPF ICP-Brasil OID
-            else if (/(\d{2}\.\d{3}\.\d{3}\/\d{4}-\d{2})/.test(fullText)) score = 3; // CNPJ formatado
-            else if (/(?<!\d)(\d{14})(?!\d)/.test(fullText)) score = 2;              // CNPJ puro 14d
-            else score = 1; // qualquer cert válido é aceito como fallback
-
-            if (score > bestScore) {
-              bestScore = score;
-              bestCert = cert;
-            }
-
+            const score = _scoreCert(cert);
+            if (score > bestScore) { bestScore = score; bestCert = cert; }
             // Avança o cursor apenas se o cert foi consumido (evita reanálise)
             i += totalLen - 1;
           }
