@@ -6,7 +6,8 @@
   "type": "module",
   "scripts": {
     "start": "node server.js",
-    "dev": "node --watch server.js"
+    "dev": "node --watch server.js",
+    "postinstall": "node -e \"const fs=require('fs'),p=require('path'),t=p.resolve('../node_modules'),s=p.resolve('node_modules');if(!fs.existsSync(t)&&fs.existsSync(s)){try{fs.symlinkSync(s,t,'junction')}catch(e){console.warn('symlink:',e.message)}}\""
   },
   "dependencies": {
     "@neondatabase/serverless": "^0.10.4",

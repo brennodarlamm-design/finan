@@ -6,8 +6,8 @@ services:
     plan: free
     region: ohio
     rootDir: backend
-    buildCommand: npm install
-    startCommand: node server.js
+    buildCommand: npm install && node -e "const fs=require('fs'),p=require('path'),t=p.resolve('../node_modules'),s=p.resolve('node_modules');if(!fs.existsSync(t)&&fs.existsSync(s)){try{fs.symlinkSync(s,t,'junction')}catch(e){}}"
+    startCommand: node -e "const fs=require('fs'),p=require('path'),t=p.resolve('../node_modules'),s=p.resolve('node_modules');if(!fs.existsSync(t)&&fs.existsSync(s)){try{fs.symlinkSync(s,t,'junction')}catch(e){}}" && node server.js
     envVars:
       - key: PORT
         value: 3333
@@ -75,8 +75,8 @@ services:
     plan: free
     region: ohio
     rootDir: backend
-    buildCommand: npm install
-    startCommand: node server.js
+    buildCommand: npm install && node -e "const fs=require('fs'),p=require('path'),t=p.resolve('../node_modules'),s=p.resolve('node_modules');if(!fs.existsSync(t)&&fs.existsSync(s)){try{fs.symlinkSync(s,t,'junction')}catch(e){}}"
+    startCommand: node -e "const fs=require('fs'),p=require('path'),t=p.resolve('../node_modules'),s=p.resolve('node_modules');if(!fs.existsSync(t)&&fs.existsSync(s)){try{fs.symlinkSync(s,t,'junction')}catch(e){}}" && node server.js
     envVars:
       - key: PORT
         value: 3333
