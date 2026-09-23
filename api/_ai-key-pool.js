@@ -109,7 +109,8 @@ export async function callGeminiKeyPool(prompt, {
   }
 
   // Modelos de última geração com alta velocidade e suporte gratuito no endpoint v1beta
-  const models = ['gemini-3.6-flash', 'gemini-flash-latest', 'gemini-3.5-flash'];
+  const models = ['gemini-3-flash-preview', 'gemini-3.5-flash-lite', 'gemini-3.6-flash', 'gemini-flash-latest', 'gemini-3.5-flash'];
+
   let attempts = 0;
   const maxAttempts = keys.length;
 

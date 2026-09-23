@@ -128,10 +128,16 @@ export default async function handler(req, res) {
     }
   }
 
-  const geminiApiKey = String(process.env.GEMINI_API_KEY || '').trim();
+  const rawGeminiKeys = String(process.env.GEMINI_API_KEYS || process.env.GEMINI_API_KEY || '').trim();
+  const geminiKeys = rawGeminiKeys
+    ? rawGeminiKeys.split(',').map(k => k.trim()).filter(k => k.length > 10)
+    : [];
+
+  const geminiApiKey = geminiKeys[0] || String(process.env.GEMINI_API_KEY || '').trim();
   if (!geminiApiKey) {
     return res.status(500).json({ error: 'GEMINI_API_KEY não configurada no servidor.' });
   }
+
 
   // Desvio para processamento assíncrono em background via Trigger.dev (elimina timeout de 10s da Vercel Hobby)
   if (req.body?.async === true || req.body?.modo === 'async') {
@@ -206,8 +212,10 @@ REGRAS CRÍTICAS PARA 'itens' E 'tipo_documento':
     let modeloUsado = null;
     let lastError = null;
 
-    // Fluxo sem OpenAI: restaura a família Gemini usada antes da integração ChatGPT.
+    // Modelos rápidos e modernos: prioriza gemini-3-flash-preview e gemini-3.5-flash-lite, mantendo fallbacks
     const models = [
+      'gemini-3-flash-preview',
+      'gemini-3.5-flash-lite',
       'gemini-3.6-flash',
       'gemini-3.5-flash',
       'gemini-flash-latest'
@@ -227,37 +235,51 @@ REGRAS CRÍTICAS PARA 'itens' E 'tipo_documento':
       }
     };
 
-    for (const model of models) {
-      try {
-        const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${geminiApiKey}`;
-        const geminiRes = await fetch(geminiUrl, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          signal: AbortSignal.timeout(20000),
-          body: JSON.stringify(geminiPayload)
-        });
+    const keysToTry = geminiKeys.length > 0 ? geminiKeys : [geminiApiKey];
 
-        if (geminiRes.ok) {
-          const geminiData = await geminiRes.json();
-          const parts = geminiData?.candidates?.[0]?.content?.parts || [];
-          let rawText = '';
-          for (const part of parts) {
-            if (part.text) rawText += part.text;
+    modelLoop:
+    for (const model of models) {
+      for (let kIdx = 0; kIdx < keysToTry.length; kIdx++) {
+        const activeKey = keysToTry[kIdx];
+        try {
+          const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${activeKey}`;
+          const geminiRes = await fetch(geminiUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            signal: AbortSignal.timeout(20000),
+            body: JSON.stringify(geminiPayload)
+          });
+
+          if (geminiRes.ok) {
+            const geminiData = await geminiRes.json();
+            const parts = geminiData?.candidates?.[0]?.content?.parts || [];
+            let rawText = '';
+            for (const part of parts) {
+              if (part.text) rawText += part.text;
+            }
+            rawText = rawText.trim();
+            if (rawText) {
+              ocrResult = repairJson(rawText);
+              modeloUsado = model;
+              break modelLoop;
+            }
+          } else {
+            const errTxt = await geminiRes.text();
+            lastError = `[${model}] HTTP ${geminiRes.status}: ${errTxt.slice(0, 150)}`;
+            console.warn('[OCR] Tentativa Gemini falhou:', model, `(chave #${kIdx + 1})`, geminiRes.status);
+            if (geminiRes.status === 404) {
+              break;
+            }
           }
-          rawText = rawText.trim();
-          if (rawText) {
-            ocrResult = repairJson(rawText);
-            modeloUsado = model;
-            break;
-          }
-        } else {
-          const errTxt = await geminiRes.text();
-          lastError = `[${model}] HTTP ${geminiRes.status}: ${errTxt.slice(0, 150)}`;
-          console.warn('[OCR] Tentativa Gemini falhou:', model, geminiRes.status);
+        } catch (errNetGemini) {
+          lastError = `[${model}] ${errNetGemini.message}`;
+          console.warn('[OCR] Tentativa Gemini falhou:', model, `(chave #${kIdx + 1})`, errNetGemini.message);
         }
-      } catch (errNetGemini) {
-        lastError = `[${model}] ${errNetGemini.message}`;
-        console.warn('[OCR] Tentativa Gemini falhou:', model, errNetGemini.message);
+
+        // Limita a 2 tentativas de chave por modelo para evitar atraso acumulado
+        if (kIdx >= 1 && keysToTry.length > 2) {
+          break;
+        }
       }
     }
 
