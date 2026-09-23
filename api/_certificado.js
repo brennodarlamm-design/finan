@@ -543,7 +543,7 @@ export default async function handler(req, res) {
       }
 
       const pfxRaw = req.body?.pfx_base64 || req.body?.base64 || req.body?.arquivo;
-      const senha = String(req.body?.senha || req.body?.passphrase || '').trim();
+      const senha = String(req.body?.senha ?? req.body?.passphrase ?? '');
       const nomeArquivo = String(req.body?.nome_arquivo || 'certificado_a1.pfx').slice(0, 255);
 
       if (!pfxRaw) {
@@ -562,6 +562,12 @@ export default async function handler(req, res) {
       if (pfxBuffer.length > 5 * 1024 * 1024) {
         return res.status(400).json({ success: false, error: 'Tamanho do certificado excede o limite máximo de 5MB.' });
       }
+
+      console.log('[Certificado] PFX recebido:', {
+        bytes: pfxBuffer.length,
+        nomeArquivo,
+        senhaInformada: Boolean(senha)
+      });
 
       // Validação criptográfica com engine nativa OpenSSL
       try {
@@ -583,6 +589,8 @@ export default async function handler(req, res) {
         });
       }
 
+      console.log('[Certificado] PFX validado pelo OpenSSL/Node');
+
       // Extração de metadados do certificado X.509
       const certX509 = await extractX509FromPfx(pfxBuffer, senha);
       if (!certX509) {
@@ -591,6 +599,13 @@ export default async function handler(req, res) {
           error: 'Não foi possível extrair o certificado X.509 do arquivo informado.'
         });
       }
+
+      console.log('[Certificado] X509 extraído:', {
+        subject: certX509?.subject,
+        issuer: certX509?.issuer,
+        validFrom: certX509?.validFrom,
+        validTo: certX509?.validTo
+      });
 
       const details = parseCertDetails(certX509);
       if (!details.validoAte) {
