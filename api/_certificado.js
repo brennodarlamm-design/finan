@@ -233,16 +233,116 @@ function _scoreCert(cert) {
 }
 
 /**
+ * Extrai o certificado X.509 utilizando o engine OpenSSL nativo do Node.js através de um
+ * handshake TLS local temporário sobre interface de loopback (127.0.0.1 com porta efêmera 0).
+ *
+ * Suporta perfeitamente arquivos PKCS#12 (.pfx/.p12) modernos e legados da ICP-Brasil onde as
+ * cert bags estão dentro de ContentInfo do tipo encryptedData (3DES PBE, AES PBES2 ou RC2).
+ */
+function extractCertViaTls(pfxBuffer, passphrase) {
+  return new Promise((resolve, reject) => {
+    let server = null;
+    let client = null;
+    let timer = null;
+    let resolved = false;
+
+    const cleanup = () => {
+      if (timer) {
+        clearTimeout(timer);
+        timer = null;
+      }
+      if (client && !client.destroyed) {
+        try { client.destroy(); } catch {}
+      }
+      if (server) {
+        try { server.close(); } catch {}
+      }
+    };
+
+    const done = (err, cert) => {
+      if (resolved) return;
+      resolved = true;
+      cleanup();
+      if (err) reject(err);
+      else resolve(cert);
+    };
+
+    try {
+      server = tls.createServer({
+        pfx: pfxBuffer,
+        passphrase: String(passphrase || ''),
+        rejectUnauthorized: false
+      });
+    } catch (e) {
+      return reject(e);
+    }
+
+    server.once('error', (err) => done(err));
+
+    server.listen(0, '127.0.0.1', () => {
+      const addr = server.address();
+      if (!addr || typeof addr === 'string') {
+        return done(new Error('Falha ao obter porta local para validação do certificado.'));
+      }
+
+      try {
+        client = tls.connect({
+          host: '127.0.0.1',
+          port: addr.port,
+          rejectUnauthorized: false
+        }, () => {
+          try {
+            const peerX509 = client.getPeerX509Certificate();
+            if (peerX509) {
+              return done(null, peerX509);
+            }
+            const rawPeer = client.getPeerCertificate(true);
+            if (rawPeer && rawPeer.raw) {
+              return done(null, new crypto.X509Certificate(rawPeer.raw));
+            }
+            done(new Error('Certificado não retornado durante o handshake TLS.'));
+          } catch (e) {
+            done(e);
+          }
+        });
+      } catch (connErr) {
+        return done(connErr);
+      }
+
+      client.once('error', (err) => done(err));
+
+      timer = setTimeout(() => {
+        done(new Error('Timeout na extração do certificado digital A1 via TLS.'));
+      }, 5000);
+      if (timer.unref) timer.unref();
+    });
+  });
+}
+
+/**
  * Extrai o certificado X.509 folha mais relevante de um buffer PFX/P12.
  *
- * Estratégia em duas etapas:
- *   1. Parser PKCS#12 estruturado via DER — lida com cert bags aninhadas
- *      (certificados ICP-Brasil modernos emitidos com PKCS#12 encapsulado).
- *   2. Fallback: varredura byte-a-byte buscando sequências SEQUENCE 0x30 0x82
- *      (compatibilidade com PFX legados/simples).
+ * Estratégia em três etapas:
+ *   1. Extração nativa OpenSSL via handshake TLS local em loopback:
+ *      decifra com perfeição PKCS#12 com bags cifradas (3DES, AES, RC2)
+ *      utilizando a senha fornecida pelo usuário.
+ *   2. Parser PKCS#12 estruturado via DER: lida com cert bags não-cifradas.
+ *   3. Fallback: varredura byte-a-byte buscando sequências SEQUENCE 0x30 0x82.
  */
-function extractX509FromPfx(buffer) {
-  // ── Tentativa 1: parse PKCS#12 estruturado ───────────────────────────────
+export async function extractX509FromPfx(buffer, passphrase = '') {
+  // ── Tentativa 1: Handshake TLS local com engine nativa OpenSSL ─────────────
+  if (passphrase) {
+    try {
+      const tlsCert = await extractCertViaTls(buffer, passphrase);
+      if (tlsCert && (tlsCert.subject || tlsCert.raw)) {
+        return tlsCert;
+      }
+    } catch {
+      // Falha no handshake local — segue para os parsers DER
+    }
+  }
+
+  // ── Tentativa 2: parse PKCS#12 estruturado via DER (bags não-cifradas) ─────
   const derList = _extractCertDERsFromPkcs12(buffer);
   if (derList.length > 0) {
     let best = null, bestScore = -1;
@@ -257,7 +357,7 @@ function extractX509FromPfx(buffer) {
     if (best) return best;
   }
 
-  // ── Tentativa 2: fallback varredura byte-a-byte (PFX legados/simples) ────
+  // ── Tentativa 3: fallback varredura byte-a-byte (PFX legados/simples) ──────
   let bestCert = null;
   let bestScore = -1;
   for (let i = 0; i < buffer.length - 100; i++) {
@@ -281,7 +381,17 @@ function extractX509FromPfx(buffer) {
   return bestCert;
 }
 
-function parseCertDetails(cert) {
+function safeIsoDate(d) {
+  if (!d) return null;
+  try {
+    const dt = new Date(d);
+    return isNaN(dt.getTime()) ? null : dt.toISOString();
+  } catch {
+    return null;
+  }
+}
+
+export function parseCertDetails(cert) {
   const subject = cert.subject || '';
   const issuer = cert.issuer || '';
 
@@ -292,8 +402,9 @@ function parseCertDetails(cert) {
   const altName = cert.subjectAltName || '';
   const fullText = subject + ' ' + altName;
 
-  // 1. OID ICP-Brasil para CNPJ: OID.2.16.76.1.3.3=<14 dígitos>
-  const icpCnpjMatch = subject.match(/OID\.2\.16\.76\.1\.3\.3=(\d{14})/i);
+  // 1. OID ICP-Brasil para CNPJ: 2.16.76.1.3.3=<14 dígitos>
+  const icpCnpjMatch = fullText.match(/2\.16\.76\.1\.3\.3[^\d]*(\d{14})/i) ||
+                       subject.match(/OID\.2\.16\.76\.1\.3\.3=(\d{14})/i);
   if (icpCnpjMatch) {
     cnpj = icpCnpjMatch[1];
   }
@@ -317,6 +428,19 @@ function parseCertDetails(cert) {
     if (candidate.length === 14) cnpj = candidate;
   }
 
+  // 5. Fallback para CPF ICP-Brasil (e-CPF): OID 2.16.76.1.3.1 ou 11 dígitos
+  if (!cnpj) {
+    const icpCpfMatch = fullText.match(/2\.16\.76\.1\.3\.1[^\d]*(\d{11})/i) ||
+                        subject.match(/OID\.2\.16\.76\.1\.3\.1=(\d{11})/i);
+    if (icpCpfMatch) {
+      cnpj = icpCpfMatch[1];
+    } else if (commonName.includes(':')) {
+      const cnParts = commonName.split(':');
+      const candidate = (cnParts[cnParts.length - 1] || '').replace(/\D/g, '');
+      if (candidate.length === 11) cnpj = candidate;
+    }
+  }
+
   let razaoSocial = commonName;
   if (commonName.includes(':')) {
     razaoSocial = commonName.split(':')[0].trim();
@@ -325,8 +449,8 @@ function parseCertDetails(cert) {
   return {
     cnpj,
     razaoSocial: razaoSocial || 'Empresa Certificada',
-    validoDe: cert.validFrom ? new Date(cert.validFrom).toISOString() : null,
-    validoAte: cert.validTo ? new Date(cert.validTo).toISOString() : null,
+    validoDe: safeIsoDate(cert.validFrom),
+    validoAte: safeIsoDate(cert.validTo),
     emissor: issuer,
     serialNumber: cert.serialNumber || null
   };
@@ -460,7 +584,7 @@ export default async function handler(req, res) {
       }
 
       // Extração de metadados do certificado X.509
-      const certX509 = extractX509FromPfx(pfxBuffer);
+      const certX509 = await extractX509FromPfx(pfxBuffer, senha);
       if (!certX509) {
         return res.status(400).json({
           success: false,

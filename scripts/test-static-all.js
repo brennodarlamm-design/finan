@@ -20,6 +20,7 @@ const tests = [
   'scripts/test-patch10-static.js',
   'scripts/test-patch11-static.js',
   'scripts/test-patch12-static.js',
+  'scripts/test-certificado-extraction.js',
   'scripts/test-patch13-static.js',
   'scripts/test-patch14-static.js',
   'scripts/test-patch15-static.js',
