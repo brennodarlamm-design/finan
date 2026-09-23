@@ -17,6 +17,20 @@ import path from 'path';
 import crypto from 'crypto';
 import { createSinapiRouter, initSinapiDatabase } from './sinapi_robot.js';
 
+// ── API Handlers de Negócio (migrados da Vercel) ─────────────────────────────
+import authHandler         from '../api/auth.js';
+import usersHandler        from '../api/users.js';
+import dashboardHandler    from '../api/dashboard.js';
+import dbHandler           from '../api/db.js';
+import nfeHandler          from '../api/nfe.js';
+import planoHandler        from '../api/plano.js';
+import uploadHandler       from '../api/upload.js';
+import adminHandler        from '../api/admin.js';
+import auditHandler        from '../api/audit.js';
+import assinaturasHandler  from '../api/assinaturas.js';
+import whatsappApiHandler  from '../api/whatsapp.js';
+import reconhecerHandler   from '../api/reconhecer-documento.js';
+
 dotenv.config({ path: '.env.local' });
 dotenv.config();
 
@@ -1581,6 +1595,77 @@ cron.schedule('*/10 * * * *', async () => {
   noOverlap: true,
   name: 'finobra-keep-alive'
 });
+
+// ── BUSINESS API — Adapter Vercel → Express ─────────────────────────────────
+//
+// Os handlers do api/ usam a interface (req, res) idêntica à do Express.
+// O adapter apenas captura exceções não tratadas e garante uma resposta 500.
+
+function apiRoute(handler) {
+  return async (req, res) => {
+    try {
+      await handler(req, res);
+    } catch (err) {
+      console.error('[API]', req.method, req.originalUrl, '—', err?.message || err);
+      if (!res.headersSent) res.status(500).json({ success: false, error: 'Erro interno no servidor.' });
+    }
+  };
+}
+
+// ── Rotas principais (1:1 com os handlers da Vercel) ─────────────────────────
+app.all('/api/auth',                 apiRoute(authHandler));
+app.all('/api/users',                apiRoute(usersHandler));
+app.all('/api/dashboard',            apiRoute(dashboardHandler));
+app.all('/api/db',                   apiRoute(dbHandler));
+app.all('/api/nfe',                  apiRoute(nfeHandler));
+app.all('/api/plano',                apiRoute(planoHandler));
+app.all('/api/upload',               apiRoute(uploadHandler));
+app.all('/api/admin',                apiRoute(adminHandler));
+app.all('/api/audit',                apiRoute(auditHandler));
+app.all('/api/assinaturas',          apiRoute(assinaturasHandler));
+app.all('/api/whatsapp',             apiRoute(whatsappApiHandler));
+app.all('/api/reconhecer-documento', apiRoute(reconhecerHandler));
+
+// ── Rewrites do vercel.json (aliases de rota) ─────────────────────────────────
+app.all('/api/health', (req, res, next) => {
+  req.query = { ...req.query, action: req.query.action || 'health' };
+  next();
+}, apiRoute(authHandler));
+
+app.all('/api/certificado', (req, res, next) => {
+  req.query = { ...req.query, sub: 'certificado' };
+  next();
+}, apiRoute(nfeHandler));
+
+app.all('/api/webhook-pix', (req, res, next) => {
+  req.query = { ...req.query, sub: 'webhook_pix' };
+  next();
+}, apiRoute(planoHandler));
+
+app.all('/api/cnpj', (req, res, next) => {
+  req.query = { ...req.query, action: 'cnpj' };
+  next();
+}, apiRoute(nfeHandler));
+
+app.all('/api/cep', (req, res, next) => {
+  req.query = { ...req.query, action: 'cep' };
+  next();
+}, apiRoute(nfeHandler));
+
+app.all('/api/support', (req, res, next) => {
+  req.query = { ...req.query, target: 'support' };
+  next();
+}, apiRoute(usersHandler));
+
+app.all('/api/tenant', (req, res, next) => {
+  req.query = { ...req.query, target: 'tenant' };
+  next();
+}, apiRoute(usersHandler));
+
+app.all('/api/send-whatsapp', (req, res, next) => {
+  req.query = { ...req.query, action: 'send' };
+  next();
+}, apiRoute(whatsappApiHandler));
 
 // ── INICIALIZAÇÃO DO SERVIDOR ────────────────────────────────────────────────
 app.listen(PORT, () => {

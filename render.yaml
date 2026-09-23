@@ -26,6 +26,47 @@ services:
         sync: false
       - key: PIX_WEBHOOK_SECRET
         sync: false
+      # ── Vars para API de Negócio (migradas da Vercel) ────────────────────────
+      - key: CERT_ENCRYPTION_KEY
+        sync: false
+      - key: DATABASE_OWNER_URL
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: MEUDANFE_API_KEY
+        sync: false
+      - key: RESEND_API_KEY
+        sync: false
+      - key: RESEND_FROM_EMAIL
+        sync: false
+      - key: RESEND_SUPPORT_TEMPLATE_ID
+        sync: false
+      - key: FINOBRA_BLOB_READ_WRITE_TOKEN
+        sync: false
+      - key: FINOBRA_BLOB_STORE_ID
+        sync: false
+      - key: FINOBRA_BLOB_ACCESS
+        sync: false
+      - key: FINOBRA_SUPPORT_EMAIL
+        sync: false
+      - key: FINOBRA_SUPPORT_EMAIL_FROM
+        sync: false
+      - key: FINOBRA_SUPPORT_WHATSAPP
+        sync: false
+      - key: FINOBRA_BILLING_WHATSAPP
+        sync: false
+      - key: FINOBRA_PIX_KEY
+        sync: false
+      - key: FINOBRA_PIX_MERCHANT_NAME
+        sync: false
+      - key: FINOBRA_PIX_CITY
+        sync: false
+      - key: FINOBRA_MASTER_URL
+        value: https://fingo.api.br
+      - key: ADMIN_NOTIFY_EMAIL
+        sync: false
 
   # Serviço WhatsApp forwarder (finan-wf12)
   - type: web
