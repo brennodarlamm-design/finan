@@ -41,6 +41,10 @@ console.error = (...args) => {
     msg.includes('Failed to decrypt message with any known session') ||
     msg.includes('Session error:Error: Bad MAC') ||
     msg.includes('Session error: Error: Bad MAC') ||
+    msg.includes('Session error:') ||
+    msg.includes('SessionError') ||
+    msg.includes('Over 2000 messages into the future') ||
+    msg.includes('libsignal') ||
     msg.includes('Closing session:') ||
     msg.includes('Connection Closed') ||
     msg.includes('Stream Errored') ||

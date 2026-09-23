@@ -34,8 +34,17 @@ export function createRuntimeSql() {
 
 export function getOwnerDatabaseUrl() {
   const conn = env('DATABASE_OWNER_URL');
-  if (!conn) throw new Error('DATABASE_OWNER_URL não configurada para operação privilegiada.');
-  return conn;
+  if (conn) return conn;
+
+  const fallback = env('DATABASE_URL');
+  if (fallback) {
+    const role = roleFromConnectionString(fallback).toLowerCase();
+    if (role === 'neondb_owner' || role.endsWith('_owner')) {
+      return fallback;
+    }
+  }
+
+  throw new Error('DATABASE_OWNER_URL não configurada para operação privilegiada.');
 }
 
 export function createOwnerSql() {
