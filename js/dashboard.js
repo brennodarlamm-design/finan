@@ -656,6 +656,18 @@ const Dashboard = {
     }
   },
 
+  _getChartTheme() {
+    const isLight = document.documentElement.getAttribute('data-theme') === 'light' || 
+                    (typeof localStorage !== 'undefined' && localStorage.getItem('finobra_theme') === 'light');
+    return {
+      isLight,
+      textColor: isLight ? '#33413A' : '#e9ecf0',
+      legendColor: isLight ? '#101814' : '#e9ecf0',
+      gridColor: isLight ? 'rgba(0, 0, 0, 0.08)' : 'rgba(255, 255, 255, 0.05)',
+      accentColor: isLight ? '#315A00' : '#C6FF00',
+    };
+  },
+
   _barChart(obraId) {
     const canvas = document.getElementById('ch-bar');
     if (!canvas) return;
@@ -685,13 +697,25 @@ const Dashboard = {
       const existing = Chart.getChart(canvas);
       if (existing) existing.destroy();
     }
+    const theme = this._getChartTheme();
     const ch = new Chart(canvas,{
       type:'bar',
       data:{ labels, datasets:[
-        { label:'Receitas', data:keys.map(k=>months[k].rec), backgroundColor:'rgba(16,185,129,.75)', borderColor:'#10b981', borderWidth:1, borderRadius:4 },
-        { label:'Despesas', data:keys.map(k=>months[k].desp), backgroundColor:'rgba(239,68,68,.75)', borderColor:'#ef4444', borderWidth:1, borderRadius:4 }
+        { label:'Receitas', data:keys.map(k=>months[k].rec), backgroundColor:theme.isLight ? 'rgba(22, 124, 69, 0.85)' : 'rgba(16,185,129,.75)', borderColor:theme.isLight ? '#167C45' : '#10b981', borderWidth:1, borderRadius:4 },
+        { label:'Despesas', data:keys.map(k=>months[k].desp), backgroundColor:theme.isLight ? 'rgba(197, 34, 31, 0.85)' : 'rgba(239,68,68,.75)', borderColor:theme.isLight ? '#C5221F' : '#ef4444', borderWidth:1, borderRadius:4 }
       ]},
-      options:{ responsive:true, maintainAspectRatio:false, plugins:{ legend:{labels:{color:'#e9ecf0',font:{size:11,weight:600}}}, tooltip:{callbacks:{label:c=>` ${c.dataset.label}: ${Utils.fmt.currency(c.raw)}`}} }, scales:{ x:{ticks:{color:'#e9ecf0'},grid:{color:'rgba(255,255,255,.03)'}}, y:{ticks:{color:'#e9ecf0',callback:v=>'R$'+(v/1000).toFixed(0)+'k'},grid:{color:'rgba(255,255,255,.05)'}} } }
+      options:{
+        responsive:true,
+        maintainAspectRatio:false,
+        plugins:{
+          legend:{labels:{color:theme.legendColor, font:{size:11, weight:700}}},
+          tooltip:{callbacks:{label:c=>` ${c.dataset.label}: ${Utils.fmt.currency(c.raw)}`}}
+        },
+        scales:{
+          x:{ticks:{color:theme.textColor, font:{weight:600}}, grid:{color:theme.gridColor}},
+          y:{ticks:{color:theme.textColor, font:{weight:600}, callback:v=>'R$ '+(v/1000).toFixed(0)+'k'}, grid:{color:theme.gridColor}}
+        }
+      }
     });
     App.registerChart(ch);
   },
@@ -739,6 +763,7 @@ const Dashboard = {
       if (existing) existing.destroy();
     }
 
+    const theme = this._getChartTheme();
     const ch = new Chart(canvas,{
       type:'doughnut',
       data:{
@@ -746,7 +771,8 @@ const Dashboard = {
         datasets:[{
           data: values,
           backgroundColor: palette.slice(0, values.length),
-          borderColor: 'transparent',
+          borderColor: theme.isLight ? '#FFFFFF' : '#1A1A1A',
+          borderWidth: 2,
           hoverOffset: 8
         }]
       },
@@ -757,7 +783,7 @@ const Dashboard = {
         plugins:{
           legend:{
             position:'right',
-            labels:{ color:'#e9ecf0', font:{size:11, weight:600}, boxWidth:10, padding:8 }
+            labels:{ color:theme.legendColor, font:{size:11, weight:600}, boxWidth:10, padding:8 }
           },
           tooltip:{
             callbacks:{
@@ -857,6 +883,7 @@ const Dashboard = {
       if (existing) existing.destroy();
     }
 
+    const theme = this._getChartTheme();
     const ch = new Chart(canvas, {
       type: 'bar',
       data: {
@@ -866,10 +893,10 @@ const Dashboard = {
             label: 'Saldo Acumulado Projetado (R$)',
             type: 'line',
             data: saldosAcumulados,
-            borderColor: '#C6FF00',
-            backgroundColor: 'rgba(198,255,0,0.1)',
+            borderColor: theme.accentColor,
+            backgroundColor: theme.isLight ? 'rgba(49, 90, 0, 0.1)' : 'rgba(198,255,0,0.1)',
             borderWidth: 2.5,
-            pointBackgroundColor: '#C6FF00',
+            pointBackgroundColor: theme.accentColor,
             pointRadius: 4,
             pointHoverRadius: 6,
             tension: 0.3,
@@ -879,14 +906,14 @@ const Dashboard = {
           {
             label: 'Entradas Previstas',
             data: recsArray,
-            backgroundColor: 'rgba(16,185,129,0.7)',
+            backgroundColor: theme.isLight ? 'rgba(22, 124, 69, 0.8)' : 'rgba(16,185,129,0.7)',
             borderRadius: 4,
             yAxisID: 'y'
           },
           {
             label: 'Saídas Previstas',
             data: despsArray,
-            backgroundColor: 'rgba(239,68,68,0.7)',
+            backgroundColor: theme.isLight ? 'rgba(197, 34, 31, 0.8)' : 'rgba(239,68,68,0.7)',
             borderRadius: 4,
             yAxisID: 'y'
           }
@@ -898,7 +925,7 @@ const Dashboard = {
         interaction: { mode: 'index', intersect: false },
         plugins: {
           legend: {
-            labels: { color: '#e9ecf0', font: { size: 11, family: 'Inter', weight: 600 }, boxWidth: 12 }
+            labels: { color: theme.legendColor, font: { size: 11, family: 'Inter', weight: 600 }, boxWidth: 12 }
           },
           tooltip: {
             callbacks: {
@@ -908,14 +935,14 @@ const Dashboard = {
         },
         scales: {
           x: {
-            grid: { color: 'rgba(255,255,255,0.04)' },
-            ticks: { color: '#e9ecf0', font: { size: 10, family: 'Inter' } }
+            grid: { color: theme.gridColor },
+            ticks: { color: theme.textColor, font: { size: 10, family: 'Inter', weight: 600 } }
           },
           y: {
-            grid: { color: 'rgba(255,255,255,0.06)' },
+            grid: { color: theme.gridColor },
             ticks: {
-              color: '#e9ecf0',
-              font: { size: 10, family: 'Inter' },
+              color: theme.textColor,
+              font: { size: 10, family: 'Inter', weight: 600 },
               callback: v => Utils.fmt.currency(v)
             }
           }

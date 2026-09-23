@@ -380,6 +380,12 @@ const ObraDetalhe = {
     const prev = Chart.getChart(canvas);
     if (prev) { try { prev.destroy(); } catch{} }
 
+    const isLight = document.documentElement.getAttribute('data-theme') === 'light' || 
+                    (typeof localStorage !== 'undefined' && localStorage.getItem('finobra_theme') === 'light');
+    const legendColor = isLight ? '#101814' : '#e9ecf0';
+    const tickColor = isLight ? '#33413A' : '#94a3b8';
+    const gridColor = isLight ? 'rgba(0, 0, 0, 0.08)' : 'rgba(255, 255, 255, 0.05)';
+
     const ch = new Chart(canvas, {
       type: 'line',
       data: {
@@ -399,7 +405,7 @@ const ObraDetalhe = {
           {
             label: 'Valor Agregado Físico (EV)',
             data: cs.evData,
-            borderColor: '#10b981',
+            borderColor: isLight ? '#167C45' : '#10b981',
             backgroundColor: 'transparent',
             tension: 0.35,
             borderWidth: 2.5,
@@ -409,7 +415,7 @@ const ObraDetalhe = {
           {
             label: 'Custo Real Acumulado (AC)',
             data: cs.acData,
-            borderColor: '#ef4444',
+            borderColor: isLight ? '#C5221F' : '#ef4444',
             backgroundColor: 'transparent',
             tension: 0.35,
             borderWidth: 2.5,
@@ -419,7 +425,7 @@ const ObraDetalhe = {
           {
             label: 'Projeção no Término (EAC)',
             data: cs.forecastData,
-            borderColor: '#f59e0b',
+            borderColor: isLight ? '#9A5C00' : '#f59e0b',
             backgroundColor: 'transparent',
             borderDash: [6, 4],
             tension: 0.25,
@@ -436,7 +442,7 @@ const ObraDetalhe = {
         plugins: {
           legend: {
             position: 'top',
-            labels: { color: '#94a3b8', font: { size: 11, weight: '700' }, boxWidth: 14 }
+            labels: { color: legendColor, font: { size: 11, weight: '700' }, boxWidth: 14 }
           },
           tooltip: {
             callbacks: {
@@ -446,16 +452,16 @@ const ObraDetalhe = {
         },
         scales: {
           x: {
-            ticks: { color: '#64748b', font: { size: 11 } },
-            grid: { color: 'rgba(255, 255, 255, 0.04)' }
+            ticks: { color: tickColor, font: { size: 11, weight: '600' } },
+            grid: { color: gridColor }
           },
           y: {
             ticks: {
-              color: '#64748b',
-              font: { size: 10 },
+              color: tickColor,
+              font: { size: 10, weight: '600' },
               callback: v => 'R$ ' + (v >= 1000000 ? (v / 1000000).toFixed(1) + 'M' : (v / 1000).toFixed(0) + 'k')
             },
-            grid: { color: 'rgba(255, 255, 255, 0.06)' }
+            grid: { color: gridColor }
           }
         }
       }
@@ -472,11 +478,17 @@ const ObraDetalhe = {
     const prev = Chart.getChart(canvas);
     if (prev) { try { prev.destroy(); } catch{} }
 
+    const isLight = document.documentElement.getAttribute('data-theme') === 'light' || 
+                    (typeof localStorage !== 'undefined' && localStorage.getItem('finobra_theme') === 'light');
+    const legendColor = isLight ? '#101814' : '#e9ecf0';
+    const tickColor = isLight ? '#33413A' : '#94a3b8';
+    const gridColor = isLight ? 'rgba(0, 0, 0, 0.08)' : 'rgba(255, 255, 255, 0.05)';
+
     const topItens = abc.itens.slice(0, 15);
     const labels = topItens.map(i => i.descricao.length > 20 ? i.descricao.slice(0, 18) + '...' : i.descricao);
     const valores = topItens.map(i => i.valorTotal);
     const pctsAcumulados = topItens.map(i => i.pctAcumulado);
-    const coresBarras = topItens.map(i => i.classe === 'A' ? '#ef4444' : i.classe === 'B' ? '#f59e0b' : '#3b82f6');
+    const coresBarras = topItens.map(i => i.classe === 'A' ? (isLight ? '#C5221F' : '#ef4444') : i.classe === 'B' ? (isLight ? '#9A5C00' : '#f59e0b') : (isLight ? '#006FAD' : '#3b82f6'));
 
     const ch = new Chart(canvas, {
       data: {
@@ -486,7 +498,7 @@ const ObraDetalhe = {
             type: 'line',
             label: '% Acumulado (Pareto)',
             data: pctsAcumulados,
-            borderColor: '#10b981',
+            borderColor: isLight ? '#167C45' : '#10b981',
             borderWidth: 2.5,
             yAxisID: 'y1',
             pointRadius: 4,
@@ -509,7 +521,7 @@ const ObraDetalhe = {
         plugins: {
           legend: {
             position: 'top',
-            labels: { color: '#94a3b8', font: { size: 11, weight: '700' } }
+            labels: { color: legendColor, font: { size: 11, weight: '700' } }
           },
           tooltip: {
             callbacks: {
@@ -522,18 +534,18 @@ const ObraDetalhe = {
         },
         scales: {
           x: {
-            ticks: { color: '#64748b', font: { size: 10 } },
+            ticks: { color: tickColor, font: { size: 10, weight: '600' } },
             grid: { display: false }
           },
           y: {
             type: 'linear',
             position: 'left',
             ticks: {
-              color: '#64748b',
-              font: { size: 10 },
+              color: tickColor,
+              font: { size: 10, weight: '600' },
               callback: v => 'R$ ' + (v >= 1000 ? (v / 1000).toFixed(0) + 'k' : v)
             },
-            grid: { color: 'rgba(255, 255, 255, 0.05)' }
+            grid: { color: gridColor }
           },
           y1: {
             type: 'linear',
@@ -541,8 +553,8 @@ const ObraDetalhe = {
             min: 0,
             max: 100,
             ticks: {
-              color: '#10b981',
-              font: { size: 10 },
+              color: isLight ? '#167C45' : '#10b981',
+              font: { size: 10, weight: '700' },
               callback: v => v + '%'
             },
             grid: { display: false }

@@ -57,5 +57,25 @@ assert(style.includes('--text: #000000 !important;'), 'Alto contraste claro prec
 assert(style.includes('filter: none;'), 'Alto contraste claro não pode depender de filtro global');
 assert(premium.includes('background:var(--bg-header)'), 'Header premium deve respeitar o token de tema');
 assert(premium.includes('color:var(--text);'), 'Hover de navegação premium deve respeitar o token de texto');
+assert(!premium.includes('--text3: #e9ecf0;'), 'premium.css não deve sobrescrever --text3 no .ui-workspace com branco');
 
-console.log('\n✅ Tokens, foco, estados semânticos e alto contraste claro validados.');
+const dashboardCode = read('js/dashboard.js');
+const obraDetalheCode = read('js/obra_detalhe.js');
+assert(dashboardCode.includes('_getChartTheme()'), 'dashboard.js deve possuir helper para paleta de gráficos adaptável ao tema');
+assert(obraDetalheCode.includes("data-theme') === 'light'"), 'obra_detalhe.js deve adaptar gráficos Curva S e Curva ABC ao tema claro');
+
+requireContrast('KPI label no card claro', '#384840', '#FFFFFF');
+requireContrast('KPI change no card claro', '#4A5A52', '#FFFFFF');
+requireContrast('Nav accordion header no sidebar claro', '#384840', '#FFFFFF');
+requireContrast('Nav section title no sidebar claro', '#384840', '#FFFFFF');
+requireContrast('Table header text no th claro', '#384840', '#F2F5F3');
+requireContrast('Form label no card claro', '#384840', '#FFFFFF');
+requireContrast('Badge success text no fundo success', '#167C45', '#E7F6EC');
+requireContrast('Badge danger text no fundo danger', '#C42B35', '#FCE8EA');
+requireContrast('Badge warning text no fundo warning', '#9A5C00', '#FFF3DB');
+
+assert(style.includes('[data-theme="light"] thead th'), 'style.css deve ter regras explícitas para cabeçalhos de tabela no tema claro');
+assert(style.includes('[data-theme="light"] .form-control'), 'style.css deve ter regras explícitas para campos de formulário no tema claro');
+assert(style.includes('[data-theme="light"] .modal'), 'style.css deve ter regras explícitas para modais no tema claro');
+
+console.log('\n✅ Tokens, foco, estados semânticos, gráficos adaptativos, tabelas, formulários e alto contraste claro validados.');

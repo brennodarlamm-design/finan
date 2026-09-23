@@ -1598,6 +1598,9 @@ const App = {
     this.applyAccessibilitySettings();
     Utils.closeModal?.();
     this.showAccessibilityModal();
+    if (this.currentRoute && typeof this.renderRoute === 'function') {
+      this.renderRoute(this.currentRoute);
+    }
   },
 
   setColorblind(mode) {
@@ -1607,6 +1610,9 @@ const App = {
     this.applyAccessibilitySettings();
     Utils.closeModal?.();
     this.showAccessibilityModal();
+    if (this.currentRoute && typeof this.renderRoute === 'function') {
+      this.renderRoute(this.currentRoute);
+    }
   },
 
   // ── Loader de Sincronização ────────────────────────────────────────────────
