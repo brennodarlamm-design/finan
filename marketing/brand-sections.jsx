@@ -218,7 +218,7 @@ export function Footer() {
             <div className="mt-6 flex items-center gap-2">
               <span className="h-2 w-2 rounded-full bg-acid animate-pulse" />
               <span className="font-mono text-[11px] text-muted">
-                FinGo OS v2.38 • Cloudflare Edge
+                FinGo OS v2.40 • Cloudflare Edge
               </span>
             </div>
           </div>

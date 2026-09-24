@@ -64,7 +64,7 @@ export async function handleV2SystemHealth(req, res) {
   return res.status(200).json({
     ok: true,
     service: 'fingo-edge-v2',
-    version: '2.38.0',
+    version: '2.40.0',
     runtime: 'cloudflare-workers',
     timestamp: new Date().toISOString(),
     architecture: 'Domain-Driven Edge API (Cloudflare Workers Full Power)',
@@ -88,7 +88,7 @@ export async function handleV2SystemRoutes(req, res) {
   res.setHeader('Content-Type', 'application/json; charset=utf-8');
   return res.status(200).json({
     ok: true,
-    version: '2.38.0',
+    version: '2.40.0',
     routes: V2_ROUTE_SPEC
   });
 }

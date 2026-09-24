@@ -194,9 +194,23 @@ const Notificacoes = {
 
   _atualizacoesPadrao: [
     {
+      versao: 'v2.40.0',
+      data: '23/09/2026',
+      badge: 'NOVO',
+      titulo: '📡 Monitor DF-e SEFAZ Nativo, Suíte mTLS & Gestão A1',
+      novidades: [
+        'Monitor DF-e Nativo SEFAZ: captura automática de NF-e e CT-e emitidos contra o CNPJ da construtora.',
+        'Conexão direta com SEFAZ Nacional via Certificado Digital A1 (.PFX) e mTLS seguro.',
+        'Descompactação e interpretação automática de lotes (resNFe, procNFe, resCTe, procCTe e eventos).',
+        'Proteção Anti-Flood contra consumo indevido (NT 2014.002) com controle de NSU contínuo.',
+        'Conversão inteligente com 1 clique de NF-e recebida em lançamento de despesa financeira.',
+        'Visualização/download de DANFE em PDF e arquivo XML com isolamento multi-tenant RLS.'
+      ]
+    },
+    {
       versao: 'v2.38.0',
       data: '15/09/2026',
-      badge: 'NOVO',
+      badge: 'ESTÁVEL',
       titulo: 'Segmentação da Sidebar, Agenda Dev & Modo Kanban',
       novidades: [
         'Sidebar reorganizada em 7 segmentos colapsáveis com terminologia da Construção Civil.',
@@ -442,5 +456,33 @@ const Notificacoes = {
         console.warn('Erro ao disparar push desktop:', err);
       }
     }
+  },
+
+  verificarNovidadesAuto() {
+    try {
+      const key = 'fingo_seen_version_v240';
+      if (!localStorage.getItem(key)) {
+        setTimeout(() => {
+          if (typeof this.enviarPushDesktop === 'function') {
+            this.enviarPushDesktop(
+              '🚀 FinGo v2.40: Monitor DF-e SEFAZ no Ar!',
+              'Captura automática de todas as NF-es e CT-es emitidas contra sua construtora na SEFAZ.'
+            );
+          }
+          if (typeof Utils !== 'undefined' && typeof Utils.toast === 'function') {
+            Utils.toast('🚀 Versão 2.40: Monitor DF-e SEFAZ ativo! Veja em Novidades no sino de alertas 🔔.', 'info', 7000);
+          }
+          localStorage.setItem(key, 'true');
+        }, 1800);
+      }
+    } catch {}
   }
 };
+
+if (typeof window !== 'undefined') {
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => Notificacoes.verificarNovidadesAuto());
+  } else {
+    Notificacoes.verificarNovidadesAuto();
+  }
+}

@@ -11,8 +11,8 @@
   "startUrl": "/",
   "iconUrl": "https://fingo.api.br/favicon-192x192.png",
   "maskableIconUrl": "https://fingo.api.br/favicon-192x192.png",
-  "appVersionName": "2.38.0",
-  "appVersionCode": 2380,
+  "appVersionName": "2.40.0",
+  "appVersionCode": 2400,
   "signingKey": {
     "alias": "fingo-release-key"
   },

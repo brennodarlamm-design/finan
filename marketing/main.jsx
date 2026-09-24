@@ -471,7 +471,7 @@ function ProductShowcase() {
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <span className="badge-purple">● SINAPI 27 Estados</span>
-            <span className="badge-acid">● FinGo OS v2.38</span>
+            <span className="badge-acid">● FinGo OS v2.40</span>
           </div>
         </div>
 
@@ -1328,7 +1328,7 @@ function ScreenSimulator({ manual, activeStep }) {
                 </div>
                 <p className="text-silver leading-relaxed">{step.desc}</p>
                 <div className="rounded border border-line bg-void p-2.5 font-mono text-[11px] text-silver">
-                  ⚙️ Parâmetros calculados automaticamente pelo FinGo OS v2.38
+                  ⚙️ Parâmetros calculados automaticamente pelo FinGo OS v2.40
                 </div>
               </div>
             </div>
@@ -1378,7 +1378,7 @@ function ScreenSimulator({ manual, activeStep }) {
           <span className="h-2.5 w-2.5 rounded-full bg-[#ffbd2e]" />
           <span className="h-2.5 w-2.5 rounded-full bg-[#27c93f]" />
           <span className="ml-2 font-mono text-[11px] text-muted hidden sm:inline">
-            FinGo OS v2.38 // Simulador de Interface
+            FinGo OS v2.40 // Simulador de Interface
           </span>
         </div>
         <div className="rounded bg-void px-2.5 py-0.5 font-mono text-[10px] text-muted border border-shadow">
