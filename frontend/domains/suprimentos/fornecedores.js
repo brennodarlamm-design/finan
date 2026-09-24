@@ -4,17 +4,23 @@ const Fornecedores = {
 
   // Categorias fixas do sistema (não podem ser excluídas)
   CATEGORIAS: [
-    { value: 'material',      label: 'Material de Construção' },
-    { value: 'mao_de_obra',   label: 'Mão de Obra / Serviços' },
-    { value: 'servico',       label: 'Serviço / Prestador' },
-    { value: 'equipamento',   label: 'Equipamento / Locação' },
-    { value: 'contabilidade', label: 'Contábil / Jurídico' },
-    { value: 'software_ti',   label: 'Software & TI' },
-    { value: 'transporte',    label: 'Transporte / Logística' },
-    { value: 'marketing',     label: 'Marketing' },
-    { value: 'trafego_pago',  label: 'Tráfego Pago' },
-    { value: 'comercial',     label: 'Comercial' },
-    { value: 'outros',        label: 'Outros' },
+    { value: 'material',            label: 'Material de Construção' },
+    { value: 'mao_de_obra',         label: 'Mão de Obra / Serviços' },
+    { value: 'servico',             label: 'Serviço / Prestador Especializado' },
+    { value: 'equipamento',         label: 'Equipamento & Locação' },
+    { value: 'internet_tel',        label: 'Internet & Telefonia' },
+    { value: 'energia',             label: 'Energia Elétrica' },
+    { value: 'agua',                label: 'Água & Saneamento' },
+    { value: 'aluguel_sede',        label: 'Aluguel & Condomínio' },
+    { value: 'contabilidade',       label: 'Contábil & Jurídico' },
+    { value: 'software_ti',         label: 'Software, TI & Domínio' },
+    { value: 'transporte',          label: 'Transporte & Logística' },
+    { value: 'veiculos_sede',       label: 'Veículos & Combustível' },
+    { value: 'material_escritorio', label: 'Material de Escritório & Copa' },
+    { value: 'marketing',           label: 'Marketing' },
+    { value: 'trafego_pago',        label: 'Tráfego Pago' },
+    { value: 'comercial',           label: 'Comercial & Vendas' },
+    { value: 'outros',              label: 'Outros' },
   ],
 
   // Categorias personalizadas ficam isoladas por tenant e sincronizadas no Neon.
@@ -28,7 +34,12 @@ const Fornecedores = {
   _getAllCategorias() {
     let custom = [];
     try { custom = JSON.parse(localStorage.getItem(this._catsStorageKey()) || '[]'); } catch {}
-    return [...this.CATEGORIAS, ...(Array.isArray(custom) ? custom : [])];
+    const list = [...this.CATEGORIAS, ...(Array.isArray(custom) ? custom : [])];
+    const map = new Map();
+    list.forEach(c => {
+      if (c && c.value && !map.has(c.value)) map.set(c.value, c);
+    });
+    return Array.from(map.values());
   },
 
   // Retorna apenas as categorias customizadas
@@ -333,7 +344,18 @@ const Fornecedores = {
                 <label class="form-label">Categoria *</label>
                 <select class="form-control" name="categoria" required>
                   <option value="">Selecione...</option>
-                  ${this._getAllCategorias().map(c=>`<option value="${Utils.escapeHtml(String(c.value || ''))}" ${f?.categoria===c.value?'selected':''}>${Utils.escapeHtml(String(c.label || ''))}</option>`).join('')}
+                  ${(() => {
+                    const allCats = this._getAllCategorias();
+                    let html = allCats.map(c => {
+                      const isSelected = f?.categoria === c.value ||
+                        (c.value === 'internet_tel' && (f?.categoria === 'internet' || f?.categoria === 'telefonia' || f?.categoria === 'internet_e_telefonia'));
+                      return `<option value="${Utils.escapeHtml(String(c.value || ''))}" ${isSelected ? 'selected' : ''}>${Utils.escapeHtml(String(c.label || ''))}</option>`;
+                    }).join('');
+                    if (f?.categoria && !allCats.some(c => c.value === f.categoria) && f.categoria !== 'internet' && f.categoria !== 'telefonia' && f.categoria !== 'internet_e_telefonia') {
+                      html += `<option value="${Utils.escapeHtml(String(f.categoria))}" selected>🏷️ ${Utils.escapeHtml(String(f.categoria))} (Atual)</option>`;
+                    }
+                    return html;
+                  })()}
                 </select>
               </div>
               <div class="form-group">
@@ -592,12 +614,12 @@ const Fornecedores = {
 
     if (id) {
       // Checa duplicidade em outros registros
-      const outros = DB.getAll('fornecedores').filter(f => f.id !== id);
-      if (!isPF && data.cnpj && outros.some(f => f.cnpj === data.cnpj)) {
+      const outros = DB.getAll('fornecedores').filter(f => String(f.id) !== String(id));
+      if (!isPF && data.cnpj && outros.some(f => (f.cnpj || '').replace(/\D/g,'') === data.cnpj)) {
         Utils.toast(`⚠ Outro fornecedor já possui este CNPJ`, 'warning');
         return;
       }
-      if (isPF && data.cpf && outros.some(f => f.cpf === data.cpf)) {
+      if (isPF && data.cpf && outros.some(f => (f.cpf || '').replace(/\D/g,'') === data.cpf)) {
         Utils.toast(`⚠ Outro fornecedor já possui este CPF`, 'warning');
         return;
       }
@@ -605,31 +627,31 @@ const Fornecedores = {
       Utils.toast('Cadastro atualizado com sucesso!', 'success');
     } else {
       // 1. Verifica duplicação por CNPJ ou CPF
+      let exist = null;
       if (!isPF && data.cnpj) {
-        const exist = DB.getAll('fornecedores').find(f => f.cnpj === data.cnpj);
-        if (exist) {
-          Utils.toast(`⚠ CNPJ já cadastrado: ${exist.razao_social || exist.nome_fantasia}`, 'warning');
-          return;
-        }
-      }
-      if (isPF && data.cpf) {
-        const exist = DB.getAll('fornecedores').find(f => f.cpf === data.cpf);
-        if (exist) {
-          Utils.toast(`⚠ CPF já cadastrado: ${exist.razao_social || exist.nome_fantasia}`, 'warning');
-          return;
-        }
+        exist = DB.getAll('fornecedores').find(f => (f.cnpj || '').replace(/\D/g,'') === data.cnpj);
+      } else if (isPF && data.cpf) {
+        exist = DB.getAll('fornecedores').find(f => (f.cpf || '').replace(/\D/g,'') === data.cpf);
       }
       // 2. Verifica duplicação por Nome / Razão Social
-      if (razaoNorm) {
-        const existNome = DB.getAll('fornecedores').find(f => {
+      if (!exist && razaoNorm) {
+        exist = DB.getAll('fornecedores').find(f => {
           const fRazao = (f.razao_social || '').trim().toLowerCase();
           const fFantasia = (f.nome_fantasia || '').trim().toLowerCase();
           return (fRazao && fRazao === razaoNorm) || (fFantasia && fFantasia === nomeNorm);
         });
-        if (existNome) {
-          Utils.toast(`⚠ Fornecedor já cadastrado com este nome: ${existNome.razao_social || existNome.nome_fantasia}`, 'warning');
-          return;
-        }
+      }
+
+      if (exist) {
+        const isInactive = exist.ativo === false;
+        const nomeExist = exist.razao_social || exist.nome_fantasia || exist.nome || 'Fornecedor';
+        Utils.confirm(
+          `O fornecedor "${nomeExist}" já está cadastrado no sistema${isInactive ? ' (atualmente marcado como INATIVO)' : ''}.\n\nDeseja abrir o cadastro dele para editar e reativá-lo agora?`,
+          () => {
+            Fornecedores.showForm(exist.id);
+          }
+        );
+        return;
       }
 
       DB.add('fornecedores', data);
@@ -679,15 +701,25 @@ const Fornecedores = {
     } else {
       // Agrupar por categoria
       const catMap = {};
+      const allCats = this._getAllCategorias();
+      const catKeys = new Set(allCats.map(c => c.value));
+      const orphans = [];
+
       lista.forEach(f => {
-        const k = f.categoria || 'outros';
-        if (!catMap[k]) catMap[k] = [];
-        catMap[k].push(f);
+        let k = f.categoria || 'outros';
+        if (k === 'internet' || k === 'telefonia' || k === 'internet_e_telefonia') k = 'internet_tel';
+        if (catKeys.has(k)) {
+          if (!catMap[k]) catMap[k] = [];
+          catMap[k].push(f);
+        } else {
+          orphans.push(f);
+        }
       });
-      this._getAllCategorias().forEach(cat => {
+
+      allCats.forEach(cat => {
         const grupo = catMap[cat.value];
         if (!grupo || !grupo.length) return;
-        html += `<optgroup label="${cat.label}">`;
+        html += `<optgroup label="${Utils.escapeHtml(cat.label)}">`;
         grupo.forEach(f => {
           const doc = f.tipo_pessoa === 'pf'
             ? (f.cpf ? this._fmtCpf(f.cpf) : '')
@@ -696,10 +728,25 @@ const Fornecedores = {
           const val   = f.nome_fantasia || f.razao_social;
           const sel   = selectedVal === val ? 'selected' : '';
           const docFmt = doc ? ` — ${doc}` : '';
-          html += `<option value="${val}" data-id="${f.id}" data-tipo="${f.tipo_pessoa||'pj'}" data-cnpj="${f.cnpj||''}" data-cpf="${f.cpf||''}" data-contato="${f.contato_nome||''}" ${sel}>${label}${docFmt}</option>`;
+          html += `<option value="${Utils.escapeHtml(val)}" data-id="${f.id}" data-tipo="${f.tipo_pessoa||'pj'}" data-cnpj="${f.cnpj||''}" data-cpf="${f.cpf||''}" data-contato="${f.contato_nome||''}" ${sel}>${Utils.escapeHtml(label)}${Utils.escapeHtml(docFmt)}</option>`;
         });
         html += `</optgroup>`;
       });
+
+      if (orphans.length) {
+        html += `<optgroup label="Outros / Diversos">`;
+        orphans.forEach(f => {
+          const doc = f.tipo_pessoa === 'pf'
+            ? (f.cpf ? this._fmtCpf(f.cpf) : '')
+            : (f.cnpj ? this._fmtCnpj(f.cnpj) : '');
+          const label = f.nome_fantasia || f.razao_social || doc || '—';
+          const val   = f.nome_fantasia || f.razao_social;
+          const sel   = selectedVal === val ? 'selected' : '';
+          const docFmt = doc ? ` — ${doc}` : '';
+          html += `<option value="${Utils.escapeHtml(val)}" data-id="${f.id}" data-tipo="${f.tipo_pessoa||'pj'}" data-cnpj="${f.cnpj||''}" data-cpf="${f.cpf||''}" data-contato="${f.contato_nome||''}" ${sel}>${Utils.escapeHtml(label)}${Utils.escapeHtml(docFmt)}</option>`;
+        });
+        html += `</optgroup>`;
+      }
     }
     if (includeManual) {
       html += `<option value="__manual__">✎ Digitar manualmente...</option>`;

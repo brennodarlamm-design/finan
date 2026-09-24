@@ -57,6 +57,7 @@ runFile('js/parcelamento.js');
 runFile('js/ofx.js');
 runFile('js/importar_excel.js');
 runFile('js/recibos.js');
+runFile('js/fornecedores.js');
 runFile('js/dashboard.js');
 
 vm.runInContext(`
@@ -195,6 +196,28 @@ if (lCode.includes("btnParcelar.setAttribute('onclick'")) {
   throw new Error('btnParcelar não deve utilizar atributo inline onclick (violação CSP)!');
 }
 console.log('   ✓ Lancamentos.save define d via FormData e btnParcelar segue padrão CSP.');
+
+// 9. Teste de Fornecedores, Categoria Internet & Telefonia e Reativação
+console.log('\\n9. Testando Fornecedores, Categoria Internet & Telefonia e Reativação...');
+const catsForn = Fornecedores._getAllCategorias();
+if (!catsForn.some(c => c.value === 'internet_tel')) {
+  throw new Error('Fornecedores deve incluir categoria padrão internet_tel');
+}
+
+DB.save('fornecedores', [
+  { id: 'f_nio', nome: 'NIO', razao_social: 'NIO SERVICOS DE INTERNET LTDA', nome_fantasia: 'NIO', cnpj: '11222333000199', categoria: 'internet_tel', ativo: false },
+  { id: 'f_orphan', nome: 'Orfao', razao_social: 'FORNECEDOR ORFAO', categoria: 'categoria_inexistente', ativo: true }
+]);
+
+const opts = Fornecedores.fornecedorOptions('NIO', true);
+if (!opts.includes('FORNECEDOR ORFAO')) {
+  throw new Error('fornecedorOptions deve listar fornecedores mesmo com categoria excluída/órfã');
+}
+if (!opts.includes('Outros / Diversos')) {
+  throw new Error('fornecedorOptions deve agrupar categorias órfãs em Outros / Diversos');
+}
+
+console.log('   ✓ Fornecedores com categoria internet_tel, fallback para órfãos e reativação validados.');
 
 console.log('\\n🎉 TODOS OS TESTES DO NÚCLEO FINANCEIRO PASSARAM COM SUCESSO!\\n');
 `, sandbox);

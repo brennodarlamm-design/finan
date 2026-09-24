@@ -1,9 +1,9 @@
 /**
  * FinGo — Service Worker Oficial (PWA / TWA / Offline Cache & Web Push)
- * Versão: 2.40.4
+ * Versão: 2.40.5
  */
 
-const CACHE_NAME = 'fingo-static-v2.40.4';
+const CACHE_NAME = 'fingo-static-v2.40.5';
 
 const PRECACHE_ASSETS = [
   '/',
