@@ -102,6 +102,14 @@ const IDBStorage = {
     }
   },
 
+  async set(key, value) {
+    return this.setItem(key, value);
+  },
+
+  async get(key) {
+    return this.getItem(key);
+  },
+
   async removeItem(key) {
     if (!key) return false;
     try {

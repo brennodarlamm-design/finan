@@ -628,9 +628,6 @@ const Produtos = {
       if (indevidos.length > 0) {
         indevidos.forEach(p => {
           DB.remove('produtos', p.id);
-          if (DB.syncToCloud) {
-            DB.syncToCloud('delete', 'produtos', { id: p.id });
-          }
         });
         console.log(`[Produtos] Limpeza: ${indevidos.length} produto(s) indevido(s) de comprovantes foram removidos.`);
         return indevidos.length;

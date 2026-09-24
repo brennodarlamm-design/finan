@@ -9,20 +9,34 @@ const Contratos = {
 
   getAll() {
     try {
-      const list = JSON.parse(localStorage.getItem(this._getKey()) || '[]');
-      return list.map(c => {
+      const key = this._getKey();
+      if (typeof DB !== 'undefined' && DB._memCache && DB._memCache.has(key)) {
+        const cached = DB._memCache.get(key);
+        if (Array.isArray(cached)) return cached;
+      }
+      const list = JSON.parse(localStorage.getItem(key) || '[]');
+      const sanitized = Array.isArray(list) ? list.map(c => {
         delete c.selo_govbr_contratada;
         delete c.selo_govbr_contratante;
         return c;
-      });
+      }) : [];
+      if (typeof DB !== 'undefined' && DB._memCache) DB._memCache.set(key, sanitized);
+      return sanitized;
     } catch { return []; }
   },
 
   salvarLista(contratos) {
     const key = this._getKey();
-    localStorage.setItem(key, JSON.stringify(contratos));
+    const list = Array.isArray(contratos) ? contratos : [];
+    if (typeof DB !== 'undefined' && DB._memCache) DB._memCache.set(key, list);
     if (typeof IDBStorage !== 'undefined' && IDBStorage.set) {
       IDBStorage.set(key, contratos).catch(() => null);
+    }
+    try {
+      localStorage.setItem(key, JSON.stringify(list));
+    } catch (e) {
+      if (typeof DB !== 'undefined' && DB.purgeStorage) DB.purgeStorage();
+      try { localStorage.setItem(key, JSON.stringify(list)); } catch (_) {}
     }
     if (typeof DB !== 'undefined' && typeof DB._broadcastLocalChange === 'function') {
       DB._broadcastLocalChange('contratos', 'save');

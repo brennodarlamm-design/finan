@@ -515,25 +515,46 @@ export async function handleTableQuery(sql, tenantId, auth, query, res) {
 
     case 'precompras': {
       if (!tableAllowed(auth, 'precompras', 'read')) return res.status(403).json({ error: 'Acesso não permitido.' });
-      const rows = pagination
-        ? await sql`SELECT * FROM precompras WHERE tenant_id=${tenantId} ORDER BY data_solicitacao DESC NULLS LAST, updated_at DESC, id DESC LIMIT ${pagination.limit} OFFSET ${pagination.offset};`
-        : await sql`SELECT * FROM precompras WHERE tenant_id=${tenantId} ORDER BY data_solicitacao DESC NULLS LAST, updated_at DESC, id DESC;`;
+      let rows;
+      if (filterObra) {
+        rows = pagination
+          ? await sql`SELECT * FROM precompras WHERE tenant_id=${tenantId} AND obra_id=${filterObra} ORDER BY data_solicitacao DESC NULLS LAST, updated_at DESC, id DESC LIMIT ${pagination.limit} OFFSET ${pagination.offset};`
+          : await sql`SELECT * FROM precompras WHERE tenant_id=${tenantId} AND obra_id=${filterObra} ORDER BY data_solicitacao DESC NULLS LAST, updated_at DESC, id DESC;`;
+      } else {
+        rows = pagination
+          ? await sql`SELECT * FROM precompras WHERE tenant_id=${tenantId} ORDER BY data_solicitacao DESC NULLS LAST, updated_at DESC, id DESC LIMIT ${pagination.limit} OFFSET ${pagination.offset};`
+          : await sql`SELECT * FROM precompras WHERE tenant_id=${tenantId} ORDER BY data_solicitacao DESC NULLS LAST, updated_at DESC, id DESC;`;
+      }
       return res.status(200).json(pageResponse(rows.map(jsonPayload), pagination));
     }
 
     case 'contratos': {
       if (!tableAllowed(auth, 'contratos', 'read')) return res.status(403).json({ error: 'Acesso não permitido.' });
-      const rows = pagination
-        ? await sql`SELECT * FROM contratos WHERE tenant_id=${tenantId} ORDER BY updated_at DESC, id DESC LIMIT ${pagination.limit} OFFSET ${pagination.offset};`
-        : await sql`SELECT * FROM contratos WHERE tenant_id=${tenantId} ORDER BY updated_at DESC, id DESC;`;
+      let rows;
+      if (filterObra) {
+        rows = pagination
+          ? await sql`SELECT * FROM contratos WHERE tenant_id=${tenantId} AND obra_id=${filterObra} ORDER BY updated_at DESC, id DESC LIMIT ${pagination.limit} OFFSET ${pagination.offset};`
+          : await sql`SELECT * FROM contratos WHERE tenant_id=${tenantId} AND obra_id=${filterObra} ORDER BY updated_at DESC, id DESC;`;
+      } else {
+        rows = pagination
+          ? await sql`SELECT * FROM contratos WHERE tenant_id=${tenantId} ORDER BY updated_at DESC, id DESC LIMIT ${pagination.limit} OFFSET ${pagination.offset};`
+          : await sql`SELECT * FROM contratos WHERE tenant_id=${tenantId} ORDER BY updated_at DESC, id DESC;`;
+      }
       return res.status(200).json(pageResponse(rows.map(jsonPayload), pagination));
     }
 
     case 'recibos': {
       if (!tableAllowed(auth, 'recibos', 'read')) return res.status(403).json({ error: 'Acesso não permitido.' });
-      const rows = pagination
-        ? await sql`SELECT * FROM recibos WHERE tenant_id=${tenantId} ORDER BY data DESC NULLS LAST, updated_at DESC, id DESC LIMIT ${pagination.limit} OFFSET ${pagination.offset};`
-        : await sql`SELECT * FROM recibos WHERE tenant_id=${tenantId} ORDER BY data DESC NULLS LAST, updated_at DESC, id DESC;`;
+      let rows;
+      if (filterObra) {
+        rows = pagination
+          ? await sql`SELECT * FROM recibos WHERE tenant_id=${tenantId} AND obra_id=${filterObra} ORDER BY data DESC NULLS LAST, updated_at DESC, id DESC LIMIT ${pagination.limit} OFFSET ${pagination.offset};`
+          : await sql`SELECT * FROM recibos WHERE tenant_id=${tenantId} AND obra_id=${filterObra} ORDER BY data DESC NULLS LAST, updated_at DESC, id DESC;`;
+      } else {
+        rows = pagination
+          ? await sql`SELECT * FROM recibos WHERE tenant_id=${tenantId} ORDER BY data DESC NULLS LAST, updated_at DESC, id DESC LIMIT ${pagination.limit} OFFSET ${pagination.offset};`
+          : await sql`SELECT * FROM recibos WHERE tenant_id=${tenantId} ORDER BY data DESC NULLS LAST, updated_at DESC, id DESC;`;
+      }
       return res.status(200).json(pageResponse(rows.map(jsonPayload), pagination));
     }
 

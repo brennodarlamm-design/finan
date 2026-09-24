@@ -93,27 +93,37 @@ const PreComprasWorkflow = {
     };
 
     if (gerarDespesa) {
-      const lancamento = {
-        obra_id: p.obra_id,
-        tipo: 'despesa',
-        data: p.data_solicitacao || Utils.today(),
-        data_vencimento: vencimento,
-        descricao: `[Ordem ${p.numero_ordem}] ${p.descricao}`,
-        categoria: p.categoria || 'material',
-        valor: p.valor_total,
-        status: 'a_pagar',
-        fornecedor_beneficiario: p.fornecedor_nome || 'Fornecedor',
-        conta_bancaria: contaBancaria,
-        observacoes: `Gerado automaticamente a partir da Ordem de Pré-Compra ${p.numero_ordem}. Parecer: ${parecer}`,
-        origem: 'precompra',
-        precompra_id: p.id,
-        conciliado: false
-      };
+      const lancamentos = (typeof DB !== 'undefined' ? DB.getAll('lancamentos') : []) || [];
+      const jaExiste = p.lancamento_id
+        ? lancamentos.some(l => l.id === p.lancamento_id)
+        : lancamentos.some(l => l.precompra_id === id);
 
-      const novoLanc = DB.add('lancamentos', lancamento);
-      updates.status = 'convertida';
-      updates.lancamento_id = novoLanc.id;
-      Utils.toast(`Ordem aprovada e Despesa de ${Utils.fmt.currency(p.valor_total)} gerada em Lançamentos!`, 'success');
+      if (jaExiste) {
+        updates.status = 'convertida';
+        Utils.toast(`Ordem já possuía despesa gerada e foi mantida como convertida.`, 'info');
+      } else {
+        const lancamento = {
+          obra_id: p.obra_id,
+          tipo: 'despesa',
+          data: p.data_solicitacao || Utils.today(),
+          data_vencimento: vencimento,
+          descricao: `[Ordem ${p.numero_ordem}] ${p.descricao}`,
+          categoria: p.categoria || 'material',
+          valor: p.valor_total,
+          status: 'a_pagar',
+          fornecedor_beneficiario: p.fornecedor_nome || 'Fornecedor',
+          conta_bancaria: contaBancaria,
+          observacoes: `Gerado automaticamente a partir da Ordem de Pré-Compra ${p.numero_ordem}. Parecer: ${parecer}`,
+          origem: 'precompra',
+          precompra_id: p.id,
+          conciliado: false
+        };
+
+        const novoLanc = DB.add('lancamentos', lancamento);
+        updates.status = 'convertida';
+        updates.lancamento_id = novoLanc?.id || null;
+        Utils.toast(`Ordem aprovada e Despesa de ${Utils.fmt.currency(p.valor_total)} gerada em Lançamentos!`, 'success');
+      }
     } else {
       Utils.toast(`Ordem de pré-compra ${p.numero_ordem} aprovada com sucesso!`, 'success');
     }
@@ -234,6 +244,17 @@ const PreComprasWorkflow = {
   executarConversaoLancamento(id) {
     const p = DB.getById('precompras', id);
     if (!p) return;
+
+    const lancamentos = (typeof DB !== 'undefined' ? DB.getAll('lancamentos') : []) || [];
+    const jaExiste = p.lancamento_id
+      ? lancamentos.some(l => l.id === p.lancamento_id)
+      : lancamentos.some(l => l.precompra_id === id);
+
+    if (jaExiste) {
+      Utils.closeModal();
+      Utils.toast('Esta ordem de compra já possui despesa gerada no financeiro.', 'warning');
+      return;
+    }
 
     const conta = document.getElementById('conv-conta')?.value || '';
     const vencimento = document.getElementById('conv-vencimento')?.value || Utils.today();

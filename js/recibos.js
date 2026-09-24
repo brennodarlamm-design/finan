@@ -8,15 +8,30 @@ const Recibos = {
 
   getAll() {
     try {
-      return JSON.parse(localStorage.getItem(this._getKey()) || '[]');
+      const key = this._getKey();
+      if (typeof DB !== 'undefined' && DB._memCache && DB._memCache.has(key)) {
+        const cached = DB._memCache.get(key);
+        if (Array.isArray(cached)) return cached;
+      }
+      const list = JSON.parse(localStorage.getItem(key) || '[]');
+      const sanitized = Array.isArray(list) ? list : [];
+      if (typeof DB !== 'undefined' && DB._memCache) DB._memCache.set(key, sanitized);
+      return sanitized;
     } catch { return []; }
   },
 
   salvarLista(recibos) {
     const key = this._getKey();
-    localStorage.setItem(key, JSON.stringify(recibos));
+    const list = Array.isArray(recibos) ? recibos : [];
+    if (typeof DB !== 'undefined' && DB._memCache) DB._memCache.set(key, list);
     if (typeof IDBStorage !== 'undefined' && IDBStorage.set) {
       IDBStorage.set(key, recibos).catch(() => null);
+    }
+    try {
+      localStorage.setItem(key, JSON.stringify(list));
+    } catch (e) {
+      if (typeof DB !== 'undefined' && DB.purgeStorage) DB.purgeStorage();
+      try { localStorage.setItem(key, JSON.stringify(list)); } catch (_) {}
     }
     if (typeof DB !== 'undefined' && typeof DB._broadcastLocalChange === 'function') {
       DB._broadcastLocalChange('recibos', 'save');
