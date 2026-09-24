@@ -285,47 +285,96 @@ export async function handleSyncAll(sql, tenantId, auth, req, res, payload) {
       const vTot = cleanNum(n.valor_total !== undefined ? n.valor_total : vBruto);
       const itensNotaJson = JSON.stringify(Array.isArray(n.itens) ? n.itens : []);
       const safeNotaObraId = (n.obra_id && (n.obra_id === 'escritorio' || n.obra_id === 'geral' || validObrasSet.has(n.obra_id))) ? n.obra_id : null;
+      const chave = (n.chave_nfe || n.chave_acesso || '').trim() || null;
 
-      await sql`
-        INSERT INTO notas_fiscais (
-          id, tenant_id, numero_nf, serie, chave_acesso, chave_nfe, emitente, cnpj_emitente, destinatario,
-          data_emissao, data_vencimento, data_pagamento, valor_bruto, impostos, valor_liquido, valor_total,
-          tipo, categoria, status, lancamento_id, observacoes, obra_id, itens
-        )
-        VALUES (
-          ${n.id}, ${tenantId}, ${n.numero_nf || ''}, ${n.serie || ''}, ${n.chave_nfe || n.chave_acesso || null}, ${n.chave_nfe || n.chave_acesso || ''},
-          ${n.emitente || ''}, ${n.cnpj_emitente || ''}, ${n.destinatario || ''},
-          ${cleanDate(n.data_emissao)}, ${cleanDate(n.data_vencimento)}, ${cleanDate(n.data_pagamento)},
-          ${vBruto}, ${vImp}, ${vLiq}, ${vTot},
-          ${n.tipo || 'entrada'}, ${n.categoria || 'material'}, ${n.status || 'paga'},
-          ${n.lancamento_id || null}, ${n.observacoes || ''}, ${safeNotaObraId},
-          ${itensNotaJson}::jsonb
-        )
-        ON CONFLICT (id) DO UPDATE SET
-          numero_nf = EXCLUDED.numero_nf,
-          serie = EXCLUDED.serie,
-          chave_acesso = EXCLUDED.chave_acesso,
-          chave_nfe = EXCLUDED.chave_nfe,
-          emitente = EXCLUDED.emitente,
-          cnpj_emitente = EXCLUDED.cnpj_emitente,
-          destinatario = EXCLUDED.destinatario,
-          data_emissao = EXCLUDED.data_emissao,
-          data_vencimento = EXCLUDED.data_vencimento,
-          data_pagamento = EXCLUDED.data_pagamento,
-          valor_bruto = EXCLUDED.valor_bruto,
-          impostos = EXCLUDED.impostos,
-          valor_liquido = EXCLUDED.valor_liquido,
-          valor_total = EXCLUDED.valor_total,
-          tipo = EXCLUDED.tipo,
-          categoria = EXCLUDED.categoria,
-          status = EXCLUDED.status,
-          lancamento_id = EXCLUDED.lancamento_id,
-          observacoes = EXCLUDED.observacoes,
-          obra_id = EXCLUDED.obra_id,
-          itens = EXCLUDED.itens
-        WHERE notas_fiscais.tenant_id = ${tenantId};
-      `;
-      totalCount++;
+      try {
+        if (chave) {
+          const existing = await sql`
+            SELECT id, obra_id
+            FROM notas_fiscais
+            WHERE (chave_acesso = ${chave} OR chave_nfe = ${chave})
+              AND tenant_id = ${tenantId}
+            LIMIT 1;
+          `;
+          if (existing.length > 0) {
+            const targetId = existing[0].id;
+            await sql`
+              UPDATE notas_fiscais
+              SET
+                numero_nf = ${n.numero_nf || ''},
+                serie = ${n.serie || ''},
+                chave_acesso = ${chave},
+                chave_nfe = ${chave || ''},
+                emitente = ${n.emitente || ''},
+                cnpj_emitente = ${n.cnpj_emitente || ''},
+                destinatario = ${n.destinatario || ''},
+                data_emissao = ${cleanDate(n.data_emissao)},
+                data_vencimento = ${cleanDate(n.data_vencimento)},
+                data_pagamento = ${cleanDate(n.data_pagamento)},
+                valor_bruto = ${vBruto},
+                impostos = ${vImp},
+                valor_liquido = ${vLiq},
+                valor_total = ${vTot},
+                tipo = ${n.tipo || 'entrada'},
+                categoria = ${n.categoria || 'material'},
+                status = ${n.status || 'paga'},
+                lancamento_id = ${n.lancamento_id || null},
+                observacoes = ${n.observacoes || ''},
+                obra_id = ${safeNotaObraId || existing[0].obra_id || null},
+                itens = ${itensNotaJson}::jsonb,
+                updated_at = NOW()
+              WHERE id = ${targetId} AND tenant_id = ${tenantId};
+            `;
+            totalCount++;
+            continue;
+          }
+        }
+
+        await sql`
+          INSERT INTO notas_fiscais (
+            id, tenant_id, numero_nf, serie, chave_acesso, chave_nfe, emitente, cnpj_emitente, destinatario,
+            data_emissao, data_vencimento, data_pagamento, valor_bruto, impostos, valor_liquido, valor_total,
+            tipo, categoria, status, lancamento_id, observacoes, obra_id, itens
+          )
+          VALUES (
+            ${n.id}, ${tenantId}, ${n.numero_nf || ''}, ${n.serie || ''}, ${chave}, ${chave || ''},
+            ${n.emitente || ''}, ${n.cnpj_emitente || ''}, ${n.destinatario || ''},
+            ${cleanDate(n.data_emissao)}, ${cleanDate(n.data_vencimento)}, ${cleanDate(n.data_pagamento)},
+            ${vBruto}, ${vImp}, ${vLiq}, ${vTot},
+            ${n.tipo || 'entrada'}, ${n.categoria || 'material'}, ${n.status || 'paga'},
+            ${n.lancamento_id || null}, ${n.observacoes || ''}, ${safeNotaObraId},
+            ${itensNotaJson}::jsonb
+          )
+          ON CONFLICT (id) DO UPDATE SET
+            numero_nf = EXCLUDED.numero_nf,
+            serie = EXCLUDED.serie,
+            chave_acesso = EXCLUDED.chave_acesso,
+            chave_nfe = EXCLUDED.chave_nfe,
+            emitente = EXCLUDED.emitente,
+            cnpj_emitente = EXCLUDED.cnpj_emitente,
+            destinatario = EXCLUDED.destinatario,
+            data_emissao = EXCLUDED.data_emissao,
+            data_vencimento = EXCLUDED.data_vencimento,
+            data_pagamento = EXCLUDED.data_pagamento,
+            valor_bruto = EXCLUDED.valor_bruto,
+            impostos = EXCLUDED.impostos,
+            valor_liquido = EXCLUDED.valor_liquido,
+            valor_total = EXCLUDED.valor_total,
+            tipo = EXCLUDED.tipo,
+            categoria = EXCLUDED.categoria,
+            status = EXCLUDED.status,
+            lancamento_id = EXCLUDED.lancamento_id,
+            observacoes = EXCLUDED.observacoes,
+            obra_id = EXCLUDED.obra_id,
+            itens = EXCLUDED.itens,
+            updated_at = NOW()
+          WHERE notas_fiscais.tenant_id = ${tenantId};
+        `;
+        totalCount++;
+      } catch (notaSyncErr) {
+        console.warn('[Sync All] Falha ao salvar nota fiscal:', notaSyncErr.message);
+        recordFailure('notas', n, 'Falha ao sincronizar nota fiscal.', 'DATABASE_WRITE_FAILED');
+      }
     }
   }
 

@@ -199,50 +199,122 @@ export async function handleSave(sql, tenantId, auth, req, res, table, data) {
     const vLiq = cleanNum(n.valor_liquido !== undefined ? n.valor_liquido : (vBruto - vImp));
     const vTot = cleanNum(n.valor_total !== undefined ? n.valor_total : vBruto);
     const safeNotaObraId = await validateObraTenant(sql, n.obra_id, tenantId);
-
     const itensNotaJson = JSON.stringify(Array.isArray(n.itens) ? n.itens : []);
+    const chave = (n.chave_nfe || n.chave_acesso || '').trim() || null;
 
-    await sql`
-      INSERT INTO notas_fiscais (
-        id, tenant_id, numero_nf, serie, chave_acesso, chave_nfe, emitente, cnpj_emitente, destinatario,
-        data_emissao, data_vencimento, data_pagamento, valor_bruto, impostos, valor_liquido, valor_total,
-        tipo, categoria, status, lancamento_id, observacoes, obra_id, itens
-      )
-      VALUES (
-        ${n.id}, ${tenantId}, ${n.numero_nf || ''}, ${n.serie || ''}, ${n.chave_nfe || n.chave_acesso || null}, ${n.chave_nfe || n.chave_acesso || ''},
-        ${n.emitente || ''}, ${n.cnpj_emitente || ''}, ${n.destinatario || ''},
-        ${cleanDate(n.data_emissao)}, ${cleanDate(n.data_vencimento)}, ${cleanDate(n.data_pagamento)},
-        ${vBruto}, ${vImp}, ${vLiq}, ${vTot},
-        ${n.tipo || 'entrada'}, ${n.categoria || 'material'}, ${n.status || 'paga'},
-        ${n.lancamento_id || null}, ${n.observacoes || ''}, ${safeNotaObraId},
-        ${itensNotaJson}::jsonb
-      )
-      ON CONFLICT (id) DO UPDATE SET
-        numero_nf = EXCLUDED.numero_nf,
-        serie = EXCLUDED.serie,
-        chave_acesso = EXCLUDED.chave_acesso,
-        chave_nfe = EXCLUDED.chave_nfe,
-        emitente = EXCLUDED.emitente,
-        cnpj_emitente = EXCLUDED.cnpj_emitente,
-        destinatario = EXCLUDED.destinatario,
-        data_emissao = EXCLUDED.data_emissao,
-        data_vencimento = EXCLUDED.data_vencimento,
-        data_pagamento = EXCLUDED.data_pagamento,
-        valor_bruto = EXCLUDED.valor_bruto,
-        impostos = EXCLUDED.impostos,
-        valor_liquido = EXCLUDED.valor_liquido,
-        valor_total = EXCLUDED.valor_total,
-        tipo = EXCLUDED.tipo,
-        categoria = EXCLUDED.categoria,
-        status = EXCLUDED.status,
-        lancamento_id = EXCLUDED.lancamento_id,
-        observacoes = EXCLUDED.observacoes,
-        obra_id = EXCLUDED.obra_id,
-        itens = EXCLUDED.itens
-      WHERE notas_fiscais.tenant_id = ${tenantId};
-    `;
-    await auditDb(sql, req, auth, 'salvar', 'notas_fiscais', n);
-    return res.status(200).json({ success: true, id: n.id });
+    try {
+      let targetId = n.id;
+
+      // 1. Resolução e deduplicação de chaves repetidas dentro do tenant
+      if (chave) {
+        const existing = await sql`
+          SELECT id, obra_id
+          FROM notas_fiscais
+          WHERE (chave_acesso = ${chave} OR chave_nfe = ${chave})
+            AND tenant_id = ${tenantId}
+          LIMIT 1;
+        `;
+        if (existing.length > 0) {
+          targetId = existing[0].id;
+          await sql`
+            UPDATE notas_fiscais
+            SET
+              numero_nf = ${n.numero_nf || ''},
+              serie = ${n.serie || ''},
+              chave_acesso = ${chave},
+              chave_nfe = ${chave || ''},
+              emitente = ${n.emitente || ''},
+              cnpj_emitente = ${n.cnpj_emitente || ''},
+              destinatario = ${n.destinatario || ''},
+              data_emissao = ${cleanDate(n.data_emissao)},
+              data_vencimento = ${cleanDate(n.data_vencimento)},
+              data_pagamento = ${cleanDate(n.data_pagamento)},
+              valor_bruto = ${vBruto},
+              impostos = ${vImp},
+              valor_liquido = ${vLiq},
+              valor_total = ${vTot},
+              tipo = ${n.tipo || 'entrada'},
+              categoria = ${n.categoria || 'material'},
+              status = ${n.status || 'paga'},
+              lancamento_id = ${n.lancamento_id || null},
+              observacoes = ${n.observacoes || ''},
+              obra_id = ${safeNotaObraId || existing[0].obra_id || null},
+              itens = ${itensNotaJson}::jsonb,
+              updated_at = NOW()
+            WHERE id = ${targetId} AND tenant_id = ${tenantId};
+          `;
+          await auditDb(sql, req, auth, 'salvar', 'notas_fiscais', { ...n, id: targetId });
+          return res.status(200).json({ success: true, id: targetId, original_id: n.id, deduplicated: true });
+        }
+      }
+
+      // 2. Inserção padrão quando a nota não colide com chave existente
+      await sql`
+        INSERT INTO notas_fiscais (
+          id, tenant_id, numero_nf, serie, chave_acesso, chave_nfe, emitente, cnpj_emitente, destinatario,
+          data_emissao, data_vencimento, data_pagamento, valor_bruto, impostos, valor_liquido, valor_total,
+          tipo, categoria, status, lancamento_id, observacoes, obra_id, itens
+        )
+        VALUES (
+          ${n.id}, ${tenantId}, ${n.numero_nf || ''}, ${n.serie || ''}, ${chave}, ${chave || ''},
+          ${n.emitente || ''}, ${n.cnpj_emitente || ''}, ${n.destinatario || ''},
+          ${cleanDate(n.data_emissao)}, ${cleanDate(n.data_vencimento)}, ${cleanDate(n.data_pagamento)},
+          ${vBruto}, ${vImp}, ${vLiq}, ${vTot},
+          ${n.tipo || 'entrada'}, ${n.categoria || 'material'}, ${n.status || 'paga'},
+          ${n.lancamento_id || null}, ${n.observacoes || ''}, ${safeNotaObraId},
+          ${itensNotaJson}::jsonb
+        )
+        ON CONFLICT (id) DO UPDATE SET
+          numero_nf = EXCLUDED.numero_nf,
+          serie = EXCLUDED.serie,
+          chave_acesso = EXCLUDED.chave_acesso,
+          chave_nfe = EXCLUDED.chave_nfe,
+          emitente = EXCLUDED.emitente,
+          cnpj_emitente = EXCLUDED.cnpj_emitente,
+          destinatario = EXCLUDED.destinatario,
+          data_emissao = EXCLUDED.data_emissao,
+          data_vencimento = EXCLUDED.data_vencimento,
+          data_pagamento = EXCLUDED.data_pagamento,
+          valor_bruto = EXCLUDED.valor_bruto,
+          impostos = EXCLUDED.impostos,
+          valor_liquido = EXCLUDED.valor_liquido,
+          valor_total = EXCLUDED.valor_total,
+          tipo = EXCLUDED.tipo,
+          categoria = EXCLUDED.categoria,
+          status = EXCLUDED.status,
+          lancamento_id = EXCLUDED.lancamento_id,
+          observacoes = EXCLUDED.observacoes,
+          obra_id = EXCLUDED.obra_id,
+          itens = EXCLUDED.itens,
+          updated_at = NOW()
+        WHERE notas_fiscais.tenant_id = ${tenantId};
+      `;
+      await auditDb(sql, req, auth, 'salvar', 'notas_fiscais', n);
+      return res.status(200).json({ success: true, id: n.id });
+    } catch (saveNotaErr) {
+      if (chave && (saveNotaErr.code === '23505' || String(saveNotaErr.message || '').includes('unique'))) {
+        console.warn('[API /api/db] Conflito de chave detectado ao salvar nota, tentando mesclagem:', chave);
+        const fallbackExisting = await sql`
+          SELECT id FROM notas_fiscais WHERE (chave_acesso = ${chave} OR chave_nfe = ${chave}) AND tenant_id = ${tenantId} LIMIT 1;
+        `;
+        if (fallbackExisting.length > 0) {
+          const fallbackId = fallbackExisting[0].id;
+          await sql`
+            UPDATE notas_fiscais
+            SET
+              itens = ${itensNotaJson}::jsonb,
+              valor_bruto = ${vBruto},
+              valor_liquido = ${vLiq},
+              valor_total = ${vTot},
+              updated_at = NOW()
+            WHERE id = ${fallbackId} AND tenant_id = ${tenantId};
+          `;
+          return res.status(200).json({ success: true, id: fallbackId, original_id: n.id, deduplicated: true });
+        }
+      }
+      console.error('[API /api/db] Erro ao salvar nota fiscal:', saveNotaErr.message, saveNotaErr.detail);
+      throw saveNotaErr;
+    }
   }
 
   if (table === 'obras' || table === 'clientes') {

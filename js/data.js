@@ -1934,7 +1934,7 @@ const DB = {
         }
 
         this._recordNetworkSuccess();
-        this._acceptSyncVersion(item, responseJson.sync_version);
+        this._acceptSyncVersion(item, responseJson.sync_version, responseJson);
         const pending = this._ackSyncQueueItem(item);
         this._emitSyncStatus(pending ? 'pending' : 'synced');
       }
@@ -1948,10 +1948,22 @@ const DB = {
     }
   },
 
-  _acceptSyncVersion(item, version) {
+  _acceptSyncVersion(item, version, responseJson = {}) {
     const table = item.payload?.table;
-    if (!table || !version) return;
-    const id = item.payload.data?.id;
+    if (!table) return;
+
+    // Se o backend deduplicou o registro para um ID canônico pré-existente
+    if (responseJson?.original_id && responseJson?.id && responseJson.id !== responseJson.original_id) {
+      const local = this.getAll(table);
+      const idx = local.findIndex(row => row.id === responseJson.original_id);
+      if (idx >= 0) {
+        local[idx] = { ...local[idx], id: responseJson.id };
+        this.save(table, local);
+      }
+    }
+
+    if (!version) return;
+    const id = responseJson?.id || item.payload.data?.id;
     const previous = item.payload.data?.sync_version;
     const local = this.getAll(table);
     const record = local.find(row => row.id === id);
