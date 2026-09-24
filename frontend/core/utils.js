@@ -224,6 +224,212 @@ const Utils = {
     return m[p] || `<span class="badge badge-secondary">${this.escapeHtml(p || 'Normal')}</span>`;
   },
 
+  // ── CATÁLOGO UNIFICADO DE CATEGORIAS FINANCIERAS & OPERACIONAIS ──
+  CATEGORIAS_PADRAO: {
+    receitas: [
+      { value: 'parcela_caixa', label: '🏦 Parcela Caixa (Financiamento)' },
+      { value: 'aporte_cliente', label: '💰 Aporte do Cliente / Particular' },
+      { value: 'medicao_obra', label: '📋 Medição / Faturamento de Obra' },
+      { value: 'taxa_adm', label: '💼 Taxa de Administração de Obra' },
+      { value: 'entrada_propria', label: '💵 Entrada Própria' },
+      { value: 'aporte_financeiro', label: '💼 Aporte Financeiro' },
+      { value: 'emprestimo', label: '🤝 Empréstimo' },
+      { value: 'financiamento', label: '🏗️ Financiamento' }
+    ],
+    custos_obra: [
+      { value: 'material', label: '🧱 Material de Obra' },
+      { value: 'mao_de_obra', label: '👷 Mão de Obra' },
+      { value: 'servico', label: '🔧 Serviço Especializado' },
+      { value: 'equipamento', label: '🏗️ Equipamento & Locação' },
+      { value: 'taxa', label: '📋 Taxa & Licenciamento' }
+    ],
+    despesas_sede: [
+      { value: 'energia', label: '💡 Energia Elétrica' },
+      { value: 'agua', label: '💧 Água e Esgoto' },
+      { value: 'internet_tel', label: '🌐 Internet & Telefonia' },
+      { value: 'imposto_simples', label: '🏛️ DAS Simples Nacional' },
+      { value: 'tributos_trabalhistas', label: '📄 INSS / FGTS / Tributos' },
+      { value: 'salario', label: '👥 Salários / Folha' },
+      { value: 'pro_labore', label: '💼 Pró-Labore Sócios' },
+      { value: 'beneficios', label: '🥗 Benefícios (VT / VR)' },
+      { value: 'aluguel_sede', label: '🏢 Aluguel & Condomínio' },
+      { value: 'contabilidade', label: '⚖️ Contábil & Jurídico' },
+      { value: 'software_ti', label: '💻 Softwares, TI & Domínio' },
+      { value: 'material_escritorio', label: '📦 Material Escritório & Copa' },
+      { value: 'manutencao_sede', label: '🔧 Manutenção da Sede' },
+      { value: 'veiculos_sede', label: '🚗 Veículos & Combustível' },
+      { value: 'marketing', label: '📣 Marketing' },
+      { value: 'trafego_pago', label: '🎯 Tráfego Pago' },
+      { value: 'comercial', label: '🤝 Comercial & Vendas' }
+    ],
+    outros: [
+      { value: 'outro', label: '📦 Outros' }
+    ]
+  },
+
+  getCustomCats(tipo = 'despesa') {
+    try {
+      const scoped = (name) => (typeof DB !== 'undefined' && DB._ck) ? DB._ck(name) : name;
+      const keyMap = {
+        despesa: 'finobra_cats_despesa_custom',
+        receita: 'finobra_cats_receita_custom',
+        fornecedor: 'finobra_categorias_custom'
+      };
+      const key = keyMap[tipo] || keyMap.despesa;
+      const list = JSON.parse(localStorage.getItem(scoped(key)) || '[]');
+      return Array.isArray(list) ? list : [];
+    } catch {
+      return [];
+    }
+  },
+
+  saveCustomCat(tipo, item) {
+    const list = this.getCustomCats(tipo);
+    const existing = list.findIndex(c => c.value === item.value);
+    if (existing >= 0) {
+      list[existing] = item;
+    } else {
+      list.push(item);
+    }
+    const safe = list.slice(0, 100);
+    const scoped = (name) => (typeof DB !== 'undefined' && DB._ck) ? DB._ck(name) : name;
+    const keyMap = {
+      despesa: 'finobra_cats_despesa_custom',
+      receita: 'finobra_cats_receita_custom',
+      fornecedor: 'finobra_categorias_custom'
+    };
+    const key = keyMap[tipo] || keyMap.despesa;
+    try { localStorage.setItem(scoped(key), JSON.stringify(safe)); } catch {}
+    if (typeof DB !== 'undefined' && DB.saveTenantPreferences) {
+      const prefKey = tipo === 'fornecedor' ? 'categorias_fornecedor' : (tipo === 'receita' ? 'categorias_receita' : 'categorias_despesa');
+      DB.saveTenantPreferences({ [prefKey]: safe });
+    }
+  },
+
+  deleteCustomCat(tipo, value) {
+    const list = this.getCustomCats(tipo).filter(c => c.value !== value);
+    const scoped = (name) => (typeof DB !== 'undefined' && DB._ck) ? DB._ck(name) : name;
+    const keyMap = {
+      despesa: 'finobra_cats_despesa_custom',
+      receita: 'finobra_cats_receita_custom',
+      fornecedor: 'finobra_categorias_custom'
+    };
+    const key = keyMap[tipo] || keyMap.despesa;
+    try { localStorage.setItem(scoped(key), JSON.stringify(list)); } catch {}
+    if (typeof DB !== 'undefined' && DB.saveTenantPreferences) {
+      const prefKey = tipo === 'fornecedor' ? 'categorias_fornecedor' : (tipo === 'receita' ? 'categorias_receita' : 'categorias_despesa');
+      DB.saveTenantPreferences({ [prefKey]: list });
+    }
+  },
+
+  renderSelectOptionsDespesa(selectedValue = '') {
+    const custom = this.getCustomCats('despesa');
+    const esc = this.escapeHtml.bind(this);
+    let html = '';
+    
+    html += '<optgroup label="🏗️ Custos Diretos de Obra">';
+    for (const c of this.CATEGORIAS_PADRAO.custos_obra) {
+      html += `<option value="${c.value}" ${selectedValue === c.value ? 'selected' : ''}>${c.label}</option>`;
+    }
+    html += '</optgroup>';
+
+    html += '<optgroup label="🏢 Despesas da Sede / Administrativo">';
+    for (const c of this.CATEGORIAS_PADRAO.despesas_sede) {
+      html += `<option value="${c.value}" ${selectedValue === c.value ? 'selected' : ''}>${c.label}</option>`;
+    }
+    html += '</optgroup>';
+
+    if (custom.length > 0) {
+      html += '<optgroup label="⭐ Categorias Personalizadas">';
+      for (const c of custom) {
+        html += `<option value="${esc(c.value)}" ${selectedValue === c.value ? 'selected' : ''}>${esc(c.label || c.value)}</option>`;
+      }
+      html += '</optgroup>';
+    }
+
+    html += '<optgroup label="📦 Outros">';
+    for (const c of this.CATEGORIAS_PADRAO.outros) {
+      html += `<option value="${c.value}" ${selectedValue === c.value ? 'selected' : ''}>${c.label}</option>`;
+    }
+    html += '</optgroup>';
+
+    return html;
+  },
+
+  renderSelectOptionsReceita(selectedValue = '') {
+    const custom = this.getCustomCats('receita');
+    const esc = this.escapeHtml.bind(this);
+    let html = '';
+
+    html += '<optgroup label="💰 Entradas & Faturamento">';
+    for (const c of this.CATEGORIAS_PADRAO.receitas) {
+      html += `<option value="${c.value}" ${selectedValue === c.value ? 'selected' : ''}>${c.label}</option>`;
+    }
+    html += '</optgroup>';
+
+    if (custom.length > 0) {
+      html += '<optgroup label="⭐ Receitas Personalizadas">';
+      for (const c of custom) {
+        html += `<option value="${esc(c.value)}" ${selectedValue === c.value ? 'selected' : ''}>${esc(c.label || c.value)}</option>`;
+      }
+      html += '</optgroup>';
+    }
+
+    html += '<optgroup label="📦 Outros">';
+    for (const c of this.CATEGORIAS_PADRAO.outros) {
+      html += `<option value="${c.value}" ${selectedValue === c.value ? 'selected' : ''}>${c.label}</option>`;
+    }
+    html += '</optgroup>';
+
+    return html;
+  },
+
+  renderFilterCategoryOptions(selectedValue = '', tipo = '') {
+    const esc = this.escapeHtml.bind(this);
+    let html = '<option value="">Todas as Categorias</option>';
+
+    if (tipo === 'receita') {
+      return html + this.renderSelectOptionsReceita(selectedValue);
+    }
+    if (tipo === 'despesa') {
+      return html + this.renderSelectOptionsDespesa(selectedValue);
+    }
+
+    html += '<optgroup label="💰 Receitas">';
+    for (const c of this.CATEGORIAS_PADRAO.receitas) {
+      html += `<option value="${c.value}" ${selectedValue === c.value ? 'selected' : ''}>${c.label}</option>`;
+    }
+    const customRec = this.getCustomCats('receita');
+    for (const c of customRec) {
+      html += `<option value="${esc(c.value)}" ${selectedValue === c.value ? 'selected' : ''}>${esc(c.label || c.value)}</option>`;
+    }
+    html += '</optgroup>';
+
+    html += '<optgroup label="🏗️ Custos de Obra">';
+    for (const c of this.CATEGORIAS_PADRAO.custos_obra) {
+      html += `<option value="${c.value}" ${selectedValue === c.value ? 'selected' : ''}>${c.label}</option>`;
+    }
+    html += '</optgroup>';
+
+    html += '<optgroup label="🏢 Escritório / Sede">';
+    for (const c of this.CATEGORIAS_PADRAO.despesas_sede) {
+      html += `<option value="${c.value}" ${selectedValue === c.value ? 'selected' : ''}>${c.label}</option>`;
+    }
+    html += '</optgroup>';
+
+    const customDesp = this.getCustomCats('despesa');
+    if (customDesp.length > 0) {
+      html += '<optgroup label="⭐ Personalizadas">';
+      for (const c of customDesp) {
+        html += `<option value="${esc(c.value)}" ${selectedValue === c.value ? 'selected' : ''}>${esc(c.label || c.value)}</option>`;
+      }
+      html += '</optgroup>';
+    }
+
+    html += '<option value="outro" ' + (selectedValue === 'outro' ? 'selected' : '') + '>📦 Outros</option>';
+    return html;
+  },
+
   catLabel(c) {
     const m = {
       // Receitas e Obras
@@ -262,12 +468,12 @@ const Utils = {
       comercial:'Comercial',
     };
     if (m[c]) return m[c];
-    // Busca em categorias customizadas (despesas e fornecedores)
+    // Busca em categorias customizadas (despesas, receitas e fornecedores)
     try {
-      const scoped = (name) => (typeof DB !== 'undefined' && DB._ck) ? DB._ck(name) : name;
-      const customDesp = JSON.parse(localStorage.getItem(scoped('finobra_cats_despesa_custom')) || '[]');
-      const customForn = JSON.parse(localStorage.getItem(scoped('finobra_categorias_custom')) || '[]');
-      const found = [...customDesp, ...customForn].find(x => x.value === c);
+      const customDesp = this.getCustomCats ? this.getCustomCats('despesa') : [];
+      const customRec = this.getCustomCats ? this.getCustomCats('receita') : [];
+      const customForn = this.getCustomCats ? this.getCustomCats('fornecedor') : [];
+      const found = [...customDesp, ...customRec, ...customForn].find(x => x.value === c);
       if (found) {
         found.label = String(found.label || '').replace(/^[\p{Extended_Pictographic}\uFE0F\u200D\s]+/u, '').trim();
         return this.escapeHtml(found.label);

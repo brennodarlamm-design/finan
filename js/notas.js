@@ -46,8 +46,7 @@ const Notas = {
         <label class="filter-label">Categoria</label>
         <select class="form-control" id="f-cat-nf" style="min-width:130px">
           <option value="">Todas</option>
-          <option value="material">🧱 Material</option><option value="mao_de_obra">👷 Mão de Obra</option>
-          <option value="servico">🔧 Serviço</option><option value="equipamento">🏗️ Equipamento</option>
+          ${typeof Utils !== 'undefined' && Utils.renderSelectOptionsDespesa ? Utils.renderSelectOptionsDespesa() : '<option value="material">Material</option>'}
         </select>
       </div>
       <div class="filter-group">
@@ -230,13 +229,7 @@ const Notas = {
             <div class="form-row cols-3" style="margin-bottom:14px;">
               <div class="form-group"><label class="form-label">Tipo *</label><select class="form-control" name="tipo" required><option value="entrada" ${(n.tipo||'entrada')==='entrada'?'selected':''}>↓ Entrada (Compra)</option><option value="saida" ${n.tipo==='saida'?'selected':''}>↑ Saída (Serviço)</option></select></div>
               <div class="form-group"><label class="form-label">Categoria *</label><select class="form-control" name="categoria" required>
-                <option value="material" ${n.categoria==='material'?'selected':''}>🧱 Material</option>
-                <option value="mao_de_obra" ${n.categoria==='mao_de_obra'?'selected':''}>👷 Mão de Obra</option>
-                <option value="servico" ${(n.categoria||'servico')==='servico'?'selected':''}>🔧 Serviço</option>
-                <option value="equipamento" ${n.categoria==='equipamento'?'selected':''}>🏗️ Equipamento</option>
-                <option value="energia" ${n.categoria==='energia'?'selected':''}>💡 Energia Elétrica</option>
-                <option value="imposto_simples" ${n.categoria==='imposto_simples'?'selected':''}>🏛️ DAS Simples Nacional</option>
-                <option value="outro" ${n.categoria==='outro'?'selected':''}>📦 Outro</option>
+                ${typeof Utils !== 'undefined' && Utils.renderSelectOptionsDespesa ? Utils.renderSelectOptionsDespesa(n.categoria || 'material') : '<option value="material">Material</option>'}
               </select></div>
               <div class="form-group"><label class="form-label">Status</label><select class="form-control" name="status" id="nf-status-sel" data-fb-change="Notas._onStatusChange" data-fb-change-n="1" data-fb-change-t0="value">
                 <option value="pendente" ${(n.status||'pendente')==='pendente'?'selected':''}>⏳ Pendente</option>

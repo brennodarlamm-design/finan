@@ -52,38 +52,7 @@ const Lancamentos = {
       <div class="filter-group">
         <label class="filter-label">Categoria</label>
         <select class="form-control" id="f-cat" style="min-width:140px">
-          <option value="">Todas</option>
-          <optgroup label="💰 Receitas">
-            <option value="parcela_caixa">🏦 Parcela Caixa (Financiamento)</option>
-            <option value="aporte_cliente">💰 Aporte Cliente / Parcela Particular</option>
-            <option value="medicao_obra">📋 Medição / Faturamento de Obra</option>
-            <option value="taxa_adm">💼 Taxa de Administração</option>
-            <option value="entrada_propria">💵 Entrada Própria</option>
-            <option value="aporte_financeiro">💼 Aporte Financeiro</option>
-            <option value="emprestimo">🤝 Empréstimo</option>
-            <option value="financiamento">🏗️ Financiamento</option>
-          </optgroup>
-          <optgroup label="🏗️ Obras">
-            <option value="material">&#x1F9F1; Material</option>
-            <option value="mao_de_obra">&#x1F477; M&atilde;o de Obra</option>
-            <option value="servico">&#x1F527; Servi&ccedil;o</option>
-            <option value="equipamento">&#x1F3D7;&#xFE0F; Equipamento</option>
-            <option value="taxa">&#x1F4CB; Taxa/Imposto</option>
-          </optgroup>
-          <optgroup label="🏢 Escritório / Sede">
-            <option value="energia">💡 Energia Elétrica</option>
-            <option value="agua">💧 Água e Esgoto</option>
-            <option value="internet_tel">🌐 Internet &amp; Telefonia</option>
-            <option value="imposto_simples">🏛️ DAS Simples Nacional</option>
-            <option value="tributos_trabalhistas">📄 INSS / FGTS / Tributos</option>
-            <option value="salario">👥 Salários / Folha</option>
-            <option value="pro_labore">💼 Pró-Labore Sócios</option>
-            <option value="aluguel_sede">🏢 Aluguel / Sede</option>
-            <option value="contabilidade">⚖️ Contábil / Jurídico</option>
-            <option value="software_ti">💻 Softwares &amp; TI</option>
-            <option value="material_escritorio">📦 Material &amp; Copa</option>
-          </optgroup>
-          <option value="outro">&#x1F4E6; Outros</option>
+          ${typeof Utils !== 'undefined' && Utils.renderFilterCategoryOptions ? Utils.renderFilterCategoryOptions() : '<option value="">Todas</option>'}
         </select>
       </div>
       <div class="filter-group">
@@ -215,36 +184,49 @@ const Lancamentos = {
     }
   },
 
-  _catRec: [
-    ['parcela_caixa','🏦 Parcela Caixa (Financiamento)'],
-    ['aporte_cliente','💰 Aporte do Cliente / Particular'],
-    ['medicao_obra','📋 Medição / Faturamento de Obra'],
-    ['taxa_adm','💼 Taxa de Administração de Obra'],
-    ['entrada_propria','💵 Entrada Própria'],
-    ['aporte_financeiro','💼 Aporte Financeiro'],
-    ['emprestimo','🤝 Empréstimo'],
-    ['financiamento','🏗️ Financiamento'],
-    ['outro','📦 Outros']
-  ],
-  _catDesp: [
-    ['material','🧱 Material de Obra'],
-    ['mao_de_obra','👷 Mão de Obra'],
-    ['servico','🔧 Serviço'],
-    ['equipamento','🏗️ Equipamento'],
-    ['taxa','📋 Taxa/Imposto'],
-    ['energia','💡 Energia Elétrica (Sede)'],
-    ['agua','💧 Água e Esgoto (Sede)'],
-    ['internet_tel','🌐 Internet & Telefonia'],
-    ['imposto_simples','🏛️ DAS Simples Nacional'],
-    ['tributos_trabalhistas','📄 INSS / FGTS / Tributos'],
-    ['salario','👥 Salários / Folha'],
-    ['pro_labore','💼 Pró-Labore Sócios'],
-    ['aluguel_sede','🏢 Aluguel / Sede'],
-    ['contabilidade','⚖️ Contábil / Jurídico'],
-    ['software_ti','💻 Softwares & TI'],
-    ['material_escritorio','📦 Material Escritório & Copa'],
-    ['outro','📦 Outros']
-  ],
+  get _catRec() {
+    const base = [
+      ['parcela_caixa','🏦 Parcela Caixa (Financiamento)'],
+      ['aporte_cliente','💰 Aporte do Cliente / Particular'],
+      ['medicao_obra','📋 Medição / Faturamento de Obra'],
+      ['taxa_adm','💼 Taxa de Administração de Obra'],
+      ['entrada_propria','💵 Entrada Própria'],
+      ['aporte_financeiro','💼 Aporte Financeiro'],
+      ['emprestimo','🤝 Empréstimo'],
+      ['financiamento','🏗️ Financiamento']
+    ];
+    const custom = (typeof Utils !== 'undefined' && Utils.getCustomCats) ? Utils.getCustomCats('receita') : [];
+    const customEntries = custom.map(c => [c.value, c.label || c.value]);
+    return [...base, ...customEntries, ['outro','📦 Outros']];
+  },
+  get _catDesp() {
+    const base = [
+      ['material','🧱 Material de Obra'],
+      ['mao_de_obra','👷 Mão de Obra'],
+      ['servico','🔧 Serviço'],
+      ['equipamento','🏗️ Equipamento'],
+      ['taxa','📋 Taxa/Imposto'],
+      ['energia','💡 Energia Elétrica (Sede)'],
+      ['agua','💧 Água e Esgoto (Sede)'],
+      ['internet_tel','🌐 Internet & Telefonia'],
+      ['imposto_simples','🏛️ DAS Simples Nacional'],
+      ['tributos_trabalhistas','📄 INSS / FGTS / Tributos'],
+      ['salario','👥 Salários / Folha'],
+      ['pro_labore','💼 Pró-Labore Sócios'],
+      ['aluguel_sede','🏢 Aluguel / Sede'],
+      ['contabilidade','⚖️ Contábil / Jurídico'],
+      ['software_ti','💻 Softwares & TI'],
+      ['material_escritorio','📦 Material Escritório & Copa'],
+      ['manutencao_sede','🔧 Manutenção da Sede'],
+      ['veiculos_sede','🚗 Veículos & Combustível'],
+      ['marketing','📣 Marketing'],
+      ['trafego_pago','🎯 Tráfego Pago'],
+      ['comercial','🤝 Comercial & Vendas']
+    ];
+    const custom = (typeof Utils !== 'undefined' && Utils.getCustomCats) ? Utils.getCustomCats('despesa') : [];
+    const customEntries = custom.map(c => [c.value, c.label || c.value]);
+    return [...base, ...customEntries, ['outro','📦 Outros']];
+  },
   _statRec: [
     ['recebido','✓ Recebido'],
     ['a_receber','⏳ A Receber']
@@ -341,7 +323,7 @@ const Lancamentos = {
             </div>
 
             <div class="form-row cols-2" style="margin-bottom:14px;">
-              <div class="form-group"><label class="form-label" for="lan-categoria">Categoria *</label><select class="form-control" id="lan-categoria" name="categoria" required>${cats.map(([v,t])=>`<option value="${v}" ${l.categoria===v?'selected':''}>${t}</option>`).join('')}</select></div>
+              <div class="form-group"><label class="form-label" for="lan-categoria">Categoria *</label><select class="form-control" id="lan-categoria" name="categoria" required>${initialTipo==='receita' ? Utils.renderSelectOptionsReceita(l.categoria) : Utils.renderSelectOptionsDespesa(l.categoria)}</select></div>
               <div class="form-group"><label class="form-label" for="lan-status-sel">Status *</label><select class="form-control" name="status" id="lan-status-sel" data-fb-change="Lancamentos._onStatusChange" data-fb-change-n="1" data-fb-change-t0="value" required>${statOpts.map(([v,t])=>`<option value="${v}" ${(l.status||statOpts[0][0])===v?'selected':''}>${t}</option>`).join('')}</select></div>
             </div>
 
@@ -499,14 +481,9 @@ const Lancamentos = {
     const catSel = document.querySelector('#f-lan [name="categoria"]');
     if (catSel) {
       const currentCat = catSel.value;
-      const cats = novoTipo === 'receita' ? this._catRec : this._catDesp;
-      catSel.innerHTML = cats.map(([v, t]) => `<option value="${v}">${t}</option>`).join('');
-      const exists = cats.some(([v]) => v === currentCat);
-      if (exists) {
-        catSel.value = currentCat;
-      } else {
-        catSel.value = cats[0][0];
-      }
+      catSel.innerHTML = novoTipo === 'receita'
+        ? Utils.renderSelectOptionsReceita(currentCat)
+        : Utils.renderSelectOptionsDespesa(currentCat);
     }
 
     // 3. Atualiza Status
@@ -1140,7 +1117,16 @@ const Lancamentos = {
     ids.forEach(id => {
       const el = document.getElementById(id);
       if (el) {
-        el.addEventListener('change', () => this._refresh(true));
+        el.addEventListener('change', () => {
+          if (id === 'f-tipo') {
+            const catEl = document.getElementById('f-cat');
+            if (catEl && typeof Utils !== 'undefined' && Utils.renderFilterCategoryOptions) {
+              const currentCat = catEl.value;
+              catEl.innerHTML = Utils.renderFilterCategoryOptions(currentCat, el.value);
+            }
+          }
+          this._refresh(true);
+        });
         el.addEventListener('input', () => this._refresh(true));
       }
     });

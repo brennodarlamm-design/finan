@@ -86,6 +86,7 @@ function sanitizeTenantPreferences(input) {
   if ('slas_padrao' in input) out.slas_padrao = sanitizeSlaProcesses(input.slas_padrao);
   if ('categorias_fornecedor' in input) out.categorias_fornecedor = cleanCats(input.categorias_fornecedor);
   if ('categorias_despesa' in input) out.categorias_despesa = cleanCats(input.categorias_despesa);
+  if ('categorias_receita' in input) out.categorias_receita = cleanCats(input.categorias_receita);
   if ('whatsapp_telefone' in input) out.whatsapp_telefone = String(input.whatsapp_telefone || '').replace(/\D/g, '').slice(0, 15);
   if ('whatsapp_modo' in input) out.whatsapp_modo = ['api', 'web'].includes(String(input.whatsapp_modo)) ? String(input.whatsapp_modo) : 'api';
   if ('bdi_padrao' in input) out.bdi_padrao = sanitizeBdiConfig(input.bdi_padrao);

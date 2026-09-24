@@ -99,12 +99,7 @@ const PreCompras = {
         <label class="filter-label">Categoria</label>
         <select class="form-control" id="pc-cat" style="min-width:130px" data-fb-change="PreCompras.aplicarFiltros" data-fb-change-n="0">
           <option value="">Todas</option>
-          <option value="material">🧱 Material</option>
-          <option value="mao_de_obra">👷 Mão de Obra</option>
-          <option value="servico">🔧 Serviço</option>
-          <option value="equipamento">🏗️ Equipamento</option>
-          <option value="taxa">📋 Taxa/Imposto</option>
-          <option value="outro">📦 Outros</option>
+          ${typeof Utils !== 'undefined' && Utils.renderSelectOptionsDespesa ? Utils.renderSelectOptionsDespesa() : '<option value="material">Material</option>'}
         </select>
       </div>
       <div class="filter-group">
@@ -352,12 +347,7 @@ const PreCompras = {
               <div class="form-group">
                 <label class="form-label">Categoria *</label>
                 <select class="form-control" name="categoria" required>
-                  <option value="material" ${item?.categoria==='material'?'selected':''}>🧱 Material</option>
-                  <option value="mao_de_obra" ${item?.categoria==='mao_de_obra'?'selected':''}>👷 Mão de Obra</option>
-                  <option value="servico" ${item?.categoria==='servico'?'selected':''}>🔧 Serviço</option>
-                  <option value="equipamento" ${item?.categoria==='equipamento'?'selected':''}>🏗️ Equipamento</option>
-                  <option value="taxa" ${item?.categoria==='taxa'?'selected':''}>📋 Taxa / Imposto</option>
-                  <option value="outro" ${item?.categoria==='outro'?'selected':''}>📦 Outros</option>
+                  ${typeof Utils !== 'undefined' && Utils.renderSelectOptionsDespesa ? Utils.renderSelectOptionsDespesa(item?.categoria || 'material') : '<option value="material">Material</option>'}
                 </select>
               </div>
               <div class="form-group">

@@ -1138,52 +1138,92 @@ const Configuracoes = {
       `<select class="form-control" id="${id}" style="font-size:1.1rem;width:80px;">${EMOJIS.map(e => `<option value="${e}">${e}</option>`).join('')}</select>`;
 
     const customForn = typeof Fornecedores !== 'undefined' ? Fornecedores._getCustomCategorias() : [];
-    const customDesp = typeof Escritorio !== 'undefined' ? Escritorio._getAllDespesaCats() : [];
+    const customDesp = (typeof Utils !== 'undefined' && Utils.getCustomCats) ? Utils.getCustomCats('despesa') : (typeof Escritorio !== 'undefined' ? Escritorio._getAllDespesaCats() : []);
+    const customRec = (typeof Utils !== 'undefined' && Utils.getCustomCats) ? Utils.getCustomCats('receita') : [];
 
     return `
     <div class="page-header">
-      <div><h1 class="page-title">🏷️ Categorias Personalizadas</h1><p class="page-sub">Crie categorias para Fornecedores/Prestadores e para Despesas do Escritório</p></div>
-    </div>
-
-    <div style="font-size:.7rem;font-weight:800;color:var(--accent2);letter-spacing:.1em;margin-bottom:10px;">🏭 FORNECEDORES / PRESTADORES</div>
-    <div class="card" style="margin-bottom:14px;">
-      <div class="card-header"><div class="card-title">➕ Nova Categoria de Fornecedor</div></div>
-      <div style="display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap;padding:4px 0 8px;">
-        <div class="form-group" style="margin-bottom:0;"><label class="form-label">Emoji</label>${makeEmojiSelect('cfg-cat-emoji-forn')}</div>
-        <div class="form-group" style="flex:1;min-width:180px;margin-bottom:0;"><label class="form-label">Nome da Categoria *</label><input class="form-control" id="cfg-cat-nome-forn" placeholder="Ex: Segurança, Limpeza, RH..." maxlength="60"></div>
-        <button class="btn btn-primary" data-fb-click="Configuracoes.saveCategoria" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="forn">+ Criar</button>
+      <div>
+        <h1 class="page-title">🏷️ Categorias Personalizadas</h1>
+        <p class="page-sub">Centralize e personalize as categorias de despesas, receitas e fornecedores da sua construtora</p>
       </div>
     </div>
-    <div class="card" style="margin-bottom:28px;padding:0;">
-      <div class="card-header" style="padding:12px 16px;"><div class="card-title">⭐ Personalizadas — Fornecedores</div></div>
-      <div class="tbl-wrap" style="border:none;"><table>
-        <thead><tr><th style="width:50px;"></th><th>Nome</th><th>Chave interna</th><th style="text-align:center;">Ações</th></tr></thead>
-        <tbody>${makeTable(customForn, 'forn')}</tbody>
-      </table></div>
+
+    <!-- BANNER EXPLICATIVO DO FLUXO UNIFICADO -->
+    <div style="background:rgba(198,255,0,0.06);border:1px solid rgba(198,255,0,0.3);border-radius:12px;padding:16px 20px;margin-bottom:24px;display:flex;align-items:flex-start;gap:14px;">
+      <span style="font-size:1.8rem;line-height:1;">💡</span>
+      <div>
+        <div style="font-weight:800;font-size:.95rem;color:var(--text);margin-bottom:4px;">Como funciona o fluxo de categorias no FinGo?</div>
+        <div style="font-size:.82rem;color:var(--text2);line-height:1.5;">
+          • <strong>Despesas (Obras &amp; Sede):</strong> As categorias criadas aqui aparecem imediatamente nos <strong>Lançamentos Financeiros</strong> (Despesas), nas <strong>Notas Fiscais</strong>, em <strong>Compras</strong> e no <strong>Escritório</strong>.<br>
+          • <strong>Receitas (Entradas):</strong> Categorias adicionais para aportes, faturamento de obra ou recebimentos no financeiro.<br>
+          • <strong>Fornecedores:</strong> Especialidades para classificar seus prestadores de serviço e parceiros comerciais.
+        </div>
+      </div>
     </div>
 
-    <div style="font-size:.7rem;font-weight:800;color:var(--accent2);letter-spacing:.1em;margin-bottom:10px;">🏢 DESPESAS DO ESCRITÓRIO / SEDE</div>
+    <!-- SEÇÃO 1: DESPESAS -->
+    <div style="font-size:.72rem;font-weight:800;color:var(--accent);letter-spacing:.08em;margin-bottom:10px;">🏗️ DESPESAS (OBRAS &amp; SEDE ADMINISTRATIVA)</div>
     <div class="card" style="margin-bottom:14px;">
       <div class="card-header"><div class="card-title">➕ Nova Categoria de Despesa</div></div>
       <div style="display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap;padding:4px 0 8px;">
         <div class="form-group" style="margin-bottom:0;"><label class="form-label">Emoji</label>${makeEmojiSelect('cfg-cat-emoji-desp')}</div>
-        <div class="form-group" style="flex:1;min-width:180px;margin-bottom:0;"><label class="form-label">Nome da Categoria *</label><input class="form-control" id="cfg-cat-nome-desp" placeholder="Ex: Farmácia, Alimentação, RH..." maxlength="60"></div>
+        <div class="form-group" style="flex:1;min-width:180px;margin-bottom:0;"><label class="form-label">Nome da Categoria *</label><input class="form-control" id="cfg-cat-nome-desp" placeholder="Ex: Alimentação, Segurança da Obra, Gesso, Fretes..." maxlength="60"></div>
         <button class="btn btn-primary" data-fb-click="Configuracoes.saveCategoria" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="desp">+ Criar</button>
       </div>
     </div>
-    <div class="card" style="padding:0;">
-      <div class="card-header" style="padding:12px 16px;"><div class="card-title">⭐ Personalizadas — Despesas</div></div>
+    <div class="card" style="margin-bottom:28px;padding:0;">
+      <div class="card-header" style="padding:12px 16px;"><div class="card-title">⭐ Personalizadas — Despesas (${customDesp.length})</div></div>
       <div class="tbl-wrap" style="border:none;"><table>
         <thead><tr><th style="width:50px;"></th><th>Nome</th><th>Chave interna</th><th style="text-align:center;">Ações</th></tr></thead>
         <tbody>${makeTable(customDesp, 'desp')}</tbody>
+      </table></div>
+    </div>
+
+    <!-- SEÇÃO 2: RECEITAS -->
+    <div style="font-size:.72rem;font-weight:800;color:var(--success);letter-spacing:.08em;margin-bottom:10px;">💰 RECEITAS (ENTRADAS &amp; FATURAMENTO)</div>
+    <div class="card" style="margin-bottom:14px;">
+      <div class="card-header"><div class="card-title">➕ Nova Categoria de Receita</div></div>
+      <div style="display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap;padding:4px 0 8px;">
+        <div class="form-group" style="margin-bottom:0;"><label class="form-label">Emoji</label>${makeEmojiSelect('cfg-cat-emoji-rec')}</div>
+        <div class="form-group" style="flex:1;min-width:180px;margin-bottom:0;"><label class="form-label">Nome da Categoria *</label><input class="form-control" id="cfg-cat-nome-rec" placeholder="Ex: Consultoria Técnica, Bonificação, Rendimentos..." maxlength="60"></div>
+        <button class="btn btn-primary" data-fb-click="Configuracoes.saveCategoria" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="rec">+ Criar</button>
+      </div>
+    </div>
+    <div class="card" style="margin-bottom:28px;padding:0;">
+      <div class="card-header" style="padding:12px 16px;"><div class="card-title">⭐ Personalizadas — Receitas (${customRec.length})</div></div>
+      <div class="tbl-wrap" style="border:none;"><table>
+        <thead><tr><th style="width:50px;"></th><th>Nome</th><th>Chave interna</th><th style="text-align:center;">Ações</th></tr></thead>
+        <tbody>${makeTable(customRec, 'rec')}</tbody>
+      </table></div>
+    </div>
+
+    <!-- SEÇÃO 3: FORNECEDORES -->
+    <div style="font-size:.72rem;font-weight:800;color:var(--text2);letter-spacing:.08em;margin-bottom:10px;">🏭 FORNECEDORES &amp; PRESTADORES</div>
+    <div class="card" style="margin-bottom:14px;">
+      <div class="card-header"><div class="card-title">➕ Nova Especialidade de Fornecedor</div></div>
+      <div style="display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap;padding:4px 0 8px;">
+        <div class="form-group" style="margin-bottom:0;"><label class="form-label">Emoji</label>${makeEmojiSelect('cfg-cat-emoji-forn')}</div>
+        <div class="form-group" style="flex:1;min-width:180px;margin-bottom:0;"><label class="form-label">Nome da Categoria *</label><input class="form-control" id="cfg-cat-nome-forn" placeholder="Ex: Vidraçaria, Serralheria, Pré-moldados..." maxlength="60"></div>
+        <button class="btn btn-primary" data-fb-click="Configuracoes.saveCategoria" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="forn">+ Criar</button>
+      </div>
+    </div>
+    <div class="card" style="padding:0;">
+      <div class="card-header" style="padding:12px 16px;"><div class="card-title">⭐ Personalizadas — Fornecedores (${customForn.length})</div></div>
+      <div class="tbl-wrap" style="border:none;"><table>
+        <thead><tr><th style="width:50px;"></th><th>Nome</th><th>Chave interna</th><th style="text-align:center;">Ações</th></tr></thead>
+        <tbody>${makeTable(customForn, 'forn')}</tbody>
       </table></div>
     </div>`;
   },
 
   saveCategoria(tipo) {
     const isForn = tipo === 'forn';
-    const nomeEl  = document.getElementById(isForn ? 'cfg-cat-nome-forn' : 'cfg-cat-nome-desp');
-    const emojiEl = document.getElementById(isForn ? 'cfg-cat-emoji-forn' : 'cfg-cat-emoji-desp');
+    const isRec = tipo === 'rec';
+    const inputId = isForn ? 'cfg-cat-nome-forn' : (isRec ? 'cfg-cat-nome-rec' : 'cfg-cat-nome-desp');
+    const emojiId = isForn ? 'cfg-cat-emoji-forn' : (isRec ? 'cfg-cat-emoji-rec' : 'cfg-cat-emoji-desp');
+    const nomeEl  = document.getElementById(inputId);
+    const emojiEl = document.getElementById(emojiId);
     const nome  = (nomeEl?.value || '').trim();
     const emoji = emojiEl?.value || '🏷️';
     if (!nome) { Utils.toast('Informe o nome da categoria!', 'warning'); return; }
@@ -1198,14 +1238,31 @@ const Configuracoes = {
       const custom = typeof Fornecedores !== 'undefined' ? Fornecedores._getCustomCategorias() : [];
       custom.push({ value: slug, label: `${emoji} ${nome}`, emoji });
       if (typeof Fornecedores !== 'undefined') Fornecedores._saveCustomCategorias(custom);
+    } else if (isRec) {
+      const custom = typeof Utils !== 'undefined' && Utils.getCustomCats ? Utils.getCustomCats('receita') : [];
+      if (custom.find(c => c.value === slug) || (Utils.CATEGORIAS_PADRAO?.receitas || []).find(c => c.value === slug)) {
+        Utils.toast('Já existe uma categoria de receita com esse nome!', 'warning');
+        return;
+      }
+      if (typeof Utils !== 'undefined' && Utils.saveCustomCat) {
+        Utils.saveCustomCat('receita', { value: slug, label: `${emoji} ${nome}`, emoji });
+      }
     } else {
-      const todas = typeof Escritorio !== 'undefined' ? Escritorio._getAllDespesaCats() : [];
-      if (todas.find(c => c.value === slug)) { Utils.toast('Já existe uma categoria de despesa com esse nome!', 'warning'); return; }
-      todas.push({ value: slug, label: `${emoji} ${nome}`, emoji });
-      if (typeof Escritorio !== 'undefined') Escritorio._saveDespesaCats(todas);
+      const custom = typeof Utils !== 'undefined' && Utils.getCustomCats ? Utils.getCustomCats('despesa') : (typeof Escritorio !== 'undefined' ? Escritorio._getAllDespesaCats() : []);
+      const defaults = [...(Utils.CATEGORIAS_PADRAO?.custos_obra || []), ...(Utils.CATEGORIAS_PADRAO?.despesas_sede || [])];
+      if (custom.find(c => c.value === slug) || defaults.find(c => c.value === slug)) {
+        Utils.toast('Já existe uma categoria de despesa com esse nome!', 'warning');
+        return;
+      }
+      if (typeof Utils !== 'undefined' && Utils.saveCustomCat) {
+        Utils.saveCustomCat('despesa', { value: slug, label: `${emoji} ${nome}`, emoji });
+      } else if (typeof Escritorio !== 'undefined') {
+        custom.push({ value: slug, label: `${emoji} ${nome}`, emoji });
+        Escritorio._saveDespesaCats(custom);
+      }
     }
 
-    Utils.toast(`Categoria "${emoji} ${nome}" criada!`, 'success');
+    Utils.toast(`Categoria "${emoji} ${nome}" criada com sucesso!`, 'success');
     if (nomeEl) nomeEl.value = '';
     this._switch('categorias');
   },
@@ -1215,9 +1272,17 @@ const Configuracoes = {
       if (tipo === 'forn') {
         const custom = typeof Fornecedores !== 'undefined' ? Fornecedores._getCustomCategorias() : [];
         if (typeof Fornecedores !== 'undefined') Fornecedores._saveCustomCategorias(custom.filter(c => c.value !== value));
+      } else if (tipo === 'rec') {
+        if (typeof Utils !== 'undefined' && Utils.deleteCustomCat) {
+          Utils.deleteCustomCat('receita', value);
+        }
       } else {
-        const custom = typeof Escritorio !== 'undefined' ? Escritorio._getAllDespesaCats() : [];
-        if (typeof Escritorio !== 'undefined') Escritorio._saveDespesaCats(custom.filter(c => c.value !== value));
+        if (typeof Utils !== 'undefined' && Utils.deleteCustomCat) {
+          Utils.deleteCustomCat('despesa', value);
+        } else if (typeof Escritorio !== 'undefined') {
+          const custom = Escritorio._getAllDespesaCats();
+          Escritorio._saveDespesaCats(custom.filter(c => c.value !== value));
+        }
       }
       Utils.toast('Categoria excluída.', 'info');
       this._switch('categorias');

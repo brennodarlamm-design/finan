@@ -298,6 +298,7 @@ const DB = {
     return {
       categorias_fornecedor: readJson('finobra_categorias_custom'),
       categorias_despesa: readJson('finobra_cats_despesa_custom'),
+      categorias_receita: readJson('finobra_cats_receita_custom'),
       slas_padrao: readJson('finobra_slas_padrao'),
       whatsapp_telefone: String(localStorage.getItem(this._ck('finobra_whatsapp_telefone')) || ''),
       whatsapp_modo: String(localStorage.getItem(this._ck('finobra_whatsapp_modo')) || 'api')
@@ -312,6 +313,7 @@ const DB = {
     };
     if ('categorias_fornecedor' in preferences) writeJson('finobra_categorias_custom', preferences.categorias_fornecedor);
     if ('categorias_despesa' in preferences) writeJson('finobra_cats_despesa_custom', preferences.categorias_despesa);
+    if ('categorias_receita' in preferences) writeJson('finobra_cats_receita_custom', preferences.categorias_receita);
     if ('slas_padrao' in preferences) writeJson('finobra_slas_padrao', preferences.slas_padrao);
     if ('whatsapp_telefone' in preferences) {
       try { localStorage.setItem(this._ck('finobra_whatsapp_telefone'), String(preferences.whatsapp_telefone || '').replace(/\D/g, '')); } catch {}
