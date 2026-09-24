@@ -34,12 +34,12 @@ const PortalCliente = {
       body.portal-public-mode aside {
         display: none !important;
       }
-      .portal-banner { background: linear-gradient(135deg, rgba(18,217,160,.12) 0%, rgba(59,130,246,.08) 100%); border: 1px solid rgba(18,217,160,.3); border-radius: var(--r-md); padding: 14px 20px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 22px; flex-wrap: wrap; gap: 12px; }
+      .portal-banner { background: linear-gradient(135deg, rgba(198,255,0,.12) 0%, rgba(59,130,246,.08) 100%); border: 1px solid rgba(198,255,0,.3); border-radius: var(--r-md); padding: 14px 20px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 22px; flex-wrap: wrap; gap: 12px; }
       .portal-tabs { display: flex; gap: 6px; border-bottom: 2px solid var(--border); margin-bottom: 22px; overflow-x: auto; scrollbar-width: none; }
       .portal-tabs::-webkit-scrollbar { display: none; }
       .portal-tab { padding: 10px 18px; border: none; background: transparent; color: var(--text3); font-weight: 700; font-size: .86rem; cursor: pointer; border-bottom: 3px solid transparent; margin-bottom: -2px; transition: color .2s, border-color .2s; white-space: nowrap; }
       .portal-tab:hover { color: var(--text); }
-      .portal-tab-active { color: var(--accent)!important; border-bottom-color: var(--accent)!important; background: rgba(18,217,160,.06); border-radius: 6px 6px 0 0; }
+      .portal-tab-active { color: var(--accent)!important; border-bottom-color: var(--accent)!important; background: rgba(198,255,0,.06); border-radius: 6px 6px 0 0; }
       .portal-doc-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-md); padding: 16px 20px; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 14px; transition: border-color .2s; }
       .portal-doc-card:hover { border-color: rgba(201,162,39,.4); }
       .portal-top-bar {
@@ -434,7 +434,7 @@ const PortalCliente = {
             </div>
           </div>
           <div style="display:flex;align-items:center;gap:8px;">
-            <span class="badge" style="background:rgba(18,217,160,.15);color:var(--accent);border:1px solid rgba(18,217,160,.3);font-size:.72rem;padding:3px 8px;font-weight:800;">
+            <span class="badge" style="background:rgba(198,255,0,.15);color:var(--accent);border:1px solid rgba(198,255,0,.3);font-size:.72rem;padding:3px 8px;font-weight:800;">
               🔒 Acesso Seguro &middot; Somente Leitura
             </span>
           </div>
@@ -834,7 +834,7 @@ const PortalCliente = {
     </div>
 
     <!-- BANNER DE ORIENTAÇÃO -->
-    <div style="background:linear-gradient(135deg, rgba(18,217,160,.1) 0%, rgba(59,130,246,.06) 100%);border:1px solid rgba(18,217,160,.25);border-radius:var(--r-md);padding:16px 20px;margin-bottom:20px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:14px;">
+    <div style="background:linear-gradient(135deg, rgba(198,255,0,.1) 0%, rgba(59,130,246,.06) 100%);border:1px solid rgba(198,255,0,.25);border-radius:var(--r-md);padding:16px 20px;margin-bottom:20px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:14px;">
       <div style="flex:1;min-width:280px;">
         <div style="font-weight:800;font-size:.95rem;color:var(--text);display:flex;align-items:center;gap:8px;">
           <span>🔒</span> Links Exclusivos por Obra &middot; Totalmente Travados
@@ -844,7 +844,7 @@ const PortalCliente = {
         </div>
       </div>
       <div style="display:flex;gap:8px;">
-        <span class="badge" style="background:rgba(18,217,160,.15);color:var(--accent);font-size:.76rem;font-weight:800;padding:6px 12px;border:1px solid rgba(18,217,160,.3);">
+        <span class="badge" style="background:rgba(198,255,0,.15);color:var(--accent);font-size:.76rem;font-weight:800;padding:6px 12px;border:1px solid rgba(198,255,0,.3);">
           ✓ Sem Senha / Celular
         </span>
       </div>

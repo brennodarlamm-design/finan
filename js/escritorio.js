@@ -786,16 +786,22 @@ const Escritorio = {
     const rows = document.querySelectorAll('#lote-tbody tr');
     let criados = 0;
 
+    const parts = comp.split('-');
+    const ano = parseInt(parts[0], 10) || new Date().getFullYear();
+    const mes = parseInt(parts[1], 10) || (new Date().getMonth() + 1);
+    const maxDia = new Date(ano, mes, 0).getDate();
+
     rows.forEach(row => {
       const chk = row.querySelector('.lote-chk');
       if (chk && chk.checked) {
-        const desc = row.querySelector('.lote-desc')?.value;
+        const desc = row.querySelector('.lote-desc')?.value?.trim();
         const cat = row.querySelector('.lote-cat')?.value || 'outro';
-        const forn = row.querySelector('.lote-forn')?.value;
-        const dia = parseInt(row.querySelector('.lote-dia')?.value) || 10;
+        const forn = row.querySelector('.lote-forn')?.value?.trim();
+        const dia = parseInt(row.querySelector('.lote-dia')?.value, 10) || 10;
         const valor = parseFloat(row.querySelector('.lote-valor')?.value) || 0;
 
-        const diaFmt = String(dia).padStart(2, '0');
+        const diaAjustado = Math.min(Math.max(dia, 1), maxDia);
+        const diaFmt = String(diaAjustado).padStart(2, '0');
         const dataVenc = `${comp}-${diaFmt}`;
 
         if (!desc || valor <= 0) return;
@@ -820,7 +826,11 @@ const Escritorio = {
     });
 
     Utils.closeModal();
-    Utils.toast(`${criados} despesas fixas do escritório geradas com sucesso para a competência ${comp}!`, 'success');
-    App.navigate('escritorio');
+    if (criados > 0) {
+      Utils.toast(`${criados} despesas fixas do escritório geradas com sucesso para a competência ${comp}!`, 'success');
+      App.navigate('escritorio');
+    } else {
+      Utils.toast('Nenhum custo fixo foi gerado. Certifique-se de selecionar as despesas com valor maior que R$ 0,00.', 'warning');
+    }
   }
 };

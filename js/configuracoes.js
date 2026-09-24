@@ -447,7 +447,7 @@ const Configuracoes = {
             </div>
 
             <!-- QUADRO DE INSTRUÇÕES E RECOMENDAÇÕES PARA O USUÁRIO -->
-            <div style="background:rgba(18,217,160,0.03);border:1px solid rgba(18,217,160,0.22);border-radius:10px;padding:14px 16px;">
+            <div style="background:rgba(198,255,0,0.03);border:1px solid rgba(198,255,0,0.22);border-radius:10px;padding:14px 16px;">
               <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
                 <span style="font-size:1.1rem;">💡</span>
                 <strong style="font-size:.88rem;color:var(--accent);">Guia & Recomendações para o Logotipo Perfeito</strong>
@@ -991,7 +991,7 @@ const Configuracoes = {
 
   // ── SESSÕES E DISPOSITIVOS ──────────────────────────────
   _renderSessoes() {
-    return `<div class="page-header"><div><h1 class="page-title">&#x1F4F1; Sess&otilde;es & Dispositivos</h1><p class="page-sub">Veja onde sua conta est&aacute; conectada e encerre acessos que voc&ecirc; n&atilde;o reconhece.</p></div><div class="page-actions"><button class="btn btn-secondary btn-sm" data-fb-click="Configuracoes.loadSessions" data-fb-click-n="0">↻ Atualizar</button><button class="btn btn-warning btn-sm" data-fb-click="Configuracoes.revokeOtherSessions" data-fb-click-n="0">Encerrar outras sess&otilde;es</button></div></div><div style="margin-bottom:14px;padding:13px 15px;border:1px solid rgba(18,217,160,.28);background:rgba(18,217,160,.05);border-radius:10px;font-size:.8rem;line-height:1.5;color:var(--text2);"><strong style="color:var(--accent)">Dispositivo não é usuário.</strong> Você pode usar a mesma conta no notebook e no celular. Essas sessões aparecem aqui por segurança, mas não consomem acessos adicionais do plano.</div><div id="sessions-list" class="card" style="padding:18px;color:var(--text3);">Carregando sess&otilde;es…</div>`;
+    return `<div class="page-header"><div><h1 class="page-title">&#x1F4F1; Sess&otilde;es & Dispositivos</h1><p class="page-sub">Veja onde sua conta est&aacute; conectada e encerre acessos que voc&ecirc; n&atilde;o reconhece.</p></div><div class="page-actions"><button class="btn btn-secondary btn-sm" data-fb-click="Configuracoes.loadSessions" data-fb-click-n="0">↻ Atualizar</button><button class="btn btn-warning btn-sm" data-fb-click="Configuracoes.revokeOtherSessions" data-fb-click-n="0">Encerrar outras sess&otilde;es</button></div></div><div style="margin-bottom:14px;padding:13px 15px;border:1px solid rgba(198,255,0,.28);background:rgba(198,255,0,.05);border-radius:10px;font-size:.8rem;line-height:1.5;color:var(--text2);"><strong style="color:var(--accent)">Dispositivo não é usuário.</strong> Você pode usar a mesma conta no notebook e no celular. Essas sessões aparecem aqui por segurança, mas não consomem acessos adicionais do plano.</div><div id="sessions-list" class="card" style="padding:18px;color:var(--text3);">Carregando sess&otilde;es…</div>`;
   },
 
   async loadSessions() {

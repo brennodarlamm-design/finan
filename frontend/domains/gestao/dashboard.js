@@ -1219,7 +1219,7 @@ const Dashboard = {
 
     if (totalDone === 3) {
       return `
-        <div class="card" style="background:linear-gradient(135deg,rgba(18,217,160,.12),rgba(16,185,129,.05));border:1px solid rgba(18,217,160,.35);margin-bottom:20px;padding:16px 20px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;">
+        <div class="card" style="background:linear-gradient(135deg,rgba(198,255,0,.12),rgba(16,185,129,.05));border:1px solid rgba(198,255,0,.35);margin-bottom:20px;padding:16px 20px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;">
           <div style="display:flex;align-items:center;gap:12px;">
             <span style="font-size:1.8rem;">🎉</span>
             <div>

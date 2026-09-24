@@ -152,7 +152,7 @@ const AgendaEventos = {
     if (tab === 'novo') {
       return `
         <form id="agenda-novo-form" data-fb-submit="AgendaEventos.salvarNovoEventoSubmit" data-fb-submit-n="1" data-fb-submit-t0="event" style="display:flex;flex-direction:column;gap:12px;">
-          <div style="background:rgba(18,217,160,.08);border:1px solid rgba(18,217,160,.25);border-radius:var(--r-md);padding:10px 14px;font-size:.78rem;color:var(--accent2);line-height:1.4;">
+          <div style="background:rgba(198,255,0,.08);border:1px solid rgba(198,255,0,.25);border-radius:var(--r-md);padding:10px 14px;font-size:.78rem;color:var(--accent2);line-height:1.4;">
             📣 <strong>Painel Dev &amp; Instrutor:</strong> Cadastre uma nova live, aula de workflow ou workshop para os usuários da construtora.
           </div>
           <div>

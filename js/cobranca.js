@@ -487,8 +487,8 @@ const Cobranca = {
 
           <!-- BLOCO PRIMÁRIO (ZERO SCROLL): Botão Copiar Código PIX de 52px -->
           ${pixPayload ? `
-            <div style="background:linear-gradient(135deg,rgba(18,217,160,.12),rgba(16,185,129,.05));border:1.5px solid var(--accent);border-radius:14px;padding:14px;display:flex;flex-direction:column;gap:10px;">
-              <button id="pix-copy-btn" style="background:linear-gradient(135deg,var(--accent),var(--accent2));border:none;color:#060e09;min-height:52px;border-radius:10px;font-size:1rem;font-weight:900;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:10px;box-shadow:0 4px 18px rgba(18,217,160,.35);transition:all .2s;width:100%;">
+            <div style="background:linear-gradient(135deg,rgba(198,255,0,.12),rgba(16,185,129,.05));border:1.5px solid var(--accent);border-radius:14px;padding:14px;display:flex;flex-direction:column;gap:10px;">
+              <button id="pix-copy-btn" style="background:linear-gradient(135deg,var(--accent),var(--accent2));border:none;color:#060e09;min-height:52px;border-radius:10px;font-size:1rem;font-weight:900;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:10px;box-shadow:0 4px 18px rgba(198,255,0,.35);transition:all .2s;width:100%;">
                 📋 COPIAR CÓDIGO PIX (1 Clique)
               </button>
               <div style="display:flex;gap:6px;align-items:center;">

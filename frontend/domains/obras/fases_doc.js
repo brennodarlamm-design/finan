@@ -59,7 +59,7 @@ const FasesDoc = {
   STATUS: {
     nao_iniciado:  { label: 'Não iniciado', icone: '⬜', cor: 'var(--text3)',  bg: 'transparent' },
     em_andamento:  { label: 'Em andamento', icone: '🟡', cor: 'var(--warning)', bg: 'rgba(245,166,35,.07)' },
-    ok:            { label: 'Concluído',    icone: '✅', cor: 'var(--success)', bg: 'rgba(18,217,160,.07)' },
+    ok:            { label: 'Concluído',    icone: '✅', cor: 'var(--success)', bg: 'rgba(198,255,0,.07)' },
     vencido:       { label: 'Vencido',      icone: '🔴', cor: 'var(--danger)',  bg: 'rgba(255,92,92,.07)' },
     nao_aplicavel: { label: 'N/A',          icone: '➖', cor: 'var(--text3)',   bg: 'transparent' },
   },
@@ -257,7 +257,7 @@ const FasesDoc = {
       <div style="flex:1;min-width:0">
         <div style="font-size:.845rem;font-weight:600;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
           ${doc.nome}
-          ${qtdArq > 0 ? `<span style="font-size:.68rem;background:rgba(18,217,160,.15);color:var(--accent);border:1px solid rgba(18,217,160,.25);border-radius:5px;padding:1px 7px;cursor:pointer;font-weight:700" data-fb-click="FasesDoc.showDocModal" data-fb-click-n="2" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(obraId))}" data-fb-click-t1="string" data-fb-click-v1="${encodeURIComponent(String(doc.id))}" title="${qtdArq} anexo(s)">📎 ${qtdArq}</span>` : ''}
+          ${qtdArq > 0 ? `<span style="font-size:.68rem;background:rgba(198,255,0,.15);color:var(--accent);border:1px solid rgba(198,255,0,.25);border-radius:5px;padding:1px 7px;cursor:pointer;font-weight:700" data-fb-click="FasesDoc.showDocModal" data-fb-click-n="2" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(obraId))}" data-fb-click-t1="string" data-fb-click-v1="${encodeURIComponent(String(doc.id))}" title="${qtdArq} anexo(s)">📎 ${qtdArq}</span>` : ''}
           ${linkExternoUrl ? `<a href="${linkExternoUrl}" target="_blank" rel="noopener noreferrer"
                                  style="font-size:.68rem;background:rgba(66,133,244,.15);color:#4285F4;border:1px solid rgba(66,133,244,.3);border-radius:5px;padding:1px 7px;text-decoration:none;font-weight:700;display:inline-flex;align-items:center;gap:3px"
                                  title="Abrir pasta/arquivo no Google Drive ou Nuvem">📁 ${linkExternoTipo==='gdrive'?'Drive':linkExternoTipo==='onedrive'?'OneDrive':'Link'}</a>` : ''}
