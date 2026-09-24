@@ -11,10 +11,11 @@
 
 | Trilha | Status | Responsável | Início | Previsão | Descrição |
 | :--- | :--- | :--- | :--- | :--- | :--- |
-| **`modernizacao-master`** | 🟢 **Em Execução** | Antigravity AI | 2026-09-15 | 2026-09-15 | Orquestração integral de todas as 22 skills instaladas: Conductor CDD, Design Agency-Grade, KPI Dashboard, Neon Postgres Egress, API RESTful Security, TDD Gates e Ecossistema `llms.txt`. |
+| **`monolito-modular`** | 🟢 **Em Execução** | Antigravity AI | 2026-09-24 | 2026-09-24 | Implementação do Monólito Modular com divisões assertivas: frontend, backend, marketing, shared e domínios de negócio com pontes de compatibilidade. |
+| **`modernizacao-master`** | 🟡 **Concluída / Em Manutenção** | Antigravity AI | 2026-09-15 | 2026-09-15 | Orquestração de skills, Conductor CDD, Design Agency-Grade, KPI Dashboard, Neon Egress e RESTful Security. |
 
-- **Especificação**: [`conductor/tracks/modernizacao-master/spec.md`](file:///d:/Projects/FINANÇAS/conductor/tracks/modernizacao-master/spec.md)
-- **Plano de Execução**: [`conductor/tracks/modernizacao-master/plan.md`](file:///d:/Projects/FINANÇAS/conductor/tracks/modernizacao-master/plan.md)
+- **Especificação Ativa**: [`conductor/tracks/monolito-modular/spec.md`](file:///d:/Projects/FINAN%C3%87AS/conductor/tracks/monolito-modular/spec.md)
+- **Plano de Execução**: [`conductor/tracks/monolito-modular/plan.md`](file:///d:/Projects/FINAN%C3%87AS/conductor/tracks/monolito-modular/plan.md)
 
 ---
 
