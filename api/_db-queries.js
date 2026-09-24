@@ -460,17 +460,31 @@ export async function handleTableQuery(sql, tenantId, auth, query, res) {
 
     case 'orcamentos': {
       if (!tableAllowed(auth, 'orcamentos', 'read')) return res.status(403).json({ error: 'Acesso não permitido.' });
-      const rows = pagination
-        ? await sql`SELECT * FROM orcamentos WHERE tenant_id = ${tenantId} ORDER BY created_at DESC, id DESC LIMIT ${pagination.limit} OFFSET ${pagination.offset};`
-        : await sql`SELECT * FROM orcamentos WHERE tenant_id = ${tenantId} ORDER BY created_at DESC, id DESC;`;
+      let rows;
+      if (filterObra) {
+        rows = pagination
+          ? await sql`SELECT * FROM orcamentos WHERE tenant_id = ${tenantId} AND obra_id = ${filterObra} ORDER BY created_at DESC, id DESC LIMIT ${pagination.limit} OFFSET ${pagination.offset};`
+          : await sql`SELECT * FROM orcamentos WHERE tenant_id = ${tenantId} AND obra_id = ${filterObra} ORDER BY created_at DESC, id DESC;`;
+      } else {
+        rows = pagination
+          ? await sql`SELECT * FROM orcamentos WHERE tenant_id = ${tenantId} ORDER BY created_at DESC, id DESC LIMIT ${pagination.limit} OFFSET ${pagination.offset};`
+          : await sql`SELECT * FROM orcamentos WHERE tenant_id = ${tenantId} ORDER BY created_at DESC, id DESC;`;
+      }
       return res.status(200).json(pageResponse(rows.map(normalizeOrcamento), pagination));
     }
 
     case 'medicoes': {
       if (!tableAllowed(auth, 'medicoes', 'read')) return res.status(403).json({ error: 'Acesso não permitido.' });
-      const rows = pagination
-        ? await sql`SELECT * FROM medicoes WHERE tenant_id = ${tenantId} ORDER BY data DESC, created_at DESC, id DESC LIMIT ${pagination.limit} OFFSET ${pagination.offset};`
-        : await sql`SELECT * FROM medicoes WHERE tenant_id = ${tenantId} ORDER BY data DESC, created_at DESC, id DESC;`;
+      let rows;
+      if (filterObra) {
+        rows = pagination
+          ? await sql`SELECT * FROM medicoes WHERE tenant_id = ${tenantId} AND obra_id = ${filterObra} ORDER BY data DESC, created_at DESC, id DESC LIMIT ${pagination.limit} OFFSET ${pagination.offset};`
+          : await sql`SELECT * FROM medicoes WHERE tenant_id = ${tenantId} AND obra_id = ${filterObra} ORDER BY data DESC, created_at DESC, id DESC;`;
+      } else {
+        rows = pagination
+          ? await sql`SELECT * FROM medicoes WHERE tenant_id = ${tenantId} ORDER BY data DESC, created_at DESC, id DESC LIMIT ${pagination.limit} OFFSET ${pagination.offset};`
+          : await sql`SELECT * FROM medicoes WHERE tenant_id = ${tenantId} ORDER BY data DESC, created_at DESC, id DESC;`;
+      }
       return res.status(200).json(pageResponse(rows.map(normalizeMedicao), pagination));
     }
 
@@ -525,9 +539,16 @@ export async function handleTableQuery(sql, tenantId, auth, query, res) {
 
     case 'orcamentos_sinapi': {
       if (!tableAllowed(auth, 'orcamentos_sinapi', 'read')) return res.status(403).json({ error: 'Acesso não permitido.' });
-      const rows = pagination
-        ? await sql`SELECT * FROM orcamentos_sinapi WHERE tenant_id=${tenantId} ORDER BY updated_at DESC, id DESC LIMIT ${pagination.limit} OFFSET ${pagination.offset};`
-        : await sql`SELECT * FROM orcamentos_sinapi WHERE tenant_id=${tenantId} ORDER BY updated_at DESC, id DESC;`;
+      let rows;
+      if (filterObra) {
+        rows = pagination
+          ? await sql`SELECT * FROM orcamentos_sinapi WHERE tenant_id=${tenantId} AND obra_id=${filterObra} ORDER BY updated_at DESC, id DESC LIMIT ${pagination.limit} OFFSET ${pagination.offset};`
+          : await sql`SELECT * FROM orcamentos_sinapi WHERE tenant_id=${tenantId} AND obra_id=${filterObra} ORDER BY updated_at DESC, id DESC;`;
+      } else {
+        rows = pagination
+          ? await sql`SELECT * FROM orcamentos_sinapi WHERE tenant_id=${tenantId} ORDER BY updated_at DESC, id DESC LIMIT ${pagination.limit} OFFSET ${pagination.offset};`
+          : await sql`SELECT * FROM orcamentos_sinapi WHERE tenant_id=${tenantId} ORDER BY updated_at DESC, id DESC;`;
+      }
       return res.status(200).json(pageResponse(rows.map(jsonPayload), pagination));
     }
 

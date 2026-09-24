@@ -286,7 +286,7 @@ const Medicoes = {
         <div class="modal-body">
           <form id="f-med">
             <div class="form-row cols-3" style="margin-bottom:14px;">
-              <div class="form-group"><label class="form-label" for="med-obra-id">Obra *</label><select class="form-control" id="med-obra-id" name="obra_id" required>${Utils.clienteOptions(m.obra_id||App.obraId!=='todas'?App.obraId:'')}</select></div>
+              <div class="form-group"><label class="form-label" for="med-obra-id">Obra *</label><select class="form-control" id="med-obra-id" name="obra_id" required>${Utils.clienteOptions(m.obra_id || (App.obraId !== 'todas' ? App.obraId : ''))}</select></div>
               <div class="form-group"><label class="form-label" for="med-numero">Nº da Medição *</label><input class="form-control" id="med-numero" type="number" name="numero_medicao" value="${m.numero_medicao||1}" min="1" required></div>
               <div class="form-group"><label class="form-label" for="med-status">Status</label><select class="form-control" id="med-status" name="status">
                 <option value="preparando" ${(m.status||'preparando')==='preparando'?'selected':''}>📋 Preparando</option>
@@ -360,7 +360,18 @@ const Medicoes = {
   },
 
   del(id) {
-    Utils.confirm('Excluir esta medição?',()=>{DB.remove('medicoes',id);this._refresh();Utils.toast('Medição excluída!','info');});
+    Utils.confirm('Excluir esta medição?', () => {
+      const m = (typeof DB !== 'undefined' && DB.getById) ? DB.getById('medicoes', id) : null;
+      if (m?.lancamento_id) {
+        DB.remove('lancamentos', m.lancamento_id);
+      } else if (typeof DB !== 'undefined' && DB.getAll) {
+        const lan = (DB.getAll('lancamentos') || []).find(l => l.medicao_id === id);
+        if (lan?.id) DB.remove('lancamentos', lan.id);
+      }
+      DB.remove('medicoes', id);
+      this._refresh();
+      Utils.toast('Medição excluída!', 'info');
+    });
   },
 
   _refresh() {

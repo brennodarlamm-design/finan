@@ -204,7 +204,7 @@ const ObraDetalhe = {
                class="btn btn-sm" style="background:#4285F4;color:#fff;font-weight:700;display:inline-flex;align-items:center;gap:5px;text-decoration:none;" title="Abrir pasta de projetos no Google Drive">
               📁 Pasta no Google Drive
             </a>` : ''}
-          <button class="btn btn-sm" style="background:rgba(18,217,160,.15);color:var(--accent);border:1px solid rgba(18,217,160,.35);font-weight:800;display:inline-flex;align-items:center;gap:6px;" data-od-click="PortalCliente.abrirModalCompartilhar('${obra.id}')" title="Compartilhar Portal do Cliente via Link / WhatsApp">
+          <button class="btn btn-sm" style="background:rgba(198,255,0,.15);color:var(--accent);border:1px solid rgba(198,255,0,.35);font-weight:800;display:inline-flex;align-items:center;gap:6px;" data-od-click="PortalCliente.abrirModalCompartilhar('${obra.id}')" title="Compartilhar Portal do Cliente via Link / WhatsApp">
             🌐 Portal do Cliente
           </button>
           <button class="btn btn-secondary btn-sm" data-od-click="Clientes.showForm('${obra.id}')" title="Editar cadastro da obra">
@@ -217,7 +217,7 @@ const ObraDetalhe = {
       </div>
 
       <!-- Hero Executivo da Obra -->
-      <div class="card" style="margin-bottom:20px;padding:22px;border:1px solid rgba(18,217,160,0.25);background:linear-gradient(180deg, var(--bg-card) 0%, rgba(18,217,160,0.03) 100%);">
+      <div class="card" style="margin-bottom:20px;padding:22px;border:1px solid rgba(198,255,0,0.25);background:linear-gradient(180deg, var(--bg-card) 0%, rgba(198,255,0,0.03) 100%);">
         <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:16px;margin-bottom:20px;">
           <div>
             <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:6px;">
@@ -577,7 +577,7 @@ const ObraDetalhe = {
     <div>
       <!-- Banner quando a obra não possui orçamento cadastrado -->
       ${!comp.temOrcamento ? `
-      <div class="card" style="margin-bottom:20px;padding:16px 20px;border-left:4px solid var(--accent);background:linear-gradient(90deg, rgba(18,217,160,0.08) 0%, var(--bg-card) 100%);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:14px;">
+      <div class="card" style="margin-bottom:20px;padding:16px 20px;border-left:4px solid var(--accent);background:linear-gradient(90deg, rgba(198,255,0,0.08) 0%, var(--bg-card) 100%);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:14px;">
         <div style="flex:1;min-width:280px;">
           <div style="display:flex;align-items:center;gap:8px;font-weight:800;font-size:1rem;color:var(--text);">
             <span>📋</span>
@@ -602,19 +602,19 @@ const ObraDetalhe = {
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px;flex-wrap:wrap;gap:12px;">
         <div style="display:flex;gap:8px;flex-wrap:wrap;background:var(--bg-secondary);padding:4px;border-radius:var(--r-md);border:1px solid var(--border);">
           <button class="btn btn-sm od-subtab-btn ${currentSubTab==='curva-s'?'active':''}" data-subtab="curva-s" data-od-click="ObraDetalhe.setSubTabOrcado('curva-s')"
-                  style="border-radius:6px;font-size:.82rem;font-weight:700;border:1px solid ${currentSubTab==='curva-s'?'var(--accent)':'transparent'};color:${currentSubTab==='curva-s'?'var(--accent)':'var(--text2)'};background:${currentSubTab==='curva-s'?'rgba(18,217,160,0.12)':'transparent'};">
+                  style="border-radius:6px;font-size:.82rem;font-weight:700;border:1px solid ${currentSubTab==='curva-s'?'var(--accent)':'transparent'};color:${currentSubTab==='curva-s'?'var(--accent)':'var(--text2)'};background:${currentSubTab==='curva-s'?'rgba(198,255,0,0.12)':'transparent'};">
             ${this._hasEngineeringFeature()?'📈':'🔒'} Curva S &amp; Previsão EVM
           </button>
           <button class="btn btn-sm od-subtab-btn ${currentSubTab==='cronograma'?'active':''}" data-subtab="cronograma" data-od-click="ObraDetalhe.setSubTabOrcado('cronograma')"
-                  style="border-radius:6px;font-size:.82rem;font-weight:700;border:1px solid ${currentSubTab==='cronograma'?'var(--accent)':'transparent'};color:${currentSubTab==='cronograma'?'var(--accent)':'var(--text2)'};background:${currentSubTab==='cronograma'?'rgba(18,217,160,0.12)':'transparent'};">
+                  style="border-radius:6px;font-size:.82rem;font-weight:700;border:1px solid ${currentSubTab==='cronograma'?'var(--accent)':'transparent'};color:${currentSubTab==='cronograma'?'var(--accent)':'var(--text2)'};background:${currentSubTab==='cronograma'?'rgba(198,255,0,0.12)':'transparent'};">
             📅 Cronograma Físico-Financeiro
           </button>
           <button class="btn btn-sm od-subtab-btn ${currentSubTab==='curva-abc'?'active':''}" data-subtab="curva-abc" data-od-click="ObraDetalhe.setSubTabOrcado('curva-abc')"
-                  style="border-radius:6px;font-size:.82rem;font-weight:700;border:1px solid ${currentSubTab==='curva-abc'?'var(--accent)':'transparent'};color:${currentSubTab==='curva-abc'?'var(--accent)':'var(--text2)'};background:${currentSubTab==='curva-abc'?'rgba(18,217,160,0.12)':'transparent'};">
+                  style="border-radius:6px;font-size:.82rem;font-weight:700;border:1px solid ${currentSubTab==='curva-abc'?'var(--accent)':'transparent'};color:${currentSubTab==='curva-abc'?'var(--accent)':'var(--text2)'};background:${currentSubTab==='curva-abc'?'rgba(198,255,0,0.12)':'transparent'};">
             ${this._hasEngineeringFeature()?'📊':'🔒'} Curva ABC (Pareto)
           </button>
           <button class="btn btn-sm od-subtab-btn ${currentSubTab==='leis-sociais'?'active':''}" data-subtab="leis-sociais" data-od-click="ObraDetalhe.setSubTabOrcado('leis-sociais')"
-                  style="border-radius:6px;font-size:.82rem;font-weight:700;border:1px solid ${currentSubTab==='leis-sociais'?'var(--accent)':'transparent'};color:${currentSubTab==='leis-sociais'?'var(--accent)':'var(--text2)'};background:${currentSubTab==='leis-sociais'?'rgba(18,217,160,0.12)':'transparent'};">
+                  style="border-radius:6px;font-size:.82rem;font-weight:700;border:1px solid ${currentSubTab==='leis-sociais'?'var(--accent)':'transparent'};color:${currentSubTab==='leis-sociais'?'var(--accent)':'var(--text2)'};background:${currentSubTab==='leis-sociais'?'rgba(198,255,0,0.12)':'transparent'};">
             ${this._hasEngineeringFeature()?'⚖️':'🔒'} Leis Sociais &amp; BDI
           </button>
         </div>
@@ -1282,7 +1282,7 @@ const ObraDetalhe = {
             </div>
 
             <!-- Faixa de Aceitabilidade TCU Dinâmica -->
-            <div id="od-bdi-status-badge" style="margin-top:14px;padding:10px 12px;background:rgba(18,217,160,0.06);border:1px solid rgba(18,217,160,0.2);border-radius:var(--r-md);font-size:.76rem;color:var(--text);">
+            <div id="od-bdi-status-badge" style="margin-top:14px;padding:10px 12px;background:rgba(198,255,0,0.06);border:1px solid rgba(198,255,0,0.2);border-radius:var(--r-md);font-size:.76rem;color:var(--text);">
               <strong>Faixa TCU Edifícios (Acórdão 2622/2013):</strong> 1º Quartil: <strong>20,34%</strong> &bull; Mediana: <strong>22,18%</strong> &bull; 3º Quartil: <strong>25,00%</strong>.
             </div>
 
@@ -2419,7 +2419,7 @@ const ObraDetalhe = {
                     </td>
                     <td style="font-size:.8rem;color:var(--text2);">${Utils.fmt.date(m.data_medicao || m.data)}</td>
                     <td style="text-align:center;">
-                      <span class="badge" style="background:rgba(18,217,160,.15);color:var(--accent);font-weight:800;">
+                      <span class="badge" style="background:rgba(198,255,0,.15);color:var(--accent);font-weight:800;">
                         ${m.percentual_fisico || 0}%
                       </span>
                     </td>

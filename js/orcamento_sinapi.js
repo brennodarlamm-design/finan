@@ -1663,16 +1663,31 @@ const OrcamentoSINAPI = {
 
   _getAll(obraId) {
     try {
-      const all = JSON.parse(localStorage.getItem(this._storageKey()) || '[]');
-      if (!obraId || obraId === 'todas') return all;
-      return all.filter(o => o.obra_id === obraId);
+      const storageKey = this._storageKey();
+      let all;
+      if (typeof DB !== 'undefined' && DB._memCache && DB._memCache.has(storageKey)) {
+        all = DB._memCache.get(storageKey);
+      } else {
+        all = JSON.parse(localStorage.getItem(storageKey) || '[]');
+        if (typeof DB !== 'undefined' && DB._memCache) DB._memCache.set(storageKey, all);
+      }
+      const list = Array.isArray(all) ? all : [];
+      if (!obraId || obraId === 'todas') return list;
+      return list.filter(o => o.obra_id === obraId);
     } catch { return []; }
   },
 
   _getById(id) {
     try {
-      const all = JSON.parse(localStorage.getItem(this._storageKey()) || '[]');
-      return all.find(o => o.id === id) || null;
+      const storageKey = this._storageKey();
+      let all;
+      if (typeof DB !== 'undefined' && DB._memCache && DB._memCache.has(storageKey)) {
+        all = DB._memCache.get(storageKey);
+      } else {
+        all = JSON.parse(localStorage.getItem(storageKey) || '[]');
+        if (typeof DB !== 'undefined' && DB._memCache) DB._memCache.set(storageKey, all);
+      }
+      return (Array.isArray(all) ? all : []).find(o => o.id === id) || null;
     } catch { return null; }
   },
 
@@ -1685,9 +1700,19 @@ const OrcamentoSINAPI = {
         orc.subtotal = t.subtotal;
         orc.valor_bdi = t.valorBDI;
       }
-      const all = JSON.parse(localStorage.getItem(this._storageKey()) || '[]');
+      const storageKey = this._storageKey();
+      const all = this._getAll();
       all.unshift(orc);
-      localStorage.setItem(this._storageKey(), JSON.stringify(all));
+      if (typeof DB !== 'undefined' && DB._memCache) DB._memCache.set(storageKey, all);
+      if (typeof IDBStorage !== 'undefined' && IDBStorage.setItem) {
+        IDBStorage.setItem(storageKey, all).catch(() => {});
+      }
+      try {
+        localStorage.setItem(storageKey, JSON.stringify(all));
+      } catch (e) {
+        if (typeof DB !== 'undefined' && DB.purgeStorage) DB.purgeStorage();
+        try { localStorage.setItem(storageKey, JSON.stringify(all)); } catch (_) {}
+      }
       this._syncCloud('save', orc);
     } catch(e) { console.error('OrcamentoSINAPI._add', e); }
   },
@@ -1701,11 +1726,21 @@ const OrcamentoSINAPI = {
         orc.subtotal = t.subtotal;
         orc.valor_bdi = t.valorBDI;
       }
-      const all = JSON.parse(localStorage.getItem(this._storageKey()) || '[]');
+      const storageKey = this._storageKey();
+      const all = this._getAll();
       const idx = all.findIndex(o => o.id === orc.id);
       if (idx !== -1) all[idx] = orc;
       else all.push(orc);
-      localStorage.setItem(this._storageKey(), JSON.stringify(all));
+      if (typeof DB !== 'undefined' && DB._memCache) DB._memCache.set(storageKey, all);
+      if (typeof IDBStorage !== 'undefined' && IDBStorage.setItem) {
+        IDBStorage.setItem(storageKey, all).catch(() => {});
+      }
+      try {
+        localStorage.setItem(storageKey, JSON.stringify(all));
+      } catch (e) {
+        if (typeof DB !== 'undefined' && DB.purgeStorage) DB.purgeStorage();
+        try { localStorage.setItem(storageKey, JSON.stringify(all)); } catch (_) {}
+      }
       this._syncCloud('save', orc);
     } catch(e) { console.error('OrcamentoSINAPI._save', e); }
   },
@@ -1713,8 +1748,18 @@ const OrcamentoSINAPI = {
   _remove(id) {
     if (typeof DB !== 'undefined' && DB.canWriteLocal && !DB.canWriteLocal('delete')) return DB._denyLocal('delete');
     try {
-      const all = JSON.parse(localStorage.getItem(this._storageKey()) || '[]').filter(o => o.id !== id);
-      localStorage.setItem(this._storageKey(), JSON.stringify(all));
+      const storageKey = this._storageKey();
+      const all = this._getAll().filter(o => o.id !== id);
+      if (typeof DB !== 'undefined' && DB._memCache) DB._memCache.set(storageKey, all);
+      if (typeof IDBStorage !== 'undefined' && IDBStorage.setItem) {
+        IDBStorage.setItem(storageKey, all).catch(() => {});
+      }
+      try {
+        localStorage.setItem(storageKey, JSON.stringify(all));
+      } catch (e) {
+        if (typeof DB !== 'undefined' && DB.purgeStorage) DB.purgeStorage();
+        try { localStorage.setItem(storageKey, JSON.stringify(all)); } catch (_) {}
+      }
       this._syncCloud('delete', null, id);
     } catch(e) { console.error('OrcamentoSINAPI._remove', e); }
   },
