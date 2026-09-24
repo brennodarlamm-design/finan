@@ -577,7 +577,7 @@ const BIMGeometryImporter = (() => {
   async function contentToFile(content, filename, mime='application/octet-stream'){
     if(content instanceof Blob) return new File([content],filename,{type:mime});
     if(content instanceof ArrayBuffer) return new File([content],filename,{type:mime});
-    const str=String(content||'');
+    const str=String(content||'').trim();
     if(/^https?:\/\//i.test(str)){
       const res=await fetch(str,{credentials:'omit'});
       if(!res.ok) throw new Error('Não foi possível carregar o arquivo BIM versionado.');
@@ -588,9 +588,20 @@ const BIMGeometryImporter = (() => {
       const is64=/;base64/i.test(head);
       let bytes;
       if(is64){
-        const bin=atob(data); bytes=new Uint8Array(bin.length); for(let i=0;i<bin.length;i++) bytes[i]=bin.charCodeAt(i);
+        const clean = data.replace(/\s+/g, '');
+        const bin=atob(clean); bytes=new Uint8Array(bin.length); for(let i=0;i<bin.length;i++) bytes[i]=bin.charCodeAt(i);
       } else bytes=new TextEncoder().encode(decodeURIComponent(data));
       return new File([bytes],filename,{type:(head.match(/^data:([^;,]+)/i)?.[1]||mime)});
+    }
+    // Suporte a base64 puro (sem cabeçalho data:)
+    if (/^[A-Za-z0-9+/=_\-\s]{60,}$/.test(str) && !str.includes('\n\n') && !str.startsWith('ISO-10303-21') && !str.startsWith('v ') && !str.startsWith('{')) {
+      try {
+        const clean = str.replace(/\s+/g, '');
+        const bin = atob(clean);
+        const bytes = new Uint8Array(bin.length);
+        for(let i=0; i<bin.length; i++) bytes[i] = bin.charCodeAt(i);
+        return new File([bytes], filename, {type: mime});
+      } catch {}
     }
     return new File([str],filename,{type:mime});
   }

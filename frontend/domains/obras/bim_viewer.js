@@ -1121,9 +1121,16 @@ const BIMViewer = {
    * Desenha a cena 3D com ordenação de profundidade (Painter's Algorithm)
    */
   _drawScene() {
-    if (!this.ctx || !this.canvas) return;
+    if (!this.ctx || !this.canvas || !this.canvas.parentElement) {
+      if (this.animationId) {
+        cancelAnimationFrame(this.animationId);
+        this.animationId = null;
+      }
+      return;
+    }
     const w = this.canvas.parentElement.clientWidth;
     const h = this.canvas.parentElement.clientHeight;
+    if (w <= 0 || h <= 0) return;
     const renderKey = this._sceneRenderKey(w, h);
     if (renderKey === this._lastRenderKey) return;
     this._lastRenderKey = renderKey;
@@ -2136,6 +2143,10 @@ const BIMViewer = {
 
   async _handleModelImport(file) {
     if (!file) return;
+    if (!this.activeObraId) {
+      Utils.toast('Selecione uma obra ativa antes de importar o modelo BIM.', 'warning');
+      return;
+    }
     try {
       Utils.toast('Validando e tessellando modelo BIM/3D...', 'info');
       const meta = await this._inspectModelFile(file);
@@ -2342,7 +2353,7 @@ const BIMViewer = {
       const comp = typeof DB.getOrcamentoVsRealizado === 'function' ? DB.getOrcamentoVsRealizado(obraId) : emptyComp;
       const lancamentos = typeof DB.getLancamentos === 'function'
         ? DB.getLancamentos(obraId)
-        : (DB.getAll?.('lancamentos') || []).filter(l => l.obra_id === obraId);
+        : (DB.getAll?.('lancamentos') || []).filter(l => String(l.obra_id) === String(obraId));
       const cronograma = typeof DB.getCronogramaFisicoFinanceiro === 'function' ? DB.getCronogramaFisicoFinanceiro(obraId) : null;
       return { resumo: { ...emptyResumo, ...(resumo || {}) }, comp: { ...emptyComp, ...(comp || {}) }, lancamentos: Array.isArray(lancamentos) ? lancamentos : [], cronograma };
     } catch (err) {
@@ -2803,5 +2814,24 @@ const BIMViewer = {
         e.target.value = '';
       });
     }
+  },
+
+  destroy() {
+    if (this.animationId) {
+      cancelAnimationFrame(this.animationId);
+      this.animationId = null;
+    }
+    if (this._escapeHandler) {
+      document.removeEventListener('keydown', this._escapeHandler);
+      this._escapeHandler = null;
+    }
+    if (this.isExpanded) {
+      document.body.style.overflow = '';
+      this.isExpanded = false;
+    }
+    this.elements = [];
+    this.renderedFaces = [];
+    this.canvas = null;
+    this.ctx = null;
   }
 };

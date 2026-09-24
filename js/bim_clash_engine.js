@@ -71,7 +71,9 @@ const BIMClashEngine = (() => {
     for(const mesh of element.meshes||[]){
       if(mesh.type!=='triangles'||!Array.isArray(mesh.triangles)) continue;
       for(const tri of mesh.triangles){
-        if(Array.isArray(tri)&&tri.length===3) records.push({tri,bounds:triBounds(tri)});
+        if(Array.isArray(tri)&&tri.length===3 && tri.every(p => p && Number.isFinite(p.x) && Number.isFinite(p.y) && Number.isFinite(p.z))) {
+          records.push({tri,bounds:triBounds(tri)});
+        }
       }
     }
     return records;
@@ -108,19 +110,29 @@ const BIMClashEngine = (() => {
       return null;
     }
     const pairs=[];
-    if(a.records) pairs.push([a,b.left],[a,b.right]);
-    else if(b.records) pairs.push([a.left,b],[a.right,b]);
-    else pairs.push([a.left,b.left],[a.left,b.right],[a.right,b.left],[a.right,b.right]);
+    if(a.records) {
+      if (b.left) pairs.push([a,b.left]);
+      if (b.right) pairs.push([a,b.right]);
+    } else if(b.records) {
+      if (a.left) pairs.push([a.left,b]);
+      if (a.right) pairs.push([a.right,b]);
+    } else {
+      if (a.left && b.left) pairs.push([a.left,b.left]);
+      if (a.left && b.right) pairs.push([a.left,b.right]);
+      if (a.right && b.left) pairs.push([a.right,b.left]);
+      if (a.right && b.right) pairs.push([a.right,b.right]);
+    }
     pairs.sort((p,q)=>{
       const volume=x=>Math.max(0,x.maxX-x.minX)*Math.max(0,x.maxY-x.minY)*Math.max(0,x.maxZ-x.minZ);
       const ix=(x,y)=>({
         minX:Math.max(x.minX,y.minX),maxX:Math.min(x.maxX,y.maxX),
         minY:Math.max(x.minY,y.minY),maxY:Math.min(x.maxY,y.maxY),
-        minZ:Math.max(x.minZ,y.minZ),maxZ:Math.min(x.maxZ,y.maxZ)
+        minZ:Math.max(x.minZ,y.minZ),maxZ:Math.max(x.maxZ,y.maxZ)
       });
       return volume(ix(q[0].bounds,q[1].bounds))-volume(ix(p[0].bounds,p[1].bounds));
     });
     for(const [x,y] of pairs){
+      if(!x||!y) continue;
       const hit=firstIntersection(x,y,state);
       if(hit) return hit;
       if(state.truncated) return null;
