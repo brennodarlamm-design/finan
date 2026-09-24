@@ -703,43 +703,48 @@ export function parseCertDetails(cert) {
   const altName = cert.subjectAltName || '';
   const fullText = subject + ' ' + altName;
 
-  // 1. OID ICP-Brasil para CNPJ: 2.16.76.1.3.3=<14 dígitos>
-  const icpCnpjMatch = fullText.match(/2\.16\.76\.1\.3\.3[^\d]*(\d{14})/i) ||
-                       subject.match(/OID\.2\.16\.76\.1\.3\.3=(\d{14})/i);
-  if (icpCnpjMatch) {
-    cnpj = icpCnpjMatch[1];
-  }
-
-  // 2. CNPJ formatado (XX.XXX.XXX/XXXX-XX) em qualquer campo legível
-  if (!cnpj) {
-    const fmtMatch = fullText.match(/(\d{2}\.\d{3}\.\d{3}\/\d{4}-\d{2})/);
-    if (fmtMatch) cnpj = fmtMatch[1].replace(/\D/g, '');
-  }
-
-  // 3. CNPJ puro de 14 dígitos isolado — ex.: CN=EMPRESA LTDA:12345678000195
-  if (!cnpj) {
-    const pureMatch = fullText.match(/(?<!\d)(\d{14})(?!\d)/);
-    if (pureMatch) cnpj = pureMatch[1];
-  }
-
-  // 4. CNPJ embutido no CN no padrão ICP-Brasil A1: "RAZÃO SOCIAL:CNPJ"
-  if (!cnpj && commonName.includes(':')) {
+  // 1. CNPJ embutido no CN no padrão oficial ICP-Brasil A1: "RAZÃO SOCIAL:CNPJ" (14 dígitos)
+  if (commonName.includes(':')) {
     const cnParts = commonName.split(':');
     const candidate = (cnParts[cnParts.length - 1] || '').replace(/\D/g, '');
     if (candidate.length === 14) cnpj = candidate;
   }
 
-  // 5. Fallback para CPF ICP-Brasil (e-CPF): OID 2.16.76.1.3.1 ou 11 dígitos
+  // 2. OID ICP-Brasil para CNPJ: 2.16.76.1.3.3=<14 dígitos>
   if (!cnpj) {
-    const icpCpfMatch = fullText.match(/2\.16\.76\.1\.3\.1[^\d]*(\d{11})/i) ||
-                        subject.match(/OID\.2\.16\.76\.1\.3\.1=(\d{11})/i);
-    if (icpCpfMatch) {
-      cnpj = icpCpfMatch[1];
-    } else if (commonName.includes(':')) {
+    const icpCnpjMatch = fullText.match(/2\.16\.76\.1\.3\.3[^\d]*(\d{14})/i) ||
+                         subject.match(/OID\.2\.16\.76\.1\.3\.3=(\d{14})/i);
+    if (icpCnpjMatch) {
+      cnpj = icpCnpjMatch[1];
+    }
+  }
+
+  // 3. CNPJ formatado (XX.XXX.XXX/XXXX-XX) em qualquer campo legível
+  if (!cnpj) {
+    const fmtMatch = fullText.match(/(\d{2}\.\d{3}\.\d{3}\/\d{4}-\d{2})/);
+    if (fmtMatch) cnpj = fmtMatch[1].replace(/\D/g, '');
+  }
+
+  // 4. Fallback para CPF ICP-Brasil (e-CPF): CN=:11digits ou OID 2.16.76.1.3.1
+  if (!cnpj) {
+    if (commonName.includes(':')) {
       const cnParts = commonName.split(':');
       const candidate = (cnParts[cnParts.length - 1] || '').replace(/\D/g, '');
       if (candidate.length === 11) cnpj = candidate;
     }
+    if (!cnpj) {
+      const icpCpfMatch = fullText.match(/2\.16\.76\.1\.3\.1[^\d]*(\d{11})/i) ||
+                          subject.match(/OID\.2\.16\.76\.1\.3\.1=(\d{11})/i);
+      if (icpCpfMatch) cnpj = icpCpfMatch[1];
+    }
+  }
+
+  // 5. Último recurso: 14 dígitos isolados fora de OU=
+  if (!cnpj) {
+    // Remove ocorrências de OU=... para não capturar número de chamado/AR de Autoridades Certificadoras
+    const sanitizedText = fullText.replace(/OU=[^,\n/]+/gi, '');
+    const pureMatch = sanitizedText.match(/(?<!\d)(\d{14})(?!\d)/);
+    if (pureMatch) cnpj = pureMatch[1];
   }
 
   let razaoSocial = commonName;

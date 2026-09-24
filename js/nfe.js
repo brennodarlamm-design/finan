@@ -137,12 +137,27 @@ const NFe = {
 
   async baixarXML(chave) {
     chave = this._limparChave(chave);
+    // 1. Tenta recuperar do DF-e nativo da SEFAZ
+    try {
+      const dfeRes = await this._fetchWithTimeout(`${this._API_BASE}?action=dfe_xml&chave=${chave}`, {
+        method: 'GET',
+        headers: this._headers()
+      });
+      if (dfeRes.ok) {
+        const dfeJson = await dfeRes.json();
+        if (dfeJson.success && dfeJson.documento?.xml) {
+          return { status: 'OK', data: dfeJson.documento.xml };
+        }
+      }
+    } catch {}
+
+    // 2. Fallback para provedor secundário
     const res = await this._fetchWithTimeout(`${this._API_BASE}?action=xml&chave=${chave}`, {
       method: 'GET',
       headers: this._headers()
     });
     if (!res.ok) {
-      if (res.status === 404) throw new Error('NF-e não encontrada na Área do Cliente. Busque-a primeiro.');
+      if (res.status === 404) throw new Error('NF-e não encontrada na base de dados.');
       throw new Error(`Erro ao baixar XML: ${res.status}`);
     }
     return await res.json();
@@ -284,7 +299,7 @@ const NFe = {
             </button>
             <button id="tab-nfe-api" data-fb-click="NFe._setTab" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="api"
               style="padding:8px 18px;border:none;background:none;color:var(--text3);font-size:.85rem;cursor:pointer;border-bottom:2px solid transparent;font-family:inherit;">
-              ☁️ Minhas NFs na Nuvem
+              📡 Monitor DF-e (SEFAZ)
             </button>
           </div>
         </div>
@@ -673,163 +688,270 @@ const NFe = {
       </div>`;
   },
 
+  _dfeFiltroTipo: '',
+  _dfeUltimosDocs: [],
+
+  _fmtCnpj(cnpj) {
+    if (!cnpj) return '';
+    const clean = String(cnpj).replace(/\D/g, '');
+    if (clean.length === 14) {
+      return clean.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, '$1.$2.$3/$4-$5');
+    }
+    if (clean.length === 11) {
+      return clean.replace(/^(\d{3})(\d{3})(\d{3})(\d{2})$/, '$1.$2.$3-$4');
+    }
+    return cnpj;
+  },
+
   async _carregarMinhasNFes() {
     const body = document.getElementById('nfe-tab-body');
     if (!body) return;
 
-    // Header com botão Atualizar e Sincronizar
-    const headerHTML = `
-      <div style="display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap;margin-bottom:16px;">
-        <div>
-          <div style="font-weight:700;color:var(--text);font-size:.9rem;">☁️ Notas Fiscais na Nuvem (Área do Cliente MeuDanfe)</div>
-          <div style="font-size:.76rem;color:var(--text3);margin-top:2px;">NF-es armazenadas na sua conta MeuDanfe prontas para visualização e download gratuito.</div>
-        </div>
-        <div style="display:flex;gap:8px;">
-          <button class="btn btn-secondary btn-sm" data-fb-click="NFe._carregarMinhasNFes" data-fb-click-n="0" style="height:36px;">
-            🔄 Atualizar
-          </button>
-          <button class="btn btn-primary btn-sm" data-fb-click="NFe._sincronizarTudo" data-fb-click-n="0" id="nfe-sync-btn" style="height:36px;white-space:nowrap;">
-            ⬇️ Sincronizar Tudo para Cache
-          </button>
-        </div>
+    body.innerHTML = `
+      <div style="text-align:center;padding:32px 20px;color:var(--text3);">
+        <div style="display:inline-block;width:24px;height:24px;border:2px solid rgba(255,255,255,.15);border-top-color:var(--accent);border-radius:50%;animation:spin .7s linear infinite;margin-bottom:12px;"></div>
+        <div style="font-weight:700;color:var(--text);font-size:.9rem;">Consultando Monitor DF-e SEFAZ...</div>
+        <div style="font-size:.78rem;color:var(--text3);margin-top:4px;">Carregando status e documentos fiscais sincronizados</div>
       </div>
-      <div id="nfe-cloud-content"></div>`;
+    `;
 
-    body.innerHTML = headerHTML;
-
-    await this._renderPaginaCloud('', document.getElementById('nfe-cloud-content'));
-  },
-
-  async _renderPaginaCloud(after = '', container) {
-    if (!container) return;
-    container.innerHTML = '<div style="text-align:center;padding:20px;color:var(--text3);"><div style="display:inline-block;width:20px;height:20px;border:2px solid rgba(255,255,255,.15);border-top-color:var(--accent);border-radius:50%;animation:spin .7s linear infinite;"></div> Carregando da nuvem...</div>';
     try {
-      const data = await this.listarMinhasNFes(after);
-      if (data && data._permissaoNegada) {
-        container.innerHTML = `
-          <div style="text-align:center;padding:32px 24px;">
-            <div style="font-size:2rem;margin-bottom:12px;">🔒</div>
-            <div style="font-weight:700;color:var(--text);font-size:.95rem;margin-bottom:6px;">Acesso Restrito</div>
-            <div style="font-size:.82rem;color:var(--text3);max-width:340px;margin:0 auto;">
-              A listagem global de NF-es na nuvem é restrita a administradores do sistema.<br>
-              Utilize a aba <strong>📋 Consultadas Recentemente</strong> para ver as NF-es que você já buscou.
-            </div>
-          </div>`;
-        return;
-      }
-      if (!data || data.status !== 'OK') {
-        const msg = (data && data.statusMessage) ? data.statusMessage : 'Nenhuma NF-e encontrada na Área do Cliente MeuDanfe.';
-        container.innerHTML = `<div style="text-align:center;padding:24px;color:var(--text3);">${Utils.escapeHtml(msg)}</div>`;
-        return;
-      }
-      const chaves = data.chaves || data.page?.keys || [];
+      const [statusRes, docsRes] = await Promise.all([
+        this._fetchWithTimeout('/api/nfe?action=dfe_status', { headers: this._headers() })
+          .then(r => r.json()).catch(() => ({})),
+        this._fetchWithTimeout('/api/nfe?action=dfe_listar&limit=100', { headers: this._headers() })
+          .then(r => r.json()).catch(() => ({}))
+      ]);
 
-      container.innerHTML = `
-        <div style="font-size:.8rem;color:var(--text3);margin-bottom:10px;">
-          Total listado: <strong style="color:var(--text);">${chaves.length}</strong> NFs na nuvem
+      const status = statusRes?.success ? statusRes : null;
+      const docs = docsRes?.success ? (docsRes.documentos || []) : [];
+      this._dfeUltimosDocs = docs;
+
+      const sync = status?.sync || {};
+      const cert = status?.certificado || null;
+      const totais = status?.totais || {};
+
+      let cooldownMsg = '';
+      let isCooldown = false;
+      if (sync.proxima_consulta_permitida) {
+        const prox = new Date(sync.proxima_consulta_permitida);
+        if (prox.getTime() > Date.now()) {
+          isCooldown = true;
+          const mins = Math.ceil((prox.getTime() - Date.now()) / 60000);
+          cooldownMsg = `Aguarde ${mins} min (até ${prox.toLocaleTimeString('pt-BR')}) para nova consulta na SEFAZ (regra de consumo indevido NT 2014.002).`;
+        }
+      }
+
+      const statusBadge = cert?.status === 'ativo'
+        ? (isCooldown 
+            ? `<span style="background:rgba(245,158,11,.15);color:#f59e0b;border:1px solid rgba(245,158,11,.3);padding:4px 10px;border-radius:20px;font-size:.76rem;font-weight:700;">⏳ Cooldown SEFAZ</span>`
+            : `<span style="background:rgba(16,185,129,.15);color:#10b981;border:1px solid rgba(16,185,129,.3);padding:4px 10px;border-radius:20px;font-size:.76rem;font-weight:700;">🟢 Conectado à SEFAZ</span>`)
+        : `<span style="background:rgba(239,68,68,.15);color:#ef4444;border:1px solid rgba(239,68,68,.3);padding:4px 10px;border-radius:20px;font-size:.76rem;font-weight:700;">⚠️ Sem Certificado A1</span>`;
+
+      body.innerHTML = `
+        <div style="display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap;margin-bottom:16px;">
+          <div>
+            <div style="display:flex;align-items:center;gap:8px;">
+              <span style="font-weight:800;color:var(--text);font-size:1rem;">📡 Monitor DF-e SEFAZ (NFe & CTe)</span>
+              ${statusBadge}
+            </div>
+            <div style="font-size:.78rem;color:var(--text3);margin-top:2px;">
+              Distribuição oficial de Documentos Fiscais Eletrônicos emitidos contra o CNPJ da empresa (${cert?.cnpj ? this._fmtCnpj(cert.cnpj) : '—'}).
+            </div>
+          </div>
+          <div style="display:flex;gap:8px;">
+            <button class="btn btn-secondary btn-sm" data-fb-click="NFe._carregarMinhasNFes" data-fb-click-n="0" style="height:36px;">
+              🔄 Atualizar Lista
+            </button>
+            <button class="btn btn-primary btn-sm" data-fb-click="NFe._sincronizarTudo" data-fb-click-n="0" id="nfe-sync-btn" style="height:36px;white-space:nowrap;font-weight:700;">
+              ⚡ Sincronizar com SEFAZ
+            </button>
+          </div>
         </div>
-        ${!chaves.length ? `<div style="text-align:center;padding:24px;color:var(--text3);">Nenhuma NF-e encontrada na sua Área do Cliente MeuDanfe.</div>` : `
-        <div style="overflow-x:auto;">
-          <table class="data-table">
-            <thead><tr><th>Chave de Acesso</th><th style="text-align:right;">Ações</th></tr></thead>
-            <tbody>
-              ${chaves.map(chave => `
-              <tr>
-                <td><code style="font-size:.72rem;color:var(--text2);">${this._fmtChave(chave)}</code></td>
-                <td style="text-align:right;">
-                  <div style="display:flex;gap:6px;justify-content:flex-end;">
-                    <button class="btn btn-sm btn-success" data-fb-click="NFe.gerarLancamentoDaNFe" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(chave))}" style="font-weight:700;" title="Gerar despesa no financeiro">⚡ Lançar</button>
-                    <button class="btn btn-sm btn-primary" data-fb-click="NFe.abrirDanfe" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(chave))}">📄 DANFE</button>
-                    <button class="btn btn-sm btn-secondary" data-fb-click="NFe.baixarXMLEAbrir" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(chave))}">⬇️ XML</button>
-                    <button class="btn btn-sm btn-secondary" data-fb-click="NFe.adicionarComoAnexo" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(chave))}">📎 Anexar</button>
-                  </div>
-                </td>
-              </tr>`).join('')}
-            </tbody>
-          </table>
+
+        <!-- Indicadores Rápidos / KPI -->
+        <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(180px, 1fr));gap:12px;margin-bottom:16px;">
+          <div style="background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--r-md);padding:12px 14px;">
+            <div style="font-size:.72rem;color:var(--text3);text-transform:uppercase;font-weight:700;">NF-e Recebidas</div>
+            <div style="font-size:1.35rem;font-weight:800;color:#10b981;margin-top:2px;">${totais.NFE || 0}</div>
+            <div style="font-size:.7rem;color:var(--text3);">Notas de produtos/serviços</div>
+          </div>
+          <div style="background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--r-md);padding:12px 14px;">
+            <div style="font-size:.72rem;color:var(--text3);text-transform:uppercase;font-weight:700;">CT-e Transporte</div>
+            <div style="font-size:1.35rem;font-weight:800;color:#3b82f6;margin-top:2px;">${totais.CTE || 0}</div>
+            <div style="font-size:.7rem;color:var(--text3);">Conhecimentos de frete</div>
+          </div>
+          <div style="background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--r-md);padding:12px 14px;">
+            <div style="font-size:.72rem;color:var(--text3);text-transform:uppercase;font-weight:700;">Último NSU SEFAZ</div>
+            <div style="font-size:1.15rem;font-weight:800;color:var(--text);margin-top:2px;font-family:monospace;">${sync.ultimo_nsu || '000000000000000'}</div>
+            <div style="font-size:.7rem;color:var(--text3);">Max NSU: ${sync.max_nsu || '000000000000000'}</div>
+          </div>
+          <div style="background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--r-md);padding:12px 14px;">
+            <div style="font-size:.72rem;color:var(--text3);text-transform:uppercase;font-weight:700;">Próxima Sincronização</div>
+            <div style="font-size:.92rem;font-weight:700;color:${isCooldown ? '#f59e0b' : 'var(--success)'};margin-top:4px;">
+              ${isCooldown ? new Date(sync.proxima_consulta_permitida).toLocaleTimeString('pt-BR') : 'Disponível Agora'}
+            </div>
+            <div style="font-size:.7rem;color:var(--text3);">
+              ${isCooldown ? 'Intervalo de proteção ativo' : 'Pronto para consultar SEFAZ'}
+            </div>
+          </div>
         </div>
-        ${chaves.length >= 50 ? `
-        <div style="display:flex;justify-content:center;gap:8px;margin-top:16px;">
-          <button class="btn btn-secondary btn-sm" data-fb-click="Patch26Actions.nfeRenderCloud" data-fb-click-n="2" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(chaves[chaves.length-1]))}" data-fb-click-t1="string" data-fb-click-v1="nfe-cloud-content">Carregar Mais NFs →</button>
-        </div>` : ''}
-        `}
+
+        ${cooldownMsg ? `
+          <div style="background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.25);border-radius:var(--r-md);padding:10px 14px;margin-bottom:16px;font-size:.78rem;color:#f59e0b;display:flex;align-items:center;gap:8px;">
+            <span>ℹ️</span>
+            <span>${cooldownMsg}</span>
+          </div>` : ''}
+
+        ${!cert?.status || cert.status !== 'ativo' ? `
+          <div style="background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.25);border-radius:var(--r-md);padding:12px 16px;margin-bottom:16px;font-size:.82rem;color:var(--danger);">
+            <strong>Certificado Digital A1 não configurado:</strong> Para que o FinGo busque suas notas automaticamente na SEFAZ, acesse a aba <strong>📂 Importar XML / Certificado</strong> e envie o arquivo .PFX da sua empresa.
+          </div>` : ''}
+
+        <!-- Tabela de Documentos Fiscais -->
+        <div id="nfe-dfe-table-container">
+          ${this._renderTabelaDFe(docs)}
+        </div>
       `;
     } catch (err) {
-      container.innerHTML = `<div style="text-align:center;padding:24px;color:var(--danger);">Erro: ${Utils.escapeHtml(err?.message || 'Falha inesperada')}</div>`;
+      console.error('[NFe] Erro ao carregar DF-e:', err);
+      body.innerHTML = `
+        <div style="text-align:center;padding:32px 20px;color:var(--danger);">
+          <div style="font-size:1.5rem;margin-bottom:8px;">⚠️</div>
+          <div style="font-weight:700;">Falha ao carregar Monitor DF-e</div>
+          <div style="font-size:.82rem;color:var(--text3);margin-top:4px;">${Utils.escapeHtml(err.message || 'Erro inesperado')}</div>
+          <button class="btn btn-secondary btn-sm" data-fb-click="NFe._carregarMinhasNFes" data-fb-click-n="0" style="margin-top:14px;">
+            Tentar Novamente
+          </button>
+        </div>
+      `;
     }
   },
 
-  // Sincroniza todas as páginas e adiciona ao cache local
+  _renderTabelaDFe(docs) {
+    if (!docs || !docs.length) {
+      return `
+        <div style="text-align:center;padding:36px 20px;background:var(--bg-secondary);border:1px dashed var(--border);border-radius:var(--r-md);">
+          <div style="font-size:2rem;margin-bottom:10px;">📭</div>
+          <div style="font-weight:700;color:var(--text);font-size:.95rem;">Nenhum documento fiscal capturado ainda</div>
+          <div style="font-size:.8rem;color:var(--text3);max-width:440px;margin:6px auto 16px auto;">
+            Clique no botão <strong>⚡ Sincronizar com SEFAZ</strong> acima para consultar todos os lotes de NF-e e CT-e emitidos contra o seu CNPJ.
+          </div>
+        </div>
+      `;
+    }
+
+    return `
+      <div style="font-size:.8rem;color:var(--text3);margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;">
+        <span>Documentos sincronizados: <strong style="color:var(--text);">${docs.length}</strong></span>
+      </div>
+      <div style="overflow-x:auto;">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th style="width:70px;">Tipo</th>
+              <th style="width:95px;">Emissão</th>
+              <th>Emitente / Fornecedor</th>
+              <th>Chave de Acesso</th>
+              <th style="text-align:right;">Valor</th>
+              <th style="text-align:center;width:95px;">Situação</th>
+              <th style="text-align:right;width:200px;">Ações</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${docs.map(d => {
+              const tipoBadge = d.tipo_documento === 'CTE'
+                ? `<span style="background:rgba(59,130,246,.15);color:#3b82f6;border:1px solid rgba(59,130,246,.3);padding:2px 7px;border-radius:12px;font-size:.72rem;font-weight:800;">CT-e</span>`
+                : (d.tipo_documento === 'EVENTO'
+                    ? `<span style="background:rgba(168,85,247,.15);color:#a855f7;border:1px solid rgba(168,85,247,.3);padding:2px 7px;border-radius:12px;font-size:.72rem;font-weight:800;">EVENTO</span>`
+                    : `<span style="background:rgba(16,185,129,.15);color:#10b981;border:1px solid rgba(16,185,129,.3);padding:2px 7px;border-radius:12px;font-size:.72rem;font-weight:800;">NF-e</span>`);
+
+              const sitBadge = d.situacao === 'cancelada'
+                ? `<span style="color:var(--danger);font-size:.75rem;font-weight:700;">❌ Cancelada</span>`
+                : `<span style="color:var(--success);font-size:.75rem;font-weight:700;">✅ Autorizada</span>`;
+
+              const emissaoFmt = d.data_emissao ? Utils.fmt.date(d.data_emissao) : '—';
+              const valorFmt = d.valor_total ? Utils.fmt.currency(d.valor_total) : '—';
+              const chaveTrunc = d.chave ? `${d.chave.slice(0, 4)}...${d.chave.slice(-6)}` : '—';
+
+              return `
+                <tr>
+                  <td>${tipoBadge}</td>
+                  <td style="font-size:.78rem;color:var(--text2);">${emissaoFmt}</td>
+                  <td>
+                    <div style="font-weight:700;color:var(--text);font-size:.82rem;">${Utils.escapeHtml(d.nome_emitente || 'Não informado')}</div>
+                    <div style="font-size:.72rem;color:var(--text3);">${d.cnpj_emitente ? this._fmtCnpj(d.cnpj_emitente) : ''}</div>
+                  </td>
+                  <td>
+                    <div style="display:flex;align-items:center;gap:6px;">
+                      <code style="font-size:.72rem;color:var(--text2);font-family:monospace;" title="${d.chave}">${chaveTrunc}</code>
+                      <button class="icon-btn" data-fb-click="NFe.rebuscarChave" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(d.chave))}" title="Consultar detalhes desta chave" style="font-size:.72rem;opacity:.7;">🔍</button>
+                    </div>
+                  </td>
+                  <td style="text-align:right;font-weight:800;color:var(--text);font-size:.85rem;">
+                    ${valorFmt}
+                  </td>
+                  <td style="text-align:center;">
+                    ${sitBadge}
+                  </td>
+                  <td style="text-align:right;">
+                    <div style="display:flex;gap:5px;justify-content:flex-end;">
+                      <button class="btn btn-sm btn-success" data-fb-click="NFe.gerarLancamentoDaNFe" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(d.chave))}" style="font-weight:700;" title="Gerar despesa no financeiro">⚡ Lançar</button>
+                      <button class="btn btn-sm btn-primary" data-fb-click="NFe.abrirDanfe" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(d.chave))}">📄 DANFE</button>
+                      <button class="btn btn-sm btn-secondary" data-fb-click="NFe.baixarXMLEAbrir" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(d.chave))}">⬇️ XML</button>
+                      <button class="btn btn-sm btn-secondary" data-fb-click="NFe.adicionarComoAnexo" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(d.chave))}">📎 Anexar</button>
+                    </div>
+                  </td>
+                </tr>
+              `;
+            }).join('')}
+          </tbody>
+        </table>
+      </div>
+    `;
+  },
+
   async _sincronizarTudo() {
-    const btn  = document.getElementById('nfe-sync-btn');
-    if (!btn) return;
+    const btn = document.getElementById('nfe-sync-btn');
+    if (btn) {
+      btn.disabled = true;
+      btn.innerHTML = '⏳ Consultando SEFAZ...';
+    }
 
-    btn.disabled = true;
-    btn.innerHTML = '⏳ Sincronizando...';
-
-    let totalImportadas = 0;
-    let after = '';
-    let hasMore = true;
-
-    const progressDiv = document.getElementById('nfe-cloud-content');
+    Utils.toast('Iniciando comunicação segura com a SEFAZ via Certificado A1...', 'info');
 
     try {
-      while (hasMore) {
-        if (progressDiv) {
-          progressDiv.innerHTML = `
-            <div style="text-align:center;padding:24px;">
-              <div style="display:inline-block;width:24px;height:24px;border:2px solid rgba(255,255,255,.15);border-top-color:var(--accent);border-radius:50%;animation:spin .7s linear infinite;margin-bottom:10px;"></div>
-              <div style="font-weight:700;color:var(--text);">${totalImportadas} NFs adicionadas ao cache...</div>
-              <div style="font-size:.78rem;color:var(--text3);margin-top:4px;">Consultando Área do Cliente MeuDanfe</div>
-            </div>`;
-        }
+      const res = await this._fetchWithTimeout('/api/nfe?action=dfe_sync', {
+        method: 'POST',
+        headers: this._headers(),
+        body: JSON.stringify({})
+      });
 
-        const data = await this.listarMinhasNFes(after);
-        if (data && data._permissaoNegada) {
-          Utils.toast('🔒 Acesso restrito: listagem global de NF-es é exclusiva de administradores.', 'warning');
-          break;
-        }
-        if (!data || data.status !== 'OK') {
-          if (data?.status === 'TOO_MANY_REQUESTS') {
-            Utils.toast(data.statusMessage || 'Aguarde 1 hora para recomeçar a listagem do início.', 'warning');
-          }
-          break;
-        }
+      const data = await res.json().catch(() => ({}));
 
-        const chaves = data.chaves || data.page?.keys || [];
-        if (!chaves.length) break;
-
-        chaves.forEach(chave => {
-          const c = this._limparChave(chave);
-          if (this._validarChave(c) && !this._getFromCache(c)) {
-            this._addToCache({ chave: c, status: 'OK', response: { status: 'OK' } });
-            totalImportadas++;
-          }
-        });
-
-        if (chaves.length < 50) {
-          hasMore = false;
-        } else {
-          after = chaves[chaves.length - 1];
-          await new Promise(r => setTimeout(r, 300));
-        }
+      if (!res.ok) {
+        throw new Error(data?.error || `Erro ${res.status} ao sincronizar com SEFAZ.`);
       }
 
-      // Atualiza contador da aba cache
-      const btnCache = document.getElementById('tab-nfe-cache');
-      if (btnCache) btnCache.textContent = `📋 Consultadas Recentemente (${this._getCache().length})`;
+      if (data.rateLimited) {
+        Utils.toast(data.message || 'SEFAZ: Cooldown ativo. Aguarde 1 hora entre consultas completas.', 'warning');
+      } else if (data.cStat === '138') {
+        Utils.toast(`🎉 Sucesso! ${data.novosDocumentos || 0} documento(s) capturados da SEFAZ.`, 'success');
+      } else if (data.cStat === '137') {
+        Utils.toast('SEFAZ: Nenhum documento novo localizado para este CNPJ no momento.', 'info');
+      } else {
+        Utils.toast(data.mensagem || 'Consulta à SEFAZ concluída.', 'info');
+      }
 
-      Utils.toast(`✅ Sincronização concluída! ${totalImportadas} novas NFs adicionadas ao cache.`, 'success');
-
-      // Recarrega a visualização
-      if (progressDiv) await this._renderPaginaCloud('', progressDiv);
-
+      await this._carregarMinhasNFes();
     } catch (err) {
+      console.error('[NFe] Falha na sincronização:', err);
       Utils.toast(`Erro na sincronização: ${err.message}`, 'error');
-      if (progressDiv) progressDiv.innerHTML = `<div style="text-align:center;padding:24px;color:var(--danger);">Erro: ${Utils.escapeHtml(err?.message || 'Falha inesperada')}</div>`;
     } finally {
-      btn.disabled = false;
-      btn.innerHTML = '⬇️ Sincronizar Tudo para Cache';
+      if (btn) {
+        btn.disabled = false;
+        btn.innerHTML = '⚡ Sincronizar com SEFAZ';
+      }
     }
   },
 

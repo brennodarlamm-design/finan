@@ -3,6 +3,9 @@
 import { resolveAuthAndTenant } from './_auth.js';
 import { canAccessModule, permissionError } from './_permissions.js';
 import { checkRateLimit, getClientIp } from './_ratelimit.js';
+import { createRuntimeSql } from './_database.js';
+import { createTenantSql } from './_tenant-sql.js';
+import { syncTenantDFe, getDFeStatus, listarDFeDocumentos, getDFeDocumentoXml } from './_sefaz-dfe.js';
 import certificadoHandler from './_certificado.js';
 
 const ALLOWED_ORIGINS = [
@@ -157,6 +160,65 @@ export default async function handler(req, res) {
   }
   if (!canAccessModule(auth,'notas','read')) return res.status(403).json(permissionError('MODULE_READ_FORBIDDEN','notas'));
 
+  const action = req.query.action || (req.body && req.body.action);
+
+  // ── AÇÕES DO MONITOR DF-E NATIVO SEFAZ (MULTI-TENANT) ─────────────────────
+  if (action && action.startsWith('dfe_')) {
+    let baseSql;
+    try {
+      baseSql = createRuntimeSql();
+    } catch (err) {
+      console.error('[NFe DF-e] Database indisponível:', err.message);
+      return res.status(500).json({ success: false, error: 'Banco de dados indisponível no servidor.' });
+    }
+    const sql = createTenantSql(baseSql, { tenantId: auth.tenantId });
+
+    if (action === 'dfe_status') {
+      const statusData = await getDFeStatus(sql, auth.tenantId);
+      return res.status(200).json(statusData);
+    }
+
+    if (action === 'dfe_listar') {
+      const docsData = await listarDFeDocumentos(sql, auth.tenantId, {
+        tipo: req.query.tipo,
+        busca: req.query.busca,
+        limit: req.query.limit,
+        offset: req.query.offset
+      });
+      return res.status(200).json(docsData);
+    }
+
+    if (action === 'dfe_sync') {
+      if (!canAccessModule(auth, 'notas', 'write')) {
+        return res.status(403).json(permissionError('MODULE_WRITE_FORBIDDEN', 'notas'));
+      }
+      const syncResult = await syncTenantDFe(sql, auth.tenantId, {
+        codUf: req.body?.codUf || req.query?.codUf,
+        force: req.body?.force === true
+      });
+      return res.status(200).json(syncResult);
+    }
+
+    if (action === 'dfe_xml') {
+      const idOrChave = req.query.id || req.query.chave || req.body?.id || req.body?.chave;
+      if (!idOrChave) {
+        return res.status(400).json({ success: false, error: 'Identificador ou chave do documento não informado.' });
+      }
+      const xmlResult = await getDFeDocumentoXml(sql, auth.tenantId, idOrChave);
+      if (!xmlResult.success) {
+        return res.status(404).json(xmlResult);
+      }
+      if (req.query.download === 'true') {
+        res.setHeader('Content-Type', 'application/xml; charset=utf-8');
+        res.setHeader('Content-Disposition', `attachment; filename="${xmlResult.documento.chave || 'documento'}.xml"`);
+        return res.status(200).send(xmlResult.documento.xml);
+      }
+      return res.status(200).json(xmlResult);
+    }
+
+    return res.status(400).json({ success: false, error: `Ação DF-e '${action}' não reconhecida.` });
+  }
+
   // Chave protegida no servidor (ambiente .env)
   const apiKey = (process.env.MEUDANFE_API_KEY || '').trim();
   if (!apiKey) {
@@ -171,7 +233,6 @@ export default async function handler(req, res) {
   };
 
   try {
-    const action = req.query.action || (req.body && req.body.action);
     const chave = (req.query.chave || (req.body && req.body.chave) || '').toString().replace(/\D/g, '').trim();
 
     // ── 1. BUSCAR OU CONSULTAR STATUS DA NF-E (PUT /fd/add/{chave}) ──────────
