@@ -350,7 +350,7 @@ export async function syncTenantDFe(sql, tenantId, options = {}) {
     if (proximaData.getTime() > now.getTime() && !options.force) {
       const minutosRestantes = Math.ceil((proximaData.getTime() - now.getTime()) / 60000);
       return {
-        success: false,
+        success: true,
         rateLimited: true,
         proximaConsulta: proximaData.toISOString(),
         minutosRestantes,

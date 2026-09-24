@@ -48,7 +48,6 @@ ALTER TABLE tenant_dfe_sync FORCE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS tenant_isolation_tenant_dfe_sync ON tenant_dfe_sync;
 CREATE POLICY tenant_isolation_tenant_dfe_sync ON tenant_dfe_sync
-  AS RESTRICTIVE
   FOR ALL
   USING (tenant_id = NULLIF(current_setting('app.current_tenant_id', true), ''))
   WITH CHECK (tenant_id = NULLIF(current_setting('app.current_tenant_id', true), ''));
@@ -58,7 +57,6 @@ ALTER TABLE tenant_dfe_documentos FORCE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS tenant_isolation_tenant_dfe_documentos ON tenant_dfe_documentos;
 CREATE POLICY tenant_isolation_tenant_dfe_documentos ON tenant_dfe_documentos
-  AS RESTRICTIVE
   FOR ALL
   USING (tenant_id = NULLIF(current_setting('app.current_tenant_id', true), ''))
   WITH CHECK (tenant_id = NULLIF(current_setting('app.current_tenant_id', true), ''));

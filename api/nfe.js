@@ -173,50 +173,58 @@ export default async function handler(req, res) {
     }
     const sql = createTenantSql(baseSql, { tenantId: auth.tenantId });
 
-    if (action === 'dfe_status') {
-      const statusData = await getDFeStatus(sql, auth.tenantId);
-      return res.status(200).json(statusData);
-    }
+    try {
+      if (action === 'dfe_status') {
+        const statusData = await getDFeStatus(sql, auth.tenantId);
+        return res.status(200).json(statusData);
+      }
 
-    if (action === 'dfe_listar') {
-      const docsData = await listarDFeDocumentos(sql, auth.tenantId, {
-        tipo: req.query.tipo,
-        busca: req.query.busca,
-        limit: req.query.limit,
-        offset: req.query.offset
+      if (action === 'dfe_listar') {
+        const docsData = await listarDFeDocumentos(sql, auth.tenantId, {
+          tipo: req.query.tipo,
+          busca: req.query.busca,
+          limit: req.query.limit,
+          offset: req.query.offset
+        });
+        return res.status(200).json(docsData);
+      }
+
+      if (action === 'dfe_sync') {
+        if (!canAccessModule(auth, 'notas', 'write')) {
+          return res.status(403).json(permissionError('MODULE_WRITE_FORBIDDEN', 'notas'));
+        }
+        const syncResult = await syncTenantDFe(sql, auth.tenantId, {
+          codUf: req.body?.codUf || req.query?.codUf,
+          force: req.body?.force === true
+        });
+        return res.status(200).json(syncResult);
+      }
+
+      if (action === 'dfe_xml') {
+        const idOrChave = req.query.id || req.query.chave || req.body?.id || req.body?.chave;
+        if (!idOrChave) {
+          return res.status(400).json({ success: false, error: 'Identificador ou chave do documento não informado.' });
+        }
+        const xmlResult = await getDFeDocumentoXml(sql, auth.tenantId, idOrChave);
+        if (!xmlResult.success) {
+          return res.status(404).json(xmlResult);
+        }
+        if (req.query.download === 'true') {
+          res.setHeader('Content-Type', 'application/xml; charset=utf-8');
+          res.setHeader('Content-Disposition', `attachment; filename="${xmlResult.documento.chave || 'documento'}.xml"`);
+          return res.status(200).send(xmlResult.documento.xml);
+        }
+        return res.status(200).json(xmlResult);
+      }
+
+      return res.status(400).json({ success: false, error: `Ação DF-e '${action}' não reconhecida.` });
+    } catch (errDFe) {
+      console.error(`[NFe DF-e] Erro ao executar ação '${action}':`, errDFe);
+      return res.status(500).json({
+        success: false,
+        error: `Erro ao processar serviço DF-e: ${errDFe.message || 'Falha interna'}`
       });
-      return res.status(200).json(docsData);
     }
-
-    if (action === 'dfe_sync') {
-      if (!canAccessModule(auth, 'notas', 'write')) {
-        return res.status(403).json(permissionError('MODULE_WRITE_FORBIDDEN', 'notas'));
-      }
-      const syncResult = await syncTenantDFe(sql, auth.tenantId, {
-        codUf: req.body?.codUf || req.query?.codUf,
-        force: req.body?.force === true
-      });
-      return res.status(200).json(syncResult);
-    }
-
-    if (action === 'dfe_xml') {
-      const idOrChave = req.query.id || req.query.chave || req.body?.id || req.body?.chave;
-      if (!idOrChave) {
-        return res.status(400).json({ success: false, error: 'Identificador ou chave do documento não informado.' });
-      }
-      const xmlResult = await getDFeDocumentoXml(sql, auth.tenantId, idOrChave);
-      if (!xmlResult.success) {
-        return res.status(404).json(xmlResult);
-      }
-      if (req.query.download === 'true') {
-        res.setHeader('Content-Type', 'application/xml; charset=utf-8');
-        res.setHeader('Content-Disposition', `attachment; filename="${xmlResult.documento.chave || 'documento'}.xml"`);
-        return res.status(200).send(xmlResult.documento.xml);
-      }
-      return res.status(200).json(xmlResult);
-    }
-
-    return res.status(400).json({ success: false, error: `Ação DF-e '${action}' não reconhecida.` });
   }
 
   // Chave protegida no servidor (ambiente .env)
