@@ -703,9 +703,10 @@ export function parseCertDetails(cert) {
   const altName = cert.subjectAltName || '';
   const fullText = subject + ' ' + altName;
 
-  // 1. CNPJ embutido no CN no padrão oficial ICP-Brasil A1: "RAZÃO SOCIAL:CNPJ" (14 dígitos)
-  if (commonName.includes(':')) {
-    const cnParts = commonName.split(':');
+  // 1. CNPJ embutido no CN no padrão oficial ICP-Brasil A1: "RAZÃO SOCIAL:CNPJ" ou "RAZÃO SOCIAL - CNPJ" (14 dígitos)
+  if (commonName.includes(':') || commonName.includes(' - ')) {
+    const sep = commonName.includes(':') ? ':' : ' - ';
+    const cnParts = commonName.split(sep);
     const candidate = (cnParts[cnParts.length - 1] || '').replace(/\D/g, '');
     if (candidate.length === 14) cnpj = candidate;
   }

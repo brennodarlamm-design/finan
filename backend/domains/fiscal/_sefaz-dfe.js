@@ -228,6 +228,12 @@ export function decompressAndParseDocZip({ nsu, schema, base64Content }) {
       if (keyMatch) chave = keyMatch[1];
     }
 
+    let dataEmissaoIso = null;
+    if (dataEmissao) {
+      const d = new Date(dataEmissao);
+      dataEmissaoIso = isNaN(d.getTime()) ? null : d.toISOString();
+    }
+
     return {
       sucesso: true,
       nsu: String(nsu || '').padStart(15, '0'),
@@ -236,7 +242,7 @@ export function decompressAndParseDocZip({ nsu, schema, base64Content }) {
       cnpjEmitente: cnpjEmitente ? cnpjEmitente.replace(/\D/g, '') : null,
       nomeEmitente: nomeEmitente || null,
       valorTotal: valorTotal || 0,
-      dataEmissao: dataEmissao ? new Date(dataEmissao).toISOString() : null,
+      dataEmissao: dataEmissaoIso,
       situacao: situacao,
       schemaTipo: schemaTipo,
       xml: xml
@@ -524,8 +530,10 @@ export async function syncTenantDFe(sql, tenantId, options = {}) {
         WHERE tenant_id = ${tenantId};
       `;
 
-      // Se já alcançamos o maxNSU, não há mais lotes
-      if (ultNsu >= maxNsu) {
+      // Se já alcançamos o maxNSU numérico, não há mais lotes
+      const nsuAtual = BigInt(String(ultNsu).replace(/\D/g, '') || '0');
+      const nsuMax = BigInt(String(maxNsu).replace(/\D/g, '') || '0');
+      if (nsuAtual >= nsuMax && nsuMax > 0n) {
         break;
       }
 
