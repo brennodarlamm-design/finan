@@ -689,102 +689,103 @@ export async function handleSave(sql, tenantId, auth, req, res, table, data) {
 /**
  * ── EXCLUIR REGISTRO INDIVIDUAL COM TOMBSTONE PARA PROPAGAÇÃO OFFLINE ────────
  */
-export async function handleDelete(sql, tenantId, auth, req, res, table, id) {
+export async function handleDelete(sql, tenantId, auth, req, res, table, id, data = null) {
   setPrivateNoCache(res);
 
+  const targetId = String(id || data?.id || data?.cloud_id || '').trim();
+  if (!targetId && (table !== 'ocr_historico' || id !== 'all')) {
+    return res.status(400).json({ success: false, error: `ID obrigatório para exclusão na tabela '${table}'.` });
+  }
+
   if (table === 'lancamentos') {
-    await sql`DELETE FROM lancamentos WHERE id = ${id} AND tenant_id = ${tenantId};`;
-    await writeAudit(sql, req, auth, { acao: 'excluir', entidade: 'lancamentos', entidadeId: id, antes: { id } });
-    return res.status(200).json({ success: true, id });
+    await sql`DELETE FROM lancamentos WHERE id = ${targetId} AND tenant_id = ${tenantId};`;
+    await writeAudit(sql, req, auth, { acao: 'excluir', entidade: 'lancamentos', entidadeId: targetId, antes: { id: targetId } });
+    return res.status(200).json({ success: true, id: targetId });
   }
 
   if (table === 'notas' || table === 'notas_fiscais') {
-    await sql`DELETE FROM notas_fiscais WHERE id = ${id} AND tenant_id = ${tenantId};`;
-    await writeAudit(sql, req, auth, { acao: 'excluir', entidade: 'notas_fiscais', entidadeId: id, antes: { id } });
-    return res.status(200).json({ success: true, id });
+    await sql`DELETE FROM notas_fiscais WHERE id = ${targetId} AND tenant_id = ${tenantId};`;
+    await writeAudit(sql, req, auth, { acao: 'excluir', entidade: 'notas_fiscais', entidadeId: targetId, antes: { id: targetId } });
+    return res.status(200).json({ success: true, id: targetId });
   }
 
   if (table === 'obras' || table === 'clientes') {
-    await sql`DELETE FROM obras WHERE id = ${id} AND tenant_id = ${tenantId};`;
-    await writeAudit(sql, req, auth, { acao: 'excluir', entidade: 'obras', entidadeId: id, antes: { id } });
-    return res.status(200).json({ success: true, id });
+    await sql`DELETE FROM obras WHERE id = ${targetId} AND tenant_id = ${tenantId};`;
+    await writeAudit(sql, req, auth, { acao: 'excluir', entidade: 'obras', entidadeId: targetId, antes: { id: targetId } });
+    return res.status(200).json({ success: true, id: targetId });
   }
 
   if (table === 'fornecedores') {
-    await sql`DELETE FROM fornecedores WHERE id = ${id} AND tenant_id = ${tenantId};`;
-    await writeAudit(sql, req, auth, { acao: 'excluir', entidade: 'fornecedores', entidadeId: id, antes: { id } });
-    return res.status(200).json({ success: true, id });
+    await sql`DELETE FROM fornecedores WHERE id = ${targetId} AND tenant_id = ${tenantId};`;
+    await writeAudit(sql, req, auth, { acao: 'excluir', entidade: 'fornecedores', entidadeId: targetId, antes: { id: targetId } });
+    return res.status(200).json({ success: true, id: targetId });
   }
 
   if (table === 'documentos') {
     try {
-      const rows = await sql`SELECT url FROM documentos WHERE id = ${id} AND tenant_id = ${tenantId} LIMIT 1;`;
+      const rows = await sql`SELECT url FROM documentos WHERE id = ${targetId} AND tenant_id = ${tenantId} LIMIT 1;`;
       if (rows.length && rows[0].url && rows[0].url.includes('blob.vercel-storage.com')) {
         import('@vercel/blob').then(({ del }) => del(rows[0].url)).catch(() => {});
       }
     } catch (e) {}
-    await sql`DELETE FROM documentos WHERE id = ${id} AND tenant_id = ${tenantId};`;
-    await writeAudit(sql, req, auth, { acao: 'excluir', entidade: 'documentos', entidadeId: id, antes: { id } });
-    return res.status(200).json({ success: true, id });
+    await sql`DELETE FROM documentos WHERE id = ${targetId} AND tenant_id = ${tenantId};`;
+    await writeAudit(sql, req, auth, { acao: 'excluir', entidade: 'documentos', entidadeId: targetId, antes: { id: targetId } });
+    return res.status(200).json({ success: true, id: targetId });
   }
 
   if (table === 'produtos') {
-    const prodId = String(id || data?.id || '').trim();
-    if (!prodId) {
-      return res.status(400).json({ success: false, error: 'ID do produto é obrigatório para exclusão.' });
-    }
-    await sql`DELETE FROM produtos WHERE id = ${prodId} AND tenant_id = ${tenantId};`;
-    await writeAudit(sql, req, auth, { acao: 'excluir', entidade: 'produtos', entidadeId: prodId, antes: { id: prodId } });
-    return res.status(200).json({ success: true, id: prodId });
+    await sql`DELETE FROM produtos WHERE id = ${targetId} AND tenant_id = ${tenantId};`;
+    await writeAudit(sql, req, auth, { acao: 'excluir', entidade: 'produtos', entidadeId: targetId, antes: { id: targetId } });
+    return res.status(200).json({ success: true, id: targetId });
   }
 
   if (table === 'precompras' || table === 'contratos' || table === 'recibos') {
     const tableName = table;
-    if (tableName === 'precompras') await sql`DELETE FROM precompras WHERE tenant_id=${tenantId} AND id=${id};`;
-    if (tableName === 'contratos') await sql`DELETE FROM contratos WHERE tenant_id=${tenantId} AND id=${id};`;
-    if (tableName === 'recibos') await sql`DELETE FROM recibos WHERE tenant_id=${tenantId} AND id=${id};`;
-    await writeAudit(sql, req, auth, { acao: 'excluir', entidade: tableName, entidadeId: id, antes: { id } });
-    return res.status(200).json({ success: true, id });
+    if (tableName === 'precompras') await sql`DELETE FROM precompras WHERE tenant_id=${tenantId} AND id=${targetId};`;
+    if (tableName === 'contratos') await sql`DELETE FROM contratos WHERE tenant_id=${tenantId} AND id=${targetId};`;
+    if (tableName === 'recibos') await sql`DELETE FROM recibos WHERE tenant_id=${tenantId} AND id=${targetId};`;
+    await writeAudit(sql, req, auth, { acao: 'excluir', entidade: tableName, entidadeId: targetId, antes: { id: targetId } });
+    return res.status(200).json({ success: true, id: targetId });
   }
 
   if (table === 'orcamentos_sinapi') {
-    await sql`DELETE FROM orcamentos_sinapi WHERE tenant_id=${tenantId} AND id=${id};`;
-    await writeAudit(sql, req, auth, { acao: 'excluir', entidade: 'orcamentos_sinapi', entidadeId: id, antes: { id } });
-    return res.status(200).json({ success: true, id });
+    await sql`DELETE FROM orcamentos_sinapi WHERE tenant_id=${tenantId} AND id=${targetId};`;
+    await writeAudit(sql, req, auth, { acao: 'excluir', entidade: 'orcamentos_sinapi', entidadeId: targetId, antes: { id: targetId } });
+    return res.status(200).json({ success: true, id: targetId });
   }
 
   if (table === 'doc_fases') {
-    await sql`DELETE FROM obra_doc_fases WHERE tenant_id=${tenantId} AND id=${id};`;
-    await writeAudit(sql, req, auth, { acao: 'excluir', entidade: 'doc_fases', entidadeId: id, antes: { id } });
-    return res.status(200).json({ success: true, id });
+    await sql`DELETE FROM obra_doc_fases WHERE tenant_id=${tenantId} AND id=${targetId};`;
+    await writeAudit(sql, req, auth, { acao: 'excluir', entidade: 'doc_fases', entidadeId: targetId, antes: { id: targetId } });
+    return res.status(200).json({ success: true, id: targetId });
   }
 
   if (table === 'ocr_historico') {
-    if (id === 'all') {
+    if (id === 'all' || targetId === 'all') {
       await sql`DELETE FROM ocr_historico WHERE tenant_id = ${tenantId};`;
     } else {
-      await sql`DELETE FROM ocr_historico WHERE id = ${id} AND tenant_id = ${tenantId};`;
+      await sql`DELETE FROM ocr_historico WHERE id = ${targetId} AND tenant_id = ${tenantId};`;
     }
-    await writeAudit(sql, req, auth, { acao: 'excluir', entidade: 'ocr_historico', entidadeId: id, antes: { id } });
-    return res.status(200).json({ success: true, id });
+    await writeAudit(sql, req, auth, { acao: 'excluir', entidade: 'ocr_historico', entidadeId: targetId, antes: { id: targetId } });
+    return res.status(200).json({ success: true, id: targetId });
   }
 
   if (table === 'contas' || table === 'contas_bancarias') {
-    await sql`DELETE FROM contas_bancarias WHERE id = ${id} AND tenant_id = ${tenantId};`;
-    await writeAudit(sql, req, auth, { acao: 'excluir', entidade: 'contas_bancarias', entidadeId: id, antes: { id } });
-    return res.status(200).json({ success: true, id });
+    await sql`DELETE FROM contas_bancarias WHERE id = ${targetId} AND tenant_id = ${tenantId};`;
+    await writeAudit(sql, req, auth, { acao: 'excluir', entidade: 'contas_bancarias', entidadeId: targetId, antes: { id: targetId } });
+    return res.status(200).json({ success: true, id: targetId });
   }
 
   if (table === 'orcamentos') {
-    await sql`DELETE FROM orcamentos WHERE id = ${id} AND tenant_id = ${tenantId};`;
-    await writeAudit(sql, req, auth, { acao: 'excluir', entidade: 'orcamentos', entidadeId: id, antes: { id } });
-    return res.status(200).json({ success: true, id });
+    await sql`DELETE FROM orcamentos WHERE id = ${targetId} AND tenant_id = ${tenantId};`;
+    await writeAudit(sql, req, auth, { acao: 'excluir', entidade: 'orcamentos', entidadeId: targetId, antes: { id: targetId } });
+    return res.status(200).json({ success: true, id: targetId });
   }
 
   if (table === 'medicoes') {
-    await sql`DELETE FROM medicoes WHERE id = ${id} AND tenant_id = ${tenantId};`;
-    await writeAudit(sql, req, auth, { acao: 'excluir', entidade: 'medicoes', entidadeId: id, antes: { id } });
-    return res.status(200).json({ success: true, id });
+    await sql`DELETE FROM medicoes WHERE id = ${targetId} AND tenant_id = ${tenantId};`;
+    await writeAudit(sql, req, auth, { acao: 'excluir', entidade: 'medicoes', entidadeId: targetId, antes: { id: targetId } });
+    return res.status(200).json({ success: true, id: targetId });
   }
 
   return res.status(400).json({ success: false, error: `Tabela '${table}' desconhecida para exclusão.` });

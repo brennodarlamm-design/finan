@@ -552,6 +552,9 @@ const DB = {
     this.syncToCloud('delete', key, null, id);
     return true;
   },
+  delete(key, id) {
+    return this.remove(key, id);
+  },
   uuid() { return (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : (Date.now().toString(36) + Math.random().toString(36).substr(2, 9)); },
 
   // ── FASES DE DOCUMENTAÇÃO DAS OBRAS ──
@@ -1024,7 +1027,9 @@ const DB = {
     if (table === 'clientes') tableAliases.push('obras');
     if (table === 'obras') tableAliases.push('clientes');
     if (table === 'notas') tableAliases.push('notas_fiscais');
+    if (table === 'notas_fiscais') tableAliases.push('notas');
     if (table === 'contas') tableAliases.push('contas_bancarias');
+    if (table === 'contas_bancarias') tableAliases.push('contas');
     if (table === 'orcamentos') tableAliases.push('orcamentos_sinapi');
     if (table === 'orcamentos_sinapi') tableAliases.push('orcamentos');
     if (table === 'documentos') tableAliases.push('doc_fases');
@@ -1163,7 +1168,9 @@ const DB = {
     if (table === 'clientes') tableAliases.push('obras');
     if (table === 'obras') tableAliases.push('clientes');
     if (table === 'notas') tableAliases.push('notas_fiscais');
+    if (table === 'notas_fiscais') tableAliases.push('notas');
     if (table === 'contas') tableAliases.push('contas_bancarias');
+    if (table === 'contas_bancarias') tableAliases.push('contas');
     if (table === 'orcamentos') tableAliases.push('orcamentos_sinapi');
     if (table === 'orcamentos_sinapi') tableAliases.push('orcamentos');
     if (table === 'documentos') tableAliases.push('doc_fases');
@@ -1811,6 +1818,9 @@ const DB = {
       const pA = this._getDependencyPriority(a);
       const pB = this._getDependencyPriority(b);
       if (pA !== pB) return pA - pB;
+      const subA = (a?.payload?.table === 'notas' || a?.payload?.table === 'notas_fiscais') ? 0 : 1;
+      const subB = (b?.payload?.table === 'notas' || b?.payload?.table === 'notas_fiscais') ? 0 : 1;
+      if (subA !== subB) return subA - subB;
       const tA = String(a?.createdAt || a?.updatedAt || '');
       const tB = String(b?.createdAt || b?.updatedAt || '');
       return tA.localeCompare(tB);
@@ -2058,12 +2068,14 @@ const DB = {
         fornecedores: this.getAll('fornecedores'),
         lancamentos: this.getAll('lancamentos'),
         notas: this.getAll('notas'),
+        produtos: this.getAll('produtos'),
         orcamentos: this.getAll('orcamentos'),
         medicoes: this.getAll('medicoes'),
         contas: this.getAll('contas'),
         precompras: this.getAll('precompras'),
         contratos: this.getAll('contratos'),
         recibos: (() => { try { return JSON.parse(localStorage.getItem(this._ck('finobra_recibos')) || '[]'); } catch { return []; } })(),
+        documentos: (() => { try { return (typeof Documentos !== 'undefined' && typeof Documentos.getAll === 'function') ? Documentos.getAll() : []; } catch { return []; } })(),
         orcamentos_sinapi: this._localSinapiForCurrentTenant ? this._localSinapiForCurrentTenant() : [],
         doc_fases: this._collectLocalDocPhases ? this._collectLocalDocPhases() : [],
         preferencias: this._preferencesLocalSnapshot ? this._preferencesLocalSnapshot() : {}
