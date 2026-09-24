@@ -2136,7 +2136,7 @@ const DB = {
       ...l,
       data_vencimento: l.data_vencimento || l.data
     }));
-    if (obraId && obraId !== 'todas') items = items.filter(l => l.obra_id === obraId);
+    if (obraId && obraId !== 'todas') items = items.filter(l => String(l.obra_id) === String(obraId));
     if (filters.tipo) items = items.filter(l => l.tipo === filters.tipo);
     if (filters.status) items = items.filter(l => l.status === filters.status);
     if (filters.categoria) items = items.filter(l => l.categoria === filters.categoria);
@@ -2150,7 +2150,7 @@ const DB = {
         (l.conta_bancaria||'').toLowerCase().includes(s)
       );
     }
-    return items.sort((a, b) => b.data.localeCompare(a.data));
+    return items.sort((a, b) => String(b.data || '').localeCompare(String(a.data || '')));
   },
 
   getResumo(obraId) {

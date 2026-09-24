@@ -124,7 +124,7 @@ const AgendaEventos = {
     const esc = v => typeof Utils !== 'undefined' ? Utils.escapeHtml(String(v ?? '')) : String(v ?? '');
 
     if (tab === 'proximos') {
-      const proximos = eventos.filter(e => !e.gravado && e.data >= hoje).sort((a, b) => a.data.localeCompare(b.data));
+      const proximos = eventos.filter(e => !e.gravado && e.data >= hoje).sort((a, b) => String(a.data || '').localeCompare(String(b.data || '')));
       if (!proximos.length) {
         return `
           <div class="empty-state" style="padding:32px 16px;text-align:center;">
@@ -137,7 +137,7 @@ const AgendaEventos = {
     }
 
     if (tab === 'gravados') {
-      const gravados = eventos.filter(e => e.gravado || e.data < hoje).sort((a, b) => b.data.localeCompare(a.data));
+      const gravados = eventos.filter(e => e.gravado || e.data < hoje).sort((a, b) => String(b.data || '').localeCompare(String(a.data || '')));
       if (!gravados.length) {
         return `
           <div class="empty-state" style="padding:32px 16px;text-align:center;">

@@ -62,27 +62,23 @@ const Parcelamento = {
               <div class="form-group">
                 <label class="form-label">Categoria</label>
                 <select class="form-control" id="parc-cat">
-                  <option value="material">🧱 Material de Construção</option>
-                  <option value="mao_de_obra">👷 Mão de Obra</option>
-                  <option value="servico">🔧 Serviços Terceirizados</option>
-                  <option value="equipamento">🚜 Equipamento / Locação</option>
-                  <option value="administrativo">💼 Administrativo / Escritório</option>
-                  <option value="impostos">🏛️ Impostos / Taxas</option>
-                  <option value="outro">📦 Outros</option>
+                  ${typeof Utils !== 'undefined' && Utils.renderSelectOptionsDespesa
+                    ? (tipoPadrao === 'receita' ? Utils.renderSelectOptionsReceita() : Utils.renderSelectOptionsDespesa())
+                    : '<option value="material">🧱 Material de Construção</option><option value="mao_de_obra">👷 Mão de Obra</option><option value="servico">🔧 Serviços Terceirizados</option><option value="outro">📦 Outros</option>'}
                 </select>
               </div>
               <div class="form-group">
                 <label class="form-label">Conta Bancária</label>
                 <select class="form-control" id="parc-conta">
-                  <option value="">Nenhuma / A definir</option>
-                  ${contas.map(c => `<option value="${c.nome}">${c.banco} — ${c.nome}</option>`).join('')}
+                  ${typeof Contas !== 'undefined' && Contas.contaOptions ? Contas.contaOptions('') : '<option value="">Nenhuma / A definir</option>'}
                 </select>
               </div>
               <div class="form-group">
                 <label class="form-label">Status Inicial</label>
                 <select class="form-control" id="parc-status">
-                  <option value="a_pagar">⏳ A Pagar / Pendente</option>
-                  <option value="pago">✅ Já Pago (todas)</option>
+                  ${tipoPadrao === 'receita'
+                    ? '<option value="a_receber">⏳ A Receber / Pendente</option><option value="recebido">✅ Já Recebido (todas)</option>'
+                    : '<option value="a_pagar">⏳ A Pagar / Pendente</option><option value="pago">✅ Já Pago (todas)</option>'}
                 </select>
               </div>
             </div>
@@ -189,8 +185,27 @@ const Parcelamento = {
   },
 
   _gerarPreview() {
-    const totalVal = parseFloat(document.getElementById('parc-total')?.value) || 0;
-    const qtd = parseInt(document.getElementById('parc-qtd')?.value, 10) || 3;
+    const tipo = document.getElementById('parc-tipo')?.value || 'despesa';
+    const catSel = document.getElementById('parc-cat');
+    const statusSel = document.getElementById('parc-status');
+
+    if (catSel && typeof Utils !== 'undefined' && catSel.dataset.tipoAtual !== tipo) {
+      catSel.dataset.tipoAtual = tipo;
+      catSel.innerHTML = tipo === 'receita'
+        ? (Utils.renderSelectOptionsReceita ? Utils.renderSelectOptionsReceita() : '<option value="receita">Receita</option>')
+        : (Utils.renderSelectOptionsDespesa ? Utils.renderSelectOptionsDespesa() : '<option value="material">Material</option>');
+    }
+
+    if (statusSel && statusSel.dataset.tipoAtual !== tipo) {
+      statusSel.dataset.tipoAtual = tipo;
+      statusSel.innerHTML = tipo === 'receita'
+        ? '<option value="a_receber">⏳ A Receber / Pendente</option><option value="recebido">✅ Já Recebido (todas)</option>'
+        : '<option value="a_pagar">⏳ A Pagar / Pendente</option><option value="pago">✅ Já Pago (todas)</option>';
+    }
+
+    const totalVal = Math.max(0, parseFloat(document.getElementById('parc-total')?.value) || 0);
+    const qtdRaw = parseInt(document.getElementById('parc-qtd')?.value, 10);
+    const qtd = Number.isFinite(qtdRaw) && qtdRaw > 0 ? qtdRaw : 3;
     const primVenc = document.getElementById('parc-prim-venc')?.value || Utils.today();
     const intervalo = document.getElementById('parc-intervalo')?.value || 'mensal';
     const descBase = (document.getElementById('parc-desc')?.value || '').trim() || 'Parcela';
@@ -223,7 +238,7 @@ const Parcelamento = {
             <input class="form-control parc-row-date" type="date" value="${vencStr}" style="font-size:.8rem;padding:4px 8px;">
           </td>
           <td style="padding:6px 10px;text-align:right;">
-            <input class="form-control parc-row-val" type="number" step="0.01" value="${valorParcela.toFixed(2)}" style="font-size:.8rem;padding:4px 8px;text-align:right;font-weight:700;">
+            <input class="form-control parc-row-val" type="number" step="0.01" min="0" value="${valorParcela.toFixed(2)}" style="font-size:.8rem;padding:4px 8px;text-align:right;font-weight:700;">
           </td>
         </tr>`;
     }
@@ -232,7 +247,7 @@ const Parcelamento = {
   },
 
   salvar() {
-    const totalVal = parseFloat(document.getElementById('parc-total')?.value) || 0;
+    const totalVal = Math.max(0, parseFloat(document.getElementById('parc-total')?.value) || 0);
     const obraId = document.getElementById('parc-obra')?.value;
     const descBase = (document.getElementById('parc-desc')?.value || '').trim();
 
@@ -252,11 +267,18 @@ const Parcelamento = {
       return;
     }
 
-    const tipo = document.getElementById('parc-tipo')?.value || 'despesa';
+    const tipo = document.getElementById('parc-tipo')?.value === 'receita' ? 'receita' : 'despesa';
     const forn = (document.getElementById('parc-forn')?.value || '').trim();
-    const cat = document.getElementById('parc-cat')?.value || 'material';
+    const cat = document.getElementById('parc-cat')?.value || (tipo === 'receita' ? 'outras_receitas' : 'material');
     const conta = document.getElementById('parc-conta')?.value || '';
-    const status = document.getElementById('parc-status')?.value || 'a_pagar';
+    let status = document.getElementById('parc-status')?.value || (tipo === 'receita' ? 'a_receber' : 'a_pagar');
+
+    // Normalização estrita de status por tipo
+    if (tipo === 'receita') {
+      if (status === 'pago' || status === 'a_pagar') status = status === 'pago' ? 'recebido' : 'a_receber';
+    } else {
+      if (status === 'recebido' || status === 'a_receber') status = status === 'recebido' ? 'pago' : 'a_pagar';
+    }
 
     const descInputs = document.querySelectorAll('.parc-row-desc');
     const dateInputs = document.querySelectorAll('.parc-row-date');
@@ -271,7 +293,8 @@ const Parcelamento = {
     descInputs.forEach((dInp, idx) => {
       const desc = dInp.value.trim() || `${descBase} (${idx+1}/${descInputs.length})`;
       const dataVenc = dateInputs[idx]?.value || Utils.today();
-      const val = parseFloat(valInputs[idx]?.value) || 0;
+      const valRaw = parseFloat(valInputs[idx]?.value) || 0;
+      const val = Math.max(0, Number.isFinite(valRaw) ? valRaw : 0);
       totalSalvo += val;
 
       const item = {

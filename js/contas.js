@@ -38,7 +38,7 @@ const Contas = {
     // Filtra conforme a seleção de visualização
     let list = contas;
     if (this._filtro === 'obra' && obraId && obraId !== 'todas') {
-      list = contas.filter(c => c.obra_id === obraId || !c.obra_id);
+      list = contas.filter(c => String(c.obra_id) === String(obraId) || !c.obra_id);
     }
 
     const todosLancamentos = DB.getAll('lancamentos') || [];
@@ -95,7 +95,7 @@ const Contas = {
         </button>
         ${obraAtiva ? `
         <button class="btn btn-sm ${this._filtro==='obra'?'btn-primary':'btn-secondary'}" data-fb-click="Contas.setFiltro" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="obra">
-          &#x1F3E0; Desta Obra &amp; Gerais (${contas.filter(c => c.obra_id === obraId || !c.obra_id).length})
+          &#x1F3E0; Desta Obra &amp; Gerais (${contas.filter(c => String(c.obra_id) === String(obraId) || !c.obra_id).length})
         </button>` : ''}
       </div>
       ${obraAtiva ? `
@@ -351,7 +351,7 @@ const Contas = {
       const obraId = App.obraId;
       let list = contas;
       if (this._filtro === 'obra' && obraId && obraId !== 'todas') {
-        list = contas.filter(c => c.obra_id === obraId || !c.obra_id);
+        list = contas.filter(c => String(c.obra_id) === String(obraId) || !c.obra_id);
       }
       el.innerHTML = list.length ? list.map(c => this._card(c)).join('') : `
         <div class="empty-state">
@@ -377,7 +377,8 @@ const Contas = {
         const nomeBanco = getNome(c);
         const label = c.apelido ? `${c.apelido} (${nomeBanco})` : `${nomeBanco} Ag:${c.agencia} / ${c.numero}`;
         const val = c.apelido || `${nomeBanco} Ag:${c.agencia} Cc:${c.numero}`;
-        const isSel = selectedVal === val || selectedVal === c.apelido || (c.numero && selectedVal?.includes(c.numero));
+        const sVal = String(selectedVal || '');
+        const isSel = selectedVal === val || selectedVal === c.apelido || (c.numero && sVal.includes(c.numero));
         return `<option value="${val}" ${isSel ? 'selected' : ''}>${label}</option>`;
       }).join('') +
       `<option value="__manual__">&#x2712; Digitar manualmente...</option>`;

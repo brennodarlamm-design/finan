@@ -37,6 +37,7 @@ const frontendMap = {
   'js/cobranca.js': 'frontend/domains/financeiro/cobranca.js',
   'js/exportar.js': 'frontend/domains/financeiro/exportar.js',
   'js/importar_excel.js': 'frontend/domains/financeiro/importar_excel.js',
+  'js/ofx.js': 'frontend/domains/financeiro/ofx.js',
 
   // Obras
   'js/clientes.js': 'frontend/domains/obras/clientes.js',

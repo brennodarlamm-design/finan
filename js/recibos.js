@@ -95,8 +95,8 @@ const Recibos = {
   // ─────────────────────────────────────────────────────────────
   render(obraId) {
     const recibos = this.getAll();
-    const cs = DB.getAll('clientes');
-    const filtrados = obraId && obraId !== 'todas' ? recibos.filter(r => r.obra_id === obraId) : recibos;
+    const cs = DB.getAll('clientes') || [];
+    const filtrados = obraId && obraId !== 'todas' ? recibos.filter(r => String(r.obra_id) === String(obraId)) : recibos;
 
     const totalValor = filtrados.reduce((acc, r) => acc + (parseFloat(r.valor) || 0), 0);
     const assinadosQtd = filtrados.filter(r => !!r.assinatura).length;
@@ -167,18 +167,18 @@ const Recibos = {
     const c = DB.getById('clientes', r.obra_id);
     const tipoLabel = r.tipo === 'pagamento' ? '<span class="badge badge-danger">Pagamento</span>' : '<span class="badge badge-success">Recebimento</span>';
     const statusAssinatura = r.assinatura 
-      ? `<span class="badge badge-success" title="Assinado eletronicamente em ${r.assinatura.data_hora_fmt}">✓ Assinado</span>` 
+      ? `<span class="badge badge-success" title="Assinado eletronicamente em ${Utils.escapeHtml(r.assinatura.data_hora_fmt || '')}">✓ Assinado</span>` 
       : `<span class="badge" style="background:rgba(148,163,184,.15);color:var(--text3);">Pendente</span>`;
 
     return `
     <tr>
-      <td style="font-weight:800;color:var(--accent);font-family:monospace;white-space:nowrap;">${r.numero}</td>
+      <td style="font-weight:800;color:var(--accent);font-family:monospace;white-space:nowrap;">${Utils.escapeHtml(r.numero || '')}</td>
       <td style="white-space:nowrap;font-weight:600;">${Utils.fmt.date(r.data)}</td>
       <td>${statusAssinatura}</td>
       <td>${tipoLabel}</td>
-      <td style="color:var(--text2);font-weight:600;">${c?.nome || r.obra_nome || '&mdash;'}</td>
-      <td><strong style="color:var(--text);">${r.beneficiario_nome}</strong>${r.beneficiario_doc ? `<div style="font-size:.72rem;color:var(--text3);">${r.beneficiario_doc}</div>` : ''}</td>
-      <td style="max-width:240px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="${r.referente}">${r.referente}</td>
+      <td style="color:var(--text2);font-weight:600;">${Utils.escapeHtml(c?.nome || r.obra_nome || '—')}</td>
+      <td><strong style="color:var(--text);">${Utils.escapeHtml(r.beneficiario_nome || '')}</strong>${r.beneficiario_doc ? `<div style="font-size:.72rem;color:var(--text3);">${Utils.escapeHtml(r.beneficiario_doc || '')}</div>` : ''}</td>
+      <td style="max-width:240px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="${Utils.escapeHtml(r.referente || '')}">${Utils.escapeHtml(r.referente || '')}</td>
       <td style="text-align:right;font-weight:900;color:var(--text);white-space:nowrap;">${Utils.fmt.currency(r.valor)}</td>
       <td style="text-align:center;">
         <div style="display:flex;gap:6px;justify-content:center;align-items:center;">

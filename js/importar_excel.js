@@ -551,22 +551,34 @@ const ImportarExcel = {
 
     selecionados.forEach(item => {
       const obra = item.obra_id || defaultObra;
-      const isBaixado = item.status === 'pago' || item.status === 'recebido';
+      const valRaw = parseFloat(item.valor) || 0;
+      const valor = Math.max(0, Number.isFinite(valRaw) ? valRaw : 0);
+      const tipo = item.tipo === 'receita' ? 'receita' : 'despesa';
+      let status = item.status || (tipo === 'receita' ? 'a_receber' : 'a_pagar');
+      if (tipo === 'receita') {
+        if (status === 'pago' || status === 'a_pagar') status = status === 'pago' ? 'recebido' : 'a_receber';
+      } else {
+        if (status === 'recebido' || status === 'a_receber') status = status === 'recebido' ? 'pago' : 'a_pagar';
+      }
+      const isBaixado = status === 'pago' || status === 'recebido';
+      const dataLanc = item.data || Utils.today();
+      const dataVenc = item.data_vencimento || dataLanc;
+
       DB.add('lancamentos', {
         obra_id: obra,
         centro_custo: obra === 'escritorio' ? 'escritorio' : 'obra',
-        tipo: item.tipo,
-        categoria: item.categoria,
-        descricao: item.descricao,
-        fornecedor_beneficiario: item.fornecedor_beneficiario,
-        data: item.data,
-        data_vencimento: item.data_vencimento,
-        data_pagamento: isBaixado ? (item.data_pagamento || item.data) : null,
-        valor: item.valor,
-        status: item.status,
-        conta_bancaria: item.conta_bancaria,
-        codigo_barras: item.codigo_barras,
-        observacoes: item.observacoes,
+        tipo: tipo,
+        categoria: item.categoria || (tipo === 'receita' ? 'outras_receitas' : 'material'),
+        descricao: item.descricao || `Lançamento ${importados + 1}`,
+        fornecedor_beneficiario: item.fornecedor_beneficiario || (tipo === 'receita' ? 'Cliente' : 'Fornecedor'),
+        data: dataLanc,
+        data_vencimento: dataVenc,
+        data_pagamento: isBaixado ? (item.data_pagamento || dataLanc) : null,
+        valor: valor,
+        status: status,
+        conta_bancaria: item.conta_bancaria || '',
+        codigo_barras: item.codigo_barras || '',
+        observacoes: item.observacoes || '',
         origem: 'importacao_excel',
         conciliado: isBaixado
       });

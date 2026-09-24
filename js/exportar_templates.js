@@ -319,7 +319,7 @@ const ExportarTemplates = {
     } else if (type === 'escritorio') {
       const todosLans = DB.getLancamentos(null);
       const lans = todosLans.filter(l => l.obra_id === 'escritorio' && l.tipo === 'despesa');
-      lans.sort((a, b) => b.data.localeCompare(a.data));
+      lans.sort((a, b) => String(b.data || '').localeCompare(String(a.data || '')));
       const hoje = Utils.today();
 
       const totDesp = lans.reduce((s, l) => s + l.valor, 0);

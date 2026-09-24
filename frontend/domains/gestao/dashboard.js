@@ -173,7 +173,7 @@ const Dashboard = {
 
     const calcularDREPara = (filtroObraId) => {
       const lFiltrados = filtroObraId
-        ? (filtroObraId === 'escritorio' ? lans.filter(l => l.obra_id === 'escritorio') : lans.filter(l => l.obra_id === filtroObraId))
+        ? (filtroObraId === 'escritorio' ? lans.filter(l => l.obra_id === 'escritorio') : lans.filter(l => String(l.obra_id) === String(filtroObraId)))
         : lans;
 
       const recs = lFiltrados.filter(l => l.tipo === 'receita').reduce((s, l) => s + (l.valor || 0), 0);
@@ -471,40 +471,40 @@ const Dashboard = {
     const future = new Date(Date.UTC(ty, tm - 1, td + 60));
     const fStr = future.toISOString().slice(0, 10);
 
-    const lans = DB.getLancamentos(obraId==='todas'?null:obraId).filter(l => {
+    const lans = (DB.getLancamentos(obraId==='todas'?null:obraId) || []).filter(l => {
       const venc = l.data_vencimento || l.data;
       return l.tipo === 'despesa' && (l.status === 'a_pagar' || l.status === 'pendente' || l.status === 'em_atraso') && venc && venc <= fStr;
     });
 
-    const nfItems = DB.getAll('notas').filter(n => {
+    const nfItems = (DB.getAll('notas') || []).filter(n => {
       const venc = n.data_vencimento || n.data_emissao;
-      return (!obraId || obraId === 'todas' || n.obra_id === obraId) && n.status === 'pendente' && venc && venc <= fStr;
+      return (!obraId || obraId === 'todas' || String(n.obra_id) === String(obraId)) && n.status === 'pendente' && venc && venc <= fStr;
     });
 
     const items = [
       ...lans.map(l => ({
         id: l.id,
         tipo_entidade: 'lancamento',
-        data: l.data_vencimento || l.data,
-        desc: l.descricao,
-        val: l.valor,
-        codigo_barras: l.codigo_barras,
+        data: l.data_vencimento || l.data || today,
+        desc: l.descricao || 'Despesa',
+        val: Number(l.valor) || 0,
+        codigo_barras: l.codigo_barras || null,
         tp: l.codigo_barras ? '📄' : '💸',
-        fornecedor: l.fornecedor_beneficiario,
+        fornecedor: l.fornecedor_beneficiario || 'Fornecedor',
         obra_id: l.obra_id
       })),
       ...nfItems.map(n => ({
         id: n.id,
         tipo_entidade: 'nota',
-        data: n.data_vencimento,
-        desc: `NF ${n.numero_nf} — ${n.emitente.slice(0,25)}`,
-        val: n.valor_bruto,
+        data: n.data_vencimento || n.data_emissao || today,
+        desc: `NF ${n.numero_nf || ''} — ${String(n.emitente || 'Fornecedor').slice(0,25)}`,
+        val: Number(n.valor_bruto) || 0,
         codigo_barras: null,
         tp: '🧾',
-        fornecedor: n.emitente,
+        fornecedor: n.emitente || 'Fornecedor',
         obra_id: n.obra_id
       }))
-    ].sort((a,b) => a.data.localeCompare(b.data)).slice(0, 30);
+    ].sort((a,b) => String(a?.data || '').localeCompare(String(b?.data || ''))).slice(0, 30);
 
     if (!items.length) {
       return '<div style="color:var(--text3);padding:24px;text-align:center;font-size:.85rem;">🎉 Nenhum vencimento para os próximos 60 dias</div>';
@@ -515,7 +515,7 @@ const Dashboard = {
 
     return items.map((it, idx) => {
       const vDate = new Date(it.data);
-      const diffTime = vDate - tDate;
+      const diffTime = Number.isNaN(vDate.getTime()) ? 0 : vDate - tDate;
       const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
       
       let diasBadge = '';
@@ -539,7 +539,7 @@ const Dashboard = {
               ${Utils.escapeHtml(it.desc || '')}
             </div>
             <div style="display:flex;gap:8px;align-items:center;font-size:.7rem;color:var(--text3);flex-wrap:wrap;margin-top:2px;">
-              <span>👤 ${Utils.escapeHtml(c?.nome || 'Geral')}</span>
+              <span>👤 ${Utils.escapeHtml(c?.nome || (it.obra_id === 'escritorio' ? 'Sede / Escritório' : 'Geral'))}</span>
               <span>&bull;</span>
               ${diasBadge}
               ${it.codigo_barras ? `<span>&bull;</span> <span style="font-family:monospace;color:var(--accent2);cursor:pointer;" data-fb-click="Patch26Actions.dashboardCopyVenc" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(idx))}" title="Clique para copiar código de barras">🔢 Boleto [Copiar]</span>` : ''}
@@ -571,11 +571,11 @@ const Dashboard = {
   },
 
   _recentRows(obraId) {
-    const lans = DB.getLancamentos(obraId==='todas'?null:obraId).slice(0,10);
-    const cs = DB.getAll('clientes');
+    const lans = (DB.getLancamentos(obraId==='todas'?null:obraId) || []).slice(0,10);
+    const cs = DB.getAll('clientes') || [];
     if (!lans.length) return `<tr><td colspan="7" style="text-align:center;color:var(--text3);padding:30px">Nenhum lançamento encontrado neste centro de custo.</td></tr>`;
     return lans.map(l=>{
-      const c = l.obra_id === 'escritorio' ? { nome: '🏢 Sede / Escritório' } : cs.find(x=>x.id===l.obra_id);
+      const c = l.obra_id === 'escritorio' ? { nome: '🏢 Sede / Escritório' } : cs.find(x=>String(x.id)===String(l.obra_id));
       return `<tr>
         <td style="white-space:nowrap">${Utils.fmt.date(l.data)}</td>
         ${obraId==='todas'?`<td style="font-size:.78rem;color:var(--text2)">${Utils.escapeHtml(c?.nome||'—')}</td>`:''}
@@ -1028,8 +1028,8 @@ const Dashboard = {
       : `<div style="width:46px;height:46px;border-radius:8px;background:#182713;border:1px solid #c9a227;display:flex;align-items:center;justify-content:center;font-size:1.4rem;">🏢</div>`;
 
     const lans = (DB.getAll('lancamentos') || [])
-      .filter(l => obraId === 'todas' || l.obra_id === obraId)
-      .sort((a,b) => new Date(b.data) - new Date(a.data))
+      .filter(l => obraId === 'todas' || String(l.obra_id) === String(obraId))
+      .sort((a,b) => String(b.data || '').localeCompare(String(a.data || '')))
       .slice(0, 15);
 
     const html = `

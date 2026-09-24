@@ -338,7 +338,7 @@ const Exportar = {
     if (tipo === 'escritorio') {
       const todosLans = DB.getLancamentos(null);
       const lans = todosLans.filter(l => l.obra_id === 'escritorio' && l.tipo === 'despesa');
-      lans.sort((a, b) => a.data.localeCompare(b.data));
+      lans.sort((a, b) => String(a.data || '').localeCompare(String(b.data || '')));
       const rows = [['Data Emissão','Data Vencimento','Data Pagamento','Categoria','Descrição','Fornecedor / Beneficiário','Conta Bancária','Valor (R$)','Status']];
       lans.forEach(l => {
         const dtPag = l.status === 'pago' ? (l.data_pagamento || l.data) : '';

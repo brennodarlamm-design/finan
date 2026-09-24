@@ -593,9 +593,9 @@ const Lancamentos = {
   save(id) {
     const f = document.getElementById('f-lan');
     if (!f.checkValidity()) { f.reportValidity(); return; }
-    const d = Object.fromEntries(new FormData(f));
-    d.valor = parseFloat(d.valor)||0;
-    d.conciliado = d.conciliado==='true';
+    d.valor = Math.abs(parseFloat(d.valor) || 0);
+    d.conciliado = d.conciliado === 'true';
+    d.data = d.data || Utils.today();
     d.data_vencimento = d.data_vencimento || d.data;
 
     // Se tipo for receita, limpa nota fiscal vinculada e normaliza status
@@ -732,8 +732,10 @@ const Lancamentos = {
   marcarBaixa(id) {
     const l = DB.getById('lancamentos', id);
     if (!l) return;
-    const contas = DB.getAll('contas');
     const isRec = l.tipo === 'receita';
+    const contasOptionsHtml = (typeof Contas !== 'undefined' && Contas.contaOptions)
+      ? Contas.contaOptions(l.conta_bancaria || '')
+      : `<option value="">Selecione a conta...</option>`;
 
     Utils.showModal(`
       <div class="modal" style="max-width:420px;width:95vw;">
@@ -749,9 +751,10 @@ const Lancamentos = {
           
           <div class="form-group" style="margin-bottom:12px;">
             <label class="form-label">${isRec ? 'Conta Bancária de Entrada' : 'Conta Bancária de Saída'}</label>
-            <select id="baixa-conta" class="form-control">
-              ${contas.map(c => `<option value="${c.apelido||c.banco_nome}" ${l.conta_bancaria===(c.apelido||c.banco_nome)?'selected':''}>${c.apelido||c.banco_nome}</option>`).join('')}
+            <select id="baixa-conta" class="form-control" data-fb-change="Lancamentos._onContaChange" data-fb-change-n="1" data-fb-change-t0="value">
+              ${contasOptionsHtml}
             </select>
+            <input type="text" id="baixa-conta-manual" class="form-control" placeholder="Digite a identificação da conta..." style="margin-top:6px;display:none;">
           </div>
           <div class="form-group">
             <label class="form-label">Data Efetiva da Baixa</label>
@@ -768,10 +771,23 @@ const Lancamentos = {
     `);
   },
 
+  _onContaChange(val) {
+    const m = document.getElementById('baixa-conta-manual');
+    if (m) m.style.display = val === '__manual__' ? 'block' : 'none';
+  },
+
   confirmarBaixa(id) {
     const l = DB.getById('lancamentos', id);
     if (!l) return;
-    const conta = document.getElementById('baixa-conta')?.value || l.conta_bancaria || '';
+    const contaSel = document.getElementById('baixa-conta')?.value || '';
+    const contaMan = (document.getElementById('baixa-conta-manual')?.value || '').trim();
+    let conta = contaSel;
+    if (contaSel === '__manual__') {
+      conta = contaMan || l.conta_bancaria || '';
+    } else if (!conta) {
+      conta = l.conta_bancaria || '';
+    }
+
     const dataBaixa = document.getElementById('baixa-data')?.value || Utils.today();
     const novoStatus = l.tipo === 'receita' ? 'recebido' : 'pago';
 
