@@ -1,5 +1,7 @@
 // js/notas.js — Notas Fiscais Module
 
+const esc = (v) => (typeof Utils !== 'undefined' && Utils.escapeHtml) ? Utils.escapeHtml(String(v ?? '')) : (v == null ? '' : String(v));
+
 const Notas = {
   render(obraId) {
     const nfs = this._getFiltered(obraId);
@@ -192,6 +194,7 @@ const Notas = {
   },
 
   showForm(id=null) {
+    const esc = (v) => (typeof Utils !== 'undefined' && Utils.escapeHtml) ? Utils.escapeHtml(String(v ?? '')) : (v == null ? '' : String(v));
     const n = id ? DB.getById('notas',id)||{} : {};
     const lans = DB.getAll('lancamentos');
     const isPaga = n.status === 'paga';

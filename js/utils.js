@@ -68,6 +68,10 @@ const Utils = {
       .replace(/'/g, '&#039;');
   },
 
+  esc(str) {
+    return this.escapeHtml(str);
+  },
+
   escapeJsAttr(value) {
     // Valor seguro para uso dentro de string JS entre aspas simples em atributos HTML.
     // Ex.: data-fb-click="fn" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="...". Prefira addEventListener quando possível.
@@ -679,3 +683,7 @@ const Utils = {
     `;
   }
 };
+
+if (typeof window !== 'undefined' && !window.esc) {
+  window.esc = (v) => (typeof Utils !== 'undefined' && Utils.escapeHtml) ? Utils.escapeHtml(String(v ?? '')) : (v == null ? '' : String(v));
+}
