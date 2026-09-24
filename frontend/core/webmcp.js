@@ -69,6 +69,24 @@
         }
       });
 
+      const ALLOWED_NAV_PATHS = new Set([
+        "/",
+        "/planos",
+        "/sobre-nos",
+        "/login",
+        "/cadastro",
+        "/calculadora-bdi",
+        "/manuais",
+        "/blog",
+        "/app",
+        "/portal"
+      ]);
+      const VALID_UFS = new Set([
+        'AC', 'AL', 'AP', 'AM', 'BA', 'CE', 'DF', 'ES', 'GO', 'MA',
+        'MT', 'MS', 'MG', 'PA', 'PB', 'PR', 'PE', 'PI', 'RJ', 'RN',
+        'RS', 'RO', 'RR', 'SC', 'SP', 'SE', 'TO'
+      ]);
+
       mc.registerTool({
         name: "navigate_to",
         description: "Navega para uma página pública ou recurso oficial do FinGo.",
@@ -77,7 +95,7 @@
           properties: {
             path: {
               type: "string",
-              enum: ["/", "/planos", "/sobre-nos", "/login", "/cadastro"],
+              enum: ["/", "/planos", "/sobre-nos", "/login", "/cadastro", "/calculadora-bdi", "/manuais", "/blog"],
               description: "Caminho de destino na plataforma."
             }
           },
@@ -85,9 +103,18 @@
         },
         signal: controller.signal,
         execute: async (args) => {
-          if (typeof window !== 'undefined' && args?.path) {
-            window.location.href = args.path;
-            return { content: [{ type: "text", text: `Navegando para ${args.path}` }] };
+          const targetPath = String(args?.path || '').trim();
+          if (!ALLOWED_NAV_PATHS.has(targetPath)) {
+            return {
+              content: [{
+                type: "text",
+                text: `Erro de segurança: O caminho "${targetPath}" não é permitido para navegação automática.`
+              }]
+            };
+          }
+          if (typeof window !== 'undefined') {
+            window.location.href = targetPath;
+            return { content: [{ type: "text", text: `Navegando com segurança para ${targetPath}` }] };
           }
           return { content: [{ type: "text", text: "Ambiente sem suporte a navegação por janela." }] };
         }
@@ -107,7 +134,8 @@
         },
         signal: controller.signal,
         execute: async (args) => {
-          const uf = String(args?.uf || 'todos os 27 estados').toUpperCase();
+          const rawUf = String(args?.uf || '').trim().toUpperCase();
+          const uf = VALID_UFS.has(rawUf) ? rawUf : 'todos os 27 estados do Brasil';
           return {
             content: [
               {

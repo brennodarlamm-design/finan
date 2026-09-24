@@ -86,8 +86,20 @@ Retorne EXCLUSIVAMENTE um objeto JSON válido no seguinte formato:
 }`;
 
       // Workers AI Vision input
+      let imageBytes;
+      if (Buffer.isBuffer(imageBase64OrBuffer) || imageBase64OrBuffer instanceof Uint8Array) {
+        imageBytes = Array.from(imageBase64OrBuffer);
+      } else if (typeof imageBase64OrBuffer === 'string') {
+        const cleanBase64 = imageBase64OrBuffer.includes(',')
+          ? imageBase64OrBuffer.split(',')[1]
+          : imageBase64OrBuffer;
+        imageBytes = Array.from(Buffer.from(cleanBase64.trim(), 'base64'));
+      } else {
+        throw new Error('Formato de imagem não suportado para OCR no Edge.');
+      }
+
       const input = {
-        image: Array.from(Buffer.from(imageBase64OrBuffer, 'base64')),
+        image: imageBytes,
         prompt: prompt,
         max_tokens: 1000
       };

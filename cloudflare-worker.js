@@ -1178,10 +1178,12 @@ async function mcpEndpointResponse(request) {
       if (toolName === "search_plans") {
         text = "Planos FinGo: Básico (R$ 119,90/mês, até 3 obras), Profissional (R$ 279,90/mês, até 10 obras, NF-e, OCR), Construtora Ilimitado (R$ 499,90/mês, obras ilimitadas, SINAPI oficial 27 estados, BDI analítico). Contratação: https://fingo.api.br/planos";
       } else if (toolName === "get_sinapi_info") {
-        const uf = String(args.state || 'BR').toUpperCase();
+        const rawState = String(args.state || 'BR').trim().toUpperCase();
+        const validUfs = new Set(['AC', 'AL', 'AP', 'AM', 'BA', 'CE', 'DF', 'ES', 'GO', 'MA', 'MT', 'MS', 'MG', 'PA', 'PB', 'PR', 'PE', 'PI', 'RJ', 'RN', 'RS', 'RO', 'RR', 'SC', 'SP', 'SE', 'TO', 'BR']);
+        const uf = validUfs.has(rawState) ? rawState : 'BR';
         text = `Base oficial SINAPI (Caixa Econômica Federal e IBGE) para ${uf}: composições analíticas, sintéticas e insumos desonerados/não desonerados conforme Decreto Federal nº 7.983/2013 disponíveis no FinGo.`;
       } else if (toolName === "get_financial_summary") {
-        text = "FinGo Financeiro: Centros de custo consolidados, conciliação bancária, fluxo de caixa e DRE operacional ativos.";
+        text = "FinGo Financeiro: Centros de custo consolidados, conciliação bancária, fluxo de caixa e DRE operacional ativos. Nota de governança: o acesso a relatórios e lançamentos reais de cada obra exige autenticação e sessão com chave do tenant via Bearer token ou cabeçalho x-api-key.";
       } else {
         return Response.json({
           jsonrpc: "2.0",

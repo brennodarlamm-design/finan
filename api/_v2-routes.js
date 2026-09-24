@@ -517,8 +517,10 @@ export async function handleV2EdgeStorageUpload(req, res) {
   }
 
   try {
+    const rawBase64 = String(base64Data || '');
+    const cleanBase64 = rawBase64.includes(',') ? rawBase64.split(',')[1] : rawBase64;
     const objectKey = buildR2ObjectKey(tenantId, category, filename);
-    const buffer = Buffer.from(base64Data, 'base64');
+    const buffer = Buffer.from(cleanBase64, 'base64');
     if (buffer.byteLength > 15 * 1024 * 1024) {
       return res.status(413).json({ success:false, error:'Arquivo excede o limite máximo permitido de 15 MB.' });
     }
@@ -572,9 +574,24 @@ export async function handleV2EdgeStorageGet(req, res) {
       return res.status(404).json({ success: false, error: 'Arquivo não encontrado no R2.' });
     }
 
+    const rawContentType = String(obj.contentType || 'application/octet-stream').toLowerCase();
+    const safeInlineTypes = new Set([
+      'application/pdf',
+      'image/jpeg',
+      'image/jpg',
+      'image/png',
+      'image/webp',
+      'image/gif',
+      'text/plain'
+    ]);
+    const isInlineSafe = safeInlineTypes.has(rawContentType);
+    const safeFilename = String(obj.customMetadata?.originalName || key.split('/').pop() || 'documento')
+      .replace(/[^a-zA-Z0-9_.-]/g, '_');
+
     res.setHeader('Content-Type', obj.contentType || 'application/octet-stream');
     res.setHeader('Cache-Control', 'private, no-store');
-    res.setHeader('Content-Disposition', 'inline');
+    res.setHeader('Content-Disposition', isInlineSafe ? `inline; filename="${safeFilename}"` : `attachment; filename="${safeFilename}"`);
+    res.setHeader('X-Content-Type-Options', 'nosniff');
     res.setHeader('X-Storage-Engine', obj.storage);
 
     return res.status(200).send(obj.body);

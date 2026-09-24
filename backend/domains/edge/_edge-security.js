@@ -57,6 +57,10 @@ export async function recordFailedAttempt(env, ip, reason = 'auth_failed') {
   currentAttempts += 1;
 
   localFailStore.set(normIp, currentAttempts);
+  if (localFailStore.size > 2000) {
+    const oldestKey = localFailStore.keys().next().value;
+    if (oldestKey) localFailStore.delete(oldestKey);
+  }
   await setKvCache(env, attemptsKey, currentAttempts, ATTEMPTS_WINDOW_SECONDS);
 
   // Se atingiu o limite de 5 falhas, aplica banimento global
@@ -71,6 +75,10 @@ export async function recordFailedAttempt(env, ip, reason = 'auth_failed') {
 
     await setKvCache(env, banKey, banData, BAN_DURATION_SECONDS);
     localBanStore.set(normIp, { ...banData, expiresAt: Date.now() + BAN_DURATION_SECONDS * 1000 });
+    if (localBanStore.size > 2000) {
+      const oldestKey = localBanStore.keys().next().value;
+      if (oldestKey) localBanStore.delete(oldestKey);
+    }
 
     // Dispara alerta operacional
     await dispatchEdgeAlert(env, {
@@ -130,6 +138,10 @@ export async function checkAndSetIdempotency(env, idempotencyKey, payload) {
   };
 
   localIdempotencyStore.set(normKey, record);
+  if (localIdempotencyStore.size > 3000) {
+    const oldestKey = localIdempotencyStore.keys().next().value;
+    if (oldestKey) localIdempotencyStore.delete(oldestKey);
+  }
   await setKvCache(env, normKey, record, IDEMPOTENCY_TTL_SECONDS);
 
   return { isDuplicate: false };
