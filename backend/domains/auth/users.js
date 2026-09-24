@@ -237,7 +237,7 @@ async function findLearnedSupportAnswer(sql, tenantId, text) {
 
 function getSupportRenderBaseUrl() {
   const custom = String(process.env.RENDER_WHATSAPP_URL || '').trim();
-  return custom ? custom.replace(/\/send-message\/?$/, '').replace(/\/+$/, '') : 'https://finan-wf12.onrender.com';
+  return custom ? custom.replace(/\/send-message\/?$/, '').replace(/\/+$/, '') : 'https://finan-backend-9rxw.onrender.com';
 }
 
 function escapeHtml(val) {

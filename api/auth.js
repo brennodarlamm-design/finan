@@ -1474,7 +1474,9 @@ export default async function handler(req, res) {
         const numFmt = destPhone.startsWith('55') ? destPhone : `55${destPhone}`;
         const mensagemOtp = `*FinGo — Código de Verificação*\n\nOlá, ${user.nome}!\n\nSeu código seguro para redefinir sua senha no FinGo é:\n\n👉 *${otpCode}*\n\nEste código é válido por *10 minutos*. Se você não solicitou esta redefinição, ignore esta mensagem.`;
         try {
-          const waResp = await fetch('https://finan-wf12.onrender.com/send-message', {
+          const renderBaseUrl = String(process.env.RENDER_WHATSAPP_URL || 'https://finan-backend-9rxw.onrender.com')
+            .replace(/\/send-message\/?$/, '').replace(/\/+$/, '');
+          const waResp = await fetch(`${renderBaseUrl}/send-message`, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
