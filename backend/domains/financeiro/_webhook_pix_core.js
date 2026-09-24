@@ -367,7 +367,10 @@ export async function settlePixPayment(sql, payload, meta = {}) {
  * Envio de Comprovante de Pagamento Instantâneo via WhatsApp (Render) e E-mail (Resend)
  */
 export async function sendPaymentReceipt(record) {
-  const phone = String(record.telefone || '').replace(/\D/g, '');
+  let phone = String(record.telefone || '').replace(/\D/g, '');
+  if (phone.length >= 10 && phone.length <= 11 && !phone.startsWith('55')) {
+    phone = '55' + phone;
+  }
   const email = String(record.email || '').trim();
   const nomeEmpresa = record.nome_fantasia || record.razao_social || 'Sua Empresa';
   const responsavel = record.responsavel || 'Gestor(a)';
@@ -475,7 +478,7 @@ export async function sendPaymentReceipt(record) {
           html: emailHtml,
           tenantId: record.tenant_id || null
         }, {
-          idempotencyKey: `pix-receipt-${record.txid || record.id || Date.now()}`
+          idempotencyKey: `pix-receipt-${record.txid || record.invoice_id || record.id || Date.now()}`
         });
 
         if (trigRes.success) {

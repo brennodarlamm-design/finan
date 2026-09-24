@@ -79,10 +79,16 @@ const SuporteDev = {
       this._summary = { ...this._summary, ...(data.summary || {}) };
       this._updateSummaryDom();
 
+      const currentWaitingIds = new Set(this._active.filter(c => c.status === 'waiting').map(c => c.id));
       for (const conv of this._active.filter(c => c.status === 'waiting')) {
         if (!previousWaiting.has(conv.id) && !this._notifiedWaiting.has(conv.id)) {
           this._notifiedWaiting.add(conv.id);
           this._showPopup(conv);
+        }
+      }
+      for (const id of this._notifiedWaiting) {
+        if (!currentWaitingIds.has(id)) {
+          this._notifiedWaiting.delete(id);
         }
       }
 
@@ -252,12 +258,20 @@ const SuporteDev = {
     if (!el || !this._current) return;
     const c = this._current;
     const resolved = c.status === 'resolved' || c.status === 'closed';
+    const currentInput = document.getElementById('suporte-dev-input');
+    const draftText = currentInput ? currentInput.value : '';
+
     el.innerHTML = `<div style="padding:12px 15px;border-bottom:1px solid rgba(255,255,255,.07);display:flex;justify-content:space-between;gap:10px;align-items:center;flex-wrap:wrap;">
       <div><div style="font-weight:950;color:#fff;">${this._esc(c.tenant_nome || c.tenant_id)}</div><div style="font-size:.7rem;color:#94a3b8;">${this._esc(c.usuario_nome || 'Usuário')} ${c.usuario_email?`· ${this._esc(c.usuario_email)}`:''} · ${this._statusBadge(c.status)}</div></div>
       <div style="display:flex;gap:6px;">${!resolved && c.status !== 'assigned' ? `<button data-fb-click="SuporteDev.assumir" data-fb-click-n="0" style="background:#22c55e;border:none;color:#fff;border-radius:7px;padding:7px 10px;font-size:.7rem;font-weight:900;cursor:pointer;">👨‍💻 Assumir</button>`:''}${!resolved?`<button data-fb-click="SuporteDev.resolver" data-fb-click-n="0" style="background:rgba(163,230,53,.1);border:1px solid rgba(163,230,53,.35);color:#bef264;border-radius:7px;padding:7px 10px;font-size:.7rem;font-weight:900;cursor:pointer;">✓ Resolver</button>`:''}</div>
     </div>
     <div id="suporte-dev-msgs" style="flex:1;overflow:auto;padding:16px;display:flex;flex-direction:column;gap:10px;min-height:0;">${this._messages.map(m=>this._renderMessage(m)).join('')}</div>
     ${!resolved?`<div style="border-top:1px solid rgba(255,255,255,.07);padding:11px 13px;display:flex;gap:8px;"><textarea id="suporte-dev-input" rows="2" maxlength="4000" placeholder="Responder como atendente..." style="flex:1;resize:none;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.13);border-radius:8px;color:#fff;padding:9px 11px;font-family:inherit;font-size:.78rem;outline:none;"></textarea><button data-fb-click="SuporteDev.enviar" data-fb-click-n="0" style="background:var(--accent);border:none;border-radius:8px;padding:8px 14px;font-weight:950;color:#111827;cursor:pointer;">Enviar ➤</button></div>`:''}`;
+
+    if (draftText && !resolved) {
+      const newInput = document.getElementById('suporte-dev-input');
+      if (newInput) newInput.value = draftText;
+    }
     setTimeout(()=>{ const m=document.getElementById('suporte-dev-msgs'); if(m)m.scrollTop=m.scrollHeight; },20);
   },
 
