@@ -351,8 +351,8 @@ const Contratos = {
     const lista = this.getAll();
     const emp = DB.getEmpresa();
     const empresaNome = Utils.escapeHtml(emp.nome_fantasia || emp.razao_social || 'sua empresa');
-    const cs = DB.getAll('clientes');
-    const filtrados = obraId && obraId !== 'todas' ? lista.filter(c => c.obra_id === obraId) : lista;
+    const cs = DB.getAll('clientes') || [];
+    const filtrados = obraId && obraId !== 'todas' ? lista.filter(c => String(c.obra_id) === String(obraId)) : lista;
 
     const totalValor = filtrados.reduce((acc, c) => acc + (parseFloat(c.valor) || 0), 0);
     const assinadosQtd = filtrados.filter(c => c.status === 'assinado' || (c.assinatura_contratante && c.assinatura_contratada) || (c.selo_govbr_contratada && c.selo_govbr_contratante)).length;

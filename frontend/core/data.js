@@ -498,7 +498,7 @@ const DB = {
       console.warn('[Storage] Erro ao limpar cache pesado:', err);
     }
   },
-  getById(key, id) { return this.getAll(key).find(i => i.id === id) || null; },
+  getById(key, id) { if (id == null) return null; return (this.getAll(key) || []).find(i => String(i.id) === String(id)) || null; },
   get(key, id) { return this.getById(key, id); },
 
   _moduleForKey(key) {
@@ -541,7 +541,7 @@ const DB = {
   update(key, id, updates) {
     if (!this.canWriteLocal('write', key)) return this._denyLocal('write');
     const data = this.getAll(key);
-    const idx = data.findIndex(i => i.id === id);
+    const idx = data.findIndex(i => String(i.id) === String(id));
     if (idx === -1) return null;
     data[idx] = { ...data[idx], ...updates, updated_at: new Date().toISOString() };
     this.save(key, data);
@@ -550,7 +550,7 @@ const DB = {
   },
   remove(key, id) {
     if (!this.canWriteLocal('delete', key)) return this._denyLocal('delete');
-    this.save(key, this.getAll(key).filter(i => i.id !== id));
+    this.save(key, this.getAll(key).filter(i => String(i.id) !== String(id)));
     this.syncToCloud('delete', key, null, id);
     return true;
   },
