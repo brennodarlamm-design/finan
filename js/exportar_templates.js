@@ -2,7 +2,7 @@
 // Suporta: Lancamentos, Escritorio/Sede, Notas, Medicoes, Orcamentos, SINAPI, DRE e Fluxo 90d
 
 const ExportarTemplates = {
-  gerar(type, obraId) {
+  gerar(type, obraId, customOptions = {}) {
     const cs = obraId === 'todas' ? DB.getAll('clientes') : [DB.getById('clientes', obraId)].filter(Boolean);
     const clienteUnico = cs.length === 1 ? cs[0] : null;
     const emissao = new Date().toLocaleString('pt-BR');
@@ -251,17 +251,41 @@ const ExportarTemplates = {
     }
 
     if (type === 'lancamentos') {
-      const lans = DB.getLancamentos(obraId === 'todas' ? null : obraId);
+      const lans = (customOptions && customOptions.lancamentos)
+        ? customOptions.lancamentos
+        : DB.getLancamentos(obraId === 'todas' ? null : obraId, customOptions?.filters || {});
       const totRec = lans.filter(l => l.tipo === 'receita').reduce((s, l) => s + l.valor, 0);
       const totDesp = lans.filter(l => l.tipo === 'despesa').reduce((s, l) => s + l.valor, 0);
+      const saldo = totRec - totDesp;
       const hoje = Utils.today();
+
+      const f = customOptions?.filters || {};
+      const badges = [];
+      if (f.fornecedor) badges.push(`🏢 <strong>Fornecedor:</strong> ${Utils.escapeHtml(f.fornecedor)}`);
+      if (f.dataInicio || f.dataFim) {
+        const diFmt = f.dataInicio ? Utils.fmt.date(f.dataInicio) : 'Início';
+        const dfFmt = f.dataFim ? Utils.fmt.date(f.dataFim) : 'Hoje';
+        badges.push(`📅 <strong>Período:</strong> ${diFmt} até ${dfFmt}`);
+      }
+      if (f.tipo) badges.push(`🏷️ <strong>Tipo:</strong> ${f.tipo === 'receita' ? 'Receitas' : 'Despesas'}`);
+      if (f.status) badges.push(`📌 <strong>Status:</strong> ${Utils.escapeHtml(f.status)}`);
+      if (f.categoria) badges.push(`📁 <strong>Categoria:</strong> ${Utils.escapeHtml(Utils.catLabel ? Utils.catLabel(f.categoria) : f.categoria)}`);
+
+      const filterBadgesHtml = badges.length ? `
+        <div class="ang-filter-badges" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;margin-bottom:8px;">
+          ${badges.map(b => `<span style="display:inline-block;padding:3px 9px;border-radius:4px;background:#f8fafc;color:#334155;border:1px solid #cbd5e1;font-size:.73rem;">${b}</span>`).join('')}
+        </div>` : '';
 
       html += `
       <div class="ang-section-header" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:8px;">
-        <h2 style="font-size:1.05rem;font-weight:900;color:#0f172a;margin:0;">Extrato Financeiro de Lan&ccedil;amentos (${lans.length} registros)</h2>
-        <div class="ang-totals-row" style="font-size:.82rem;">
-          <span style="display:inline-block;background:#dcfce7;color:#15803d;padding:4px 10px;border-radius:4px;font-weight:800;margin-right:8px;">+ Receitas: ${Utils.fmt.currency(totRec)}</span>
+        <div>
+          <h2 style="font-size:1.05rem;font-weight:900;color:#0f172a;margin:0;">Extrato Financeiro de Lan&ccedil;amentos (${lans.length} registros)</h2>
+          ${filterBadgesHtml}
+        </div>
+        <div class="ang-totals-row" style="font-size:.82rem;display:flex;flex-wrap:wrap;gap:6px;">
+          <span style="display:inline-block;background:#dcfce7;color:#15803d;padding:4px 10px;border-radius:4px;font-weight:800;">+ Receitas: ${Utils.fmt.currency(totRec)}</span>
           <span style="display:inline-block;background:#fee2e2;color:#b91c1c;padding:4px 10px;border-radius:4px;font-weight:800;">- Despesas: ${Utils.fmt.currency(totDesp)}</span>
+          <span style="display:inline-block;background:${saldo>=0?'#e0f2fe':'#fee2e2'};color:${saldo>=0?'#0369a1':'#b91c1c'};padding:4px 10px;border-radius:4px;font-weight:800;">Saldo: ${Utils.fmt.currency(saldo)}</span>
         </div>
       </div>
       <div class="ang-tbl-wrap"><table style="width:100%;border-collapse:collapse;font-size:.78rem;margin-bottom:24px;color:#0f172a;">

@@ -2140,6 +2140,14 @@ const DB = {
     if (filters.tipo) items = items.filter(l => l.tipo === filters.tipo);
     if (filters.status) items = items.filter(l => l.status === filters.status);
     if (filters.categoria) items = items.filter(l => l.categoria === filters.categoria);
+    if (filters.fornecedor) {
+      const qForn = String(filters.fornecedor).trim().toLowerCase();
+      items = items.filter(l => {
+        const fb = String(l.fornecedor_beneficiario || '').trim().toLowerCase();
+        const fid = l.fornecedor_id ? String(l.fornecedor_id).trim().toLowerCase() : '';
+        return fb === qForn || fid === qForn || (fb.length > 0 && fb.includes(qForn));
+      });
+    }
     if (filters.dataInicio) items = items.filter(l => (l.data_vencimento || l.data) >= filters.dataInicio);
     if (filters.dataFim) items = items.filter(l => (l.data_vencimento || l.data) <= filters.dataFim);
     if (filters.search) {

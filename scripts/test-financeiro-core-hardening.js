@@ -59,6 +59,7 @@ runFile('js/importar_excel.js');
 runFile('js/recibos.js');
 runFile('js/fornecedores.js');
 runFile('js/dashboard.js');
+runFile('js/exportar_templates.js');
 
 vm.runInContext(`
 console.log('🧪 Iniciando testes do Núcleo Financeiro Core (OFX, Contas, Parcelamento & Lançamentos)...');
@@ -218,6 +219,55 @@ if (!opts.includes('Outros / Diversos')) {
 }
 
 console.log('   ✓ Fornecedores com categoria internet_tel, fallback para órfãos e reativação validados.');
+
+// 10. Teste de Filtro por Fornecedor em Lançamentos e Exportação Direta com Filtros
+console.log('\\n10. Testando filtro de fornecedor em Lançamentos e Exportação Direta...');
+DB.save('lancamentos', [
+  { id: 'lan_forn_1', obra_id: 1, data: '2026-09-10', tipo: 'despesa', categoria: 'internet_tel', fornecedor_beneficiario: 'NIO INTERNET', valor: 250, status: 'pago' },
+  { id: 'lan_forn_2', obra_id: 1, data: '2026-09-15', tipo: 'despesa', categoria: 'material', fornecedor_beneficiario: 'Cimento & Cia', fornecedor_id: 'f_cimento', valor: 800, status: 'pago' },
+  { id: 'lan_forn_3', obra_id: 1, data: '2026-09-20', tipo: 'receita', categoria: 'medicao', fornecedor_beneficiario: 'Cliente Alpha', valor: 5000, status: 'pago' }
+]);
+
+const lansNio = DB.getLancamentos(1, { fornecedor: 'NIO INTERNET' });
+if (lansNio.length !== 1 || lansNio[0].id !== 'lan_forn_1') {
+  throw new Error('getLancamentos com filtro fornecedor deve retornar apenas lançamentos do fornecedor especificado');
+}
+
+const lansCimento = DB.getLancamentos(1, { fornecedor: 'f_cimento' });
+if (lansCimento.length !== 1 || lansCimento[0].id !== 'lan_forn_2') {
+  throw new Error('getLancamentos com filtro fornecedor por ID deve funcionar');
+}
+
+const fornOptionsHtml = Lancamentos._renderFornecedorFilterOptions('NIO INTERNET');
+if (!fornOptionsHtml.includes('value="NIO INTERNET" selected')) {
+  throw new Error('_renderFornecedorFilterOptions deve marcar o fornecedor selecionado');
+}
+if (!fornOptionsHtml.includes('Cimento &amp; Cia') && !fornOptionsHtml.includes('Cimento & Cia')) {
+  throw new Error('_renderFornecedorFilterOptions deve conter fornecedores dos lançamentos existentes');
+}
+
+// Teste de exportação com opções e badges
+const relatorioCustomHtml = ExportarTemplates.gerar('lancamentos', 1, {
+  filters: {
+    fornecedor: 'NIO INTERNET',
+    dataInicio: '2026-09-01',
+    dataFim: '2026-09-30',
+    tipo: 'despesa'
+  }
+});
+if (!relatorioCustomHtml.includes('Fornecedor:</strong> NIO INTERNET') && !relatorioCustomHtml.includes('NIO INTERNET')) {
+  throw new Error('ExportarTemplates.gerar deve exibir badge do filtro de Fornecedor ativo');
+}
+if (!relatorioCustomHtml.includes('Período:')) {
+  throw new Error('ExportarTemplates.gerar deve exibir badge do período filtrado');
+}
+if (!relatorioCustomHtml.includes(Utils.fmt.currency(250))) {
+  throw new Error('ExportarTemplates.gerar deve conter o lançamento filtrado de R$ 250,00');
+}
+if (relatorioCustomHtml.includes('Cimento & Cia') || relatorioCustomHtml.includes('Cliente Alpha')) {
+  throw new Error('ExportarTemplates.gerar não deve conter lançamentos fora do filtro de fornecedor');
+}
+console.log('   ✓ Filtro por fornecedor em getLancamentos e badges/dados de ExportarTemplates validados.');
 
 console.log('\\n🎉 TODOS OS TESTES DO NÚCLEO FINANCEIRO PASSARAM COM SUCESSO!\\n');
 `, sandbox);

@@ -13,6 +13,9 @@ const Lancamentos = {
     <div class="page-header">
       <div><h1 class="page-title">&#x1F4B0; Lan&ccedil;amentos</h1><p class="page-sub">Controle de receitas e despesas com vencimentos e contas banc&aacute;rias</p></div>
       <div class="page-actions finance-actions" style="display:flex;gap:8px;flex-wrap:wrap;">
+        <button class="btn btn-secondary btn-sm" data-fb-click="Lancamentos.abrirModalExportar" data-fb-click-n="0" style="display:flex;align-items:center;gap:6px;border:1px solid rgba(59,130,246,.5);color:#60a5fa;font-weight:700;" title="Exportar relatório ou planilha com período e fornecedor personalizados">
+          📥 Exportar Relatório
+        </button>
         <button class="btn btn-secondary btn-sm" data-fb-click="ImportarExcel.abrirModal" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(obraId))}" style="display:flex;align-items:center;gap:6px;border:1px solid var(--accent);color:var(--accent2);">
           📊 Importar Planilha Excel
         </button>
@@ -60,6 +63,13 @@ const Lancamentos = {
         <select class="form-control" id="f-status" style="min-width:130px">
           <option value="">Todos</option><option value="pago">Pago</option><option value="recebido">Recebido</option>
           <option value="a_pagar">A Pagar</option><option value="a_receber">A Receber</option><option value="em_atraso">Em Atraso</option>
+        </select>
+      </div>
+      <div class="filter-group">
+        <label class="filter-label">Fornecedor</label>
+        <select class="form-control" id="f-forn" style="min-width:150px;max-width:210px">
+          <option value="">Todos os Fornecedores</option>
+          ${this._renderFornecedorFilterOptions()}
         </select>
       </div>
       <div class="filter-group">
@@ -820,6 +830,7 @@ const Lancamentos = {
       tipo: document.getElementById('f-tipo')?.value||undefined,
       status: document.getElementById('f-status')?.value||undefined,
       categoria: document.getElementById('f-cat')?.value||undefined,
+      fornecedor: document.getElementById('f-forn')?.value||undefined,
       dataInicio: document.getElementById('f-di')?.value||undefined,
       dataFim: document.getElementById('f-df')?.value||undefined,
       search: document.getElementById('f-srch')?.value||undefined,
@@ -887,7 +898,7 @@ const Lancamentos = {
   },
 
   clearFilters() {
-    ['f-srch','f-tipo','f-cat','f-status','f-di','f-df'].forEach(id=>{ const el=document.getElementById(id); if(el) el.value=''; });
+    ['f-srch','f-tipo','f-cat','f-status','f-forn','f-di','f-df'].forEach(id=>{ const el=document.getElementById(id); if(el) el.value=''; });
     this._refresh(true);
   },
 
@@ -1131,8 +1142,289 @@ const Lancamentos = {
     if (typeof Parcelamento !== 'undefined') Parcelamento.salvar();
   },
 
+  // ── FORNECEDOR OPTIONS HELPER PARA FILTROS ──────────────────────────────
+  _renderFornecedorFilterOptions(selectedVal = '') {
+    const fornecedoresCadastrados = (typeof DB !== 'undefined' ? (DB.getAll('fornecedores') || []) : [])
+      .filter(f => f && f.ativo !== false)
+      .map(f => (f.nome_fantasia || f.razao_social || '').trim())
+      .filter(Boolean);
+
+    const fornecedoresLancamentos = (typeof DB !== 'undefined' ? (DB.getAll('lancamentos') || []) : [])
+      .map(l => (l.fornecedor_beneficiario || '').trim())
+      .filter(Boolean);
+
+    const unicos = Array.from(new Set([...fornecedoresCadastrados, ...fornecedoresLancamentos]))
+      .sort((a, b) => a.localeCompare(b, 'pt-BR', { sensitivity: 'base' }));
+
+    return unicos.map(nome => {
+      const sel = (selectedVal && selectedVal.toLowerCase() === nome.toLowerCase()) ? 'selected' : '';
+      return `<option value="${Utils.escapeHtml(nome)}" ${sel}>${Utils.escapeHtml(nome)}</option>`;
+    }).join('');
+  },
+
+  // ── MODAL DE EXPORTAÇÃO DIRETA DE LANÇAMENTOS ───────────────────────────
+  abrirModalExportar() {
+    const esc = (v) => Utils.escapeHtml(String(v ?? ''));
+    const fornAtual = document.getElementById('f-forn')?.value || '';
+    const diTela = document.getElementById('f-di')?.value || '';
+    const dfTela = document.getElementById('f-df')?.value || '';
+    const tipoAtual = document.getElementById('f-tipo')?.value || '';
+    const statusAtual = document.getElementById('f-status')?.value || '';
+    const obraAtual = App.obraId || 'todas';
+
+    let periodoDefault = 'mes_atual';
+    let diDefault = '';
+    let dfDefault = '';
+
+    const agora = new Date();
+    const ano = agora.getFullYear();
+    const mes = agora.getMonth();
+    const toISO = (d) => {
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${y}-${m}-${day}`;
+    };
+
+    if (diTela || dfTela) {
+      periodoDefault = 'custom';
+      diDefault = diTela;
+      dfDefault = dfTela;
+    } else {
+      diDefault = toISO(new Date(ano, mes, 1));
+      dfDefault = toISO(new Date(ano, mes + 1, 0));
+    }
+
+    Utils.showModal(`
+      <div class="modal" id="modal-export-lancamentos" style="max-width:640px;width:100%;">
+        <div class="modal-header" style="border-bottom:1px solid var(--border);padding-bottom:12px;">
+          <div>
+            <span class="modal-title" style="display:flex;align-items:center;gap:8px;font-size:1.15rem;color:var(--accent2);font-weight:800;">
+              📥 Exportar Relatório de Lançamentos
+            </span>
+            <div style="font-size:.76rem;color:var(--text3);margin-top:2px;">
+              Gere extratos executivos em PDF/A4 ou planilhas Excel filtrando por período e fornecedor
+            </div>
+          </div>
+          <button class="modal-close" data-fb-click="Utils.closeModal" data-fb-click-n="0">✕</button>
+        </div>
+
+        <div class="modal-body" style="padding:16px 0;">
+          <form id="f-export-lan" data-fb-submit="Patch26Actions.prevent" data-fb-submit-n="1" data-fb-submit-t0="event">
+            <!-- Atalhos Rápidos de Período -->
+            <div class="form-group" style="margin-bottom:14px;">
+              <label class="form-label" style="font-weight:700;display:flex;justify-content:space-between;align-items:center;">
+                <span>📅 Selecione o Período Desejado</span>
+                <span style="font-size:.72rem;color:var(--text3);font-weight:400;">Datas de competência / vencimento</span>
+              </label>
+              <select class="form-control" id="exp-lan-periodo" data-fb-change="Lancamentos._onExportModalPeriodoChange" data-fb-change-n="0" style="font-weight:600;">
+                <option value="mes_atual" ${periodoDefault==='mes_atual'?'selected':''}>📆 Mês Atual</option>
+                <option value="mes_anterior">📆 Mês Anterior</option>
+                <option value="ultimos_30">⏳ Últimos 30 Dias</option>
+                <option value="ultimos_90">⏳ Últimos 90 Dias (Trimestre)</option>
+                <option value="ano_atual">📅 Ano Corrente (Todo o Ano)</option>
+                <option value="tudo">🌐 Todo o Histórico (Sem filtro de data)</option>
+                <option value="custom" ${periodoDefault==='custom'?'selected':''}>✎ Período Personalizado...</option>
+              </select>
+            </div>
+
+            <!-- Campos de Data Inicial e Final -->
+            <div class="form-row cols-2" style="margin-bottom:14px;">
+              <div class="form-group">
+                <label class="form-label" for="exp-lan-di">Data Inicial</label>
+                <input class="form-control" type="date" id="exp-lan-di" value="${esc(diDefault)}" data-fb-change="Lancamentos._onExportModalFilterChange" data-fb-change-n="0" data-fb-input="Lancamentos._onExportModalFilterChange" data-fb-input-n="0">
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="exp-lan-df">Data Final</label>
+                <input class="form-control" type="date" id="exp-lan-df" value="${esc(dfDefault)}" data-fb-change="Lancamentos._onExportModalFilterChange" data-fb-change-n="0" data-fb-input="Lancamentos._onExportModalFilterChange" data-fb-input-n="0">
+              </div>
+            </div>
+
+            <!-- Filtro por Fornecedor & Obra -->
+            <div class="form-row cols-2" style="margin-bottom:14px;">
+              <div class="form-group">
+                <label class="form-label" for="exp-lan-forn" style="font-weight:700;">🏢 Filtrar por Fornecedor</label>
+                <select class="form-control" id="exp-lan-forn" data-fb-change="Lancamentos._onExportModalFilterChange" data-fb-change-n="0">
+                  <option value="">Todos os Fornecedores</option>
+                  ${this._renderFornecedorFilterOptions(fornAtual)}
+                </select>
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="exp-lan-obra">🏗️ Obra / Centro de Custo</label>
+                <select class="form-control" id="exp-lan-obra" data-fb-change="Lancamentos._onExportModalFilterChange" data-fb-change-n="0">
+                  <option value="todas">Todas as Obras (Visão Geral)</option>
+                  ${Utils.clienteOptions(obraAtual, 'Todas as Obras', false)}
+                </select>
+              </div>
+            </div>
+
+            <!-- Filtros de Tipo & Status -->
+            <div class="form-row cols-2" style="margin-bottom:16px;">
+              <div class="form-group">
+                <label class="form-label" for="exp-lan-tipo">🏷️ Tipo de Lançamento</label>
+                <select class="form-control" id="exp-lan-tipo" data-fb-change="Lancamentos._onExportModalFilterChange" data-fb-change-n="0">
+                  <option value="">Receitas e Despesas (Todos)</option>
+                  <option value="despesa" ${tipoAtual==='despesa'?'selected':''}>Apenas Despesas (Saídas)</option>
+                  <option value="receita" ${tipoAtual==='receita'?'selected':''}>Apenas Receitas (Entradas)</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="exp-lan-status">📌 Status Financeiro</label>
+                <select class="form-control" id="exp-lan-status" data-fb-change="Lancamentos._onExportModalFilterChange" data-fb-change-n="0">
+                  <option value="">Todos os Status</option>
+                  <option value="pago" ${statusAtual==='pago'?'selected':''}>Apenas Pagos</option>
+                  <option value="recebido" ${statusAtual==='recebido'?'selected':''}>Apenas Recebidos</option>
+                  <option value="a_pagar" ${statusAtual==='a_pagar'?'selected':''}>A Pagar (Pendentes)</option>
+                  <option value="a_receber" ${statusAtual==='a_receber'?'selected':''}>A Receber (Pendentes)</option>
+                  <option value="em_atraso" ${statusAtual==='em_atraso'?'selected':''}>Em Atraso</option>
+                </select>
+              </div>
+            </div>
+
+            <!-- Resumo Dinâmico / Prévia em Tempo Real -->
+            <div id="exp-lan-resumo" style="background:var(--bg-secondary);border:1px solid var(--border);border-radius:10px;padding:12px 16px;margin-bottom:8px;">
+              <!-- Atualizado dinamicamente -->
+            </div>
+          </form>
+        </div>
+
+        <div class="modal-footer" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;border-top:1px solid var(--border);padding-top:14px;">
+          <button class="btn btn-secondary btn-sm" data-fb-click="Utils.closeModal" data-fb-click-n="0">Cancelar</button>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            <button class="btn btn-secondary btn-sm" data-fb-click="Lancamentos.exportarModalNovaAba" data-fb-click-n="0" style="display:flex;align-items:center;gap:6px;" title="Visualizar documento em nova aba">
+              🔗 Abrir em Nova Guia
+            </button>
+            <button class="btn btn-primary btn-sm" data-fb-click="Lancamentos.exportarModalPDF" data-fb-click-n="0" style="display:flex;align-items:center;gap:6px;" title="Imprimir ou gerar PDF formato A4">
+              🖨️ Imprimir / PDF
+            </button>
+            <button class="btn btn-success btn-sm" data-fb-click="Lancamentos.exportarModalExcel" data-fb-click-n="0" style="display:flex;align-items:center;gap:6px;font-weight:700;" title="Baixar planilha Excel (.xlsx)">
+              📊 Baixar Planilha (.xlsx)
+            </button>
+          </div>
+        </div>
+      </div>
+    `);
+
+    this._atualizarPreviaModalExportar();
+  },
+
+  _onExportModalPeriodoChange() {
+    const sel = document.getElementById('exp-lan-periodo')?.value || 'custom';
+    const diEl = document.getElementById('exp-lan-di');
+    const dfEl = document.getElementById('exp-lan-df');
+    if (!diEl || !dfEl) return;
+
+    const toISO = (d) => {
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${y}-${m}-${day}`;
+    };
+
+    const agora = new Date();
+    const ano = agora.getFullYear();
+    const mes = agora.getMonth();
+
+    if (sel === 'mes_atual') {
+      diEl.value = toISO(new Date(ano, mes, 1));
+      dfEl.value = toISO(new Date(ano, mes + 1, 0));
+    } else if (sel === 'mes_anterior') {
+      diEl.value = toISO(new Date(ano, mes - 1, 1));
+      dfEl.value = toISO(new Date(ano, mes, 0));
+    } else if (sel === 'ultimos_30') {
+      const d30 = new Date(agora);
+      d30.setDate(agora.getDate() - 30);
+      diEl.value = toISO(d30);
+      dfEl.value = toISO(agora);
+    } else if (sel === 'ultimos_90') {
+      const d90 = new Date(agora);
+      d90.setDate(agora.getDate() - 90);
+      diEl.value = toISO(d90);
+      dfEl.value = toISO(agora);
+    } else if (sel === 'ano_atual') {
+      diEl.value = `${ano}-01-01`;
+      dfEl.value = `${ano}-12-31`;
+    } else if (sel === 'tudo') {
+      diEl.value = '';
+      dfEl.value = '';
+    }
+    this._atualizarPreviaModalExportar();
+  },
+
+  _onExportModalFilterChange() {
+    this._atualizarPreviaModalExportar();
+  },
+
+  _getModalExportFilters() {
+    const obraId = document.getElementById('exp-lan-obra')?.value || 'todas';
+    const f = {
+      dataInicio: document.getElementById('exp-lan-di')?.value || undefined,
+      dataFim: document.getElementById('exp-lan-df')?.value || undefined,
+      fornecedor: document.getElementById('exp-lan-forn')?.value || undefined,
+      tipo: document.getElementById('exp-lan-tipo')?.value || undefined,
+      status: document.getElementById('exp-lan-status')?.value || undefined,
+    };
+    Object.keys(f).forEach(k => { if (!f[k]) delete f[k]; });
+    return { obraId, filters: f };
+  },
+
+  _atualizarPreviaModalExportar() {
+    const resumoEl = document.getElementById('exp-lan-resumo');
+    if (!resumoEl) return;
+
+    const { obraId, filters } = this._getModalExportFilters();
+    const lans = DB.getLancamentos(obraId === 'todas' ? null : obraId, filters);
+
+    const totRec = lans.filter(l => l.tipo === 'receita').reduce((s, l) => s + l.valor, 0);
+    const totDesp = lans.filter(l => l.tipo === 'despesa').reduce((s, l) => s + l.valor, 0);
+    const saldo = totRec - totDesp;
+
+    if (lans.length === 0) {
+      resumoEl.innerHTML = `
+        <div style="display:flex;align-items:center;gap:8px;color:var(--warning);font-size:.82rem;">
+          <span>⚠️</span>
+          <span>Nenhum lançamento encontrado para os filtros e período selecionados.</span>
+        </div>`;
+      return;
+    }
+
+    resumoEl.innerHTML = `
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
+        <div style="font-size:.82rem;font-weight:700;color:var(--text);">
+          ✓ <strong>${lans.length}</strong> ${lans.length === 1 ? 'lançamento selecionado' : 'lançamentos selecionados'}
+        </div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;font-size:.76rem;font-weight:700;">
+          <span style="background:rgba(16,185,129,.15);color:#34d399;padding:3px 8px;border-radius:4px;border:1px solid rgba(16,185,129,.3);">+ Rec: ${Utils.fmt.currency(totRec)}</span>
+          <span style="background:rgba(239,68,68,.15);color:#f87171;padding:3px 8px;border-radius:4px;border:1px solid rgba(239,68,68,.3);">- Desp: ${Utils.fmt.currency(totDesp)}</span>
+          <span style="background:rgba(59,130,246,.15);color:#60a5fa;padding:3px 8px;border-radius:4px;border:1px solid rgba(59,130,246,.3);">Saldo: ${Utils.fmt.currency(saldo)}</span>
+        </div>
+      </div>`;
+  },
+
+  async exportarModalPDF() {
+    const { obraId, filters } = this._getModalExportFilters();
+    if (typeof Exportar !== 'undefined') {
+      await Exportar.imprimirRelatorio('lancamentos', obraId, { filters });
+      Utils.toast('📄 Gerando documento para impressão / PDF...', 'info');
+    }
+  },
+
+  async exportarModalExcel() {
+    const { obraId, filters } = this._getModalExportFilters();
+    if (typeof Exportar !== 'undefined') {
+      await Exportar.exportarExcel('lancamentos', { filters, obraId });
+    }
+  },
+
+  async exportarModalNovaAba() {
+    const { obraId, filters } = this._getModalExportFilters();
+    if (typeof Exportar !== 'undefined') {
+      await Exportar.abrirEmNovaAba('lancamentos', obraId, { filters });
+    }
+  },
+
   init() {
-    const ids = ['f-srch','f-tipo','f-cat','f-status','f-di','f-df'];
+    const ids = ['f-srch','f-tipo','f-cat','f-status','f-forn','f-di','f-df'];
     ids.forEach(id => {
       const el = document.getElementById(id);
       if (el) {

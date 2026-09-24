@@ -118,9 +118,9 @@ const Exportar = {
   // ─────────────────────────────────────────────────────────────
   // GERAÇÃO DO DOCUMENTO EXECUTIVO PREMIUM (HTML PURO PARA A4)
   // ─────────────────────────────────────────────────────────────
-  gerarHTMLDocumento(type, obraId = this.getObraId()) {
+  gerarHTMLDocumento(type, obraId = this.getObraId(), customOptions = {}) {
     if (typeof ExportarTemplates !== 'undefined') {
-      return ExportarTemplates.gerar(type, obraId);
+      return ExportarTemplates.gerar(type, obraId, customOptions);
     }
     return '';
   },
@@ -128,11 +128,9 @@ const Exportar = {
   // ─────────────────────────────────────────────────────────────
   // MOTOR DE IMPRESSÃO (SEM ELEMENTOS DE TELA DO SISTEMA)
   // ─────────────────────────────────────────────────────────────
-  async imprimirRelatorio() {
-    const type = this._currentPreview;
-    const obraId = this.getObraId();
+  async imprimirRelatorio(type = this._currentPreview, obraId = this.getObraId(), customOptions = {}) {
     if (!await FinObraAssets.require('reports')) return;
-    const htmlDoc = this.gerarHTMLDocumento(type, obraId);
+    const htmlDoc = this.gerarHTMLDocumento(type, obraId, customOptions);
     
     // Injetar frame invisível ou janela limpa
     let printFrame = document.getElementById('finobra-print-frame');
@@ -183,14 +181,12 @@ const Exportar = {
     }, 400);
   },
 
-  async abrirEmNovaAba() {
-    const type = this._currentPreview;
-    const obraId = this.getObraId();
+  async abrirEmNovaAba(type = this._currentPreview, obraId = this.getObraId(), customOptions = {}) {
     const w = window.open('', '_blank');
     if (!w) { Utils.toast('Permita popups para abrir em nova guia', 'warning'); return; }
     if (!await FinObraAssets.require('reports')) { w.close(); return; }
     if (w.closed) return;
-    const htmlDoc = this.gerarHTMLDocumento(type, obraId);
+    const htmlDoc = this.gerarHTMLDocumento(type, obraId, customOptions);
     w.document.write(`
       <!DOCTYPE html>
       <html>
@@ -223,8 +219,8 @@ const Exportar = {
   // ─────────────────────────────────────────────────────────────
   // EXPORTAÇÃO EXCEL (.XLSX COM NOME LIMPO)
   // ─────────────────────────────────────────────────────────────
-  async exportarExcel(tipo) {
-    const obraId = this.getObraId();
+  async exportarExcel(tipo, customOptions = {}) {
+    const obraId = (customOptions && customOptions.obraId !== undefined) ? customOptions.obraId : this.getObraId();
     if (!await FinObraAssets.require('excel')) return;
     if (!await FinObraAssets.require('sinapi')) return;
     if (typeof XLSX === 'undefined') { Utils.toast('Biblioteca XLSX n&atilde;o carregada','error'); return; }
@@ -257,7 +253,9 @@ const Exportar = {
     }
 
     if (tipo === 'completo' || tipo === 'lancamentos') {
-      const lans = DB.getLancamentos(obraId==='todas'?null:obraId);
+      const lans = (customOptions && customOptions.lancamentos)
+        ? customOptions.lancamentos
+        : DB.getLancamentos(obraId==='todas'?null:obraId, customOptions?.filters || {});
       const cs = DB.getAll('clientes');
       const rows = [['Data Emissão','Data Vencimento','Data Pagamento / Recebimento','Obra / Centro de Custo','Tipo','Categoria','Descrição','Fornecedor/Beneficiário','Valor','Status','Conciliado','Conta Bancária','Código de Barras','Origem']];
       lans.forEach(l=>{
@@ -413,7 +411,18 @@ const Exportar = {
     const emp = DB.getEmpresa ? DB.getEmpresa() : {};
     const empresaArq = String(emp.nome_fantasia || emp.razao_social || 'FinGo')
       .normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-zA-Z0-9_-]/g, '_').replace(/_+/g,'_').slice(0, 35) || 'FinGo';
-    const nomeArq = `${empresaArq}_${safeNome}_${tipoLabel}_${dataIso}.xlsx`;
+    
+    let extraForn = '';
+    if (customOptions?.filters?.fornecedor) {
+      extraForn = '_' + String(customOptions.filters.fornecedor).normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 15);
+    }
+    let extraPeriodo = '';
+    if (customOptions?.filters?.dataInicio || customOptions?.filters?.dataFim) {
+      const di = customOptions.filters.dataInicio || 'inicio';
+      const df = customOptions.filters.dataFim || 'fim';
+      extraPeriodo = `_${di}_a_${df}`;
+    }
+    const nomeArq = `${empresaArq}_${safeNome}_${tipoLabel}${extraForn}${extraPeriodo}_${dataIso}.xlsx`;
 
     // Download direto via Blob com nome garantido
     try {
