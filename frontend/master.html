@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Painel Master Administrativo | FinGo Backoffice</title>
+  <meta name="robots" content="noindex, nofollow">
+  <link rel="canonical" href="https://fingo.api.br/master">
+  <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png?v=3">
+  <link rel="icon" type="image/x-icon" href="/favicon.ico?v=3">
+  <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png?v=3">
+  <link rel="preconnect" href="https://fonts.googleapis.com" crossorigin>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&display=optional">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&display=optional" rel="stylesheet">
+  <link rel="stylesheet" href="/css/tokens.css?v=20260918_1">
+  <link rel="stylesheet" href="/css/style.css">
+  <style>
+    :root {
+      --bg-base: #0A0A0A;
+      --bg-card: #1A1A1A;
+      --accent: #C6FF00;
+      --accent2: #D4FF33;
+      --border: #282828;
+    }
+    body {
+      background: var(--bg-base);
+      color: #F0F0E8;
+      font-family: 'Inter', sans-serif;
+      margin: 0;
+      padding: 0;
+      min-height: 100vh;
+    }
+    .master-header {
+      background: linear-gradient(135deg, #111D0D, #182B12);
+      border-bottom: 1px solid var(--border);
+      padding: 16px 28px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 16px;
+      box-shadow: 0 4px 20px rgba(0,0,0,.5);
+    }
+    .badge-dev {
+      background: rgba(198,255,0,.12);
+      border: 1px solid var(--accent);
+      color: var(--accent);
+      padding: 4px 12px;
+      border-radius: 20px;
+      font-size: .75rem;
+      font-weight: 800;
+      letter-spacing: .05em;
+    }
+    .btn-action {
+      background: rgba(255,255,255,.05);
+      border: 1px solid var(--border);
+      color: #f0ead6;
+      padding: 8px 16px;
+      border-radius: 8px;
+      font-size: .82rem;
+      font-weight: 700;
+      cursor: pointer;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: all .2s;
+    }
+    .btn-action:hover {
+      background: rgba(201,162,39,.15);
+      color: var(--accent2);
+      border-color: var(--accent);
+    }
+    .metric-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 20px 24px;
+      box-shadow: 0 8px 24px rgba(0,0,0,.3);
+    }
+    .table-container {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      overflow: hidden;
+      margin-bottom: 30px;
+    }
+  </style>
+  <script src="/js/version_guard.js"></script>
+  <link rel="stylesheet" href="/css/premium.css?v=20260913" media="screen">
+</head>
+<body class="ui-portal">
+
+  <!-- Verificação de Acesso / Bloqueio por Usuário e Senha Master -->
+  <div id="master-auth-gate" style="display:flex;min-height:100vh;align-items:center;justify-content:center;padding:20px;background:radial-gradient(ellipse at center, #121F0D 0%, #060B04 80%);">
+    <div style="background:#0f1a0b;border:1px solid var(--accent);border-radius:16px;max-width:420px;width:100%;padding:36px 30px;box-shadow:0 24px 60px rgba(0,0,0,.85);position:relative;overflow:hidden;">
+      
+      <div style="position:absolute;top:0;left:0;right:0;height:4px;background:linear-gradient(90deg, #10b981, var(--accent), var(--accent2));"></div>
+
+      <div style="text-align:center;margin-bottom:24px;">
+        <div style="display:inline-flex;align-items:center;justify-content:center;gap:10px;margin-bottom:12px;">
+          <img src="/img/fingo/fingo-symbol.png" alt="FinGo" style="width:48px;height:48px;border-radius:6px;border:1px solid rgba(198,255,0,0.3);background:#0A0A0A;box-shadow:0 8px 24px rgba(198,255,0,0.25);object-fit:contain;padding:4px;">
+        </div>
+        <div style="display:flex;align-items:center;justify-content:center;margin-bottom:6px;">
+          <img src="/img/fingo/fingo-wordmark.png" alt="FinGo" style="height:28px;width:auto;object-fit:contain;display:block;">
+        </div>
+        <div style="font-size:.78rem;color:#94a3b8;text-transform:uppercase;letter-spacing:.08em;">Portal Master Dev &bull; Backoffice</div>
+      </div>
+
+      <div id="master-err-box" style="display:none;background:rgba(239,68,68,.12);border:1px solid rgba(239,68,68,.35);color:#fca5a5;padding:10px 14px;border-radius:8px;font-size:.82rem;margin-bottom:16px;text-align:center;"></div>
+
+      <!-- ETAPA 1: Login Master (Usuário e Senha) -->
+      <div id="master-step-credentials">
+        <form data-fb-submit="executarLoginMaster" data-fb-submit-n="1" data-fb-submit-t0="event" style="display:flex;flex-direction:column;gap:14px;">
+          <div>
+            <label style="display:block;font-size:.78rem;color:#cbd5e1;font-weight:700;margin-bottom:6px;">Usuário Master / Dev</label>
+            <div style="position:relative;">
+              <input type="text" id="master-user-input" required placeholder="Digite seu usuário master (ex: admin)" autocomplete="username" style="width:100%;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.18);border-radius:8px;padding:11px 14px 11px 36px;color:#fff;font-size:.88rem;outline:none;transition:border-color .2s;" data-fb-focus="Patch26Actions.borderAccent" data-fb-focus-n="1" data-fb-focus-t0="self" data-fb-blur="Patch26Actions.borderMasterBlur" data-fb-blur-n="1" data-fb-blur-t0="self">
+              <span style="position:absolute;left:12px;top:50%;transform:translateY(-50%);font-size:.9rem;color:#94a3b8;pointer-events:none;">👤</span>
+            </div>
+          </div>
+
+          <div>
+            <label style="display:block;font-size:.78rem;color:#cbd5e1;font-weight:700;margin-bottom:6px;">Senha de Segurança</label>
+            <div style="position:relative;">
+              <input type="password" id="master-pass-input" required placeholder="Digite sua senha de acesso" autocomplete="current-password" style="width:100%;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.18);border-radius:8px;padding:11px 40px 11px 36px;color:#fff;font-size:.88rem;outline:none;transition:border-color .2s;" data-fb-focus="Patch26Actions.borderAccent" data-fb-focus-n="1" data-fb-focus-t0="self" data-fb-blur="Patch26Actions.borderMasterBlur" data-fb-blur-n="1" data-fb-blur-t0="self">
+              <span style="position:absolute;left:12px;top:50%;transform:translateY(-50%);font-size:.9rem;color:#94a3b8;pointer-events:none;">🔒</span>
+              <button type="button" data-fb-click="alternarVisibilidadeSenha" data-fb-click-n="0" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;color:#94a3b8;cursor:pointer;font-size:.9rem;padding:4px;" title="Mostrar / ocultar senha">👁️</button>
+            </div>
+          </div>
+
+          <button type="submit" class="btn-primary" style="margin-top:6px;width:100%;padding:13px;border-radius:8px;font-weight:800;font-size:.92rem;display:flex;align-items:center;justify-content:center;gap:8px;box-shadow:0 8px 24px rgba(201,162,39,.35);cursor:pointer;">
+            <span>Autenticar no Portal Master</span>
+            <span>🛡️</span>
+          </button>
+        </form>
+      </div>
+
+      <!-- ETAPA 2: Código 2FA do Google Authenticator -->
+      <div id="master-step-mfa" style="display:none;">
+        <div style="text-align:center;margin-bottom:18px;">
+          <div style="display:inline-block;padding:8px 14px;background:rgba(16,185,129,.12);border:1px solid rgba(16,185,129,.3);border-radius:20px;font-size:.76rem;color:#6ee7b7;font-weight:700;margin-bottom:10px;">
+            🔐 AUTENTICAÇÃO EM 2 ETAPAS (2FA)
+          </div>
+          <p style="font-size:.82rem;color:#94a3b8;line-height:1.5;margin:0;">
+            Abra o <strong>Google Authenticator</strong> no seu celular e digite o código de 6 dígitos:
+          </p>
+        </div>
+
+        <form data-fb-submit="executarVerificacaoMfa" data-fb-submit-n="1" data-fb-submit-t0="event" style="display:flex;flex-direction:column;gap:14px;">
+          <div id="master-totp-container">
+            <label style="display:block;font-size:.78rem;color:#cbd5e1;font-weight:700;margin-bottom:6px;text-align:center;">Código de 6 dígitos</label>
+            <input type="text" id="master-totp-input" inputmode="numeric" pattern="[0-9]*" maxlength="6" placeholder="000000" autocomplete="one-time-code" style="width:100%;background:rgba(255,255,255,.07);border:1px solid var(--accent);border-radius:10px;padding:14px;color:#fff;font-size:1.8rem;font-weight:800;letter-spacing:0.35em;text-align:center;outline:none;font-family:monospace;box-shadow:inset 0 2px 8px rgba(0,0,0,.4);">
+          </div>
+
+          <div id="master-backup-container" style="display:none;">
+            <label style="display:block;font-size:.78rem;color:#cbd5e1;font-weight:700;margin-bottom:6px;text-align:center;">Código de Recuperação (Backup)</label>
+            <input type="text" id="master-backup-input" maxlength="12" placeholder="XXXX-XXXX" style="width:100%;background:rgba(255,255,255,.07);border:1px solid #38bdf8;border-radius:10px;padding:14px;color:#fff;font-size:1.3rem;font-weight:800;letter-spacing:0.15em;text-align:center;outline:none;font-family:monospace;text-transform:uppercase;">
+          </div>
+
+          <button type="submit" class="btn-primary" style="margin-top:6px;width:100%;padding:13px;border-radius:8px;font-weight:800;font-size:.92rem;display:flex;align-items:center;justify-content:center;gap:8px;box-shadow:0 8px 24px rgba(201,162,39,.35);cursor:pointer;">
+            <span>Confirmar e Entrar</span>
+            <span>🚀</span>
+          </button>
+
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px;font-size:.78rem;">
+            <button type="button" data-fb-click="alternarModoBackupMfa" data-fb-click-n="0" style="background:none;border:none;color:#38bdf8;cursor:pointer;padding:0;text-decoration:underline;">
+              <span id="master-mfa-switch-btn-text">Usar código de emergência</span>
+            </button>
+            <button type="button" data-fb-click="voltarEtapaLoginMaster" data-fb-click-n="0" style="background:none;border:none;color:#94a3b8;cursor:pointer;padding:0;">
+              ← Voltar ao login
+            </button>
+          </div>
+        </form>
+      </div>
+
+      <!-- ETAPA 3: Ativação Inicial do Google Authenticator (QR Code) -->
+      <div id="master-step-setup" style="display:none;">
+        <div style="text-align:center;margin-bottom:14px;">
+          <div style="display:inline-block;padding:6px 12px;background:rgba(234,179,8,.15);border:1px solid rgba(234,179,8,.4);border-radius:20px;font-size:.74rem;color:#fde047;font-weight:700;margin-bottom:8px;">
+            ⚠️ ATIVAÇÃO OBRIGATÓRIA DE 2FA
+          </div>
+          <h3 style="font-size:1.05rem;font-weight:800;color:#fff;margin:0 0 6px;">Vincular Google Authenticator</h3>
+          <p style="font-size:.78rem;color:#94a3b8;line-height:1.4;margin:0;">
+            1. Escaneie o QR Code abaixo com o app Google Authenticator no smartphone:
+          </p>
+        </div>
+
+        <div style="background:#fff;border-radius:12px;padding:12px;display:flex;justify-content:center;align-items:center;margin-bottom:12px;box-shadow:0 4px 16px rgba(0,0,0,.4);">
+          <div id="master-qrcode-container" style="display:flex;align-items:center;justify-content:center;min-height:160px;">
+            <!-- SVG QR Code gerado pelo backend -->
+          </div>
+        </div>
+
+        <div style="background:rgba(255,255,255,.04);border:1px dashed rgba(255,255,255,.15);border-radius:8px;padding:8px 12px;margin-bottom:12px;font-size:.74rem;color:#cbd5e1;text-align:center;">
+          <div style="font-size:.68rem;color:#94a3b8;margin-bottom:4px;">Chave manual (caso prefira digitar no aplicativo):</div>
+          <div style="display:flex;align-items:center;justify-content:center;gap:8px;">
+            <code id="master-secret-key-display" style="font-family:monospace;font-weight:800;color:var(--accent2);letter-spacing:.05em;font-size:.82rem;">...</code>
+            <button type="button" data-fb-click="MasterAdmin.copiarChaveMfa" data-fb-click-n="0" style="background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.2);color:#fff;padding:3px 8px;border-radius:4px;font-size:.68rem;cursor:pointer;">Copiar</button>
+          </div>
+        </div>
+
+        <div style="margin-bottom:12px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);border-radius:8px;padding:10px;">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
+            <div style="font-size:.72rem;font-weight:700;color:#fde047;">💾 Códigos de emergência (descartáveis):</div>
+          </div>
+          <p style="font-size:.68rem;color:#94a3b8;line-height:1.35;margin:0 0 8px;">
+            Guarde-os em local seguro. Cada código é de uso único caso perca o celular, e só será ativado após você confirmar os 6 dígitos abaixo:
+          </p>
+          <div id="master-setup-backup-codes" style="background:#060B04;border:1px solid rgba(255,255,255,.1);border-radius:6px;padding:8px;display:grid;grid-template-columns:1fr 1fr;gap:4px;font-family:monospace;font-size:.72rem;color:#6ee7b7;text-align:center;">
+            <!-- Preenchido dinamicamente -->
+          </div>
+        </div>
+
+        <form data-fb-submit="executarAtivacaoMfa" data-fb-submit-n="1" data-fb-submit-t0="event" style="display:flex;flex-direction:column;gap:10px;">
+          <div>
+            <label style="display:block;font-size:.76rem;color:#cbd5e1;font-weight:700;margin-bottom:4px;text-align:center;">2. Digite o código de 6 dígitos gerado no app:</label>
+            <input type="text" id="master-setup-totp-input" inputmode="numeric" pattern="[0-9]*" maxlength="6" placeholder="000000" autocomplete="one-time-code" style="width:100%;background:rgba(255,255,255,.07);border:1px solid var(--accent);border-radius:8px;padding:10px;color:#fff;font-size:1.4rem;font-weight:800;letter-spacing:0.3em;text-align:center;outline:none;font-family:monospace;">
+          </div>
+
+          <button type="submit" class="btn-primary" style="width:100%;padding:12px;border-radius:8px;font-weight:800;font-size:.88rem;display:flex;align-items:center;justify-content:center;gap:6px;box-shadow:0 8px 24px rgba(201,162,39,.35);cursor:pointer;">
+            <span>Ativar 2FA &amp; Entrar</span>
+            <span>🛡️</span>
+          </button>
+
+          <div style="text-align:center;margin-top:4px;">
+            <button type="button" data-fb-click="voltarEtapaLoginMaster" data-fb-click-n="0" style="background:none;border:none;color:#94a3b8;cursor:pointer;font-size:.76rem;">
+              ← Cancelar e Voltar
+            </button>
+          </div>
+        </form>
+      </div>
+
+      <div style="margin-top:20px;text-align:center;border-top:1px solid rgba(255,255,255,.08);padding-top:16px;">
+        <a href="/login" style="color:#94a3b8;font-size:.8rem;text-decoration:none;transition:color .2s;">
+          ← Ir para a Área do Cliente
+        </a>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Conteúdo Principal do Painel Master -->
+  <div id="master-app" style="display:none;">
+    
+    <!-- Topbar -->
+    <header class="master-header">
+      <div style="display:flex;align-items:center;gap:14px;">
+        <div style="width:42px;height:42px;border-radius:6px;background:#0A0A0A;border:1px solid rgba(198,255,0,0.3);display:flex;align-items:center;justify-content:center;box-shadow:0 4px 12px rgba(198,255,0,0.2);padding:4px;">
+          <img src="/img/fingo/fingo-symbol.png" alt="FinGo" style="width:100%;height:100%;object-fit:contain;">
+        </div>
+        <div>
+          <div style="display:flex;align-items:center;gap:8px;">
+            <img src="/img/fingo/fingo-wordmark.png" alt="FinGo" style="height:18px;width:auto;object-fit:contain;display:block;">
+            <span style="font-weight:900;font-size:1.05rem;color:#F0F0E8;letter-spacing:.02em;">Master Backoffice</span>
+            <span class="badge-dev">SUPER ADMIN DEV</span>
+          </div>
+          <div style="font-size:.75rem;color:#94a3b8;">Gestão Centralizada de Construtoras, MRR, Assinaturas e Suporte</div>
+        </div>
+      </div>
+
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+        <button data-fb-click="MasterAdmin.switchTab" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="leads" class="btn-action" style="background:rgba(198,255,0,.12);border-color:var(--accent);color:var(--accent2);" title="Ver Solicitações de Acesso e Leads Comerciais">
+          <span>📥 Leads Comerciais</span>
+          <span id="master-leads-badge-header" style="display:none;background:#ef4444;color:#fff;padding:1px 6px;border-radius:10px;font-size:.7rem;font-weight:900;margin-left:4px;">0</span>
+        </button>
+        <button data-fb-click="MasterAdmin.executarVarreduraCobranca" data-fb-click-n="0" class="btn-action" style="background:rgba(16,185,129,.1);border-color:#10b981;color:#6ee7b7;" title="Executar Varredura de Cobrança 24/7 Imediatamente">
+          <span>⚡ Varredura de Cobrança</span>
+        </button>
+        <button data-fb-click="MasterAdmin.abrirSimuladorWebhookPix" data-fb-click-n="0" class="btn-action" style="background:rgba(2,132,199,.12);border-color:#0284c7;color:#38bdf8;" title="Simular Recebimento de Webhook PIX e Baixa Automática">
+          <span>⚡ Simular Webhook PIX</span>
+        </button>
+        <button data-fb-click="MasterAdmin.switchTab" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="contas" class="btn-action" style="background:rgba(56,189,248,.1);border-color:#38bdf8;color:#7dd3fc;" title="Ver Contas Bancárias e Conciliação Multi-Tenant">
+          <span>🏦 Contas Bancárias</span>
+        </button>
+        <button data-fb-click="MasterAdmin.switchTab" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="agenda" class="btn-action" style="background:rgba(18,217,160,.12);border-color:#12D9A0;color:#3EE8B5;" title="Gerenciar e Agendar Lives & Capacitação">
+          <span>📅 Agenda &amp; Lives Dev</span>
+        </button>
+        <a href="/apresentacao" target="_blank" class="btn-action" title="Abrir Página de Vendas Externa">
+          <span>📢 Ver Landing Page Comercial</span>
+        </a>
+        <a href="/app" class="btn-action" title="Acessar o Sistema como Usuário">
+          <span>⚡ Ir ao Sistema FinGo ↗</span>
+        </a>
+        <button data-fb-click="MasterAdmin.abrirModalMfa" data-fb-click-n="0" class="btn-action" style="background:rgba(234,179,8,.12);border-color:#eab308;color:#fde047;" title="Gerenciar Segurança e Autenticação de 2 Fatores">
+          <span>🔐 Segurança &amp; 2FA</span>
+        </button>
+        <button data-fb-click="sairMaster" data-fb-click-n="0" class="btn-action" style="color:#ef4444;border-color:rgba(239,68,68,.3);" title="Sair do Portal">
+          <span>Sair 🔒</span>
+        </button>
+      </div>
+    </header>
+
+    <main style="max-width:1260px;margin:0 auto;padding:26px 20px 60px;">
+      <div id="master-content-area">
+        <!-- Renderizado dinamicamente por MasterAdmin.render() -->
+      </div>
+    </main>
+
+    <!-- Modal de Gerenciamento de Segurança & 2FA Master -->
+    <div id="master-mfa-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);backdrop-filter:blur(4px);z-index:9999;align-items:center;justify-content:center;padding:20px;">
+      <div style="background:#0f1a0b;border:1px solid var(--accent);border-radius:16px;max-width:500px;width:100%;padding:28px 26px;box-shadow:0 24px 60px rgba(0,0,0,.85);position:relative;">
+        
+        <div style="position:absolute;top:0;left:0;right:0;height:4px;background:linear-gradient(90deg, #10b981, var(--accent), var(--accent2));border-radius:16px 16px 0 0;"></div>
+
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;border-bottom:1px solid rgba(255,255,255,.08);padding-bottom:14px;">
+          <div style="display:flex;align-items:center;gap:10px;">
+            <span style="font-size:1.5rem;">🔐</span>
+            <div>
+              <h3 style="font-size:1.15rem;font-weight:900;color:var(--accent2);margin:0;">Segurança Master &amp; 2FA</h3>
+              <div style="font-size:.74rem;color:#94a3b8;">Google Authenticator (RFC 6238 TOTP)</div>
+            </div>
+          </div>
+          <button type="button" data-fb-click="MasterAdmin.fecharModalMfa" data-fb-click-n="0" style="background:rgba(255,255,255,.08);border:none;color:#cbd5e1;padding:6px 10px;border-radius:6px;cursor:pointer;font-size:.9rem;" title="Fechar modal">✕</button>
+        </div>
+
+        <div style="margin-bottom:20px;">
+          <div style="display:flex;align-items:center;justify-content:space-between;background:rgba(16,185,129,.1);border:1px solid #10b981;padding:12px 16px;border-radius:10px;margin-bottom:14px;">
+            <div style="display:flex;align-items:center;gap:8px;">
+              <span style="font-size:1.2rem;">🛡️</span>
+              <div>
+                <div style="font-size:.82rem;font-weight:800;color:#6ee7b7;">Proteção em 2 Fatores Ativa</div>
+                <div style="font-size:.72rem;color:#cbd5e1;">Seu smartphone valida cada acesso ao painel Master.</div>
+              </div>
+            </div>
+            <span style="background:#10b981;color:#060B04;font-weight:900;font-size:.68rem;padding:4px 8px;border-radius:12px;text-transform:uppercase;">ATIVO</span>
+          </div>
+
+          <div style="border-top:1px solid rgba(255,255,255,.08);padding-top:16px;">
+            <h4 style="font-size:.88rem;font-weight:800;color:#fff;margin:0 0 6px;">Códigos de Recuperação de Emergência</h4>
+            <p style="font-size:.76rem;color:#94a3b8;line-height:1.45;margin:0 0 12px;">
+              Caso perca o acesso ao smartphone, use um dos códigos reservas descartáveis. Digite sua senha atual para gerar uma nova lista de 8 códigos:
+            </p>
+
+            <div id="mfa-regen-box" style="display:flex;gap:8px;margin-bottom:12px;">
+              <input type="password" id="mfa-regen-pass" placeholder="Confirme sua senha master" style="flex:1;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.2);border-radius:6px;padding:8px 12px;color:#fff;font-size:.82rem;outline:none;">
+              <button type="button" data-fb-click="MasterAdmin.regenerarBackupCodes" data-fb-click-n="0" class="btn-action" style="background:rgba(234,179,8,.12);border-color:#eab308;color:#fde047;white-space:nowrap;font-size:.8rem;">
+                <span>Gerar Novos Códigos</span>
+              </button>
+            </div>
+
+            <div id="mfa-backup-codes-display" style="display:none;background:#060B04;border:1px solid var(--accent);border-radius:8px;padding:12px;margin-top:10px;">
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+                <span style="font-size:.72rem;font-weight:700;color:#fde047;">⚠️ Novos códigos gerados (guarde-os):</span>
+                <button type="button" data-fb-click="MasterAdmin.copiarNovosBackupCodes" data-fb-click-n="0" style="background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.2);color:#fff;padding:2px 8px;border-radius:4px;font-size:.68rem;cursor:pointer;">Copiar Todos</button>
+              </div>
+              <div id="mfa-backup-codes-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:6px;font-family:monospace;font-size:.8rem;color:#6ee7b7;text-align:center;">
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div style="text-align:right;border-top:1px solid rgba(255,255,255,.08);padding-top:14px;">
+          <button type="button" data-fb-click="MasterAdmin.fecharModalMfa" data-fb-click-n="0" class="btn-primary" style="padding:8px 18px;font-size:.82rem;border-radius:6px;cursor:pointer;">
+            Fechar
+          </button>
+        </div>
+
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Scripts -->
+  <script src="/js/auth.js"></script>
+  <script src="/js/utils.js"></script>
+  <script src="/js/data.js"></script>
+  <script src="/js/suporte.js"></script>
+  <script src="/js/suporte_dev.js"></script>
+  <script src="/js/cobranca.js"></script>
+  <script src="/js/whatsapp.js"></script>
+  <script src="/js/configuracoes.js"></script>
+  <script src="/js/agenda_eventos.js"></script>
+  <script src="/js/master.js"></script>
+
+  <script src="/js/cookie_banner.js"></script>
+  <script src="/js/master_page.js"></script>
+  <script src="/js/patch26-actions.js"></script>
+  <script src="/js/patch26-events.js"></script>
+</body>
+</html>

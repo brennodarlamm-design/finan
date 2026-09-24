@@ -1,0 +1,330 @@
+/**
+ * FinObra Design System — Canonical Design Tokens v4.0 (FinGo Brand System)
+ * Arquivo: css/tokens.css
+ * Padrão Arquitetural: Single Source of Truth (SSOT)
+ * Estética: Brutalist Tech Industrial
+ */
+
+@layer reset, tokens, base, components, utilities;
+
+@layer tokens {
+  :root {
+    /* === FINGO BRAND SYSTEM — CORES BRAND === */
+    --fingo-acid: #C6FF00;
+    --fingo-acid-hover: #D4FF33;
+    --fingo-void: #0A0A0A;
+    --fingo-ink: #0D0D0D;
+    --fingo-deep: #1A1A1A;
+    --fingo-shadow: #282828;
+    --fingo-stone: #2B2B2B;
+    --fingo-smoke: #3D3D3D;
+    --fingo-mist: #e9ecf0;
+    --fingo-silver: #E8E8DC;
+    --fingo-offwhite: #F0F0E8;
+    --fingo-purple: #7F49B8;
+    --fingo-purple-light: #9B6FD4;
+
+    /* === ALIASES SEMÂNTICOS FINGO === */
+    --brand: var(--fingo-acid);
+    --bg-base: var(--fingo-ink);
+    --bg-elevated: var(--fingo-deep);
+    --bg-hero: var(--fingo-void);
+    --text-primary: var(--fingo-offwhite);
+    --text-secondary: var(--fingo-silver);
+    --text-tertiary: var(--fingo-mist);
+    --border-default: var(--fingo-shadow);
+    --border-subtle: var(--fingo-stone);
+    --border-input: var(--fingo-smoke);
+    --accent-tech: var(--fingo-purple);
+
+    /* === SISTEMA (FEEDBACK) === */
+    --color-success: var(--fingo-acid);
+    --color-warning: #FFB800;
+    --color-error: #FF3B3B;
+    --color-info: var(--fingo-purple);
+
+    /* === SHADOWS NEON === */
+    --shadow-neon: 0 0 20px rgba(198, 255, 0, 0.4);
+    --shadow-neon-strong: 0 0 40px rgba(198, 255, 0, 0.6);
+    --shadow-purple: 0 0 20px rgba(127, 73, 184, 0.4);
+    --shadow-card: 0 4px 24px rgba(0, 0, 0, 0.6);
+    --shadow-modal: 0 16px 64px rgba(0, 0, 0, 0.8);
+
+    /* === MOTION === */
+    --ease-sharp: cubic-bezier(0.4, 0, 0.6, 1);
+    --ease-enter: cubic-bezier(0, 0, 0.2, 1);
+    --ease-exit: cubic-bezier(0.4, 0, 1, 1);
+    --duration-instant: 80ms;
+    --duration-fast: 150ms;
+    --duration-base: 200ms;
+    --duration-slow: 300ms;
+    --duration-reveal: 500ms;
+
+    /* === BORDER RADIUS === */
+    --radius-none: 0;
+    --radius-sm: 2px;
+    --radius-default: 4px;
+    --radius-md: 6px;
+    --radius-lg: 8px;
+
+    /* === TIPOGRAFIA === */
+    --font-family-base: 'Monument Grotesk', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    --font-family-sans: var(--font-family-base);
+    --font-family-mono: 'JetBrains Mono', 'Fira Code', ui-monospace, SFMono-Regular, monospace;
+
+    /* Pesos Tipográficos */
+    --font-weight-regular: 400;
+    --font-weight-medium: 500;
+    --font-weight-semibold: 600;
+    --font-weight-bold: 700;
+    --font-weight-extrabold: 800;
+    --font-weight-black: 900;
+
+    /* ─────────────────────────────────────────────────────────────
+       ALIASES DE RETROCOMPATIBILIDADE (LEGADO FINOBRA v4)
+       ───────────────────────────────────────────────────────────── */
+    --surface-ground: var(--fingo-void);
+    --surface-base: var(--fingo-ink);
+    --surface-primary: var(--fingo-ink);
+    --surface-card: var(--fingo-deep);
+    --surface-card-hover: var(--fingo-stone);
+    --surface-card-active: var(--fingo-smoke);
+    --surface-overlay: var(--fingo-deep);
+    --surface-input: var(--fingo-deep);
+    --surface-input-hover: var(--fingo-stone);
+    --surface-table-header: var(--fingo-ink);
+    --surface-table-zebra: var(--fingo-void);
+
+    --border-strong: var(--fingo-smoke);
+    --border-focus: var(--fingo-acid);
+    --border-accent: var(--fingo-purple);
+    --border-table: var(--fingo-shadow);
+
+    --text-muted: var(--fingo-mist);
+    --text-disabled: var(--fingo-stone);
+    --text-inverse: var(--fingo-ink);
+    --text-accent: var(--fingo-acid);
+
+    --color-primary: var(--fingo-acid);
+    --color-primary-hover: var(--fingo-acid-hover);
+    --color-primary-active: var(--fingo-acid);
+    --color-primary-dim: rgba(198, 255, 0, 0.1);
+    --color-primary-dim-hover: rgba(198, 255, 0, 0.2);
+    --color-primary-border: rgba(198, 255, 0, 0.3);
+    --color-primary-glow: rgba(198, 255, 0, 0.4);
+
+    --color-gold: var(--fingo-purple); /* Remapeado para tech acento */
+    --color-gold-hover: var(--fingo-purple-light);
+    --color-gold-active: var(--fingo-purple);
+    --color-gold-dim: rgba(127, 73, 184, 0.1);
+    --color-gold-border: rgba(127, 73, 184, 0.25);
+    --color-gold-glow: rgba(127, 73, 184, 0.4);
+    --color-gold-text: var(--fingo-purple-light);
+
+    --color-success-hover: var(--fingo-acid-hover);
+    --color-success-dim: rgba(198, 255, 0, 0.1);
+    --color-success-border: rgba(198, 255, 0, 0.25);
+    --color-success-text: var(--fingo-acid);
+
+    --color-warning-hover: #E5A600;
+    --color-warning-dim: rgba(255, 184, 0, 0.1);
+    --color-warning-border: rgba(255, 184, 0, 0.25);
+    --color-warning-text: #FFB800;
+
+    --color-danger: var(--color-error);
+    --color-danger-hover: #E53535;
+    --color-danger-dim: rgba(255, 59, 59, 0.1);
+    --color-danger-border: rgba(255, 59, 59, 0.25);
+    --color-danger-text: #FF3B3B;
+
+    --color-info-hover: var(--fingo-purple-light);
+    --color-info-dim: rgba(127, 73, 184, 0.1);
+    --color-info-border: rgba(127, 73, 184, 0.25);
+    --color-info-text: var(--fingo-purple);
+
+    --color-neutral: var(--fingo-mist);
+    --color-neutral-dim: rgba(142, 142, 142, 0.1);
+    --color-neutral-border: rgba(142, 142, 142, 0.25);
+
+    --z-ground: 0;
+    --z-base: 1;
+    --z-card: 2;
+    --z-sticky-nav: 50;
+    --z-header: 90;
+    --z-sidebar: 100;
+    --z-sidebar-overlay: 105;
+    --z-dropdown: 500;
+    --z-modal-backdrop: 1000;
+    --z-modal-window: 1010;
+    --z-toast: 1200;
+    --z-tooltip: 1300;
+
+    --shadow-rim-light: none;
+    --shadow-glow-teal: var(--shadow-neon);
+    --shadow-glow-gold: var(--shadow-purple);
+    --shadow-sm: var(--shadow-card);
+    --shadow-md: var(--shadow-card);
+    --shadow-lg: var(--shadow-modal);
+    --shadow-xl: var(--shadow-modal);
+
+    --space-05: 2px;
+    --space-1: 4px;
+    --space-2: 8px;
+    --space-3: 12px;
+    --space-4: 16px;
+    --space-5: 20px;
+    --space-6: 24px;
+    --space-8: 32px;
+    --space-10: 40px;
+    --space-12: 48px;
+    --space-16: 64px;
+
+    --radius-xs: var(--radius-sm);
+    --radius-xl: var(--radius-lg);
+    --radius-2xl: var(--radius-lg);
+    --radius-full: 9999px;
+
+    --font-size-2xs: 0.6875rem;
+    --font-size-xs: 0.75rem;
+    --font-size-sm: 0.8125rem;
+    --font-size-base: 0.875rem;
+    --font-size-md: 1.00rem;
+    --font-size-lg: 1.125rem;
+    --font-size-xl: 1.375rem;
+    --font-size-2xl: 1.75rem;
+    --font-size-3xl: 2.25rem;
+
+    --line-height-tight: 1.2;
+    --line-height-snug: 1.35;
+    --line-height-normal: 1.5;
+    --line-height-relaxed: 1.65;
+    --letter-spacing-tight: -0.03em;
+    --letter-spacing-normal: 0em;
+    --letter-spacing-wide: 0.05em;
+
+    --ease-spring: var(--ease-sharp);
+    --ease-out-quad: var(--ease-exit);
+    --duration-enter: var(--duration-base);
+    --transition-fast: var(--duration-fast) var(--ease-sharp);
+    --transition-base: var(--duration-base) var(--ease-sharp);
+    --transition-slow: var(--duration-slow) var(--ease-sharp);
+    
+    --sidebar-width: 240px;
+    --header-height: 64px;
+
+    --bg-primary: var(--fingo-ink);
+    --bg-secondary: var(--fingo-ink);
+    --bg-card: var(--fingo-deep);
+    --bg-card-hover: var(--fingo-stone);
+    --bg-input: var(--fingo-deep);
+    --border-s: var(--fingo-stone);
+    --border-d: var(--fingo-shadow);
+    --border-str: var(--fingo-smoke);
+    --border: var(--fingo-shadow);
+    --text: var(--fingo-offwhite);
+    --text2: var(--fingo-silver);
+    --text3: var(--fingo-mist);
+    --accent: var(--fingo-acid);
+    --accent-h: var(--fingo-acid-hover);
+    --accent2: var(--fingo-acid-hover);
+    --accent3: var(--fingo-acid);
+    --accent-glow: var(--shadow-neon);
+    --sidebar-w: var(--sidebar-width);
+    --header-h: var(--header-height);
+    --r-sm: var(--radius-sm);
+    --r-md: var(--radius-md);
+    --r-lg: var(--radius-lg);
+    --success: var(--color-success);
+    --warning: var(--color-warning);
+    --danger: var(--color-error);
+    --info: var(--color-info);
+    --t: var(--transition-base);
+    --t-fast: var(--transition-fast);
+    --t-base: var(--transition-base);
+    --t-spring: var(--transition-base);
+  }
+
+  .ui-portal, [data-theme="master"] {
+    --color-gold:            #C5A059;
+    --color-gold-hover:      #D4AF37;
+    --color-gold-active:     #AA8232;
+    --color-gold-dim:        rgba(197, 160, 89, 0.12);
+    --color-gold-border:     rgba(197, 160, 89, 0.28);
+    --color-gold-glow:       rgba(197, 160, 89, 0.22);
+    --color-primary:          var(--color-gold);
+    --color-primary-hover:   var(--color-gold-hover);
+    --color-primary-active:  var(--color-gold-active);
+    --color-primary-dim:     var(--color-gold-dim);
+    --color-primary-border:  var(--color-gold-border);
+    --color-primary-glow:    var(--color-gold-glow);
+    --border-accent:         var(--color-gold);
+    --accent:                 var(--color-gold);
+    --accent2:               var(--color-gold-hover);
+    --accent-glow:           var(--color-gold-glow);
+  }
+
+  .ui-workspace {
+    --color-primary: var(--fingo-acid);
+    --accent: var(--fingo-acid);
+  }
+
+  .ui-auth, .ui-public {
+    --surface-ground: var(--fingo-void);
+    --surface-card: var(--fingo-deep);
+  }
+}
+
+@layer utilities {
+  .numeric, .tabular-nums, table th.numeric, table td.numeric, .financial-value, .kpi-value-numeric {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum" 1;
+    text-align: right;
+    white-space: nowrap;
+  }
+  .text-right { text-align: right !important; }
+  .text-center { text-align: center !important; }
+  .text-left { text-align: left !important; }
+  .nowrap { white-space: nowrap !important; }
+  .truncate { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  .font-mono-financial {
+    font-family: var(--font-family-mono);
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum" 1;
+    letter-spacing: -0.02em;
+  }
+
+  .text-primary { color: var(--text-primary) !important; }
+  .text-secondary { color: var(--text-secondary) !important; }
+  .text-muted { color: var(--text-muted) !important; }
+  .text-accent { color: var(--text-accent) !important; }
+  .text-gold { color: var(--color-gold) !important; }
+  .text-success { color: var(--color-success) !important; }
+  .text-danger { color: var(--color-error) !important; }
+  .text-warning { color: var(--color-warning) !important; }
+  .text-info { color: var(--color-info) !important; }
+
+  .font-regular { font-weight: var(--font-weight-regular) !important; }
+  .font-medium { font-weight: var(--font-weight-medium) !important; }
+  .font-semibold { font-weight: var(--font-weight-semibold) !important; }
+  .font-bold { font-weight: var(--font-weight-bold) !important; }
+  .font-heavy { font-weight: var(--font-weight-extrabold) !important; }
+  .font-mono { font-family: var(--font-family-mono) !important; }
+
+  .d-flex { display: flex !important; }
+  .flex-row-center { display: flex !important; align-items: center !important; }
+  .flex-between { display: flex !important; align-items: center !important; justify-content: space-between !important; }
+  .gap-1 { gap: var(--space-1) !important; }
+  .gap-2 { gap: var(--space-2) !important; }
+  .gap-3 { gap: var(--space-3) !important; }
+  .gap-4 { gap: var(--space-4) !important; }
+
+  .border-b-subtle { border-bottom: 1px solid var(--border-subtle) !important; }
+  .border-subtle { border: 1px solid var(--border-subtle) !important; }
+  .border-default { border: 1px solid var(--border-default) !important; }
+
+  .haptic-btn:active, .haptic-card:active {
+    transform: scale(0.98);
+    transition: transform var(--duration-instant) var(--ease-sharp);
+  }
+}
