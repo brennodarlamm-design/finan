@@ -1,6 +1,6 @@
 {
   "name": "finobra-saas",
-  "version": "2.40.2",
+  "version": "2.40.3",
   "description": "FinObra — SaaS de gestão financeira e operacional para construtoras",
   "type": "module",
   "scripts": {
