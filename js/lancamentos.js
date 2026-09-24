@@ -517,7 +517,8 @@ const Lancamentos = {
     // 6. Atualiza botão Parcelar
     const btnParcelar = document.getElementById('lan-btn-parcelar');
     if (btnParcelar) {
-      btnParcelar.setAttribute('onclick', `Lancamentos.showParcelamento('${novoTipo}')`);
+      btnParcelar.removeAttribute('onclick');
+      btnParcelar.setAttribute('data-fb-click-v0', encodeURIComponent(String(novoTipo)));
     }
   },
 
@@ -593,6 +594,8 @@ const Lancamentos = {
   save(id) {
     const f = document.getElementById('f-lan');
     if (!f.checkValidity()) { f.reportValidity(); return; }
+    const fd = new FormData(f);
+    const d = Object.fromEntries(fd);
     d.valor = Math.abs(parseFloat(d.valor) || 0);
     d.conciliado = d.conciliado === 'true';
     d.data = d.data || Utils.today();

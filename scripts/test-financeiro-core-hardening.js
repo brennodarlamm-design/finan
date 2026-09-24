@@ -23,6 +23,7 @@ const sandbox = {
     getUser: () => ({ perfil: 'admin', nome: 'Admin Teste' }),
     canModule: () => true
   },
+  fs,
   console,
   setTimeout,
   clearTimeout,
@@ -183,6 +184,17 @@ const htmlRecibos = Recibos.render('10');
 if (htmlRecibos.includes('<script>')) throw new Error('Recibos não deve injetar HTML/script bruto');
 if (!htmlRecibos.includes('&lt;script&gt;')) throw new Error('Nome do beneficiário deve ser escapado com segurança');
 console.log('   ✓ Recibos com coerção de tipos e sanitização XSS validados.');
+
+// 8. Teste de Blindagem de Lancamentos.save e btnParcelar
+console.log('\\n8. Testando integridade de Lancamentos.save e CSP de Parcelamento...');
+const lCode = fs.readFileSync('js/lancamentos.js', 'utf8');
+if (!lCode.includes('const d = Object.fromEntries(fd);')) {
+  throw new Error('Lancamentos.save deve definir objeto d a partir do FormData!');
+}
+if (lCode.includes("btnParcelar.setAttribute('onclick'")) {
+  throw new Error('btnParcelar não deve utilizar atributo inline onclick (violação CSP)!');
+}
+console.log('   ✓ Lancamentos.save define d via FormData e btnParcelar segue padrão CSP.');
 
 console.log('\\n🎉 TODOS OS TESTES DO NÚCLEO FINANCEIRO PASSARAM COM SUCESSO!\\n');
 `, sandbox);
