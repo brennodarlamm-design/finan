@@ -132,21 +132,290 @@ function* derChildren(buf) {
 }
 
 // OIDs relevantes para PKCS#12 (value bytes DER, sem tag 0x06 nem length)
-const _OID_PKCS7_DATA     = Buffer.from('2a864886f70d010701',    'hex'); // 1.2.840.113549.1.7.1
-const _OID_CERT_BAG       = Buffer.from('2a864886f70d010c0a0103','hex'); // 1.2.840.113549.1.12.10.1.3
-const _OID_X509_CERT_TYPE = Buffer.from('2a864886f70d01091601',  'hex'); // 1.2.840.113549.1.9.22.1
+const _OID_PKCS7_DATA           = Buffer.from('2a864886f70d010701',    'hex'); // 1.2.840.113549.1.7.1
+const _OID_PKCS7_ENCRYPTED_DATA = Buffer.from('2a864886f70d010706',    'hex'); // 1.2.840.113549.1.7.6
+const _OID_CERT_BAG             = Buffer.from('2a864886f70d010c0a0103','hex'); // 1.2.840.113549.1.12.10.1.3
+const _OID_X509_CERT_TYPE       = Buffer.from('2a864886f70d01091601',  'hex'); // 1.2.840.113549.1.9.22.1
+
+// Algoritmos de cifra PBES1 / PKCS#12
+const _OID_PBE_SHA1_3DES        = Buffer.from('2a864886f70d010c0103',  'hex'); // 1.2.840.113549.1.12.1.3
+const _OID_PBE_SHA1_2KEY_3DES   = Buffer.from('2a864886f70d010c0104',  'hex'); // 1.2.840.113549.1.12.1.4
+const _OID_PBES2                = Buffer.from('2a864886f70d01050d',    'hex'); // 1.2.840.113549.1.5.13
+const _OID_PBKDF2               = Buffer.from('2a864886f70d01050c',    'hex'); // 1.2.840.113549.1.5.12
+
+// Cifras suportadas em PBES2
+const _OID_AES128_CBC           = Buffer.from('608648016503040102',    'hex'); // 2.16.840.1.101.3.4.1.2
+const _OID_AES192_CBC           = Buffer.from('608648016503040116',    'hex'); // 2.16.840.1.101.3.4.1.22
+const _OID_AES256_CBC           = Buffer.from('60864801650304012a',    'hex'); // 2.16.840.1.101.3.4.1.42
+const _OID_DES_EDE3_CBC         = Buffer.from('2a864886f70d0307',      'hex'); // 1.2.840.113549.3.7
+
+// PRF para PBKDF2
+const _OID_HMAC_SHA1            = Buffer.from('2a864886f70d0207',      'hex'); // 1.2.840.113549.2.7
+const _OID_HMAC_SHA256          = Buffer.from('2a864886f70d0209',      'hex'); // 1.2.840.113549.2.9
+const _OID_HMAC_SHA384          = Buffer.from('2a864886f70d020a',      'hex'); // 1.2.840.113549.2.10
+const _OID_HMAC_SHA512          = Buffer.from('2a864886f70d020b',      'hex'); // 1.2.840.113549.2.11
+
+// Hashes para MacData
+const _OID_DIGEST_SHA1          = Buffer.from('2b0e03021a',            'hex'); // 1.3.14.3.2.26
+const _OID_DIGEST_SHA256        = Buffer.from('608648016503040201',    'hex'); // 2.16.840.1.101.3.4.2.1
+const _OID_DIGEST_SHA384        = Buffer.from('608648016503040202',    'hex'); // 2.16.840.1.101.3.4.2.2
+const _OID_DIGEST_SHA512        = Buffer.from('608648016503040203',    'hex'); // 2.16.840.1.101.3.4.2.3
 
 /**
- * Extrai buffers DER brutos dos certificados X.509 contidos em cert bags
- * não-encriptadas de um arquivo PKCS#12 (.pfx/.p12).
+ * Converte a senha de string para bytes no formato BMPString (UTF-16BE com
+ * terminador nulo de 2 bytes), conforme especificação RFC 7292 Apêndice B.
+ */
+export function passwordToPkcs12Bytes(password) {
+  if (password === null || password === undefined) return Buffer.alloc(0);
+  const str = String(password);
+  const buf = Buffer.alloc(str.length * 2 + 2);
+  for (let i = 0; i < str.length; i++) {
+    buf.writeUInt16BE(str.charCodeAt(i), i * 2);
+  }
+  buf.writeUInt16BE(0, str.length * 2);
+  return buf;
+}
+
+/**
+ * Derivação de chaves e IVs conforme RFC 7292 Apêndice B (PKCS#12 KDF).
+ * Suporta ID 1 (chave de encriptação), ID 2 (IV) e ID 3 (chave MAC).
+ */
+export function pkcs12Kdf(id, n, salt, passwordBytes, iterations = 1, hashAlgorithm = 'sha1') {
+  const u = (hashAlgorithm === 'sha256' ? 32 : (hashAlgorithm === 'sha384' ? 48 : (hashAlgorithm === 'sha512' ? 64 : 20)));
+  const v = (hashAlgorithm === 'sha384' || hashAlgorithm === 'sha512') ? 128 : 64;
+
+  const D = Buffer.alloc(v, id);
+
+  const sLen = salt ? salt.length : 0;
+  let sHat = Buffer.alloc(0);
+  if (sLen > 0) {
+    const sBlocks = Math.ceil(sLen / v);
+    sHat = Buffer.alloc(v * sBlocks);
+    for (let i = 0; i < sHat.length; i++) {
+      sHat[i] = salt[i % sLen];
+    }
+  }
+
+  const pLen = passwordBytes ? passwordBytes.length : 0;
+  let pHat = Buffer.alloc(0);
+  if (pLen > 0) {
+    const pBlocks = Math.ceil(pLen / v);
+    pHat = Buffer.alloc(v * pBlocks);
+    for (let i = 0; i < pHat.length; i++) {
+      pHat[i] = passwordBytes[i % pLen];
+    }
+  }
+
+  const I = Buffer.concat([sHat, pHat]);
+  const cBlocks = Math.ceil(n / u);
+  const A = [];
+
+  for (let i = 0; i < cBlocks; i++) {
+    let hash = crypto.createHash(hashAlgorithm);
+    hash.update(D);
+    hash.update(I);
+    let H = hash.digest();
+
+    for (let iter = 1; iter < iterations; iter++) {
+      hash = crypto.createHash(hashAlgorithm);
+      hash.update(H);
+      H = hash.digest();
+    }
+    A.push(H);
+
+    if (i === cBlocks - 1) break;
+
+    const B = Buffer.alloc(v);
+    for (let k = 0; k < v; k++) {
+      B[k] = H[k % u];
+    }
+
+    const numBlocksI = Math.floor(I.length / v);
+    for (let j = 0; j < numBlocksI; j++) {
+      let carry = 1;
+      const offset = j * v;
+      for (let k = v - 1; k >= 0; k--) {
+        const sum = I[offset + k] + B[k] + carry;
+        I[offset + k] = sum & 0xff;
+        carry = sum >> 8;
+      }
+    }
+  }
+
+  return Buffer.concat(A).subarray(0, n);
+}
+
+/**
+ * Validação de integridade e senha de arquivo PKCS#12 através da MacData (RFC 7292 Seção 4.2.1).
+ */
+export function verifyPkcs12Mac(pfxBuf, password) {
+  try {
+    const pfxSeq = derTLV(pfxBuf, 0);
+    if (!pfxSeq || pfxSeq.tag !== 0x30) return { hasMac: false, ok: false, error: 'Não é um arquivo PFX/PKCS#12 válido.' };
+    const pfxKids = [...derChildren(pfxSeq.val)];
+    if (pfxKids.length < 3) return { hasMac: false, ok: true };
+
+    const authSafeCI = pfxKids[1];
+    if (!authSafeCI || authSafeCI.tag !== 0x30) return { hasMac: false, ok: false };
+    const authSafeKids = [...derChildren(authSafeCI.val)];
+    const authContent = authSafeKids[1];
+    if (!authContent) return { hasMac: false, ok: false };
+    const authOctet = derTLV(authContent.val, 0);
+    if (!authOctet || authOctet.tag !== 0x04) return { hasMac: false, ok: false };
+    const authSafeData = authOctet.val;
+
+    const macData = pfxKids[2];
+    if (!macData || macData.tag !== 0x30) return { hasMac: false, ok: true };
+    const macKids = [...derChildren(macData.val)];
+    const digestInfo = macKids[0];
+    if (!digestInfo || digestInfo.tag !== 0x30) return { hasMac: false, ok: false };
+    const diKids = [...derChildren(digestInfo.val)];
+    const algId = diKids[0];
+    const algKids = [...derChildren(algId.val)];
+    const hashOid = algKids[0]?.val;
+    const storedDigest = diKids[1]?.val;
+
+    const salt = macKids[1]?.val;
+    let iterations = 1;
+    if (macKids[2] && macKids[2].tag === 0x02) {
+      iterations = 0;
+      for (const b of macKids[2].val) iterations = (iterations << 8) | b;
+    }
+
+    let hashAlg = 'sha1';
+    let u = 20;
+    if (hashOid && hashOid.equals(_OID_DIGEST_SHA256)) { hashAlg = 'sha256'; u = 32; }
+    else if (hashOid && hashOid.equals(_OID_DIGEST_SHA1)) { hashAlg = 'sha1'; u = 20; }
+    else if (hashOid && hashOid.equals(_OID_DIGEST_SHA384)) { hashAlg = 'sha384'; u = 48; }
+    else if (hashOid && hashOid.equals(_OID_DIGEST_SHA512)) { hashAlg = 'sha512'; u = 64; }
+
+    const pwBytes = passwordToPkcs12Bytes(password);
+    const key = pkcs12Kdf(3, u, salt, pwBytes, iterations, hashAlg);
+    const computedMac = crypto.createHmac(hashAlg, key).update(authSafeData).digest();
+
+    const ok = storedDigest && computedMac.length === storedDigest.length && crypto.timingSafeEqual(computedMac, storedDigest);
+    return { hasMac: true, ok, hashAlg, iterations };
+  } catch (err) {
+    return { hasMac: false, ok: false, error: err.message };
+  }
+}
+
+/**
+ * Decripta contêiner PKCS#7 EncryptedData em memória via RFC 7292 (PBES1 / PBES2).
+ */
+export function decryptPkcs7EncryptedData(encDataSeqVal, passphrase) {
+  try {
+    const encDataKids = [...derChildren(encDataSeqVal)];
+    const eci = encDataKids[1]; // EncryptedContentInfo
+    if (!eci || eci.tag !== 0x30) return null;
+    const eciKids = [...derChildren(eci.val)];
+    const algId = eciKids[1];
+    const encContent = eciKids[2];
+    if (!algId || !encContent) return null;
+
+    const algKids = [...derChildren(algId.val)];
+    const algOid = algKids[0]?.val;
+    const algParams = algKids[1];
+    const ciphertext = encContent.val;
+    if (!algOid || !ciphertext) return null;
+
+    // 1. PBES1 com 3DES / 2-Key 3DES
+    if (algOid.equals(_OID_PBE_SHA1_3DES) || algOid.equals(_OID_PBE_SHA1_2KEY_3DES)) {
+      if (!algParams) return null;
+      const paramsKids = [...derChildren(algParams.val)];
+      const salt = paramsKids[0]?.val;
+      const iterBuf = paramsKids[1]?.val;
+      let iterations = 1;
+      if (iterBuf) {
+        iterations = 0;
+        for (const b of iterBuf) iterations = (iterations << 8) | b;
+      }
+
+      const is2Key = algOid.equals(_OID_PBE_SHA1_2KEY_3DES);
+      const keyLen = is2Key ? 16 : 24;
+      const pwBytes = passwordToPkcs12Bytes(passphrase);
+      let key = pkcs12Kdf(1, keyLen, salt, pwBytes, iterations, 'sha1');
+      if (is2Key) {
+        key = Buffer.concat([key, key.subarray(0, 8)]); // K1, K2, K1
+      }
+      const iv = pkcs12Kdf(2, 8, salt, pwBytes, iterations, 'sha1');
+
+      try {
+        const decipher = crypto.createDecipheriv('des-ede3-cbc', key, iv);
+        return Buffer.concat([decipher.update(ciphertext), decipher.final()]);
+      } catch {
+        return null;
+      }
+    }
+
+    // 2. PBES2 (RFC 8018 / PKCS#5 v2.0)
+    if (algOid.equals(_OID_PBES2)) {
+      if (!algParams) return null;
+      const pbes2Params = [...derChildren(algParams.val)];
+      const kdf = pbes2Params[0];
+      const encScheme = pbes2Params[1];
+      if (!kdf || !encScheme) return null;
+
+      const kdfKids = [...derChildren(kdf.val)];
+      const kdfOid = kdfKids[0]?.val;
+      if (!kdfOid || !kdfOid.equals(_OID_PBKDF2)) return null;
+
+      const pbkdf2Params = [...derChildren(kdfKids[1].val)];
+      const salt = pbkdf2Params[0]?.val;
+      let iterations = 1;
+      if (pbkdf2Params[1]) {
+        iterations = 0;
+        for (const b of pbkdf2Params[1].val) iterations = (iterations << 8) | b;
+      }
+
+      let prf = 'sha1';
+      if (pbkdf2Params[2]) {
+        const prfKids = [...derChildren(pbkdf2Params[2].val)];
+        const prfOid = prfKids[0]?.val;
+        if (prfOid && prfOid.equals(_OID_HMAC_SHA256)) prf = 'sha256';
+        else if (prfOid && prfOid.equals(_OID_HMAC_SHA384)) prf = 'sha384';
+        else if (prfOid && prfOid.equals(_OID_HMAC_SHA512)) prf = 'sha512';
+        else if (prfOid && prfOid.equals(_OID_HMAC_SHA1)) prf = 'sha1';
+      }
+
+      const encSchemeKids = [...derChildren(encScheme.val)];
+      const encSchemeOid = encSchemeKids[0]?.val;
+      const iv = encSchemeKids[1]?.val;
+
+      let cipherName = 'aes-256-cbc';
+      let keyLen = 32;
+      if (encSchemeOid && encSchemeOid.equals(_OID_AES256_CBC)) { cipherName = 'aes-256-cbc'; keyLen = 32; }
+      else if (encSchemeOid && encSchemeOid.equals(_OID_AES128_CBC)) { cipherName = 'aes-128-cbc'; keyLen = 16; }
+      else if (encSchemeOid && encSchemeOid.equals(_OID_AES192_CBC)) { cipherName = 'aes-192-cbc'; keyLen = 24; }
+      else if (encSchemeOid && encSchemeOid.equals(_OID_DES_EDE3_CBC)) { cipherName = 'des-ede3-cbc'; keyLen = 24; }
+      else return null;
+
+      // Suporta senhas em UTF-8 nativo ou codificação BMPString
+      for (const pwCandidate of [String(passphrase || ''), passwordToPkcs12Bytes(passphrase)]) {
+        try {
+          const key = crypto.pbkdf2Sync(pwCandidate, salt, iterations, keyLen, prf);
+          const decipher = crypto.createDecipheriv(cipherName, key, iv);
+          const decrypted = Buffer.concat([decipher.update(ciphertext), decipher.final()]);
+          if (decrypted && decrypted.length > 0) return decrypted;
+        } catch {}
+      }
+    }
+  } catch {}
+
+  return null;
+}
+
+/**
+ * Extrai buffers DER brutos dos certificados X.509 contidos em um arquivo PKCS#12 (.pfx/.p12),
+ * com suporte nativo em pura memória para cert bags não-encriptadas e contêineres encryptedData.
  *
  * Estrutura percorrida (RFC 7292):
  *   PFX → authSafe ContentInfo → AuthenticatedSafe (SEQUENCE OF ContentInfo)
- *     → SafeContents (para cada ContentInfo data não-encriptada)
+ *     → SafeContents (data direta ou payload de encryptedData decifrado)
  *       → SafeBag (bagId = certBag)
  *         → CertBag → [0] OCTET STRING → DER X.509
  */
-function _extractCertDERsFromPkcs12(pfxBuf) {
+export function _extractCertDERsFromPkcs12(pfxBuf, passphrase = '') {
   const results = [];
   try {
     // 1. PFX ::= SEQUENCE { version INTEGER, authSafe ContentInfo, ... }
@@ -180,41 +449,75 @@ function _extractCertDERsFromPkcs12(pfxBuf) {
       const ciKids   = [...derChildren(ci.val)];
       const ciOid    = ciKids[0];
       const ciCont   = ciKids[1];
-      if (!ciOid || ciOid.tag !== 0x06) continue;
-      // Processa apenas ContentInfos do tipo data (não-encriptadas)
-      if (!ciOid.val.equals(_OID_PKCS7_DATA)) continue;
-      if (!ciCont || (ciCont.tag & 0xe0) !== 0xa0) continue;
+      if (!ciOid || ciOid.tag !== 0x06 || !ciCont || (ciCont.tag & 0xe0) !== 0xa0) continue;
 
-      // [0] EXPLICIT → OCTET STRING → SafeContents DER
-      const scOctet = derTLV(ciCont.val, 0);
-      if (!scOctet || scOctet.tag !== 0x04) continue;
-      const scSeq = derTLV(scOctet.val, 0);
-      if (!scSeq || scSeq.tag !== 0x30) continue;
+      let safeContentsBuf = null;
+
+      if (ciOid.val.equals(_OID_PKCS7_DATA)) {
+        // ContentInfo tipo data (não-encriptada)
+        const scOctet = derTLV(ciCont.val, 0);
+        if (scOctet && scOctet.tag === 0x04) {
+          safeContentsBuf = scOctet.val;
+        }
+      } else if (ciOid.val.equals(_OID_PKCS7_ENCRYPTED_DATA) && passphrase) {
+        // ContentInfo tipo encryptedData — decripta em memória via RFC 7292
+        const encDataWrap = derTLV(ciCont.val, 0);
+        if (encDataWrap && encDataWrap.tag === 0x30) {
+          safeContentsBuf = decryptPkcs7EncryptedData(encDataWrap.val, passphrase);
+        }
+      }
+
+      if (!safeContentsBuf) continue;
 
       // 6. SafeContents ::= SEQUENCE OF SafeBag
-      for (const safeBag of derChildren(scSeq.val)) {
-        if (safeBag.tag !== 0x30) continue;
-        const sbKids  = [...derChildren(safeBag.val)];
-        const bagId   = sbKids[0];
-        const bagVal  = sbKids[1];
-        if (!bagId || bagId.tag !== 0x06) continue;
-        if (!bagId.val.equals(_OID_CERT_BAG)) continue;       // filtra certBag
-        if (!bagVal || (bagVal.tag & 0xe0) !== 0xa0) continue;
+      let foundInBags = false;
+      const scSeq = derTLV(safeContentsBuf, 0);
+      if (scSeq && scSeq.tag === 0x30) {
+        for (const safeBag of derChildren(scSeq.val)) {
+          if (safeBag.tag !== 0x30) continue;
+          const sbKids  = [...derChildren(safeBag.val)];
+          const bagId   = sbKids[0];
+          const bagVal  = sbKids[1];
+          if (!bagId || bagId.tag !== 0x06) continue;
+          if (!bagId.val.equals(_OID_CERT_BAG)) continue;       // filtra certBag
+          if (!bagVal || (bagVal.tag & 0xe0) !== 0xa0) continue;
 
-        // bagValue [0] → CertBag ::= SEQUENCE { certId OID, [0] certValue }
-        const cbSeq = derTLV(bagVal.val, 0);
-        if (!cbSeq || cbSeq.tag !== 0x30) continue;
-        const cbKids      = [...derChildren(cbSeq.val)];
-        const certId      = cbKids[0];
-        const certValWrap = cbKids[1];
-        if (!certId || certId.tag !== 0x06) continue;
-        if (!certId.val.equals(_OID_X509_CERT_TYPE)) continue; // x509Certificate
-        if (!certValWrap || (certValWrap.tag & 0xe0) !== 0xa0) continue;
+          // bagValue [0] → CertBag ::= SEQUENCE { certId OID, [0] certValue }
+          const cbSeq = derTLV(bagVal.val, 0);
+          if (!cbSeq || cbSeq.tag !== 0x30) continue;
+          const cbKids      = [...derChildren(cbSeq.val)];
+          const certId      = cbKids[0];
+          const certValWrap = cbKids[1];
+          if (!certId || certId.tag !== 0x06) continue;
+          if (!certId.val.equals(_OID_X509_CERT_TYPE)) continue; // x509Certificate
+          if (!certValWrap || (certValWrap.tag & 0xe0) !== 0xa0) continue;
 
-        // [0] EXPLICIT → OCTET STRING → DER X.509
-        const x509Oct = derTLV(certValWrap.val, 0);
-        if (!x509Oct || x509Oct.tag !== 0x04) continue;
-        results.push(x509Oct.val);
+          // [0] EXPLICIT → OCTET STRING → DER X.509
+          const x509Oct = derTLV(certValWrap.val, 0);
+          if (!x509Oct || x509Oct.tag !== 0x04) continue;
+          results.push(x509Oct.val);
+          foundInBags = true;
+        }
+      }
+
+      // Varredura byte-a-byte no payload decifrado se os bags não foram identificados diretamente
+      if (!foundInBags) {
+        for (let i = 0; i < safeContentsBuf.length - 100; i++) {
+          if (safeContentsBuf[i] === 0x30 && safeContentsBuf[i + 1] === 0x82) {
+            const len = (safeContentsBuf[i + 2] << 8) | safeContentsBuf[i + 3];
+            const totalLen = len + 4;
+            if (totalLen > 100 && i + totalLen <= safeContentsBuf.length) {
+              const candidate = safeContentsBuf.subarray(i, i + totalLen);
+              try {
+                const cert = new crypto.X509Certificate(candidate);
+                if (cert.subject && cert.validTo) {
+                  results.push(candidate);
+                  i += totalLen - 1;
+                }
+              } catch {}
+            }
+          }
+        }
       }
     }
   } catch { /* buffer malformado — retorna o que foi coletado até aqui */ }
@@ -233,13 +536,12 @@ function _scoreCert(cert) {
 }
 
 /**
- * Extrai o certificado X.509 utilizando o engine OpenSSL nativo do Node.js através de um
- * handshake TLS local temporário sobre interface de loopback (127.0.0.1 com porta efêmera 0).
- *
- * Suporta perfeitamente arquivos PKCS#12 (.pfx/.p12) modernos e legados da ICP-Brasil onde as
- * cert bags estão dentro de ContentInfo do tipo encryptedData (3DES PBE, AES PBES2 ou RC2).
+ * Fallback de extração via engine OpenSSL local (Node.js).
  */
 function extractCertViaTls(pfxBuffer, passphrase) {
+  if (typeof tls?.createServer !== 'function') {
+    return Promise.reject(new Error('tls.createServer indisponível neste ambiente.'));
+  }
   return new Promise((resolve, reject) => {
     let server = null;
     let client = null;
@@ -322,28 +624,15 @@ function extractCertViaTls(pfxBuffer, passphrase) {
 /**
  * Extrai o certificado X.509 folha mais relevante de um buffer PFX/P12.
  *
- * Estratégia em três etapas:
- *   1. Extração nativa OpenSSL via handshake TLS local em loopback:
- *      decifra com perfeição PKCS#12 com bags cifradas (3DES, AES, RC2)
- *      utilizando a senha fornecida pelo usuário.
- *   2. Parser PKCS#12 estruturado via DER: lida com cert bags não-cifradas.
- *   3. Fallback: varredura byte-a-byte buscando sequências SEQUENCE 0x30 0x82.
+ * Estratégia em três etapas com processamento síncrono em memória prioritário:
+ *   1. Parser PKCS#12 estruturado via DER em memória (RFC 7292): decifra bags
+ *      3DES / AES PBES2 e extrai certBags sem dependência de sockets ou portas TCP.
+ *   2. Fallback de TLS loopback local quando suportado no ambiente Node.js.
+ *   3. Fallback de varredura byte-a-byte buscando sequências SEQUENCE 0x30 0x82.
  */
 export async function extractX509FromPfx(buffer, passphrase = '') {
-  // ── Tentativa 1: Handshake TLS local com engine nativa OpenSSL ─────────────
-  if (passphrase) {
-    try {
-      const tlsCert = await extractCertViaTls(buffer, passphrase);
-      if (tlsCert && (tlsCert.subject || tlsCert.raw)) {
-        return tlsCert;
-      }
-    } catch {
-      // Falha no handshake local — segue para os parsers DER
-    }
-  }
-
-  // ── Tentativa 2: parse PKCS#12 estruturado via DER (bags não-cifradas) ─────
-  const derList = _extractCertDERsFromPkcs12(buffer);
+  // ── Tentativa 1: parse PKCS#12 estruturado via DER em pura memória ─────────
+  const derList = _extractCertDERsFromPkcs12(buffer, passphrase);
   if (derList.length > 0) {
     let best = null, bestScore = -1;
     for (const der of derList) {
@@ -355,6 +644,18 @@ export async function extractX509FromPfx(buffer, passphrase = '') {
       } catch {}
     }
     if (best) return best;
+  }
+
+  // ── Tentativa 2: Handshake TLS local com engine nativa OpenSSL (Node.js) ───
+  if (passphrase) {
+    try {
+      const tlsCert = await extractCertViaTls(buffer, passphrase);
+      if (tlsCert && (tlsCert.subject || tlsCert.raw)) {
+        return tlsCert;
+      }
+    } catch {
+      // Falha no handshake local — segue para o fallback byte-a-byte
+    }
   }
 
   // ── Tentativa 3: fallback varredura byte-a-byte (PFX legados/simples) ──────
@@ -569,7 +870,16 @@ export default async function handler(req, res) {
         senhaInformada: Boolean(senha)
       });
 
-      // Validação criptográfica com engine nativa OpenSSL
+      // Validação de integridade e senha PKCS#12 em memória (RFC 7292)
+      const macCheck = verifyPkcs12Mac(pfxBuffer, senha);
+      if (macCheck.hasMac && !macCheck.ok) {
+        return res.status(400).json({
+          success: false,
+          error: 'Senha do certificado digital incorreta. Verifique a senha digitada.'
+        });
+      }
+
+      // Validação criptográfica com engine nativa OpenSSL (Node.js)
       try {
         tls.createSecureContext({
           pfx: pfxBuffer,
@@ -589,9 +899,9 @@ export default async function handler(req, res) {
         });
       }
 
-      console.log('[Certificado] PFX validado pelo OpenSSL/Node');
+      console.log('[Certificado] PFX validado com sucesso');
 
-      // Extração de metadados do certificado X.509
+      // Extração de metadados do certificado X.509 diretamente em memória
       const certX509 = await extractX509FromPfx(pfxBuffer, senha);
       if (!certX509) {
         return res.status(400).json({

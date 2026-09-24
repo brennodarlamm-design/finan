@@ -1,9 +1,9 @@
 import fs from 'fs';
 import path from 'path';
 import assert from 'assert';
-import { extractX509FromPfx, parseCertDetails } from '../api/_certificado.js';
+import { extractX509FromPfx, parseCertDetails, verifyPkcs12Mac, _extractCertDERsFromPkcs12 } from '../api/_certificado.js';
 
-console.log('=== Teste de Extração de Certificado A1 (PKCS#12 & Parser ICP-Brasil) ===');
+console.log('=== Teste de Extração de Certificado A1 (PKCS#12 & Parser ICP-Brasil em Pura Memória) ===');
 
 async function run() {
   // 1. Teste de parseCertDetails com padrão ICP-Brasil PJ no CN
@@ -52,13 +52,54 @@ async function run() {
   assert.strictEqual(certVazio, null, 'Buffer vazio deve retornar null sem crashar');
   console.log('✅ extractX509FromPfx: Buffer vazio tratado com segurança.');
 
-  // 5. Se houver arquivo de teste em scratch/, executa teste mTLS local
-  const pfxPath = path.resolve('scratch/test_cert.pfx');
-  if (fs.existsSync(pfxPath)) {
-    const pfxBuf = fs.readFileSync(pfxPath);
-    const cert = await extractX509FromPfx(pfxBuf, '123456');
-    assert(cert, 'Deveria extrair via TLS');
-    console.log('✅ Teste com PFX real em scratch/ executado com sucesso.');
+  // 5. Testes com arquivos PFX reais em scratch/ (3DES e AES-256)
+  const pfx3desPath = path.resolve('scratch/test_3des.pfx');
+  if (fs.existsSync(pfx3desPath)) {
+    const pfxBuf = fs.readFileSync(pfx3desPath);
+
+    // Validação de MAC
+    const macOk = verifyPkcs12Mac(pfxBuf, 'senha123');
+    assert.strictEqual(macOk.ok, true, 'MAC com senha correta deve ser válido');
+    const macErr = verifyPkcs12Mac(pfxBuf, 'senha_incorreta');
+    assert.strictEqual(macErr.ok, false, 'MAC com senha incorreta deve falhar');
+    console.log('✅ verifyPkcs12Mac: Validação de integridade e senha PKCS#12 (3DES) validada.');
+
+    // Extração em pura memória
+    const certs = _extractCertDERsFromPkcs12(pfxBuf, 'senha123');
+    assert.strictEqual(certs.length, 1, 'Deve decifrar e extrair 1 certificado X.509 em memória');
+
+    const cert = await extractX509FromPfx(pfxBuf, 'senha123');
+    assert(cert, 'extractX509FromPfx deve extrair o certificado');
+    const details = parseCertDetails(cert);
+    assert.strictEqual(details.cnpj, '12345678000199');
+    console.log('✅ extractX509FromPfx: Extração 3DES PBES1 (padrão ICP-Brasil) em pura memória validada.');
+
+    // Senha incorreta não deve extrair o certificado
+    const certsErr = _extractCertDERsFromPkcs12(pfxBuf, 'senha_errada');
+    assert.strictEqual(certsErr.length, 0, 'Senha incorreta não deve decifrar contêineres 3DES');
+    console.log('✅ extractX509FromPfx: Rejeição segura com senha incorreta em 3DES validada.');
+  }
+
+  const pfxAesPath = path.resolve('scratch/test_aes.pfx');
+  if (fs.existsSync(pfxAesPath)) {
+    const pfxBuf = fs.readFileSync(pfxAesPath);
+
+    // Validação de MAC
+    const macOk = verifyPkcs12Mac(pfxBuf, 'senha123');
+    assert.strictEqual(macOk.ok, true, 'MAC AES com senha correta deve ser válido');
+    const macErr = verifyPkcs12Mac(pfxBuf, 'senha_incorreta');
+    assert.strictEqual(macErr.ok, false, 'MAC AES com senha incorreta deve falhar');
+    console.log('✅ verifyPkcs12Mac: Validação de integridade e senha PKCS#12 (AES PBES2) validada.');
+
+    // Extração em pura memória
+    const certs = _extractCertDERsFromPkcs12(pfxBuf, 'senha123');
+    assert.strictEqual(certs.length, 1, 'Deve decifrar e extrair 1 certificado X.509 via PBES2');
+
+    const cert = await extractX509FromPfx(pfxBuf, 'senha123');
+    assert(cert, 'extractX509FromPfx deve extrair o certificado');
+    const details = parseCertDetails(cert);
+    assert.strictEqual(details.cnpj, '12345678000199');
+    console.log('✅ extractX509FromPfx: Extração AES-256 PBES2 moderna em pura memória validada.');
   }
 
   console.log('🎉 Todos os testes de extração e parsing de certificados passaram!');
