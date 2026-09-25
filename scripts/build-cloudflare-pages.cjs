@@ -144,6 +144,25 @@ function writeDeploymentMetadata() {
   return metadata;
 }
 
+// Build do bundle do Sentry Browser se esbuild estiver disponível
+try {
+  const sentryEntry = path.join(root, 'scripts', 'sentry-entry.js');
+  const sentryOut = path.join(root, 'js', 'sentry.js');
+  if (fs.existsSync(sentryEntry)) {
+    const esbuild = require('esbuild');
+    esbuild.buildSync({
+      entryPoints: [sentryEntry],
+      bundle: true,
+      minify: true,
+      format: 'iife',
+      globalName: 'FinGoSentry',
+      outfile: sentryOut
+    });
+  }
+} catch (err) {
+  console.warn('[Build] Aviso ao empacotar Sentry:', err?.message);
+}
+
 fs.rmSync(out, { recursive: true, force: true });
 fs.mkdirSync(out, { recursive: true });
 

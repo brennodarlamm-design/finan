@@ -155,7 +155,7 @@ function buildContentSecurityPolicy(nonce) {
     "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://accounts.google.com",
     "font-src 'self' data: https://fonts.gstatic.com",
     "img-src 'self' data: blob: https:",
-    "connect-src 'self' https://accounts.google.com https://apis.google.com https://www.googleapis.com https://content.googleapis.com https://generativelanguage.googleapis.com https://brasilapi.com.br https://viacep.com.br https://api.meudanfe.com.br https://finan-wf12.onrender.com https://*.blob.vercel-storage.com https://cloudflareinsights.com https://raw.githubusercontent.com https://github.com",
+    "connect-src 'self' https://accounts.google.com https://apis.google.com https://www.googleapis.com https://content.googleapis.com https://generativelanguage.googleapis.com https://brasilapi.com.br https://viacep.com.br https://api.meudanfe.com.br https://finan-wf12.onrender.com https://*.blob.vercel-storage.com https://cloudflareinsights.com https://raw.githubusercontent.com https://github.com https://*.ingest.us.sentry.io https://*.ingest.sentry.io https://*.sentry.io",
     "frame-src 'self' blob: data: https://accounts.google.com https://drive.google.com https://docs.google.com",
     "worker-src 'self' blob: https://cdnjs.cloudflare.com",
     "manifest-src 'self'",

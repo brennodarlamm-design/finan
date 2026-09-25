@@ -9,6 +9,7 @@
     "deploy:cloudflare": "npx wrangler deploy",
     "clean:deployments": "node scripts/clean-old-deployments.js",
     "build:cloudflare": "node scripts/build-cloudflare-pages.cjs && node scripts/patch38-postbuild.cjs",
+    "build:sentry": "esbuild scripts/sentry-entry.js --bundle --minify --format=iife --global-name=FinGoSentry --outfile=js/sentry.js",
     "postinstall": "node scripts/build-cloudflare-pages.cjs && node scripts/patch38-postbuild.cjs",
     "render:status": "node scripts/render-status.js",
     "render:deploy": "node scripts/render-deploy.js",
@@ -78,6 +79,7 @@
   },
   "dependencies": {
     "@neondatabase/serverless": "^0.9.5",
+    "@sentry/browser": "^11.0.0",
     "@trigger.dev/sdk": "^4.6.2",
     "@vercel/blob": "^2.8.0",
     "dotenv": "^16.4.5",
