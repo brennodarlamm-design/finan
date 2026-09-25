@@ -606,6 +606,12 @@ const WhatsApp = {
               <span style="font-size:0.78rem;color:var(--text3);">Servidor:</span>
               <span style="font-weight:600;color:#10b981;font-size:0.8rem;">⚡ 24/7 Alta Disponibilidade (Render)</span>
             </div>
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;padding-bottom:8px;border-bottom:1px solid rgba(255,255,255,0.06);">
+              <span style="font-size:0.78rem;color:var(--text3);">Motor:</span>
+              <span style="font-weight:600;color:#38bdf8;font-size:0.8rem;display:flex;align-items:center;gap:4px;">
+                <span>🚀</span> Evolution Go (Golang)
+              </span>
+            </div>
             <div style="display:flex;justify-content:space-between;align-items:center;">
               <span style="font-size:0.78rem;color:var(--text3);">Conectado desde:</span>
               <span style="font-size:0.78rem;color:var(--text2);">${lastConFmt}</span>

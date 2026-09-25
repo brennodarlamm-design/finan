@@ -13,13 +13,11 @@
     "@neondatabase/serverless": "^0.10.4",
     "@trigger.dev/sdk": "^4.6.2",
     "@vercel/blob": "^2.8.0",
-    "@whiskeysockets/baileys": "^6.7.24",
     "cors": "^2.8.5",
     "dotenv": "^16.4.7",
     "express": "^4.22.2",
     "google-auth-library": "^11.0.2",
     "node-cron": "^4.6.0",
-    "pino": "^9.6.0",
     "qrcode": "^1.5.4"
   },
   "overrides": {
