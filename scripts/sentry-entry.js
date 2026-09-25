@@ -6,8 +6,13 @@ const isDev = typeof window !== 'undefined' && Boolean(window.location) && (
   window.location.hostname === '127.0.0.1'
 );
 
+const release = typeof __SENTRY_RELEASE__ !== 'undefined'
+  ? __SENTRY_RELEASE__
+  : (typeof process !== 'undefined' && process.env?.SENTRY_RELEASE ? process.env.SENTRY_RELEASE : undefined);
+
 Sentry.init({
   dsn: "https://4cbf4bd58a1c50cedb4dae263b24008f@o4511236225892352.ingest.us.sentry.io/4512148402929664",
+  release: release,
   environment: isDev ? 'development' : 'production',
   tracesSampleRate: isDev ? 1.0 : 0.2,
   replaysSessionSampleRate: 0.05,

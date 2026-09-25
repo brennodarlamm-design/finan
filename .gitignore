@@ -26,6 +26,8 @@ backend/auth_info_baileys/
 .env*.local
 .env.vault
 .env.backup
+.sentryclirc
+*.sentryclirc
 *.pem
 *.key
 *.crt

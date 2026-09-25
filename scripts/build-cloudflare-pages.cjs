@@ -150,13 +150,17 @@ try {
   const sentryOut = path.join(root, 'js', 'sentry.js');
   if (fs.existsSync(sentryEntry)) {
     const esbuild = require('esbuild');
+    const commit = resolveGitCommit() || 'local';
     esbuild.buildSync({
       entryPoints: [sentryEntry],
       bundle: true,
       minify: true,
       format: 'iife',
       globalName: 'FinGoSentry',
-      outfile: sentryOut
+      outfile: sentryOut,
+      define: {
+        '__SENTRY_RELEASE__': JSON.stringify(commit)
+      }
     });
   }
 } catch (err) {

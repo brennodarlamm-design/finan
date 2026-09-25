@@ -9,7 +9,8 @@
     "deploy:cloudflare": "npx wrangler deploy",
     "clean:deployments": "node scripts/clean-old-deployments.js",
     "build:cloudflare": "node scripts/build-cloudflare-pages.cjs && node scripts/patch38-postbuild.cjs",
-    "build:sentry": "esbuild scripts/sentry-entry.js --bundle --minify --format=iife --global-name=FinGoSentry --outfile=js/sentry.js",
+    "build:sentry": "node scripts/build-sentry.cjs",
+    "sentry:release": "node scripts/sentry-release.js",
     "postinstall": "node scripts/build-cloudflare-pages.cjs && node scripts/patch38-postbuild.cjs",
     "render:status": "node scripts/render-status.js",
     "render:deploy": "node scripts/render-deploy.js",
@@ -91,6 +92,7 @@
   "devDependencies": {
     "@electric-sql/pglite": "^0.5.8",
     "@playwright/test": "^1.63.0",
+    "@sentry/cli": "^3.8.0",
     "@tailwindcss/vite": "^4.3.3",
     "@vitejs/plugin-react": "^6.1.1",
     "tailwindcss": "^4.3.3",
