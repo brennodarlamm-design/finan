@@ -70,6 +70,7 @@ build/
 .vite/
 .eslintcache
 *.tsbuildinfo
+*.map
 .marketing-dist/
 
 # Testes, Cobertura & Relatórios

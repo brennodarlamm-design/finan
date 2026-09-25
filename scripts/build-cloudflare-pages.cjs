@@ -155,6 +155,7 @@ try {
       entryPoints: [sentryEntry],
       bundle: true,
       minify: true,
+      sourcemap: true,
       format: 'iife',
       globalName: 'FinGoSentry',
       outfile: sentryOut,

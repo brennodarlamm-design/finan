@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "@neondatabase/serverless": "^0.10.4",
+    "@sentry/node": "^11.0.0",
     "@trigger.dev/sdk": "^4.6.2",
     "@vercel/blob": "^2.8.0",
     "cors": "^2.8.5",

@@ -13,6 +13,7 @@ esbuild.buildSync({
   entryPoints: [path.join(root, 'scripts', 'sentry-entry.js')],
   bundle: true,
   minify: true,
+  sourcemap: true,
   format: 'iife',
   globalName: 'FinGoSentry',
   outfile: path.join(root, 'js', 'sentry.js'),

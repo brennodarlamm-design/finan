@@ -14,6 +14,7 @@ import { evolutionGo } from './evolution_client.js';
 import { createGracefulShutdownManager } from './graceful_shutdown.js';
 import { requestIdMiddleware, createTaggedSql } from './traceability.js';
 import { createResilientNeon } from './neon_resilience.js';
+import * as Sentry from '@sentry/node';
 
 // Garantir link simbólico de ../node_modules -> ./node_modules para que os handlers em ../api/*.js resolvam dependências
 try {
@@ -29,6 +30,22 @@ try {
 
 dotenv.config({ path: '.env.local' });
 dotenv.config();
+
+// ── INICIALIZAÇÃO DO SENTRY NODE NO BACKEND RENDER ──────────────────────────
+Sentry.init({
+  dsn: process.env.SENTRY_DSN || "https://4cbf4bd58a1c50cedb4dae263b24008f@o4511236225892352.ingest.us.sentry.io/4512148402929664",
+  environment: process.env.NODE_ENV || 'production',
+  tracesSampleRate: process.env.NODE_ENV === 'development' ? 1.0 : 0.2,
+  beforeSend(event) {
+    if (event.request && event.request.headers) {
+      delete event.request.headers['authorization'];
+      delete event.request.headers['cookie'];
+      delete event.request.headers['x-api-key'];
+      delete event.request.headers['apikey'];
+    }
+    return event;
+  }
+});
 
 // Suprime logs ruidosos de decifração externa/Bad MAC/Reconexão do libsignal para não poluir os logs do Render
 const _rawConsoleError = console.error;
@@ -59,6 +76,12 @@ console.error = (...args) => {
 
 const app = express();
 app.use(requestIdMiddleware({ getSql: () => sql }));
+app.use((req, res, next) => {
+  if (req.id) {
+    Sentry.setTag('request_id', req.id);
+  }
+  next();
+});
 const shutdownManager = createGracefulShutdownManager({ timeoutMs: 10000, cron });
 app.use(shutdownManager.middleware());
 
@@ -1493,6 +1516,9 @@ app.all('/api/send-whatsapp', (req, res, next) => {
   req.query = { ...req.query, action: 'send' };
   next();
 }, apiRoute(() => whatsappApiHandler));
+
+// ── SENTRY EXPRESS ERROR HANDLER (APM & OBSERVABILIDADE) ─────────────────────
+Sentry.setupExpressErrorHandler(app);
 
 const server = app.listen(PORT, () => {
   console.log(`\n======================================================`);

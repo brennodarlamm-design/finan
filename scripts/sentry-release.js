@@ -49,6 +49,17 @@ try {
     console.warn(`⚠️ Não foi possível associar commits automaticamente (${commitErr.message}). Continuando...`);
   }
 
+  // 3.1. Upload de Source Maps
+  const distDir = path.resolve(process.cwd(), 'dist');
+  if (fs.existsSync(distDir)) {
+    console.log(`📦 Enviando sourcemaps para o Sentry...`);
+    try {
+      execSync(`npx @sentry/cli sourcemaps upload --release="${version}" dist --url-prefix ~/`, { env, stdio: 'inherit' });
+    } catch (smErr) {
+      console.warn(`⚠️ Aviso ao enviar sourcemaps (${smErr.message}). Continuando...`);
+    }
+  }
+
   // 4. Finalizar release
   console.log(`🏁 Finalizando release ${version}...`);
   execSync(`npx @sentry/cli releases finalize "${version}"`, { env, stdio: 'inherit' });
