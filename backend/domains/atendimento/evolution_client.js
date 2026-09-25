@@ -95,12 +95,22 @@ export class EvolutionGoClient {
    */
   async createInstance(tenantId) {
     const instanceName = this.cleanInstanceName(tenantId);
+    const webhookUrl = (process.env.EVOLUTION_GO_WEBHOOK_URL || '').trim();
+    const body = {
+      instanceName,
+      integration: 'WHATSAPP-BAILEYS',
+      qrcode: true
+    };
+
+    if (webhookUrl) {
+      body.webhook = webhookUrl;
+      body.webhook_by_events = true;
+      body.events = ['CONNECTION_UPDATE', 'MESSAGES_UPSERT', 'QRCODE_UPDATED'];
+    }
+
     return await this.request('/instance/create', {
       method: 'POST',
-      body: {
-        instanceName,
-        integration: 'WHATSAPP-BAILEYS'
-      }
+      body
     });
   }
 
@@ -192,6 +202,148 @@ export class EvolutionGoClient {
         caption: caption || undefined
       }
     });
+  }
+
+  /**
+   * Configura a URL de webhook e os eventos observados para a instância do tenant
+   */
+  async setWebhook(tenantId, webhookUrl, options = {}) {
+    const instanceName = this.cleanInstanceName(tenantId);
+    const events = options.events || [
+      'CONNECTION_UPDATE',
+      'MESSAGES_UPSERT',
+      'QRCODE_UPDATED'
+    ];
+
+    return await this.request(`/webhook/set/${instanceName}`, {
+      method: 'POST',
+      body: {
+        url: webhookUrl,
+        enabled: options.enabled !== false,
+        webhook_by_events: true,
+        events
+      }
+    });
+  }
+
+  /**
+   * Consulta a configuração de webhook cadastrada para a instância
+   */
+  async findWebhook(tenantId) {
+    const instanceName = this.cleanInstanceName(tenantId);
+    return await this.request(`/webhook/find/${instanceName}`);
+  }
+
+  /**
+   * Reinicia a instância do tenant
+   */
+  async restartInstance(tenantId) {
+    const instanceName = this.cleanInstanceName(tenantId);
+    return await this.request(`/instance/restart/${instanceName}`, {
+      method: 'POST'
+    });
+  }
+
+  /**
+   * Executa logout/desconexão graciosa da sessão no WhatsApp
+   */
+  async logoutInstance(tenantId) {
+    const instanceName = this.cleanInstanceName(tenantId);
+    return await this.request(`/instance/logout/${instanceName}`, {
+      method: 'DELETE'
+    });
+  }
+
+  /**
+   * Interpreta e normaliza eventos recebidos via webhook do Evolution Go
+   */
+  parseWebhookPayload(payload = {}) {
+    const event = String(payload.event || payload.type || '').toLowerCase();
+    const instance = this.cleanInstanceName(payload.instance || payload.tenantId || 'public');
+    const data = payload.data || payload;
+
+    if (event === 'qrcode.updated' || event === 'qrcode') {
+      const rawCode = data.base64 || data.qrcode || data.code || null;
+      let qrDataUrl = null;
+      if (rawCode) {
+        qrDataUrl = rawCode.startsWith('data:') ? rawCode : `data:image/png;base64,${rawCode}`;
+      }
+      return {
+        type: 'qrcode',
+        event,
+        tenantId: instance,
+        qrDataUrl,
+        raw: data
+      };
+    }
+
+    if (event === 'connection.update' || event === 'status') {
+      const state = String(data.state || data.status || '').toLowerCase();
+      const connected = state === 'open' || state === 'connected';
+      return {
+        type: 'connection',
+        event,
+        tenantId: instance,
+        state,
+        connected,
+        status: connected ? 'connected' : (state === 'connecting' ? 'connecting' : 'disconnected'),
+        number: data.number || data.userJid || null,
+        raw: data
+      };
+    }
+
+    if (event === 'messages.upsert' || event === 'message') {
+      const key = data.key || {};
+      const remoteJid = String(key.remoteJid || data.from || '').trim();
+      const phone = remoteJid.replace(/@.*$/, '').replace(/\D/g, '');
+      const isFromMe = Boolean(key.fromMe || data.fromMe);
+      const pushName = data.pushName || data.senderName || 'Desconhecido';
+
+      const messageContent = data.message || {};
+      const text = String(
+        messageContent.conversation ||
+        messageContent.extendedTextMessage?.text ||
+        messageContent.imageMessage?.caption ||
+        messageContent.documentMessage?.caption ||
+        data.text ||
+        ''
+      ).trim();
+
+      const hasMedia = Boolean(
+        messageContent.imageMessage ||
+        messageContent.documentMessage ||
+        messageContent.audioMessage ||
+        messageContent.videoMessage
+      );
+
+      const mediaType = messageContent.imageMessage ? 'image' :
+                        messageContent.documentMessage ? 'document' :
+                        messageContent.audioMessage ? 'audio' :
+                        messageContent.videoMessage ? 'video' : null;
+
+      return {
+        type: 'message',
+        event,
+        tenantId: instance,
+        messageId: key.id || data.id || null,
+        phone,
+        remoteJid,
+        pushName,
+        isFromMe,
+        text,
+        hasMedia,
+        mediaType,
+        timestamp: data.messageTimestamp || Math.floor(Date.now() / 1000),
+        raw: data
+      };
+    }
+
+    return {
+      type: 'unknown',
+      event,
+      tenantId: instance,
+      data
+    };
   }
 
   /**

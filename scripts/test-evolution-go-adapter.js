@@ -62,8 +62,90 @@ assert.equal(serverCode.includes("evolutionGo.isConfigured()"), true, 'server.js
 assert.equal(serverCode.includes("evolutionGo.getUnifiedSessionSummary"), true, 'server.js deve consultar sessão unificada.');
 console.log('   ✓ Todos os invariantes de segurança e delegação do backend foram confirmados.');
 
-// 5. Verificação dos Arquivos de Orquestração Docker
-console.log('\n5. Validando arquivos de configuração Docker e variáveis...');
+// 5. Testes do Interpretador de Webhooks (parseWebhookPayload)
+console.log('\n5. Validando interpretação e normalização de webhooks do Evolution Go...');
+// 5.1 QR Code
+const qrPayload = {
+  event: 'qrcode.updated',
+  instance: 'construtora_alfa',
+  data: {
+    qrcode: 'test-raw-qr-code-string',
+    base64: 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=='
+  }
+};
+const parsedQr = clientDefault.parseWebhookPayload(qrPayload);
+assert.equal(parsedQr.type, 'qrcode');
+assert.equal(parsedQr.tenantId, 'construtora_alfa');
+assert.match(parsedQr.qrDataUrl, /^data:image\/png;base64,/);
+
+// 5.2 Conexão (Open / Close)
+const connOpenPayload = {
+  event: 'connection.update',
+  instance: 'tenant-99',
+  data: {
+    state: 'open',
+    number: '5595991363678'
+  }
+};
+const parsedOpen = clientDefault.parseWebhookPayload(connOpenPayload);
+assert.equal(parsedOpen.type, 'connection');
+assert.equal(parsedOpen.connected, true);
+assert.equal(parsedOpen.status, 'connected');
+assert.equal(parsedOpen.number, '5595991363678');
+
+const connClosePayload = {
+  event: 'connection.update',
+  instance: 'tenant-99',
+  data: {
+    state: 'close',
+    statusReason: 401
+  }
+};
+const parsedClose = clientDefault.parseWebhookPayload(connClosePayload);
+assert.equal(parsedClose.type, 'connection');
+assert.equal(parsedClose.connected, false);
+assert.equal(parsedClose.status, 'disconnected');
+
+// 5.3 Mensagem Recebida (Messages Upsert)
+const msgPayload = {
+  event: 'messages.upsert',
+  instance: 'tenant-99',
+  data: {
+    key: {
+      remoteJid: '5595988887777@s.whatsapp.net',
+      fromMe: false,
+      id: 'MSG-001'
+    },
+    pushName: 'Engenheiro Carlos',
+    message: {
+      conversation: 'Relatório da concretagem enviado.'
+    },
+    messageTimestamp: 1727274000
+  }
+};
+const parsedMsg = clientDefault.parseWebhookPayload(msgPayload);
+assert.equal(parsedMsg.type, 'message');
+assert.equal(parsedMsg.tenantId, 'tenant-99');
+assert.equal(parsedMsg.phone, '5595988887777');
+assert.equal(parsedMsg.pushName, 'Engenheiro Carlos');
+assert.equal(parsedMsg.isFromMe, false);
+assert.equal(parsedMsg.text, 'Relatório da concretagem enviado.');
+assert.equal(parsedMsg.hasMedia, false);
+
+console.log('   ✓ Normalização de QR Code, Conexão e Mensagens do webhook validadas.');
+
+// 6. Verificação de Rotas Webhook no Servidor e Proxy
+console.log('\n6. Validando rotas de webhook em backend/server.js e api/whatsapp.js...');
+const apiWaCode = fs.readFileSync('api/whatsapp.js', 'utf8');
+
+assert.equal(serverCode.includes("app.post(['/webhook/evolution-go', '/api/webhook-whatsapp']"), true, 'server.js deve expor rota de webhook do Evolution Go.');
+assert.equal(serverCode.includes("evolutionGo.parseWebhookPayload(req.body)"), true, 'server.js deve usar parseWebhookPayload no endpoint de webhook.');
+assert.equal(apiWaCode.includes("incomingAction === 'webhook'"), true, 'api/whatsapp.js deve interceptar e rotear webhooks.');
+assert.equal(apiWaCode.includes("/webhook/evolution-go"), true, 'api/whatsapp.js deve encaminhar eventos para o backend.');
+console.log('   ✓ Rotas de webhook do servidor e proxy confirmadas.');
+
+// 7. Verificação dos Arquivos de Orquestração Docker
+console.log('\n7. Validando arquivos de configuração Docker e variáveis...');
 assert.equal(fs.existsSync('docker-compose.evolution-go.yml'), true, 'docker-compose.evolution-go.yml deve existir.');
 assert.equal(fs.existsSync('.env.evolution-go.example'), true, '.env.evolution-go.example deve existir.');
 

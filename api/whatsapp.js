@@ -42,6 +42,54 @@ export default async function handler(req, res) {
     return res.status(200).end();
   }
 
+  // 0. Receptor e Proxy de Webhooks de Mensageria (Evolution Go)
+  const incomingAction = req.query?.action || req.body?.action;
+  if (incomingAction === 'webhook') {
+    const evoKey = (process.env.EVOLUTION_GO_API_KEY || '').trim();
+    const internalSecret = getInternalApiSecret();
+    const incomingKey = String(
+      req.headers?.['apikey'] ||
+      req.headers?.['x-api-key'] ||
+      req.headers?.['authorization']?.replace(/^Bearer\s+/i, '') ||
+      req.query?.token ||
+      ''
+    ).trim();
+
+    const isAuthorized = (evoKey && incomingKey === evoKey) || (internalSecret && incomingKey === internalSecret);
+    if (!isAuthorized) {
+      return res.status(401).json({ success: false, error: 'Acesso não autorizado ao webhook do WhatsApp.' });
+    }
+
+    try {
+      const renderBase = getRenderBaseUrl();
+      const headers = {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
+        'User-Agent': 'FinGo-WhatsApp-Proxy/1.0'
+      };
+      if (internalSecret) {
+        headers['Authorization'] = `Bearer ${internalSecret}`;
+        headers['x-api-key'] = internalSecret;
+      }
+      if (evoKey) {
+        headers['apikey'] = evoKey;
+      }
+
+      const forwardRes = await fetch(`${renderBase}/webhook/evolution-go`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(req.body || {}),
+        signal: AbortSignal.timeout(10000)
+      });
+
+      const forwardData = await forwardRes.json().catch(() => ({}));
+      return res.status(forwardRes.status).json(forwardData);
+    } catch (fwdErr) {
+      console.error('[WhatsApp:Webhook] Falha ao encaminhar evento para o backend Render:', fwdErr?.message || fwdErr);
+      return res.status(502).json({ success: false, error: 'Falha na entrega do webhook ao backend.' });
+    }
+  }
+
   // 1. Validação de Autenticação do Usuário FinObra
   const auth = await resolveAuthAndTenant(req);
   if (!auth.authenticated) {

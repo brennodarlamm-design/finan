@@ -87,8 +87,42 @@ Assim que essas variáveis forem detectadas:
 
 ## 5. Testes e Validação Automatizada
 
-Para validar toda a camada de integração do conector sem precisar subir o container:
+Para validar toda a camada de integração do conector, parsing de webhooks e invariantes do servidor:
 
 ```bash
 node scripts/test-evolution-go-adapter.js
 ```
+
+---
+
+## 6. Arquitetura de Webhooks (Inbound Events)
+
+O Evolution Go emite webhooks HTTP em tempo real quando ocorrem alterações na conexão, atualização de QR code ou chegada de novas mensagens.
+
+### Endpoints Receptores no FinGo:
+* **Backend Render 24/7:** `POST /webhook/evolution-go` (e alias `/api/webhook-whatsapp`)
+* **Proxy Serverless / Edge:** `POST /api/whatsapp?action=webhook`
+
+### Autenticação do Webhook:
+O Evolution Go deve enviar a chave de segurança configurada em `GLOBAL_API_KEY` através do header `apikey` ou `Authorization: Bearer <token>`.
+
+### Eventos Processados:
+1. `qrcode.updated`:
+   - Atualiza o cache de QR Code na sessão do tenant sem atraso de sondagem (polling).
+2. `connection.update`:
+   - Atualiza o status da conexão (`connected`, `disconnected`, `connecting`) instantaneamente na memória e banco de dados.
+3. `messages.upsert`:
+   - Extrai o remetente, texto ou mídia da mensagem recebida para exibição ou roteamento.
+
+### Como Simular um Webhook Localmente:
+```bash
+curl -X POST http://localhost:3333/webhook/evolution-go \
+  -H "Content-Type: application/json" \
+  -H "apikey: sua-chave-secreta-forte" \
+  -d '{
+    "event": "connection.update",
+    "instance": "public",
+    "data": { "state": "open", "number": "5595991363678" }
+  }'
+```
+

@@ -733,6 +733,54 @@ app.get('/whatsapp-session', requireAuth, async (req, res) => {
   });
 });
 
+// 1.3 Webhook Receptor de Eventos do Evolution Go
+app.post(['/webhook/evolution-go', '/api/webhook-whatsapp'], async (req, res) => {
+  const evoKey = (process.env.EVOLUTION_GO_API_KEY || '').trim();
+  const incomingKey = String(
+    req.headers['apikey'] ||
+    req.headers['x-api-key'] ||
+    req.headers['authorization']?.replace(/^Bearer\s+/i, '') ||
+    req.query?.token ||
+    ''
+  ).trim();
+
+  const isAuthorized = (evoKey && incomingKey === evoKey) || hasInternalApiAuth(req);
+  if (!isAuthorized) {
+    return res.status(401).json({ error: 'Acesso não autorizado ao webhook do WhatsApp.' });
+  }
+
+  try {
+    const parsed = evolutionGo.parseWebhookPayload(req.body);
+    const tenantId = parsed.tenantId || 'public';
+    const session = getTenantSession(tenantId);
+
+    if (parsed.type === 'qrcode') {
+      if (parsed.qrDataUrl) {
+        session.qrDataUrl = parsed.qrDataUrl;
+        session.connectionStatus = 'qr_ready';
+        console.log(`⚡ [Webhook:${tenantId}] QR Code atualizado via Evolution Go.`);
+      }
+    } else if (parsed.type === 'connection') {
+      if (parsed.connected) {
+        session.connectionStatus = 'connected';
+        session.lastConnectedAt = new Date().toISOString();
+        session.qrDataUrl = null;
+        console.log(`✅ [Webhook:${tenantId}] Conexão estabelecida via Evolution Go.`);
+      } else {
+        session.connectionStatus = parsed.status || 'disconnected';
+        console.log(`🔌 [Webhook:${tenantId}] Status de conexão alterado: ${session.connectionStatus}`);
+      }
+    } else if (parsed.type === 'message') {
+      console.log(`📩 [Webhook:${tenantId}] Mensagem recebida de ${parsed.phone} (${parsed.pushName}): ${parsed.text ? parsed.text.slice(0, 60) : '[Mídia]'}`);
+    }
+
+    return res.status(200).json({ success: true, event: parsed.event, type: parsed.type, tenantId });
+  } catch (err) {
+    console.error('❌ [Webhook:EvolutionGo] Falha no processamento:', err.message);
+    return res.status(500).json({ error: 'Falha no processamento do webhook.' });
+  }
+});
+
 // 2. Página Web Visual do QR Code com Suporte Multi-Tenant e Sem Token em Query String (C-05/H-15)
 app.all('/qr', (req, res) => {
   const secret = getInternalSecret();
