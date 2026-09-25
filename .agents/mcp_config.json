@@ -9,7 +9,9 @@
     },
     "context7": {
       "url": "https://mcp.context7.com/mcp",
+      "serverUrl": "https://mcp.context7.com/mcp",
       "headers": {
+        "CONTEXT7_API_KEY": "${CONTEXT7_API_KEY}",
         "Authorization": "Bearer ${CONTEXT7_API_KEY}"
       },
       "description": "Context7 Remote MCP Server para consulta em tempo real de documentações e bibliotecas"
