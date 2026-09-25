@@ -45,7 +45,7 @@ console.log('   ✓ Fail2Ban: limite de 5 falhas, banimento automático e middle
 // -------------------------------------------------------------
 console.log('2. Validando Idempotência Criptográfica...');
 
-const idempKey = 'tx_pix_payment_998124';
+const idempKey = `tx_pix_payment_${Date.now()}`;
 const payload = { valor: 2500.00, obraId: 'obra_77' };
 
 const firstCheck = await checkAndSetIdempotency({}, idempKey, payload);
@@ -89,7 +89,7 @@ console.log('   ✓ Geo-Fencing: validação de país e bloqueio de nós anônim
 // -------------------------------------------------------------
 console.log('4. Validando Audit Ledger Criptográfico (Hash Encadeado SHA-256)...');
 
-const tenantId = 'construtora_alfa';
+const tenantId = `construtora_alfa_${Date.now()}`;
 const block1 = await appendLedgerBlock({}, {
   tenantId,
   userId: 'eng_lucas',

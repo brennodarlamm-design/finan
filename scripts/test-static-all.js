@@ -108,7 +108,8 @@ const tests = [
   'scripts/test-edge-alert-chaos.js',
   'scripts/test-review-remediation.js',
   'scripts/test-sefaz-dfe.js',
-  'scripts/test-financeiro-core-hardening.js'
+  'scripts/test-financeiro-core-hardening.js',
+  'scripts/test-upstash-redis-integration.js'
 ].filter(fs.existsSync);
 
 const p50NativeSourceTests = new Set([

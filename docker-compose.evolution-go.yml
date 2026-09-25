@@ -32,6 +32,14 @@ services:
       # Webhooks para receber mensagens e comprovantes no FinBot
       - WEBHOOKFILES=true
       - WEBHOOK_URL=${EVOLUTION_GO_WEBHOOK_URL:-http://host.docker.internal:3333/api/whatsapp?action=webhook}
+      # Cache Redis & Queue (Upstash Redis TLS ou Redis dedicado)
+      # Documentação oficial: https://docs.evolutionfoundation.com.br/evolution-api/requirements/redis
+      - CACHE_REDIS_ENABLED=${CACHE_REDIS_ENABLED:-true}
+      - CACHE_REDIS_URI=${CACHE_REDIS_URI:-rediss://default:gQAAAAAABI-XAAIgcDEwMGI1YWQ1Njk2OWU0MjQ3YjEzODk1ZmI2OGY5MjE2Yg@better-wallaby-298903.upstash.io:6379}
+      - CACHE_REDIS_PREFIX_KEY=${CACHE_REDIS_PREFIX_KEY:-evolution_fingo}
+      - CACHE_REDIS_SAVE_INSTANCES=${CACHE_REDIS_SAVE_INSTANCES:-false}
+      - CACHE_LOCAL_ENABLED=${CACHE_LOCAL_ENABLED:-false}
+      - REDIS_URL=${REDIS_URL:-rediss://default:gQAAAAAABI-XAAIgcDEwMGI1YWQ1Njk2OWU0MjQ3YjEzODk1ZmI2OGY5MjE2Yg@better-wallaby-298903.upstash.io:6379}
     networks:
       - fingo-network
 

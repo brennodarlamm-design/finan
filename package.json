@@ -73,6 +73,7 @@
     "dev:landing": "vite --host 127.0.0.1",
     "build:landing": "node scripts/build-marketing.js",
     "test:landing": "playwright test --config marketing/playwright.config.js",
+    "test:upstash-redis": "node scripts/test-upstash-redis-integration.js",
     "dev:legacy": "npx serve ."
   },
   "dependencies": {

@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "upstash": {
+      "url": "https://mcp.upstash.com/mcp",
+      "headers": {
+        "Authorization": "Bearer ${UPSTASH_API_KEY}"
+      },
+      "description": "Upstash Remote MCP Server para gerenciamento e consulta de recursos Upstash (Redis, QStash, Vector, Workflow)"
+    }
+  }
+}

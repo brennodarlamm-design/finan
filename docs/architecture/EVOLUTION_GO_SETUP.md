@@ -126,3 +126,60 @@ curl -X POST http://localhost:3333/webhook/evolution-go \
   }'
 ```
 
+---
+
+## 7. Cache Redis & Mensageria de Alta Performance (Upstash Redis TLS)
+
+Conforme a [Documentação Oficial do Evolution Foundation sobre Redis](https://docs.evolutionfoundation.com.br/evolution-api/requirements/redis), o Redis atua como a camada de alta performance para instâncias, cache de mensagens e mensageria distribuída.
+
+### Parâmetros Oficiais de Configuração:
+```env
+# Ativa o cache em Redis
+CACHE_REDIS_ENABLED=true
+
+# URI TLS com autenticação (Upstash exige rediss:// ou --tls na porta 6379)
+CACHE_REDIS_URI=rediss://default:gQAAAAAABI-XAAIgcDEwMGI1YWQ1Njk2OWU0MjQ3YjEzODk1ZmI2OGY5MjE2Yg@better-wallaby-298903.upstash.io:6379
+
+# Prefixo de chave para segregação no Redis compartilhado
+CACHE_REDIS_PREFIX_KEY=evolution_fingo
+
+# Salvar metadados de instâncias no Redis
+CACHE_REDIS_SAVE_INSTANCES=false
+
+# Cache local em memória (desativado quando Redis distribuído está ativo)
+CACHE_LOCAL_ENABLED=false
+
+# URI compatível com clientes Go/Queue
+REDIS_URL=rediss://default:gQAAAAAABI-XAAIgcDEwMGI1YWQ1Njk2OWU0MjQ3YjEzODk1ZmI2OGY5MjE2Yg@better-wallaby-298903.upstash.io:6379
+```
+
+### Upstash Redis REST no FinGo (Edge & Backend):
+O FinGo disponibiliza os módulos [`api/_edge-redis.js`](file:///d:/Projects/FINAN%C3%87AS/api/_edge-redis.js) e [`backend/domains/integrations/upstash_redis.js`](file:///d:/Projects/FINAN%C3%87AS/backend/domains/integrations/upstash_redis.js):
+- **Ultra-baixa latência (<10ms):** opera via HTTPS REST puro, funcionando tanto no Node.js quanto em Cloudflare Pages / Workers sem requerer sockets TCP nativos.
+- **Deduplicação de Webhooks:** através de `redisSetNx(msgId, 1, 60)`, previne disparos e processamentos repetidos de mensagens em cluster.
+- **Rate-Limiting Atômico:** através de `checkRateLimitRedis(key, limit, windowSeconds)`.
+
+---
+
+## 8. Integração com Upstash MCP (Model Context Protocol)
+
+O Upstash disponibiliza um servidor remoto oficial de MCP no endpoint:
+`https://mcp.upstash.com/mcp`
+
+### Configuração no Antigravity / Claude / Cursor:
+O arquivo [`.agents/mcp_config.json`](file:///d:/Projects/FINAN%C3%87AS/.agents/mcp_config.json) já está preparado no repositório:
+```json
+{
+  "mcpServers": {
+    "upstash": {
+      "url": "https://mcp.upstash.com/mcp",
+      "headers": {
+        "Authorization": "Bearer ${UPSTASH_API_KEY}"
+      }
+    }
+  }
+}
+```
+Isso permite que assistentes de IA realizem diagnósticos em tempo real, auditoria de métricas e gerenciamento dos recursos Redis e Vector diretamente pelo protocolo MCP.
+
+
