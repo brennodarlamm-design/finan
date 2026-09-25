@@ -71,6 +71,7 @@ const tests = [
   'scripts/test-patch51-workflow-integration.js',
   'scripts/test-patch52-static.js',
   'scripts/test-patch53-static.js',
+  'scripts/test-evolution-go-adapter.js',
   'scripts/test-master-improvement.js',
   'scripts/test-segmentation-agenda.js',
   'scripts/test-sync-optimization.js',

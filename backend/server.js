@@ -16,6 +16,7 @@ import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
 import { createSinapiRouter, initSinapiDatabase } from './sinapi_robot.js';
+import { evolutionGo } from './evolution_client.js';
 
 // Garantir link simbólico de ../node_modules -> ./node_modules para que os handlers em ../api/*.js resolvam dependências
 try {
@@ -700,8 +701,19 @@ app.get('/health', async (req, res) => {
 });
 
 // 1.2 Sessão Estruturada do WhatsApp por Tenant
-app.get('/whatsapp-session', requireAuth, (req, res) => {
+app.get('/whatsapp-session', requireAuth, async (req, res) => {
   const tenantId = extractTenantFromReq(req);
+
+  // Delegação transparente para o Evolution Go quando configurado no ambiente
+  if (evolutionGo.isConfigured()) {
+    try {
+      const summary = await evolutionGo.getUnifiedSessionSummary(tenantId);
+      return res.json(summary);
+    } catch (evoErr) {
+      console.warn(`⚠️ [EvolutionGo:${tenantId}] Falha ao consultar sessão, tentando fallback:`, evoErr.message);
+    }
+  }
+
   const session = getTenantSession(tenantId);
 
   // Se a sessão estiver desconectada e não estiver gerando QR, inicia a geração
@@ -873,6 +885,17 @@ app.all('/reset-auth', requireQrOrApiAuth, async (req, res) => {
   const tenantId = extractTenantFromReq(req);
   const reason = req.body?.reason || req.query?.reason || 'Solicitado via API /reset-auth';
   console.log(`🔄 [API] Requisição de reset de autenticação recebida para tenant: ${tenantId}`);
+
+  if (evolutionGo.isConfigured()) {
+    try {
+      await evolutionGo.deleteInstance(tenantId);
+      await evolutionGo.createInstance(tenantId);
+      console.log(`✅ [EvolutionGo:${tenantId}] Instância resetada no Evolution Go.`);
+    } catch (evoResetErr) {
+      console.warn(`⚠️ [EvolutionGo:${tenantId}] Aviso no reset da instância:`, evoResetErr.message);
+    }
+  }
+
   await resetWhatsAppSession(tenantId, reason);
 
   if (req.headers.accept && req.headers.accept.includes('text/html')) {
@@ -924,6 +947,46 @@ app.post('/send-message', requireAuth, async (req, res) => {
       return res.status(400).json({ error: 'Campo "message" ou "base64" é obrigatório.' });
     }
 
+    if (base64) {
+      const cleanB64 = String(base64).replace(/^data:[^;]+;base64,/, '');
+      const buf = Buffer.from(cleanB64, 'base64');
+      const MAX_MEDIA_BYTES = 8 * 1024 * 1024;
+      if (buf.length === 0 || buf.length > MAX_MEDIA_BYTES) {
+        return res.status(413).json({ error: 'Arquivo inválido ou acima do limite de 8 MB.' });
+      }
+      const mime = String(mimeType || 'application/pdf').split(';')[0].trim().toLowerCase();
+      const forbiddenMime = /^(?:text\/html|image\/svg\+xml|application\/xhtml\+xml|text\/javascript|application\/javascript)$/i;
+      if (forbiddenMime.test(mime)) {
+        return res.status(400).json({ error: 'Tipo de mídia não permitido.' });
+      }
+    }
+
+    // Delegação para o Evolution Go quando configurado no ambiente
+    if (evolutionGo.isConfigured()) {
+      let evoResult;
+      if (base64) {
+        evoResult = await evolutionGo.sendMediaMessage(tenantId, destPhone, {
+          base64: String(base64).replace(/^data:[^;]+;base64,/, ''),
+          mimeType: String(mimeType || 'application/pdf').split(';')[0].trim().toLowerCase(),
+          fileName: fileName || 'documento.pdf',
+          caption: msgText
+        });
+      } else {
+        evoResult = await evolutionGo.sendTextMessage(tenantId, destPhone, msgText);
+      }
+
+      if (evoResult.ok) {
+        return res.json({
+          success: true,
+          tenantId,
+          messageId: evoResult.data?.key?.id || evoResult.data?.messageId || 'evo-msg-ok',
+          to: destPhone,
+          engine: 'evolution-go'
+        });
+      }
+      console.warn(`⚠️ [EvolutionGo:${tenantId}] Envio falhou (${evoResult.error}), tentando fallback legado...`);
+    }
+
     if (session.connectionStatus !== 'connected' || !session.sock) {
       return res.status(503).json({
         error: `WhatsApp da empresa (${session.tenantId}) ainda não está conectado no servidor.`,
@@ -939,15 +1002,7 @@ app.post('/send-message', requireAuth, async (req, res) => {
     if (base64) {
       const cleanB64 = String(base64).replace(/^data:[^;]+;base64,/, '');
       const buf = Buffer.from(cleanB64, 'base64');
-      const MAX_MEDIA_BYTES = 8 * 1024 * 1024;
-      if (buf.length === 0 || buf.length > MAX_MEDIA_BYTES) {
-        return res.status(413).json({ error: 'Arquivo inválido ou acima do limite de 8 MB.' });
-      }
       const mime = String(mimeType || 'application/pdf').split(';')[0].trim().toLowerCase();
-      const forbiddenMime = /^(?:text\/html|image\/svg\+xml|application\/xhtml\+xml|text\/javascript|application\/javascript)$/i;
-      if (forbiddenMime.test(mime)) {
-        return res.status(400).json({ error: 'Tipo de mídia não permitido.' });
-      }
 
       if (/^image\/(?:jpeg|png|webp)$/i.test(mime)) {
         console.log(`📤 [WhatsApp:${session.tenantId}] Enviando imagem para ${jid}...`);
