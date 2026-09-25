@@ -9,42 +9,14 @@
     "directory": "./dist",
     "binding": "ASSETS",
     "html_handling": "none",
-    "run_worker_first": [
-      "/.well-known/*",
-      "/openapi.json",
-      "/auth.md",
-      "/js/webmcp.js",
-      "/planos",
-      "/sobre-nos",
-      "/calculadora-bdi",
-      "/calculadora-bdi.html",
-      "/api/*",
-      "/__finobra/health",
-      "/",
-      "/index.html",
-      "/app.html",
-      "/login.html",
-      "/landing.html",
-      "/master.html",
-      "/privacidade.html",
-      "/termos.html",
-      "/validar.html",
-      "/llms.txt",
-      "/llms-full.txt",
-      "/app",
-      "/app/*",
-      "/landing",
-      "/master",
-      "/privacidade",
-      "/termos",
-      "/validar",
-      "/login",
-      "/cadastro",
-      "/apresentacao",
-      "/comercial",
-      "/portal",
-      "/portal/*"
-    ]
+    "run_worker_first": true
+    // Rotas públicas e de API executadas primeiro pelo Worker:
+    // "/.well-known/*", "/openapi.json", "/auth.md", "/js/webmcp.js", "/planos", "/sobre-nos"
+    // "/calculadora-bdi", "/calculadora-bdi.html", "/api/*", "/__finobra/health"
+    // "/", "/index.html", "/app.html", "/login.html", "/landing.html", "/master.html"
+    // "/privacidade.html", "/termos.html", "/validar.html", "/llms.txt", "/llms-full.txt"
+    // "/app", "/app/*", "/landing", "/master", "/privacidade", "/termos", "/validar"
+    // "/login", "/cadastro", "/apresentacao", "/comercial", "/portal", "/portal/*"
   },
   "r2_buckets": [
     {
