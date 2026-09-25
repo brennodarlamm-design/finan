@@ -4,9 +4,13 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
+import dotenv from 'dotenv';
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const ROOT = path.resolve(__dirname, '..');
+
+dotenv.config({ path: path.join(ROOT, '.env.local') });
 
 console.log('🧪 Iniciando testes de integração do Upstash Redis e Evolution Go...\n');
 

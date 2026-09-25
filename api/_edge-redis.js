@@ -2,8 +2,8 @@
 // Oferece cache distribuído sub-10ms, deduplicação de webhooks e rate-limiting
 // compatível com Cloudflare Pages Functions, Workers e Node.js.
 
-const DEFAULT_UPSTASH_URL = 'https://better-wallaby-298903.upstash.io';
-const DEFAULT_UPSTASH_TOKEN = 'gQAAAAAABI-XAAIgcDEwMGI1YWQ1Njk2OWU0MjQ3YjEzODk1ZmI2OGY5MjE2Yg';
+const DEFAULT_UPSTASH_URL = process.env.UPSTASH_REDIS_REST_URL || 'https://better-wallaby-298903.upstash.io';
+const DEFAULT_UPSTASH_TOKEN = process.env.UPSTASH_REDIS_REST_TOKEN || '';
 
 /**
  * Resolve as credenciais do Upstash Redis a partir do ambiente ou padrões de produção.

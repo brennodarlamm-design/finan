@@ -18,6 +18,9 @@ backend/auth_info_baileys/
 
 # Variáveis locais e credenciais sensíveis (NUNCA versionar)
 .env
+.env.*
+!.env.example
+!.env.*.example
 .env.local
 .env.*.local
 .env*.local
@@ -28,6 +31,12 @@ backend/auth_info_baileys/
 *.crt
 *.pfx
 *.p12
+*.cer
+*.jks
+*.keystore
+id_rsa
+id_ed25519
+*.secret
 
 # Logs & Diagnósticos
 *.log

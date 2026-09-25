@@ -19,7 +19,7 @@ services:
       # Chave de API Global para proteger a comunicação com o FinGo
       - GLOBAL_API_KEY=${EVOLUTION_GO_API_KEY:-fingo-evo-secret-change-me-in-production}
       # Banco de dados Neon / PostgreSQL para persistência segura de sessões e credenciais
-      # Exemplo Neon: postgresql://user:pass@ep-xyz.us-east-2.aws.neon.tech/neondb?sslmode=require
+      # Exemplo Neon: postgresql://USUARIO:SENHA@SEU_ENDPOINT.neon.tech/neondb?sslmode=require
       - POSTGRES_AUTH_DB=${POSTGRES_AUTH_DB:-postgresql://postgres:postgres@postgres:5432/evogo_auth?sslmode=disable}
       - POSTGRES_USERS_DB=${POSTGRES_USERS_DB:-postgresql://postgres:postgres@postgres:5432/evogo_users?sslmode=disable}
       # Desativa gravação de mensagens para manter o banco leve (foco exclusivo em sessões e envio)
@@ -34,12 +34,12 @@ services:
       - WEBHOOK_URL=${EVOLUTION_GO_WEBHOOK_URL:-http://host.docker.internal:3333/api/whatsapp?action=webhook}
       # Cache Redis & Queue (Upstash Redis TLS ou Redis dedicado)
       # Documentação oficial: https://docs.evolutionfoundation.com.br/evolution-api/requirements/redis
-      - CACHE_REDIS_ENABLED=${CACHE_REDIS_ENABLED:-true}
-      - CACHE_REDIS_URI=${CACHE_REDIS_URI:-rediss://default:gQAAAAAABI-XAAIgcDEwMGI1YWQ1Njk2OWU0MjQ3YjEzODk1ZmI2OGY5MjE2Yg@better-wallaby-298903.upstash.io:6379}
+      - CACHE_REDIS_ENABLED=${CACHE_REDIS_ENABLED:-false}
+      - CACHE_REDIS_URI=${CACHE_REDIS_URI:-}
       - CACHE_REDIS_PREFIX_KEY=${CACHE_REDIS_PREFIX_KEY:-evolution_fingo}
       - CACHE_REDIS_SAVE_INSTANCES=${CACHE_REDIS_SAVE_INSTANCES:-false}
       - CACHE_LOCAL_ENABLED=${CACHE_LOCAL_ENABLED:-false}
-      - REDIS_URL=${REDIS_URL:-rediss://default:gQAAAAAABI-XAAIgcDEwMGI1YWQ1Njk2OWU0MjQ3YjEzODk1ZmI2OGY5MjE2Yg@better-wallaby-298903.upstash.io:6379}
+      - REDIS_URL=${REDIS_URL:-}
     networks:
       - fingo-network
 

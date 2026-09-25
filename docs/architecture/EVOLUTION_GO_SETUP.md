@@ -138,7 +138,7 @@ Conforme a [Documentação Oficial do Evolution Foundation sobre Redis](https://
 CACHE_REDIS_ENABLED=true
 
 # URI TLS com autenticação (Upstash exige rediss:// ou --tls na porta 6379)
-CACHE_REDIS_URI=rediss://default:gQAAAAAABI-XAAIgcDEwMGI1YWQ1Njk2OWU0MjQ3YjEzODk1ZmI2OGY5MjE2Yg@better-wallaby-298903.upstash.io:6379
+CACHE_REDIS_URI=rediss://default:SEU_TOKEN_UPSTASH@better-wallaby-298903.upstash.io:6379
 
 # Prefixo de chave para segregação no Redis compartilhado
 CACHE_REDIS_PREFIX_KEY=evolution_fingo
@@ -150,7 +150,7 @@ CACHE_REDIS_SAVE_INSTANCES=false
 CACHE_LOCAL_ENABLED=false
 
 # URI compatível com clientes Go/Queue
-REDIS_URL=rediss://default:gQAAAAAABI-XAAIgcDEwMGI1YWQ1Njk2OWU0MjQ3YjEzODk1ZmI2OGY5MjE2Yg@better-wallaby-298903.upstash.io:6379
+REDIS_URL=rediss://default:SEU_TOKEN_UPSTASH@better-wallaby-298903.upstash.io:6379
 ```
 
 ### Upstash Redis REST no FinGo (Edge & Backend):
