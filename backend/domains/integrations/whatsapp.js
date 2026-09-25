@@ -70,12 +70,19 @@ export default async function handler(req, res) {
   const internalSecret = getInternalApiSecret();
   const tenantId = auth.tenantId || 'public';
 
+  const requestId = String(req.headers?.['x-request-id'] || req.id || '').trim();
+
   const authHeaders = {
     'Accept': 'application/json',
     'Content-Type': 'application/json',
     'User-Agent': 'FinObra-WhatsApp-Proxy/1.0',
     'x-tenant-id': tenantId
   };
+
+  if (requestId) {
+    authHeaders['x-request-id'] = requestId;
+    res.setHeader?.('x-request-id', requestId);
+  }
 
   if (internalSecret) {
     authHeaders['Authorization'] = `Bearer ${internalSecret}`;

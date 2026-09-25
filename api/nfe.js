@@ -7,6 +7,7 @@ import { createRuntimeSql } from './_database.js';
 import { createTenantSql } from './_tenant-sql.js';
 import { syncTenantDFe, getDFeStatus, listarDFeDocumentos, getDFeDocumentoXml } from './_sefaz-dfe.js';
 import certificadoHandler from './_certificado.js';
+import { getCachedReference, applySwrCacheHeaders, cepCacheKey } from './_reference-cache.js';
 
 const ALLOWED_ORIGINS = [
   'https://fingo.api.br',
@@ -93,53 +94,58 @@ export default async function handler(req, res) {
     }
 
     try {
-      let data = null;
-      // 1. Consulta primária via BrasilAPI
-      try {
-        const brResp = await fetch(`https://brasilapi.com.br/api/cep/v1/${cepLimpo}`, {
-          headers: { 'Accept': 'application/json', 'User-Agent': 'FinObra/1.0' },
-          signal: AbortSignal.timeout(5000)
-        });
-        if (brResp.ok) {
-          const brJson = await brResp.json().catch(() => null);
-          if (brJson && !brJson.errors) {
-            data = {
-              success: true,
-              cep: brJson.cep || cepLimpo,
-              logradouro: brJson.street || '',
-              bairro: brJson.neighborhood || '',
-              cidade: brJson.city || '',
-              uf: brJson.state || '',
-              provedor: 'brasilapi'
-            };
+      const cacheKey = cepCacheKey(cepLimpo);
+      const { data, fromCache } = await getCachedReference(req.env, cacheKey, async () => {
+        let fetchedData = null;
+        // 1. Consulta primária via BrasilAPI
+        try {
+          const brResp = await fetch(`https://brasilapi.com.br/api/cep/v1/${cepLimpo}`, {
+            headers: { 'Accept': 'application/json', 'User-Agent': 'FinObra/1.0' },
+            signal: AbortSignal.timeout(5000)
+          });
+          if (brResp.ok) {
+            const brJson = await brResp.json().catch(() => null);
+            if (brJson && !brJson.errors) {
+              fetchedData = {
+                success: true,
+                cep: brJson.cep || cepLimpo,
+                logradouro: brJson.street || '',
+                bairro: brJson.neighborhood || '',
+                cidade: brJson.city || '',
+                uf: brJson.state || '',
+                provedor: 'brasilapi'
+              };
+            }
           }
-        }
-      } catch {}
+        } catch {}
 
-      // 2. Fallback resiliente via ViaCEP
-      if (!data) {
-        const viaResp = await fetch(`https://viacep.com.br/ws/${cepLimpo}/json/`, {
-          headers: { 'Accept': 'application/json', 'User-Agent': 'FinObra/1.0' },
-          signal: AbortSignal.timeout(5000)
-        });
-        if (viaResp.ok) {
-          const viaJson = await viaResp.json().catch(() => null);
-          if (viaJson && !viaJson.erro) {
-            data = {
-              success: true,
-              cep: (viaJson.cep || cepLimpo).replace(/\D/g, ''),
-              logradouro: viaJson.logradouro || '',
-              bairro: viaJson.bairro || '',
-              cidade: viaJson.localidade || '',
-              uf: viaJson.uf || '',
-              ibge: viaJson.ibge || '',
-              provedor: 'viacep'
-            };
+        // 2. Fallback resiliente via ViaCEP
+        if (!fetchedData) {
+          const viaResp = await fetch(`https://viacep.com.br/ws/${cepLimpo}/json/`, {
+            headers: { 'Accept': 'application/json', 'User-Agent': 'FinObra/1.0' },
+            signal: AbortSignal.timeout(5000)
+          });
+          if (viaResp.ok) {
+            const viaJson = await viaResp.json().catch(() => null);
+            if (viaJson && !viaJson.erro) {
+              fetchedData = {
+                success: true,
+                cep: (viaJson.cep || cepLimpo).replace(/\D/g, ''),
+                logradouro: viaJson.logradouro || '',
+                bairro: viaJson.bairro || '',
+                cidade: viaJson.localidade || '',
+                uf: viaJson.uf || '',
+                ibge: viaJson.ibge || '',
+                provedor: 'viacep'
+              };
+            }
           }
         }
-      }
+        return fetchedData;
+      }, 86400);
 
       if (data) {
+        applySwrCacheHeaders(res, { isHit: fromCache, provider: 'REDIS' });
         return res.status(200).json(data);
       } else {
         return res.status(404).json({ success: false, error: 'CEP não encontrado nas bases de dados.' });

@@ -11,6 +11,9 @@ import path from 'path';
 import crypto from 'crypto';
 import { createSinapiRouter, initSinapiDatabase } from './sinapi_robot.js';
 import { evolutionGo } from './evolution_client.js';
+import { createGracefulShutdownManager } from './graceful_shutdown.js';
+import { requestIdMiddleware, createTaggedSql } from './traceability.js';
+import { createResilientNeon } from './neon_resilience.js';
 
 // Garantir link simbólico de ../node_modules -> ./node_modules para que os handlers em ../api/*.js resolvam dependências
 try {
@@ -55,6 +58,9 @@ console.error = (...args) => {
 };
 
 const app = express();
+app.use(requestIdMiddleware({ getSql: () => sql }));
+const shutdownManager = createGracefulShutdownManager({ timeoutMs: 10000, cron });
+app.use(shutdownManager.middleware());
 
 const ALLOWED_ORIGINS = [
   'https://fingo.api.br',
@@ -160,8 +166,8 @@ if (!rawDbUrl) {
   console.warn('⚠️ [Aviso] DATABASE_URL não configurada no ambiente. Configure no .env ou no painel do Render.');
 } else {
   try {
-    sql = neon(rawDbUrl);
-    console.log('✅ Cliente Neon PostgreSQL inicializado.');
+    sql = createResilientNeon(rawDbUrl, { statementTimeoutMs: 8000 });
+    console.log('✅ Cliente Neon PostgreSQL blindado inicializado (statement_timeout = 8s).');
   } catch (err) {
     console.error('❌ [Erro Neon] String de conexão inválida ou incompleta:', err.message);
   }
@@ -387,6 +393,17 @@ app.get('/health', async (req, res) => {
   }
   const healthy = Boolean(sql && dbOk);
   return res.status(healthy ? 200 : 503).json({ status: healthy ? 'healthy' : 'degraded' });
+});
+
+// 1.1.1 Health Probe dedicado do Evolution Go (Golang WhatsApp + Circuit Breaker)
+app.get('/health/evolution-go', async (req, res) => {
+  try {
+    const health = await evolutionGo.checkHealth();
+    const code = health.healthy ? 200 : (health.status === 'circuit_open' ? 503 : 502);
+    return res.status(code).json(health);
+  } catch (err) {
+    return res.status(500).json({ healthy: false, error: err.message, circuitState: evolutionGo.getCircuitState() });
+  }
 });
 
 // 1.2 Sessão Estruturada do WhatsApp por Tenant
@@ -721,10 +738,16 @@ app.post('/send-message', requireAuth, async (req, res) => {
       });
     }
 
+    if (evoResult.circuitOpen) {
+      console.warn(`⚡ [EvolutionGo:${tenantId}] Circuit Breaker ABERTO — Fast failover/contingência ativada.`);
+    }
+
     return res.status(evoResult.status || 502).json({
       error: evoResult.error || 'Falha ao despachar mensagem pelo Evolution Go.',
       tenantId,
       status: 'disconnected',
+      circuitOpen: Boolean(evoResult.circuitOpen),
+      fallbackActive: Boolean(evoResult.circuitOpen),
       hint: `Acesse /qr?tenant_id=${tenantId} para conectar o aparelho no Evolution Go.`
     });
   } catch (err) {
@@ -739,15 +762,17 @@ app.get('/test-neon', requireAuth, async (req, res) => {
     return res.status(503).json({ success: false, error: 'DATABASE_URL não configurada ou inválida no servidor.' });
   }
   try {
-    const result = await sql`SELECT version(), CURRENT_TIMESTAMP as agora;`;
+    const querySql = req.sql || sql;
+    const result = await querySql`SELECT version(), CURRENT_TIMESTAMP as agora;`;
     const [obras, lancamentos, whatsappAuth] = await Promise.all([
-      sql`SELECT COUNT(*) FROM obras;`,
-      sql`SELECT COUNT(*) FROM lancamentos;`,
-      sql`SELECT COUNT(*) FROM tenant_whatsapp_auth;`
+      querySql`SELECT COUNT(*) FROM obras;`,
+      querySql`SELECT COUNT(*) FROM lancamentos;`,
+      querySql`SELECT COUNT(*) FROM tenant_whatsapp_auth;`
     ]);
 
     return res.json({
       success: true,
+      req_id: req.id,
       postgres_version: result[0]?.version,
       agora: result[0]?.agora,
       total_obras: Number(obras[0]?.count || 0),
@@ -1469,8 +1494,7 @@ app.all('/api/send-whatsapp', (req, res, next) => {
   next();
 }, apiRoute(() => whatsappApiHandler));
 
-// ── INICIALIZAÇÃO DO SERVIDOR ────────────────────────────────────────────────
-app.listen(PORT, () => {
+const server = app.listen(PORT, () => {
   console.log(`\n======================================================`);
   console.log(`🚀 SERVIDOR FINOBRA 24/7 MULTI-TENANT NA PORTA ${PORT}`);
   console.log(`👉 Status: http://localhost:${PORT}/status`);
@@ -1478,3 +1502,11 @@ app.listen(PORT, () => {
   console.log(`👉 Teste Neon: http://localhost:${PORT}/test-neon`);
   console.log(`======================================================\n`);
 });
+
+shutdownManager.setServer(server);
+
+// ── INTERCEPTAÇÃO DE SINAIS SIGTERM / SIGINT (RENDER / DOCKER) ─────────────
+process.on('SIGTERM', () => shutdownManager.shutdown('SIGTERM'));
+process.on('SIGINT', () => shutdownManager.shutdown('SIGINT'));
+
+export { app, server, shutdownManager };

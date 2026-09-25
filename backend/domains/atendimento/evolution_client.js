@@ -6,7 +6,137 @@ export class EvolutionGoClient {
   constructor(options = {}) {
     this.baseUrl = (options.baseUrl || process.env.EVOLUTION_GO_URL || 'http://localhost:8085').replace(/\/+$/, '');
     this.apiKey = options.apiKey || process.env.EVOLUTION_GO_API_KEY || '';
-    this.timeoutMs = Number(options.timeoutMs || process.env.EVOLUTION_GO_TIMEOUT_MS || 12000);
+    // Teto de timeout HTTP configurável (padrão 2.5s para evitar congelamento de UI)
+    this.timeoutMs = Number(options.timeoutMs || process.env.EVOLUTION_GO_TIMEOUT_MS || 2500);
+
+    // Circuit Breaker (Disjuntor de Rede): CLOSED -> OPEN -> HALF_OPEN
+    this.failureThreshold = Number(options.failureThreshold || 3);
+    this.cooldownMs = Number(options.cooldownMs || 30000); // 30s
+    this.circuitState = 'CLOSED';
+    this.consecutiveFailures = 0;
+    this.lastFailureTime = 0;
+    this.lastStateChange = Date.now();
+    this.contingencyHandler = typeof options.contingencyHandler === 'function' ? options.contingencyHandler : null;
+  }
+
+  /**
+   * Registra handler customizado de contingência a ser acionado com o circuito aberto
+   */
+  setContingencyHandler(fn) {
+    this.contingencyHandler = typeof fn === 'function' ? fn : null;
+  }
+
+  /**
+   * Retorna o estado atual do disjuntor avaliando o período de cooldown
+   */
+  getCircuitState() {
+    if (this.circuitState === 'OPEN') {
+      const elapsed = Date.now() - this.lastFailureTime;
+      if (elapsed >= this.cooldownMs) {
+        this.circuitState = 'HALF_OPEN';
+        this.lastStateChange = Date.now();
+      }
+    }
+    return this.circuitState;
+  }
+
+  /**
+   * Verifica se o disjuntor está em estado ABERTO (tráfego barrado/contingência)
+   */
+  isCircuitOpen() {
+    return this.getCircuitState() === 'OPEN';
+  }
+
+  /**
+   * Registra sucesso de requisição, fechando o circuito se estiver em HALF_OPEN
+   */
+  recordSuccess() {
+    if (this.circuitState === 'HALF_OPEN' || this.consecutiveFailures > 0) {
+      this.circuitState = 'CLOSED';
+      this.consecutiveFailures = 0;
+      this.lastStateChange = Date.now();
+    }
+  }
+
+  /**
+   * Registra falha de rede/timeout/5xx, abrindo o circuito ao atingir o limiar
+   */
+  recordFailure(reason = '') {
+    this.consecutiveFailures += 1;
+    this.lastFailureTime = Date.now();
+
+    if (this.circuitState === 'HALF_OPEN' || this.consecutiveFailures >= this.failureThreshold) {
+      this.circuitState = 'OPEN';
+      this.lastStateChange = Date.now();
+    }
+  }
+
+  /**
+   * Restaura o disjuntor para o estado fechado
+   */
+  resetCircuit() {
+    this.circuitState = 'CLOSED';
+    this.consecutiveFailures = 0;
+    this.lastFailureTime = 0;
+    this.lastStateChange = Date.now();
+  }
+
+  /**
+   * Força a abertura do disjuntor (para testes e contingências emergenciais)
+   */
+  tripCircuit() {
+    this.circuitState = 'OPEN';
+    this.consecutiveFailures = this.failureThreshold;
+    this.lastFailureTime = Date.now();
+    this.lastStateChange = Date.now();
+  }
+
+  /**
+   * Sonda a saúde do container Evolution Go com latência e status do circuito
+   */
+  async checkHealth() {
+    if (!this.isConfigured()) {
+      return {
+        healthy: false,
+        status: 'unconfigured',
+        circuitState: this.getCircuitState(),
+        latencyMs: 0,
+        error: 'Evolution Go não configurado (URL ou API Key ausente).'
+      };
+    }
+
+    if (this.isCircuitOpen()) {
+      return {
+        healthy: false,
+        status: 'circuit_open',
+        circuitState: 'OPEN',
+        latencyMs: 0,
+        error: 'Circuit Breaker aberto: Evolution Go indisponível ou oscilando.'
+      };
+    }
+
+    const start = Date.now();
+    try {
+      const res = await this.request('/health', { timeoutMs: 2500 });
+      const latencyMs = Date.now() - start;
+      const healthy = Boolean(res.ok || res.status === 200);
+      return {
+        healthy,
+        status: healthy ? 'healthy' : 'degraded',
+        circuitState: this.getCircuitState(),
+        latencyMs,
+        statusCode: res.status,
+        error: healthy ? null : (res.error || `HTTP ${res.status}`)
+      };
+    } catch (err) {
+      return {
+        healthy: false,
+        status: 'unhealthy',
+        circuitState: this.getCircuitState(),
+        latencyMs: Date.now() - start,
+        error: err.message
+      };
+    }
   }
 
   /**
@@ -44,11 +174,45 @@ export class EvolutionGoClient {
   }
 
   /**
-   * Executa requisições HTTP seguras contra a API do Evolution Go
+   * Executa requisições HTTP seguras contra a API do Evolution Go com proteção de Circuit Breaker
    */
   async request(path, options = {}) {
     if (!this.isConfigured()) {
       return { ok: false, status: 503, error: 'Evolution Go não configurado (URL ou API Key ausente).' };
+    }
+
+    // ── GATING DO CIRCUIT BREAKER ───────────────────────────────────────────
+    if (this.isCircuitOpen()) {
+      if (this.contingencyHandler) {
+        try {
+          const contingencyResult = await this.contingencyHandler(path, options);
+          return {
+            ...contingencyResult,
+            circuitOpen: true,
+            circuitState: 'OPEN',
+            contingencyUsed: true
+          };
+        } catch (contingencyErr) {
+          return {
+            ok: false,
+            status: 503,
+            circuitOpen: true,
+            circuitState: 'OPEN',
+            contingencyUsed: true,
+            error: `Falha no motor de contingência: ${contingencyErr.message}`
+          };
+        }
+      }
+
+      return {
+        ok: false,
+        status: 503,
+        circuitOpen: true,
+        circuitState: 'OPEN',
+        fallback: true,
+        data: null,
+        error: 'Circuit Breaker aberto: Evolution Go indisponível ou oscilando. Chaveado para contingência.'
+      };
     }
 
     const url = `${this.baseUrl}${path.startsWith('/') ? path : '/' + path}`;
@@ -59,8 +223,9 @@ export class EvolutionGoClient {
       ...(options.headers || {})
     };
 
+    const effectiveTimeout = Number(options.timeoutMs || this.timeoutMs || 2500);
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), options.timeoutMs || this.timeoutMs);
+    const timeout = setTimeout(() => controller.abort(), effectiveTimeout);
 
     try {
       const response = await fetch(url, {
@@ -72,18 +237,38 @@ export class EvolutionGoClient {
 
       clearTimeout(timeout);
       const data = await response.json().catch(() => ({}));
+
+      if (response.ok) {
+        this.recordSuccess();
+        return {
+          ok: true,
+          status: response.status,
+          circuitState: this.getCircuitState(),
+          data,
+          error: null
+        };
+      }
+
+      // Falhas 5xx do servidor indicam oscilação ou quebra do container
+      if (response.status >= 500) {
+        this.recordFailure(`HTTP ${response.status}`);
+      }
+
       return {
-        ok: response.ok,
+        ok: false,
         status: response.status,
+        circuitState: this.getCircuitState(),
         data,
         error: !response.ok ? (data.message || data.error || `HTTP ${response.status}`) : null
       };
     } catch (err) {
       clearTimeout(timeout);
-      const isAbort = err.name === 'AbortError';
+      this.recordFailure(err.message);
+      const isAbort = err.name === 'AbortError' || err.name === 'TimeoutError';
       return {
         ok: false,
         status: isAbort ? 504 : 502,
+        circuitState: this.getCircuitState(),
         data: null,
         error: isAbort ? 'Tempo limite esgotado ao contatar o Evolution Go.' : `Falha de rede no Evolution Go: ${err.message}`
       };

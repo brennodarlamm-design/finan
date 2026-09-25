@@ -289,7 +289,7 @@ export default async function handler(req, res) {
       }
 
       if (table === 'sinapi') {
-        return await handleSinapiQuery(sql, req.query, res);
+        return await handleSinapiQuery(sql, req.query, res, req.env);
       }
 
       // Consultas individuais filtradas e paginadas:

@@ -14,6 +14,7 @@ import whatsappHandler from './whatsapp.js';
 import auditHandler from './audit.js';
 import reconhecerHandler from './reconhecer-documento.js';
 import { resolveV2Route } from './_v2-routes.js';
+import crypto from 'crypto';
 
 const HANDLERS = {
   auth: authHandler,
@@ -192,11 +193,16 @@ export async function executeEdgeApi(request, env) {
   headers['cf-connecting-ip'] = headers['cf-connecting-ip'] || cfIp;
   headers['cf-ray'] = headers['cf-ray'] || request.headers.get('cf-ray') || '';
 
+  // Rastreabilidade Distribuída: Garante geração e propagação de X-Request-Id (UUIDv4)
+  const incomingReqId = request.headers.get('x-request-id') || headers['x-request-id'] || crypto.randomUUID();
+  headers['x-request-id'] = incomingReqId;
+
   // Objeto req compatível com Vercel/Express
   const req = {
     method,
     url: url.pathname + url.search,
     headers,
+    id: incomingReqId,
     query,
     cookies,
     body,
@@ -209,13 +215,16 @@ export async function executeEdgeApi(request, env) {
     const responseHeaders = new Headers();
     let finished = false;
 
-    // SEC-EDGE-06: Aplica cabeçalhos defensivos globais de API
+    // SEC-EDGE-06: Aplica cabeçalhos defensivos globais de API e rastreabilidade distribuída
     function ensureSecurityHeaders() {
       if (!responseHeaders.has('strict-transport-security')) {
         responseHeaders.set('strict-transport-security', 'max-age=31536000; includeSubDomains');
       }
       if (!responseHeaders.has('x-content-type-options')) {
         responseHeaders.set('x-content-type-options', 'nosniff');
+      }
+      if (!responseHeaders.has('x-request-id')) {
+        responseHeaders.set('x-request-id', incomingReqId);
       }
     }
 
