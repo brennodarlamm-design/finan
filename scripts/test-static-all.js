@@ -80,6 +80,7 @@ const tests = [
   'scripts/test-master-improvement.js',
   'scripts/test-master-isolation.js',
   'scripts/test-sentry-integration.js',
+  'scripts/test-tenant-cache.js',
   'scripts/test-segmentation-agenda.js',
   'scripts/test-sync-optimization.js',
   'scripts/test-storage-reliability.js',
@@ -143,7 +144,8 @@ const p50NativeSourceTests = new Set([
   'scripts/test-legal-cookie-banner.js',
   'scripts/test-evolutionary-pillars.js',
   'scripts/test-master-isolation.js',
-  'scripts/test-sentry-integration.js'
+  'scripts/test-sentry-integration.js',
+  'scripts/test-tenant-cache.js'
 ]);
 const preload = path.resolve('scripts/test-api-wrapper-preload.cjs');
 
