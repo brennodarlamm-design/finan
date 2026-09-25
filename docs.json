@@ -1,0 +1,31 @@
+{
+  "$schema": "https://context7.com/schema/docs7.json",
+  "name": "FinGo Docs",
+  "colors": {
+    "primary": "#C6FF00"
+  },
+  "navigation": {
+    "groups": [
+      {
+        "group": "Visão Geral",
+        "pages": ["docs/index"]
+      },
+      {
+        "group": "Infraestrutura & Mensageria",
+        "pages": ["docs/evolution-go"]
+      },
+      {
+        "group": "Arquitetura do Sistema",
+        "pages": ["docs/architecture"]
+      },
+      {
+        "group": "Segurança & Governança",
+        "pages": ["docs/security"]
+      },
+      {
+        "group": "Engenharia & Performance",
+        "pages": ["docs/performance"]
+      }
+    ]
+  }
+}

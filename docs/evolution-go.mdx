@@ -1,0 +1,54 @@
+---
+title: Evolution Go & Upstash Redis
+description: Arquitetura de mensageria em Golang e cache distribuído para o FinGo
+---
+
+# Evolution Go & Upstash Redis
+
+O FinGo utiliza o **Evolution Go** como motor principal de WhatsApp, combinado com **Upstash Redis TLS** para caching e mensageria distribuída.
+
+---
+
+## ⚡ Por que Golang & whatsmeow?
+
+A migração do Baileys (Node.js) para o **Evolution Go (Golang)** proporcionou:
+
+- **Redução de ~90% no Consumo de RAM:** De 500 MB para apenas ~40 MB.
+- **Persistência Transacional no PostgreSQL (Neon):** As chaves de sessão são armazenadas no banco relacional (`POSTGRES_AUTH_DB`), evitando desconexões ao reiniciar o container.
+- **Eliminação de Erros de Bad MAC:** O `whatsmeow` realiza gerenciamento criptográfico Signal de baixo nível.
+
+---
+
+## 🚀 Configuração do Upstash Redis
+
+O Redis é utilizado pela Evolution Foundation para aceleração de instâncias e filas de mensagens.
+
+```env
+# Cache Redis Oficial Evolution
+CACHE_REDIS_ENABLED=true
+CACHE_REDIS_URI=rediss://default:gQAAAAAABI-XAAIgcDEwMGI1YWQ1Njk2OWU0MjQ3YjEzODk1ZmI2OGY5MjE2Yg@better-wallaby-298903.upstash.io:6379
+CACHE_REDIS_PREFIX_KEY=evolution_fingo
+CACHE_REDIS_SAVE_INSTANCES=false
+CACHE_LOCAL_ENABLED=false
+REDIS_URL=rediss://default:gQAAAAAABI-XAAIgcDEwMGI1YWQ1Njk2OWU0MjQ3YjEzODk1ZmI2OGY5MjE2Yg@better-wallaby-298903.upstash.io:6379
+
+# Credenciais Upstash Redis REST (Edge Functions & Backend)
+UPSTASH_REDIS_REST_URL=https://better-wallaby-298903.upstash.io
+UPSTASH_REDIS_REST_TOKEN=gQAAAAAABI-XAAIgcDEwMGI1YWQ1Njk2OWU0MjQ3YjEzODk1ZmI2OGY5MjE2Yg
+```
+
+---
+
+## 🐳 Executando com Docker Compose
+
+Suba o container com:
+
+```bash
+docker compose -f docker-compose.evolution-go.yml up -d
+```
+
+Verifique a integridade do serviço:
+
+```bash
+curl http://localhost:8085/
+```

@@ -1,0 +1,26 @@
+---
+title: Segurança & Governança
+description: Camadas de Defesa em Profundidade, Fail2Ban, Zero Trust e Criptografia
+---
+
+# Segurança & Governança
+
+O FinGo adota o modelo de **Defesa em Profundidade** cobrindo a borda, o servidor e o banco de dados.
+
+---
+
+## 🛡️ Controles de Segurança
+
+1. **Fail2Ban Global na Borda:**
+   - Monitora tentativas incorretas de autenticação por IP.
+   - Aplica banimento automático no 5º erro consecutivo por 30 minutos via KV/Redis.
+
+2. **Isolamento de Tenants (RLS):**
+   - Todas as tabelas críticas possuem `tenant_id` e políticas ativas de **Row Level Security** no PostgreSQL Neon.
+   - Um tenant nunca acessa ou altera dados de outra construtora.
+
+3. **Autenticação com Chave da Empresa (Company Access Key):**
+   - Chave de segurança de 6 dígitos protegida por **HMAC-SHA256** com Pepper exclusivo de servidor.
+
+4. **Trilha Imutável de Auditoria (Audit Ledger):**
+   - Registro encadeado com hash **SHA-256** de todas as operações sensíveis (criação de obras, aprovação de medições e baixas financeiras).

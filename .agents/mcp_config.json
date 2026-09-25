@@ -6,6 +6,13 @@
         "Authorization": "Bearer ${UPSTASH_API_KEY}"
       },
       "description": "Upstash Remote MCP Server para gerenciamento e consulta de recursos Upstash (Redis, QStash, Vector, Workflow)"
+    },
+    "context7": {
+      "url": "https://mcp.context7.com/mcp",
+      "headers": {
+        "Authorization": "Bearer ${CONTEXT7_API_KEY}"
+      },
+      "description": "Context7 Remote MCP Server para consulta em tempo real de documentações e bibliotecas"
     }
   }
 }

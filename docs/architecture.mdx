@@ -1,0 +1,43 @@
+---
+title: Arquitetura do Sistema
+description: Monólito Modular, Bounded Contexts e Topologia de Infraestrutura do FinGo
+---
+
+# Arquitetura do Sistema
+
+O FinGo foi modelado para balancear **alta velocidade de desenvolvimento**, **performance de borda (<10ms)** e **isolamento estrito multi-tenant**.
+
+---
+
+## 🏛️ Topologia de Três Camadas
+
+```mermaid
+graph TD
+    Client[Navegador do Cliente / PWA] -->|HTTPS / WAF| Cloudflare[Cloudflare Pages & Workers]
+    Cloudflare -->|Cache L1 / L2| Redis[Upstash Redis REST]
+    Cloudflare -->|Queries & Sync| Neon[(Neon Serverless PostgreSQL)]
+    Render[Backend Render 24/7] -->|Orquestração| EvolutionGo[Container Evolution Go]
+    EvolutionGo -->|Sessões & Auth| Neon
+    EvolutionGo -->|Cache & Filas| Redis
+    EvolutionGo -->|Webhooks| Cloudflare
+```
+
+---
+
+## 🧩 Bounded Contexts do Monólito Modular
+
+1. **Atendimento & Notificações (`/whatsapp`):**
+   - Gestão de sessões por tenant.
+   - Envio automático de relatórios, cobranças e alertas de vencimento.
+
+2. **Engenharia & Obras (`/obras`):**
+   - Diário de Obras, Boletim de Medição e Curva S.
+   - Cronograma físico-financeiro com índice SPI/CPI.
+
+3. **Orçamentação Técnica (`/sinapi`):**
+   - Catálogo oficial da Caixa Econômica Federal.
+   - Cálculo automático de BDI conforme acórdão do TCU e Leis Sociais.
+
+4. **Financeiro & Conciliação (`/financeiro`):**
+   - Lançamentos de despesas e receitas por centro de custo de obra.
+   - Importação e conciliação bancária via OFX e PIX.

@@ -1,0 +1,43 @@
+---
+title: Visão Geral do FinGo
+description: SaaS de Gestão Financeira, Operacional e Engenharia para Construtoras
+---
+
+# Bem-vindo ao FinGo
+
+O **FinGo** é a plataforma SaaS de referência para gestão financeira, orçamentação técnica (SINAPI), boletins de medição e automação de atendimento via WhatsApp desenhada exclusivamente para construtoras e incorporadoras.
+
+---
+
+## 🏗️ Pilares da Arquitetura
+
+O sistema é construído sobre uma arquitetura moderna de **Monólito Modular** com aceleração na borda global:
+
+1. **Frontend SPA Vanilla & Ultra-Rápido:**
+   - Zero dependências pesadas de framework para carregamento instantâneo.
+   - Design System **Brutalist Tech** com paleta neon-industrial (`#C6FF00`).
+   - Política de Segurança de Conteúdo (CSP) estrita com event bridge declarativo.
+   - Suporte completo a operação offline com sincronização bidirecional via **IndexedDB**.
+
+2. **Borda Global Serverless (Cloudflare Pages & Workers):**
+   - Roteamento e APIs Edge em `/api/*` com latência sub-10ms.
+   - Cache distribuído multinível (L1 em memória + L2 no **Upstash Redis**).
+   - Bloqueio automatizado de força bruta com **Fail2Ban distribuído**.
+
+3. **Banco de Dados Relacional Serverless (Neon PostgreSQL):**
+   - Isolamento multi-tenant estrito com **Row Level Security (RLS)**.
+   - Modelagem transacional segura para lançamentos, contratos, fornecedores e medições.
+
+4. **Motor de Mensageria Corporativo (Evolution Go):**
+   - Motor em **Golang** de alto desempenho com biblioteca `whatsmeow`.
+   - Persistência nativa de sessões no PostgreSQL sem perda de credenciais.
+   - Cache de instâncias e deduplicação de mensagens através de **Upstash Redis TLS**.
+
+---
+
+## 📚 Navegação da Documentação
+
+- [**Infraestrutura & Mensageria**](/evolution-go): Instalação, Docker e variáveis de ambiente do Evolution Go e Upstash Redis.
+- [**Arquitetura do Sistema**](/architecture): Bounded contexts, monólito modular e fluxo de dados.
+- [**Segurança & Governança**](/security): Autenticação com chave da empresa, auditoria criptográfica e WAF.
+- [**Engenharia & Performance**](/performance): Curva ABC, Curva S, BDI oficial e tabela SINAPI da Caixa.

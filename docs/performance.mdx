@@ -1,0 +1,27 @@
+---
+title: Engenharia & Performance
+description: Orçamentação SINAPI, Curvas ABC/S e Otimizações de Latência do FinGo
+---
+
+# Engenharia & Performance
+
+O FinGo foi otimizado para operações pesadas da construção civil mantendo tempo de resposta instantâneo.
+
+---
+
+## 📊 Orçamento Técnico & SINAPI
+
+- **Snapshot Oficial Caixa Econômica Federal:** Base atualizada com composições analíticas e sintéticas.
+- **Curva ABC (Pareto):** Classificação automática em Classe A (80% do valor), Classe B (15%) e Classe C (5%).
+- **Curva S Físico-Financeira:** Acompanhamento de avanço real versus previsto com cálculo de Earned Value Management (EVM).
+
+---
+
+## ⚡ Budgets de Latência
+
+| Camada | Alvo de Latência | Tecnologia |
+| :--- | :--- | :--- |
+| **Cache L1** | < 0.5 ms | Memória Local do Isolate / V8 |
+| **Cache L2** | < 15 ms | Upstash Redis REST / Cloudflare KV |
+| **Borda Global** | < 30 ms | Cloudflare Pages & Workers |
+| **Banco Central** | < 80 ms | Neon Serverless PostgreSQL (US-East) |
