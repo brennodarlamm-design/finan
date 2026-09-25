@@ -71,7 +71,7 @@ async function executarLoginMaster(e) {
   showMasterError('');
 
   // Valida credenciais com o servidor de autenticação seguro (Neon / scrypt / TOTP)
-  const loginRes = await Auth.login(uInput, pInput, true);
+  const loginRes = await Auth.login(uInput, pInput, true, { portal: 'master' });
 
   // Caso 1: MFA obrigatório mas ainda não configurado (primeiro acesso superadmin)
   if (loginRes.mfa_setup_required && loginRes.mfa_token) {
@@ -96,9 +96,13 @@ async function executarLoginMaster(e) {
     showMasterError('');
     verificarSessaoMaster();
   } else {
+    let msg = loginRes.message || 'Usuário ou senha incorretos.';
+    if (!loginRes.success && (msg.includes('Chave da Empresa') || msg.includes('chave da empresa'))) {
+      msg = 'Acesso negado. Este portal é restrito exclusivamente ao Superadministrador da plataforma FinGo.';
+    }
     showMasterError(loginRes.success
       ? 'Acesso negado. Apenas o Super Administrador da plataforma FinGo pode acessar este portal.'
-      : (loginRes.message || 'Usuário ou senha incorretos.'));
+      : msg);
   }
 }
 

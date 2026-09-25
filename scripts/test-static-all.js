@@ -78,6 +78,7 @@ const tests = [
   'scripts/test-phase4-neon-resilience.js',
   'scripts/test-phase5-edge-swr-cache.js',
   'scripts/test-master-improvement.js',
+  'scripts/test-master-isolation.js',
   'scripts/test-segmentation-agenda.js',
   'scripts/test-sync-optimization.js',
   'scripts/test-storage-reliability.js',
@@ -139,7 +140,8 @@ const p50NativeSourceTests = new Set([
   'scripts/test-edge-v2-routes.js',
   'scripts/test-bug-hunter-reaudit-fixes.js',
   'scripts/test-legal-cookie-banner.js',
-  'scripts/test-evolutionary-pillars.js'
+  'scripts/test-evolutionary-pillars.js',
+  'scripts/test-master-isolation.js'
 ]);
 const preload = path.resolve('scripts/test-api-wrapper-preload.cjs');
 

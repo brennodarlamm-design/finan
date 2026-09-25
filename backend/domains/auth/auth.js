@@ -314,9 +314,11 @@ export default async function handler(req, res) {
         remember,
         company_key,
         access_key,
-        accessKey
+        accessKey,
+        portal
       } = req.body || {};
 
+      const isMasterPortal = portal === 'master' || req.headers['x-portal'] === 'master';
       const companyKey = String(access_key || company_key || accessKey || '').trim();
 
       if (!username || !password) {
@@ -385,6 +387,14 @@ export default async function handler(req, res) {
         // Conta Master encontrada — segue pelo pipeline existente (senha + MFA)
         rows = masterRows;
       } else {
+        // Se a requisição veio especificamente do Portal Master ou declarou portal: 'master'
+        if (isMasterPortal) {
+          return res.status(403).json({
+            success: false,
+            message: 'Acesso negado. Este portal é restrito exclusivamente ao Superadministrador da plataforma FinGo.'
+          });
+        }
+
         // ── Fluxo empresarial: Chave da Empresa obrigatória ───────────────────
         if (!companyKey) {
           return res.status(400).json({
@@ -414,6 +424,13 @@ export default async function handler(req, res) {
           return res.status(401).json({
             success: false,
             message: 'Credenciais de acesso inválidas.'
+          });
+        }
+
+        if (isMasterPortal) {
+          return res.status(403).json({
+            success: false,
+            message: 'Acesso negado. Este portal é restrito exclusivamente ao Superadministrador da plataforma FinGo.'
           });
         }
 
