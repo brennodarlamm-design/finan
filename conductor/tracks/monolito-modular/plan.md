@@ -31,8 +31,8 @@
 - [x] Criar suíte de testes de conformidade arquitetural do monólito modular (`scripts/test-monolito-modular.js`).
 
 ### Fase 3: Validação, Testes e Deploy
-- [ ] Executar `npm test` para garantir conformidade estática total.
-- [ ] Commit semântico seguindo a convenção do projeto.
-- [ ] Push para `origin/main`.
-- [ ] Build e Deploy no Cloudflare Pages.
-- [ ] Deploy no Render.
+- [x] Executar `npm test` para garantir conformidade estática total (116/116 testes aprovados).
+- [x] Commit semântico seguindo a convenção do projeto (`72808b8`).
+- [x] Push para `origin/main` (disparando CI/CD e Pages deployment).
+- [x] Build de distribuição Cloudflare Pages validado (`dist/` e `.marketing-dist/` sanitizados).
+- [x] Deploy no Render disparado com sucesso (`dep-dardo23tqb8s73f3cang`).

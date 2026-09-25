@@ -11,10 +11,10 @@
 
 | Trilha | Status | Responsável | Início | Previsão | Descrição |
 | :--- | :--- | :--- | :--- | :--- | :--- |
-| **`monolito-modular`** | 🟢 **Em Execução** | Antigravity AI | 2026-09-24 | 2026-09-24 | Implementação do Monólito Modular com divisões assertivas: frontend, backend, marketing, shared e domínios de negócio com pontes de compatibilidade. |
-| **`modernizacao-master`** | 🟡 **Concluída / Em Manutenção** | Antigravity AI | 2026-09-15 | 2026-09-15 | Orquestração de skills, Conductor CDD, Design Agency-Grade, KPI Dashboard, Neon Egress e RESTful Security. |
+| **`relatorios-executivos-evidencias`** | 🟡 **Aguardando Início** | Antigravity AI | 2026-09-25 | 2026-09-25 | Patch 54: Fotos e evidências de campo anexadas por etapa do cronograma, PDF A4 executivo e alertas de SLA. |
+| **`monolito-modular`** | 🟢 **Concluída com Sucesso** | Antigravity AI | 2026-09-24 | 2026-09-25 | Monólito Modular: 81 módulos frontend canônicos (core e domains), fachadas unificadas em frontend/modules, paridade total com js/, páginas de marketing e testes automatizados. |
 
-- **Especificação Ativa**: [`conductor/tracks/monolito-modular/spec.md`](file:///d:/Projects/FINAN%C3%87AS/conductor/tracks/monolito-modular/spec.md)
+- **Especificação**: [`conductor/tracks/monolito-modular/spec.md`](file:///d:/Projects/FINAN%C3%87AS/conductor/tracks/monolito-modular/spec.md)
 - **Plano de Execução**: [`conductor/tracks/monolito-modular/plan.md`](file:///d:/Projects/FINAN%C3%87AS/conductor/tracks/monolito-modular/plan.md)
 
 ---
@@ -23,6 +23,8 @@
 
 | Trilha / Patch | Data | Resumo da Entrega | Status |
 | :--- | :--- | :--- | :--- |
+| **Monólito Modular** | 2026-09-25 | 81 módulos canônicos em frontend/core e frontend/domains, 11 fachadas em frontend/modules/, marketing/pages/ com paridade total, validador de sincronização e suíte test:monolito. | ✅ Concluído |
+| **Melhoria Infraestrutura** | 2026-09-25 | 5 fases de infra: WhatsApp Circuit Breaker, Render Graceful Shutdown, Tracing X-Request-Id, Neon Hardening e Cache SWR Edge. | ✅ Concluído |
 | **Patch 53** | 2026-09-15 | Integração ativa WhatsApp (Baileys), visões Kanban/Gantt de workflow, automação de avanço em cascata e histórico sanitizado. | ✅ Concluído |
 | **Patch 52** | 2026-09-15 | Central do Gestor, Painel Minhas Demandas, semáforo de SLAs, templates configuráveis de workflow por tipo de obra. | ✅ Concluído |
 | **Patch 51** | 2026-09-14 | Estrutura base de workflow de etapas, persistência no Neon PostgreSQL, vinculação de cargos e responsáveis. | ✅ Concluído |
