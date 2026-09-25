@@ -6,6 +6,11 @@ Este diretório centraliza a documentação técnica, manuais de arquitetura e h
 
 ## 📁 Estrutura de Documentação
 
+* **[Estrutura & Arquitetura](architecture/):**
+  * [`ESTRUTURA_DO_SISTEMA.md`](architecture/ESTRUTURA_DO_SISTEMA.md): Mapeamento completo e ponta a ponta da estrutura do sistema, topologia, camadas e domínios.
+  * [`MONOLITO_MODULAR.md`](architecture/MONOLITO_MODULAR.md): Arquitetura de Monólito Modular, Bounded Contexts e governança de código.
+* **[Segurança & Governança](security/):**
+  * [`docs/security/README.md`](security/README.md): Mapeamento completo de segurança, autenticação scrypt/JWT, multi-tenancy RLS, RBAC fail-closed, WAF de borda e criptografia.
 * **[Histórico de Patches & Migrações](history/):**
   * [`CLOUDFLARE_MIGRATION.md`](history/CLOUDFLARE_MIGRATION.md): Arquitetura de migração de edge computing para Cloudflare Workers e Pages com redundância Vercel.
   * [`DOMAIN_CUTOVER.md`](history/DOMAIN_CUTOVER.md): Procedimentos e gates de segurança para o cutover do domínio `fingo.api.br`.

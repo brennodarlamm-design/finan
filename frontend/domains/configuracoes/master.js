@@ -1419,6 +1419,80 @@ const MasterAdmin = {
           </div>
         </div>
 
+        <!-- Card Estrutura e Arquitetura do Sistema Ponta a Ponta -->
+        <div style="background:rgba(255,255,255,.02);border:1px solid rgba(198,255,0,.25);border-radius:14px;padding:22px;margin-top:20px;">
+          <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:16px;">
+            <div>
+              <div style="display:inline-flex;align-items:center;gap:8px;padding:3px 10px;border-radius:20px;background:rgba(198,255,0,0.12);border:1px solid rgba(198,255,0,0.3);font-size:0.75rem;font-weight:800;color:var(--accent);margin-bottom:8px;">
+                🔗 MAPA ARQUITETURAL &amp; SEGURANÇA PONTA A PONTA
+              </div>
+              <h3 style="font-size:1.15rem;font-weight:900;color:#fff;margin:0;">
+                🏗️ Estrutura e Governança do Ecossistema FinGo
+              </h3>
+              <p style="font-size:0.82rem;color:#94a3b8;margin:6px 0 0;line-height:1.5;max-width:800px;">
+                Visão técnica para engenharia e suporte DEV: topologia das 6 camadas, 8 domínios de negócio, garantias criptográficas e isolamento multi-tenant com PostgreSQL RLS.
+              </p>
+            </div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;">
+              <a href="/docs/architecture/ESTRUTURA_DO_SISTEMA.md" target="_blank" rel="noopener" class="btn-action" style="font-size:0.78rem;padding:6px 12px;">
+                <span>📖 Doc Estrutura</span>
+              </a>
+              <a href="/docs/security/README.md" target="_blank" rel="noopener" class="btn-action" style="font-size:0.78rem;padding:6px 12px;">
+                <span>🛡️ Doc Segurança</span>
+              </a>
+              <a href="/openapi.json" target="_blank" rel="noopener" class="btn-action" style="font-size:0.78rem;padding:6px 12px;">
+                <span>⚙️ OpenAPI 3.0</span>
+              </a>
+              <a href="/auth.md" target="_blank" rel="noopener" class="btn-action" style="font-size:0.78rem;padding:6px 12px;">
+                <span>🔐 Auth Spec</span>
+              </a>
+            </div>
+          </div>
+
+          <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(260px, 1fr));gap:14px;margin-bottom:18px;">
+            <div style="background:rgba(0,0,0,0.35);border:1px solid rgba(255,255,255,0.06);border-radius:10px;padding:14px;">
+              <div style="font-size:0.86rem;font-weight:800;color:#fff;margin-bottom:6px;display:flex;align-items:center;gap:6px;">
+                <span>🌐</span> 1. Borda Cloudflare
+              </div>
+              <div style="font-size:0.76rem;color:#94a3b8;line-height:1.5;">Worker Edge, Fail2Ban KV, WAF, CSP Estrita com Nonce e Storage R2.</div>
+            </div>
+            <div style="background:rgba(0,0,0,0.35);border:1px solid rgba(255,255,255,0.06);border-radius:10px;padding:14px;">
+              <div style="font-size:0.86rem;font-weight:800;color:#fff;margin-bottom:6px;display:flex;align-items:center;gap:6px;">
+                <span>💻</span> 2. Frontend Modular
+              </div>
+              <div style="font-size:0.76rem;color:#94a3b8;line-height:1.5;">SPA Vanilla ES6+, Barramento <code>data-fb-*</code>, IndexedDB e BIM 3D.</div>
+            </div>
+            <div style="background:rgba(0,0,0,0.35);border:1px solid rgba(255,255,255,0.06);border-radius:10px;padding:14px;">
+              <div style="font-size:0.86rem;font-weight:800;color:#fff;margin-bottom:6px;display:flex;align-items:center;gap:6px;">
+                <span>⚡</span> 3. APIs Serverless
+              </div>
+              <div style="font-size:0.76rem;color:#94a3b8;line-height:1.5;">12 Rotas Públicas com multiplexação interna, Cookie HttpOnly e RBAC.</div>
+            </div>
+            <div style="background:rgba(0,0,0,0.35);border:1px solid rgba(255,255,255,0.06);border-radius:10px;padding:14px;">
+              <div style="font-size:0.86rem;font-weight:800;color:#fff;margin-bottom:6px;display:flex;align-items:center;gap:6px;">
+                <span>🔄</span> 4. Retaguarda 24/7 Render
+              </div>
+              <div style="font-size:0.76rem;color:#94a3b8;line-height:1.5;">Container Docker, Baileys WhatsApp, Ingestão SINAPI 27 UFs e Cron.</div>
+            </div>
+            <div style="background:rgba(0,0,0,0.35);border:1px solid rgba(255,255,255,0.06);border-radius:10px;padding:14px;">
+              <div style="font-size:0.86rem;font-weight:800;color:#fff;margin-bottom:6px;display:flex;align-items:center;gap:6px;">
+                <span>🐘</span> 5. Neon PostgreSQL
+              </div>
+              <div style="font-size:0.76rem;color:#94a3b8;line-height:1.5;">FORCE RLS, role <code>finobra_app</code> (NOBYPASSRLS) e 32+ migrações.</div>
+            </div>
+            <div style="background:rgba(0,0,0,0.35);border:1px solid rgba(255,255,255,0.06);border-radius:10px;padding:14px;">
+              <div style="font-size:0.86rem;font-weight:800;color:#fff;margin-bottom:6px;display:flex;align-items:center;gap:6px;">
+                <span>📦</span> 6. Storage Cloudflare R2
+              </div>
+              <div style="font-size:0.76rem;color:#94a3b8;line-height:1.5;">Bucket privado <code>fingo-attachments</code> com validação de magic bytes.</div>
+            </div>
+          </div>
+
+          <div style="background:rgba(0,0,0,0.25);border:1px solid rgba(255,255,255,0.06);border-radius:8px;padding:12px;font-size:0.78rem;color:#cbd5e1;line-height:1.6;">
+            <strong style="color:var(--accent);">🧩 8 Domínios de Negócio:</strong> Fiscal (NF-e/SEFAZ/A1) &middot; Financeiro (Contas/Lançamentos/OFX/Pix) &middot; Obras (Cadastros/Medições/SLA/BIM) &middot; Suprimentos (Pré-compras/Cotações) &middot; Contratos (Assinador/R2) &middot; Atendimento (WhatsApp/FinBot) &middot; Gestão (Dashboard/Central) &middot; Configurações (Empresa/Usuários/Auditoria).
+          </div>
+        </div>
+
       </div>
     `;
   },
