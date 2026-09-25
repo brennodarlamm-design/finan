@@ -21,6 +21,7 @@
     "render:canal-lowerthird": "npm --prefix remotion run render:canal-lowerthird",
     "render:canal-thumb": "npm --prefix remotion run render:canal-thumb",
     "test": "node scripts/test-static-all.js",
+    "test:fast": "node scripts/test-static-parallel.js",
     "test:patch05": "node scripts/test-patch05-static.js",
     "test:patch06": "node scripts/test-patch06-static.js",
     "test:patch07": "node scripts/test-patch07-static.js",
