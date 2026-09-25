@@ -26,8 +26,9 @@
   - `atendimento/` (Suporte, Chat WhatsApp, Notificações)
   - `gestao/` (Dashboard, Central do Gestor, Minhas Demandas)
   - `auth/` (Login, Sessões, 2FA, RBAC)
-- [ ] Criar estrutura física em `frontend/modules/` e espelhar com pontes transparentes para `js/`.
-- [ ] Mapear páginas de marketing públicas em `marketing/pages/` garantindo cópia no build do Cloudflare.
+- [x] Criar estrutura física em `frontend/modules/` e espelhar com pontes transparentes para `js/` (81 módulos canônicos em `frontend/core` e `frontend/domains`, 11 fachadas em `frontend/modules/`, validador de paridade `scripts/sync-frontend-modules.js`).
+- [x] Mapear páginas de marketing públicas em `marketing/pages/` garantindo cópia no build do Cloudflare (`build-cloudflare-pages.cjs` e `build-marketing.js`).
+- [x] Criar suíte de testes de conformidade arquitetural do monólito modular (`scripts/test-monolito-modular.js`).
 
 ### Fase 3: Validação, Testes e Deploy
 - [ ] Executar `npm test` para garantir conformidade estática total.

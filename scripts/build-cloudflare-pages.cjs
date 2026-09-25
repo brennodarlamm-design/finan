@@ -22,6 +22,8 @@ const rootFiles = [
   'calculadora-bdi.html',
   'manuais.html',
   'blog.html',
+  'planos.html',
+  'sobre-nos.html',
   'version.json',
   'robots.txt',
   'sitemap.xml',
@@ -40,6 +42,12 @@ const rootFiles = [
 ];
 
 const directories = ['css', 'js', 'img', 'data', '.well-known'];
+
+function resolveSourceFile(file) {
+  const mktgPath = path.join(root, 'marketing', 'pages', file);
+  if (fs.existsSync(mktgPath)) return mktgPath;
+  return path.join(root, file);
+}
 
 function copyRequired(src, dst) {
   if (!fs.existsSync(src)) throw new Error(`Arquivo obrigatório ausente: ${path.relative(root, src)}`);
@@ -171,7 +179,7 @@ try {
 fs.rmSync(out, { recursive: true, force: true });
 fs.mkdirSync(out, { recursive: true });
 
-for (const file of rootFiles) copyRequired(path.join(root, file), path.join(out, file));
+for (const file of rootFiles) copyRequired(resolveSourceFile(file), path.join(out, file));
 for (const dir of directories) copyRequired(path.join(root, dir), path.join(out, dir));
 
 // Patch 37: a raiz pública é comercial; o login possui shell dedicado.

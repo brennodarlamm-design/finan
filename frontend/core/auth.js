@@ -108,6 +108,18 @@ const Auth = {
     } else {
       sessionStorage.setItem(this.SESSION_KEY, JSON.stringify(session));
     }
+
+    if (typeof window !== 'undefined' && window.Sentry && typeof window.Sentry.setUser === 'function') {
+      try {
+        window.Sentry.setUser({
+          id: session.userId,
+          username: session.username,
+          tenant_id: session.tenantId,
+          perfil: session.perfil
+        });
+      } catch {}
+    }
+
     return session;
   },
 
@@ -567,6 +579,10 @@ const Auth = {
     sessionStorage.removeItem(this.SESSION_KEY);
     this._purgeLegacyToken();
     sessionStorage.removeItem(this.IMPERSONATION_BACKUP_KEY);
+
+    if (typeof window !== 'undefined' && window.Sentry && typeof window.Sentry.setUser === 'function') {
+      try { window.Sentry.setUser(null); } catch {}
+    }
   },
 
   handleSessionExpired() {

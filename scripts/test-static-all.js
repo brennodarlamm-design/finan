@@ -81,6 +81,7 @@ const tests = [
   'scripts/test-master-isolation.js',
   'scripts/test-sentry-integration.js',
   'scripts/test-tenant-cache.js',
+  'scripts/test-monolito-modular.js',
   'scripts/test-segmentation-agenda.js',
   'scripts/test-sync-optimization.js',
   'scripts/test-storage-reliability.js',
@@ -145,7 +146,8 @@ const p50NativeSourceTests = new Set([
   'scripts/test-evolutionary-pillars.js',
   'scripts/test-master-isolation.js',
   'scripts/test-sentry-integration.js',
-  'scripts/test-tenant-cache.js'
+  'scripts/test-tenant-cache.js',
+  'scripts/test-monolito-modular.js'
 ]);
 const preload = path.resolve('scripts/test-api-wrapper-preload.cjs');
 
