@@ -7,15 +7,18 @@
 
 ---
 
-## 1. Trilha Ativa
+## 1. Trilha Ativa & Próximas Frentes (Patch 54)
 
 | Trilha | Status | Responsável | Início | Previsão | Descrição |
 | :--- | :--- | :--- | :--- | :--- | :--- |
-| **`relatorios-executivos-evidencias`** | 🟡 **Aguardando Início** | Antigravity AI | 2026-09-25 | 2026-09-25 | Patch 54: Fotos e evidências de campo anexadas por etapa do cronograma, PDF A4 executivo e alertas de SLA. |
-| **`monolito-modular`** | 🟢 **Concluída com Sucesso** | Antigravity AI | 2026-09-24 | 2026-09-25 | Monólito Modular: 81 módulos frontend canônicos (core e domains), fachadas unificadas em frontend/modules, paridade total com js/, páginas de marketing e testes automatizados. |
+| **`patch54-evidencias-campo`** | 🟡 **Pronto para Início** | Antigravity AI | 2026-09-25 | 2026-09-25 | **Patch 54.1**: Upload e anexo de fotos georreferenciadas e evidências de campo vinculadas a cada etapa do cronograma (R2 + Neon RLS). |
+| **`patch54-relatorios-executivos`** | 🟡 **Pronto para Início** | Antigravity AI | 2026-09-25 | 2026-09-25 | **Patch 54.2**: Geração de relatório executivo em PDF A4 de alta fidelidade e exportação multi-abas em Excel (.xlsx). |
+| **`patch54-alertas-matinais-sla`** | 🟡 **Pronto para Início** | Antigravity AI | 2026-09-25 | 2026-09-25 | **Patch 54.3**: Disparo automático matinal (07:30) de alertas consolidados em lote via WhatsApp (Evolution Go) e e-mail (Resend). |
 
-- **Especificação**: [`conductor/tracks/monolito-modular/spec.md`](file:///d:/Projects/FINAN%C3%87AS/conductor/tracks/monolito-modular/spec.md)
-- **Plano de Execução**: [`conductor/tracks/monolito-modular/plan.md`](file:///d:/Projects/FINAN%C3%87AS/conductor/tracks/monolito-modular/plan.md)
+### Documentos das Trilhas do Patch 54:
+1. **Evidências de Campo**: [`conductor/tracks/patch54-evidencias-campo/spec.md`](file:///d:/Projects/FINAN%C3%87AS/conductor/tracks/patch54-evidencias-campo/spec.md) | [`plan.md`](file:///d:/Projects/FINAN%C3%87AS/conductor/tracks/patch54-evidencias-campo/plan.md)
+2. **Relatórios Executivos**: [`conductor/tracks/patch54-relatorios-executivos/spec.md`](file:///d:/Projects/FINAN%C3%87AS/conductor/tracks/patch54-relatorios-executivos/spec.md) | [`plan.md`](file:///d:/Projects/FINAN%C3%87AS/conductor/tracks/patch54-relatorios-executivos/plan.md)
+3. **Alertas Matinais SLA**: [`conductor/tracks/patch54-alertas-matinais-sla/spec.md`](file:///d:/Projects/FINAN%C3%87AS/conductor/tracks/patch54-alertas-matinais-sla/spec.md) | [`plan.md`](file:///d:/Projects/FINAN%C3%87AS/conductor/tracks/patch54-alertas-matinais-sla/plan.md)
 
 ---
 
