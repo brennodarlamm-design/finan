@@ -551,7 +551,7 @@ export default async function handler(req, res) {
             newBackupCodes = backupRes.remainingHashedCodes;
           }
         } else if (totpCode) {
-          const { secret: decryptedSecret, isLegacy } = decryptMfaSecret(user.mfa_secret);
+          const { secret: decryptedSecret, isLegacy } = await decryptMfaSecret(user.mfa_secret);
           const totpRes = verifyTotpCode(decryptedSecret, totpCode, {
             lastUsedStep: user.mfa_last_used_step || 0
           });
@@ -559,7 +559,7 @@ export default async function handler(req, res) {
             mfaValid = true;
             newStep = totpRes.step;
             if (isLegacy && decryptedSecret) {
-              const reEncrypted = encryptMfaSecret(decryptedSecret);
+              const reEncrypted = await encryptMfaSecret(decryptedSecret);
               await sql`UPDATE usuarios SET mfa_secret = ${reEncrypted} WHERE id = ${user.id};`;
             }
           }
@@ -677,7 +677,7 @@ export default async function handler(req, res) {
         let decryptedSecret = '';
         let isLegacy = false;
         try {
-          const dec = decryptMfaSecret(user.mfa_secret);
+          const dec = await decryptMfaSecret(user.mfa_secret);
           decryptedSecret = dec.secret;
           isLegacy = dec.isLegacy;
         } catch (mfaErr) {
@@ -703,7 +703,7 @@ export default async function handler(req, res) {
           newStep = totpRes.step;
           if (isLegacy && decryptedSecret) {
             try {
-              const reEncrypted = encryptMfaSecret(decryptedSecret);
+              const reEncrypted = await encryptMfaSecret(decryptedSecret);
               await sql`UPDATE usuarios SET mfa_secret = ${reEncrypted} WHERE id = ${user.id};`;
             } catch (encErr) {
               console.warn('[Auth MFA] Migração para segredo criptografado adiada:', encErr.message || encErr);
@@ -845,7 +845,7 @@ export default async function handler(req, res) {
       }
 
       // Persiste MFA ativado com segredo criptografado em repouso (AES-256-GCM)
-      const encryptedSecret = encryptMfaSecret(decoded.temp_secret);
+      const encryptedSecret = await encryptMfaSecret(decoded.temp_secret);
       await sql`
         UPDATE usuarios
         SET mfa_secret = ${encryptedSecret},

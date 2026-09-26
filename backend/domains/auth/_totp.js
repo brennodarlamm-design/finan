@@ -240,14 +240,27 @@ export function generateQrSvg(text, size = 220) {
 
 /**
  * Criptografa o segredo MFA Base32 utilizando AES-256-GCM.
+ * Suporta Web Crypto API (nativo e de alta performance no Cloudflare Workers e Node.js)
+ * com fallback para Node crypto.
  * Retorna string compacta prefixada com v1$: v1$<iv_base64>$<authTag_base64>$<ciphertext_base64>
  */
-export function encryptMfaSecret(secretText, customKey) {
+export async function encryptMfaSecret(secretText, customKey) {
   if (!secretText) return null;
   const rawKey = getMfaEncryptionKey(customKey);
-  const key = crypto.createHash('sha256').update(String(rawKey), 'utf8').digest();
-  const iv = crypto.randomBytes(12);
-  const cipher = crypto.createCipheriv('aes-256-gcm', key, iv);
+  const keyHash = crypto.createHash ? crypto.createHash('sha256').update(String(rawKey), 'utf8').digest() : await crypto.subtle.digest('SHA-256', new TextEncoder().encode(String(rawKey)));
+  const iv = crypto.randomBytes ? crypto.randomBytes(12) : crypto.getRandomValues(new Uint8Array(12));
+
+  const subtle = globalThis.crypto?.subtle || crypto?.webcrypto?.subtle;
+  if (subtle) {
+    const cryptoKey = await subtle.importKey('raw', keyHash, { name: 'AES-GCM' }, false, ['encrypt']);
+    const encBuffer = await subtle.encrypt({ name: 'AES-GCM', iv }, cryptoKey, Buffer.from(String(secretText).trim(), 'utf8'));
+    const encFull = Buffer.from(encBuffer);
+    const ciphertext = encFull.subarray(0, encFull.length - 16);
+    const tag = encFull.subarray(encFull.length - 16);
+    return `v1$${Buffer.from(iv).toString('base64')}$${tag.toString('base64')}$${ciphertext.toString('base64')}`;
+  }
+
+  const cipher = crypto.createCipheriv('aes-256-gcm', keyHash, iv);
   let encrypted = cipher.update(String(secretText).trim(), 'utf8', 'base64');
   encrypted += cipher.final('base64');
   const tag = cipher.getAuthTag().toString('base64');
@@ -256,9 +269,10 @@ export function encryptMfaSecret(secretText, customKey) {
 
 /**
  * Descriptografa o segredo MFA. Suporta transparência com segredos legados em texto plano.
+ * Suporta Web Crypto API (Cloudflare Workers) com fallback para Node crypto.
  * Retorna { secret: string, isLegacy: boolean }
  */
-export function decryptMfaSecret(storedValue, customKey) {
+export async function decryptMfaSecret(storedValue, customKey) {
   if (!storedValue) return { secret: '', isLegacy: false };
   const str = String(storedValue).trim();
   if (!str.startsWith('v1$')) {
@@ -270,13 +284,29 @@ export function decryptMfaSecret(storedValue, customKey) {
     throw new Error('Formato inválido para segredo MFA criptografado');
   }
   const [, ivB64, tagB64, encB64] = parts;
+  const iv = Buffer.from(ivB64, 'base64');
+  const tag = Buffer.from(tagB64, 'base64');
+  const ciphertext = Buffer.from(encB64, 'base64');
+  const subtle = globalThis.crypto?.subtle || crypto?.webcrypto?.subtle;
+
+  const tryDecrypt = async (k) => {
+    const keyHash = crypto.createHash ? crypto.createHash('sha256').update(String(k), 'utf8').digest() : await crypto.subtle.digest('SHA-256', new TextEncoder().encode(String(k)));
+    if (subtle) {
+      const cryptoKey = await subtle.importKey('raw', keyHash, { name: 'AES-GCM' }, false, ['decrypt']);
+      const combined = Buffer.concat([ciphertext, tag]);
+      const decBuffer = await subtle.decrypt({ name: 'AES-GCM', iv }, cryptoKey, combined);
+      return Buffer.from(decBuffer).toString('utf8');
+    }
+    const decipher = crypto.createDecipheriv('aes-256-gcm', keyHash, iv);
+    decipher.setAuthTag(tag);
+    let dec = decipher.update(ciphertext, null, 'utf8');
+    dec += decipher.final('utf8');
+    return dec;
+  };
+
   try {
     const rawKey = getMfaEncryptionKey(customKey);
-    const key = crypto.createHash('sha256').update(String(rawKey), 'utf8').digest();
-    const decipher = crypto.createDecipheriv('aes-256-gcm', key, Buffer.from(ivB64, 'base64'));
-    decipher.setAuthTag(Buffer.from(tagB64, 'base64'));
-    let decrypted = decipher.update(encB64, 'base64', 'utf8');
-    decrypted += decipher.final('utf8');
+    const decrypted = await tryDecrypt(rawKey);
     return { secret: decrypted, isLegacy: false };
   } catch (err) {
     // Auto-migração: se falhar com a chave dedicada (ex: segredo criptografado antes do Patch 56),
@@ -284,11 +314,7 @@ export function decryptMfaSecret(storedValue, customKey) {
     const legacyKey = String(process.env.SESSION_SIGNING_SECRET || '').trim();
     if (legacyKey && legacyKey.length >= 32) {
       try {
-        const lKey = crypto.createHash('sha256').update(legacyKey, 'utf8').digest();
-        const lDecipher = crypto.createDecipheriv('aes-256-gcm', lKey, Buffer.from(ivB64, 'base64'));
-        lDecipher.setAuthTag(Buffer.from(tagB64, 'base64'));
-        let dec = lDecipher.update(encB64, 'base64', 'utf8');
-        dec += lDecipher.final('utf8');
+        const dec = await tryDecrypt(legacyKey);
         return { secret: dec, isLegacy: true };
       } catch {
         // Falhou com ambas as chaves

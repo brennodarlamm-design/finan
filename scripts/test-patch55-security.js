@@ -12,6 +12,9 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const root = path.resolve(__dirname, '..');
 
+process.env.MFA_ENCRYPTION_KEY ||= 'test-only-mfa-encryption-key-0123456789abcdef';
+process.env.TENANT_KEY_PEPPER ||= 'test-only-tenant-key-pepper-0123456789abcdef';
+
 import {
   encryptMfaSecret,
   decryptMfaSecret,
@@ -93,27 +96,27 @@ console.log('4. Testando criptografia em repouso AES-256-GCM para segredos MFA..
 const rawSecret = generateTotpSecret(20);
 assert(/^[A-Z2-7]+$/.test(rawSecret), 'Segredo Base32 gerado deve ser válido.');
 
-const encryptedSecret = encryptMfaSecret(rawSecret);
+const encryptedSecret = await encryptMfaSecret(rawSecret);
 assert(encryptedSecret.startsWith('v1$'), 'Segredo criptografado deve iniciar com versão v1$.');
 
 const parts = encryptedSecret.split('$');
 assert.strictEqual(parts.length, 4, 'Envelope criptografado deve conter 4 partes: v1, iv, tag, ciphertext.');
 
 // Descriptografia normal
-const decRes = decryptMfaSecret(encryptedSecret);
+const decRes = await decryptMfaSecret(encryptedSecret);
 assert.strictEqual(decRes.isLegacy, false, 'Segredo v1 não deve ser marcado como legado.');
 assert.strictEqual(decRes.secret, rawSecret, 'Descriptografia deve recuperar o segredo Base32 original idêntico.');
 
 // Compatibilidade transparente com formato legado (texto puro)
-const legacyRes = decryptMfaSecret('JBSWY3DPEHPK3PXP');
+const legacyRes = await decryptMfaSecret('JBSWY3DPEHPK3PXP');
 assert.strictEqual(legacyRes.isLegacy, true, 'Segredo sem prefixo v1 deve ser identificado como legado.');
 assert.strictEqual(legacyRes.secret, 'JBSWY3DPEHPK3PXP', 'Segredo legado deve ser retornado intacto.');
 
 // Detecção de adulteração de ciphertext ou tag (GCM Authentication Tag)
 const tamperedEncrypted = encryptedSecret.slice(0, -4) + 'AAAA';
-assert.throws(() => {
-  decryptMfaSecret(tamperedEncrypted);
-}, /Unsupported state or unable to authenticate data|Formato inválido/i, 'Adulteração do envelope criptografado deve falhar na autenticação GCM.');
+await assert.rejects(async () => {
+  await decryptMfaSecret(tamperedEncrypted);
+}, /Unsupported state or unable to authenticate data|Formato inválido|operation failed/i, 'Adulteração do envelope criptografado deve falhar na autenticação GCM.');
 
 // Verificação em api/auth.js
 const authCode = fs.readFileSync(path.join(root, 'api/auth.js'), 'utf8');

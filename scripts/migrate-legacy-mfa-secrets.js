@@ -51,7 +51,7 @@ if (!apply) {
 
 for (const user of legacy) {
   const original = String(user.mfa_secret);
-  const sealed = encryptMfaSecret(original, mfaKey);
+  const sealed = await encryptMfaSecret(original, mfaKey);
   const updated = await sql`
     UPDATE usuarios
     SET mfa_secret = ${sealed}
