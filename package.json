@@ -19,7 +19,7 @@
     "render:canal-intro": "npm --prefix remotion run render:canal-intro",
     "render:canal-outro": "npm --prefix remotion run render:canal-outro",
     "render:canal-lowerthird": "npm --prefix remotion run render:canal-lowerthird",
-    "render:canal-thumb": "npm --prefix remotion run render:canal-thumb",
+    "security:scan": "node scripts/security-secrets-scanner.cjs",
     "test": "node scripts/test-static-all.js",
     "test:fast": "node scripts/test-static-parallel.js",
     "test:monolito": "node scripts/test-monolito-modular.js",

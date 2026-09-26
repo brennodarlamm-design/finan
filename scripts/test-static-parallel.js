@@ -23,6 +23,15 @@ const p50NativeSourceTests = new Set(
     : []
 );
 
+// Gate 0: Auditoria Estrita Anti-Vazamento de Segredos
+import { execFileSync } from 'child_process';
+try {
+  execFileSync(process.execPath, [path.resolve('scripts/security-secrets-scanner.cjs')], { stdio: 'inherit' });
+} catch (gateErr) {
+  console.error('💥 Gate 0 de Segurança falhou: credenciais expostas detectadas.');
+  process.exit(1);
+}
+
 const preload = path.resolve('scripts/test-api-wrapper-preload.cjs');
 const maxConcurrency = Math.min(6, Math.max(2, os.cpus().length || 4));
 

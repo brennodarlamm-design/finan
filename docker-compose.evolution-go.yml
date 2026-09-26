@@ -19,7 +19,7 @@ services:
       # Chave de API Global para proteger a comunicação com o FinGo
       - GLOBAL_API_KEY=${EVOLUTION_GO_API_KEY:-fingo-evo-secret-change-me-in-production}
       # Banco de dados Neon / PostgreSQL para persistência segura de sessões e credenciais
-      # Exemplo Neon: postgresql://USUARIO:SENHA@SEU_ENDPOINT.neon.tech/neondb?sslmode=require
+      # Exemplo Neon: postgresql://[USER]:[PASS]@[ENDPOINT].neon.tech/neondb?sslmode=require
       - POSTGRES_AUTH_DB=${POSTGRES_AUTH_DB:-postgresql://postgres:postgres@postgres:5432/evogo_auth?sslmode=disable}
       - POSTGRES_USERS_DB=${POSTGRES_USERS_DB:-postgresql://postgres:postgres@postgres:5432/evogo_users?sslmode=disable}
       # Desativa gravação de mensagens para manter o banco leve (foco exclusivo em sessões e envio)

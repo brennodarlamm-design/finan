@@ -1,8 +1,14 @@
 import fs from 'fs';
 import path from 'path';
 import { neon } from '@neondatabase/serverless';
+import dotenv from 'dotenv';
+dotenv.config({ path: '.env.local' });
 
-const ownerUrl = 'postgresql://neondb_owner:npg_9xuOtBcag6Sh@ep-proud-recipe-b4encxce-pooler.c-6.us-east-2.aws.neon.tech/neondb?channel_binding=require&sslmode=require';
+const ownerUrl = process.env.DATABASE_OWNER_URL;
+if (!ownerUrl) {
+  console.error('❌ DATABASE_OWNER_URL não configurado em .env.local');
+  process.exit(1);
+}
 const sql = neon(ownerUrl);
 
 async function main() {
@@ -89,7 +95,7 @@ async function main() {
 
   // Validação: consultar contagem como finobra_app
   console.log('\n--- Validação com Role finobra_app (Least Privilege Runtime) ---');
-  const appConnUrl = 'postgresql://finobra_app:fingo_app_kYKWKMZW3TpTcSqd5nmq3Gk8uLh8stR1@ep-proud-recipe-b4encxce-pooler.c-6.us-east-2.aws.neon.tech/neondb?sslmode=require';
+  const appConnUrl = process.env.DATABASE_URL;
   const appSql = neon(appConnUrl);
   
   const tenantsCount = await appSql`SELECT count(*) FROM tenants;`;

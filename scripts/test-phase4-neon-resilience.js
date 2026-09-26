@@ -16,7 +16,7 @@ console.log('=== Testes da Fase 4: Blindagem de Conexões Neon Postgres ===\n');
 
 // 1. Injeção de statement_timeout = 8000 (8 segundos) na URL
 console.log('1. Validando injeção de statement_timeout=8000 na URL de conexão Neon...');
-const rawUrl = 'postgres://finobra_app:secret123@ep-cool-frost.sa-east-1.aws.neon.tech/neondb?sslmode=require';
+const rawUrl = 'postgres://finobra_app:[REDACTED_SECRET]@ep-cool-frost.sa-east-1.aws.neon.tech/neondb?sslmode=require';
 const hardenedUrl = injectStatementTimeout(rawUrl, 8000);
 
 assert.ok(decodeURIComponent(hardenedUrl).includes('statement_timeout=8000'), 'URL deve conter statement_timeout=8000');

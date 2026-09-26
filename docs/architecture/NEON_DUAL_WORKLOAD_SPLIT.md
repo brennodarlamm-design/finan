@@ -62,8 +62,8 @@ Em vez de dividir requisições de forma cega entre dois bancos (o que causaria 
 | Propriedade | Banco 1 (Novo — SaaS Core) | Banco 2 (Antigo — WhatsApp) |
 |---|---|---|
 | **Ambiente** | Produção Core SaaS | Motor Evolution Go |
-| **Endpoint Pooler** | `ep-proud-recipe-b4encxce-pooler.c-6.us-east-2.aws.neon.tech` | `ep-solitary-river-ach3x8za-pooler.sa-east-1.aws.neon.tech` |
-| **Endpoint Direto** | `ep-proud-recipe-b4encxce.c-6.us-east-2.aws.neon.tech` | `ep-solitary-river-ach3x8za.sa-east-1.aws.neon.tech` |
+| **Endpoint Pooler** | `ep-flat-fire-b4qu9c7p-pooler.c-6.us-east-2.aws.neon.tech` | `ep-solitary-river-ach3x8za-pooler.sa-east-1.aws.neon.tech` |
+| **Endpoint Direto** | `ep-flat-fire-b4qu9c7p.c-6.us-east-2.aws.neon.tech` | `ep-solitary-river-ach3x8za.sa-east-1.aws.neon.tech` |
 | **Serviço Render** | `finan-backend` (`srv-dak05l8jo6nc73fh98cg`) | `fingo-evolution-go` (`srv-dart4pnpn0mc73dufvcg`) |
 | **Variáveis Utilizadas** | `DATABASE_URL`<br>`DATABASE_OWNER_URL`<br>`DATABASE_URL_UNPOOLED` | `POSTGRES_AUTH_DB`<br>`POSTGRES_USERS_DB` |
 

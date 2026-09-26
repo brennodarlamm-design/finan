@@ -16,8 +16,8 @@ if (!apiKey) {
 const EVOLUTION_GO_SERVICE_ID = 'srv-dart4pnpn0mc73dufvcg';
 
 // Banco Antigo (Neon 2 - São Paulo sa-east-1)
-const OLD_NEON_OWNER_URL = 'postgresql://neondb_owner:npg_lJBk2TaoWwp1@ep-solitary-river-ach3x8za.sa-east-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require';
-const OLD_NEON_HOST = 'ep-solitary-river-ach3x8za-pooler.sa-east-1.aws.neon.tech';
+const OLD_NEON_OWNER_URL = process.env.OLD_DATABASE_OWNER_URL || process.env.DATABASE_OWNER_URL;
+const OLD_NEON_HOST = OLD_NEON_OWNER_URL ? new URL(OLD_NEON_OWNER_URL).host : '';
 
 async function testOldNeonActive() {
   console.log('🔍 Testando conectividade com o Banco Antigo (Neon 2)...');

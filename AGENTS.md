@@ -4,6 +4,19 @@ Este documento define regras inegociáveis para o desenvolvimento e operação d
 
 ---
 
+## 🚨 Regra Inegociável: Proibição Absoluta de Credenciais e Segredos no Git (Zero Secrets in Repository)
+
+> **POLÍTICA DE TOLERÂNCIA ZERO PARA SEGREDOS NO REPOSITÓRIO:**
+> ❌ **NUNCA**, sob nenhuma hipótese, escrever, commitar, salvar ou documentar credenciais reais, senhas de banco de dados (`npg_`, `fingo_app_`), connection strings completas (`postgresql://user:pass@host`), tokens de API (`rnd_`, `sk-`, etc.) ou chaves privadas em arquivos do repositório (`.md`, `.js`, `.ts`, `.json`, `.yml`, etc.).
+>
+> ✅ **CARREGAMENTO EXCLUSIVO EM RUNTIME VIA ENVIRONMENT VARIABLES:**
+> 1. Todas as credenciais de desenvolvimento/teste devem residir estritamente no arquivo `.env.local` (que é gitignored e NUNCA versionado).
+> 2. Todas as credenciais de produção residem exclusivamente nos Secrets do Cloudflare Worker (`wrangler secret`) e do Render (`env-vars`).
+> 3. Documentação técnica (`docs/*.md`) e scripts de exemplo DEVEM conter apenas placeholders genéricos (ex: `process.env.DATABASE_URL` ou `postgresql://[USER]:[PASS]@[HOST]/neondb`).
+> 4. O scanner de segurança `scripts/security-secrets-scanner.cjs` roda compulsoriamente como Gate 0 no `npm run test:fast` e aborta imediatamente qualquer operação caso detecte padrões de credenciais.
+
+---
+
 ## 🚨 Regra Inegociável: Commit ANTES de Qualquer Deploy
 
 > **ORDEM OBRIGATÓRIA DE OPERAÇÕES:**

@@ -54,25 +54,25 @@ async function triggerDeploy(serviceId, serviceName) {
 async function main() {
   console.log('🔄 Atualizando credenciais do novo Neon no Render...');
 
-  // 1. Atualizar FinGo Backend
+  // 1. Atualizar FinGo Backend a partir do .env.local
   const backendVars = {
-    DATABASE_URL: 'postgresql://finobra_app:fingo_app_kYKWKMZW3TpTcSqd5nmq3Gk8uLh8stR1@ep-proud-recipe-b4encxce-pooler.c-6.us-east-2.aws.neon.tech/neondb?sslmode=require',
-    DATABASE_OWNER_URL: 'postgresql://neondb_owner:npg_9xuOtBcag6Sh@ep-proud-recipe-b4encxce-pooler.c-6.us-east-2.aws.neon.tech/neondb?sslmode=require',
-    DATABASE_URL_UNPOOLED: 'postgresql://finobra_app:fingo_app_kYKWKMZW3TpTcSqd5nmq3Gk8uLh8stR1@ep-proud-recipe-b4encxce.c-6.us-east-2.aws.neon.tech/neondb?sslmode=require'
+    DATABASE_URL: process.env.DATABASE_URL,
+    DATABASE_OWNER_URL: process.env.DATABASE_OWNER_URL,
+    DATABASE_URL_UNPOOLED: process.env.DATABASE_URL_UNPOOLED || process.env.DATABASE_URL
   };
 
   for (const [k, v] of Object.entries(backendVars)) {
-    await updateEnvVar(FINAN_BACKEND_ID, 'finan-backend', k, v);
+    if (v) await updateEnvVar(FINAN_BACKEND_ID, 'finan-backend', k, v);
   }
 
-  // 2. Atualizar Evolution Go
+  // 2. Atualizar Evolution Go a partir do .env.local
   const evoVars = {
-    POSTGRES_AUTH_DB: 'postgresql://neondb_owner:npg_9xuOtBcag6Sh@ep-proud-recipe-b4encxce.c-6.us-east-2.aws.neon.tech/neondb?sslmode=require&channel_binding=require',
-    POSTGRES_USERS_DB: 'postgresql://neondb_owner:npg_9xuOtBcag6Sh@ep-proud-recipe-b4encxce.c-6.us-east-2.aws.neon.tech/neondb?sslmode=require&channel_binding=require'
+    POSTGRES_AUTH_DB: process.env.POSTGRES_AUTH_DB || process.env.DATABASE_OWNER_URL,
+    POSTGRES_USERS_DB: process.env.POSTGRES_USERS_DB || process.env.DATABASE_OWNER_URL
   };
 
   for (const [k, v] of Object.entries(evoVars)) {
-    await updateEnvVar(EVOLUTION_GO_ID, 'evolution-go', k, v);
+    if (v) await updateEnvVar(EVOLUTION_GO_ID, 'evolution-go', k, v);
   }
 
   console.log('\n🚀 Disparando novo deploy nos 2 serviços para carregar a nova configuração...');
