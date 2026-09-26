@@ -19,8 +19,12 @@ backend/auth_info_baileys/
 # Variáveis locais e credenciais sensíveis (NUNCA versionar)
 .env
 .env.*
+*.env
+fingo-evolution-go.env
+.env.evolution-go
 !.env.example
 !.env.*.example
+!.env*.example
 .env.local
 .env.*.local
 .env*.local

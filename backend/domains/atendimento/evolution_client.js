@@ -117,7 +117,10 @@ export class EvolutionGoClient {
 
     const start = Date.now();
     try {
-      const res = await this.request('/health', { timeoutMs: 2500 });
+      let res = await this.request('/server/ok', { timeoutMs: 2500 });
+      if (!res.ok && res.status === 404) {
+        res = await this.request('/health', { timeoutMs: 2500 });
+      }
       const latencyMs = Date.now() - start;
       const healthy = Boolean(res.ok || res.status === 200);
       return {

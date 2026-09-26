@@ -409,13 +409,30 @@ app.get('/healthz', (req, res) => {
 });
 
 // 1.1 Health Check Monitor
+// Suporta verificação leve por padrão para não impedir a hibernação (scale-to-zero) do Neon Postgres no Render.
+// Para testar conectividade ativa ao banco, passe ?deep=true.
+let lastDbCheck = { time: 0, ok: true };
 app.get('/health', async (req, res) => {
-  let dbOk = false;
-  if (sql) {
-    try { await sql`SELECT 1;`; dbOk = true; } catch {}
+  const deep = req.query.deep === 'true';
+  let dbOk = lastDbCheck.ok;
+
+  if (deep && sql) {
+    try {
+      await sql`SELECT 1;`;
+      dbOk = true;
+      lastDbCheck = { time: Date.now(), ok: true };
+    } catch {
+      dbOk = false;
+      lastDbCheck = { time: Date.now(), ok: false };
+    }
   }
-  const healthy = Boolean(sql && dbOk);
-  return res.status(healthy ? 200 : 503).json({ status: healthy ? 'healthy' : 'degraded' });
+
+  const healthy = Boolean(sql ? dbOk : true);
+  return res.status(healthy ? 200 : 503).json({
+    status: healthy ? 'healthy' : 'degraded',
+    service: 'finan-backend',
+    database: sql ? (dbOk ? 'connected' : 'degraded') : 'unconfigured'
+  });
 });
 
 // 1.1.1 Health Probe dedicado do Evolution Go (Golang WhatsApp + Circuit Breaker)
