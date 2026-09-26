@@ -9,6 +9,7 @@ import { setEdgeCacheHeaders } from './_http.js';
 import webhookPixHandler from './_webhook_pix.js';
 import { createTenantSql } from './_tenant-sql.js';
 import { createRuntimeSql } from './_database.js';
+import { getCachedTenant, invalidateTenantCache } from './_tenant-cache.js';
 
 function getSql() {
   return createRuntimeSql();
@@ -188,6 +189,7 @@ export default async function handler(req, res) {
         if (!cancellationRows.length) {
           return res.status(409).json({ success:false, error:'Não foi possível agendar o cancelamento da assinatura.' });
         }
+        await invalidateTenantCache(auth.tenantId, req?.env || process.env);
         const accessUntil = dateOnly(cancellationRows[0]?.vencimento || tenant.vencimento) || null;
         await writeAudit(sql, req, auth, {
           acao:'cancelar_assinatura',
@@ -286,10 +288,8 @@ export default async function handler(req, res) {
       return res.status(201).json({ success:true, invoice:rows[0], cycleInfo, billingWhatsapp:billingWhatsapp(), reused:false });
     }
 
-    const tenantRows = await sql`SELECT plano, status, created_at, vencimento FROM tenants WHERE id = ${auth.tenantId} LIMIT 1;`;
-    if (!tenantRows.length) return res.status(404).json({ success: false, error: 'Empresa não encontrada.' });
-
-    const tenant = tenantRows[0];
+    const tenant = await getCachedTenant(auth.tenantId, sql, req?.env || process.env);
+    if (!tenant) return res.status(404).json({ success: false, error: 'Empresa não encontrada.' });
     const rule = getPlanRule(tenant.plano);
     let vencStr = dateOnly(tenant.vencimento);
     if (!vencStr && tenant.created_at) {

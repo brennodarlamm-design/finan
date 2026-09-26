@@ -132,3 +132,6 @@ export async function checkRateLimit(key, limit = 10, windowMs = 60000) {
 export function resetRateLimit(key) {
   localFallback.delete(key);
 }
+
+export { checkRateLimitRedis } from './_edge-redis.js';
+

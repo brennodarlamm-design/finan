@@ -1,6 +1,6 @@
 // api/certificado.js — Gestão Segura de Certificado Digital A1 com Criptografia AES-256-GCM
 
-import crypto from 'crypto';
+import crypto from 'node:crypto';
 import tls from 'tls';
 import { neon } from '@neondatabase/serverless';
 import { resolveAuthAndTenant } from './_auth.js';

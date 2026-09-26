@@ -8,6 +8,8 @@ import {
 import { setEdgeCacheHeaders, setPrivateNoCache } from './_http.js';
 import { canAccessTable } from './_permissions.js';
 import { canUseFeature, planError } from './_plans.js';
+import { getCachedReference, applySwrCacheHeaders } from './_reference-cache.js';
+import { sinapiCacheKey } from './_edge-kv.js';
 
 function planFeatureErrorForTable(auth, table) {
   const feature = String(table || '') === 'orcamentos_sinapi' ? 'sinapi' : null;
@@ -282,21 +284,27 @@ export async function handleFullSnapshot(sql, tenantId, auth, res) {
 }
 
 /**
- * ── 4. CONSULTA DAS BASES OFICIAIS SINAPI (COM EDGE CACHING) ────────────────
+ * ── 4. CONSULTA DAS BASES OFICIAIS SINAPI (COM EDGE CACHING SWR) ────────────
  */
-export async function handleSinapiQuery(sql, query, res) {
+export async function handleSinapiQuery(sql, query, res, env) {
   const sinapiPlanError = planFeatureErrorForTable(null, 'orcamentos_sinapi');
   if (sinapiPlanError) return res.status(403).json(sinapiPlanError);
 
-  // Snapshot oficial Caixa é imutável: Cache de 24h no Cloudflare Edge
-  setEdgeCacheHeaders(res, { sMaxAge: 86400, staleWhileRevalidate: 604800, isPublic: true });
+  const uf = String(query.uf || query.estado || 'SP').trim().toUpperCase();
+  const competencia = String(query.competencia || 'default').trim();
+  const termo = String(query.q || query.busca || '').trim();
+  const cacheKey = sinapiCacheKey(uf, competencia, termo);
 
-  const rows = await sql`
-    SELECT id, codigo, descricao, unidade, valor, data_referencia, estado
-    FROM sinapi_itens
-    LIMIT 200;
-  `;
-  return res.status(200).json(rows);
+  const { data, fromCache } = await getCachedReference(env, cacheKey, async () => {
+    return await sql`
+      SELECT id, codigo, descricao, unidade, valor, data_referencia, estado
+      FROM sinapi_itens
+      LIMIT 200;
+    `;
+  }, 86400);
+
+  applySwrCacheHeaders(res, { isHit: fromCache, provider: 'REDIS' });
+  return res.status(200).json(data);
 }
 
 /**

@@ -4,6 +4,7 @@
 // DATABASE_OWNER_URL: conexão privilegiada, usada apenas em bootstrap/auth/admin/jobs globais.
 
 import { neon } from '@neondatabase/serverless';
+import { createResilientNeon } from './_neon-resilience.js';
 
 function env(name) {
   return String(process.env[name] || '').trim();
@@ -28,8 +29,8 @@ export function getRuntimeDatabaseUrl() {
   return conn;
 }
 
-export function createRuntimeSql() {
-  return neon(getRuntimeDatabaseUrl());
+export function createRuntimeSql(options = {}) {
+  return createResilientNeon(getRuntimeDatabaseUrl(), options);
 }
 
 export function getOwnerDatabaseUrl() {
@@ -47,6 +48,6 @@ export function getOwnerDatabaseUrl() {
   throw new Error('DATABASE_OWNER_URL não configurada para operação privilegiada.');
 }
 
-export function createOwnerSql() {
-  return neon(getOwnerDatabaseUrl());
+export function createOwnerSql(options = {}) {
+  return createResilientNeon(getOwnerDatabaseUrl(), options);
 }

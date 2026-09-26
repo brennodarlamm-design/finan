@@ -1,7 +1,7 @@
 // api/_dev-tenant-keys.js — Cofre server-side das Chaves da Empresa para DEV / Master
 // Helper interno compartilhado por uma rota serverless existente para respeitar o limite Hobby da Vercel.
 
-import crypto from 'crypto';
+import crypto from 'node:crypto';
 import { neon } from '@neondatabase/serverless';
 import { resolveAuthAndTenant, getInternalApiSecret } from './_auth.js';
 import { generateTenantAccessKey, hashTenantAccessKey, hashTenantAccessKeyLegacy, tenantAccessKeyLast4 } from './_tenant-access-key.js';

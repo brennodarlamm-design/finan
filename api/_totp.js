@@ -2,7 +2,7 @@
 // Compatível com Google Authenticator, Microsoft Authenticator, 1Password e Authy.
 // 100% nativo para geração/validação TOTP. O enrollment visual usa fallback manual seguro.
 
-import crypto from 'crypto';
+import crypto from 'node:crypto';
 import QRCode from 'qrcode';
 import svgRenderer from 'qrcode/lib/renderer/svg.js';
 
