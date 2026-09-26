@@ -1662,6 +1662,16 @@ export default async function handler(req, res) {
     return res.status(400).json({ success: false, error: `Ação '${action}' inválida para /api/auth.` });
   } catch (err) {
     console.error('Erro na API de autenticação:', err);
+    try {
+      const sqlErr = getSql();
+      const errId = 'err_' + crypto.randomBytes(8).toString('hex');
+      await sqlErr`
+        INSERT INTO client_error_logs (id, route, message, stack, user_agent)
+        VALUES (${errId}, '/api/auth', ${String(err?.message || err)}, ${String(err?.stack || '')}, ${String(req?.headers?.['user-agent'] || '')});
+      `;
+    } catch (logErr) {
+      console.error('Falha ao registrar erro no banco:', logErr?.message || logErr);
+    }
     return res.status(500).json({ success: false, error: 'Erro interno ao processar autenticação.' });
   }
 }
