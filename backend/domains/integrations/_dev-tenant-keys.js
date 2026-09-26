@@ -15,26 +15,62 @@ function getSql() {
 function deriveVaultKey() {
   const secret = getInternalApiSecret();
   if (!secret) throw new Error('INTERNAL_API_SECRET não configurado para o cofre de chaves.');
-  return crypto.createHash('sha256').update(`finobra:dev-tenant-keys:v1:${secret}`, 'utf8').digest();
+  return crypto.createHash ? crypto.createHash('sha256').update(`finobra:dev-tenant-keys:v1:${secret}`, 'utf8').digest() : null;
 }
 
-function encryptAccessKey(accessKey) {
-  const iv = crypto.randomBytes(12);
-  const cipher = crypto.createCipheriv('aes-256-gcm', deriveVaultKey(), iv);
+async function getVaultCryptoKey() {
+  const secret = getInternalApiSecret();
+  if (!secret) throw new Error('INTERNAL_API_SECRET não configurado para o cofre de chaves.');
+  const subtle = globalThis.crypto?.subtle || crypto?.webcrypto?.subtle;
+  if (subtle) {
+    const keyBytes = await subtle.digest('SHA-256', new TextEncoder().encode(`finobra:dev-tenant-keys:v1:${secret}`));
+    return subtle.importKey('raw', keyBytes, { name: 'AES-GCM' }, false, ['encrypt', 'decrypt']);
+  }
+  return null;
+}
+
+async function encryptAccessKey(accessKey) {
+  const subtle = globalThis.crypto?.subtle || crypto?.webcrypto?.subtle;
+  const iv = crypto.randomBytes ? crypto.randomBytes(12) : crypto.getRandomValues(new Uint8Array(12));
+  if (subtle) {
+    const cryptoKey = await getVaultCryptoKey();
+    const encBuffer = await subtle.encrypt({ name: 'AES-GCM', iv }, cryptoKey, Buffer.from(String(accessKey), 'utf8'));
+    const encFull = Buffer.from(encBuffer);
+    const ciphertext = encFull.subarray(0, encFull.length - 16);
+    const tag = encFull.subarray(encFull.length - 16);
+    return {
+      ciphertext: ciphertext.toString('base64'),
+      iv: Buffer.from(iv).toString('hex'),
+      authTag: tag.toString('hex')
+    };
+  }
+  const keyBytes = deriveVaultKey();
+  const cipher = crypto.createCipheriv('aes-256-gcm', keyBytes, iv);
   const ciphertext = Buffer.concat([cipher.update(String(accessKey), 'utf8'), cipher.final()]);
   return {
     ciphertext: ciphertext.toString('base64'),
-    iv: iv.toString('hex'),
+    iv: Buffer.from(iv).toString('hex'),
     authTag: cipher.getAuthTag().toString('hex')
   };
 }
 
-function decryptAccessKey(row) {
+async function decryptAccessKey(row) {
   if (!row?.key_ciphertext || !row?.key_iv || !row?.key_auth_tag) return null;
-  const decipher = crypto.createDecipheriv('aes-256-gcm', deriveVaultKey(), Buffer.from(row.key_iv, 'hex'));
-  decipher.setAuthTag(Buffer.from(row.key_auth_tag, 'hex'));
+  const subtle = globalThis.crypto?.subtle || crypto?.webcrypto?.subtle;
+  const iv = Buffer.from(row.key_iv, 'hex');
+  const tag = Buffer.from(row.key_auth_tag, 'hex');
+  const ciphertext = Buffer.from(row.key_ciphertext, 'base64');
+  if (subtle) {
+    const cryptoKey = await getVaultCryptoKey();
+    const combined = Buffer.concat([ciphertext, tag]);
+    const decBuffer = await subtle.decrypt({ name: 'AES-GCM', iv }, cryptoKey, combined);
+    return Buffer.from(decBuffer).toString('utf8');
+  }
+  const keyBytes = deriveVaultKey();
+  const decipher = crypto.createDecipheriv('aes-256-gcm', keyBytes, iv);
+  decipher.setAuthTag(tag);
   return Buffer.concat([
-    decipher.update(Buffer.from(row.key_ciphertext, 'base64')),
+    decipher.update(ciphertext),
     decipher.final()
   ]).toString('utf8');
 }
@@ -97,7 +133,7 @@ export default async function handler(req, res) {
 
         let accessKey;
         try {
-          accessKey = decryptAccessKey(rows[0]);
+          accessKey = await decryptAccessKey(rows[0]);
         } catch (err) {
           console.error('[DEV Tenant Keys] Falha ao descriptografar chave:', tenantId, err.message);
           return res.status(409).json({ success: false, error: 'A chave armazenada não pôde ser descriptografada. Rotacione-a.' });
@@ -202,7 +238,7 @@ export default async function handler(req, res) {
     if (!accessKey) throw new Error('Não foi possível gerar uma chave única para a empresa.');
 
     const last4 = tenantAccessKeyLast4(accessKey);
-    const enc = encryptAccessKey(accessKey);
+    const enc = await encryptAccessKey(accessKey);
 
     const rotated = await sql`
       WITH updated AS (
