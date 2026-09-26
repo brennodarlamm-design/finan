@@ -7,7 +7,7 @@
 ## 🚨 Padrões Terminantemente Proibidos no Código e Documentação
 
 1. **Strings de Conexão com Senhas:**
-   - ❌ **PROIBIDO:** `postgresql://usuario:senha_real@ep-xxxx.neon.tech/...`
+   - ❌ **PROIBIDO:** Strings contendo usuário e senha fixos no código.
    - ✅ **CORRETO:** `process.env.DATABASE_URL` ou `postgresql://[USER]:[PASS]@[HOST]/neondb`
 2. **Senhas de Banco de Dados:**
    - ❌ **PROIBIDO:** Senhas com prefixo `npg_`, `fingo_app_`, senhas de root, etc.
