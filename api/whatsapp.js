@@ -171,6 +171,19 @@ export default async function handler(req, res) {
               isDeploying: true
             });
           }
+          // 503 = Render em cold-start (plano free dorme após inatividade)
+          // Retorna estado "iniciando" ao invés de repassar o 503 ao browser
+          if (response.status === 503 || response.status === 502) {
+            return res.status(200).json({
+              success: true,
+              status: 'connecting',
+              connected: false,
+              connectedNumber: null,
+              qrDataUrl: null,
+              warmingUp: true,
+              message: 'Servidor WhatsApp acordando... Aguarde alguns segundos.'
+            });
+          }
           return res.status(response.status).json({
             success: false,
             error: `Servidor WhatsApp retornou status ${response.status}`

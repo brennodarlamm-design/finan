@@ -508,7 +508,7 @@ export default async function handler(req, res) {
             userId: user.id,
             username: user.username,
             purpose: 'mfa_setup',
-            exp: Date.now() + 10 * 60 * 1000
+            exp: Date.now() + 15 * 60 * 1000  // 15 minutos — tempo suficiente para instalar o app
           }, secret);
 
           return res.status(200).json({
@@ -526,7 +526,7 @@ export default async function handler(req, res) {
             username: user.username,
             purpose: 'mfa_pending',
             remember: !!remember,
-            exp: Date.now() + 5 * 60 * 1000
+            exp: Date.now() + 15 * 60 * 1000  // 15 minutos — previne 401 por timeout do usuário
           }, secret);
 
           return res.status(200).json({
