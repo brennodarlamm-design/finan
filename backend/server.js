@@ -528,7 +528,7 @@ app.post(['/webhook/evolution-go', '/api/webhook-whatsapp'], async (req, res) =>
 });
 
 // 2. Página Web Visual do QR Code com Suporte Multi-Tenant e Sem Token em Query String (C-05/H-15)
-app.all('/qr', (req, res) => {
+app.all('/qr', async (req, res) => {
   const secret = getInternalSecret();
   const providedToken = String(req.body?.token || req.headers?.authorization?.replace(/^Bearer\s+/i, '') || req.headers?.['x-api-key'] || '').trim();
   const tenantId = extractTenantFromReq(req);
@@ -567,12 +567,116 @@ app.all('/qr', (req, res) => {
 
   if (secretAuthorized) setQrAccessCookie(res, tenantId);
 
+  const hiddenTokenInput = `<input type="hidden" name="tenant_id" value="${tenantId}" />`;
+
+  // Delegação transparente para o Evolution Go quando configurado no ambiente
+  if (evolutionGo.isConfigured()) {
+    try {
+      const evoSummary = await evolutionGo.getUnifiedSessionSummary(tenantId);
+      if (evoSummary && evoSummary.connected) {
+        const num = evoSummary.connectedNumber;
+        return res.send(`
+          <!DOCTYPE html>
+          <html lang="pt-BR">
+          <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>WhatsApp Conectado — FinGo</title>
+            <style>
+              body { font-family: system-ui, sans-serif; background: #0f172a; color: #f8fafc; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; }
+              .card { background: #1e293b; padding: 32px; border-radius: 16px; border: 1px solid #334155; text-align: center; max-width: 420px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
+              .badge { background: #10b981; color: #022c22; font-weight: 700; padding: 6px 14px; border-radius: 999px; display: inline-block; margin-bottom: 16px; }
+              h1 { margin: 0 0 8px; font-size: 1.5rem; }
+              p { color: #94a3b8; font-size: 0.9rem; line-height: 1.5; }
+              .btn-danger { display: inline-block; margin-top: 20px; background: #dc2626; color: white; border: none; padding: 10px 20px; border-radius: 8px; font-weight: 600; cursor: pointer; text-decoration: none; font-size: 0.85rem; transition: background 0.2s; }
+              .btn-danger:hover { background: #b91c1c; }
+            </style>
+          </head>
+          <body>
+            <div class="card">
+              <div class="badge">🟢 100% CONECTADO (Evolution Go)</div>
+              <h1>WhatsApp Conectado!</h1>
+              <p>Empresa / Tenant: <strong>${tenantId}</strong></p>
+              <p>Número conectado: <strong>${num ? '+' + num : 'Conectado'}</strong></p>
+              <form action="/reset-auth" method="POST" onsubmit="return confirm('Deseja realmente desconectar e trocar o aparelho desta empresa?');">
+                ${hiddenTokenInput}
+                <button type="submit" class="btn-danger">🔌 Desconectar e Trocar de Aparelho</button>
+              </form>
+            </div>
+          </body>
+          </html>
+        `);
+      }
+
+      if (evoSummary && evoSummary.qrDataUrl) {
+        return res.send(`
+          <!DOCTYPE html>
+          <html lang="pt-BR">
+          <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <meta http-equiv="refresh" content="15">
+            <title>Escanear QR Code — FinGo WhatsApp</title>
+            <style>
+              body { font-family: system-ui, sans-serif; background: #0f172a; color: #f8fafc; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; }
+              .card { background: #1e293b; padding: 32px; border-radius: 16px; border: 1px solid #334155; text-align: center; max-width: 420px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
+              .qr-img { background: #fff; padding: 12px; border-radius: 12px; margin: 20px 0; display: inline-block; }
+              h1 { margin: 0 0 8px; font-size: 1.4rem; }
+              p { color: #94a3b8; font-size: 0.85rem; line-height: 1.4; margin: 0; }
+              .pulse { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #f59e0b; margin-right: 6px; }
+              .btn-subtle { display: inline-block; margin-top: 15px; color: #94a3b8; font-size: 0.75rem; text-decoration: underline; background: transparent; border: none; cursor: pointer; }
+            </style>
+          </head>
+          <body>
+            <div class="card">
+              <h1>📲 Conectar WhatsApp</h1>
+              <p style="color:#38bdf8;font-weight:600;margin-bottom:8px;">Empresa: ${tenantId}</p>
+              <p><span class="pulse"></span> Abra o WhatsApp no celular &gt; <strong>Aparelhos conectados</strong> &gt; <strong>Conectar um aparelho</strong> e aponte para a imagem abaixo:</p>
+              <div class="qr-img">
+                <img src="${evoSummary.qrDataUrl}" alt="QR Code WhatsApp" style="width: 260px; height: 260px; display: block;" />
+              </div>
+              <p style="font-size: 0.75rem; color: #64748b;">Motor: Evolution Go. A página atualiza automaticamente a cada 15 segundos.</p>
+              <form action="/reset-auth" method="POST">
+                ${hiddenTokenInput}
+                <button type="submit" class="btn-subtle">🔄 Limpar sessão e forçar novo QR Code</button>
+              </form>
+            </div>
+          </body>
+          </html>
+        `);
+      }
+
+      if (evoSummary && evoSummary.warmingUp) {
+        return res.send(`
+          <!DOCTYPE html>
+          <html lang="pt-BR">
+          <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <meta http-equiv="refresh" content="3">
+            <title>Gerando QR Code...</title>
+            <style>
+              body { font-family: system-ui, sans-serif; background: #0f172a; color: #f8fafc; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; text-align: center; }
+            </style>
+          </head>
+          <body>
+            <div>
+              <h2>⏳ Conectando ao Evolution Go (${tenantId})...</h2>
+              <p style="color:#94a3b8;">Gerando QR Code seguro. Aguarde alguns instantes...</p>
+            </div>
+          </body>
+          </html>
+        `);
+      }
+    } catch (evoErr) {
+      console.warn(`⚠️ [EvolutionGo:${tenantId}] Falha ao consultar sessão em /qr, tentando fallback:`, evoErr.message);
+    }
+  }
+
   const session = getTenantSession(tenantId);
   if (session.connectionStatus === 'disconnected' && !session.isStarting) {
     startWhatsApp(session.tenantId);
   }
-
-  const hiddenTokenInput = `<input type="hidden" name="tenant_id" value="${tenantId}" />`;
 
   if (session.connectionStatus === 'connected') {
     const num = getConnectedWhatsAppNumber(session);

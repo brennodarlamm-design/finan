@@ -80,8 +80,11 @@ const activePromises = Array.from({ length: CONCURRENT_REQUESTS }).map((_, i) =>
   });
 });
 
-// Aguarda 40ms para garantir que todas as 5 requisições estejam em voo no servidor
-await new Promise(r => setTimeout(r, 40));
+// Aguarda as requisições estarem em voo no servidor (com retry para evitar flakiness sob alta carga de CPU)
+const startWait = Date.now();
+while (testManager.activeRequestsCount < CONCURRENT_REQUESTS && Date.now() - startWait < 500) {
+  await new Promise(r => setTimeout(r, 10));
+}
 assert.equal(testManager.activeRequestsCount, CONCURRENT_REQUESTS, `Deve haver exatamente ${CONCURRENT_REQUESTS} requisições em voo`);
 console.log(`   ✓ ${testManager.activeRequestsCount} requisições ativas confirmadas em processamento simultâneo.`);
 

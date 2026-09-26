@@ -695,12 +695,14 @@ const WhatsApp = {
     }
 
     // ── ESTADO 3: INICIANDO / CONECTANDO ──
+    const isWarmingUp = !!session?.warmingUp;
+    const warmupMsg = session?.message || 'Servidor WhatsApp acordando... Aguarde alguns segundos.';
     container.innerHTML = `
       <div style="text-align:center;padding:36px 16px;">
         <div class="spinner" style="width:44px;height:44px;border:3px solid rgba(37,211,102,0.2);border-top-color:#25D366;border-radius:50%;animation:spin 1s linear infinite;margin:0 auto 16px;"></div>
-        <h4 style="margin:0 0 6px;font-size:1.05rem;font-weight:700;color:var(--text);">Iniciando Motor do WhatsApp...</h4>
+        <h4 style="margin:0 0 6px;font-size:1.05rem;font-weight:700;color:var(--text);">${isWarmingUp ? '⏳ Servidor Acordando...' : 'Iniciando Motor do WhatsApp...'}</h4>
         <p style="color:var(--text2);font-size:.84rem;max-width:320px;margin:0 auto 14px;line-height:1.4;">
-          Sincronizando com o servidor em nuvem. O QR Code aparecerá nesta tela em instantes.
+          ${isWarmingUp ? warmupMsg + ' O plano free hiberna após inatividade.' : 'Sincronizando com o servidor em nuvem. O QR Code aparecerá nesta tela em instantes.'}
         </p>
         <span style="font-size:.74rem;color:var(--text3);display:block;margin-bottom:20px;">
           ⚡ Verificando automaticamente a cada 2 segundos...
