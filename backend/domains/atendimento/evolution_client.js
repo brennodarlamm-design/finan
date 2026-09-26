@@ -253,7 +253,7 @@ export class EvolutionGoClient {
       }
 
       // Falhas 5xx do servidor indicam oscilação ou quebra do container
-      if (response.status >= 500) {
+      if (response.status >= 500 && options.recordFailure !== false) {
         this.recordFailure(`HTTP ${response.status}`);
       }
 
@@ -266,7 +266,9 @@ export class EvolutionGoClient {
       };
     } catch (err) {
       clearTimeout(timeout);
-      this.recordFailure(err.message);
+      if (options.recordFailure !== false) {
+        this.recordFailure(err.message);
+      }
       const isAbort = err.name === 'AbortError' || err.name === 'TimeoutError';
       return {
         ok: false,
@@ -279,27 +281,51 @@ export class EvolutionGoClient {
   }
 
   /**
+   * Localiza uma instância existente pelo nome do tenant
+   */
+  async findInstance(tenantId) {
+    const instanceName = this.cleanInstanceName(tenantId);
+    try {
+      const res = await this.request('/instance/all', { recordFailure: false });
+      if (!res.ok || !Array.isArray(res.data?.data)) return null;
+      return res.data.data.find(i => i.name === instanceName) || null;
+    } catch {
+      return null;
+    }
+  }
+
+  /**
    * Cria ou garante a existência de uma instância do tenant
    */
   async createInstance(tenantId) {
     const instanceName = this.cleanInstanceName(tenantId);
+    const token = `token_${instanceName}_123`;
     const webhookUrl = (process.env.EVOLUTION_GO_WEBHOOK_URL || '').trim();
+
+    // No Evolution Go (Golang), o body exige "name" e "token"
     const body = {
-      instanceName,
-      integration: 'WHATSAPP-BAILEYS',
+      name: instanceName,
+      token,
       qrcode: true
     };
 
     if (webhookUrl) {
       body.webhook = webhookUrl;
-      body.webhook_by_events = true;
-      body.events = ['CONNECTION_UPDATE', 'MESSAGES_UPSERT', 'QRCODE_UPDATED'];
     }
 
-    return await this.request('/instance/create', {
+    const res = await this.request('/instance/create', {
       method: 'POST',
       body
     });
+
+    // Inicia a geração imediata do QR code conectando a instância criada
+    await this.request('/instance/connect', {
+      method: 'POST',
+      headers: { apikey: token },
+      body: {}
+    }).catch(() => {});
+
+    return res;
   }
 
   /**
@@ -307,9 +333,44 @@ export class EvolutionGoClient {
    */
   async getQrCode(tenantId) {
     const instanceName = this.cleanInstanceName(tenantId);
+    let inst = await this.findInstance(tenantId);
+    if (!inst) {
+      await this.createInstance(tenantId);
+      inst = await this.findInstance(tenantId);
+    }
+
+    if (inst) {
+      let rawCode = inst.qrcode || '';
+      if (!rawCode && !inst.connected) {
+        await this.request('/instance/connect', {
+          method: 'POST',
+          headers: { apikey: inst.token || this.apiKey },
+          body: {}
+        }).catch(() => {});
+
+        const qrFetch = await this.request('/instance/qr', {
+          headers: { apikey: inst.token || this.apiKey }
+        });
+        if (qrFetch.ok && qrFetch.data?.data?.qrcode) {
+          rawCode = qrFetch.data.data.qrcode;
+        }
+      }
+
+      if (rawCode) {
+        const base64Part = rawCode.split('|')[0].trim();
+        const qrDataUrl = base64Part.startsWith('data:') ? base64Part : `data:image/png;base64,${base64Part}`;
+        return {
+          ok: true,
+          qrDataUrl,
+          pairingCode: rawCode.includes('|') ? rawCode.split('|')[1] : null,
+          status: 'qr_ready'
+        };
+      }
+    }
+
+    // Fallback legado para /instance/:name/qrcode
     const res = await this.request(`/instance/${instanceName}/qrcode`);
     if (res.ok && res.data) {
-      // O Evolution Go pode retornar o QR em qrcode, base64 ou pairingCode
       const rawCode = res.data.base64 || res.data.qrcode || res.data.code || null;
       let qrDataUrl = null;
       if (rawCode) {
@@ -330,6 +391,20 @@ export class EvolutionGoClient {
    */
   async getConnectionStatus(tenantId) {
     const instanceName = this.cleanInstanceName(tenantId);
+    const inst = await this.findInstance(tenantId);
+    if (inst) {
+      const connected = Boolean(inst.connected);
+      const connectedNumber = inst.jid ? inst.jid.replace(/@.*$/, '') : null;
+      return {
+        ok: true,
+        connected,
+        status: connected ? 'connected' : (inst.qrcode ? 'qr_ready' : 'connecting'),
+        connectedNumber,
+        raw: inst
+      };
+    }
+
+    // Fallback legado para /instance/:name/status
     const res = await this.request(`/instance/${instanceName}/status`);
     if (res.ok && res.data) {
       const state = String(res.data.state || res.data.status || '').toLowerCase();
@@ -361,6 +436,24 @@ export class EvolutionGoClient {
       return { ok: false, status: 400, error: 'Telefone de destino inválido.' };
     }
 
+    const inst = await this.findInstance(tenantId);
+    const token = inst?.token || this.apiKey;
+
+    // Tenta primeiro /send/text (Evolution Go oficial)
+    const res = await this.request('/send/text', {
+      method: 'POST',
+      headers: { apikey: token },
+      body: {
+        number: cleanPhone,
+        text: String(text || '').trim()
+      }
+    });
+
+    if (res.ok || res.status !== 404) {
+      return res;
+    }
+
+    // Fallback para rota legada v1/v2 caso a API externa seja NodeJS
     return await this.request(`/message/sendText/${instanceName}`, {
       method: 'POST',
       body: {
@@ -437,6 +530,14 @@ export class EvolutionGoClient {
    */
   async logoutInstance(tenantId) {
     const instanceName = this.cleanInstanceName(tenantId);
+    const inst = await this.findInstance(tenantId);
+    const token = inst?.token || this.apiKey;
+    const res = await this.request('/instance/logout', {
+      method: 'DELETE',
+      headers: { apikey: token }
+    });
+    if (res.ok || res.status !== 404) return res;
+
     return await this.request(`/instance/logout/${instanceName}`, {
       method: 'DELETE'
     });
@@ -539,6 +640,13 @@ export class EvolutionGoClient {
    */
   async deleteInstance(tenantId) {
     const instanceName = this.cleanInstanceName(tenantId);
+    const inst = await this.findInstance(tenantId);
+    if (inst?.id) {
+      const res = await this.request(`/instance/delete/${inst.id}`, {
+        method: 'DELETE'
+      });
+      if (res.ok || res.status !== 404) return res;
+    }
     return await this.request(`/instance/delete/${instanceName}`, {
       method: 'DELETE'
     });

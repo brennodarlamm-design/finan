@@ -21,4 +21,8 @@ esbuild.buildSync({
     '__SENTRY_RELEASE__': JSON.stringify(commit)
   }
 });
+const fs = require('fs');
+try {
+  fs.copyFileSync(path.join(root, 'js', 'sentry.js'), path.join(root, 'frontend', 'core', 'sentry.js'));
+} catch {}
 console.log(`[Sentry] Bundle gerado com release: ${commit}`);
