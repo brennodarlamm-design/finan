@@ -167,7 +167,7 @@ export class EvolutionGoClient {
    * Normaliza números de telefone garantindo padrão E.164 brasileiro quando aplicável
    */
   normalizePhoneNumber(phone) {
-    let clean = String(phone || '').replace(/\D/g, '');
+    let clean = String(phone || '').split(/[:@]/)[0].replace(/\D/g, '');
     if (!clean) return '';
     // Adiciona código do Brasil 55 se o usuário informou DDD + número (10 ou 11 dígitos)
     if ((clean.length === 10 || clean.length === 11) && !clean.startsWith('55')) {
@@ -285,9 +285,21 @@ export class EvolutionGoClient {
    */
   async findInstance(tenantId) {
     const instanceName = this.cleanInstanceName(tenantId);
+    const now = Date.now();
+    if (!this._instanceCache) this._instanceCache = new Map();
+    const cached = this._instanceCache.get(instanceName);
+    if (cached && (now - cached.timestamp < 1500)) {
+      return cached.data;
+    }
+
     try {
       const res = await this.request('/instance/all', { recordFailure: false });
       if (!res.ok || !Array.isArray(res.data?.data)) return null;
+      res.data.data.forEach(item => {
+        if (item.name) {
+          this._instanceCache.set(item.name, { timestamp: now, data: item });
+        }
+      });
       return res.data.data.find(i => i.name === instanceName) || null;
     } catch {
       return null;
@@ -415,7 +427,7 @@ export class EvolutionGoClient {
     const inst = await this.findInstance(tenantId);
     if (inst) {
       const connected = Boolean(inst.connected);
-      const connectedNumber = inst.jid ? inst.jid.replace(/@.*$/, '') : null;
+      const connectedNumber = inst.jid ? inst.jid.replace(/[:@].*$/, '') : null;
       return {
         ok: true,
         connected,
@@ -468,10 +480,12 @@ export class EvolutionGoClient {
     }
 
     const token = inst?.token || this.apiKey;
+    const sendTimeoutMs = Math.max(this.timeoutMs, 12000);
 
     // Tenta primeiro /send/text (Evolution Go oficial)
     const res = await this.request('/send/text', {
       method: 'POST',
+      timeoutMs: sendTimeoutMs,
       headers: { apikey: token },
       body: {
         number: cleanPhone,
@@ -486,6 +500,7 @@ export class EvolutionGoClient {
     // Fallback para rota legada v1/v2 caso a API externa seja NodeJS
     return await this.request(`/message/sendText/${instanceName}`, {
       method: 'POST',
+      timeoutMs: sendTimeoutMs,
       body: {
         number: cleanPhone,
         text: String(text || '').trim()
@@ -513,8 +528,11 @@ export class EvolutionGoClient {
       };
     }
 
+    const mediaTimeoutMs = Math.max(this.timeoutMs, 15000);
+
     return await this.request(`/message/sendMedia/${instanceName}`, {
       method: 'POST',
+      timeoutMs: mediaTimeoutMs,
       body: {
         number: cleanPhone,
         media: base64,

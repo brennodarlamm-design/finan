@@ -531,7 +531,7 @@ const WhatsApp = {
     const inicial = await this.consultarSessao();
     this.renderModalEstado(inicial);
 
-    // Inicia polling a cada 2.5 segundos enquanto o modal estiver aberto
+    // Inicia polling a cada 4 segundos enquanto o modal estiver aberto
     this._pollTimer = setInterval(async () => {
       // Se o modal foi fechado pelo usuário, cancela o timer
       if (!document.getElementById('wa-conexao-modal')) {
@@ -555,10 +555,17 @@ const WhatsApp = {
         if (badgeTel && atual.connectedNumber) {
           badgeTel.innerHTML = `Número ativo: <strong style="color:var(--success);">${this.formatarTelefone(atual.connectedNumber)}</strong>`;
         }
+        // Para o polling para não sobrecarregar o container
+        clearInterval(this._pollTimer);
+        this._pollTimer = null;
+      } else if (atual.connected) {
+        // Já está conectado, para o polling
+        clearInterval(this._pollTimer);
+        this._pollTimer = null;
       } else if (prevStatus !== atual.status || (atual.qrDataUrl && atual.qrDataUrl !== prevQR)) {
         this.renderModalEstado(atual);
       }
-    }, 2500);
+    }, 4000);
   },
 
   renderModalEstado(session) {
@@ -775,7 +782,7 @@ const WhatsApp = {
   async executarTesteConexao() {
     const input = document.getElementById('wa-teste-phone');
     const raw = input?.value || this.getTelefonePadrao();
-    const limpo = String(raw).replace(/\D/g, '');
+    const limpo = String(raw).split(':')[0].replace(/\D/g, '');
 
     if (!limpo || limpo.length < 10) {
       Utils.toast('Informe um número válido com DDD para o teste.', 'warning');
