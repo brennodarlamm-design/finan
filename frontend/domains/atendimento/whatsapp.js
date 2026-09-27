@@ -807,7 +807,7 @@ const WhatsApp = {
         Utils.toast('✅ Mensagem de teste enviada com sucesso para o WhatsApp!', 'success');
       } else if (data.notConnected || res.status === 503 || (data.error && data.error.includes('não está conectado'))) {
         Utils.toast('⚠️ WhatsApp desconectado: Escaneie o QR Code para parear o aparelho.', 'warning');
-        this.forcarNovoQR();
+        this.abrirModalConexao();
       } else {
         Utils.toast('⚠️ Erro ao enviar: ' + (data.error || 'Verifique o status do aparelho'), 'warning');
       }

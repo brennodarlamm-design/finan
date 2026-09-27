@@ -323,7 +323,7 @@ export class EvolutionGoClient {
     if (instanceId && webhookUrl) {
       await this.request(`/instance/${instanceId}/advanced-settings`, {
         method: 'PUT',
-        headers: { apikey: this.apiKey },
+        headers: { apikey: token },
         body: { webhookUrl, webhookEnabled: true }
       }).catch(() => {});
     }
@@ -458,6 +458,15 @@ export class EvolutionGoClient {
     }
 
     const inst = await this.findInstance(tenantId);
+    if (inst && inst.connected === false) {
+      return {
+        ok: false,
+        status: 503,
+        notConnected: true,
+        error: 'WhatsApp desconectado. Leia o QR Code no painel de atendimento antes de enviar mensagens.'
+      };
+    }
+
     const token = inst?.token || this.apiKey;
 
     // Tenta primeiro /send/text (Evolution Go oficial)
@@ -492,6 +501,16 @@ export class EvolutionGoClient {
     const cleanPhone = this.normalizePhoneNumber(phone);
     if (!cleanPhone) {
       return { ok: false, status: 400, error: 'Telefone de destino inválido.' };
+    }
+
+    const inst = await this.findInstance(tenantId);
+    if (inst && inst.connected === false) {
+      return {
+        ok: false,
+        status: 503,
+        notConnected: true,
+        error: 'WhatsApp desconectado. Leia o QR Code no painel de atendimento antes de enviar mensagens.'
+      };
     }
 
     return await this.request(`/message/sendMedia/${instanceName}`, {
