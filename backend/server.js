@@ -860,16 +860,17 @@ app.post('/send-message', requireAuth, async (req, res) => {
     }
 
     // Disparo 100% via Evolution Go (Golang WhatsApp Engine)
+    const cleanPhone = String(phone || '').includes(':') ? String(phone).split(':')[0].replace(/\D/g, '') : destPhone;
     let evoResult;
     if (base64) {
-      evoResult = await evolutionGo.sendMediaMessage(tenantId, destPhone, {
+      evoResult = await evolutionGo.sendMediaMessage(tenantId, cleanPhone, {
         base64: String(base64).replace(/^data:[^;]+;base64,/, ''),
         mimeType: String(mimeType || 'application/pdf').split(';')[0].trim().toLowerCase(),
         fileName: fileName || 'documento.pdf',
         caption: msgText
       });
     } else {
-      evoResult = await evolutionGo.sendTextMessage(tenantId, destPhone, msgText);
+      evoResult = await evolutionGo.sendTextMessage(tenantId, cleanPhone, msgText);
     }
 
     if (evoResult.ok) {
