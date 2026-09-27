@@ -549,7 +549,30 @@ export class EvolutionGoClient {
     }
 
     const mediaTimeoutMs = Math.max(this.timeoutMs, 15000);
+    const token = inst?.token || this.apiKey;
+    const mediaUrl = url || base64;
+    const isImage = String(mimeType || '').toLowerCase().startsWith('image/');
+    const mediaType = isImage ? 'image' : 'document';
 
+    // Rota oficial do Evolution Go: POST /send/media
+    const res = await this.request('/send/media', {
+      method: 'POST',
+      timeoutMs: mediaTimeoutMs,
+      headers: { apikey: token },
+      body: {
+        number: cleanPhone,
+        url: mediaUrl,
+        type: mediaType,
+        fileName: fileName || (isImage ? 'imagem.jpg' : 'documento.pdf'),
+        caption: caption || undefined
+      }
+    });
+
+    if (res.ok || res.status !== 404) {
+      return res;
+    }
+
+    // Fallback para rota legada v1/v2 caso a API externa seja NodeJS
     return await this.request(`/message/sendMedia/${instanceName}`, {
       method: 'POST',
       timeoutMs: mediaTimeoutMs,
