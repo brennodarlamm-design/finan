@@ -861,22 +861,40 @@ app.post('/send-message', requireAuth, async (req, res) => {
 
     // Disparo 100% via Evolution Go (Golang WhatsApp Engine)
     const cleanPhone = String(phone || '').includes(':') ? String(phone).split(':')[0].replace(/\D/g, '') : destPhone;
+
+    // Suporte resiliente a fallback para instância master:
+    // Se o tenant solicitado não possui instância conectada, mas a instância master do sistema está ativa,
+    // permite envio da mensagem usando a instância master do FinGo.
+    let effectiveTenantId = tenantId;
+    const masterTenant = (process.env.TARGET_TENANT_ID || process.env.FINOBRA_MASTER_TENANT || 'angelim').trim();
+    if (tenantId !== masterTenant) {
+      const requestedInst = await evolutionGo.findInstance(tenantId);
+      if (!requestedInst || !requestedInst.connected) {
+        const masterInst = await evolutionGo.findInstance(masterTenant);
+        if (masterInst && masterInst.connected) {
+          console.log(`ℹ️ [SendMessage] Tenant "${tenantId}" não possui WhatsApp conectado. Usando instância master "${masterTenant}".`);
+          effectiveTenantId = masterTenant;
+        }
+      }
+    }
+
     let evoResult;
     if (base64) {
-      evoResult = await evolutionGo.sendMediaMessage(tenantId, cleanPhone, {
+      evoResult = await evolutionGo.sendMediaMessage(effectiveTenantId, cleanPhone, {
         base64: String(base64).replace(/^data:[^;]+;base64,/, ''),
         mimeType: String(mimeType || 'application/pdf').split(';')[0].trim().toLowerCase(),
         fileName: fileName || 'documento.pdf',
         caption: msgText
       });
     } else {
-      evoResult = await evolutionGo.sendTextMessage(tenantId, cleanPhone, msgText);
+      evoResult = await evolutionGo.sendTextMessage(effectiveTenantId, cleanPhone, msgText);
     }
 
     if (evoResult.ok) {
       return res.json({
         success: true,
-        tenantId,
+        tenantId: effectiveTenantId,
+        requestedTenantId: tenantId,
         messageId: evoResult.data?.key?.id || evoResult.data?.messageId || 'evo-msg-ok',
         to: destPhone,
         engine: 'evolution-go'

@@ -293,7 +293,7 @@ export class EvolutionGoClient {
     }
 
     try {
-      const res = await this.request('/instance/all', { recordFailure: false });
+      const res = await this.request('/instance/all', { timeoutMs: 5000, recordFailure: false });
       if (!res.ok || !Array.isArray(res.data?.data)) return null;
       res.data.data.forEach(item => {
         if (item.name) {
@@ -469,7 +469,17 @@ export class EvolutionGoClient {
       return { ok: false, status: 400, error: 'Telefone de destino inválido.' };
     }
 
-    const inst = await this.findInstance(tenantId);
+    let inst = await this.findInstance(tenantId);
+    if (!inst) {
+      const masterTenant = (process.env.TARGET_TENANT_ID || process.env.FINOBRA_MASTER_TENANT || 'angelim').trim();
+      if (tenantId !== masterTenant) {
+        const masterInst = await this.findInstance(masterTenant);
+        if (masterInst && masterInst.connected) {
+          inst = masterInst;
+        }
+      }
+    }
+
     if (inst && inst.connected === false) {
       return {
         ok: false,
@@ -518,7 +528,17 @@ export class EvolutionGoClient {
       return { ok: false, status: 400, error: 'Telefone de destino inválido.' };
     }
 
-    const inst = await this.findInstance(tenantId);
+    let inst = await this.findInstance(tenantId);
+    if (!inst) {
+      const masterTenant = (process.env.TARGET_TENANT_ID || process.env.FINOBRA_MASTER_TENANT || 'angelim').trim();
+      if (tenantId !== masterTenant) {
+        const masterInst = await this.findInstance(masterTenant);
+        if (masterInst && masterInst.connected) {
+          inst = masterInst;
+        }
+      }
+    }
+
     if (inst && inst.connected === false) {
       return {
         ok: false,
