@@ -296,113 +296,115 @@ export class EvolutionGoClient {
 
   /**
    * Cria ou garante a existência de uma instância do tenant.
-   * Configura webhook com eventos explícitos conforme documentação oficial:
-   * https://docs.evolutionfoundation.com.br/evolution-api/configuration/env
+   * Evolution Go v0.7.2: webhook NÃO é aceito em /instance/create;
+   * deve ser configurado via /instance/:id/advanced-settings após criação.
    */
   async createInstance(tenantId) {
     const instanceName = this.cleanInstanceName(tenantId);
-    const token = `token_${instanceName}_123`;
+    const token = `token_${instanceName}_fingo`;
     const webhookUrl = (process.env.EVOLUTION_GO_WEBHOOK_URL || '').trim();
 
-    // No Evolution Go (Golang), o body exige "name" e "token"
-    // Referência: https://docs.evolutionfoundation.com.br/evolution-go/get-all-instances
-    const body = {
-      name: instanceName,
-      token,
-      qrcode: true
-    };
-
-    if (webhookUrl) {
-      // Configurar webhook com eventos críticos explícitos (documentação oficial)
-      body.webhook = webhookUrl;
-      body.webhook_by_events = true;
-      body.events = [
-        'QRCODE_UPDATED',
-        'CONNECTION_UPDATE',
-        'MESSAGES_UPSERT',
-        'MESSAGES_UPDATE',
-        'SEND_MESSAGE'
-      ];
-    }
-
+    // Cria a instância com global API key
     const res = await this.request('/instance/create', {
       method: 'POST',
-      body
+      body: { name: instanceName, token }
     });
 
-    // Inicia a geração imediata do QR code conectando a instância criada
+    const instanceId = res.data?.data?.id || res.data?.id;
+
+    // Conecta imediatamente usando o token da instância
     await this.request('/instance/connect', {
       method: 'POST',
       headers: { apikey: token },
       body: {}
     }).catch(() => {});
 
+    // Configura webhook via advanced-settings se disponível
+    if (instanceId && webhookUrl) {
+      await this.request(`/instance/${instanceId}/advanced-settings`, {
+        method: 'PUT',
+        headers: { apikey: this.apiKey },
+        body: { webhookUrl, webhookEnabled: true }
+      }).catch(() => {});
+    }
+
     return res;
   }
 
   /**
-   * Obtém o QR Code em base64 da instância
-   * Usa timeout maior (5000ms) para acomodar cold-start do Render Free tier
+   * Obtém o QR Code em base64 da instância.
+   * No Evolution Go v0.7.2, o qrcode já é retornado no campo `qrcode` de
+   * /instance/all após chamar /instance/connect com o token da instância.
+   * Timeout maior (5000ms) para acomodar cold-start do Render Free tier.
    */
   async getQrCode(tenantId) {
-    const instanceName = this.cleanInstanceName(tenantId);
-    // Timeout maior especificamente para QR Code (cold-start pode demorar ~30s,
-    // mas a instância já deve estar up antes desta chamada)
     const qrTimeoutMs = Math.max(this.timeoutMs, 5000);
 
     let inst = await this.findInstance(tenantId);
     if (!inst) {
       await this.createInstance(tenantId);
+      // Aguarda um momento para o QR ser gerado
+      await new Promise(r => setTimeout(r, 1500));
       inst = await this.findInstance(tenantId);
     }
 
     if (inst) {
+      // Se já conectado, retornar status conectado
+      if (inst.connected) {
+        return { ok: true, connected: true, status: 'connected', qrDataUrl: null };
+      }
+
       let rawCode = inst.qrcode || '';
-      if (!rawCode && !inst.connected) {
+
+      // Se não tem QR ainda, chamar /instance/connect com o token da instância
+      if (!rawCode && inst.token) {
         await this.request('/instance/connect', {
           method: 'POST',
           timeoutMs: qrTimeoutMs,
-          headers: { apikey: inst.token || this.apiKey },
+          headers: { apikey: inst.token },
           body: {}
         }).catch(() => {});
 
-        const qrFetch = await this.request('/instance/qr', {
-          timeoutMs: qrTimeoutMs,
-          headers: { apikey: inst.token || this.apiKey }
-        });
-        if (qrFetch.ok && qrFetch.data?.data?.qrcode) {
-          rawCode = qrFetch.data.data.qrcode;
-        }
+        // Re-buscar instância para pegar QR atualizado
+        await new Promise(r => setTimeout(r, 1000));
+        const refreshed = await this.findInstance(tenantId);
+        rawCode = refreshed?.qrcode || '';
       }
 
       if (rawCode) {
-        const base64Part = rawCode.split('|')[0].trim();
-        const qrDataUrl = base64Part.startsWith('data:') ? base64Part : `data:image/png;base64,${base64Part}`;
+        // O qrcode pode vir como "data:image/png;base64,...|pairing_code_url"
+        const parts = rawCode.split('|');
+        const imgPart = parts[0].trim();
+        const qrDataUrl = imgPart.startsWith('data:') ? imgPart : `data:image/png;base64,${imgPart}`;
         return {
           ok: true,
           qrDataUrl,
-          pairingCode: rawCode.includes('|') ? rawCode.split('|')[1] : null,
+          pairingCode: parts[1] || null,
           status: 'qr_ready'
         };
       }
     }
 
-    // Fallback legado para /instance/:name/qrcode
-    const res = await this.request(`/instance/${instanceName}/qrcode`, { timeoutMs: qrTimeoutMs });
-    if (res.ok && res.data) {
-      const rawCode = res.data.base64 || res.data.qrcode || res.data.code || null;
-      let qrDataUrl = null;
-      if (rawCode) {
-        qrDataUrl = rawCode.startsWith('data:') ? rawCode : `data:image/png;base64,${rawCode}`;
+    // Fallback: tentar /instance/qr com token da instância
+    if (inst?.token) {
+      const res = await this.request('/instance/qr', {
+        timeoutMs: qrTimeoutMs,
+        headers: { apikey: inst.token }
+      });
+      if (res.ok && res.data?.data?.qrcode) {
+        const rawCode = res.data.data.qrcode;
+        const parts = rawCode.split('|');
+        const imgPart = parts[0].trim();
+        return {
+          ok: true,
+          qrDataUrl: imgPart.startsWith('data:') ? imgPart : `data:image/png;base64,${imgPart}`,
+          pairingCode: parts[1] || null,
+          status: 'qr_ready'
+        };
       }
-      return {
-        ok: true,
-        qrDataUrl,
-        pairingCode: res.data.pairingCode || null,
-        status: res.data.status || 'qr_ready'
-      };
     }
-    return res;
+
+    return { ok: false, status: 'unavailable', error: 'QR code not available' };
   }
 
   /**
@@ -729,6 +731,7 @@ export class EvolutionGoClient {
         connected: false,
         connectedNumber: null,
         qrDataUrl: qrRes.qrDataUrl,
+        pairingCode: qrRes.pairingCode || null,
         lastConnectedAt: null,
         engine: 'evolution-go'
       };
