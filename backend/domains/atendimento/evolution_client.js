@@ -295,7 +295,9 @@ export class EvolutionGoClient {
   }
 
   /**
-   * Cria ou garante a existência de uma instância do tenant
+   * Cria ou garante a existência de uma instância do tenant.
+   * Configura webhook com eventos explícitos conforme documentação oficial:
+   * https://docs.evolutionfoundation.com.br/evolution-api/configuration/env
    */
   async createInstance(tenantId) {
     const instanceName = this.cleanInstanceName(tenantId);
@@ -303,6 +305,7 @@ export class EvolutionGoClient {
     const webhookUrl = (process.env.EVOLUTION_GO_WEBHOOK_URL || '').trim();
 
     // No Evolution Go (Golang), o body exige "name" e "token"
+    // Referência: https://docs.evolutionfoundation.com.br/evolution-go/get-all-instances
     const body = {
       name: instanceName,
       token,
@@ -310,7 +313,16 @@ export class EvolutionGoClient {
     };
 
     if (webhookUrl) {
+      // Configurar webhook com eventos críticos explícitos (documentação oficial)
       body.webhook = webhookUrl;
+      body.webhook_by_events = true;
+      body.events = [
+        'QRCODE_UPDATED',
+        'CONNECTION_UPDATE',
+        'MESSAGES_UPSERT',
+        'MESSAGES_UPDATE',
+        'SEND_MESSAGE'
+      ];
     }
 
     const res = await this.request('/instance/create', {
@@ -330,9 +342,14 @@ export class EvolutionGoClient {
 
   /**
    * Obtém o QR Code em base64 da instância
+   * Usa timeout maior (5000ms) para acomodar cold-start do Render Free tier
    */
   async getQrCode(tenantId) {
     const instanceName = this.cleanInstanceName(tenantId);
+    // Timeout maior especificamente para QR Code (cold-start pode demorar ~30s,
+    // mas a instância já deve estar up antes desta chamada)
+    const qrTimeoutMs = Math.max(this.timeoutMs, 5000);
+
     let inst = await this.findInstance(tenantId);
     if (!inst) {
       await this.createInstance(tenantId);
@@ -344,11 +361,13 @@ export class EvolutionGoClient {
       if (!rawCode && !inst.connected) {
         await this.request('/instance/connect', {
           method: 'POST',
+          timeoutMs: qrTimeoutMs,
           headers: { apikey: inst.token || this.apiKey },
           body: {}
         }).catch(() => {});
 
         const qrFetch = await this.request('/instance/qr', {
+          timeoutMs: qrTimeoutMs,
           headers: { apikey: inst.token || this.apiKey }
         });
         if (qrFetch.ok && qrFetch.data?.data?.qrcode) {
@@ -369,7 +388,7 @@ export class EvolutionGoClient {
     }
 
     // Fallback legado para /instance/:name/qrcode
-    const res = await this.request(`/instance/${instanceName}/qrcode`);
+    const res = await this.request(`/instance/${instanceName}/qrcode`, { timeoutMs: qrTimeoutMs });
     if (res.ok && res.data) {
       const rawCode = res.data.base64 || res.data.qrcode || res.data.code || null;
       let qrDataUrl = null;
@@ -544,43 +563,55 @@ export class EvolutionGoClient {
   }
 
   /**
-   * Interpreta e normaliza eventos recebidos via webhook do Evolution Go
+   * Interpreta e normaliza eventos recebidos via webhook do Evolution Go.
+   * Suporta tanto nomes de evento em snake_case quanto UPPER_CASE (ambos usados
+   * pela Evolution Foundation dependendo da versão e configuração).
+   * Referência de eventos: https://docs.evolutionfoundation.com.br/evolution-api/configuration/env
    */
   parseWebhookPayload(payload = {}) {
-    const event = String(payload.event || payload.type || '').toLowerCase();
+    // Normaliza para lowercase para comparação case-insensitive
+    const eventRaw = String(payload.event || payload.type || '');
+    const event = eventRaw.toLowerCase().replace(/_/g, '.');
     const instance = this.cleanInstanceName(payload.instance || payload.tenantId || 'public');
     const data = payload.data || payload;
 
+    // qrcode.updated / QRCODE_UPDATED / qrcode
     if (event === 'qrcode.updated' || event === 'qrcode') {
       const rawCode = data.base64 || data.qrcode || data.code || null;
       let qrDataUrl = null;
       if (rawCode) {
-        qrDataUrl = rawCode.startsWith('data:') ? rawCode : `data:image/png;base64,${rawCode}`;
+        const cleanCode = String(rawCode).split('|')[0].trim();
+        qrDataUrl = cleanCode.startsWith('data:') ? cleanCode : `data:image/png;base64,${cleanCode}`;
       }
       return {
         type: 'qrcode',
-        event,
+        event: eventRaw,
         tenantId: instance,
         qrDataUrl,
+        pairingCode: String(data.qrcode || '').includes('|') ? String(data.qrcode).split('|')[1] : null,
         raw: data
       };
     }
 
+    // connection.update / CONNECTION_UPDATE / status
     if (event === 'connection.update' || event === 'status') {
       const state = String(data.state || data.status || '').toLowerCase();
+      // 'open' e 'connected' indicam conexão ativa; 'close' indica desconexão
       const connected = state === 'open' || state === 'connected';
+      const disconnected = state === 'close' || state === 'disconnected';
       return {
         type: 'connection',
-        event,
+        event: eventRaw,
         tenantId: instance,
         state,
         connected,
-        status: connected ? 'connected' : (state === 'connecting' ? 'connecting' : 'disconnected'),
+        status: connected ? 'connected' : (disconnected ? 'disconnected' : 'connecting'),
         number: data.number || data.userJid || null,
         raw: data
       };
     }
 
+    // messages.upsert / MESSAGES_UPSERT / message
     if (event === 'messages.upsert' || event === 'message') {
       const key = data.key || {};
       const remoteJid = String(key.remoteJid || data.from || '').trim();
@@ -612,7 +643,7 @@ export class EvolutionGoClient {
 
       return {
         type: 'message',
-        event,
+        event: eventRaw,
         tenantId: instance,
         messageId: key.id || data.id || null,
         phone,
@@ -627,9 +658,25 @@ export class EvolutionGoClient {
       };
     }
 
+    // messages.update / MESSAGES_UPDATE (status de entrega)
+    if (event === 'messages.update') {
+      const updates = Array.isArray(data) ? data : [data];
+      return {
+        type: 'message_update',
+        event: eventRaw,
+        tenantId: instance,
+        updates: updates.map(u => ({
+          messageId: u.key?.id || u.id || null,
+          remoteJid: u.key?.remoteJid || null,
+          status: u.update?.status || u.status || null
+        })),
+        raw: data
+      };
+    }
+
     return {
       type: 'unknown',
-      event,
+      event: eventRaw,
       tenantId: instance,
       data
     };
