@@ -150,7 +150,7 @@ export async function migrateLegacyDocumentsToR2(env, { limit = 25 } = {}) {
   const rowsResult = await sql.query(
     `SELECT id, tenant_id, nome_arquivo, tipo_arquivo, tamanho_bytes, base64_data, url
        FROM documentos
-       WHERE url ILIKE '%blob.vercel-storage.com%'
+       WHERE (url IS NULL OR url = '' OR url ILIKE '%blob.vercel-storage.com%')
          AND base64_data IS NOT NULL
          AND length(base64_data) > 0
        ORDER BY created_at ASC NULLS LAST, id ASC
@@ -192,16 +192,25 @@ export async function migrateLegacyDocumentsToR2(env, { limit = 25 } = {}) {
         UPDATE documentos
         SET url = ${newUrl},
             tipo_arquivo = ${decoded.mime},
-            tamanho_bytes = ${decoded.bytes.length}
+            tamanho_bytes = ${decoded.bytes.length},
+            base64_data = NULL
         WHERE id = ${row.id}
           AND tenant_id = ${row.tenant_id}
-          AND url = ${row.url}
       `;
       migrated++;
     } catch (err) {
       failures.push({ id:row.id, error:String(err?.message || err).slice(0, 300) });
     }
   }
+
+  // Limpeza de segurança: anular base64_data duplicado para documentos que já possuem URL válida
+  await sql.query(
+    `UPDATE documentos
+        SET base64_data = NULL
+      WHERE url IS NOT NULL
+        AND url != ''
+        AND base64_data IS NOT NULL`
+  ).catch(() => {});
 
   if (failures.length) {
     await dispatchEdgeAlert(env, {

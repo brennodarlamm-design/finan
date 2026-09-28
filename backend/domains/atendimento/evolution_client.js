@@ -368,8 +368,15 @@ export class EvolutionGoClient {
 
       let rawCode = inst.qrcode || '';
 
-      // Se não tem QR ainda, chamar /instance/connect com o token da instância
-      if (!rawCode && inst.token) {
+      // Se não tem QR ainda, chamar /instance/connect com token da instância (cooldown de 25s para não interromper pairing)
+      const instanceName = this.cleanInstanceName(tenantId);
+      if (!this._lastConnectAttempts) this._lastConnectAttempts = new Map();
+      const lastConnect = this._lastConnectAttempts.get(instanceName) || 0;
+      const now = Date.now();
+      const canConnect = (now - lastConnect) > 25000;
+
+      if (!rawCode && inst.token && canConnect) {
+        this._lastConnectAttempts.set(instanceName, now);
         await this.request('/instance/connect', {
           method: 'POST',
           timeoutMs: qrTimeoutMs,
