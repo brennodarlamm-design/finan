@@ -331,12 +331,18 @@ export class EvolutionGoClient {
       body: {}
     }).catch(() => {});
 
-    // Configura webhook via advanced-settings se disponível
-    if (instanceId && webhookUrl) {
+    // Configura advanced-settings com ignoreGroups e ignoreStatus para blindar RAM e evitar travamentos por grupos
+    if (instanceId) {
       await this.request(`/instance/${instanceId}/advanced-settings`, {
         method: 'PUT',
         headers: { apikey: token },
-        body: { webhookUrl, webhookEnabled: true }
+        body: {
+          ignoreGroups: true,
+          ignoreStatus: true,
+          alwaysOnline: false,
+          readMessages: false,
+          rejectCall: false
+        }
       }).catch(() => {});
     }
 
