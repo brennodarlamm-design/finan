@@ -30,6 +30,7 @@
   "vars": {
     "FINOBRA_API_ORIGIN": "https://api.fingo.api.br",
     "FINOBRA_CANONICAL_ORIGIN": "https://fingo.api.br",
-    "RENDER_HEALTH_URL": "https://finan-backend-9rxw.onrender.com/healthz"
+    "RENDER_HEALTH_URL": "https://finan-backend-9rxw.onrender.com/healthz",
+    "EVOLUTION_GO_HEALTH_URL": "https://fingo-evolution-go.onrender.com/server/ok"
   }
 }

@@ -236,19 +236,24 @@ export const weeklyNeonMaintenance = schedules.task({
 
 /**
  * ── 4. ROBÔ KEEP-ALIVE RENDER (A cada 10 minutos 24/7) ─────────────────────
- * Dispara requisições periódicas para o backend Render mantendo o processo ativo
- * e prevenindo o desligamento automático (sleep de 15 minutos) do plano gratuito.
+ * Dispara requisições periódicas para o backend Render e o motor WhatsApp Evolution Go
+ * mantendo ambos os processos ativos e prevenindo o sleep de 15 minutos do plano gratuito.
  */
 export const renderKeepAlive = schedules.task({
   id: "render-keep-alive",
   cron: "*/10 * * * *", // A cada 10 minutos
   run: async () => {
     const targetUrl = process.env.RENDER_HEALTH_URL || "https://finan-backend-9rxw.onrender.com/healthz";
+    const evoUrl = process.env.EVOLUTION_GO_HEALTH_URL || "https://fingo-evolution-go.onrender.com/server/ok";
     try {
       const res = await fetch(targetUrl, {
         headers: { "User-Agent": "FinGo-KeepAlive/1.0 (Trigger.dev Robot)" },
         signal: AbortSignal.timeout(5000)
       });
+      fetch(evoUrl, {
+        headers: { "User-Agent": "FinGo-KeepAlive/1.0 (Trigger.dev Robot)" },
+        signal: AbortSignal.timeout(5000)
+      }).catch(() => {});
       if (!res.ok) {
         logger.warn("[Render Keep-Alive] Backend respondeu com erro HTTP.", { status: res.status });
         return { ok: false, status: res.status, url: targetUrl };

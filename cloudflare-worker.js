@@ -1737,14 +1737,23 @@ export default {
    */
   async scheduled(event, env, ctx) {
     const targetUrl = env.RENDER_HEALTH_URL || 'https://finan-backend-9rxw.onrender.com/healthz';
+    const evoUrl = env.EVOLUTION_GO_HEALTH_URL || 'https://fingo-evolution-go.onrender.com/server/ok';
     ctx.waitUntil(
-      fetch(targetUrl, {
-        headers: { 'User-Agent': 'FinGo-KeepAlive/1.0 (Cloudflare Edge Worker)' },
-        signal: AbortSignal.timeout(5000)
-      }).then(res => {
-        console.log(`[Cloudflare Keep-Alive] Ping no Render status: ${res.status}`);
+      Promise.allSettled([
+        fetch(targetUrl, {
+          headers: { 'User-Agent': 'FinGo-KeepAlive/1.0 (Cloudflare Edge Worker)' },
+          signal: AbortSignal.timeout(5000)
+        }),
+        fetch(evoUrl, {
+          headers: { 'User-Agent': 'FinGo-KeepAlive/1.0 (Cloudflare Edge Worker)' },
+          signal: AbortSignal.timeout(5000)
+        })
+      ]).then(([r1, r2]) => {
+        const s1 = r1.status === 'fulfilled' ? r1.value.status : 'err';
+        const s2 = r2.status === 'fulfilled' ? r2.value.status : 'err';
+        console.log(`[Cloudflare Keep-Alive] Render: ${s1}, Evolution Go: ${s2}`);
       }).catch(err => {
-        console.warn(`[Cloudflare Keep-Alive] Aviso no ping do Render: ${err.message}`);
+        console.warn(`[Cloudflare Keep-Alive] Aviso no ping: ${err.message}`);
       })
     );
 
