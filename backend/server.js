@@ -1632,6 +1632,11 @@ app.all('/api/webhook-pix', (req, res, next) => {
   next();
 }, apiRoute(() => planoHandler));
 
+app.all('/api/webhook-email', (req, res, next) => {
+  req.query = { ...req.query, sub: 'webhook_email' };
+  next();
+}, apiRoute(() => planoHandler));
+
 app.all('/api/cnpj', (req, res, next) => {
   req.query = { ...req.query, action: 'cnpj' };
   next();

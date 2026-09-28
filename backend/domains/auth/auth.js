@@ -967,7 +967,7 @@ export default async function handler(req, res) {
       if ((resendKey.startsWith('"') && resendKey.endsWith('"')) || (resendKey.startsWith("'") && resendKey.endsWith("'"))) {
         resendKey = resendKey.slice(1, -1);
       }
-      const fromEmail = String(process.env.RESEND_FROM_EMAIL || 'FinGo <suporte@fingo.api.br>').trim();
+      const fromEmail = String(process.env.RESEND_FROM_EMAIL || 'FinGo Comercial <comercial@fingo.api.br>').trim();
       const adminEmails = [
         'brennodarlam@gmail.com',
         'suporte@fingo.api.br'
@@ -1515,7 +1515,7 @@ export default async function handler(req, res) {
       const resendKey = (process.env.RESEND_API_KEY || '').trim();
       if ((resendKey || isTriggerConfigured()) && user.email) {
         try {
-          const fromEmail = (process.env.RESEND_FROM_EMAIL || 'FinGo <nao-responder@fingo.api.br>').trim();
+          const fromEmail = (process.env.RESEND_FROM_EMAIL || 'FinGo Segurança <no-reply@fingo.api.br>').trim();
           const emailSubject = 'FinGo — Código de Recuperação de Senha';
           const emailHtml = `
             <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 500px; margin: 0 auto; padding: 24px; border: 1px solid #e2e8f0; border-radius: 8px; background: #ffffff;">

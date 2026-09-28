@@ -18,6 +18,13 @@ const MasterAdmin = {
   _accessRequestsFilter: 'all',
   _accessRequestsSearch: '',
   _activeLeadToConvert: null,
+  _emails: null,
+  _emailsLoading: false,
+  _emailStats: null,
+  _emailFilterDir: 'all',
+  _emailFilterChannel: 'all',
+  _emailSearch: '',
+  _activeEmailDetail: null,
 
   async _fetchWithTimeout(url, options = {}, timeoutMs = 20000) {
     if (typeof Auth !== 'undefined' && typeof Auth._fetchWithTimeout === 'function') {
@@ -1124,6 +1131,7 @@ const MasterAdmin = {
     if (!this._integrity && !this._integrityLoading) this.carregarIntegridade().then(() => this.render(containerId));
     if (!this._bankAccounts && !this._bankAccountsLoading) this.carregarContasBancarias().then(() => this.render(containerId));
     if (!this._accessRequests && !this._accessRequestsLoading) this.carregarSolicitacoesAcesso().then(() => this.render(containerId));
+    if (!this._emails && !this._emailsLoading) this.carregarEmails().then(() => this.render(containerId));
 
     // Cálculo das métricas globais
     const totalEmpresas = empresas.length;
@@ -1149,7 +1157,8 @@ const MasterAdmin = {
     const isSistema = this._activeTab === 'sistema';
     const isContas = this._activeTab === 'contas';
     const isAgenda = this._activeTab === 'agenda';
-    const isEmpresas = !isSistema && !isContas && !isAgenda && !isLeads;
+    const isEmails = this._activeTab === 'emails';
+    const isEmpresas = !isSistema && !isContas && !isAgenda && !isLeads && !isEmails;
 
     let tabContent = '';
     if (isLeads) {
@@ -1158,6 +1167,8 @@ const MasterAdmin = {
       tabContent = this._renderAgendaDev();
     } else if (isContas) {
       tabContent = this._renderContasBancariasSaaS();
+    } else if (isEmails) {
+      tabContent = this._renderEmails();
     } else if (isSistema) {
       tabContent = this._renderSistema();
     } else {
@@ -1285,6 +1296,10 @@ const MasterAdmin = {
           </button>
           <button data-fb-click="MasterAdmin.switchTab" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="contas" style="padding:12px 20px;border:none;background:transparent;color:${isContas?'var(--accent)':'#94a3b8'};font-family:inherit;font-size:.875rem;font-weight:800;cursor:pointer;border-bottom:3px solid ${isContas?'var(--accent)':'transparent'};margin-bottom:-2px;transition:all .2s;display:flex;align-items:center;gap:8px;">
             <span>🏦</span> Contas Bancárias &amp; Conciliação
+          </button>
+          <button data-fb-click="MasterAdmin.switchTab" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="emails" style="padding:12px 20px;border:none;background:transparent;color:${isEmails?'#c084fc':'#94a3b8'};font-family:inherit;font-size:.875rem;font-weight:800;cursor:pointer;border-bottom:3px solid ${isEmails?'#7F49B8':'transparent'};margin-bottom:-2px;transition:all .2s;display:flex;align-items:center;gap:8px;">
+            <span>📧</span> Central de E-mails
+            ${(this._emailStats?.unread_received || 0) > 0 ? `<span style="background:#ef4444;color:#fff;font-size:.7rem;padding:2px 7px;border-radius:12px;font-weight:900;">${this._emailStats.unread_received}</span>` : ''}
           </button>
           <button data-fb-click="MasterAdmin.switchTab" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="agenda" style="padding:12px 20px;border:none;background:transparent;color:${isAgenda?'var(--accent)':'#94a3b8'};font-family:inherit;font-size:.875rem;font-weight:800;cursor:pointer;border-bottom:3px solid ${isAgenda?'var(--accent)':'transparent'};margin-bottom:-2px;transition:all .2s;display:flex;align-items:center;gap:8px;">
             <span>📅</span> Agenda &amp; Lives Dev
@@ -3004,6 +3019,493 @@ const MasterAdmin = {
             </table>
           </div>
         `}
+      </div>
+    `;
+  },
+
+  // ── MÉTODOS DA CENTRAL DE E-MAILS (HUB MULTICANAL) ─────────────────────────
+  async carregarEmails(force = false) {
+    if (this._emails && !force) return this._emails;
+    this._emailsLoading = true;
+    try {
+      const dir = this._emailFilterDir || 'all';
+      const chan = encodeURIComponent(this._emailFilterChannel || 'all');
+      const search = encodeURIComponent(this._emailSearch || '');
+      const url = `/api/admin?action=email_logs&direction=${dir}&channel=${chan}&search=${search}`;
+      const resp = await this._fetchWithTimeout(url, {
+        headers: (typeof Auth !== 'undefined' && Auth.getAuthHeaders) ? Auth.getAuthHeaders() : {}
+      });
+      if (resp.ok) {
+        const data = await resp.json();
+        this._emails = data.emails || [];
+        this._emailStats = data.stats || {};
+        const unreadCount = Number(this._emailStats?.unread_received || 0);
+        const badgeEl = document.getElementById('master-email-badge-header');
+        if (badgeEl) {
+          badgeEl.textContent = unreadCount;
+          badgeEl.style.display = unreadCount > 0 ? 'inline-block' : 'none';
+        }
+      }
+    } catch (err) {
+      console.warn('⚠️ [MasterAdmin] Falha ao carregar e-mails:', err.message);
+    } finally {
+      this._emailsLoading = false;
+    }
+    return this._emails || [];
+  },
+
+  filtrarEmailsDirecao(dir) {
+    this._emailFilterDir = dir;
+    this.carregarEmails(true).then(() => {
+      const target = document.getElementById('master-content-area') ? 'master-content-area' : 'route-content';
+      this.render(target);
+    });
+  },
+
+  filtrarEmailsCanal(canal) {
+    this._emailFilterChannel = canal;
+    this.carregarEmails(true).then(() => {
+      const target = document.getElementById('master-content-area') ? 'master-content-area' : 'route-content';
+      this.render(target);
+    });
+  },
+
+  buscarEmails(term) {
+    this._emailSearch = String(term || '').trim();
+    this.carregarEmails(true).then(() => {
+      const target = document.getElementById('master-content-area') ? 'master-content-area' : 'route-content';
+      this.render(target);
+    });
+  },
+
+  async recarregarEmails() {
+    await this.carregarEmails(true);
+    const target = document.getElementById('master-content-area') ? 'master-content-area' : 'route-content';
+    this.render(target);
+    if (typeof Utils !== 'undefined' && Utils.toast) Utils.toast('Central de E-mails atualizada!', 'info');
+  },
+
+  async abrirEmailModal(id) {
+    const modal = document.getElementById('master-email-view-modal');
+    if (!modal) return;
+    modal.style.display = 'flex';
+    const container = document.getElementById('master-email-modal-body-container');
+    if (container) container.innerHTML = '<div style="padding:40px;text-align:center;color:#94a3b8;">Carregando e-mail... ⏳</div>';
+
+    try {
+      const resp = await this._fetchWithTimeout(`/api/admin?action=email_detail&id=${encodeURIComponent(id)}`, {
+        headers: (typeof Auth !== 'undefined' && Auth.getAuthHeaders) ? Auth.getAuthHeaders() : {}
+      });
+      const data = await resp.json();
+      if (!resp.ok || !data.success) throw new Error(data.error || 'Erro ao abrir e-mail');
+
+      const email = data.email;
+      this._activeEmailDetail = email;
+
+      const dirBadge = document.getElementById('master-email-modal-dir-badge');
+      if (dirBadge) {
+        const isOut = email.direction === 'outbound';
+        dirBadge.textContent = isOut ? '📤 ENVIADO (OUTBOUND)' : '📥 RECEBIDO (INBOUND)';
+        dirBadge.style.background = isOut ? 'rgba(34,197,94,.15)' : 'rgba(56,189,248,.15)';
+        dirBadge.style.color = isOut ? '#86efac' : '#7dd3fc';
+        dirBadge.style.border = `1px solid ${isOut ? '#22c55e' : '#38bdf8'}`;
+      }
+
+      const chanBadge = document.getElementById('master-email-modal-channel-badge');
+      if (chanBadge) chanBadge.textContent = email.channel || 'contato@fingo.api.br';
+
+      const statusBadge = document.getElementById('master-email-modal-status-badge');
+      if (statusBadge) {
+        statusBadge.textContent = email.status ? String(email.status).toUpperCase() : 'OK';
+        statusBadge.style.background = email.status === 'failed' ? 'rgba(239,68,68,.2)' : 'rgba(16,185,129,.15)';
+        statusBadge.style.color = email.status === 'failed' ? '#fca5a5' : '#6ee7b7';
+      }
+
+      const subjEl = document.getElementById('master-email-modal-subject');
+      if (subjEl) subjEl.textContent = email.subject || '(Sem Assunto)';
+      const fromEl = document.getElementById('master-email-modal-from');
+      if (fromEl) fromEl.textContent = email.sender || '—';
+      const toEl = document.getElementById('master-email-modal-to');
+      if (toEl) toEl.textContent = email.recipient || '—';
+      const dtEl = document.getElementById('master-email-modal-date');
+      if (dtEl) dtEl.textContent = email.created_at ? new Date(email.created_at).toLocaleString('pt-BR') : '—';
+      const tNameEl = document.getElementById('master-email-modal-tenant-name');
+      if (tNameEl) tNameEl.textContent = email.tenant_nome || '— (Geral / Sem Construtora)';
+
+      let bodyContent = `
+        <div style="background:#0F1A0B;border:1px solid rgba(255,255,255,.1);border-radius:8px;padding:16px;margin-bottom:16px;">
+          <div style="font-size:.72rem;color:#94a3b8;margin-bottom:8px;text-transform:uppercase;font-weight:700;">Mensagem:</div>
+          <pre style="white-space:pre-wrap;font-family:inherit;font-size:.85rem;color:#e2e8f0;line-height:1.5;margin:0;">${this._esc(email.body_text || email.body_html || '(Sem conteúdo de texto)')}</pre>
+        </div>
+      `;
+
+      if (Array.isArray(data.thread) && data.thread.length > 0) {
+        bodyContent += `
+          <div style="margin-top:20px;border-top:1px solid rgba(255,255,255,.1);padding-top:16px;">
+            <div style="font-size:.75rem;font-weight:800;color:var(--accent2);margin-bottom:10px;">💬 Mensagens Relacionadas na Conversa (${data.thread.length}):</div>
+            <div style="display:flex;flex-direction:column;gap:8px;">
+              ${data.thread.map(t => `
+                <div style="background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06);border-radius:6px;padding:10px 12px;font-size:.78rem;">
+                  <div style="display:flex;justify-content:space-between;margin-bottom:4px;color:#94a3b8;">
+                    <span>${t.direction === 'outbound' ? '📤 Enviado' : '📥 Recebido'}: <strong>${this._esc(t.sender)}</strong> &rarr; ${this._esc(t.recipient)}</span>
+                    <span>${new Date(t.created_at).toLocaleString('pt-BR')}</span>
+                  </div>
+                  <div style="color:#cbd5e1;">${this._esc(t.snippet || t.subject)}</div>
+                </div>
+              `).join('')}
+            </div>
+          </div>
+        `;
+      }
+
+      if (container) container.innerHTML = bodyContent;
+      this.carregarEmails(true);
+    } catch (err) {
+      if (container) container.innerHTML = `<div style="padding:30px;color:#ef4444;text-align:center;">Falha ao carregar mensagem: ${this._esc(err.message)}</div>`;
+    }
+  },
+
+  fecharEmailModal() {
+    const modal = document.getElementById('master-email-view-modal');
+    if (modal) modal.style.display = 'none';
+    this._activeEmailDetail = null;
+  },
+
+  abrirModalNovoEmail(isReply = false) {
+    const modal = document.getElementById('master-email-compose-modal');
+    if (!modal) return;
+    modal.style.display = 'flex';
+
+    const active = (isReply === true && this._activeEmailDetail) ? this._activeEmailDetail : null;
+    const toInput = document.getElementById('email-compose-to');
+    const subjectInput = document.getElementById('email-compose-subject');
+    const bodyInput = document.getElementById('email-compose-body');
+    const channelSelect = document.getElementById('email-compose-channel');
+    const inReplyToInput = document.getElementById('email-compose-in-reply-to');
+    const tenantIdInput = document.getElementById('email-compose-tenant-id');
+    const title = document.getElementById('master-email-compose-title');
+    const fb = document.getElementById('email-compose-feedback');
+    if (fb) fb.style.display = 'none';
+
+    if (active) {
+      if (title) title.textContent = 'Responder E-mail';
+      const targetTo = active.direction === 'inbound' ? active.sender : active.recipient;
+      if (toInput) toInput.value = targetTo || '';
+      if (subjectInput) {
+        const subj = active.subject || '';
+        subjectInput.value = subj.startsWith('Re:') ? subj : `Re: ${subj}`;
+      }
+      if (bodyInput) bodyInput.value = '';
+      if (inReplyToInput) inReplyToInput.value = active.message_id || active.id || '';
+      if (tenantIdInput) tenantIdInput.value = active.tenant_id || '';
+      if (channelSelect && active.channel) {
+        if (active.channel.includes('suporte')) channelSelect.value = 'SUPORTE';
+        else if (active.channel.includes('comercial')) channelSelect.value = 'COMERCIAL';
+        else if (active.channel.includes('novidades')) channelSelect.value = 'NOVIDADES';
+        else channelSelect.value = 'CONTATO';
+      }
+    } else {
+      if (title) title.textContent = 'Novo Disparo de E-mail';
+      if (toInput) toInput.value = '';
+      if (subjectInput) subjectInput.value = '';
+      if (bodyInput) bodyInput.value = '';
+      if (inReplyToInput) inReplyToInput.value = '';
+      if (tenantIdInput) tenantIdInput.value = '';
+      if (channelSelect) channelSelect.value = 'CONTATO';
+    }
+  },
+
+  fecharModalNovoEmail() {
+    const modal = document.getElementById('master-email-compose-modal');
+    if (modal) modal.style.display = 'none';
+  },
+
+  async enviarEmailSubmit(event) {
+    if (event && event.preventDefault) event.preventDefault();
+    const to = (document.getElementById('email-compose-to')?.value || '').trim();
+    const subject = (document.getElementById('email-compose-subject')?.value || '').trim();
+    const body = (document.getElementById('email-compose-body')?.value || '').trim();
+    const channelKey = document.getElementById('email-compose-channel')?.value || 'CONTATO';
+    const inReplyTo = (document.getElementById('email-compose-in-reply-to')?.value || '').trim();
+    const tenantId = (document.getElementById('email-compose-tenant-id')?.value || '').trim();
+    const btn = document.getElementById('email-compose-submit-btn');
+    const fb = document.getElementById('email-compose-feedback');
+
+    if (!to || !to.includes('@')) {
+      alert('Informe um endereço de e-mail de destino válido.');
+      return;
+    }
+    if (!subject || !body) {
+      alert('Assunto e conteúdo da mensagem são obrigatórios.');
+      return;
+    }
+
+    if (btn) {
+      btn.disabled = true;
+      btn.innerText = 'Enviando... ⏳';
+    }
+
+    try {
+      const resp = await this._fetchWithTimeout('/api/admin', {
+        method: 'POST',
+        headers: (typeof Auth !== 'undefined' && Auth.getAuthHeaders) ? Auth.getAuthHeaders() : { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'email_send',
+          channelKey,
+          to,
+          subject,
+          text: body,
+          html: `<div style="font-family:sans-serif;font-size:14px;color:#333;line-height:1.6;">${body.replace(/\n/g, '<br>')}</div>`,
+          tenantId: tenantId || null,
+          inReplyTo: inReplyTo || null
+        })
+      });
+
+      const data = await resp.json().catch(() => ({}));
+      if (!resp.ok || !data.success) throw new Error(data.error || 'Falha ao enviar e-mail.');
+
+      if (fb) {
+        fb.style.display = 'block';
+        fb.style.background = 'rgba(34,197,94,.15)';
+        fb.style.color = '#86efac';
+        fb.textContent = `✅ E-mail enviado com sucesso pelo canal ${data.channel}!`;
+      }
+
+      if (typeof Utils !== 'undefined' && Utils.toast) {
+        Utils.toast('E-mail disparado com sucesso!', 'success');
+      }
+
+      setTimeout(() => {
+        this.fecharModalNovoEmail();
+        this.recarregarEmails();
+      }, 900);
+    } catch (err) {
+      if (fb) {
+        fb.style.display = 'block';
+        fb.style.background = 'rgba(239,68,68,.15)';
+        fb.style.color = '#fca5a5';
+        fb.textContent = `❌ Erro: ${err.message}`;
+      }
+      alert('Erro ao disparar e-mail: ' + err.message);
+    } finally {
+      if (btn) {
+        btn.disabled = false;
+        btn.innerText = 'Disparar E-mail 🚀';
+      }
+    }
+  },
+
+  async simularEmailInboundTeste() {
+    const from = prompt('Digite o e-mail do cliente simulado que está respondendo:', 'cliente.diretoria@construtora.com.br');
+    if (!from) return;
+    const subject = prompt('Digite o assunto da resposta:', 'Re: Proposta e Fatura FinGo');
+    if (!subject) return;
+    const msg = prompt('Digite o texto do e-mail recebido:', 'Olá, recebemos a fatura e o boleto PIX foi pago. Poderia confirmar a ativação do módulo BIM? Obrigado!');
+    if (!msg) return;
+
+    try {
+      const resp = await this._fetchWithTimeout('/api/admin', {
+        method: 'POST',
+        headers: (typeof Auth !== 'undefined' && Auth.getAuthHeaders) ? Auth.getAuthHeaders() : { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'email_simulate_inbound',
+          from,
+          to: 'contato@fingo.api.br',
+          subject,
+          text: msg
+        })
+      });
+
+      const data = await resp.json().catch(() => ({}));
+      if (!resp.ok || !data.success) throw new Error(data.error || 'Falha na simulação.');
+
+      alert('🎉 Sucesso! ' + data.message);
+      await this.recarregarEmails();
+    } catch (err) {
+      alert('Erro ao simular recebimento: ' + err.message);
+    }
+  },
+
+  _renderEmails() {
+    const emails = this._emails || [];
+    const stats = this._emailStats || { total_sent: 0, total_received: 0, unread_received: 0, failed_count: 0 };
+    const curDir = this._emailFilterDir || 'all';
+    const curChan = this._emailFilterChannel || 'all';
+
+    const channels = [
+      { key: 'all', label: '🌐 Todos os Canais', email: 'all' },
+      { key: 'contato', label: '👑 contato@ (Principal)', email: 'contato@fingo.api.br' },
+      { key: 'suporte', label: '🛠️ suporte@ (FinBot & SLA)', email: 'suporte@fingo.api.br' },
+      { key: 'comercial', label: '💳 comercial@ (Faturamento)', email: 'comercial@fingo.api.br' },
+      { key: 'novidades', label: '📢 novidades@ (Newsletter)', email: 'novidades@fingo.api.br' },
+      { key: 'no-reply', label: '🤖 no-reply@ (Transacional)', email: 'no-reply@fingo.api.br' }
+    ];
+
+    return `
+      <div>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:24px;flex-wrap:wrap;gap:14px;">
+          <div>
+            <div style="display:inline-flex;align-items:center;gap:6px;background:rgba(127,73,184,.15);border:1px solid #7F49B8;color:#c084fc;padding:4px 12px;border-radius:20px;font-size:.75rem;font-weight:800;margin-bottom:6px;">
+              <span>📧</span><span>CENTRAL DE E-MAILS &amp; COMUNICAÇÃO MULTICANAL</span>
+            </div>
+            <h2 style="font-size:1.6rem;font-weight:900;color:#fff;">Hub de E-mails FinGo</h2>
+            <div style="font-size:.82rem;color:#94a3b8;">Histórico unificado de envios (outbound) e respostas recebidas (inbound) via Resend</div>
+          </div>
+
+          <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+            <button type="button" data-fb-click="MasterAdmin.abrirModalNovoEmail" data-fb-click-n="0" class="btn-primary" style="padding:10px 18px;border-radius:8px;font-weight:800;display:inline-flex;align-items:center;gap:8px;font-size:.85rem;">
+              <span>✉️ Novo E-mail</span>
+            </button>
+            <button type="button" data-fb-click="MasterAdmin.simularEmailInboundTeste" data-fb-click-n="0" class="btn-action" style="background:rgba(56,189,248,.12);border-color:#38bdf8;color:#7dd3fc;padding:10px 14px;border-radius:8px;font-size:.82rem;font-weight:700;" title="Simular um e-mail de resposta recebido de um cliente">
+              <span>⚡ Simular Resposta</span>
+            </button>
+            <button type="button" data-fb-click="MasterAdmin.recarregarEmails" data-fb-click-n="0" class="btn-action" style="padding:10px 14px;border-radius:8px;font-size:.82rem;" title="Atualizar dados de e-mails">
+              <span>🔄 Atualizar</span>
+            </button>
+          </div>
+        </div>
+
+        <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(220px, 1fr));gap:16px;margin-bottom:26px;">
+          <div style="background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:18px 20px;">
+            <div style="font-size:.74rem;color:#94a3b8;text-transform:uppercase;letter-spacing:.05em;display:flex;justify-content:space-between;">
+              <span>Total Enviados (Outbound)</span>
+              <span>📤</span>
+            </div>
+            <div style="font-size:1.8rem;font-weight:900;color:#22c55e;margin:8px 0 4px;">${stats.total_sent || 0}</div>
+            <div style="font-size:.76rem;color:#94a3b8;">Faturas, OTPs e Avisos</div>
+          </div>
+
+          <div style="background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:18px 20px;">
+            <div style="font-size:.74rem;color:#94a3b8;text-transform:uppercase;letter-spacing:.05em;display:flex;justify-content:space-between;">
+              <span>Total Recebidos (Inbound)</span>
+              <span>📥</span>
+            </div>
+            <div style="font-size:1.8rem;font-weight:900;color:#38bdf8;margin:8px 0 4px;">${stats.total_received || 0}</div>
+            <div style="font-size:.76rem;color:#94a3b8;">Respostas e Novas Mensagens</div>
+          </div>
+
+          <div style="background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:18px 20px;">
+            <div style="font-size:.74rem;color:#94a3b8;text-transform:uppercase;letter-spacing:.05em;display:flex;justify-content:space-between;">
+              <span>Respostas Não Lidas</span>
+              <span>🟡</span>
+            </div>
+            <div style="font-size:1.8rem;font-weight:900;color:${(stats.unread_received||0)>0?'#f59e0b':'#94a3b8'};margin:8px 0 4px;">${stats.unread_received || 0}</div>
+            <div style="font-size:.76rem;color:#94a3b8;">Aguardando atendimento</div>
+          </div>
+
+          <div style="background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:18px 20px;">
+            <div style="font-size:.74rem;color:#94a3b8;text-transform:uppercase;letter-spacing:.05em;display:flex;justify-content:space-between;">
+              <span>Falhas / Bounces</span>
+              <span>⚠️</span>
+            </div>
+            <div style="font-size:1.8rem;font-weight:900;color:${(stats.failed_count||0)>0?'#ef4444':'#22c55e'};margin:8px 0 4px;">${stats.failed_count || 0}</div>
+            <div style="font-size:.76rem;color:#94a3b8;">Entrega rejeitada ou erro</div>
+          </div>
+        </div>
+
+        <div style="background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:12px 16px;margin-bottom:20px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+          <span style="font-size:.75rem;font-weight:800;color:#94a3b8;margin-right:6px;text-transform:uppercase;">Canal:</span>
+          ${channels.map(c => {
+            const isSel = curChan === c.email;
+            return `
+              <button type="button" data-fb-click="MasterAdmin.filtrarEmailsCanal" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(c.email)}" style="background:${isSel?'rgba(127,73,184,.25)':'rgba(255,255,255,.04)'};border:1px solid ${isSel?'#7F49B8':'rgba(255,255,255,.1)'};color:${isSel?'#c084fc':'#cbd5e1'};padding:6px 12px;border-radius:20px;font-size:.76rem;font-weight:${isSel?'800':'600'};cursor:pointer;transition:all .15s;">
+                ${c.label}
+              </button>
+            `;
+          }).join('')}
+        </div>
+
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:12px;">
+          <div style="display:flex;gap:6px;background:rgba(0,0,0,.3);padding:4px;border-radius:8px;border:1px solid rgba(255,255,255,.08);">
+            <button type="button" data-fb-click="MasterAdmin.filtrarEmailsDirecao" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="all" style="padding:6px 14px;border:none;border-radius:6px;font-size:.78rem;font-weight:700;cursor:pointer;background:${curDir==='all'?'var(--accent)':'transparent'};color:${curDir==='all'?'#0A0A0A':'#94a3b8'};">
+              Todos (${emails.length})
+            </button>
+            <button type="button" data-fb-click="MasterAdmin.filtrarEmailsDirecao" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="outbound" style="padding:6px 14px;border:none;border-radius:6px;font-size:.78rem;font-weight:700;cursor:pointer;background:${curDir==='outbound'?'#22c55e':'transparent'};color:${curDir==='outbound'?'#0A0A0A':'#94a3b8'};">
+              📤 Enviados
+            </button>
+            <button type="button" data-fb-click="MasterAdmin.filtrarEmailsDirecao" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="inbound" style="padding:6px 14px;border:none;border-radius:6px;font-size:.78rem;font-weight:700;cursor:pointer;background:${curDir==='inbound'?'#38bdf8':'transparent'};color:${curDir==='inbound'?'#0A0A0A':'#94a3b8'};">
+              📥 Recebidos ${stats.unread_received > 0 ? `(${stats.unread_received} novos)` : ''}
+            </button>
+          </div>
+        </div>
+
+        <div style="background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.08);border-radius:14px;overflow:hidden;">
+          <div style="overflow-x:auto;">
+            <table style="width:100%;border-collapse:collapse;text-align:left;font-size:.82rem;">
+              <thead>
+                <tr style="background:rgba(255,255,255,.03);border-bottom:1px solid rgba(255,255,255,.06);color:#94a3b8;font-size:.72rem;text-transform:uppercase;letter-spacing:.05em;">
+                  <th style="padding:12px 16px;">Direção</th>
+                  <th style="padding:12px 16px;">Canal FinGo</th>
+                  <th style="padding:12px 16px;">De &rarr; Para</th>
+                  <th style="padding:12px 16px;">Assunto &amp; Prévia</th>
+                  <th style="padding:12px 16px;">Status</th>
+                  <th style="padding:12px 16px;">Data / Hora</th>
+                  <th style="padding:12px 16px;text-align:right;">Ações</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${emails.length === 0 ? `
+                  <tr>
+                    <td colspan="7" style="padding:40px 20px;text-align:center;color:#64748b;">
+                      <div style="font-size:2rem;margin-bottom:8px;">📭</div>
+                      Nenhum e-mail registrado ainda para os filtros selecionados.<br>
+                      <button type="button" data-fb-click="MasterAdmin.simularEmailInboundTeste" data-fb-click-n="0" style="margin-top:12px;background:rgba(56,189,248,.15);border:1px solid #38bdf8;color:#7dd3fc;border-radius:6px;padding:6px 14px;font-size:.78rem;cursor:pointer;">
+                        ⚡ Simular Recebimento de E-mail de Teste
+                      </button>
+                    </td>
+                  </tr>
+                ` : emails.map(e => {
+                  const isOut = e.direction === 'outbound';
+                  const dirBadge = isOut
+                    ? `<span style="font-size:.7rem;padding:3px 8px;border-radius:10px;background:rgba(34,197,94,.15);color:#86efac;border:1px solid #22c55e;font-weight:800;">↗ Enviado</span>`
+                    : `<span style="font-size:.7rem;padding:3px 8px;border-radius:10px;background:rgba(56,189,248,.15);color:#7dd3fc;border:1px solid #38bdf8;font-weight:800;">↙ Recebido</span>`;
+                  
+                  const channelShort = this._esc((e.channel || 'contato@fingo.api.br').replace('@fingo.api.br', ''));
+                  const dePara = isOut
+                    ? `<div style="font-weight:700;color:#fff;">Para: ${this._esc(e.recipient)}</div><div style="font-size:.7rem;color:#94a3b8;">De: ${this._esc(e.sender)}</div>`
+                    : `<div style="font-weight:700;color:#fff;">De: ${this._esc(e.sender)}</div><div style="font-size:.7rem;color:#94a3b8;">Para: ${this._esc(e.recipient)}</div>`;
+
+                  const dt = e.created_at ? new Date(e.created_at).toLocaleString('pt-BR') : '—';
+                  const unreadDot = (!isOut && !e.is_read)
+                    ? `<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#ef4444;margin-right:6px;" title="Não lido"></span>`
+                    : '';
+
+                  return `
+                    <tr style="border-bottom:1px solid rgba(255,255,255,.05);background:${(!isOut && !e.is_read)?'rgba(56,189,248,.03)':'transparent'};">
+                      <td style="padding:12px 16px;">${dirBadge}</td>
+                      <td style="padding:12px 16px;">
+                        <span style="font-size:.74rem;background:rgba(255,255,255,.06);padding:2px 8px;border-radius:4px;color:#cbd5e1;font-family:monospace;">
+                          ${channelShort}@
+                        </span>
+                      </td>
+                      <td style="padding:12px 16px;">${dePara}</td>
+                      <td style="padding:12px 16px;max-width:320px;">
+                        <div style="font-weight:700;color:#f1f5f9;display:flex;align-items:center;">
+                          ${unreadDot}
+                          <span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${this._esc(e.subject || '(Sem assunto)')}</span>
+                        </div>
+                        <div style="font-size:.72rem;color:#94a3b8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px;">
+                          ${this._esc(e.snippet || '—')}
+                        </div>
+                      </td>
+                      <td style="padding:12px 16px;">
+                        <span style="font-size:.7rem;padding:2px 8px;border-radius:10px;background:${e.status==='failed'?'rgba(239,68,68,.2)':(e.status==='received'?'rgba(56,189,248,.15)':'rgba(34,197,94,.15)')};color:${e.status==='failed'?'#fca5a5':(e.status==='received'?'#7dd3fc':'#86efac')};font-weight:700;text-transform:uppercase;">
+                          ${this._esc(e.status || 'OK')}
+                        </span>
+                      </td>
+                      <td style="padding:12px 16px;color:#94a3b8;font-size:.74rem;">${dt}</td>
+                      <td style="padding:12px 16px;text-align:right;white-space:nowrap;">
+                        <button type="button" data-fb-click="MasterAdmin.abrirEmailModal" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(e.id)}" style="background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15);color:#fff;padding:5px 10px;border-radius:6px;font-size:.74rem;font-weight:700;cursor:pointer;margin-right:6px;" title="Ver mensagem completa">
+                          👁️ Ver
+                        </button>
+                      </td>
+                    </tr>
+                  `;
+                }).join('')}
+              </tbody>
+            </table>
+          </div>
+        </div>
       </div>
     `;
   }

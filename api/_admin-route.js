@@ -12,8 +12,8 @@ import {
   hashTenantAccessKey,
   tenantAccessKeyLast4
 } from './_tenant-access-key.js';
-import { triggerBillingSweep, isTriggerConfigured } from './_trigger-client.js';
 import { createOwnerSql } from './_database.js';
+import { EMAIL_CHANNELS, sendAndLogEmail, parseInboundEmailPayload } from './_email_service.js';
 
 /**
  * Retorna o cliente SQL com o role neondb_owner (conexão privilegiada).
@@ -498,6 +498,255 @@ export default async function handler(req, res) {
       `;
       await writeAudit(sql, req, { ...auth, tenantId:rows[0].tenant_id }, { acao:'suporte_resolvido', entidade:'support_conversation', entidadeId:conversationId });
       return res.status(200).json({ success:true });
+    }
+
+    // ── Central de E-mails Master (PATCH 55 — E-mail Hub) ─────────────────────
+    if (req.method === 'GET' && action === 'email_logs') {
+      const limit = Math.min(Math.max(Number.parseInt(req.query?.limit || '50', 10) || 50, 1), 200);
+      const offset = Math.max(Number.parseInt(req.query?.offset || '0', 10) || 0, 0);
+      const direction = String(req.query?.direction || 'all').trim().toLowerCase();
+      const channel = String(req.query?.channel || 'all').trim();
+      const search = String(req.query?.search || '').trim().toLowerCase();
+      const unreadOnly = req.query?.unreadOnly === 'true';
+
+      let rows = [];
+      let stats = {
+        total: 0,
+        total_sent: 0,
+        total_received: 0,
+        unread_received: 0,
+        failed_count: 0
+      };
+
+      try {
+        await sql`
+          CREATE TABLE IF NOT EXISTS email_messages (
+            id VARCHAR(80) PRIMARY KEY,
+            tenant_id VARCHAR(80),
+            direction VARCHAR(10) NOT NULL CHECK (direction IN ('outbound', 'inbound')),
+            channel VARCHAR(100) NOT NULL DEFAULT 'contato@fingo.api.br',
+            sender VARCHAR(255) NOT NULL,
+            recipient VARCHAR(255) NOT NULL,
+            reply_to VARCHAR(255) DEFAULT 'contato@fingo.api.br',
+            subject TEXT,
+            body_text TEXT,
+            body_html TEXT,
+            status VARCHAR(30) NOT NULL DEFAULT 'sent',
+            provider_id VARCHAR(100),
+            message_id VARCHAR(255),
+            in_reply_to VARCHAR(255),
+            metadata JSONB DEFAULT '{}'::jsonb,
+            is_read BOOLEAN NOT NULL DEFAULT FALSE,
+            created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+          );
+        `;
+
+        const statRows = await sql`
+          SELECT
+            COUNT(*) FILTER (WHERE direction = 'outbound')::int AS total_sent,
+            COUNT(*) FILTER (WHERE direction = 'inbound')::int AS total_received,
+            COUNT(*) FILTER (WHERE direction = 'inbound' AND is_read = FALSE)::int AS unread_received,
+            COUNT(*) FILTER (WHERE status IN ('failed', 'bounced'))::int AS failed_count
+          FROM email_messages;
+        `;
+        if (statRows.length) {
+          const sent = statRows[0].total_sent || 0;
+          const recv = statRows[0].total_received || 0;
+          stats = {
+            total: sent + recv,
+            total_sent: sent,
+            total_received: recv,
+            unread_received: statRows[0].unread_received || 0,
+            failed_count: statRows[0].failed_count || 0
+          };
+        }
+
+        rows = await sql`
+          SELECT
+            e.id, e.tenant_id, e.direction, e.channel, e.sender, e.recipient, e.reply_to,
+            e.subject, LEFT(COALESCE(e.body_text, ''), 180) AS snippet, e.status, e.provider_id,
+            e.message_id, e.in_reply_to, e.is_read, e.created_at,
+            COALESCE(t.nome_fantasia, t.razao_social, e.tenant_id, '') AS tenant_nome
+          FROM email_messages e
+          LEFT JOIN tenants t ON t.id = e.tenant_id
+          WHERE (${direction} = 'all' OR e.direction = ${direction})
+            AND (${channel} = 'all' OR e.channel = ${channel})
+            AND (${unreadOnly} = FALSE OR e.is_read = FALSE)
+            AND (${search} = '' OR (
+              LOWER(e.sender) LIKE ${'%' + search + '%'} OR
+              LOWER(e.recipient) LIKE ${'%' + search + '%'} OR
+              LOWER(COALESCE(e.subject, '')) LIKE ${'%' + search + '%'} OR
+              LOWER(COALESCE(e.body_text, '')) LIKE ${'%' + search + '%'}
+            ))
+          ORDER BY e.created_at DESC
+          LIMIT ${limit} OFFSET ${offset};
+        `;
+      } catch (logErr) {
+        console.warn('⚠️ [Admin email_logs] Falha ao consultar email_messages:', logErr.message);
+      }
+
+      return res.status(200).json({
+        success: true,
+        emails: rows,
+        stats,
+        channels: Object.values(EMAIL_CHANNELS),
+        pagination: { limit, offset, count: rows.length }
+      });
+    }
+
+    if (req.method === 'GET' && action === 'email_detail') {
+      const emailId = String(req.query?.id || '').trim();
+      if (!emailId) return res.status(400).json({ success: false, error: 'ID do e-mail não informado.' });
+
+      const rows = await sql`
+        SELECT
+          e.*,
+          COALESCE(t.nome_fantasia, t.razao_social, e.tenant_id, '') AS tenant_nome
+        FROM email_messages e
+        LEFT JOIN tenants t ON t.id = e.tenant_id
+        WHERE e.id = ${emailId}
+        LIMIT 1;
+      `;
+      if (!rows.length) return res.status(404).json({ success: false, error: 'E-mail não encontrado.' });
+
+      const email = rows[0];
+
+      if (email.direction === 'inbound' && !email.is_read) {
+        try {
+          await sql`UPDATE email_messages SET is_read = TRUE, updated_at = CURRENT_TIMESTAMP WHERE id = ${emailId};`;
+          email.is_read = true;
+        } catch {}
+      }
+
+      let thread = [];
+      try {
+        thread = await sql`
+          SELECT
+            id, direction, channel, sender, recipient, subject, LEFT(COALESCE(body_text, ''), 140) as snippet,
+            status, is_read, created_at
+          FROM email_messages
+          WHERE id != ${emailId}
+            AND (
+              in_reply_to = ${emailId} OR
+              id = ${email.in_reply_to || ''} OR
+              (sender = ${email.recipient} AND recipient = ${email.sender}) OR
+              (sender = ${email.sender} AND recipient = ${email.recipient})
+            )
+          ORDER BY created_at ASC
+          LIMIT 10;
+        `;
+      } catch {}
+
+      return res.status(200).json({
+        success: true,
+        email,
+        thread
+      });
+    }
+
+    if (req.method === 'POST' && action === 'email_mark_read') {
+      const emailId = String(req.body?.id || '').trim();
+      if (!emailId) return res.status(400).json({ success: false, error: 'ID obrigatório.' });
+      await sql`UPDATE email_messages SET is_read = TRUE, updated_at = CURRENT_TIMESTAMP WHERE id = ${emailId};`;
+      return res.status(200).json({ success: true });
+    }
+
+    if (req.method === 'POST' && action === 'email_send') {
+      const to = String(req.body?.to || '').trim();
+      const subject = String(req.body?.subject || '').trim();
+      const text = String(req.body?.text || '').trim();
+      const html = String(req.body?.html || '').trim();
+      const channelKey = String(req.body?.channelKey || 'CONTATO').trim().toUpperCase();
+      const tenantId = String(req.body?.tenantId || '').trim() || null;
+      const inReplyTo = String(req.body?.inReplyTo || '').trim() || null;
+
+      if (!to || !to.includes('@')) {
+        return res.status(400).json({ success: false, error: 'Destinatário de e-mail inválido.' });
+      }
+      if (!subject && !text && !html) {
+        return res.status(400).json({ success: false, error: 'Assunto ou conteúdo do e-mail é obrigatório.' });
+      }
+
+      const result = await sendAndLogEmail(sql, {
+        tenantId,
+        channelKey,
+        to,
+        subject,
+        text,
+        html,
+        inReplyTo,
+        metadata: { sent_by: auth.user?.username || 'master_superadmin' }
+      });
+
+      await writeAudit(sql, req, { ...auth, tenantId: tenantId || 'master' }, {
+        acao: 'email_enviado_master',
+        entidade: 'email_message',
+        entidadeId: result.id,
+        depois: { to, subject, channel: result.channel, status: result.status }
+      });
+
+      return res.status(200).json({
+        success: result.success,
+        id: result.id,
+        status: result.status,
+        channel: result.channel,
+        error: result.error
+      });
+    }
+
+    if (req.method === 'POST' && action === 'email_simulate_inbound') {
+      const from = String(req.body?.from || '').trim();
+      const to = String(req.body?.to || 'contato@fingo.api.br').trim();
+      const subject = String(req.body?.subject || '').trim();
+      const text = String(req.body?.text || '').trim();
+      const inReplyTo = String(req.body?.inReplyTo || '').trim() || null;
+
+      if (!from || !from.includes('@')) {
+        return res.status(400).json({ success: false, error: 'E-mail do remetente (cliente) é obrigatório.' });
+      }
+
+      const payload = parseInboundEmailPayload({
+        from,
+        to,
+        subject: subject || 'Resposta de Teste do Cliente',
+        text: text || 'Olá equipe FinGo, estou respondendo ao e-mail anterior sobre nossa conta.',
+        html: `<p>${text || 'Olá equipe FinGo, estou respondendo ao e-mail anterior sobre nossa conta.'}</p>`,
+        in_reply_to: inReplyTo
+      });
+
+      const emailId = `eml_in_${crypto.randomBytes(12).toString('hex')}`;
+      await sql`
+        INSERT INTO email_messages (
+          id, tenant_id, direction, channel, sender, recipient, reply_to,
+          subject, body_text, body_html, status, in_reply_to, metadata, is_read, created_at, updated_at
+        ) VALUES (
+          ${emailId},
+          null,
+          'inbound',
+          ${payload.channel},
+          ${payload.from},
+          ${payload.to},
+          ${payload.from},
+          ${payload.subject},
+          ${payload.text},
+          ${payload.html},
+          'received',
+          ${inReplyTo},
+          ${JSON.stringify({ simulated: true, simulated_by: auth.user?.username })}::jsonb,
+          false,
+          CURRENT_TIMESTAMP,
+          CURRENT_TIMESTAMP
+        );
+      `;
+
+      return res.status(200).json({
+        success: true,
+        id: emailId,
+        channel: payload.channel,
+        email: { id: emailId, channel: payload.channel, direction: 'inbound', is_read: false },
+        message: `Simulação concluída! Mensagem gravada no canal ${payload.channel}.`
+      });
     }
 
     // ── 1. GET ?action=tenants (Listar Construtoras com Métricas Reais do Neon) ──
@@ -1178,7 +1427,7 @@ export default async function handler(req, res) {
         if ((resendKey.startsWith('"') && resendKey.endsWith('"')) || (resendKey.startsWith("'") && resendKey.endsWith("'"))) {
           resendKey = resendKey.slice(1, -1);
         }
-        let emailFrom = String(process.env.RESEND_FROM_EMAIL || process.env.FINOBRA_SUPPORT_EMAIL_FROM || 'FinGo <suporte@fingo.api.br>').trim();
+        let emailFrom = String(process.env.RESEND_FROM_EMAIL || process.env.FINOBRA_BILLING_EMAIL_FROM || EMAIL_CHANNELS.COMERCIAL.formatted).trim();
         if ((emailFrom.startsWith('"') && emailFrom.endsWith('"')) || (emailFrom.startsWith("'") && emailFrom.endsWith("'"))) {
           emailFrom = emailFrom.slice(1, -1);
         }

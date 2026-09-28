@@ -3,6 +3,7 @@
 // fornecendo endpoints modulares, analíticos, inteligentes, seguros e de alto desempenho no Edge.
 
 import webhookPixHandler from './_webhook_pix.js';
+import webhookEmailHandler from './_webhook_email.js';
 import nfeHandler from './nfe.js';
 import usersHandler from './users.js';
 import dbHandler from './db.js';
@@ -28,6 +29,7 @@ export const V2_ROUTE_SPEC = [
   { method: 'GET', path: '/api/v2/system/metrics', desc: 'Métricas de telemetria, latência (P50/P95/P99) e tráfego' },
   // 2. Webhooks & Pagamentos
   { method: 'POST', path: '/api/v2/webhooks/pix', desc: 'Webhook bancário PIX segregado (sem query multiplexing)' },
+  { method: 'POST', path: '/api/v2/webhooks/email-inbound', desc: 'Webhook de e-mails recebidos e respostas (Resend Inbound / Cloudflare)' },
   // 3. Consultas Públicas
   { method: 'GET', path: '/api/v2/public/cnpj/:cnpj', desc: 'Consulta aberta de CNPJ na BrasilAPI' },
   { method: 'GET', path: '/api/v2/public/cep/:cep', desc: 'Consulta aberta de CEP na BrasilAPI / ViaCEP' },
@@ -942,6 +944,9 @@ export function resolveV2Route(pathname, searchParams) {
   // 2. Webhooks Segregados
   if (pathname === '/api/v2/webhooks/pix') {
     return { handler: webhookPixHandler, query, moduleName: 'v2-webhook-pix' };
+  }
+  if (pathname === '/api/v2/webhooks/email-inbound') {
+    return { handler: webhookEmailHandler, query, moduleName: 'v2-webhook-email' };
   }
 
   // 3. Consultas Públicas (CNPJ e CEP)

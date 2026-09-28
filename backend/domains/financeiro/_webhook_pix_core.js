@@ -437,7 +437,7 @@ export async function sendPaymentReceipt(record) {
   if (email && email.includes('@') && resendKey) {
     results.email.attempted = true;
     try {
-      const emailFrom = String(process.env.FINOBRA_SUPPORT_EMAIL_FROM || 'FinGo <suporte@fingo.api.br>').trim();
+      const emailFrom = String(process.env.FINOBRA_BILLING_EMAIL_FROM || process.env.RESEND_FROM_EMAIL || 'FinGo Financeiro <comercial@fingo.api.br>').trim();
       const subject = `🎉 FinGo — Pagamento Confirmado e Assinatura Renovada (${fmtVenc})`;
 
       const emailHtml = `

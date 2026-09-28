@@ -84,7 +84,12 @@ const frontendMap = {
   'js/master.js': 'frontend/domains/configuracoes/master.js',
   'js/dev-tenant-keys.js': 'frontend/domains/configuracoes/dev-tenant-keys.js',
   'js/ocr.js': 'frontend/domains/configuracoes/ocr.js',
-  'js/academia.js': 'frontend/domains/configuracoes/academia.js'
+  'js/academia.js': 'frontend/domains/configuracoes/academia.js',
+
+  // Shells de Aplicação
+  'master.html': 'frontend/master.html',
+  'app.html': 'frontend/app.html',
+  'bim.html': 'frontend/bim.html'
 };
 
 const backendMap = {
@@ -151,6 +156,8 @@ const backendMap = {
   'api/upload.js': 'backend/domains/integrations/upload.js',
   'api/admin.js': 'backend/domains/integrations/admin.js',
   'api/_admin-route.js': 'backend/domains/integrations/_admin-route.js',
+  'api/_email_service.js': 'backend/domains/integrations/_email_service.js',
+  'api/_webhook_email.js': 'backend/domains/integrations/_webhook_email.js',
   'api/audit.js': 'backend/domains/integrations/audit.js',
   'api/_audit.js': 'backend/domains/integrations/_audit.js',
   'api/_audit-route.js': 'backend/domains/integrations/_audit-route.js',

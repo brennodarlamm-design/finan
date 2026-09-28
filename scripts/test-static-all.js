@@ -118,7 +118,8 @@ const tests = [
   'scripts/test-review-remediation.js',
   'scripts/test-sefaz-dfe.js',
   'scripts/test-financeiro-core-hardening.js',
-  'scripts/test-upstash-redis-integration.js'
+  'scripts/test-upstash-redis-integration.js',
+  'scripts/test-email-hub.js'
 ].filter(fs.existsSync);
 
 const p50NativeSourceTests = new Set([

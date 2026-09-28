@@ -99,7 +99,8 @@ export const scheduledBillingSweep = schedules.task({
                 'Authorization': `Bearer ${resendKey}`
               },
               body: JSON.stringify({
-                from: process.env.FINOBRA_SUPPORT_EMAIL_FROM || 'FinGo <suporte@fingo.api.br>',
+                from: process.env.FINOBRA_BILLING_EMAIL_FROM || process.env.FINOBRA_SUPPORT_EMAIL_FROM || 'FinGo Financeiro <comercial@fingo.api.br>',
+                reply_to: 'comercial@fingo.api.br',
                 to: [t.email],
                 subject: `⚠️ Lembrete de Vencimento: ${pendentes.length} conta(s) pendente(s) — FinGo`,
                 html: emailHtml

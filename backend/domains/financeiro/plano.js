@@ -7,6 +7,7 @@ import { canManageTenant, canAccessModule, permissionError } from './_permission
 import { writeAudit } from './_audit.js';
 import { setEdgeCacheHeaders } from './_http.js';
 import webhookPixHandler from './_webhook_pix.js';
+import webhookEmailHandler from './_webhook_email.js';
 import { createTenantSql } from './_tenant-sql.js';
 import { createRuntimeSql } from './_database.js';
 import { getCachedTenant, invalidateTenantCache } from './_tenant-cache.js';
@@ -94,6 +95,16 @@ export default async function handler(req, res) {
 
   if (isWebhookPix) {
     return webhookPixHandler(req, res);
+  }
+
+  // ── DESPACHO PARA WEBHOOK DE E-MAILS RECEBIDOS (INBOUND) ─────────────────
+  const isWebhookEmail = req.query?.sub === 'webhook_email' ||
+    req.query?.scope === 'webhook_email' ||
+    req.query?.action === 'webhook_email' ||
+    String(req.url || '').includes('webhook-email');
+
+  if (isWebhookEmail) {
+    return webhookEmailHandler(req, res);
   }
 
   // ── CATÁLOGO PÚBLICO DE PREÇOS COM EDGE CACHING ──────────────────────────
