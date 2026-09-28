@@ -3171,6 +3171,67 @@ const MasterAdmin = {
     this._activeEmailDetail = null;
   },
 
+  _esc(v) {
+    if (typeof Utils !== 'undefined' && Utils.escapeHtml) return Utils.escapeHtml(String(v ?? ''));
+    return String(v ?? '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;');
+  },
+
+  _EMAIL_PRESETS: {
+    manual: {
+      channel: 'CONTATO',
+      subject: '',
+      head: '',
+      body: '',
+      ctaText: '',
+      ctaUrl: ''
+    },
+    boas_vindas: {
+      channel: 'COMERCIAL',
+      subject: 'Bem-vindo ao FinGo — Obras em Fluxo',
+      head: 'Sua conta corporativa no FinGo está ativa!',
+      body: 'Olá!\n\nSeja muito bem-vindo à FinGo — a plataforma de inteligência e gestão financeira para obras e construção civil.\n\nSua conta corporativa já foi provisionada com sucesso no nosso ambiente seguro. Você agora tem acesso em tempo real ao controle de fluxo de caixa, gestão de contratos, medições de campo, cotações com base SINAPI e relatórios executivos para sua diretoria.\n\nPara iniciar seu primeiro acesso, clique no botão abaixo ou utilize suas credenciais cadastradas.\n\nSe precisar de qualquer auxílio no onboarding da sua equipe, nosso time de engenharia de suporte está à sua inteira disposição.',
+      ctaText: 'Acessar Plataforma FinGo',
+      ctaUrl: 'https://finobra.app.br/app'
+    },
+    fatura_pix: {
+      channel: 'COMERCIAL',
+      subject: 'Fatura Disponível para Pagamento — FinGo',
+      head: 'Demonstrativo da sua Mensalidade FinGo',
+      body: 'Prezado cliente,\n\nInformamos que a fatura referente ao ciclo de serviços da sua assinatura FinGo já está disponível para liquidação.\n\nVocê pode efetuar o pagamento instantâneo via PIX com reconciliação automática em nosso sistema bancário. Basta acessar a central financeira ou utilizar o link seguro abaixo.\n\nApós o pagamento, o comprovante e a nota fiscal correspondente estarão disponíveis imediatamente no seu painel administrativo.\n\nCaso já tenha efetuado o pagamento, por favor desconsidere este aviso.',
+      ctaText: 'Visualizar Fatura & PIX',
+      ctaUrl: 'https://finobra.app.br/master'
+    },
+    suporte_finbot: {
+      channel: 'SUPORTE',
+      subject: 'Atualização no seu Chamado de Suporte — FinGo',
+      head: 'Posicionamento Técnico da Equipe FinGo',
+      body: 'Olá,\n\nSeu chamado de atendimento técnico foi analisado pelos nossos especialistas de suporte e engenharia da plataforma.\n\nRealizamos a verificação solicitada e registramos o andamento no histórico do seu canteiro de obras. Todas as rotinas operacionais continuam funcionando em alta disponibilidade.\n\nCaso tenha novas informações ou queira interagir diretamente com o atendente, você pode responder a este e-mail ou interagir via FinBot no painel da aplicação.',
+      ctaText: 'Acompanhar Atendimento',
+      ctaUrl: 'https://finobra.app.br/app'
+    },
+    radar_novidades: {
+      channel: 'NOVIDADES',
+      subject: 'Novidades da Plataforma FinGo: Recursos Atualizados',
+      head: 'O que há de novo na sua gestão de obras',
+      body: 'Olá, gestor!\n\nTemos o prazer de apresentar as mais recentes melhorias implementadas na plataforma FinGo para tornar sua rotina de obras ainda mais eficiente:\n\n• Central Multicanal de E-mails integrada diretamente ao Painel Master;\n• Leitor de NFe com conferência de impostos e automação de XML;\n• Visualizador BIM 3D com análise rápida de canteiro;\n• Relatórios executivos de fluxo de caixa exportáveis em PDF e Excel.\n\nAcesse sua plataforma agora para explorar essas novidades na prática.',
+      ctaText: 'Explorar Atualizações',
+      ctaUrl: 'https://finobra.app.br/app'
+    },
+    alerta_seguranca: {
+      channel: 'NO_REPLY',
+      subject: 'Alerta de Segurança da Conta — FinGo',
+      head: 'Novo Acesso ou Alteração de Segurança Detectada',
+      body: 'Identificamos uma atividade recente de login ou alteração nas credenciais de acesso associadas à sua conta na plataforma FinGo.\n\nSe essa ação foi realizada por você ou por um administrador autorizado da sua empresa, nenhuma providência adicional é necessária.\n\nSe você não reconhece esta atividade ou suspeita de uso não autorizado, recomendamos a troca imediata da sua senha e a ativação da autenticação em duas etapas (MFA/TOTP) através das configurações de perfil.',
+      ctaText: 'Revisar Segurança da Conta',
+      ctaUrl: 'https://finobra.app.br/app'
+    }
+  },
+
   abrirModalNovoEmail(isReply = false) {
     const modal = document.getElementById('master-email-compose-modal');
     if (!modal) return;
@@ -3179,13 +3240,19 @@ const MasterAdmin = {
     const active = (isReply === true && this._activeEmailDetail) ? this._activeEmailDetail : null;
     const toInput = document.getElementById('email-compose-to');
     const subjectInput = document.getElementById('email-compose-subject');
+    const headInput = document.getElementById('email-compose-head');
     const bodyInput = document.getElementById('email-compose-body');
+    const ctaTextInput = document.getElementById('email-compose-cta-text');
+    const ctaUrlInput = document.getElementById('email-compose-cta-url');
     const channelSelect = document.getElementById('email-compose-channel');
+    const presetSelect = document.getElementById('email-compose-preset');
     const inReplyToInput = document.getElementById('email-compose-in-reply-to');
     const tenantIdInput = document.getElementById('email-compose-tenant-id');
     const title = document.getElementById('master-email-compose-title');
     const fb = document.getElementById('email-compose-feedback');
     if (fb) fb.style.display = 'none';
+
+    this.alternarModoEditorEmail('edit');
 
     if (active) {
       if (title) title.textContent = 'Responder E-mail';
@@ -3195,7 +3262,14 @@ const MasterAdmin = {
         const subj = active.subject || '';
         subjectInput.value = subj.startsWith('Re:') ? subj : `Re: ${subj}`;
       }
+      if (headInput) {
+        const subj = active.subject || '';
+        headInput.value = subj.startsWith('Re:') ? subj : `Re: ${subj}`;
+      }
       if (bodyInput) bodyInput.value = '';
+      if (ctaTextInput) ctaTextInput.value = '';
+      if (ctaUrlInput) ctaUrlInput.value = '';
+      if (presetSelect) presetSelect.value = 'manual';
       if (inReplyToInput) inReplyToInput.value = active.message_id || active.id || '';
       if (tenantIdInput) tenantIdInput.value = active.tenant_id || '';
       if (channelSelect && active.channel) {
@@ -3205,10 +3279,14 @@ const MasterAdmin = {
         else channelSelect.value = 'CONTATO';
       }
     } else {
-      if (title) title.textContent = 'Novo Disparo de E-mail';
+      if (title) title.textContent = 'Novo Disparo de E-mail com Arte Oficial FinGo';
       if (toInput) toInput.value = '';
       if (subjectInput) subjectInput.value = '';
+      if (headInput) headInput.value = '';
       if (bodyInput) bodyInput.value = '';
+      if (ctaTextInput) ctaTextInput.value = '';
+      if (ctaUrlInput) ctaUrlInput.value = '';
+      if (presetSelect) presetSelect.value = 'manual';
       if (inReplyToInput) inReplyToInput.value = '';
       if (tenantIdInput) tenantIdInput.value = '';
       if (channelSelect) channelSelect.value = 'CONTATO';
@@ -3220,11 +3298,148 @@ const MasterAdmin = {
     if (modal) modal.style.display = 'none';
   },
 
+  selecionarPresetEmail(presetKey) {
+    const key = String(presetKey || 'manual').trim();
+    const preset = this._EMAIL_PRESETS?.[key];
+    if (!preset) return;
+
+    const channelSelect = document.getElementById('email-compose-channel');
+    const subjectInput = document.getElementById('email-compose-subject');
+    const headInput = document.getElementById('email-compose-head');
+    const bodyInput = document.getElementById('email-compose-body');
+    const ctaTextInput = document.getElementById('email-compose-cta-text');
+    const ctaUrlInput = document.getElementById('email-compose-cta-url');
+
+    if (key === 'manual') {
+      if (headInput && !headInput.value) headInput.placeholder = 'Ex: Sua conta corporativa na FinGo está ativa!';
+      return;
+    }
+
+    if (channelSelect && preset.channel) channelSelect.value = preset.channel;
+    if (subjectInput) subjectInput.value = preset.subject;
+    if (headInput) headInput.value = preset.head;
+    if (bodyInput) bodyInput.value = preset.body;
+    if (ctaTextInput) ctaTextInput.value = preset.ctaText || '';
+    if (ctaUrlInput) ctaUrlInput.value = preset.ctaUrl || '';
+
+    const previewPane = document.getElementById('email-compose-pane-preview');
+    if (previewPane && previewPane.style.display !== 'none') {
+      this.atualizarPreviaEmail();
+    }
+  },
+
+  alternarModoEditorEmail(mode = 'edit') {
+    const editPane = document.getElementById('email-compose-pane-edit');
+    const previewPane = document.getElementById('email-compose-pane-preview');
+    const editBtn = document.getElementById('email-compose-tab-btn-edit');
+    const previewBtn = document.getElementById('email-compose-tab-btn-preview');
+
+    if (mode === 'preview') {
+      if (editPane) editPane.style.display = 'none';
+      if (previewPane) previewPane.style.display = 'block';
+      if (editBtn) {
+        editBtn.style.borderBottom = '2px solid transparent';
+        editBtn.style.color = '#94a3b8';
+      }
+      if (previewBtn) {
+        previewBtn.style.borderBottom = '2px solid var(--accent)';
+        previewBtn.style.color = 'var(--accent)';
+      }
+      this.atualizarPreviaEmail();
+    } else {
+      if (editPane) editPane.style.display = 'flex';
+      if (previewPane) previewPane.style.display = 'none';
+      if (editBtn) {
+        editBtn.style.borderBottom = '2px solid var(--accent)';
+        editBtn.style.color = 'var(--accent)';
+      }
+      if (previewBtn) {
+        previewBtn.style.borderBottom = '2px solid transparent';
+        previewBtn.style.color = '#94a3b8';
+      }
+    }
+  },
+
+  atualizarPreviaEmail() {
+    const container = document.getElementById('email-compose-preview-container');
+    if (!container) return;
+
+    const channelSelect = document.getElementById('email-compose-channel');
+    const channelKey = channelSelect?.value || 'CONTATO';
+    const channelNameMap = {
+      CONTATO: 'FinGo Institucional',
+      COMERCIAL: 'FinGo Comercial',
+      SUPORTE: 'FinGo Suporte & FinBot',
+      NOVIDADES: 'FinGo Radar',
+      NO_REPLY: 'FinGo Alerta'
+    };
+    const channelBadge = channelNameMap[channelKey] || 'FinGo Oficial';
+
+    const head = (document.getElementById('email-compose-head')?.value || '').trim() ||
+                 (document.getElementById('email-compose-subject')?.value || '').trim() ||
+                 'Comunicado Oficial FinGo';
+    const body = (document.getElementById('email-compose-body')?.value || '').trim() ||
+                 'O texto digitado aparecerá aqui formatado em blocos tipográficos de alta legibilidade com espaçamento uniforme.';
+    const ctaText = (document.getElementById('email-compose-cta-text')?.value || '').trim();
+    const ctaUrl = (document.getElementById('email-compose-cta-url')?.value || '').trim();
+
+    const paragraphsHtml = body.split(/\n\s*\n/).map(p => {
+      const sanitized = this._esc(p).replace(/\n/g, '<br>');
+      return `<p style="margin:0 0 16px 0;font-size:14px;line-height:1.65;color:#CBD5E1;">${sanitized}</p>`;
+    }).join('');
+
+    const ctaHtml = (ctaText) ? `
+      <div style="margin:26px 0 10px;text-align:center;">
+        <span style="display:inline-block;background:#C6FF00;border-radius:6px;font-family:-apple-system,sans-serif;font-size:13px;font-weight:900;color:#0A0A0A;padding:12px 28px;letter-spacing:0.04em;text-transform:uppercase;box-shadow:0 4px 14px rgba(198,255,0,0.3);">
+          ${this._esc(ctaText)} &rarr;
+        </span>
+        ${ctaUrl ? `<div style="font-size:10px;color:#64748b;margin-top:6px;">Destino: ${this._esc(ctaUrl)}</div>` : ''}
+      </div>
+    ` : '';
+
+    container.innerHTML = `
+      <div style="background:#0A0A0A;padding:24px 16px;">
+        <div style="max-width:560px;margin:0 auto;background:#141D12;border:1px solid #282828;border-radius:8px;overflow:hidden;box-shadow:0 12px 30px rgba(0,0,0,.7);">
+          
+          <!-- Cabeçalho com Logo FinGo e Badge do Canal -->
+          <div style="background:#0A0A0A;padding:18px 24px;border-bottom:3px solid #C6FF00;display:flex;align-items:center;justify-content:space-between;">
+            <img src="https://fingo.api.br/img/fingo/fingo-logo-full.png" alt="FinGo" style="height:28px;width:auto;display:block;" onerror="this.outerHTML='<span style=\\'font-weight:900;font-size:18px;color:#F0F0E8;letter-spacing:-0.5px;\\'>Fin<span style=\\'color:#C6FF00;\\'>Go</span></span>';" />
+            <span style="padding:4px 10px;background:rgba(198,255,0,0.12);border:1px solid rgba(198,255,0,0.35);border-radius:4px;font-size:10px;font-weight:800;color:#C6FF00;text-transform:uppercase;letter-spacing:0.05em;">
+              ${this._esc(channelBadge)}
+            </span>
+          </div>
+
+          <!-- Conteúdo -->
+          <div style="padding:26px 24px 20px;">
+            <h2 style="margin:0 0 16px 0;font-size:18px;font-weight:900;color:#F0F0E8;line-height:1.35;letter-spacing:-0.3px;">
+              ${this._esc(head)}
+            </h2>
+            <div style="font-size:14px;line-height:1.65;color:#CBD5E1;">
+              ${paragraphsHtml}
+            </div>
+            ${ctaHtml}
+          </div>
+
+          <!-- Rodapé Institucional -->
+          <div style="background:#0A0A0A;padding:18px 24px;border-top:1px solid #282828;font-size:10px;color:#8E8E8E;line-height:1.6;text-align:center;">
+            <strong style="color:#CBD5E1;">FinGo Tecnologia &amp; Gestão de Obras</strong> &bull; CNPJ 53.864.218/0001-20<br>
+            Canal de Atendimento Oficial: <span style="color:#C6FF00;font-weight:700;">${channelKey.toLowerCase()}@fingo.api.br</span><br>
+            <span style="font-size:9px;color:#64748B;">Layout padrão oficial FinGo — Obras em Fluxo</span>
+          </div>
+
+        </div>
+      </div>
+    `;
+  },
+
   async enviarEmailSubmit(event) {
     if (event && event.preventDefault) event.preventDefault();
     const to = (document.getElementById('email-compose-to')?.value || '').trim();
     const subject = (document.getElementById('email-compose-subject')?.value || '').trim();
+    const headTitle = (document.getElementById('email-compose-head')?.value || '').trim();
     const body = (document.getElementById('email-compose-body')?.value || '').trim();
+    const ctaText = (document.getElementById('email-compose-cta-text')?.value || '').trim();
+    const ctaUrl = (document.getElementById('email-compose-cta-url')?.value || '').trim();
     const channelKey = document.getElementById('email-compose-channel')?.value || 'CONTATO';
     const inReplyTo = (document.getElementById('email-compose-in-reply-to')?.value || '').trim();
     const tenantId = (document.getElementById('email-compose-tenant-id')?.value || '').trim();
@@ -3254,8 +3469,10 @@ const MasterAdmin = {
           channelKey,
           to,
           subject,
+          headTitle: headTitle || subject,
           text: body,
-          html: `<div style="font-family:sans-serif;font-size:14px;color:#333;line-height:1.6;">${body.replace(/\n/g, '<br>')}</div>`,
+          ctaText: ctaText || null,
+          ctaUrl: ctaUrl || null,
           tenantId: tenantId || null,
           inReplyTo: inReplyTo || null
         })

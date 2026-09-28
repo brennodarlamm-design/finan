@@ -79,7 +79,24 @@ assert.strictEqual(parsedResend.sender, 'engenheiro@obra.com');
 assert.strictEqual(parsedResend.recipient, 'suporte@fingo.api.br');
 assert.strictEqual(parsedResend.channel, 'suporte@fingo.api.br');
 assert.strictEqual(parsedResend.messageId, '<header-id-999>');
-console.log('✅ [2/5] api/_email_service.js (canais, roteamento e parser) validado');
+// 2.1. Validar Layout Padrão com Arte, Logo e Identidade Visual FinGo
+const { buildStandardEmailHtml } = emailServiceModule;
+assert.ok(typeof buildStandardEmailHtml === 'function', 'buildStandardEmailHtml deve ser função exportada');
+const renderedSample = buildStandardEmailHtml({
+  headTitle: 'Headline de Teste Unitário',
+  bodyText: 'Primeiro parágrafo do teste.\n\nSegundo parágrafo com detalhes.',
+  channelKey: 'COMERCIAL',
+  ctaText: 'Acessar Fatura',
+  ctaUrl: 'https://finobra.app.br/app'
+});
+assert.ok(renderedSample.includes('fingo-logo-full.png'), 'Layout padrão DEVE conter o logotipo oficial da FinGo');
+assert.ok(renderedSample.includes('#C6FF00'), 'Layout padrão DEVE conter a cor acentuada oficial (#C6FF00 neon acid green)');
+assert.ok(renderedSample.includes('Headline de Teste Unitário'), 'Layout padrão deve injetar o headTitle');
+assert.ok(renderedSample.includes('Primeiro parágrafo do teste.'), 'Layout padrão deve injetar os parágrafos de texto livre');
+assert.ok(renderedSample.includes('Acessar Fatura'), 'Layout padrão deve renderizar o botão CTA');
+assert.ok(renderedSample.includes('53.864.218/0001-20'), 'Layout padrão deve conter o CNPJ institucional');
+assert.ok(renderedSample.includes('comercial@fingo.api.br'), 'Layout padrão deve exibir o canal de atendimento no rodapé');
+console.log('✅ [2/5] api/_email_service.js (layout padrão com arte/logo e parser) validado');
 
 // 3. Validar Rotas de API e Webhook
 const adminRouteCode = fs.readFileSync(path.resolve('api/_admin-route.js'), 'utf8');
@@ -88,6 +105,9 @@ assert.ok(adminRouteCode.includes("action === 'email_detail'"), 'Admin route dev
 assert.ok(adminRouteCode.includes("action === 'email_mark_read'"), 'Admin route deve conter action email_mark_read');
 assert.ok(adminRouteCode.includes("action === 'email_send'"), 'Admin route deve conter action email_send');
 assert.ok(adminRouteCode.includes("action === 'email_simulate_inbound'"), 'Admin route deve conter action email_simulate_inbound');
+assert.ok(adminRouteCode.includes("headTitle"), 'Admin route deve aceitar headTitle no email_send');
+assert.ok(adminRouteCode.includes("ctaText"), 'Admin route deve aceitar ctaText no email_send');
+assert.ok(adminRouteCode.includes("ctaUrl"), 'Admin route deve aceitar ctaUrl no email_send');
 
 const webhookCode = fs.readFileSync(path.resolve('api/_webhook_email.js'), 'utf8');
 assert.ok(webhookCode.includes('handleInboundEmailWebhook'), 'Webhook de e-mail deve exportar handleInboundEmailWebhook');
@@ -106,12 +126,15 @@ const p26ModCode = fs.readFileSync(path.resolve('frontend/core/patch26-events.js
 const requiredEvents = [
   'MasterAdmin.abrirEmailModal',
   'MasterAdmin.abrirModalNovoEmail',
+  'MasterAdmin.alternarModoEditorEmail',
+  'MasterAdmin.atualizarPreviaEmail',
   'MasterAdmin.enviarEmailSubmit',
   'MasterAdmin.fecharEmailModal',
   'MasterAdmin.fecharModalNovoEmail',
   'MasterAdmin.filtrarEmailsCanal',
   'MasterAdmin.filtrarEmailsDirecao',
   'MasterAdmin.recarregarEmails',
+  'MasterAdmin.selecionarPresetEmail',
   'MasterAdmin.simularEmailInboundTeste'
 ];
 
@@ -127,6 +150,11 @@ assert.ok(masterHtml.includes('data-fb-click-v0="emails"'), 'master.html deve te
 assert.ok(masterHtml.includes('id="master-email-badge-header"'), 'master.html deve ter badge de e-mails não lidos no header');
 assert.ok(masterHtml.includes('id="master-email-view-modal"'), 'master.html deve ter modal de visualização de e-mails');
 assert.ok(masterHtml.includes('id="master-email-compose-modal"'), 'master.html deve ter modal de composição de e-mails');
+assert.ok(masterHtml.includes('id="email-compose-preset"'), 'master.html deve ter seletor de modelos pré-definidos');
+assert.ok(masterHtml.includes('id="email-compose-head"'), 'master.html deve ter campo de título de destaque (head)');
+assert.ok(masterHtml.includes('id="email-compose-cta-text"'), 'master.html deve ter campo para texto de botão CTA');
+assert.ok(masterHtml.includes('id="email-compose-cta-url"'), 'master.html deve ter campo para link de botão CTA');
+assert.ok(masterHtml.includes('id="email-compose-preview-container"'), 'master.html deve ter container para pré-visualização da arte');
 assert.ok(masterHtml.includes('contato@fingo.api.br'), 'master.html deve conter canal contato@fingo.api.br');
 assert.ok(masterHtml.includes('suporte@fingo.api.br'), 'master.html deve conter canal suporte@fingo.api.br');
 assert.ok(masterHtml.includes('comercial@fingo.api.br'), 'master.html deve conter canal comercial@fingo.api.br');
@@ -134,6 +162,10 @@ assert.ok(masterHtml.includes('comercial@fingo.api.br'), 'master.html deve conte
 const masterJs = fs.readFileSync(path.resolve('js/master.js'), 'utf8');
 assert.ok(masterJs.includes('carregarEmails()'), 'master.js deve ter carregarEmails');
 assert.ok(masterJs.includes('_renderEmails()'), 'master.js deve ter _renderEmails');
+assert.ok(masterJs.includes('_EMAIL_PRESETS'), 'master.js deve ter presets pré-definidos de e-mail');
+assert.ok(masterJs.includes('selecionarPresetEmail'), 'master.js deve ter selecionarPresetEmail');
+assert.ok(masterJs.includes('alternarModoEditorEmail'), 'master.js deve ter alternarModoEditorEmail');
+assert.ok(masterJs.includes('atualizarPreviaEmail'), 'master.js deve ter atualizarPreviaEmail');
 assert.ok(masterJs.includes('simularEmailInboundTeste()'), 'master.js deve ter simularEmailInboundTeste');
 assert.ok(!masterJs.match(/await\s+fetch\(\s*['"]\/api/i), 'master.js NÃO deve usar raw fetch para /api (deve usar _fetchWithTimeout)');
 

@@ -657,8 +657,11 @@ export default async function handler(req, res) {
     if (req.method === 'POST' && action === 'email_send') {
       const to = String(req.body?.to || '').trim();
       const subject = String(req.body?.subject || '').trim();
+      const headTitle = String(req.body?.headTitle || req.body?.head || '').trim();
       const text = String(req.body?.text || '').trim();
       const html = String(req.body?.html || '').trim();
+      const ctaText = String(req.body?.ctaText || '').trim();
+      const ctaUrl = String(req.body?.ctaUrl || '').trim();
       const channelKey = String(req.body?.channelKey || 'CONTATO').trim().toUpperCase();
       const tenantId = String(req.body?.tenantId || '').trim() || null;
       const inReplyTo = String(req.body?.inReplyTo || '').trim() || null;
@@ -675,8 +678,11 @@ export default async function handler(req, res) {
         channelKey,
         to,
         subject,
+        headTitle,
         text,
         html,
+        ctaText,
+        ctaUrl,
         inReplyTo,
         metadata: { sent_by: auth.user?.username || 'master_superadmin' }
       });
