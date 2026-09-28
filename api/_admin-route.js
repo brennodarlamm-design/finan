@@ -40,6 +40,8 @@ function getOwnerSql() {
 const ALLOWED_ORIGINS = [
   'https://fingo.api.br',
   'https://www.fingo.api.br',
+  'https://finobra.app.br',
+  'https://www.finobra.app.br',
   'http://localhost:3000',
   'http://localhost:3333',
   'http://localhost:5000',
