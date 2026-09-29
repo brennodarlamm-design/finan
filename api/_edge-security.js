@@ -147,6 +147,92 @@ export async function checkAndSetIdempotency(env, idempotencyKey, payload) {
   return { isDuplicate: false };
 }
 
+const MCP_RATE_LIMIT = 120; // 120 requisições por minuto por IP
+const MCP_WINDOW_MS = 60 * 1000;
+const localMcpRateStore = new Map();
+
+export const MALICIOUS_PATH_PATTERNS = [
+  // Arquivos .env e backups de ambiente (.env, .env.prod, .env.bak, .env.development, .env.local, etc.)
+  /(?:^|\/)\.env(?:\.[\w.-]+)?$/i,
+  // WordPress / CMS probes (wp-config, wp-includes, wp-admin, wp-content, xmlrpc.php)
+  /(?:^|\/)(?:wp-config|wp-includes|wp-admin|wp-content|xmlrpc\.php)(?:\.[\w.-]+)?/i,
+  // Controle de versão exposto (.git, .svn, .hg)
+  /(?:^|\/)\.(?:git|svn|hg)(?:\/|$)/i,
+  // Backups, dumps e arquivos temporários perigosos (.bak, .old, .backup, .swp, dump.sql)
+  /(?:\.bak|\.old|\.backup|\.swp|\.save|dump\.sql|backup\.sql)$/i,
+  // Executáveis/scripts PHP (não utilizados na stack FinGo)
+  /\.php(?:\d+)?$/i,
+  // Scanners de painéis administrativos de banco / frameworks
+  /(?:phpmyadmin|pma|myadmin|adminer|\/webdav|\/actuator|\/_ignition)/i,
+  // Credenciais de infraestrutura / docker
+  /(?:docker-compose\.ya?ml|Dockerfile|\.aws\/credentials|\.docker\/config\.json)/i
+];
+
+export const MALICIOUS_USER_AGENTS = [
+  /brickbluebot/i,
+  /nikto/i,
+  /sqlmap/i,
+  /nmap/i,
+  /masscan/i,
+  /zgrab/i,
+  /acunetix/i,
+  /havij/i,
+  /dirbuster/i,
+  /gobuster/i,
+  /wpscan/i
+];
+
+/**
+ * Avalia se o caminho ou o User-Agent corresponde a um scanner de vulnerabilidades conhecido.
+ */
+export function isMaliciousProbe(pathname, userAgent = '') {
+  const rawPath = String(pathname || '');
+  let decodedPath = rawPath;
+  try {
+    decodedPath = decodeURIComponent(rawPath);
+  } catch {}
+
+  const targets = [rawPath, decodedPath];
+  for (const path of targets) {
+    for (const pattern of MALICIOUS_PATH_PATTERNS) {
+      if (pattern.test(path)) {
+        return { blocked: true, reason: 'malicious_path_probe', pattern: pattern.toString() };
+      }
+    }
+  }
+
+  const normUa = String(userAgent || '').trim();
+  if (normUa) {
+    for (const pattern of MALICIOUS_USER_AGENTS) {
+      if (pattern.test(normUa)) {
+        return { blocked: true, reason: 'malicious_user_agent', pattern: pattern.toString() };
+      }
+    }
+  }
+
+  return { blocked: false };
+}
+
+/**
+ * Rate limit em memória para proteção de exaustão do endpoint MCP.
+ */
+export function checkMcpRateLimit(ip) {
+  const normIp = String(ip || '127.0.0.1').trim();
+  const now = Date.now();
+  const windowStart = now - MCP_WINDOW_MS;
+  const history = (localMcpRateStore.get(normIp) || []).filter(ts => ts > windowStart);
+  if (history.length >= MCP_RATE_LIMIT) {
+    return { allowed: false, remaining: 0, retryAfter: 60 };
+  }
+  history.push(now);
+  localMcpRateStore.set(normIp, history);
+  if (localMcpRateStore.size > 2000) {
+    const oldestKey = localMcpRateStore.keys().next().value;
+    if (oldestKey) localMcpRateStore.delete(oldestKey);
+  }
+  return { allowed: true, remaining: MCP_RATE_LIMIT - history.length };
+}
+
 /**
  * Valida a geolocalização da requisição (Geo-Fencing).
  */
@@ -181,7 +267,50 @@ export async function applyEdgeSecurityMiddleware(request, env) {
     });
   }
 
-  // 2. Proteção de Idempotência para mutações financeiras
+  // 2. Proteção contra Scanners e Probes Maliciosos (.env, wp-config, .git, bots ofensivos)
+  let url = null;
+  try {
+    url = new URL(request.url);
+  } catch {}
+  const userAgent = request.headers.get('user-agent') || '';
+
+  if (url) {
+    const probe = isMaliciousProbe(url.pathname, userAgent);
+    if (probe.blocked) {
+      await recordFailedAttempt(env, ip, probe.reason);
+      return Response.json({
+        success: false,
+        error: 'Acesso negado por política de segurança de borda.',
+        code: 'EDGE_PROBE_BLOCKED'
+      }, {
+        status: 403,
+        headers: {
+          'X-FinGo-Security': 'probe-blocked',
+          'X-Content-Type-Options': 'nosniff'
+        }
+      });
+    }
+
+    // 3. Rate limiting no endpoint do MCP
+    if ((url.pathname === '/api/mcp' || url.pathname === '/mcp') && request.method !== 'OPTIONS') {
+      const mcpRate = checkMcpRateLimit(ip);
+      if (!mcpRate.allowed) {
+        return Response.json({
+          success: false,
+          error: 'Limite de requisições excedido para o endpoint MCP.',
+          code: 'MCP_RATE_LIMITED'
+        }, {
+          status: 429,
+          headers: {
+            'Retry-After': String(mcpRate.retryAfter || 60),
+            'X-FinGo-Security': 'mcp-rate-limited'
+          }
+        });
+      }
+    }
+  }
+
+  // 4. Proteção de Idempotência para mutações financeiras
   const idempotencyHeader = request.headers.get('x-idempotency-key');
   if (idempotencyHeader && ['POST', 'PUT', 'DELETE'].includes(request.method)) {
     const check = await checkAndSetIdempotency(env, idempotencyHeader, request.url);

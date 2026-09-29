@@ -1,6 +1,15 @@
-// scripts/test-edge-security-monitoring.js — Suíte de Testes de Defesa, Segurança & Monitoramento
 import assert from 'node:assert/strict';
-import { isIpBanned, recordFailedAttempt, recordSuccessfulAuth, unbanIp, checkAndSetIdempotency, checkGeoFencing, applyEdgeSecurityMiddleware } from '../api/_edge-security.js';
+import {
+  isIpBanned,
+  recordFailedAttempt,
+  recordSuccessfulAuth,
+  unbanIp,
+  checkAndSetIdempotency,
+  checkGeoFencing,
+  applyEdgeSecurityMiddleware,
+  isMaliciousProbe,
+  checkMcpRateLimit
+} from '../api/_edge-security.js';
 import { appendLedgerBlock, verifyLedgerIntegrity, calculateBlockHash, detectExpenseAnomaly } from '../api/_edge-ledger.js';
 import { dispatchEdgeAlert, _resetAlertsHistory } from '../api/_edge-alerts.js';
 import { recordEdgeMetric, getEdgeMetricsSummary, renderEdgeMetricsHtml } from '../api/_edge-metrics.js';
@@ -83,6 +92,86 @@ const reqTor = new Request('https://fingo.api.br/api/v2/engineering/obras', {
 const geoTor = checkGeoFencing(reqTor, ['BR']);
 assert.equal(geoTor.allowed, false, 'Rede anônima / Tor (T1) deve ser bloqueada.');
 console.log('   ✓ Geo-Fencing: validação de país e bloqueio de nós anônimos aprovados.');
+
+// -------------------------------------------------------------
+// 3.5 WAF de Borda, Bloqueio de Scanners & Proteção MCP
+// -------------------------------------------------------------
+console.log('3.5 Validando WAF de Borda e Bloqueio de Scanners/Probes...');
+
+// Teste de caminhos maliciosos comuns detectados no tráfego
+const maliciousPaths = [
+  '/.env',
+  '/.env.prod',
+  '/.env.development',
+  '/.env.bak',
+  '/wp-config.php.bak',
+  '/wp-admin/setup-config.php',
+  '/xmlrpc.php',
+  '/.git/config',
+  '/.svn/entries',
+  '/backup.sql',
+  '/dump.sql',
+  '/config.php',
+  '/phpmyadmin/index.php'
+];
+
+for (const p of maliciousPaths) {
+  const probeResult = isMaliciousProbe(p);
+  assert.equal(probeResult.blocked, true, `Caminho malicioso deve ser detectado: ${p}`);
+}
+
+// Caminhos legítimos NÃO devem ser bloqueados
+const legitimatePaths = [
+  '/',
+  '/index.html',
+  '/app',
+  '/app.html',
+  '/bim',
+  '/planos',
+  '/sobre-nos',
+  '/calculadora-bdi',
+  '/manuais',
+  '/blog',
+  '/api/mcp',
+  '/api/db',
+  '/api/auth',
+  '/img/fingo/fingo-symbol.png',
+  '/assets/main.js',
+  '/.well-known/agent-card.json',
+  '/openapi.json'
+];
+
+for (const p of legitimatePaths) {
+  const legitResult = isMaliciousProbe(p);
+  assert.equal(legitResult.blocked, false, `Caminho legítimo não deve ser bloqueado: ${p}`);
+}
+
+// User-agents de scanners ofensivos
+assert.equal(isMaliciousProbe('/', 'BrickBlueBot/0.1 (+https://brick.blue/bot)').blocked, true);
+assert.equal(isMaliciousProbe('/', 'sqlmap/1.5#stable').blocked, true);
+assert.equal(isMaliciousProbe('/', 'nikto/2.1.6').blocked, true);
+assert.equal(isMaliciousProbe('/', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)').blocked, false);
+assert.equal(isMaliciousProbe('/api/mcp', 'node').blocked, false);
+
+// Middleware de borda: interceptação direta com 403 Forbidden
+const scannerReq = new Request('https://fingo.api.br/.env.prod', {
+  headers: { 'cf-connecting-ip': '198.51.100.42' }
+});
+const scannerResp = await applyEdgeSecurityMiddleware(scannerReq, {});
+assert(scannerResp && scannerResp.status === 403, 'Middleware deve retornar 403 Forbidden para tentativa de probe.');
+assert.equal(scannerResp.headers.get('X-FinGo-Security'), 'probe-blocked');
+
+// Rate limiting do endpoint MCP
+const mcpTestIp = `mcp_client_${Date.now()}`;
+for (let i = 1; i <= 120; i++) {
+  const rl = checkMcpRateLimit(mcpTestIp);
+  assert.equal(rl.allowed, true, `Requisição ${i} dentro da cota do MCP deve ser permitida.`);
+}
+const rlExceeded = checkMcpRateLimit(mcpTestIp);
+assert.equal(rlExceeded.allowed, false, '121ª requisição no mesmo minuto deve ser bloqueada por rate limit.');
+assert.equal(rlExceeded.retryAfter, 60);
+
+console.log('   ✓ WAF de Borda: bloqueio de .env, wp-config, bots e rate limit MCP aprovados.');
 
 // -------------------------------------------------------------
 // 4. Trilha de Auditoria Criptográfica (Audit Ledger)
