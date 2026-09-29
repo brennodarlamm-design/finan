@@ -341,7 +341,8 @@ export class EvolutionGoClient {
           ignoreStatus: true,
           alwaysOnline: false,
           readMessages: false,
-          rejectCall: false
+          rejectCall: true,
+          msgRejectCall: 'Canal automatizado para notificações financeiras FinGo. Não recebemos chamadas.'
         }
       }).catch(() => {});
     }
