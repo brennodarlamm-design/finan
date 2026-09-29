@@ -32,6 +32,9 @@ services:
       # Webhooks para receber mensagens e comprovantes no FinBot
       - WEBHOOKFILES=true
       - WEBHOOK_URL=${EVOLUTION_GO_WEBHOOK_URL:-http://host.docker.internal:3333/api/whatsapp?action=webhook}
+      # Limites de memória e garbage collector do Go (evita estouro de 512MB RAM)
+      - GOMEMLIMIT=${GOMEMLIMIT:-384MiB}
+      - GOGC=${GOGC:-50}
       # Cache Redis & Queue (Upstash Redis TLS ou Redis dedicado)
       # Documentação oficial: https://docs.evolutionfoundation.com.br/evolution-api/requirements/redis
       - CACHE_REDIS_ENABLED=${CACHE_REDIS_ENABLED:-false}
