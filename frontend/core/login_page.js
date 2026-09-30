@@ -168,8 +168,16 @@ if (window.location.hash.startsWith('#validar') || window.location.search.includ
           cancel_on_tap_outside: true
         });
 
-        const container = document.getElementById('google-btn-container');
+        let container = document.getElementById('google-btn-container');
         const fallbackBtn = document.getElementById('btn-google-login');
+
+        // Se o container não estiver no DOM, insere imediatamente antes do botão fallback
+        if (!container && fallbackBtn && fallbackBtn.parentNode) {
+          container = document.createElement('div');
+          container.id = 'google-btn-container';
+          container.style.cssText = 'display:flex;justify-content:center;align-items:center;min-height:44px;width:100%;margin-bottom:6px;';
+          fallbackBtn.parentNode.insertBefore(container, fallbackBtn);
+        }
 
         if (container) {
           google.accounts.id.renderButton(container, {
@@ -201,7 +209,7 @@ if (window.location.hash.startsWith('#validar') || window.location.search.includ
     setupOtpInputs();
   });
 
-  function iniciarLoginGoogle() {
+  async function iniciarLoginGoogle() {
     const errBox = document.getElementById('err-box');
     errBox.style.display = 'none';
 
@@ -216,17 +224,53 @@ if (window.location.hash.startsWith('#validar') || window.location.search.includ
 
     if (window.google && google.accounts && google.accounts.id) {
       try {
-        const officialBtn = document.querySelector('#google-btn-container div[role=button]');
-        if (officialBtn) {
+        initGoogleIdentity();
+        const officialBtn = document.querySelector('#google-btn-container [role=button], #google-btn-container iframe');
+        if (officialBtn && typeof officialBtn.click === 'function') {
           officialBtn.click();
           return;
         }
+        google.accounts.id.prompt();
+        return;
       } catch (e) {
-        console.warn(e);
+        console.warn('Google prompt notice:', e);
       }
     }
-    errBox.textContent = 'O botão do Google ainda não carregou. Aguarde alguns segundos e tente novamente, ou entre com usuário e senha.';
-    errBox.style.display = 'block';
+
+    // Se o SDK do Google ainda está sendo baixado pela rede
+    const fallbackBtn = document.getElementById('btn-google-login');
+    const originalContent = fallbackBtn ? fallbackBtn.innerHTML : '';
+    if (fallbackBtn) {
+      fallbackBtn.disabled = true;
+      fallbackBtn.innerHTML = '<span style="display:inline-flex;align-items:center;gap:8px;"><span class="spinner" style="display:inline-block;width:14px;height:14px;border:2px solid rgba(255,255,255,.3);border-top-color:#fff;border-radius:50%;animation:spin 1s linear infinite;"></span> Conectando ao Google...</span>';
+    }
+
+    let attempts = 0;
+    const interval = setInterval(() => {
+      attempts++;
+      if (window.google && google.accounts && google.accounts.id) {
+        clearInterval(interval);
+        if (fallbackBtn) {
+          fallbackBtn.disabled = false;
+          fallbackBtn.innerHTML = originalContent;
+        }
+        initGoogleIdentity();
+        try {
+          google.accounts.id.prompt();
+        } catch {}
+        return;
+      }
+
+      if (attempts >= 10) { // 3 segundos
+        clearInterval(interval);
+        if (fallbackBtn) {
+          fallbackBtn.disabled = false;
+          fallbackBtn.innerHTML = originalContent;
+        }
+        errBox.textContent = 'O serviço do Google não pôde ser carregado. Verifique sua conexão com a internet, bloqueadores de anúncio ou acesse com usuário e senha.';
+        errBox.style.display = 'block';
+      }
+    }, 300);
   }
 
   // ── FLUXO DE RECUPERAÇÃO DE SENHA COM CÓDIGO OTP ─────────────

@@ -8,6 +8,8 @@ const CACHE_NAME = 'fingo-static-v2.40.6';
 const PRECACHE_ASSETS = [
   '/',
   '/index.html',
+  '/login.html',
+  '/login',
   '/app.html',
   '/css/tokens.css',
   '/css/style.css',
@@ -98,14 +100,18 @@ self.addEventListener('fetch', (event) => {
         const accept = event.request.headers.get('accept') || '';
         const isHtml = event.request.mode === 'navigate' || accept.includes('text/html') || url.pathname.startsWith('/app');
         if (isHtml) {
+          if (url.pathname === '/login' || url.pathname === '/login.html' || url.pathname === '/cadastro') {
+            const loginCached = (await caches.match('/login.html')) || (await caches.match('/login')) || (await caches.match('/index.html'));
+            if (loginCached) return loginCached;
+          }
           const appCached = await caches.match('/app.html');
           if (appCached) return appCached;
           const indexCached = (await caches.match('/index.html')) || (await caches.match('/'));
           if (indexCached) return indexCached;
         }
         return new Response('<html><body><h1>Modo Offline</h1><p>Conexão indisponível no momento.</p></body></html>', {
-          status: 503,
-          statusText: 'Service Unavailable',
+          status: 200,
+          statusText: 'OK',
           headers: { 'Content-Type': 'text/html;charset=utf-8' }
         });
       }

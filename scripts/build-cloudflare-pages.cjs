@@ -171,6 +171,9 @@ try {
         '__SENTRY_RELEASE__': JSON.stringify(commit)
       }
     });
+    try {
+      fs.copyFileSync(sentryOut, path.join(root, 'frontend', 'core', 'sentry.js'));
+    } catch {}
   }
 } catch (err) {
   console.warn('[Build] Aviso ao empacotar Sentry:', err?.message);
