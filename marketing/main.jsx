@@ -359,7 +359,7 @@ function Home() {
       <section className="relative isolate overflow-hidden">
         <HeroVideo />
         <div className="wrap relative py-24 md:py-36">
-          <p className="eyebrow">Gestão para a construção civil / FinGo</p>
+          <p className="eyebrow">Sistema de Obra &amp; Gestão para Construção Civil / FinGo</p>
           <h1 className="page-title max-w-3xl">
             Sua obra avança.
             <br />
@@ -370,8 +370,8 @@ function Home() {
             </span>
           </h1>
           <p className="mb-9 mt-8 max-w-lg text-lg leading-relaxed text-paper">
-            Do canteiro ao escritório. Obras, finanças e equipe conectadas para
-            você construir com mais controle.
+            O sistema de obra que conecta canteiro e escritório. Finanças, orçamentos SINAPI,
+            medições e equipe para construir com mais controle.
           </p>
           <a className="action" href="/planos">
             Conheça os planos <span aria-hidden="true">↗</span>

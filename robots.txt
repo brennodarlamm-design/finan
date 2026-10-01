@@ -5,10 +5,14 @@ Allow: /api/mcp
 User-agent: *
 Content-Signal: ai-train=no, search=yes, ai-input=yes
 Allow: /
+Allow: /planos
+Allow: /sobre-nos
+Allow: /calculadora-bdi
+Allow: /blog
+Allow: /manuais
 Allow: /privacidade
 Allow: /termos
 Allow: /validar
-Allow: /calculadora-bdi
 Allow: /llms.txt
 Allow: /llms-full.txt
 Allow: /api/mcp
@@ -26,4 +30,3 @@ Disallow: /version.json
 
 Sitemap: https://fingo.api.br/sitemap.xml
 Agentmap: https://fingo.api.br/.well-known/ai-catalog.json
-
