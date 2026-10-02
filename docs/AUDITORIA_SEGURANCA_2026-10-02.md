@@ -114,15 +114,15 @@ Escopo: `auth.js` (reset de senha, MFA, Google), `whatsapp.js`, `nfe.js`/`_certi
 | T7 | 🔵 Baixa | `INTERNAL_API_SECRET` e chave do Evolution comparados com `===` (`_auth.js`, `whatsapp.js`, `backend/server.js`) | `secretsEqual()`/`safeEqualSecret()` em tempo constante |
 | T8 | 🔵 Baixa | Telemetria anônima de erros disparava alerta `CRITICAL` (que vai por WhatsApp ao administrador) com 5 requisições forjadas | Pico sem sessão gera apenas `WARNING` |
 | T9 | 🔵 Baixa | Recibo PIX por e-mail interpolava nome da empresa, responsável e TXID sem escape (injeção de HTML/links em e-mail do domínio oficial) | Escape HTML |
+| T10 | 🟡 Média | Tokens antigos sem `sessionId` continuavam válidos por até 30 dias e não eram encerrados na troca ou no reset de senha | Recusados (401) antes de consultar o banco; o usuário entra de novo. Troca/reset de senha já revogava as demais sessões |
 
 Revisado e sem problema encontrado: webhook PIX (segredo dedicado, valor e tenant conferidos, idempotência), `upload.js`, portal Master (MFA obrigatório em todas as ações), cofre de chaves DEV, workflow (filtro por `tenant_id` em todas as consultas), Google login (`email_verified`, superadmin excluído), cobrança (`create_invoice` usa preço do catálogo).
 
 ### Pontos para decisão do responsável (não alterados)
 1. **Token na URL dos webhooks do WhatsApp** (`?token=` em `api/whatsapp.js` e `backend/server.js`). O segredo pode aparecer em logs. Se o Evolution Go permitir enviar a chave em header, remova o suporte a `?token=`.
-2. **Tokens antigos sem `sessionId`** continuam válidos até expirar (até 30 dias) e não são revogados por troca/reset de senha. Se já passou o prazo desde o Patch 08, passe a recusá-los.
-3. **Certificado A1**: qualquer usuário com escrita em `notas` pode substituir o certificado da empresa. Avalie restringir a `admin`.
-4. **Sala de colaboração em tempo real**: qualquer usuário da empresa entra, sem checar permissão do módulo de orçamentos.
-5. **MFA de usuários de empresa** não é exigido no login (só o superadmin passa pelo TOTP).
+2. **Certificado A1**: qualquer usuário com escrita em `notas` pode substituir o certificado da empresa. Avalie restringir a `admin`.
+3. **Sala de colaboração em tempo real**: qualquer usuário da empresa entra, sem checar permissão do módulo de orçamentos.
+4. **MFA de usuários de empresa** não é exigido no login (só o superadmin passa pelo TOTP).
 
 ## Testes
 - Novo: `scripts/test-audit-2026-10-02.js` (incluído em `npm test`). Cobre F1–F11 e R1–R5. Falha na versão anterior e passa na corrigida.

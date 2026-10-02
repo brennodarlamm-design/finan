@@ -316,6 +316,11 @@ export async function resolveAuthAndTenant(req) {
   if (!payload?.userId || !payload?.tenantId) {
     return { authenticated: false, status: 401, error: 'Token de autenticação inválido ou expirado.' };
   }
+  // AUDIT-2026-10-02 T10: tokens legados sem sessionId não podem ser revogados (troca ou
+  // reset de senha não os encerrava) e passam a ser recusados; o usuário entra novamente.
+  if (!payload.sessionId) {
+    return { authenticated: false, status: 401, error: 'Sessão antiga encerrada por segurança. Entre novamente.' };
+  }
 
   if (!String(process.env.DATABASE_OWNER_URL || '').trim()) {
     console.error('🚨 [Segurança] DATABASE_OWNER_URL não configurada para validação da sessão.');
@@ -341,24 +346,21 @@ export async function resolveAuthAndTenant(req) {
     const live = rows[0];
     const isSuperAdmin = live.perfil === 'superadmin';
 
-    // Patch 08: sessões novas são revogáveis por dispositivo. Tokens legados sem
-    // sessionId continuam válidos até expirar para não derrubar usuários no deploy.
-    if (payload.sessionId) {
-      const sessionRows = await sql`
-        SELECT id, revoked_at, expires_at
-        FROM auth_sessions
-        WHERE id=${payload.sessionId} AND user_id=${payload.userId}
-        LIMIT 1;
-      `;
-      const sess = sessionRows[0];
-      if (!sess || sess.revoked_at || !sess.expires_at || new Date(sess.expires_at).getTime() <= Date.now()) {
-        return { authenticated:false, status:401, error:'Esta sessão foi encerrada ou expirou. Entre novamente.' };
-      }
-      // Atualiza atividade no máximo a cada 15 minutos para reduzir escrita no Neon.
-      sql`UPDATE auth_sessions SET last_seen_at=NOW() WHERE id=${payload.sessionId} AND last_seen_at < NOW() - INTERVAL '15 minutes';`.catch((err) => {
-        console.warn('[Auth] Falha ao atualizar last_seen da sessão:', err?.message || err);
-      });
+    // Patch 08: sessões são revogáveis por dispositivo.
+    const sessionRows = await sql`
+      SELECT id, revoked_at, expires_at
+      FROM auth_sessions
+      WHERE id=${payload.sessionId} AND user_id=${payload.userId}
+      LIMIT 1;
+    `;
+    const sess = sessionRows[0];
+    if (!sess || sess.revoked_at || !sess.expires_at || new Date(sess.expires_at).getTime() <= Date.now()) {
+      return { authenticated:false, status:401, error:'Esta sessão foi encerrada ou expirou. Entre novamente.' };
     }
+    // Atualiza atividade no máximo a cada 15 minutos para reduzir escrita no Neon.
+    sql`UPDATE auth_sessions SET last_seen_at=NOW() WHERE id=${payload.sessionId} AND last_seen_at < NOW() - INTERVAL '15 minutes';`.catch((err) => {
+      console.warn('[Auth] Falha ao atualizar last_seen da sessão:', err?.message || err);
+    });
 
     if (!isSuperAdmin) {
       if (live.tenant_status === 'bloqueado' || live.tenant_status === 'cancelado') {

@@ -121,4 +121,27 @@ console.log('=== Auditoria 2026-10-02 (3ª rodada) — regressões ===\n');
   console.log('  ✓ T9 recibo PIX por e-mail escapa nome, responsável e TXID');
 }
 
+// T10 — Troca/reset de senha encerra todas as sessões: token sem sessionId (não revogável) é recusado.
+{
+  const { resolveAuthAndTenant, signToken } = await import('../api/_auth.js');
+  const saved = { secret: process.env.SESSION_SIGNING_SECRET, owner: process.env.DATABASE_OWNER_URL };
+  process.env.SESSION_SIGNING_SECRET = 'test-only-session-signing-secret-r3-0123456789';
+  process.env.DATABASE_OWNER_URL = 'postgresql://[USER]:[PASS]@127.0.0.1:9/neondb';
+  try {
+    const legacy = signToken({ userId: 'usr_1', tenantId: 't1', exp: Date.now() + 60000 }, process.env.SESSION_SIGNING_SECRET);
+    const auth = await resolveAuthAndTenant({ method: 'GET', headers: { authorization: `Bearer ${legacy}` } });
+    assert.strictEqual(auth.authenticated, false, 'T10: token sem sessionId deve ser recusado');
+    assert.strictEqual(auth.status, 401, 'T10: recusado antes de consultar o banco');
+  } finally {
+    if (saved.secret === undefined) delete process.env.SESSION_SIGNING_SECRET; else process.env.SESSION_SIGNING_SECRET = saved.secret;
+    if (saved.owner === undefined) delete process.env.DATABASE_OWNER_URL; else process.env.DATABASE_OWNER_URL = saved.owner;
+  }
+  const src = read('api/_auth.js');
+  assert(src.includes("if (!payload.sessionId) {"), 'T10: _auth recusa token sem sessionId');
+  const users = read('api/users.js');
+  assert(users.includes('UPDATE auth_sessions SET revoked_at=NOW() WHERE user_id=${targetId}'), 'T10: troca de senha revoga sessões');
+  assert(read('api/auth.js').includes('sessions_revoked AS ('), 'T10: reset de senha revoga sessões');
+  console.log('  ✓ T10 troca/reset de senha encerra todas as sessões (inclusive tokens antigos)');
+}
+
 console.log('\n✅ Auditoria 2026-10-02 (3ª rodada): todas as regressões passaram.');
