@@ -18,6 +18,7 @@ export class BudgetSyncRoom {
     const userName = String(request.headers.get('x-fingo-user-name') || '').trim();
     const role = String(request.headers.get('x-fingo-user-role') || '').trim().toLowerCase();
     const tenantId = String(request.headers.get('x-fingo-tenant-id') || '').trim();
+    const canEdit = request.headers.get('x-fingo-can-edit') === '1';
     if (!userId || !tenantId) {
       return Response.json({ ok:false, error:'Identidade autenticada obrigatória.' }, { status:401 });
     }
@@ -32,7 +33,8 @@ export class BudgetSyncRoom {
         userId,
         userName: userName || 'Usuário FinGo',
         role: role || 'visualizador',
-        tenantId
+        tenantId,
+        canEdit
       });
 
       return new Response(null, {
@@ -65,7 +67,7 @@ export class BudgetSyncRoom {
     // Notifica todos que um novo usuário entrou
     this.broadcast({
       type: 'user_joined',
-      user: userInfo,
+      user: { userId: userInfo.userId, userName: userInfo.userName, role: userInfo.role },
       activeCount: this.sessions.size
     }, webSocket);
 
@@ -86,7 +88,7 @@ export class BudgetSyncRoom {
           case 'item_updated':
           case 'etapa_reordered':
           case 'bdi_changed':
-            if (userInfo.role === 'visualizador') {
+            if (userInfo.role === 'visualizador' || !userInfo.canEdit) {
               webSocket.send(JSON.stringify({ type:'error', code:'READ_ONLY', message:'Seu perfil não pode editar esta sala.' }));
               break;
             }

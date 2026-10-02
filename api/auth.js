@@ -138,6 +138,28 @@ async function burnPasswordCheck(password) {
   try { await verifyPassword(String(password || ''), await dummyPasswordHashPromise); } catch {}
 }
 
+// AUDIT-2026-10-02 V2: consome o fator MFA de forma atômica. Antes, o step TOTP/código de
+// backup era gravado sem condição; duas requisições simultâneas com o mesmo código passavam.
+async function consumeMfaFactor(sql, user, { usedBackup, newBackupCodes, newStep }) {
+  if (usedBackup) {
+    const rows = await sql`
+      UPDATE usuarios SET mfa_backup_codes = ${JSON.stringify(newBackupCodes)}::jsonb
+      WHERE id = ${user.id} AND mfa_backup_codes = ${JSON.stringify(user.mfa_backup_codes || [])}::jsonb
+      RETURNING id;
+    `;
+    return rows.length > 0;
+  }
+  if (newStep > 0) {
+    const rows = await sql`
+      UPDATE usuarios SET mfa_last_used_step = ${newStep}
+      WHERE id = ${user.id} AND COALESCE(mfa_last_used_step, 0) < ${newStep}
+      RETURNING id;
+    `;
+    return rows.length > 0;
+  }
+  return false;
+}
+
 // AUDIT-2026-10-02 T2: limite por conta para códigos MFA. O limite por IP sozinho
 // permitia, com a senha em mãos, distribuir tentativas de TOTP/backup por vários IPs.
 // O prefixo 'mfa-user:' não é tratado como IP pelo Fail2Ban de _ratelimit.js.
@@ -602,10 +624,8 @@ export default async function handler(req, res) {
           });
         }
 
-        if (usedBackup) {
-          await sql`UPDATE usuarios SET mfa_backup_codes = ${JSON.stringify(newBackupCodes)}::jsonb WHERE id = ${user.id};`;
-        } else if (newStep > 0) {
-          await sql`UPDATE usuarios SET mfa_last_used_step = ${newStep} WHERE id = ${user.id};`;
+        if (!(await consumeMfaFactor(sql, user, { usedBackup, newBackupCodes, newStep }))) {
+          return res.status(401).json({ success: false, message: 'Este código já foi utilizado. Aguarde o próximo código.' });
         }
       }
 
@@ -755,10 +775,8 @@ export default async function handler(req, res) {
         });
       }
 
-      if (usedBackup) {
-        await sql`UPDATE usuarios SET mfa_backup_codes = ${JSON.stringify(newBackupCodes)}::jsonb WHERE id = ${user.id};`;
-      } else if (newStep > 0) {
-        await sql`UPDATE usuarios SET mfa_last_used_step = ${newStep} WHERE id = ${user.id};`;
+      if (!(await consumeMfaFactor(sql, user, { usedBackup, newBackupCodes, newStep }))) {
+        return res.status(401).json({ success: false, message: 'Este código já foi utilizado. Aguarde o próximo código.' });
       }
 
       const remember = Boolean(decoded.remember);
@@ -1447,6 +1465,12 @@ export default async function handler(req, res) {
         expiresInSeconds: 600
       });
       const fakeRequestId = () => 'rec_' + crypto.randomBytes(8).toString('hex');
+      // AUDIT-2026-10-02 V1: conta inexistente também paga o custo do hash do OTP, para o tempo
+      // de resposta não indicar se a conta existe.
+      const genericFakeResponse = async () => {
+        try { await hashPassword(crypto.randomInt(100000, 1000000).toString()); } catch {}
+        return genericResponse(fakeRequestId());
+      };
 
       const clean = identificador.trim().toLowerCase();
 
@@ -1470,24 +1494,24 @@ export default async function handler(req, res) {
         // Se access_key / company_key ausente, retornar resposta genérica (sem revelar que é obrigatória).
         const rawResetKey = String(resetAccessKey || resetCompanyKey || resetCamelKey || '').trim();
         if (!rawResetKey) {
-          return genericResponse(fakeRequestId());
+          return genericFakeResponse();
         }
         if (!isTenantAccessKeyShapeValid(rawResetKey)) {
-          return genericResponse(fakeRequestId());
+          return genericFakeResponse();
         }
         const resetTenant = await resolveTenantByAccessKey(sql, rawResetKey);
         if (!resetTenant) {
-          return genericResponse(fakeRequestId());
+          return genericFakeResponse();
         }
         const tenantUser = await resolveTenantUserByLogin(sql, resetTenant.id, clean);
         if (!tenantUser) {
-          return genericResponse(fakeRequestId());
+          return genericFakeResponse();
         }
         rows = [tenantUser];
       }
 
       if (!rows.length) {
-        return genericResponse(fakeRequestId());
+        return genericFakeResponse();
       }
 
       const user = rows[0];
@@ -1498,7 +1522,7 @@ export default async function handler(req, res) {
         WHERE usuario_id = ${user.id} AND created_at > NOW() - INTERVAL '15 minutes';
       `;
       if (Number(recentOtpCount[0]?.count || 0) >= 3) {
-        return genericResponse(fakeRequestId());
+        return genericFakeResponse();
       }
 
       await sql`

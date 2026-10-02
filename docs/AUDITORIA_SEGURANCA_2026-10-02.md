@@ -141,10 +141,26 @@ Revisado e sem problema novo: `_totp.js` (anti-replay por step, códigos de back
 6. **TOTP e código de backup** são marcados como usados depois da verificação, sem trava. Duas requisições simultâneas com o mesmo código podem passar. Risco baixo (exige senha e código válido).
 7. **Worker Cloudflare sem `NODE_ENV=production`**: nesse caso `MFA_ENCRYPTION_KEY` ausente cai para `SESSION_SIGNING_SECRET`. Confirme que `MFA_ENCRYPTION_KEY` está configurada nos Secrets do Worker.
 
+## Quinta rodada — pendências resolvidas
+
+`MFA_ENCRYPTION_KEY` confirmada nos Secrets do Worker pelo responsável.
+
+| # | Problema | Correção |
+|---|---|---|
+| V1 | `request_reset` respondia mais rápido quando a conta não existia | Caminhos sem conta também calculam o hash do OTP. O tempo de envio por WhatsApp/e-mail ainda difere quando a conta existe (o envio é aguardado) |
+| V2 | TOTP/código de backup gravados sem condição: duas requisições simultâneas com o mesmo código passavam | `consumeMfaFactor()` grava o step só se for maior que o último e consome o código de backup comparando a lista anterior |
+| V3 | Qualquer usuário com escrita em `notas` trocava ou removia o certificado A1 | Upload e remoção exigem administrador (`canManageTenant`). Consulta de status continua liberada |
+| V4 | Sala de colaboração em tempo real aceitava qualquer usuário da empresa | O Worker exige leitura no módulo `orcamentos` (perfil, plano e permissão customizada); edição exige escrita no módulo |
+
+Itens 2 a 7 das listas de decisão acima: resolvidos (V1–V4, T10, MFA confirmada), exceto:
+- **Token na URL dos webhooks do WhatsApp** (`?token=`): depende da configuração do Evolution Go.
+- **MFA para usuários de empresa**: hoje só o superadmin é obrigado. Exigir de todos é decisão de produto.
+
 ## Testes
 - Novo: `scripts/test-audit-2026-10-02.js` (incluído em `npm test`). Cobre F1–F11 e R1–R5. Falha na versão anterior e passa na corrigida.
 - Novo: `scripts/test-audit-2026-10-02-r3.js` (incluído em `npm test`). Cobre a terceira rodada.
 - Novo: `scripts/test-audit-2026-10-02-r4.js` (incluído em `npm test`). Cobre a quarta rodada; suíte com 121 testes, mesmas duas falhas externas, nenhuma regressão.
+- Novo: `scripts/test-audit-2026-10-02-r5.js` (incluído em `npm test`). Cobre a quinta rodada; suíte com 122 testes, mesmas duas falhas externas, nenhuma regressão.
 - Terceira rodada, suíte completa rodada teste a teste antes e depois: 118 de 119 → 119 de 120 (o novo passa). Falham igualmente nas duas versões, por dependerem de serviço externo: `test-phase5-edge-swr-cache.js` (API de CEP) e `test-upstash-redis-integration.js` (Redis real).
 - Atualizados para o novo contrato:
   - `test-edge-v2-routes.js` e `test-review-remediation.js`: antes exigiam a lista fixa do SINAPI e o otimizador sem login.

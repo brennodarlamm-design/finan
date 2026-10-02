@@ -4,6 +4,7 @@ import { recordEdgeMetric, getEdgeMetricsSummary, renderEdgeMetricsHtml } from '
 import { dispatchEdgeAlert } from './api/_edge-alerts.js';
 import { createCriticalR2Backup, migrateLegacyDocumentsToR2 } from './api/_edge-backup.js';
 export { BudgetSyncRoom } from './api/_edge-realtime.js';
+import { canAccessModule } from './api/_permissions.js';
 
 const DEFAULT_API_ORIGIN = 'https://api.fingo.api.br';
 const DEFAULT_CANONICAL_ORIGIN = 'https://fingo.api.br';
@@ -51,12 +52,23 @@ async function authenticateEdgeRequest(request, env) {
     if (!response.ok || !body?.success || !body?.user?.id || !body?.user?.tenantId) {
       return { ok:false, status:response.status === 403 ? 403 : 401 };
     }
+    // AUDIT-2026-10-02 V4: a sala de orçamento respeita perfil, plano e permissão customizada
+    // do módulo (antes qualquer usuário da empresa entrava e só "visualizador" era barrado).
+    const moduleAuth = {
+      user: {
+        perfil: body.user.perfil,
+        permissions: body.user.permissions || {},
+        tenantPlan: body.tenant?.plano || body.user.tenantPlan || 'trial'
+      }
+    };
     return {
       ok:true,
       userId:String(body.user.id),
       userName:String(body.user.nome || body.user.username || 'Usuário'),
       role:String(body.user.perfil || 'visualizador').toLowerCase(),
-      tenantId:String(body.user.tenantId)
+      tenantId:String(body.user.tenantId),
+      canRead:canAccessModule(moduleAuth, 'orcamentos', 'read'),
+      canEdit:canAccessModule(moduleAuth, 'orcamentos', 'write')
     };
   } catch (error) {
     console.warn('[FinGo Realtime] Falha ao validar sessão:', error?.message || error);
@@ -1662,6 +1674,10 @@ export default {
         );
       }
 
+      if (!identity.canRead) {
+        return Response.json({ ok:false, error:'Sem permissão para o módulo de orçamentos.' }, { status:403 });
+      }
+
       const rawRoomId = url.pathname.replace('/api/v2/edge/realtime/room/', '').split('/')[0] || 'general_room';
       const roomId = rawRoomId.replace(/[^a-zA-Z0-9_.:-]/g, '').slice(0, 120) || 'general_room';
       const tenantRoomId = `${identity.tenantId}:${roomId}`;
@@ -1674,6 +1690,7 @@ export default {
         trustedHeaders.set('x-fingo-user-name', identity.userName);
         trustedHeaders.set('x-fingo-user-role', identity.role);
         trustedHeaders.set('x-fingo-tenant-id', identity.tenantId);
+        trustedHeaders.set('x-fingo-can-edit', identity.canEdit ? '1' : '0');
         return stub.fetch(new Request(request, { headers: trustedHeaders }));
       }
       return Response.json({ ok:false, error:'Serviço de colaboração em tempo real indisponível.' }, { status:503 });
