@@ -130,10 +130,67 @@ const SINAPI = {
       return normalized;
     } catch {
       const reduced={ ...normalized, composicoes:(normalized.composicoes || []).slice(0,5000), parcial:true };
-      this._cachedBase[key]=reduced;
-      localStorage.setItem(key, JSON.stringify(reduced));
-      return reduced;
+      this._cachedBase[key]=normalized;
+      try {
+        localStorage.setItem(key, JSON.stringify(reduced));
+      } catch {}
+      return normalized;
     }
+  },
+
+  async ensureBaseLoaded(desonerado = true, uf = 'SP', referencia = '2026-08') {
+    const u = this._cleanUf(uf) || 'SP';
+    const r = this._cleanRef(referencia) || '2026-08';
+    const existing = this.getBase(desonerado, u, r);
+    if (existing?.composicoes?.length) return existing;
+
+    const snap = this.snapshotFor(u, r, desonerado) || this.snapshotFor('SP', '2026-08', desonerado);
+    if (!snap) return null;
+
+    if (this._loadingPromises?.[snap.file]) {
+      return this._loadingPromises[snap.file];
+    }
+
+    this._loadingPromises = this._loadingPromises || {};
+    this._loadingPromises[snap.file] = (async () => {
+      try {
+        if (typeof fetch === 'undefined') return null;
+        const res = await fetch(snap.file, { cache: 'default' });
+        if (!res.ok) return null;
+        const data = await res.json();
+        if (data && Array.isArray(data.composicoes) && data.composicoes.length) {
+          const stored = this._saveBase({
+            ...data,
+            source: 'snapshot_caixa_empacotado',
+            importada_em: data.importada_em || new Date().toISOString()
+          }, desonerado, snap.uf, snap.referencia);
+          return stored;
+        }
+      } catch (err) {
+        console.warn('SINAPI.ensureBaseLoaded error:', err);
+      } finally {
+        if (this._loadingPromises) delete this._loadingPromises[snap.file];
+      }
+      return null;
+    })();
+
+    return this._loadingPromises[snap.file];
+  },
+
+  autoPreloadDefault() {
+    if (typeof window === 'undefined' || typeof fetch === 'undefined') return;
+    try {
+      const empUf = (typeof DB !== 'undefined' && DB.getEmpresa) ? DB.getEmpresa()?.uf : 'SP';
+      const targetUf = this._cleanUf(empUf) || 'SP';
+      const snapDes = this.snapshotFor(targetUf, '2026-08', true) || this.snapshotFor('SP', '2026-08', true);
+      if (snapDes && !this.hasBase(true, snapDes.uf, snapDes.referencia)) {
+        this.ensureBaseLoaded(true, snapDes.uf, snapDes.referencia);
+      }
+      const snapOn = this.snapshotFor(targetUf, '2026-08', false) || this.snapshotFor('SP', '2026-08', false);
+      if (snapOn && !this.hasBase(false, snapOn.uf, snapOn.referencia)) {
+        this.ensureBaseLoaded(false, snapOn.uf, snapOn.referencia);
+      }
+    } catch {}
   },
 
   clearBase(desonerado = false, uf = '', referencia = '') {
@@ -520,29 +577,49 @@ const SINAPI = {
   // ─────────────────────────────────────────────────
 
   /**
-   * Busca composições por código ou descrição (case-insensitive).
+   * Busca composições por código ou descrição (case-insensitive e accent-insensitive).
    * @param {string} termo — texto a buscar
    * @param {boolean} desonerado — qual série usar
    * @param {number} limite — max resultados retornados
    */
   buscar(termo, desonerado = false, limite = 50, uf = '', referencia = '') {
-    const base = this.getBase(desonerado, uf, referencia);
-    if (!base || !base.composicoes) return [];
+    let base = this.getBase(desonerado, uf, referencia);
+    if (!base || !base.composicoes || !base.composicoes.length) {
+      if (!uf && !referencia) {
+        const anyKey = Object.keys(this._cachedBase).find(k => k.endsWith(desonerado ? '_des' : '_on') && this._cachedBase[k]?.composicoes?.length);
+        if (anyKey) base = this._cachedBase[anyKey];
+      }
+    }
+    if (!base || !base.composicoes) {
+      if (typeof window !== 'undefined' && typeof fetch !== 'undefined') {
+        const u = this._cleanUf(uf) || 'SP';
+        const r = this._cleanRef(referencia) || '2026-08';
+        this.ensureBaseLoaded(desonerado, u, r);
+      }
+      return [];
+    }
 
-    const t = (termo || '').trim().toLowerCase();
+    const norm = s => String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+    const t = norm(termo);
     if (!t) return base.composicoes.slice(0, limite);
 
+    const palavras = t.split(/\s+/).filter(Boolean);
     const resultados = [];
     for (const c of base.composicoes) {
-      const match =
-        String(c.codigo || '').toLowerCase().includes(t) ||
-        String(c.descricao || '').toLowerCase().includes(t);
+      const cod = String(c.codigo || '').toLowerCase();
+      const descNorm = c._norm || (c._norm = norm(c.descricao));
+      const match = cod.includes(t) || (palavras.length && palavras.every(p => descNorm.includes(p)));
       if (match) {
         resultados.push(c);
         if (resultados.length >= limite) break;
       }
     }
     return resultados;
+  },
+
+  async buscarAsync(termo, desonerado = false, limite = 50, uf = '', referencia = '') {
+    await this.ensureBaseLoaded(desonerado, uf, referencia);
+    return this.buscar(termo, desonerado, limite, uf, referencia);
   },
 
   // ─────────────────────────────────────────────────
@@ -563,3 +640,10 @@ const SINAPI = {
   },
 
 };
+
+if (typeof window !== 'undefined' && typeof setTimeout === 'function') {
+  setTimeout(() => {
+    try { SINAPI.autoPreloadDefault(); } catch {}
+  }, 250);
+}
+

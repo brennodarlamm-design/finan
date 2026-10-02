@@ -1,4 +1,4 @@
-﻿// js/busca.js — Busca Global Ctrl+K
+// js/busca.js — Busca Global Ctrl+K
 // Pesquisa em tempo real por Lancamentos, Obras, Fornecedores, Notas, Pre-Compras
 
 const BuscaGlobal = {
@@ -145,6 +145,31 @@ const BuscaGlobal = {
         });
       }
     });
+
+    // Orçamentos
+    (DB.getAll('orcamentos') || []).forEach(o => {
+      if ((o.nome||'').toLowerCase().includes(q) || (o.descricao||'').toLowerCase().includes(q)) {
+        resultados.push({
+          tipo: 'orcamento', icone: '📋', cor: '#0284c7',
+          titulo: o.nome,
+          sub: `${Utils.badge(o.status || 'ativo')} · ${Utils.fmt.currency(o.valor_total || o.total || 0)} · Orçamento`,
+          badge: 'Orçamentos', acao: () => { this.fechar(); App.navigate('orcamentos'); if (typeof OrcamentoSINAPI !== 'undefined') OrcamentoSINAPI.openEditor(o.id); }
+        });
+      }
+    });
+
+    // Catálogo Oficial SINAPI Caixa
+    if (typeof SINAPI !== 'undefined' && SINAPI.buscar) {
+      const sinapiHits = SINAPI.buscar(q, true, 4);
+      sinapiHits.forEach(s => {
+        resultados.push({
+          tipo: 'sinapi', icone: '🏛️', cor: '#10b981',
+          titulo: s.descricao,
+          sub: `Código ${s.codigo} · ${s.unidade} · ${Utils.fmt.currency(s.preco_unitario)} (SINAPI Caixa)`,
+          badge: 'Catálogo SINAPI', acao: () => { this.fechar(); App.navigate('orcamentos'); if (typeof OrcamentoSINAPI !== 'undefined') OrcamentoSINAPI.abrirCatalogoSINAPI(s.codigo); }
+        });
+      });
+    }
 
     if (resultados.length === 0) {
       container.innerHTML = `<div style="text-align:center;padding:32px;color:var(--text3);">😕 Nenhum resultado para "<strong style="color:var(--text);">${this._esc(query)}</strong>"</div>`;

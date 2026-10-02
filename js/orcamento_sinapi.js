@@ -124,7 +124,14 @@ const OrcamentoSINAPI = {
       orcs = orcs.filter(o => !!o.proposta);
     }
 
-
+    let sinapiSearchResults = [];
+    if (this._filterSearch && this._filterSearch.trim().length >= 2 && typeof SINAPI !== 'undefined') {
+      const targetUf = this._defaultUF(obraId) || 'SP';
+      sinapiSearchResults = SINAPI.buscar(this._filterSearch, true, 8, targetUf, '2026-08');
+      if (!sinapiSearchResults.length) {
+        sinapiSearchResults = SINAPI.buscar(this._filterSearch, false, 8, targetUf, '2026-08');
+      }
+    }
 
     return `
     <div class="page-container" style="padding:0;">
@@ -141,24 +148,38 @@ const OrcamentoSINAPI = {
                 <h2 style="font-weight:800;font-size:1.25rem;color:var(--text);margin:0;letter-spacing:-.02em;">Orçamentos</h2>
                 <span style="background:var(--accent-dim, rgba(198,255,0,0.12));color:var(--action-fg);border:1px solid var(--border);font-size:.72rem;font-weight:800;padding:2px 8px;border-radius:4px;">${orcs.length} cadastrado${orcs.length===1?'':'s'}</span>
               </div>
-              <p style="font-size:.78rem;color:var(--text3);margin:2px 0 0 0;">Gestão de orçamentos, composições unitárias e propostas comerciais</p>
+              <p style="font-size:.78rem;color:var(--text3);margin:2px 0 0 0;">Gestão de orçamentos, composições unitárias oficiais da Caixa e propostas comerciais</p>
             </div>
           </div>
 
-          <!-- Barra de Busca com alto contraste -->
-          <div style="display:flex;align-items:center;background:var(--bg-input);border:1.5px solid var(--border);border-radius:6px;overflow:hidden;min-width:280px;height:38px;">
-            <span style="color:var(--action-fg);font-size:.85rem;padding:0 12px;display:flex;align-items:center;gap:6px;font-weight:700;">
-              🔍
-            </span>
-            <input
-              type="text"
-              style="background:transparent;border:none;color:var(--text);padding:6px 12px 6px 0;font-size:.85rem;outline:none;width:100%;font-weight:500;"
-              placeholder="Buscar por orçamento, cliente ou obra..."
-              value="${e(this._filterSearch)}"
-              data-fb-input="OrcamentoSINAPI._onSearchLista"
-              data-fb-input-n="1"
-              data-fb-input-t0="value"
+          <!-- Barra de Busca Unificada com Catálogo SINAPI -->
+          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+            <div style="display:flex;align-items:center;background:var(--bg-input);border:1.5px solid var(--border);border-radius:6px;overflow:hidden;min-width:320px;height:38px;">
+              <span style="color:var(--action-fg);font-size:.85rem;padding:0 12px;display:flex;align-items:center;gap:6px;font-weight:700;">
+                🔍
+              </span>
+              <input
+                type="text"
+                style="background:transparent;border:none;color:var(--text);padding:6px 12px 6px 0;font-size:.85rem;outline:none;width:100%;font-weight:500;"
+                placeholder="Buscar orçamento ou item no Catálogo SINAPI..."
+                value="${e(this._filterSearch)}"
+                data-fb-input="OrcamentoSINAPI._onSearchLista"
+                data-fb-input-n="1"
+                data-fb-input-t0="value"
+              >
+            </div>
+            <button
+              type="button"
+              class="btn btn-sm"
+              style="background:var(--accent);color:var(--accent-contrast, #101814);font-weight:800;font-size:.8rem;height:38px;padding:0 12px;border:none;border-radius:6px;display:inline-flex;align-items:center;gap:6px;cursor:pointer;white-space:nowrap;"
+              data-fb-click="OrcamentoSINAPI.abrirCatalogoSINAPI"
+              data-fb-click-n="1"
+              data-fb-click-t0="string"
+              data-fb-click-v0="${encodeURIComponent(this._filterSearch || '')}"
+              title="Abrir Catálogo Oficial SINAPI Caixa com 15.423 itens"
             >
+              🏛️ Catálogo SINAPI
+            </button>
           </div>
         </div>
 
@@ -233,7 +254,7 @@ const OrcamentoSINAPI = {
         </div>
       </div>
 
-      <!-- Barra de Ações: + NOVO, COPIAR, MODELOS PRONTOS, etc. -->
+      <!-- Barra de Ações: + NOVO, CONSULTAR SINAPI, COPIAR, MODELOS PRONTOS, etc. -->
       <div style="background:var(--bg-card);border:1.5px solid var(--border);border-top:none;padding:12px 20px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;box-shadow:var(--shadow-sm, 0 1px 3px rgba(0,0,0,0.05));">
         <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
           
@@ -245,6 +266,17 @@ const OrcamentoSINAPI = {
             data-fb-click-n="0"
           >
             <span style="font-size:1rem;line-height:1;">+</span> NOVO ORÇAMENTO
+          </button>
+
+          <button
+            type="button"
+            class="btn btn-sm"
+            style="font-weight:800;font-size:.82rem;background:linear-gradient(135deg, #0284c7 0%, #0369a1 100%);color:#fff;border:1.5px solid #0284c7;padding:6px 14px;border-radius:6px;display:inline-flex;align-items:center;gap:6px;cursor:pointer;box-shadow:0 2px 6px rgba(2,132,199,0.25);"
+            data-fb-click="OrcamentoSINAPI.abrirCatalogoSINAPI"
+            data-fb-click-n="0"
+            title="Consultar todo o catálogo oficial da Caixa com mais de 15.000 composições e insumos"
+          >
+            🏛️ CONSULTAR CATÁLOGO SINAPI (15.423 ITENS)
           </button>
 
           <button
@@ -311,6 +343,20 @@ const OrcamentoSINAPI = {
           ?
         </button>
       </div>
+
+      ${(orcs.length > 0 && sinapiSearchResults.length > 0) ? `
+        <div style="background:rgba(2,132,199,0.1);border:1.5px solid #0284c7;border-radius:8px;padding:12px 18px;margin:12px 0;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">
+          <div style="display:flex;align-items:center;gap:10px;">
+            <span style="font-size:1.3rem;">🏛️</span>
+            <span style="font-size:.86rem;color:var(--text);font-weight:600;">
+              Encontramos também <strong>${sinapiSearchResults.length}+ composições e insumos oficiais</strong> no Catálogo SINAPI Caixa para "<strong>${e(this._filterSearch)}</strong>".
+            </span>
+          </div>
+          <button class="btn btn-sm" style="background:#0284c7;color:#fff;border:none;font-size:.8rem;font-weight:700;padding:5px 14px;border-radius:5px;cursor:pointer;" data-fb-click="OrcamentoSINAPI.abrirCatalogoSINAPI" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(this._filterSearch)}">
+            Ver itens no Catálogo SINAPI ➔
+          </button>
+        </div>
+      ` : ''}
 
       <!-- Tabela Principal de Orçamentos com Alto Contraste -->
       <div style="background:var(--bg-card);border:1.5px solid var(--border);border-top:none;overflow-x:auto;">
@@ -387,14 +433,61 @@ const OrcamentoSINAPI = {
 
             ${!orcs.length ? `
               <tr>
-                <td colspan="11" style="text-align:center;padding:48px 20px;color:var(--text2);">
-                  <div style="font-size:2.5rem;margin-bottom:8px;">📋</div>
-                  <h3 style="color:var(--text);font-weight:800;margin-bottom:6px;">Nenhum orçamento encontrado</h3>
-                  <p style="font-size:.85rem;color:var(--text3);max-width:400px;margin:0 auto 16px;font-weight:500;">
-                    Crie um novo orçamento ou utilize nossos templates pré-prontos do SINAPI.
-                  </p>
-                  <button class="btn btn-primary" data-fb-click="OrcamentoSINAPI.showForm" data-fb-click-n="0">+ Novo Orçamento</button>
-                  <button class="btn btn-secondary" style="margin-left:8px;" data-fb-click="OrcamentoTemplates.abrirModalCatalogo" data-fb-click-n="0">⭐ Modelos Prontos</button>
+                <td colspan="11" style="text-align:center;padding:32px 20px;color:var(--text2);">
+                  ${sinapiSearchResults.length > 0 ? `
+                    <div style="background:var(--bg-secondary);border:1.5px solid var(--accent);border-radius:10px;padding:24px;text-align:left;">
+                      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:10px;">
+                        <div style="display:flex;align-items:center;gap:10px;">
+                          <span style="font-size:1.8rem;">🏛️</span>
+                          <div>
+                            <h3 style="margin:0;font-size:1.1rem;font-weight:800;color:var(--text);">
+                              Itens encontrados no Catálogo Oficial SINAPI Caixa para "<span style="color:var(--accent);">${e(this._filterSearch)}</span>":
+                            </h3>
+                            <p style="margin:2px 0 0;font-size:.8rem;color:var(--text3);">
+                              Nenhum orçamento cadastrado com este nome, mas localizamos ${sinapiSearchResults.length}+ composições e insumos oficiais na base da Caixa:
+                            </p>
+                          </div>
+                        </div>
+                        <button class="btn btn-primary btn-sm" data-fb-click="OrcamentoSINAPI.abrirCatalogoSINAPI" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(this._filterSearch)}" style="font-weight:800;">
+                          🔍 Abrir no Catálogo SINAPI Completo
+                        </button>
+                      </div>
+                      <div style="display:grid;grid-template-columns:repeat(auto-fill, minmax(320px, 1fr));gap:12px;">
+                        ${sinapiSearchResults.slice(0, 6).map(it => `
+                          <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:8px;padding:14px;display:flex;flex-direction:column;justify-content:space-between;gap:10px;">
+                            <div>
+                              <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;">
+                                <span style="font-family:monospace;font-weight:800;color:var(--accent);font-size:.85rem;">${e(it.codigo)}</span>
+                                <span style="background:${it.tipo==='COMP'?'rgba(168,85,247,0.15)':'rgba(245,158,11,0.15)'};color:${it.tipo==='COMP'?'#c084fc':'#fbbf24'};font-size:.7rem;padding:1px 6px;border-radius:4px;font-weight:800;">${e(it.tipo||'COMP')}</span>
+                                <span style="color:var(--text3);font-size:.75rem;">· ${e(it.unidade)}</span>
+                              </div>
+                              <div style="font-size:.84rem;font-weight:600;color:var(--text);line-height:1.35;" title="${e(it.descricao)}">
+                                ${e(it.descricao)}
+                              </div>
+                            </div>
+                            <div style="display:flex;align-items:center;justify-content:space-between;border-top:1px solid var(--border);padding-top:8px;">
+                              <div style="font-weight:800;color:var(--success);font-size:.95rem;">
+                                ${Utils.fmt.currency(it.preco_unitario)}
+                              </div>
+                              <div style="display:flex;gap:6px;">
+                                <button class="btn btn-sm btn-secondary" style="font-size:.74rem;padding:3px 10px;" data-fb-click="OrcamentoSINAPI.copiarCodigo" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(it.codigo)}" title="Copiar código SINAPI">📋 Copiar</button>
+                                <button class="btn btn-sm btn-primary" style="font-size:.74rem;padding:3px 10px;" data-fb-click="OrcamentoSINAPI.criarOrcamentoComItem" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(it.codigo)}" title="Adicionar ou criar orçamento com este item">+ Usar</button>
+                              </div>
+                            </div>
+                          </div>
+                        `).join('')}
+                      </div>
+                    </div>
+                  ` : `
+                    <div style="font-size:2.5rem;margin-bottom:8px;">📋</div>
+                    <h3 style="color:var(--text);font-weight:800;margin-bottom:6px;">Nenhum orçamento encontrado</h3>
+                    <p style="font-size:.85rem;color:var(--text3);max-width:440px;margin:0 auto 16px;font-weight:500;">
+                      ${this._filterSearch ? `Não encontramos orçamentos ou itens na base para "${e(this._filterSearch)}". Tente outros termos ou consulte a base oficial.` : 'Crie um novo orçamento ou utilize nossos templates pré-prontos do SINAPI.'}
+                    </p>
+                    <button class="btn btn-primary" data-fb-click="OrcamentoSINAPI.showForm" data-fb-click-n="0">+ Novo Orçamento</button>
+                    <button class="btn btn-secondary" style="margin-left:8px;" data-fb-click="OrcamentoTemplates.abrirModalCatalogo" data-fb-click-n="0">⭐ Modelos Prontos</button>
+                    <button class="btn btn-secondary" style="margin-left:8px;" data-fb-click="OrcamentoSINAPI.abrirCatalogoSINAPI" data-fb-click-n="0">🏛️ Catálogo SINAPI</button>
+                  `}
                 </td>
               </tr>
             ` : ''}
@@ -1046,8 +1139,21 @@ const OrcamentoSINAPI = {
       : [];
 
     if (!resultados.length) {
+      if (typeof SINAPI !== 'undefined' && orc && !SINAPI.hasBase(orc.desonerado, orc.uf, orc.referencia_sinapi) && typeof fetch !== 'undefined') {
+        dropdown.style.display = 'block';
+        dropdown.innerHTML = `<div style="padding:14px;color:var(--accent);font-size:.82rem;display:flex;align-items:center;gap:8px;"><span style="display:inline-block;animation:spin 1s linear infinite;">⏳</span> Carregando base oficial SINAPI Caixa (${Utils.escapeHtml(orc.uf || 'SP')})...</div>`;
+        SINAPI.ensureBaseLoaded(orc.desonerado, orc.uf, orc.referencia_sinapi).then(loaded => {
+          if (loaded) {
+            const input = document.getElementById('sinapi-quick-add-input');
+            if (input && input.value.trim() === termo.trim()) {
+              this._onQuickSearchInput(orcId, termo);
+            }
+          }
+        });
+        return;
+      }
       dropdown.style.display = 'block';
-      dropdown.innerHTML = `<div style="padding:12px;color:#94a3b8;font-size:.82rem;">Nenhum item encontrado para "${Utils.escapeHtml(termo)}"</div>`;
+      dropdown.innerHTML = `<div style="padding:12px;color:#94a3b8;font-size:.82rem;display:flex;align-items:center;justify-content:space-between;gap:8px;"><span>Nenhum item encontrado para "${Utils.escapeHtml(termo)}"</span><button class="btn btn-secondary btn-sm" style="font-size:.72rem;padding:2px 8px;" data-fb-click="OrcamentoSINAPI.abrirCatalogoSINAPI" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(termo)}">Abrir Catálogo</button></div>`;
       return;
     }
 
@@ -1774,6 +1880,546 @@ const OrcamentoSINAPI = {
         el.innerHTML = Orcamentos.render(App.obraId);
       }
     }
+  },
+
+  _catState: {
+    termo: '',
+    uf: 'SP',
+    referencia: '2026-08',
+    desonerado: true,
+    tipo: 'TODOS',
+    pagina: 1,
+    porPagina: 25
+  },
+
+  abrirCatalogoSINAPI(termo = '', uf = '') {
+    if (!this._ensurePlanAccess()) return;
+    this._catState.termo = (typeof termo === 'string' && termo !== 'undefined') ? termo : (this._filterSearch || '');
+    if (uf) this._catState.uf = uf;
+    else if (!this._catState.uf) this._catState.uf = this._defaultUF();
+    this._catState.pagina = 1;
+
+    const u = this._catState.uf;
+    const r = this._catState.referencia;
+    const d = this._catState.desonerado;
+
+    if (typeof SINAPI !== 'undefined' && !SINAPI.hasBase(d, u, r) && typeof fetch !== 'undefined') {
+      SINAPI.ensureBaseLoaded(d, u, r).then(() => {
+        this._atualizarTabelaCatalogo();
+      });
+    }
+
+    const e = Utils.escapeHtml.bind(Utils);
+    Utils.showModal(`
+      <div class="modal modal-xl" style="max-width:1150px;width:96vw;max-height:92vh;display:flex;flex-direction:column;padding:0;overflow:hidden;border-radius:var(--r-lg);">
+        
+        <!-- Header -->
+        <div style="background:#161b22;color:#fff;padding:16px 24px;border-bottom:1px solid #30363d;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">
+          <div style="display:flex;align-items:center;gap:12px;">
+            <span style="font-size:1.6rem;">🏛️</span>
+            <div>
+              <div style="display:flex;align-items:center;gap:8px;">
+                <h3 style="margin:0;font-size:1.15rem;font-weight:800;letter-spacing:-.02em;color:#f0f6fc;">
+                  Catálogo Oficial SINAPI — Caixa Econômica Federal
+                </h3>
+                <span id="cat-badge-total" style="background:var(--accent-dim, rgba(198,255,0,0.15));color:var(--action-fg, #c6ff00);font-weight:800;font-size:.72rem;padding:2px 8px;border-radius:4px;border:1px solid rgba(198,255,0,0.3);">
+                  15.423 itens oficiais
+                </span>
+              </div>
+              <p style="margin:2px 0 0;font-size:.78rem;color:#8b949e;">
+                Banco de preços e composições unitárias da Caixa para orçamento de obras
+              </p>
+            </div>
+          </div>
+          <button class="modal-close" data-fb-click="Utils.closeModal" data-fb-click-n="0" style="color:#8b949e;font-size:1.4rem;background:transparent;border:none;cursor:pointer;">✕</button>
+        </div>
+
+        <!-- Filtros do Catálogo -->
+        <div style="background:#0d1117;border-bottom:1px solid #30363d;padding:14px 24px;display:flex;flex-direction:column;gap:12px;">
+          
+          <!-- Linha de Busca -->
+          <div style="display:flex;align-items:center;gap:10px;">
+            <div style="flex:1;display:flex;align-items:center;background:#161b22;border:1.5px solid #30363d;border-radius:8px;overflow:hidden;padding:0 12px;height:42px;">
+              <span style="color:#8b949e;font-size:1rem;margin-right:8px;">🔍</span>
+              <input
+                id="cat-sinapi-q"
+                type="text"
+                style="flex:1;background:transparent;border:none;outline:none;color:#f0f6fc;font-size:.92rem;font-weight:500;"
+                placeholder="Digite o código SINAPI (ex: 88309) ou palavras-chave (ex: concreto, cimento, alvenaria, piso, tubo)..."
+                value="${e(this._catState.termo)}"
+                data-fb-input="OrcamentoSINAPI._onCatSearchInput"
+                data-fb-input-n="1"
+                data-fb-input-t0="value"
+                autofocus
+              >
+              ${this._catState.termo ? `
+                <button
+                  type="button"
+                  style="background:transparent;border:none;color:#8b949e;cursor:pointer;font-size:.9rem;"
+                  data-fb-click="OrcamentoSINAPI._limparBuscaCat"
+                  data-fb-click-n="0"
+                  title="Limpar busca"
+                >✕</button>
+              ` : ''}
+            </div>
+          </div>
+
+          <!-- Linha de Controles: UF, Competência, Desoneração, Tipo -->
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">
+            <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+              
+              <!-- UF -->
+              <div style="display:inline-flex;align-items:center;gap:6px;">
+                <label style="font-size:.74rem;font-weight:700;color:#8b949e;text-transform:uppercase;">UF:</label>
+                <select
+                  id="cat-select-uf"
+                  style="height:32px;background:#161b22;color:#f0f6fc;border:1px solid #30363d;border-radius:6px;padding:0 8px;font-size:.82rem;font-weight:700;outline:none;cursor:pointer;"
+                  data-fb-change="OrcamentoSINAPI._onCatChangeUF"
+                  data-fb-change-n="1"
+                  data-fb-change-t0="value"
+                >
+                  <option value="SP" ${this._catState.uf==='SP'?'selected':''}>SP - São Paulo (Oficial)</option>
+                  <option value="SC" ${this._catState.uf==='SC'?'selected':''}>SC - Santa Catarina (Oficial)</option>
+                  <option value="RR" ${this._catState.uf==='RR'?'selected':''}>RR - Roraima (Oficial)</option>
+                </select>
+              </div>
+
+              <!-- Série -->
+              <div style="display:inline-flex;align-items:center;gap:6px;">
+                <label style="font-size:.74rem;font-weight:700;color:#8b949e;text-transform:uppercase;">Regime:</label>
+                <select
+                  id="cat-select-des"
+                  style="height:32px;background:#161b22;color:#f0f6fc;border:1px solid #30363d;border-radius:6px;padding:0 8px;font-size:.82rem;font-weight:700;outline:none;cursor:pointer;"
+                  data-fb-change="OrcamentoSINAPI._onCatChangeDes"
+                  data-fb-change-n="1"
+                  data-fb-change-t0="value"
+                >
+                  <option value="true" ${this._catState.desonerado?'selected':''}>Desonerado (Sem Oneração)</option>
+                  <option value="false" ${!this._catState.desonerado?'selected':''}>Com Oneração (Padrão)</option>
+                </select>
+              </div>
+
+              <!-- Tipo Filtro -->
+              <div style="display:inline-flex;align-items:center;gap:4px;background:#161b22;border:1px solid #30363d;border-radius:6px;padding:2px;">
+                <button
+                  type="button"
+                  style="padding:3px 10px;font-size:.76rem;font-weight:700;border:none;border-radius:4px;cursor:pointer;background:${this._catState.tipo==='TODOS'?'var(--accent)':'transparent'};color:${this._catState.tipo==='TODOS'?'#101814':'#8b949e'};"
+                  data-fb-click="OrcamentoSINAPI._onCatSetTipo"
+                  data-fb-click-n="1"
+                  data-fb-click-t0="string"
+                  data-fb-click-v0="TODOS"
+                >Todos</button>
+                <button
+                  type="button"
+                  style="padding:3px 10px;font-size:.76rem;font-weight:700;border:none;border-radius:4px;cursor:pointer;background:${this._catState.tipo==='COMP'?'#8b5cf6':'transparent'};color:${this._catState.tipo==='COMP'?'#fff':'#8b949e'};"
+                  data-fb-click="OrcamentoSINAPI._onCatSetTipo"
+                  data-fb-click-n="1"
+                  data-fb-click-t0="string"
+                  data-fb-click-v0="COMP"
+                >Composições</button>
+                <button
+                  type="button"
+                  style="padding:3px 10px;font-size:.76rem;font-weight:700;border:none;border-radius:4px;cursor:pointer;background:${this._catState.tipo==='INSUMO'?'#f59e0b':'transparent'};color:${this._catState.tipo==='INSUMO'?'#101814':'#8b949e'};"
+                  data-fb-click="OrcamentoSINAPI._onCatSetTipo"
+                  data-fb-click-n="1"
+                  data-fb-click-t0="string"
+                  data-fb-click-v0="INSUMO"
+                >Insumos</button>
+              </div>
+
+            </div>
+
+            <div id="cat-status-msg" style="font-size:.78rem;color:#8b949e;font-weight:600;">
+              Base: ${e(this._catState.uf)} 08/2026
+            </div>
+          </div>
+        </div>
+
+        <!-- Tabela / Conteúdo de Resultados -->
+        <div id="cat-sinapi-results-container" style="flex:1;overflow-y:auto;background:var(--bg-card);padding:0;">
+          ${this._renderCatalogoResultsHtml()}
+        </div>
+
+        <!-- Footer do Modal -->
+        <div style="background:#161b22;border-top:1px solid #30363d;padding:12px 24px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">
+          <div id="cat-pagination-info" style="font-size:.8rem;color:#8b949e;font-weight:600;">
+            ${this._renderCatalogoPaginationInfo()}
+          </div>
+          <div style="display:flex;gap:8px;">
+            <button
+              class="btn btn-secondary btn-sm"
+              data-fb-click="OrcamentoSINAPI.showImportModal"
+              data-fb-click-n="3"
+              data-fb-click-t0="bool"
+              data-fb-click-v0="${!!this._catState.desonerado}"
+              data-fb-click-t1="string"
+              data-fb-click-v1="${encodeURIComponent(this._catState.uf)}"
+              data-fb-click-t2="string"
+              data-fb-click-v2="2026-08"
+              style="font-size:.78rem;"
+            >
+              📥 Importar Planilha Caixa
+            </button>
+            <button class="btn btn-primary btn-sm" data-fb-click="Utils.closeModal" data-fb-click-n="0" style="font-weight:700;">
+              Fechar
+            </button>
+          </div>
+        </div>
+
+      </div>
+    `);
+  },
+
+  _renderCatalogoResultsHtml() {
+    const e = Utils.escapeHtml.bind(Utils);
+    const u = this._catState.uf;
+    const r = this._catState.referencia;
+    const d = this._catState.desonerado;
+
+    let items = (typeof SINAPI !== 'undefined') ? SINAPI.buscar(this._catState.termo, d, 2000, u, r) : [];
+
+    if (this._catState.tipo === 'COMP') {
+      items = items.filter(it => (it.tipo || 'COMP') === 'COMP');
+    } else if (this._catState.tipo === 'INSUMO') {
+      items = items.filter(it => (it.tipo || 'COMP') === 'INSUMO');
+    }
+
+    if (!items.length) {
+      if (typeof SINAPI !== 'undefined' && !SINAPI.hasBase(d, u, r)) {
+        return `
+          <div style="padding:48px 20px;text-align:center;">
+            <div style="font-size:2.5rem;margin-bottom:8px;animation:spin 1s linear infinite;display:inline-block;">⏳</div>
+            <h4 style="color:var(--text);font-weight:800;margin-bottom:6px;">Carregando Base Oficial SINAPI Caixa (${u} ${r})...</h4>
+            <p style="color:var(--text3);font-size:.85rem;">Os dados estão sendo transferidos e indexados para acesso ultrarrápido.</p>
+          </div>
+        `;
+      }
+      return `
+        <div style="padding:48px 20px;text-align:center;">
+          <div style="font-size:2.5rem;margin-bottom:8px;">🔍</div>
+          <h4 style="color:var(--text);font-weight:800;margin-bottom:6px;">Nenhum item encontrado para "${e(this._catState.termo)}"</h4>
+          <p style="color:var(--text3);font-size:.85rem;max-width:440px;margin:0 auto 12px;">
+            Tente palavras-chave simples como "cimento", "concreto", "argamassa", "alvenaria", "tijolo", "piso", "eletroduto", ou digite o código SINAPI diretamente.
+          </p>
+          <button class="btn btn-secondary btn-sm" data-fb-click="OrcamentoSINAPI._limparBuscaCat" data-fb-click-n="0">Ver todos os itens</button>
+        </div>
+      `;
+    }
+
+    const total = items.length;
+    const porPag = this._catState.porPagina;
+    const pag = this._catState.pagina;
+    const startIdx = (pag - 1) * porPag;
+    const endIdx = Math.min(startIdx + porPag, total);
+    const paged = items.slice(startIdx, endIdx);
+
+    return `
+      <table style="width:100%;border-collapse:collapse;font-size:.84rem;">
+        <thead>
+          <tr style="background:var(--bg-elevated);color:var(--text);font-size:.76rem;text-transform:uppercase;letter-spacing:.6px;font-weight:800;border-bottom:2px solid var(--border);position:sticky;top:0;z-index:2;">
+            <th style="padding:10px 14px;text-align:left;width:90px;">CÓDIGO</th>
+            <th style="padding:10px 10px;text-align:center;width:75px;">TIPO</th>
+            <th style="padding:10px 14px;text-align:left;">DESCRIÇÃO OFICIAL DA COMPOSIÇÃO / INSUMO</th>
+            <th style="padding:10px 10px;text-align:center;width:65px;">UNID</th>
+            <th style="padding:10px 14px;text-align:right;width:120px;">PREÇO CAIXA</th>
+            <th style="padding:10px 14px;text-align:center;width:150px;">AÇÕES</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${paged.map(it => `
+            <tr style="border-bottom:1px solid var(--border);">
+              <td style="padding:10px 14px;font-family:monospace;font-weight:800;color:var(--accent);">
+                ${e(it.codigo)}
+              </td>
+              <td style="padding:10px 10px;text-align:center;">
+                <span style="background:${it.tipo==='COMP'?'rgba(168,85,247,0.15)':'rgba(245,158,11,0.15)'};color:${it.tipo==='COMP'?'#c084fc':'#fbbf24'};font-size:.7rem;padding:2px 6px;border-radius:4px;font-weight:800;">
+                  ${e(it.tipo||'COMP')}
+                </span>
+              </td>
+              <td style="padding:10px 14px;color:var(--text);font-weight:500;line-height:1.35;">
+                ${e(it.descricao)}
+              </td>
+              <td style="padding:10px 10px;text-align:center;color:var(--text3);font-weight:700;">
+                ${e(it.unidade)}
+              </td>
+              <td style="padding:10px 14px;text-align:right;font-weight:800;color:var(--success);font-size:.9rem;">
+                ${Utils.fmt.currency(it.preco_unitario)}
+              </td>
+              <td style="padding:10px 14px;text-align:center;">
+                <div style="display:flex;gap:4px;justify-content:center;">
+                  <button
+                    class="btn btn-sm btn-secondary"
+                    style="font-size:.72rem;padding:3px 8px;"
+                    data-fb-click="OrcamentoSINAPI.copiarCodigo"
+                    data-fb-click-n="1"
+                    data-fb-click-t0="string"
+                    data-fb-click-v0="${encodeURIComponent(it.codigo)}"
+                    title="Copiar código"
+                  >📋</button>
+                  <button
+                    class="btn btn-sm btn-primary"
+                    style="font-size:.74rem;padding:3px 10px;font-weight:700;"
+                    data-fb-click="OrcamentoSINAPI.promptAdicionarItem"
+                    data-fb-click-n="1"
+                    data-fb-click-t0="string"
+                    data-fb-click-v0="${encodeURIComponent(it.codigo)}"
+                    title="Adicionar ao orçamento"
+                  >+ Usar</button>
+                </div>
+              </td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    `;
+  },
+
+  _renderCatalogoPaginationInfo() {
+    const u = this._catState.uf;
+    const r = this._catState.referencia;
+    const d = this._catState.desonerado;
+    let items = (typeof SINAPI !== 'undefined') ? SINAPI.buscar(this._catState.termo, d, 2000, u, r) : [];
+    if (this._catState.tipo === 'COMP') items = items.filter(it => (it.tipo || 'COMP') === 'COMP');
+    else if (this._catState.tipo === 'INSUMO') items = items.filter(it => (it.tipo || 'COMP') === 'INSUMO');
+
+    const total = items.length;
+    const porPag = this._catState.porPagina;
+    const pag = this._catState.pagina;
+    const totalPags = Math.ceil(total / porPag) || 1;
+    const startIdx = total ? ((pag - 1) * porPag + 1) : 0;
+    const endIdx = Math.min(pag * porPag, total);
+
+    return `
+      <div style="display:flex;align-items:center;gap:12px;">
+        <span>Mostrando <strong>${startIdx}–${endIdx}</strong> de <strong>${total.toLocaleString('pt-BR')}</strong> itens encontrados</span>
+        <div style="display:flex;gap:4px;">
+          <button class="btn btn-sm btn-secondary" style="padding:2px 8px;font-size:.76rem;" ${pag <= 1 ? 'disabled' : ''} data-fb-click="OrcamentoSINAPI._catPaginaAnterior" data-fb-click-n="0">◀ Anterior</button>
+          <span style="padding:2px 6px;font-size:.76rem;font-weight:700;">${pag} / ${totalPags}</span>
+          <button class="btn btn-sm btn-secondary" style="padding:2px 8px;font-size:.76rem;" ${pag >= totalPags ? 'disabled' : ''} data-fb-click="OrcamentoSINAPI._catProximaPagina" data-fb-click-n="0">Próximo ▶</button>
+        </div>
+      </div>
+    `;
+  },
+
+  _atualizarTabelaCatalogo() {
+    const container = document.getElementById('cat-sinapi-results-container');
+    if (container) container.innerHTML = this._renderCatalogoResultsHtml();
+    const pagInfo = document.getElementById('cat-pagination-info');
+    if (pagInfo) pagInfo.innerHTML = this._renderCatalogoPaginationInfo();
+  },
+
+  _onCatSearchInput(val) {
+    this._catState.termo = val || '';
+    this._catState.pagina = 1;
+    this._atualizarTabelaCatalogo();
+  },
+
+  _limparBuscaCat() {
+    this._catState.termo = '';
+    this._catState.pagina = 1;
+    const input = document.getElementById('cat-sinapi-q');
+    if (input) { input.value = ''; input.focus(); }
+    this._atualizarTabelaCatalogo();
+  },
+
+  _onCatChangeUF(uf) {
+    this._catState.uf = uf;
+    this._catState.pagina = 1;
+    const d = this._catState.desonerado;
+    const r = this._catState.referencia;
+    if (typeof SINAPI !== 'undefined' && !SINAPI.hasBase(d, uf, r) && typeof fetch !== 'undefined') {
+      SINAPI.ensureBaseLoaded(d, uf, r).then(() => this._atualizarTabelaCatalogo());
+    }
+    this._atualizarTabelaCatalogo();
+  },
+
+  _onCatChangeDes(val) {
+    this._catState.desonerado = val === 'true';
+    this._catState.pagina = 1;
+    const d = this._catState.desonerado;
+    const u = this._catState.uf;
+    const r = this._catState.referencia;
+    if (typeof SINAPI !== 'undefined' && !SINAPI.hasBase(d, u, r) && typeof fetch !== 'undefined') {
+      SINAPI.ensureBaseLoaded(d, u, r).then(() => this._atualizarTabelaCatalogo());
+    }
+    this._atualizarTabelaCatalogo();
+  },
+
+  _onCatSetTipo(tipo) {
+    this._catState.tipo = tipo;
+    this._catState.pagina = 1;
+    this.abrirCatalogoSINAPI(this._catState.termo, this._catState.uf);
+  },
+
+  _catProximaPagina() {
+    this._catState.pagina++;
+    this._atualizarTabelaCatalogo();
+  },
+
+  _catPaginaAnterior() {
+    if (this._catState.pagina > 1) {
+      this._catState.pagina--;
+      this._atualizarTabelaCatalogo();
+    }
+  },
+
+  copiarCodigo(codigo) {
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(String(codigo));
+      }
+      Utils.toast(`Código SINAPI ${codigo} copiado!`, 'success');
+    } catch {
+      Utils.toast(`Código: ${codigo}`, 'info');
+    }
+  },
+
+  criarOrcamentoComItem(codigo) {
+    if (!this._ensurePlanAccess()) return;
+    const uf = this._defaultUF();
+    const item = (typeof SINAPI !== 'undefined') ? SINAPI.buscar(codigo, true, 1, uf, '2026-08')[0] : null;
+    if (!item) {
+      Utils.toast('Item não localizado na base SINAPI.', 'error');
+      return;
+    }
+    const orcs = this._getAll();
+    if (orcs.length > 0) {
+      this.promptAdicionarItem(codigo);
+    } else {
+      const novoId = DB.uuid ? DB.uuid() : 'orc_' + Date.now();
+      const novo = {
+        id: novoId,
+        numero: '0001',
+        nome: 'Orçamento SINAPI - ' + (item.descricao.slice(0, 30)) + '...',
+        obra_id: (typeof App !== 'undefined' && App.obraId !== 'todas') ? App.obraId : '',
+        uf: uf,
+        referencia_sinapi: '2026-08',
+        desonerado: true,
+        bdi: this.BDI_PADRAO,
+        status: 'ativo',
+        itens: [{
+          id: DB.uuid ? DB.uuid() : 'item_' + Date.now(),
+          codigo: item.codigo,
+          codigo_sinapi: item.codigo,
+          tipo: item.tipo || 'COMP',
+          descricao: item.descricao,
+          unidade: item.unidade,
+          quantidade: 1,
+          preco_unitario: item.preco_unitario,
+          banco: 'SINAPI',
+          etapa_id: 'geral',
+          etapa_nome: 'Serviços Gerais'
+        }]
+      };
+      this._save(novo);
+      Utils.toast(`Orçamento criado com o item ${codigo}!`, 'success');
+      this.openEditor(novoId);
+    }
+  },
+
+  promptAdicionarItem(codigo) {
+    const u = this._catState?.uf || this._defaultUF();
+    const d = !!this._catState?.desonerado;
+    const r = this._catState?.referencia || '2026-08';
+    const item = (typeof SINAPI !== 'undefined') ? SINAPI.buscar(codigo, d, 1, u, r)[0] : null;
+    if (!item) {
+      Utils.toast('Item não localizado na base SINAPI.', 'error');
+      return;
+    }
+
+    const orcs = this._getAll();
+    if (!orcs.length) {
+      this.criarOrcamentoComItem(codigo);
+      return;
+    }
+
+    const e = Utils.escapeHtml.bind(Utils);
+    Utils.showModal(`
+      <div class="modal" style="max-width:540px;">
+        <div class="modal-header">
+          <span class="modal-title">Adicionar Item ao Orçamento</span>
+          <button class="modal-close" data-fb-click="Utils.closeModal" data-fb-click-n="0">✕</button>
+        </div>
+        <div class="modal-body">
+          <div style="background:var(--bg-secondary);padding:14px;border-radius:6px;border:1px solid var(--border);margin-bottom:16px;">
+            <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;">
+              <span style="font-family:monospace;font-weight:800;color:var(--accent);font-size:.9rem;">${e(item.codigo)}</span>
+              <span style="background:var(--bg-elevated);color:var(--text3);font-size:.72rem;padding:1px 6px;border-radius:4px;font-weight:700;">${e(item.tipo||'COMP')}</span>
+              <span style="color:var(--text3);font-size:.78rem;">· ${e(item.unidade)}</span>
+              <span style="margin-left:auto;font-weight:800;color:var(--success);font-size:1rem;">${Utils.fmt.currency(item.preco_unitario)}</span>
+            </div>
+            <div style="font-size:.85rem;font-weight:600;color:var(--text);line-height:1.35;">${e(item.descricao)}</div>
+          </div>
+
+          <form id="f-add-item-orc" data-fb-submit="Patch26Actions.prevent">
+            <div class="form-group" style="margin-bottom:12px;">
+              <label style="font-weight:700;font-size:.82rem;color:var(--text2);display:block;margin-bottom:4px;">Selecione o Orçamento de Destino:</label>
+              <select id="add-item-orc-id" class="form-control" style="font-weight:600;">
+                ${orcs.map(o => `<option value="${e(o.id)}">${e(o.nome)} (${e(o.uf||'SP')})</option>`).join('')}
+              </select>
+            </div>
+
+            <div class="form-row cols-2" style="margin-bottom:12px;">
+              <div class="form-group">
+                <label style="font-weight:700;font-size:.82rem;color:var(--text2);display:block;margin-bottom:4px;">Quantidade:</label>
+                <input id="add-item-qtd" type="number" step="0.01" min="0.01" class="form-control" value="1.00" required>
+              </div>
+              <div class="form-group">
+                <label style="font-weight:700;font-size:.82rem;color:var(--text2);display:block;margin-bottom:4px;">Etapa:</label>
+                <input id="add-item-etapa" type="text" class="form-control" value="1 - SERVIÇOS GERAIS" placeholder="Ex: Alvenaria, Estrutura...">
+              </div>
+            </div>
+          </form>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-secondary" data-fb-click="Utils.closeModal" data-fb-click-n="0">Cancelar</button>
+          <button class="btn btn-primary" data-fb-click="OrcamentoSINAPI.confirmarAdicionarItem" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(item.codigo)}">
+            ✓ Adicionar ao Orçamento
+          </button>
+        </div>
+      </div>
+    `);
+  },
+
+  confirmarAdicionarItem(codigo) {
+    const orcId = document.getElementById('add-item-orc-id')?.value;
+    const qtd = parseFloat(document.getElementById('add-item-qtd')?.value || '1') || 1;
+    const etapa = document.getElementById('add-item-etapa')?.value || '1 - SERVIÇOS GERAIS';
+    if (!orcId) return;
+
+    const orc = this._getById(orcId);
+    if (!orc) return;
+
+    const u = this._catState?.uf || orc.uf || 'SP';
+    const d = !!orc.desonerado;
+    const r = orc.referencia_sinapi || '2026-08';
+    const item = (typeof SINAPI !== 'undefined') ? SINAPI.buscar(codigo, d, 1, u, r)[0] : null;
+    if (!item) return;
+
+    const bdi = Number(orc.bdi || 0);
+    const precoUnit = Number(item.preco_unitario) || 0;
+    const precoBdi = precoUnit * (1 + bdi / 100);
+
+    const novoItem = {
+      id: DB.uuid ? DB.uuid() : 'it_' + Date.now(),
+      etapa_nome: etapa,
+      tipo: item.tipo || 'COMP',
+      banco: 'SINAPI',
+      codigo: item.codigo,
+      codigo_sinapi: item.codigo,
+      descricao: item.descricao,
+      unidade: item.unidade,
+      quantidade: qtd,
+      preco_unitario: precoUnit,
+      preco_com_bdi: Math.round(precoBdi * 100) / 100,
+      total: Math.round(qtd * precoUnit * 100) / 100,
+      total_com_bdi: Math.round(qtd * precoBdi * 100) / 100
+    };
+
+    orc.itens = [...(orc.itens || []), novoItem];
+    this._save(orc);
+    Utils.closeModal();
+    Utils.toast(`Item ${codigo} (${qtd} ${item.unidade}) adicionado ao orçamento "${orc.nome}"!`, 'success');
   },
 
   init() {}

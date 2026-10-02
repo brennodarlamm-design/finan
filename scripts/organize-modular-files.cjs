@@ -53,6 +53,12 @@ const frontendMap = {
   'js/bim_clash_engine.js': 'frontend/domains/obras/bim_clash_engine.js',
   'js/bim_presets.js': 'frontend/domains/obras/bim_presets.js',
   'js/bim_presets_data.js': 'frontend/domains/obras/bim_presets_data.js',
+  'js/orcamentos.js': 'frontend/domains/obras/orcamentos.js',
+  'js/orcamento_sinapi.js': 'frontend/domains/obras/orcamento_sinapi.js',
+  'js/sinapi.js': 'frontend/domains/obras/sinapi.js',
+  'js/orcamento_bancos.js': 'frontend/domains/obras/orcamento_bancos.js',
+  'js/orcamento_templates.js': 'frontend/domains/obras/orcamento_templates.js',
+  'js/orcamento_proposta.js': 'frontend/domains/obras/orcamento_proposta.js',
 
   // Suprimentos
   'js/precompras.js': 'frontend/domains/suprimentos/precompras.js',

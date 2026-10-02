@@ -112,7 +112,21 @@ const Orcamentos = {
       if (typeof OrcamentoSINAPI !== 'undefined' && OrcamentoSINAPI.render) {
         return OrcamentoSINAPI.render(obraId);
       }
-      return `<div class="empty-state"><h3>Módulo SINAPI indisponível</h3></div>`;
+      if (typeof FinObraAssets !== 'undefined' && FinObraAssets.load) {
+        FinObraAssets.load('sinapi').then(() => {
+          const c = document.getElementById('orc-tab-content');
+          if (c && typeof OrcamentoSINAPI !== 'undefined' && OrcamentoSINAPI.render) {
+            c.innerHTML = OrcamentoSINAPI.render(obraId);
+          }
+        }).catch(() => {});
+      }
+      return `
+        <div style="padding:60px 20px;text-align:center;">
+          <div style="font-size:2.5rem;margin-bottom:12px;animation:spin 1s linear infinite;display:inline-block;">⏳</div>
+          <h3 style="color:var(--text);font-weight:800;margin-bottom:8px;">Carregando Módulo SINAPI e Banco de Dados Oficial...</h3>
+          <p style="color:var(--text3);font-size:.85rem;">Inicializando catálogo Caixa, composições analíticas e gerador de orçamentos.</p>
+        </div>
+      `;
     }
     return this._renderEtapas(obraId);
   },
