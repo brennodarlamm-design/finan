@@ -49,12 +49,12 @@ console.log('📌 CENÁRIO 1: Autenticação, Tokens JWT e Controle de Permissõ
 
 const jwtSecret = 'finobra-test-jwt-secret-very-secure-32chars!';
 
-step('Hashing de senha com Scrypt e Salt criptográfico', () => {
+await stepAsync('Hashing de senha com Scrypt assíncrono e Salt criptográfico', async () => {
   const plainPassword = 'Obra@2026_Forte!';
-  const hash = hashPassword(plainPassword);
+  const hash = await hashPassword(plainPassword);
   assert.ok(hash.includes(':'), 'O hash deve conter salt:keyHex');
-  assert.equal(verifyPassword(plainPassword, hash), true, 'Senha correta deve validar com sucesso');
-  assert.equal(verifyPassword('SenhaIncorreta!123', hash), false, 'Senha incorreta deve ser rejeitada');
+  assert.equal(await verifyPassword(plainPassword, hash), true, 'Senha correta deve validar com sucesso');
+  assert.equal(await verifyPassword('SenhaIncorreta!123', hash), false, 'Senha incorreta deve ser rejeitada');
 });
 
 step('Geração de Token JWT assinado com HMAC-SHA256', () => {

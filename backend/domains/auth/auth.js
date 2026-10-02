@@ -4,6 +4,7 @@ import { neon } from '@neondatabase/serverless';
 import crypto from 'crypto';
 import { OAuth2Client } from 'google-auth-library';
 import { hashPassword, verifyPassword, signToken, verifyToken, resolveAuthAndTenant, getSessionSigningSecret, getInternalApiSecret } from './_auth.js';
+import { validatePasswordPolicy } from './_auth.js';
 import { checkRateLimit, getClientIp } from './_ratelimit.js';
 import { writeAudit } from './_audit.js';
 import { getPlanRule } from './_plans.js';
@@ -492,7 +493,7 @@ export default async function handler(req, res) {
         }
       }
 
-      const passwordMatches = verifyPassword(password, user.senha_hash);
+      const passwordMatches = await verifyPassword(password, user.senha_hash);
       if (!passwordMatches) {
         await writeAudit(sql, req, { tenantId: user.tenant_id, user: { id: user.id } }, { acao: 'login_bloqueado', entidade: 'auth', entidadeId: user.id, depois: { motivo: 'invalid_password', ip: clientIp } });
         // Mensagem genérica — não revela se é usuário ou senha o problema (anti-enumeração)
@@ -1478,7 +1479,7 @@ export default async function handler(req, res) {
       `;
 
       const otpCode = crypto.randomInt(100000, 1000000).toString();
-      const otpHash = hashPassword(otpCode);
+      const otpHash = await hashPassword(otpCode);
       const resetId = 'rec_' + crypto.randomBytes(8).toString('hex');
       const expiraEm = new Date(Date.now() + 10 * 60 * 1000);
 
@@ -1591,6 +1592,10 @@ export default async function handler(req, res) {
       if (normalizedNewPassword.length > 128) {
         return res.status(400).json({ success: false, message: 'A nova senha excede o limite máximo permitido de 128 caracteres.' });
       }
+      const pwCheck = validatePasswordPolicy(normalizedNewPassword);
+      if (!pwCheck.valid) {
+        return res.status(400).json({ success: false, message: pwCheck.error });
+      }
 
       const activeResets = await sql`
         SELECT id, usuario_id, codigo_hash, tentativas, max_tentativas
@@ -1609,14 +1614,14 @@ export default async function handler(req, res) {
         return res.status(403).json({ success: false, message: 'Limite de tentativas excedido por segurança. Solicite um novo código.' });
       }
 
-      const codeMatches = verifyPassword(String(code).trim(), rec.codigo_hash);
+      const codeMatches = await verifyPassword(String(code).trim(), rec.codigo_hash);
       if (!codeMatches) {
         await sql`UPDATE recuperacao_senhas SET tentativas = tentativas + 1 WHERE id = ${rec.id};`;
         const restantes = Math.max(0, Number(rec.max_tentativas || 5) - (Number(rec.tentativas || 0) + 1));
         return res.status(401).json({ success: false, message: `Código incorreto. Você tem mais ${restantes} tentativa(s).` });
       }
 
-      const newHash = hashPassword(normalizedNewPassword);
+      const newHash = await hashPassword(normalizedNewPassword);
       const resetApplied = await sql`
         WITH consumed AS (
           UPDATE recuperacao_senhas

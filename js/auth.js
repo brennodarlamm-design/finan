@@ -29,6 +29,55 @@ const Auth = {
     return '';
   },
 
+  hasSequentialNumbers(str, minLength = 3) {
+    if (!str || typeof str !== 'string') return false;
+    const asc = '0123456789';
+    const desc = '9876543210';
+    for (let i = 0; i <= asc.length - minLength; i++) {
+      if (str.includes(asc.slice(i, i + minLength))) return true;
+    }
+    for (let i = 0; i <= desc.length - minLength; i++) {
+      if (str.includes(desc.slice(i, i + minLength))) return true;
+    }
+    if (/(000|111|222|333|444|555|666|777|888|999)/.test(str)) return true;
+    for (let i = 0; i < str.length - 2; i++) {
+      const d1 = str.charCodeAt(i);
+      const d2 = str.charCodeAt(i + 1);
+      const d3 = str.charCodeAt(i + 2);
+      if (d1 >= 48 && d1 <= 57 && d2 >= 48 && d2 <= 57 && d3 >= 48 && d3 <= 57) {
+        if ((d2 === d1 + 1 && d3 === d2 + 1) || (d2 === d1 - 1 && d3 === d2 - 1) || (d1 === d2 && d2 === d3)) {
+          return true;
+        }
+      }
+    }
+    return false;
+  },
+
+  validatePasswordPolicy(password) {
+    if (!password || typeof password !== 'string') {
+      return { valid: false, error: 'A senha é obrigatória.' };
+    }
+    if (password.length < 8) {
+      return { valid: false, error: 'A senha deve conter no mínimo 8 caracteres.' };
+    }
+    if (!/[A-Z]/.test(password)) {
+      return { valid: false, error: 'A senha deve conter pelo menos uma letra maiúscula.' };
+    }
+    if (!/[a-z]/.test(password)) {
+      return { valid: false, error: 'A senha deve conter pelo menos uma letra minúscula.' };
+    }
+    if (!/[0-9]/.test(password)) {
+      return { valid: false, error: 'A senha deve conter pelo menos um número.' };
+    }
+    if (!/[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?~`]/.test(password) && !/[^A-Za-z0-9]/.test(password)) {
+      return { valid: false, error: 'A senha deve conter pelo menos um caractere especial (ex: !@#$%&*).' };
+    }
+    if (this.hasSequentialNumbers(password)) {
+      return { valid: false, error: 'A senha não pode conter sequências numéricas (ex: 123, 321 ou repetições como 111).' };
+    }
+    return { valid: true };
+  },
+
   _purgeLegacyToken() {
     localStorage.removeItem(this.LEGACY_TOKEN_KEY);
     sessionStorage.removeItem(this.LEGACY_TOKEN_KEY);
@@ -318,6 +367,10 @@ const Auth = {
     if (novaSenha.length < 8) {
       return { success: false, message: 'A nova senha deve possuir pelo menos 8 caracteres.' };
     }
+    const pwCheck = this.validatePasswordPolicy(novaSenha);
+    if (!pwCheck.valid) {
+      return { success: false, message: pwCheck.error };
+    }
 
     const code = resetToken || sessionStorage.getItem(`finobra_otp_${requestId}`);
     if (!code) {
@@ -351,6 +404,10 @@ const Auth = {
     }
     if (senha.length < 8) {
       return { success: false, message: 'A senha deve ter pelo menos 8 caracteres.' };
+    }
+    const pwCheck = this.validatePasswordPolicy(senha);
+    if (!pwCheck.valid) {
+      return { success: false, message: pwCheck.error };
     }
 
     try {

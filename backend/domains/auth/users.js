@@ -2,6 +2,7 @@
 import { neon } from '@neondatabase/serverless';
 import crypto from 'crypto';
 import { hashPassword, verifyPassword, resolveAuthAndTenant, getInternalApiSecret } from './_auth.js';
+import { validatePasswordPolicy } from './_auth.js';
 import { writeAudit } from './_audit.js';
 import { canManageUsers, canManageTenant, permissionError, sanitizePermissions } from './_permissions.js';
 import { getPlanRule, minimumPlanForUsers, upgradeDescriptor } from './_plans.js';
@@ -713,6 +714,10 @@ export default async function handler(req, res) {
       if (!n || un.length < 3 || !em || !em.includes('@') || pw.length < 8) {
         return res.status(400).json({ success:false, error:'Informe nome, usuário (mín. 3), e-mail válido e senha (mín. 8).' });
       }
+      const pwCheck = validatePasswordPolicy(pw);
+      if (!pwCheck.valid) {
+        return res.status(400).json({ success:false, error: pwCheck.error });
+      }
       if (!allowedProfiles.includes(perfil)) return res.status(400).json({ success:false, error:'Perfil inválido.' });
       const planUsage = await getUserPlanUsage(sql, auth.tenantId);
       if (planUsage.maxUsers != null && planUsage.activeUsers >= planUsage.maxUsers) {
@@ -721,7 +726,7 @@ export default async function handler(req, res) {
       const exists = await sql`SELECT id FROM usuarios WHERE LOWER(username)=${un} OR LOWER(email)=${em} LIMIT 1;`;
       if (exists.length) return res.status(409).json({ success:false, error:'Usuário ou e-mail já cadastrado.' });
       const id = 'usr_' + crypto.randomBytes(8).toString('hex');
-      const senhaHash = hashPassword(pw);
+      const senhaHash = await hashPassword(pw);
       const cleanPermissions = (!planUsage.advancedPermissions || ['admin','superadmin'].includes(String(perfil))) ? {} : sanitizePermissions(permissions);
       const permissionsJson = JSON.stringify(cleanPermissions);
       const rows = await sql`
@@ -787,14 +792,18 @@ export default async function handler(req, res) {
       let senhaHash = cur.senha_hash;
       if (senha) {
         if (String(senha).length < 8) return res.status(400).json({ success:false, error:'A nova senha deve ter no mínimo 8 caracteres.' });
+        const pwCheck = validatePasswordPolicy(String(senha));
+        if (!pwCheck.valid) {
+          return res.status(400).json({ success:false, error: pwCheck.error });
+        }
         if (isSelf && !actorIsAdmin) {
-          if (!senha_atual || !verifyPassword(String(senha_atual), cur.senha_hash)) return res.status(403).json({ success:false, error:'Senha atual incorreta.' });
+          if (!senha_atual || !(await verifyPassword(String(senha_atual), cur.senha_hash))) return res.status(403).json({ success:false, error:'Senha atual incorreta.' });
         }
         // Mesmo admin alterando a própria senha deve confirmar a atual.
-        if (isSelf && actorIsAdmin && (!senha_atual || !verifyPassword(String(senha_atual), cur.senha_hash))) {
+        if (isSelf && actorIsAdmin && (!senha_atual || !(await verifyPassword(String(senha_atual), cur.senha_hash)))) {
           return res.status(403).json({ success:false, error:'Senha atual incorreta.' });
         }
-        senhaHash = hashPassword(String(senha));
+        senhaHash = await hashPassword(String(senha));
       }
 
       const permissionPlanUsage = await getUserPlanUsage(sql, auth.tenantId);

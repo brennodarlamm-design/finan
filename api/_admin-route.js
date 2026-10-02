@@ -4,6 +4,7 @@
 import { neon } from '@neondatabase/serverless';
 import crypto from 'crypto';
 import { hashPassword, verifyPassword, resolveAuthAndTenant, signToken, verifyToken, getSessionSigningSecret, getInternalApiSecret } from './_auth.js';
+import { validatePasswordPolicy } from './_auth.js';
 import { generateBackupCodes } from './_totp.js';
 import { writeAudit } from './_audit.js';
 import { parseWebhookPayload, settlePixPayment, sendPaymentReceipt } from './_webhook_pix_core.js';
@@ -1744,6 +1745,13 @@ export default async function handler(req, res) {
           error: 'A senha inicial deve ter no mínimo 8 caracteres.'
         });
       }
+      const pwCheck = validatePasswordPolicy(finalSenha);
+      if (!pwCheck.valid) {
+        return res.status(400).json({
+          success: false,
+          error: pwCheck.error
+        });
+      }
 
       const rawUser = (username || finalEmail.split('@')[0]).trim().toLowerCase().replace(/[^a-z0-9._-]/g, '');
       const allowedPlans = ['trial', 'starter', 'pro', 'unlimited'];
@@ -1773,7 +1781,7 @@ export default async function handler(req, res) {
 
       const tenantId = 'tenant_' + crypto.randomBytes(6).toString('hex');
       const userId = 'usr_' + crypto.randomBytes(6).toString('hex');
-      const passHash = hashPassword(finalSenha);
+      const passHash = await hashPassword(finalSenha);
 
       let finalVencimento = String(vencimento || req.body?.vencimento || '').trim();
       if (!finalVencimento || !/^\d{4}-\d{2}-\d{2}$/.test(finalVencimento)) {
@@ -2145,7 +2153,7 @@ export default async function handler(req, res) {
       const users = await sql`SELECT id, senha_hash, mfa_enabled FROM usuarios WHERE id = ${userId} LIMIT 1;`;
       if (!users.length) return res.status(404).json({ success: false, error: 'Usuário não encontrado.' });
       const u = users[0];
-      if (!verifyPassword(password, u.senha_hash)) {
+      if (!(await verifyPassword(password, u.senha_hash))) {
         return res.status(401).json({ success: false, error: 'Senha incorreta.' });
       }
       if (!u.mfa_enabled) {
