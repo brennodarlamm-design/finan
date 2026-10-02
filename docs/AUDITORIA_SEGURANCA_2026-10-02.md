@@ -1,6 +1,6 @@
 # Auditoria de segurança e backend — 02/10/2026
 
-Escopo: `api/`, `cloudflare-worker.js`, `backend/server.js`, migrações e testes relacionados. Frontend fora do escopo.
+Escopo: `api/`, `cloudflare-worker.js`, `backend/server.js`, migrações e testes relacionados. Frontend incluído a partir da sétima rodada.
 Método: leitura do código, provas locais com dados sintéticos e R2/SQL simulados, comparação da suíte antes e depois. **Nada foi executado contra produção, nenhum commit foi feito e nenhum deploy foi disparado.**
 
 ## Resumo
@@ -170,12 +170,28 @@ Revisado e sem problema: tela de empresa e suporte em `users.js` (admin para alt
 ### Verificação recomendada (fora do código)
 - **Chave Google do Drive Picker** em `js/gdrive.js` (`API_KEY`). Chave de navegador é pública por natureza, mas no Google Cloud ela precisa estar restrita por referenciador HTTP (`https://fingo.api.br/*`) e às APIs Picker/Drive. Sem essa restrição, qualquer pessoa pode usar a cota do projeto.
 
+## Sétima rodada — frontend (injeção de HTML)
+
+**Contexto que muda a gravidade:** a CSP bloqueia `<script>` e handlers inline, mas o barramento `data-fb-*` (`js/patch26-events.js`) aceita `click`, `focus`, `mouseover`, `input` etc. HTML injetado como `<input autofocus data-fb-focus="Modulo.acao">` executa uma ação da allowlist **sem clique**. Na prática, injeção de HTML equivale a disparar ações do app na sessão da vítima.
+
+| # | Severidade | Problema | Correção |
+|---|---|---|---|
+| X1 | 🟠 Alta | Dados sem escape em `innerHTML`: **emitente e itens de NF-e** (`nfe.js`, `lancamentos.js`), que vêm de XML de terceiros, inclusive pelo sync automático do DF-e; nomes de obras e contas (`nfe.js`, `notas.js`, `ocr.js`, `parcelamento.js`); atributos de fornecedor (`fornecedores.js`); responsável (`fases_doc.js`, `exportar_templates.js`); mensagens de erro de provedores no portal Master (`master.js`) | `Utils.escapeHtml` / `this._esc` em todos os pontos |
+| X2 | 🟠 Alta | O portal público do cliente monta a página a partir de `pdata` (JSON na URL). Qualquer pessoa pode criar o link. `dias_atraso` entrava cru: link forjado = HTML injetado em `fingo.api.br`, executado com a sessão de quem abrir logado | Valor forçado a número |
+| X3 | 🟡 Média | No modo portal público, o barramento aceitava qualquer ação da allowlist (o app completo está carregado) | Em `portal-public-mode`, só ações `PortalCliente.*` e `Utils.closeModal` |
+
+Revisado e sem problema: `validar_page.js` (tudo escapado), `master.js` (nomes de empresa, e-mails recebidos e leads escapados), `login_page.js` e `assinador.js` (parâmetros da URL não vão para o HTML), visualizador de documentos (W1).
+
+### Recomendação (decisão do responsável)
+- **Assinar o link do portal do cliente.** Hoje o `token` do link é `btoa("finobra_portal_<tenant>_<obra>")`, sem segredo, e o conteúdo vem inteiro da URL. Qualquer pessoa consegue gerar uma página em `fingo.api.br` com nome de construtora, obra, valores e **telefone de WhatsApp** à escolha (vetor de golpe). Correção: gerar o link por um endpoint autenticado que assina o `pdata` com HMAC e validar a assinatura no servidor antes de exibir.
+
 ## Testes
 - Novo: `scripts/test-audit-2026-10-02.js` (incluído em `npm test`). Cobre F1–F11 e R1–R5. Falha na versão anterior e passa na corrigida.
 - Novo: `scripts/test-audit-2026-10-02-r3.js` (incluído em `npm test`). Cobre a terceira rodada.
 - Novo: `scripts/test-audit-2026-10-02-r4.js` (incluído em `npm test`). Cobre a quarta rodada; suíte com 121 testes, mesmas duas falhas externas, nenhuma regressão.
 - Novo: `scripts/test-audit-2026-10-02-r5.js` (incluído em `npm test`). Cobre a quinta rodada; suíte com 122 testes, mesmas duas falhas externas, nenhuma regressão.
 - Novo: `scripts/test-audit-2026-10-02-r6.js` (incluído em `npm test`). Cobre a sexta rodada; suíte com 123 testes, mesmas duas falhas externas, nenhuma regressão.
+- Novo: `scripts/test-audit-2026-10-02-r7.js` (incluído em `npm test`). Cobre a sétima rodada e confere os espelhos de `frontend/`; suíte com 124 testes, mesmas duas falhas externas, nenhuma regressão.
 - Terceira rodada, suíte completa rodada teste a teste antes e depois: 118 de 119 → 119 de 120 (o novo passa). Falham igualmente nas duas versões, por dependerem de serviço externo: `test-phase5-edge-swr-cache.js` (API de CEP) e `test-upstash-redis-integration.js` (Redis real).
 - Atualizados para o novo contrato:
   - `test-edge-v2-routes.js` e `test-review-remediation.js`: antes exigiam a lista fixa do SINAPI e o otimizador sem login.

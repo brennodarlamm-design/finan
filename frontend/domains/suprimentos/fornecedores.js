@@ -728,7 +728,7 @@ const Fornecedores = {
           const val   = f.nome_fantasia || f.razao_social;
           const sel   = selectedVal === val ? 'selected' : '';
           const docFmt = doc ? ` — ${doc}` : '';
-          html += `<option value="${Utils.escapeHtml(val)}" data-id="${f.id}" data-tipo="${f.tipo_pessoa||'pj'}" data-cnpj="${f.cnpj||''}" data-cpf="${f.cpf||''}" data-contato="${f.contato_nome||''}" ${sel}>${Utils.escapeHtml(label)}${Utils.escapeHtml(docFmt)}</option>`;
+          html += `<option value="${Utils.escapeHtml(val)}" data-id="${Utils.escapeHtml(f.id)}" data-tipo="${Utils.escapeHtml(f.tipo_pessoa||'pj')}" data-cnpj="${Utils.escapeHtml(f.cnpj||'')}" data-cpf="${Utils.escapeHtml(f.cpf||'')}" data-contato="${Utils.escapeHtml(f.contato_nome||'')}" ${sel}>${Utils.escapeHtml(label)}${Utils.escapeHtml(docFmt)}</option>`;
         });
         html += `</optgroup>`;
       });
@@ -743,7 +743,7 @@ const Fornecedores = {
           const val   = f.nome_fantasia || f.razao_social;
           const sel   = selectedVal === val ? 'selected' : '';
           const docFmt = doc ? ` — ${doc}` : '';
-          html += `<option value="${Utils.escapeHtml(val)}" data-id="${f.id}" data-tipo="${f.tipo_pessoa||'pj'}" data-cnpj="${f.cnpj||''}" data-cpf="${f.cpf||''}" data-contato="${f.contato_nome||''}" ${sel}>${Utils.escapeHtml(label)}${Utils.escapeHtml(docFmt)}</option>`;
+          html += `<option value="${Utils.escapeHtml(val)}" data-id="${Utils.escapeHtml(f.id)}" data-tipo="${Utils.escapeHtml(f.tipo_pessoa||'pj')}" data-cnpj="${Utils.escapeHtml(f.cnpj||'')}" data-cpf="${Utils.escapeHtml(f.cpf||'')}" data-contato="${Utils.escapeHtml(f.contato_nome||'')}" ${sel}>${Utils.escapeHtml(label)}${Utils.escapeHtml(docFmt)}</option>`;
         });
         html += `</optgroup>`;
       }

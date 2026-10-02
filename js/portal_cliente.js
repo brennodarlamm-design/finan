@@ -594,7 +594,8 @@ const PortalCliente = {
             : 'var(--success)';
 
         const textoStatus = p.status_sla === 'atrasado'
-          ? `🔴 Atrasado +${p.dias_atraso}d`
+          // AUDIT-2026-10-02 X2: o payload do portal vem da URL (qualquer um pode montar o link).
+          ? `🔴 Atrasado +${Math.max(0, parseInt(p.dias_atraso, 10) || 0)}d`
           : p.status_sla === 'atencao'
             ? '🟡 Em Atenção'
             : '🟢 No Prazo';

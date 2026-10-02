@@ -91,8 +91,14 @@
     if (t === 'string') return decode(v);
     throw new Error('argumento não permitido');
   }
+  /* AUDIT-2026-10-02 X3: o portal público é aberto por link montado por qualquer pessoa,
+     dentro do app completo (com a sessão de quem abre). Ali só as ações do próprio portal. */
+  const PUBLIC_PORTAL_PREFIXES = ['PortalCliente.', 'Utils.closeModal'];
   function resolve(path) {
     if (!ALLOWED.has(path)) throw new Error('ação fora da allowlist');
+    if (document.body?.classList?.contains('portal-public-mode') && !PUBLIC_PORTAL_PREFIXES.some(p => path === p || path.startsWith(p))) {
+      throw new Error('ação indisponível no portal público');
+    }
     const parts = path.split('.');
     let ctx = globalThis;
     let cur = Object.prototype.hasOwnProperty.call(ROOTS, parts[0]) ? ROOTS[parts[0]] : globalThis[parts[0]];
