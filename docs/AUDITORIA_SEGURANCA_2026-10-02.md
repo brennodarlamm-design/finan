@@ -182,8 +182,23 @@ Revisado e sem problema: tela de empresa e suporte em `users.js` (admin para alt
 
 Revisado e sem problema: `validar_page.js` (tudo escapado), `master.js` (nomes de empresa, e-mails recebidos e leads escapados), `login_page.js` e `assinador.js` (parâmetros da URL não vão para o HTML), visualizador de documentos (W1).
 
-### Recomendação (decisão do responsável)
+### Recomendação (decisão do responsável) — implementada na oitava rodada (X4)
 - **Assinar o link do portal do cliente.** Hoje o `token` do link é `btoa("finobra_portal_<tenant>_<obra>")`, sem segredo, e o conteúdo vem inteiro da URL. Qualquer pessoa consegue gerar uma página em `fingo.api.br` com nome de construtora, obra, valores e **telefone de WhatsApp** à escolha (vetor de golpe). Correção: gerar o link por um endpoint autenticado que assina o `pdata` com HMAC e validar a assinatura no servidor antes de exibir.
+
+## Oitava rodada — links assinados do Portal do Cliente (X4)
+
+Implementa a recomendação da sétima rodada, aprovada pelo responsável.
+
+| Antes | Agora |
+|---|---|
+| `token` = `btoa("finobra_portal_<tenant>_<obra>")`, previsível e nunca verificado | Link assinado com HMAC-SHA256 pelo servidor (`api/_portal-link.js`), válido por 90 dias |
+| Página pública exibia qualquer `pdata` da URL | `POST /api/v2/portal/verify` confirma assinatura e validade antes de exibir. Link alterado, sem assinatura ou vencido mostra "link não localizado ou expirou" |
+| Nome, logo, telefone e responsável da construtora vinham do navegador | `POST /api/v2/portal/link` (com login e leitura em `obras`) força o tenant autenticado e preenche esses dados a partir do cadastro (`tenants`) |
+| Link montado no navegador | Botões Copiar, WhatsApp e Visualizar pedem o link ao servidor. O WhatsApp da lista virou ação `PortalCliente.enviarWhatsAppLink` |
+
+**Chave:** usa `PORTAL_LINK_SECRET` (mín. 32 caracteres) se existir; senão, uma chave derivada de `SESSION_SIGNING_SECRET` (link do portal nunca vale como sessão). Trocar `SESSION_SIGNING_SECRET` ou `PORTAL_LINK_SECRET` invalida os links já enviados.
+
+**Efeito no deploy:** links do portal enviados antes desta versão param de abrir. A construtora precisa gerar e reenviar o link da obra.
 
 ## Testes
 - Novo: `scripts/test-audit-2026-10-02.js` (incluído em `npm test`). Cobre F1–F11 e R1–R5. Falha na versão anterior e passa na corrigida.
@@ -192,6 +207,7 @@ Revisado e sem problema: `validar_page.js` (tudo escapado), `master.js` (nomes d
 - Novo: `scripts/test-audit-2026-10-02-r5.js` (incluído em `npm test`). Cobre a quinta rodada; suíte com 122 testes, mesmas duas falhas externas, nenhuma regressão.
 - Novo: `scripts/test-audit-2026-10-02-r6.js` (incluído em `npm test`). Cobre a sexta rodada; suíte com 123 testes, mesmas duas falhas externas, nenhuma regressão.
 - Novo: `scripts/test-audit-2026-10-02-r7.js` (incluído em `npm test`). Cobre a sétima rodada e confere os espelhos de `frontend/`; suíte com 124 testes, mesmas duas falhas externas, nenhuma regressão.
+- Novo: `scripts/test-audit-2026-10-02-r8.js` (incluído em `npm test`). Cobre X4: assinatura, adulteração, validade, dados do cadastro e frontend; suíte com 125 testes, mesmas duas falhas externas, nenhuma regressão.
 - Terceira rodada, suíte completa rodada teste a teste antes e depois: 118 de 119 → 119 de 120 (o novo passa). Falham igualmente nas duas versões, por dependerem de serviço externo: `test-phase5-edge-swr-cache.js` (API de CEP) e `test-upstash-redis-integration.js` (Redis real).
 - Atualizados para o novo contrato:
   - `test-edge-v2-routes.js` e `test-review-remediation.js`: antes exigiam a lista fixa do SINAPI e o otimizador sem login.

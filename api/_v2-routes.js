@@ -23,6 +23,7 @@ import { createOwnerSql, createRuntimeSql } from './_database.js';
 import { querySinapiReferencia, normalizeSinapiParams } from './_sinapi-reference.js';
 import { checkRateLimit, getClientIp } from './_ratelimit.js';
 import { checkRateLimitRedis } from './_edge-redis.js';
+import { handlePortalLinkSign, handlePortalLinkVerify } from './_portal-link.js';
 
 // AUDIT-2026-10-02 F5: resolveAuthAndTenant() expõe perfil e plano em auth.user
 // (perfil / tenantPlan). auth.role e auth.plan não existem e faziam o plano cair
@@ -79,6 +80,8 @@ export const V2_ROUTE_SPEC = [
   { method: 'GET', path: '/api/v2/public/cep/:cep', desc: 'Consulta aberta de CEP na BrasilAPI / ViaCEP' },
   { method: 'POST', path: '/api/v2/public/newsletter/subscribe', desc: 'Inscrição no Radar FinGo (Newsletter & Eventos)' },
   { method: 'POST', path: '/api/v2/public/newsletter/unsubscribe', desc: 'Cancelamento de inscrição no Radar FinGo' },
+  { method: 'POST', path: '/api/v2/portal/link', desc: 'Gera link assinado do Portal do Cliente (autenticado)' },
+  { method: 'POST', path: '/api/v2/portal/verify', desc: 'Verifica assinatura de link do Portal do Cliente (público)' },
   // 4. Construtora / Tenant
   { method: 'GET', path: '/api/v2/tenants/current', desc: 'Dados e preferências da construtora ativa' },
   { method: 'POST', path: '/api/v2/support/chat', desc: 'Mensagens para o Copiloto FinBot com pool de IA' },
@@ -1027,6 +1030,14 @@ export function resolveV2Route(pathname, searchParams) {
   // 3.1 Newsletter Radar FinGo (Inscrição e Descadastro)
   if (pathname === '/api/v2/public/newsletter/subscribe' || pathname === '/api/v2/public/newsletter/unsubscribe') {
     return { handler: handleV2Newsletter, query, moduleName: 'v2-public-newsletter' };
+  }
+
+  // 3.2 Portal do Cliente (links assinados)
+  if (pathname === '/api/v2/portal/link') {
+    return { handler: handlePortalLinkSign, query, moduleName: 'v2-portal-link' };
+  }
+  if (pathname === '/api/v2/portal/verify') {
+    return { handler: handlePortalLinkVerify, query, moduleName: 'v2-portal-verify' };
   }
 
   // 4. Construtora / Tenant
