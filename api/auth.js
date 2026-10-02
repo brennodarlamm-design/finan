@@ -130,6 +130,14 @@ function tokenFieldForExplicitClient(req, token) {
   return mode === 'bearer' && token ? { token } : {};
 }
 
+// AUDIT-2026-10-02 U4: usuário/empresa inexistente também paga o custo do scrypt,
+// para o tempo de resposta não revelar quais contas existem.
+let dummyPasswordHashPromise = null;
+async function burnPasswordCheck(password) {
+  if (!dummyPasswordHashPromise) dummyPasswordHashPromise = hashPassword(crypto.randomBytes(16).toString('hex'));
+  try { await verifyPassword(String(password || ''), await dummyPasswordHashPromise); } catch {}
+}
+
 // AUDIT-2026-10-02 T2: limite por conta para códigos MFA. O limite por IP sozinho
 // permitia, com a senha em mãos, distribuir tentativas de TOTP/backup por vários IPs.
 // O prefixo 'mfa-user:' não é tratado como IP pelo Fail2Ban de _ratelimit.js.
@@ -424,6 +432,7 @@ export default async function handler(req, res) {
 
         const tenant = await resolveTenantByAccessKey(sql, companyKey);
         if (!tenant) {
+          await burnPasswordCheck(password);
           return res.status(401).json({
             success: false,
             message: 'Credenciais de acesso inválidas.'
@@ -432,6 +441,7 @@ export default async function handler(req, res) {
 
         const tenantUser = await resolveTenantUserByLogin(sql, tenant.id, cleanUser);
         if (!tenantUser) {
+          await burnPasswordCheck(password);
           return res.status(401).json({
             success: false,
             message: 'Credenciais de acesso inválidas.'
@@ -449,10 +459,22 @@ export default async function handler(req, res) {
       }
 
       if (!rows.length) {
+        await burnPasswordCheck(password);
         return res.status(401).json({ success: false, message: 'Credenciais de acesso inválidas.' });
       }
 
       const user = rows[0];
+
+      // AUDIT-2026-10-02 U4: a senha é conferida ANTES dos status da conta/empresa. Antes, sem a
+      // senha, as mensagens de conta inativa, empresa bloqueada/cancelada ou trial vencido
+      // confirmavam que o usuário existia e expunham a situação da empresa.
+      const passwordMatches = await verifyPassword(password, user.senha_hash);
+      if (!passwordMatches) {
+        await writeAudit(sql, req, { tenantId: user.tenant_id, user: { id: user.id } }, { acao: 'login_bloqueado', entidade: 'auth', entidadeId: user.id, depois: { motivo: 'invalid_password', ip: clientIp } });
+        // Mensagem genérica — não revela se é usuário ou senha o problema (anti-enumeração)
+        return res.status(401).json({ success: false, message: 'Credenciais de acesso inválidas.' });
+      }
+
       if (!user.ativo) {
         await writeAudit(sql, req, { tenantId: user.tenant_id, user: { id: user.id } }, { acao: 'login_bloqueado', entidade: 'auth', entidadeId: user.id, depois: { motivo: 'user_inactive', ip: clientIp } });
         return res.status(403).json({ success: false, message: 'Conta de usuário inativa. Contate o administrador.' });
@@ -499,13 +521,6 @@ export default async function handler(req, res) {
           await writeAudit(sql, req, { tenantId:user.tenant_id, user:{ id:user.id } }, { acao:'login_bloqueado', entidade:'auth', entidadeId:user.id, depois:{ motivo:'subscription_canceled_period_end', ip:clientIp } });
           return res.status(403).json({ success:false, message:'Sua assinatura foi encerrada ao final do período contratado. Reative um plano para continuar.' });
         }
-      }
-
-      const passwordMatches = await verifyPassword(password, user.senha_hash);
-      if (!passwordMatches) {
-        await writeAudit(sql, req, { tenantId: user.tenant_id, user: { id: user.id } }, { acao: 'login_bloqueado', entidade: 'auth', entidadeId: user.id, depois: { motivo: 'invalid_password', ip: clientIp } });
-        // Mensagem genérica — não revela se é usuário ou senha o problema (anti-enumeração)
-        return res.status(401).json({ success: false, message: 'Credenciais de acesso inválidas.' });
       }
 
       // PATCH 49: Proteção MFA para Super Admin Master Backoffice
@@ -1261,13 +1276,16 @@ export default async function handler(req, res) {
         });
       }
 
+      // AUDIT-2026-10-02 U5: mesma resposta para chave inexistente e conta não vinculada;
+      // antes a diferença permitia descobrir chaves de empresa válidas com qualquer conta Google.
+      const googleNotLinked = () => res.status(403).json({
+        success: false,
+        not_registered: true,
+        message: 'Esta conta Google não está vinculada a esta Chave da Empresa. Confira a chave ou solicite acesso ao administrador da sua empresa.'
+      });
       const googleTenant = await resolveTenantByAccessKey(sql, rawGoogleCompanyKey);
       if (!googleTenant) {
-        return res.status(403).json({
-          success: false,
-          not_registered: true,
-          message: 'Chave da Empresa não encontrada ou empresa com acesso bloqueado.'
-        });
+        return googleNotLinked();
       }
       const googleTenantId = googleTenant.id;
 
@@ -1309,11 +1327,7 @@ export default async function handler(req, res) {
           userRecord.avatar = picture;
         }
       } else {
-        return res.status(403).json({
-          success: false,
-          not_registered: true,
-          message: 'Esta conta Google não está vinculada a nenhuma construtora cadastrada no FinGo. Solicite acesso ao administrador da sua empresa ou à nossa equipe comercial.'
-        });
+        return googleNotLinked();
       }
 
       const exp = Date.now() + 30 * 24 * 60 * 60 * 1000; // 30 dias

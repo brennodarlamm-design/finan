@@ -124,9 +124,27 @@ Revisado e sem problema encontrado: webhook PIX (segredo dedicado, valor e tenan
 3. **Sala de colaboração em tempo real**: qualquer usuário da empresa entra, sem checar permissão do módulo de orçamentos.
 4. **MFA de usuários de empresa** não é exigido no login (só o superadmin passa pelo TOTP).
 
+## Quarta rodada — documentos, assinaturas e login
+
+| # | Severidade | Problema | Correção |
+|---|---|---|---|
+| U1 | 🟠 Alta | `documentos.url` é gravável pelo cliente (`/api/db` e `sync_all`). Bastava gravar uma linha apontando para o arquivo de outra empresa no Vercel Blob para que `GET /api/upload` gerasse um link assinado de leitura e `DELETE /api/upload` ou `/api/db` apagasse o arquivo. A checagem de dono só existia quando a linha não existia | `isTenantStorageUrl()` (`api/_edge-r2.js`) exige o prefixo da empresa ao salvar, ao gerar o link e ao apagar. Links externos comuns continuam aceitos |
+| U2 | 🟡 Média (regressão do F10) | A validação pública mascarava `ip_dispositivo`, mas o assinador grava ali o tipo de aparelho ("Computador / Desktop"), que passou a aparecer como `***` | Só mascara valores que parecem IP |
+| U3 | 🟡 Média | A data/hora da assinatura vinha do navegador sem limite: dava para registrar assinatura retroativa ou futura, exibida como oficial | Diferença máxima de 24 h para o relógio do servidor. A validação pública mostra também "Registrado na base FinGo em" (horário do servidor) |
+| U4 | 🟡 Média | Login checava conta inativa, empresa bloqueada/cancelada e trial vencido **antes** da senha: sem senha, dava para confirmar usuário e situação da empresa. O tempo de resposta também diferenciava usuário existente (scrypt) de inexistente | Senha conferida primeiro. Usuário ou empresa inexistente passam por um scrypt equivalente |
+| U5 | 🟡 Média | Login com Google respondia "Chave da Empresa não encontrada" ou "conta não vinculada": com qualquer conta Google era possível testar quais chaves de 6 dígitos existem | Mesma resposta nos dois casos |
+
+Revisado e sem problema novo: `_totp.js` (anti-replay por step, códigos de backup com hash), cofre de chaves DEV, alertas de borda (com intervalo mínimo por tipo), mutações e exclusões do `/api/db` (filtro por `tenant_id` em todas).
+
+### Pontos para decisão do responsável (quarta rodada)
+5. **`request_reset`** demora mais quando a conta existe (gera e grava o OTP). Para usuários de empresa isso exige a chave da empresa; risco baixo.
+6. **TOTP e código de backup** são marcados como usados depois da verificação, sem trava. Duas requisições simultâneas com o mesmo código podem passar. Risco baixo (exige senha e código válido).
+7. **Worker Cloudflare sem `NODE_ENV=production`**: nesse caso `MFA_ENCRYPTION_KEY` ausente cai para `SESSION_SIGNING_SECRET`. Confirme que `MFA_ENCRYPTION_KEY` está configurada nos Secrets do Worker.
+
 ## Testes
 - Novo: `scripts/test-audit-2026-10-02.js` (incluído em `npm test`). Cobre F1–F11 e R1–R5. Falha na versão anterior e passa na corrigida.
 - Novo: `scripts/test-audit-2026-10-02-r3.js` (incluído em `npm test`). Cobre a terceira rodada.
+- Novo: `scripts/test-audit-2026-10-02-r4.js` (incluído em `npm test`). Cobre a quarta rodada; suíte com 121 testes, mesmas duas falhas externas, nenhuma regressão.
 - Terceira rodada, suíte completa rodada teste a teste antes e depois: 118 de 119 → 119 de 120 (o novo passa). Falham igualmente nas duas versões, por dependerem de serviço externo: `test-phase5-edge-swr-cache.js` (API de CEP) e `test-upstash-redis-integration.js` (Redis real).
 - Atualizados para o novo contrato:
   - `test-edge-v2-routes.js` e `test-review-remediation.js`: antes exigiam a lista fixa do SINAPI e o otimizador sem login.

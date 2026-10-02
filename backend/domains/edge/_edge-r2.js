@@ -4,6 +4,27 @@
 const memoryStorage = new Map();
 
 /**
+ * AUDIT-2026-10-02 U1: diz se uma URL de armazenamento (R2 ou Vercel Blob legado) pertence ao tenant.
+ * URLs externas (links comuns) não são armazenamento da plataforma e retornam true.
+ * Usado antes de gravar `documentos.url`, gerar link assinado ou apagar o objeto.
+ */
+export function isTenantStorageUrl(url, tenantId) {
+  const raw = String(url || '').trim();
+  const tenant = String(tenantId || '').trim();
+  if (!raw) return true;
+  if (!tenant) return false;
+  if (raw.startsWith('r2://')) return raw.slice('r2://'.length).startsWith(`tenants/${tenant}/`);
+  let parsed;
+  try { parsed = new URL(raw); } catch { return !/blob\.vercel-storage\.com/i.test(raw); }
+  const host = parsed.hostname.toLowerCase();
+  if (host !== 'blob.vercel-storage.com' && !host.endsWith('.blob.vercel-storage.com')) return true;
+  let pathname = '';
+  try { pathname = decodeURIComponent(parsed.pathname).replace(/^\/+/, ''); } catch { return false; }
+  if (pathname.includes('..')) return false;
+  return pathname.startsWith(`${tenant}/`) || pathname.startsWith(`tenants/${tenant}/`);
+}
+
+/**
  * Gera caminho canônico e seguro no bucket R2 com isolamento multi-tenant.
  */
 export function buildR2ObjectKey(tenantId, category, filename) {

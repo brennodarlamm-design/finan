@@ -6,6 +6,7 @@ import {
   todayBoaVista, sanitizeCronogramaConfig, sanitizeBdiConfig, sanitizeTenantPreferences
 } from './_db-normalizers.js';
 import { setPrivateNoCache } from './_http.js';
+import { isTenantStorageUrl } from './_edge-r2.js';
 import { getPlanRule, isActiveObraStatus } from './_plans.js';
 import { writeAudit } from './_audit.js';
 
@@ -385,6 +386,9 @@ export async function handleSave(sql, tenantId, auth, req, res, table, data) {
 
   if (table === 'documentos') {
     const doc = data;
+    if (!isTenantStorageUrl(doc.url, tenantId)) {
+      return res.status(403).json({ success: false, error: 'O arquivo informado não pertence a esta empresa.' });
+    }
     await sql`
       INSERT INTO documentos (
         id, tenant_id, tipo, referencia_id, titulo, categoria, nome_arquivo,
@@ -724,7 +728,7 @@ export async function handleDelete(sql, tenantId, auth, req, res, table, id, dat
   if (table === 'documentos') {
     try {
       const rows = await sql`SELECT url FROM documentos WHERE id = ${targetId} AND tenant_id = ${tenantId} LIMIT 1;`;
-      if (rows.length && rows[0].url && rows[0].url.includes('blob.vercel-storage.com')) {
+      if (rows.length && rows[0].url && rows[0].url.includes('blob.vercel-storage.com') && isTenantStorageUrl(rows[0].url, tenantId)) {
         import('@vercel/blob').then(({ del }) => del(rows[0].url)).catch(() => {});
       }
     } catch (e) {}

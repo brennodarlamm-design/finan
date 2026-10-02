@@ -5,7 +5,7 @@ import { neon } from '@neondatabase/serverless';
 import { resolveAuthAndTenant } from './_auth.js';
 import { canWriteData, canDeleteData, canAccessModule, permissionError } from './_permissions.js';
 import { createTenantSql } from './_tenant-sql.js';
-import { putR2Object, deleteR2Object, buildR2ObjectKey } from './_edge-r2.js';
+import { putR2Object, deleteR2Object, buildR2ObjectKey, isTenantStorageUrl } from './_edge-r2.js';
 import { createRuntimeSql } from './_database.js';
 
 function getSql() {
@@ -130,6 +130,11 @@ export default async function handler(req, res) {
         });
       }
 
+      // AUDIT-2026-10-02 U1: a linha em `documentos` é gravável pelo cliente; o caminho precisa ser do tenant.
+      if (!isTenantStorageUrl(blobUrl, tenantId) && !auth.isSystem) {
+        return res.status(403).json({ success:false, error:'Arquivo não pertence ao tenant autenticado.' });
+      }
+
       const isPrivate = blobUrl.includes('.private.blob.vercel-storage.com');
       if (!isPrivate) {
         return res.status(200).json({ success: true, url: blobUrl, private: false });
@@ -216,6 +221,10 @@ export default async function handler(req, res) {
       }
 
       // 2. Exclusão no armazenamento persistente
+      // AUDIT-2026-10-02 U1: vale também quando a linha existe (a URL dela é gravável pelo cliente).
+      if (finalUrl && !isTenantStorageUrl(finalUrl, tenantId) && !auth.isSystem) {
+        return res.status(403).json({ success:false, error:'Arquivo não pertence ao tenant autenticado.' });
+      }
       if (finalUrl && String(finalUrl).startsWith('r2://')) {
         const key = String(finalUrl).slice('r2://'.length);
         const expectedPrefix = `tenants/${tenantId}/`;
