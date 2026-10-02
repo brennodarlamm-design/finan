@@ -363,6 +363,17 @@ export async function settlePixPayment(sql, payload, meta = {}) {
   };
 }
 
+// AUDIT-2026-10-02 T9: nome da empresa, responsável e TXID vêm do cadastro/payload e eram
+// interpolados sem escape no HTML do e-mail enviado pelo domínio oficial (injeção de HTML/links).
+function escapeEmailHtml(value) {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 /**
  * Envio de Comprovante de Pagamento Instantâneo via WhatsApp (Render) e E-mail (Resend)
  */
@@ -447,15 +458,15 @@ export async function sendPaymentReceipt(record) {
             <p style="margin:6px 0 0 0;font-size:14px;color:#e0f2fe;">Comprovante Oficial de Liquidação de Assinatura</p>
           </div>
           <div style="padding:28px 30px;">
-            <p style="margin:0 0 16px 0;font-size:15px;line-height:1.6;">Olá, <strong>${responsavel}</strong>!</p>
-            <p style="margin:0 0 20px 0;font-size:15px;line-height:1.6;">Confirmamos o recebimento do pagamento da assinatura do <strong>FinGo</strong> para a empresa <strong>${nomeEmpresa}</strong>.</p>
+            <p style="margin:0 0 16px 0;font-size:15px;line-height:1.6;">Olá, <strong>${escapeEmailHtml(responsavel)}</strong>!</p>
+            <p style="margin:0 0 20px 0;font-size:15px;line-height:1.6;">Confirmamos o recebimento do pagamento da assinatura do <strong>FinGo</strong> para a empresa <strong>${escapeEmailHtml(nomeEmpresa)}</strong>.</p>
             <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:18px;margin-bottom:24px;">
               <table style="width:100%;border-collapse:collapse;font-size:14px;">
                 <tr><td style="padding:6px 0;color:#64748b;">Status:</td><td style="padding:6px 0;font-weight:700;color:#16a34a;">🟢 Assinatura Ativa & Liberada</td></tr>
-                <tr><td style="padding:6px 0;color:#64748b;">Plano:</td><td style="padding:6px 0;font-weight:700;">${String(record.plan_id || 'Profissional').toUpperCase()} (${cicloDesc})</td></tr>
+                <tr><td style="padding:6px 0;color:#64748b;">Plano:</td><td style="padding:6px 0;font-weight:700;">${escapeEmailHtml(String(record.plan_id || 'Profissional').toUpperCase())} (${cicloDesc})</td></tr>
                 <tr><td style="padding:6px 0;color:#64748b;">Valor Liquidado:</td><td style="padding:6px 0;font-weight:700;">R$ ${valorFmt}</td></tr>
                 <tr><td style="padding:6px 0;color:#64748b;">Novo Vencimento:</td><td style="padding:6px 0;font-weight:700;color:#0284c7;">${fmtVenc}</td></tr>
-                <tr><td style="padding:6px 0;color:#64748b;">Identificador TXID:</td><td style="padding:6px 0;font-family:monospace;font-size:12px;">${record.txid || '—'}</td></tr>
+                <tr><td style="padding:6px 0;color:#64748b;">Identificador TXID:</td><td style="padding:6px 0;font-family:monospace;font-size:12px;">${escapeEmailHtml(record.txid || '—')}</td></tr>
               </table>
             </div>
             <p style="margin:0;font-size:14px;line-height:1.5;color:#475569;">Agradecemos pela parceria contínua! Os acessos de todos os colaboradores e canteiros de obras estão ativos normalmente.</p>

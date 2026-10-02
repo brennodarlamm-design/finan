@@ -130,6 +130,14 @@ function tokenFieldForExplicitClient(req, token) {
   return mode === 'bearer' && token ? { token } : {};
 }
 
+// AUDIT-2026-10-02 T2: limite por conta para códigos MFA. O limite por IP sozinho
+// permitia, com a senha em mãos, distribuir tentativas de TOTP/backup por vários IPs.
+// O prefixo 'mfa-user:' não é tratado como IP pelo Fail2Ban de _ratelimit.js.
+async function mfaAccountLimited(userId) {
+  const rl = await checkRateLimit(`mfa-user:${String(userId || 'unknown')}`, 10, 15 * 60 * 1000);
+  return !rl.allowed;
+}
+
 export default async function handler(req, res) {
   setCors(req, res);
   res.setHeader('Cache-Control', 'no-store');
@@ -540,6 +548,10 @@ export default async function handler(req, res) {
           });
         }
 
+        if (await mfaAccountLimited(user.id)) {
+          return res.status(429).json({ success: false, message: 'Muitas tentativas de código MFA para esta conta. Aguarde 15 minutos.' });
+        }
+
         // Código enviado diretamente no formulário de login
         let mfaValid = false;
         let usedBackup = false;
@@ -645,6 +657,9 @@ export default async function handler(req, res) {
       const decoded = verifyToken(tokenToVerify, secret);
       if (!decoded || decoded.purpose !== 'mfa_pending' || !decoded.userId) {
         return res.status(401).json({ success: false, message: 'Desafio MFA expirado ou inválido. Refaça o login.' });
+      }
+      if (await mfaAccountLimited(decoded.userId)) {
+        return res.status(429).json({ success: false, message: 'Muitas tentativas de código MFA para esta conta. Aguarde 15 minutos.' });
       }
 
       const rows = await sql`
@@ -1597,27 +1612,34 @@ export default async function handler(req, res) {
         return res.status(400).json({ success: false, message: pwCheck.error });
       }
 
-      const activeResets = await sql`
-        SELECT id, usuario_id, codigo_hash, tentativas, max_tentativas
-        FROM recuperacao_senhas
+      // AUDIT-2026-10-02 T1: a tentativa é reservada de forma atômica ANTES de verificar o código.
+      // Antes, o contador era lido, o código verificado e só então incrementado; requisições
+      // paralelas liam o mesmo valor e ultrapassavam max_tentativas.
+      const reservedResets = await sql`
+        UPDATE recuperacao_senhas
+        SET tentativas = tentativas + 1
         WHERE id = ${String(requestId)} AND usado = FALSE AND expira_em > NOW()
-        LIMIT 1;
+          AND tentativas < COALESCE(max_tentativas, 5)
+        RETURNING id, usuario_id, codigo_hash, tentativas, max_tentativas;
       `;
 
-      if (!activeResets.length) {
+      if (!reservedResets.length) {
+        const exhausted = await sql`
+          UPDATE recuperacao_senhas
+          SET usado = TRUE
+          WHERE id = ${String(requestId)} AND usado = FALSE AND expira_em > NOW()
+          RETURNING id;
+        `;
+        if (exhausted.length) {
+          return res.status(403).json({ success: false, message: 'Limite de tentativas excedido por segurança. Solicite um novo código.' });
+        }
         return res.status(400).json({ success: false, message: 'Código expirado ou inválido. Solicite um novo código.' });
       }
 
-      const rec = activeResets[0];
-      if (Number(rec.tentativas || 0) >= Number(rec.max_tentativas || 5)) {
-        await sql`UPDATE recuperacao_senhas SET usado = TRUE WHERE id = ${rec.id};`;
-        return res.status(403).json({ success: false, message: 'Limite de tentativas excedido por segurança. Solicite um novo código.' });
-      }
-
+      const rec = reservedResets[0];
       const codeMatches = await verifyPassword(String(code).trim(), rec.codigo_hash);
       if (!codeMatches) {
-        await sql`UPDATE recuperacao_senhas SET tentativas = tentativas + 1 WHERE id = ${rec.id};`;
-        const restantes = Math.max(0, Number(rec.max_tentativas || 5) - (Number(rec.tentativas || 0) + 1));
+        const restantes = Math.max(0, Number(rec.max_tentativas || 5) - Number(rec.tentativas || 0));
         return res.status(401).json({ success: false, message: `Código incorreto. Você tem mais ${restantes} tentativa(s).` });
       }
 
@@ -1630,7 +1652,7 @@ export default async function handler(req, res) {
             AND usuario_id = ${rec.usuario_id}
             AND usado = FALSE
             AND expira_em > NOW()
-            AND tentativas < max_tentativas
+            AND tentativas <= COALESCE(max_tentativas, 5)
           RETURNING usuario_id
         ),
         password_upd AS (

@@ -1,6 +1,6 @@
 // api/whatsapp.js — Serverless Proxy Seguro para Gerenciamento do WhatsApp no FinObra
 
-import { resolveAuthAndTenant, getInternalApiSecret } from './_auth.js';
+import { resolveAuthAndTenant, getInternalApiSecret, secretsEqual } from './_auth.js';
 import { checkRateLimit, getClientIp } from './_ratelimit.js';
 import { canWriteData, canManageTenant, canAccessModule, permissionError } from './_permissions.js';
 
@@ -57,7 +57,7 @@ export default async function handler(req, res) {
       ''
     ).trim();
 
-    const isAuthorized = (evoKey && incomingKey === evoKey) || (internalSecret && incomingKey === internalSecret);
+    const isAuthorized = (evoKey && secretsEqual(incomingKey, evoKey)) || (internalSecret && secretsEqual(incomingKey, internalSecret));
     if (!isAuthorized) {
       return res.status(401).json({ success: false, error: 'Acesso não autorizado ao webhook do WhatsApp.' });
     }
@@ -234,6 +234,12 @@ export default async function handler(req, res) {
 
     // ── AÇÃO: DISPARO DE TESTE ─────────────────────────────────────────────
     if (action === 'test') {
+      // AUDIT-2026-10-02 T3: o teste aceita destino e texto livres; sem limite, servia para
+      // disparar mensagens em massa pelo número da empresa (risco de banimento no WhatsApp).
+      const testRl = await checkRateLimit(`wa_send:${auth.tenantId || getClientIp(req)}`, 20, 60000);
+      if (!testRl.allowed) {
+        return res.status(429).json({ success: false, error: 'Limite de envios por minuto atingido. Aguarde e tente novamente.' });
+      }
       const destPhone = (req.body?.phone || req.query?.phone || '').replace(/\D/g, '');
       const testMsg = req.body?.message || `*FinGo — Teste de Notificação*\n\n✅ Olá! Seu WhatsApp está conectado e pronto para enviar relatórios, alertas de vencimento de boletos e comprovantes da sua construtora.`;
 

@@ -99,8 +99,35 @@ Mantido como está, por decisão do responsável: rota `/api/x402` com carteira 
 
 Pressuposto a confirmar no R2: no Render, o último item do `X-Forwarded-For` é o IP visto pelo balanceador. Se os logs mostrarem o IP de um proxy em vez do cliente para acessos diretos, ajuste `backend/origin_trust.js`.
 
+## Terceira rodada — módulos ainda não auditados
+
+Escopo: `auth.js` (reset de senha, MFA, Google), `whatsapp.js`, `nfe.js`/`_certificado.js`/`_sefaz-dfe.js`, `upload.js`, webhook PIX, `admin.js`/`_admin-route.js`, cofre de chaves, workflow, telemetria, Durable Object de tempo real e rotas internas do `backend/server.js`.
+
+| # | Severidade | Problema | Correção |
+|---|---|---|---|
+| T1 | 🟠 Média | `verify_reset` lia `tentativas`, verificava o OTP e só depois incrementava. Requisições paralelas liam o mesmo contador e passavam do limite de 5 tentativas | A tentativa é reservada com `UPDATE … SET tentativas = tentativas + 1 … RETURNING` antes da verificação |
+| T2 | 🟠 Média | MFA do superadmin limitado só por IP (8/5 min). Com a senha, era possível distribuir tentativas de TOTP/backup por vários IPs | Limite adicional por conta (`mfa-user:<id>`, 10 a cada 15 min) no login direto e no `mfa_verify` |
+| T3 | 🟠 Média | `action=test` do WhatsApp aceitava destino e texto livres sem limite: disparo em massa pelo número da empresa (risco de banimento) | Usa o mesmo limite de `send` (20/min por empresa) |
+| T4 | 🟠 Média | `POST /api/v2/edge/storage/upload` aceitava qualquer extensão e `Content-Type` (HTML, SVG, executáveis), contornando a validação de `/api/upload` | Lista fechada (pdf, png, jpg, webp, xlsx, docx, zip, txt, csv), assinatura binária conferida, `Content-Type` definido pelo servidor |
+| T5 | 🟡 Média | `force: true` no `dfe_sync` ignorava a trava de 1 h da SEFAZ. Consultas repetidas podem bloquear o CNPJ por consumo indevido (cStat 656). `codUf` ia sem validação para o XML SOAP | `force` só para superadmin/sistema; `codUf` precisa ter 2 dígitos |
+| T6 | 🔵 Baixa | Proxy MeuDanfe (`buscar`, `danfe`, `xml`, `sefaz_xml`) sem limite: uma empresa podia esgotar os créditos da conta compartilhada | 60 consultas a cada 10 min por empresa |
+| T7 | 🔵 Baixa | `INTERNAL_API_SECRET` e chave do Evolution comparados com `===` (`_auth.js`, `whatsapp.js`, `backend/server.js`) | `secretsEqual()`/`safeEqualSecret()` em tempo constante |
+| T8 | 🔵 Baixa | Telemetria anônima de erros disparava alerta `CRITICAL` (que vai por WhatsApp ao administrador) com 5 requisições forjadas | Pico sem sessão gera apenas `WARNING` |
+| T9 | 🔵 Baixa | Recibo PIX por e-mail interpolava nome da empresa, responsável e TXID sem escape (injeção de HTML/links em e-mail do domínio oficial) | Escape HTML |
+
+Revisado e sem problema encontrado: webhook PIX (segredo dedicado, valor e tenant conferidos, idempotência), `upload.js`, portal Master (MFA obrigatório em todas as ações), cofre de chaves DEV, workflow (filtro por `tenant_id` em todas as consultas), Google login (`email_verified`, superadmin excluído), cobrança (`create_invoice` usa preço do catálogo).
+
+### Pontos para decisão do responsável (não alterados)
+1. **Token na URL dos webhooks do WhatsApp** (`?token=` em `api/whatsapp.js` e `backend/server.js`). O segredo pode aparecer em logs. Se o Evolution Go permitir enviar a chave em header, remova o suporte a `?token=`.
+2. **Tokens antigos sem `sessionId`** continuam válidos até expirar (até 30 dias) e não são revogados por troca/reset de senha. Se já passou o prazo desde o Patch 08, passe a recusá-los.
+3. **Certificado A1**: qualquer usuário com escrita em `notas` pode substituir o certificado da empresa. Avalie restringir a `admin`.
+4. **Sala de colaboração em tempo real**: qualquer usuário da empresa entra, sem checar permissão do módulo de orçamentos.
+5. **MFA de usuários de empresa** não é exigido no login (só o superadmin passa pelo TOTP).
+
 ## Testes
 - Novo: `scripts/test-audit-2026-10-02.js` (incluído em `npm test`). Cobre F1–F11 e R1–R5. Falha na versão anterior e passa na corrigida.
+- Novo: `scripts/test-audit-2026-10-02-r3.js` (incluído em `npm test`). Cobre a terceira rodada.
+- Terceira rodada, suíte completa rodada teste a teste antes e depois: 118 de 119 → 119 de 120 (o novo passa). Falham igualmente nas duas versões, por dependerem de serviço externo: `test-phase5-edge-swr-cache.js` (API de CEP) e `test-upstash-redis-integration.js` (Redis real).
 - Atualizados para o novo contrato:
   - `test-edge-v2-routes.js` e `test-review-remediation.js`: antes exigiam a lista fixa do SINAPI e o otimizador sem login.
 - Comparação da suíte, antes e depois, em ambiente isolado: 126 testes, nenhuma regressão.

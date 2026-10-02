@@ -201,9 +201,13 @@ export default async function handler(req, res) {
         if (!canAccessModule(auth, 'notas', 'write')) {
           return res.status(403).json(permissionError('MODULE_WRITE_FORBIDDEN', 'notas'));
         }
+        // AUDIT-2026-10-02 T5: `force` ignora a trava anti-flood de 1 h da SEFAZ. Liberado ao
+        // cliente, permitia consultas repetidas e bloqueio do CNPJ por consumo indevido (cStat 656).
+        const canForce = auth.isSystem || auth.user?.perfil === 'superadmin';
+        const rawCodUf = String(req.body?.codUf || req.query?.codUf || '').trim();
         const syncResult = await syncTenantDFe(sql, auth.tenantId, {
-          codUf: req.body?.codUf || req.query?.codUf,
-          force: req.body?.force === true
+          codUf: /^\d{2}$/.test(rawCodUf) ? rawCodUf : undefined,
+          force: canForce && req.body?.force === true
         });
         return res.status(200).json(syncResult);
       }
@@ -247,6 +251,15 @@ export default async function handler(req, res) {
     'Api-Key': apiKey,
     'Accept': 'application/json'
   };
+
+  // AUDIT-2026-10-02 T6: as consultas MeuDanfe consomem créditos da conta da plataforma
+  // (compartilhada entre empresas). Limite por empresa evita esgotamento por um único tenant.
+  if (['buscar', 'status', 'danfe', 'xml', 'sefaz_xml'].includes(action)) {
+    const mdRl = await checkRateLimit(`meudanfe:tenant:${auth.tenantId}`, 60, 10 * 60 * 1000);
+    if (!mdRl.allowed) {
+      return res.status(429).json({ success: false, error: 'Limite de consultas de NF-e atingido. Aguarde alguns minutos.' });
+    }
+  }
 
   try {
     const chave = (req.query.chave || (req.body && req.body.chave) || '').toString().replace(/\D/g, '').trim();

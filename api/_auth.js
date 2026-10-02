@@ -229,6 +229,16 @@ export function getSessionSigningSecret() {
   return String(process.env.SESSION_SIGNING_SECRET || '').trim();
 }
 
+// AUDIT-2026-10-02 T7: comparação de segredos em tempo constante (hash fixa o tamanho).
+export function secretsEqual(a, b) {
+  const left = String(a || '');
+  const right = String(b || '');
+  if (!left || !right) return false;
+  const ha = crypto.createHash('sha256').update(left).digest();
+  const hb = crypto.createHash('sha256').update(right).digest();
+  return crypto.timingSafeEqual(ha, hb);
+}
+
 export function getInternalApiSecret() {
   // Requer INTERNAL_API_SECRET dedicado — sem fallback para evitar que vire chave de sessão.
   return String(process.env.INTERNAL_API_SECRET || '').trim();
@@ -280,7 +290,7 @@ export async function resolveAuthAndTenant(req) {
   }
 
   // Chave interna para jobs/cron. Nunca deve existir no frontend.
-  if (internalSecret && rawToken === internalSecret) {
+  if (internalSecret && secretsEqual(rawToken, internalSecret)) {
     // Chaves internas nunca assumem uma empresa padrão. Isso evita que um job mal
     // configurado leia/grave acidentalmente no tenant histórico da plataforma.
     const explicitTenant = String(req.headers['x-tenant-id'] || '').trim();
