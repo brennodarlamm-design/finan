@@ -244,10 +244,11 @@ REGRAS CRÍTICAS PARA 'itens' E 'tipo_documento':
       for (let kIdx = 0; kIdx < keysToTry.length; kIdx++) {
         const activeKey = keysToTry[kIdx];
         try {
-          const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${activeKey}`;
+          // AUDIT-2026-10-02 W4: chave no header, não na URL (URLs aparecem em logs/erros).
+          const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
           const geminiRes = await fetch(geminiUrl, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json', 'x-goog-api-key': activeKey },
             signal: AbortSignal.timeout(20000),
             body: JSON.stringify(geminiPayload)
           });

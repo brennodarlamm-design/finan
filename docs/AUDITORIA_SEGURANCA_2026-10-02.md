@@ -156,11 +156,26 @@ Itens 2 a 7 das listas de decisão acima: resolvidos (V1–V4, T10, MFA confirma
 - **Token na URL dos webhooks do WhatsApp** (`?token=`): depende da configuração do Evolution Go.
 - **MFA para usuários de empresa**: hoje só o superadmin é obrigado. Exigir de todos é decisão de produto.
 
+## Sexta rodada — frontend de documentos, delta, SINAPI no Render e IA
+
+| # | Severidade | Problema | Correção |
+|---|---|---|---|
+| W1 | 🔵 Baixa (contida pela CSP) | O visualizador de documentos colocava `doc.url`/conteúdo cru no `src` de `<iframe>`/`<img>`. O valor é gravável por qualquer usuário com escrita em documentos. A CSP (`script-src-attr 'none'`, sem `unsafe-inline`, `frame-src` restrito) impede execução, mas não havia defesa no código | `_safePreviewSrc()` aceita só `data:` de PDF/HTML/imagem, `http(s)` e `blob:`, sempre escapado. Fora disso, mostra "use o botão Baixar" |
+| W2 | 🔵 Baixa | `GET /api/db?table=delta` devolvia IDs excluídos de todos os módulos, inclusive os que o usuário não pode ler | Filtro por permissão de leitura do módulo |
+| W3 | 🟡 Média | `/api/sinapi/search` e `/api/sinapi/recalc` no Render eram públicos, sem limite. A busca faz `ILIKE '%termo%'` na base inteira (carga no Neon) e ignorava a regra de plano do SINAPI. O app não usa essas rotas | Exigem a chave interna, como `/robot/run` |
+| W4 | 🔵 Baixa | Chave Gemini enviada na URL (`?key=`), que aparece em logs e mensagens de erro | Enviada no header `x-goog-api-key` |
+
+Revisado e sem problema: tela de empresa e suporte em `users.js` (admin para alterar empresa, conversa filtrada pela empresa), leituras do `/api/db` (permissão por tabela em consulta, snapshot e delta), ledger (perfil de auditoria), e-mails de saída (tudo escapado), Central de E-mails no portal Master (HTML recebido exibido como texto), `/test-neon` e crons do Render (chave interna).
+
+### Verificação recomendada (fora do código)
+- **Chave Google do Drive Picker** em `js/gdrive.js` (`API_KEY`). Chave de navegador é pública por natureza, mas no Google Cloud ela precisa estar restrita por referenciador HTTP (`https://fingo.api.br/*`) e às APIs Picker/Drive. Sem essa restrição, qualquer pessoa pode usar a cota do projeto.
+
 ## Testes
 - Novo: `scripts/test-audit-2026-10-02.js` (incluído em `npm test`). Cobre F1–F11 e R1–R5. Falha na versão anterior e passa na corrigida.
 - Novo: `scripts/test-audit-2026-10-02-r3.js` (incluído em `npm test`). Cobre a terceira rodada.
 - Novo: `scripts/test-audit-2026-10-02-r4.js` (incluído em `npm test`). Cobre a quarta rodada; suíte com 121 testes, mesmas duas falhas externas, nenhuma regressão.
 - Novo: `scripts/test-audit-2026-10-02-r5.js` (incluído em `npm test`). Cobre a quinta rodada; suíte com 122 testes, mesmas duas falhas externas, nenhuma regressão.
+- Novo: `scripts/test-audit-2026-10-02-r6.js` (incluído em `npm test`). Cobre a sexta rodada; suíte com 123 testes, mesmas duas falhas externas, nenhuma regressão.
 - Terceira rodada, suíte completa rodada teste a teste antes e depois: 118 de 119 → 119 de 120 (o novo passa). Falham igualmente nas duas versões, por dependerem de serviço externo: `test-phase5-edge-swr-cache.js` (API de CEP) e `test-upstash-redis-integration.js` (Redis real).
 - Atualizados para o novo contrato:
   - `test-edge-v2-routes.js` e `test-review-remediation.js`: antes exigiam a lista fixa do SINAPI e o otimizador sem login.

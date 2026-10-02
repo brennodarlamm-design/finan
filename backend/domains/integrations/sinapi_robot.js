@@ -411,7 +411,10 @@ export function createSinapiRouter({ authorizeRobot = (_req, res) => res.status(
   });
 
   // 4. Busca Unificada de Insumos e Composições (COMP + INSUMO)
-  router.get('/search', async (req, res) => {
+  // AUDIT-2026-10-02 W3: busca com ILIKE '%termo%' na base inteira e recálculo em lote eram
+  // públicos no Render (sem limite e fora da regra de plano do SINAPI). Uso interno apenas;
+  // o app consulta o SINAPI pelas rotas autenticadas de /api/db e /api/v2.
+  router.get('/search', authorizeRobot, async (req, res) => {
     const q = String(req.query.q || '').trim();
     const uf = String(req.query.uf || 'SP').toUpperCase();
     const desonerado = req.query.desonerado === 'true';
@@ -461,7 +464,7 @@ export function createSinapiRouter({ authorizeRobot = (_req, res) => res.status(
   });
 
   // 5. Recálculo em lote de itens orçamentários
-  router.post('/recalc', (req, res) => {
+  router.post('/recalc', authorizeRobot, (req, res) => {
     const itens = req.body?.itens || [];
     const bdi = Number(req.body?.bdi) || 0;
     const bancosConfig = req.body?.bancos || [];

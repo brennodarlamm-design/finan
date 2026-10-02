@@ -127,7 +127,8 @@ export async function callGeminiKeyPool(prompt, {
 
     for (const model of models) {
       try {
-        const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${currentKey}`;
+        // AUDIT-2026-10-02 W4: chave no header, não na URL (URLs aparecem em logs/erros).
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
 
         // Monta o histórico de conversação no formato Gemini
         const contents = [];
@@ -156,7 +157,7 @@ export async function callGeminiKeyPool(prompt, {
 
         const response = await fetch(url, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', 'x-goog-api-key': currentKey },
           body: JSON.stringify(payload),
           signal: AbortSignal.timeout(15000)
         });

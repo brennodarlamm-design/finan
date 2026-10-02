@@ -71,6 +71,9 @@ export async function handleDeltaSync(sql, tenantId, auth, query, res) {
       if (ent === 'notas_fiscais') ent = 'notas';
       if (ent === 'obras') ent = 'clientes';
       if (ent === 'contas_bancarias') ent = 'contas';
+      // AUDIT-2026-10-02 W2: IDs excluídos só de módulos que o usuário pode ler.
+      const entTable = ent === 'clientes' ? 'obras' : ent;
+      if (!tableAllowed(auth, entTable, 'read')) continue;
       if (!deleted[ent]) deleted[ent] = [];
       if (row.entidade_id) deleted[ent].push(row.entidade_id);
     }
