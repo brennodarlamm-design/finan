@@ -200,6 +200,24 @@ Implementa a recomendação da sétima rodada, aprovada pelo responsável.
 
 **Efeito no deploy:** links do portal enviados antes desta versão param de abrir. A construtora precisa gerar e reenviar o link da obra.
 
+## Nona rodada — privacidade, dependências e frontend restante
+
+| # | Severidade | Problema | Correção |
+|---|---|---|---|
+| Y1 | 🟡 Média (LGPD) | O link do portal carregava o CPF/CNPJ do cliente e o valor financiado da obra, que a página não exibe. O link circula por WhatsApp e fica nos logs de acesso | Campos removidos no navegador e, por garantia, também ao assinar no servidor |
+
+Revisado e sem problema:
+- Service worker (`sw.js`) não guarda nenhuma resposta de `/api/` em cache.
+- Não há listener de `postMessage` para outras origens (só `BroadcastChannel` entre abas da mesma origem).
+- Nenhuma credencial é gravada em `localStorage`.
+- Exportações Excel (`aoa_to_sheet`) gravam texto, sem risco de fórmula.
+- Cabeçalhos de segurança aplicados em todo HTML: CSP com nonce, HSTS, `nosniff`, `X-Frame-Options`, `Referrer-Policy`, `Permissions-Policy`.
+- Endpoint MCP público só devolve texto institucional fixo.
+
+### Dependências (`npm audit`)
+- **Produção:** 0 vulnerabilidades (raiz e `backend/`).
+- **Desenvolvimento:** 5 (3 altas, 2 moderadas), todas vindas do `wrangler@3` (`miniflare`/`undici@5`, `esbuild`, `sharp`). Afetam só a máquina de quem roda `wrangler dev`/deploy; não vão para o Worker publicado. **Recomendação:** atualizar para `wrangler@4` em uma tarefa separada, testando o deploy, porque é a ferramenta de publicação.
+
 ## Testes
 - Novo: `scripts/test-audit-2026-10-02.js` (incluído em `npm test`). Cobre F1–F11 e R1–R5. Falha na versão anterior e passa na corrigida.
 - Novo: `scripts/test-audit-2026-10-02-r3.js` (incluído em `npm test`). Cobre a terceira rodada.
@@ -208,6 +226,7 @@ Implementa a recomendação da sétima rodada, aprovada pelo responsável.
 - Novo: `scripts/test-audit-2026-10-02-r6.js` (incluído em `npm test`). Cobre a sexta rodada; suíte com 123 testes, mesmas duas falhas externas, nenhuma regressão.
 - Novo: `scripts/test-audit-2026-10-02-r7.js` (incluído em `npm test`). Cobre a sétima rodada e confere os espelhos de `frontend/`; suíte com 124 testes, mesmas duas falhas externas, nenhuma regressão.
 - Novo: `scripts/test-audit-2026-10-02-r8.js` (incluído em `npm test`). Cobre X4: assinatura, adulteração, validade, dados do cadastro e frontend; suíte com 125 testes, mesmas duas falhas externas, nenhuma regressão.
+- Novo: `scripts/test-audit-2026-10-02-r9.js` (incluído em `npm test`). Cobre Y1; suíte com 126 testes, mesmas duas falhas externas, nenhuma regressão.
 - Terceira rodada, suíte completa rodada teste a teste antes e depois: 118 de 119 → 119 de 120 (o novo passa). Falham igualmente nas duas versões, por dependerem de serviço externo: `test-phase5-edge-swr-cache.js` (API de CEP) e `test-upstash-redis-integration.js` (Redis real).
 - Atualizados para o novo contrato:
   - `test-edge-v2-routes.js` e `test-review-remediation.js`: antes exigiam a lista fixa do SINAPI e o otimizador sem login.

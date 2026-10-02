@@ -123,6 +123,7 @@ const tests = [
   'scripts/test-audit-2026-10-02-r6.js',
   'scripts/test-audit-2026-10-02-r7.js',
   'scripts/test-audit-2026-10-02-r8.js',
+  'scripts/test-audit-2026-10-02-r9.js',
   'scripts/test-sefaz-dfe.js',
   'scripts/test-financeiro-core-hardening.js',
   'scripts/test-upstash-redis-integration.js',

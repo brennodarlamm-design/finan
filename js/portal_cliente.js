@@ -61,6 +61,8 @@ const PortalCliente = {
   // ── GERADOR DE LINK ASSINADO E PACOTE COMPACTO DE DADOS ──
   // AUDIT-2026-10-02 X4: o link é assinado pelo servidor (/api/v2/portal/link). O token antigo
   // (btoa previsível) permitia a qualquer pessoa montar um portal falso em fingo.api.br.
+  // AUDIT-2026-10-02 Y1: CPF/CNPJ do cliente e valor financiado não são exibidos no portal e
+  // não vão mais no link (que circula por WhatsApp e logs de acesso) — minimização da LGPD.
   _montarPdata(obraId) {
     const obra = (typeof DB !== 'undefined' && DB.getAll)
       ? ((DB.getAll('clientes') || []).find(o => String(o.id) === String(obraId)) || {})
@@ -84,12 +86,10 @@ const PortalCliente = {
         id: obra.id || obraId,
         n: obra.nome || 'Obra',
         c: obra.cliente || obra.nome || 'Proprietário',
-        doc: obra.cpf_cnpj || '',
         e: obra.endereco || '',
         cid: obra.cidade || '',
         uf: obra.estado || '',
         eng: obra.engenheiro_responsavel || '',
-        v: obra.valor_financiado || 0,
         di: obra.data_inicio || '',
         df: obra.data_previsao_termino || '',
         st: obra.status || 'em_andamento',
@@ -380,12 +380,10 @@ const PortalCliente = {
             id: obraLocal.id,
             n: obraLocal.nome || 'Obra',
             c: obraLocal.cliente || obraLocal.nome || 'Proprietário',
-            doc: obraLocal.cpf_cnpj || '',
             e: obraLocal.endereco || '',
             cid: obraLocal.cidade || '',
             uf: obraLocal.estado || '',
             eng: obraLocal.engenheiro_responsavel || '',
-            v: obraLocal.valor_financiado || 0,
             di: obraLocal.data_inicio || '',
             df: obraLocal.data_previsao_termino || '',
             st: obraLocal.status || 'em_andamento',

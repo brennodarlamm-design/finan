@@ -74,6 +74,8 @@ export async function handlePortalLinkSign(req, res, deps = {}) {
 
   // O link sempre pertence à empresa autenticada; os dados da construtora vêm do cadastro.
   bundle.t = auth.tenantId;
+  // AUDIT-2026-10-02 Y1: dados pessoais/financeiros não exibidos no portal não entram no link.
+  if (bundle.o && typeof bundle.o === 'object') { delete bundle.o.doc; delete bundle.o.v; }
   try {
     const sql = deps.sql || createOwnerSql();
     const rows = await sql`
