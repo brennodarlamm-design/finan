@@ -31,7 +31,10 @@ export function getTrustedClientIp(req) {
   const headers = req?.headers || {};
 
   // Vercel: prioriza headers definidos pela própria plataforma.
-  if (process.env.VERCEL || headers['x-vercel-id']) {
+  // AUDIT-2026-10-02 F3: só confia nos headers da Vercel quando o runtime É a Vercel
+  // (variável de plataforma). Antes bastava o cliente enviar `x-vercel-id` para
+  // escolher o próprio IP via `x-vercel-forwarded-for` e escapar de rate limit/Fail2Ban.
+  if (process.env.VERCEL) {
     const vercelForwarded = String(headers['x-vercel-forwarded-for'] || '').trim();
     if (vercelForwarded) return normalizeIp(vercelForwarded.split(',')[0]);
     const real = String(headers['x-real-ip'] || '').trim();

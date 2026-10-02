@@ -216,7 +216,10 @@ function tableAllowed(auth, table, action = 'read') {
 const SYNC_COLLECTION_TABLE = Object.freeze({
   clientes: 'obras', fornecedores: 'fornecedores', lancamentos: 'lancamentos', notas: 'notas',
   contas: 'contas', precompras: 'precompras', contratos: 'contratos', recibos: 'recibos',
-  orcamentos_sinapi: 'orcamentos_sinapi', doc_fases: 'doc_fases', preferencias: 'preferencias'
+  orcamentos_sinapi: 'orcamentos_sinapi', doc_fases: 'doc_fases', preferencias: 'preferencias',
+  // AUDIT-2026-10-02 F6: coleções gravadas por handleSyncAll que não eram verificadas,
+  // permitindo escrita em módulos bloqueados pelo perfil, plano ou permissão customizada.
+  medicoes: 'medicoes', orcamentos: 'orcamentos', produtos: 'produtos', documentos: 'documentos'
 });
 
 function deniedSyncCollection(auth, payload) {
@@ -289,7 +292,7 @@ export default async function handler(req, res) {
       }
 
       if (table === 'sinapi') {
-        return await handleSinapiQuery(sql, req.query, res, req.env);
+        return await handleSinapiQuery(sql, req.query, res, req.env, auth);
       }
 
       // Consultas individuais filtradas e paginadas:

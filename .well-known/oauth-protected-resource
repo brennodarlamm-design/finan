@@ -5,15 +5,10 @@
   ],
   "scopes_supported": [
     "read",
-    "write",
-    "finance",
-    "construction",
-    "openid",
-    "profile",
-    "email"
+    "write"
   ],
   "bearer_methods_supported": [
     "header"
   ],
-  "resource_documentation": "https://fingo.api.br/llms-full.txt"
+  "resource_documentation": "https://fingo.api.br/auth.md"
 }

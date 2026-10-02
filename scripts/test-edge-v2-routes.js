@@ -114,12 +114,28 @@ assert.strictEqual(curvaData.itens[2].classe, 'C');
 console.log('   ✓ Curva ABC de Pareto calculou classes A (80%), B (15%) e C (5%) com exatidão.');
 
 // 4.3 SINAPI Export (CSV)
+// AUDIT-2026-10-02 F7: sem base disponível a rota responde 503 e NUNCA devolve o catálogo fixo antigo.
+const resSinapiDown = createMockResponse();
+await handleV2SinapiExport({ query: { uf: 'SP', formato: 'csv', bdi: '20' } }, resSinapiDown, { sql: async () => { throw new Error('db down'); } });
+assert.strictEqual(resSinapiDown.getStatusCode(), 503);
+assert(!String(resSinapiDown.getRawBody() || JSON.stringify(resSinapiDown.getBody() || {})).includes('104658'), 'Export não pode devolver a lista fixa antiga.');
+
+const sinapiCalls = [];
+const mockSinapiSql = async (strings, ...values) => {
+  const text = strings.join('?');
+  sinapiCalls.push({ text, values });
+  if (text.includes('MAX(referencia)')) return [{ referencia: '2026-08' }];
+  return [{ codigo: '87878', descricao: '=HYPERLINK("x") CHAPISCO', unidade: 'M2', preco_unitario: '10.00', tipo: 'COMP', desonerado: false, referencia: '2026-08', uf: 'SP' }];
+};
 const resSinapi = createMockResponse();
-await handleV2SinapiExport({ query: { uf: 'SP', formato: 'csv', bdi: '20' } }, resSinapi);
+await handleV2SinapiExport({ query: { uf: 'SP', formato: 'csv', bdi: '20' } }, resSinapi, { sql: mockSinapiSql });
 assert.strictEqual(resSinapi.getStatusCode(), 200);
 assert(resSinapi.getHeaders()['content-type'].includes('text/csv'));
-assert(resSinapi.getRawBody().includes('104658'));
-console.log('   ✓ Exportação SINAPI gerou arquivo CSV estruturado com BDI de 20%.');
+assert(resSinapi.getRawBody().includes('87878'));
+assert(resSinapi.getRawBody().includes('12.00'), 'BDI de 20% aplicado sobre 10,00.');
+assert(resSinapi.getRawBody().includes("'=HYPERLINK"), 'Fórmulas devem ser neutralizadas no CSV.');
+assert(sinapiCalls.every(c => c.text.includes('itens_referenciais')), 'Consulta deve usar a base real itens_referenciais.');
+console.log('   ✓ Exportação SINAPI usa itens_referenciais, aplica BDI de 20%, neutraliza fórmulas e responde 503 sem base.');
 
 // 4.4 Boletim de Medição com Retenções Tributárias
 const resBoletim = createMockResponse();

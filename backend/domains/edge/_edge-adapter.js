@@ -169,11 +169,14 @@ export async function executeEdgeApi(request, env) {
   const cookies = parseCookies(headers.cookie);
 
   let body = null;
+  let rawBody = null;
   if (!['GET', 'HEAD'].includes(method)) {
     const contentType = headers['content-type'] || '';
     if (contentType.includes('application/json')) {
+      // AUDIT-2026-10-02 F2: preserva o corpo bruto para verificação de assinaturas de webhook.
       try {
-        body = await request.json();
+        rawBody = await request.text();
+        body = rawBody ? JSON.parse(rawBody) : {};
       } catch {
         body = {};
       }
@@ -206,6 +209,7 @@ export async function executeEdgeApi(request, env) {
     query,
     cookies,
     body,
+    rawBody,
     env
   };
 

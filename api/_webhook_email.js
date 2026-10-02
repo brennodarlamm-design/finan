@@ -15,6 +15,30 @@ function safeCompare(a, b) {
   return crypto.timingSafeEqual(bufA, bufB);
 }
 
+/**
+ * Verifica assinatura Svix (usada pelo Resend):
+ * HMAC-SHA256( base64decode(secret sem 'whsec_'), `${id}.${timestamp}.${rawBody}` ),
+ * comparada com cada entrada `v1,<base64>` do header, com tolerância de 5 minutos.
+ */
+export function verifySvixSignature({ secret, id, timestamp, signatureHeader, rawBody, nowMs = Date.now(), toleranceSec = 300 }) {
+  if (!secret || !id || !timestamp || !signatureHeader || typeof rawBody !== 'string') return false;
+  const ts = Number(timestamp);
+  if (!Number.isFinite(ts) || Math.abs(Math.floor(nowMs / 1000) - ts) > toleranceSec) return false;
+  let key;
+  try {
+    const rawSecret = secret.startsWith('whsec_') ? secret.slice(6) : secret;
+    key = Buffer.from(rawSecret, 'base64');
+    if (!key.length) return false;
+  } catch {
+    return false;
+  }
+  const expected = crypto.createHmac('sha256', key).update(`${id}.${timestamp}.${rawBody}`).digest('base64');
+  return signatureHeader.split(/\s+/).some(part => {
+    const [version, sig] = part.split(',');
+    return version === 'v1' && typeof sig === 'string' && safeCompare(sig, expected);
+  });
+}
+
 export function isEmailWebhookAuthorized(req) {
   const emailSecret = String(process.env.EMAIL_WEBHOOK_SECRET || '').trim();
   const internalSecret = String(process.env.INTERNAL_API_SECRET || '').trim();
@@ -37,10 +61,19 @@ export function isEmailWebhookAuthorized(req) {
   }
 
   // 3. Svix / Resend Webhook Signature (se configurado)
+  // AUDIT-2026-10-02 F2: antes, a simples PRESENÇA do header svix-signature
+  // autorizava o webhook. Agora a assinatura HMAC é verificada de fato.
   const svixSig = String(req.headers?.['svix-signature'] || '').trim();
-  if (svixSig && emailSecret) {
-    // Svix signature presente
-    return { authorized: true, source: 'svix-signature' };
+  const svixSecret = String(process.env.RESEND_WEBHOOK_SECRET || process.env.SVIX_WEBHOOK_SECRET || emailSecret || '').trim();
+  if (svixSig && svixSecret) {
+    const verified = verifySvixSignature({
+      secret: svixSecret,
+      id: String(req.headers?.['svix-id'] || '').trim(),
+      timestamp: String(req.headers?.['svix-timestamp'] || '').trim(),
+      signatureHeader: svixSig,
+      rawBody: typeof req.rawBody === 'string' ? req.rawBody : (typeof req.body === 'string' ? req.body : JSON.stringify(req.body ?? {}))
+    });
+    if (verified) return { authorized: true, source: 'svix-signature' };
   }
 
   return { authorized: false, error: 'Token ou assinatura de webhook de e-mail inválido ou não fornecido.' };

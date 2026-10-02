@@ -10,6 +10,7 @@ import { canAccessTable } from './_permissions.js';
 import { canUseFeature, planError } from './_plans.js';
 import { getCachedReference, applySwrCacheHeaders } from './_reference-cache.js';
 import { sinapiCacheKey } from './_edge-kv.js';
+import { querySinapiReferencia, normalizeSinapiParams } from './_sinapi-reference.js';
 
 function planFeatureErrorForTable(auth, table) {
   const feature = String(table || '') === 'orcamentos_sinapi' ? 'sinapi' : null;
@@ -286,21 +287,19 @@ export async function handleFullSnapshot(sql, tenantId, auth, res) {
 /**
  * ── 4. CONSULTA DAS BASES OFICIAIS SINAPI (COM EDGE CACHING SWR) ────────────
  */
-export async function handleSinapiQuery(sql, query, res, env) {
-  const sinapiPlanError = planFeatureErrorForTable(null, 'orcamentos_sinapi');
+export async function handleSinapiQuery(sql, query, res, env, auth = null) {
+  // AUDIT-2026-10-02 F7: o plano era checado com auth=null (caía no plano 'trial',
+  // que libera tudo), e a consulta ignorava UF/competência/termo e lia a tabela
+  // inexistente `sinapi_itens`. Agora valida o plano real e filtra a base importada.
+  const sinapiPlanError = planFeatureErrorForTable(auth, 'orcamentos_sinapi');
   if (sinapiPlanError) return res.status(403).json(sinapiPlanError);
 
-  const uf = String(query.uf || query.estado || 'SP').trim().toUpperCase();
-  const competencia = String(query.competencia || 'default').trim();
-  const termo = String(query.q || query.busca || '').trim();
-  const cacheKey = sinapiCacheKey(uf, competencia, termo);
+  const params = normalizeSinapiParams(query || {});
+  const cacheKey = sinapiCacheKey(`${params.uf}:${params.desonerado === null ? 'all' : (params.desonerado ? 'des' : 'on')}`, params.referencia || 'latest', params.termo);
 
   const { data, fromCache } = await getCachedReference(env, cacheKey, async () => {
-    return await sql`
-      SELECT id, codigo, descricao, unidade, valor, data_referencia, estado
-      FROM sinapi_itens
-      LIMIT 200;
-    `;
+    const result = await querySinapiReferencia(sql, { ...params, limit: 200 });
+    return result.items;
   }, 86400);
 
   applySwrCacheHeaders(res, { isHit: fromCache, provider: 'REDIS' });

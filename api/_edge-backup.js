@@ -42,7 +42,50 @@ async function readCriticalTable(sql, table) {
   return Array.isArray(rows) ? rows : (rows?.rows || []);
 }
 
-export async function createCriticalR2Backup(env, { force = false } = {}) {
+// AUDIT-2026-10-02 R3: o snapshot tinha todas as tabelas críticas (inclusive `usuarios`)
+// em JSON puro, no mesmo bucket dos anexos dos clientes. Agora:
+//   1. é cifrado com AES-256-GCM (chave derivada de BACKUP_ENCRYPTION_KEY via SHA-256);
+//   2. vai para o bucket dedicado BACKUPS_R2 (fallback: ATTACHMENTS_R2, sempre cifrado, com alerta);
+//   3. sem chave de cifra, o backup NÃO é gravado (falha fechada) e um alerta crítico é disparado.
+// Formato do arquivo .enc: "FGBK1" (5 bytes) | IV (12 bytes) | ciphertext+tag (AES-GCM).
+// Para restaurar: node scripts/decrypt-r2-backup.mjs <arquivo.enc> <saida.json>
+export const BACKUP_MAGIC = 'FGBK1';
+
+async function deriveBackupKey(secret) {
+  const material = new TextEncoder().encode(String(secret));
+  const digest = await globalThis.crypto.subtle.digest('SHA-256', material);
+  return globalThis.crypto.subtle.importKey('raw', digest, { name: 'AES-GCM' }, false, ['encrypt', 'decrypt']);
+}
+
+export async function encryptBackupPayload(plainBytes, secret) {
+  const key = await deriveBackupKey(secret);
+  const iv = globalThis.crypto.getRandomValues(new Uint8Array(12));
+  const cipher = new Uint8Array(await globalThis.crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, plainBytes));
+  const magic = new TextEncoder().encode(BACKUP_MAGIC);
+  const out = new Uint8Array(magic.length + iv.length + cipher.length);
+  out.set(magic, 0);
+  out.set(iv, magic.length);
+  out.set(cipher, magic.length + iv.length);
+  return out;
+}
+
+export async function decryptBackupPayload(encBytes, secret) {
+  const bytes = encBytes instanceof Uint8Array ? encBytes : new Uint8Array(encBytes);
+  const magic = new TextDecoder().decode(bytes.slice(0, BACKUP_MAGIC.length));
+  if (magic !== BACKUP_MAGIC) throw new Error('Arquivo não é um backup cifrado FinGo (FGBK1).');
+  const iv = bytes.slice(BACKUP_MAGIC.length, BACKUP_MAGIC.length + 12);
+  const cipher = bytes.slice(BACKUP_MAGIC.length + 12);
+  const key = await deriveBackupKey(secret);
+  return new Uint8Array(await globalThis.crypto.subtle.decrypt({ name: 'AES-GCM', iv }, key, cipher));
+}
+
+function resolveBackupBucket(env) {
+  if (env?.BACKUPS_R2 && typeof env.BACKUPS_R2.put === 'function') return { bucket: env.BACKUPS_R2, isolated: true };
+  if (env?.ATTACHMENTS_R2 && typeof env.ATTACHMENTS_R2.put === 'function') return { bucket: env.ATTACHMENTS_R2, isolated: false };
+  return { bucket: null, isolated: false };
+}
+
+export async function createCriticalR2Backup(env, { force = false, sqlFactory = neon } = {}) {
   const now = new Date();
   const dateKey = utcDateKey(now);
   const hour = now.getUTCHours();
@@ -51,6 +94,18 @@ export async function createCriticalR2Backup(env, { force = false } = {}) {
   // O cron roda a cada 10 min. A janela 07:00 UTC corresponde a 03:00 em Boa Vista.
   if (!force && (hour !== 7 || minute >= 10)) {
     return { skipped: true, reason: 'outside_backup_window', date: dateKey };
+  }
+
+  const encryptionSecret = String(env?.BACKUP_ENCRYPTION_KEY || '').trim();
+  if (encryptionSecret.length < 32) {
+    const error = 'BACKUP_ENCRYPTION_KEY ausente ou curta (mín. 32 caracteres). Backup não gravado para não expor dados em texto puro.';
+    await dispatchEdgeAlert(env, {
+      type: 'BACKUP_CONFIGURATION_ERROR',
+      severity: 'CRITICAL',
+      title: 'Backup diário do FinGo sem chave de criptografia',
+      message: error
+    }).catch(() => {});
+    throw new Error(error);
   }
 
   const conn = String(env?.DATABASE_OWNER_URL || env?.DATABASE_URL || '').trim();
@@ -65,8 +120,9 @@ export async function createCriticalR2Backup(env, { force = false } = {}) {
     throw new Error(error);
   }
 
-  if (!env?.ATTACHMENTS_R2 || typeof env.ATTACHMENTS_R2.put !== 'function') {
-    const error = 'Binding ATTACHMENTS_R2 ausente no Worker para backup.';
+  const { bucket, isolated } = resolveBackupBucket(env);
+  if (!bucket) {
+    const error = 'Nenhum bucket R2 (BACKUPS_R2/ATTACHMENTS_R2) disponível no Worker para backup.';
     await dispatchEdgeAlert(env, {
       type: 'BACKUP_CONFIGURATION_ERROR',
       severity: 'CRITICAL',
@@ -75,8 +131,16 @@ export async function createCriticalR2Backup(env, { force = false } = {}) {
     }).catch(() => {});
     throw new Error(error);
   }
+  if (!isolated) {
+    await dispatchEdgeAlert(env, {
+      type: 'BACKUP_BUCKET_NOT_ISOLATED',
+      severity: 'WARNING',
+      title: 'Backup cifrado gravado no bucket de anexos',
+      message: 'Binding BACKUPS_R2 ausente; o snapshot cifrado foi gravado em ATTACHMENTS_R2. Crie o bucket dedicado.'
+    }).catch(() => {});
+  }
 
-  const sql = neon(conn);
+  const sql = sqlFactory(conn);
   const snapshot = {
     schemaVersion: 1,
     generatedAt: now.toISOString(),
@@ -93,35 +157,37 @@ export async function createCriticalR2Backup(env, { force = false } = {}) {
     };
   }
 
-  const json = safeJson(snapshot);
-  const bytes = new TextEncoder().encode(json);
-  const key = `backups/neon-critical/${dateKey}/snapshot.json`;
+  const plainBytes = new TextEncoder().encode(safeJson(snapshot));
+  const encrypted = await encryptBackupPayload(plainBytes, encryptionSecret);
+  const key = `backups/neon-critical/${dateKey}/snapshot.json.enc`;
 
-  const stored = await putR2Object(env, key, bytes, {
-    contentType: 'application/json',
+  const stored = await bucket.put(key, encrypted, {
+    httpMetadata: { contentType: 'application/octet-stream' },
     customMetadata: {
       backupType: 'neon-critical',
+      encryption: 'AES-256-GCM/FGBK1',
       date: dateKey,
       generatedAt: snapshot.generatedAt,
       tableCount: String(CRITICAL_TABLES.length)
     }
   });
 
-  // Manifesto separado facilita validar existência/tamanho sem baixar todo o snapshot.
+  // Manifesto separado (somente contagens, sem dados) facilita validar existência/tamanho.
   const manifest = {
     ok: true,
     key,
+    encrypted: true,
+    isolatedBucket: isolated,
     generatedAt: snapshot.generatedAt,
-    bytes: stored.size,
+    bytes: stored?.size ?? encrypted.byteLength,
     tables: Object.fromEntries(
       Object.entries(snapshot.tables).map(([name, value]) => [name, value.count])
     )
   };
-  await putR2Object(
-    env,
+  await bucket.put(
     `backups/neon-critical/${dateKey}/manifest.json`,
     new TextEncoder().encode(JSON.stringify(manifest, null, 2)),
-    { contentType: 'application/json', customMetadata: { backupType: 'manifest', date: dateKey } }
+    { httpMetadata: { contentType: 'application/json' }, customMetadata: { backupType: 'manifest', date: dateKey } }
   );
 
   return manifest;

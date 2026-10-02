@@ -38,6 +38,17 @@ function maskDocument(value) {
   return `${raw.slice(0,2)}***${raw.slice(-2)}`;
 }
 
+function maskIp(value) {
+  const raw = clean(value, 64);
+  if (!raw) return '';
+  if (raw.includes('.')) {
+    const parts = raw.split('.');
+    return parts.length === 4 ? `${parts[0]}.${parts[1]}.*.*` : '***';
+  }
+  if (raw.includes(':')) return raw.split(':').slice(0, 2).join(':') + ':****';
+  return '***';
+}
+
 export default async function handler(req, res) {
   cors(req, res);
   res.setHeader('Cache-Control', 'no-store');
@@ -95,7 +106,8 @@ export default async function handler(req, res) {
           doc_numero: r.doc_numero,
           data_hora: r.data_hora,
           data_hora_fmt: r.data_hora_fmt,
-          ip_dispositivo: r.ip_dispositivo,
+          // AUDIT-2026-10-02 F10: IP do signatário é dado pessoal (LGPD); a validação pública mostra só um trecho.
+          ip_dispositivo: maskIp(r.ip_dispositivo),
           empresa: r.nome_fantasia || r.razao_social || 'Empresa usuária do FinGo',
           empresa_cnpj: maskDocument(r.cnpj),
           empresa_cidade: r.cidade || '',

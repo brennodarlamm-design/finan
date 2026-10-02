@@ -266,71 +266,38 @@ const API_CATALOG_PAYLOAD = {
   ]
 };
 
+// AUDIT-2026-10-02 R5: metadados ajustados às rotas que existem de fato. Antes anunciavam
+// endpoints inexistentes (agent-register, claim, token) e fluxos OAuth não implementados.
 const OPENID_CONFIGURATION_PAYLOAD = {
   "issuer": "https://fingo.api.br",
   "authorization_endpoint": "https://fingo.api.br/login",
   "token_endpoint": "https://fingo.api.br/api/auth?action=login",
   "userinfo_endpoint": "https://fingo.api.br/api/auth?action=me",
-  "jwks_uri": "https://fingo.api.br/.well-known/jwks.json",
-  "registration_endpoint": "https://fingo.api.br/planos",
+  "revocation_endpoint": "https://fingo.api.br/api/auth?action=logout",
   "scopes_supported": [
-    "openid",
-    "profile",
-    "email",
     "read",
-    "write",
-    "finance",
-    "construction"
+    "write"
   ],
   "response_types_supported": [
     "token"
   ],
   "grant_types_supported": [
-    "password",
-    "client_credentials"
+    "password"
+  ],
+  "token_endpoint_auth_methods_supported": [
+    "none"
   ],
   "subject_types_supported": [
     "public"
   ],
-  "id_token_signing_alg_values_supported": [
-    "HS256"
-  ],
-  "token_endpoint_auth_methods_supported": [
-    "bearer",
-    "client_secret_post"
-  ],
-  "agent_auth": {
-    "skill": "https://fingo.api.br/auth.md",
-    "type": "bearer_and_session_cookie",
-    "register_uri": "https://fingo.api.br/api/auth?action=agent-register",
-    "claim_uri": "https://fingo.api.br/api/auth?action=claim",
-    "identity_types_supported": [
-      "identity_assertion",
-      "anonymous",
-      "verified_email"
-    ],
-    "identity_assertion": {
-      "assertion_types_supported": [
-        "urn:ietf:params:oauth:token-type:id-jag",
-        "verified_email"
-      ],
-      "credential_types_supported": [
-        "bearer"
-      ],
-      "claim_uri": "https://fingo.api.br/api/auth?action=claim"
-    },
-    "verified_email": {
-      "claim_uri": "https://fingo.api.br/api/auth?action=claim",
-      "credential_types_supported": [
-        "bearer"
-      ]
-    },
-    "anonymous": {
-      "credential_types_supported": [
-        "bearer"
-      ],
-      "claim_uri": "https://fingo.api.br/api/auth?action=claim"
-    }
+  "fingo_auth": {
+    "note": "O FinGo não é um provedor OAuth/OpenID Connect completo. A autenticação é por sessão: POST no token_endpoint com {username, password} (e access_key quando exigida pela empresa). Navegadores recebem cookie HttpOnly; integrações enviam o cabeçalho X-FinObra-Token-Mode: bearer para receber o token no corpo e usam Authorization: Bearer <token>. Contas com 2FA concluem em /api/auth?action=mfa_verify. Tokens são assinados com HMAC (HS256) e não são verificáveis por terceiros.",
+    "login_endpoint": "https://fingo.api.br/api/auth?action=login",
+    "mfa_endpoint": "https://fingo.api.br/api/auth?action=mfa_verify",
+    "session_endpoint": "https://fingo.api.br/api/auth?action=me",
+    "logout_endpoint": "https://fingo.api.br/api/auth?action=logout",
+    "bearer_token_mode_header": "X-FinObra-Token-Mode: bearer",
+    "documentation": "https://fingo.api.br/auth.md"
   }
 };
 
@@ -341,40 +308,17 @@ const OAUTH_PROTECTED_RESOURCE_PAYLOAD = {
   ],
   "scopes_supported": [
     "read",
-    "write",
-    "finance",
-    "construction",
-    "openid",
-    "profile",
-    "email"
+    "write"
   ],
   "bearer_methods_supported": [
     "header"
   ],
-  "resource_documentation": "https://fingo.api.br/llms-full.txt"
+  "resource_documentation": "https://fingo.api.br/auth.md"
 };
 
-const JWKS_PAYLOAD = {
-  "keys": [
-    {
-      "kty": "RSA",
-      "use": "sig",
-      "alg": "RS256",
-      "kid": "fingo-auth-rsa-2026",
-      "n": "u1P5z9n3Q8u6sF9l6cT4W2b7A5y8H3j1K9m0N4v7P2r5T8x1Z3c6B9e2D5g8J1m4P7s0V3y6B9e2D5g8J1m4P7s0V3y6B9e2D5g8J1m4P7s0V3y6B9e2D5g8J1m4P7s0V3y6B9e2D5g8J1m4P7s0V3y6B9e2D5g8J1m4P7s0V3y6B9e2D5g8J1m4P7s0V3y6B9e2D5g8J1m4P7s0V3y6B9e2D5g8J1m4",
-      "e": "AQAB"
-    },
-    {
-      "kty": "EC",
-      "crv": "P-256",
-      "use": "sig",
-      "alg": "ES256",
-      "kid": "fingo-auth-es256",
-      "x": "bD6Mktk3a3VEqjMXdAC70r3nB1ujA2BOjQHf7qk8brg",
-      "y": "d_W_2lTazf8SA_VvbCgV1Rp03mdCbYZ5NioRUsKQZI0"
-    }
-  ]
-};
+// AUDIT-2026-10-02 R5: as sessões usam HMAC (HS256), que não tem chave pública.
+// As chaves RSA/EC publicadas antes eram fictícias e não verificavam nenhum token.
+const JWKS_PAYLOAD = { "keys": [] };
 
 const WEB_BOT_AUTH_JWKS_PAYLOAD = {
   "keys": [
@@ -680,7 +624,7 @@ const OPENAPI_PAYLOAD = {
             "required": true,
             "schema": {
               "type": "string",
-              "enum": ["login", "logout", "totp-setup", "totp-verify", "request_reset", "verify_reset", "agent-register", "token"]
+              "enum": ["login", "logout", "mfa_verify", "mfa_setup", "mfa_activate", "register", "google", "revoke_session", "request_reset", "verify_reset"]
             }
           }
         ],
@@ -1451,6 +1395,18 @@ async function proxyApi(request, env) {
   if (!SAFE_METHODS.has(method)) headers.set('Origin', canonicalOrigin(env));
   headers.set('X-FinObra-Edge', 'cloudflare-worker');
 
+  // AUDIT-2026-10-02 R2: o Render só confia no IP do cliente quando a requisição traz o
+  // segredo compartilhado com o Worker. Sem isso, cabeçalhos cf-* enviados direto ao
+  // *.onrender.com poderiam forjar o IP e contornar rate limit/Fail2Ban.
+  headers.delete('x-fingo-origin-auth');
+  headers.delete('x-fingo-client-ip');
+  const originSecret = String(env.ORIGIN_SHARED_SECRET || '').trim();
+  if (originSecret) {
+    headers.set('X-FinGo-Origin-Auth', originSecret);
+    const clientIp = request.headers.get('cf-connecting-ip');
+    if (clientIp) headers.set('X-FinGo-Client-IP', clientIp);
+  }
+
   const init = {
     method,
     headers,
@@ -1512,7 +1468,12 @@ async function handleApi(request, env) {
     const isMutating = !SAFE_METHODS.has(String(request.method || 'GET').toUpperCase());
     const edgeRequest = isMutating ? request.clone() : request;
     let response = await executeEdgeApi(edgeRequest, env);
-    if (response && response.status >= 500 && env.FINOBRA_API_ORIGIN) {
+    // AUDIT-2026-10-02 R1: gravações (POST/PUT/PATCH/DELETE) não são reenviadas ao
+    // Render após um 5xx do Edge — o handler pode já ter gravado no banco antes de falhar,
+    // e o reenvio duplicaria lançamentos, assinaturas ou pagamentos. Só há fallback para
+    // métodos seguros ou quando o Edge declara explicitamente que não processou a requisição.
+    const edgeDeclaredUnprocessed = response && response.headers.get('X-FinGo-Edge-Unprocessed') === '1';
+    if (response && response.status >= 500 && env.FINOBRA_API_ORIGIN && (!isMutating || edgeDeclaredUnprocessed)) {
       console.warn('[FinGo Edge] Resposta 5xx no Edge, acionando fallback upstream...');
       response = await proxyApi(request, env);
     }
@@ -1545,7 +1506,9 @@ async function handleApi(request, env) {
     return response;
   } catch (err) {
     console.error('[FinGo Edge] Falha ao processar API no Edge:', err?.message || err);
-    if (env.FINOBRA_API_ORIGIN) {
+    // AUDIT-2026-10-02 R1: idem — exceção no meio de uma gravação não é reenviada ao upstream.
+    const mutatingRequest = !SAFE_METHODS.has(String(request.method || 'GET').toUpperCase());
+    if (env.FINOBRA_API_ORIGIN && !mutatingRequest) {
       try {
         return await proxyApi(request, env);
       } catch (proxyErr) {

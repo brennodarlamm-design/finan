@@ -15,7 +15,8 @@ export function buildR2ObjectKey(tenantId, category, filename) {
   const normCat = String(category || 'docs').trim().replace(/[^a-zA-Z0-9_-]/g, '') || 'docs';
   const cleanName = String(filename || 'arquivo.bin').trim().replace(/[^a-zA-Z0-9_.-]/g, '_');
   const timestamp = Date.now();
-  const rand = Math.random().toString(36).substring(2, 8);
+  // AUDIT-2026-10-02: sufixo com CSPRNG (antes Math.random, 6 caracteres previsíveis).
+  const rand = (globalThis.crypto?.randomUUID ? globalThis.crypto.randomUUID().replace(/-/g, '').slice(0, 16) : Math.random().toString(36).substring(2, 10));
   return `tenants/${normTenant}/${normCat}/${timestamp}_${rand}_${cleanName}`;
 }
 

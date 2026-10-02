@@ -764,7 +764,10 @@ export default async function handler(req, res) {
       const newAvatar = avatar !== undefined ? (String(avatar).trim() || newNome.slice(0,2).toUpperCase()) : cur.avatar;
 
       if (!newNome || newUsername.length < 3 || !newEmail || !newEmail.includes('@')) return res.status(400).json({ success:false, error:'Dados de usuário inválidos.' });
-      if (!allowedProfiles.includes(newPerfil)) return res.status(400).json({ success:false, error:'Perfil inválido.' });
+      // AUDIT-2026-10-02 F11: um superadmin editando a própria conta mantém o perfil atual;
+      // antes a validação rejeitava 'superadmin' e bloqueava a edição/troca de senha.
+      const keepsSuperadmin = cur.perfil === 'superadmin' && newPerfil === 'superadmin' && auth.user.perfil === 'superadmin';
+      if (!keepsSuperadmin && !allowedProfiles.includes(newPerfil)) return res.status(400).json({ success:false, error:'Perfil inválido.' });
       if (isSelf && !newAtivo) return res.status(400).json({ success:false, error:'Você não pode desativar sua própria conta.' });
 
       // Evita deixar a empresa sem nenhum administrador ativo, o que bloquearia a gestão de usuários/empresa.

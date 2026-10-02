@@ -71,6 +71,12 @@ services:
         value: https://fingo.api.br
       - key: ADMIN_NOTIFY_EMAIL
         sync: false
+      # AUDIT-2026-10-02 R2: segredo compartilhado com o Worker (mesmo valor nos dois lados).
+      - key: ORIGIN_SHARED_SECRET
+        sync: false
+      # Mude para "true" depois de confirmar o tráfego pelo Worker: bloqueia /api/* direto no onrender.com.
+      - key: ORIGIN_ENFORCE_EDGE
+        value: "false"
 
   # Serviço WhatsApp forwarder (finan-wf12)
   - type: web

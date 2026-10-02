@@ -150,6 +150,7 @@ const backendMap = {
   'api/_edge-r2.js': 'backend/domains/edge/_edge-r2.js',
   'api/_edge-realtime.js': 'backend/domains/edge/_edge-realtime.js',
   'api/_edge-security.js': 'backend/domains/edge/_edge-security.js',
+  'api/_sinapi-reference.js': 'backend/domains/integrations/_sinapi-reference.js',
   'api/_edge-vector.js': 'backend/domains/edge/_edge-vector.js',
   'api/_v2-routes.js': 'backend/domains/edge/_v2-routes.js',
 

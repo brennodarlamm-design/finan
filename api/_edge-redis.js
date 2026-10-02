@@ -160,11 +160,14 @@ export async function checkRateLimitRedis(key, limit = 10, windowSeconds = 60, e
   if (!key) return { allowed: true, remaining: limit, resetSeconds: windowSeconds };
   const safeLimit = Math.max(1, Number(limit) || 10);
   const safeWindow = Math.max(1, Number(windowSeconds) || 60);
-  const rateKey = `rl:${key}`;
+  // AUDIT-2026-10-02: janela fixa. Antes, o EXPIRE a cada chamada renovava a janela
+  // indefinidamente, e um cliente acima do limite nunca era liberado sob tráfego contínuo.
+  const windowBucket = Math.floor(Date.now() / (safeWindow * 1000));
+  const rateKey = `rl:${key}:${windowBucket}`;
 
   const results = await upstashPipeline([
     ['INCR', rateKey],
-    ['EXPIRE', rateKey, safeWindow]
+    ['EXPIRE', rateKey, safeWindow + 5]
   ], env);
 
   if (!results || !Array.isArray(results)) {

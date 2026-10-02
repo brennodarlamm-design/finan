@@ -22,6 +22,12 @@
     {
       "binding": "ATTACHMENTS_R2",
       "bucket_name": "fingo-attachments"
+    },
+    // AUDIT-2026-10-02 R3: bucket exclusivo dos snapshots diários cifrados.
+    // Crie antes do deploy: npx wrangler r2 bucket create fingo-backups
+    {
+      "binding": "BACKUPS_R2",
+      "bucket_name": "fingo-backups"
     }
   ],
   "triggers": {

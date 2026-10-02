@@ -81,15 +81,16 @@ console.log('   ✓ Todas as 4 rotas de IA de borda exigem autenticação ativa 
 console.log('\n3. Validando eliminação de mocks e validação de parâmetros...');
 const { handleV2EdgeMediaOptimize, handleV2SinapiExport } = await import('../api/_v2-routes.js');
 
-const resMediaNoKey = createMockResponse();
-await handleV2EdgeMediaOptimize({ url: '/api/v2/edge/media/optimize' }, resMediaNoKey);
-assert.strictEqual(resMediaNoKey.getStatusCode(), 400, 'Optimize sem key deve retornar 400 Bad Request');
-assert.strictEqual(resMediaNoKey.getBody()?.error, 'PARAM_REQUIRED');
+// AUDIT-2026-10-02 F1: o otimizador de mídia exige sessão (antes lia qualquer objeto do R2, inclusive backups).
+const resMediaAnon = createMockResponse();
+await handleV2EdgeMediaOptimize({ url: '/api/v2/edge/media/optimize?key=backups/neon-critical/2026-10-02/snapshot.json', headers: {} }, resMediaAnon);
+assert.strictEqual(resMediaAnon.getStatusCode(), 401, 'Optimize sem sessão deve retornar 401');
 
+// AUDIT-2026-10-02 F7: sem base SINAPI acessível a exportação responde 503, sem catálogo fixo.
 const resSinapiExp = createMockResponse();
-await handleV2SinapiExport({ query: { uf: 'SP', formato: 'json' } }, resSinapiExp);
-assert.strictEqual(resSinapiExp.getStatusCode(), 200);
-assert(resSinapiExp.getBody()?.source, 'Exportação SINAPI deve indicar source de dados');
+await handleV2SinapiExport({ query: { uf: 'SP', formato: 'json' } }, resSinapiExp, { sql: async () => { throw new Error('db down'); } });
+assert.strictEqual(resSinapiExp.getStatusCode(), 503);
+assert.strictEqual(resSinapiExp.getBody()?.error, 'SINAPI_UNAVAILABLE');
 console.log('   ✓ Endpoints de mídia e SINAPI rejeitam parâmetros ausentes e identificam fonte de dados.');
 
 // -------------------------------------------------------------
@@ -148,7 +149,7 @@ console.log('   ✓ scripts/setup-neon.js alinhado ao ecossistema multi-tenant m
 console.log('\n8. Validando conformidade realista do catálogo OIDC...');
 const workerSrc = fs.readFileSync(path.join(root, 'cloudflare-worker.js'), 'utf8').replace(/\r\n/g, '\n');
 assert(workerSrc.includes('"response_types_supported": [\n    "token"'), 'OIDC deve anunciar response_type token');
-assert(workerSrc.includes('"grant_types_supported": [\n    "password",\n    "client_credentials"'), 'OIDC deve anunciar grants reais');
+assert(workerSrc.includes('"grant_types_supported": [\n    "password"'), 'OIDC deve anunciar grants reais');
 console.log('   ✓ Catálogo OIDC reflete autenticação real (Bearer/Session/API Key).');
 
 // -------------------------------------------------------------

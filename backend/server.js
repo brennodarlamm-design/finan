@@ -14,6 +14,7 @@ import { evolutionGo } from './evolution_client.js';
 import { createGracefulShutdownManager } from './graceful_shutdown.js';
 import { requestIdMiddleware, createTaggedSql } from './traceability.js';
 import { createResilientNeon } from './neon_resilience.js';
+import { createOriginTrustMiddleware } from './origin_trust.js';
 import * as Sentry from '@sentry/node';
 
 // Garantir link simbólico de ../node_modules -> ./node_modules para que os handlers em ../api/*.js resolvam dependências
@@ -84,6 +85,9 @@ app.use((req, res, next) => {
 });
 const shutdownManager = createGracefulShutdownManager({ timeoutMs: 10000, cron });
 app.use(shutdownManager.middleware());
+// AUDIT-2026-10-02 R2: fronteira de confiança da origem Render (ver backend/origin_trust.js).
+app.use(createOriginTrustMiddleware());
+
 
 const ALLOWED_ORIGINS = [
   'https://fingo.api.br',
@@ -107,6 +111,9 @@ app.use(cors({
   credentials: true
 }));
 
+// AUDIT-2026-10-02 F2: nas rotas de webhook de e-mail, guarda o corpo bruto para verificar
+// a assinatura Svix/Resend. O body-parser genérico abaixo ignora requisições já parseadas.
+app.use(['/api/webhook-email', '/api/plano'], express.json({ limit: '2mb', verify: (req, _res, buf) => { req.rawBody = buf.toString('utf8'); } }));
 app.use(express.json({ limit: '12mb' }));
 app.use(express.urlencoded({ extended: true, limit: '12mb' }));
 
@@ -173,6 +180,26 @@ function verifyQrAccess(req, tenantId) {
 function setQrAccessCookie(res, tenantId) {
   const token = signQrAccess(tenantId);
   res.setHeader('Set-Cookie', `${QR_COOKIE}=${encodeURIComponent(token)}; Path=/; HttpOnly; SameSite=Strict; Max-Age=900; Secure`);
+}
+// AUDIT-2026-10-02 F8: comparação em tempo constante e limite de tentativas na página /qr.
+const qrFailures = new Map();
+function safeEqualSecret(a, b) {
+  const ha = crypto.createHash('sha256').update(String(a)).digest();
+  const hb = crypto.createHash('sha256').update(String(b)).digest();
+  return crypto.timingSafeEqual(ha, hb);
+}
+function qrAttemptBlocked(ip) {
+  const entry = qrFailures.get(ip);
+  if (!entry) return false;
+  if (Date.now() - entry.first > 15 * 60 * 1000) { qrFailures.delete(ip); return false; }
+  return entry.count >= 10;
+}
+function registerQrFailure(ip) {
+  const now = Date.now();
+  const entry = qrFailures.get(ip);
+  if (!entry || now - entry.first > 15 * 60 * 1000) qrFailures.set(ip, { first: now, count: 1 });
+  else entry.count += 1;
+  if (qrFailures.size > 5000) qrFailures.clear();
 }
 function requireQrOrApiAuth(req, res, next) {
   const tenantId = extractTenantFromReq(req);
@@ -532,10 +559,19 @@ app.all('/qr', async (req, res) => {
   const secret = getInternalSecret();
   const providedToken = String(req.body?.token || req.headers?.authorization?.replace(/^Bearer\s+/i, '') || req.headers?.['x-api-key'] || '').trim();
   const tenantId = extractTenantFromReq(req);
+  // AUDIT-2026-10-02 F8: falha fechada. Sem INTERNAL_API_SECRET a página ficava aberta.
+  if (!secret) {
+    return res.status(503).send('Configuração de segurança pendente no servidor.');
+  }
+  const qrIp = String(req.headers['x-real-ip'] || req.headers['cf-connecting-ip'] || req.socket?.remoteAddress || 'unknown');
+  if (qrAttemptBlocked(qrIp)) {
+    return res.status(429).send('Muitas tentativas. Aguarde alguns minutos.');
+  }
   const cookieAuthorized = verifyQrAccess(req, tenantId);
-  const secretAuthorized = Boolean(secret && providedToken === secret);
+  const secretAuthorized = Boolean(providedToken) && safeEqualSecret(providedToken, secret);
+  if (providedToken && !secretAuthorized) registerQrFailure(qrIp);
 
-  if (secret && !secretAuthorized && !cookieAuthorized) {
+  if (!secretAuthorized && !cookieAuthorized) {
     return res.status(401).send(`
       <!DOCTYPE html>
       <html lang="pt-BR">

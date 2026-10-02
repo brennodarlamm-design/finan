@@ -116,6 +116,7 @@ const tests = [
   'scripts/test-r2-failclosed-runtime.js',
   'scripts/test-edge-alert-chaos.js',
   'scripts/test-review-remediation.js',
+  'scripts/test-audit-2026-10-02.js',
   'scripts/test-sefaz-dfe.js',
   'scripts/test-financeiro-core-hardening.js',
   'scripts/test-upstash-redis-integration.js',

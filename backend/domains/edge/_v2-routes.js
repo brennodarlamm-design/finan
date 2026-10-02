@@ -19,8 +19,52 @@ import { dispatchEdgeAlert } from './_edge-alerts.js';
 import { resolveAuthAndTenant } from './_auth.js';
 import { can, canAccessModule, canWriteData, canDeleteData, permissionError } from './_permissions.js';
 import { canUseFeature, planError } from './_plans.js';
-import { createOwnerSql } from './_database.js';
+import { createOwnerSql, createRuntimeSql } from './_database.js';
+import { querySinapiReferencia, normalizeSinapiParams } from './_sinapi-reference.js';
 import { checkRateLimit, getClientIp } from './_ratelimit.js';
+import { checkRateLimitRedis } from './_edge-redis.js';
+
+// AUDIT-2026-10-02 F5: resolveAuthAndTenant() expõe perfil e plano em auth.user
+// (perfil / tenantPlan). auth.role e auth.plan não existem e faziam o plano cair
+// em 'trial' (todas as features liberadas) e o perfil em 'visualizador'.
+function authRole(auth) {
+  return String(auth?.user?.perfil || '').trim().toLowerCase();
+}
+function authPlan(auth) {
+  return auth?.user?.tenantPlan || auth?.user?.plano || '';
+}
+
+// AUDIT-2026-10-02 R4: limite por IP para as rotas públicas (sem sessão).
+// Usa Upstash Redis (janela fixa) para não gastar uma escrita no Neon a cada consulta
+// em cache; sem Redis configurado, cai num limitador em memória do isolate.
+const publicRouteHits = new Map();
+function memoryRateLimit(key, limit, windowMs) {
+  const now = Date.now();
+  const entry = publicRouteHits.get(key);
+  if (!entry || now - entry.start >= windowMs) {
+    publicRouteHits.set(key, { start: now, count: 1 });
+    if (publicRouteHits.size > 10000) publicRouteHits.clear();
+    return { allowed: true };
+  }
+  entry.count += 1;
+  return { allowed: entry.count <= limit };
+}
+export async function publicRouteLimited(req, res, bucket, limitPerMinute) {
+  const ip = getClientIp(req) || 'unknown';
+  const key = `pub:${bucket}:${ip}`;
+  let result = null;
+  try {
+    result = await checkRateLimitRedis(key, limitPerMinute, 60, req.env || process.env);
+  } catch {
+    result = null;
+  }
+  if (!result || result.fallback) result = memoryRateLimit(key, limitPerMinute, 60000);
+  if (result.allowed) return false;
+  res.setHeader('Retry-After', '60');
+  res.setHeader('Cache-Control', 'no-store');
+  res.status(429).json({ success:false, error:'RATE_LIMIT_EXCEEDED', message:'Muitas requisições. Aguarde um minuto e tente novamente.' });
+  return true;
+}
 
 export const V2_ROUTE_SPEC = [
   // 1. Sistema & Telemetria
@@ -98,6 +142,12 @@ export async function handleV2SystemRoutes(req, res) {
 export async function handleV2SystemMetrics(req, res) {
   res.setHeader('Cache-Control', 'no-store');
   res.setHeader('Content-Type', 'application/json; charset=utf-8');
+  // AUDIT-2026-10-02 F9: mesma telemetria de /__edge/metrics, que é restrita a superadmin.
+  const auth = await resolveAuthAndTenant(req);
+  if (!auth.authenticated) return res.status(auth.status || 401).json({ success:false, error:auth.error || 'Não autorizado.' });
+  if (!auth.isSystem && authRole(auth) !== 'superadmin') {
+    return res.status(403).json({ success:false, error:'Acesso restrito à administração da plataforma.' });
+  }
   return res.status(200).json({
     success: true,
     metrics: getEdgeMetricsSummary()
@@ -108,6 +158,7 @@ export async function handleV2SystemMetrics(req, res) {
  * Endpoint analítico de Curva ABC (Classificação de Pareto A/B/C)
  */
 export async function handleV2CurvaAbc(req, res) {
+  if (await publicRouteLimited(req, res, 'curva-abc', 30)) return;
   res.setHeader('Cache-Control', 'private, no-cache');
   res.setHeader('Content-Type', 'application/json; charset=utf-8');
 
@@ -208,68 +259,59 @@ export async function handleV2CurvaAbc(req, res) {
 /**
  * Exportação rápida de tabela SINAPI com BDI calculado
  */
-export async function handleV2SinapiExport(req, res) {
-  const uf = String(req.query?.uf || 'SP').toUpperCase();
+export async function handleV2SinapiExport(req, res, deps = {}) {
+  if (await publicRouteLimited(req, res, 'sinapi-export', 10)) return;
+  const params = normalizeSinapiParams(req.query || {});
   const formato = String(req.query?.formato || 'json').toLowerCase();
-  const bdi = Number(req.query?.bdi || 25.0);
+  const rawBdi = Number(req.query?.bdi);
+  const bdi = Number.isFinite(rawBdi) && rawBdi >= 0 && rawBdi <= 100 ? rawBdi : 25.0;
+  res.setHeader('Cache-Control', 'no-store');
 
-  let items = [];
-  let source = 'database';
+  // AUDIT-2026-10-02 F7: consulta a base importada real (itens_referenciais).
+  // Sem base disponível, responde 503 em vez de devolver uma lista fixa como se fosse a base oficial.
+  let result;
   try {
-    const sql = createOwnerSql();
-    const rows = await sql`
-      SELECT codigo, descricao, unidade, valor as preco_base
-      FROM sinapi_itens
-      WHERE estado = ${uf} OR estado IS NULL
-      ORDER BY codigo ASC
-      LIMIT 1000;
-    `;
-    if (rows && rows.length > 0) {
-      items = rows.map(r => ({
-        codigo: String(r.codigo),
-        descricao: String(r.descricao),
-        unidade: String(r.unidade || 'UN'),
-        precoBase: Number(r.preco_base || 0)
-      }));
-    }
-  } catch (_dbErr) {
-    // Banco não conectado ou em ambiente de teste estático
+    result = await querySinapiReferencia(deps.sql || createRuntimeSql(), { ...params, limit: 1000 });
+  } catch (dbErr) {
+    console.error('[SINAPI Export] Base indisponível:', dbErr?.message || dbErr);
+    return res.status(503).json({ success:false, error:'SINAPI_UNAVAILABLE', message:'Base SINAPI indisponível no momento.' });
+  }
+  if (!result.items.length) {
+    return res.status(404).json({ success:false, error:'SINAPI_NOT_IMPORTED', message:`Nenhum item SINAPI importado para ${result.uf}${result.referencia ? ' / ' + result.referencia : ''}.` });
   }
 
-  if (items.length === 0) {
-    source = 'official_seed';
-    items = [
-      { codigo: '104658', descricao: 'ALVENARIA DE VEDAÇÃO DE BLOCOS CERÂMICOS', unidade: 'M2', precoBase: 208.00 },
-      { codigo: '45333', descricao: 'PISO CERÂMICO ESMALTADO EXTRA', unidade: 'M2', precoBase: 199.02 },
-      { codigo: '98504', descricao: 'IMPERMEABILIZAÇÃO COM MANTA ASFÁLTICA', unidade: 'M2', precoBase: 84.50 },
-      { codigo: '92762', descricao: 'ARMAÇÃO DE PILAR OU VIGA DE ESTRUTURA', unidade: 'KG', precoBase: 14.80 }
-    ];
-  }
-
-  const dados = items.map(c => {
-    const valorComBdi = c.precoBase * (1 + bdi / 100);
-    return {
-      ...c,
-      uf,
-      bdi: `${bdi}%`,
-      precoComBdi: Number(valorComBdi.toFixed(2))
-    };
-  });
+  const dados = result.items.map(c => ({
+    codigo: c.codigo,
+    descricao: c.descricao,
+    unidade: c.unidade,
+    precoBase: c.preco,
+    uf: result.uf,
+    referencia: result.referencia,
+    desonerado: c.desonerado,
+    bdi: `${bdi}%`,
+    precoComBdi: Number((c.preco * (1 + bdi / 100)).toFixed(2))
+  }));
 
   if (formato === 'csv') {
+    // Neutraliza fórmulas (CSV injection) e aspas na descrição.
+    const cell = (v) => {
+      const t = String(v ?? '').replace(/"/g, '""');
+      return /^[=+\-@]/.test(t) ? `'${t}` : t;
+    };
     res.setHeader('Content-Type', 'text/csv; charset=utf-8');
-    res.setHeader('Content-Disposition', `attachment; filename="sinapi_${uf}_export.csv"`);
+    res.setHeader('Content-Disposition', `attachment; filename="sinapi_${result.uf}_${result.referencia}_export.csv"`);
     const header = 'Codigo;Descricao;Unidade;PrecoBase;BDI;PrecoComBDI\n';
-    const rows = dados.map(d => `${d.codigo};"${d.descricao}";${d.unidade};${d.precoBase.toFixed(2)};${d.bdi};${d.precoComBdi.toFixed(2)}`).join('\n');
+    const rows = dados.map(d => `${cell(d.codigo)};"${cell(d.descricao)}";${cell(d.unidade)};${d.precoBase.toFixed(2)};${d.bdi};${d.precoComBdi.toFixed(2)}`).join('\n');
     return res.status(200).send(header + rows);
   }
 
   res.setHeader('Content-Type', 'application/json; charset=utf-8');
   return res.status(200).json({
     success: true,
-    uf,
+    uf: result.uf,
+    referencia: result.referencia,
     bdi,
-    source,
+    source: 'itens_referenciais',
     totalItens: dados.length,
     dados
   });
@@ -279,6 +321,7 @@ export async function handleV2SinapiExport(req, res) {
  * Cálculo e conferência de boletim de medição com retenções tributárias na fonte
  */
 export async function handleV2BoletimMedicao(req, res) {
+  if (await publicRouteLimited(req, res, 'boletim', 60)) return;
   res.setHeader('Content-Type', 'application/json; charset=utf-8');
   const body = req.body || {};
 
@@ -419,6 +462,7 @@ export async function handleV2Newsletter(req, res, deps = {}) {
  * Endpoint 1: Cloudflare KV — Consulta rápida em Cache do SINAPI
  */
 export async function handleV2EdgeSinapiCached(req, res) {
+  if (await publicRouteLimited(req, res, 'sinapi-cached', 120)) return;
   res.setHeader('Cache-Control', 'public, max-age=3600');
   res.setHeader('Content-Type', 'application/json; charset=utf-8');
 
@@ -442,44 +486,21 @@ export async function handleV2EdgeSinapiCached(req, res) {
   }
 
   let dbData = [];
+  let referencia = null;
   try {
-    const sql = createOwnerSql();
-    let rows = [];
-    if (query) {
-      const qLike = `%${query}%`;
-      rows = await sql`
-        SELECT codigo, descricao, unidade, valor as preco
-        FROM sinapi_itens
-        WHERE (estado = ${uf} OR estado IS NULL)
-          AND (descricao ILIKE ${qLike} OR codigo ILIKE ${qLike})
-        LIMIT 50;
-      `;
-    } else {
-      rows = await sql`
-        SELECT codigo, descricao, unidade, valor as preco
-        FROM sinapi_itens
-        WHERE (estado = ${uf} OR estado IS NULL)
-        LIMIT 50;
-      `;
-    }
-    if (rows && rows.length > 0) {
-      dbData = rows.map(r => ({
-        codigo: String(r.codigo),
-        descricao: String(r.descricao),
-        unidade: String(r.unidade || 'UN'),
-        preco: Number(r.preco || 0)
-      }));
-    }
-  } catch (_err) {
-    // Falha silenciosa de DB, usa snapshot oficial
+    const result = await querySinapiReferencia(createRuntimeSql(), { uf, referencia: req.query?.competencia, q: query, desonerado: req.query?.desonerado, limit: 50 });
+    dbData = result.items;
+    referencia = result.referencia;
+  } catch (err) {
+    // AUDIT-2026-10-02 F7: sem fallback para a lista fixa (mesmos preços para qualquer UF).
+    console.error('[SINAPI Cache] Base indisponível:', err?.message || err);
+    res.setHeader('Cache-Control', 'no-store');
+    return res.status(503).json({ success:false, error:'SINAPI_UNAVAILABLE', message:'Base SINAPI indisponível no momento.' });
   }
 
   if (dbData.length === 0) {
-    dbData = [
-      { codigo: '104658', descricao: 'ALVENARIA DE VEDAÇÃO DE BLOCOS CERÂMICOS 9X19X19CM', unidade: 'M2', preco: 208.00 },
-      { codigo: '45333', descricao: 'PISO CERÂMICO ESMALTADO EXTRA 45X45CM', unidade: 'M2', preco: 199.02 },
-      { codigo: '98504', descricao: 'IMPERMEABILIZAÇÃO COM MANTA ASFÁLTICA E=3MM', unidade: 'M2', preco: 84.50 }
-    ];
+    res.setHeader('Cache-Control', 'no-store');
+    return res.status(200).json({ success:true, cached:false, source:'itens_referenciais', uf, competencia: referencia || competencia, data: [] });
   }
 
   await setKvCache(env, key, dbData, 3600);
@@ -645,7 +666,7 @@ export async function handleV2EdgeAiChat(req, res) {
   }
 
   const rateKey = `edge-chat:${auth.tenantId || 'global'}:${getClientIp(req)}`;
-  const rate = await checkRateLimit(req, rateKey, 30, 60000);
+  const rate = await checkRateLimit(rateKey, 30, 60000);
   if (!rate.allowed) {
     return res.status(429).json({ success: false, error: 'RATE_LIMIT_EXCEEDED', message: 'Limite de mensagens de IA atingido temporariamente. Aguarde.' });
   }
@@ -686,8 +707,8 @@ export async function handleV2EdgeAiOcr(req, res) {
     return res.status(auth.status || 401).json({ success: false, error: auth.error || 'Não autorizado.' });
   }
 
-  if (!canUseFeature(auth.plan, 'ocr') && !auth.isSystem && auth.role !== 'superadmin') {
-    return res.status(403).json(planError('ocr', auth.plan));
+  if (!canUseFeature(authPlan(auth), 'ocr') && !auth.isSystem && authRole(auth) !== 'superadmin') {
+    return res.status(403).json(planError('ocr', authPlan(auth)));
   }
 
   if (!canAccessModule(auth, 'notas', 'write')) {
@@ -695,7 +716,7 @@ export async function handleV2EdgeAiOcr(req, res) {
   }
 
   const rateKey = `edge-ocr:${auth.tenantId || 'global'}:${getClientIp(req)}`;
-  const rate = await checkRateLimit(req, rateKey, 20, 60000);
+  const rate = await checkRateLimit(rateKey, 20, 60000);
   if (!rate.allowed) {
     return res.status(429).json({ success: false, error: 'RATE_LIMIT_EXCEEDED', message: 'Limite de processamento OCR atingido para o minuto. Aguarde.' });
   }
@@ -729,12 +750,12 @@ export async function handleV2EdgeAiSemanticSearch(req, res) {
     return res.status(auth.status || 401).json({ success: false, error: auth.error || 'Não autorizado.' });
   }
 
-  if (!canUseFeature(auth.plan, 'sinapi') && !auth.isSystem && auth.role !== 'superadmin') {
-    return res.status(403).json(planError('sinapi', auth.plan));
+  if (!canUseFeature(authPlan(auth), 'sinapi') && !auth.isSystem && authRole(auth) !== 'superadmin') {
+    return res.status(403).json(planError('sinapi', authPlan(auth)));
   }
 
   const rateKey = `edge-vector:${auth.tenantId || 'global'}:${getClientIp(req)}`;
-  const rate = await checkRateLimit(req, rateKey, 60, 60000);
+  const rate = await checkRateLimit(rateKey, 60, 60000);
   if (!rate.allowed) {
     return res.status(429).json({ success: false, error: 'RATE_LIMIT_EXCEEDED', message: 'Limite de buscas vetoriais atingido. Aguarde.' });
   }
@@ -746,33 +767,21 @@ export async function handleV2EdgeAiSemanticSearch(req, res) {
 
   let catalog = [];
   try {
-    const sql = createOwnerSql();
-    const rows = await sql`
-      SELECT codigo, descricao, unidade, valor
-      FROM sinapi_itens
-      LIMIT 100;
-    `;
-    if (rows && rows.length > 0) {
-      catalog = rows.map(r => ({
-        codigo: String(r.codigo),
-        descricao: String(r.descricao),
-        unidade: String(r.unidade || 'UN'),
-        grupo: 'SINAPI Oficial Caixa'
-      }));
-    }
-  } catch (_err) {
-    // Database query failed
+    const result = await querySinapiReferencia(createRuntimeSql(), { uf: req.body?.uf || req.query?.uf, q: query.split(/\s+/)[0] || '', limit: 200 });
+    catalog = result.items.map(r => ({
+      codigo: r.codigo,
+      descricao: r.descricao,
+      unidade: r.unidade,
+      grupo: 'SINAPI Oficial Caixa'
+    }));
+  } catch (err) {
+    console.error('[SINAPI Semântico] Base indisponível:', err?.message || err);
+    return res.status(503).json({ success:false, error:'SINAPI_UNAVAILABLE', message:'Base SINAPI indisponível no momento.' });
   }
 
+  // AUDIT-2026-10-02 F7: catálogo fixo removido; sem base importada não há resultado.
   if (catalog.length === 0) {
-    catalog = [
-      { codigo: '104658', descricao: 'Alvenaria de vedação de blocos cerâmicos furados 9x19x19cm', unidade: 'M2', grupo: 'Estruturas e Alvenarias' },
-      { codigo: '45333', descricao: 'Piso cerâmico esmaltado extra acabamento polido', unidade: 'M2', grupo: 'Revestimentos e Pisos' },
-      { codigo: '98504', descricao: 'Impermeabilização com manta asfáltica armada aderida a maçarico', unidade: 'M2', grupo: 'Impermeabilizações' },
-      { codigo: '92762', descricao: 'Armação de pilar ou viga de estrutura convencional de concreto armado aço CA-50', unidade: 'KG', grupo: 'Estruturas' },
-      { codigo: '88316', descricao: 'Servente com encargos complementares', unidade: 'H', grupo: 'Mão de Obra' },
-      { codigo: '88309', descricao: 'Pedreiro com encargos complementares', unidade: 'H', grupo: 'Mão de Obra' }
-    ];
+    return res.status(200).json({ success:true, query, totalMatches:0, results:[] });
   }
 
   try {
@@ -794,8 +803,15 @@ export async function handleV2EdgeAiSemanticSearch(req, res) {
 export async function handleV2EdgeMediaOptimize(req, res) {
   const urlObj = new URL(req.url || 'http://localhost', 'http://localhost');
   const options = parseImageTransformOptions(urlObj.searchParams);
-  const key = urlObj.searchParams.get('key') || req.query?.key;
+  const key = String(urlObj.searchParams.get('key') || req.query?.key || '');
   const env = req.env || process.env;
+
+  // AUDIT-2026-10-02 F1: esta rota lia QUALQUER objeto do bucket (inclusive
+  // backups/neon-critical/*) sem sessão. Agora exige autenticação, permissão de
+  // leitura em documentos e chave dentro do prefixo do tenant autenticado.
+  const auth = await resolveAuthAndTenant(req);
+  if (!auth.authenticated) return res.status(auth.status || 401).json({ success:false, error:auth.error || 'Não autorizado.' });
+  if (!canAccessModule(auth, 'documentos', 'read')) return res.status(403).json(permissionError('MODULE_READ_FORBIDDEN', 'documentos'));
 
   if (!key) {
     return res.status(400).json({
@@ -805,14 +821,25 @@ export async function handleV2EdgeMediaOptimize(req, res) {
     });
   }
 
+  const expectedPrefix = `tenants/${auth.tenantId}/`;
+  if (!key.startsWith(expectedPrefix) || key.includes('..')) {
+    return res.status(403).json({ success:false, error:'Arquivo não pertence ao tenant autenticado.' });
+  }
+
   try {
     const obj = await getR2Object(env, key);
     if (!obj || !obj.body) {
       return res.status(404).json({ success: false, error: 'Imagem não encontrada no storage.' });
     }
 
-    res.setHeader('Content-Type', `image/${options.format}`);
-    res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+    const storedType = String(obj.contentType || '').toLowerCase();
+    if (!storedType.startsWith('image/') || storedType.includes('svg')) {
+      return res.status(415).json({ success:false, error:'O otimizador aceita somente imagens.' });
+    }
+
+    res.setHeader('Content-Type', storedType);
+    res.setHeader('Cache-Control', 'private, no-store');
+    res.setHeader('X-Content-Type-Options', 'nosniff');
     res.setHeader('X-FinGo-Transformed', 'true');
     res.setHeader('X-FinGo-Width', String(options.width));
 
@@ -834,12 +861,12 @@ export async function handleV2AuditLedgerAppend(req, res) {
     return res.status(auth.status || 401).json({ success: false, error: auth.error || 'Não autorizado para registrar no audit ledger.' });
   }
 
-  if (auth.role !== 'admin' && auth.role !== 'superadmin' && !auth.isSystem && !can(auth.role, 'audit')) {
+  if (!auth.isSystem && !can(authRole(auth), 'audit')) {
     return res.status(403).json(permissionError('ROLE_READ_ONLY'));
   }
 
   const rateKey = `audit-ledger:${auth.tenantId || 'global'}:${getClientIp(req)}`;
-  const rate = await checkRateLimit(req, rateKey, 30, 60000);
+  const rate = await checkRateLimit(rateKey, 30, 60000);
   if (!rate.allowed) {
     return res.status(429).json({ success: false, error: 'RATE_LIMIT_EXCEEDED', message: 'Limite de registro de auditoria atingido temporariamente.' });
   }
@@ -906,7 +933,7 @@ export async function handleV2DetectAnomaly(req, res) {
   }
 
   const rateKey = `detect-anomaly:${auth.tenantId || 'global'}:${getClientIp(req)}`;
-  const rate = await checkRateLimit(req, rateKey, 60, 60000);
+  const rate = await checkRateLimit(rateKey, 60, 60000);
   if (!rate.allowed) {
     return res.status(429).json({ success: false, error: 'RATE_LIMIT_EXCEEDED', message: 'Limite de detecção de anomalias excedido.' });
   }
