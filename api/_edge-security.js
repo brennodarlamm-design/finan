@@ -151,21 +151,34 @@ const MCP_RATE_LIMIT = 120; // 120 requisições por minuto por IP
 const MCP_WINDOW_MS = 60 * 1000;
 const localMcpRateStore = new Map();
 
+export const KNOWN_MALICIOUS_IPS = new Set([
+  '34.38.113.44', // GCP Bélgica (scanner ativo automatizado detectado no tráfego)
+  '40.160.65.14', // Microsoft Azure (probes automatizados de credenciais)
+  '185.110.9.30', // Scanner de vulnerabilidades conhecido
+  '45.138.12.42'  // Scanner de vulnerabilidades conhecido
+]);
+
+export function isKnownMaliciousIp(ip) {
+  return KNOWN_MALICIOUS_IPS.has(String(ip || '').trim());
+}
+
 export const MALICIOUS_PATH_PATTERNS = [
-  // Arquivos .env e backups de ambiente (.env, .env.prod, .env.bak, .env.development, .env.local, etc.)
-  /(?:^|\/)\.env(?:\.[\w.-]+)?$/i,
+  // Arquivos .env e backups de ambiente em qualquer nível (.env, .env.old, .env.staging, /api/.env, /config/.env)
+  /(?:^|\/)[\w.-]*\.env(?:\.[\w.-]+)?(?:\/|$)/i,
   // WordPress / CMS probes (wp-config, wp-includes, wp-admin, wp-content, xmlrpc.php)
   /(?:^|\/)(?:wp-config|wp-includes|wp-admin|wp-content|xmlrpc\.php)(?:\.[\w.-]+)?/i,
-  // Controle de versão exposto (.git, .svn, .hg)
-  /(?:^|\/)\.(?:git|svn|hg)(?:\/|$)/i,
-  // Backups, dumps e arquivos temporários perigosos (.bak, .old, .backup, .swp, dump.sql)
+  // Controle de versão e dot-directories de configuração (.git, .svn, .hg, .vscode, .idea, .DS_Store, .bash_history, .ssh, .kube)
+  /(?:^|\/)\.(?:git|svn|hg|vscode|idea|DS_Store|bash_history|zsh_history|ssh|kube)(?:\/|$)/i,
+  // Configurações de nuvem e AWS expostas (.aws/config, .aws/credentials, etc.)
+  /(?:^|\/)\.aws(?:\/|$)/i,
+  // Backups, dumps e arquivos temporários perigosos (.bak, .old, .backup, .swp, dump.sql, backup.sql)
   /(?:\.bak|\.old|\.backup|\.swp|\.save|dump\.sql|backup\.sql)$/i,
   // Executáveis/scripts PHP (não utilizados na stack FinGo)
   /\.php(?:\d+)?$/i,
   // Scanners de painéis administrativos de banco / frameworks
   /(?:phpmyadmin|pma|myadmin|adminer|\/webdav|\/actuator|\/_ignition)/i,
   // Credenciais de infraestrutura / docker
-  /(?:docker-compose\.ya?ml|Dockerfile|\.aws\/credentials|\.docker\/config\.json)/i
+  /(?:docker-compose\.ya?ml|Dockerfile|\.docker\/config\.json)/i
 ];
 
 export const MALICIOUS_USER_AGENTS = [
@@ -179,7 +192,11 @@ export const MALICIOUS_USER_AGENTS = [
   /havij/i,
   /dirbuster/i,
   /gobuster/i,
-  /wpscan/i
+  /wpscan/i,
+  /agenstrybot/i,
+  /cloud-crawler/i,
+  /censys/i,
+  /shodan/i
 ];
 
 /**
@@ -214,7 +231,7 @@ export function isMaliciousProbe(pathname, userAgent = '') {
 }
 
 /**
- * Rate limit em memória para proteção de exaustão do endpoint MCP.
+ * Rate limit em memória para proteção de exaustão do endpoint MCP e SSE.
  */
 export function checkMcpRateLimit(ip) {
   const normIp = String(ip || '127.0.0.1').trim();
@@ -252,7 +269,22 @@ export function checkGeoFencing(request, allowedCountries = ['BR']) {
 export async function applyEdgeSecurityMiddleware(request, env) {
   const ip = getClientIp(request);
 
-  // 1. Verifica se o IP está bloqueado pelo Fail2Ban
+  // 1. Bloqueio imediato de IPs com reputação maliciosa conhecida (scanners ativos)
+  if (KNOWN_MALICIOUS_IPS.has(ip)) {
+    return Response.json({
+      success: false,
+      error: 'Acesso bloqueado por reputação de segurança de borda.',
+      code: 'EDGE_IP_BANNED'
+    }, {
+      status: 403,
+      headers: {
+        'X-FinGo-Security': 'ip-reputation-blocked',
+        'X-Content-Type-Options': 'nosniff'
+      }
+    });
+  }
+
+  // 2. Verifica se o IP está bloqueado pelo Fail2Ban
   if (await isIpBanned(env, ip)) {
     return Response.json({
       success: false,
@@ -267,7 +299,7 @@ export async function applyEdgeSecurityMiddleware(request, env) {
     });
   }
 
-  // 2. Proteção contra Scanners e Probes Maliciosos (.env, wp-config, .git, bots ofensivos)
+  // 3. Proteção contra Scanners e Probes Maliciosos (.env, wp-config, .git, bots ofensivos)
   let url = null;
   try {
     url = new URL(request.url);
@@ -291,13 +323,13 @@ export async function applyEdgeSecurityMiddleware(request, env) {
       });
     }
 
-    // 3. Rate limiting no endpoint do MCP
-    if ((url.pathname === '/api/mcp' || url.pathname === '/mcp') && request.method !== 'OPTIONS') {
+    // 4. Rate limiting no endpoint do MCP e SSE
+    if ((url.pathname === '/api/mcp' || url.pathname === '/mcp' || url.pathname === '/sse') && request.method !== 'OPTIONS') {
       const mcpRate = checkMcpRateLimit(ip);
       if (!mcpRate.allowed) {
         return Response.json({
           success: false,
-          error: 'Limite de requisições excedido para o endpoint MCP.',
+          error: 'Limite de requisições excedido para o endpoint MCP / SSE.',
           code: 'MCP_RATE_LIMITED'
         }, {
           status: 429,
@@ -310,7 +342,7 @@ export async function applyEdgeSecurityMiddleware(request, env) {
     }
   }
 
-  // 4. Proteção de Idempotência para mutações financeiras
+  // 5. Proteção de Idempotência para mutações financeiras
   const idempotencyHeader = request.headers.get('x-idempotency-key');
   if (idempotencyHeader && ['POST', 'PUT', 'DELETE'].includes(request.method)) {
     const check = await checkAndSetIdempotency(env, idempotencyHeader, request.url);

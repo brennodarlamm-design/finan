@@ -8,7 +8,9 @@ import {
   checkGeoFencing,
   applyEdgeSecurityMiddleware,
   isMaliciousProbe,
-  checkMcpRateLimit
+  checkMcpRateLimit,
+  isKnownMaliciousIp,
+  KNOWN_MALICIOUS_IPS
 } from '../api/_edge-security.js';
 import { appendLedgerBlock, verifyLedgerIntegrity, calculateBlockHash, detectExpenseAnomaly } from '../api/_edge-ledger.js';
 import { dispatchEdgeAlert, _resetAlertsHistory } from '../api/_edge-alerts.js';
@@ -98,12 +100,32 @@ console.log('   ✓ Geo-Fencing: validação de país e bloqueio de nós anônim
 // -------------------------------------------------------------
 console.log('3.5 Validando WAF de Borda e Bloqueio de Scanners/Probes...');
 
+// Validação de IPs com reputação maliciosa conhecida (scanners agressivos detectados)
+assert.equal(isKnownMaliciousIp('34.38.113.44'), true, 'IP GCP de scanner ativo deve ser identificado.');
+assert.equal(isKnownMaliciousIp('40.160.65.14'), true, 'IP Azure de scanner ativo deve ser identificado.');
+assert.equal(isKnownMaliciousIp('200.180.10.5'), false, 'IP legítimo de usuário não deve ser identificado como malicioso.');
+
+const maliciousIpReq = new Request('https://fingo.api.br/', {
+  headers: { 'cf-connecting-ip': '34.38.113.44' }
+});
+const maliciousIpResp = await applyEdgeSecurityMiddleware(maliciousIpReq, {});
+assert(maliciousIpResp && maliciousIpResp.status === 403, 'IP malicioso conhecido deve receber 403 na borda.');
+assert.equal(maliciousIpResp.headers.get('X-FinGo-Security'), 'ip-reputation-blocked');
+
 // Teste de caminhos maliciosos comuns detectados no tráfego
 const maliciousPaths = [
   '/.env',
   '/.env.prod',
   '/.env.development',
   '/.env.bak',
+  '/.env.old',
+  '/.env.staging',
+  '/api/.env',
+  '/config/.env',
+  '/.aws/config',
+  '/.aws/credentials',
+  '/.vscode/settings.json',
+  '/.ssh/id_rsa',
   '/wp-config.php.bak',
   '/wp-admin/setup-config.php',
   '/xmlrpc.php',
@@ -138,7 +160,10 @@ const legitimatePaths = [
   '/img/fingo/fingo-symbol.png',
   '/assets/main.js',
   '/.well-known/agent-card.json',
-  '/openapi.json'
+  '/openapi.json',
+  '/auth.md',
+  '/.well-known/api-catalog',
+  '/.well-known/ai-catalog.json'
 ];
 
 for (const p of legitimatePaths) {
@@ -150,18 +175,23 @@ for (const p of legitimatePaths) {
 assert.equal(isMaliciousProbe('/', 'BrickBlueBot/0.1 (+https://brick.blue/bot)').blocked, true);
 assert.equal(isMaliciousProbe('/', 'sqlmap/1.5#stable').blocked, true);
 assert.equal(isMaliciousProbe('/', 'nikto/2.1.6').blocked, true);
+assert.equal(isMaliciousProbe('/', 'AgenstryBot/1.0').blocked, true);
+assert.equal(isMaliciousProbe('/', 'Mozilla/5.0 (compatible; cloud-crawler/1.0)').blocked, true);
+assert.equal(isMaliciousProbe('/', 'CensysInspect/1.1').blocked, true);
 assert.equal(isMaliciousProbe('/', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)').blocked, false);
 assert.equal(isMaliciousProbe('/api/mcp', 'node').blocked, false);
 
-// Middleware de borda: interceptação direta com 403 Forbidden
-const scannerReq = new Request('https://fingo.api.br/.env.prod', {
-  headers: { 'cf-connecting-ip': '198.51.100.42' }
-});
-const scannerResp = await applyEdgeSecurityMiddleware(scannerReq, {});
-assert(scannerResp && scannerResp.status === 403, 'Middleware deve retornar 403 Forbidden para tentativa de probe.');
-assert.equal(scannerResp.headers.get('X-FinGo-Security'), 'probe-blocked');
+// Middleware de borda: interceptação direta com 403 Forbidden para .env.old e .aws/config
+for (const testProbePath of ['/.env.old', '/.aws/config']) {
+  const scannerReq = new Request(`https://fingo.api.br${testProbePath}`, {
+    headers: { 'cf-connecting-ip': '198.51.100.42' }
+  });
+  const scannerResp = await applyEdgeSecurityMiddleware(scannerReq, {});
+  assert(scannerResp && scannerResp.status === 403, `Middleware deve retornar 403 Forbidden para probe em ${testProbePath}`);
+  assert.equal(scannerResp.headers.get('X-FinGo-Security'), 'probe-blocked');
+}
 
-// Rate limiting do endpoint MCP
+// Rate limiting dos endpoints MCP e SSE
 const mcpTestIp = `mcp_client_${Date.now()}`;
 for (let i = 1; i <= 120; i++) {
   const rl = checkMcpRateLimit(mcpTestIp);
@@ -171,7 +201,15 @@ const rlExceeded = checkMcpRateLimit(mcpTestIp);
 assert.equal(rlExceeded.allowed, false, '121ª requisição no mesmo minuto deve ser bloqueada por rate limit.');
 assert.equal(rlExceeded.retryAfter, 60);
 
-console.log('   ✓ WAF de Borda: bloqueio de .env, wp-config, bots e rate limit MCP aprovados.');
+// Teste de rate limit no endpoint /sse via applyEdgeSecurityMiddleware
+const sseReq = new Request('https://fingo.api.br/sse', {
+  headers: { 'cf-connecting-ip': mcpTestIp }
+});
+const sseResp = await applyEdgeSecurityMiddleware(sseReq, {});
+assert(sseResp && sseResp.status === 429, 'Endpoint /sse deve acionar rate limit para IP saturado.');
+assert.equal(sseResp.headers.get('X-FinGo-Security'), 'mcp-rate-limited');
+
+console.log('   ✓ WAF de Borda: bloqueio de .env/.aws, reputação de IPs, bots e rate limit MCP/SSE aprovados.');
 
 // -------------------------------------------------------------
 // 4. Trilha de Auditoria Criptográfica (Audit Ledger)
