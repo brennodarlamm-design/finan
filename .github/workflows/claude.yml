@@ -1,0 +1,59 @@
+name: Claude Code
+
+# Responde a menções @claude em issues e pull requests.
+# Autenticação: assinatura do Claude via secret CLAUDE_CODE_OAUTH_TOKEN
+# (gere com `claude setup-token` e salve em Settings → Secrets and variables → Actions).
+# Regras do projeto: CLAUDE.md → AGENTS.md. O Claude NUNCA faz deploy por aqui.
+
+on:
+  issue_comment:
+    types: [created]
+  pull_request_review_comment:
+    types: [created]
+  issues:
+    types: [opened, assigned]
+  pull_request_review:
+    types: [submitted]
+
+concurrency:
+  group: claude-${{ github.event.issue.number || github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: false
+
+jobs:
+  claude:
+    if: |
+      (github.event_name == 'issue_comment' && contains(github.event.comment.body, '@claude')) ||
+      (github.event_name == 'pull_request_review_comment' && contains(github.event.comment.body, '@claude')) ||
+      (github.event_name == 'pull_request_review' && contains(github.event.review.body, '@claude')) ||
+      (github.event_name == 'issues' && (contains(github.event.issue.body, '@claude') || contains(github.event.issue.title, '@claude')))
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+      id-token: write
+      actions: read # Permite ao Claude ler resultados de CI nos PRs
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+
+      # --ignore-scripts: o postinstall do projeto roda o build do Cloudflare, desnecessário aqui.
+      - name: Install dependencies
+        run: npm ci --ignore-scripts
+
+      - name: Run Claude Code
+        uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          claude_args: |
+            --max-turns 30
+            --allowedTools "Edit,Write,Read,Glob,Grep,Bash(npm test),Bash(npm run test:*),Bash(node scripts/test-*),Bash(node --check:*),Bash(npm run security:scan),Bash(git status),Bash(git diff:*),Bash(git log:*)"
+            --disallowedTools "Bash(npx wrangler:*),Bash(wrangler:*),Bash(npm run deploy:*),Bash(npm run deploy),Bash(npm run render:*),Bash(npm run build:*),Bash(vercel:*),Bash(npx vercel:*),Bash(node scripts/deploy*),Bash(node scripts/sync-*-secrets*)"
