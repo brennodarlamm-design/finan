@@ -45,7 +45,7 @@ const Parcelamento = {
                 <label class="form-label">Fornecedor / Beneficiário</label>
                 <input class="form-control" id="parc-forn" list="parc-forn-list" placeholder="Digite ou selecione...">
                 <datalist id="parc-forn-list">
-                  ${fornecedores.map(f => `<option value="${(f.nome||f.razao_social||'').replace(/"/g,'&quot;')}">`).join('')}
+                  ${fornecedores.map(f => `<option value="${Utils.escapeHtml(f.nome||f.razao_social||'')}">`).join('')}
                 </datalist>
               </div>
               <div class="form-group">
@@ -53,7 +53,7 @@ const Parcelamento = {
                 <select class="form-control" id="parc-obra" required>
                   <option value="">Selecione a obra...</option>
                   <option value="escritorio">🏢 Sede / Escritório Central</option>
-                  ${clientes.map(c => `<option value="${c.id}" ${App.obraId===c.id?'selected':''}>${c.nome}</option>`).join('')}
+                  ${clientes.map(c => `<option value="${Utils.escapeHtml(c.id)}" ${App.obraId===c.id?'selected':''}>${Utils.escapeHtml(c.nome)}</option>`).join('')}
                 </select>
               </div>
             </div>

@@ -7,6 +7,7 @@ import {
 } from './_db-normalizers.js';
 import { validateObraTenant, validateBulkObraPlanLimit } from './_db-mutations.js';
 import { setPrivateNoCache } from './_http.js';
+import { isTenantStorageUrl } from './_edge-r2.js';
 import { writeAudit } from './_audit.js';
 
 /**
@@ -579,6 +580,10 @@ export async function handleSyncAll(sql, tenantId, auth, req, res, payload) {
   if (Array.isArray(payload.documentos)) {
     for (const doc of payload.documentos) {
       if (!doc.id) continue;
+      if (!isTenantStorageUrl(doc.url, tenantId)) {
+        recordFailure('documentos', doc, 'URL de arquivo de outra empresa.', 'STORAGE_OWNERSHIP_DENIED');
+        continue;
+      }
       try {
         await sql`
           INSERT INTO documentos (

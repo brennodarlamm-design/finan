@@ -23,6 +23,7 @@ import { createOwnerSql, createRuntimeSql } from './_database.js';
 import { querySinapiReferencia, normalizeSinapiParams } from './_sinapi-reference.js';
 import { checkRateLimit, getClientIp } from './_ratelimit.js';
 import { checkRateLimitRedis } from './_edge-redis.js';
+import { handlePortalLinkSign, handlePortalLinkVerify } from './_portal-link.js';
 
 // AUDIT-2026-10-02 F5: resolveAuthAndTenant() expõe perfil e plano em auth.user
 // (perfil / tenantPlan). auth.role e auth.plan não existem e faziam o plano cair
@@ -79,6 +80,8 @@ export const V2_ROUTE_SPEC = [
   { method: 'GET', path: '/api/v2/public/cep/:cep', desc: 'Consulta aberta de CEP na BrasilAPI / ViaCEP' },
   { method: 'POST', path: '/api/v2/public/newsletter/subscribe', desc: 'Inscrição no Radar FinGo (Newsletter & Eventos)' },
   { method: 'POST', path: '/api/v2/public/newsletter/unsubscribe', desc: 'Cancelamento de inscrição no Radar FinGo' },
+  { method: 'POST', path: '/api/v2/portal/link', desc: 'Gera link assinado do Portal do Cliente (autenticado)' },
+  { method: 'POST', path: '/api/v2/portal/verify', desc: 'Verifica assinatura de link do Portal do Cliente (público)' },
   // 4. Construtora / Tenant
   { method: 'GET', path: '/api/v2/tenants/current', desc: 'Dados e preferências da construtora ativa' },
   { method: 'POST', path: '/api/v2/support/chat', desc: 'Mensagens para o Copiloto FinBot com pool de IA' },
@@ -518,6 +521,35 @@ export async function handleV2EdgeSinapiCached(req, res) {
 /**
  * Endpoint 2: Cloudflare R2 — Upload de Arquivos de Obra (Zero Egress)
  */
+// AUDIT-2026-10-02 T4: a rota v2 aceitava qualquer extensão e Content-Type (HTML, SVG,
+// executáveis), contornando a validação de /api/upload. Agora usa lista fechada + assinatura.
+const EDGE_UPLOAD_TYPES = {
+  pdf:  { mime: 'application/pdf', magic: ['25504446'] },
+  png:  { mime: 'image/png', magic: ['89504e47'] },
+  jpg:  { mime: 'image/jpeg', magic: ['ffd8ff'] },
+  jpeg: { mime: 'image/jpeg', magic: ['ffd8ff'] },
+  webp: { mime: 'image/webp', magic: ['52494646'] },
+  xlsx: { mime: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', magic: ['504b0304'] },
+  docx: { mime: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', magic: ['504b0304'] },
+  zip:  { mime: 'application/zip', magic: ['504b0304', '504b0506'] },
+  txt:  { mime: 'text/plain', magic: null },
+  csv:  { mime: 'text/csv', magic: null }
+};
+
+export function validateEdgeUpload(filename, buffer) {
+  const ext = String(filename || '').toLowerCase().split('.').pop();
+  const rule = EDGE_UPLOAD_TYPES[ext];
+  if (!rule) return { ok: false, error: 'Tipo de arquivo não permitido.' };
+  const head = Buffer.from(buffer.subarray(0, 8)).toString('hex');
+  if (rule.magic && !rule.magic.some(sig => head.startsWith(sig))) {
+    return { ok: false, error: 'Conteúdo do arquivo não corresponde à extensão informada.' };
+  }
+  if (!rule.magic && /<(html|script|svg|!doctype)/i.test(Buffer.from(buffer.subarray(0, 512)).toString('utf8'))) {
+    return { ok: false, error: 'Conteúdo do arquivo não permitido.' };
+  }
+  return { ok: true, contentType: rule.mime };
+}
+
 export async function handleV2EdgeStorageUpload(req, res) {
   res.setHeader('Content-Type', 'application/json; charset=utf-8');
   res.setHeader('Cache-Control', 'no-store');
@@ -532,7 +564,6 @@ export async function handleV2EdgeStorageUpload(req, res) {
   const tenantId = auth.tenantId;
   const category = body.category || 'obras_anexos';
   const filename = body.filename || 'anexo_canteiro.pdf';
-  const contentType = body.contentType || 'application/octet-stream';
   const base64Data = body.data || body.fileBase64;
 
   if (!base64Data) {
@@ -547,6 +578,9 @@ export async function handleV2EdgeStorageUpload(req, res) {
     if (buffer.byteLength > 15 * 1024 * 1024) {
       return res.status(413).json({ success:false, error:'Arquivo excede o limite máximo permitido de 15 MB.' });
     }
+    const check = validateEdgeUpload(filename, buffer);
+    if (!check.ok) return res.status(415).json({ success:false, error:check.error });
+    const contentType = check.contentType;
     const result = await putR2Object(env, objectKey, buffer, {
       contentType,
       customMetadata: {
@@ -996,6 +1030,14 @@ export function resolveV2Route(pathname, searchParams) {
   // 3.1 Newsletter Radar FinGo (Inscrição e Descadastro)
   if (pathname === '/api/v2/public/newsletter/subscribe' || pathname === '/api/v2/public/newsletter/unsubscribe') {
     return { handler: handleV2Newsletter, query, moduleName: 'v2-public-newsletter' };
+  }
+
+  // 3.2 Portal do Cliente (links assinados)
+  if (pathname === '/api/v2/portal/link') {
+    return { handler: handlePortalLinkSign, query, moduleName: 'v2-portal-link' };
+  }
+  if (pathname === '/api/v2/portal/verify') {
+    return { handler: handlePortalLinkVerify, query, moduleName: 'v2-portal-verify' };
   }
 
   // 4. Construtora / Tenant

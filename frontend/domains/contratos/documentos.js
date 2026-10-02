@@ -746,6 +746,9 @@ const Documentos = {
       return;
     }
 
+    // AUDIT-2026-10-02 W1: url/conteúdo vem do registro (gravável por usuários da empresa);
+    // só esquemas de pré-visualização conhecidos e sempre escapado no atributo.
+    const previewSrc = this._safePreviewSrc(conteudo);
     const nomeNorm = (doc.nome_arquivo || doc.titulo || '').toLowerCase();
     const isPDF = doc.tipo_mime === 'application/pdf' || nomeNorm.endsWith('.pdf');
     const isHTML = doc.tipo_mime === 'text/html' || nomeNorm.endsWith('.html') || conteudo.startsWith('data:text/html');
@@ -763,11 +766,13 @@ const Documentos = {
           </div>
         </div>
         <div class="modal-body" style="flex:1;padding:0;overflow:hidden;background:#0f172a;display:flex;align-items:center;justify-content:center;">
-          ${isPDF || isHTML ? `
-            <iframe src="${conteudo}" style="width:100%;height:100%;border:none;background:#ffffff;"></iframe>
+          ${!previewSrc ? `
+            <div style="color:#fff;padding:20px;text-align:center;">Pré-visualização indisponível para este arquivo. Use o botão Baixar.</div>
+          ` : isPDF || isHTML ? `
+            <iframe src="${previewSrc}" style="width:100%;height:100%;border:none;background:#ffffff;"></iframe>
           ` : isImage ? `
             <div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;padding:16px;overflow:auto;">
-              <img src="${conteudo}" style="max-width:100%;max-height:100%;object-fit:contain;border-radius:4px;box-shadow:0 4px 20px rgba(0,0,0,0.5);" onerror="this.parentElement.innerHTML='<div style=\\'color:#fff;padding:20px;text-align:center;\\'>Não foi possível exibir a pré-visualização. Clique em Baixar para ver o arquivo.</div>'">
+              <img src="${previewSrc}" style="max-width:100%;max-height:100%;object-fit:contain;border-radius:4px;box-shadow:0 4px 20px rgba(0,0,0,0.5);" onerror="this.parentElement.innerHTML='<div style=\\'color:#fff;padding:20px;text-align:center;\\'>Não foi possível exibir a pré-visualização. Clique em Baixar para ver o arquivo.</div>'">
             </div>
           ` : `
             <div style="width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:30px;text-align:center;">
@@ -785,6 +790,20 @@ const Documentos = {
         </div>
       </div>
     `);
+  },
+
+  _safePreviewSrc(value) {
+    const raw = String(value || '').trim();
+    if (!raw) return '';
+    const okData = /^data:(application\/pdf|text\/html|image\/(png|jpe?g|webp|gif|svg\+xml))[;,]/i.test(raw);
+    let okUrl = false;
+    if (!raw.startsWith('data:')) {
+      try {
+        const u = new URL(raw, window.location.origin);
+        okUrl = ['https:', 'http:', 'blob:'].includes(u.protocol);
+      } catch { okUrl = false; }
+    }
+    return (okData || okUrl) ? Utils.escapeHtml(raw) : '';
   },
 
   async baixar(id) {

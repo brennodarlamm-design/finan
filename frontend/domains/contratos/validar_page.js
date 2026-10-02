@@ -122,9 +122,13 @@
             <span class="data-val">${escapeHtml(registro.papel || 'Signatário')}</span>
           </div>
           <div class="data-row">
-            <span class="data-label">Data e Hora do Registro:</span>
+            <span class="data-label">Data e Hora da Assinatura:</span>
             <span class="data-val">${escapeHtml(registro.data_hora_fmt)}</span>
           </div>
+          ${registro.registrado_em ? `<div class="data-row">
+            <span class="data-label">Registrado na base FinGo em:</span>
+            <span class="data-val">${escapeHtml(new Date(registro.registrado_em).toLocaleString('pt-BR'))}</span>
+          </div>` : ''}
           <div class="data-row">
             <span class="data-label">Dispositivo de Registro:</span>
             <span class="data-val" style="font-size:.8rem;color:#cbd5e1;">${escapeHtml(registro.ip_dispositivo || 'Navegador Web')}</span>

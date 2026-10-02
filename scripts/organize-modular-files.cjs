@@ -153,6 +153,7 @@ const backendMap = {
   'api/_sinapi-reference.js': 'backend/domains/integrations/_sinapi-reference.js',
   'api/_edge-vector.js': 'backend/domains/edge/_edge-vector.js',
   'api/_v2-routes.js': 'backend/domains/edge/_v2-routes.js',
+  'api/_portal-link.js': 'backend/domains/edge/_portal-link.js',
 
   // Integrations
   'backend/sinapi_robot.js': 'backend/domains/integrations/sinapi_robot.js',

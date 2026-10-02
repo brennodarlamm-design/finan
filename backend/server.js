@@ -131,9 +131,9 @@ function hasInternalApiAuth(req) {
   const secret = getInternalSecret();
   if (!secret) return false;
   const authHeader = String(req.headers.authorization || req.headers.Authorization || '');
-  if (authHeader.startsWith('Bearer ') && authHeader.substring(7).trim() === secret) return true;
+  if (authHeader.startsWith('Bearer ') && safeEqualSecret(authHeader.substring(7).trim(), secret)) return true;
   const apiKey = String(req.headers['x-api-key'] || req.headers['apikey'] || '');
-  return Boolean(apiKey && apiKey.trim() === secret);
+  return Boolean(apiKey && safeEqualSecret(apiKey.trim(), secret));
 }
 
 function requireAuth(req, res, next) {
@@ -517,7 +517,7 @@ app.post(['/webhook/evolution-go', '/api/webhook-whatsapp'], async (req, res) =>
     ''
   ).trim();
 
-  const isAuthorized = (evoKey && incomingKey === evoKey) || hasInternalApiAuth(req);
+  const isAuthorized = Boolean(evoKey && incomingKey && safeEqualSecret(incomingKey, evoKey)) || hasInternalApiAuth(req);
   if (!isAuthorized) {
     return res.status(401).json({ error: 'Acesso não autorizado ao webhook do WhatsApp.' });
   }

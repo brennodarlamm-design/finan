@@ -853,7 +853,7 @@ const ExportarTemplates = {
         <div>
           <div style="border-bottom:1px solid #94a3b8;margin-bottom:6px;height:30px;"></div>
           <strong style="color:#0f172a;">${clienteUnico?.engenheiro_responsavel || 'Engenheiro Responsável Técnico'}</strong><br>
-          <span style="color:#64748b;font-size:.72rem;">${emp.responsavel ? emp.responsavel : 'Responsável Técnico'} ${emp.crea_cau ? `(${emp.crea_cau})` : ''}</span>
+          <span style="color:#64748b;font-size:.72rem;">${Utils.escapeHtml(emp.responsavel || 'Responsável Técnico')} ${emp.crea_cau ? `(${Utils.escapeHtml(emp.crea_cau)})` : ''}</span>
         </div>
         <div>
           <div style="border-bottom:1px solid #94a3b8;margin-bottom:6px;height:30px;"></div>

@@ -2,6 +2,36 @@
 // Cliente HTTP robusto para integração do FinGo com o Evolution Go (Golang WhatsApp Engine)
 // Documentação: https://docs.evolutionfoundation.com.br/evolution-go/installation
 
+import crypto from 'crypto';
+
+// AUDIT-2026-10-02 Z1: tokens de instância eram `token_<tenant>_fingo` (previsíveis). Com o
+// Evolution Go acessível publicamente, qualquer pessoa enviava mensagens, lia o QR ou
+// desconectava o WhatsApp de qualquer empresa. Agora o token é aleatório.
+export function generateInstanceToken() {
+  return `fgo_${crypto.randomBytes(24).toString('hex')}`;
+}
+
+// AUDIT-2026-10-02 Z2: o Evolution Go roda como Web Service público (plano gratuito). A chave
+// global dá acesso a todas as instâncias e aos tokens delas, então precisa ser forte e secreta.
+// O valor padrão que estava no docker-compose/.env de exemplo é público e nunca é aceito.
+export const KNOWN_DEFAULT_EVOLUTION_KEYS = Object.freeze(['fingo-evo-secret-change-me-in-production']);
+
+export function evolutionApiKeyProblem(key, env = process.env) {
+  const value = String(key || '').trim();
+  if (!value) return 'EVOLUTION_GO_API_KEY ausente.';
+  if (KNOWN_DEFAULT_EVOLUTION_KEYS.includes(value)) return 'EVOLUTION_GO_API_KEY usa o valor padrão público do repositório.';
+  if (String(env.NODE_ENV || '').toLowerCase() === 'production' && value.length < 32) {
+    return 'EVOLUTION_GO_API_KEY curta demais para produção (mínimo 32 caracteres).';
+  }
+  return '';
+}
+
+export function isLegacyPredictableInstanceToken(inst) {
+  if (!inst || !inst.token) return false;
+  const name = String(inst.name || '').trim();
+  return Boolean(name) && String(inst.token) === `token_${name}_fingo`;
+}
+
 export class EvolutionGoClient {
   constructor(options = {}) {
     this.baseUrl = (options.baseUrl || process.env.EVOLUTION_GO_URL || 'http://localhost:8085').replace(/\/+$/, '');
@@ -146,7 +176,16 @@ export class EvolutionGoClient {
    * Verifica se o provedor Evolution Go possui configuração mínima necessária
    */
   isConfigured() {
-    return Boolean(this.baseUrl && this.apiKey);
+    if (!this.baseUrl || !this.apiKey) return false;
+    const problem = evolutionApiKeyProblem(this.apiKey);
+    if (problem) {
+      if (!this._weakKeyWarned) {
+        this._weakKeyWarned = true;
+        console.error(`🚨 [EvolutionGo] Integração bloqueada: ${problem} Gere uma chave aleatória e configure o MESMO valor em GLOBAL_API_KEY (serviço do Evolution) e EVOLUTION_GO_API_KEY (finan-backend).`);
+      }
+      return false;
+    }
+    return true;
   }
 
   /**
@@ -313,7 +352,7 @@ export class EvolutionGoClient {
    */
   async createInstance(tenantId) {
     const instanceName = this.cleanInstanceName(tenantId);
-    const token = `token_${instanceName}_fingo`;
+    const token = generateInstanceToken();
     const webhookUrl = (process.env.EVOLUTION_GO_WEBHOOK_URL || '').trim();
 
     // Cria a instância com global API key
@@ -360,6 +399,18 @@ export class EvolutionGoClient {
     const qrTimeoutMs = Math.max(this.timeoutMs, 5000);
 
     let inst = await this.findInstance(tenantId);
+    // AUDIT-2026-10-02 Z1: instância antiga desconectada com token previsível é recriada com
+    // token aleatório (o QR precisa ser lido de qualquer forma). Conectada, só é trocada no
+    // "Desconectar/Resetar" do painel, para não derrubar o WhatsApp em uso.
+    if (inst && !inst.connected && isLegacyPredictableInstanceToken(inst)) {
+      console.warn(`[EvolutionGo] Rotacionando token previsível da instância ${inst.name}.`);
+      await this.deleteInstance(tenantId).catch(() => {});
+      if (this._instanceCache) this._instanceCache.delete(this.cleanInstanceName(tenantId));
+      inst = null;
+    }
+    if (inst && inst.connected && isLegacyPredictableInstanceToken(inst)) {
+      console.warn(`[EvolutionGo] Instância ${inst.name} conectada com token previsível. Use "Desconectar/Resetar" e leia o QR novamente.`);
+    }
     if (!inst) {
       await this.createInstance(tenantId);
       // Aguarda um momento para o QR ser gerado

@@ -1209,7 +1209,7 @@ const NFe = {
             <details style="margin-top:10px;font-size:.78rem;color:var(--text2);cursor:pointer;">
               <summary style="font-weight:600;color:var(--accent);">📦 Ver ${parsed.itens.length} produto(s)/serviço(s) da nota</summary>
               <div style="max-height:120px;overflow-y:auto;margin-top:6px;padding:6px 10px;background:var(--bg-secondary);border-radius:var(--r-sm);display:flex;flex-direction:column;gap:4px;">
-                ${parsed.itens.map(i => `<div>• <strong>${i.nome}</strong> (${i.qtd} ${i.unidade}) — ${Utils.fmt.currency(i.total)}</div>`).join('')}
+                ${parsed.itens.map(i => `<div>• <strong>${Utils.escapeHtml(i.nome)}</strong> (${Utils.escapeHtml(i.qtd)} ${Utils.escapeHtml(i.unidade)}) — ${Utils.fmt.currency(i.total)}</div>`).join('')}
               </div>
             </details>` : ''}
           </div>
@@ -1221,7 +1221,7 @@ const NFe = {
                 <select id="nfe-dest-obra" class="form-control" required>
                   <option value="">Selecione a Obra...</option>
                   <option value="escritorio">🏢 Sede / Escritório Central</option>
-                  ${obras.map(o => `<option value="${o.id}">${o.nome}</option>`).join('')}
+                  ${obras.map(o => `<option value="${Utils.escapeHtml(o.id)}">${Utils.escapeHtml(o.nome)}</option>`).join('')}
                 </select>
               </div>
               <div>
@@ -1240,7 +1240,7 @@ const NFe = {
               <div>
                 <label class="form-label" style="font-size:.78rem;font-weight:700;">Conta de Pagamento *</label>
                 <select id="nfe-dest-conta" class="form-control" required>
-                  ${contas.map(c => { const label = c.apelido || c.banco_nome || 'Conta'; const saldo = Utils.fmt.currency(c.saldo_atual||0); return `<option value="${c.id}">${label} — ${c.numero||''} (${saldo})</option>`; }).join('')}
+                  ${contas.map(c => { const label = c.apelido || c.banco_nome || 'Conta'; const saldo = Utils.fmt.currency(c.saldo_atual||0); return `<option value="${Utils.escapeHtml(c.id)}">${Utils.escapeHtml(label)} — ${Utils.escapeHtml(c.numero||'')} (${saldo})</option>`; }).join('')}
                 </select>
               </div>
               <div>
@@ -1287,7 +1287,7 @@ const NFe = {
                   <div>
                     <label class="form-label" style="font-size:.78rem;font-weight:700;">Conta Bancária Debitada *</label>
                     <select id="nfe-conta-pagto" class="form-control">
-                      ${contas.map(c => { const label = c.apelido || c.banco_nome || 'Conta'; return `<option value="${label}">${label} — ${c.numero||''}</option>`; }).join('')}
+                      ${contas.map(c => { const label = c.apelido || c.banco_nome || 'Conta'; return `<option value="${Utils.escapeHtml(label)}">${Utils.escapeHtml(label)} — ${Utils.escapeHtml(c.numero||'')}</option>`; }).join('')}
                     </select>
                   </div>
                 </div>
@@ -1299,7 +1299,7 @@ const NFe = {
                 <span>ℹ️ Ações Automáticas:</span>
               </div>
               <ul style="margin:4px 0 0 0;padding-left:18px;display:flex;flex-direction:column;gap:3px;">
-                <li>${fornExistente ? `Fornecedor vinculado: <strong>${fornExistente.nome}</strong>` : `Fornecedor <strong>${parsed.emitente}</strong> será <strong>cadastrado automaticamente</strong>.`}</li>
+                <li>${fornExistente ? `Fornecedor vinculado: <strong>${Utils.escapeHtml(fornExistente.nome)}</strong>` : `Fornecedor <strong>${Utils.escapeHtml(parsed.emitente)}</strong> será <strong>cadastrado automaticamente</strong>.`}</li>
                 <li>DANFE PDF será baixado e anexado ao lançamento no GED.</li>
                 <li>Nota Fiscal será registrada na aba de Notas Fiscais.</li>
               </ul>

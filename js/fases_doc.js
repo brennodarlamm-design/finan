@@ -235,7 +235,7 @@ const FasesDoc = {
       const vencido = doc.status === 'vencido';
       metaInfo += `&nbsp;·&nbsp; <span style="color:${vencido?'var(--danger)':'var(--warning)'}">Validade: ${Utils.fmt.date(doc.data_validade)}</span>`;
     }
-    if (doc.responsavel) metaInfo += `<span style="color:var(--text3)">&nbsp;·&nbsp; ${doc.responsavel}</span>`;
+    if (doc.responsavel) metaInfo += `<span style="color:var(--text3)">&nbsp;·&nbsp; ${Utils.escapeHtml(doc.responsavel)}</span>`;
 
     let linkExternoUrl = null;
     let linkExternoTipo = 'link';

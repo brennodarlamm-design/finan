@@ -121,7 +121,9 @@ export default async function handler(req, res) {
       if (burstCount >= 5 && (burstCount === 5 || burstCount % 10 === 0)) {
         dispatchEdgeAlert(req.env || process.env, {
           type:'CLIENT_ERROR_BURST',
-          severity:'CRITICAL',
+          // AUDIT-2026-10-02 T8: erros anônimos podem ser forjados por qualquer IP; não
+          // devem disparar alerta crítico (fadiga de alertas / mascarar incidente real).
+          severity: tenantId ? 'CRITICAL' : 'WARNING',
           title:'Pico de erros no frontend FinGo',
           message:`${burstCount} erros em 5 minutos na rota ${routeName || 'desconhecida'}.`,
           details:{ route:routeName || 'unknown', tenantScoped:Boolean(tenantId), count:burstCount },

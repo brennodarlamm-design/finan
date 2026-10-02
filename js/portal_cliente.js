@@ -58,18 +58,12 @@ const PortalCliente = {
     document.head.appendChild(s);
   },
 
-  // ── GERADOR DE LINK SEGURO E PACOTE COMPACTO DE DADOS ──
-  gerarToken(obraId, tenantId = '') {
-    if (!obraId) return '';
-    try {
-      return btoa(`finobra_portal_${tenantId}_${obraId}`).replace(/=/g, '');
-    } catch {
-      return `pt_${obraId}`;
-    }
-  },
-
-  getUrlPortal(obraId) {
-    const origin = (typeof window !== 'undefined' && window.location.origin) ? window.location.origin : 'https://fingo.api.br';
+  // ── GERADOR DE LINK ASSINADO E PACOTE COMPACTO DE DADOS ──
+  // AUDIT-2026-10-02 X4: o link é assinado pelo servidor (/api/v2/portal/link). O token antigo
+  // (btoa previsível) permitia a qualquer pessoa montar um portal falso em fingo.api.br.
+  // AUDIT-2026-10-02 Y1: CPF/CNPJ do cliente e valor financiado não são exibidos no portal e
+  // não vão mais no link (que circula por WhatsApp e logs de acesso) — minimização da LGPD.
+  _montarPdata(obraId) {
     const obra = (typeof DB !== 'undefined' && DB.getAll)
       ? ((DB.getAll('clientes') || []).find(o => String(o.id) === String(obraId)) || {})
       : {};
@@ -77,7 +71,6 @@ const PortalCliente = {
       ? Auth.getCurrentTenantId()
       : ((typeof DB !== 'undefined' && DB._t) ? DB._t() : '');
     const empresa = (typeof DB !== 'undefined' && DB.getEmpresa) ? DB.getEmpresa() : {};
-    const token = this.gerarToken(obraId, tenantId);
 
     // Constrói o pacote de dados encapsulado
     const bundle = {
@@ -93,12 +86,10 @@ const PortalCliente = {
         id: obra.id || obraId,
         n: obra.nome || 'Obra',
         c: obra.cliente || obra.nome || 'Proprietário',
-        doc: obra.cpf_cnpj || '',
         e: obra.endereco || '',
         cid: obra.cidade || '',
         uf: obra.estado || '',
         eng: obra.engenheiro_responsavel || '',
-        v: obra.valor_financiado || 0,
         di: obra.data_inicio || '',
         df: obra.data_previsao_termino || '',
         st: obra.status || 'em_andamento',
@@ -163,25 +154,72 @@ const PortalCliente = {
       pdata = '';
     }
 
-    return `${origin}/portal?portal_obra=${encodeURIComponent(obraId)}&tenant=${encodeURIComponent(tenantId)}&token=${encodeURIComponent(token)}&pdata=${encodeURIComponent(pdata)}`;
+    return { pdata, tenantId };
+  },
+
+  async obterUrlAssinada(obraId) {
+    const { pdata } = this._montarPdata(obraId);
+    if (!pdata) {
+      Utils.toast('Não foi possível montar os dados do portal.', 'error');
+      return '';
+    }
+    try {
+      const headers = (typeof DB !== 'undefined' && DB._apiHeaders) ? DB._apiHeaders() : { 'Content-Type': 'application/json' };
+      const res = await fetch('/api/v2/portal/link', {
+        method: 'POST',
+        headers: { ...headers, 'Content-Type': 'application/json' },
+        credentials: 'same-origin',
+        body: JSON.stringify({ pdata }),
+        signal: AbortSignal.timeout(20000)
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.success || !data.sig) {
+        Utils.toast(data.error || 'Não foi possível gerar o link seguro do portal.', 'error');
+        return '';
+      }
+      const origin = (typeof window !== 'undefined' && window.location.origin) ? window.location.origin : 'https://fingo.api.br';
+      return `${origin}/portal?portal_obra=${encodeURIComponent(obraId)}&tenant=${encodeURIComponent(data.tenant || '')}&exp=${encodeURIComponent(data.exp)}&sig=${encodeURIComponent(data.sig)}&pdata=${encodeURIComponent(data.pdata)}`;
+    } catch {
+      Utils.toast('Sem conexão para gerar o link seguro do portal.', 'error');
+      return '';
+    }
+  },
+
+  _whatsUrlPortal(obra, url) {
+    const clienteNome = obra.cliente || obra.nome || 'Cliente';
+    const obraNome = obra.nome || 'Sua Obra';
+    const tel = String(obra.telefone || obra.whatsapp || '').replace(/\D/g, '');
+    const msgWhats = `Olá, ${clienteNome}! Segue o link exclusivo para acompanhar a sua obra (${obraNome}) em tempo real pelo nosso Portal de Transparência:\n\n${url}\n\nLá você pode ver o cronograma de fases, fotos, medições aprovadas, comprovantes e assinar documentos pendentes diretamente pelo celular.`;
+    return tel
+      ? `https://wa.me/55${tel}?text=${encodeURIComponent(msgWhats)}`
+      : `https://wa.me/?text=${encodeURIComponent(msgWhats)}`;
+  },
+
+  async enviarWhatsAppLink(obraId) {
+    const obra = (typeof DB !== 'undefined' && DB.getAll)
+      ? ((DB.getAll('clientes') || []).find(o => String(o.id) === String(obraId)) || null)
+      : null;
+    if (!obra) return Utils.toast('Obra não encontrada.', 'error');
+    const win = window.open('about:blank', '_blank');
+    const url = await this.obterUrlAssinada(obraId);
+    if (!url) { if (win) win.close(); return; }
+    const whatsUrl = this._whatsUrlPortal(obra, url);
+    if (win) win.location.href = whatsUrl; else window.open(whatsUrl, '_blank');
   },
 
   // ── MODAL PARA A CONSTRUTORA COMPARTILHAR COM O CLIENTE ──
-  abrirModalCompartilhar(obraId) {
+  async abrirModalCompartilhar(obraId) {
     const obra = (typeof DB !== 'undefined' && DB.getAll)
       ? ((DB.getAll('clientes') || []).find(o => String(o.id) === String(obraId)) || null)
       : null;
     if (!obra) return Utils.toast('Obra não encontrada.', 'error');
 
-    const url = this.getUrlPortal(obraId);
+    Utils.toast('Gerando link seguro do portal...', 'info');
+    const url = await this.obterUrlAssinada(obraId);
+    if (!url) return;
     const clienteNome = obra.cliente || obra.nome || 'Cliente';
     const obraNome = obra.nome || 'Sua Obra';
-    const tel = (obra.telefone || obra.whatsapp || '').replace(/\D/g, '');
-
-    const msgWhats = `Olá, ${clienteNome}! Segue o link exclusivo para acompanhar a sua obra (${obraNome}) em tempo real pelo nosso Portal de Transparência:\n\n${url}\n\nLá você pode ver o cronograma de fases, fotos, medições aprovadas, comprovantes e assinar documentos pendentes diretamente pelo celular.`;
-    const whatsUrl = tel
-      ? `https://wa.me/55${tel}?text=${encodeURIComponent(msgWhats)}`
-      : `https://wa.me/?text=${encodeURIComponent(msgWhats)}`;
+    const whatsUrl = this._whatsUrlPortal(obra, url);
 
     const e = Utils.escapeHtml.bind(Utils);
 
@@ -221,7 +259,7 @@ const PortalCliente = {
 
           <!-- AÇÕES DIRETAS -->
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:18px;">
-            <a href="${whatsUrl}" target="_blank" rel="noopener noreferrer" class="btn btn-sm" style="background:#25D366;color:#fff;border:none;font-weight:700;display:inline-flex;align-items:center;justify-content:center;gap:6px;text-decoration:none;padding:10px;">
+            <a href="${e(whatsUrl)}" target="_blank" rel="noopener noreferrer" class="btn btn-sm" style="background:#25D366;color:#fff;border:none;font-weight:700;display:inline-flex;align-items:center;justify-content:center;gap:6px;text-decoration:none;padding:10px;">
               📲 Enviar por WhatsApp
             </a>
             <button class="btn btn-primary btn-sm" data-fb-click="PortalCliente.abrirVisualizacaoCliente" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(obraId))}" style="font-weight:700;display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:10px;">
@@ -263,10 +301,13 @@ const PortalCliente = {
     }
   },
 
-  abrirVisualizacaoCliente(obraId) {
+  async abrirVisualizacaoCliente(obraId) {
     Utils.closeModal();
-    const url = this.getUrlPortal(obraId);
-    window.open(url, '_blank');
+    // Abre a aba no clique (evita bloqueio de pop-up) e navega após o link ser assinado.
+    const win = window.open('about:blank', '_blank');
+    const url = await this.obterUrlAssinada(obraId);
+    if (!url) { if (win) win.close(); return; }
+    if (win) win.location.href = url; else window.open(url, '_blank');
   },
 
   abrirPortalInterno(obraId) {
@@ -302,8 +343,18 @@ const PortalCliente = {
     const obraId = params.get('portal_obra') || params.get('obra') || '';
     const tenantParam = params.get('tenant') || '';
 
-    // 1. Tenta decodificar do payload encapsulado na URL (100% autônomo)
-    let bundle = this._decodificarPayload(pdata);
+    const rootEl = document.getElementById('app-root') || document.body;
+
+    // 1. Link com payload na URL: só é exibido depois que o servidor confirma a assinatura
+    //    (AUDIT-2026-10-02 X4). Link sem assinatura, alterado ou vencido não abre.
+    if (pdata) {
+      rootEl.innerHTML = `<div style="min-height:100vh;display:flex;align-items:center;justify-content:center;background:#080F05;color:#A8C090;font-size:.9rem;">Verificando link seguro...</div>`;
+      this._verificarLinkAssinado(pdata, params.get('exp'), params.get('sig')).then(valido => {
+        this._finalizarTelaPublica(rootEl, valido ? this._decodificarPayload(pdata) : null);
+      });
+      return;
+    }
+    let bundle = null;
 
     // 2. Se não veio payload, tenta localizar no banco local APENAS se o tenant coincidir (evitando cross-tenant)
     if (!bundle && typeof DB !== 'undefined' && DB.getAll) {
@@ -329,12 +380,10 @@ const PortalCliente = {
             id: obraLocal.id,
             n: obraLocal.nome || 'Obra',
             c: obraLocal.cliente || obraLocal.nome || 'Proprietário',
-            doc: obraLocal.cpf_cnpj || '',
             e: obraLocal.endereco || '',
             cid: obraLocal.cidade || '',
             uf: obraLocal.estado || '',
             eng: obraLocal.engenheiro_responsavel || '',
-            v: obraLocal.valor_financiado || 0,
             di: obraLocal.data_inicio || '',
             df: obraLocal.data_previsao_termino || '',
             st: obraLocal.status || 'em_andamento',
@@ -379,8 +428,26 @@ const PortalCliente = {
       }
     }
 
-    const rootEl = document.getElementById('app-root') || document.body;
+    this._finalizarTelaPublica(rootEl, bundle);
+  },
 
+  async _verificarLinkAssinado(pdata, exp, sig) {
+    if (!pdata || !exp || !sig) return false;
+    try {
+      const res = await fetch('/api/v2/portal/verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pdata, exp, sig }),
+        signal: AbortSignal.timeout(15000)
+      });
+      const data = await res.json().catch(() => ({}));
+      return Boolean(res.ok && data.valid);
+    } catch {
+      return false;
+    }
+  },
+
+  _finalizarTelaPublica(rootEl, bundle) {
     // Se nenhuma obra foi encontrada de forma legítima, bloqueia com segurança (NUNCA usa obra de outra empresa!)
     if (!bundle || !bundle.o) {
       rootEl.innerHTML = `
@@ -594,7 +661,8 @@ const PortalCliente = {
             : 'var(--success)';
 
         const textoStatus = p.status_sla === 'atrasado'
-          ? `🔴 Atrasado +${p.dias_atraso}d`
+          // AUDIT-2026-10-02 X2: o payload do portal vem da URL (qualquer um pode montar o link).
+          ? `🔴 Atrasado +${Math.max(0, parseInt(p.dias_atraso, 10) || 0)}d`
           : p.status_sla === 'atencao'
             ? '🟡 Em Atenção'
             : '🟢 No Prazo';
@@ -895,12 +963,6 @@ const PortalCliente = {
           const medsObra = allMedicoes.filter(m => String(m.obra_id) === String(o.id));
           const ctrsObra = allContratos.filter(c => String(c.obra_id) === String(o.id));
           const ctrsPend = ctrsObra.filter(c => !c.assinado_por_cliente);
-          const urlPortal = this.getUrlPortal(o.id);
-          const tel = (o.telefone || o.whatsapp || '').replace(/\D/g, '');
-          const msgWhats = `Olá, ${o.cliente || o.nome}! Segue o link exclusivo para acompanhar a sua obra (${o.nome}) em tempo real pelo nosso Portal de Transparência:\n\n${urlPortal}\n\nLá você pode ver prazos, fotos, medições aprovadas, comprovantes e assinar contratos diretamente pelo celular.`;
-          const whatsUrl = tel
-            ? `https://wa.me/55${tel}?text=${encodeURIComponent(msgWhats)}`
-            : `https://wa.me/?text=${encodeURIComponent(msgWhats)}`;
 
           return `
           <div class="card" style="padding:20px;display:flex;flex-direction:column;justify-content:space-between;gap:16px;border:1px solid var(--border);transition:border-color .2s;background:var(--bg-card);">
@@ -952,9 +1014,9 @@ const PortalCliente = {
                 <button class="btn btn-secondary btn-sm" data-fb-click="PortalCliente.copiarLinkDireto" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(o.id))}" style="font-size:.76rem;font-weight:700;padding:7px;display:inline-flex;align-items:center;justify-content:center;gap:6px;">
                   📋 Copiar Link
                 </button>
-                <a href="${whatsUrl}" target="_blank" rel="noopener noreferrer" class="btn btn-sm" style="background:#25D366;color:#fff;border:none;font-weight:700;font-size:.76rem;padding:7px;display:inline-flex;align-items:center;justify-content:center;gap:6px;text-decoration:none;">
+                <button type="button" data-fb-click="PortalCliente.enviarWhatsAppLink" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(o.id))}" class="btn btn-sm" style="background:#25D366;color:#fff;border:none;font-weight:700;font-size:.76rem;padding:7px;display:inline-flex;align-items:center;justify-content:center;gap:6px;">
                   📲 WhatsApp
-                </a>
+                </button>
               </div>
               <button class="btn btn-primary btn-sm" data-fb-click="PortalCliente.abrirVisualizacaoCliente" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(o.id))}" style="font-size:.78rem;font-weight:800;padding:8px;display:inline-flex;align-items:center;justify-content:center;gap:6px;">
                 👁️ Visualizar como Cliente
@@ -967,9 +1029,9 @@ const PortalCliente = {
     `;
   },
 
-  copiarLinkDireto(obraId) {
-    const url = this.getUrlPortal(obraId);
-    if (!url) return Utils.toast('Obra não encontrada para gerar o link.', 'error');
+  async copiarLinkDireto(obraId) {
+    const url = await this.obterUrlAssinada(obraId);
+    if (!url) return;
     if (navigator.clipboard && navigator.clipboard.writeText) {
       navigator.clipboard.writeText(url).then(() => {
         Utils.toast('Link do portal copiado para a área de transferência!', 'success');

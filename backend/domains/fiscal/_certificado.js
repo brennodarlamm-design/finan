@@ -4,7 +4,7 @@ import crypto from 'node:crypto';
 import tls from 'tls';
 import { neon } from '@neondatabase/serverless';
 import { resolveAuthAndTenant } from './_auth.js';
-import { canAccessModule, permissionError } from './_permissions.js';
+import { canAccessModule, canManageTenant, permissionError } from './_permissions.js';
 import { writeAudit } from './_audit.js';
 import { createTenantSql } from './_tenant-sql.js';
 import { createRuntimeSql } from './_database.js';
@@ -847,6 +847,11 @@ export default async function handler(req, res) {
 
     // ── 2. UPLOAD E VINCULAÇÃO DE CERTIFICADO A1 (.pfx / .p12) ─────────────────
     if (action === 'upload' || (req.method === 'POST' && action === 'upload')) {
+      // AUDIT-2026-10-02 V3: o certificado A1 assina em nome da empresa; trocar ou remover é
+      // ação de administrador, não de qualquer usuário com escrita em notas.
+      if (!canManageTenant(auth)) {
+        return res.status(403).json(permissionError('ROLE_MANAGE_TENANT_FORBIDDEN'));
+      }
       if (!canAccessModule(auth, 'notas', 'write')) {
         return res.status(403).json(permissionError('MODULE_WRITE_FORBIDDEN', 'notas'));
       }
@@ -1008,6 +1013,11 @@ export default async function handler(req, res) {
 
     // ── 3. REMOÇÃO DE CERTIFICADO ─────────────────────────────────────────────
     if (action === 'remover' || req.method === 'DELETE') {
+      // AUDIT-2026-10-02 V3: o certificado A1 assina em nome da empresa; trocar ou remover é
+      // ação de administrador, não de qualquer usuário com escrita em notas.
+      if (!canManageTenant(auth)) {
+        return res.status(403).json(permissionError('ROLE_MANAGE_TENANT_FORBIDDEN'));
+      }
       if (!canAccessModule(auth, 'notas', 'delete')) {
         return res.status(403).json(permissionError('MODULE_DELETE_FORBIDDEN', 'notas'));
       }

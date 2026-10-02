@@ -41,6 +41,10 @@ function maskDocument(value) {
 function maskIp(value) {
   const raw = clean(value, 64);
   if (!raw) return '';
+  // AUDIT-2026-10-02 U2: o assinador grava o tipo de aparelho ("Computador / Desktop"), não o IP.
+  // Só mascara o que parece endereço IP; antes o rótulo do aparelho virava "***".
+  const looksLikeIp = /^\d{1,3}(\.\d{1,3}){3}$/.test(raw) || (raw.includes(':') && /^[0-9a-f:]+$/i.test(raw));
+  if (!looksLikeIp) return raw;
   if (raw.includes('.')) {
     const parts = raw.split('.');
     return parts.length === 4 ? `${parts[0]}.${parts[1]}.*.*` : '***';
@@ -108,6 +112,8 @@ export default async function handler(req, res) {
           data_hora_fmt: r.data_hora_fmt,
           // AUDIT-2026-10-02 F10: IP do signatário é dado pessoal (LGPD); a validação pública mostra só um trecho.
           ip_dispositivo: maskIp(r.ip_dispositivo),
+          // AUDIT-2026-10-02 U3: horário gravado pelo servidor (data_hora vem do navegador).
+          registrado_em: r.created_at,
           empresa: r.nome_fantasia || r.razao_social || 'Empresa usuária do FinGo',
           empresa_cnpj: maskDocument(r.cnpj),
           empresa_cidade: r.cidade || '',
@@ -141,6 +147,11 @@ export default async function handler(req, res) {
       const id = `sig_${crypto.randomUUID()}`;
       const parsedDate = b.data_hora ? new Date(b.data_hora) : new Date();
       const dataHoraIso = Number.isNaN(parsedDate.getTime()) ? new Date().toISOString() : parsedDate.toISOString();
+      // AUDIT-2026-10-02 U3: a data/hora vem do navegador. Sem limite, era possível registrar
+      // assinatura com data retroativa ou futura. Tolera só diferença de relógio (24 h).
+      if (Math.abs(new Date(dataHoraIso).getTime() - Date.now()) > 24 * 60 * 60 * 1000) {
+        return res.status(400).json({ success: false, error: 'Data/hora da assinatura fora do horário atual. Verifique o relógio do dispositivo.' });
+      }
       try {
         await tenantSql`
           INSERT INTO document_signatures (

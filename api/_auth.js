@@ -229,6 +229,16 @@ export function getSessionSigningSecret() {
   return String(process.env.SESSION_SIGNING_SECRET || '').trim();
 }
 
+// AUDIT-2026-10-02 T7: comparação de segredos em tempo constante (hash fixa o tamanho).
+export function secretsEqual(a, b) {
+  const left = String(a || '');
+  const right = String(b || '');
+  if (!left || !right) return false;
+  const ha = crypto.createHash('sha256').update(left).digest();
+  const hb = crypto.createHash('sha256').update(right).digest();
+  return crypto.timingSafeEqual(ha, hb);
+}
+
 export function getInternalApiSecret() {
   // Requer INTERNAL_API_SECRET dedicado — sem fallback para evitar que vire chave de sessão.
   return String(process.env.INTERNAL_API_SECRET || '').trim();
@@ -280,7 +290,7 @@ export async function resolveAuthAndTenant(req) {
   }
 
   // Chave interna para jobs/cron. Nunca deve existir no frontend.
-  if (internalSecret && rawToken === internalSecret) {
+  if (internalSecret && secretsEqual(rawToken, internalSecret)) {
     // Chaves internas nunca assumem uma empresa padrão. Isso evita que um job mal
     // configurado leia/grave acidentalmente no tenant histórico da plataforma.
     const explicitTenant = String(req.headers['x-tenant-id'] || '').trim();
@@ -305,6 +315,11 @@ export async function resolveAuthAndTenant(req) {
   const payload = verifyToken(rawToken, sessionSecret);
   if (!payload?.userId || !payload?.tenantId) {
     return { authenticated: false, status: 401, error: 'Token de autenticação inválido ou expirado.' };
+  }
+  // AUDIT-2026-10-02 T10: tokens legados sem sessionId não podem ser revogados (troca ou
+  // reset de senha não os encerrava) e passam a ser recusados; o usuário entra novamente.
+  if (!payload.sessionId) {
+    return { authenticated: false, status: 401, error: 'Sessão antiga encerrada por segurança. Entre novamente.' };
   }
 
   if (!String(process.env.DATABASE_OWNER_URL || '').trim()) {
@@ -331,24 +346,21 @@ export async function resolveAuthAndTenant(req) {
     const live = rows[0];
     const isSuperAdmin = live.perfil === 'superadmin';
 
-    // Patch 08: sessões novas são revogáveis por dispositivo. Tokens legados sem
-    // sessionId continuam válidos até expirar para não derrubar usuários no deploy.
-    if (payload.sessionId) {
-      const sessionRows = await sql`
-        SELECT id, revoked_at, expires_at
-        FROM auth_sessions
-        WHERE id=${payload.sessionId} AND user_id=${payload.userId}
-        LIMIT 1;
-      `;
-      const sess = sessionRows[0];
-      if (!sess || sess.revoked_at || !sess.expires_at || new Date(sess.expires_at).getTime() <= Date.now()) {
-        return { authenticated:false, status:401, error:'Esta sessão foi encerrada ou expirou. Entre novamente.' };
-      }
-      // Atualiza atividade no máximo a cada 15 minutos para reduzir escrita no Neon.
-      sql`UPDATE auth_sessions SET last_seen_at=NOW() WHERE id=${payload.sessionId} AND last_seen_at < NOW() - INTERVAL '15 minutes';`.catch((err) => {
-        console.warn('[Auth] Falha ao atualizar last_seen da sessão:', err?.message || err);
-      });
+    // Patch 08: sessões são revogáveis por dispositivo.
+    const sessionRows = await sql`
+      SELECT id, revoked_at, expires_at
+      FROM auth_sessions
+      WHERE id=${payload.sessionId} AND user_id=${payload.userId}
+      LIMIT 1;
+    `;
+    const sess = sessionRows[0];
+    if (!sess || sess.revoked_at || !sess.expires_at || new Date(sess.expires_at).getTime() <= Date.now()) {
+      return { authenticated:false, status:401, error:'Esta sessão foi encerrada ou expirou. Entre novamente.' };
     }
+    // Atualiza atividade no máximo a cada 15 minutos para reduzir escrita no Neon.
+    sql`UPDATE auth_sessions SET last_seen_at=NOW() WHERE id=${payload.sessionId} AND last_seen_at < NOW() - INTERVAL '15 minutes';`.catch((err) => {
+      console.warn('[Auth] Falha ao atualizar last_seen da sessão:', err?.message || err);
+    });
 
     if (!isSuperAdmin) {
       if (live.tenant_status === 'bloqueado' || live.tenant_status === 'cancelado') {

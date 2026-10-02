@@ -367,7 +367,7 @@ const Lancamentos = {
               <label class="form-label" for="lan-nf-sel">Vincular Nota Fiscal</label>
               <select class="form-control" id="lan-nf-sel" name="nota_fiscal_id">
                 <option value="">Nenhuma NF vinculada</option>
-                ${notas.filter(n=>n.tipo==='entrada').map(n=>`<option value="${n.id}" ${l.nota_fiscal_id===n.id?'selected':''}>NF ${n.numero_nf||'S/N'} &mdash; ${(n.emitente||'Sem emitente').slice(0,30)} (${Utils.fmt.currency(n.valor_bruto !== undefined ? n.valor_bruto : (n.valor_total || 0))})</option>`).join('')}
+                ${notas.filter(n=>n.tipo==='entrada').map(n=>`<option value="${Utils.escapeHtml(n.id)}" ${l.nota_fiscal_id===n.id?'selected':''}>NF ${Utils.escapeHtml(n.numero_nf||'S/N')} &mdash; ${Utils.escapeHtml((n.emitente||'Sem emitente').slice(0,30))} (${Utils.fmt.currency(n.valor_bruto !== undefined ? n.valor_bruto : (n.valor_total || 0))})</option>`).join('')}
               </select>
             </div>
 

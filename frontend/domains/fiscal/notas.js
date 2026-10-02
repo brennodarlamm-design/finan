@@ -339,7 +339,7 @@ const Notas = {
           <div class="form-group" style="margin-bottom:12px;">
             <label class="form-label">Conta Bancária de Débito</label>
             <select id="nf-baixa-conta" class="form-control">
-              ${contas.map(c => `<option value="${c.apelido||c.banco_nome}">${c.apelido||c.banco_nome}</option>`).join('')}
+              ${contas.map(c => `<option value="${Utils.escapeHtml(c.apelido||c.banco_nome)}">${Utils.escapeHtml(c.apelido||c.banco_nome)}</option>`).join('')}
             </select>
           </div>
           <div class="form-group">
@@ -572,7 +572,7 @@ const Notas = {
         <div class="modal-body">
           ${err.length ? `<div style="padding:12px 16px;background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.3);border-radius:8px;margin-bottom:14px;font-size:.82rem">
             ⚠️ <strong>${err.length} arquivo(s) com erro:</strong>
-            ${err.map(r => `<div style="margin-top:4px;color:var(--danger)">${r.file}: ${r.error}</div>`).join('')}
+            ${err.map(r => `<div style="margin-top:4px;color:var(--danger)">${Utils.escapeHtml(r.file)}: ${Utils.escapeHtml(r.error)}</div>`).join('')}
           </div>` : ''}
           ${dups.length ? `<div style="padding:12px 16px;background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.25);border-radius:8px;margin-bottom:14px;font-size:.82rem">
             ⏭️ <strong>${dups.length} NF(s) já cadastrada(s) serão ignoradas:</strong>

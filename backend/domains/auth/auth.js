@@ -130,6 +130,44 @@ function tokenFieldForExplicitClient(req, token) {
   return mode === 'bearer' && token ? { token } : {};
 }
 
+// AUDIT-2026-10-02 U4: usuário/empresa inexistente também paga o custo do scrypt,
+// para o tempo de resposta não revelar quais contas existem.
+let dummyPasswordHashPromise = null;
+async function burnPasswordCheck(password) {
+  if (!dummyPasswordHashPromise) dummyPasswordHashPromise = hashPassword(crypto.randomBytes(16).toString('hex'));
+  try { await verifyPassword(String(password || ''), await dummyPasswordHashPromise); } catch {}
+}
+
+// AUDIT-2026-10-02 V2: consome o fator MFA de forma atômica. Antes, o step TOTP/código de
+// backup era gravado sem condição; duas requisições simultâneas com o mesmo código passavam.
+async function consumeMfaFactor(sql, user, { usedBackup, newBackupCodes, newStep }) {
+  if (usedBackup) {
+    const rows = await sql`
+      UPDATE usuarios SET mfa_backup_codes = ${JSON.stringify(newBackupCodes)}::jsonb
+      WHERE id = ${user.id} AND mfa_backup_codes = ${JSON.stringify(user.mfa_backup_codes || [])}::jsonb
+      RETURNING id;
+    `;
+    return rows.length > 0;
+  }
+  if (newStep > 0) {
+    const rows = await sql`
+      UPDATE usuarios SET mfa_last_used_step = ${newStep}
+      WHERE id = ${user.id} AND COALESCE(mfa_last_used_step, 0) < ${newStep}
+      RETURNING id;
+    `;
+    return rows.length > 0;
+  }
+  return false;
+}
+
+// AUDIT-2026-10-02 T2: limite por conta para códigos MFA. O limite por IP sozinho
+// permitia, com a senha em mãos, distribuir tentativas de TOTP/backup por vários IPs.
+// O prefixo 'mfa-user:' não é tratado como IP pelo Fail2Ban de _ratelimit.js.
+async function mfaAccountLimited(userId) {
+  const rl = await checkRateLimit(`mfa-user:${String(userId || 'unknown')}`, 10, 15 * 60 * 1000);
+  return !rl.allowed;
+}
+
 export default async function handler(req, res) {
   setCors(req, res);
   res.setHeader('Cache-Control', 'no-store');
@@ -416,6 +454,7 @@ export default async function handler(req, res) {
 
         const tenant = await resolveTenantByAccessKey(sql, companyKey);
         if (!tenant) {
+          await burnPasswordCheck(password);
           return res.status(401).json({
             success: false,
             message: 'Credenciais de acesso inválidas.'
@@ -424,6 +463,7 @@ export default async function handler(req, res) {
 
         const tenantUser = await resolveTenantUserByLogin(sql, tenant.id, cleanUser);
         if (!tenantUser) {
+          await burnPasswordCheck(password);
           return res.status(401).json({
             success: false,
             message: 'Credenciais de acesso inválidas.'
@@ -441,10 +481,22 @@ export default async function handler(req, res) {
       }
 
       if (!rows.length) {
+        await burnPasswordCheck(password);
         return res.status(401).json({ success: false, message: 'Credenciais de acesso inválidas.' });
       }
 
       const user = rows[0];
+
+      // AUDIT-2026-10-02 U4: a senha é conferida ANTES dos status da conta/empresa. Antes, sem a
+      // senha, as mensagens de conta inativa, empresa bloqueada/cancelada ou trial vencido
+      // confirmavam que o usuário existia e expunham a situação da empresa.
+      const passwordMatches = await verifyPassword(password, user.senha_hash);
+      if (!passwordMatches) {
+        await writeAudit(sql, req, { tenantId: user.tenant_id, user: { id: user.id } }, { acao: 'login_bloqueado', entidade: 'auth', entidadeId: user.id, depois: { motivo: 'invalid_password', ip: clientIp } });
+        // Mensagem genérica — não revela se é usuário ou senha o problema (anti-enumeração)
+        return res.status(401).json({ success: false, message: 'Credenciais de acesso inválidas.' });
+      }
+
       if (!user.ativo) {
         await writeAudit(sql, req, { tenantId: user.tenant_id, user: { id: user.id } }, { acao: 'login_bloqueado', entidade: 'auth', entidadeId: user.id, depois: { motivo: 'user_inactive', ip: clientIp } });
         return res.status(403).json({ success: false, message: 'Conta de usuário inativa. Contate o administrador.' });
@@ -493,13 +545,6 @@ export default async function handler(req, res) {
         }
       }
 
-      const passwordMatches = await verifyPassword(password, user.senha_hash);
-      if (!passwordMatches) {
-        await writeAudit(sql, req, { tenantId: user.tenant_id, user: { id: user.id } }, { acao: 'login_bloqueado', entidade: 'auth', entidadeId: user.id, depois: { motivo: 'invalid_password', ip: clientIp } });
-        // Mensagem genérica — não revela se é usuário ou senha o problema (anti-enumeração)
-        return res.status(401).json({ success: false, message: 'Credenciais de acesso inválidas.' });
-      }
-
       // PATCH 49: Proteção MFA para Super Admin Master Backoffice
       const isSuperAdmin = user.perfil === 'superadmin';
       const totpCode = String(req.body.totp_code || req.body.mfa_code || '').trim();
@@ -540,6 +585,10 @@ export default async function handler(req, res) {
           });
         }
 
+        if (await mfaAccountLimited(user.id)) {
+          return res.status(429).json({ success: false, message: 'Muitas tentativas de código MFA para esta conta. Aguarde 15 minutos.' });
+        }
+
         // Código enviado diretamente no formulário de login
         let mfaValid = false;
         let usedBackup = false;
@@ -575,10 +624,8 @@ export default async function handler(req, res) {
           });
         }
 
-        if (usedBackup) {
-          await sql`UPDATE usuarios SET mfa_backup_codes = ${JSON.stringify(newBackupCodes)}::jsonb WHERE id = ${user.id};`;
-        } else if (newStep > 0) {
-          await sql`UPDATE usuarios SET mfa_last_used_step = ${newStep} WHERE id = ${user.id};`;
+        if (!(await consumeMfaFactor(sql, user, { usedBackup, newBackupCodes, newStep }))) {
+          return res.status(401).json({ success: false, message: 'Este código já foi utilizado. Aguarde o próximo código.' });
         }
       }
 
@@ -645,6 +692,9 @@ export default async function handler(req, res) {
       const decoded = verifyToken(tokenToVerify, secret);
       if (!decoded || decoded.purpose !== 'mfa_pending' || !decoded.userId) {
         return res.status(401).json({ success: false, message: 'Desafio MFA expirado ou inválido. Refaça o login.' });
+      }
+      if (await mfaAccountLimited(decoded.userId)) {
+        return res.status(429).json({ success: false, message: 'Muitas tentativas de código MFA para esta conta. Aguarde 15 minutos.' });
       }
 
       const rows = await sql`
@@ -725,10 +775,8 @@ export default async function handler(req, res) {
         });
       }
 
-      if (usedBackup) {
-        await sql`UPDATE usuarios SET mfa_backup_codes = ${JSON.stringify(newBackupCodes)}::jsonb WHERE id = ${user.id};`;
-      } else if (newStep > 0) {
-        await sql`UPDATE usuarios SET mfa_last_used_step = ${newStep} WHERE id = ${user.id};`;
+      if (!(await consumeMfaFactor(sql, user, { usedBackup, newBackupCodes, newStep }))) {
+        return res.status(401).json({ success: false, message: 'Este código já foi utilizado. Aguarde o próximo código.' });
       }
 
       const remember = Boolean(decoded.remember);
@@ -1246,13 +1294,16 @@ export default async function handler(req, res) {
         });
       }
 
+      // AUDIT-2026-10-02 U5: mesma resposta para chave inexistente e conta não vinculada;
+      // antes a diferença permitia descobrir chaves de empresa válidas com qualquer conta Google.
+      const googleNotLinked = () => res.status(403).json({
+        success: false,
+        not_registered: true,
+        message: 'Esta conta Google não está vinculada a esta Chave da Empresa. Confira a chave ou solicite acesso ao administrador da sua empresa.'
+      });
       const googleTenant = await resolveTenantByAccessKey(sql, rawGoogleCompanyKey);
       if (!googleTenant) {
-        return res.status(403).json({
-          success: false,
-          not_registered: true,
-          message: 'Chave da Empresa não encontrada ou empresa com acesso bloqueado.'
-        });
+        return googleNotLinked();
       }
       const googleTenantId = googleTenant.id;
 
@@ -1294,11 +1345,7 @@ export default async function handler(req, res) {
           userRecord.avatar = picture;
         }
       } else {
-        return res.status(403).json({
-          success: false,
-          not_registered: true,
-          message: 'Esta conta Google não está vinculada a nenhuma construtora cadastrada no FinGo. Solicite acesso ao administrador da sua empresa ou à nossa equipe comercial.'
-        });
+        return googleNotLinked();
       }
 
       const exp = Date.now() + 30 * 24 * 60 * 60 * 1000; // 30 dias
@@ -1418,6 +1465,12 @@ export default async function handler(req, res) {
         expiresInSeconds: 600
       });
       const fakeRequestId = () => 'rec_' + crypto.randomBytes(8).toString('hex');
+      // AUDIT-2026-10-02 V1: conta inexistente também paga o custo do hash do OTP, para o tempo
+      // de resposta não indicar se a conta existe.
+      const genericFakeResponse = async () => {
+        try { await hashPassword(crypto.randomInt(100000, 1000000).toString()); } catch {}
+        return genericResponse(fakeRequestId());
+      };
 
       const clean = identificador.trim().toLowerCase();
 
@@ -1441,24 +1494,24 @@ export default async function handler(req, res) {
         // Se access_key / company_key ausente, retornar resposta genérica (sem revelar que é obrigatória).
         const rawResetKey = String(resetAccessKey || resetCompanyKey || resetCamelKey || '').trim();
         if (!rawResetKey) {
-          return genericResponse(fakeRequestId());
+          return genericFakeResponse();
         }
         if (!isTenantAccessKeyShapeValid(rawResetKey)) {
-          return genericResponse(fakeRequestId());
+          return genericFakeResponse();
         }
         const resetTenant = await resolveTenantByAccessKey(sql, rawResetKey);
         if (!resetTenant) {
-          return genericResponse(fakeRequestId());
+          return genericFakeResponse();
         }
         const tenantUser = await resolveTenantUserByLogin(sql, resetTenant.id, clean);
         if (!tenantUser) {
-          return genericResponse(fakeRequestId());
+          return genericFakeResponse();
         }
         rows = [tenantUser];
       }
 
       if (!rows.length) {
-        return genericResponse(fakeRequestId());
+        return genericFakeResponse();
       }
 
       const user = rows[0];
@@ -1469,7 +1522,7 @@ export default async function handler(req, res) {
         WHERE usuario_id = ${user.id} AND created_at > NOW() - INTERVAL '15 minutes';
       `;
       if (Number(recentOtpCount[0]?.count || 0) >= 3) {
-        return genericResponse(fakeRequestId());
+        return genericFakeResponse();
       }
 
       await sql`
@@ -1597,27 +1650,34 @@ export default async function handler(req, res) {
         return res.status(400).json({ success: false, message: pwCheck.error });
       }
 
-      const activeResets = await sql`
-        SELECT id, usuario_id, codigo_hash, tentativas, max_tentativas
-        FROM recuperacao_senhas
+      // AUDIT-2026-10-02 T1: a tentativa é reservada de forma atômica ANTES de verificar o código.
+      // Antes, o contador era lido, o código verificado e só então incrementado; requisições
+      // paralelas liam o mesmo valor e ultrapassavam max_tentativas.
+      const reservedResets = await sql`
+        UPDATE recuperacao_senhas
+        SET tentativas = tentativas + 1
         WHERE id = ${String(requestId)} AND usado = FALSE AND expira_em > NOW()
-        LIMIT 1;
+          AND tentativas < COALESCE(max_tentativas, 5)
+        RETURNING id, usuario_id, codigo_hash, tentativas, max_tentativas;
       `;
 
-      if (!activeResets.length) {
+      if (!reservedResets.length) {
+        const exhausted = await sql`
+          UPDATE recuperacao_senhas
+          SET usado = TRUE
+          WHERE id = ${String(requestId)} AND usado = FALSE AND expira_em > NOW()
+          RETURNING id;
+        `;
+        if (exhausted.length) {
+          return res.status(403).json({ success: false, message: 'Limite de tentativas excedido por segurança. Solicite um novo código.' });
+        }
         return res.status(400).json({ success: false, message: 'Código expirado ou inválido. Solicite um novo código.' });
       }
 
-      const rec = activeResets[0];
-      if (Number(rec.tentativas || 0) >= Number(rec.max_tentativas || 5)) {
-        await sql`UPDATE recuperacao_senhas SET usado = TRUE WHERE id = ${rec.id};`;
-        return res.status(403).json({ success: false, message: 'Limite de tentativas excedido por segurança. Solicite um novo código.' });
-      }
-
+      const rec = reservedResets[0];
       const codeMatches = await verifyPassword(String(code).trim(), rec.codigo_hash);
       if (!codeMatches) {
-        await sql`UPDATE recuperacao_senhas SET tentativas = tentativas + 1 WHERE id = ${rec.id};`;
-        const restantes = Math.max(0, Number(rec.max_tentativas || 5) - (Number(rec.tentativas || 0) + 1));
+        const restantes = Math.max(0, Number(rec.max_tentativas || 5) - Number(rec.tentativas || 0));
         return res.status(401).json({ success: false, message: `Código incorreto. Você tem mais ${restantes} tentativa(s).` });
       }
 
@@ -1630,7 +1690,7 @@ export default async function handler(req, res) {
             AND usuario_id = ${rec.usuario_id}
             AND usado = FALSE
             AND expira_em > NOW()
-            AND tentativas < max_tentativas
+            AND tentativas <= COALESCE(max_tentativas, 5)
           RETURNING usuario_id
         ),
         password_upd AS (

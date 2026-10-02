@@ -508,7 +508,7 @@ const OCR = {
             <select id="ocr-obra" class="form-control" style="font-size:.85rem;font-weight:700;border:2px solid var(--accent);background:var(--bg-card);" required>
               <option value="escritorio" ${defaultObraId==='escritorio'?'selected':''}>🏢 Sede / Escritório Central</option>
               <optgroup label="🏗️ Obras em Andamento">
-                ${obras.map(o => `<option value="${o.id}" ${defaultObraId===o.id?'selected':''}>${o.nome}</option>`).join('')}
+                ${obras.map(o => `<option value="${Utils.escapeHtml(o.id)}" ${defaultObraId===o.id?'selected':''}>${Utils.escapeHtml(o.nome)}</option>`).join('')}
               </optgroup>
             </select>
           </div>
@@ -518,7 +518,7 @@ const OCR = {
             </label>
             <select id="ocr-conta" class="form-control" style="font-size:.85rem;background:var(--bg-card);">
               <option value="">Selecione a conta...</option>
-              ${contas.map(c => `<option value="${c.apelido || c.banco_nome}">${c.apelido || c.banco_nome} (${c.agencia||''}/${c.numero||''})</option>`).join('')}
+              ${contas.map(c => `<option value="${Utils.escapeHtml(c.apelido || c.banco_nome)}">${Utils.escapeHtml(c.apelido || c.banco_nome)} (${Utils.escapeHtml(c.agencia||'')}/${Utils.escapeHtml(c.numero||'')})</option>`).join('')}
             </select>
           </div>
         </div>

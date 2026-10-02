@@ -2741,16 +2741,16 @@ const MasterAdmin = {
           relatorioHtml += `<li><strong>WhatsApp:</strong> Entregue com sucesso pelo robô (ID: ${results.whatsapp.messageId})</li>`;
         } else {
           const waHref = results.waLink || (phone && phone.length >= 10 ? `https://wa.me/${phone.startsWith('55') ? phone : '55' + phone}?text=${encodeURIComponent(message)}` : `https://web.whatsapp.com/send?text=${encodeURIComponent(message)}`);
-          relatorioHtml += `<li style="color:#fca5a5;"><strong>WhatsApp:</strong> ${results.whatsapp.error} <a href="${waHref}" target="_blank" rel="noopener noreferrer" style="color:#38bdf8;text-decoration:underline;font-weight:700;">[Abrir no WhatsApp Web]</a></li>`;
+          relatorioHtml += `<li style="color:#fca5a5;"><strong>WhatsApp:</strong> ${this._esc(results.whatsapp.error)} <a href="${this._esc(waHref)}" target="_blank" rel="noopener noreferrer" style="color:#38bdf8;text-decoration:underline;font-weight:700;">[Abrir no WhatsApp Web]</a></li>`;
         }
       }
 
       if (results.email?.attempted) {
         if (results.email.success) {
           const extraInfo = results.email.fallbackUsed ? ` (via ${results.email.fallbackUsed})` : '';
-          relatorioHtml += `<li><strong>E-mail:</strong> Enviado com sucesso via Resend (ID: ${results.email.id})${extraInfo}</li>`;
+          relatorioHtml += `<li><strong>E-mail:</strong> Enviado com sucesso via Resend (ID: ${this._esc(results.email.id)})${this._esc(extraInfo)}</li>`;
         } else {
-          relatorioHtml += `<li style="color:#fca5a5;"><strong>E-mail:</strong> ${results.email.error}</li>`;
+          relatorioHtml += `<li style="color:#fca5a5;"><strong>E-mail:</strong> ${this._esc(results.email.error)}</li>`;
         }
       }
       relatorioHtml += `</ul>`;
@@ -2770,7 +2770,7 @@ const MasterAdmin = {
         fb.style.background = 'rgba(239,68,68,.15)';
         fb.style.border = '1px solid #ef4444';
         fb.style.color = '#fca5a5';
-        fb.innerHTML = `<strong>Falha ao enviar:</strong> ${err.message}`;
+        fb.innerHTML = `<strong>Falha ao enviar:</strong> ${this._esc(err.message)}`;
       }
       alert('Erro no envio da cobrança: ' + err.message);
     } finally {
