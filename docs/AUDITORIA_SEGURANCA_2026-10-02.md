@@ -218,6 +218,19 @@ Revisado e sem problema:
 - **Produção:** 0 vulnerabilidades (raiz e `backend/`).
 - **Desenvolvimento:** 5 (3 altas, 2 moderadas), todas vindas do `wrangler@3` (`miniflare`/`undici@5`, `esbuild`, `sharp`). Afetam só a máquina de quem roda `wrangler dev`/deploy; não vão para o Worker publicado. **Recomendação:** atualizar para `wrangler@4` em uma tarefa separada, testando o deploy, porque é a ferramenta de publicação.
 
+## Décima rodada — WhatsApp (Evolution Go)
+
+| # | Severidade | Problema | Correção |
+|---|---|---|---|
+| Z1 | 🔴 Crítica | O token de cada instância do WhatsApp no Evolution Go era `token_<id-da-empresa>_fingo`. O serviço `fingo-evolution-go.onrender.com` é público (o próprio cron do Worker faz ping nele). Com o id da empresa (ex.: `angelim`), qualquer pessoa podia chamar a API do Evolution com esse token: enviar mensagens e arquivos pelo número da empresa, obter o QR de pareamento ou desconectar o WhatsApp | Token aleatório (`fgo_` + 192 bits) para instâncias novas. Instâncias antigas **desconectadas** são recriadas automaticamente com token novo ao pedir o QR. As **conectadas** geram aviso no log e precisam de "Desconectar/Resetar" no painel |
+
+Revisado e sem problema: `/qr` do Render (segredo forte, cookie assinado, `tenantId` sanitizado), `origin_trust.js`, `traceability.js`.
+
+### Ações necessárias após o deploy (Z1)
+1. **Resetar o WhatsApp de cada empresa conectada.** No painel: WhatsApp → Desconectar/Resetar → ler o QR de novo. Até isso acontecer, a instância conectada continua com o token antigo e previsível. O log do Render mostra `Instância <nome> conectada com token previsível` para cada uma.
+2. **Tirar o Evolution Go da internet.** No Render, transformar `fingo-evolution-go` em *Private Service*, acessível só pelo `finan-backend` pela rede interna, e ajustar `EVOLUTION_GO_URL`/`EVOLUTION_GO_HEALTH_URL`. Assim, nem a chave global nem tokens de instância ficam expostos.
+3. **Verificar se houve abuso.** Procurar no log do Evolution Go chamadas a `/send/*`, `/instance/qr` ou `/instance/logout` que não tenham partido do `finan-backend`.
+
 ## Testes
 - Novo: `scripts/test-audit-2026-10-02.js` (incluído em `npm test`). Cobre F1–F11 e R1–R5. Falha na versão anterior e passa na corrigida.
 - Novo: `scripts/test-audit-2026-10-02-r3.js` (incluído em `npm test`). Cobre a terceira rodada.
@@ -227,6 +240,7 @@ Revisado e sem problema:
 - Novo: `scripts/test-audit-2026-10-02-r7.js` (incluído em `npm test`). Cobre a sétima rodada e confere os espelhos de `frontend/`; suíte com 124 testes, mesmas duas falhas externas, nenhuma regressão.
 - Novo: `scripts/test-audit-2026-10-02-r8.js` (incluído em `npm test`). Cobre X4: assinatura, adulteração, validade, dados do cadastro e frontend; suíte com 125 testes, mesmas duas falhas externas, nenhuma regressão.
 - Novo: `scripts/test-audit-2026-10-02-r9.js` (incluído em `npm test`). Cobre Y1; suíte com 126 testes, mesmas duas falhas externas, nenhuma regressão.
+- Novo: `scripts/test-audit-2026-10-02-r10.js` (incluído em `npm test`). Cobre Z1, inclusive a recriação automática da instância antiga; suíte com 127 testes, mesmas duas falhas externas, nenhuma regressão.
 - Terceira rodada, suíte completa rodada teste a teste antes e depois: 118 de 119 → 119 de 120 (o novo passa). Falham igualmente nas duas versões, por dependerem de serviço externo: `test-phase5-edge-swr-cache.js` (API de CEP) e `test-upstash-redis-integration.js` (Redis real).
 - Atualizados para o novo contrato:
   - `test-edge-v2-routes.js` e `test-review-remediation.js`: antes exigiam a lista fixa do SINAPI e o otimizador sem login.

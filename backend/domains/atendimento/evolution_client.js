@@ -2,6 +2,21 @@
 // Cliente HTTP robusto para integração do FinGo com o Evolution Go (Golang WhatsApp Engine)
 // Documentação: https://docs.evolutionfoundation.com.br/evolution-go/installation
 
+import crypto from 'crypto';
+
+// AUDIT-2026-10-02 Z1: tokens de instância eram `token_<tenant>_fingo` (previsíveis). Com o
+// Evolution Go acessível publicamente, qualquer pessoa enviava mensagens, lia o QR ou
+// desconectava o WhatsApp de qualquer empresa. Agora o token é aleatório.
+export function generateInstanceToken() {
+  return `fgo_${crypto.randomBytes(24).toString('hex')}`;
+}
+
+export function isLegacyPredictableInstanceToken(inst) {
+  if (!inst || !inst.token) return false;
+  const name = String(inst.name || '').trim();
+  return Boolean(name) && String(inst.token) === `token_${name}_fingo`;
+}
+
 export class EvolutionGoClient {
   constructor(options = {}) {
     this.baseUrl = (options.baseUrl || process.env.EVOLUTION_GO_URL || 'http://localhost:8085').replace(/\/+$/, '');
@@ -313,7 +328,7 @@ export class EvolutionGoClient {
    */
   async createInstance(tenantId) {
     const instanceName = this.cleanInstanceName(tenantId);
-    const token = `token_${instanceName}_fingo`;
+    const token = generateInstanceToken();
     const webhookUrl = (process.env.EVOLUTION_GO_WEBHOOK_URL || '').trim();
 
     // Cria a instância com global API key
@@ -360,6 +375,18 @@ export class EvolutionGoClient {
     const qrTimeoutMs = Math.max(this.timeoutMs, 5000);
 
     let inst = await this.findInstance(tenantId);
+    // AUDIT-2026-10-02 Z1: instância antiga desconectada com token previsível é recriada com
+    // token aleatório (o QR precisa ser lido de qualquer forma). Conectada, só é trocada no
+    // "Desconectar/Resetar" do painel, para não derrubar o WhatsApp em uso.
+    if (inst && !inst.connected && isLegacyPredictableInstanceToken(inst)) {
+      console.warn(`[EvolutionGo] Rotacionando token previsível da instância ${inst.name}.`);
+      await this.deleteInstance(tenantId).catch(() => {});
+      if (this._instanceCache) this._instanceCache.delete(this.cleanInstanceName(tenantId));
+      inst = null;
+    }
+    if (inst && inst.connected && isLegacyPredictableInstanceToken(inst)) {
+      console.warn(`[EvolutionGo] Instância ${inst.name} conectada com token previsível. Use "Desconectar/Resetar" e leia o QR novamente.`);
+    }
     if (!inst) {
       await this.createInstance(tenantId);
       // Aguarda um momento para o QR ser gerado
