@@ -153,13 +153,18 @@ const localMcpRateStore = new Map();
 
 export const KNOWN_MALICIOUS_IPS = new Set([
   '34.38.113.44', // GCP Bélgica (scanner ativo automatizado detectado no tráfego)
+  '35.240.58.49', // GCP Bélgica (scanner ativo de .env e sondas de mídia)
   '40.160.65.14', // Microsoft Azure (probes automatizados de credenciais)
   '185.110.9.30', // Scanner de vulnerabilidades conhecido
   '45.138.12.42'  // Scanner de vulnerabilidades conhecido
 ]);
 
 export function isKnownMaliciousIp(ip) {
-  return KNOWN_MALICIOUS_IPS.has(String(ip || '').trim());
+  const norm = String(ip || '').trim();
+  if (KNOWN_MALICIOUS_IPS.has(norm)) return true;
+  // Bloqueio de subnets de scanners persistentes em datacenters estrangeiros (GCP Bélgica e Azure):
+  if (norm.startsWith('34.38.') || norm.startsWith('35.240.') || norm.startsWith('40.160.')) return true;
+  return false;
 }
 
 export const MALICIOUS_PATH_PATTERNS = [
@@ -270,7 +275,7 @@ export async function applyEdgeSecurityMiddleware(request, env) {
   const ip = getClientIp(request);
 
   // 1. Bloqueio imediato de IPs com reputação maliciosa conhecida (scanners ativos)
-  if (KNOWN_MALICIOUS_IPS.has(ip)) {
+  if (isKnownMaliciousIp(ip)) {
     return Response.json({
       success: false,
       error: 'Acesso bloqueado por reputação de segurança de borda.',
