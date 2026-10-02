@@ -223,13 +223,18 @@ Revisado e sem problema:
 | # | Severidade | Problema | Correção |
 |---|---|---|---|
 | Z1 | 🔴 Crítica | O token de cada instância do WhatsApp no Evolution Go era `token_<id-da-empresa>_fingo`. O serviço `fingo-evolution-go.onrender.com` é público (o próprio cron do Worker faz ping nele). Com o id da empresa (ex.: `angelim`), qualquer pessoa podia chamar a API do Evolution com esse token: enviar mensagens e arquivos pelo número da empresa, obter o QR de pareamento ou desconectar o WhatsApp | Token aleatório (`fgo_` + 192 bits) para instâncias novas. Instâncias antigas **desconectadas** são recriadas automaticamente com token novo ao pedir o QR. As **conectadas** geram aviso no log e precisam de "Desconectar/Resetar" no painel |
+| Z2 | 🟠 Alta | A chave global do Evolution tinha valor padrão público (`fingo-evo-secret-change-me-in-production`) no `docker-compose` e no `.env` de exemplo. Quem tem a chave global lista todas as instâncias com seus tokens | O backend recusa o valor padrão, chave vazia e, em produção, chave com menos de 32 caracteres (a integração fica desligada e o log explica o motivo). Valor padrão removido do `docker-compose` (agora obrigatório) e do exemplo |
 
 Revisado e sem problema: `/qr` do Render (segredo forte, cookie assinado, `tenantId` sanitizado), `origin_trust.js`, `traceability.js`.
 
-### Ações necessárias após o deploy (Z1)
-1. **Resetar o WhatsApp de cada empresa conectada.** No painel: WhatsApp → Desconectar/Resetar → ler o QR de novo. Até isso acontecer, a instância conectada continua com o token antigo e previsível. O log do Render mostra `Instância <nome> conectada com token previsível` para cada uma.
-2. **Tirar o Evolution Go da internet.** No Render, transformar `fingo-evolution-go` em *Private Service*, acessível só pelo `finan-backend` pela rede interna, e ajustar `EVOLUTION_GO_URL`/`EVOLUTION_GO_HEALTH_URL`. Assim, nem a chave global nem tokens de instância ficam expostos.
-3. **Verificar se houve abuso.** Procurar no log do Evolution Go chamadas a `/send/*`, `/instance/qr` ou `/instance/logout` que não tenham partido do `finan-backend`.
+**Decisão do responsável:** o Evolution Go continua como *Web Service* gratuito (público). A proteção vem de chaves fortes, sem serviço pago.
+
+### Ações necessárias após o deploy (Z1/Z2)
+1. **Gerar uma chave global nova e forte** (64 caracteres hex): `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`.
+2. **Configurar o MESMO valor** em `GLOBAL_API_KEY` no serviço `fingo-evolution-go` e em `EVOLUTION_GO_API_KEY` no `finan-backend` (e nos Secrets do Worker, se estiver lá). Se a chave atual for o padrão ou tiver menos de 32 caracteres, o WhatsApp fica desligado até isso ser feito. O log do Render mostra `Integração bloqueada`.
+3. **Resetar o WhatsApp de cada empresa conectada.** No painel: WhatsApp → Desconectar/Resetar → ler o QR. Isso troca o token previsível da instância por um aleatório. O log mostra quais faltam (`conectada com token previsível`).
+4. **Manter o ping de keep-alive** (`EVOLUTION_GO_HEALTH_URL` / padrão `https://fingo-evolution-go.onrender.com/server/ok`): ele é necessário no plano gratuito, e `/server/ok` não expõe dados.
+5. **Verificar se houve abuso.** Procurar no log do Evolution Go chamadas a `/send/*`, `/instance/qr`, `/instance/logout` ou `/instance/all` que não tenham partido do `finan-backend`.
 
 ## Testes
 - Novo: `scripts/test-audit-2026-10-02.js` (incluído em `npm test`). Cobre F1–F11 e R1–R5. Falha na versão anterior e passa na corrigida.

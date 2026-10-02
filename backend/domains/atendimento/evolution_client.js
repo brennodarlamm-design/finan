@@ -11,6 +11,21 @@ export function generateInstanceToken() {
   return `fgo_${crypto.randomBytes(24).toString('hex')}`;
 }
 
+// AUDIT-2026-10-02 Z2: o Evolution Go roda como Web Service público (plano gratuito). A chave
+// global dá acesso a todas as instâncias e aos tokens delas, então precisa ser forte e secreta.
+// O valor padrão que estava no docker-compose/.env de exemplo é público e nunca é aceito.
+export const KNOWN_DEFAULT_EVOLUTION_KEYS = Object.freeze(['fingo-evo-secret-change-me-in-production']);
+
+export function evolutionApiKeyProblem(key, env = process.env) {
+  const value = String(key || '').trim();
+  if (!value) return 'EVOLUTION_GO_API_KEY ausente.';
+  if (KNOWN_DEFAULT_EVOLUTION_KEYS.includes(value)) return 'EVOLUTION_GO_API_KEY usa o valor padrão público do repositório.';
+  if (String(env.NODE_ENV || '').toLowerCase() === 'production' && value.length < 32) {
+    return 'EVOLUTION_GO_API_KEY curta demais para produção (mínimo 32 caracteres).';
+  }
+  return '';
+}
+
 export function isLegacyPredictableInstanceToken(inst) {
   if (!inst || !inst.token) return false;
   const name = String(inst.name || '').trim();
@@ -161,7 +176,16 @@ export class EvolutionGoClient {
    * Verifica se o provedor Evolution Go possui configuração mínima necessária
    */
   isConfigured() {
-    return Boolean(this.baseUrl && this.apiKey);
+    if (!this.baseUrl || !this.apiKey) return false;
+    const problem = evolutionApiKeyProblem(this.apiKey);
+    if (problem) {
+      if (!this._weakKeyWarned) {
+        this._weakKeyWarned = true;
+        console.error(`🚨 [EvolutionGo] Integração bloqueada: ${problem} Gere uma chave aleatória e configure o MESMO valor em GLOBAL_API_KEY (serviço do Evolution) e EVOLUTION_GO_API_KEY (finan-backend).`);
+      }
+      return false;
+    }
+    return true;
   }
 
   /**

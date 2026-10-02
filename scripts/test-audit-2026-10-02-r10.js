@@ -55,4 +55,18 @@ const { EvolutionGoClient, generateInstanceToken, isLegacyPredictableInstanceTok
   console.log('  ✓ Z1 instância antiga desconectada é recriada com token novo');
 }
 
+// Z2 — Chave global do Evolution: padrão público e chave curta em produção são recusados.
+{
+  const { evolutionApiKeyProblem } = mod;
+  assert(evolutionApiKeyProblem('fingo-evo-secret-change-me-in-production', {}), 'Z2: padrão público recusado');
+  assert(evolutionApiKeyProblem('', {}), 'Z2: chave vazia recusada');
+  assert(evolutionApiKeyProblem('curta', { NODE_ENV: 'production' }), 'Z2: chave curta recusada em produção');
+  assert.strictEqual(evolutionApiKeyProblem('a'.repeat(32), { NODE_ENV: 'production' }), '', 'Z2: chave forte aceita');
+  const weak = new EvolutionGoClient({ baseUrl: 'http://evo.test', apiKey: 'fingo-evo-secret-change-me-in-production' });
+  assert.strictEqual(weak.isConfigured(), false, 'Z2: integração bloqueada com chave padrão');
+  assert(!read('docker-compose.evolution-go.yml').includes('fingo-evo-secret-change-me-in-production'), 'Z2: compose sem chave padrão');
+  assert(!read('.env.evolution-go.example').includes('fingo-evo-secret-change-me-in-production'), 'Z2: exemplo sem chave padrão');
+  console.log('  ✓ Z2 chave global fraca ou padrão bloqueia a integração');
+}
+
 console.log('\n✅ Auditoria 2026-10-02 (10ª rodada): todas as regressões passaram.');
