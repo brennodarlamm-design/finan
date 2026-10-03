@@ -30,7 +30,7 @@ O FinGo comprova que a verificação foi feita (data, hash e resultado). Para o 
 
 - `api/_pdf-signature.js`: extrai as assinaturas do PDF, valida o CMS (`pkijs`), monta a cadeia, consulta a LCR e classifica.
 - `api/_trust-anchors-br.js`: raízes oficiais com impressão digital SHA-256 fixada (conferida ao carregar).
-- `api/_icp-intermediates.pem`: ACs intermediárias, usadas só para montar a cadeia (não são âncoras).
+- `api/_icp-intermediates.txt`: ACs intermediárias, usadas só para montar a cadeia (não são âncoras).
 - `api/assinaturas.js`: `POST /api/assinaturas?action=verificar_pdf` e `GET ?action=verificacoes`.
 - **Execução no Render (Node):** o Worker encaminha `verificar_pdf` ao backend, porque cadeia + LCR passam do limite de CPU do plano gratuito do Workers. Com o Render gratuito "dormindo", a primeira verificação pode levar até 1 minuto.
 - **Proteção contra SSRF:** endereços de LCR e AIA vêm do certificado; só `http(s)` em portas padrão, com nome de domínio (sem IP, `localhost` ou nomes internos).

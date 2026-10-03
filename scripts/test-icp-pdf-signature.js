@@ -229,6 +229,7 @@ const cleanCrl = await makeCrl(pki);
 // 10. Cadeias REAIS: ACs oficiais do pacote chegam às raízes oficiais (sem rede).
 {
   const inter = await __test.loadBundledIntermediates();
+  assert(inter.length > 300, 'arquivo de intermediárias versionado e carregado');
   const cn = c => c.subject.typesAndValues.find(t => t.type === '2.5.4.3')?.value.valueBlock.value;
   const noNet = mockFetch({});
   const casos = [

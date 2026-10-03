@@ -141,7 +141,7 @@ async function loadBundledIntermediates() {
   const certs = BUNDLED_INTERMEDIATES.map(p => parseCertDer(pemToDer(p)));
   try {
     const fs = await import('node:fs/promises');
-    const url = new URL('./_icp-intermediates.pem', import.meta.url);
+    const url = new URL('./_icp-intermediates.txt', import.meta.url);
     const text = await fs.readFile(url, 'utf8');
     for (const block of text.match(/-----BEGIN CERTIFICATE-----[\s\S]+?-----END CERTIFICATE-----/g) || []) {
       try { certs.push(parseCertDer(pemToDer(block))); } catch { /* ignora bloco inválido */ }
