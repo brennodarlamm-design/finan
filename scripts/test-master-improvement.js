@@ -129,11 +129,19 @@ test('llms.txt e llms-full.txt existem e seguem padrão llmstxt.org', () => {
 
   const txtContent = fs.readFileSync(txtPath, 'utf8');
   assert.ok(txtContent.startsWith('# FinGo') || txtContent.startsWith('# FinObra'), 'llms.txt deve iniciar com H1');
-  assert.ok(txtContent.includes('> FinGo é uma plataforma') || txtContent.includes('> FinObra é uma plataforma'), 'llms.txt deve conter resumo em blockquote');
+  assert.ok(/^> FinGo é /m.test(txtContent), 'llms.txt deve conter resumo em blockquote');
+  // Auditoria SEO/GEO 2026-10-03: só páginas públicas; nada de área logada, API ou fornecedores antigos.
+  for (const proibido of ['/app#', 'https://fingo.api.br/api', 'Vercel', 'Baileys']) {
+    assert.ok(!txtContent.includes(proibido), `llms.txt não deve citar ${proibido}`);
+  }
 
   const fullContent = fs.readFileSync(fullPath, 'utf8');
-  assert.ok(fullContent.includes('Documentação Completa para LLMs'), 'llms-full.txt deve ter escopo completo');
-  assert.ok(fullContent.includes('Especificação dos Endpoints RESTful'), 'llms-full.txt deve documentar endpoints');
+  assert.ok(fullContent.includes('Guia completo para assistentes de IA'), 'llms-full.txt deve ter escopo completo');
+  assert.ok(fullContent.includes('Acórdão 2.622/2013') && fullContent.includes('Perguntas frequentes'), 'llms-full.txt deve trazer BDI e FAQ');
+  // Não expõe detalhes internos (rotas, banco, CSP) — mapa de ataque e informação desatualizada para IAs.
+  for (const interno of ['/api/db', '/api/auth', 'Content-Security-Policy', 'empresa_id', 'Baileys']) {
+    assert.ok(!fullContent.includes(interno), `llms-full.txt não deve expor ${interno}`);
+  }
 });
 
 test('robots.txt permite acesso público a /llms.txt e /llms-full.txt', () => {
