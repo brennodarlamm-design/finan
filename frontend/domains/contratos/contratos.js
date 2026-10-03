@@ -650,26 +650,26 @@ const Contratos = {
               <div class="form-row cols-3" style="margin-bottom:10px;">
                 <div class="form-group">
                   <label class="form-label">Valor Total da Obra (R$) *</label>
-                  <input class="form-control" type="number" step="0.01" name="valor" id="ct-valor" value="${e(dados.valor || '122000.00')}" required data-fb-input="Contratos._recalcularValores" data-fb-input-n="0">
+                  <input class="form-control" type="number" step="0.01" name="valor" id="ct-valor" value="${e(dados.valor ?? '')}" placeholder="Ex: 122000.00" min="0.01" required data-fb-input="Contratos._recalcularValores" data-fb-input-n="0">
                 </div>
                 <div class="form-group">
                   <label class="form-label">Área Construída (m²) *</label>
-                  <input class="form-control" type="number" step="0.01" name="area_m2" id="ct-area" value="${e(dados.area_m2 || '40')}" required data-fb-input="Contratos._recalcularValores" data-fb-input-n="0">
+                  <input class="form-control" type="number" step="0.01" name="area_m2" id="ct-area" value="${e(dados.area_m2 ?? '')}" placeholder="Ex: 40" min="0.01" required data-fb-input="Contratos._recalcularValores" data-fb-input-n="0">
                 </div>
                 <div class="form-group">
                   <label class="form-label">Valor por m² (R$/m²)</label>
-                  <input class="form-control" name="valor_m2" id="ct-valor-m2" value="${e(dados.valor_m2 || 'R$ 3.050,00')}" readonly style="background:var(--bg-card);font-weight:700;color:var(--accent);">
+                  <input class="form-control" name="valor_m2" id="ct-valor-m2" value="${e(dados.valor_m2 || '')}" placeholder="Calculado" readonly style="background:var(--bg-card);font-weight:700;color:var(--accent);">
                 </div>
               </div>
 
               <div class="form-row cols-2" style="margin-bottom:10px;">
                 <div class="form-group">
                   <label class="form-label">Valor da Entrada / Recursos Próprios (R$)</label>
-                  <input class="form-control" type="number" step="0.01" name="valor_entrada" id="ct-entrada" value="${e(dados.valor_entrada || '14504.52')}">
+                  <input class="form-control" type="number" step="0.01" name="valor_entrada" id="ct-entrada" value="${e(dados.valor_entrada ?? '')}" placeholder="0,00 se não houver entrada" min="0">
                 </div>
                 <div class="form-group">
                   <label class="form-label">Parcela Paga na Assinatura da Caixa (R$)</label>
-                  <input class="form-control" name="parcela_entrada_caixa" id="ct-parc-caixa" value="${e(dados.parcela_entrada_caixa || 'R$ 10.978,13')}" placeholder="Ex: R$ 10.978,13">
+                  <input class="form-control" name="parcela_entrada_caixa" id="ct-parc-caixa" value="${e(dados.parcela_entrada_caixa || '')}" placeholder="Ex: R$ 10.978,13">
                 </div>
               </div>
 
@@ -787,7 +787,7 @@ const Contratos = {
         const m2 = v / a;
         valorM2El.value = Utils.fmt.currency(m2);
       } else {
-        valorM2El.value = 'R$ 3.050,00';
+        valorM2El.value = '';
       }
     }
 
@@ -850,8 +850,18 @@ const Contratos = {
     const fd = new FormData(f);
     const d = Object.fromEntries(fd);
     d.valor = parseFloat(d.valor) || 0;
-    d.area_m2 = parseFloat(d.area_m2) || 40;
+    d.area_m2 = parseFloat(d.area_m2) || 0;
     d.valor_entrada = parseFloat(d.valor_entrada) || 0;
+    d.parcela_entrada_caixa = String(d.parcela_entrada_caixa || '').trim();
+    if (!(d.valor > 0) || !(d.area_m2 > 0)) {
+      Utils.toast('Informe o valor total da obra e a área construída.', 'warning');
+      return;
+    }
+    if (d.valor_entrada > 0 && !d.parcela_entrada_caixa) {
+      Utils.toast('Informe a parcela paga na assinatura da Caixa (cláusula 08).', 'warning');
+      document.getElementById('ct-parc-caixa')?.focus();
+      return;
+    }
     d.clausulas = this._clausulasTemporarias;
 
     let contratoSalvo;
@@ -938,7 +948,7 @@ const Contratos = {
       `*Contrato Nº:* ${c.numero}\n` +
       `*Cliente (Contratante):* ${c.contratante_nome}\n` +
       `*Valor Total da Obra:* ${valorFmt}\n` +
-      `*Área Construída:* ${c.area_m2 || 40}m²\n` +
+      `*Área Construída:* ${Number(c.area_m2) > 0 ? `${Number(c.area_m2).toLocaleString('pt-BR')} m²` : '—'}\n` +
       `*Modalidade:* MCMV / Financiamento Caixa Econômica Federal\n\n` +
       `_Acesse a minuta completa em anexo ou no sistema FinObra para assinatura digital._`;
 
@@ -1035,13 +1045,19 @@ const Contratos = {
 
     const valorFmt = Utils.fmt.currency(c.valor);
     const extensoFmt = Utils.extenso(c.valor);
-    const areaFmt = `${c.area_m2 || 40}`;
-    const areaExtensoFmt = `${areaFmt === '40' ? 'quarenta' : areaFmt}`;
-    const valorM2Fmt = c.valor_m2 || Utils.fmt.currency((c.valor || 122000) / (c.area_m2 || 40));
+    // Só valores do próprio contrato: nada de exemplo no documento impresso.
+    const area = Number(c.area_m2) || 0;
+    const areaFmt = area.toLocaleString('pt-BR', { maximumFractionDigits: 2 });
+    const [areaInt, areaDecRaw] = area.toFixed(2).split('.');
+    const areaDec = areaDecRaw.replace(/0+$/, ''); // 85,50 -> "vírgula cinco"; 85,25 -> "vírgula vinte e cinco"
+    const decExtenso = areaDec ? `${areaDec.startsWith('0') ? 'zero ' : ''}${Utils.numeroExtenso(areaDec)}` : ''; // 120,05 -> "zero cinco"
+    const areaExtensoFmt = Utils.numeroExtenso(areaInt) + (decExtenso ? ` vírgula ${decExtenso}` : '');
+    const valorM2Fmt = area > 0 && Number(c.valor) > 0 ? Utils.fmt.currency(Number(c.valor) / area) : Utils.escapeHtml(c.valor_m2 || '—');
 
-    const valorEntradaFmt = Utils.fmt.currency(c.valor_entrada || 14504.52);
-    const extensoEntradaFmt = Utils.extenso(c.valor_entrada || 14504.52);
-    const parcelaEntradaFmt = c.parcela_entrada_caixa || 'R$ 10.978,13';
+    const valorEntrada = Number(c.valor_entrada) || 0;
+    const valorEntradaFmt = Utils.fmt.currency(valorEntrada);
+    const extensoEntradaFmt = Utils.extenso(valorEntrada);
+    const parcelaEntradaFmt = Utils.escapeHtml(c.parcela_entrada_caixa || '');
 
     const [y, m, d] = (Utils.cleanDate(c.data_emissao || c.criado_em) || Utils.today()).split('-');
     const meses = ['','Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
@@ -1188,9 +1204,9 @@ const Contratos = {
       ${logoHeaderHtml}
 
       <div style="font-size:.88rem;line-height:1.8;text-align:justify;margin-bottom:18px;">
-        <strong>CLÁUSULA 08 –</strong> O valor total referente à entrada, correspondente aos recursos próprios da CONTRATANTE, é de <strong>${valorEntradaFmt} (${extensoEntradaFmt})</strong>, a serem pagos da seguinte forma:
+        ${valorEntrada > 0 ? `<strong>CLÁUSULA 08 –</strong> O valor total referente à entrada, correspondente aos recursos próprios da CONTRATANTE, é de <strong>${valorEntradaFmt} (${extensoEntradaFmt})</strong>, a serem pagos da seguinte forma:
         <br>
-        <strong>a) ${parcelaEntradaFmt}</strong>, pagos na data da assinatura do contrato de financiamento junto à Caixa Econômica Federal;
+        <strong>a) ${parcelaEntradaFmt || valorEntradaFmt}</strong>, pagos na data da assinatura do contrato de financiamento junto à Caixa Econômica Federal;` : `<strong>CLÁUSULA 08 –</strong> Não há valor de entrada com recursos próprios da CONTRATANTE; o valor da obra será integralmente pago por meio do financiamento junto à Caixa Econômica Federal.`}
       </div>
 
       <div style="font-size:.88rem;line-height:1.8;text-align:justify;margin-bottom:18px;">

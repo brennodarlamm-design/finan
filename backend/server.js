@@ -1060,7 +1060,7 @@ async function executarResumoMatinal(explicitTenantId = null) {
           ON l.obra_id = o.id
          AND l.tenant_id = o.tenant_id
         WHERE l.tipo = 'despesa'
-          AND l.tenant_id = ${tId} -- l.tenant_id = ${TARGET_TENANT_ID}
+          AND l.tenant_id = ${tId}
           AND l.status IN ('a_pagar', 'pendente', 'em_atraso')
           AND (DATE(COALESCE(l.data_vencimento, l.data)) <= ${hoje}::date)
         ORDER BY COALESCE(l.data_vencimento, l.data) ASC;

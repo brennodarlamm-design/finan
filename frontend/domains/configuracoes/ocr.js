@@ -97,8 +97,7 @@ const OCR = {
           <div id="ocr-dropzone"
             style="border:2px dashed rgba(79,70,229,.4);border-radius:12px;padding:16px;text-align:center;
                    background:rgba(79,70,229,.04);cursor:pointer;transition:all .2s;" data-fb-click="Patch26Actions.clickById" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="ocr-file-input"
-            ondragover="OCR._onDragOver(event)"
-            ondragleave="OCR._onDragLeave(event)" data-fb-drop="OCR._onDrop" data-fb-drop-n="1" data-fb-drop-t0="event">
+            data-fb-drop="OCR._onDrop" data-fb-drop-n="1" data-fb-drop-t0="event">
             <div style="font-size:.78rem;color:var(--text3);">
               🖥️ Ou arraste um arquivo aqui (PDF, imagem)
             </div>
@@ -128,16 +127,6 @@ const OCR = {
   },
 
   // ── Drag & Drop handlers ──────────────────────────────────────────────────
-  _onDragOver(e) {
-    e.preventDefault();
-    const dz = document.getElementById('ocr-dropzone');
-    if (dz) {
-      dz.style.borderColor = '#6366f1';
-      dz.style.background  = 'linear-gradient(135deg,rgba(99,102,241,.15) 0%,rgba(139,92,246,.1) 100%)';
-      dz.style.transform   = 'scale(1.01)';
-    }
-  },
-
   _onDragLeave(e) {
     const dz = document.getElementById('ocr-dropzone');
     if (dz) {

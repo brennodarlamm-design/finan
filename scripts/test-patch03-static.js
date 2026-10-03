@@ -30,7 +30,7 @@ ok('Migração cria registro central de assinaturas', migration.includes('CREATE
 ok('Contas novas não recebem bancos fictícios da Angelim', /DEFAULT_CONTAS\s*:\s*\[\s*\]/.test(contas));
 ok('Backend cron exige tenant e telefone explícitos', backend.includes('if (!TARGET_TENANT_ID || !TARGET_PHONE)') && !backend.includes("const TARGET_PHONE = process.env.TARGET_PHONE || '"));
 ok('Backend não aceita API_SECRET por query/body', !backend.includes('queryToken') && !backend.includes("req.query?.secret"));
-ok('Backend cron filtra lançamentos pelo tenant', backend.includes('l.tenant_id = ${TARGET_TENANT_ID}'));
+ok('Backend cron filtra lançamentos pelo tenant', backend.includes('AND l.tenant_id = ${tId}') && !/--[^\n`]*\$\{/.test(backend));
 ok('Utils.confirm escapa HTML por padrão', utils.includes('allowHtml') && utils.includes('this.escapeHtml'));
 ok('Cláusulas de contratos são escapadas', contratos.includes('Utils.escapeHtml(cl.texto') && contratos.includes('Utils.escapeHtml(cl.titulo'));
 ok('Recibos usam cidade/UF do tenant e escapam dados', recibos.includes('cidadeUfPadrao') && recibos.includes('Utils.safeUrl(emp.logo_url)'));

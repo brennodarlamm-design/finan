@@ -468,8 +468,7 @@ const NFe = {
 
         <div id="nfe-cert-dropzone"
           style="border:2px dashed var(--border);border-radius:var(--r-md);padding:32px;text-align:center;background:var(--bg-secondary);cursor:pointer;transition:.2s all;" data-fb-click="Patch26Actions.clickById" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="nfe-cert-file"
-          ondragover="event.preventDefault();this.style.borderColor='var(--accent)';this.style.background='rgba(201,162,39,.06)';"
-          ondragleave="this.style.borderColor='var(--border)';this.style.background='var(--bg-secondary)';" data-fb-drop="Patch26Actions.nfeDrop" data-fb-drop-n="2" data-fb-drop-t0="event" data-fb-drop-t1="self">
+          data-fb-drop="Patch26Actions.nfeDrop" data-fb-drop-n="2" data-fb-drop-t0="event" data-fb-drop-t1="self">
           <div style="font-size:2.8rem;margin-bottom:8px;">🗂️</div>
           <div style="font-weight:700;color:var(--text);margin-bottom:4px;">Arraste os arquivos XML aqui ou clique para selecionar</div>
           <div style="font-size:.78rem;color:var(--text3);">Aceita arquivos <strong>.xml</strong> individuais de NF-e ou arquivos de lote <strong>retDistDFeInt.xml</strong> / <strong>enviNFe.xml</strong> (suporta múltiplos arquivos)</div>

@@ -130,4 +130,24 @@
     }, true);
   }
   EVENTS.forEach(bind);
+  /* Arrastar arquivos: ondragover/ondragleave inline são bloqueados pelo CSP
+     (script-src-attr 'none') e, sem preventDefault no dragover, o navegador
+     nunca dispara o drop (abre o arquivo na aba). Vale para todo [data-fb-drop]. */
+  const dropZone = ev => ev.target?.closest?.('[data-fb-drop]');
+  document.addEventListener('dragover', ev => {
+    const el = dropZone(ev);
+    if (!el) return;
+    ev.preventDefault();
+    el.classList.add('drag-over');
+  }, true);
+  document.addEventListener('dragleave', ev => {
+    const el = dropZone(ev);
+    if (el && !el.contains(ev.relatedTarget)) el.classList.remove('drag-over');
+  }, true);
+  document.addEventListener('drop', ev => {
+    const el = dropZone(ev);
+    if (!el) return;
+    ev.preventDefault();
+    el.classList.remove('drag-over');
+  }, true);
 })();

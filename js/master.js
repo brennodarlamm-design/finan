@@ -307,7 +307,7 @@ const MasterAdmin = {
       const st = statusBadges[r.status] || statusBadges.pendente;
       const dataHora = r.created_at ? new Date(r.created_at).toLocaleString('pt-BR') : '—';
       const cleanPhone = String(r.telefone || '').replace(/\D/g, '');
-      const waLink = cleanPhone ? (cleanPhone.startsWith('55') ? `https://wa.me/${cleanPhone}` : `https://wa.me/55${cleanPhone}`) : '';
+      const waLink = cleanPhone ? ((cleanPhone.length === 10 || cleanPhone.length === 11) ? `https://wa.me/55${cleanPhone}` : `https://wa.me/${cleanPhone}`) : '';
       const waText = encodeURIComponent(`Olá ${r.nome}, sou da equipe comercial FinGo! Recebi sua solicitação de acesso para a construtora ${r.empresa_nome || ''}.`);
       const fullWaUrl = waLink ? `${waLink}?text=${waText}` : '';
 
@@ -1578,7 +1578,7 @@ const MasterAdmin = {
     const plano=this._esc(planosNome[e.plano]||e.plano||'—');
     const id=String(e.id||''); // IDs de tenant são gerados pelo servidor e não são texto livre.
     const telDigits=String(e.telefone||'').replace(/\D/g,'');
-    const wa=(telDigits ? (telDigits.startsWith('55')?telDigits:'55'+telDigits) : '5595991363678');
+    const wa=(telDigits ? ((telDigits.length===10||telDigits.length===11)?'55'+telDigits:telDigits) : '5595991363678');
     const waText=encodeURIComponent(`Olá, ${e.responsavel||''}! Aqui é do FinGo referente à assinatura da ${e.nome_fantasia||''}.`);
 
     let vencHtml = '<span style="color:#64748b;">—</span>';
@@ -2639,7 +2639,7 @@ const MasterAdmin = {
     const msg = document.getElementById('mc-message')?.value || '';
     let url;
     if (phone && phone.length >= 10) {
-      const fullPhone = phone.startsWith('55') ? phone : '55' + phone;
+      const fullPhone = (phone.length === 10 || phone.length === 11) ? '55' + phone : phone;
       url = `https://wa.me/${fullPhone}?text=${encodeURIComponent(msg)}`;
     } else {
       url = `https://web.whatsapp.com/send?text=${encodeURIComponent(msg)}`;
@@ -2740,7 +2740,7 @@ const MasterAdmin = {
         if (results.whatsapp.success) {
           relatorioHtml += `<li><strong>WhatsApp:</strong> Entregue com sucesso pelo robô (ID: ${results.whatsapp.messageId})</li>`;
         } else {
-          const waHref = results.waLink || (phone && phone.length >= 10 ? `https://wa.me/${phone.startsWith('55') ? phone : '55' + phone}?text=${encodeURIComponent(message)}` : `https://web.whatsapp.com/send?text=${encodeURIComponent(message)}`);
+          const waHref = results.waLink || (phone && phone.length >= 10 ? `https://wa.me/${(phone.length === 10 || phone.length === 11) ? '55' + phone : phone}?text=${encodeURIComponent(message)}` : `https://web.whatsapp.com/send?text=${encodeURIComponent(message)}`);
           relatorioHtml += `<li style="color:#fca5a5;"><strong>WhatsApp:</strong> ${this._esc(results.whatsapp.error)} <a href="${this._esc(waHref)}" target="_blank" rel="noopener noreferrer" style="color:#38bdf8;text-decoration:underline;font-weight:700;">[Abrir no WhatsApp Web]</a></li>`;
         }
       }

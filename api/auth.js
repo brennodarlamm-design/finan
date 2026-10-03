@@ -1038,7 +1038,7 @@ export default async function handler(req, res) {
 
           const cleanPhone = rawTelefone.replace(/\D/g, '');
           const waLeadUrl = cleanPhone
-            ? (cleanPhone.startsWith('55') ? `https://wa.me/${cleanPhone}` : `https://wa.me/55${cleanPhone}`)
+            ? ((cleanPhone.length === 10 || cleanPhone.length === 11) ? `https://wa.me/55${cleanPhone}` : `https://wa.me/${cleanPhone}`)
             : '';
           const waAdminMsg = encodeURIComponent(`Olá ${rawNome}, sou da equipe comercial do FinGo! Recebi sua solicitação de acesso para a ${rawEmpresa || 'sua construtora'}.`);
           const waActionLink = waLeadUrl ? `${waLeadUrl}?text=${waAdminMsg}` : '';
@@ -1544,7 +1544,7 @@ export default async function handler(req, res) {
       // O envio é best-effort. A resposta pública nunca revela qual canal existe ou se o envio funcionou.
       const destPhone = (user.tenant_telefone || '').replace(/\D/g, '');
       if (destPhone) {
-        const numFmt = destPhone.startsWith('55') ? destPhone : `55${destPhone}`;
+        const numFmt = (destPhone.length === 10 || destPhone.length === 11) ? `55${destPhone}` : destPhone;
         const mensagemOtp = `*FinGo — Código de Verificação*\n\nOlá, ${user.nome}!\n\nSeu código seguro para redefinir sua senha no FinGo é:\n\n👉 *${otpCode}*\n\nEste código é válido por *10 minutos*. Se você não solicitou esta redefinição, ignore esta mensagem.`;
         try {
           const renderBaseUrl = String(process.env.RENDER_WHATSAPP_URL || 'https://finan-backend-9rxw.onrender.com')

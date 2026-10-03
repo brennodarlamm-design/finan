@@ -545,6 +545,8 @@ textarea.form-control { resize:vertical; }
   padding:48px;text-align:center;cursor:pointer;transition:all var(--t);background:var(--bg-secondary);
 }
 .drop-zone:hover,.drop-zone.drag-over { border-color:var(--accent);background:rgba(18,217,160,.04); }
+/* Área de soltar arquivos com data-fb-drop (realce aplicado por patch26-events.js) */
+[data-fb-drop].drag-over { border-color:var(--accent) !important;background:rgba(18,217,160,.08) !important; }
 
 /* ===== TOAST — AUDIT FIX 3.3: entrada e saída animadas com spring ===== */
 .toast-container { position:fixed;top:74px;right:20px;z-index:300;display:flex;flex-direction:column;gap:7px; }
