@@ -45,12 +45,28 @@ export function injectRoot(html, rendered) {
   return html.replace('<div id="root"></div>', () => `<div id="root">${rendered}</div>`);
 }
 
+/** Texto corrido do artigo (resposta curta, blocos e FAQ), para contagem de palavras. */
+export function textoArtigo(artigo) {
+  const partes = [artigo.respostaCurta || ''];
+  for (const b of artigo.conteudo || []) {
+    if (typeof b === 'string') partes.push(b);
+    else if (b.texto) partes.push(b.texto);
+    else if (b.itens) partes.push(...b.itens);
+    else if (b.linhas) partes.push(...(b.cabecalho || []), ...b.linhas.flat(), b.legenda || '');
+  }
+  for (const f of artigo.faq || []) partes.push(f.q, f.a);
+  return partes.join(' ');
+}
+
+export const contarPalavras = (artigo) => textoArtigo(artigo).split(/\s+/).filter(Boolean).length;
+
 /** Monta o HTML de um artigo a partir do template original do /blog (#root ainda vazio). */
 export function buildArticleHtml(blogTemplate, artigo, renderedArticle) {
   const url = `${SITE}/blog/${artigo.slug}`;
   const title = `${artigo.titulo} | Blog FinGo`;
   const desc = String(artigo.resumo || '').slice(0, 300);
-  const iso = dataIso(artigo.data);
+  const iso = artigo.dataPublicacao || dataIso(artigo.data);
+  const modificado = artigo.atualizado || iso;
   let html = blogTemplate;
 
   const setMeta = (re, value) => {
@@ -79,12 +95,22 @@ export function buildArticleHtml(blogTemplate, artigo, renderedArticle) {
         mainEntityOfPage: url,
         inLanguage: 'pt-BR',
         articleSection: artigo.categoria,
-        ...(iso ? { datePublished: iso, dateModified: iso } : {}),
+        ...(iso ? { datePublished: iso, dateModified: modificado } : {}),
+        wordCount: contarPalavras(artigo),
         image: `${SITE}/img/og-finobra-cover.jpg`,
         author: { '@type': 'Organization', '@id': `${SITE}/#organization`, name: 'FinGo' },
         publisher: { '@type': 'Organization', '@id': `${SITE}/#organization`, name: 'FinGo', logo: { '@type': 'ImageObject', url: `${SITE}/img/finobra_logo.jpg` } },
         isPartOf: { '@type': 'Blog', '@id': `${SITE}/blog#blog`, name: 'Blog FinGo' }
       },
+      ...(artigo.faq?.length ? [{
+        '@type': 'FAQPage',
+        '@id': `${url}#faq`,
+        mainEntity: artigo.faq.map((f) => ({
+          '@type': 'Question',
+          name: f.q,
+          acceptedAnswer: { '@type': 'Answer', text: f.a }
+        }))
+      }] : []),
       {
         '@type': 'BreadcrumbList',
         itemListElement: [

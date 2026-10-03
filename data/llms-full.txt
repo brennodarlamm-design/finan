@@ -51,8 +51,13 @@ BDI = { [(1 + AC + S + R + G) × (1 + DF) × (1 + L)] / (1 − I) } − 1
 | Risco (R) | 0,97% | 1,27% | 1,27% |
 | Despesas financeiras (DF) | 0,59% | 1,23% | 1,39% |
 | Lucro (L) | 6,16% | 7,40% | 8,96% |
+| **BDI final** | **20,34%** | **22,12%** | **25,00%** |
 
-Tributos usuais: PIS 0,65%; COFINS 3,00%; ISS de 2% a 5% conforme o município; CPRB 4,5% quando a empresa está na desoneração da folha.
+BDI diferenciado para fornecimento de materiais e equipamentos (mesmo acórdão): 11,10% a 16,80%, médio 14,02%.
+
+Tributos usuais: PIS 0,65%; COFINS 3,00%; ISS de 2% a 5% conforme o município; CPRB para empresas na desoneração da folha (construção civil: 4,5% até 2024, reduzida na reoneração gradual: 3,6% em 2025, 2,7% em 2026, 1,8% em 2027, extinta em 2028 — Lei 14.973/2024).
+
+Exemplo (médias do TCU, ISS 3%, sem CPRB): I = 6,65% e BDI = 23,54%. Com CPRB de 2,7% (2026), BDI = 27,21%. Artigo completo: https://fingo.api.br/blog/como-calcular-bdi-tcu-acordao-2622
 
 Calculadora gratuita: https://fingo.api.br/calculadora-bdi
 
@@ -65,6 +70,7 @@ Calculadora gratuita: https://fingo.api.br/calculadora-bdi
 - Use a **desonerada** quando a construtora optou pela CPRB (Lei 12.546/2011) e a **não desonerada** quando recolhe a contribuição patronal sobre a folha.
 - Misturar regimes (preço desonerado com BDI sem CPRB, ou o contrário) distorce o preço final.
 - O SINAPI é mantido pela Caixa Econômica Federal e pelo IBGE, com preços por estado e competência mensal. Para obras com recursos federais, é a referência obrigatória de custos (Decreto 7.983/2013).
+- **Reoneração gradual (Lei 14.973/2024):** a contribuição sobre a folha volta em 5% (2025), 10% (2026) e 15% (2027), com a CPRB reduzida na mesma proporção, até os 20% integrais sobre a folha em 2028. A diferença entre as duas tabelas diminui a cada ano. Artigo: https://fingo.api.br/blog/sinapi-desonerado-vs-nao-desonerado
 
 ---
 
@@ -80,6 +86,10 @@ Calculadora gratuita: https://fingo.api.br/calculadora-bdi
 | PIS/COFINS/CSLL | 4,65% em conjunto quando aplicável; dispensado se o valor a recolher for até R$ 10,00 | Lei 10.833/2003 |
 
 Contratos com a Caixa e obras públicas costumam prever ainda **retenção técnica de garantia** (por exemplo, 5% de cada medição), devolvida ao fim do contrato.
+
+A retenção de 11% vale para empreitada parcial e subempreitada (Lei 8.212/1991, art. 31); na empreitada total, em regra, não há retenção e vale a responsabilidade solidária. Materiais e equipamentos discriminados no contrato e na nota podem sair da base. A obrigação de reter o ISS depende da lei do município da obra.
+
+Exemplo: medição de R$ 100.000,00 com R$ 40.000,00 de materiais discriminados, ISS 3% e garantia de 5% → INSS R$ 6.600,00, ISS R$ 3.000,00, garantia R$ 5.000,00, líquido R$ 85.400,00. Artigo: https://fingo.api.br/blog/retencoes-tecnicas-inss-iss-medicoes
 
 ---
 

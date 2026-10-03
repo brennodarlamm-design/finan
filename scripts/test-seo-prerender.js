@@ -14,7 +14,7 @@ const text = (html) => html.replace(/<script[\s\S]*?<\/script>/g, ' ').replace(/
 
 console.log('=== Pré-renderização SEO/GEO das páginas de marketing ===\n');
 
-const { prerenderMarketing, createRenderer, dataIso } = await import('../scripts/prerender-marketing.mjs');
+const { prerenderMarketing, createRenderer, contarPalavras } = await import('../scripts/prerender-marketing.mjs');
 const { ARTIGOS_BLOG } = await import('../marketing/blog-data.js');
 
 // Simula o destino do build com as páginas-fonte (mesmo <div id="root"></div> do build do Vite).
@@ -62,13 +62,24 @@ const files = await prerenderMarketing(dest, { root, render });
     const ld = JSON.parse(html.match(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/)[1]);
     const post = ld['@graph'].find(x => x['@type'] === 'BlogPosting');
     assert(post && post.headline === a.titulo, `${a.slug}: BlogPosting com headline`);
-    assert.strictEqual(post.datePublished, dataIso(a.data), `${a.slug}: data ISO`);
+    assert.strictEqual(post.datePublished, a.dataPublicacao, `${a.slug}: data de publicação ISO`);
+    assert.strictEqual(post.dateModified, a.atualizado, `${a.slug}: data de atualização ISO`);
     assert(/^\d{4}-\d{2}-\d{2}$/.test(post.datePublished), `${a.slug}: data em formato ISO`);
+    assert(post.wordCount === contarPalavras(a) && post.wordCount >= 500, `${a.slug}: wordCount (${post.wordCount})`);
+    const faq = ld['@graph'].find(x => x['@type'] === 'FAQPage');
+    assert(faq && faq.mainEntity.length === a.faq.length, `${a.slug}: FAQPage com as perguntas`);
     const h1 = (html.match(/<h1[^>]*>([\s\S]*?)<\/h1>/) || [])[1] || '';
     assert(text(h1).trim().includes(a.titulo.split(':')[0]), `${a.slug}: <h1> do artigo`);
-    for (const p of a.conteudo.slice(0, 2)) assert(text(html).includes(p.slice(0, 40)), `${a.slug}: corpo do artigo no HTML`);
+    const corpo = text(html).replace(/&quot;/g, '"').replace(/&#x27;/g, "'").replace(/&amp;/g, '&');
+    assert(corpo.includes(a.respostaCurta.slice(0, 60)), `${a.slug}: resposta curta no HTML`);
+    for (const p of a.conteudo.filter(b => typeof b === 'string').slice(0, 2)) assert(corpo.includes(p.slice(0, 40)), `${a.slug}: corpo do artigo no HTML`);
+    for (const f of a.faq) assert(corpo.includes(f.q), `${a.slug}: pergunta do FAQ visível`);
+    const h2 = (html.match(/<h2[\s>]/g) || []).length;
+    assert(h2 >= 4, `${a.slug}: subtítulos <h2> (${h2})`);
+    if (a.conteudo.some(b => b.tipo === 'tabela')) assert(/<table[\s>][\s\S]*<th[\s>]/.test(html), `${a.slug}: tabela com cabeçalho`);
+    assert(a.fontes.length >= 1 && corpo.includes('Fontes e base legal'), `${a.slug}: fontes`);
   }
-  console.log(`  ✓ ${ARTIGOS_BLOG.length} artigos com URL própria, canonical, título, BlogPosting (data ISO) e corpo no HTML`);
+  console.log(`  ✓ ${ARTIGOS_BLOG.length} artigos com URL própria, canonical, título, BlogPosting (datas, wordCount), FAQPage, resposta curta, <h2>, tabelas e fontes no HTML`);
 }
 
 // 3. Worker, sitemap e llms.txt apontam para as URLs dos artigos.
@@ -83,6 +94,7 @@ const files = await prerenderMarketing(dest, { root, render });
   }
   assert(read('scripts/build-marketing.js').includes('prerenderMarketing'), 'build chama a pré-renderização');
   assert.strictEqual(read('marketing/main.jsx'), read('marketing/src/main.jsx'), 'main.jsx espelhado');
+  assert.strictEqual(read('marketing/blog-data.js'), read('marketing/src/blog-data.js'), 'blog-data.js espelhado');
   console.log('  ✓ Worker, sitemap, llms.txt e build integrados');
 }
 

@@ -1977,6 +1977,81 @@ function ManualsView() {
   );
 }
 
+// Data ISO (AAAA-MM-DD) -> DD/MM/AAAA, sem depender do fuso do navegador.
+function dataBr(iso) {
+  const m = String(iso || "").match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  return m ? `${m[3]}/${m[2]}/${m[1]}` : iso;
+}
+
+// Bloco do corpo do artigo: string = parágrafo; objeto = h2, lista, passos, tabela, fórmula ou destaque.
+function BlocoArtigo({ bloco }) {
+  if (typeof bloco === "string") {
+    return <p className="text-muted leading-relaxed">{bloco}</p>;
+  }
+  switch (bloco.tipo) {
+    case "h2":
+      return (
+        <h2 className="font-display pt-6 text-2xl uppercase leading-tight text-paper md:text-3xl">
+          {bloco.texto}
+        </h2>
+      );
+    case "lista":
+      return (
+        <ul className="list-disc space-y-2 pl-6 text-muted">
+          {bloco.itens.map((item, i) => <li key={i}>{item}</li>)}
+        </ul>
+      );
+    case "passos":
+      return (
+        <div className="space-y-2 rounded-sm border border-shadow bg-panel p-4">
+          {bloco.itens.map((item, i) => (
+            <p key={i} className="font-mono text-xs leading-relaxed text-paper">{item}</p>
+          ))}
+        </div>
+      );
+    case "formula":
+      return (
+        <div className="rounded-sm border border-acid bg-void p-5 font-mono text-sm text-acid my-6 overflow-x-auto shadow-[0_0_15px_rgba(198,255,0,0.15)]">
+          {bloco.texto}
+        </div>
+      );
+    case "destaque":
+      return (
+        <p className="border-l-2 border-acid bg-panel/30 py-3 pl-4 text-paper leading-relaxed">
+          {bloco.texto}
+        </p>
+      );
+    case "tabela":
+      return (
+        <figure className="my-6 overflow-x-auto">
+          <table className="w-full border-collapse text-left text-sm">
+            <thead>
+              <tr>
+                {bloco.cabecalho.map((c, i) => (
+                  <th key={i} scope="col" className="border-b border-acid/60 px-3 py-2 font-mono text-xs uppercase text-acid">{c}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {bloco.linhas.map((linha, i) => (
+                <tr key={i} className="border-b border-shadow">
+                  {linha.map((cel, j) => (
+                    <td key={j} className={`px-3 py-2 ${j === 0 ? "text-paper" : "text-muted"}`}>{cel}</td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {bloco.legenda ? (
+            <figcaption className="mt-2 text-xs text-muted">{bloco.legenda}</figcaption>
+          ) : null}
+        </figure>
+      );
+    default:
+      return null;
+  }
+}
+
 function BlogView() {
   // Cada artigo tem URL própria (/blog/<slug>) para ser indexado e citado.
   const [selectedArticle] = useState(
@@ -2015,38 +2090,68 @@ function BlogView() {
           {selectedArticle.titulo}
         </h1>
 
-        <p className="mt-6 border-l-2 border-acid pl-4 text-lg italic text-silver leading-relaxed bg-panel/30 py-2">
-          {selectedArticle.resumo}
+        <p className="mt-4 font-mono text-xs text-muted">
+          Por {selectedArticle.autor || "Equipe FinGo"}
+          {selectedArticle.atualizado ? ` • Atualizado em ${dataBr(selectedArticle.atualizado)}` : ""}
         </p>
 
+        {selectedArticle.respostaCurta ? (
+          <section
+            aria-label="Resposta rápida"
+            className="mt-6 rounded-sm border border-acid/60 bg-panel/40 p-5"
+          >
+            <p className="font-mono text-xs uppercase text-acid">Resposta rápida</p>
+            <p className="mt-2 text-base leading-relaxed text-paper">
+              {selectedArticle.respostaCurta}
+            </p>
+          </section>
+        ) : (
+          <p className="mt-6 border-l-2 border-acid pl-4 text-lg italic text-silver leading-relaxed bg-panel/30 py-2">
+            {selectedArticle.resumo}
+          </p>
+        )}
+
         <div className="mt-10 space-y-5 text-base leading-relaxed text-silver">
-          {selectedArticle.conteudo.map((paragrafo, idx) => {
-            const isFormula = paragrafo.startsWith("BDI =");
-            const isBullet = paragrafo.startsWith("•") || paragrafo.startsWith("1.") || paragrafo.startsWith("2.");
-            if (isFormula) {
-              return (
-                <div
-                  key={idx}
-                  className="rounded-sm border border-acid bg-void p-5 font-mono text-sm text-acid my-6 overflow-x-auto shadow-[0_0_15px_rgba(198,255,0,0.15)]"
-                >
-                  {paragrafo}
-                </div>
-              );
-            }
-            if (isBullet) {
-              return (
-                <div key={idx} className="font-mono text-xs bg-panel p-3 rounded-sm border border-shadow text-paper pl-4">
-                  {paragrafo}
-                </div>
-              );
-            }
-            return (
-              <p key={idx} className="text-muted leading-relaxed">
-                {paragrafo}
-              </p>
-            );
-          })}
+          {selectedArticle.conteudo.map((bloco, idx) => (
+            <BlocoArtigo key={idx} bloco={bloco} />
+          ))}
         </div>
+
+        {selectedArticle.faq?.length ? (
+          <section className="mt-14">
+            <h2 className="font-display text-2xl uppercase text-paper">Perguntas frequentes</h2>
+            <div className="mt-6 space-y-3">
+              {selectedArticle.faq.map((item, idx) => (
+                <details key={idx} className="rounded-sm border border-shadow bg-panel p-4" open={idx === 0}>
+                  <summary className="cursor-pointer font-bold text-paper">{item.q}</summary>
+                  <p className="mt-3 text-sm leading-relaxed text-muted">{item.a}</p>
+                </details>
+              ))}
+            </div>
+          </section>
+        ) : null}
+
+        {selectedArticle.fontes?.length ? (
+          <section className="mt-12 border-t border-shadow pt-6">
+            <h2 className="font-mono text-sm uppercase text-silver">Fontes e base legal</h2>
+            <ul className="mt-3 list-disc space-y-1 pl-5 text-sm text-muted">
+              {selectedArticle.fontes.map((fonte, idx) => (
+                <li key={idx}>
+                  {fonte.url ? (
+                    <a href={fonte.url} rel="noopener noreferrer" target="_blank" className="underline hover:text-acid">
+                      {fonte.nome}
+                    </a>
+                  ) : (
+                    fonte.nome
+                  )}
+                </li>
+              ))}
+            </ul>
+            <p className="mt-4 text-xs text-muted">
+              Conteúdo informativo. Regras fiscais e técnicas mudam: confirme com o contador e o engenheiro responsável antes de aplicar.
+            </p>
+          </section>
+        ) : null}
 
         {/* Banner de Conversão ao Fim do Artigo */}
         <div className="mt-14 rounded-sm border border-shadow bg-panel p-8">
@@ -2057,7 +2162,7 @@ function BlogView() {
                 Pronto para automatizar esses cálculos na sua construtora?
               </h3>
               <p className="text-xs text-muted mt-1 max-w-lg">
-                O FinGo possui calculadora oficial de BDI TCU Acórdão 2622, tabelas SINAPI Caixa atualizadas e retenções automáticas de 11% INSS e 5% ISS em boletins de medição.
+                O FinGo tem calculadora gratuita de BDI pela fórmula do TCU (Acórdão 2.622/2013), orçamento com a base SINAPI da Caixa e cálculo das retenções (INSS, ISS, IRRF e garantia) nos boletins de medição.
               </p>
             </div>
             <div className="flex flex-col sm:flex-row gap-3 shrink-0">

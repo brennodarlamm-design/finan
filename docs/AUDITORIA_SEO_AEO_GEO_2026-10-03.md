@@ -79,7 +79,7 @@
 |---|---|---|---|
 | 1 | ✅ **Feito** — Pré-renderizar landing, planos, sobre, blog e manuais (HTML com o conteúdo) | 🔴 muito alto (SEO e GEO) | médio |
 | 2 | ✅ **Feito** — Uma página por artigo (`/blog/<slug>`) com `BlogPosting` e data, no sitemap e no llms.txt (autor ainda é a organização) | 🔴 alto | baixo/médio |
-| 3 | Reescrever os 6 artigos com 1.000+ palavras: resposta direta no 1º parágrafo, tabela, exemplo numérico, fontes | 🔴 alto | médio (conteúdo) |
+| 3 | ✅ **Feito** — Reescrever os 6 artigos: resposta direta no topo, subtítulos, tabelas, exemplo numérico, FAQ e fontes (580 a 1.140 palavras) | 🔴 alto | médio (conteúdo) |
 | 4 | Novas páginas-resposta para buscas fortes: "planilha de medição de obra", "como calcular retenção de INSS 11%", "BDI para obra particular", "sistema de gestão de obras para MCMV", "orçamento SINAPI por estado" | 🟠 alto | médio |
 | 5 | `sameAs` na Organization e perfil no Google Meu Negócio, LinkedIn e YouTube | 🟠 médio | baixo (preciso dos links reais) |
 | 6 | Sobre-nós com empresa, CNPJ, cidade, fundadores e responsável técnico | 🟠 médio | baixo |
@@ -102,6 +102,23 @@
 - **Artigos com página própria:** `/blog/<slug>` (6 páginas), cada uma com título, descrição, canonical, Open Graph, JSON-LD `BlogPosting` (data ISO) e `BreadcrumbList`. Os links antigos `/blog#slug` redirecionam para a URL nova.
 - **Worker:** serve `/blog/<slug>` (só slugs `a-z0-9-`). **Sitemap:** 17 URLs.
 - **Testes:** `scripts/test-seo-prerender.js`. Também conferido no Chromium com o servidor do Vite: navegação, redirecionamento do hash antigo e nenhum erro de JavaScript.
+
+## Aplicado em 03/10/2026 (item 3: blog)
+
+- **Artigos reescritos** em `marketing/blog-data.js` com blocos estruturados (subtítulos, listas, passos, tabelas, fórmula, destaque), resposta curta no topo, FAQ e fontes.
+
+  | Artigo | Palavras: antes → depois |
+  |---|---|
+  | BDI pelo TCU | 214 → ~1.140 |
+  | Retenções INSS/ISS | ~180 → ~960 |
+  | SINAPI desonerado | ~170 → ~830 |
+  | Conciliação OFX | ~150 → ~610 |
+  | NF-e e OCR | ~140 → ~610 |
+  | BIM e clash | ~130 → ~580 |
+
+- **Erros corrigidos:** no BDI, Seguro e Garantia aparecem juntos (S+G) e o Risco médio é 1,27%, como no TCU. O texto ganhou o BDI final de referência (20,34% a 25,00%) e um exemplo com a conta passo a passo. Nas retenções, a regra do CPOM foi apresentada como exemplo de São Paulo, entraram a base legal, a alíquota de 3,5% da CPRB e a regra da empreitada total. No SINAPI, entrou a reoneração gradual da Lei 14.973/2024. No BIM, ficou claro que a detecção de interferências só vale sobre modelos reais.
+- **Schema do artigo:** `BlogPosting` com `dateModified` e `wordCount`, além de `FAQPage`. A página mostra autor e data de atualização. O sitemap passou a usar a data de atualização. O `llms-full.txt` foi alinhado com os artigos.
+- **Revisão pendente:** as alíquotas, as faixas do TCU e as regras de retenção precisam passar por um engenheiro e um contador antes de entrar no ar. A Calculadora de BDI ainda considera a CPRB de 4,5%, sem a transição de 2025 a 2027.
 
 ## Como medir depois
 
