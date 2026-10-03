@@ -336,11 +336,39 @@ const ObraDetalhe = {
     return this._renderTabLancamentos(obraId);
   },
 
+  // VARREDURA 2026-10-03 #32: os scripts do BIM (~740 KB) só são baixados quando a aba 3D abre.
+  _bimPromise: null,
+  _carregarBIM() {
+    if (typeof BIMViewer !== 'undefined') return Promise.resolve();
+    if (this._bimPromise) return this._bimPromise;
+    const meta = document.querySelector('meta[name="fingo-bim-scripts"]');
+    const urls = String(meta?.getAttribute('content') || '').split(',').map(u => u.trim())
+      .filter(u => /^\/js\/bim_[a-z_]+\.js(\?v=[\w.-]+)?$/.test(u));
+    if (!urls.length) return Promise.reject(new Error('BIM indisponível'));
+    this._bimPromise = urls.reduce((anterior, src) => anterior.then(() => new Promise((ok, falha) => {
+      const el = document.createElement('script');
+      el.src = src;
+      el.async = false;
+      el.onload = () => ok();
+      el.onerror = () => falha(new Error('Falha ao carregar ' + src));
+      document.head.appendChild(el);
+    })), Promise.resolve()).catch(err => { this._bimPromise = null; throw err; });
+    return this._bimPromise;
+  },
+
   _bindTabEvents(tab, obraId) {
     if (tab === 'bim-3d') {
-      if (typeof BIMViewer !== 'undefined') {
-        BIMViewer.render('od-bim-container', obraId);
+      const box = document.getElementById('od-bim-container');
+      if (box && typeof BIMViewer === 'undefined') {
+        box.innerHTML = '<div class="empty-state" role="status">Carregando visualizador 3D…</div>';
       }
+      this._carregarBIM().then(() => {
+        if (this.activeTab !== 'bim-3d' || !document.getElementById('od-bim-container')) return;
+        if (typeof BIMViewer !== 'undefined') BIMViewer.render('od-bim-container', obraId);
+      }).catch(() => {
+        const el = document.getElementById('od-bim-container');
+        if (el) el.innerHTML = '<div class="empty-state" role="alert">Não foi possível carregar o visualizador 3D. Verifique a conexão e abra a aba de novo.</div>';
+      });
       return;
     }
     if (tab === 'orcado-realizado') {

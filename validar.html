@@ -516,6 +516,12 @@
         color: #000 !important;
       }
     }
+    /* VARREDURA 2026-10-03 #38: em 390px o botão "Consultar" saía da tela. */
+    .input-code { min-width: 0; }
+    @media (max-width: 480px) {
+      .input-row { flex-direction: column; }
+      .btn-search { justify-content: center; padding: 12px 24px; }
+    }
   </style>
   <script src="/js/version_guard.js"></script>
   <link rel="stylesheet" href="/css/premium.css?v=20260913" media="screen">

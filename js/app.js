@@ -327,6 +327,7 @@ const App = {
       synced:    ['●', 'Sincronizado', '#10b981', 'rgba(16,185,129,.3)', 'rgba(16,185,129,.06)'],
       pending:   ['●', `${pending || 1} pendente(s)`, '#f59e0b', 'rgba(245,158,11,.35)', 'rgba(245,158,11,.08)'],
       offline:   ['○', 'Offline — canteiro', '#94a3b8', 'rgba(148,163,184,.35)', 'rgba(148,163,184,.06)'],
+      server_down: ['⚠', 'Servidor indisponível', '#ef4444', 'rgba(239,68,68,.4)', 'rgba(239,68,68,.08)'],
       attention: ['⚠', `${failed || 1} requer(em) atenção`, '#ef4444', 'rgba(239,68,68,.4)', 'rgba(239,68,68,.08)'],
       cached:    ['●', 'Cache local', 'var(--text3)', 'var(--border)', 'transparent']
     };
@@ -338,6 +339,46 @@ const App = {
     box.style.borderColor = borda;
     box.style.background = bg;
     box.dataset.status = status || 'cached';
+    this._avisoServidor(status);
+  },
+
+  // VARREDURA 2026-10-03 #36: aviso visível quando o servidor não responde (as listas podem
+  // aparecer vazias ou desatualizadas). Some sozinho quando a sincronização volta.
+  _avisoServidor(status) {
+    if (typeof document === 'undefined' || !document.body) return;
+    let el = document.getElementById('server-down-banner');
+    if (status !== 'server_down') {
+      if (el && (status === 'synced' || status === 'pending' || status === 'offline')) el.remove();
+      return;
+    }
+    if (el) return;
+    el = document.createElement('div');
+    el.id = 'server-down-banner';
+    el.setAttribute('role', 'alert');
+    el.style.cssText = 'position:fixed;left:50%;bottom:16px;transform:translateX(-50%);z-index:9000;max-width:calc(100vw - 32px);width:520px;display:flex;gap:12px;align-items:center;padding:12px 14px;border-radius:10px;background:var(--bg-card,#111);border:1px solid rgba(239,68,68,.5);box-shadow:0 8px 30px rgba(0,0,0,.35);font-size:.82rem;color:var(--text,#fff);';
+    el.innerHTML = `
+      <span aria-hidden="true" style="font-size:1.2rem;">⚠️</span>
+      <div style="flex:1;min-width:0;">
+        <strong>Não foi possível falar com o servidor.</strong>
+        <div style="color:var(--text3,#aaa);margin-top:2px;">Os dados na tela podem estar incompletos ou desatualizados. O que você salvar fica guardado neste aparelho e é enviado quando a conexão voltar.</div>
+      </div>
+      <button type="button" class="btn btn-sm btn-primary" data-fb-click="App.tentarReconectar" data-fb-click-n="0">Tentar de novo</button>
+      <button type="button" class="btn btn-sm btn-secondary" aria-label="Fechar aviso" data-fb-click="App.fecharAvisoServidor" data-fb-click-n="0">✕</button>`;
+    document.body.appendChild(el);
+  },
+
+  fecharAvisoServidor() {
+    document.getElementById('server-down-banner')?.remove();
+  },
+
+  async tentarReconectar() {
+    this.fecharAvisoServidor();
+    const ok = await (DB.getSyncCursor?.() ? DB.syncDelta() : DB.syncFromCloud());
+    if (ok) {
+      if (typeof DB._flushCloudQueue === 'function') DB._flushCloudQueue();
+      this.refreshCurrentRoute();
+      if (typeof Utils !== 'undefined' && Utils.toast) Utils.toast('Conexão com o servidor restabelecida.', 'success');
+    }
   },
 
   refreshCurrentRoute() {

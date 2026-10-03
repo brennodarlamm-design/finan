@@ -2092,3 +2092,9 @@ select:focus-visible {
   filter: none;
 }
 
+/* VARREDURA 2026-10-03 #37: em tela de toque, nenhum botão fica menor que 32px de altura
+   (havia botões com 20–28px, difíceis de acertar com o dedo). */
+@media (pointer: coarse) {
+  button, .btn, a.btn, [role="button"] { min-height: 32px; }
+  .modal-close { min-width: 32px; }
+}

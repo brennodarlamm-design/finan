@@ -571,6 +571,13 @@
       pointer-events: auto;
       transform: translateY(0);
     }
+    /* VARREDURA 2026-10-03 #38: no celular o menu estourava a largura (556px em tela de 390px). */
+    @media (max-width: 640px) {
+      .header { gap: 0.75rem; }
+      .nav-links { gap: 0.75rem; font-size: 0.85rem; }
+      .nav-links a[href="/planos"], .nav-links a[href="/sobre-nos"], .nav-links a[href="/calculadora-bdi"] { display: none; }
+      .nav-cta { padding: 0.45rem 0.75rem; white-space: nowrap; }
+    }
   </style>
 </head>
 <body>

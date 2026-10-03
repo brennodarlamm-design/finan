@@ -790,6 +790,16 @@ const DB = {
   },
 
 
+  /**
+   * VARREDURA 2026-10-03 #36: com internet mas a API fora do ar, o app mostrava "Offline" e
+   * listas vazias sem explicar nada. Distingue "sem internet" de "servidor indisponível".
+   */
+  _statusFalhaSync(e) {
+    if (typeof navigator !== 'undefined' && navigator.onLine === false) return 'offline';
+    if (String(e?.message || '') === 'SESSION_EXPIRED') return 'offline';
+    return 'server_down';
+  },
+
   _emitSyncStatus(status, detail = {}) {
     if (typeof window === 'undefined' || typeof CustomEvent === 'undefined') return;
     try {
@@ -1494,7 +1504,7 @@ const DB = {
       return true;
     } catch (e) {
       console.warn('[Sync] Falha na sincronização delta, mantendo cache:', e?.message || e);
-      this._emitSyncStatus('offline', { error: e?.message || 'offline' });
+      this._emitSyncStatus(this._statusFalhaSync(e), { error: e?.message || 'offline' });
       return false;
     }
   },
@@ -1640,7 +1650,7 @@ const DB = {
       return true;
     } catch (e) {
       console.warn('Neon Cloud Sync offline, usando cache local:', e);
-      this._emitSyncStatus('offline', { error: e?.message || 'offline' });
+      this._emitSyncStatus(this._statusFalhaSync(e), { error: e?.message || 'offline' });
       return false;
     }
   },

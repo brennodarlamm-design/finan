@@ -687,4 +687,75 @@ function appCtx(modulos) {
   console.log('  ✓ Documentos: arquivo recusado pelo servidor não aparece como salvo; limite de 15 MB');
 }
 
-console.log('\n✅ Varredura 03/10/2026 (rápidas, dados, OFX, NF-e, financeiro, cliente/portal e obras): tudo certo.');
+
+// ── UX e performance ──────────────────────────────────────────────────────────
+{
+  // #32 BIM sob demanda: nenhum <script> de BIM no app; lista na ordem certa para o carregador.
+  const app = read('app.html');
+  assert(!/<script[^>]+\/js\/bim_/.test(app), 'app.html não baixa o BIM no início');
+  const meta = app.match(/<meta name="fingo-bim-scripts" content="([^"]+)">/);
+  assert(meta, 'lista de scripts do BIM presente');
+  const ordem = meta[1].split(',').map(u => u.replace(/\?.*$/, ''));
+  assert.deepEqual(ordem, ['/js/bim_csg.js', '/js/bim_ifc_extended.js', '/js/bim_geometry_importer.js', '/js/bim_clash_engine.js', '/js/bim_presets.js', '/js/bim_viewer.js']);
+  const od = read('js/obra_detalhe.js');
+  assert(od.includes('_carregarBIM()') && od.includes("el.async = false"), 'aba 3D carrega o BIM em ordem');
+  assert.equal(read('frontend/app.html'), app);
+  assert.equal(read('frontend/domains/obras/obra_detalhe.js'), od);
+
+  // #33 Sentry não bloqueia a renderização.
+  for (const f of ['landing.html', 'marketing/pages/landing.html', 'index.html', 'master.html', 'app.html']) {
+    assert(!read(f).includes('<script src="/js/sentry.js"></script>'), `${f}: sentry sem defer`);
+  }
+
+  // #34 Vídeo da landing só em tela larga e sem economia de dados.
+  const mk = read('marketing/main.jsx');
+  assert(mk.includes('function podeTocarVideo()') && mk.includes('(min-width: 768px)') && mk.includes('saveData'));
+  assert(/\{ativo && !failed && \(\s*<video/.test(mk), 'vídeo nem é montado no celular');
+  assert.equal(read('marketing/src/main.jsx'), mk);
+  assert(fs.statSync('img/fingo/construction-background.mp4').size < 2 * 1024 * 1024, 'vídeo de fundo comprimido');
+
+  // #35 Service worker: uma cópia por arquivo, sem vídeos nem /data.
+  const sw = read('sw.js');
+  assert(sw.includes('function chaveSemQuery(') && sw.includes('cache.put(chave,') && sw.includes('naoCachear(url)'));
+  assert(sw.includes("event.request.mode === 'navigate'"), 'fora de JS/CSS/imagens só HTML de navegação é guardado');
+  const headers = read('cloudflare/_headers');
+  assert(/\/data\/sinapi_\*\n\s+Cache-Control: public, max-age=86400/.test(headers));
+
+  // #36 Servidor indisponível ≠ sem internet.
+  const { ctx } = appCtx([]);
+  ctx.navigator.onLine = true;
+  assert.equal(ctx.DB._statusFalhaSync(new Error('HTTP 503')), 'server_down');
+  ctx.navigator.onLine = false;
+  assert.equal(ctx.DB._statusFalhaSync(new Error('Failed to fetch')), 'offline');
+  const appJs = read('js/app.js');
+  assert(appJs.includes("server_down: ['⚠', 'Servidor indisponível'") && appJs.includes('_avisoServidor(status)'));
+  for (const f of ['js/patch26-events.js', 'frontend/core/patch26-events.js']) {
+    const ev = read(f);
+    assert(ev.includes('"App.tentarReconectar"') && ev.includes('"App.fecharAvisoServidor"'), `${f}: ações do aviso liberadas`);
+  }
+
+  // #37 Acessibilidade: rótulos e nomes automáticos; alvo de toque mínimo.
+  const ev = read('js/patch26-events.js');
+  assert(ev.includes('function rotularCampo(') && ev.includes("b.setAttribute('aria-label', b.getAttribute('title') || 'Fechar')"));
+  assert.equal(read('frontend/core/patch26-events.js'), ev);
+  assert(read('css/style.css').includes('@media (pointer: coarse) {\n  button, .btn, a.btn, [role="button"] { min-height: 32px; }'));
+
+  // #38 Sem estouro em 390px (verificado no Chromium; aqui as regras).
+  assert(read('calculadora-bdi.html').includes('.nav-links a[href="/planos"]'));
+  assert(read('validar.html').includes('.input-code { min-width: 0; }'));
+
+  // #39 Imagens.
+  assert(fs.statSync('img/og-finobra-cover.jpg').size < 200 * 1024 && fs.statSync('img/finobra_logo.jpg').size < 100 * 1024);
+  for (const f of ['img/fingo/hero-video-preview.png', 'img/fingo/logo-reveal-frame120.png', 'img/fingo/logo-reveal-frame60.png', 'img/fingo/hero-video-frame160.png']) {
+    assert(!fs.existsSync(f), `${f} órfão removido`);
+  }
+  assert(read('js/academia.js').includes('/img/fingo/logo-reveal-poster.jpg') && fs.existsSync('img/fingo/logo-reveal-poster.jpg'));
+
+  // #40 Sem e-mails fictícios; histórico por empresa.
+  const notif = read('js/notificacoes.js');
+  assert(!notif.includes('engenhariabrasil.com.br') && !notif.includes('_emailsPadrao'));
+  assert(notif.includes("DB._ck('finobra_email_logs')"));
+  console.log('  ✓ UX/performance: BIM sob demanda, Sentry com defer, vídeo só no desktop, cache sem acúmulo, aviso de servidor fora, acessibilidade, 390px, imagens e e-mails reais');
+}
+
+console.log('\n✅ Varredura 03/10/2026 (rápidas, dados, OFX, NF-e, financeiro, cliente/portal, obras e UX/performance): tudo certo.');

@@ -128,4 +128,17 @@ Legenda: **C** = confirmado (reproduzido ou evidente no código), **P** = prová
 - ✅ #29 Upload: se o servidor recusar o arquivo (tipo, tamanho ou permissão), ele não é salvo e o motivo aparece. Sem conexão, o arquivo fica só no aparelho, com um aviso claro. O limite no app passou a ser 15 MB, igual ao do servidor.
 - ✅ #30 Excluir uma medição ou pré-compra só apaga lançamentos vinculados que ainda estejam em aberto e não conciliados. O que já foi pago, recebido ou conciliado continua no financeiro (`DB.removerLancamentosDaOrigem`).
 
-**Próximos passos:** UX/performance (#32–#40).
+**UX e performance**
+- ✅ #32 Os 6 scripts do BIM (~740 KB) não entram mais no carregamento inicial do app. Eles baixam em ordem só quando a aba "BIM 3D" da obra é aberta (`ObraDetalhe._carregarBIM`, lista em `<meta name="fingo-bim-scripts">`). A página `bim.html` continua igual.
+- ✅ #33 `sentry.js` com `defer` na landing, no login e no master.
+- ✅ #34 O vídeo da landing só é montado em telas a partir de 768px, sem "reduzir movimento" e sem economia de dados. Os vídeos foram recomprimidos: fundo de 7,6 MB para 1,1 MB e vídeo da Academia de 5,3 MB para 0,6 MB, sem diferença visível.
+- ✅ #35 Service worker: guarda JS, CSS e imagens pelo caminho sem `?v=`, então a versão nova substitui a antiga e não acumula. Vídeos e `/data` (SINAPI) ficam fora do cache, e fora isso só o HTML de navegação é guardado. Cache HTTP: SINAPI por 1 dia (+7 dias de revalidação em segundo plano) e imagens por 7 dias. `/js` continua revalidando porque o `?v=` dos HTML é manual e nem todo script o usa: um cache longo serviria código velho depois de um deploy.
+- ✅ #36 Com internet mas a API fora do ar, o indicador mostra "Servidor indisponível" e aparece um aviso com "Tentar de novo". Antes aparecia "Offline" e listas vazias sem explicação.
+- ✅ #37 Campos ligados automaticamente ao rótulo do `.form-group` (ou `aria-label` vindo do placeholder), botões "✕" com nome "Fechar", botões só com ícone usam o `title`, e alvo de toque mínimo de 32px em telas de toque. Verificado no formulário de medição: 20 de 20 campos com nome.
+- ✅ #38 `calculadora-bdi` e `validar` sem rolagem horizontal em 390px (medido no Chromium).
+- ✅ #39 og:image de 690 KB para 110 KB, agora no tamanho declarado de 1200×630; logo de 560 KB para 21 KB; poster da Academia de PNG 233 KB para JPG 39 KB; 4 PNGs órfãos (2,6 MB) removidos.
+- ✅ #40 A aba de e-mails não mostra mais envios fictícios, e o histórico fica separado por empresa.
+
+**Observação:** a imagem de compartilhamento (`og-finobra-cover.jpg`) ainda tem a marca antiga "FinObra" e precisa de uma arte nova com "FinGo".
+
+**Pendentes opcionais:** #8 (OFX no servidor), #41 (rota pública do boletim de medição) e migração dos 4 documentos que ainda apontam para o vercel-storage.
