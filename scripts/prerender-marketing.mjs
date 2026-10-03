@@ -97,9 +97,9 @@ export function buildArticleHtml(blogTemplate, artigo, renderedArticle) {
         articleSection: artigo.categoria,
         ...(iso ? { datePublished: iso, dateModified: modificado } : {}),
         wordCount: contarPalavras(artigo),
-        image: `${SITE}/img/og-finobra-cover.jpg`,
+        image: `${SITE}/img/og-fingo-cover.jpg`,
         author: { '@type': 'Organization', '@id': `${SITE}/#organization`, name: 'FinGo' },
-        publisher: { '@type': 'Organization', '@id': `${SITE}/#organization`, name: 'FinGo', logo: { '@type': 'ImageObject', url: `${SITE}/img/finobra_logo.jpg` } },
+        publisher: { '@type': 'Organization', '@id': `${SITE}/#organization`, name: 'FinGo', logo: { '@type': 'ImageObject', url: `${SITE}/img/fingo-logo-512.jpg` } },
         isPartOf: { '@type': 'Blog', '@id': `${SITE}/blog#blog`, name: 'Blog FinGo' }
       },
       ...(artigo.faq?.length ? [{

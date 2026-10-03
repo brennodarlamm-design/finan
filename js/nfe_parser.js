@@ -61,7 +61,11 @@ const NFeParser = {
     const vCOFINS = parseFloat(get(icmsTot || infNFe, 'vCOFINS')) || 0;
     const vISS = parseFloat(get(icmsTot || infNFe, 'vISS')) || 0;
     const impostos = parseFloat((vICMS + vIPI + vPIS + vCOFINS + vISS).toFixed(2));
-    const valorLiquido = parseFloat((vNF - impostos).toFixed(2));
+    // Quem compra paga o vNF (o IPI já está somado e o ICMS embutido no preço). Só as
+    // retenções na fonte (<retTrib>) saem do valor a pagar; os impostos ficam como informação.
+    const retTrib = infNFe.querySelector('retTrib') || Array.from(infNFe.querySelectorAll('*')).find(el => el.localName === 'retTrib');
+    const retencoes = retTrib ? ['vRetPIS', 'vRetCOFINS', 'vRetCSLL', 'vIRRF', 'vRetPrev'].reduce((s, tag) => s + (parseFloat(get(retTrib, tag)) || 0), 0) : 0;
+    const valorLiquido = parseFloat((vNF - retencoes).toFixed(2));
 
     // Duplicatas / Cobrança
     const duplicatas = [];

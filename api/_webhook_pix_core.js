@@ -379,7 +379,7 @@ function escapeEmailHtml(value) {
  */
 export async function sendPaymentReceipt(record) {
   let phone = String(record.telefone || '').replace(/\D/g, '');
-  if (phone.length >= 10 && phone.length <= 11 && !phone.startsWith('55')) {
+  if (phone.length >= 10 && phone.length <= 11) {
     phone = '55' + phone;
   }
   const email = String(record.email || '').trim();

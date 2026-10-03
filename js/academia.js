@@ -24,7 +24,7 @@ const Academia = {
       rota: 'obras',
       moduloNome: 'Obras & Clientes',
       videoUrl: '/img/fingo/feature-demo.mp4',
-      videoPoster: '/img/fingo/logo-reveal-poster.png',
+      videoPoster: '/img/fingo/logo-reveal-poster.jpg',
       videoPlaceholder: 'https://images.unsplash.com/photo-1541888946425-d0fbb186156a?w=800&q=80',
       resumo: 'Aprenda a estruturar uma nova obra, vincular o cliente, prever etapas construtivas e cadastrar o contrato Caixa.',
       passos: [
@@ -45,7 +45,7 @@ const Academia = {
       rota: 'documentacao',
       moduloNome: 'Documentação de Obras',
       videoUrl: '/img/fingo/hero-video.mp4',
-      videoPoster: '/img/fingo/logo-reveal-poster.png',
+      videoPoster: '/img/fingo/logo-reveal-poster.jpg',
       videoPlaceholder: 'https://images.unsplash.com/photo-1504307651254-35680f356dfd?w=800&q=80',
       resumo: 'Organize alvarás, memoriais descritivos e registre a evolução fotográfica da obra dividida por etapas.',
       passos: [
@@ -66,7 +66,7 @@ const Academia = {
       rota: 'medicoes',
       moduloNome: 'Medições & Faturamento',
       videoUrl: '/img/fingo/feature-demo.mp4',
-      videoPoster: '/img/fingo/logo-reveal-poster.png',
+      videoPoster: '/img/fingo/logo-reveal-poster.jpg',
       videoPlaceholder: 'https://images.unsplash.com/photo-1581094794329-c8112a89af12?w=800&q=80',
       resumo: 'Como calcular o percentual acumulado de cada serviço, gerar espelho de medição para bancos e liberar valores a receber.',
       passos: [
@@ -87,7 +87,7 @@ const Academia = {
       rota: 'lancamentos',
       moduloNome: 'Lançamentos',
       videoUrl: '/img/fingo/feature-demo.mp4',
-      videoPoster: '/img/fingo/logo-reveal-poster.png',
+      videoPoster: '/img/fingo/logo-reveal-poster.jpg',
       videoPlaceholder: 'https://images.unsplash.com/photo-1554224155-6726b3ff858f?w=800&q=80',
       resumo: 'Domine a segregação de custos por centro de custo para garantir DRE preciso e saber a margem real de cada obra.',
       passos: [
@@ -109,7 +109,7 @@ const Academia = {
       rota: 'conciliacao-ofx',
       moduloNome: 'Conciliação OFX',
       videoUrl: '/img/fingo/feature-demo.mp4',
-      videoPoster: '/img/fingo/logo-reveal-poster.png',
+      videoPoster: '/img/fingo/logo-reveal-poster.jpg',
       videoPlaceholder: 'https://images.unsplash.com/photo-1559526324-4b87b5e36e44?w=800&q=80',
       resumo: 'Importe extratos do seu banco em formato OFX e deixe o robô do FinGo casar as transações automaticamente.',
       passos: [
@@ -130,7 +130,7 @@ const Academia = {
       rota: 'recibos',
       moduloNome: 'Recibos Oficiais',
       videoUrl: '/img/fingo/hero-video.mp4',
-      videoPoster: '/img/fingo/logo-reveal-poster.png',
+      videoPoster: '/img/fingo/logo-reveal-poster.jpg',
       videoPlaceholder: 'https://images.unsplash.com/photo-1450133064473-71024230f91b?w=800&q=80',
       resumo: 'Gere recibos para empreiteiros e fornecedores autônomos com QR Code de autenticidade pública e assinatura.',
       passos: [
@@ -151,7 +151,7 @@ const Academia = {
       rota: 'notas-fiscais',
       moduloNome: 'Notas Fiscais',
       videoUrl: '/img/fingo/feature-demo.mp4',
-      videoPoster: '/img/fingo/logo-reveal-poster.png',
+      videoPoster: '/img/fingo/logo-reveal-poster.jpg',
       videoPlaceholder: 'https://images.unsplash.com/photo-1607604276583-eef5d076aa5f?w=800&q=80',
       resumo: 'Acabe com a digitação manual de notas fiscais de materiais: importe lotes de XML ou fotos de notas em papel.',
       passos: [
@@ -172,7 +172,7 @@ const Academia = {
       rota: 'pre-compras',
       moduloNome: 'Pré-Compras',
       videoUrl: '/img/fingo/hero-video.mp4',
-      videoPoster: '/img/fingo/logo-reveal-poster.png',
+      videoPoster: '/img/fingo/logo-reveal-poster.jpg',
       videoPlaceholder: 'https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?w=800&q=80',
       resumo: 'Controle o fluxo de cotações, pedidos de compra do canteiro e aprovações antes de comprometer o caixa.',
       passos: [
@@ -193,7 +193,7 @@ const Academia = {
       rota: 'orcamentos',
       moduloNome: 'Orçamentos',
       videoUrl: '/img/fingo/feature-demo.mp4',
-      videoPoster: '/img/fingo/logo-reveal-poster.png',
+      videoPoster: '/img/fingo/logo-reveal-poster.jpg',
       videoPlaceholder: 'https://images.unsplash.com/photo-1503387762-592deb58ef4e?w=800&q=80',
       resumo: 'Construa orçamentos analíticos com a base oficial da Caixa Econômica Federal e aplique taxa de BDI determinística.',
       passos: [
@@ -214,7 +214,7 @@ const Academia = {
       rota: 'relatorios',
       moduloNome: 'Exportar Relatórios',
       videoUrl: '/img/fingo/hero-video.mp4',
-      videoPoster: '/img/fingo/logo-reveal-poster.png',
+      videoPoster: '/img/fingo/logo-reveal-poster.jpg',
       videoPlaceholder: 'https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?w=800&q=80',
       resumo: 'Transforme o orçamento técnico em uma proposta executiva atraente com a logomarca da sua construtora.',
       passos: [
@@ -235,7 +235,7 @@ const Academia = {
       rota: 'obra-detalhe',
       moduloNome: 'BIM Viewer 3D',
       videoUrl: '/img/fingo/feature-demo.mp4',
-      videoPoster: '/img/fingo/logo-reveal-poster.png',
+      videoPoster: '/img/fingo/logo-reveal-poster.jpg',
       videoPlaceholder: 'https://images.unsplash.com/photo-1503387762-592deb58ef4e?w=800&q=80',
       resumo: 'Visualize o modelo 3D da edificação direto no navegador com alto desempenho sem travar seu celular.',
       passos: [
@@ -256,7 +256,7 @@ const Academia = {
       rota: 'obra-detalhe',
       moduloNome: 'BIM Clash Detection',
       videoUrl: '/img/fingo/feature-demo.mp4',
-      videoPoster: '/img/fingo/logo-reveal-poster.png',
+      videoPoster: '/img/fingo/logo-reveal-poster.jpg',
       videoPlaceholder: 'https://images.unsplash.com/photo-1581092160607-ee22621dd758?w=800&q=80',
       resumo: 'Evite retrabalhos caros na obra: encontre tubulações hidráulicas atravessando vigas antes de concretar.',
       passos: [
@@ -583,7 +583,7 @@ const Academia = {
                 controls
                 playsinline
                 preload="auto"
-                poster="${aula.videoPoster || '/img/fingo/logo-reveal-poster.png'}"
+                poster="${aula.videoPoster || '/img/fingo/logo-reveal-poster.jpg'}"
                 style="width:100%;height:100%;min-height:280px;aspect-ratio:16/9;display:block;background:#000;outline:none;"
                 data-fb-ended="Academia.onVideoEnded" data-fb-ended-n="1" data-fb-ended-t0="string" data-fb-ended-v0="${encodeURIComponent(aula.id)}"
               >

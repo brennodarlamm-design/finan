@@ -372,16 +372,20 @@ const Contas = {
       return b ? b.name : (c.banco_nome || 'Banco');
     };
 
-    return `<option value="">Selecione uma conta cadastrada...</option>` +
-      contas.map(c => {
+    let encontrou = false;
+    const opcoes = contas.map(c => {
         const nomeBanco = getNome(c);
         const label = c.apelido ? `${c.apelido} (${nomeBanco})` : `${nomeBanco} Ag:${c.agencia} / ${c.numero}`;
         const val = c.apelido || `${nomeBanco} Ag:${c.agencia} Cc:${c.numero}`;
         const sVal = String(selectedVal || '');
-        const isSel = selectedVal === val || selectedVal === c.apelido || (c.numero && sVal.includes(c.numero));
+        const isSel = !encontrou && (selectedVal === val || selectedVal === c.apelido || (c.numero && sVal.includes(c.numero)));
+        if (isSel) encontrou = true;
         return `<option value="${val}" ${isSel ? 'selected' : ''}>${label}</option>`;
-      }).join('') +
-      `<option value="__manual__">&#x2712; Digitar manualmente...</option>`;
+      }).join('');
+    // Conta digitada à mão (fora da lista) volta selecionada como "manual", sem se perder ao salvar.
+    const manual = !!String(selectedVal || '').trim() && !encontrou;
+    return `<option value="">Selecione uma conta cadastrada...</option>` + opcoes +
+      `<option value="__manual__" ${manual ? 'selected' : ''}>&#x2712; Digitar manualmente...</option>`;
   },
 
   init() {

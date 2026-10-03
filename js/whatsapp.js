@@ -71,7 +71,7 @@ const WhatsApp = {
   // Formata o link do WhatsApp Web/App
   gerarLink(texto, telefone = '') {
     const num = (telefone || this.getTelefonePadrao() || '').replace(/\D/g, '');
-    const numFmt = num ? (num.startsWith('55') ? num : `55${num}`) : '';
+    const numFmt = num ? ((num.length === 10 || num.length === 11) ? `55${num}` : num) : '';
     const encoded = encodeURIComponent(texto);
     return numFmt ? `https://api.whatsapp.com/send?phone=${numFmt}&text=${encoded}` : `https://api.whatsapp.com/send?text=${encoded}`;
   },
@@ -80,7 +80,7 @@ const WhatsApp = {
   async abrirEnvio(texto, telefone = '') {
     const modo = this.getModoEnvio();
     const tel = (telefone || this.getTelefonePadrao() || '').replace(/\D/g, '');
-    const numFmt = tel ? (tel.startsWith('55') ? tel : `55${tel}`) : '';
+    const numFmt = tel ? ((tel.length === 10 || tel.length === 11) ? `55${tel}` : tel) : '';
 
     if (!numFmt) {
       Utils.toast('⚠️ Por favor, informe o número de WhatsApp para recebimento.', 'warning');
@@ -922,7 +922,7 @@ const WhatsApp = {
 
   abrirWhatsAppWeb(phone, message) {
     const limpo = String(phone || '').replace(/\D/g, '');
-    const num = limpo ? (limpo.startsWith('55') ? limpo : '55' + limpo) : '';
+    const num = limpo ? ((limpo.length === 10 || limpo.length === 11) ? '55' + limpo : limpo) : '';
     const url = num
       ? `https://wa.me/${num}?text=${encodeURIComponent(message)}`
       : `https://wa.me/?text=${encodeURIComponent(message)}`;

@@ -209,7 +209,7 @@ export class EvolutionGoClient {
     let clean = String(phone || '').split(/[:@]/)[0].replace(/\D/g, '');
     if (!clean) return '';
     // Adiciona código do Brasil 55 se o usuário informou DDD + número (10 ou 11 dígitos)
-    if ((clean.length === 10 || clean.length === 11) && !clean.startsWith('55')) {
+    if (clean.length === 10 || clean.length === 11) {
       clean = '55' + clean;
     }
     return clean;

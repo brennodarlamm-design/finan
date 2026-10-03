@@ -7,8 +7,17 @@
   Cross-Origin-Opener-Policy: same-origin-allow-popups
   Link: </.well-known/api-catalog>; rel="api-catalog", </.well-known/ai-catalog.json>; rel="ai-catalog", </openapi.json>; rel="service-desc", </llms-full.txt>; rel="service-doc", </auth.md>; rel="service-doc", </llms.txt>; rel="describedby", </api/x402>; rel="payment"
 
+# /js e /css seguem revalidando: o ?v= dos HTML é manual e nem todo script o usa, então um
+# cache longo serviria código velho depois de um deploy (VARREDURA 2026-10-03 #35).
 /js/*
   Cache-Control: public, max-age=0, must-revalidate
+
+# Base SINAPI: o nome do arquivo já traz o mês de referência (~3 MB cada).
+/data/sinapi_*
+  Cache-Control: public, max-age=86400, stale-while-revalidate=604800
+
+/img/*
+  Cache-Control: public, max-age=604800, stale-while-revalidate=2592000
 
 /*.html
   Cache-Control: public, max-age=0, must-revalidate

@@ -97,8 +97,7 @@ const OCR = {
           <div id="ocr-dropzone"
             style="border:2px dashed rgba(79,70,229,.4);border-radius:12px;padding:16px;text-align:center;
                    background:rgba(79,70,229,.04);cursor:pointer;transition:all .2s;" data-fb-click="Patch26Actions.clickById" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="ocr-file-input"
-            ondragover="OCR._onDragOver(event)"
-            ondragleave="OCR._onDragLeave(event)" data-fb-drop="OCR._onDrop" data-fb-drop-n="1" data-fb-drop-t0="event">
+            data-fb-drop="OCR._onDrop" data-fb-drop-n="1" data-fb-drop-t0="event">
             <div style="font-size:.78rem;color:var(--text3);">
               🖥️ Ou arraste um arquivo aqui (PDF, imagem)
             </div>
@@ -128,16 +127,6 @@ const OCR = {
   },
 
   // ── Drag & Drop handlers ──────────────────────────────────────────────────
-  _onDragOver(e) {
-    e.preventDefault();
-    const dz = document.getElementById('ocr-dropzone');
-    if (dz) {
-      dz.style.borderColor = '#6366f1';
-      dz.style.background  = 'linear-gradient(135deg,rgba(99,102,241,.15) 0%,rgba(139,92,246,.1) 100%)';
-      dz.style.transform   = 'scale(1.01)';
-    }
-  },
-
   _onDragLeave(e) {
     const dz = document.getElementById('ocr-dropzone');
     if (dz) {
@@ -689,6 +678,13 @@ const OCR = {
 
   // ── Cria e salva o lançamento diretamente com centro de custo e anexo ─────────────
   confirmarESalvarLancamento() {
+    // Clique duplo gerava dois lançamentos.
+    if (this._salvandoLancamento) return;
+    this._salvandoLancamento = true;
+    try { return this._confirmarESalvarLancamento(); } finally { this._salvandoLancamento = false; }
+  },
+
+  _confirmarESalvarLancamento() {
     const get = id => document.getElementById(id)?.value?.trim() || '';
 
     const obraId      = get('ocr-obra');
@@ -718,19 +714,27 @@ const OCR = {
       return;
     }
 
+    // NF-e já lançada (pela chave de acesso): não gera a mesma despesa de novo.
+    const chaveNfe = String(this._dadosOCR?.chave_acesso || '').replace(/\D/g, '');
+    if (chaveNfe.length === 44 && typeof NFe !== 'undefined' && NFe._nfeJaLancada && NFe._nfeJaLancada(chaveNfe)) {
+      Utils.toast('Esta nota fiscal já foi lançada no financeiro (mesma chave de acesso).', 'warning');
+      return;
+    }
+
     // 1. Cadastra fornecedor se não existir
     let fornecedorId = null;
     if (fornecedor) {
       const fornecedores = DB.getAll('fornecedores') || [];
       const cnpjLimpo = cnpj.replace(/\D/g, '');
       let forn = fornecedores.find(f => {
-        const fCnpj = (f.cnpj || f.cpf || '').replace(/\D/g, '');
+        const fCnpj = (f.cnpj || f.cpf || f.cnpj_cpf || '').replace(/\D/g, '');
         return (cnpjLimpo && fCnpj === cnpjLimpo) || (f.nome && f.nome.toLowerCase() === fornecedor.toLowerCase());
       });
       if (!forn) {
         forn = DB.add('fornecedores', {
           nome: fornecedor,
           razao_social: fornecedor,
+          cnpj: cnpjLimpo,
           cnpj_cpf: cnpj || '',
           categoria: categoria
         });
@@ -770,9 +774,6 @@ const OCR = {
             if (prod) {
               it.produto_id = prod.id;
               prodsCadastrados.push(prod.nome);
-              if (Produtos.atualizarValorMedio) {
-                Produtos.atualizarValorMedio(prod.id);
-              }
             }
           }
         });
@@ -797,6 +798,7 @@ const OCR = {
       fornecedor_beneficiario: fornecedor,
       fornecedor_id: fornecedorId,
       codigo_barras: barcode || '',
+      chave_nfe: chaveNfe.length === 44 ? chaveNfe : null,
       origem: 'ocr',
       observacoes: [obs, numDoc ? `Doc: ${numDoc}` : '', this._dadosOCR?.chave_acesso ? `Chave NF-e: ${this._dadosOCR.chave_acesso}` : ''].filter(Boolean).join(' | ') || '',
       itens: itensParaSalvar,
@@ -822,12 +824,18 @@ const OCR = {
           obra_id: obraId,
           lancamento_id: lanc.id,
           chave_acesso: this._dadosOCR?.chave_acesso || '',
+          chave_nfe: chaveNfe.length === 44 ? chaveNfe : '',
           itens: itensParaSalvar,
           observacoes: `Reconhecido via OCR em ${new Date().toLocaleString('pt-BR')}`
         });
       } catch (errNota) {
         console.warn('Erro ao criar nota fiscal vinculada:', errNota);
       }
+    }
+
+    // Valor médio dos produtos depois de gravar a compra (antes ficava de fora).
+    if (typeof Produtos !== 'undefined' && Produtos.atualizarValorMedio) {
+      new Set(itensParaSalvar.map(it => it.produto_id).filter(Boolean)).forEach(id => Produtos.atualizarValorMedio(id));
     }
 
     // 4. Anexa o arquivo/comprovante se disponível

@@ -318,19 +318,36 @@ function Header() {
     </header>
   );
 }
+// VARREDURA 2026-10-03 #34: o vídeo de 7,6 MB tocava em qualquer celular. Agora só entra em
+// telas largas, sem "reduzir movimento" e sem economia de dados/rede lenta; nos outros casos
+// fica a imagem de fundo (o vídeo nem é baixado).
+function podeTocarVideo() {
+  if (typeof window === "undefined" || !window.matchMedia) return false;
+  if (!matchMedia("(min-width: 768px)").matches) return false;
+  if (matchMedia("(prefers-reduced-motion: reduce)").matches) return false;
+  const conn = navigator.connection;
+  if (conn && (conn.saveData || /(^|-)2g$/.test(String(conn.effectiveType || "")))) return false;
+  return true;
+}
 function HeroVideo() {
   const ref = useRef(null);
   const [failed, setFailed] = useState(false);
+  const [ativo, setAtivo] = useState(false);
   useEffect(() => {
-    const media = matchMedia("(prefers-reduced-motion: reduce)");
-    const sync = () => {
-      if (media.matches) ref.current?.pause();
-      else ref.current?.play().catch(() => {});
-    };
+    const largura = matchMedia("(min-width: 768px)");
+    const movimento = matchMedia("(prefers-reduced-motion: reduce)");
+    const sync = () => setAtivo(podeTocarVideo());
     sync();
-    media.addEventListener("change", sync);
-    return () => media.removeEventListener("change", sync);
+    largura.addEventListener("change", sync);
+    movimento.addEventListener("change", sync);
+    return () => {
+      largura.removeEventListener("change", sync);
+      movimento.removeEventListener("change", sync);
+    };
   }, []);
+  useEffect(() => {
+    if (ativo) ref.current?.play().catch(() => {});
+  }, [ativo]);
   return (
     <>
       <img
@@ -338,23 +355,26 @@ function HeroVideo() {
         alt=""
         className="absolute inset-0 h-full w-full object-cover"
       />
-      <video
-        ref={ref}
-        muted
-        loop
-        playsInline
-        preload="none"
-        poster="/img/fingo/construction-background.jpg"
-        aria-hidden="true"
-        onError={() => setFailed(true)}
-        className={`absolute inset-0 h-full w-full object-cover ${failed ? "hidden" : ""}`}
-      >
-        <source
-          src="/img/fingo/construction-background.mp4"
-          type="video/mp4"
+      {ativo && !failed && (
+        <video
+          ref={ref}
+          muted
+          loop
+          playsInline
+          autoPlay
+          preload="none"
+          poster="/img/fingo/construction-background.jpg"
+          aria-hidden="true"
           onError={() => setFailed(true)}
-        />
-      </video>
+          className="absolute inset-0 h-full w-full object-cover"
+        >
+          <source
+            src="/img/fingo/construction-background.mp4"
+            type="video/mp4"
+            onError={() => setFailed(true)}
+          />
+        </video>
+      )}
       <div className="absolute inset-0 bg-linear-to-r from-void via-void/80 to-void/20" />
     </>
   );

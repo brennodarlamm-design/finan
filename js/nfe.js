@@ -468,8 +468,7 @@ const NFe = {
 
         <div id="nfe-cert-dropzone"
           style="border:2px dashed var(--border);border-radius:var(--r-md);padding:32px;text-align:center;background:var(--bg-secondary);cursor:pointer;transition:.2s all;" data-fb-click="Patch26Actions.clickById" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="nfe-cert-file"
-          ondragover="event.preventDefault();this.style.borderColor='var(--accent)';this.style.background='rgba(201,162,39,.06)';"
-          ondragleave="this.style.borderColor='var(--border)';this.style.background='var(--bg-secondary)';" data-fb-drop="Patch26Actions.nfeDrop" data-fb-drop-n="2" data-fb-drop-t0="event" data-fb-drop-t1="self">
+          data-fb-drop="Patch26Actions.nfeDrop" data-fb-drop-n="2" data-fb-drop-t0="event" data-fb-drop-t1="self">
           <div style="font-size:2.8rem;margin-bottom:8px;">🗂️</div>
           <div style="font-weight:700;color:var(--text);margin-bottom:4px;">Arraste os arquivos XML aqui ou clique para selecionar</div>
           <div style="font-size:.78rem;color:var(--text3);">Aceita arquivos <strong>.xml</strong> individuais de NF-e ou arquivos de lote <strong>retDistDFeInt.xml</strong> / <strong>enviNFe.xml</strong> (suporta múltiplos arquivos)</div>
@@ -1272,6 +1271,10 @@ const NFe = {
                   value="${vencimentoPadrao}">
               </div>
             </div>
+            ${(parsed.duplicatas || []).filter(d => Number(d.valor) > 0).length > 1 ? `<div style="margin:-4px 0 12px;font-size:.78rem;color:var(--text2);background:var(--bg-secondary);border-radius:6px;padding:8px 10px;">
+              📑 Esta nota tem <strong>${parsed.duplicatas.filter(d => Number(d.valor) > 0).length} duplicatas</strong>: será criada uma conta a pagar para cada uma, com o valor e o vencimento da nota. Para lançar tudo numa conta só, altere o valor acima.
+            </div>` : ''}
+            ${this._nfeJaLancada(parsed.chave) ? `<div role="alert" style="margin:0 0 12px;font-size:.8rem;color:#991b1b;background:#fef2f2;border:1px solid #fecaca;border-radius:6px;padding:8px 10px;">⚠️ Esta NF-e já foi lançada no financeiro. Lançar de novo duplicaria a conta a pagar.</div>` : ''}
 
             <div style="margin-bottom:14px;">
               <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:.84rem;font-weight:700;color:var(--text);background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--r-md);padding:10px 14px;user-select:none;" id="nfe-ja-pago-label">
@@ -1321,8 +1324,25 @@ const NFe = {
     if (section) section.style.display = checkbox.checked ? 'block' : 'none';
   },
 
+  /** A NF-e (pela chave de acesso) já virou lançamento ou nota neste tenant? */
+  _nfeJaLancada(chave) {
+    const ch = String(chave || '').replace(/\D/g, '');
+    if (ch.length !== 44) return false;
+    const lancs = DB.getAll('lancamentos') || [];
+    if (lancs.some(l => String(l.chave_nfe || '').replace(/\D/g, '') === ch)) return true;
+    const notas = DB.getAll('notas') || [];
+    return notas.some(n => n.lancamento_id && [n.chave_nfe, n.chave_acesso, n.chave].some(c => String(c || '').replace(/\D/g, '') === ch));
+  },
+
   async _confirmarGeracaoLancamento(chave) {
     const parsed = window._tempNFeParsed || {};
+    // Clique duplo enquanto o DANFE é baixado gerava duas despesas.
+    if (this._gerandoLancamento) return;
+    if (this._nfeJaLancada(chave)) {
+      Utils.toast('Esta NF-e já foi lançada no financeiro. Abra o lançamento existente em vez de lançar de novo.', 'warning');
+      return;
+    }
+    this._gerandoLancamento = true;
     try {
       const obraId = document.getElementById('nfe-dest-obra')?.value;
       const cat = document.getElementById('nfe-dest-cat')?.value || 'material';
@@ -1344,7 +1364,7 @@ const NFe = {
       const fornecedores = DB.getAll('fornecedores') || [];
       const cnpjLimpo = (parsed.cnpj_emitente || '').replace(/\D/g, '');
       let forn = fornecedores.find(f => {
-        const fCnpj = (f.cnpj || f.cpf || '').replace(/\D/g, '');
+        const fCnpj = (f.cnpj || f.cpf || f.cnpj_cpf || '').replace(/\D/g, '');
         return (fCnpj && fCnpj === cnpjLimpo) || (f.nome && f.nome.toLowerCase() === (parsed.emitente || '').toLowerCase());
       });
 
@@ -1352,6 +1372,7 @@ const NFe = {
         forn = DB.add('fornecedores', {
           nome: parsed.emitente,
           razao_social: parsed.emitente,
+          cnpj: cnpjLimpo, // a busca local usa "cnpj"; sem ele o próximo XML criava fornecedor duplicado
           cnpj_cpf: parsed.cnpj_emitente || '',
           telefone: parsed.telefone_emitente || '',
           categoria: cat
@@ -1359,26 +1380,37 @@ const NFe = {
       }
       fornecedorId = forn?.id || null;
 
-      // 2. Cria o Lançamento Financeiro (Despesa)
-      const contaBancaria = contaPagtoNome ||
-        (DB.getAll('contas').find(c => c.id === contaId)?.nome) || '';
-
-      const lanc = DB.add('lancamentos', {
+      // 2. Cria o(s) lançamento(s) financeiro(s) (despesa)
+      const conta = (DB.getAll('contas') || []).find(c => c.id === contaId);
+      const contaBancaria = contaPagtoNome || conta?.apelido || conta?.banco_nome || conta?.nome || '';
+      const totalNota = Number(parsed.valor_bruto) || valor;
+      const duplicatas = (parsed.duplicatas || []).filter(d => Number(d.valor) > 0);
+      // Uma conta a pagar por duplicata (boleto), com o valor e o vencimento de cada uma.
+      // Só quando o usuário não alterou o valor total do formulário.
+      const porDuplicata = duplicatas.length > 1 && Math.abs(valor - totalNota) < 0.01;
+      const parcelas = porDuplicata
+        ? duplicatas.map((d, i) => ({ valor: Number(d.valor), vencimento: d.vencimento || venc, sufixo: ` (parcela ${i + 1}/${duplicatas.length}${d.numero ? ` · dup. ${d.numero}` : ''})` }))
+        : [{ valor, vencimento: venc, sufixo: '' }];
+      const grupoParcelas = porDuplicata ? DB.uuid() : null;
+      const lancamentos = parcelas.map((p, i) => DB.add('lancamentos', {
         tipo: 'despesa',
         obra_id: obraId,
         conta_bancaria: contaBancaria,
         categoria: cat,
-        descricao: desc,
-        valor: valor,
+        descricao: `${desc}${p.sufixo}`,
+        valor: p.valor,
         data: parsed.data_emissao || Utils.today(),
-        data_vencimento: venc,
+        data_vencimento: p.vencimento,
         data_pagamento: dataPagto || null,
         status: jaPago ? 'pago' : 'a_pagar',
         fornecedor_beneficiario: parsed.emitente || '',
         fornecedor_id: fornecedorId,
         chave_nfe: chave,
+        grupo_parcelamento_id: grupoParcelas,
+        numero_parcela: porDuplicata ? i + 1 : null,
         conciliado: false
-      });
+      }));
+      const lanc = lancamentos[0];
 
       // 3. Cria o registro na tabela de Notas Fiscais
       DB.add('notas', {
@@ -1387,17 +1419,17 @@ const NFe = {
         emitente: parsed.emitente,
         cnpj_emitente: parsed.cnpj_emitente,
         data_emissao: parsed.data_emissao || Utils.today(),
-        data_vencimento: venc,
+        data_vencimento: parcelas[0].vencimento,
         data_pagamento: dataPagto || null,
-        valor_total: parsed.valor_bruto || valor,
+        valor_total: totalNota,
         tipo: 'entrada',
         categoria: cat,
-        status: jaPago ? 'pago' : 'pendente',
+        status: jaPago ? 'paga' : 'pendente', // a tela de Notas usa "paga"
         obra_id: obraId,
         lancamento_id: lanc.id,
         chave_acesso: chave,
         chave_nfe: chave,
-        observacoes: `Gerado automaticamente via busca NF-e em ${Utils.fmt.datetime(new Date().toISOString())}`
+        observacoes: `Gerado automaticamente via busca NF-e em ${Utils.fmt.datetime(new Date().toISOString())}${porDuplicata ? ` · ${parcelas.length} parcelas no financeiro` : ''}`
       });
 
       // 4. Baixa o DANFE PDF e anexa ao lançamento
@@ -1420,7 +1452,9 @@ const NFe = {
       }
 
       Utils.closeModal();
-      Utils.toast('✅ Despesa e Nota Fiscal cadastradas com sucesso!', 'success');
+      Utils.toast(lancamentos.length > 1
+        ? `✅ Nota fiscal cadastrada e ${lancamentos.length} parcelas lançadas no contas a pagar!`
+        : '✅ Despesa e Nota Fiscal cadastradas com sucesso!', 'success');
 
       if (typeof Lancamentos !== 'undefined' && Lancamentos._refresh) Lancamentos._refresh();
       if (typeof Notas !== 'undefined' && Notas.render) {
@@ -1431,6 +1465,8 @@ const NFe = {
       }
     } catch (err) {
       Utils.toast(`Erro ao gerar lançamento: ${err.message}`, 'error');
+    } finally {
+      this._gerandoLancamento = false;
     }
   },
 

@@ -394,8 +394,7 @@ const FasesDoc = {
             <!-- Aba Upload -->
             <div id="fd-panel-upload" style="margin-top:10px">
               <div class="drop-zone" style="padding:18px;text-align:center;cursor:pointer" data-fb-click="Patch26Actions.fasesClickFile" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(docId))}"
-                   ondragover="event.preventDefault();this.classList.add('drag-over')"
-                   ondragleave="this.classList.remove('drag-over')" data-fb-drop="Patch26Actions.fasesDrop" data-fb-drop-n="4" data-fb-drop-t0="event" data-fb-drop-t1="self" data-fb-drop-t2="string" data-fb-drop-v2="${encodeURIComponent(String(obraId))}" data-fb-drop-t3="string" data-fb-drop-v3="${encodeURIComponent(String(docId))}">
+                   data-fb-drop="Patch26Actions.fasesDrop" data-fb-drop-n="4" data-fb-drop-t0="event" data-fb-drop-t1="self" data-fb-drop-t2="string" data-fb-drop-v2="${encodeURIComponent(String(obraId))}" data-fb-drop-t3="string" data-fb-drop-v3="${encodeURIComponent(String(docId))}">
                 <div style="font-size:1.4rem;margin-bottom:5px">📁</div>
                 <div style="font-size:.82rem;color:var(--text2);font-weight:600">Clique ou arraste o arquivo</div>
                 <div style="font-size:.71rem;color:var(--text3);margin-top:3px">PDF, PNG, JPG, DWG, XLSX, ZIP, RAR</div>

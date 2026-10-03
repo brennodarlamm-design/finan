@@ -50,10 +50,11 @@ export default async function handler(req, res) {
         SELECT
           COALESCE(SUM(valor) FILTER (WHERE tipo='receita' AND status='recebido'),0)::numeric AS total_receitas,
           COALESCE(SUM(valor) FILTER (WHERE tipo='despesa' AND status='pago'),0)::numeric AS total_despesas,
-          COUNT(*) FILTER (WHERE tipo='despesa' AND status='a_pagar')::int AS a_pagar,
-          COALESCE(SUM(valor) FILTER (WHERE tipo='despesa' AND status='a_pagar'),0)::numeric AS a_pagar_valor,
-          COUNT(*) FILTER (WHERE tipo='receita' AND status='a_receber')::int AS a_receber,
-          COALESCE(SUM(valor) FILTER (WHERE tipo='receita' AND status='a_receber'),0)::numeric AS a_receber_valor
+          -- "em_atraso" e "pendente" também estão em aberto (antes sumiam do A Pagar/A Receber).
+          COUNT(*) FILTER (WHERE tipo='despesa' AND status IN ('a_pagar','pendente','em_atraso'))::int AS a_pagar,
+          COALESCE(SUM(valor) FILTER (WHERE tipo='despesa' AND status IN ('a_pagar','pendente','em_atraso')),0)::numeric AS a_pagar_valor,
+          COUNT(*) FILTER (WHERE tipo='receita' AND status IN ('a_receber','pendente','em_atraso'))::int AS a_receber,
+          COALESCE(SUM(valor) FILTER (WHERE tipo='receita' AND status IN ('a_receber','pendente','em_atraso')),0)::numeric AS a_receber_valor
         FROM lancamentos
         WHERE tenant_id=${auth.tenantId}
           AND (${filter}='' OR obra_id=${filter});

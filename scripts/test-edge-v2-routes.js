@@ -142,6 +142,7 @@ const resBoletim = createMockResponse();
 await handleV2BoletimMedicao({
   body: {
     valorBruto: 10000,
+    tipoServico: 'engenharia_consultiva',
     aliqISS: 5,
     desonerado: true,
     aliqIRRF: 1.5,

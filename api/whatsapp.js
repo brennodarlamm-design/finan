@@ -292,7 +292,7 @@ export default async function handler(req, res) {
         return res.status(400).json({ error: 'Telefone e mensagem/arquivo são obrigatórios.' });
       }
 
-      const numFmt = destPhone.startsWith('55') ? destPhone : `55${destPhone}`;
+      const numFmt = (destPhone.length === 10 || destPhone.length === 11) ? `55${destPhone}` : destPhone;
       const payloadObj = {
         tenantId,
         number: numFmt,

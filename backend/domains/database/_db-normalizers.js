@@ -44,7 +44,11 @@ export function jsonPayload(row) {
   if (typeof raw === 'string') {
     try { parsed = JSON.parse(raw); } catch { parsed = {}; }
   }
-  return { ...(parsed && typeof parsed === 'object' ? parsed : {}), id: row.id };
+  const out = { ...(parsed && typeof parsed === 'object' ? parsed : {}), id: row.id };
+  // A versão vale a da linha (xmin), nunca uma cópia antiga guardada dentro do payload.
+  delete out.sync_version;
+  if (row.sync_version) out.sync_version = String(row.sync_version);
+  return out;
 }
 
 export function docPhasePayload(row) {
@@ -208,6 +212,8 @@ export function normalizeMedicao(m) {
     etapa_descricao: m.etapa_descricao || '',
     documentos_ok: Boolean(m.documentos_ok),
     lancamento_id: m.lancamento_id || null,
+    // Sem coluna própria: vem do payload (receita "a receber" da retenção técnica).
+    retencao_lancamento_id: m.retencao_lancamento_id || jsonPayload(m).retencao_lancamento_id || null,
     retencao_tecnica: cleanNum(m.retencao_tecnica),
     descontos: cleanNum(m.descontos),
     itens: (typeof m.itens_json === 'string' ? safeJsonParse(m.itens_json, []) : m.itens_json) || m.itens || []

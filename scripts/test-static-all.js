@@ -127,6 +127,7 @@ const tests = [
   'scripts/test-audit-2026-10-02-r10.js',
   'scripts/test-icp-pdf-signature.js',
   'scripts/test-seo-prerender.js',
+  'scripts/test-varredura-2026-10-03.js',
   'scripts/test-sefaz-dfe.js',
   'scripts/test-financeiro-core-hardening.js',
   'scripts/test-upstash-redis-integration.js',

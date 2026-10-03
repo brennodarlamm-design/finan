@@ -287,7 +287,7 @@ async function handleBillingNotice(req, res) {
 
   const tenantId = String(preview.tenant?.id || req.body?.tenantId || '').trim();
   let destPhone = String(preview.destPhone || '').replace(/\D/g, '');
-  if (destPhone.length >= 10 && destPhone.length <= 11 && !destPhone.startsWith('55')) {
+  if (destPhone.length >= 10 && destPhone.length <= 11) {
     destPhone = '55' + destPhone;
   }
   if (!tenantId) return res.status(400).json({ success: false, error: 'Empresa não informada.' });

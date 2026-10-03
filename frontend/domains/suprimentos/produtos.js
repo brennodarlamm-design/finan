@@ -301,7 +301,9 @@ const Produtos = {
     clientesMap.set('escritorio', '🏢 Escritório');
 
     // Lançamentos com itens vinculados a produto_id
+    const lancamentosComItens = new Set();
     DB.getAll('lancamentos').filter(l => l.itens && l.itens.length && l.tipo === 'despesa').forEach(l => {
+      lancamentosComItens.add(l.id);
       if (obraId && l.obra_id !== obraId) return;
       const obraNome = clientesMap.get(l.obra_id) || '—';
       l.itens.forEach(it => {
@@ -318,6 +320,8 @@ const Produtos = {
     // Notas com itens vinculados a produto_id
     DB.getAll('notas').filter(n => n.itens && n.itens.length).forEach(n => {
       if (obraId && n.obra_id !== obraId) return;
+      // Mesma compra já contada pelo lançamento vinculado (OCR grava os itens nos dois).
+      if (n.lancamento_id && lancamentosComItens.has(n.lancamento_id)) return;
       const obraNome = clientesMap.get(n.obra_id) || '—';
       n.itens.forEach(it => {
         if (!it.produto_id || !mapa[it.produto_id]) return;

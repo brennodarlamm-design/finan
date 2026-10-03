@@ -86,11 +86,11 @@ console.log(`   ✓ Meta Description otimizada (${descLen} caracteres): "${descM
 assert(landing.includes('<link rel="canonical" href="https://fingo.api.br/">'), 'landing.html deve ter canonical link para https://fingo.api.br/');
 
 // OpenGraph e Twitter Cards 1200x630
-assert(landing.includes('property="og:image" content="https://fingo.api.br/img/og-finobra-cover.jpg"'), 'og:image deve apontar para banner 1200x630');
+assert(landing.includes('property="og:image" content="https://fingo.api.br/img/og-fingo-cover.jpg"'), 'og:image deve apontar para banner 1200x630');
 assert(landing.includes('property="og:image:width" content="1200"'), 'og:image:width deve ser 1200');
 assert(landing.includes('property="og:image:height" content="630"'), 'og:image:height deve ser 630');
 assert(landing.includes('name="twitter:card" content="summary_large_image"'), 'twitter:card deve ser summary_large_image');
-assert(landing.includes('name="twitter:image" content="https://fingo.api.br/img/og-finobra-cover.jpg"'), 'twitter:image deve apontar para banner 1200x630');
+assert(landing.includes('name="twitter:image" content="https://fingo.api.br/img/og-fingo-cover.jpg"'), 'twitter:image deve apontar para banner 1200x630');
 
 // Schema.org JSON-LD Graph
 const jsonLdMatch = landing.match(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/i);
@@ -161,15 +161,31 @@ assert(masterHtml.includes('<meta name="robots" content="noindex, nofollow">'), 
 console.log('   ✓ app.html e master.html blindados contra indexação indevida.');
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 6. Integridade do Banner Social (img/og-finobra-cover.jpg)
+// 6. Integridade do Banner Social (img/og-fingo-cover.jpg)
 // ─────────────────────────────────────────────────────────────────────────────
 console.log('\n6. Validando existência e integridade física do banner OpenGraph...');
 
-assert(fs.existsSync(path.join(root, 'img/og-finobra-cover.jpg')), 'img/og-finobra-cover.jpg deve existir');
-const bannerStat = fs.statSync(path.join(root, 'img/og-finobra-cover.jpg'));
-assert(bannerStat.size > 50000, `Banner og-finobra-cover.jpg deve ter alta resolução (> 50KB). Tamanho atual: ${bannerStat.size} bytes`);
+assert(fs.existsSync(path.join(root, 'img/og-fingo-cover.jpg')), 'img/og-fingo-cover.jpg deve existir');
+const bannerStat = fs.statSync(path.join(root, 'img/og-fingo-cover.jpg'));
+// Resolução lida do próprio JPEG (marcador SOF), em vez de usar o peso do arquivo como indício.
+function jpegSize(buf) {
+  let i = 2;
+  while (i + 9 < buf.length) {
+    if (buf[i] !== 0xFF) { i++; continue; }
+    const marker = buf[i + 1];
+    const len = buf.readUInt16BE(i + 2);
+    if (marker >= 0xC0 && marker <= 0xCF && ![0xC4, 0xC8, 0xCC].includes(marker)) {
+      return { height: buf.readUInt16BE(i + 5), width: buf.readUInt16BE(i + 7) };
+    }
+    i += 2 + len;
+  }
+  return null;
+}
+const bannerDim = jpegSize(fs.readFileSync(path.join(root, 'img/og-fingo-cover.jpg')));
+assert(bannerDim && bannerDim.width === 1200 && bannerDim.height === 630, `Banner og-fingo-cover.jpg deve ter 1200x630 (atual: ${bannerDim ? `${bannerDim.width}x${bannerDim.height}` : 'ilegível'})`);
+assert(bannerStat.size < 300 * 1024, `Banner og-fingo-cover.jpg deve ser leve (< 300KB). Tamanho atual: ${bannerStat.size} bytes`);
 
-if (fs.existsSync(path.join(root, 'dist'))) assert(fs.existsSync(path.join(root, 'dist/img/og-finobra-cover.jpg')), 'Distribuição existente deve conter banner OpenGraph');
+if (fs.existsSync(path.join(root, 'dist'))) assert(fs.existsSync(path.join(root, 'dist/img/og-fingo-cover.jpg')), 'Distribuição existente deve conter banner OpenGraph');
 
 console.log(`   ✓ Banner OpenGraph verificado (${Math.round(bannerStat.size / 1024)} KB) em img/ e dist/img/.`);
 

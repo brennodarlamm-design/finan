@@ -655,70 +655,65 @@ const Utils = {
     return opts;
   },
 
-  extenso(valor) {
-    const v = parseFloat(valor) || 0;
-    if (v === 0) return 'zero reais';
-    
+  /**
+   * Número inteiro por extenso (0 a 999.999.999.999), sem moeda: 1250 -> "mil duzentos e cinquenta".
+   * Regra do "e" entre grupos: só antes do último grupo quando o número dele é menor que 100
+   * ou centena exata (1.200 = "mil e duzentos"; 1.250 = "mil duzentos e cinquenta";
+   * 2.500.000 = "dois milhões e quinhentos mil").
+   */
+  numeroExtenso(numero) {
+    const n = Math.floor(Math.abs(Number(numero) || 0));
+    if (n === 0) return 'zero';
     const unidades = ['','um','dois','três','quatro','cinco','seis','sete','oito','nove','dez','onze','doze','treze','quatorze','quinze','dezesseis','dezessete','dezoito','dezenove'];
     const dezenas = ['','','vinte','trinta','quarenta','cinquenta','sessenta','setenta','oitenta','noventa'];
     const centenas = ['','cento','duzentos','trezentos','quatrocentos','quinhentos','seiscentos','setecentos','oitocentos','novecentos'];
-
-    function converterCentena(n) {
-      if (n === 100) return 'cem';
-      let r = '';
-      const c = Math.floor(n / 100);
-      const d = Math.floor((n % 100) / 10);
-      const u = n % 10;
-      if (c > 0) r += centenas[c];
-      const du = n % 100;
-      if (du > 0 && du < 20) {
-        if (r) r += ' e ';
-        r += unidades[du];
-      } else {
-        if (d > 0) {
-          if (r) r += ' e ';
-          r += dezenas[d];
-        }
-        if (u > 0) {
-          if (r) r += ' e ';
-          r += unidades[u];
-        }
+    const centena = (x) => {
+      if (x === 100) return 'cem';
+      const partes = [];
+      if (x >= 100) partes.push(centenas[Math.floor(x / 100)]);
+      const du = x % 100;
+      if (du > 0 && du < 20) partes.push(unidades[du]);
+      else if (du >= 20) {
+        partes.push(dezenas[Math.floor(du / 10)]);
+        if (du % 10) partes.push(unidades[du % 10]);
       }
-      return r;
+      return partes.join(' e ');
+    };
+    const escalas = [
+      [1e9, 'bilhão', 'bilhões'],
+      [1e6, 'milhão', 'milhões'],
+      [1e3, 'mil', 'mil']
+    ];
+    const grupos = [];
+    let resto = n;
+    for (const [base, sing, plur] of escalas) {
+      const q = Math.floor(resto / base);
+      resto %= base;
+      if (!q) continue;
+      grupos.push({ coef: q, texto: base === 1e3 ? (q === 1 ? 'mil' : `${centena(q)} mil`) : `${centena(q)} ${q === 1 ? sing : plur}` });
     }
+    if (resto) grupos.push({ coef: resto, texto: centena(resto) });
+    if (grupos.length === 1) return grupos[0].texto;
+    const ultimo = grupos[grupos.length - 1];
+    const comE = ultimo.coef < 100 || ultimo.coef % 100 === 0;
+    return grupos.slice(0, -1).map(g => g.texto).join(' ') + (comE ? ' e ' : ' ') + ultimo.texto;
+  },
 
+  /** Valor em reais por extenso: 1000000 -> "um milhão de reais"; 1001,50 -> "mil e um reais e cinquenta centavos". */
+  extenso(valor) {
+    const v = Math.round((parseFloat(valor) || 0) * 100) / 100;
+    if (v <= 0) return 'zero reais';
     const inteira = Math.floor(v);
     const centavos = Math.round((v - inteira) * 100);
-
-    let partes = [];
-    const milhoes = Math.floor(inteira / 1000000);
-    const milhares = Math.floor((inteira % 1000000) / 1000);
-    const resto = inteira % 1000;
-
-    if (milhoes > 0) {
-      partes.push(converterCentena(milhoes) + (milhoes === 1 ? ' milhão' : ' milhões'));
-    }
-    if (milhares > 0) {
-      partes.push((milhares === 1 ? 'um mil' : converterCentena(milhares) + ' mil'));
-    }
-    if (resto > 0) {
-      partes.push(converterCentena(resto));
-    }
-
     let textoReais = '';
     if (inteira > 0) {
-      textoReais = partes.join(' e ') + (inteira === 1 ? ' real' : ' reais');
+      // "de reais" quando termina em milhão/bilhão exatos (um milhão de reais, dois bilhões de reais).
+      const deReais = inteira >= 1e6 && inteira % 1e6 === 0;
+      textoReais = this.numeroExtenso(inteira) + (inteira === 1 ? ' real' : (deReais ? ' de reais' : ' reais'));
     }
-
-    let textoCentavos = '';
-    if (centavos > 0) {
-      textoCentavos = converterCentena(centavos) + (centavos === 1 ? ' centavo' : ' centavos');
-    }
-
+    const textoCentavos = centavos > 0 ? this.numeroExtenso(centavos) + (centavos === 1 ? ' centavo' : ' centavos') : '';
     if (textoReais && textoCentavos) return `${textoReais} e ${textoCentavos}`;
-    if (textoReais) return textoReais;
-    if (textoCentavos) return textoCentavos;
-    return 'zero reais';
+    return textoReais || textoCentavos;
   },
 
   compressImage(file, maxW = 400, maxH = 200, quality = 0.88) {

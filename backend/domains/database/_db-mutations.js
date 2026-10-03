@@ -9,6 +9,7 @@ import { setPrivateNoCache } from './_http.js';
 import { isTenantStorageUrl } from './_edge-r2.js';
 import { getPlanRule, isActiveObraStatus } from './_plans.js';
 import { writeAudit } from './_audit.js';
+import { SYNC_GUARD_TABLES, syncVersionConflict, readSyncVersion, syncRecordId, withoutSyncVersion } from './_sync-guard.js';
 
 export async function validateObraTenant(sql, obraId, tenantId) {
   if (!obraId) return null;
@@ -139,6 +140,22 @@ export async function auditDb(sql, req, auth, acao, table, data, id = null) {
  */
 export async function handleSave(sql, tenantId, auth, req, res, table, data) {
   setPrivateNoCache(res);
+
+  // Concorrência otimista (VARREDURA 2026-10-03 #4). `lancamentos` já faz a checagem na própria query.
+  if (table !== 'lancamentos' && SYNC_GUARD_TABLES[table]) {
+    const conflict = await syncVersionConflict(sql, table, tenantId, data);
+    if (conflict) return res.status(409).json(conflict);
+    data = withoutSyncVersion(data);
+    // Devolve a versão nova junto do sucesso, para o app gravar no registro local.
+    const respond = res.json.bind(res);
+    res.json = (body) => {
+      res.json = respond;
+      if (!body || body.success !== true) return respond(body);
+      const id = String(body.id || syncRecordId(table, data));
+      return readSyncVersion(sql, table, tenantId, id)
+        .then(version => respond(version ? { ...body, sync_version: version } : body), () => respond(body));
+    };
+  }
 
   if (table === 'lancamentos') {
     const l = data;

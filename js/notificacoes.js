@@ -185,13 +185,6 @@ const Notificacoes = {
 
   _tabAtiva: 'alertas',
 
-  _emailsPadrao: [
-    { id: 'em_1', data: '2026-09-15 17:40', para: 'financeiro@engenhariabrasil.com.br', assunto: 'Recibo Oficial de Pagamento — Obra Residencial Bella Vista', tipo: 'recibo', status: 'entregue' },
-    { id: 'em_2', data: '2026-09-15 14:15', para: 'diretoria@construtoraprimor.com.br', assunto: 'Boletim de Medição BM-04 submetido para validação', tipo: 'medicao', status: 'entregue' },
-    { id: 'em_3', data: '2026-09-14 09:30', para: 'compras@fornecedorao.com.br', assunto: 'Ordem de Pré-Compra Aprovada #PC-1082 — Cimento e Aço CA-50', tipo: 'precompra', status: 'entregue' },
-    { id: 'em_4', data: '2026-09-13 11:20', para: 'carlos.engenheiro@cliente.com', assunto: 'Convite de Acesso ao Portal de Transparência da Obra', tipo: 'portal', status: 'entregue' },
-  ],
-
   _atualizacoesPadrao: [
     {
       versao: 'v2.40.0',
@@ -231,15 +224,23 @@ const Notificacoes = {
     }
   ],
 
+  // VARREDURA 2026-10-03 #40: a aba mostrava 4 envios fictícios para toda empresa, e o
+  // histórico ficava numa chave sem tenant (visível para outra empresa no mesmo navegador).
+  _emailLogKey() {
+    return (typeof DB !== 'undefined' && DB._ck) ? DB._ck('finobra_email_logs') : 'finobra_email_logs';
+  },
+
   getEmails() {
     try {
-      const raw = localStorage.getItem('finobra_email_logs');
+      const key = this._emailLogKey();
+      if (key !== 'finobra_email_logs') localStorage.removeItem('finobra_email_logs'); // chave antiga, sem tenant
+      const raw = localStorage.getItem(key);
       if (raw) {
         const parsed = JSON.parse(raw);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        if (Array.isArray(parsed)) return parsed;
       }
     } catch {}
-    return this._emailsPadrao;
+    return [];
   },
 
   registrarEnvioEmail(para, assunto, tipo = 'geral', status = 'entregue') {
@@ -255,7 +256,7 @@ const Notificacoes = {
     };
     emails.unshift(novo);
     try {
-      localStorage.setItem('finobra_email_logs', JSON.stringify(emails.slice(0, 50)));
+      localStorage.setItem(this._emailLogKey(), JSON.stringify(emails.slice(0, 50)));
     } catch {}
     return novo;
   },
@@ -461,7 +462,9 @@ const Notificacoes = {
   verificarNovidadesAuto() {
     try {
       const key = 'fingo_seen_version_v240';
-      if (!localStorage.getItem(key)) {
+      // Novidade interna do sistema: nunca aparece para o cliente final no Portal de Transparência.
+      const portalPublico = typeof document !== 'undefined' && document.body?.classList?.contains('portal-public-mode');
+      if (!portalPublico && !localStorage.getItem(key)) {
         setTimeout(() => {
           if (typeof this.enviarPushDesktop === 'function') {
             this.enviarPushDesktop(

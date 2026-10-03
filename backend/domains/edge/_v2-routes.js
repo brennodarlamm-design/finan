@@ -23,7 +23,8 @@ import { createOwnerSql, createRuntimeSql } from './_database.js';
 import { querySinapiReferencia, normalizeSinapiParams } from './_sinapi-reference.js';
 import { checkRateLimit, getClientIp } from './_ratelimit.js';
 import { checkRateLimitRedis } from './_edge-redis.js';
-import { handlePortalLinkSign, handlePortalLinkVerify } from './_portal-link.js';
+import { handlePortalLinkSign, handlePortalLinkVerify, handlePortalData } from './_portal-link.js';
+import { handleOfxFitids } from './_ofx-registry.js';
 
 // AUDIT-2026-10-02 F5: resolveAuthAndTenant() expõe perfil e plano em auth.user
 // (perfil / tenantPlan). auth.role e auth.plan não existem e faziam o plano cair
@@ -82,6 +83,8 @@ export const V2_ROUTE_SPEC = [
   { method: 'POST', path: '/api/v2/public/newsletter/unsubscribe', desc: 'Cancelamento de inscrição no Radar FinGo' },
   { method: 'POST', path: '/api/v2/portal/link', desc: 'Gera link assinado do Portal do Cliente (autenticado)' },
   { method: 'POST', path: '/api/v2/portal/verify', desc: 'Verifica assinatura de link do Portal do Cliente (público)' },
+  { method: 'POST', path: '/api/v2/portal/data', desc: 'Dados atuais da obra para link v2 do Portal do Cliente (público)' },
+  { method: 'POST', path: '/api/v2/ofx/fitids', desc: 'Registro das transações OFX já importadas (evita reimportar o mesmo extrato em outro aparelho)' },
   // 4. Construtora / Tenant
   { method: 'GET', path: '/api/v2/tenants/current', desc: 'Dados e preferências da construtora ativa' },
   { method: 'POST', path: '/api/v2/support/chat', desc: 'Mensagens para o Copiloto FinBot com pool de IA' },
@@ -333,23 +336,54 @@ export async function handleV2BoletimMedicao(req, res) {
     return res.status(400).json({ success: false, error: 'valorBruto deve ser maior que zero.' });
   }
 
-  const aliqISS = Number(body.aliqISS !== undefined ? body.aliqISS : 5.0);
+  // VARREDURA 2026-10-03 #41: a rota retinha IRRF de optante do Simples e de empreitada de obra,
+  // aplicava a CSRF (4,65%) a qualquer serviço e aceitava qualquer alíquota (até negativa).
+  // Regras (estimativa; confirme com a contabilidade do contrato):
+  //   • INSS: 11% (empresa do Simples no Anexo IV também sofre retenção) ou 3,5% se desonerada (CPRB);
+  //   • ISS: 0 (não retido) ou entre 2% e 5% (LC 116/2003, arts. 8º e 8º-A);
+  //   • IRRF 1,5% e CSRF 4,65% só para serviços profissionais de engenharia/consultoria e de manutenção;
+  //     empreitada de obra não sofre esses dois, e optante do Simples nunca sofre;
+  //   • CSRF dispensada quando o DARF fica em R$ 10,00 ou menos (Lei 13.137/2015);
+  //   • garantia contratual entre 0% e 10%.
+  const TIPOS = {
+    construcao: { label: 'Empreitada de obra', irrfPadrao: 0, csrf: false },
+    engenharia_consultiva: { label: 'Engenharia consultiva / projetos', irrfPadrao: 1.5, csrf: true },
+    manutencao: { label: 'Manutenção / conservação', irrfPadrao: 1.5, csrf: true }
+  };
+  const tipoServico = String(body.tipoServico || 'construcao');
+  const tipo = TIPOS[tipoServico];
+  if (!tipo) {
+    return res.status(400).json({ success: false, error: `tipoServico inválido. Use: ${Object.keys(TIPOS).join(', ')}.` });
+  }
+  const numero = (v, padrao) => (v === undefined || v === null || v === '' ? padrao : Number(v));
   const desonerado = Boolean(body.desonerado);
   const optanteSimples = Boolean(body.optanteSimples || body.simplesNacional);
+  const aliqISS = numero(body.aliqISS, 5.0);
+  const aliqRetencaoGarantia = numero(body.aliqRetencaoGarantia, 5.0);
+  const sofreIrrf = !optanteSimples && tipo.irrfPadrao > 0;
+  const aliqIRRF = sofreIrrf ? numero(body.aliqIRRF, tipo.irrfPadrao) : 0;
+  const erros = [];
+  if (!Number.isFinite(aliqISS) || aliqISS < 0 || aliqISS > 5 || (aliqISS > 0 && aliqISS < 2)) erros.push('aliqISS deve ser 0 (não retido) ou estar entre 2 e 5.');
+  if (!Number.isFinite(aliqIRRF) || aliqIRRF < 0 || aliqIRRF > 1.5) erros.push('aliqIRRF deve estar entre 0 e 1,5.');
+  if (!Number.isFinite(aliqRetencaoGarantia) || aliqRetencaoGarantia < 0 || aliqRetencaoGarantia > 10) erros.push('aliqRetencaoGarantia deve estar entre 0 e 10.');
+  if (erros.length) return res.status(400).json({ success: false, error: erros.join(' ') });
   const aliqINSS = desonerado ? 3.5 : 11.0;
-  const aliqIRRF = Number(body.aliqIRRF !== undefined ? body.aliqIRRF : 1.5);
-  const aliqRetencaoGarantia = Number(body.aliqRetencaoGarantia !== undefined ? body.aliqRetencaoGarantia : 5.0);
 
   const valorISS = Number((valorBruto * (aliqISS / 100)).toFixed(2));
   const valorINSS = Number((valorBruto * (aliqINSS / 100)).toFixed(2));
   const valorIRRF = Number((valorBruto * (aliqIRRF / 100)).toFixed(2));
 
   const rawPisCofins = valorBruto * 0.0465;
-  const valorPisCofinsCsll = (optanteSimples || rawPisCofins <= 10.0) ? 0 : Number(rawPisCofins.toFixed(2));
+  const csrfAplicavel = tipo.csrf && !optanteSimples;
+  const valorPisCofinsCsll = (!csrfAplicavel || rawPisCofins <= 10.0) ? 0 : Number(rawPisCofins.toFixed(2));
   const valorGarantia = Number((valorBruto * (aliqRetencaoGarantia / 100)).toFixed(2));
 
   const totalRetencoes = Number((valorISS + valorINSS + valorIRRF + valorPisCofinsCsll + valorGarantia).toFixed(2));
   const valorLiquido = Number((valorBruto - totalRetencoes).toFixed(2));
+  const irrfMotivo = optanteSimples ? 'Isento (Simples Nacional)' : (tipo.irrfPadrao > 0 ? `${aliqIRRF}%` : 'Não se aplica (empreitada de obra)');
+  const csrfMotivo = optanteSimples ? 'Isento (Simples Nacional)'
+    : !tipo.csrf ? 'Não se aplica (empreitada de obra)'
+      : (rawPisCofins <= 10.0 ? 'Dispensado (DARF <= R$ 10,00)' : '4.65% (CSRF)');
 
   return res.status(200).json({
     success: true,
@@ -358,16 +392,18 @@ export async function handleV2BoletimMedicao(req, res) {
       retencoes: {
         iss: { aliquota: `${aliqISS}%`, valor: valorISS },
         inss: { aliquota: `${aliqINSS}%`, regime: desonerado ? 'Desonerado (Lei 12.546)' : 'Geral', valor: valorINSS },
-        irrf: { aliquota: `${aliqIRRF}%`, valor: valorIRRF },
+        irrf: { aliquota: irrfMotivo, valor: valorIRRF },
         pisCofinsCsll: {
-          aliquota: optanteSimples ? 'Isento (Simples Nacional)' : (rawPisCofins <= 10.0 ? 'Dispensado (DARF <= R$ 10,00)' : '4.65% (CSRF)'),
-          regime: optanteSimples ? 'Simples Nacional' : 'Lei 13.137/2015',
+          aliquota: csrfMotivo,
+          regime: optanteSimples ? 'Simples Nacional' : 'Lei 10.833/2003, art. 30 e Lei 13.137/2015',
           valor: valorPisCofinsCsll
         },
         garantiaContratual: { aliquota: `${aliqRetencaoGarantia}%`, valor: valorGarantia }
       },
+      tipoServico: { codigo: tipoServico, descricao: tipo.label },
       totalRetencoes,
-      valorLiquido
+      valorLiquido,
+      aviso: 'Estimativa. A base do INSS pode ser reduzida pelos materiais e equipamentos discriminados na nota; confirme as retenções com a contabilidade do contrato.'
     }
   });
 }
@@ -1038,6 +1074,12 @@ export function resolveV2Route(pathname, searchParams) {
   }
   if (pathname === '/api/v2/portal/verify') {
     return { handler: handlePortalLinkVerify, query, moduleName: 'v2-portal-verify' };
+  }
+  if (pathname === '/api/v2/portal/data') {
+    return { handler: handlePortalData, query, moduleName: 'v2-portal-data' };
+  }
+  if (pathname === '/api/v2/ofx/fitids') {
+    return { handler: handleOfxFitids, query, moduleName: 'v2-ofx-fitids' };
   }
 
   // 4. Construtora / Tenant

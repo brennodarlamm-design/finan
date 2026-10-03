@@ -78,12 +78,15 @@ const Recibos = {
     if (typeof DB !== 'undefined' && DB.syncToCloud) DB.syncToCloud('delete', 'recibos', null, id);
   },
 
+  /** Maior número do ano + 1 (antes era a quantidade + 1: repetia depois de excluir um recibo). */
   _proximoNumero() {
-    const recibos = this.getAll();
-    if (!recibos.length) return '0001/2026';
-    const num = recibos.length + 1;
-    const ano = new Date().getFullYear();
-    return `${String(num).padStart(4, '0')}/${ano}`;
+    const ano = String((typeof Utils !== 'undefined' && Utils.today ? Utils.today() : new Date().toISOString()).slice(0, 4));
+    let maior = 0;
+    for (const r of this.getAll()) {
+      const m = String(r?.numero || '').match(/^(\d+)\/(\d{4})$/);
+      if (m && m[2] === ano) maior = Math.max(maior, Number(m[1]));
+    }
+    return `${String(maior + 1).padStart(4, '0')}/${ano}`;
   },
 
   init(obraId) {

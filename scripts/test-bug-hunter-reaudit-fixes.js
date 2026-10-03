@@ -144,6 +144,7 @@ const resBolBaixo = mockRes();
 await handleV2BoletimMedicao({
   body: {
     valorBruto: 200, // 200 * 0.0465 = 9.30 (menor que 10.00)
+    tipoServico: 'manutencao',
     aliqISS: 5,
     desonerado: false
   }

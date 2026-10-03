@@ -10,7 +10,9 @@ function assert(condition, message) {
 
 const migrationSql = fs.readFileSync('migrations/019_billing_automation_idempotency.sql', 'utf8');
 const serverJs = fs.readFileSync('backend/server.js', 'utf8');
-const adminJs = fs.readFileSync('api/admin.js', 'utf8');
+const billingStagesJs = fs.readFileSync('backend/billing_stages.js', 'utf8');
+// As ações do admin ficam em api/_admin-route.js, atrás do wrapper seguro de api/admin.js.
+const adminJs = fs.readFileSync('api/admin.js', 'utf8') + '\n' + fs.readFileSync('api/_admin-route.js', 'utf8');
 const masterHtml = fs.readFileSync('master.html', 'utf8');
 const masterJs = fs.readFileSync('js/master.js', 'utf8');
 const patch26Events = fs.readFileSync('js/patch26-events.js', 'utf8');
@@ -59,8 +61,8 @@ assert(
 );
 
 assert(
-  serverJs.includes('reminder_10d') && serverJs.includes('due_today') && serverJs.includes('overdue_1d'),
-  'backend/server.js calcula estágios dinâmicos de vencimento (10d antes, hoje, atraso).'
+  serverJs.includes('billingStageFor(') && billingStagesJs.includes('reminder_10d') && billingStagesJs.includes('due_today') && billingStagesJs.includes('overdue_1d'),
+  'backend/server.js calcula estágios dinâmicos de vencimento (10d antes, hoje, atraso) via backend/billing_stages.js.'
 );
 
 assert(

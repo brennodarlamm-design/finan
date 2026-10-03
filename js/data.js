@@ -21,16 +21,39 @@ const DB = {
   _circuitFailureThreshold: 5,
 
   async _fetchWithTimeout(url, options = {}, timeoutMs = 25000) {
+    let res;
     if (typeof Auth !== 'undefined' && typeof Auth._fetchWithTimeout === 'function') {
-      return Auth._fetchWithTimeout(url, options, timeoutMs);
+      res = await Auth._fetchWithTimeout(url, options, timeoutMs);
+    } else {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), timeoutMs);
+      try {
+        res = await fetch(url, { ...options, signal: controller.signal });
+      } finally {
+        clearTimeout(timer);
+      }
     }
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    this._trackServerClock(res);
+    return res;
+  },
+
+  /** Diferença entre o relógio do servidor (cabeçalho Date) e o do aparelho, em ms. */
+  _trackServerClock(res) {
     try {
-      return await fetch(url, { ...options, signal: controller.signal });
-    } finally {
-      clearTimeout(timer);
-    }
+      const header = res?.headers?.get?.('date');
+      const server = header ? Date.parse(header) : NaN;
+      if (Number.isFinite(server)) this._serverClockOffsetMs = server - Date.now();
+    } catch {}
+  },
+
+  /**
+   * Cursor do delta sync na hora do servidor, recuado 2 min: o que outro aparelho gravou
+   * enquanto o snapshot era baixado volta no próximo delta (reaplicar é idempotente), e um
+   * relógio do aparelho adiantado não gera cursor "no futuro" (que forçava sync completo sempre).
+   */
+  _serverCursor(baseMs = Date.now()) {
+    const offset = Number.isFinite(this._serverClockOffsetMs) ? this._serverClockOffsetMs : 0;
+    return new Date(baseMs + offset - 2 * 60 * 1000).toISOString();
   },
 
   _t() {
@@ -144,6 +167,14 @@ const DB = {
       if (!e.key) return;
       const tenant = this._t();
       if (e.key.startsWith(`finobra_${tenant}_`)) {
+        // Outra aba gravou (coleção ou fila de sync): atualiza a memória desta aba
+        // antes de qualquer escrita, para não sobrescrever o que a outra aba salvou.
+        if (this._memCache) {
+          if (e.newValue === null) this._memCache.delete(e.key);
+          else {
+            try { this._memCache.set(e.key, JSON.parse(e.newValue)); } catch { this._memCache.delete(e.key); }
+          }
+        }
         const table = e.key.replace(`finobra_${tenant}_`, '');
         this._handleCrossTabMutation(table);
       }
@@ -176,15 +207,15 @@ const DB = {
   async _handleCrossTabMutation(table) {
     const storageKey = this._k(table);
     let updatedData = null;
-    if (typeof IDBStorage !== 'undefined' && IDBStorage.isAvailable()) {
+    // localStorage é gravado de forma síncrona pela outra aba; o IndexedDB pode ainda
+    // ter a versão anterior. Só recorre ao IndexedDB quando a chave não cabe no localStorage.
+    try {
+      const raw = localStorage.getItem(storageKey);
+      if (raw) updatedData = JSON.parse(raw);
+    } catch {}
+    if (!updatedData && typeof IDBStorage !== 'undefined' && IDBStorage.isAvailable()) {
       try {
         updatedData = await IDBStorage.getItem(storageKey);
-      } catch {}
-    }
-    if (!updatedData) {
-      try {
-        const raw = localStorage.getItem(storageKey);
-        if (raw) updatedData = JSON.parse(raw);
       } catch {}
     }
     if (Array.isArray(updatedData) && this._memCache) {
@@ -238,12 +269,40 @@ const DB = {
     }
   },
 
+  // Única definição de init (havia uma segunda no fim do objeto que substituía esta:
+  // o IndexedDB nunca era lido de volta, não havia sincronia entre abas e o
+  // purgeStorage rodava em toda abertura apagando anexos ainda não migrados).
+  // O purgeStorage agora só roda quando o localStorage estoura a cota.
   init() {
+    this._migrateLegacyTenantCache();
+    this.expurgarDadosDemo();
+    // Garante que todas as coleções existam no LocalStorage como array vazio se inexistentes
+    Object.keys(this.K).forEach(k => {
+      const sk = this._k(k);
+      if (localStorage.getItem(sk) === null) {
+        localStorage.setItem(sk, '[]');
+      }
+    });
+    const docsKey = this._ck('finobra_documentos');
+    if (localStorage.getItem(docsKey) === null) {
+      localStorage.setItem(docsKey, '[]');
+    }
+    const recKey = this._ck('finobra_recibos');
+    if (localStorage.getItem(recKey) === null) {
+      localStorage.setItem(recKey, '[]');
+    }
+    const ctKey = this._ck('finobra_contratos');
+    if (localStorage.getItem(ctKey) === null) {
+      localStorage.setItem(ctKey, '[]');
+    }
+    const sinapiKey = this._ck('orcamentos_sinapi');
+    if (localStorage.getItem(sinapiKey) === null) {
+      localStorage.setItem(sinapiKey, '[]');
+    }
     this._initMemoryCache();
     this._bindNetworkListeners();
     this._bindCrossTabChannel();
-    this.expurgarDadosDemo();
-    this._hydrateFromIndexedDB();
+    this._hydrationPromise = this._hydrateFromIndexedDB();
     const pending = this.getSyncPendingCount ? this.getSyncPendingCount() : 0;
     const failed = this.getSyncFailedCount ? this.getSyncFailedCount() : 0;
     if (failed > 0) {
@@ -414,8 +473,9 @@ const DB = {
     if (this._memCache) this._memCache.set(storageKey, normalized);
 
     // Persistência assíncrona robusta no IndexedDB (sem limite de 5MB do LocalStorage)
+    let idbWrite = null;
     if (typeof IDBStorage !== 'undefined' && IDBStorage.setItem) {
-      IDBStorage.setItem(storageKey, normalized).catch(err => {
+      idbWrite = IDBStorage.setItem(storageKey, normalized).catch(err => {
         console.warn(`[Storage] Falha ao persistir no IndexedDB (${key}):`, err);
       });
     }
@@ -433,8 +493,9 @@ const DB = {
       }
     }
 
-    // Notifica outras abas ativas
-    this._broadcastMutation(key);
+    // Notifica outras abas depois que o IndexedDB tem a versão nova (elas podem ler de lá).
+    if (idbWrite && typeof idbWrite.finally === 'function') idbWrite.finally(() => this._broadcastMutation(key));
+    else this._broadcastMutation(key);
   },
 
   purgeStorage() {
@@ -745,6 +806,16 @@ const DB = {
     return headers;
   },
 
+
+  /**
+   * VARREDURA 2026-10-03 #36: com internet mas a API fora do ar, o app mostrava "Offline" e
+   * listas vazias sem explicar nada. Distingue "sem internet" de "servidor indisponível".
+   */
+  _statusFalhaSync(e) {
+    if (typeof navigator !== 'undefined' && navigator.onLine === false) return 'offline';
+    if (String(e?.message || '') === 'SESSION_EXPIRED') return 'offline';
+    return 'server_down';
+  },
 
   _emitSyncStatus(status, detail = {}) {
     if (typeof window === 'undefined' || typeof CustomEvent === 'undefined') return;
@@ -1400,6 +1471,7 @@ const DB = {
   },
 
   async syncDelta() {
+    if (this._hydrationPromise) { try { await this._hydrationPromise; } catch {} }
     const cursor = this.getSyncCursor();
     if (!cursor) {
       console.info('[Sync] Nenhum cursor prévio; executando sincronização inicial.');
@@ -1449,7 +1521,7 @@ const DB = {
       return true;
     } catch (e) {
       console.warn('[Sync] Falha na sincronização delta, mantendo cache:', e?.message || e);
-      this._emitSyncStatus('offline', { error: e?.message || 'offline' });
+      this._emitSyncStatus(this._statusFalhaSync(e), { error: e?.message || 'offline' });
       return false;
     }
   },
@@ -1542,9 +1614,11 @@ const DB = {
   },
 
   async syncFromCloud() {
+    if (this._hydrationPromise) { try { await this._hydrationPromise; } catch {} }
     this._emitSyncStatus('syncing');
     try {
       const revision = this._localMutationRevision || 0;
+      const inicioSnapshot = Date.now(); // o cursor é o início do download, não o fim
       const d = await this._fetchCloudSnapshot();
       // Uma edição ou confirmação durante a leitura invalida este snapshot.
       if (revision !== (this._localMutationRevision || 0)) {
@@ -1587,13 +1661,13 @@ const DB = {
         console.warn('[Tenant] Não foi possível atualizar os dados cadastrais:', tenantErr);
       }
 
-      this.setSyncCursor(new Date().toISOString());
+      this.setSyncCursor(this._serverCursor(inicioSnapshot));
       console.log('✅ Dados sincronizados com Neon PostgreSQL!');
       this._emitSyncStatus('synced');
       return true;
     } catch (e) {
       console.warn('Neon Cloud Sync offline, usando cache local:', e);
-      this._emitSyncStatus('offline', { error: e?.message || 'offline' });
+      this._emitSyncStatus(this._statusFalhaSync(e), { error: e?.message || 'offline' });
       return false;
     }
   },
@@ -1936,6 +2010,7 @@ const DB = {
   },
 
   async _executeFlushQueue() {
+    if (this._hydrationPromise) { try { await this._hydrationPromise; } catch {} }
     if (this._isCircuitOpen()) {
       const waitMs = Math.max(2000, this._circuitNextAttemptAt - Date.now());
       console.warn(`[Sync] Disjuntor de rede aberto. Aguardando ${Math.ceil(waitMs / 1000)}s antes da próxima sondagem.`);
@@ -2209,7 +2284,14 @@ const DB = {
     }));
     if (obraId && obraId !== 'todas') items = items.filter(l => String(l.obra_id) === String(obraId));
     if (filters.tipo) items = items.filter(l => l.tipo === filters.tipo);
-    if (filters.status) items = items.filter(l => l.status === filters.status);
+    if (filters.status === 'em_atraso') {
+      // "Em atraso" = em aberto com vencimento passado (a tabela já mostra "⚠ Atrasado"),
+      // não só quem foi gravado com esse status.
+      items = items.filter(l => l.status === 'em_atraso' || this.isLancamentoVencido(l));
+    } else if (filters.status === 'a_pagar' || filters.status === 'a_receber') {
+      const tipoAlvo = filters.status === 'a_pagar' ? 'despesa' : 'receita';
+      items = items.filter(l => l.status === filters.status || (l.tipo === tipoAlvo && l.status === 'em_atraso'));
+    } else if (filters.status) items = items.filter(l => l.status === filters.status);
     if (filters.categoria) items = items.filter(l => l.categoria === filters.categoria);
     if (filters.fornecedor) {
       const qForn = String(filters.fornecedor).trim().toLowerCase();
@@ -2232,13 +2314,46 @@ const DB = {
     return items.sort((a, b) => String(b.data || '').localeCompare(String(a.data || '')));
   },
 
+  /** Lançamento ainda em aberto (inclui o status "em_atraso", que antes sumia dos totais). */
+  isLancamentoEmAberto(l) {
+    const st = String(l?.status || '');
+    if (l?.tipo === 'receita') return st === 'a_receber' || st === 'pendente' || st === 'em_atraso';
+    return st === 'a_pagar' || st === 'pendente' || st === 'em_atraso';
+  },
+
+  /**
+   * VARREDURA 2026-10-03 #30: ao excluir a origem (medição, pré-compra), só apaga o lançamento
+   * vinculado que ainda está em aberto e não foi conciliado. O que já foi pago/recebido ou
+   * conciliado com o extrato continua no financeiro. Retorna { removidos, mantidos }.
+   */
+  removerLancamentosDaOrigem(campo, origemId, idsDiretos = []) {
+    const ids = new Set((idsDiretos || []).filter(Boolean).map(String));
+    const origem = String(origemId || '');
+    const vinculados = (this.getAll('lancamentos') || []).filter(l =>
+      ids.has(String(l.id)) || (origem && String(l[campo] || '') === origem));
+    const mantidos = [];
+    let removidos = 0;
+    for (const l of vinculados) {
+      const removivel = !l.conciliado && (this.isLancamentoEmAberto(l) || l.status === 'cancelado');
+      if (removivel) { this.remove('lancamentos', l.id); removidos++; }
+      else mantidos.push(l);
+    }
+    return { removidos, mantidos };
+  },
+
+  /** Em aberto e já vencido (pela data de hoje em Boa Vista). */
+  isLancamentoVencido(l, hoje = (typeof Utils !== 'undefined' && Utils.today ? Utils.today() : new Date().toISOString().slice(0, 10))) {
+    const venc = String(l?.data_vencimento || l?.data || '').slice(0, 10);
+    return this.isLancamentoEmAberto(l) && !!venc && venc < hoje;
+  },
+
   getResumo(obraId) {
     const lans = this.getLancamentos(obraId === 'todas' ? null : obraId);
     const rec = lans.filter(l => l.tipo === 'receita' && l.status === 'recebido').reduce((s,l)=>s+l.valor,0);
     const desp = lans.filter(l => l.tipo === 'despesa' && l.status === 'pago').reduce((s,l)=>s+l.valor,0);
     const nfItems = this.getAll('notas').filter(n => (!obraId || obraId === 'todas' || n.obra_id === obraId) && n.status === 'pendente');
-    const aPagar = lans.filter(l => l.tipo === 'despesa' && l.status === 'a_pagar');
-    const aReceber = lans.filter(l => l.tipo === 'receita' && l.status === 'a_receber');
+    const aPagar = lans.filter(l => l.tipo === 'despesa' && this.isLancamentoEmAberto(l));
+    const aReceber = lans.filter(l => l.tipo === 'receita' && this.isLancamentoEmAberto(l));
     return {
       totalReceitas: rec, totalDespesas: desp, saldo: rec - desp,
       nfPendentes: nfItems.length, nfPendentesValor: nfItems.reduce((s,n)=>s+(n.valor_total||n.valor_bruto||0),0),
@@ -2403,14 +2518,13 @@ const DB = {
       return m.obra_id === obraId;
     });
 
+    // VARREDURA 2026-10-03 #22: em "todas as obras" o avanço físico era o maior % de uma só obra.
+    // Agora é a média das obras ponderada pelo orçamento de cada uma.
     let percentualFisico = 0;
-    if (meds.length > 0) {
-      const medsLiberadas = meds.filter(m => m.status === 'liberada' || m.status === 'aprovada');
-      if (medsLiberadas.length > 0) {
-        percentualFisico = Math.min(100, Math.max(...medsLiberadas.map(m => Number(m.percentual_fisico || 0))));
-      } else {
-        percentualFisico = Math.min(100, Math.max(...meds.map(m => Number(m.percentual_fisico || 0))));
-      }
+    if (isTodas) {
+      percentualFisico = this._pctFisicoCarteira(targetObras, meds);
+    } else {
+      percentualFisico = this._pctFisicoDasMedicoes(meds);
     }
 
     const saldoRestante = totalOrcado - totalRealizado;
@@ -2459,6 +2573,41 @@ const DB = {
   },
 
   // ── ENGENHARIA DE CUSTOS & CRONOGRAMA FÍSICO-FINANCEIRO (EVM / CURVA S) ──
+  /** Avanço físico de uma obra: maior % das medições liberadas/aprovadas (ou de todas, se nenhuma). */
+  _pctFisicoDasMedicoes(meds) {
+    if (!Array.isArray(meds) || !meds.length) return 0;
+    const liberadas = meds.filter(m => m.status === 'liberada' || m.status === 'aprovada');
+    const base = liberadas.length ? liberadas : meds;
+    return Math.min(100, Math.max(0, ...base.map(m => Number(m.percentual_fisico || 0))));
+  },
+
+  /** Peso de cada obra na carteira: o orçado dela (ou peso igual quando nenhuma tem orçamento). */
+  _pesosCarteira(obras) {
+    const lista = (obras || []).filter(o => o && o.id && o.id !== 'escritorio' && o.id !== 'sede');
+    const pesos = lista.map(o => ({ id: o.id, orc: Math.max(0, Number(this.getOrcamentoVsRealizado(o.id).totalOrcado) || 0) }));
+    const totalOrc = pesos.reduce((s, p) => s + p.orc, 0);
+    return pesos.map(p => ({ id: p.id, peso: totalOrc > 0 ? p.orc / totalOrc : 1 / pesos.length }));
+  },
+
+  /** Avanço físico da carteira = média das obras ponderada pelo orçamento. */
+  _pctFisicoCarteira(obras, meds, pesos = null) {
+    const ps = pesos || this._pesosCarteira(obras);
+    if (!ps.length) return 0;
+    let pct = 0;
+    for (const { id, peso } of ps) {
+      pct += peso * this._pctFisicoDasMedicoes((meds || []).filter(m => m.obra_id === id));
+    }
+    return Math.min(100, Math.round(pct * 10) / 10);
+  },
+
+  /** Data 'AAAA-MM-DD' como data local (new Date('AAAA-MM-DD') é UTC e no Brasil cai no dia anterior). */
+  _dataLocal(valor) {
+    const str = String(valor || '').slice(0, 10);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(str)) return null;
+    const d = new Date(`${str}T12:00:00`);
+    return isNaN(d.getTime()) ? null : d;
+  },
+
   getCurvaS(obraId) {
     const isTodas = !obraId || obraId === 'todas';
     const cs = this.getAll('clientes') || [];
@@ -2471,12 +2620,13 @@ const DB = {
     let maiorFim = null;
 
     targetObras.forEach(o => {
-      const dtIni = o.data_inicio ? new Date(o.data_inicio) : null;
-      const dtFim = (o.data_previsao_termino || o.data_fim) ? new Date(o.data_previsao_termino || o.data_fim) : null;
-      if (dtIni && !isNaN(dtIni.getTime())) {
+      // VARREDURA 2026-10-03 #22: data local (a curva começava um mês antes no fuso do Brasil).
+      const dtIni = this._dataLocal(o.data_inicio);
+      const dtFim = this._dataLocal(o.data_previsao_termino || o.data_fim);
+      if (dtIni) {
         if (!menorInicio || dtIni < menorInicio) menorInicio = dtIni;
       }
-      if (dtFim && !isNaN(dtFim.getTime())) {
+      if (dtFim) {
         if (!maiorFim || dtFim > maiorFim) maiorFim = dtFim;
       }
     });
@@ -2600,12 +2750,16 @@ const DB = {
 
     const evData = [];
     let maiorPctFisico = 0;
+    // Em "todas as obras", cada obra entra com o peso do seu orçamento (não o maior % de uma obra só).
+    const pesosCarteira = isTodas ? this._pesosCarteira(targetObras) : null;
     for (let i = 0; i < meses.length; i++) {
       if (i <= mesAtualIdx) {
         const mesKey = meses[i];
         const medsAteMes = meds.filter(m => String(m.data || '').slice(0, 7) <= mesKey);
         if (medsAteMes.length > 0) {
-          const maxMed = Math.max(...medsAteMes.map(m => Number(m.percentual_fisico || 0)));
+          const maxMed = isTodas
+            ? this._pctFisicoCarteira(targetObras, medsAteMes, pesosCarteira)
+            : Math.max(...medsAteMes.map(m => Number(m.percentual_fisico || 0)));
           if (maxMed > maiorPctFisico) maiorPctFisico = maxMed;
         } else if (comp.percentualFisico > 0 && i === mesAtualIdx) {
           maiorPctFisico = comp.percentualFisico;
@@ -3287,7 +3441,8 @@ const DB = {
 
   // ── DESPESAS DO ESCRITÓRIO / SEDE QUERIES ──
   getDespesasEscritorio(filters = {}) {
-    let items = this.getAll('lancamentos').filter(l => l.obra_id === 'escritorio' || l.obra_id === 'sede' || l.centro_custo === 'escritorio');
+    // Só despesas: receitas lançadas na sede entravam no "Total do Escritório" como gasto.
+    let items = this.getAll('lancamentos').filter(l => l.tipo !== 'receita' && (l.obra_id === 'escritorio' || l.obra_id === 'sede' || l.centro_custo === 'escritorio'));
     if (filters.grupo) {
       if (filters.grupo === 'consumo') items = items.filter(l => ['energia','agua','internet_tel'].includes(l.categoria));
       else if (filters.grupo === 'impostos') items = items.filter(l => ['imposto_simples','tributos_trabalhistas','taxa'].includes(l.categoria));
@@ -3314,7 +3469,7 @@ const DB = {
   getResumoEscritorio(filters = {}) {
     const list = this.getDespesasEscritorio(filters);
     const pagas = list.filter(l => l.status === 'pago');
-    const aPagar = list.filter(l => l.status === 'a_pagar');
+    const aPagar = list.filter(l => this.isLancamentoEmAberto(l));
     const consumo = list.filter(l => ['energia','agua','internet_tel'].includes(l.categoria));
     const impostos = list.filter(l => ['imposto_simples','tributos_trabalhistas','taxa'].includes(l.categoria));
     const folha = list.filter(l => ['salario','pro_labore','beneficios'].includes(l.categoria));
@@ -3333,35 +3488,6 @@ const DB = {
       estruturaValor: estrutura.reduce((s, l) => s + (l.valor || 0), 0),
       servicosValor: servicos.reduce((s, l) => s + (l.valor || 0), 0)
     };
-  },
-
-  init() {
-    this._migrateLegacyTenantCache();
-    this.purgeStorage();
-    this.expurgarDadosDemo();
-    // Garante que todas as coleções existam no LocalStorage como array vazio se inexistentes
-    Object.keys(this.K).forEach(k => {
-      const sk = this._k(k);
-      if (localStorage.getItem(sk) === null) {
-        localStorage.setItem(sk, '[]');
-      }
-    });
-    const docsKey = this._ck('finobra_documentos');
-    if (localStorage.getItem(docsKey) === null) {
-      localStorage.setItem(docsKey, '[]');
-    }
-    const recKey = this._ck('finobra_recibos');
-    if (localStorage.getItem(recKey) === null) {
-      localStorage.setItem(recKey, '[]');
-    }
-    const ctKey = this._ck('finobra_contratos');
-    if (localStorage.getItem(ctKey) === null) {
-      localStorage.setItem(ctKey, '[]');
-    }
-    const sinapiKey = this._ck('orcamentos_sinapi');
-    if (localStorage.getItem(sinapiKey) === null) {
-      localStorage.setItem(sinapiKey, '[]');
-    }
   },
 
   // ── Expurgar permanentemente dados fictícios de demonstração ──────────────

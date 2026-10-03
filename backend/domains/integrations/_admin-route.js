@@ -1271,7 +1271,7 @@ export default async function handler(req, res) {
       const nomeEmpresa = t.nome_fantasia || t.razao_social || 'Sua Empresa';
       const responsavel = t.responsavel || 'Gestor(a)';
       let destPhone = String(userPhone || t.telefone || '').replace(/\D/g, '');
-      if (destPhone.length >= 10 && destPhone.length <= 11 && !destPhone.startsWith('55')) {
+      if (destPhone.length >= 10 && destPhone.length <= 11) {
         destPhone = '55' + destPhone;
       }
       let destEmail = String(userEmail || t.email || '').trim();

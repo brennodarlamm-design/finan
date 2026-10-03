@@ -18,7 +18,7 @@
   <meta property="og:url" content="https://fingo.api.br/calculadora-bdi">
   <meta property="og:title" content="Calculadora de BDI Online Oficial — TCU & Decreto 7.983/2013 | FinGo">
   <meta property="og:description" content="Calcule o BDI para orçamentos de obras civis e públicas no sistema de obra FinGo. Em conformidade com o TCU, CPRB e SINAPI.">
-  <meta property="og:image" content="https://fingo.api.br/img/og-finobra-cover.jpg">
+  <meta property="og:image" content="https://fingo.api.br/img/og-fingo-cover.jpg">
   <meta property="og:site_name" content="FinGo">
   <meta property="og:locale" content="pt_BR">
   <meta name="twitter:card" content="summary_large_image">
@@ -570,6 +570,13 @@
       visibility: visible;
       pointer-events: auto;
       transform: translateY(0);
+    }
+    /* VARREDURA 2026-10-03 #38: no celular o menu estourava a largura (556px em tela de 390px). */
+    @media (max-width: 640px) {
+      .header { gap: 0.75rem; }
+      .nav-links { gap: 0.75rem; font-size: 0.85rem; }
+      .nav-links a[href="/planos"], .nav-links a[href="/sobre-nos"], .nav-links a[href="/calculadora-bdi"] { display: none; }
+      .nav-cta { padding: 0.45rem 0.75rem; white-space: nowrap; }
     }
   </style>
 </head>
