@@ -46,15 +46,15 @@ test('Resposta de autenticação não é cacheada', /Cache-Control', 'no-store/i
 test('Compatibilidade Bearer fica opt-in no Patch 10', authApi.includes('x-finobra-token-mode') && authApi.includes('tokenFieldForExplicitClient'));
 
 // SINAPI correto por contexto
-test('SINAPI declara snapshots com UF, competência e série', /OFFICIAL_SNAPSHOTS/i.test(sinapi) && /uf:'RR'/i.test(sinapi) && /referencia:'2024-12'/i.test(sinapi));
+test('SINAPI declara snapshots com UF, competência e série, só da competência atual', /OFFICIAL_SNAPSHOTS/i.test(sinapi) && /uf:'RR'/i.test(sinapi) && /REFERENCIA_ATUAL: '2026-08'/.test(sinapi) && !/referencia:'2024-12'/i.test(sinapi));
 test('Snapshot 1-clique exige correspondência exata', /snapshotFor\(uf, referencia, desonerado/i.test(sinapi) && /x\.uf===u && x\.referencia===r/i.test(sinapi));
 test('SINAPI não usa mais fallback falso /api/sinapi', !/fetch\(`?\/api\/sinapi/i.test(sinapi) && !/"source": "\/api\/sinapi"/i.test(vercel));
-test('UI informa quando não existe snapshot da seleção', /Sem snapshot 1-clique/i.test(orc));
+test('UI informa quando não existe tabela para a seleção', /Não há tabela SINAPI para/.test(orc) && /Sem tabela SINAPI para/.test(orc));
 test('UI envia UF e referência ao carregar snapshot', /SINAPI\.puxarOficial\(orc\.desonerado, orc\.uf, orc\.referencia_sinapi/i.test(orc));
 test('Busca SINAPI usa UF e referência do orçamento', /SINAPI\.buscar\(termo, orc\.desonerado, 30, orc\.uf, orc\.referencia_sinapi\)/i.test(orc));
-test('Cache SINAPI diferencia UF, referência e série', /finobra_sinapi_base_/i.test(sinapi) && /desonerado \? 'des' : 'on'/i.test(sinapi));
-test('Seleção ativa SINAPI continua isolada por tenant', /finobra_\$\{this\._tenant\(\)\}_sinapi_active_/i.test(sinapi));
-test('Cache SINAPI legado é migrado com metadados', /_migrateLegacyBase/i.test(sinapi) && /sinapi_base_desonerado/i.test(sinapi));
+test('Cache SINAPI diferencia UF, referência e série', /_baseKey\(desonerado, uf, referencia\)/.test(sinapi) && /desonerado \? 'des' : 'on'/i.test(sinapi));
+test('Bases SINAPI não são gravadas no localStorage (sem truncamento)', !/localStorage\.setItem/.test(sinapi) && /_limparCacheLegado/.test(sinapi));
+test('SINAPI nunca troca para outra UF ou competência', !/snapshotFor\('SP'/.test(sinapi) && !/'2024-12'/.test(orc) && !/RR 12\/2024/.test(orc));
 
 // Sync sem perda silenciosa
 test('sync_all registra falhas por item', /const failures = \[\]/i.test(db) && /recordFailure/i.test(db));

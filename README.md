@@ -29,7 +29,7 @@ O **FinGo** foi desenvolvido sob medida para a realidade de construtoras, incorp
 ### 🌟 Principais Recursos:
 
 * **📊 Gestão Financeira de Obras:** Centros de custo por obra, plano de contas específico para construção civil, DRE em tempo real, fluxo de caixa projetado x realizado e conciliação bancária OFX.
-* **📐 Orçamentos & Base SINAPI Oficial:** Integração completa com os snapshots mensais da **Caixa Econômica Federal e IBGE** para todas as 27 Unidades Federativas do Brasil (opções desoneradas e não desoneradas conforme Lei 14.133/2021 e Decreto Federal 7.983/2013).
+* **📐 Orçamentos & Base SINAPI Oficial:** Integração completa com os snapshots mensais da **Caixa Econômica Federal e IBGE** para SP, SC e RR na competência mais recente (opções desoneradas e não desoneradas; demais estados em breve conforme Lei 14.133/2021 e Decreto Federal 7.983/2013).
 * **⚖️ Calculadora Analítica de BDI Oficial TCU:** Cálculo exato de Benefícios e Despesas Indiretas conforme a fórmula oficial do **Acórdão nº 2622/2013 - TCU Plenário**, com limites de referência por tipologia de obra.
 * **📋 Medições de Obras com Retenções Técnicas:** Lançamento de medições acumuladas de empreiteiros com apuração automática de retenções contratuais e fiscais (11% INSS patronal, 5% ISS, IRRF e caução).
 * **🛒 Compras & Suprimentos com OCR:** Requisições de materiais, ordens de compra com mapa comparativo de cotações, leitura de NF-e via OCR inteligente e importação automática de XMLs via SEFAZ.
@@ -78,7 +78,7 @@ Adicione ao seu arquivo de configuração MCP (`claude_desktop_config.json` ou `
 
 ### 🛠️ Ferramentas Disponíveis no Servidor MCP:
 1. `search_plans`: Pesquisa planos de assinatura, cotas de obras, usuários simultâneos e capacidades operacionais da plataforma.
-2. `get_sinapi_info`: Consulta cobertura e referencial legal das bases analíticas do SINAPI (Caixa/IBGE) para os 27 estados do Brasil (regimes desonerado CPRB e não desonerado).
+2. `get_sinapi_info`: Consulta cobertura e referencial legal das bases analíticas do SINAPI (Caixa/IBGE) de SP, SC e RR (regimes desonerado CPRB e não desonerado).
 3. `get_financial_summary`: Retorna resumo sintético de saúde financeira, fluxo de caixa e centros de custo por obra.
 
 ---

@@ -475,7 +475,7 @@ function ProductShowcase() {
             </h2>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <span className="badge-purple">● SINAPI 27 Estados</span>
+            <span className="badge-purple">● SINAPI Caixa · SP, SC e RR</span>
             <span className="badge-acid">● FinGo OS v2.40</span>
           </div>
         </div>
@@ -619,10 +619,10 @@ function ProductShowcase() {
                 <div className="rounded-sm border border-shadow bg-panel p-5">
                   <div className="flex flex-col justify-between gap-2 sm:flex-row sm:items-center">
                     <span className="font-bold text-paper">Base Oficial SINAPI — Caixa Econômica Federal</span>
-                    <span className="text-purple-light">27 Unidades Federativas</span>
+                    <span className="text-purple-light">SP, SC e RR</span>
                   </div>
                   <p className="mt-3 leading-relaxed text-muted">
-                    Composições analíticas e sintéticas com desoneração e sem desoneração atualizadas mensalmente. Precificação precisa para licitações e orçamentos executivos.
+                    Composições e insumos oficiais com e sem desoneração, na competência mais recente. Disponível para SP, SC e RR; os demais estados serão liberados depois.
                   </p>
                 </div>
               </div>
@@ -1081,7 +1081,7 @@ function ManualsSection() {
               num: "07",
               title: "Orçamentos SINAPI da Caixa",
               trilha: "Engenharia & SINAPI",
-              desc: "Consultas das composições oficiais dos 27 estados, aplicação de BDI TCU e curvas ABC de insumos.",
+              desc: "Composições oficiais do SINAPI (SP, SC e RR), aplicação de BDI pelo TCU e curva ABC.",
               id: "manual-7-orcamento-sinapi",
             },
             {

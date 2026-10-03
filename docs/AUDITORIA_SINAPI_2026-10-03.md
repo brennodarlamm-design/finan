@@ -87,3 +87,32 @@
 6. **Ajustar a comunicação** enquanto os 27 estados não estiverem prontos: tirar "27 estados" e "BDI diferenciado" do site e dos planos, e esconder os bancos sem dados.
 7. Excel com preço unitário com BDI, regime e total por item coerente com o subtotal.
 8. Testes automáticos para os casos 1, 2 e 4.
+
+## Correções aplicadas em 03/10/2026
+
+Escopo decidido: **só os estados que já têm tabela (SP, SC e RR) e só a competência mais recente (08/2026)**.
+
+| # | Problema | Situação |
+|---|---|---|
+| 1 | Orçamento novo sem itens e ciclo de carregamento | ✅ O formulário só oferece SP, SC e RR, e a competência é fixa na mais recente. Sem tabela para a UF/competência, aparece uma mensagem e nada é baixado. O sistema nunca troca por outra UF ou competência |
+| 2 | Tabela truncada em 5.000 itens após recarregar | ✅ As tabelas ficam só em memória (o arquivo vem do cache do navegador) e não vão mais para o `localStorage`. As cópias antigas, possivelmente truncadas, são apagadas ao abrir o sistema |
+| 3 | Só 3 estados e site prometendo 27 | ✅ Site, planos, blog, `llms.txt`, Worker, `agent-card` e WebMCP passam a dizer "SP, SC e RR". Tabela antiga RR 12/2024 removida |
+| 4 | Trocar UF/regime no cadastro não reprecificava | ✅ Ao salvar com outra UF ou regime, os preços são atualizados pela nova tabela. Orçamentos de competência antiga mostram um aviso com o botão "Atualizar para 08/2026" |
+| 5 | Itens com preço zero entravam sem aviso | ✅ Aparecem como "Sem preço nesta UF" e não podem ser inseridos. Na reprecificação ficam marcados como pendentes, com o valor anterior preservado e aviso no orçamento |
+| 6 | Atalho que trocava para RR 12/2024 | ✅ Removido |
+| 7 | Bancos sem preços e "BDI diferenciado" anunciado | ✅ "Períodos utilizados" mostra só SINAPI (SP, SC e RR, 08/2026) e Próprio. "BDI diferenciado" saiu das ofertas do produto |
+| — | Adicionar pelo catálogo usava a UF do catálogo e busca por trecho do código | ✅ Agora usa o código exato e o preço da tabela do orçamento de destino |
+| — | `/api/sinapi` (servidor) devolvia preços de SP para qualquer UF | ✅ Só devolve a tabela da própria UF e competência |
+| — | Importação de planilha no navegador | Desativada: a base importada se perdia ao recarregar. Volta junto com a base no servidor |
+
+**Verificação:**
+- Testes atualizados: `scripts/test-audit-regressions.js` e `scripts/test-patch09-static.js`.
+- Teste ponta a ponta no Chromium com os arquivos reais:
+  - Orçamento novo em SP desonerado: 88309 a R$ 35,18.
+  - Trocar para RR no cadastro: R$ 32,36 (oficial).
+  - Trocar para SC em "Períodos utilizados": R$ 38,10 (oficial).
+  - Item sem preço bloqueado.
+  - Orçamento de 12/2024 com aviso, nenhum download repetido e atualização para 08/2026.
+  - Depois de recarregar a página, 15.423 itens nas duas séries.
+
+**Pendente para os 27 estados:** carregar o pacote mensal da Caixa no banco e fazer a tela consultar o servidor (item 3 das recomendações).

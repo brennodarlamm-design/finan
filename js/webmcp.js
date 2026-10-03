@@ -50,7 +50,7 @@
               price: "R$ 499,90/mês",
               obras: "Ilimitadas",
               users: 5,
-              highlights: ["SINAPI Oficial 27 Estados", "BDI Diferenciado", "Engenharia Avançada"],
+              highlights: ["SINAPI Oficial SP, SC e RR", "BDI pelo TCU", "Engenharia Avançada"],
               description: "Operação completa de engenharia e orçamentos de licitação."
             }
           ];
@@ -135,12 +135,16 @@
         signal: controller.signal,
         execute: async (args) => {
           const rawUf = String(args?.uf || '').trim().toUpperCase();
-          const uf = VALID_UFS.has(rawUf) ? rawUf : 'todos os 27 estados do Brasil';
+          const DISPONIVEIS = new Set(['SP', 'SC', 'RR']);
+          if (VALID_UFS.has(rawUf) && !DISPONIVEIS.has(rawUf)) {
+            return { content: [{ type: "text", text: `A tabela SINAPI de ${rawUf} ainda não está disponível no FinGo. Disponíveis: SP, SC e RR (competência mais recente).` }] };
+          }
+          const uf = DISPONIVEIS.has(rawUf) ? rawUf : 'SP, SC e RR';
           return {
             content: [
               {
                 type: "text",
-                text: `O FinGo disponibiliza as bases oficiais completas do SINAPI (Caixa Econômica Federal e IBGE) para ${uf}, incluindo composições analíticas, sintéticas e insumos, com opções desoneradas e não desoneradas conforme Decreto Federal nº 7.983/2013 e Lei nº 14.133/2021.`
+                text: `O FinGo disponibiliza as tabelas oficiais do SINAPI (Caixa Econômica Federal e IBGE) de ${uf}, na competência mais recente, com composições e insumos e opções desoneradas e não desoneradas conforme Decreto Federal nº 7.983/2013 e Lei nº 14.133/2021.`
               }
             ]
           };

@@ -14,7 +14,7 @@ O FinGo é um sistema de gestão de obras (SaaS, acesso pelo navegador no comput
 
 ### Principais funções
 - **Financeiro da obra**: contas a pagar e a receber por obra, fluxo de caixa, DRE gerencial e conciliação bancária por arquivo OFX.
-- **Orçamentos com SINAPI**: composições e insumos oficiais da Caixa/IBGE por estado, regimes desonerado e não desonerado, BDI e curva ABC.
+- **Orçamentos com SINAPI**: composições e insumos oficiais da Caixa/IBGE de SP, SC e RR (competência mais recente), regimes desonerado e não desonerado, BDI e curva ABC.
 - **Medições**: boletim com acumulado físico-financeiro e retenções na fonte (INSS, ISS, IRRF e PIS/COFINS/CSLL).
 - **Compras e NF-e**: pré-compras com aprovação, importação de NF-e por XML ou pela SEFAZ (com certificado digital A1) e leitura de notas por OCR.
 - **Contratos e recibos**: modelos de contrato, recibos e assinatura eletrônica (detalhes na seção 6).
@@ -27,7 +27,7 @@ O FinGo é um sistema de gestão de obras (SaaS, acesso pelo navegador no comput
 | Teste gratuito | R$ 0 por 15 dias | — | 2 | principais recursos liberados, sem cartão de crédito |
 | Básico | R$ 119,90 | até 3 | 1 | financeiro, obras, fornecedores, recibos, medições, relatórios, WhatsApp |
 | Profissional | R$ 279,90 | até 10 | 2 | + pré-compras, contratos, NF-e, orçamentos, documentos, assinatura eletrônica, OCR |
-| Construtora Ilimitado | R$ 499,90 | ilimitadas | 5 | + SINAPI dos 27 estados, engenharia avançada, BDI diferenciado, permissões por usuário |
+| Construtora Ilimitado | R$ 499,90 | ilimitadas | 5 | + SINAPI oficial de SP, SC e RR, engenharia avançada, permissões por usuário |
 
 Ciclos trimestral, semestral e anual têm desconto; no anual, paga-se 10 meses e usam-se 12. Detalhes: https://fingo.api.br/planos
 
@@ -116,7 +116,7 @@ O OFX é o arquivo de extrato que os bancos exportam. No FinGo, o extrato é imp
 
 **Como é contado o limite de usuários?** Por pessoa com login próprio. A mesma pessoa no computador e no celular conta como um usuário.
 
-**A base SINAPI é oficial?** Sim. São os relatórios mensais publicados pela Caixa e pelo IBGE, por estado, nos regimes desonerado e não desonerado (plano Construtora Ilimitado).
+**A base SINAPI é oficial?** Sim. São os relatórios mensais publicados pela Caixa e pelo IBGE, por estado, nos regimes desonerado e não desonerado (plano Construtora Ilimitado). Nesta versão estão disponíveis SP, SC e RR, na competência mais recente; os demais estados serão liberados depois.
 
 **Como é o suporte?** Atendimento humano de segunda a sexta, das 08h às 20h (horário de Brasília), por chat dentro do sistema, WhatsApp (+55 95 99136-3678) e e-mail (contato@fingo.api.br), com equipe treinada em gestão de obras, financeiro, orçamentos e medições. Fora desse horário, o assistente FinBot responde no sistema. A equipe ajuda na implantação: configuração da conta, primeiras obras e importação de dados.
 

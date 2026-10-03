@@ -150,10 +150,10 @@ function getLocalSnapshot(uf, desonerado, referencia = '2026-08') {
 
   const u = String(uf).toLowerCase();
   const d = desonerado ? 'desonerado' : 'onerado';
+  // Só a tabela da própria UF e competência: nunca devolve preços de outro estado.
+  const ref = /^\d{4}-\d{2}$/.test(String(referencia)) ? String(referencia).replace('-', '_') : '2026_08';
   const candidates = [
-    path.resolve(process.cwd(), 'data', `sinapi_${u}_2026_08_${d}.json`),
-    path.resolve(process.cwd(), 'data', `sinapi_${u}_${d}.json`),
-    path.resolve(process.cwd(), 'data', `sinapi_sp_2026_08_${d}.json`)
+    path.resolve(process.cwd(), 'data', `sinapi_${u}_${ref}_${d}.json`)
   ];
 
   for (const p of candidates) {

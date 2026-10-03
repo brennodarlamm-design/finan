@@ -74,7 +74,7 @@ export const ARTIGOS_BLOG = [
         "Usar tabela SINAPI desonerada sem incluir a CPRB no BDI, ou o contrário."
       ] },
       { tipo: "h2", texto: "Como fazer no FinGo" },
-      "A Calculadora de BDI do FinGo (gratuita, em fingo.api.br/calculadora-bdi) aplica a fórmula do TCU, mostra as faixas de referência e gera a memória de cálculo. Dentro do sistema, o orçamento com SINAPI aplica o BDI escolhido sobre o custo direto e permite usar BDI diferenciado para materiais."
+      "A Calculadora de BDI do FinGo (gratuita, em fingo.api.br/calculadora-bdi) aplica a fórmula do TCU, mostra as faixas de referência e gera a memória de cálculo. Dentro do sistema, o orçamento com SINAPI aplica o BDI escolhido sobre o custo direto de cada item."
     ],
     faq: [
       { q: "Qual é a fórmula do BDI pelo TCU?", a: "BDI = {[(1 + AC + S + R + G) × (1 + DF) × (1 + L)] / (1 − I)} − 1, conforme o Acórdão 2.622/2013 do TCU. AC é administração central, S e G seguro e garantia, R risco, DF despesas financeiras, L lucro e I os tributos sobre o faturamento." },
@@ -202,7 +202,7 @@ export const ARTIGOS_BLOG = [
       { tipo: "h2", texto: "Exemplo do efeito no BDI" },
       "Com as médias do TCU para edificações e ISS de 3%, o BDI sem CPRB é de 23,54%. Com a CPRB cheia de 4,5% (regime até 2024), o mesmo cálculo vai para 29,79%. Com a CPRB de transição de 2026 (2,7%), fica em 27,21%. Por isso, a comparação entre tabelas precisa olhar o preço final (custo direto mais BDI), e não só o custo unitário.",
       { tipo: "h2", texto: "Como fazer no FinGo" },
-      "No plano Construtora Ilimitado, o orçamento do FinGo usa a base oficial do SINAPI dos 27 estados nos dois regimes. Você escolhe a UF, a competência e o regime, e o sistema aplica o BDI correspondente."
+      "No plano Construtora Ilimitado, o orçamento do FinGo usa as tabelas oficiais do SINAPI de SP, SC e RR, na competência mais recente, nos dois regimes. Você escolhe a UF e o regime, e o sistema aplica o BDI sobre o custo direto. Os demais estados serão liberados depois."
     ],
     faq: [
       { q: "Qual a diferença entre SINAPI desonerado e não desonerado?", a: "A tabela não desonerada inclui nos encargos sociais da mão de obra a contribuição patronal de 20% sobre a folha. A desonerada não inclui, porque a empresa recolhe a CPRB sobre a receita, que deve entrar no BDI." },

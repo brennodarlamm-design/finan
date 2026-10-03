@@ -519,11 +519,11 @@ const AGENT_CARD_PAYLOAD = {
     {
       "id": "sinapi-budgeting",
       "name": "Orçamentação Paramétrica e SINAPI",
-      "description": "Consultas a tabelas oficiais Caixa/IBGE SINAPI para 27 estados (desonerado e não-desonerado) e composição de BDI.",
+      "description": "Consultas a tabelas oficiais Caixa/IBGE SINAPI de SP, SC e RR (desonerado e não-desonerado) e composição de BDI.",
       "tags": ["sinapi", "orcamento", "bdi", "engenharia"],
       "examples": [
         "Buscar composição de alvenaria de bloco cerâmico em SP",
-        "Calcular BDI diferenciado para licitação"
+        "Calcular BDI pela fórmula do TCU para licitação"
       ]
     },
     {
@@ -982,7 +982,7 @@ async function mcpEndpointResponse(request) {
     },
     {
       name: "get_sinapi_info",
-      description: "Consulta a cobertura e base de dados oficial SINAPI (Caixa Econômica Federal e IBGE) para os 27 estados do Brasil.",
+      description: "Consulta a cobertura e base de dados oficial SINAPI (Caixa Econômica Federal e IBGE) de SP, SC e RR (competência mais recente).",
       inputSchema: {
         type: "object",
         properties: {
@@ -1132,7 +1132,7 @@ async function mcpEndpointResponse(request) {
       let text = "";
 
       if (toolName === "search_plans") {
-        text = "Planos FinGo: Básico (R$ 119,90/mês, até 3 obras), Profissional (R$ 279,90/mês, até 10 obras, NF-e, OCR), Construtora Ilimitado (R$ 499,90/mês, obras ilimitadas, SINAPI oficial 27 estados, BDI analítico). Contratação: https://fingo.api.br/planos";
+        text = "Planos FinGo: Básico (R$ 119,90/mês, até 3 obras), Profissional (R$ 279,90/mês, até 10 obras, NF-e, OCR), Construtora Ilimitado (R$ 499,90/mês, obras ilimitadas, SINAPI oficial de SP, SC e RR, BDI analítico). Contratação: https://fingo.api.br/planos";
       } else if (toolName === "get_sinapi_info") {
         const rawState = String(args.state || 'BR').trim().toUpperCase();
         const validUfs = new Set(['AC', 'AL', 'AP', 'AM', 'BA', 'CE', 'DF', 'ES', 'GO', 'MA', 'MT', 'MS', 'MG', 'PA', 'PB', 'PR', 'PE', 'PI', 'RJ', 'RN', 'RS', 'RO', 'RR', 'SC', 'SP', 'SE', 'TO', 'BR']);
@@ -1194,7 +1194,7 @@ async function fetchFrontendResponse(request, env) {
   if (wantsMarkdown && shellMethod && (landingShell || incoming.pathname === '/planos' || incoming.pathname === '/sobre-nos' || incoming.pathname === '/calculadora-bdi' || incoming.pathname === '/manuais' || incoming.pathname === '/blog' || incoming.pathname === '/index.html' || incoming.pathname === '/landing')) {
     let md = '';
     if (incoming.pathname === '/planos') {
-      md = `# FinGo — Planos & Preços\n\nO plano certo para a sua obra. Compare recursos, equipe e capacidade de obras.\n\n## Planos Disponíveis\n\n### 1. Plano Básico — R$ 119,90 / mês\n- Ideal para: Profissionais autônomos e pequenas construtoras com operação enxuta\n- Obras ativas: Até 3\n- Usuários: 1\n- Recursos: Dashboard, Obras & Clientes, Financeiro, Fornecedores, Produtos, Recibos, Medições, Relatórios, Contas Bancárias, WhatsApp, Suporte padrão.\n\n### 2. Plano Profissional — R$ 279,90 / mês (Mais Escolhido)\n- Ideal para: Construtoras em crescimento que precisam automatizar documentos e compras\n- Obras ativas: Até 10\n- Usuários: 2\n- Recursos: Todos do Básico + Pré-compras, Contratos, NF-e, Orçamentos, Documentos, Assinatura eletrônica com verificação de PDFs assinados no Gov.br e com certificado ICP-Brasil, OCR de Notas Fiscais, Suporte prioritário.\n\n### 3. Construtora Ilimitado — R$ 499,90 / mês (Engenharia & SINAPI)\n- Ideal para: Operações completas com engenharia, equipe e obras em escala\n- Obras ativas: Ilimitadas\n- Usuários: 5\n- Recursos: Todos do Profissional + Base Oficial SINAPI (Caixa/IBGE) 27 estados desonerado/não desonerado, Engenharia Avançada, BDI diferenciado, Permissões avançadas, Suporte Prioritário/VIP.\n\n## Ciclos de Cobrança\n- Mensal: Sem fidelidade\n- Trimestral: ~5,5% OFF\n- Semestral: ~11% OFF\n- Anual: 2 meses grátis (Pague 10, Leve 12) — ~20% OFF\n\nContratação: https://fingo.api.br/planos\n`;
+      md = `# FinGo — Planos & Preços\n\nO plano certo para a sua obra. Compare recursos, equipe e capacidade de obras.\n\n## Planos Disponíveis\n\n### 1. Plano Básico — R$ 119,90 / mês\n- Ideal para: Profissionais autônomos e pequenas construtoras com operação enxuta\n- Obras ativas: Até 3\n- Usuários: 1\n- Recursos: Dashboard, Obras & Clientes, Financeiro, Fornecedores, Produtos, Recibos, Medições, Relatórios, Contas Bancárias, WhatsApp, Suporte padrão.\n\n### 2. Plano Profissional — R$ 279,90 / mês (Mais Escolhido)\n- Ideal para: Construtoras em crescimento que precisam automatizar documentos e compras\n- Obras ativas: Até 10\n- Usuários: 2\n- Recursos: Todos do Básico + Pré-compras, Contratos, NF-e, Orçamentos, Documentos, Assinatura eletrônica com verificação de PDFs assinados no Gov.br e com certificado ICP-Brasil, OCR de Notas Fiscais, Suporte prioritário.\n\n### 3. Construtora Ilimitado — R$ 499,90 / mês (Engenharia & SINAPI)\n- Ideal para: Operações completas com engenharia, equipe e obras em escala\n- Obras ativas: Ilimitadas\n- Usuários: 5\n- Recursos: Todos do Profissional + Base Oficial SINAPI (Caixa/IBGE) de SP, SC e RR, desonerado/não desonerado, Engenharia Avançada, Permissões avançadas, Suporte Prioritário/VIP.\n\n## Ciclos de Cobrança\n- Mensal: Sem fidelidade\n- Trimestral: ~5,5% OFF\n- Semestral: ~11% OFF\n- Anual: 2 meses grátis (Pague 10, Leve 12) — ~20% OFF\n\nContratação: https://fingo.api.br/planos\n`;
     } else if (incoming.pathname === '/sobre-nos') {
       md = `# Sobre o FinGo — Obras em Fluxo\n\nConstruir exige visão. Gerir também.\n\n## Nosso Propósito\nTornar a gestão da construção mais clara, conectada e próxima de quem faz a obra acontecer. O FinGo é uma plataforma de gestão financeira e operacional para a construção civil. Reunimos rotinas de obras, custos, compras e medições em um só lugar.\n\n## Nossos Objetivos\n1. Aproximar canteiro e escritório\n2. Dar clareza à gestão de custos\n3. Simplificar rotinas para evoluir a operação\n\nContato: contato@fingo.api.br\n`;
     } else if (incoming.pathname === '/calculadora-bdi') {

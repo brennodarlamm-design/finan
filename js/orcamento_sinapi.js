@@ -37,57 +37,14 @@ const OrcamentoSINAPI = {
     Utils.showModal(`<div class="modal" style="max-width:560px"><div class="modal-header"><span class="modal-title">Orçamento SINAPI</span><button class="modal-close" data-fb-click="Utils.closeModal" data-fb-click-n="0" aria-label="Fechar">✕</button></div><div class="modal-body" style="white-space:pre-line">${Utils.escapeHtml(message)}</div></div>`);
   },
 
-  showImportModal(desonerado = false, uf = '', referencia = '') {
+  // Importação de planilha da Caixa desativada nesta versão: as tabelas oficiais de
+  // SP, SC e RR (competência mais recente) já vêm no sistema. Uma base importada
+  // ficaria só neste navegador e se perderia ao recarregar a página.
+  showImportModal() {
     if (!this._ensurePlanAccess()) return;
-    this._importEditor = this._currentEditor;
-    const e = Utils.escapeHtml.bind(Utils);
-    Utils.showModal(`<div class="modal" style="max-width:620px">
-      <div class="modal-header"><span class="modal-title">Importar base SINAPI</span><button class="modal-close" aria-label="Fechar" data-fb-click="Utils.closeModal" data-fb-click-n="0">✕</button></div>
-      <div class="modal-body"><p>Selecione a planilha oficial de composições sintéticas ou analíticas, em XLSX ou ZIP. Informe a UF, a competência e a série do arquivo. A base ficará disponível neste navegador.</p>
-        <form id="sinapi-import-form"><div class="form-row cols-2">
-          <label class="form-group">UF<select id="imp-uf" class="form-control" required>${Utils.stateOptions(uf)}</select></label>
-          <label class="form-group">Competência<input id="imp-ref" class="form-control" type="month" value="${e(referencia)}" required></label>
-        </div><label class="form-group">Série<select id="imp-serie" class="form-control"><option value="false" ${!desonerado?'selected':''}>Onerado</option><option value="true" ${desonerado?'selected':''}>Desonerado</option></select></label>
-        <label class="form-group">Arquivo oficial<input id="imp-file" class="form-control" type="file" accept=".xlsx,.xls,.zip" required></label></form>
-        <p id="imp-progress-msg" role="status" aria-live="polite"></p>
-      </div><div class="modal-footer"><button class="btn btn-secondary" data-fb-click="Utils.closeModal" data-fb-click-n="0">Cancelar</button><button id="imp-run" class="btn btn-primary" data-fb-click="OrcamentoSINAPI.executarImport" data-fb-click-n="0">Importar base</button></div></div>`);
-  },
-
-  async executarImport() {
-    if (!this._ensurePlanAccess() || this._importRunning) return;
-    const form = document.getElementById('sinapi-import-form');
-    if (!form?.reportValidity()) return;
-    const file = document.getElementById('imp-file').files[0];
-    if (!file) return;
-    const uf = document.getElementById('imp-uf').value;
-    const referencia = document.getElementById('imp-ref').value;
-    const desonerado = document.getElementById('imp-serie').value === 'true';
-    const button = document.getElementById('imp-run');
-    const progress = document.getElementById('imp-progress-msg');
-    this._importRunning = true;
-    button.disabled = true;
-    try {
-      const result = await SINAPI.importar(file, desonerado, uf, referencia, message => { progress.textContent = message; });
-      progress.textContent = result.msg;
-      if (!result.ok) { Utils.toast(result.msg, 'error'); return; }
-      Utils.toast(result.msg, 'success');
-      const editor = this._getById(this._importEditor);
-      if (editor) {
-        editor.uf = uf; editor.referencia_sinapi = referencia; editor.desonerado = desonerado;
-        if (editor.bancos_config) {
-          editor.bancos_config.desonerado = desonerado;
-          const bank = editor.bancos_config.bancos?.find(b => b.id === 'sinapi');
-          if (bank) { bank.uf = uf; bank.ref = `${Number(referencia.slice(5))}/${referencia.slice(0,4)}`; bank.checked = true; }
-        }
-        this._save(editor);
-        if (typeof OrcamentoBancos !== 'undefined') OrcamentoBancos._recalcularItensDoOrcamento(editor);
-      }
-      // Não substitui outro diálogo que o usuário tenha aberto durante o processamento.
-      if (form.isConnected) { Utils.closeModal(); if (editor) this.openEditor(editor.id); }
-    } catch (error) {
-      progress.textContent = error.message || 'Não foi possível importar a base.';
-      Utils.toast(progress.textContent, 'error');
-    } finally { this._importRunning = false; button.disabled = false; }
+    const ufs = typeof SINAPI !== 'undefined' ? SINAPI.UFS_DISPONIVEIS.join(', ') : 'SP, SC, RR';
+    const ref = typeof SINAPI !== 'undefined' ? SINAPI.refLabel() : '';
+    this._showInfo(`As tabelas oficiais SINAPI da Caixa de ${ufs} (competência ${ref}, onerada e desonerada) já estão no sistema.\n\nOutros estados serão liberados em breve.`);
   },
 
   _ensurePlanAccess() {
@@ -101,6 +58,71 @@ const OrcamentoSINAPI = {
     const obra = id ? DB.getById('clientes', id) : null;
     const emp = DB.getEmpresa ? DB.getEmpresa() : {};
     return String(obra?.estado || obra?.uf || emp?.uf || 'SP').trim().toUpperCase();
+  },
+
+  /** UF do orçamento: a da obra, se houver tabela SINAPI para ela; senão, a primeira disponível. */
+  _ufOrcamento(obraId='') {
+    const uf = this._defaultUF(obraId);
+    if (typeof SINAPI === 'undefined') return uf;
+    return SINAPI.ufDisponivel(uf) ? uf : SINAPI.UFS_DISPONIVEIS[0];
+  },
+
+  _refAtual() {
+    return typeof SINAPI !== 'undefined' ? SINAPI.REFERENCIA_ATUAL : '';
+  },
+
+  _bdiDe(orc) {
+    return Number(orc?.bdi ?? this.BDI_PADRAO);
+  },
+
+  _baseLabel(orc) {
+    const ref = typeof SINAPI !== 'undefined' ? SINAPI.refLabel(orc.referencia_sinapi) : (orc.referencia_sinapi || '');
+    return `SINAPI ${orc.uf || '—'} ${ref} · ${orc.desonerado ? 'DESONERADO' : 'NÃO DESONERADO'}`;
+  },
+
+  _baseDisponivel(orc) {
+    return typeof SINAPI !== 'undefined' && SINAPI.disponivel(orc.uf, orc.referencia_sinapi);
+  },
+
+  _semPreco(item) {
+    return !(Number(item?.preco_unitario) > 0);
+  },
+
+  _avisoSemPreco(item) {
+    Utils.toast(`O item ${item.codigo} não tem preço na tabela SINAPI desta UF. Escolha outra composição.`, 'warning');
+  },
+
+  /** Item da base oficial do orçamento pelo código exato (carrega a base se preciso). */
+  async _itemDaBase(codigo, desonerado, uf, referencia) {
+    if (typeof SINAPI === 'undefined') return null;
+    const base = await SINAPI.ensureBaseLoaded(desonerado, uf, referencia);
+    const cod = String(codigo || '').trim();
+    return base?.composicoes?.find(item => String(item.codigo) === cod) || null;
+  },
+
+  /** Atualiza os preços dos itens pela base do orçamento (UF, competência e regime). */
+  async reprecificar(orc) {
+    if (typeof SINAPI !== 'undefined') await SINAPI.ensureBaseLoaded(orc.desonerado, orc.uf, orc.referencia_sinapi);
+    return OrcamentoBancos._recalcularItensDoOrcamento(orc);
+  },
+
+  _avisoReprecificacao(recalc) {
+    if (recalc.missing) Utils.toast(`${recalc.updated} preço(s) atualizado(s). ${recalc.missing} item(ns) sem preço na tabela escolhida: revise antes de emitir a proposta.`, 'warning');
+    else Utils.toast(`${recalc.updated} preço(s) atualizado(s) pela tabela SINAPI.`, 'success');
+  },
+
+  /** Leva um orçamento antigo para a competência atual e reprecifica. */
+  async atualizarParaBaseAtual(orcId) {
+    const orc = this._getById(orcId);
+    if (!orc) return;
+    if (typeof SINAPI === 'undefined' || !SINAPI.ufDisponivel(orc.uf)) {
+      Utils.toast(`Não há tabela SINAPI para ${orc.uf || 'esta UF'}. Edite o orçamento e escolha ${typeof SINAPI !== 'undefined' ? SINAPI.UFS_DISPONIVEIS.join(', ') : 'outra UF'}.`, 'warning');
+      return this.showForm(orcId);
+    }
+    orc.referencia_sinapi = SINAPI.REFERENCIA_ATUAL;
+    const recalc = await this.reprecificar(orc);
+    this._avisoReprecificacao(recalc);
+    if (this._currentEditor === orcId) this.openEditor(orcId);
   },
 
   // ─────────────────────────────────────────────────
@@ -126,10 +148,10 @@ const OrcamentoSINAPI = {
 
     let sinapiSearchResults = [];
     if (this._filterSearch && this._filterSearch.trim().length >= 2 && typeof SINAPI !== 'undefined') {
-      const targetUf = this._defaultUF(obraId) || 'SP';
-      sinapiSearchResults = SINAPI.buscar(this._filterSearch, true, 8, targetUf, '2026-08');
+      const targetUf = this._ufOrcamento(obraId);
+      sinapiSearchResults = SINAPI.buscar(this._filterSearch, true, 8, targetUf, this._refAtual());
       if (!sinapiSearchResults.length) {
-        sinapiSearchResults = SINAPI.buscar(this._filterSearch, false, 8, targetUf, '2026-08');
+        sinapiSearchResults = SINAPI.buscar(this._filterSearch, false, 8, targetUf, this._refAtual());
       }
     }
 
@@ -687,9 +709,7 @@ const OrcamentoSINAPI = {
               📄 Gerar proposta (PDF)
             </button>
 
-            <button class="btn btn-secondary btn-sm" style="font-size:.78rem;background:#333842;color:#fff;border-color:#454d59;" data-fb-click="OrcamentoSINAPI.showImportModal" data-fb-click-n="3" data-fb-click-t0="bool" data-fb-click-v0="${!!orc.desonerado}" data-fb-click-t1="string" data-fb-click-v1="${encodeURIComponent(orc.uf||'')}" data-fb-click-t2="string" data-fb-click-v2="${encodeURIComponent(orc.referencia_sinapi||'')}" title="Importar planilha Caixa">
-              📥 Importar Planilha
-            </button>
+
 
             <button class="modal-close" style="color:#aaa;background:transparent;border:none;font-size:1.3rem;cursor:pointer;margin-left:6px;" data-fb-click="Utils.closeModal" data-fb-click-n="0">✕</button>
           </div>
@@ -703,7 +723,7 @@ const OrcamentoSINAPI = {
           <div style="display:flex;align-items:center;gap:6px;cursor:pointer;" data-fb-click="OrcamentoSINAPI.editarParametro" data-fb-click-n="2" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(orc.id)}" data-fb-click-t1="string" data-fb-click-v1="bdi">
             <span style="font-weight:700;color:#64748b;">BDI</span>
             <span style="font-size:12px;">✏️</span>
-            <span style="font-weight:800;color:#0f172a;">${Number(orc.bdi || 0).toFixed(3)}%</span>
+            <span style="font-weight:800;color:#0f172a;">${this._bdiDe(orc).toFixed(3)}%</span>
           </div>
 
           <!-- DESCONTO / ACRÉSCIMO ✏️ -->
@@ -732,11 +752,23 @@ const OrcamentoSINAPI = {
             <span style="font-weight:700;color:#64748b;">PERÍODO</span>
             <span style="font-size:12px;">✏️</span>
             <span style="font-weight:800;color:#2563eb;font-size:.78rem;">
-              ${OrcamentoBancos.getResumoAtivo(orc)}
+              ${e(this._baseLabel(orc))}
             </span>
           </div>
 
         </div>
+
+        ${(() => {
+          const semPreco = (orc.itens || []).filter(it => it.preco_pendente || this._semPreco(it)).length;
+          if (typeof SINAPI === 'undefined') return '';
+          if (!this._baseDisponivel(orc)) {
+            return `<div role="alert" style="background:#fffbeb;border-bottom:1px solid #fde68a;padding:10px 20px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;font-size:.84rem;color:#92400e;">
+              <span>⚠️ Este orçamento usa a tabela SINAPI ${e(orc.uf || '')} ${e(SINAPI.refLabel(orc.referencia_sinapi))}, que não está disponível. Tabelas atuais: ${e(SINAPI.UFS_DISPONIVEIS.join(', '))} — ${e(SINAPI.refLabel())}.</span>
+              <button type="button" class="btn btn-primary btn-sm" data-fb-click="OrcamentoSINAPI.atualizarParaBaseAtual" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(orc.id)}">Atualizar para ${e(SINAPI.refLabel())}</button>
+            </div>`;
+          }
+          return semPreco ? `<div role="status" style="background:#fef2f2;border-bottom:1px solid #fecaca;padding:10px 20px;font-size:.84rem;color:#991b1b;">⚠️ ${semPreco} item(ns) sem preço na tabela SINAPI ${e(orc.uf || '')} ${e(SINAPI.refLabel(orc.referencia_sinapi))}. Substitua ou remova antes de emitir a proposta.</div>` : '';
+        })()}
 
         <!-- BARRA 3: Ações de Etapa (+ Incluir etapa, + Incluir item, Ajustar itens, Filtrar, Remover) -->
         <div style="background:#fff;border-bottom:1px solid #e2e8f0;padding:10px 20px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
@@ -1039,7 +1071,7 @@ const OrcamentoSINAPI = {
               <!-- Linhas dos Itens da Etapa -->
               ${etItens.map((it, itemIdx) => {
                 const pUnit = Number(it.preco_unitario) || 0;
-                const bdi = Number(orc.bdi || 0);
+                const bdi = this._bdiDe(orc);
                 const pBdi = Math.round(pUnit * (1 + bdi / 100) * 100) / 100;
                 const totalItem = this.calcularTotais({ ...orc, itens:[it] }).totalGeral;
 
@@ -1066,6 +1098,7 @@ const OrcamentoSINAPI = {
                     </td>
                     <td style="padding:8px 14px;color:#1e293b;font-weight:500;">
                       ${e(it.descricao)}
+                      ${it.preco_pendente || !(pUnit > 0) ? '<div style="color:#b91c1c;font-size:.72rem;font-weight:700;margin-top:2px;">⚠ Sem preço na tabela SINAPI selecionada</div>' : ''}
                     </td>
                     <td style="padding:8px 10px;text-align:center;color:#64748b;">
                       ${e(it.unidade)}
@@ -1139,15 +1172,22 @@ const OrcamentoSINAPI = {
       : [];
 
     if (!resultados.length) {
-      if (typeof SINAPI !== 'undefined' && orc && !SINAPI.hasBase(orc.desonerado, orc.uf, orc.referencia_sinapi) && typeof fetch !== 'undefined') {
+      if (typeof SINAPI !== 'undefined' && orc && !SINAPI.hasBase(orc.desonerado, orc.uf, orc.referencia_sinapi)) {
         dropdown.style.display = 'block';
-        dropdown.innerHTML = `<div style="padding:14px;color:var(--accent);font-size:.82rem;display:flex;align-items:center;gap:8px;"><span style="display:inline-block;animation:spin 1s linear infinite;">⏳</span> Carregando base oficial SINAPI Caixa (${Utils.escapeHtml(orc.uf || 'SP')})...</div>`;
+        if (!SINAPI.disponivel(orc.uf, orc.referencia_sinapi)) {
+          dropdown.innerHTML = `<div style="padding:14px;color:#92400e;font-size:.82rem;">Não há tabela SINAPI para ${Utils.escapeHtml(orc.uf || 'esta UF')} ${Utils.escapeHtml(SINAPI.refLabel(orc.referencia_sinapi))}. Tabelas disponíveis: ${Utils.escapeHtml(SINAPI.UFS_DISPONIVEIS.join(', '))} — ${Utils.escapeHtml(SINAPI.refLabel())}. Use "Atualizar" no aviso acima ou edite o orçamento.</div>`;
+          return;
+        }
+        dropdown.innerHTML = `<div style="padding:14px;color:var(--accent);font-size:.82rem;display:flex;align-items:center;gap:8px;"><span style="display:inline-block;animation:spin 1s linear infinite;">⏳</span> Carregando tabela SINAPI Caixa ${Utils.escapeHtml(orc.uf)} ${Utils.escapeHtml(SINAPI.refLabel(orc.referencia_sinapi))}...</div>`;
         SINAPI.ensureBaseLoaded(orc.desonerado, orc.uf, orc.referencia_sinapi).then(loaded => {
-          if (loaded) {
-            const input = document.getElementById('sinapi-quick-add-input');
-            if (input && input.value.trim() === termo.trim()) {
-              this._onQuickSearchInput(orcId, termo);
-            }
+          const input = document.getElementById('sinapi-quick-add-input');
+          if (!loaded) {
+            if (input && input.value.trim() === termo.trim()) dropdown.innerHTML = '<div style="padding:14px;color:#b91c1c;font-size:.82rem;">Não foi possível carregar a tabela SINAPI. Verifique a conexão e tente novamente.</div>';
+            return;
+          }
+          // Só repete a busca com a base já em memória: não há novo carregamento.
+          if (input && input.value.trim() === termo.trim() && SINAPI.hasBase(orc.desonerado, orc.uf, orc.referencia_sinapi)) {
+            this._onQuickSearchInput(orcId, termo);
           }
         });
         return;
@@ -1190,8 +1230,8 @@ const OrcamentoSINAPI = {
             </div>
 
             <!-- Lado Direito: Preço em 4 decimais -->
-            <div style="font-weight:800;font-size:.95rem;color:#0f172a;white-space:nowrap;">
-              R$${r.preco_unitario.toLocaleString('pt-BR', { minimumFractionDigits: 4, maximumFractionDigits: 4 })}
+            <div style="font-weight:800;font-size:.95rem;color:${r.preco_unitario > 0 ? '#0f172a' : '#b91c1c'};white-space:nowrap;">
+              ${r.preco_unitario > 0 ? `R$${r.preco_unitario.toLocaleString('pt-BR', { minimumFractionDigits: 4, maximumFractionDigits: 4 })}` : 'Sem preço nesta UF'}
             </div>
           </div>
         `).join('')}
@@ -1218,6 +1258,7 @@ const OrcamentoSINAPI = {
 
     const orc = this._getById(orcId);
     if (!orc) return;
+    if (this._semPreco(item)) return this._avisoSemPreco(item);
 
     // Se não houver etapas criadas, define etapa padrão
     let etapaAlvo = orc.etapa_ativa || '1 - SERVIÇOS PRELIMINARES';
@@ -1225,7 +1266,7 @@ const OrcamentoSINAPI = {
       etapaAlvo = orc.itens[orc.itens.length - 1].etapa_nome || etapaAlvo;
     }
 
-    const bdi = Number(orc.bdi || 0);
+    const bdi = this._bdiDe(orc);
     const precoUnit = Number(item.preco_unitario) || 0;
     const precoBdi = precoUnit * (1 + bdi / 100);
 
@@ -1312,7 +1353,7 @@ const OrcamentoSINAPI = {
     if (!it) return;
 
     const qtd = Math.max(0, parseFloat(novaQtd) || 0);
-    const bdi = Number(orc.bdi || 0);
+    const bdi = this._bdiDe(orc);
     const pBdi = it.preco_com_bdi || (it.preco_unitario * (1 + bdi / 100));
 
     it.quantidade = qtd;
@@ -1410,7 +1451,7 @@ const OrcamentoSINAPI = {
     const orc = this._getById(orcId);
     if (!orc) return;
 
-    const bdi = Number(orc.bdi || 0);
+    const bdi = this._bdiDe(orc);
     (orc.itens || []).forEach(it => {
       const pUnit = Number(it.preco_unitario) || 0;
       it.preco_com_bdi = Math.round((pUnit * (1 + bdi / 100)) * 100) / 100;
@@ -1490,7 +1531,10 @@ const OrcamentoSINAPI = {
     const orc = id ? (this._getById(id) || {}) : {};
     const hoje = Utils.today();
     const e = Utils.escapeHtml.bind(Utils);
-    const defaultUf = orc.uf || this._defaultUF(orc.obra_id);
+    const ufsDisponiveis = typeof SINAPI !== 'undefined' ? SINAPI.UFS_DISPONIVEIS : ['SP'];
+    const defaultUf = ufsDisponiveis.includes(orc.uf) ? orc.uf : this._ufOrcamento(orc.obra_id);
+    const ufObra = this._defaultUF(orc.obra_id);
+    const refAtual = this._refAtual();
 
     Utils.showModal(`
       <div class="modal" style="max-width:560px;padding:0;overflow:hidden;border-radius:var(--r-lg);">
@@ -1500,6 +1544,11 @@ const OrcamentoSINAPI = {
         </div>
         <div class="modal-body" style="padding:20px;">
           <form id="f-sinapi-orc">
+            <p style="margin:0 0 14px;font-size:.8rem;color:#475569;background:#f1f5f9;border-radius:6px;padding:8px 10px;">
+              Tabelas SINAPI disponíveis: <strong>${e(ufsDisponiveis.join(', '))}</strong>, competência <strong>${e(typeof SINAPI !== 'undefined' ? SINAPI.refLabel() : refAtual)}</strong>.
+              ${ufObra && !ufsDisponiveis.includes(ufObra) ? ` A obra fica em ${e(ufObra)}, que ainda não tem tabela: escolha a UF de referência.` : ''}
+              ${id && orc.referencia_sinapi && orc.referencia_sinapi !== refAtual ? ' Ao salvar, os preços serão atualizados para a competência atual.' : ''}
+            </p>
             <div class="form-row cols-2" style="margin-bottom:14px;">
               <div class="form-group">
                 <label class="form-label" style="font-weight:700;">Obra / Cliente *</label>
@@ -1513,13 +1562,14 @@ const OrcamentoSINAPI = {
             <div class="form-row cols-3" style="margin-bottom:14px;">
               <div class="form-group">
                 <label class="form-label" style="font-weight:700;">UF (Estado)</label>
-                <select class="form-control" name="uf">
-                  ${Utils.stateOptions(defaultUf)}
+                <select class="form-control" name="uf" required>
+                  ${ufsDisponiveis.map(uf => `<option value="${e(uf)}" ${uf === defaultUf ? 'selected' : ''}>${e(uf)}</option>`).join('')}
                 </select>
               </div>
               <div class="form-group">
-                <label class="form-label" style="font-weight:700;">Referência</label>
-                <input class="form-control" type="month" name="referencia_sinapi" value="${e(orc.referencia_sinapi || '2026-07')}">
+                <label class="form-label" style="font-weight:700;">Referência SINAPI</label>
+                <input class="form-control" value="${e(typeof SINAPI !== 'undefined' ? SINAPI.refLabel() : refAtual)} (mais recente)" readonly aria-readonly="true">
+                <input type="hidden" name="referencia_sinapi" value="${e(refAtual)}">
               </div>
               <div class="form-group">
                 <label class="form-label" style="font-weight:700;">BDI (%)</label>
@@ -1565,11 +1615,16 @@ const OrcamentoSINAPI = {
     const fd = new FormData(f);
     const d = Object.fromEntries(fd);
 
+    const uf = String(d.uf || '').toUpperCase();
+    if (typeof SINAPI !== 'undefined' && !SINAPI.ufDisponivel(uf)) {
+      Utils.toast(`Escolha uma UF com tabela SINAPI: ${SINAPI.UFS_DISPONIVEIS.join(', ')}.`, 'warning');
+      return;
+    }
     const payload = {
       obra_id: d.obra_id,
       nome: d.nome,
-      uf: d.uf,
-      referencia_sinapi: d.referencia_sinapi,
+      uf,
+      referencia_sinapi: this._refAtual() || d.referencia_sinapi,
       bdi: Number.isFinite(parseFloat(d.bdi)) ? parseFloat(d.bdi) : this.BDI_PADRAO,
       desonerado: d.desonerado === 'true',
       status: d.status,
@@ -1577,10 +1632,14 @@ const OrcamentoSINAPI = {
       data_alteracao: new Date().toLocaleString('pt-BR')
     };
 
-    let saved;
+    let saved, mudouBase = false;
     if (id) {
       const existing = this._getById(id);
+      mudouBase = !!existing && (existing.uf !== payload.uf || existing.referencia_sinapi !== payload.referencia_sinapi || !!existing.desonerado !== payload.desonerado);
       saved = { ...existing, ...payload };
+      if (mudouBase && saved.bancos_config) {
+        saved.bancos_config = { ...saved.bancos_config, desonerado: payload.desonerado };
+      }
       saved.itens = (saved.itens || []).map(item => {
         const pUnit = Number(item.preco_unitario || 0);
         const preco = Math.round(pUnit * (1 + saved.bdi / 100) * 100) / 100;
@@ -1593,7 +1652,11 @@ const OrcamentoSINAPI = {
         };
       });
       this._save(saved);
-      Utils.toast('Orçamento atualizado!', 'success');
+      if (mudouBase && saved.itens.length) {
+        this.reprecificar(saved).then(recalc => { this._avisoReprecificacao(recalc); this._refresh(); });
+      } else {
+        Utils.toast('Orçamento atualizado!', 'success');
+      }
     } else {
       const todos = this._getAll();
       const proximoNum = String(todos.length + 1).padStart(4, '0');
@@ -1720,7 +1783,8 @@ const OrcamentoSINAPI = {
       btn.className = 'btn btn-secondary';
       btn.style.opacity = '1';
       btn.style.cursor = 'pointer';
-      btn.innerHTML = `<span>⚡</span> Sem snapshot 1-clique para ${uf || 'UF'} ${ref || 'competência'} — Clique para usar RR 12/2024`;
+      btn.disabled = true;
+      btn.innerHTML = `<span>⚡</span> Sem tabela SINAPI para ${uf || 'UF'} ${ref || 'competência'}`;
     }
   },
 
@@ -1729,15 +1793,10 @@ const OrcamentoSINAPI = {
     let uf = String(document.getElementById('imp-uf')?.value || '').toUpperCase();
     let ref = String(document.getElementById('imp-ref')?.value || '');
 
-    let snap = (typeof SINAPI !== 'undefined' && SINAPI.snapshotFor) ? SINAPI.snapshotFor(uf, ref, desonerado) : null;
+    const snap = (typeof SINAPI !== 'undefined' && SINAPI.snapshotFor) ? SINAPI.snapshotFor(uf, ref, desonerado) : null;
     if (!snap) {
-      uf = 'RR';
-      ref = '2024-12';
-      const ufEl = document.getElementById('imp-uf');
-      const refEl = document.getElementById('imp-ref');
-      if (ufEl) ufEl.value = uf;
-      if (refEl) refEl.value = ref;
-      this._updateOfficialSnapshotAvailability();
+      Utils.toast(`Não há tabela SINAPI para ${uf || 'a UF'} ${ref || ''}. Disponível: ${typeof SINAPI !== 'undefined' ? SINAPI.UFS_DISPONIVEIS.join(', ') + ' — ' + SINAPI.refLabel() : ''}.`, 'warning');
+      return;
     }
 
     const progMsg = document.getElementById('imp-progress-msg');
@@ -1885,7 +1944,7 @@ const OrcamentoSINAPI = {
   _catState: {
     termo: '',
     uf: 'SP',
-    referencia: '2026-08',
+    referencia: '',
     desonerado: true,
     tipo: 'TODOS',
     pagina: 1,
@@ -1895,16 +1954,18 @@ const OrcamentoSINAPI = {
   abrirCatalogoSINAPI(termo = '', uf = '') {
     if (!this._ensurePlanAccess()) return;
     this._catState.termo = (typeof termo === 'string' && termo !== 'undefined') ? termo : (this._filterSearch || '');
-    if (uf) this._catState.uf = uf;
-    else if (!this._catState.uf) this._catState.uf = this._defaultUF();
+    if (uf && (typeof SINAPI === 'undefined' || SINAPI.ufDisponivel(uf))) this._catState.uf = uf;
+    else if (!uf && !this._catState.touched) this._catState.uf = this._ufOrcamento();
+    this._catState.referencia = this._refAtual();
     this._catState.pagina = 1;
 
     const u = this._catState.uf;
     const r = this._catState.referencia;
     const d = this._catState.desonerado;
 
-    if (typeof SINAPI !== 'undefined' && !SINAPI.hasBase(d, u, r) && typeof fetch !== 'undefined') {
-      SINAPI.ensureBaseLoaded(d, u, r).then(() => {
+    if (typeof SINAPI !== 'undefined' && !SINAPI.hasBase(d, u, r)) {
+      SINAPI.ensureBaseLoaded(d, u, r).then(loaded => {
+        this._catState.erroCarga = !loaded;
         this._atualizarTabelaCatalogo();
       });
     }
@@ -1923,7 +1984,7 @@ const OrcamentoSINAPI = {
                   Catálogo Oficial SINAPI — Caixa Econômica Federal
                 </h3>
                 <span id="cat-badge-total" style="background:var(--accent-dim, rgba(198,255,0,0.15));color:var(--action-fg, #c6ff00);font-weight:800;font-size:.72rem;padding:2px 8px;border-radius:4px;border:1px solid rgba(198,255,0,0.3);">
-                  15.423 itens oficiais
+                  ${typeof SINAPI !== 'undefined' ? `${e(SINAPI.UFS_DISPONIVEIS.join(' · '))} — ${e(SINAPI.refLabel())}` : ''}
                 </span>
               </div>
               <p style="margin:2px 0 0;font-size:.78rem;color:#8b949e;">
@@ -1978,9 +2039,7 @@ const OrcamentoSINAPI = {
                   data-fb-change-n="1"
                   data-fb-change-t0="value"
                 >
-                  <option value="SP" ${this._catState.uf==='SP'?'selected':''}>SP - São Paulo (Oficial)</option>
-                  <option value="SC" ${this._catState.uf==='SC'?'selected':''}>SC - Santa Catarina (Oficial)</option>
-                  <option value="RR" ${this._catState.uf==='RR'?'selected':''}>RR - Roraima (Oficial)</option>
+                  ${(typeof SINAPI !== 'undefined' ? SINAPI.UFS_DISPONIVEIS : ['SP']).map(uf => `<option value="${e(uf)}" ${this._catState.uf===uf?'selected':''}>${e(uf)} - ${e((typeof OrcamentoBancos !== 'undefined' && OrcamentoBancos.NOME_UFS[uf]) || uf)}</option>`).join('')}
                 </select>
               </div>
 
@@ -2030,7 +2089,7 @@ const OrcamentoSINAPI = {
             </div>
 
             <div id="cat-status-msg" style="font-size:.78rem;color:#8b949e;font-weight:600;">
-              Base: ${e(this._catState.uf)} 08/2026
+              Tabela: ${e(this._catState.uf)} ${e(typeof SINAPI !== 'undefined' ? SINAPI.refLabel(this._catState.referencia) : '')}
             </div>
           </div>
         </div>
@@ -2046,20 +2105,7 @@ const OrcamentoSINAPI = {
             ${this._renderCatalogoPaginationInfo()}
           </div>
           <div style="display:flex;gap:8px;">
-            <button
-              class="btn btn-secondary btn-sm"
-              data-fb-click="OrcamentoSINAPI.showImportModal"
-              data-fb-click-n="3"
-              data-fb-click-t0="bool"
-              data-fb-click-v0="${!!this._catState.desonerado}"
-              data-fb-click-t1="string"
-              data-fb-click-v1="${encodeURIComponent(this._catState.uf)}"
-              data-fb-click-t2="string"
-              data-fb-click-v2="2026-08"
-              style="font-size:.78rem;"
-            >
-              📥 Importar Planilha Caixa
-            </button>
+
             <button class="btn btn-primary btn-sm" data-fb-click="Utils.closeModal" data-fb-click-n="0" style="font-weight:700;">
               Fechar
             </button>
@@ -2085,11 +2131,14 @@ const OrcamentoSINAPI = {
     }
 
     if (!items.length) {
+      if (typeof SINAPI !== 'undefined' && !SINAPI.hasBase(d, u, r) && this._catState.erroCarga) {
+        return `<div style="padding:48px 20px;text-align:center;color:#b91c1c;font-weight:700;">Não foi possível carregar a tabela SINAPI ${e(u)} ${e(SINAPI.refLabel(r))}. Verifique a conexão e reabra o catálogo.</div>`;
+      }
       if (typeof SINAPI !== 'undefined' && !SINAPI.hasBase(d, u, r)) {
         return `
           <div style="padding:48px 20px;text-align:center;">
             <div style="font-size:2.5rem;margin-bottom:8px;animation:spin 1s linear infinite;display:inline-block;">⏳</div>
-            <h4 style="color:var(--text);font-weight:800;margin-bottom:6px;">Carregando Base Oficial SINAPI Caixa (${u} ${r})...</h4>
+            <h4 style="color:var(--text);font-weight:800;margin-bottom:6px;">Carregando tabela SINAPI Caixa ${e(u)} ${e(typeof SINAPI !== 'undefined' ? SINAPI.refLabel(r) : r)}...</h4>
             <p style="color:var(--text3);font-size:.85rem;">Os dados estão sendo transferidos e indexados para acesso ultrarrápido.</p>
           </div>
         `;
@@ -2142,8 +2191,8 @@ const OrcamentoSINAPI = {
               <td style="padding:10px 10px;text-align:center;color:var(--text3);font-weight:700;">
                 ${e(it.unidade)}
               </td>
-              <td style="padding:10px 14px;text-align:right;font-weight:800;color:var(--success);font-size:.9rem;">
-                ${Utils.fmt.currency(it.preco_unitario)}
+              <td style="padding:10px 14px;text-align:right;font-weight:800;color:${Number(it.preco_unitario) > 0 ? 'var(--success)' : '#b91c1c'};font-size:.9rem;">
+                ${Number(it.preco_unitario) > 0 ? Utils.fmt.currency(it.preco_unitario) : 'Sem preço nesta UF'}
               </td>
               <td style="padding:10px 14px;text-align:center;">
                 <div style="display:flex;gap:4px;justify-content:center;">
@@ -2222,27 +2271,30 @@ const OrcamentoSINAPI = {
     this._atualizarTabelaCatalogo();
   },
 
-  _onCatChangeUF(uf) {
-    this._catState.uf = uf;
-    this._catState.pagina = 1;
-    const d = this._catState.desonerado;
-    const r = this._catState.referencia;
-    if (typeof SINAPI !== 'undefined' && !SINAPI.hasBase(d, uf, r) && typeof fetch !== 'undefined') {
-      SINAPI.ensureBaseLoaded(d, uf, r).then(() => this._atualizarTabelaCatalogo());
+  _carregarBaseCatalogo() {
+    const { desonerado:d, uf:u, referencia:r } = this._catState;
+    this._catState.erroCarga = false;
+    if (typeof SINAPI !== 'undefined' && !SINAPI.hasBase(d, u, r)) {
+      SINAPI.ensureBaseLoaded(d, u, r).then(loaded => {
+        this._catState.erroCarga = !loaded;
+        this._atualizarTabelaCatalogo();
+      });
     }
     this._atualizarTabelaCatalogo();
+  },
+
+  _onCatChangeUF(uf) {
+    if (typeof SINAPI !== 'undefined' && !SINAPI.ufDisponivel(uf)) return;
+    this._catState.uf = uf;
+    this._catState.touched = true;
+    this._catState.pagina = 1;
+    this._carregarBaseCatalogo();
   },
 
   _onCatChangeDes(val) {
     this._catState.desonerado = val === 'true';
     this._catState.pagina = 1;
-    const d = this._catState.desonerado;
-    const u = this._catState.uf;
-    const r = this._catState.referencia;
-    if (typeof SINAPI !== 'undefined' && !SINAPI.hasBase(d, u, r) && typeof fetch !== 'undefined') {
-      SINAPI.ensureBaseLoaded(d, u, r).then(() => this._atualizarTabelaCatalogo());
-    }
-    this._atualizarTabelaCatalogo();
+    this._carregarBaseCatalogo();
   },
 
   _onCatSetTipo(tipo) {
@@ -2274,14 +2326,17 @@ const OrcamentoSINAPI = {
     }
   },
 
-  criarOrcamentoComItem(codigo) {
+  async criarOrcamentoComItem(codigo) {
     if (!this._ensurePlanAccess()) return;
-    const uf = this._defaultUF();
-    const item = (typeof SINAPI !== 'undefined') ? SINAPI.buscar(codigo, true, 1, uf, '2026-08')[0] : null;
+    const uf = this._catState?.uf || this._ufOrcamento();
+    const desonerado = !!this._catState?.desonerado;
+    const referencia = this._refAtual();
+    const item = await this._itemDaBase(codigo, desonerado, uf, referencia);
     if (!item) {
-      Utils.toast('Item não localizado na base SINAPI.', 'error');
+      Utils.toast('Item não localizado na tabela SINAPI.', 'error');
       return;
     }
+    if (this._semPreco(item)) return this._avisoSemPreco(item);
     const orcs = this._getAll();
     if (orcs.length > 0) {
       this.promptAdicionarItem(codigo);
@@ -2292,9 +2347,9 @@ const OrcamentoSINAPI = {
         numero: '0001',
         nome: 'Orçamento SINAPI - ' + (item.descricao.slice(0, 30)) + '...',
         obra_id: (typeof App !== 'undefined' && App.obraId !== 'todas') ? App.obraId : '',
-        uf: uf,
-        referencia_sinapi: '2026-08',
-        desonerado: true,
+        uf,
+        referencia_sinapi: referencia,
+        desonerado,
         bdi: this.BDI_PADRAO,
         status: 'ativo',
         itens: [{
@@ -2305,27 +2360,28 @@ const OrcamentoSINAPI = {
           descricao: item.descricao,
           unidade: item.unidade,
           quantidade: 1,
-          preco_unitario: item.preco_unitario,
+          preco_unitario: Number(item.preco_unitario),
           banco: 'SINAPI',
           etapa_id: 'geral',
           etapa_nome: 'Serviços Gerais'
         }]
       };
-      this._save(novo);
+      this._add(novo);
       Utils.toast(`Orçamento criado com o item ${codigo}!`, 'success');
       this.openEditor(novoId);
     }
   },
 
-  promptAdicionarItem(codigo) {
-    const u = this._catState?.uf || this._defaultUF();
+  async promptAdicionarItem(codigo) {
+    const u = this._catState?.uf || this._ufOrcamento();
     const d = !!this._catState?.desonerado;
-    const r = this._catState?.referencia || '2026-08';
-    const item = (typeof SINAPI !== 'undefined') ? SINAPI.buscar(codigo, d, 1, u, r)[0] : null;
+    const r = this._catState?.referencia || this._refAtual();
+    const item = await this._itemDaBase(codigo, d, u, r);
     if (!item) {
-      Utils.toast('Item não localizado na base SINAPI.', 'error');
+      Utils.toast('Item não localizado na tabela SINAPI.', 'error');
       return;
     }
+    if (this._semPreco(item)) return this._avisoSemPreco(item);
 
     const orcs = this._getAll();
     if (!orcs.length) {
@@ -2352,10 +2408,11 @@ const OrcamentoSINAPI = {
           </div>
 
           <form id="f-add-item-orc" data-fb-submit="Patch26Actions.prevent">
+            <p style="font-size:.78rem;color:var(--text3);margin:0 0 10px;">O preço gravado é o da tabela do orçamento de destino (UF e regime dele).</p>
             <div class="form-group" style="margin-bottom:12px;">
               <label style="font-weight:700;font-size:.82rem;color:var(--text2);display:block;margin-bottom:4px;">Selecione o Orçamento de Destino:</label>
               <select id="add-item-orc-id" class="form-control" style="font-weight:600;">
-                ${orcs.map(o => `<option value="${e(o.id)}">${e(o.nome)} (${e(o.uf||'SP')})</option>`).join('')}
+                ${orcs.map(o => `<option value="${e(o.id)}">${e(o.nome)} (${e(this._baseLabel(o))})</option>`).join('')}
               </select>
             </div>
 
@@ -2381,7 +2438,7 @@ const OrcamentoSINAPI = {
     `);
   },
 
-  confirmarAdicionarItem(codigo) {
+  async confirmarAdicionarItem(codigo) {
     const orcId = document.getElementById('add-item-orc-id')?.value;
     const qtd = parseFloat(document.getElementById('add-item-qtd')?.value || '1') || 1;
     const etapa = document.getElementById('add-item-etapa')?.value || '1 - SERVIÇOS GERAIS';
@@ -2389,14 +2446,20 @@ const OrcamentoSINAPI = {
 
     const orc = this._getById(orcId);
     if (!orc) return;
+    if (!this._baseDisponivel(orc)) {
+      Utils.toast(`O orçamento "${orc.nome}" usa uma tabela SINAPI indisponível. Abra-o e atualize para ${typeof SINAPI !== 'undefined' ? SINAPI.refLabel() : 'a competência atual'}.`, 'warning');
+      return;
+    }
 
-    const u = this._catState?.uf || orc.uf || 'SP';
-    const d = !!orc.desonerado;
-    const r = orc.referencia_sinapi || '2026-08';
-    const item = (typeof SINAPI !== 'undefined') ? SINAPI.buscar(codigo, d, 1, u, r)[0] : null;
-    if (!item) return;
+    // Preço sempre da tabela do orçamento de destino (UF, competência e regime dele).
+    const item = await this._itemDaBase(codigo, !!orc.desonerado, orc.uf, orc.referencia_sinapi);
+    if (!item) {
+      Utils.toast(`O item ${codigo} não existe na tabela SINAPI ${orc.uf} do orçamento.`, 'error');
+      return;
+    }
+    if (this._semPreco(item)) return this._avisoSemPreco(item);
 
-    const bdi = Number(orc.bdi || 0);
+    const bdi = this._bdiDe(orc);
     const precoUnit = Number(item.preco_unitario) || 0;
     const precoBdi = precoUnit * (1 + bdi / 100);
 

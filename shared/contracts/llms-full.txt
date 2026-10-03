@@ -12,7 +12,7 @@
 O FinGo é uma solução B2B desenvolvida para empresas da construção civil no Brasil (construtoras, incorporadoras, empreiteiras, engenheiros civis e arquitetos). O sistema combina gestão financeira especializada, custos de engenharia e controle operacional de prazos em uma única plataforma multitenant.
 
 ### Diferenciais Centrais:
-- **SINAPI Integrado**: Integração analítica e sintética com tabelas oficiais da Caixa Econômica Federal e IBGE (regimes Desonerado e Não Desonerado, encargos sociais e fórmulas de BDI diferenciado).
+- **SINAPI Integrado**: Integração analítica e sintética com tabelas oficiais da Caixa Econômica Federal e IBGE (regimes Desonerado e Não Desonerado, e BDI pela fórmula do TCU).
 - **Workflow & SLAs em Cascata**: Motor de cronograma inteligente em que a conclusão de etapas predecessoras dispara automaticamente o início de fases sucessoras, recalculando a data final de entrega da obra.
 - **Notificações Ativas WhatsApp**: Comunicação automatizada via Baileys API para cobrança amigável de etapas atrasadas, avisos de início de fase e envio de resumos executivos.
 - **Monitoramento Fiscal SEFAZ**: Busca e download em tempo real de XMLs de NF-e emitidas contra o CNPJ da construtora usando Certificado Digital A1 mTLS.

@@ -84,33 +84,70 @@ assert.equal(budgets._matchesGridFilter({descricao:'Execução de fundação',et
 assert.equal(budgets._matchesGridFilter({codigo_sinapi:'98458'}, '98458'),true);
 assert.equal(budgets._matchesGridFilter({descricao:'Concreto'}, 'zzznomatch'),false);
 assert.equal(budgets._matchesGridFilter({descricao:'Concreto'}, ''),true);
-budgets._add({id:'orc-a',obra_id:'obra-a',uf:'AM',referencia_sinapi:'2026-07',desonerado:false,itens:[],bdi:0});
-sinapi._saveBase({composicoes:[{codigo:'98458',descricao:'Tapume',unidade:'M2',preco_unitario:999}]},false,'AM','2026-07');
+const banks = r.load('js/orcamento_bancos.js','OrcamentoBancos');
+const toasts = [];
+r.context.Utils.toast = (msg, kind) => toasts.push({ msg, kind });
+// Base SP da competência atual em memória (o arquivo oficial é servido pelo /data no navegador).
+assert.equal(sinapi.REFERENCIA_ATUAL,'2026-08');
+assert.deepEqual(plain(sinapi.UFS_DISPONIVEIS),['SP','SC','RR']);
+sinapi._saveBase({composicoes:[
+  {codigo:'98458',tipo:'COMP',descricao:'Tapume',unidade:'M2',preco_unitario:999},
+  {codigo:'107344',tipo:'COMP',descricao:'Alvenaria estrutural sem preço na UF',unidade:'M2',preco_unitario:0}
+]},false,'SP','2026-08');
+budgets._add({id:'orc-a',obra_id:'obra-a',uf:'SP',referencia_sinapi:'2026-08',desonerado:false,itens:[],bdi:0});
 r.nodes.set('sinapi-quick-dropdown',{style:{},innerHTML:''});
 budgets._onQuickSearchInput('orc-a','98458');
 assert.equal(budgets._lastSearchResults[0].preco_unitario,999);
 budgets._onQuickSearchInput('orc-a','sem-resultados');
 budgets._onQuickSearchKeyDown({key:'Enter',preventDefault(){}},'orc-a');
 assert.equal(budgets._getById('orc-a').itens.length,0);
+// Item sem preço na tabela da UF não entra no orçamento.
+budgets._onQuickSearchInput('orc-a','107344');
+assert.match(r.nodes.get('sinapi-quick-dropdown').innerHTML,/Sem preço nesta UF/);
+budgets._onQuickSearchKeyDown({key:'Enter',preventDefault(){}},'orc-a');
+assert.equal(budgets._getById('orc-a').itens.length,0,'Item com preço zero não é inserido');
+assert.ok(toasts.some(t => /não tem preço/.test(t.msg)));
 const budget = budgets._getById('orc-a');
 budget.bancos_config = {bancos:[{id:'sinapi',checked:false}]}; budgets._save(budget);
 budgets._onQuickSearchInput('orc-a','98458');
 assert.equal(budgets._lastSearchResults.length,0,'Banco desmarcado não participa da pesquisa');
-budget.bancos_config.bancos[0].checked = true; budget.uf = 'SP'; budgets._save(budget);
+budget.bancos_config.bancos[0].checked = true; budget.uf = 'SC'; budgets._save(budget);
 budgets._onQuickSearchInput('orc-a','98458');
 assert.equal(budgets._lastSearchResults.length,0,'A pesquisa não usa preços de outra UF');
+// UF sem tabela: mensagem clara e nenhuma tentativa de carregar outra base.
+budget.uf = 'AM'; budgets._save(budget);
+budgets._onQuickSearchInput('orc-a','98458');
+assert.match(r.nodes.get('sinapi-quick-dropdown').innerHTML,/Não há tabela SINAPI para AM 08\/2026/);
+assert.equal(sinapi.hasBase(false,'AM','2026-08'),false);
+assert.equal(await sinapi.ensureBaseLoaded(false,'AM','2026-08'),null,'Sem tabela da UF, não troca por SP');
+assert.equal(await sinapi.ensureBaseLoaded(false,'SP','2026-07'),null,'Sem tabela da competência, não troca pela atual');
+assert.equal(sinapi.getBase(false,'SP','2026-08').composicoes.length,2,'A base SP continua intacta');
 assert.equal(typeof budgets.showImportModal,'function');
-assert.equal(typeof budgets.executarImport,'function');
-// Salvar e editar devem preservar zero e chamar o callback correto do diálogo.
+// Salvar: só UF com tabela e sempre a competência atual; preserva BDI zero.
 r.context.FormData = class {
-  *[Symbol.iterator]() { yield* Object.entries({obra_id:'obra-a',nome:'Orçamento',uf:'AM',referencia_sinapi:'2026-07',bdi:'0',desonerado:'false',status:'ativo'}); }
+  *[Symbol.iterator]() { yield* Object.entries(globalThis.formSinapi); }
 };
 r.nodes.set('f-sinapi-orc',{checkValidity:() => true});
 r.context.Utils.closeModal = () => {};
 budgets._refresh = () => {};
 budgets.openEditor = () => {};
+globalThis.formSinapi = {obra_id:'obra-a',nome:'Orçamento',uf:'AM',referencia_sinapi:'2026-07',bdi:'0',desonerado:'false',status:'ativo'};
 budgets.save('orc-a');
-assert.equal(budgets._getById('orc-a').bdi,0);
+assert.equal(budgets._getById('orc-a').uf,'AM','UF sem tabela é recusada');
+assert.ok(toasts.some(t => /Escolha uma UF com tabela SINAPI/.test(t.msg)));
+// Orçamento antigo (outra competência) é levado para a atual e reprecificado ao salvar.
+const antigo = budgets._getById('orc-a');
+antigo.uf = 'RR'; antigo.referencia_sinapi = '2024-12';
+antigo.itens = [{id:'i1',codigo:'98458',banco:'SINAPI',quantidade:2,preco_unitario:50}];
+budgets._save(antigo);
+globalThis.formSinapi = {obra_id:'obra-a',nome:'Orçamento',uf:'SP',referencia_sinapi:'2024-12',bdi:'0',desonerado:'false',status:'ativo'};
+budgets.save('orc-a');
+await new Promise(resolve => setTimeout(resolve, 0));
+const salvo = budgets._getById('orc-a');
+assert.equal(salvo.bdi,0);
+assert.equal(salvo.uf,'SP');
+assert.equal(salvo.referencia_sinapi,'2026-08','Salvar usa sempre a competência atual');
+assert.equal(salvo.itens[0].preco_unitario,999,'Preços atualizados pela nova base ao salvar');
 r.context.Utils.prompt = (_title,callback) => { assert.equal(typeof callback,'function'); callback('Estrutura'); };
 budgets.incluirEtapa('orc-a');
 assert.ok(budgets._getById('orc-a').etapas.includes('Estrutura'));
@@ -118,13 +155,15 @@ r.context.Utils.prompt = (_title,callback) => { assert.equal(typeof callback,'fu
 budgets.editarParametro('orc-a','bdi');
 assert.equal(budgets._getById('orc-a').bdi,10);
 
-const banks = r.load('js/orcamento_bancos.js','OrcamentoBancos');
 const updatedBudget = budgets._getById('orc-a');
-updatedBudget.itens = [{codigo:'98458',banco:'SINAPI',quantidade:0,preco_unitario:85.4}];
+updatedBudget.itens = [{codigo:'98458',banco:'SINAPI',quantidade:0,preco_unitario:85.4},{codigo:'107344',banco:'SINAPI',quantidade:1,preco_unitario:70}];
 const repriced = banks._recalcularItensDoOrcamento(updatedBudget);
 assert.equal(repriced.updated,1);
+assert.equal(repriced.missing,1,'Preço zero na tabela conta como pendente');
 assert.equal(updatedBudget.itens[0].preco_unitario,999);
 assert.equal(updatedBudget.itens[0].total,0);
+assert.equal(updatedBudget.itens[1].preco_unitario,70,'Valor anterior preservado quando a tabela não tem preço');
+assert.equal(updatedBudget.itens[1].preco_pendente,true);
 assert.deepEqual(plain(budgets.calcularTotais({bdi:10,itens:[{quantidade:1,preco_unitario:999,total:1098.9}]})),{subtotal:999,bdi:10,valorBDI:99.9,totalGeral:1098.9},'BDI é aplicado uma vez, sem usar o total já majorado');
 assert.equal(budgets.calcularTotais({bdi:0,itens:[{quantidade:2,preco_unitario:12.5}]}).totalGeral,25);
 assert.equal(budgets.calcularTotais({bdi:10,itens:[{quantidade:3,preco_unitario:0.05}]}).totalGeral,0.18,'O total acompanha o arredondamento do preço com BDI exibido nas linhas');
@@ -136,7 +175,7 @@ portal._activeBundle = {ctr:[{id:'contract',ass:false}]};
 portal.assinarDocumentoCliente('contract','obra-a');
 assert.equal(signatureCalls,0,'Portal não coleta assinatura sem persistência externa implementada');
 assert.equal(portal._activeBundle.ctr[0].ass,false);
-console.log('✅ Botões e SINAPI: raiz de Pré-Compras, importação disponível, preço da base correta e busca sem resultado antigo.');
+console.log('✅ Botões e SINAPI: raiz de Pré-Compras, base só da UF/competência atual, sem preço zero, reprecificação ao salvar e busca sem resultado antigo.');
 
 const routes = [];
 const backendContext = vm.createContext({

@@ -5,7 +5,7 @@ description: Consulta a composições de custo oficiais SINAPI Caixa/IBGE e orç
 
 # FinGo Skill: Orçamentação Paramétrica & SINAPI
 
-Permite que agentes de IA acessem o catálogo oficial da base SINAPI da Caixa Econômica Federal e IBGE para 27 Unidades Federativas nos regimes desonerado e não desonerado, aplicando BDI diferenciado para materiais e serviços conforme Lei 14.133/2021 e Decreto 7.983/2013.
+Permite que agentes de IA acessem o catálogo oficial da base SINAPI da Caixa Econômica Federal e IBGE de SP, SC e RR (competência mais recente) nos regimes desonerado e não desonerado, aplicando o BDI pela fórmula do TCU conforme Lei 14.133/2021 e Decreto 7.983/2013.
 
 ## Capacidades
 

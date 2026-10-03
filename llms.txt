@@ -27,7 +27,7 @@
 - **Teste gratuito**: 15 dias com os principais recursos liberados, sem cartão de crédito e sem taxa de implantação.
 - **Básico — R$ 119,90/mês**: até 3 obras ativas e 1 usuário. Dashboard, obras e clientes, financeiro, fornecedores, produtos, recibos, medições, relatórios, contas bancárias e WhatsApp.
 - **Profissional — R$ 279,90/mês**: até 10 obras ativas e 2 usuários. Tudo do Básico, mais pré-compras, contratos, NF-e, orçamentos, documentos, assinatura eletrônica e OCR de notas fiscais. Suporte prioritário.
-- **Construtora Ilimitado — R$ 499,90/mês**: obras ilimitadas e 5 usuários. Tudo do Profissional, mais base oficial SINAPI dos 27 estados (desonerado e não desonerado), engenharia avançada, BDI diferenciado e permissões por usuário. Suporte prioritário/VIP.
+- **Construtora Ilimitado — R$ 499,90/mês**: obras ilimitadas e 5 usuários. Tudo do Profissional, mais tabelas oficiais SINAPI da Caixa de SP, SC e RR (desonerado e não desonerado, competência mais recente), engenharia avançada e permissões por usuário. Suporte prioritário/VIP.
 - Ciclos com desconto: trimestral, semestral e anual (no anual, 12 meses pelo preço de 10).
 
 ## O que o sistema faz

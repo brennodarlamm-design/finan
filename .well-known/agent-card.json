@@ -69,11 +69,11 @@
     {
       "id": "sinapi-budgeting",
       "name": "Orçamentação Paramétrica e SINAPI",
-      "description": "Consultas a tabelas oficiais Caixa/IBGE SINAPI para 27 estados (desonerado e não-desonerado) e composição de BDI.",
+      "description": "Consultas a tabelas oficiais Caixa/IBGE SINAPI de SP, SC e RR (desonerado e não-desonerado) e composição de BDI.",
       "tags": ["sinapi", "orcamento", "bdi", "engenharia"],
       "examples": [
         "Buscar composição de alvenaria de bloco cerâmico em SP",
-        "Calcular BDI diferenciado para licitação"
+        "Calcular BDI pela fórmula do TCU para licitação"
       ]
     },
     {
