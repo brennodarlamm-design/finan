@@ -27,6 +27,17 @@ function upstreamOrigin(env) {
   return url.origin;
 }
 
+function backendOrigin(env) {
+  const custom = env.RENDER_BACKEND_URL || env.FINOBRA_BACKEND_URL;
+  if (custom) {
+    try { return new URL(custom).origin; } catch {}
+  }
+  if (env.RENDER_HEALTH_URL) {
+    try { return new URL(env.RENDER_HEALTH_URL).origin; } catch {}
+  }
+  return upstreamOrigin(env);
+}
+
 function canonicalOrigin(env) {
   const raw = String(env.FINOBRA_CANONICAL_ORIGIN || DEFAULT_CANONICAL_ORIGIN).trim();
   const url = new URL(raw);
@@ -1377,7 +1388,7 @@ async function healthResponse(request, env) {
   });
 }
 
-async function proxyApi(request, env) {
+async function proxyApi(request, env, options = {}) {
   const method = String(request.method || 'GET').toUpperCase();
 
   if (!SAFE_METHODS.has(method) && !sameOriginBrowserRequest(request)) {
@@ -1389,7 +1400,7 @@ async function proxyApi(request, env) {
   let apiOrigin;
   try {
     incoming = new URL(request.url);
-    apiOrigin = upstreamOrigin(env);
+    apiOrigin = options.targetOrigin || backendOrigin(env);
 
     if (apiOrigin === incoming.origin) {
       console.error('[FinObra Cloudflare] API upstream loop detected:', apiOrigin);
@@ -1423,11 +1434,13 @@ async function proxyApi(request, env) {
     if (clientIp) headers.set('X-FinGo-Client-IP', clientIp);
   }
 
+  const isHeavyVerify = incoming.pathname === '/api/assinaturas' && incoming.searchParams.get('action') === 'verificar_pdf';
+  const timeoutMs = isHeavyVerify ? 90000 : Number(options.timeoutMs || env.FINOBRA_UPSTREAM_TIMEOUT_MS || 20000);
   const init = {
     method,
     headers,
     redirect: 'manual',
-    signal: AbortSignal.timeout(Number(env.FINOBRA_UPSTREAM_TIMEOUT_MS || 20000))
+    signal: AbortSignal.timeout(timeoutMs)
   };
 
   if (!['GET', 'HEAD'].includes(method)) {
@@ -1481,7 +1494,7 @@ async function proxyApi(request, env) {
 
 async function handleApi(request, env) {
   try {
-    // Verificação de assinaturas em PDF (cadeia ICP-Brasil/Gov.br + LCR) roda no backend Node:
+    // Verificação de assinaturas em PDF (cadeia ICP-Brasil/Gov.br + LCR) roda no backend Node (Render):
     // o custo de CPU passa do limite do plano gratuito do Workers.
     const apiUrl = new URL(request.url);
     if (apiUrl.pathname === '/api/assinaturas' && apiUrl.searchParams.get('action') === 'verificar_pdf' && env.FINOBRA_API_ORIGIN) {

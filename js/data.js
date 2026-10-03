@@ -444,7 +444,8 @@ const DB = {
         this._ck('finobra_snapshot_seguranca'),
         this._ck('finobra_backup_temp'),
         'sinapi_itens_cache',
-        this._ck('finobra_ofximports_cache')
+        this._ck('finobra_ofximports_cache'),
+        this._ck('finobra_ocr_historico')
       ];
       heavyKeys.forEach(k => {
         try { localStorage.removeItem(k); } catch {}
@@ -454,44 +455,60 @@ const DB = {
       const docsKey = this._ck('finobra_documentos');
       const docsRaw = localStorage.getItem(docsKey);
       if (docsRaw) {
-        const docs = JSON.parse(docsRaw);
-        if (Array.isArray(docs)) {
-          const lightDocs = docs.map(d => {
-            const { data_base64, base64_data, base64, conteudo_base64, ...rest } = d;
-            return rest;
-          });
-          localStorage.setItem(docsKey, JSON.stringify(lightDocs));
-        }
+        try {
+          const docs = JSON.parse(docsRaw);
+          if (Array.isArray(docs)) {
+            const lightDocs = docs.map(d => {
+              const { data_base64, base64_data, base64, conteudo_base64, ...rest } = d;
+              return rest;
+            });
+            localStorage.removeItem(docsKey);
+            localStorage.setItem(docsKey, JSON.stringify(lightDocs));
+          }
+        } catch {}
       }
 
-      // 3. Remove base64 de anexos em fases de obras (Patch 43)
+      // 3. Remove base64 de anexos em fases de obras (Patch 43) e caches diversos
       if (typeof localStorage !== 'undefined' && typeof localStorage.key === 'function') {
+        const toClean = [];
         for (let i = 0; i < (localStorage.length || 0); i++) {
           const k = localStorage.key(i);
-          if (k && k.includes('fases_doc')) {
-            try {
-              const val = JSON.parse(localStorage.getItem(k) || '{}');
-              let modified = false;
-              for (const fk of Object.keys(val || {})) {
-                if (Array.isArray(val[fk])) {
-                  val[fk] = val[fk].map(doc => {
-                    if (Array.isArray(doc.arquivos)) {
-                      doc.arquivos = doc.arquivos.map(a => {
-                        if (a && (a.base64 || a.data_base64)) {
-                          modified = true;
-                          const { base64, data_base64, ...cleanA } = a;
-                          return cleanA;
-                        }
-                        return a;
-                      });
-                    }
-                    return doc;
-                  });
-                }
-              }
-              if (modified) localStorage.setItem(k, JSON.stringify(val));
-            } catch {}
+          if (k && (k.includes('fases_doc') || k.includes('documento_conteudo') || k.includes('_cache'))) {
+            toClean.push(k);
           }
+        }
+        for (const k of toClean) {
+          try {
+            if (k.includes('_cache')) {
+              localStorage.removeItem(k);
+              continue;
+            }
+            const rawVal = localStorage.getItem(k);
+            if (!rawVal) continue;
+            const val = JSON.parse(rawVal || '{}');
+            let modified = false;
+            for (const fk of Object.keys(val || {})) {
+              if (Array.isArray(val[fk])) {
+                val[fk] = val[fk].map(doc => {
+                  if (Array.isArray(doc.arquivos)) {
+                    doc.arquivos = doc.arquivos.map(a => {
+                      if (a && (a.base64 || a.data_base64)) {
+                        modified = true;
+                        const { base64, data_base64, ...cleanA } = a;
+                        return cleanA;
+                      }
+                      return a;
+                    });
+                  }
+                  return doc;
+                });
+              }
+            }
+            if (modified) {
+              localStorage.removeItem(k);
+              localStorage.setItem(k, JSON.stringify(val));
+            }
+          } catch {}
         }
       }
     } catch (err) {
@@ -1604,25 +1621,66 @@ const DB = {
     }
   },
 
+  _sanitizeForLocalStorage(data, depth = 0) {
+    if (!data || depth > 8) return data;
+    if (typeof data !== 'object') return data;
+    if (Array.isArray(data)) {
+      return data.map(item => this._sanitizeForLocalStorage(item, depth + 1));
+    }
+    const clean = {};
+    for (const [k, v] of Object.entries(data)) {
+      if (typeof v === 'string') {
+        const isBlobKey = ['data_base64', 'base64_data', 'base64', 'conteudo_base64', 'arquivo_base64', 'file_base64'].includes(k.toLowerCase());
+        if (isBlobKey && v.length > 256) {
+          clean[k] = null; // expurgado do LocalStorage; mantido intacto no IDBStorage/R2
+          continue;
+        }
+        if (v.length > 32 * 1024) {
+          clean[k] = v.slice(0, 512); // corta payloads gigantes no LocalStorage
+          continue;
+        }
+      } else if (v && typeof v === 'object') {
+        clean[k] = this._sanitizeForLocalStorage(v, depth + 1);
+        continue;
+      }
+      clean[k] = v;
+    }
+    return clean;
+  },
+
   _saveSyncQueue(queue) {
     const normalized = Array.isArray(queue) ? queue : [];
     const key = this._syncQueueKey();
     if (this._memCache) this._memCache.set(key, normalized);
-    if (typeof IDBStorage !== 'undefined' && IDBStorage.setItem) {
+    const idbAvailable = (typeof IDBStorage !== 'undefined' && IDBStorage.setItem);
+    if (idbAvailable) {
       IDBStorage.setItem(key, normalized).catch(() => {});
     }
-    const payload = JSON.stringify(normalized);
-    const persist = () => localStorage.setItem(key, payload);
+    const sanitized = this._sanitizeForLocalStorage(normalized);
+    const payload = JSON.stringify(sanitized);
+    const persist = (dataToSave = payload) => localStorage.setItem(key, dataToSave);
     try {
       persist();
       return true;
     } catch (err) {
-      console.warn('[Sync] Falha ao persistir fila. Liberando cache pesado e tentando novamente:', err);
+      console.warn('[Sync] Falha ao persistir fila no LocalStorage. Liberando cache pesado e tentando novamente:', err);
       if (this.purgeStorage) this.purgeStorage();
       try {
         persist();
         return true;
       } catch (retryErr) {
+        // Tentativa de contingência: salvar apenas os últimos itens sanitizados
+        try {
+          const minimal = JSON.stringify(sanitized.slice(-5));
+          persist(minimal);
+          return true;
+        } catch {}
+
+        if (idbAvailable) {
+          console.info('[Sync] LocalStorage sem espaço livre; fila offline garantida via IndexedDB.');
+          return true;
+        }
+
         console.error('[Sync] Falha crítica ao persistir fila offline:', retryErr);
         this._emitSyncStatus('attention', { storageFailure:true, error:'Fila offline sem espaço para persistência.' });
         return false;
@@ -1660,21 +1718,34 @@ const DB = {
     const normalized = Array.isArray(items) ? items.slice(-200) : [];
     const key = this._syncFailedKey();
     if (this._memCache) this._memCache.set(key, normalized);
-    if (typeof IDBStorage !== 'undefined' && IDBStorage.setItem) {
+    const idbAvailable = (typeof IDBStorage !== 'undefined' && IDBStorage.setItem);
+    if (idbAvailable) {
       IDBStorage.setItem(key, normalized).catch(() => {});
     }
-    const payload = JSON.stringify(normalized);
-    const persist = () => localStorage.setItem(key, payload);
+    const sanitized = this._sanitizeForLocalStorage(normalized);
+    const payload = JSON.stringify(sanitized);
+    const persist = (dataToSave = payload) => localStorage.setItem(key, dataToSave);
     try {
       persist();
       return true;
     } catch (err) {
-      console.warn('[Sync] Falha ao persistir fila de atenção. Liberando cache pesado e tentando novamente:', err);
+      console.warn('[Sync] Falha ao persistir fila de atenção no LocalStorage. Liberando cache pesado e tentando novamente:', err);
       if (this.purgeStorage) this.purgeStorage();
       try {
         persist();
         return true;
       } catch (retryErr) {
+        try {
+          const minimal = JSON.stringify(sanitized.slice(-5));
+          persist(minimal);
+          return true;
+        } catch {}
+
+        if (idbAvailable) {
+          console.info('[Sync] LocalStorage sem espaço livre; fila de atenção garantida via IndexedDB.');
+          return true;
+        }
+
         console.error('[Sync] Falha crítica ao persistir fila de atenção:', retryErr);
         this._emitSyncStatus('attention', { storageFailure:true, error:'Fila de atenção sem espaço para persistência.' });
         return false;
