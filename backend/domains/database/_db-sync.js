@@ -585,6 +585,7 @@ export async function handleSyncAll(sql, tenantId, auth, req, res, payload) {
         continue;
       }
       try {
+        const cleanBase64 = doc.url ? null : (doc.data_base64 || doc.base64_data || null);
         await sql`
           INSERT INTO documentos (
             id, tenant_id, tipo, referencia_id, titulo, categoria, nome_arquivo,
@@ -594,14 +595,17 @@ export async function handleSyncAll(sql, tenantId, auth, req, res, payload) {
             ${doc.id}, ${tenantId}, ${doc.entidade_tipo || doc.tipo || 'geral'}, ${doc.entidade_id || doc.referencia_id || ''},
             ${doc.titulo || doc.nome_arquivo || 'Documento'}, ${doc.categoria || ''}, ${doc.nome_arquivo || ''},
             ${doc.tipo_mime || doc.tipo_arquivo || 'application/octet-stream'}, ${cleanNum(doc.tamanho || doc.tamanho_bytes)},
-            ${doc.url || null}, ${doc.data_base64 || doc.base64_data || null}, ${doc.criado_em || new Date().toISOString()}
+            ${doc.url || null}, ${cleanBase64}, ${doc.criado_em || new Date().toISOString()}
           )
           ON CONFLICT (id) DO UPDATE SET
             titulo = EXCLUDED.titulo,
             categoria = EXCLUDED.categoria,
             nome_arquivo = EXCLUDED.nome_arquivo,
             url = COALESCE(EXCLUDED.url, documentos.url),
-            base64_data = COALESCE(EXCLUDED.base64_data, documentos.base64_data)
+            base64_data = CASE 
+              WHEN COALESCE(EXCLUDED.url, documentos.url) IS NOT NULL THEN NULL
+              ELSE EXCLUDED.base64_data
+            END
           WHERE documentos.tenant_id = ${tenantId};
         `;
         totalCount++;
