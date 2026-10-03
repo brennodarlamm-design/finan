@@ -1,0 +1,396 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FinGo — Preview do redesign</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..900&family=Inter:wght@400;600;700;900&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --void:#0A0A0A; --ink:#0D0D0D; --deep:#1A1A1A; --shadow:#282828; --stone:#2B2B2B;
+    --acid:#C6FF00; --acid-h:#D4FF33; --purple:#7F49B8; --purple-l:#9B6FD4;
+    --off:#F0F0E8; --silver:#E8E8DC;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:#050505;color:var(--off);font-family:Inter,system-ui,sans-serif;line-height:1.5;padding:40px 16px 80px}
+  .page{max-width:1280px;margin:0 auto}
+  header.top h1{font-family:Archivo,Impact,sans-serif;font-stretch:75%;font-weight:900;text-transform:uppercase;font-size:clamp(2rem,5vw,3.4rem);line-height:.95;letter-spacing:-.01em}
+  header.top h1 span{color:var(--acid)}
+  header.top p{color:#8E8E8E;max-width:680px;margin-top:12px}
+  .section{margin-top:56px}
+  .section-h{display:flex;align-items:baseline;gap:14px;margin-bottom:18px;border-top:2px solid var(--acid);padding-top:14px}
+  .section-h .n{font-family:'JetBrains Mono',monospace;color:var(--acid);font-size:.8rem}
+  .section-h h2{font-family:Archivo,Impact,sans-serif;font-stretch:80%;font-weight:800;text-transform:uppercase;font-size:1.4rem;letter-spacing:.01em}
+  .pair{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+  @media(max-width:980px){.pair{grid-template-columns:1fr}}
+  .tag{display:inline-block;font-family:'JetBrains Mono',monospace;font-size:.7rem;letter-spacing:.12em;text-transform:uppercase;padding:4px 8px;margin-bottom:10px;border:1px solid}
+  .tag.before{color:#FF8A8A;border-color:rgba(255,59,59,.4);background:rgba(255,59,59,.08)}
+  .tag.after{color:var(--acid);border-color:rgba(198,255,0,.4);background:rgba(198,255,0,.08)}
+  .notes{margin-top:10px;font-size:.8rem;color:#8E8E8E;display:grid;gap:4px}
+  .notes li{list-style:none;padding-left:16px;position:relative}
+  .notes li::before{content:"";position:absolute;left:0;top:.6em;width:8px;height:2px;background:currentColor}
+  .notes.bad li::before{background:#FF3B3B}
+  .notes.good li::before{background:var(--acid)}
+  .frame{border:1px solid #222;overflow:hidden;background:var(--ink)}
+
+  /* ================= APP: shared skeleton ================= */
+  .app{display:grid;grid-template-columns:180px 1fr;min-height:430px;font-size:13px}
+  .sb{border-right:1px solid var(--shadow);padding:14px 10px;background:var(--void)}
+  .main{padding:16px 18px;min-width:0}
+  .kpis{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:12px 0 14px}
+  .kpi .v{white-space:nowrap;font-size:clamp(.95rem,1.4vw,1.2rem)!important}
+  table{width:100%;border-collapse:collapse}
+  td,th{padding:8px 8px;text-align:left;white-space:nowrap}
+  .num{text-align:right;font-variant-numeric:tabular-nums}
+
+  /* ================= BEFORE ================= */
+  .b{font-family:Inter,sans-serif}
+  .b .logo{font-weight:900;font-size:1rem;text-transform:uppercase;background:linear-gradient(135deg,#D4FF33,#C6FF00,#7F49B8);-webkit-background-clip:text;background-clip:text;color:transparent;padding:4px 6px 14px}
+  .b .sec{font-size:.58rem;letter-spacing:.12em;text-transform:uppercase;color:#e9ecf0;padding:10px 6px 4px;font-weight:700}
+  .b .ni{padding:8px 6px;color:#E8E8DC;border-radius:10px;display:flex;gap:8px}
+  .b .ni.on{background:linear-gradient(90deg,rgba(198,255,0,.25),transparent);color:var(--acid);border-radius:18px}
+  .b .ht{display:flex;justify-content:space-between;align-items:center}
+  .b .ht h3{font-size:1.1rem;font-weight:800}
+  .b .ht small{color:#e9ecf0;display:block;font-size:.72rem}
+  .b .btn{background:linear-gradient(135deg,#C6FF00,#D4FF33);color:#0A0A0A;font-weight:700;padding:8px 12px;border-radius:20px;font-size:.78rem}
+  .b .kpi{background:#1A1A1A;border:1px solid #282828;border-radius:14px;padding:12px;position:relative}
+  .b .kpi .l{font-size:.6rem;text-transform:uppercase;letter-spacing:.07em;color:#e9ecf0;font-weight:700}
+  .b .kpi .v{font-size:1.25rem;font-weight:700;color:#F0F0E8;margin-top:6px}
+  .b .kpi .c{font-size:.7rem;color:#e9ecf0}
+  .b .kpi .e{position:absolute;right:10px;top:8px;font-size:1rem}
+  .b .search{display:flex;gap:8px;margin-bottom:10px}
+  .b .search div{flex:1;background:#1A1A1A;border:1px solid #3D3D3D;border-radius:6px;padding:7px 10px;color:#e9ecf0}
+  .b table{background:#1A1A1A;border:1px solid #282828;border-radius:10px;overflow:hidden}
+  .b th{font-size:.6rem;text-transform:uppercase;color:#e9ecf0;letter-spacing:.07em;background:#0D0D0D}
+  .b td{border-top:1px solid #282828;color:#F0F0E8}
+  .b td .sub{color:#e9ecf0;font-size:.7rem}
+  .b .bd{font-size:.68rem;font-weight:700;padding:2px 8px;border-radius:999px}
+  .b .bd.ok{background:rgba(198,255,0,.1);color:#C6FF00}
+  .b .bd.info{background:rgba(127,73,184,.1);color:#7F49B8}
+  .b .bd.warn{background:rgba(255,184,0,.1);color:#FFB800}
+
+  /* ================= AFTER ================= */
+  .a{
+    --bg:#0D0D0D; --card:#1A1A1A; --line:#282828; --line-input:#6A6A6A;
+    --t1:#F0F0E8; --t2:#E8E8DC; --t3:#8E8E8E;
+    --brand:#C6FF00; --success:#3DDC84; --warn:#FFB800; --danger:#FF3B3B; --info-t:#9B6FD4;
+    --r:4px; --r-md:6px; --ease:cubic-bezier(.4,0,.6,1);
+    font-family:Inter,sans-serif;background:var(--bg)
+  }
+  .a .disp{font-family:Archivo,Impact,sans-serif;font-stretch:75%;text-transform:uppercase;letter-spacing:-.005em}
+  .a .logo{display:flex;align-items:center;gap:8px;padding:4px 6px 16px}
+  .a .logo b{font-family:Archivo,sans-serif;font-stretch:80%;font-weight:900;font-size:1.05rem;letter-spacing:.02em;text-transform:uppercase}
+  .a .logo b i{font-style:normal;color:var(--brand)}
+  .a .mark{width:22px;height:22px;background:var(--brand);clip-path:polygon(0 0,100% 0,100% 30%,40% 30%,40% 45%,85% 45%,85% 70%,40% 70%,40% 100%,0 100%)}
+  .a .sec{font-size:.68rem;letter-spacing:.12em;text-transform:uppercase;color:var(--t3);padding:12px 6px 4px;font-weight:700}
+  .a .ni{padding:8px 6px;color:var(--t2);display:flex;align-items:center;gap:9px;border-left:3px solid transparent;transition:background-color 150ms var(--ease),color 150ms var(--ease)}
+  .a .ni svg{width:16px;height:16px;flex:none;stroke:currentColor;fill:none;stroke-width:1.75;stroke-linecap:square}
+  .a .ni:hover{background:rgba(255,255,255,.03);color:var(--t1)}
+  .a .ni.on{background:rgba(198,255,0,.06);color:var(--brand);border-left-color:var(--brand)}
+  .a .ht{display:flex;justify-content:space-between;align-items:flex-end;padding-bottom:12px;border-bottom:1px solid var(--line)}
+  .a .ht h3{font-family:Archivo,sans-serif;font-stretch:75%;font-weight:900;font-size:1.45rem;text-transform:uppercase;line-height:1}
+  .a .ht small{color:var(--t3);display:block;font-size:.75rem;margin-top:4px}
+  .a .btn{background:var(--brand);color:#0A0A0A;font-weight:700;padding:9px 14px;border-radius:var(--r);font-size:.75rem;text-transform:uppercase;letter-spacing:.05em;transition:transform 150ms var(--ease),box-shadow 150ms var(--ease)}
+  .a .btn:hover{transform:translateY(-2px);box-shadow:0 4px 20px rgba(198,255,0,.3)}
+  .a .kpi{background:var(--card);border:1px solid var(--line);border-radius:var(--r-md);padding:12px 12px 11px;border-top:2px solid var(--line)}
+  .a .kpi.hl{border-top-color:var(--brand)}
+  .a .kpi .l{font-size:.68rem;text-transform:uppercase;letter-spacing:.08em;color:var(--t3);font-weight:700}
+  .a .kpi .v{font-family:'JetBrains Mono',monospace;font-size:1.2rem;font-weight:600;color:var(--t1);margin-top:6px;letter-spacing:-.02em}
+  .a .kpi .c{font-size:.72rem;color:var(--t3);display:flex;gap:6px;align-items:center;margin-top:2px}
+  .a .up{color:var(--success)} .a .dn{color:var(--danger)}
+  .a .search{display:flex;gap:8px;margin-bottom:10px}
+  .a .search div{flex:1;background:var(--card);border:1px solid var(--line-input);border-radius:var(--r);padding:7px 10px;color:var(--t3);display:flex;gap:8px;align-items:center}
+  .a .search svg{width:14px;height:14px;stroke:currentColor;fill:none;stroke-width:1.75}
+  .a .search .f{flex:none;color:var(--t2)}
+  .a table{background:var(--card);border:1px solid var(--line);border-radius:var(--r-md)}
+  .a th{font-size:.68rem;text-transform:uppercase;color:var(--t3);letter-spacing:.08em;font-weight:700;border-bottom:1px solid var(--line)}
+  .a td{border-top:1px solid var(--line);color:var(--t1)}
+  .a td .sub{color:var(--t3);font-size:.72rem}
+  .a td,.a th{padding:8px 6px}
+  .a table{font-size:12px}
+  .a .bd{letter-spacing:.03em!important;padding:2px 5px!important}
+  .a .money{font-family:'JetBrains Mono',monospace;font-size:.8rem}
+  .a .bd{font-size:.66rem;font-weight:700;padding:2px 7px;border-radius:var(--r);text-transform:uppercase;letter-spacing:.05em;border:1px solid;display:inline-flex;align-items:center;gap:5px}
+  .a .bd::before{content:"";width:6px;height:6px;background:currentColor}
+  .a .bd.ok{color:var(--success);border-color:rgba(61,220,132,.3);background:rgba(61,220,132,.08)}
+  .a .bd.info{color:var(--info-t);border-color:rgba(127,73,184,.35);background:rgba(127,73,184,.1)}
+  .a .bd.warn{color:var(--warn);border-color:rgba(255,184,0,.3);background:rgba(255,184,0,.08)}
+
+  @media(max-width:620px){
+    .app{grid-template-columns:1fr}
+    .sb{display:none}
+    .kpis{grid-template-columns:1fr 1fr}
+    .hide-sm{display:none}
+  }
+
+  /* ================= PHONE (login) ================= */
+  .phones{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+  @media(max-width:760px){.phones{grid-template-columns:1fr}}
+  .phone{width:300px;max-width:100%;height:560px;margin:0 auto;border:8px solid #1d1d1d;border-radius:30px;overflow:hidden;position:relative;background:var(--void)}
+  .lg{padding:22px 18px}
+  .lg .brand{display:flex;gap:8px;align-items:center;margin-bottom:26px}
+  .lg h4{font-size:1.2rem;font-weight:800;margin-bottom:4px}
+  .lg p.s{font-size:.78rem;margin-bottom:18px}
+  .lg label{display:block;font-size:.72rem;font-weight:600;margin:12px 0 6px}
+  .lg .in{border-radius:4px;padding:11px 12px;font-size:.82rem}
+  .lg .go{margin-top:18px;text-align:center;font-weight:700;padding:12px;border-radius:4px;background:var(--acid);color:#0A0A0A;font-size:.82rem}
+  .lg .alt{text-align:center;font-size:.75rem;margin-top:14px}
+  /* before */
+  .pb .brand b{font-weight:900;background:linear-gradient(135deg,#D4FF33,#7F49B8);-webkit-background-clip:text;background-clip:text;color:transparent}
+  .pb p.s,.pb .alt{color:#e9ecf0} .pb label{color:#E8E8DC}
+  .pb .in{background:#1A1A1A;border:1px solid #3D3D3D;color:#e9ecf0}
+  .pb .go{border-radius:20px}
+  .cookie{position:absolute;left:10px;right:10px;bottom:10px;background:#141a06;border:1px solid rgba(198,255,0,.4);border-radius:14px;padding:14px;font-size:.72rem;color:#E8E8DC;box-shadow:0 -10px 40px rgba(0,0,0,.8)}
+  .cookie b{display:block;font-size:.85rem;margin:6px 0}
+  .cookie .pill{display:inline-block;background:rgba(127,73,184,.2);color:#7F49B8;font-weight:700;font-size:.6rem;padding:2px 6px;border-radius:4px}
+  .cookie .acc{margin-top:12px;background:var(--acid);color:#0A0A0A;text-align:center;font-weight:800;padding:11px;border-radius:8px;font-size:.8rem}
+  .cookie .more{margin-top:8px;text-align:center;border:1px solid #3D3D3D;border-radius:8px;padding:9px}
+  /* after */
+  .pa .brand b{font-family:Archivo,sans-serif;font-stretch:80%;font-weight:900;text-transform:uppercase;letter-spacing:.02em}
+  .pa .brand b i{font-style:normal;color:var(--acid)}
+  .pa h4{font-family:Archivo,sans-serif;font-stretch:75%;font-weight:900;text-transform:uppercase;font-size:1.6rem;line-height:1}
+  .pa p.s,.pa .alt{color:#8E8E8E} .pa label{color:#E8E8DC}
+  .pa .in{background:#1A1A1A;border:1px solid #6A6A6A;color:#8E8E8E}
+  .pa .in.f{border-color:var(--acid);box-shadow:0 0 0 2px rgba(198,255,0,.15);color:#F0F0E8}
+  .pa .go{text-transform:uppercase;letter-spacing:.05em}
+  .pa .alt a{color:var(--acid)}
+  .cbar{position:absolute;left:0;right:0;bottom:0;background:#141414;border-top:1px solid #282828;padding:10px 14px;font-size:.68rem;color:#8E8E8E;display:flex;gap:10px;align-items:center}
+  .cbar span{flex:1}
+  .cbar a{color:#E8E8DC;text-decoration:underline}
+  .cbar .ok{border:1px solid #6A6A6A;color:#E8E8DC;padding:6px 10px;border-radius:4px;font-weight:600;white-space:nowrap}
+
+  /* ================= TOKENS ================= */
+  .tok{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:12px}
+  .tc{border:1px solid #222;background:var(--ink);padding:14px}
+  .tc h5{font-family:'JetBrains Mono',monospace;font-size:.75rem;color:var(--silver);font-weight:600;margin-bottom:10px}
+  .sw{display:flex;align-items:center;gap:10px;font-size:.78rem;margin-top:6px}
+  .sw i{width:34px;height:22px;flex:none;border:1px solid #333}
+  .sw .x{color:#FF8A8A;text-decoration:line-through}
+  .sw .ok{color:var(--acid)}
+  .sw small{color:#8E8E8E;font-family:'JetBrains Mono',monospace}
+  .sample{margin-top:10px;padding:10px;background:#1A1A1A;font-size:.8rem}
+
+  /* ================= MASTER ================= */
+  .mst{padding:16px;font-size:13px}
+  .mst .bar{display:flex;align-items:center;gap:10px;padding-bottom:12px;border-bottom:1px solid #282828;margin-bottom:12px}
+  .mst .row{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+  .mst .row div{background:#1A1A1A;border:1px solid #282828;padding:10px}
+  .mst .row small{display:block;font-size:.62rem;text-transform:uppercase;letter-spacing:.08em}
+  .mst .row b{font-family:'JetBrains Mono',monospace;font-size:1.05rem}
+  .mb .bar b{color:#C5A059;font-weight:800} .mb .row div{border-radius:12px} .mb small{color:#94a3b8} .mb .row b{color:#cbd5e1}
+  .mb .gbtn{margin-left:auto;background:linear-gradient(135deg,#C5A059,#D4AF37);color:#0A0A0A;padding:6px 12px;border-radius:20px;font-weight:700;font-size:.72rem}
+  .ma .bar b{font-family:Archivo,sans-serif;font-stretch:80%;font-weight:900;text-transform:uppercase}
+  .ma .bar b i{font-style:normal;color:var(--acid)}
+  .ma .mtag{font-family:'JetBrains Mono',monospace;font-size:.62rem;letter-spacing:.14em;color:#E8E8DC;background:#7F49B8;padding:3px 7px}
+  .ma .row div{border-radius:6px} .ma small{color:#8E8E8E} .ma .row b{color:#F0F0E8}
+  .ma .gbtn{margin-left:auto;background:var(--acid);color:#0A0A0A;padding:7px 12px;border-radius:4px;font-weight:700;font-size:.7rem;text-transform:uppercase;letter-spacing:.05em}
+
+  footer{margin-top:56px;color:#8E8E8E;font-size:.78rem;border-top:1px solid #222;padding-top:14px}
+</style>
+</head>
+<body>
+<div class="page">
+
+<header class="top">
+  <h1>FinGo — <span>antes</span> e depois</h1>
+  <p>Preview ilustrativo do plano da auditoria de design (02/10/2026). As telas usam dados fictícios. A fonte de título aqui é Archivo Condensed, como substituta até a Monument Grotesk ser licenciada e hospedada.</p>
+</header>
+
+<!-- ============ 1. WORKSPACE ============ -->
+<section class="section">
+  <div class="section-h"><span class="n">01</span><h2>Painel do app</h2></div>
+  <div class="pair">
+    <div>
+      <span class="tag before">Antes — hoje</span>
+      <div class="frame">
+        <div class="app b">
+          <aside class="sb">
+            <div class="logo">FinGo</div>
+            <div class="sec">Principal</div>
+            <div class="ni on">📊 Início</div>
+            <div class="ni">💰 Financeiro</div>
+            <div class="ni">🏗️ Obras</div>
+            <div class="ni">📋 Medições</div>
+            <div class="sec">Gestão</div>
+            <div class="ni">🧾 Notas fiscais</div>
+            <div class="ni">⚙️ Configurações</div>
+          </aside>
+          <main class="main">
+            <div class="ht"><div><h3>Painel executivo</h3><small>Visão geral das obras ativas</small></div><span class="btn">+ Novo lançamento</span></div>
+            <div class="kpis">
+              <div class="kpi"><span class="e">💵</span><div class="l">Saldo em caixa</div><div class="v">R$ 482.310</div><div class="c">vs mês anterior</div></div>
+              <div class="kpi"><span class="e">📈</span><div class="l">A receber 30d</div><div class="v">R$ 215.900</div><div class="c">12 parcelas</div></div>
+              <div class="kpi"><span class="e">⚠️</span><div class="l">A pagar 30d</div><div class="v">R$ 168.440</div><div class="c">3 vencidas</div></div>
+            </div>
+            <div class="search"><div>Buscar lançamento…</div></div>
+            <table>
+              <thead><tr><th>Descrição</th><th class="hide-sm">Obra</th><th class="num">Valor</th><th>Status</th></tr></thead>
+              <tbody>
+                <tr><td>Concreto usinado<div class="sub">Fornecedor A</div></td><td class="hide-sm">Res. Aurora</td><td class="num">R$ 38.200</td><td><span class="bd ok">Pago</span></td></tr>
+                <tr><td>Medição nº 7<div class="sub">Cliente B</div></td><td class="hide-sm">Ed. Horizonte</td><td class="num">R$ 92.000</td><td><span class="bd info">Em análise</span></td></tr>
+                <tr><td>Aço CA-50<div class="sub">Fornecedor C</div></td><td class="hide-sm">Res. Aurora</td><td class="num">R$ 21.540</td><td><span class="bd warn">Vence hoje</span></td></tr>
+              </tbody>
+            </table>
+          </main>
+        </div>
+      </div>
+      <ul class="notes bad">
+        <li>Texto secundário (#e9ecf0) quase igual ao principal — sem hierarquia</li>
+        <li>"Pago" usa o mesmo verde do botão e da marca</li>
+        <li>"Em análise" roxo #7F49B8: contraste 2,94:1 (reprovado)</li>
+        <li>Emojis como ícones, logo e botão com gradiente, raios de 10–20 px</li>
+        <li>Borda da busca 1,6:1 — campo quase invisível</li>
+      </ul>
+    </div>
+
+    <div>
+      <span class="tag after">Depois — proposta</span>
+      <div class="frame">
+        <div class="app a">
+          <aside class="sb">
+            <div class="logo"><span class="mark"></span><b>Fin<i>Go</i></b></div>
+            <div class="sec">Principal</div>
+            <div class="ni on"><svg viewBox="0 0 24 24"><path d="M3 3h8v8H3zM13 3h8v5h-8zM13 10h8v11h-8zM3 13h8v8H3z"/></svg>Início</div>
+            <div class="ni"><svg viewBox="0 0 24 24"><path d="M3 6h18v12H3z"/><path d="M3 10h18"/><path d="M7 15h4"/></svg>Financeiro</div>
+            <div class="ni"><svg viewBox="0 0 24 24"><path d="M3 21h18"/><path d="M5 21V9l7-5 7 5v12"/><path d="M10 21v-6h4v6"/></svg>Obras</div>
+            <div class="ni"><svg viewBox="0 0 24 24"><path d="M4 20 20 4"/><path d="M4 14l6 6"/><path d="M8 10l2 2M12 6l2 2M14 12l2 2"/></svg>Medições</div>
+            <div class="sec">Gestão</div>
+            <div class="ni"><svg viewBox="0 0 24 24"><path d="M6 3h12v18l-3-2-3 2-3-2-3 2z"/><path d="M9 8h6M9 12h6"/></svg>Notas fiscais</div>
+            <div class="ni"><svg viewBox="0 0 24 24"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><path d="M14 4v6M8 14v6"/></svg>Configurações</div>
+          </aside>
+          <main class="main">
+            <div class="ht"><div><h3>Painel executivo</h3><small>Visão geral das obras ativas · out/2026</small></div><span class="btn">+ Lançamento</span></div>
+            <div class="kpis">
+              <div class="kpi hl"><div class="l">Saldo em caixa</div><div class="v">R$ 482.310</div><div class="c"><span class="up">▲ 8,2%</span> vs set</div></div>
+              <div class="kpi"><div class="l">A receber · 30d</div><div class="v">R$ 215.900</div><div class="c">12 parcelas · meta R$ 240 mil</div></div>
+              <div class="kpi"><div class="l">A pagar · 30d</div><div class="v">R$ 168.440</div><div class="c"><span class="dn">3 vencidas</span></div></div>
+            </div>
+            <div class="search"><div><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="6"/><path d="M20 20l-4.5-4.5"/></svg>Buscar lançamento…</div><div class="f">Filtros</div></div>
+            <table>
+              <thead><tr><th>Descrição</th><th class="hide-sm">Obra</th><th class="num">Valor</th><th>Status</th></tr></thead>
+              <tbody>
+                <tr><td>Concreto usinado<div class="sub">Fornecedor A</div></td><td class="hide-sm">Res. Aurora</td><td class="num money">38.200,00</td><td><span class="bd ok">Pago</span></td></tr>
+                <tr><td>Medição nº 7<div class="sub">Cliente B</div></td><td class="hide-sm">Ed. Horizonte</td><td class="num money">92.000,00</td><td><span class="bd info">Em análise</span></td></tr>
+                <tr><td>Aço CA-50<div class="sub">Fornecedor C</div></td><td class="hide-sm">Res. Aurora</td><td class="num money">21.540,00</td><td><span class="bd warn">Vence hoje</span></td></tr>
+              </tbody>
+            </table>
+          </main>
+        </div>
+      </div>
+      <ul class="notes good">
+        <li>Três níveis de texto claros: #F0F0E8 / #E8E8DC / #8E8E8E</li>
+        <li>Sucesso em verde próprio (#3DDC84); ácido só para marca, ação e item ativo</li>
+        <li>Roxo de texto #9B6FD4 (4,66:1); borda de campo #6A6A6A (3,2:1)</li>
+        <li>Ícones SVG de traço reto, cantos de 4–6 px, valores em mono tabular</li>
+        <li>KPI com comparação e meta; destaque de um único indicador</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 2. LOGIN ============ -->
+<section class="section">
+  <div class="section-h"><span class="n">02</span><h2>Login no celular</h2></div>
+  <div class="phones">
+    <div>
+      <span class="tag before">Antes — hoje</span>
+      <div class="phone pb">
+        <div class="lg">
+          <div class="brand"><b>FinGo</b></div>
+          <h4>Bem-vindo ao FinGo!</h4>
+          <p class="s">Acesse o portal da sua construtora</p>
+          <label>Usuário ou e-mail</label><div class="in">Digite seu usuário ou e-mail</div>
+          <label>Senha</label><div class="in">••••••••</div>
+          <div class="go">Entrar</div>
+        </div>
+        <div class="cookie">
+          <span class="pill">LGPD &amp; SEGURANÇA</span>
+          <b>Privacidade e Termos de Uso</b>
+          Utilizamos cookies essenciais e tecnologias seguras para autenticação, isolamento dos dados da sua construtora e proteção de uploads…
+          <div class="acc">Aceitar e Continuar</div>
+          <div class="more">Ver Políticas</div>
+        </div>
+      </div>
+      <ul class="notes bad" style="max-width:300px;margin:10px auto 0">
+        <li>Banner cobre senha e botão Entrar</li>
+        <li>Botão do banner é mais forte que o do login</li>
+      </ul>
+    </div>
+    <div>
+      <span class="tag after">Depois — proposta</span>
+      <div class="phone pa">
+        <div class="lg">
+          <div class="brand"><span class="mark" style="width:20px;height:20px;background:#C6FF00;clip-path:polygon(0 0,100% 0,100% 30%,40% 30%,40% 45%,85% 45%,85% 70%,40% 70%,40% 100%,0 100%)"></span><b>Fin<i>Go</i></b></div>
+          <h4>Entrar</h4>
+          <p class="s" style="margin-top:6px">Acesse o portal da sua construtora</p>
+          <label>Usuário ou e-mail</label><div class="in f">joao@construtora.com.br</div>
+          <label>Senha</label><div class="in">Sua senha</div>
+          <div class="go">Entrar</div>
+          <div class="alt"><a>Esqueci a senha</a> · <a>Criar conta</a></div>
+        </div>
+        <div class="cbar"><span>Só usamos cookies essenciais. <a>Política</a></span><span class="ok">Entendi</span></div>
+      </div>
+      <ul class="notes good" style="max-width:300px;margin:10px auto 0">
+        <li>Aviso de cookies em uma linha no rodapé</li>
+        <li>Uma única ação primária na tela</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 3. MASTER ============ -->
+<section class="section">
+  <div class="section-h"><span class="n">03</span><h2>Portal Master</h2></div>
+  <div class="pair">
+    <div>
+      <span class="tag before">Antes — hoje</span>
+      <div class="frame mst mb">
+        <div class="bar"><b>FinGo Master</b><span class="gbtn">+ Novo tenant</span></div>
+        <div class="row"><div><small>Tenants ativos</small><b>7</b></div><div><small>MRR</small><b>R$ 9,8 mil</b></div><div><small>Chamados</small><b>4</b></div></div>
+      </div>
+      <ul class="notes bad"><li>Primário dourado + paleta slate do Tailwind: parece outro produto</li></ul>
+    </div>
+    <div>
+      <span class="tag after">Depois — proposta</span>
+      <div class="frame mst ma">
+        <div class="bar"><b>Fin<i>Go</i></b><span class="mtag">MASTER</span><span class="gbtn">+ Novo tenant</span></div>
+        <div class="row"><div><small>Tenants ativos</small><b>7</b></div><div><small>MRR</small><b>R$ 9,8 mil</b></div><div><small>Chamados</small><b>4</b></div></div>
+      </div>
+      <ul class="notes good"><li>Mesma marca; o contexto vem da etiqueta roxa "MASTER"</li></ul>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 4. TOKENS ============ -->
+<section class="section">
+  <div class="section-h"><span class="n">04</span><h2>Tokens que mudam</h2></div>
+  <div class="tok">
+    <div class="tc"><h5>--fingo-mist</h5>
+      <div class="sw"><i style="background:#e9ecf0"></i><span class="x">#e9ecf0</span><small>1,03:1 vs texto</small></div>
+      <div class="sw"><i style="background:#8E8E8E"></i><span class="ok">#8E8E8E</span><small>5,3:1</small></div>
+      <div class="sample"><span style="color:#F0F0E8">Primário</span> · <span style="color:#E8E8DC">Secundário</span> · <span style="color:#8E8E8E">Terciário</span></div>
+    </div>
+    <div class="tc"><h5>--color-success</h5>
+      <div class="sw"><i style="background:#C6FF00"></i><span class="x">#C6FF00</span><small>= marca</small></div>
+      <div class="sw"><i style="background:#3DDC84"></i><span class="ok">#3DDC84</span><small>9,75:1</small></div>
+      <div class="sample"><span style="color:#3DDC84">■ Pago</span> &nbsp; <span style="background:#C6FF00;color:#0A0A0A;padding:2px 6px;font-weight:700">SALVAR</span></div>
+    </div>
+    <div class="tc"><h5>--text-info (novo)</h5>
+      <div class="sw"><i style="background:#7F49B8"></i><span class="x">#7F49B8</span><small>2,94:1</small></div>
+      <div class="sw"><i style="background:#9B6FD4"></i><span class="ok">#9B6FD4</span><small>4,66:1</small></div>
+      <div class="sample"><span style="color:#7F49B8">Em análise</span> → <span style="color:#9B6FD4">Em análise</span></div>
+    </div>
+    <div class="tc"><h5>--border-input</h5>
+      <div class="sw"><i style="background:#3D3D3D"></i><span class="x">#3D3D3D</span><small>1,6:1</small></div>
+      <div class="sw"><i style="background:#6A6A6A"></i><span class="ok">#6A6A6A</span><small>3,22:1</small></div>
+      <div class="sample" style="display:grid;gap:6px"><div style="border:1px solid #3D3D3D;padding:5px 8px;color:#8E8E8E">Campo antes</div><div style="border:1px solid #6A6A6A;padding:5px 8px;color:#8E8E8E">Campo depois</div></div>
+    </div>
+  </div>
+</section>
+
+<footer>Detalhes e passo a passo de implementação: docs/AUDITORIA_DESIGN_2026-10-02.md. Preview estático — não altera o código do sistema.</footer>
+</div>
+</body>
+</html>
