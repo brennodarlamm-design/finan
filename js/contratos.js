@@ -964,6 +964,7 @@ const Contratos = {
           <div>
             <span class="modal-title">📜 Contrato Nº ${c.numero}</span>
             <span class="badge badge-success" style="margin-left:8px;">Modelo da Contratada (MCMV)</span>
+            ${(typeof Assinador !== 'undefined' && Assinador.seloVerificacao) ? Assinador.seloVerificacao(c) : ''}
           </div>
 
           <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
@@ -983,6 +984,10 @@ const Contratos = {
 
             <button class="btn btn-sm btn-secondary" data-fb-click="Patch26Actions.contratoGovBr" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(c.id))}" style="color:#0284c7;font-size:.75rem;">
               🏛️ Gov.br
+            </button>
+
+            <button class="btn btn-sm btn-secondary" data-fb-click="Assinador.verificarPdfAssinado" data-fb-click-n="2" data-fb-click-t0="string" data-fb-click-v0="contratos" data-fb-click-t1="string" data-fb-click-v1="${encodeURIComponent(String(c.id))}" style="color:#10b981;font-size:.75rem;" title="Enviar o PDF assinado (Gov.br ou certificado ICP-Brasil) para conferência">
+              🛡️ Verificar PDF assinado
             </button>
 
             <button class="btn btn-sm btn-primary" data-fb-click="Contratos.imprimirContrato" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(c.id))}" style="font-size:.75rem;">

@@ -236,6 +236,17 @@ Revisado e sem problema: `/qr` do Render (segredo forte, cookie assinado, `tenan
 4. **Manter o ping de keep-alive** (`EVOLUTION_GO_HEALTH_URL` / padrão `https://fingo-evolution-go.onrender.com/server/ok`): ele é necessário no plano gratuito, e `/server/ok` não expõe dados.
 5. **Verificar se houve abuso.** Procurar no log do Evolution Go chamadas a `/send/*`, `/instance/qr`, `/instance/logout` ou `/instance/all` que não tenham partido do `finan-backend`.
 
+## Status de execução (02/10/2026)
+
+O responsável confirmou que **todas as ações** listadas foram executadas: código na `main`, `npm test`, bucket `fingo-backups`, segredos (`BACKUP_ENCRYPTION_KEY`, `ORIGIN_SHARED_SECRET`, `RESEND_WEBHOOK_SECRET`, chave forte do Evolution em `GLOBAL_API_KEY`/`EVOLUTION_GO_API_KEY`), deploy do Worker e do Render, purga de cache, reenvio dos links do portal, reset do WhatsApp das empresas, investigação de logs (F1 e Evolution), `ORIGIN_ENFORCE_EDGE=true`, remoção dos snapshots em texto puro e restrição da chave do Google Drive Picker.
+
+Confirmado nesta sessão: o commit final da auditoria (`f692f74`) está em `origin/main`. A checagem direta de `fingo.api.br` não foi possível a partir do ambiente da auditoria (rede bloqueada).
+
+Pendências sem urgência, por decisão do responsável:
+- Atualizar `wrangler@3` → `@4` (vulnerabilidades só em ferramentas de desenvolvimento).
+- Exigir MFA para usuários de empresa (decisão de produto).
+- Chave do webhook do WhatsApp na URL (`?token=`), se o Evolution Go aceitar header.
+
 ## Testes
 - Novo: `scripts/test-audit-2026-10-02.js` (incluído em `npm test`). Cobre F1–F11 e R1–R5. Falha na versão anterior e passa na corrigida.
 - Novo: `scripts/test-audit-2026-10-02-r3.js` (incluído em `npm test`). Cobre a terceira rodada.

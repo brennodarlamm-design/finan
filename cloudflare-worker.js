@@ -1477,6 +1477,12 @@ async function proxyApi(request, env) {
 
 async function handleApi(request, env) {
   try {
+    // Verificação de assinaturas em PDF (cadeia ICP-Brasil/Gov.br + LCR) roda no backend Node:
+    // o custo de CPU passa do limite do plano gratuito do Workers.
+    const apiUrl = new URL(request.url);
+    if (apiUrl.pathname === '/api/assinaturas' && apiUrl.searchParams.get('action') === 'verificar_pdf' && env.FINOBRA_API_ORIGIN) {
+      return await proxyApi(request, env);
+    }
     const isMutating = !SAFE_METHODS.has(String(request.method || 'GET').toUpperCase());
     const edgeRequest = isMutating ? request.clone() : request;
     let response = await executeEdgeApi(edgeRequest, env);

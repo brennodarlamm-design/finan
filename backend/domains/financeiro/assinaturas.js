@@ -58,6 +58,12 @@ export default async function handler(req, res) {
   res.setHeader('Cache-Control', 'no-store');
   if (req.method === 'OPTIONS') return res.status(200).end();
 
+  // Verificação de PDFs assinados (ICP-Brasil / Gov.br) — rotas autenticadas.
+  const action = String(req.query?.action || req.body?.action || '').trim().toLowerCase();
+  if (action === 'verificar_pdf' || action === 'verificacoes') {
+    return handlePdfVerification(req, res, action);
+  }
+
   // publicSql: acesso global sem contexto de tenant (GET de validação pública por código único).
   const publicSql = getSql();
 
@@ -186,5 +192,82 @@ export default async function handler(req, res) {
   } catch (err) {
     console.error('[Assinaturas API]', err);
     return res.status(500).json({ success: false, error: 'Falha ao processar a assinatura.' });
+  }
+}
+
+// ── Verificação de assinaturas digitais em PDF (contratos e recibos) ─────────────────────────
+// Executa no backend Node (o Worker encaminha action=verificar_pdf ao Render). Guarda a prova
+// da verificação (hash do arquivo, resultado e signatários) em document_signature_verifications.
+const VERIFY_ENTITIES = new Set(['contratos', 'recibos']);
+
+async function handlePdfVerification(req, res, action) {
+  const auth = await resolveAuthAndTenant(req);
+  if (!auth.authenticated) return res.status(auth.status || 401).json({ success: false, error: auth.error || 'Não autorizado.' });
+
+  const entity = clean(req.query?.entity || req.body?.entity, 40);
+  const entityId = clean(req.query?.entity_id || req.body?.entity_id, 120);
+  if (!VERIFY_ENTITIES.has(entity) || !entityId) {
+    return res.status(400).json({ success: false, error: 'Informe o contrato ou recibo da verificação.' });
+  }
+  const tenantSql = createTenantSql(getSql(), { tenantId: auth.tenantId });
+
+  try {
+    if (action === 'verificacoes' && req.method === 'GET') {
+      if (!canAccessModule(auth, entity, 'read')) return res.status(403).json(permissionError('MODULE_READ_FORBIDDEN', entity));
+      const rows = await tenantSql`
+        SELECT id, entity, entity_id, file_name, file_sha256, status, nivel, signatarios, relatorio, created_at
+        FROM document_signature_verifications
+        WHERE tenant_id = ${auth.tenantId} AND entity = ${entity} AND entity_id = ${entityId}
+        ORDER BY created_at DESC LIMIT 10;
+      `;
+      return res.status(200).json({ success: true, verificacoes: rows });
+    }
+
+    if (action !== 'verificar_pdf' || req.method !== 'POST') {
+      return res.status(405).json({ success: false, error: 'Método não permitido.' });
+    }
+    if (!canAccessModule(auth, entity, 'write')) return res.status(403).json(permissionError('MODULE_WRITE_FORBIDDEN', entity));
+    if (!canWriteData(auth)) return res.status(403).json(permissionError('ROLE_READ_ONLY'));
+
+    const rl = await checkRateLimit(`assinatura:verify:${auth.tenantId}`, 20, 60_000);
+    if (!rl.allowed) return res.status(429).json({ success: false, error: 'Muitas verificações seguidas. Aguarde um minuto.' });
+
+    const raw = String(req.body?.base64 || '');
+    const b64 = raw.includes(',') ? raw.split(',').pop() : raw;
+    if (!b64 || b64.length > 14_000_000) return res.status(413).json({ success: false, error: 'Envie um PDF de até 10 MB.' });
+    const pdf = Buffer.from(b64, 'base64');
+
+    const { verifyPdfSignatures } = await import('./_pdf-signature.js');
+    let report;
+    try {
+      report = await verifyPdfSignatures(pdf);
+    } catch (err) {
+      return res.status(400).json({ success: false, error: err?.message || 'Não foi possível ler o PDF.' });
+    }
+
+    const signatarios = (report.assinaturas || []).map(a => ({
+      nome: a.signatario?.nome || null,
+      cpf_mascarado: a.signatario?.cpf_mascarado || null,
+      cnpj_mascarado: a.signatario?.cnpj_mascarado || null,
+      nivel: a.nivel || null,
+      status: a.status
+    }));
+    const id = `sigver_${crypto.randomUUID()}`;
+    const fileName = clean(req.body?.file_name, 255) || null;
+    await tenantSql`
+      INSERT INTO document_signature_verifications
+        (id, tenant_id, entity, entity_id, file_name, file_sha256, status, nivel, signatarios, relatorio, verified_by)
+      VALUES
+        (${id}, ${auth.tenantId}, ${entity}, ${entityId}, ${fileName}, ${report.file_sha256}, ${report.status},
+         ${report.nivel || null}, ${JSON.stringify(signatarios)}::jsonb, ${JSON.stringify(report)}::jsonb, ${auth.user?.id || null});
+    `;
+    await writeAudit(tenantSql, req, auth, {
+      acao: 'verificar_assinatura_pdf', entidade: entity, entidadeId: entityId,
+      depois: { verificacao_id: id, status: report.status, nivel: report.nivel, file_sha256: report.file_sha256 }
+    });
+    return res.status(200).json({ success: true, id, ...report, signatarios });
+  } catch (err) {
+    console.error('[Assinaturas API] Falha na verificação de PDF:', err?.message || err);
+    return res.status(500).json({ success: false, error: 'Falha ao verificar o PDF assinado.' });
   }
 }

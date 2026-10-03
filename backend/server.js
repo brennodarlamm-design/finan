@@ -114,6 +114,8 @@ app.use(cors({
 // AUDIT-2026-10-02 F2: nas rotas de webhook de e-mail, guarda o corpo bruto para verificar
 // a assinatura Svix/Resend. O body-parser genérico abaixo ignora requisições já parseadas.
 app.use(['/api/webhook-email', '/api/plano'], express.json({ limit: '2mb', verify: (req, _res, buf) => { req.rawBody = buf.toString('utf8'); } }));
+// Verificação de PDF assinado: até 10 MB de PDF em base64 (~14 MB).
+app.use('/api/assinaturas', express.json({ limit: '16mb' }));
 app.use(express.json({ limit: '12mb' }));
 app.use(express.urlencoded({ extended: true, limit: '12mb' }));
 

@@ -518,6 +518,134 @@ const Assinador = {
   // ─────────────────────────────────────────────────────────────
   // MODAL DE ORIENTAÇÃO PARA ASSINATURA GOV.BR (ICP-BRASIL)
   // ─────────────────────────────────────────────────────────────
+  // ─────────────────────────────────────────────────────────────
+  // VERIFICAÇÃO DE PDF ASSINADO (ICP-Brasil qualificada / Gov.br avançada)
+  // O servidor confere integridade, cadeia até a AC Raiz oficial e revogação (LCR),
+  // guarda a prova da verificação e devolve o resultado.
+  // ─────────────────────────────────────────────────────────────
+  _VERIF_ROTULOS: {
+    valida: { txt: 'Assinatura válida', cor: '#10b981', icone: '🛡️' },
+    indeterminada: { txt: 'Verificação inconclusiva', cor: '#f59e0b', icone: '⚠️' },
+    invalida: { txt: 'Assinatura inválida', cor: '#ef4444', icone: '⛔' },
+    sem_assinatura: { txt: 'PDF sem assinatura digital', cor: '#94a3b8', icone: '📄' }
+  },
+
+  _nivelTexto(nivel) {
+    if (nivel === 'qualificada') return 'Qualificada · ICP-Brasil';
+    if (nivel === 'avancada') return 'Avançada · Gov.br';
+    return 'Nível não reconhecido';
+  },
+
+  seloVerificacao(item) {
+    const v = item && item.verificacao_assinatura;
+    if (!v || !v.status) return '';
+    const r = this._VERIF_ROTULOS[v.status] || this._VERIF_ROTULOS.indeterminada;
+    const nivel = v.status === 'valida' ? ` · ${this._nivelTexto(v.nivel)}` : '';
+    return `<span class="badge" style="margin-left:8px;background:${r.cor}22;color:${r.cor};border:1px solid ${r.cor}55;">${r.icone} ${Utils.escapeHtml(r.txt + nivel)}</span>`;
+  },
+
+  verificarPdfAssinado(entity, id) {
+    if (!['contratos', 'recibos'].includes(entity) || !id) return;
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'application/pdf,.pdf';
+    input.style.display = 'none';
+    input.addEventListener('change', () => {
+      const file = input.files && input.files[0];
+      input.remove();
+      if (file) this._enviarPdfParaVerificacao(entity, id, file);
+    });
+    document.body.appendChild(input);
+    input.click();
+  },
+
+  async _enviarPdfParaVerificacao(entity, id, file) {
+    if (file.size > 10 * 1024 * 1024) return Utils.toast('Envie um PDF de até 10 MB.', 'warning');
+    if (!/\.pdf$/i.test(file.name) && file.type !== 'application/pdf') return Utils.toast('Selecione o arquivo PDF assinado.', 'warning');
+    Utils.toast('Verificando assinatura digital... pode levar até 1 minuto.', 'info');
+    try {
+      const base64 = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result || '').split(',').pop());
+        reader.onerror = () => reject(new Error('Não foi possível ler o arquivo.'));
+        reader.readAsDataURL(file);
+      });
+      const headers = (typeof Auth !== 'undefined' && Auth.getAuthHeaders) ? Auth.getAuthHeaders() : { 'Content-Type': 'application/json' };
+      const res = await fetch('/api/assinaturas?action=verificar_pdf', {
+        method: 'POST',
+        headers: { ...headers, 'Content-Type': 'application/json' },
+        credentials: 'same-origin',
+        signal: AbortSignal.timeout(120000),
+        body: JSON.stringify({ entity, entity_id: id, file_name: file.name, base64 })
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.success) {
+        return Utils.toast(data.error || 'Não foi possível verificar o PDF agora.', 'error');
+      }
+      const resumo = {
+        id: data.id,
+        status: data.status,
+        nivel: data.nivel || null,
+        signatarios: data.signatarios || [],
+        arquivo: file.name,
+        file_sha256: data.file_sha256,
+        verificado_em: data.verificado_em
+      };
+      const mod = entity === 'contratos' ? (typeof Contratos !== 'undefined' ? Contratos : null) : (typeof Recibos !== 'undefined' ? Recibos : null);
+      if (mod && typeof mod.atualizar === 'function') mod.atualizar(id, { verificacao_assinatura: resumo });
+      this._mostrarResultadoVerificacao(data, file.name);
+    } catch (err) {
+      Utils.toast(err?.name === 'TimeoutError' ? 'A verificação demorou demais. Tente novamente.' : 'Falha ao enviar o PDF para verificação.', 'error');
+    }
+  },
+
+  _mostrarResultadoVerificacao(data, nomeArquivo) {
+    const e = Utils.escapeHtml.bind(Utils);
+    const r = this._VERIF_ROTULOS[data.status] || this._VERIF_ROTULOS.indeterminada;
+    const fmt = (iso) => { try { return iso ? new Date(iso).toLocaleString('pt-BR') : '—'; } catch { return '—'; } };
+    const revTxt = { nao_revogado: 'Não revogado (LCR consultada)', revogado: 'REVOGADO', nao_verificado: 'Não foi possível consultar' };
+    const assinaturas = (data.assinaturas || []).map((a, i) => `
+      <div style="border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:10px;">
+        <div style="font-weight:800;color:var(--text);margin-bottom:6px;">Assinatura ${i + 1}: ${e(a.signatario?.nome || 'Signatário não identificado')}</div>
+        <div style="font-size:.78rem;color:var(--text2);line-height:1.6;">
+          ${a.signatario?.cpf_mascarado ? `CPF: ${e(a.signatario.cpf_mascarado)}<br>` : ''}
+          ${a.signatario?.cnpj_mascarado ? `CNPJ: ${e(a.signatario.cnpj_mascarado)}<br>` : ''}
+          Situação: <strong style="color:${(this._VERIF_ROTULOS[a.status] || r).cor};">${e((this._VERIF_ROTULOS[a.status] || r).txt)}</strong><br>
+          Tipo: ${e(this._nivelTexto(a.nivel))}${a.ac_raiz ? ` (${e(a.ac_raiz)})` : ''}<br>
+          Documento íntegro: ${a.integridade ? 'sim' : 'não'} · Revogação: ${e(revTxt[a.revogacao?.situacao] || '—')}<br>
+          Horário declarado: ${e(fmt(a.horario_declarado))}${a.carimbo_do_tempo ? ' · com carimbo do tempo' : ''}<br>
+          ${a.signatario?.emissor ? `Emissor: ${e(a.signatario.emissor)}<br>` : ''}
+          ${(a.problemas || []).length ? `<span style="color:#f59e0b;">${a.problemas.map(e).join('<br>')}</span>` : ''}
+        </div>
+      </div>`).join('');
+    Utils.showModal(`
+      <div class="modal" style="max-width:640px;width:95vw;">
+        <div class="modal-header">
+          <span class="modal-title">${r.icone} ${e(r.txt)}${data.status === 'valida' ? ` · ${e(this._nivelTexto(data.nivel))}` : ''}</span>
+          <button class="modal-close" data-fb-click="Utils.closeModal" data-fb-click-n="0">✕</button>
+        </div>
+        <div class="modal-body" style="padding:20px;">
+          <div style="font-size:.8rem;color:var(--text3);margin-bottom:12px;">
+            Arquivo: <strong>${e(nomeArquivo || '')}</strong><br>
+            SHA-256: <span style="font-family:monospace;font-size:.72rem;word-break:break-all;">${e(data.file_sha256 || '')}</span><br>
+            Verificado em: ${e(fmt(data.verificado_em))}
+          </div>
+          ${data.alterado_apos_ultima_assinatura ? '<div style="background:rgba(245,158,11,.12);border:1px solid rgba(245,158,11,.4);border-radius:6px;padding:10px;font-size:.78rem;margin-bottom:12px;">⚠️ O PDF recebeu alterações depois da última assinatura. Confira se são apenas novas assinaturas ou anotações.</div>' : ''}
+          ${assinaturas || '<p style="font-size:.85rem;color:var(--text2);">Nenhuma assinatura digital foi encontrada neste PDF. Assine no Gov.br ou com certificado ICP-Brasil e envie o arquivo assinado.</p>'}
+          <div style="font-size:.74rem;color:var(--text3);line-height:1.5;border-top:1px solid var(--border);padding-top:10px;">
+            Assinatura <strong>qualificada (ICP-Brasil)</strong> tem presunção de veracidade (MP 2.200-2/2001, art. 10, §1º; Lei 14.063/2020, art. 4º, III).
+            Assinatura <strong>avançada (Gov.br)</strong> é admitida nos termos da Lei 14.063/2020, art. 4º, II.
+            O FinGo guarda o registro desta verificação. Para o relatório oficial de conformidade, confira também no
+            <a href="https://validar.iti.gov.br" target="_blank" rel="noopener noreferrer">validar.iti.gov.br</a>.
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-secondary" data-fb-click="Utils.closeModal" data-fb-click-n="0">Fechar</button>
+        </div>
+      </div>
+    `);
+  },
+
   executarGovBrDownload() {
     if (typeof this._govBrDownload === 'function') this._govBrDownload();
     Utils.toast('PDF preparado para Gov.br!','info');
@@ -550,7 +678,7 @@ const Assinador = {
           </div>
 
           <div style="background:rgba(201,162,39,.1);border:1px solid rgba(201,162,39,.3);border-radius:6px;padding:10px 14px;font-size:.75rem;color:var(--text);margin-bottom:14px;">
-            💡 <em>Dica:</em> Após assinar no Gov.br, faça o download do PDF assinado e anexe-o diretamente no menu <strong>Documentos / GED</strong> da Obra no FinGo para manter o histórico arquivado na nuvem.
+            💡 <em>Depois de assinar:</em> baixe o PDF assinado do Gov.br e use o botão <strong>🛡️ Verificar PDF assinado</strong> neste contrato/recibo. O FinGo confere a assinatura e guarda o registro da verificação.
           </div>
         </div>
         <div class="modal-footer" style="display:flex;justify-content:space-between;align-items:center;">
