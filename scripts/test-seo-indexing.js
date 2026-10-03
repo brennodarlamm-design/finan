@@ -37,7 +37,9 @@ assert(sitemap.includes('<loc>https://fingo.api.br/calculadora-bdi</loc>'), 'sit
 
 // Contagem exata de URLs no sitemap
 const urlMatches = sitemap.match(/<loc>/g) || [];
-assert.strictEqual(urlMatches.length, 9, `sitemap.xml deve conter exatamente 9 URLs públicas canônicas. Encontradas: ${urlMatches.length}`);
+assert(sitemap.includes('<loc>https://fingo.api.br/blog</loc>'), 'sitemap.xml deve conter rota /blog');
+assert(sitemap.includes('<loc>https://fingo.api.br/manuais</loc>'), 'sitemap.xml deve conter rota /manuais');
+assert.strictEqual(urlMatches.length, 17, `sitemap.xml deve conter exatamente 17 URLs públicas canônicas (11 páginas + 6 artigos). Encontradas: ${urlMatches.length}`);
 
 // Verificação de URLs duplicadas
 const locs = [...sitemap.matchAll(/<loc>(.*?)<\/loc>/g)].map(m => m[1]);

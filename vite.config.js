@@ -26,6 +26,8 @@ export default defineConfig({
           };
           if (routes[pathname])
             req.url = routes[pathname] + (query ? "?" + query : "");
+          else if (/^\/blog\/[a-z0-9-]+$/.test(pathname))
+            req.url = "/blog.html" + (query ? "?" + query : "");
           next();
         });
       },

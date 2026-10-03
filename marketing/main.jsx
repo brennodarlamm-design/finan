@@ -13,7 +13,12 @@ import { Brand, Faq, Newsletter, Footer } from "./brand-sections.jsx";
 import { TRILHAS, MANUAIS } from "./manuais-data.js";
 import { ARTIGOS_BLOG } from "./blog-data.js";
 
-const route = location.pathname.replace(/\/$|\.html$/g, "") || "/";
+// No navegador a rota vem de location; na pré-renderização do build (SEO/GEO) vem de
+// globalThis.__FINGO_SSR_ROUTE__, definido por scripts/prerender-marketing.mjs.
+const isBrowser = typeof window !== "undefined" && typeof document !== "undefined";
+const route =
+  ((isBrowser ? location.pathname : globalThis.__FINGO_SSR_ROUTE__) || "/").replace(/\/$|\.html$/g, "") || "/";
+const blogSlug = route.startsWith("/blog/") ? route.slice("/blog/".length) : "";
 const current =
   route === "/planos"
     ? "plans"
@@ -21,7 +26,7 @@ const current =
       ? "about"
       : route === "/manuais"
         ? "manuais"
-        : route === "/blog"
+        : route === "/blog" || blogSlug
           ? "blog"
           : "home";
 const contact = "https://wa.me/5595991363678";
@@ -841,6 +846,9 @@ function Plans() {
     </div>
   );
 }
+// Horário do atendimento humano (também no JSON-LD de sobre-nos.html e no llms.txt).
+const SUPORTE_HORARIO = "de segunda a sexta, das 08h às 20h (horário de Brasília)";
+
 function About() {
   return (
     <>
@@ -858,9 +866,10 @@ function About() {
           </p>
           <p className="text-lg leading-relaxed text-muted">
             O FinGo é uma plataforma de gestão financeira e operacional para a
-            construção civil. Reunimos rotinas de obras, custos, compras e
-            medições em um só lugar, para ajudar profissionais e construtoras a
-            acompanhar sua operação com mais contexto.
+            construção civil. Reunimos obras, custos, compras, notas fiscais,
+            orçamentos com SINAPI, medições e contratos em um só lugar, para que
+            construtoras, empreiteiros, engenheiros e arquitetos acompanhem cada
+            obra com números confiáveis.
           </p>
         </div>
       </section>
@@ -871,39 +880,160 @@ function About() {
           className="h-72 w-full rounded-sm object-cover grayscale md:h-96"
         />
       </div>
+
       <section className="wrap py-24">
-        <p className="eyebrow">Nossos objetivos</p>
-        <div className="grid gap-10 md:grid-cols-3">
-          {[
-            [
-              "01",
-              "Aproximar canteiro e escritório",
-              "Fazer a informação circular entre quem executa, quem acompanha e quem decide.",
-            ],
-            [
-              "02",
-              "Dar clareza à gestão",
-              "Ajudar a entender os custos e acompanhar os compromissos de cada obra, com informações organizadas.",
-            ],
-            [
-              "03",
-              "Simplificar para evoluir",
-              "Reduzir o trabalho repetitivo e desenvolver ferramentas úteis para a realidade da construção.",
-            ],
-          ].map(([n, t, d]) => (
-            <article key={n} className="border-t border-acid pt-6">
-              <p className="font-mono text-acid">{n} /</p>
-              <h2 className="mb-5 mt-8 text-2xl font-bold">{t}</h2>
-              <p className="leading-relaxed text-muted">{d}</p>
-            </article>
-          ))}
-        </div>
-        <div className="mt-20 flex flex-col items-start justify-between gap-8 border-t border-line pt-12 md:flex-row">
-          <h2 className="font-display text-4xl uppercase">
-            Sua próxima obra.
+        <p className="eyebrow">Nossa história</p>
+        <div className="grid gap-10 md:grid-cols-2">
+          <h2 className="font-display text-3xl uppercase leading-tight md:text-5xl">
+            Nascemos da rotina
             <br />
-            Um novo jeito de gerir.
+            <span className="text-acid">de quem toca obra.</span>
           </h2>
+          <div className="space-y-5 text-lg leading-relaxed text-muted">
+            <p>
+              O FinGo surgiu de um problema que todo construtor conhece: a obra
+              anda no canteiro, mas o controle fica espalhado em planilhas,
+              cadernos, grupos de WhatsApp e notas guardadas na gaveta. Quando o
+              custo real aparece, muitas vezes já é tarde para corrigir.
+            </p>
+            <p>
+              Por isso desenvolvemos um sistema pensado para a realidade da
+              construção brasileira: funciona no celular, no meio da obra, e fala
+              a língua do setor, com BDI pelo TCU, tabela SINAPI, retenções de
+              INSS e ISS nas medições, NF-e e conciliação bancária.
+            </p>
+            <p>
+              Hoje o FinGo atende desde o engenheiro autônomo com poucas obras até
+              construtoras com várias frentes ao mesmo tempo, sempre com o mesmo
+              objetivo: saber, a qualquer momento, quanto cada obra custou, quanto
+              falta receber e o que precisa ser feito.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <section className="border-y border-shadow bg-ink py-24">
+        <div className="wrap">
+          <p className="eyebrow">Nossos objetivos</p>
+          <div className="grid gap-10 md:grid-cols-3">
+            {[
+              [
+                "01",
+                "Aproximar canteiro e escritório",
+                "Fazer a informação circular entre quem executa, quem acompanha e quem decide: fotos, etapas, compras e medições registradas na hora, pelo celular.",
+              ],
+              [
+                "02",
+                "Dar clareza aos números",
+                "Mostrar o custo real de cada obra, comparar orçado e realizado e manter o fluxo de caixa batendo com o banco.",
+              ],
+              [
+                "03",
+                "Simplificar para evoluir",
+                "Eliminar digitação repetitiva com importação de NF-e, OFX e leitura de notas, para a equipe gastar tempo com a obra.",
+              ],
+              [
+                "04",
+                "Proteger a operação",
+                "Dados de cada construtora isolados, acesso protegido, trilha de auditoria e tratamento de dados conforme a LGPD.",
+              ],
+              [
+                "05",
+                "Falar a língua da engenharia",
+                "Seguir as referências do setor: Acórdão 2.622/2013 do TCU, SINAPI da Caixa e as regras de retenção em medições.",
+              ],
+              [
+                "06",
+                "Crescer junto com o cliente",
+                "Evoluir o sistema a partir das sugestões de quem usa no dia a dia, com planos que acompanham o tamanho da empresa.",
+              ],
+            ].map(([n, t, d]) => (
+              <article key={n} className="border-t border-acid pt-6">
+                <p className="font-mono text-acid">{n} /</p>
+                <h3 className="mb-5 mt-8 text-2xl font-bold">{t}</h3>
+                <p className="leading-relaxed text-muted">{d}</p>
+              </article>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section className="wrap py-24">
+        <p className="eyebrow">Suporte / Gente de verdade</p>
+        <div className="grid gap-10 md:grid-cols-2">
+          <div>
+            <h2 className="font-display text-3xl uppercase leading-tight md:text-5xl">
+              Uma equipe preparada
+              <br />
+              <span className="text-acid">para a sua obra.</span>
+            </h2>
+            <p className="mt-6 text-lg leading-relaxed text-muted">
+              Nosso suporte é feito por pessoas que conhecem a rotina da
+              construção e o sistema por dentro. A equipe é treinada em gestão de
+              obras, financeiro, orçamentos e medições, para entender a sua
+              dúvida de primeira e resolver sem jogo de empurra.
+            </p>
+            <p className="mt-4 text-lg leading-relaxed text-muted">
+              Na chegada, ajudamos a configurar a conta, cadastrar as primeiras
+              obras e importar os dados. Depois, seguimos por perto para tirar
+              dúvidas, orientar a equipe e receber sugestões de melhoria.
+            </p>
+          </div>
+          <div className="rounded-sm border border-acid/60 bg-panel p-8">
+            <p className="font-mono text-xs uppercase text-acid">Horário de atendimento</p>
+            <p className="font-display mt-3 text-4xl uppercase text-paper md:text-5xl">
+              08h às 20h
+            </p>
+            <p className="mt-1 font-mono text-sm uppercase text-silver">
+              Segunda a sexta · horário de Brasília
+            </p>
+            <p className="mt-2 text-sm text-muted">
+              Atendimento humano {SUPORTE_HORARIO}. Fora desse horário, o assistente
+              FinBot responde dentro do sistema e a equipe retoma o atendimento no
+              próximo dia útil.
+            </p>
+            <ul className="mt-6 space-y-3 border-t border-shadow pt-6 text-sm text-silver">
+              <li>
+                <span className="font-bold text-paper">Chat no sistema</span> — direto
+                da tela em que você está trabalhando.
+              </li>
+              <li>
+                <span className="font-bold text-paper">WhatsApp</span> —{" "}
+                <a href={contact} className="underline hover:text-acid" rel="noopener noreferrer" target="_blank">
+                  (95) 99136-3678
+                </a>
+              </li>
+              <li>
+                <span className="font-bold text-paper">E-mail</span> —{" "}
+                <a href="mailto:contato@fingo.api.br" className="underline hover:text-acid">
+                  contato@fingo.api.br
+                </a>
+              </li>
+              <li>
+                <span className="font-bold text-paper">Manuais</span> —{" "}
+                <a href="/manuais" className="underline hover:text-acid">
+                  guias passo a passo
+                </a>{" "}
+                para treinar a equipe.
+              </li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <section className="wrap pb-24">
+        <div className="flex flex-col items-start justify-between gap-8 border-t border-line pt-12 md:flex-row">
+          <div>
+            <h2 className="font-display text-4xl uppercase">
+              Sua próxima obra.
+              <br />
+              Um novo jeito de gerir.
+            </h2>
+            <p className="mt-4 text-muted">
+              Teste grátis por 15 dias, sem cartão de crédito e com a nossa equipe
+              ajudando na implantação.
+            </p>
+          </div>
           <a href="/planos" className="action">
             Conheça os planos ↗
           </a>
@@ -1972,14 +2102,93 @@ function ManualsView() {
   );
 }
 
+// Data ISO (AAAA-MM-DD) -> DD/MM/AAAA, sem depender do fuso do navegador.
+function dataBr(iso) {
+  const m = String(iso || "").match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  return m ? `${m[3]}/${m[2]}/${m[1]}` : iso;
+}
+
+// Bloco do corpo do artigo: string = parágrafo; objeto = h2, lista, passos, tabela, fórmula ou destaque.
+function BlocoArtigo({ bloco }) {
+  if (typeof bloco === "string") {
+    return <p className="text-muted leading-relaxed">{bloco}</p>;
+  }
+  switch (bloco.tipo) {
+    case "h2":
+      return (
+        <h2 className="font-display pt-6 text-2xl uppercase leading-tight text-paper md:text-3xl">
+          {bloco.texto}
+        </h2>
+      );
+    case "lista":
+      return (
+        <ul className="list-disc space-y-2 pl-6 text-muted">
+          {bloco.itens.map((item, i) => <li key={i}>{item}</li>)}
+        </ul>
+      );
+    case "passos":
+      return (
+        <div className="space-y-2 rounded-sm border border-shadow bg-panel p-4">
+          {bloco.itens.map((item, i) => (
+            <p key={i} className="font-mono text-xs leading-relaxed text-paper">{item}</p>
+          ))}
+        </div>
+      );
+    case "formula":
+      return (
+        <div className="rounded-sm border border-acid bg-void p-5 font-mono text-sm text-acid my-6 overflow-x-auto shadow-[0_0_15px_rgba(198,255,0,0.15)]">
+          {bloco.texto}
+        </div>
+      );
+    case "destaque":
+      return (
+        <p className="border-l-2 border-acid bg-panel/30 py-3 pl-4 text-paper leading-relaxed">
+          {bloco.texto}
+        </p>
+      );
+    case "tabela":
+      return (
+        <figure className="my-6 overflow-x-auto">
+          <table className="w-full border-collapse text-left text-sm">
+            <thead>
+              <tr>
+                {bloco.cabecalho.map((c, i) => (
+                  <th key={i} scope="col" className="border-b border-acid/60 px-3 py-2 font-mono text-xs uppercase text-acid">{c}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {bloco.linhas.map((linha, i) => (
+                <tr key={i} className="border-b border-shadow">
+                  {linha.map((cel, j) => (
+                    <td key={j} className={`px-3 py-2 ${j === 0 ? "text-paper" : "text-muted"}`}>{cel}</td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {bloco.legenda ? (
+            <figcaption className="mt-2 text-xs text-muted">{bloco.legenda}</figcaption>
+          ) : null}
+        </figure>
+      );
+    default:
+      return null;
+  }
+}
+
 function BlogView() {
-  const [selectedArticle, setSelectedArticle] = useState(null);
+  // Cada artigo tem URL própria (/blog/<slug>) para ser indexado e citado.
+  const [selectedArticle] = useState(
+    () => ARTIGOS_BLOG.find((a) => a.slug === blogSlug) || null,
+  );
 
   useEffect(() => {
+    // Compatibilidade com links antigos /blog#slug: leva para a URL própria do artigo.
     const hash = window.location.hash.replace("#", "");
-    if (hash) {
+    if (hash && !blogSlug) {
       const found = ARTIGOS_BLOG.find((a) => a.slug === hash || a.id === hash);
-      if (found) setSelectedArticle(found);
+      if (found) window.location.replace(`/blog/${found.slug}`);
     }
   }, []);
 
@@ -1987,12 +2196,12 @@ function BlogView() {
     return (
       <article className="wrap py-16 md:py-24 max-w-4xl">
         <div className="mb-8">
-          <button
-            onClick={() => setSelectedArticle(null)}
+          <a
+            href="/blog"
             className="outline-action text-xs py-2 px-3 inline-flex items-center gap-1.5"
           >
             <span>← Voltar para todos os artigos</span>
-          </button>
+          </a>
         </div>
 
         <div className="flex flex-wrap items-center gap-3">
@@ -2006,38 +2215,68 @@ function BlogView() {
           {selectedArticle.titulo}
         </h1>
 
-        <p className="mt-6 border-l-2 border-acid pl-4 text-lg italic text-silver leading-relaxed bg-panel/30 py-2">
-          {selectedArticle.resumo}
+        <p className="mt-4 font-mono text-xs text-muted">
+          Por {selectedArticle.autor || "Equipe FinGo"}
+          {selectedArticle.atualizado ? ` • Atualizado em ${dataBr(selectedArticle.atualizado)}` : ""}
         </p>
 
+        {selectedArticle.respostaCurta ? (
+          <section
+            aria-label="Resposta rápida"
+            className="mt-6 rounded-sm border border-acid/60 bg-panel/40 p-5"
+          >
+            <p className="font-mono text-xs uppercase text-acid">Resposta rápida</p>
+            <p className="mt-2 text-base leading-relaxed text-paper">
+              {selectedArticle.respostaCurta}
+            </p>
+          </section>
+        ) : (
+          <p className="mt-6 border-l-2 border-acid pl-4 text-lg italic text-silver leading-relaxed bg-panel/30 py-2">
+            {selectedArticle.resumo}
+          </p>
+        )}
+
         <div className="mt-10 space-y-5 text-base leading-relaxed text-silver">
-          {selectedArticle.conteudo.map((paragrafo, idx) => {
-            const isFormula = paragrafo.startsWith("BDI =");
-            const isBullet = paragrafo.startsWith("•") || paragrafo.startsWith("1.") || paragrafo.startsWith("2.");
-            if (isFormula) {
-              return (
-                <div
-                  key={idx}
-                  className="rounded-sm border border-acid bg-void p-5 font-mono text-sm text-acid my-6 overflow-x-auto shadow-[0_0_15px_rgba(198,255,0,0.15)]"
-                >
-                  {paragrafo}
-                </div>
-              );
-            }
-            if (isBullet) {
-              return (
-                <div key={idx} className="font-mono text-xs bg-panel p-3 rounded-sm border border-shadow text-paper pl-4">
-                  {paragrafo}
-                </div>
-              );
-            }
-            return (
-              <p key={idx} className="text-muted leading-relaxed">
-                {paragrafo}
-              </p>
-            );
-          })}
+          {selectedArticle.conteudo.map((bloco, idx) => (
+            <BlocoArtigo key={idx} bloco={bloco} />
+          ))}
         </div>
+
+        {selectedArticle.faq?.length ? (
+          <section className="mt-14">
+            <h2 className="font-display text-2xl uppercase text-paper">Perguntas frequentes</h2>
+            <div className="mt-6 space-y-3">
+              {selectedArticle.faq.map((item, idx) => (
+                <details key={idx} className="rounded-sm border border-shadow bg-panel p-4" open={idx === 0}>
+                  <summary className="cursor-pointer font-bold text-paper">{item.q}</summary>
+                  <p className="mt-3 text-sm leading-relaxed text-muted">{item.a}</p>
+                </details>
+              ))}
+            </div>
+          </section>
+        ) : null}
+
+        {selectedArticle.fontes?.length ? (
+          <section className="mt-12 border-t border-shadow pt-6">
+            <h2 className="font-mono text-sm uppercase text-silver">Fontes e base legal</h2>
+            <ul className="mt-3 list-disc space-y-1 pl-5 text-sm text-muted">
+              {selectedArticle.fontes.map((fonte, idx) => (
+                <li key={idx}>
+                  {fonte.url ? (
+                    <a href={fonte.url} rel="noopener noreferrer" target="_blank" className="underline hover:text-acid">
+                      {fonte.nome}
+                    </a>
+                  ) : (
+                    fonte.nome
+                  )}
+                </li>
+              ))}
+            </ul>
+            <p className="mt-4 text-xs text-muted">
+              Conteúdo informativo. Regras fiscais e técnicas mudam: confirme com o contador e o engenheiro responsável antes de aplicar.
+            </p>
+          </section>
+        ) : null}
 
         {/* Banner de Conversão ao Fim do Artigo */}
         <div className="mt-14 rounded-sm border border-shadow bg-panel p-8">
@@ -2048,7 +2287,7 @@ function BlogView() {
                 Pronto para automatizar esses cálculos na sua construtora?
               </h3>
               <p className="text-xs text-muted mt-1 max-w-lg">
-                O FinGo possui calculadora oficial de BDI TCU Acórdão 2622, tabelas SINAPI Caixa atualizadas e retenções automáticas de 11% INSS e 5% ISS em boletins de medição.
+                O FinGo tem calculadora gratuita de BDI pela fórmula do TCU (Acórdão 2.622/2013), orçamento com a base SINAPI da Caixa e cálculo das retenções (INSS, ISS, IRRF e garantia) nos boletins de medição.
               </p>
             </div>
             <div className="flex flex-col sm:flex-row gap-3 shrink-0">
@@ -2100,7 +2339,7 @@ function BlogView() {
                 </p>
 
                 <h2 className="mt-2 font-bold text-lg leading-snug text-paper group-hover:text-acid">
-                  {artigo.titulo}
+                  <a href={`/blog/${artigo.slug}`}>{artigo.titulo}</a>
                 </h2>
 
                 <p className="mt-3 text-xs leading-relaxed text-muted line-clamp-3">
@@ -2109,13 +2348,13 @@ function BlogView() {
               </div>
 
               <div className="mt-6 border-t border-shadow pt-4">
-                <button
-                  onClick={() => setSelectedArticle(artigo)}
+                <a
+                  href={`/blog/${artigo.slug}`}
                   className="inline-flex items-center gap-1.5 text-xs font-bold text-acid group-hover:underline"
                 >
                   <span>Ler artigo completo</span>
                   <span aria-hidden="true">↗</span>
-                </button>
+                </a>
               </div>
             </article>
           ))}
@@ -2213,8 +2452,13 @@ function App() {
     </>
   );
 }
-createRoot(document.getElementById("root")).render(
-  <React.StrictMode>
-    <App />
-  </React.StrictMode>,
-);
+export { App };
+
+// No navegador, o React substitui o HTML pré-renderizado do build pelo mesmo conteúdo.
+if (isBrowser && document.getElementById("root")) {
+  createRoot(document.getElementById("root")).render(
+    <React.StrictMode>
+      <App />
+    </React.StrictMode>,
+  );
+}

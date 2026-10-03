@@ -22,3 +22,7 @@ if (destination !== ".")
     path.join(destination, "landing.html"),
     path.join(destination, "index.html"),
   );
+// SEO/AEO/GEO: HTML com conteúdo no #root e uma página por artigo do blog.
+const { prerenderMarketing } = await import("./prerender-marketing.mjs");
+const prerendered = await prerenderMarketing(path.resolve(destination));
+console.log(`✅ Pré-renderização SEO/GEO: ${prerendered.length} páginas`);
