@@ -323,7 +323,8 @@ const OFX = {
     };
   },
 
-  processImport() {
+  async processImport() {
+    if (this._importando) return;
     if (!this._importData || !this._importData.transacoes.length) {
       Utils.toast('Nenhum dado de extrato carregado para importar.', 'warning');
       return;
@@ -345,6 +346,18 @@ const OFX = {
       if (this._chaveConta(imp.banco_id, imp.conta_id, imp.conta_bancaria) !== chaveConta) continue;
       for (const t of imp.transacoes || []) if (t.fitid || t.id) fitidsExistentes.add(String(t.fitid || t.id));
     }
+    // VARREDURA 2026-10-03 #8: também consulta o registro do servidor (extrato importado em outro aparelho).
+    const dadosImport = this._importData;
+    this._importando = true;
+    let consultouServidor = false;
+    try {
+      const fitidsArquivo = dadosImport.transacoes.map(t => String(t.fitid || '')).filter(Boolean);
+      const doServidor = await this._fitidsNoServidor(chaveConta, fitidsArquivo);
+      if (doServidor) { consultouServidor = true; doServidor.forEach(f => fitidsExistentes.add(f)); }
+    } finally {
+      this._importando = false;
+    }
+    if (this._importData !== dadosImport) return; // outro arquivo foi carregado enquanto consultava
     const vistosNoArquivo = new Set();
     const novas = this._importData.transacoes.filter(t => {
       const f = String(t.fitid || '');
@@ -407,8 +420,10 @@ const OFX = {
       transacoes: trns
     };
 
+    importRec.registro_servidor = 'pendente';
     DB.add('ofximports', importRec);
     const newId = importRec.id;
+    this._registrarFitidsNoServidor(importRec);
 
     this._importData = null;
     const parseRes = document.getElementById('ofx-parse-result');
@@ -416,7 +431,7 @@ const OFX = {
     const btnImp = document.getElementById('ofx-import-btn');
     if (btnImp) btnImp.style.display = 'none';
 
-    Utils.toast(`Extrato importado com ${trns.length} transações pendentes! O robô calculou ${sugestoesCount} sugestões para sua conferência.${repetidas ? ` ${repetidas} transação(ões) já importada(s) antes foram ignoradas.` : ''}`, repetidas ? 'warning' : 'success');
+    Utils.toast(`Extrato importado com ${trns.length} transações pendentes! O robô calculou ${sugestoesCount} sugestões para sua conferência.${repetidas ? ` ${repetidas} transação(ões) já importada(s) antes foram ignoradas.` : ''}${consultouServidor ? '' : ' Sem conexão com o servidor: a checagem de extrato repetido valeu só para este aparelho.'}`, (repetidas || !consultouServidor) ? 'warning' : 'success');
 
     // Refresh OFX screen
     const el = document.getElementById('route-content');
@@ -804,6 +819,43 @@ const OFX = {
     DB.update('lancamentos', lanId, patch);
   },
 
+  // ── Registro de FITIDs no servidor (VARREDURA 2026-10-03 #8) ──────────────
+  async _chamarRegistroOfx(payload) {
+    if (typeof DB === 'undefined' || (!DB._fetchWithTimeout && typeof fetch === 'undefined')) return null;
+    try {
+      const opts = { method: 'POST', headers: DB._apiHeaders ? DB._apiHeaders() : { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) };
+      const res = DB._fetchWithTimeout ? await DB._fetchWithTimeout('/api/v2/ofx/fitids', opts, 10000) : await fetch('/api/v2/ofx/fitids', opts);
+      if (!res || !res.ok) return null;
+      const json = await res.json().catch(() => null);
+      return json && json.success ? json : null;
+    } catch {
+      return null;
+    }
+  },
+
+  /** Set com os FITIDs desta conta que o servidor já conhece, ou null se não deu para consultar. */
+  async _fitidsNoServidor(chaveConta, fitids) {
+    if (!fitids.length) return new Set();
+    const json = await this._chamarRegistroOfx({ action: 'check', conta: chaveConta, fitids });
+    return json ? new Set((json.existentes || []).map(String)) : null;
+  },
+
+  async _registrarFitidsNoServidor(imp) {
+    if (!imp || imp.registro_servidor === 'ok') return false;
+    const fitids = (imp.transacoes || []).map(t => String(t.fitid || '')).filter(Boolean);
+    const chave = this._chaveConta(imp.banco_id, imp.conta_id, imp.conta_bancaria);
+    const json = fitids.length ? await this._chamarRegistroOfx({ action: 'register', conta: chave, fitids, import_id: imp.id }) : { success: true };
+    if (!json) return false; // fica 'pendente' e é reenviado ao abrir a tela
+    if (DB.getById('ofximports', imp.id)) DB.update('ofximports', imp.id, { registro_servidor: 'ok' });
+    return true;
+  },
+
+  _reenviarRegistrosPendentes() {
+    for (const imp of DB.getAll('ofximports') || []) {
+      if (imp.registro_servidor === 'pendente') this._registrarFitidsNoServidor(imp);
+    }
+  },
+
   _chaveConta(bancoId, contaId, contaBancaria) {
     const b = String(bancoId || '').trim(), c = String(contaId || '').trim();
     return (b || c) ? `${b}|${c}` : `nome:${String(contaBancaria || '').trim().toLowerCase()}`;
@@ -1012,6 +1064,8 @@ const OFX = {
       });
     }
     DB.remove('ofximports', importId);
+    // Libera as transações no registro do servidor para o extrato poder ser importado de novo.
+    this._chamarRegistroOfx({ action: 'unregister', import_id: importId });
     Utils.toast('Extrato excluído com sucesso.', 'success');
     const el = document.getElementById('route-content');
     if (el) {
@@ -1059,6 +1113,7 @@ const OFX = {
   },
 
   init(obraId) {
+    this._reenviarRegistrosPendentes();
     const drop = document.getElementById('ofx-drop');
     const file = document.getElementById('ofx-file');
     if (!drop || !file) return;

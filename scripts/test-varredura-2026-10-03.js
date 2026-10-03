@@ -362,11 +362,11 @@ function appCtx(modulos) {
   DB.add('lancamentos', { id: 'P1', tipo: 'despesa', descricao: 'Parcela 1/3', valor: 500, data: '2026-09-10', data_vencimento: '2026-09-10', status: 'a_pagar' });
   DB.add('lancamentos', { id: 'P2', tipo: 'despesa', descricao: 'Parcela 2/3', valor: 500, data: '2026-09-17', data_vencimento: '2026-09-17', status: 'a_pagar' });
   const ofx = `<OFX><BANKID>341</BANKID><ACCTID>1234</ACCTID><DTSTART>20260901</DTSTART><DTEND>20260930</DTEND><STMTTRN><TRNTYPE>DEBIT</TRNTYPE><DTPOSTED>20260910</DTPOSTED><TRNAMT>-500.00</TRNAMT><FITID>X1</FITID><MEMO>Pagamento</MEMO></STMTTRN></OFX>`;
-  OFX._importData = OFX._parseOFX(ofx); OFX.processImport();
+  OFX._importData = OFX._parseOFX(ofx); await OFX.processImport();
   const imp1 = DB.getAll('ofximports')[0];
   OFX._confirmarTodosMatchesRobo(imp1.id);
   assert.equal(DB.getById('lancamentos', 'P1').status, 'pago');
-  OFX._importData = OFX._parseOFX(ofx); OFX.processImport();
+  OFX._importData = OFX._parseOFX(ofx); await OFX.processImport();
   assert.equal(DB.getAll('ofximports').length, 1, 'mesmo extrato não é importado de novo');
   assert(toasts.some(t => /já foi importado/.test(t.m)));
   assert.equal(DB.getById('lancamentos', 'P2').status, 'a_pagar', 'parcela 2 não é "paga" por reimportação');
@@ -377,7 +377,7 @@ function appCtx(modulos) {
   // Lote: só valor exato.
   DB.add('lancamentos', { id: 'Q', tipo: 'despesa', descricao: 'Cimento', valor: 95, data: '2026-09-20', data_vencimento: '2026-09-20', status: 'a_pagar' });
   const ofx2 = `<OFX><BANKID>341</BANKID><ACCTID>1234</ACCTID><STMTTRN><TRNTYPE>DEBIT</TRNTYPE><DTPOSTED>20260920</DTPOSTED><TRNAMT>-100.00</TRNAMT><FITID>X2</FITID><MEMO>Cimento</MEMO></STMTTRN></OFX>`;
-  OFX._importData = OFX._parseOFX(ofx2); OFX.processImport();
+  OFX._importData = OFX._parseOFX(ofx2); await OFX.processImport();
   const imp2 = DB.getAll('ofximports').find(i => i.transacoes.some(t => t.fitid === 'X2'));
   OFX._confirmarTodosMatchesRobo(imp2.id);
   assert.equal(DB.getById('lancamentos', 'Q').status, 'a_pagar', 'diferença de R$ 5 não é conciliada em lote');
@@ -758,4 +758,122 @@ function appCtx(modulos) {
   console.log('  ✓ UX/performance: BIM sob demanda, Sentry com defer, vídeo só no desktop, cache sem acúmulo, aviso de servidor fora, acessibilidade, 390px, imagens e e-mails reais');
 }
 
-console.log('\n✅ Varredura 03/10/2026 (rápidas, dados, OFX, NF-e, financeiro, cliente/portal, obras e UX/performance): tudo certo.');
+
+// ── Pendentes opcionais ───────────────────────────────────────────────────────
+
+// #8 — Registro de FITIDs no servidor: extrato importado num aparelho não entra de novo em outro.
+{
+  const { handleOfxFitids } = await import('../api/_ofx-registry.js');
+  const db = new PGlite();
+  const mig = read('migrations/039_ofx_transacoes_importadas.sql').replace(/DO \$\$[\s\S]*?END \$\$;/, '');
+  await db.exec(mig);
+  const sql = async (strings, ...values) => { let t = strings[0]; values.forEach((_, k) => { t += `$${k + 1}` + strings[k + 1]; }); return (await db.query(t, values)).rows; };
+  const auth = { authenticated: true, tenantId: 'acme', user: { id: 'u1', perfil: 'admin' } };
+  const call = async (body, a = auth) => { let status = 200, out; const res = { status(c) { status = c; return this; }, json(b) { out = b; return this; }, setHeader() {} }; await handleOfxFitids({ method: 'POST', headers: {}, body }, res, { sql, resolveAuth: async () => a, rateLimit: async () => ({ allowed: true }) }); return { status, out }; };
+  assert.deepEqual((await call({ action: 'check', conta: '341|1234', fitids: ['X1', 'X2'] })).out.existentes, []);
+  assert.equal((await call({ action: 'register', conta: '341|1234', fitids: ['X1', 'X2', 'X2'], import_id: 'imp1' })).out.registrados, 2);
+  assert.equal((await call({ action: 'register', conta: '341|1234', fitids: ['X2', 'X3'], import_id: 'imp2' })).out.registrados, 1, 'repetido não duplica');
+  assert.deepEqual([...(await call({ action: 'check', conta: '341|1234', fitids: ['X1', 'X9'] })).out.existentes], ['X1']);
+  assert.deepEqual([...(await call({ action: 'check', conta: '001|9', fitids: ['X1'] })).out.existentes], [], 'outra conta não conflita');
+  assert.deepEqual([...(await call({ action: 'check', conta: '341|1234', fitids: ['X1'] }, { ...auth, tenantId: 'outra' })).out.existentes], [], 'outra empresa não vê');
+  assert.equal((await call({ action: 'unregister', import_id: 'imp1' })).out.removidos, 2);
+  assert.deepEqual([...(await call({ action: 'check', conta: '341|1234', fitids: ['X1', 'X3'] })).out.existentes], ['X3'], 'excluir o import libera o extrato');
+  assert.equal((await call({ action: 'check', conta: '341|1234', fitids: ['X1'] }, { authenticated: false, status: 401 })).status, 401);
+  assert.equal((await call({ action: 'register', conta: '341|1234', fitids: ['Z'] }, { ...auth, user: { id: 'v', perfil: 'visualizador' } })).status, 403, 'somente leitura não registra');
+  await db.close();
+
+  // App: consulta o servidor antes de importar; sem servidor, segue só com a checagem local.
+  const { ctx, toasts } = appCtx([['js/ofx.js', 'OFX']]);
+  const { DB, OFX } = ctx;
+  OFX.viewImport = () => {}; OFX.render = () => ''; OFX.init = () => {};
+  const chamadas = [];
+  ctx.DB._fetchWithTimeout = async (url, opts) => {
+    const b = JSON.parse(opts.body); chamadas.push(b.action);
+    return { ok: true, json: async () => (b.action === 'check' ? { success: true, existentes: ['Y1'] } : { success: true, registrados: 1 }) };
+  };
+  const ofx = `<OFX><BANKID>341</BANKID><ACCTID>1234</ACCTID><STMTTRN><TRNTYPE>DEBIT</TRNTYPE><DTPOSTED>20260910</DTPOSTED><TRNAMT>-50.00</TRNAMT><FITID>Y1</FITID><MEMO>A</MEMO></STMTTRN><STMTTRN><TRNTYPE>DEBIT</TRNTYPE><DTPOSTED>20260911</DTPOSTED><TRNAMT>-60.00</TRNAMT><FITID>Y2</FITID><MEMO>B</MEMO></STMTTRN></OFX>`;
+  OFX._importData = OFX._parseOFX(ofx); await OFX.processImport();
+  const imp = DB.getAll('ofximports')[0];
+  assert.deepEqual(JSON.parse(JSON.stringify(imp.transacoes.map(t => t.fitid))), ['Y2'], 'transação importada em outro aparelho é ignorada');
+  await new Promise(r => setTimeout(r, 0));
+  assert.deepEqual(chamadas, ['check', 'register']);
+  assert.equal(DB.getById('ofximports', imp.id).registro_servidor, 'ok');
+  // Offline: importa com aviso e deixa o registro pendente para reenviar.
+  ctx.DB._fetchWithTimeout = async () => { throw new Error('offline'); };
+  OFX._importData = OFX._parseOFX(ofx.replace(/Y1/g, 'W1').replace(/Y2/g, 'W2')); await OFX.processImport();
+  const imp2 = DB.getAll('ofximports').find(i => i.id !== imp.id);
+  await new Promise(r => setTimeout(r, 0));
+  assert.equal(imp2.transacoes.length, 2); assert.equal(DB.getById('ofximports', imp2.id).registro_servidor, 'pendente');
+  assert(toasts.some(t => /só para este aparelho/.test(t.m)));
+  assert.equal(read('js/ofx.js'), read('frontend/domains/financeiro/ofx.js'));
+  assert.equal(read('api/_ofx-registry.js'), read('backend/domains/edge/_ofx-registry.js'));
+  console.log('  ✓ OFX: transações importadas ficam registradas no servidor (por empresa e conta); outro aparelho não reimporta');
+}
+
+// #41 — Boletim de medição: retenções conforme o tipo de serviço e alíquotas validadas.
+{
+  const { handleV2BoletimMedicao } = await import('../api/_v2-routes.js');
+  const call = async (body) => { let status = 200, out; const res = { status(c) { status = c; return this; }, json(b) { out = b; return this; }, setHeader() {} }; await handleV2BoletimMedicao({ method: 'POST', headers: {}, body, socket: {} }, res); return { status, out }; };
+  const obra = (await call({ valorBruto: 10000, aliqISS: 3 })).out.boletim;
+  assert.equal(obra.retencoes.irrf.valor, 0, 'empreitada de obra sem IRRF');
+  assert.equal(obra.retencoes.pisCofinsCsll.valor, 0, 'empreitada de obra sem CSRF');
+  assert.equal(obra.retencoes.inss.valor, 1100);
+  const simples = (await call({ valorBruto: 10000, tipoServico: 'engenharia_consultiva', optanteSimples: true, aliqIRRF: 1.5 })).out.boletim;
+  assert.equal(simples.retencoes.irrf.valor, 0, 'Simples não sofre IRRF mesmo se pedirem');
+  assert.equal(simples.retencoes.pisCofinsCsll.valor, 0);
+  const cons = (await call({ valorBruto: 10000, tipoServico: 'engenharia_consultiva' })).out.boletim;
+  assert.equal(cons.retencoes.irrf.valor, 150); assert.equal(cons.retencoes.pisCofinsCsll.valor, 465);
+  for (const ruim of [{ aliqISS: -5 }, { aliqISS: 1 }, { aliqISS: 7 }, { aliqRetencaoGarantia: 50 }, { tipoServico: 'x' }, { tipoServico: 'manutencao', aliqIRRF: 9 }]) {
+    assert.equal((await call({ valorBruto: 1000, ...ruim })).status, 400, JSON.stringify(ruim));
+  }
+  assert.equal(read('api/_v2-routes.js'), read('backend/domains/edge/_v2-routes.js'));
+  console.log('  ✓ Boletim: sem IRRF/CSRF em empreitada de obra e no Simples; alíquotas fora da faixa legal recusadas');
+}
+
+
+// Documentos no Vercel Blob: a migração para o R2 leva o ORIGINAL e não troca por cópia degradada.
+{
+  const { migrateLegacyDocumentsToR2 } = await import('../api/_edge-backup.js');
+  const db = new PGlite();
+  await db.exec(`CREATE TABLE documentos (id text, tenant_id text, nome_arquivo text, tipo_arquivo text, tamanho_bytes bigint, base64_data text, url text, created_at timestamptz default now())`);
+  const pdf = Buffer.from('%PDF-1.4 original da conta');
+  const jpgDegradado = Buffer.from([0xff, 0xd8, 0xff, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]).toString('base64');
+  const V = 'https://abc123.public.blob.vercel-storage.com/angelim/documentos/2026/09/';
+  const rows = [
+    ['A', 'conta-A.pdf', 'application/pdf', pdf.length, jpgDegradado, V + 'conta-A.pdf'],            // original acessível
+    ['B', 'conta-B.pdf', 'application/pdf', 18635, jpgDegradado, V + 'conta-B.pdf'],                 // sem original, cópia não confere
+    ['C', 'danfe.pdf', 'application/pdf', pdf.length, pdf.toString('base64'), V + 'danfe.pdf'],      // sem original, cópia fiel
+    ['D', 'foto.jpg', 'image/jpeg', 14, jpgDegradado, null],                                         // só no banco
+    ['E', 'ja.pdf', 'application/pdf', 3, 'QUJD', 'r2://tenants/angelim/documentos/ja.pdf']          // já no R2
+  ];
+  for (const r of rows) await db.query(`INSERT INTO documentos (id, tenant_id, nome_arquivo, tipo_arquivo, tamanho_bytes, base64_data, url) VALUES ($1,'angelim',$2,$3,$4,$5,$6)`, r);
+  const sql = async (strings, ...values) => { let t = strings[0]; values.forEach((_, k) => { t += `$${k + 1}` + strings[k + 1]; }); return (await db.query(t, values)).rows; };
+  sql.query = async (text) => (await db.query(text)).rows;
+  const r2 = new Map();
+  const env = { ATTACHMENTS_R2: {
+    put: async (key, data, opts) => { const bytes = Buffer.from(data); r2.set(key, { bytes, opts }); return { key, size: bytes.length, etag: 'e', httpMetadata: opts.httpMetadata }; },
+    get: async (key) => (r2.has(key) ? { size: r2.get(key).bytes.length, httpMetadata: r2.get(key).opts.httpMetadata, customMetadata: r2.get(key).opts.customMetadata } : null)
+  } };
+  const fetchImpl = async (url) => (url.endsWith('conta-A.pdf')
+    ? { ok: true, headers: { get: () => 'application/pdf' }, arrayBuffer: async () => pdf }
+    : { ok: false, status: 404, headers: { get: () => '' } });
+  const res = await migrateLegacyDocumentsToR2(env, { sql, fetchImpl });
+  const doc = async id => (await db.query(`SELECT * FROM documentos WHERE id=$1`, [id])).rows[0];
+  const a = await doc('A');
+  assert(a.url.startsWith('r2://'), 'A migrado');
+  const objA = [...r2.values()].find(o => o.opts.customMetadata.documentId === 'A');
+  assert(objA.bytes.equals(pdf), 'A: R2 recebeu o PDF original, não o JPG do banco');
+  assert.equal(objA.opts.customMetadata.migratedFrom, 'vercel_blob');
+  const b = await doc('B');
+  assert(b.url.startsWith(V) && b.base64_data === jpgDegradado, 'B: sem original e sem cópia fiel, nada muda');
+  assert(res.failures.some(f => f.id === 'B'));
+  assert((await doc('C')).url.startsWith('r2://'), 'C: cópia fiel usada');
+  assert((await doc('D')).url.startsWith('r2://'), 'D: só no banco, migrado');
+  assert.equal((await doc('E')).base64_data, null, 'E: já no R2, cópia duplicada limpa');
+  assert.equal(res.migrated, 3);
+  assert.equal(read('api/_edge-backup.js'), read('backend/domains/edge/_edge-backup.js'));
+  await db.close();
+  console.log('  ✓ Vercel → R2: leva o original; cópia do banco só se for fiel; nada é apagado quando não há original');
+}
+
+console.log('\n✅ Varredura 03/10/2026 (todas as correções, inclusive OFX no servidor, boletim e documentos do Vercel): tudo certo.');
