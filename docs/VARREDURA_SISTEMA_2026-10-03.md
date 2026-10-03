@@ -117,4 +117,8 @@ Legenda: **C** = confirmado (reproduzido ou evidente no código), **P** = prová
 - ✅ #28 Histórico de preços sem contar a mesma compra duas vezes, e a média é calculada depois de gravar.
 - ⏳ #8 Imports de OFX gravados no servidor: falta. Exige uma tabela nova. Hoje a proteção contra reimportação vale por aparelho.
 
-**Próximos passos:** cliente e portal (#15, #16), obras (#21–#23, #29, #30) e UX/performance (#31–#40).
+**Cliente e portal**
+- ✅ #15 O link do portal agora tem cerca de 120 caracteres e leva só empresa, obra, validade e assinatura (v2). O portal busca os dados atuais no servidor (`POST /api/v2/portal/data`) e não inclui arquivos do armazenamento privado. Links antigos continuam abrindo. A mensagem do WhatsApp não promete mais "tempo real" nem assinatura de documentos. O aviso interno de versão não aparece mais para o cliente.
+- ✅ #16 Cobrança: os estágios passaram a ser faixas de dias (`backend/billing_stages.js`), com envio único por ciclo de vencimento. Nenhum aviso some quando o vencimento cai no fim de semana; isso foi verificado numa simulação com vencimento em cada dia da semana.
+
+**Próximos passos:** obras (#21–#23, #29, #30) e UX/performance (#32–#40).

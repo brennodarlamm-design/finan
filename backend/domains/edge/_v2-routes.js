@@ -23,7 +23,7 @@ import { createOwnerSql, createRuntimeSql } from './_database.js';
 import { querySinapiReferencia, normalizeSinapiParams } from './_sinapi-reference.js';
 import { checkRateLimit, getClientIp } from './_ratelimit.js';
 import { checkRateLimitRedis } from './_edge-redis.js';
-import { handlePortalLinkSign, handlePortalLinkVerify } from './_portal-link.js';
+import { handlePortalLinkSign, handlePortalLinkVerify, handlePortalData } from './_portal-link.js';
 
 // AUDIT-2026-10-02 F5: resolveAuthAndTenant() expõe perfil e plano em auth.user
 // (perfil / tenantPlan). auth.role e auth.plan não existem e faziam o plano cair
@@ -82,6 +82,7 @@ export const V2_ROUTE_SPEC = [
   { method: 'POST', path: '/api/v2/public/newsletter/unsubscribe', desc: 'Cancelamento de inscrição no Radar FinGo' },
   { method: 'POST', path: '/api/v2/portal/link', desc: 'Gera link assinado do Portal do Cliente (autenticado)' },
   { method: 'POST', path: '/api/v2/portal/verify', desc: 'Verifica assinatura de link do Portal do Cliente (público)' },
+  { method: 'POST', path: '/api/v2/portal/data', desc: 'Dados atuais da obra para link v2 do Portal do Cliente (público)' },
   // 4. Construtora / Tenant
   { method: 'GET', path: '/api/v2/tenants/current', desc: 'Dados e preferências da construtora ativa' },
   { method: 'POST', path: '/api/v2/support/chat', desc: 'Mensagens para o Copiloto FinBot com pool de IA' },
@@ -1038,6 +1039,9 @@ export function resolveV2Route(pathname, searchParams) {
   }
   if (pathname === '/api/v2/portal/verify') {
     return { handler: handlePortalLinkVerify, query, moduleName: 'v2-portal-verify' };
+  }
+  if (pathname === '/api/v2/portal/data') {
+    return { handler: handlePortalData, query, moduleName: 'v2-portal-data' };
   }
 
   // 4. Construtora / Tenant

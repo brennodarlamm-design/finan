@@ -58,118 +58,21 @@ const PortalCliente = {
     document.head.appendChild(s);
   },
 
-  // ── GERADOR DE LINK ASSINADO E PACOTE COMPACTO DE DADOS ──
+  // ── GERADOR DE LINK ASSINADO ──
   // AUDIT-2026-10-02 X4: o link é assinado pelo servidor (/api/v2/portal/link). O token antigo
   // (btoa previsível) permitia a qualquer pessoa montar um portal falso em fingo.api.br.
-  // AUDIT-2026-10-02 Y1: CPF/CNPJ do cliente e valor financiado não são exibidos no portal e
-  // não vão mais no link (que circula por WhatsApp e logs de acesso) — minimização da LGPD.
-  _montarPdata(obraId) {
-    const obra = (typeof DB !== 'undefined' && DB.getAll)
-      ? ((DB.getAll('clientes') || []).find(o => String(o.id) === String(obraId)) || {})
-      : {};
-    const tenantId = (typeof Auth !== 'undefined' && Auth.getCurrentTenantId)
-      ? Auth.getCurrentTenantId()
-      : ((typeof DB !== 'undefined' && DB._t) ? DB._t() : '');
-    const empresa = (typeof DB !== 'undefined' && DB.getEmpresa) ? DB.getEmpresa() : {};
-
-    // Constrói o pacote de dados encapsulado
-    const bundle = {
-      t: tenantId,
-      oid: obraId,
-      emp: {
-        n: empresa.nome_fantasia || empresa.razao_social || 'Construtora',
-        logo: empresa.logo_url || '',
-        tel: empresa.telefone || empresa.whatsapp || '',
-        resp: empresa.responsavel || ''
-      },
-      o: {
-        id: obra.id || obraId,
-        n: obra.nome || 'Obra',
-        c: obra.cliente || obra.nome || 'Proprietário',
-        e: obra.endereco || '',
-        cid: obra.cidade || '',
-        uf: obra.estado || '',
-        eng: obra.engenheiro_responsavel || '',
-        di: obra.data_inicio || '',
-        df: obra.data_previsao_termino || '',
-        st: obra.status || 'em_andamento',
-        mod: obra.modalidade_obra || 'caixa',
-        sla: obra.processos_sla || ((typeof CronogramaSLA !== 'undefined') ? CronogramaSLA.getObraProcessos(obraId) : [])
-      },
-      med: ((typeof DB !== 'undefined') ? (DB.getAll('medicoes') || []) : [])
-        .filter(m => String(m.obra_id) === String(obraId))
-        .map(m => ({
-          id: m.id,
-          num: m.numero_medicao || m.numero || 1,
-          desc: m.etapa_descricao || 'Vistoria e Execução',
-          pct: m.percentual_fisico || 0,
-          val: m.valor_liberado || m.valor_solicitado || 0,
-          dt: m.data_medicao || m.data || ''
-        })),
-      nfe: ((typeof DB !== 'undefined') ? (DB.getAll('lancamentos') || []) : [])
-        .filter(l => String(l.obra_id) === String(obraId) && l.tipo === 'despesa')
-        .slice(0, 50)
-        .map(l => ({
-          id: l.id,
-          desc: l.descricao || 'Despesa de Obra',
-          cat: l.categoria || 'Geral',
-          nf: l.numero_nf || '',
-          val: l.valor || 0,
-          dt: l.data || l.created_at || ''
-        })),
-      doc: ((typeof Documentos !== 'undefined' && Documentos.listar)
-        ? [...Documentos.listar('obra', obraId), ...Documentos.listar('orcamento', obraId)]
-        : [])
-        .slice(0, 30)
-        .map(d => ({
-          id: d.id,
-          tit: d.titulo || d.nome_arquivo || 'Documento',
-          tipo: d.tipo_mime || d.tipo_servico || 'Arquivo',
-          url: d.url_externa || d.url || '',
-          dt: d.criado_em || ''
-        })),
-      ctr: ((typeof DB !== 'undefined') ? (DB.getAll('contratos') || []) : [])
-        .filter(c => String(c.obra_id) === String(obraId))
-        .map(c => ({
-          id: c.id,
-          tit: c.titulo || 'Contrato de Obra',
-          st: c.status || 'ativo',
-          ass: !!c.assinado_por_cliente,
-          dtAss: c.data_assinatura_cliente || null,
-          signatario: c.assinatura_cliente_nome || null
-        }))
-    };
-
-    let pdata = '';
-    try {
-      const jsonStr = JSON.stringify(bundle);
-      let b64 = '';
-      try {
-        b64 = btoa(unescape(encodeURIComponent(jsonStr)));
-      } catch {
-        b64 = btoa(encodeURIComponent(jsonStr).replace(/%([0-9A-F]{2})/g, (match, p1) => String.fromCharCode('0x' + p1)));
-      }
-      pdata = b64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-    } catch {
-      pdata = '';
-    }
-
-    return { pdata, tenantId };
-  },
-
+  // AUDIT-2026-10-02 Y1: CPF/CNPJ do cliente e valor financiado não aparecem no portal.
+  // VARREDURA 2026-10-03 #15: o link leva só empresa + obra + validade + assinatura (v2).
+  // O formato antigo (obra inteira em "pdata" na URL) passava de 14 mil caracteres e
+  // congelava os dados; links antigos continuam abrindo.
   async obterUrlAssinada(obraId) {
-    const { pdata } = this._montarPdata(obraId);
-    if (!pdata) {
-      Utils.toast('Não foi possível montar os dados do portal.', 'error');
-      return '';
-    }
     try {
       const headers = (typeof DB !== 'undefined' && DB._apiHeaders) ? DB._apiHeaders() : { 'Content-Type': 'application/json' };
       const res = await fetch('/api/v2/portal/link', {
         method: 'POST',
         headers: { ...headers, 'Content-Type': 'application/json' },
         credentials: 'same-origin',
-        body: JSON.stringify({ pdata }),
+        body: JSON.stringify({ obraId }),
         signal: AbortSignal.timeout(20000)
       });
       const data = await res.json().catch(() => ({}));
@@ -178,7 +81,7 @@ const PortalCliente = {
         return '';
       }
       const origin = (typeof window !== 'undefined' && window.location.origin) ? window.location.origin : 'https://fingo.api.br';
-      return `${origin}/portal?portal_obra=${encodeURIComponent(obraId)}&tenant=${encodeURIComponent(data.tenant || '')}&exp=${encodeURIComponent(data.exp)}&sig=${encodeURIComponent(data.sig)}&pdata=${encodeURIComponent(data.pdata)}`;
+      return `${origin}/portal?portal_obra=${encodeURIComponent(data.obra || obraId)}&tenant=${encodeURIComponent(data.tenant || '')}&exp=${encodeURIComponent(data.exp)}&sig=${encodeURIComponent(data.sig)}`;
     } catch {
       Utils.toast('Sem conexão para gerar o link seguro do portal.', 'error');
       return '';
@@ -189,7 +92,7 @@ const PortalCliente = {
     const clienteNome = obra.cliente || obra.nome || 'Cliente';
     const obraNome = obra.nome || 'Sua Obra';
     const tel = String(obra.telefone || obra.whatsapp || '').replace(/\D/g, '');
-    const msgWhats = `Olá, ${clienteNome}! Segue o link exclusivo para acompanhar a sua obra (${obraNome}) em tempo real pelo nosso Portal de Transparência:\n\n${url}\n\nLá você pode ver o cronograma de fases, fotos, medições aprovadas, comprovantes e assinar documentos pendentes diretamente pelo celular.`;
+    const msgWhats = `Olá, ${clienteNome}! Segue o link exclusivo para acompanhar a sua obra (${obraNome}) pelo nosso Portal de Transparência:\n\n${url}\n\nLá você vê o cronograma de fases, as medições, os comprovantes e os contratos, sempre com os dados mais recentes, direto pelo celular.`;
     return tel
       ? `https://wa.me/55${tel}?text=${encodeURIComponent(msgWhats)}`
       : `https://wa.me/?text=${encodeURIComponent(msgWhats)}`;
@@ -345,7 +248,15 @@ const PortalCliente = {
 
     const rootEl = document.getElementById('app-root') || document.body;
 
-    // 1. Link com payload na URL: só é exibido depois que o servidor confirma a assinatura
+    // 1. Link v2 (empresa + obra + assinatura): o servidor confere e devolve os dados atuais.
+    if (!pdata && params.get('sig') && tenantParam && obraId) {
+      rootEl.innerHTML = `<div style="min-height:100vh;display:flex;align-items:center;justify-content:center;background:#080F05;color:#A8C090;font-size:.9rem;">Carregando a sua obra...</div>`;
+      this._carregarBundleServidor({ tenant: tenantParam, obra: obraId, exp: params.get('exp'), sig: params.get('sig') })
+        .then(bundle => this._finalizarTelaPublica(rootEl, bundle));
+      return;
+    }
+
+    // 1b. Link antigo com payload na URL: só é exibido depois que o servidor confirma a assinatura
     //    (AUDIT-2026-10-02 X4). Link sem assinatura, alterado ou vencido não abre.
     if (pdata) {
       rootEl.innerHTML = `<div style="min-height:100vh;display:flex;align-items:center;justify-content:center;background:#080F05;color:#A8C090;font-size:.9rem;">Verificando link seguro...</div>`;
@@ -429,6 +340,30 @@ const PortalCliente = {
     }
 
     this._finalizarTelaPublica(rootEl, bundle);
+  },
+
+  async _carregarBundleServidor(ref) {
+    try {
+      const res = await fetch('/api/v2/portal/data', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(ref),
+        signal: AbortSignal.timeout(20000)
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.success || !data.bundle?.o) return null;
+      const bundle = data.bundle;
+      // Datas das fases em cascata a partir dos processos salvos (ou do modelo padrão).
+      if (typeof CronogramaSLA !== 'undefined' && CronogramaSLA.calcularCascata) {
+        const base = Array.isArray(bundle.o.sla_raw) && bundle.o.sla_raw.length ? bundle.o.sla_raw : (CronogramaSLA.PADRAO_PROCESSOS || []);
+        try { bundle.o.sla = CronogramaSLA.calcularCascata(base, bundle.o.di); } catch { bundle.o.sla = []; }
+      } else {
+        bundle.o.sla = bundle.o.sla_raw || [];
+      }
+      return bundle;
+    } catch {
+      return null;
+    }
   },
 
   async _verificarLinkAssinado(pdata, exp, sig) {
@@ -518,7 +453,7 @@ const PortalCliente = {
                 </h1>
                 <div style="font-size:.82rem;color:var(--text2);display:flex;gap:14px;flex-wrap:wrap;">
                   <span>👤 <strong>Proprietário:</strong> ${e(o.c)}</span>
-                  ${o.e ? `<span>📍 <strong>Local:</strong> ${e(o.e)} &middot; ${e(o.cid)}/${e(o.uf)}</span>` : ''}
+                  ${o.e ? `<span>📍 <strong>Local:</strong> ${e([o.e, [o.cid, o.uf].filter(Boolean).join('/')].filter(Boolean).join(' · '))}</span>` : ''}
                   ${o.eng ? `<span>👷 <strong>Resp. Técnico:</strong> ${e(o.eng)}</span>` : ''}
                 </div>
               </div>
@@ -892,7 +827,7 @@ const PortalCliente = {
     <div class="page-header">
       <div>
         <h1 class="page-title">🌐 Portal do Cliente &middot; Central de Transparência</h1>
-        <p class="page-sub">Gere e envie links exclusivos e seguros para cada cliente acompanhar sua obra em tempo real, sem necessidade de login</p>
+        <p class="page-sub">Gere e envie links exclusivos e seguros para cada cliente acompanhar sua obra, sempre com os dados mais recentes, sem necessidade de login</p>
       </div>
       <div class="page-actions">
         <button class="btn btn-secondary" data-fb-click="PortalCliente.abrirModalExplicativo" data-fb-click-n="0">

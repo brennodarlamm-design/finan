@@ -4,6 +4,7 @@ import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import cron from 'node-cron';
+import { billingStageFor } from './billing_stages.js';
 import QRCode from 'qrcode';
 import { neon } from '@neondatabase/serverless';
 import fs from 'fs';
@@ -1333,37 +1334,7 @@ async function executarVarreduraCobranca({ manualTrigger = false, forcedTenantId
     let situacaoTxt = '';
     let badgeStatus = 'Aviso';
 
-    if (t.plano === 'trial' && diasRestantes <= 2 && diasRestantes >= 0) {
-      stage = 'trial_ending';
-      templateType = 'trial_ending';
-      situacaoTxt = diasRestantes === 0 ? 'termina hoje' : `termina em ${diasRestantes} dia(s)`;
-      badgeStatus = 'Fim do Trial';
-    } else if (diasRestantes === 10) {
-      stage = 'reminder_10d';
-      templateType = 'reminder';
-      situacaoTxt = 'vence em 10 dias';
-      badgeStatus = 'Vence em 10d';
-    } else if (diasRestantes === 3) {
-      stage = 'reminder_3d';
-      templateType = 'reminder';
-      situacaoTxt = 'vence em 3 dias';
-      badgeStatus = 'Vence em 3d';
-    } else if (diasRestantes === 0) {
-      stage = 'due_today';
-      templateType = 'due_today';
-      situacaoTxt = 'vence hoje';
-      badgeStatus = 'Vence Hoje';
-    } else if (diasRestantes === -1) {
-      stage = 'overdue_1d';
-      templateType = 'overdue';
-      situacaoTxt = 'vencido há 1 dia';
-      badgeStatus = 'Vencido há 1d';
-    } else if (diasRestantes === -5) {
-      stage = 'overdue_5d';
-      templateType = 'overdue';
-      situacaoTxt = 'vencido há 5 dias';
-      badgeStatus = 'Vencido há 5d';
-    }
+    ({ stage, templateType, situacaoTxt, badgeStatus } = billingStageFor(t.plano, diasRestantes));
 
     if (!stage) {
       summary.ignoredNoMatch++;
@@ -1373,12 +1344,16 @@ async function executarVarreduraCobranca({ manualTrigger = false, forcedTenantId
     // ── CHECK ANTI-SPAM / IDEMPOTÊNCIA ──────────────────────────────
     const alreadySent = await sql`
       SELECT id FROM billing_notifications_sent
-      WHERE tenant_id = ${t.id} AND stage = ${stage} AND sent_date = ${hoje}::date
+      WHERE tenant_id = ${t.id} AND stage = ${stage}
+        -- Uma vez por ciclo: desde 15 dias antes deste vencimento (o próximo ciclo é ~1 mês depois).
+        -- O aviso de fim do trial continua diário (últimos 3 dias).
+        AND sent_date >= CASE WHEN ${stage} = 'trial_ending' THEN ${hoje}::date
+                              ELSE (${t.vencimento}::date - INTERVAL '15 days')::date END
       LIMIT 1;
     `;
 
     if (alreadySent.length > 0 && !manualTrigger) {
-      console.log(`ℹ️ [BillingCron:${t.id}] Já notificado hoje sobre estágio "${stage}". Anti-spam ativado.`);
+      console.log(`ℹ️ [BillingCron:${t.id}] Estágio "${stage}" já enviado neste ciclo de vencimento. Anti-spam ativado.`);
       summary.skippedAntiSpam++;
       summary.details.push({ tenant_id: t.id, stage, status: 'skipped_anti_spam' });
       continue;

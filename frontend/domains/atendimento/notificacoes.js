@@ -461,7 +461,9 @@ const Notificacoes = {
   verificarNovidadesAuto() {
     try {
       const key = 'fingo_seen_version_v240';
-      if (!localStorage.getItem(key)) {
+      // Novidade interna do sistema: nunca aparece para o cliente final no Portal de Transparência.
+      const portalPublico = typeof document !== 'undefined' && document.body?.classList?.contains('portal-public-mode');
+      if (!portalPublico && !localStorage.getItem(key)) {
         setTimeout(() => {
           if (typeof this.enviarPushDesktop === 'function') {
             this.enviarPushDesktop(

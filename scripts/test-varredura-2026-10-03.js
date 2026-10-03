@@ -471,4 +471,86 @@ function appCtx(modulos) {
   console.log('  ✓ Lançamento (conta manual), Notas (entrada/saída e valor líquido)');
 }
 
+
+// ── Cliente e cobrança ────────────────────────────────────────────────────────
+{
+  const { billingStageFor } = await import('../backend/billing_stages.js');
+  const dia = (iso, n) => { const d = new Date(`${iso}T12:00:00Z`); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); };
+  // Vencimento em cada dia da semana (05/10/2026 é segunda); cron de segunda a sexta.
+  for (let k = 0; k < 7; k++) {
+    const venc = dia('2026-10-05', k);
+    const enviados = [];
+    for (let n = -12; n <= 16; n++) {
+      const hoje = dia(venc, n);
+      const semana = new Date(`${hoje}T12:00:00Z`).getUTCDay();
+      if (semana === 0 || semana === 6) continue; // cron 1-5
+      const { stage } = billingStageFor('pro', -n);
+      if (stage && !enviados.includes(stage)) enviados.push(stage); // anti-spam por ciclo
+    }
+    for (const st of ['reminder_10d', 'reminder_3d', 'overdue_1d', 'overdue_5d']) {
+      assert(enviados.includes(st), `vencimento ${venc}: estágio ${st} precisa sair (enviados: ${enviados.join(', ')})`);
+    }
+    const semanaVenc = new Date(`${venc}T12:00:00Z`).getUTCDay();
+    if (semanaVenc >= 1 && semanaVenc <= 5) assert(enviados.includes('due_today'), `vencimento em dia útil ${venc}: aviso "vence hoje"`);
+  }
+  assert.equal(billingStageFor('pro', -2).situacaoTxt, 'vencido há 2 dias');
+  assert.equal(billingStageFor('trial', 1).stage, 'trial_ending');
+  const server = read('backend/server.js');
+  assert(/billingStageFor\(t\.plano, diasRestantes\)/.test(server), 'servidor usa as faixas');
+  assert(/INTERVAL '15 days'/.test(server), 'anti-spam por ciclo de vencimento');
+  console.log('  ✓ Cobrança: nenhum aviso some quando o vencimento cai no fim de semana; um envio por estágio e ciclo');
+}
+
+
+{
+  // Portal do cliente v2: link curto assinado; dados atuais vêm do servidor.
+  process.env.SESSION_SIGNING_SECRET = process.env.SESSION_SIGNING_SECRET || 'teste-'.repeat(8);
+  const portal = await import('../api/_portal-link.js');
+  const db = new PGlite();
+  await db.exec(`CREATE TABLE obras (id text, tenant_id text, nome text, cliente text, endereco text, status text, data_inicio date, data_previsao date, cronograma_config jsonb);
+    CREATE TABLE tenants (id text, nome_fantasia text, razao_social text, logo_url text, telefone text, responsavel text);
+    CREATE TABLE medicoes (id text, tenant_id text, obra_id text, numero int, etapa_descricao text, percentual_fisico numeric, valor_liberado numeric, valor_solicitado numeric, data date);
+    CREATE TABLE lancamentos (id text, tenant_id text, obra_id text, tipo text, descricao text, categoria text, valor numeric, data date);
+    CREATE TABLE documentos (id text, tenant_id text, tipo text, referencia_id text, titulo text, nome_arquivo text, tipo_arquivo text, url text, created_at timestamptz);
+    CREATE TABLE contratos (id text, tenant_id text, obra_id text, status text, payload jsonb);
+    INSERT INTO tenants VALUES ('acme','Acme Construtora',NULL,'','(95) 99999-0000','Ana');
+    INSERT INTO obras VALUES ('ob1','acme','Casa Silva','João Silva','Rua A','em_andamento','2026-09-01','2027-02-01','{"processos_sla":[{"id":"p1","nome":"Fundação","dias_sla":10}]}');
+    INSERT INTO obras VALUES ('ob9','outra','Obra de outra empresa','X','','em_andamento',NULL,NULL,NULL);
+    INSERT INTO medicoes VALUES ('m1','acme','ob1',1,'Fundação',20,25000,NULL,'2026-09-20');
+    INSERT INTO lancamentos VALUES ('l1','acme','ob1','despesa','Cimento','material',4500,'2026-09-15'), ('l2','acme','ob1','receita','Medição 1','receita',25000,'2026-09-21');
+    INSERT INTO documentos VALUES ('d1','acme','obra','ob1','Projeto','p.pdf','application/pdf','https://drive.example.com/p.pdf','2026-09-02'), ('d2','acme','obra','ob1','Privado','x.pdf','application/pdf','r2://tenants/acme/x.pdf','2026-09-03');
+    INSERT INTO contratos VALUES ('c1','acme','ob1','ativo','{"titulo":"Contrato de Obra","assinado_por_cliente":true}');`);
+  const sql = async (strings, ...values) => { let t = strings[0]; values.forEach((_, k) => { t += `$${k + 1}` + strings[k + 1]; }); return (await db.query(t, values)).rows; };
+  const call = async (fn, body, deps = {}) => { let status = 200, out; const res = { status(c) { status = c; return this; }, json(b) { out = b; return this; }, setHeader() {} }; await fn({ method: 'POST', headers: {}, body }, res, { sql, ...deps }); return { status, out }; };
+  const auth = { authenticated: true, tenantId: 'acme', user: { id: 'u1', perfil: 'admin', tenantPlan: 'profissional' } };
+  const link = await call(portal.handlePortalLinkSign, { obraId: 'ob1' }, { resolveAuth: async () => auth });
+  assert.equal(link.status, 200); assert.equal(link.out.v, 2);
+  const url = `https://fingo.api.br/portal?portal_obra=${link.out.obra}&tenant=${link.out.tenant}&exp=${link.out.exp}&sig=${link.out.sig}`;
+  assert(url.length < 250, `link curto (${url.length} caracteres)`);
+  assert.equal((await call(portal.handlePortalLinkSign, { obraId: 'ob9' }, { resolveAuth: async () => auth })).status, 404, 'obra de outra empresa não gera link');
+  const ref = { tenant: link.out.tenant, obra: link.out.obra, exp: link.out.exp, sig: link.out.sig };
+  const dados = await call(portal.handlePortalData, ref);
+  assert.equal(dados.status, 200);
+  const b = dados.out.bundle;
+  assert.equal(b.o.n, 'Casa Silva'); assert.equal(b.emp.n, 'Acme Construtora');
+  assert.equal(b.med[0].val, 25000); assert.equal(b.nfe.length, 1, 'só despesas'); assert.equal(b.nfe[0].val, 4500);
+  assert.deepEqual(b.doc.map(d => d.url), ['', 'https://drive.example.com/p.pdf'], 'mais recente primeiro; arquivo privado sem URL e link externo mantido');
+  assert(b.doc.every(d => !String(d.url).startsWith('r2://')), 'arquivo privado não vai para o portal');
+  assert.equal(b.ctr[0].ass, true); assert.equal(b.o.sla_raw[0].nome, 'Fundação');
+  // Dado novo aparece no mesmo link (antes ficava congelado).
+  await db.exec(`INSERT INTO medicoes VALUES ('m2','acme','ob1',2,'Estrutura',45,30000,NULL,'2026-10-01')`);
+  assert.equal((await call(portal.handlePortalData, ref)).out.bundle.med.length, 2, 'mesmo link mostra a medição nova');
+  assert.equal((await call(portal.handlePortalData, { ...ref, obra: 'ob9' })).status, 401, 'trocar a obra invalida a assinatura');
+  assert.equal((await call(portal.handlePortalData, { ...ref, tenant: 'outra' })).status, 401, 'trocar a empresa invalida a assinatura');
+  const expirado = Date.now() - 1000;
+  assert.equal((await call(portal.handlePortalData, { ...ref, exp: expirado, sig: portal.signPortalRef('acme', 'ob1', expirado) })).status, 401, 'link vencido');
+  await db.close();
+  const cli = read('js/portal_cliente.js');
+  assert(!/em tempo real/.test(cli) && !/assinar documentos pendentes/.test(cli), 'mensagem não promete o que o portal não faz');
+  assert(cli.includes("fetch('/api/v2/portal/data'") && cli.includes('JSON.stringify({ obraId })'), 'cliente usa o link v2');
+  assert.equal(cli, read('frontend/domains/gestao/portal_cliente.js'));
+  assert.equal(read('api/_portal-link.js'), read('backend/domains/edge/_portal-link.js'));
+  console.log(`  ✓ Portal: link curto (${url.length} caracteres) e assinado, dados atuais do servidor, sem arquivos privados nem troca de obra/empresa`);
+}
+
 console.log('\n✅ Varredura 03/10/2026 (rápidas, dados, OFX, NF-e e financeiro): tudo certo.');
