@@ -1351,7 +1351,7 @@ const Configuracoes = {
         const backup = JSON.parse(e.target.result);
         if (!backup || typeof backup !== 'object') throw new Error('Arquivo JSON inválido.');
 
-        Utils.confirm('⚠️ Tem certeza que deseja restaurar este backup? Os dados atuais serão substituídos pelos do arquivo.', () => {
+        Utils.confirm('⚠️ Restaurar este backup? Os registros do arquivo substituem as versões atuais e são enviados para a nuvem. Registros criados depois do backup são mantidos.', () => {
           // Salva snapshot de emergência antes
           Configuracoes.criarSnapshot();
 
@@ -1385,8 +1385,29 @@ const Configuracoes = {
             });
             grouped.forEach((value, obraId) => localStorage.setItem(DB._fasesDocKey(obraId), JSON.stringify(value)));
           }
-          Utils.toast('✅ Backup restaurado com sucesso!', 'success');
-          setTimeout(() => location.reload(), 800);
+          // Envia os registros restaurados pela fila de sincronização. Antes eles ficavam só
+          // no navegador e o próximo sync com a nuvem desfazia a restauração.
+          let enfileirados = 0;
+          const enviar = (tabela, lista) => {
+            if (!Array.isArray(lista)) return;
+            lista.forEach(item => {
+              if (item && item.id && DB.syncToCloud('save', tabela, item) === true) enfileirados++;
+            });
+          };
+          ['clientes','lancamentos','notas','orcamentos','medicoes','contas','precompras','fornecedores'].forEach(k => enviar(k, backup[k]));
+          enviar('recibos', backup.recibos);
+          enviar('contratos', backup.contratos);
+          enviar('orcamentos_sinapi', backup.orcamentos_sinapi);
+          const aguardarEnvio = async () => {
+            try { if (DB._flushCloudQueue) await Promise.race([DB._flushCloudQueue(), new Promise(r => setTimeout(r, 15000))]); } catch {}
+            const pendentes = DB.getSyncPendingCount ? DB.getSyncPendingCount() : 0;
+            Utils.toast(pendentes
+              ? `✅ Backup restaurado. ${pendentes} registro(s) ainda serão enviados à nuvem quando houver conexão.`
+              : `✅ Backup restaurado e enviado à nuvem (${enfileirados} registros).`, pendentes ? 'warning' : 'success');
+            setTimeout(() => location.reload(), 1200);
+          };
+          Utils.toast(`Restaurando ${enfileirados} registro(s)...`, 'info');
+          aguardarEnvio();
         });
       } catch (err) {
         Utils.toast(`Erro ao importar backup: ${err.message}`, 'error');

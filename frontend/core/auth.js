@@ -589,16 +589,56 @@ const Auth = {
     } catch { return { success:false, changed:false }; }
   },
 
-  logout() {
+  /** Quantidade de alterações deste tenant que ainda não foram enviadas à nuvem. */
+  _pendingSyncCount(tenantId) {
+    if (!tenantId || typeof localStorage === 'undefined') return 0;
+    try {
+      const fila = JSON.parse(localStorage.getItem(`finobra_${tenantId}_sync_queue`) || '[]');
+      return Array.isArray(fila) ? fila.length : 0;
+    } catch { return 0; }
+  },
+
+  logout(confirmado = false) {
+    const session = this.getSession();
+    const tenantId = session?.tenantId || session?.tenant_id;
+    const pendentes = this._pendingSyncCount(tenantId);
+    if (pendentes > 0 && !confirmado && typeof Utils !== 'undefined' && typeof Utils.confirm === 'function') {
+      Utils.confirm(`Há ${pendentes} alteração(ões) ainda não enviada(s) para a nuvem. Se sair agora, elas serão apagadas deste aparelho. Conecte-se à internet e aguarde a sincronização para não perdê-las. Sair mesmo assim?`, () => this.logout(true));
+      return;
+    }
     const headers = this.getAuthHeaders();
     fetch('/api/auth?action=logout', { method:'POST', headers, body:'{}', keepalive:true }).catch(() => {});
     this.logoutSilently();
-    window.location.replace('/login');
+    // Logout explícito: apaga também a cópia em IndexedDB (computador compartilhado).
+    Promise.race([this._clearTenantIndexedDB(tenantId), new Promise(resolve => setTimeout(resolve, 1500))])
+      .finally(() => window.location.replace('/login'));
   },
 
-  logoutSilently() {
+  async _clearTenantIndexedDB(tenantId) {
+    if (typeof IDBStorage === 'undefined' || !IDBStorage.isAvailable?.()) return;
+    try {
+      const keys = await IDBStorage.getAllKeys();
+      for (const k of keys || []) {
+        if (typeof k !== 'string' || !k.startsWith('finobra_')) continue;
+        if (/_sync_queue$/.test(k) && tenantId && !k.startsWith(`finobra_${tenantId}_`)) continue; // fila de outra empresa
+        try { await IDBStorage.removeItem(k); } catch {}
+      }
+    } catch {}
+  },
+
+  /**
+   * Limpa a sessão e o cache local. Filas de sincronização com alterações pendentes de
+   * outras empresas são sempre preservadas; a deste tenant só é preservada quando
+   * `preservarFila` (sessão expirada), para ser enviada depois de entrar de novo.
+   */
+  logoutSilently({ preservarFila = false } = {}) {
     const session = this.getSession();
     const tenantId = session?.tenantId || session?.tenant_id;
+    const filaPendente = (k) => {
+      if (!/^finobra_.+_sync_queue$/.test(k)) return false;
+      if (tenantId && k === `finobra_${tenantId}_sync_queue` && !preservarFila) return false;
+      try { const v = JSON.parse(localStorage.getItem(k) || '[]'); return Array.isArray(v) && v.length > 0; } catch { return false; }
+    };
 
     // H-16: Expurgo de dados financeiros e operacionais em cache local no logout
     if (typeof localStorage !== 'undefined') {
@@ -609,6 +649,8 @@ const Auth = {
           if (!k) continue;
           // Preserva preferências agnósticas de UI (ex: tema claro/escuro)
           if (k === 'finobra_theme' || k === 'finobra_color_theme') continue;
+          // Nunca descarta alterações ainda não enviadas sem o usuário saber.
+          if (filaPendente(k)) continue;
 
           if (
             (tenantId && (k.includes(`_${tenantId}_`) || k.includes(`finobra_${tenantId}`))) ||
@@ -643,7 +685,8 @@ const Auth = {
   },
 
   handleSessionExpired() {
-    this.logoutSilently();
+    // Sessão expirada não é decisão do usuário: mantém a fila offline para enviar após novo login.
+    this.logoutSilently({ preservarFila: true });
     if (typeof window !== 'undefined') {
       const p = window.location.pathname;
       const isLogin = p === '/login' || p === '/login.html' || p === '/cadastro' || p.endsWith('index.html');

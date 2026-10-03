@@ -5,6 +5,7 @@ import fs from 'node:fs';
 import vm from 'node:vm';
 import { PGlite } from '@electric-sql/pglite';
 import { EvolutionGoClient } from '../backend/domains/atendimento/evolution_client.js';
+import { createCriticalR2Backup } from '../api/_edge-backup.js';
 
 const read = (file) => fs.readFileSync(file, 'utf8');
 
@@ -105,4 +106,149 @@ console.log('=== Varredura 03/10/2026: correções rápidas ===\n');
   console.log('  ✓ Contrato: sem valores de exemplo; entrada 0 gera cláusula própria');
 }
 
-console.log('\n✅ Varredura 03/10/2026 (correções rápidas): tudo certo.');
+
+// ── Proteção de dados ─────────────────────────────────────────────────────────
+
+// Ambiente de navegador compartilhado entre "abas": mesmo localStorage, IndexedDB em memória.
+function navegador() {
+  const store = new Map();
+  const idb = new Map();
+  const tabs = [];
+  const localStorage = {
+    getItem: k => (store.has(k) ? store.get(k) : null),
+    setItem(k, v) {
+      const old = store.has(k) ? store.get(k) : null;
+      v = String(v); store.set(k, v);
+      // Como no navegador: o evento "storage" chega nas OUTRAS abas.
+      for (const t of tabs) if (t.writer !== this.__tab) t.fire({ key: k, oldValue: old, newValue: v });
+    },
+    removeItem(k) { store.delete(k); },
+    key: i => [...store.keys()][i] ?? null,
+    get length() { return store.size; }
+  };
+  const IDBStorage = {
+    isAvailable: () => true,
+    async getItem(k) { return idb.has(k) ? structuredClone(idb.get(k)) : null; },
+    async setItem(k, v) { idb.set(k, structuredClone(v)); },
+    async removeItem(k) { idb.delete(k); },
+    async getAllKeys() { return [...idb.keys()]; }
+  };
+  function abrirAba(nome) {
+    const listeners = {};
+    const tabLS = Object.create(localStorage);
+    tabLS.__tab = nome;
+    tabLS.setItem = function (k, v) { localStorage.setItem.call({ __tab: nome }, k, v); };
+    const ctx = vm.createContext({
+      console, structuredClone, setTimeout, clearTimeout, Promise,
+      localStorage: tabLS, IDBStorage,
+      Auth: { getCurrentTenantId: () => 't1', canModule: () => true, getAuthHeaders: () => ({}) },
+      navigator: { onLine: false },
+      window: { addEventListener: (t, fn) => { (listeners[t] ||= []).push(fn); }, dispatchEvent() {} },
+      CustomEvent: class { constructor(t, o) { this.type = t; this.detail = o?.detail; } },
+      crypto: { randomUUID: () => Math.random().toString(16).slice(2) + Date.now().toString(16) },
+      document: { getElementById: () => null }
+    });
+    vm.runInContext(`${read('js/data.js')}\nglobalThis.DB = DB;`, ctx);
+    const tab = { nome, writer: null, fire: ev => (listeners.storage || []).forEach(fn => fn(ev)), DB: ctx.DB, ctx };
+    tabs.push(tab);
+    return tab;
+  }
+  return { abrirAba, store, idb, localStorage };
+}
+
+{
+  const src = read('js/data.js');
+  assert.equal((src.match(/^  init\(\) \{/gm) || []).length, 1, 'DB.init definido uma única vez');
+  const initBody = src.slice(src.indexOf('  init() {'), src.indexOf('  _bindNetworkListeners() {'));
+  assert(/_hydrateFromIndexedDB\(\)/.test(initBody) && /_bindCrossTabChannel\(\)/.test(initBody), 'init lê o IndexedDB e liga a sincronia entre abas');
+  assert(!/purgeStorage\(\)/.test(initBody), 'purgeStorage não roda em toda abertura');
+  assert.equal(src, read('frontend/core/data.js'), 'data.js espelhado');
+
+  // IndexedDB é lido de volta quando o localStorage perdeu a coleção.
+  const nav = navegador();
+  await nav.idb.set('finobra_t1_lancamentos', [{ id: 'salvo-no-idb', valor: 10 }]);
+  const a = nav.abrirAba('A');
+  a.DB._syncQueueKey = () => 'finobra_t1_sync_queue';
+  a.DB.syncToCloud = () => true;
+  a.DB.init();
+  await a.DB._hydrationPromise;
+  assert.deepEqual(JSON.parse(JSON.stringify(a.DB.getAll('lancamentos').map(l => l.id))), ['salvo-no-idb'], 'coleção recuperada do IndexedDB');
+  console.log('  ✓ DB.init único: IndexedDB recuperado, sincronia entre abas ativa, sem purge na abertura');
+}
+
+{
+  // Duas abas offline: a aba 1 (cache antigo) não pode apagar o que a aba 2 lançou.
+  const nav = navegador();
+  const t1 = nav.abrirAba('1'), t2 = nav.abrirAba('2');
+  for (const t of [t1, t2]) { t.DB.canWriteLocal = () => true; t.DB.init(); await t.DB._hydrationPromise; t.DB._flushCloudQueue = async () => {}; t.DB._scheduleFlush = () => {}; }
+  t1.DB.getAll('lancamentos'); t1.DB._getSyncQueue(); // aba 1 já tem tudo em memória
+  t2.DB.add('lancamentos', { id: 'X', valor: 100 });
+  t1.DB.add('lancamentos', { id: 'Y', valor: 200 });
+  const final = JSON.parse(nav.store.get('finobra_t1_lancamentos'));
+  assert.deepEqual(final.map(l => l.id).sort(), ['X', 'Y'], 'as duas abas mantêm seus lançamentos');
+  const fila = JSON.parse(nav.store.get('finobra_t1_sync_queue') || '[]').map(q => q.payload?.data?.id).sort();
+  assert.deepEqual(fila, ['X', 'Y'], 'fila de envio com os dois lançamentos');
+  console.log('  ✓ Duas abas offline: nenhuma sobrescreve o lançamento nem a fila da outra');
+}
+
+{
+  // Sessão expirada não apaga a fila offline; logout explícito apaga, mas nunca a de outra empresa.
+  const nav = navegador();
+  const ctx = vm.createContext({ console, localStorage: nav.localStorage, sessionStorage: { getItem: () => null, removeItem() {} }, window: {} });
+  vm.runInContext(`${read('js/auth.js')}\nglobalThis.Auth = Auth;`, ctx);
+  const Auth = ctx.Auth;
+  const prepara = () => {
+    nav.localStorage.setItem(Auth.SESSION_KEY, JSON.stringify({ tenantId: 't1' }));
+    nav.localStorage.setItem('finobra_t1_sync_queue', JSON.stringify([{ queueId: 'q1' }]));
+    nav.localStorage.setItem('finobra_t1_lancamentos', '[{"id":"a"}]');
+    nav.localStorage.setItem('finobra_t2_sync_queue', JSON.stringify([{ queueId: 'q2' }]));
+  };
+  prepara();
+  Auth.logoutSilently({ preservarFila: true });
+  assert(nav.store.has('finobra_t1_sync_queue'), 'sessão expirada preserva a fila do tenant');
+  assert(!nav.store.has('finobra_t1_lancamentos'), 'o cache comum continua sendo limpo');
+  prepara();
+  Auth.logoutSilently();
+  assert(!nav.store.has('finobra_t1_sync_queue'), 'logout explícito (já confirmado) apaga a fila do tenant');
+  assert(nav.store.has('finobra_t2_sync_queue'), 'fila pendente de outra empresa nunca é apagada');
+  const auth = read('js/auth.js');
+  assert(/handleSessionExpired\(\) \{\s*\/\/[^\n]*\n\s*this\.logoutSilently\(\{ preservarFila: true \}\)/.test(auth), 'handleSessionExpired preserva a fila');
+  assert(/alteração\(ões\) ainda não enviada\(s\)/.test(auth), 'logout pede confirmação com alterações pendentes');
+  assert(/logoutSilently\(\{ preservarFila: true \}\)/.test(read('js/login_page.js')), 'tela de login (expired=1) preserva a fila');
+  console.log('  ✓ Logout/expiração: fila offline preservada, confirmação antes de descartar e filas de outras empresas intactas');
+}
+
+{
+  // Restaurar backup passa pela fila de sincronização.
+  const cfg = read('js/configuracoes.js');
+  const bloco = cfg.slice(cfg.indexOf('  importarBackup(input) {'), cfg.indexOf('  async sincronizarTudoNeon()'));
+  assert(/DB\.syncToCloud\('save', tabela, item\)/.test(bloco), 'restauração enfileira os registros para a nuvem');
+  console.log('  ✓ Restaurar backup envia os registros pela fila (não é desfeito no próximo sync)');
+}
+
+{
+  // Backup diário: tabelas reais e falha de uma tabela não aborta as demais.
+  const lidas = [];
+  const sqlFactory = () => ({
+    query: async (q) => {
+      const t = q.match(/FROM "([^"]+)"/)[1];
+      lidas.push(t);
+      if (t === 'ocr_historico') throw new Error('relation "ocr_historico" does not exist');
+      return [{ id: 1 }];
+    }
+  });
+  const puts = [];
+  const bucket = { put: async (key, body) => { puts.push(key); return { size: body.byteLength ?? body.length }; } };
+  const env = { BACKUP_ENCRYPTION_KEY: 'k'.repeat(40), DATABASE_URL: 'postgres://x', BACKUPS_R2: bucket };
+  const manifest = await createCriticalR2Backup(env, { force: true, sqlFactory });
+  assert(!lidas.includes('clientes') && !lidas.includes('contas'), 'não consulta tabelas inexistentes');
+  for (const t of ['obras', 'contas_bancarias', 'notas_fiscais', 'precompras', 'recibos', 'obra_doc_fases', 'tenant_preferences']) assert(lidas.includes(t), `backup inclui ${t}`);
+  assert.equal(manifest.ok, false);
+  assert.deepEqual(manifest.failedTables, ['ocr_historico']);
+  assert.equal(manifest.tables.lancamentos, 1, 'as outras tabelas foram copiadas');
+  assert(puts.some(k => k.endsWith('snapshot.json.enc')), 'snapshot gravado mesmo com uma tabela falhando');
+  assert.equal(read('api/_edge-backup.js'), read('backend/domains/edge/_edge-backup.js'), '_edge-backup espelhado');
+  console.log('  ✓ Backup diário: tabelas reais (sem clientes/contas), inclui notas/pré-compras/recibos e tolera falha isolada');
+}
+
+console.log('\n✅ Varredura 03/10/2026 (correções rápidas e proteção de dados): tudo certo.');

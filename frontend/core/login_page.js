@@ -3,11 +3,22 @@ if (window.location.hash.startsWith('#validar') || window.location.search.includ
     window.location.href = '/validar' + window.location.search;
   }
   if (window.location.search.includes('expired=1')) {
-    Auth.logoutSilently();
+    // Sessão expirada: mantém alterações feitas offline para enviar depois do novo login.
+    Auth.logoutSilently({ preservarFila: true });
+    let pendentesOffline = 0;
+    try {
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (k && /^finobra_.+_sync_queue$/.test(k)) {
+          const fila = JSON.parse(localStorage.getItem(k) || '[]');
+          if (Array.isArray(fila)) pendentesOffline += fila.length;
+        }
+      }
+    } catch {}
     window.addEventListener('DOMContentLoaded', () => {
       const eBox = document.getElementById('err-box');
       if (eBox) {
-        eBox.textContent = 'Sua sessão foi redefinida por segurança após atualização do servidor. Por favor, faça login novamente.';
+        eBox.textContent = 'Sua sessão expirou. Por favor, faça login novamente.' + (pendentesOffline ? ` ${pendentesOffline} alteração(ões) feitas sem internet foram guardadas neste aparelho e serão enviadas quando você entrar.` : '');
         eBox.style.display = 'block';
       }
     });

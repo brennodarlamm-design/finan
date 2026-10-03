@@ -144,6 +144,14 @@ const DB = {
       if (!e.key) return;
       const tenant = this._t();
       if (e.key.startsWith(`finobra_${tenant}_`)) {
+        // Outra aba gravou (coleção ou fila de sync): atualiza a memória desta aba
+        // antes de qualquer escrita, para não sobrescrever o que a outra aba salvou.
+        if (this._memCache) {
+          if (e.newValue === null) this._memCache.delete(e.key);
+          else {
+            try { this._memCache.set(e.key, JSON.parse(e.newValue)); } catch { this._memCache.delete(e.key); }
+          }
+        }
         const table = e.key.replace(`finobra_${tenant}_`, '');
         this._handleCrossTabMutation(table);
       }
@@ -176,15 +184,15 @@ const DB = {
   async _handleCrossTabMutation(table) {
     const storageKey = this._k(table);
     let updatedData = null;
-    if (typeof IDBStorage !== 'undefined' && IDBStorage.isAvailable()) {
+    // localStorage é gravado de forma síncrona pela outra aba; o IndexedDB pode ainda
+    // ter a versão anterior. Só recorre ao IndexedDB quando a chave não cabe no localStorage.
+    try {
+      const raw = localStorage.getItem(storageKey);
+      if (raw) updatedData = JSON.parse(raw);
+    } catch {}
+    if (!updatedData && typeof IDBStorage !== 'undefined' && IDBStorage.isAvailable()) {
       try {
         updatedData = await IDBStorage.getItem(storageKey);
-      } catch {}
-    }
-    if (!updatedData) {
-      try {
-        const raw = localStorage.getItem(storageKey);
-        if (raw) updatedData = JSON.parse(raw);
       } catch {}
     }
     if (Array.isArray(updatedData) && this._memCache) {
@@ -238,12 +246,40 @@ const DB = {
     }
   },
 
+  // Única definição de init (havia uma segunda no fim do objeto que substituía esta:
+  // o IndexedDB nunca era lido de volta, não havia sincronia entre abas e o
+  // purgeStorage rodava em toda abertura apagando anexos ainda não migrados).
+  // O purgeStorage agora só roda quando o localStorage estoura a cota.
   init() {
+    this._migrateLegacyTenantCache();
+    this.expurgarDadosDemo();
+    // Garante que todas as coleções existam no LocalStorage como array vazio se inexistentes
+    Object.keys(this.K).forEach(k => {
+      const sk = this._k(k);
+      if (localStorage.getItem(sk) === null) {
+        localStorage.setItem(sk, '[]');
+      }
+    });
+    const docsKey = this._ck('finobra_documentos');
+    if (localStorage.getItem(docsKey) === null) {
+      localStorage.setItem(docsKey, '[]');
+    }
+    const recKey = this._ck('finobra_recibos');
+    if (localStorage.getItem(recKey) === null) {
+      localStorage.setItem(recKey, '[]');
+    }
+    const ctKey = this._ck('finobra_contratos');
+    if (localStorage.getItem(ctKey) === null) {
+      localStorage.setItem(ctKey, '[]');
+    }
+    const sinapiKey = this._ck('orcamentos_sinapi');
+    if (localStorage.getItem(sinapiKey) === null) {
+      localStorage.setItem(sinapiKey, '[]');
+    }
     this._initMemoryCache();
     this._bindNetworkListeners();
     this._bindCrossTabChannel();
-    this.expurgarDadosDemo();
-    this._hydrateFromIndexedDB();
+    this._hydrationPromise = this._hydrateFromIndexedDB();
     const pending = this.getSyncPendingCount ? this.getSyncPendingCount() : 0;
     const failed = this.getSyncFailedCount ? this.getSyncFailedCount() : 0;
     if (failed > 0) {
@@ -414,8 +450,9 @@ const DB = {
     if (this._memCache) this._memCache.set(storageKey, normalized);
 
     // Persistência assíncrona robusta no IndexedDB (sem limite de 5MB do LocalStorage)
+    let idbWrite = null;
     if (typeof IDBStorage !== 'undefined' && IDBStorage.setItem) {
-      IDBStorage.setItem(storageKey, normalized).catch(err => {
+      idbWrite = IDBStorage.setItem(storageKey, normalized).catch(err => {
         console.warn(`[Storage] Falha ao persistir no IndexedDB (${key}):`, err);
       });
     }
@@ -433,8 +470,9 @@ const DB = {
       }
     }
 
-    // Notifica outras abas ativas
-    this._broadcastMutation(key);
+    // Notifica outras abas depois que o IndexedDB tem a versão nova (elas podem ler de lá).
+    if (idbWrite && typeof idbWrite.finally === 'function') idbWrite.finally(() => this._broadcastMutation(key));
+    else this._broadcastMutation(key);
   },
 
   purgeStorage() {
@@ -1383,6 +1421,7 @@ const DB = {
   },
 
   async syncDelta() {
+    if (this._hydrationPromise) { try { await this._hydrationPromise; } catch {} }
     const cursor = this.getSyncCursor();
     if (!cursor) {
       console.info('[Sync] Nenhum cursor prévio; executando sincronização inicial.');
@@ -1525,6 +1564,7 @@ const DB = {
   },
 
   async syncFromCloud() {
+    if (this._hydrationPromise) { try { await this._hydrationPromise; } catch {} }
     this._emitSyncStatus('syncing');
     try {
       const revision = this._localMutationRevision || 0;
@@ -1865,6 +1905,7 @@ const DB = {
   },
 
   async _executeFlushQueue() {
+    if (this._hydrationPromise) { try { await this._hydrationPromise; } catch {} }
     if (this._isCircuitOpen()) {
       const waitMs = Math.max(2000, this._circuitNextAttemptAt - Date.now());
       console.warn(`[Sync] Disjuntor de rede aberto. Aguardando ${Math.ceil(waitMs / 1000)}s antes da próxima sondagem.`);
@@ -3262,35 +3303,6 @@ const DB = {
       estruturaValor: estrutura.reduce((s, l) => s + (l.valor || 0), 0),
       servicosValor: servicos.reduce((s, l) => s + (l.valor || 0), 0)
     };
-  },
-
-  init() {
-    this._migrateLegacyTenantCache();
-    this.purgeStorage();
-    this.expurgarDadosDemo();
-    // Garante que todas as coleções existam no LocalStorage como array vazio se inexistentes
-    Object.keys(this.K).forEach(k => {
-      const sk = this._k(k);
-      if (localStorage.getItem(sk) === null) {
-        localStorage.setItem(sk, '[]');
-      }
-    });
-    const docsKey = this._ck('finobra_documentos');
-    if (localStorage.getItem(docsKey) === null) {
-      localStorage.setItem(docsKey, '[]');
-    }
-    const recKey = this._ck('finobra_recibos');
-    if (localStorage.getItem(recKey) === null) {
-      localStorage.setItem(recKey, '[]');
-    }
-    const ctKey = this._ck('finobra_contratos');
-    if (localStorage.getItem(ctKey) === null) {
-      localStorage.setItem(ctKey, '[]');
-    }
-    const sinapiKey = this._ck('orcamentos_sinapi');
-    if (localStorage.getItem(sinapiKey) === null) {
-      localStorage.setItem(sinapiKey, '[]');
-    }
   },
 
   // ── Expurgar permanentemente dados fictícios de demonstração ──────────────

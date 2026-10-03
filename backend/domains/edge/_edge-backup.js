@@ -5,21 +5,30 @@ import { neon } from '@neondatabase/serverless';
 import { putR2Object, getR2Object, buildR2ObjectKey } from './_edge-r2.js';
 import { dispatchEdgeAlert } from './_edge-alerts.js';
 
+// Nomes reais das tabelas no Neon. "clientes" e "contas" não existem (as obras ficam
+// em "obras" e as contas em "contas_bancarias"): a primeira consulta falhava e
+// abortava o snapshot inteiro.
 const CRITICAL_TABLES = Object.freeze([
   'tenants',
   'usuarios',
   'obras',
-  'clientes',
+  'obra_cadastro_geral',
   'lancamentos',
   'fornecedores',
   'produtos',
-  'contas',
   'contas_bancarias',
+  'notas_fiscais',
+  'precompras',
   'orcamentos',
   'orcamentos_sinapi',
   'medicoes',
   'contratos',
+  'recibos',
   'documentos',
+  'obra_doc_fases',
+  'document_signatures',
+  'ocr_historico',
+  'tenant_preferences',
   'billing_invoices',
   'audit_logs'
 ]);
@@ -149,12 +158,30 @@ export async function createCriticalR2Backup(env, { force = false, sqlFactory = 
     tables: {}
   };
 
+  // Uma tabela com problema não pode derrubar o backup das demais: registra a falha,
+  // segue com as outras e alerta no fim.
+  const failedTables = [];
   for (const table of CRITICAL_TABLES) {
-    const rows = await readCriticalTable(sql, table);
-    snapshot.tables[table] = {
-      count: rows.length,
-      rows
-    };
+    try {
+      const rows = await readCriticalTable(sql, table);
+      snapshot.tables[table] = { count: rows.length, rows };
+    } catch (err) {
+      failedTables.push(table);
+      snapshot.tables[table] = { count: 0, rows: [], error: String(err?.message || err).slice(0, 200) };
+    }
+  }
+  if (failedTables.length === CRITICAL_TABLES.length) {
+    const error = 'Nenhuma tabela pôde ser lida para o backup diário.';
+    await dispatchEdgeAlert(env, { type: 'BACKUP_FAILED', severity: 'CRITICAL', title: 'Backup diário do FinGo falhou', message: error }).catch(() => {});
+    throw new Error(error);
+  }
+  if (failedTables.length) {
+    await dispatchEdgeAlert(env, {
+      type: 'BACKUP_PARTIAL',
+      severity: 'HIGH',
+      title: 'Backup diário do FinGo incompleto',
+      message: `Tabelas não copiadas: ${failedTables.join(', ')}`
+    }).catch(() => {});
   }
 
   const plainBytes = new TextEncoder().encode(safeJson(snapshot));
@@ -174,7 +201,8 @@ export async function createCriticalR2Backup(env, { force = false, sqlFactory = 
 
   // Manifesto separado (somente contagens, sem dados) facilita validar existência/tamanho.
   const manifest = {
-    ok: true,
+    ok: failedTables.length === 0,
+    failedTables,
     key,
     encrypted: true,
     isolatedBucket: isolated,
