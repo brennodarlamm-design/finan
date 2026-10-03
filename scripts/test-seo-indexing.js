@@ -87,6 +87,9 @@ assert(landing.includes('<link rel="canonical" href="https://fingo.api.br/">'), 
 
 // OpenGraph e Twitter Cards 1200x630
 assert(landing.includes('property="og:image" content="https://fingo.api.br/img/og-fingo-cover.jpg"'), 'og:image deve apontar para banner 1200x630');
+for (const page of ['landing.html', 'sobre-nos.html', 'planos.html', 'blog.html', 'calculadora-bdi.html', 'manuais.html', 'privacidade.html', 'termos.html', 'validar.html']) {
+  assert(fs.readFileSync(path.join(root, page), 'utf8').includes('<meta property="fb:app_id" content="2479033335926572">'), `${page} deve declarar fb:app_id`);
+}
 assert(landing.includes('property="og:image:width" content="1200"'), 'og:image:width deve ser 1200');
 assert(landing.includes('property="og:image:height" content="630"'), 'og:image:height deve ser 630');
 assert(landing.includes('name="twitter:card" content="summary_large_image"'), 'twitter:card deve ser summary_large_image');
