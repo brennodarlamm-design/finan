@@ -308,4 +308,21 @@ function navegador() {
   console.log('  ✓ Versão em todas as tabelas: edição velha recusada (409), excluído não volta, sync_all protegido');
 }
 
+
+{
+  // Cursor do delta: hora do servidor no início do download, com 2 min de sobreposição.
+  const nav = navegador();
+  const aba = nav.abrirAba('cursor');
+  const relogioServidor = Date.now() + 10 * 60 * 1000; // aparelho 10 min atrasado
+  aba.DB._trackServerClock({ headers: { get: h => (h === 'date' ? new Date(relogioServidor).toUTCString() : null) } });
+  const inicio = Date.now();
+  const cursor = Date.parse(aba.DB._serverCursor(inicio));
+  const esperado = relogioServidor - 2 * 60 * 1000;
+  assert(Math.abs(cursor - esperado) < 2000, `cursor na hora do servidor menos 2 min (diferença ${cursor - esperado} ms)`);
+  const src = read('js/data.js');
+  assert(/this\.setSyncCursor\(this\._serverCursor\(inicioSnapshot\)\)/.test(src), 'sync completo usa o início do download');
+  assert(/const nextCursor = new Date\(Date\.now\(\) - 2 \* 60 \* 1000\)/.test(read('api/_db-queries.js')), 'delta do servidor com sobreposição');
+  console.log('  ✓ Delta sync: cursor no relógio do servidor, desde o início do download, com sobreposição de 2 min');
+}
+
 console.log('\n✅ Varredura 03/10/2026 (correções rápidas e proteção de dados): tudo certo.');

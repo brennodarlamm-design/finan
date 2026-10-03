@@ -30,7 +30,9 @@ export async function handleDeltaSync(sql, tenantId, auth, query, res) {
   setPrivateNoCache(res);
   const queryObj = (query && typeof query === 'object' && query.query) ? query.query : (query || {});
   const rawCursor = queryObj.cursor || queryObj.since || null;
-  const nextCursor = new Date().toISOString();
+  // Recuo de 2 min: transações que começaram antes desta leitura e terminaram depois
+  // voltam no próximo delta (reaplicar o mesmo registro é idempotente no app).
+  const nextCursor = new Date(Date.now() - 2 * 60 * 1000).toISOString();
 
   let sinceDate = null;
   let isValidSince = false;

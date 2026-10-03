@@ -21,16 +21,39 @@ const DB = {
   _circuitFailureThreshold: 5,
 
   async _fetchWithTimeout(url, options = {}, timeoutMs = 25000) {
+    let res;
     if (typeof Auth !== 'undefined' && typeof Auth._fetchWithTimeout === 'function') {
-      return Auth._fetchWithTimeout(url, options, timeoutMs);
+      res = await Auth._fetchWithTimeout(url, options, timeoutMs);
+    } else {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), timeoutMs);
+      try {
+        res = await fetch(url, { ...options, signal: controller.signal });
+      } finally {
+        clearTimeout(timer);
+      }
     }
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    this._trackServerClock(res);
+    return res;
+  },
+
+  /** Diferença entre o relógio do servidor (cabeçalho Date) e o do aparelho, em ms. */
+  _trackServerClock(res) {
     try {
-      return await fetch(url, { ...options, signal: controller.signal });
-    } finally {
-      clearTimeout(timer);
-    }
+      const header = res?.headers?.get?.('date');
+      const server = header ? Date.parse(header) : NaN;
+      if (Number.isFinite(server)) this._serverClockOffsetMs = server - Date.now();
+    } catch {}
+  },
+
+  /**
+   * Cursor do delta sync na hora do servidor, recuado 2 min: o que outro aparelho gravou
+   * enquanto o snapshot era baixado volta no próximo delta (reaplicar é idempotente), e um
+   * relógio do aparelho adiantado não gera cursor "no futuro" (que forçava sync completo sempre).
+   */
+  _serverCursor(baseMs = Date.now()) {
+    const offset = Number.isFinite(this._serverClockOffsetMs) ? this._serverClockOffsetMs : 0;
+    return new Date(baseMs + offset - 2 * 60 * 1000).toISOString();
   },
 
   _t() {
@@ -1568,6 +1591,7 @@ const DB = {
     this._emitSyncStatus('syncing');
     try {
       const revision = this._localMutationRevision || 0;
+      const inicioSnapshot = Date.now(); // o cursor é o início do download, não o fim
       const d = await this._fetchCloudSnapshot();
       // Uma edição ou confirmação durante a leitura invalida este snapshot.
       if (revision !== (this._localMutationRevision || 0)) {
@@ -1610,7 +1634,7 @@ const DB = {
         console.warn('[Tenant] Não foi possível atualizar os dados cadastrais:', tenantErr);
       }
 
-      this.setSyncCursor(new Date().toISOString());
+      this.setSyncCursor(this._serverCursor(inicioSnapshot));
       console.log('✅ Dados sincronizados com Neon PostgreSQL!');
       this._emitSyncStatus('synced');
       return true;
