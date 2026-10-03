@@ -101,4 +101,20 @@ Legenda: **C** = confirmado (reproduzido ou evidente no código), **P** = prová
 
 **Testes:** `scripts/test-varredura-2026-10-03.js`, incluído na suíte.
 
-**Próximos passos:** OFX e NF-e (#6–#11, #17, #19, #20, #24–#28), cliente e portal (#15, #16), obras (#21–#23, #29, #30) e UX/performance (#32–#40).
+**OFX, NF-e e financeiro**
+- ✅ #6 Reimportar o mesmo OFX: as transações já importadas da mesma conta (FITID) são ignoradas; se o arquivo inteiro já existir, ele é bloqueado.
+- ✅ #7 A baixa manual não marca mais "conciliado".
+- ✅ #9 Eventos da SEFAZ não sobrescrevem mais a NF-e, e o cancelamento atualiza a situação.
+- ✅ #10 NF-e e OCR: sem clique duplo e sem relançar uma chave já lançada.
+- ✅ #11 Uma conta a pagar por duplicata.
+- ✅ #17 Notas por XML: entrada/saída decidida pelo CNPJ da construtora, e o valor a pagar é o vNF menos as retenções.
+- ✅ #19 "Em atraso" entra nos totais, no filtro e na projeção de 90 dias.
+- ✅ #20 O total do Escritório não soma mais receitas.
+- ✅ #24 Em lote só entra conciliação com valor exato, confiança de 70% ou mais e da mesma conta; desconciliar desfaz a baixa.
+- ✅ #25 Recibos: número sem repetição. (O valor por extenso foi corrigido na etapa de correções rápidas.)
+- ✅ #26 Conta digitada à mão no lançamento.
+- ✅ #27 Lançamento gerado pela NF-e: conta pelo apelido, status "paga" e fornecedor pelo CNPJ.
+- ✅ #28 Histórico de preços sem contar a mesma compra duas vezes, e a média é calculada depois de gravar.
+- ⏳ #8 Imports de OFX gravados no servidor: falta. Exige uma tabela nova. Hoje a proteção contra reimportação vale por aparelho.
+
+**Próximos passos:** cliente e portal (#15, #16), obras (#21–#23, #29, #30) e UX/performance (#31–#40).
