@@ -745,7 +745,10 @@ function appCtx(modulos) {
   assert(read('validar.html').includes('.input-code { min-width: 0; }'));
 
   // #39 Imagens.
-  assert(fs.statSync('img/og-finobra-cover.jpg').size < 200 * 1024 && fs.statSync('img/finobra_logo.jpg').size < 100 * 1024);
+  assert(fs.statSync('img/og-fingo-cover.jpg').size < 200 * 1024 && fs.statSync('img/fingo-logo-512.jpg').size < 100 * 1024);
+  for (const f of ['landing.html', 'sobre-nos.html', 'planos.html', 'blog.html', 'site.webmanifest', 'scripts/prerender-marketing.mjs']) {
+    assert(!/og-finobra-cover|finobra_logo/.test(read(f)), `${f}: imagem com a marca antiga`);
+  }
   for (const f of ['img/fingo/hero-video-preview.png', 'img/fingo/logo-reveal-frame120.png', 'img/fingo/logo-reveal-frame60.png', 'img/fingo/hero-video-frame160.png']) {
     assert(!fs.existsSync(f), `${f} órfão removido`);
   }
