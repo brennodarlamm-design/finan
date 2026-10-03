@@ -32,7 +32,7 @@ const files = await prerenderMarketing(dest, { root, render });
   const expect = {
     'index.html': ['15 dias'],
     'planos.html': ['R$ 119,90', 'R$ 279,90', 'R$ 499,90'],
-    'sobre-nos.html': ['FinGo', 'Nossa história', 'Nossos objetivos', '08h às 20h', 'contato@fingo.api.br'],
+    'sobre-nos.html': ['FinGo', 'Nossa história', 'Nossos objetivos', '08h às 20h', 'Segunda a sexta', 'horário de Brasília', 'contato@fingo.api.br'],
     'manuais.html': ['SINAPI'],
     'blog.html': ARTIGOS_BLOG.map(a => a.titulo)
   };

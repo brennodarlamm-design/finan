@@ -118,7 +118,7 @@ O OFX é o arquivo de extrato que os bancos exportam. No FinGo, o extrato é imp
 
 **A base SINAPI é oficial?** Sim. São os relatórios mensais publicados pela Caixa e pelo IBGE, por estado, nos regimes desonerado e não desonerado (plano Construtora Ilimitado).
 
-**Como é o suporte?** Atendimento humano das 08h às 20h, por chat dentro do sistema, WhatsApp (+55 95 99136-3678) e e-mail (contato@fingo.api.br), com equipe treinada em gestão de obras, financeiro, orçamentos e medições. Fora desse horário, o assistente FinBot responde no sistema. A equipe ajuda na implantação: configuração da conta, primeiras obras e importação de dados.
+**Como é o suporte?** Atendimento humano de segunda a sexta, das 08h às 20h (horário de Brasília), por chat dentro do sistema, WhatsApp (+55 95 99136-3678) e e-mail (contato@fingo.api.br), com equipe treinada em gestão de obras, financeiro, orçamentos e medições. Fora desse horário, o assistente FinBot responde no sistema. A equipe ajuda na implantação: configuração da conta, primeiras obras e importação de dados.
 
 **Os dados ficam seguros?** Cada construtora tem os dados isolados no banco, o acesso usa sessão protegida e há trilha de auditoria das alterações. O tratamento segue a LGPD (https://fingo.api.br/privacidade).
 

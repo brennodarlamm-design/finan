@@ -847,7 +847,7 @@ function Plans() {
   );
 }
 // Horário do atendimento humano (também no JSON-LD de sobre-nos.html e no llms.txt).
-const SUPORTE_HORARIO = "das 08h às 20h";
+const SUPORTE_HORARIO = "de segunda a sexta, das 08h às 20h (horário de Brasília)";
 
 function About() {
   return (
@@ -984,10 +984,13 @@ function About() {
             <p className="font-display mt-3 text-4xl uppercase text-paper md:text-5xl">
               08h às 20h
             </p>
+            <p className="mt-1 font-mono text-sm uppercase text-silver">
+              Segunda a sexta · horário de Brasília
+            </p>
             <p className="mt-2 text-sm text-muted">
               Atendimento humano {SUPORTE_HORARIO}. Fora desse horário, o assistente
               FinBot responde dentro do sistema e a equipe retoma o atendimento no
-              próximo período.
+              próximo dia útil.
             </p>
             <ul className="mt-6 space-y-3 border-t border-shadow pt-6 text-sm text-silver">
               <li>
