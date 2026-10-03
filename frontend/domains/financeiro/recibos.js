@@ -470,6 +470,7 @@ const Recibos = {
           <div>
             <span class="modal-title">🧾 Recibo Oficial Nº ${r.numero}</span>
             ${r.assinatura ? `<span class="badge badge-success" style="margin-left:8px;">✓ Assinado Eletronicamente</span>` : `<span class="badge" style="background:rgba(148,163,184,.2);color:var(--text3);margin-left:8px;">Pendente de Assinatura</span>`}
+            ${(typeof Assinador !== 'undefined' && Assinador.seloVerificacao) ? Assinador.seloVerificacao(r) : ''}
           </div>
           
           <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
@@ -489,6 +490,10 @@ const Recibos = {
 
             <button class="btn btn-sm btn-secondary" data-fb-click="Patch26Actions.reciboGovBr" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(r.id))}" style="color:#0284c7;" title="Como assinar oficialmente com o Gov.br ICP-Brasil">
               🏛️ Gov.br
+            </button>
+
+            <button class="btn btn-sm btn-secondary" data-fb-click="Assinador.verificarPdfAssinado" data-fb-click-n="2" data-fb-click-t0="string" data-fb-click-v0="recibos" data-fb-click-t1="string" data-fb-click-v1="${encodeURIComponent(String(r.id))}" style="color:#10b981;font-size:.75rem;" title="Enviar o PDF assinado (Gov.br ou certificado ICP-Brasil) para conferência">
+              🛡️ Verificar PDF assinado
             </button>
 
             <button class="btn btn-sm btn-primary" data-fb-click="Recibos.imprimirRecibo" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(r.id))}">

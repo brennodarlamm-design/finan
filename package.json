@@ -86,8 +86,10 @@
     "@sentry/node": "^11.0.0",
     "@trigger.dev/sdk": "^4.6.2",
     "@vercel/blob": "^2.8.0",
+    "asn1js": "^3.0.10",
     "dotenv": "^16.4.5",
     "google-auth-library": "^11.0.2",
+    "pkijs": "^3.4.1",
     "qrcode": "^1.5.4",
     "react": "^19.3.0",
     "react-dom": "^19.3.0"
