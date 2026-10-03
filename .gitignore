@@ -124,3 +124,6 @@ $RECYCLE.BIN/
 __pycache__/
 *.py[cod]
 *$py.class
+
+# SSR temporário da pré-renderização de marketing (scripts/prerender-marketing.mjs)
+.marketing-ssr/

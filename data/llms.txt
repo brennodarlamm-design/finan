@@ -13,6 +13,15 @@
 - [Validar documento](https://fingo.api.br/validar): confere, pelo código impresso, se um contrato, recibo ou medição assinado no FinGo está registrado e qual o hash SHA-256.
 - [Termos de uso](https://fingo.api.br/termos) e [Política de privacidade (LGPD)](https://fingo.api.br/privacidade).
 
+## Artigos do blog
+
+- [Como Calcular o BDI de Obras Públicas e Privadas pelo Acórdão 2622/2013 do TCU](https://fingo.api.br/blog/como-calcular-bdi-tcu-acordao-2622): Entenda a fórmula oficial do Tribunal de Contas da União, faixas de referência de 2026 para edificações e como o BDI diferenciado para materiais funciona na Nova Lei de Licitações (Lei 14.133/2021).
+- [Retenções Técnicas na Construção Civil: Guia Prático dos 11% de INSS e 5% de ISS em Medições](https://fingo.api.br/blog/retencoes-tecnicas-inss-iss-medicoes): Como apurar corretamente a retenção na fonte sobre cessão de mão de obra de empreiteiros e proteger sua construtora contra passivos tributários solidários.
+- [SINAPI Desonerado vs Não Desonerado: Como Escolher o Regime Certo para sua Construtora](https://fingo.api.br/blog/sinapi-desonerado-vs-nao-desonerado): Entenda a Contribuição Previdenciária sobre a Receita Bruta (CPRB 4,5%), o impacto nos encargos sociais de 110% vs 85% e as regras da Lei 14.133/2021.
+- [Conciliação Bancária OFX em Construtoras: Como Blindar o Fluxo de Caixa de Obras](https://fingo.api.br/blog/conciliacao-bancaria-ofx-obras): Por que conferir extrato bancário em papel é o caminho mais rápido para perder dinheiro na construção civil e como automatizar com arquivos .OFX.
+- [OCR e Importação de NF-e: Eliminando a Digitação Manual de Notas de Materiais](https://fingo.api.br/blog/ocr-e-importacao-nfe-no-canteiro): Como a inteligência óptica transforma fotos de cupons fiscais e DANFEs em lançamentos financeiros e controle de estoque de forma instantânea.
+- [BIM 3D no Canteiro: Como Cortes Interativos e Detecção de Interferências Evitam Retrabalhos](https://fingo.api.br/blog/bim-3d-no-canteiro-clash-detection): A engenharia do futuro na palma da mão: como visualizar modelos tridimensionais leves no navegador e antecipar choques entre vigas e tubulações.
+
 ## Planos (valores mensais em reais)
 
 - **Teste gratuito**: 15 dias com os principais recursos liberados, sem cartão de crédito e sem taxa de implantação.

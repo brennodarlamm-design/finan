@@ -1244,6 +1244,10 @@ async function fetchFrontendResponse(request, env) {
   } else if (['/planos', '/sobre-nos', '/calculadora-bdi', '/manuais', '/blog'].includes(incoming.pathname)) {
     assetPath = incoming.pathname + '.html';
     routeName = 'marketing-shell';
+  } else if (/^\/blog\/[a-z0-9-]{3,120}$/.test(incoming.pathname)) {
+    // Artigo do blog pré-renderizado no build (scripts/prerender-marketing.mjs).
+    assetPath = incoming.pathname + '.html';
+    routeName = 'marketing-shell';
   } else if (landingShell) {
     assetPath = '/index.html';
     routeName = 'landing-shell';

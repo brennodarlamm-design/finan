@@ -13,7 +13,12 @@ import { Brand, Faq, Newsletter, Footer } from "./brand-sections.jsx";
 import { TRILHAS, MANUAIS } from "./manuais-data.js";
 import { ARTIGOS_BLOG } from "./blog-data.js";
 
-const route = location.pathname.replace(/\/$|\.html$/g, "") || "/";
+// No navegador a rota vem de location; na pré-renderização do build (SEO/GEO) vem de
+// globalThis.__FINGO_SSR_ROUTE__, definido por scripts/prerender-marketing.mjs.
+const isBrowser = typeof window !== "undefined" && typeof document !== "undefined";
+const route =
+  ((isBrowser ? location.pathname : globalThis.__FINGO_SSR_ROUTE__) || "/").replace(/\/$|\.html$/g, "") || "/";
+const blogSlug = route.startsWith("/blog/") ? route.slice("/blog/".length) : "";
 const current =
   route === "/planos"
     ? "plans"
@@ -21,7 +26,7 @@ const current =
       ? "about"
       : route === "/manuais"
         ? "manuais"
-        : route === "/blog"
+        : route === "/blog" || blogSlug
           ? "blog"
           : "home";
 const contact = "https://wa.me/5595991363678";
@@ -359,7 +364,7 @@ function Home() {
       <section className="relative isolate overflow-hidden">
         <HeroVideo />
         <div className="wrap relative py-24 md:py-36">
-          <p className="eyebrow">Gestão para a construção civil / FinGo</p>
+          <p className="eyebrow">Sistema de Obra &amp; Gestão para Construção Civil / FinGo</p>
           <h1 className="page-title max-w-3xl">
             Sua obra avança.
             <br />
@@ -370,8 +375,8 @@ function Home() {
             </span>
           </h1>
           <p className="mb-9 mt-8 max-w-lg text-lg leading-relaxed text-paper">
-            Do canteiro ao escritório. Obras, finanças e equipe conectadas para
-            você construir com mais controle.
+            O sistema de obra que conecta canteiro e escritório. Finanças, orçamentos SINAPI,
+            medições e equipe para construir com mais controle.
           </p>
           <a className="action" href="/planos">
             Conheça os planos <span aria-hidden="true">↗</span>
@@ -1973,13 +1978,17 @@ function ManualsView() {
 }
 
 function BlogView() {
-  const [selectedArticle, setSelectedArticle] = useState(null);
+  // Cada artigo tem URL própria (/blog/<slug>) para ser indexado e citado.
+  const [selectedArticle] = useState(
+    () => ARTIGOS_BLOG.find((a) => a.slug === blogSlug) || null,
+  );
 
   useEffect(() => {
+    // Compatibilidade com links antigos /blog#slug: leva para a URL própria do artigo.
     const hash = window.location.hash.replace("#", "");
-    if (hash) {
+    if (hash && !blogSlug) {
       const found = ARTIGOS_BLOG.find((a) => a.slug === hash || a.id === hash);
-      if (found) setSelectedArticle(found);
+      if (found) window.location.replace(`/blog/${found.slug}`);
     }
   }, []);
 
@@ -1987,12 +1996,12 @@ function BlogView() {
     return (
       <article className="wrap py-16 md:py-24 max-w-4xl">
         <div className="mb-8">
-          <button
-            onClick={() => setSelectedArticle(null)}
+          <a
+            href="/blog"
             className="outline-action text-xs py-2 px-3 inline-flex items-center gap-1.5"
           >
             <span>← Voltar para todos os artigos</span>
-          </button>
+          </a>
         </div>
 
         <div className="flex flex-wrap items-center gap-3">
@@ -2100,7 +2109,7 @@ function BlogView() {
                 </p>
 
                 <h2 className="mt-2 font-bold text-lg leading-snug text-paper group-hover:text-acid">
-                  {artigo.titulo}
+                  <a href={`/blog/${artigo.slug}`}>{artigo.titulo}</a>
                 </h2>
 
                 <p className="mt-3 text-xs leading-relaxed text-muted line-clamp-3">
@@ -2109,13 +2118,13 @@ function BlogView() {
               </div>
 
               <div className="mt-6 border-t border-shadow pt-4">
-                <button
-                  onClick={() => setSelectedArticle(artigo)}
+                <a
+                  href={`/blog/${artigo.slug}`}
                   className="inline-flex items-center gap-1.5 text-xs font-bold text-acid group-hover:underline"
                 >
                   <span>Ler artigo completo</span>
                   <span aria-hidden="true">↗</span>
-                </button>
+                </a>
               </div>
             </article>
           ))}
@@ -2213,8 +2222,13 @@ function App() {
     </>
   );
 }
-createRoot(document.getElementById("root")).render(
-  <React.StrictMode>
-    <App />
-  </React.StrictMode>,
-);
+export { App };
+
+// No navegador, o React substitui o HTML pré-renderizado do build pelo mesmo conteúdo.
+if (isBrowser && document.getElementById("root")) {
+  createRoot(document.getElementById("root")).render(
+    <React.StrictMode>
+      <App />
+    </React.StrictMode>,
+  );
+}

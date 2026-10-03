@@ -77,8 +77,8 @@
 
 | # | Ação | Impacto | Esforço |
 |---|---|---|---|
-| 1 | Pré-renderizar landing, planos, sobre, blog e manuais (HTML com o conteúdo) | 🔴 muito alto (SEO e GEO) | médio |
-| 2 | Uma página por artigo (`/blog/<slug>`) com `BlogPosting`, autor e data, no sitemap | 🔴 alto | baixo/médio |
+| 1 | ✅ **Feito** — Pré-renderizar landing, planos, sobre, blog e manuais (HTML com o conteúdo) | 🔴 muito alto (SEO e GEO) | médio |
+| 2 | ✅ **Feito** — Uma página por artigo (`/blog/<slug>`) com `BlogPosting` e data, no sitemap e no llms.txt (autor ainda é a organização) | 🔴 alto | baixo/médio |
 | 3 | Reescrever os 6 artigos com 1.000+ palavras: resposta direta no 1º parágrafo, tabela, exemplo numérico, fontes | 🔴 alto | médio (conteúdo) |
 | 4 | Novas páginas-resposta para buscas fortes: "planilha de medição de obra", "como calcular retenção de INSS 11%", "BDI para obra particular", "sistema de gestão de obras para MCMV", "orçamento SINAPI por estado" | 🟠 alto | médio |
 | 5 | `sameAs` na Organization e perfil no Google Meu Negócio, LinkedIn e YouTube | 🟠 médio | baixo (preciso dos links reais) |
@@ -86,6 +86,22 @@
 | 7 | Cadastro em Capterra, B2B Stack, G2 e Google, com avaliações de clientes reais | 🟠 médio (GEO) | contínuo |
 | 8 | Otimizar imagens OG e logo | 🟡 baixo | baixo |
 | 9 | Medir Core Web Vitals e reduzir o JS da home | 🟡 médio | médio |
+
+## Aplicado em 03/10/2026 (itens 1 e 2)
+
+- `scripts/prerender-marketing.mjs`, chamado no fim do `scripts/build-marketing.js`, compila `marketing/main.jsx` para SSR, renderiza cada rota com `react-dom/server` e injeta o HTML no `#root`. No navegador o React substitui esse HTML pelo mesmo conteúdo.
+
+  | Página | Palavras no HTML: antes → depois |
+  |---|---|
+  | Home | 0 → ~900 |
+  | Planos | 0 → ~460 |
+  | Sobre | 0 → ~280 |
+  | Manuais | 0 → ~750 |
+  | Blog | 0 → ~480 |
+
+- **Artigos com página própria:** `/blog/<slug>` (6 páginas), cada uma com título, descrição, canonical, Open Graph, JSON-LD `BlogPosting` (data ISO) e `BreadcrumbList`. Os links antigos `/blog#slug` redirecionam para a URL nova.
+- **Worker:** serve `/blog/<slug>` (só slugs `a-z0-9-`). **Sitemap:** 17 URLs.
+- **Testes:** `scripts/test-seo-prerender.js`. Também conferido no Chromium com o servidor do Vite: navegação, redirecionamento do hash antigo e nenhum erro de JavaScript.
 
 ## Como medir depois
 

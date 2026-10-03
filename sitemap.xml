@@ -34,6 +34,42 @@
     <priority>0.8</priority>
   </url>
   <url>
+    <loc>https://fingo.api.br/blog/como-calcular-bdi-tcu-acordao-2622</loc>
+    <lastmod>2026-09-21</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+  </url>
+  <url>
+    <loc>https://fingo.api.br/blog/retencoes-tecnicas-inss-iss-medicoes</loc>
+    <lastmod>2026-09-18</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+  </url>
+  <url>
+    <loc>https://fingo.api.br/blog/sinapi-desonerado-vs-nao-desonerado</loc>
+    <lastmod>2026-09-14</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+  </url>
+  <url>
+    <loc>https://fingo.api.br/blog/conciliacao-bancaria-ofx-obras</loc>
+    <lastmod>2026-09-10</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+  </url>
+  <url>
+    <loc>https://fingo.api.br/blog/ocr-e-importacao-nfe-no-canteiro</loc>
+    <lastmod>2026-09-05</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+  </url>
+  <url>
+    <loc>https://fingo.api.br/blog/bim-3d-no-canteiro-clash-detection</loc>
+    <lastmod>2026-09-01</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+  </url>
+  <url>
     <loc>https://fingo.api.br/manuais</loc>
     <lastmod>2026-10-03</lastmod>
     <changefreq>monthly</changefreq>
