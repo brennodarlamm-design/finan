@@ -78,3 +78,27 @@ Legenda: **C** = confirmado (reproduzido ou evidente no código), **P** = prová
 3. **Cliente e WhatsApp (13–16, 18):** correções de uma linha no cron e no telefone, contrato sem valores de exemplo e portal com token curto que busca os dados atuais.
 4. **Obras (21–23, 29, 30):** SLA, Curva S, medições e upload.
 5. **Rápidas de UX e performance (31–40):** arrastar arquivos, BIM sob demanda, `defer` no Sentry, vídeo, cache, acessibilidade e imagens.
+
+## Correções aplicadas (03/10/2026)
+
+**Rápidas**
+- ✅ #13 Resumo das 08h no WhatsApp: a query volta a funcionar.
+- ✅ #14 DDD 55: o código do país agora depende só de o número ter 10 ou 11 dígitos. Corrigido em 12 lugares (backend, admin, PIX, master e WhatsApp).
+- ✅ #31 Arrastar arquivos em NF-e, OCR e Fases: o barramento de eventos trata o `dragover`. Testado no Chromium.
+- ✅ #18 Contrato sem valores de exemplo; com entrada 0, a cláusula 08 sai com texto próprio; a área sai por extenso para qualquer valor.
+- ✅ #25 (parte) Valor por extenso: "mil", "um milhão de reais" e o "e" entre grupos pela regra.
+
+**Proteção de dados**
+- ✅ #1 `DB.init` único: o IndexedDB é restaurado (o sync e o envio esperam), a sincronia entre abas está ativa e o `purgeStorage` só roda quando o espaço estoura.
+- ✅ #2 Duas abas: o evento `storage` atualiza a memória da aba. Testado em Node e com duas abas reais no Chromium.
+- ✅ #3 Sessão expirada preserva a fila offline. O logout pede confirmação quando há alterações pendentes e limpa o IndexedDB. Filas de outras empresas nunca são apagadas.
+- ✅ #4 Versão por registro em todas as tabelas: edição velha recebe 409 e vai para "Revisar conflito", e registro excluído não volta. Vale também para o "Sincronizar tudo". Fases documentais ficam de fora.
+- ✅ #5 "Restaurar backup" envia os registros pela fila.
+- ✅ #6 O cursor do delta usa o relógio do servidor e o início do download, com 2 minutos de sobreposição.
+- ✅ #12 Backup diário: corrigida a lista de tabelas, incluídas as que faltavam, e uma falha numa tabela não derruba as demais.
+
+**Limitação conhecida (#4):** se a confirmação de uma gravação se perder na rede e o app reenviar, o reenvio vira conflito "sem divergência" para revisar. Em `lancamentos` isso não acontece, porque a query aceita conteúdo idêntico.
+
+**Testes:** `scripts/test-varredura-2026-10-03.js`, incluído na suíte.
+
+**Próximos passos:** OFX e NF-e (#6–#11, #17, #19, #20, #24–#28), cliente e portal (#15, #16), obras (#21–#23, #29, #30) e UX/performance (#32–#40).
