@@ -48,6 +48,7 @@ Construtoras e empreiteiras de pequeno e médio porte, obras do programa Minha C
 ## Contato
 
 - E-mail: contato@fingo.api.br
+- Suporte humano: das 08h às 20h, por chat no sistema, WhatsApp e e-mail; fora desse horário, assistente FinBot no sistema.
 - WhatsApp/telefone: +55 95 99136-3678
 - Site: https://fingo.api.br
 

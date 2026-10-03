@@ -846,6 +846,9 @@ function Plans() {
     </div>
   );
 }
+// Horário do atendimento humano (também no JSON-LD de sobre-nos.html e no llms.txt).
+const SUPORTE_HORARIO = "das 08h às 20h";
+
 function About() {
   return (
     <>
@@ -863,9 +866,10 @@ function About() {
           </p>
           <p className="text-lg leading-relaxed text-muted">
             O FinGo é uma plataforma de gestão financeira e operacional para a
-            construção civil. Reunimos rotinas de obras, custos, compras e
-            medições em um só lugar, para ajudar profissionais e construtoras a
-            acompanhar sua operação com mais contexto.
+            construção civil. Reunimos obras, custos, compras, notas fiscais,
+            orçamentos com SINAPI, medições e contratos em um só lugar, para que
+            construtoras, empreiteiros, engenheiros e arquitetos acompanhem cada
+            obra com números confiáveis.
           </p>
         </div>
       </section>
@@ -876,39 +880,157 @@ function About() {
           className="h-72 w-full rounded-sm object-cover grayscale md:h-96"
         />
       </div>
+
       <section className="wrap py-24">
-        <p className="eyebrow">Nossos objetivos</p>
-        <div className="grid gap-10 md:grid-cols-3">
-          {[
-            [
-              "01",
-              "Aproximar canteiro e escritório",
-              "Fazer a informação circular entre quem executa, quem acompanha e quem decide.",
-            ],
-            [
-              "02",
-              "Dar clareza à gestão",
-              "Ajudar a entender os custos e acompanhar os compromissos de cada obra, com informações organizadas.",
-            ],
-            [
-              "03",
-              "Simplificar para evoluir",
-              "Reduzir o trabalho repetitivo e desenvolver ferramentas úteis para a realidade da construção.",
-            ],
-          ].map(([n, t, d]) => (
-            <article key={n} className="border-t border-acid pt-6">
-              <p className="font-mono text-acid">{n} /</p>
-              <h2 className="mb-5 mt-8 text-2xl font-bold">{t}</h2>
-              <p className="leading-relaxed text-muted">{d}</p>
-            </article>
-          ))}
-        </div>
-        <div className="mt-20 flex flex-col items-start justify-between gap-8 border-t border-line pt-12 md:flex-row">
-          <h2 className="font-display text-4xl uppercase">
-            Sua próxima obra.
+        <p className="eyebrow">Nossa história</p>
+        <div className="grid gap-10 md:grid-cols-2">
+          <h2 className="font-display text-3xl uppercase leading-tight md:text-5xl">
+            Nascemos da rotina
             <br />
-            Um novo jeito de gerir.
+            <span className="text-acid">de quem toca obra.</span>
           </h2>
+          <div className="space-y-5 text-lg leading-relaxed text-muted">
+            <p>
+              O FinGo surgiu de um problema que todo construtor conhece: a obra
+              anda no canteiro, mas o controle fica espalhado em planilhas,
+              cadernos, grupos de WhatsApp e notas guardadas na gaveta. Quando o
+              custo real aparece, muitas vezes já é tarde para corrigir.
+            </p>
+            <p>
+              Por isso desenvolvemos um sistema pensado para a realidade da
+              construção brasileira: funciona no celular, no meio da obra, e fala
+              a língua do setor, com BDI pelo TCU, tabela SINAPI, retenções de
+              INSS e ISS nas medições, NF-e e conciliação bancária.
+            </p>
+            <p>
+              Hoje o FinGo atende desde o engenheiro autônomo com poucas obras até
+              construtoras com várias frentes ao mesmo tempo, sempre com o mesmo
+              objetivo: saber, a qualquer momento, quanto cada obra custou, quanto
+              falta receber e o que precisa ser feito.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <section className="border-y border-shadow bg-ink py-24">
+        <div className="wrap">
+          <p className="eyebrow">Nossos objetivos</p>
+          <div className="grid gap-10 md:grid-cols-3">
+            {[
+              [
+                "01",
+                "Aproximar canteiro e escritório",
+                "Fazer a informação circular entre quem executa, quem acompanha e quem decide: fotos, etapas, compras e medições registradas na hora, pelo celular.",
+              ],
+              [
+                "02",
+                "Dar clareza aos números",
+                "Mostrar o custo real de cada obra, comparar orçado e realizado e manter o fluxo de caixa batendo com o banco.",
+              ],
+              [
+                "03",
+                "Simplificar para evoluir",
+                "Eliminar digitação repetitiva com importação de NF-e, OFX e leitura de notas, para a equipe gastar tempo com a obra.",
+              ],
+              [
+                "04",
+                "Proteger a operação",
+                "Dados de cada construtora isolados, acesso protegido, trilha de auditoria e tratamento de dados conforme a LGPD.",
+              ],
+              [
+                "05",
+                "Falar a língua da engenharia",
+                "Seguir as referências do setor: Acórdão 2.622/2013 do TCU, SINAPI da Caixa e as regras de retenção em medições.",
+              ],
+              [
+                "06",
+                "Crescer junto com o cliente",
+                "Evoluir o sistema a partir das sugestões de quem usa no dia a dia, com planos que acompanham o tamanho da empresa.",
+              ],
+            ].map(([n, t, d]) => (
+              <article key={n} className="border-t border-acid pt-6">
+                <p className="font-mono text-acid">{n} /</p>
+                <h3 className="mb-5 mt-8 text-2xl font-bold">{t}</h3>
+                <p className="leading-relaxed text-muted">{d}</p>
+              </article>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section className="wrap py-24">
+        <p className="eyebrow">Suporte / Gente de verdade</p>
+        <div className="grid gap-10 md:grid-cols-2">
+          <div>
+            <h2 className="font-display text-3xl uppercase leading-tight md:text-5xl">
+              Uma equipe preparada
+              <br />
+              <span className="text-acid">para a sua obra.</span>
+            </h2>
+            <p className="mt-6 text-lg leading-relaxed text-muted">
+              Nosso suporte é feito por pessoas que conhecem a rotina da
+              construção e o sistema por dentro. A equipe é treinada em gestão de
+              obras, financeiro, orçamentos e medições, para entender a sua
+              dúvida de primeira e resolver sem jogo de empurra.
+            </p>
+            <p className="mt-4 text-lg leading-relaxed text-muted">
+              Na chegada, ajudamos a configurar a conta, cadastrar as primeiras
+              obras e importar os dados. Depois, seguimos por perto para tirar
+              dúvidas, orientar a equipe e receber sugestões de melhoria.
+            </p>
+          </div>
+          <div className="rounded-sm border border-acid/60 bg-panel p-8">
+            <p className="font-mono text-xs uppercase text-acid">Horário de atendimento</p>
+            <p className="font-display mt-3 text-4xl uppercase text-paper md:text-5xl">
+              08h às 20h
+            </p>
+            <p className="mt-2 text-sm text-muted">
+              Atendimento humano {SUPORTE_HORARIO}. Fora desse horário, o assistente
+              FinBot responde dentro do sistema e a equipe retoma o atendimento no
+              próximo período.
+            </p>
+            <ul className="mt-6 space-y-3 border-t border-shadow pt-6 text-sm text-silver">
+              <li>
+                <span className="font-bold text-paper">Chat no sistema</span> — direto
+                da tela em que você está trabalhando.
+              </li>
+              <li>
+                <span className="font-bold text-paper">WhatsApp</span> —{" "}
+                <a href={contact} className="underline hover:text-acid" rel="noopener noreferrer" target="_blank">
+                  (95) 99136-3678
+                </a>
+              </li>
+              <li>
+                <span className="font-bold text-paper">E-mail</span> —{" "}
+                <a href="mailto:contato@fingo.api.br" className="underline hover:text-acid">
+                  contato@fingo.api.br
+                </a>
+              </li>
+              <li>
+                <span className="font-bold text-paper">Manuais</span> —{" "}
+                <a href="/manuais" className="underline hover:text-acid">
+                  guias passo a passo
+                </a>{" "}
+                para treinar a equipe.
+              </li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <section className="wrap pb-24">
+        <div className="flex flex-col items-start justify-between gap-8 border-t border-line pt-12 md:flex-row">
+          <div>
+            <h2 className="font-display text-4xl uppercase">
+              Sua próxima obra.
+              <br />
+              Um novo jeito de gerir.
+            </h2>
+            <p className="mt-4 text-muted">
+              Teste grátis por 15 dias, sem cartão de crédito e com a nossa equipe
+              ajudando na implantação.
+            </p>
+          </div>
           <a href="/planos" className="action">
             Conheça os planos ↗
           </a>
