@@ -319,6 +319,61 @@ export async function consultarSefaz({ pfxBuffer, passphrase, cnpj, codUf, ultNs
  * Orquestrador principal de Sincronização DF-e do Tenant
  * Executa as consultas com anti-flood, persiste os documentos e atualiza o estado de NSU.
  */
+/**
+ * Grava um documento recebido da SEFAZ (NF-e, CT-e ou evento) em tenant_dfe_documentos.
+ * Eventos não sobrescrevem a nota (ver comentário abaixo).
+ */
+export async function upsertDfeDocumento(sql, tenantId, parsed) {
+  const docId = `dfe_${tenantId}_${parsed.chave}`;
+  if (parsed.tipoDocumento === 'EVENTO') {
+    // Eventos (ciência, carta de correção, cancelamento) usam a mesma chave da NF-e.
+    // Antes sobrescreviam a nota: valor 0, emitente = descrição do evento e o XML da
+    // NF-e trocado pelo do evento. Agora só o cancelamento altera a situação da nota;
+    // se o evento chegar antes da nota, fica um registro provisório que a NF-e substitui.
+    await sql`
+      INSERT INTO tenant_dfe_documentos (
+        id, tenant_id, tipo_documento, nsu, chave, cnpj_emitente,
+        nome_emitente, valor_total, data_emissao, situacao,
+        schema_tipo, xml_completo, danfe_url, manifesto_status, updated_at
+      ) VALUES (
+        ${docId}, ${tenantId}, 'EVENTO', ${parsed.nsu}, ${parsed.chave},
+        ${parsed.cnpjEmitente}, ${parsed.nomeEmitente}, 0,
+        ${parsed.dataEmissao}, ${parsed.situacao}, ${parsed.schemaTipo},
+        NULL, NULL, 'sem_manifesto', NOW()
+      )
+      ON CONFLICT (tenant_id, chave) DO UPDATE SET
+        situacao = CASE WHEN ${parsed.situacao} = 'cancelada' THEN 'cancelada' ELSE tenant_dfe_documentos.situacao END,
+        updated_at = NOW();
+    `;
+    return;
+  }
+  await sql`
+    INSERT INTO tenant_dfe_documentos (
+      id, tenant_id, tipo_documento, nsu, chave, cnpj_emitente,
+      nome_emitente, valor_total, data_emissao, situacao,
+      schema_tipo, xml_completo, danfe_url, manifesto_status, updated_at
+    ) VALUES (
+      ${docId}, ${tenantId}, ${parsed.tipoDocumento}, ${parsed.nsu}, ${parsed.chave},
+      ${parsed.cnpjEmitente}, ${parsed.nomeEmitente}, ${parsed.valorTotal},
+      ${parsed.dataEmissao}, ${parsed.situacao}, ${parsed.schemaTipo},
+      ${parsed.xml}, NULL, 'sem_manifesto', NOW()
+    )
+    ON CONFLICT (tenant_id, chave) DO UPDATE SET
+      tipo_documento = EXCLUDED.tipo_documento,
+      nsu = EXCLUDED.nsu,
+      cnpj_emitente = COALESCE(EXCLUDED.cnpj_emitente, tenant_dfe_documentos.cnpj_emitente),
+      nome_emitente = COALESCE(EXCLUDED.nome_emitente, tenant_dfe_documentos.nome_emitente),
+      valor_total = COALESCE(EXCLUDED.valor_total, tenant_dfe_documentos.valor_total),
+      data_emissao = COALESCE(EXCLUDED.data_emissao, tenant_dfe_documentos.data_emissao),
+      -- Um cancelamento já registrado não é desfeito pela chegada (atrasada) da própria NF-e.
+      situacao = CASE WHEN tenant_dfe_documentos.situacao = 'cancelada' THEN 'cancelada'
+                      ELSE COALESCE(EXCLUDED.situacao, tenant_dfe_documentos.situacao) END,
+      schema_tipo = EXCLUDED.schema_tipo,
+      xml_completo = COALESCE(EXCLUDED.xml_completo, tenant_dfe_documentos.xml_completo),
+      updated_at = NOW();
+  `;
+}
+
 export async function syncTenantDFe(sql, tenantId, options = {}) {
   // 1. Carrega ou inicializa o registro de sincronização do tenant
   let syncRows = await sql`
@@ -488,30 +543,7 @@ export async function syncTenantDFe(sql, tenantId, options = {}) {
         const parsed = decompressAndParseDocZip(item);
         if (!parsed.sucesso || !parsed.chave) continue;
 
-        const docId = `dfe_${tenantId}_${parsed.chave}`;
-        await sql`
-          INSERT INTO tenant_dfe_documentos (
-            id, tenant_id, tipo_documento, nsu, chave, cnpj_emitente,
-            nome_emitente, valor_total, data_emissao, situacao,
-            schema_tipo, xml_completo, danfe_url, manifesto_status, updated_at
-          ) VALUES (
-            ${docId}, ${tenantId}, ${parsed.tipoDocumento}, ${parsed.nsu}, ${parsed.chave},
-            ${parsed.cnpjEmitente}, ${parsed.nomeEmitente}, ${parsed.valorTotal},
-            ${parsed.dataEmissao}, ${parsed.situacao}, ${parsed.schemaTipo},
-            ${parsed.xml}, NULL, 'sem_manifesto', NOW()
-          )
-          ON CONFLICT (tenant_id, chave) DO UPDATE SET
-            tipo_documento = EXCLUDED.tipo_documento,
-            nsu = EXCLUDED.nsu,
-            cnpj_emitente = COALESCE(EXCLUDED.cnpj_emitente, tenant_dfe_documentos.cnpj_emitente),
-            nome_emitente = COALESCE(EXCLUDED.nome_emitente, tenant_dfe_documentos.nome_emitente),
-            valor_total = COALESCE(EXCLUDED.valor_total, tenant_dfe_documentos.valor_total),
-            data_emissao = COALESCE(EXCLUDED.data_emissao, tenant_dfe_documentos.data_emissao),
-            situacao = COALESCE(EXCLUDED.situacao, tenant_dfe_documentos.situacao),
-            schema_tipo = EXCLUDED.schema_tipo,
-            xml_completo = COALESCE(EXCLUDED.xml_completo, tenant_dfe_documentos.xml_completo),
-            updated_at = NOW();
-        `;
+        await upsertDfeDocumento(sql, tenantId, parsed);
         totalProcessados++;
       }
 

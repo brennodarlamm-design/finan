@@ -10,6 +10,8 @@ const OFX = {
   _toleranciaValor: 10,       // R$ 10 padrão (ou string 'pct:2')
   _toleranciaDias: 7,         // ± 7 dias padrão
   _toleranciaScoreMin: 50,
+  // "Conciliar Todas" (lote, sem revisão item a item) só aceita par seguro.
+  _scoreMinLote: 70,
 
   render(obraId) {
     const imports = DB.getAll('ofximports') || [];
@@ -181,6 +183,7 @@ const OFX = {
       const isCredit = amtRaw > 0 || trnType === 'CREDIT' || trnType === 'DEP' || trnType === 'DIRECTDEP';
       return {
         id: fitId || DB.uuid(),
+        fitid: fitId || '',
         data: dt,
         memo: memo.replace(/\s+/g, ' ').trim(),
         valor: Math.abs(amtRaw),
@@ -333,14 +336,37 @@ const OFX = {
     const tolValor = document.getElementById('ofx-tol-valor')?.value || this._toleranciaValor;
     const tolDias = parseInt(document.getElementById('ofx-tol-dias')?.value) || this._toleranciaDias;
 
+    // Transações já importadas desta conta (FITID é único por conta no padrão OFX).
+    // Reimportar o mesmo extrato voltava as transações como pendentes e o robô
+    // "pagava" outra conta de mesmo valor.
+    const chaveConta = this._chaveConta(this._importData.bankId, this._importData.acctId, conta);
+    const fitidsExistentes = new Set();
+    for (const imp of DB.getAll('ofximports') || []) {
+      if (this._chaveConta(imp.banco_id, imp.conta_id, imp.conta_bancaria) !== chaveConta) continue;
+      for (const t of imp.transacoes || []) if (t.fitid || t.id) fitidsExistentes.add(String(t.fitid || t.id));
+    }
+    const vistosNoArquivo = new Set();
+    const novas = this._importData.transacoes.filter(t => {
+      const f = String(t.fitid || '');
+      if (!f) return true;
+      if (fitidsExistentes.has(f) || vistosNoArquivo.has(f)) return false;
+      vistosNoArquivo.add(f);
+      return true;
+    });
+    const repetidas = this._importData.transacoes.length - novas.length;
+    if (!novas.length) {
+      Utils.toast('Este extrato já foi importado para esta conta: todas as transações já existem.', 'warning');
+      return;
+    }
+
     // Fetch ALL non-deleted transactions across all obras and headquarters
     const allLans = DB.getLancamentos(null);
-    const unconciliatedLans = allLans.filter(l => !l.conciliado);
+    const unconciliatedLans = allLans.filter(l => !l.conciliado && OFX._mesmaConta(l, { conta_bancaria: conta }));
 
     let sugestoesCount = 0;
     const matchedLanIds = new Set();
 
-    const trns = this._importData.transacoes.map(t => {
+    const trns = novas.map(t => {
       // Busca melhor match disponível pelo Robô Inteligente para sugerir ao usuário
       let bestMatch = null;
       for (const lan of unconciliatedLans) {
@@ -390,7 +416,7 @@ const OFX = {
     const btnImp = document.getElementById('ofx-import-btn');
     if (btnImp) btnImp.style.display = 'none';
 
-    Utils.toast(`Extrato importado com ${trns.length} transações pendentes! O robô calculou ${sugestoesCount} sugestões para sua conferência.`, 'success');
+    Utils.toast(`Extrato importado com ${trns.length} transações pendentes! O robô calculou ${sugestoesCount} sugestões para sua conferência.${repetidas ? ` ${repetidas} transação(ões) já importada(s) antes foram ignoradas.` : ''}`, repetidas ? 'warning' : 'success');
 
     // Refresh OFX screen
     const el = document.getElementById('route-content');
@@ -571,7 +597,7 @@ const OFX = {
     const allLans = DB.getLancamentos(null);
     const clientesMap = Object.fromEntries((DB.getAll('clientes') || []).map(c => [c.id, c]));
     const pendentes = (imp.transacoes || []).filter(t => t.status === 'pendente');
-    const unconciliatedLans = allLans.filter(l => !l.conciliado);
+    const unconciliatedLans = allLans.filter(l => !l.conciliado && OFX._mesmaConta(l, imp));
 
     const matchesEncontrados = [];
     const matchedLanIds = new Set();
@@ -616,9 +642,9 @@ const OFX = {
         <div class="modal-body" style="padding:16px 20px;overflow-y:auto;flex:1;">
           ${matchesEncontrados.length > 0 ? `
             <div style="margin-bottom:14px;display:flex;align-items:center;justify-content:space-between;">
-              <span style="font-size:.82rem;color:var(--text2);">Revise as sugestões calculadas pelo robô:</span>
+              <span style="font-size:.82rem;color:var(--text2);">Revise as sugestões. Em lote entram só as de valor exato e confiança ≥ ${OFX._scoreMinLote}%; as demais, confirme uma a uma.</span>
               <button class="btn btn-primary btn-sm" data-fb-click="OFX._confirmarTodosMatchesRobo" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(importId))}" style="font-weight:700;">
-                ⚡ Conciliar Todas (${matchesEncontrados.length})
+                ⚡ Conciliar exatas (${matchesEncontrados.filter(m => m.isExato && m.score >= OFX._scoreMinLote).length})
               </button>
             </div>
 
@@ -696,7 +722,8 @@ const OFX = {
 
     const allLans = DB.getLancamentos(null);
     const pendentes = (imp.transacoes || []).filter(t => t.status === 'pendente');
-    const unconciliatedLans = allLans.filter(l => !l.conciliado);
+    // Só lançamentos da mesma conta do extrato (ou sem conta definida).
+    const unconciliatedLans = allLans.filter(l => !l.conciliado && OFX._mesmaConta(l, imp));
 
     const matchedLanIds = new Set();
     let count = 0;
@@ -706,7 +733,8 @@ const OFX = {
       unconciliatedLans.forEach(lan => {
         if (matchedLanIds.has(lan.id)) return;
         const res = OFX._avaliarMatch(trn, lan, OFX._toleranciaValor, OFX._toleranciaDias);
-        if (res && res.score >= OFX._toleranciaScoreMin) {
+        // Em lote só entra valor exato com confiança alta; diferenças ficam para conferência individual.
+        if (res && res.isExato && res.score >= OFX._scoreMinLote) {
           if (!best || res.score > best.score) {
             best = res;
           }
@@ -720,7 +748,7 @@ const OFX = {
           imp.transacoes[idx].status = 'conciliada';
           imp.transacoes[idx].lancamento_id = best.lancamento.id;
           imp.transacoes[idx].match_score = best.score;
-          OFX._aplicarBaixaConciliacao(best.lancamento.id, trn.data, imp.conta_bancaria);
+          imp.transacoes[idx].baixa_anterior = OFX._aplicarBaixaConciliacao(best.lancamento.id, trn.data, imp.conta_bancaria);
           count++;
         }
       }
@@ -731,10 +759,15 @@ const OFX = {
     this.viewImport(importId);
   },
 
+  /**
+   * Concilia e, se ainda estava em aberto, dá baixa na data do extrato.
+   * Devolve o estado anterior para desfazer exatamente o que a conciliação mudou.
+   */
   _aplicarBaixaConciliacao(lanId, trnData, contaBancaria) {
-    if (!lanId) return;
+    if (!lanId) return null;
     const l = DB.getById('lancamentos', lanId);
-    if (!l) return;
+    if (!l) return null;
+    const anterior = { status: l.status ?? null, data_pagamento: l.data_pagamento ?? null, conta_bancaria: l.conta_bancaria ?? null };
     const patch = { conciliado: true };
     if (l.tipo === 'despesa') {
       if (l.status === 'a_pagar' || !l.status) {
@@ -751,6 +784,36 @@ const OFX = {
       patch.conta_bancaria = contaBancaria;
     }
     DB.update('lancamentos', lanId, patch);
+    return { ...anterior, aplicado: { status: patch.status ?? null, data_pagamento: patch.data_pagamento ?? null, conta_bancaria: patch.conta_bancaria ?? null } };
+  },
+
+  /** Desfaz a conciliação e, se a baixa foi feita por ela (e ninguém mexeu depois), reabre o lançamento. */
+  _desfazerBaixaConciliacao(lanId, baixaAnterior) {
+    if (!lanId) return;
+    const l = DB.getById('lancamentos', lanId);
+    if (!l) return;
+    const patch = { conciliado: false };
+    const ap = baixaAnterior?.aplicado;
+    if (ap) {
+      if (ap.status && l.status === ap.status && (ap.data_pagamento === null || l.data_pagamento === ap.data_pagamento)) {
+        patch.status = baixaAnterior.status || (l.tipo === 'receita' ? 'a_receber' : 'a_pagar');
+        if (ap.data_pagamento !== null) patch.data_pagamento = baixaAnterior.data_pagamento;
+      }
+      if (ap.conta_bancaria && l.conta_bancaria === ap.conta_bancaria) patch.conta_bancaria = baixaAnterior.conta_bancaria || '';
+    }
+    DB.update('lancamentos', lanId, patch);
+  },
+
+  _chaveConta(bancoId, contaId, contaBancaria) {
+    const b = String(bancoId || '').trim(), c = String(contaId || '').trim();
+    return (b || c) ? `${b}|${c}` : `nome:${String(contaBancaria || '').trim().toLowerCase()}`;
+  },
+
+  /** O lançamento é da conta do extrato (ou ainda não tem conta definida). */
+  _mesmaConta(lan, imp) {
+    const contaLan = String(lan?.conta_bancaria || '').trim().toLowerCase();
+    const contaImp = String(imp?.conta_bancaria || '').trim().toLowerCase();
+    return !contaLan || !contaImp || contaLan === contaImp;
   },
 
   _recItem(t, allLans, clientesMap, importId) {
@@ -891,8 +954,8 @@ const OFX = {
 
     imp.transacoes[idx].status = 'conciliada';
     imp.transacoes[idx].lancamento_id = lanId;
+    imp.transacoes[idx].baixa_anterior = this._aplicarBaixaConciliacao(lanId, imp.transacoes[idx].data, imp.conta_bancaria);
     DB.update('ofximports', importId, { transacoes: imp.transacoes });
-    this._aplicarBaixaConciliacao(lanId, imp.transacoes[idx].data, imp.conta_bancaria);
 
     if (showToast) Utils.toast('Transação bancária conciliada!', 'success');
     this.viewImport(importId, this._activeFilterTab, this._activeSearchTerm);
@@ -905,10 +968,12 @@ const OFX = {
     if (idx === -1) return;
 
     const lanId = imp.transacoes[idx].lancamento_id;
+    const baixaAnterior = imp.transacoes[idx].baixa_anterior;
     imp.transacoes[idx].status = 'pendente';
     imp.transacoes[idx].lancamento_id = null;
+    imp.transacoes[idx].baixa_anterior = null;
     DB.update('ofximports', importId, { transacoes: imp.transacoes });
-    if (lanId) DB.update('lancamentos', lanId, { conciliado: false });
+    if (lanId) this._desfazerBaixaConciliacao(lanId, baixaAnterior);
 
     Utils.toast('Conciliação desfeita.', 'info');
     this.viewImport(importId, this._activeFilterTab, this._activeSearchTerm);
@@ -943,9 +1008,7 @@ const OFX = {
     const imp = DB.getById('ofximports', importId);
     if (imp && Array.isArray(imp.transacoes)) {
       imp.transacoes.forEach(t => {
-        if (t.lancamento_id) {
-          DB.update('lancamentos', t.lancamento_id, { conciliado: false });
-        }
+        if (t.lancamento_id) this._desfazerBaixaConciliacao(t.lancamento_id, t.baixa_anterior);
       });
     }
     DB.remove('ofximports', importId);

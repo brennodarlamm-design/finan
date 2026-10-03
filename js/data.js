@@ -2203,7 +2203,14 @@ const DB = {
     }));
     if (obraId && obraId !== 'todas') items = items.filter(l => String(l.obra_id) === String(obraId));
     if (filters.tipo) items = items.filter(l => l.tipo === filters.tipo);
-    if (filters.status) items = items.filter(l => l.status === filters.status);
+    if (filters.status === 'em_atraso') {
+      // "Em atraso" = em aberto com vencimento passado (a tabela já mostra "⚠ Atrasado"),
+      // não só quem foi gravado com esse status.
+      items = items.filter(l => l.status === 'em_atraso' || this.isLancamentoVencido(l));
+    } else if (filters.status === 'a_pagar' || filters.status === 'a_receber') {
+      const tipoAlvo = filters.status === 'a_pagar' ? 'despesa' : 'receita';
+      items = items.filter(l => l.status === filters.status || (l.tipo === tipoAlvo && l.status === 'em_atraso'));
+    } else if (filters.status) items = items.filter(l => l.status === filters.status);
     if (filters.categoria) items = items.filter(l => l.categoria === filters.categoria);
     if (filters.fornecedor) {
       const qForn = String(filters.fornecedor).trim().toLowerCase();
@@ -2226,13 +2233,26 @@ const DB = {
     return items.sort((a, b) => String(b.data || '').localeCompare(String(a.data || '')));
   },
 
+  /** Lançamento ainda em aberto (inclui o status "em_atraso", que antes sumia dos totais). */
+  isLancamentoEmAberto(l) {
+    const st = String(l?.status || '');
+    if (l?.tipo === 'receita') return st === 'a_receber' || st === 'pendente' || st === 'em_atraso';
+    return st === 'a_pagar' || st === 'pendente' || st === 'em_atraso';
+  },
+
+  /** Em aberto e já vencido (pela data de hoje em Boa Vista). */
+  isLancamentoVencido(l, hoje = (typeof Utils !== 'undefined' && Utils.today ? Utils.today() : new Date().toISOString().slice(0, 10))) {
+    const venc = String(l?.data_vencimento || l?.data || '').slice(0, 10);
+    return this.isLancamentoEmAberto(l) && !!venc && venc < hoje;
+  },
+
   getResumo(obraId) {
     const lans = this.getLancamentos(obraId === 'todas' ? null : obraId);
     const rec = lans.filter(l => l.tipo === 'receita' && l.status === 'recebido').reduce((s,l)=>s+l.valor,0);
     const desp = lans.filter(l => l.tipo === 'despesa' && l.status === 'pago').reduce((s,l)=>s+l.valor,0);
     const nfItems = this.getAll('notas').filter(n => (!obraId || obraId === 'todas' || n.obra_id === obraId) && n.status === 'pendente');
-    const aPagar = lans.filter(l => l.tipo === 'despesa' && l.status === 'a_pagar');
-    const aReceber = lans.filter(l => l.tipo === 'receita' && l.status === 'a_receber');
+    const aPagar = lans.filter(l => l.tipo === 'despesa' && this.isLancamentoEmAberto(l));
+    const aReceber = lans.filter(l => l.tipo === 'receita' && this.isLancamentoEmAberto(l));
     return {
       totalReceitas: rec, totalDespesas: desp, saldo: rec - desp,
       nfPendentes: nfItems.length, nfPendentesValor: nfItems.reduce((s,n)=>s+(n.valor_total||n.valor_bruto||0),0),
@@ -3281,7 +3301,8 @@ const DB = {
 
   // ── DESPESAS DO ESCRITÓRIO / SEDE QUERIES ──
   getDespesasEscritorio(filters = {}) {
-    let items = this.getAll('lancamentos').filter(l => l.obra_id === 'escritorio' || l.obra_id === 'sede' || l.centro_custo === 'escritorio');
+    // Só despesas: receitas lançadas na sede entravam no "Total do Escritório" como gasto.
+    let items = this.getAll('lancamentos').filter(l => l.tipo !== 'receita' && (l.obra_id === 'escritorio' || l.obra_id === 'sede' || l.centro_custo === 'escritorio'));
     if (filters.grupo) {
       if (filters.grupo === 'consumo') items = items.filter(l => ['energia','agua','internet_tel'].includes(l.categoria));
       else if (filters.grupo === 'impostos') items = items.filter(l => ['imposto_simples','tributos_trabalhistas','taxa'].includes(l.categoria));
@@ -3308,7 +3329,7 @@ const DB = {
   getResumoEscritorio(filters = {}) {
     const list = this.getDespesasEscritorio(filters);
     const pagas = list.filter(l => l.status === 'pago');
-    const aPagar = list.filter(l => l.status === 'a_pagar');
+    const aPagar = list.filter(l => this.isLancamentoEmAberto(l));
     const consumo = list.filter(l => ['energia','agua','internet_tel'].includes(l.categoria));
     const impostos = list.filter(l => ['imposto_simples','tributos_trabalhistas','taxa'].includes(l.categoria));
     const folha = list.filter(l => ['salario','pro_labore','beneficios'].includes(l.categoria));

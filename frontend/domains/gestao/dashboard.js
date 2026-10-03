@@ -833,17 +833,21 @@ const Dashboard = {
     let totalPrevDesp = 0;
 
     lans.forEach(l => {
-      const venc = l.data_vencimento || l.data;
-      if (!venc) return;
+      let venc = String(l.data_vencimento || l.data || '').slice(0, 10);
+      if (!venc || !DB.isLancamentoEmAberto(l)) return;
+      // O que já venceu e não foi pago/recebido continua a sair/entrar: entra na 1ª semana
+      // (antes ficava fora e o saldo de 90 dias saía superestimado).
+      if (venc < semanas[0].iniStr) venc = semanas[0].iniStr;
 
       semanas.forEach(sem => {
         if (venc >= sem.iniStr && venc <= sem.fimStr) {
-          if (l.tipo === 'receita' && (l.status === 'a_receber' || l.status === 'pendente')) {
-            sem.rec += l.valor;
-            totalPrevRec += l.valor;
-          } else if (l.tipo === 'despesa' && (l.status === 'a_pagar' || l.status === 'pendente')) {
-            sem.desp += l.valor;
-            totalPrevDesp += l.valor;
+          const valor = Number(l.valor) || 0;
+          if (l.tipo === 'receita') {
+            sem.rec += valor;
+            totalPrevRec += valor;
+          } else if (l.tipo === 'despesa') {
+            sem.desp += valor;
+            totalPrevDesp += valor;
           }
         }
       });

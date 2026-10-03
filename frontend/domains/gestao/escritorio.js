@@ -539,7 +539,8 @@ const Escritorio = {
       conta_bancaria: fd.get('conta_bancaria') || '',
       codigo_barras: fd.get('codigo_barras') || '',
       origem: 'manual',
-      conciliado: fd.get('status') === 'pago'
+      // Pagar não é conciliar: só a conciliação OFX marca o lançamento como conciliado.
+      conciliado: id ? !!DB.getById('lancamentos', id)?.conciliado : false
     };
 
     let lancamentoId = id;
@@ -621,8 +622,8 @@ const Escritorio = {
     DB.update('lancamentos', id, {
       status: 'pago',
       data_pagamento: dataPago,
-      conta_bancaria: conta,
-      conciliado: true
+      conta_bancaria: conta
+      // Sem "conciliado": o débito do extrato OFX ainda precisa encontrar este lançamento.
     });
 
     Utils.closeModal();

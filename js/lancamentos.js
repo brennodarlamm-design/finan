@@ -261,6 +261,7 @@ const Lancamentos = {
     const statOpts = initialTipo === 'receita' ? this._statRec : this._statDesp;
     
     const contaAtual = l.conta_bancaria || '';
+    const contaOptionsHtml = typeof Contas !== 'undefined' ? Contas.contaOptions(contaAtual) : `<option value="">Nenhuma conta</option>`;
     const hoje = Utils.today();
     const isPagoOuRec = l.status === 'pago' || l.status === 'recebido';
 
@@ -351,11 +352,11 @@ const Lancamentos = {
               <label class="form-label" for="lan-conta-sel">Conta Banc&aacute;ria</label>
               <div style="display:flex;gap:8px;align-items:center;">
                 <select class="form-control" id="lan-conta-sel" data-fb-change="Lancamentos._onContaChange" data-fb-change-n="1" data-fb-change-t0="self" style="flex:1;">
-                  ${typeof Contas !== 'undefined' ? Contas.contaOptions(contaAtual) : `<option value="">Nenhuma conta</option>`}
+                  ${contaOptionsHtml}
                 </select>
                 <button type="button" class="btn btn-secondary btn-sm" data-fb-click="App.navigate" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="contas" title="Cadastrar nova conta" style="white-space:nowrap;">&#x2795; Nova Conta</button>
               </div>
-              <input class="form-control" name="conta_bancaria_manual" id="lan-conta-manual" value="${contaAtual}" placeholder="Ou digite o nome/agência/conta" style="margin-top:6px;display:none;">
+              <input class="form-control" name="conta_bancaria_manual" id="lan-conta-manual" value="${Utils.escapeHtml(contaAtual)}" placeholder="Ou digite o nome/agência/conta" style="margin-top:6px;display:${contaOptionsHtml.includes('value="__manual__" selected') ? 'block' : 'none'};">
             </div>
 
             <div class="form-group" style="margin-bottom:14px;">
@@ -688,10 +689,11 @@ const Lancamentos = {
     // Tratar conta bancária selecionada ou digitada
     const selConta = document.getElementById('lan-conta-sel')?.value;
     const manConta = document.getElementById('lan-conta-manual')?.value || '';
-    if (selConta && selConta !== '__manual__') {
-      d.conta_bancaria = selConta;
+    if (selConta === '__manual__') {
+      d.conta_bancaria = manConta.trim();
     } else {
-      d.conta_bancaria = manConta;
+      // Inclui "nenhuma conta" (valor vazio): antes caía no campo manual, pré-preenchido com a conta antiga.
+      d.conta_bancaria = selConta || '';
     }
 
     if (!d.nota_fiscal_id) delete d.nota_fiscal_id;
@@ -764,7 +766,7 @@ const Lancamentos = {
           
           <div class="form-group" style="margin-bottom:12px;">
             <label class="form-label">${isRec ? 'Conta Bancária de Entrada' : 'Conta Bancária de Saída'}</label>
-            <select id="baixa-conta" class="form-control" data-fb-change="Lancamentos._onContaChange" data-fb-change-n="1" data-fb-change-t0="value">
+            <select id="baixa-conta" class="form-control" data-fb-change="Lancamentos._onBaixaContaChange" data-fb-change-n="1" data-fb-change-t0="value">
               ${contasOptionsHtml}
             </select>
             <input type="text" id="baixa-conta-manual" class="form-control" placeholder="Digite a identificação da conta..." style="margin-top:6px;display:none;">
@@ -784,7 +786,9 @@ const Lancamentos = {
     `);
   },
 
-  _onContaChange(val) {
+  // Nome próprio: havia dois "_onContaChange" no objeto e este (do modal de baixa)
+  // substituía o do formulário, que nunca mostrava o campo "digitar manualmente".
+  _onBaixaContaChange(val) {
     const m = document.getElementById('baixa-conta-manual');
     if (m) m.style.display = val === '__manual__' ? 'block' : 'none';
   },
@@ -807,8 +811,9 @@ const Lancamentos = {
     DB.update('lancamentos', id, {
       status: novoStatus,
       data_pagamento: dataBaixa,
-      conta_bancaria: conta,
-      conciliado: true
+      conta_bancaria: conta
+      // Baixa manual não é conciliação: o débito do extrato OFX precisa encontrar este
+      // lançamento como par (antes ele sumia da busca e o usuário lançava em dobro).
     });
 
     Utils.closeModal();

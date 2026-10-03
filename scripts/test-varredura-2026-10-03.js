@@ -325,4 +325,150 @@ function navegador() {
   console.log('  ✓ Delta sync: cursor no relógio do servidor, desde o início do download, com sobreposição de 2 min');
 }
 
-console.log('\n✅ Varredura 03/10/2026 (correções rápidas e proteção de dados): tudo certo.');
+
+// ── OFX, NF-e e financeiro ────────────────────────────────────────────────────
+
+function appCtx(modulos) {
+  const store = new Map();
+  const toasts = [];
+  const ctx = vm.createContext({
+    console, structuredClone, setTimeout, clearTimeout, Promise, URLSearchParams,
+    localStorage: { getItem: k => (store.has(k) ? store.get(k) : null), setItem: (k, v) => store.set(k, String(v)), removeItem: k => store.delete(k), key: i => [...store.keys()][i] ?? null, get length() { return store.size; } },
+    Auth: { getCurrentTenantId: () => 't1', canModule: () => true },
+    navigator: { onLine: false },
+    window: { addEventListener() {}, dispatchEvent() {} },
+    document: { getElementById: () => null, querySelector: () => null, addEventListener() {} },
+    crypto: { randomUUID: () => Math.random().toString(16).slice(2) + Date.now().toString(16) },
+    confirm: () => true,
+    App: { obraId: 'todas', route: 'x' }
+  });
+  ctx.globalThis = ctx;
+  vm.runInContext(`${read('js/utils.js')}\nglobalThis.Utils = Utils;`, ctx);
+  vm.runInContext(`${read('js/data.js')}\nglobalThis.DB = DB;`, ctx);
+  ctx.Utils.toast = (m, k) => toasts.push({ m, k });
+  ctx.Utils.today = () => '2026-10-03';
+  ctx.Utils.closeModal = () => {};
+  ctx.Utils.showModal = () => {};
+  ctx.DB.canWriteLocal = () => true;
+  ctx.DB.syncToCloud = () => true;
+  for (const [arq, nome] of modulos) vm.runInContext(`${read(arq)}\nglobalThis.${nome} = ${nome};`, ctx);
+  return { ctx, toasts, plain: v => JSON.parse(JSON.stringify(v)) };
+}
+
+{
+  const { ctx, toasts } = appCtx([['js/ofx.js', 'OFX']]);
+  const { DB, OFX } = ctx;
+  OFX.viewImport = () => {}; OFX.render = () => ''; OFX.init = () => {};
+  DB.add('lancamentos', { id: 'P1', tipo: 'despesa', descricao: 'Parcela 1/3', valor: 500, data: '2026-09-10', data_vencimento: '2026-09-10', status: 'a_pagar' });
+  DB.add('lancamentos', { id: 'P2', tipo: 'despesa', descricao: 'Parcela 2/3', valor: 500, data: '2026-09-17', data_vencimento: '2026-09-17', status: 'a_pagar' });
+  const ofx = `<OFX><BANKID>341</BANKID><ACCTID>1234</ACCTID><DTSTART>20260901</DTSTART><DTEND>20260930</DTEND><STMTTRN><TRNTYPE>DEBIT</TRNTYPE><DTPOSTED>20260910</DTPOSTED><TRNAMT>-500.00</TRNAMT><FITID>X1</FITID><MEMO>Pagamento</MEMO></STMTTRN></OFX>`;
+  OFX._importData = OFX._parseOFX(ofx); OFX.processImport();
+  const imp1 = DB.getAll('ofximports')[0];
+  OFX._confirmarTodosMatchesRobo(imp1.id);
+  assert.equal(DB.getById('lancamentos', 'P1').status, 'pago');
+  OFX._importData = OFX._parseOFX(ofx); OFX.processImport();
+  assert.equal(DB.getAll('ofximports').length, 1, 'mesmo extrato não é importado de novo');
+  assert(toasts.some(t => /já foi importado/.test(t.m)));
+  assert.equal(DB.getById('lancamentos', 'P2').status, 'a_pagar', 'parcela 2 não é "paga" por reimportação');
+  // Desconciliar desfaz a baixa feita pela conciliação.
+  OFX.desconciliar(imp1.id, 'X1');
+  const p1 = DB.getById('lancamentos', 'P1');
+  assert.equal(p1.status, 'a_pagar'); assert.equal(p1.conciliado, false); assert(!p1.data_pagamento);
+  // Lote: só valor exato.
+  DB.add('lancamentos', { id: 'Q', tipo: 'despesa', descricao: 'Cimento', valor: 95, data: '2026-09-20', data_vencimento: '2026-09-20', status: 'a_pagar' });
+  const ofx2 = `<OFX><BANKID>341</BANKID><ACCTID>1234</ACCTID><STMTTRN><TRNTYPE>DEBIT</TRNTYPE><DTPOSTED>20260920</DTPOSTED><TRNAMT>-100.00</TRNAMT><FITID>X2</FITID><MEMO>Cimento</MEMO></STMTTRN></OFX>`;
+  OFX._importData = OFX._parseOFX(ofx2); OFX.processImport();
+  const imp2 = DB.getAll('ofximports').find(i => i.transacoes.some(t => t.fitid === 'X2'));
+  OFX._confirmarTodosMatchesRobo(imp2.id);
+  assert.equal(DB.getById('lancamentos', 'Q').status, 'a_pagar', 'diferença de R$ 5 não é conciliada em lote');
+  for (const f of ['js/lancamentos.js', 'js/escritorio.js']) assert(!/conciliado: true/.test(read(f)), `${f}: baixa manual não marca conciliado`);
+  console.log('  ✓ OFX: reimportação bloqueada por FITID, lote só com valor exato, desconciliar reabre a conta, baixa manual não concilia');
+}
+
+{
+  const { ctx, toasts } = appCtx([['js/produtos.js', 'Produtos'], ['js/nfe.js', 'NFe']]);
+  const { DB, NFe } = ctx;
+  NFe.baixarDanfePDF = async () => null;
+  DB.add('contas', { id: 'cc1', apelido: 'Itaú Obra', banco_nome: 'Itaú' });
+  const campos = { 'nfe-dest-obra': 'obra1', 'nfe-dest-conta': 'cc1', 'nfe-dest-valor': '15430.50', 'nfe-dest-venc': '2026-11-01', 'nfe-ja-pago': false };
+  ctx.document.getElementById = id => (id in campos ? { value: campos[id], checked: campos[id] === true } : null);
+  const chave = '13261012345678000199550010000012341000012345';
+  ctx.window._tempNFeParsed = { chave, numero_nf: '1234', emitente: 'CIMENTOS LTDA', cnpj_emitente: '12.345.678/0001-99', data_emissao: '2026-10-01', valor_bruto: 15430.5,
+    duplicatas: [{ numero: '001', vencimento: '2026-11-01', valor: 5143.5 }, { numero: '002', vencimento: '2026-12-01', valor: 5143.5 }, { numero: '003', vencimento: '2027-01-01', valor: 5143.5 }] };
+  await Promise.all([NFe._confirmarGeracaoLancamento(chave), NFe._confirmarGeracaoLancamento(chave)]);
+  const lancs = DB.getAll('lancamentos');
+  assert.equal(lancs.length, 3, 'uma conta por duplicata e clique duplo não duplica');
+  assert.deepEqual(JSON.parse(JSON.stringify(lancs.map(l => [l.valor, l.data_vencimento]))), [[5143.5, '2026-11-01'], [5143.5, '2026-12-01'], [5143.5, '2027-01-01']]);
+  assert(lancs.every(l => l.conta_bancaria === 'Itaú Obra'), 'conta preenchida pelo apelido');
+  assert.equal(DB.getAll('fornecedores')[0].cnpj, '12345678000199');
+  await NFe._confirmarGeracaoLancamento(chave);
+  assert.equal(DB.getAll('lancamentos').length, 3, 'NF-e já lançada não é lançada de novo');
+  assert(toasts.some(t => /já foi lançada/.test(t.m)));
+  assert(/status: jaPago \? 'paga' : 'pendente'/.test(read('js/nfe.js')), 'nota paga usa o status "paga"');
+  console.log('  ✓ NF-e: uma conta por duplicata, sem duplicar por clique duplo ou relançamento, conta e fornecedor corretos');
+}
+
+{
+  const { upsertDfeDocumento, decompressAndParseDocZip } = await import('../api/_sefaz-dfe.js');
+  const zlib = await import('node:zlib');
+  const ch = '13261012345678000199550010000012341000012345';
+  const z = x => zlib.gzipSync(Buffer.from(x)).toString('base64');
+  const nfe = `<nfeProc xmlns="http://www.portalfiscal.inf.br/nfe"><NFe><infNFe Id="NFe${ch}"><ide><dhEmi>2026-10-01T10:00:00-04:00</dhEmi></ide><emit><CNPJ>12345678000199</CNPJ><xNome>CIMENTOS LTDA</xNome></emit><total><ICMSTot><vNF>15430.50</vNF></ICMSTot></total></infNFe></NFe><protNFe><infProt><chNFe>${ch}</chNFe></infProt></protNFe></nfeProc>`;
+  const ev = (tp, desc) => `<procEventoNFe xmlns="http://www.portalfiscal.inf.br/nfe"><evento><infEvento><CNPJ>99888777000166</CNPJ><chNFe>${ch}</chNFe><dhEvento>2026-10-02T09:00:00-04:00</dhEvento><tpEvento>${tp}</tpEvento><detEvento><descEvento>${desc}</descEvento></detEvento></infEvento></evento></procEventoNFe>`;
+  const db = new PGlite();
+  await db.exec(`CREATE TABLE tenant_dfe_documentos (id text, tenant_id text, tipo_documento text, nsu text, chave text, cnpj_emitente text, nome_emitente text, valor_total numeric, data_emissao timestamptz, situacao text, schema_tipo text, xml_completo text, danfe_url text, manifesto_status text, updated_at timestamptz, UNIQUE(tenant_id, chave))`);
+  const sql = async (strings, ...values) => { let t = strings[0]; values.forEach((_, i) => { t += `$${i + 1}` + strings[i + 1]; }); return (await db.query(t, values)).rows; };
+  const doc = async () => (await db.query(`SELECT tipo_documento, nome_emitente, valor_total::float AS v, situacao, left(xml_completo, 8) AS x FROM tenant_dfe_documentos`)).rows[0];
+  await upsertDfeDocumento(sql, 't1', decompressAndParseDocZip({ nsu: '1', schema: 'procNFe_v4.00.xsd', base64Content: z(nfe) }));
+  await upsertDfeDocumento(sql, 't1', decompressAndParseDocZip({ nsu: '2', schema: 'procEventoNFe_v1.00.xsd', base64Content: z(ev('210210', 'Ciencia da Operacao')) }));
+  let d = await doc();
+  assert.equal(d.v, 15430.5); assert.equal(d.nome_emitente, 'CIMENTOS LTDA'); assert.equal(d.x, '<nfeProc'); assert.equal(d.situacao, 'autorizada');
+  await upsertDfeDocumento(sql, 't1', decompressAndParseDocZip({ nsu: '3', schema: 'procEventoNFe_v1.00.xsd', base64Content: z(ev('110111', 'Cancelamento')) }));
+  d = await doc();
+  assert.equal(d.situacao, 'cancelada'); assert.equal(d.v, 15430.5);
+  await upsertDfeDocumento(sql, 't1', decompressAndParseDocZip({ nsu: '4', schema: 'procNFe_v4.00.xsd', base64Content: z(nfe) }));
+  assert.equal((await doc()).situacao, 'cancelada', 'NF-e reenviada não desfaz o cancelamento');
+  await db.close();
+  assert.equal(read('api/_sefaz-dfe.js'), read('backend/domains/fiscal/_sefaz-dfe.js'), '_sefaz-dfe espelhado');
+  console.log('  ✓ DF-e: eventos não sobrescrevem a NF-e (valor, emitente e XML preservados) e cancelamento vale');
+}
+
+{
+  const { ctx, plain } = appCtx([['js/produtos.js', 'Produtos'], ['js/recibos.js', 'Recibos']]);
+  const { DB, Produtos, Recibos } = ctx;
+  DB.add('lancamentos', { id: 'a', tipo: 'despesa', valor: 1000, status: 'a_pagar', data_vencimento: '2026-10-10', obra_id: 'o1' });
+  DB.add('lancamentos', { id: 'b', tipo: 'despesa', valor: 5000, status: 'em_atraso', data_vencimento: '2026-09-01', obra_id: 'o1' });
+  DB.add('lancamentos', { id: 'c', tipo: 'despesa', valor: 70, status: 'a_pagar', data_vencimento: '2026-09-20', obra_id: 'o1' });
+  const r = DB.getResumo('todas');
+  assert.equal(r.aPagar, 3); assert.equal(r.aPagarValor, 6070, 'em_atraso entra no A Pagar');
+  assert.deepEqual(plain(DB.getLancamentos(null, { status: 'em_atraso' }).map(l => l.id).sort()), ['b', 'c'], 'filtro "Em Atraso" pega pendentes vencidos');
+  DB.add('lancamentos', { id: 'e1', tipo: 'despesa', valor: 300, status: 'pago', obra_id: 'escritorio' });
+  DB.add('lancamentos', { id: 'e2', tipo: 'receita', valor: 5000, status: 'recebido', obra_id: 'escritorio' });
+  assert.equal(DB.getResumoEscritorio().totalGeral, 300, 'receita da sede não entra como gasto do escritório');
+  assert(/if \(venc < semanas\[0\]\.iniStr\) venc = semanas\[0\]\.iniStr;/.test(read('js/dashboard.js')), 'fluxo de 90 dias inclui o que já venceu');
+  assert(/status IN \('a_pagar','pendente','em_atraso'\)/.test(read('api/dashboard.js')), 'dashboard do servidor inclui em_atraso');
+  // Histórico de preços: compra do OCR (lançamento + nota com os mesmos itens) conta uma vez.
+  DB.add('produtos', { id: 'p1', nome: 'Cimento', unidade: 'sc' });
+  const itens = [{ produto_id: 'p1', qtd: 10, valor_unit: 45, total: 450 }];
+  DB.add('lancamentos', { id: 'L', tipo: 'despesa', valor: 450, status: 'pago', itens });
+  DB.add('notas', { id: 'N', lancamento_id: 'L', itens });
+  const an = Produtos.getAnaliseGastos().find(x => x.id === 'p1');
+  assert.equal(an.total, 450); assert.equal(an.qtd_total, 10);
+  // Recibo: maior número do ano + 1.
+  Recibos.salvarLista([{ id: 'r1', numero: '0001/2026' }, { id: 'r3', numero: '0003/2026' }, { id: 'r9', numero: '0009/2025' }]);
+  assert.equal(Recibos._proximoNumero(), '0004/2026');
+  console.log('  ✓ Financeiro: em atraso nos totais e filtro, escritório sem receitas, preço médio sem contagem dupla, recibo sem número repetido');
+}
+
+{
+  const lanc = read('js/lancamentos.js');
+  assert.equal((lanc.match(/^  _onContaChange\(/gm) || []).length, 1, 'um único _onContaChange');
+  assert(/_onBaixaContaChange\(val\)/.test(lanc) && /data-fb-change="Lancamentos\._onBaixaContaChange"/.test(lanc));
+  assert(read('js/patch26-events.js').includes('"Lancamentos._onBaixaContaChange"'), 'nova ação na allowlist do CSP');
+  const notas = read('js/notas.js');
+  assert(/vRetPIS/.test(notas) && !/vNF - impostos/.test(notas), 'valor a pagar desconta só retenções');
+  assert(/cnpjEmpresa/.test(notas), 'entrada/saída pelo CNPJ da construtora');
+  console.log('  ✓ Lançamento (conta manual), Notas (entrada/saída e valor líquido)');
+}
+
+console.log('\n✅ Varredura 03/10/2026 (rápidas, dados, OFX, NF-e e financeiro): tudo certo.');

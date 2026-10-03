@@ -498,9 +498,20 @@ const Notas = {
     const vCOFINS = parseFloat(get(icmsTot || infNFe, 'vCOFINS')) || 0;
     const vISS  = parseFloat(get(icmsTot || infNFe, 'vISS'))  || 0;
     const impostos = parseFloat((vICMS + vIPI + vPIS + vCOFINS + vISS).toFixed(2));
-    const valorLiquido = parseFloat((vNF - impostos).toFixed(2));
+    // Quem compra paga o vNF (o IPI já está somado e o ICMS embutido no preço). Só as
+    // retenções na fonte (<retTrib>) saem do valor a pagar; os impostos ficam como informação.
+    const retTrib = infNFe.querySelector('retTrib') || Array.from(infNFe.querySelectorAll('*')).find(el => el.localName === 'retTrib');
+    const retencoes = retTrib ? ['vRetPIS', 'vRetCOFINS', 'vRetCSLL', 'vIRRF', 'vRetPrev'].reduce((s, tag) => s + (parseFloat(get(retTrib, tag)) || 0), 0) : 0;
+    const valorLiquido = parseFloat((vNF - retencoes).toFixed(2));
 
-    const tipo = tpNF === '0' ? 'entrada' : 'saida';
+    // Entrada/saída do ponto de vista da construtora: tpNF é o ponto de vista do emitente
+    // (venda do fornecedor = tpNF 1), por isso compras apareciam como "Saída".
+    const destCNPJ = get(dest || infNFe, 'CNPJ') || get(dest || infNFe, 'CPF');
+    const cnpjEmpresa = String((typeof DB !== 'undefined' && DB.getEmpresa ? DB.getEmpresa()?.cnpj : '') || '').replace(/\D/g, '');
+    let tipo;
+    if (cnpjEmpresa && String(destCNPJ).replace(/\D/g, '') === cnpjEmpresa) tipo = tpNF === '0' ? 'saida' : 'entrada';
+    else if (cnpjEmpresa && String(emitenteCNPJ).replace(/\D/g, '') === cnpjEmpresa) tipo = tpNF === '0' ? 'entrada' : 'saida';
+    else tipo = tpNF === '0' ? 'saida' : 'entrada'; // sem CNPJ cadastrado: XML importado costuma ser compra
 
     if (!nNF) throw new Error('Número da NF não encontrado no XML.');
     if (!emitenteNome) throw new Error('Emitente não encontrado no XML.');
@@ -637,17 +648,20 @@ const Notas = {
       }
 
       // 2. Cadastra ou vincula produtos e calcula/atualiza histórico
+      const produtosDaNota = new Set();
       if (Array.isArray(nf.itens) && typeof Produtos !== 'undefined') {
         nf.itens.forEach(it => {
           const prod = Produtos.encontrarOuCriar(it.produto, it.unidade, nf.categoria || 'material');
           if (prod) {
             it.produto_id = prod.id;
-            Produtos.atualizarValorMedio(prod.id);
+            produtosDaNota.add(prod.id);
           }
         });
       }
 
       DB.add('notas', nf);
+      // Valor médio depois de gravar a nota (antes a compra nova ficava fora da média).
+      produtosDaNota.forEach(id => Produtos.atualizarValorMedio(id));
       count++;
     });
 
