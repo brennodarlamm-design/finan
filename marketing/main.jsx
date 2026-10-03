@@ -10,6 +10,7 @@ import "./styles.css";
 import { FinBot } from "./finbot.jsx";
 import { FeatureTour } from "./feature-tour.jsx";
 import { Brand, Faq, Newsletter, Footer } from "./brand-sections.jsx";
+import { AboutVideoBand, AboutObjectives, SupportChatVisual } from "./about-sections.jsx";
 import { TRILHAS, MANUAIS } from "./manuais-data.js";
 import { ARTIGOS_BLOG } from "./blog-data.js";
 
@@ -873,13 +874,7 @@ function About() {
           </p>
         </div>
       </section>
-      <div className="wrap">
-        <img
-          src="/img/fingo/construction-background.jpg"
-          alt="Profissional com capacete acompanhando uma obra"
-          className="h-72 w-full rounded-sm object-cover grayscale md:h-96"
-        />
-      </div>
+      <AboutVideoBand />
 
       <section className="wrap py-24">
         <p className="eyebrow">Nossa história</p>
@@ -912,55 +907,11 @@ function About() {
         </div>
       </section>
 
-      <section className="border-y border-shadow bg-ink py-24">
-        <div className="wrap">
-          <p className="eyebrow">Nossos objetivos</p>
-          <div className="grid gap-10 md:grid-cols-3">
-            {[
-              [
-                "01",
-                "Aproximar canteiro e escritório",
-                "Fazer a informação circular entre quem executa, quem acompanha e quem decide: fotos, etapas, compras e medições registradas na hora, pelo celular.",
-              ],
-              [
-                "02",
-                "Dar clareza aos números",
-                "Mostrar o custo real de cada obra, comparar orçado e realizado e manter o fluxo de caixa batendo com o banco.",
-              ],
-              [
-                "03",
-                "Simplificar para evoluir",
-                "Eliminar digitação repetitiva com importação de NF-e, OFX e leitura de notas, para a equipe gastar tempo com a obra.",
-              ],
-              [
-                "04",
-                "Proteger a operação",
-                "Dados de cada construtora isolados, acesso protegido, trilha de auditoria e tratamento de dados conforme a LGPD.",
-              ],
-              [
-                "05",
-                "Falar a língua da engenharia",
-                "Seguir as referências do setor: Acórdão 2.622/2013 do TCU, SINAPI da Caixa e as regras de retenção em medições.",
-              ],
-              [
-                "06",
-                "Crescer junto com o cliente",
-                "Evoluir o sistema a partir das sugestões de quem usa no dia a dia, com planos que acompanham o tamanho da empresa.",
-              ],
-            ].map(([n, t, d]) => (
-              <article key={n} className="border-t border-acid pt-6">
-                <p className="font-mono text-acid">{n} /</p>
-                <h3 className="mb-5 mt-8 text-2xl font-bold">{t}</h3>
-                <p className="leading-relaxed text-muted">{d}</p>
-              </article>
-            ))}
-          </div>
-        </div>
-      </section>
+      <AboutObjectives />
 
       <section className="wrap py-24">
         <p className="eyebrow">Suporte / Gente de verdade</p>
-        <div className="grid gap-10 md:grid-cols-2">
+        <div className="grid items-start gap-10 lg:grid-cols-2">
           <div>
             <h2 className="font-display text-3xl uppercase leading-tight md:text-5xl">
               Uma equipe preparada
@@ -977,6 +928,12 @@ function About() {
               Na chegada, ajudamos a configurar a conta, cadastrar as primeiras
               obras e importar os dados. Depois, seguimos por perto para tirar
               dúvidas, orientar a equipe e receber sugestões de melhoria.
+            </p>
+          </div>
+          <div className="lg:col-start-2 lg:row-span-2 lg:row-start-1 lg:sticky lg:top-24">
+            <SupportChatVisual />
+            <p className="mt-3 font-mono text-xs uppercase tracking-widest text-muted">
+              Conversa ilustrativa · o status mostra se a equipe está online agora
             </p>
           </div>
           <div className="rounded-sm border border-acid/60 bg-panel p-8">

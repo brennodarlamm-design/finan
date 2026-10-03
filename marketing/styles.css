@@ -136,3 +136,65 @@
     background-color: #ffffff !important;
   }
 }
+
+/* ── Sobre nós: objetivos ─────────────────────────────────────────────────── */
+.objetivo-tab { position: relative; }
+.objetivo-tab::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: -1px;
+  height: 2px;
+  width: 0;
+  background: var(--color-acid);
+  transition: width 300ms cubic-bezier(0.4, 0, 0.6, 1);
+}
+.objetivo-tab.is-active::before { width: 100%; }
+.objetivo-panel { animation: objetivo-in 200ms cubic-bezier(0, 0, 0.2, 1); }
+@keyframes objetivo-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: none; }
+}
+.objetivo-visual .ov-box { stroke: var(--color-line); stroke-width: 1.5; fill: var(--color-panel); }
+.objetivo-visual .ov-acid { fill: var(--color-acid); }
+.objetivo-visual .ov-danger { fill: #ff3b3b; }
+.objetivo-visual .ov-acid-outline { stroke: var(--color-acid); stroke-width: 2; fill: rgba(198, 255, 0, 0.06); }
+.objetivo-visual .ov-axis { stroke: var(--color-line); stroke-width: 1.5; }
+.objetivo-visual .ov-faint { stroke: var(--color-shadow); }
+.objetivo-visual .ov-acid-line { stroke: var(--color-acid); stroke-width: 2; }
+.objetivo-visual .ov-wall { stroke: var(--color-acid); stroke-width: 3; stroke-dasharray: 2 6; }
+.objetivo-visual .ov-label { fill: var(--color-silver); font: 700 11px/1 "Monument Grotesk", "Helvetica Neue", sans-serif; letter-spacing: 0.08em; }
+.objetivo-visual .ov-mono { fill: var(--color-muted); font: 500 10px/1 ui-monospace, "JetBrains Mono", monospace; letter-spacing: 0.08em; }
+.objetivo-visual .ov-big { fill: var(--color-acid); font: 900 26px/1 "Monument Grotesk", Impact, sans-serif; }
+.objetivo-visual .ov-flow { stroke: var(--color-acid); stroke-width: 2; stroke-dasharray: 6 6; animation: ov-dash 900ms linear infinite; }
+.objetivo-visual .ov-flow-rev { stroke: var(--color-purple-light); animation-direction: reverse; }
+.objetivo-visual .ov-travel { animation: ov-travel 1800ms cubic-bezier(0.4, 0, 0.6, 1) infinite; }
+.objetivo-visual .ov-grow { transform-box: fill-box; transform-origin: bottom; animation: ov-grow 500ms cubic-bezier(0, 0, 0.2, 1) both; }
+.objetivo-visual .ov-slide { animation: ov-slide 400ms cubic-bezier(0, 0, 0.2, 1) both; }
+.objetivo-visual .ov-pulse { animation: ov-blink 1.6s steps(2) infinite; }
+@keyframes ov-dash { to { stroke-dashoffset: -24; } }
+@keyframes ov-travel { 0% { transform: translateX(-40px); } 50% { transform: translateX(40px); } 100% { transform: translateX(-40px); } }
+@keyframes ov-grow { from { transform: scaleY(0); } to { transform: scaleY(1); } }
+@keyframes ov-slide { from { opacity: 0; transform: translateX(-12px); } to { opacity: 1; transform: none; } }
+@keyframes ov-blink { 50% { opacity: 0.2; } }
+
+/* ── Sobre nós: suporte ───────────────────────────────────────────────────── */
+.support-visual-grid {
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.025) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.025) 1px, transparent 1px);
+  background-size: 32px 32px;
+  pointer-events: none;
+}
+.support-msg { animation: objetivo-in 200ms cubic-bezier(0, 0, 0.2, 1); }
+.support-typing { display: inline-flex; gap: 4px; }
+.support-typing i { width: 6px; height: 6px; background: var(--color-acid); animation: ov-blink 900ms steps(2) infinite; }
+.support-typing i:nth-child(2) { animation-delay: 150ms; }
+.support-typing i:nth-child(3) { animation-delay: 300ms; }
+
+@media (prefers-reduced-motion: reduce) {
+  .objetivo-panel,
+  .support-msg,
+  .objetivo-visual *,
+  .support-typing i { animation: none !important; }
+}
