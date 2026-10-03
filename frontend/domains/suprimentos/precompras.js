@@ -655,15 +655,13 @@ const PreCompras = {
   excluir(id) {
     const item = DB.getById('precompras', id);
     if (!item) return;
-    Utils.confirm(`Deseja realmente excluir a ordem de pré-compra <strong>${Utils.escapeHtml(item.numero_ordem || '')}</strong>?`, () => {
-      if (item.lancamento_id) {
-        DB.remove('lancamentos', item.lancamento_id);
-      } else if (typeof DB !== 'undefined' && DB.getAll) {
-        const lan = (DB.getAll('lancamentos') || []).find(l => l.precompra_id === id);
-        if (lan?.id) DB.remove('lancamentos', lan.id);
-      }
+    Utils.confirm(`Deseja realmente excluir a ordem de pré-compra <strong>${Utils.escapeHtml(item.numero_ordem || '')}</strong>?<br><small>Uma conta a pagar ainda em aberto também será excluída. O que já foi pago ou conciliado continua no financeiro.</small>`, () => {
+      // VARREDURA 2026-10-03 #30: pagamento já feito ou conciliado não some junto com a ordem.
+      const { mantidos } = DB.removerLancamentosDaOrigem('precompra_id', id, [item.lancamento_id]);
       DB.remove('precompras', id);
-      Utils.toast('Ordem de pré-compra excluída!', 'info');
+      Utils.toast(mantidos.length
+        ? 'Ordem excluída. O pagamento já registrado foi mantido no financeiro.'
+        : 'Ordem de pré-compra excluída!', 'info');
       App.navigate('precompras');
     });
   },

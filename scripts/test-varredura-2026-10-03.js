@@ -553,4 +553,138 @@ function appCtx(modulos) {
   console.log(`  ✓ Portal: link curto (${url.length} caracteres) e assinado, dados atuais do servidor, sem arquivos privados nem troca de obra/empresa`);
 }
 
-console.log('\n✅ Varredura 03/10/2026 (rápidas, dados, OFX, NF-e e financeiro): tudo certo.');
+
+// ── Obras ─────────────────────────────────────────────────────────────────────
+
+// #21 — SLA: atraso contado em cada etapa seguinte e +1 dia por etapa.
+{
+  const { ctx } = appCtx([['js/cronograma_sla.js', 'CronogramaSLA']]);
+  const S = ctx.CronogramaSLA;
+  const r = S.calcularCascata([
+    { id: 'a', dias_sla: 10, status: 'em_andamento', data_inicio_real: '2026-09-01' },
+    { id: 'b', dias_sla: 10, predecessor_id: 'a', status: 'pendente' },
+    { id: 'c', dias_sla: 10, predecessor_id: 'b', status: 'pendente' }
+  ], '2026-09-01');
+  assert.equal(r[0].data_fim_prevista, '2026-09-10', '10 dias a partir de 01/09 terminam em 10/09');
+  assert.deepEqual(JSON.parse(JSON.stringify(r.map(p => p.dias_atraso))), [23, 0, 0], 'só a etapa atrasada conta atraso');
+  assert.equal(r[1].data_inicio_prevista, '2026-10-04', 'a seguinte é empurrada para depois de hoje');
+  assert.equal(S._atrasoEntrega(r), 23, 'entrega atrasa 23 dias, não a soma das etapas');
+  const semAtraso = S.calcularCascata([{ id: 'a', dias_sla: 30, status: 'pendente' }, { id: 'b', dias_sla: 30, predecessor_id: 'a', status: 'pendente' }], '2026-11-01');
+  assert.deepEqual(JSON.parse(JSON.stringify(semAtraso.map(p => [p.data_inicio_prevista, p.data_fim_prevista]))), [['2026-11-01', '2026-11-30'], ['2026-12-01', '2026-12-30']], 'sem dia extra entre etapas');
+  // Etapa concluída com atraso: a próxima, liberada e não iniciada, só conta desde que pôde começar.
+  const r2 = S.calcularCascata([
+    { id: 'a', dias_sla: 10, status: 'concluido', data_inicio_real: '2026-09-01', data_fim_real: '2026-09-25' },
+    { id: 'b', dias_sla: 10, predecessor_id: 'a', status: 'pendente' }
+  ], '2026-09-01');
+  assert.deepEqual(JSON.parse(JSON.stringify(r2.map(p => p.dias_atraso))), [15, 7]);
+  assert.equal(read('js/cronograma_sla.js'), read('frontend/domains/obras/cronograma_sla.js'));
+  console.log('  ✓ SLA: cada etapa conta só o próprio atraso, sem +1 dia por etapa; entrega atrasa o que realmente atrasou');
+}
+
+// #22 — Curva S: fuso do Brasil e "todas as obras".
+{
+  const tzAntes = process.env.TZ;
+  process.env.TZ = 'America/Sao_Paulo';
+  try {
+    const { ctx } = appCtx([]);
+    const { DB } = ctx;
+    DB.add('clientes', { id: 'o1', nome: 'A', data_inicio: '2026-09-01', data_previsao_termino: '2027-02-28' });
+    DB.add('clientes', { id: 'o2', nome: 'B', data_inicio: '2026-09-01', data_previsao_termino: '2027-02-28' });
+    DB.add('orcamentos', { id: 'r1', obra_id: 'o1', valor_total: 900000, itens: [] });
+    DB.add('orcamentos', { id: 'r2', obra_id: 'o2', valor_total: 100000, itens: [] });
+    DB.add('medicoes', { id: 'm1', obra_id: 'o1', status: 'liberada', percentual_fisico: 10, data: '2026-09-20' });
+    DB.add('medicoes', { id: 'm2', obra_id: 'o2', status: 'liberada', percentual_fisico: 90, data: '2026-09-20' });
+    const cs = DB.getCurvaS('o1');
+    assert.equal(cs.mesesKeys[0], '2026-09', 'curva começa em setembro, não em agosto');
+    const comp = DB.getOrcamentoVsRealizado('todas');
+    assert(comp.totalOrcado > 0, 'orçamentos lidos'); assert.equal(comp.percentualFisico, 18, 'média ponderada pelo orçado (10% de 900 mil + 90% de 100 mil)');
+    assert.equal(DB._pctFisicoCarteira(DB.getAll('clientes'), DB.getAll('medicoes'), [{ id: 'o1', peso: 0.9 }, { id: 'o2', peso: 0.1 }]), 18);
+    assert.notEqual(comp.percentualFisico, 90, 'não usa o maior % de uma obra só');
+  } finally {
+    if (tzAntes === undefined) delete process.env.TZ; else process.env.TZ = tzAntes;
+  }
+  console.log('  ✓ Curva S: começa no mês certo no fuso do Brasil; carteira usa média ponderada pelo orçamento');
+}
+
+// #23 e #30 — Medição: receita acompanha a edição, retenção vira "a receber", exclusão preserva o recebido.
+{
+  const { ctx, toasts } = appCtx([['js/medicoes.js', 'Medicoes']]);
+  const { DB, Medicoes } = ctx;
+  ctx.Utils.confirm = (_m, cb) => cb();
+  DB.add('clientes', { id: 'o1', nome: 'Casa', modalidade_obra: 'particular', data_previsao_termino: '2027-03-31' });
+  DB.add('medicoes', { id: 'M1', obra_id: 'o1', numero_medicao: 1, status: 'aprovada', valor_solicitado: 10000, percentual_fisico: 20 });
+  const campos = { 'lib-val': '10000', 'lib-retencao': '500', 'lib-descontos': '0', 'lib-dt': '2026-10-01' };
+  ctx.document.getElementById = id => (campos[id] !== undefined ? { value: campos[id] } : null);
+  Medicoes._confirmLiberar('M1');
+  ctx.document.getElementById = () => null;
+  let m = DB.getById('medicoes', 'M1');
+  const rec = DB.getById('lancamentos', m.lancamento_id);
+  const ret = DB.getById('lancamentos', m.retencao_lancamento_id);
+  assert.equal(rec.valor, 9500); assert.equal(rec.status, 'recebido');
+  assert.equal(ret.valor, 500); assert.equal(ret.status, 'a_receber'); assert.equal(ret.data_vencimento, '2027-03-31', 'retenção volta no término da obra');
+  // Edição: valor liberado e retenção mudam → receitas acompanham.
+  DB.update('medicoes', 'M1', { valor_liberado: 12000, retencao_tecnica: 600 });
+  Medicoes._sincronizarFinanceiro('M1');
+  assert.equal(DB.getById('lancamentos', rec.id).valor, 11400);
+  assert.equal(DB.getById('lancamentos', ret.id).valor, 600);
+  // Receita conciliada não muda de valor.
+  DB.update('lancamentos', rec.id, { conciliado: true });
+  DB.update('medicoes', 'M1', { valor_liberado: 13000 });
+  const avisos = Medicoes._sincronizarFinanceiro('M1');
+  assert.equal(DB.getById('lancamentos', rec.id).valor, 11400); assert.equal(avisos.length, 1);
+  // Exclusão: receita conciliada fica; retenção ainda a receber sai.
+  Medicoes.del('M1');
+  assert(DB.getById('lancamentos', rec.id), 'receita conciliada continua');
+  assert.equal(DB.getById('lancamentos', ret.id), null, 'retenção em aberto sai junto');
+  assert(toasts.some(t => /mantida no financeiro/.test(t.m)));
+  // Voltar de "liberada" tira as receitas não conciliadas.
+  DB.add('medicoes', { id: 'M2', obra_id: 'o1', numero_medicao: 2, status: 'liberada', valor_liberado: 5000, retencao_tecnica: 0, data_liberacao: '2026-10-02' });
+  Medicoes._sincronizarFinanceiro('M2');
+  const lan2 = DB.getById('medicoes', 'M2').lancamento_id;
+  assert(DB.getById('lancamentos', lan2));
+  DB.update('medicoes', 'M2', { status: 'aprovada' });
+  Medicoes._sincronizarFinanceiro('M2');
+  assert.equal(DB.getById('lancamentos', lan2), null);
+  assert.equal(DB.getById('medicoes', 'M2').lancamento_id, null);
+  // Pré-compra: pagamento feito não some; conta em aberto sai.
+  const { ctx: c2 } = appCtx([['js/precompras.js', 'PreCompras']]);
+  c2.Utils.confirm = (_m, cb) => cb(); c2.App.navigate = () => {};
+  c2.DB.add('lancamentos', { id: 'PG', tipo: 'despesa', valor: 300, status: 'pago', precompra_id: 'PC1' });
+  c2.DB.add('lancamentos', { id: 'AB', tipo: 'despesa', valor: 200, status: 'a_pagar', precompra_id: 'PC2' });
+  c2.DB.add('precompras', { id: 'PC1', numero_ordem: 'OC-1', lancamento_id: 'PG' });
+  c2.DB.add('precompras', { id: 'PC2', numero_ordem: 'OC-2', lancamento_id: 'AB' });
+  c2.PreCompras.excluir('PC1'); c2.PreCompras.excluir('PC2');
+  assert(c2.DB.getById('lancamentos', 'PG'), 'pagamento feito continua');
+  assert.equal(c2.DB.getById('lancamentos', 'AB'), null, 'conta em aberto sai junto');
+  // A retenção vinculada sobrevive ao recarregar da nuvem (vem do payload).
+  const { normalizeMedicao } = await import('../api/_db-normalizers.js');
+  assert.equal(normalizeMedicao({ id: 'x', payload: JSON.stringify({ retencao_lancamento_id: 'R9' }) }).retencao_lancamento_id, 'R9');
+  for (const f of [['medicoes', 'obras'], ['precompras', 'suprimentos'], ['data', null]]) {
+    assert.equal(read(`js/${f[0]}.js`), read(f[1] ? `frontend/domains/${f[1]}/${f[0]}.js` : `frontend/core/${f[0]}.js`));
+  }
+  console.log('  ✓ Medição: receita e retenção acompanham a edição; excluir medição/pré-compra não apaga o que já foi pago ou conciliado');
+}
+
+// #29 — Upload recusado pelo servidor não aparece como salvo.
+{
+  const { ctx, toasts } = appCtx([['js/documentos.js', 'Documentos']]);
+  const D = ctx.Documentos;
+  ctx.AbortSignal = AbortSignal;
+  D.lerArquivoBase64 = async () => 'QUJD';
+  D._idbSet = async () => {}; D.abrirModal = () => {};
+  const arquivo = { name: 'planta.exe', size: 1000, type: 'application/x-msdownload' };
+  ctx.fetch = async () => ({ ok: false, status: 400, json: async () => ({ success: false, error: 'Tipo de arquivo não permitido.' }) });
+  await D._onUpload('obra', 'o1', { files: [arquivo], value: 'x' });
+  assert.equal(D.getAll().length, 0, 'recusado não é salvo');
+  assert(toasts.some(t => t.k === 'error' && /não permitido/.test(t.m)));
+  ctx.fetch = async () => { throw new Error('offline'); };
+  await D._onUpload('obra', 'o1', { files: [{ name: 'a.pdf', size: 1000, type: 'application/pdf' }], value: 'x' });
+  assert.equal(D.getAll().length, 1, 'sem conexão fica neste aparelho');
+  assert(toasts.some(t => t.k === 'warning' && /só neste aparelho/.test(t.m)));
+  await D._onUpload('obra', 'o1', { files: [{ name: 'g.pdf', size: 16 * 1024 * 1024, type: 'application/pdf' }], value: 'x' });
+  assert(toasts.some(t => /15MB/.test(t.m)), 'limite igual ao do servidor');
+  assert.equal(read('js/documentos.js'), read('frontend/domains/contratos/documentos.js'));
+  console.log('  ✓ Documentos: arquivo recusado pelo servidor não aparece como salvo; limite de 15 MB');
+}
+
+console.log('\n✅ Varredura 03/10/2026 (rápidas, dados, OFX, NF-e, financeiro, cliente/portal e obras): tudo certo.');

@@ -2240,6 +2240,26 @@ const DB = {
     return st === 'a_pagar' || st === 'pendente' || st === 'em_atraso';
   },
 
+  /**
+   * VARREDURA 2026-10-03 #30: ao excluir a origem (medição, pré-compra), só apaga o lançamento
+   * vinculado que ainda está em aberto e não foi conciliado. O que já foi pago/recebido ou
+   * conciliado com o extrato continua no financeiro. Retorna { removidos, mantidos }.
+   */
+  removerLancamentosDaOrigem(campo, origemId, idsDiretos = []) {
+    const ids = new Set((idsDiretos || []).filter(Boolean).map(String));
+    const origem = String(origemId || '');
+    const vinculados = (this.getAll('lancamentos') || []).filter(l =>
+      ids.has(String(l.id)) || (origem && String(l[campo] || '') === origem));
+    const mantidos = [];
+    let removidos = 0;
+    for (const l of vinculados) {
+      const removivel = !l.conciliado && (this.isLancamentoEmAberto(l) || l.status === 'cancelado');
+      if (removivel) { this.remove('lancamentos', l.id); removidos++; }
+      else mantidos.push(l);
+    }
+    return { removidos, mantidos };
+  },
+
   /** Em aberto e já vencido (pela data de hoje em Boa Vista). */
   isLancamentoVencido(l, hoje = (typeof Utils !== 'undefined' && Utils.today ? Utils.today() : new Date().toISOString().slice(0, 10))) {
     const venc = String(l?.data_vencimento || l?.data || '').slice(0, 10);
@@ -2417,14 +2437,13 @@ const DB = {
       return m.obra_id === obraId;
     });
 
+    // VARREDURA 2026-10-03 #22: em "todas as obras" o avanço físico era o maior % de uma só obra.
+    // Agora é a média das obras ponderada pelo orçamento de cada uma.
     let percentualFisico = 0;
-    if (meds.length > 0) {
-      const medsLiberadas = meds.filter(m => m.status === 'liberada' || m.status === 'aprovada');
-      if (medsLiberadas.length > 0) {
-        percentualFisico = Math.min(100, Math.max(...medsLiberadas.map(m => Number(m.percentual_fisico || 0))));
-      } else {
-        percentualFisico = Math.min(100, Math.max(...meds.map(m => Number(m.percentual_fisico || 0))));
-      }
+    if (isTodas) {
+      percentualFisico = this._pctFisicoCarteira(targetObras, meds);
+    } else {
+      percentualFisico = this._pctFisicoDasMedicoes(meds);
     }
 
     const saldoRestante = totalOrcado - totalRealizado;
@@ -2473,6 +2492,41 @@ const DB = {
   },
 
   // ── ENGENHARIA DE CUSTOS & CRONOGRAMA FÍSICO-FINANCEIRO (EVM / CURVA S) ──
+  /** Avanço físico de uma obra: maior % das medições liberadas/aprovadas (ou de todas, se nenhuma). */
+  _pctFisicoDasMedicoes(meds) {
+    if (!Array.isArray(meds) || !meds.length) return 0;
+    const liberadas = meds.filter(m => m.status === 'liberada' || m.status === 'aprovada');
+    const base = liberadas.length ? liberadas : meds;
+    return Math.min(100, Math.max(0, ...base.map(m => Number(m.percentual_fisico || 0))));
+  },
+
+  /** Peso de cada obra na carteira: o orçado dela (ou peso igual quando nenhuma tem orçamento). */
+  _pesosCarteira(obras) {
+    const lista = (obras || []).filter(o => o && o.id && o.id !== 'escritorio' && o.id !== 'sede');
+    const pesos = lista.map(o => ({ id: o.id, orc: Math.max(0, Number(this.getOrcamentoVsRealizado(o.id).totalOrcado) || 0) }));
+    const totalOrc = pesos.reduce((s, p) => s + p.orc, 0);
+    return pesos.map(p => ({ id: p.id, peso: totalOrc > 0 ? p.orc / totalOrc : 1 / pesos.length }));
+  },
+
+  /** Avanço físico da carteira = média das obras ponderada pelo orçamento. */
+  _pctFisicoCarteira(obras, meds, pesos = null) {
+    const ps = pesos || this._pesosCarteira(obras);
+    if (!ps.length) return 0;
+    let pct = 0;
+    for (const { id, peso } of ps) {
+      pct += peso * this._pctFisicoDasMedicoes((meds || []).filter(m => m.obra_id === id));
+    }
+    return Math.min(100, Math.round(pct * 10) / 10);
+  },
+
+  /** Data 'AAAA-MM-DD' como data local (new Date('AAAA-MM-DD') é UTC e no Brasil cai no dia anterior). */
+  _dataLocal(valor) {
+    const str = String(valor || '').slice(0, 10);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(str)) return null;
+    const d = new Date(`${str}T12:00:00`);
+    return isNaN(d.getTime()) ? null : d;
+  },
+
   getCurvaS(obraId) {
     const isTodas = !obraId || obraId === 'todas';
     const cs = this.getAll('clientes') || [];
@@ -2485,12 +2539,13 @@ const DB = {
     let maiorFim = null;
 
     targetObras.forEach(o => {
-      const dtIni = o.data_inicio ? new Date(o.data_inicio) : null;
-      const dtFim = (o.data_previsao_termino || o.data_fim) ? new Date(o.data_previsao_termino || o.data_fim) : null;
-      if (dtIni && !isNaN(dtIni.getTime())) {
+      // VARREDURA 2026-10-03 #22: data local (a curva começava um mês antes no fuso do Brasil).
+      const dtIni = this._dataLocal(o.data_inicio);
+      const dtFim = this._dataLocal(o.data_previsao_termino || o.data_fim);
+      if (dtIni) {
         if (!menorInicio || dtIni < menorInicio) menorInicio = dtIni;
       }
-      if (dtFim && !isNaN(dtFim.getTime())) {
+      if (dtFim) {
         if (!maiorFim || dtFim > maiorFim) maiorFim = dtFim;
       }
     });
@@ -2614,12 +2669,16 @@ const DB = {
 
     const evData = [];
     let maiorPctFisico = 0;
+    // Em "todas as obras", cada obra entra com o peso do seu orçamento (não o maior % de uma obra só).
+    const pesosCarteira = isTodas ? this._pesosCarteira(targetObras) : null;
     for (let i = 0; i < meses.length; i++) {
       if (i <= mesAtualIdx) {
         const mesKey = meses[i];
         const medsAteMes = meds.filter(m => String(m.data || '').slice(0, 7) <= mesKey);
         if (medsAteMes.length > 0) {
-          const maxMed = Math.max(...medsAteMes.map(m => Number(m.percentual_fisico || 0)));
+          const maxMed = isTodas
+            ? this._pctFisicoCarteira(targetObras, medsAteMes, pesosCarteira)
+            : Math.max(...medsAteMes.map(m => Number(m.percentual_fisico || 0)));
           if (maxMed > maiorPctFisico) maiorPctFisico = maxMed;
         } else if (comp.percentualFisico > 0 && i === mesAtualIdx) {
           maiorPctFisico = comp.percentualFisico;

@@ -269,68 +269,81 @@ const CronogramaSLA = {
     const recalculados = this.calcularCascata(processos, DB.getById('clientes', obraId)?.data_inicio);
     
     // Atualiza a obra com os processos e a nova data prevista de término
-    const ultimaEtapa = recalculados[recalculados.length - 1];
+    // Previsão de término = a etapa que termina por último (projetada, já com os atrasos).
+    const fimObra = recalculados.reduce((m, p) => {
+      const fp = p.data_fim_projetada || p.data_fim_prevista || '';
+      return fp > m ? fp : m;
+    }, '');
     const updates = {
       processos_sla: recalculados,
       cronograma_config: { ...(DB.getById('clientes', obraId)?.cronograma_config || {}), processos_sla: recalculados }
     };
-    if (ultimaEtapa && ultimaEtapa.data_fim_prevista) {
-      updates.data_previsao_termino = ultimaEtapa.data_fim_prevista;
-      updates.data_previsao = ultimaEtapa.data_fim_prevista;
+    if (fimObra) {
+      updates.data_previsao_termino = fimObra;
+      updates.data_previsao = fimObra;
     }
 
     return !!DB.update('clientes', obraId, updates);
   },
 
   // ── MOTOR DE RECÁLCULO EM CASCATA ──
+  // VARREDURA 2026-10-03 #21:
+  //   • Datas inclusivas: uma etapa de 30 dias que começa no dia 1 termina no dia 30 e a próxima
+  //     começa no dia 31 (antes cada etapa ganhava +1 dia).
+  //   • Cada etapa conta só o próprio atraso. Uma etapa que ainda espera a anterior não está
+  //     "atrasada": as datas dela são empurradas para frente (projeção), em vez de repetir o
+  //     atraso da anterior (22 dias reais apareciam como +53d).
+  //   • `data_fim_base` guarda o prazo original (sem atrasos) para o resumo calcular quanto a
+  //     entrega da obra realmente escorregou.
   calcularCascata(processosRaw, dataInicioObra = null) {
     if (!Array.isArray(processosRaw) || !processosRaw.length) return [];
     const processos = JSON.parse(JSON.stringify(processosRaw));
 
     // Data base inicial
     const baseDate = dataInicioObra && !isNaN(new Date(dataInicioObra).getTime())
-      ? dataInicioObra
+      ? String(dataInicioObra).slice(0, 10)
       : Utils.today();
 
     const procMap = new Map();
     processos.forEach(p => procMap.set(p.id, p));
 
     const hoje = Utils.today();
-    let atrasoAcumuladoTotal = 0;
 
     for (let i = 0; i < processos.length; i++) {
       const p = processos[i];
       const diasSla = Math.max(1, parseInt(p.dias_sla, 10) || 15);
       p.dias_sla = diasSla;
 
-      // Determina a data de início prevista
-      let inicioPrevisto = baseDate;
-      if (p.predecessor_id && procMap.has(p.predecessor_id)) {
-        const pred = procMap.get(p.predecessor_id);
-        // Se o predecessor foi concluído com data real, a próxima etapa começa a partir do término real
-        if (pred.status === 'concluido' && pred.data_fim_real) {
-          inicioPrevisto = this._somarDias(pred.data_fim_real, 1);
-        } else {
-          // Senão, projeta a partir do término previsto ajustado do predecessor
-          inicioPrevisto = this._somarDias(pred.data_fim_prevista || baseDate, 1);
-        }
+      // Etapa anterior: predecessor explícito ou, sem ele, a etapa de cima da lista.
+      let anterior = null;
+      if (p.predecessor_id && procMap.has(p.predecessor_id) && procMap.get(p.predecessor_id) !== p) {
+        anterior = procMap.get(p.predecessor_id);
       } else if (i > 0 && !p.predecessor_id) {
-        // Se não tem predecessor explícito, encadeia na etapa anterior
-        const prev = processos[i - 1];
-        inicioPrevisto = prev.status === 'concluido' && prev.data_fim_real
-          ? this._somarDias(prev.data_fim_real, 1)
-          : this._somarDias(prev.data_fim_prevista || baseDate, 1);
+        anterior = processos[i - 1];
       }
 
-      // Se a etapa tem data_inicio_real, usa para orientar
+      // Começa no dia seguinte ao término (real ou projetado) da anterior.
+      const inicioPrevisto = anterior
+        ? this._somarDias(anterior.data_fim_projetada || anterior.data_fim_prevista || baseDate, 1)
+        : baseDate;
+      const inicioBase = anterior
+        ? this._somarDias(anterior.data_fim_base || baseDate, 1)
+        : baseDate;
+      // A etapa está liberada quando não depende de ninguém ou a anterior já terminou.
+      const liberada = !anterior || anterior.status === 'concluido';
+
+      p.data_inicio_prevista = inicioPrevisto;
       if (p.data_inicio_real) {
         p.data_inicio_efetiva = p.data_inicio_real;
+      } else if (p.status !== 'concluido' && inicioPrevisto < hoje) {
+        // Ainda não começou: o mais cedo que pode começar é hoje.
+        p.data_inicio_efetiva = hoje;
       } else {
         p.data_inicio_efetiva = inicioPrevisto;
       }
 
-      p.data_inicio_prevista = inicioPrevisto;
-      p.data_fim_prevista = this._somarDias(p.data_inicio_efetiva, diasSla);
+      p.data_fim_prevista = this._somarDias(p.data_inicio_efetiva, diasSla - 1);
+      p.data_fim_base = this._somarDias(inicioBase, diasSla - 1);
 
       // Verificação de Atraso e Semáforo (SLA)
       let diasAtraso = 0;
@@ -342,48 +355,39 @@ const CronogramaSLA = {
           if (diff > 0) {
             diasAtraso = diff;
             statusSla = 'atrasado';
-          } else {
-            statusSla = 'no_prazo';
           }
         }
+        p.data_fim_projetada = p.data_fim_real || p.data_fim_prevista;
       } else if (p.status === 'em_andamento') {
         const diffHoje = this._diffDias(hoje, p.data_fim_prevista);
         if (diffHoje > 0) {
           diasAtraso = diffHoje;
           statusSla = 'atrasado';
-        } else {
-          const diasRestantes = Math.abs(diffHoje);
-          if (diasRestantes <= 3) {
-            statusSla = 'atencao';
-          } else {
-            statusSla = 'no_prazo';
-          }
+        } else if (-diffHoje <= 3) {
+          statusSla = 'atencao';
         }
+        // Atrasada e ainda aberta: termina no mínimo hoje.
+        p.data_fim_projetada = p.data_fim_prevista < hoje ? hoje : p.data_fim_prevista;
       } else {
-        // pendente
-        if (hoje > p.data_inicio_prevista && p.status === 'pendente') {
-          const diffAtrasoInicio = this._diffDias(hoje, p.data_inicio_prevista);
-          if (diffAtrasoInicio > 0) {
-            diasAtraso = diffAtrasoInicio;
-            statusSla = 'atrasado';
-          }
+        // Pendente: só é atraso desta etapa se ela já podia ter começado.
+        if (liberada && !p.data_inicio_real && inicioPrevisto < hoje) {
+          diasAtraso = this._diffDias(hoje, inicioPrevisto);
+          statusSla = 'atrasado';
         }
+        p.data_fim_projetada = p.data_fim_prevista;
       }
 
       p.dias_atraso = diasAtraso;
       p.status_sla = statusSla;
-      if (diasAtraso > 0) {
-        atrasoAcumuladoTotal += diasAtraso;
-      }
 
       // ── SLA EVOLUTIVO (Patch 52) ──
-      // Dias já executados (desde data de início até hoje ou até conclusão)
+      // Dias já executados (contando o dia de início) e dias que faltam até o prazo.
       if (p.status === 'concluido' && p.data_inicio_real && p.data_fim_real) {
-        p.dias_executados = Math.max(0, this._diffDias(p.data_fim_real, p.data_inicio_real));
+        p.dias_executados = Math.max(1, this._diffDias(p.data_fim_real, p.data_inicio_real) + 1);
         p.dias_restantes = 0;
       } else if (p.status === 'em_andamento') {
-        const inicioEfetivo = p.data_inicio_real || p.data_inicio_prevista;
-        p.dias_executados = Math.max(0, this._diffDias(hoje, inicioEfetivo));
+        const inicioEfetivo = p.data_inicio_real || p.data_inicio_efetiva;
+        p.dias_executados = Math.max(0, this._diffDias(hoje, inicioEfetivo) + 1);
         p.dias_restantes = Math.max(0, this._diffDias(p.data_fim_prevista, hoje));
       } else {
         p.dias_executados = 0;
@@ -397,6 +401,19 @@ const CronogramaSLA = {
     }
 
     return processos;
+  },
+
+  /** Quantos dias a entrega da obra escorregou em relação ao prazo original (nunca negativo). */
+  _atrasoEntrega(processos) {
+    let fimProjetado = '';
+    let fimBase = '';
+    for (const p of processos || []) {
+      const fp = p.data_fim_projetada || p.data_fim_prevista || '';
+      if (fp > fimProjetado) fimProjetado = fp;
+      if ((p.data_fim_base || '') > fimBase) fimBase = p.data_fim_base;
+    }
+    if (!fimProjetado || !fimBase) return 0;
+    return Math.max(0, this._diffDias(fimProjetado, fimBase));
   },
 
   // ── RESUMO EXECUTIVO DO CRONOGRAMA ──
@@ -423,7 +440,8 @@ const CronogramaSLA = {
     const pendentes = total - concluidos - emAndamento;
     const atrasados = processos.filter(p => p.status_sla === 'atrasado').length;
     const emAtencao = processos.filter(p => p.status_sla === 'atencao').length;
-    const diasAtrasoTotal = processos.reduce((s, p) => s + (p.dias_atraso || 0), 0);
+    // Atraso da obra = quanto a entrega projetada passou do prazo original (não a soma das etapas).
+    const diasAtrasoTotal = this._atrasoEntrega(processos);
 
     const pctGeral = total > 0 ? Math.round((concluidos / total) * 100) : 0;
     const ultima = processos[processos.length - 1];
@@ -442,7 +460,10 @@ const CronogramaSLA = {
       pctGeral,
       diasAtrasoAcumulado: diasAtrasoTotal,
       statusGeral,
-      dataEntregaEstimada: ultima?.data_fim_prevista || null,
+      dataEntregaEstimada: processos.reduce((m, p) => {
+        const fp = p.data_fim_projetada || p.data_fim_prevista || '';
+        return fp > m ? fp : m;
+      }, '') || null,
       etapaAtual
     };
   },
@@ -826,13 +847,13 @@ const CronogramaSLA = {
     let maxDate = processos[processos.length - 1].data_fim_prevista || hoje;
 
     for (const p of processos) {
-      const ini = p.data_inicio_real || p.data_inicio_prevista;
-      const fim = p.data_fim_real || p.data_fim_prevista;
+      const ini = p.data_inicio_real || p.data_inicio_efetiva || p.data_inicio_prevista;
+      const fim = p.data_fim_real || p.data_fim_projetada || p.data_fim_prevista;
       if (ini && ini < minDate) minDate = ini;
       if (fim && fim > maxDate) maxDate = fim;
     }
 
-    const totalDias = Math.max(1, this._diffDias(maxDate, minDate));
+    const totalDias = Math.max(1, this._diffDias(maxDate, minDate) + 1);
     const hojeOffset = this._diffDias(hoje, minDate);
     const hojePct = Math.min(100, Math.max(0, Math.round((hojeOffset / totalDias) * 100)));
 
@@ -867,10 +888,10 @@ const CronogramaSLA = {
           <!-- Linhas do Gantt -->
           <div style="display:flex;flex-direction:column;gap:6px;">
             ${processos.map((p) => {
-              const ini = p.data_inicio_real || p.data_inicio_prevista || minDate;
-              const fim = p.data_fim_real || p.data_fim_prevista || ini;
+              const ini = p.data_inicio_real || p.data_inicio_efetiva || p.data_inicio_prevista || minDate;
+              const fim = p.data_fim_real || p.data_fim_projetada || p.data_fim_prevista || ini;
               const offsetDias = Math.max(0, this._diffDias(ini, minDate));
-              const duracaoDias = Math.max(1, this._diffDias(fim, ini));
+              const duracaoDias = Math.max(1, this._diffDias(fim, ini) + 1);
               const leftPct = Math.min(99, Math.max(0, (offsetDias / totalDias) * 100));
               const widthPct = Math.min(100 - leftPct, Math.max(1.5, (duracaoDias / totalDias) * 100));
 

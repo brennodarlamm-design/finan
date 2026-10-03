@@ -220,7 +220,6 @@ const Medicoes = {
     const ret = parseFloat(document.getElementById('lib-retencao')?.value)||0;
     const descValor = parseFloat(document.getElementById('lib-descontos')?.value)||0;
     const dt = document.getElementById('lib-dt')?.value || Utils.today();
-    const liquido = Math.max(0, val - ret - descValor);
 
     DB.update('medicoes', id, {
       status: 'liberada',
@@ -230,21 +229,58 @@ const Medicoes = {
       data_liberacao: dt
     });
 
-    // Proteção contra duplicação de receita no financeiro
-    const lancamentos = DB.getAll('lancamentos') || [];
-    const jaExiste = m.lancamento_id
-      ? lancamentos.some(l => l.id === m.lancamento_id)
-      : lancamentos.some(l => l.medicao_id === id);
+    const avisos = this._sincronizarFinanceiro(id);
+    Utils.closeModal();
+    this._refresh();
+    Utils.toast(avisos.length
+      ? `Medição liberada. ${avisos.join(' ')}`
+      : (Number(ret) > 0
+        ? 'Medição liberada: receita registrada e retenção lançada como "a receber".'
+        : 'Medição liberada e receita registrada no financeiro!'), avisos.length ? 'warning' : 'success');
+  },
 
-    if (jaExiste) {
-      if (m.lancamento_id) {
-        DB.update('lancamentos', m.lancamento_id, { valor: liquido, data: dt });
+  /**
+   * VARREDURA 2026-10-03 #23: mantém o financeiro igual à medição.
+   *  • Liberada: uma receita "recebido" com o líquido (bruto − retenção − descontos) e, se houver
+   *    retenção técnica, uma receita "a receber" com o valor retido (antes ele sumia).
+   *  • Editada depois: as receitas acompanham (valor, data, retenção). O que já foi conciliado com o
+   *    extrato não muda de valor.
+   *  • Voltou de "liberada": as receitas ainda não conciliadas/recebidas saem do financeiro.
+   * Retorna uma lista de avisos para mostrar ao usuário.
+   */
+  _sincronizarFinanceiro(id) {
+    const avisos = [];
+    const m = DB.getById('medicoes', id);
+    if (!m) return avisos;
+    const lancamentos = DB.getAll('lancamentos') || [];
+    const principal = (m.lancamento_id && lancamentos.find(l => l.id === m.lancamento_id))
+      || lancamentos.find(l => l.medicao_id === id && l.origem !== 'medicao_retencao');
+    const retencaoLan = (m.retencao_lancamento_id && lancamentos.find(l => l.id === m.retencao_lancamento_id))
+      || lancamentos.find(l => l.medicao_id === id && l.origem === 'medicao_retencao');
+
+    if (m.status !== 'liberada') {
+      if (!principal && !retencaoLan) return avisos;
+      // A receita principal nasce "recebido" na liberação: sai se ainda não foi conciliada.
+      // A retenção sai se ainda estiver a receber.
+      const tiraPrincipal = principal && !principal.conciliado;
+      const tiraRetencao = retencaoLan && !retencaoLan.conciliado && DB.isLancamentoEmAberto(retencaoLan);
+      if (tiraPrincipal) DB.remove('lancamentos', principal.id);
+      if (tiraRetencao) DB.remove('lancamentos', retencaoLan.id);
+      DB.update('medicoes', id, {
+        lancamento_id: tiraPrincipal ? null : (principal?.id || null),
+        retencao_lancamento_id: tiraRetencao ? null : (retencaoLan?.id || null)
+      });
+      if ((principal && !tiraPrincipal) || (retencaoLan && !tiraRetencao)) {
+        avisos.push('O que já foi recebido ou conciliado com o extrato continua no financeiro.');
       }
-      Utils.closeModal();
-      this._refresh();
-      Utils.toast('Medição liberada e lançamento financeiro sincronizado!', 'success');
-      return;
+      return avisos;
     }
+
+    const bruto = Number(m.valor_liberado || m.valor_aprovado || m.valor_solicitado || m.valor_medido || 0);
+    const ret = Math.max(0, Number(m.retencao_tecnica || 0));
+    const descValor = Math.max(0, Number(m.descontos || 0));
+    const liquido = Math.max(0, Math.round((bruto - ret - descValor) * 100) / 100);
+    const dt = m.data_liberacao || Utils.today();
 
     const c = DB.getById('clientes', m.obra_id);
     const isCaixa = !c?.modalidade_obra || c?.modalidade_obra === 'caixa';
@@ -254,24 +290,72 @@ const Medicoes = {
       ? `${m.numero_medicao}ª Parcela Caixa — Medição ${m.numero_medicao} (${m.percentual_fisico || 0}%)`
       : `${m.numero_medicao}ª Medição / Faturamento — ${c?.nome || 'Obra'} (${m.percentual_fisico || 0}%)`;
 
-    const lan = DB.add('lancamentos', {
-      obra_id: m.obra_id,
-      tipo: 'receita',
-      data: dt,
-      descricao: desc,
-      categoria: categoria,
-      valor: liquido,
-      status: 'recebido',
-      fornecedor_beneficiario: beneficiario,
-      origem: 'medicao',
-      conciliado: false,
-      medicao_id: id
-    });
+    const vinculos = {};
+    if (principal) {
+      if (principal.conciliado) {
+        if (Math.abs(Number(principal.valor || 0) - liquido) > 0.009) {
+          avisos.push('A receita desta medição já foi conciliada com o extrato e não teve o valor alterado.');
+        }
+      } else {
+        DB.update('lancamentos', principal.id, { valor: liquido, data: dt, obra_id: m.obra_id, medicao_id: id });
+      }
+      vinculos.lancamento_id = principal.id;
+    } else if (liquido > 0) {
+      const lan = DB.add('lancamentos', {
+        obra_id: m.obra_id,
+        tipo: 'receita',
+        data: dt,
+        descricao: desc,
+        categoria,
+        valor: liquido,
+        status: 'recebido',
+        fornecedor_beneficiario: beneficiario,
+        origem: 'medicao',
+        conciliado: false,
+        medicao_id: id
+      });
+      vinculos.lancamento_id = lan?.id || null;
+    }
 
-    DB.update('medicoes', id, { lancamento_id: lan?.id || null });
-    Utils.closeModal();
-    this._refresh();
-    Utils.toast('Medição liberada e receita registrada no financeiro!', 'success');
+    // Retenção técnica: fica "a receber" até a devolução (prevista para o término da obra).
+    const fimObra = String(c?.data_previsao_termino || c?.data_previsao || '').slice(0, 10);
+    const vencRetencao = fimObra && fimObra > dt ? fimObra : dt;
+    if (ret > 0) {
+      if (retencaoLan) {
+        if (!retencaoLan.conciliado && DB.isLancamentoEmAberto(retencaoLan)) {
+          DB.update('lancamentos', retencaoLan.id, { valor: ret, obra_id: m.obra_id });
+        } else if (Math.abs(Number(retencaoLan.valor || 0) - ret) > 0.009) {
+          avisos.push('A retenção desta medição já foi recebida e não teve o valor alterado.');
+        }
+        vinculos.retencao_lancamento_id = retencaoLan.id;
+      } else {
+        const lanRet = DB.add('lancamentos', {
+          obra_id: m.obra_id,
+          tipo: 'receita',
+          data: vencRetencao,
+          data_vencimento: vencRetencao,
+          descricao: `Retenção técnica — Medição ${m.numero_medicao} (${c?.nome || 'Obra'})`,
+          categoria,
+          valor: ret,
+          status: 'a_receber',
+          fornecedor_beneficiario: beneficiario,
+          origem: 'medicao_retencao',
+          conciliado: false,
+          medicao_id: id
+        });
+        vinculos.retencao_lancamento_id = lanRet?.id || null;
+      }
+    } else if (retencaoLan) {
+      if (!retencaoLan.conciliado && DB.isLancamentoEmAberto(retencaoLan)) {
+        DB.remove('lancamentos', retencaoLan.id);
+        vinculos.retencao_lancamento_id = null;
+      } else {
+        avisos.push('A retenção desta medição já foi recebida e continua no financeiro.');
+      }
+    }
+
+    if (Object.keys(vinculos).some(k => vinculos[k] !== (m[k] ?? null))) DB.update('medicoes', id, vinculos);
+    return avisos;
   },
 
   edit(id) {
@@ -353,24 +437,29 @@ const Medicoes = {
     if(!d.data_submissao) d.data_submissao=null;
     if(!d.data_aprovacao) d.data_aprovacao=null;
     if(!d.data_liberacao) d.data_liberacao=null;
-    if(id){DB.update('medicoes',id,d);Utils.toast('Medição atualizada!','success');}
-    else{DB.add('medicoes',d);Utils.toast('Medição cadastrada!','success');}
+    let medId=id;
+    if(id){DB.update('medicoes',id,d);}
+    else{medId=DB.add('medicoes',d)?.id;}
+    // VARREDURA 2026-10-03 #23: a receita e a retenção acompanham a edição da medição.
+    const antes=id?(DB.getAll('lancamentos')||[]).some(l=>l.medicao_id===id):false;
+    const avisos=medId?this._sincronizarFinanceiro(medId):[];
+    const depois=medId?(DB.getAll('lancamentos')||[]).some(l=>l.medicao_id===medId):false;
+    const msg=id?'Medição atualizada':'Medição cadastrada';
+    Utils.toast(avisos.length?`${msg}. ${avisos.join(' ')}`:(antes||depois)?`${msg} e financeiro sincronizado!`:`${msg}!`,avisos.length?'warning':'success');
     Utils.closeModal();
     this._refresh();
   },
 
   del(id) {
-    Utils.confirm('Excluir esta medição?', () => {
-      const m = (typeof DB !== 'undefined' && DB.getById) ? DB.getById('medicoes', id) : null;
-      if (m?.lancamento_id) {
-        DB.remove('lancamentos', m.lancamento_id);
-      } else if (typeof DB !== 'undefined' && DB.getAll) {
-        const lan = (DB.getAll('lancamentos') || []).find(l => l.medicao_id === id);
-        if (lan?.id) DB.remove('lancamentos', lan.id);
-      }
+    Utils.confirm('Excluir esta medição?<br><small>Valores ainda a receber desta medição também serão excluídos. O que já foi recebido ou conciliado continua no financeiro.</small>', () => {
+      const m = DB.getById('medicoes', id);
+      // VARREDURA 2026-10-03 #30: receita já recebida/conciliada não some junto com a medição.
+      const { mantidos } = DB.removerLancamentosDaOrigem('medicao_id', id, [m?.lancamento_id, m?.retencao_lancamento_id]);
       DB.remove('medicoes', id);
       this._refresh();
-      Utils.toast('Medição excluída!', 'info');
+      Utils.toast(mantidos.length
+        ? 'Medição excluída. A receita já recebida foi mantida no financeiro.'
+        : 'Medição excluída!', 'info');
     });
   },
 

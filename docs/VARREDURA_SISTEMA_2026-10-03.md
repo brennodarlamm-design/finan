@@ -121,4 +121,11 @@ Legenda: **C** = confirmado (reproduzido ou evidente no código), **P** = prová
 - ✅ #15 O link do portal agora tem cerca de 120 caracteres e leva só empresa, obra, validade e assinatura (v2). O portal busca os dados atuais no servidor (`POST /api/v2/portal/data`) e não inclui arquivos do armazenamento privado. Links antigos continuam abrindo. A mensagem do WhatsApp não promete mais "tempo real" nem assinatura de documentos. O aviso interno de versão não aparece mais para o cliente.
 - ✅ #16 Cobrança: os estágios passaram a ser faixas de dias (`backend/billing_stages.js`), com envio único por ciclo de vencimento. Nenhum aviso some quando o vencimento cai no fim de semana; isso foi verificado numa simulação com vencimento em cada dia da semana.
 
-**Próximos passos:** obras (#21–#23, #29, #30) e UX/performance (#32–#40).
+**Obras**
+- ✅ #21 SLA: datas inclusivas (uma etapa de 30 dias não ganha mais um dia extra). Cada etapa conta só o próprio atraso; as etapas que esperam a anterior são empurradas para frente, em vez de repetir o atraso. O "+Nd" da obra é quanto a entrega projetada passou do prazo original (antes, 23 dias reais apareciam como a soma de todas as etapas).
+- ✅ #22 Curva S: as datas são lidas no fuso local, e a curva não começa mais um mês antes. Em "todas as obras", o avanço físico é a média ponderada pelo orçamento de cada obra (antes era o maior % de uma só).
+- ✅ #23 Medição: a receita acompanha a edição (valor e data). A retenção técnica vira uma receita "a receber", com vencimento no término previsto da obra. Se a medição volta de "liberada", as receitas não conciliadas saem. O que já foi conciliado não muda de valor e gera um aviso. O vínculo da retenção é salvo no payload da medição.
+- ✅ #29 Upload: se o servidor recusar o arquivo (tipo, tamanho ou permissão), ele não é salvo e o motivo aparece. Sem conexão, o arquivo fica só no aparelho, com um aviso claro. O limite no app passou a ser 15 MB, igual ao do servidor.
+- ✅ #30 Excluir uma medição ou pré-compra só apaga lançamentos vinculados que ainda estejam em aberto e não conciliados. O que já foi pago, recebido ou conciliado continua no financeiro (`DB.removerLancamentosDaOrigem`).
+
+**Próximos passos:** UX/performance (#32–#40).

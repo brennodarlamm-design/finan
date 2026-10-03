@@ -243,7 +243,7 @@ const Documentos = {
       this._idbSet(id, base64);
     }
 
-    const { data_base64, base64_data, base64: _b, conteudo_base64, ...lightDoc } = doc;
+    const { data_base64, base64_data, base64: _b, conteudo_base64, _skipBackgroundUpload, ...lightDoc } = doc;
     const item = {
       id,
       criado_em: doc.criado_em || new Date().toISOString(),
@@ -264,7 +264,7 @@ const Documentos = {
     }
 
     // Se o documento ainda não tiver URL persistente e houver base64, faz upload em segundo plano
-    if (!item.url && base64 && typeof fetch !== 'undefined') {
+    if (!item.url && base64 && !_skipBackgroundUpload && typeof fetch !== 'undefined') {
       this._uploadBlobBackground(id, item.nome_arquivo || item.titulo || 'documento', base64, item.tipo_mime);
     }
 
@@ -444,7 +444,7 @@ const Documentos = {
           <div id="doc-panel-file" style="border:2px dashed var(--border);border-radius:var(--r-md);padding:20px;text-align:center;background:var(--bg-card);margin-bottom:20px;">
             <div style="font-size:2rem;margin-bottom:6px;">📄</div>
             <div style="font-weight:700;margin-bottom:4px;color:var(--text);">Adicionar Boleto, Comprovante, Foto ou Pacote</div>
-            <div style="font-size:.76rem;color:var(--text3);margin-bottom:12px;">Formatos aceitos: PDF, Imagens, ZIP, RAR, 7Z, DWG, DOCX (Máx. 20MB)</div>
+            <div style="font-size:.76rem;color:var(--text3);margin-bottom:12px;">Formatos aceitos: PDF, Imagens, ZIP, RAR, 7Z, DWG, DOCX (Máx. 15MB)</div>
             
             <div style="display:flex;gap:8px;max-width:420px;margin:0 auto;flex-wrap:wrap;justify-content:center;">
               <input type="text" id="doc-titulo-input" class="form-control form-control-sm" placeholder="Nome/Descrição do documento (opcional)" style="flex:1;min-width:180px;">
@@ -644,8 +644,9 @@ const Documentos = {
     const file = input.files?.[0];
     if (!file) return;
 
-    if (file.size > 30 * 1024 * 1024) {
-      Utils.toast('Arquivo muito grande! O limite máximo é de 30MB.', 'error');
+    // Mesmo limite do servidor (api/upload.js): acima disso o arquivo nunca chegaria à nuvem.
+    if (file.size > 15 * 1024 * 1024) {
+      Utils.toast('Arquivo muito grande! O limite máximo é de 15MB.', 'error');
       input.value = '';
       return;
     }
@@ -658,6 +659,10 @@ const Documentos = {
       const base64 = await this.lerArquivoBase64(file);
       
       let blobUrl = null;
+      // VARREDURA 2026-10-03 #29: se o servidor RECUSAR o arquivo (tipo bloqueado, tamanho,
+      // permissão), não salva como se tivesse dado certo. Só guarda neste aparelho quando a falha
+      // é de conexão/servidor fora do ar, e avisa que o arquivo ainda não está na nuvem.
+      let recusa = null;
       try {
         const headers = (typeof DB !== 'undefined' && DB._apiHeaders) ? DB._apiHeaders() : { 'Content-Type': 'application/json' };
         const res = await fetch('/api/upload', {
@@ -675,11 +680,20 @@ const Documentos = {
           if (resData.success && resData.url) {
             blobUrl = resData.url;
           }
+        } else if (res.status >= 400 && res.status < 500) {
+          const corpo = await res.json().catch(() => ({}));
+          recusa = String(corpo?.error || corpo?.message || '').trim() || `O servidor recusou o arquivo (código ${res.status}).`;
         } else {
           console.warn('[Blob] Upload na API falhou com status', res.status);
         }
       } catch (errUpload) {
         console.warn('[Documentos] Falha de conexão ao enviar para o armazenamento:', errUpload);
+      }
+
+      if (recusa) {
+        input.value = '';
+        Utils.toast(`Documento não foi salvo: ${recusa}`, 'error');
+        return;
       }
 
       this.adicionar({
@@ -690,10 +704,12 @@ const Documentos = {
         tipo_mime: file.type || 'application/octet-stream',
         tamanho: file.size,
         url: blobUrl,
-        data_base64: blobUrl ? null : base64
+        data_base64: blobUrl ? null : base64,
+        _skipBackgroundUpload: !blobUrl
       });
 
-      Utils.toast(blobUrl ? 'Documento salvo no armazenamento seguro!' : 'Documento salvo localmente!', 'success');
+      if (blobUrl) Utils.toast('Documento salvo no armazenamento seguro!', 'success');
+      else Utils.toast('Sem conexão com o servidor: o documento ficou salvo só neste aparelho. Ele será enviado para a nuvem quando você abrir o app com internet.', 'warning');
       this.abrirModal(entidadeTipo, entidadeId);
       
       // Atualizar a visualização na tabela se aplicável

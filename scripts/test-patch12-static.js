@@ -153,7 +153,8 @@ ok('Data layer inclui medicoes e orcamentos nas cloudTables',
 
 ok('Medicoes protege contra duplicação de receita no financeiro',
   medicoesJs.includes('m.lancamento_id') &&
-  medicoesJs.includes('jaExiste')
+  medicoesJs.includes('_sincronizarFinanceiro(id)') &&
+  medicoesJs.includes('if (principal) {')
 );
 
 ok('Medicoes calcula retenção técnica e descontos no saldo',

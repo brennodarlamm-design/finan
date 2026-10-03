@@ -212,6 +212,8 @@ export function normalizeMedicao(m) {
     etapa_descricao: m.etapa_descricao || '',
     documentos_ok: Boolean(m.documentos_ok),
     lancamento_id: m.lancamento_id || null,
+    // Sem coluna própria: vem do payload (receita "a receber" da retenção técnica).
+    retencao_lancamento_id: m.retencao_lancamento_id || jsonPayload(m).retencao_lancamento_id || null,
     retencao_tecnica: cleanNum(m.retencao_tecnica),
     descontos: cleanNum(m.descontos),
     itens: (typeof m.itens_json === 'string' ? safeJsonParse(m.itens_json, []) : m.itens_json) || m.itens || []
