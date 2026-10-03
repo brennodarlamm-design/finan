@@ -83,50 +83,50 @@ export async function handleDeltaSync(sql, tenantId, auth, query, res) {
       obrasMutated, fornecedoresMutated, lancamentosMutated, notasMutated, orcamentosMutated, medicoesMutated, docsMutated, produtosMutated, contasMutated
     ] = await Promise.all([
       tableAllowed(auth, 'precompras', 'read')
-        ? sql`SELECT * FROM precompras WHERE tenant_id = ${tenantId} AND (updated_at >= ${sinceIso} OR created_at >= ${sinceIso}) ORDER BY updated_at ASC;`
+        ? sql`SELECT *, xmin::text AS sync_version FROM precompras WHERE tenant_id = ${tenantId} AND (updated_at >= ${sinceIso} OR created_at >= ${sinceIso}) ORDER BY updated_at ASC;`
         : Promise.resolve([]),
       tableAllowed(auth, 'contratos', 'read')
-        ? sql`SELECT * FROM contratos WHERE tenant_id = ${tenantId} AND (updated_at >= ${sinceIso} OR created_at >= ${sinceIso}) ORDER BY updated_at ASC;`
+        ? sql`SELECT *, xmin::text AS sync_version FROM contratos WHERE tenant_id = ${tenantId} AND (updated_at >= ${sinceIso} OR created_at >= ${sinceIso}) ORDER BY updated_at ASC;`
         : Promise.resolve([]),
       tableAllowed(auth, 'recibos', 'read')
-        ? sql`SELECT * FROM recibos WHERE tenant_id = ${tenantId} AND (updated_at >= ${sinceIso} OR created_at >= ${sinceIso}) ORDER BY updated_at ASC;`
+        ? sql`SELECT *, xmin::text AS sync_version FROM recibos WHERE tenant_id = ${tenantId} AND (updated_at >= ${sinceIso} OR created_at >= ${sinceIso}) ORDER BY updated_at ASC;`
         : Promise.resolve([]),
       tableAllowed(auth, 'orcamentos_sinapi', 'read')
-        ? sql`SELECT * FROM orcamentos_sinapi WHERE tenant_id = ${tenantId} AND (updated_at >= ${sinceIso} OR created_at >= ${sinceIso}) ORDER BY updated_at ASC;`
+        ? sql`SELECT *, xmin::text AS sync_version FROM orcamentos_sinapi WHERE tenant_id = ${tenantId} AND (updated_at >= ${sinceIso} OR created_at >= ${sinceIso}) ORDER BY updated_at ASC;`
         : Promise.resolve([]),
       tableAllowed(auth, 'doc_fases', 'read')
-        ? sql`SELECT * FROM obra_doc_fases WHERE tenant_id = ${tenantId} AND (updated_at >= ${sinceIso} OR created_at >= ${sinceIso}) ORDER BY updated_at ASC;`
+        ? sql`SELECT *, xmin::text AS sync_version FROM obra_doc_fases WHERE tenant_id = ${tenantId} AND (updated_at >= ${sinceIso} OR created_at >= ${sinceIso}) ORDER BY updated_at ASC;`
         : Promise.resolve([]),
       tableAllowed(auth, 'preferencias', 'read')
         ? sql`SELECT preferences, updated_at FROM tenant_preferences WHERE tenant_id = ${tenantId} AND updated_at >= ${sinceIso} LIMIT 1;`
         : Promise.resolve([]),
 
       tableAllowed(auth, 'obras', 'read')
-        ? sql`SELECT * FROM obras WHERE tenant_id = ${tenantId} AND id NOT IN ('escritorio', 'geral') AND (created_at >= ${sinceIso} OR id IN (SELECT entidade_id FROM audit_logs WHERE tenant_id = ${tenantId} AND entidade = 'obras' AND created_at >= ${sinceIso}));`
+        ? sql`SELECT *, xmin::text AS sync_version FROM obras WHERE tenant_id = ${tenantId} AND id NOT IN ('escritorio', 'geral') AND (created_at >= ${sinceIso} OR id IN (SELECT entidade_id FROM audit_logs WHERE tenant_id = ${tenantId} AND entidade = 'obras' AND created_at >= ${sinceIso}));`
         : Promise.resolve([]),
       tableAllowed(auth, 'fornecedores', 'read')
-        ? sql`SELECT * FROM fornecedores WHERE tenant_id = ${tenantId} AND (created_at >= ${sinceIso} OR id IN (SELECT entidade_id FROM audit_logs WHERE tenant_id = ${tenantId} AND entidade = 'fornecedores' AND created_at >= ${sinceIso}));`
+        ? sql`SELECT *, xmin::text AS sync_version FROM fornecedores WHERE tenant_id = ${tenantId} AND (created_at >= ${sinceIso} OR id IN (SELECT entidade_id FROM audit_logs WHERE tenant_id = ${tenantId} AND entidade = 'fornecedores' AND created_at >= ${sinceIso}));`
         : Promise.resolve([]),
       tableAllowed(auth, 'lancamentos', 'read')
         ? sql`SELECT *, xmin::text AS sync_version FROM lancamentos WHERE tenant_id = ${tenantId} AND (created_at >= ${sinceIso} OR id IN (SELECT entidade_id FROM audit_logs WHERE tenant_id = ${tenantId} AND entidade = 'lancamentos' AND created_at >= ${sinceIso})) ORDER BY data DESC;`
         : Promise.resolve([]),
       tableAllowed(auth, 'notas', 'read')
-        ? sql`SELECT * FROM notas_fiscais WHERE tenant_id = ${tenantId} AND (created_at >= ${sinceIso} OR id IN (SELECT entidade_id FROM audit_logs WHERE tenant_id = ${tenantId} AND entidade IN ('notas','notas_fiscais') AND created_at >= ${sinceIso})) ORDER BY data_emissao DESC;`
+        ? sql`SELECT *, xmin::text AS sync_version FROM notas_fiscais WHERE tenant_id = ${tenantId} AND (created_at >= ${sinceIso} OR id IN (SELECT entidade_id FROM audit_logs WHERE tenant_id = ${tenantId} AND entidade IN ('notas','notas_fiscais') AND created_at >= ${sinceIso})) ORDER BY data_emissao DESC;`
         : Promise.resolve([]),
       tableAllowed(auth, 'orcamentos', 'read')
-        ? sql`SELECT * FROM orcamentos WHERE tenant_id = ${tenantId} AND (created_at >= ${sinceIso} OR id IN (SELECT entidade_id FROM audit_logs WHERE tenant_id = ${tenantId} AND entidade = 'orcamentos' AND created_at >= ${sinceIso})) ORDER BY created_at DESC;`
+        ? sql`SELECT *, xmin::text AS sync_version FROM orcamentos WHERE tenant_id = ${tenantId} AND (created_at >= ${sinceIso} OR id IN (SELECT entidade_id FROM audit_logs WHERE tenant_id = ${tenantId} AND entidade = 'orcamentos' AND created_at >= ${sinceIso})) ORDER BY created_at DESC;`
         : Promise.resolve([]),
       tableAllowed(auth, 'medicoes', 'read')
-        ? sql`SELECT * FROM medicoes WHERE tenant_id = ${tenantId} AND (created_at >= ${sinceIso} OR id IN (SELECT entidade_id FROM audit_logs WHERE tenant_id = ${tenantId} AND entidade = 'medicoes' AND created_at >= ${sinceIso})) ORDER BY data DESC;`
+        ? sql`SELECT *, xmin::text AS sync_version FROM medicoes WHERE tenant_id = ${tenantId} AND (created_at >= ${sinceIso} OR id IN (SELECT entidade_id FROM audit_logs WHERE tenant_id = ${tenantId} AND entidade = 'medicoes' AND created_at >= ${sinceIso})) ORDER BY data DESC;`
         : Promise.resolve([]),
       tableAllowed(auth, 'documentos', 'read')
         ? sql`SELECT id, tipo, referencia_id, titulo, categoria, nome_arquivo, tipo_arquivo, tamanho_bytes, url, created_at FROM documentos WHERE tenant_id = ${tenantId} AND (created_at >= ${sinceIso} OR id IN (SELECT entidade_id FROM audit_logs WHERE tenant_id = ${tenantId} AND entidade = 'documentos' AND created_at >= ${sinceIso})) ORDER BY created_at DESC;`
         : Promise.resolve([]),
       tableAllowed(auth, 'produtos', 'read')
-        ? sql`SELECT * FROM produtos WHERE tenant_id = ${tenantId} AND (created_at >= ${sinceIso} OR id IN (SELECT entidade_id FROM audit_logs WHERE tenant_id = ${tenantId} AND entidade = 'produtos' AND created_at >= ${sinceIso})) ORDER BY nome ASC;`
+        ? sql`SELECT *, xmin::text AS sync_version FROM produtos WHERE tenant_id = ${tenantId} AND (created_at >= ${sinceIso} OR id IN (SELECT entidade_id FROM audit_logs WHERE tenant_id = ${tenantId} AND entidade = 'produtos' AND created_at >= ${sinceIso})) ORDER BY nome ASC;`
         : Promise.resolve([]),
       tableAllowed(auth, 'contas', 'read')
-        ? sql`SELECT * FROM contas_bancarias WHERE tenant_id = ${tenantId} AND (created_at >= ${sinceIso} OR id IN (SELECT entidade_id FROM audit_logs WHERE tenant_id = ${tenantId} AND entidade IN ('contas','contas_bancarias') AND created_at >= ${sinceIso})) ORDER BY created_at ASC;`
+        ? sql`SELECT *, xmin::text AS sync_version FROM contas_bancarias WHERE tenant_id = ${tenantId} AND (created_at >= ${sinceIso} OR id IN (SELECT entidade_id FROM audit_logs WHERE tenant_id = ${tenantId} AND entidade IN ('contas','contas_bancarias') AND created_at >= ${sinceIso})) ORDER BY created_at ASC;`
         : Promise.resolve([])
     ]);
 
@@ -215,46 +215,46 @@ export async function handleFullSnapshot(sql, tenantId, auth, res) {
     precompras, contratos, recibos, orcamentosSinapi, docFases, prefs
   ] = await Promise.all([
     tableAllowed(auth, 'obras', 'read')
-      ? sql`SELECT * FROM obras WHERE tenant_id = ${tenantId} AND id NOT IN ('escritorio', 'geral') ORDER BY nome ASC;`
+      ? sql`SELECT *, xmin::text AS sync_version FROM obras WHERE tenant_id = ${tenantId} AND id NOT IN ('escritorio', 'geral') ORDER BY nome ASC;`
       : Promise.resolve([]),
     tableAllowed(auth, 'fornecedores', 'read')
-      ? sql`SELECT * FROM fornecedores WHERE tenant_id = ${tenantId} ORDER BY nome ASC;`
+      ? sql`SELECT *, xmin::text AS sync_version FROM fornecedores WHERE tenant_id = ${tenantId} ORDER BY nome ASC;`
       : Promise.resolve([]),
     tableAllowed(auth, 'lancamentos', 'read')
       ? sql`SELECT *, xmin::text AS sync_version FROM lancamentos WHERE tenant_id = ${tenantId} ORDER BY data DESC;`
       : Promise.resolve([]),
     tableAllowed(auth, 'notas', 'read')
-      ? sql`SELECT * FROM notas_fiscais WHERE tenant_id = ${tenantId} ORDER BY data_emissao DESC;`
+      ? sql`SELECT *, xmin::text AS sync_version FROM notas_fiscais WHERE tenant_id = ${tenantId} ORDER BY data_emissao DESC;`
       : Promise.resolve([]),
     tableAllowed(auth, 'produtos', 'read')
-      ? sql`SELECT * FROM produtos WHERE tenant_id = ${tenantId} ORDER BY nome ASC;`
+      ? sql`SELECT *, xmin::text AS sync_version FROM produtos WHERE tenant_id = ${tenantId} ORDER BY nome ASC;`
       : Promise.resolve([]),
     tableAllowed(auth, 'orcamentos', 'read')
-      ? sql`SELECT * FROM orcamentos WHERE tenant_id = ${tenantId} ORDER BY created_at DESC;`
+      ? sql`SELECT *, xmin::text AS sync_version FROM orcamentos WHERE tenant_id = ${tenantId} ORDER BY created_at DESC;`
       : Promise.resolve([]),
     tableAllowed(auth, 'medicoes', 'read')
-      ? sql`SELECT * FROM medicoes WHERE tenant_id = ${tenantId} ORDER BY data DESC;`
+      ? sql`SELECT *, xmin::text AS sync_version FROM medicoes WHERE tenant_id = ${tenantId} ORDER BY data DESC;`
       : Promise.resolve([]),
     tableAllowed(auth, 'documentos', 'read')
       ? sql`SELECT id, tipo, referencia_id, titulo, categoria, nome_arquivo, tipo_arquivo, tamanho_bytes, url, created_at FROM documentos WHERE tenant_id = ${tenantId} ORDER BY created_at DESC;`
       : Promise.resolve([]),
     tableAllowed(auth, 'contas', 'read')
-      ? sql`SELECT * FROM contas_bancarias WHERE tenant_id = ${tenantId} ORDER BY created_at ASC;`
+      ? sql`SELECT *, xmin::text AS sync_version FROM contas_bancarias WHERE tenant_id = ${tenantId} ORDER BY created_at ASC;`
       : Promise.resolve([]),
     tableAllowed(auth, 'precompras', 'read')
-      ? sql`SELECT * FROM precompras WHERE tenant_id = ${tenantId} ORDER BY updated_at ASC;`
+      ? sql`SELECT *, xmin::text AS sync_version FROM precompras WHERE tenant_id = ${tenantId} ORDER BY updated_at ASC;`
       : Promise.resolve([]),
     tableAllowed(auth, 'contratos', 'read')
-      ? sql`SELECT * FROM contratos WHERE tenant_id = ${tenantId} ORDER BY updated_at ASC;`
+      ? sql`SELECT *, xmin::text AS sync_version FROM contratos WHERE tenant_id = ${tenantId} ORDER BY updated_at ASC;`
       : Promise.resolve([]),
     tableAllowed(auth, 'recibos', 'read')
-      ? sql`SELECT * FROM recibos WHERE tenant_id = ${tenantId} ORDER BY updated_at ASC;`
+      ? sql`SELECT *, xmin::text AS sync_version FROM recibos WHERE tenant_id = ${tenantId} ORDER BY updated_at ASC;`
       : Promise.resolve([]),
     tableAllowed(auth, 'orcamentos_sinapi', 'read')
-      ? sql`SELECT * FROM orcamentos_sinapi WHERE tenant_id = ${tenantId} ORDER BY updated_at ASC;`
+      ? sql`SELECT *, xmin::text AS sync_version FROM orcamentos_sinapi WHERE tenant_id = ${tenantId} ORDER BY updated_at ASC;`
       : Promise.resolve([]),
     tableAllowed(auth, 'doc_fases', 'read')
-      ? sql`SELECT * FROM obra_doc_fases WHERE tenant_id = ${tenantId} ORDER BY updated_at ASC;`
+      ? sql`SELECT *, xmin::text AS sync_version FROM obra_doc_fases WHERE tenant_id = ${tenantId} ORDER BY updated_at ASC;`
       : Promise.resolve([]),
     tableAllowed(auth, 'preferencias', 'read')
       ? sql`SELECT preferences FROM tenant_preferences WHERE tenant_id = ${tenantId} LIMIT 1;`
@@ -328,9 +328,9 @@ export async function handleTableQuery(sql, tenantId, auth, query, res) {
       if (!tableAllowed(auth, 'obras', 'read')) return res.status(403).json({ error: 'Acesso não permitido.' });
       const rows = pagination
         ? (pagination.cursor
-            ? await sql`SELECT * FROM obras WHERE tenant_id = ${tenantId} AND id NOT IN ('escritorio', 'geral') AND id > ${pagination.cursor} ORDER BY id ASC LIMIT ${pagination.limit};`
-            : await sql`SELECT * FROM obras WHERE tenant_id = ${tenantId} AND id NOT IN ('escritorio', 'geral') ORDER BY id ASC LIMIT ${pagination.limit} OFFSET ${pagination.offset};`)
-        : await sql`SELECT * FROM obras WHERE tenant_id = ${tenantId} AND id NOT IN ('escritorio', 'geral') ORDER BY nome ASC;`;
+            ? await sql`SELECT *, xmin::text AS sync_version FROM obras WHERE tenant_id = ${tenantId} AND id NOT IN ('escritorio', 'geral') AND id > ${pagination.cursor} ORDER BY id ASC LIMIT ${pagination.limit};`
+            : await sql`SELECT *, xmin::text AS sync_version FROM obras WHERE tenant_id = ${tenantId} AND id NOT IN ('escritorio', 'geral') ORDER BY id ASC LIMIT ${pagination.limit} OFFSET ${pagination.offset};`)
+        : await sql`SELECT *, xmin::text AS sync_version FROM obras WHERE tenant_id = ${tenantId} AND id NOT IN ('escritorio', 'geral') ORDER BY nome ASC;`;
       return res.status(200).json(pageResponse(rows.map(o => ({ ...o, data_inicio: cleanDate(o.data_inicio), data_previsao: cleanDate(o.data_previsao) })), pagination));
     }
 
@@ -338,9 +338,9 @@ export async function handleTableQuery(sql, tenantId, auth, query, res) {
       if (!tableAllowed(auth, 'fornecedores', 'read')) return res.status(403).json({ error: 'Acesso não permitido.' });
       const rows = pagination
         ? (pagination.cursor
-            ? await sql`SELECT * FROM fornecedores WHERE tenant_id = ${tenantId} AND id > ${pagination.cursor} ORDER BY id ASC LIMIT ${pagination.limit};`
-            : await sql`SELECT * FROM fornecedores WHERE tenant_id = ${tenantId} ORDER BY id ASC LIMIT ${pagination.limit} OFFSET ${pagination.offset};`)
-        : await sql`SELECT * FROM fornecedores WHERE tenant_id = ${tenantId} ORDER BY nome ASC;`;
+            ? await sql`SELECT *, xmin::text AS sync_version FROM fornecedores WHERE tenant_id = ${tenantId} AND id > ${pagination.cursor} ORDER BY id ASC LIMIT ${pagination.limit};`
+            : await sql`SELECT *, xmin::text AS sync_version FROM fornecedores WHERE tenant_id = ${tenantId} ORDER BY id ASC LIMIT ${pagination.limit} OFFSET ${pagination.offset};`)
+        : await sql`SELECT *, xmin::text AS sync_version FROM fornecedores WHERE tenant_id = ${tenantId} ORDER BY nome ASC;`;
       return res.status(200).json(pageResponse(rows.map(f => ({ ...f, cnpj: f.cnpj_cpf || f.cnpj || '', razao_social: f.razao_social || f.nome, nome_fantasia: f.nome, endereco: f.endereco || '', municipio: f.municipio || '', uf: f.uf || '', ativo: f.ativo !== false })), pagination));
     }
 
@@ -348,9 +348,9 @@ export async function handleTableQuery(sql, tenantId, auth, query, res) {
       if (!tableAllowed(auth, 'produtos', 'read')) return res.status(403).json({ error: 'Acesso não permitido.' });
       const rows = pagination
         ? (pagination.cursor
-            ? await sql`SELECT * FROM produtos WHERE tenant_id = ${tenantId} AND id > ${pagination.cursor} ORDER BY id ASC LIMIT ${pagination.limit};`
-            : await sql`SELECT * FROM produtos WHERE tenant_id = ${tenantId} ORDER BY nome ASC LIMIT ${pagination.limit} OFFSET ${pagination.offset};`)
-        : await sql`SELECT * FROM produtos WHERE tenant_id = ${tenantId} ORDER BY nome ASC;`;
+            ? await sql`SELECT *, xmin::text AS sync_version FROM produtos WHERE tenant_id = ${tenantId} AND id > ${pagination.cursor} ORDER BY id ASC LIMIT ${pagination.limit};`
+            : await sql`SELECT *, xmin::text AS sync_version FROM produtos WHERE tenant_id = ${tenantId} ORDER BY nome ASC LIMIT ${pagination.limit} OFFSET ${pagination.offset};`)
+        : await sql`SELECT *, xmin::text AS sync_version FROM produtos WHERE tenant_id = ${tenantId} ORDER BY nome ASC;`;
       return res.status(200).json(pageResponse(rows.map(p => ({ ...p, valor_medio: cleanNum(p.valor_medio) })), pagination));
     }
 
@@ -359,9 +359,9 @@ export async function handleTableQuery(sql, tenantId, auth, query, res) {
       if (!tableAllowed(auth, 'contas', 'read')) return res.status(403).json({ error: 'Acesso não permitido.' });
       const rows = pagination
         ? (pagination.cursor
-            ? await sql`SELECT * FROM contas_bancarias WHERE tenant_id = ${tenantId} AND id > ${pagination.cursor} ORDER BY id ASC LIMIT ${pagination.limit};`
-            : await sql`SELECT * FROM contas_bancarias WHERE tenant_id = ${tenantId} ORDER BY created_at ASC LIMIT ${pagination.limit} OFFSET ${pagination.offset};`)
-        : await sql`SELECT * FROM contas_bancarias WHERE tenant_id = ${tenantId} ORDER BY created_at ASC;`;
+            ? await sql`SELECT *, xmin::text AS sync_version FROM contas_bancarias WHERE tenant_id = ${tenantId} AND id > ${pagination.cursor} ORDER BY id ASC LIMIT ${pagination.limit};`
+            : await sql`SELECT *, xmin::text AS sync_version FROM contas_bancarias WHERE tenant_id = ${tenantId} ORDER BY created_at ASC LIMIT ${pagination.limit} OFFSET ${pagination.offset};`)
+        : await sql`SELECT *, xmin::text AS sync_version FROM contas_bancarias WHERE tenant_id = ${tenantId} ORDER BY created_at ASC;`;
       return res.status(200).json(pageResponse(rows, pagination));
     }
 
@@ -422,7 +422,7 @@ export async function handleTableQuery(sql, tenantId, auth, query, res) {
       if (filterObra) {
         rows = pagination
           ? await sql`
-              SELECT * FROM notas_fiscais 
+              SELECT *, xmin::text AS sync_version FROM notas_fiscais 
               WHERE tenant_id = ${tenantId}
                 AND obra_id = ${filterObra}
                 AND (${filterInicio}::date IS NULL OR data_emissao >= ${filterInicio}::date)
@@ -430,7 +430,7 @@ export async function handleTableQuery(sql, tenantId, auth, query, res) {
               ORDER BY data_emissao DESC, created_at DESC, id DESC 
               LIMIT ${pagination.limit} OFFSET ${pagination.offset};`
           : await sql`
-              SELECT * FROM notas_fiscais 
+              SELECT *, xmin::text AS sync_version FROM notas_fiscais 
               WHERE tenant_id = ${tenantId}
                 AND obra_id = ${filterObra}
                 AND (${filterInicio}::date IS NULL OR data_emissao >= ${filterInicio}::date)
@@ -439,14 +439,14 @@ export async function handleTableQuery(sql, tenantId, auth, query, res) {
       } else {
         rows = pagination
           ? await sql`
-              SELECT * FROM notas_fiscais 
+              SELECT *, xmin::text AS sync_version FROM notas_fiscais 
               WHERE tenant_id = ${tenantId}
                 AND (${filterInicio}::date IS NULL OR data_emissao >= ${filterInicio}::date)
                 AND (${filterFim}::date IS NULL OR data_emissao <= ${filterFim}::date)
               ORDER BY data_emissao DESC, created_at DESC, id DESC 
               LIMIT ${pagination.limit} OFFSET ${pagination.offset};`
           : await sql`
-              SELECT * FROM notas_fiscais 
+              SELECT *, xmin::text AS sync_version FROM notas_fiscais 
               WHERE tenant_id = ${tenantId}
                 AND (${filterInicio}::date IS NULL OR data_emissao >= ${filterInicio}::date)
                 AND (${filterFim}::date IS NULL OR data_emissao <= ${filterFim}::date)
@@ -473,12 +473,12 @@ export async function handleTableQuery(sql, tenantId, auth, query, res) {
       let rows;
       if (filterObra) {
         rows = pagination
-          ? await sql`SELECT * FROM orcamentos WHERE tenant_id = ${tenantId} AND obra_id = ${filterObra} ORDER BY created_at DESC, id DESC LIMIT ${pagination.limit} OFFSET ${pagination.offset};`
-          : await sql`SELECT * FROM orcamentos WHERE tenant_id = ${tenantId} AND obra_id = ${filterObra} ORDER BY created_at DESC, id DESC;`;
+          ? await sql`SELECT *, xmin::text AS sync_version FROM orcamentos WHERE tenant_id = ${tenantId} AND obra_id = ${filterObra} ORDER BY created_at DESC, id DESC LIMIT ${pagination.limit} OFFSET ${pagination.offset};`
+          : await sql`SELECT *, xmin::text AS sync_version FROM orcamentos WHERE tenant_id = ${tenantId} AND obra_id = ${filterObra} ORDER BY created_at DESC, id DESC;`;
       } else {
         rows = pagination
-          ? await sql`SELECT * FROM orcamentos WHERE tenant_id = ${tenantId} ORDER BY created_at DESC, id DESC LIMIT ${pagination.limit} OFFSET ${pagination.offset};`
-          : await sql`SELECT * FROM orcamentos WHERE tenant_id = ${tenantId} ORDER BY created_at DESC, id DESC;`;
+          ? await sql`SELECT *, xmin::text AS sync_version FROM orcamentos WHERE tenant_id = ${tenantId} ORDER BY created_at DESC, id DESC LIMIT ${pagination.limit} OFFSET ${pagination.offset};`
+          : await sql`SELECT *, xmin::text AS sync_version FROM orcamentos WHERE tenant_id = ${tenantId} ORDER BY created_at DESC, id DESC;`;
       }
       return res.status(200).json(pageResponse(rows.map(normalizeOrcamento), pagination));
     }
@@ -488,12 +488,12 @@ export async function handleTableQuery(sql, tenantId, auth, query, res) {
       let rows;
       if (filterObra) {
         rows = pagination
-          ? await sql`SELECT * FROM medicoes WHERE tenant_id = ${tenantId} AND obra_id = ${filterObra} ORDER BY data DESC, created_at DESC, id DESC LIMIT ${pagination.limit} OFFSET ${pagination.offset};`
-          : await sql`SELECT * FROM medicoes WHERE tenant_id = ${tenantId} AND obra_id = ${filterObra} ORDER BY data DESC, created_at DESC, id DESC;`;
+          ? await sql`SELECT *, xmin::text AS sync_version FROM medicoes WHERE tenant_id = ${tenantId} AND obra_id = ${filterObra} ORDER BY data DESC, created_at DESC, id DESC LIMIT ${pagination.limit} OFFSET ${pagination.offset};`
+          : await sql`SELECT *, xmin::text AS sync_version FROM medicoes WHERE tenant_id = ${tenantId} AND obra_id = ${filterObra} ORDER BY data DESC, created_at DESC, id DESC;`;
       } else {
         rows = pagination
-          ? await sql`SELECT * FROM medicoes WHERE tenant_id = ${tenantId} ORDER BY data DESC, created_at DESC, id DESC LIMIT ${pagination.limit} OFFSET ${pagination.offset};`
-          : await sql`SELECT * FROM medicoes WHERE tenant_id = ${tenantId} ORDER BY data DESC, created_at DESC, id DESC;`;
+          ? await sql`SELECT *, xmin::text AS sync_version FROM medicoes WHERE tenant_id = ${tenantId} ORDER BY data DESC, created_at DESC, id DESC LIMIT ${pagination.limit} OFFSET ${pagination.offset};`
+          : await sql`SELECT *, xmin::text AS sync_version FROM medicoes WHERE tenant_id = ${tenantId} ORDER BY data DESC, created_at DESC, id DESC;`;
       }
       return res.status(200).json(pageResponse(rows.map(normalizeMedicao), pagination));
     }
@@ -528,12 +528,12 @@ export async function handleTableQuery(sql, tenantId, auth, query, res) {
       let rows;
       if (filterObra) {
         rows = pagination
-          ? await sql`SELECT * FROM precompras WHERE tenant_id=${tenantId} AND obra_id=${filterObra} ORDER BY data_solicitacao DESC NULLS LAST, updated_at DESC, id DESC LIMIT ${pagination.limit} OFFSET ${pagination.offset};`
-          : await sql`SELECT * FROM precompras WHERE tenant_id=${tenantId} AND obra_id=${filterObra} ORDER BY data_solicitacao DESC NULLS LAST, updated_at DESC, id DESC;`;
+          ? await sql`SELECT *, xmin::text AS sync_version FROM precompras WHERE tenant_id=${tenantId} AND obra_id=${filterObra} ORDER BY data_solicitacao DESC NULLS LAST, updated_at DESC, id DESC LIMIT ${pagination.limit} OFFSET ${pagination.offset};`
+          : await sql`SELECT *, xmin::text AS sync_version FROM precompras WHERE tenant_id=${tenantId} AND obra_id=${filterObra} ORDER BY data_solicitacao DESC NULLS LAST, updated_at DESC, id DESC;`;
       } else {
         rows = pagination
-          ? await sql`SELECT * FROM precompras WHERE tenant_id=${tenantId} ORDER BY data_solicitacao DESC NULLS LAST, updated_at DESC, id DESC LIMIT ${pagination.limit} OFFSET ${pagination.offset};`
-          : await sql`SELECT * FROM precompras WHERE tenant_id=${tenantId} ORDER BY data_solicitacao DESC NULLS LAST, updated_at DESC, id DESC;`;
+          ? await sql`SELECT *, xmin::text AS sync_version FROM precompras WHERE tenant_id=${tenantId} ORDER BY data_solicitacao DESC NULLS LAST, updated_at DESC, id DESC LIMIT ${pagination.limit} OFFSET ${pagination.offset};`
+          : await sql`SELECT *, xmin::text AS sync_version FROM precompras WHERE tenant_id=${tenantId} ORDER BY data_solicitacao DESC NULLS LAST, updated_at DESC, id DESC;`;
       }
       return res.status(200).json(pageResponse(rows.map(jsonPayload), pagination));
     }
@@ -543,12 +543,12 @@ export async function handleTableQuery(sql, tenantId, auth, query, res) {
       let rows;
       if (filterObra) {
         rows = pagination
-          ? await sql`SELECT * FROM contratos WHERE tenant_id=${tenantId} AND obra_id=${filterObra} ORDER BY updated_at DESC, id DESC LIMIT ${pagination.limit} OFFSET ${pagination.offset};`
-          : await sql`SELECT * FROM contratos WHERE tenant_id=${tenantId} AND obra_id=${filterObra} ORDER BY updated_at DESC, id DESC;`;
+          ? await sql`SELECT *, xmin::text AS sync_version FROM contratos WHERE tenant_id=${tenantId} AND obra_id=${filterObra} ORDER BY updated_at DESC, id DESC LIMIT ${pagination.limit} OFFSET ${pagination.offset};`
+          : await sql`SELECT *, xmin::text AS sync_version FROM contratos WHERE tenant_id=${tenantId} AND obra_id=${filterObra} ORDER BY updated_at DESC, id DESC;`;
       } else {
         rows = pagination
-          ? await sql`SELECT * FROM contratos WHERE tenant_id=${tenantId} ORDER BY updated_at DESC, id DESC LIMIT ${pagination.limit} OFFSET ${pagination.offset};`
-          : await sql`SELECT * FROM contratos WHERE tenant_id=${tenantId} ORDER BY updated_at DESC, id DESC;`;
+          ? await sql`SELECT *, xmin::text AS sync_version FROM contratos WHERE tenant_id=${tenantId} ORDER BY updated_at DESC, id DESC LIMIT ${pagination.limit} OFFSET ${pagination.offset};`
+          : await sql`SELECT *, xmin::text AS sync_version FROM contratos WHERE tenant_id=${tenantId} ORDER BY updated_at DESC, id DESC;`;
       }
       return res.status(200).json(pageResponse(rows.map(jsonPayload), pagination));
     }
@@ -558,12 +558,12 @@ export async function handleTableQuery(sql, tenantId, auth, query, res) {
       let rows;
       if (filterObra) {
         rows = pagination
-          ? await sql`SELECT * FROM recibos WHERE tenant_id=${tenantId} AND obra_id=${filterObra} ORDER BY data DESC NULLS LAST, updated_at DESC, id DESC LIMIT ${pagination.limit} OFFSET ${pagination.offset};`
-          : await sql`SELECT * FROM recibos WHERE tenant_id=${tenantId} AND obra_id=${filterObra} ORDER BY data DESC NULLS LAST, updated_at DESC, id DESC;`;
+          ? await sql`SELECT *, xmin::text AS sync_version FROM recibos WHERE tenant_id=${tenantId} AND obra_id=${filterObra} ORDER BY data DESC NULLS LAST, updated_at DESC, id DESC LIMIT ${pagination.limit} OFFSET ${pagination.offset};`
+          : await sql`SELECT *, xmin::text AS sync_version FROM recibos WHERE tenant_id=${tenantId} AND obra_id=${filterObra} ORDER BY data DESC NULLS LAST, updated_at DESC, id DESC;`;
       } else {
         rows = pagination
-          ? await sql`SELECT * FROM recibos WHERE tenant_id=${tenantId} ORDER BY data DESC NULLS LAST, updated_at DESC, id DESC LIMIT ${pagination.limit} OFFSET ${pagination.offset};`
-          : await sql`SELECT * FROM recibos WHERE tenant_id=${tenantId} ORDER BY data DESC NULLS LAST, updated_at DESC, id DESC;`;
+          ? await sql`SELECT *, xmin::text AS sync_version FROM recibos WHERE tenant_id=${tenantId} ORDER BY data DESC NULLS LAST, updated_at DESC, id DESC LIMIT ${pagination.limit} OFFSET ${pagination.offset};`
+          : await sql`SELECT *, xmin::text AS sync_version FROM recibos WHERE tenant_id=${tenantId} ORDER BY data DESC NULLS LAST, updated_at DESC, id DESC;`;
       }
       return res.status(200).json(pageResponse(rows.map(jsonPayload), pagination));
     }
@@ -573,12 +573,12 @@ export async function handleTableQuery(sql, tenantId, auth, query, res) {
       let rows;
       if (filterObra) {
         rows = pagination
-          ? await sql`SELECT * FROM orcamentos_sinapi WHERE tenant_id=${tenantId} AND obra_id=${filterObra} ORDER BY updated_at DESC, id DESC LIMIT ${pagination.limit} OFFSET ${pagination.offset};`
-          : await sql`SELECT * FROM orcamentos_sinapi WHERE tenant_id=${tenantId} AND obra_id=${filterObra} ORDER BY updated_at DESC, id DESC;`;
+          ? await sql`SELECT *, xmin::text AS sync_version FROM orcamentos_sinapi WHERE tenant_id=${tenantId} AND obra_id=${filterObra} ORDER BY updated_at DESC, id DESC LIMIT ${pagination.limit} OFFSET ${pagination.offset};`
+          : await sql`SELECT *, xmin::text AS sync_version FROM orcamentos_sinapi WHERE tenant_id=${tenantId} AND obra_id=${filterObra} ORDER BY updated_at DESC, id DESC;`;
       } else {
         rows = pagination
-          ? await sql`SELECT * FROM orcamentos_sinapi WHERE tenant_id=${tenantId} ORDER BY updated_at DESC, id DESC LIMIT ${pagination.limit} OFFSET ${pagination.offset};`
-          : await sql`SELECT * FROM orcamentos_sinapi WHERE tenant_id=${tenantId} ORDER BY updated_at DESC, id DESC;`;
+          ? await sql`SELECT *, xmin::text AS sync_version FROM orcamentos_sinapi WHERE tenant_id=${tenantId} ORDER BY updated_at DESC, id DESC LIMIT ${pagination.limit} OFFSET ${pagination.offset};`
+          : await sql`SELECT *, xmin::text AS sync_version FROM orcamentos_sinapi WHERE tenant_id=${tenantId} ORDER BY updated_at DESC, id DESC;`;
       }
       return res.status(200).json(pageResponse(rows.map(jsonPayload), pagination));
     }
@@ -588,12 +588,12 @@ export async function handleTableQuery(sql, tenantId, auth, query, res) {
       let rows;
       if (filterObra) {
         rows = pagination
-          ? await sql`SELECT * FROM obra_doc_fases WHERE tenant_id=${tenantId} AND obra_id=${filterObra} ORDER BY updated_at DESC, id DESC LIMIT ${pagination.limit} OFFSET ${pagination.offset};`
-          : await sql`SELECT * FROM obra_doc_fases WHERE tenant_id=${tenantId} AND obra_id=${filterObra} ORDER BY updated_at DESC, id DESC;`;
+          ? await sql`SELECT *, xmin::text AS sync_version FROM obra_doc_fases WHERE tenant_id=${tenantId} AND obra_id=${filterObra} ORDER BY updated_at DESC, id DESC LIMIT ${pagination.limit} OFFSET ${pagination.offset};`
+          : await sql`SELECT *, xmin::text AS sync_version FROM obra_doc_fases WHERE tenant_id=${tenantId} AND obra_id=${filterObra} ORDER BY updated_at DESC, id DESC;`;
       } else {
         rows = pagination
-          ? await sql`SELECT * FROM obra_doc_fases WHERE tenant_id=${tenantId} ORDER BY updated_at DESC, id DESC LIMIT ${pagination.limit} OFFSET ${pagination.offset};`
-          : await sql`SELECT * FROM obra_doc_fases WHERE tenant_id=${tenantId} ORDER BY updated_at DESC, id DESC;`;
+          ? await sql`SELECT *, xmin::text AS sync_version FROM obra_doc_fases WHERE tenant_id=${tenantId} ORDER BY updated_at DESC, id DESC LIMIT ${pagination.limit} OFFSET ${pagination.offset};`
+          : await sql`SELECT *, xmin::text AS sync_version FROM obra_doc_fases WHERE tenant_id=${tenantId} ORDER BY updated_at DESC, id DESC;`;
       }
       return res.status(200).json(pageResponse(rows.map(docPhasePayload), pagination));
     }

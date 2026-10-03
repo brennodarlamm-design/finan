@@ -9,6 +9,7 @@ import { validateObraTenant, validateBulkObraPlanLimit } from './_db-mutations.j
 import { setPrivateNoCache } from './_http.js';
 import { isTenantStorageUrl } from './_edge-r2.js';
 import { writeAudit } from './_audit.js';
+import { syncVersionConflict, withoutSyncVersion } from './_sync-guard.js';
 
 /**
  * Executa a sincronização em lote de todas as coleções do cliente com isolamento multi-tenant.
@@ -37,6 +38,9 @@ export async function handleSyncAll(sql, tenantId, auth, req, res, payload) {
       if (!planCheck.allowed) return res.status(planCheck.status).json(planCheck.body);
     }
     for (const o of payload.clientes) {
+      // Concorrência otimista (VARREDURA 2026-10-03 #4): não sobrescreve versão mais nova nem recria excluído.
+      const conflito = await syncVersionConflict(sql, 'clientes', tenantId, o);
+      if (conflito) { recordFailure('clientes', o, conflito.error, 'SYNC_CONFLICT'); continue; }
       if (!o.id || !o.nome) continue;
       const cronogramaJson = o.cronograma_config == null && !Array.isArray(o.processos_sla) ? null : JSON.stringify(sanitizeCronogramaConfig({ ...(o.cronograma_config || {}), processos_sla: o.cronograma_config?.processos_sla || o.processos_sla }));
       const bdiJson = o.bdi_config == null ? null : JSON.stringify(sanitizeBdiConfig(o.bdi_config));
@@ -72,6 +76,9 @@ export async function handleSyncAll(sql, tenantId, auth, req, res, payload) {
   // 2. Fornecedores
   if (Array.isArray(payload.fornecedores)) {
     for (const f of payload.fornecedores) {
+      // Concorrência otimista (VARREDURA 2026-10-03 #4): não sobrescreve versão mais nova nem recria excluído.
+      const conflito = await syncVersionConflict(sql, 'fornecedores', tenantId, f);
+      if (conflito) { recordFailure('fornecedores', f, conflito.error, 'SYNC_CONFLICT'); continue; }
       if (!f.id) continue;
       const nomeFinal = (f.nome || f.nome_fantasia || f.razao_social || f.razao || 'Fornecedor').trim();
       const razaoSocialFinal = (f.razao_social || f.nome_fantasia || f.nome || nomeFinal).trim();
@@ -113,6 +120,9 @@ export async function handleSyncAll(sql, tenantId, auth, req, res, payload) {
   // 3. Contas Bancárias
   if (Array.isArray(payload.contas)) {
     for (const c of payload.contas) {
+      // Concorrência otimista (VARREDURA 2026-10-03 #4): não sobrescreve versão mais nova nem recria excluído.
+      const conflito = await syncVersionConflict(sql, 'contas', tenantId, c);
+      if (conflito) { recordFailure('contas', c, conflito.error, 'SYNC_CONFLICT'); continue; }
       if (!c.id) continue;
       try {
         await sql`
@@ -146,6 +156,9 @@ export async function handleSyncAll(sql, tenantId, auth, req, res, payload) {
   // 4. Produtos (normalização defensiva de nome/descrição)
   if (Array.isArray(payload.produtos)) {
     for (const p of payload.produtos) {
+      // Concorrência otimista (VARREDURA 2026-10-03 #4): não sobrescreve versão mais nova nem recria excluído.
+      const conflito = await syncVersionConflict(sql, 'produtos', tenantId, p);
+      if (conflito) { recordFailure('produtos', p, conflito.error, 'SYNC_CONFLICT'); continue; }
       const prodId = String(p?.id || '').trim();
       const nomeFinal = String(p?.nome || p?.descricao || p?.titulo || '').trim();
       if (!prodId || !nomeFinal) continue;
@@ -174,6 +187,9 @@ export async function handleSyncAll(sql, tenantId, auth, req, res, payload) {
   // 5. Notas Fiscais (Processadas ANTES de Lançamentos para garantir FK referencial)
   if (Array.isArray(payload.notas)) {
     for (const n of payload.notas) {
+      // Concorrência otimista (VARREDURA 2026-10-03 #4): não sobrescreve versão mais nova nem recria excluído.
+      const conflito = await syncVersionConflict(sql, 'notas', tenantId, n);
+      if (conflito) { recordFailure('notas', n, conflito.error, 'SYNC_CONFLICT'); continue; }
       if (!n.id) continue;
       const vBruto = cleanNum(n.valor_bruto !== undefined ? n.valor_bruto : n.valor_total);
       const vImp = cleanNum(n.impostos);
@@ -350,9 +366,12 @@ export async function handleSyncAll(sql, tenantId, auth, req, res, payload) {
   // 7. Pré-Compras
   if (Array.isArray(payload.precompras)) {
     for (const pc of payload.precompras) {
+      // Concorrência otimista (VARREDURA 2026-10-03 #4): não sobrescreve versão mais nova nem recria excluído.
+      const conflito = await syncVersionConflict(sql, 'precompras', tenantId, pc);
+      if (conflito) { recordFailure('precompras', pc, conflito.error, 'SYNC_CONFLICT'); continue; }
       if (!pc?.id) continue;
       const safeObraId = await validateObraTenant(sql, pc.obra_id, tenantId);
-      const rawJson = JSON.stringify(pc);
+      const rawJson = JSON.stringify(withoutSyncVersion(pc));
       try {
         await sql`
           INSERT INTO precompras (tenant_id,id,obra_id,numero_ordem,status,valor_total,data_solicitacao,payload)
@@ -370,9 +389,12 @@ export async function handleSyncAll(sql, tenantId, auth, req, res, payload) {
   // 8. Contratos
   if (Array.isArray(payload.contratos)) {
     for (const c of payload.contratos) {
+      // Concorrência otimista (VARREDURA 2026-10-03 #4): não sobrescreve versão mais nova nem recria excluído.
+      const conflito = await syncVersionConflict(sql, 'contratos', tenantId, c);
+      if (conflito) { recordFailure('contratos', c, conflito.error, 'SYNC_CONFLICT'); continue; }
       if (!c?.id) continue;
       const safeObraId = await validateObraTenant(sql, c.obra_id, tenantId);
-      const rawJson = JSON.stringify(c);
+      const rawJson = JSON.stringify(withoutSyncVersion(c));
       try {
         await sql`
           INSERT INTO contratos (tenant_id,id,obra_id,numero,status,payload)
@@ -390,9 +412,12 @@ export async function handleSyncAll(sql, tenantId, auth, req, res, payload) {
   // 9. Recibos
   if (Array.isArray(payload.recibos)) {
     for (const r of payload.recibos) {
+      // Concorrência otimista (VARREDURA 2026-10-03 #4): não sobrescreve versão mais nova nem recria excluído.
+      const conflito = await syncVersionConflict(sql, 'recibos', tenantId, r);
+      if (conflito) { recordFailure('recibos', r, conflito.error, 'SYNC_CONFLICT'); continue; }
       if (!r?.id) continue;
       const safeObraId = await validateObraTenant(sql, r.obra_id, tenantId);
-      const rawJson = JSON.stringify(r);
+      const rawJson = JSON.stringify(withoutSyncVersion(r));
       const recStatus = r.assinatura ? 'assinado' : (r.status || 'pendente');
       try {
         await sql`
@@ -411,6 +436,9 @@ export async function handleSyncAll(sql, tenantId, auth, req, res, payload) {
   // 10. Orçamentos SINAPI
   if (Array.isArray(payload.orcamentos_sinapi)) {
     for (const o of payload.orcamentos_sinapi) {
+      // Concorrência otimista (VARREDURA 2026-10-03 #4): não sobrescreve versão mais nova nem recria excluído.
+      const conflito = await syncVersionConflict(sql, 'orcamentos_sinapi', tenantId, o);
+      if (conflito) { recordFailure('orcamentos_sinapi', o, conflito.error, 'SYNC_CONFLICT'); continue; }
       if (!o?.id || !validCloudId(o.id, 80)) {
         recordFailure('orcamentos_sinapi', o, 'ID de orçamento SINAPI inválido.', 'INVALID_ID');
         continue;
@@ -421,7 +449,7 @@ export async function handleSyncAll(sql, tenantId, auth, req, res, payload) {
         continue;
       }
       const dbObraId = (!safeObraId || safeObraId === 'escritorio' || safeObraId === 'geral') ? null : safeObraId;
-      const rawJson = JSON.stringify(o);
+      const rawJson = JSON.stringify(withoutSyncVersion(o));
       const subtotal = (Array.isArray(o.itens) ? o.itens : []).reduce((sum, item) => sum + cleanNum(item?.total), 0);
       const total = cleanNum(o.valor_total) > 0 ? cleanNum(o.valor_total) : (subtotal * (1 + cleanNum(o.bdi) / 100));
       try {
@@ -441,6 +469,9 @@ export async function handleSyncAll(sql, tenantId, auth, req, res, payload) {
   // 11. Orçamentos
   if (Array.isArray(payload.orcamentos)) {
     for (const o of payload.orcamentos) {
+      // Concorrência otimista (VARREDURA 2026-10-03 #4): não sobrescreve versão mais nova nem recria excluído.
+      const conflito = await syncVersionConflict(sql, 'orcamentos', tenantId, o);
+      if (conflito) { recordFailure('orcamentos', o, conflito.error, 'SYNC_CONFLICT'); continue; }
       if (!o.id) continue;
       const safeOrcObraId = await validateObraTenant(sql, o.obra_id, tenantId);
       const rawItens = o.etapas || o.itens || (typeof o.itens_json === 'string' ? safeJsonParse(o.itens_json, []) : o.itens_json) || [];
@@ -488,6 +519,9 @@ export async function handleSyncAll(sql, tenantId, auth, req, res, payload) {
   // 12. Medições
   if (Array.isArray(payload.medicoes)) {
     for (const m of payload.medicoes) {
+      // Concorrência otimista (VARREDURA 2026-10-03 #4): não sobrescreve versão mais nova nem recria excluído.
+      const conflito = await syncVersionConflict(sql, 'medicoes', tenantId, m);
+      if (conflito) { recordFailure('medicoes', m, conflito.error, 'SYNC_CONFLICT'); continue; }
       if (!m.id) continue;
       const safeMedObraId = await validateObraTenant(sql, m.obra_id, tenantId);
       const numMed = parseInt(m.numero || m.numero_medicao) || 1;
@@ -495,7 +529,7 @@ export async function handleSyncAll(sql, tenantId, auth, req, res, payload) {
       const valMed = cleanNum(m.valor_medido || m.valor_solicitado);
       const rawItens = m.itens || (typeof m.itens_json === 'string' ? safeJsonParse(m.itens_json, []) : m.itens_json) || [];
       const itensJson = JSON.stringify(Array.isArray(rawItens) ? rawItens : []);
-      const payloadJson = JSON.stringify(m);
+      const payloadJson = JSON.stringify(withoutSyncVersion(m));
 
       try {
         await sql`
@@ -561,7 +595,7 @@ export async function handleSyncAll(sql, tenantId, auth, req, res, payload) {
         recordFailure('doc_fases', d, 'A obra da fase documental não pertence ao tenant autenticado.', 'INVALID_TENANT_RELATION');
         continue;
       }
-      const rawJson = JSON.stringify({ ...d, id: d.doc_id });
+      const rawJson = JSON.stringify({ ...withoutSyncVersion(d), id: d.doc_id });
       try {
         await sql`
           INSERT INTO obra_doc_fases (tenant_id,id,obra_id,doc_id,fase_key,payload)
@@ -579,6 +613,9 @@ export async function handleSyncAll(sql, tenantId, auth, req, res, payload) {
   // 14. Documentos
   if (Array.isArray(payload.documentos)) {
     for (const doc of payload.documentos) {
+      // Concorrência otimista (VARREDURA 2026-10-03 #4): não sobrescreve versão mais nova nem recria excluído.
+      const conflito = await syncVersionConflict(sql, 'documentos', tenantId, doc);
+      if (conflito) { recordFailure('documentos', doc, conflito.error, 'SYNC_CONFLICT'); continue; }
       if (!doc.id) continue;
       if (!isTenantStorageUrl(doc.url, tenantId)) {
         recordFailure('documentos', doc, 'URL de arquivo de outra empresa.', 'STORAGE_OWNERSHIP_DENIED');

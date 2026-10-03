@@ -39,9 +39,9 @@ test('data.js consolida SINAPI sem multiplicar BDI duplamente', /Number\(orc\.va
 
 // BUG-CRIT-02: Quebra Silenciosa do Delta Sync
 console.log('\n[BUG-CRIT-02] Quebra Silenciosa do Delta Sync para Obras, Fornecedores e Produtos:');
-test('_db-queries.js inclui created_at e audit_logs no delta sync de obras', /SELECT \* FROM obras WHERE.*\(created_at >= \$\{sinceIso\} OR id IN \(SELECT entidade_id FROM audit_logs WHERE tenant_id = \$\{tenantId\} AND entidade = 'obras'/.test(queriesCode));
-test('_db-queries.js inclui created_at e audit_logs no delta sync de fornecedores', /SELECT \* FROM fornecedores WHERE.*\(created_at >= \$\{sinceIso\} OR id IN \(SELECT entidade_id FROM audit_logs WHERE tenant_id = \$\{tenantId\} AND entidade = 'fornecedores'/.test(queriesCode));
-test('_db-queries.js inclui created_at e audit_logs no delta sync de produtos', /SELECT \* FROM produtos WHERE.*\(created_at >= \$\{sinceIso\} OR id IN \(SELECT entidade_id FROM audit_logs WHERE tenant_id = \$\{tenantId\} AND entidade = 'produtos'/.test(queriesCode));
+test('_db-queries.js inclui created_at e audit_logs no delta sync de obras', /SELECT \*(?:, xmin::text AS sync_version)? FROM obras WHERE.*\(created_at >= \$\{sinceIso\} OR id IN \(SELECT entidade_id FROM audit_logs WHERE tenant_id = \$\{tenantId\} AND entidade = 'obras'/.test(queriesCode));
+test('_db-queries.js inclui created_at e audit_logs no delta sync de fornecedores', /SELECT \*(?:, xmin::text AS sync_version)? FROM fornecedores WHERE.*\(created_at >= \$\{sinceIso\} OR id IN \(SELECT entidade_id FROM audit_logs WHERE tenant_id = \$\{tenantId\} AND entidade = 'fornecedores'/.test(queriesCode));
+test('_db-queries.js inclui created_at e audit_logs no delta sync de produtos', /SELECT \*(?:, xmin::text AS sync_version)? FROM produtos WHERE.*\(created_at >= \$\{sinceIso\} OR id IN \(SELECT entidade_id FROM audit_logs WHERE tenant_id = \$\{tenantId\} AND entidade = 'produtos'/.test(queriesCode));
 
 // BUG-CRIT-03: Ressuscitação Fantasma de Registros no IndexedDB
 console.log('\n[BUG-CRIT-03] Ressuscitação Fantasma de Registros pelo IndexedDB:');

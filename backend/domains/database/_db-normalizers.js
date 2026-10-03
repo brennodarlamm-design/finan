@@ -44,7 +44,11 @@ export function jsonPayload(row) {
   if (typeof raw === 'string') {
     try { parsed = JSON.parse(raw); } catch { parsed = {}; }
   }
-  return { ...(parsed && typeof parsed === 'object' ? parsed : {}), id: row.id };
+  const out = { ...(parsed && typeof parsed === 'object' ? parsed : {}), id: row.id };
+  // A versão vale a da linha (xmin), nunca uma cópia antiga guardada dentro do payload.
+  delete out.sync_version;
+  if (row.sync_version) out.sync_version = String(row.sync_version);
+  return out;
 }
 
 export function docPhasePayload(row) {

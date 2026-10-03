@@ -134,6 +134,7 @@ const backendMap = {
   'api/_db-queries.js': 'backend/domains/database/_db-queries.js',
   'api/_db-sync.js': 'backend/domains/database/_db-sync.js',
   'api/_db-normalizers.js': 'backend/domains/database/_db-normalizers.js',
+  'api/_sync-guard.js': 'backend/domains/database/_sync-guard.js',
   'api/_tenant-sql.js': 'backend/domains/database/_tenant-sql.js',
   'api/_tenant-access-key.js': 'backend/domains/database/_tenant-access-key.js',
   'api/db.js': 'backend/domains/database/db.js',

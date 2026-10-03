@@ -251,4 +251,61 @@ function navegador() {
   console.log('  ✓ Backup diário: tabelas reais (sem clientes/contas), inclui notas/pré-compras/recibos e tolera falha isolada');
 }
 
+
+{
+  // Concorrência otimista em todas as tabelas (antes só em lançamentos).
+  const { handleSave } = await import('../api/_db-mutations.js');
+  const { handleSyncAll } = await import('../api/_db-sync.js');
+  const { jsonPayload } = await import('../api/_db-normalizers.js');
+  const db = new PGlite();
+  await db.exec(`CREATE TABLE contratos (tenant_id text NOT NULL, id text NOT NULL, obra_id text, numero text, status text, payload jsonb, updated_at timestamptz DEFAULT now(), PRIMARY KEY (tenant_id, id));
+    CREATE TABLE fornecedores (id text PRIMARY KEY, tenant_id text, nome text);`);
+  const sql = async (strings, ...values) => {
+    let text = strings[0];
+    for (let i = 0; i < values.length; i++) text += `$${i + 1}` + strings[i + 1];
+    return (await db.query(text, values)).rows;
+  };
+  const auth = { tenantId: 't1', user: { id: 'u1', perfil: 'admin' } };
+  const call = async (data) => {
+    let status = 200, body;
+    const res = { status(c) { status = c; return this; }, json(b) { body = b; return this; }, setHeader() {} };
+    await handleSave(sql, 't1', auth, { headers: {} }, res, 'contratos', data);
+    return { status, body };
+  };
+  const novo = await call({ id: 'c1', numero: '1', status: 'pendente' });
+  assert.equal(novo.status, 200);
+  assert(novo.body.sync_version, 'resposta traz a versão nova');
+  const v1 = novo.body.sync_version;
+  const edit = await call({ id: 'c1', numero: '1', status: 'assinado', sync_version: v1 });
+  assert.equal(edit.status, 200, 'edição com a versão atual grava');
+  const v2 = edit.body.sync_version;
+  assert.notEqual(v2, v1);
+  const velho = await call({ id: 'c1', numero: '1', status: 'cancelado', sync_version: v1 });
+  assert.equal(velho.status, 409, 'versão antiga não sobrescreve a edição mais nova');
+  assert.equal(velho.body.code, 'SYNC_CONFLICT');
+  assert.equal((await db.query(`SELECT status FROM contratos WHERE id='c1'`)).rows[0].status, 'assinado');
+  const payload = (await db.query(`SELECT payload FROM contratos WHERE id='c1'`)).rows[0].payload;
+  assert(!('sync_version' in payload), 'a versão não fica gravada dentro do payload');
+  await db.exec(`DELETE FROM contratos WHERE id='c1'`);
+  const recriar = await call({ id: 'c1', numero: '1', status: 'pendente', sync_version: v2 });
+  assert.equal(recriar.status, 409, 'registro excluído em outro aparelho não é recriado');
+  assert.equal(recriar.body.deleted, true);
+  assert.equal((await db.query(`SELECT count(*)::int AS n FROM contratos`)).rows[0].n, 0);
+
+  // "Sincronizar tudo" com cache velho: não sobrescreve e devolve o conflito.
+  await call({ id: 'c2', numero: '2', status: 'pendente' });
+  const atual = (await db.query(`SELECT xmin::text AS v FROM contratos WHERE id='c2'`)).rows[0].v;
+  await call({ id: 'c2', numero: '2', status: 'assinado', sync_version: atual });
+  let syncStatus = 200, syncBody;
+  const res = { status(c) { syncStatus = c; return this; }, json(b) { syncBody = b; return this; }, setHeader() {} };
+  await handleSyncAll(sql, 't1', auth, { headers: {} }, res, { contratos: [{ id: 'c2', numero: '2', status: 'pendente', sync_version: atual }] });
+  assert.equal((await db.query(`SELECT status FROM contratos WHERE id='c2'`)).rows[0].status, 'assinado', 'sync_all não volta para a versão velha');
+  assert(JSON.stringify(syncBody).includes('SYNC_CONFLICT'), 'sync_all informa o conflito');
+
+  // Leitura devolve a versão da linha, não a do payload.
+  assert.equal(jsonPayload({ id: 'x', payload: { a: 1, sync_version: 'velha' }, sync_version: '99' }).sync_version, '99');
+  await db.close();
+  console.log('  ✓ Versão em todas as tabelas: edição velha recusada (409), excluído não volta, sync_all protegido');
+}
+
 console.log('\n✅ Varredura 03/10/2026 (correções rápidas e proteção de dados): tudo certo.');
