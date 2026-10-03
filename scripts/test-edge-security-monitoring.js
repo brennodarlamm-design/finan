@@ -191,6 +191,16 @@ for (const testProbePath of ['/.env.old', '/.aws/config']) {
   assert.equal(scannerResp.headers.get('X-FinGo-Security'), 'probe-blocked');
 }
 
+// Bloqueio imediato por reputação para IPs persistentes de scanners (Bélgica / GCP / Azure)
+assert.equal(isKnownMaliciousIp('35.240.58.49'), true, '35.240.58.49 deve ser reconhecido como IP malicioso.');
+assert.equal(isKnownMaliciousIp('34.38.113.44'), true, '34.38.113.44 deve ser reconhecido como IP malicioso.');
+const persistentScannerReq = new Request('https://www.finobra.app.br/media/.env', {
+  headers: { 'cf-connecting-ip': '35.240.58.49' }
+});
+const persistentScannerResp = await applyEdgeSecurityMiddleware(persistentScannerReq, {});
+assert(persistentScannerResp && persistentScannerResp.status === 403, 'Scanner persistente 35.240.58.49 deve receber 403 imediato.');
+assert.equal(persistentScannerResp.headers.get('X-FinGo-Security'), 'ip-reputation-blocked');
+
 // Rate limiting dos endpoints MCP e SSE
 const mcpTestIp = `mcp_client_${Date.now()}`;
 for (let i = 1; i <= 120; i++) {

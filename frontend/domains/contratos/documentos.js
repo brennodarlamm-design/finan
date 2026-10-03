@@ -254,12 +254,12 @@ const Documentos = {
     docs.push(item);
     this.salvarLista(docs);
 
-    // Sincronizar com banco de dados Neon
+    // Sincronizar metadados com banco de dados Neon (Zero-bloat: binários vão exclusivamente para o Cloudflare R2)
     if (typeof DB !== 'undefined' && DB.syncToCloud) {
       DB.syncToCloud('save', 'documentos', {
         ...item,
         url: doc.url || null,
-        base64_data: base64 || null
+        base64_data: null
       });
     }
 

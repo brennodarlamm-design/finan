@@ -230,6 +230,15 @@ export const weeklyNeonMaintenance = schedules.task({
       logger.info("Auditoria de rotina pulada ou não necessária.");
     }
 
+    // 3. Expurgar segredos efêmeros do WhatsApp acumulados pelo whatsmeow no Postgres
+    try {
+      await sql`TRUNCATE TABLE whatsmeow_message_secrets;`;
+      result.purgedWhatsmeowSecrets = true;
+      logger.info("whatsmeow_message_secrets truncada com sucesso pela manutenção periódica.");
+    } catch (errWm) {
+      logger.warn("Aviso ao limpar whatsmeow_message_secrets:", { error: errWm.message });
+    }
+
     return result;
   }
 });

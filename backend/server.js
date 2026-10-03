@@ -1525,6 +1525,22 @@ cron.schedule('30 9 * * 1-5', async () => {
   name: 'finobra-billing-sweep'
 });
 
+// Agendado para domingo às 04:00 (Boa Vista / Brasília): manutenção de storage do Neon
+cron.schedule('0 4 * * 0', async () => {
+  if (!sql) return;
+  try {
+    console.log('🧹 [StorageCron] Iniciando limpeza de segredos efêmeros do WhatsApp...');
+    await sql`TRUNCATE TABLE whatsmeow_message_secrets;`;
+    console.log('✅ [StorageCron] whatsmeow_message_secrets truncada com sucesso.');
+  } catch (err) {
+    console.warn('⚠️ [StorageCron] Aviso ao purgar whatsmeow_message_secrets:', err?.message || err);
+  }
+}, {
+  timezone: 'America/Boa_Vista',
+  noOverlap: true,
+  name: 'finobra-whatsapp-storage-purge'
+});
+
 // Endpoint para disparo manual e teste sob demanda pelo SuperAdmin
 app.post('/cron/billing-sweep', requireAuth, async (req, res) => {
   const forcedTenantId = req.body?.tenantId || req.query?.tenant_id || null;
