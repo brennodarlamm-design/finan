@@ -91,3 +91,30 @@ Legenda: 🔴 crítica · 🟠 alta · 🟡 média · 🔵 baixa · ✅ confirma
 - **Render:** com os dois serviços no plano grátis, o ping a cada 10 min pode estourar as 750 h do mês.
 - **Trigger.dev:** se estiver implantado, o resumo das 08:00 sai em dobro.
 - **Fuso de "hoje":** está fixo em Boa Vista (UTC-4). Avaliar se deve seguir o fuso do navegador ou da empresa.
+
+---
+
+## Correções aplicadas
+
+**Lote 1 (04/10/2026)**, coberto por `scripts/test-auditoria-2026-10-04.js`, que roda o handler real de autenticação sobre um Postgres em memória:
+- ✅ #1 `mfa_setup` só aceita o token de primeira configuração e só quando o MFA está desligado. Trocar o autenticador exige sessão Master verificada mais o código atual ou um código de backup. O `mfa_activate` nunca sobrescreve um MFA ativo fora dessa troca autorizada.
+- ✅ #2 Confirmado no banco: o superadmin está na empresa "angelim", que tem outro admin, e o e-mail cadastrado dele é inválido.
+  - O código de redefinição vai para o e-mail da própria pessoa. O WhatsApp da empresa só é usado para quem não tem e-mail válido, e nunca para a conta Master.
+  - A conta Master também precisa do Google Authenticator (ou de um código de backup) para concluir a redefinição. A tela de login pede esse código.
+- ✅ #3 O hash foi removido da migração 023 e o `apply-migration-023.js` foi desativado (ele também desligava o MFA do Master). O scanner de segredos passou a barrar hashes `salt:hash`. **O hash continua no histórico do Git: troque a senha do superadmin.**
+- ✅ #4 A varredura de cobrança e o recibo PIX leem `vencimento::text`. O teste demonstra o problema com o parser real do driver do Neon.
+- ✅ #5 Resumo matinal:
+  - sem o fallback para `TARGET_PHONE`, exceto no teste manual do próprio tenant padrão;
+  - empresas canceladas ou arquivadas ficam de fora;
+  - no máximo 20 itens, com total e quantidade;
+  - uma vez por dia por empresa (`billing_notifications_sent`, estágio `daily_summary`).
+- ✅ #6 Varredura manual do Master:
+  - sem o Render, nada é marcado como enviado, e a resposta passa a ser 503 com a mensagem real;
+  - uma varredura demorada aparece como "em andamento";
+  - o anti-spam conta só `status = 'sent'`;
+  - o clique manual geral respeita o anti-spam; só o teste de uma empresa força o reenvio.
+
+**Ações para uma pessoa:**
+1. Trocar a senha do superadmin.
+2. Cadastrar um e-mail válido na conta Master (hoje ela não consegue receber o código de redefinição).
+3. Avaliar mover o superadmin para uma empresa técnica, sem outros usuários.

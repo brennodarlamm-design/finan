@@ -1602,65 +1602,12 @@ export default async function handler(req, res) {
         }
       }
 
-      // Fallback local via Neon caso o backend Render não responda
+      // AUDITORIA 2026-10-04 #6: sem o Render, nada é marcado como enviado (o antigo fallback gravava
+      // 'pending_dispatch', que ninguém despachava, e bloqueava o aviso real do ciclo).
+      // Obs.: esta ação é atendida antes pelo wrapper de api/admin.js; aqui fica coerente com ele.
       if (!sweepResult || !sweepResult.success) {
-        usedEngine = 'neon_fallback';
-        const hoje = new Intl.DateTimeFormat('en-CA', {
-          timeZone: 'America/Boa_Vista', year: 'numeric', month: '2-digit', day: '2-digit'
-        }).format(new Date());
-
-        const tenants = forcedTenantId
-          ? await sql`SELECT id, razao_social, nome_fantasia, telefone, email, responsavel, plano, status, vencimento FROM tenants WHERE id = ${forcedTenantId};`
-          : await sql`SELECT id, razao_social, nome_fantasia, telefone, email, responsavel, plano, status, vencimento FROM tenants WHERE status NOT IN ('cancelado', 'arquivado') AND vencimento IS NOT NULL;`;
-
-        let evaluated = 0;
-        let notified = 0;
-        let skipped = 0;
-
-        for (const t of tenants) {
-          evaluated++;
-          const vInfo = parseVencimento(t.vencimento);
-          if (!vInfo.iso) continue;
-          const diff = vInfo.dias;
-
-          let stage = null;
-          if (t.plano === 'trial' && diff <= 2 && diff >= 0) stage = 'trial_ending';
-          else if (diff === 10) stage = 'reminder_10d';
-          else if (diff === 3) stage = 'reminder_3d';
-          else if (diff === 0) stage = 'due_today';
-          else if (diff === -1) stage = 'overdue_1d';
-          else if (diff === -5) stage = 'overdue_5d';
-
-          if (!stage) continue;
-
-          const check = await sql`
-            SELECT id FROM billing_notifications_sent
-            WHERE tenant_id = ${t.id} AND stage = ${stage} AND sent_date = ${hoje}::date
-            LIMIT 1;
-          `;
-          if (check.length > 0) {
-            skipped++;
-            continue;
-          }
-
-          // Grava idempotência no banco de dados
-          await sql`
-            INSERT INTO billing_notifications_sent (
-              tenant_id, stage, channel, sent_date, recipient_phone, recipient_email, status, metadata
-            ) VALUES (
-              ${t.id}, ${stage}, 'email', ${hoje}::date, ${t.telefone || null}, ${t.email || null}, 'pending_dispatch',
-              ${JSON.stringify({ diff, plano: t.plano, vencimento: t.vencimento, via: 'master_fallback' })}::jsonb
-            ) ON CONFLICT (tenant_id, stage, sent_date) DO NOTHING;
-          `;
-          notified++;
-        }
-
-        sweepResult = {
-          success: true,
-          totalEvaluated: evaluated,
-          notified,
-          skippedAntiSpam: skipped
-        };
+        usedEngine = 'indisponivel';
+        sweepResult = { success: false, notified: 0, message: 'Servidor de envio indisponível: nenhum aviso foi enviado.' };
       }
 
       await writeAudit(sql, req, auth, {

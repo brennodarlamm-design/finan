@@ -52,6 +52,11 @@ const FORBIDDEN_PATTERNS = [
   {
     name: 'Hardcoded OpenAI / AI Secret Key',
     regex: /sk-[a-zA-Z0-9_-]{32,}/g
+  },
+  {
+    // AUDITORIA 2026-10-04 #3: hash de senha scrypt (salt:hash) versionado permite ataque offline.
+    name: 'Password Hash (scrypt salt:hash)',
+    regex: /\b[0-9a-f]{32}:[0-9a-f]{128}\b/g
   }
 ];
 

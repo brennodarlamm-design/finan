@@ -359,7 +359,7 @@ const Auth = {
     return { success: true, resetToken: cleanCode };
   },
 
-  async redefinirSenha(requestId, resetToken, novaSenha) {
+  async redefinirSenha(requestId, resetToken, novaSenha, fatorMfa = null) {
     if (!requestId || !novaSenha) {
       return { success: false, message: 'Dados incompletos para redefinição de senha.' };
     }
@@ -381,12 +381,16 @@ const Auth = {
       const resp = await this._fetchWithTimeout('/api/auth?action=verify_reset', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ requestId, code, newPassword: novaSenha })
+        body: JSON.stringify({ requestId, code, newPassword: novaSenha, ...(fatorMfa ? { totp_code: fatorMfa } : {}) })
       });
       const data = await resp.json().catch(() => ({}));
       if (resp.ok && data.success) {
         sessionStorage.removeItem(`finobra_otp_${requestId}`);
         return { success: true, message: data.message || 'Senha redefinida com sucesso!' };
+      }
+      // Conta Master: o servidor pede também o autenticador (AUDITORIA 2026-10-04 #2).
+      if (data.code === 'MFA_REQUIRED' || data.code === 'MFA_INVALID') {
+        return { success: false, mfaRequired: true, message: data.message };
       }
       return { success: false, message: data.message || 'Código incorreto ou expirado.' };
     } catch (err) {

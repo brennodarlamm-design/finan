@@ -28,7 +28,7 @@ console.log('=== Auditoria 2026-10-02 (3ª rodada) — regressões ===\n');
   const src = read('api/auth.js');
   assert(src.includes('async function mfaAccountLimited(userId)'), 'T2: helper de limite por conta');
   assert(src.includes('`mfa-user:'), 'T2: chave não pode começar com "mfa:" (seria tratada como IP pelo Fail2Ban)');
-  assert.strictEqual(src.split('await mfaAccountLimited(').length - 1, 2, 'T2: limite aplicado no login e no mfa_verify');
+  assert.strictEqual(src.split('await mfaAccountLimited(').length - 1, 3, 'T2: limite aplicado no login, no mfa_verify e na redefinição de senha do Master');
   console.log('  ✓ T2 tentativas de MFA limitadas por conta');
 }
 

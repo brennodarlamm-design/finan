@@ -832,10 +832,23 @@ export default async function handler(req, res) {
       let targetUserId = null;
       let targetUsername = 'admin';
 
+      // AUDITORIA 2026-10-04 #1: o token "mfa_pending" (emitido com a senha certa, ANTES do código)
+      // também abria o setup, e o activate sobrescrevia o MFA já ativo: bastava a senha para
+      // cadastrar um autenticador novo e entrar no Master. Agora:
+      //   • token: só o de primeira configuração ("mfa_setup") e só se o MFA ainda estiver desligado;
+      //   • reconfigurar: sessão Master já verificada por MFA + código atual (ou de backup).
+      let reconfigure = false;
       if (rawSetupToken) {
         const decoded = verifyToken(rawSetupToken, secret);
-        if (!decoded || (decoded.purpose !== 'mfa_setup' && decoded.purpose !== 'mfa_pending') || !decoded.userId) {
+        if (!decoded || decoded.purpose !== 'mfa_setup' || !decoded.userId) {
           return res.status(401).json({ success: false, message: 'Token de configuração MFA inválido ou expirado.' });
+        }
+        const atual = await sql`SELECT perfil, mfa_enabled FROM usuarios WHERE id = ${decoded.userId} LIMIT 1;`;
+        if (!atual[0] || atual[0].perfil !== 'superadmin') {
+          return res.status(403).json({ success: false, message: 'Apenas superadmin pode configurar o MFA.' });
+        }
+        if (atual[0].mfa_enabled) {
+          return res.status(409).json({ success: false, message: 'O autenticador já está configurado. Entre com o código atual para trocá-lo.' });
         }
         targetUserId = decoded.userId;
         targetUsername = decoded.username || 'admin';
@@ -843,6 +856,26 @@ export default async function handler(req, res) {
         const auth = await resolveAuthAndTenant(req);
         if (!auth.authenticated || auth.user?.perfil !== 'superadmin') {
           return res.status(403).json({ success: false, message: 'Apenas superadmin pode configurar o MFA.' });
+        }
+        if (!auth.user?.mfa_verified) {
+          return res.status(403).json({ success: false, message: 'Confirme o código do autenticador antes de trocá-lo.' });
+        }
+        const rows = await sql`SELECT mfa_secret, mfa_enabled, mfa_backup_codes, mfa_last_used_step FROM usuarios WHERE id = ${auth.user.userId} LIMIT 1;`;
+        const u = rows[0];
+        if (u?.mfa_enabled) {
+          const codigoAtual = String(req.body?.totp_code || req.body?.mfa_code || '').trim();
+          const codigoBackup = String(req.body?.backup_code || '').trim();
+          let ok = false;
+          if (codigoBackup) {
+            ok = verifyBackupCode(codigoBackup, u.mfa_backup_codes || []).valid;
+          } else if (codigoAtual) {
+            try {
+              const dec = await decryptMfaSecret(u.mfa_secret);
+              ok = !!dec.secret && verifyTotpCode(dec.secret, codigoAtual, { lastUsedStep: u.mfa_last_used_step || 0 }).valid;
+            } catch { ok = false; }
+          }
+          if (!ok) return res.status(401).json({ success: false, message: 'Informe o código atual do autenticador (ou um código de backup) para trocá-lo.' });
+          reconfigure = true;
         }
         targetUserId = auth.user.userId;
         targetUsername = auth.user.username;
@@ -858,6 +891,7 @@ export default async function handler(req, res) {
         username: targetUsername,
         temp_secret: generatedSecret,
         backup_hashes: backup.hashedCodes,
+        reconfigure,
         purpose: 'mfa_confirm_activation',
         exp: Date.now() + 15 * 60 * 1000
       }, secret);
@@ -897,14 +931,30 @@ export default async function handler(req, res) {
 
       // Persiste MFA ativado com segredo criptografado em repouso (AES-256-GCM)
       const encryptedSecret = await encryptMfaSecret(decoded.temp_secret);
-      await sql`
-        UPDATE usuarios
-        SET mfa_secret = ${encryptedSecret},
-            mfa_enabled = TRUE,
-            mfa_backup_codes = ${JSON.stringify(decoded.backup_hashes || [])}::jsonb,
-            mfa_last_used_step = ${verifyRes.step}
-        WHERE id = ${decoded.userId};
-      `;
+      // AUDITORIA 2026-10-04 #1: nunca sobrescreve um MFA ativo, a não ser numa troca autorizada
+      // (sessão verificada + código atual, marcada no token de confirmação).
+      const ativado = decoded.reconfigure === true
+        ? await sql`
+            UPDATE usuarios
+            SET mfa_secret = ${encryptedSecret},
+                mfa_enabled = TRUE,
+                mfa_backup_codes = ${JSON.stringify(decoded.backup_hashes || [])}::jsonb,
+                mfa_last_used_step = ${verifyRes.step}
+            WHERE id = ${decoded.userId} AND perfil = 'superadmin'
+            RETURNING id;
+          `
+        : await sql`
+            UPDATE usuarios
+            SET mfa_secret = ${encryptedSecret},
+                mfa_enabled = TRUE,
+                mfa_backup_codes = ${JSON.stringify(decoded.backup_hashes || [])}::jsonb,
+                mfa_last_used_step = ${verifyRes.step}
+            WHERE id = ${decoded.userId} AND perfil = 'superadmin' AND COALESCE(mfa_enabled, FALSE) = FALSE
+            RETURNING id;
+          `;
+      if (!ativado.length) {
+        return res.status(409).json({ success: false, message: 'O autenticador já está configurado. Entre com o código atual para trocá-lo.' });
+      }
 
       const rows = await sql`
         SELECT u.id, u.username, u.email, u.nome, u.perfil, u.avatar, u.tenant_id, u.permissoes,
@@ -1542,7 +1592,13 @@ export default async function handler(req, res) {
       `;
 
       // O envio é best-effort. A resposta pública nunca revela qual canal existe ou se o envio funcionou.
-      const destPhone = (user.tenant_telefone || '').replace(/\D/g, '');
+      // AUDITORIA 2026-10-04 #2: o código ia para o WhatsApp da EMPRESA — quem tem acesso a ele (ou um
+      // admin que troca o telefone da empresa) redefinia a senha de qualquer usuário, inclusive do Master.
+      // Agora vai para o e-mail da própria pessoa; o WhatsApp da empresa só serve a quem não tem e-mail
+      // válido, e nunca à conta Master.
+      const emailValido = /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(String(user.email || '').trim());
+      const contaMaster = masterResetRows.length > 0;
+      const destPhone = (!contaMaster && !emailValido) ? (user.tenant_telefone || '').replace(/\D/g, '') : '';
       if (destPhone) {
         const numFmt = (destPhone.length === 10 || destPhone.length === 11) ? `55${destPhone}` : destPhone;
         const mensagemOtp = `*FinGo — Código de Verificação*\n\nOlá, ${user.nome}!\n\nSeu código seguro para redefinir sua senha no FinGo é:\n\n👉 *${otpCode}*\n\nEste código é válido por *10 minutos*. Se você não solicitou esta redefinição, ignore esta mensagem.`;
@@ -1569,7 +1625,7 @@ export default async function handler(req, res) {
       }
 
       const resendKey = (process.env.RESEND_API_KEY || '').trim();
-      if ((resendKey || isTriggerConfigured()) && user.email) {
+      if ((resendKey || isTriggerConfigured()) && emailValido) {
         try {
           const fromEmail = (process.env.RESEND_FROM_EMAIL || 'FinGo Segurança <no-reply@fingo.api.br>').trim();
           const emailSubject = 'FinGo — Código de Recuperação de Senha';
@@ -1679,6 +1735,39 @@ export default async function handler(req, res) {
       if (!codeMatches) {
         const restantes = Math.max(0, Number(rec.max_tentativas || 5) - Number(rec.tentativas || 0));
         return res.status(401).json({ success: false, message: `Código incorreto. Você tem mais ${restantes} tentativa(s).` });
+      }
+
+      // AUDITORIA 2026-10-04 #2: na conta Master, o código recebido não basta — exige também o
+      // autenticador (TOTP) ou um código de backup.
+      const alvoRows = await sql`
+        SELECT id, perfil, mfa_enabled, mfa_secret, mfa_backup_codes, mfa_last_used_step
+        FROM usuarios WHERE id = ${rec.usuario_id} LIMIT 1;
+      `;
+      const alvo = alvoRows[0];
+      if (alvo?.perfil === 'superadmin' && alvo.mfa_enabled) {
+        const totpReset = String(req.body?.totp_code || '').trim();
+        const backupReset = String(req.body?.backup_code || '').trim();
+        if (!totpReset && !backupReset) {
+          return res.status(401).json({ success: false, code: 'MFA_REQUIRED', message: 'Conta Master: informe também o código do Google Authenticator (ou um código de backup).' });
+        }
+        if (await mfaAccountLimited(alvo.id)) {
+          return res.status(429).json({ success: false, message: 'Muitas tentativas. Aguarde alguns minutos.' });
+        }
+        let fatorOk = false;
+        let fator = { usedBackup: false, newBackupCodes: null, newStep: 0 };
+        if (backupReset) {
+          const b = verifyBackupCode(backupReset, alvo.mfa_backup_codes || []);
+          if (b.valid) { fatorOk = true; fator = { usedBackup: true, newBackupCodes: b.remainingHashedCodes, newStep: 0 }; }
+        } else {
+          try {
+            const dec = await decryptMfaSecret(alvo.mfa_secret);
+            const t = dec.secret ? verifyTotpCode(dec.secret, totpReset, { lastUsedStep: alvo.mfa_last_used_step || 0 }) : { valid: false };
+            if (t.valid) { fatorOk = true; fator = { usedBackup: false, newBackupCodes: null, newStep: t.step }; }
+          } catch { fatorOk = false; }
+        }
+        if (!fatorOk || !(await consumeMfaFactor(sql, alvo, fator))) {
+          return res.status(401).json({ success: false, code: 'MFA_INVALID', message: 'Autenticador: valor incorreto ou já usado. Tente o próximo que aparecer no app.' });
+        }
       }
 
       const newHash = await hashPassword(normalizedNewPassword);
