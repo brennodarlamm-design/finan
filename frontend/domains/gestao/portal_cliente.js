@@ -81,7 +81,9 @@ const PortalCliente = {
         return '';
       }
       const origin = (typeof window !== 'undefined' && window.location.origin) ? window.location.origin : 'https://fingo.api.br';
-      return `${origin}/portal?portal_obra=${encodeURIComponent(data.obra || obraId)}&tenant=${encodeURIComponent(data.tenant || '')}&exp=${encodeURIComponent(data.exp)}&sig=${encodeURIComponent(data.sig)}`;
+      // AUDITORIA 2026-10-04 #13: o escopo (módulos que quem gerou pode ver) vai assinado no link.
+      const escopo = typeof data.scope === 'string' ? `&scope=${encodeURIComponent(data.scope)}` : '';
+      return `${origin}/portal?portal_obra=${encodeURIComponent(data.obra || obraId)}&tenant=${encodeURIComponent(data.tenant || '')}&exp=${encodeURIComponent(data.exp)}&sig=${encodeURIComponent(data.sig)}${escopo}`;
     } catch {
       Utils.toast('Sem conexão para gerar o link seguro do portal.', 'error');
       return '';
@@ -251,7 +253,9 @@ const PortalCliente = {
     // 1. Link v2 (empresa + obra + assinatura): o servidor confere e devolve os dados atuais.
     if (!pdata && params.get('sig') && tenantParam && obraId) {
       rootEl.innerHTML = `<div style="min-height:100vh;display:flex;align-items:center;justify-content:center;background:#080F05;color:#A8C090;font-size:.9rem;">Carregando a sua obra...</div>`;
-      this._carregarBundleServidor({ tenant: tenantParam, obra: obraId, exp: params.get('exp'), sig: params.get('sig') })
+      const ref = { tenant: tenantParam, obra: obraId, exp: params.get('exp'), sig: params.get('sig') };
+      if (params.has('scope')) ref.scope = params.get('scope');
+      this._carregarBundleServidor(ref)
         .then(bundle => this._finalizarTelaPublica(rootEl, bundle));
       return;
     }

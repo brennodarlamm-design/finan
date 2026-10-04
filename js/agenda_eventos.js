@@ -162,7 +162,7 @@ const AgendaEventos = {
           <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;">
             <div>
               <label style="font-size:.75rem;font-weight:700;color:var(--text2);display:block;margin-bottom:4px;">Data *</label>
-              <input type="date" id="agenda-data" class="input" required value="${hoje}" style="width:100%;font-size:.82rem;">
+              <input type="date" id="agenda-data" class="input" required value="${Utils.esc(hoje)}" style="width:100%;font-size:.82rem;">
             </div>
             <div>
               <label style="font-size:.75rem;font-weight:700;color:var(--text2);display:block;margin-bottom:4px;">Horário *</label>

@@ -295,28 +295,28 @@ const Lancamentos = {
                   <span>Receita</span>
                 </button>
               </div>
-              <input type="hidden" name="tipo" id="lan-tipo-input" value="${initialTipo}">
+              <input type="hidden" name="tipo" id="lan-tipo-input" value="${Utils.esc(initialTipo)}">
             </div>
             
             <div class="form-row cols-2" style="margin-bottom:14px;">
               <div class="form-group"><label class="form-label" for="lan-obra-id">Obra / Centro de Custo *</label><select class="form-control" id="lan-obra-id" name="obra_id" required>${Utils.clienteOptions(l.obra_id||(App.obraId!=='todas'?App.obraId:''), 'Selecione centro...', true)}</select></div>
-              <div class="form-group"><label class="form-label" for="lan-valor">Valor (R$) *</label><div class="input-prefix"><span class="input-pfx-txt">R$</span><input id="lan-valor" name="valor" type="number" value="${l.valor||''}" step="0.01" min="0" required placeholder="0,00"></div></div>
+              <div class="form-group"><label class="form-label" for="lan-valor">Valor (R$) *</label><div class="input-prefix"><span class="input-pfx-txt">R$</span><input id="lan-valor" name="valor" type="number" value="${Utils.esc(l.valor||'')}" step="0.01" min="0" required placeholder="0,00"></div></div>
             </div>
 
             <div class="form-row cols-2" style="margin-bottom:14px;">
               <div class="form-group">
                 <label class="form-label" for="lan-data">Data de Compet&ecirc;ncia / Emiss&atilde;o *</label>
-                <input class="form-control" id="lan-data" type="date" name="data" value="${l.data||hoje}" required>
+                <input class="form-control" id="lan-data" type="date" name="data" value="${Utils.esc(l.data||hoje)}" required>
               </div>
               <div class="form-group">
                 <label class="form-label" for="lan-data-venc">Data de Vencimento / Previs&atilde;o *</label>
-                <input class="form-control" id="lan-data-venc" type="date" name="data_vencimento" value="${l.data_vencimento||l.data||hoje}" required>
+                <input class="form-control" id="lan-data-venc" type="date" name="data_vencimento" value="${Utils.esc(l.data_vencimento||l.data||hoje)}" required>
               </div>
             </div>
 
             <div class="form-group" style="margin-bottom:14px;">
               <label class="form-label" for="lan-descricao">Descri&ccedil;&atilde;o *</label>
-              <input class="form-control" id="lan-descricao" name="descricao" value="${l.descricao||''}" required placeholder="Ex: Compra de cimento para fundação">
+              <input class="form-control" id="lan-descricao" name="descricao" value="${Utils.esc(l.descricao||'')}" required placeholder="Ex: Compra de cimento para fundação">
             </div>
 
             <div class="form-group" style="margin-bottom:14px;">
@@ -329,13 +329,13 @@ const Lancamentos = {
                   &#x2795; Novo
                 </button>
               </div>
-              <input class="form-control" name="fornecedor_beneficiario" id="lan-forn-manual" value="${l.fornecedor_beneficiario||''}" placeholder="Ou digite o nome do fornecedor / beneficiário" style="margin-top:6px;display:${l.fornecedor_beneficiario && !Fornecedores?.getByNome(l.fornecedor_beneficiario) ? 'block' : 'none'};">
+              <input class="form-control" name="fornecedor_beneficiario" id="lan-forn-manual" value="${Utils.esc(l.fornecedor_beneficiario||'')}" placeholder="Ou digite o nome do fornecedor / beneficiário" style="margin-top:6px;display:${l.fornecedor_beneficiario && !Fornecedores?.getByNome(l.fornecedor_beneficiario) ? 'block' : 'none'};">
               <div id="lan-forn-info" style="margin-top:5px;font-size:.74rem;color:var(--accent2);display:none;"></div>
             </div>
 
             <div class="form-row cols-2" style="margin-bottom:14px;">
               <div class="form-group"><label class="form-label" for="lan-categoria">Categoria *</label><select class="form-control" id="lan-categoria" name="categoria" required>${initialTipo==='receita' ? Utils.renderSelectOptionsReceita(l.categoria) : Utils.renderSelectOptionsDespesa(l.categoria)}</select></div>
-              <div class="form-group"><label class="form-label" for="lan-status-sel">Status *</label><select class="form-control" name="status" id="lan-status-sel" data-fb-change="Lancamentos._onStatusChange" data-fb-change-n="1" data-fb-change-t0="value" required>${statOpts.map(([v,t])=>`<option value="${v}" ${(l.status||statOpts[0][0])===v?'selected':''}>${t}</option>`).join('')}</select></div>
+              <div class="form-group"><label class="form-label" for="lan-status-sel">Status *</label><select class="form-control" name="status" id="lan-status-sel" data-fb-change="Lancamentos._onStatusChange" data-fb-change-n="1" data-fb-change-t0="value" required>${statOpts.map(([v,t])=>`<option value="${Utils.esc(v)}" ${(l.status||statOpts[0][0])===v?'selected':''}>${t}</option>`).join('')}</select></div>
             </div>
 
             <!-- CAMPO: DATA DE PAGAMENTO / RECEBIMENTO -->
@@ -343,7 +343,7 @@ const Lancamentos = {
               <label class="form-label" id="lan-data-pagamento-label" for="lan-data-pagamento" style="color:var(--success);font-weight:700;margin-bottom:4px;">
                 ${initialTipo === 'receita' ? '✓ Data Efetiva do Recebimento' : '✓ Data Efetiva do Pagamento'}
               </label>
-              <input class="form-control" type="date" name="data_pagamento" id="lan-data-pagamento" value="${l.data_pagamento || (isPagoOuRec ? l.data : hoje)}" style="border-color:var(--success);background:var(--bg-card);">
+              <input class="form-control" type="date" name="data_pagamento" id="lan-data-pagamento" value="${Utils.esc(l.data_pagamento || (isPagoOuRec ? l.data : hoje))}" style="border-color:var(--success);background:var(--bg-card);">
               <span style="font-size:.72rem;color:var(--text3);margin-top:3px;display:block;">Data exata em que o valor foi pago ou recebido na conta</span>
             </div>
 
@@ -390,10 +390,10 @@ const Lancamentos = {
                   <div id="itens-lista">
                     ${(l.itens||[]).map(it => `
                       <div class="item-row" style="display:grid;grid-template-columns:2fr .7fr .8fr 1fr auto;gap:6px;margin-bottom:8px;align-items:center;">
-                        <input class="form-control item-produto" placeholder="Produto (ex: Cimento CP-II)" value="${it.produto}" data-fb-input="Lancamentos._recalcItem" data-fb-input-n="1" data-fb-input-t0="self" style="font-size:.82rem;">
-                        <input class="form-control item-qtd" type="number" placeholder="Qtd" step="0.01" min="0" value="${it.qtd}" data-fb-input="Lancamentos._recalcItem" data-fb-input-n="1" data-fb-input-t0="self" style="font-size:.82rem;text-align:right;">
-                        <input class="form-control item-unidade" placeholder="Un (sc, m², kg)" value="${it.unidade}" style="font-size:.82rem;">
-                        <input class="form-control item-vunit" type="number" placeholder="Valor unit. R$" step="0.01" min="0" value="${it.valor_unit}" data-fb-input="Lancamentos._recalcItem" data-fb-input-n="1" data-fb-input-t0="self" style="font-size:.82rem;text-align:right;">
+                        <input class="form-control item-produto" placeholder="Produto (ex: Cimento CP-II)" value="${Utils.esc(it.produto)}" data-fb-input="Lancamentos._recalcItem" data-fb-input-n="1" data-fb-input-t0="self" style="font-size:.82rem;">
+                        <input class="form-control item-qtd" type="number" placeholder="Qtd" step="0.01" min="0" value="${Utils.esc(it.qtd)}" data-fb-input="Lancamentos._recalcItem" data-fb-input-n="1" data-fb-input-t0="self" style="font-size:.82rem;text-align:right;">
+                        <input class="form-control item-unidade" placeholder="Un (sc, m², kg)" value="${Utils.esc(it.unidade)}" style="font-size:.82rem;">
+                        <input class="form-control item-vunit" type="number" placeholder="Valor unit. R$" step="0.01" min="0" value="${Utils.esc(it.valor_unit)}" data-fb-input="Lancamentos._recalcItem" data-fb-input-n="1" data-fb-input-t0="self" style="font-size:.82rem;text-align:right;">
                         <button type="button" class="icon-btn" data-fb-click="Patch26Actions.lancamentoRemoveItem" data-fb-click-n="1" data-fb-click-t0="self" title="Remover" style="color:var(--danger);font-size:15px;">🗑️</button>
                       </div>
                     `).join('')}
@@ -508,7 +508,7 @@ const Lancamentos = {
         nextStatus = (prevStatus === 'recebido') ? 'pago' : 'a_pagar';
       }
       const statOpts = novoTipo === 'receita' ? this._statRec : this._statDesp;
-      statusSel.innerHTML = statOpts.map(([v, t]) => `<option value="${v}">${t}</option>`).join('');
+      statusSel.innerHTML = statOpts.map(([v, t]) => `<option value="${Utils.esc(v)}">${t}</option>`).join('');
       statusSel.value = nextStatus;
       this._onStatusChange(nextStatus);
     }
@@ -773,7 +773,7 @@ const Lancamentos = {
           </div>
           <div class="form-group">
             <label class="form-label">Data Efetiva da Baixa</label>
-            <input type="date" id="baixa-data" class="form-control" value="${Utils.today()}" required>
+            <input type="date" id="baixa-data" class="form-control" value="${Utils.esc(Utils.today())}" required>
           </div>
         </div>
         <div class="modal-footer">

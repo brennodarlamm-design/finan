@@ -217,7 +217,7 @@ const Contas = {
               <label class="form-label">Banco *</label>
               <select class="form-control" name="banco_codigo" required data-fb-change="Contas._onBancoChange" data-fb-change-n="1" data-fb-change-t0="self">
                 <option value="">Selecione o banco...</option>
-                ${this.BANCOS.map(b => `<option value="${b.code}" ${conta?.banco_codigo===b.code?'selected':''}>${b.code} &mdash; ${b.name}</option>`).join('')}
+                ${this.BANCOS.map(b => `<option value="${Utils.esc(b.code)}" ${conta?.banco_codigo===b.code?'selected':''}>${b.code} &mdash; ${b.name}</option>`).join('')}
               </select>
             </div>
             <div class="form-group">
@@ -380,7 +380,7 @@ const Contas = {
         const sVal = String(selectedVal || '');
         const isSel = !encontrou && (selectedVal === val || selectedVal === c.apelido || (c.numero && sVal.includes(c.numero)));
         if (isSel) encontrou = true;
-        return `<option value="${val}" ${isSel ? 'selected' : ''}>${label}</option>`;
+        return `<option value="${Utils.esc(val)}" ${isSel ? 'selected' : ''}>${label}</option>`;
       }).join('');
     // Conta digitada à mão (fora da lista) volta selecionada como "manual", sem se perder ao salvar.
     const manual = !!String(selectedVal || '').trim() && !encontrou;

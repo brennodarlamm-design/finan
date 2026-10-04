@@ -366,7 +366,7 @@ const Escritorio = {
 
             <div class="form-group">
               <label class="form-label">Descrição do Custo *</label>
-              <input class="form-control" name="descricao" id="adm-form-desc" value="${l?.descricao || ''}" placeholder="Ex: Conta de Luz — Sede Central" required>
+              <input class="form-control" name="descricao" id="adm-form-desc" value="${Utils.esc(l?.descricao || '')}" placeholder="Ex: Conta de Luz — Sede Central" required>
             </div>
           </div>
 
@@ -381,27 +381,27 @@ const Escritorio = {
                   ➕ Novo
                 </button>
               </div>
-              <input class="form-control" name="fornecedor_beneficiario" id="adm-form-forn" value="${l?.fornecedor_beneficiario || ''}" placeholder="Ou digite o nome do fornecedor / órgão" style="margin-top:6px;display:${l?.fornecedor_beneficiario && (!Fornecedores?.getByNome(l.fornecedor_beneficiario)) ? 'block' : 'none'};">
+              <input class="form-control" name="fornecedor_beneficiario" id="adm-form-forn" value="${Utils.esc(l?.fornecedor_beneficiario || '')}" placeholder="Ou digite o nome do fornecedor / órgão" style="margin-top:6px;display:${l?.fornecedor_beneficiario && (!Fornecedores?.getByNome(l.fornecedor_beneficiario)) ? 'block' : 'none'};">
               <div id="adm-forn-info" style="margin-top:5px;font-size:.74rem;color:var(--accent2);display:none;"></div>
             </div>
             <div class="form-group">
               <label class="form-label">Mês Competência</label>
-              <input class="form-control" type="month" name="competencia" value="${l?.competencia || mesAtual}">
+              <input class="form-control" type="month" name="competencia" value="${Utils.esc(l?.competencia || mesAtual)}">
             </div>
             <div class="form-group">
               <label class="form-label">Valor (R$) *</label>
-              <input class="form-control" type="number" step="0.01" min="0" name="valor" value="${l?.valor || ''}" placeholder="0,00" required style="font-weight:800;font-size:1.05rem;color:var(--danger);">
+              <input class="form-control" type="number" step="0.01" min="0" name="valor" value="${Utils.esc(l?.valor || '')}" placeholder="0,00" required style="font-weight:800;font-size:1.05rem;color:var(--danger);">
             </div>
           </div>
 
           <div class="g3" style="margin-bottom:14px;">
             <div class="form-group">
               <label class="form-label">Data de Emissão</label>
-              <input class="form-control" type="date" name="data" value="${l?.data || Utils.today()}" required>
+              <input class="form-control" type="date" name="data" value="${Utils.esc(l?.data || Utils.today())}" required>
             </div>
             <div class="form-group">
               <label class="form-label">Data de Vencimento *</label>
-              <input class="form-control" type="date" name="data_vencimento" value="${l?.data_vencimento || l?.data || Utils.today()}" required>
+              <input class="form-control" type="date" name="data_vencimento" value="${Utils.esc(l?.data_vencimento || l?.data || Utils.today())}" required>
             </div>
             <div class="form-group">
               <label class="form-label">Status *</label>
@@ -602,7 +602,7 @@ const Escritorio = {
           </div>
           <div class="form-group">
             <label class="form-label">Data do Pagamento</label>
-            <input type="date" id="pago-data" class="form-control" value="${Utils.today()}">
+            <input type="date" id="pago-data" class="form-control" value="${Utils.esc(Utils.today())}">
           </div>
         </div>
         <div class="modal-footer">
@@ -698,7 +698,7 @@ const Escritorio = {
           <div style="background:var(--bg-secondary);border:1px solid var(--border);border-radius:10px;padding:12px 16px;margin-bottom:16px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;">
             <div style="display:flex;align-items:center;gap:10px;">
               <label class="form-label" style="margin:0;font-weight:700;">Mês de Competência:</label>
-              <input type="month" id="lote-competencia" class="form-control" value="${mesAtual}" style="width:160px;font-weight:700;color:var(--accent2);">
+              <input type="month" id="lote-competencia" class="form-control" value="${Utils.esc(mesAtual)}" style="width:160px;font-weight:700;color:var(--accent2);">
             </div>
             <div style="font-size:.75rem;color:var(--text3);">
               Dica: Desmarque as contas que não deseja gerar agora.
@@ -724,20 +724,20 @@ const Escritorio = {
                       <input type="checkbox" class="lote-chk" checked data-idx="${idx}">
                     </td>
                     <td>
-                      <input type="text" class="form-control lote-desc" value="${it.desc}" style="font-size:.8rem;padding:4px 6px;">
+                      <input type="text" class="form-control lote-desc" value="${Utils.esc(it.desc)}" style="font-size:.8rem;padding:4px 6px;">
                     </td>
                     <td style="font-size:.75rem;color:var(--text2);white-space:nowrap;">
                       ${Utils.catLabel(it.cat)}
-                      <input type="hidden" class="lote-cat" value="${it.cat}">
+                      <input type="hidden" class="lote-cat" value="${Utils.esc(it.cat)}">
                     </td>
                     <td>
-                      <input type="text" class="form-control lote-forn" value="${it.forn}" style="font-size:.8rem;padding:4px 6px;">
+                      <input type="text" class="form-control lote-forn" value="${Utils.esc(it.forn)}" style="font-size:.8rem;padding:4px 6px;">
                     </td>
                     <td>
-                      <input type="number" min="1" max="31" class="form-control lote-dia" value="${it.diaVenc}" style="font-size:.8rem;padding:4px 4px;text-align:center;">
+                      <input type="number" min="1" max="31" class="form-control lote-dia" value="${Utils.esc(it.diaVenc)}" style="font-size:.8rem;padding:4px 4px;text-align:center;">
                     </td>
                     <td>
-                      <input type="number" step="0.01" min="0" class="form-control lote-valor" value="${it.valor}" style="font-size:.8rem;padding:4px 6px;text-align:right;font-weight:800;color:var(--danger);" data-fb-input="Escritorio._recalcLoteTotal" data-fb-input-n="0">
+                      <input type="number" step="0.01" min="0" class="form-control lote-valor" value="${Utils.esc(it.valor)}" style="font-size:.8rem;padding:4px 6px;text-align:right;font-weight:800;color:var(--danger);" data-fb-input="Escritorio._recalcLoteTotal" data-fb-input-n="0">
                     </td>
                   </tr>
                 `).join('')}

@@ -385,7 +385,7 @@ const WhatsApp = {
             <label class="form-label" style="font-weight:700;color:var(--accent);">Telefone / WhatsApp com DDD *</label>
             <input type="text" id="cli-wa-phone" class="form-control"
               placeholder="Ex: 95 99123-4567 ou 11 98765-4321"
-              value="${telAtual}"
+              value="${Utils.esc(telAtual)}"
               style="font-size:1.05rem;font-weight:700;letter-spacing:.02em;"
               autofocus>
             <span style="font-size:.74rem;color:var(--text3);margin-top:4px;display:block;">
@@ -633,7 +633,7 @@ const WhatsApp = {
             <div style="display:flex;gap:8px;">
               <input type="text" id="wa-teste-phone" class="form-control"
                 placeholder="DDD + Telefone (ex: 95 99136-3678)"
-                value="${connectedNum || telPadrao || ''}"
+                value="${Utils.esc(connectedNum || telPadrao || '')}"
                 style="font-size:0.86rem;">
               <button class="btn btn-sm" id="wa-btn-teste" data-fb-click="WhatsApp.executarTesteConexao" data-fb-click-n="0" style="background:#25D366;color:#fff;font-weight:700;white-space:nowrap;display:flex;align-items:center;gap:6px;">
                 <span>🚀 Testar</span>

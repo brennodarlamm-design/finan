@@ -56,20 +56,24 @@ export function verifyPortalLink({ pdata, exp, sig }, key = portalLinkKey(), now
 // várias bordas) e congelava os dados no momento em que era gerado. O v2 leva só
 // empresa + obra + validade + assinatura; o portal busca os dados atuais no servidor.
 
-export function signPortalRef(tenantId, obraId, exp, key = portalLinkKey()) {
+export function signPortalRef(tenantId, obraId, exp, key = portalLinkKey(), escopo = null) {
   if (!key) throw new Error('Chave de assinatura do portal não configurada.');
-  return crypto.createHmac('sha256', key).update(`v2.${tenantId}.${obraId}.${exp}`).digest('base64url');
+  const base = `v2.${tenantId}.${obraId}.${exp}`;
+  return crypto.createHmac('sha256', key).update(escopo === null ? base : `${base}.s:${escopo}`).digest('base64url');
 }
 
-export function verifyPortalRef({ tenant, obra, exp, sig }, key = portalLinkKey(), now = Date.now()) {
+export function verifyPortalRef({ tenant, obra, exp, sig, scope }, key = portalLinkKey(), now = Date.now()) {
   if (!key || !tenant || !obra || !sig) return { valid: false, reason: 'missing' };
   if (String(tenant).length > 80 || String(obra).length > 180) return { valid: false, reason: 'invalid' };
+  const escopo = scope === undefined || scope === null ? null : String(scope);
+  if (escopo !== null && !ESCOPO_VALIDO.test(escopo)) return { valid: false, reason: 'invalid' };
   const expNum = Number(exp);
   if (!Number.isFinite(expNum) || expNum <= now) return { valid: false, reason: 'expired' };
-  const expected = Buffer.from(signPortalRef(String(tenant), String(obra), expNum, key));
+  const expected = Buffer.from(signPortalRef(String(tenant), String(obra), expNum, key, escopo));
   const given = Buffer.from(String(sig));
   if (expected.length !== given.length || !crypto.timingSafeEqual(expected, given)) return { valid: false, reason: 'bad_signature' };
-  return { valid: true };
+  // Link antigo, sem escopo assinado: mantém o comportamento de antes até expirar.
+  return { valid: true, escopo: escopo === null ? 'fmcd' : escopo };
 }
 
 const parseJson = (v) => {
@@ -79,14 +83,16 @@ const parseJson = (v) => {
 const isoDate = (v) => (v ? String(v instanceof Date ? v.toISOString() : v).slice(0, 10) : '');
 
 /** Monta, a partir do banco, o mesmo pacote que o portal já sabe exibir. */
-export async function buildPortalBundle(sql, tenantId, obraId) {
+export async function buildPortalBundle(sql, tenantId, obraId, escopo = 'fmcd') {
+  const ve = (letra) => String(escopo || '').includes(letra);
+  const nada = Promise.resolve([]);
   const [obras, tenants, medicoes, despesas, documentos, contratos] = await Promise.all([
     sql`SELECT id, nome, cliente, endereco, status, data_inicio, data_previsao, cronograma_config FROM obras WHERE tenant_id = ${tenantId} AND id = ${obraId} LIMIT 1;`,
     sql`SELECT nome_fantasia, razao_social, logo_url, telefone, responsavel FROM tenants WHERE id = ${tenantId} LIMIT 1;`,
-    sql`SELECT id, numero, etapa_descricao, percentual_fisico, valor_liberado, valor_solicitado, data FROM medicoes WHERE tenant_id = ${tenantId} AND obra_id = ${obraId} ORDER BY data ASC NULLS LAST, numero ASC;`,
-    sql`SELECT id, descricao, categoria, valor, data FROM lancamentos WHERE tenant_id = ${tenantId} AND obra_id = ${obraId} AND tipo = 'despesa' ORDER BY data DESC NULLS LAST LIMIT 50;`,
-    sql`SELECT id, titulo, nome_arquivo, tipo_arquivo, url, created_at FROM documentos WHERE tenant_id = ${tenantId} AND referencia_id = ${obraId} AND tipo IN ('obra', 'orcamento') ORDER BY created_at DESC LIMIT 30;`,
-    sql`SELECT id, status, payload FROM contratos WHERE tenant_id = ${tenantId} AND obra_id = ${obraId};`
+    ve('m') ? sql`SELECT id, numero, etapa_descricao, percentual_fisico, valor_liberado, valor_solicitado, data FROM medicoes WHERE tenant_id = ${tenantId} AND obra_id = ${obraId} ORDER BY data ASC NULLS LAST, numero ASC;` : nada,
+    ve('f') ? sql`SELECT id, descricao, categoria, valor, data FROM lancamentos WHERE tenant_id = ${tenantId} AND obra_id = ${obraId} AND tipo = 'despesa' ORDER BY data DESC NULLS LAST LIMIT 50;` : nada,
+    ve('d') ? sql`SELECT id, titulo, nome_arquivo, tipo_arquivo, url, created_at FROM documentos WHERE tenant_id = ${tenantId} AND referencia_id = ${obraId} AND tipo IN ('obra', 'orcamento') ORDER BY created_at DESC LIMIT 30;` : nada,
+    ve('c') ? sql`SELECT id, status, payload FROM contratos WHERE tenant_id = ${tenantId} AND obra_id = ${obraId};` : nada
   ]);
   const o = obras[0];
   if (!o) return null;
@@ -124,11 +130,11 @@ export async function handlePortalData(req, res, deps = {}) {
   if (String(req.method || '').toUpperCase() !== 'POST') return json(res, 405, { success: false, error: 'Método não permitido.' });
   const rl = await checkRateLimit(`portal-data:${getClientIp(req)}`, 60, 60 * 1000);
   if (!rl.allowed) return json(res, 429, { success: false, error: 'Muitas consultas. Aguarde um minuto.' });
-  const ref = { tenant: req.body?.tenant, obra: req.body?.obra, exp: req.body?.exp, sig: req.body?.sig };
+  const ref = { tenant: req.body?.tenant, obra: req.body?.obra, exp: req.body?.exp, sig: req.body?.sig, scope: req.body?.scope };
   const check = verifyPortalRef(ref, deps.key);
   if (!check.valid) return json(res, 401, { success: false, valid: false, reason: check.reason });
   try {
-    const bundle = await buildPortalBundle(deps.sql || createOwnerSql(), String(ref.tenant), String(ref.obra));
+    const bundle = await buildPortalBundle(deps.sql || createOwnerSql(), String(ref.tenant), String(ref.obra), check.escopo);
     if (!bundle) return json(res, 404, { success: false, valid: false, reason: 'not_found' });
     return json(res, 200, { success: true, valid: true, bundle });
   } catch (err) {
@@ -141,6 +147,19 @@ function json(res, status, body) {
   res.setHeader('Content-Type', 'application/json; charset=utf-8');
   res.setHeader('Cache-Control', 'no-store');
   return res.status(status).json(body);
+}
+
+/**
+ * AUDITORIA 2026-10-04 #13: o portal mostrava despesas, medições, contratos e documentos para
+ * qualquer link gerado por quem lia "obras" — contornando as permissões por módulo. O link v2
+ * agora leva, assinado, o escopo de quem o gerou (uma letra por módulo que essa pessoa pode ler),
+ * e o portal só entrega esses módulos. Links v2 antigos (sem escopo) continuam valendo até expirar.
+ */
+export const PORTAL_ESCOPO = Object.freeze({ f: 'financeiro', m: 'medicoes', c: 'contratos', d: 'documentos' });
+const ESCOPO_VALIDO = /^[fmcd]{0,4}$/;
+
+export function escopoDoUsuario(auth) {
+  return Object.entries(PORTAL_ESCOPO).filter(([, modulo]) => canAccessModule(auth, modulo, 'read')).map(([letra]) => letra).join('');
 }
 
 /** POST /api/v2/portal/link — gera link assinado (usuário autenticado da empresa). */
@@ -162,8 +181,9 @@ export async function handlePortalLinkSign(req, res, deps = {}) {
       const found = await sql`SELECT 1 FROM obras WHERE tenant_id = ${auth.tenantId} AND id = ${obraIdV2} LIMIT 1;`;
       if (!found.length) return json(res, 404, { success: false, error: 'Obra não encontrada na nuvem. Sincronize e tente de novo.' });
       const exp = Date.now() + PORTAL_LINK_TTL_DAYS * 24 * 60 * 60 * 1000;
-      const sig = signPortalRef(auth.tenantId, obraIdV2, exp);
-      return json(res, 200, { success: true, v: 2, tenant: auth.tenantId, obra: obraIdV2, exp, sig });
+      const scope = escopoDoUsuario(auth);
+      const sig = signPortalRef(auth.tenantId, obraIdV2, exp, undefined, scope);
+      return json(res, 200, { success: true, v: 2, tenant: auth.tenantId, obra: obraIdV2, exp, sig, scope });
     } catch (err) {
       console.error('[Portal Link v2]', err?.message || err);
       return json(res, 503, { success: false, error: 'Não foi possível gerar o link agora.' });

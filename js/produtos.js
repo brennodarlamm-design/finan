@@ -73,7 +73,7 @@ const Produtos = {
         <label class="filter-label">Categoria</label>
         <select class="form-control" id="prod-cat" style="min-width:160px" data-fb-change="Produtos._refresh" data-fb-change-n="1" data-fb-change-t0="bool" data-fb-change-v0="true">
           <option value="">Todas</option>
-          ${this.CATEGORIAS.map(c => `<option value="${c.value}">${c.label}</option>`).join('')}
+          ${this.CATEGORIAS.map(c => `<option value="${Utils.esc(c.value)}">${c.label}</option>`).join('')}
         </select>
       </div>
     </div>
@@ -214,7 +214,7 @@ const Produtos = {
               <div class="form-group">
                 <label class="form-label">Categoria *</label>
                 <select class="form-control" name="categoria" required>
-                  ${this.CATEGORIAS.map(c => `<option value="${c.value}" ${p.categoria === c.value ? 'selected' : ''}>${c.label}</option>`).join('')}
+                  ${this.CATEGORIAS.map(c => `<option value="${Utils.esc(c.value)}" ${p.categoria === c.value ? 'selected' : ''}>${c.label}</option>`).join('')}
                 </select>
               </div>
               <div class="form-group">
@@ -224,7 +224,7 @@ const Produtos = {
               <div class="form-group">
                 <label class="form-label">Valor Médio (R$)</label>
                 <div class="input-prefix"><span class="input-pfx-txt">R$</span>
-                <input class="form-control" name="valor_medio" type="number" step="0.01" min="0" value="${p.valor_medio || ''}" placeholder="0,00"></div>
+                <input class="form-control" name="valor_medio" type="number" step="0.01" min="0" value="${Utils.esc(p.valor_medio || '')}" placeholder="0,00"></div>
               </div>
             </div>
             <div class="form-group" style="margin-bottom:14px;">

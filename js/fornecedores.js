@@ -129,7 +129,7 @@ const Fornecedores = {
         <label class="filter-label">UF</label>
         <select class="form-control" id="forn-uf" style="min-width:80px" data-fb-change="Fornecedores.aplicarFiltros" data-fb-change-n="0">
           <option value="">Todas</option>
-          ${[...new Set(fornecedores.map(f=>f.uf).filter(Boolean))].sort().map(uf=>`<option value="${uf}">${uf}</option>`).join('')}
+          ${[...new Set(fornecedores.map(f=>f.uf).filter(Boolean))].sort().map(uf=>`<option value="${Utils.esc(uf)}">${Utils.esc(uf)}</option>`).join('')}
         </select>
       </div>
       <div class="filter-group">
@@ -289,7 +289,7 @@ const Fornecedores = {
                 👤 Pessoa Física (PF)
               </button>
             </div>
-            <input type="hidden" id="forn-tipo-pessoa" name="tipo_pessoa" value="${isPF ? 'pf' : 'pj'}">
+            <input type="hidden" id="forn-tipo-pessoa" name="tipo_pessoa" value="${Utils.esc(isPF ? 'pf' : 'pj')}">
 
             <!-- BLOCO PJ: CNPJ com Consulta -->
             <div id="bloco-pj" style="${isPF ? 'display:none;' : ''}background:linear-gradient(135deg,rgba(201,162,39,.08),rgba(201,162,39,.04));border:1px solid rgba(201,162,39,.25);border-radius:10px;padding:16px;margin-bottom:18px;">

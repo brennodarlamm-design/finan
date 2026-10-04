@@ -365,7 +365,7 @@ const OCR = {
       <div style="text-align:center;padding:40px 20px;">
         <div style="font-size:3rem;margin-bottom:16px;animation:spin 1s linear infinite;display:inline-block;">⚙️</div>
         <div style="font-size:1.05rem;font-weight:700;color:var(--text);margin-bottom:8px;">Analisando documento...</div>
-        <div style="font-size:.82rem;color:var(--text3);margin-bottom:20px;">${nomeArquivo}</div>
+        <div style="font-size:.82rem;color:var(--text3);margin-bottom:20px;">${this._esc(nomeArquivo)}</div>
         <div style="background:var(--bg-secondary);border:1px solid var(--border);border-radius:10px;padding:14px;text-align:left;font-size:.78rem;color:var(--text3);line-height:1.8;">
           <div>🔍 Lendo conteúdo do documento...</div>
           <div>🤖 Identificando tipo e campos...</div>
@@ -443,9 +443,9 @@ const OCR = {
             <tbody>
               ${d.itens.map(it => `
                 <tr style="border-top:1px solid var(--border);">
-                  <td style="padding:7px 10px;color:var(--text);font-weight:600;">${it.produto || '—'}</td>
+                  <td style="padding:7px 10px;color:var(--text);font-weight:600;">${this._esc(it.produto || '—')}</td>
                   <td style="padding:7px 10px;text-align:right;color:var(--text2);">${it.qtd || 1}</td>
-                  <td style="padding:7px 10px;text-align:center;color:var(--text3);">${it.unidade || 'un'}</td>
+                  <td style="padding:7px 10px;text-align:center;color:var(--text3);">${this._esc(it.unidade || 'un')}</td>
                   <td style="padding:7px 10px;text-align:right;color:var(--text);font-weight:700;">${it.valor_unit ? Utils.fmt.currency(it.valor_unit) : '—'}</td>
                 </tr>
               `).join('')}
@@ -525,7 +525,7 @@ const OCR = {
             <label style="font-size:.74rem;color:var(--success);font-weight:700;display:block;margin-bottom:4px;">
               Data do Pagamento Efetivo
             </label>
-            <input id="ocr-data-pagto" class="form-control" type="date" value="${Utils.today()}" style="font-size:.85rem;border-color:var(--success);">
+            <input id="ocr-data-pagto" class="form-control" type="date" value="${Utils.esc(Utils.today())}" style="font-size:.85rem;border-color:var(--success);">
           </div>
         </div>
       </div>
@@ -554,7 +554,7 @@ const OCR = {
           <div>
             <label style="font-size:.72rem;color:var(--text3);font-weight:700;display:block;margin-bottom:4px;">Valor Total (R$)</label>
             <input id="ocr-valor" class="form-control" type="number" step="0.01" min="0"
-              value="${d.valor ?? ''}" placeholder="0,00"
+              value="${Utils.esc(d.valor ?? '')}" placeholder="0,00"
               style="font-size:.92rem;font-weight:800;color:var(--danger);">
           </div>
           <div>
@@ -959,7 +959,7 @@ const OCR = {
       ['material_escritorio','📦 Material Escritório'],
       ['outro','📦 Outros']
     ];
-    return cats.map(([v,t]) => `<option value="${v}" ${v === selecionada ? 'selected' : ''}>${t}</option>`).join('');
+    return cats.map(([v,t]) => `<option value="${Utils.esc(v)}" ${v === selecionada ? 'selected' : ''}>${t}</option>`).join('');
   },
 
   // Guardar estado temporário

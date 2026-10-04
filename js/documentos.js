@@ -398,8 +398,8 @@ const Documentos = {
         const c = DB.getById('clientes', l.obra_id);
         infoEntidade = `
         <div style="background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--r-md);padding:10px 14px;margin-bottom:16px;font-size:.82rem;">
-          <div><strong style="color:var(--text);">${l.descricao}</strong> &middot; <span style="color:${l.tipo==='receita'?'var(--success)':'var(--danger)'};font-weight:800;">${Utils.fmt.currency(l.valor)}</span></div>
-          <div style="color:var(--text3);margin-top:2px;">Obra: ${c?.nome || '&mdash;'} &middot; Vencimento: ${Utils.fmt.date(l.data_vencimento || l.data)}</div>
+          <div><strong style="color:var(--text);">${Utils.esc(l.descricao)}</strong> &middot; <span style="color:${l.tipo==='receita'?'var(--success)':'var(--danger)'};font-weight:800;">${Utils.fmt.currency(l.valor)}</span></div>
+          <div style="color:var(--text3);margin-top:2px;">Obra: ${c?.nome ? Utils.esc(c.nome) : '&mdash;'} &middot; Vencimento: ${Utils.fmt.date(l.data_vencimento || l.data)}</div>
         </div>`;
       }
     } else if (entidadeTipo === 'medicao') {
@@ -408,8 +408,8 @@ const Documentos = {
         const c = DB.getById('clientes', m.obra_id);
         infoEntidade = `
         <div style="background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--r-md);padding:10px 14px;margin-bottom:16px;font-size:.82rem;">
-          <div><strong style="color:var(--text);">${m.numero_medicao}&ordf; Medi&ccedil;&atilde;o Caixa (${m.percentual_fisico}%)</strong> &middot; <span style="color:var(--success);font-weight:800;">${Utils.fmt.currency(m.valor_liberado || m.valor_solicitado)}</span></div>
-          <div style="color:var(--text3);margin-top:2px;">Obra: ${c?.nome || '&mdash;'} &middot; Etapa: ${m.etapa_descricao}</div>
+          <div><strong style="color:var(--text);">${Utils.esc(m.numero_medicao)}&ordf; Medi&ccedil;&atilde;o Caixa (${Utils.esc(m.percentual_fisico)}%)</strong> &middot; <span style="color:var(--success);font-weight:800;">${Utils.fmt.currency(m.valor_liberado || m.valor_solicitado)}</span></div>
+          <div style="color:var(--text3);margin-top:2px;">Obra: ${c?.nome ? Utils.esc(c.nome) : '&mdash;'} &middot; Etapa: ${Utils.esc(m.etapa_descricao)}</div>
         </div>`;
       }
     } else if (entidadeTipo === 'orcamento') {
@@ -428,7 +428,7 @@ const Documentos = {
     Utils.showModal(`
       <div class="modal" style="max-width:650px;">
         <div class="modal-header">
-          <span class="modal-title">📎 ${titulo}</span>
+          <span class="modal-title">📎 ${Utils.esc(titulo)}</span>
           <button class="modal-close" data-fb-click="Utils.closeModal" data-fb-click-n="0">✕</button>
         </div>
         <div class="modal-body">

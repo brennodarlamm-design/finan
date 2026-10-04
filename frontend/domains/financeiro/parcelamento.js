@@ -97,7 +97,7 @@ const Parcelamento = {
                 <div class="form-group">
                   <label class="form-label">Nº Parcelas *</label>
                   <select class="form-control" id="parc-qtd" data-fb-change="Parcelamento._gerarPreview" data-fb-change-n="0">
-                    ${[2,3,4,5,6,7,8,9,10,11,12,18,24,36].map(n => `<option value="${n}" ${n===3?'selected':''}>${n}x vezes</option>`).join('')}
+                    ${[2,3,4,5,6,7,8,9,10,11,12,18,24,36].map(n => `<option value="${Utils.esc(n)}" ${n===3?'selected':''}>${n}x vezes</option>`).join('')}
                   </select>
                 </div>
                 <div class="form-group">
@@ -110,7 +110,7 @@ const Parcelamento = {
                 </div>
                 <div class="form-group">
                   <label class="form-label">1º Vencimento *</label>
-                  <input class="form-control" id="parc-prim-venc" type="date" value="${hoje}" required data-fb-change="Parcelamento._gerarPreview" data-fb-change-n="0">
+                  <input class="form-control" id="parc-prim-venc" type="date" value="${Utils.esc(hoje)}" required data-fb-change="Parcelamento._gerarPreview" data-fb-change-n="0">
                 </div>
               </div>
             </div>
@@ -235,10 +235,10 @@ const Parcelamento = {
             <input class="form-control parc-row-desc" value="${descItem.replace(/"/g,'&quot;')}" style="font-size:.8rem;padding:4px 8px;">
           </td>
           <td style="padding:6px 10px;">
-            <input class="form-control parc-row-date" type="date" value="${vencStr}" style="font-size:.8rem;padding:4px 8px;">
+            <input class="form-control parc-row-date" type="date" value="${Utils.esc(vencStr)}" style="font-size:.8rem;padding:4px 8px;">
           </td>
           <td style="padding:6px 10px;text-align:right;">
-            <input class="form-control parc-row-val" type="number" step="0.01" min="0" value="${valorParcela.toFixed(2)}" style="font-size:.8rem;padding:4px 8px;text-align:right;font-weight:700;">
+            <input class="form-control parc-row-val" type="number" step="0.01" min="0" value="${Utils.esc(valorParcela.toFixed(2))}" style="font-size:.8rem;padding:4px 8px;text-align:right;font-weight:700;">
           </td>
         </tr>`;
     }

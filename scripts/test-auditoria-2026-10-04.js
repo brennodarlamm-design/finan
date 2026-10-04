@@ -196,5 +196,129 @@ console.log('=== Auditoria 04/10/2026 ===\n');
   console.log('  ✓ #3 Hash da senha do Master removido do repositório e bloqueado pelo scanner');
 }
 
+// #12 — Assinaturas: sem leitura pública entre empresas; validação por código continua.
+{
+  const pg = new PGlite();
+  await pg.exec(`
+    CREATE TABLE tenants (id text primary key, nome_fantasia text, razao_social text, cnpj text, cidade text, uf text);
+    CREATE TABLE document_signatures (id text primary key, tenant_id text, user_id text, codigo_validacao text unique, hash_sha256 text,
+      nome text, doc text, papel text, doc_tipo text, doc_id text, doc_numero text, data_hora timestamptz, data_hora_fmt text,
+      ip_dispositivo text, created_at timestamptz default now());
+    INSERT INTO tenants VALUES ('t1','Construtora Um',null,null,'Boa Vista','RR'), ('t2','Construtora Dois',null,null,'Manaus','AM');
+    INSERT INTO document_signatures (id, tenant_id, codigo_validacao, hash_sha256, nome, doc, ip_dispositivo)
+      VALUES ('s1','t1','FIN-SIG-AAAA1111','aa11','Ana','11122233344','10.0.0.1'), ('s2','t2','FIN-SIG-BBBB2222','bb22','Bruno','55566677788','10.0.0.2');
+    ALTER TABLE document_signatures ENABLE ROW LEVEL SECURITY;
+    ALTER TABLE document_signatures FORCE ROW LEVEL SECURITY;
+    CREATE POLICY tenant_isolation_document_signatures ON document_signatures FOR ALL
+      USING (tenant_id = NULLIF(current_setting('app.current_tenant_id', true), ''))
+      WITH CHECK (tenant_id = NULLIF(current_setting('app.current_tenant_id', true), ''));
+    CREATE POLICY signatures_public_read ON document_signatures FOR SELECT USING (codigo_validacao IS NOT NULL);
+    CREATE ROLE finobra_app;
+    GRANT SELECT, INSERT ON document_signatures, tenants TO finobra_app;
+  `);
+  const comoApp = async (q, params = []) => {
+    await pg.exec(`SET ROLE finobra_app; SELECT set_config('app.current_tenant_id', 't1', false);`);
+    try { return (await pg.query(q, params)).rows; } finally { await pg.exec('RESET ROLE;'); }
+  };
+  assert.equal((await comoApp('SELECT count(*)::int c FROM document_signatures'))[0].c, 2, 'antes: empresa t1 lia a assinatura da t2 (bug)');
+  await pg.exec(read('migrations/040_document_signatures_sem_leitura_publica.sql'));
+  assert.equal((await comoApp('SELECT count(*)::int c FROM document_signatures'))[0].c, 1, 'depois: só as assinaturas da própria empresa');
+  const pub = await comoApp('SELECT * FROM validar_assinatura_publica($1)', ['fin-sig-bbbb2222']);
+  assert.equal(pub.length, 1); assert.equal(pub[0].nome, 'Bruno'); assert.equal(pub[0].nome_fantasia, 'Construtora Dois');
+  assert.equal((await comoApp('SELECT * FROM validar_assinatura_publica($1)', ['FIN-SIG-NAOEXISTE'])).length, 0);
+  assert.equal((await comoApp(`SELECT * FROM validar_assinatura_publica('')`)).length, 0);
+  assert.equal((await comoApp('SELECT codigo_assinatura_status($1,$2,$3) st', ['FIN-SIG-BBBB2222', 't1', 'bb22']))[0].st, 'em_uso');
+  assert.equal((await comoApp('SELECT codigo_assinatura_status($1,$2,$3) st', ['FIN-SIG-AAAA1111', 't1', 'AA11']))[0].st, 'mesmo_registro');
+  assert.equal((await comoApp('SELECT codigo_assinatura_status($1,$2,$3) st', ['FIN-SIG-NOVO0000', 't1', 'x']))[0].st, 'livre');
+  await pg.close();
+  const src = read('api/assinaturas.js');
+  assert(src.includes('SELECT * FROM validar_assinatura_publica(${code})') && src.includes('codigo_assinatura_status(${codigo}, ${auth.tenantId}, ${hash})'));
+  assert.equal(src, read('backend/domains/financeiro/assinaturas.js'));
+  console.log('  ✓ #12 Assinaturas: RLS volta a isolar por empresa; validação pública por código via função');
+}
+
+// #7 a #11 — Dados de usuários, NF-e e OCR não viram HTML/ações na tela.
+{
+  const vm = await import('node:vm');
+  const XSS = '"><img src=x data-fb-mouseover="Auth.logout"><b>';
+  const store = new Map();
+  const ctx = vm.createContext({
+    console, structuredClone, setTimeout, clearTimeout, Promise, URL,
+    localStorage: { getItem: k => store.get(k) ?? null, setItem: (k, v) => store.set(k, String(v)), removeItem: k => store.delete(k), key: () => null, get length() { return 0; } },
+    Auth: { getCurrentTenantId: () => 't1', canModule: () => true, getUser: () => ({ nome: 'U' }) },
+    navigator: { onLine: false }, window: { addEventListener() {}, dispatchEvent() {}, location: { origin: 'https://fingo.api.br' } },
+    document: { getElementById: () => null, querySelector: () => null, addEventListener() {}, body: { classList: { contains: () => false } } },
+    crypto: { randomUUID: () => Math.random().toString(16).slice(2) }, App: { obraId: 'todas' }
+  });
+  ctx.globalThis = ctx;
+  for (const m of ['Clientes', 'Configuracoes', 'Contas', 'Contratos', 'Dashboard', 'Escritorio', 'Exportar', 'FasesDoc', 'Fornecedores', 'Lancamentos', 'Medicoes', 'Notas', 'Orcamentos', 'PreCompras', 'Produtos', 'Recibos']) ctx[m] = {};
+  vm.runInContext(`${read('js/utils.js')}\nglobalThis.Utils = Utils;`, ctx);
+  vm.runInContext(`${read('js/data.js')}\nglobalThis.DB = DB;`, ctx);
+  for (const [f, n] of [['js/app.js', 'App2'], ['js/documentos.js', 'Documentos'], ['js/exportar_templates.js', 'ExportarTemplates']]) {
+    const nome = f === 'js/app.js' ? 'App' : n;
+    vm.runInContext(`${read(f)}\nglobalThis.${n} = ${nome};`, ctx);
+  }
+  ctx.DB.canWriteLocal = () => true; ctx.DB.syncToCloud = () => true;
+  ctx.DB.add('clientes', { id: 'o1', nome: XSS, cidade: XSS, estado: 'RR', num_contrato_caixa: XSS, status: 'em_andamento' });
+  ctx.DB.add('lancamentos', { id: 'l1', obra_id: 'o1', tipo: 'despesa', descricao: XSS, fornecedor_beneficiario: XSS, valor: 10, data: '2026-10-01', status: 'a_pagar', categoria: 'material' });
+  ctx.DB.add('medicoes', { id: 'm1', obra_id: 'o1', numero_medicao: 1, etapa_descricao: XSS, percentual_fisico: 5 });
+  const semInjecao = (html, onde) => {
+    assert(!/<img src=x/i.test(html), `${onde}: tag injetada`);
+    assert(!/data-fb-mouseover="Auth\.logout"/.test(html.replace(/&quot;/g, '"').replace(/&lt;img[^]*?&gt;/g, '')), `${onde}: atributo injetado`);
+  };
+  semInjecao(ctx.App2._renderListaBuscaObras(''), 'busca de obras');
+  let modal = '';
+  ctx.Utils.showModal = h => { modal = h; };
+  ctx.Documentos.abrirModal('lancamento', 'l1'); semInjecao(modal, 'anexos (lançamento)');
+  ctx.Documentos.abrirModal('medicao', 'm1'); semInjecao(modal, 'anexos (medição)');
+  for (const tipo of ['lancamentos', 'medicoes', 'engenharia']) semInjecao(ctx.ExportarTemplates.gerar(tipo, 'o1', {}), `exportação ${tipo}`);
+  assert(ctx.ExportarTemplates.gerar('lancamentos', 'o1', {}).includes('&lt;img src=x'), 'o texto aparece escapado (não some)');
+  // Nenhum value="${...}" sem escape nos módulos do app.
+  const app = read('app.html');
+  for (const f of [...new Set([...app.matchAll(/src="\/js\/([a-z0-9_\-]+\.js)/g)].map(m => m[1]))]) {
+    if (!fs.existsSync(`js/${f}`) || f === 'utils.js') continue; // utils: listas fixas de categorias
+    const src = read(`js/${f}`);
+    if (!src.includes('Utils.')) continue;
+    const ruins = [...src.matchAll(/value="\$\{([^{}`]+)\}"/g)].map(m => m[1].trim())
+      .filter(ex => !/^(Utils\.(esc|escapeHtml|safeUrl|escapeJsAttr)|this\._esc|this\.esc|Patch51\.esc|esc\(|e\(|safeUrl\(|_esc\(|encodeURIComponent|\w+Esc$|descItem\.replace)/.test(ex));
+    assert.deepEqual(ruins, [], `js/${f}: value sem escape`);
+  }
+  // NF-e/Notas/OCR.
+  assert(read('js/nfe.js').includes('NF nº ${Utils.esc(parsed.numero_nf)} · ${Utils.esc(parsed.emitente)}'));
+  assert(read('js/notas.js').includes('title="${Utils.esc(r.data.emitente)}">${Utils.esc(r.data.emitente)}</td>'));
+  assert(read('js/ocr.js').includes("${this._esc(it.produto || '—')}"));
+  // #11 Barramentos: eventos passivos não chamam ações; data-od-* parado no portal público.
+  const ev = read('js/patch26-events.js');
+  assert(ev.includes("if (PASSIVE_EVENTS.has(e) && !PASSIVE_ACTIONS.has(action))"));
+  const od = read('js/obra_detalhe.js');
+  assert(od.includes("if (document.body?.classList?.contains('portal-public-mode')) return;") && od.includes('hoverOnly: true'));
+  for (const f of ['patch26-events', 'app', 'documentos', 'exportar_templates', 'nfe', 'notas', 'ocr', 'obra_detalhe', 'lancamentos', 'medicoes', 'escritorio']) {
+    const m = ['frontend/core', ...fs.readdirSync('frontend/domains').map(d => `frontend/domains/${d}`)].map(d => `${d}/${f}.js`).find(p => fs.existsSync(p));
+    assert.equal(read(`js/${f}.js`), read(m), `espelho de ${f}`);
+  }
+  console.log('  ✓ #7–#11 Telas e exportações mostram nomes/descrições/NF-e/OCR como texto; eventos passivos e data-od-* sem ações perigosas');
+}
+
+// #13 — Portal: o link leva, assinado, o que quem gerou pode ver.
+{
+  const portal = await import('../api/_portal-link.js');
+  const key = 'x'.repeat(40);
+  const exp = Date.now() + 60000;
+  const sigF = portal.signPortalRef('acme', 'ob1', exp, key, 'm');
+  assert.equal(portal.verifyPortalRef({ tenant: 'acme', obra: 'ob1', exp, sig: sigF, scope: 'm' }, key).escopo, 'm');
+  assert.equal(portal.verifyPortalRef({ tenant: 'acme', obra: 'ob1', exp, sig: sigF, scope: 'fmcd' }, key).valid, false, 'aumentar o escopo invalida o link');
+  assert.equal(portal.verifyPortalRef({ tenant: 'acme', obra: 'ob1', exp, sig: sigF }, key).valid, false, 'tirar o escopo invalida o link');
+  const antigo = portal.signPortalRef('acme', 'ob1', exp, key);
+  assert.equal(portal.verifyPortalRef({ tenant: 'acme', obra: 'ob1', exp, sig: antigo }, key).escopo, 'fmcd', 'link antigo continua até expirar');
+  const consultas = [];
+  const fakeSql = async (strings) => { const q = strings.join('?'); consultas.push(q); return /FROM obras/.test(q) ? [{ id: 'ob1', nome: 'Casa' }] : []; };
+  const b = await portal.buildPortalBundle(fakeSql, 'acme', 'ob1', 'm');
+  assert(consultas.some(q => /FROM medicoes/.test(q)) && !consultas.some(q => /FROM lancamentos|FROM contratos|FROM documentos/.test(q)), 'só consulta o que o escopo permite');
+  assert.deepEqual(JSON.parse(JSON.stringify([b.nfe, b.ctr, b.doc])), [[], [], []]);
+  assert(read('js/portal_cliente.js').includes("if (params.has('scope')) ref.scope = params.get('scope');"));
+  assert.equal(read('api/_portal-link.js'), read('backend/domains/edge/_portal-link.js'));
+  console.log('  ✓ #13 Portal: escopo assinado no link; quem não vê o financeiro gera link sem despesas; link antigo segue até expirar');
+}
+
 await db.close();
 console.log('\n✅ Auditoria 04/10/2026: tudo certo.');

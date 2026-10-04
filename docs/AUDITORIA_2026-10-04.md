@@ -118,3 +118,19 @@ Legenda: 🔴 crítica · 🟠 alta · 🟡 média · 🔵 baixa · ✅ confirma
 1. Trocar a senha do superadmin.
 2. Cadastrar um e-mail válido na conta Master (hoje ela não consegue receber o código de redefinição).
 3. Avaliar mover o superadmin para uma empresa técnica, sem outros usuários.
+
+**Empresa do superadmin (04/10/2026, a pedido):** criada a empresa `fingo-master` ("FinGo Teste (Master)", plano unlimited, sem vencimento e sem telefone, portanto fora da cobrança automática e do resumo matinal). O superadmin foi movido para ela e está sozinho nessa empresa. As sessões dele foram encerradas, então é preciso entrar de novo. Os usos de `angelim` no código se referem ao WhatsApp que envia as mensagens da plataforma e não mudaram.
+
+**Lote 2 (04/10/2026)**
+- ✅ #7 Campos de usuário passaram a ser exibidos como texto:
+  - busca de obras;
+  - anexos;
+  - fases de documentos (com links via `Utils.safeUrl`);
+  - todas as exportações: dentro de `ExportarTemplates.gerar()`, o `DB` é um proxy que devolve cópias com os textos escapados.
+- ✅ #8 e #10 NF-e (emitente, número, CNPJ), prévia de XML em Notas e resultado do OCR escapados.
+- ✅ #9 Todos os `value="${…}"` e `<textarea>${…}</textarea>` dos módulos do app passaram a ser escapados (147 pontos em 23 arquivos), sem escape em dobro onde o valor já vinha escapado. O teste falha se aparecer um novo sem escape.
+- ✅ #11 Barramentos de eventos:
+  - os eventos passivos (passar o mouse, foco, sair do campo) só chamam as 8 ações de estilo/CEP permitidas;
+  - o `data-od-*` não roda no portal público e, no mouse, só aplica o realce de borda.
+- ✅ #12 Migração `040`: remove a política pública de `document_signatures`. A validação pública usa `validar_assinatura_publica(código)` e o registro usa `codigo_assinatura_status(...)`, as duas funções SECURITY DEFINER. Testado com RLS e o papel da aplicação. Até a migração ser aplicada, a API cai na consulta antiga. **Aplicar a 040 no banco.**
+- ✅ #13 O link do portal leva, assinado, o escopo de quem o gerou (módulos que essa pessoa pode ler), e o portal só entrega esses módulos. Mexer no escopo invalida o link. Links v2 antigos continuam até expirar (90 dias).
