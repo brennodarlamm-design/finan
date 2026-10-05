@@ -1264,12 +1264,12 @@ const App = {
       <div class="obra-search-item ${isSel ? 'selected' : ''}" data-fb-click="App.selecionarObra" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(c.id))}" style="margin-bottom:8px;border-left:4px solid ${isSel ? 'var(--accent)' : 'var(--border)'};">
         <div style="flex:1;min-width:0;margin-right:12px;">
           <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;flex-wrap:wrap;">
-            <strong style="font-size:.92rem;color:var(--text);">${c.nome}</strong>
+            <strong style="font-size:.92rem;color:var(--text);">${Utils.esc(c.nome)}</strong>
             ${Utils.badge(c.status || 'em_andamento')}
           </div>
           <div style="display:flex;gap:12px;font-size:.74rem;color:var(--text3);flex-wrap:wrap;">
-            <span>📍 ${c.cidade}/${c.estado}</span>
-            ${c.num_contrato_caixa ? `<span style="color:var(--accent2);font-weight:600;">🏦 Contrato: ${c.num_contrato_caixa}</span>` : ''}
+            <span>📍 ${Utils.esc(c.cidade)}/${Utils.esc(c.estado)}</span>
+            ${c.num_contrato_caixa ? `<span style="color:var(--accent2);font-weight:600;">🏦 Contrato: ${Utils.esc(c.num_contrato_caixa)}</span>` : ''}
             <span>💰 Financiado: ${Utils.fmt.currency(c.valor_financiado)}</span>
           </div>
         </div>
@@ -1348,11 +1348,11 @@ const App = {
           <div class="g2">
             <div class="form-group">
               <label class="form-label">Nome Fantasia da Empresa *</label>
-              <input class="form-control" name="nome_fantasia" id="ob-nome-fantasia" value="${emp.nome_fantasia || ''}" required placeholder="Ex: Silva & Souza Engenharia">
+              <input class="form-control" name="nome_fantasia" id="ob-nome-fantasia" value="${Utils.esc(emp.nome_fantasia || '')}" required placeholder="Ex: Silva & Souza Engenharia">
             </div>
             <div class="form-group">
               <label class="form-label">Razão Social</label>
-              <input class="form-control" name="razao_social" id="ob-razao-social" value="${emp.razao_social || emp.nome_fantasia || ''}" placeholder="Ex: Silva & Souza Construtora LTDA">
+              <input class="form-control" name="razao_social" id="ob-razao-social" value="${Utils.esc(emp.razao_social || emp.nome_fantasia || '')}" placeholder="Ex: Silva & Souza Construtora LTDA">
             </div>
           </div>
 
@@ -1360,13 +1360,13 @@ const App = {
             <div class="form-group">
               <label class="form-label">CNPJ ou CPF</label>
               <div style="display:flex;gap:6px;">
-                <input class="form-control" name="cnpj" id="ob-cnpj" value="${emp.cnpj || ''}" placeholder="00.000.000/0001-00">
+                <input class="form-control" name="cnpj" id="ob-cnpj" value="${Utils.esc(emp.cnpj || '')}" placeholder="00.000.000/0001-00">
                 <button type="button" class="btn btn-secondary btn-sm" data-fb-click="App.consultarCnpjOnboarding" data-fb-click-n="0" title="Buscar CNPJ na Receita">🔍</button>
               </div>
             </div>
             <div class="form-group">
               <label class="form-label">WhatsApp / Telefone de Contato</label>
-              <input class="form-control" name="telefone" id="ob-tel" value="${emp.telefone || ''}" placeholder="(00) 90000-0000">
+              <input class="form-control" name="telefone" id="ob-tel" value="${Utils.esc(emp.telefone || '')}" placeholder="(00) 90000-0000">
             </div>
           </div>
 
@@ -1374,13 +1374,13 @@ const App = {
             <div class="form-group">
               <label class="form-label">Cidade / UF</label>
               <div style="display:flex;gap:6px;">
-                <input class="form-control" name="cidade" id="ob-cidade" value="${emp.cidade || ''}" placeholder="Cidade" style="flex:2;">
-                <input class="form-control" name="uf" id="ob-uf" value="${emp.uf || ''}" placeholder="UF" maxlength="2" style="flex:1;text-transform:uppercase;">
+                <input class="form-control" name="cidade" id="ob-cidade" value="${Utils.esc(emp.cidade || '')}" placeholder="Cidade" style="flex:2;">
+                <input class="form-control" name="uf" id="ob-uf" value="${Utils.esc(emp.uf || '')}" placeholder="UF" maxlength="2" style="flex:1;text-transform:uppercase;">
               </div>
             </div>
             <div class="form-group">
               <label class="form-label">Responsável Técnico / Engenheiro</label>
-              <input class="form-control" name="responsavel" id="ob-responsavel" value="${emp.responsavel || u?.nome || ''}" placeholder="Nome do engenheiro/responsável">
+              <input class="form-control" name="responsavel" id="ob-responsavel" value="${Utils.esc(emp.responsavel || u?.nome || '')}" placeholder="Nome do engenheiro/responsável">
             </div>
           </div>
 
@@ -1395,7 +1395,7 @@ const App = {
             <div style="font-size:.72rem;color:var(--text3);margin-top:6px;line-height:1.4;">
               💡 <strong>Recomendado:</strong> Formato horizontal retangular (~3:1 ou 4:1, ex: 300x100px) com fundo transparente em <strong>.PNG</strong> para perfeito encaixe no menu e relatórios.
             </div>
-            <input type="hidden" name="logo_url" id="ob-logo-url" value="${emp.logo_url || ''}">
+            <input type="hidden" name="logo_url" id="ob-logo-url" value="${Utils.esc(emp.logo_url || '')}">
           </div>
 
           <div class="modal-footer" style="padding-bottom:0;">

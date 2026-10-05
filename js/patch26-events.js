@@ -110,6 +110,15 @@
     if (typeof cur !== 'function') throw new Error('ação indisponível');
     return { fn: cur, ctx };
   }
+  // AUDITORIA 2026-10-04 #11: eventos passivos (passar o mouse, foco, sair do campo) só podem chamar
+  // ações sem efeito colateral. Antes, um HTML injetado com data-fb-mouseover disparava qualquer
+  // ação da lista (ex.: logout, revogar sessões) só com o movimento do mouse.
+  const PASSIVE_EVENTS = new Set(['mouseover', 'mouseout', 'focus', 'blur']);
+  const PASSIVE_ACTIONS = new Set([
+    'Patch26Actions.borderAccent', 'Patch26Actions.borderDefault', 'Patch26Actions.borderMasterBlur',
+    'Patch26Actions.linkAccent', 'Patch26Actions.linkUnderline',
+    'Clientes.onCepChange', 'Configuracoes.buscarCep', 'Fornecedores.onCepChange'
+  ]);
   function bind(e) {
     document.addEventListener(e, ev => {
       const attr = 'data-fb-' + e;
@@ -117,6 +126,7 @@
       if (!el) return;
       try {
         const action = el.getAttribute(attr);
+        if (PASSIVE_EVENTS.has(e) && !PASSIVE_ACTIONS.has(action)) throw new Error('ação não permitida neste evento');
         const { fn, ctx } = resolve(action);
         const n = Number(el.getAttribute(attr + '-n') || 0);
         const args = [];

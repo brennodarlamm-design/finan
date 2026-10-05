@@ -128,6 +128,7 @@ const tests = [
   'scripts/test-icp-pdf-signature.js',
   'scripts/test-seo-prerender.js',
   'scripts/test-varredura-2026-10-03.js',
+  'scripts/test-auditoria-2026-10-04.js',
   'scripts/test-sefaz-dfe.js',
   'scripts/test-financeiro-core-hardening.js',
   'scripts/test-upstash-redis-integration.js',
@@ -136,6 +137,7 @@ const tests = [
 ].filter(fs.existsSync);
 
 const p50NativeSourceTests = new Set([
+  'scripts/test-auditoria-2026-10-04.js',
   'scripts/test-patch50-security.js',
   'scripts/test-p50-dev-key-vault.js',
   'scripts/test-p50-admin-secret-boundaries.js',

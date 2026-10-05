@@ -1243,7 +1243,7 @@ const ObraDetalhe = {
                 </div>
                 <div style="display:flex;align-items:center;gap:4px;">
                   <input type="number" step="0.01" min="0" max="30" id="od-bdi-ac" class="form-control form-control-sm"
-                         value="${acVal.toFixed(2)}" style="width:85px;text-align:right;font-weight:800;" data-od-input="ObraDetalhe.recalcularBDIInput('${obraId}')">
+                         value="${Utils.esc(acVal.toFixed(2))}" style="width:85px;text-align:right;font-weight:800;" data-od-input="ObraDetalhe.recalcularBDIInput('${obraId}')">
                   <span style="font-weight:700;color:var(--text2);">%</span>
                 </div>
               </div>
@@ -1255,7 +1255,7 @@ const ObraDetalhe = {
                 </div>
                 <div style="display:flex;align-items:center;gap:4px;">
                   <input type="number" step="0.01" min="0" max="20" id="od-bdi-sg" class="form-control form-control-sm"
-                         value="${sgVal.toFixed(2)}" style="width:85px;text-align:right;font-weight:800;" data-od-input="ObraDetalhe.recalcularBDIInput('${obraId}')">
+                         value="${Utils.esc(sgVal.toFixed(2))}" style="width:85px;text-align:right;font-weight:800;" data-od-input="ObraDetalhe.recalcularBDIInput('${obraId}')">
                   <span style="font-weight:700;color:var(--text2);">%</span>
                 </div>
               </div>
@@ -1267,7 +1267,7 @@ const ObraDetalhe = {
                 </div>
                 <div style="display:flex;align-items:center;gap:4px;">
                   <input type="number" step="0.01" min="0" max="20" id="od-bdi-r" class="form-control form-control-sm"
-                         value="${rVal.toFixed(2)}" style="width:85px;text-align:right;font-weight:800;" data-od-input="ObraDetalhe.recalcularBDIInput('${obraId}')">
+                         value="${Utils.esc(rVal.toFixed(2))}" style="width:85px;text-align:right;font-weight:800;" data-od-input="ObraDetalhe.recalcularBDIInput('${obraId}')">
                   <span style="font-weight:700;color:var(--text2);">%</span>
                 </div>
               </div>
@@ -1279,7 +1279,7 @@ const ObraDetalhe = {
                 </div>
                 <div style="display:flex;align-items:center;gap:4px;">
                   <input type="number" step="0.01" min="0" max="20" id="od-bdi-df" class="form-control form-control-sm"
-                         value="${dfVal.toFixed(2)}" style="width:85px;text-align:right;font-weight:800;" data-od-input="ObraDetalhe.recalcularBDIInput('${obraId}')">
+                         value="${Utils.esc(dfVal.toFixed(2))}" style="width:85px;text-align:right;font-weight:800;" data-od-input="ObraDetalhe.recalcularBDIInput('${obraId}')">
                   <span style="font-weight:700;color:var(--text2);">%</span>
                 </div>
               </div>
@@ -1291,7 +1291,7 @@ const ObraDetalhe = {
                 </div>
                 <div style="display:flex;align-items:center;gap:4px;">
                   <input type="number" step="0.01" min="0" max="30" id="od-bdi-l" class="form-control form-control-sm"
-                         value="${lVal.toFixed(2)}" style="width:85px;text-align:right;font-weight:800;" data-od-input="ObraDetalhe.recalcularBDIInput('${obraId}')">
+                         value="${Utils.esc(lVal.toFixed(2))}" style="width:85px;text-align:right;font-weight:800;" data-od-input="ObraDetalhe.recalcularBDIInput('${obraId}')">
                   <span style="font-weight:700;color:var(--text2);">%</span>
                 </div>
               </div>
@@ -1303,7 +1303,7 @@ const ObraDetalhe = {
                 </div>
                 <div style="display:flex;align-items:center;gap:4px;">
                   <input type="number" step="0.01" min="0" max="35" id="od-bdi-t" class="form-control form-control-sm"
-                         value="${tVal.toFixed(2)}" style="width:85px;text-align:right;font-weight:800;color:var(--danger);" data-od-input="ObraDetalhe.recalcularBDIInput('${obraId}')">
+                         value="${Utils.esc(tVal.toFixed(2))}" style="width:85px;text-align:right;font-weight:800;color:var(--danger);" data-od-input="ObraDetalhe.recalcularBDIInput('${obraId}')">
                   <span style="font-weight:700;color:var(--danger);">%</span>
                 </div>
               </div>
@@ -1458,11 +1458,11 @@ const ObraDetalhe = {
           <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(210px, 1fr));gap:14px;margin-bottom:18px;background:var(--bg-secondary);padding:14px;border-radius:var(--r-md);border:1px solid var(--border);">
             <div>
               <label style="font-size:.76rem;font-weight:700;color:var(--text2);display:block;margin-bottom:4px;">Duração da Obra (Meses)</label>
-              <input type="number" id="od-cfg-meses" class="form-control" min="3" max="36" value="${totalMeses}">
+              <input type="number" id="od-cfg-meses" class="form-control" min="3" max="36" value="${Utils.esc(totalMeses)}">
             </div>
             <div>
               <label style="font-size:.76rem;font-weight:700;color:var(--text2);display:block;margin-bottom:4px;">Mês Inicial de Obra</label>
-              <input type="month" id="od-cfg-inicio" class="form-control" value="${mesInicio}">
+              <input type="month" id="od-cfg-inicio" class="form-control" value="${Utils.esc(mesInicio)}">
             </div>
             <div>
               <label style="font-size:.76rem;font-weight:700;color:var(--text2);display:block;margin-bottom:4px;">Distribuição dos Desembolsos</label>
@@ -1500,7 +1500,7 @@ const ObraDetalhe = {
                     </td>
                     <td style="text-align:right;">
                       <input type="number" step="0.01" min="0" id="od-cfg-val-${idx}" data-idx="${idx}" data-codigo="${l.codigo}" class="form-control form-control-sm od-cfg-step-val"
-                             value="${l.previstoTotal || 0}" style="text-align:right;font-weight:800;" data-od-input="ObraDetalhe._atualizarSomaModalCronograma()">
+                             value="${Utils.esc(l.previstoTotal || 0)}" style="text-align:right;font-weight:800;" data-od-input="ObraDetalhe._atualizarSomaModalCronograma()">
                     </td>
                   </tr>
                 `).join('')}
@@ -3200,16 +3200,27 @@ window.ObraDetalhe = ObraDetalhe;
     }
   }
 
+  // AUDITORIA 2026-10-04 #11: este barramento não tinha a trava do portal público (patch26 X3) e
+  // aceitava qualquer ação da lista também em "passar o mouse". Agora:
+  //   • no portal público do cliente, nenhuma ação data-od-* roda;
+  //   • mouseenter/mouseleave só aplicam o realce de borda (nunca chamam funções).
   const bind = (domEvent, attr, opts = {}) => document.addEventListener(domEvent, (ev) => {
     const el = ev.target && ev.target.closest ? ev.target.closest('[' + attr + ']') : null;
     if (!el) return;
+    if (document.body?.classList?.contains('portal-public-mode')) return;
     if (opts.boundary && ev.relatedTarget && el.contains(ev.relatedTarget)) return;
-    execute(el, el.getAttribute(attr));
+    const command = el.getAttribute(attr);
+    if (opts.hoverOnly) {
+      const hover = String(command || '').match(/^this\.style\.borderColor='(var\(--(?:accent|border)\))'$/);
+      if (hover) el.style.borderColor = hover[1];
+      return;
+    }
+    execute(el, command);
   }, true);
 
   bind('click', 'data-od-click');
   bind('change', 'data-od-change');
   bind('input', 'data-od-input');
-  bind('mouseover', 'data-od-mouseenter', { boundary: true });
-  bind('mouseout', 'data-od-mouseleave', { boundary: true });
+  bind('mouseover', 'data-od-mouseenter', { boundary: true, hoverOnly: true });
+  bind('mouseout', 'data-od-mouseleave', { boundary: true, hoverOnly: true });
 })();

@@ -20,7 +20,8 @@ console.log('=== Auditoria 2026-10-02 (7ª rodada) — regressões do frontend =
     'js/ocr.js': ['>${Utils.escapeHtml(o.nome)}</option>'],
     'js/fornecedores.js': ["data-contato=\"${Utils.escapeHtml(f.contato_nome||'')}\""],
     'js/fases_doc.js': ['${Utils.escapeHtml(doc.responsavel)}'],
-    'js/exportar_templates.js': ["${Utils.escapeHtml(emp.responsavel || 'Responsável Técnico')}"],
+    // AUDITORIA 2026-10-04 #7: o escape agora vem da origem (DB seguro dentro de gerar()).
+    'js/exportar_templates.js': ['const DB = this._dbSeguro();', "if (typeof valor === 'string') return Utils.escapeHtml(valor);"],
     'js/parcelamento.js': ['>${Utils.escapeHtml(c.nome)}</option>'],
     'js/master.js': ['${this._esc(results.email.error)}', '${this._esc(err.message)}']
   };

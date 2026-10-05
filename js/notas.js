@@ -222,9 +222,9 @@ const Notas = {
               <div class="form-group"><label class="form-label">Data Vencimento</label><input class="form-control" type="date" name="data_vencimento" value="${esc(n.data_vencimento||'')}"></div>
             </div>
             <div class="form-row cols-3" style="margin-bottom:14px;">
-              <div class="form-group"><label class="form-label">Valor Bruto *</label><div class="input-prefix"><span class="input-pfx-txt">R$</span><input name="valor_bruto" type="number" value="${n.valor_bruto||''}" step="0.01" min="0" required id="nf-vb" data-fb-input="Notas.calcLiq" data-fb-input-n="0"></div></div>
-              <div class="form-group"><label class="form-label">Impostos (R$)</label><div class="input-prefix"><span class="input-pfx-txt">R$</span><input name="impostos" type="number" value="${n.impostos||0}" step="0.01" min="0" id="nf-imp" data-fb-input="Notas.calcLiq" data-fb-input-n="0"></div></div>
-              <div class="form-group"><label class="form-label">Valor Líquido</label><div class="input-prefix"><span class="input-pfx-txt">R$</span><input name="valor_liquido" type="number" value="${n.valor_liquido||''}" step="0.01" id="nf-vl" readonly style="background:var(--bg-secondary)"></div></div>
+              <div class="form-group"><label class="form-label">Valor Bruto *</label><div class="input-prefix"><span class="input-pfx-txt">R$</span><input name="valor_bruto" type="number" value="${Utils.esc(n.valor_bruto||'')}" step="0.01" min="0" required id="nf-vb" data-fb-input="Notas.calcLiq" data-fb-input-n="0"></div></div>
+              <div class="form-group"><label class="form-label">Impostos (R$)</label><div class="input-prefix"><span class="input-pfx-txt">R$</span><input name="impostos" type="number" value="${Utils.esc(n.impostos||0)}" step="0.01" min="0" id="nf-imp" data-fb-input="Notas.calcLiq" data-fb-input-n="0"></div></div>
+              <div class="form-group"><label class="form-label">Valor Líquido</label><div class="input-prefix"><span class="input-pfx-txt">R$</span><input name="valor_liquido" type="number" value="${Utils.esc(n.valor_liquido||'')}" step="0.01" id="nf-vl" readonly style="background:var(--bg-secondary)"></div></div>
             </div>
             <div class="form-row cols-3" style="margin-bottom:14px;">
               <div class="form-group"><label class="form-label">Tipo *</label><select class="form-control" name="tipo" required><option value="entrada" ${(n.tipo||'entrada')==='entrada'?'selected':''}>↓ Entrada (Compra)</option><option value="saida" ${n.tipo==='saida'?'selected':''}>↑ Saída (Serviço)</option></select></div>
@@ -331,7 +331,7 @@ const Notas = {
           <button class="modal-close" data-fb-click="Utils.closeModal" data-fb-click-n="0">✕</button>
         </div>
         <div class="modal-body" style="padding:16px 20px;">
-          <div style="font-weight:700;color:var(--text);margin-bottom:4px;">NF ${n.numero_nf} &mdash; ${n.emitente}</div>
+          <div style="font-weight:700;color:var(--text);margin-bottom:4px;">NF ${Utils.esc(n.numero_nf)} &mdash; ${Utils.esc(n.emitente)}</div>
           <div style="font-size:1.2rem;font-weight:900;color:var(--success);margin-bottom:12px;">
             ${Utils.fmt.currency(n.valor_liquido || n.valor_bruto)}
           </div>
@@ -344,7 +344,7 @@ const Notas = {
           </div>
           <div class="form-group">
             <label class="form-label">Data Efetiva do Pagamento</label>
-            <input type="date" id="nf-baixa-data" class="form-control" value="${Utils.today()}" required>
+            <input type="date" id="nf-baixa-data" class="form-control" value="${Utils.esc(Utils.today())}" required>
           </div>
         </div>
         <div class="modal-footer">
@@ -587,7 +587,7 @@ const Notas = {
           </div>` : ''}
           ${dups.length ? `<div style="padding:12px 16px;background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.25);border-radius:8px;margin-bottom:14px;font-size:.82rem">
             ⏭️ <strong>${dups.length} NF(s) já cadastrada(s) serão ignoradas:</strong>
-            ${dups.map(r => `<div style="color:var(--warning);margin-top:3px">${r.file} — NF ${r.data.numero_nf} (chave já existe)</div>`).join('')}
+            ${dups.map(r => `<div style="color:var(--warning);margin-top:3px">${Utils.esc(r.file)} — NF ${Utils.esc(r.data.numero_nf)} (chave já existe)</div>`).join('')}
           </div>` : ''}
           ${toImport.length === 0 ? `<div style="text-align:center;padding:32px;color:var(--text3)">Nenhuma NF nova para importar.</div>` : `
           <div style="font-size:.82rem;color:var(--text2);margin-bottom:12px">✅ <strong>${toImport.length} NF(s)</strong> prontas para importar (com cadastro automático de produtos):</div>
@@ -599,11 +599,11 @@ const Notas = {
               </tr></thead>
               <tbody>
                 ${toImport.map((r, i) => `<tr>
-                  <td style="font-size:.74rem;color:var(--text3);max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${r.file}">${r.file}</td>
-                  <td style="font-weight:800;color:var(--accent)">${r.data.numero_nf}</td>
+                  <td style="font-size:.74rem;color:var(--text3);max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${Utils.esc(r.file)}">${Utils.esc(r.file)}</td>
+                  <td style="font-weight:800;color:var(--accent)">${Utils.esc(r.data.numero_nf)}</td>
                   <td style="font-size:.8rem">${Utils.fmt.date(r.data.data_emissao)}</td>
-                  <td style="font-size:.78rem;max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${r.data.emitente}">${r.data.emitente}</td>
-                  <td style="font-size:.74rem;color:var(--text2)">${r.data.cnpj_emitente}</td>
+                  <td style="font-size:.78rem;max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${Utils.esc(r.data.emitente)}">${Utils.esc(r.data.emitente)}</td>
+                  <td style="font-size:.74rem;color:var(--text2)">${Utils.esc(r.data.cnpj_emitente)}</td>
                   <td><span class="badge badge-accent" style="font-size:.72rem;">📦 ${r.data.itens?.length || 0} produto(s)</span></td>
                   <td>${r.data.tipo==='entrada'?'<span class="badge badge-info">↓ Entrada</span>':'<span class="badge badge-accent">↑ Saída</span>'}</td>
                   <td style="font-weight:700">${Utils.fmt.currency(r.data.valor_bruto)}</td>

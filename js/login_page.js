@@ -536,7 +536,20 @@ if (window.location.hash.startsWith('#validar') || window.location.search.includ
     btn.innerHTML = '<div class="spinner"></div> Salvando nova senha...';
 
     try {
-      const result = await Auth.redefinirSenha(recoveryRequestId, recoveryResetToken, p1);
+      let result = await Auth.redefinirSenha(recoveryRequestId, recoveryResetToken, p1);
+      // Conta Master: pede o código do autenticador (ou de backup) e tenta de novo.
+      while (!result.success && result.mfaRequired) {
+        const fator = window.prompt(`${result.message}\n\nDigite o código de 6 dígitos do Google Authenticator:`);
+        if (!fator) break;
+        result = await Auth.redefinirSenha(recoveryRequestId, recoveryResetToken, p1, String(fator).replace(/\s/g, ''));
+      }
+      if (!result.success && result.mfaRequired) {
+        errBox.textContent = result.message || 'Informe o código do autenticador para concluir.';
+        errBox.style.display = 'block';
+        btn.disabled = false;
+        btn.innerHTML = '<span>Salvar Nova Senha</span>';
+        return;
+      }
       if (!result.success) {
         const message = result.message || 'Não foi possível redefinir a senha.';
         const otpRejected = /c[oó]digo|otp|tentativas de validação|tentativas excedid|novo c[oó]digo/i.test(message);

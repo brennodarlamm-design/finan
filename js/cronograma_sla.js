@@ -1055,7 +1055,7 @@ const CronogramaSLA = {
 
           <div class="form-group" style="margin-bottom:14px;">
             <label class="form-label">SLA desta Etapa (dias)</label>
-            <input type="number" min="1" max="365" class="form-control" id="sla-dias-val" value="${p.dias_sla}">
+            <input type="number" min="1" max="365" class="form-control" id="sla-dias-val" value="${Utils.esc(p.dias_sla)}">
             <span style="font-size:.72rem;color:var(--text3);margin-top:2px;display:block">Alterar recalcula todo o cronograma em cascata.</span>
           </div>
 
@@ -1248,7 +1248,7 @@ const CronogramaSLA = {
                     <td>${e(p.nome)}</td>
                     <td><span style="font-size:.72rem;color:var(--text3)">${e(p.tipoLabel || p.tipo)}</span></td>
                     <td style="text-align:right">
-                      <input type="number" min="1" max="365" class="form-control form-control-sm cfg-sla-input" data-proc-id="${e(p.id)}" value="${p.dias_sla}" style="width:80px;display:inline-block;text-align:center;">
+                      <input type="number" min="1" max="365" class="form-control form-control-sm cfg-sla-input" data-proc-id="${e(p.id)}" value="${Utils.esc(p.dias_sla)}" style="width:80px;display:inline-block;text-align:center;">
                     </td>
                   </tr>
                 `).join('')}

@@ -344,7 +344,8 @@ export async function settlePixPayment(sql, payload, meta = {}) {
     SELECT paid.id AS invoice_id, paid.tenant_id, paid.plan_id, paid.cycle, paid.amount_cents, paid.txid, paid.paid_at,
            paid.prior_status,
            tenant_upd.nome_fantasia, tenant_upd.razao_social, tenant_upd.telefone, tenant_upd.email,
-           tenant_upd.responsavel, tenant_upd.status, tenant_upd.vencimento
+           tenant_upd.responsavel, tenant_upd.status,
+           tenant_upd.vencimento::text AS vencimento -- AUDITORIA 2026-10-04 #4: texto, não objeto Date
     FROM paid JOIN tenant_upd ON tenant_upd.id = paid.tenant_id;
   `;
 

@@ -3,7 +3,7 @@
 import { neon } from '@neondatabase/serverless';
 import { resolveAuthAndTenant } from './_auth.js';
 import { canAccessModule, canWriteData, normalizeRole, permissionError } from './_permissions.js';
-import { writeAudit } from './_audit.js';
+import { writeAudit, marcarAlteracao } from './_audit.js';
 import { createTenantSql } from './_tenant-sql.js';
 import { createRuntimeSql } from './_database.js';
 
@@ -32,6 +32,7 @@ async function updateForecast(sql, tenantId, obraId) {
     WHERE tenant_id=${tenantId} AND id=${obraId}
     RETURNING data_previsao
   `;
+  await marcarAlteracao(sql, tenantId, 'obras', obraId, 'atualizar_previsao'); // AUDITORIA 2026-10-04 #14
   return { total_dias:total, data_previsao:updated[0]?.data_previsao || null };
 }
 

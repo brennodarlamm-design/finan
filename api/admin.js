@@ -365,8 +365,12 @@ async function handleBillingSweep(req, res) {
   const renderBaseUrl = String(process.env.RENDER_WHATSAPP_URL || 'https://finan-backend-9rxw.onrender.com')
     .replace(/\/send-message\/?$/, '').replace(/\/+$/, '');
 
+  // AUDITORIA 2026-10-04 #6: o fallback "neon" gravava os avisos como enviados ('pending_dispatch',
+  // que nenhum código despacha) e bloqueava o aviso real do ciclo. Agora só o Render envia; se ele
+  // não responder, a resposta diz que nada foi enviado. Demora (varredura longa) ≠ falha.
   let sweepResult = null;
   let usedEngine = 'render';
+  let emAndamento = false;
   try {
     const renderRes = await fetch(`${renderBaseUrl}/cron/billing-sweep`, {
       method: 'POST',
@@ -381,65 +385,16 @@ async function handleBillingSweep(req, res) {
     });
     if (renderRes.ok) sweepResult = await renderRes.json().catch(() => null);
   } catch (err) {
-    console.warn('[Admin Billing] Render indisponível para sweep:', err?.message || err);
+    emAndamento = err?.name === 'TimeoutError' || err?.name === 'AbortError';
+    console.warn('[Admin Billing] Render sem resposta no sweep:', err?.message || err);
   }
 
   const sql = getSql();
   if (!sweepResult?.success) {
-    usedEngine = 'neon_fallback';
-    const hoje = new Intl.DateTimeFormat('en-CA', {
-      timeZone: 'America/Boa_Vista', year: 'numeric', month: '2-digit', day: '2-digit'
-    }).format(new Date());
-
-    const tenants = forcedTenantId
-      ? await sql`SELECT id, razao_social, nome_fantasia, telefone, email, responsavel, plano, status, vencimento FROM tenants WHERE id=${forcedTenantId};`
-      : await sql`SELECT id, razao_social, nome_fantasia, telefone, email, responsavel, plano, status, vencimento FROM tenants WHERE status NOT IN ('cancelado','arquivado') AND vencimento IS NOT NULL;`;
-
-    let evaluated = 0;
-    let notified = 0;
-    let skipped = 0;
-    for (const t of tenants) {
-      evaluated++;
-      let iso = '';
-      if (t.vencimento instanceof Date && !isNaN(t.vencimento.getTime())) {
-        iso = t.vencimento.toISOString().split('T')[0];
-      } else {
-        const m = String(t.vencimento || '').match(/(\d{4})-(\d{2})-(\d{2})/);
-        if (m) iso = `${m[1]}-${m[2]}-${m[3]}`;
-      }
-      if (!iso) continue;
-      const parts = iso.split('-');
-      const vencDate = new Date(`${parts[0]}-${parts[1]}-${parts[2]}T00:00:00`);
-      const todayDate = new Date(`${hoje}T00:00:00`);
-      const diff = Math.round((vencDate.getTime() - todayDate.getTime()) / 86400000);
-
-      let stage = null;
-      if (t.plano === 'trial' && diff <= 2 && diff >= 0) stage = 'trial_ending';
-      else if (diff === 10) stage = 'reminder_10d';
-      else if (diff === 3) stage = 'reminder_3d';
-      else if (diff === 0) stage = 'due_today';
-      else if (diff === -1) stage = 'overdue_1d';
-      else if (diff === -5) stage = 'overdue_5d';
-      if (!stage) continue;
-
-      const check = await sql`
-        SELECT id FROM billing_notifications_sent
-        WHERE tenant_id=${t.id} AND stage=${stage} AND sent_date=${hoje}::date LIMIT 1;
-      `;
-      if (check.length) { skipped++; continue; }
-
-      const inserted = await sql`
-        INSERT INTO billing_notifications_sent (
-          tenant_id, stage, channel, sent_date, recipient_phone, recipient_email, status, metadata
-        ) VALUES (
-          ${t.id}, ${stage}, 'email', ${hoje}::date, ${t.telefone || null}, ${t.email || null}, 'pending_dispatch',
-          ${JSON.stringify({ diff, plano: t.plano, vencimento: t.vencimento, via: 'master_secure_fallback' })}::jsonb
-        ) ON CONFLICT (tenant_id, stage, sent_date) DO NOTHING RETURNING id;
-      `;
-      if (inserted.length) notified++;
-      else skipped++;
-    }
-    sweepResult = { success: true, totalEvaluated: evaluated, notified, skippedAntiSpam: skipped };
+    usedEngine = emAndamento ? 'render_em_andamento' : 'indisponivel';
+    sweepResult = emAndamento
+      ? { success: true, pending: true, message: 'Varredura iniciada no servidor de envio. Acompanhe o resultado no histórico de disparos.' }
+      : { success: false, notified: 0, message: 'Servidor de envio indisponível: nenhum aviso foi enviado. A varredura automática roda nos dias úteis às 09:30.' };
   }
 
   await writeAudit(sql, req, guard.auth, {
@@ -447,11 +402,11 @@ async function handleBillingSweep(req, res) {
     depois: { engine: usedEngine, result: sweepResult }
   });
 
-  return res.status(200).json({
-    success: true,
+  return res.status(sweepResult.success ? 200 : 503).json({
+    success: !!sweepResult.success,
     engine: usedEngine,
     result: sweepResult,
-    message: 'Varredura de cobrança executada com sucesso.'
+    message: sweepResult.message || 'Varredura de cobrança executada com sucesso.'
   });
 }
 

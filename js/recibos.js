@@ -274,12 +274,12 @@ const Recibos = {
                 <label class="form-label">Valor (R$) *</label>
                 <div class="input-prefix">
                   <span class="input-pfx-txt">R$</span>
-                  <input class="form-control" type="number" step="0.01" min="0.01" name="valor" id="rec-valor" value="${valorPadrao}" required placeholder="0,00" data-fb-input="Recibos._onValorInput" data-fb-input-n="1" data-fb-input-t0="value">
+                  <input class="form-control" type="number" step="0.01" min="0.01" name="valor" id="rec-valor" value="${Utils.esc(valorPadrao)}" required placeholder="0,00" data-fb-input="Recibos._onValorInput" data-fb-input-n="1" data-fb-input-t0="value">
                 </div>
               </div>
               <div class="form-group">
                 <label class="form-label">Data da Emissão *</label>
-                <input class="form-control" type="date" name="data" value="${dadosPreenchidos.data || hoje}" required>
+                <input class="form-control" type="date" name="data" value="${Utils.esc(dadosPreenchidos.data || hoje)}" required>
               </div>
             </div>
 

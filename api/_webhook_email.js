@@ -40,24 +40,19 @@ export function verifySvixSignature({ secret, id, timestamp, signatureHeader, ra
 }
 
 export function isEmailWebhookAuthorized(req) {
+  // AUDITORIA 2026-10-04 #24: aceitava também os segredos do PIX e o interno — um vazamento de
+  // qualquer um deles abria a entrada de e-mails. Agora só o segredo próprio (ou a assinatura Svix).
   const emailSecret = String(process.env.EMAIL_WEBHOOK_SECRET || '').trim();
-  const internalSecret = String(process.env.INTERNAL_API_SECRET || '').trim();
-  const pixSecret = String(process.env.PIX_WEBHOOK_SECRET || '').trim();
 
   // 1. Header x-webhook-secret ou x-email-webhook-secret
   const headerSecret = String(req.headers?.['x-webhook-secret'] || req.headers?.['x-email-webhook-secret'] || '').trim();
-  if (headerSecret) {
-    if (emailSecret && safeCompare(headerSecret, emailSecret)) return { authorized: true, source: 'x-webhook-secret' };
-    if (internalSecret && safeCompare(headerSecret, internalSecret)) return { authorized: true, source: 'internal-secret' };
-    if (pixSecret && safeCompare(headerSecret, pixSecret)) return { authorized: true, source: 'pix-fallback' };
-  }
+  if (headerSecret && emailSecret && safeCompare(headerSecret, emailSecret)) return { authorized: true, source: 'x-webhook-secret' };
 
   // 2. Authorization Bearer
   const authHeader = String(req.headers?.authorization || req.headers?.Authorization || '').trim();
   if (authHeader.startsWith('Bearer ')) {
     const bearer = authHeader.slice(7).trim();
     if (emailSecret && safeCompare(bearer, emailSecret)) return { authorized: true, source: 'bearer-token' };
-    if (internalSecret && safeCompare(bearer, internalSecret)) return { authorized: true, source: 'bearer-internal' };
   }
 
   // 3. Svix / Resend Webhook Signature (se configurado)
@@ -126,19 +121,26 @@ export default async function webhookEmailHandler(req, res) {
   }
 
   const sql = createOwnerSql();
-  const emailId = `eml_in_${crypto.randomBytes(12).toString('hex')}`;
+  // AUDITORIA 2026-10-04 #24: o Svix entrega "pelo menos uma vez" (reenvio após timeout). O id passa a
+  // derivar do svix-id, e o INSERT ignora repetidos — o mesmo e-mail não entra duas vezes.
+  const svixId = String(req.headers?.['svix-id'] || '').trim();
+  const emailId = svixId
+    ? `eml_in_${crypto.createHash('sha256').update(svixId).digest('hex').slice(0, 24)}`
+    : `eml_in_${crypto.randomBytes(12).toString('hex')}`;
+  // "Nome <a@b.com>" → "a@b.com" (antes nunca casava com usuarios.email).
+  const remetente = (String(payload.from).match(/<([^>]+)>/)?.[1] || String(payload.from)).trim();
 
   // Tenta associar tenant_id pelo e-mail do remetente
   let matchedTenantId = null;
   try {
     const userMatch = await sql`
-      SELECT tenant_id FROM usuarios WHERE LOWER(email) = LOWER(${payload.from}) LIMIT 1;
+      SELECT tenant_id FROM usuarios WHERE LOWER(email) = LOWER(${remetente}) LIMIT 1;
     `;
     if (userMatch.length && userMatch[0].tenant_id) {
       matchedTenantId = userMatch[0].tenant_id;
     } else {
       const tenantMatch = await sql`
-        SELECT id FROM tenants WHERE LOWER(email) = LOWER(${payload.from}) LIMIT 1;
+        SELECT id FROM tenants WHERE LOWER(email) = LOWER(${remetente}) LIMIT 1;
       `;
       if (tenantMatch.length) matchedTenantId = tenantMatch[0].id;
     }
@@ -187,7 +189,8 @@ export default async function webhookEmailHandler(req, res) {
         false,
         CURRENT_TIMESTAMP,
         CURRENT_TIMESTAMP
-      );
+      )
+      ON CONFLICT (id) DO NOTHING;
     `;
 
     return res.status(200).json({

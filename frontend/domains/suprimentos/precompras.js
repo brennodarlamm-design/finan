@@ -379,11 +379,11 @@ const PreCompras = {
               </div>
               <div class="form-group">
                 <label class="form-label">Data Solicitação</label>
-                <input class="form-control" type="date" name="data_solicitacao" value="${item?.data_solicitacao || Utils.today()}" required>
+                <input class="form-control" type="date" name="data_solicitacao" value="${Utils.esc(item?.data_solicitacao || Utils.today())}" required>
               </div>
               <div class="form-group">
                 <label class="form-label">Necessidade / Entrega</label>
-                <input class="form-control" type="date" name="data_necessidade" value="${item?.data_necessidade || ''}">
+                <input class="form-control" type="date" name="data_necessidade" value="${Utils.esc(item?.data_necessidade || '')}">
               </div>
             </div>
 
@@ -480,14 +480,14 @@ const PreCompras = {
         </td>
         <td>
           <select class="form-control" data-fb-change="PreCompras._atualizarItem" data-fb-change-n="3" data-fb-change-t0="auto" data-fb-change-v0="${encodeURIComponent(String(idx))}" data-fb-change-t1="string" data-fb-change-v1="unidade" data-fb-change-t2="value" style="padding:6px 4px;font-size:.8rem;">
-            ${unidades.map(u => `<option value="${u}" ${it.unidade === u ? 'selected' : ''}>${u}</option>`).join('')}
+            ${unidades.map(u => `<option value="${Utils.esc(u)}" ${it.unidade === u ? 'selected' : ''}>${u}</option>`).join('')}
           </select>
         </td>
         <td>
-          <input type="number" step="any" min="0" class="form-control" value="${it.quantidade || 1}" data-fb-input="PreCompras._atualizarItem" data-fb-input-n="3" data-fb-input-t0="auto" data-fb-input-v0="${encodeURIComponent(String(idx))}" data-fb-input-t1="string" data-fb-input-v1="quantidade" data-fb-input-t2="float" required style="padding:6px 8px;font-size:.8rem;text-align:right;">
+          <input type="number" step="any" min="0" class="form-control" value="${Utils.esc(it.quantidade || 1)}" data-fb-input="PreCompras._atualizarItem" data-fb-input-n="3" data-fb-input-t0="auto" data-fb-input-v0="${encodeURIComponent(String(idx))}" data-fb-input-t1="string" data-fb-input-v1="quantidade" data-fb-input-t2="float" required style="padding:6px 8px;font-size:.8rem;text-align:right;">
         </td>
         <td>
-          <input type="number" step="any" min="0" class="form-control" value="${it.valor_unitario || 0}" data-fb-input="PreCompras._atualizarItem" data-fb-input-n="3" data-fb-input-t0="auto" data-fb-input-v0="${encodeURIComponent(String(idx))}" data-fb-input-t1="string" data-fb-input-v1="valor_unitario" data-fb-input-t2="float" required style="padding:6px 8px;font-size:.8rem;text-align:right;">
+          <input type="number" step="any" min="0" class="form-control" value="${Utils.esc(it.valor_unitario || 0)}" data-fb-input="PreCompras._atualizarItem" data-fb-input-n="3" data-fb-input-t0="auto" data-fb-input-v0="${encodeURIComponent(String(idx))}" data-fb-input-t1="string" data-fb-input-v1="valor_unitario" data-fb-input-t2="float" required style="padding:6px 8px;font-size:.8rem;text-align:right;">
         </td>
         <td style="text-align:right;font-weight:800;color:var(--text);font-family:monospace;white-space:nowrap;padding-right:8px;">
           ${Utils.fmt.currency(it.subtotal || (it.quantidade * it.valor_unitario))}
@@ -577,8 +577,21 @@ const PreCompras = {
     }
   },
 
+  // AUDITORIA 2026-10-04 #18: com anexo, o registro era criado antes de ler o arquivo e o modal
+  // continuava aberto — um segundo clique/Enter criava outra pré-compra. Um salvamento por vez.
   async salvar(event, id = '') {
-    event.preventDefault();
+    event?.preventDefault?.();
+    if (this._salvando) return;
+    this._salvando = true;
+    try {
+      return await this._salvarImpl(event, id);
+    } finally {
+      this._salvando = false;
+    }
+  },
+
+  async _salvarImpl(event, id = '') {
+    event?.preventDefault?.();
     const form = event.target;
     const fd = new FormData(form);
     const user = Auth.getUser();
@@ -663,7 +676,7 @@ const PreCompras = {
         ? 'Ordem excluída. O pagamento já registrado foi mantido no financeiro.'
         : 'Ordem de pré-compra excluída!', 'info');
       App.navigate('precompras');
-    });
+    }, { allowHtml: true }); // texto fixo + número da ordem já escapado
   },
 
   // ─────────────────────────────────────────────────────────────

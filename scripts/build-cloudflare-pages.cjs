@@ -152,11 +152,14 @@ function writeDeploymentMetadata() {
   return metadata;
 }
 
-// Build do bundle do Sentry Browser se esbuild estiver disponível
-try {
-  const sentryEntry = path.join(root, 'scripts', 'sentry-entry.js');
-  const sentryOut = path.join(root, 'js', 'sentry.js');
-  if (fs.existsSync(sentryEntry)) {
+// Build do bundle do Sentry Browser se esbuild estiver disponível.
+// AUDITORIA 2026-10-04 #27: o bundle (com o hash do commit) era gravado em js/sentry.js e
+// frontend/core/sentry.js — arquivos versionados —, e como este build roda no postinstall, todo
+// `npm install` sujava a árvore do git. Agora vai só para dist/js/sentry.js, depois da cópia.
+function empacotarSentry(destino) {
+  try {
+    const sentryEntry = path.join(root, 'scripts', 'sentry-entry.js');
+    if (!fs.existsSync(sentryEntry)) return;
     const esbuild = require('esbuild');
     const commit = resolveGitCommit() || 'local';
     esbuild.buildSync({
@@ -166,17 +169,14 @@ try {
       sourcemap: true,
       format: 'iife',
       globalName: 'FinGoSentry',
-      outfile: sentryOut,
+      outfile: destino,
       define: {
         '__SENTRY_RELEASE__': JSON.stringify(commit)
       }
     });
-    try {
-      fs.copyFileSync(sentryOut, path.join(root, 'frontend', 'core', 'sentry.js'));
-    } catch {}
+  } catch (err) {
+    console.warn('[Build] Aviso ao empacotar Sentry:', err?.message);
   }
-} catch (err) {
-  console.warn('[Build] Aviso ao empacotar Sentry:', err?.message);
 }
 
 fs.rmSync(out, { recursive: true, force: true });
@@ -184,6 +184,7 @@ fs.mkdirSync(out, { recursive: true });
 
 for (const file of rootFiles) copyRequired(resolveSourceFile(file), path.join(out, file));
 for (const dir of directories) copyRequired(path.join(root, dir), path.join(out, dir));
+empacotarSentry(path.join(out, 'js', 'sentry.js'));
 
 // Patch 37: a raiz pública é comercial; o login possui shell dedicado.
 copyRequired(path.join(root, 'landing.html'), path.join(out, 'index.html'));

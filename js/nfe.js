@@ -883,7 +883,7 @@ const NFe = {
                   </td>
                   <td>
                     <div style="display:flex;align-items:center;gap:6px;">
-                      <code style="font-size:.72rem;color:var(--text2);font-family:monospace;" title="${d.chave}">${chaveTrunc}</code>
+                      <code style="font-size:.72rem;color:var(--text2);font-family:monospace;" title="${Utils.esc(d.chave)}">${Utils.esc(chaveTrunc)}</code>
                       <button class="icon-btn" data-fb-click="NFe.rebuscarChave" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(d.chave))}" title="Consultar detalhes desta chave" style="font-size:.72rem;opacity:.7;">🔍</button>
                     </div>
                   </td>
@@ -930,6 +930,11 @@ const NFe = {
 
       if (!res.ok) {
         throw new Error(data?.error || `Erro ${res.status} ao sincronizar com SEFAZ.`);
+      }
+      // AUDITORIA 2026-10-04 #19: o servidor responde 200 com success:false (sem certificado, falha
+      // ao decifrar, erro de rede na SEFAZ) e a tela mostrava "Consulta concluída".
+      if (data.success === false && !data.rateLimited) {
+        throw new Error(data.error || data.mensagem || data.message || 'A SEFAZ não respondeu como esperado.');
       }
 
       if (data.rateLimited) {
@@ -1196,8 +1201,8 @@ const NFe = {
           <div style="background:rgba(201,162,39,.08);border:1px solid rgba(201,162,39,.25);border-radius:var(--r-md);padding:12px 16px;margin-bottom:16px;">
             <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap;">
               <div>
-                <div style="font-weight:800;color:var(--text);font-size:.95rem;">NF nº ${parsed.numero_nf} · ${parsed.emitente}</div>
-                <div style="font-size:.76rem;color:var(--text3);margin-top:2px;">CNPJ: <strong>${parsed.cnpj_emitente}</strong> · Emissão: <strong>${Utils.fmt.date(parsed.data_emissao)}</strong></div>
+                <div style="font-weight:800;color:var(--text);font-size:.95rem;">NF nº ${Utils.esc(parsed.numero_nf)} · ${Utils.esc(parsed.emitente)}</div>
+                <div style="font-size:.76rem;color:var(--text3);margin-top:2px;">CNPJ: <strong>${Utils.esc(parsed.cnpj_emitente)}</strong> · Emissão: <strong>${Utils.fmt.date(parsed.data_emissao)}</strong></div>
               </div>
               <div style="text-align:right;">
                 <div style="font-size:.72rem;color:var(--text3);text-transform:uppercase;font-weight:700;">Valor Total</div>
@@ -1258,17 +1263,17 @@ const NFe = {
               <div>
                 <label class="form-label" style="font-size:.78rem;font-weight:700;">Descrição do Lançamento *</label>
                 <input type="text" id="nfe-dest-desc" class="form-control" required
-                  value="NF ${parsed.numero_nf} — ${parsed.emitente}">
+                  value="NF ${Utils.esc(parsed.numero_nf)} — ${Utils.esc(parsed.emitente)}">
               </div>
               <div>
                 <label class="form-label" style="font-size:.78rem;font-weight:700;">Valor (R$) *</label>
                 <input type="number" step="0.01" id="nfe-dest-valor" class="form-control" required
-                  value="${parsed.valor_bruto || 0}">
+                  value="${Utils.esc(parsed.valor_bruto || 0)}">
               </div>
               <div>
                 <label class="form-label" style="font-size:.78rem;font-weight:700;">Data Vencimento *</label>
                 <input type="date" id="nfe-dest-venc" class="form-control" required
-                  value="${vencimentoPadrao}">
+                  value="${Utils.esc(vencimentoPadrao)}">
               </div>
             </div>
             ${(parsed.duplicatas || []).filter(d => Number(d.valor) > 0).length > 1 ? `<div style="margin:-4px 0 12px;font-size:.78rem;color:var(--text2);background:var(--bg-secondary);border-radius:6px;padding:8px 10px;">
@@ -1285,7 +1290,7 @@ const NFe = {
                 <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
                   <div>
                     <label class="form-label" style="font-size:.78rem;font-weight:700;">Data do Pagamento *</label>
-                    <input type="date" id="nfe-data-pagto" class="form-control" value="${Utils.today()}">
+                    <input type="date" id="nfe-data-pagto" class="form-control" value="${Utils.esc(Utils.today())}">
                   </div>
                   <div>
                     <label class="form-label" style="font-size:.78rem;font-weight:700;">Conta Bancária Debitada *</label>

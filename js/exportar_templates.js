@@ -2,12 +2,37 @@
 // Suporta: Lancamentos, Escritorio/Sede, Notas, Medicoes, Orcamentos, SINAPI, DRE e Fluxo 90d
 
 const ExportarTemplates = {
+  // AUDITORIA 2026-10-04 #7: os relatórios interpolam descrições, fornecedores, emitentes de NF-e,
+  // etapas e itens direto no HTML da prévia (#print-sheet.innerHTML). Dentro de gerar(), "DB" é esta
+  // versão que devolve cópias com todos os textos escapados — vale para todos os relatórios de uma vez.
+  _escaparProfundo(valor, nivel = 0) {
+    if (typeof valor === 'string') return Utils.escapeHtml(valor);
+    if (!valor || typeof valor !== 'object' || nivel > 8 || valor instanceof Date) return valor;
+    if (Array.isArray(valor)) return valor.map(v => this._escaparProfundo(v, nivel + 1));
+    const out = {};
+    for (const [k, v] of Object.entries(valor)) out[k] = this._escaparProfundo(v, nivel + 1);
+    return out;
+  },
+
+  _dbSeguro() {
+    const real = DB; // o DB global (const do data.js), não o "DB" local de gerar()
+    const self = this;
+    return new Proxy(real, {
+      get(alvo, chave) {
+        const v = alvo[chave];
+        if (typeof v !== 'function') return v;
+        return (...args) => self._escaparProfundo(v.apply(alvo, args));
+      }
+    });
+  },
+
   gerar(type, obraId, customOptions = {}) {
+    const DB = this._dbSeguro();
     const cs = obraId === 'todas' ? DB.getAll('clientes') : [DB.getById('clientes', obraId)].filter(Boolean);
     const clienteUnico = cs.length === 1 ? cs[0] : null;
     const emissao = new Date().toLocaleString('pt-BR');
     const emp = DB.getEmpresa();
-    const empNome = Utils.escapeHtml(emp.nome_fantasia || emp.razao_social || 'Minha Empresa');
+    const empNome = emp.nome_fantasia || emp.razao_social || 'Minha Empresa'; // já escapado (DB seguro)
     const safeLogoUrl = Utils.safeUrl(emp.logo_url);
     const logoHtml = safeLogoUrl 
       ? `<img src="${safeLogoUrl}" alt="${empNome}" style="max-height:48px;max-width:120px;object-fit:contain;">` 
@@ -160,7 +185,7 @@ const ExportarTemplates = {
             <tbody>
               ${crono.linhas.map((l, i) => `
                 <tr style="background:${i%2===0?'#fff':'#f8fafc'};border-bottom:1px solid #cbd5e1;">
-                  <td style="padding:6px 8px;font-weight:700;">${Utils.escapeHtml(l.nome)}</td>
+                  <td style="padding:6px 8px;font-weight:700;">${l.nome}</td>
                   <td style="padding:6px 8px;text-align:right;font-weight:800;">${Utils.fmt.currency(l.previstoTotal)}</td>
                   ${l.meses.slice(0, 12).map(m => `
                     <td style="padding:6px 8px;text-align:center;">
@@ -208,7 +233,7 @@ const ExportarTemplates = {
                 ${abc.itens.slice(0, 8).map((it, i) => `
                   <tr style="background:${i%2===0?'#fff':'#f8fafc'};border-bottom:1px solid #cbd5e1;">
                     <td style="padding:5px 8px;text-align:center;font-weight:700;">${it.ranking}</td>
-                    <td style="padding:5px 8px;font-weight:600;">${Utils.escapeHtml(it.descricao)}</td>
+                    <td style="padding:5px 8px;font-weight:600;">${it.descricao}</td>
                     <td style="padding:5px 8px;text-align:right;font-weight:800;">${Utils.fmt.currency(it.valorTotal)}</td>
                     <td style="padding:5px 8px;text-align:right;font-weight:700;color:#15803d;">${it.pctAcumulado}%</td>
                     <td style="padding:5px 8px;text-align:center;font-weight:900;color:${it.classe==='A'?'#991b1b':'#0f172a'};">${it.classe}</td>
@@ -243,7 +268,7 @@ const ExportarTemplates = {
           </div>
 
           <div style="margin-top:10px;background:#f8fafc;border:1px solid #cbd5e1;border-radius:6px;padding:8px 10px;font-size:.74rem;color:#334155;">
-            <strong>Diagnóstico Executivo:</strong> ${comp ? Utils.escapeHtml(comp.alertaDesc) : ''} &bull; ${cs ? Utils.escapeHtml(cs.diagnosticoTexto) : ''}
+            <strong>Diagnóstico Executivo:</strong> ${comp ? comp.alertaDesc : ''} &bull; ${cs ? cs.diagnosticoTexto : ''}
           </div>
         </div>
       </div>
@@ -853,7 +878,7 @@ const ExportarTemplates = {
         <div>
           <div style="border-bottom:1px solid #94a3b8;margin-bottom:6px;height:30px;"></div>
           <strong style="color:#0f172a;">${clienteUnico?.engenheiro_responsavel || 'Engenheiro Responsável Técnico'}</strong><br>
-          <span style="color:#64748b;font-size:.72rem;">${Utils.escapeHtml(emp.responsavel || 'Responsável Técnico')} ${emp.crea_cau ? `(${Utils.escapeHtml(emp.crea_cau)})` : ''}</span>
+          <span style="color:#64748b;font-size:.72rem;">${emp.responsavel || 'Responsável Técnico'} ${emp.crea_cau ? `(${emp.crea_cau})` : ''}</span>
         </div>
         <div>
           <div style="border-bottom:1px solid #94a3b8;margin-bottom:6px;height:30px;"></div>

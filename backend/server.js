@@ -375,16 +375,11 @@ process.on('uncaughtException', async (err) => {
     msg.includes('noise-handler') ||
     msg.includes('Decipheriv')
   ) {
-    console.warn('🚨 [Auto-Recovery] Falha de sessão interceptada. Recuperando via Evolution Go...');
-    for (const [tId, sess] of sessions.entries()) {
-      if (sess.connectionStatus !== 'connected') {
-        try {
-          await resetWhatsAppSession(tId, 'Recuperação automática de erro');
-        } catch (resetErr) {
-          console.error(`❌ [Auto-Recovery:${tId}] Falha ao resetar:`, resetErr?.message || resetErr);
-        }
-      }
-    }
+    // AUDITORIA 2026-10-04 #22: herança do Baileys. "unable to authenticate data" é o erro padrão do
+    // AES-GCM do Node (MFA, certificado A1, backup) e chamava resetWhatsAppSession em todas as
+    // empresas que não estavam "connected" na memória — apagando as sessões (QR Code de novo) se o
+    // Evolution estivesse dormindo. O WhatsApp agora roda no Evolution Go: só registra o erro.
+    console.error('🔐 [Crypto/Sessão] Erro de decifragem não tratado (sessões de WhatsApp preservadas):', err?.stack || msg);
   } else {
     console.error('Stack:', err?.stack);
     setTimeout(() => process.exit(1), 100).unref?.();
@@ -1026,10 +1021,11 @@ async function executarResumoMatinal(explicitTenantId = null) {
     `;
     tenantsToProcess = rows || [];
   } else {
-    // Itera por todos os tenants ativos no sistema
+    // Itera pelos tenants ativos. AUDITORIA 2026-10-04 #5: antes "status != 'bloqueado'" incluía
+    // empresas canceladas/arquivadas e deixava de fora as com status vazio.
     const rows = await sql`
       SELECT id, COALESCE(nome_fantasia, razao_social, id) AS nome, telefone
-      FROM tenants WHERE status != 'bloqueado';
+      FROM tenants WHERE COALESCE(status, 'ativo') NOT IN ('bloqueado', 'cancelado', 'arquivado');
     `;
     tenantsToProcess = rows || [];
   }
@@ -1043,58 +1039,91 @@ async function executarResumoMatinal(explicitTenantId = null) {
     timeZone: 'America/Boa_Vista', year: 'numeric', month: '2-digit', day: '2-digit'
   }).format(new Date());
 
+  const MAX_ITENS_RESUMO = 20;
   for (const t of tenantsToProcess) {
     const tId = t.id;
-    const session = getTenantSession(tId);
-    const destPhone = t.telefone || TARGET_PHONE;
+    // AUDITORIA 2026-10-04 #5: empresa sem telefone recebia o resumo no TARGET_PHONE (telefone fixo do
+    // servidor) — as contas de uma empresa iam para outra pessoa. O fallback só vale para o próprio
+    // tenant padrão, e só quando ele é pedido explicitamente (teste manual).
+    const destPhone = String(t.telefone || '').trim()
+      || (explicitTenantId && tId === TARGET_TENANT_ID ? TARGET_PHONE : '');
 
     if (!destPhone) {
       console.log(`ℹ️ [Cron:${tId}] Nenhum telefone cadastrado para o tenant.`);
       continue;
     }
 
+    let reservaId = null;
     try {
-      const boletos = await sql`
-        SELECT l.*, o.nome as obra_nome
-        FROM lancamentos l
-        LEFT JOIN obras o
-          ON l.obra_id = o.id
-         AND l.tenant_id = o.tenant_id
-        WHERE l.tipo = 'despesa'
-          AND l.tenant_id = ${tId}
-          AND l.status IN ('a_pagar', 'pendente', 'em_atraso')
-          AND (DATE(COALESCE(l.data_vencimento, l.data)) <= ${hoje}::date)
-        ORDER BY COALESCE(l.data_vencimento, l.data) ASC;
+      const resumo = await sql`
+        SELECT COUNT(*)::int AS qtd, COALESCE(SUM(valor), 0)::float AS total
+        FROM lancamentos
+        WHERE tipo = 'despesa' AND tenant_id = ${tId}
+          AND status IN ('a_pagar', 'pendente', 'em_atraso')
+          AND (DATE(COALESCE(data_vencimento, data)) <= ${hoje}::date);
       `;
-
-      if (!boletos || boletos.length === 0) {
+      const qtdTotal = Number(resumo?.[0]?.qtd || 0);
+      if (!qtdTotal) {
         console.log(`✅ [Cron:${tId}] Nenhuma conta pendente vencendo hoje.`);
         continue;
       }
 
-      let totalValor = 0;
+      // Uma vez por dia por empresa (deploy às 08:00 ou disparo manual não reenviam).
+      if (!explicitTenantId) {
+        const reserva = await sql`
+          INSERT INTO billing_notifications_sent (tenant_id, stage, channel, sent_date, status, metadata)
+          VALUES (${tId}, 'daily_summary', 'whatsapp', ${hoje}::date, 'sent', ${JSON.stringify({ itens: qtdTotal })}::jsonb)
+          ON CONFLICT (tenant_id, stage, sent_date) DO NOTHING
+          RETURNING id;
+        `;
+        if (!reserva.length) {
+          console.log(`ℹ️ [Cron:${tId}] Resumo matinal de hoje já enviado.`);
+          continue;
+        }
+        reservaId = reserva[0].id;
+      }
+
+      // Mensagem com as contas mais antigas (o WhatsApp recusa textos muito longos).
+      const boletos = await sql`
+        SELECT l.valor, l.fornecedor_beneficiario, l.descricao, l.data_vencimento, l.data, l.codigo_barras
+        FROM lancamentos l
+        WHERE l.tipo = 'despesa'
+          AND l.tenant_id = ${tId}
+          AND l.status IN ('a_pagar', 'pendente', 'em_atraso')
+          AND (DATE(COALESCE(l.data_vencimento, l.data)) <= ${hoje}::date)
+        ORDER BY COALESCE(l.data_vencimento, l.data) ASC
+        LIMIT ${MAX_ITENS_RESUMO};
+      `;
+
+      const totalValor = Number(resumo[0].total) || 0;
       let listaTexto = '';
       boletos.forEach((b, idx) => {
         const v = Number(b.valor) || 0;
-        totalValor += v;
         const vFmt = v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
         const dtVencFmt = formatDateBR(b.data_vencimento || b.data);
         listaTexto += `\n${idx + 1}. *${b.fornecedor_beneficiario || b.descricao || 'Conta'}*\n   💵 Valor: ${vFmt}\n   📅 Vencimento: ${dtVencFmt}\n`;
         if (b.codigo_barras) listaTexto += `   🔢 Código: \`${b.codigo_barras}\`\n`;
       });
 
+      if (qtdTotal > boletos.length) {
+        listaTexto += `\n… e mais *${qtdTotal - boletos.length} conta(s)*. Veja todas no FinGo.\n`;
+      }
+
       const totalFmt = totalValor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
       const dataLocal = new Date().toLocaleDateString('pt-BR', { timeZone: 'America/Boa_Vista' });
-      const msg = `🏢 *${t.nome.toUpperCase()} — RESUMO MATINAL*\n📅 *Data:* ${dataLocal}\n\n⚠️ *Atenção:* Você possui *${boletos.length} conta(s)* com vencimento hoje ou pendentes:\n${listaTexto}\n💰 *Total a pagar:* ${totalFmt}\n\n_Mensagem automática gerada pelo FinGo._`;
+      const msg = `🏢 *${t.nome.toUpperCase()} — RESUMO MATINAL*\n📅 *Data:* ${dataLocal}\n\n⚠️ *Atenção:* Você possui *${qtdTotal} conta(s)* com vencimento hoje ou pendentes:\n${listaTexto}\n💰 *Total a pagar:* ${totalFmt}\n\n_Mensagem automática gerada pelo FinGo._`;
 
       const evoSend = await evolutionGo.sendTextMessage(tId, destPhone, msg);
       if (evoSend.ok) {
-        console.log(`✅ [Cron:${tId}] Resumo matinal enviado para ${destPhone} via Evolution Go.`);
+        console.log(`✅ [Cron:${tId}] Resumo matinal enviado via Evolution Go.`);
       } else {
         console.log(`⚠️ [Cron:${tId}] Falha ao enviar resumo matinal via Evolution Go: ${evoSend.error}`);
+        // Libera a reserva do dia para um novo disparo manual poder tentar de novo.
+        if (reservaId) await sql`DELETE FROM billing_notifications_sent WHERE id = ${reservaId};`.catch(() => {});
       }
     } catch (tErr) {
       console.error(`❌ [Cron:${tId}] Erro ao processar tenant:`, tErr.message);
+      if (reservaId) await sql`DELETE FROM billing_notifications_sent WHERE id = ${reservaId};`.catch(() => {});
     }
   }
 }
@@ -1274,12 +1303,14 @@ async function executarVarreduraCobranca({ manualTrigger = false, forcedTenantId
   let tenants = [];
   if (forcedTenantId) {
     tenants = await sql`
-      SELECT id, razao_social, nome_fantasia, telefone, email, responsavel, plano, status, vencimento
+      -- AUDITORIA 2026-10-04 #4: vencimento como texto 'AAAA-MM-DD'. O driver devolve DATE como
+      -- objeto Date, e String(Date).split('-') dava NaN: nenhum aviso de cobrança era enviado.
+      SELECT id, razao_social, nome_fantasia, telefone, email, responsavel, plano, status, vencimento::text AS vencimento
       FROM tenants WHERE id = ${forcedTenantId};
     `;
   } else {
     tenants = await sql`
-      SELECT id, razao_social, nome_fantasia, telefone, email, responsavel, plano, status, vencimento
+      SELECT id, razao_social, nome_fantasia, telefone, email, responsavel, plano, status, vencimento::text AS vencimento
       FROM tenants 
       WHERE status NOT IN ('cancelado', 'arquivado') AND vencimento IS NOT NULL
       ORDER BY vencimento ASC;
@@ -1344,7 +1375,7 @@ async function executarVarreduraCobranca({ manualTrigger = false, forcedTenantId
     // ── CHECK ANTI-SPAM / IDEMPOTÊNCIA ──────────────────────────────
     const alreadySent = await sql`
       SELECT id FROM billing_notifications_sent
-      WHERE tenant_id = ${t.id} AND stage = ${stage}
+      WHERE tenant_id = ${t.id} AND stage = ${stage} AND status = 'sent'
         -- Uma vez por ciclo: desde 15 dias antes deste vencimento (o próximo ciclo é ~1 mês depois).
         -- O aviso de fim do trial continua diário (últimos 3 dias).
         AND sent_date >= CASE WHEN ${stage} = 'trial_ending' THEN ${hoje}::date
@@ -1352,7 +1383,9 @@ async function executarVarreduraCobranca({ manualTrigger = false, forcedTenantId
       LIMIT 1;
     `;
 
-    if (alreadySent.length > 0 && !manualTrigger) {
+    // AUDITORIA 2026-10-04 #6: o disparo manual geral (sem empresa) ignorava o anti-spam e reenviava
+    // os avisos a todas as empresas a cada clique. Só o teste de UMA empresa força o reenvio.
+    if (alreadySent.length > 0 && !(manualTrigger && forcedTenantId)) {
       console.log(`ℹ️ [BillingCron:${t.id}] Estágio "${stage}" já enviado neste ciclo de vencimento. Anti-spam ativado.`);
       summary.skippedAntiSpam++;
       summary.details.push({ tenant_id: t.id, stage, status: 'skipped_anti_spam' });

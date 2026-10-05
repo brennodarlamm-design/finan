@@ -725,7 +725,7 @@ const Orcamentos = {
                 <div style="position:relative;">
                   <select class="form-control btn-sm" id="sel-add-cat-padrao" data-fb-change="Orcamentos._onSelectAddPadrao" data-fb-change-n="1" data-fb-change-t0="self" style="cursor:pointer;font-weight:600">
                     <option value="">+ Adicionar Categoria Padrão...</option>
-                    ${this.CATEGORIAS_PADRAO.map(cp => `<option value="${cp.id}">${cp.icone} ${cp.nome}</option>`).join('')}
+                    ${this.CATEGORIAS_PADRAO.map(cp => `<option value="${Utils.esc(cp.id)}">${cp.icone} ${cp.nome}</option>`).join('')}
                   </select>
                 </div>
                 <!-- Botão Categoria Customizada -->
@@ -869,32 +869,32 @@ const Orcamentos = {
         <div class="form-group" style="margin:0">
           <label class="form-label" style="font-size:.7rem">Unidade</label>
           <select class="form-control item-unidade">
-            ${this.UNIDADES_PADRAO.map(u => `<option value="${u}" ${u === und ? 'selected' : ''}>${u}</option>`).join('')}
+            ${this.UNIDADES_PADRAO.map(u => `<option value="${Utils.esc(u)}" ${u === und ? 'selected' : ''}>${u}</option>`).join('')}
           </select>
         </div>
         <div class="form-group" style="margin:0">
           <label class="form-label" style="font-size:.7rem">Qtd.</label>
-          <input type="number" step="0.01" min="0" class="form-control item-qtd" value="${qtd}" data-fb-input="Orcamentos._calcItemRow" data-fb-input-n="1" data-fb-input-t0="string" data-fb-input-v0="${encodeURIComponent(String(itemId))}">
+          <input type="number" step="0.01" min="0" class="form-control item-qtd" value="${Utils.esc(qtd)}" data-fb-input="Orcamentos._calcItemRow" data-fb-input-n="1" data-fb-input-t0="string" data-fb-input-v0="${encodeURIComponent(String(itemId))}">
         </div>
         <div class="form-group" style="margin:0">
           <label class="form-label" style="font-size:.7rem">Unitário (R$)</label>
           <div class="input-prefix">
             <span class="input-pfx-txt">R$</span>
-            <input type="number" step="0.01" min="0" class="form-control item-unit" value="${unit}" data-fb-input="Orcamentos._calcItemRow" data-fb-input-n="1" data-fb-input-t0="string" data-fb-input-v0="${encodeURIComponent(String(itemId))}">
+            <input type="number" step="0.01" min="0" class="form-control item-unit" value="${Utils.esc(unit)}" data-fb-input="Orcamentos._calcItemRow" data-fb-input-n="1" data-fb-input-t0="string" data-fb-input-v0="${encodeURIComponent(String(itemId))}">
           </div>
         </div>
         <div class="form-group" style="margin:0">
           <label class="form-label" style="font-size:.7rem">Total Previsto (R$)</label>
           <div class="input-prefix">
             <span class="input-pfx-txt">R$</span>
-            <input type="number" step="0.01" min="0" class="form-control item-prev" value="${prev}" data-fb-input="Orcamentos._recalcModalTotals" data-fb-input-n="0">
+            <input type="number" step="0.01" min="0" class="form-control item-prev" value="${Utils.esc(prev)}" data-fb-input="Orcamentos._recalcModalTotals" data-fb-input-n="0">
           </div>
         </div>
         <div class="form-group" style="margin:0">
           <label class="form-label" style="font-size:.7rem">Realizado (R$)</label>
           <div class="input-prefix">
             <span class="input-pfx-txt">R$</span>
-            <input type="number" step="0.01" min="0" class="form-control item-real" value="${real}" data-fb-input="Orcamentos._onRealizadoChange" data-fb-input-n="1" data-fb-input-t0="string" data-fb-input-v0="${encodeURIComponent(String(itemId))}">
+            <input type="number" step="0.01" min="0" class="form-control item-real" value="${Utils.esc(real)}" data-fb-input="Orcamentos._onRealizadoChange" data-fb-input-n="1" data-fb-input-t0="string" data-fb-input-v0="${encodeURIComponent(String(itemId))}">
           </div>
         </div>
         <div style="margin-bottom:4px">
@@ -916,8 +916,8 @@ const Orcamentos = {
         </div>
         <div class="form-group" style="margin:0;display:flex;align-items:center;gap:6px;">
           <span style="font-size:.72rem;color:var(--text3);white-space:nowrap">%:</span>
-          <input type="range" class="item-pct-range" min="0" max="100" value="${pct}" style="flex:1;accent-color:var(--accent)" data-fb-input="Patch26Actions.orcamentosSyncNext" data-fb-input-n="1" data-fb-input-t0="self">
-          <input type="number" min="0" max="100" class="form-control item-pct" value="${pct}" style="width:48px;height:30px;font-size:.74rem;padding:2px 4px;text-align:center" data-fb-input="Patch26Actions.orcamentosSyncPrev" data-fb-input-n="1" data-fb-input-t0="self">
+          <input type="range" class="item-pct-range" min="0" max="100" value="${Utils.esc(pct)}" style="flex:1;accent-color:var(--accent)" data-fb-input="Patch26Actions.orcamentosSyncNext" data-fb-input-n="1" data-fb-input-t0="self">
+          <input type="number" min="0" max="100" class="form-control item-pct" value="${Utils.esc(pct)}" style="width:48px;height:30px;font-size:.74rem;padding:2px 4px;text-align:center" data-fb-input="Patch26Actions.orcamentosSyncPrev" data-fb-input-n="1" data-fb-input-t0="self">
           <span style="font-size:.72rem;color:var(--text3)">%</span>
         </div>
       </div>
@@ -1512,7 +1512,7 @@ const Orcamentos = {
       });
       Utils.toast('Orçamento cancelado.', 'info');
       this._refresh();
-    });
+    }, { allowHtml: true }); // dados já escapados
   },
 
   colocarEmRevisao(id) {
@@ -1579,7 +1579,7 @@ const Orcamentos = {
             </div>
             <div class="form-group">
               <label class="form-label">Data de Vencimento Inicial</label>
-              <input type="date" id="gen-desp-vencimento" class="form-control" value="${Utils.today()}">
+              <input type="date" id="gen-desp-vencimento" class="form-control" value="${Utils.esc(Utils.today())}">
             </div>
             <div class="form-group">
               <label class="form-label">Status Inicial dos Lançamentos</label>
@@ -1645,7 +1645,7 @@ const Orcamentos = {
                     <td style="text-align:right;">
                       <div class="input-prefix" style="max-width:140px;margin-left:auto;">
                         <span class="input-pfx-txt" style="font-size:.75rem;">R$</span>
-                        <input type="number" step="0.01" min="0" class="form-control gen-desp-val" value="${subPrev.toFixed(2)}" style="font-size:.8rem;height:32px;text-align:right;font-weight:700;">
+                        <input type="number" step="0.01" min="0" class="form-control gen-desp-val" value="${Utils.esc(subPrev.toFixed(2))}" style="font-size:.8rem;height:32px;text-align:right;font-weight:700;">
                       </div>
                     </td>
                   </tr>`;
@@ -1670,7 +1670,11 @@ const Orcamentos = {
     document.querySelectorAll('.gen-desp-chk').forEach(c => c.checked = isChecked);
   },
 
+  // AUDITORIA 2026-10-04 #17: gerar de novo duplicava todo o contas a pagar do orçamento (o botão
+  // continua visível) e sobrescrevia os vínculos do primeiro lote. Agora cada etapa guarda os
+  // lançamentos que gerou; etapas já geradas pedem confirmação e os vínculos são acumulados.
   confirmarGerarDespesaSubmit(id) {
+    if (this._gerandoDespesas) return;
     const orc = DB.getById('orcamentos', id);
     if (!orc) return;
 
@@ -1679,10 +1683,8 @@ const Orcamentos = {
     const statusLanc = document.getElementById('gen-desp-status')?.value || 'a_pagar';
 
     const fornecedores = DB.getAll('fornecedores') || [];
-    const rows = document.querySelectorAll('.gen-desp-row');
-    const lancamentosCriados = [];
-
-    rows.forEach(row => {
+    const itens = [];
+    document.querySelectorAll('.gen-desp-row').forEach(row => {
       const chk = row.querySelector('.gen-desp-chk');
       if (!chk || !chk.checked) return;
 
@@ -1704,43 +1706,71 @@ const Orcamentos = {
 
       const val = parseFloat(row.querySelector('.gen-desp-val')?.value) || 0;
       if (val <= 0) return;
-
-      const novoLanc = DB.add('lancamentos', {
-        obra_id: orc.obra_id,
-        tipo: 'despesa',
-        data: Utils.today(),
-        data_vencimento: vencimento,
-        descricao: `[Orçamento: ${orc.nome || orc.titulo || 'Obra'}] ${catNome}`,
-        categoria: 'servico',
-        categoria_obra: catNome,
-        valor: val,
-        status: statusLanc,
-        fornecedor_beneficiario: fornNome || 'Fornecedor da Etapa',
-        fornecedor_id: fornId || '',
-        conta_bancaria: contaBancaria,
-        observacoes: `Gerado a partir do Orçamento "${orc.nome || orc.titulo}" aprovado. Etapa: ${catNome}`,
-        origem: 'orcamento',
-        orcamento_id: orc.id,
-        conciliado: false
-      });
-
-      lancamentosCriados.push(novoLanc.id);
+      itens.push({ catId, catNome, fornId, fornNome, val });
     });
 
-    if (!lancamentosCriados.length) {
+    if (!itens.length) {
       Utils.toast('Selecione pelo menos uma etapa com valor para gerar despesa.', 'warning');
       return;
     }
 
-    DB.update('orcamentos', id, {
-      despesas_geradas: true,
-      despesas_geradas_em: new Date().toISOString(),
-      despesas_lancamentos_ids: lancamentosCriados
-    });
+    // Etapas que já geraram despesa (orçamentos antigos sem o mapa: todas, se já houve geração).
+    const porEtapa = orc.despesas_por_etapa && typeof orc.despesas_por_etapa === 'object' ? orc.despesas_por_etapa : null;
+    const repetidas = itens.filter(it => porEtapa ? (porEtapa[it.catId] || []).length > 0 : !!orc.despesas_geradas);
+    const gerar = () => this._gerarDespesasOrcamento(id, itens, { contaBancaria, vencimento, statusLanc });
+    if (repetidas.length) {
+      const quando = orc.despesas_geradas_em ? ` em ${Utils.fmt.date(String(orc.despesas_geradas_em).slice(0, 10))}` : '';
+      Utils.confirm(`${repetidas.length} etapa(s) selecionada(s) já tiveram despesas geradas${quando}. Gerar de novo vai criar contas a pagar em dobro no Financeiro. Deseja gerar mesmo assim?`, gerar);
+      return;
+    }
+    gerar();
+  },
 
-    Utils.closeModal();
-    Utils.toast(`Sucesso! ${lancamentosCriados.length} lançamento(s) de despesa gerado(s) no Financeiro.`, 'success');
-    this._refresh();
+  _gerarDespesasOrcamento(id, itens, { contaBancaria, vencimento, statusLanc }) {
+    if (this._gerandoDespesas) return;
+    const orc = DB.getById('orcamentos', id);
+    if (!orc) return;
+    this._gerandoDespesas = true;
+    try {
+      const porEtapa = { ...(orc.despesas_por_etapa && typeof orc.despesas_por_etapa === 'object' ? orc.despesas_por_etapa : {}) };
+      const lancamentosCriados = [];
+      for (const it of itens) {
+        const novoLanc = DB.add('lancamentos', {
+          obra_id: orc.obra_id,
+          tipo: 'despesa',
+          data: Utils.today(),
+          data_vencimento: vencimento,
+          descricao: `[Orçamento: ${orc.nome || orc.titulo || 'Obra'}] ${it.catNome}`,
+          categoria: 'servico',
+          categoria_obra: it.catNome,
+          valor: it.val,
+          status: statusLanc,
+          fornecedor_beneficiario: it.fornNome || 'Fornecedor da Etapa',
+          fornecedor_id: it.fornId || '',
+          conta_bancaria: contaBancaria,
+          observacoes: `Gerado a partir do Orçamento "${orc.nome || orc.titulo}" aprovado. Etapa: ${it.catNome}`,
+          origem: 'orcamento',
+          orcamento_id: orc.id,
+          conciliado: false
+        });
+        if (!novoLanc?.id) continue;
+        lancamentosCriados.push(novoLanc.id);
+        porEtapa[it.catId] = [...(porEtapa[it.catId] || []), novoLanc.id];
+      }
+
+      DB.update('orcamentos', id, {
+        despesas_geradas: true,
+        despesas_geradas_em: new Date().toISOString(),
+        despesas_lancamentos_ids: [...(Array.isArray(orc.despesas_lancamentos_ids) ? orc.despesas_lancamentos_ids : []), ...lancamentosCriados],
+        despesas_por_etapa: porEtapa
+      });
+
+      Utils.closeModal();
+      Utils.toast(`Sucesso! ${lancamentosCriados.length} lançamento(s) de despesa gerado(s) no Financeiro.`, 'success');
+      this._refresh();
+    } finally {
+      this._gerandoDespesas = false;
+    }
   },
 
   del(id) {

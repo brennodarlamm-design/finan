@@ -59,7 +59,7 @@ const PreComprasWorkflow = {
               </div>
               <div style="width:140px;">
                 <label class="form-label" style="font-size:.72rem;">Vencimento</label>
-                <input type="date" id="aprov-vencimento" class="form-control" style="font-size:.8rem;" value="${p.data_necessidade || Utils.today()}">
+                <input type="date" id="aprov-vencimento" class="form-control" style="font-size:.8rem;" value="${Utils.esc(p.data_necessidade || Utils.today())}">
               </div>
             </div>
           </div>
@@ -220,7 +220,7 @@ const PreComprasWorkflow = {
           <div class="g2">
             <div class="form-group">
               <label class="form-label">Data de Vencimento</label>
-              <input type="date" id="conv-vencimento" class="form-control" value="${p.data_necessidade || Utils.today()}">
+              <input type="date" id="conv-vencimento" class="form-control" value="${Utils.esc(p.data_necessidade || Utils.today())}">
             </div>
             <div class="form-group">
               <label class="form-label">Status Inicial</label>

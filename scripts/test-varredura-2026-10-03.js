@@ -525,10 +525,10 @@ function appCtx(modulos) {
   const auth = { authenticated: true, tenantId: 'acme', user: { id: 'u1', perfil: 'admin', tenantPlan: 'profissional' } };
   const link = await call(portal.handlePortalLinkSign, { obraId: 'ob1' }, { resolveAuth: async () => auth });
   assert.equal(link.status, 200); assert.equal(link.out.v, 2);
-  const url = `https://fingo.api.br/portal?portal_obra=${link.out.obra}&tenant=${link.out.tenant}&exp=${link.out.exp}&sig=${link.out.sig}`;
+  const url = `https://fingo.api.br/portal?portal_obra=${link.out.obra}&tenant=${link.out.tenant}&exp=${link.out.exp}&sig=${link.out.sig}&scope=${link.out.scope}`;
   assert(url.length < 250, `link curto (${url.length} caracteres)`);
   assert.equal((await call(portal.handlePortalLinkSign, { obraId: 'ob9' }, { resolveAuth: async () => auth })).status, 404, 'obra de outra empresa não gera link');
-  const ref = { tenant: link.out.tenant, obra: link.out.obra, exp: link.out.exp, sig: link.out.sig };
+  const ref = { tenant: link.out.tenant, obra: link.out.obra, exp: link.out.exp, sig: link.out.sig, scope: link.out.scope };
   const dados = await call(portal.handlePortalData, ref);
   assert.equal(dados.status, 200);
   const b = dados.out.bundle;
@@ -860,7 +860,7 @@ function appCtx(modulos) {
   const fetchImpl = async (url) => (url.endsWith('conta-A.pdf')
     ? { ok: true, headers: { get: () => 'application/pdf' }, arrayBuffer: async () => pdf }
     : { ok: false, status: 404, headers: { get: () => '' } });
-  const res = await migrateLegacyDocumentsToR2(env, { sql, fetchImpl });
+  const res = await migrateLegacyDocumentsToR2(env, { sql, fetchImpl, force: true });
   const doc = async id => (await db.query(`SELECT * FROM documentos WHERE id=$1`, [id])).rows[0];
   const a = await doc('A');
   assert(a.url.startsWith('r2://'), 'A migrado');

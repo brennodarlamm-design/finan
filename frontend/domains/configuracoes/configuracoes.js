@@ -278,7 +278,7 @@ const Configuracoes = {
         <td><span style="font-family:monospace;font-size:.78rem;color:var(--text3);">${e(s.predecessor_id || 'Início da Obra')}</span></td>
         <td style="width:140px;">
           <div style="display:flex;align-items:center;gap:6px;">
-            <input type="number" class="form-control" name="sla_dias_${s.id}" value="${s.dias_sla}" min="1" max="365" style="width:75px;padding:4px 8px;text-align:right;">
+            <input type="number" class="form-control" name="sla_dias_${s.id}" value="${Utils.esc(s.dias_sla)}" min="1" max="365" style="width:75px;padding:4px 8px;text-align:right;">
             <span style="font-size:.78rem;color:var(--text3);">dias</span>
           </div>
         </td>
@@ -1135,7 +1135,7 @@ const Configuracoes = {
     };
 
     const makeEmojiSelect = (id) =>
-      `<select class="form-control" id="${id}" style="font-size:1.1rem;width:80px;">${EMOJIS.map(e => `<option value="${e}">${e}</option>`).join('')}</select>`;
+      `<select class="form-control" id="${id}" style="font-size:1.1rem;width:80px;">${EMOJIS.map(e => `<option value="${Utils.esc(e)}">${e}</option>`).join('')}</select>`;
 
     const customForn = typeof Fornecedores !== 'undefined' ? Fornecedores._getCustomCategorias() : [];
     const customDesp = (typeof Utils !== 'undefined' && Utils.getCustomCats) ? Utils.getCustomCats('despesa') : (typeof Escritorio !== 'undefined' ? Escritorio._getAllDespesaCats() : []);

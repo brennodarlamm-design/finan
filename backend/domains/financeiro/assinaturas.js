@@ -79,17 +79,26 @@ export default async function handler(req, res) {
         return res.status(400).json({ success: false, valid: false, error: 'Código de validação inválido.' });
       }
 
-      const rows = await publicSql`
-        SELECT
-          s.codigo_validacao, s.hash_sha256, s.nome, s.doc, s.papel,
-          s.doc_tipo, s.doc_id, s.doc_numero, s.data_hora, s.data_hora_fmt,
-          s.ip_dispositivo, s.created_at,
-          t.nome_fantasia, t.razao_social, t.cnpj, t.cidade, t.uf
-        FROM document_signatures s
-        JOIN tenants t ON t.id = s.tenant_id
-        WHERE UPPER(s.codigo_validacao) = ${code}
-        LIMIT 1;
-      `;
+      // AUDITORIA 2026-10-04 #12: leitura pela função da migração 040 (só o registro deste código),
+      // sem depender da política RLS pública que expunha as assinaturas de todas as empresas.
+      // Até a migração 040 ser aplicada, cai na consulta antiga.
+      let rows;
+      try {
+        rows = await publicSql`SELECT * FROM validar_assinatura_publica(${code});`;
+      } catch (fnErr) {
+        if (!/validar_assinatura_publica/.test(String(fnErr?.message || ''))) throw fnErr;
+        rows = await publicSql`
+          SELECT
+            s.codigo_validacao, s.hash_sha256, s.nome, s.doc, s.papel,
+            s.doc_tipo, s.doc_id, s.doc_numero, s.data_hora, s.data_hora_fmt,
+            s.ip_dispositivo, s.created_at,
+            t.nome_fantasia, t.razao_social, t.cnpj, t.cidade, t.uf
+          FROM document_signatures s
+          JOIN tenants t ON t.id = s.tenant_id
+          WHERE UPPER(s.codigo_validacao) = ${code}
+          LIMIT 1;
+        `;
+      }
 
       if (!rows.length) {
         return res.status(404).json({ success: true, valid: false, error: 'Código não localizado na base central.' });
@@ -172,8 +181,16 @@ export default async function handler(req, res) {
         `;
       } catch (err) {
         if (String(err?.message || '').toLowerCase().includes('unique')) {
-          const existing = await tenantSql`SELECT tenant_id, hash_sha256 FROM document_signatures WHERE codigo_validacao=${codigo} LIMIT 1;`;
-          if (existing.length && existing[0].tenant_id === auth.tenantId && String(existing[0].hash_sha256).toLowerCase() === hash) {
+          // AUDITORIA 2026-10-04 #12: status pelo banco, sem ler a linha de outra empresa.
+          let mesmoRegistro = false;
+          try {
+            const st = await tenantSql`SELECT codigo_assinatura_status(${codigo}, ${auth.tenantId}, ${hash}) AS st;`;
+            mesmoRegistro = st[0]?.st === 'mesmo_registro';
+          } catch {
+            const existing = await tenantSql`SELECT tenant_id, hash_sha256 FROM document_signatures WHERE codigo_validacao=${codigo} LIMIT 1;`;
+            mesmoRegistro = !!(existing.length && existing[0].tenant_id === auth.tenantId && String(existing[0].hash_sha256).toLowerCase() === hash);
+          }
+          if (mesmoRegistro) {
             return res.status(200).json({ success: true, codigo_validacao: codigo, already_registered: true });
           }
           return res.status(409).json({ success: false, error: 'Código de validação já registrado.' });

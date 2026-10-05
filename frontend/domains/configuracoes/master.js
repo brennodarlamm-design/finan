@@ -2798,11 +2798,13 @@ const MasterAdmin = {
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok || !data.success) {
-        throw new Error(data.error || `Erro ${res.status} na varredura`);
+        throw new Error(data.message || data.error || `Erro ${res.status} na varredura`);
       }
 
       const resObj = data.result || {};
-      const msg = `⚡ Varredura Concluída!\n\n• Empresas avaliadas: ${resObj.totalEvaluated || 0}\n• Notificações enviadas: ${resObj.notified || 0}\n• Bloqueadas por anti-spam (já notificadas hoje): ${resObj.skippedAntiSpam || 0}\n• Engine utilizada: ${data.engine === 'render' ? 'Robô 24/7 Render' : 'Neon Serverless Fallback'}`;
+      const msg = resObj.pending
+        ? `⏳ ${resObj.message || 'Varredura iniciada no servidor de envio.'}`
+        : `⚡ Varredura Concluída!\n\n• Empresas avaliadas: ${resObj.totalEvaluated || 0}\n• Notificações enviadas: ${resObj.notified || 0}\n• Já avisadas neste ciclo (anti-spam): ${resObj.skippedAntiSpam || 0}`;
 
       alert(msg);
       if (typeof Utils !== 'undefined' && Utils.toast) {

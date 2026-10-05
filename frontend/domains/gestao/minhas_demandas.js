@@ -30,7 +30,7 @@ const MinhasDemandas = {
     if (!u) return '<div class="empty-state"><h3>Usuário não autenticado</h3></div>';
 
     const demandas = typeof CronogramaSLA !== 'undefined'
-      ? CronogramaSLA.getDemandas(u.id)
+      ? CronogramaSLA.getDemandas(u.userId || u.id) // AUDITORIA 2026-10-04 #16: a sessão guarda "userId"
       : [];
 
     const hoje = typeof Utils !== 'undefined' ? Utils.today() : new Date().toISOString().slice(0, 10);
@@ -239,7 +239,7 @@ const MinhasDemandas = {
   getBadgeCount() {
     const u = typeof Auth !== 'undefined' ? Auth.getUser() : null;
     if (!u) return 0;
-    const demandas = typeof CronogramaSLA !== 'undefined' ? CronogramaSLA.getDemandas(u.id) : [];
+    const demandas = typeof CronogramaSLA !== 'undefined' ? CronogramaSLA.getDemandas(u.userId || u.id) : [];
     const hoje = typeof Utils !== 'undefined' ? Utils.today() : new Date().toISOString().slice(0, 10);
     const d5 = new Date(hoje + 'T12:00:00'); d5.setDate(d5.getDate() + 5);
     const dMais5 = d5.toISOString().slice(0, 10);

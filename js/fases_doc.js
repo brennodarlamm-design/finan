@@ -256,9 +256,9 @@ const FasesDoc = {
       <span style="font-size:1rem;flex-shrink:0;width:22px;text-align:center">${doc.icone}</span>
       <div style="flex:1;min-width:0">
         <div style="font-size:.845rem;font-weight:600;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-          ${doc.nome}
+          ${Utils.esc(doc.nome)}
           ${qtdArq > 0 ? `<span style="font-size:.68rem;background:rgba(198,255,0,.15);color:var(--accent);border:1px solid rgba(198,255,0,.25);border-radius:5px;padding:1px 7px;cursor:pointer;font-weight:700" data-fb-click="FasesDoc.showDocModal" data-fb-click-n="2" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(obraId))}" data-fb-click-t1="string" data-fb-click-v1="${encodeURIComponent(String(doc.id))}" title="${qtdArq} anexo(s)">📎 ${qtdArq}</span>` : ''}
-          ${linkExternoUrl ? `<a href="${linkExternoUrl}" target="_blank" rel="noopener noreferrer"
+          ${Utils.safeUrl(linkExternoUrl) ? `<a href="${Utils.safeUrl(linkExternoUrl)}" target="_blank" rel="noopener noreferrer"
                                  style="font-size:.68rem;background:rgba(66,133,244,.15);color:#4285F4;border:1px solid rgba(66,133,244,.3);border-radius:5px;padding:1px 7px;text-decoration:none;font-weight:700;display:inline-flex;align-items:center;gap:3px"
                                  title="Abrir pasta/arquivo no Google Drive ou Nuvem">📁 ${linkExternoTipo==='gdrive'?'Drive':linkExternoTipo==='onedrive'?'OneDrive':'Link'}</a>` : ''}
         </div>
@@ -331,7 +331,7 @@ const FasesDoc = {
     const obra = DB.getById('clientes', obraId);
     const faseLabel = this.FASES_META[faseKey]?.label || '';
     const statusOpts = Object.entries(this.STATUS).map(([k, v]) =>
-      `<option value="${k}" ${doc.status === k ? 'selected' : ''}>${v.icone} ${v.label}</option>`
+      `<option value="${Utils.esc(k)}" ${doc.status === k ? 'selected' : ''}>${v.icone} ${v.label}</option>`
     ).join('');
     const arquivosHtml = this._buildArquivosHtml(obraId, docId, doc.arquivos || []);
 
@@ -339,7 +339,7 @@ const FasesDoc = {
     <div class="modal-overlay" id="modal-fases-doc" data-fb-click="Patch26Actions.fasesBackdropClose" data-fb-click-n="2" data-fb-click-t0="event" data-fb-click-t1="self">
       <div class="modal" style="max-width:580px">
         <div class="modal-header">
-          <div class="modal-title">${tmpl.icone} ${tmpl.nome}</div>
+          <div class="modal-title">${tmpl.icone} ${Utils.esc(tmpl.nome)}</div>
           <button class="modal-close" data-fb-click="FasesDoc.closeModal" data-fb-click-n="0">✕</button>
         </div>
         <div class="modal-body">
@@ -359,21 +359,21 @@ const FasesDoc = {
           <div class="form-row cols-2">
             <div class="form-group">
               <label class="form-label">Data de Obtenção</label>
-              <input type="date" class="form-control" id="fd-data-obtencao" value="${doc.data_obtencao||''}">
+              <input type="date" class="form-control" id="fd-data-obtencao" value="${Utils.esc(doc.data_obtencao||'')}">
             </div>
             <div class="form-group">
               <label class="form-label">Validade <span style="font-size:.7rem;color:var(--text3)">(certidões)</span></label>
-              <input type="date" class="form-control" id="fd-data-validade" value="${doc.data_validade||''}">
+              <input type="date" class="form-control" id="fd-data-validade" value="${Utils.esc(doc.data_validade||'')}">
             </div>
           </div>
           <div class="form-row cols-2">
             <div class="form-group">
               <label class="form-label">Órgão / Emissor</label>
-              <input class="form-control" id="fd-orgao" value="${doc.orgao_emissor||''}" placeholder="Prefeitura, CREA, CEF...">
+              <input class="form-control" id="fd-orgao" value="${Utils.esc(doc.orgao_emissor||'')}" placeholder="Prefeitura, CREA, CEF...">
             </div>
             <div class="form-group">
               <label class="form-label">Nº Protocolo / Registro</label>
-              <input class="form-control" id="fd-protocolo" value="${doc.protocolo||''}" placeholder="Nº do documento oficial">
+              <input class="form-control" id="fd-protocolo" value="${Utils.esc(doc.protocolo||'')}" placeholder="Nº do documento oficial">
             </div>
           </div>
           <div class="form-group">
@@ -453,23 +453,23 @@ const FasesDoc = {
       const icone = isGDrive ? '📁' : isOneDrive ? '☁️' : '🔗';
       const badge = isGDrive ? 'Drive' : isOneDrive ? 'OneDrive' : 'Link';
       const badgeBg = isGDrive ? '#4285F4' : isOneDrive ? '#0078D4' : 'var(--accent)';
-      return `<div class="rec-item" id="arq-row-${aid}" style="margin-bottom:6px">
+      return `<div class="rec-item" id="arq-row-${Utils.esc(aid)}" style="margin-bottom:6px">
         <span style="font-size:1.1rem">${icone}</span>
         <div style="flex:1;min-width:0;display:flex;align-items:center;gap:6px;">
           <span style="font-size:.65rem;font-weight:800;background:${badgeBg};color:#fff;padding:1px 5px;border-radius:3px;">${badge}</span>
-          <div style="flex:1;min-width:0;font-size:.8rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text)">${d.titulo || d.url_externa}</div>
+          <div style="flex:1;min-width:0;font-size:.8rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text)">${Utils.esc(d.titulo || d.url_externa)}</div>
         </div>
         <div style="display:flex;gap:5px;flex-shrink:0">
-          <a href="${d.url_externa}" target="_blank" rel="noopener noreferrer" class="btn btn-sm btn-ghost" style="padding:2px 8px;font-size:.72rem;color:var(--accent);text-decoration:none;" title="Abrir link externo">🔗 Abrir</a>
+          <a href="${Utils.safeUrl(d.url_externa) || '#'}" target="_blank" rel="noopener noreferrer" class="btn btn-sm btn-ghost" style="padding:2px 8px;font-size:.72rem;color:var(--accent);text-decoration:none;" title="Abrir link externo">🔗 Abrir</a>
           <button class="btn btn-sm btn-ghost" style="padding:2px 8px;font-size:.72rem;color:var(--danger)" data-fb-click="FasesDoc._removerArqModal" data-fb-click-n="3" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(obraId))}" data-fb-click-t1="string" data-fb-click-v1="${encodeURIComponent(String(docId))}" data-fb-click-t2="string" data-fb-click-v2="${encodeURIComponent(String(aid))}" title="Remover link">🗑</button>
         </div>
       </div>`;
     }
     const nome = d?.titulo || d?.nome || aid;
     const icone = nome.match(/\.pdf$/i) ? '📄' : nome.match(/\.(png|jpg|jpeg|webp)$/i) ? '🖼️' : nome.match(/\.(dwg|dxf)$/i) ? '📐' : nome.match(/\.(zip|rar|7z|tar|gz)$/i) ? '📦' : '📎';
-    return `<div class="rec-item" id="arq-row-${aid}" style="margin-bottom:6px">
+    return `<div class="rec-item" id="arq-row-${Utils.esc(aid)}" style="margin-bottom:6px">
       <span style="font-size:1rem">${icone}</span>
-      <div style="flex:1;min-width:0;font-size:.8rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${nome}</div>
+      <div style="flex:1;min-width:0;font-size:.8rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${Utils.esc(nome)}</div>
       <div style="display:flex;gap:5px;flex-shrink:0">
         <button class="btn btn-sm btn-ghost" style="padding:2px 8px;font-size:.72rem" data-fb-click="Patch26Actions.documentosView" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(aid))}" title="Visualizar ou Baixar">👁 Ver</button>
         <button class="btn btn-sm btn-ghost" style="padding:2px 8px;font-size:.72rem" data-fb-click="Patch26Actions.documentosDownload" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(aid))}" title="Baixar arquivo">⬇️</button>
