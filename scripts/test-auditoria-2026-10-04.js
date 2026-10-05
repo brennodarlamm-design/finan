@@ -452,7 +452,8 @@ console.log('=== Auditoria 04/10/2026 ===\n');
   assert(!/script-src[^`]*cdnjs/.test(worker) && worker.includes(`"worker-src 'self' blob:",`));
   for (const f of ['jszip.min.js', 'jspdf.umd.min.js', 'pdf.min.mjs', 'pdf.worker.min.mjs', 'three.min.js']) assert(fs.existsSync(`js/vendor/${f}`), f);
   assert(read('js/vendor/jspdf.umd.min.js').includes('3.0.4'), 'jsPDF 3.0.4');
-  assert(read('js/assets.js').includes('xlsx-0.20.3'));
+  assert(fs.existsSync('js/vendor/xlsx.full.min.js') && read('js/vendor/xlsx.full.min.js').includes('0.20.3'), 'xlsx 0.20.3 local');
+  assert(read('js/assets.js').includes('/js/vendor/xlsx.full.min.js') && !worker.includes('cdn.sheetjs.com'));
   for (const f of ['js/assets.js', 'js/ocr.js', 'js/pdfjs_bootstrap.js', 'bim.html']) assert(!read(f).includes('cdnjs.cloudflare.com'), `${f} sem cdnjs`);
   // #29 workers.dev de produção.
   assert(worker.includes('function blockProductionWorkersDev(request, env)') && worker.includes("if (String(env?.FINOBRA_PREVIEW_COMMIT || '').trim()) return null;"));

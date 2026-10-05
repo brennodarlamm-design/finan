@@ -2,8 +2,8 @@
 const FinObraAssets = (() => {
   const registry = Object.freeze({
     // AUDITORIA 2026-10-04 #28: xlsx 0.20.3 (CVE-2024-22363, ReDoS); jsPDF 3.0.4 (CVE-2025-29907/57810)
-    // e JSZip servidos do próprio domínio. O xlsx segue no CDN oficial (cdn.sheetjs.com) até ser copiado.
-    excel: { src:'https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js', ready:() => typeof XLSX !== 'undefined' },
+    // e JSZip servidos do próprio domínio. O xlsx 0.20.3 também é servido do próprio domínio.
+    excel: { src:'/js/vendor/xlsx.full.min.js', ready:() => typeof XLSX !== 'undefined' },
     zip: { src:'/js/vendor/jszip.min.js?v=3.10.1', ready:() => typeof JSZip !== 'undefined' },
     pdf: { src:'/js/vendor/jspdf.umd.min.js?v=3.0.4', ready:() => !!window.jspdf?.jsPDF },
     charts: { src:'/js/vendor/chart.umd.min.js?v=4.4.0', ready:() => typeof Chart !== 'undefined' },

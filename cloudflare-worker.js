@@ -190,7 +190,7 @@ function buildContentSecurityPolicy(nonce) {
     "form-action 'self'",
     // AUDITORIA 2026-10-04 #28: sem o cdnjs inteiro (qualquer biblioteca do CDN servia de "gadget" para
     // contornar o nonce). jsPDF, JSZip, pdf.js e three.js vêm de /js/vendor.
-    `script-src 'self' 'nonce-${nonce}' https://accounts.google.com https://apis.google.com https://cdn.sheetjs.com https://static.cloudflareinsights.com`,
+    `script-src 'self' 'nonce-${nonce}' https://accounts.google.com https://apis.google.com https://static.cloudflareinsights.com`,
     "script-src-attr 'none'",
     "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://accounts.google.com",
     "font-src 'self' data: https://fonts.gstatic.com",
