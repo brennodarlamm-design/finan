@@ -224,8 +224,29 @@ export async function runBulkSinapiIngest(competencia = '2026-08') {
       const wb = XLSXModule.read(buf, { type: 'buffer' });
       const sql = getSql();
 
+      // AUDITORIA 2026-10-04 #23: a linha 4 (colunas das UFs) era obtida com sheet_to_json da planilha
+      // inteira para cada UF × regime (108 vezes, síncrono, travando o processo por minutos).
+      // Agora lê só a linha 4, uma vez por planilha.
+      const colunasUF = (sheet) => {
+        const mapa = {};
+        if (!sheet) return mapa;
+        const range = XLSXModule.utils.decode_range(sheet['!ref'] || 'A1:ZZ10');
+        for (let c = range.s.c; c <= range.e.c; c++) {
+          const cel = sheet[XLSXModule.utils.encode_cell({ r: 3, c })];
+          const sigla = String(cel?.v ?? '').trim().toUpperCase();
+          if (/^[A-Z]{2}$/.test(sigla) && mapa[sigla] === undefined) mapa[sigla] = c;
+        }
+        return mapa;
+      };
+      const ufCols = {
+        CSD: colunasUF(wb.Sheets.CSD), CCD: colunasUF(wb.Sheets.CCD),
+        ISD: colunasUF(wb.Sheets.ISD), ICD: colunasUF(wb.Sheets.ICD)
+      };
+
       const totalUfs = UFS_BRASIL.length;
       for (let i = 0; i < totalUfs; i++) {
+        // Devolve a vez ao event loop entre UFs (health check, crons e WhatsApp continuam respondendo).
+        await new Promise(r => setImmediate(r));
         const uf = UFS_BRASIL[i];
         RobotState.currentUF = uf;
         RobotState.progressPct = Math.round(((i + 1) / totalUfs) * 100);
@@ -238,13 +259,8 @@ export async function runBulkSinapiIngest(competencia = '2026-08') {
           const insumoSheet = wb.Sheets[desonerado ? 'ICD' : 'ISD'];
           if (!compSheet) continue;
 
-          // Localiza coluna da UF na linha 4
-          const compRows = XLSXModule.utils.sheet_to_json(compSheet, { header: 1, defval: '' });
-          const ufRow = compRows[3] || [];
-          let compPriceCol = -1;
-          for (let c = 0; c < ufRow.length; c++) {
-            if (String(ufRow[c]).trim().toUpperCase() === uf) { compPriceCol = c; break; }
-          }
+          // Coluna da UF na linha 4 (lida uma vez por planilha)
+          const compPriceCol = ufCols[desonerado ? 'CCD' : 'CSD'][uf] ?? -1;
           if (compPriceCol === -1) continue;
 
           const compRange = XLSXModule.utils.decode_range(compSheet['!ref'] || 'A1:ZZ10000');
@@ -292,12 +308,7 @@ export async function runBulkSinapiIngest(competencia = '2026-08') {
 
           // Insumos
           if (insumoSheet) {
-            const insumoRows = XLSXModule.utils.sheet_to_json(insumoSheet, { header: 1, defval: '' });
-            const inUfRow = insumoRows[3] || [];
-            let inPriceCol = -1;
-            for (let c = 0; c < inUfRow.length; c++) {
-              if (String(inUfRow[c]).trim().toUpperCase() === uf) { inPriceCol = c; break; }
-            }
+            const inPriceCol = ufCols[desonerado ? 'ICD' : 'ISD'][uf] ?? -1;
 
             if (inPriceCol !== -1) {
               const inRange = XLSXModule.utils.decode_range(insumoSheet['!ref'] || 'A1:ZZ10000');
@@ -348,12 +359,20 @@ export async function runBulkSinapiIngest(competencia = '2026-08') {
                 DO UPDATE SET total_itens = EXCLUDED.total_itens, atualizado_em = CURRENT_TIMESTAMP;
               `;
 
-              // Insere os primeiros 200 itens representativos por lote para lookup rápido
-              for (const item of batchItems.slice(0, 300)) {
+              // AUDITORIA 2026-10-04 #23: gravava só os 300 primeiros itens (e registrava o total como se
+              // tivesse gravado todos). Agora grava todos, em lotes de 500 por INSERT.
+              for (let k = 0; k < batchItems.length; k += 500) {
+                const lote = batchItems.slice(k, k + 500);
                 await sql`
                   INSERT INTO itens_referenciais (id, banco, uf, referencia, desonerado, tipo, codigo, descricao, unidade, preco_unitario)
-                  VALUES (${item.id}, ${item.banco}, ${item.uf}, ${item.referencia}, ${item.desonerado}, ${item.tipo}, ${item.codigo}, ${item.descricao}, ${item.unidade}, ${item.preco_unitario})
-                  ON CONFLICT (id) DO UPDATE SET preco_unitario = EXCLUDED.preco_unitario;
+                  SELECT * FROM unnest(
+                    ${lote.map(it => it.id)}::text[], ${lote.map(it => it.banco)}::text[], ${lote.map(it => it.uf)}::text[],
+                    ${lote.map(it => it.referencia)}::text[], ${lote.map(it => it.desonerado)}::boolean[], ${lote.map(it => it.tipo)}::text[],
+                    ${lote.map(it => it.codigo)}::text[], ${lote.map(it => it.descricao)}::text[], ${lote.map(it => it.unidade)}::text[],
+                    ${lote.map(it => it.preco_unitario)}::numeric[]
+                  )
+                  ON CONFLICT (id) DO UPDATE SET
+                    descricao = EXCLUDED.descricao, unidade = EXCLUDED.unidade, preco_unitario = EXCLUDED.preco_unitario;
                 `;
               }
             } catch (dbErr) {

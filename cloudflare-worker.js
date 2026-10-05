@@ -2,7 +2,7 @@ import { executeEdgeApi } from './api/_edge-adapter.js';
 import { applyEdgeSecurityMiddleware } from './api/_edge-security.js';
 import { recordEdgeMetric, getEdgeMetricsSummary, renderEdgeMetricsHtml } from './api/_edge-metrics.js';
 import { dispatchEdgeAlert } from './api/_edge-alerts.js';
-import { createCriticalR2Backup, migrateLegacyDocumentsToR2 } from './api/_edge-backup.js';
+import { createCriticalR2Backup, migrateLegacyDocumentsToR2, verificarBackupDoDia } from './api/_edge-backup.js';
 export { BudgetSyncRoom } from './api/_edge-realtime.js';
 import { canAccessModule } from './api/_permissions.js';
 
@@ -96,6 +96,21 @@ function isMasterShellPath(pathname) {
   return pathname === '/master' || pathname === '/master.html';
 }
 
+function blockProductionWorkersDev(request, env) {
+  try {
+    const incoming = new URL(request.url);
+    if (!incoming.hostname.endsWith('.workers.dev')) return null;
+    if (String(env?.FINOBRA_PREVIEW_COMMIT || '').trim()) return null; // preview de PR
+    if (isApiPath(incoming.pathname)) {
+      return Response.json({ success: false, error: 'Use https://fingo.api.br.' }, { status: 403, headers: { 'Cache-Control': 'no-store' } });
+    }
+    const canonical = new URL(canonicalOrigin(env));
+    return Response.redirect(new URL(incoming.pathname + incoming.search, canonical).toString(), 301);
+  } catch {
+    return null;
+  }
+}
+
 function canonicalRedirect(request, env) {
   const method = String(request.method || 'GET').toUpperCase();
   if (!['GET', 'HEAD'].includes(method)) return null;
@@ -162,14 +177,16 @@ function buildContentSecurityPolicy(nonce) {
     "object-src 'none'",
     "frame-ancestors 'self'",
     "form-action 'self'",
-    `script-src 'self' 'nonce-${nonce}' https://accounts.google.com https://apis.google.com https://cdn.sheetjs.com https://cdnjs.cloudflare.com https://static.cloudflareinsights.com`,
+    // AUDITORIA 2026-10-04 #28: sem o cdnjs inteiro (qualquer biblioteca do CDN servia de "gadget" para
+    // contornar o nonce). jsPDF, JSZip, pdf.js e three.js vêm de /js/vendor.
+    `script-src 'self' 'nonce-${nonce}' https://accounts.google.com https://apis.google.com https://cdn.sheetjs.com https://static.cloudflareinsights.com`,
     "script-src-attr 'none'",
     "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://accounts.google.com",
     "font-src 'self' data: https://fonts.gstatic.com",
     "img-src 'self' data: blob: https:",
     "connect-src 'self' https://accounts.google.com https://apis.google.com https://www.googleapis.com https://content.googleapis.com https://generativelanguage.googleapis.com https://brasilapi.com.br https://viacep.com.br https://api.meudanfe.com.br https://finan-wf12.onrender.com https://*.blob.vercel-storage.com https://cloudflareinsights.com https://raw.githubusercontent.com https://github.com https://*.ingest.us.sentry.io https://*.ingest.sentry.io https://*.sentry.io",
     "frame-src 'self' blob: data: https://accounts.google.com https://drive.google.com https://docs.google.com",
-    "worker-src 'self' blob: https://cdnjs.cloudflare.com",
+    "worker-src 'self' blob:",
     "manifest-src 'self'",
     "media-src 'self' blob: https:",
     'upgrade-insecure-requests'
@@ -1595,6 +1612,12 @@ export default {
       return securityBlock;
     }
 
+    // AUDITORIA 2026-10-04 #29: o Worker de produção também respondia em *.workers.dev, fora das
+    // regras de WAF e limite de requisições da zona fingo.api.br. Páginas redirecionam para o domínio
+    // oficial e a API recusa. Os previews de PR (FINOBRA_PREVIEW_COMMIT) continuam no workers.dev.
+    const workersDev = blockProductionWorkersDev(request, env);
+    if (workersDev) return workersDev;
+
     const redirect = canonicalRedirect(request, env);
     if (redirect) return redirect;
 
@@ -1759,6 +1782,13 @@ export default {
         if (!result?.skipped) console.log('[FinGo Backup] Snapshot crítico salvo:', result?.key || result);
       }).catch(err => {
         console.error('[FinGo Backup] Falha no snapshot crítico:', err?.message || err);
+      })
+    );
+
+    // AUDITORIA 2026-10-04 #21: alerta se o backup do dia não foi gravado (janela 08:00 UTC).
+    ctx.waitUntil(
+      verificarBackupDoDia(env).catch(err => {
+        console.error('[FinGo Backup] Falha ao verificar o backup do dia:', err?.message || err);
       })
     );
 

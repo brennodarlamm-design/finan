@@ -44,11 +44,43 @@ function safeJson(value) {
   });
 }
 
+// AUDITORIA 2026-10-04 #21: o snapshot inteiro fica na memória do Worker (128 MB) — JSON, bytes e
+// versão cifrada. Os binários legados (documentos.base64_data) já vão para o R2 e não entram aqui,
+// e o audit_logs (que só cresce) entra com os últimos 90 dias.
+const BACKUP_SEM_COLUNAS = Object.freeze({ documentos: ['base64_data'] });
+const BACKUP_FILTRO = Object.freeze({ audit_logs: `WHERE created_at >= NOW() - INTERVAL '90 days'` });
+
 async function readCriticalTable(sql, table) {
   // Identificadores nunca vêm de entrada externa: apenas da allowlist acima.
-  const query = `SELECT * FROM "${table.replace(/"/g, '""')}" ORDER BY 1`;
+  const nome = `"${table.replace(/"/g, '""')}"`;
+  const filtro = BACKUP_FILTRO[table] || '';
+  const sem = BACKUP_SEM_COLUNAS[table];
+  const query = sem
+    ? `SELECT to_jsonb(t) - ${sem.map(c => `'${c}'`).join(' - ')} AS __row FROM ${nome} t ${filtro} ORDER BY 1`
+    : `SELECT * FROM ${nome} ${filtro} ORDER BY 1`;
   const rows = await sql.query(query);
-  return Array.isArray(rows) ? rows : (rows?.rows || []);
+  const lista = Array.isArray(rows) ? rows : (rows?.rows || []);
+  return sem ? lista.map(r => (r && r.__row !== undefined ? r.__row : r)) : lista;
+}
+
+/**
+ * AUDITORIA 2026-10-04 #21: se o backup das 07:00 UTC morrer (memória, tempo) não havia alerta.
+ * Na janela 08:00 UTC confere se o manifesto do dia existe; se não, alerta.
+ */
+export async function verificarBackupDoDia(env, { force = false, now = new Date() } = {}) {
+  if (!force && (now.getUTCHours() !== 8 || now.getUTCMinutes() >= 10)) return { skipped: true };
+  const { bucket } = resolveBackupBucket(env);
+  if (!bucket || typeof bucket.head !== 'function') return { skipped: true, reason: 'no_bucket' };
+  const key = `backups/neon-critical/${utcDateKey(now)}/manifest.json`;
+  const existe = await bucket.head(key).catch(() => null);
+  if (existe) return { ok: true, key };
+  await dispatchEdgeAlert(env, {
+    type: 'BACKUP_MISSING',
+    severity: 'CRITICAL',
+    title: 'Backup diário do FinGo não foi gravado',
+    message: `O manifesto ${key} não existe. O backup das 07:00 UTC falhou ou não rodou.`
+  }).catch(() => {});
+  return { ok: false, key };
 }
 
 // AUDIT-2026-10-02 R3: o snapshot tinha todas as tabelas críticas (inclusive `usuarios`)
@@ -273,7 +305,15 @@ function copiaConfere(decoded, row) {
   return Math.abs(decoded.bytes.length - esperado) <= 2;
 }
 
-export async function migrateLegacyDocumentsToR2(env, { limit = 25, sql: sqlOverride = null, fetchImpl = null } = {}) {
+export async function migrateLegacyDocumentsToR2(env, { limit = 25, sql: sqlOverride = null, fetchImpl = null, force = false, now = new Date() } = {}) {
+  // AUDITORIA 2026-10-04 #20: rodava a cada 10 min (cron do Worker). Documentos que sempre falham
+  // eram baixados de novo a cada rodada e geravam um alerta CRÍTICO a cada 10 min (o intervalo
+  // entre alertas fica em memória e não sobrevive entre execuções). Agora: uma vez por dia, na
+  // janela 07:20 UTC (depois do backup), e em ordem que muda a cada dia — os que falham não
+  // travam a fila para sempre.
+  if (!force && (now.getUTCHours() !== 7 || now.getUTCMinutes() < 20 || now.getUTCMinutes() >= 30)) {
+    return { skipped: true, reason: 'outside_migration_window' };
+  }
   const conn = String(env?.DATABASE_OWNER_URL || env?.DATABASE_URL || '').trim();
   if ((!conn && !sqlOverride) || !env?.ATTACHMENTS_R2 || typeof env.ATTACHMENTS_R2.put !== 'function') {
     return { skipped:true, reason:'storage_or_database_not_ready' };
@@ -285,7 +325,7 @@ export async function migrateLegacyDocumentsToR2(env, { limit = 25, sql: sqlOver
        FROM documentos
        WHERE url ILIKE '%blob.vercel-storage.com%'
           OR ((url IS NULL OR url = '') AND base64_data IS NOT NULL AND length(base64_data) > 0)
-       ORDER BY created_at ASC NULLS LAST, id ASC
+       ORDER BY md5(id || current_date::text)
        LIMIT ${Math.max(1, Math.min(Number(limit) || 25, 100))}`
   );
   const rows = Array.isArray(rowsResult) ? rowsResult : (rowsResult?.rows || []);

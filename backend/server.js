@@ -375,16 +375,11 @@ process.on('uncaughtException', async (err) => {
     msg.includes('noise-handler') ||
     msg.includes('Decipheriv')
   ) {
-    console.warn('🚨 [Auto-Recovery] Falha de sessão interceptada. Recuperando via Evolution Go...');
-    for (const [tId, sess] of sessions.entries()) {
-      if (sess.connectionStatus !== 'connected') {
-        try {
-          await resetWhatsAppSession(tId, 'Recuperação automática de erro');
-        } catch (resetErr) {
-          console.error(`❌ [Auto-Recovery:${tId}] Falha ao resetar:`, resetErr?.message || resetErr);
-        }
-      }
-    }
+    // AUDITORIA 2026-10-04 #22: herança do Baileys. "unable to authenticate data" é o erro padrão do
+    // AES-GCM do Node (MFA, certificado A1, backup) e chamava resetWhatsAppSession em todas as
+    // empresas que não estavam "connected" na memória — apagando as sessões (QR Code de novo) se o
+    // Evolution estivesse dormindo. O WhatsApp agora roda no Evolution Go: só registra o erro.
+    console.error('🔐 [Crypto/Sessão] Erro de decifragem não tratado (sessões de WhatsApp preservadas):', err?.stack || msg);
   } else {
     console.error('Stack:', err?.stack);
     setTimeout(() => process.exit(1), 100).unref?.();

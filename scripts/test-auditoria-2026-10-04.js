@@ -386,5 +386,73 @@ console.log('=== Auditoria 04/10/2026 ===\n');
   console.log('  ✓ #16–#19 Minhas Demandas, despesas do orçamento sem duplicar, salvar com anexo, SEFAZ (erro real, trava, UF, Render)');
 }
 
+// #20 a #29 — Rotinas, infraestrutura e configuração.
+{
+  const backup = await import('../api/_edge-backup.js');
+  // #20 migração legada só na janela diária.
+  const fora = await backup.migrateLegacyDocumentsToR2({ ATTACHMENTS_R2: { put() {} } }, { sql: { query: async () => { throw new Error('não deveria consultar'); } }, now: new Date('2026-10-05T12:00:00Z') });
+  assert.equal(fora.reason, 'outside_migration_window');
+  assert(read('api/_edge-backup.js').includes('ORDER BY md5(id || current_date::text)'));
+  // #21 backup sem base64 dos documentos e com audit_logs de 90 dias (SQL real no Postgres).
+  const pg = new PGlite();
+  await pg.exec(`CREATE TABLE documentos (id text, nome_arquivo text, base64_data text); INSERT INTO documentos VALUES ('d1','a.pdf','QUJD');
+    CREATE TABLE audit_logs (id text, created_at timestamptz); INSERT INTO audit_logs VALUES ('novo', now()), ('velho', now() - interval '200 days');`);
+  const consultas = [];
+  const sqlFactory = () => ({ query: async (q) => { consultas.push(q); if (/FROM "(documentos|audit_logs)"/.test(q)) return (await pg.query(q)).rows; return []; } });
+  const puts = {};
+  const bucket = { put: async (k, body) => { puts[k] = body; return { size: body.byteLength ?? body.length }; }, head: async (k) => (puts[k] ? { key: k } : null) };
+  const manifest = await backup.createCriticalR2Backup({ BACKUP_ENCRYPTION_KEY: 'k'.repeat(40), DATABASE_URL: 'postgres://x', BACKUPS_R2: bucket }, { force: true, sqlFactory });
+  assert.equal(manifest.tables.documentos, 1); assert.equal(manifest.tables.audit_logs, 1, 'audit_logs só dos últimos 90 dias');
+  assert(consultas.some(q => q.includes(`to_jsonb(t) - 'base64_data'`)), 'documentos sem base64_data');
+  await pg.close();
+  const alertas = [];
+  const ok = await backup.verificarBackupDoDia({ BACKUPS_R2: bucket }, { force: true, now: new Date() });
+  assert.equal(ok.ok, true, 'manifesto do dia encontrado');
+  const falta = await backup.verificarBackupDoDia({ BACKUPS_R2: { put: async () => ({}), head: async () => null } }, { force: true });
+  assert.equal(falta.ok, false, 'sem manifesto → alerta');
+  assert(read('cloudflare-worker.js').includes('verificarBackupDoDia(env)'));
+  assert.equal(read('api/_edge-backup.js'), read('backend/domains/edge/_edge-backup.js'));
+  // #22 erro de criptografia não apaga sessões do WhatsApp.
+  const server = read('backend/server.js');
+  const handler = server.slice(server.indexOf("process.on('uncaughtException'"), server.indexOf("process.on('unhandledRejection'"));
+  assert(!handler.includes('resetWhatsAppSession('), 'não reseta sessões em erro de decifragem');
+  // #23 robô SINAPI grava tudo, em lote, e lê a linha das UFs uma vez.
+  const robo = read('backend/sinapi_robot.js');
+  assert(!robo.includes('batchItems.slice(0, 300)') && robo.includes('FROM unnest(') && !robo.includes("sheet_to_json(compSheet") && robo.includes('await new Promise(r => setImmediate(r));'));
+  // #24 webhook de e-mail.
+  const prev = { ...process.env };
+  process.env.EMAIL_WEBHOOK_SECRET = 'segredo-email-' + 'x'.repeat(20); process.env.PIX_WEBHOOK_SECRET = 'segredo-pix-' + 'y'.repeat(20); process.env.INTERNAL_API_SECRET = 'segredo-int-' + 'z'.repeat(20);
+  const { isEmailWebhookAuthorized } = await import('../api/_webhook_email.js');
+  assert.equal(isEmailWebhookAuthorized({ headers: { 'x-webhook-secret': process.env.PIX_WEBHOOK_SECRET } }).authorized, false, 'segredo do PIX não abre o webhook de e-mail');
+  assert.equal(isEmailWebhookAuthorized({ headers: { authorization: 'Bearer ' + process.env.INTERNAL_API_SECRET } }).authorized, false, 'segredo interno não abre');
+  assert.equal(isEmailWebhookAuthorized({ headers: { 'x-webhook-secret': process.env.EMAIL_WEBHOOK_SECRET } }).authorized, true);
+  process.env = prev;
+  const wh = read('api/_webhook_email.js');
+  assert(wh.includes("createHash('sha256').update(svixId)") && wh.includes('ON CONFLICT (id) DO NOTHING') && wh.includes('const remetente = '));
+  assert.equal(wh, read('backend/domains/integrations/_webhook_email.js'));
+  // #25 render.yaml.
+  const ry = read('render.yaml');
+  assert(!/\d{12,13}/.test(ry), 'sem telefone no render.yaml'); assert(/ORIGIN_ENFORCE_EDGE\n\s+value: "true"/.test(ry));
+  // #26 workflows.
+  const pv = read('.github/workflows/cloudflare-pages-migration.yml');
+  const jobValidate = pv.slice(pv.indexOf('  validate:'), pv.indexOf('    steps:', pv.indexOf('  validate:')));
+  assert(!jobValidate.includes('CLOUDFLARE_API_TOKEN'), 'token fora do ambiente do job');
+  assert(pv.includes('npm ci --ignore-scripts') && !pv.includes('npx --yes wrangler') && pv.includes('npx wrangler delete --name "$PREVIEW_NAME"'));
+  assert(read('.github/workflows/production-cicd.yml').includes('environment: production'));
+  // #27 build não reescreve arquivos versionados.
+  const build = read('scripts/build-cloudflare-pages.cjs');
+  assert(!build.includes("path.join(root, 'js', 'sentry.js')") && build.includes("empacotarSentry(path.join(out, 'js', 'sentry.js'));"));
+  // #28 bibliotecas do próprio domínio, CSP sem cdnjs.
+  const worker = read('cloudflare-worker.js');
+  assert(!/script-src[^`]*cdnjs/.test(worker) && worker.includes(`"worker-src 'self' blob:",`));
+  for (const f of ['jszip.min.js', 'jspdf.umd.min.js', 'pdf.min.mjs', 'pdf.worker.min.mjs', 'three.min.js']) assert(fs.existsSync(`js/vendor/${f}`), f);
+  assert(read('js/vendor/jspdf.umd.min.js').includes('3.0.4'), 'jsPDF 3.0.4');
+  assert(read('js/assets.js').includes('xlsx-0.20.3'));
+  for (const f of ['js/assets.js', 'js/ocr.js', 'js/pdfjs_bootstrap.js', 'bim.html']) assert(!read(f).includes('cdnjs.cloudflare.com'), `${f} sem cdnjs`);
+  // #29 workers.dev de produção.
+  assert(worker.includes('function blockProductionWorkersDev(request, env)') && worker.includes("if (String(env?.FINOBRA_PREVIEW_COMMIT || '').trim()) return null;"));
+  console.log('  ✓ #20–#29 Migração diária, backup enxuto com alerta, WhatsApp preservado, SINAPI completo, webhook de e-mail, render.yaml, workflows, build, bibliotecas locais e workers.dev');
+}
+
 await db.close();
 console.log('\n✅ Auditoria 04/10/2026: tudo certo.');

@@ -296,14 +296,14 @@ const OCR = {
   async _converterPdfParaImagem(file) {
     if (typeof window !== 'undefined' && !window.pdfjsLib) {
       try {
-        const pdfModule = await import('https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.2.67/pdf.min.mjs');
+        const pdfModule = await import('/js/vendor/pdf.min.mjs');
         window.pdfjsLib = pdfModule;
-        window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.2.67/pdf.worker.min.mjs';
+        window.pdfjsLib.GlobalWorkerOptions.workerSrc = '/js/vendor/pdf.worker.min.mjs';
       } catch (err) {
         throw new Error('Falha ao carregar biblioteca segura PDF.js: ' + err.message);
       }
     } else if (window.pdfjsLib && !window.pdfjsLib.GlobalWorkerOptions?.workerSrc) {
-      window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.2.67/pdf.worker.min.mjs';
+      window.pdfjsLib.GlobalWorkerOptions.workerSrc = '/js/vendor/pdf.worker.min.mjs';
     }
 
     const arrayBuffer = await file.arrayBuffer();

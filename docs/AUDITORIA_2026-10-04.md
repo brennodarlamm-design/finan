@@ -151,3 +151,40 @@ Legenda: 🔴 crítica · 🟠 alta · 🟡 média · 🔵 baixa · ✅ confirma
   - `cUFAutor` vem da UF da empresa;
   - o `dfe_sync` é encaminhado pelo Worker ao Render, que envia o certificado A1 no TLS.
 - ✅ Extra: cinco confirmações com `<strong>`/`<br>` mostravam as tags como texto, porque o `Utils.confirm` escapa a mensagem. Elas passaram a usar `allowHtml` (os dados interpolados já eram escapados).
+
+**Lote 4 (05/10/2026)**
+- ✅ #20 A migração de documentos antigos para o R2 roda uma vez por dia (07:20 UTC) em vez de a cada 10 min, com ordem que muda a cada dia (documentos que falham não travam a fila). Acaba o alerta crítico a cada 10 min.
+- ✅ #21 Backup:
+  - `documentos` sem `base64_data`;
+  - `audit_logs` só com os últimos 90 dias;
+  - checagem às 08:00 UTC dispara um alerta se o manifesto do dia não existir.
+- ✅ #22 Erro de decifragem não tratado só é registrado; não apaga mais as sessões de WhatsApp.
+- ✅ #23 Robô SINAPI:
+  - grava todos os itens (antes, 300 por UF), em lotes de 500;
+  - lê a linha das UFs uma vez por planilha;
+  - devolve a vez ao event loop entre as UFs.
+- ✅ #24 Webhook de e-mail:
+  - só o segredo próprio (ou a assinatura Svix);
+  - id derivado do `svix-id` com `ON CONFLICT DO NOTHING`;
+  - remetente "Nome <email>" casado corretamente.
+- ✅ #25 `render.yaml`: `ORIGIN_ENFORCE_EDGE` = `"true"` e `TARGET_PHONE` como `sync: false` (sem telefone versionado).
+- ✅ #26 Workflows:
+  - o token da Cloudflare só no passo de deploy do preview;
+  - `npm ci --ignore-scripts`;
+  - wrangler travado no lock;
+  - o preview é apagado quando o PR fecha;
+  - o deploy de produção usa `environment: production`. **Configure revisores obrigatórios no GitHub** (Settings → Environments → production).
+- ✅ #27 O build gera o bundle do Sentry só em `dist/js/sentry.js`, e o `npm install` deixa de reescrever arquivos versionados. O `postinstall` foi mantido, porque não dá para confirmar daqui se o build da Cloudflare depende dele.
+- ✅ #28 Bibliotecas:
+  - JSZip 3.10.1, jsPDF 3.0.4 (corrige CVE-2025-29907/57810), pdf.js 4.2.67 e three.js r128 servidos de `/js/vendor`, testados no Chromium;
+  - o CSP não libera mais o cdnjs (`script-src` e `worker-src`);
+  - xlsx atualizado para 0.20.3 (CVE-2024-22363), ainda pelo `cdn.sheetjs.com`, porque esse host é bloqueado na rede deste ambiente. Copiar o arquivo para `/js/vendor` depois e tirar o host do CSP.
+- ✅ #29 O Worker de produção, acessado por `*.workers.dev`, redireciona as páginas para `fingo.api.br` e recusa a API (os previews de PR continuam acessíveis).
+
+**Migrações pendentes em produção (verificado em `schema_migrations` e na existência das tabelas):**
+- `033` (newsletter);
+- `034` (anti-duplicidade de faturas pendentes);
+- `037` (Central de E-mails: a tabela `email_messages` não existe, e o webhook de e-mail falha hoje);
+- `038` (verificação de assinaturas ICP);
+- `039` (OFX);
+- `040` (assinaturas sem leitura pública).

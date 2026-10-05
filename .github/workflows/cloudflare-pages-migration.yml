@@ -7,24 +7,27 @@ on:
   pull_request:
     branches:
       - main
+    types: [opened, synchronize, reopened, closed]
 
 permissions:
   contents: read
 
+# AUDITORIA 2026-10-04 #26: o token da Cloudflare ficava no ambiente do job inteiro — disponível
+# para os scripts de instalação de todas as dependências e para o build com o código do PR.
+# Agora: instalação sem scripts, token só no passo de deploy do preview, wrangler travado no lock
+# e o preview é apagado quando o PR fecha.
 jobs:
   validate:
+    if: github.event.action != 'closed'
     runs-on: ubuntu-latest
-    env:
-      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
-      - name: Install dependencies and apply build transforms
-        run: npm ci
+      - name: Install dependencies (sem scripts de instalação)
+        run: npm ci --ignore-scripts
       - name: Build Cloudflare Pages frontend
         run: npm run build:cloudflare
       - name: Validate Pages Function syntax
@@ -50,13 +53,15 @@ jobs:
         id: worker_preview
         shell: bash
         env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           PREVIEW_NAME: finan-pr-${{ github.event.pull_request.number }}-preview
           PREVIEW_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
           set -euo pipefail
           [[ -n "$CLOUDFLARE_API_TOKEN" ]]
           [[ -n "$CLOUDFLARE_ACCOUNT_ID" ]]
-          OUTPUT="$(npx --yes wrangler deploy             --config wrangler.preview.jsonc             --name "$PREVIEW_NAME"             --var FINOBRA_PREVIEW_COMMIT:"$PREVIEW_SHA" 2>&1 | tee /dev/stderr)"
+          OUTPUT="$(npx wrangler deploy             --config wrangler.preview.jsonc             --name "$PREVIEW_NAME"             --var FINOBRA_PREVIEW_COMMIT:"$PREVIEW_SHA" 2>&1 | tee /dev/stderr)"
           URL="$(printf '%s\n' "$OUTPUT" | grep -Eo 'https://[a-zA-Z0-9._-]+\.workers\.dev' | tail -n 1 || true)"
           [[ -n "$URL" ]] || { echo "::error::Wrangler did not return a workers.dev preview URL."; exit 1; }
           echo "url=$URL" >> "$GITHUB_OUTPUT"
@@ -231,3 +236,24 @@ jobs:
             echo "- URL: $PREVIEW_URL"
             echo '- Smoke test: PASS'
           } >> "$GITHUB_STEP_SUMMARY"
+
+  cleanup-preview:
+    if: github.event_name == 'pull_request' && github.event.action == 'closed'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install dependencies (sem scripts de instalação)
+        run: npm ci --ignore-scripts
+      - name: Delete Cloudflare Worker preview
+        shell: bash
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          PREVIEW_NAME: finan-pr-${{ github.event.pull_request.number }}-preview
+        run: |
+          set -euo pipefail
+          npx wrangler delete --name "$PREVIEW_NAME" --force || echo "Preview $PREVIEW_NAME não existia."
