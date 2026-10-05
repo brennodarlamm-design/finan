@@ -184,6 +184,14 @@ Legenda: 🔴 crítica · 🟠 alta · 🟡 média · 🔵 baixa · ✅ confirma
 **Migrações pendentes (verificado em `schema_migrations` e na existência das tabelas):**
 
 > ⚠️ Correção de 05/10: esta verificação foi feita no projeto Neon `blue-thunder-76323603` (sa-east-1, `ep-solitary-river`), que é o banco antigo, hoje usado pelo WhatsApp. O banco do SaaS é o `ep-flat-fire-b4qu9c7p` (us-east-2, ver `docs/architecture/NEON_DUAL_WORKLOAD_SPLIT.md`), que fica em outra conta Neon e ainda não foi conferido. A empresa de teste do superadmin (`fingo-master`) também foi criada no banco antigo.
+>
+> Conferido também o `restless-butterfly-67699513` (us-east-2, endpoint `ep-proud-recipe-b4encxce`), em 05/10:
+> - 7 tenants e 1 usuário (`u1`), sem superadmin;
+> - nenhuma sessão e nenhum lançamento;
+> - migrações só até a 036;
+> - sem atividade desde 03/10.
+>
+> Não é o banco em uso.
 
 - `033` (newsletter);
 - `034` (anti-duplicidade de faturas pendentes);
@@ -203,4 +211,11 @@ Legenda: 🔴 crítica · 🟠 alta · 🟡 média · 🔵 baixa · ✅ confirma
   - ausência de HTML/script.
   
   Um arquivo recusado não é gravado. Os metadados do documento seguem, e o app mantém a cópia local. Efeito colateral: os contratos e recibos gerados em HTML deixam de ter cópia na nuvem, porque HTML é bloqueado como no `/api/upload`. Eles continuam no aparelho e podem ser gerados de novo.
+- ✅ #32 Newsletter. Antes, qualquer pessoa inscrevia ou descadastrava um e-mail de terceiro só digitando o endereço. Agora:
+  - a inscrição fica pendente até o dono clicar no link de confirmação (double opt-in);
+  - o descadastro só vale pelo link assinado (HMAC, 7 dias); pelo formulário, o servidor envia esse link para o próprio e-mail;
+  - as respostas não revelam se o e-mail está na lista;
+  - é enviado no máximo um e-mail a cada 10 minutos por endereço.
+
+  Requer a migração `041_newsletter_double_opt_in.sql`. Inscrições antigas continuam como `subscribed`.
 

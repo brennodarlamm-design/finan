@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { FAQ_ITEMS } from "./faq-data.js";
 
 export function Brand({ compact = false }) {
@@ -74,6 +74,18 @@ export function Newsletter() {
   const [mode, setMode] = useState("subscribe");
   const [pending, setPending] = useState(false);
   const [feedback, setFeedback] = useState("");
+  // Retorno dos links enviados por e-mail (confirmar inscrição / cancelar).
+  useEffect(() => {
+    const estado = new URLSearchParams(window.location.search).get("newsletter");
+    const mensagens = {
+      confirmado: "Inscrição confirmada! Obrigado por acompanhar o Radar FinGo.",
+      cancelado: "Sua inscrição foi cancelada.",
+      invalido: "Link inválido ou expirado. Peça um novo pelo formulário abaixo.",
+      limite: "Muitas tentativas em pouco tempo. Tente novamente mais tarde.",
+      erro: "Não foi possível concluir agora. Tente novamente mais tarde.",
+    };
+    if (estado && mensagens[estado]) setFeedback(mensagens[estado]);
+  }, []);
   async function submit(event) {
     event.preventDefault();
     if (pending) return;
@@ -91,8 +103,8 @@ export function Newsletter() {
         throw new Error("unavailable");
       setFeedback(
         mode === "subscribe"
-          ? "Inscrição confirmada! Obrigado por acompanhar o Radar FinGo."
-          : "Sua inscrição foi cancelada.",
+          ? "Enviamos um link de confirmação para o seu e-mail. A inscrição vale depois que você clicar nele."
+          : "Se este e-mail estiver inscrito, enviamos para ele um link para confirmar o cancelamento.",
       );
       setEmail("");
     } catch {

@@ -481,5 +481,51 @@ console.log('=== Auditoria 04/10/2026 ===\n');
   console.log('  ✓ #31 Arquivo em base64 no save/sync validado como no /api/upload');
 }
 
+// #32 — newsletter com confirmação por e-mail e descadastro só pelo link assinado.
+{
+  process.env.SESSION_SIGNING_SECRET = process.env.SESSION_SIGNING_SECRET || 'teste-newsletter-segredo-de-sessao-com-mais-de-32-chars';
+  const pg = new PGlite();
+  const nsql = async (strings, ...values) => { let t = strings[0]; values.forEach((_, k) => { t += `$${k + 1}` + strings[k + 1]; }); return (await pg.query(t, values)).rows; };
+  await pg.exec(read('migrations/033_newsletter_subscriptions.sql').replace(/REVOKE[^;]*;/g, ''));
+  await pg.exec(read('migrations/041_newsletter_double_opt_in.sql'));
+  const { handleV2Newsletter, assinarLinkNewsletter, verificarLinkNewsletter } = await import('../api/_v2-routes.js');
+  const emails = [];
+  const deps = { sql: nsql, sendEmail: async (_s, m) => { emails.push(m); return { success: true }; } };
+  const call = (url, opts) => chamar((req, res) => handleV2Newsletter({ ...req, url }, res, deps), opts);
+  const alvo = 'vitima@exemplo.com.br';
+  let r = await call('/api/v2/public/newsletter/subscribe', { body: { email: alvo } });
+  assert.equal(r.body.action, 'confirmation_sent');
+  assert.equal((await nsql`SELECT status FROM newsletter_subscriptions WHERE email = ${alvo}`)[0].status, 'pending', 'só pendente até confirmar');
+  assert.equal(emails.length, 1); assert(emails[0].ctaUrl.includes('/newsletter/confirm?'));
+  await call('/api/v2/public/newsletter/subscribe', { body: { email: alvo } });
+  assert.equal(emails.length, 1, 'não reenvia antes de 10 min');
+  const link = new URL(emails[0].ctaUrl);
+  const q = Object.fromEntries(link.searchParams);
+  r = await call(link.pathname + link.search, { method: 'GET', query: { ...q, sig: q.sig.slice(0, -2) + 'xx' } });
+  assert.equal(r.status, 302); assert(r.headers.location.includes('newsletter=invalido'));
+  r = await call(link.pathname + link.search, { method: 'GET', query: q });
+  assert(r.headers.location.includes('newsletter=confirmado'));
+  assert.equal((await nsql`SELECT status FROM newsletter_subscriptions WHERE email = ${alvo}`)[0].status, 'subscribed');
+  // Terceiro tenta descadastrar só com o e-mail: nada muda, o link vai para o dono.
+  await nsql`UPDATE newsletter_subscriptions SET confirmation_sent_at = NULL`;
+  r = await call('/api/v2/public/newsletter/unsubscribe', { body: { email: alvo } });
+  assert.equal(r.body.action, 'unsubscribe_link_sent'); assert(!JSON.stringify(r.body).includes(alvo), 'não ecoa o e-mail');
+  assert.equal((await nsql`SELECT status FROM newsletter_subscriptions WHERE email = ${alvo}`)[0].status, 'subscribed');
+  const sair = new URL(emails.at(-1).ctaUrl);
+  r = await call(sair.pathname, { method: 'GET', query: Object.fromEntries(sair.searchParams) });
+  assert(r.headers.location.includes('newsletter=cancelado'));
+  assert.equal((await nsql`SELECT status FROM newsletter_subscriptions WHERE email = ${alvo}`)[0].status, 'unsubscribed');
+  // Link de confirmação não serve para descadastrar (e vice-versa) e expira.
+  const exp = Date.now() + 1000;
+  assert.equal(verificarLinkNewsletter('unsubscribe', alvo, exp, assinarLinkNewsletter('confirm', alvo, exp, 'k'), { key: 'k' }), false);
+  assert.equal(verificarLinkNewsletter('confirm', alvo, exp, assinarLinkNewsletter('confirm', alvo, exp, 'k'), { key: 'k', now: exp + 1 }), false);
+  r = await call('/api/v2/public/newsletter/subscribe', { method: 'GET', query: { email: alvo } });
+  assert.equal(r.status, 405);
+  await pg.close();
+  assert.equal(read('api/_v2-routes.js'), read('backend/domains/edge/_v2-routes.js'));
+  assert.equal(read('marketing/src/brand-sections.jsx'), read('marketing/brand-sections.jsx'));
+  console.log('  ✓ #32 Newsletter: inscrição só após confirmar pelo e-mail; descadastro só pelo link assinado');
+}
+
 await db.close();
 console.log('\n✅ Auditoria 04/10/2026: tudo certo.');
