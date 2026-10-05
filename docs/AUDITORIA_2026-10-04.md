@@ -237,4 +237,7 @@ Legenda: 🔴 crítica · 🟠 alta · 🟡 média · 🔵 baixa · ✅ confirma
   - a imagem vai ao modelo como data URL, e não mais como um array JS com um número por byte;
   - o tipo é detectado pelos bytes (só JPEG, PNG e WEBP; um PDF cai direto no pipeline principal);
   - o limite é de 10 MB.
+- ✅ #35 O Sentry de toda página caiu de 143 KB para 55 KB gzip. O Replay virou o arquivo `js/sentry-replay.js`, que o `sentry.js` carrega só no app e no painel master, depois do `load`. Login e landing não baixam o Replay. Conferido no Chromium:
+  - no `/app`, o Replay é anexado ao cliente;
+  - no login, o arquivo nem é pedido.
 

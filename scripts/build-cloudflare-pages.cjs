@@ -162,18 +162,10 @@ function empacotarSentry(destino) {
     if (!fs.existsSync(sentryEntry)) return;
     const esbuild = require('esbuild');
     const commit = resolveGitCommit() || 'local';
-    esbuild.buildSync({
-      entryPoints: [sentryEntry],
-      bundle: true,
-      minify: true,
-      sourcemap: true,
-      format: 'iife',
-      globalName: 'FinGoSentry',
-      outfile: destino,
-      define: {
-        '__SENTRY_RELEASE__': JSON.stringify(commit)
-      }
-    });
+    const opcoes = { bundle: true, minify: true, sourcemap: true, format: 'iife', define: { '__SENTRY_RELEASE__': JSON.stringify(commit) } };
+    esbuild.buildSync({ ...opcoes, entryPoints: [sentryEntry], globalName: 'FinGoSentry', outfile: destino });
+    // AUDITORIA 2026-10-04 #35: Replay em arquivo separado, carregado sob demanda pelo sentry.js.
+    esbuild.buildSync({ ...opcoes, entryPoints: [path.join(root, 'scripts', 'sentry-replay-entry.js')], outfile: path.join(path.dirname(destino), 'sentry-replay.js') });
   } catch (err) {
     console.warn('[Build] Aviso ao empacotar Sentry:', err?.message);
   }

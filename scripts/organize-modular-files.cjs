@@ -19,6 +19,7 @@ const frontendMap = {
   'js/patch26-events.js': 'frontend/core/patch26-events.js',
   'js/patch26-actions.js': 'frontend/core/patch26-actions.js',
   'js/sentry.js': 'frontend/core/sentry.js',
+  'js/sentry-replay.js': 'frontend/core/sentry-replay.js',
   'js/patch22.js': 'frontend/core/patch22.js',
   'js/patch51.js': 'frontend/core/patch51.js',
   'js/patch51-hardening.js': 'frontend/core/patch51-hardening.js',

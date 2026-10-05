@@ -558,5 +558,20 @@ console.log('=== Auditoria 04/10/2026 ===\n');
   console.log('  ✓ #34 OCR v2: falha honesta em vez de dados inventados; imagem como data URL, com limite de 10 MB');
 }
 
+// #35 — Replay do Sentry fora do bundle principal.
+{
+  const entry = read('scripts/sentry-entry.js');
+  assert(!entry.includes('import * as Sentry') && !entry.includes('replayIntegration'), 'bundle principal sem Replay');
+  assert(entry.includes("script.src = '/js/sentry-replay.js'") && entry.includes('(app|master)'));
+  assert(read('scripts/sentry-replay-entry.js').includes('window.Sentry.addIntegration(replayIntegration())'));
+  const { gzipSync } = await import('node:zlib');
+  assert(gzipSync(fs.readFileSync('js/sentry.js')).length < 80 * 1024, 'sentry.js abaixo de 80 KB gzip');
+  assert(fs.existsSync('js/sentry-replay.js'));
+  for (const f of ['sentry.js', 'sentry-replay.js']) assert.equal(read(`js/${f}`), read(`frontend/core/${f}`), f);
+  const build = read('scripts/build-cloudflare-pages.cjs');
+  assert(build.includes("'sentry-replay-entry.js'") && build.includes("'sentry-replay.js'"));
+  console.log('  ✓ #35 Sentry: 143 KB → 55 KB gzip em toda página; Replay sob demanda só no app e no master');
+}
+
 await db.close();
 console.log('\n✅ Auditoria 04/10/2026: tudo certo.');
