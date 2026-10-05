@@ -81,25 +81,25 @@
     "dev:legacy": "npx serve ."
   },
   "dependencies": {
-    "@neondatabase/serverless": "^0.9.5",
-    "@sentry/browser": "^11.0.0",
-    "@sentry/node": "^11.0.0",
+    "@neondatabase/serverless": "^0.10.4",
     "@trigger.dev/sdk": "^4.6.2",
     "@vercel/blob": "^2.8.0",
     "asn1js": "^3.0.10",
     "dotenv": "^16.4.5",
     "google-auth-library": "^11.0.2",
     "pkijs": "^3.4.1",
-    "qrcode": "^1.5.4",
-    "react": "^19.3.0",
-    "react-dom": "^19.3.0"
+    "qrcode": "^1.5.4"
   },
   "devDependencies": {
     "@electric-sql/pglite": "^0.5.8",
     "@playwright/test": "^1.63.0",
+    "@sentry/browser": "^11.0.0",
     "@sentry/cli": "^3.8.0",
     "@tailwindcss/vite": "^4.3.3",
     "@vitejs/plugin-react": "^6.1.1",
+    "esbuild": "^0.28.2",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0",
     "tailwindcss": "^4.3.3",
     "vite": "^8.3.0",
     "wrangler": "^3.114.0"

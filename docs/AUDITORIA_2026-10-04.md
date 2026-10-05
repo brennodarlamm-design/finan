@@ -240,4 +240,12 @@ Legenda: 🔴 crítica · 🟠 alta · 🟡 média · 🔵 baixa · ✅ confirma
 - ✅ #35 O Sentry de toda página caiu de 143 KB para 55 KB gzip. O Replay virou o arquivo `js/sentry-replay.js`, que o `sentry.js` carrega só no app e no painel master, depois do `load`. Login e landing não baixam o Replay. Conferido no Chromium:
   - no `/app`, o Replay é anexado ao cliente;
   - no login, o arquivo nem é pedido.
+- ✅ #36 Dependências da raiz:
+  - saiu o `@sentry/node`, que só o backend usa;
+  - `@sentry/browser`, `react` e `react-dom` passaram para `devDependencies`, porque só entram nos bundles do build;
+  - o `esbuild`, usado pelo build, foi declarado;
+  - o driver do Neon do Worker subiu de 0.9.5 para 0.10.4, a mesma versão do Render. Só há correções entre as duas, e a suíte passou.
+- ✅ #37 Índices:
+  - `042_audit_logs_indice_delta.sql` cria `(tenant_id, entidade, created_at DESC) INCLUDE (entidade_id)` para o delta do "Sincronizar tudo". Foi aplicada no butterfly em 05/10.
+  - `043_lancamentos_indices_redundantes.sql` remove 5 índices de `lancamentos` sem `tenant_id` ou repetidos, e um duplicado de `audit_logs`. Todos tinham `idx_scan = 0`. Remove só índices, mas **ainda não foi aplicada: aguarda confirmação**.
 

@@ -573,5 +573,26 @@ console.log('=== Auditoria 04/10/2026 ===\n');
   console.log('  ✓ #35 Sentry: 143 KB → 55 KB gzip em toda página; Replay sob demanda só no app e no master');
 }
 
+// #36/#37 — dependências e índices.
+{
+  const pkg = JSON.parse(read('package.json')); const back = JSON.parse(read('backend/package.json'));
+  assert(!pkg.dependencies['@sentry/node'], '@sentry/node só no backend');
+  for (const d of ['@sentry/browser', 'react', 'react-dom', 'esbuild']) assert(pkg.devDependencies[d] && !pkg.dependencies[d], `${d} é dependência de build`);
+  assert.equal(pkg.dependencies['@neondatabase/serverless'], back.dependencies['@neondatabase/serverless'], 'mesmo driver do Neon no Worker e no Render');
+  const m42 = read('migrations/042_audit_logs_indice_delta.sql');
+  assert(m42.includes('ON audit_logs (tenant_id, entidade, created_at DESC) INCLUDE (entidade_id)') && !/DROP/i.test(m42.replace(/--.*$/gm, '')), '042 só aditiva');
+  const pg = new PGlite();
+  await pg.exec(`CREATE TABLE audit_logs (id text primary key, tenant_id text, entidade text, entidade_id text, user_id text, created_at timestamptz default now());
+    CREATE INDEX idx_audit_tenant_created ON audit_logs (tenant_id, created_at DESC);
+    CREATE TABLE lancamentos (id text primary key, tenant_id text, obra_id text, status text, data date, data_vencimento date);
+    CREATE INDEX idx_lancamentos_obra ON lancamentos (obra_id); CREATE INDEX idx_lancamentos_tenant ON lancamentos (tenant_id);`);
+  await pg.exec(m42); await pg.exec(m42);
+  await pg.exec(read('migrations/043_lancamentos_indices_redundantes.sql')); await pg.exec(read('migrations/043_lancamentos_indices_redundantes.sql'));
+  const idx = (await pg.query(`SELECT indexname FROM pg_indexes WHERE tablename IN ('audit_logs','lancamentos')`)).rows.map(r => r.indexname);
+  assert(idx.includes('idx_audit_logs_tenant_entidade_created') && !idx.includes('idx_lancamentos_obra') && !idx.includes('idx_audit_tenant_created'));
+  await pg.close();
+  console.log('  ✓ #36/#37 Dependências no grupo certo, driver do Neon alinhado, índice do delta e remoção dos redundantes (idempotentes)');
+}
+
 await db.close();
 console.log('\n✅ Auditoria 04/10/2026: tudo certo.');
