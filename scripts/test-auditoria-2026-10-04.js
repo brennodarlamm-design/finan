@@ -189,7 +189,12 @@ console.log('=== Auditoria 04/10/2026 ===\n');
 // #3 — Nenhum hash de senha versionado; script que zerava o MFA do Master desativado.
 {
   const { execSync } = await import('node:child_process');
-  const comHash = execSync(`git grep -lE "\\b[0-9a-f]{32}:[0-9a-f]{128}\\b" -- . ":!node_modules" || true`).toString().trim();
+  let comHash = '';
+  try {
+    comHash = execSync(`git grep -lE "\\b[0-9a-f]{32}:[0-9a-f]{128}\\b" -- . ":!node_modules"`, { stdio: ['ignore', 'pipe', 'ignore'] }).toString().trim();
+  } catch (err) {
+    if (err.status !== 1) throw err; // status 1 = nenhum match
+  }
   assert.equal(comHash, '', `hash de senha versionado em: ${comHash}`);
   assert(read('scripts/security-secrets-scanner.cjs').includes("name: 'Password Hash (scrypt salt:hash)'"));
   assert(!/mfa_enabled\s*=\s*FALSE/.test(read('scripts/apply-migration-023.js')), 'script não desliga mais o MFA do Master');
@@ -432,7 +437,7 @@ console.log('=== Auditoria 04/10/2026 ===\n');
   assert.equal(wh, read('backend/domains/integrations/_webhook_email.js'));
   // #25 render.yaml.
   const ry = read('render.yaml');
-  assert(!/\d{12,13}/.test(ry), 'sem telefone no render.yaml'); assert(/ORIGIN_ENFORCE_EDGE\n\s+value: "true"/.test(ry));
+  assert(!/\d{12,13}/.test(ry), 'sem telefone no render.yaml'); assert(/ORIGIN_ENFORCE_EDGE\r?\n\s+value: "true"/.test(ry));
   // #26 workflows.
   const pv = read('.github/workflows/cloudflare-pages-migration.yml');
   const jobValidate = pv.slice(pv.indexOf('  validate:'), pv.indexOf('    steps:', pv.indexOf('  validate:')));
