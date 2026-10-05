@@ -374,6 +374,13 @@ export async function upsertDfeDocumento(sql, tenantId, parsed) {
   `;
 }
 
+/** Código IBGE da UF (cUFAutor do NFeDistribuicaoDFe). */
+export const CODIGO_UF_IBGE = Object.freeze({
+  RO: '11', AC: '12', AM: '13', RR: '14', PA: '15', AP: '16', TO: '17', MA: '21', PI: '22', CE: '23',
+  RN: '24', PB: '25', PE: '26', AL: '27', SE: '28', BA: '29', MG: '31', ES: '32', RJ: '33', SP: '35',
+  PR: '41', SC: '42', RS: '43', MS: '50', MT: '51', GO: '52', DF: '53'
+});
+
 export async function syncTenantDFe(sql, tenantId, options = {}) {
   // 1. Carrega ou inicializa o registro de sincronização do tenant
   let syncRows = await sql`
@@ -420,6 +427,27 @@ export async function syncTenantDFe(sql, tenantId, options = {}) {
     }
   }
 
+  // AUDITORIA 2026-10-04 #19: trava atômica — uma consulta por vez por empresa e no máximo uma a
+  // cada 2 minutos. Duas abas/cliques consultavam o mesmo NSU ao mesmo tempo e a SEFAZ respondia
+  // 656 (CNPJ bloqueado por 1 hora).
+  if (!options.force) {
+    const reserva = await sql`
+      UPDATE tenant_dfe_sync
+      SET proxima_consulta_permitida = NOW() + INTERVAL '2 minutes', updated_at = NOW()
+      WHERE tenant_id = ${tenantId}
+        AND (proxima_consulta_permitida IS NULL OR proxima_consulta_permitida <= NOW())
+      RETURNING tenant_id;
+    `;
+    if (!reserva.length) {
+      return {
+        success: true,
+        rateLimited: true,
+        minutosRestantes: 2,
+        message: 'Já existe uma consulta à SEFAZ em andamento para esta empresa. Aguarde alguns minutos.'
+      };
+    }
+  }
+
   // 3. Obter certificado digital A1 ativo do tenant
   const certRows = await sql`
     SELECT cert_pfx_base64_enc, iv, auth_tag, cnpj, razao_social, status
@@ -450,7 +478,15 @@ export async function syncTenantDFe(sql, tenantId, options = {}) {
   }
 
   const cnpj = certData.cnpj.replace(/\D/g, '');
-  const codUf = options.codUf || '14'; // Padrão: 14 (RR) ou conforme UF informada
+  // AUDITORIA 2026-10-04 #19: cUFAutor era sempre 14 (RR). Agora vem da UF cadastrada da empresa.
+  let codUf = options.codUf || '';
+  if (!codUf) {
+    try {
+      const t = await sql`SELECT uf FROM tenants WHERE id = ${tenantId} LIMIT 1;`;
+      codUf = CODIGO_UF_IBGE[String(t[0]?.uf || '').trim().toUpperCase()] || '';
+    } catch { codUf = ''; }
+  }
+  if (!codUf) codUf = '14'; // sem UF cadastrada: mantém o padrão anterior (RR)
   let ultNsu = sync.ultimo_nsu || '000000000000000';
   let totalProcessados = 0;
   let lastCStat = null;
@@ -480,6 +516,7 @@ export async function syncTenantDFe(sql, tenantId, options = {}) {
         UPDATE tenant_dfe_sync
         SET status_sefaz = 'erro_comunicacao',
             mensagem_sefaz = ${'Falha de comunicação com a SEFAZ: ' + errNet.message},
+            proxima_consulta_permitida = NOW() + INTERVAL '15 minutes', -- pausa após erro
             updated_at = NOW()
         WHERE tenant_id = ${tenantId};
       `;
@@ -578,6 +615,7 @@ export async function syncTenantDFe(sql, tenantId, options = {}) {
         UPDATE tenant_dfe_sync
         SET status_sefaz = ${'cStat_' + lastCStat},
             mensagem_sefaz = ${lastMotivo},
+            proxima_consulta_permitida = NOW() + INTERVAL '15 minutes', -- pausa após resposta inesperada
             updated_at = NOW()
         WHERE tenant_id = ${tenantId};
       `;

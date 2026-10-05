@@ -320,5 +320,71 @@ console.log('=== Auditoria 04/10/2026 ===\n');
   console.log('  ✓ #13 Portal: escopo assinado no link; quem não vê o financeiro gera link sem despesas; link antigo segue até expirar');
 }
 
+// #14 e #15 — "Sincronizar tudo": alterações chegam ao delta dos outros aparelhos; versões lidas em lote.
+{
+  const { handleSyncAll } = await import('../api/_db-sync.js');
+  const pg = new PGlite();
+  await pg.exec(`
+    CREATE TABLE fornecedores (id text PRIMARY KEY, tenant_id text, nome text, razao_social text, cnpj_cpf text, telefone text, email text,
+      categoria text, chave_pix text, banco_info text, endereco text, municipio text, uf text, ativo boolean, created_at timestamptz DEFAULT now());
+    CREATE TABLE audit_logs (id text, tenant_id text, user_id text, acao text, entidade text, entidade_id text, dados_anteriores jsonb,
+      dados_novos jsonb, ip text, user_agent text, created_at timestamptz DEFAULT now());
+    INSERT INTO fornecedores (id, tenant_id, nome, created_at) SELECT 'f' || g, 't1', 'Antigo ' || g, now() - interval '30 days' FROM generate_series(1, 300) g;
+  `);
+  let consultas = 0;
+  const sqlPg = async (strings, ...values) => {
+    consultas++;
+    let t = strings[0];
+    values.forEach((_, k) => { t += `$${k + 1}` + strings[k + 1]; });
+    return (await pg.query(t, values)).rows;
+  };
+  const versoes = new Map((await pg.query(`SELECT id, xmin::text v FROM fornecedores`)).rows.map(r => [r.id, r.v]));
+  const payload = { fornecedores: [...versoes.keys()].map(id => ({ id, nome: 'Novo ' + id, sync_version: versoes.get(id) })) };
+  let status = 200, body;
+  const res = { status(c) { status = c; return this; }, json(b) { body = b; return this; }, setHeader() {} };
+  const auth = { tenantId: 't1', user: { userId: 'u1', perfil: 'admin' } };
+  await handleSyncAll(sqlPg, 't1', auth, { headers: {} }, res, payload);
+  assert.equal(status, 200, JSON.stringify(body)); assert.equal(body.synced, 300);
+  assert(consultas <= 300 + 5, `consultas ao banco: ${consultas} (antes eram ~600)`);
+  // O delta usado pelos outros aparelhos (mesma regra de _db-queries.js) enxerga os 300 alterados.
+  const since = new Date(Date.now() - 60_000).toISOString();
+  const delta = (await pg.query(`SELECT count(*)::int c FROM fornecedores WHERE tenant_id='t1' AND (created_at >= $1 OR id IN (SELECT entidade_id FROM audit_logs WHERE tenant_id='t1' AND entidade='fornecedores' AND created_at >= $1))`, [since])).rows[0].c;
+  assert.equal(delta, 300, 'outros aparelhos recebem as alterações do Sincronizar tudo');
+  // Versão velha continua recusada (com a leitura em lote).
+  const velho = { fornecedores: [{ id: 'f1', nome: 'X', sync_version: versoes.get('f1') }] };
+  await handleSyncAll(sqlPg, 't1', auth, { headers: {} }, res, velho);
+  assert.equal(status, 207); assert.equal(body.failed[0].code, 'SYNC_CONFLICT');
+  await pg.close();
+  for (const f of ['_db-sync', '_sync-guard', '_audit']) {
+    const d = { '_db-sync': 'database', '_sync-guard': 'database', '_audit': 'integrations' }[f];
+    assert.equal(read(`api/${f}.js`), read(`backend/domains/${d}/${f}.js`));
+  }
+  for (const f of ['_workflow', '_workflow-complete', '_workflow-stage-update']) {
+    assert(read(`api/${f}.js`).includes("marcarAlteracao(sql"), `${f}: marca a obra alterada`);
+    assert.equal(read(`api/${f}.js`), read(`backend/domains/obras/${f}.js`));
+  }
+  console.log(`  ✓ #14/#15 Sincronizar tudo: alterações chegam aos outros aparelhos; ${consultas} consultas para 300 registros (antes ~600)`);
+}
+
+// #16 a #19
+{
+  assert.equal((read('js/minhas_demandas.js').match(/getDemandas\(u\.userId \|\| u\.id\)/g) || []).length, 2, 'Minhas Demandas usa o userId da sessão');
+  assert(read('js/notificacoes.js').includes('const uid = u ? (u.userId || u.id) : null;'));
+  const orc = read('js/orcamentos.js');
+  assert(orc.includes('despesas_por_etapa: porEtapa') && orc.includes('já tiveram despesas geradas') && orc.includes('if (this._gerandoDespesas) return;'));
+  for (const f of ['precompras', 'escritorio']) {
+    const src = read(`js/${f}.js`);
+    assert(src.includes('if (this._salvando) return;') && src.includes('return await this._salvarImpl(event, id);'), `${f}: um salvamento por vez`);
+  }
+  for (const f of ['clientes', 'medicoes', 'precompras', 'orcamentos']) assert(/\{ allowHtml: true \}\);/.test(read(`js/${f}.js`)), `${f}: confirmação com HTML fixo`);
+  assert(read('js/nfe.js').includes('if (data.success === false && !data.rateLimited) {'), 'SEFAZ: falha não aparece como sucesso');
+  const dfe = read('api/_sefaz-dfe.js');
+  assert(dfe.includes("SET proxima_consulta_permitida = NOW() + INTERVAL '2 minutes'") && dfe.includes("INTERVAL '15 minutes', -- pausa após erro"));
+  assert(dfe.includes('codUf = CODIGO_UF_IBGE['));
+  assert(read('cloudflare-worker.js').includes("apiUrl.searchParams.get('action') === 'dfe_sync' && env.FINOBRA_API_ORIGIN"));
+  assert.equal(dfe, read('backend/domains/fiscal/_sefaz-dfe.js'));
+  console.log('  ✓ #16–#19 Minhas Demandas, despesas do orçamento sem duplicar, salvar com anexo, SEFAZ (erro real, trava, UF, Render)');
+}
+
 await db.close();
 console.log('\n✅ Auditoria 04/10/2026: tudo certo.');

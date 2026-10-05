@@ -2,7 +2,7 @@
 import { neon } from '@neondatabase/serverless';
 import { resolveAuthAndTenant } from './_auth.js';
 import { canAccessModule, canWriteData, permissionError, normalizeRole } from './_permissions.js';
-import { writeAudit } from './_audit.js';
+import { writeAudit, marcarAlteracao } from './_audit.js';
 import { createTenantSql } from './_tenant-sql.js';
 import { createRuntimeSql } from './_database.js';
 
@@ -18,7 +18,7 @@ function stage(x,n){const eid=id(x?.id||x?.etapa_id);if(!eid)return null;return{
 function clauses(v){return Array.isArray(v)?v.slice(0,100).map((x,n)=>({id:id(x?.id||`cl_${n+1}`)||`cl_${n+1}`,secao:text(x?.secao,120),numero:text(x?.numero||`CLÁUSULA ${n+1}`,80),titulo:text(x?.titulo,300),texto:text(x?.texto,12000)})).filter(x=>x.titulo||x.texto):[]}
 async function obra(sql,t,o){const r=await sql`SELECT id,nome,data_inicio FROM obras WHERE tenant_id=${t} AND id=${id(o,64)} LIMIT 1`;return r[0]||null}
 async function user(sql,t,u,{technical=false}={}){if(!u)return null;const r=await sql`SELECT id,nome,perfil,ativo FROM usuarios WHERE tenant_id=${t} AND id=${id(u,64)} AND ativo=TRUE LIMIT 1`;const x=r[0]||null;return technical&&x&&!rtRole(x.perfil)?null:x}
-async function forecast(sql,t,o){const r=await sql`SELECT x.data_inicio,COALESCE(SUM(w.dias_sla),0)::int total_dias FROM obras x LEFT JOIN workflow_etapas w ON w.tenant_id=x.tenant_id AND w.obra_id=x.id WHERE x.tenant_id=${t} AND x.id=${o} GROUP BY x.data_inicio`;const b=r[0],total=Number(b?.total_dias||0);if(!b?.data_inicio)return{total_dias:total,data_previsao:null};const u=await sql`UPDATE obras SET data_previsao=(${b.data_inicio}::date+${total}::int) WHERE tenant_id=${t} AND id=${o} RETURNING data_previsao`;return{total_dias:total,data_previsao:u[0]?.data_previsao||null}}
+async function forecast(sql,t,o){const r=await sql`SELECT x.data_inicio,COALESCE(SUM(w.dias_sla),0)::int total_dias FROM obras x LEFT JOIN workflow_etapas w ON w.tenant_id=x.tenant_id AND w.obra_id=x.id WHERE x.tenant_id=${t} AND x.id=${o} GROUP BY x.data_inicio`;const b=r[0],total=Number(b?.total_dias||0);if(!b?.data_inicio)return{total_dias:total,data_previsao:null};const u=await sql`UPDATE obras SET data_previsao=(${b.data_inicio}::date+${total}::int) WHERE tenant_id=${t} AND id=${o} RETURNING data_previsao`;await marcarAlteracao(sql,t,'obras',o,'atualizar_previsao');/* AUDITORIA 2026-10-04 #14 */return{total_dias:total,data_previsao:u[0]?.data_previsao||null}}
 function schemaErr(e){return/relation .* does not exist|function finobra_complete_workflow_stage|column .* does not exist/i.test(String(e?.message||''))}
 
 export default async function workflowHandler(req,res){

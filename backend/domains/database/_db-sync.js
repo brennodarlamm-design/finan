@@ -8,8 +8,8 @@ import {
 import { validateObraTenant, validateBulkObraPlanLimit } from './_db-mutations.js';
 import { setPrivateNoCache } from './_http.js';
 import { isTenantStorageUrl } from './_edge-r2.js';
-import { writeAudit } from './_audit.js';
-import { syncVersionConflict, withoutSyncVersion } from './_sync-guard.js';
+import { writeAudit, writeAuditBatch } from './_audit.js';
+import { syncVersionConflict, withoutSyncVersion, prefetchSyncVersions } from './_sync-guard.js';
 
 /**
  * Executa a sincronização em lote de todas as coleções do cliente com isolamento multi-tenant.
@@ -31,6 +31,22 @@ export async function handleSyncAll(sql, tenantId, auth, req, res, payload) {
   const validObrasSet = new Set(['escritorio', 'geral']);
   const validNotasSet = new Set();
 
+  // AUDITORIA 2026-10-04 #14: o delta das outras telas acha alterações por created_at ou por
+  // audit_logs (entidade + id). O "Sincronizar tudo" gravava um único log genérico, então um registro
+  // ALTERADO aqui não chegava aos outros aparelhos. Agora os ids gravados vão para audit_logs em lote.
+  // AUDITORIA 2026-10-04 #15: versões de cada tabela lidas uma vez (antes: 1 consulta por registro).
+  const cacheVersoes = new Map();
+  const versoesDe = async (tabela) => {
+    if (!cacheVersoes.has(tabela)) cacheVersoes.set(tabela, await prefetchSyncVersions(sql, tabela, tenantId, payload?.[tabela]));
+    return cacheVersoes.get(tabela);
+  };
+  const tocadosDelta = new Map();
+  const marcarDelta = (entidade, id) => {
+    if (!id) return;
+    if (!tocadosDelta.has(entidade)) tocadosDelta.set(entidade, new Set());
+    tocadosDelta.get(entidade).add(String(id).slice(0, 128));
+  };
+
   // 1. Obras — valida o lote inteiro antes da primeira gravação para evitar sync parcial
   if (Array.isArray(payload.clientes)) {
     if (!auth.isSystem && auth.user?.perfil !== 'superadmin') {
@@ -39,7 +55,7 @@ export async function handleSyncAll(sql, tenantId, auth, req, res, payload) {
     }
     for (const o of payload.clientes) {
       // Concorrência otimista (VARREDURA 2026-10-03 #4): não sobrescreve versão mais nova nem recria excluído.
-      const conflito = await syncVersionConflict(sql, 'clientes', tenantId, o);
+      const conflito = await syncVersionConflict(sql, 'clientes', tenantId, o, await versoesDe('clientes'));
       if (conflito) { recordFailure('clientes', o, conflito.error, 'SYNC_CONFLICT'); continue; }
       if (!o.id || !o.nome) continue;
       const cronogramaJson = o.cronograma_config == null && !Array.isArray(o.processos_sla) ? null : JSON.stringify(sanitizeCronogramaConfig({ ...(o.cronograma_config || {}), processos_sla: o.cronograma_config?.processos_sla || o.processos_sla }));
@@ -66,6 +82,7 @@ export async function handleSyncAll(sql, tenantId, auth, req, res, payload) {
         `;
         validObrasSet.add(o.id);
         totalCount++;
+        marcarDelta('obras', o.id);
       } catch (err) {
         console.warn('[Sync All] Falha ao salvar obra:', err.message);
         recordFailure('clientes', o, err.message, 'DATABASE_WRITE_FAILED');
@@ -77,7 +94,7 @@ export async function handleSyncAll(sql, tenantId, auth, req, res, payload) {
   if (Array.isArray(payload.fornecedores)) {
     for (const f of payload.fornecedores) {
       // Concorrência otimista (VARREDURA 2026-10-03 #4): não sobrescreve versão mais nova nem recria excluído.
-      const conflito = await syncVersionConflict(sql, 'fornecedores', tenantId, f);
+      const conflito = await syncVersionConflict(sql, 'fornecedores', tenantId, f, await versoesDe('fornecedores'));
       if (conflito) { recordFailure('fornecedores', f, conflito.error, 'SYNC_CONFLICT'); continue; }
       if (!f.id) continue;
       const nomeFinal = (f.nome || f.nome_fantasia || f.razao_social || f.razao || 'Fornecedor').trim();
@@ -110,6 +127,7 @@ export async function handleSyncAll(sql, tenantId, auth, req, res, payload) {
           WHERE fornecedores.tenant_id = ${tenantId};
         `;
         totalCount++;
+        marcarDelta('fornecedores', f.id);
       } catch (err) {
         console.warn('[Sync All] Falha ao salvar fornecedor:', err.message);
         recordFailure('fornecedores', f, err.message, 'DATABASE_WRITE_FAILED');
@@ -121,7 +139,7 @@ export async function handleSyncAll(sql, tenantId, auth, req, res, payload) {
   if (Array.isArray(payload.contas)) {
     for (const c of payload.contas) {
       // Concorrência otimista (VARREDURA 2026-10-03 #4): não sobrescreve versão mais nova nem recria excluído.
-      const conflito = await syncVersionConflict(sql, 'contas', tenantId, c);
+      const conflito = await syncVersionConflict(sql, 'contas', tenantId, c, await versoesDe('contas'));
       if (conflito) { recordFailure('contas', c, conflito.error, 'SYNC_CONFLICT'); continue; }
       if (!c.id) continue;
       try {
@@ -146,6 +164,7 @@ export async function handleSyncAll(sql, tenantId, auth, req, res, payload) {
           WHERE contas_bancarias.tenant_id = ${tenantId};
         `;
         totalCount++;
+        marcarDelta('contas', c.id);
       } catch (err) {
         console.warn('[Sync All] Falha ao salvar conta bancária:', err.message);
         recordFailure('contas', c, err.message, 'DATABASE_WRITE_FAILED');
@@ -157,7 +176,7 @@ export async function handleSyncAll(sql, tenantId, auth, req, res, payload) {
   if (Array.isArray(payload.produtos)) {
     for (const p of payload.produtos) {
       // Concorrência otimista (VARREDURA 2026-10-03 #4): não sobrescreve versão mais nova nem recria excluído.
-      const conflito = await syncVersionConflict(sql, 'produtos', tenantId, p);
+      const conflito = await syncVersionConflict(sql, 'produtos', tenantId, p, await versoesDe('produtos'));
       if (conflito) { recordFailure('produtos', p, conflito.error, 'SYNC_CONFLICT'); continue; }
       const prodId = String(p?.id || '').trim();
       const nomeFinal = String(p?.nome || p?.descricao || p?.titulo || '').trim();
@@ -177,6 +196,7 @@ export async function handleSyncAll(sql, tenantId, auth, req, res, payload) {
           WHERE produtos.tenant_id = ${tenantId};
         `;
         totalCount++;
+        marcarDelta('produtos', prodId);
       } catch (err) {
         console.warn('[Sync All] Falha ao salvar produto:', err.message);
         recordFailure('produtos', p, err.message, 'DATABASE_WRITE_FAILED');
@@ -188,7 +208,7 @@ export async function handleSyncAll(sql, tenantId, auth, req, res, payload) {
   if (Array.isArray(payload.notas)) {
     for (const n of payload.notas) {
       // Concorrência otimista (VARREDURA 2026-10-03 #4): não sobrescreve versão mais nova nem recria excluído.
-      const conflito = await syncVersionConflict(sql, 'notas', tenantId, n);
+      const conflito = await syncVersionConflict(sql, 'notas', tenantId, n, await versoesDe('notas'));
       if (conflito) { recordFailure('notas', n, conflito.error, 'SYNC_CONFLICT'); continue; }
       if (!n.id) continue;
       const vBruto = cleanNum(n.valor_bruto !== undefined ? n.valor_bruto : n.valor_total);
@@ -240,6 +260,7 @@ export async function handleSyncAll(sql, tenantId, auth, req, res, payload) {
             validNotasSet.add(targetId);
             validNotasSet.add(n.id);
             totalCount++;
+            marcarDelta('notas', targetId);
             continue;
           }
         }
@@ -286,6 +307,7 @@ export async function handleSyncAll(sql, tenantId, auth, req, res, payload) {
         `;
         validNotasSet.add(n.id);
         totalCount++;
+        marcarDelta('notas', n.id);
       } catch (notaSyncErr) {
         console.warn('[Sync All] Falha ao salvar nota fiscal:', notaSyncErr.message);
         recordFailure('notas', n, 'Falha ao sincronizar nota fiscal.', 'DATABASE_WRITE_FAILED');
@@ -356,6 +378,7 @@ export async function handleSyncAll(sql, tenantId, auth, req, res, payload) {
           continue;
         }
         totalCount++;
+        marcarDelta('lancamentos', l.id);
       } catch (err) {
         console.warn('[Sync All] Falha ao salvar lançamento:', err.message);
         recordFailure('lancamentos', l, err.message, 'DATABASE_WRITE_FAILED');
@@ -367,7 +390,7 @@ export async function handleSyncAll(sql, tenantId, auth, req, res, payload) {
   if (Array.isArray(payload.precompras)) {
     for (const pc of payload.precompras) {
       // Concorrência otimista (VARREDURA 2026-10-03 #4): não sobrescreve versão mais nova nem recria excluído.
-      const conflito = await syncVersionConflict(sql, 'precompras', tenantId, pc);
+      const conflito = await syncVersionConflict(sql, 'precompras', tenantId, pc, await versoesDe('precompras'));
       if (conflito) { recordFailure('precompras', pc, conflito.error, 'SYNC_CONFLICT'); continue; }
       if (!pc?.id) continue;
       const safeObraId = await validateObraTenant(sql, pc.obra_id, tenantId);
@@ -390,7 +413,7 @@ export async function handleSyncAll(sql, tenantId, auth, req, res, payload) {
   if (Array.isArray(payload.contratos)) {
     for (const c of payload.contratos) {
       // Concorrência otimista (VARREDURA 2026-10-03 #4): não sobrescreve versão mais nova nem recria excluído.
-      const conflito = await syncVersionConflict(sql, 'contratos', tenantId, c);
+      const conflito = await syncVersionConflict(sql, 'contratos', tenantId, c, await versoesDe('contratos'));
       if (conflito) { recordFailure('contratos', c, conflito.error, 'SYNC_CONFLICT'); continue; }
       if (!c?.id) continue;
       const safeObraId = await validateObraTenant(sql, c.obra_id, tenantId);
@@ -413,7 +436,7 @@ export async function handleSyncAll(sql, tenantId, auth, req, res, payload) {
   if (Array.isArray(payload.recibos)) {
     for (const r of payload.recibos) {
       // Concorrência otimista (VARREDURA 2026-10-03 #4): não sobrescreve versão mais nova nem recria excluído.
-      const conflito = await syncVersionConflict(sql, 'recibos', tenantId, r);
+      const conflito = await syncVersionConflict(sql, 'recibos', tenantId, r, await versoesDe('recibos'));
       if (conflito) { recordFailure('recibos', r, conflito.error, 'SYNC_CONFLICT'); continue; }
       if (!r?.id) continue;
       const safeObraId = await validateObraTenant(sql, r.obra_id, tenantId);
@@ -437,7 +460,7 @@ export async function handleSyncAll(sql, tenantId, auth, req, res, payload) {
   if (Array.isArray(payload.orcamentos_sinapi)) {
     for (const o of payload.orcamentos_sinapi) {
       // Concorrência otimista (VARREDURA 2026-10-03 #4): não sobrescreve versão mais nova nem recria excluído.
-      const conflito = await syncVersionConflict(sql, 'orcamentos_sinapi', tenantId, o);
+      const conflito = await syncVersionConflict(sql, 'orcamentos_sinapi', tenantId, o, await versoesDe('orcamentos_sinapi'));
       if (conflito) { recordFailure('orcamentos_sinapi', o, conflito.error, 'SYNC_CONFLICT'); continue; }
       if (!o?.id || !validCloudId(o.id, 80)) {
         recordFailure('orcamentos_sinapi', o, 'ID de orçamento SINAPI inválido.', 'INVALID_ID');
@@ -470,7 +493,7 @@ export async function handleSyncAll(sql, tenantId, auth, req, res, payload) {
   if (Array.isArray(payload.orcamentos)) {
     for (const o of payload.orcamentos) {
       // Concorrência otimista (VARREDURA 2026-10-03 #4): não sobrescreve versão mais nova nem recria excluído.
-      const conflito = await syncVersionConflict(sql, 'orcamentos', tenantId, o);
+      const conflito = await syncVersionConflict(sql, 'orcamentos', tenantId, o, await versoesDe('orcamentos'));
       if (conflito) { recordFailure('orcamentos', o, conflito.error, 'SYNC_CONFLICT'); continue; }
       if (!o.id) continue;
       const safeOrcObraId = await validateObraTenant(sql, o.obra_id, tenantId);
@@ -509,6 +532,7 @@ export async function handleSyncAll(sql, tenantId, auth, req, res, payload) {
           WHERE orcamentos.tenant_id = ${tenantId};
         `;
         totalCount++;
+        marcarDelta('orcamentos', o.id);
       } catch (err) {
         console.warn('[Sync All] Falha ao salvar orçamento:', err.message);
         recordFailure('orcamentos', o, err.message, 'DATABASE_WRITE_FAILED');
@@ -520,7 +544,7 @@ export async function handleSyncAll(sql, tenantId, auth, req, res, payload) {
   if (Array.isArray(payload.medicoes)) {
     for (const m of payload.medicoes) {
       // Concorrência otimista (VARREDURA 2026-10-03 #4): não sobrescreve versão mais nova nem recria excluído.
-      const conflito = await syncVersionConflict(sql, 'medicoes', tenantId, m);
+      const conflito = await syncVersionConflict(sql, 'medicoes', tenantId, m, await versoesDe('medicoes'));
       if (conflito) { recordFailure('medicoes', m, conflito.error, 'SYNC_CONFLICT'); continue; }
       if (!m.id) continue;
       const safeMedObraId = await validateObraTenant(sql, m.obra_id, tenantId);
@@ -575,6 +599,7 @@ export async function handleSyncAll(sql, tenantId, auth, req, res, payload) {
           WHERE medicoes.tenant_id = ${tenantId};
         `;
         totalCount++;
+        marcarDelta('medicoes', m.id);
       } catch (err) {
         console.warn('[Sync All] Falha ao salvar medição:', err.message);
         recordFailure('medicoes', m, err.message, 'DATABASE_WRITE_FAILED');
@@ -614,7 +639,7 @@ export async function handleSyncAll(sql, tenantId, auth, req, res, payload) {
   if (Array.isArray(payload.documentos)) {
     for (const doc of payload.documentos) {
       // Concorrência otimista (VARREDURA 2026-10-03 #4): não sobrescreve versão mais nova nem recria excluído.
-      const conflito = await syncVersionConflict(sql, 'documentos', tenantId, doc);
+      const conflito = await syncVersionConflict(sql, 'documentos', tenantId, doc, await versoesDe('documentos'));
       if (conflito) { recordFailure('documentos', doc, conflito.error, 'SYNC_CONFLICT'); continue; }
       if (!doc.id) continue;
       if (!isTenantStorageUrl(doc.url, tenantId)) {
@@ -646,6 +671,7 @@ export async function handleSyncAll(sql, tenantId, auth, req, res, payload) {
           WHERE documentos.tenant_id = ${tenantId};
         `;
         totalCount++;
+        marcarDelta('documentos', doc.id);
       } catch (err) {
         console.warn('[Sync All] Falha ao salvar documento:', err.message);
         recordFailure('documentos', doc, err.message, 'DATABASE_WRITE_FAILED');
@@ -669,6 +695,8 @@ export async function handleSyncAll(sql, tenantId, auth, req, res, payload) {
       recordFailure('preferencias', { id: tenantId }, err.message, 'DATABASE_WRITE_FAILED');
     }
   }
+
+  await writeAuditBatch(sql, req, auth, 'sincronizar_registro', tocadosDelta);
 
   await writeAudit(sql, req, auth, {
     acao: 'sincronizar', entidade: 'dados', entidadeId: null,

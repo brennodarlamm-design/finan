@@ -931,6 +931,11 @@ const NFe = {
       if (!res.ok) {
         throw new Error(data?.error || `Erro ${res.status} ao sincronizar com SEFAZ.`);
       }
+      // AUDITORIA 2026-10-04 #19: o servidor responde 200 com success:false (sem certificado, falha
+      // ao decifrar, erro de rede na SEFAZ) e a tela mostrava "Consulta concluída".
+      if (data.success === false && !data.rateLimited) {
+        throw new Error(data.error || data.mensagem || data.message || 'A SEFAZ não respondeu como esperado.');
+      }
 
       if (data.rateLimited) {
         Utils.toast(data.message || 'SEFAZ: Cooldown ativo. Aguarde 1 hora entre consultas completas.', 'warning');

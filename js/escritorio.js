@@ -519,8 +519,21 @@ const Escritorio = {
     }
   },
 
+  // AUDITORIA 2026-10-04 #18: com anexo, o registro era criado antes de ler o arquivo e o modal
+  // continuava aberto — um segundo clique/Enter criava outra despesa do escritório. Um salvamento por vez.
   async salvar(event, id = '') {
-    event.preventDefault();
+    event?.preventDefault?.();
+    if (this._salvando) return;
+    this._salvando = true;
+    try {
+      return await this._salvarImpl(event, id);
+    } finally {
+      this._salvando = false;
+    }
+  },
+
+  async _salvarImpl(event, id = '') {
+    event?.preventDefault?.();
     const form = event.target;
     const fd = new FormData(form);
 

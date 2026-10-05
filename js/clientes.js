@@ -323,7 +323,7 @@ const Clientes = {
       App.refreshObraSelector();
       document.getElementById('cli-grid').innerHTML = this._cards(DB.getAll('clientes'));
       Utils.toast('Obra excluída!','info');
-    });
+    }, { allowHtml: true }); // dados já escapados
   },
 
   init() {

@@ -62,16 +62,55 @@ export async function readSyncVersion(sql, table, tenantId, id) {
 }
 
 /**
- * Retorna o corpo do 409 quando a gravação usaria uma versão desatualizada (ou recriaria
- * um registro excluído); null quando pode gravar.
+ * AUDITORIA 2026-10-04 #15: no "Sincronizar tudo", ler a versão de cada registro (1 consulta por
+ * registro, em série) estourava o tempo com milhares de registros. Busca as versões da tabela
+ * inteira de uma vez (só dos registros que vieram da nuvem). Retorna Map<id, versão>.
  */
-export async function syncVersionConflict(sql, table, tenantId, data) {
+export async function prefetchSyncVersions(sql, table, tenantId, records) {
+  const dbTable = SYNC_GUARD_TABLES[table];
+  if (!dbTable) return null;
+  const ids = [...new Set((records || [])
+    .filter(r => String(r?.sync_version ?? '').trim())
+    .map(r => syncRecordId(table, r))
+    .filter(Boolean))];
+  const versoes = new Map();
+  for (let i = 0; i < ids.length; i += 1000) {
+    const parte = ids.slice(i, i + 1000);
+    let rows;
+    switch (dbTable) {
+    case 'obras': rows = await sql`SELECT id, xmin::text AS v FROM obras WHERE tenant_id = ${tenantId} AND id = ANY(${parte})`; break;
+    case 'fornecedores': rows = await sql`SELECT id, xmin::text AS v FROM fornecedores WHERE tenant_id = ${tenantId} AND id = ANY(${parte})`; break;
+    case 'notas_fiscais': rows = await sql`SELECT id, xmin::text AS v FROM notas_fiscais WHERE tenant_id = ${tenantId} AND id = ANY(${parte})`; break;
+    case 'produtos': rows = await sql`SELECT id, xmin::text AS v FROM produtos WHERE tenant_id = ${tenantId} AND id = ANY(${parte})`; break;
+    case 'contas_bancarias': rows = await sql`SELECT id, xmin::text AS v FROM contas_bancarias WHERE tenant_id = ${tenantId} AND id = ANY(${parte})`; break;
+    case 'orcamentos': rows = await sql`SELECT id, xmin::text AS v FROM orcamentos WHERE tenant_id = ${tenantId} AND id = ANY(${parte})`; break;
+    case 'medicoes': rows = await sql`SELECT id, xmin::text AS v FROM medicoes WHERE tenant_id = ${tenantId} AND id = ANY(${parte})`; break;
+    case 'documentos': rows = await sql`SELECT id, xmin::text AS v FROM documentos WHERE tenant_id = ${tenantId} AND id = ANY(${parte})`; break;
+    case 'precompras': rows = await sql`SELECT id, xmin::text AS v FROM precompras WHERE tenant_id = ${tenantId} AND id = ANY(${parte})`; break;
+    case 'contratos': rows = await sql`SELECT id, xmin::text AS v FROM contratos WHERE tenant_id = ${tenantId} AND id = ANY(${parte})`; break;
+    case 'recibos': rows = await sql`SELECT id, xmin::text AS v FROM recibos WHERE tenant_id = ${tenantId} AND id = ANY(${parte})`; break;
+    case 'orcamentos_sinapi': rows = await sql`SELECT id, xmin::text AS v FROM orcamentos_sinapi WHERE tenant_id = ${tenantId} AND id = ANY(${parte})`; break;
+      default: return null;
+    }
+    const lista = Array.isArray(rows) ? rows : (rows?.rows || []);
+    for (const r of lista) versoes.set(String(r.id), r.v ?? null);
+  }
+  return versoes;
+}
+
+/**
+ * Retorna o corpo do 409 quando a gravação usaria uma versão desatualizada (ou recriaria
+ * um registro excluído); null quando pode gravar. `versoes` (opcional) vem de prefetchSyncVersions.
+ */
+export async function syncVersionConflict(sql, table, tenantId, data, versoes = null) {
   if (!SYNC_GUARD_TABLES[table]) return null;
   const expected = String(data?.sync_version ?? '').trim();
   if (!expected) return null; // registro criado neste aparelho e ainda não confirmado pela nuvem
   const id = syncRecordId(table, data);
   if (!id) return null;
-  const current = await readSyncVersion(sql, table, tenantId, id);
+  const current = versoes instanceof Map
+    ? (versoes.has(String(id)) ? versoes.get(String(id)) : null)
+    : await readSyncVersion(sql, table, tenantId, id);
   if (current === null) {
     return { success: false, code: 'SYNC_CONFLICT', deleted: true, id, error: 'Este registro foi excluído em outro dispositivo. Revise a alteração antes de recriá-lo.' };
   }

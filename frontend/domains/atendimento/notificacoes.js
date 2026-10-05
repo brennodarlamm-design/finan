@@ -102,8 +102,9 @@ const Notificacoes = {
     // 6. Workflow & Etapas de Obras (Patch 52)
     if (typeof CronogramaSLA !== 'undefined') {
       const u = typeof Auth !== 'undefined' ? Auth.getUser() : null;
-      if (u && u.id) {
-        const demandas = CronogramaSLA.getDemandas(u.id);
+      const uid = u ? (u.userId || u.id) : null; // AUDITORIA 2026-10-04 #16
+      if (uid) {
+        const demandas = CronogramaSLA.getDemandas(uid);
         const atrasadasWf = demandas.filter(d => d.status_sla === 'atrasado');
         if (atrasadasWf.length > 0) {
           alertas.push({

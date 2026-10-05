@@ -460,7 +460,7 @@ const Medicoes = {
       Utils.toast(mantidos.length
         ? 'Medição excluída. A receita já recebida foi mantida no financeiro.'
         : 'Medição excluída!', 'info');
-    });
+    }, { allowHtml: true });
   },
 
   _refresh() {

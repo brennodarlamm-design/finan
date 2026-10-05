@@ -134,3 +134,20 @@ Legenda: 🔴 crítica · 🟠 alta · 🟡 média · 🔵 baixa · ✅ confirma
   - o `data-od-*` não roda no portal público e, no mouse, só aplica o realce de borda.
 - ✅ #12 Migração `040`: remove a política pública de `document_signatures`. A validação pública usa `validar_assinatura_publica(código)` e o registro usa `codigo_assinatura_status(...)`, as duas funções SECURITY DEFINER. Testado com RLS e o papel da aplicação. Até a migração ser aplicada, a API cai na consulta antiga. **Aplicar a 040 no banco.**
 - ✅ #13 O link do portal leva, assinado, o escopo de quem o gerou (módulos que essa pessoa pode ler), e o portal só entrega esses módulos. Mexer no escopo invalida o link. Links v2 antigos continuam até expirar (90 dias).
+
+**Lote 3 (05/10/2026)**
+- ✅ #14 O "Sincronizar tudo" registra em `audit_logs`, num único INSERT (`writeAuditBatch`), o id de cada registro gravado. Os workflows de obra marcam a obra alterada (`marcarAlteracao`). Assim o delta dos outros aparelhos passa a receber essas alterações. O teste confere com a mesma consulta do delta.
+- ✅ #15 As versões (`xmin`) de cada tabela são lidas numa consulta só (`prefetchSyncVersions`), em vez de uma por registro: 300 registros passaram de ~600 para 305 consultas. A gravação em lote dos próprios registros fica para uma etapa futura.
+- ✅ #16 "Minhas Demandas" e as notificações de workflow usam o `userId` da sessão.
+- ✅ #17 "Gerar despesas" do orçamento:
+  - guarda os lançamentos por etapa (`despesas_por_etapa`) e acumula os vínculos;
+  - etapas já geradas pedem confirmação antes de duplicar;
+  - um clique duplo não gera em dobro.
+- ✅ #18 Pré-compra e despesa do escritório: um salvamento por vez, enquanto o anexo é lido.
+- ✅ #19 SEFAZ:
+  - `success:false` aparece como erro;
+  - trava atômica (uma consulta por vez e no máximo uma a cada 2 min);
+  - pausa de 15 min depois de erro ou de resposta inesperada;
+  - `cUFAutor` vem da UF da empresa;
+  - o `dfe_sync` é encaminhado pelo Worker ao Render, que envia o certificado A1 no TLS.
+- ✅ Extra: cinco confirmações com `<strong>`/`<br>` mostravam as tags como texto, porque o `Utils.confirm` escapa a mensagem. Elas passaram a usar `allowHtml` (os dados interpolados já eram escapados).

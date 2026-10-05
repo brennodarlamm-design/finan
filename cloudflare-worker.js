@@ -1487,6 +1487,11 @@ async function handleApi(request, env) {
     if (apiUrl.pathname === '/api/assinaturas' && apiUrl.searchParams.get('action') === 'verificar_pdf' && env.FINOBRA_API_ORIGIN) {
       return await proxyApi(request, env);
     }
+    // AUDITORIA 2026-10-04 #19: a consulta DF-e na SEFAZ exige TLS mútuo com o certificado A1 (.pfx).
+    // O https.request do Workers não garante o envio do certificado cliente; o Node do Render sim.
+    if (apiUrl.pathname === '/api/nfe' && apiUrl.searchParams.get('action') === 'dfe_sync' && env.FINOBRA_API_ORIGIN) {
+      return await proxyApi(request, env);
+    }
     const isMutating = !SAFE_METHODS.has(String(request.method || 'GET').toUpperCase());
     const edgeRequest = isMutating ? request.clone() : request;
     let response = await executeEdgeApi(edgeRequest, env);
