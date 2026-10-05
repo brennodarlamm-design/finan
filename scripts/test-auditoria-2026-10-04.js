@@ -454,5 +454,32 @@ console.log('=== Auditoria 04/10/2026 ===\n');
   console.log('  ✓ #20–#29 Migração diária, backup enxuto com alerta, WhatsApp preservado, SINAPI completo, webhook de e-mail, render.yaml, workflows, build, bibliotecas locais e workers.dev');
 }
 
+// #31 — base64 via save/sync_all passa pela mesma política do /api/upload.
+{
+  const { validarArquivoBase64 } = await import('../api/_file-validation.js');
+  const b64 = (t) => Buffer.from(t).toString('base64');
+  const pdf = b64('%PDF-1.7\n1 0 obj');
+  assert.equal(validarArquivoBase64({ nomeArquivo: 'nota.pdf', mime: 'application/pdf', base64: pdf }).ok, true);
+  assert.equal(validarArquivoBase64({ nomeArquivo: 'nota.pdf', mime: 'application/pdf', base64: 'data:application/pdf;base64,' + pdf }).ok, true);
+  assert.equal(validarArquivoBase64({ nomeArquivo: 'sem-extensao', mime: 'application/pdf', base64: pdf }).ok, true, 'extensão pelo MIME');
+  assert.equal(validarArquivoBase64({ base64: null }).ok, true, 'sem arquivo');
+  const html = 'data:text/html;charset=utf-8,' + encodeURIComponent('<script>alert(1)</script>');
+  assert.equal(validarArquivoBase64({ nomeArquivo: 'Contrato.html', mime: 'text/html', base64: html }).code, 'FILE_TYPE_BLOCKED');
+  assert.equal(validarArquivoBase64({ nomeArquivo: 'a.svg', mime: 'image/svg+xml', base64: b64('<svg/>') }).ok, false);
+  assert.equal(validarArquivoBase64({ nomeArquivo: 'falso.pdf', mime: 'application/pdf', base64: b64('<html><script>x</script>') }).code, 'FILE_CONTENT_BLOCKED');
+  assert.equal(validarArquivoBase64({ nomeArquivo: 'falso.png', mime: 'image/png', base64: pdf }).code, 'FILE_CONTENT_MISMATCH');
+  assert.equal(validarArquivoBase64({ nomeArquivo: 'virus.exe.pdf', mime: 'application/pdf', base64: pdf }).ok, false, 'extensão oculta');
+  assert.equal(validarArquivoBase64({ nomeArquivo: 'x.pdf', mime: 'text/plain', base64: pdf }).code, 'FILE_TYPE_MISMATCH');
+  assert.equal(validarArquivoBase64({ nomeArquivo: 'grande.pdf', mime: 'application/pdf', base64: 'A'.repeat(21 * 1024 * 1024) }).code, 'FILE_TOO_LARGE');
+  assert.equal(validarArquivoBase64({ nomeArquivo: 'planilha.csv', mime: 'text/csv', base64: b64('a;b\n1;2') }).ok, true);
+  const mut = read('api/_db-mutations.js'); const sync = read('api/_db-sync.js');
+  assert(mut.includes('validarArquivoBase64({ nomeArquivo: doc.nome_arquivo || doc.titulo') && mut.includes('arquivo_recusado: true'));
+  assert(sync.includes('validarArquivoBase64({ nomeArquivo: doc.nome_arquivo || doc.titulo'));
+  assert.equal(mut, read('backend/domains/database/_db-mutations.js'));
+  assert.equal(sync, read('backend/domains/database/_db-sync.js'));
+  assert.equal(read('api/_file-validation.js'), read('backend/domains/database/_file-validation.js'));
+  console.log('  ✓ #31 Arquivo em base64 no save/sync validado como no /api/upload');
+}
+
 await db.close();
 console.log('\n✅ Auditoria 04/10/2026: tudo certo.');

@@ -181,10 +181,26 @@ Legenda: 🔴 crítica · 🟠 alta · 🟡 média · 🔵 baixa · ✅ confirma
   - xlsx atualizado para 0.20.3 (CVE-2024-22363), ainda pelo `cdn.sheetjs.com`, porque esse host é bloqueado na rede deste ambiente. Copiar o arquivo para `/js/vendor` depois e tirar o host do CSP.
 - ✅ #29 O Worker de produção, acessado por `*.workers.dev`, redireciona as páginas para `fingo.api.br` e recusa a API (os previews de PR continuam acessíveis).
 
-**Migrações pendentes em produção (verificado em `schema_migrations` e na existência das tabelas):**
+**Migrações pendentes (verificado em `schema_migrations` e na existência das tabelas):**
+
+> ⚠️ Correção de 05/10: esta verificação foi feita no projeto Neon `blue-thunder-76323603` (sa-east-1, `ep-solitary-river`), que é o banco antigo, hoje usado pelo WhatsApp. O banco do SaaS é o `ep-flat-fire-b4qu9c7p` (us-east-2, ver `docs/architecture/NEON_DUAL_WORKLOAD_SPLIT.md`), que fica em outra conta Neon e ainda não foi conferido. A empresa de teste do superadmin (`fingo-master`) também foi criada no banco antigo.
+
 - `033` (newsletter);
 - `034` (anti-duplicidade de faturas pendentes);
 - `037` (Central de E-mails: a tabela `email_messages` não existe, e o webhook de e-mail falha hoje);
 - `038` (verificação de assinaturas ICP);
 - `039` (OFX);
 - `040` (assinaturas sem leitura pública).
+
+### Lote 5 (em andamento)
+
+- ✅ #30 Para trocar o próprio e-mail ou login é preciso informar a senha atual. Depois da troca, as outras sessões são encerradas.
+- ✅ #31 O `base64` de documentos enviado pelo `save` e pelo "Sincronizar tudo" passa pela mesma política do `/api/upload`, em `api/_file-validation.js`. A política verifica:
+  - extensão e MIME permitidos;
+  - extensão executável oculta;
+  - limite de 15 MB;
+  - assinatura binária;
+  - ausência de HTML/script.
+  
+  Um arquivo recusado não é gravado. Os metadados do documento seguem, e o app mantém a cópia local. Efeito colateral: os contratos e recibos gerados em HTML deixam de ter cópia na nuvem, porque HTML é bloqueado como no `/api/upload`. Eles continuam no aparelho e podem ser gerados de novo.
+

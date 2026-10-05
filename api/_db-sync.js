@@ -10,6 +10,7 @@ import { setPrivateNoCache } from './_http.js';
 import { isTenantStorageUrl } from './_edge-r2.js';
 import { writeAudit, writeAuditBatch } from './_audit.js';
 import { syncVersionConflict, withoutSyncVersion, prefetchSyncVersions } from './_sync-guard.js';
+import { validarArquivoBase64 } from './_file-validation.js';
 
 /**
  * Executa a sincronização em lote de todas as coleções do cliente com isolamento multi-tenant.
@@ -647,7 +648,15 @@ export async function handleSyncAll(sql, tenantId, auth, req, res, payload) {
         continue;
       }
       try {
-        const cleanBase64 = doc.url ? null : (doc.data_base64 || doc.base64_data || null);
+        let cleanBase64 = doc.url ? null : (doc.data_base64 || doc.base64_data || null);
+        // AUDITORIA 2026-10-04 #31: mesma política do /api/upload; arquivo recusado não é gravado.
+        if (cleanBase64) {
+          const validacao = validarArquivoBase64({ nomeArquivo: doc.nome_arquivo || doc.titulo, mime: doc.tipo_mime || doc.tipo_arquivo, base64: cleanBase64 });
+          if (!validacao.ok) {
+            console.warn('[Sync All] Arquivo do documento recusado:', doc.id, validacao.code);
+            cleanBase64 = null;
+          }
+        }
         await sql`
           INSERT INTO documentos (
             id, tenant_id, tipo, referencia_id, titulo, categoria, nome_arquivo,
