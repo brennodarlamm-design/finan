@@ -249,7 +249,7 @@ export function decompressAndParseDocZip({ nsu, schema, base64Content }) {
     };
   } catch (err) {
     console.error(`[DF-e] Erro ao descompactar docZip (NSU ${nsu}):`, err.message);
-    return { sucesso: false, erro: err.message, nsu };
+    return { sucesso: false, erro: 'Documento compactado inválido.', nsu };
   }
 }
 
@@ -515,14 +515,14 @@ export async function syncTenantDFe(sql, tenantId, options = {}) {
       await sql`
         UPDATE tenant_dfe_sync
         SET status_sefaz = 'erro_comunicacao',
-            mensagem_sefaz = ${'Falha de comunicação com a SEFAZ: ' + errNet.message},
+            mensagem_sefaz = ${'Falha de comunicação com a SEFAZ. Nova tentativa liberada em 15 minutos.'},
             proxima_consulta_permitida = NOW() + INTERVAL '15 minutes', -- pausa após erro
             updated_at = NOW()
         WHERE tenant_id = ${tenantId};
       `;
       return {
         success: false,
-        error: `Falha ao comunicar com os servidores da SEFAZ: ${errNet.message}`
+        error: 'Falha ao comunicar com os servidores da SEFAZ. Tente novamente em 15 minutos.'
       };
     }
 

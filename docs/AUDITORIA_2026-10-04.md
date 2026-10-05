@@ -192,6 +192,14 @@ Legenda: 🔴 crítica · 🟠 alta · 🟡 média · 🔵 baixa · ✅ confirma
 > - sem atividade desde 03/10.
 >
 > Não é o banco em uso.
+>
+> Atualização de 05/10: a migração para o `restless-butterfly-67699513` foi concluída e ele passou a ser o banco de produção. Situação verificada:
+> - 7 tenants, 9 usuários e 562 lançamentos;
+> - migrações 033–040 aplicadas; a 041 foi aplicada nesta data;
+> - `finobra_app` sem BYPASSRLS;
+> - a policy pública de `document_signatures` foi removida.
+>
+> O superadmin foi movido para a empresa de teste `fingo-master` e as sessões dele foram encerradas. Na migração ele tinha voltado para o tenant `angelim`.
 
 - `033` (newsletter);
 - `034` (anti-duplicidade de faturas pendentes);
@@ -218,4 +226,15 @@ Legenda: 🔴 crítica · 🟠 alta · 🟡 média · 🔵 baixa · ✅ confirma
   - é enviado no máximo um e-mail a cada 10 minutos por endereço.
 
   Requer a migração `041_newsletter_double_opt_in.sql`. Inscrições antigas continuam como `subscribed`.
+- ✅ #33 Erros internos não vão mais para o cliente. Os casos corrigidos:
+  - DF-e e SEFAZ: a mensagem gravada em `tenant_dfe_sync` também deixou de ter o detalhe da rede;
+  - chat, OCR, busca semântica e ledger do v2;
+  - verificação de PDF assinado.
+
+  O detalhe fica no log. Só as mensagens escritas para o usuário (PDF inválido, imagem acima do limite) continuam aparecendo.
+- ✅ #34 OCR v2 (`/api/v2/edge/ai/ocr` e a aceleração no Edge do `reconhecer-documento`):
+  - quando a IA falha ou responde sem JSON, devolve falha (422) em vez de inventar fornecedor, itens e data;
+  - a imagem vai ao modelo como data URL, e não mais como um array JS com um número por byte;
+  - o tipo é detectado pelos bytes (só JPEG, PNG e WEBP; um PDF cai direto no pipeline principal);
+  - o limite é de 10 MB.
 

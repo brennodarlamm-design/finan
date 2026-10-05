@@ -56,6 +56,35 @@ export async function runEdgeChat(env, messages = [], options = {}) {
   };
 }
 
+export const OCR_MAX_BYTES = 10 * 1024 * 1024;
+
+function tipoDaImagem(base64) {
+  const inicio = Buffer.from(base64.slice(0, 24), 'base64');
+  const hex = inicio.toString('hex').toUpperCase();
+  if (hex.startsWith('FFD8FF')) return 'image/jpeg';
+  if (hex.startsWith('89504E47')) return 'image/png';
+  if (hex.startsWith('52494646') && inicio.slice(8, 12).toString('ascii') === 'WEBP') return 'image/webp';
+  return '';
+}
+
+function imagemComoDataUrl(entrada) {
+  let base64;
+  if (Buffer.isBuffer(entrada) || entrada instanceof Uint8Array) {
+    if (entrada.length > OCR_MAX_BYTES) throw new Error('Imagem acima do limite de 10 MB.');
+    base64 = Buffer.from(entrada).toString('base64');
+  } else if (typeof entrada === 'string') {
+    const texto = entrada.trim();
+    base64 = texto.startsWith('data:') ? texto.slice(texto.indexOf(',') + 1) : texto;
+    if (Math.ceil(base64.length * 0.75) > OCR_MAX_BYTES) throw new Error('Imagem acima do limite de 10 MB.');
+  } else {
+    throw new Error('Formato de imagem não suportado para OCR no Edge.');
+  }
+  // O tipo vem dos bytes, não do cabeçalho enviado: só JPEG, PNG e WEBP vão para o modelo de visão.
+  const tipo = tipoDaImagem(base64);
+  if (!tipo) throw new Error('Formato de imagem não suportado para OCR no Edge.');
+  return `data:${tipo};base64,${base64}`;
+}
+
 /**
  * Realiza OCR e extração estruturada de dados de uma foto de nota ou cupom fiscal.
  */
@@ -63,6 +92,9 @@ export async function runEdgeDocumentOcr(env, imageBase64OrBuffer, options = {})
   if (!imageBase64OrBuffer) {
     throw new Error('Imagem obrigatória para processamento OCR.');
   }
+  // AUDITORIA 2026-10-04 #34: o modelo aceita a imagem como data URL em base64. Antes ela virava
+  // um array JS com um número por byte (uma foto de 8 MB ocupava centenas de MB no Worker).
+  const imagem = imagemComoDataUrl(imageBase64OrBuffer);
 
   if (env && env.AI && typeof env.AI.run === 'function') {
     try {
@@ -85,21 +117,8 @@ Retorne EXCLUSIVAMENTE um objeto JSON válido no seguinte formato:
   "descricao_sugerida": "Resumo objetivo da despesa"
 }`;
 
-      // Workers AI Vision input
-      let imageBytes;
-      if (Buffer.isBuffer(imageBase64OrBuffer) || imageBase64OrBuffer instanceof Uint8Array) {
-        imageBytes = Array.from(imageBase64OrBuffer);
-      } else if (typeof imageBase64OrBuffer === 'string') {
-        const cleanBase64 = imageBase64OrBuffer.includes(',')
-          ? imageBase64OrBuffer.split(',')[1]
-          : imageBase64OrBuffer;
-        imageBytes = Array.from(Buffer.from(cleanBase64.trim(), 'base64'));
-      } else {
-        throw new Error('Formato de imagem não suportado para OCR no Edge.');
-      }
-
       const input = {
-        image: imageBytes,
+        image: imagem,
         prompt: prompt,
         max_tokens: 1000
       };
@@ -113,7 +132,7 @@ Retorne EXCLUSIVAMENTE um objeto JSON válido no seguinte formato:
         const parsed = JSON.parse(jsonMatch[0]);
         parsed.valor = typeof parsed.valor === 'number' ? parsed.valor : (parsed.valor_total || null);
         parsed.valor_total = parsed.valor || parsed.valor_total || null;
-        parsed.fornecedor = parsed.fornecedor || parsed.razao_social || 'Fornecedor Identificado';
+        parsed.fornecedor = parsed.fornecedor || parsed.razao_social || null;
         parsed.razao_social = parsed.fornecedor;
         return {
           success: true,
@@ -126,23 +145,11 @@ Retorne EXCLUSIVAMENTE um objeto JSON válido no seguinte formato:
     }
   }
 
-  // Fallback heurístico estruturado
+  // AUDITORIA 2026-10-04 #34: sem leitura válida, devolve falha. Antes inventava fornecedor,
+  // itens e data de hoje, que podiam virar despesa sem ninguém perceber.
   return {
-    success: true,
-    data: {
-      tipo_documento: 'cupom_fiscal',
-      fornecedor: 'Fornecedor de Materiais de Construção',
-      razao_social: 'Fornecedor de Materiais de Construção',
-      cnpj_emitente: null,
-      data_emissao: new Date().toISOString().split('T')[0],
-      data_vencimento: null,
-      valor: null,
-      valor_total: null,
-      itens: ['Materiais diversos para canteiro'],
-      categoria_sugerida: 'Material Bruto',
-      descricao_sugerida: 'Materiais de construção para canteiro de obras',
-      nota: 'Processamento assistido pelo motor de inteligência de documentos FinGo.'
-    },
-    provider: 'fingo_ocr_fallback'
+    success: false,
+    error: 'Não foi possível ler o documento. Confira a foto ou preencha os dados manualmente.',
+    provider: 'fingo_ocr_indisponivel'
   };
 }

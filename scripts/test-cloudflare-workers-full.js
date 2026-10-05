@@ -116,9 +116,11 @@ assert(chatRes.reply && chatRes.reply.length > 20, 'runEdgeChat deve responder a
 assert(chatRes.model, 'runEdgeChat deve indicar o modelo ou motor de execução.');
 
 const dummyReceiptBase64 = Buffer.from('FAKE_IMAGE_RECEIPT').toString('base64');
-const ocrRes = await runEdgeDocumentOcr({}, dummyReceiptBase64);
-assert.equal(ocrRes.success, true, 'runEdgeDocumentOcr deve concluir com sucesso.');
-assert(ocrRes.data && ocrRes.data.categoria_sugerida, 'runEdgeDocumentOcr deve extrair categoria sugerida.');
+await assert.rejects(() => runEdgeDocumentOcr({}, dummyReceiptBase64), /Formato de imagem não suportado/, 'OCR recusa conteúdo que não é imagem.');
+const pngBase64 = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';
+const ocrRes = await runEdgeDocumentOcr({}, pngBase64);
+assert.equal(ocrRes.success, false, 'sem Workers AI o OCR informa a falha em vez de inventar dados.');
+assert.equal(ocrRes.data, undefined, 'nenhum dado inventado.');
 console.log('   ✓ Workers AI: FinBot Edge e Leitor OCR de comprovantes aprovados.');
 
 // -------------------------------------------------------------

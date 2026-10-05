@@ -234,7 +234,8 @@ export default async function handler(req, res) {
       console.error(`[NFe DF-e] Erro ao executar ação '${action}':`, errDFe);
       return res.status(500).json({
         success: false,
-        error: `Erro ao processar serviço DF-e: ${errDFe.message || 'Falha interna'}`
+        // AUDITORIA 2026-10-04 #33: o detalhe fica no log; o cliente recebe só a mensagem genérica.
+        error: 'Não foi possível processar o serviço DF-e agora. Tente novamente em alguns minutos.'
       });
     }
   }

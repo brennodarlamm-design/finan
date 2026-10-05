@@ -527,5 +527,36 @@ console.log('=== Auditoria 04/10/2026 ===\n');
   console.log('  ✓ #32 Newsletter: inscrição só após confirmar pelo e-mail; descadastro só pelo link assinado');
 }
 
+// #33 — erros internos não vão para o cliente.
+{
+  const v2 = read('api/_v2-routes.js');
+  assert(!/json\(\{ success: false, error: err\.message \}\)/.test(v2.replace("if (OCR_ERROS_PUBLICOS.includes(err?.message)) return res.status(400).json({ success: false, error: err.message });", '')), 'v2 sem err.message bruto');
+  assert(!read('api/nfe.js').includes('${errDFe.message'));
+  const dfe = read('api/_sefaz-dfe.js');
+  assert(!dfe.includes('${errNet.message}') && !dfe.includes("+ errNet.message") && !dfe.includes('erro: err.message'));
+  assert(read('api/assinaturas.js').includes("mensagensPublicas.includes(err?.message) ? err.message : 'Não foi possível ler o PDF.'"));
+  for (const [a, b] of [['api/nfe.js', 'backend/domains/fiscal/nfe.js'], ['api/assinaturas.js', 'backend/domains/financeiro/assinaturas.js'], ['api/_v2-routes.js', 'backend/domains/edge/_v2-routes.js'], ['api/_sefaz-dfe.js', 'backend/domains/fiscal/_sefaz-dfe.js']]) assert.equal(read(a), read(b), b);
+  console.log('  ✓ #33 Erros internos (DF-e, SEFAZ, IA, OCR, busca, ledger, verificação de PDF) ficam no log');
+}
+
+// #34 — OCR v2 não inventa dados e não explode a memória.
+{
+  const { runEdgeDocumentOcr } = await import('../api/_edge-ai.js');
+  const png = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';
+  const semIA = await runEdgeDocumentOcr({}, png);
+  assert.equal(semIA.success, false); assert.equal(semIA.data, undefined, 'sem dados inventados');
+  const iaQuebrada = await runEdgeDocumentOcr({ AI: { run: async () => ({ response: 'não consegui ler' }) } }, png);
+  assert.equal(iaQuebrada.success, false, 'resposta sem JSON vira falha');
+  let recebido;
+  const ok = await runEdgeDocumentOcr({ AI: { run: async (_m, input) => { recebido = input.image; return { response: '{"valor": 10}' }; } } }, png);
+  assert.equal(typeof recebido, 'string'); assert(recebido.startsWith('data:image/png;base64,'), 'imagem vai como data URL');
+  assert.equal(ok.data.fornecedor, null, 'não inventa fornecedor');
+  await assert.rejects(() => runEdgeDocumentOcr({}, Buffer.from('%PDF-1.7').toString('base64')), /não suportado/);
+  await assert.rejects(() => runEdgeDocumentOcr({}, 'A'.repeat(14 * 1024 * 1024)), /10 MB/);
+  assert(!read('api/_edge-ai.js').includes('Array.from('));
+  assert.equal(read('api/_edge-ai.js'), read('backend/domains/edge/_edge-ai.js'));
+  console.log('  ✓ #34 OCR v2: falha honesta em vez de dados inventados; imagem como data URL, com limite de 10 MB');
+}
+
 await db.close();
 console.log('\n✅ Auditoria 04/10/2026: tudo certo.');

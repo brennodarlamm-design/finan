@@ -411,6 +411,13 @@ export async function handleV2BoletimMedicao(req, res) {
   });
 }
 
+// AUDITORIA 2026-10-04 #33: erros internos (provedor de IA, banco, rede) não vão para o cliente.
+const OCR_ERROS_PUBLICOS = ['Imagem obrigatória para processamento OCR.', 'Formato de imagem não suportado para OCR no Edge.', 'Imagem acima do limite de 10 MB.'];
+function erroInterno(res, contexto, err, mensagem) {
+  console.error(contexto + ':', err?.message || err);
+  return res.status(500).json({ success: false, error: mensagem });
+}
+
 /**
  * Endpoint de Gestão da Newsletter / Radar FinGo
  *
@@ -880,7 +887,7 @@ export async function handleV2EdgeAiChat(req, res) {
       provider: result.provider
     });
   } catch (err) {
-    return res.status(500).json({ success: false, error: err.message });
+    return erroInterno(res, '[V2 IA] Falha no chat', err, 'O assistente não respondeu agora. Tente novamente em instantes.');
   }
 }
 
@@ -921,9 +928,10 @@ export async function handleV2EdgeAiOcr(req, res) {
 
   try {
     const result = await runEdgeDocumentOcr(env, imageBase64);
-    return res.status(200).json(result);
+    return res.status(result.success ? 200 : 422).json(result);
   } catch (err) {
-    return res.status(500).json({ success: false, error: err.message });
+    if (OCR_ERROS_PUBLICOS.includes(err?.message)) return res.status(400).json({ success: false, error: err.message });
+    return erroInterno(res, '[V2 OCR] Falha na leitura', err, 'Não foi possível ler o documento agora. Tente novamente em instantes.');
   }
 }
 
@@ -982,7 +990,7 @@ export async function handleV2EdgeAiSemanticSearch(req, res) {
       results
     });
   } catch (err) {
-    return res.status(500).json({ success: false, error: err.message });
+    return erroInterno(res, '[V2 Busca] Falha na busca semântica', err, 'A busca não está disponível agora. Tente novamente em instantes.');
   }
 }
 
@@ -1083,7 +1091,7 @@ export async function handleV2AuditLedgerAppend(req, res) {
       block
     });
   } catch (err) {
-    return res.status(500).json({ success: false, error: err.message });
+    return erroInterno(res, '[V2 Ledger] Falha ao registrar bloco', err, 'Não foi possível registrar agora. Tente novamente em instantes.');
   }
 }
 
