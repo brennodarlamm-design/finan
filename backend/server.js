@@ -18,6 +18,17 @@ import { createResilientNeon } from './neon_resilience.js';
 import { createOriginTrustMiddleware } from './origin_trust.js';
 import * as Sentry from '@sentry/node';
 
+// AUDITORIA 2026-10-04 #40: telefone e e-mail não vão inteiros para os logs (o Render guarda os logs
+// fora do nosso controle). Fica o suficiente para suporte: final do número e domínio do e-mail.
+function mascararTelefone(tel) {
+  const digitos = String(tel || '').replace(/\D/g, '');
+  return digitos ? `***${digitos.slice(-4)}` : '(sem telefone)';
+}
+function mascararEmail(email) {
+  const [usuario, dominio] = String(email || '').split('@');
+  return dominio ? `${usuario.slice(0, 2)}***@${dominio}` : '(sem e-mail)';
+}
+
 // Garantir link simbólico de ../node_modules -> ./node_modules para que os handlers em ../api/*.js resolvam dependências
 try {
   const rootNm = path.resolve('../node_modules');
@@ -542,7 +553,7 @@ app.post(['/webhook/evolution-go', '/api/webhook-whatsapp'], async (req, res) =>
         console.log(`🔌 [Webhook:${tenantId}] Status de conexão alterado: ${session.connectionStatus}`);
       }
     } else if (parsed.type === 'message') {
-      console.log(`📩 [Webhook:${tenantId}] Mensagem recebida de ${parsed.phone} (${parsed.pushName}): ${parsed.text ? parsed.text.slice(0, 60) : '[Mídia]'}`);
+      console.log(`📩 [Webhook:${tenantId}] Mensagem recebida de ${mascararTelefone(parsed.phone)} (${parsed.text ? 'texto' : 'mídia'})`);
     }
 
     return res.status(200).json({ success: true, event: parsed.event, type: parsed.type, tenantId });
@@ -1426,7 +1437,7 @@ async function executarVarreduraCobranca({ manualTrigger = false, forcedTenantId
         if (evoSend.ok) {
           wpSuccess = true;
           channelUsed = 'whatsapp';
-          console.log(`✅ [BillingCron:${t.id}] WhatsApp enviado para ${destPhone} via Evolution Go (estágio: ${stage})`);
+          console.log(`✅ [BillingCron:${t.id}] WhatsApp enviado para ${mascararTelefone(destPhone)} via Evolution Go (estágio: ${stage})`);
         }
       } catch (wpErr) {
         console.warn(`⚠️ [BillingCron:${t.id}] Falha ao enviar WhatsApp via Evolution Go:`, wpErr.message);
@@ -1453,6 +1464,7 @@ async function executarVarreduraCobranca({ manualTrigger = false, forcedTenantId
 
         const res = await fetch('https://api.resend.com/emails', {
           method: 'POST',
+          signal: AbortSignal.timeout(10000),
           headers: {
             'Authorization': `Bearer ${resendKey}`,
             'Content-Type': 'application/json'
@@ -1467,7 +1479,7 @@ async function executarVarreduraCobranca({ manualTrigger = false, forcedTenantId
         if (res.ok) {
           emailSuccess = true;
           channelUsed = wpSuccess ? 'both' : 'email';
-          console.log(`✅ [BillingCron:${t.id}] E-mail enviado para ${destEmail} (estágio: ${stage})`);
+          console.log(`✅ [BillingCron:${t.id}] E-mail enviado para ${mascararEmail(destEmail)} (estágio: ${stage})`);
         } else {
           const errText = await res.text().catch(() => '');
           console.warn(`⚠️ [BillingCron:${t.id}] Falha no envio de e-mail (${res.status}):`, errText);

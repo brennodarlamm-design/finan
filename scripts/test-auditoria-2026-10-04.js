@@ -594,5 +594,31 @@ console.log('=== Auditoria 04/10/2026 ===\n');
   console.log('  ✓ #36/#37 Dependências no grupo certo, driver do Neon alinhado, índice do delta e remoção dos redundantes (idempotentes)');
 }
 
+// #38–#40 — restos sem uso, parcela da Caixa e PII/timeout.
+{
+  for (const f of ['js/data_demo.js', 'frontend/core/data_demo.js', 'js/recovery-account-ux.js', 'frontend/core/recovery-account-ux.js']) assert(!fs.existsSync(f), `${f} removido`);
+  for (const f of ['app.html', 'frontend/app.html']) assert(!read(f).includes('data_demo.js'), `${f} sem data_demo`);
+  const ct = read('js/contratos.js');
+  assert(!ct.includes('ent * 0.75'), 'sem 75% automático');
+  assert(ct.includes("Informe a parcela paga na assinatura da Caixa (cláusula 08)."), 'salvar continua exigindo a parcela');
+  assert.equal(ct, read('frontend/domains/contratos/contratos.js'));
+  const server = read('backend/server.js');
+  assert(!server.includes('enviado para ${destPhone}') && !server.includes('enviado para ${destEmail}') && !server.includes('Mensagem recebida de ${parsed.phone}'));
+  const helpers = server.slice(server.indexOf('function mascararTelefone'), server.indexOf('function mascararEmail') + 400);
+  const mt = new Function(helpers.slice(0, helpers.indexOf('function mascararEmail')) + 'return mascararTelefone;')();
+  const trechoEmail = helpers.slice(helpers.indexOf('function mascararEmail'));
+  const me = new Function(trechoEmail.slice(0, trechoEmail.indexOf('\n}') + 2) + '\nreturn mascararEmail;')();
+  assert.equal(mt('+55 (95) 99123-4567'), '***4567'); assert.equal(me('financeiro@construtora.com.br'), 'fi***@construtora.com.br');
+  for (const f of ['backend/server.js', 'api/_admin-route.js', 'api/_email_service.js', 'api/_webhook_pix_core.js', 'api/auth.js', 'api/users.js']) {
+    const src = read(f); let i = -1;
+    while ((i = src.indexOf("fetch('https://api.resend.com/emails'", i + 1)) >= 0) {
+      const bloco = src.slice(i, src.indexOf('});', i));
+      assert(bloco.includes('signal: AbortSignal.timeout('), `${f}: fetch do Resend com timeout`);
+    }
+  }
+  assert.equal(read('api/_email_service.js'), read('backend/domains/integrations/_email_service.js'));
+  console.log('  ✓ #38–#40 Arquivos mortos removidos, parcela da Caixa sem 75% inventado, logs sem telefone/e-mail inteiros e Resend com timeout');
+}
+
 await db.close();
 console.log('\n✅ Auditoria 04/10/2026: tudo certo.');

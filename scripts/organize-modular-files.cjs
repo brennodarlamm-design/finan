@@ -8,7 +8,6 @@ const frontendMap = {
   // Core
   'js/auth.js': 'frontend/core/auth.js',
   'js/data.js': 'frontend/core/data.js',
-  'js/data_demo.js': 'frontend/core/data_demo.js',
   'js/ui.js': 'frontend/core/ui.js',
   'js/utils.js': 'frontend/core/utils.js',
   'js/assets.js': 'frontend/core/assets.js',

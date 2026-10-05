@@ -248,4 +248,10 @@ Legenda: 🔴 crítica · 🟠 alta · 🟡 média · 🔵 baixa · ✅ confirma
 - ✅ #37 Índices:
   - `042_audit_logs_indice_delta.sql` cria `(tenant_id, entidade, created_at DESC) INCLUDE (entidade_id)` para o delta do "Sincronizar tudo". Foi aplicada no butterfly em 05/10.
   - `043_lancamentos_indices_redundantes.sql` remove 5 índices de `lancamentos` sem `tenant_id` ou repetidos, e um duplicado de `audit_logs`. Todos tinham `idx_scan = 0`. Remove só índices, mas **ainda não foi aplicada: aguarda confirmação**.
+- ✅ #38 Saíram `js/data_demo.js`, que estava vazio e ainda era carregado no `app.html`, e `js/recovery-account-ux.js`, que nenhuma página carregava, junto com os espelhos. O `vercel.json` ficou: 15 testes antigos o leem como fixture de CSP e de rotas, então removê-lo é uma tarefa à parte. Ele não entra no build da Cloudflare.
+- ✅ #39 O contrato não preenche mais a parcela da Caixa com 75% da entrada. O valor era inventado e ficava travado no primeiro dígito digitado. O salvar continua exigindo a parcela quando há entrada.
+- ✅ #40 Logs e Resend:
+  - os logs do backend mostram só o final do telefone e o domínio do e-mail;
+  - o webhook do WhatsApp deixou de registrar nome e trecho da mensagem;
+  - os dois `fetch` do Resend que não tinham timeout passaram a ter 10 s (os outros seis já tinham).
 
