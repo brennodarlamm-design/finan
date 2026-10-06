@@ -634,5 +634,18 @@ console.log('=== Auditoria 04/10/2026 ===\n');
   console.log('  ✓ Pós-auditoria: anexo do R2 abre pela rota autenticada; NF-e com resumo preenche emitente e valor; DANFE busca a nota antes');
 }
 
+// Pós-auditoria: produtos da NF-e entram no controle de compras.
+{
+  const nfe = read('js/nfe.js');
+  assert(nfe.includes("itens: i === 0 ? itensNota : [],") && nfe.includes('itens: itensNota,'), 'itens no 1º lançamento e na nota');
+  assert(nfe.includes('Produtos.encontrarOuCriar(it.nome, unidade'), 'produto cadastrado/encontrado no módulo Produtos');
+  assert(nfe.includes('await this.buscarPorChave(chave);\n        res = await pedirXml();'), 'XML completo: busca a nota no MeuDanfe uma vez');
+  assert(nfe.includes('async puxarProdutosDoLancamento(lancId)'));
+  assert(read('js/lancamentos.js').includes('data-fb-click="NFe.puxarProdutosDoLancamento"'));
+  assert(read('js/patch26-events.js').includes('"NFe.puxarProdutosDoLancamento"'));
+  for (const [a, b] of [['js/nfe.js', 'frontend/domains/fiscal/nfe.js'], ['js/lancamentos.js', 'frontend/domains/financeiro/lancamentos.js'], ['js/patch26-events.js', 'frontend/core/patch26-events.js']]) assert.equal(read(a), read(b), b);
+  console.log('  ✓ Pós-auditoria: produtos da NF-e no lançamento, na nota e no controle de Produtos; botão para despesas antigas');
+}
+
 await db.close();
 console.log('\n✅ Auditoria 04/10/2026: tudo certo.');

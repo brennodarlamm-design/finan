@@ -164,10 +164,17 @@ const NFe = {
 
     // 2. Fallback para provedor secundário
     try {
-      const res = await this._fetchWithTimeout(`${this._API_BASE}?action=xml&chave=${chave}`, {
+      const pedirXml = () => this._fetchWithTimeout(`${this._API_BASE}?action=xml&chave=${chave}`, {
         method: 'GET',
         headers: this._headers()
       });
+      let res = await pedirXml();
+      // Como no DANFE: o MeuDanfe só entrega notas da Área do Cliente. O XML completo é o que traz
+      // os produtos (o resumo do DF-e não traz), então adiciona a nota uma vez e tenta de novo.
+      if (res.status === 404) {
+        await this.buscarPorChave(chave);
+        res = await pedirXml();
+      }
       if (!res.ok) {
         if (res.status === 404) throw new Error('NF-e não encontrada na base de dados.');
         throw new Error(`Erro ao baixar XML: ${res.status}`);
@@ -1209,7 +1216,7 @@ const NFe = {
     // Escapa dados para callback
     window._tempNFeParsed = parsed;
     if (parsed.resumo) {
-      Utils.toast('Só o resumo da NF-e está disponível (sem itens e duplicatas). Confira o vencimento antes de salvar.', 'warning');
+      Utils.toast('Só o resumo da NF-e está disponível: os produtos e as parcelas não vieram. Confira o vencimento antes de salvar.', 'warning');
     }
 
     Utils.showModal(`
@@ -1232,7 +1239,7 @@ const NFe = {
             </div>
             ${parsed.itens.length ? `
             <details style="margin-top:10px;font-size:.78rem;color:var(--text2);cursor:pointer;">
-              <summary style="font-weight:600;color:var(--accent);">📦 Ver ${parsed.itens.length} produto(s)/serviço(s) da nota</summary>
+              <summary style="font-weight:600;color:var(--accent);">📦 ${parsed.itens.length} produto(s)/serviço(s) da nota — entram no controle de Produtos</summary>
               <div style="max-height:120px;overflow-y:auto;margin-top:6px;padding:6px 10px;background:var(--bg-secondary);border-radius:var(--r-sm);display:flex;flex-direction:column;gap:4px;">
                 ${parsed.itens.map(i => `<div>• <strong>${Utils.escapeHtml(i.nome)}</strong> (${Utils.escapeHtml(i.qtd)} ${Utils.escapeHtml(i.unidade)}) — ${Utils.fmt.currency(i.total)}</div>`).join('')}
               </div>
@@ -1360,6 +1367,66 @@ const NFe = {
     return notas.some(n => n.lancamento_id && [n.chave_nfe, n.chave_acesso, n.chave].some(c => String(c || '').replace(/\D/g, '') === ch));
   },
 
+  _itensDaNotaParaLancamento(parsed, categoria) {
+    return (parsed.itens || []).filter(it => it && it.nome).map(it => {
+      const qtd = Number(it.qtd) || 0;
+      const total = Number(it.total) || 0;
+      const unidade = String(it.unidade || 'un').trim() || 'un';
+      const prod = (typeof Produtos !== 'undefined' && Produtos.encontrarOuCriar)
+        ? Produtos.encontrarOuCriar(it.nome, unidade, categoria || 'material')
+        : null;
+      return {
+        produto: it.nome,
+        qtd,
+        unidade,
+        valor_unit: qtd > 0 ? Math.round((total / qtd) * 10000) / 10000 : total,
+        total,
+        produto_id: prod?.id || null
+      };
+    });
+  },
+
+  // Despesas já geradas de uma NF-e sem os produtos (ex.: geradas só com o resumo do DF-e):
+  // busca o XML completo e grava os itens; corrige também o fornecedor e o valor de reserva.
+  async puxarProdutosDoLancamento(lancId) {
+    const l = DB.getById('lancamentos', lancId);
+    const chave = this._limparChave(l?.chave_nfe || '');
+    if (!l || chave.length !== 44) { Utils.toast('Este lançamento não tem chave de NF-e.', 'warning'); return; }
+    if (this._puxandoProdutos) return;
+    this._puxandoProdutos = true;
+    Utils.toast('Buscando os produtos da NF-e...', 'info');
+    try {
+      const resp = await this.baixarXML(chave);
+      const parsed = resp?.data ? this._parseXmlCompleto(resp.data) : null;
+      if (!parsed || parsed.resumo || !parsed.itens?.length) {
+        Utils.toast('O XML completo desta NF-e ainda não está disponível (só o resumo). Tente de novo mais tarde.', 'warning');
+        return;
+      }
+      const itens = this._itensDaNotaParaLancamento(parsed, l.categoria || 'material');
+      const patch = { itens };
+      if (!l.fornecedor_beneficiario || l.fornecedor_beneficiario === 'Fornecedor da NF-e') patch.fornecedor_beneficiario = parsed.emitente || l.fornecedor_beneficiario;
+      if (String(l.descricao || '').includes('Fornecedor da NF-e') && parsed.emitente) patch.descricao = l.descricao.replace('Fornecedor da NF-e', parsed.emitente);
+      if (!(Number(l.valor) > 0) && !l.numero_parcela && parsed.valor_bruto > 0) patch.valor = parsed.valor_bruto;
+      DB.update('lancamentos', l.id, patch);
+      const nota = (DB.getAll('notas') || []).find(n => n.lancamento_id === l.id || this._limparChave(n.chave_nfe || n.chave_acesso || '') === chave);
+      if (nota) {
+        const notaPatch = { itens };
+        if (!nota.emitente || nota.emitente === 'Fornecedor da NF-e') notaPatch.emitente = parsed.emitente || nota.emitente;
+        if (!(Number(nota.valor_total) > 0) && parsed.valor_bruto > 0) notaPatch.valor_total = parsed.valor_bruto;
+        DB.update('notas', nota.id, notaPatch);
+      }
+      if (typeof Produtos !== 'undefined' && Produtos.atualizarValorMedio) {
+        for (const it of itens) if (it.produto_id) Produtos.atualizarValorMedio(it.produto_id);
+      }
+      Utils.toast(`${itens.length} produto(s) da NF-e adicionados ao lançamento.`, 'success');
+      if (typeof Lancamentos !== 'undefined' && Lancamentos._refresh) Lancamentos._refresh();
+    } catch (err) {
+      Utils.toast(`Não foi possível buscar os produtos: ${err.message}`, 'error');
+    } finally {
+      this._puxandoProdutos = false;
+    }
+  },
+
   async _confirmarGeracaoLancamento(chave) {
     const parsed = window._tempNFeParsed || {};
     // Clique duplo enquanto o DANFE é baixado gerava duas despesas.
@@ -1418,7 +1485,11 @@ const NFe = {
         ? duplicatas.map((d, i) => ({ valor: Number(d.valor), vencimento: d.vencimento || venc, sufixo: ` (parcela ${i + 1}/${duplicatas.length}${d.numero ? ` · dup. ${d.numero}` : ''})` }))
         : [{ valor, vencimento: venc, sufixo: '' }];
       const grupoParcelas = porDuplicata ? DB.uuid() : null;
+      // Produtos da nota → controle de compras (módulo Produtos). Ficam só no primeiro lançamento,
+      // para a nota parcelada não contar a mesma compra uma vez por parcela.
+      const itensNota = this._itensDaNotaParaLancamento(parsed, cat);
       const lancamentos = parcelas.map((p, i) => DB.add('lancamentos', {
+        itens: i === 0 ? itensNota : [],
         tipo: 'despesa',
         obra_id: obraId,
         conta_bancaria: contaBancaria,
@@ -1455,8 +1526,13 @@ const NFe = {
         lancamento_id: lanc.id,
         chave_acesso: chave,
         chave_nfe: chave,
+        itens: itensNota,
         observacoes: `Gerado automaticamente via busca NF-e em ${Utils.fmt.datetime(new Date().toISOString())}${porDuplicata ? ` · ${parcelas.length} parcelas no financeiro` : ''}`
       });
+
+      if (typeof Produtos !== 'undefined' && Produtos.atualizarValorMedio) {
+        for (const it of itensNota) if (it.produto_id) Produtos.atualizarValorMedio(it.produto_id);
+      }
 
       // 4. Baixa o DANFE PDF e anexa ao lançamento
       try {
