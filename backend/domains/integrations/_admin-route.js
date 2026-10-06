@@ -132,16 +132,28 @@ function crc16Ccitt(text) {
   return crc.toString(16).toUpperCase().padStart(4, '0');
 }
 
+function normalizePixKey(key) {
+  let k = String(key || '').trim();
+  if (!k) return '';
+  if (k.startsWith('+')) return k;
+  if (k.includes('@') || /^[0-9a-f]{8}-[0-9a-f]{4}/i.test(k)) return k;
+  const digits = k.replace(/\D/g, '');
+  if (digits.length === 10 || digits.length === 11) return '+55' + digits;
+  if (digits.length === 13 && digits.startsWith('55')) return '+' + digits;
+  return digits || k;
+}
+
 function buildPixPayload({ key, amountCents, txid, merchantName, merchantCity }) {
-  const cleanKey = String(key || '').trim();
+  const cleanKey = normalizePixKey(key);
   if (!cleanKey) return '';
-  const mName = onlyAscii(merchantName || 'FINGO SISTEMA', 25) || 'FINGO';
-  const mCity = onlyAscii(merchantCity || 'BOA VISTA', 15) || 'BOA VISTA';
+  const mName = onlyAscii(merchantName || process.env.FINOBRA_PIX_MERCHANT_NAME || process.env.FINGO_PIX_MERCHANT_NAME || 'BRENNO DARLAN A COSTA', 25) || 'BRENNO DARLAN';
+  const mCity = onlyAscii(merchantCity || process.env.FINOBRA_PIX_CITY || 'BOA VISTA', 15) || 'BOA VISTA';
   const merchantAccount = tlv('00', 'BR.GOV.BCB.PIX') + tlv('01', cleanKey);
   const amount = (Number(amountCents || 0) / 100).toFixed(2);
   const additional = tlv('05', onlyAscii(txid, 25) || '***');
   const base =
     tlv('00', '01') +
+    tlv('01', '11') +
     tlv('26', merchantAccount) +
     tlv('52', '0000') +
     tlv('53', '986') +
@@ -313,7 +325,7 @@ function renderBillingEmailHtml(vars) {
         </div>
       </div>
       <div style="background:#0A0A0A;padding:20px 32px;border-top:1px solid #282828;text-align:center;font-size:11px;color:#8E8E8E;line-height:1.6;">
-        <strong style="color:#CBD5E1;">FinGo ERP — Obras em Fluxo</strong> &bull; CNPJ 53.864.218/0001-20<br>
+        <strong style="color:#CBD5E1;">FinGo ERP — Obras em Fluxo</strong><br>
         Em caso de dúvidas ou comprovante, contate: <a href="mailto:suporte@fingo.api.br" style="color:#C6FF00;text-decoration:none;">suporte@fingo.api.br</a>
       </div>
     </div>
@@ -1305,7 +1317,7 @@ export default async function handler(req, res) {
       };
       const planoInfo = PLANOS_INFO[t.plano] || { nome: String(t.plano || 'Profissional').toUpperCase(), valor: '279,90', cents: 27990 };
 
-      const pixKey = String(userPixKey || process.env.FINOBRA_PIX_KEY || '5595991363678').trim();
+      const pixKey = String(userPixKey || process.env.FINOBRA_PIX_KEY || '+5595991363678').trim();
       if (!pixKey) {
         return res.status(503).json({
           success:false,
@@ -1313,7 +1325,7 @@ export default async function handler(req, res) {
           error:'Nenhuma chave PIX foi informada e FINOBRA_PIX_KEY não está configurada. O aviso de cobrança não foi enviado.'
         });
       }
-      const pixBeneficiary = String(userPixBeneficiary || process.env.FINOBRA_PIX_BENEFICIARY || 'FinGo Soluções Tecnológicas').trim();
+      const pixBeneficiary = String(userPixBeneficiary || process.env.FINOBRA_PIX_BENEFICIARY || 'Brenno Darlan Almeida Costa').trim();
 
       // Cálculo de vencimento e dias restantes com parsing robusto (suporta Date, ISO, GMT)
       const vInfo = parseVencimento(t.vencimento);
@@ -1332,7 +1344,7 @@ export default async function handler(req, res) {
         key: pixKey,
         amountCents,
         txid: `FINGO${cleanTenantId}`,
-        merchantName: pixBeneficiary || 'FINGO SISTEMA',
+        merchantName: pixBeneficiary || 'BRENNO DARLAN A COSTA',
         merchantCity: 'BOA VISTA'
       }) || pixKey;
 

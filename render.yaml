@@ -65,6 +65,8 @@ services:
         sync: false
       - key: FINOBRA_PIX_MERCHANT_NAME
         sync: false
+      - key: FINOBRA_PIX_BENEFICIARY
+        sync: false
       - key: FINOBRA_PIX_CITY
         sync: false
       - key: FINOBRA_MASTER_URL

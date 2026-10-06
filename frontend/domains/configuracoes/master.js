@@ -2516,7 +2516,7 @@ const MasterAdmin = {
             </div>
             <div>
               <label style="display:block;font-size:.74rem;color:#94a3b8;margin-bottom:4px;">Chave PIX de Recebimento</label>
-              <input type="text" id="mc-pix" value="5595991363678" placeholder="Chave PIX" style="width:100%;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.15);border-radius:8px;padding:8px 10px;color:#fff;font-size:.82rem;font-weight:700;">
+              <input type="text" id="mc-pix" value="+5595991363678" placeholder="Chave PIX (Telefone: +5595991363678)" style="width:100%;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.15);border-radius:8px;padding:8px 10px;color:#fff;font-size:.82rem;font-weight:700;">
             </div>
           </div>
 
@@ -2527,7 +2527,7 @@ const MasterAdmin = {
               <div style="font-size:.72rem;color:#94a3b8;line-height:1.4;">O e-mail enviado ao cliente exibirá o QR Code gerado em alta definição com o valor exato do plano para pagamento instantâneo via app do banco.</div>
             </div>
             <div style="background:#fff;padding:4px;border-radius:6px;flex-shrink:0;">
-              <img id="mc-pix-qr-preview" src="https://api.qrserver.com/v1/create-qr-code/?size=64x64&margin=1&data=5595991363678" alt="QR Code PIX" style="display:block;width:64px;height:64px;border:0;">
+              <img id="mc-pix-qr-preview" src="https://api.qrserver.com/v1/create-qr-code/?size=64x64&margin=1&data=%2B5595991363678" alt="QR Code PIX" style="display:block;width:64px;height:64px;border:0;">
             </div>
           </div>
 
@@ -2569,6 +2569,7 @@ const MasterAdmin = {
       </div>
     `;
 
+    document.getElementById('mc-pix')?.addEventListener('input', () => this.mudarTemplateCobranca());
     this.mudarTemplateCobranca(defaultTemplate);
   },
 
@@ -2592,14 +2593,23 @@ const MasterAdmin = {
       return String(v);
     };
     const venc = parseVencLocal(emp.vencimento);
-    const pix = document.getElementById('mc-pix')?.value || '5595991363678';
-    const qrImg = document.getElementById('mc-pix-qr-preview');
-    if (qrImg && pix) {
-      qrImg.src = `https://api.qrserver.com/v1/create-qr-code/?size=64x64&margin=1&data=${encodeURIComponent(pix)}`;
-    }
+    const pix = document.getElementById('mc-pix')?.value || '+5595991363678';
     
     const planosMap = { starter: { n: 'Básico', v: '119,90' }, pro: { n: 'Profissional', v: '279,90' }, unlimited: { n: 'Ilimitado', v: '499,90' }, trial: { n: 'Trial', v: '279,90' } };
     const pInfo = planosMap[emp.plano] || { n: 'Profissional', v: '279,90' };
+
+    const qrImg = document.getElementById('mc-pix-qr-preview');
+    if (qrImg && pix) {
+      const valNum = parseFloat(String(pInfo.v || '279,90').replace(',', '.'));
+      const payloadPreview = this.gerarPixPayload({
+        key: pix,
+        amount: valNum,
+        txid: ('FINGO' + String(emp.id || 'PREVIEW').replace(/[^a-zA-Z0-9]/g, '')).slice(0, 25),
+        merchantName: 'BRENNO DARLAN A COSTA',
+        merchantCity: 'BOA VISTA'
+      }) || pix;
+      qrImg.src = `https://api.qrserver.com/v1/create-qr-code/?size=160x160&margin=1&data=${encodeURIComponent(payloadPreview)}`;
+    }
 
     let situacaoTxt = '';
     if (dr > 1) situacaoTxt = `vence em ${dr} dias`;
@@ -2613,16 +2623,16 @@ const MasterAdmin = {
 
     if (type === 'reminder') {
       subject = `🔔 FinGo — Lembrete de Renovação de Assinatura (${venc})`;
-      msg = `Olá, ${resp}! 👋\n\nPassando para lembrar que a assinatura do *FinGo* da empresa *${nome}* (Plano ${pInfo.n}) vence em *${venc}* (${situacaoTxt}).\n\n💰 *Valor:* R$ ${pInfo.v}\n🔑 *Chave PIX:* ${pix}\n👤 *Beneficiário:* FinGo Soluções Tecnológicas\n\nQualquer dúvida ou caso precise de emissão de NF, estamos à disposição!`;
+      msg = `Olá, ${resp}! 👋\n\nPassando para lembrar que a assinatura do *FinGo* da empresa *${nome}* (Plano ${pInfo.n}) vence em *${venc}* (${situacaoTxt}).\n\n💰 *Valor:* R$ ${pInfo.v}\n🔑 *Chave PIX (Telefone):* ${pix}\n👤 *Beneficiário:* Brenno Darlan Almeida Costa\n\nQualquer dúvida ou caso precise de emissão de NF, estamos à disposição!`;
     } else if (type === 'due_today') {
       subject = `⚠️ FinGo — Sua assinatura vence hoje (${venc})`;
-      msg = `Olá, ${resp}! 🔔\n\nA assinatura do *FinGo* da empresa *${nome}* vence *hoje (${venc})*.\n\nPara garantir a continuidade dos acessos da sua equipe e sincronização das obras sem interrupção:\n\n💰 *Valor:* R$ ${pInfo.v}\n🔑 *Chave PIX:* ${pix}\n👤 *Beneficiário:* FinGo Soluções Tecnológicas\n\nApós o pagamento via PIX, a renovação é confirmada e os acessos continuam ativos normalmente.`;
+      msg = `Olá, ${resp}! 🔔\n\nA assinatura do *FinGo* da empresa *${nome}* vence *hoje (${venc})*.\n\nPara garantir a continuidade dos acessos da sua equipe e sincronização das obras sem interrupção:\n\n💰 *Valor:* R$ ${pInfo.v}\n🔑 *Chave PIX (Telefone):* ${pix}\n👤 *Beneficiário:* Brenno Darlan Almeida Costa\n\nApós o pagamento via PIX, a renovação é confirmada e os acessos continuam ativos normalmente.`;
     } else if (type === 'overdue') {
       subject = `🚨 FinGo — Aviso de Vencimento e Regularização de Acesso`;
-      msg = `Olá, ${resp}! ⚠️\n\nIdentificamos que a assinatura do *FinGo* da empresa *${nome}* venceu em *${venc}* (${situacaoTxt}) e consta pendente.\n\nPara evitar o bloqueio preventivo dos acessos, emissão de relatórios e sincronização no canteiro de obras, solicitamos a regularização:\n\n💰 *Valor:* R$ ${pInfo.v}\n🔑 *Chave PIX:* ${pix}\n👤 *Beneficiário:* FinGo Soluções Tecnológicas\n\nSe já realizou o pagamento, desconsidere este aviso ou nos envie o comprovante por aqui!`;
+      msg = `Olá, ${resp}! ⚠️\n\nIdentificamos que a assinatura do *FinGo* da empresa *${nome}* venceu em *${venc}* (${situacaoTxt}) e consta pendente.\n\nPara evitar o bloqueio preventivo dos acessos, emissão de relatórios e sincronização no canteiro de obras, solicitamos a regularização:\n\n💰 *Valor:* R$ ${pInfo.v}\n🔑 *Chave PIX (Telefone):* ${pix}\n👤 *Beneficiário:* Brenno Darlan Almeida Costa\n\nSe já realizou o pagamento, desconsidere este aviso ou nos envie o comprovante por aqui!`;
     } else if (type === 'trial_ending') {
       subject = `🚀 FinGo — Seu período de testes termina em ${venc}`;
-      msg = `Olá, ${resp}! 🚀\n\nSeu período de teste gratuito do *FinGo* na empresa *${nome}* termina em *${venc}*.\n\nEsperamos que a plataforma esteja transformando a gestão das suas obras! Para continuar utilizando todos os recursos com a sua equipe:\n\n👉 Conheça os planos e assine: https://fingo.api.br/app.html#planos\n💰 *Valor de referência:* R$ ${pInfo.v}/mês (${pInfo.n})\n🔑 *Chave PIX:* ${pix}\n👤 *Beneficiário:* FinGo Soluções Tecnológicas\n\nEstamos à disposição para ajudar na escolha do melhor plano!`;
+      msg = `Olá, ${resp}! 🚀\n\nSeu período de teste gratuito do *FinGo* na empresa *${nome}* termina em *${venc}*.\n\nEsperamos que a plataforma esteja transformando a gestão das suas obras! Para continuar utilizando todos os recursos com a sua equipe:\n\n👉 Conheça os planos e assine: https://fingo.api.br/app.html#planos\n💰 *Valor de referência:* R$ ${pInfo.v}/mês (${pInfo.n})\n🔑 *Chave PIX (Telefone):* ${pix}\n👤 *Beneficiário:* Brenno Darlan Almeida Costa\n\nEstamos à disposição para ajudar na escolha do melhor plano!`;
     } else {
       subject = `FinGo — Notificação de Assinatura (${nome})`;
       msg = `Olá, ${resp}! Aqui é do FinGo referente à assinatura da empresa ${nome}.`;
@@ -3726,7 +3736,52 @@ const MasterAdmin = {
           </div>
         </div>
       </div>
-    `;
+  },
+
+  gerarPixPayload({ key = '+5595991363678', amount = 0, txid = '***', merchantName = 'BRENNO DARLAN A COSTA', merchantCity = 'BOA VISTA' } = {}) {
+    const tlv = (id, val) => {
+      const v = String(val ?? '');
+      return id + String(v.length).padStart(2, '0') + v;
+    };
+    const crc16 = (text) => {
+      let crc = 0xFFFF;
+      for (let i = 0; i < text.length; i++) {
+        crc ^= text.charCodeAt(i) << 8;
+        for (let b = 0; b < 8; b++) crc = (crc & 0x8000) ? ((crc << 1) ^ 0x1021) : (crc << 1);
+        crc &= 0xFFFF;
+      }
+      return crc.toString(16).toUpperCase().padStart(4, '0');
+    };
+    const normalizePixKey = (raw) => {
+      let k = String(raw || '').trim();
+      if (!k) return '';
+      if (k.startsWith('+')) return k;
+      if (k.includes('@') || /^[0-9a-f]{8}-[0-9a-f]{4}/i.test(k)) return k;
+      const digits = k.replace(/\D/g, '');
+      if (digits.length === 10 || digits.length === 11) return '+55' + digits;
+      if (digits.length === 13 && digits.startsWith('55')) return '+' + digits;
+      return digits || k;
+    };
+    const cleanKey = normalizePixKey(key);
+    if (!cleanKey) return '';
+    const mName = String(merchantName).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase().replace(/[^A-Z0-9 .\-]/g, '').slice(0, 25) || 'BRENNO DARLAN';
+    const mCity = String(merchantCity).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase().replace(/[^A-Z0-9 .\-]/g, '').slice(0, 15) || 'BOA VISTA';
+    const merchantAccount = tlv('00', 'BR.GOV.BCB.PIX') + tlv('01', cleanKey);
+    const amountStr = amount > 0 ? Number(amount).toFixed(2) : '';
+    const additional = tlv('05', String(txid || '***').slice(0, 25));
+    const base =
+      tlv('00', '01') +
+      tlv('01', '11') +
+      tlv('26', merchantAccount) +
+      tlv('52', '0000') +
+      tlv('53', '986') +
+      (amountStr ? tlv('54', amountStr) : '') +
+      tlv('58', 'BR') +
+      tlv('59', mName) +
+      tlv('60', mCity) +
+      tlv('62', additional) +
+      '6304';
+    return base + crc16(base);
   }
 };
 

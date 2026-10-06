@@ -1176,6 +1176,57 @@ function escapeHtmlServer(str) {
     .replace(/'/g, '&#039;');
 }
 
+function tlvServer(id, value) {
+  const v = String(value ?? '');
+  return `${id}${String(v.length).padStart(2, '0')}${v}`;
+}
+
+function crc16CcittServer(text) {
+  let crc = 0xFFFF;
+  for (let i = 0; i < text.length; i++) {
+    crc ^= text.charCodeAt(i) << 8;
+    for (let bit = 0; bit < 8; bit++) {
+      crc = (crc & 0x8000) ? ((crc << 1) ^ 0x1021) : (crc << 1);
+      crc &= 0xFFFF;
+    }
+  }
+  return crc.toString(16).toUpperCase().padStart(4, '0');
+}
+
+function normalizePixKeyServer(key) {
+  let k = String(key || '').trim();
+  if (!k) return '';
+  if (k.startsWith('+')) return k;
+  if (k.includes('@') || /^[0-9a-f]{8}-[0-9a-f]{4}/i.test(k)) return k;
+  const digits = k.replace(/\D/g, '');
+  if (digits.length === 10 || digits.length === 11) return '+55' + digits;
+  if (digits.length === 13 && digits.startsWith('55')) return '+' + digits;
+  return digits || k;
+}
+
+function buildPixPayloadServer({ key, amountCents, txid, merchantName, merchantCity }) {
+  const cleanKey = normalizePixKeyServer(key);
+  if (!cleanKey) return '';
+  const mName = String(merchantName || process.env.FINOBRA_PIX_MERCHANT_NAME || 'BRENNO DARLAN A COSTA').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase().replace(/[^A-Z0-9 .\-]/g, '').slice(0, 25) || 'BRENNO DARLAN';
+  const mCity = String(merchantCity || process.env.FINOBRA_PIX_CITY || 'BOA VISTA').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase().replace(/[^A-Z0-9 .\-]/g, '').slice(0, 15) || 'BOA VISTA';
+  const merchantAccount = tlvServer('00', 'BR.GOV.BCB.PIX') + tlvServer('01', cleanKey);
+  const amount = (Number(amountCents || 0) / 100).toFixed(2);
+  const additional = tlvServer('05', String(txid || '***').slice(0, 25));
+  const base =
+    tlvServer('00', '01') +
+    tlvServer('01', '11') +
+    tlvServer('26', merchantAccount) +
+    tlvServer('52', '0000') +
+    tlvServer('53', '986') +
+    (Number(amountCents) > 0 ? tlvServer('54', amount) : '') +
+    tlvServer('58', 'BR') +
+    tlvServer('59', mName) +
+    tlvServer('60', mCity) +
+    tlvServer('62', additional) +
+    '6304';
+  return base + crc16CcittServer(base);
+}
+
 function renderBillingEmailHtmlServer(vars) {
   const empresa = escapeHtmlServer(vars.EMPRESA);
   const responsavel = escapeHtmlServer(vars.RESPONSAVEL);
@@ -1349,7 +1400,7 @@ async function executarVarreduraCobranca({ manualTrigger = false, forcedTenantId
     console.error('❌ [BillingCron] FINOBRA_PIX_KEY ausente. Notificações de cobrança bloqueadas para evitar envio de chave incorreta.');
     return { success:false, executed:false, reason:'pix_key_not_configured', error:'FINOBRA_PIX_KEY não configurada.' };
   }
-  const pixBeneficiary = String(process.env.FINOBRA_PIX_BENEFICIARY || 'FinGo Soluções Tecnológicas').trim();
+  const pixBeneficiary = String(process.env.FINOBRA_PIX_BENEFICIARY || 'Brenno Darlan Almeida Costa').trim();
   const resendKey = String(process.env.RESEND_API_KEY || '').trim();
   const emailFrom = String(process.env.FINOBRA_SUPPORT_EMAIL_FROM || 'FinGo <suporte@fingo.api.br>').trim();
 
@@ -1447,6 +1498,16 @@ async function executarVarreduraCobranca({ manualTrigger = false, forcedTenantId
     // Disparo E-mail
     if (destEmail && destEmail.includes('@') && resendKey) {
       try {
+        const amountCents = planoInfo.cents || Math.round(parseFloat(String(planoInfo.valor || '279.90').replace(',', '.')) * 100);
+        const cleanTenantId = String(t.id).replace(/[^a-zA-Z0-9]/g, '').slice(0, 15);
+        const pixPayload = buildPixPayloadServer({
+          key: pixKey,
+          amountCents,
+          txid: `FINGO${cleanTenantId}`,
+          merchantName: pixBeneficiary || 'BRENNO DARLAN A COSTA',
+          merchantCity: 'BOA VISTA'
+        }) || pixKey;
+
         const html = renderBillingEmailHtmlServer({
           EMPRESA: nomeEmpresa,
           RESPONSAVEL: responsavel,
@@ -1457,6 +1518,7 @@ async function executarVarreduraCobranca({ manualTrigger = false, forcedTenantId
           BADGE_STATUS: badgeStatus,
           TITULO_AVISO: defaultTituloAviso,
           PIX_CHAVE: pixKey,
+          PIX_PAYLOAD: pixPayload,
           PIX_BENEFICIARIO: pixBeneficiary,
           MENSAGEM_EXTRA: finalMessage,
           LINK_ACESSO: 'https://fingo.api.br/login'

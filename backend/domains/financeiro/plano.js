@@ -49,23 +49,35 @@ function crc16Ccitt(text) {
   return crc.toString(16).toUpperCase().padStart(4, '0');
 }
 
-function buildPixPayload({ key, amountCents, txid }) {
-  const cleanKey = String(key || '').trim();
+function normalizePixKey(key) {
+  let k = String(key || '').trim();
+  if (!k) return '';
+  if (k.startsWith('+')) return k;
+  if (k.includes('@') || /^[0-9a-f]{8}-[0-9a-f]{4}/i.test(k)) return k;
+  const digits = k.replace(/\D/g, '');
+  if (digits.length === 10 || digits.length === 11) return '+55' + digits;
+  if (digits.length === 13 && digits.startsWith('55')) return '+' + digits;
+  return digits || k;
+}
+
+function buildPixPayload({ key, amountCents, txid, merchantName, merchantCity }) {
+  const cleanKey = normalizePixKey(key);
   if (!cleanKey) return '';
-  const merchantName = onlyAscii(process.env.FINOBRA_PIX_MERCHANT_NAME || process.env.FINGO_PIX_MERCHANT_NAME || 'FINGO SISTEMA', 25) || 'FINGO';
-  const merchantCity = onlyAscii(process.env.FINOBRA_PIX_CITY || 'BOA VISTA', 15) || 'BOA VISTA';
+  const mName = onlyAscii(merchantName || process.env.FINOBRA_PIX_MERCHANT_NAME || process.env.FINGO_PIX_MERCHANT_NAME || 'BRENNO DARLAN A COSTA', 25) || 'BRENNO DARLAN';
+  const mCity = onlyAscii(merchantCity || process.env.FINOBRA_PIX_CITY || 'BOA VISTA', 15) || 'BOA VISTA';
   const merchantAccount = tlv('00', 'BR.GOV.BCB.PIX') + tlv('01', cleanKey);
   const amount = (Number(amountCents || 0) / 100).toFixed(2);
   const additional = tlv('05', onlyAscii(txid, 25) || '***');
   const base =
     tlv('00', '01') +
+    tlv('01', '11') +
     tlv('26', merchantAccount) +
     tlv('52', '0000') +
     tlv('53', '986') +
-    tlv('54', amount) +
+    (Number(amountCents) > 0 ? tlv('54', amount) : '') +
     tlv('58', 'BR') +
-    tlv('59', merchantName) +
-    tlv('60', merchantCity) +
+    tlv('59', mName) +
+    tlv('60', mCity) +
     tlv('62', additional) +
     '6304';
   return base + crc16Ccitt(base);

@@ -434,8 +434,16 @@ const Cobranca = {
     this.fecharModalPix();
 
     const emp = (typeof DB !== 'undefined' && DB.getEmpresa()) || {};
-    const u = (typeof Auth !== 'undefined' && Auth.getUser()) || {};
-    const pixPayload = String(inv.pix_payload || '');
+    let pixPayload = String(inv.pix_payload || '');
+    if (!pixPayload) {
+      pixPayload = this.gerarPixPayloadFallback({
+        key: '+5595991363678',
+        amount: Number(inv.amount_cents || 0) / 100,
+        txid: String(inv.txid || ('FINGO' + String(inv.id || '').slice(-8))).slice(0, 25),
+        merchantName: 'BRENNO DARLAN A COSTA',
+        merchantCity: 'BOA VISTA'
+      });
+    }
     const txid = Utils.escapeHtml(String(inv.txid || ''));
     const whatsapp = String(billingWhatsapp || this._accountData?.billingWhatsapp || '').replace(/\D/g, '');
     const whatsappDisplay = whatsapp ? `+${whatsapp}` : 'Suporte FinGo';
@@ -522,7 +530,7 @@ const Cobranca = {
 
           <!-- Resumo e Identificador TXID -->
           <div style="background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:8px 12px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px;font-size:.72rem;text-align:left;">
-            <div><span style="color:#94a3b8;">Beneficiário Oficial:</span> <strong style="color:#fff;">FinGo Soluções Tecnológicas</strong></div>
+            <div><span style="color:#94a3b8;">Beneficiário Oficial:</span> <strong style="color:#fff;">Brenno Darlan Almeida Costa</strong></div>
             <div><span style="color:#94a3b8;">Identificador (TXID):</span> <code style="color:var(--accent2);font-family:monospace;background:rgba(0,0,0,.3);padding:2px 6px;border-radius:4px;">${txid}</code></div>
           </div>
 
@@ -713,5 +721,51 @@ const Cobranca = {
         }
       }
     }, 4000);
+  },
+
+  gerarPixPayloadFallback({ key = '+5595991363678', amount = 0, txid = '***', merchantName = 'BRENNO DARLAN A COSTA', merchantCity = 'BOA VISTA' } = {}) {
+    const tlv = (id, val) => {
+      const v = String(val ?? '');
+      return id + String(v.length).padStart(2, '0') + v;
+    };
+    const crc16 = (text) => {
+      let crc = 0xFFFF;
+      for (let i = 0; i < text.length; i++) {
+        crc ^= text.charCodeAt(i) << 8;
+        for (let b = 0; b < 8; b++) crc = (crc & 0x8000) ? ((crc << 1) ^ 0x1021) : (crc << 1);
+        crc &= 0xFFFF;
+      }
+      return crc.toString(16).toUpperCase().padStart(4, '0');
+    };
+    const normalizePixKey = (raw) => {
+      let k = String(raw || '').trim();
+      if (!k) return '';
+      if (k.startsWith('+')) return k;
+      if (k.includes('@') || /^[0-9a-f]{8}-[0-9a-f]{4}/i.test(k)) return k;
+      const digits = k.replace(/\D/g, '');
+      if (digits.length === 10 || digits.length === 11) return '+55' + digits;
+      if (digits.length === 13 && digits.startsWith('55')) return '+' + digits;
+      return digits || k;
+    };
+    const cleanKey = normalizePixKey(key);
+    if (!cleanKey) return '';
+    const mName = String(merchantName).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase().replace(/[^A-Z0-9 .\-]/g, '').slice(0, 25) || 'BRENNO DARLAN';
+    const mCity = String(merchantCity).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase().replace(/[^A-Z0-9 .\-]/g, '').slice(0, 15) || 'BOA VISTA';
+    const merchantAccount = tlv('00', 'BR.GOV.BCB.PIX') + tlv('01', cleanKey);
+    const amountStr = amount > 0 ? Number(amount).toFixed(2) : '';
+    const additional = tlv('05', String(txid || '***').slice(0, 25));
+    const base =
+      tlv('00', '01') +
+      tlv('01', '11') +
+      tlv('26', merchantAccount) +
+      tlv('52', '0000') +
+      tlv('53', '986') +
+      (amountStr ? tlv('54', amountStr) : '') +
+      tlv('58', 'BR') +
+      tlv('59', mName) +
+      tlv('60', mCity) +
+      tlv('62', additional) +
+      '6304';
+    return base + crc16(base);
   }
 };
