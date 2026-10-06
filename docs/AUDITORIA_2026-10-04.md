@@ -181,10 +181,77 @@ Legenda: 🔴 crítica · 🟠 alta · 🟡 média · 🔵 baixa · ✅ confirma
   - xlsx atualizado para 0.20.3 (CVE-2024-22363), ainda pelo `cdn.sheetjs.com`, porque esse host é bloqueado na rede deste ambiente. Copiar o arquivo para `/js/vendor` depois e tirar o host do CSP.
 - ✅ #29 O Worker de produção, acessado por `*.workers.dev`, redireciona as páginas para `fingo.api.br` e recusa a API (os previews de PR continuam acessíveis).
 
-**Migrações pendentes em produção (verificado em `schema_migrations` e na existência das tabelas):**
+**Migrações pendentes (verificado em `schema_migrations` e na existência das tabelas):**
+
+> ⚠️ Correção de 05/10: esta verificação foi feita no projeto Neon `blue-thunder-76323603` (sa-east-1, `ep-solitary-river`), que é o banco antigo, hoje usado pelo WhatsApp. O banco do SaaS é o `ep-flat-fire-b4qu9c7p` (us-east-2, ver `docs/architecture/NEON_DUAL_WORKLOAD_SPLIT.md`), que fica em outra conta Neon e ainda não foi conferido. A empresa de teste do superadmin (`fingo-master`) também foi criada no banco antigo.
+>
+> Conferido também o `restless-butterfly-67699513` (us-east-2, endpoint `ep-proud-recipe-b4encxce`), em 05/10:
+> - 7 tenants e 1 usuário (`u1`), sem superadmin;
+> - nenhuma sessão e nenhum lançamento;
+> - migrações só até a 036;
+> - sem atividade desde 03/10.
+>
+> Não é o banco em uso.
+>
+> Atualização de 05/10: a migração para o `restless-butterfly-67699513` foi concluída e ele passou a ser o banco de produção. Situação verificada:
+> - 7 tenants, 9 usuários e 562 lançamentos;
+> - migrações 033–040 aplicadas; a 041 foi aplicada nesta data;
+> - `finobra_app` sem BYPASSRLS;
+> - a policy pública de `document_signatures` foi removida.
+>
+> O superadmin foi movido para a empresa de teste `fingo-master` e as sessões dele foram encerradas. Na migração ele tinha voltado para o tenant `angelim`.
+
 - `033` (newsletter);
 - `034` (anti-duplicidade de faturas pendentes);
 - `037` (Central de E-mails: a tabela `email_messages` não existe, e o webhook de e-mail falha hoje);
 - `038` (verificação de assinaturas ICP);
 - `039` (OFX);
 - `040` (assinaturas sem leitura pública).
+
+### Lote 5 (em andamento)
+
+- ✅ #30 Para trocar o próprio e-mail ou login é preciso informar a senha atual. Depois da troca, as outras sessões são encerradas.
+- ✅ #31 O `base64` de documentos enviado pelo `save` e pelo "Sincronizar tudo" passa pela mesma política do `/api/upload`, em `api/_file-validation.js`. A política verifica:
+  - extensão e MIME permitidos;
+  - extensão executável oculta;
+  - limite de 15 MB;
+  - assinatura binária;
+  - ausência de HTML/script.
+  
+  Um arquivo recusado não é gravado. Os metadados do documento seguem, e o app mantém a cópia local. Efeito colateral: os contratos e recibos gerados em HTML deixam de ter cópia na nuvem, porque HTML é bloqueado como no `/api/upload`. Eles continuam no aparelho e podem ser gerados de novo.
+- ✅ #32 Newsletter. Antes, qualquer pessoa inscrevia ou descadastrava um e-mail de terceiro só digitando o endereço. Agora:
+  - a inscrição fica pendente até o dono clicar no link de confirmação (double opt-in);
+  - o descadastro só vale pelo link assinado (HMAC, 7 dias); pelo formulário, o servidor envia esse link para o próprio e-mail;
+  - as respostas não revelam se o e-mail está na lista;
+  - é enviado no máximo um e-mail a cada 10 minutos por endereço.
+
+  Requer a migração `041_newsletter_double_opt_in.sql`. Inscrições antigas continuam como `subscribed`.
+- ✅ #33 Erros internos não vão mais para o cliente. Os casos corrigidos:
+  - DF-e e SEFAZ: a mensagem gravada em `tenant_dfe_sync` também deixou de ter o detalhe da rede;
+  - chat, OCR, busca semântica e ledger do v2;
+  - verificação de PDF assinado.
+
+  O detalhe fica no log. Só as mensagens escritas para o usuário (PDF inválido, imagem acima do limite) continuam aparecendo.
+- ✅ #34 OCR v2 (`/api/v2/edge/ai/ocr` e a aceleração no Edge do `reconhecer-documento`):
+  - quando a IA falha ou responde sem JSON, devolve falha (422) em vez de inventar fornecedor, itens e data;
+  - a imagem vai ao modelo como data URL, e não mais como um array JS com um número por byte;
+  - o tipo é detectado pelos bytes (só JPEG, PNG e WEBP; um PDF cai direto no pipeline principal);
+  - o limite é de 10 MB.
+- ✅ #35 O Sentry de toda página caiu de 143 KB para 55 KB gzip. O Replay virou o arquivo `js/sentry-replay.js`, que o `sentry.js` carrega só no app e no painel master, depois do `load`. Login e landing não baixam o Replay. Conferido no Chromium:
+  - no `/app`, o Replay é anexado ao cliente;
+  - no login, o arquivo nem é pedido.
+- ✅ #36 Dependências da raiz:
+  - saiu o `@sentry/node`, que só o backend usa;
+  - `@sentry/browser`, `react` e `react-dom` passaram para `devDependencies`, porque só entram nos bundles do build;
+  - o `esbuild`, usado pelo build, foi declarado;
+  - o driver do Neon do Worker subiu de 0.9.5 para 0.10.4, a mesma versão do Render. Só há correções entre as duas, e a suíte passou.
+- ✅ #37 Índices:
+  - `042_audit_logs_indice_delta.sql` cria `(tenant_id, entidade, created_at DESC) INCLUDE (entidade_id)` para o delta do "Sincronizar tudo". Foi aplicada no butterfly em 05/10.
+  - `043_lancamentos_indices_redundantes.sql` remove 5 índices de `lancamentos` sem `tenant_id` ou repetidos, e um duplicado de `audit_logs`. Todos tinham `idx_scan = 0`. Remove só índices, mas **ainda não foi aplicada: aguarda confirmação**.
+- ✅ #38 Saíram `js/data_demo.js`, que estava vazio e ainda era carregado no `app.html`, e `js/recovery-account-ux.js`, que nenhuma página carregava, junto com os espelhos. O `vercel.json` ficou: 15 testes antigos o leem como fixture de CSP e de rotas, então removê-lo é uma tarefa à parte. Ele não entra no build da Cloudflare.
+- ✅ #39 O contrato não preenche mais a parcela da Caixa com 75% da entrada. O valor era inventado e ficava travado no primeiro dígito digitado. O salvar continua exigindo a parcela quando há entrada.
+- ✅ #40 Logs e Resend:
+  - os logs do backend mostram só o final do telefone e o domínio do e-mail;
+  - o webhook do WhatsApp deixou de registrar nome e trecho da mensagem;
+  - os dois `fetch` do Resend que não tinham timeout passaram a ter 10 s (os outros seis já tinham).
+

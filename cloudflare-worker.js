@@ -1519,7 +1519,8 @@ async function handleApi(request, env) {
     }
     // AUDITORIA 2026-10-04 #19: a consulta DF-e na SEFAZ exige TLS mútuo com o certificado A1 (.pfx).
     // O https.request do Workers não garante o envio do certificado cliente; o Node do Render sim.
-    if (apiUrl.pathname === '/api/nfe' && apiUrl.searchParams.get('action') === 'dfe_sync' && env.FINOBRA_API_ORIGIN) {
+    // dfe_xml_completo também fala com a SEFAZ com o certificado (ciência + consulta pela chave).
+    if (apiUrl.pathname === '/api/nfe' && ['dfe_sync', 'dfe_xml_completo'].includes(apiUrl.searchParams.get('action')) && env.FINOBRA_API_ORIGIN) {
       return await proxyApi(request, env);
     }
     const isMutating = !SAFE_METHODS.has(String(request.method || 'GET').toUpperCase());

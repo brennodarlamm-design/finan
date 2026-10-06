@@ -945,7 +945,7 @@ const Configuracoes = {
             <input class="form-control" name="avatar" maxlength="2" value="${this._esc(u.avatar||'')}">
           </div>
           <hr style="border-color:var(--border);margin:16px 0;">
-          <div style="color:var(--text3);font-size:.8rem;margin-bottom:10px;">Alterar senha (deixe em branco para manter a atual)</div>
+          <div style="color:var(--text3);font-size:.8rem;margin-bottom:10px;">Para alterar a senha ou o e-mail, informe a senha atual. Deixe a nova senha em branco para manter a atual.</div>
           <div class="g2">
             <div class="form-group">
               <label class="form-label">Senha atual</label>

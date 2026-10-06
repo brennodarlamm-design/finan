@@ -25,9 +25,10 @@ async function runTests() {
 
   const dummyImageBase64 = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';
   const ocrRes = await runEdgeDocumentOcr({}, dummyImageBase64);
-  assert(ocrRes && ocrRes.success === true, 'runEdgeDocumentOcr executa com sucesso');
-  assert(ocrRes.data && ocrRes.data.fornecedor, 'runEdgeDocumentOcr extrai fornecedor do documento');
-  assert(ocrRes.data && ocrRes.data.categoria_sugerida, 'runEdgeDocumentOcr sugere categoria de despesa');
+  assert(ocrRes && ocrRes.success === false && !ocrRes.data, 'sem Workers AI, runEdgeDocumentOcr informa a falha em vez de inventar dados');
+  const comIA = await runEdgeDocumentOcr({ AI: { run: async (_m, input) => ({ response: input.image.startsWith('data:image/png;base64,') ? '{"fornecedor":"Casa do Construtor","valor":120.5,"categoria_sugerida":"Material Bruto"}' : '' }) } }, dummyImageBase64);
+  assert(comIA.success === true && comIA.data.fornecedor === 'Casa do Construtor', 'runEdgeDocumentOcr envia a imagem como data URL e extrai fornecedor');
+  assert(comIA.data.categoria_sugerida, 'runEdgeDocumentOcr sugere categoria de despesa');
 
   const reconhecerDocCode = fs.readFileSync(path.resolve('api/reconhecer-documento.js'), 'utf8');
   assert(reconhecerDocCode.includes('runEdgeDocumentOcr'), 'api/reconhecer-documento.js integra runEdgeDocumentOcr para aceleração no Edge');

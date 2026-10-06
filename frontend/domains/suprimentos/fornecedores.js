@@ -774,20 +774,35 @@ const Fornecedores = {
     const cpf  = (dados.cpf || '').replace(/\D/g, '');
     const lista = DB.getAll('fornecedores');
 
+    // Fornecedor já cadastrado: usa o cadastro existente e só preenche o que estiver em branco
+    // (endereço, telefone, CNPJ...) com os dados da nota; nada que o usuário digitou é trocado.
+    const completar = (achado) => {
+      const campos = ['telefone', 'email', 'endereco', 'numero', 'bairro', 'municipio', 'uf', 'cep', 'ie'];
+      const patch = {};
+      for (const c of campos) {
+        const novo = String(dados[c] || '').trim();
+        if (novo && !String(achado[c] || '').trim()) patch[c] = c === 'uf' ? novo.toUpperCase().slice(0, 2) : novo;
+      }
+      if (cnpj && !String(achado.cnpj || '').replace(/\D/g, '')) patch.cnpj = cnpj;
+      if (Object.keys(patch).length) return DB.update('fornecedores', achado.id, patch) || { ...achado, ...patch };
+      return achado;
+    };
+    const mesmoDoc = (f, doc) => [f.cnpj, f.cpf, f.cnpj_cpf].some(v => String(v || '').replace(/\D/g, '') === doc);
+
     // 1. Busca por CNPJ
     if (cnpj) {
-      const achado = lista.find(f => (f.cnpj || '').replace(/\D/g, '') === cnpj);
-      if (achado) return achado;
+      const achado = lista.find(f => mesmoDoc(f, cnpj));
+      if (achado) return completar(achado);
     }
     // 2. Busca por CPF
     if (cpf) {
-      const achado = lista.find(f => (f.cpf || '').replace(/\D/g, '') === cpf);
-      if (achado) return achado;
+      const achado = lista.find(f => mesmoDoc(f, cpf));
+      if (achado) return completar(achado);
     }
-    // 3. Busca por Nome
-    if (nome) {
-      const achado = this.getByNome(nome);
-      if (achado) return achado;
+    // 3. Busca por Nome (razão social ou fantasia)
+    for (const n of [nome, (dados.razao_social || '').trim()].filter(Boolean)) {
+      const achado = this.getByNome(n);
+      if (achado) return completar(achado);
     }
 
     // Não existe: cadastra novo
@@ -802,6 +817,13 @@ const Fornecedores = {
       categoria: dados.categoria || 'material',
       telefone: dados.telefone || '',
       email: dados.email || '',
+      ie: dados.ie || '',
+      endereco: dados.endereco || '',
+      numero: dados.numero || '',
+      bairro: dados.bairro || '',
+      municipio: dados.municipio || '',
+      uf: String(dados.uf || '').toUpperCase().slice(0, 2),
+      cep: dados.cep || '',
       ativo: true
     };
     return DB.add('fornecedores', novo);

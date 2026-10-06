@@ -386,7 +386,7 @@ console.log('=== Auditoria 04/10/2026 ===\n');
   const dfe = read('api/_sefaz-dfe.js');
   assert(dfe.includes("SET proxima_consulta_permitida = NOW() + INTERVAL '2 minutes'") && dfe.includes("INTERVAL '15 minutes', -- pausa após erro"));
   assert(dfe.includes('codUf = CODIGO_UF_IBGE['));
-  assert(read('cloudflare-worker.js').includes("apiUrl.searchParams.get('action') === 'dfe_sync' && env.FINOBRA_API_ORIGIN"));
+  assert(read('cloudflare-worker.js').includes("['dfe_sync', 'dfe_xml_completo'].includes(apiUrl.searchParams.get('action')) && env.FINOBRA_API_ORIGIN"));
   assert.equal(dfe, read('backend/domains/fiscal/_sefaz-dfe.js'));
   console.log('  ✓ #16–#19 Minhas Demandas, despesas do orçamento sem duplicar, salvar com anexo, SEFAZ (erro real, trava, UF, Render)');
 }
@@ -458,6 +458,282 @@ console.log('=== Auditoria 04/10/2026 ===\n');
   // #29 workers.dev de produção.
   assert(worker.includes('function blockProductionWorkersDev(request, env)') && worker.includes("if (String(env?.FINOBRA_PREVIEW_COMMIT || '').trim()) return null;"));
   console.log('  ✓ #20–#29 Migração diária, backup enxuto com alerta, WhatsApp preservado, SINAPI completo, webhook de e-mail, render.yaml, workflows, build, bibliotecas locais e workers.dev');
+}
+
+// #31 — base64 via save/sync_all passa pela mesma política do /api/upload.
+{
+  const { validarArquivoBase64 } = await import('../api/_file-validation.js');
+  const b64 = (t) => Buffer.from(t).toString('base64');
+  const pdf = b64('%PDF-1.7\n1 0 obj');
+  assert.equal(validarArquivoBase64({ nomeArquivo: 'nota.pdf', mime: 'application/pdf', base64: pdf }).ok, true);
+  assert.equal(validarArquivoBase64({ nomeArquivo: 'nota.pdf', mime: 'application/pdf', base64: 'data:application/pdf;base64,' + pdf }).ok, true);
+  assert.equal(validarArquivoBase64({ nomeArquivo: 'sem-extensao', mime: 'application/pdf', base64: pdf }).ok, true, 'extensão pelo MIME');
+  assert.equal(validarArquivoBase64({ base64: null }).ok, true, 'sem arquivo');
+  const html = 'data:text/html;charset=utf-8,' + encodeURIComponent('<script>alert(1)</script>');
+  assert.equal(validarArquivoBase64({ nomeArquivo: 'Contrato.html', mime: 'text/html', base64: html }).code, 'FILE_TYPE_BLOCKED');
+  assert.equal(validarArquivoBase64({ nomeArquivo: 'a.svg', mime: 'image/svg+xml', base64: b64('<svg/>') }).ok, false);
+  assert.equal(validarArquivoBase64({ nomeArquivo: 'falso.pdf', mime: 'application/pdf', base64: b64('<html><script>x</script>') }).code, 'FILE_CONTENT_BLOCKED');
+  assert.equal(validarArquivoBase64({ nomeArquivo: 'falso.png', mime: 'image/png', base64: pdf }).code, 'FILE_CONTENT_MISMATCH');
+  assert.equal(validarArquivoBase64({ nomeArquivo: 'virus.exe.pdf', mime: 'application/pdf', base64: pdf }).ok, false, 'extensão oculta');
+  assert.equal(validarArquivoBase64({ nomeArquivo: 'x.pdf', mime: 'text/plain', base64: pdf }).code, 'FILE_TYPE_MISMATCH');
+  assert.equal(validarArquivoBase64({ nomeArquivo: 'grande.pdf', mime: 'application/pdf', base64: 'A'.repeat(21 * 1024 * 1024) }).code, 'FILE_TOO_LARGE');
+  assert.equal(validarArquivoBase64({ nomeArquivo: 'planilha.csv', mime: 'text/csv', base64: b64('a;b\n1;2') }).ok, true);
+  const mut = read('api/_db-mutations.js'); const sync = read('api/_db-sync.js');
+  assert(mut.includes('validarArquivoBase64({ nomeArquivo: doc.nome_arquivo || doc.titulo') && mut.includes('arquivo_recusado: true'));
+  assert(sync.includes('validarArquivoBase64({ nomeArquivo: doc.nome_arquivo || doc.titulo'));
+  assert.equal(mut, read('backend/domains/database/_db-mutations.js'));
+  assert.equal(sync, read('backend/domains/database/_db-sync.js'));
+  assert.equal(read('api/_file-validation.js'), read('backend/domains/database/_file-validation.js'));
+  console.log('  ✓ #31 Arquivo em base64 no save/sync validado como no /api/upload');
+}
+
+// #32 — newsletter com confirmação por e-mail e descadastro só pelo link assinado.
+{
+  process.env.SESSION_SIGNING_SECRET = process.env.SESSION_SIGNING_SECRET || 'teste-newsletter-segredo-de-sessao-com-mais-de-32-chars';
+  const pg = new PGlite();
+  const nsql = async (strings, ...values) => { let t = strings[0]; values.forEach((_, k) => { t += `$${k + 1}` + strings[k + 1]; }); return (await pg.query(t, values)).rows; };
+  await pg.exec(read('migrations/033_newsletter_subscriptions.sql').replace(/REVOKE[^;]*;/g, ''));
+  await pg.exec(read('migrations/041_newsletter_double_opt_in.sql'));
+  const { handleV2Newsletter, assinarLinkNewsletter, verificarLinkNewsletter } = await import('../api/_v2-routes.js');
+  const emails = [];
+  const deps = { sql: nsql, sendEmail: async (_s, m) => { emails.push(m); return { success: true }; } };
+  const call = (url, opts) => chamar((req, res) => handleV2Newsletter({ ...req, url }, res, deps), opts);
+  const alvo = 'vitima@exemplo.com.br';
+  let r = await call('/api/v2/public/newsletter/subscribe', { body: { email: alvo } });
+  assert.equal(r.body.action, 'confirmation_sent');
+  assert.equal((await nsql`SELECT status FROM newsletter_subscriptions WHERE email = ${alvo}`)[0].status, 'pending', 'só pendente até confirmar');
+  assert.equal(emails.length, 1); assert(emails[0].ctaUrl.includes('/newsletter/confirm?'));
+  await call('/api/v2/public/newsletter/subscribe', { body: { email: alvo } });
+  assert.equal(emails.length, 1, 'não reenvia antes de 10 min');
+  const link = new URL(emails[0].ctaUrl);
+  const q = Object.fromEntries(link.searchParams);
+  r = await call(link.pathname + link.search, { method: 'GET', query: { ...q, sig: q.sig.slice(0, -2) + 'xx' } });
+  assert.equal(r.status, 302); assert(r.headers.location.includes('newsletter=invalido'));
+  r = await call(link.pathname + link.search, { method: 'GET', query: q });
+  assert(r.headers.location.includes('newsletter=confirmado'));
+  assert.equal((await nsql`SELECT status FROM newsletter_subscriptions WHERE email = ${alvo}`)[0].status, 'subscribed');
+  // Terceiro tenta descadastrar só com o e-mail: nada muda, o link vai para o dono.
+  await nsql`UPDATE newsletter_subscriptions SET confirmation_sent_at = NULL`;
+  r = await call('/api/v2/public/newsletter/unsubscribe', { body: { email: alvo } });
+  assert.equal(r.body.action, 'unsubscribe_link_sent'); assert(!JSON.stringify(r.body).includes(alvo), 'não ecoa o e-mail');
+  assert.equal((await nsql`SELECT status FROM newsletter_subscriptions WHERE email = ${alvo}`)[0].status, 'subscribed');
+  const sair = new URL(emails.at(-1).ctaUrl);
+  r = await call(sair.pathname, { method: 'GET', query: Object.fromEntries(sair.searchParams) });
+  assert(r.headers.location.includes('newsletter=cancelado'));
+  assert.equal((await nsql`SELECT status FROM newsletter_subscriptions WHERE email = ${alvo}`)[0].status, 'unsubscribed');
+  // Link de confirmação não serve para descadastrar (e vice-versa) e expira.
+  const exp = Date.now() + 1000;
+  assert.equal(verificarLinkNewsletter('unsubscribe', alvo, exp, assinarLinkNewsletter('confirm', alvo, exp, 'k'), { key: 'k' }), false);
+  assert.equal(verificarLinkNewsletter('confirm', alvo, exp, assinarLinkNewsletter('confirm', alvo, exp, 'k'), { key: 'k', now: exp + 1 }), false);
+  r = await call('/api/v2/public/newsletter/subscribe', { method: 'GET', query: { email: alvo } });
+  assert.equal(r.status, 405);
+  await pg.close();
+  assert.equal(read('api/_v2-routes.js'), read('backend/domains/edge/_v2-routes.js'));
+  assert.equal(read('marketing/src/brand-sections.jsx'), read('marketing/brand-sections.jsx'));
+  console.log('  ✓ #32 Newsletter: inscrição só após confirmar pelo e-mail; descadastro só pelo link assinado');
+}
+
+// #33 — erros internos não vão para o cliente.
+{
+  const v2 = read('api/_v2-routes.js');
+  assert(!/json\(\{ success: false, error: err\.message \}\)/.test(v2.replace("if (OCR_ERROS_PUBLICOS.includes(err?.message)) return res.status(400).json({ success: false, error: err.message });", '')), 'v2 sem err.message bruto');
+  assert(!read('api/nfe.js').includes('${errDFe.message'));
+  const dfe = read('api/_sefaz-dfe.js');
+  assert(!dfe.includes('${errNet.message}') && !dfe.includes("+ errNet.message") && !dfe.includes('erro: err.message'));
+  assert(read('api/assinaturas.js').includes("mensagensPublicas.includes(err?.message) ? err.message : 'Não foi possível ler o PDF.'"));
+  for (const [a, b] of [['api/nfe.js', 'backend/domains/fiscal/nfe.js'], ['api/assinaturas.js', 'backend/domains/financeiro/assinaturas.js'], ['api/_v2-routes.js', 'backend/domains/edge/_v2-routes.js'], ['api/_sefaz-dfe.js', 'backend/domains/fiscal/_sefaz-dfe.js']]) assert.equal(read(a), read(b), b);
+  console.log('  ✓ #33 Erros internos (DF-e, SEFAZ, IA, OCR, busca, ledger, verificação de PDF) ficam no log');
+}
+
+// #34 — OCR v2 não inventa dados e não explode a memória.
+{
+  const { runEdgeDocumentOcr } = await import('../api/_edge-ai.js');
+  const png = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';
+  const semIA = await runEdgeDocumentOcr({}, png);
+  assert.equal(semIA.success, false); assert.equal(semIA.data, undefined, 'sem dados inventados');
+  const iaQuebrada = await runEdgeDocumentOcr({ AI: { run: async () => ({ response: 'não consegui ler' }) } }, png);
+  assert.equal(iaQuebrada.success, false, 'resposta sem JSON vira falha');
+  let recebido;
+  const ok = await runEdgeDocumentOcr({ AI: { run: async (_m, input) => { recebido = input.image; return { response: '{"valor": 10}' }; } } }, png);
+  assert.equal(typeof recebido, 'string'); assert(recebido.startsWith('data:image/png;base64,'), 'imagem vai como data URL');
+  assert.equal(ok.data.fornecedor, null, 'não inventa fornecedor');
+  await assert.rejects(() => runEdgeDocumentOcr({}, Buffer.from('%PDF-1.7').toString('base64')), /não suportado/);
+  await assert.rejects(() => runEdgeDocumentOcr({}, 'A'.repeat(14 * 1024 * 1024)), /10 MB/);
+  assert(!read('api/_edge-ai.js').includes('Array.from('));
+  assert.equal(read('api/_edge-ai.js'), read('backend/domains/edge/_edge-ai.js'));
+  console.log('  ✓ #34 OCR v2: falha honesta em vez de dados inventados; imagem como data URL, com limite de 10 MB');
+}
+
+// #35 — Replay do Sentry fora do bundle principal.
+{
+  const entry = read('scripts/sentry-entry.js');
+  assert(!entry.includes('import * as Sentry') && !entry.includes('replayIntegration'), 'bundle principal sem Replay');
+  assert(entry.includes("script.src = '/js/sentry-replay.js'") && entry.includes('(app|master)'));
+  assert(read('scripts/sentry-replay-entry.js').includes('window.Sentry.addIntegration(replayIntegration())'));
+  const { gzipSync } = await import('node:zlib');
+  assert(gzipSync(fs.readFileSync('js/sentry.js')).length < 80 * 1024, 'sentry.js abaixo de 80 KB gzip');
+  assert(fs.existsSync('js/sentry-replay.js'));
+  for (const f of ['sentry.js', 'sentry-replay.js']) assert.equal(read(`js/${f}`), read(`frontend/core/${f}`), f);
+  const build = read('scripts/build-cloudflare-pages.cjs');
+  assert(build.includes("'sentry-replay-entry.js'") && build.includes("'sentry-replay.js'"));
+  console.log('  ✓ #35 Sentry: 143 KB → 55 KB gzip em toda página; Replay sob demanda só no app e no master');
+}
+
+// #36/#37 — dependências e índices.
+{
+  const pkg = JSON.parse(read('package.json')); const back = JSON.parse(read('backend/package.json'));
+  assert(!pkg.dependencies['@sentry/node'], '@sentry/node só no backend');
+  for (const d of ['@sentry/browser', 'react', 'react-dom', 'esbuild']) assert(pkg.devDependencies[d] && !pkg.dependencies[d], `${d} é dependência de build`);
+  assert.equal(pkg.dependencies['@neondatabase/serverless'], back.dependencies['@neondatabase/serverless'], 'mesmo driver do Neon no Worker e no Render');
+  const m42 = read('migrations/042_audit_logs_indice_delta.sql');
+  assert(m42.includes('ON audit_logs (tenant_id, entidade, created_at DESC) INCLUDE (entidade_id)') && !/DROP/i.test(m42.replace(/--.*$/gm, '')), '042 só aditiva');
+  const pg = new PGlite();
+  await pg.exec(`CREATE TABLE audit_logs (id text primary key, tenant_id text, entidade text, entidade_id text, user_id text, created_at timestamptz default now());
+    CREATE INDEX idx_audit_tenant_created ON audit_logs (tenant_id, created_at DESC);
+    CREATE TABLE lancamentos (id text primary key, tenant_id text, obra_id text, status text, data date, data_vencimento date);
+    CREATE INDEX idx_lancamentos_obra ON lancamentos (obra_id); CREATE INDEX idx_lancamentos_tenant ON lancamentos (tenant_id);`);
+  await pg.exec(m42); await pg.exec(m42);
+  await pg.exec(read('migrations/043_lancamentos_indices_redundantes.sql')); await pg.exec(read('migrations/043_lancamentos_indices_redundantes.sql'));
+  const idx = (await pg.query(`SELECT indexname FROM pg_indexes WHERE tablename IN ('audit_logs','lancamentos')`)).rows.map(r => r.indexname);
+  assert(idx.includes('idx_audit_logs_tenant_entidade_created') && !idx.includes('idx_lancamentos_obra') && !idx.includes('idx_audit_tenant_created'));
+  await pg.close();
+  console.log('  ✓ #36/#37 Dependências no grupo certo, driver do Neon alinhado, índice do delta e remoção dos redundantes (idempotentes)');
+}
+
+// #38–#40 — restos sem uso, parcela da Caixa e PII/timeout.
+{
+  for (const f of ['js/data_demo.js', 'frontend/core/data_demo.js', 'js/recovery-account-ux.js', 'frontend/core/recovery-account-ux.js']) assert(!fs.existsSync(f), `${f} removido`);
+  for (const f of ['app.html', 'frontend/app.html']) assert(!read(f).includes('data_demo.js'), `${f} sem data_demo`);
+  const ct = read('js/contratos.js');
+  assert(!ct.includes('ent * 0.75'), 'sem 75% automático');
+  assert(ct.includes("Informe a parcela paga na assinatura da Caixa (cláusula 08)."), 'salvar continua exigindo a parcela');
+  assert.equal(ct, read('frontend/domains/contratos/contratos.js'));
+  const server = read('backend/server.js');
+  assert(!server.includes('enviado para ${destPhone}') && !server.includes('enviado para ${destEmail}') && !server.includes('Mensagem recebida de ${parsed.phone}'));
+  const helpers = server.slice(server.indexOf('function mascararTelefone'), server.indexOf('function mascararEmail') + 400);
+  const mt = new Function(helpers.slice(0, helpers.indexOf('function mascararEmail')) + 'return mascararTelefone;')();
+  const trechoEmail = helpers.slice(helpers.indexOf('function mascararEmail'));
+  const me = new Function(trechoEmail.slice(0, trechoEmail.indexOf('\n}') + 2) + '\nreturn mascararEmail;')();
+  assert.equal(mt('+55 (95) 99123-4567'), '***4567'); assert.equal(me('financeiro@construtora.com.br'), 'fi***@construtora.com.br');
+  for (const f of ['backend/server.js', 'api/_admin-route.js', 'api/_email_service.js', 'api/_webhook_pix_core.js', 'api/auth.js', 'api/users.js']) {
+    const src = read(f); let i = -1;
+    while ((i = src.indexOf("fetch('https://api.resend.com/emails'", i + 1)) >= 0) {
+      const bloco = src.slice(i, src.indexOf('});', i));
+      assert(bloco.includes('signal: AbortSignal.timeout('), `${f}: fetch do Resend com timeout`);
+    }
+  }
+  assert.equal(read('api/_email_service.js'), read('backend/domains/integrations/_email_service.js'));
+  console.log('  ✓ #38–#40 Arquivos mortos removidos, parcela da Caixa sem 75% inventado, logs sem telefone/e-mail inteiros e Resend com timeout');
+}
+
+// Pós-auditoria (06/10, log do navegador): anexo no R2, NF-e só com resumo e DANFE fora da Área do Cliente.
+{
+  const docs = read('js/documentos.js');
+  assert(docs.includes("if (raw.startsWith('r2://')) return `/api/v2/edge/storage/file/${encodeURIComponent(raw.slice('r2://'.length))}`;"));
+  assert(docs.includes(': this._urlDeLeitura(doc.url);') && docs.includes(': this._urlDeLeitura(json.url);'), 'r2:// nunca vai cru para o navegador');
+  const parser = read('js/nfe_parser.js');
+  assert(parser.includes('if (resNFe) return this._parseResumo(resNFe, get);') && parser.includes('resumo: true,'));
+  const nfe = read('js/nfe.js');
+  assert(nfe.includes("await FinObraAssets.load('danfe');"), 'DANFE gerado a partir do XML, sem MeuDanfe');
+  assert(nfe.includes("if (resumoDfe) return { status: 'OK', data: resumoDfe, resumo: true };"), 'XML completo tem preferência sobre o resumo');
+  for (const [a, b] of [['js/documentos.js', 'frontend/domains/contratos/documentos.js'], ['js/nfe.js', 'frontend/domains/fiscal/nfe.js'], ['js/nfe_parser.js', 'frontend/domains/fiscal/nfe_parser.js']]) assert.equal(read(a), read(b), b);
+  console.log('  ✓ Pós-auditoria: anexo do R2 abre pela rota autenticada; NF-e com resumo preenche emitente e valor; DANFE busca a nota antes');
+}
+
+// Pós-auditoria: produtos da NF-e entram no controle de compras.
+{
+  const nfe = read('js/nfe.js');
+  assert(nfe.includes("itens: i === 0 ? itensNota : [],") && nfe.includes('itens: itensNota,'), 'itens no 1º lançamento e na nota');
+  assert(nfe.includes('Produtos.encontrarOuCriar(it.nome, unidade'), 'produto cadastrado/encontrado no módulo Produtos');
+  assert(nfe.includes('action=dfe_xml_completo'), 'XML completo pela SEFAZ (ciência + consulta pela chave)');
+  assert(nfe.includes('async puxarProdutosDoLancamento(lancId)'));
+  assert(read('js/lancamentos.js').includes('data-fb-click="NFe.puxarProdutosDoLancamento"'));
+  assert(read('js/patch26-events.js').includes('"NFe.puxarProdutosDoLancamento"'));
+  for (const [a, b] of [['js/nfe.js', 'frontend/domains/fiscal/nfe.js'], ['js/lancamentos.js', 'frontend/domains/financeiro/lancamentos.js'], ['js/patch26-events.js', 'frontend/core/patch26-events.js']]) assert.equal(read(a), read(b), b);
+  console.log('  ✓ Pós-auditoria: produtos da NF-e no lançamento, na nota e no controle de Produtos; botão para despesas antigas');
+}
+
+// SEFAZ sem MeuDanfe: ciência da operação assinada, XML completo pela chave, DANFE local e fornecedor.
+{
+  const zlib = await import('node:zlib');
+  const nodeCrypto = await import('node:crypto');
+  const { extrairChaveECertificadoDoPfx } = await import('../api/_certificado.js');
+  const dfe = await import('../api/_sefaz-dfe.js');
+  // Certificado A1 de teste gerado na hora (autoassinado, senha "Senha123"): nenhuma chave privada
+  // fica no repositório.
+  const os = await import('node:os'); const path = await import('node:path');
+  const dirCert = fs.mkdtempSync(path.join(os.tmpdir(), 'fingo-a1-'));
+  const openssl = (args) => spawnSync('openssl', args, { cwd: dirCert, stdio: 'pipe' });
+  openssl(['req', '-x509', '-newkey', 'rsa:2048', '-keyout', 'k.pem', '-out', 'c.pem', '-days', '2', '-nodes', '-subj', '/CN=EMPRESA TESTE:12345678000195']);
+  openssl(['pkcs12', '-export', '-inkey', 'k.pem', '-in', 'c.pem', '-out', 'a1.pfx', '-passout', 'pass:Senha123']);
+  const pfx = fs.readFileSync(path.join(dirCert, 'a1.pfx'));
+  fs.rmSync(dirCert, { recursive: true, force: true });
+  const { privateKey, certDer, cert } = extrairChaveECertificadoDoPfx(pfx, 'Senha123');
+  assert.throws(() => extrairChaveECertificadoDoPfx(pfx, 'errada'), /chave privada/);
+  const chave = '14261010159093000236550010009028961848516750';
+  const env = dfe.montarEnvEventoCiencia({ cnpj: '12345678000195', chave, privateKey, certDer, idLote: 1, now: new Date('2026-10-06T15:00:00Z') });
+  assert(env.includes(`<infEvento Id="ID210210${chave}01">`) && env.includes('<tpEvento>210210</tpEvento>') && env.includes('<descEvento>Ciencia da Operacao</descEvento>'));
+  assert(env.includes('<dhEvento>2026-10-06T11:59:00-03:00</dhEvento>'), 'horário de Brasília, 1 min atrás');
+  // Confere a assinatura: digest do infEvento canônico e RSA-SHA1 sobre o SignedInfo canônico.
+  const canonInf = env.match(/<infEvento[\s\S]*?<\/infEvento>/)[0].replace('<infEvento ', '<infEvento xmlns="http://www.portalfiscal.inf.br/nfe" ');
+  assert.equal(env.match(/<DigestValue>([^<]+)/)[1], nodeCrypto.createHash('sha1').update(canonInf).digest('base64'));
+  const signedInfo = env.match(/<SignedInfo>[\s\S]*?<\/SignedInfo>/)[0].replace('<SignedInfo>', '<SignedInfo xmlns="http://www.w3.org/2000/09/xmldsig#">');
+  assert(nodeCrypto.verify('sha1', Buffer.from(signedInfo), cert.publicKey, Buffer.from(env.match(/<SignatureValue>([^<]+)/)[1], 'base64')), 'assinatura RSA-SHA1 válida');
+  assert.deepEqual(dfe.interpretarRetornoEvento('<retEnvEvento><cStat>128</cStat><retEvento><infEvento><cStat>135</cStat><xMotivo>Evento registrado</xMotivo></infEvento></retEvento></retEnvEvento>'), { ok: true, cStat: '135', xMotivo: 'Evento registrado' });
+  assert.equal(dfe.interpretarRetornoEvento('<retEnvEvento><cStat>128</cStat><retEvento><infEvento><cStat>573</cStat></infEvento></retEvento></retEnvEvento>').ok, true, 'duplicidade = já tinha ciência');
+  assert.equal(dfe.interpretarRetornoEvento('<retEnvEvento><cStat>128</cStat><retEvento><infEvento><cStat>596</cStat></infEvento></retEvento></retEnvEvento>').ok, false);
+
+  // Banco: resumo → ciência → XML completo pela chave; resumo atrasado não apaga o completo.
+  const pg = new PGlite();
+  const psql = async (strings, ...values) => { let t = strings[0]; values.forEach((_, k) => { t += `$${k + 1}` + strings[k + 1]; }); return (await pg.query(t, values)).rows; };
+  await pg.exec(`CREATE TABLE IF NOT EXISTS tenants (id varchar(100) primary key, uf text); INSERT INTO tenants VALUES ('t1','RR');
+    CREATE TABLE IF NOT EXISTS schema_migrations (version text primary key, applied_at timestamptz default now(), checksum text, execution_time_ms int);`);
+  await pg.exec(read('migrations/035_tenant_dfe_monitor.sql').replace(/ALTER TABLE[^;]*ENABLE ROW LEVEL SECURITY;|CREATE POLICY[\s\S]*?;|GRANT[^;]*;|REVOKE[^;]*;/g, ''));
+  const resumo = `<resNFe xmlns="http://www.portalfiscal.inf.br/nfe" versao="1.01"><chNFe>${chave}</chNFe><CNPJ>10159093000236</CNPJ><xNome>CASA DO CONSTRUTOR</xNome><dhEmi>2026-10-02T11:17:43-04:00</dhEmi><vNF>1030.75</vNF><cSitNFe>1</cSitNFe></resNFe>`;
+  const completoXml = `<nfeProc xmlns="http://www.portalfiscal.inf.br/nfe"><NFe><infNFe Id="NFe${chave}"><emit><CNPJ>10159093000236</CNPJ><xNome>CASA DO CONSTRUTOR</xNome></emit><det nItem="1"><prod><xProd>CIMENTO</xProd></prod></det><total><ICMSTot><vNF>1030.75</vNF></ICMSTot></total></infNFe></NFe><protNFe><infProt><chNFe>${chave}</chNFe></infProt></protNFe></nfeProc>`;
+  const zip = (xml, schema, nsu) => ({ nsu, schema, base64Content: zlib.gzipSync(Buffer.from(xml)).toString('base64') });
+  await dfe.upsertDfeDocumento(psql, 't1', dfe.decompressAndParseDocZip(zip(resumo, 'resNFe_v1.01.xsd', '1')));
+  const enviadas = [];
+  const enviar = async ({ chave: c }) => { enviadas.push(c); return { ok: true, cStat: '135' }; };
+  const n = await dfe.darCienciaPendentes(psql, 't1', { pfxBuffer: pfx, passphrase: 'Senha123', cnpj: '12345678000195', enviar });
+  assert.equal(n, 1); assert.deepEqual(enviadas, [chave]);
+  assert.equal((await psql`SELECT manifesto_status FROM tenant_dfe_documentos WHERE chave = ${chave}`)[0].manifesto_status, 'ciencia');
+  assert.equal(await dfe.darCienciaPendentes(psql, 't1', { pfxBuffer: pfx, passphrase: 'Senha123', cnpj: '1', enviar }), 0, 'não repete a ciência');
+  const consultas = [];
+  const r = await dfe.obterXmlCompletoNFe(psql, 't1', chave, { cert: { pfxBuffer: pfx, passphrase: 'Senha123', cnpj: '12345678000195' }, enviar, consultar: async (a) => { consultas.push(a); return { cStat: '138', docZipList: [zip(completoXml, 'procNFe_v4.00.xsd', '2')] }; } });
+  assert.equal(r.completo, true); assert(r.xml.includes('<xProd>CIMENTO</xProd>'));
+  assert.equal(consultas[0].chave, chave); assert.equal(consultas[0].codUf, '14');
+  assert.equal(enviadas.length, 1, 'ciência já registrada não é reenviada');
+  await dfe.upsertDfeDocumento(psql, 't1', dfe.decompressAndParseDocZip(zip(resumo, 'resNFe_v1.01.xsd', '3')));
+  assert((await psql`SELECT xml_completo FROM tenant_dfe_documentos WHERE chave = ${chave}`)[0].xml_completo.includes('<infNFe'), 'resumo atrasado não troca o XML completo');
+  // Marcação de "já lançada" (migração 044): marca, aparece na lista, desmarca.
+  await pg.exec(read('migrations/044_dfe_documentos_lancada.sql'));
+  const m1 = await dfe.marcarDFeLancada(psql, 't1', { chave, lancada: true, manual: true, userId: 'u1' });
+  assert(m1.documento.lancada_em && m1.documento.lancada_manual === true);
+  const lista = await dfe.listarDFeDocumentos(psql, 't1', {});
+  assert(lista.documentos[0].lancada_em, 'lista devolve a marcação');
+  const m2 = await dfe.marcarDFeLancada(psql, 't1', { chave, lancada: false });
+  assert.equal(m2.documento.lancada_em, null);
+  assert.equal((await dfe.marcarDFeLancada(psql, 't1', { chave: '123' })).success, false);
+  const pend = await dfe.obterXmlCompletoNFe(psql, 't1', '1'.repeat(44), { cert: {}, enviar, consultar: async () => ({ cStat: '137' }) });
+  assert.equal(pend.success, false); assert.match(pend.error, /não encontrada na SEFAZ/);
+  await pg.close();
+
+  const nfeSrv = read('api/nfe.js');
+  assert(nfeSrv.includes("if (action === 'dfe_xml_completo') {") && nfeSrv.includes("canAccessModule(auth, 'notas', 'write')"));
+  const nfeCli = read('js/nfe.js');
+  assert(nfeCli.includes("await FinObraAssets.load('danfe');") && !nfeCli.includes('try { await this.buscarPorChave(chave); }') && !nfeCli.includes('await this.buscarPorChave(chave);\n        res = await pedirXml();'), 'sem busca paga automática no MeuDanfe');
+  assert(nfeCli.includes('action=dfe_xml_completo'));
+  assert(read('js/assets.js').includes("danfe: { src:'/js/danfe_simplificado.js"));
+  const forn = read('js/fornecedores.js');
+  assert(forn.includes("const campos = ['telefone', 'email', 'endereco', 'numero', 'bairro', 'municipio', 'uf', 'cep', 'ie'];"), 'completa só campos vazios');
+  assert(nfeCli.includes('_acoesLancamento(chave, doc = null)') && nfeCli.includes('this._registrarLancadaNoServidor(chave);') && nfeCli.includes("Utils.toast('Esta NF-e já foi lançada. Use \"Ver lançamento\" para abrir a despesa.', 'warning');"));
+  assert(!/data-fb-click="NFe\.gerarLancamentoDaNFe"[^`]*⚡ Lançar<\/button>\n\s*<button class="btn btn-sm btn-primary" data-fb-click="NFe\.abrirDanfe"/.test(nfeCli), 'listas usam o botão que sabe se a nota já foi lançada');
+  assert(read('api/nfe.js').includes("if (action === 'dfe_marcar_lancada') {"));
+  for (const a of ['NFe.verLancamentoDaNFe', 'NFe.marcarComoLancada', 'NFe._toggleOcultarLancadas']) assert(read('js/patch26-events.js').includes(`"${a}"`), a);
+  assert(read('js/notas.js').includes('webkitdirectory') && read('js/patch26-events.js').includes('"Notas.triggerXmlFolderImport"'));
+  for (const [a, b] of [['api/_sefaz-dfe.js', 'backend/domains/fiscal/_sefaz-dfe.js'], ['api/_certificado.js', 'backend/domains/fiscal/_certificado.js'], ['api/nfe.js', 'backend/domains/fiscal/nfe.js'], ['js/nfe.js', 'frontend/domains/fiscal/nfe.js'], ['js/nfe_parser.js', 'frontend/domains/fiscal/nfe_parser.js'], ['js/danfe_simplificado.js', 'frontend/domains/fiscal/danfe_simplificado.js'], ['js/fornecedores.js', 'frontend/domains/suprimentos/fornecedores.js'], ['js/notas.js', 'frontend/domains/fiscal/notas.js'], ['js/assets.js', 'frontend/core/assets.js']]) assert.equal(read(a), read(b), b);
+  console.log('  ✓ SEFAZ sem MeuDanfe: ciência assinada, XML completo pela chave, DANFE local, fornecedor completado e pasta de XMLs');
 }
 
 await db.close();

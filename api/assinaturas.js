@@ -259,7 +259,10 @@ async function handlePdfVerification(req, res, action) {
     try {
       report = await verifyPdfSignatures(pdf);
     } catch (err) {
-      return res.status(400).json({ success: false, error: err?.message || 'Não foi possível ler o PDF.' });
+      // AUDITORIA 2026-10-04 #33: só as mensagens pensadas para o usuário saem; o resto vai para o log.
+      const mensagensPublicas = ['PDF ausente ou acima de 10 MB.', 'O arquivo não é um PDF.'];
+      if (!mensagensPublicas.includes(err?.message)) console.error('[Assinaturas] Falha ao verificar PDF:', err?.message || err);
+      return res.status(400).json({ success: false, error: mensagensPublicas.includes(err?.message) ? err.message : 'Não foi possível ler o PDF.' });
     }
 
     const signatarios = (report.assinaturas || []).map(a => ({

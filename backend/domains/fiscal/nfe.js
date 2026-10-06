@@ -5,7 +5,7 @@ import { canAccessModule, permissionError } from './_permissions.js';
 import { checkRateLimit, getClientIp } from './_ratelimit.js';
 import { createRuntimeSql } from './_database.js';
 import { createTenantSql } from './_tenant-sql.js';
-import { syncTenantDFe, getDFeStatus, listarDFeDocumentos, getDFeDocumentoXml } from './_sefaz-dfe.js';
+import { syncTenantDFe, getDFeStatus, listarDFeDocumentos, getDFeDocumentoXml, obterXmlCompletoNFe, marcarDFeLancada } from './_sefaz-dfe.js';
 import certificadoHandler from './_certificado.js';
 import { getCachedReference, applySwrCacheHeaders, cepCacheKey } from './_reference-cache.js';
 
@@ -212,6 +212,36 @@ export default async function handler(req, res) {
         return res.status(200).json(syncResult);
       }
 
+      // Marca/desmarca a NF-e como já lançada (evita lançar a mesma nota duas vezes).
+      if (action === 'dfe_marcar_lancada') {
+        if (req.method !== 'POST') return res.status(405).json({ success: false, error: 'Método não permitido.' });
+        if (!canAccessModule(auth, 'notas', 'write')) {
+          return res.status(403).json(permissionError('MODULE_WRITE_FORBIDDEN', 'notas'));
+        }
+        const r = await marcarDFeLancada(sql, auth.tenantId, {
+          chave: req.body?.chave || req.query?.chave,
+          lancada: req.body?.lancada !== false,
+          manual: req.body?.manual === true,
+          userId: auth.user?.userId || null
+        });
+        return res.status(r.success ? 200 : 400).json(r);
+      }
+
+      // XML completo pela SEFAZ (ciência + consulta pela chave), sem crédito do MeuDanfe.
+      if (action === 'dfe_xml_completo') {
+        // Pode enviar a ciência à SEFAZ em nome da empresa: exige permissão de escrita, como o sync.
+        if (!canAccessModule(auth, 'notas', 'write')) {
+          return res.status(403).json(permissionError('MODULE_WRITE_FORBIDDEN', 'notas'));
+        }
+        const chaveCompleta = String(req.query.chave || req.body?.chave || '').replace(/\D/g, '');
+        const rlChave = await checkRateLimit(`dfe:xml_completo:${auth.tenantId}:${chaveCompleta}`, 3, 10 * 60 * 1000);
+        if (!rlChave.allowed) {
+          return res.status(429).json({ success: false, error: 'Esta NF-e já foi consultada agora há pouco. Aguarde alguns minutos.' });
+        }
+        const resultado = await obterXmlCompletoNFe(sql, auth.tenantId, chaveCompleta);
+        return res.status(resultado.success ? 200 : 404).json(resultado);
+      }
+
       if (action === 'dfe_xml') {
         const idOrChave = req.query.id || req.query.chave || req.body?.id || req.body?.chave;
         if (!idOrChave) {
@@ -234,7 +264,8 @@ export default async function handler(req, res) {
       console.error(`[NFe DF-e] Erro ao executar ação '${action}':`, errDFe);
       return res.status(500).json({
         success: false,
-        error: `Erro ao processar serviço DF-e: ${errDFe.message || 'Falha interna'}`
+        // AUDITORIA 2026-10-04 #33: o detalhe fica no log; o cliente recebe só a mensagem genérica.
+        error: 'Não foi possível processar o serviço DF-e agora. Tente novamente em alguns minutos.'
       });
     }
   }

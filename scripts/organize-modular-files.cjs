@@ -8,7 +8,6 @@ const frontendMap = {
   // Core
   'js/auth.js': 'frontend/core/auth.js',
   'js/data.js': 'frontend/core/data.js',
-  'js/data_demo.js': 'frontend/core/data_demo.js',
   'js/ui.js': 'frontend/core/ui.js',
   'js/utils.js': 'frontend/core/utils.js',
   'js/assets.js': 'frontend/core/assets.js',
@@ -19,6 +18,7 @@ const frontendMap = {
   'js/patch26-events.js': 'frontend/core/patch26-events.js',
   'js/patch26-actions.js': 'frontend/core/patch26-actions.js',
   'js/sentry.js': 'frontend/core/sentry.js',
+  'js/sentry-replay.js': 'frontend/core/sentry-replay.js',
   'js/patch22.js': 'frontend/core/patch22.js',
   'js/patch51.js': 'frontend/core/patch51.js',
   'js/patch51-hardening.js': 'frontend/core/patch51-hardening.js',
@@ -29,6 +29,7 @@ const frontendMap = {
   'js/notas.js': 'frontend/domains/fiscal/notas.js',
   'js/nfe.js': 'frontend/domains/fiscal/nfe.js',
   'js/nfe_parser.js': 'frontend/domains/fiscal/nfe_parser.js',
+  'js/danfe_simplificado.js': 'frontend/domains/fiscal/danfe_simplificado.js',
 
   // Financeiro
   'js/contas.js': 'frontend/domains/financeiro/contas.js',
@@ -135,6 +136,7 @@ const backendMap = {
   'api/_db-sync.js': 'backend/domains/database/_db-sync.js',
   'api/_db-normalizers.js': 'backend/domains/database/_db-normalizers.js',
   'api/_sync-guard.js': 'backend/domains/database/_sync-guard.js',
+  'api/_file-validation.js': 'backend/domains/database/_file-validation.js',
   'api/_tenant-sql.js': 'backend/domains/database/_tenant-sql.js',
   'api/_tenant-access-key.js': 'backend/domains/database/_tenant-access-key.js',
   'api/db.js': 'backend/domains/database/db.js',

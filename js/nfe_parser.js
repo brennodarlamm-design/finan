@@ -29,7 +29,13 @@ const NFeParser = {
 
     const infNFe = doc.querySelector('infNFe') ||
                    Array.from(doc.querySelectorAll('*')).find(el => el.localName === 'infNFe');
-    if (!infNFe) throw new Error('Estrutura <infNFe> não encontrada no XML.');
+    if (!infNFe) {
+      // O DF-e da SEFAZ entrega só o resumo (<resNFe>) enquanto a empresa não manifesta ciência da
+      // nota. Ele já tem emitente, CNPJ, data e valor; itens e duplicatas só vêm no XML completo.
+      const resNFe = Array.from(doc.querySelectorAll('*')).find(el => el.localName === 'resNFe');
+      if (resNFe) return this._parseResumo(resNFe, get);
+      throw new Error('Estrutura <infNFe> não encontrada no XML.');
+    }
 
     const chaveRaw = infNFe.getAttribute('Id') || '';
     const chave = chaveRaw.replace(/^NFe/, '').trim();
@@ -51,6 +57,21 @@ const NFeParser = {
     const emitenteTelefone = get(enderEmit || emit || infNFe, 'fone');
     const emitenteCidade = get(enderEmit || emit || infNFe, 'xMun');
     const emitenteUF = get(enderEmit || emit || infNFe, 'UF');
+    // Dados completos do emitente para o cadastro automático do fornecedor.
+    const fornecedor = enderEmit || emit ? {
+      razao_social: emitenteNome,
+      nome_fantasia: get(emit || infNFe, 'xFant') || emitenteNome,
+      cnpj: emitenteCNPJ.length === 14 ? emitenteCNPJ : '',
+      cpf: emitenteCNPJ.length === 11 ? emitenteCNPJ : '',
+      ie: get(emit || infNFe, 'IE'),
+      telefone: emitenteTelefone,
+      endereco: get(enderEmit || emit, 'xLgr'),
+      numero: get(enderEmit || emit, 'nro'),
+      bairro: get(enderEmit || emit, 'xBairro'),
+      municipio: emitenteCidade,
+      uf: emitenteUF,
+      cep: get(enderEmit || emit, 'CEP')
+    } : null;
 
     // Totais
     const icmsTot = infNFe.querySelector('ICMSTot') || Array.from(infNFe.querySelectorAll('*')).find(el => el.localName === 'ICMSTot');
@@ -103,11 +124,36 @@ const NFeParser = {
       telefone_emitente: emitenteTelefone,
       cidade_emitente: emitenteCidade,
       uf_emitente: emitenteUF,
+      fornecedor,
       valor_bruto: vNF,
       impostos,
       valor_liquido: valorLiquido,
       duplicatas,
       itens
+    };
+  },
+
+  _parseResumo(resNFe, get) {
+    const chave = get(resNFe, 'chNFe');
+    const doc = get(resNFe, 'CNPJ') || get(resNFe, 'CPF');
+    const dhEmi = get(resNFe, 'dhEmi');
+    const vNF = parseFloat(get(resNFe, 'vNF')) || 0;
+    return {
+      resumo: true,
+      chave,
+      numero_nf: chave ? (chave.substring(25, 34).replace(/^0+/, '') || '—') : '—',
+      serie: chave ? (chave.substring(22, 25).replace(/^0+/, '') || '1') : '1',
+      data_emissao: dhEmi ? dhEmi.substring(0, 10) : Utils.today(),
+      emitente: get(resNFe, 'xNome'),
+      cnpj_emitente: doc.length === 14 ? doc.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/, '$1.$2.$3/$4-$5') : doc,
+      telefone_emitente: '',
+      cidade_emitente: '',
+      uf_emitente: '',
+      valor_bruto: vNF,
+      impostos: 0,
+      valor_liquido: vNF,
+      duplicatas: [],
+      itens: []
     };
   },
 
@@ -272,7 +318,7 @@ const NFeParser = {
                 <td style="text-align:right;">
                   <div style="display:flex;gap:5px;justify-content:flex-end;">
                     ${item.status === 'OK' && chave ? `
-                      <button class="btn btn-sm btn-success" data-fb-click="NFe.gerarLancamentoDaNFe" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(chave))}" style="font-weight:700;" title="Gerar despesa no financeiro">⚡ Lançar</button>
+                      ${nfe._acoesLancamento(chave)}
                       <button class="btn btn-sm btn-primary" data-fb-click="NFe.abrirDanfe" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(chave))}">📄 DANFE</button>
                       <button class="btn btn-sm btn-secondary" data-fb-click="NFe.baixarXMLEAbrir" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(chave))}">⬇️ XML</button>
                       <button class="btn btn-sm btn-secondary" data-fb-click="NFe.adicionarComoAnexo" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(chave))}">📎 Anexar</button>

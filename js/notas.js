@@ -19,6 +19,8 @@ const Notas = {
           Importar XML NF-e
         </button>
         <input type="file" id="xml-nfe-input" accept=".xml" multiple style="display:none" data-fb-change="Notas.handleXmlFiles" data-fb-change-n="1" data-fb-change-t0="event">
+        <button class="btn btn-secondary" data-fb-click="Notas.triggerXmlFolderImport" data-fb-click-n="0" title="Escolha uma pasta: todos os arquivos .xml dela (e das subpastas) são lidos">📁 Importar pasta de XMLs</button>
+        <input type="file" id="xml-nfe-folder-input" webkitdirectory directory multiple style="display:none" data-fb-change="Notas.handleXmlFiles" data-fb-change-n="1" data-fb-change-t0="event">
         <button class="btn btn-primary" data-fb-click="Notas.showForm" data-fb-click-n="0">+ Nova NF</button>
       </div>
     </div>
@@ -414,9 +416,18 @@ const Notas = {
     document.getElementById('xml-nfe-input')?.click();
   },
 
+  triggerXmlFolderImport() {
+    document.getElementById('xml-nfe-folder-input')?.click();
+  },
+
   handleXmlFiles(event) {
-    const files = Array.from(event.target.files);
-    if (!files.length) return;
+    // Pela pasta chegam todos os arquivos (PDFs, imagens...): só os .xml interessam.
+    const files = Array.from(event.target.files || []).filter(f => /\.xml$/i.test(f.name) || /xml/i.test(f.type || ''));
+    if (!files.length) {
+      if (event.target.files?.length) Utils.toast('Nenhum arquivo .xml encontrado na seleção.', 'warning');
+      event.target.value = '';
+      return;
+    }
     let processed = 0;
     const results = [];
 
@@ -559,7 +570,21 @@ const Notas = {
       status:         'pendente',
       chave_nfe:      chave,
       observacoes:    '',
-      itens:          itens
+      itens:          itens,
+      // Endereço, telefone e IE do emitente para o cadastro automático do fornecedor.
+      _fornecedor:    this._fornecedorDoXml(emit)
+    };
+  },
+
+  _fornecedorDoXml(emit) {
+    if (!emit) return null;
+    const get = (tag) => (Array.from(emit.getElementsByTagNameNS('*', tag))[0]?.textContent || '').trim();
+    const cnpj = get('CNPJ'); const cpf = get('CPF');
+    return {
+      razao_social: get('xNome'), nome_fantasia: get('xFant') || get('xNome'),
+      cnpj, cpf, ie: get('IE'), telefone: get('fone'),
+      endereco: get('xLgr'), numero: get('nro'), bairro: get('xBairro'),
+      municipio: get('xMun'), uf: get('UF'), cep: get('CEP')
     };
   },
 
@@ -637,12 +662,15 @@ const Notas = {
     nfs.forEach(nf => {
       if (!nf.obra_id) { Utils.toast('Selecione uma obra para cada NF!', 'warning'); return; }
 
-      // 1. Cadastra ou vincula fornecedor sem duplicar
+      // 1. Fornecedor: usa o cadastro existente ou cadastra com os dados completos da nota
+      const dadosFornecedor = nf._fornecedor;
+      delete nf._fornecedor;
       if (typeof Fornecedores !== 'undefined' && nf.emitente) {
         Fornecedores.encontrarOuCriar({
-          razao_social: nf.emitente,
-          nome_fantasia: nf.emitente,
-          cnpj: nf.cnpj_emitente,
+          ...(dadosFornecedor || {}),
+          razao_social: dadosFornecedor?.razao_social || nf.emitente,
+          nome_fantasia: dadosFornecedor?.nome_fantasia || nf.emitente,
+          cnpj: dadosFornecedor?.cnpj || nf.cnpj_emitente,
           categoria: nf.categoria || 'material'
         });
       }

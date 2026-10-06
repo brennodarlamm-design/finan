@@ -776,9 +776,6 @@ const Contratos = {
     const valorEl = document.getElementById('ct-valor');
     const areaEl = document.getElementById('ct-area');
     const valorM2El = document.getElementById('ct-valor-m2');
-    const entradaEl = document.getElementById('ct-entrada');
-    const parcCaixaEl = document.getElementById('ct-parc-caixa');
-
     const v = parseFloat(valorEl?.value) || 0;
     const a = parseFloat(areaEl?.value) || 0;
 
@@ -791,12 +788,9 @@ const Contratos = {
       }
     }
 
-    if (entradaEl && parcCaixaEl && !parcCaixaEl.value) {
-      const ent = parseFloat(entradaEl.value) || 0;
-      if (ent > 0) {
-        parcCaixaEl.value = Utils.fmt.currency(ent * 0.75);
-      }
-    }
+    // AUDITORIA 2026-10-04 #39: a parcela da Caixa não é mais preenchida com 75% da entrada.
+    // O valor fixo era inventado e travava no primeiro dígito digitado na entrada; o salvar já
+    // exige a parcela quando há entrada (cláusula 08).
   },
 
   _renderClausulasNoForm() {

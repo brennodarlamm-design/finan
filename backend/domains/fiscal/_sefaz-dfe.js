@@ -4,7 +4,7 @@
 import https from 'node:https';
 import zlib from 'node:zlib';
 import crypto from 'node:crypto';
-import { decryptCertData } from './_certificado.js';
+import { decryptCertData, extrairChaveECertificadoDoPfx } from './_certificado.js';
 
 // Mapeamento de UFs brasileiras para código IBGE
 const UF_IBGE_MAP = {
@@ -65,7 +65,7 @@ function buildSoapCTeDist(cnpj, codUf, ultNsu) {
 /**
  * Executa requisição HTTPS SOAP com mTLS à SEFAZ
  */
-function callSefazHttps({ pfxBuffer, passphrase, hostname, path, actionHeader, soapBody, timeout = 30000 }) {
+export function callSefazHttps({ pfxBuffer, passphrase, hostname, path, actionHeader, soapBody, timeout = 30000 }) {
   return new Promise((resolve, reject) => {
     const agent = new https.Agent({
       pfx: pfxBuffer,
@@ -109,6 +109,96 @@ function callSefazHttps({ pfxBuffer, passphrase, hostname, path, actionHeader, s
     req.write(soapBody);
     req.end();
   });
+}
+
+// ── Manifestação do destinatário: Ciência da Operação (evento 210210) ─────────────────────────
+// Sem a ciência, o DF-e só entrega o resumo da NF-e (<resNFe>: sem produtos nem duplicatas). Com
+// ela, a SEFAZ libera o XML completo (procNFe) para o CNPJ da empresa, sem custo. A ciência só
+// registra que a empresa tomou conhecimento da nota; não confirma nem recusa a operação.
+
+const NS_NFE = 'http://www.portalfiscal.inf.br/nfe';
+const NS_DSIG = 'http://www.w3.org/2000/09/xmldsig#';
+const C14N = 'http://www.w3.org/TR/2001/REC-xml-c14n-20010315';
+
+/** dhEvento no horário de Brasília (um minuto atrás, para não cair "no futuro" na SEFAZ). */
+export function dhEventoBrasilia(now = new Date()) {
+  return new Date(now.getTime() - 3 * 3600000 - 60000).toISOString().slice(0, 19) + '-03:00';
+}
+
+/**
+ * Monta o <infEvento> da ciência. O XML é gerado sem espaços, comentários nem caracteres que
+ * precisem de escape, então a forma canônica (C14N) é ele mesmo com o namespace herdado explícito.
+ */
+export function montarInfEventoCiencia({ cnpj, chave, dhEvento, nSeqEvento = 1, tpAmb = 1 }) {
+  const id = `ID210210${chave}${String(nSeqEvento).padStart(2, '0')}`;
+  const corpo = `<cOrgao>91</cOrgao><tpAmb>${tpAmb}</tpAmb><CNPJ>${cnpj}</CNPJ><chNFe>${chave}</chNFe>`
+    + `<dhEvento>${dhEvento}</dhEvento><tpEvento>210210</tpEvento><nSeqEvento>${nSeqEvento}</nSeqEvento>`
+    + `<verEvento>1.00</verEvento><detEvento versao="1.00"><descEvento>Ciencia da Operacao</descEvento></detEvento>`;
+  return {
+    id,
+    xml: `<infEvento Id="${id}">${corpo}</infEvento>`,
+    canonico: `<infEvento xmlns="${NS_NFE}" Id="${id}">${corpo}</infEvento>`
+  };
+}
+
+/** Assinatura XMLDSig (enveloped, C14N, RSA-SHA1) exigida pela SEFAZ para eventos da NF-e. */
+export function assinarInfEvento({ id, canonico }, privateKey, certDer) {
+  const digest = crypto.createHash('sha1').update(canonico, 'utf8').digest('base64');
+  const signedInfoCorpo = `<CanonicalizationMethod Algorithm="${C14N}"></CanonicalizationMethod>`
+    + `<SignatureMethod Algorithm="${NS_DSIG}rsa-sha1"></SignatureMethod>`
+    + `<Reference URI="#${id}"><Transforms><Transform Algorithm="${NS_DSIG}enveloped-signature"></Transform>`
+    + `<Transform Algorithm="${C14N}"></Transform></Transforms>`
+    + `<DigestMethod Algorithm="${NS_DSIG}sha1"></DigestMethod><DigestValue>${digest}</DigestValue></Reference>`;
+  const signedInfoCanonico = `<SignedInfo xmlns="${NS_DSIG}">${signedInfoCorpo}</SignedInfo>`;
+  const assinatura = crypto.sign('sha1', Buffer.from(signedInfoCanonico, 'utf8'), privateKey).toString('base64');
+  return `<Signature xmlns="${NS_DSIG}"><SignedInfo>${signedInfoCorpo}</SignedInfo>`
+    + `<SignatureValue>${assinatura}</SignatureValue>`
+    + `<KeyInfo><X509Data><X509Certificate>${Buffer.from(certDer).toString('base64')}</X509Certificate></X509Data></KeyInfo></Signature>`;
+}
+
+export function montarEnvEventoCiencia({ cnpj, chave, privateKey, certDer, now = new Date(), idLote = Date.now() }) {
+  const inf = montarInfEventoCiencia({ cnpj, chave, dhEvento: dhEventoBrasilia(now) });
+  const assinatura = assinarInfEvento(inf, privateKey, certDer);
+  return `<envEvento xmlns="${NS_NFE}" versao="1.00"><idLote>${String(idLote).slice(-15)}</idLote>`
+    + `<evento xmlns="${NS_NFE}" versao="1.00">${inf.xml}${assinatura}</evento></envEvento>`;
+}
+
+/** Lê o retorno do NFeRecepcaoEvento4: o cStat que interessa é o do evento (retEvento). */
+export function interpretarRetornoEvento(soapResp) {
+  const ret = String(soapResp || '').match(/<retEvento[\s\S]*?<\/retEvento>/i)?.[0] || '';
+  const cStat = extractTagValue(ret, 'cStat') || extractTagValue(soapResp || '', 'cStat');
+  const xMotivo = extractTagValue(ret, 'xMotivo') || extractTagValue(soapResp || '', 'xMotivo');
+  // 135 registrado e vinculado; 136 registrado sem vínculo; 573 duplicidade (já havia ciência).
+  return { ok: ['135', '136', '573'].includes(cStat), cStat, xMotivo };
+}
+
+export async function enviarCienciaOperacao({ pfxBuffer, passphrase, cnpj, chave, chaveAssinatura, now }) {
+  const { privateKey, certDer } = chaveAssinatura || extrairChaveECertificadoDoPfx(pfxBuffer, passphrase);
+  const envEvento = montarEnvEventoCiencia({ cnpj, chave, privateKey, certDer, now });
+  const soapBody = `<?xml version="1.0" encoding="utf-8"?><soap12:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:soap12="http://www.w3.org/2003/05/soap-envelope"><soap12:Body><nfeDadosMsg xmlns="http://www.portalfiscal.inf.br/nfe/wsdl/NFeRecepcaoEvento4">${envEvento}</nfeDadosMsg></soap12:Body></soap12:Envelope>`;
+  const resp = await callSefazHttps({
+    pfxBuffer,
+    passphrase,
+    hostname: 'www.nfe.fazenda.gov.br',
+    path: '/NFeRecepcaoEvento4/NFeRecepcaoEvento4.asmx',
+    actionHeader: 'http://www.portalfiscal.inf.br/nfe/wsdl/NFeRecepcaoEvento4/nfeRecepcaoEvento',
+    soapBody
+  });
+  return interpretarRetornoEvento(resp.body);
+}
+
+/** Consulta uma NF-e específica no DF-e pela chave (consChNFe). */
+export async function consultarNFePorChave({ pfxBuffer, passphrase, cnpj, codUf, chave }) {
+  const soapBody = `<?xml version="1.0" encoding="utf-8"?><soap12:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:soap12="http://www.w3.org/2003/05/soap-envelope"><soap12:Body><nfeDistDFeInteresse xmlns="http://www.portalfiscal.inf.br/nfe/wsdl/NFeDistribuicaoDFe"><nfeDadosMsg><distDFeInt xmlns="${NS_NFE}" versao="1.01"><tpAmb>1</tpAmb><cUFAutor>${codUf || '91'}</cUFAutor><CNPJ>${cnpj}</CNPJ><consChNFe><chNFe>${chave}</chNFe></consChNFe></distDFeInt></nfeDadosMsg></nfeDistDFeInteresse></soap12:Body></soap12:Envelope>`;
+  const resp = await callSefazHttps({
+    pfxBuffer,
+    passphrase,
+    hostname: 'www1.nfe.fazenda.gov.br',
+    path: '/NFeDistribuicaoDFe/NFeDistribuicaoDFe.asmx',
+    actionHeader: 'http://www.portalfiscal.inf.br/nfe/wsdl/NFeDistribuicaoDFe/nfeDistDFeInteresse',
+    soapBody
+  });
+  return parseSefazDistResponse(resp.body);
 }
 
 /**
@@ -249,7 +339,7 @@ export function decompressAndParseDocZip({ nsu, schema, base64Content }) {
     };
   } catch (err) {
     console.error(`[DF-e] Erro ao descompactar docZip (NSU ${nsu}):`, err.message);
-    return { sucesso: false, erro: err.message, nsu };
+    return { sucesso: false, erro: 'Documento compactado inválido.', nsu };
   }
 }
 
@@ -368,8 +458,13 @@ export async function upsertDfeDocumento(sql, tenantId, parsed) {
       -- Um cancelamento já registrado não é desfeito pela chegada (atrasada) da própria NF-e.
       situacao = CASE WHEN tenant_dfe_documentos.situacao = 'cancelada' THEN 'cancelada'
                       ELSE COALESCE(EXCLUDED.situacao, tenant_dfe_documentos.situacao) END,
-      schema_tipo = EXCLUDED.schema_tipo,
-      xml_completo = COALESCE(EXCLUDED.xml_completo, tenant_dfe_documentos.xml_completo),
+      -- O resumo (resNFe) pode chegar depois do XML completo (procNFe): nunca troca o completo
+      -- pelo resumo, que não tem produtos nem duplicatas.
+      schema_tipo = CASE WHEN EXCLUDED.schema_tipo ILIKE 'resNFe%' AND tenant_dfe_documentos.schema_tipo ILIKE 'procNFe%'
+                         THEN tenant_dfe_documentos.schema_tipo ELSE EXCLUDED.schema_tipo END,
+      xml_completo = CASE WHEN EXCLUDED.schema_tipo ILIKE 'resNFe%' AND tenant_dfe_documentos.schema_tipo ILIKE 'procNFe%'
+                          THEN tenant_dfe_documentos.xml_completo
+                          ELSE COALESCE(EXCLUDED.xml_completo, tenant_dfe_documentos.xml_completo) END,
       updated_at = NOW();
   `;
 }
@@ -515,14 +610,14 @@ export async function syncTenantDFe(sql, tenantId, options = {}) {
       await sql`
         UPDATE tenant_dfe_sync
         SET status_sefaz = 'erro_comunicacao',
-            mensagem_sefaz = ${'Falha de comunicação com a SEFAZ: ' + errNet.message},
+            mensagem_sefaz = ${'Falha de comunicação com a SEFAZ. Nova tentativa liberada em 15 minutos.'},
             proxima_consulta_permitida = NOW() + INTERVAL '15 minutes', -- pausa após erro
             updated_at = NOW()
         WHERE tenant_id = ${tenantId};
       `;
       return {
         success: false,
-        error: `Falha ao comunicar com os servidores da SEFAZ: ${errNet.message}`
+        error: 'Falha ao comunicar com os servidores da SEFAZ. Tente novamente em 15 minutos.'
       };
     }
 
@@ -623,7 +718,18 @@ export async function syncTenantDFe(sql, tenantId, options = {}) {
     }
   }
 
-  // 5. Retorna o resumo consolidado
+  // 5. Ciência da operação para as NF-e que só vieram em resumo (até 10 por rodada). Com ela a
+  // SEFAZ libera o XML completo, que chega numa das próximas sincronizações.
+  let ciencias = 0;
+  if (options.ciencia !== false) {
+    try {
+      ciencias = await darCienciaPendentes(sql, tenantId, { pfxBuffer, passphrase, cnpj, limite: 10 });
+    } catch (errCiencia) {
+      console.warn('[DF-e] Ciência automática não concluída:', errCiencia.message);
+    }
+  }
+
+  // 6. Retorna o resumo consolidado
   const contagem = await sql`
     SELECT COUNT(*) as count FROM tenant_dfe_documentos WHERE tenant_id = ${tenantId};
   `;
@@ -633,9 +739,113 @@ export async function syncTenantDFe(sql, tenantId, options = {}) {
     cStat: lastCStat,
     mensagem: lastMotivo,
     novosDocumentos: totalProcessados,
+    ciencias,
     ultimoNsu: ultNsu,
     totalDocumentos: parseInt(contagem[0]?.count || '0', 10)
   };
+}
+
+/** Envia a ciência das NF-e em resumo ainda sem manifestação. Devolve quantas foram registradas. */
+export async function darCienciaPendentes(sql, tenantId, { pfxBuffer, passphrase, cnpj, limite = 10, enviar = enviarCienciaOperacao } = {}) {
+  const pendentes = await sql`
+    SELECT chave FROM tenant_dfe_documentos
+    WHERE tenant_id = ${tenantId} AND tipo_documento = 'NFE'
+      AND schema_tipo ILIKE 'resNFe%' AND COALESCE(manifesto_status, 'sem_manifesto') = 'sem_manifesto'
+      AND COALESCE(situacao, 'autorizada') = 'autorizada'
+    ORDER BY data_emissao DESC NULLS LAST
+    LIMIT ${limite};
+  `;
+  if (!pendentes.length) return 0;
+  const chaveAssinatura = extrairChaveECertificadoDoPfx(pfxBuffer, passphrase);
+  let registradas = 0;
+  for (const { chave } of pendentes) {
+    let status = 'ciencia_erro';
+    try {
+      const r = await enviar({ pfxBuffer, passphrase, cnpj, chave, chaveAssinatura });
+      if (r.ok) { status = 'ciencia'; registradas++; }
+      else console.warn(`[DF-e] Ciência recusada para ...${chave.slice(-6)}: ${r.cStat} ${r.xMotivo || ''}`);
+    } catch (err) {
+      console.warn(`[DF-e] Falha ao enviar ciência ...${chave.slice(-6)}:`, err.message);
+      status = 'sem_manifesto'; // erro de rede: tenta de novo na próxima sincronização
+    }
+    await sql`UPDATE tenant_dfe_documentos SET manifesto_status = ${status}, updated_at = NOW() WHERE tenant_id = ${tenantId} AND chave = ${chave};`;
+  }
+  return registradas;
+}
+
+async function carregarCertificadoTenant(sql, tenantId) {
+  const rows = await sql`SELECT cert_pfx_base64_enc, iv, auth_tag, cnpj, status FROM tenant_certificates WHERE tenant_id = ${tenantId} LIMIT 1;`;
+  if (!rows.length || rows[0].status !== 'ativo') throw new Error('Nenhum certificado A1 ativo configurado para esta empresa.');
+  const dec = decryptCertData(rows[0].cert_pfx_base64_enc, rows[0].iv, rows[0].auth_tag);
+  return { pfxBuffer: Buffer.from(dec.pfx_base64, 'base64'), passphrase: dec.passphrase, cnpj: String(rows[0].cnpj || '').replace(/\D/g, '') };
+}
+
+/**
+ * XML completo de uma NF-e da empresa, direto da SEFAZ e sem custo: se só existe o resumo, envia a
+ * ciência (quando falta) e consulta a nota pela chave (consChNFe). Quando a SEFAZ ainda não liberou
+ * o XML completo, devolve o resumo com `pendente: true`.
+ */
+export async function obterXmlCompletoNFe(sql, tenantId, chave, deps = {}) {
+  const ch = String(chave || '').replace(/\D/g, '');
+  if (ch.length !== 44) return { success: false, error: 'Chave de acesso inválida.' };
+  const lerLinha = async () => (await sql`
+    SELECT chave, schema_tipo, xml_completo, manifesto_status FROM tenant_dfe_documentos
+    WHERE tenant_id = ${tenantId} AND chave = ${ch} LIMIT 1;`)[0];
+  let linha = await lerLinha();
+  const completo = (l) => l && l.xml_completo && /<infNFe[\s>]/.test(l.xml_completo);
+  if (completo(linha)) return { success: true, completo: true, xml: linha.xml_completo };
+
+  const cert = deps.cert || await carregarCertificadoTenant(sql, tenantId);
+  if (linha && COALESCE_STATUS(linha.manifesto_status) !== 'ciencia') {
+    await darCienciaParaChave(sql, tenantId, ch, cert, deps.enviar || enviarCienciaOperacao);
+  }
+  let codUf = '';
+  try {
+    const t = await sql`SELECT uf FROM tenants WHERE id = ${tenantId} LIMIT 1;`;
+    codUf = CODIGO_UF_IBGE[String(t[0]?.uf || '').trim().toUpperCase()] || '';
+  } catch {}
+  const resp = await (deps.consultar || consultarNFePorChave)({ ...cert, codUf: codUf || '14', chave: ch });
+  if (resp.cStat === '138') {
+    for (const item of resp.docZipList || []) {
+      const parsed = decompressAndParseDocZip(item);
+      if (parsed.sucesso && parsed.chave) await upsertDfeDocumento(sql, tenantId, parsed);
+    }
+    linha = await lerLinha();
+    if (completo(linha)) return { success: true, completo: true, xml: linha.xml_completo };
+  }
+  if (linha?.xml_completo) {
+    return { success: true, completo: false, pendente: true, xml: linha.xml_completo, cStat: resp.cStat, mensagem: 'A SEFAZ ainda não liberou o XML completo desta NF-e. Tente de novo em alguns minutos.' };
+  }
+  return { success: false, cStat: resp.cStat, error: resp.cStat === '137' ? 'NF-e não encontrada na SEFAZ para o CNPJ desta empresa.' : (resp.xMotivo || 'A SEFAZ não devolveu esta NF-e.') };
+}
+
+function COALESCE_STATUS(v) { return v || 'sem_manifesto'; }
+
+async function darCienciaParaChave(sql, tenantId, chave, cert, enviar) {
+  try {
+    const r = await enviar({ ...cert, chave });
+    await sql`UPDATE tenant_dfe_documentos SET manifesto_status = ${r.ok ? 'ciencia' : 'ciencia_erro'}, updated_at = NOW() WHERE tenant_id = ${tenantId} AND chave = ${chave};`;
+    return r;
+  } catch (err) {
+    console.warn('[DF-e] Falha ao enviar ciência:', err.message);
+    return { ok: false };
+  }
+}
+
+/** Marca (ou desmarca) uma NF-e capturada como já lançada no financeiro. */
+export async function marcarDFeLancada(sql, tenantId, { chave, lancada = true, manual = false, userId = null }) {
+  const ch = String(chave || '').replace(/\D/g, '');
+  if (ch.length !== 44) return { success: false, error: 'Chave de acesso inválida.' };
+  const rows = await sql`
+    UPDATE tenant_dfe_documentos
+       SET lancada_em = CASE WHEN ${lancada === true} THEN COALESCE(lancada_em, NOW()) ELSE NULL END,
+           lancada_por = CASE WHEN ${lancada === true} THEN ${userId} ELSE NULL END,
+           lancada_manual = ${lancada === true && manual === true},
+           updated_at = NOW()
+     WHERE tenant_id = ${tenantId} AND chave = ${ch}
+     RETURNING chave, lancada_em, lancada_manual;
+  `;
+  return rows.length ? { success: true, documento: rows[0] } : { success: true, documento: null };
 }
 
 /**
@@ -694,6 +904,7 @@ export async function listarDFeDocumentos(sql, tenantId, filters = {}) {
     rows = await sql`
       SELECT id, tipo_documento, nsu, chave, cnpj_emitente, nome_emitente,
              valor_total, data_emissao, situacao, schema_tipo, manifesto_status,
+             lancada_em, lancada_manual,
              (xml_completo IS NOT NULL) AS tem_xml, created_at
       FROM tenant_dfe_documentos
       WHERE tenant_id = ${tenantId}
@@ -706,6 +917,7 @@ export async function listarDFeDocumentos(sql, tenantId, filters = {}) {
     rows = await sql`
       SELECT id, tipo_documento, nsu, chave, cnpj_emitente, nome_emitente,
              valor_total, data_emissao, situacao, schema_tipo, manifesto_status,
+             lancada_em, lancada_manual,
              (xml_completo IS NOT NULL) AS tem_xml, created_at
       FROM tenant_dfe_documentos
       WHERE tenant_id = ${tenantId}
@@ -718,6 +930,7 @@ export async function listarDFeDocumentos(sql, tenantId, filters = {}) {
     rows = await sql`
       SELECT id, tipo_documento, nsu, chave, cnpj_emitente, nome_emitente,
              valor_total, data_emissao, situacao, schema_tipo, manifesto_status,
+             lancada_em, lancada_manual,
              (xml_completo IS NOT NULL) AS tem_xml, created_at
       FROM tenant_dfe_documentos
       WHERE tenant_id = ${tenantId}
@@ -729,6 +942,7 @@ export async function listarDFeDocumentos(sql, tenantId, filters = {}) {
     rows = await sql`
       SELECT id, tipo_documento, nsu, chave, cnpj_emitente, nome_emitente,
              valor_total, data_emissao, situacao, schema_tipo, manifesto_status,
+             lancada_em, lancada_manual,
              (xml_completo IS NOT NULL) AS tem_xml, created_at
       FROM tenant_dfe_documentos
       WHERE tenant_id = ${tenantId}

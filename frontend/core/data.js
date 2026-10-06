@@ -1981,10 +1981,17 @@ const DB = {
     if (typeof navigator !== 'undefined' && navigator.locks && navigator.locks.request) {
       return navigator.locks.request(`finobra_sync_lock_${this._t()}`, { ifAvailable: true }, async (lock) => {
         if (!lock) {
-          console.info('[Sync] Outra aba está sincronizando a fila offline. Aguardando...');
+          // Se o envio em andamento é desta aba, ele mesmo esvazia a fila (o laço só para com a
+          // fila vazia): nada a avisar. A mensagem fica para quando outra aba segura a trava.
+          if (!this._syncLockHeld) console.info('[Sync] Outra aba está sincronizando a fila offline. Aguardando...');
           return;
         }
-        await this._executeFlushQueue();
+        this._syncLockHeld = true;
+        try {
+          await this._executeFlushQueue();
+        } finally {
+          this._syncLockHeld = false;
+        }
       });
     }
 

@@ -265,6 +265,7 @@ export async function sendAndLogEmail(sql, {
 
       const res = await fetch('https://api.resend.com/emails', {
         method: 'POST',
+        signal: AbortSignal.timeout(10000),
         headers: {
           'Authorization': `Bearer ${resendKey}`,
           'Content-Type': 'application/json'

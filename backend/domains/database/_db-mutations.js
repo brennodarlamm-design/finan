@@ -9,6 +9,7 @@ import { setPrivateNoCache } from './_http.js';
 import { isTenantStorageUrl } from './_edge-r2.js';
 import { getPlanRule, isActiveObraStatus } from './_plans.js';
 import { writeAudit } from './_audit.js';
+import { validarArquivoBase64 } from './_file-validation.js';
 import { SYNC_GUARD_TABLES, syncVersionConflict, readSyncVersion, syncRecordId, withoutSyncVersion } from './_sync-guard.js';
 
 export async function validateObraTenant(sql, obraId, tenantId) {
@@ -407,7 +408,14 @@ export async function handleSave(sql, tenantId, auth, req, res, table, data) {
       return res.status(403).json({ success: false, error: 'O arquivo informado não pertence a esta empresa.' });
     }
     // Zero-bloat: se o documento já possui URL no R2 ou storage externo, nunca grava base64 no banco relacional
-    const cleanBase64 = doc.url ? null : (doc.data_base64 || doc.base64_data || null);
+    let cleanBase64 = doc.url ? null : (doc.data_base64 || doc.base64_data || null);
+    // AUDITORIA 2026-10-04 #31: mesma política do /api/upload. Arquivo recusado não é gravado;
+    // os metadados seguem (o app guarda a cópia local e não fica reenviando).
+    let arquivoRecusado = null;
+    if (cleanBase64) {
+      const validacao = validarArquivoBase64({ nomeArquivo: doc.nome_arquivo || doc.titulo, mime: doc.tipo_mime || doc.tipo_arquivo, base64: cleanBase64 });
+      if (!validacao.ok) { arquivoRecusado = validacao; cleanBase64 = null; }
+    }
     await sql`
       INSERT INTO documentos (
         id, tenant_id, tipo, referencia_id, titulo, categoria, nome_arquivo,
@@ -431,6 +439,9 @@ export async function handleSave(sql, tenantId, auth, req, res, table, data) {
       WHERE documentos.tenant_id = ${tenantId};
     `;
     await auditDb(sql, req, auth, 'salvar', 'documentos', doc);
+    if (arquivoRecusado) {
+      return res.status(200).json({ success: true, id: doc.id, arquivo_recusado: true, code: arquivoRecusado.code, aviso: arquivoRecusado.error });
+    }
     return res.status(200).json({ success: true, id: doc.id });
   }
 

@@ -122,22 +122,22 @@ const NFe = {
     } catch { return null; }
   },
 
+  // DANFE simplificado gerado aqui a partir do XML completo (sem crédito do MeuDanfe).
   async baixarDanfePDF(chave) {
     chave = this._limparChave(chave);
-    const res = await this._fetchWithTimeout(`${this._API_BASE}?action=danfe&chave=${chave}`, {
-      method: 'GET',
-      headers: this._headers()
-    });
-    if (!res.ok) {
-      if (res.status === 404) throw new Error('NF-e não encontrada na Área do Cliente. Busque-a primeiro.');
-      throw new Error(`Erro ao baixar DANFE: ${res.status}`);
+    const xml = await this.baixarXML(chave);
+    if (!xml?.data || xml.resumo || !/<infNFe[\s>]/.test(String(xml.data))) {
+      throw new Error('O DANFE precisa do XML completo da NF-e, que a SEFAZ ainda não liberou (só o resumo). Tente de novo em alguns minutos.');
     }
-    return await res.json();
+    await FinObraAssets.load('danfe');
+    return { data: window.DanfeSimplificado.gerarBase64(xml.data), simplificado: true };
   },
 
   async baixarXML(chave) {
     chave = this._limparChave(chave);
-    // 1. Tenta recuperar do DF-e nativo da SEFAZ
+    const ehCompleto = (xml) => /<infNFe[\s>]/.test(String(xml || ''));
+    let resumoDfe = null;
+    // 1. XML já capturado pelo DF-e da SEFAZ
     try {
       const dfeRes = await this._fetchWithTimeout(`${this._API_BASE}?action=dfe_xml&chave=${chave}`, {
         method: 'GET',
@@ -146,21 +146,43 @@ const NFe = {
       if (dfeRes.ok) {
         const dfeJson = await dfeRes.json();
         if (dfeJson.success && dfeJson.documento?.xml) {
-          return { status: 'OK', data: dfeJson.documento.xml };
+          const xml = String(dfeJson.documento.xml);
+          if (ehCompleto(xml)) return { status: 'OK', data: xml };
+          resumoDfe = xml;
         }
       }
     } catch {}
 
-    // 2. Fallback para provedor secundário
-    const res = await this._fetchWithTimeout(`${this._API_BASE}?action=xml&chave=${chave}`, {
-      method: 'GET',
-      headers: this._headers()
-    });
-    if (!res.ok) {
-      if (res.status === 404) throw new Error('NF-e não encontrada na base de dados.');
-      throw new Error(`Erro ao baixar XML: ${res.status}`);
-    }
-    return await res.json();
+    // 2. Só o resumo (ou nada): a SEFAZ entrega o XML completo depois da ciência da operação, sem
+    //    custo. O servidor envia a ciência (se faltar) e consulta a nota pela chave.
+    try {
+      const res = await this._fetchWithTimeout(`${this._API_BASE}?action=dfe_xml_completo&chave=${chave}`, {
+        method: 'POST',
+        headers: this._headers(),
+        body: JSON.stringify({ chave })
+      }, 45000);
+      const json = await res.json().catch(() => ({}));
+      if (json.success && json.xml) {
+        if (json.completo && ehCompleto(json.xml)) return { status: 'OK', data: json.xml };
+        resumoDfe = resumoDfe || json.xml;
+      }
+    } catch {}
+
+    // 3. Última tentativa sem custo: o MeuDanfe só devolve o XML se a nota já estiver na Área do
+    //    Cliente (a busca que adiciona a nota consome crédito e não é feita aqui).
+    try {
+      const res = await this._fetchWithTimeout(`${this._API_BASE}?action=xml&chave=${chave}`, {
+        method: 'GET',
+        headers: this._headers()
+      });
+      if (res.ok) {
+        const json = await res.json();
+        if (json && json.data && ehCompleto(json.data)) return json;
+      }
+    } catch {}
+
+    if (resumoDfe) return { status: 'OK', data: resumoDfe, resumo: true };
+    throw new Error('NF-e não encontrada na SEFAZ para o CNPJ desta empresa.');
   },
 
   async listarMinhasNFes(after = '') {
@@ -670,7 +692,7 @@ const NFe = {
                 <td style="text-align:right;">
                   <div style="display:flex;gap:6px;justify-content:flex-end;flex-wrap:wrap;">
                     ${c.status === 'OK' ? `
-                      <button class="btn btn-sm btn-success" data-fb-click="NFe.gerarLancamentoDaNFe" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(c.chave))}" style="font-weight:700;" title="Gerar despesa no financeiro">⚡ Lançar</button>
+                      ${this._acoesLancamento(c.chave)}
                       <button class="btn btn-sm btn-primary" data-fb-click="NFe.abrirDanfe" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(c.chave))}">📄 DANFE</button>
                       <button class="btn btn-sm btn-secondary" data-fb-click="NFe.baixarXMLEAbrir" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(c.chave))}">⬇️ XML</button>
                       <button class="btn btn-sm btn-secondary" data-fb-click="NFe.adicionarComoAnexo" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(c.chave))}">📎 Anexar</button>
@@ -840,12 +862,20 @@ const NFe = {
       `;
     }
 
+    const estaLancada = (d) => !!(d.lancada_em || this._lancamentoDaNFe(d.chave));
+    const qtdLancadas = docs.filter(d => d.tipo_documento === 'NFE' && estaLancada(d)).length;
+    const todos = docs;
+    docs = this._dfeOcultarLancadas ? docs.filter(d => !(d.tipo_documento === 'NFE' && estaLancada(d))) : docs;
     return `
-      <div style="font-size:.8rem;color:var(--text3);margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;">
-        <span>Documentos sincronizados: <strong style="color:var(--text);">${docs.length}</strong></span>
+      <div style="font-size:.8rem;color:var(--text3);margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;">
+        <span>Documentos sincronizados: <strong style="color:var(--text);">${todos.length}</strong> · já lançadas: <strong style="color:#10b981;">${qtdLancadas}</strong> · pendentes: <strong style="color:var(--text);">${todos.filter(d => d.tipo_documento === 'NFE').length - qtdLancadas}</strong></span>
+        <label style="display:flex;align-items:center;gap:6px;cursor:pointer;">
+          <input type="checkbox" ${this._dfeOcultarLancadas ? 'checked' : ''} data-fb-change="NFe._toggleOcultarLancadas" data-fb-change-n="1" data-fb-change-t0="self"> Ocultar notas já lançadas
+        </label>
       </div>
       <div style="overflow-x:auto;">
-        <table class="data-table">
+        ${!docs.length ? `<div style="text-align:center;padding:24px;color:var(--text3);font-size:.85rem;">Todas as notas desta lista já foram lançadas. 🎉</div>` : ''}
+        <table class="data-table" ${!docs.length ? 'style="display:none"' : ''}>
           <thead>
             <tr>
               <th style="width:70px;">Tipo</th>
@@ -854,7 +884,7 @@ const NFe = {
               <th>Chave de Acesso</th>
               <th style="text-align:right;">Valor</th>
               <th style="text-align:center;width:95px;">Situação</th>
-              <th style="text-align:right;width:200px;">Ações</th>
+              <th style="text-align:right;width:260px;">Ações</th>
             </tr>
           </thead>
           <tbody>
@@ -894,8 +924,8 @@ const NFe = {
                     ${sitBadge}
                   </td>
                   <td style="text-align:right;">
-                    <div style="display:flex;gap:5px;justify-content:flex-end;">
-                      <button class="btn btn-sm btn-success" data-fb-click="NFe.gerarLancamentoDaNFe" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(d.chave))}" style="font-weight:700;" title="Gerar despesa no financeiro">⚡ Lançar</button>
+                    <div style="display:flex;gap:5px;justify-content:flex-end;align-items:center;flex-wrap:wrap;">
+                      ${d.tipo_documento === 'NFE' ? this._acoesLancamento(d.chave, d) : ''}
                       <button class="btn btn-sm btn-primary" data-fb-click="NFe.abrirDanfe" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(d.chave))}">📄 DANFE</button>
                       <button class="btn btn-sm btn-secondary" data-fb-click="NFe.baixarXMLEAbrir" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(d.chave))}">⬇️ XML</button>
                       <button class="btn btn-sm btn-secondary" data-fb-click="NFe.adicionarComoAnexo" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(d.chave))}">📎 Anexar</button>
@@ -1077,7 +1107,7 @@ const NFe = {
           </span>
         </div>
         <div style="display:flex;gap:8px;flex-wrap:wrap;">
-          <button class="btn btn-success btn-sm" data-fb-click="NFe.gerarLancamentoDaNFe" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(chave))}" style="font-weight:700;">⚡ Gerar Lançamento</button>
+          ${this._lancamentoDaNFe(chave) ? this._acoesLancamento(chave) : `<button class="btn btn-success btn-sm" data-fb-click="NFe.gerarLancamentoDaNFe" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(chave))}" style="font-weight:700;">⚡ Gerar Lançamento</button>`}
           <button class="btn btn-primary btn-sm" data-fb-click="NFe.abrirDanfe" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(chave))}">📄 Visualizar DANFE PDF</button>
           <button class="btn btn-secondary btn-sm" data-fb-click="NFe.baixarXMLEAbrir" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(chave))}">⬇️ Baixar XML</button>
           <button class="btn btn-secondary btn-sm" data-fb-click="NFe.adicionarComoAnexo" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(chave))}">📎 Anexar a Lançamento</button>
@@ -1099,7 +1129,7 @@ const NFe = {
           <div class="modal-header">
             <span class="modal-title">📄 DANFE — NF-e</span>
             <div style="display:flex;gap:8px;align-items:center;">
-              <button class="btn btn-sm btn-success" data-fb-click="Patch26Actions.nfeGenerateClose" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(chave))}" style="font-weight:700;">⚡ Gerar Despesa</button>
+              ${this._lancamentoDaNFe(chave) ? this._acoesLancamento(chave) : `<button class="btn btn-sm btn-success" data-fb-click="Patch26Actions.nfeGenerateClose" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(chave))}" style="font-weight:700;">⚡ Gerar Despesa</button>`}
               <button class="btn btn-sm btn-secondary" data-fb-click="Patch26Actions.nfeAttachClose" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(chave))}">📎 Anexar</button>
               <button class="btn btn-sm btn-primary" data-fb-click="Patch26Actions.nfeDownload" data-fb-click-n="2" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(pdfSrc))}" data-fb-click-t1="string" data-fb-click-v1="${encodeURIComponent(String(chave))}">⬇️ Baixar PDF</button>
               <button class="modal-close" data-fb-click="Utils.closeModal" data-fb-click-n="0">✕</button>
@@ -1146,6 +1176,10 @@ const NFe = {
 
   async gerarLancamentoDaNFe(chave) {
     chave = this._limparChave(chave);
+    if (this._lancamentoDaNFe(chave)) {
+      Utils.toast('Esta NF-e já foi lançada. Use "Ver lançamento" para abrir a despesa.', 'warning');
+      return;
+    }
     Utils.toast('Carregando dados da NF-e...', 'info');
 
     let parsed = null;
@@ -1190,6 +1224,9 @@ const NFe = {
 
     // Escapa dados para callback
     window._tempNFeParsed = parsed;
+    if (parsed.resumo) {
+      Utils.toast('Só o resumo da NF-e está disponível: os produtos e as parcelas não vieram. Confira o vencimento antes de salvar.', 'warning');
+    }
 
     Utils.showModal(`
       <div class="modal" style="max-width:680px;max-height:92vh;display:flex;flex-direction:column;">
@@ -1211,7 +1248,7 @@ const NFe = {
             </div>
             ${parsed.itens.length ? `
             <details style="margin-top:10px;font-size:.78rem;color:var(--text2);cursor:pointer;">
-              <summary style="font-weight:600;color:var(--accent);">📦 Ver ${parsed.itens.length} produto(s)/serviço(s) da nota</summary>
+              <summary style="font-weight:600;color:var(--accent);">📦 ${parsed.itens.length} produto(s)/serviço(s) da nota — entram no controle de Produtos</summary>
               <div style="max-height:120px;overflow-y:auto;margin-top:6px;padding:6px 10px;background:var(--bg-secondary);border-radius:var(--r-sm);display:flex;flex-direction:column;gap:4px;">
                 ${parsed.itens.map(i => `<div>• <strong>${Utils.escapeHtml(i.nome)}</strong> (${Utils.escapeHtml(i.qtd)} ${Utils.escapeHtml(i.unidade)}) — ${Utils.fmt.currency(i.total)}</div>`).join('')}
               </div>
@@ -1339,6 +1376,174 @@ const NFe = {
     return notas.some(n => n.lancamento_id && [n.chave_nfe, n.chave_acesso, n.chave].some(c => String(c || '').replace(/\D/g, '') === ch));
   },
 
+  /** Lançamento gerado a partir desta NF-e (pela chave), se houver. */
+  _lancamentoDaNFe(chave) {
+    const ch = String(chave || '').replace(/\D/g, '');
+    if (ch.length !== 44) return null;
+    const lancs = DB.getAll('lancamentos') || [];
+    const direto = lancs.find(l => String(l.chave_nfe || '').replace(/\D/g, '') === ch);
+    if (direto) return direto;
+    const nota = (DB.getAll('notas') || []).find(n => n.lancamento_id && [n.chave_nfe, n.chave_acesso, n.chave].some(c => String(c || '').replace(/\D/g, '') === ch));
+    return nota ? (lancs.find(l => l.id === nota.lancamento_id) || null) : null;
+  },
+
+  /**
+   * Botões de "lançar" de uma NF-e em qualquer lista. Nota já lançada mostra o selo e "Ver lançamento"
+   * em vez de "Lançar"; no Monitor DF-e (`doc` vindo do servidor) dá para marcar à mão uma nota que
+   * foi lançada por fora do sistema.
+   */
+  _acoesLancamento(chave, doc = null) {
+    const ch = String(chave || '').replace(/\D/g, '');
+    const v = encodeURIComponent(ch);
+    const lanc = this._lancamentoDaNFe(ch);
+    const selo = (texto, titulo) => `<span title="${Utils.escapeHtml(titulo)}" style="background:rgba(16,185,129,.15);color:#10b981;border:1px solid rgba(16,185,129,.35);padding:3px 8px;border-radius:12px;font-size:.72rem;font-weight:800;white-space:nowrap;">${texto}</span>`;
+    if (lanc) {
+      return `${selo('✅ Lançada', 'Esta NF-e já gerou uma despesa no financeiro')}
+        <button class="btn btn-sm btn-secondary" data-fb-click="NFe.verLancamentoDaNFe" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${v}" title="Abrir a despesa gerada por esta nota">👁️ Ver lançamento</button>`;
+    }
+    if (doc && doc.lancada_em) {
+      return `${selo(doc.lancada_manual ? '✅ Marcada como lançada' : '✅ Lançada', `Marcada em ${Utils.fmt.datetime(doc.lancada_em)}`)}
+        <button class="btn btn-sm btn-secondary" data-fb-click="NFe.marcarComoLancada" data-fb-click-n="2" data-fb-click-t0="string" data-fb-click-v0="${v}" data-fb-click-t1="string" data-fb-click-v1="nao" title="Voltar a nota para pendente">↩️ Desmarcar</button>`;
+    }
+    return `<button class="btn btn-sm btn-success" data-fb-click="NFe.gerarLancamentoDaNFe" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${v}" style="font-weight:700;" title="Gerar despesa no financeiro">⚡ Lançar</button>${doc ? `
+        <button class="btn btn-sm btn-secondary" data-fb-click="NFe.marcarComoLancada" data-fb-click-n="2" data-fb-click-t0="string" data-fb-click-v0="${v}" data-fb-click-t1="string" data-fb-click-v1="sim" title="Já lancei esta nota por fora (sem a chave): marcar para ninguém lançar de novo">☑️ Já lancei</button>` : ''}`;
+  },
+
+  verLancamentoDaNFe(chave) {
+    const lanc = this._lancamentoDaNFe(chave);
+    if (!lanc) { Utils.toast('Lançamento desta NF-e não encontrado.', 'warning'); return; }
+    Utils.closeModal?.();
+    if (typeof App !== 'undefined' && App.navigate) App.navigate('lancamentos');
+    setTimeout(() => { if (typeof Lancamentos !== 'undefined') Lancamentos.showForm(lanc.tipo || 'despesa', lanc.id); }, 150);
+  },
+
+  async marcarComoLancada(chave, valor) {
+    const lancada = valor === 'sim';
+    const enviar = async () => {
+      try {
+        const res = await this._fetchWithTimeout(`${this._API_BASE}?action=dfe_marcar_lancada`, {
+          method: 'POST',
+          headers: this._headers(),
+          body: JSON.stringify({ chave, lancada, manual: true })
+        });
+        const json = await res.json().catch(() => ({}));
+        if (!res.ok || !json.success) throw new Error(json.error || `Erro ${res.status}`);
+        const doc = (this._dfeUltimosDocs || []).find(d => d.chave === chave);
+        if (doc) { doc.lancada_em = json.documento?.lancada_em || null; doc.lancada_manual = !!json.documento?.lancada_manual; }
+        this._rerenderTabelaDFe();
+        Utils.toast(lancada ? 'NF-e marcada como lançada.' : 'NF-e voltou para pendente.', 'success');
+      } catch (err) {
+        Utils.toast(`Não foi possível atualizar a nota: ${err.message}`, 'error');
+      }
+    };
+    if (lancada) Utils.confirm('Marcar esta NF-e como já lançada? Ela continua na lista, mas sem o botão de lançar.', enviar);
+    else await enviar();
+  },
+
+  /** Registra no servidor que a NF-e virou despesa (vale para os outros usuários e aparelhos). */
+  _registrarLancadaNoServidor(chave) {
+    try {
+      this._fetchWithTimeout(`${this._API_BASE}?action=dfe_marcar_lancada`, {
+        method: 'POST',
+        headers: this._headers(),
+        body: JSON.stringify({ chave, lancada: true, manual: false })
+      }).catch(() => {});
+    } catch {}
+  },
+
+  _toggleOcultarLancadas(el) {
+    this._dfeOcultarLancadas = !!el?.checked;
+    this._rerenderTabelaDFe();
+  },
+
+  _rerenderTabelaDFe() {
+    const box = document.getElementById('nfe-dfe-table-container');
+    if (box) box.innerHTML = this._renderTabelaDFe(this._dfeUltimosDocs || []);
+  },
+
+  _fornecedorDaNota(parsed, categoria) {
+    if (!parsed?.emitente && !parsed?.cnpj_emitente) return null;
+    const doc = String(parsed.cnpj_emitente || '').replace(/\D/g, '');
+    const dados = {
+      razao_social: parsed.emitente || '',
+      nome_fantasia: parsed.emitente || '',
+      cnpj: doc.length === 14 ? doc : '',
+      cpf: doc.length === 11 ? doc : '',
+      telefone: parsed.telefone_emitente || '',
+      municipio: parsed.cidade_emitente || '',
+      uf: parsed.uf_emitente || '',
+      ...(parsed.fornecedor || {}),
+      categoria: categoria || 'material'
+    };
+    if (typeof Fornecedores !== 'undefined' && Fornecedores.encontrarOuCriar) return Fornecedores.encontrarOuCriar(dados);
+    const existente = (DB.getAll('fornecedores') || []).find(f => doc && String(f.cnpj || f.cpf || f.cnpj_cpf || '').replace(/\D/g, '') === doc);
+    return existente || DB.add('fornecedores', { nome: dados.razao_social, razao_social: dados.razao_social, cnpj: dados.cnpj, cpf: dados.cpf, telefone: dados.telefone, categoria: dados.categoria });
+  },
+
+  _itensDaNotaParaLancamento(parsed, categoria) {
+    return (parsed.itens || []).filter(it => it && it.nome).map(it => {
+      const qtd = Number(it.qtd) || 0;
+      const total = Number(it.total) || 0;
+      const unidade = String(it.unidade || 'un').trim() || 'un';
+      const prod = (typeof Produtos !== 'undefined' && Produtos.encontrarOuCriar)
+        ? Produtos.encontrarOuCriar(it.nome, unidade, categoria || 'material')
+        : null;
+      return {
+        produto: it.nome,
+        qtd,
+        unidade,
+        valor_unit: qtd > 0 ? Math.round((total / qtd) * 10000) / 10000 : total,
+        total,
+        produto_id: prod?.id || null
+      };
+    });
+  },
+
+  // Despesas já geradas de uma NF-e sem os produtos (ex.: geradas só com o resumo do DF-e):
+  // busca o XML completo e grava os itens; corrige também o fornecedor e o valor de reserva.
+  async puxarProdutosDoLancamento(lancId) {
+    const l = DB.getById('lancamentos', lancId);
+    const chave = this._limparChave(l?.chave_nfe || '');
+    if (!l || chave.length !== 44) { Utils.toast('Este lançamento não tem chave de NF-e.', 'warning'); return; }
+    if (this._puxandoProdutos) return;
+    this._puxandoProdutos = true;
+    Utils.toast('Buscando os produtos da NF-e...', 'info');
+    try {
+      const resp = await this.baixarXML(chave);
+      const parsed = resp?.data ? this._parseXmlCompleto(resp.data) : null;
+      if (!parsed || parsed.resumo || !parsed.itens?.length) {
+        Utils.toast('O XML completo desta NF-e ainda não está disponível (só o resumo). Tente de novo mais tarde.', 'warning');
+        return;
+      }
+      const itens = this._itensDaNotaParaLancamento(parsed, l.categoria || 'material');
+      const patch = { itens };
+      if (!l.fornecedor_id) {
+        const forn = this._fornecedorDaNota(parsed, l.categoria || 'material');
+        if (forn?.id) patch.fornecedor_id = forn.id;
+      }
+      if (!l.fornecedor_beneficiario || l.fornecedor_beneficiario === 'Fornecedor da NF-e') patch.fornecedor_beneficiario = parsed.emitente || l.fornecedor_beneficiario;
+      if (String(l.descricao || '').includes('Fornecedor da NF-e') && parsed.emitente) patch.descricao = l.descricao.replace('Fornecedor da NF-e', parsed.emitente);
+      if (!(Number(l.valor) > 0) && !l.numero_parcela && parsed.valor_bruto > 0) patch.valor = parsed.valor_bruto;
+      DB.update('lancamentos', l.id, patch);
+      const nota = (DB.getAll('notas') || []).find(n => n.lancamento_id === l.id || this._limparChave(n.chave_nfe || n.chave_acesso || '') === chave);
+      if (nota) {
+        const notaPatch = { itens };
+        if (!nota.emitente || nota.emitente === 'Fornecedor da NF-e') notaPatch.emitente = parsed.emitente || nota.emitente;
+        if (!(Number(nota.valor_total) > 0) && parsed.valor_bruto > 0) notaPatch.valor_total = parsed.valor_bruto;
+        DB.update('notas', nota.id, notaPatch);
+      }
+      if (typeof Produtos !== 'undefined' && Produtos.atualizarValorMedio) {
+        for (const it of itens) if (it.produto_id) Produtos.atualizarValorMedio(it.produto_id);
+      }
+      Utils.toast(`${itens.length} produto(s) da NF-e adicionados ao lançamento.`, 'success');
+      if (typeof Lancamentos !== 'undefined' && Lancamentos._refresh) Lancamentos._refresh();
+    } catch (err) {
+      Utils.toast(`Não foi possível buscar os produtos: ${err.message}`, 'error');
+    } finally {
+      this._puxandoProdutos = false;
+    }
+  },
+
   async _confirmarGeracaoLancamento(chave) {
     const parsed = window._tempNFeParsed || {};
     // Clique duplo enquanto o DANFE é baixado gerava duas despesas.
@@ -1364,26 +1569,9 @@ const NFe = {
 
       Utils.toast('Gerando lançamento e anexando DANFE...', 'info');
 
-      // 1. Cadastra Fornecedor se não existir
-      let fornecedorId = null;
-      const fornecedores = DB.getAll('fornecedores') || [];
-      const cnpjLimpo = (parsed.cnpj_emitente || '').replace(/\D/g, '');
-      let forn = fornecedores.find(f => {
-        const fCnpj = (f.cnpj || f.cpf || f.cnpj_cpf || '').replace(/\D/g, '');
-        return (fCnpj && fCnpj === cnpjLimpo) || (f.nome && f.nome.toLowerCase() === (parsed.emitente || '').toLowerCase());
-      });
-
-      if (!forn && parsed.emitente) {
-        forn = DB.add('fornecedores', {
-          nome: parsed.emitente,
-          razao_social: parsed.emitente,
-          cnpj: cnpjLimpo, // a busca local usa "cnpj"; sem ele o próximo XML criava fornecedor duplicado
-          cnpj_cpf: parsed.cnpj_emitente || '',
-          telefone: parsed.telefone_emitente || '',
-          categoria: cat
-        });
-      }
-      fornecedorId = forn?.id || null;
+      // 1. Fornecedor: usa o cadastro existente (CNPJ/CPF ou nome) ou cadastra a partir da nota
+      const forn = this._fornecedorDaNota(parsed, cat);
+      const fornecedorId = forn?.id || null;
 
       // 2. Cria o(s) lançamento(s) financeiro(s) (despesa)
       const conta = (DB.getAll('contas') || []).find(c => c.id === contaId);
@@ -1397,7 +1585,11 @@ const NFe = {
         ? duplicatas.map((d, i) => ({ valor: Number(d.valor), vencimento: d.vencimento || venc, sufixo: ` (parcela ${i + 1}/${duplicatas.length}${d.numero ? ` · dup. ${d.numero}` : ''})` }))
         : [{ valor, vencimento: venc, sufixo: '' }];
       const grupoParcelas = porDuplicata ? DB.uuid() : null;
+      // Produtos da nota → controle de compras (módulo Produtos). Ficam só no primeiro lançamento,
+      // para a nota parcelada não contar a mesma compra uma vez por parcela.
+      const itensNota = this._itensDaNotaParaLancamento(parsed, cat);
       const lancamentos = parcelas.map((p, i) => DB.add('lancamentos', {
+        itens: i === 0 ? itensNota : [],
         tipo: 'despesa',
         obra_id: obraId,
         conta_bancaria: contaBancaria,
@@ -1434,8 +1626,14 @@ const NFe = {
         lancamento_id: lanc.id,
         chave_acesso: chave,
         chave_nfe: chave,
+        itens: itensNota,
         observacoes: `Gerado automaticamente via busca NF-e em ${Utils.fmt.datetime(new Date().toISOString())}${porDuplicata ? ` · ${parcelas.length} parcelas no financeiro` : ''}`
       });
+
+      if (typeof Produtos !== 'undefined' && Produtos.atualizarValorMedio) {
+        for (const it of itensNota) if (it.produto_id) Produtos.atualizarValorMedio(it.produto_id);
+      }
+      this._registrarLancadaNoServidor(chave);
 
       // 4. Baixa o DANFE PDF e anexa ao lançamento
       try {

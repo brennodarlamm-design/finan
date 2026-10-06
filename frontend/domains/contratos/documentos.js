@@ -108,6 +108,15 @@ const Documentos = {
     return typeof url === 'string' && url.includes('.private.blob.vercel-storage.com');
   },
 
+  // `r2://tenants/<empresa>/...` é o endereço interno do arquivo no Cloudflare R2; o navegador não
+  // sabe abri-lo ("scheme does not have a registered handler"). A leitura passa pela rota
+  // autenticada do Worker, que confere a empresa da sessão (cookie) antes de entregar o arquivo.
+  _urlDeLeitura(url) {
+    const raw = String(url || '');
+    if (raw.startsWith('r2://')) return `/api/v2/edge/storage/file/${encodeURIComponent(raw.slice('r2://'.length))}`;
+    return raw;
+  },
+
   async _resolverUrlProtegida(id) {
     try {
       const headers = (typeof DB !== 'undefined' && DB._apiHeaders) ? DB._apiHeaders() : {};
@@ -128,7 +137,7 @@ const Documentos = {
   async obterConteudo(id) {
     const doc = this.getById(id);
     if (doc && doc.url) {
-      return this._isPrivateBlobUrl(doc.url) ? await this._resolverUrlProtegida(id) : doc.url;
+      return this._isPrivateBlobUrl(doc.url) ? await this._resolverUrlProtegida(id) : this._urlDeLeitura(doc.url);
     }
     if (this._memoryBlobs.has(this._blobKey(id))) {
       return this._memoryBlobs.get(this._blobKey(id));
@@ -160,7 +169,7 @@ const Documentos = {
             doc.url = json.url;
             this.salvarLista(this.getAll().map(d => d.id === id ? { ...d, url: json.url } : d));
           }
-          return this._isPrivateBlobUrl(json.url) ? await this._resolverUrlProtegida(id) : json.url;
+          return this._isPrivateBlobUrl(json.url) ? await this._resolverUrlProtegida(id) : this._urlDeLeitura(json.url);
         }
         if (json.base64) {
           this._memoryBlobs.set(this._blobKey(id), json.base64);

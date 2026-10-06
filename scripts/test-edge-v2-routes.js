@@ -163,21 +163,25 @@ console.log('   ✓ Boletim de Medição calculou todas as 5 retenções na font
 
 // 4.5 Newsletter Radar FinGo (Subscribe & Unsubscribe)
 const { handleV2Newsletter } = await import('../api/_v2-routes.js');
+process.env.SESSION_SIGNING_SECRET = process.env.SESSION_SIGNING_SECRET || 'teste-newsletter-segredo-de-sessao-com-mais-de-32-chars';
 const newsletterSqlCalls = [];
 const mockNewsletterSql = async (strings, ...values) => {
   newsletterSqlCalls.push({ text: Array.isArray(strings) ? strings.join('?') : String(strings), values });
   return [];
 };
+const emailsNewsletter = [];
+const sendEmailMock = async (_sql, msg) => { emailsNewsletter.push(msg); return { success: true }; };
 const resSub = createMockResponse();
-await handleV2Newsletter({ body: { email: 'contato@construtora.com.br' } }, resSub, { sql: mockNewsletterSql });
+await handleV2Newsletter({ body: { email: 'contato@construtora.com.br' } }, resSub, { sql: mockNewsletterSql, sendEmail: sendEmailMock });
 assert.strictEqual(resSub.getStatusCode(), 200);
-assert.strictEqual(resSub.getBody().action, 'subscribed');
+assert.strictEqual(resSub.getBody().action, 'confirmation_sent', 'inscrição só vale depois da confirmação por e-mail');
+assert.strictEqual(emailsNewsletter.length, 1);
 
 const resUnsub = createMockResponse();
-await handleV2Newsletter({ url: '/api/v2/public/newsletter/unsubscribe', body: { email: 'contato@construtora.com.br' } }, resUnsub, { sql: mockNewsletterSql });
+await handleV2Newsletter({ url: '/api/v2/public/newsletter/unsubscribe', body: { email: 'contato@construtora.com.br' } }, resUnsub, { sql: mockNewsletterSql, sendEmail: sendEmailMock });
 assert.strictEqual(resUnsub.getStatusCode(), 200);
-assert.strictEqual(resUnsub.getBody().action, 'unsubscribed');
-assert.strictEqual(newsletterSqlCalls.length, 2, 'Newsletter deve persistir subscribe e unsubscribe via SQL injetado no teste.');
+assert.strictEqual(resUnsub.getBody().action, 'unsubscribe_link_sent', 'descadastro pelo formulário só envia o link');
+assert(newsletterSqlCalls.length >= 2, 'Newsletter deve persistir via SQL injetado no teste.');
 console.log('   ✓ Endpoints de Newsletter (Inscrição e Cancelamento) validados com sucesso.');
 
 console.log('\n======================================================');

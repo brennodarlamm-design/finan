@@ -25,6 +25,8 @@ import { checkRateLimit, getClientIp } from './_ratelimit.js';
 import { checkRateLimitRedis } from './_edge-redis.js';
 import { handlePortalLinkSign, handlePortalLinkVerify, handlePortalData } from './_portal-link.js';
 import { handleOfxFitids } from './_ofx-registry.js';
+import crypto from 'crypto';
+import { sendAndLogEmail } from './_email_service.js';
 
 // AUDIT-2026-10-02 F5: resolveAuthAndTenant() expõe perfil e plano em auth.user
 // (perfil / tenantPlan). auth.role e auth.plan não existem e faziam o plano cair
@@ -81,6 +83,7 @@ export const V2_ROUTE_SPEC = [
   { method: 'GET', path: '/api/v2/public/cep/:cep', desc: 'Consulta aberta de CEP na BrasilAPI / ViaCEP' },
   { method: 'POST', path: '/api/v2/public/newsletter/subscribe', desc: 'Inscrição no Radar FinGo (Newsletter & Eventos)' },
   { method: 'POST', path: '/api/v2/public/newsletter/unsubscribe', desc: 'Cancelamento de inscrição no Radar FinGo' },
+  { method: 'GET', path: '/api/v2/public/newsletter/confirm', desc: 'Confirmação da inscrição (link assinado enviado por e-mail)' },
   { method: 'POST', path: '/api/v2/portal/link', desc: 'Gera link assinado do Portal do Cliente (autenticado)' },
   { method: 'POST', path: '/api/v2/portal/verify', desc: 'Verifica assinatura de link do Portal do Cliente (público)' },
   { method: 'POST', path: '/api/v2/portal/data', desc: 'Dados atuais da obra para link v2 do Portal do Cliente (público)' },
@@ -408,20 +411,83 @@ export async function handleV2BoletimMedicao(req, res) {
   });
 }
 
+// AUDITORIA 2026-10-04 #33: erros internos (provedor de IA, banco, rede) não vão para o cliente.
+const OCR_ERROS_PUBLICOS = ['Imagem obrigatória para processamento OCR.', 'Formato de imagem não suportado para OCR no Edge.', 'Imagem acima do limite de 10 MB.'];
+function erroInterno(res, contexto, err, mensagem) {
+  console.error(contexto + ':', err?.message || err);
+  return res.status(500).json({ success: false, error: mensagem });
+}
+
 /**
  * Endpoint de Gestão da Newsletter / Radar FinGo
+ *
+ * AUDITORIA 2026-10-04 #32: antes, qualquer pessoa inscrevia ou descadastrava um e-mail de
+ * terceiro só digitando o endereço. Agora:
+ *   • a inscrição fica `pending` até o dono clicar no link de confirmação enviado por e-mail;
+ *   • o descadastro só vale com o link assinado; pelo formulário, o servidor envia esse link;
+ *   • as respostas não dizem se o e-mail está ou não na lista;
+ *   • no máximo um e-mail a cada 10 minutos por endereço.
  */
+const NEWSLETTER_LINK_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+const NEWSLETTER_REENVIO_MS = 10 * 60 * 1000;
+const NEWSLETTER_BASE_URL = 'https://fingo.api.br';
+
+function newsletterKey() {
+  const session = String(process.env.SESSION_SIGNING_SECRET || '').trim();
+  if (!session) return '';
+  // Chave derivada: o link da newsletter nunca vale como sessão nem como link do portal.
+  return crypto.createHmac('sha256', session).update('fingo-newsletter-v1').digest('base64url');
+}
+
+export function assinarLinkNewsletter(acao, email, exp, key = newsletterKey()) {
+  if (!key) return '';
+  return crypto.createHmac('sha256', key).update(`${acao}.${email}.${exp}`).digest('base64url');
+}
+
+export function verificarLinkNewsletter(acao, email, exp, sig, { key = newsletterKey(), now = Date.now() } = {}) {
+  const expNum = Number(exp);
+  if (!key || !sig || !Number.isFinite(expNum) || expNum < now) return false;
+  const esperado = Buffer.from(assinarLinkNewsletter(acao, email, expNum, key));
+  const recebido = Buffer.from(String(sig));
+  return esperado.length === recebido.length && crypto.timingSafeEqual(esperado, recebido);
+}
+
+function linkNewsletter(acao, email) {
+  const exp = Date.now() + NEWSLETTER_LINK_TTL_MS;
+  const sig = assinarLinkNewsletter(acao, email, exp);
+  if (!sig) throw new Error('SESSION_SIGNING_SECRET ausente: não há como assinar o link da newsletter.');
+  const qs = new URLSearchParams({ email, exp: String(exp), sig });
+  return `${NEWSLETTER_BASE_URL}/api/v2/public/newsletter/${acao}?${qs.toString()}`;
+}
+
 export async function handleV2Newsletter(req, res, deps = {}) {
   res.setHeader('Cache-Control', 'no-store');
-  res.setHeader('Content-Type', 'application/json; charset=utf-8');
 
-  if (String(req.method || 'POST').toUpperCase() !== 'POST') {
+  const url = String(req.url || '');
+  const acao = url.includes('/newsletter/confirm') ? 'confirm' : (url.includes('unsubscribe') ? 'unsubscribe' : 'subscribe');
+  const method = String(req.method || 'POST').toUpperCase();
+  const email = String(req.body?.email || req.query?.email || '').trim().toLowerCase();
+  const exp = req.body?.exp || req.query?.exp;
+  const sig = req.body?.sig || req.query?.sig;
+  const veioPeloLink = method === 'GET';
+
+  // Links do e-mail (GET) só existem para confirmar e descadastrar; respondem com redirect para a landing.
+  if (veioPeloLink && acao === 'subscribe') {
     return res.status(405).json({ success:false, error:'METHOD_NOT_ALLOWED', message:'Método não permitido.' });
   }
+  if (!veioPeloLink && method !== 'POST') {
+    return res.status(405).json({ success:false, error:'METHOD_NOT_ALLOWED', message:'Método não permitido.' });
+  }
+  if (!veioPeloLink) res.setHeader('Content-Type', 'application/json; charset=utf-8');
+  const redirecionar = (estado) => {
+    res.setHeader('Location', `/?newsletter=${estado}#newsletter`);
+    return res.status(302).end();
+  };
 
   const clientIp = getClientIp(req);
   const rl = await checkRateLimit(`newsletter:${clientIp}`, 20, 60 * 60 * 1000);
   if (!rl.allowed) {
+    if (veioPeloLink) return redirecionar('limite');
     return res.status(429).json({
       success:false,
       error:'RATE_LIMITED',
@@ -429,11 +495,9 @@ export async function handleV2Newsletter(req, res, deps = {}) {
     });
   }
 
-  const isUnsubscribe = req.url?.includes('unsubscribe');
-  const email = String(req.body?.email || req.query?.email || '').trim().toLowerCase();
   const validEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) && email.length <= 254;
-
   if (!validEmail) {
+    if (veioPeloLink) return redirecionar('invalido');
     return res.status(400).json({
       success: false,
       error: 'INVALID_EMAIL',
@@ -441,10 +505,34 @@ export async function handleV2Newsletter(req, res, deps = {}) {
     });
   }
 
+  const linkValido = (acao === 'confirm' || acao === 'unsubscribe') && sig
+    ? verificarLinkNewsletter(acao, email, exp, sig, deps.now ? { now: deps.now } : {})
+    : false;
+  if (acao === 'confirm' && !linkValido) {
+    if (veioPeloLink) return redirecionar('invalido');
+    return res.status(400).json({ success:false, error:'INVALID_LINK', message:'Link de confirmação inválido ou expirado.' });
+  }
+  if (acao === 'unsubscribe' && sig && !linkValido) {
+    if (veioPeloLink) return redirecionar('invalido');
+    return res.status(400).json({ success:false, error:'INVALID_LINK', message:'Link de cancelamento inválido ou expirado.' });
+  }
+  if (veioPeloLink && acao === 'unsubscribe' && !linkValido) return redirecionar('invalido');
+
   try {
     const sql = deps.sql || createOwnerSql();
+    const enviarEmail = deps.sendEmail || sendAndLogEmail;
 
-    if (isUnsubscribe) {
+    if (acao === 'confirm') {
+      await sql`
+        UPDATE newsletter_subscriptions
+           SET status = 'subscribed', subscribed_at = NOW(), confirmed_at = NOW(), unsubscribed_at = NULL, updated_at = NOW()
+         WHERE email = ${email} AND status = 'pending';
+      `;
+      if (veioPeloLink) return redirecionar('confirmado');
+      return res.status(200).json({ success: true, action: 'confirmed', message: 'Inscrição no Radar FinGo confirmada. Obrigado!' });
+    }
+
+    if (acao === 'unsubscribe' && linkValido) {
       await sql`
         INSERT INTO newsletter_subscriptions
           (email, status, source, subscribed_at, unsubscribed_at, updated_at)
@@ -455,36 +543,74 @@ export async function handleV2Newsletter(req, res, deps = {}) {
           unsubscribed_at = NOW(),
           updated_at = NOW();
       `;
-
+      if (veioPeloLink) return redirecionar('cancelado');
       return res.status(200).json({
         success: true,
         action: 'unsubscribed',
-        email,
         message: 'Inscrição no Radar FinGo cancelada com sucesso. Você não receberá mais comunicados de marketing.'
       });
     }
 
-    await sql`
-      INSERT INTO newsletter_subscriptions
-        (email, status, source, subscribed_at, unsubscribed_at, updated_at)
-      VALUES
-        (${email}, 'subscribed', 'landing', NOW(), NULL, NOW())
-      ON CONFLICT (email) DO UPDATE SET
-        status = 'subscribed',
-        source = 'landing',
-        subscribed_at = NOW(),
-        unsubscribed_at = NULL,
-        updated_at = NOW();
+    const [atual] = await sql`
+      SELECT status, (confirmation_sent_at IS NOT NULL AND confirmation_sent_at > NOW() - ${NEWSLETTER_REENVIO_MS / 1000} * INTERVAL '1 second') AS enviado_recente
+        FROM newsletter_subscriptions WHERE email = ${email} LIMIT 1;
     `;
+
+    if (acao === 'unsubscribe') {
+      // Pelo formulário: manda o link assinado para o próprio e-mail, se ele estiver na lista.
+      if (atual && atual.status !== 'unsubscribed' && !atual.enviado_recente) {
+        const ctaUrl = linkNewsletter('unsubscribe', email);
+        await sql`UPDATE newsletter_subscriptions SET confirmation_sent_at = NOW(), updated_at = NOW() WHERE email = ${email};`;
+        await enviarEmail(sql, {
+          category: 'newsletter',
+          to: email,
+          subject: 'Cancelar inscrição no Radar FinGo',
+          text: 'Recebemos um pedido para cancelar sua inscrição no Radar FinGo.\n\nPara confirmar o cancelamento, use o botão abaixo. Se não foi você, ignore este e-mail.',
+          ctaText: 'Cancelar inscrição',
+          ctaUrl,
+          metadata: { origem: 'newsletter_unsubscribe' }
+        });
+      }
+      return res.status(200).json({
+        success: true,
+        action: 'unsubscribe_link_sent',
+        message: 'Se este e-mail estiver inscrito, enviamos para ele um link para confirmar o cancelamento.'
+      });
+    }
+
+    // Inscrição: fica pendente até o dono do e-mail confirmar.
+    if (!(atual && (atual.status === 'subscribed' || atual.enviado_recente))) {
+      const ctaUrl = linkNewsletter('confirm', email);
+      await sql`
+        INSERT INTO newsletter_subscriptions
+          (email, status, source, subscribed_at, unsubscribed_at, confirmation_sent_at, updated_at)
+        VALUES
+          (${email}, 'pending', 'landing', NULL, NULL, NOW(), NOW())
+        ON CONFLICT (email) DO UPDATE SET
+          status = 'pending',
+          source = 'landing',
+          confirmation_sent_at = NOW(),
+          updated_at = NOW();
+      `;
+      await enviarEmail(sql, {
+        category: 'newsletter',
+        to: email,
+        subject: 'Confirme sua inscrição no Radar FinGo',
+        text: 'Recebemos um pedido de inscrição deste e-mail no Radar FinGo (novidades de engenharia e SINAPI).\n\nPara confirmar, use o botão abaixo. Se não foi você, ignore este e-mail e nada será enviado.',
+        ctaText: 'Confirmar inscrição',
+        ctaUrl,
+        metadata: { origem: 'newsletter_subscribe' }
+      });
+    }
 
     return res.status(200).json({
       success: true,
-      action: 'subscribed',
-      email,
-      message: 'Inscrição no Radar FinGo confirmada com sucesso! Bem-vindo(a) às atualizações de engenharia e SINAPI.'
+      action: 'confirmation_sent',
+      message: 'Enviamos um link de confirmação para o seu e-mail. A inscrição vale depois que você clicar nele.'
     });
   } catch (err) {
     console.error('[Newsletter] Falha ao persistir consentimento:', err?.message || err);
+    if (veioPeloLink) return redirecionar('erro');
     return res.status(503).json({
       success:false,
       error:'NEWSLETTER_PERSISTENCE_UNAVAILABLE',
@@ -761,7 +887,7 @@ export async function handleV2EdgeAiChat(req, res) {
       provider: result.provider
     });
   } catch (err) {
-    return res.status(500).json({ success: false, error: err.message });
+    return erroInterno(res, '[V2 IA] Falha no chat', err, 'O assistente não respondeu agora. Tente novamente em instantes.');
   }
 }
 
@@ -802,9 +928,10 @@ export async function handleV2EdgeAiOcr(req, res) {
 
   try {
     const result = await runEdgeDocumentOcr(env, imageBase64);
-    return res.status(200).json(result);
+    return res.status(result.success ? 200 : 422).json(result);
   } catch (err) {
-    return res.status(500).json({ success: false, error: err.message });
+    if (OCR_ERROS_PUBLICOS.includes(err?.message)) return res.status(400).json({ success: false, error: err.message });
+    return erroInterno(res, '[V2 OCR] Falha na leitura', err, 'Não foi possível ler o documento agora. Tente novamente em instantes.');
   }
 }
 
@@ -863,7 +990,7 @@ export async function handleV2EdgeAiSemanticSearch(req, res) {
       results
     });
   } catch (err) {
-    return res.status(500).json({ success: false, error: err.message });
+    return erroInterno(res, '[V2 Busca] Falha na busca semântica', err, 'A busca não está disponível agora. Tente novamente em instantes.');
   }
 }
 
@@ -964,7 +1091,7 @@ export async function handleV2AuditLedgerAppend(req, res) {
       block
     });
   } catch (err) {
-    return res.status(500).json({ success: false, error: err.message });
+    return erroInterno(res, '[V2 Ledger] Falha ao registrar bloco', err, 'Não foi possível registrar agora. Tente novamente em instantes.');
   }
 }
 
@@ -1064,7 +1191,7 @@ export function resolveV2Route(pathname, searchParams) {
   }
 
   // 3.1 Newsletter Radar FinGo (Inscrição e Descadastro)
-  if (pathname === '/api/v2/public/newsletter/subscribe' || pathname === '/api/v2/public/newsletter/unsubscribe') {
+  if (pathname === '/api/v2/public/newsletter/subscribe' || pathname === '/api/v2/public/newsletter/unsubscribe' || pathname === '/api/v2/public/newsletter/confirm') {
     return { handler: handleV2Newsletter, query, moduleName: 'v2-public-newsletter' };
   }
 
