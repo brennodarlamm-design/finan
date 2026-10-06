@@ -57,6 +57,21 @@ const NFeParser = {
     const emitenteTelefone = get(enderEmit || emit || infNFe, 'fone');
     const emitenteCidade = get(enderEmit || emit || infNFe, 'xMun');
     const emitenteUF = get(enderEmit || emit || infNFe, 'UF');
+    // Dados completos do emitente para o cadastro automático do fornecedor.
+    const fornecedor = enderEmit || emit ? {
+      razao_social: emitenteNome,
+      nome_fantasia: get(emit || infNFe, 'xFant') || emitenteNome,
+      cnpj: emitenteCNPJ.length === 14 ? emitenteCNPJ : '',
+      cpf: emitenteCNPJ.length === 11 ? emitenteCNPJ : '',
+      ie: get(emit || infNFe, 'IE'),
+      telefone: emitenteTelefone,
+      endereco: get(enderEmit || emit, 'xLgr'),
+      numero: get(enderEmit || emit, 'nro'),
+      bairro: get(enderEmit || emit, 'xBairro'),
+      municipio: emitenteCidade,
+      uf: emitenteUF,
+      cep: get(enderEmit || emit, 'CEP')
+    } : null;
 
     // Totais
     const icmsTot = infNFe.querySelector('ICMSTot') || Array.from(infNFe.querySelectorAll('*')).find(el => el.localName === 'ICMSTot');
@@ -109,6 +124,7 @@ const NFeParser = {
       telefone_emitente: emitenteTelefone,
       cidade_emitente: emitenteCidade,
       uf_emitente: emitenteUF,
+      fornecedor,
       valor_bruto: vNF,
       impostos,
       valor_liquido: valorLiquido,

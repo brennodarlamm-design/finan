@@ -29,6 +29,7 @@ const frontendMap = {
   'js/notas.js': 'frontend/domains/fiscal/notas.js',
   'js/nfe.js': 'frontend/domains/fiscal/nfe.js',
   'js/nfe_parser.js': 'frontend/domains/fiscal/nfe_parser.js',
+  'js/danfe_simplificado.js': 'frontend/domains/fiscal/danfe_simplificado.js',
 
   // Financeiro
   'js/contas.js': 'frontend/domains/financeiro/contas.js',

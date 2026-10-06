@@ -6,6 +6,7 @@ const FinObraAssets = (() => {
     excel: { src:'https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js', ready:() => typeof XLSX !== 'undefined' },
     zip: { src:'/js/vendor/jszip.min.js?v=3.10.1', ready:() => typeof JSZip !== 'undefined' },
     pdf: { src:'/js/vendor/jspdf.umd.min.js?v=3.0.4', ready:() => !!window.jspdf?.jsPDF },
+    danfe: { src:'/js/danfe_simplificado.js?v=20261006', dependencies:['pdf'], ready:() => typeof window.DanfeSimplificado !== 'undefined' },
     charts: { src:'/js/vendor/chart.umd.min.js?v=4.4.0', ready:() => typeof Chart !== 'undefined' },
     ofx: { src:'/js/ofx.js', ready:() => typeof OFX !== 'undefined' },
     budgetBanks: { src:'/js/orcamento_bancos.js', ready:() => typeof OrcamentoBancos !== 'undefined' },

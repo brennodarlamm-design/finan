@@ -122,30 +122,22 @@ const NFe = {
     } catch { return null; }
   },
 
+  // DANFE simplificado gerado aqui a partir do XML completo (sem crédito do MeuDanfe).
   async baixarDanfePDF(chave) {
     chave = this._limparChave(chave);
-    const pedir = () => this._fetchWithTimeout(`${this._API_BASE}?action=danfe&chave=${chave}`, {
-      method: 'GET',
-      headers: this._headers()
-    });
-    let res = await pedir();
-    // O MeuDanfe só entrega o PDF de notas que já estão na Área do Cliente. Notas que chegaram
-    // pelo DF-e da SEFAZ nunca passaram pela busca: adiciona uma vez e tenta de novo.
-    if (res.status === 404) {
-      try { await this.buscarPorChave(chave); } catch (err) { throw new Error(`DANFE indisponível: ${err.message}`); }
-      res = await pedir();
+    const xml = await this.baixarXML(chave);
+    if (!xml?.data || xml.resumo || !/<infNFe[\s>]/.test(String(xml.data))) {
+      throw new Error('O DANFE precisa do XML completo da NF-e, que a SEFAZ ainda não liberou (só o resumo). Tente de novo em alguns minutos.');
     }
-    if (!res.ok) {
-      if (res.status === 404) throw new Error('A NF-e ainda não está disponível no MeuDanfe. Tente de novo em alguns minutos.');
-      throw new Error(`Erro ao baixar DANFE: ${res.status}`);
-    }
-    return await res.json();
+    await FinObraAssets.load('danfe');
+    return { data: window.DanfeSimplificado.gerarBase64(xml.data), simplificado: true };
   },
 
   async baixarXML(chave) {
     chave = this._limparChave(chave);
+    const ehCompleto = (xml) => /<infNFe[\s>]/.test(String(xml || ''));
     let resumoDfe = null;
-    // 1. Tenta recuperar do DF-e nativo da SEFAZ
+    // 1. XML já capturado pelo DF-e da SEFAZ
     try {
       const dfeRes = await this._fetchWithTimeout(`${this._API_BASE}?action=dfe_xml&chave=${chave}`, {
         method: 'GET',
@@ -155,37 +147,42 @@ const NFe = {
         const dfeJson = await dfeRes.json();
         if (dfeJson.success && dfeJson.documento?.xml) {
           const xml = String(dfeJson.documento.xml);
-          // Resumo (<resNFe>) não tem itens nem duplicatas: tenta o XML completo antes de usá-lo.
-          if (!/<resNFe[\s>]/.test(xml) || /<infNFe[\s>]/.test(xml)) return { status: 'OK', data: xml };
+          if (ehCompleto(xml)) return { status: 'OK', data: xml };
           resumoDfe = xml;
         }
       }
     } catch {}
 
-    // 2. Fallback para provedor secundário
+    // 2. Só o resumo (ou nada): a SEFAZ entrega o XML completo depois da ciência da operação, sem
+    //    custo. O servidor envia a ciência (se faltar) e consulta a nota pela chave.
     try {
-      const pedirXml = () => this._fetchWithTimeout(`${this._API_BASE}?action=xml&chave=${chave}`, {
+      const res = await this._fetchWithTimeout(`${this._API_BASE}?action=dfe_xml_completo&chave=${chave}`, {
+        method: 'POST',
+        headers: this._headers(),
+        body: JSON.stringify({ chave })
+      }, 45000);
+      const json = await res.json().catch(() => ({}));
+      if (json.success && json.xml) {
+        if (json.completo && ehCompleto(json.xml)) return { status: 'OK', data: json.xml };
+        resumoDfe = resumoDfe || json.xml;
+      }
+    } catch {}
+
+    // 3. Última tentativa sem custo: o MeuDanfe só devolve o XML se a nota já estiver na Área do
+    //    Cliente (a busca que adiciona a nota consome crédito e não é feita aqui).
+    try {
+      const res = await this._fetchWithTimeout(`${this._API_BASE}?action=xml&chave=${chave}`, {
         method: 'GET',
         headers: this._headers()
       });
-      let res = await pedirXml();
-      // Como no DANFE: o MeuDanfe só entrega notas da Área do Cliente. O XML completo é o que traz
-      // os produtos (o resumo do DF-e não traz), então adiciona a nota uma vez e tenta de novo.
-      if (res.status === 404) {
-        await this.buscarPorChave(chave);
-        res = await pedirXml();
+      if (res.ok) {
+        const json = await res.json();
+        if (json && json.data && ehCompleto(json.data)) return json;
       }
-      if (!res.ok) {
-        if (res.status === 404) throw new Error('NF-e não encontrada na base de dados.');
-        throw new Error(`Erro ao baixar XML: ${res.status}`);
-      }
-      const json = await res.json();
-      if (json && json.data) return json;
-      if (!resumoDfe) return json;
-    } catch (err) {
-      if (!resumoDfe) throw err;
-    }
-    return { status: 'OK', data: resumoDfe, resumo: true };
+    } catch {}
+
+    if (resumoDfe) return { status: 'OK', data: resumoDfe, resumo: true };
+    throw new Error('NF-e não encontrada na SEFAZ para o CNPJ desta empresa.');
   },
 
   async listarMinhasNFes(after = '') {
@@ -1367,6 +1364,25 @@ const NFe = {
     return notas.some(n => n.lancamento_id && [n.chave_nfe, n.chave_acesso, n.chave].some(c => String(c || '').replace(/\D/g, '') === ch));
   },
 
+  _fornecedorDaNota(parsed, categoria) {
+    if (!parsed?.emitente && !parsed?.cnpj_emitente) return null;
+    const doc = String(parsed.cnpj_emitente || '').replace(/\D/g, '');
+    const dados = {
+      razao_social: parsed.emitente || '',
+      nome_fantasia: parsed.emitente || '',
+      cnpj: doc.length === 14 ? doc : '',
+      cpf: doc.length === 11 ? doc : '',
+      telefone: parsed.telefone_emitente || '',
+      municipio: parsed.cidade_emitente || '',
+      uf: parsed.uf_emitente || '',
+      ...(parsed.fornecedor || {}),
+      categoria: categoria || 'material'
+    };
+    if (typeof Fornecedores !== 'undefined' && Fornecedores.encontrarOuCriar) return Fornecedores.encontrarOuCriar(dados);
+    const existente = (DB.getAll('fornecedores') || []).find(f => doc && String(f.cnpj || f.cpf || f.cnpj_cpf || '').replace(/\D/g, '') === doc);
+    return existente || DB.add('fornecedores', { nome: dados.razao_social, razao_social: dados.razao_social, cnpj: dados.cnpj, cpf: dados.cpf, telefone: dados.telefone, categoria: dados.categoria });
+  },
+
   _itensDaNotaParaLancamento(parsed, categoria) {
     return (parsed.itens || []).filter(it => it && it.nome).map(it => {
       const qtd = Number(it.qtd) || 0;
@@ -1404,6 +1420,10 @@ const NFe = {
       }
       const itens = this._itensDaNotaParaLancamento(parsed, l.categoria || 'material');
       const patch = { itens };
+      if (!l.fornecedor_id) {
+        const forn = this._fornecedorDaNota(parsed, l.categoria || 'material');
+        if (forn?.id) patch.fornecedor_id = forn.id;
+      }
       if (!l.fornecedor_beneficiario || l.fornecedor_beneficiario === 'Fornecedor da NF-e') patch.fornecedor_beneficiario = parsed.emitente || l.fornecedor_beneficiario;
       if (String(l.descricao || '').includes('Fornecedor da NF-e') && parsed.emitente) patch.descricao = l.descricao.replace('Fornecedor da NF-e', parsed.emitente);
       if (!(Number(l.valor) > 0) && !l.numero_parcela && parsed.valor_bruto > 0) patch.valor = parsed.valor_bruto;
@@ -1452,26 +1472,9 @@ const NFe = {
 
       Utils.toast('Gerando lançamento e anexando DANFE...', 'info');
 
-      // 1. Cadastra Fornecedor se não existir
-      let fornecedorId = null;
-      const fornecedores = DB.getAll('fornecedores') || [];
-      const cnpjLimpo = (parsed.cnpj_emitente || '').replace(/\D/g, '');
-      let forn = fornecedores.find(f => {
-        const fCnpj = (f.cnpj || f.cpf || f.cnpj_cpf || '').replace(/\D/g, '');
-        return (fCnpj && fCnpj === cnpjLimpo) || (f.nome && f.nome.toLowerCase() === (parsed.emitente || '').toLowerCase());
-      });
-
-      if (!forn && parsed.emitente) {
-        forn = DB.add('fornecedores', {
-          nome: parsed.emitente,
-          razao_social: parsed.emitente,
-          cnpj: cnpjLimpo, // a busca local usa "cnpj"; sem ele o próximo XML criava fornecedor duplicado
-          cnpj_cpf: parsed.cnpj_emitente || '',
-          telefone: parsed.telefone_emitente || '',
-          categoria: cat
-        });
-      }
-      fornecedorId = forn?.id || null;
+      // 1. Fornecedor: usa o cadastro existente (CNPJ/CPF ou nome) ou cadastra a partir da nota
+      const forn = this._fornecedorDaNota(parsed, cat);
+      const fornecedorId = forn?.id || null;
 
       // 2. Cria o(s) lançamento(s) financeiro(s) (despesa)
       const conta = (DB.getAll('contas') || []).find(c => c.id === contaId);

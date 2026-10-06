@@ -314,11 +314,21 @@ export function decryptPkcs7EncryptedData(encDataSeqVal, passphrase) {
     const algId = eciKids[1];
     const encContent = eciKids[2];
     if (!algId || !encContent) return null;
+    return decryptPbe(algId, encContent.val, passphrase);
+  } catch {}
+  return null;
+}
 
+/**
+ * Decifra `ciphertext` com o algoritmo PBE descrito em `algId` (AlgorithmIdentifier DER):
+ * PBES1 do PKCS#12 (3DES) ou PBES2 (PBKDF2 + AES/3DES). Usado nos contêineres encryptedData e
+ * nas chaves privadas (pkcs8ShroudedKeyBag).
+ */
+function decryptPbe(algId, ciphertext, passphrase) {
+  try {
     const algKids = [...derChildren(algId.val)];
     const algOid = algKids[0]?.val;
     const algParams = algKids[1];
-    const ciphertext = encContent.val;
     if (!algOid || !ciphertext) return null;
 
     // 1. PBES1 com 3DES / 2-Key 3DES
@@ -524,6 +534,76 @@ export function _extractCertDERsFromPkcs12(pfxBuf, passphrase = '') {
     }
   } catch { /* buffer malformado — retorna o que foi coletado até aqui */ }
   return results;
+}
+
+const _OID_KEY_BAG             = Buffer.from('2a864886f70d010c0a0101','hex'); // 1.2.840.113549.1.12.10.1.1
+const _OID_SHROUDED_KEY_BAG    = Buffer.from('2a864886f70d010c0a0102','hex'); // 1.2.840.113549.1.12.10.1.2
+
+/** Percorre as SafeContents do PKCS#12 (dados abertos e encryptedData) e devolve cada SafeBag. */
+function* _safeBagsDoPkcs12(pfxBuf, passphrase) {
+  const pfxSeq = derTLV(pfxBuf, 0);
+  if (!pfxSeq || pfxSeq.tag !== 0x30) return;
+  const authSafeCI = [...derChildren(pfxSeq.val)][1];
+  if (!authSafeCI || authSafeCI.tag !== 0x30) return;
+  const [authOid, authContent] = [...derChildren(authSafeCI.val)];
+  if (!authOid || !authOid.val.equals(_OID_PKCS7_DATA) || !authContent) return;
+  const authOctet = derTLV(authContent.val, 0);
+  const authSafeSeq = authOctet && authOctet.tag === 0x04 ? derTLV(authOctet.val, 0) : null;
+  if (!authSafeSeq || authSafeSeq.tag !== 0x30) return;
+  for (const ci of derChildren(authSafeSeq.val)) {
+    const [ciOid, ciCont] = [...derChildren(ci.val)];
+    if (!ciOid || ciOid.tag !== 0x06 || !ciCont) continue;
+    let sc = null;
+    if (ciOid.val.equals(_OID_PKCS7_DATA)) {
+      const oct = derTLV(ciCont.val, 0);
+      if (oct && oct.tag === 0x04) sc = oct.val;
+    } else if (ciOid.val.equals(_OID_PKCS7_ENCRYPTED_DATA)) {
+      const wrap = derTLV(ciCont.val, 0);
+      if (wrap && wrap.tag === 0x30) sc = decryptPkcs7EncryptedData(wrap.val, passphrase);
+    }
+    const scSeq = sc ? derTLV(sc, 0) : null;
+    if (!scSeq || scSeq.tag !== 0x30) continue;
+    for (const bag of derChildren(scSeq.val)) {
+      const [bagId, bagVal] = [...derChildren(bag.val)];
+      if (bagId && bagId.tag === 0x06 && bagVal) yield { bagId: bagId.val, bagVal };
+    }
+  }
+}
+
+/**
+ * Extrai a chave privada e o certificado correspondente de um PFX (A1), para assinar XML
+ * (eventos da NF-e). A conexão mTLS não precisa disso: o Node lê o PFX direto.
+ * @returns {{ privateKey: crypto.KeyObject, certDer: Buffer, cert: crypto.X509Certificate }}
+ */
+export function extrairChaveECertificadoDoPfx(pfxBuf, passphrase = '') {
+  const chaves = [];
+  for (const { bagId, bagVal } of _safeBagsDoPkcs12(pfxBuf, passphrase)) {
+    const inner = derTLV(bagVal.val, 0); // [0] EXPLICIT → valor do bag
+    if (!inner) continue;
+    try {
+      if (bagId.equals(_OID_KEY_BAG)) {
+        chaves.push(crypto.createPrivateKey({ key: Buffer.from(bagVal.val.subarray(0, inner.next)), format: 'der', type: 'pkcs8' }));
+      } else if (bagId.equals(_OID_SHROUDED_KEY_BAG)) {
+        const derEnc = Buffer.from(bagVal.val.subarray(0, inner.next)); // EncryptedPrivateKeyInfo
+        let key = null;
+        try { key = crypto.createPrivateKey({ key: derEnc, format: 'der', type: 'pkcs8', passphrase: String(passphrase || '') }); } catch {}
+        if (!key) {
+          const [algId, enc] = [...derChildren(inner.val)];
+          const pkcs8 = algId && enc ? decryptPbe(algId, enc.val, passphrase) : null;
+          if (pkcs8) key = crypto.createPrivateKey({ key: pkcs8, format: 'der', type: 'pkcs8' });
+        }
+        if (key) chaves.push(key);
+      }
+    } catch { /* bag ilegível: tenta os demais */ }
+  }
+  if (!chaves.length) throw new Error('Não foi possível ler a chave privada do certificado A1 (senha incorreta ou formato não suportado).');
+  for (const der of _extractCertDERsFromPkcs12(pfxBuf, passphrase)) {
+    let cert;
+    try { cert = new crypto.X509Certificate(der); } catch { continue; }
+    const key = chaves.find(k => { try { return cert.checkPrivateKey(k); } catch { return false; } });
+    if (key) return { privateKey: key, certDer: Buffer.from(der), cert };
+  }
+  throw new Error('O certificado A1 não contém o certificado correspondente à chave privada.');
 }
 
 /** Aplica scoring ICP-Brasil para selecionar o certificado folha mais relevante. */

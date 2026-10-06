@@ -5,7 +5,7 @@ import { canAccessModule, permissionError } from './_permissions.js';
 import { checkRateLimit, getClientIp } from './_ratelimit.js';
 import { createRuntimeSql } from './_database.js';
 import { createTenantSql } from './_tenant-sql.js';
-import { syncTenantDFe, getDFeStatus, listarDFeDocumentos, getDFeDocumentoXml } from './_sefaz-dfe.js';
+import { syncTenantDFe, getDFeStatus, listarDFeDocumentos, getDFeDocumentoXml, obterXmlCompletoNFe } from './_sefaz-dfe.js';
 import certificadoHandler from './_certificado.js';
 import { getCachedReference, applySwrCacheHeaders, cepCacheKey } from './_reference-cache.js';
 
@@ -210,6 +210,21 @@ export default async function handler(req, res) {
           force: canForce && req.body?.force === true
         });
         return res.status(200).json(syncResult);
+      }
+
+      // XML completo pela SEFAZ (ciência + consulta pela chave), sem crédito do MeuDanfe.
+      if (action === 'dfe_xml_completo') {
+        // Pode enviar a ciência à SEFAZ em nome da empresa: exige permissão de escrita, como o sync.
+        if (!canAccessModule(auth, 'notas', 'write')) {
+          return res.status(403).json(permissionError('MODULE_WRITE_FORBIDDEN', 'notas'));
+        }
+        const chaveCompleta = String(req.query.chave || req.body?.chave || '').replace(/\D/g, '');
+        const rlChave = await checkRateLimit(`dfe:xml_completo:${auth.tenantId}:${chaveCompleta}`, 3, 10 * 60 * 1000);
+        if (!rlChave.allowed) {
+          return res.status(429).json({ success: false, error: 'Esta NF-e já foi consultada agora há pouco. Aguarde alguns minutos.' });
+        }
+        const resultado = await obterXmlCompletoNFe(sql, auth.tenantId, chaveCompleta);
+        return res.status(resultado.success ? 200 : 404).json(resultado);
       }
 
       if (action === 'dfe_xml') {
