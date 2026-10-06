@@ -5,7 +5,7 @@ import { canAccessModule, permissionError } from './_permissions.js';
 import { checkRateLimit, getClientIp } from './_ratelimit.js';
 import { createRuntimeSql } from './_database.js';
 import { createTenantSql } from './_tenant-sql.js';
-import { syncTenantDFe, getDFeStatus, listarDFeDocumentos, getDFeDocumentoXml, obterXmlCompletoNFe } from './_sefaz-dfe.js';
+import { syncTenantDFe, getDFeStatus, listarDFeDocumentos, getDFeDocumentoXml, obterXmlCompletoNFe, marcarDFeLancada } from './_sefaz-dfe.js';
 import certificadoHandler from './_certificado.js';
 import { getCachedReference, applySwrCacheHeaders, cepCacheKey } from './_reference-cache.js';
 
@@ -210,6 +210,21 @@ export default async function handler(req, res) {
           force: canForce && req.body?.force === true
         });
         return res.status(200).json(syncResult);
+      }
+
+      // Marca/desmarca a NF-e como já lançada (evita lançar a mesma nota duas vezes).
+      if (action === 'dfe_marcar_lancada') {
+        if (req.method !== 'POST') return res.status(405).json({ success: false, error: 'Método não permitido.' });
+        if (!canAccessModule(auth, 'notas', 'write')) {
+          return res.status(403).json(permissionError('MODULE_WRITE_FORBIDDEN', 'notas'));
+        }
+        const r = await marcarDFeLancada(sql, auth.tenantId, {
+          chave: req.body?.chave || req.query?.chave,
+          lancada: req.body?.lancada !== false,
+          manual: req.body?.manual === true,
+          userId: auth.user?.userId || null
+        });
+        return res.status(r.success ? 200 : 400).json(r);
       }
 
       // XML completo pela SEFAZ (ciência + consulta pela chave), sem crédito do MeuDanfe.

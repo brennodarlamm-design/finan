@@ -692,7 +692,7 @@ const NFe = {
                 <td style="text-align:right;">
                   <div style="display:flex;gap:6px;justify-content:flex-end;flex-wrap:wrap;">
                     ${c.status === 'OK' ? `
-                      <button class="btn btn-sm btn-success" data-fb-click="NFe.gerarLancamentoDaNFe" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(c.chave))}" style="font-weight:700;" title="Gerar despesa no financeiro">⚡ Lançar</button>
+                      ${this._acoesLancamento(c.chave)}
                       <button class="btn btn-sm btn-primary" data-fb-click="NFe.abrirDanfe" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(c.chave))}">📄 DANFE</button>
                       <button class="btn btn-sm btn-secondary" data-fb-click="NFe.baixarXMLEAbrir" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(c.chave))}">⬇️ XML</button>
                       <button class="btn btn-sm btn-secondary" data-fb-click="NFe.adicionarComoAnexo" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(c.chave))}">📎 Anexar</button>
@@ -862,12 +862,20 @@ const NFe = {
       `;
     }
 
+    const estaLancada = (d) => !!(d.lancada_em || this._lancamentoDaNFe(d.chave));
+    const qtdLancadas = docs.filter(d => d.tipo_documento === 'NFE' && estaLancada(d)).length;
+    const todos = docs;
+    docs = this._dfeOcultarLancadas ? docs.filter(d => !(d.tipo_documento === 'NFE' && estaLancada(d))) : docs;
     return `
-      <div style="font-size:.8rem;color:var(--text3);margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;">
-        <span>Documentos sincronizados: <strong style="color:var(--text);">${docs.length}</strong></span>
+      <div style="font-size:.8rem;color:var(--text3);margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;">
+        <span>Documentos sincronizados: <strong style="color:var(--text);">${todos.length}</strong> · já lançadas: <strong style="color:#10b981;">${qtdLancadas}</strong> · pendentes: <strong style="color:var(--text);">${todos.filter(d => d.tipo_documento === 'NFE').length - qtdLancadas}</strong></span>
+        <label style="display:flex;align-items:center;gap:6px;cursor:pointer;">
+          <input type="checkbox" ${this._dfeOcultarLancadas ? 'checked' : ''} data-fb-change="NFe._toggleOcultarLancadas" data-fb-change-n="1" data-fb-change-t0="self"> Ocultar notas já lançadas
+        </label>
       </div>
       <div style="overflow-x:auto;">
-        <table class="data-table">
+        ${!docs.length ? `<div style="text-align:center;padding:24px;color:var(--text3);font-size:.85rem;">Todas as notas desta lista já foram lançadas. 🎉</div>` : ''}
+        <table class="data-table" ${!docs.length ? 'style="display:none"' : ''}>
           <thead>
             <tr>
               <th style="width:70px;">Tipo</th>
@@ -876,7 +884,7 @@ const NFe = {
               <th>Chave de Acesso</th>
               <th style="text-align:right;">Valor</th>
               <th style="text-align:center;width:95px;">Situação</th>
-              <th style="text-align:right;width:200px;">Ações</th>
+              <th style="text-align:right;width:260px;">Ações</th>
             </tr>
           </thead>
           <tbody>
@@ -916,8 +924,8 @@ const NFe = {
                     ${sitBadge}
                   </td>
                   <td style="text-align:right;">
-                    <div style="display:flex;gap:5px;justify-content:flex-end;">
-                      <button class="btn btn-sm btn-success" data-fb-click="NFe.gerarLancamentoDaNFe" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(d.chave))}" style="font-weight:700;" title="Gerar despesa no financeiro">⚡ Lançar</button>
+                    <div style="display:flex;gap:5px;justify-content:flex-end;align-items:center;flex-wrap:wrap;">
+                      ${d.tipo_documento === 'NFE' ? this._acoesLancamento(d.chave, d) : ''}
                       <button class="btn btn-sm btn-primary" data-fb-click="NFe.abrirDanfe" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(d.chave))}">📄 DANFE</button>
                       <button class="btn btn-sm btn-secondary" data-fb-click="NFe.baixarXMLEAbrir" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(d.chave))}">⬇️ XML</button>
                       <button class="btn btn-sm btn-secondary" data-fb-click="NFe.adicionarComoAnexo" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(d.chave))}">📎 Anexar</button>
@@ -1099,7 +1107,7 @@ const NFe = {
           </span>
         </div>
         <div style="display:flex;gap:8px;flex-wrap:wrap;">
-          <button class="btn btn-success btn-sm" data-fb-click="NFe.gerarLancamentoDaNFe" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(chave))}" style="font-weight:700;">⚡ Gerar Lançamento</button>
+          ${this._lancamentoDaNFe(chave) ? this._acoesLancamento(chave) : `<button class="btn btn-success btn-sm" data-fb-click="NFe.gerarLancamentoDaNFe" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(chave))}" style="font-weight:700;">⚡ Gerar Lançamento</button>`}
           <button class="btn btn-primary btn-sm" data-fb-click="NFe.abrirDanfe" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(chave))}">📄 Visualizar DANFE PDF</button>
           <button class="btn btn-secondary btn-sm" data-fb-click="NFe.baixarXMLEAbrir" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(chave))}">⬇️ Baixar XML</button>
           <button class="btn btn-secondary btn-sm" data-fb-click="NFe.adicionarComoAnexo" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(chave))}">📎 Anexar a Lançamento</button>
@@ -1121,7 +1129,7 @@ const NFe = {
           <div class="modal-header">
             <span class="modal-title">📄 DANFE — NF-e</span>
             <div style="display:flex;gap:8px;align-items:center;">
-              <button class="btn btn-sm btn-success" data-fb-click="Patch26Actions.nfeGenerateClose" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(chave))}" style="font-weight:700;">⚡ Gerar Despesa</button>
+              ${this._lancamentoDaNFe(chave) ? this._acoesLancamento(chave) : `<button class="btn btn-sm btn-success" data-fb-click="Patch26Actions.nfeGenerateClose" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(chave))}" style="font-weight:700;">⚡ Gerar Despesa</button>`}
               <button class="btn btn-sm btn-secondary" data-fb-click="Patch26Actions.nfeAttachClose" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(chave))}">📎 Anexar</button>
               <button class="btn btn-sm btn-primary" data-fb-click="Patch26Actions.nfeDownload" data-fb-click-n="2" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(pdfSrc))}" data-fb-click-t1="string" data-fb-click-v1="${encodeURIComponent(String(chave))}">⬇️ Baixar PDF</button>
               <button class="modal-close" data-fb-click="Utils.closeModal" data-fb-click-n="0">✕</button>
@@ -1168,6 +1176,10 @@ const NFe = {
 
   async gerarLancamentoDaNFe(chave) {
     chave = this._limparChave(chave);
+    if (this._lancamentoDaNFe(chave)) {
+      Utils.toast('Esta NF-e já foi lançada. Use "Ver lançamento" para abrir a despesa.', 'warning');
+      return;
+    }
     Utils.toast('Carregando dados da NF-e...', 'info');
 
     let parsed = null;
@@ -1364,6 +1376,91 @@ const NFe = {
     return notas.some(n => n.lancamento_id && [n.chave_nfe, n.chave_acesso, n.chave].some(c => String(c || '').replace(/\D/g, '') === ch));
   },
 
+  /** Lançamento gerado a partir desta NF-e (pela chave), se houver. */
+  _lancamentoDaNFe(chave) {
+    const ch = String(chave || '').replace(/\D/g, '');
+    if (ch.length !== 44) return null;
+    const lancs = DB.getAll('lancamentos') || [];
+    const direto = lancs.find(l => String(l.chave_nfe || '').replace(/\D/g, '') === ch);
+    if (direto) return direto;
+    const nota = (DB.getAll('notas') || []).find(n => n.lancamento_id && [n.chave_nfe, n.chave_acesso, n.chave].some(c => String(c || '').replace(/\D/g, '') === ch));
+    return nota ? (lancs.find(l => l.id === nota.lancamento_id) || null) : null;
+  },
+
+  /**
+   * Botões de "lançar" de uma NF-e em qualquer lista. Nota já lançada mostra o selo e "Ver lançamento"
+   * em vez de "Lançar"; no Monitor DF-e (`doc` vindo do servidor) dá para marcar à mão uma nota que
+   * foi lançada por fora do sistema.
+   */
+  _acoesLancamento(chave, doc = null) {
+    const ch = String(chave || '').replace(/\D/g, '');
+    const v = encodeURIComponent(ch);
+    const lanc = this._lancamentoDaNFe(ch);
+    const selo = (texto, titulo) => `<span title="${Utils.escapeHtml(titulo)}" style="background:rgba(16,185,129,.15);color:#10b981;border:1px solid rgba(16,185,129,.35);padding:3px 8px;border-radius:12px;font-size:.72rem;font-weight:800;white-space:nowrap;">${texto}</span>`;
+    if (lanc) {
+      return `${selo('✅ Lançada', 'Esta NF-e já gerou uma despesa no financeiro')}
+        <button class="btn btn-sm btn-secondary" data-fb-click="NFe.verLancamentoDaNFe" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${v}" title="Abrir a despesa gerada por esta nota">👁️ Ver lançamento</button>`;
+    }
+    if (doc && doc.lancada_em) {
+      return `${selo(doc.lancada_manual ? '✅ Marcada como lançada' : '✅ Lançada', `Marcada em ${Utils.fmt.datetime(doc.lancada_em)}`)}
+        <button class="btn btn-sm btn-secondary" data-fb-click="NFe.marcarComoLancada" data-fb-click-n="2" data-fb-click-t0="string" data-fb-click-v0="${v}" data-fb-click-t1="string" data-fb-click-v1="nao" title="Voltar a nota para pendente">↩️ Desmarcar</button>`;
+    }
+    return `<button class="btn btn-sm btn-success" data-fb-click="NFe.gerarLancamentoDaNFe" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${v}" style="font-weight:700;" title="Gerar despesa no financeiro">⚡ Lançar</button>${doc ? `
+        <button class="btn btn-sm btn-secondary" data-fb-click="NFe.marcarComoLancada" data-fb-click-n="2" data-fb-click-t0="string" data-fb-click-v0="${v}" data-fb-click-t1="string" data-fb-click-v1="sim" title="Já lancei esta nota por fora (sem a chave): marcar para ninguém lançar de novo">☑️ Já lancei</button>` : ''}`;
+  },
+
+  verLancamentoDaNFe(chave) {
+    const lanc = this._lancamentoDaNFe(chave);
+    if (!lanc) { Utils.toast('Lançamento desta NF-e não encontrado.', 'warning'); return; }
+    Utils.closeModal?.();
+    if (typeof App !== 'undefined' && App.navigate) App.navigate('lancamentos');
+    setTimeout(() => { if (typeof Lancamentos !== 'undefined') Lancamentos.showForm(lanc.tipo || 'despesa', lanc.id); }, 150);
+  },
+
+  async marcarComoLancada(chave, valor) {
+    const lancada = valor === 'sim';
+    const enviar = async () => {
+      try {
+        const res = await this._fetchWithTimeout(`${this._API_BASE}?action=dfe_marcar_lancada`, {
+          method: 'POST',
+          headers: this._headers(),
+          body: JSON.stringify({ chave, lancada, manual: true })
+        });
+        const json = await res.json().catch(() => ({}));
+        if (!res.ok || !json.success) throw new Error(json.error || `Erro ${res.status}`);
+        const doc = (this._dfeUltimosDocs || []).find(d => d.chave === chave);
+        if (doc) { doc.lancada_em = json.documento?.lancada_em || null; doc.lancada_manual = !!json.documento?.lancada_manual; }
+        this._rerenderTabelaDFe();
+        Utils.toast(lancada ? 'NF-e marcada como lançada.' : 'NF-e voltou para pendente.', 'success');
+      } catch (err) {
+        Utils.toast(`Não foi possível atualizar a nota: ${err.message}`, 'error');
+      }
+    };
+    if (lancada) Utils.confirm('Marcar esta NF-e como já lançada? Ela continua na lista, mas sem o botão de lançar.', enviar);
+    else await enviar();
+  },
+
+  /** Registra no servidor que a NF-e virou despesa (vale para os outros usuários e aparelhos). */
+  _registrarLancadaNoServidor(chave) {
+    try {
+      this._fetchWithTimeout(`${this._API_BASE}?action=dfe_marcar_lancada`, {
+        method: 'POST',
+        headers: this._headers(),
+        body: JSON.stringify({ chave, lancada: true, manual: false })
+      }).catch(() => {});
+    } catch {}
+  },
+
+  _toggleOcultarLancadas(el) {
+    this._dfeOcultarLancadas = !!el?.checked;
+    this._rerenderTabelaDFe();
+  },
+
+  _rerenderTabelaDFe() {
+    const box = document.getElementById('nfe-dfe-table-container');
+    if (box) box.innerHTML = this._renderTabelaDFe(this._dfeUltimosDocs || []);
+  },
+
   _fornecedorDaNota(parsed, categoria) {
     if (!parsed?.emitente && !parsed?.cnpj_emitente) return null;
     const doc = String(parsed.cnpj_emitente || '').replace(/\D/g, '');
@@ -1536,6 +1633,7 @@ const NFe = {
       if (typeof Produtos !== 'undefined' && Produtos.atualizarValorMedio) {
         for (const it of itensNota) if (it.produto_id) Produtos.atualizarValorMedio(it.produto_id);
       }
+      this._registrarLancadaNoServidor(chave);
 
       // 4. Baixa o DANFE PDF e anexa ao lançamento
       try {

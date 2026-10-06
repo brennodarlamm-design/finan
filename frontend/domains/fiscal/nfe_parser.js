@@ -318,7 +318,7 @@ const NFeParser = {
                 <td style="text-align:right;">
                   <div style="display:flex;gap:5px;justify-content:flex-end;">
                     ${item.status === 'OK' && chave ? `
-                      <button class="btn btn-sm btn-success" data-fb-click="NFe.gerarLancamentoDaNFe" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(chave))}" style="font-weight:700;" title="Gerar despesa no financeiro">⚡ Lançar</button>
+                      ${nfe._acoesLancamento(chave)}
                       <button class="btn btn-sm btn-primary" data-fb-click="NFe.abrirDanfe" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(chave))}">📄 DANFE</button>
                       <button class="btn btn-sm btn-secondary" data-fb-click="NFe.baixarXMLEAbrir" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(chave))}">⬇️ XML</button>
                       <button class="btn btn-sm btn-secondary" data-fb-click="NFe.adicionarComoAnexo" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(chave))}">📎 Anexar</button>

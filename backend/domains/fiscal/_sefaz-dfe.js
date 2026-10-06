@@ -832,6 +832,22 @@ async function darCienciaParaChave(sql, tenantId, chave, cert, enviar) {
   }
 }
 
+/** Marca (ou desmarca) uma NF-e capturada como já lançada no financeiro. */
+export async function marcarDFeLancada(sql, tenantId, { chave, lancada = true, manual = false, userId = null }) {
+  const ch = String(chave || '').replace(/\D/g, '');
+  if (ch.length !== 44) return { success: false, error: 'Chave de acesso inválida.' };
+  const rows = await sql`
+    UPDATE tenant_dfe_documentos
+       SET lancada_em = CASE WHEN ${lancada === true} THEN COALESCE(lancada_em, NOW()) ELSE NULL END,
+           lancada_por = CASE WHEN ${lancada === true} THEN ${userId} ELSE NULL END,
+           lancada_manual = ${lancada === true && manual === true},
+           updated_at = NOW()
+     WHERE tenant_id = ${tenantId} AND chave = ${ch}
+     RETURNING chave, lancada_em, lancada_manual;
+  `;
+  return rows.length ? { success: true, documento: rows[0] } : { success: true, documento: null };
+}
+
 /**
  * Consulta o status atual do Monitor DF-e para o tenant
  */
@@ -888,6 +904,7 @@ export async function listarDFeDocumentos(sql, tenantId, filters = {}) {
     rows = await sql`
       SELECT id, tipo_documento, nsu, chave, cnpj_emitente, nome_emitente,
              valor_total, data_emissao, situacao, schema_tipo, manifesto_status,
+             lancada_em, lancada_manual,
              (xml_completo IS NOT NULL) AS tem_xml, created_at
       FROM tenant_dfe_documentos
       WHERE tenant_id = ${tenantId}
@@ -900,6 +917,7 @@ export async function listarDFeDocumentos(sql, tenantId, filters = {}) {
     rows = await sql`
       SELECT id, tipo_documento, nsu, chave, cnpj_emitente, nome_emitente,
              valor_total, data_emissao, situacao, schema_tipo, manifesto_status,
+             lancada_em, lancada_manual,
              (xml_completo IS NOT NULL) AS tem_xml, created_at
       FROM tenant_dfe_documentos
       WHERE tenant_id = ${tenantId}
@@ -912,6 +930,7 @@ export async function listarDFeDocumentos(sql, tenantId, filters = {}) {
     rows = await sql`
       SELECT id, tipo_documento, nsu, chave, cnpj_emitente, nome_emitente,
              valor_total, data_emissao, situacao, schema_tipo, manifesto_status,
+             lancada_em, lancada_manual,
              (xml_completo IS NOT NULL) AS tem_xml, created_at
       FROM tenant_dfe_documentos
       WHERE tenant_id = ${tenantId}
@@ -923,6 +942,7 @@ export async function listarDFeDocumentos(sql, tenantId, filters = {}) {
     rows = await sql`
       SELECT id, tipo_documento, nsu, chave, cnpj_emitente, nome_emitente,
              valor_total, data_emissao, situacao, schema_tipo, manifesto_status,
+             lancada_em, lancada_manual,
              (xml_completo IS NOT NULL) AS tem_xml, created_at
       FROM tenant_dfe_documentos
       WHERE tenant_id = ${tenantId}
