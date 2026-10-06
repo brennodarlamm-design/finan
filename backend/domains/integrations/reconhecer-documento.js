@@ -112,24 +112,6 @@ export default async function handler(req, res) {
     });
   }
 
-  // 1. Prioridade Edge: Execução nativa via Cloudflare Workers AI quando disponível no ambiente
-  const edgeEnv = req.env || globalThis.__CLOUDFLARE_ENV__;
-  if (edgeEnv && edgeEnv.AI) {
-    try {
-      const edgeOcrResult = await runEdgeDocumentOcr(edgeEnv, cleanBase64);
-      if (edgeOcrResult && edgeOcrResult.success && edgeOcrResult.data && edgeOcrResult.provider === 'cloudflare_vision_ai') {
-        return res.status(200).json({
-          ok: true,
-          sucesso: true,
-          dados: edgeOcrResult.data,
-          provider: 'cloudflare_vision_ai'
-        });
-      }
-    } catch (edgeOcrErr) {
-      console.warn('[OCR] Erro ao processar via Workers AI, prosseguindo para o pipeline principal:', edgeOcrErr.message);
-    }
-  }
-
   const rawGeminiKeys = String(process.env.GEMINI_API_KEYS || process.env.GEMINI_API_KEY || '').trim();
   const geminiKeys = rawGeminiKeys
     ? rawGeminiKeys.split(',').map(k => k.trim()).filter(k => k.length > 10)
@@ -209,6 +191,14 @@ REGRAS CRÍTICAS PARA 'itens' E 'tipo_documento':
    - Apenas para Notas Fiscais com mercadorias/serviços discriminados, extraia para a lista 'itens' com descrição, quantidade (default 1), unidade (default 'un') e valor unitário.
 4. valor = total do documento (numero). Datas ISO YYYY-MM-DD. Não invente dados - use null. Retorne APENAS o JSON.`;
 
+  // O navegador desiste em 65 s. Antes, o Workers AI rodava primeiro e sem limite de tempo, e depois
+  // vinham até 5 modelos Gemini × 20 s: a leitura passava do limite e o usuário via "demorou mais
+  // que o esperado". Agora o Gemini (que devolve o formato que a tela usa) vem primeiro, com um
+  // orçamento total de 45 s, e o Workers AI só entra como reserva, com no máximo 15 s.
+  const inicioOcr = Date.now();
+  const ORCAMENTO_GEMINI_MS = 45000;
+  const restante = () => ORCAMENTO_GEMINI_MS - (Date.now() - inicioOcr);
+
   try {
     let ocrResult = null;
     let modeloUsado = null;
@@ -242,6 +232,7 @@ REGRAS CRÍTICAS PARA 'itens' E 'tipo_documento':
     modelLoop:
     for (const model of models) {
       for (let kIdx = 0; kIdx < keysToTry.length; kIdx++) {
+        if (restante() < 5000) break modelLoop;
         const activeKey = keysToTry[kIdx];
         try {
           // AUDIT-2026-10-02 W4: chave no header, não na URL (URLs aparecem em logs/erros).
@@ -249,7 +240,7 @@ REGRAS CRÍTICAS PARA 'itens' E 'tipo_documento':
           const geminiRes = await fetch(geminiUrl, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'x-goog-api-key': activeKey },
-            signal: AbortSignal.timeout(20000),
+            signal: AbortSignal.timeout(Math.max(5000, Math.min(20000, restante()))),
             body: JSON.stringify(geminiPayload)
           });
 
@@ -287,6 +278,21 @@ REGRAS CRÍTICAS PARA 'itens' E 'tipo_documento':
     }
 
     if (!ocrResult) {
+      // Reserva: Workers AI (só imagens), limitado a 15 s.
+      const edgeEnv = req.env || globalThis.__CLOUDFLARE_ENV__;
+      if (edgeEnv && edgeEnv.AI && /^image\//.test(cleanMime)) {
+        try {
+          const edgeOcrResult = await Promise.race([
+            runEdgeDocumentOcr(edgeEnv, cleanBase64),
+            new Promise((_, rej) => setTimeout(() => rej(new Error('Workers AI excedeu 15 s')), 15000))
+          ]);
+          if (edgeOcrResult && edgeOcrResult.success && edgeOcrResult.data && edgeOcrResult.provider === 'cloudflare_vision_ai') {
+            return res.status(200).json({ ok: true, sucesso: true, dados: edgeOcrResult.data, provider: 'cloudflare_vision_ai' });
+          }
+        } catch (edgeOcrErr) {
+          console.warn('[OCR] Reserva Workers AI não concluiu:', edgeOcrErr.message);
+        }
+      }
       console.error('[OCR] Todos os modelos Gemini falharam:', lastError);
       return res.status(502).json({
         error: 'O reconhecimento de documentos está temporariamente indisponível. Tente novamente.'
