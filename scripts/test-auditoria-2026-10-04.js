@@ -648,6 +648,8 @@ console.log('=== Auditoria 04/10/2026 ===\n');
   assert(nfe.includes('action=dfe_xml_completo'), 'XML completo pela SEFAZ (ciência + consulta pela chave)');
   assert(nfe.includes('async puxarProdutosDoLancamento(lancId)'));
   assert(read('js/lancamentos.js').includes('data-fb-click="NFe.puxarProdutosDoLancamento"'));
+  assert(read('js/lancamentos.js').includes("NFe._lancamentoPrincipalDaNFe?.(l.chave_nfe)?.id === l.id"), 'atalho só no lançamento principal da nota');
+  assert(nfe.includes('const principal = this._lancamentoPrincipalDaNFe(chave);'), 'puxar produtos recusa outra parcela');
   assert(read('js/patch26-events.js').includes('"NFe.puxarProdutosDoLancamento"'));
   for (const [a, b] of [['js/nfe.js', 'frontend/domains/fiscal/nfe.js'], ['js/lancamentos.js', 'frontend/domains/financeiro/lancamentos.js'], ['js/patch26-events.js', 'frontend/core/patch26-events.js']]) assert.equal(read(a), read(b), b);
   console.log('  ✓ Pós-auditoria: produtos da NF-e no lançamento, na nota e no controle de Produtos; botão para despesas antigas');

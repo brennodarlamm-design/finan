@@ -1388,6 +1388,24 @@ const NFe = {
   },
 
   /**
+   * Entre os lançamentos de uma mesma NF-e (nota parcelada), o único que guarda os produtos.
+   * O número da parcela não vai para o servidor; por isso a escolha usa o que sobrevive à
+   * sincronização: quem já tem itens; senão a "(parcela 1/…" da descrição; senão o vencimento
+   * mais antigo.
+   */
+  _lancamentoPrincipalDaNFe(chave) {
+    const ch = String(chave || '').replace(/\D/g, '');
+    if (ch.length !== 44) return null;
+    const irmaos = (DB.getAll('lancamentos') || []).filter(l => String(l.chave_nfe || '').replace(/\D/g, '') === ch);
+    if (!irmaos.length) return null;
+    const comItens = irmaos.find(l => Array.isArray(l.itens) && l.itens.length);
+    if (comItens) return comItens;
+    const parcela1 = irmaos.find(l => /\(parcela 1\//.test(String(l.descricao || '')) || Number(l.numero_parcela) === 1);
+    if (parcela1) return parcela1;
+    return [...irmaos].sort((a, b) => String(a.data_vencimento || a.data || '').localeCompare(String(b.data_vencimento || b.data || '')))[0];
+  },
+
+  /**
    * Botões de "lançar" de uma NF-e em qualquer lista. Nota já lançada mostra o selo e "Ver lançamento"
    * em vez de "Lançar"; no Monitor DF-e (`doc` vindo do servidor) dá para marcar à mão uma nota que
    * foi lançada por fora do sistema.
@@ -1505,6 +1523,15 @@ const NFe = {
     const l = DB.getById('lancamentos', lancId);
     const chave = this._limparChave(l?.chave_nfe || '');
     if (!l || chave.length !== 44) { Utils.toast('Este lançamento não tem chave de NF-e.', 'warning'); return; }
+    // Nota parcelada: os produtos ficam num lançamento só, senão a compra conta uma vez por parcela.
+    const principal = this._lancamentoPrincipalDaNFe(chave);
+    if (principal && principal.id !== l.id) {
+      Utils.toast(principal.itens?.length
+        ? 'Os produtos desta NF-e já estão em outra parcela desta nota.'
+        : 'Os produtos desta NF-e ficam na 1ª parcela. Use o atalho no lançamento da 1ª parcela.', 'warning');
+      return;
+    }
+    if (l.itens?.length) { Utils.toast('Este lançamento já tem os produtos da NF-e.', 'info'); return; }
     if (this._puxandoProdutos) return;
     this._puxandoProdutos = true;
     Utils.toast('Buscando os produtos da NF-e...', 'info');
