@@ -124,12 +124,19 @@ const NFe = {
 
   async baixarDanfePDF(chave) {
     chave = this._limparChave(chave);
-    const res = await this._fetchWithTimeout(`${this._API_BASE}?action=danfe&chave=${chave}`, {
+    const pedir = () => this._fetchWithTimeout(`${this._API_BASE}?action=danfe&chave=${chave}`, {
       method: 'GET',
       headers: this._headers()
     });
+    let res = await pedir();
+    // O MeuDanfe só entrega o PDF de notas que já estão na Área do Cliente. Notas que chegaram
+    // pelo DF-e da SEFAZ nunca passaram pela busca: adiciona uma vez e tenta de novo.
+    if (res.status === 404) {
+      try { await this.buscarPorChave(chave); } catch (err) { throw new Error(`DANFE indisponível: ${err.message}`); }
+      res = await pedir();
+    }
     if (!res.ok) {
-      if (res.status === 404) throw new Error('NF-e não encontrada na Área do Cliente. Busque-a primeiro.');
+      if (res.status === 404) throw new Error('A NF-e ainda não está disponível no MeuDanfe. Tente de novo em alguns minutos.');
       throw new Error(`Erro ao baixar DANFE: ${res.status}`);
     }
     return await res.json();
@@ -137,6 +144,7 @@ const NFe = {
 
   async baixarXML(chave) {
     chave = this._limparChave(chave);
+    let resumoDfe = null;
     // 1. Tenta recuperar do DF-e nativo da SEFAZ
     try {
       const dfeRes = await this._fetchWithTimeout(`${this._API_BASE}?action=dfe_xml&chave=${chave}`, {
@@ -146,21 +154,31 @@ const NFe = {
       if (dfeRes.ok) {
         const dfeJson = await dfeRes.json();
         if (dfeJson.success && dfeJson.documento?.xml) {
-          return { status: 'OK', data: dfeJson.documento.xml };
+          const xml = String(dfeJson.documento.xml);
+          // Resumo (<resNFe>) não tem itens nem duplicatas: tenta o XML completo antes de usá-lo.
+          if (!/<resNFe[\s>]/.test(xml) || /<infNFe[\s>]/.test(xml)) return { status: 'OK', data: xml };
+          resumoDfe = xml;
         }
       }
     } catch {}
 
     // 2. Fallback para provedor secundário
-    const res = await this._fetchWithTimeout(`${this._API_BASE}?action=xml&chave=${chave}`, {
-      method: 'GET',
-      headers: this._headers()
-    });
-    if (!res.ok) {
-      if (res.status === 404) throw new Error('NF-e não encontrada na base de dados.');
-      throw new Error(`Erro ao baixar XML: ${res.status}`);
+    try {
+      const res = await this._fetchWithTimeout(`${this._API_BASE}?action=xml&chave=${chave}`, {
+        method: 'GET',
+        headers: this._headers()
+      });
+      if (!res.ok) {
+        if (res.status === 404) throw new Error('NF-e não encontrada na base de dados.');
+        throw new Error(`Erro ao baixar XML: ${res.status}`);
+      }
+      const json = await res.json();
+      if (json && json.data) return json;
+      if (!resumoDfe) return json;
+    } catch (err) {
+      if (!resumoDfe) throw err;
     }
-    return await res.json();
+    return { status: 'OK', data: resumoDfe, resumo: true };
   },
 
   async listarMinhasNFes(after = '') {
@@ -1190,6 +1208,9 @@ const NFe = {
 
     // Escapa dados para callback
     window._tempNFeParsed = parsed;
+    if (parsed.resumo) {
+      Utils.toast('Só o resumo da NF-e está disponível (sem itens e duplicatas). Confira o vencimento antes de salvar.', 'warning');
+    }
 
     Utils.showModal(`
       <div class="modal" style="max-width:680px;max-height:92vh;display:flex;flex-direction:column;">

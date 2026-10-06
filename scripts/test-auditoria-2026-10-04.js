@@ -620,5 +620,19 @@ console.log('=== Auditoria 04/10/2026 ===\n');
   console.log('  ✓ #38–#40 Arquivos mortos removidos, parcela da Caixa sem 75% inventado, logs sem telefone/e-mail inteiros e Resend com timeout');
 }
 
+// Pós-auditoria (06/10, log do navegador): anexo no R2, NF-e só com resumo e DANFE fora da Área do Cliente.
+{
+  const docs = read('js/documentos.js');
+  assert(docs.includes("if (raw.startsWith('r2://')) return `/api/v2/edge/storage/file/${encodeURIComponent(raw.slice('r2://'.length))}`;"));
+  assert(docs.includes(': this._urlDeLeitura(doc.url);') && docs.includes(': this._urlDeLeitura(json.url);'), 'r2:// nunca vai cru para o navegador');
+  const parser = read('js/nfe_parser.js');
+  assert(parser.includes('if (resNFe) return this._parseResumo(resNFe, get);') && parser.includes('resumo: true,'));
+  const nfe = read('js/nfe.js');
+  assert(nfe.includes('try { await this.buscarPorChave(chave); }'), 'DANFE: busca a nota no MeuDanfe uma vez e tenta de novo');
+  assert(nfe.includes("return { status: 'OK', data: resumoDfe, resumo: true };"), 'XML completo tem preferência sobre o resumo');
+  for (const [a, b] of [['js/documentos.js', 'frontend/domains/contratos/documentos.js'], ['js/nfe.js', 'frontend/domains/fiscal/nfe.js'], ['js/nfe_parser.js', 'frontend/domains/fiscal/nfe_parser.js']]) assert.equal(read(a), read(b), b);
+  console.log('  ✓ Pós-auditoria: anexo do R2 abre pela rota autenticada; NF-e com resumo preenche emitente e valor; DANFE busca a nota antes');
+}
+
 await db.close();
 console.log('\n✅ Auditoria 04/10/2026: tudo certo.');
