@@ -763,5 +763,36 @@ console.log('=== Auditoria 04/10/2026 ===\n');
   console.log('  ✓ Obra: cartão "Falta Receber" (financiado − recebido)');
 }
 
+// Obras: o cadastro completo vai para o banco (migração 045) e não some na sincronização.
+{
+  const { dadosExtrasDaObra } = await import('../api/_obra-dados.js');
+  const extras = dadosExtrasDaObra({ id: 'o1', nome: 'X', status: 'ativo', valor_financiado: 135700, cpf_cnpj: '003.925.092-02', modalidade_obra: 'caixa', _tmp: 1, sync_version: '9', foto: 'data:image/png;base64,' + 'A'.repeat(5000) });
+  assert.deepEqual(extras, { valor_financiado: 135700, cpf_cnpj: '003.925.092-02', modalidade_obra: 'caixa' }, 'só os campos sem coluna própria, sem base64 nem internos');
+  const pg = new PGlite();
+  const psql = async (strings, ...values) => { let t = strings[0]; values.forEach((_, k) => { t += `$${k + 1}` + strings[k + 1]; }); return (await pg.query(t, values)).rows; };
+  await pg.exec(`CREATE TABLE obras (id text, tenant_id text, nome text, cliente text, endereco text, orcamento_total numeric, status text, data_inicio date, data_previsao date, cronograma_config jsonb, bdi_config jsonb, created_at timestamptz default now(), PRIMARY KEY (tenant_id, id));
+    CREATE TABLE audit_logs (id text, tenant_id text, user_id text, acao text, entidade text, entidade_id text, dados_anteriores jsonb, dados_novos jsonb, ip text, user_agent text, created_at timestamptz default now());`);
+  await pg.exec(read('migrations/045_obras_dados_cadastro.sql'));
+  const { handleSave } = await import('../api/_db-mutations.js');
+  const auth = { isSystem: false, tenantId: 't1', user: { userId: 'u1', perfil: 'superadmin' } };
+  const salvar = (data) => new Promise((resolve, reject) => {
+    const res = { statusCode: 200, setHeader() {}, status(c) { this.statusCode = c; return this; }, json(b) { resolve({ status: this.statusCode, body: b }); return this; } };
+    handleSave(psql, 't1', auth, { headers: {}, socket: {} }, res, 'clientes', data).catch(reject);
+  });
+  let r = await salvar({ id: 'o1', nome: 'PAULA VANESSA', status: 'em_andamento', valor_financiado: 135700, cpf_cnpj: '003.925.092-02', num_contrato_caixa: '8.4444', data_previsao_termino: '2027-03-01' });
+  assert.equal(r.status, 200, JSON.stringify(r.body));
+  let [o] = await psql`SELECT dados, data_previsao::text AS fim FROM obras WHERE id = 'o1'`;
+  assert.equal(o.dados.valor_financiado, 135700); assert.equal(o.dados.num_contrato_caixa, '8.4444');
+  assert.equal(o.fim, '2027-03-01', 'data de término do formulário agora é gravada');
+  r = await salvar({ id: 'o1', nome: 'PAULA VANESSA', status: 'em_andamento', area_construida: 62 });
+  [o] = await psql`SELECT dados FROM obras WHERE id = 'o1'`;
+  assert.equal(o.dados.valor_financiado, 135700, 'envio parcial não apaga o que já estava salvo'); assert.equal(o.dados.area_construida, 62);
+  await pg.close();
+  const dataJs = read('js/data.js');
+  assert(dataJs.includes('const normalized = cloudItems.map(({ dados, ...o }) => ({') && dataJs.includes('_mesclarCamposLocais(localItem, cloudItem)'));
+  for (const [a, b] of [['api/_obra-dados.js', 'backend/domains/database/_obra-dados.js'], ['api/_db-mutations.js', 'backend/domains/database/_db-mutations.js'], ['api/_db-sync.js', 'backend/domains/database/_db-sync.js'], ['js/data.js', 'frontend/core/data.js']]) assert.equal(read(a), read(b), b);
+  console.log('  ✓ Obras: cadastro completo gravado no banco, término gravado, envio parcial não apaga e a sincronização não descarta campos');
+}
+
 await db.close();
 console.log('\n✅ Auditoria 04/10/2026: tudo certo.');

@@ -1171,6 +1171,8 @@ const DB = {
       if (pendingSaves.has(id)) {
         const pendingItem = pendingSaves.get(id);
         resultMap.set(id, { ...(resultMap.get(id) || lItem), ...pendingItem });
+      } else if (resultMap.has(id) && this._mantemCamposLocais(table)) {
+        resultMap.set(id, this._mesclarCamposLocais(lItem, resultMap.get(id)));
       } else if (!resultMap.has(id) && (preserveUnmigrated || this._syncStorageFailure)) {
         // Protege dados ainda não migrados e alterações cuja fila não pôde ser salva.
         resultMap.set(id, lItem);
@@ -1297,6 +1299,8 @@ const DB = {
       if (!id || pendingDeletes.has(id)) continue;
       if (pendingSaves.has(id)) {
         resultMap.set(id, { ...cItem, ...pendingSaves.get(id) });
+      } else if (resultMap.has(id) && this._mantemCamposLocais(table)) {
+        resultMap.set(id, this._mesclarCamposLocais(resultMap.get(id), cItem));
       } else {
         resultMap.set(id, cItem);
       }
@@ -1308,13 +1312,30 @@ const DB = {
     return Array.from(resultMap.values());
   },
 
+  // Obras: a versão da nuvem trocava o registro local inteiro, e os campos do cadastro que o servidor
+  // não guardava (valor financiado, CPF, cidade, área, contrato Caixa...) sumiam a cada sincronização.
+  // A nuvem continua mandando em tudo o que ela traz; só o que ela não traz é mantido do aparelho.
+  _mantemCamposLocais(table) {
+    return table === 'clientes' || table === 'obras';
+  },
+
+  _mesclarCamposLocais(localItem, cloudItem) {
+    const out = { ...cloudItem };
+    for (const [k, v] of Object.entries(localItem || {})) {
+      if (!(k in out) && v !== undefined) out[k] = v;
+    }
+    return out;
+  },
+
   _applyTableData(table, cloudItems, isDelta = false) {
     if (!cloudItems) return;
     const completenessBootstrapped = this.isCloudCompletenessBootstrapped ? this.isCloudCompletenessBootstrapped() : true;
 
     if (['clientes', 'obras'].includes(table) && Array.isArray(cloudItems)) {
       const local = this.getAll('clientes') || [];
-      const normalized = cloudItems.map(o => ({
+      // `dados` (migração 045) guarda o cadastro completo da obra; as colunas próprias prevalecem.
+      const normalized = cloudItems.map(({ dados, ...o }) => ({
+        ...(dados && typeof dados === 'object' && !Array.isArray(dados) ? dados : {}),
         ...o,
         data_inicio: (typeof Utils !== 'undefined' && Utils.cleanDate) ? Utils.cleanDate(o.data_inicio) : (o.data_inicio ? String(o.data_inicio).split('T')[0] : o.data_inicio),
         processos_sla: o.cronograma_config?.processos_sla || o.processos_sla || [],

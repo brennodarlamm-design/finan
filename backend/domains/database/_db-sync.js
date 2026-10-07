@@ -8,6 +8,7 @@ import {
 import { validateObraTenant, validateBulkObraPlanLimit } from './_db-mutations.js';
 import { setPrivateNoCache } from './_http.js';
 import { isTenantStorageUrl } from './_edge-r2.js';
+import { dadosExtrasDaObra } from './_obra-dados.js';
 import { writeAudit, writeAuditBatch } from './_audit.js';
 import { syncVersionConflict, withoutSyncVersion, prefetchSyncVersions } from './_sync-guard.js';
 import { validarArquivoBase64 } from './_file-validation.js';
@@ -63,12 +64,12 @@ export async function handleSyncAll(sql, tenantId, auth, req, res, payload) {
       const bdiJson = o.bdi_config == null ? null : JSON.stringify(sanitizeBdiConfig(o.bdi_config));
       try {
         await sql`
-          INSERT INTO obras (id, tenant_id, nome, cliente, endereco, orcamento_total, status, data_inicio, data_previsao, cronograma_config, bdi_config)
+          INSERT INTO obras (id, tenant_id, nome, cliente, endereco, orcamento_total, status, data_inicio, data_previsao, cronograma_config, bdi_config, dados)
           VALUES (
             ${o.id}, ${tenantId}, ${o.nome}, ${o.cliente || ''}, ${o.endereco || ''},
             ${cleanNum(o.orcamento_total || o.valor_contrato)}, ${o.status || 'em_andamento'},
-            ${cleanDate(o.data_inicio)}, ${cleanDate(o.data_previsao)},
-            ${cronogramaJson}::jsonb, ${bdiJson}::jsonb
+            ${cleanDate(o.data_inicio)}, ${cleanDate(o.data_previsao || o.data_previsao_termino)},
+            ${cronogramaJson}::jsonb, ${bdiJson}::jsonb, ${JSON.stringify(dadosExtrasDaObra(o))}::jsonb
           )
           ON CONFLICT (tenant_id, id) DO UPDATE SET
             nome = EXCLUDED.nome,
@@ -79,7 +80,9 @@ export async function handleSyncAll(sql, tenantId, auth, req, res, payload) {
             data_inicio = EXCLUDED.data_inicio,
             data_previsao = EXCLUDED.data_previsao,
             cronograma_config = EXCLUDED.cronograma_config,
-            bdi_config = EXCLUDED.bdi_config;
+            bdi_config = EXCLUDED.bdi_config,
+            -- Cadastro completo (migração 045). Mescla: um envio parcial não apaga o que já estava salvo.
+            dados = COALESCE(obras.dados, '{}'::jsonb) || EXCLUDED.dados;
         `;
         validObrasSet.add(o.id);
         totalCount++;

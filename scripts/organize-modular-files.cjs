@@ -137,6 +137,7 @@ const backendMap = {
   'api/_db-normalizers.js': 'backend/domains/database/_db-normalizers.js',
   'api/_sync-guard.js': 'backend/domains/database/_sync-guard.js',
   'api/_file-validation.js': 'backend/domains/database/_file-validation.js',
+  'api/_obra-dados.js': 'backend/domains/database/_obra-dados.js',
   'api/_tenant-sql.js': 'backend/domains/database/_tenant-sql.js',
   'api/_tenant-access-key.js': 'backend/domains/database/_tenant-access-key.js',
   'api/db.js': 'backend/domains/database/db.js',

@@ -8,6 +8,7 @@ import {
 import { setPrivateNoCache } from './_http.js';
 import { isTenantStorageUrl } from './_edge-r2.js';
 import { getPlanRule, isActiveObraStatus } from './_plans.js';
+import { dadosExtrasDaObra } from './_obra-dados.js';
 import { writeAudit } from './_audit.js';
 import { validarArquivoBase64 } from './_file-validation.js';
 import { SYNC_GUARD_TABLES, syncVersionConflict, readSyncVersion, syncRecordId, withoutSyncVersion } from './_sync-guard.js';
@@ -345,12 +346,12 @@ export async function handleSave(sql, tenantId, auth, req, res, table, data) {
     const cronogramaJson = o.cronograma_config == null && !Array.isArray(o.processos_sla) ? null : JSON.stringify(sanitizeCronogramaConfig({ ...(o.cronograma_config || {}), processos_sla: o.cronograma_config?.processos_sla || o.processos_sla }));
     const bdiJson = o.bdi_config == null ? null : JSON.stringify(sanitizeBdiConfig(o.bdi_config));
     await sql`
-      INSERT INTO obras (id, tenant_id, nome, cliente, endereco, orcamento_total, status, data_inicio, data_previsao, cronograma_config, bdi_config)
+      INSERT INTO obras (id, tenant_id, nome, cliente, endereco, orcamento_total, status, data_inicio, data_previsao, cronograma_config, bdi_config, dados)
       VALUES (
         ${o.id}, ${tenantId}, ${o.nome}, ${o.cliente || ''}, ${o.endereco || ''},
         ${cleanNum(o.orcamento_total || o.valor_contrato)}, ${o.status || 'em_andamento'},
-        ${cleanDate(o.data_inicio)}, ${cleanDate(o.data_previsao)},
-        ${cronogramaJson}::jsonb, ${bdiJson}::jsonb
+        ${cleanDate(o.data_inicio)}, ${cleanDate(o.data_previsao || o.data_previsao_termino)},
+        ${cronogramaJson}::jsonb, ${bdiJson}::jsonb, ${JSON.stringify(dadosExtrasDaObra(o))}::jsonb
       )
       ON CONFLICT (tenant_id, id) DO UPDATE SET
         nome = EXCLUDED.nome,
@@ -361,7 +362,9 @@ export async function handleSave(sql, tenantId, auth, req, res, table, data) {
         data_inicio = EXCLUDED.data_inicio,
         data_previsao = EXCLUDED.data_previsao,
         cronograma_config = EXCLUDED.cronograma_config,
-        bdi_config = EXCLUDED.bdi_config;
+        bdi_config = EXCLUDED.bdi_config,
+        -- Cadastro completo (migração 045). Mescla: um envio parcial não apaga o que já estava salvo.
+        dados = COALESCE(obras.dados, '{}'::jsonb) || EXCLUDED.dados;
     `;
     await auditDb(sql, req, auth, 'salvar', table === 'clientes' ? 'obras' : table, o);
     return res.status(200).json({ success: true, id: o.id });
