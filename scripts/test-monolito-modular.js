@@ -116,16 +116,10 @@ for (const shell of shells) {
 }
 console.log(`  ✓ 5. Shells de aplicação (${shells.join(', ')}) presentes em frontend/`);
 
-// 5b. A fonte canônica dos HTML é marketing/pages/ e frontend/; build, Vite e testes não leem
-// mais a raiz. Enquanto as cópias antigas da raiz não forem excluídas, elas só podem existir
-// idênticas à fonte canônica (e nenhum HTML novo pode nascer na raiz).
+// 5b. A raiz do repositório não tem HTML: a fonte canônica é marketing/pages/ e frontend/.
 const htmlNaRaiz = fs.readdirSync(root).filter(f => f.endsWith('.html'));
-for (const f of htmlNaRaiz) {
-  const canonico = [path.join(root, 'frontend', f), path.join(root, 'marketing', 'pages', f)].find(fs.existsSync);
-  assert(canonico, `HTML solto na raiz sem fonte canônica (use marketing/pages/ ou frontend/): ${f}`);
-  assert(fs.readFileSync(canonico).equals(fs.readFileSync(path.join(root, f))), `Cópia antiga ${f} na raiz diverge de ${path.relative(root, canonico)} — edite a fonte canônica`);
-}
-console.log(htmlNaRaiz.length ? `  ✓ 5b. ${htmlNaRaiz.length} cópias antigas na raiz idênticas à fonte canônica (a excluir)` : '  ✓ 5b. Raiz sem arquivos HTML');
+assert(htmlNaRaiz.length === 0, `HTML solto na raiz (use marketing/pages/ ou frontend/): ${htmlNaRaiz.join(', ')}`);
+console.log('  ✓ 5b. Raiz sem arquivos HTML');
 
 // 6. Validar CSS em frontend/css
 const cssDir = path.join(root, 'css');
