@@ -90,11 +90,11 @@ assert.equal(content.innerHTML, 'Exportar');
 assert.equal(history.at(-1), '/app/relatorios');
 console.log('✅ Navegação: módulo tardio funciona no bridge e não substitui a rota mais recente.');
 
-const html = fs.readFileSync('app.html', 'utf8');
+const html = fs.readFileSync('frontend/app.html', 'utf8');
 const tags = [...html.matchAll(/<script\b[^>]*src="([^"]+)"[^>]*>/g)];
 assert.ok(tags.every(([tag]) => /\bdefer\b/.test(tag)), 'Scripts iniciais preservam ordem sem bloquear o parser');
 for (const optional of ['xlsx.full.min.js','jszip.min.js','jspdf.umd.min.js','pdfjs_bootstrap.js','sinapi.js','orcamento_sinapi.js','exportar_templates.js','master.js']) {
   assert.ok(tags.every(([, src]) => src.split('?')[0].split('/').at(-1) !== optional), optional + ' não deve estar na abertura');
 }
-assert.match(fs.readFileSync('master.html','utf8'), /src="\/js\/master.js"/, 'Portal Master mantém seu módulo');
+assert.match(fs.readFileSync('frontend/master.html','utf8'), /src="\/js\/master.js"/, 'Portal Master mantém seu módulo');
 console.log(`✅ Abertura: ${tags.length} scripts com defer; bibliotecas opcionais fora do caminho inicial.`);

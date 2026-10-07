@@ -16,7 +16,7 @@ const users = read('api/_workflow-users.js');
 const audit = read('api/audit.js');
 const sla = read('api/_sla.js');
 const migration = read('migrations/028_patch51_workflow_obras.sql');
-const app = read('app.html');
+const app = read('frontend/app.html');
 
 for (const file of ['js/patch51.js','js/patch51-hardening.js','js/patch51-followup.js','js/patch51-sla-sync.js','api/_workflow.js','api/_workflow-complete.js','api/_workflow-stage-update.js','api/_workflow-meta.js','api/_workflow-users.js','api/audit.js','api/_sla.js']) {
   const r = spawnSync(process.execPath, ['--check', file], { encoding:'utf8' });

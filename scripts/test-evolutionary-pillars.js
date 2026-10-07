@@ -73,7 +73,7 @@ async function runTests() {
   assert(obraDetalheCode.includes('data-tab="bim-3d"'), 'js/obra_detalhe.js possui o botão da aba Modelo 3D BIM');
   assert(obraDetalheCode.includes('od-bim-container') && obraDetalheCode.includes('BIMViewer.render'), 'js/obra_detalhe.js instancia BIMViewer.render na aba bim-3d');
 
-  const appHtmlCode = fs.readFileSync(path.resolve('app.html'), 'utf8');
+  const appHtmlCode = fs.readFileSync(path.resolve('frontend/app.html'), 'utf8');
   assert(appHtmlCode.includes('/js/bim_viewer.js'), 'app.html importa o script js/bim_viewer.js');
 
   console.log(`\n======================================================`);

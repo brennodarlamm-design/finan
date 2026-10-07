@@ -94,10 +94,7 @@ const frontendMap = {
   'js/ocr.js': 'frontend/domains/configuracoes/ocr.js',
   'js/academia.js': 'frontend/domains/configuracoes/academia.js',
 
-  // Shells de Aplicação
-  'master.html': 'frontend/master.html',
-  'app.html': 'frontend/app.html',
-  'bim.html': 'frontend/bim.html'
+  // Shells de Aplicação: frontend/*.html é a fonte canônica (não há mais cópia na raiz).
 };
 
 const backendMap = {

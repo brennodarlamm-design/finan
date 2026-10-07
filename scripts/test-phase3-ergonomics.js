@@ -21,16 +21,16 @@ console.log('1. Validando elevação de contraste WCAG AA (--text3: #94A3B8)...'
 const styleCss = read('css/style.css');
 assert(/--text3:\s*#94a3b8/i.test(styleCss), 'css/style.css deve conter --text3: #94A3B8');
 
-const indexHtml = read('index.html');
+const indexHtml = read('frontend/index.html');
 assert(/--text3:\s*#94a3b8/i.test(indexHtml), 'index.html deve conter --text3: #94A3B8');
 
 const premiumCss = read('css/premium.css');
 assert(/--text3:\s*#94a3b8/i.test(premiumCss), 'css/premium.css deve conter --text3: #94A3B8');
 
-const privacidadeHtml = read('privacidade.html');
+const privacidadeHtml = read('marketing/pages/privacidade.html');
 assert(/--text3:\s*#94a3b8/i.test(privacidadeHtml), 'privacidade.html deve conter --text3: #94A3B8');
 
-const termosHtml = read('termos.html');
+const termosHtml = read('marketing/pages/termos.html');
 assert(/--text3:\s*#94a3b8/i.test(termosHtml), 'termos.html deve conter --text3: #94A3B8');
 
 // Cálculo matemático da razão de contraste WCAG

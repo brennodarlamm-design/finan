@@ -13,17 +13,17 @@ function assert(condition, message) {
 
 const worker = read('cloudflare-worker.js');
 const build = read('scripts/build-cloudflare-pages.cjs');
-const landing = read('landing.html') + read('marketing/main.jsx');
+const landing = read('marketing/pages/landing.html') + read('marketing/main.jsx');
 const landingPage = read('marketing/main.jsx') + read('marketing/brand-sections.jsx');
-const login = read('index.html');
+const login = read('frontend/index.html');
 const loginPage = read('js/login_page.js');
 const authRoute = read('js/auth-route-patch38.js');
 const redirects = read('cloudflare/_redirects');
 const robots = read('data/robots.txt');
 const sitemap = read('data/sitemap.xml');
-const privacy = read('privacidade.html');
-const terms = read('termos.html');
-const validation = read('validar.html');
+const privacy = read('marketing/pages/privacidade.html');
+const terms = read('marketing/pages/termos.html');
+const validation = read('marketing/pages/validar.html');
 const authCss = read('css/auth-patch38.css');
 const postbuild = read('scripts/patch38-postbuild.cjs');
 const pkg = JSON.parse(read('package.json'));
@@ -34,8 +34,8 @@ assert(worker.includes("routeName = incoming.pathname === '/cadastro' ? 'signup-
 assert(worker.includes("headers.set('X-Robots-Tag', 'noindex, nofollow')"), 'rotas privadas devem enviar X-Robots-Tag noindex.');
 assert(worker.includes("target.pathname === '/app.html'"), 'app.html deve possuir redirect canônico para /app.');
 
-assert(build.includes("copyRequired(path.join(root, 'landing.html'), path.join(out, 'index.html'))"), 'a raiz pública deve ser materializada a partir da landing.');
-assert(build.includes("copyRequired(path.join(root, 'index.html'), path.join(out, 'login.html'))"), 'o login deve ter arquivo dedicado no dist.');
+assert(build.includes("copyRequired(path.join(marketingPagesDir, 'landing.html'), path.join(out, 'index.html'))"), 'a raiz pública deve ser materializada a partir da landing.');
+assert(build.includes("copyRequired(path.join(frontendDir, 'index.html'), path.join(out, 'login.html'))"), 'o login deve ter arquivo dedicado no dist.');
 assert(pkg.scripts['build:cloudflare'].includes('patch38-postbuild.cjs'), 'build Cloudflare deve executar o pós-build do Patch 38.');
 assert(pkg.scripts.postinstall.includes('patch38-postbuild.cjs'), 'postinstall deve gerar o mesmo dist endurecido.');
 assert(postbuild.includes("patchDocument('privacidade.html'"), 'pós-build deve canonicalizar Privacidade.');

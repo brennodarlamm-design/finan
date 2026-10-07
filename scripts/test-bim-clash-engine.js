@@ -69,7 +69,7 @@ assert(viewer.includes('Clash bloqueado: a geometria IFC desta versão é parcia
 assert(viewer.includes("origem:'clash_detection'"), 'clash pode virar pendência de coordenação');
 assert(viewer.includes('interseção triângulo-triângulo'), 'painel explica o método de confirmação');
 
-const app = fs.readFileSync('app.html','utf8');
+const app = fs.readFileSync('frontend/app.html','utf8');
 assert(app.indexOf('/js/bim_clash_engine.js') < app.indexOf('/js/bim_viewer.js'), 'motor de clash carrega antes do viewer');
 
 if (process.exitCode) process.exit(process.exitCode);

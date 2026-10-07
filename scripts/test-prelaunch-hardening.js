@@ -39,7 +39,7 @@ const auth=read('api/_auth.js');
 const authApi=read('api/auth.js');
 const cobranca=read('js/cobranca.js');
 const app=read('js/app.js');
-const landing=read('landing.html');
+const landing=read('marketing/pages/landing.html');
 const backup=read('.github/workflows/database-backup.yml');
 const rollback=read('.github/workflows/cloudflare-rollback.yml');
 const vercelConfig=read('vercel.json');
@@ -90,7 +90,7 @@ ok('Pagamento confirmado recupera UI quando refresh de sessão falha', cobranca.
 ok('Falha de sincronização de rota é mostrada ao usuário', app.includes('Dados locais exibidos. A sincronização com a nuvem falhou'));
 
 const loginRecoveryClient=read('js/login_page.js');
-const loginShell=read('index.html');
+const loginShell=read('frontend/index.html');
 ok('Recuperação OTP não cria falsa confirmação nem dead-end', loginRecoveryClient.includes('O código só é confirmado pelo servidor junto com a troca atômica da senha.') && loginRecoveryClient.includes('Continuar com este código') && loginRecoveryClient.includes('otpRejected') && loginRecoveryClient.includes("document.getElementById('rec-step-2').className = 'recovery-step active'") && loginRecoveryClient.includes('sessionStorage.removeItem'));
 ok('Recuperação de senha comunica validação atômica e mínimo correto', loginShell.includes('Agora defina sua nova senha. O código será confirmado com segurança ao salvar a alteração.') && loginShell.includes('placeholder="Mínimo 8 caracteres"') && !loginShell.includes('Código verificado com sucesso!'));
 

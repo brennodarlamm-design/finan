@@ -279,7 +279,7 @@ console.log('=== Auditoria 04/10/2026 ===\n');
   for (const tipo of ['lancamentos', 'medicoes', 'engenharia']) semInjecao(ctx.ExportarTemplates.gerar(tipo, 'o1', {}), `exportação ${tipo}`);
   assert(ctx.ExportarTemplates.gerar('lancamentos', 'o1', {}).includes('&lt;img src=x'), 'o texto aparece escapado (não some)');
   // Nenhum value="${...}" sem escape nos módulos do app.
-  const app = read('app.html');
+  const app = read('frontend/app.html');
   for (const f of [...new Set([...app.matchAll(/src="\/js\/([a-z0-9_\-]+\.js)/g)].map(m => m[1]))]) {
     if (!fs.existsSync(`js/${f}`) || f === 'utils.js') continue; // utils: listas fixas de categorias
     const src = read(`js/${f}`);
@@ -455,7 +455,7 @@ console.log('=== Auditoria 04/10/2026 ===\n');
   assert(read('js/vendor/jspdf.umd.min.js').includes('3.0.4'), 'jsPDF 3.0.4');
   assert(fs.existsSync('js/vendor/xlsx.full.min.js') && read('js/vendor/xlsx.full.min.js').includes('0.20.3'), 'xlsx 0.20.3 local');
   assert(read('js/assets.js').includes('/js/vendor/xlsx.full.min.js') && !worker.includes('cdn.sheetjs.com'));
-  for (const f of ['js/assets.js', 'js/ocr.js', 'js/pdfjs_bootstrap.js', 'bim.html']) assert(!read(f).includes('cdnjs.cloudflare.com'), `${f} sem cdnjs`);
+  for (const f of ['js/assets.js', 'js/ocr.js', 'js/pdfjs_bootstrap.js', 'frontend/bim.html']) assert(!read(f).includes('cdnjs.cloudflare.com'), `${f} sem cdnjs`);
   // #29 workers.dev de produção.
   assert(worker.includes('function blockProductionWorkersDev(request, env)') && worker.includes("if (String(env?.FINOBRA_PREVIEW_COMMIT || '').trim()) return null;"));
   console.log('  ✓ #20–#29 Migração diária, backup enxuto com alerta, WhatsApp preservado, SINAPI completo, webhook de e-mail, render.yaml, workflows, build, bibliotecas locais e workers.dev');
@@ -604,7 +604,7 @@ console.log('=== Auditoria 04/10/2026 ===\n');
 // #38–#40 — restos sem uso, parcela da Caixa e PII/timeout.
 {
   for (const f of ['js/data_demo.js', 'frontend/core/data_demo.js', 'js/recovery-account-ux.js', 'frontend/core/recovery-account-ux.js']) assert(!fs.existsSync(f), `${f} removido`);
-  for (const f of ['app.html', 'frontend/app.html']) assert(!read(f).includes('data_demo.js'), `${f} sem data_demo`);
+  for (const f of ['frontend/app.html']) assert(!read(f).includes('data_demo.js'), `${f} sem data_demo`);
   const ct = read('js/contratos.js');
   assert(!ct.includes('ent * 0.75'), 'sem 75% automático');
   assert(ct.includes("Informe a parcela paga na assinatura da Caixa (cláusula 08)."), 'salvar continua exigindo a parcela');

@@ -21,7 +21,7 @@ const auth = read('js/auth.js');
 const app = read('js/app.js');
 const suporte = read('js/suporte.js');
 const suporteDev = read('js/suporte_dev.js');
-const masterHtml = read('master.html');
+const masterHtml = read('frontend/master.html');
 const vercel = read('vercel.json');
 
 // Migração / schema

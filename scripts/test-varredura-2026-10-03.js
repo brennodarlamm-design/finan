@@ -694,7 +694,7 @@ function appCtx(modulos) {
 // ── UX e performance ──────────────────────────────────────────────────────────
 {
   // #32 BIM sob demanda: nenhum <script> de BIM no app; lista na ordem certa para o carregador.
-  const app = read('app.html');
+  const app = read('frontend/app.html');
   assert(!/<script[^>]+\/js\/bim_/.test(app), 'app.html não baixa o BIM no início');
   const meta = app.match(/<meta name="fingo-bim-scripts" content="([^"]+)">/);
   assert(meta, 'lista de scripts do BIM presente');
@@ -706,7 +706,7 @@ function appCtx(modulos) {
   assert.equal(read('frontend/domains/obras/obra_detalhe.js'), od);
 
   // #33 Sentry não bloqueia a renderização.
-  for (const f of ['landing.html', 'marketing/pages/landing.html', 'index.html', 'master.html', 'app.html']) {
+  for (const f of ['marketing/pages/landing.html', 'frontend/index.html', 'frontend/master.html', 'frontend/app.html']) {
     assert(!read(f).includes('<script src="/js/sentry.js"></script>'), `${f}: sentry sem defer`);
   }
 
@@ -744,12 +744,12 @@ function appCtx(modulos) {
   assert(read('css/style.css').includes('@media (pointer: coarse) {\n  button, .btn, a.btn, [role="button"] { min-height: 32px; }'));
 
   // #38 Sem estouro em 390px (verificado no Chromium; aqui as regras).
-  assert(read('calculadora-bdi.html').includes('.nav-links a[href="/planos"]'));
-  assert(read('validar.html').includes('.input-code { min-width: 0; }'));
+  assert(read('marketing/pages/calculadora-bdi.html').includes('.nav-links a[href="/planos"]'));
+  assert(read('marketing/pages/validar.html').includes('.input-code { min-width: 0; }'));
 
   // #39 Imagens.
   assert(fs.statSync('img/og-fingo-cover.jpg').size < 200 * 1024 && fs.statSync('img/fingo-logo-512.jpg').size < 100 * 1024);
-  for (const f of ['landing.html', 'sobre-nos.html', 'planos.html', 'blog.html', 'site.webmanifest', 'scripts/prerender-marketing.mjs']) {
+  for (const f of ['marketing/pages/landing.html', 'marketing/pages/sobre-nos.html', 'marketing/pages/planos.html', 'marketing/pages/blog.html', 'site.webmanifest', 'scripts/prerender-marketing.mjs']) {
     assert(!/og-finobra-cover|finobra_logo/.test(read(f)), `${f}: imagem com a marca antiga`);
   }
   for (const f of ['img/fingo/hero-video-preview.png', 'img/fingo/logo-reveal-frame120.png', 'img/fingo/logo-reveal-frame60.png', 'img/fingo/hero-video-frame160.png']) {

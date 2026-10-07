@@ -10,7 +10,7 @@ const master = read('js/master.js');
 const devKeys = read('js/dev-tenant-keys.js');
 const api = read('api/_dev-tenant-keys.js');
 const auditMux = read('api/audit.js');
-const app = read('app.html');
+const app = read('frontend/app.html');
 const build = read('scripts/build-cloudflare-pages.cjs');
 const migration = read('migrations/027_dev_tenant_key_vault.sql');
 

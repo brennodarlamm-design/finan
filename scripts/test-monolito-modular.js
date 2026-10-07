@@ -105,26 +105,21 @@ const marketingPages = [
 
 for (const page of marketingPages) {
   const mktgPath = path.join(root, 'marketing', 'pages', page);
-  const rootPath = path.join(root, page);
   assert(fs.existsSync(mktgPath), `Página de marketing ausente em marketing/pages/${page}`);
-  assert(fs.existsSync(rootPath), `Página raiz correspondente ausente: ${page}`);
-  const mktgBuf = fs.readFileSync(mktgPath);
-  const rootBuf = fs.readFileSync(rootPath);
-  assert(mktgBuf.equals(rootBuf), `Divergência entre marketing/pages/${page} e ${page}`);
 }
-console.log(`  ✓ 4. Todas as ${marketingPages.length} páginas públicas de marketing validadas com 100% de paridade`);
+console.log(`  ✓ 4. Todas as ${marketingPages.length} páginas públicas presentes em marketing/pages/ (fonte canônica)`);
 
-// 5. Validar shells de aplicação em frontend/
-const shells = ['app.html', 'master.html', 'bim.html'];
+// 5. Validar shells de aplicação em frontend/ (fonte canônica; login = frontend/index.html)
+const shells = ['index.html', 'app.html', 'master.html', 'bim.html'];
 for (const shell of shells) {
-  const feShell = path.join(root, 'frontend', shell);
-  const rootShell = path.join(root, shell);
-  assert(fs.existsSync(feShell), `Shell ausente em frontend/${shell}`);
-  const feBuf = fs.readFileSync(feShell);
-  const rootBuf = fs.readFileSync(rootShell);
-  assert(feBuf.equals(rootBuf), `Divergência entre frontend/${shell} e ${shell}`);
+  assert(fs.existsSync(path.join(root, 'frontend', shell)), `Shell ausente em frontend/${shell}`);
 }
-console.log(`  ✓ 5. Shells de aplicação (${shells.join(', ')}) validados`);
+console.log(`  ✓ 5. Shells de aplicação (${shells.join(', ')}) presentes em frontend/`);
+
+// 5b. A raiz do repositório não tem HTML: a fonte canônica é marketing/pages/ e frontend/.
+const htmlNaRaiz = fs.readdirSync(root).filter(f => f.endsWith('.html'));
+assert(htmlNaRaiz.length === 0, `HTML solto na raiz (use marketing/pages/ ou frontend/): ${htmlNaRaiz.join(', ')}`);
+console.log('  ✓ 5b. Raiz sem arquivos HTML');
 
 // 6. Validar CSS em frontend/css
 const cssDir = path.join(root, 'css');

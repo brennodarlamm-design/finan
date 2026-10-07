@@ -77,7 +77,7 @@ const clientesJsSrc = fs.readFileSync(path.join(root, 'js/clientes.js'), 'utf8')
 ok('Clientes formulário inclui campo tipo_workflow', clientesJsSrc.includes('name="tipo_workflow"'));
 ok('Clientes.save persiste tipo_workflow', clientesJsSrc.includes('d.tipo_workflow = d.tipo_workflow || null;'));
 
-const appHtmlSrc = fs.readFileSync(path.join(root, 'app.html'), 'utf8');
+const appHtmlSrc = fs.readFileSync(path.join(root, 'frontend/app.html'), 'utf8');
 ok('app.html carrega minhas_demandas.js', appHtmlSrc.includes('/js/minhas_demandas.js'));
 ok('app.html carrega central_gestor.js', appHtmlSrc.includes('/js/central_gestor.js'));
 

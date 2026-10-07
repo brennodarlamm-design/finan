@@ -13,7 +13,7 @@ function ok(name, cond) {
 const auth = read('api/_auth.js');
 const admin = read('api/admin.js');
 const master = read('js/master.js');
-const masterHtml = read('master.html');
+const masterHtml = read('frontend/master.html');
 const wa = read('js/whatsapp.js');
 const cfg = read('js/configuracoes.js');
 const data = read('js/data.js');

@@ -43,11 +43,18 @@ const rootFiles = [
 
 const directories = ['css', 'js', 'img', 'data', '.well-known'];
 
+// Fontes canônicas dos HTML: as páginas públicas ficam em marketing/pages/ e os shells da
+// aplicação (login, app, master, BIM) em frontend/. A raiz do repositório não tem mais HTML.
+const marketingPagesDir = path.join(root, 'marketing', 'pages');
+const frontendDir = path.join(root, 'frontend');
+
 function resolveSourceFile(file) {
   const pubPath = path.join(root, 'public', file);
   if (fs.existsSync(pubPath)) return pubPath;
-  const mktgPath = path.join(root, 'marketing', 'pages', file);
+  const mktgPath = path.join(marketingPagesDir, file);
   if (fs.existsSync(mktgPath)) return mktgPath;
+  const frontendPath = path.join(frontendDir, file);
+  if (file.endsWith('.html') && fs.existsSync(frontendPath)) return frontendPath;
   return path.join(root, file);
 }
 
@@ -181,8 +188,8 @@ for (const dir of directories) copyRequired(path.join(root, dir), path.join(out,
 empacotarSentry(path.join(out, 'js', 'sentry.js'));
 
 // Patch 37: a raiz pública é comercial; o login possui shell dedicado.
-copyRequired(path.join(root, 'landing.html'), path.join(out, 'index.html'));
-copyRequired(path.join(root, 'index.html'), path.join(out, 'login.html'));
+copyRequired(path.join(marketingPagesDir, 'landing.html'), path.join(out, 'index.html'));
+copyRequired(path.join(frontendDir, 'index.html'), path.join(out, 'login.html'));
 
 const cfDir = path.join(root, 'cloudflare');
 if (fs.existsSync(cfDir)) {

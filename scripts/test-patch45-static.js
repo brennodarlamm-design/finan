@@ -20,7 +20,7 @@ function test(name, condition, details = '') {
 console.log('🧪 Executando Testes Estáticos — PATCH 45: Gestão de Contas Bancárias e Conciliação no Painel Master...\n');
 
 const adminPath = path.resolve('api/admin.js');
-const masterHtmlPath = path.resolve('master.html');
+const masterHtmlPath = path.resolve('frontend/master.html');
 const masterJsPath = path.resolve('js/master.js');
 const patch26EventsPath = path.resolve('js/patch26-events.js');
 

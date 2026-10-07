@@ -35,7 +35,7 @@ const exportar = read('js/exportar.js');
 const escritorio = read('js/escritorio.js');
 const notasJs = read('js/notas.js');
 const importarExcel = read('js/importar_excel.js');
-const privacidade = read('privacidade.html');
+const privacidade = read('marketing/pages/privacidade.html');
 
 test('Migração cria coluna de permissões por usuário', /ADD COLUMN IF NOT EXISTS permissoes JSONB/i.test(migration));
 test('Migração cria sessões revogáveis', /CREATE TABLE IF NOT EXISTS auth_sessions/i.test(migration));

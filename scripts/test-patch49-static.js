@@ -127,7 +127,7 @@ console.log(`✅ [4/6] Contagem de endpoints serverless em conformidade: ${apiFi
 
 // 5. Testar Interface master.html e CSP Bridge
 console.log('👉 [5/6] Verificando master.html, master_page.js e CSP allowlist em patch26-events.js...');
-const masterHtml = fs.readFileSync(path.join(rootDir, 'master.html'), 'utf8');
+const masterHtml = fs.readFileSync(path.join(rootDir, 'frontend/master.html'), 'utf8');
 assert.ok(masterHtml.includes('id="master-step-credentials"'), 'master.html deve ter step de credenciais');
 assert.ok(masterHtml.includes('id="master-step-mfa"'), 'master.html deve ter step de MFA 2FA');
 assert.ok(masterHtml.includes('id="master-step-setup"'), 'master.html deve ter step de ativação com QR code');

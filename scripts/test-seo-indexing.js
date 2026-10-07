@@ -79,7 +79,7 @@ console.log('   ✓ robots.txt validado: crawl budget protegido, áreas privadas
 // ─────────────────────────────────────────────────────────────────────────────
 console.log('\n3. Validando SEO on-page, OpenGraph e Schema.org em landing.html...');
 
-const landing = read('landing.html');
+const landing = read('marketing/pages/landing.html');
 
 // Meta description de tamanho ideal para Google (120 - 165 caracteres)
 const descMatch = landing.match(/<meta\s+name=["']description["']\s+content=["'](.*?)["']/i);
@@ -93,7 +93,7 @@ assert(landing.includes('<link rel="canonical" href="https://fingo.api.br/">'), 
 
 // OpenGraph e Twitter Cards 1200x630
 assert(landing.includes('property="og:image" content="https://fingo.api.br/img/og-fingo-cover.jpg"'), 'og:image deve apontar para banner 1200x630');
-for (const page of ['landing.html', 'sobre-nos.html', 'planos.html', 'blog.html', 'calculadora-bdi.html', 'manuais.html', 'privacidade.html', 'termos.html', 'validar.html']) {
+for (const page of ['marketing/pages/landing.html', 'marketing/pages/sobre-nos.html', 'marketing/pages/planos.html', 'marketing/pages/blog.html', 'marketing/pages/calculadora-bdi.html', 'marketing/pages/manuais.html', 'marketing/pages/privacidade.html', 'marketing/pages/termos.html', 'marketing/pages/validar.html']) {
   assert(fs.readFileSync(path.join(root, page), 'utf8').includes('<meta property="fb:app_id" content="2479033335926572">'), `${page} deve declarar fb:app_id`);
 }
 assert(landing.includes('property="og:image:width" content="1200"'), 'og:image:width deve ser 1200');
@@ -122,7 +122,7 @@ assert(webSiteNode.alternateName && webSiteNode.alternateName.length > 0);
 const orgNode = schema['@graph'].find(n => n['@type'] === 'Organization');
 assert(orgNode.contactPoint, 'Organization mantém contato comercial');
 
-const faqNode = JSON.parse(read('planos.html').match(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/i)[1]);
+const faqNode = JSON.parse(read('marketing/pages/planos.html').match(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/i)[1]);
 assert.strictEqual(faqNode.mainEntity.length, 3, 'FAQPage deve conter exatamente as 3 perguntas exibidas na interface');
 
 const softNode = schema['@graph'].find(n => n['@type'] === 'SoftwareApplication');
@@ -137,9 +137,9 @@ console.log('   ✓ Schema.org @graph (WebSite, Organization, SoftwareApplicatio
 console.log('\n4. Validando páginas públicas secundárias (privacidade, termos, validar)...');
 
 const pages = [
-  { file: 'privacidade.html', canonical: 'https://fingo.api.br/privacidade' },
-  { file: 'termos.html', canonical: 'https://fingo.api.br/termos' },
-  { file: 'validar.html', canonical: 'https://fingo.api.br/validar' }
+  { file: 'marketing/pages/privacidade.html', canonical: 'https://fingo.api.br/privacidade' },
+  { file: 'marketing/pages/termos.html', canonical: 'https://fingo.api.br/termos' },
+  { file: 'marketing/pages/validar.html', canonical: 'https://fingo.api.br/validar' }
 ];
 
 for (const p of pages) {
@@ -161,10 +161,10 @@ for (const p of pages) {
 // ─────────────────────────────────────────────────────────────────────────────
 console.log('\n5. Validando blindagem de páginas restritas (noindex, nofollow)...');
 
-const appHtml = read('app.html');
+const appHtml = read('frontend/app.html');
 assert(appHtml.includes('<meta name="robots" content="noindex, nofollow">'), 'app.html deve ter noindex, nofollow para não vazar no Google');
 
-const masterHtml = read('master.html');
+const masterHtml = read('frontend/master.html');
 assert(masterHtml.includes('<meta name="robots" content="noindex, nofollow">'), 'master.html deve ter noindex, nofollow');
 
 console.log('   ✓ app.html e master.html blindados contra indexação indevida.');

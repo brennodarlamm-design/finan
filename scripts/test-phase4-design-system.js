@@ -144,13 +144,13 @@ console.log('   ✓ Padrão contábil DES-04 e tabular-nums homologados em todos
 // ─────────────────────────────────────────────────────────────────────────────
 console.log('\n5. Validando inclusão de tokens.css nos pontos de entrada HTML...');
 
-const appHtml = read('app.html');
+const appHtml = read('frontend/app.html');
 assert(appHtml.includes('href="/css/tokens.css?v='), 'app.html deve referenciar /css/tokens.css');
 
-const masterHtml = read('master.html');
+const masterHtml = read('frontend/master.html');
 assert(masterHtml.includes('href="/css/tokens.css?v='), 'master.html deve referenciar /css/tokens.css');
 
-const indexHtml = read('index.html');
+const indexHtml = read('frontend/index.html');
 assert(indexHtml.includes('href="/css/tokens.css?v='), 'index.html deve referenciar /css/tokens.css');
 
 console.log('   ✓ Inclusão nos documentos HTML confirmada.');

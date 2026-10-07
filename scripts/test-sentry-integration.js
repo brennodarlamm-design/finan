@@ -18,7 +18,7 @@ assert.ok(
 assert.ok(sentryBundle.includes('browserTracingIntegration'), 'js/sentry.js deve conter tracing do Sentry');
 
 // 2. Validar inclusão do script nas páginas principais
-for (const page of ['index.html', 'app.html', 'master.html', 'landing.html']) {
+for (const page of ['frontend/index.html', 'frontend/app.html', 'frontend/master.html', 'marketing/pages/landing.html']) {
   const pagePath = path.join(root, page);
   assert.ok(fs.existsSync(pagePath), `${page} deve existir`);
   const html = fs.readFileSync(pagePath, 'utf8');

@@ -13,7 +13,7 @@ const test = (n, c) => {
 };
 
 const idbStorageCode = read('js/idb_storage.js');
-const appHtml = read('app.html');
+const appHtml = read('frontend/app.html');
 const jsData = read('js/data.js');
 const jsApp = read('js/app.js');
 
