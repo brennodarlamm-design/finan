@@ -127,9 +127,7 @@ $RECYCLE.BIN/
 
 # Editores, IDEs & Agentes de IA
 .idea/
-.vscode/*
-!.vscode/settings.json
-!.vscode/extensions.json
+.vscode/
 .claude/
 .cursor/
 .gemini/
