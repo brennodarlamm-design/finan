@@ -129,8 +129,10 @@
           color: #E8C84A;
         }
         .fingo-cb-text a:focus,
+        .fingo-cb-text a:focus-visible,
         .fingo-cb-btn-accept:focus,
-        .fingo-cb-btn-link:focus {
+        .fingo-cb-btn-link:focus,
+        .fingo-cb-btn-link:focus-visible {
           outline: 3px solid #D4FF33;
           outline-offset: 3px;
         }
@@ -172,7 +174,8 @@
           border-radius: 6px;
           text-decoration: none;
           cursor: pointer;
-          transition: all 0.15s;
+          /* Sem "all": o contorno de foco aparecia animado (0 → 3px) e ficava invisível no instante do foco. */
+          transition: color 0.15s, background-color 0.15s, border-color 0.15s;
         }
         .fingo-cb-btn-link:hover {
           color: #F0EAD6;

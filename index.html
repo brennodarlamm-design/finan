@@ -233,6 +233,13 @@
       align-items: center;
       justify-content: center;
     }
+    /* Foco por teclado sempre visível (links, botões, checkbox e o olho da senha não tinham
+       indicador). Sem animar o contorno, para ele aparecer no instante do foco. */
+    :is(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
+      outline: 2px solid var(--accent, #C6FF00) !important;
+      outline-offset: 2px;
+      transition-property: color, background-color, border-color, box-shadow, transform, opacity;
+    }
 </style>
   <script src="/js/version_guard.js"></script>
   <link rel="stylesheet" href="/css/premium.css?v=20260913" media="screen">
