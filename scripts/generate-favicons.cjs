@@ -28,11 +28,13 @@ const svgContent = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512
 </svg>
 `;
 
-fs.writeFileSync('favicon.svg', svgContent, 'utf8');
+const publicDir = path.resolve(__dirname, '..', 'public');
+if (!fs.existsSync(publicDir)) fs.mkdirSync(publicDir, { recursive: true });
+fs.writeFileSync(path.join(publicDir, 'favicon.svg'), svgContent, 'utf8');
 if (fs.existsSync('dist')) {
   fs.writeFileSync('dist/favicon.svg', svgContent, 'utf8');
 }
-console.log('✓ favicon.svg gerado com sucesso.');
+console.log('✓ favicon.svg gerado com sucesso em public/.');
 
 // 2. Load authentic fingo-symbol.png
 const symbolPngData = fs.readFileSync('img/fingo/fingo-symbol.png');
@@ -132,15 +134,15 @@ function renderFaviconPng(targetSize, cornerRadius = 0) {
 
 // Generate 32x32 PNG
 const png32 = renderFaviconPng(32, 6);
-fs.writeFileSync('favicon-32x32.png', png32);
+fs.writeFileSync(path.join(publicDir, 'favicon-32x32.png'), png32);
 if (fs.existsSync('dist')) fs.writeFileSync('dist/favicon-32x32.png', png32);
-console.log('✓ favicon-32x32.png gerado com sucesso.');
+console.log('✓ favicon-32x32.png gerado com sucesso em public/.');
 
 // Generate 192x192 PNG
 const png192 = renderFaviconPng(192, 38);
-fs.writeFileSync('favicon-192x192.png', png192);
+fs.writeFileSync(path.join(publicDir, 'favicon-192x192.png'), png192);
 if (fs.existsSync('dist')) fs.writeFileSync('dist/favicon-192x192.png', png192);
-console.log('✓ favicon-192x192.png gerado com sucesso.');
+console.log('✓ favicon-192x192.png gerado com sucesso em public/.');
 
 // Generate 16x16 PNG for multi-size ICO
 const png16 = renderFaviconPng(16, 3);
@@ -181,6 +183,6 @@ const icoBuffer = createIco([
   { width: 16, height: 16, data: png16 }
 ]);
 
-fs.writeFileSync('favicon.ico', icoBuffer);
+fs.writeFileSync(path.join(publicDir, 'favicon.ico'), icoBuffer);
 if (fs.existsSync('dist')) fs.writeFileSync('dist/favicon.ico', icoBuffer);
-console.log('✓ favicon.ico gerado com sucesso.');
+console.log('✓ favicon.ico gerado com sucesso em public/.');

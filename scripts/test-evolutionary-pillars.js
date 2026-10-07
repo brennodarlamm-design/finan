@@ -35,20 +35,24 @@ async function runTests() {
 
   // 2. Validando PWA, TWA, Service Worker & Web Push
   console.log('\n2. Validando PWA, TWA & Notificações Web Push...');
-  assert(fs.existsSync(path.resolve('sw.js')), 'sw.js (Service Worker) existe na raiz do projeto');
-  const swCode = fs.readFileSync(path.resolve('sw.js'), 'utf8');
+  const resolvePwaFile = (f) => fs.existsSync(path.resolve(f)) ? path.resolve(f) : path.resolve('public', f);
+  const swPath = resolvePwaFile('sw.js');
+  assert(fs.existsSync(swPath), 'sw.js (Service Worker) existe no projeto');
+  const swCode = fs.readFileSync(swPath, 'utf8');
   assert(swCode.includes('fingo-static-') && swCode.includes('addEventListener(\'fetch\''), 'sw.js implementa cache e interceptação de fetch');
   assert(swCode.includes('addEventListener(\'push\'') && swCode.includes('showNotification'), 'sw.js manipula eventos de Web Push nativo');
   assert(swCode.includes('addEventListener(\'notificationclick\''), 'sw.js manipula clique em notificações push');
 
-  assert(fs.existsSync(path.resolve('site.webmanifest')), 'site.webmanifest existe');
-  const manifest = JSON.parse(fs.readFileSync(path.resolve('site.webmanifest'), 'utf8'));
+  const manifestPath = resolvePwaFile('site.webmanifest');
+  assert(fs.existsSync(manifestPath), 'site.webmanifest existe');
+  const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
   assert(manifest.name === 'FinGo — Obras em Fluxo' && manifest.display === 'standalone', 'site.webmanifest possui name e display standalone');
   assert(Array.isArray(manifest.shortcuts) && manifest.shortcuts.length >= 3, 'site.webmanifest possui atalhos de aplicativo (shortcuts)');
   assert(Array.isArray(manifest.categories) && manifest.categories.includes('finance'), 'site.webmanifest possui categorias definidas');
 
-  assert(fs.existsSync(path.resolve('twa-manifest.json')), 'twa-manifest.json existe para empacotamento Google Play TWA');
-  const twaManifest = JSON.parse(fs.readFileSync(path.resolve('twa-manifest.json'), 'utf8'));
+  const twaManifestPath = resolvePwaFile('twa-manifest.json');
+  assert(fs.existsSync(twaManifestPath), 'twa-manifest.json existe para empacotamento Google Play TWA');
+  const twaManifest = JSON.parse(fs.readFileSync(twaManifestPath, 'utf8'));
   assert(twaManifest.packageId === 'br.api.fingo.app', 'twa-manifest.json define packageId br.api.fingo.app');
   assert(twaManifest.enableNotifications === true, 'twa-manifest.json habilita notificações nativas');
 

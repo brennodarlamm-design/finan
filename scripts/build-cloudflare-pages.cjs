@@ -44,6 +44,8 @@ const rootFiles = [
 const directories = ['css', 'js', 'img', 'data', '.well-known'];
 
 function resolveSourceFile(file) {
+  const pubPath = path.join(root, 'public', file);
+  if (fs.existsSync(pubPath)) return pubPath;
   const mktgPath = path.join(root, 'marketing', 'pages', file);
   if (fs.existsSync(mktgPath)) return mktgPath;
   return path.join(root, file);

@@ -7,7 +7,10 @@ import { PGlite } from '@electric-sql/pglite';
 import { EvolutionGoClient } from '../backend/domains/atendimento/evolution_client.js';
 import { createCriticalR2Backup } from '../api/_edge-backup.js';
 
-const read = (file) => fs.readFileSync(file, 'utf8').replace(/\r\n/g, '\n');
+const read = (file) => {
+  const p = fs.existsSync(file) ? file : (fs.existsSync('public/' + file) ? 'public/' + file : file);
+  return fs.readFileSync(p, 'utf8').replace(/\r\n/g, '\n');
+};
 
 console.log('=== Varredura 03/10/2026: correções rápidas ===\n');
 

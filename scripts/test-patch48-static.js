@@ -20,14 +20,15 @@ function test(name, condition, details = '') {
 console.log('🧪 Executando Testes Estáticos — PATCH 48: SEO, Metadados, Robots, Sitemap e Schema.org...\n');
 
 // 1. Validação de Arquivos Robots e Sitemap
-const rootRobotsPath = path.resolve('robots.txt');
+const resolvePublicOrRoot = (f) => fs.existsSync(path.resolve('public', f)) ? path.resolve('public', f) : path.resolve(f);
+const rootRobotsPath = resolvePublicOrRoot('robots.txt');
 const dataRobotsPath = path.resolve('data/robots.txt');
-const rootSitemapPath = path.resolve('sitemap.xml');
+const rootSitemapPath = resolvePublicOrRoot('sitemap.xml');
 const dataSitemapPath = path.resolve('data/sitemap.xml');
 
-test('robots.txt na raiz do projeto existe', fs.existsSync(rootRobotsPath));
+test('robots.txt existe', fs.existsSync(rootRobotsPath));
 test('data/robots.txt existe', fs.existsSync(dataRobotsPath));
-test('sitemap.xml na raiz do projeto existe', fs.existsSync(rootSitemapPath));
+test('sitemap.xml existe', fs.existsSync(rootSitemapPath));
 test('data/sitemap.xml existe', fs.existsSync(dataSitemapPath));
 
 const rootRobots = fs.readFileSync(rootRobotsPath, 'utf8');

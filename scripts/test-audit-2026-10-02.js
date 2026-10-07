@@ -8,7 +8,13 @@ import { fileURLToPath } from 'url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(__dirname, '..');
-const read = (rel) => fs.readFileSync(path.join(root, rel), 'utf8');
+const read = (rel) => {
+  const p = path.join(root, rel);
+  if (fs.existsSync(p)) return fs.readFileSync(p, 'utf8');
+  const pub = path.join(root, 'public', rel);
+  if (fs.existsSync(pub)) return fs.readFileSync(pub, 'utf8');
+  return fs.readFileSync(p, 'utf8');
+};
 
 function createMockResponse() {
   let statusCode = 200; let body; const headers = {};

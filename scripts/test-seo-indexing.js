@@ -9,7 +9,13 @@ import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const root = path.resolve(__dirname, '..');
-const read = (p) => fs.readFileSync(path.join(root, p), 'utf8');
+const read = (p) => {
+  const full = path.join(root, p);
+  if (fs.existsSync(full)) return fs.readFileSync(full, 'utf8');
+  const pub = path.join(root, 'public', p);
+  if (fs.existsSync(pub)) return fs.readFileSync(pub, 'utf8');
+  return fs.readFileSync(full, 'utf8');
+};
 
 console.log('=== Suíte de Testes de SEO Técnico e Indexabilidade ===\n');
 
@@ -204,7 +210,7 @@ assert(llmsTxt.includes('https://fingo.api.br/llms-full.txt'), 'llms.txt deve li
 const dataLlmsTxt = read('data/llms.txt');
 assert(dataLlmsTxt.includes('## Optional'), 'data/llms.txt deve conter seção ## Optional');
 
-assert(fs.existsSync(path.join(root, 'site.webmanifest')), 'site.webmanifest deve existir na raiz');
+assert(fs.existsSync(path.join(root, 'site.webmanifest')) || fs.existsSync(path.join(root, 'public', 'site.webmanifest')), 'site.webmanifest deve existir');
 const manifestContent = JSON.parse(read('site.webmanifest'));
 assert.strictEqual(manifestContent.short_name, 'FinGo');
 assert(Array.isArray(manifestContent.icons) && manifestContent.icons.length >= 2, 'site.webmanifest deve conter ícones');

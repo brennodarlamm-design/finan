@@ -122,8 +122,9 @@ test('api/_sla.js implementa envelopes padronizados RESTful e projeção de egre
 console.log('\n[4] Padrão llms.txt & Descoberta por IA');
 
 test('llms.txt e llms-full.txt existem e seguem padrão llmstxt.org', () => {
-  const txtPath = path.join(root, 'llms.txt');
-  const fullPath = path.join(root, 'llms-full.txt');
+  const resolveRootOrPublic = (f) => fs.existsSync(path.join(root, 'public', f)) ? path.join(root, 'public', f) : path.join(root, f);
+  const txtPath = resolveRootOrPublic('llms.txt');
+  const fullPath = resolveRootOrPublic('llms-full.txt');
   assert.ok(fs.existsSync(txtPath), 'llms.txt deve existir');
   assert.ok(fs.existsSync(fullPath), 'llms-full.txt deve existir');
 
@@ -145,13 +146,15 @@ test('llms.txt e llms-full.txt existem e seguem padrão llmstxt.org', () => {
 });
 
 test('robots.txt permite acesso público a /llms.txt e /llms-full.txt', () => {
-  const r = fs.readFileSync(path.join(root, 'robots.txt'), 'utf8');
+  const resolveRootOrPublic = (f) => fs.existsSync(path.join(root, 'public', f)) ? path.join(root, 'public', f) : path.join(root, f);
+  const r = fs.readFileSync(resolveRootOrPublic('robots.txt'), 'utf8');
   assert.ok(r.includes('Allow: /llms.txt'), 'robots.txt deve conter Allow: /llms.txt');
   assert.ok(r.includes('Allow: /llms-full.txt'), 'robots.txt deve conter Allow: /llms-full.txt');
 });
 
 test('sitemap.xml e data/sitemap.xml indexam as rotas de LLMs', () => {
-  const s1 = fs.readFileSync(path.join(root, 'sitemap.xml'), 'utf8');
+  const resolveRootOrPublic = (f) => fs.existsSync(path.join(root, 'public', f)) ? path.join(root, 'public', f) : path.join(root, f);
+  const s1 = fs.readFileSync(resolveRootOrPublic('sitemap.xml'), 'utf8');
   const s2 = fs.readFileSync(path.join(root, 'data', 'sitemap.xml'), 'utf8');
   assert.ok(s1.includes('https://fingo.api.br/llms.txt') && s1.includes('https://fingo.api.br/llms-full.txt'), 'sitemap.xml deve conter URLs de LLM');
   assert.ok(s2.includes('https://fingo.api.br/llms.txt') && s2.includes('https://fingo.api.br/llms-full.txt'), 'data/sitemap.xml deve conter URLs de LLM');
