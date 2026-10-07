@@ -32,6 +32,9 @@ fingo-evolution-go.env
 .env.backup
 .sentryclirc
 *.sentryclirc
+.secrets.temp.json
+*.secrets.temp.json
+*.credentials
 *.pem
 *.key
 *.crt
@@ -63,25 +66,33 @@ monitor-nfe/whatsapp-server/
 .trigger/
 .render/
 .mf/
+.dev.vars
 
 # Build & Caches
 dist/
 build/
+out/
 .next/
 .turbo/
 .cache/
+.parcel-cache/
 .output/
 .vite/
 .eslintcache
 *.tsbuildinfo
 *.map
 .marketing-dist/
+dist-ssr/
 
 # Testes, Cobertura & Relatórios
 coverage/
 .nyc_output/
 test-results/
 playwright-report/
+.playwright/
+.qa/
+audit-output/
+*.lcov
 
 # Backups temporários, binários locais, arquivos scratch & pacotes
 *.tmp
@@ -98,6 +109,9 @@ scratch/
 *.rar
 *.7z
 .release_temp/
+*.step.cache
+*.blend1
+*.blend2
 
 # Sistema Operacional
 .DS_Store
@@ -111,11 +125,14 @@ ehthumbs.db
 Desktop.ini
 $RECYCLE.BIN/
 
-# Editores & IDEs
+# Editores, IDEs & Agentes de IA
 .idea/
 .vscode/*
 !.vscode/settings.json
 !.vscode/extensions.json
+.claude/
+.cursor/
+.gemini/
 *.suo
 *.ntvs*
 *.njsproj
@@ -127,3 +144,4 @@ __pycache__/
 
 # SSR temporário da pré-renderização de marketing (scripts/prerender-marketing.mjs)
 .marketing-ssr/
+

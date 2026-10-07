@@ -1,6 +1,7 @@
 # OS files
 .DS_Store
 Thumbs.db
+Desktop.ini
 
 # Python
 __pycache__/
@@ -13,11 +14,14 @@ __pycache__/
 venv/
 ENV/
 
-# IDE
+# IDE & AI Agents
 .idea/
 .vscode/
 *.swp
 *.swo
+.claude/
+.cursor/
+.gemini/
 
 # Logs
 *.log
@@ -36,20 +40,25 @@ build/
 .nuxt/
 .output/
 out/
+*.tsbuildinfo
 
-# Cache
+# Cache & Testing
 .cache/
 .parcel-cache/
 .turbo/
+coverage/
+.playwright/
+playwright-report/
+test-results/
 
 # Environment
 .env
+.env.*
+!.env.example
 .env.local
 .env.*.local
 
-# Local settings
-.claude/settings.local.json
-.claude/session-state/
+# Local settings & Skill temporary files
 ui-ux-pro-max-website/*
 /plans/
 /repomix-output.xml

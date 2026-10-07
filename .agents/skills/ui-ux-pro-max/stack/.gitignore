@@ -4,15 +4,21 @@ package-lock.json
 pnpm-lock.yaml
 yarn.lock
 
+# Build & caches
+dist/
+build/
+.cache/
+
 # Audit / Playwright output (regenerate locally; examples/ is committed on purpose)
 audit-output/
 test-results/
 playwright-report/
 .playwright/
 
-# Local Claude Code state
-.claude/settings.local.json
-.claude/.session/
+# Local AI agent state
+.claude/
+.cursor/
+.gemini/
 
 # Env / secrets
 .env
@@ -22,6 +28,7 @@ playwright-report/
 # OS / editor
 .DS_Store
 Thumbs.db
+Desktop.ini
 *.log
 .idea/
 .vscode/
