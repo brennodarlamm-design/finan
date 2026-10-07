@@ -3736,6 +3736,7 @@ const MasterAdmin = {
           </div>
         </div>
       </div>
+    `;
   },
 
   gerarPixPayload({ key = '+5595991363678', amount = 0, txid = '***', merchantName = 'BRENNO DARLAN A COSTA', merchantCity = 'BOA VISTA' } = {}) {
