@@ -50,7 +50,7 @@ test('sitemap.xml contém URLs canônicas essenciais com prioridades e changefre
   rootSitemap.includes('<priority>1.0</priority>'));
 
 // 2. Validação da Landing Page (landing.html)
-const landingPath = path.resolve('landing.html');
+const landingPath = path.resolve('marketing/pages/landing.html');
 test('landing.html existe', fs.existsSync(landingPath));
 const landing = fs.readFileSync(landingPath, 'utf8');
 
@@ -76,11 +76,11 @@ test('landing.html possui código de verificação Google Search Console',
 test('landing.html possui Schema.org JSON-LD com SoftwareApplication, Organization e FAQPage',
   landing.includes('"@type": "SoftwareApplication"') &&
   landing.includes('"@type": "Organization"') &&
-  fs.readFileSync('planos.html','utf8').includes('"@type": "FAQPage"'));
+  fs.readFileSync('marketing/pages/planos.html','utf8').includes('"@type": "FAQPage"'));
 
 // 3. Validação de index.html, master.html e auth-route-patch38.js
-const indexPath = path.resolve('index.html');
-const masterPath = path.resolve('master.html');
+const indexPath = path.resolve('frontend/index.html');
+const masterPath = path.resolve('frontend/master.html');
 const authRoutePath = path.resolve('js/auth-route-patch38.js');
 
 const indexHtml = fs.readFileSync(indexPath, 'utf8');

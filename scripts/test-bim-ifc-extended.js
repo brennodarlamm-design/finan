@@ -1189,7 +1189,7 @@ assert(viewer.includes('id="bim-floor-panel"'),'viewer possui painel de paviment
 assert(viewer.includes("elem.importedProperties?.storeyName"),'inspetor mostra pavimento IFC');
 assert(viewer.includes("option value=\"hidraulica\"")&&viewer.includes("option value=\"eletrica\""),'filtro inclui disciplinas MEP');
 
-const app=fs.readFileSync('app.html','utf8');
+const app=fs.readFileSync('frontend/app.html','utf8');
 assert(app.indexOf('/js/bim_csg.js') < app.indexOf('/js/bim_ifc_extended.js'),'motor CSG carrega antes do tessellador IFC');
 assert(app.indexOf('/js/bim_ifc_extended.js') < app.indexOf('/js/bim_geometry_importer.js'),'tessellador IFC estendido carrega antes do importador');
 assert(typeof csg.subtract === 'function' && typeof csg.booleanOperation === 'function','motor CSG expõe operações determinísticas');

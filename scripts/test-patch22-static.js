@@ -2,7 +2,7 @@ import fs from 'fs';
 
 const read = p => fs.readFileSync(new URL(`../${p}`, import.meta.url), 'utf8');
 const patch = read('js/patch22.js');
-const app = read('app.html');
+const app = read('frontend/app.html');
 const db = read('api/db.js');
 const auth = read('api/auth.js');
 const backend = read('backend/server.js');

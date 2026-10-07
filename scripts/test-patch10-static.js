@@ -12,7 +12,7 @@ const app=read('js/app.js');
 const upload=read('api/upload.js');
 const docs=read('js/documentos.js');
 const vercel=read('vercel.json');
-const htmls=['index.html','master.html','validar.html','landing.html','app.html'].map(read).join('\n');
+const htmls=['frontend/index.html','frontend/master.html','marketing/pages/validar.html','marketing/pages/landing.html','frontend/app.html'].map(read).join('\n');
 
 test('Migração remove defaults implícitos de tenant', /ALTER TABLE obras\s+ALTER COLUMN tenant_id DROP DEFAULT/i.test(migration) && /ALTER TABLE lancamentos\s+ALTER COLUMN tenant_id DROP DEFAULT/i.test(migration));
 test('Migração protege tenant obrigatório em novas gravações', /CHECK \(tenant_id IS NOT NULL\) NOT VALID/i.test(migration));

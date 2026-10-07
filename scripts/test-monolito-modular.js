@@ -105,26 +105,27 @@ const marketingPages = [
 
 for (const page of marketingPages) {
   const mktgPath = path.join(root, 'marketing', 'pages', page);
-  const rootPath = path.join(root, page);
   assert(fs.existsSync(mktgPath), `Página de marketing ausente em marketing/pages/${page}`);
-  assert(fs.existsSync(rootPath), `Página raiz correspondente ausente: ${page}`);
-  const mktgBuf = fs.readFileSync(mktgPath);
-  const rootBuf = fs.readFileSync(rootPath);
-  assert(mktgBuf.equals(rootBuf), `Divergência entre marketing/pages/${page} e ${page}`);
 }
-console.log(`  ✓ 4. Todas as ${marketingPages.length} páginas públicas de marketing validadas com 100% de paridade`);
+console.log(`  ✓ 4. Todas as ${marketingPages.length} páginas públicas presentes em marketing/pages/ (fonte canônica)`);
 
-// 5. Validar shells de aplicação em frontend/
-const shells = ['app.html', 'master.html', 'bim.html'];
+// 5. Validar shells de aplicação em frontend/ (fonte canônica; login = frontend/index.html)
+const shells = ['index.html', 'app.html', 'master.html', 'bim.html'];
 for (const shell of shells) {
-  const feShell = path.join(root, 'frontend', shell);
-  const rootShell = path.join(root, shell);
-  assert(fs.existsSync(feShell), `Shell ausente em frontend/${shell}`);
-  const feBuf = fs.readFileSync(feShell);
-  const rootBuf = fs.readFileSync(rootShell);
-  assert(feBuf.equals(rootBuf), `Divergência entre frontend/${shell} e ${shell}`);
+  assert(fs.existsSync(path.join(root, 'frontend', shell)), `Shell ausente em frontend/${shell}`);
 }
-console.log(`  ✓ 5. Shells de aplicação (${shells.join(', ')}) validados`);
+console.log(`  ✓ 5. Shells de aplicação (${shells.join(', ')}) presentes em frontend/`);
+
+// 5b. A fonte canônica dos HTML é marketing/pages/ e frontend/; build, Vite e testes não leem
+// mais a raiz. Enquanto as cópias antigas da raiz não forem excluídas, elas só podem existir
+// idênticas à fonte canônica (e nenhum HTML novo pode nascer na raiz).
+const htmlNaRaiz = fs.readdirSync(root).filter(f => f.endsWith('.html'));
+for (const f of htmlNaRaiz) {
+  const canonico = [path.join(root, 'frontend', f), path.join(root, 'marketing', 'pages', f)].find(fs.existsSync);
+  assert(canonico, `HTML solto na raiz sem fonte canônica (use marketing/pages/ ou frontend/): ${f}`);
+  assert(fs.readFileSync(canonico).equals(fs.readFileSync(path.join(root, f))), `Cópia antiga ${f} na raiz diverge de ${path.relative(root, canonico)} — edite a fonte canônica`);
+}
+console.log(htmlNaRaiz.length ? `  ✓ 5b. ${htmlNaRaiz.length} cópias antigas na raiz idênticas à fonte canônica (a excluir)` : '  ✓ 5b. Raiz sem arquivos HTML');
 
 // 6. Validar CSS em frontend/css
 const cssDir = path.join(root, 'css');

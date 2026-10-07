@@ -26,9 +26,9 @@ const { ARTIGOS_BLOG } = await import('../marketing/blog-data.js');
 // Simula o destino do build com as páginas-fonte (mesmo <div id="root"></div> do build do Vite).
 const dest = fs.mkdtempSync(path.join(os.tmpdir(), 'fingo-prerender-'));
 for (const f of ['landing.html', 'planos.html', 'sobre-nos.html', 'manuais.html', 'blog.html']) {
-  fs.copyFileSync(path.join(root, f), path.join(dest, f));
+  fs.copyFileSync(path.join(root, 'marketing', 'pages', f), path.join(dest, f));
 }
-fs.copyFileSync(path.join(root, 'landing.html'), path.join(dest, 'index.html'));
+fs.copyFileSync(path.join(root, 'marketing', 'pages', 'landing.html'), path.join(dest, 'index.html'));
 
 const render = await createRenderer({ root });
 const files = await prerenderMarketing(dest, { root, render });

@@ -13,7 +13,9 @@ for (const file of [
   "blog.html",
   "assets",
 ]) {
-  fs.cpSync(path.join(".marketing-dist", file), path.join(destination, file), {
+  // O Vite preserva o caminho da entrada: marketing/pages/X.html → .marketing-dist/marketing/pages/X.html.
+  const built = file === "assets" ? path.join(".marketing-dist", file) : path.join(".marketing-dist", "marketing", "pages", file);
+  fs.cpSync(built, path.join(destination, file), {
     recursive: true,
   });
 }

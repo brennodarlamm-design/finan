@@ -13,7 +13,7 @@ const serverJs = fs.readFileSync('backend/server.js', 'utf8');
 const billingStagesJs = fs.readFileSync('backend/billing_stages.js', 'utf8');
 // As ações do admin ficam em api/_admin-route.js, atrás do wrapper seguro de api/admin.js.
 const adminJs = fs.readFileSync('api/admin.js', 'utf8') + '\n' + fs.readFileSync('api/_admin-route.js', 'utf8');
-const masterHtml = fs.readFileSync('master.html', 'utf8');
+const masterHtml = fs.readFileSync('frontend/master.html', 'utf8');
 const masterJs = fs.readFileSync('js/master.js', 'utf8');
 const patch26Events = fs.readFileSync('js/patch26-events.js', 'utf8');
 const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));

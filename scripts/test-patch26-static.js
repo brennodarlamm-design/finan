@@ -15,8 +15,11 @@ const actionAttr = /data-fb-(?:click|change|input|submit|mouseover|mouseout|mous
 const jsUrl = /(?:href|src)\s*=\s*(['"])\s*javascript\s*:/gi;
 
 const files = [];
-for (const name of fs.readdirSync(root)) {
-  if (name.endsWith('.html')) files.push(path.join(root, name));
+// HTML canônicos: shells em frontend/ e páginas públicas em marketing/pages/ (a raiz não tem HTML).
+for (const dir of ['frontend', path.join('marketing', 'pages')]) {
+  for (const name of fs.readdirSync(path.join(root, dir))) {
+    if (name.endsWith('.html')) files.push(path.join(root, dir, name));
+  }
 }
 const jsDir = path.join(root, 'js');
 for (const name of fs.readdirSync(jsDir)) {
@@ -67,12 +70,12 @@ ok('CSP ativa não contém unsafe-inline em script-src-attr', !activeCsp.include
 const lifecycle = `${packageJson.scripts?.postinstall || ''} ${packageJson.scripts?.pretest || ''}`;
 ok('CSP materializada não depende de transformadores no lifecycle npm', !/prepare-patch26|apply-patch26|apply-patch25|apply-patch24|apply-patch23|apply-patch22/.test(lifecycle));
 
-for (const name of ['app.html', 'index.html', 'master.html', 'validar.html']) {
+for (const name of ['frontend/app.html', 'frontend/index.html', 'frontend/master.html', 'marketing/pages/validar.html']) {
   const src = fs.readFileSync(path.join(root, name), 'utf8');
   ok(`${name} carrega ações nomeadas antes do bridge`, src.includes('/js/patch26-actions.js') && src.includes('/js/patch26-events.js') && src.indexOf('/js/patch26-actions.js') < src.indexOf('/js/patch26-events.js'));
 }
 
-for (const page of ['landing.html','planos.html','sobre-nos.html']) {
+for (const page of ['marketing/pages/landing.html','marketing/pages/planos.html','marketing/pages/sobre-nos.html']) {
  const html=fs.readFileSync(path.join(root,page),'utf8');
  ok(page+' usa módulo React externo sem bridge legado', html.includes('type="module" src="/marketing/main.jsx"') && !html.includes('patch26-events.js'));
 }

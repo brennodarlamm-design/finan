@@ -56,11 +56,13 @@ A plataforma foi desenhada sob a filosofia de **Monólito Modular** com **Proces
 ### 2.1 Camada 1: Frontend SPA (Vanilla Modular ES6+)
 - **Localização:** `frontend/` (com pontes de compatibilidade em `js/`).
 - **Padrão:** Single Page Application (SPA) em JavaScript Moderno sem frameworks pesados no core operacional, proporcionando tempo de carregamento imediato (*Time to Interactive < 1s*).
-- **Shells da Aplicação:**
-  - `app.html`: Shell principal da aplicação autenticada (Finanças, Obras, Canteiro, Suprimentos).
-  - `master.html`: Painel super-admin para governança da plataforma SaaS.
-  - `bim.html`: Visualizador 3D BIM, CSG e Clash Detection baseado em Three.js.
-  - `landing.html`, `calculadora-bdi.html`, `validar.html`: Portais de aquisição e utilitários públicos.
+- **HTML (fontes canônicas; a raiz do repositório não tem arquivos `.html`):**
+  - `frontend/index.html`: Shell de login e cadastro (publicado como `/login` e `/cadastro`).
+  - `frontend/app.html`: Shell principal da aplicação autenticada (Finanças, Obras, Canteiro, Suprimentos).
+  - `frontend/master.html`: Painel super-admin para governança da plataforma SaaS.
+  - `frontend/bim.html`: Visualizador 3D BIM, CSG e Clash Detection baseado em Three.js.
+  - `marketing/pages/*.html` (`landing.html`, `planos.html`, `calculadora-bdi.html`, `validar.html`...): Portais de aquisição, páginas institucionais e utilitários públicos.
+  - O build (`scripts/build-cloudflare-pages.cjs`) e o Vite leem dessas pastas; `npm run test:monolito` falha se aparecer HTML solto na raiz.
 - **Barramento de Eventos:** `frontend/core/patch26-events.js` gerencia eventos por delegação declarativa (`data-fb-click`, `data-fb-change`, `data-fb-input`), cumprindo a política estrita de CSP (`script-src-attr 'none'`).
 - **Resiliência Offline:** `frontend/core/data.js` implementa sincronização bidirecional entre o IndexedDB do navegador e a nuvem via fila local, Circuit Breaker com Jitter e detecção de conflitos de versão.
 

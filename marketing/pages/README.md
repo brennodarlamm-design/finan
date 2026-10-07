@@ -1,7 +1,8 @@
 # FinGo — Páginas Públicas & Marketing
 
 > **Fronteira Arquitetural:** Portal de Aquisição, Páginas Institucionais e Ferramentas Públicas  
-> **Destino de Distribuição:** Cloudflare Pages (copiado para `dist/` durante `npm run build:cloudflare`)
+> **Destino de Distribuição:** Cloudflare Pages (copiado para `dist/` durante `npm run build:cloudflare`)  
+> **Fonte canônica:** esta pasta. Não existe mais cópia destes arquivos na raiz do repositório; edite aqui.
 
 ---
 

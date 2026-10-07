@@ -21,6 +21,7 @@ As regras inegociáveis do projeto estão no AGENTS.md e valem integralmente par
 - SINAPI no banco: tabela `itens_referenciais` (helper `api/_sinapi-reference.js`).
 - Frontend com CSP estrita: nada de `onclick` inline; use `data-fb-click="Modulo.metodo"` (barramento em `patch26-events.js`) e escape interpolações com `Utils.esc`.
 - Arquivos usam CRLF; preserve as quebras de linha ao editar.
+- HTML: as páginas públicas ficam em `marketing/pages/` e os shells (login `index.html`, `app.html`, `master.html`, `bim.html`) em `frontend/`. Não crie `.html` na raiz.
 - BIM/3D: leia `.agents/skills/fingo-bim-3d-pipeline/SKILL.md` antes de mexer.
 
 ## Documentação

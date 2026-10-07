@@ -1,7 +1,7 @@
 import fs from 'fs';
 function a(c,m){if(!c){console.error('❌ '+m);process.exit(1)}console.log('✅ '+m)}
 const css=fs.readFileSync('css/style.css','utf8');
-const app=fs.readFileSync('app.html','utf8');
+const app=fs.readFileSync('frontend/app.html','utf8');
 const cfg=fs.readFileSync('js/configuracoes.js','utf8');
 const cob=fs.readFileSync('js/cobranca.js','utf8');
 a(app.includes('viewport-fit=cover'),'App respeita safe-area de dispositivos móveis.');

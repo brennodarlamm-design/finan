@@ -18,7 +18,7 @@ function assert(condition, message) {
 
 // 1. Validar termos.html
 console.log('1. Validando Termos de Serviço (termos.html)...');
-const termos = fs.readFileSync(path.resolve('termos.html'), 'utf8');
+const termos = fs.readFileSync(path.resolve('marketing/pages/termos.html'), 'utf8');
 assert(termos.includes('Da Custódia, Armazenamento e Upload de Arquivos'), 'termos.html possui seção dedicada de custódia e upload de arquivos');
 assert(termos.includes('Titularidade Exclusiva do Cliente'), 'termos.html define titularidade 100% exclusiva da construtora');
 assert(termos.includes('Cloudflare R2 Object Storage') || termos.includes('R2 Object Storage'), 'termos.html especifica armazenamento seguro em nuvem');
@@ -29,7 +29,7 @@ assert(termos.includes('Responsabilidade Técnica de Engenharia'), 'termos.html 
 
 // 2. Validar privacidade.html
 console.log('\n2. Validando Política de Privacidade (privacidade.html)...');
-const privacidade = fs.readFileSync(path.resolve('privacidade.html'), 'utf8');
+const privacidade = fs.readFileSync(path.resolve('marketing/pages/privacidade.html'), 'utf8');
 assert(privacidade.includes('Tratamento de Dados em Arquivos e Documentos Enviados pelo Cliente (Uploads)'), 'privacidade.html possui seção específica de dados em uploads');
 assert(privacidade.includes('Controladora de Dados') && privacidade.includes('Operador de Dados'), 'privacidade.html delimita papéis de Controlador e Operador conforme LGPD');
 assert(privacidade.includes('Política de Cookies e Tecnologias de Sessão'), 'privacidade.html possui seção dedicada de cookies e tecnologias de sessão');
@@ -51,12 +51,12 @@ assert(react.includes('fingo_cookie_consent_v2') && react.includes('<CookieNotic
 // 4. Validar injeção do banner nas páginas HTML
 console.log('\n4. Validando carregamento do banner nas páginas da aplicação...');
 const htmlPages = [
-  'index.html',
-  'app.html',
-  'master.html',
-  'termos.html',
-  'privacidade.html',
-  'validar.html'
+  'frontend/index.html',
+  'frontend/app.html',
+  'frontend/master.html',
+  'marketing/pages/termos.html',
+  'marketing/pages/privacidade.html',
+  'marketing/pages/validar.html'
 ];
 
 for (const page of htmlPages) {

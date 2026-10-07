@@ -3,7 +3,7 @@ import vm from 'vm';
 
 const importerPath = 'js/bim_geometry_importer.js';
 const viewerPath = 'js/bim_viewer.js';
-const appPath = 'app.html';
+const appPath = 'frontend/app.html';
 
 const source = fs.readFileSync(importerPath, 'utf8');
 const sandbox = {

@@ -1,7 +1,7 @@
 # FinGo — Camada de Frontend (Monólito Modular)
 
 > **Fronteira Arquitetural:** Interface de Usuário & SaaS SPA  
-> **Shell Principal:** `app.html`  
+> **Shells (fonte canônica, sem cópia na raiz):** `app.html`, `index.html` (login/cadastro), `master.html`, `bim.html`  
 > **Padrão de Execução:** Vanilla ES6+ Modules com Design Tokens e Barramento de Eventos Declarativo (`data-fb-*`).
 
 ---

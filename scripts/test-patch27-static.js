@@ -13,7 +13,7 @@ const docker = read('./backend/Dockerfile');
 const backend = read('./backend/server.js');
 const obra = read('./js/obra_detalhe.js');
 const events = read('./js/patch26-events.js');
-const app = read('./app.html');
+const app = read('frontend/app.html');
 
 console.log('=== Patch 27 — Fonte materializada / build imutável ===\n');
 

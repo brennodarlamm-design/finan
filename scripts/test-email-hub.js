@@ -145,7 +145,7 @@ for (const evt of requiredEvents) {
 console.log('✅ [4/5] CSP e Event Delegation (patch26-events.js) validados');
 
 // 5. Validar Interface do Painel Master (HTML e JS)
-const masterHtml = fs.readFileSync(path.resolve('master.html'), 'utf8');
+const masterHtml = fs.readFileSync(path.resolve('frontend/master.html'), 'utf8');
 assert.ok(masterHtml.includes('data-fb-click-v0="emails"'), 'master.html deve ter botão de navegação para e-mails');
 assert.ok(masterHtml.includes('id="master-email-badge-header"'), 'master.html deve ter badge de e-mails não lidos no header');
 assert.ok(masterHtml.includes('id="master-email-view-modal"'), 'master.html deve ter modal de visualização de e-mails');

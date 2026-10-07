@@ -5,7 +5,7 @@ const perms=fs.readFileSync('api/_permissions.js','utf8');
 const users=fs.readFileSync('api/users.js','utf8');
 const plano=fs.readFileSync('api/plano.js','utf8');
 const admin=fs.readFileSync('api/admin.js','utf8');
-const app=fs.readFileSync('app.html','utf8');
+const app=fs.readFileSync('frontend/app.html','utf8');
 const worker=fs.readFileSync('cloudflare-worker.js','utf8');
 assert(plans.includes('maxUsers: 1') && plans.includes('maxUsers: 2') && plans.includes('maxUsers: 5'),'Planos usam limites 1/2/5 usuários.');
 assert(plans.includes('canUseModule') && plans.includes('PLAN_MODULE_REQUIRED'),'Regras centrais conhecem módulos por plano.');

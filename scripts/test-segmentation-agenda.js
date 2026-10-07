@@ -73,7 +73,7 @@ test('js/notificacoes.js implementa abas de Alertas, E-mails e Atualizações', 
 
 // 4. Integração HTML e CSS
 test('app.html importa agenda_eventos.js', () => {
-  const appHtml = fs.readFileSync(path.join(root, 'app.html'), 'utf8');
+  const appHtml = fs.readFileSync(path.join(root, 'frontend/app.html'), 'utf8');
   assert.ok(appHtml.includes('/js/agenda_eventos.js'), 'app.html deve importar agenda_eventos.js');
 });
 
