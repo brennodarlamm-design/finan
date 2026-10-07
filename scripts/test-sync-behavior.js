@@ -79,13 +79,15 @@ try {
     categoria varchar(100), fornecedor_beneficiario varchar(255), conta_bancaria varchar(100),
     tipo varchar(20), valor numeric(15,2), status varchar(50), obra_id varchar(64),
     nota_fiscal_id varchar(64), codigo_barras varchar(120), chave_nfe varchar(64),
-    observacoes text, conciliado boolean, itens jsonb, created_at timestamptz DEFAULT now()
+    observacoes text, conciliado boolean, itens jsonb, created_at timestamptz DEFAULT now(),
+    fornecedor_id varchar(64), dados jsonb NOT NULL DEFAULT '{}'::jsonb
   )`);
   for (const query of queries) {
     await pg.exec('TRUNCATE lancamentos');
     const save = (l, tenantId = 'tenant-a') => vm.runInNewContext(`(async () => sql\`${query}\`)()`, {
       l, tenantId, dataLanc:'2026-09-13', dataVenc:'2026-09-13', dataPag:null,
-      safeObraId:null, safeNotaId:null, itensJson:'[]', itensLancJson:'[]', cleanNum:Number,
+      safeObraId:null, safeNotaId:null, safeFornecedorId:null, itensJson:'[]', itensLancJson:'[]', cleanNum:Number,
+      dadosExtrasDoLancamento: () => ({}),
       sql: async (parts, ...values) => (await pg.query(parts.reduce((text, part, index) => text + (index ? '$' + index : '') + part, ''), values)).rows
     });
     const original = { id:'record', descricao:'Original', valor:100 };

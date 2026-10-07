@@ -28,7 +28,11 @@ export function sanitizeSlaProcesses(input) {
       responsavel_usuario_id:raw.responsavel_usuario_id ? text(raw.responsavel_usuario_id, 80).replace(/[^a-zA-Z0-9_-]/g, '') : null,
       motivo_atraso:text(raw.motivo_atraso, 100),
       motivo_atraso_detalhe:text(raw.motivo_atraso_detalhe, 500),
-      checklist_status:text(raw.checklist_status, 40),
+      // Varredura 07/10: o app guarda {item do checklist: true/false}; como texto virava "[object Object]"
+      // e o progresso do checklist se perdia.
+      checklist_status:(raw.checklist_status && typeof raw.checklist_status === 'object' && !Array.isArray(raw.checklist_status))
+        ? Object.fromEntries(Object.entries(raw.checklist_status).slice(0, 50).map(([k, v]) => [text(k, 200), v === true]))
+        : {},
       transferida_em:date(raw.transferida_em),
       checklist:Array.isArray(raw.checklist) ? raw.checklist.slice(0, 50).map(item => (typeof item === 'object' && item !== null ? {id:text(item.id, 40), descricao:text(item.descricao || item.texto, 255), concluido:!!item.concluido} : text(item, 255))) : [],
       historico:Array.isArray(raw.historico) ? raw.historico.slice(0, 50).flatMap(h => {

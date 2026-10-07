@@ -8,7 +8,7 @@ import {
 import { setPrivateNoCache } from './_http.js';
 import { isTenantStorageUrl } from './_edge-r2.js';
 import { getPlanRule, isActiveObraStatus } from './_plans.js';
-import { dadosExtrasDaObra } from './_obra-dados.js';
+import { dadosExtrasDaObra, dadosExtrasDoLancamento, dadosExtras } from './_obra-dados.js';
 import { writeAudit } from './_audit.js';
 import { validarArquivoBase64 } from './_file-validation.js';
 import { SYNC_GUARD_TABLES, syncVersionConflict, readSyncVersion, syncRecordId, withoutSyncVersion } from './_sync-guard.js';
@@ -166,6 +166,8 @@ export async function handleSave(sql, tenantId, auth, req, res, table, data) {
     const dataPag = cleanDate(l.data_pagamento);
     const safeObraId = await validateObraTenant(sql, l.obra_id, tenantId);
     const safeNotaId = await validateNotaFiscalTenant(sql, l.nota_fiscal_id, tenantId);
+    // Vínculo com o cadastro do fornecedor: a coluna existia, mas a gravação nunca a preenchia.
+    const safeFornecedorId = await validateFornecedorTenant(sql, l.fornecedor_id || null, tenantId);
 
     const itensLancJson = JSON.stringify(Array.isArray(l.itens) ? l.itens : []);
 
@@ -173,13 +175,13 @@ export async function handleSave(sql, tenantId, auth, req, res, table, data) {
       INSERT INTO lancamentos (
         id, tenant_id, data, data_vencimento, data_pagamento, descricao, categoria,
         fornecedor_beneficiario, conta_bancaria, tipo, valor, status,
-        obra_id, nota_fiscal_id, codigo_barras, chave_nfe, observacoes, conciliado, itens
+        obra_id, nota_fiscal_id, codigo_barras, chave_nfe, observacoes, conciliado, itens, fornecedor_id, dados
       )
       SELECT
         ${l.id}, ${tenantId}, ${dataLanc}, ${dataVenc}, ${dataPag}, ${l.descricao}, ${l.categoria || 'Outros'},
         ${l.fornecedor_beneficiario || ''}, ${l.conta_bancaria || ''}, ${l.tipo || 'despesa'}, ${cleanNum(l.valor)}, ${l.status || 'pendente'},
         ${safeObraId}, ${safeNotaId}, ${l.codigo_barras || null}, ${l.chave_nfe || null}, ${l.observacoes || ''}, ${!!l.conciliado},
-        ${itensLancJson}::jsonb
+        ${itensLancJson}::jsonb, ${safeFornecedorId}, ${JSON.stringify(dadosExtrasDoLancamento(l))}::jsonb
       WHERE ${String(l.sync_version || '')} = '' OR EXISTS (
         SELECT 1 FROM lancamentos WHERE id = ${l.id} AND tenant_id = ${tenantId} FOR UPDATE
       )
@@ -200,11 +202,13 @@ export async function handleSave(sql, tenantId, auth, req, res, table, data) {
         chave_nfe = EXCLUDED.chave_nfe,
         observacoes = EXCLUDED.observacoes,
         conciliado = EXCLUDED.conciliado,
-        itens = EXCLUDED.itens
+        itens = EXCLUDED.itens,
+            fornecedor_id = EXCLUDED.fornecedor_id,
+            dados = COALESCE(lancamentos.dados, '{}'::jsonb) || EXCLUDED.dados
       WHERE lancamentos.tenant_id = ${tenantId}
         AND (lancamentos.xmin::text = ${String(l.sync_version || '')} OR
-            ROW(lancamentos.data, lancamentos.data_vencimento, lancamentos.data_pagamento, lancamentos.descricao, lancamentos.categoria, lancamentos.fornecedor_beneficiario, lancamentos.conta_bancaria, lancamentos.tipo, lancamentos.valor, lancamentos.status, lancamentos.obra_id, lancamentos.nota_fiscal_id, lancamentos.codigo_barras, lancamentos.chave_nfe, lancamentos.observacoes, lancamentos.conciliado, lancamentos.itens)
-            IS NOT DISTINCT FROM ROW(EXCLUDED.data, EXCLUDED.data_vencimento, EXCLUDED.data_pagamento, EXCLUDED.descricao, EXCLUDED.categoria, EXCLUDED.fornecedor_beneficiario, EXCLUDED.conta_bancaria, EXCLUDED.tipo, EXCLUDED.valor, EXCLUDED.status, EXCLUDED.obra_id, EXCLUDED.nota_fiscal_id, EXCLUDED.codigo_barras, EXCLUDED.chave_nfe, EXCLUDED.observacoes, EXCLUDED.conciliado, EXCLUDED.itens))
+            ROW(lancamentos.data, lancamentos.data_vencimento, lancamentos.data_pagamento, lancamentos.descricao, lancamentos.categoria, lancamentos.fornecedor_beneficiario, lancamentos.conta_bancaria, lancamentos.tipo, lancamentos.valor, lancamentos.status, lancamentos.obra_id, lancamentos.nota_fiscal_id, lancamentos.codigo_barras, lancamentos.chave_nfe, lancamentos.observacoes, lancamentos.conciliado, lancamentos.itens, lancamentos.fornecedor_id, lancamentos.dados)
+            IS NOT DISTINCT FROM ROW(EXCLUDED.data, EXCLUDED.data_vencimento, EXCLUDED.data_pagamento, EXCLUDED.descricao, EXCLUDED.categoria, EXCLUDED.fornecedor_beneficiario, EXCLUDED.conta_bancaria, EXCLUDED.tipo, EXCLUDED.valor, EXCLUDED.status, EXCLUDED.obra_id, EXCLUDED.nota_fiscal_id, EXCLUDED.codigo_barras, EXCLUDED.chave_nfe, EXCLUDED.observacoes, EXCLUDED.conciliado, EXCLUDED.itens, EXCLUDED.fornecedor_id, COALESCE(lancamentos.dados, '{}'::jsonb) || EXCLUDED.dados))
       RETURNING id, xmin::text AS sync_version;
     `;
     if (!saved.length) return res.status(409).json({ success: false, code: 'SYNC_CONFLICT', error: 'Lançamento alterado ou excluído em outro dispositivo. Atualize os dados e revise a alteração.' });
@@ -217,7 +221,8 @@ export async function handleSave(sql, tenantId, auth, req, res, table, data) {
     const vBruto = cleanNum(n.valor_bruto !== undefined ? n.valor_bruto : n.valor_total);
     const vImp = cleanNum(n.impostos);
     const vLiq = cleanNum(n.valor_liquido !== undefined ? n.valor_liquido : (vBruto - vImp));
-    const vTot = cleanNum(n.valor_total !== undefined ? n.valor_total : vBruto);
+    // O formulário de notas edita valor_bruto; o valor_total antigo (vindo da nuvem) não pode prevalecer.
+    const vTot = (n.valor_bruto !== undefined && n.valor_bruto !== null && n.valor_bruto !== '') ? vBruto : cleanNum(n.valor_total);
     const safeNotaObraId = await validateObraTenant(sql, n.obra_id, tenantId);
     const itensNotaJson = JSON.stringify(Array.isArray(n.itens) ? n.itens : []);
     const chave = (n.chave_nfe || n.chave_acesso || '').trim() || null;
@@ -379,14 +384,16 @@ export async function handleSave(sql, tenantId, auth, req, res, table, data) {
     await sql`
       INSERT INTO fornecedores (
         id, tenant_id, nome, razao_social, cnpj_cpf, telefone, email, categoria,
-        chave_pix, banco_info, endereco, municipio, uf, ativo
+        chave_pix, banco_info, endereco, municipio, uf, ativo, dados
       )
       VALUES (
         ${f.id}, ${tenantId}, ${nomeFinal}, ${razaoSocialFinal}, ${cnpjCpfFinal},
         ${f.telefone || ''}, ${f.email || ''}, ${f.categoria || 'outros'}, ${f.chave_pix || ''}, ${f.banco_info || ''},
-        ${f.endereco || ''}, ${f.municipio || ''}, ${(f.uf || '').toUpperCase().slice(0, 2)}, ${f.ativo !== false}
+        ${f.endereco || ''}, ${f.municipio || ''}, ${(f.uf || '').toUpperCase().slice(0, 2)}, ${f.ativo !== false},
+        ${JSON.stringify(dadosExtras('fornecedores', f))}::jsonb
       )
       ON CONFLICT (id) DO UPDATE SET
+        dados = COALESCE(fornecedores.dados, '{}'::jsonb) || EXCLUDED.dados,
         nome = EXCLUDED.nome,
         razao_social = EXCLUDED.razao_social,
         cnpj_cpf = EXCLUDED.cnpj_cpf,
@@ -422,15 +429,17 @@ export async function handleSave(sql, tenantId, auth, req, res, table, data) {
     await sql`
       INSERT INTO documentos (
         id, tenant_id, tipo, referencia_id, titulo, categoria, nome_arquivo,
-        tipo_arquivo, tamanho_bytes, url, base64_data, created_at
+        tipo_arquivo, tamanho_bytes, url, base64_data, created_at, dados
       )
       VALUES (
         ${doc.id}, ${tenantId}, ${doc.entidade_tipo || doc.tipo || 'geral'}, ${doc.entidade_id || doc.referencia_id || ''},
         ${doc.titulo || doc.nome_arquivo || 'Documento'}, ${doc.categoria || ''}, ${doc.nome_arquivo || ''},
         ${doc.tipo_mime || doc.tipo_arquivo || 'application/octet-stream'}, ${cleanNum(doc.tamanho || doc.tamanho_bytes)},
-        ${doc.url || null}, ${cleanBase64}, ${doc.criado_em || new Date().toISOString()}
+        ${doc.url || null}, ${cleanBase64}, ${doc.criado_em || new Date().toISOString()},
+        ${JSON.stringify(dadosExtras('documentos', doc))}::jsonb
       )
       ON CONFLICT (id) DO UPDATE SET
+        dados = COALESCE(documentos.dados, '{}'::jsonb) || EXCLUDED.dados,
         titulo = EXCLUDED.titulo,
         categoria = EXCLUDED.categoria,
         nome_arquivo = EXCLUDED.nome_arquivo,
@@ -462,13 +471,15 @@ export async function handleSave(sql, tenantId, auth, req, res, table, data) {
       return res.status(400).json({ success: false, error: 'ID do produto é obrigatório.' });
     }
     await sql`
-      INSERT INTO produtos (id, tenant_id, nome, unidade, categoria, codigo, valor_medio, observacoes)
+      INSERT INTO produtos (id, tenant_id, nome, unidade, categoria, codigo, valor_medio, observacoes, dados)
       VALUES (
         ${prodId}, ${tenantId}, ${nomeFinal.slice(0, 255)}, ${String(p.unidade || 'un').trim().slice(0, 32)},
         ${String(p.categoria || 'material').trim().slice(0, 100)},
-        ${p.codigo ? String(p.codigo).trim().slice(0, 64) : null}, ${cleanNum(p.valor_medio)}, ${String(p.observacoes || '')}
+        ${p.codigo ? String(p.codigo).trim().slice(0, 64) : null}, ${cleanNum(p.valor_medio)}, ${String(p.observacoes || '')},
+        ${JSON.stringify(dadosExtras('produtos', p))}::jsonb
       )
       ON CONFLICT (id) DO UPDATE SET
+        dados = COALESCE(produtos.dados, '{}'::jsonb) || EXCLUDED.dados,
         nome = EXCLUDED.nome,
         unidade = EXCLUDED.unidade,
         categoria = EXCLUDED.categoria,
@@ -648,12 +659,14 @@ export async function handleSave(sql, tenantId, auth, req, res, table, data) {
     const dataCriacao = cleanDate(o.data_criacao) || todayBoaVista();
 
     await sql`
-      INSERT INTO orcamentos (id, tenant_id, obra_id, titulo, valor_total, itens_json, status, descricao, data_criacao)
+      INSERT INTO orcamentos (id, tenant_id, obra_id, titulo, valor_total, itens_json, status, descricao, data_criacao, dados)
       VALUES (
         ${o.id}, ${tenantId}, ${safeObraId}, ${titulo},
-        ${valorTotal}, ${payloadJson}::jsonb, ${status}, ${descricao}, ${dataCriacao}
+        ${valorTotal}, ${payloadJson}::jsonb, ${status}, ${descricao}, ${dataCriacao},
+        ${JSON.stringify(dadosExtras('orcamentos', o))}::jsonb
       )
       ON CONFLICT (id) DO UPDATE SET
+        dados = COALESCE(orcamentos.dados, '{}'::jsonb) || EXCLUDED.dados,
         obra_id = EXCLUDED.obra_id,
         titulo = EXCLUDED.titulo,
         valor_total = EXCLUDED.valor_total,
@@ -670,12 +683,16 @@ export async function handleSave(sql, tenantId, auth, req, res, table, data) {
   if (table === 'medicoes') {
     const m = data;
     const safeObraId = await validateObraTenant(sql, m.obra_id, tenantId);
-    const numMed = parseInt(m.numero || m.numero_medicao) || 1;
-    const dataMed = cleanDate(m.data || m.data_medicao) || todayBoaVista();
+    // O formulário edita numero_medicao/data_medicao; numero/data vêm da leitura da nuvem e, antes,
+    // tinham prioridade: a edição do número ou da data voltava ao valor antigo na sincronização.
+    const numMed = parseInt(m.numero_medicao || m.numero) || 1;
+    // Medição "não realizada" (data_medicao vazia) fica sem data, em vez de ganhar a data de hoje.
+    const dataMed = ('data_medicao' in m) ? cleanDate(m.data_medicao) : (cleanDate(m.data) || todayBoaVista());
     const valMed = cleanNum(m.valor_medido || m.valor_solicitado);
     const rawItens = m.itens || (typeof m.itens_json === 'string' ? safeJsonParse(m.itens_json, []) : m.itens_json) || [];
     const itensJson = JSON.stringify(Array.isArray(rawItens) ? rawItens : []);
-    const payloadJson = JSON.stringify(m);
+    const { payload: _payloadAnterior, ...mSemPayload } = m; // a leitura devolve `payload`: sem isso ele se aninhava a cada gravação
+    const payloadJson = JSON.stringify(mSemPayload);
 
     await sql`
       INSERT INTO medicoes (

@@ -360,8 +360,22 @@ const DB = {
       categorias_receita: readJson('finobra_cats_receita_custom'),
       slas_padrao: readJson('finobra_slas_padrao'),
       whatsapp_telefone: String(localStorage.getItem(this._ck('finobra_whatsapp_telefone')) || ''),
-      whatsapp_modo: String(localStorage.getItem(this._ck('finobra_whatsapp_modo')) || 'api')
+      whatsapp_modo: String(localStorage.getItem(this._ck('finobra_whatsapp_modo')) || 'api'),
+      // Cargos e modelos de workflow: só vão se este aparelho tiver uma versão salva (não manda o padrão
+      // por cima do que já está no servidor).
+      ...this._preferenciaWorkflowLocal()
     };
+  },
+
+  _preferenciaWorkflowLocal() {
+    const out = {};
+    try {
+      const cargos = localStorage.getItem(this._ck('finobra_workflow_cargos'));
+      if (cargos) { const v = JSON.parse(cargos); if (Array.isArray(v)) out.workflow_cargos = v; }
+      const templates = localStorage.getItem(this._ck('finobra_workflow_templates'));
+      if (templates) { const v = JSON.parse(templates); if (v && typeof v === 'object' && !Array.isArray(v)) out.workflow_templates = v; }
+    } catch {}
+    return out;
   },
 
   _applyTenantPreferences(preferences = {}) {
@@ -376,6 +390,12 @@ const DB = {
     if ('slas_padrao' in preferences) writeJson('finobra_slas_padrao', preferences.slas_padrao);
     if ('whatsapp_telefone' in preferences) {
       try { localStorage.setItem(this._ck('finobra_whatsapp_telefone'), String(preferences.whatsapp_telefone || '').replace(/\D/g, '')); } catch {}
+    }
+    if ('workflow_cargos' in preferences && Array.isArray(preferences.workflow_cargos) && preferences.workflow_cargos.length) {
+      writeJson('finobra_workflow_cargos', preferences.workflow_cargos);
+    }
+    if ('workflow_templates' in preferences && preferences.workflow_templates && typeof preferences.workflow_templates === 'object' && !Array.isArray(preferences.workflow_templates)) {
+      try { localStorage.setItem(this._ck('finobra_workflow_templates'), JSON.stringify(preferences.workflow_templates)); } catch {}
     }
     if ('whatsapp_modo' in preferences) {
       const modo = ['api','web'].includes(String(preferences.whatsapp_modo)) ? String(preferences.whatsapp_modo) : 'api';
@@ -1316,7 +1336,7 @@ const DB = {
   // não guardava (valor financiado, CPF, cidade, área, contrato Caixa...) sumiam a cada sincronização.
   // A nuvem continua mandando em tudo o que ela traz; só o que ela não traz é mantido do aparelho.
   _mantemCamposLocais(table) {
-    return table === 'clientes' || table === 'obras';
+    return ['clientes', 'obras', 'lancamentos', 'fornecedores', 'produtos', 'orcamentos', 'documentos'].includes(table);
   },
 
   _mesclarCamposLocais(localItem, cloudItem) {
@@ -1327,8 +1347,22 @@ const DB = {
     return out;
   },
 
+  /** `dados` (migrações 045/046): campos do registro sem coluna própria no banco. As colunas prevalecem. */
+  _expandirDados(item) {
+    if (!item || typeof item !== 'object' || !('dados' in item)) return item;
+    const { dados, ...resto } = item;
+    return { ...(dados && typeof dados === 'object' && !Array.isArray(dados) ? dados : {}), ...resto };
+  },
+
   _applyTableData(table, cloudItems, isDelta = false) {
     if (!cloudItems) return;
+    if (Array.isArray(cloudItems) && ['fornecedores', 'produtos', 'orcamentos', 'documentos'].includes(table)) {
+      cloudItems = cloudItems.map(item => this._expandirDados(item));
+      // Pessoa física: o banco guarda o CPF em cnpj_cpf e a leitura o devolve como `cnpj`.
+      if (table === 'fornecedores') {
+        cloudItems = cloudItems.map(f => (f.tipo_pessoa === 'pf' && f.cpf) ? { ...f, cnpj: '' } : f);
+      }
+    }
     const completenessBootstrapped = this.isCloudCompletenessBootstrapped ? this.isCloudCompletenessBootstrapped() : true;
 
     if (['clientes', 'obras'].includes(table) && Array.isArray(cloudItems)) {
@@ -1348,7 +1382,13 @@ const DB = {
       this.save('fornecedores', isDelta ? this._applyDeltaToCollection('fornecedores', cloudItems, local) : this._reconcileCollection('fornecedores', cloudItems, local));
     } else if (table === 'lancamentos' && Array.isArray(cloudItems)) {
       const local = this.getAll('lancamentos') || [];
-      const normalized = cloudItems.map(l => ({
+      // `dados` (migração 046): origem, competência, vínculos com medição/pré-compra, parcela...
+      // fornecedor_id nulo na nuvem é de lançamento gravado antes da correção: não apaga o do aparelho.
+      const normalized = cloudItems.map(({ dados, ...l }) => {
+        const base = { ...(dados && typeof dados === 'object' && !Array.isArray(dados) ? dados : {}), ...l };
+        if (base.fornecedor_id == null) delete base.fornecedor_id;
+        return base;
+      }).map(l => ({
         ...l,
         data: (typeof Utils !== 'undefined' && Utils.cleanDate) ? Utils.cleanDate(l.data) || l.data : (l.data ? String(l.data).split('T')[0] : l.data),
         data_vencimento: (typeof Utils !== 'undefined' && Utils.cleanDate) ? Utils.cleanDate(l.data_vencimento) || Utils.cleanDate(l.data) || l.data : (l.data_vencimento ? String(l.data_vencimento).split('T')[0] : l.data),
@@ -1460,15 +1500,20 @@ const DB = {
     } else if (table === 'documentos' && Array.isArray(cloudItems) && typeof Documentos !== 'undefined') {
       const locais = Documentos.getAll() || [];
       const localMap = new Map(locais.map(x => [x.id, x]));
+      // Campos que só existem em `dados` (link externo do Drive/OneDrive, pendências do BIM...):
+      // antes o documento era remontado só com as colunas fixas e eles sumiam.
+      const COLUNAS_DOC = new Set(['id', 'tenant_id', 'tipo', 'referencia_id', 'titulo', 'categoria', 'nome_arquivo', 'tipo_arquivo', 'tamanho_bytes', 'base64_data', 'url', 'created_at', 'sync_version']);
       const merged = cloudItems.map(cloudDoc => {
         const loc = localMap.get(cloudDoc.id);
+        const extras = Object.fromEntries(Object.entries(cloudDoc).filter(([k]) => !COLUNAS_DOC.has(k)));
         return {
+          ...extras,
           id: cloudDoc.id,
           entidade_tipo: cloudDoc.tipo || cloudDoc.entidade_tipo,
           entidade_id: cloudDoc.referencia_id || cloudDoc.entidade_id,
           titulo: cloudDoc.titulo,
           categoria: cloudDoc.categoria || loc?.categoria || '',
-          subtipo: loc?.subtipo || (cloudDoc.categoria === 'bim_model' ? 'bim_model' : undefined),
+          subtipo: extras.subtipo || loc?.subtipo || (cloudDoc.categoria === 'bim_model' ? 'bim_model' : undefined),
           nome_arquivo: cloudDoc.nome_arquivo,
           tipo_mime: cloudDoc.tipo_arquivo || cloudDoc.tipo_mime,
           tamanho: cloudDoc.tamanho_bytes || cloudDoc.tamanho,
