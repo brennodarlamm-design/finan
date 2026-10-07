@@ -494,13 +494,16 @@ const FasesDoc = {
 
     for (const file of files) {
       try {
-        if (file.size > 20 * 1024 * 1024) { Utils.toast(`${file.name} excede 20MB`, 'error'); continue; }
+        // Mesmo limite do /api/upload (15 MB); acima disso o arquivo ficava só neste aparelho.
+        if (file.size > 15 * 1024 * 1024) { Utils.toast(`${file.name} excede 15MB`, 'error'); continue; }
         Utils.toast(`Carregando ${file.name}...`, 'info');
         const base64 = await Documentos.lerArquivoBase64(file);
         const docObj = Documentos.adicionar({
           titulo: file.name,
-          nome: file.name,
-          tipo: file.type,
+          // nome_arquivo/tipo_mime são os campos que o servidor grava (antes ia `nome`/`tipo` e o anexo
+          // voltava da nuvem sem nome e como application/octet-stream).
+          nome_arquivo: file.name,
+          tipo_mime: file.type || 'application/octet-stream',
           tamanho: file.size,
           entidade_tipo: 'fases_doc',
           entidade_id: `${obraId}_${docId}`,

@@ -11,6 +11,8 @@ const Medicoes = {
     const totalLib = liberadas.reduce((s,m)=>s+(Number(m.valor_liberado)||0),0);
     const totalSolic = meds.reduce((s,m)=>s+(Number(m.valor_solicitado || m.valor_medido)||0),0);
     const totalRetencoes = meds.reduce((s,m)=>s+(Number(m.retencao_tecnica)||0),0);
+    const devendo = meds.map(m => ({ m, sit: this._situacaoCliente(m) })).filter(x => x.sit && x.sit.falta > 0.009);
+    const totalDevendo = devendo.reduce((s,x)=>s+x.sit.falta,0);
 
     return `
     <div class="page-header">
@@ -24,6 +26,9 @@ const Medicoes = {
       <div class="kpi-card" style="padding:14px;"><div class="kpi-label">Retenções Técnicas</div><div class="kpi-value yellow" style="font-size:1.2rem">${Utils.fmt.currency(totalRetencoes)}</div></div>
       <div class="kpi-card" style="padding:14px;"><div class="kpi-label">Total Solicitado</div><div class="kpi-value cyan" style="font-size:1.2rem">${Utils.fmt.currency(totalSolic)}</div></div>
     </div>
+    ${totalDevendo > 0 ? `<div class="card" style="margin-bottom:16px;padding:12px 16px;border-left:4px solid var(--danger);background:rgba(239,68,68,.06);font-size:.85rem;">
+      ⚠️ <strong>Clientes ainda devem ${Utils.fmt.currency(totalDevendo)}</strong> à construtora de ${devendo.length} ${devendo.length === 1 ? 'medição liberada' : 'medições liberadas'} na conta deles.
+    </div>` : ''}
 
     <div class="filters-bar">
       <div class="filter-group">
@@ -57,6 +62,7 @@ const Medicoes = {
       const financiado = Number(c?.valor_financiado) || 0;
       const saldoAFaturar = Math.max(0, financiado - totalLib);
       const pctLib = financiado>0 ? Math.min(100,(totalLib/financiado)*100) : 0;
+      const clienteDeve = obMeds.reduce((s,m)=>s+(this._situacaoCliente(m)?.falta||0),0);
 
       const modInfo = isCaixa
         ? `Contrato: ${esc(c?.num_contrato_caixa||'—')} &nbsp;|&nbsp; Financiado Caixa: ${Utils.fmt.currency(financiado)} &nbsp;|&nbsp; Agência: ${esc(c?.agencia_caixa||'—')}`
@@ -72,6 +78,7 @@ const Medicoes = {
             <div style="font-size:.72rem;color:var(--text3)">${isCaixa ? 'Liberado / Solicitado' : 'Faturado / Previsto'}</div>
             <div class="numeric tabular-nums" style="font-weight:900;font-size:1rem;color:var(--success)">${Utils.fmt.currency(totalLib)} <span style="color:var(--text3);font-weight:400">/ ${Utils.fmt.currency(totalSol)}</span></div>
             ${saldoAFaturar > 0 ? `<div style="font-size:.7rem;color:var(--accent);margin-top:2px;">Saldo a faturar: <strong>${Utils.fmt.currency(saldoAFaturar)}</strong></div>` : ''}
+            ${clienteDeve > 0.009 ? `<div style="font-size:.72rem;color:var(--danger);margin-top:2px;">⚠️ Cliente ainda deve: <strong>${Utils.fmt.currency(clienteDeve)}</strong></div>` : ''}
           </div>
         </div>
 
@@ -126,6 +133,7 @@ const Medicoes = {
             <div><span style="color:var(--text3)">Previsão:</span> ${Utils.fmt.date(m.data_previsao)}</div>
           </div>
           ${m.observacoes?`<div style="margin-top:8px;font-size:.75rem;color:var(--text3);padding:7px;background:var(--bg-secondary);border-radius:6px">💬 ${esc(m.observacoes)}</div>`:''}
+          ${this._blocoPagamentos(m)}
         </div>
 
         <div style="min-width:220px">
@@ -174,6 +182,7 @@ const Medicoes = {
           ${m.status==='submetida'?`<button class="btn btn-secondary btn-sm" data-fb-click="Medicoes.avancarStatus" data-fb-click-n="2" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(m.id))}" data-fb-click-t1="string" data-fb-click-v1="em_analise">🔍 Em Análise</button>`:''}
           ${m.status==='em_analise'?`<button class="btn btn-success btn-sm" data-fb-click="Medicoes.avancarStatus" data-fb-click-n="2" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(m.id))}" data-fb-click-t1="string" data-fb-click-v1="aprovada">✅ Aprovar</button>`:''}
           ${m.status==='aprovada'?`<button class="btn btn-success btn-sm" data-fb-click="Medicoes.liberarValor" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(m.id))}">💰 Liberar</button>`:''}
+          ${m.status==='liberada'?`<button class="btn btn-secondary btn-sm" data-fb-click="Medicoes.novoPagamento" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(m.id))}" title="O cliente pagou parte desta medição à construtora">👤 Pagamento do cliente</button>`:''}
           <button class="icon-btn btn-sm" data-fb-click="Medicoes.del" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(m.id))}" style="color:var(--danger)">🗑️</button>
         </div>
       </div>
@@ -205,6 +214,9 @@ const Medicoes = {
             </div>
           </div>
           <div class="form-group"><label class="form-label" for="lib-dt">Data de Liberação</label><input class="form-control" type="date" id="lib-dt" value="${Utils.esc(Utils.today())}"></div>
+          <div class="form-group"><label class="form-label" for="lib-repasse">Onde o dinheiro caiu?</label>
+            ${this._selectRepasse('lib-repasse', this._repassePadrao(m))}
+          </div>
         </div>
         <div class="modal-footer">
           <button class="btn btn-secondary" data-fb-click="Utils.closeModal" data-fb-click-n="0">Cancelar</button>
@@ -220,13 +232,20 @@ const Medicoes = {
     const ret = parseFloat(document.getElementById('lib-retencao')?.value)||0;
     const descValor = parseFloat(document.getElementById('lib-descontos')?.value)||0;
     const dt = document.getElementById('lib-dt')?.value || Utils.today();
+    const repasse = document.getElementById('lib-repasse')?.value === 'true';
+    if (!repasse && this._pagamentos(id).length) {
+      Utils.toast('Esta medição já tem pagamentos do cliente registrados. Mantenha "Na conta do cliente" ou exclua os pagamentos antes.', 'warning');
+      return;
+    }
+    try { localStorage.setItem('finobra_medicao_repasse_padrao', repasse ? '1' : '0'); } catch (_) {}
 
     DB.update('medicoes', id, {
       status: 'liberada',
       valor_liberado: val,
       retencao_tecnica: ret,
       descontos: descValor,
-      data_liberacao: dt
+      data_liberacao: dt,
+      repasse_cliente: repasse
     });
 
     const avisos = this._sincronizarFinanceiro(id);
@@ -234,6 +253,8 @@ const Medicoes = {
     this._refresh();
     Utils.toast(avisos.length
       ? `Medição liberada. ${avisos.join(' ')}`
+      : repasse
+        ? 'Medição liberada. O valor ficou "a receber do cliente": registre cada pagamento em "👤 Pagamento do cliente".'
       : (Number(ret) > 0
         ? 'Medição liberada: receita registrada e retenção lançada como "a receber".'
         : 'Medição liberada e receita registrada no financeiro!'), avisos.length ? 'warning' : 'success');
@@ -254,7 +275,7 @@ const Medicoes = {
     if (!m) return avisos;
     const lancamentos = DB.getAll('lancamentos') || [];
     const principal = (m.lancamento_id && lancamentos.find(l => l.id === m.lancamento_id))
-      || lancamentos.find(l => l.medicao_id === id && l.origem !== 'medicao_retencao');
+      || lancamentos.find(l => l.medicao_id === id && l.origem !== 'medicao_retencao' && l.origem !== 'medicao_pagamento' && !l.baixa_de);
     const retencaoLan = (m.retencao_lancamento_id && lancamentos.find(l => l.id === m.retencao_lancamento_id))
       || lancamentos.find(l => l.medicao_id === id && l.origem === 'medicao_retencao');
 
@@ -262,7 +283,8 @@ const Medicoes = {
       if (!principal && !retencaoLan) return avisos;
       // A receita principal nasce "recebido" na liberação: sai se ainda não foi conciliada.
       // A retenção sai se ainda estiver a receber.
-      const tiraPrincipal = principal && !principal.conciliado;
+      // Título com pagamentos do cliente fica: os pagamentos dependem dele para aparecer agrupados.
+      const tiraPrincipal = principal && !principal.conciliado && !DB.baixasDoTitulo(principal.id).length;
       const tiraRetencao = retencaoLan && !retencaoLan.conciliado && DB.isLancamentoEmAberto(retencaoLan);
       if (tiraPrincipal) DB.remove('lancamentos', principal.id);
       if (tiraRetencao) DB.remove('lancamentos', retencaoLan.id);
@@ -270,7 +292,7 @@ const Medicoes = {
         lancamento_id: tiraPrincipal ? null : (principal?.id || null),
         retencao_lancamento_id: tiraRetencao ? null : (retencaoLan?.id || null)
       });
-      if ((principal && !tiraPrincipal) || (retencaoLan && !tiraRetencao)) {
+      if ((principal && !tiraPrincipal) || (retencaoLan && !tiraRetencao) || this._pagamentos(id).length) {
         avisos.push('O que já foi recebido ou conciliado com o extrato continua no financeiro.');
       }
       return avisos;
@@ -290,26 +312,40 @@ const Medicoes = {
       ? `${m.numero_medicao}ª Parcela Caixa — Medição ${m.numero_medicao} (${m.percentual_fisico || 0}%)`
       : `${m.numero_medicao}ª Medição / Faturamento — ${c?.nome || 'Obra'} (${m.percentual_fisico || 0}%)`;
 
+    // Pagamentos do cliente: quando o valor cai na conta do cliente, ele repassa à construtora aos
+    // poucos. A receita principal vira um título único "a receber do cliente" (valor_original =
+    // líquido) e cada pagamento é uma baixa parcial dele (DB.registrarBaixa), visível em Lançamentos
+    // dentro do mesmo título. Pago tudo, o título fica quitado com valor 0.
+    const repasse = !!m.repasse_cliente;
+    const nomeCliente = c?.nome || 'Cliente da Obra';
+    const baixas = principal ? DB.baixasDoTitulo(principal.id) : [];
+    const pago = Math.round(baixas.reduce((s, l) => s + (Number(l.valor) || 0), 0) * 100) / 100;
+    const saldo = Math.max(0, Math.round((liquido - pago) * 100) / 100);
+    const ultimaBaixa = baixas.length ? (baixas[baixas.length - 1].data_pagamento || baixas[baixas.length - 1].data) : null;
+    const dadosPrincipal = repasse
+      ? { valor: saldo, valor_original: liquido, status: saldo > 0 ? 'a_receber' : 'recebido', data_pagamento: saldo > 0 ? null : ultimaBaixa,
+          data: dt, data_vencimento: dt, fornecedor_beneficiario: nomeCliente,
+          descricao: `Saldo a receber do cliente — ${m.numero_medicao}ª Medição (${nomeCliente})` }
+      : { valor: liquido, data: dt, fornecedor_beneficiario: beneficiario, descricao: desc,
+          ...(principal && principal.valor_original != null ? { valor_original: null, status: 'recebido', data_pagamento: dt } : {}) };
+
     const vinculos = {};
     if (principal) {
       if (principal.conciliado) {
-        if (Math.abs(Number(principal.valor || 0) - liquido) > 0.009) {
+        if (Math.abs(Number(principal.valor || 0) - dadosPrincipal.valor) > 0.009) {
           avisos.push('A receita desta medição já foi conciliada com o extrato e não teve o valor alterado.');
         }
       } else {
-        DB.update('lancamentos', principal.id, { valor: liquido, data: dt, obra_id: m.obra_id, medicao_id: id });
+        DB.update('lancamentos', principal.id, { ...dadosPrincipal, obra_id: m.obra_id, medicao_id: id });
       }
       vinculos.lancamento_id = principal.id;
     } else if (liquido > 0) {
       const lan = DB.add('lancamentos', {
         obra_id: m.obra_id,
         tipo: 'receita',
-        data: dt,
-        descricao: desc,
         categoria,
-        valor: liquido,
         status: 'recebido',
-        fornecedor_beneficiario: beneficiario,
+        ...dadosPrincipal,
         origem: 'medicao',
         conciliado: false,
         medicao_id: id
@@ -358,6 +394,92 @@ const Medicoes = {
     return avisos;
   },
 
+  /** Pagamentos do cliente (baixas parciais do título "a receber do cliente" da medição). */
+  _pagamentos(medicaoId) {
+    const m = DB.getById('medicoes', medicaoId);
+    return m?.lancamento_id ? DB.baixasDoTitulo(m.lancamento_id) : [];
+  },
+
+  _liquido(m) {
+    const bruto = Number(m?.valor_liberado || m?.valor_aprovado || m?.valor_solicitado || m?.valor_medido || 0);
+    return Math.max(0, Math.round((bruto - Math.max(0, Number(m?.retencao_tecnica || 0)) - Math.max(0, Number(m?.descontos || 0))) * 100) / 100);
+  },
+
+  /** Quanto o cliente já repassou e quanto falta, para medições liberadas na conta do cliente. */
+  _situacaoCliente(m) {
+    if (!m || m.status !== 'liberada' || !m.repasse_cliente) return null;
+    const liquido = this._liquido(m);
+    const pago = Math.round(this._pagamentos(m.id).reduce((s, l) => s + (Number(l.valor) || 0), 0) * 100) / 100;
+    return { liquido, pago, falta: Math.max(0, Math.round((liquido - pago) * 100) / 100), excedente: Math.max(0, Math.round((pago - liquido) * 100) / 100) };
+  },
+
+  _repassePadrao(m) {
+    if (m && typeof m.repasse_cliente === 'boolean') return m.repasse_cliente;
+    try { return localStorage.getItem('finobra_medicao_repasse_padrao') === '1'; } catch (_) { return false; }
+  },
+
+  _selectRepasse(idCampo, repasse, nome = '') {
+    return `<select class="form-control" id="${idCampo}"${nome ? ` name="${nome}"` : ''}>
+      <option value="false" ${!repasse ? 'selected' : ''}>🏢 Na conta da construtora (já recebido)</option>
+      <option value="true" ${repasse ? 'selected' : ''}>👤 Na conta do cliente — ele paga a construtora</option>
+    </select>`;
+  },
+
+  _blocoPagamentos(m) {
+    const sit = this._situacaoCliente(m);
+    if (!sit) return '';
+    const linhas = this._pagamentos(m.id).map(l => `
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:4px 0;border-bottom:1px dashed var(--border);">
+        <span>${Utils.fmt.date(l.data_pagamento || l.data)}${l.observacoes ? ` <span style="color:var(--text3)">· ${Utils.esc(l.observacoes)}</span>` : ''}${l.conciliado ? ' <span class="badge badge-success" style="font-size:.6rem">conciliado</span>' : ''}</span>
+        <span style="display:flex;align-items:center;gap:6px;">
+          <strong class="numeric tabular-nums" style="color:var(--success)">${Utils.fmt.currency(l.valor)}</strong>
+          ${l.conciliado ? '' : `<button class="icon-btn btn-sm" title="Excluir pagamento" style="color:var(--danger)" data-fb-click="Lancamentos.desfazerBaixa" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(l.id))}">🗑️</button>`}
+        </span>
+      </div>`).join('');
+    const situacao = sit.falta > 0.009
+      ? `<span style="color:var(--danger);font-weight:800">⚠️ Cliente ainda deve ${Utils.fmt.currency(sit.falta)}</span>`
+      : sit.excedente > 0.009
+        ? `<span style="color:var(--warning);font-weight:800">Pago ${Utils.fmt.currency(sit.excedente)} a mais</span>`
+        : `<span style="color:var(--success);font-weight:800">✅ Quitada pelo cliente</span>`;
+    return `<div style="margin-top:10px;padding:10px 12px;border:1px solid var(--border);border-radius:8px;font-size:.78rem;">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:6px;">
+        <strong>👤 Pagamentos do cliente à construtora</strong>
+        ${situacao}
+      </div>
+      <div style="display:flex;gap:14px;flex-wrap:wrap;color:var(--text3);margin-bottom:6px;">
+        <span>Liberado (líquido): <strong style="color:var(--text)">${Utils.fmt.currency(sit.liquido)}</strong></span>
+        <span>Pago: <strong style="color:var(--success)">${Utils.fmt.currency(sit.pago)}</strong></span>
+        <span>Falta: <strong style="color:${sit.falta > 0.009 ? 'var(--danger)' : 'var(--text)'}">${Utils.fmt.currency(sit.falta)}</strong></span>
+      </div>
+      ${linhas || '<div style="color:var(--text3)">Nenhum pagamento registrado ainda.</div>'}
+    </div>`;
+  },
+
+  /** Registra um pagamento do cliente: abre a baixa (completa ou parcial) do título da medição. */
+  novoPagamento(id) {
+    const m = DB.getById('medicoes', id);
+    if (!m) return;
+    if (!m.repasse_cliente) {
+      const principal = m.lancamento_id ? DB.getById('lancamentos', m.lancamento_id) : null;
+      if (principal?.conciliado) {
+        Utils.toast('A receita desta medição já foi conciliada com o extrato como recebida pela construtora. Não dá para controlar pagamentos do cliente nela.', 'warning');
+        return;
+      }
+      Utils.confirm(`O valor da ${Utils.esc(m.numero_medicao)}ª medição caiu na conta do cliente?<br><small>A receita passa a ser "a receber do cliente" e cada pagamento que ele fizer à construtora é baixado nela, parcial ou completo.</small>`, () => {
+        DB.update('medicoes', id, { repasse_cliente: true });
+        this._sincronizarFinanceiro(id);
+        this._refresh();
+        setTimeout(() => this.novoPagamento(id), 50);
+      }, { allowHtml: true });
+      return;
+    }
+    const titulo = m.lancamento_id ? DB.getById('lancamentos', m.lancamento_id) : null;
+    if (!titulo) { Utils.toast('Esta medição não tem valor líquido a receber.', 'warning'); return; }
+    if (!DB.isLancamentoEmAberto(titulo)) { Utils.toast('O cliente já pagou toda esta medição.', 'info'); return; }
+    if (typeof Lancamentos === 'undefined') { Utils.toast('Módulo de lançamentos indisponível.', 'error'); return; }
+    Lancamentos.marcarBaixa(titulo.id, { parcialPadrao: true });
+  },
+
   edit(id) {
     this.showForm(id);
   },
@@ -403,6 +525,9 @@ const Medicoes = {
             </div>
             <div class="form-row cols-2" style="margin-bottom:14px;">
               <div class="form-group"><label class="form-label" for="med-rt">Engenheiro / Responsável Técnico</label><input class="form-control" id="med-rt" name="engenheiro_responsavel" value="${Utils.esc(m.engenheiro_responsavel||'')}" placeholder="Nome e CREA/CAU"></div>
+              <div class="form-group"><label class="form-label" for="med-repasse">Onde o dinheiro caiu?</label>${this._selectRepasse('med-repasse', this._repassePadrao(m), 'repasse_cliente')}</div>
+            </div>
+            <div class="form-row cols-2" style="margin-bottom:14px;">
               <div class="form-group"><label class="form-label" for="med-docs-ok">Documentação</label><select class="form-control" id="med-docs-ok" name="documentos_ok">
                 <option value="true" ${m.documentos_ok?'selected':''}>✅ Completa</option>
                 <option value="false" ${!m.documentos_ok?'selected':''}>⏳ Pendente</option>
@@ -432,6 +557,11 @@ const Medicoes = {
     d.retencao_tecnica=parseFloat(d.retencao_tecnica)||0;
     d.descontos=parseFloat(d.descontos)||0;
     d.documentos_ok=d.documentos_ok==='true';
+    d.repasse_cliente=d.repasse_cliente==='true';
+    if(id&&!d.repasse_cliente&&this._pagamentos(id).length){
+      Utils.toast('Esta medição tem pagamentos do cliente registrados. Mantenha "Na conta do cliente" ou exclua os pagamentos antes.','warning');
+      return;
+    }
     if(!d.data_previsao) d.data_previsao=null;
     if(!d.data_medicao) d.data_medicao=null;
     if(!d.data_submissao) d.data_submissao=null;

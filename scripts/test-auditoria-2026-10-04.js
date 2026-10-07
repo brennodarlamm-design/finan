@@ -331,7 +331,8 @@ console.log('=== Auditoria 04/10/2026 ===\n');
   const pg = new PGlite();
   await pg.exec(`
     CREATE TABLE fornecedores (id text PRIMARY KEY, tenant_id text, nome text, razao_social text, cnpj_cpf text, telefone text, email text,
-      categoria text, chave_pix text, banco_info text, endereco text, municipio text, uf text, ativo boolean, created_at timestamptz DEFAULT now());
+      categoria text, chave_pix text, banco_info text, endereco text, municipio text, uf text, ativo boolean, created_at timestamptz DEFAULT now(),
+      dados jsonb NOT NULL DEFAULT '{}'::jsonb);
     CREATE TABLE audit_logs (id text, tenant_id text, user_id text, acao text, entidade text, entidade_id text, dados_anteriores jsonb,
       dados_novos jsonb, ip text, user_agent text, created_at timestamptz DEFAULT now());
     INSERT INTO fornecedores (id, tenant_id, nome, created_at) SELECT 'f' || g, 't1', 'Antigo ' || g, now() - interval '30 days' FROM generate_series(1, 300) g;
@@ -782,6 +783,124 @@ console.log('=== Auditoria 04/10/2026 ===\n');
   assert(od.includes('Falta Receber') && od.includes('const falta = contrato - recebido;'));
   assert.equal(od, read('frontend/domains/obras/obra_detalhe.js'));
   console.log('  ✓ Obra: cartão "Falta Receber" (financiado − recebido)');
+}
+
+// Obras: o cadastro completo vai para o banco (migração 045) e não some na sincronização.
+{
+  const { dadosExtrasDaObra } = await import('../api/_obra-dados.js');
+  const extras = dadosExtrasDaObra({ id: 'o1', nome: 'X', status: 'ativo', valor_financiado: 135700, cpf_cnpj: '003.925.092-02', modalidade_obra: 'caixa', _tmp: 1, sync_version: '9', foto: 'data:image/png;base64,' + 'A'.repeat(5000) });
+  assert.deepEqual(extras, { valor_financiado: 135700, cpf_cnpj: '003.925.092-02', modalidade_obra: 'caixa' }, 'só os campos sem coluna própria, sem base64 nem internos');
+  const pg = new PGlite();
+  const psql = async (strings, ...values) => { let t = strings[0]; values.forEach((_, k) => { t += `$${k + 1}` + strings[k + 1]; }); return (await pg.query(t, values)).rows; };
+  await pg.exec(`CREATE TABLE obras (id text, tenant_id text, nome text, cliente text, endereco text, orcamento_total numeric, status text, data_inicio date, data_previsao date, cronograma_config jsonb, bdi_config jsonb, created_at timestamptz default now(), PRIMARY KEY (tenant_id, id));
+    CREATE TABLE audit_logs (id text, tenant_id text, user_id text, acao text, entidade text, entidade_id text, dados_anteriores jsonb, dados_novos jsonb, ip text, user_agent text, created_at timestamptz default now());`);
+  await pg.exec(read('migrations/045_obras_dados_cadastro.sql'));
+  const { handleSave } = await import('../api/_db-mutations.js');
+  const auth = { isSystem: false, tenantId: 't1', user: { userId: 'u1', perfil: 'superadmin' } };
+  const salvar = (data) => new Promise((resolve, reject) => {
+    const res = { statusCode: 200, setHeader() {}, status(c) { this.statusCode = c; return this; }, json(b) { resolve({ status: this.statusCode, body: b }); return this; } };
+    handleSave(psql, 't1', auth, { headers: {}, socket: {} }, res, 'clientes', data).catch(reject);
+  });
+  let r = await salvar({ id: 'o1', nome: 'PAULA VANESSA', status: 'em_andamento', valor_financiado: 135700, cpf_cnpj: '003.925.092-02', num_contrato_caixa: '8.4444', data_previsao_termino: '2027-03-01' });
+  assert.equal(r.status, 200, JSON.stringify(r.body));
+  let [o] = await psql`SELECT dados, data_previsao::text AS fim FROM obras WHERE id = 'o1'`;
+  assert.equal(o.dados.valor_financiado, 135700); assert.equal(o.dados.num_contrato_caixa, '8.4444');
+  assert.equal(o.fim, '2027-03-01', 'data de término do formulário agora é gravada');
+  r = await salvar({ id: 'o1', nome: 'PAULA VANESSA', status: 'em_andamento', area_construida: 62 });
+  [o] = await psql`SELECT dados FROM obras WHERE id = 'o1'`;
+  assert.equal(o.dados.valor_financiado, 135700, 'envio parcial não apaga o que já estava salvo'); assert.equal(o.dados.area_construida, 62);
+  await pg.close();
+  const dataJs = read('js/data.js');
+  assert(dataJs.includes('const normalized = cloudItems.map(({ dados, ...o }) => ({') && dataJs.includes('_mesclarCamposLocais(localItem, cloudItem)'));
+  for (const [a, b] of [['api/_obra-dados.js', 'backend/domains/database/_obra-dados.js'], ['api/_db-mutations.js', 'backend/domains/database/_db-mutations.js'], ['api/_db-sync.js', 'backend/domains/database/_db-sync.js'], ['js/data.js', 'frontend/core/data.js']]) assert.equal(read(a), read(b), b);
+  console.log('  ✓ Obras: cadastro completo gravado no banco, término gravado, envio parcial não apaga e a sincronização não descarta campos');
+}
+
+// Varredura 07/10: campos que o app grava e o servidor descartava (todas as tabelas).
+{
+  const pg = new PGlite();
+  const psql = async (strings, ...values) => { let t = strings[0]; values.forEach((_, k) => { t += `$${k + 1}` + strings[k + 1]; }); return (await pg.query(t, values)).rows; };
+  await pg.exec(`
+    CREATE TABLE audit_logs (id text, tenant_id text, user_id text, acao text, entidade text, entidade_id text, dados_anteriores jsonb, dados_novos jsonb, ip text, user_agent text, created_at timestamptz default now());
+    CREATE TABLE obras (id text, tenant_id text, nome text, cliente text, endereco text, orcamento_total numeric, status text, data_inicio date, data_previsao date, cronograma_config jsonb, bdi_config jsonb, created_at timestamptz default now(), PRIMARY KEY (tenant_id, id));
+    CREATE TABLE fornecedores (id text primary key, tenant_id text, nome text, razao_social text, cnpj_cpf text, telefone text, email text, categoria text, chave_pix text, banco_info text, endereco text, municipio text, uf text, ativo boolean, created_at timestamptz default now());
+    CREATE TABLE lancamentos (id text primary key, tenant_id text, data date, data_vencimento date, data_pagamento date, descricao text, categoria text, fornecedor_beneficiario text, fornecedor_id text, conta_bancaria text, tipo text, valor numeric, status text, obra_id text, nota_fiscal_id text, codigo_barras text, chave_nfe text, observacoes text, conciliado boolean, itens jsonb, created_at timestamptz default now());
+    CREATE TABLE notas_fiscais (id text primary key, tenant_id text, numero_nf text, serie text, chave_acesso text, chave_nfe text, emitente text, cnpj_emitente text, destinatario text, data_emissao date, data_vencimento date, data_pagamento date, valor_bruto numeric, impostos numeric, valor_liquido numeric, valor_total numeric, tipo text, categoria text, obra_id text, lancamento_id text, status text, observacoes text, pdf_url text, xml_data text, itens jsonb, created_at timestamptz default now(), updated_at timestamptz default now());
+    CREATE UNIQUE INDEX ON notas_fiscais (tenant_id, chave_nfe) WHERE chave_nfe IS NOT NULL;
+    CREATE TABLE produtos (id text primary key, tenant_id text, nome text, unidade text, categoria text, codigo text, valor_medio numeric, observacoes text, created_at timestamptz default now(), updated_at timestamptz default now());
+    CREATE TABLE orcamentos (id text primary key, tenant_id text, obra_id text, titulo text, valor_total numeric, itens_json jsonb, status text, descricao text, data_criacao date, created_at timestamptz default now());
+    CREATE TABLE documentos (id text primary key, tenant_id text, tipo text, referencia_id text, titulo text, categoria text, nome_arquivo text, tipo_arquivo text, tamanho_bytes bigint, base64_data text, url text, created_at timestamptz default now());
+    CREATE TABLE medicoes (id text primary key, tenant_id text, obra_id text, numero int, data date, valor_medido numeric, status text, observacoes text, itens_json jsonb, percentual_fisico numeric, percentual_financeiro numeric, valor_solicitado numeric, valor_aprovado numeric, valor_liberado numeric, data_previsao date, data_submissao date, data_aprovacao date, data_liberacao date, engenheiro_responsavel text, etapa_descricao text, documentos_ok boolean, lancamento_id text, retencao_tecnica numeric, descontos numeric, payload jsonb, created_at timestamptz default now());
+    CREATE TABLE tenants (id text primary key, cep varchar(10));
+    CREATE TABLE tenant_preferences (tenant_id text primary key, preferences jsonb, updated_at timestamptz default now());
+  `);
+  await pg.exec(read('migrations/045_obras_dados_cadastro.sql'));
+  await pg.exec(read('migrations/046_dados_campos_sem_coluna.sql'));
+  const { handleSave } = await import('../api/_db-mutations.js');
+  const auth = { isSystem: false, tenantId: 't1', user: { userId: 'u1', perfil: 'superadmin' } };
+  const salvar = (table, data) => new Promise((resolve, reject) => {
+    const res = { statusCode: 200, setHeader() {}, status(c) { this.statusCode = c; return this; }, json(b) { resolve({ status: this.statusCode, body: b }); return this; } };
+    handleSave(psql, 't1', auth, { headers: {}, socket: {} }, res, table, data).catch(reject);
+  });
+  const ok = async (table, data) => { const r = await salvar(table, data); assert.equal(r.status, 200, `${table}: ${JSON.stringify(r.body)}`); return r; };
+
+  // Fornecedor pessoa física com endereço completo, contato e prazo.
+  await ok('fornecedores', { id: 'f1', nome: 'JOÃO PEDREIRO', razao_social: 'JOÃO PEDREIRO', tipo_pessoa: 'pf', cpf: '12345678909', numero: '120', bairro: 'Caçari', cep: '69307000', ie: '', contato_nome: 'João', prazo_pagamento: '30 dias', observacoes: 'Paga no PIX' });
+  let [f] = await psql`SELECT dados, cnpj_cpf FROM fornecedores WHERE id = 'f1'`;
+  assert.equal(f.dados.tipo_pessoa, 'pf'); assert.equal(f.dados.cpf, '12345678909'); assert.equal(f.dados.bairro, 'Caçari'); assert.equal(f.dados.prazo_pagamento, '30 dias'); assert.equal(f.dados.observacoes, 'Paga no PIX');
+  assert(!('nome' in f.dados) && !('cnpj' in f.dados), 'colunas próprias não duplicam em dados');
+
+  // Lançamento: fornecedor_id (validado) e campos extras.
+  await ok('lancamentos', { id: 'l1', descricao: 'Pedreiro', valor: 500, data: '2026-10-07', tipo: 'despesa', fornecedor_id: 'f1', origem: 'medicao', competencia: '2026-10', medicao_id: 'm1', numero_parcela: 1, conta_bancaria_manual: 'x' });
+  let [l] = await psql`SELECT fornecedor_id, dados FROM lancamentos WHERE id = 'l1'`;
+  assert.equal(l.fornecedor_id, 'f1'); assert.deepEqual(l.dados, { origem: 'medicao', competencia: '2026-10', medicao_id: 'm1', numero_parcela: 1 });
+  await ok('lancamentos', { id: 'l2', descricao: 'X', valor: 1, data: '2026-10-07', fornecedor_id: 'de-outra-empresa' });
+  assert.equal((await psql`SELECT fornecedor_id FROM lancamentos WHERE id = 'l2'`)[0].fornecedor_id, null, 'fornecedor inexistente/de outra empresa não entra');
+
+  // Orçamento: trava das despesas já geradas.
+  await ok('orcamentos', { id: 'o1', obra_id: '', titulo: 'Casa', itens: [], despesas_por_etapa: { fundacao: ['l1'] }, despesas_geradas: true, data_aprovacao: '2026-10-01' });
+  let [o] = await psql`SELECT dados FROM orcamentos WHERE id = 'o1'`;
+  assert.deepEqual(o.dados.despesas_por_etapa, { fundacao: ['l1'] }); assert.equal(o.dados.despesas_geradas, true);
+
+  // Documento: link externo e pendência do BIM.
+  await ok('documentos', { id: 'd1', entidade_tipo: 'obra', entidade_id: 'o1', titulo: 'Projeto', nome_arquivo: 'projeto', url_externa: 'https://drive.google.com/x', tipo_servico: 'gdrive', subtipo: 'bim_issue', status: 'aberta', prioridade: 'alta', data_base64: null });
+  let [d] = await psql`SELECT dados FROM documentos WHERE id = 'd1'`;
+  assert.equal(d.dados.url_externa, 'https://drive.google.com/x'); assert.equal(d.dados.status, 'aberta'); assert(!('entidade_tipo' in d.dados));
+  await ok('documentos', { id: 'd1', entidade_tipo: 'obra', titulo: 'Projeto', status: 'resolvida' });
+  assert.equal((await psql`SELECT dados->>'status' AS s, dados->>'url_externa' AS u FROM documentos WHERE id = 'd1'`)[0].s, 'resolvida', 'resolver a pendência agora grava');
+
+  // Produto: fornecedor principal.
+  await ok('produtos', { id: 'p1', nome: 'Cimento', fornecedor_principal: 'f1' });
+  assert.equal((await psql`SELECT dados->>'fornecedor_principal' AS fp FROM produtos WHERE id = 'p1'`)[0].fp, 'f1');
+
+  // Medição: número e data editados prevalecem; "não realizada" fica sem data; payload não se aninha.
+  await ok('medicoes', { id: 'm1', numero: 1, numero_medicao: 3, data: '2026-09-01', data_medicao: '2026-10-05', valor_medido: 1000, payload: { payload: { x: 1 } } });
+  let [m] = await psql`SELECT numero, data::text AS data, payload FROM medicoes WHERE id = 'm1'`;
+  assert.equal(m.numero, 3); assert.equal(m.data, '2026-10-05'); assert(!('payload' in m.payload), 'payload não se aninha');
+  await ok('medicoes', { id: 'm1', numero_medicao: 3, data: '2026-10-05', data_medicao: null, valor_medido: 1000 });
+  assert.equal((await psql`SELECT data FROM medicoes WHERE id = 'm1'`)[0].data, null, 'medição não realizada fica sem data');
+
+  // Nota: valor_bruto editado prevalece sobre o valor_total antigo.
+  await ok('notas', { id: 'n1', numero_nf: '10', emitente: 'X', valor_total: 100, valor_bruto: 150 });
+  assert.equal(Number((await psql`SELECT valor_total FROM notas_fiscais WHERE id = 'n1'`)[0].valor_total), 150);
+
+  // Preferências: cargos e modelos de workflow.
+  await ok('preferencias', { preferences: { workflow_cargos: [{ id: 'eng', nome: 'Engenheiro', usuario_id: 'u1' }], workflow_templates: { meu: { nome: 'Meu fluxo', processos: [{ id: 'p1', nome: 'Projeto', dias_sla: 10 }] } } } });
+  const [pref] = await psql`SELECT preferences FROM tenant_preferences WHERE tenant_id = 't1'`;
+  assert.equal(pref.preferences.workflow_cargos[0].usuario_id, 'u1'); assert(pref.preferences.workflow_templates.meu);
+  await pg.close();
+
+  // Checklist do workflow como objeto.
+  const { sanitizeSlaProcesses } = await import('../api/_sla.js');
+  const [proc] = sanitizeSlaProcesses([{ id: 'p1', nome: 'Projeto', checklist_status: { 'ART emitida': true, 'Planta': false } }]);
+  assert.deepEqual(proc.checklist_status, { 'ART emitida': true, 'Planta': false });
+
+  const dataJs = read('js/data.js');
+  assert(dataJs.includes("['fornecedores', 'produtos', 'orcamentos', 'documentos'].includes(table)") && dataJs.includes('const extras = Object.fromEntries(Object.entries(cloudDoc)'));
+  assert(read('api/users.js').includes("cep: t.cep || ''") && read('js/app.js').includes('this._enviarEmpresaAoServidor(empresaData);'));
+  assert(read('js/fases_doc.js').includes("tipo_mime: file.type || 'application/octet-stream',"));
+  for (const [a, b] of [['api/_sla.js', 'backend/domains/obras/_sla.js'], ['api/_db-normalizers.js', 'backend/domains/database/_db-normalizers.js'], ['api/_db-queries.js', 'backend/domains/database/_db-queries.js'], ['api/users.js', 'backend/domains/auth/users.js'], ['js/app.js', 'frontend/core/app.js'], ['js/fases_doc.js', 'frontend/domains/obras/fases_doc.js'], ['js/data.js', 'frontend/core/data.js']]) assert.equal(read(a), read(b), b);
+  console.log('  ✓ Varredura 07/10: fornecedor, lançamento, orçamento, documento, produto, medição, nota, preferências, checklist, empresa e anexos das fases gravados');
 }
 
 await db.close();

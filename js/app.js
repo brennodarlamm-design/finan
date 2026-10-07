@@ -1478,6 +1478,23 @@ const App = {
     Utils.toast('Empresa salva com sucesso!', 'success');
     this.renderShell();
     this.navigate(this.route);
+    // Varredura 07/10: a configuração inicial só gravava no navegador e a sincronização seguinte
+    // apagava tudo com os dados (vazios) do servidor. Envia ao servidor como a tela de Configurações.
+    this._enviarEmpresaAoServidor(empresaData);
+  },
+
+  async _enviarEmpresaAoServidor(empresaData) {
+    try {
+      const { whatsapp, configurada, ...campos } = empresaData;
+      const headers = (typeof Auth !== 'undefined' && Auth.getAuthHeaders) ? Auth.getAuthHeaders() : { 'Content-Type': 'application/json' };
+      const res = await fetch('/api/tenant', { method: 'PATCH', headers, body: JSON.stringify(campos), signal: AbortSignal.timeout(20000) });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.success) throw new Error(data.error || `Erro ${res.status}`);
+      DB.saveEmpresa({ ...data.tenant, whatsapp: (data.tenant.telefone || '').replace(/\D/g, ''), configurada: true });
+    } catch (err) {
+      console.warn('[Onboarding] Dados da empresa não foram enviados ao servidor:', err?.message || err);
+      Utils.toast('Os dados da empresa ficaram só neste aparelho. Salve de novo em Configurações › Empresa.', 'warning');
+    }
   },
 
   clearAllData() {

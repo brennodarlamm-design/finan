@@ -21,7 +21,7 @@ const slaApiSrc = fs.readFileSync(path.join(root, 'api/_sla.js'), 'utf8');
 ok('_sla.js sanitiza cargo_responsavel', slaApiSrc.includes('cargo_responsavel:text(raw.cargo_responsavel'));
 ok('_sla.js sanitiza checklist', slaApiSrc.includes('checklist:Array.isArray(raw.checklist)'));
 ok('_sla.js sanitiza motivo_atraso', slaApiSrc.includes('motivo_atraso:text(raw.motivo_atraso'));
-ok('_sla.js sanitiza checklist_status', slaApiSrc.includes('checklist_status:text(raw.checklist_status'));
+ok('_sla.js sanitiza checklist_status', slaApiSrc.includes('checklist_status:(raw.checklist_status && typeof raw.checklist_status === \'object\''));
 
 const cargosApiSrc = fs.readFileSync(path.join(root, 'api/_cargos.js'), 'utf8');
 ok('_cargos.js exporta sanitizeCargos', cargosApiSrc.includes('export function sanitizeCargos'));

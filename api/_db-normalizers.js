@@ -1,5 +1,6 @@
 // api/_db-normalizers.js — Sanitizadores, Normalizadores e Conversores de Dados de Domínio
 import { sanitizeSlaProcesses } from './_sla.js';
+import { sanitizeCargos, sanitizeWorkflowTemplates } from './_cargos.js';
 
 export function cleanDate(d) {
   if (!d || d === '—' || d === '-') return null;
@@ -149,6 +150,10 @@ export function sanitizeTenantPreferences(input) {
   if ('whatsapp_telefone' in input) out.whatsapp_telefone = String(input.whatsapp_telefone || '').replace(/\D/g, '').slice(0, 15);
   if ('whatsapp_modo' in input) out.whatsapp_modo = ['api', 'web'].includes(String(input.whatsapp_modo)) ? String(input.whatsapp_modo) : 'api';
   if ('bdi_padrao' in input) out.bdi_padrao = sanitizeBdiConfig(input.bdi_padrao);
+  // Varredura 07/10: cargos (quem recebe cada etapa) e modelos de workflow personalizados eram
+  // enviados pelo app mas descartados aqui; os sanitizadores já existiam em _cargos.js.
+  if ('workflow_cargos' in input) out.workflow_cargos = sanitizeCargos(input.workflow_cargos);
+  if ('workflow_templates' in input) out.workflow_templates = sanitizeWorkflowTemplates(input.workflow_templates);
   return out;
 }
 
@@ -214,6 +219,8 @@ export function normalizeMedicao(m) {
     lancamento_id: m.lancamento_id || null,
     // Sem coluna própria: vem do payload (receita "a receber" da retenção técnica).
     retencao_lancamento_id: m.retencao_lancamento_id || jsonPayload(m).retencao_lancamento_id || null,
+    // Sem coluna própria: o valor liberado caiu na conta do cliente, que paga a construtora aos poucos.
+    repasse_cliente: Boolean(m.repasse_cliente ?? jsonPayload(m).repasse_cliente),
     retencao_tecnica: cleanNum(m.retencao_tecnica),
     descontos: cleanNum(m.descontos),
     itens: (typeof m.itens_json === 'string' ? safeJsonParse(m.itens_json, []) : m.itens_json) || m.itens || []

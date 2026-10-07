@@ -266,6 +266,10 @@ const ObraDetalhe = {
             const falta = contrato - recebido;
             const pctRecebido = contrato > 0 ? Math.min(100, Math.max(0, (recebido / contrato) * 100)) : 0;
             const acima = contrato > 0 && falta < 0;
+            // Medições liberadas na conta do cliente que ele ainda não repassou à construtora.
+            const clienteDeve = (typeof Medicoes !== 'undefined' && Medicoes._situacaoCliente)
+              ? (DB.getAll('medicoes') || []).filter(m => m.obra_id === obra.id).reduce((s, m) => s + (Medicoes._situacaoCliente(m)?.falta || 0), 0)
+              : 0;
             return `
           <div style="background:var(--bg-secondary);padding:14px;border-radius:var(--r-md);border:1px solid var(--border);">
             <div style="font-size:.7rem;color:var(--text3);text-transform:uppercase;font-weight:700;letter-spacing:.05em;">Falta Receber</div>
@@ -278,6 +282,7 @@ const ObraDetalhe = {
               : acima
                 ? `Recebido ${Utils.fmt.currency(-falta)} acima do contrato`
                 : `${pctRecebido.toFixed(1).replace('.', ',')}% do ${isCaixa ? 'financiado' : 'contratado'} já recebido`}</div>
+            ${clienteDeve > 0.009 ? `<div style="font-size:.72rem;color:var(--danger);font-weight:700;margin-top:4px;">⚠️ Cliente deve ${Utils.fmt.currency(clienteDeve)} de medições já liberadas</div>` : ''}
           </div>`;
           })()}
 

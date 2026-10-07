@@ -122,7 +122,7 @@ export async function handleDeltaSync(sql, tenantId, auth, query, res) {
         ? sql`SELECT *, xmin::text AS sync_version FROM medicoes WHERE tenant_id = ${tenantId} AND (created_at >= ${sinceIso} OR id IN (SELECT entidade_id FROM audit_logs WHERE tenant_id = ${tenantId} AND entidade = 'medicoes' AND created_at >= ${sinceIso})) ORDER BY data DESC;`
         : Promise.resolve([]),
       tableAllowed(auth, 'documentos', 'read')
-        ? sql`SELECT id, tipo, referencia_id, titulo, categoria, nome_arquivo, tipo_arquivo, tamanho_bytes, url, created_at FROM documentos WHERE tenant_id = ${tenantId} AND (created_at >= ${sinceIso} OR id IN (SELECT entidade_id FROM audit_logs WHERE tenant_id = ${tenantId} AND entidade = 'documentos' AND created_at >= ${sinceIso})) ORDER BY created_at DESC;`
+        ? sql`SELECT id, tipo, referencia_id, titulo, categoria, nome_arquivo, tipo_arquivo, tamanho_bytes, url, dados, created_at FROM documentos WHERE tenant_id = ${tenantId} AND (created_at >= ${sinceIso} OR id IN (SELECT entidade_id FROM audit_logs WHERE tenant_id = ${tenantId} AND entidade = 'documentos' AND created_at >= ${sinceIso})) ORDER BY created_at DESC;`
         : Promise.resolve([]),
       tableAllowed(auth, 'produtos', 'read')
         ? sql`SELECT *, xmin::text AS sync_version FROM produtos WHERE tenant_id = ${tenantId} AND (created_at >= ${sinceIso} OR id IN (SELECT entidade_id FROM audit_logs WHERE tenant_id = ${tenantId} AND entidade = 'produtos' AND created_at >= ${sinceIso})) ORDER BY nome ASC;`
@@ -238,7 +238,7 @@ export async function handleFullSnapshot(sql, tenantId, auth, res) {
       ? sql`SELECT *, xmin::text AS sync_version FROM medicoes WHERE tenant_id = ${tenantId} ORDER BY data DESC;`
       : Promise.resolve([]),
     tableAllowed(auth, 'documentos', 'read')
-      ? sql`SELECT id, tipo, referencia_id, titulo, categoria, nome_arquivo, tipo_arquivo, tamanho_bytes, url, created_at FROM documentos WHERE tenant_id = ${tenantId} ORDER BY created_at DESC;`
+      ? sql`SELECT id, tipo, referencia_id, titulo, categoria, nome_arquivo, tipo_arquivo, tamanho_bytes, url, dados, created_at FROM documentos WHERE tenant_id = ${tenantId} ORDER BY created_at DESC;`
       : Promise.resolve([]),
     tableAllowed(auth, 'contas', 'read')
       ? sql`SELECT *, xmin::text AS sync_version FROM contas_bancarias WHERE tenant_id = ${tenantId} ORDER BY created_at ASC;`
@@ -503,8 +503,8 @@ export async function handleTableQuery(sql, tenantId, auth, query, res) {
     case 'documentos': {
       if (!tableAllowed(auth, 'documentos', 'read')) return res.status(403).json({ error: 'Acesso não permitido.' });
       const rows = pagination
-        ? await sql`SELECT id, tipo, referencia_id, titulo, categoria, nome_arquivo, tipo_arquivo, tamanho_bytes, url, created_at FROM documentos WHERE tenant_id = ${tenantId} ORDER BY created_at DESC, id DESC LIMIT ${pagination.limit} OFFSET ${pagination.offset};`
-        : await sql`SELECT id, tipo, referencia_id, titulo, categoria, nome_arquivo, tipo_arquivo, tamanho_bytes, url, created_at FROM documentos WHERE tenant_id = ${tenantId} ORDER BY created_at DESC, id DESC;`;
+        ? await sql`SELECT id, tipo, referencia_id, titulo, categoria, nome_arquivo, tipo_arquivo, tamanho_bytes, url, dados, created_at FROM documentos WHERE tenant_id = ${tenantId} ORDER BY created_at DESC, id DESC LIMIT ${pagination.limit} OFFSET ${pagination.offset};`
+        : await sql`SELECT id, tipo, referencia_id, titulo, categoria, nome_arquivo, tipo_arquivo, tamanho_bytes, url, dados, created_at FROM documentos WHERE tenant_id = ${tenantId} ORDER BY created_at DESC, id DESC;`;
       return res.status(200).json(pageResponse(rows, pagination));
     }
 

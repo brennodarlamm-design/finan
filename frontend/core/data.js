@@ -360,8 +360,22 @@ const DB = {
       categorias_receita: readJson('finobra_cats_receita_custom'),
       slas_padrao: readJson('finobra_slas_padrao'),
       whatsapp_telefone: String(localStorage.getItem(this._ck('finobra_whatsapp_telefone')) || ''),
-      whatsapp_modo: String(localStorage.getItem(this._ck('finobra_whatsapp_modo')) || 'api')
+      whatsapp_modo: String(localStorage.getItem(this._ck('finobra_whatsapp_modo')) || 'api'),
+      // Cargos e modelos de workflow: só vão se este aparelho tiver uma versão salva (não manda o padrão
+      // por cima do que já está no servidor).
+      ...this._preferenciaWorkflowLocal()
     };
+  },
+
+  _preferenciaWorkflowLocal() {
+    const out = {};
+    try {
+      const cargos = localStorage.getItem(this._ck('finobra_workflow_cargos'));
+      if (cargos) { const v = JSON.parse(cargos); if (Array.isArray(v)) out.workflow_cargos = v; }
+      const templates = localStorage.getItem(this._ck('finobra_workflow_templates'));
+      if (templates) { const v = JSON.parse(templates); if (v && typeof v === 'object' && !Array.isArray(v)) out.workflow_templates = v; }
+    } catch {}
+    return out;
   },
 
   _applyTenantPreferences(preferences = {}) {
@@ -376,6 +390,12 @@ const DB = {
     if ('slas_padrao' in preferences) writeJson('finobra_slas_padrao', preferences.slas_padrao);
     if ('whatsapp_telefone' in preferences) {
       try { localStorage.setItem(this._ck('finobra_whatsapp_telefone'), String(preferences.whatsapp_telefone || '').replace(/\D/g, '')); } catch {}
+    }
+    if ('workflow_cargos' in preferences && Array.isArray(preferences.workflow_cargos) && preferences.workflow_cargos.length) {
+      writeJson('finobra_workflow_cargos', preferences.workflow_cargos);
+    }
+    if ('workflow_templates' in preferences && preferences.workflow_templates && typeof preferences.workflow_templates === 'object' && !Array.isArray(preferences.workflow_templates)) {
+      try { localStorage.setItem(this._ck('finobra_workflow_templates'), JSON.stringify(preferences.workflow_templates)); } catch {}
     }
     if ('whatsapp_modo' in preferences) {
       const modo = ['api','web'].includes(String(preferences.whatsapp_modo)) ? String(preferences.whatsapp_modo) : 'api';
@@ -1171,6 +1191,8 @@ const DB = {
       if (pendingSaves.has(id)) {
         const pendingItem = pendingSaves.get(id);
         resultMap.set(id, { ...(resultMap.get(id) || lItem), ...pendingItem });
+      } else if (resultMap.has(id) && this._mantemCamposLocais(table)) {
+        resultMap.set(id, this._mesclarCamposLocais(lItem, resultMap.get(id)));
       } else if (!resultMap.has(id) && (preserveUnmigrated || this._syncStorageFailure)) {
         // Protege dados ainda não migrados e alterações cuja fila não pôde ser salva.
         resultMap.set(id, lItem);
@@ -1297,6 +1319,8 @@ const DB = {
       if (!id || pendingDeletes.has(id)) continue;
       if (pendingSaves.has(id)) {
         resultMap.set(id, { ...cItem, ...pendingSaves.get(id) });
+      } else if (resultMap.has(id) && this._mantemCamposLocais(table)) {
+        resultMap.set(id, this._mesclarCamposLocais(resultMap.get(id), cItem));
       } else {
         resultMap.set(id, cItem);
       }
@@ -1308,13 +1332,44 @@ const DB = {
     return Array.from(resultMap.values());
   },
 
+  // Obras: a versão da nuvem trocava o registro local inteiro, e os campos do cadastro que o servidor
+  // não guardava (valor financiado, CPF, cidade, área, contrato Caixa...) sumiam a cada sincronização.
+  // A nuvem continua mandando em tudo o que ela traz; só o que ela não traz é mantido do aparelho.
+  _mantemCamposLocais(table) {
+    return ['clientes', 'obras', 'lancamentos', 'fornecedores', 'produtos', 'orcamentos', 'documentos'].includes(table);
+  },
+
+  _mesclarCamposLocais(localItem, cloudItem) {
+    const out = { ...cloudItem };
+    for (const [k, v] of Object.entries(localItem || {})) {
+      if (!(k in out) && v !== undefined) out[k] = v;
+    }
+    return out;
+  },
+
+  /** `dados` (migrações 045/046): campos do registro sem coluna própria no banco. As colunas prevalecem. */
+  _expandirDados(item) {
+    if (!item || typeof item !== 'object' || !('dados' in item)) return item;
+    const { dados, ...resto } = item;
+    return { ...(dados && typeof dados === 'object' && !Array.isArray(dados) ? dados : {}), ...resto };
+  },
+
   _applyTableData(table, cloudItems, isDelta = false) {
     if (!cloudItems) return;
+    if (Array.isArray(cloudItems) && ['fornecedores', 'produtos', 'orcamentos', 'documentos'].includes(table)) {
+      cloudItems = cloudItems.map(item => this._expandirDados(item));
+      // Pessoa física: o banco guarda o CPF em cnpj_cpf e a leitura o devolve como `cnpj`.
+      if (table === 'fornecedores') {
+        cloudItems = cloudItems.map(f => (f.tipo_pessoa === 'pf' && f.cpf) ? { ...f, cnpj: '' } : f);
+      }
+    }
     const completenessBootstrapped = this.isCloudCompletenessBootstrapped ? this.isCloudCompletenessBootstrapped() : true;
 
     if (['clientes', 'obras'].includes(table) && Array.isArray(cloudItems)) {
       const local = this.getAll('clientes') || [];
-      const normalized = cloudItems.map(o => ({
+      // `dados` (migração 045) guarda o cadastro completo da obra; as colunas próprias prevalecem.
+      const normalized = cloudItems.map(({ dados, ...o }) => ({
+        ...(dados && typeof dados === 'object' && !Array.isArray(dados) ? dados : {}),
         ...o,
         data_inicio: (typeof Utils !== 'undefined' && Utils.cleanDate) ? Utils.cleanDate(o.data_inicio) : (o.data_inicio ? String(o.data_inicio).split('T')[0] : o.data_inicio),
         processos_sla: o.cronograma_config?.processos_sla || o.processos_sla || [],
@@ -1327,7 +1382,13 @@ const DB = {
       this.save('fornecedores', isDelta ? this._applyDeltaToCollection('fornecedores', cloudItems, local) : this._reconcileCollection('fornecedores', cloudItems, local));
     } else if (table === 'lancamentos' && Array.isArray(cloudItems)) {
       const local = this.getAll('lancamentos') || [];
-      const normalized = cloudItems.map(l => ({
+      // `dados` (migração 046): origem, competência, vínculos com medição/pré-compra, parcela...
+      // fornecedor_id nulo na nuvem é de lançamento gravado antes da correção: não apaga o do aparelho.
+      const normalized = cloudItems.map(({ dados, ...l }) => {
+        const base = { ...(dados && typeof dados === 'object' && !Array.isArray(dados) ? dados : {}), ...l };
+        if (base.fornecedor_id == null) delete base.fornecedor_id;
+        return base;
+      }).map(l => ({
         ...l,
         data: (typeof Utils !== 'undefined' && Utils.cleanDate) ? Utils.cleanDate(l.data) || l.data : (l.data ? String(l.data).split('T')[0] : l.data),
         data_vencimento: (typeof Utils !== 'undefined' && Utils.cleanDate) ? Utils.cleanDate(l.data_vencimento) || Utils.cleanDate(l.data) || l.data : (l.data_vencimento ? String(l.data_vencimento).split('T')[0] : l.data),
@@ -1439,15 +1500,20 @@ const DB = {
     } else if (table === 'documentos' && Array.isArray(cloudItems) && typeof Documentos !== 'undefined') {
       const locais = Documentos.getAll() || [];
       const localMap = new Map(locais.map(x => [x.id, x]));
+      // Campos que só existem em `dados` (link externo do Drive/OneDrive, pendências do BIM...):
+      // antes o documento era remontado só com as colunas fixas e eles sumiam.
+      const COLUNAS_DOC = new Set(['id', 'tenant_id', 'tipo', 'referencia_id', 'titulo', 'categoria', 'nome_arquivo', 'tipo_arquivo', 'tamanho_bytes', 'base64_data', 'url', 'created_at', 'sync_version']);
       const merged = cloudItems.map(cloudDoc => {
         const loc = localMap.get(cloudDoc.id);
+        const extras = Object.fromEntries(Object.entries(cloudDoc).filter(([k]) => !COLUNAS_DOC.has(k)));
         return {
+          ...extras,
           id: cloudDoc.id,
           entidade_tipo: cloudDoc.tipo || cloudDoc.entidade_tipo,
           entidade_id: cloudDoc.referencia_id || cloudDoc.entidade_id,
           titulo: cloudDoc.titulo,
           categoria: cloudDoc.categoria || loc?.categoria || '',
-          subtipo: loc?.subtipo || (cloudDoc.categoria === 'bim_model' ? 'bim_model' : undefined),
+          subtipo: extras.subtipo || loc?.subtipo || (cloudDoc.categoria === 'bim_model' ? 'bim_model' : undefined),
           nome_arquivo: cloudDoc.nome_arquivo,
           tipo_mime: cloudDoc.tipo_arquivo || cloudDoc.tipo_mime,
           tamanho: cloudDoc.tamanho_bytes || cloudDoc.tamanho,
@@ -2346,6 +2412,100 @@ const DB = {
       else mantidos.push(l);
     }
     return { removidos, mantidos };
+  },
+
+  // ── BAIXA PARCIAL ──
+  // Um título (lançamento a pagar/receber) pode ser quitado aos poucos. Cada pagamento vira um
+  // lançamento pago/recebido com `baixa_de` = id do título (assim cada entrada bate com o extrato
+  // e os totais continuam certos), e o título guarda o total em `valor_original` e só o saldo em
+  // aberto em `valor`. Quitado, o título fica com valor 0: os pagamentos somam o total.
+
+  /** Pagamentos parciais de um título, do mais antigo para o mais novo. */
+  baixasDoTitulo(tituloId) {
+    const id = String(tituloId || '');
+    if (!id) return [];
+    return (this.getAll('lancamentos') || [])
+      .filter(l => String(l.baixa_de || '') === id && l.status !== 'cancelado')
+      .sort((a, b) => String(a.data_pagamento || a.data || '').localeCompare(String(b.data_pagamento || b.data || '')));
+  },
+
+  /** { total, pago, aberto, baixas } de um título; `baixas` vazio se nunca teve baixa parcial. */
+  resumoTitulo(l) {
+    const baixas = l ? this.baixasDoTitulo(l.id) : [];
+    const r2 = (v) => Math.round((Number(v) || 0) * 100) / 100;
+    const pagoFilhos = r2(baixas.reduce((s, b) => s + (Number(b.valor) || 0), 0));
+    const aberto = l && this.isLancamentoEmAberto(l) ? r2(l.valor) : 0;
+    const quitadoDireto = l && !baixas.length && !this.isLancamentoEmAberto(l) ? r2(l.valor) : 0;
+    const total = l?.valor_original != null && l.valor_original !== '' ? r2(l.valor_original) : r2(pagoFilhos + (Number(l?.valor) || 0));
+    return { total, pago: r2(pagoFilhos + quitadoDireto), aberto, baixas };
+  },
+
+  /**
+   * Dá baixa em um título. `valor` menor que o saldo em aberto = baixa parcial.
+   * opts: { valor, data, conta, observacoes, extras } — extras vão para o pagamento (ex.: origem).
+   * Retorna { ok, parcial, aberto, erro }.
+   */
+  registrarBaixa(tituloId, opts = {}) {
+    const l = this.getById('lancamentos', tituloId);
+    if (!l) return { ok: false, erro: 'Lançamento não encontrado.' };
+    if (!this.isLancamentoEmAberto(l)) return { ok: false, erro: 'Este lançamento já está baixado.' };
+    const r2 = (v) => Math.round((Number(v) || 0) * 100) / 100;
+    const aberto = r2(l.valor);
+    const valor = opts.valor == null ? aberto : r2(opts.valor);
+    if (!(valor > 0)) return { ok: false, erro: 'Informe o valor pago.' };
+    if (valor - aberto > 0.009) return { ok: false, erro: `O valor pago é maior que o saldo em aberto (${aberto.toFixed(2).replace('.', ',')}).` };
+    const data = opts.data || (typeof Utils !== 'undefined' ? Utils.today() : new Date().toISOString().slice(0, 10));
+    const conta = opts.conta ?? l.conta_bancaria ?? '';
+    const pago = l.tipo === 'receita' ? 'recebido' : 'pago';
+    const temBaixas = this.baixasDoTitulo(l.id).length > 0;
+    const quita = aberto - valor <= 0.009;
+
+    // Baixa completa de título que nunca teve baixa parcial: comportamento de sempre.
+    if (quita && !temBaixas && (l.valor_original == null || l.valor_original === '')) {
+      this.update('lancamentos', l.id, { status: pago, data_pagamento: data, conta_bancaria: conta });
+      return { ok: true, parcial: false, aberto: 0 };
+    }
+    const total = l.valor_original != null && l.valor_original !== '' ? r2(l.valor_original) : r2(aberto + this.baixasDoTitulo(l.id).reduce((s, b) => s + (Number(b.valor) || 0), 0));
+    this.add('lancamentos', {
+      tipo: l.tipo,
+      obra_id: l.obra_id,
+      categoria: l.categoria,
+      descricao: `${l.descricao || 'Lançamento'} — pagamento ${quita ? 'final' : 'parcial'}`,
+      fornecedor_beneficiario: l.fornecedor_beneficiario || '',
+      ...(l.fornecedor_id ? { fornecedor_id: l.fornecedor_id } : {}),
+      valor,
+      data,
+      data_vencimento: data,
+      data_pagamento: data,
+      status: pago,
+      conta_bancaria: conta,
+      observacoes: String(opts.observacoes || '').slice(0, 300),
+      origem: l.origem === 'medicao' ? 'medicao_pagamento' : 'baixa_parcial',
+      ...(l.medicao_id ? { medicao_id: l.medicao_id } : {}),
+      conciliado: false,
+      ...(opts.extras || {}),
+      baixa_de: l.id
+    });
+    const resto = r2(aberto - valor);
+    this.update('lancamentos', l.id, quita
+      ? { valor: 0, valor_original: total, status: pago, data_pagamento: data }
+      : { valor: resto, valor_original: total });
+    return { ok: true, parcial: !quita, aberto: quita ? 0 : resto };
+  },
+
+  /** Desfaz um pagamento parcial: o valor volta para o saldo em aberto do título. */
+  desfazerBaixa(baixaId) {
+    const b = this.getById('lancamentos', baixaId);
+    if (!b || !b.baixa_de) return { ok: false, erro: 'Pagamento não encontrado.' };
+    if (b.conciliado) return { ok: false, erro: 'Este pagamento já foi conciliado com o extrato.' };
+    const l = this.getById('lancamentos', b.baixa_de);
+    this.remove('lancamentos', b.id);
+    if (l) {
+      const aberto = l.tipo === 'receita' ? 'a_receber' : 'a_pagar';
+      const base = this.isLancamentoEmAberto(l) ? Number(l.valor) || 0 : 0;
+      this.update('lancamentos', l.id, { valor: Math.round((base + (Number(b.valor) || 0)) * 100) / 100, status: this.isLancamentoEmAberto(l) ? l.status : aberto, data_pagamento: this.isLancamentoEmAberto(l) ? (l.data_pagamento || null) : null });
+    }
+    return { ok: true, titulo: l || null };
   },
 
   /** Em aberto e já vencido (pela data de hoje em Boa Vista). */

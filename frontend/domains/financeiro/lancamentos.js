@@ -6,7 +6,8 @@ const Lancamentos = {
   render(obraId) {
     this._limit = 30;
     const r = DB.getResumo(obraId==='todas'?null:obraId);
-    const lans = DB.getLancamentos(obraId==='todas'?null:obraId);
+    const todos = DB.getLancamentos(obraId==='todas'?null:obraId);
+    const lans = this._agruparBaixas(todos);
     const showObra = obraId==='todas';
     const visiveis = lans.slice(0, this._limit);
     return `
@@ -98,7 +99,7 @@ const Lancamentos = {
             <th style="text-align:center;">A&ccedil;&otilde;es</th>
           </tr></thead>
           <tbody id="t-lans">${this._rows(visiveis,showObra)}</tbody>
-          <tfoot id="t-foot"><tr>${this._foot(lans,showObra,visiveis.length)}</tr></tfoot>
+          <tfoot id="t-foot"><tr>${this._foot(todos,showObra,visiveis.length,lans.length)}</tr></tfoot>
         </table>
       </div>
       <div id="lan-load-more-bar">
@@ -119,7 +120,11 @@ const Lancamentos = {
       const venc = l.data_vencimento || l.data;
       const isAtrasado = (l.status==='a_pagar'||l.status==='a_receber') && venc < hoje;
       const isBaixado = l.status === 'pago' || l.status === 'recebido';
-      const statusBadge = isAtrasado ? `<span class="badge badge-danger">&#x26A0; Atrasado</span>` : Utils.badge(l.status);
+      const tit = DB.resumoTitulo(l);
+      const temBaixas = tit.baixas.length > 0;
+      const statusBadge = isAtrasado ? `<span class="badge badge-danger">&#x26A0; Atrasado${temBaixas ? ' · parcial' : ''}</span>`
+        : (temBaixas && !isBaixado) ? `<span class="badge badge-warning">◐ Parcial</span>` : Utils.badge(l.status);
+      const lidEnc = encodeURIComponent(String(l.id));
       const clipBadge = typeof Documentos !== 'undefined' ? Documentos.badgeClip('lancamento', l.id, { titulo: l.descricao }) : '📎';
       const dataPagtoFmt = isBaixado
         ? `<span style="color:var(--success);font-weight:700;font-size:.78rem;">✓ ${Utils.fmt.date(l.data_pagamento || l.data)}</span>`
@@ -135,13 +140,14 @@ const Lancamentos = {
           ${l.itens && l.itens.length ? `<div style="font-size:.7rem;color:var(--accent2);margin-top:2px;cursor:pointer" data-fb-click="Lancamentos.verItens" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(l.id))}" title="Ver produtos deste lançamento">📦 ${l.itens.length} produto${l.itens.length>1?'s':''}</div>` : (l.chave_nfe && l.tipo === 'despesa' && typeof NFe !== 'undefined' && NFe._lancamentoPrincipalDaNFe?.(l.chave_nfe)?.id === l.id ? `<div style="font-size:.7rem;color:var(--accent);margin-top:2px;cursor:pointer" data-fb-click="NFe.puxarProdutosDoLancamento" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(l.id))}" title="Buscar os produtos da NF-e e levar ao controle de Produtos">📦 Puxar produtos da NF-e</div>` : '')}
           ${l.codigo_barras ? `<div style="font-size:.7rem;font-family:monospace;color:var(--accent2);" title="Linha digitável do boleto">🔢 ${Utils.escapeHtml(l.codigo_barras)}</div>` : ''}
           ${l.observacoes?`<div style="font-size:.72rem;color:var(--text3)">${Utils.escapeHtml(l.observacoes)}</div>`:''}
+          ${temBaixas ? `<div style="font-size:.72rem;color:var(--accent2);margin-top:3px;cursor:pointer;font-weight:700" data-fb-click="Lancamentos.toggleBaixas" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${lidEnc}" title="Ver os pagamentos deste título">▸ ${tit.baixas.length} pagamento${tit.baixas.length>1?'s':''} · pago ${Utils.fmt.currency(tit.pago)}${tit.aberto > 0 ? ` · <span style="color:var(--danger)">falta ${Utils.fmt.currency(tit.aberto)}</span>` : ' · quitado'}</div>` : ''}
         </td>
         <td style="white-space:nowrap">${Utils.catLabel(l.categoria)}</td>
         <td style="font-size:.78rem;color:var(--text2);max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${Utils.escapeHtml(l.fornecedor_beneficiario)||'&mdash;'}</td>
         <td style="font-size:.76rem;color:var(--text3);max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${l.conta_bancaria ? `&#x1F3E6; ${Utils.escapeHtml(l.conta_bancaria)}` : '&mdash;'}</td>
         <td>${nf?`<span style="color:var(--accent2);cursor:pointer;font-size:.78rem;font-weight:700" data-fb-click="App.navigate" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="notas" title="Ver NF">#${Utils.escapeHtml(nf.numero_nf)}</span>`:'&mdash;'}</td>
         <td>${l.tipo==='receita'?'<span class="badge badge-success">&uarr; Receita</span>':'<span class="badge badge-danger">&darr; Despesa</span>'}</td>
-        <td class="numeric font-weight-bold" style="font-weight:800;white-space:nowrap;text-align:right;color:${l.tipo==='receita'?'var(--success)':'var(--danger)'};">${l.tipo==='receita'?'+':'&minus;'} ${Utils.fmt.currency(l.valor)}</td>
+        <td class="numeric font-weight-bold" style="font-weight:800;white-space:nowrap;text-align:right;color:${l.tipo==='receita'?'var(--success)':'var(--danger)'};">${l.tipo==='receita'?'+':'&minus;'} ${Utils.fmt.currency(temBaixas ? tit.total : l.valor)}${temBaixas && tit.aberto > 0 ? `<div style="font-size:.68rem;font-weight:700;color:var(--text3)">em aberto ${Utils.fmt.currency(tit.aberto)}</div>` : ''}</td>
         <td>${statusBadge}</td>
         <td style="text-align:center;">${clipBadge}</td>
         <td style="text-align:center;font-size:14px">${l.conciliado?'&#x2705;':'&#x23F3;'}</td>
@@ -157,15 +163,16 @@ const Lancamentos = {
             <button class="icon-btn" data-fb-click="Lancamentos.del" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(l.id))}" title="Excluir" style="font-size:13px;color:var(--danger);min-width:32px;min-height:32px;">&#x1F5D1;&#xFE0F;</button>
           </div>
         </td>
-      </tr>`;
+      </tr>${temBaixas ? this._linhaBaixas(l, tit, colsCount) : ''}`;
     }).join('');
   },
 
-  _foot(lans, showObra, visiveisCount = null) {
+  _foot(lans, showObra, visiveisCount = null, totalLinhas = null) {
     const cols = showObra ? 15 : 14;
+    // Somas sobre todos os lançamentos (pagamentos parciais inclusos); a contagem é por linha da tabela.
     const rec = lans.filter(l=>l.tipo==='receita').reduce((s,l)=>s+l.valor,0);
     const desp = lans.filter(l=>l.tipo==='despesa').reduce((s,l)=>s+l.valor,0);
-    const total = lans.length;
+    const total = totalLinhas !== null ? totalLinhas : lans.length;
     const vCount = visiveisCount !== null ? visiveisCount : Math.min(total, this._limit || 30);
     const labelTxt = total > vCount
       ? `TOTAL FILTRADO (${total} itens &bull; exibindo ${vCount})`
@@ -374,7 +381,7 @@ const Lancamentos = {
 
             <div class="form-row cols-2" style="margin-bottom:14px;">
               <div class="form-group"><label class="form-label" for="lan-conciliado">Conciliado?</label><select class="form-control" id="lan-conciliado" name="conciliado"><option value="true" ${l.conciliado?'selected':''}>&#x2705; Sim</option><option value="false" ${!l.conciliado?'selected':''}>&#x23F3; N&atilde;o</option></select></div>
-              <div class="form-group"><label class="form-label" for="lan-origem">Origem</label><select class="form-control" id="lan-origem" name="origem"><option value="manual" ${(l.origem||'manual')==='manual'?'selected':''}>&#x270D; Manual</option><option value="ocr" ${l.origem==='ocr'?'selected':''}>🤖 Reconhecimento OCR</option><option value="ofx" ${l.origem==='ofx'?'selected':''}>&#x1F504; Importado OFX</option><option value="importacao_excel" ${l.origem==='importacao_excel'?'selected':''}>📊 Planilha Excel</option><option value="medicao" ${l.origem==='medicao'?'selected':''}>&#x1F4CB; Medi&ccedil;&atilde;o Caixa</option></select></div>
+              <div class="form-group"><label class="form-label" for="lan-origem">Origem</label><select class="form-control" id="lan-origem" name="origem"><option value="manual" ${(l.origem||'manual')==='manual'?'selected':''}>&#x270D; Manual</option><option value="ocr" ${l.origem==='ocr'?'selected':''}>🤖 Reconhecimento OCR</option><option value="ofx" ${l.origem==='ofx'?'selected':''}>&#x1F504; Importado OFX</option><option value="importacao_excel" ${l.origem==='importacao_excel'?'selected':''}>📊 Planilha Excel</option><option value="medicao" ${l.origem==='medicao'?'selected':''}>&#x1F4CB; Medi&ccedil;&atilde;o Caixa</option><option value="medicao_pagamento" ${l.origem==='medicao_pagamento'?'selected':''}>&#x1F464; Pagamento do cliente (medi&ccedil;&atilde;o)</option><option value="medicao_retencao" ${l.origem==='medicao_retencao'?'selected':''}>&#x1F512; Reten&ccedil;&atilde;o de medi&ccedil;&atilde;o</option></select></div>
             </div>
 
             <div class="form-group"><label class="form-label" for="lan-obs">Observa&ccedil;&otilde;es</label><textarea class="form-control" id="lan-obs" name="observacoes" rows="2" placeholder="Observações adicionais ou notas">${Utils.escapeHtml(l.observacoes||'')}</textarea></div>
@@ -744,26 +751,41 @@ const Lancamentos = {
     }
   },
 
-  marcarBaixa(id) {
+  marcarBaixa(id, opts = {}) {
     const l = DB.getById('lancamentos', id);
     if (!l) return;
     const isRec = l.tipo === 'receita';
+    const tit = DB.resumoTitulo(l);
+    const parcial = !!opts.parcialPadrao;
     const contasOptionsHtml = (typeof Contas !== 'undefined' && Contas.contaOptions)
       ? Contas.contaOptions(l.conta_bancaria || '')
       : `<option value="">Selecione a conta...</option>`;
 
     Utils.showModal(`
-      <div class="modal" style="max-width:420px;width:95vw;">
+      <div class="modal" style="max-width:440px;width:95vw;">
         <div class="modal-header">
           <span class="modal-title">${isRec ? '✓ Confirmar Recebimento' : '✓ Confirmar Pagamento'}</span>
           <button class="modal-close" data-fb-click="Utils.closeModal" data-fb-click-n="0">✕</button>
         </div>
         <div class="modal-body" style="padding:16px 20px;">
           <div style="font-weight:700;color:var(--text);margin-bottom:4px;">${Utils.escapeHtml(l.descricao)}</div>
-          <div style="font-size:1.2rem;font-weight:900;color:${isRec?'var(--success)':'var(--danger)'};margin-bottom:12px;">
-            ${isRec?'+':'-'}${Utils.fmt.currency(l.valor)}
+          <div style="font-size:1.2rem;font-weight:900;color:${isRec?'var(--success)':'var(--danger)'};margin-bottom:4px;">
+            ${isRec?'+':'-'}${Utils.fmt.currency(tit.total)}
           </div>
-          
+          ${tit.baixas.length ? `<div style="font-size:.78rem;color:var(--text3);margin-bottom:12px;">Já ${isRec ? 'recebido' : 'pago'}: <strong style="color:var(--success)">${Utils.fmt.currency(tit.pago)}</strong> · Em aberto: <strong style="color:var(--danger)">${Utils.fmt.currency(tit.aberto)}</strong></div>` : '<div style="margin-bottom:12px"></div>'}
+
+          <div class="form-group" style="margin-bottom:12px;">
+            <label class="form-label" for="baixa-tipo">Tipo de baixa</label>
+            <select id="baixa-tipo" class="form-control" data-fb-change="Lancamentos._onBaixaTipoChange" data-fb-change-n="1" data-fb-change-t0="value">
+              <option value="completa" ${parcial ? '' : 'selected'}>Completa — ${isRec ? 'recebeu' : 'pagou'} ${Utils.fmt.currency(tit.aberto)}</option>
+              <option value="parcial" ${parcial ? 'selected' : ''}>Parcial — ${isRec ? 'recebeu' : 'pagou'} só uma parte</option>
+            </select>
+          </div>
+          <div class="form-group" id="baixa-valor-wrap" style="margin-bottom:12px;display:${parcial ? 'block' : 'none'};">
+            <label class="form-label" for="baixa-valor">Valor ${isRec ? 'recebido' : 'pago'} agora</label>
+            <div class="input-prefix"><span class="input-pfx-txt">R$</span><input id="baixa-valor" type="number" step="0.01" min="0.01" max="${Utils.esc(tit.aberto)}" placeholder="0,00"></div>
+            <div style="font-size:.72rem;color:var(--text3);margin-top:4px;">O restante continua em aberto neste mesmo lançamento.</div>
+          </div>
           <div class="form-group" style="margin-bottom:12px;">
             <label class="form-label">${isRec ? 'Conta Bancária de Entrada' : 'Conta Bancária de Saída'}</label>
             <select id="baixa-conta" class="form-control" data-fb-change="Lancamentos._onBaixaContaChange" data-fb-change-n="1" data-fb-change-t0="value">
@@ -771,9 +793,13 @@ const Lancamentos = {
             </select>
             <input type="text" id="baixa-conta-manual" class="form-control" placeholder="Digite a identificação da conta..." style="margin-top:6px;display:none;">
           </div>
-          <div class="form-group">
+          <div class="form-group" style="margin-bottom:12px;">
             <label class="form-label">Data Efetiva da Baixa</label>
             <input type="date" id="baixa-data" class="form-control" value="${Utils.esc(Utils.today())}" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="baixa-obs">Observação</label>
+            <input type="text" id="baixa-obs" class="form-control" maxlength="200" placeholder="Ex.: Pix, transferência, dinheiro">
           </div>
         </div>
         <div class="modal-footer">
@@ -784,6 +810,13 @@ const Lancamentos = {
         </div>
       </div>
     `);
+    if (parcial) setTimeout(() => document.getElementById('baixa-valor')?.focus(), 50);
+  },
+
+  _onBaixaTipoChange(val) {
+    const w = document.getElementById('baixa-valor-wrap');
+    if (w) w.style.display = val === 'parcial' ? 'block' : 'none';
+    if (val === 'parcial') document.getElementById('baixa-valor')?.focus();
   },
 
   // Nome próprio: havia dois "_onContaChange" no objeto e este (do modal de baixa)
@@ -806,27 +839,90 @@ const Lancamentos = {
     }
 
     const dataBaixa = document.getElementById('baixa-data')?.value || Utils.today();
-    const novoStatus = l.tipo === 'receita' ? 'recebido' : 'pago';
+    const parcial = document.getElementById('baixa-tipo')?.value === 'parcial';
+    const valorParcial = parseFloat(document.getElementById('baixa-valor')?.value);
+    if (parcial && !(valorParcial > 0)) { Utils.toast('Informe o valor pago nesta baixa parcial.', 'warning'); return; }
 
-    DB.update('lancamentos', id, {
-      status: novoStatus,
-      data_pagamento: dataBaixa,
-      conta_bancaria: conta
-      // Baixa manual não é conciliação: o débito do extrato OFX precisa encontrar este
-      // lançamento como par (antes ele sumia da busca e o usuário lançava em dobro).
+    // Baixa manual não é conciliação: o débito do extrato OFX precisa encontrar este
+    // lançamento (ou o pagamento parcial) como par (antes ele sumia da busca e o usuário lançava em dobro).
+    const r = DB.registrarBaixa(id, {
+      valor: parcial ? valorParcial : null,
+      data: dataBaixa,
+      conta,
+      observacoes: document.getElementById('baixa-obs')?.value || ''
     });
+    if (!r.ok) { Utils.toast(r.erro, 'warning'); return; }
 
+    if (l.medicao_id && typeof Medicoes !== 'undefined') {
+      Medicoes._sincronizarFinanceiro(l.medicao_id);
+      Medicoes._refresh();
+    }
     Utils.closeModal();
-    Utils.toast(l.tipo === 'receita' ? 'Receita marcada como Recebida!' : 'Despesa baixada como Paga!', 'success');
+    const isRec = l.tipo === 'receita';
+    Utils.toast(r.parcial
+      ? `Baixa parcial registrada. Ainda falta ${isRec ? 'receber' : 'pagar'} ${Utils.fmt.currency(r.aberto)}.`
+      : (isRec ? 'Receita marcada como Recebida!' : 'Despesa baixada como Paga!'), 'success');
     this._refresh();
   },
 
+  /** Pagamentos parciais de um título ficam agrupados sob ele (um título só na lista). */
+  _agruparBaixas(lans) {
+    const ids = new Set(lans.map(l => String(l.id)));
+    return lans.filter(l => !(l.baixa_de && ids.has(String(l.baixa_de))));
+  },
+
+  _linhaBaixas(l, tit, colsCount) {
+    const isRec = l.tipo === 'receita';
+    const itens = tit.baixas.map(b => `
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;padding:5px 0;border-bottom:1px dashed var(--border);">
+        <span>✓ ${Utils.fmt.date(b.data_pagamento || b.data)}${b.conta_bancaria ? ` · 🏦 ${Utils.escapeHtml(b.conta_bancaria)}` : ''}${b.observacoes ? ` · <span style="color:var(--text3)">${Utils.escapeHtml(b.observacoes)}</span>` : ''}${b.conciliado ? ' · ✅ conciliado' : ''}</span>
+        <span style="display:flex;align-items:center;gap:8px;">
+          <strong class="numeric tabular-nums" style="color:${isRec ? 'var(--success)' : 'var(--danger)'}">${Utils.fmt.currency(b.valor)}</strong>
+          <button class="icon-btn" data-fb-click="Lancamentos.emitirRecibo" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(b.id))}" title="Recibo deste pagamento" style="font-size:12px;">&#x1F9FE;</button>
+          ${b.conciliado ? '' : `<button class="icon-btn" data-fb-click="Lancamentos.desfazerBaixa" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(b.id))}" title="Desfazer este pagamento" style="font-size:12px;color:var(--danger);">↩</button>`}
+        </span>
+      </div>`).join('');
+    return `<tr data-baixas-de="${Utils.esc(l.id)}" style="display:none;background:var(--bg-secondary);">
+      <td colspan="${colsCount}" style="padding:8px 18px 10px 40px;font-size:.78rem;">
+        <div style="font-weight:700;margin-bottom:4px;">${isRec ? 'Recebimentos' : 'Pagamentos'} deste título</div>
+        ${itens}
+        <div style="display:flex;gap:16px;flex-wrap:wrap;margin-top:6px;">
+          <span>Total: <strong>${Utils.fmt.currency(tit.total)}</strong></span>
+          <span>${isRec ? 'Recebido' : 'Pago'}: <strong style="color:var(--success)">${Utils.fmt.currency(tit.pago)}</strong></span>
+          <span>Em aberto: <strong style="color:${tit.aberto > 0 ? 'var(--danger)' : 'var(--text)'}">${Utils.fmt.currency(tit.aberto)}</strong></span>
+        </div>
+      </td>
+    </tr>`;
+  },
+
+  toggleBaixas(id) {
+    const tr = Array.from(document.querySelectorAll('tr[data-baixas-de]')).find(x => x.getAttribute('data-baixas-de') === String(id));
+    if (tr) tr.style.display = tr.style.display === 'none' ? '' : 'none';
+  },
+
+  desfazerBaixa(baixaId) {
+    const b = DB.getById('lancamentos', baixaId);
+    if (!b) return;
+    Utils.confirm(`Desfazer o pagamento de ${Utils.fmt.currency(b.valor)} de ${Utils.fmt.date(b.data_pagamento || b.data)}?<br><small>O valor volta a ficar em aberto no lançamento.</small>`, () => {
+      const r = DB.desfazerBaixa(baixaId);
+      if (!r.ok) { Utils.toast(r.erro, 'warning'); return; }
+      const medId = r.titulo?.medicao_id;
+      if (medId && typeof Medicoes !== 'undefined') { Medicoes._sincronizarFinanceiro(medId); Medicoes._refresh(); }
+      this._refresh();
+      Utils.toast('Pagamento desfeito. O valor voltou para "em aberto".', 'info');
+    }, { allowHtml: true });
+  },
+
   del(id) {
-    Utils.confirm('Excluir este lançamento?', () => {
+    const nBaixas = DB.baixasDoTitulo(id).length;
+    const msg = nBaixas
+      ? `Excluir este lançamento?<br><small>Os ${nBaixas} pagamento(s) já registrados continuam no financeiro como lançamentos avulsos.</small>`
+      : 'Excluir este lançamento?';
+    Utils.confirm(msg, () => {
       DB.remove('lancamentos',id);
       this._refresh();
       Utils.toast('Lançamento excluído!','info');
-    });
+    }, { allowHtml: true });
   },
 
   _getFiltered() {
@@ -892,13 +988,14 @@ const Lancamentos = {
       this._limit = 30;
     }
     const showObra = App.obraId==='todas';
-    const lans = this._getFiltered();
+    const todos = this._getFiltered();
+    const lans = this._agruparBaixas(todos);
     const visiveis = lans.slice(0, this._limit);
     const tb = document.getElementById('t-lans');
     const tf = document.getElementById('t-foot');
     const lm = document.getElementById('lan-load-more-bar');
     if (tb) tb.innerHTML = this._rows(visiveis, showObra);
-    if (tf) tf.innerHTML = `<tr>${this._foot(lans, showObra, visiveis.length)}</tr>`;
+    if (tf) tf.innerHTML = `<tr>${this._foot(todos, showObra, visiveis.length, lans.length)}</tr>`;
     if (lm) lm.innerHTML = this._loadMoreHtml(lans.length, visiveis.length);
   },
 

@@ -644,6 +644,7 @@ export default async function handler(req, res) {
       responsavel: t.responsavel || '',
       logo_url: t.logo_url || '',
       crea_cau: t.crea_cau || '',
+      cep: t.cep || '',
       plano: t.plano || 'trial',
       status: t.status || 'trial',
       vencimento: t.vencimento ? String(t.vencimento).slice(0, 10) : '',
@@ -668,7 +669,8 @@ export default async function handler(req, res) {
             telefone=${String(b.telefone ?? before.telefone).trim() || null}, email=${String(b.email ?? before.email).trim().toLowerCase() || null},
             cidade=${String(b.cidade ?? before.cidade).trim() || null}, uf=${uf || null}, endereco=${String(b.endereco ?? before.endereco).trim() || null},
             responsavel=${String(b.responsavel ?? before.responsavel).trim() || null}, logo_url=${String(b.logo_url ?? before.logo_url).trim() || null},
-            crea_cau=${String(b.crea_cau ?? before.crea_cau).trim() || null}, updated_at=NOW()
+            crea_cau=${String(b.crea_cau ?? before.crea_cau).trim() || null},
+            cep=${String(b.cep ?? before.cep ?? '').replace(/\D/g, '').slice(0, 8) || null}, updated_at=NOW()
           WHERE id=${auth.tenantId}
           RETURNING *;
         `;
