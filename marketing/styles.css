@@ -198,3 +198,15 @@
   .objetivo-visual *,
   .support-typing i { animation: none !important; }
 }
+
+/* Foco visível imediato: `transition-all` animava também a largura do contorno (0 → 2px em
+   150 ms), então no instante do foco por teclado não aparecia indicador nenhum. Fora das
+   camadas (@layer) para valer sobre os utilitários. */
+:is(a, button, summary, input, select, textarea, [tabindex]):focus-visible {
+  transition-property: color, background-color, border-color, text-decoration-color, fill, stroke, opacity, box-shadow, transform, translate, scale, rotate;
+}
+/* Campos com `outline-none` (newsletter, FinBot, busca) ganham contorno no foco por teclado. */
+:is(input, select, textarea):focus-visible {
+  outline: 2px solid var(--color-acid);
+  outline-offset: 2px;
+}
