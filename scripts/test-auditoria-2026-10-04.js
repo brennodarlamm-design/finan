@@ -648,6 +648,8 @@ console.log('=== Auditoria 04/10/2026 ===\n');
   assert(nfe.includes('action=dfe_xml_completo'), 'XML completo pela SEFAZ (ciência + consulta pela chave)');
   assert(nfe.includes('async puxarProdutosDoLancamento(lancId)'));
   assert(read('js/lancamentos.js').includes('data-fb-click="NFe.puxarProdutosDoLancamento"'));
+  assert(read('js/lancamentos.js').includes("NFe._lancamentoPrincipalDaNFe?.(l.chave_nfe)?.id === l.id"), 'atalho só no lançamento principal da nota');
+  assert(nfe.includes('const principal = this._lancamentoPrincipalDaNFe(chave);'), 'puxar produtos recusa outra parcela');
   assert(read('js/patch26-events.js').includes('"NFe.puxarProdutosDoLancamento"'));
   for (const [a, b] of [['js/nfe.js', 'frontend/domains/fiscal/nfe.js'], ['js/lancamentos.js', 'frontend/domains/financeiro/lancamentos.js'], ['js/patch26-events.js', 'frontend/core/patch26-events.js']]) assert.equal(read(a), read(b), b);
   console.log('  ✓ Pós-auditoria: produtos da NF-e no lançamento, na nota e no controle de Produtos; botão para despesas antigas');
@@ -755,6 +757,31 @@ console.log('=== Auditoria 04/10/2026 ===\n');
   assert(read('js/notas.js').includes('webkitdirectory') && read('js/patch26-events.js').includes('"Notas.triggerXmlFolderImport"'));
   for (const [a, b] of [['api/_sefaz-dfe.js', 'backend/domains/fiscal/_sefaz-dfe.js'], ['api/_certificado.js', 'backend/domains/fiscal/_certificado.js'], ['api/nfe.js', 'backend/domains/fiscal/nfe.js'], ['js/nfe.js', 'frontend/domains/fiscal/nfe.js'], ['js/nfe_parser.js', 'frontend/domains/fiscal/nfe_parser.js'], ['js/danfe_simplificado.js', 'frontend/domains/fiscal/danfe_simplificado.js'], ['js/fornecedores.js', 'frontend/domains/suprimentos/fornecedores.js'], ['js/notas.js', 'frontend/domains/fiscal/notas.js'], ['js/assets.js', 'frontend/core/assets.js']]) assert.equal(read(a), read(b), b);
   console.log('  ✓ SEFAZ sem MeuDanfe: ciência assinada, XML completo pela chave, DANFE local, fornecedor completado e pasta de XMLs');
+}
+
+// Log de 06/10 (pós-deploy): anexo do OCR, leitura do R2, CSP do "Ver", telemetria e tempo do OCR.
+{
+  const ocr = read('js/ocr.js');
+  assert(ocr.includes('const original = this._originalBase64;') && ocr.includes("`${nomeOriginal.replace(/\\.[^.]+$/, '')}.jpg`"), 'OCR anexa o original ou o JPEG com nome certo');
+  const adapter = read('api/_edge-adapter.js');
+  const send = adapter.slice(adapter.indexOf('      send(data) {'), adapter.indexOf('      end(data) {'));
+  assert(send.indexOf('if (data != null && typeof data === \'object\' && !binario) return res.json(data);') < send.indexOf('finished = true;'), 'json antes de marcar finished');
+  assert(send.includes('data instanceof ReadableStream'), 'stream do R2 vai como binário');
+  assert(!read('js/documentos.js').includes('onerror="this.parentElement'), 'sem handler em linha (CSP)');
+  assert(read('api/_audit-route.js').includes('const sql = tenantId ? createTenantSql(getSql(), { tenantId }) : createOwnerSql();'), 'telemetria grava com contexto de RLS');
+  const rec = read('api/reconhecer-documento.js');
+  assert(rec.indexOf('modelLoop:') < rec.indexOf('runEdgeDocumentOcr(edgeEnv, cleanBase64)'), 'Gemini antes do Workers AI');
+  assert(rec.includes('const ORCAMENTO_GEMINI_MS = 45000;') && rec.includes("rej(new Error('Workers AI excedeu 15 s'))"));
+  for (const [a, b] of [['js/ocr.js', 'frontend/domains/configuracoes/ocr.js'], ['js/documentos.js', 'frontend/domains/contratos/documentos.js'], ['api/_edge-adapter.js', 'backend/domains/edge/_edge-adapter.js'], ['api/_audit-route.js', 'backend/domains/integrations/_audit-route.js'], ['api/reconhecer-documento.js', 'backend/domains/integrations/reconhecer-documento.js']]) assert.equal(read(a), read(b), b);
+  console.log('  ✓ Log 06/10: anexo do OCR aceito, R2 abre, CSP do "Ver", telemetria gravando, OCR dentro do tempo');
+}
+
+// Obra: quanto falta receber (financiado − recebido).
+{
+  const od = read('js/obra_detalhe.js');
+  assert(od.includes('Falta Receber') && od.includes('const falta = contrato - recebido;'));
+  assert.equal(od, read('frontend/domains/obras/obra_detalhe.js'));
+  console.log('  ✓ Obra: cartão "Falta Receber" (financiado − recebido)');
 }
 
 await db.close();

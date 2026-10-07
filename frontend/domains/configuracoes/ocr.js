@@ -206,9 +206,16 @@ const OCR = {
         throw new Error(data?.error || data?.detalhe || `Erro na API (${resp.status})`);
       }
 
-      // Guardar arquivo para anexar depois
+      // Guardar arquivo para anexar depois. O que foi para a IA (`base64`) é a versão convertida em
+      // JPEG; o anexo deve ser o arquivo original (o PDF inteiro), lido em segundo plano enquanto o
+      // usuário confere os dados.
       this._arquivoAtual = file;
       this._base64Atual  = base64;
+      this._mimeAtual    = mimeType;
+      this._originalBase64 = null;
+      if (file.size <= 14 * 1024 * 1024) {
+        this._lerBase64(file).then(b => { if (this._arquivoAtual === file) this._originalBase64 = b; }).catch(() => {});
+      }
 
       // Salvar no histórico de leituras
       this._salvarNoHistorico(file.name, data.dados, base64);
@@ -841,15 +848,21 @@ const OCR = {
     // 4. Anexa o arquivo/comprovante se disponível
     if (this._base64Atual && typeof Documentos !== 'undefined') {
       try {
-        const ext = (this._arquivoAtual?.name || '').split('.').pop() || 'pdf';
+        // O upload confere extensão × tipo × conteúdo: anexar o JPEG convertido com o nome ".pdf"
+        // (ou ".png") era recusado com 400. Usa o original; sem ele, o JPEG com nome e tipo certos.
+        const original = this._originalBase64;
+        const nomeOriginal = this._arquivoAtual?.name || `documento_ocr_${lanc.id}`;
+        const convertido = !original && this._mimeAtual && this._mimeAtual !== this._arquivoAtual?.type;
+        const nomeArquivo = convertido ? `${nomeOriginal.replace(/\.[^.]+$/, '')}.jpg` : nomeOriginal;
+        const conteudo = original || this._base64Atual;
         Documentos.adicionar({
           entidade_tipo: 'lancamento',
           entidade_id: lanc.id,
           titulo: `Comprovante / ${descricao.slice(0, 30)}`,
-          nome_arquivo: this._arquivoAtual?.name || `documento_ocr_${lanc.id}.${ext}`,
-          tipo_mime: this._arquivoAtual?.type || 'application/pdf',
-          tamanho: this._arquivoAtual?.size || Math.round(this._base64Atual.length * 0.75),
-          data_base64: this._base64Atual
+          nome_arquivo: nomeArquivo,
+          tipo_mime: convertido ? this._mimeAtual : (this._arquivoAtual?.type || this._mimeAtual || 'application/pdf'),
+          tamanho: original ? this._arquivoAtual?.size : Math.round(String(conteudo).length * 0.75),
+          data_base64: conteudo
         });
       } catch (errDoc) {
         console.warn('Erro ao anexar arquivo ao lançamento:', errDoc);
@@ -965,6 +978,8 @@ const OCR = {
   // Guardar estado temporário
   _arquivoAtual: null,
   _base64Atual:  null,
+  _mimeAtual:    null,
+  _originalBase64: null,
   _dadosOCR:     null,
 
   // ── HISTÓRICO DE DOCUMENTOS LIDOS PELO OCR ────────────────────────────────

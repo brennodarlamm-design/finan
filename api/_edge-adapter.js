@@ -271,11 +271,18 @@ export async function executeEdgeApi(request, env) {
       },
       send(data) {
         if (finished) return res;
+        // Conteúdo binário (stream do R2, ArrayBuffer, Uint8Array, Blob) vai como está. Antes o
+        // stream de um arquivo do R2 caía no ramo de JSON — e, como `finished` já estava marcado,
+        // o json() saía sem responder: a leitura do anexo terminava em 500.
+        const binario = data != null && typeof data === 'object' && (
+          Buffer.isBuffer(data) || ArrayBuffer.isView(data) || data instanceof ArrayBuffer ||
+          (typeof ReadableStream !== 'undefined' && data instanceof ReadableStream) ||
+          (typeof Blob !== 'undefined' && data instanceof Blob) ||
+          typeof data.getReader === 'function'
+        );
+        if (data != null && typeof data === 'object' && !binario) return res.json(data);
         finished = true;
         ensureSecurityHeaders();
-        if (typeof data === 'object' && data !== null && !Buffer.isBuffer(data)) {
-          return res.json(data);
-        }
         resolve(new Response(data, { status: statusCode, headers: responseHeaders }));
         return res;
       },

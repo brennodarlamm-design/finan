@@ -797,7 +797,7 @@ const Documentos = {
             <iframe src="${previewSrc}" style="width:100%;height:100%;border:none;background:#ffffff;"></iframe>
           ` : isImage ? `
             <div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;padding:16px;overflow:auto;">
-              <img src="${previewSrc}" style="max-width:100%;max-height:100%;object-fit:contain;border-radius:4px;box-shadow:0 4px 20px rgba(0,0,0,0.5);" onerror="this.parentElement.innerHTML='<div style=\\'color:#fff;padding:20px;text-align:center;\\'>Não foi possível exibir a pré-visualização. Clique em Baixar para ver o arquivo.</div>'">
+              <img id="doc-preview-img" src="${previewSrc}" style="max-width:100%;max-height:100%;object-fit:contain;border-radius:4px;box-shadow:0 4px 20px rgba(0,0,0,0.5);">
             </div>
           ` : `
             <div style="width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:30px;text-align:center;">
@@ -815,6 +815,13 @@ const Documentos = {
         </div>
       </div>
     `);
+    // CSP sem handlers em linha (script-src-attr 'none'): o aviso de falha é ligado aqui.
+    document.getElementById('doc-preview-img')?.addEventListener('error', (ev) => {
+      const aviso = document.createElement('div');
+      aviso.style.cssText = 'color:#fff;padding:20px;text-align:center;';
+      aviso.textContent = 'Não foi possível exibir a pré-visualização. Clique em Baixar para ver o arquivo.';
+      ev.target.parentElement?.replaceChildren(aviso);
+    }, { once: true });
   },
 
   _safePreviewSrc(value) {

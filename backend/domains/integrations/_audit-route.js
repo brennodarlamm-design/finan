@@ -5,7 +5,7 @@ import { canViewAudit, permissionError } from './_permissions.js';
 import { checkRateLimit, getClientIp } from './_ratelimit.js';
 import { createTenantSql } from './_tenant-sql.js';
 import { dispatchEdgeAlert } from './_edge-alerts.js';
-import { createRuntimeSql } from './_database.js';
+import { createRuntimeSql, createOwnerSql } from './_database.js';
 
 function getSql() {
   return createRuntimeSql();
@@ -87,10 +87,13 @@ export default async function handler(req, res) {
     };
 
     try {
-      const sql = getSql();
       const id = `err_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`;
       const routeName = redactSensitive(b.route, 120) || null;
       const tenantId = auth.authenticated ? auth.tenantId : null;
+      // client_error_logs tem RLS forçado por app.current_tenant_id. Sem esse contexto todo insert
+      // era recusado (500) e nenhum erro do navegador chegava ao painel. Logado: grava no contexto
+      // da própria empresa. Anônimo (login, landing): tenant_id NULL só passa pela conexão do dono.
+      const sql = tenantId ? createTenantSql(getSql(), { tenantId }) : createOwnerSql();
       await sql`
         INSERT INTO client_error_logs (
           id, tenant_id, user_id, route, message, source, line_no, col_no, stack, user_agent, metadata, status

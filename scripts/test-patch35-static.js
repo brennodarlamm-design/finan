@@ -61,7 +61,7 @@ assert((whatsappApi.match(/AbortSignal\.timeout\(/g) || []).length >= 5, 'Chamad
 
 assert(!ocrApi.includes('OPENAI_API_KEY') && !ocrApi.includes('api.openai.com') && !ocrApi.includes('gpt-4o-mini'), 'OCR não usa OpenAI nem gera custo por chamada OpenAI.');
 assert(ocrApi.includes('GEMINI_API_KEY') && ocrApi.includes('gemini-3.6-flash') && ocrApi.includes('gemini-3.5-flash'), 'OCR voltou ao fluxo Gemini-only anterior.');
-assert(ocrApi.includes('AbortSignal.timeout(20000)'), 'Gemini OCR possui timeout por tentativa.');
+assert(ocrApi.includes('AbortSignal.timeout(Math.max(5000, Math.min(20000, restante())))'), 'Gemini OCR possui timeout por tentativa (até 20 s, dentro do orçamento total).');
 assert(!ocrApi.includes('detalhe: err.message'), 'OCR não devolve exceção interna inesperada.');
 assert(!usersApi.includes('OPENAI_API_KEY') && !usersApi.includes('api.openai.com') && !usersApi.includes('getOpenAIBotReply'), 'FinBot não depende da OpenAI.');
 assert(usersApi.includes('findLearnedSupportAnswer') && usersApi.includes("a.sender_type='agent'") && usersApi.includes('q.tenant_id=${tenantId}'), 'FinBot aprende apenas com respostas humanas anteriores do mesmo tenant.');
