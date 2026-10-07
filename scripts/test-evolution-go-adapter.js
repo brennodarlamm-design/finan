@@ -146,10 +146,16 @@ console.log('   ✓ Rotas de webhook do servidor e proxy confirmadas.');
 
 // 7. Verificação dos Arquivos de Orquestração Docker
 console.log('\n7. Validando arquivos de configuração Docker e variáveis...');
-assert.equal(fs.existsSync('docker-compose.evolution-go.yml'), true, 'docker-compose.evolution-go.yml deve existir.');
-assert.equal(fs.existsSync('.env.evolution-go.example'), true, '.env.evolution-go.example deve existir.');
+const composePath = fs.existsSync(path.join('infra', 'evolution-go', 'docker-compose.evolution-go.yml'))
+  ? path.join('infra', 'evolution-go', 'docker-compose.evolution-go.yml')
+  : 'docker-compose.evolution-go.yml';
+const envExamplePath = fs.existsSync(path.join('infra', 'evolution-go', '.env.evolution-go.example'))
+  ? path.join('infra', 'evolution-go', '.env.evolution-go.example')
+  : '.env.evolution-go.example';
+assert.equal(fs.existsSync(composePath), true, 'docker-compose.evolution-go.yml deve existir.');
+assert.equal(fs.existsSync(envExamplePath), true, '.env.evolution-go.example deve existir.');
 
-const composeContent = fs.readFileSync('docker-compose.evolution-go.yml', 'utf8');
+const composeContent = fs.readFileSync(composePath, 'utf8');
 assert.equal(composeContent.includes('evoapicloud/evolution-go:latest'), true, 'Compose deve referenciar a imagem oficial.');
 assert.equal(composeContent.includes('POSTGRES_AUTH_DB'), true, 'Compose deve declarar POSTGRES_AUTH_DB.');
 assert.equal(composeContent.includes('SERVER_PORT=8080'), true, 'Compose deve expor porta 8080.');

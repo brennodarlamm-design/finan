@@ -21,12 +21,17 @@ O **Evolution Go** é o novo motor de integração com o WhatsApp desenvolvido e
 
 ## 2. Como Rodar Localmente com Docker
 
-1. Copie o arquivo de exemplo de variáveis:
+1. Navegue para a pasta de infraestrutura do Evolution Go:
+   ```bash
+   cd infra/evolution-go
+   ```
+
+2. Copie o arquivo de exemplo de variáveis:
    ```bash
    cp .env.evolution-go.example .env.evolution-go
    ```
 
-2. Suba o container com o Docker Compose dedicado:
+3. Suba o container com o Docker Compose dedicado:
    ```bash
    docker compose -f docker-compose.evolution-go.yml up -d
    ```

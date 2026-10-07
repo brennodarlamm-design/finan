@@ -50,7 +50,9 @@ assert(ratelimitSrc.includes("export { checkRateLimitRedis } from './_edge-redis
 console.log('  ✓ api/_ratelimit.js expõe rate-limiting distribuído atômico.');
 
 // 5. Verificação do Docker Compose do Evolution Go
-const dockerComposePath = path.join(ROOT, 'docker-compose.evolution-go.yml');
+const dockerComposePath = fs.existsSync(path.join(ROOT, 'infra', 'evolution-go', 'docker-compose.evolution-go.yml'))
+  ? path.join(ROOT, 'infra', 'evolution-go', 'docker-compose.evolution-go.yml')
+  : path.join(ROOT, 'docker-compose.evolution-go.yml');
 const dockerComposeSrc = fs.readFileSync(dockerComposePath, 'utf8');
 assert(dockerComposeSrc.includes('CACHE_REDIS_ENABLED'), 'docker-compose deve conter CACHE_REDIS_ENABLED');
 assert(dockerComposeSrc.includes('CACHE_REDIS_URI'), 'docker-compose deve conter CACHE_REDIS_URI');
@@ -60,7 +62,9 @@ assert(dockerComposeSrc.includes('REDIS_URL'), 'docker-compose deve conter REDIS
 console.log('  ✓ docker-compose.evolution-go.yml contém os parâmetros oficiais do Evolution Foundation.');
 
 // 6. Verificação do .env.evolution-go.example
-const envExamplePath = path.join(ROOT, '.env.evolution-go.example');
+const envExamplePath = fs.existsSync(path.join(ROOT, 'infra', 'evolution-go', '.env.evolution-go.example'))
+  ? path.join(ROOT, 'infra', 'evolution-go', '.env.evolution-go.example')
+  : path.join(ROOT, '.env.evolution-go.example');
 const envExampleSrc = fs.readFileSync(envExamplePath, 'utf8');
 assert(envExampleSrc.includes('CACHE_REDIS_URI='), '.env.example deve conter CACHE_REDIS_URI');
 assert(envExampleSrc.includes('UPSTASH_REDIS_REST_URL='), '.env.example deve conter UPSTASH_REDIS_REST_URL');

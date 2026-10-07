@@ -64,8 +64,14 @@ const { EvolutionGoClient, generateInstanceToken, isLegacyPredictableInstanceTok
   assert.strictEqual(evolutionApiKeyProblem('a'.repeat(32), { NODE_ENV: 'production' }), '', 'Z2: chave forte aceita');
   const weak = new EvolutionGoClient({ baseUrl: 'http://evo.test', apiKey: 'fingo-evo-secret-change-me-in-production' });
   assert.strictEqual(weak.isConfigured(), false, 'Z2: integração bloqueada com chave padrão');
-  assert(!read('docker-compose.evolution-go.yml').includes('fingo-evo-secret-change-me-in-production'), 'Z2: compose sem chave padrão');
-  assert(!read('.env.evolution-go.example').includes('fingo-evo-secret-change-me-in-production'), 'Z2: exemplo sem chave padrão');
+  const composeRel = fs.existsSync(path.join(root, 'infra', 'evolution-go', 'docker-compose.evolution-go.yml'))
+    ? 'infra/evolution-go/docker-compose.evolution-go.yml'
+    : 'docker-compose.evolution-go.yml';
+  const envExampleRel = fs.existsSync(path.join(root, 'infra', 'evolution-go', '.env.evolution-go.example'))
+    ? 'infra/evolution-go/.env.evolution-go.example'
+    : '.env.evolution-go.example';
+  assert(!read(composeRel).includes('fingo-evo-secret-change-me-in-production'), 'Z2: compose sem chave padrão');
+  assert(!read(envExampleRel).includes('fingo-evo-secret-change-me-in-production'), 'Z2: exemplo sem chave padrão');
   console.log('  ✓ Z2 chave global fraca ou padrão bloqueia a integração');
 }
 

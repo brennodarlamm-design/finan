@@ -773,7 +773,7 @@ async function generate() {
   const page = await browser.newPage();
   await page.setContent(htmlContent, { waitUntil: 'networkidle' });
 
-  const pdfWorkspacePath = path.join(root, 'fingo-documentacao-completa.pdf');
+  const pdfWorkspacePath = path.join(root, 'docs', 'fingo-documentacao-completa.pdf');
   const pdfArtifactPath = path.join(artifactDir, 'fingo-documentacao-completa.pdf');
 
   await page.pdf({
