@@ -755,5 +755,13 @@ console.log('=== Auditoria 04/10/2026 ===\n');
   console.log('  ✓ Log 06/10: anexo do OCR aceito, R2 abre, CSP do "Ver", telemetria gravando, OCR dentro do tempo');
 }
 
+// Obra: quanto falta receber (financiado − recebido).
+{
+  const od = read('js/obra_detalhe.js');
+  assert(od.includes('Falta Receber') && od.includes('const falta = contrato - recebido;'));
+  assert.equal(od, read('frontend/domains/obras/obra_detalhe.js'));
+  console.log('  ✓ Obra: cartão "Falta Receber" (financiado − recebido)');
+}
+
 await db.close();
 console.log('\n✅ Auditoria 04/10/2026: tudo certo.');

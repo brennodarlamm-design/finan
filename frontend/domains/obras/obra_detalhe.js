@@ -246,7 +246,7 @@ const ObraDetalhe = {
         </div>
 
         <!-- KPIs Financeiros e Físicos em Grid -->
-        <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(200px, 1fr));gap:12px;">
+        <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(150px, 1fr));gap:12px;">
           <div style="background:var(--bg-secondary);padding:14px;border-radius:var(--r-md);border:1px solid var(--border);">
             <div style="font-size:.7rem;color:var(--text3);text-transform:uppercase;font-weight:700;letter-spacing:.05em;">${isCaixa ? 'Valor Financiado' : 'Valor Contratado'}</div>
             <div style="font-size:1.35rem;font-weight:900;color:var(--text);margin-top:4px;">${Utils.fmt.currency(obra.valor_financiado)}</div>
@@ -258,6 +258,28 @@ const ObraDetalhe = {
             <div style="font-size:1.35rem;font-weight:900;color:var(--success);margin-top:4px;">${Utils.fmt.currency(r.totalReceitas)}</div>
             <div style="font-size:.7rem;color:var(--text3);margin-top:2px;">${isCaixa ? 'Liberado Caixa + Entradas' : 'Faturado / Aportes'}</div>
           </div>
+
+          ${(() => {
+            // Quanto ainda falta entrar da obra: valor financiado/contratado − total já recebido.
+            const contrato = Number(obra.valor_financiado) || 0;
+            const recebido = Number(r.totalReceitas) || 0;
+            const falta = contrato - recebido;
+            const pctRecebido = contrato > 0 ? Math.min(100, Math.max(0, (recebido / contrato) * 100)) : 0;
+            const acima = contrato > 0 && falta < 0;
+            return `
+          <div style="background:var(--bg-secondary);padding:14px;border-radius:var(--r-md);border:1px solid var(--border);">
+            <div style="font-size:.7rem;color:var(--text3);text-transform:uppercase;font-weight:700;letter-spacing:.05em;">Falta Receber</div>
+            <div style="font-size:1.35rem;font-weight:900;color:${acima ? 'var(--warning, #f59e0b)' : '#38bdf8'};margin-top:4px;">${contrato > 0 ? Utils.fmt.currency(Math.max(0, falta)) : '—'}</div>
+            <div style="height:5px;background:var(--border);border-radius:3px;margin:6px 0 3px;overflow:hidden;">
+              <div style="width:${pctRecebido.toFixed(1)}%;height:100%;background:#38bdf8;border-radius:3px;"></div>
+            </div>
+            <div style="font-size:.7rem;color:var(--text3);">${contrato <= 0
+              ? 'Informe o valor financiado na obra'
+              : acima
+                ? `Recebido ${Utils.fmt.currency(-falta)} acima do contrato`
+                : `${pctRecebido.toFixed(1).replace('.', ',')}% do ${isCaixa ? 'financiado' : 'contratado'} já recebido`}</div>
+          </div>`;
+          })()}
 
           <div style="background:var(--bg-secondary);padding:14px;border-radius:var(--r-md);border:1px solid var(--border);">
             <div style="font-size:.7rem;color:var(--text3);text-transform:uppercase;font-weight:700;letter-spacing:.05em;">Total Gasto (Despesas)</div>
