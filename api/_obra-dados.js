@@ -65,7 +65,9 @@ function extrairExtras(registro, excluidos) {
 // cascata e checagem de duplicidade, parcela da NF-e). Lista explícita: só o que tem uso real.
 const CAMPOS_EXTRAS_LANCAMENTO = [
   'origem', 'competencia', 'medicao_id', 'precompra_id', 'numero_parcela', 'total_parcelas',
-  'grupo_parcelamento_id', 'orcamento_id', 'categoria_obra', 'centro_custo', 'retencao_de'
+  'grupo_parcelamento_id', 'orcamento_id', 'categoria_obra', 'centro_custo', 'retencao_de',
+  // Baixa parcial: o título guarda o valor total e cada pagamento parcial aponta para ele.
+  'valor_original', 'baixa_de'
 ];
 
 /** Campos extras do lançamento, prontos para `lancamentos.dados` (migração 046). */

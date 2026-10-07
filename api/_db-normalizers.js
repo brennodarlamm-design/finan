@@ -219,6 +219,8 @@ export function normalizeMedicao(m) {
     lancamento_id: m.lancamento_id || null,
     // Sem coluna própria: vem do payload (receita "a receber" da retenção técnica).
     retencao_lancamento_id: m.retencao_lancamento_id || jsonPayload(m).retencao_lancamento_id || null,
+    // Sem coluna própria: o valor liberado caiu na conta do cliente, que paga a construtora aos poucos.
+    repasse_cliente: Boolean(m.repasse_cliente ?? jsonPayload(m).repasse_cliente),
     retencao_tecnica: cleanNum(m.retencao_tecnica),
     descontos: cleanNum(m.descontos),
     itens: (typeof m.itens_json === 'string' ? safeJsonParse(m.itens_json, []) : m.itens_json) || m.itens || []

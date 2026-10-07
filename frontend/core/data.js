@@ -2414,6 +2414,100 @@ const DB = {
     return { removidos, mantidos };
   },
 
+  // ── BAIXA PARCIAL ──
+  // Um título (lançamento a pagar/receber) pode ser quitado aos poucos. Cada pagamento vira um
+  // lançamento pago/recebido com `baixa_de` = id do título (assim cada entrada bate com o extrato
+  // e os totais continuam certos), e o título guarda o total em `valor_original` e só o saldo em
+  // aberto em `valor`. Quitado, o título fica com valor 0: os pagamentos somam o total.
+
+  /** Pagamentos parciais de um título, do mais antigo para o mais novo. */
+  baixasDoTitulo(tituloId) {
+    const id = String(tituloId || '');
+    if (!id) return [];
+    return (this.getAll('lancamentos') || [])
+      .filter(l => String(l.baixa_de || '') === id && l.status !== 'cancelado')
+      .sort((a, b) => String(a.data_pagamento || a.data || '').localeCompare(String(b.data_pagamento || b.data || '')));
+  },
+
+  /** { total, pago, aberto, baixas } de um título; `baixas` vazio se nunca teve baixa parcial. */
+  resumoTitulo(l) {
+    const baixas = l ? this.baixasDoTitulo(l.id) : [];
+    const r2 = (v) => Math.round((Number(v) || 0) * 100) / 100;
+    const pagoFilhos = r2(baixas.reduce((s, b) => s + (Number(b.valor) || 0), 0));
+    const aberto = l && this.isLancamentoEmAberto(l) ? r2(l.valor) : 0;
+    const quitadoDireto = l && !baixas.length && !this.isLancamentoEmAberto(l) ? r2(l.valor) : 0;
+    const total = l?.valor_original != null && l.valor_original !== '' ? r2(l.valor_original) : r2(pagoFilhos + (Number(l?.valor) || 0));
+    return { total, pago: r2(pagoFilhos + quitadoDireto), aberto, baixas };
+  },
+
+  /**
+   * Dá baixa em um título. `valor` menor que o saldo em aberto = baixa parcial.
+   * opts: { valor, data, conta, observacoes, extras } — extras vão para o pagamento (ex.: origem).
+   * Retorna { ok, parcial, aberto, erro }.
+   */
+  registrarBaixa(tituloId, opts = {}) {
+    const l = this.getById('lancamentos', tituloId);
+    if (!l) return { ok: false, erro: 'Lançamento não encontrado.' };
+    if (!this.isLancamentoEmAberto(l)) return { ok: false, erro: 'Este lançamento já está baixado.' };
+    const r2 = (v) => Math.round((Number(v) || 0) * 100) / 100;
+    const aberto = r2(l.valor);
+    const valor = opts.valor == null ? aberto : r2(opts.valor);
+    if (!(valor > 0)) return { ok: false, erro: 'Informe o valor pago.' };
+    if (valor - aberto > 0.009) return { ok: false, erro: `O valor pago é maior que o saldo em aberto (${aberto.toFixed(2).replace('.', ',')}).` };
+    const data = opts.data || (typeof Utils !== 'undefined' ? Utils.today() : new Date().toISOString().slice(0, 10));
+    const conta = opts.conta ?? l.conta_bancaria ?? '';
+    const pago = l.tipo === 'receita' ? 'recebido' : 'pago';
+    const temBaixas = this.baixasDoTitulo(l.id).length > 0;
+    const quita = aberto - valor <= 0.009;
+
+    // Baixa completa de título que nunca teve baixa parcial: comportamento de sempre.
+    if (quita && !temBaixas && (l.valor_original == null || l.valor_original === '')) {
+      this.update('lancamentos', l.id, { status: pago, data_pagamento: data, conta_bancaria: conta });
+      return { ok: true, parcial: false, aberto: 0 };
+    }
+    const total = l.valor_original != null && l.valor_original !== '' ? r2(l.valor_original) : r2(aberto + this.baixasDoTitulo(l.id).reduce((s, b) => s + (Number(b.valor) || 0), 0));
+    this.add('lancamentos', {
+      tipo: l.tipo,
+      obra_id: l.obra_id,
+      categoria: l.categoria,
+      descricao: `${l.descricao || 'Lançamento'} — pagamento ${quita ? 'final' : 'parcial'}`,
+      fornecedor_beneficiario: l.fornecedor_beneficiario || '',
+      ...(l.fornecedor_id ? { fornecedor_id: l.fornecedor_id } : {}),
+      valor,
+      data,
+      data_vencimento: data,
+      data_pagamento: data,
+      status: pago,
+      conta_bancaria: conta,
+      observacoes: String(opts.observacoes || '').slice(0, 300),
+      origem: l.origem === 'medicao' ? 'medicao_pagamento' : 'baixa_parcial',
+      ...(l.medicao_id ? { medicao_id: l.medicao_id } : {}),
+      conciliado: false,
+      ...(opts.extras || {}),
+      baixa_de: l.id
+    });
+    const resto = r2(aberto - valor);
+    this.update('lancamentos', l.id, quita
+      ? { valor: 0, valor_original: total, status: pago, data_pagamento: data }
+      : { valor: resto, valor_original: total });
+    return { ok: true, parcial: !quita, aberto: quita ? 0 : resto };
+  },
+
+  /** Desfaz um pagamento parcial: o valor volta para o saldo em aberto do título. */
+  desfazerBaixa(baixaId) {
+    const b = this.getById('lancamentos', baixaId);
+    if (!b || !b.baixa_de) return { ok: false, erro: 'Pagamento não encontrado.' };
+    if (b.conciliado) return { ok: false, erro: 'Este pagamento já foi conciliado com o extrato.' };
+    const l = this.getById('lancamentos', b.baixa_de);
+    this.remove('lancamentos', b.id);
+    if (l) {
+      const aberto = l.tipo === 'receita' ? 'a_receber' : 'a_pagar';
+      const base = this.isLancamentoEmAberto(l) ? Number(l.valor) || 0 : 0;
+      this.update('lancamentos', l.id, { valor: Math.round((base + (Number(b.valor) || 0)) * 100) / 100, status: this.isLancamentoEmAberto(l) ? l.status : aberto, data_pagamento: this.isLancamentoEmAberto(l) ? (l.data_pagamento || null) : null });
+    }
+    return { ok: true, titulo: l || null };
+  },
+
   /** Em aberto e já vencido (pela data de hoje em Boa Vista). */
   isLancamentoVencido(l, hoje = (typeof Utils !== 'undefined' && Utils.today ? Utils.today() : new Date().toISOString().slice(0, 10))) {
     const venc = String(l?.data_vencimento || l?.data || '').slice(0, 10);
