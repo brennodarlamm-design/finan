@@ -663,7 +663,28 @@ console.log('=== Auditoria 04/10/2026 ===\n');
   // fica no repositório.
   const os = await import('node:os'); const path = await import('node:path');
   const dirCert = fs.mkdtempSync(path.join(os.tmpdir(), 'fingo-a1-'));
-  const openssl = (args) => spawnSync('openssl', args, { cwd: dirCert, stdio: 'pipe' });
+  const resolveOpenSsl = () => {
+    const probe = spawnSync('openssl', ['version'], { stdio: 'pipe' });
+    if (!probe.error && probe.status === 0) return 'openssl';
+    if (process.platform === 'win32') {
+      const gitProbe = spawnSync('where', ['git'], { stdio: 'pipe', encoding: 'utf8' });
+      if (!gitProbe.error && gitProbe.stdout) {
+        for (const line of gitProbe.stdout.split(/\r?\n/)) {
+          const trimmed = line.trim();
+          if (trimmed) {
+            const candidate = path.resolve(path.dirname(trimmed), '..', 'usr', 'bin', 'openssl.exe');
+            if (fs.existsSync(candidate)) return candidate;
+          }
+        }
+      }
+      for (const p of ['D:\\Git\\usr\\bin\\openssl.exe', 'C:\\Program Files\\Git\\usr\\bin\\openssl.exe', 'C:\\Program Files (x86)\\Git\\usr\\bin\\openssl.exe']) {
+        if (fs.existsSync(p)) return p;
+      }
+    }
+    return 'openssl';
+  };
+  const opensslBin = resolveOpenSsl();
+  const openssl = (args) => spawnSync(opensslBin, args, { cwd: dirCert, stdio: 'pipe' });
   openssl(['req', '-x509', '-newkey', 'rsa:2048', '-keyout', 'k.pem', '-out', 'c.pem', '-days', '2', '-nodes', '-subj', '/CN=EMPRESA TESTE:12345678000195']);
   openssl(['pkcs12', '-export', '-inkey', 'k.pem', '-in', 'c.pem', '-out', 'a1.pfx', '-passout', 'pass:Senha123']);
   const pfx = fs.readFileSync(path.join(dirCert, 'a1.pfx'));
