@@ -493,40 +493,49 @@ const Cobranca = {
         <!-- Corpo Rolável Mobile-First -->
         <div style="padding:18px 20px;overflow-y:auto;display:flex;flex-direction:column;gap:14px;text-align:center;">
 
-          <!-- BLOCO PRIMÁRIO (ZERO SCROLL): Botão Copiar Código PIX de 52px -->
-          ${pixPayload ? `
-            <div style="background:linear-gradient(135deg,rgba(198,255,0,.12),rgba(16,185,129,.05));border:1.5px solid var(--accent);border-radius:14px;padding:14px;display:flex;flex-direction:column;gap:10px;">
-              <button id="pix-copy-btn" style="background:linear-gradient(135deg,var(--accent),var(--accent2));border:none;color:#060e09;min-height:52px;border-radius:10px;font-size:1rem;font-weight:900;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:10px;box-shadow:0 4px 18px rgba(198,255,0,.35);transition:all .2s;width:100%;">
-                📋 COPIAR CÓDIGO PIX (1 Clique)
-              </button>
-              <div style="display:flex;gap:6px;align-items:center;">
-                <input type="text" id="pix-copia-cola-input" readonly value="${Utils.escapeHtml(pixPayload)}" style="flex:1;background:rgba(0,0,0,.4);border:1px solid rgba(255,255,255,.12);border-radius:6px;padding:6px 10px;color:#cbd5e1;font-size:.72rem;font-family:monospace;outline:none;" title="Código PIX Copia e Cola">
-                <span style="font-size:.68rem;color:#94a3b8;white-space:nowrap;">Expira em 24h</span>
+          <!-- SELETOR DE MODALIDADE PIX: QR Code vs Copia e Cola -->
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.12);border-radius:12px;padding:4px;">
+            <button type="button" id="pix-toggle-qr-btn" style="min-height:44px;border:none;border-radius:8px;font-size:.82rem;font-weight:900;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;transition:all .2s;background:linear-gradient(135deg,var(--accent,#C6FF00),var(--accent2,#a3e635));color:#060e09;" title="Escanear QR Code com o celular">
+              <span>📱 Escanear QR Code</span>
+              <span id="pix-qr-chevron" style="display:none;">▼</span>
+            </button>
+            <button type="button" id="pix-toggle-copy-btn" style="min-height:44px;border:none;border-radius:8px;font-size:.82rem;font-weight:800;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;transition:all .2s;background:transparent;color:#cbd5e1;" title="Copiar código PIX para colar no banco">
+              <span>📋 PIX Copia e Cola</span>
+            </button>
+          </div>
+
+          <!-- PAINEL 1: QR CODE EM DESTAQUE (Visível por padrão) -->
+          <div id="pix-qr-container" style="display:flex;padding:16px;flex-direction:column;align-items:center;gap:12px;border:1.5px solid rgba(201,162,39,.35);border-radius:14px;background:linear-gradient(145deg,rgba(255,255,255,.03),rgba(0,0,0,.3));">
+            ${qrSrc ? `
+              <div style="background:#ffffff;padding:12px;border-radius:14px;box-shadow:0 10px 30px rgba(0,0,0,.6);display:inline-block;">
+                <img src="${qrSrc}" alt="QR Code PIX" style="display:block;width:180px;height:180px;border-radius:4px;">
               </div>
+              <div style="font-size:.8rem;color:#f0ead6;font-weight:700;">Aponte a câmera do aplicativo do seu banco para escanear</div>
+              <button type="button" id="pix-quick-copy-btn" style="background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.18);color:#cbd5e1;padding:8px 16px;border-radius:8px;font-size:.76rem;font-weight:800;cursor:pointer;display:flex;align-items:center;gap:6px;transition:all .2s;">
+                📋 Copiar código também
+              </button>
+            ` : `
+              <div style="color:#fca5a5;font-size:.8rem;">QR Code indisponível no momento. Utilize a opção Copia e Cola ao lado.</div>
+            `}
+          </div>
+
+          <!-- PAINEL 2: BLOCO PRIMÁRIO COPIA E COLA -->
+          <div id="pix-copy-container" style="display:none;background:linear-gradient(135deg,rgba(198,255,0,.12),rgba(16,185,129,.05));border:1.5px solid var(--accent);border-radius:14px;padding:14px;flex-direction:column;gap:10px;">
+            <button id="pix-copy-btn" style="background:linear-gradient(135deg,var(--accent),var(--accent2));border:none;color:#060e09;min-height:52px;border-radius:10px;font-size:1rem;font-weight:900;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:10px;box-shadow:0 4px 18px rgba(198,255,0,.35);transition:all .2s;width:100%;">
+              📋 COPIAR CÓDIGO PIX (1 Clique)
+            </button>
+            <div style="display:flex;gap:6px;align-items:center;">
+              <input type="text" id="pix-copia-cola-input" readonly value="${Utils.escapeHtml(pixPayload)}" style="flex:1;background:rgba(0,0,0,.4);border:1px solid rgba(255,255,255,.12);border-radius:6px;padding:6px 10px;color:#cbd5e1;font-size:.72rem;font-family:monospace;outline:none;" title="Código PIX Copia e Cola">
+              <span style="font-size:.68rem;color:#94a3b8;white-space:nowrap;">Expira em 24h</span>
             </div>
-          ` : ''}
+            <div style="font-size:.74rem;color:#94a3b8;margin-top:2px;">Cole no aplicativo do seu banco na opção <strong>PIX Copia e Cola</strong></div>
+          </div>
 
           <!-- Radar de Status em Tempo Real -->
           <div id="pix-status-box" style="background:rgba(34,197,94,.06);border:1px solid rgba(34,197,94,.22);border-radius:10px;padding:10px 14px;font-size:.78rem;color:#86efac;display:flex;align-items:center;justify-content:center;gap:8px;">
             <span class="spinner" style="width:14px;height:14px;border:2px solid rgba(134,239,172,.3);border-top-color:#22c55e;border-radius:50%;animation:spin 1s linear infinite;display:inline-block;"></span>
             <span>Aguardando compensação bancária em tempo real...</span>
           </div>
-
-          <!-- Accordion Retrátil para QR Code (Mobile amigável) -->
-          ${qrSrc ? `
-            <div style="border:1px solid rgba(255,255,255,.1);border-radius:12px;overflow:hidden;background:rgba(255,255,255,.02);">
-              <button type="button" id="pix-toggle-qr-btn" style="width:100%;min-height:44px;background:none;border:none;color:#94a3b8;font-size:.78rem;font-weight:700;padding:10px 14px;display:flex;align-items:center;justify-content:space-between;cursor:pointer;">
-                <span>📱 Prefere escanear com outro aparelho? [Ver QR Code]</span>
-                <span id="pix-qr-chevron">▼</span>
-              </button>
-              <div id="pix-qr-container" style="display:none;padding:14px;flex-direction:column;align-items:center;gap:10px;border-top:1px solid rgba(255,255,255,.08);background:rgba(0,0,0,.2);">
-                <div style="background:#ffffff;padding:10px;border-radius:12px;box-shadow:0 8px 24px rgba(0,0,0,.5);display:inline-block;">
-                  <img src="${qrSrc}" alt="QR Code PIX" style="display:block;width:170px;height:170px;border-radius:4px;">
-                </div>
-                <div style="font-size:.72rem;color:#94a3b8;">Aponte a câmera do aplicativo do seu banco para escanear</div>
-              </div>
-            </div>
-          ` : ''}
 
           <!-- Resumo e Identificador TXID -->
           <div style="background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:8px 12px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px;font-size:.72rem;text-align:left;">
@@ -541,7 +550,7 @@ const Cobranca = {
             </div>
             <ol style="margin:0;padding-left:18px;font-size:.74rem;color:#94a3b8;line-height:1.5;display:flex;flex-direction:column;gap:3px;">
               <li>Abra o app do seu banco e acesse a área <strong>PIX</strong>.</li>
-              <li>Escolha <strong>PIX Copia e Cola</strong> ou <strong>Pagar com QR Code</strong>.</li>
+              <li>Escolha <strong>Pagar com QR Code</strong> ou <strong>PIX Copia e Cola</strong>.</li>
               <li>Confira o valor de <strong>R$ ${amountFmt}</strong> e confirme.</li>
               <li>Pronto! A liquidação é reconhecida automaticamente aqui em segundos.</li>
             </ol>
@@ -573,22 +582,42 @@ const Cobranca = {
     document.getElementById('pix-modal-close-btn')?.addEventListener('click', () => this.fecharModalPix());
     document.getElementById('pix-cancel-btn')?.addEventListener('click', () => this.fecharModalPix());
 
-    // Toggle QR Code
+    // Toggle e Abas de Pagamento PIX (QR Code vs Copia e Cola)
     const qrToggleBtn = document.getElementById('pix-toggle-qr-btn');
+    const copyToggleBtn = document.getElementById('pix-toggle-copy-btn');
     const qrContainer = document.getElementById('pix-qr-container');
+    const copyContainer = document.getElementById('pix-copy-container');
     const qrChevron = document.getElementById('pix-qr-chevron');
-    if (qrToggleBtn && qrContainer) {
-      qrToggleBtn.onclick = () => {
-        const isHidden = qrContainer.style.display === 'none';
-        qrContainer.style.display = isHidden ? 'flex' : 'none';
-        if (qrChevron) qrChevron.textContent = isHidden ? '▲' : '▼';
-      };
-    }
+
+    const setPixMode = (mode) => {
+      const isQr = mode === 'qr';
+      if (qrContainer) qrContainer.style.display = isQr ? 'flex' : 'none';
+      if (copyContainer) copyContainer.style.display = isQr ? 'none' : 'flex';
+      if (qrToggleBtn) {
+        qrToggleBtn.style.background = isQr ? 'linear-gradient(135deg,var(--accent,#C6FF00),var(--accent2,#a3e635))' : 'transparent';
+        qrToggleBtn.style.color = isQr ? '#060e09' : '#cbd5e1';
+        qrToggleBtn.style.fontWeight = isQr ? '900' : '750';
+      }
+      if (copyToggleBtn) {
+        copyToggleBtn.style.background = !isQr ? 'linear-gradient(135deg,var(--accent,#C6FF00),var(--accent2,#a3e635))' : 'transparent';
+        copyToggleBtn.style.color = !isQr ? '#060e09' : '#cbd5e1';
+        copyToggleBtn.style.fontWeight = !isQr ? '900' : '750';
+      }
+      if (qrChevron) qrChevron.textContent = isQr ? '▲' : '▼';
+    };
+
+    if (qrToggleBtn) qrToggleBtn.onclick = () => setPixMode('qr');
+    if (copyToggleBtn) copyToggleBtn.onclick = () => setPixMode('copy');
+
+    // QR Code fica ativo por padrão para escaneamento imediato
+    setPixMode('qr');
 
     // Copiar código PIX com feedback háptico e visual
     const input = document.getElementById('pix-copia-cola-input');
     const copyBtn = document.getElementById('pix-copy-btn');
-    if (copyBtn) copyBtn.onclick = async () => {
+    const quickCopyBtn = document.getElementById('pix-quick-copy-btn');
+
+    const executarCopiaPix = async (btn) => {
       try {
         if (navigator.clipboard?.writeText) {
           await navigator.clipboard.writeText(pixPayload);
@@ -599,9 +628,11 @@ const Cobranca = {
         if (navigator.vibrate) {
           try { navigator.vibrate([40, 60, 40]); } catch {}
         }
-        copyBtn.textContent = '✓ Código Copiado!';
-        copyBtn.style.background = '#22c55e';
-        copyBtn.style.color = '#060e09';
+        if (btn) {
+          btn.textContent = '✓ Código Copiado!';
+          btn.style.background = '#22c55e';
+          btn.style.color = '#060e09';
+        }
         if (typeof Utils !== 'undefined' && Utils.toast) {
           Utils.toast('Código PIX copiado! Abra o app do banco para pagar.', 'success');
         }
@@ -610,13 +641,20 @@ const Cobranca = {
         document.execCommand?.('copy');
       }
       setTimeout(() => {
-        if (copyBtn) {
+        if (btn === copyBtn) {
           copyBtn.textContent = '📋 COPIAR CÓDIGO PIX (1 Clique)';
           copyBtn.style.background = 'linear-gradient(135deg,var(--accent),var(--accent2))';
           copyBtn.style.color = '#060e09';
+        } else if (btn) {
+          btn.textContent = '📋 Copiar código também';
+          btn.style.background = 'rgba(255,255,255,.08)';
+          btn.style.color = '#cbd5e1';
         }
       }, 3500);
     };
+
+    if (copyBtn) copyBtn.onclick = () => executarCopiaPix(copyBtn);
+    if (quickCopyBtn) quickCopyBtn.onclick = () => executarCopiaPix(quickCopyBtn);
 
     // ── MONITORAMENTO DE LIQUIDAÇÃO EM TEMPO REAL (POLLING) ──────────────────
     let pollCycles = 0;
