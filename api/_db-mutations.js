@@ -446,7 +446,8 @@ export async function handleSave(sql, tenantId, auth, req, res, table, data) {
         url = COALESCE(EXCLUDED.url, documentos.url),
         base64_data = CASE 
           WHEN COALESCE(EXCLUDED.url, documentos.url) IS NOT NULL THEN NULL
-          ELSE EXCLUDED.base64_data
+          -- Gravar só os dados do documento (título, vínculo...) não apaga o arquivo já guardado.
+          ELSE COALESCE(EXCLUDED.base64_data, documentos.base64_data)
         END
       WHERE documentos.tenant_id = ${tenantId};
     `;
