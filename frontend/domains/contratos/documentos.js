@@ -152,7 +152,11 @@ const Documentos = {
       this._memoryBlobs.set(this._blobKey(id), fromIdb);
       return fromIdb;
     }
-    // Tenta buscar da nuvem (Neon) se o arquivo foi anexado por outro dispositivo (ex: celular)
+    // Tenta buscar da nuvem (Neon) se o arquivo foi anexado por outro dispositivo (ex: celular).
+    // Um "não existe" recente não é consultado de novo a cada clique (evita 404 repetido).
+    this._semConteudo = this._semConteudo || new Map();
+    const faltou = this._semConteudo.get(id);
+    if (faltou && Date.now() - faltou < 60000) return null;
     try {
       const headers = (typeof DB !== 'undefined' && DB._apiHeaders) ? DB._apiHeaders() : {};
       const res = await fetch(`/api/db?table=documento_conteudo&id=${encodeURIComponent(id)}`, { headers, signal: AbortSignal.timeout(20000) });
@@ -176,6 +180,8 @@ const Documentos = {
           this._idbSet(id, json.base64);
           return json.base64;
         }
+      } else if (res.status === 404) {
+        this._semConteudo.set(id, Date.now());
       }
     } catch (e) {
       console.warn('[Documentos] Falha ao obter conteúdo da nuvem:', e);
@@ -796,6 +802,10 @@ const Documentos = {
     const isImage = (doc.tipo_mime && doc.tipo_mime.startsWith('image/')) || nomeNorm.match(/\.(png|jpg|jpeg|webp|gif|svg)$/i) || conteudo.startsWith('data:image/');
     const isZip = nomeNorm.match(/\.(zip|rar|7z|tar|gz)$/i);
     const isCAD = nomeNorm.match(/\.(dwg|dxf)$/i);
+    // PDF/HTML hospedado fora do FinGo (ex.: anexos antigos no armazenamento da Vercel) não pode ser
+    // embutido: a CSP (frame-src) bloqueia. Abre em nova aba. Imagens externas seguem no <img>.
+    let externo = false;
+    try { const u = new URL(conteudo, window.location.origin); externo = /^https?:$/.test(u.protocol) && u.origin !== window.location.origin; } catch (_) {}
 
     Utils.showModal(`
       <div class="modal" style="max-width:850px;width:95vw;height:85vh;display:flex;flex-direction:column;">
@@ -809,6 +819,12 @@ const Documentos = {
         <div class="modal-body" style="flex:1;padding:0;overflow:hidden;background:#0f172a;display:flex;align-items:center;justify-content:center;">
           ${!previewSrc ? `
             <div style="color:#fff;padding:20px;text-align:center;">Pré-visualização indisponível para este arquivo. Use o botão Baixar.</div>
+          ` : (isPDF || isHTML) && externo ? `
+            <div style="color:#fff;padding:30px;text-align:center;">
+              <div style="font-size:3rem;margin-bottom:12px;">📄</div>
+              <p style="font-size:.88rem;color:#cbd5e1;margin-bottom:16px;">Este arquivo está guardado fora do FinGo e abre numa nova aba.</p>
+              <a class="btn btn-primary" href="${previewSrc}" target="_blank" rel="noopener noreferrer" style="text-decoration:none;">↗ Abrir arquivo</a>
+            </div>
           ` : isPDF || isHTML ? `
             <iframe src="${previewSrc}" style="width:100%;height:100%;border:none;background:#ffffff;"></iframe>
           ` : isImage ? `
