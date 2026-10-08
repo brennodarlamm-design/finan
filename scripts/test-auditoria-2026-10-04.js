@@ -636,7 +636,7 @@ console.log('=== Auditoria 04/10/2026 ===\n');
   assert(parser.includes('if (resNFe) return this._parseResumo(resNFe, get);') && parser.includes('resumo: true,'));
   const nfe = read('js/nfe.js');
   assert(nfe.includes("await FinObraAssets.load('danfe');"), 'DANFE gerado a partir do XML, sem MeuDanfe');
-  assert(nfe.includes("if (resumoDfe) return { status: 'OK', data: resumoDfe, resumo: true };"), 'XML completo tem preferência sobre o resumo');
+  assert(nfe.includes("if (resumoDfe) return { status: 'OK', data: resumoDfe, resumo: true, aviso: avisoSefaz };"), 'XML completo tem preferência sobre o resumo');
   for (const [a, b] of [['js/documentos.js', 'frontend/domains/contratos/documentos.js'], ['js/nfe.js', 'frontend/domains/fiscal/nfe.js'], ['js/nfe_parser.js', 'frontend/domains/fiscal/nfe_parser.js']]) assert.equal(read(a), read(b), b);
   console.log('  ✓ Pós-auditoria: anexo do R2 abre pela rota autenticada; NF-e com resumo preenche emitente e valor; DANFE busca a nota antes');
 }
@@ -741,10 +741,25 @@ console.log('=== Auditoria 04/10/2026 ===\n');
   assert.equal((await dfe.marcarDFeLancada(psql, 't1', { chave: '123' })).success, false);
   const pend = await dfe.obterXmlCompletoNFe(psql, 't1', '1'.repeat(44), { cert: {}, enviar, consultar: async () => ({ cStat: '137' }) });
   assert.equal(pend.success, false); assert.match(pend.error, /não encontrada na SEFAZ/);
+  // Bloqueio por consumo (656): a consulta pela chave não chama a SEFAZ durante a espera e, quando
+  // recebe 656, registra a espera para a sincronização (antes reiniciava o relógio da SEFAZ sem avisar).
+  const outraChave = '2'.repeat(44);
+  await psql`INSERT INTO tenant_dfe_sync (tenant_id, ultimo_nsu, max_nsu, proxima_consulta_permitida, status_sefaz) VALUES ('t1', '000000000000050', '000000000000046', NOW() + INTERVAL '30 minutes', 'bloqueado_sefaz')`;
+  let chamadasSefaz = 0;
+  const bloq = await dfe.obterXmlCompletoNFe(psql, 't1', outraChave, { cert: {}, enviar, consultar: async () => { chamadasSefaz++; return { cStat: '138', docZipList: [] }; } });
+  assert.equal(chamadasSefaz, 0, 'sem consulta à SEFAZ durante o bloqueio'); assert.equal(bloq.bloqueado, true); assert.match(bloq.error, /em espera até/);
+  await psql`UPDATE tenant_dfe_sync SET proxima_consulta_permitida = NOW() - INTERVAL '1 minute', status_sefaz = 'sincronizado'`;
+  const r656 = await dfe.obterXmlCompletoNFe(psql, 't1', outraChave, { cert: {}, enviar, consultar: async () => { chamadasSefaz++; return { cStat: '656', xMotivo: 'Rejeicao: Consumo Indevido' }; } });
+  assert.equal(chamadasSefaz, 1); assert.equal(r656.bloqueado, true);
+  const syncDepois = (await psql`SELECT status_sefaz, proxima_consulta_permitida FROM tenant_dfe_sync WHERE tenant_id = 't1'`)[0];
+  assert.equal(syncDepois.status_sefaz, 'bloqueado_sefaz');
+  const minutos = (new Date(syncDepois.proxima_consulta_permitida) - Date.now()) / 60000;
+  assert(minutos > 59 && minutos <= 61.5, `656 da consulta pela chave registra 61 min de espera (${minutos})`);
   await pg.close();
 
   const nfeSrv = read('api/nfe.js');
   assert(nfeSrv.includes("if (action === 'dfe_xml_completo') {") && nfeSrv.includes("canAccessModule(auth, 'notas', 'write')"));
+  assert(nfeSrv.includes('`dfe:xml_completo:${auth.tenantId}:${chaveCompleta}`, 1, 60 * 60 * 1000'), 'no máximo uma consulta por nota por hora');
   const nfeCli = read('js/nfe.js');
   assert(nfeCli.includes("await FinObraAssets.load('danfe');") && !nfeCli.includes('try { await this.buscarPorChave(chave); }') && !nfeCli.includes('await this.buscarPorChave(chave);\n        res = await pedirXml();'), 'sem busca paga automática no MeuDanfe');
   assert(nfeCli.includes('action=dfe_xml_completo'));

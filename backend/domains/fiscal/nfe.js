@@ -234,9 +234,12 @@ export default async function handler(req, res) {
           return res.status(403).json(permissionError('MODULE_WRITE_FORBIDDEN', 'notas'));
         }
         const chaveCompleta = String(req.query.chave || req.body?.chave || '').replace(/\D/g, '');
-        const rlChave = await checkRateLimit(`dfe:xml_completo:${auth.tenantId}:${chaveCompleta}`, 3, 10 * 60 * 1000);
-        if (!rlChave.allowed) {
-          return res.status(429).json({ success: false, error: 'Esta NF-e já foi consultada agora há pouco. Aguarde alguns minutos.' });
+        // A consulta pela chave conta no limite de consumo da SEFAZ (NT 2014.002): no máximo uma por
+        // nota a cada hora e poucas por empresa. O XML completo chega normalmente pela sincronização.
+        const rlChave = await checkRateLimit(`dfe:xml_completo:${auth.tenantId}:${chaveCompleta}`, 1, 60 * 60 * 1000);
+        const rlEmpresa = rlChave.allowed ? await checkRateLimit(`dfe:xml_completo:${auth.tenantId}`, 6, 60 * 60 * 1000) : { allowed: false };
+        if (!rlChave.allowed || !rlEmpresa.allowed) {
+          return res.status(429).json({ success: false, limite: true, error: 'Esta NF-e já foi consultada na SEFAZ na última hora. O XML completo chega pela próxima sincronização.' });
         }
         const resultado = await obterXmlCompletoNFe(sql, auth.tenantId, chaveCompleta);
         return res.status(resultado.success ? 200 : 404).json(resultado);

@@ -127,7 +127,7 @@ const NFe = {
     chave = this._limparChave(chave);
     const xml = await this.baixarXML(chave);
     if (!xml?.data || xml.resumo || !/<infNFe[\s>]/.test(String(xml.data))) {
-      throw new Error('O DANFE precisa do XML completo da NF-e, que a SEFAZ ainda não liberou (só o resumo). Tente de novo em alguns minutos.');
+      throw new Error(xml?.aviso || 'O DANFE precisa do XML completo da NF-e, que a SEFAZ ainda não liberou (só o resumo). Ele chega pela próxima sincronização.');
     }
     await FinObraAssets.load('danfe');
     return { data: window.DanfeSimplificado.gerarBase64(xml.data), simplificado: true };
@@ -137,6 +137,7 @@ const NFe = {
     chave = this._limparChave(chave);
     const ehCompleto = (xml) => /<infNFe[\s>]/.test(String(xml || ''));
     let resumoDfe = null;
+    let avisoSefaz = null; // SEFAZ em espera (consumo) ou nota já consultada na última hora
     // 1. XML já capturado pelo DF-e da SEFAZ
     try {
       const dfeRes = await this._fetchWithTimeout(`${this._API_BASE}?action=dfe_xml&chave=${chave}`, {
@@ -162,6 +163,7 @@ const NFe = {
         body: JSON.stringify({ chave })
       }, 45000);
       const json = await res.json().catch(() => ({}));
+      if (json.bloqueado || json.limite) avisoSefaz = json.mensagem || json.error || null;
       if (json.success && json.xml) {
         if (json.completo && ehCompleto(json.xml)) return { status: 'OK', data: json.xml };
         resumoDfe = resumoDfe || json.xml;
@@ -181,8 +183,8 @@ const NFe = {
       }
     } catch {}
 
-    if (resumoDfe) return { status: 'OK', data: resumoDfe, resumo: true };
-    throw new Error('NF-e não encontrada na SEFAZ para o CNPJ desta empresa.');
+    if (resumoDfe) return { status: 'OK', data: resumoDfe, resumo: true, aviso: avisoSefaz };
+    throw new Error(avisoSefaz || 'NF-e não encontrada na SEFAZ para o CNPJ desta empresa.');
   },
 
   async listarMinhasNFes(after = '') {
