@@ -2493,19 +2493,69 @@ const DB = {
     return { ok: true, parcial: !quita, aberto: quita ? 0 : resto };
   },
 
-  /** Desfaz um pagamento parcial: o valor volta para o saldo em aberto do título. */
+  /**
+   * Recebimentos/pagamentos já lançados (extrato OFX, PIX lançado à mão...) que podem ser
+   * vinculados a um título como baixa, em vez de criar um lançamento novo (que duplicaria o dinheiro).
+   */
+  candidatosVinculoBaixa(tituloId) {
+    const t = this.getById('lancamentos', tituloId);
+    if (!t) return [];
+    const pago = t.tipo === 'receita' ? 'recebido' : 'pago';
+    const titulos = new Set((this.getAll('lancamentos') || []).filter(l => l.baixa_de).map(l => String(l.baixa_de)));
+    return (this.getAll('lancamentos') || [])
+      .filter(l => l.id !== t.id && l.tipo === t.tipo && l.status === pago && !l.baixa_de
+        && String(l.obra_id || '') === String(t.obra_id || '')
+        && (l.valor_original == null || l.valor_original === '') && !titulos.has(String(l.id))
+        && !(l.origem === 'medicao' && l.medicao_id) && Number(l.valor) > 0)
+      .sort((a, b) => String(b.data_pagamento || b.data || '').localeCompare(String(a.data_pagamento || a.data || '')))
+      .slice(0, 80);
+  },
+
+  /** Vincula lançamentos já pagos/recebidos a um título como baixas (sem criar lançamento novo). */
+  vincularBaixas(tituloId, ids = []) {
+    const t = this.getById('lancamentos', tituloId);
+    if (!t) return { ok: false, erro: 'Lançamento não encontrado.' };
+    if (!this.isLancamentoEmAberto(t)) return { ok: false, erro: 'Este lançamento já está baixado.' };
+    const r2 = (v) => Math.round((Number(v) || 0) * 100) / 100;
+    const validos = new Map(this.candidatosVinculoBaixa(tituloId).map(l => [String(l.id), l]));
+    const escolhidos = [...new Set(ids.map(String))].map(id => validos.get(id)).filter(Boolean);
+    if (!escolhidos.length) return { ok: false, erro: 'Selecione ao menos um lançamento.' };
+    const aberto = r2(t.valor);
+    const soma = r2(escolhidos.reduce((s, l) => s + (Number(l.valor) || 0), 0));
+    if (soma - aberto > 0.009) return { ok: false, erro: `Os lançamentos selecionados somam mais que o saldo em aberto (${aberto.toFixed(2).replace('.', ',')}).` };
+    const total = t.valor_original != null && t.valor_original !== '' ? r2(t.valor_original) : r2(aberto + this.baixasDoTitulo(t.id).reduce((s, b) => s + (Number(b.valor) || 0), 0));
+    for (const l of escolhidos) {
+      this.update('lancamentos', l.id, { baixa_de: t.id, baixa_vinculada: true, ...(t.medicao_id ? { medicao_id: t.medicao_id } : {}) });
+    }
+    const resto = r2(aberto - soma);
+    const quita = resto <= 0.009;
+    const ultima = escolhidos.map(l => String(l.data_pagamento || l.data || '')).sort().pop() || null;
+    this.update('lancamentos', t.id, quita
+      ? { valor: 0, valor_original: total, status: t.tipo === 'receita' ? 'recebido' : 'pago', data_pagamento: ultima }
+      : { valor: resto, valor_original: total });
+    return { ok: true, parcial: !quita, aberto: quita ? 0 : resto, vinculados: escolhidos.length };
+  },
+
+  /**
+   * Desfaz um pagamento do título: o valor volta para o saldo em aberto. Pagamento criado pela baixa
+   * é excluído; recebimento que já existia (vinculado) só é desvinculado e continua no financeiro.
+   */
   desfazerBaixa(baixaId) {
     const b = this.getById('lancamentos', baixaId);
     if (!b || !b.baixa_de) return { ok: false, erro: 'Pagamento não encontrado.' };
-    if (b.conciliado) return { ok: false, erro: 'Este pagamento já foi conciliado com o extrato.' };
+    if (b.conciliado && !b.baixa_vinculada) return { ok: false, erro: 'Este pagamento já foi conciliado com o extrato.' };
     const l = this.getById('lancamentos', b.baixa_de);
-    this.remove('lancamentos', b.id);
+    if (b.baixa_vinculada) {
+      this.update('lancamentos', b.id, { baixa_de: null, baixa_vinculada: null, ...(l?.medicao_id && b.medicao_id === l.medicao_id ? { medicao_id: null } : {}) });
+    } else {
+      this.remove('lancamentos', b.id);
+    }
     if (l) {
       const aberto = l.tipo === 'receita' ? 'a_receber' : 'a_pagar';
       const base = this.isLancamentoEmAberto(l) ? Number(l.valor) || 0 : 0;
       this.update('lancamentos', l.id, { valor: Math.round((base + (Number(b.valor) || 0)) * 100) / 100, status: this.isLancamentoEmAberto(l) ? l.status : aberto, data_pagamento: this.isLancamentoEmAberto(l) ? (l.data_pagamento || null) : null });
     }
-    return { ok: true, titulo: l || null };
+    return { ok: true, titulo: l || null, desvinculado: !!b.baixa_vinculada };
   },
 
   /** Em aberto e já vencido (pela data de hoje em Boa Vista). */
