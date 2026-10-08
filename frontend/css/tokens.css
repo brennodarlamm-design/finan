@@ -263,7 +263,9 @@
     --accent-glow:           var(--color-gold-glow);
   }
 
-  .ui-workspace {
+  /* Verde-limão como cor de destaque só no tema escuro: no claro, texto em var(--accent) ficava
+     #C6FF00 sobre branco (contraste 1,1:1). O tema claro usa --action-fg (verde escuro). */
+  :root:not([data-theme="light"]) .ui-workspace {
     --color-primary: var(--fingo-acid);
     --accent: var(--fingo-acid);
   }

@@ -1,6 +1,8 @@
 /* FinObra — identidade compartilhada, hierarquia e layout responsivo. */
 /* Phase 4: Canonical Design Tokens defer to css/tokens.css (SSOT) */
-:root { --text3: #94A3B8; }
+/* Cinza terciário do tema escuro. No tema claro vale o token de style.css (#526158); antes este
+   :root vinha depois e sobrescrevia o claro, deixando rótulos com contraste 2:1 no branco. */
+:root:not([data-theme="light"]) { --text3: #94A3B8; }
 .ui-workspace, .ui-portal, .ui-auth, .ui-public {
   --sidebar-w: 260px;
   --header-h: 64px;

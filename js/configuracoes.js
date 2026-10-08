@@ -502,7 +502,7 @@ const Configuracoes = {
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px;text-align:center;">
               <!-- Visualização 1: Menu Escuro -->
               <div style="background:#090C07;border:1px solid rgba(201,162,39,.3);border-radius:10px;padding:14px;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:95px;">
-                <div style="font-size:.68rem;text-transform:uppercase;letter-spacing:.06em;color:var(--text3);margin-bottom:8px;font-weight:700;">No Menu Lateral (Escuro)</div>
+                <div style="font-size:.68rem;text-transform:uppercase;letter-spacing:.06em;color:#AEBBB3;margin-bottom:8px;font-weight:700;">No Menu Lateral (Escuro)</div>
                 <div id="cfg-logo-preview-dark" style="display:inline-flex;align-items:center;justify-content:center;padding:2px;border-radius:8px;background:rgba(255,255,255,0.02);border:1px solid rgba(201,162,39,0.25);">
                   ${emp.logo_url 
                     ? `<img id="cfg-preview-logo-img-dark" src="${(typeof Utils !== 'undefined' && Utils.safeUrl) ? Utils.safeUrl(emp.logo_url) : emp.logo_url}" alt="Logo" style="max-height:48px;max-width:180px;width:auto;height:auto;object-fit:contain;border-radius:6px;display:block;">` 
