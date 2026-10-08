@@ -280,7 +280,12 @@ const Documentos = {
     return item;
   },
 
-  async _uploadBlobBackground(id, filename, base64, contentType) {
+  /**
+   * Envia o arquivo para o armazenamento (R2) e grava o endereço no documento.
+   * Retorna { ok } ou { ok:false, recusado, erro }. Antes a falha era silenciosa: o anexo ficava só
+   * no aparelho que o enviou e, em qualquer outro, "Ver" não achava o arquivo.
+   */
+  async _uploadBlobBackground(id, filename, base64, contentType, { avisar = true } = {}) {
     try {
       const headers = (typeof DB !== 'undefined' && DB._apiHeaders) ? DB._apiHeaders() : { 'Content-Type': 'application/json' };
       const res = await fetch('/api/upload', {
@@ -309,10 +314,21 @@ const Documentos = {
               });
             }
           }
+          return { ok: true };
         }
+        return { ok: false, recusado: false, erro: 'Resposta inesperada do servidor.' };
       }
+      const corpo = await res.json().catch(() => ({}));
+      const erro = String(corpo?.error || corpo?.message || `código ${res.status}`);
+      const recusado = res.status >= 400 && res.status < 500 && res.status !== 401 && res.status !== 408 && res.status !== 429;
+      console.warn('[Documentos] Envio do anexo para a nuvem falhou:', res.status, erro);
+      if (recusado && avisar && typeof Utils !== 'undefined') {
+        Utils.toast(`O anexo "${filename}" não foi enviado para a nuvem: ${erro}. Ele só abre neste aparelho.`, 'warning');
+      }
+      return { ok: false, recusado, erro };
     } catch (e) {
-      console.warn('[Blob] Upload em background falhou:', e.message);
+      console.warn('[Documentos] Envio do anexo para a nuvem falhou (conexão):', e.message);
+      return { ok: false, recusado: false, erro: e.message };
     }
   },
 
@@ -756,15 +772,15 @@ const Documentos = {
     if (!conteudo) {
       Utils.showModal(`
         <div class="modal" style="max-width:480px;text-align:center;padding:24px;">
-          <div style="font-size:3rem;margin-bottom:12px;">📱 ➔ 💻</div>
-          <h3 style="font-size:1.1rem;font-weight:800;margin-bottom:8px;color:var(--text);">Arquivo Gravado no Celular</h3>
+          <div style="font-size:3rem;margin-bottom:12px;">☁️ ✕</div>
+          <h3 style="font-size:1.1rem;font-weight:800;margin-bottom:8px;color:var(--text);">Arquivo ainda não está na nuvem</h3>
           <p style="font-size:.85rem;color:var(--text2);line-height:1.5;margin-bottom:16px;text-align:left;background:var(--bg-secondary);padding:14px;border-radius:8px;border:1px solid var(--border);">
-            O arquivo deste comprovante (<strong>${Utils.escapeHtml(doc.nome_arquivo || doc.titulo || '')}</strong>) foi gerado no smartphone e ainda está pendente de sincronização com o banco de dados em nuvem.
+            O arquivo <strong>${Utils.escapeHtml(doc.nome_arquivo || doc.titulo || '')}</strong> foi anexado em outro aparelho e não chegou ao armazenamento online.
             <br><br>
-            👉 <strong>Como sincronizar:</strong> Abra a página no celular e dê um <em>recarregar (F5/puxar para baixo)</em>. O aplicativo enviará o arquivo automaticamente para a nuvem e ele abrirá aqui no computador imediatamente!
+            👉 <strong>Como resolver:</strong> abra o FinGo no aparelho (celular ou computador) onde ele foi anexado. O sistema reenvia sozinho os anexos pendentes. Se esse aparelho não estiver mais disponível, anexe o arquivo de novo.
           </p>
           <div style="display:flex;gap:8px;justify-content:center;">
-            <button class="btn btn-primary" data-fb-click="Utils.closeModal" data-fb-click-n="0">OK, vou abrir no celular</button>
+            <button class="btn btn-primary" data-fb-click="Utils.closeModal" data-fb-click-n="0">Entendi</button>
           </div>
         </div>
       `);
@@ -844,7 +860,7 @@ const Documentos = {
     Utils.toast('Baixando anexo...', 'info');
     const conteudo = await this.obterConteudo(id);
     if (!conteudo) {
-      Utils.toast('Arquivo pendente no celular. Abra o app no celular para sincronizar.', 'warning');
+      Utils.toast('Este arquivo ainda não está na nuvem. Abra o FinGo no aparelho onde ele foi anexado para enviá-lo.', 'warning');
       return;
     }
 
@@ -868,30 +884,31 @@ const Documentos = {
     link.remove();
   },
 
-  // Sincroniza arquivos que já estão salvos localmente no celular diretamente para a nuvem
+  // Reenvia para a nuvem os anexos que só existem neste aparelho (o envio falhou ou estava sem
+  // internet). Só marca como resolvido depois de dar certo: antes a marca era gravada na primeira
+  // tentativa, e um anexo que falhou uma vez nunca mais era reenviado.
   async sincronizarPendentesParaNuvem() {
-    if (typeof DB === 'undefined' || !DB.syncToCloud) return;
     const docs = this.getAll();
     if (!docs.length) return;
-
+    const chave = (sufixo) => (typeof DB !== 'undefined' && DB._ck) ? DB._ck(sufixo) : sufixo;
+    let enviados = 0;
     for (const d of docs) {
+      if (d.url || d.tipo_servico || d.url_externa) continue;
       try {
+        const marcaRecusa = chave('finobra_anexo_recusado_' + d.id);
+        if (localStorage.getItem(marcaRecusa)) continue;
         let b64 = this._memoryBlobs.get(this._blobKey(d.id));
         if (!b64) b64 = await this._idbGet(d.id);
-
-        if (b64) {
-          const syncKey = (typeof DB !== 'undefined' && DB._ck) ? DB._ck('finobra_cloud_uploaded_' + d.id) : ('finobra_cloud_uploaded_' + d.id);
-          if (!localStorage.getItem(syncKey)) {
-            DB.syncToCloud('save', 'documentos', {
-              ...d,
-              base64_data: b64
-            });
-            localStorage.setItem(syncKey, '1');
-          }
-        }
+        if (!b64) continue;
+        const r = await this._uploadBlobBackground(d.id, d.nome_arquivo || d.titulo || 'documento', b64, d.tipo_mime || d.tipo_arquivo, { avisar: false });
+        if (r.ok) enviados++;
+        else if (r.recusado) localStorage.setItem(marcaRecusa, String(r.erro || '1').slice(0, 200));
       } catch (e) {
-        console.warn('[Documentos] Falha ao enviar anexo pendente para nuvem:', d.id, e);
+        console.warn('[Documentos] Falha ao reenviar anexo pendente para a nuvem:', d.id, e);
       }
+    }
+    if (enviados && typeof Utils !== 'undefined') {
+      Utils.toast(`${enviados} anexo(s) que estavam só neste aparelho foram enviados para a nuvem.`, 'success');
     }
   }
 };
