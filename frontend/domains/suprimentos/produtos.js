@@ -109,7 +109,7 @@ const Produtos = {
     if (total === 0) return '';
     if (visiveis >= total) {
       return `
-      <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 18px;background:rgba(20,31,14,0.6);border-top:1px solid var(--border-s);flex-wrap:wrap;gap:8px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 18px;background:var(--bg-secondary);border-top:1px solid var(--border-s);flex-wrap:wrap;gap:8px;">
         <span style="font-size:.78rem;color:var(--text3);">
           ✓ Exibindo todos os <strong>${total}</strong> produtos
         </span>
@@ -118,7 +118,7 @@ const Produtos = {
     const restantes = total - visiveis;
     const prox = Math.min(30, restantes);
     return `
-    <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 18px;background:rgba(20,31,14,0.85);border-top:1px solid var(--border-s);flex-wrap:wrap;gap:12px;">
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 18px;background:var(--bg-secondary);border-top:1px solid var(--border-s);flex-wrap:wrap;gap:12px;">
       <div style="display:flex;align-items:center;gap:10px;">
         <span style="font-size:.82rem;color:var(--text2);">
           Exibindo <strong>${visiveis}</strong> de <strong>${total}</strong> produtos

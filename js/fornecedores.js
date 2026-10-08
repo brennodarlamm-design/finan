@@ -277,14 +277,14 @@ const Fornecedores = {
               <button type="button" id="btn-tipo-pj" data-fb-click="Fornecedores._onTipoChange" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="pj"
                 style="flex:1;padding:10px;font-size:.85rem;font-weight:700;border:none;cursor:pointer;
                   background:${isPF ? 'transparent' : 'var(--accent2)'};
-                  color:${isPF ? 'var(--text2)' : '#0f172a'};
+                  color:${isPF ? 'var(--text2)' : 'var(--accent-contrast, #0f172a)'};
                   transition:all .2s;">
                 🏢 Pessoa Jurídica (PJ)
               </button>
               <button type="button" id="btn-tipo-pf" data-fb-click="Fornecedores._onTipoChange" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="pf"
                 style="flex:1;padding:10px;font-size:.85rem;font-weight:700;border:none;cursor:pointer;
                   background:${isPF ? 'var(--accent2)' : 'transparent'};
-                  color:${isPF ? '#0f172a' : 'var(--text2)'};
+                  color:${isPF ? 'var(--accent-contrast, #0f172a)' : 'var(--text2)'};
                   transition:all .2s;">
                 👤 Pessoa Física (PF)
               </button>
@@ -466,8 +466,8 @@ const Fornecedores = {
 
     const btnPJ = document.getElementById('btn-tipo-pj');
     const btnPF = document.getElementById('btn-tipo-pf');
-    if (btnPJ) { btnPJ.style.background = isPF ? 'transparent' : 'var(--accent2)'; btnPJ.style.color = isPF ? 'var(--text2)' : '#0f172a'; }
-    if (btnPF) { btnPF.style.background = isPF ? 'var(--accent2)' : 'transparent'; btnPF.style.color = isPF ? '#0f172a' : 'var(--text2)'; }
+    if (btnPJ) { btnPJ.style.background = isPF ? 'transparent' : 'var(--accent2)'; btnPJ.style.color = isPF ? 'var(--text2)' : 'var(--accent-contrast, #0f172a)'; }
+    if (btnPF) { btnPF.style.background = isPF ? 'var(--accent2)' : 'transparent'; btnPF.style.color = isPF ? 'var(--accent-contrast, #0f172a)' : 'var(--text2)'; }
 
     const blPJ = document.getElementById('bloco-pj');
     const blPF = document.getElementById('bloco-pf');

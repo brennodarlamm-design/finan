@@ -903,5 +903,19 @@ console.log('=== Auditoria 04/10/2026 ===\n');
   console.log('  ✓ Varredura 07/10: fornecedor, lançamento, orçamento, documento, produto, medição, nota, preferências, checklist, empresa e anexos das fases gravados');
 }
 
+// Acessibilidade 08/10: tema claro com contraste WCAG (cinza e verde-limão do tema escuro vazavam).
+{
+  const premium = read('css/premium.css');
+  assert(!/^:root\s*\{\s*--text3:\s*#94A3B8/im.test(premium), 'premium.css não pode redefinir --text3 para o tema claro');
+  assert(premium.includes(':root:not([data-theme="light"]) { --text3: #94A3B8; }'));
+  const tokens = read('css/tokens.css');
+  assert(tokens.includes(':root:not([data-theme="light"]) .ui-workspace {'), '--accent verde-limão só no tema escuro');
+  const style = read('css/style.css');
+  assert(style.includes('--text3: #526158;') && style.includes('[data-theme="light"] { --accent-contrast: #FFFFFF; }'));
+  assert(style.includes('[style*=";color:#f59e0b" i]') && style.includes('img[src*="fingo-wordmark"]'), 'cores vivas fixas e marca legíveis no claro');
+  for (const f of ['premium.css', 'tokens.css', 'style.css']) assert.equal(read('css/' + f), read('frontend/css/' + f), 'frontend/css/' + f);
+  console.log('  ✓ Acessibilidade: tema claro sem cinza/verde-limão do escuro, cores vivas fixas escurecidas, marca visível');
+}
+
 await db.close();
 console.log('\n✅ Auditoria 04/10/2026: tudo certo.');

@@ -293,7 +293,7 @@ const OrcamentoSINAPI = {
           <button
             type="button"
             class="btn btn-sm"
-            style="font-weight:800;font-size:.82rem;background:linear-gradient(135deg, #0284c7 0%, #0369a1 100%);color:#fff;border:1.5px solid #0284c7;padding:6px 14px;border-radius:6px;display:inline-flex;align-items:center;gap:6px;cursor:pointer;box-shadow:0 2px 6px rgba(2,132,199,0.25);"
+            style="font-weight:800;font-size:.82rem;background:linear-gradient(135deg, #0369a1 0%, #075985 100%);color:#fff;border:1.5px solid #0369a1;padding:6px 14px;border-radius:6px;display:inline-flex;align-items:center;gap:6px;cursor:pointer;box-shadow:0 2px 6px rgba(2,132,199,0.25);"
             data-fb-click="OrcamentoSINAPI.abrirCatalogoSINAPI"
             data-fb-click-n="0"
             title="Consultar todo o catálogo oficial da Caixa com mais de 15.000 composições e insumos"
