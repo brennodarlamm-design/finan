@@ -40,6 +40,9 @@ export default defineConfig({
             req.url = routes[pathname] + (query ? "?" + query : "");
           else if (/^\/blog\/[a-z0-9-]+$/.test(pathname))
             req.url = mk("blog.html") + (query ? "?" + query : "");
+          // Rotas internas do app (/app/lancamentos, /app/medicoes...) abrem o shell do app.
+          else if (/^\/app\/[a-z0-9_-]+\/?$/i.test(pathname))
+            req.url = fe("app.html") + (query ? "?" + query : "");
           next();
         });
       },

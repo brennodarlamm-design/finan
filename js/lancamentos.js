@@ -756,7 +756,10 @@ const Lancamentos = {
     if (!l) return;
     const isRec = l.tipo === 'receita';
     const tit = DB.resumoTitulo(l);
-    const parcial = !!opts.parcialPadrao;
+    const candidatos = DB.candidatosVinculoBaixa(l.id);
+    // Quando já existem recebimentos lançados (extrato/PIX), vincular é o padrão: evita dinheiro em dobro.
+    const tipoPadrao = opts.parcialPadrao ? (candidatos.length ? 'vincular' : 'parcial') : 'completa';
+    const parcial = tipoPadrao === 'parcial';
     const contasOptionsHtml = (typeof Contas !== 'undefined' && Contas.contaOptions)
       ? Contas.contaOptions(l.conta_bancaria || '')
       : `<option value="">Selecione a conta...</option>`;
@@ -777,15 +780,29 @@ const Lancamentos = {
           <div class="form-group" style="margin-bottom:12px;">
             <label class="form-label" for="baixa-tipo">Tipo de baixa</label>
             <select id="baixa-tipo" class="form-control" data-fb-change="Lancamentos._onBaixaTipoChange" data-fb-change-n="1" data-fb-change-t0="value">
-              <option value="completa" ${parcial ? '' : 'selected'}>Completa — ${isRec ? 'recebeu' : 'pagou'} ${Utils.fmt.currency(tit.aberto)}</option>
-              <option value="parcial" ${parcial ? 'selected' : ''}>Parcial — ${isRec ? 'recebeu' : 'pagou'} só uma parte</option>
+              <option value="completa" ${tipoPadrao === 'completa' ? 'selected' : ''}>Completa — ${isRec ? 'recebeu' : 'pagou'} ${Utils.fmt.currency(tit.aberto)}</option>
+              <option value="parcial" ${tipoPadrao === 'parcial' ? 'selected' : ''}>Parcial — ${isRec ? 'recebeu' : 'pagou'} só uma parte</option>
+              ${candidatos.length ? `<option value="vincular" ${tipoPadrao === 'vincular' ? 'selected' : ''}>Vincular ${isRec ? 'recebimento' : 'pagamento'} já lançado (extrato, PIX...)</option>` : ''}
             </select>
           </div>
+          ${candidatos.length ? `<div class="form-group" id="baixa-vinculo-wrap" style="margin-bottom:12px;display:${tipoPadrao === 'vincular' ? 'block' : 'none'};">
+            <label class="form-label">Marque os ${isRec ? 'recebimentos' : 'pagamentos'} desta obra que quitam este título</label>
+            <div style="max-height:220px;overflow:auto;border:1px solid var(--border);border-radius:8px;padding:4px 8px;">
+              ${candidatos.map(c => `<label style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px dashed var(--border);font-size:.8rem;cursor:pointer;">
+                <input type="checkbox" class="baixa-vinculo-cb" value="${Utils.esc(c.id)}" data-valor="${Utils.esc(c.valor)}" data-fb-change="Lancamentos._onVinculoChange" data-fb-change-n="0">
+                <span style="flex:1;min-width:0;"><strong>${Utils.fmt.date(c.data_pagamento || c.data)}</strong> · ${Utils.escapeHtml(String(c.descricao || '').slice(0, 70))}</span>
+                <strong class="numeric tabular-nums" style="white-space:nowrap;">${Utils.fmt.currency(c.valor)}</strong>
+              </label>`).join('')}
+            </div>
+            <div id="baixa-vinculo-soma" data-aberto="${Utils.esc(tit.aberto)}" style="font-size:.76rem;color:var(--text3);margin-top:6px;">Selecionado: ${Utils.fmt.currency(0)} de ${Utils.fmt.currency(tit.aberto)} em aberto</div>
+            <div style="font-size:.72rem;color:var(--text3);margin-top:2px;">Os lançamentos marcados passam a ficar dentro deste título. Nenhum lançamento novo é criado.</div>
+          </div>` : ''}
           <div class="form-group" id="baixa-valor-wrap" style="margin-bottom:12px;display:${parcial ? 'block' : 'none'};">
             <label class="form-label" for="baixa-valor">Valor ${isRec ? 'recebido' : 'pago'} agora</label>
             <div class="input-prefix"><span class="input-pfx-txt">R$</span><input id="baixa-valor" type="number" step="0.01" min="0.01" max="${Utils.esc(tit.aberto)}" placeholder="0,00"></div>
             <div style="font-size:.72rem;color:var(--text3);margin-top:4px;">O restante continua em aberto neste mesmo lançamento.</div>
           </div>
+          <div id="baixa-campos-novos" style="display:${tipoPadrao === 'vincular' ? 'none' : 'block'};">
           <div class="form-group" style="margin-bottom:12px;">
             <label class="form-label">${isRec ? 'Conta Bancária de Entrada' : 'Conta Bancária de Saída'}</label>
             <select id="baixa-conta" class="form-control" data-fb-change="Lancamentos._onBaixaContaChange" data-fb-change-n="1" data-fb-change-t0="value">
@@ -800,6 +817,7 @@ const Lancamentos = {
           <div class="form-group">
             <label class="form-label" for="baixa-obs">Observação</label>
             <input type="text" id="baixa-obs" class="form-control" maxlength="200" placeholder="Ex.: Pix, transferência, dinheiro">
+          </div>
           </div>
         </div>
         <div class="modal-footer">
@@ -816,7 +834,21 @@ const Lancamentos = {
   _onBaixaTipoChange(val) {
     const w = document.getElementById('baixa-valor-wrap');
     if (w) w.style.display = val === 'parcial' ? 'block' : 'none';
+    const v = document.getElementById('baixa-vinculo-wrap');
+    if (v) v.style.display = val === 'vincular' ? 'block' : 'none';
+    const novos = document.getElementById('baixa-campos-novos');
+    if (novos) novos.style.display = val === 'vincular' ? 'none' : 'block';
     if (val === 'parcial') document.getElementById('baixa-valor')?.focus();
+  },
+
+  _onVinculoChange() {
+    const marcados = Array.from(document.querySelectorAll('.baixa-vinculo-cb:checked'));
+    const soma = marcados.reduce((s, cb) => s + (Number(cb.getAttribute('data-valor')) || 0), 0);
+    const el = document.getElementById('baixa-vinculo-soma');
+    if (!el) return;
+    const aberto = Number(el.getAttribute('data-aberto')) || 0;
+    el.textContent = `Selecionado: ${Utils.fmt.currency(soma)} de ${Utils.fmt.currency(aberto)} em aberto`;
+    el.style.color = soma - aberto > 0.009 ? 'var(--danger)' : 'var(--text3)';
   },
 
   // Nome próprio: havia dois "_onContaChange" no objeto e este (do modal de baixa)
@@ -839,7 +871,18 @@ const Lancamentos = {
     }
 
     const dataBaixa = document.getElementById('baixa-data')?.value || Utils.today();
-    const parcial = document.getElementById('baixa-tipo')?.value === 'parcial';
+    const tipoBaixa = document.getElementById('baixa-tipo')?.value;
+    if (tipoBaixa === 'vincular') {
+      const ids = Array.from(document.querySelectorAll('.baixa-vinculo-cb:checked')).map(cb => cb.value);
+      const rv = DB.vincularBaixas(id, ids);
+      if (!rv.ok) { Utils.toast(rv.erro, 'warning'); return; }
+      this._aposBaixa(l);
+      Utils.toast(rv.parcial
+        ? `${rv.vinculados} lançamento(s) vinculado(s). Ainda falta ${l.tipo === 'receita' ? 'receber' : 'pagar'} ${Utils.fmt.currency(rv.aberto)}.`
+        : `${rv.vinculados} lançamento(s) vinculado(s). Título quitado!`, 'success');
+      return;
+    }
+    const parcial = tipoBaixa === 'parcial';
     const valorParcial = parseFloat(document.getElementById('baixa-valor')?.value);
     if (parcial && !(valorParcial > 0)) { Utils.toast('Informe o valor pago nesta baixa parcial.', 'warning'); return; }
 
@@ -853,16 +896,22 @@ const Lancamentos = {
     });
     if (!r.ok) { Utils.toast(r.erro, 'warning'); return; }
 
-    if (l.medicao_id && typeof Medicoes !== 'undefined') {
-      Medicoes._sincronizarFinanceiro(l.medicao_id);
-      Medicoes._refresh();
-    }
-    Utils.closeModal();
+    this._aposBaixa(l, false);
     const isRec = l.tipo === 'receita';
     Utils.toast(r.parcial
       ? `Baixa parcial registrada. Ainda falta ${isRec ? 'receber' : 'pagar'} ${Utils.fmt.currency(r.aberto)}.`
       : (isRec ? 'Receita marcada como Recebida!' : 'Despesa baixada como Paga!'), 'success');
     this._refresh();
+  },
+
+  /** Depois de uma baixa: medição vinculada acompanha, modal fecha e as listas atualizam. */
+  _aposBaixa(l, refresh = true) {
+    if (l.medicao_id && typeof Medicoes !== 'undefined') {
+      Medicoes._sincronizarFinanceiro(l.medicao_id);
+      Medicoes._refresh();
+    }
+    Utils.closeModal();
+    if (refresh) this._refresh();
   },
 
   /** Pagamentos parciais de um título ficam agrupados sob ele (um título só na lista). */
@@ -875,11 +924,11 @@ const Lancamentos = {
     const isRec = l.tipo === 'receita';
     const itens = tit.baixas.map(b => `
       <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;padding:5px 0;border-bottom:1px dashed var(--border);">
-        <span>✓ ${Utils.fmt.date(b.data_pagamento || b.data)}${b.conta_bancaria ? ` · 🏦 ${Utils.escapeHtml(b.conta_bancaria)}` : ''}${b.observacoes ? ` · <span style="color:var(--text3)">${Utils.escapeHtml(b.observacoes)}</span>` : ''}${b.conciliado ? ' · ✅ conciliado' : ''}</span>
+        <span>✓ ${Utils.fmt.date(b.data_pagamento || b.data)}${b.baixa_vinculada ? ` · ${Utils.escapeHtml(String(b.descricao || '').slice(0, 60))}` : ''}${b.conta_bancaria ? ` · 🏦 ${Utils.escapeHtml(b.conta_bancaria)}` : ''}${b.observacoes ? ` · <span style="color:var(--text3)">${Utils.escapeHtml(b.observacoes)}</span>` : ''}${b.conciliado ? ' · ✅ conciliado' : ''}</span>
         <span style="display:flex;align-items:center;gap:8px;">
           <strong class="numeric tabular-nums" style="color:${isRec ? 'var(--success)' : 'var(--danger)'}">${Utils.fmt.currency(b.valor)}</strong>
           <button class="icon-btn" data-fb-click="Lancamentos.emitirRecibo" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(b.id))}" title="Recibo deste pagamento" style="font-size:12px;">&#x1F9FE;</button>
-          ${b.conciliado ? '' : `<button class="icon-btn" data-fb-click="Lancamentos.desfazerBaixa" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(b.id))}" title="Desfazer este pagamento" style="font-size:12px;color:var(--danger);">↩</button>`}
+          ${b.conciliado && !b.baixa_vinculada ? '' : `<button class="icon-btn" data-fb-click="Lancamentos.desfazerBaixa" data-fb-click-n="1" data-fb-click-t0="string" data-fb-click-v0="${encodeURIComponent(String(b.id))}" title="Desfazer este pagamento" style="font-size:12px;color:var(--danger);">↩</button>`}
         </span>
       </div>`).join('');
     return `<tr data-baixas-de="${Utils.esc(l.id)}" style="display:none;background:var(--bg-secondary);">
@@ -903,13 +952,18 @@ const Lancamentos = {
   desfazerBaixa(baixaId) {
     const b = DB.getById('lancamentos', baixaId);
     if (!b) return;
-    Utils.confirm(`Desfazer o pagamento de ${Utils.fmt.currency(b.valor)} de ${Utils.fmt.date(b.data_pagamento || b.data)}?<br><small>O valor volta a ficar em aberto no lançamento.</small>`, () => {
+    const aviso = b.baixa_vinculada
+      ? 'O lançamento continua no financeiro, só deixa de quitar este título.'
+      : 'O pagamento é excluído e o valor volta a ficar em aberto no lançamento.';
+    Utils.confirm(`Desfazer o pagamento de ${Utils.fmt.currency(b.valor)} de ${Utils.fmt.date(b.data_pagamento || b.data)}?<br><small>${aviso}</small>`, () => {
       const r = DB.desfazerBaixa(baixaId);
       if (!r.ok) { Utils.toast(r.erro, 'warning'); return; }
       const medId = r.titulo?.medicao_id;
       if (medId && typeof Medicoes !== 'undefined') { Medicoes._sincronizarFinanceiro(medId); Medicoes._refresh(); }
       this._refresh();
-      Utils.toast('Pagamento desfeito. O valor voltou para "em aberto".', 'info');
+      Utils.toast(r.desvinculado
+        ? 'Lançamento desvinculado (continua no financeiro). O valor voltou para "em aberto" no título.'
+        : 'Pagamento desfeito. O valor voltou para "em aberto".', 'info');
     }, { allowHtml: true });
   },
 
