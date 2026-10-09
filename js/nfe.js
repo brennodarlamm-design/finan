@@ -1,4 +1,4 @@
-// js/nfe.js — Motor de Busca NF-e via API MeuDanfe
+// js/nfe.js — NF-e: busca gratuita na SEFAZ (certificado A1 + Monitor DF-e), DANFE local e importação de XML
 // Documentação: https://meudanfe.com.br/documentacao.php
 // API Base: https://api.meudanfe.com.br/v2
 
@@ -94,21 +94,6 @@ const NFe = {
   },
 
   // ─── API calls via Servidor Seguro (/api/nfe) ──────────────────────────────
-  async buscarPorChave(chaveRaw) {
-    const chave = this._limparChave(chaveRaw);
-    if (!this._validarChave(chave)) throw new Error('Chave de acesso inválida (deve ter 44 dígitos).');
-    const res = await this._fetchWithTimeout(`${this._API_BASE}?action=buscar&chave=${chave}`, {
-      method: 'POST',
-      headers: this._headers()
-    });
-    if (!res.ok) {
-      if (res.status === 402) throw new Error('Saldo insuficiente na conta MeuDanfe.');
-      if (res.status === 401) throw new Error('Acesso não autorizado para consulta de NF-e.');
-      if (res.status === 400) throw new Error('Chave de acesso inválida.');
-      throw new Error(`Erro ${res.status}`);
-    }
-    return await res.json();
-  },
 
   async consultarStatus(chave) {
     chave = this._limparChave(chave);
@@ -244,33 +229,6 @@ const NFe = {
   },
 
   // ─── Polling ────────────────────────────────────────────────────────────────
-  async buscarComPolling(chave, onUpdate, maxTentativas = 15, intervaloMs = 2000) {
-    chave = this._limparChave(chave);
-    let tentativa = 0;
-
-    const poll = async () => {
-      tentativa++;
-      const data = await this.consultarStatus(chave);
-      if (onUpdate) onUpdate(data, tentativa);
-      if (!data) return null;
-      if (['OK', 'NOT_FOUND', 'ERROR'].includes(data.status)) {
-        if (data.status === 'OK') this._addToCache({ chave, status: 'OK', response: data });
-        return data;
-      }
-      if (tentativa >= maxTentativas) return data;
-      await new Promise(r => setTimeout(r, intervaloMs));
-      return poll();
-    };
-
-    const inicial = await this.buscarPorChave(chave);
-    if (onUpdate) onUpdate(inicial, 0);
-    if (['OK', 'NOT_FOUND', 'ERROR'].includes(inicial.status)) {
-      if (inicial.status === 'OK') this._addToCache({ chave, status: 'OK', response: inicial });
-      return inicial;
-    }
-    await new Promise(r => setTimeout(r, 1000));
-    return poll();
-  },
 
   // ─── Render principal ────────────────────────────────────────────────────────
   render() {
@@ -279,7 +237,7 @@ const NFe = {
       <div class="page-header" style="margin-bottom:20px;">
         <div>
           <h1 class="page-title">🔎 Busca NF-e</h1>
-          <p class="page-sub">Consulte, visualize e baixe Notas Fiscais Eletrônicas via API MeuDanfe</p>
+          <p class="page-sub">Consulte, visualize e baixe Notas Fiscais Eletrônicas direto da SEFAZ, sem custo</p>
         </div>
       </div>
 
@@ -290,8 +248,8 @@ const NFe = {
         <div class="card-body" style="padding-top:12px;">
           <div style="background:rgba(201,162,39,.06);border:1px solid rgba(201,162,39,.18);border-radius:var(--r-md);padding:12px 16px;margin-bottom:16px;font-size:.8rem;color:var(--text2);">
             <strong style="color:var(--accent);">ℹ️ Como funciona:</strong>
-            Informe a chave de acesso (44 dígitos) da NF-e. A API MeuDanfe consultará a Receita Federal.
-            Cada consulta nova custa <strong style="color:var(--accent);">R$ 0,03</strong>. NFs já consultadas são <strong style="color:var(--success);">GRATUITAS</strong>.
+            Informe a chave de acesso (44 dígitos) de uma NF-e emitida <strong>para a sua empresa</strong>. O FinGo consulta direto na SEFAZ com o seu certificado A1,
+            <strong style="color:var(--success);">sem custo por nota</strong>. Notas de outros CNPJs não são entregues pela SEFAZ: para elas use a aba <strong>Importar XML</strong>.
           </div>
           <div style="display:flex;gap:10px;align-items:flex-start;flex-wrap:wrap;">
             <div style="flex:1;min-width:240px;">
@@ -1013,6 +971,35 @@ const NFe = {
   },
 
   // ─── Iniciar busca com polling ────────────────────────────────────────────
+  // Busca gratuita pela chave: primeiro o que o Monitor DF-e já baixou; se não houver (ou só o
+  // resumo), a SEFAZ pela chave com o certificado A1 da empresa (ciência + consChNFe). Antes ia
+  // para o MeuDanfe, que cobra por nota consultada ("Saldo insuficiente na conta MeuDanfe").
+  async _consultarGratuita(chave) {
+    const ehCompleto = (xml) => /<infNFe[\s>]/.test(String(xml || ''));
+    let resumo = null;
+    try {
+      const r = await this._fetchWithTimeout(`${this._API_BASE}?action=dfe_xml&chave=${chave}`, { method: 'GET', headers: this._headers() });
+      if (r.ok) {
+        const j = await r.json();
+        const xml = j?.documento?.xml ? String(j.documento.xml) : '';
+        if (ehCompleto(xml)) return { status: 'OK', xml, completo: true, origem: 'monitor' };
+        if (xml) resumo = xml;
+      }
+    } catch {}
+    const r = await this._fetchWithTimeout(`${this._API_BASE}?action=dfe_xml_completo&chave=${chave}`, {
+      method: 'POST', headers: this._headers(), body: JSON.stringify({ chave })
+    }, 45000);
+    const j = await r.json().catch(() => ({}));
+    if (r.status === 403) throw new Error(j.error || 'Sem permissão para consultar NF-e na SEFAZ.');
+    if (j.success && j.xml) {
+      if (j.completo && ehCompleto(j.xml)) return { status: 'OK', xml: j.xml, completo: true, origem: 'sefaz' };
+      return { status: 'OK', xml: j.xml, completo: false, aviso: j.mensagem };
+    }
+    if (resumo) return { status: 'OK', xml: resumo, completo: false, aviso: j.mensagem || j.error };
+    if (/certificado/i.test(String(j.error || ''))) throw new Error('Cadastre o certificado A1 da empresa (aba Importar XML / Certificado) para consultar notas na SEFAZ sem custo.');
+    return { status: 'NOT_FOUND', aviso: j.error };
+  },
+
   async iniciarBusca() {
     const input = document.getElementById('nfe-chave-input');
     const resultDiv = document.getElementById('nfe-resultado');
@@ -1028,9 +1015,8 @@ const NFe = {
       return;
     }
 
-    // Cache hit
     const cached = this._getFromCache(chave);
-    if (cached && cached.status === 'OK') {
+    if (cached && cached.status === 'OK' && cached.response?.completo) {
       resultDiv.innerHTML = this._renderResultOK(chave, cached.response, true);
       return;
     }
@@ -1038,44 +1024,34 @@ const NFe = {
     btn.disabled = true;
     btn.textContent = '⏳ Consultando...';
     resultDiv.innerHTML = `
-      <div id="nfe-status-box" style="padding:16px;background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--r-md);">
+      <div style="padding:16px;background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--r-md);">
         <div style="display:flex;align-items:center;gap:12px;">
           <div style="width:20px;height:20px;border:2px solid rgba(255,255,255,.15);border-top-color:var(--accent);border-radius:50%;animation:spin .7s linear infinite;flex-shrink:0;"></div>
           <div>
-            <div style="font-weight:700;color:var(--text);">Consultando a Receita Federal...</div>
-            <div id="nfe-status-msg" style="font-size:.8rem;color:var(--text3);margin-top:2px;">Iniciando busca...</div>
+            <div style="font-weight:700;color:var(--text);">Consultando a SEFAZ...</div>
+            <div style="font-size:.8rem;color:var(--text3);margin-top:2px;">Registrando a ciência e buscando a nota pela chave (sem custo)</div>
           </div>
         </div>
       </div>`;
 
     try {
-      const resultado = await this.buscarComPolling(
-        chave,
-        (data, tentativa) => {
-          const msg = document.getElementById('nfe-status-msg');
-          if (msg && data) {
-            const st = this._statusLabel(data.status);
-            msg.textContent = `${st.icon} ${st.label} — tentativa ${tentativa}`;
-          }
-        },
-        20, 2000
-      );
-
-      if (!resultado) throw new Error('Sem resposta da API.');
-
+      const resultado = await this._consultarGratuita(chave);
       if (resultado.status === 'OK') {
-        resultDiv.innerHTML = this._renderResultOK(chave, resultado, false);
-      } else if (resultado.status === 'NOT_FOUND') {
-        resultDiv.innerHTML = `
-          <div style="padding:16px;background:rgba(239,68,68,.07);border:1px solid rgba(239,68,68,.25);border-radius:var(--r-md);">
-            <div style="font-weight:700;color:var(--danger);margin-bottom:4px;">❌ NF-e não encontrada</div>
-            <div style="font-size:.82rem;color:var(--text2);">A chave informada não foi localizada na Receita Federal. Verifique se está correta.</div>
-          </div>`;
+        const nota = this._parseXmlCompleto(resultado.xml) || {};
+        const resumoTxt = [nota.emitente, nota.valor_bruto ? Utils.fmt.currency(nota.valor_bruto) : '', nota.data_emissao ? Utils.fmt.date(nota.data_emissao) : '']
+          .filter(Boolean).join(' · ');
+        const resposta = {
+          status: 'OK',
+          completo: resultado.completo,
+          statusMessage: [resumoTxt, resultado.completo ? '' : (resultado.aviso || 'A SEFAZ entregou só o resumo; o XML completo chega pela próxima sincronização do Monitor DF-e.')].filter(Boolean).join(' — ')
+        };
+        if (resultado.completo) this._addToCache({ chave, status: 'OK', response: resposta });
+        resultDiv.innerHTML = this._renderResultOK(chave, resposta, false);
       } else {
         resultDiv.innerHTML = `
           <div style="padding:16px;background:rgba(239,68,68,.07);border:1px solid rgba(239,68,68,.25);border-radius:var(--r-md);">
-            <div style="font-weight:700;color:var(--danger);margin-bottom:4px;">⚠️ Status: ${Utils.escapeHtml(resultado.status || '—')}</div>
-            <div style="font-size:.82rem;color:var(--text2);">${Utils.escapeHtml(resultado.statusMessage || 'Tente novamente em instantes.')}</div>
+            <div style="font-weight:700;color:var(--danger);margin-bottom:4px;">❌ NF-e não entregue pela SEFAZ</div>
+            <div style="font-size:.82rem;color:var(--text2);">${Utils.escapeHtml(resultado.aviso || 'A SEFAZ só entrega notas emitidas para o CNPJ da sua empresa.')} Confira a chave; se a nota for de outro CNPJ, importe o XML na aba <strong>Importar XML</strong>.</div>
           </div>`;
       }
     } catch (err) {

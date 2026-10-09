@@ -755,6 +755,21 @@ console.log('=== Auditoria 04/10/2026 ===\n');
   assert.equal(syncDepois.status_sefaz, 'bloqueado_sefaz');
   const minutos = (new Date(syncDepois.proxima_consulta_permitida) - Date.now()) / 60000;
   assert(minutos > 59 && minutos <= 61.5, `656 da consulta pela chave registra 61 min de espera (${minutos})`);
+  // Busca NF-e pela chave sem MeuDanfe (09/10): nota ainda desconhecida recebe a ciência ANTES da
+  // consulta pela chave, e a SEFAZ já devolve o XML completo numa única consulta.
+  await psql`UPDATE tenant_dfe_sync SET proxima_consulta_permitida = NULL, status_sefaz = 'sincronizado'`;
+  const chaveNova = '4'.repeat(44);
+  const ordem = [];
+  const completoNovo = completoXml.split(chave).join(chaveNova);
+  const rNova = await dfe.obterXmlCompletoNFe(psql, 't1', chaveNova, { cert: {}, semEspera: true,
+    enviar: async ({ chave: c }) => { ordem.push('ciencia:' + c.slice(0, 2)); return { ok: true, cStat: '135' }; },
+    consultar: async () => { ordem.push('consulta'); return { cStat: '138', docZipList: [zip(completoNovo, 'procNFe_v4.00.xsd', '0')] }; } });
+  assert.deepEqual(ordem, ['ciencia:44', 'consulta'], 'ciência antes da consulta pela chave');
+  assert.equal(rNova.completo, true);
+  assert.equal((await psql`SELECT manifesto_status FROM tenant_dfe_documentos WHERE chave = ${chaveNova}`)[0].manifesto_status, 'ciencia');
+  const nfeTela = read('js/nfe.js');
+  assert(!nfeTela.includes('action=buscar') && !nfeTela.includes('R$ 0,03') && nfeTela.includes('async _consultarGratuita(chave)'), 'busca por chave sem MeuDanfe pago');
+  assert.equal(nfeTela, read('frontend/domains/fiscal/nfe.js'));
   // NSUs pulados (09/10): outro sistema com o mesmo certificado consumia a distribuição; o 656 trazia o
   // último NSU dele e o FinGo gravava, perdendo as notas do intervalo. Agora vão para a fila e são
   // buscados um a um (consNSU).

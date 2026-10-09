@@ -67,7 +67,7 @@ test('Interface mostra estado Requer atenção', /attention: \['⚠'/i.test(app)
 test('Coalescência preserva última versão offline', /Coalesce saves/i.test(data) && /updatedAt:new Date\(\)\.toISOString\(\), payload/i.test(data));
 
 // XSS residual em fontes externas
-test('Erros/status de NF-e são escapados', /escapeHtml\(resultado\.status/i.test(nfe) && /escapeHtml\(err\?\.message/i.test(nfe));
+test('Erros/status de NF-e são escapados', /escapeHtml\(resultado\.aviso/i.test(nfe) && /escapeHtml\(err\?\.message/i.test(nfe));
 test('Parser de NF-e escapa arquivo e status externo', /escapeHtml\(item\.arquivo/i.test(parser) && /escapeHtml\(item\.statusMessage/i.test(parser));
 test('OFX escapa instituição e conta do arquivo', /escapeHtml\(data\.org/i.test(ofx) && /escapeHtml\(data\.acctId/i.test(ofx));
 test('OFX escapa memo e descrição antes do innerHTML', /e\(trn\.memo\.slice/i.test(ofx) && /title="\$\{e\(t\.memo\)\}"/i.test(ofx));

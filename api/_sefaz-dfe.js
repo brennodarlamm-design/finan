@@ -902,8 +902,14 @@ export async function obterXmlCompletoNFe(sql, tenantId, chave, deps = {}) {
   if (completo(linha)) return { success: true, completo: true, xml: linha.xml_completo };
 
   const cert = deps.cert || await carregarCertificadoTenant(sql, tenantId);
-  if (linha && COALESCE_STATUS(linha.manifesto_status) !== 'ciencia') {
-    await darCienciaParaChave(sql, tenantId, ch, cert, deps.enviar || enviarCienciaOperacao);
+  // Ciência antes da consulta (serviço de eventos, gratuito e fora do limite de consumo): com ela a
+  // SEFAZ já devolve o XML completo na mesma consulta. Vale também para a nota ainda desconhecida
+  // (busca pela chave na tela "Busca NF-e"), que antes ia para o MeuDanfe, pago por consulta.
+  let cienciaAgora = false;
+  if (!linha || COALESCE_STATUS(linha.manifesto_status) !== 'ciencia') {
+    const r = await darCienciaParaChave(sql, tenantId, ch, cert, deps.enviar || enviarCienciaOperacao);
+    cienciaAgora = Boolean(r?.ok);
+    if (cienciaAgora && !deps.semEspera) await new Promise(res => setTimeout(res, 3000));
   }
   // A consulta pela chave é o mesmo serviço da distribuição (NFeDistribuicaoDFe): durante o bloqueio
   // de 1 hora por consumo indevido, cada chamada faz a SEFAZ reiniciar a contagem. Antes esta
@@ -934,11 +940,12 @@ export async function obterXmlCompletoNFe(sql, tenantId, chave, deps = {}) {
       const parsed = decompressAndParseDocZip(item);
       if (parsed.sucesso && parsed.chave) await upsertDfeDocumento(sql, tenantId, parsed);
     }
+    if (cienciaAgora) await sql`UPDATE tenant_dfe_documentos SET manifesto_status = 'ciencia', updated_at = NOW() WHERE tenant_id = ${tenantId} AND chave = ${ch};`;
     linha = await lerLinha();
     if (completo(linha)) return { success: true, completo: true, xml: linha.xml_completo };
   }
   if (linha?.xml_completo) {
-    return { success: true, completo: false, pendente: true, xml: linha.xml_completo, cStat: resp.cStat, mensagem: 'A SEFAZ ainda não liberou o XML completo desta NF-e. Tente de novo em alguns minutos.' };
+    return { success: true, completo: false, pendente: true, xml: linha.xml_completo, cStat: resp.cStat, mensagem: 'Ciência registrada. A SEFAZ ainda não liberou o XML completo desta NF-e: ele chega pela próxima sincronização do Monitor DF-e.' };
   }
   return { success: false, cStat: resp.cStat, error: resp.cStat === '137' ? 'NF-e não encontrada na SEFAZ para o CNPJ desta empresa.' : (resp.xMotivo || 'A SEFAZ não devolveu esta NF-e.') };
 }
