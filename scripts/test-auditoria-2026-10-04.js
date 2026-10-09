@@ -755,6 +755,28 @@ console.log('=== Auditoria 04/10/2026 ===\n');
   assert.equal(syncDepois.status_sefaz, 'bloqueado_sefaz');
   const minutos = (new Date(syncDepois.proxima_consulta_permitida) - Date.now()) / 60000;
   assert(minutos > 59 && minutos <= 61.5, `656 da consulta pela chave registra 61 min de espera (${minutos})`);
+  // NSUs pulados (09/10): outro sistema com o mesmo certificado consumia a distribuição; o 656 trazia o
+  // último NSU dele e o FinGo gravava, perdendo as notas do intervalo. Agora vão para a fila e são
+  // buscados um a um (consNSU).
+  assert.deepEqual(dfe.intervaloNsu('000000000000046', '000000000000049'), ['000000000000047', '000000000000048', '000000000000049']);
+  assert.equal(dfe.intervaloNsu('000000000000050', '000000000000050').length, 0);
+  await pg.exec(read('migrations/047_dfe_nsu_lacunas.sql'));
+  await psql`UPDATE tenant_dfe_sync SET nsu_lacunas = ARRAY['000000000000047','000000000000048','000000000000049'], proxima_consulta_permitida = NULL`;
+  const chaveLacuna = '3'.repeat(44);
+  const resumoLacuna = resumo.replace(chave, chaveLacuna);
+  const pedidos = [];
+  const consultarNsu = async ({ nsu }) => { pedidos.push(nsu);
+    if (nsu === '000000000000047') return { cStat: '138', docZipList: [zip(resumoLacuna, 'resNFe_v1.01.xsd', '47')] };
+    if (nsu === '000000000000048') return { cStat: '137' };
+    return { cStat: '656', xMotivo: 'Consumo Indevido' }; };
+  const rec = await dfe.recuperarLacunasNsu(psql, 't1', { cert: {}, consultar: consultarNsu });
+  assert.deepEqual(pedidos, ['000000000000047', '000000000000048', '000000000000049']);
+  assert.equal(rec.recuperados, 1); assert.equal(rec.bloqueado, true);
+  assert.equal((await psql`SELECT count(*)::int AS n FROM tenant_dfe_documentos WHERE chave = ${chaveLacuna}`)[0].n, 1, 'nota do NSU pulado recuperada');
+  assert.deepEqual((await psql`SELECT nsu_lacunas FROM tenant_dfe_sync WHERE tenant_id = 't1'`)[0].nsu_lacunas, ['000000000000049'], '137 e 138 saem da fila; o que bateu no 656 fica');
+  const src = read('api/_sefaz-dfe.js');
+  assert(src.includes('if (nsuNum(novoUltNsu) > nsuNum(ultNsu)) await registrarLacunasNsu(sql, tenantId, intervaloNsu(ultNsu, novoUltNsu));'), '656 não perde o intervalo');
+  assert.equal(read('api/_sefaz-dfe.js'), read('backend/domains/fiscal/_sefaz-dfe.js'));
   await pg.close();
 
   const nfeSrv = read('api/nfe.js');

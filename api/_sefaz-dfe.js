@@ -38,6 +38,79 @@ function buildSoapNFeDist(cnpj, codUf, ultNsu) {
 </soap12:Envelope>`;
 }
 
+/** Envelope de consulta de um NSU específico (consNSU) — recupera um documento já distribuído. */
+function buildSoapNFeConsNSU(cnpj, codUf, nsu) {
+  const n = String(nsu || '0').replace(/\D/g, '').padStart(15, '0');
+  return `<?xml version="1.0" encoding="utf-8"?><soap12:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:soap12="http://www.w3.org/2003/05/soap-envelope"><soap12:Body><nfeDistDFeInteresse xmlns="http://www.portalfiscal.inf.br/nfe/wsdl/NFeDistribuicaoDFe"><nfeDadosMsg><distDFeInt xmlns="http://www.portalfiscal.inf.br/nfe" versao="1.01"><tpAmb>1</tpAmb><cUFAutor>${codUf || '91'}</cUFAutor><CNPJ>${cnpj}</CNPJ><consNSU><NSU>${n}</NSU></consNSU></distDFeInt></nfeDadosMsg></nfeDistDFeInteresse></soap12:Body></soap12:Envelope>`;
+}
+
+export async function consultarNFePorNSU({ pfxBuffer, passphrase, cnpj, codUf, nsu }) {
+  const resp = await callSefazHttps({
+    pfxBuffer,
+    passphrase,
+    hostname: 'www1.nfe.fazenda.gov.br',
+    path: '/NFeDistribuicaoDFe/NFeDistribuicaoDFe.asmx',
+    actionHeader: 'http://www.portalfiscal.inf.br/nfe/wsdl/NFeDistribuicaoDFe/nfeDistDFeInteresse',
+    soapBody: buildSoapNFeConsNSU(cnpj, codUf, nsu)
+  });
+  return parseSefazDistResponse(resp.body);
+}
+
+const nsuNum = (v) => { try { return BigInt(String(v || '0').replace(/\D/g, '') || '0'); } catch { return 0n; } };
+const nsuStr = (n) => String(n).padStart(15, '0');
+
+/** NSUs de (de, ate] — o intervalo que a SEFAZ pulou sem entregar ao FinGo. No máximo 50. */
+export function intervaloNsu(de, ate, limite = 50) {
+  const out = [];
+  for (let n = nsuNum(de) + 1n; n <= nsuNum(ate) && out.length < limite; n++) out.push(nsuStr(n));
+  return out;
+}
+
+/** Acrescenta NSUs pulados à fila de recuperação (ignora se a coluna da migração 047 não existir). */
+async function registrarLacunasNsu(sql, tenantId, nsus) {
+  if (!nsus.length) return;
+  try {
+    await sql`
+      UPDATE tenant_dfe_sync
+      SET nsu_lacunas = (SELECT ARRAY(SELECT DISTINCT x FROM unnest(nsu_lacunas || ${nsus}::text[]) AS x ORDER BY x LIMIT 200))
+      WHERE tenant_id = ${tenantId};
+    `;
+  } catch (err) {
+    console.warn('[DF-e] Fila de NSUs pulados indisponível (migração 047?):', err.message);
+  }
+}
+
+/**
+ * Busca, um a um, os NSUs que a SEFAZ entregou a outro sistema ou que foram pulados (consNSU).
+ * Para no primeiro 656 (registra a espera). Devolve { recuperados, bloqueado }.
+ */
+export async function recuperarLacunasNsu(sql, tenantId, { pfxBuffer, passphrase, cnpj, codUf, limite = 5, consultar = consultarNFePorNSU } = {}) {
+  let fila = [];
+  try {
+    fila = (await sql`SELECT nsu_lacunas FROM tenant_dfe_sync WHERE tenant_id = ${tenantId} LIMIT 1;`)[0]?.nsu_lacunas || [];
+  } catch { return { recuperados: 0, bloqueado: false }; }
+  let recuperados = 0;
+  for (const nsu of fila.slice(0, limite)) {
+    const r = await consultar({ pfxBuffer, passphrase, cnpj, codUf, nsu });
+    if (r.cStat === '656') {
+      await registrarBloqueioDfe(sql, tenantId, r.xMotivo);
+      return { recuperados, bloqueado: true };
+    }
+    if (r.cStat === '138') {
+      for (const item of r.docZipList || []) {
+        const parsed = decompressAndParseDocZip(item);
+        if (parsed.sucesso && parsed.chave) { await upsertDfeDocumento(sql, tenantId, parsed); recuperados++; }
+      }
+    } else if (r.cStat !== '137') {
+      break; // resposta inesperada: tenta de novo na próxima sincronização
+    }
+    // 138 (recuperado) ou 137 (NSU sem documento para este CNPJ): sai da fila.
+    await sql`UPDATE tenant_dfe_sync SET nsu_lacunas = array_remove(nsu_lacunas, ${nsu}) WHERE tenant_id = ${tenantId};`;
+    await new Promise(res => setTimeout(res, 1500));
+  }
+  return { recuperados, bloqueado: false };
+}
+
 /**
  * Monta o Envelope SOAP 1.2 para CTeDistribuicaoDFe
  */
@@ -583,9 +656,31 @@ export async function syncTenantDFe(sql, tenantId, options = {}) {
   }
   if (!codUf) codUf = '14'; // sem UF cadastrada: mantém o padrão anterior (RR)
   let ultNsu = sync.ultimo_nsu || '000000000000000';
+  // Estado deixado pelo tratamento antigo do 656 (gravava o NSU pulado sem buscar os documentos):
+  // o intervalo entre o maxNSU já sincronizado e o último NSU vai para a fila de recuperação.
+  if (nsuNum(sync.max_nsu) > 0n && nsuNum(ultNsu) > nsuNum(sync.max_nsu)) {
+    await registrarLacunasNsu(sql, tenantId, intervaloNsu(sync.max_nsu, ultNsu));
+    await sql`UPDATE tenant_dfe_sync SET max_nsu = ${ultNsu} WHERE tenant_id = ${tenantId};`;
+  }
   let totalProcessados = 0;
   let lastCStat = null;
   let lastMotivo = null;
+
+  // NSUs pulados (entregues a outro sistema ou perdidos num 656): busca até 5 por rodada, antes da
+  // consulta normal — depois de um 137 a SEFAZ espera 1 hora sem nenhuma consulta.
+  let recuperadas = 0;
+  try {
+    const rec = await recuperarLacunasNsu(sql, tenantId, { pfxBuffer, passphrase, cnpj, codUf, limite: 5 });
+    recuperadas = rec.recuperados;
+    totalProcessados += recuperadas;
+    if (rec.bloqueado) {
+      return { success: true, cStat: '656', rateLimited: true, recuperadas, novosDocumentos: totalProcessados,
+        message: 'A SEFAZ pediu 1 hora de espera durante a busca dos documentos pulados.',
+        proximaConsulta: new Date(Date.now() + 61 * 60000).toISOString() };
+    }
+  } catch (errRec) {
+    console.warn('[DF-e] Recuperação de NSUs pulados não concluída:', errRec.message);
+  }
 
   // 4. Executa consulta para NF-e (máximo 5 iterações contínuas para não esgotar timeout serverless)
   const maxLotes = options.maxBatches || 5;
@@ -627,7 +722,11 @@ export async function syncTenantDFe(sql, tenantId, options = {}) {
     // Caso A: Consumo Indevido (656) — SEFAZ impõe cooldown de 1 hora
     if (lastCStat === '656') {
       console.warn(`[DF-e] SEFAZ 656 Consumo Indevido para ${cnpj}: ${lastMotivo}`);
+      // No 656 a SEFAZ informa o último NSU que ela já distribuiu (a outro sistema com o mesmo
+      // certificado, por exemplo). As consultas seguintes têm de partir dele, mas os documentos do
+      // intervalo não vieram para o FinGo: vão para a fila e são buscados um a um (consNSU) depois.
       const novoUltNsu = sefazResult.ultNSU || ultNsu;
+      if (nsuNum(novoUltNsu) > nsuNum(ultNsu)) await registrarLacunasNsu(sql, tenantId, intervaloNsu(ultNsu, novoUltNsu));
       await sql`
         UPDATE tenant_dfe_sync
         SET ultimo_nsu = ${novoUltNsu},
@@ -745,6 +844,7 @@ export async function syncTenantDFe(sql, tenantId, options = {}) {
     cStat: lastCStat,
     mensagem: lastMotivo,
     novosDocumentos: totalProcessados,
+    recuperadas,
     ciencias,
     ultimoNsu: ultNsu,
     totalDocumentos: parseInt(contagem[0]?.count || '0', 10)
