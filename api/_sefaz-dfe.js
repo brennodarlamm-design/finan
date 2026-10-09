@@ -633,17 +633,23 @@ export async function syncTenantDFe(sql, tenantId, options = {}) {
         SET ultimo_nsu = ${novoUltNsu},
             status_sefaz = 'bloqueado_sefaz',
             mensagem_sefaz = ${lastMotivo || 'Consumo indevido: aguarde 1 hora.'},
-            proxima_consulta_permitida = NOW() + INTERVAL '1 hour',
+            proxima_consulta_permitida = NOW() + INTERVAL '61 minutes', -- 1 min de folga sobre o relógio da SEFAZ
             updated_at = NOW()
         WHERE tenant_id = ${tenantId};
       `;
+      // A ciência vai por outro serviço (eventos), fora do limite de consumo da distribuição: antes ela
+      // só era enviada quando a sincronização dava certo, e com a SEFAZ em espera nunca saía.
+      if (options.ciencia !== false) {
+        try { await darCienciaPendentes(sql, tenantId, { pfxBuffer, passphrase, cnpj, limite: 10 }); }
+        catch (errCiencia) { console.warn('[DF-e] Ciência durante a espera não concluída:', errCiencia.message); }
+      }
       return {
         success: true,
         cStat: '656',
         rateLimited: true,
         message: lastMotivo,
         novosDocumentos: totalProcessados,
-        proximaConsulta: new Date(Date.now() + 3600000).toISOString()
+        proximaConsulta: new Date(Date.now() + 61 * 60000).toISOString()
       };
     }
 
@@ -659,7 +665,7 @@ export async function syncTenantDFe(sql, tenantId, options = {}) {
             ultima_sincronizacao = NOW(),
             status_sefaz = 'sincronizado',
             mensagem_sefaz = ${lastMotivo || 'Nenhum documento localizado.'},
-            proxima_consulta_permitida = NOW() + INTERVAL '1 hour',
+            proxima_consulta_permitida = NOW() + INTERVAL '61 minutes',
             updated_at = NOW()
         WHERE tenant_id = ${tenantId};
       `;
@@ -799,12 +805,30 @@ export async function obterXmlCompletoNFe(sql, tenantId, chave, deps = {}) {
   if (linha && COALESCE_STATUS(linha.manifesto_status) !== 'ciencia') {
     await darCienciaParaChave(sql, tenantId, ch, cert, deps.enviar || enviarCienciaOperacao);
   }
+  // A consulta pela chave é o mesmo serviço da distribuição (NFeDistribuicaoDFe): durante o bloqueio
+  // de 1 hora por consumo indevido, cada chamada faz a SEFAZ reiniciar a contagem. Antes esta
+  // consulta (DANFE, XML, "Lançar") ignorava o bloqueio e a resposta 656, e a sincronização ficava
+  // presa para sempre: quando o FinGo liberava, a SEFAZ ainda contava a partir do último clique.
+  const bloqueio = await bloqueioDfeAtivo(sql, tenantId);
+  if (bloqueio) {
+    const msg = `A SEFAZ está em espera até ${bloqueio.horario} (regra de consumo da NT 2014.002). O XML completo chega pela sincronização depois desse horário.`;
+    return linha?.xml_completo
+      ? { success: true, completo: false, pendente: true, bloqueado: true, xml: linha.xml_completo, proximaConsulta: bloqueio.ate, mensagem: msg }
+      : { success: false, bloqueado: true, proximaConsulta: bloqueio.ate, error: msg };
+  }
   let codUf = '';
   try {
     const t = await sql`SELECT uf FROM tenants WHERE id = ${tenantId} LIMIT 1;`;
     codUf = CODIGO_UF_IBGE[String(t[0]?.uf || '').trim().toUpperCase()] || '';
   } catch {}
   const resp = await (deps.consultar || consultarNFePorChave)({ ...cert, codUf: codUf || '14', chave: ch });
+  if (resp.cStat === '656') {
+    await registrarBloqueioDfe(sql, tenantId, resp.xMotivo);
+    const msg = 'A SEFAZ pediu 1 hora de espera (consumo indevido). O XML completo chega pela sincronização depois disso.';
+    return linha?.xml_completo
+      ? { success: true, completo: false, pendente: true, bloqueado: true, xml: linha.xml_completo, mensagem: msg }
+      : { success: false, bloqueado: true, cStat: '656', error: msg };
+  }
   if (resp.cStat === '138') {
     for (const item of resp.docZipList || []) {
       const parsed = decompressAndParseDocZip(item);
@@ -820,6 +844,35 @@ export async function obterXmlCompletoNFe(sql, tenantId, chave, deps = {}) {
 }
 
 function COALESCE_STATUS(v) { return v || 'sem_manifesto'; }
+
+/** Bloqueio de consulta à SEFAZ ainda valendo para a empresa ({ ate, horario }) ou null. */
+async function bloqueioDfeAtivo(sql, tenantId) {
+  try {
+    const rows = await sql`SELECT proxima_consulta_permitida FROM tenant_dfe_sync WHERE tenant_id = ${tenantId} LIMIT 1;`;
+    const ate = rows[0]?.proxima_consulta_permitida ? new Date(rows[0].proxima_consulta_permitida) : null;
+    if (!ate || ate.getTime() <= Date.now()) return null;
+    const horario = ate.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Boa_Vista' });
+    return { ate: ate.toISOString(), horario };
+  } catch {
+    return null;
+  }
+}
+
+/** Registra o bloqueio de 1 hora que a SEFAZ impôs (656), com margem, para todas as consultas. */
+async function registrarBloqueioDfe(sql, tenantId, motivo) {
+  try {
+    await sql`
+      UPDATE tenant_dfe_sync
+      SET status_sefaz = 'bloqueado_sefaz',
+          mensagem_sefaz = ${motivo || 'Consumo indevido: aguarde 1 hora.'},
+          proxima_consulta_permitida = GREATEST(COALESCE(proxima_consulta_permitida, NOW()), NOW() + INTERVAL '61 minutes'),
+          updated_at = NOW()
+      WHERE tenant_id = ${tenantId};
+    `;
+  } catch (err) {
+    console.warn('[DF-e] Não foi possível registrar o bloqueio da SEFAZ:', err.message);
+  }
+}
 
 async function darCienciaParaChave(sql, tenantId, chave, cert, enviar) {
   try {
