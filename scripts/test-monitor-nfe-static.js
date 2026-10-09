@@ -9,7 +9,6 @@ function assert(cond, msg) {
   console.log('✅ ' + msg);
 }
 
-const monitor = fs.readFileSync('monitor-nfe/MonitorNFe.ps1', 'utf8');
 const alert = fs.readFileSync('monitor-nfe/AlertaBoletosWhatsApp.ps1', 'utf8');
 const cfg = fs.readFileSync('monitor-nfe/config.example.json', 'utf8');
 const readme = fs.readFileSync('monitor-nfe/README.md', 'utf8');
@@ -22,14 +21,11 @@ assert(!tracked.some(file => file.startsWith('monitor-nfe/evolution-api/')), 'Ev
 assert(!tracked.includes('monitor-nfe/ultimo_nsu.txt'), 'Estado runtime ultimo_nsu.txt não permanece versionado.');
 assert(ignore.includes('monitor-nfe/ultimo_nsu.txt'), 'Estado NSU local está protegido pelo .gitignore.');
 
-assert(monitor.includes('System.Net.Http.HttpClientHandler'), 'SEFAZ usa HttpClient com certificado cliente.');
-assert(monitor.includes('ClientCertificates.Add($cert)'), 'Certificado A1 é anexado diretamente ao cliente mTLS.');
-assert(!monitor.includes('curl.exe') && !monitor.includes('"-k"') && !monitor.includes('--cert'), 'Monitor não desabilita TLS nem expõe senha do PFX via curl.');
-assert(!monitor.includes('X509KeyStorageFlags]::Exportable'), 'Chave privada do certificado não é marcada como exportável.');
-assert(monitor.includes('DtdProcessing]::Prohibit') && monitor.includes('XmlResolver = $null'), 'Parser XML proíbe DTD e resolução externa.');
-assert(monitor.includes('FINOBRA_CERT_PASSWORD') && monitor.includes('MEUDANFE_API_KEY'), 'Segredos sensíveis aceitam variáveis de ambiente.');
-assert(monitor.includes('Timeout = [TimeSpan]::FromSeconds(60)') && monitor.includes('-TimeoutSec 30'), 'Chamadas externas críticas possuem timeout explícito.');
-assert(!monitor.includes('Resposta: $respXml'), 'Resposta SOAP bruta não é gravada em log de erro.');
+// Verificações de desativação do monitor local concorrente (regra SEFAZ cStat 656)
+assert(!fs.existsSync('monitor-nfe/MonitorNFe.ps1'), 'MonitorNFe.ps1 local obsoleto foi removido para evitar concorrência com SEFAZ.');
+assert(!fs.existsSync('monitor-nfe/InstalarTarefa.ps1'), 'InstalarTarefa.ps1 local foi removido.');
+assert(fs.existsSync('backend/domains/fiscal/_sefaz-dfe.js'), 'Monitor DF-e nativo está presente no backend cloud.');
+assert(fs.existsSync('api/_sefaz-dfe.js'), 'Sincronizador DF-e está presente na API Edge.');
 
 assert(alert.includes('FINOBRA_API_SECRET'), 'Job financeiro prefere segredo do ambiente.');
 assert(alert.includes('"x-tenant-id"') && alert.includes('"x-api-key"'), 'Job financeiro envia autenticação interna com escopo de tenant.');

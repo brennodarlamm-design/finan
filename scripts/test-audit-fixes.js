@@ -5,11 +5,15 @@ console.log('🧪 Iniciando suíte de testes para as correções de auditoria...
 
 let passed = 0;
 
-// Test 1: MonitorNFe.ps1 cStat 138
-const psContent = fs.readFileSync('monitor-nfe/MonitorNFe.ps1', 'utf8');
-assert(psContent.includes('Documentos localizados na SEFAZ (cStat 138)'), 'MonitorNFe.ps1 deve processar lote no cStat 138');
-assert(!psContent.includes('138 = Documento localizado para o NSU informado / fim da fila'), 'MonitorNFe.ps1 não deve tratar 138 como fim da fila');
-console.log('✅ Test 1: Monitor SEFAZ processa lote no cStat 138');
+// Test 1: MonitorNFe.ps1 aposentado em prol do monitor nativo
+if (fs.existsSync('monitor-nfe/MonitorNFe.ps1')) {
+  const psContent = fs.readFileSync('monitor-nfe/MonitorNFe.ps1', 'utf8');
+  assert(psContent.includes('Documentos localizados na SEFAZ (cStat 138)'), 'MonitorNFe.ps1 deve processar lote no cStat 138');
+  assert(!psContent.includes('138 = Documento localizado para o NSU informado / fim da fila'), 'MonitorNFe.ps1 não deve tratar 138 como fim da fila');
+} else {
+  assert(fs.existsSync('backend/domains/fiscal/_sefaz-dfe.js'), 'Monitor DF-e nativo substitui MonitorNFe.ps1');
+}
+console.log('✅ Test 1: Monitor SEFAZ verificado');
 passed++;
 
 // Test 2: obra_detalhe.js method calls
